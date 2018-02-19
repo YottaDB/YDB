@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,15 +37,23 @@ GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 
 LITREF	mval		literal_null;
 
-error_def(ERR_STACKOFLOW);
-error_def(ERR_STACKCRIT);
 error_def(ERR_LVNULLSUBS);
+error_def(ERR_MAXSTRLEN);
+error_def(ERR_STACKCRIT);
+error_def(ERR_STACKOFLOW);
 
-void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
+void op_fnquery(int sbscnt, mval *dst, ...)
 {
-	int			length;
-	mval		 	tmp_sbs;
-	va_list			var;
+	va_list		var;
+
+	VAR_START(var, dst);
+	op_fnquery_va(sbscnt, dst, var);
+}
+
+void op_fnquery_va(int sbscnt, mval *dst, va_list var)
+{
+	int			length, dstlen;
+	mval			tmp_sbs, *last_fnquery_ret;
 	mval			*varname, *v1, *v2, *mv, tmpmv;
 	mval			*arg1, **argpp, *args[MAX_LVSUBSCRIPTS], **argpp2, *lfrsbs, *argp2;
 	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
@@ -50,15 +61,12 @@ void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 	lv_val			*v;
 	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *parent, *node, *nullsubsnode, *nullsubsparent;
 	lvTree			*lvt;
-	int			i, j;
-	VMS_ONLY(int		sbscnt;)
-	boolean_t		found, is_num, last_sub_null, nullify_term, is_str;
+	int			i, j, nexti;
+	boolean_t		found, is_num, last_sub_null, nullsubs_implies_firstsub, is_str;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	VAR_START(var, dst);
-	VMS_ONLY(va_count(sbscnt));
-		assert(3 <= sbscnt);
+	assert(3 <= sbscnt);
 	sbscnt -= 3;
 	varname = va_arg(var, mval *);
 	v = va_arg(var, lv_val *);
@@ -73,36 +81,24 @@ void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 	}
 	h1 = history;
 	*h1++ = (lvTreeNode *)v;
-	found = FALSE;
 	DEBUG_ONLY(node = NULL;)
-	for (i = 0, argpp = &args[0]; i < sbscnt; i++, argpp++, h1++)
+	for (i = 0, argpp = &args[0]; i < sbscnt; i = nexti, argpp++, h1++)
 	{
-		if (NULL == lvt)
-		{	/* Subtree does not exist at this level. To get $query of input node,
-			 * need to start from right sibling of parent level.  */
-			h1--;
-			assert(h1 >= &history[1]);
-			assert(NULL != node);
-			assert(node == *h1);
-			node = *(h1 - 1);
-			lvt = LV_GET_CHILD(node);
-			assert(NULL != lvt);
-			break;
-		}
 		arg1 = *argpp = va_arg(var, mval *);
 		MV_FORCE_DEFINED(arg1);
 		is_str = MV_IS_STRING(arg1);
+		nexti = i + 1;
 		if (is_str)
 		{
-			if ((0 == arg1->str.len) && (i + 1 != sbscnt) && (LVNULLSUBS_NEVER == TREF(lv_null_subs)))
+			if ((0 == arg1->str.len) && (nexti != sbscnt) && (LVNULLSUBS_NEVER == TREF(lv_null_subs)))
 			{	/* This is not the last subscript, we don't allow nulls subs and it was null */
 				va_end(var);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVNULLSUBS);
 			}
 			if (is_num = MV_IS_CANONICAL(arg1))
 				MV_FORCE_NUM(arg1);
-			else if ((i + 1 == sbscnt) && (0 == arg1->str.len))
-			{ 	/* The last search argument is a null string. For this situation, there is the possibility
+			else if ((nexti == sbscnt) && (0 == arg1->str.len))
+			{	/* The last search argument is a null string. For this situation, there is the possibility
 				 * of a syntax collision if (1) the user had (for example) specified $Q(a(1,3,"") to get
 				 * the first a(1,3,x) node or (2) this is the "next" element that was legitimately returned
 				 * by $Query on the last call. If the element a(1,3,"") actually exists, the code whereby
@@ -115,12 +111,12 @@ void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 				 * process. Any intervening $QUery calls for other local variables will reset the check.
 				 * SE 2/2004 (D9D08-002352).
 				 */
-				nullify_term = TRUE;
-				if ((TREF(last_fnquery_return_varname)).str.len
-					&& (TREF(last_fnquery_return_varname)).str.len == varname->str.len
-					&& 0 == memcmp((TREF(last_fnquery_return_varname)).str.addr,
-						varname->str.addr, varname->str.len)
-					&& sbscnt == TREF(last_fnquery_return_subcnt))
+				nullsubs_implies_firstsub = TRUE;
+				last_fnquery_ret = &TREF(last_fnquery_return_varname);
+				if (last_fnquery_ret->str.len
+					&& (last_fnquery_ret->str.len == varname->str.len)
+					&& (0 == memcmp(last_fnquery_ret->str.addr, varname->str.addr, varname->str.len))
+					&& (sbscnt == TREF(last_fnquery_return_subcnt)))
 				{	/* We have an equivalent varname and same number subscripts */
 					for (j = 0, argpp2 = &args[0], lfrsbs = TADR(last_fnquery_return_sub);
 						j < i; j++, argpp2++, lfrsbs++)
@@ -134,17 +130,17 @@ void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 						{	/* Should be string only in order to compare */
 							if ((argp2)->str.len == lfrsbs->str.len
 								&& 0 != memcmp((argp2)->str.addr, lfrsbs->str.addr,
-								   lfrsbs->str.len))
+													lfrsbs->str.len))
 								break;	/* This subscript isn't the same */
 						} else
 							break;		/* This subscript isn't even close.. */
 					}
 					if (j == i)
-						nullify_term = FALSE;/* We made it through the loop unscathed !! */
+						nullsubs_implies_firstsub = FALSE;/* We made it through the loop unscathed !! */
 				}
-				if (nullify_term)
+				if (nullsubs_implies_firstsub)
 				{
-					i++;
+					i = nexti;
 					assert(i == sbscnt);
 					break;
 				}
@@ -191,40 +187,41 @@ void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 			break; /* Key not found in tree at this level. find right sibling in "lvt" tree with key="arg1" */
 		lvt = LV_GET_CHILD(node);
 		*h1 = node;
-	}
-	va_end(var);
-	assert((i != sbscnt) || !found);
-	if (!found)
-	{
-		if (i == sbscnt)
-		{
-			assert(!found);
-			parent = *(h1 - 1);
-			assert(NULL != parent);
-			lvt = LV_GET_CHILD(parent);
-			if (lvt)
-			{
-				found = TRUE;
-				nullsubsnode = TREF(local_collseq_stdnull)
-					?  lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent)
-					: NULL;
-				node = (NULL == nullsubsnode) ? lvAvlTreeFirst(lvt) : nullsubsnode;
-				assert(NULL != node);
-				*h1 = node;
-			} else
-				--h1;
-		} else
-		{	/* Need to find right sibling. "lvt" is tree to search in and "arg1" is key to search for. */
-			node = lvAvlTreeKeyCollatedNext(lvt, arg1);
-			if (NULL != node)
-			{
-				*h1 = node;
-				found = TRUE;
-			} else	/* if "node" is still NULL, need to start searching for right siblings at the parent level. */
-				h1--;
+		if (NULL == lvt)
+		{	/* Subtree does not exist at this level. To get $query of input node,
+			 * need to start from right sibling of parent level.  */
+			assert(h1 >= &history[1]);
+			node = *(h1 - 1);
+			lvt = LV_GET_CHILD(node);
+			assert(NULL != lvt);
+			break;
 		}
 	}
-	if (!found)	/* separate if needed because "found" could change after the previous "if" but before this "if" */
+	va_end(var);
+	assert(NULL != lvt);
+	if (i == sbscnt)
+	{
+		found = TRUE;
+		nullsubsnode = TREF(local_collseq_stdnull)
+			?  lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent)
+			: NULL;
+		node = (NULL == nullsubsnode) ? lvAvlTreeFirst(lvt) : nullsubsnode;
+		assert(NULL != node);
+		*h1 = node;
+	} else
+	{	/* Need to find right sibling. "lvt" is tree to search in and "arg1" is key to search for. */
+		node = lvAvlTreeKeyCollatedNext(lvt, arg1);
+		if (NULL != node)
+		{
+			*h1 = node;
+			found = TRUE;
+		} else	/* if "node" is still NULL, need to start searching for right siblings at the parent level. */
+		{
+			found = FALSE;
+			h1--;
+		}
+	}
+	if (!found)
 	{
 		for ( ; ; --h1)
 		{
@@ -375,9 +372,21 @@ void op_fnquery(UNIX_ONLY_COMMA(int sbscnt) mval *dst, ...)
 		}
 		*stringpool.free++ = (h2 < h1 ? ',' : ')');
 	}
-	dst->mvtype = MV_STR;
-	dst->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
-	dst->str.addr = v1->str.addr;
 	POP_MV_STENT();	/* v2 */
 	POP_MV_STENT();	/* v1 */
+	dstlen = INTCAST((char *)stringpool.free - v1->str.addr);
+	if (MAX_STRLEN < dstlen)
+	{	/* Result of $query would be greater than maximum string length allowed. Error out but cleanup before that. */
+		stringpool.free = (unsigned char *)v1->str.addr; /* Remove the incomplete $query result from stringpool */
+		if (last_sub_null)
+		{	/* If TREF(last_fnquery_return_subcnt) was being maintained above, reset it too */
+			TREF(last_fnquery_return_subcnt) = 0;
+			(TREF(last_fnquery_return_varname)).mvtype = MV_STR;
+			(TREF(last_fnquery_return_varname)).str.len = 0;
+		}
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+	}
+	dst->mvtype = MV_STR;
+	dst->str.len = dstlen;
+	dst->str.addr = v1->str.addr;
 }

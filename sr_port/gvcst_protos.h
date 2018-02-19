@@ -3,6 +3,9 @@
  * Copyright (c) 2004-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -37,7 +40,7 @@ boolean_t	gvcst_gblmod(mval *v);
 boolean_t	gvcst_get(mval *v);
 boolean_t	gvcst_get2(mval *v, unsigned char *sn_ptr);
 void		gvcst_incr(mval *increment, mval *result);
-void		gvcst_init(gd_region *greg);
+void		gvcst_init(gd_region *greg, gd_addr *addr);
 void		gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init);
 void		gvcst_kill(boolean_t do_subtree);
 void		gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing_chunks);
@@ -50,6 +53,8 @@ boolean_t	gvcst_query(void);
 boolean_t	gvcst_query2(void);
 boolean_t	gvcst_queryget(mval *val);
 boolean_t	gvcst_queryget2(mval *val, unsigned char *sn_ptr);
+boolean_t	gvcst_reversequery(void);
+boolean_t	gvcst_reversequery2(void);
 void		gvcst_remove_statsDB_linkage(gd_region *baseDBreg);
 void		gvcst_remove_statsDB_linkage_all(void);
 void		gvcst_remove_statsDB_linkage_wrapper(gd_region *baseDBreg, gd_region *statsDBreg);
@@ -67,6 +72,7 @@ boolean_t	gvcst_spr_order(void);
 boolean_t	gvcst_spr_zprevious(void);
 boolean_t	gvcst_spr_query(void);
 boolean_t	gvcst_spr_queryget(mval *cumul_val);
+boolean_t	gvcst_spr_reversequery(void);
 
 # define INVOKE_GVCST_SPR_XXX(GVNH_REG, STATEMENT)	\
 {							\

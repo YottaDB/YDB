@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,15 +32,15 @@ typedef enum
 	INDR_REF,	/* 11 */
 	MLAB_REF,	/* 12 */
 	ILIT_REF,	/* 13 */
-	CDLT_REF,	/* 14 */
-	TEMP_REF,	/* 15 */
+	CDLT_REF,	/* 14 - apparently no longer used */
+	TEMP_REF,	/* 15 - apparently no longer maintained */
 	MFUN_REF,	/* 16 */
 	MNXL_REF,	/* 17 refer to internalentry of child line */
 	TSIZ_REF,	/* 18 ilit refering to size of given triple codegen */
 	OCNT_REF,	/* 19 Offset from Call to Next Triple */
 	CDIDX_REF	/* 20 Denotes index into a table containing a code address */
 } operclass;
-#define VALUED_REF_TYPES 6	/* Types 0-6 are specific types used by alloc_reg() in array references
+#define VALUED_REF_TYPES 6	/* Types 0-5 are specific types used by alloc_reg() in array references
 				 * **** WARNING **** Do NOT reorder
 				 */
 
@@ -68,6 +71,7 @@ typedef struct	mlinestruct
 	struct	tripletype	*externalentry;
 	uint4			line_number;	/* ...operation on this line */
 	boolean_t		table;		/* put in table or not */
+	boolean_t		block_ok;	/* saw argumentless DO or not */
 } mline;
 
 typedef struct	mlabstruct
@@ -147,8 +151,10 @@ typedef struct	tripletype
 				jmplist;	/* triples which jump to this one */
 	source_address		src;
 	int			rtaddr;		/* relative run time address of triple */
-	oprtype			operand[2],
-				destination;
+	oprtype			operand[2],	/* Note: operand[0] corresponds to val.1 in ttt.txt
+						 *	 operand[1] corresponds to val.2 in ttt.txt
+						 */
+				destination;	/* Note: corresponds to val.0 in ttt.txt */
 } triple;
 
 typedef struct
@@ -476,7 +482,7 @@ typedef struct
 }
 
 #define GOOD_FOR  FALSE	/* single level */
-#define BLOWN_FOR TRUE	/* all levels */
+#define BLOWN_FOR (!TREF(xecute_literal_parse))	/* all levels, except only one for our funky friend xecute_literal_parse */
 
 /* Marco to decrement or clear the for_stack, clear the for_temp array
  * and generate code to release run-time malloc'd mvals anchored in the for_saved_indx array
@@ -559,6 +565,68 @@ MBSTART {												\
 		unary_tail(OPR);									\
 } MBEND
 
+/* the following structure and macros save and restore parsing state and as of this writing are only used by m_xecute */
+typedef struct
+{
+	boolean_t	source_error_found;
+	int		source_column;
+	int		director_ident_len;
+	int4		block_level;
+	mstr_len_t	source_len;
+	mval		director_mval;
+	unsigned char	ident_buffer[(MAX_MIDENT_LEN * 2) + 1];
+	char		director_token;
+	char		*lexical_ptr;
+	char		window_token;
+} parse_save_block;
+
+#define SAVE_PARSE_STATE(SAVE_PARSE_PTR)									\
+MBSTART {													\
+	SAVE_PARSE_PTR->block_level = TREF(block_level);							\
+	SAVE_PARSE_PTR->director_ident_len = (TREF(director_ident)).len;					\
+	memcpy(SAVE_PARSE_PTR->ident_buffer, (TREF(director_ident)).addr, SAVE_PARSE_PTR->director_ident_len);	\
+	SAVE_PARSE_PTR->director_mval = TREF(director_mval);							\
+	SAVE_PARSE_PTR->director_token = TREF(director_token);							\
+	SAVE_PARSE_PTR->lexical_ptr = TREF(lexical_ptr);							\
+	SAVE_PARSE_PTR->source_column = source_column;								\
+	SAVE_PARSE_PTR->source_error_found = TREF(source_error_found);						\
+	SAVE_PARSE_PTR->source_len = (TREF(source_buffer)).len;							\
+	SAVE_PARSE_PTR->window_token = TREF(window_token);							\
+} MBEND
+
+#define RESTORE_PARSE_STATE(SAVE_PARSE_PTR)								\
+MBSTART {													\
+	TREF(block_level) = SAVE_PARSE_PTR->block_level;							\
+	(TREF(director_ident)).len = SAVE_PARSE_PTR->director_ident_len;					\
+	memcpy((TREF(director_ident)).addr, SAVE_PARSE_PTR->ident_buffer, SAVE_PARSE_PTR->director_ident_len);	\
+	TREF(director_mval) = SAVE_PARSE_PTR->director_mval;							\
+	TREF(director_token) = SAVE_PARSE_PTR->director_token;							\
+	TREF(lexical_ptr) = SAVE_PARSE_PTR->lexical_ptr;							\
+	(TREF(source_buffer)).addr = (char *)&aligned_source_buffer;						\
+	(TREF(source_buffer)).len = SAVE_PARSE_PTR->source_len;							\
+	source_column = SAVE_PARSE_PTR->source_column;								\
+	TREF(source_error_found) = SAVE_PARSE_PTR->source_error_found;						\
+	TREF(window_token) = SAVE_PARSE_PTR->window_token;							\
+} MBEND
+
+#define RETURN_IF_RTS_ERROR							\
+MBSTART {									\
+	if (TREF(rts_error_in_parse))						\
+		return;								\
+} MBEND
+
+#define RETURN_EXPR_IF_RTS_ERROR						\
+MBSTART {									\
+	if (TREF(rts_error_in_parse))						\
+	{									\
+		TREF(rts_error_in_parse) = FALSE;				\
+		DECREMENT_EXPR_DEPTH;						\
+		return EXPR_FAIL;						\
+	}									\
+} MBEND
+
+#define ALREADY_RTERROR (OC_RTERROR == (TREF(curtchain))->exorder.bl->exorder.bl->exorder.bl->opcode)
+
 /* Autorelink enabled platforms pass a different argument to glue code when calling a non-local M
  * routine. Use put_cdlt() to pass addresses of the items and use put_cdidx() when passing an ofset
  * into the linkage table where the items reside. Also macroize the opcode to use.
@@ -575,7 +643,7 @@ MBSTART {												\
 
 int		actuallist(oprtype *opr);
 int		bool_expr(boolean_t sense, oprtype *addr);
-void		bx_boollit(triple *t, boolean_t sense, oprtype *addr);
+void		bx_boollit(triple *t);
 void		bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr);
 void		bx_relop(triple *t, opctype cmp, opctype tst, oprtype *addr);
 void		bx_tail(triple *t, boolean_t sense, oprtype *addr);
@@ -621,7 +689,8 @@ int		f_order1(oprtype *a, opctype op);
 int		f_piece(oprtype *a, opctype op);
 int		f_qlength(oprtype *a, opctype op);
 int		f_qsubscript(oprtype *a, opctype op);
-int		f_query (oprtype *a, opctype op);
+int		f_query(oprtype *a, opctype op);
+int		f_reversequery1(oprtype *a, opctype op);
 int		f_reverse(oprtype *a, opctype op);
 int		f_select(oprtype *a, opctype op);
 int		f_stack(oprtype *a, opctype op);

@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2015 Fidelity National Information	*
+ * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +19,7 @@
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
 
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "op.h"
 #include "dollar_zlevel.h"
@@ -32,6 +35,7 @@
 #endif
 
 GBLREF	stack_frame		*frame_pointer;
+GBLREF	int			mumps_status;
 #ifdef GTM_TRIGGER
 GBLREF	boolean_t		goframes_unwound_trigger;
 GBLREF	int4			gtm_trigger_depth;
@@ -48,9 +52,11 @@ error_def(ERR_ZGOTOTOOBIG);
 void op_zg1(int4 level)
 {
 	stack_frame	*fp, *fpprev;
-	int4		unwframes, unwlevels, unwtrglvls, curlvl;
+	int4		curlvl, exi_cond, unwframes, unwlevels, unwtrglvls;
 	mval		zposition;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	curlvl = dollar_zlevel();
         if (0 > level)
 	{	/* Negative level specified, means to use relative level change */
@@ -65,18 +71,24 @@ void op_zg1(int4 level)
 			/* Couldn't get to the level we were trying to unwind to */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOTOOBIG);
 	}
-	/* For ZGOTO 0, if we are running in GTM's runtime (via mumps executable), we allow this to proceed with the
-	 * unwind and return back to the caller. However if this is MUPIP, we will exit after sending an oplog message
-	 * recording the uncommon exit method.
-	 */
-	if ((0 == level) && !IS_GTM_IMAGE)
-	{
-		zposition.mvtype = 0;	/* It's not an mval yet till getzposition fills it in */
-		getzposition(&zposition);
-		assert(MV_IS_STRING(&zposition) && (0 < zposition.str.len));
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_PROCTERM, 7, GTMIMAGENAMETXT(image_type), RTS_ERROR_TEXT("ZGOTO 0"),
-			 ERR_PROCTERM, zposition.str.len, zposition.str.addr);
-		EXIT(ERR_PROCTERM);
+	if ((0 == level) && (0 == TREF(gtmci_nested_level)))
+	{	/* For ZGOTO 0, if this is MUPIP, exit after sending an oplog message recording the uncommon exit method.
+		 * Otherwise, if $ZTRAP is active or ""=$ECODE return a status of 0, else return the last error in $ECODE
+		 * Note that if we are inside a call-in, we want to return to the caller C frame (not shell) so do not
+		 * come into this codepath which does an unconditional EXIT.
+		 */
+		exi_cond = (((TREF(dollar_ztrap)).str.len) || !(dollar_ecode.index)) ? 0 : dollar_ecode.error_last_ecode;
+		if (IS_MUPIP_IMAGE)
+		{
+			zposition.mvtype = 0;	/* It's not an mval yet till getzposition fills it in */
+			getzposition(&zposition);
+			assert(MV_IS_STRING(&zposition) && (0 < zposition.str.len));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_PROCTERM, 6, GTMIMAGENAMETXT(image_type), "ZGOTO 0", exi_cond,
+				zposition.str.len, zposition.str.addr);
+			EXIT(ERR_PROCTERM);
+		}
+		assert(IS_GTM_IMAGE);
+		EXIT(exi_cond);
 	}
 	/* Find the frame we are unwinding to while counting the frames we need to unwind (which we will feed to
 	 * GOFRAMES(). As we unwind, keep track of how many trigger base frames we encounter (if triggers are supported)
@@ -134,12 +146,12 @@ void op_zg1(int4 level)
 		 " type 0x%04lx\n", curlvl, level, unwframes, frame_pointer, (frame_pointer ? frame_pointer->type : 0xffff)));
 	assert(level == dollar_zlevel());
 #	ifdef GTM_TRIGGER
-	if (goframes_unwound_trigger)
-	{
-		/* If goframes() called by golevel unwound a trigger base frame, we must use MUM_TSTART to unroll the
+	if (goframes_unwound_trigger || (SFT_CI & fp->type))
+	{	/* If goframes() called by golevel unwound a trigger base frame, we must use MUM_TSTART to unroll the
 		 * C stack before invoking the return frame. Otherwise we can just return and avoid the overhead that
-		 * MUM_TSTART incurs.
+		 * MUM_TSTART incurs. Also, if we unwound to a call-in base frame, we need to return to ydb_ci[p]().
 		 */
+		mumps_status = SUCCESS;			/* ZGOTO 0 is causes return code to be 0 for call-in */
 		MUM_TSTART;
 	}
 #	endif

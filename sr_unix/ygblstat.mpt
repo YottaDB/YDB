@@ -51,10 +51,11 @@ help    ; Usage: mumps -run %YGBLSTAT [--help] [--pid pidlist] [--reg reglist] [
 
 	; Main Program
 	if $stack do PROMPTGO quit      ; if invoked from another program, prompt for inputs, do work, and exit
-	use $principal:(ctrap=$char(3):nocenable:exception="halt")	   ; terminate on Ctrl-C if invoked from shell
-	set $etrap="set $etrap=""use $principal write $zstatus,! zhalt 1"""
+	use $principal:(ctrap=$char(3):nocenable:exception="zgoto 0")	   ; terminate on Ctrl-C if invoked from shell
+	set $etrap="set $etrap=""use $principal write $zstatus,! set $etrap=""""zshow """"""*"""""" zgoto 0"""" zhalt 1"""
 	set $etrap=$etrap_" set tmp1=$piece($ecode,"","",2),tmp2=$text(@tmp1)"
-	set $etrap=$etrap_" if $length(tmp2) write $text(+0),@$piece(tmp2,"";"",2),! zhalt +$extract(tmp1,2,$length(tmp1))"
+	set $etrap=$etrap_" if $length(tmp2) write $text(+0),@$piece(tmp2,"";"",2),!"
+	set $etrap=$etrap_" set $etrap=""zgoto 0"" zhalt +$extract(tmp1,2,$length(tmp1))"
 	new cmdline,pid,reg
 	set cmdline=$zcmdline
 	set (pid,reg,stat)="*"                  ; Default is all processes, all regions, all statistics
@@ -83,7 +84,8 @@ INITYGS ; Initialize statistics names and locations in %YGS
 
 MSGANDHALT(label)
 	new j,tmp
-	for j=0:1 set tmp=$piece($text(@label+j),"; ",2) halt:""=tmp  write tmp,!
+	set $etrap="zgoto 0"
+	for j=0:1 set tmp=$piece($text(@label+j),"; ",2) zhalt:""=tmp 1 write tmp,!
 
 ORDERPID(pid,gld,reg)
 	; Get the next pid as specified by gld and reg, first pid if pid=""

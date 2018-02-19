@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -119,9 +119,6 @@ GBLDEF boolean_t	extended_symbols_present;
 GBLDEF int		total_length;
 GBLDEF int		text_counter;
 #endif
-
-LITREF char		gtm_release_name[];
-LITREF int4		gtm_release_name_len;
 
 typedef struct	res_list_struct
 {
@@ -505,6 +502,9 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 			DBGARLNK((stderr, "incr_link: Bypassing (re)zlink for routine %.*s (old rhead 0x"lvaddr") - same objhash\n",
 				  old_rhead->routine_name.len, old_rhead->routine_name.addr, old_rhead));
 #			ifdef ZLINK_BYPASS /* #ifdef'd out for now due to issues with ERRWETRAP */
+			/* If this code is enabled please remove the ZLINKBYPASS message from merrors.msg's undocumented
+			 * section and document the message.
+			 */
 			SAVE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);
 			save_error_condition = error_condition;
 			error_condition = 0;

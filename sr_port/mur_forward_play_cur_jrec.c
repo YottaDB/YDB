@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -128,7 +131,8 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 		if (USES_ANY_KEY(jctl->jfh))
 		{
 			use_new_key = USES_NEW_KEY(jctl->jfh);
-			assert(NEEDS_NEW_KEY(jctl->jfh, rec->prefix.tn) == use_new_key);
+			/* Note: JRT_ALIGN does not have a "prefix.tn" field. But in that case we would not have come in the "if" */
+			assert((JRT_ALIGN != rectype) && NEEDS_NEW_KEY(jctl->jfh, rec->prefix.tn) == use_new_key);
 			MUR_DECRYPT_LOGICAL_RECS(
 					keystr,
 					(use_new_key ? TRUE : jctl->jfh->non_null_iv),
@@ -174,8 +178,11 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	recstat = process_losttn ? LOST_TN : GOOD_TN;
 	status = SS_NORMAL;
 	if (FENCE_NONE != mur_options.fences)
-	{
-		if (IS_FENCED(rectype))
+	{	/* Note that a JRT_NULL record could also be part of a TP transaction
+		 * (see mur_back_process.c comment describing "jnl_phase2_salvage".
+		 * So check for that too when checking for fenced record types.
+		 */
+		if (IS_FENCED(rectype) || (JRT_NULL == rectype))
 		{
 			assert(rec_token_seq);
 #			ifdef DEBUG
@@ -183,8 +190,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			if (IS_TP(rectype) && ((!mur_options.rollback && rec_time < murgbl.min_broken_time)
 						|| (mur_options.rollback && rec_token_seq < murgbl.min_broken_seqno)))
 			{
-				rec_fence = GET_REC_FENCE_TYPE(rectype);
-				if (NULL != (multi = MUR_TOKEN_LOOKUP(rec_token_seq, rec_time, rec_fence)))
+				if (NULL != (multi = MUR_TOKEN_LOOKUP(rec_token_seq, rec_time, TPFENCE)))
 				{
 					assert(0 == multi->partner);
 					assert(FALSE == multi->this_is_broken);
@@ -209,7 +215,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 			} else if (IS_REC_POSSIBLY_BROKEN(rec_time, rec_token_seq))
 			{
 				assert(!mur_options.rollback || process_losttn);
-				rec_fence = GET_REC_FENCE_TYPE(rectype);
+				rec_fence = (IS_TP(rectype) ? TPFENCE : ZTPFENCE);
 				assert(rec_token_seq == ((struct_jrec_upd *)rec)->token_seq.token);
 				multi = MUR_TOKEN_LOOKUP(rec_token_seq, rec_time, rec_fence);
 				if ((NULL != multi) && (0 < multi->partner))
@@ -232,21 +238,14 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	if (mur_options.show)
 	{
 		assert(SS_NORMAL == status);
+		/* Note that ALIGN records do not have a pini_addr field. So skip the "mur_pini_state" call in that case */
 		if (BROKEN_TN != recstat)
 		{
 			if (JRT_PFIN == rectype)
 				status = mur_pini_state(jctl, rec->prefix.pini_addr, FINISHED_PROC);
-			else if ((JRT_EOF != rectype)
-					&& ((JRT_ALIGN != rectype) || (JNL_HDR_LEN != rec->prefix.pini_addr)))
-			{	/* Note that it is possible that we have a PINI record followed by a PFIN record
-				 * and later an ALIGN record with the pini_addr pointing to the original PINI
-				 * record (see comment in jnl_write.c where pini_addr gets assigned to JNL_HDR_LEN)
-				 * In this case we do not want the ALIGN record to cause the process to become
-				 * ACTIVE although it has written a PFIN record. Hence the check above.
-				 */
+			else if ((JRT_EOF != rectype) && (JRT_ALIGN != rectype))
 				status = mur_pini_state(jctl, rec->prefix.pini_addr, ACTIVE_PROC);
-			}
-		} else
+		} else if (JRT_ALIGN != rectype)
 			status = mur_pini_state(jctl, rec->prefix.pini_addr, BROKEN_PROC);
 		if (SS_NORMAL != status)
 			return status;	/* "mur_pini_state" failed due to bad pini_addr */
@@ -283,7 +282,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	/* For extract, if database was present we would have done gvcst_init().
 	 * For recover/rollback gvcst_init() should definitely have been done.
 	 * In both cases rctl->gd->open will be non-NULL. Note that rctl->csa could be non-NULL
-	 * (set in mur_forward) even if rctl->gd->open is non-NULL. So dont use that.
+	 * (set in mur_forward) even if rctl->gd->open is non-NULL. So don't use that.
 	 * Only then can we call gvcst_root_search() to find out collation set up for this global.
 	 */
 	assert(gv_cur_region == rctl->gd);
@@ -375,7 +374,8 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 				return status;
 		}
 		/* extract "rec" using routine "extraction_routine[rectype]" into broken transaction file */
-		status = mur_get_pini(jctl, rec->prefix.pini_addr, &plst);
+		/* Use GET_JREC_PINI_ADDR macro instead of "rec->prefix.pini_addr" to account for JRT_ALIGN rectype */
+		status = mur_get_pini(jctl, GET_JREC_PINI_ADDR(rec, rectype), &plst);
 		if (SS_NORMAL == status)
 			(*extraction_routine[rectype])(jctl, recstat, rec, plst);
 		else

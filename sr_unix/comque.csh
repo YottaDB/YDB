@@ -1,7 +1,8 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2017 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -147,6 +148,7 @@ if ( ! -d $gtm_ver/log ) then
 	chmod 775 $gtm_ver/log
 endif
 
+rm -f $gtm_ver/log/comlist.$comque_image.log
 if ( $?comque_no_background != 0) then
 	if ( $?comque_batch_mode != 0) then
 		/usr/local/bin/tcsh $gtm_tools/comlist.csh \

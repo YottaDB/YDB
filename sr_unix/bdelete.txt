@@ -1,6 +1,9 @@
 #################################################################
 #								#
-#	Copyright 2011, 2013 Fidelity Information Services, Inc       #
+# Copyright 2011, 2013 Fidelity Information Services, Inc       #
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -33,7 +36,7 @@ gtm.gtc
 gtmbase.gtc
 gtmcshrc.gtc
 gtmhelp.dmp
-gtminstall
+ydbinstall
 gtmprofile.gtc
 gtmprofile_preV54000.gtc
 map
@@ -73,7 +76,7 @@ arch.gtc -> ../arch.gtc
 configure -> ../configure
 dbcertify -> ../dbcertify
 gtmhelp.dmp -> ../gtmhelp.dmp
-gtminstall -> ../gtminstall
+ydbinstall -> ../ydbinstall
 gtmsecshr -> ../gtmsecshr
 gtmsecshrdir -> ../gtmsecshrdir
 lowerc_cp -> ../lowerc_cp

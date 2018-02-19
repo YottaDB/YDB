@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -60,6 +63,7 @@ CONDITION_HANDLER(gvcmz_netopen_ch)
 {
 	/* This condition handler is established only for VMS. In VMS, we do not do CONTINUE for INFO/SUCCESS severity.
 	 * FALSE input to START_CH achieves the same thing. */
+	ASSERT_IS_LIBGNPCLIENT;
 	START_CH(FALSE);
 	if (SIGNAL != CMERR_INVPROT || second_attempt)
 	{
@@ -81,6 +85,7 @@ void gvcmz_netopen_attempt(struct CLB *c)
 	jnl_process_vector	temp_vect;
 #endif
 
+	ASSERT_IS_LIBGNPCLIENT;
 	VMS_ONLY(
 		ESTABLISH(gvcmz_netopen_ch); /* our old servers run only on VMS; no need for retry on other OSs */
 		clb = c; /* need this assignment since we can't pass c to gvcmz_netopen_ch */
@@ -150,6 +155,7 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 	uint4			status;
 	protocol_msg		*server_proto;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	c = UNIX_ONLY(cmi_alloc_clb())VMS_ONLY(cmu_makclb());
 	c->usr = malloc(SIZEOF(link_info));
 	li = c->usr;
@@ -216,6 +222,7 @@ struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *t
 	li->server_supports_dollar_incr = (0 <= memcmp(server_proto->msg + CM_LEVEL_OFFSET, CMM_INCREMENT_MIN_LEVEL, 3));
 	li->server_supports_std_null_coll = (0 <= memcmp(server_proto->msg + CM_LEVEL_OFFSET, CMM_STDNULLCOLL_MIN_LEVEL, 3));
 	li->server_supports_long_names = (0 <= memcmp(server_proto->msg + CM_LEVEL_OFFSET, CMM_LONGNAMES_MIN_LEVEL, 3));
+	li->server_supports_reverse_query = (0 <= memcmp(server_proto->msg + CM_LEVEL_OFFSET, CMM_REVERSEQUERY_MIN_LEVEL, 3));
 	if (!(li->err_compat = gtcm_err_compat((protocol_msg *)(c->mbf + 1), &myproto)))
 	{
 		gvcmy_close(c);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,7 +78,7 @@ void mur_close_file_extfmt(boolean_t in_mur_close_files)
 		extr_file_created = FALSE;
 		for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total; rctl < rctl_top; rctl++)
 		{
-			this_reg_file_created = rctl->extr_file_created[recstat];
+			this_reg_file_created = rctl->extr_file_created[recstat] && (NULL != rctl->file_info[recstat]);
 			if (this_reg_file_created)
 				extr_file_created = TRUE;
 			if (!in_mur_close_files)

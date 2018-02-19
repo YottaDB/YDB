@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +19,6 @@
 
 #include "mdef.h"
 
-#define GTM_CIMOD       "GTM$CI" /* base call-in frame at level 1 */
 /* Allow this many nested callin levels before generating an error.  Previously, the code
  * allowed a number of condition handlers per call-in invocation, but when we implemented
  * triggers they count as an invocation and caused varying behavior that made testing the limit
@@ -24,12 +27,11 @@
 
 #define CALLIN_HASHTAB_SIZE	32
 
-#define SET_CI_ENV(g)								\
-{										\
-	frame_pointer->flags = SFF_CI; 						\
-	frame_pointer->old_frame_pointer->ctxt = GTM_CONTEXT(g);		\
-	IA64_ONLY(frame_pointer->old_frame_pointer->mpc = CODE_ADDRESS_C(g);)	\
-	NON_IA64_ONLY(frame_pointer->old_frame_pointer->mpc = CODE_ADDRESS(g);)	\
+#define SET_CI_ENV(g)				\
+{						\
+	frame_pointer->type |= SFT_CI; 		\
+	frame_pointer->ctxt = GTM_CONTEXT(g);	\
+	frame_pointer->mpc = CODE_ADDRESS(g);	\
 }
 
 /* Macro that allows temp_fgncal_stack to override fgncal_stack. This is used in gtm_init (in gtmci.c)
@@ -39,14 +41,10 @@
  */
 #define FGNCAL_STACK ((NULL == TREF(temp_fgncal_stack)) ? fgncal_stack : TREF(temp_fgncal_stack))
 
-void	ci_restart(void);
-void	ci_ret_code(void);
-void	ci_ret_code_exit(void);
 void	ci_ret_code_quit(void);
 void	gtmci_isv_save(void);
 void	gtmci_isv_restore(void);
-rhdtyp 	*make_cimode(void);
-int 	gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list var);
+int 	ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list var);
 #ifdef _AIX
 void	gtmci_cleanup(void);
 #endif

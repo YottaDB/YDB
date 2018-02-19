@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -57,6 +60,7 @@ void gvcmz_int_lkcancel(void)
 	CMI_MUTEX_DECL(cmi_mutex_rc);
 	DEBUG_ONLY(void		(*oldast)();)
 
+	ASSERT_IS_LIBGNPCLIENT;
 	assertpro(ntd_root);
 	CMI_MUTEX_BLOCK(cmi_mutex_rc);
 	action = CMMS_L_LKCANCEL;

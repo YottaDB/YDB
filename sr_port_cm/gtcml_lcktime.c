@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +29,7 @@ bool gtcml_lcktime(cm_lckblklck *lck)
 	ABS_TIME	new_blktime;
 	uint4		status;
 
+	ASSERT_IS_LIBGNPSERVER;
 	add_int_to_abs_time(&lck->blktime, CM_LKBLK_TIME, &new_blktime);
 	return (0 > abs_time_comp(&chkreg_time, &new_blktime) ? FALSE : TRUE);
 }

@@ -26,6 +26,7 @@
 #include "mlk_region_lookup.h"
 #include "mlk_pvtblk_insert.h"
 #include "mlk_pvtblk_create.h"
+#include "mmrhash.h"
 #include "dpgbldir.h"
 #include "gtm_reservedDB.h"
 /* The header files below are for environment translation*/
@@ -34,7 +35,6 @@
 #include "gtm_env_xlate_init.h"
 
 GBLREF gd_addr		*gd_header;
-static mstr     	gtmgbldir_mstr;
 
 error_def(ERR_LOCKSUB2LONG);
 error_def(ERR_PCTYRESERVED);
@@ -61,14 +61,14 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 {
 	va_list		mp;
 	int		i, len;
-	int4		rlen;			/* Roundup each length to get clear len for mlk_shrsub */
-	unsigned char	*cp;
+	unsigned char	*cp, *cp_prev;
 	mval		*extgbl2, *mp_temp, val_xlated;
 	mlk_pvtblk	*r;
 	gd_region	*reg;
 	sgmnt_addrs	*sa;
 	gd_addr		*gld;
-
+	hash128_state_t	accstate, tmpstate;
+	gtm_uint16	hashres;
 
 	/* Get count of mvals including extgbl1 */
 	assert (subcnt >= 2);
@@ -104,7 +104,7 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_PCTYRESERVED);
 	reg = mlk_region_lookup((mp_temp), gld);
 	/* Add up the sizes of all MVAL strings */
-	for (len = 0, rlen=0, i = 0;  i < subcnt;  mp_temp=va_arg(mp, mval *), i++)
+	for (len = 0, i = 0;  i < subcnt;  mp_temp=va_arg(mp, mval *), i++)
 	{
 		MV_FORCE_STR(mp_temp);
 		if ((mp_temp)->str.len > 255)
@@ -112,7 +112,6 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 				      ERR_TEXT, 2, (mp_temp)->str.len, (mp_temp)->str.addr);
 		assert((mp_temp)->mvtype & MV_STR);
 		len += (int)(mp_temp)->str.len;
-		rlen += ROUND_UP(((mp_temp)->str.len + 1), 4);
 	}
 	va_end(mp);
 	/*
@@ -120,23 +119,28 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 	 * All strings are stored one after another in the buffer.
 	 * Each string is preceeded by 1 byte string len.
 	 */
-	r = (mlk_pvtblk *) malloc(MLK_PVTBLK_SIZE(len, subcnt));
-	memset(r, 0, SIZEOF(mlk_pvtblk) - 1);
+	MLK_PVTBLK_ALLOC(len + subcnt, subcnt, 0, r);
 	r->translev = 1;
 	r->subscript_cnt = subcnt;
 	/* Each string is preceeded by string length byte */
-	r->total_length = len + subcnt;
-	r->total_len_padded = rlen;		/* len byte already accounted for */
+	r->nref_length = len + subcnt;
+	/* Keep the hash code generation here in sync with MLK_PVTBLK_SUBHASH_GEN() */
+	HASH128_STATE_INIT(accstate, 0);
 	cp = &r->value[0];
 	/* Copy all strings into the buffer one after another */
 	for (i = 0, VAR_COPY(mp, subptr);  i < subcnt;  i++)
 	{
+		cp_prev = cp;
 		mp_temp = va_arg(mp, mval *);
 		MV_FORCE_STR(mp_temp);
 		len = (int)(mp_temp)->str.len;
 		*cp++ = len;
 		memcpy(cp, (mp_temp)->str.addr, len);
 		cp += len;
+		gtmmrhash_128_ingest(&accstate, cp_prev, len + 1);
+		tmpstate = accstate;
+		gtmmrhash_128_result(&tmpstate, (cp - r->value), &hashres);
+		MLK_PVTBLK_SUBHASH(r, i) = (uint4)hashres.one;
 	}
 	va_end(mp);
 	r->region = reg;

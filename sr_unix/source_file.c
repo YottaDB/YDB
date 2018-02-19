@@ -37,19 +37,22 @@
 #include "util.h"
 #include "op_fnzsearch.h"
 
-GBLREF unsigned short	source_name_len;
-GBLREF unsigned char	source_file_name[];
-GBLREF char		rev_time_buf[];
-GBLREF mident		routine_name, module_name, int_module_name;
-GBLREF int4		dollar_zcstatus;
-GBLREF io_pair          io_curr_device, io_std_device;
-GBLREF char		object_file_name[];
-GBLREF short		object_name_len;
-GBLREF int		object_file_des;
-GBLREF command_qualifier cmd_qlf;
-GBLREF stack_frame	*frame_pointer;
+GBLREF char			object_file_name[], rev_time_buf[];
+GBLREF command_qualifier	cmd_qlf;
+GBLREF int			object_file_des;
+GBLREF int4			dollar_zcstatus;
+GBLREF io_pair			io_curr_device, io_std_device;
+GBLREF mident			routine_name, module_name, int_module_name;
+GBLREF short			object_name_len;
+GBLREF stack_frame		*frame_pointer;
+GBLREF uint4			dollar_tlevel;
+GBLREF unsigned char		source_file_name[];
+GBLREF unsigned short		source_name_len;
+GBLREF short int		source_line;
 
-LITREF mval		literal_null;
+LITREF	mval		literal_null;
+LITREF	mval		literal_notimeout;
+LITREF	mval		literal_zero;
 
 static bool	tt_so_do_once;
 static io_pair	compile_src_dev;
@@ -74,6 +77,7 @@ error_def(ERR_MEMORY);
 error_def(ERR_OBJFILERR);
 error_def(ERR_SRCFILERR);
 error_def(ERR_STACKOFLOW);
+error_def(ERR_LSINSERTED);
 
 void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 {
@@ -183,7 +187,7 @@ bool	open_source_file (void)
 	val.mvtype = MV_STR;
 	val.str.len = source_name_len;
 	val.str.addr = (char *)source_file_name;
-	op_open(&val, &pars, 0, 0);
+	op_open(&val, &pars, (mval *)&literal_zero, 0);
 	dev_in_use = io_curr_device;	/*	save list file info in use if it is opened	*/
 	op_use(&val, &pars);
 	compile_src_dev = io_curr_device;
@@ -239,7 +243,9 @@ bool	open_source_file (void)
  */
 int4	read_source_file (void)
 {
+	static char	extra_ch;
 	unsigned char	*cp;
+	int4		read_len;
 	mval		val;
 	DCL_THREADGBL_ACCESS;
 
@@ -248,16 +254,33 @@ int4	read_source_file (void)
 	tmp_list_dev = io_curr_device;
 	io_curr_device = compile_src_dev;
 	ESTABLISH_RET(read_source_ch, -1);
-	op_readfl(&val, MAX_SRCLINE, NO_M_TIMEOUT);
+	read_len = MAX_SRCLINE + (extra_ch ? 0 : 1);			/* read up to 1 extra character in case of line > 8k */
+	op_readfl(&val, read_len, (mval *)(dollar_tlevel ? &literal_zero : &literal_notimeout));
 	REVERT;
+	if (extra_ch)
+		*((TREF(source_buffer)).addr++) = extra_ch;		/* start with the overflow character from the last readfl */
 	memcpy((TREF(source_buffer)).addr, val.str.addr, val.str.len);
+	if (extra_ch)
+	{	/* we had an overflow character from the last readfl */
+		extra_ch = '\0';
+		(TREF(source_buffer)).addr--;
+		val.str.len++;
+	}
 	cp = (unsigned char *)((TREF(source_buffer)).addr + val.str.len);
-	*cp++ = '\n';				/* insert /n needed in checksum calculation */
-	*cp = '\0';
-	if ( FALSE != io_curr_device.in->dollar.zeof )
+	(TREF(source_buffer)).len = val.str.len;
+	if (MAX_SRCLINE < val.str.len)
+	{	/* Emit a warning */
+		extra_ch = *(--cp);					/* save the overflow character */
+		dec_err(VARLSTCNT(4) ERR_LSINSERTED, 3, source_line, source_name_len, source_file_name);
+		if (1 < source_line)
+			source_line--;
+	} else
+		(TREF(source_buffer)).len++;
+	*cp = '\n';							/* insert \n needed in checksum calculation */
+	*(++cp) = '\0';							/* UNIX string terminator */
+	if (FALSE != io_curr_device.in->dollar.zeof)
 		return -1;
-	io_curr_device = tmp_list_dev;	/*	restore list file after reading	if it's opened	*/
-	(TREF(source_buffer)).len = val.str.len + 1;
+	io_curr_device = tmp_list_dev;					/* restore list file after reading in case it's opened */
 	return (int4)((TREF(source_buffer)).len);
 }
 

@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,13 +50,14 @@ error_def(ERR_JNLFILNOTCHG);
 error_def(ERR_JNLFNF);
 error_def(ERR_MUSTANDALONE);
 error_def(ERR_PREVJNLLINKSET);
+error_def(ERR_FILENAMETOOLONG);
 
 uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 {
 	unsigned short	buf_len;
 	unsigned int	full_buf_len, prev_buf_len, jnl_fn_len;
 	uint4		ustatus;
-	char		buf[JNL_NAME_SIZE], full_buf[JNL_NAME_SIZE], prev_buf[JNL_NAME_SIZE];
+	char		buf[JNL_NAME_SIZE], full_buf[YDB_PATH_MAX], prev_buf[JNL_NAME_SIZE];
 	char		jnl_fn[JNL_NAME_SIZE];
 	mstr		jnlfile, jnldef;
 
@@ -107,6 +111,12 @@ uint4 mupip_set_jnlfile_aux(jnl_file_header *header, char *jnl_fname)
 		{
 			prev_buf_len = SIZEOF("NULL") - 1;
 			memcpy(prev_buf, "NULL", prev_buf_len);
+		}
+		if (full_buf_len > JNL_NAME_SIZE)
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, full_buf_len,
+					full_buf, ERR_FILENAMETOOLONG);
+			return ((uint4)ERR_JNLFILNOTCHG);
 		}
 		header->prev_jnl_file_name_length = full_buf_len;
 		memcpy(header->prev_jnl_file_name, full_buf, full_buf_len);

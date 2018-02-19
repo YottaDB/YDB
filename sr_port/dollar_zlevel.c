@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2011 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,7 +14,8 @@
  ****************************************************************/
 
 #include "mdef.h"
-#include <rtnhdr.h>
+
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "dollar_zlevel.h"
 
@@ -28,7 +33,7 @@ int dollar_zlevel()
 		if (!(fp->type & SFT_COUNT))
 			continue;
 		if (NULL == fpprev)
-		{	/* Next frame is some sort of base frame */
+		{	/* If previous frame pointer is null, the current frame is some sort of base frame */
 #			ifdef GTM_TRIGGER
 			if (fp->type & SFT_TRIGR)
 			{	/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by base_frame() */
@@ -36,7 +41,7 @@ int dollar_zlevel()
 				continue;
 			} else
 #			endif
-				break;			/* Some other base frame that stops us */
+				break;			/* Some other base frame that stops us (M stack or call-in base frame) */
 		}
 		count++;
 	}

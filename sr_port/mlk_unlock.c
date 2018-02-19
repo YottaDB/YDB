@@ -59,7 +59,7 @@ void mlk_unlock(mlk_pvtblk *p)
 		d = p->nodptr;
 		if (dollar_tlevel)
 		{
-			assert((CDB_STAGNATE > t_tries) || csa->now_crit);
+			assert((CDB_STAGNATE > t_tries) || csa->now_crit || !csa->lock_crit_with_db);
 			/* make sure this region is in the list in case we end up retrying */
 			insert_region(p->region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 		}
@@ -92,6 +92,6 @@ void mlk_unlock(mlk_pvtblk *p)
 			csa->nl->lockspacefull_logged = FALSE; /* Allow syslog writes if enough free space is established. */
 		REL_LOCK_CRIT(csa, p->region, was_crit);
 	} else	/* acc_meth == dba_usr */
-		gvusr_unlock(p->total_length, &p->value[0], p->region);
+		gvusr_unlock(p->nref_length, &p->value[0], p->region);
 	return;
 }

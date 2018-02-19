@@ -2,6 +2,9 @@
 #                                                               #
 # Copyright (c) 2010-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
+#								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -177,7 +180,7 @@ endif
 foreach image (pro dbg)
 	\rm -f gtm_threadgbl_deftypes_asm_${image}.fail
 	./gtm_threadgbl_deftypes_${image} > gtm_threadgbl_deftypes_asm_${image}.in
-	env gtm_dist=$currprofull gtm_chset="M" gtmroutines=". $currprofull" \
+	env ydb_dist=$currprofull gtm_chset="M" gtmroutines=". $currprofull" \
 		$currprofull/mumps -run gtmthreadgblasm ${accesstxt} gtm_threadgbl_deftypes_asm_${image}.in \
 			gtm_threadgbl_deftypes_asm_${image}.si || touch gtm_threadgbl_deftypes_asm_${image}.fail
 	if ( -e gtm_threadgbl_deftypes_asm_${image}.fail) then

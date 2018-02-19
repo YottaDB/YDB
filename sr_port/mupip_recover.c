@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,7 +65,7 @@ GBLREF 	jnl_gbls_t		jgbl;
 GBLREF 	mur_gbls_t		murgbl;
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF  jnl_process_vector	*prc_vec;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	int4			strm_index;
 #ifdef GTM_TRIGGER
@@ -270,11 +270,11 @@ void	mupip_recover(void)
 	 */
 	if (mur_options.rollback && !mur_options.forward && !intrrupted_recov_processing && all_gen_properly_closed)
 	{
-		assert(NULL != jnlpool.repl_inst_filehdr);
-		replinst_seqno = jnlpool.repl_inst_filehdr->jnl_seqno;
-		if (!jnlpool.repl_inst_filehdr->crash && (0 != replinst_seqno) && (max_reg_seqno != replinst_seqno))
+		assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));
+		replinst_seqno = jnlpool->repl_inst_filehdr->jnl_seqno;
+		if (!jnlpool->repl_inst_filehdr->crash && (0 != replinst_seqno) && (max_reg_seqno != replinst_seqno))
 		{
-			udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+			udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTDBMATCH, 4,
 				LEN_AND_STR(udi->fn), &replinst_seqno, &max_reg_seqno);
 			mupip_exit(ERR_MUNOACTION);
@@ -298,10 +298,8 @@ void	mupip_recover(void)
 			/* Determine if any of the databases are taken back in time.
 			 * If so we have to increment cycles in mur_close_files.
 			 */
-			assert(NULL != jnlpool.repl_inst_filehdr);
-			murgbl.incr_db_rlbkd_cycle = jgbl.onlnrlbk
-							? jnlpool.repl_inst_filehdr->jnl_seqno - murgbl.consist_jnl_seqno
-							: FALSE;
+			assert(NULL != jnlpool->repl_inst_filehdr);
+			murgbl.incr_db_rlbkd_cycle = FALSE;
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RLBKJNSEQ, 2,
 					&murgbl.consist_jnl_seqno, &murgbl.consist_jnl_seqno);
 		}
@@ -377,7 +375,7 @@ void	mupip_recover(void)
 	{	/* -RESYNC=<strm_seqno> AND -RSYNC_STRM=<strm_num> were specified. Verify input stream is a valid #
 		 * and input seqno is a valid strm_seqno in the current replication instance file. If not, issue errors.
 		 */
-		if (!jnlpool.repl_inst_filehdr->is_supplementary)
+		if (!jnlpool->repl_inst_filehdr->is_supplementary)
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RSYNCSTRMSUPPLONLY);
 			mupip_exit(ERR_MUNOACTION);
@@ -399,7 +397,7 @@ void	mupip_recover(void)
 				assert(ERR_REPLINSTNOHIST == status);
 				SPRINTF(histdetail, "Stream Seqno "INT8_FMT" "INT8_FMTX" (Stream # %2d) ",
 					murgbl.resync_seqno - 1, murgbl.resync_seqno - 1, murgbl.resync_strm_index);
-				udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+				udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTNOHIST, 4,
 						LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
 				mupip_exit(ERR_MUNOACTION);
@@ -423,7 +421,7 @@ void	mupip_recover(void)
 		 * murgbl.resync_strm_seqno.
 		 */
 		assert(!remote_side->is_supplementary
-			|| (jnlpool.repl_inst_filehdr->is_supplementary && (0 == murgbl.resync_strm_index)));
+			|| (jnlpool->repl_inst_filehdr->is_supplementary && (0 == murgbl.resync_strm_index)));
 		if ((INVALID_SUPPL_STRM != murgbl.resync_strm_index) && !remote_side->is_supplementary)
 		{
 			assert((0 <= murgbl.resync_strm_index) && (MAX_SUPPL_STRMS > murgbl.resync_strm_index));
@@ -552,9 +550,12 @@ void	mupip_recover(void)
 	if (jgbl.onlnrlbk)
 	{
 		/* Determine if any of the databases are taken back in time. If so we have to increment cycles in mur_close_files */
-		assert(NULL != jnlpool.repl_inst_filehdr);
-		murgbl.incr_db_rlbkd_cycle = jgbl.onlnrlbk ? jnlpool.repl_inst_filehdr->jnl_seqno - murgbl.consist_jnl_seqno
-							   : FALSE;
+		assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));
+		assert(!jnlpool->repl_inst_filehdr->jnl_seqno
+				|| (jnlpool->repl_inst_filehdr->jnl_seqno >= murgbl.consist_jnl_seqno));
+		murgbl.incr_db_rlbkd_cycle = (jnlpool->repl_inst_filehdr->jnl_seqno)
+						? (jnlpool->repl_inst_filehdr->jnl_seqno != murgbl.consist_jnl_seqno)
+						: FALSE;
 	}
 	/* PHASE 7 : Close all files, rundown and exit */
 	murgbl.clean_exit = TRUE;

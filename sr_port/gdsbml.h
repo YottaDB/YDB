@@ -89,14 +89,12 @@
 
 
 #define DETERMINE_BML_FUNC_COMMON(FUNC, CS, CSA)								\
-{														\
+MBSTART {													\
 	FUNC = (CS->reference_cnt > 0) ? bml_busy : (CSA->hdr->db_got_to_v5_once ? bml_recycled : bml_free);	\
-}
-#ifndef UNIX
- #define DETERMINE_BML_FUNC(FUNC, CS, CSA)	DETERMINE_BML_FUNC_COMMON(FUNC, CS, CSA)
-#else
+} MBEND
+
 # define DETERMINE_BML_FUNC(FUNC, CS, CSA)											\
-{																\
+MBSTART {															\
 	GBLREF	boolean_t	mu_reorg_upgrd_dwngrd_in_prog;									\
 																\
 	if (CSA->nl->trunc_pid)													\
@@ -128,8 +126,7 @@
 		}														\
 	} else	/* Choose bml_func as it was chosen before truncate feature. */							\
 		DETERMINE_BML_FUNC_COMMON(FUNC, CS, CSA);									\
-}
-#endif
+} MBEND
 
 int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits);
 int4 bml_init(block_id bml);

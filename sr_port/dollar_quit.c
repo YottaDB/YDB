@@ -1,6 +1,12 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2010, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
+ * Copyright (c) 2017,2018 Stephen L Johnson.			*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +33,8 @@
 #  include "hppa.h"
 #elif defined(__ia64)
 #  include "ia64.h"
+#elif defined(__armv6l__) || defined(__armv7l__)
+#  include "arm.h"
 #endif
 
 GBLREF	int	process_exiting;
@@ -242,6 +250,26 @@ int dollar_quit(void)
 			xfer_index = imm14.offset / SIZEOF(void *);
 		} else
 			xfer_index = -1;
+	}
+#	elif defined(__armv6l__) || defined(__armv7l__)
+	{
+#		define	MAX_SKIP	10
+		int4	skip;
+
+		/* There can be between 1 and 5 instructions to skip past */
+		for (ptrs.instr = sf->mpc,skip = 0; skip < MAX_SKIP; ptrs.instr += 4,skip++)
+		{
+			if (0xE597 == *(ptrs.instr_type + 1))		/* Check upper half of instruction */
+			{
+				/* ldr of return address from xfer table */
+				xfer_index = (*ptrs.xfer_offset_16 & ARM_MASK_IMM12) / SIZEOF(void *);
+				break;
+			}
+		}
+		if (0xE597 != *(ptrs.instr_type + 1))
+		{
+			xfer_index = -1;
+		}
 	}
 #	else
 #	  error Unsupported Platform

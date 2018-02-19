@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -62,6 +65,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	ASSERT_IS_LIBGTCM;
 	ESTABLISH_RET(rc_dbms_ch,0);
 	req = (rc_req_getr *)qhdr;
 	rsp = (rc_rsp_page *)qhdr;
@@ -111,7 +115,7 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 	{	TREF(gv_last_subsc_null) = TRUE;			/* Trailing null subscript has NO trailing zero */
 		gv_currkey->base[gv_currkey->end] = 0;
 		gv_currkey->end += 1;
-	}else
+	} else
 	{	TREF(gv_last_subsc_null) = FALSE;
 		if (gv_currkey->base[gv_currkey->end - 1] == 0x01)
 		{	dollar_order = TRUE;
@@ -175,7 +179,6 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 		REVERT;
 		return 0;
 	}
-
 	t_begin(ERR_GVGETFAIL, 0);
 	for (;;)
 	{
@@ -185,6 +188,10 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 		if ((status = gvcst_search(gv_currkey, NULL)) == cdb_sc_normal)
 		{
 			bh = gv_target->hist.h;
+			/* Before using "bh->prev_rec", assert that it is usable. Can assert this since bh is a leaf level block
+			 * and prev_rec is always initialized for leaf blocks in "gvcst_search".
+			 */
+			ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(bh);
 			if (fmode & RC_MODE_NEXT)	/* if getnext */
 			{
 				rp = (rec_hdr *)(bh->buffaddr + bh->curr_rec.offset);
@@ -201,23 +208,20 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 						else
 							goto restart;
 				}
-			}
-			else
-				if (fmode & RC_MODE_PREV)	/* if get previous */
+			} else if (fmode & RC_MODE_PREV)	/* if get previous */
+			{
+				if (0 == bh->prev_rec.offset)
 				{
-					if (bh->prev_rec.offset == 0)
-					{
-						two_histories = TRUE;
-						status = gvcst_lftsib(&second_history);
-						if (status == cdb_sc_normal)
-							bh = second_history.h;
-						else
-							if (status == cdb_sc_endtree)
-								two_histories = FALSE;	/* second history not valid */
-							else
-								goto restart;
-					}
+					two_histories = TRUE;
+					status = gvcst_lftsib(&second_history);
+					if (status == cdb_sc_normal)
+						bh = second_history.h;
+					else if (status == cdb_sc_endtree)
+						two_histories = FALSE;	/* second history not valid */
+					else
+						goto restart;
 				}
+			}
 			if ((bsiz = ((blk_hdr *)(bh->buffaddr))->bsiz + RC_BLKHD_PAD) > SIZEOF(blk_hdr) + RC_BLKHD_PAD)
 			{	/* Non-empty block, global exists */
 				if (bsiz > size_return)
@@ -227,7 +231,6 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 					rc_overflow->size = 0;
 					size_return = bsiz;
 				}
-
 				memcpy(rsp->page, bh->buffaddr, SIZEOF(blk_hdr));
 				PUT_SHORT(&((blk_hdr*)rsp->page)->bsiz,bsiz);
 				memcpy(rsp->page + SIZEOF(blk_hdr) + RC_BLKHD_PAD, bh->buffaddr + SIZEOF(blk_hdr),
@@ -246,9 +249,8 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 				}
 				rsp->size_remain.value = rc_overflow->size;
 			}
-
-			if (0 == (rc_read_stamp = t_end(&gv_target->hist, two_histories ? &second_history : NULL,
-				TN_NOT_SPECIFIED)))
+			if (0 == (rc_read_stamp = t_end(&gv_target->hist,	/* Warning: Assignment */
+								two_histories ? &second_history : NULL, TN_NOT_SPECIFIED)))
 				continue;
 			if (bsiz == SIZEOF(blk_hdr) + RC_BLKHD_PAD)	/* Empty block, global does not exist */
 			{
@@ -262,38 +264,42 @@ int rc_prc_getr(rc_q_hdr *qhdr)
 			if (status == cdb_sc_endtree)
 			{
 				if (fmode & RC_MODE_NEXT)
-				{	rsp->after.value = (unsigned short)-1;
+				{
+					rsp->after.value = (unsigned short)-1;
 					rsp->before.value = 0;
-				}else
-				{	rsp->after.value = 0;
+				} else
+				{
+					rsp->after.value = 0;
 					rsp->before.value = (unsigned short)-1;
 				}
 				rsp->xcc.value = 0;
-			}else
+			} else
 			{
 				if (two_histories)
 				{
 					rsp->after.value  = 0;
 					rsp->before.value = 0;
 					rsp->xcc.value	= 0;
-				}else
+				} else
 				{
 					if (fmode & RC_MODE_PREV)		/* getprev */
-					{	rsp->before.value = bh->prev_rec.offset;
+					{
+						rsp->before.value = bh->prev_rec.offset;
 						if (rsp->before.value)
 							rsp->before.value += RC_BLKHD_PAD;
 						rsp->xcc.value	= bh->prev_rec.match;
 						rsp->after.value  = bh->curr_rec.offset + RC_BLKHD_PAD;
-					}else				/* if getnext or just get */
-					{			/* If key not found, use prev and curr, else use curr and next */
+					} else				/* if getnext or just get */
+					{	/* If key not found, use prev and curr, else use curr and next */
 						if (gv_currkey->end + 1 != bh->curr_rec.match)	/* not found */
 						{	rsp->before.value = bh->prev_rec.offset;
 							if (rsp->before.value)
 								rsp->before.value += RC_BLKHD_PAD;
 							rsp->xcc.value	= bh->prev_rec.match;
 							rsp->after.value  = bh->curr_rec.offset + RC_BLKHD_PAD;
-						}else	/* found */
-						{	rsp->before.value = bh->curr_rec.offset;
+						} else	/* found */
+						{
+							rsp->before.value = bh->curr_rec.offset;
 							if (rsp->before.value)
 								rsp->before.value += RC_BLKHD_PAD;
 							rsp->xcc.value	= bh->curr_rec.match;

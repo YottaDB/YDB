@@ -40,7 +40,7 @@ void comp_init(mstr *src, oprtype *dst)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if ((MAX_SRCLINE <= (unsigned)src->len) && ((TREF(source_buffer)).addr == (char *)&aligned_source_buffer))
+	if ((MAX_SRCLINE < (unsigned)src->len) && ((TREF(source_buffer)).addr == (char *)&aligned_source_buffer))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_INDRMAXLEN, 1, MAX_SRCLINE);	/* no error if it's ojchildparms */
 	memcpy((TREF(source_buffer)).addr,src->addr,src->len);
 	(TREF(source_buffer)).len = src->len + 1;

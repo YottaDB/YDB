@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,7 @@
 #include "jnl.h"
 #include "change_reg.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			process_id;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	gd_addr			*gd_header;
@@ -54,51 +54,52 @@ void	gtmsource_rootprimary_init(seq_num start_seqno)
 	jnl_buffer_ptr_t	jbp;
 	uint4			jnl_status;
 
-	udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
-	assert(NULL != jnlpool.repl_inst_filehdr);
+	assert(NULL != jnlpool);
+	udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
+	assert(NULL != jnlpool->repl_inst_filehdr);
 	/* Update journal pool fields to reflect this is a root primary startup and updates are enabled */
 	assert(!udi->s_addrs.hold_onto_crit || jgbl.onlnrlbk);
 	was_crit = udi->s_addrs.now_crit;
 	if (!was_crit)
-		grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
-	jnlpool.repl_inst_filehdr->root_primary_cycle++;
+		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
+	jnlpool->repl_inst_filehdr->root_primary_cycle++;
 	/* If this instance is transitioning from a non-rootprimary to rootprimary, switch journal files.
 	 * This helps with maintaining accurate value of csd->zqgblmod_tn when the former primary connects
 	 * to the current primary through a fetchresync-rollback or receiver-server-autorollback..
 	 */
-	switch_jnl = (!jnlpool.repl_inst_filehdr->was_rootprimary && (0 < jnlpool.repl_inst_filehdr->num_histinfo));
-	jnlpool.repl_inst_filehdr->was_rootprimary = TRUE;
-	assert(start_seqno >= jnlpool.jnlpool_ctl->start_jnl_seqno);
-	assert(start_seqno == jnlpool.jnlpool_ctl->jnl_seqno);
-	jnlpool.repl_inst_filehdr->jnl_seqno = start_seqno;
-	assert(jgbl.onlnrlbk || jnlpool.jnlpool_ctl->upd_disabled);
+	switch_jnl = (!jnlpool->repl_inst_filehdr->was_rootprimary && (0 < jnlpool->repl_inst_filehdr->num_histinfo));
+	jnlpool->repl_inst_filehdr->was_rootprimary = TRUE;
+	assert(start_seqno >= jnlpool->jnlpool_ctl->start_jnl_seqno);
+	assert(start_seqno == jnlpool->jnlpool_ctl->jnl_seqno);
+	jnlpool->repl_inst_filehdr->jnl_seqno = start_seqno;
+	assert(jgbl.onlnrlbk || jnlpool->jnlpool_ctl->upd_disabled);
 	if (!jgbl.onlnrlbk)
-		jnlpool.jnlpool_ctl->upd_disabled = FALSE;
-	if (IS_REPL_INST_UUID_NULL(jnlpool.repl_inst_filehdr->lms_group_info))
+		jnlpool->jnlpool_ctl->upd_disabled = FALSE;
+	if (IS_REPL_INST_UUID_NULL(jnlpool->repl_inst_filehdr->lms_group_info))
 	{	/* This is the first time this instance is being brought up either as a root primary or as a propagating
 		 * primary. Initialize the "lms_group_info" fields in the instance file header in journal pool shared memory.
 		 * They will be flushed to the instance file as part of the "repl_inst_histinfo_add -> repl_inst_flush_filehdr"
 		 * function invocation below.
 		 */
-		assert('\0' == jnlpool.repl_inst_filehdr->lms_group_info.created_nodename[0]);
-		assert('\0' == jnlpool.repl_inst_filehdr->lms_group_info.this_instname[0]);
-		assert(!jnlpool.repl_inst_filehdr->lms_group_info.creator_pid);
-		jnlpool.repl_inst_filehdr->lms_group_info = jnlpool.repl_inst_filehdr->inst_info;
-		assert('\0' != jnlpool.repl_inst_filehdr->lms_group_info.created_nodename[0]);
-		DBG_CHECK_CREATED_NODENAME(jnlpool.repl_inst_filehdr->lms_group_info.created_nodename);
-		assert('\0' != jnlpool.repl_inst_filehdr->lms_group_info.this_instname[0]);
-		assert(jnlpool.repl_inst_filehdr->lms_group_info.created_time);
-		assert(jnlpool.repl_inst_filehdr->lms_group_info.creator_pid);
+		assert('\0' == jnlpool->repl_inst_filehdr->lms_group_info.created_nodename[0]);
+		assert('\0' == jnlpool->repl_inst_filehdr->lms_group_info.this_instname[0]);
+		assert(!jnlpool->repl_inst_filehdr->lms_group_info.creator_pid);
+		jnlpool->repl_inst_filehdr->lms_group_info = jnlpool->repl_inst_filehdr->inst_info;
+		assert('\0' != jnlpool->repl_inst_filehdr->lms_group_info.created_nodename[0]);
+		DBG_CHECK_CREATED_NODENAME(jnlpool->repl_inst_filehdr->lms_group_info.created_nodename);
+		assert('\0' != jnlpool->repl_inst_filehdr->lms_group_info.this_instname[0]);
+		assert(jnlpool->repl_inst_filehdr->lms_group_info.created_time);
+		assert(jnlpool->repl_inst_filehdr->lms_group_info.creator_pid);
 	}
 	/* Initialize histinfo fields */
-	memcpy(histinfo.root_primary_instname, jnlpool.repl_inst_filehdr->inst_info.this_instname, MAX_INSTNAME_LEN - 1);
+	memcpy(histinfo.root_primary_instname, jnlpool->repl_inst_filehdr->inst_info.this_instname, MAX_INSTNAME_LEN - 1);
 	histinfo.root_primary_instname[MAX_INSTNAME_LEN - 1] = '\0';
 	assert('\0' != histinfo.root_primary_instname[0]);
 	histinfo.start_seqno = start_seqno;
-	assert(jnlpool.jnlpool_ctl->strm_seqno[0] == jnlpool.repl_inst_filehdr->strm_seqno[0]);
-	assert(jnlpool.repl_inst_filehdr->is_supplementary || (0 == jnlpool.jnlpool_ctl->strm_seqno[0]));
-	histinfo.strm_seqno = (!jnlpool.repl_inst_filehdr->is_supplementary) ? 0 : jnlpool.jnlpool_ctl->strm_seqno[0];
-	histinfo.root_primary_cycle = jnlpool.repl_inst_filehdr->root_primary_cycle;
+	assert(jnlpool->jnlpool_ctl->strm_seqno[0] == jnlpool->repl_inst_filehdr->strm_seqno[0]);
+	assert(jnlpool->repl_inst_filehdr->is_supplementary || (0 == jnlpool->jnlpool_ctl->strm_seqno[0]));
+	histinfo.strm_seqno = (!jnlpool->repl_inst_filehdr->is_supplementary) ? 0 : jnlpool->jnlpool_ctl->strm_seqno[0];
+	histinfo.root_primary_cycle = jnlpool->repl_inst_filehdr->root_primary_cycle;
 	assert(process_id == getpid());
 	histinfo.creator_pid = process_id;
 	JNL_SHORT_TIME(histinfo.created_time);
@@ -113,7 +114,7 @@ void	gtmsource_rootprimary_init(seq_num start_seqno)
 	/* Add the histinfo record to the instance file and flush the changes in the journal pool to the file header */
 	repl_inst_histinfo_add(&histinfo);
 	if (!was_crit)
-		rel_lock(jnlpool.jnlpool_dummy_reg);
+		rel_lock(jnlpool->jnlpool_dummy_reg);
 	if (switch_jnl)
 	{
 		SET_GBL_JREC_TIME; /* jnl_ensure_open/jnl_file_extend and its callees assume jgbl.gbl_jrec_time is set */

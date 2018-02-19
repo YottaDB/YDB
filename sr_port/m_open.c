@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +22,8 @@
 #include "deviceparameters.h"
 #include "mdq.h"
 
-LITREF mval	literal_null;
+LITREF	mval	literal_notimeout;
+LITREF	mval	literal_null;
 
 int m_open(void)
 {
@@ -72,16 +74,16 @@ int m_open(void)
 	/* Code generation for the optional timeout parm */
 	is_timeout = FALSE;
 	if (TK_COLON != TREF(window_token))
-		timeout = put_ilit(NO_M_TIMEOUT);
+		timeout = put_lit((mval *)&literal_notimeout);
 	else
 	{
 		advancewindow();
 		if (TK_COLON == TREF(window_token))
-			timeout = put_ilit(NO_M_TIMEOUT);
+			timeout = put_lit((mval *)&literal_notimeout);
 		else
 		{
 			is_timeout = TRUE;
-			if (EXPR_FAIL == expr(&timeout, MUMPS_INT))
+			if (EXPR_FAIL == expr(&timeout, MUMPS_EXPR))
 				return FALSE;
 		}
 	}

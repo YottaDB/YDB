@@ -1,8 +1,11 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2011-2017 Fidelity National Information		#
+# Copyright (c) 2011-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
+#								#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -23,7 +26,7 @@
 # Make sure don't start in utf-8 mode
 if ($?gtm_chset) then
 	if (M != $gtm_chset) then
-		set longline='$LC_CTYPE, $gtm_dist, and $gtmroutines for M mode'
+		set longline='$LC_CTYPE, $ydb_dist, and $gtmroutines for M mode'
 		echo '$gtm_chset'" = $gtm_chset, so change to M mode and also check "$longline
 		exit
 	endif
@@ -32,7 +35,7 @@ endif
 # This script needs root privileges to
 # - test install GT.M
 # - set file ownership to 40535
-set euser = `$gtm_dist/geteuid`
+set euser = `$ydb_dist/geteuid`
 if ("$euser" != "root") then
 	echo "You must have root privileges to run kitstart"
 	exit -1
@@ -69,11 +72,11 @@ end
 # if not found in distribution servers then try from uname in case -allow entered
 if (! $?os_arch) then
 	# make a directory in /tmp to use to run unamearch.m
-	setenv randstr `$gtm_dist/mumps -r %XCMD 'do ^%RANDSTR'`
+	setenv randstr `$ydb_dist/mumps -r %XCMD 'do ^%RANDSTR'`
 	set tempdir = /tmp/kit_unamearch_${randstr}
 	mkdir $tempdir
 	cp $cms_tools/unamearch.m $tempdir
-	set os_arch=`(cd $tempdir; $gtm_dist/mumps -r unamearch $distrib_unix_platformarch%$uname_platformarch)`
+	set os_arch=`(cd $tempdir; $ydb_dist/mumps -r unamearch $distrib_unix_platformarch%$uname_platformarch)`
 	if ("" == "$os_arch") then
 		echo "Problem getting platform and arch from uname -a"
 		rm -rf $tempdir
@@ -183,7 +186,8 @@ endif
 
 version $version p  # Set the current version so that relative paths work
 cmsver $version	    # Set appropriate path to locate $version sources in CMS, the default is V990
-set releasever = `$gtm_dist/mumps -run %XCMD 'write $piece($zversion," ",2),!'`
+set zver = `$ydb_dist/mumps -run %XCMD 'write $zversion'`
+set releasever = $zver[2]
 
 # create a README.txt which has the current year in it
 setenv readme_txt ${gtm_com}/README.txt
@@ -325,7 +329,7 @@ foreach image ($imagetype)
 	find . -type f -exec chmod a-xw {} \;
 	# no directories to be writeable for group or world if aix or 32-bit linux, otherwise for all
 	chmod a+x configure
-	chmod a+x gtminstall
+	chmod a+x ydbinstall
 	if ((aix == ${osname}) || ((linux == ${osname}) && ("i586" == "$arch"))) then
 		find . -type d -exec chmod go-w {} \;
 	else
@@ -358,6 +362,38 @@ foreach image ($imagetype)
 end
 echo ""
 
+if (-f $gtm_tools/gtmpcat.m) then
+	pushd $gtm_tools
+	set nonomatch ; set fldbld = (gtmpcat*On*${version}.m) ; unset nonomatch
+	if (("$fldbld" == "gtmpcat*On*${version}.m") || ($#fldbld > 1)) then
+		echo ""
+		echo "FAIL:missing or duplicate gtmpcat field build file ($fldbld)"
+	else
+		set dist_file = "${dist}/gtmpcat_for_${version}_${osname}_${arch}.${package_ext}"
+		echo ""
+		echo "Creating $dist_file"
+		sed "s/#ZVERSION#/${zver}/;s/#FLDBLD#/${fldbld}/" < install_gtmpcat_sh.txt > install_gtmpcat.sh
+		cat gtmpcat_sh.txt > gtmpcat.sh
+		chmod 500 install_gtmpcat.sh gtmpcat.sh
+		set prev_user = `filetest -U gtmpcat.m`
+		set prev_group = `filetest -G gtmpcat.m`
+		set prev_perm = `filetest -P: gtmpcat.m`
+		chown 0:0 gtmpcat.m $fldbld
+		chmod 400 gtmpcat.m $fldbld
+		$package $dist_file gtmpcat.m $fldbld install_gtmpcat.sh gtmpcat.sh || exit 10
+		chown ${prev_user}:${prev_group} gtmpcat.m $fldbld
+		chmod ${prev_perm} gtmpcat.m $fldbld
+		rm -f gtmpcat.sh install_gtmpcat.sh
+		echo ""
+		echo "Gzipping $dist_file"
+		gzip $dist_file || exit 11
+	endif
+	popd
+else
+	echo ""
+	echo "FAIL:gtmpcat was not found"
+endif
+
 find $dist -type f -exec chmod 444 {} \;
 find $dist -type d -exec chmod 755 {} \;
 chown -R library:gtc $dist
@@ -385,9 +421,9 @@ if ($testinstall) then
 		# restricted build.
 		# V54002 now asks for an installation group (newline entered for default) so response needs one more
 		# blank line for default group
-		# V54003 now asks whether or not to retain .o files if libgtmutil.so is created
+		# V54003 now asks whether or not to retain .o files if libyottadbutil.so is created
 		# We answer "y" to this question
-		# If libgtmutil.so is not created(on i586) this question is not asked
+		# If libyottadbutil.so is not created(on i586) this question is not asked
 			if ("$osname" == "linux" && "$arch" == "i586") then
 				sh ./configure << CONFIGURE_EOF
 
@@ -422,9 +458,9 @@ CONFIGURE_EOF
 
 		# V54002 now asks for an installation group before the restricted group question so response is
 		# reversed from V54000
-		# V54003 now asks whether or not to retain .o files if libgtmutil.so is created
+		# V54003 now asks whether or not to retain .o files if libyottadbutil.so is created
 		# We answer "y" to this question
-		# If libgtmutil.so is not created(on i586) this question is not asked
+		# If libyottadbutil.so is not created(on i586) this question is not asked
 			if ("$osname" == "linux" && "$arch" == "i586") then
 	 			sh ./configure << CONFIGURE_EOF
 
@@ -545,6 +581,18 @@ CONFIGURE_EOF
 			echo "Test of installation for group restriced ${version}/${image} FAILED"
 			set leavedir = 1
 		endif
+
+		# Install gtmpcat
+		pushd $gtm_tools
+		yes | env ydb_dist=${install}/defgroup/${image} sh ./install_gtmpcat.sh
+		yes | env ydb_dist=${install}/${image} sh ./install_gtmpcat.sh
+		popd
+
+		# Test gtmpcat
+		pushd /tmp
+		(source ${install}/defgroup/${image}/gtmcshrc ; $ydb_dist/mumps -r %XCMD 'zsystem "$ydb_dist/gtmpcat "_$job')
+		(source ${install}/${image}/gtmcshrc ; $ydb_dist/mumps -r %XCMD 'zsystem "$ydb_dist/gtmpcat "_$job')
+		popd
 
 	end
 endif

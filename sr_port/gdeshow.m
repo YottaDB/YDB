@@ -11,7 +11,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 show:	;implement the verb: SHOW
 ALL
-	d TEMPLATE,ALLNAME,ALLGBLNAME,ALLREGIO,ALLSEGME,MAP
+	d TEMPLATE,ALLNAME,ALLGBLNAME,ALLREGIO,ALLSEGME,MAP,INSTANCE
 	q
 COMMANDS
 	n tmpreg2,tmpseg2
@@ -25,9 +25,9 @@ COMMANDS
 	set delim="-"
 	; show NAMES after GBLNAME to avoid potential NAMRANGEORDER errors in case of non-zero collation
 	i '$l($get(cfile)) d
-	. f i="@useio",$s(log:"@uself",1:"") q:'$l(i)  u @i d templatec,regionc,segmentc,gblnamec,namec
+	. f i="@useio",$s(log:"@uself",1:"") q:'$l(i)  u @i d templatec,regionc,segmentc,gblnamec,namec,instc
 	e  o cfile:(newversion:exc="w !,$ztatus c cfile zgoto $zl:cfilefail") u cfile d
-	. d templatec,regionc,segmentc,gblnamec,namec
+	. d templatec,regionc,segmentc,gblnamec,namec,instc
 	. c cfile
 cfilefail:
 	s BOL=""
@@ -98,6 +98,23 @@ gblnamec:
 	i gnams=0 q
 	s s=""
 	f  s s=$o(gnams(s)) q:s=""  w !,"ADD "_delim_"GBLNAME ",s," "_delim_"COLLATION=",gnams(s,"COLLATION")
+	w !,BOL
+	q
+ALLINSTA
+INSTANCE
+	i ($d(inst)<10)!(inst=0) q
+	d in2
+	i log s BOL="!" u @uself w BOL d in2 w ! u @useio s BOL=""
+	q
+in2:	d insthd,insteach
+	q
+insteach;
+	w !,BOL,?x(1),$$namedisp(inst("FILE_NAME"),0)
+	q
+instc:
+	i ($d(inst)<10)!(inst=0) q
+	s s=""
+	w !,"CHANGE "_delim_"INSTANCE "_delim_"FILE_NAME=",$$namedisp(inst("FILE_NAME"),1)
 	w !,BOL
 	q
 REGION
@@ -436,6 +453,12 @@ gblnamehd:
 	w !,BOL,!,BOL,?x(0),"*** GBLNAMES ***",!,BOL,?x(1),"Global",?x(2),"Coll",?x(3),"Ver"
 	w !,BOL,?x(1),$tr($j("",78)," ","-")
 	q
+insthd:
+	s x(0)=43,x(1)=1
+	w !,BOL,!,BOL,?x(0),"*** INSTANCE ***"
+	w !,BOL," Instance File (def ext: .repl)"
+	w !,BOL,?x(1),$tr($j("",57)," ","-")
+	q
 regionhd:
 	s x(0)=32,x(1)=1,x(2)=33,x(3)=65,x(4)=71
 	s x(5)=79,x(6)=85,x(7)=95,x(8)=100,x(9)=104,x(10)=111,x(11)=117,x(12)=123,x(13)=130,x(14)=136,x(15)=141
@@ -555,7 +578,7 @@ namscollatecalc:
 	. . ; Some processing needed so X(2,4:5) (a range) comes AFTER X(2,4,5:"") (a point within X(2,4)).
 	. . ; Add a 01 at the end of the left subscript of a range.
 	. . s key=key_ONE
-	. ; ASSERT : i $d(namscollate(key)) zsh "*"  h  ; assert that checks for duplicate keys
+	. ; ASSERT : i $d(namscollate(key)) s $etrap="zg 0" zsh "*"  zhalt 1  ; assert that checks for duplicate keys
 	. s namscollate(key)=s
 	q
 namedisp(name,addquote)
@@ -593,7 +616,7 @@ namedisp(name,addquote)
 	. . . s namedisp=namedisp_$ze(namezwr,starti,i-1),namedisplen=namedisplen+(i-starti),starti=i+4,quotestate=1,i=i+3 q
 	i addquote&$d(seenquotestate3) s namedisp=doublequote_namedisp_doublequote
 	; 2 and 3 are the only terminating states; check that. that too 3 only if addquote is 1.
-	; ASSERT : i '((quotestate=2)!(addquote&(quotestate=3)))  zsh "*"  h
+	; ASSERT : i '((quotestate=2)!(addquote&(quotestate=3))) s $etrap="zg 0" zsh "*"  zhalt 1
 	q namedisp
 namedisplaycalc:(name)
 	; if name is subscripted, make sure control characters are displayed in $c() notation

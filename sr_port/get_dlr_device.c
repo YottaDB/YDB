@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,11 +19,12 @@ GBLREF io_pair		io_curr_device;
 void get_dlr_device(mval *v)
 {
 	mstr	x;
-	char 	buff[128], *cp, *cend;
+	char 	*cp, *cend;
 
-	x.len = SIZEOF(buff);
-	x.addr = buff;
+	x.len = DD_BUFLEN;	/* Default length, if dollar.device[] array is used. */
+	x.addr = NULL;
 	(io_curr_device.in->disp_ptr->dlr_device)(&x);
+	assert((0 >= x.len) || (NULL != x.addr));
 	v->mvtype = MV_STR;
 	v->str.addr = cp = x.addr;
 	cend = cp + x.len;

@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -89,10 +92,10 @@
 # include "gtm_utf8.h"
 #endif
 #include "getjobnum.h"
+#include "ydb_chk_dist.h"
 
-#define execname 	"gtmsecshr"	/* this is what this executable is supposed to be called. A different name is verboten */
-#define intent_open	"for open"	/* FLUSH_DB_IPCS_INFO types */
-#define intent_close	"for close"
+#define intent_open		"for open"	/* FLUSH_DB_IPCS_INFO types */
+#define intent_close		"for close"
 
 GBLDEF CLI_ENTRY	*cmd_ary = NULL; /* GTMSECSHR does not have any command tables so initialize command array to NULL */
 
@@ -103,11 +106,11 @@ GBLREF	key_t			gtmsecshr_key;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		need_core;
 GBLREF	boolean_t		first_syslog;		/* Defined in util_output.c */
-GBLREF	char			gtm_dist[GTM_PATH_MAX];
-GBLREF	boolean_t		gtm_dist_ok_to_use;
+GBLREF	char			ydb_dist[YDB_PATH_MAX];
+GBLREF	boolean_t		ydb_dist_ok_to_use;
 
-LITREF	char			gtm_release_name[];
-LITREF	int4			gtm_release_name_len;
+LITREF	char			ydb_release_name[];
+LITREF	int4			ydb_release_name_len;
 
 static	volatile int		gtmsecshr_timer_popped;
 static	int			gtmsecshr_socket_dir_len;
@@ -198,7 +201,7 @@ uint4 have_crit(uint4 crit_state)
 /* For gtmsecshr, no forking but still allow to create a core */
 void gtm_fork_n_core(void)
 {	/* Should we switch to an otherwise unpriv'd id of some sort and chdir to create the core
-	 * in say $gtm_dist ?
+	 * in say $ydb_dist ?
 	 */
 	DUMP_CORE;
 }
@@ -214,7 +217,6 @@ int main(int argc, char_ptr_t argv[])
 	int			save_errno;
 	int			recv_complete, send_complete;
 	int			num_chars_recd, num_chars_sent, rundir_len;
-	int4			msec_timeout;			/* timeout in milliseconds */
 	TID			timer_id;
 	GTM_SOCKLEN_TYPE	client_addr_len;
 	char			*recv_ptr, *send_ptr, *rundir;
@@ -225,7 +227,8 @@ int main(int argc, char_ptr_t argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	common_startup_init(GTMSECSHR_IMAGE); 	/* Side-effect : Sets skip_dbtriggers = TRUE if platorm lacks trigger support */
+	assert(MAXPOSINT4 >= GTMSECSHR_MESG_TIMEOUT);
+	common_startup_init(GTMSECSHR_IMAGE, NULL); /* Side-effect : Sets skip_dbtriggers = TRUE if platorm lacks trigger support */
 	err_init(gtmsecshr_cond_hndlr);
 	gtmsecshr_init(argv, &rundir, &rundir_len);
 	timer_id = (TID)main;
@@ -249,9 +252,8 @@ int main(int argc, char_ptr_t argv[])
 		}
 		recv_ptr = (char *)&mesg;
 		client_addr_len = SIZEOF(struct sockaddr_un);
-		msec_timeout = timeout2msec(GTMSECSHR_MESG_TIMEOUT);
-		DBGGSSHR((LOGFLAGS, "gtmsecshr: Select rc = %d  message timeout = %d\n", selstat, msec_timeout));
-		start_timer(timer_id, msec_timeout, gtmsecshr_timer_handler, 0, NULL);
+		DBGGSSHR((LOGFLAGS, "gtmsecshr: Select rc = %d  message timeout = %d\n", selstat, GTMSECSHR_MESG_TIMEOUT));
+		start_timer(timer_id, GTMSECSHR_MESG_TIMEOUT, gtmsecshr_timer_handler, 0, NULL);
 		recv_complete = FALSE;
 		do
 		{	/* Note RECVFROM does not loop on EINTR return codes so must be handled */
@@ -274,8 +276,7 @@ int main(int argc, char_ptr_t argv[])
 		if (INVALID_COMMAND != mesg.code)
 		{	/* Reply if code not overridden to mean no acknowledgement required */
 			send_ptr = (char *)&mesg;
-			msec_timeout = timeout2msec(GTMSECSHR_MESG_TIMEOUT);
-			start_timer(timer_id, msec_timeout, gtmsecshr_timer_handler, 0, NULL);
+			start_timer(timer_id, GTMSECSHR_MESG_TIMEOUT, gtmsecshr_timer_handler, 0, NULL);
 			send_complete = FALSE;
 			do
 			{
@@ -299,13 +300,15 @@ int main(int argc, char_ptr_t argv[])
 	}
 }
 
+/* Note: *rundir points to $ydb_dist (the full path of ydb_dist env var) on return */
 void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 {
 	int		file_des, save_errno, len = 0;
 	int		create_attempts = 0;
 	int		secshr_sem;
-	int		semop_res, rndirln, modlen;
-	char		*name_ptr, *rndir, *cp, realpathbef[GTM_PATH_MAX], *realpathaft, gtmdist[GTM_PATH_MAX];
+	int		semop_res, rndirln, modlen, ydbdistlen;
+	char		*name_ptr, *rndir, *tmp_ptr, ydbdist[YDB_PATH_MAX];
+	char		gtmsecshr_realpath[YDB_PATH_MAX];
 	char		*path, *chrrv;
 	pid_t		pid;
 	struct sembuf	sop[4];
@@ -323,9 +326,9 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	 *
 	 * Steps:
 	 *
-	 * 1. Verify we are "gtmsecshr" and not a module renamed for some other purpose.
-	 * 2. Verify current working dir is $gtm_dist/gtmsecshrdir.
-	 * 3. Verify we are loaded from $gtm_dist (a pretense setup by the wrapper).
+	 * 1. Verify the currently running executable is "$ydb_dist/gtmsecshrdir/gtmsecshr". Issue error otherwise.
+	 * 2. Verify current working dir is $ydb_dist/gtmsecshrdir. Issue error otherwise.
+	 * 3. Copy "$ydb_dist" to output parameter "*rundir"
 	 *
 	 * Note when/if this module merges with its wrapper, step 2 should be modified to that extent. Note our dependence
 	 * on argv[0] for correct startup directory may preclude getting rid of the wrapper. The execl*() functions allow
@@ -333,62 +336,66 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	 */
 
 	/* Step 1 */
-	rndir = argv[0];
-	rndirln = STRLEN(rndir);
+	rndir = realpath(PROCSELF, gtmsecshr_realpath);
+	if (NULL != rndir)
+		rndirln = STRLEN(rndir);
+	else
+		rndirln = 0;
 	if (0 == rndirln)
 	{
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMSECSHRSTART, 3,
-			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRNOARG0);
+			RTS_ERROR_LITERAL("Server 1"), process_id, ERR_GTMSECSHRNOARG0);
 		gtmsecshr_exit(UNABLETODETERMINEPATH, FALSE);
 	}
-	for (cp = rndir + rndirln - 1; cp >= rndir; cp--)
+	path = ydb_dist;
+	chrrv = realpath(path, ydbdist);
+	if (NULL != chrrv)
 	{
-		if ('/' == *cp)
-			break;
-	}
-	cp++;			/* Bump back past the '/' */
-	modlen = (rndir + rndirln) - cp;
-	if ((STRLEN(execname) != modlen) || (0 != memcmp(execname, cp, modlen)))
+		ydbdistlen = STRLEN(ydbdist);
+		/* Now compute the length of the string "$ydb_dist/gtmsecshrdir/gtmsecshr" */
+		if (SIZEOF(ydbdist) >= (ydbdistlen + STR_LIT_LEN(GTMSECSHR_DIR_SUFFIX) + 1 + SIZEOF(GTMSECSHR_EXECUTABLE)))
+		{
+			tmp_ptr = ydbdist + ydbdistlen;
+			memcpy(tmp_ptr, GTMSECSHR_DIR_SUFFIX, STR_LIT_LEN(GTMSECSHR_DIR_SUFFIX));
+			tmp_ptr += STR_LIT_LEN(GTMSECSHR_DIR_SUFFIX);
+			*tmp_ptr++ = '/';
+			memcpy(tmp_ptr, GTMSECSHR_EXECUTABLE, STR_LIT_LEN(GTMSECSHR_EXECUTABLE));
+			tmp_ptr += STR_LIT_LEN(GTMSECSHR_EXECUTABLE);
+			*tmp_ptr = '\0';
+			ydbdistlen = tmp_ptr - ydbdist;
+		} else
+			ydbdistlen = 0;
+	} else
+		ydbdistlen = 0;
+	if ((rndirln != ydbdistlen) || (0 != memcmp(rndir, ydbdist, rndirln)))
 	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GTMSECSHRSTART, 3,
-			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRISNOT, 2, modlen, cp);
-		gtmsecshr_exit(NOTGTMSECSHR, FALSE);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMSECSHRSTART, 3,
+			RTS_ERROR_LITERAL("Server 2"), process_id, ERR_GTMSECSHRBADDIR);
+		gtmsecshr_exit(BADYDBDISTDIR, FALSE);
 	}
-	rndirln = rndirln - modlen - 1;
 	/* Step 2 */
-	realpathaft = malloc(GTM_PATH_MAX);		/* Malloc space as this dir is used later during message validations */
-	memcpy(realpathbef, rndir, rndirln);		/* Need to copy before we modify it */
-	realpathbef[rndirln] = '\0';			/* Terminate directory string (executable/dir name already checked) */
-	chrrv = realpath(realpathbef, realpathaft);	/* Normalize dir name - eliminate all symlinks */
-	if (NULL == chrrv)
-	{
-		save_errno = errno;
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRSTART, 3,
-			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRISNOT, 0, save_errno);
-		gtmsecshr_exit(NOTGTMSECSHR, FALSE);
-	}
-	rndirln = STRLEN(realpathaft);			/* Record (new) length now that realpath has normalized the path */
-	/* Temporaryily add gtmsecshrdir to exec path for verification purposes */
-	memcpy(realpathaft + rndirln, GTMSECSHR_DIR_SUFFIX, SIZEOF(GTMSECSHR_DIR_SUFFIX));	/* includes null terminator */
-	chrrv = getcwd(gtmdist, GTM_PATH_MAX);	/* Use gtmdist 'cause it's convenient */
-	if ((NULL == chrrv) || (0 != strncmp(gtmdist, realpathaft, GTM_PATH_MAX)))
+	/* Take off the "/gtmsecshr" suffix (leaves "$ydb_dist/gtmsecshrdir") and use this to compare current working directory */
+	rndirln -= SIZEOF(GTMSECSHR_EXECUTABLE); /* SIZEOF includes 1 for trailing null byte but we use that for leading '/') */
+	rndir[rndirln] = '\0';			/* Terminate directory string (executable/dir name already checked) */
+	chrrv = getcwd(ydbdist, YDB_PATH_MAX);	/* Use ydbdist 'cause it's convenient */
+	if (NULL != chrrv)
+		ydbdistlen = STRLEN(ydbdist);
+	else
+		ydbdistlen = 0;
+	if ((rndirln != ydbdistlen) || (0 != memcmp(rndir, ydbdist, rndirln)))
 	{
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMSECSHRSTART, 3,
-			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRBADDIR);
-		gtmsecshr_exit(BADGTMDISTDIR, FALSE);
+			RTS_ERROR_LITERAL("Server 3"), process_id, ERR_GTMSECSHRBADDIR);
+		gtmsecshr_exit(BADYDBDISTDIR, FALSE);
 	}
-	realpathaft[rndirln] = '\0';			/* Remove gtmsecshrdir part - Put it back to supplied path ($gtm_dist) */
-	*rundir = realpathaft;				/* This value for $gtm_dist is used in later validations */
-	*rundir_len = rndirln;				/* .. and can be used either with this len or NULL char terminator */
 	/* Step 3 */
-	path = gtm_dist;
-	chrrv = realpath(path, gtmdist);
-	if ((NULL == chrrv) || (0 != strncmp(realpathaft, gtmdist, GTM_PATH_MAX)))
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMSECSHRSTART, 3,
-			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRBADDIR);
-		gtmsecshr_exit(BADGTMDISTDIR, FALSE);
-	}
+	rndirln -= STR_LIT_LEN(GTMSECSHR_DIR_SUFFIX);
+	rndir[rndirln] = '\0';			/* Terminate directory string (executable/dir name already checked) */
+	tmp_ptr = malloc(rndirln + 1);		/* Malloc space as this dir is used later during message validations */
+	memcpy(tmp_ptr, rndir, rndirln);
+	tmp_ptr[rndirln] = '\0';			/* Remove gtmsecshrdir part - Put it back to supplied path ($ydb_dist) */
+	*rundir = tmp_ptr;				/* This value for $ydb_dist is used in later validations */
+	*rundir_len = rndirln;				/* .. and can be used either with this len or NULL char terminator */
 	/*
 	 **** With invocation validated, begin our priviledge escalation ****
 	 */
@@ -396,7 +403,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	{
 		save_errno = errno;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
-			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRSUIDF, 0, ERR_GTMSECSHROPCMP, 0, save_errno);
+			RTS_ERROR_LITERAL("Server 4"), process_id, ERR_GTMSECSHRSUIDF, 0, ERR_GTMSECSHROPCMP, 0, save_errno);
 		gtmsecshr_exit(SETUIDROOT, FALSE);
 	}
 	/* Before we fork, close the system log because when the facility name disappears in this middle-process,
@@ -412,7 +419,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	{	/* Fork failed */
 		save_errno = errno;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRSTART, 3,
-			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRFORKF, 0, save_errno);
+			RTS_ERROR_LITERAL("Server 5"), process_id, ERR_GTMSECSHRFORKF, 0, save_errno);
 		EXIT(GNDCHLDFORKFLD);
 	} else if (0 < pid)
 		/* This is the original process - it dies quietly (no exit handler of any sort) to isolate us */
@@ -420,13 +427,13 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	/****** We are now in the (isolated) child process ******/
 	getjobnum();
 	pid = getsid(process_id);
-	gtm_dist_ok_to_use = TRUE;
+	ydb_dist_ok_to_use = TRUE;
 	if ((pid != process_id) && ((pid_t)-1 == setsid()))
 	{
 		save_errno = errno;
 		DEBUG_ONLY(util_out_print("expected sid !UL but have !UL", OPER, process_id, pid));
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
-			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRSSIDF, 0, save_errno);
+			RTS_ERROR_LITERAL("Server 6"), process_id, ERR_GTMSECSHRSSIDF, 0, save_errno);
 	}
 	/* Close standard IO devices - we don't need/want them as all IO goes to operator log. Else we would have IO devices
 	 * tied to whatever process started gtmsecshr up which we definitely don't want.
@@ -448,13 +455,14 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	if (-1 == CHDIR(P_tmpdir))	/* Switch to temporary directory as CWD */
 	{
 		save_errno = errno;
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSTART, 3,
-			RTS_ERROR_LITERAL("Server"), process_id, ERR_GTMSECSHRCHDIRF, 2, LEN_AND_STR(P_tmpdir), save_errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_SEVERE(ERR_GTMSECSHRSTART), 3,
+			RTS_ERROR_LITERAL("Server 7"), process_id, ERR_GTMSECSHRCHDIRF, 2, LEN_AND_STR(P_tmpdir), save_errno);
 		EXIT(UNABLETOCHDIR);
 	}
 	umask(0);
 	if (0 != gtmsecshr_pathname_init(SERVER, *rundir, *rundir_len))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_LITERAL("Server path"), process_id);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server path"),
+			process_id);
 	if (-1 == (secshr_sem = semget(gtmsecshr_key, FTOK_SEM_PER_ID, RWDALL | IPC_NOWAIT)))
 	{
 		secshr_sem = INVALID_SEMID;
@@ -475,8 +483,8 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	SEMOP(secshr_sem, sop, 2, semop_res, NO_WAIT);
 	if (0 > semop_res)
 	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_SEVERE(ERR_GTMSECSHRSTART), 3,
-			RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
+			RTS_ERROR_LITERAL("Server 8"), process_id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("server already running"), errno);
 		/* If gtm_tmp is not defined, show default path */
 		if (gtm_tmp_ptr = GETENV("gtm_tmp"))		/* Warning - assignment */
@@ -487,10 +495,11 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 		gtmsecshr_exit(SEMAPHORETAKEN, FALSE);
 	}
 	if (0 != gtmsecshr_sock_init(SERVER))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GTMSECSHRSOCKET, 3, RTS_ERROR_LITERAL("Server"), process_id);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3, RTS_ERROR_LITERAL("Server 9"),
+			process_id);
 	if (-1 == Stat(gtmsecshr_sock_name.sun_path, &stat_buf))
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
-			RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
+			RTS_ERROR_LITERAL("Server 10"), process_id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Unable to get status of socket file"), errno);
 	/* Get the distribution group */
 	lib_gid = gtm_get_group_id(&dist_stat_buff);
@@ -504,13 +513,13 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 		/* Change group if different from current user group */
 		if (lib_gid != GETGID() && (-1 == CHOWN(gtmsecshr_sock_name.sun_path, -1, lib_gid)))
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
-				 RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
+				 RTS_ERROR_LITERAL("Server 11"), process_id, ERR_TEXT, 2,
 				 RTS_ERROR_LITERAL("Unable to change socket file group"), errno);
 		stat_buf.st_mode = 0660;
 	}
 	if (-1 == CHMOD(gtmsecshr_sock_name.sun_path, stat_buf.st_mode))
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
-			RTS_ERROR_LITERAL("Server"), process_id, ERR_TEXT, 2,
+			RTS_ERROR_LITERAL("Server 12"), process_id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Unable to change socket file permisions"), errno);
 	name_ptr = strrchr(gtmsecshr_sock_name.sun_path, '/');
 	while (*name_ptr == '/')	/* back off in case of double-slash */
@@ -521,10 +530,10 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	/* Create communication key used in all gtmsecshr messages. Key's purpose is to eliminate cross-version
 	 * communication issues.
 	 */
-	STR_HASH((char *)gtm_release_name, gtm_release_name_len, TREF(gtmsecshr_comkey), 0);
+	STR_HASH((char *)ydb_release_name, ydb_release_name_len, TREF(gtmsecshr_comkey), 0);
 	/* Initialization complete */
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GTMSECSHRDMNSTARTED, 5,
-		gtmsecshr_key, gtm_release_name_len, gtm_release_name, *rundir_len, *rundir);
+		gtmsecshr_key, ydb_release_name_len, ydb_release_name, *rundir_len, *rundir);
 	return;
 }
 
@@ -589,7 +598,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 	{
 		buf->code = INVALID_COMKEY;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6,
-			RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
+			RTS_ERROR_LITERAL("Server 13"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Comkey not correct for this gtmsecshr version"));
 		return;
 	}
@@ -613,7 +622,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				save_errno = errno;
 				buf->code = save_errno;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-					     RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id,
+					     RTS_ERROR_LITERAL("Server 14"), process_id, buf->pid, save_code, buf->mesg.id,
 					     ERR_TEXT, 2, RTS_ERROR_LITERAL("Unable to wake up process"), save_errno);
 			}
 #			ifdef DEBUG
@@ -632,7 +641,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				save_errno = errno;
 				buf->code = save_errno;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-					     RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id,
+					     RTS_ERROR_LITERAL("Server 15"), process_id, buf->pid, save_code, buf->mesg.id,
 					     ERR_TEXT, 2,
 					     RTS_ERROR_LITERAL("Unable to request process to resume processing"),
 					     save_errno);
@@ -651,7 +660,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			else
 			{
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Server 16"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Unable to remove semaphore"), buf->code);
 			}
 			break;
@@ -660,7 +669,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			if (buf->code)
 			{
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Server 17"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Unable to get shared memory statistics"), buf->code);
 				break;
 			} else if (1 < temp_shmctl_buf.shm_nattch)
@@ -677,7 +686,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			else
 			{
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Server 18"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Unable to remove shared memory segment"), buf->code);
 			}
 			break;
@@ -694,7 +703,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			if ((0 == index) || (index >= SIZEOF(buf->mesg.path)) || (index != (msglen - GTM_MESG_HDR_SIZE - 1)))
 			{
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
+					RTS_ERROR_LITERAL("Server 19"), process_id, buf->pid, buf->code,
 					index >= SIZEOF(buf->mesg.path) ? SIZEOF(buf->mesg.path) - 1 : index,
 					buf->mesg.path, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("no file name or length too long or invalid"));
@@ -738,7 +747,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 						save_errno = errno;
 						buf->code = save_errno;
 						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_GTMSECSHRSRVFIL, 7,
-							RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
+							RTS_ERROR_LITERAL("Server 20"), process_id, buf->pid, buf->code,
 							index, buf->mesg.path, ERR_TEXT, 2,
 							RTS_ERROR_LITERAL("Unable to get file status"), save_errno);
 					}
@@ -746,14 +755,14 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				{
 					buf->code = EINVAL;
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7,
-						RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
+						RTS_ERROR_LITERAL("Server 21"), process_id, buf->pid, buf->code,
 						index, buf->mesg.path, ERR_TEXT, 2,
 						RTS_ERROR_LITERAL("File is not a GTM mutex socket file"));
 				} else if (0 != MEMCMP_LIT(basnam, MUTEX_SOCK_FILE_PREFIX))
 				{
 					buf->code = EINVAL;
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7,
-						RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
+						RTS_ERROR_LITERAL("Server 22"), process_id, buf->pid, buf->code,
 						index, buf->mesg.path, ERR_TEXT, 2,
 						RTS_ERROR_LITERAL("File name does not match the naming convention for a GT.M "
 								   "mutex socket file"));
@@ -761,14 +770,14 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				{
 					buf->code = EINVAL;
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFIL, 7,
-						RTS_ERROR_LITERAL("Server"), process_id, buf->pid, buf->code,
+						RTS_ERROR_LITERAL("Server 23"), process_id, buf->pid, buf->code,
 						index, buf->mesg.path, ERR_TEXT, 2,
 						RTS_ERROR_LITERAL("File does not reside in the normal directory for a GT.M "
 								     "mutex socket file"));
 				} else if (buf->code = (-1 == UNLINK(buf->mesg.path)) ? errno : 0)
 				{
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(14) ERR_GTMSECSHRSRVFIL, 7,
-						RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code,
+						RTS_ERROR_LITERAL("Server 24"), process_id, buf->pid, save_code,
 						RTS_ERROR_STRING(buf->mesg.path), ERR_TEXT, 2,
 						RTS_ERROR_LITERAL("Unable to remove file"), buf->code);
 				} else
@@ -783,12 +792,12 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			 */
 			fn = buf->mesg.db_ipcs.fn;
 			fn_len = buf->mesg.db_ipcs.fn_len;
-			if ((GTM_PATH_MAX < fn_len) || ('\0' != *(fn + fn_len))
+			if ((YDB_PATH_MAX < fn_len) || ('\0' != *(fn + fn_len))
 				|| (fn_len != (msglen - GTM_MESG_HDR_SIZE - offsetof(ipcs_mesg, fn[0]) - 1)))
 			{
 				buf->code = EINVAL;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Server 25"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("invalid file name argument"));
 				break;
 			}
@@ -805,7 +814,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			{
 				save_errno = buf->code = errno;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code,
+					RTS_ERROR_LITERAL("Server 26"), process_id, buf->pid, save_code,
 					buf->mesg.id, ERR_DBFILOPERR, 2, fn_len, fn, save_errno);
 				break;
 			}
@@ -828,7 +837,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			{
 				buf->code = save_errno;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
+					RTS_ERROR_LITERAL("Server 27"), process_id, buf->pid,
 					save_code, buf->mesg.id, ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
 				CLOSEFILE_RESET(fd, save_errno);	/* resets "fd" to FD_INVALID */
 				break;
@@ -837,7 +846,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			{
 				buf->code = ERR_DBNOTGDS;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
+					RTS_ERROR_LITERAL("Server 28"), process_id, buf->pid,
 					save_code, buf->mesg.id, ERR_DBNOTGDS, 2, LEN_AND_STR(fn));
 				CLOSEFILE_RESET(fd, save_errno);	/* resets "fd" to FD_INVALID */
 				break;
@@ -854,7 +863,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			{
 				buf->code = save_errno;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
+					RTS_ERROR_LITERAL("Server 29"), process_id, buf->pid,
 					save_code, buf->mesg.id, ERR_DBFILOPERR, 2, LEN_AND_STR(fn), save_errno);
 				CLOSEFILE_RESET(fd, save_errno);	/* resets "fd" to FD_INVALID */
 				break;
@@ -863,7 +872,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			{
 				buf->code = ERR_DBNOTGDS;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
+					RTS_ERROR_LITERAL("Server 30"), process_id, buf->pid,
 					save_code, buf->mesg.id, ERR_DBNOTGDS, 2, LEN_AND_STR(fn));
 				CLOSEFILE_RESET(fd, save_errno);	/* resets "fd" to FD_INVALID */
 				break;
@@ -874,7 +883,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			{
 				buf->code = ERR_DBENDIAN;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
+					RTS_ERROR_LITERAL("Server 31"), process_id, buf->pid,
 					save_code, buf->mesg.id, ERR_DBENDIAN, 4, fn_len, fn, ENDIANOTHER, ENDIANTHIS);
 				CLOSEFILE_RESET(fd, save_errno);
 				break;
@@ -908,7 +917,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				{
 					buf->code = EINVAL;
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6,
-						RTS_ERROR_LITERAL("Server"), process_id,
+						RTS_ERROR_LITERAL("Server 32"), process_id,
 						buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
 						RTS_ERROR_LITERAL("Invalid header value combination"));
 					CLOSEFILE_RESET(fd, save_errno);
@@ -927,7 +936,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				{
 					buf->code = EINVAL;
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6,
-						RTS_ERROR_LITERAL("Server"), process_id,
+						RTS_ERROR_LITERAL("Server 33"), process_id,
 						buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
 						RTS_ERROR_LITERAL("Invalid header value combination"));
 					CLOSEFILE_RESET(fd, save_errno);
@@ -945,7 +954,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			{
 				buf->code = save_errno;
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-					RTS_ERROR_LITERAL("Server"), process_id,
+					RTS_ERROR_LITERAL("Server 34"), process_id,
 					buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Unable to write database file header"), save_errno);
 				CLOSEFILE_RESET(fd, save_errno);
@@ -958,7 +967,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			break;
 		default:
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_GTMSECSHRSRVFID, 6,
-				RTS_ERROR_LITERAL("Server"), process_id, buf->pid,
+				RTS_ERROR_LITERAL("Server 35"), process_id, buf->pid,
 				buf->code, buf->mesg.id, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Invalid Service Request"));
 			buf->code = 0x8000;	/* Flag for no-ack required - invalid commands get no response */
@@ -969,9 +978,9 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 /* Service request asks gtmsecshr to send a signal to a given process. Verify (as best we can) this process is running something
  * related to GT.M. Two potential methods are used:
  *
- * 1. Target process has an execution directory the same as ours ($gtm_dist). Note it is possible a target process is doing
+ * 1. Target process has an execution directory the same as ours ($ydb_dist). Note it is possible a target process is doing
  *    a call-in so this test is not always TRUE but is the faster of the two tests.
- * 2. Target process has libgtmshr.{suffix} (aka GTMSHR_IMAGE_NAME from mdefsa.h) loaded which we can tell by examining the
+ * 2. Target process has libyottadb.{suffix} (aka YOTTADB_IMAGE_NAME from mdefsa.h) loaded which we can tell by examining the
  *    open files of the target process.
  *
  * Note - this routine is currently NOT USED as it is incomplete and not yet implemented for all platforms. We leave it in here
@@ -986,7 +995,7 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 #	  define PROCPATH_MAPSSUFFIX	"/maps"
 	int	lnln, clrv, cmdbufln;
 	FILE	*procstrm;
-	char	procpath[GTM_PATH_MAX],	cmdbuf[GTM_PATH_MAX], rpcmdbuf[GTM_PATH_MAX];
+	char	procpath[YDB_PATH_MAX],	cmdbuf[YDB_PATH_MAX], rpcmdbuf[YDB_PATH_MAX];
 	char	*ppptr, *ppptr_save, *csrv, *cptr;
 
 	/* Check #1 - open /proc/<pid>/cmdline, read to first NULL - this is the command name */
@@ -1002,24 +1011,24 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 		save_errno = errno;
 		buf->code = save_errno;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-			RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
+			RTS_ERROR_LITERAL("Server 36"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Could not open /proc/<pid>/cmdline"), save_errno);
 		return save_errno;
 	}
-	FGETS(cmdbuf, GTM_PATH_MAX, procstrm, csrv);
+	FGETS(cmdbuf, YDB_PATH_MAX, procstrm, csrv);
 	if (NULL == csrv)
 	{
 		save_errno = errno;
 		buf->code = save_errno;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-			RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
+			RTS_ERROR_LITERAL("Server 37"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Could not read /proc/<pid>/cmdline"), save_errno);
 		return save_errno;
 	}
 	FCLOSE(procstrm, clrv);
 	if (-1 == clrv)
 		/* Not a functional issue so just warn about it in op-log */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_WARNING(ERR_SYSCALL), 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
 	lnln = STRLEN(cmdbuf);
 	/* Look from the end backwards to find the last '/' to isolate the directory */
 	for (cptr = cmdbuf + lnln - 1; (cptr >= cmdbuf) && ('/' != *cptr); cptr--)
@@ -1037,7 +1046,7 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 			return 0;
 		}
 	}
-	/* Check #1 failed - attempt check #2 - read /proc/<pid>/maps to see if libgtmshr is there */
+	/* Check #1 failed - attempt check #2 - read /proc/<pid>/maps to see if libyottadb is there */
 	memcpy(ppptr_save, PROCPATH_MAPSSUFFIX, SIZEOF(PROCPATH_MAPSSUFFIX));	/* Copy includes terminating null of literal */
 	Fopen(procstrm, procpath, "r");
 	if (NULL == procstrm)
@@ -1045,7 +1054,7 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 		save_errno = errno;
 		buf->code = save_errno;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
-			RTS_ERROR_LITERAL("Server"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
+			RTS_ERROR_LITERAL("Server 38"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Could not open /proc/<pid>/cmdline"), save_errno);
 		return save_errno;
 	}
@@ -1053,7 +1062,7 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 	FCLOSE(procstrm, clrv);
 	if (-1 == clrv)
 		/* Not a functional issue so just warn about it in op-log */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_WARNING(ERR_SYSCALL), 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
 #	endif
 	return 0;
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +20,8 @@
 #include "cmd.h"
 
 error_def(ERR_RPARENMISSING);
+
+LITREF	mval		literal_notimeout;
 
 int m_zallocate(void)
 {
@@ -69,12 +72,12 @@ int m_zallocate(void)
 	ref = maketriple(OC_ZALLOCATE);
 	if (TK_COLON != TREF(window_token))
 	{
-		ref->operand[0] = put_ilit(NO_M_TIMEOUT);
+		ref->operand[0] = put_lit((mval *)&literal_notimeout);
 		ins_triple(ref);
 	} else
 	{
 		advancewindow();
-		if (EXPR_FAIL == expr(&(ref->operand[0]), MUMPS_INT))
+		if (EXPR_FAIL == expr(&(ref->operand[0]), MUMPS_EXPR))
 			return EXPR_FAIL;
 		ins_triple(ref);
 		newtriple(OC_TIMTRU);

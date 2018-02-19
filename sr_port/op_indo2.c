@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +24,9 @@
 error_def(ERR_ORDER2);
 error_def(ERR_VAREXPECTED);
 
+LITREF	mval	literal_one;
+LITREF	mval	literal_minusone;
+
 void	op_indo2(mval *dst, uint4 indx, mval *direct)
 {
 	glvn_pool_entry	*slot;
@@ -33,7 +39,8 @@ void	op_indo2(mval *dst, uint4 indx, mval *direct)
 
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_NUM(direct);
-	if (!MV_IS_TRUEINT(direct, &dummy_intval) || (direct->m[1] != (1 * MV_BIAS) && direct->m[1] != (-1 * MV_BIAS)))
+	if (!MV_IS_TRUEINT(direct, &dummy_intval)
+			|| ((literal_one.m[1] != direct->m[1]) && (literal_minusone.m[1] != direct->m[1])))
 		rts_error(VARLSTCNT(1) ERR_ORDER2);
 	slot = &((TREF(glvn_pool_ptr))->slot[indx]);
 	oc = slot->sav_opcode;
@@ -44,7 +51,7 @@ void	op_indo2(mval *dst, uint4 indx, mval *direct)
 		{	/* lvn name */
 			slot->glvn_info.n++;				/* quick restore count so glvnpop works correctly */
 			/* like op_fnlvnameo2 */
-			if ((1 * MV_BIAS) == direct->m[1])
+			if (literal_one.m[1] == direct->m[1])
 				op_fnlvname(slot->lvname, FALSE, dst);
 			else
 				op_fnlvprvname(slot->lvname, dst);
@@ -53,8 +60,8 @@ void	op_indo2(mval *dst, uint4 indx, mval *direct)
 			key = (mval *)slot->glvn_info.arg[n];
 			lv = op_rfrshlvn(indx, OC_RFRSHLVN);		/* funky opcode prevents UNDEF in rfrlvn */
 			slot->glvn_info.n++;				/* quick restore count so glvnpop works correctly */
-			/* like op_fnno2 */
-			if ((1 * MV_BIAS) == direct->m[1])
+			/* like op_fno2 */
+			if (literal_one.m[1] == direct->m[1])
 				op_fnorder(lv, key, dst);
 			else
 				op_fnzprevious(lv, key, dst);
@@ -63,7 +70,7 @@ void	op_indo2(mval *dst, uint4 indx, mval *direct)
 	{	/* gvn */
 		op_rfrshgvn(indx, oc);
 		/* like op_gvno2 */
-		if ((1 * MV_BIAS) == direct->m[1])
+		if (literal_one.m[1] == direct->m[1])
 			op_gvorder(dst);
 		else
 			op_zprevious(dst);

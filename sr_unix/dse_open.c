@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,9 +46,11 @@
 #pragma pointer_size (long)
 #endif
 
-GBLREF int	(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF int	(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF spdesc stringpool;
 GBLREF gtm_chset_t	dse_over_chset;
+
+LITREF	mval		literal_zero;
 
 #ifdef	__osf__
 #pragma pointer_size (restore)
@@ -116,7 +119,7 @@ void	dse_open (void)
 		open_pars.mvtype = MV_STR;
 		open_pars.str.len = SIZEOF(open_params_list);
 		open_pars.str.addr = (char *)open_params_list;
-		(*op_open_ptr)(&val, &open_pars, 0, NULL);
+		(*op_open_ptr)(&val, &open_pars, (mval *)&literal_zero, NULL);
 		use_pars.mvtype = MV_STR;
 		use_pars.str.len = SIZEOF(use_params_list);
 		use_pars.str.addr = (char *)use_params_list;

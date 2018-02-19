@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc *
+ * Copyright 2001, 2013 Fidelity Information Services, Inc 	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,6 +42,7 @@ void gtcm_cn_disc(omi_conn *cptr, omi_conn_ll *cll)
 	int	i, nxact, nerrs;
 	int	rc;
 
+	ASSERT_IS_LIBGTCM;
 	/*  Cumulative statistics */
 	end = time((time_t *)0);
 	cll->st_cn.start      += end - cptr->stats.start;

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -14,11 +17,11 @@
 #define __ERRORSP_H__
 
 #include <setjmp.h>
-
 #include "gtm_stdio.h"
+
 #include "have_crit.h"
 #include "gtmimagename.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 
 #ifdef __MVS__
@@ -427,12 +430,19 @@ MBSTART {													\
 																\
 					intrpt_state_t			prev_intrpt_state;					\
 																\
-					/* If threads are in use, an UNWIND inside a condition-handler transitions		\
-					 * the thread from error-handling to a no-error state which can cause an		\
-					 * out-of-design situation because we assume that all threads which go			\
-					 * through any condition-handler exit and never resume execution.			\
-					 */											\
-					assert(!multi_thread_in_use);								\
+					if (multi_thread_in_use)								\
+					{	/* If threads are in use, an UNWIND inside a condition-handler transitions	\
+						 * the thread from error-handling to a no-error state. The condition handler	\
+						 * would have gotten the pthread mutex lock as part of the "rts_error_va" call	\
+						 * and that needs to be released before this thread unwinds its error context	\
+						 * (i.e. resumes normal execution). This code has some similarity to that in	\
+						 * GTM_PTHREAD_EXIT macro. In dbg, assert that we hold the thread mutex lock	\
+						 * but in pro handle the case we do not hold it (reasons unknown).		\
+						 */										\
+						assert(IS_LIBPTHREAD_MUTEX_LOCK_HOLDER);					\
+						if (IS_LIBPTHREAD_MUTEX_LOCK_HOLDER)						\
+							PTHREAD_MUTEX_UNLOCK_IF_NEEDED(FALSE);					\
+					}											\
 					assert(!process_exiting || ok_to_UNWIND_in_exit_handling);				\
 					/* When we hit an error in the midst of commit, t_ch/t_commit_cleanup should be invoked	\
 					 * and clean it up before any condition handler on the stack unwinds. 			\
@@ -568,9 +578,11 @@ CONDITION_HANDLER(dbopen_ch);
 CONDITION_HANDLER(gtmci_ch);
 CONDITION_HANDLER(gtmci_init_ch);
 CONDITION_HANDLER(gtmsecshr_cond_hndlr);
+CONDITION_HANDLER(gvcst_init_autoDB_ch);
 CONDITION_HANDLER(gvtr_tpwrap_ch);
 CONDITION_HANDLER(iob_io_error1);
 CONDITION_HANDLER(iob_io_error2);
+CONDITION_HANDLER(mu_cre_file_ch);
 CONDITION_HANDLER(mu_extract_handler);
 CONDITION_HANDLER(mu_extract_handler1);
 CONDITION_HANDLER(mu_extract_handler2);
@@ -596,6 +608,7 @@ CONDITION_HANDLER(gvcst_order_ch);
 CONDITION_HANDLER(gvcst_put_ch);
 CONDITION_HANDLER(gvcst_query_ch);
 CONDITION_HANDLER(gvcst_queryget_ch);
+CONDITION_HANDLER(gvcst_reversequery_ch);
 CONDITION_HANDLER(gvcst_zprevious_ch);
 
 CONDITION_HANDLER(gvcst_spr_data_ch);
@@ -604,6 +617,7 @@ CONDITION_HANDLER(gvcst_spr_order_ch);
 CONDITION_HANDLER(gvcst_spr_zprevious_ch);
 CONDITION_HANDLER(gvcst_spr_query_ch);
 CONDITION_HANDLER(gvcst_spr_queryget_ch);
+CONDITION_HANDLER(gvcst_spr_reversequery_ch);
 
 CONDITION_HANDLER(op_fnzpeek_ch);
 CONDITION_HANDLER(op_fnzpeek_getpool_ch);

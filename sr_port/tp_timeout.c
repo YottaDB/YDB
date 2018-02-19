@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,8 +97,6 @@
 
 /* External variables */
 GBLREF dollar_ecode_type	dollar_ecode;
-GBLREF mval			dollar_etrap;
-GBLREF mval			dollar_ztrap;
 GBLREF volatile int4		outofband;
 GBLREF xfer_entry_t     	xfer_table[];
 GBLREF boolean_t		in_timed_tn;
@@ -145,9 +144,9 @@ STATICFNDEF void tp_expire_now(void)
  */
 STATICFNDEF void tptimeout_set(int4 dummy_param)
 {
-	VMS_ONLY(int4 status;)
+	DCL_THREADGBL_ACCESS;
 
-#	ifdef UNIX
+	SETUP_THREADGBL_ACCESS;
 	/* TP timeout deferral is UNIX-only. This is because the mechanism becomes much more complicated on VMS
 	 * due to the mixing of timers and TP timeout, both of which use the same event flag so don't play well
 	 * together. It could be fixed for VMS with some perhaps non-trivial work but with VMS approaching EOL,
@@ -172,7 +171,6 @@ STATICFNDEF void tptimeout_set(int4 dummy_param)
 		DBGWTIME((stderr, "%s tptimeout_set: TP timeout *NOT* deferred - ecode index: %d  etrap: %d\n"  VMS_ONLY("\n"),
 			  asccurtime, dollar_ecode.index, ETRAP_IN_EFFECT));
 	}
-#	endif
 	if (tptimeout != outofband)
 	{
 		FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
@@ -324,5 +322,5 @@ void tp_timeout_action(void)
 	 */
 	DBGWTIME((stderr, "%s tp_timeout_action: Driving TP timeout error\n" VMS_ONLY("\n"), asccurtime));
 	tp_clear_timeout();
-	rts_error(VARLSTCNT(1) ERR_TPTIMEOUT);
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPTIMEOUT);
 }

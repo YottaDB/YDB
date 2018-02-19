@@ -41,7 +41,7 @@
 #include "gtmio.h"
 
 #ifdef DEBUG_FREEZE
-GBLREF	bool		caller_id_flag;
+GBLREF	boolean_t	caller_id_flag;
 #endif
 GBLREF	bool		in_mupip_freeze;
 GBLREF	uint4		process_id;
@@ -52,7 +52,7 @@ GBLREF	gd_region	*gv_cur_region;
 # define FREEZE_ID	((0 == user_id) ? FROZEN_BY_ROOT : user_id)
 # define FREEZE_MATCH	process_id
 # define OWNERSHIP	(in_mupip_freeze ? (csd->freeze == freeze_id) : (csd->image_count == FREEZE_MATCH))
-# define LATCH_WAIT_SEC	(5 * 60)
+# define NEG_STR(VAL)	((VAL) ? "" : "NO")
 
 #ifdef DEBUG_FREEZE
 #define SEND_FREEZEID(STATE, CSA)							\
@@ -67,7 +67,8 @@ GBLREF	gd_region	*gv_cur_region;
 error_def(ERR_FREEZEID);
 #endif
 
-error_def(ERR_DBFILERR);
+error_def(ERR_DBFREEZEON);
+error_def(ERR_DBFREEZEOFF);
 
 freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t override, boolean_t wait_for_kip,
 				uint4 online, boolean_t flush_sync)
@@ -181,8 +182,8 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 			 */
 			JNL_ENSURE_OPEN_WCS_WTSTART(csa, region, csd->n_bts, NULL, FALSE, dummy_errno);
 		}
-		while (!grab_latch(&cnl->freeze_latch, LATCH_WAIT_SEC))
-			assert(FREEZE_LATCH_HELD(csa));
+		/* Return value of "grab_latch" does not need to be checked because we pass GRAB_LATCH_INDEFINITE_WAIT as timeout */
+		grab_latch(&cnl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT);
 		rval = REG_FREEZE_SUCCESS;
 		jnl_switch_done = FALSE;
 		jpc = csa->jnl;
@@ -227,7 +228,7 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		csd->freeze = freeze_id;		/* the order of this line and the next is important */
 		csd->image_count = FREEZE_MATCH;
 		csa->freeze = TRUE;
-		csd->freeze_online = online;
+		cnl->freeze_online = online;
 		DEBUG_ONLY(cnl->freezer_waited_for_kip = wait_for_kip;)
 		SIGNAL_WRITERS_TO_RESUME(cnl);
 		DECR_INHIBIT_KILLS(cnl);
@@ -245,15 +246,17 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		SEND_FREEZEID("FREEZE", csa);
 #		endif
 		rel_latch(&cnl->freeze_latch);
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBFREEZEON, 5, REG_LEN_STR(region), NEG_STR(override), NEG_STR(online),
+								NEG_STR(online & CHILLED_AUTORELEASE_MASK));
 		return rval;
 	}
 	/* !freeze */
-	while (!grab_latch(&cnl->freeze_latch, LATCH_WAIT_SEC))
-		assert(FREEZE_LATCH_HELD(csa));
+	/* Return value of "grab_latch" does not need to be checked because we pass GRAB_LATCH_INDEFINITE_WAIT as timeout */
+	grab_latch(&cnl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT);
 	/* If there is no freeze, but there is a freeze_online, then there was an autorelease, which needs to be cleaned up
 	 * by the normal unfreeze procedure. However, we only do it in MUPIP FREEZE -OFF to ensure that the user gets a warning.
 	 */
-	cleanup_autorelease = ((0 == csd->freeze) && CHILLED_AUTORELEASE(csd) && in_mupip_freeze);
+	cleanup_autorelease = ((0 == csd->freeze) && CHILLED_AUTORELEASE(csa) && in_mupip_freeze);
 	if ((0 == csd->freeze) && !cleanup_autorelease)
 	{
 		rel_latch(&cnl->freeze_latch);
@@ -261,10 +264,10 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 	}
 	if (override || OWNERSHIP || cleanup_autorelease)
 	{
-		was_online = csd->freeze_online;
+		was_online = cnl->freeze_online;
 		csd->image_count = 0;		/* the order of this line and the next is important */
 		csd->freeze = 0;
-		csd->freeze_online = FALSE;
+		cnl->freeze_online = FALSE;
 		csa->freeze = FALSE;
 		rel_latch(&cnl->freeze_latch);
 #		ifdef DEBUG_FREEZE
@@ -279,6 +282,8 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		{
 			csa->needs_post_freeze_flushsync = TRUE;
 		}
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFREEZEOFF, 4, REG_LEN_STR(region), NEG_STR(override),
+								NEG_STR(cleanup_autorelease));
 		return rval;
 	} else
 		rel_latch(&cnl->freeze_latch);

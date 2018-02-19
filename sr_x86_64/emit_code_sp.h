@@ -2,6 +2,11 @@
  *                                                              *
  * Copyright (c) 2007-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
+ * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -37,6 +42,10 @@ void clear_memory_reg(void);
 #endif
 
 void emit_base_offset(int base, int offset);
+
+#define EMIT_BASE_OFFSET_ADDR(base, offset)		emit_base_offset(base, offset)
+#define EMIT_BASE_OFFSET_LOAD(base, offset)		emit_base_offset(base, offset)
+#define EMIT_BASE_OFFSET_EITHER(base, offset, inst)	emit_base_offset(base, offset)
 
 /*  Define the COND values for use in the 2 byte JCC instructions.. */
 #define INST_SIZE 	1

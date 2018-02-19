@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -109,9 +112,12 @@ error_def(ERR_RLNKRECLATCH);	/* needed for the RELINKCTL_CYCLE_INCR macro */
 #define	IS_INSERT		0
 #define	IS_DELETE		1
 
-#define ISSUE_REQRLNKCTLRNDWN_SYSCALL(ZRO_ENTRY_NAME, ERRSTR, ERRNO)						\
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_REQRLNKCTLRNDWN, 2, RTS_ERROR_MSTR(ZRO_ENTRY_NAME),	\
-		      ERR_SYSCALL, 5, LEN_AND_STR(ERRSTR), CALLFROM, DEBUG_ONLY(saved_errno = )ERRNO)
+error_def(ERR_REQRLNKCTLRNDWN);	/* needed for the ISSUE_REQRLNKCTLRNDWN_SYSCALL macro */
+
+#define ISSUE_REQRLNKCTLRNDWN_SYSCALL(LINKCTL, ERRSTR, ERRNO)							\
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(13)								\
+		ERR_REQRLNKCTLRNDWN, 3, LINKCTL->relinkctl_path, RTS_ERROR_MSTR(&LINKCTL->zro_entry_name), 	\
+		ERR_SYSCALL, 5, LEN_AND_STR(ERRSTR), CALLFROM, DEBUG_ONLY(saved_errno = )ERRNO)
 
 #define ISSUE_RELINKCTLERR_SYSCALL(ZRO_ENTRY_NAME, ERRSTR, ERRNO)						\
 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_RELINKCTLERR, 2, RTS_ERROR_MSTR(ZRO_ENTRY_NAME),		\
@@ -217,7 +223,7 @@ typedef struct rtnobjshm_hdr_struct
  */
 typedef struct relinkshm_hdr
 {
-	char		relinkctl_fname[GTM_PATH_MAX];	/* full path of the relinkctl file (mmr hash is in this name) */
+	char		relinkctl_fname[YDB_PATH_MAX];	/* full path of the relinkctl file (mmr hash is in this name) */
 	int		min_shm_index;
 	int		rtnobj_min_shm_index;		/* Minimum 'i' where rtnobj_shmhdr[i].rtnobj_shmid is a valid shmid */
 	int		rtnobj_max_shm_index;		/* Maximum 'i' where rtnobj_shmhdr[i-1].rtnobj_shmid is a valid shmid.
@@ -285,7 +291,7 @@ typedef struct rtnobj_hdr_struct
  */
 open_relinkctl_sgm	*relinkctl_attach(mstr *obj_container_name, mstr *objpath, int objpath_alloc_len);
 void			relinkctl_incr_nattached(void);
-int			relinkctl_get_key(char key[GTM_PATH_MAX], mstr *zro_entry_name);
+int			relinkctl_get_key(char key[YDB_PATH_MAX], mstr *zro_entry_name);
 relinkrec_t		*relinkctl_find_record(open_relinkctl_sgm *linkctl, mstr *rtnname, uint4 hash, uint4 *prev_hash_index);
 relinkrec_t		*relinkctl_insert_record(open_relinkctl_sgm *linkctl, mstr *rtnname);
 int			relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t obj_file_missing);

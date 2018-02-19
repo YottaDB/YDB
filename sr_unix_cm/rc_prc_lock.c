@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +35,7 @@
 #include "lckclr.h"
 #include "mlk_lock.h"
 #include "mlk_bckout.h"
+#include "mmrhash.h"
 
 GBLREF UINTPTR_T	rc_auxown;		/* From server, address to use in auxown field, same as OMI */
 GBLREF unsigned short	lks_this_cmd;
@@ -56,6 +61,7 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 	short		subcnt;
 	int		in_pid, locks_done, temp;
 
+	ASSERT_IS_LIBGTCM;
 	ESTABLISH_RET(rc_dbms_ch, RC_SUCCESS);
 	/*  Clean up dead locks in private list */
 	for (prior = &mlk_pvt_root; *prior; )
@@ -75,10 +81,11 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 	if (req->hdr.r.fmd.value & RC_MODE_CLEARLOCK)
 	{	/*  Loop through all the locks, unlocking ones that belong to this client */
 		for (prior = &mlk_pvt_root; *prior; )
-		{	if ((*prior)->nodptr->auxowner == rc_auxown
-					&& pid_len == (*prior)->value[(*prior)->total_length]
-					&& !memcmp(&(*prior)->value[(*prior)->total_length+1],
-					buff,pid_len))
+		{
+			MLK_PVTBLK_VALIDATE(*prior);
+			if ((*prior)->nodptr->auxowner == rc_auxown
+					&& pid_len == MLK_PVTBLK_TAIL(*prior)[0]
+					&& !memcmp(MLK_PVTBLK_TAIL(*prior) + 1, buff, pid_len))
  			{	mlk_unlock(*prior);
 				mlk_pvtblk_delete(prior);
 			}else
@@ -122,18 +129,20 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 
 			/*  Loop through all owned locks looking for requested one */
 			for (prior = &mlk_pvt_root; *prior; )
-			{	if ((*prior)->nodptr->auxowner == rc_auxown
-						&& temp == (*prior)->total_length
-						&& !memcmp(&(*prior)->value[0],key_buff,temp)
-						&& pid_len == (*prior)->value[(*prior)->total_length]
-						&& !memcmp(&(*prior)->value[(*prior)->total_length+1],
-						buff,pid_len))
-	 			{	(*prior)->level -= 1;
+			{
+				MLK_PVTBLK_VALIDATE(*prior);
+				if ((*prior)->nodptr->auxowner == rc_auxown
+						&& temp == (*prior)->nref_length
+						&& !memcmp(&(*prior)->value[0], key_buff, temp)
+						&& pid_len == MLK_PVTBLK_TAIL(*prior)[0]
+						&& !memcmp(MLK_PVTBLK_TAIL(*prior) + 1, buff, pid_len))
+	 			{
+					(*prior)->level -= 1;
 					if (!(*prior)->level)
 					{	mlk_unlock(*prior);
 						mlk_pvtblk_delete(prior);
 					}
-				}else
+				} else
 					prior = &(*prior)->next;
 			}
 		fl = (rc_lknam*)((char *)fl + sbk->len.value - 1 + SIZEOF(rc_lknam));
@@ -186,20 +195,22 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 			return -1;
 		}
 		temp += subcnt;
-		mp = (mlk_pvtblk*)malloc(SIZEOF(mlk_pvtblk) + temp + pid_len + 1);
-		memset(mp, 0, SIZEOF(mlk_pvtblk) - 1);
+		MLK_PVTBLK_ALLOC(temp, subcnt, pid_len + 1, mp);
 		mp->subscript_cnt = subcnt;
-		mp->total_length = temp;
-		memcpy(mp->value, key_buff, mp->total_length);
+		mp->nref_length = temp;
+		memcpy(mp->value, key_buff, mp->nref_length);
+		MLK_PVTBLK_SUBHASH_GEN(mp);
 		mp->region = gv_cur_region;
 		mp->ctlptr = (mlk_ctldata*)cs_addrs->lock_addrs[0];
-		mp->value[mp->total_length] = pid_len;
-		memcpy(&mp->value[mp->total_length + 1], buff, pid_len);
+		MLK_PVTBLK_TAIL(mp)[0] = pid_len;
+		memcpy(MLK_PVTBLK_TAIL(mp) + 1, buff, pid_len);
 		if (!mlk_pvtblk_insert(mp))
-		{	if (!(mp->value[mp->total_length] == mlk_pvt_root->value[mlk_pvt_root->total_length]
-				&& !memcmp(&mp->value[mp->total_length + 1], &mlk_pvt_root->value[mp->total_length + 1],
-				mp->total_length + 1)))
-			{	free(mp);	/* Server owns lock on behalf of a different agent/client pair */
+		{
+			if (!(MLK_PVTBLK_TAIL(mp)[0] == MLK_PVTBLK_TAIL(mlk_pvt_root)[0]
+				&& !memcmp(MLK_PVTBLK_TAIL(mp) + 1, MLK_PVTBLK_TAIL(mlk_pvt_root) + 1,
+						MLK_PVTBLK_TAIL(mp)[0])))
+			{
+				free(mp);	/* Server owns lock on behalf of a different agent/client pair */
 				REVERT;
 				qhdr->a.erc.value = RC_LOCKCONFLICT;
 				return 0;	/* Return lock not granted */
@@ -214,6 +225,7 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 			return -1;/* error */
 
 		}
+		MLK_PVTBLK_VALIDATE(mp);
 		fl = (rc_lknam*)((char *)fl + sbk->len.value - 1 + SIZEOF(rc_lknam));
 		sbk = &fl->sb_key;
 	}

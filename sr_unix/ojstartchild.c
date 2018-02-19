@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,6 +60,7 @@
 #include "zshow.h"
 #include "zwrite.h"
 #include "gtm_maxstr.h"
+#include "getzdir.h"
 
 GBLREF	bool			jobpid;	/* job's output files should have the pid appended to them. */
 GBLREF	volatile boolean_t	ojtimeout;
@@ -81,20 +85,10 @@ GBLREF	int			sys_nerr;
 #endif
 #endif
 
-#ifdef	__osf__
-/* environ is from the O/S which only uses 64-bit pointers on OSF/1. */
-#pragma	pointer_size (save)
-#pragma pointer_size (long)
-#endif
-
 GBLREF char		**environ;
-GBLREF char		gtm_dist[GTM_PATH_MAX];
-GBLREF boolean_t	gtm_dist_ok_to_use;
+GBLREF char		ydb_dist[YDB_PATH_MAX];
+GBLREF boolean_t	ydb_dist_ok_to_use;
 LITREF gtmImageName	gtmImageNames[];
-
-#ifdef	__osf__
-#pragma pointer_size (restore)
-#endif
 
 #define MAX_MUMPS_EXE_PATH_LEN	8192
 #define MAX_PATH		 128	/* Maximum file path length */
@@ -115,7 +109,7 @@ LITREF gtmImageName	gtmImageNames[];
 {											\
 	if (-1 != (RET_VAL = kill(PROCESS_ID, SIGNAL)))					\
 	{										\
-		/* reap the just killed child, so there wont be any zombies */		\
+		/* reap the just killed child, so there won't be any zombies */		\
 		WAITPID(PROCESS_ID, &wait_status, 0, done_pid);				\
 		assert(done_pid == PROCESS_ID);						\
 	}										\
@@ -139,6 +133,7 @@ LITREF gtmImageName	gtmImageNames[];
 	job_errno = errno;										\
 	DOWRITERC(pipe_fd, &job_errno, SIZEOF(job_errno), pipe_status);					\
 	ARLINK_ONLY(relinkctl_rundown(FALSE, FALSE));	/* do not decrement counters, just shmdt */	\
+	assert(FALSE);											\
 	UNDERSCORE_EXIT(joberr);									\
 }
 
@@ -149,6 +144,7 @@ LITREF gtmImageName	gtmImageNames[];
 	job_errno = errno;										\
 	DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);				\
 	ARLINK_ONLY(relinkctl_rundown(FALSE, FALSE));	/* do not decrement counters, just shmdt */	\
+	assert(FALSE);											\
 	UNDERSCORE_EXIT(joberr);									\
 }
 
@@ -161,7 +157,7 @@ LITREF gtmImageName	gtmImageNames[];
 }
 #endif
 
-error_def(ERR_GTMDISTUNVERIF);
+error_def(ERR_YDBDISTUNVERIF);
 error_def(ERR_JOBFAIL);
 error_def(ERR_JOBLVN2LONG);
 error_def(ERR_JOBPARTOOLONG);
@@ -194,7 +190,7 @@ static CONDITION_HANDLER(middle_child)
 	UNDERSCORE_EXIT(joberr);
 }
 
-/* Following condition handles the rts_error occurred in the grandchild before doing execv(). Sinec we have not started executing
+/* Following condition handles the rts_error occurred in the grandchild before doing execv(). Since we have not started executing
  * M-cmd specified as a part of JOB command, it is enough to print the error and exit.
  */
 static CONDITION_HANDLER(grand_child)
@@ -222,8 +218,10 @@ STATICFNDEF void job_term_handler(int sig)
 		if (0 == ret)
 			return;
 		else if (0 > ret)
+		{
+			assert(FALSE);
 			UNDERSCORE_EXIT(exit_status);
-		else
+		} else
 			return;
 }
 
@@ -371,26 +369,18 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	job_arg_count_msg	arg_count;
 	job_arg_msg		arg_msg;
 	job_buffer_size_msg	buffer_size;
-#	ifdef	__osf__
-		/* These must be O/S-compatible 64-bit pointers for OSF/1.  */
-#		pragma	pointer_size (save)
-#		pragma pointer_size (long)
-#	endif
-	char		*c1, *c2, **c3;
-	char		*argv[4];
-	char		**env_ary, **env_ind;
-	char		**new_env_cur, **new_env_top, **old_env_cur, **old_env_top, *env_end;
-#	ifdef	__osf__
-#		pragma pointer_size (restore)
-#	endif
+	char			*c1, *c2, **c3;
+	char			*argv[4];
+	char			**env_ary, **env_ind;
+	char			**new_env_cur, **new_env_top, **old_env_cur, **old_env_top, *env_end;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	/* Do the fork and exec but BEFORE that do a FFLUSH(NULL) to make sure any fclose (done in io_rundown
 	 * in the child process) does not affect file offsets in this (parent) process' file descriptors
 	 */
-	if (!gtm_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+	if (!ydb_dist_ok_to_use)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	FFLUSH(NULL);
 	FORK_RETRY(child_pid);
@@ -423,6 +413,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			joberr = joberr_pipe_mgc;
 			job_errno = errno;
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
+			assert(FALSE);
 			UNDERSCORE_EXIT(joberr);
 		}
 		if (!IS_JOB_SOCKET(jparms->input.addr, jparms->input.len))
@@ -438,6 +429,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				joberr = joberr_io_stdin_open;
 				job_errno = errno;
 				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
+				assert(FALSE);
 				UNDERSCORE_EXIT(joberr);
 			}
 			CLOSEFILE(0, rc);
@@ -447,13 +439,14 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				joberr = joberr_io_stdin_dup;
 				job_errno = errno;
 				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
+				assert(FALSE);
 				UNDERSCORE_EXIT(joberr);
 			}
-#ifdef __MVS__
+#			ifdef __MVS__
 			/* policy tagging because by default input is /dev/null */
 			if (-1 == gtm_zos_tag_to_policy(in_fd, TAG_UNTAGGED, &realfiletag))
 				TAG_POLICY_SEND_MSG(fname_buf, errno, realfiletag, TAG_UNTAGGED);
-#endif
+#			endif
 			CLOSEFILE_RESET(in_fd, rc);	/* resets "in_fd" to FD_INVALID */
 		}
 		if (0 != jparms->directory.len)
@@ -463,6 +456,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			{
 				joberr = joberr_cd_toolong;
 				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
+				assert(FALSE);
 				UNDERSCORE_EXIT(joberr);
 			}
 			strncpy(pbuff, jparms->directory.addr, jparms->directory.len);
@@ -474,7 +468,8 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				job_errno = errno;
 				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(errno), pipe_status);
 				UNDERSCORE_EXIT(joberr);
-			}
+			} else	/* update dollar_zdir with the new current working directory */
+				getzdir();
 		}
 
 		/* attempt to open output files. This also redirects stdin/out/err, so any error messages by this process during the
@@ -489,7 +484,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 * incrementing the linkctl->hdr->nattached count. This is required by the relinkctl_rundown(TRUE, FALSE)
 		 * call done as part of the RELINKCTL_RUNDOWN_MIDDLE_PARENT macro in the middle child or the grandchild.
 		 * Do this BEFORE the call to job_addr. In case that does a relinkctl_attach of a new relinkctl file,
-		 * we would increment the counter automatically so dont want that to go through a double-increment.
+		 * we would increment the counter automatically so don't want that to go through a double-increment.
 		 */
 		ARLINK_ONLY(relinkctl_incr_nattached());
 		joberr = joberr_rtn;
@@ -518,6 +513,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			job_errno = errno;
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 			ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr));
+			assert(FALSE);
 			UNDERSCORE_EXIT(joberr);
 		}
 
@@ -527,6 +523,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			job_errno = errno;
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 			ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr));
+			assert(FALSE);
 			UNDERSCORE_EXIT(joberr);
 		}
 
@@ -563,6 +560,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 						kill(child_pid, SIGTERM);
 					DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 					ARLINK_ONLY(relinkctl_rundown(FALSE, FALSE));	/* do not decrement counters, just shmdt */
+					assert(FALSE);
 					UNDERSCORE_EXIT(joberr);
 				}
 			}
@@ -576,6 +574,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 				job_errno = errno;
 				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 				ARLINK_ONLY(relinkctl_rundown(FALSE, FALSE));	/* do not decrement counters, just shmdt */
+				assert(FALSE);
 				UNDERSCORE_EXIT(joberr);
 			}
 			/* send job parameters and arguments to final mumps process over setup socket */
@@ -623,6 +622,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 					job_errno = ERR_JOBPARTOOLONG;
 					DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 					ARLINK_ONLY(relinkctl_rundown(FALSE, FALSE));	/* do not decrement counters, just shmdt */
+					assert(FALSE);
 					UNDERSCORE_EXIT(joberr);
 				}
 				if (0 == jp->parm->mvtype)
@@ -719,11 +719,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		/* Count the number of environment variables.  */
 		for (environ_count = 0, c3 = environ, c2 = *c3;  c2;  c3++, c2 = *c3)
 			environ_count++;
-#ifdef	__osf__
-/* Since we're creating an array of pointers for the O/S, make sure SIZEOF(char *) is correct for 64-bit pointers for OSF/1.  */
-#pragma	pointer_size (save)
-#pragma pointer_size (long)
-#endif
 
 		/* the environment array passed to the grandchild is constructed by prefixing the job related environment
 		 * variables ahead of the current environment (pointed to by the "environ" variable)
@@ -754,10 +749,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 */
 
 		env_ind = env_ary = (char **)malloc((environ_count + MAX_JOB_QUALS + 1)*SIZEOF(char *));
-
-#ifdef	__osf__
-#pragma pointer_size (restore)
-#endif
 
 		string_len = STRLEN("%s=%d") + STRLEN(CHILD_FLAG_ENV) + MAX_NUM_LEN - 4;
 		if (string_len >= MAX_MUMPS_EXE_PATH_LEN)
@@ -794,12 +785,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 #pragma convlit(resume)
 #endif
 		}
-
-#ifdef	__osf__
-/* Make sure SIZEOF(char *) is correct.  */
-#pragma pointer_size (save)
-#pragma pointer_size (long)
-#endif
 		/* before appending the old environment into the environment array, do not add those
 		 * lines that correspond to any of the above already initialized environment variables.
 		 * this prevents indefinite growing of the environment array with nesting of job commands
@@ -833,11 +818,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		}
 		*env_ind = NULL;	/* null terminator required by execve() */
 
-#ifdef	__osf__
-#pragma pointer_size (restore)
-#endif
-
-		c1 = gtm_dist;
+		c1 = ydb_dist;
 		string_len = STRLEN(c1);
 		if ((string_len + SIZEOF(MUMPS_EXE_STR)) < SIZEOF(tbuff))
 		{

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,8 +40,8 @@
 #include "lockconst.h"
 #include "wcs_phase2_commit_wait.h"
 
-LITREF  char                    gtm_release_name[];
-LITREF  int4                    gtm_release_name_len;
+LITREF  char                    ydb_release_name[];
+LITREF  int4                    ydb_release_name_len;
 
 error_def(ERR_MUINFOUINT8);
 
@@ -84,7 +87,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->last_com_backup = v15_csd->last_com_backup;
 	csd->last_rec_backup = v15_csd->last_rec_backup;
 	csd->reorg_restart_block = v15_csd->reorg_restart_block;		/* New from V4.2 */
-	memcpy(csd->now_running, gtm_release_name, gtm_release_name_len + 1);	/* GT.M release name */
+	memcpy(csd->now_running, ydb_release_name, ydb_release_name_len + 1);	/* YottaDB release name */
 	VMS_ONLY(csd->owner_node = v15_csd->owner_node;)
 	csd->image_count = v15_csd->image_count;
 	csd->kill_in_prog = 0;

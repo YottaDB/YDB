@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,17 +28,19 @@
 #include "gtmsource.h"
 #include "jnl_get_checksum.h"
 
-GBLREF  jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF 	jnl_gbls_t		jgbl;
 
 void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 {
 	jnl_private_control	*jpc;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 
-	assert(csa->now_crit);
+	assert(!IN_PHASE2_JNL_COMMIT(csa));
 	jpc = csa->jnl;
 	assert((0 != jpc->pini_addr)
-		|| ((off_t)jpc->jnl_buff->freeaddr > ((off_t)DISK_BLOCK_SIZE * jpc->jnl_buff->filesize) - JNL_FILE_TAIL_PRESERVE));
+		|| ((off_t)jpc->jnl_buff->rsrv_freeaddr
+				> ((off_t)DISK_BLOCK_SIZE * jpc->jnl_buff->filesize) - JNL_FILE_TAIL_PRESERVE));
 	eof_record->prefix.jrec_type = JRT_EOF;
 	eof_record->prefix.forwptr = eof_record->suffix.backptr = EOF_RECLEN;
 	eof_record->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
@@ -48,7 +50,10 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 	/* At this point jgbl.gbl_jrec_time should be set by the caller */
 	assert(jgbl.gbl_jrec_time);
 	eof_record->prefix.time = jgbl.gbl_jrec_time;
-	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa->hdr, jnlpool_ctl); /* debug-only sanity check between seqno of filehdr and jnlpool */
+	save_jnlpool = jnlpool;
+	if (csa->jnlpool && (csa->jnlpool == jnlpool))
+		jnlpool = csa->jnlpool;
+	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa, jnlpool); /* debug-only sanity check between seqno of csa->hdr and jnlpool */
 	/* In UNIX, mur_close_files, at the beginning sets both jgbl.mur_jrec_seqno and csa->hdr->reg_seqno to
 	 * murgbl.consist_jnl_seqno. Assert that this is indeed the case. However, csa->hdr->reg_seqno is NOT
 	 * maintained by rollback during forward phase of recovery and is set only at mur_close_files whereas
@@ -71,5 +76,7 @@ void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record)
 		QWASSIGN(eof_record->jnl_seqno, jgbl.mur_jrec_seqno);
 	eof_record->filler = 0;
 	eof_record->prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)eof_record, SIZEOF(struct_jrec_eof));
-	jnl_write(jpc, JRT_EOF, (jnl_record *)eof_record, NULL, NULL, NULL);
+	jnl_write(jpc, JRT_EOF, (jnl_record *)eof_record, NULL);
+	if (save_jnlpool != jnlpool)
+		jnlpool = save_jnlpool;
 }

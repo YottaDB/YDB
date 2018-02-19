@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +28,6 @@ GBLREF	hash_table_objcode	cache_table;
 GBLREF	int			indir_cache_mem_size;
 
 error_def(ERR_MEMORY);
-error_def(ERR_VMSMEMORY);
 
 void cache_table_rebuild()
 {
@@ -49,6 +51,6 @@ void cache_table_rebuild()
 	/* Only do compaction processing if we are not processing a memory type error (which
 	 * involves allocating a smaller table with storage we don't have.
 	 */
-	if (COMPACT_NEEDED(&cache_table) && error_condition != UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY))
+	if (COMPACT_NEEDED(&cache_table) && (error_condition != ERR_MEMORY))
 		compact_hashtab_objcode(&cache_table);
 }

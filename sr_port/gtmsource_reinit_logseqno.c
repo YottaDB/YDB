@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc.	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,14 +27,14 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 
-GBLREF jnlpool_addrs	jnlpool;
-GBLREF seq_num		lastlog_seqno;
-GBLREF uint4		log_interval;
-GBLREF qw_num		trans_sent_cnt, last_log_tr_sent_cnt;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;
+GBLREF seq_num			lastlog_seqno;
+GBLREF uint4			log_interval;
+GBLREF qw_num			trans_sent_cnt, last_log_tr_sent_cnt;
 
 void gtmsource_reinit_logseqno(void)
 {
-	lastlog_seqno = jnlpool.gtmsource_local->read_jnl_seqno - log_interval;
+	lastlog_seqno = jnlpool->gtmsource_local->read_jnl_seqno - log_interval;
 	trans_sent_cnt = -(qw_num)(log_interval - 1);
 	last_log_tr_sent_cnt = 0;
 }

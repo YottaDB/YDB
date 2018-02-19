@@ -88,12 +88,12 @@ void dse_dmp_fhead (void)
 {
 	boolean_t		is_mm, jnl_buff_open;
 	unsigned char		util_buff[MAX_UTIL_LEN], buffer[MAXNUMLEN];
-	int			util_len, rectype, time_len, index, activeque_cnt, freeque_cnt, wipque_cnt;
+	int			util_len, rectype, time_len, index, activeque_cnt, freeque_cnt, wipque_cnt, i, j;
 	uint4			jnl_status;
 	enum jnl_state_codes	jnl_state;
 	gds_file_id		zero_fid;
 	mval			dollarh_mval, zdate_mval;
-	char			dollarh_buffer[MAXNUMLEN], zdate_buffer[SIZEOF(DSE_DMP_TIME_FMT)];
+	char			dollarh_buffer[MAXNUMLEN], zdate_buffer[SIZEOF(DSE_DMP_TIME_FMT)], fullblockwrite_buffer[255], *k;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
@@ -166,9 +166,9 @@ void dse_dmp_fhead (void)
 		util_out_print("  Freeze match                   0x!XL", FALSE, csd->image_count ? csd->image_count : 0);
 		util_out_print("  Flush trigger         !12UL", TRUE, csd->flush_trigger);
 		util_out_print("  Freeze online                 !AD", FALSE, 11,
-					(csd->freeze_online) ? "       TRUE" : "      FALSE");
+					(cnl->freeze_online) ? "       TRUE" : "      FALSE");
 		util_out_print("  Freeze online autorelease    !AD", TRUE, 5,
-					(csd->freeze_online & CHILLED_AUTORELEASE_MASK) ? " TRUE" : "FALSE");
+					(cnl->freeze_online & CHILLED_AUTORELEASE_MASK) ? " TRUE" : "FALSE");
 		util_out_print("  Current transaction    0x!16@XQ", FALSE, &csa->ti->curr_tn);
 		util_out_print("  No. of writes/flush   !12UL", TRUE, csd->n_wrt_per_flu);
 		util_out_print("  Maximum TN             0x!16@XQ", FALSE, &csd->max_tn);
@@ -243,7 +243,8 @@ void dse_dmp_fhead (void)
 				  (RDBF_AUTODB & csd->reservedDBFlags) ? " TRUE" : "FALSE");
 		util_out_print("  DB shares gvstats            !AD", TRUE, 5,
 				  ! (RDBF_NOSTATS & csd->reservedDBFlags) ? " TRUE" : "FALSE");
-		util_out_print("  LOCK shares DB critical section     !AD", TRUE, 5, csd->lock_crit_with_db ? " TRUE" : "FALSE");
+		util_out_print("  LOCK shares DB critical section     !AD", FALSE, 5, csd->lock_crit_with_db ? " TRUE" : "FALSE");
+		util_out_print("  Read Only                      !AD", TRUE, 3, csd->read_only ? " ON" : "OFF");
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */
@@ -332,9 +333,7 @@ void dse_dmp_fhead (void)
 	}
 	if (NEED_TO_DUMP("ENVIRONMENT"))
 	{
-                util_out_print(0, TRUE);
-		util_out_print("  Full Block Writes                  !AD", FALSE, 6,
-			(csa->do_fullblockwrites) ? "    ON" : "   OFF");
+		util_out_print("  Full Block Writes                       !UL", FALSE, csa->do_fullblockwrites);
 		util_out_print("  Full Block Write Len  !12UL", TRUE, csa->fullblockwrite_len);
 	}
 	if (NEED_TO_DUMP("DB_CSH"))
@@ -390,6 +389,18 @@ void dse_dmp_fhead (void)
 		util_out_print("  bytcnt                  0x!XL", FALSE, jb->bytcnt);
 		util_out_print("      ", FALSE);
 		util_out_print("  Max_write_size          0x!XL", TRUE, jb->max_write_size);
+		util_out_print("  Reserved Free           0x!XL", FALSE, jb->rsrv_free);
+		util_out_print("      ", FALSE);
+		util_out_print("  Reserved Freeaddr       0x!XL", TRUE, jb->rsrv_freeaddr);
+		util_out_print("  Alignsize               0x!XL", FALSE, jb->alignsize);
+		util_out_print("      ", FALSE);
+		util_out_print("  Next Align Rec Addr     0x!XL", TRUE, jb->next_align_addr);
+		util_out_print("  Phase2 Commit Index1    0x!XL", FALSE, jb->phase2_commit_index1);
+		util_out_print("      ", FALSE);
+		util_out_print("  Phase2 Commit Index2    0x!XL", TRUE, jb->phase2_commit_index2);
+		util_out_print("  Phase2 Commit MaxIndex  0x!XL", FALSE, JNL_PHASE2_COMMIT_ARRAY_SIZE);
+		util_out_print("      ", FALSE);
+		util_out_print("  Phase2Commit LatchPid !12UL", TRUE, jb->phase2_commit_latch.u.parts.latch_pid);
 		util_out_print("  Before image                 !AD", FALSE, 5, (jb->before_images ? " TRUE" : "FALSE"));
 		util_out_print("      ", FALSE);
 		util_out_print("  Filesize              !12UL", TRUE, jb->filesize);

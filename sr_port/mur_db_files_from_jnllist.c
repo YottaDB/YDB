@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +62,7 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 	unsigned int		db_fname_len;
 	uint4			ustatus;
 	gld_dbname_list		head, *tdblist, *dblist = &head;
-	char 			*cptr, *ctop, *cptr_last, db_fname[MAX_FN_LEN + 1];
+	char 			*cptr, *ctop, *cptr_last, db_fname[YDB_PATH_MAX];
 	jnl_ctl_list		jctl_temp, *jctl = &jctl_temp;
 	jnl_file_header		*jfh;
 #if defined(VMS)
@@ -87,12 +90,12 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 	{
 		seg = reg->dyn.addr;
 		if (!get_full_path((char *)seg->fname, (unsigned int)seg->fname_len,
-					(char *)&db_fname[0], &db_fname_len, MAX_FN_LEN, &ustatus))
+					(char *)&db_fname[0], &db_fname_len, YDB_PATH_MAX, &ustatus))
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, seg->fname_len, seg->fname, ustatus);
 			return NULL;
 		}
-		assert(db_fname_len);
+		assert(db_fname_len && (db_fname_len < MAX_FN_LEN + 1));
 		seg->fname_len = db_fname_len;
 		memcpy(seg->fname, &db_fname[0], db_fname_len);
 		/* This code is lifted from the tail of "mu_gv_cur_reg_init". Any changes here need to be reflected there */

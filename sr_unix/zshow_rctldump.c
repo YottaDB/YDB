@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -66,7 +69,7 @@ void	zshow_rctldump(zshow_out *output)
 		nbytes = SNPRINTF(buff, SIZEOF(buff), "# of attached processes  : %d", hdr->nattached);
 		DUMP_ONE_LINE(output, buff, nbytes);
 		nbytes = SNPRINTF(buff, SIZEOF(buff), "Relinkctl shared memory  : shmid: %d  shmlen: 0x%llx",
-			hdr->relinkctl_shmid, hdr->relinkctl_shmlen);
+			hdr->relinkctl_shmid, (unsigned long long)hdr->relinkctl_shmlen);
 		DUMP_ONE_LINE(output, buff, nbytes);
 		shm_hdr = GET_RELINK_SHM_HDR(linkctl);
 		for (i = 0, j = 1; i < NUM_RTNOBJ_SHM_INDEX; i++)

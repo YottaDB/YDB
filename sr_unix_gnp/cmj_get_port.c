@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +36,7 @@ cmi_status_t cmj_get_port(cmi_descriptor *tnd, unsigned short *outport)
 	struct servent *s;
 	unsigned short myport;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	/*
 	 * port number determination:
 	 *

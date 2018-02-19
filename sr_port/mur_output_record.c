@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -124,6 +124,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 			break;
 	}
 	jgbl.gbl_jrec_time = rec->prefix.time;
+	/* Since we would have returned for the JRT_ALIGN case above, we can safely use rec->prefix.pini_addr below */
 	pini_addr = rec->prefix.pini_addr;
 	reg = rctl->gd;
 	jctl = rctl->jctl;
@@ -408,7 +409,7 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 			{
 				assert(plst->new_pini_addr == csa->jnl->pini_addr);
 				if (0 != csa->jnl->pini_addr)
-					jnl_put_jrt_pfin(csa);
+					jnl_write_pfin(csa);
 			} else
 			{
 				if (SS_NORMAL != csa->jnl->status)

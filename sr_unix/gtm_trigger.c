@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -87,9 +90,6 @@ GBLREF	unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF	symval			*curr_symval;
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
-GBLREF	mval			dollar_etrap;
-GBLREF	mval			dollar_ztrap;
-GBLREF	mval			gtm_trigger_etrap;
 GBLREF	mstr			*dollar_ztname;
 GBLREF	mval			*dollar_ztdata;
 GBLREF	mval			*dollar_ztdelim;
@@ -307,9 +307,9 @@ STATICFNDEF int gtm_trigger_invoke(void)
 
 int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 {
-	char		rtnname[GTM_PATH_MAX + 1], rtnname_template[GTM_PATH_MAX + 1];
-	char		objname[GTM_PATH_MAX + 1];
-	char		zcomp_parms[(GTM_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)
+	char		rtnname[YDB_PATH_MAX + 1], rtnname_template[YDB_PATH_MAX + 1];
+	char		objname[YDB_PATH_MAX + 1];
+	char		zcomp_parms[(YDB_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)
 				    + SIZEOF(EMBED_SOURCE_PARM)];
 	mstr		save_zsource;
 	int		rtnfd, rc, lenrtnname, lenobjname, len, retry, save_errno;
@@ -368,9 +368,9 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	}
 	/* Write trigger execute string out to temporary file and compile it */
 	assert(MAX_XECUTE_LEN >= trigdsc->xecute_str.str.len);
-	rc = SNPRINTF(rtnname_template, GTM_PATH_MAX, "%s/trgtmpXXXXXX", DEFAULT_GTM_TMP);
+	rc = SNPRINTF(rtnname_template, YDB_PATH_MAX, "%s/trgtmpXXXXXX", DEFAULT_GTM_TMP);
 	assert(0 < rc);					/* Note rc is return code aka length - we expect a non-zero length */
-	assert(GTM_PATH_MAX >= rc);
+	assert(YDB_PATH_MAX >= rc);
 	/* The mkstemp() routine is known to bogus-fail for no apparent reason at all especially on AIX 6.1. In the event
 	 * this shortcoming plagues other platforms as well, we add a low-cost retry wrapper.
 	 */
@@ -519,7 +519,9 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	uint4		dollar_tlevel_start;
 	stack_frame	*fp;
 	intrpt_state_t	prev_intrpt_state;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(!skip_dbtriggers);	/* should not come here if triggers are not supposed to be invoked */
 	assert(trigdsc);
 	assert(trigprm);
@@ -632,21 +634,20 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		mv_st_ent->mv_st_cont.mvs_trigr.gtm_trigger_depth_save = gtm_trigger_depth;
 		if (0 == gtm_trigger_depth)
 		{	/* Only back up $*trap settings when initiating the first trigger level */
-			mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save = dollar_etrap;
-			mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save = dollar_ztrap;
+			mv_st_ent->mv_st_cont.mvs_trigr.dollar_etrap_save = TREF(dollar_etrap);
+			mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save = TREF(dollar_ztrap);
 			mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save = ztrap_explicit_null;
-			dollar_ztrap.str.len = 0;
+			(TREF(dollar_ztrap)).str.len = 0;
 			ztrap_explicit_null = FALSE;
-			if (NULL != gtm_trigger_etrap.str.addr)
+			if (NULL != (TREF(gtm_trigger_etrap)).str.addr)
 				/* An etrap was defined for the trigger environment - Else existing $etrap persists */
-				dollar_etrap = gtm_trigger_etrap;
+				TREF(dollar_etrap) = TREF(gtm_trigger_etrap);
 		}
 		mv_st_ent->mv_st_cont.mvs_trigr.mumps_status_save = mumps_status;
 		mv_st_ent->mv_st_cont.mvs_trigr.run_time_save = run_time;
 		/* See if a MERGE launched the trigger. If yes, save some state so ZWRITE, ZSHOW and/or MERGE can be
 		 * run in the trigger we dispatch. */
 		PUSH_MVST_MRGZWRSV_IF_NEEDED;
-		mumps_status = 0;
 		run_time = TRUE;	/* Previous value saved just above restored when frame pops */
 	} else
 	{	/* Trigger base frame exists so reinitialize the symbol table for new trigger invocation */
@@ -666,12 +667,14 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		extnam_str.len = mv_st_ent->mv_st_cont.mvs_trigr.savextref.len;
 		if (extnam_str.len)
 			memcpy(extnam_str.addr, mv_st_ent->mv_st_cont.mvs_trigr.savextref.addr, extnam_str.len);
-		mumps_status = 0;
 		assert(run_time);
 		/* Note we do not reset the handlers for parallel triggers - set one time only when enter first level
 		 * trigger. After that, whatever happens in trigger world, stays in trigger world.
 		 */
 	}
+	mumps_status = 0;			/* Reset later by dm_start - this is just clearing any setting that
+						 * is irrelevant in the trigger frame.
+						 */
 	assert(frame_pointer->type & SFT_TRIGR);
 #	ifdef DEBUG
 	gtm_trigdsc_last = trigdsc;
@@ -881,7 +884,7 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	int		size;
 	stack_frame	*fp;
 
-	/* TODO: We don't expect the trigger source to exist now the gtm_trigger cleans it up ASAP. Remove it after a few releases */
+	/* TODO: We don't expect the trigger source to exist now gtm_trigger cleans it up ASAP. Remove it after a few releases */
 	assert (0 == trigdsc->xecute_str.str.len);
 	/* First thing to do is release trigger source field if it exists */
 	if (0 < trigdsc->xecute_str.str.len)
@@ -898,6 +901,9 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	/* Verify trigger routine we want to remove is not currently active. If it is, we need to assert fail.
 	 * Triggers are not like regular routines since they should only ever be referenced from the stack during a
 	 * transaction. Likewise, we should only ever load the triggers as the first action in that transaction.
+	 * Note, we can use SKIP_BASE_FRAME in the "for" statement here where we cannot in other places. In those
+	 * other places, we want the checks done in SKIP_BASE_FRAME to be applicable to "fp" in the first iteration
+	 * but here it is impossible for the first frame we look at to be either a trigger or call-in frame.
 	 */
 #	ifdef DEBUG
 	for (fp = frame_pointer; NULL != fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))

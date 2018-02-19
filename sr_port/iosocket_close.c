@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,13 +21,10 @@
 
 #include "gtm_string.h"
 #include "gtm_iconv.h"
-#ifndef  VMS
 #include "gtm_stat.h"
 #include "gtmio.h"
-#endif
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
-
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 
@@ -42,12 +39,12 @@
 #include "gtm_tls.h"
 #endif
 #include "error.h"
+#include "op.h"
+#include "indir_enum.h"
 
 GBLREF	io_desc		*active_device;
 GBLREF	int		process_exiting;
-#ifndef VMS
 GBLREF	boolean_t	gtm_pipe_child;
-#endif
 
 LITREF unsigned char		io_params_size[];
 
@@ -71,7 +68,9 @@ void iosocket_close(io_desc *iod, mval *pp)
 	boolean_t	socket_destroy = FALSE;
 	boolean_t	socket_delete = FALSE;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(iod->type == gtmsocket);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
@@ -81,9 +80,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 		switch (ch)
 		{
 		case iop_exception:
-			iod->error_handler.len = (int)(*(pp->str.addr + p_offset));
-			iod->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
-			s2pool(&iod->error_handler);
+			DEF_EXCEPTION(pp, p_offset, iod);
 			break;
 		case iop_socket:
 			handle_len = (int)(*(pp->str.addr + p_offset));
@@ -92,8 +89,8 @@ void iosocket_close(io_desc *iod, mval *pp)
 			socket_specified = TRUE;
 			break;
 		case iop_ipchset:
-#			if defined(KEEP_zOS_EBCDIC) || defined(VMS)
-			if ( (iconv_t)0 != iod->input_conv_cd )
+#			if defined(KEEP_zOS_EBCDIC)
+			if ((iconv_t)0 != iod->input_conv_cd)
 			{
 				ICONV_CLOSE_CD(iod->input_conv_cd);
 			}
@@ -102,9 +99,9 @@ void iosocket_close(io_desc *iod, mval *pp)
 				ICONV_OPEN_CD(iod->input_conv_cd, INSIDE_CH_SET, (char *)(pp->str.addr + p_offset + 1));
 #			endif
 			break;
-                case iop_opchset:
-#			if defined(KEEP_zOS_EBCDIC) || defined(VMS)
-			if ( (iconv_t)0 != iod->output_conv_cd )
+		case iop_opchset:
+#			if defined(KEEP_zOS_EBCDIC)
+			if ((iconv_t)0 != iod->output_conv_cd)
 			{
 				ICONV_CLOSE_CD(iod->output_conv_cd);
 			}
@@ -119,11 +116,9 @@ void iosocket_close(io_desc *iod, mval *pp)
 		case iop_nodestroy:
 			socket_destroy = FALSE;
 			break;
-#		ifndef VMS
 		case iop_delete:
 			socket_delete = TRUE;
 			break;
-#		endif
 		default:
 			break;
 		}
@@ -169,17 +164,14 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 	int		rc, save_fd, save_rc = 0, save_errno;
 	ssize_t		status;
 	socket_struct	*socketptr;
-#	ifndef VMS
 	struct stat	statbuf, fstatbuf;
 	char		*path;
 	int		res;
 	int		null_fd = 0;
-#	endif
 
 	for (ii = start; ii >= end; ii--)
 	{
 		socketptr = dsocketptr->socket[ii];
-#		ifndef VMS
 		/* Don't reap if in a child process creating a new job or pipe device */
 		if ((socket_local == socketptr->protocol) && socketptr->passive && !gtm_pipe_child)
 		{	/* only delete if passive/listening */
@@ -197,7 +189,6 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("unlink during socket delete"), CALLFROM, errno);
 		}
-#		endif
 		/* below is similar to iosocket_flush but socketptr may not be current socket */
 		if (socketptr->obuffer_timer_set)
 		{
@@ -227,7 +218,6 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 			save_fd = socketptr->sd;
 			save_errno = errno;
 		}
-#		ifndef VMS
 		else if (!process_exiting && (3 > socketptr->sd))
 		{
 			OPENFILE("/dev/null", O_RDWR, null_fd);
@@ -237,7 +227,6 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 			}
 			assert(socketptr->sd == null_fd);
 		}
-#		endif
 		SOCKET_FREE(socketptr);
 		if (dsocketptr->current_socket >= ii)
 			dsocketptr->current_socket--;
@@ -249,12 +238,10 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CLOSEFAIL, 1, save_fd, save_errno);
 	}
-#	ifndef VMS
 	else if (-1 == null_fd)
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILEOPENFAIL, 2, LIT_AND_LEN("/dev/null"), save_errno, 0);
 	}
-#	endif
 }
 
 void iosocket_close_one(d_socket_struct *dsocketptr, int index)

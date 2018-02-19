@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,6 +35,8 @@
 #include "gtcmd.h"
 #include "send_msg.h"
 #include "targ_alloc.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
 GBLREF	cm_region_head		*reglist;
 GBLREF	gd_region		*gv_cur_region;
@@ -53,6 +58,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 	boolean_t		was_crit;
 	int4			rundown_status = EXIT_NRM;			/* if "gds_rundown" went smoothly */
 
+	ASSERT_IS_LIBGNPSERVER;
 	for (ptr = cnx->region_root;  ptr;)
 	{
 		region = ptr->reghead;
@@ -66,7 +72,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 			if (JNL_ENABLED(cs_data))
 			{
 				jpc->pini_addr = ptr->pini_addr;
-				SET_GBL_JREC_TIME; /* jnl_ensure_open/jnl_put_jrt_pfin needs this to be set */
+				SET_GBL_JREC_TIME; /* jnl_ensure_open/jnl_write_pfin needs this to be set */
 				jbp = jpc->jnl_buff;
 				/* Before writing to jnlfile, adjust jgbl.gbl_jrec_time if needed to maintain time order
 				 * of jnl records.  This needs to be done BEFORE the jnl_ensure_open as that could write
@@ -77,7 +83,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 				if (0 == jnl_status)
 				{
 					if (0 != jpc->pini_addr)
-						jnl_put_jrt_pfin(cs_addrs);
+						jnl_write_pfin(cs_addrs);
 				} else
 					send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) jnl_status, 4,
 							JNL_LEN_STR(cs_data), DB_LEN_STR(gv_cur_region));
@@ -86,7 +92,7 @@ void gtcmd_rundown(connection_struct *cnx, bool clean_exit)
 				rel_crit(gv_cur_region);
 		}
 		refcnt = --region->refcnt;
-		/* Dont know how refcnt can become negative but in pro handle it by bypassing this region. The reason is the
+		/* Don't know how refcnt can become negative but in pro handle it by bypassing this region. The reason is the
 		 * following. refcnt should have originally been a positive value. Every time this function is invoked, it would
 		 * be decremented by one. There should have been one invocation that saw refcnt to be zero. That would have
 		 * done the rundown of the region or if it is still in the stack the rundown is still in progress. Therefore

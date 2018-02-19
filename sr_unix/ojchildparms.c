@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -271,7 +274,8 @@ STATICFNDEF void receive_child_locals_init(char **local_buff, mval **command_str
 	PUSH_MV_STENT(MVST_MVAL);
 	*command_str = &mv_chain->mv_st_cont.mvs_mval;
 	/* Setup the base frame */
-	base_addr = make_cimode();
+	base_addr = make_dmode();	/* This isn't a direct mode frame - just gives the frame some context so the base-frame
+					 * unwinds correctly */
 	base_frame(base_addr);
 	/* Finish base frame initialization - reset mpc/context to return to us without unwinding base frame */
 	frame_pointer->mpc = CODE_ADDRESS(gtm_levl_ret_code);

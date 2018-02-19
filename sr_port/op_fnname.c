@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,10 +28,12 @@
 #include "op.h"
 #include "gvsub2str.h"
 #include "mvalconv.h"
+#include "get_reference.h"	/* for get_reference() prototype */
 
 GBLREF gv_key		*gv_currkey;
-GBLREF spdesc		stringpool;
+GBLREF mstr		extnam_str;
 GBLREF mv_stent		*mv_chain;
+GBLREF spdesc		stringpool;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 
 error_def(ERR_MAXSTRLEN);
@@ -96,16 +99,13 @@ error_def(ERR_STACKCRIT);
 */
 void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 {
-	int		space_needed;
-	int 		depth_count, fnname_type;
-	mval		*dst, *arg, *depth;
-	VMS_ONLY(int	sub_count;)
+	int 		depth_count, fnname_type, len, space_needed;;
+	mval		*arg, *depth, *dst;
 	mstr		format_out, opstr;
 	va_list		var;
-	unsigned char	*sptr, *key_ptr, *key_top;
+	unsigned char	*key_ptr, *key_top, *sptr;
 
 	VAR_START(var, finaldst);
-	VMS_ONLY(va_count(sub_count);)
 	assert(3 <= sub_count);
 	fnname_type = va_arg(var, int);
 	depth = va_arg(var, mval *); /* if second arg to $NAME not specified, compiler sets depth_count to MAXPOSINT4 */
@@ -141,21 +141,24 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 		/* Reserve enough space for naked reference. Include space for ^() and a maximum of sub_count ',' separators for
 		 * subscripts specified as arguments to $NAME() in addition to those in the naked reference
 		 */
-		space_needed = (int)((STR_LIT_LEN("^()") + ZWR_EXP_RATIO(MAX_KEY_SZ) + sub_count));
+		space_needed = MAX_ZWR_KEY_SZ + (!extnam_str.len ? 0 : ((extnam_str.len * 2) + SIZEOF("^|\"\"|")));
 		TEST_FAKE_STRINGPOOL_FULL;
 		ENSURE_STP_FREE_SPACE(space_needed);
 		sptr = stringpool.free;
-		*sptr++ = '^';
-		key_ptr = (unsigned char *)&gv_currkey->base[0];
-		key_top = (unsigned char *)&gv_currkey->base[gv_currkey->prev];
-		for ( ; (*sptr = *key_ptr++); sptr++)
+		get_reference(dst);							/*this handles any extended reference */
+		assert(dst->str.len);							/* should have caused GVNAKED error above */
+		assert(dst->str.addr == (char *)sptr);
+		for (len = dst->str.len; ('(' != *sptr++) && len--;)			/* step past the name returned */
 			;
+		assert(0 < len);							/* otherwise GVNAKED error above */
 		if (0 != depth_count)
-		{
-			*sptr++ = '(';
-			if (key_ptr < key_top)
+		{	/* the return from get_reference already has text, but this needs to count subscripts */
+			key_top = (unsigned char *)&gv_currkey->base[gv_currkey->prev];
+			for (key_ptr = (unsigned char *)&gv_currkey->base[0]; *key_ptr; key_ptr++)	/* step past name in key */
+				;
+			if (++key_ptr < key_top)
 			{
-				for ( ; ; )
+				do
 				{
 					opstr.addr = (char *)sptr;
 					opstr.len = space_needed;
@@ -168,13 +171,12 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 					if (0 == depth_count       /* fewer subscripts requested than in naked reference */
 					    || key_ptr >= key_top) /* more subscripts requested than in naked reference */
 						break;
-				}
+				} while (depth_count);
 			}
 			/* Naked reference copied, now copy remaining subscripts. From this point on, maintain dst to protect
 			 * against potential string shuffling by mval_lex->stp_gcol
 			 */
-			dst->str.len = INTCAST(sptr - stringpool.free);
-			dst->str.addr = (char *)stringpool.free;
+			dst->str.len = INTCAST((char *)sptr - dst->str.addr);
 			assert(dst->str.len < space_needed);
 			stringpool.free = sptr;
 			depth_count = ((sub_count < depth_count) ? sub_count : depth_count);
@@ -188,10 +190,10 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 			}
 			*stringpool.free++ = ')';
 			dst->str.len++;
+			assert((unsigned char *)(dst->str.addr + dst->str.len) == stringpool.free);
 		} else
 		{ /* naked reference, zero depth => result is just the global name */
-			dst->str.len = INTCAST(sptr - stringpool.free);
-			dst->str.addr = (char *)stringpool.free;
+			dst->str.len = INTCAST((char *)sptr - dst->str.addr - 1);
 			assert(dst->str.len < space_needed);
 			stringpool.free = sptr;
 		}

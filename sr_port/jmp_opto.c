@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -139,7 +140,7 @@ LITDEF readonly jump_opto_struct jump_opto_table[NUM_JO_TBL_ELE] =
 			 JOPT_NO_OPT	/* RET */
 		}
 	},
-	{	OC_HALT,	/* opcode */
+	{	OC_ZHALT,	/* opcode */
 		9,		/* index */
 		{
 			 JOPT_NO_OPT,	/* OC_JMP */		 JOPT_NO_OPT,	/* OC_JMPTSET */
@@ -320,7 +321,7 @@ void jmp_opto(void)
 							i = NO_ENTRY;
 						break;
 					default:
-						GTMASSERT;
+						assertpro(FALSE && p[i]);
 						break;
 				} /* switch */
 			} /* while  */

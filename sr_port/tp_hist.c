@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -13,6 +16,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "gdsblk.h"
@@ -25,7 +29,6 @@
 #include "copy.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "longcpy.h"
 #include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "longset.h"		/* needed for cws_insert.h */
@@ -471,9 +474,14 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 			rel_crit(gv_cur_region);
 	}
 	if (si->start_tn <= cnl->last_wcs_recover_tn)
-	{
+	{	/* Note that it is possible that gvt->clue.end is non-zero even in the final retry (e.g. if we encounter
+		 * this gvt for the first time in the final retry). If so, t1->tn would be set (by "gvcst_search" done in
+		 * the caller) to the tn when the clue got set which could be stale compared to cnl->last_wcs_recover_tn
+		 * (if this gvt was never accessed after the most recent "wcs_recover"). In that case, t1->tn would get
+		 * copied over to si->start_tn above and we will reach here. We should restart in this situation
+		 * (i.e. cdb_sc_wcs_recover is a valid final retry restart code in TP).
+		 */
 		status = cdb_sc_wcs_recover;
-		assert(CDB_STAGNATE > t_tries);
 	}
 	/* If validation has succeeded, assert that if gtm_gvundef_fatal is non-zero, then we better not signal a GVUNDEF */
 	assert((cdb_sc_normal != status) || !TREF(gtm_gvundef_fatal) || !ready2signal_gvundef_lcl);
@@ -496,7 +504,7 @@ void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 	assert(si->cur_tp_hist_size < si->tp_hist_size);
 	si->cur_tp_hist_size <<= 1;
 	new_first_tp_hist = (srch_blk_status *)malloc(SIZEOF(srch_blk_status) * si->cur_tp_hist_size);
-	longcpy((uchar_ptr_t)new_first_tp_hist, (uchar_ptr_t)si->first_tp_hist,
+	memcpy((uchar_ptr_t)new_first_tp_hist, (uchar_ptr_t)si->first_tp_hist,
 		(sm_uc_ptr_t)si->last_tp_hist - (sm_uc_ptr_t)si->first_tp_hist);
 	delta = (sm_long_t)((sm_uc_ptr_t)new_first_tp_hist - (sm_uc_ptr_t)si->first_tp_hist);
 	for (tabent = si->blks_in_use->base, topent = si->blks_in_use->top; tabent < topent; tabent++)

@@ -1,7 +1,13 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
+ * Copyright (c) 2018 Stephen L Johnson.			*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -602,17 +608,19 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 		while (timeroot)
 		{
 			eltime = sub_abs_time((ABS_TIME *)&timeroot->expir_time, curr_time);
-			/* If nothing has expired yet, break. */
-			if (((0 <= eltime.at_sec) && !((0 == eltime.at_sec) && (0 == eltime.at_usec))) || (0 < timer_stack_count))
+			if (((0 <= eltime.at_sec) && !((0 == eltime.at_sec) && (0 == eltime.at_usec))))
+			{	/* Timer isn't due yet, so set signal to fire at proper time. */
+				deferred_timers_check_needed = FALSE;
+				SYS_SETTIMER(timeroot, &eltime);
 				break;
+			}
+			else if (0 < timer_stack_count)
+			{	/* Timer has expired, but we can't fire it now, so defer. */
+				deferred_timers_check_needed = TRUE;
+				break;
+			}
 			/* Otherwise, drive the handler. */
 			timer_handler(DUMMY_SIG_NUM);
-		}
-		/* Do we still have a timer to set? */
-		if (timeroot)
-		{
-			deferred_timers_check_needed = FALSE;
-			SYS_SETTIMER(timeroot, &eltime);
 		}
 	} else if (0 < safe_timer_cnt)
 	{	/* There are some safe timers on the queue. */
@@ -715,13 +723,13 @@ STATICFNDEF void timer_handler(int why)
 		cmp = abs_time_comp(&at, (ABS_TIME *)&tpop->expir_time);
 		if (cmp < 0)
 			break;
-#		if defined(DEBUG) && !defined(_AIX)
+#		if defined(DEBUG) && !defined(_AIX) && !defined(__armv6l__) && !defined(__armv7l__)
 		if (tpop->safe && (TREF(continue_proc_cnt) == last_continue_proc_cnt)
 			&& !(gtm_white_box_test_case_enabled
 				&& (WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == gtm_white_box_test_case_number)))
 		{	/* Check if the timer is extremely overdue, with the following exceptions:
 			 *	- Unsafe timers can be delayed indefinitely.
-			 *	- AIX systems tend to arbitrarily delay processes when loaded.
+			 *	- AIX and ARM systems tend to arbitrarily delay processes when loaded.
 			 *	- WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP stops the process from running.
 			 *	- Some other mechanism causes a SIGSTOP/SIGCONT, bumping continue_proc_cnt.
 			 */
@@ -976,7 +984,11 @@ STATICFNDEF void remove_timer(TID tid)
 		if (tprev)
 			tprev->next = tp->next;
 		else
+		{
 			timeroot = tp->next;
+			if (NULL == timeroot)
+				deferred_timers_check_needed = FALSE;	/* assert in fast path of "clear_timers" relies on this */
+		}
 		if (tp->safe)
 			safe_timer_cnt--;
 		tp->next = (GT_TIMER *)timefree;	/* place element on free queue */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,6 +52,7 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 	const err_ctl	*ctl;
 	boolean_t	freeze_needed = FALSE;
 	char		*rname;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* used by CHECK_IF_FREEZE_ON_ERROR_NEEDED and FREEZE_INSTANCE_IF_NEEDED */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -75,7 +76,7 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 	for (; ; )
 	{
 		msg_id = va_arg(var, int);
-		CHECK_IF_FREEZE_ON_ERROR_NEEDED(csa, msg_id, freeze_needed, freeze_msg_id);
+		CHECK_IF_FREEZE_ON_ERROR_NEEDED(csa, msg_id, freeze_needed, freeze_msg_id, local_jnlpool);
 		--arg_count;
 		if (NULL == (ctl = err_check(msg_id)))
 			msg = NULL;
@@ -135,5 +136,5 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 		if (!IS_GTMSECSHR_IMAGE)
 			util_out_print("!/", NOFLUSH);
 	}
-	FREEZE_INSTANCE_IF_NEEDED(csa, freeze_needed, freeze_msg_id);
+	FREEZE_INSTANCE_IF_NEEDED(csa, freeze_needed, freeze_msg_id, local_jnlpool);
 }

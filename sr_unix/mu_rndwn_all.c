@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -90,11 +93,14 @@ MBSTART {														\
 			SHMID, LEN_AND_STR(FNAME));									\
 } MBEND
 
-GBLREF gd_region        *gv_cur_region;
-GBLREF semid_queue_elem	*keep_semids;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	mval			dollar_zdir;
+GBLREF	semid_queue_elem	*keep_semids;
+GBLREF	uid_t			user_id;
+GBLREF	uint4			process_id;
 
-LITREF char             gtm_release_name[];
-LITREF int4             gtm_release_name_len;
+LITREF char             ydb_release_name[];
+LITREF int4             ydb_release_name_len;
 
 error_def(ERR_DBFILERR);
 error_def(ERR_MUFILRNDWNFL2);
@@ -102,6 +108,7 @@ error_def(ERR_MUFILRNDWNSUC);
 error_def(ERR_MUJPOOLRNDWNFL);
 error_def(ERR_MUJPOOLRNDWNSUC);
 error_def(ERR_MUNOTALLSEC);
+error_def(ERR_MURNDWNARGLESS);
 error_def(ERR_MURPOOLRNDWNFL);
 error_def(ERR_MURPOOLRNDWNSUC);
 error_def(ERR_SEMREMOVED);
@@ -197,6 +204,9 @@ int mu_rndwn_all(void)
 	char			*fname, *fgets_res;
 	shm_parms		*parm_buff;
 
+	/* Record the start of an argumentless MUPIP RUNDOWN with current directory info. Useful for debugging purposes */
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MURNDWNARGLESS, 4, process_id, user_id,
+									dollar_zdir.str.len, dollar_zdir.str.addr);
 	if (NULL == (pf = POPEN(IPCS_CMD_STR ,"r")))
         {
 		save_errno = errno;
@@ -445,7 +455,7 @@ boolean_t validate_replpool_shm_entry(shm_parms *parm_buff, replpool_id_ptr_t re
 			util_out_print("Cannot rundown replpool shmid = !UL as it has format !AD "
 				"created by !AD but this mupip is version and uses format !AD",
 				TRUE, shmid, GDS_LABEL_SZ - 1, replpool_id->label,
-				LEN_AND_STR(replpool_id->now_running), gtm_release_name_len, gtm_release_name,
+				LEN_AND_STR(replpool_id->now_running), ydb_release_name_len, ydb_release_name,
 				GDS_LABEL_SZ - 1, GDS_RPL_LABEL);
 			*exit_stat = ERR_MUNOTALLSEC;
 		}

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +20,7 @@ GBLREF	uint4		process_id;
 GBLREF	mlk_pvtblk	*mlk_pvt_root;
 GBLREF	mlk_stats_t	mlk_stats;			/* Process-private M-lock statistics */
 
-void zshow_locks(zshow_out *output)
+void zshow_locks(zshow_out *output, boolean_t total_only)
 {
 	static readonly char zal[] = "ZAL ";
 	static readonly char lck[] = "LOCK ";
@@ -40,7 +41,6 @@ void zshow_locks(zshow_out *output)
 	v.str.len = (mstr_len_t)(ptr - &valstr[0]);
 	v.str.addr = (char *)&valstr[0];
 	zshow_output(output, &v.str);
-
 	/* Print LUF statistic */
 	output->flush = FALSE;
 	v.str.addr = &mlt[0];
@@ -53,54 +53,56 @@ void zshow_locks(zshow_out *output)
 	output->flush = TRUE;
 	v.str.len = 0;
 	zshow_output(output,&v.str);
-
-	for (temp = mlk_pvt_root; temp; temp = temp->next)
+	if (!total_only)
 	{
-		if (!temp->granted)
-			continue;
-		if (temp->nodptr && (temp->nodptr->owner != process_id
-			|| temp->sequence != temp->nodptr->sequence))
-			continue;
-		output->flush = FALSE;
-		if (temp->level && temp->zalloc)
+		for (temp = mlk_pvt_root; temp; temp = temp->next)
 		{
-			v.str.addr = &zal[0];
-			v.str.len = SIZEOF(zal) - 1;
-			zshow_output(output,&v.str);
-			zshow_format_lock(output,temp);
-			output->flush = TRUE;
-			v.str.len = 0;
-			zshow_output(output,&v.str);
+			if (!temp->granted)
+				continue;
+			if (temp->nodptr && (temp->nodptr->owner != process_id
+				|| temp->sequence != temp->nodptr->sequence))
+				continue;
 			output->flush = FALSE;
-			v.str.addr = &lck[0];
-			v.str.len = SIZEOF(lck) - 1;
-			zshow_output(output,&v.str);
-			zshow_format_lock(output,temp);
-			v.str.addr = &lvl[0];
-			v.str.len = SIZEOF(lvl) - 1;
-			zshow_output(output,&v.str);
-			MV_FORCE_MVAL(&v,(int)temp->level) ;
-			mval_write(output,&v,TRUE);
-		} else if (temp->level)
-		{
-			v.str.addr = &lck[0];
-			v.str.len = SIZEOF(lck) - 1;
-			zshow_output(output,&v.str);
-			zshow_format_lock(output,temp);
-			v.str.addr = &lvl[0];
-			v.str.len = SIZEOF(lvl) - 1;
-			zshow_output(output,&v.str);
-			MV_FORCE_MVAL(&v,(int)temp->level) ;
-			mval_write(output,&v,TRUE);
-		} else if (temp->zalloc)
-		{
-			v.str.addr = &zal[0];
-			v.str.len = SIZEOF(zal) - 1;
-			zshow_output(output,&v.str);
-			zshow_format_lock(output,temp);
-			output->flush = TRUE;
-			v.str.len = 0;
-			zshow_output(output,&v.str);
+			if (temp->level && temp->zalloc)
+			{
+				v.str.addr = &zal[0];
+				v.str.len = SIZEOF(zal) - 1;
+				zshow_output(output,&v.str);
+				zshow_format_lock(output,temp);
+				output->flush = TRUE;
+				v.str.len = 0;
+				zshow_output(output,&v.str);
+				output->flush = FALSE;
+				v.str.addr = &lck[0];
+				v.str.len = SIZEOF(lck) - 1;
+				zshow_output(output,&v.str);
+				zshow_format_lock(output,temp);
+				v.str.addr = &lvl[0];
+				v.str.len = SIZEOF(lvl) - 1;
+				zshow_output(output,&v.str);
+				MV_FORCE_MVAL(&v,(int)temp->level) ;
+				mval_write(output,&v,TRUE);
+			} else if (temp->level)
+			{
+				v.str.addr = &lck[0];
+				v.str.len = SIZEOF(lck) - 1;
+				zshow_output(output,&v.str);
+				zshow_format_lock(output,temp);
+				v.str.addr = &lvl[0];
+				v.str.len = SIZEOF(lvl) - 1;
+				zshow_output(output,&v.str);
+				MV_FORCE_MVAL(&v,(int)temp->level) ;
+				mval_write(output,&v,TRUE);
+			} else if (temp->zalloc)
+			{
+				v.str.addr = &zal[0];
+				v.str.len = SIZEOF(zal) - 1;
+				zshow_output(output,&v.str);
+				zshow_format_lock(output,temp);
+				output->flush = TRUE;
+				v.str.len = 0;
+				zshow_output(output,&v.str);
+			}
 		}
- 	}
+	}
 }

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2012, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,7 +46,7 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 	char		*currpos;
 	int		save_errno;
 	mstr		envvar_logical, trans;
-	char		buf[GTM_PATH_MAX];
+	char		buf[YDB_PATH_MAX];
 	int		status;
 #	ifdef _BSD
 	union wait      wait_stat;

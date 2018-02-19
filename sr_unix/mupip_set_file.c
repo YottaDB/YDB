@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -88,6 +91,7 @@ error_def(ERR_MUREENCRYPTV4NOALLOW);
 error_def(ERR_NODFRALLOCSUPP);
 error_def(ERR_NOUSERDB);
 error_def(ERR_OFRZACTIVE);
+error_def(ERR_READONLYNOBG);
 error_def(ERR_SETQUALPROB);
 error_def(ERR_TEXT);
 error_def(ERR_WCERRNOTCHG);
@@ -107,18 +111,20 @@ MBSTART {									\
 int4 mupip_set_file(int db_fn_len, char *db_fn)
 {
 	boolean_t		bypass_partial_recov, got_standalone, need_standalone = FALSE, acc_meth_changing;
-	char			acc_spec[MAX_ACC_METH_LEN], *command = "MUPIP SET VERSION", *errptr, exit_stat, *fn,
-				ver_spec[MAX_DB_VER_LEN];
+	char			acc_spec[MAX_ACC_METH_LEN + 1], *command = "MUPIP SET VERSION", *errptr, exit_stat, *fn,
+				ver_spec[MAX_DB_VER_LEN + 1];
 	enum db_acc_method	access, access_new;
 	enum db_ver		desired_dbver;
 	gd_region		*temp_cur_region;
 	int			asyncio_status, defer_allocate_status, defer_status, disk_wait_status, encryptable_status,
-				encryption_complete_status, epoch_taper_status, extn_count_status,
-				fd, fn_len, glbl_buff_status, inst_freeze_on_error_status, key_size_status, locksharesdbcrit,
-				lock_space_status, mutex_space_status, qdbrundown_status, rec_size_status, reg_exit_stat, rc,
-				rsrvd_bytes_status, sleep_cnt_status, save_errno, stats_status, status, status1;
-	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_key_size, new_lock_space,
-				new_mutex_space, new_rec_size, new_sleep_cnt, new_spin_sleep, reserved_bytes, spin_sleep_status;
+				encryption_complete_status, epoch_taper_status, extn_count_status, fd, fn_len, glbl_buff_status,
+				hard_spin_status, inst_freeze_on_error_status, key_size_status, locksharesdbcrit,
+				lock_space_status, mutex_space_status, null_subs_status, qdbrundown_status, rec_size_status,
+				reg_exit_stat, rc, rsrvd_bytes_status, sleep_cnt_status, save_errno, stats_status, status,
+				status1, stdnullcoll_status;
+	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_hard_spin, new_key_size,
+				new_lock_space, new_mutex_space, new_null_subs, new_rec_size, new_sleep_cnt, new_spin_sleep,
+				new_stdnullcoll, reserved_bytes, spin_sleep_status, read_only_status;
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;
 	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
@@ -141,6 +147,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	if (cli_present("ACCESS_METHOD"))
 	{
 		cli_get_str("ACCESS_METHOD", acc_spec, &acc_spec_len);
+		acc_spec[acc_spec_len] = '\0';
 		cli_strupper(acc_spec);
 		if (0 == memcmp(acc_spec, "MM", acc_spec_len))
 			access = dba_mm;
@@ -160,6 +167,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	defer_allocate_status = cli_present("DEFER_ALLOCATE");
 	if (encryptable_status = cli_present("ENCRYPTABLE"))
 		need_standalone = TRUE;
+	if (read_only_status = cli_present("READ_ONLY")) /* Note assignment */
+		need_standalone = TRUE;
 	encryption_complete_status = cli_present("ENCRYPTIONCOMPLETE");
 	epoch_taper_status = cli_present("EPOCHTAPER");
 	/* EXTENSION_COUNT does not require standalone access and hence need_standalone will not be set to TRUE for this. */
@@ -175,7 +184,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("EXTENSION COUNT"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("EXTENSION COUNT"));
 			exit_stat |= EXIT_ERR;
 		}
 	}
@@ -197,11 +206,19 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("GLOBAL_BUFFERS"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("GLOBAL_BUFFERS"));
 			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
 	}
+	if (hard_spin_status = cli_present("HARD_SPIN_COUNT"))
+        {	/* No min or max tests needed because mupip_cmd enforces min of 0 and no max requirement is documented*/
+                if (!cli_get_int("HARD_SPIN_COUNT", &new_hard_spin))
+                {
+                        gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("HARD_SPIN_COUNT"));
+                        exit_stat |= EXIT_ERR;
+                }
+        }
 	inst_freeze_on_error_status = cli_present("INST_FREEZE_ON_ERROR");
 	if (key_size_status = cli_present("KEY_SIZE"))
 	{
@@ -221,7 +238,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("KEY_SIZE"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("KEY_SIZE"));
 			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
@@ -246,7 +263,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("LOCK_SPACE"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("LOCK_SPACE"));
 			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
@@ -268,9 +285,15 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("MUTEX_SLOTS"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("MUTEX_SLOTS"));
 			exit_stat |= EXIT_ERR;
 		}
+		need_standalone = TRUE;
+	}
+	if (null_subs_status = cli_present("NULL_SUBSCRIPTS"))
+	{
+		if (-1 == (new_null_subs = cli_n_a_e("NULL_SUBSCRIPTS")))
+                        exit_stat |= EXIT_ERR;
 		need_standalone = TRUE;
 	}
 	if (qdbrundown_status = cli_present("QDBRUNDOWN"))
@@ -287,7 +310,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("RECORD_SIZE"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("RECORD_SIZE"));
 			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
@@ -296,7 +319,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	{
 		if (!cli_get_int("RESERVED_BYTES", &reserved_bytes))
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("RESERVED_BYTES"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("RESERVED_BYTES"));
 			exit_stat |= EXIT_ERR;
 		}
 		need_standalone = TRUE;
@@ -314,41 +337,39 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("SLEEP_SPIN_COUNT"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("SLEEP_SPIN_COUNT"));
 			exit_stat |= EXIT_ERR;
 		}
 	}
-	if (spin_sleep_status = cli_present("SPIN_SLEEP_LIMIT"))
+	if (spin_sleep_status = cli_present("SPIN_SLEEP_MASK"))
 	{
-		if (cli_get_int("SPIN_SLEEP_LIMIT", &new_spin_sleep))
-		{	/* minimum is 0 & mupip_cmd defines this qualifier to not accept negative values, so no min check */
-			if (new_spin_sleep > MAX_SPIN_SLEEP)
+		if (cli_get_hex("SPIN_SLEEP_MASK", (uint4 *) &new_spin_sleep))
+		{
+			/* minimum is 0 and mupip_cmd defines this qualifier to only accept hex values no min check*/
+			if ((uint4) new_spin_sleep > MAX_SPIN_SLEEP_MASK)
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_spin_sleep,
-					LEN_AND_LIT("SPIN_SLEEP_LIMIT"), MAX_SPIN_SLEEP);
+                                      LEN_AND_LIT("SPIN_SLEEP_MASK"), MAX_SPIN_SLEEP_MASK);
 				exit_stat |= EXIT_ERR;
-			}
-			if (new_spin_sleep)
-			{	/* find the power of 2 equal to or greater than the value */
-				for (spin_sleep_status = 2; spin_sleep_status < new_spin_sleep; spin_sleep_status <<= 1)
-					;
-				new_spin_sleep = spin_sleep_status - 1;	/* make new_spin_sleep a mask; status remains "true" */
 			}
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("SPIN_SLEEP_LIMIT"));
-			exit_stat |= EXIT_ERR;
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("SPIN_SLEEP_MASK"));
+                      	exit_stat |= EXIT_ERR;
 		}
 	}
 	if (stats_status = cli_present("STATS"))
 		need_standalone = TRUE;
+	if (stdnullcoll_status = cli_present("STDNULLCOLL"))
+		need_standalone = TRUE;
 	if (cli_present("VERSION"))
 	{
 		cli_get_str("VERSION", ver_spec, &ver_spec_len);
+		ver_spec[ver_spec_len] = '\0';
 		cli_strupper(ver_spec);
-		if (0 == memcmp(ver_spec, "V4", ver_spec_len))
+		if (0 == memcmp(ver_spec, "V4", ver_spec_len + 1))
 			desired_dbver = GDSV4;
-		else  if (0 == memcmp(ver_spec, "V6", ver_spec_len))
+		else  if (0 == memcmp(ver_spec, "V6", ver_spec_len + 1))
 			desired_dbver = GDSV6;
 		else
 			assertpro(FALSE);		/* CLI should prevent us ever getting here */
@@ -367,7 +388,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			need_standalone = TRUE;
 		} else
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, LEN_AND_LIT("WAIT_DISK"));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("WAIT_DISK"));
 			exit_stat |= EXIT_ERR;
 		}
 	}
@@ -381,6 +402,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		memset(&single, 0, SIZEOF(single));
 	}
 	pvt_csd = (sgmnt_data *)malloc(ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE));
+	pvt_csd->read_only = FALSE;
 	in_backup = FALSE;		/* Only want yes/no from mupfndfil, not an address */
 	for (;  rptr != NULL;  rptr = rptr->fPtr)
 	{
@@ -464,9 +486,15 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 							LEN_AND_LIT("enable MM and ASYNCIO at the same time"));
 						reg_exit_stat |= EXIT_WRN;
 					}
-				}
-				if (dba_mm == access)
 					pvt_csd->defer_time = 1;			/* defer defaults to 1 */
+				} else
+				{	/* Setting access method to BG. Check for incompatibilities. */
+					if (!read_only_status && pvt_csd->read_only)
+					{
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_READONLYNOBG);
+						reg_exit_stat |= EXIT_WRN;
+					}
+				}
 				pvt_csd->acc_meth = access;
 				if (0 == pvt_csd->n_bts)
 				{
@@ -481,7 +509,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					pvt_csd->defer_time = 0;
 				else  if (CLI_PRESENT == defer_status)
 				{
-					if (cli_get_num("DEFER_TIME", &defer_time))
+					if (cli_get_defertime("DEFER_TIME", &defer_time))
 					{
 						if (-1 > defer_time)
 						{
@@ -489,10 +517,10 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 								LEN_AND_LIT("DEFER_TIME"), -1);
 							reg_exit_stat |= EXIT_WRN;
 						} else
-						pvt_csd->defer_time = defer_time;
+							pvt_csd->defer_time = defer_time;
 					} else
 					{
-						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB,
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2,
 							LEN_AND_LIT("DEFER_TIME"));
 						reg_exit_stat |= EXIT_WRN;
 					}
@@ -585,6 +613,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				pvt_csd->lock_space_size = (uint4)new_lock_space * OS_PAGELET_SIZE;
 			if (mutex_space_status)
 				NUM_CRIT_ENTRY(pvt_csd) = new_mutex_space;
+			if (null_subs_status)
+				gv_cur_region->null_subs = pvt_csd->null_subs = (unsigned char)new_null_subs;
 			if (qdbrundown_status)
 				pvt_csd->mumps_can_bypass = (CLI_PRESENT == qdbrundown_status);
 			if (rec_size_status)
@@ -612,8 +642,37 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				reservedDBFlags = pvt_csd->reservedDBFlags & ~RDBF_NOSTATS;
 				if (CLI_NEGATED == stats_status)
 					reservedDBFlags |= RDBF_NOSTATS;
+				else if (!read_only_status && pvt_csd->read_only)
+				{	/* READ_ONLY has not been specified on a database that is already READ_ONLY
+					 * but STATS is now being enabled. Issue error as the two are incompatible.
+					 */
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_READONLYNOSTATS);
+					reg_exit_stat |= EXIT_WRN;
+				}
 				pvt_csd->reservedDBFlags = reservedDBFlags;
 			}
+			/* Now that we know what the new STATS setting is going to be, check for READ_ONLY */
+			if (CLI_PRESENT == read_only_status)
+			{
+				/* Check if new access method is MM. If so issue error */
+				if (dba_mm != pvt_csd->acc_meth)
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_READONLYNOBG);
+					reg_exit_stat |= EXIT_WRN;
+				}
+				/* Check if new statistics sharing is turned ON. If so issue error */
+				if (!(RDBF_NOSTATS & pvt_csd->reservedDBFlags))
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_READONLYNOSTATS);
+					reg_exit_stat |= EXIT_WRN;
+				}
+			}
+			if (read_only_status)
+				pvt_csd->read_only = !(CLI_NEGATED == read_only_status);
+			if (CLI_NEGATED == stdnullcoll_status)
+				gv_cur_region->std_null_coll = pvt_csd->std_null_coll = FALSE;
+			else if (CLI_PRESENT == stdnullcoll_status)
+				gv_cur_region->std_null_coll = pvt_csd->std_null_coll = TRUE;
 			if (EXIT_NRM != reg_exit_stat)
 			{
 				DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, reg_exit_stat);
@@ -636,7 +695,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				 * as appropriate.
 				 */
 			}
-			gvcst_init(gv_cur_region);
+			gvcst_init(gv_cur_region, NULL);
 			change_reg();	/* sets cs_addrs and cs_data */
 			if (gv_cur_region->read_only)
 			{
@@ -649,10 +708,10 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			csd = cs_data;
 			assert(!cs_addrs->hold_onto_crit); /* this ensures we can safely do unconditional grab_crit and rel_crit */
 			grab_crit(gv_cur_region);
-			if (FROZEN_CHILLED(cs_data))
+			if (FROZEN_CHILLED(cs_addrs))
 			{
 				DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
-				if (FROZEN_CHILLED(cs_data))
+				if (FROZEN_CHILLED(cs_addrs))
 				{
 					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2,
 								DB_LEN_STR(gv_cur_region));
@@ -750,6 +809,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				csd->freeze_on_fail = FALSE;
 			else if (CLI_PRESENT == inst_freeze_on_error_status)
 				csd->freeze_on_fail = TRUE;
+			if (hard_spin_status)
+				HARD_SPIN_COUNT(csd) = new_hard_spin;
 			if (sleep_cnt_status)
 				SLEEP_SPIN_CNT(csd) = new_sleep_cnt;
 			if (spin_sleep_status)
@@ -764,6 +825,12 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("Database file !AD now has asyncio !AD", TRUE,
 						       fn_len, fn, LEN_AND_LIT("disabled"));
 			}
+			if (CLI_NEGATED == read_only_status)
+				util_out_print("Database file !AD is no longer read-only",
+					TRUE, fn_len, fn);
+			else if (CLI_PRESENT == read_only_status)
+				util_out_print("Database file !AD is now read-only",
+					TRUE, fn_len, fn);
 			if (disk_wait_status)
 				util_out_print("Database file !AD now has wait disk set to !UL seconds",
 					TRUE, fn_len, fn, csd->wait_disk_space);
@@ -781,11 +848,14 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			else if (CLI_PRESENT == inst_freeze_on_error_status)
 				util_out_print("Database file !AD now has inst freeze on fail flag set to TRUE",
 					TRUE, fn_len, fn);
+                        if (hard_spin_status)
+				util_out_print("Database file !AD now has hard spin count !UL",
+                                        TRUE, fn_len, fn, HARD_SPIN_COUNT(csd));
 			if (sleep_cnt_status)
 				util_out_print("Database file !AD now has sleep spin count !UL",
 					TRUE, fn_len, fn, SLEEP_SPIN_CNT(csd));
 			if (spin_sleep_status)
-				util_out_print("Database file !AD now has sleep spin mask !UL",
+				util_out_print("Database file !AD now has spin sleep mask !UL",
 					TRUE, fn_len, fn, SPIN_SLEEP_MASK(csd));
 			if (got_standalone)
 			{
@@ -821,6 +891,11 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				if (mutex_space_status)
 					util_out_print("Database file !AD now has !UL mutex queue slots",
 							TRUE, fn_len, fn, NUM_CRIT_ENTRY(pvt_csd));
+				if (null_subs_status)
+					util_out_print("Database file !AD now has null subscripts set to !AD",
+							TRUE, fn_len, fn, strlen("EXISTING"), (pvt_csd->null_subs == ALWAYS) ?
+							"ALWAYS  " : (pvt_csd->null_subs == ALLOWEXISTING) ?
+							"EXISTING" : "NEVER   ");
 				if (qdbrundown_status)
 					util_out_print("Database file !AD now has quick database rundown flag set to !AD", TRUE,
 						       fn_len, fn, 5, (pvt_csd->mumps_can_bypass ? " TRUE" : "FALSE"));
@@ -833,6 +908,11 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				if (stats_status)
 					util_out_print("Database file !AD now has sharing of gvstats set to !AD", TRUE,
 						       fn_len, fn, 5, (CLI_PRESENT == stats_status) ? " TRUE" : "FALSE");
+				if (stdnullcoll_status)
+					util_out_print("Database file !AD is now using !AD", TRUE, fn_len, fn,
+							strlen("M standard null collation"),
+							(CLI_PRESENT == stdnullcoll_status) ?
+							"M standard null collation" : "GT.M null collation      ");
 			} else
 				wcs_flu(WCSFLU_FLUSH_HDR);
 		} else

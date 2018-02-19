@@ -1,17 +1,19 @@
 1 Overview
    Overview
 
-   The GT.M Global Directory Editor (GDE) is a utility for creating,
+   The YottaDB Global Directory Editor (GDE) is a utility for creating,
    examining, and modifying a global directory. GDE is a program written in M
-   and you can invoke it from the shell with $gtm_dist/mumps -run ^GDE.
+   and you can invoke it from the shell with $ydb_dist/mumps -run ^GDE. If
+   you invoke it from the shell, GDE returns a status indicating success (0)
+   or an issue (non-zero).
 
-   Because GDE is an M program, you can also invoke GDE from a GT.M process
+   Because GDE is an M program, you can also invoke GDE from a YottaDB process
    with DO ^GDE. If you invoke GDE with a DO and modify the map of global
    directly currently opened by that process, you must HALT and restart the
-   process for the process to pick up the revised mapping. FIS expects users
-   normally run GDE from the shell --$gtm_dist/mumps -run GDE.
+   process for the process to pick up the revised mapping. YottaDB expects users
+   normally run GDE from the shell --$ydb_dist/mumps -run GDE.
 
-   The input to GDE can be a command file. In a production environment, FIS
+   The input to GDE can be a command file. In a production environment, YottaDB
    recommends using command files to define database configurations and
    putting them under version control.
 
@@ -21,7 +23,7 @@
    use mapping rules to determine which database file contains a global
    variable node. MUPIP CREATE uses database attributes to create new
    database file(s). Once MUPIP CREATE applies the database attributes to
-   create a database file, GT.M does not use the attributes until the next
+   create a database file, YottaDB does not use the attributes until the next
    MUPIP CREATE. If you use MUPIP SET (or DSE) to change the attributes of a
    database file, always perform an equivalent change to any global directory
    used for a subsequent MUPIP CREATE. Conversely, if you change attributes
@@ -38,7 +40,7 @@
    code can also use extended global references with the || or {} syntax.
 
    Note that $gtmgbldir / $ZGBLDIR are pathnames. If they do not start with a
-   "/", then the pathname is relative and GT.M searches for the global
+   "/", then the pathname is relative and YottaDB searches for the global
    directory starting in the current working directory.
 
    To change the Global Directory used by processes, specify a new value for
@@ -76,7 +78,7 @@
 
    $ gtmgbldir=/usr/accntg/jones/mumps.gld
    $ export gtmgbldir
-   $ $gtm_dist/mumps -dir
+   $ $ydb_dist/mumps -dir
    GTM>do ^GDE
    %GDE-I-GDUSEDEFS, Using defaults for Global Directory
    /usr/accntg/jones/mumps.gld
@@ -196,7 +198,7 @@
    TEMPLATES
 
    This section of the Global Directory provides a default value for every
-   database or file parameter passed to GT.M as part of a region or segment
+   database or file parameter passed to YottaDB as part of a region or segment
    definition. GDE uses templates to complete a region or segment definition
    where one of these necessary values is not explicitly defined.
 
@@ -287,7 +289,7 @@
 2 Customizing_a_Global_Directory
    Customizing a Global Directory
 
-   Once you have installed GT.M and verified its operation, create Global
+   Once you have installed YottaDB and verified its operation, create Global
    Directories based on your needs. To create customized Global Directories,
    use the appropriate GDE commands and qualifiers to build each desired
    Global Directory. The GDE commands are described later in this chapter.
@@ -302,7 +304,7 @@
    If you select the -JOURNAL option when you ADD or CHANGE a region in a
    Global Directory, the following section is added to your Global Directory
    and displays when you invoke SHOW. The columns provided display the values
-   you selected with the journal options, or defaults provided by FIS for any
+   you selected with the journal options, or defaults provided by YottaDB for any
    options not explicitly defined.
 
                     *** JOURNALING INFORMATION ***
@@ -315,7 +317,7 @@
    Using GDE
 
    The default installation procedure places the GDE utility into a directory
-   assigned to the environment variable gtm_dist.
+   assigned to the environment variable ydb_dist.
 
    To invoke GDE:
 
@@ -339,7 +341,7 @@
 
    **Note**
 
-   Even when invoked from within GT.M, GDE always uses the gtmgbldir
+   Even when invoked from within YottaDB, GDE always uses the gtmgbldir
    environment variable to identify its target
 
    To leave GDE:
@@ -380,7 +382,7 @@
        starting from ^abc(1) up to (but not including) to ^abc(10).
      o A global name can be one to 31 alphanumeric characters. However, the
        combined length of a global and its subscripts is limited to 1,019
-       bytes (the maximum key size supported by GT.M). Note that the byte
+       bytes (the maximum key size supported by YottaDB). Note that the byte
        length of the subscripted global specification can exceed the maximum
        KeySize specified for its region.
      o Maps to only one region in the Global Directory.
@@ -410,7 +412,7 @@
    file-related database storage characteristics. A segment must map to a
    single file. A segment can be mapped by only one region.
 
-   GT.M uses a segment to define a physical file and access method for the
+   YottaDB uses a segment to define a physical file and access method for the
    database stored in that file.
 
    A segment-name:
@@ -424,7 +426,7 @@
    FILE
 
    Files are the structures provided by UNIX for the storage and retrieval of
-   information. Files used by GT.M must be random-access files resident on
+   information. Files used by YottaDB must be random-access files resident on
    disk.
 
    By default, GDE uses the file-name mumps.dat for the DEFAULT segment. GDE
@@ -553,10 +555,10 @@
 
    The format of the ADD command is one of the following:
 
+   A[DD] -G[BLNAME] global-name [-GBLNAME-qualifier ...]
    A[DD] -N[AME] namespace -R[EGION]=region-name
    A[DD] -R[EGION] region-name -D[YNAMIC]=segment-name [-REGION-qualifier...]
    A[DD] -S[EGMENT] segment-name [-SEGMENT-qualifier...] -F[ILE_NAME]=file-name
-   A[DD] -G[BLNAME] global-name [-GBLNAME-qualifier ...]
 
    The ADD command requires specification of an object-type and object-name.
    GDE supplies default values from the templates for qualifiers not
@@ -594,7 +596,7 @@
    Example:
 
    GDE> add    -name IMPL                             -region=OTHERMUMPS  ! Map MUMPS implementations to OTHERMUMPS
-   GDE> add    -name IMPL("GT.M")                     -region=MYMUMPS     ! While mapping GT.M to MYMUMPS
+   GDE> add    -name IMPL("YottaDB")                  -region=MYMUMPS     ! While mapping YottaDB to MYMUMPS
 
    These examples map an entire subtree of a global to a region.
 
@@ -703,7 +705,7 @@
        unsubscripted global variable name. M standard collation (the default)
        has a collation number of zero (0). As a consequence, when you use
        alternative collation(s) (other than 0), the collation transforms must
-       be available to GDE in the same way as they are to other GT.M
+       be available to GDE in the same way as they are to other YottaDB
        components. All of a global (all nodes sharing the same unsubscripted
        global name) must have a single collation, which is implicitly the
        case for globals that do not span multiple regions.
@@ -714,7 +716,7 @@
        span multiple regions have their collation implicitly (collation 0),
        or explicitly, established by the GBLNAME section of the global
        directory and cannot adopt a differing collation based on the region
-       collation characteristic. Because GT.M determines collation for
+       collation characteristic. Because YottaDB determines collation for
        globals spanning multiple regions by the GBLNAME characteristic, which
        cannot change once the database files are created, GDE reports
        collation on many error messages.
@@ -732,24 +734,27 @@
    Change
 
    The CHANGE command alters the name-to-region or region-to-segment mapping
-   and /or the environment for a region or segment.
+   and /or the environment for a region or segment. It may also alter the
+   association of a global directory with a replication instance file.
 
    The format of the CHANGE command is:
 
-   C[HANGE]-N[AME] namespace -R[EGION]=new-region
-   C[HANGE]-R[EGION] region-name [-REGION-qualifier...]
-   C[HANGE]-S[EGMENT] segment-name [-SEGMENT-qualifier...]
    C[HANGE] -G[BLNAME] -C[OLLATION]=collation_number
+   C[HANGE] -I[INSTANCE] -F[ILE_NAME=[repl_inst_filename|""]
+   C[HANGE] -N[AME] namespace -R[EGION]=new-region
+   C[HANGE] -R[EGION] region-name [-REGION-qualifier...]
+   C[HANGE] -S[EGMENT] segment-name [-SEGMENT-qualifier...]
 
    The CHANGE command requires specification of an object-type and
    object-name.
 
-   Once you exit GDE, mapping changes take effect for any subsequent image
-   activation (for example, the next RUN or the mumps -direct command).
-   Changes to database parameters only take effect for new database files
-   created with subsequent MUPIP CREATE commands that use the modified Global
-   Directory. Use the MUPIP SET command (or in some cases DSE) to change
-   characteristics of existing database files.
+   Once you exit GDE, mapping changes, including Instance mapping, take
+   effect for any subsequent image activation (for example, the next RUN or
+   the mumps -direct command). Changes to database parameters only take
+   effect for new database files created with subsequent MUPIP CREATE
+   commands that use the modified Global Directory. Use the MUPIP SET command
+   (or in some cases DSE) to change characteristics of existing database
+   files.
 
    Example:
 
@@ -767,18 +772,18 @@
 
    The DELETE command removes a name, region, or segment from the Global
    Directory. The DELETE command does not delete any actual data. However,
-   GT.M does not access database files that do not have mapped global
+   YottaDB does not access database files that do not have mapped global
    variables except through extended references using an alternative global
-   directory that does not map to them. Note that GT.M replication does not
+   directory that does not map to them. Note that YottaDB replication does not
    support global updates made with extended references, unless they actually
    map to a database file that is a part of the replicated instance.
 
    The format of the DELETE command is:
 
+   D[ELETE] -G[BLNAME] global-name
    D[ELETE] -N[AME] namespace
    D[ELETE] -R[EGION] region-name
    D[ELETE] -S[EGMENT] segment-name
-   D[ELETE] -G[BLNAME] global-name
 
    The DELETE command requires specification of an object-type and
    object-name.
@@ -846,7 +851,7 @@
 2 LOCks
    LOCks
 
-   The LOCKS command specifies the region into which GT.M maps "local"
+   The LOCKS command specifies the region into which YottaDB maps "local"
    locks(those with resource names not starting with a caret symbol ^). GDE
    maps locks on resource names, starting with a caret symbol, to the
    database region mapped for the global variable name matching the resource
@@ -868,7 +873,7 @@
 
    **Caution**
 
-   GT.M associates LOCKs for global names with the database region holding
+   YottaDB associates LOCKs for global names with the database region holding
    the corresponding unsubscripted global name. Suppose a global called
    ^EURWest spans multiple regions in multiple global directories, a command
    like LOCK ^EURWest may not work in the same way as it would do if ^EURWest
@@ -938,10 +943,10 @@
 
    The format of the RENAME command is:
 
+   R[ENAME] -G[BLNAME] old-global-name new-global-name
    R[ENAME] -N[AME] old-name new-name
    R[ENAME] -R[EGION] old-region-name new-region-name
    R[ENAME] -S[EGMENT] old-segment-name new-segment-name
-   R[ENAME] -G[BLNAME] old-global-name new-global-name
 
    The RENAME command requires specification of an object-type and two
    object-names.
@@ -999,14 +1004,16 @@
 
    The format of the SHOW command is:
 
+   SH[OW]
+   SH[OW] -A[LL]
    SH[OW] -C[OMMAND] -F[ILE]=[gde-command-file]
+   SH[OW] -G[BLNAME]
+   SH[OW] -I[NSTANCE]
+   SH[OW] -M[AP] [-R[EGION]=region-name]
    SH[OW] -N[AME] [namespace]
    SH[OW] -R[EGION] [region-name]
    SH[OW] -S[EGMENT] [segment-name]
-   SH[OW] -M[AP] [-R[EGION]=region-name]
    SH[OW] -T[EMPLATE]
-   SH[OW] -G[BLNAME]
-   SH[OW] -A[LL]
 
    -COMMAND: Displays GDE commands that recreate the current Global Directory
    state.
@@ -1019,8 +1026,18 @@
    for creating new regions and segments in a global directory as the
    defaults come from the templates. If you inadvertently upgrade a global
    directory, you can use SHOW -COMMAND to create a file of commands that you
-   can input to GDE with the prior GT.M release to recreate the prior global
+   can input to GDE with the prior YottaDB release to recreate the prior global
    directory file.
+
+   SHOW -COMMAND displays the GDE commands for creating names, regions, and
+   segments of the current global directory state in a target environment.
+   However, it does not always include the same template settings (SHOW
+   -TEMPLATE) of the current global directory. SHOW -COMMAND creates an
+   appropriate set of templates that minimize other adjustments to recreate
+   the current global directory. If the current GDE template settings (SHOW
+   -TEMPLATE) are important for your application, you need set them again
+   after applying the commands from GDE SHOW -COMMAND in the target
+   environment.
 
    **Note**
 
@@ -1031,9 +1048,21 @@
    same command-file, GDE resumes processing it at the line after the last
    error.
 
-   -NAME, -REGION, -SEGMENT, -GBLNAME, -MAP, -TEMPLATE, and -ALL are
+   -ALL: Displays the entire Global Directory. This qualifier corresponds to
+   displaying "all" sections of the SHOW report:
+
+   ***TEMPLATES***, ***NAMES***, ***REGIONS***, ***SEGMENTS***, ***MAP***, ***INSTANCE***.
+
+   By default, SHOW displays -ALL.
+
+   -GBLNAME, -INSTANCE, -MAP, -NAME, -REGION, -SEGMENT, and -TEMPLATE are
    qualifiers that cause GDE to display selected portions of the Global
    Directory as follows:
+
+   -INSTANCE: Displays the current Instance Mapping, if any. This qualifier
+   corresponds to the section of the SHOW report titled:
+
+   ***INSTANCE***
 
    -MAP: Displays the current mapping of all names, regions, segments, and
    files. This qualifier corresponds to the section of the SHOW report titled
@@ -1044,13 +1073,6 @@
    qualifier corresponds to the section of the SHOW report titled:
 
    ***TEMPLATES***
-
-   -ALL: Displays the entire Global Directory. This qualifier corresponds to
-   displaying "all" sections of the SHOW report:
-
-   ***TEMPLATES***, ***NAMES***, ***REGIONS***, ***SEGMENTS***,  ***MAP***.
-
-   By default, SHOW displays -ALL.
 
    If you want to print the Global Directory, create a log file by executing
    LOG -ON= before executing the SHOW command. The -LOG command captures all
@@ -1102,16 +1124,20 @@
    The format of the VERIFY command is:
 
    V[ERIFY]
+   V[ERIFY] -A[LL]
+   V[ERIFY] -G[BLNAME]
+   V[ERIFY] -M[AP]
    V[ERIFY] -N[AME] [namespace]
    V[ERIFY] -R[EGION] [region-name]
    V[ERIFY] -S[EGMENT] [segment-name]
-   V[ERIFY] -M[AP]
-   V[ERIFY] -G[BLNAME]
    V[ERIFY] -T[EMPLATE]
-   V[ERIFY] -A[LL]
 
    The object-type is optional. -MAP, -TEMPLATE, and -ALL are special
    qualifiers used as follows:
+
+   -ALL
+
+           Checks all map and template data.
 
    -MAP
 
@@ -1121,10 +1147,6 @@
    -TEMPLATE
 
            Checks that all templates currently are consistent and useable.
-
-   -ALL
-
-           Checks all map and template data.
 
    VERIFY with no qualifier, VERIFY -MAP, and VERIFY -ALL each check all
    current information.
@@ -1181,7 +1203,7 @@
 
    -[NO]AU[TODB]
 
-   Specifies whether GT.M should implicitly create a database file for the
+   Specifies whether YottaDB should implicitly create a database file for the
    region if none exists when a process attempts to access it. Because it
    carries lower operational risk and provides better operational control,
    the common practice is to create database files with MUPIP CREATE.
@@ -1199,8 +1221,7 @@
    defined collation sequence that resides in the shared library pointed to
    by the environment variable gtm_collate_n. For information on defining
    this environment variable and creating an alternate collation sequence,
-   refer to the "Internationalization" chapter in the GT.M Programmer's
-   Guide.
+   refer to the "Internationalization" chapter in the M Programmer's Guide.
 
    The minimum COLLATION_DEFAULT number is zero, which is the standard M
    collation sequence.
@@ -1222,7 +1243,7 @@
    -[NO]EPOCHTAPER
 
    Tries to minimize epoch duration by reducing the number of buffers to
-   flush by GT.M and the file system (via an fsync()) as the epoch
+   flush by YottaDB and the file system (via an fsync()) as the epoch
    (time-based or due to a journal file auto-switch) approaches. By default,
    EPOCHTAPER is enabled.
 
@@ -1270,7 +1291,7 @@
    -AU[TOSWITCHLIMIT]=blocks
 
    Specifies the limit on the size of a journal file. When the journal file
-   size reaches the limit, GT.M automatically switches to a new journal file
+   size reaches the limit, YottaDB automatically switches to a new journal file
    with a back-pointer to the prior journal file.
 
    -[NO]BE[FORE_IMAGE]
@@ -1305,7 +1326,7 @@
 
    Example:
 
-   CHANGE -REGION DEFAULT -JOURNAL=(ALLOCATION=2048,AUTOSWITCHLIMIT=8386560,BEFORE_IMAGE,BUFFER_SIZE=2308,EXTENSION=2048)
+   CHANGE -REGION DEFAULT -JOURNAL=(ALLOCATION=2048,AUTOSWITCHLIMIT=8386560,BEFORE_IMAGE,BUFFER_SIZE=2312,EXTENSION=2048)
 
    Summary
 
@@ -1322,11 +1343,11 @@
    When determining the maximum key size, applications should consider the
    following:
 
-     * GT.M uses packed decimal representation for numeric subscripts which
+     * YottaDB uses packed decimal representation for numeric subscripts which
        may be larger or smaller than the original representation.
-     * GT.M substitutes an element terminator for the caret (^), any comma
+     * YottaDB substitutes an element terminator for the caret (^), any comma
        (,), and any right parenthesis ()).
-     * GT.M adds an extra byte for every string element, including the global
+     * YottaDB adds an extra byte for every string element, including the global
        name.
 
    For example, the key ^ACN ("Name", "Type") internally occupies 17 bytes.
@@ -1335,10 +1356,10 @@
 
    -[NO]L[OCK_CRIT]
 
-   Specifies whether GT.M should share the resource management between a
+   Specifies whether YottaDB should share the resource management between a
    database and its corresponding LOCKs or use separate and different
    resource management for the two. Because, in the current implementation,
-   FIS has not identified any reason to share resource management between
+   YottaDB has not identified any reason to share resource management between
    LOCKs and database actions, we have no recommendations other than to
    choose what seems to work better for your application.
 
@@ -1347,8 +1368,8 @@
 
    -[NO]N[ULL_SUBSCRIPTS]=[ALWAYS|NEVER|EXISTING]
 
-   Indicates whether GT.M allows null subscripts for global variables stored
-   in the region (that is, whether GT.M permits references such as
+   Indicates whether YottaDB allows null subscripts for global variables stored
+   in the region (that is, whether YottaDB permits references such as
    ^aaa("",1)).
 
    ALWAYS indicates that the null subscripts for global variables are
@@ -1367,7 +1388,7 @@
    accessing a database file need to shutdown almost simultaneously, for
    example, in benchmarking scenarios or emergencies.
 
-   When a terminating GT.M process observes that a large number of processes
+   When a terminating YottaDB process observes that a large number of processes
    are attached to a database file and QDBRUNDOWN is enabled, it bypasses
    checking whether it is the last process accessing the database. Such a
    check occurs in a critical section and bypassing it also bypasses the
@@ -1385,7 +1406,7 @@
    damage.
 
    When a database has QDBRUNDOWN enabled, if the number of attached
-   processes ever exceeds 32Ki, GT.M stops tracking the number of attached
+   processes ever exceeds 32Ki, YottaDB stops tracking the number of attached
    processes, which means that it cannot recognize when the number reaches
    zero (0) and the shared resources can be released. The process that
    detects this event issues a NOMORESEMCNT in the system log. This means an
@@ -1398,10 +1419,10 @@
    Specifies the maximum size (in bytes) of a global variable node's value
    that can be stored in a region.
 
-   If the size of a global exceeds one database block, GT.M implicitly spans
+   If the size of a global exceeds one database block, YottaDB implicitly spans
    that global across multiple database blocks. In the event a global
    variable node spans multiple blocks, and the process is not already within
-   a TP transaction, the GT.M run-time system automatically and transparently
+   a TP transaction, the YottaDB run-time system automatically and transparently
    performs the entire operation within an implicit TP transaction (as it
    does for Triggers).
 
@@ -1416,17 +1437,17 @@
 
    -[NO][STA[TS]
 
-   Specifies whether GT.M should permit processes to share their database
+   Specifies whether YottaDB should permit processes to share their database
    access statistics for other processes to monitor. There may be operational
-   or security reasons to prohibit sharing of statistics. For example, GT.M
+   or security reasons to prohibit sharing of statistics. For example, YottaDB
    does not share statistics on database files that exist solely to support
-   GT.M features.
+   YottaDB features.
 
    By default, GDE uses STATS.
 
    -[NO]STD[NULLCOLL]
 
-   Determines whether GT.M null subscripts collate in conformance to the M
+   Determines whether YottaDB null subscripts collate in conformance to the M
    standard.
 
    If STDNULLCOLL is specified, subscripts of globals in the database follow
@@ -1434,12 +1455,12 @@
    subscripts.
 
    If NOSTDNULLCOLL is specified, null subscripts collate between numeric and
-   string subscripts. FIS strongly recommends that you use STDNULL and
+   string subscripts. YottaDB strongly recommends that you use STDNULL and
    against using this non-standard null collation, which is the default for
    historical reasons.
 
    The following table summarizes GDE region qualifiers. It provides their
-   abbreviations, defaults (as provided by FIS), and allowable minimum and
+   abbreviations, defaults (as provided by YottaDB), and allowable minimum and
    maximum values.
 
  +-----------------------------------------------------------------------------+
@@ -1485,7 +1506,7 @@
 
    -AC[CESS_METHOD]=code
 
-   Specifies the access method or the GT.M buffering strategy for storing and
+   Specifies the access method or the YottaDB buffering strategy for storing and
    retrieving data from the global database file.
 
      o code can have 2 values - Buffered Global (BG) or Memory Mapped (MM).
@@ -1499,12 +1520,12 @@
           * BG is a likely choice when you need faster recovery times from
             system failures.
 
-     o With MM, GT.M bypasses the global buffer pool and relies entirely on
+     o With MM, YottaDB bypasses the global buffer pool and relies entirely on
        the OS/file system to manage the data traffic between memory and disk.
-       GT.M has no control over the timing of disk updates, therefore there
+       YottaDB has no control over the timing of disk updates, therefore there
        is a greater reliance on the OS/file system for database performance.
 
-          * MM supports NOBEFORE_IMAGE journaling only. GT.M issues an error
+          * MM supports NOBEFORE_IMAGE journaling only. YottaDB issues an error
             if you use MM with BEFORE_IMAGE Journaling. MM supports MUPIP
             JOURNAL -RECOVER -FORWARD and MUPIP JOURNAL -ROLLBACK -FORWARD.
             With MM, MUPIP JOURNAL -RECOVER -BACKWARD only generates lost and
@@ -1523,12 +1544,12 @@
 
    GDE> change -segment DEFAULT -access_method=MM
 
-   This command sets MM as the access method or the GT.M buffering strategy
+   This command sets MM as the access method or the YottaDB buffering strategy
    for storing and retrieving database for segment DEFAULT.
 
    -AL[LOCATION]=blocks
 
-   Specifies the number of blocks GT.M allocates to a disk file when MUPIP
+   Specifies the number of blocks YottaDB allocates to a disk file when MUPIP
    creates the file. For GDS files, the number of bytes allocated is the size
    of the database file header plus the ALLOCATION size times the BLOCK_SIZE.
 
@@ -1537,7 +1558,7 @@
      * By default, GDE uses an ALLOCATION of 100 blocks.
      * The maximum size of a database file is 1,040,187,392(992Mi) blocks.
      * The default ALLOCATION was chosen for initial development and
-       experimentation with GT.M. Because file fragmentation impairs
+       experimentation with YottaDB. Because file fragmentation impairs
        performance, make the initial allocation for production files and
        large projects large enough to hold the anticipated contents of the
        file for a length of time consistent with your UNIX file
@@ -1559,15 +1580,15 @@
    tuning for your application to achieve the best performance it can with
    asynchronous IO. Some notes and observations that we have to share:
 
-     o As asynchronous IO dispenses with the UNIX file buffer cache, GT.M
+     o As asynchronous IO dispenses with the UNIX file buffer cache, YottaDB
        global buffers are the sole caching mechanism. To make asynchronous IO
        perform well, you will likely need to increase the number of global
-       buffers considerably. With GT.M's limit of 2GiB per shared memory
+       buffers considerably. With YottaDB's limit of 2GiB per shared memory
        segment, a database segment with 4KiB blocks has a limit of almost two
        million global buffers.
      o A large number of global buffers potentially implies a large number of
        dirty global buffers to be flushed at an epoch. You should investigate
-       the impact on application response time of GT.M epoch tapering vs.
+       the impact on application response time of YottaDB epoch tapering vs.
        turning off epoch tapering and using a separate stand-alone process
        that executes a line of code such as: for set x="" for set
        x=$view("gvnext",x) quit:""=x view "dbflush":x,"dbsync":x,"epoch":x
@@ -1580,7 +1601,7 @@
      o On AIX, consider mounting file systems with the CIO mount option. The
        CIO mount option drops support for the file buffer cache (unused by
        asynchronous IO), and also eliminates a lock that is a potential
-       bottleneck to GT.M performance on the AIX jfs2 filesystem.
+       bottleneck to YottaDB performance on the AIX jfs2 filesystem.
      o For Linux x86_64, the gtm_aio_nr_events environment variable controls
        the number of structures a process has per global directory to manage
        asynchronous writes, and therefore determines the number of concurrent
@@ -1602,7 +1623,7 @@
        then gtm_aio_nr_events needs to be set to a value <= 200,000 / (10,000
        * 2) = 10. Conversely if gtm_aio_nr_events is set to a value of 20,
        then aio-max-nr needs to be bumped up to (10,000 * 2 * 20) = 400,000.
-       GT.M captures the number of errors encountered when attempting to
+       YottaDB captures the number of errors encountered when attempting to
        write database blocks for a region, and, barring problems with the
        storage subsystem, hitting an asynchronous write limit would
        constitute primary (probably only) contribution to that value, which
@@ -1611,23 +1632,17 @@
        $$^%PEEKBYNAME("sgmnt_data.wcs_wterror_invoked_cntr",<region>)
 
      o Limited experience with solid-state storage (SSDs) on Linux in the
-       GT.M development environment suggests a considerable difference in
+       YottaDB development environment suggests a considerable difference in
        asynchronous IO performance on the same underlying hardware, with f2fs
        performing better than xfs, which in turn performed better than ext4.
 
-   In GT.M development, we have not benchmarked asynchronous IO on the types
+   In YottaDB development, we have not benchmarked asynchronous IO on the types
    of storage commonly used for enterprise scale applications (as workloads
    vary widely, we do not routinely benchmark workloads in development).
    Please consider the above observations in this light.
 
    By default GDE uses NOASYNCIO. On segments with an access method of MM,
-   GT.M ignores this setting.
-
-   -[NO]ENcryption
-
-   Specifies whether or not the database file for a segment is flagged for
-   encryption. Note that MUPIP CREATE acquires an encryption key for this
-   file and puts a cryptographic hash of the key in the database file header.
+   YottaDB ignores this setting.
 
    -BL[OCK_SIZE]=size
 
@@ -1668,9 +1683,9 @@
 
    **Note**
 
-   FIS recommends against using databases with block sizes larger than 16KiB.
+   YottaDB recommends against using databases with block sizes larger than 16KiB.
    If a specific global variable has records that have large record sizes,
-   FIS recommends placing that global variable in a file by itself with large
+   YottaDB recommends placing that global variable in a file by itself with large
    block sizes and using more appropriate block sizes for other global
    variables. 4KiB and 8KiB are popular database block sizes.
 
@@ -1682,7 +1697,7 @@
    and determines whether subsequent extensions also preallocate. The default
    is DEFER_ALLOCATE. This provides an option to preallocate blocks from the
    file system when creating or extending a database file; by default UNIX
-   file systems, and GT.M, use sparse (or lazy) allocation, which defers
+   file systems, and YottaDB, use sparse (or lazy) allocation, which defers
    actual allocation until blocks are first written. Failures to preallocate
    space produce a PREALLOCATEFAIL error.
 
@@ -1698,10 +1713,10 @@
    should extend. The extend amount is interpreted as the number of usable
    GDS blocks to create with the extension. To calculate the number of host
    operating system blocks added with each extension, multiply the number of
-   GDS blocks added by (GDS BLOCK_SIZE/host BLOCK_SIZE); add one local bitmap
-   block for each 512 blocks added in each extension to the amount from step
-   1. If the extension is not a multiple of 512, remember to roundup when
-   figuring the number of bitmap blocks.
+   GDS blocks by (GDS BLOCK_SIZE/host BLOCK_SIZE); add one local bitmap block
+   for each 512 blocks added in each extension to the amount from step 1. If
+   the extension is not a multiple of 512, remember to roundup when figuring
+   the number of bitmap blocks.
 
    When a MUPIP EXTEND command does not include a -BLOCKS= qualifier, EXTEND
    uses the extension size in the database header.
@@ -1711,8 +1726,8 @@
    The minimum EXTENSION is zero blocks.
 
    When a database file with automatic extension disabled (EXTENSION_COUNT=0)
-   starts to get full, GT.M records the FREEBLSLOW warning in the system log.
-   So as to not compromise performance, GT.M checks whenever the master bit
+   starts to get full, YottaDB records the FREEBLSLOW warning in the system log.
+   So as to not compromise performance, YottaDB checks whenever the master bit
    map must be updated to show that a local bit map is full, and issues the
    warning if there are fewer than 512 free blocks or if the number of free
    blocks is less than total blocks/32. This means that for databases whose
@@ -1760,7 +1775,7 @@
    GLOBAL_BUFFERs and performance. However, the relationship is not linear,
    but asymptotic, so that increases past some point have progressively less
    benefit. This point of diminishing returns depends on the application. For
-   most applications, FIS expects the optimum number of GLOBAL_BUFFERs to be
+   most applications, YottaDB expects the optimum number of GLOBAL_BUFFERs to be
    between 1K and 64K.
 
    Because transaction processing can be involved in an update and a
@@ -1770,7 +1785,7 @@
    application.
 
    Generally, you should increase the number of GLOBAL_BUFFERs for production
-   GDS database files. This is because GT.M uses the shared memory database
+   GDS database files. This is because YottaDB uses the shared memory database
    cache associated with each GDS file for the majority of caching.
 
    The minimum GLOBAL_BUFFER_COUNT for BG is 64 blocks.
@@ -1788,7 +1803,7 @@
    resulting from more global buffers will be more than offset by the
    dramatic slowdown that results from globals buffers that are "paged out."
 
-   Out of the requested allocation, GT.M always reserves 32 global buffers
+   Out of the requested allocation, YottaDB always reserves 32 global buffers
    for BG access method for read-only use to ensure that non-dirty global
    buffers are always available.
 
@@ -1797,14 +1812,14 @@
    Specifies the number of pages of space to use for the lock database stored
    with this segment. The size of a page is always 512 bytes.
 
-   As GT.M runs out of space to store LOCK control information, LOCKs become
+   As YottaDB runs out of space to store LOCK control information, LOCKs become
    progressively less efficient. If a single process consumes all the LOCK
    space, it cannot continue, and any other processes cannot proceed using
    LOCKs.
 
    The minimum LOCK_SPACE is 10 pages.
 
-   The maximum LOCK_SPACE is 65,536 pages.
+   The maximum LOCK_SPACE is 262144 pages.
 
    By default, GDE uses a LOCK_SPACE of 40 pages.
 
@@ -1820,15 +1835,15 @@
    Generally, you would limit LOCK_SPACE only when memory is scarce or you
    want to be made aware of unexpected levels of LOCK usage. For most other
    cases, there is no reason to limit the LOCK_SPACE. If you are introducing
-   new code, FIS recommends using TSTART and TCOMMIT as a more efficient
+   new code, YottaDB recommends using TSTART and TCOMMIT as a more efficient
    alternate for most LOCKs because it pushes the responsibility for
-   Isolation onto GT.M, which internally manages them with optimistic
+   Isolation onto YottaDB, which internally manages them with optimistic
    algorithms.
 
    -M[UTEX_SLOTS]=integer
 
-   Specifies the number of mutex slots for a database file. GT.M uses mutex
-   slots to manage database contention. FIS recommends you configure the
+   Specifies the number of mutex slots for a database file. YottaDB uses mutex
+   slots to manage database contention. YottaDB recommends you configure the
    slots to cover the maximum number of processes you expect to concurrently
    access the database file, as an insufficient number of slots can lead to
    much steeper and more severe degradation of performance under heavy loads.
@@ -1852,7 +1867,7 @@
    Summary
 
    The following table summarizes GDE segment qualifiers. It provides
-   abbreviations, defaults (as provided by FIS), and allowable minimum and
+   abbreviations, defaults (as provided by YottaDB), and allowable minimum and
    maximum values.
 
    +------------------------------------------------------------------------+
@@ -1887,7 +1902,7 @@
    | -G[LOBAL_BUFFER_COUNT]=size | 1024*     | 64    | 2,147,483,647        |
    | (blocks)                    |           |       |                      |
    |-----------------------------+-----------+-------+----------------------|
-   | -L[OCK_SPACE]=size (pages)  | 40        | 10    | 65536                |
+   | -L[OCK_SPACE]=size (pages)  | 40        | 10    | 262144               |
    |-----------------------------+-----------+-------+----------------------|
    | -M[UTEX_SLOTS]=integer      | 1,024     | 1,024 | 32,768               |
    |-----------------------------+-----------+-------+----------------------|
@@ -1904,7 +1919,7 @@
    -C[OLLATION]=collation_number
 
    Specifies the collation number for a global name; a value of 0 specifies
-   standard M collation. The first time that a GT.M processes accesses a
+   standard M collation. The first time that a YottaDB processes accesses a
    global variable name in a database file, it determines the collation
    sequence as follows:
 
@@ -1930,6 +1945,22 @@
           o else, if there is a default for that database file, use it
           o else (that is, neither exists), use standard M collation
 
+2 Instance_Qualifier
+   Instance Qualifier
+
+   The following -INSTANCE qualifier is used with the CHANGE command.
+
+   -F[ILE_NAME=[repl_inst_filename|""]
+
+     o -FILE_NAME=repl_inst_filename maps a replication instance file with
+       the global directory. -FILE_NAME="" removes the mapping of a global
+       directory with a replication instance file.
+     o When a global directory is use, the mapping set with CHANGE -INSTANCE
+       FILE_NAME=repl_inst_filename overrides any setting of the
+       gtm_repl_instance environment variable. However, other utilities
+       (MUPIP, LKE, and DSE) use the setting of the gtm_repl_instance
+       environment variable.
+
 1 Summary
    Summary
 
@@ -1939,123 +1970,131 @@
    +------------------------------------------------------------------------+
    |                          GDE Command Summary                           |
    |------------------------------------------------------------------------|
-   |  Command   | Specified Object |    Required Object Name/[Optional]     |
-   |            |       Type       |               Qualifier                |
+   |  Command   |  Specified  |  Required Object Name/[Optional] Qualifier  |
+   |            | Object Type |                                             |
    |------------------------------------------------------------------------|
    |        * -ALL is the default for the SHOW and VERIFY commands.         |
    |------------------------------------------------------------------------|
-   | @          | N/A              | file-name                              |
-   |------------+------------------+----------------------------------------|
-   |            |                  | namespace                              |
-   | A[DD]      | -N[AME]          |                                        |
-   |            |                  | -R[EGION]=region-name                  |
-   |------------+------------------+----------------------------------------|
-   |            |                  | region-name                            |
-   | -          | -R[EGION]        |                                        |
-   |            |                  | -D[YNAMIC]=segment-name                |
-   |            |                  | [-REGION-qualifier...]                 |
-   |------------+------------------+----------------------------------------|
-   |            |                  | segment-name                           |
-   | -          | -S[EGMENT]       |                                        |
-   |            |                  | -F[ILE_NAME]=file-name                 |
-   |            |                  | [-SEGMENT-qualifier...]                |
-   |------------+------------------+----------------------------------------|
-   |            |                  | global-name                            |
-   | -          | -G[BLNAME]       |                                        |
-   |            |                  | -C[OLLATION]=collation                 |
-   |------------+------------------+----------------------------------------|
-   |            |                  | namespace                              |
-   | C[HANGE]   | -N[AME]          |                                        |
-   |            |                  | -R[EGION]=new-region                   |
-   |------------+------------------+----------------------------------------|
-   |            |                  | region-name                            |
-   | -          | -R[EGION]        |                                        |
-   |            |                  | [-REGION-qualifier...]                 |
-   |------------+------------------+----------------------------------------|
-   |            |                  | segment-name                           |
-   | -          | -S[EGMENT]       |                                        |
-   |            |                  | [-SEGMENT-qualifier]                   |
-   |------------+------------------+----------------------------------------|
-   |            |                  | global-name                            |
-   | -          | -G[BLNAME]       |                                        |
-   |            |                  | -C[OLLATION]=collation                 |
-   |------------+------------------+----------------------------------------|
-   | D[ELETE]   | -N[AME]          | namespace                              |
-   |------------+------------------+----------------------------------------|
-   | -          | -R[EGION]        | region-name                            |
-   |------------+------------------+----------------------------------------|
-   | -          | -S[EGMENT]       | segment-name                           |
-   |------------+------------------+----------------------------------------|
-   |            |                  | global-name                            |
-   | -          | -G[BLNAME]       |                                        |
-   |            |                  | -C[OLLATION]=collation                 |
-   |------------+------------------+----------------------------------------|
-   | E[XIT]     | N/A              | N/A                                    |
-   |------------+------------------+----------------------------------------|
-   | HE[LP]     | N/A              | Keyword                                |
-   |------------+------------------+----------------------------------------|
-   | LOC[KS]    | N/A              | -R[EGION]=region-name                  |
-   |------------+------------------+----------------------------------------|
-   |            |                  | [-ON][=file-name]                      |
-   | LOG        | N/A              |                                        |
-   |            |                  | [-OF[F]]                               |
-   |------------+------------------+----------------------------------------|
-   | Q[UIT]     | N/A              | N/A                                    |
-   |------------+------------------+----------------------------------------|
-   | R[ENAME]   | -N[AME]          | old-name new-name                      |
-   |------------+------------------+----------------------------------------|
-   | -          | -R[EGION]        | old-reg-name new-reg-name              |
-   |------------+------------------+----------------------------------------|
-   | -          | -S[EGMENT]       | old-seg-name new-seg-name              |
-   |------------+------------------+----------------------------------------|
-   |            |                  | global-name                            |
-   | -          | -G[BLNAME]       |                                        |
-   |            |                  | -C[OLLATION]=collation                 |
-   |------------+------------------+----------------------------------------|
-   | SE[TGD]    | N/A              | -F[ILE]=file-name [-Q[UIT]]            |
-   |------------+------------------+----------------------------------------|
-   | SH[OW]     | -N[AME]          | [namespace]                            |
-   |------------+------------------+----------------------------------------|
-   | -          | -R[EGION]        | [region-name]                          |
-   |------------+------------------+----------------------------------------|
-   | -          | -S[EGMENT]       | [segment-name]                         |
-   |------------+------------------+----------------------------------------|
-   |            |                  | global-name                            |
-   | -          | -G[BLNAME]       |                                        |
-   |            |                  | -C[OLLATION]=collation                 |
-   |------------+------------------+----------------------------------------|
-   | -          | -M[AP]           | [R[EGION]=region-name]                 |
-   |------------+------------------+----------------------------------------|
-   | -          | T[EMPLATE]       | N/A                                    |
-   |------------+------------------+----------------------------------------|
-   | -          | -A[LL]*          | N/A                                    |
-   |------------+------------------+----------------------------------------|
-   | T[EMPLATE] | -R[EGION]        | [-REGION-qualifier...]                 |
-   |------------+------------------+----------------------------------------|
-   | -          | -S[EGMENT]       | [ -SEGMENT-qualifier...]               |
-   |------------+------------------+----------------------------------------|
-   | V[ERIFY]   | -N[AME]          | [namespace]                            |
-   |------------+------------------+----------------------------------------|
-   | -          | -R[EGION]        | [region-name]                          |
-   |------------+------------------+----------------------------------------|
-   | -          | -S[EGMENT]       | [segment-name]                         |
-   |------------+------------------+----------------------------------------|
-   |            |                  | global-name                            |
-   | -          | -G[BLNAME]       |                                        |
-   |            |                  | -C[OLLATION]=collation                 |
-   |------------+------------------+----------------------------------------|
-   | -          | -M[AP]           | N/A                                    |
-   |------------+------------------+----------------------------------------|
-   | -          | -T[EMPLATE]      | N/A                                    |
-   |------------+------------------+----------------------------------------|
-   | -          | -A[LL]*          | N/A                                    |
+   | @          | N/A         | file-name                                   |
+   |------------+-------------+---------------------------------------------|
+   |            |             | global-name                                 |
+   | A[DD]      | -G[BLNAME]  |                                             |
+   |            |             | -C[OLLATION]=collation                      |
+   |------------+-------------+---------------------------------------------|
+   |            |             | namespace                                   |
+   | -          | -N[AME]     |                                             |
+   |            |             | -R[EGION]=region-name                       |
+   |------------+-------------+---------------------------------------------|
+   |            |             | region-name                                 |
+   | -          | -R[EGION]   |                                             |
+   |            |             | -D[YNAMIC]=segment-name                     |
+   |            |             | [-REGION-qualifier...]                      |
+   |------------+-------------+---------------------------------------------|
+   |            |             | segment-name                                |
+   | -          | -S[EGMENT]  |                                             |
+   |            |             | -F[ILE_NAME]=file-name                      |
+   |            |             | [-SEGMENT-qualifier...]                     |
+   |------------+-------------+---------------------------------------------|
+   |            |             | global-name                                 |
+   | C[HANGE]   | -G[BLNAME]  |                                             |
+   |            |             | -C[OLLATION]=collation                      |
+   |------------+-------------+---------------------------------------------|
+   |            |             | replication-instance                        |
+   | -          | -I[NSTANCE] |                                             |
+   |            |             | -F[ILE_NAME]=replication_instance_file      |
+   |------------+-------------+---------------------------------------------|
+   |            |             | namespace                                   |
+   | -          | -N[AME]     |                                             |
+   |            |             | -R[EGION]=new-region                        |
+   |------------+-------------+---------------------------------------------|
+   |            |             | region-name                                 |
+   | -          | -R[EGION]   |                                             |
+   |            |             | [-REGION-qualifier...]                      |
+   |------------+-------------+---------------------------------------------|
+   |            |             | segment-name                                |
+   | -          | -S[EGMENT]  |                                             |
+   |            |             | [-SEGMENT-qualifier]                        |
+   |------------+-------------+---------------------------------------------|
+   |            |             | global-name                                 |
+   | D[ELETE]   | -G[BLNAME]  |                                             |
+   |            |             | -C[OLLATION]=collation                      |
+   |------------+-------------+---------------------------------------------|
+   | -          | -N[AME]     | namespace                                   |
+   |------------+-------------+---------------------------------------------|
+   | -          | -R[EGION]   | region-name                                 |
+   |------------+-------------+---------------------------------------------|
+   | -          | -S[EGMENT]  | segment-name                                |
+   |------------+-------------+---------------------------------------------|
+   | E[XIT]     | N/A         | N/A                                         |
+   |------------+-------------+---------------------------------------------|
+   | HE[LP]     | N/A         | Keyword                                     |
+   |------------+-------------+---------------------------------------------|
+   | LOC[KS]    | N/A         | -R[EGION]=region-name                       |
+   |------------+-------------+---------------------------------------------|
+   |            |             | [-ON][=file-name]                           |
+   | LOG        | N/A         |                                             |
+   |            |             | [-OF[F]]                                    |
+   |------------+-------------+---------------------------------------------|
+   | Q[UIT]     | N/A         | N/A                                         |
+   |------------+-------------+---------------------------------------------|
+   |            |             | global-name                                 |
+   | R[ENAME]   | -G[BLNAME]  |                                             |
+   |            |             | -C[OLLATION]=collation                      |
+   |------------+-------------+---------------------------------------------|
+   | -          | -N[AME]     | old-name new-name                           |
+   |------------+-------------+---------------------------------------------|
+   | -          | -R[EGION]   | old-reg-name new-reg-name                   |
+   |------------+-------------+---------------------------------------------|
+   | -          | -S[EGMENT]  | old-seg-name new-seg-name                   |
+   |------------+-------------+---------------------------------------------|
+   | SE[TGD]    | N/A         | -F[ILE]=file-name [-Q[UIT]]                 |
+   |------------+-------------+---------------------------------------------|
+   | SH[OW]     | -A[LL]*     | N/A                                         |
+   |------------+-------------+---------------------------------------------|
+   |            |             | global-name                                 |
+   | -          | -G[BLNAME]  |                                             |
+   |            |             | -C[OLLATION]=collation                      |
+   |------------+-------------+---------------------------------------------|
+   |            |             | replication-instance                        |
+   | -          | -I[NSTANCE] |                                             |
+   |            |             | -F[ILE_NAME]=replication_instance_file      |
+   |------------+-------------+---------------------------------------------|
+   | -          | -M[AP]      | [R[EGION]=region-name]                      |
+   |------------+-------------+---------------------------------------------|
+   | -          | -N[AME]     | [namespace]                                 |
+   |------------+-------------+---------------------------------------------|
+   | -          | -R[EGION]   | [region-name]                               |
+   |------------+-------------+---------------------------------------------|
+   | -          | -S[EGMENT]  | [segment-name]                              |
+   |------------+-------------+---------------------------------------------|
+   | -          | T[EMPLATE]  | N/A                                         |
+   |------------+-------------+---------------------------------------------|
+   | T[EMPLATE] | -R[EGION]   | [-REGION-qualifier...]                      |
+   |------------+-------------+---------------------------------------------|
+   | -          | -S[EGMENT]  | [ -SEGMENT-qualifier...]                    |
+   |------------+-------------+---------------------------------------------|
+   | V[ERIFY]   | -A[LL]*     | N/A                                         |
+   |------------+-------------+---------------------------------------------|
+   |            |             | global-name                                 |
+   | -          | -G[BLNAME]  |                                             |
+   |            |             | -C[OLLATION]=collation                      |
+   |------------+-------------+---------------------------------------------|
+   | -          | -N[AME]     | [namespace]                                 |
+   |------------+-------------+---------------------------------------------|
+   | -          | -R[EGION]   | [region-name]                               |
+   |------------+-------------+---------------------------------------------|
+   | -          | -S[EGMENT]  | [segment-name]                              |
+   |------------+-------------+---------------------------------------------|
+   | -          | -M[AP]      | N/A                                         |
+   |------------+-------------+---------------------------------------------|
+   | -          | -T[EMPLATE] | N/A                                         |
    +------------------------------------------------------------------------+
 
 2 Qualifier_Summary
    Qualifier Summary
 
    The following table summarizes all qualifiers for the ADD, CHANGE, and
-   TEMPLATE commands. The defaults are those supplied by FIS.
+   TEMPLATE commands. The defaults are those supplied by YottaDB.
 
    +-----------------------------------------------------------------------------------------------------+
    |                                       GDE Command Qualifiers                                        |
@@ -2131,25 +2170,29 @@
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
 
+   Copyright 2017-2018 YottaDB LLC and/or its subsidiaries. All Rights Reserved.
+
    Permission is granted to copy, distribute and/or modify this document
    under the terms of the GNU Free Documentation License, Version 1.3 or any
    later version published by the Free Software Foundation; with no Invariant
    Sections, no Front-Cover Texts and no Back-Cover Texts.
 
    GT.M(TM) is a trademark of Fidelity National Information Services, Inc.
+
+   YottaDB(TM) is a trademark of YottaDB LLC.
+
    Other trademarks are the property of their respective owners.
 
-   This document contains a description of GT.M and the operating
+   This document contains a description of YottaDB and the operating
    instructions pertaining to the various functions that comprise the system.
-   This document does not contain any commitment of FIS. FIS believes the
-   information in this publication is accurate as of its publication date;
-   such information is subject to change without notice. FIS is not
-   responsible for any errors or defects.
+   This document does not contain any commitment of YottaDB. YottaDB believes
+   the information in this publication is accurate as of its publication
+   date; such information is subject to change without notice.  YottaDB is
+   not responsible for any errors or defects.
 
    **Note**
 
-   This help file is a concise representation of revision V6.3-001 of the
-   UNIX Administration and Operations Guide. To obtain a copy of the current
-   revision, go to www.fis-gtm.com and then click on the User Documentation
-   tab.
+   This help file is a concise representation of the revision r1.20 of the
+   Administration and Operations Guide. To obtain a copy of the current
+   revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
 

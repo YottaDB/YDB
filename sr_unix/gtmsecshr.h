@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +25,7 @@
 # define DBGGSSHR(x)
 #endif
 #define ABSOLUTE_PATH(X)	('/' == X[0])
-#define GTMSECSHR_MESG_TIMEOUT  30
+#define GTMSECSHR_MESG_TIMEOUT  30 * MILLISECS_IN_SEC
 #define GTMSECSHR_PERMS		0666
 
 /* Exit codes from gtmsecshr - note matching text entries are in message table in secshr_client.c */
@@ -37,7 +40,7 @@
 #define UNABLETOCHDIR			8
 #define UNABLETODETERMINEPATH		9
 #define NOTGTMSECSHR			10
-#define BADGTMDISTDIR			11
+#define BADYDBDISTDIR			11
 #define LASTEXITCODE			11	/* Should have same value as last error code */
 
 /* return codes with gtmsecshr*/
@@ -84,7 +87,7 @@ typedef struct ipcs_mesg_struct
 	time_t		gt_sem_ctime;
 	time_t		gt_shm_ctime;
 	unsigned int	fn_len;
-	char		fn[GTM_PATH_MAX];
+	char		fn[YDB_PATH_MAX];
 } ipcs_mesg;
 
 typedef struct gtmsecshr_mesg_struct
@@ -101,7 +104,7 @@ typedef struct gtmsecshr_mesg_struct
 	union
 	{
 		int4 		id;	/* Can be pid, semid or shmid */
-		char 		path[GTM_PATH_MAX];
+		char 		path[YDB_PATH_MAX];
 		ipcs_mesg	db_ipcs;
 	} mesg;
 } gtmsecshr_mesg;

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,11 +70,11 @@ void	lvtree_newblock(symval *sym, int numElems)
 
 void	lvtreenode_newblock(symval *sym, int numElems)
 {
-	register lv_blk	*ptr;
-	register int	n;
-	lvTreeNode	*lv_base;
+	register		lv_blk	*ptr;
+	register gtm_uint64_t	n;
+	lvTreeNode		*lv_base;
 
-	n = numElems * SIZEOF(lvTreeNode) + SIZEOF(lv_blk);
+	n = ((gtm_uint64_t)numElems * SIZEOF(lvTreeNode)) + SIZEOF(lv_blk);
 	n = INTCAST(gtm_bestfitsize(n));
 	/* Maximize use of storage block we are going to get */
 	assert(DIVIDE_ROUND_DOWN(n - SIZEOF(lv_blk), SIZEOF(lvTreeNode)) >= numElems);

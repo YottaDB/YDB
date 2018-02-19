@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,6 +26,7 @@
 
 void gtcm_read_ast(struct CLB *c)
 {
+	ASSERT_IS_LIBGNPSERVER;
 	if (VMS_ONLY((c->ios.status & 1) == 0  &&  c->ios.status != SS$_DATAOVERUN)
 	    UNIX_ONLY(CMI_CLB_ERROR(c)))
 	{

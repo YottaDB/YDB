@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -80,22 +83,22 @@ MBSTART {															\
 
 #define SUSPICIOUS_EXTEND 	(2 * (dollar_tlevel ? sgm_info_ptr->cw_set_depth : cw_set_depth) < cs_addrs->ti->free_blocks)
 
-GBLREF	sigset_t	blockalrm;
-GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	sgmnt_data_ptr_t cs_data;
-GBLREF	unsigned char	cw_set_depth;
-GBLREF	uint4		dollar_tlevel;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	inctn_opcode_t	inctn_opcode;
-GBLREF	boolean_t	mu_reorg_process;
-GBLREF	uint4		process_id;
-GBLREF	sgm_info	*sgm_info_ptr;
-GBLREF	unsigned int	t_tries;
-GBLREF	jnl_gbls_t	jgbl;
-GBLREF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
-GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
-GBLREF	uint4		gtmDebugLevel;
-GBLREF	jnlpool_addrs	jnlpool;
+GBLREF	sigset_t		blockalrm;
+GBLREF	sgmnt_addrs		*cs_addrs;
+GBLREF	sgmnt_data_ptr_t	 cs_data;
+GBLREF	unsigned char		cw_set_depth;
+GBLREF	uint4			dollar_tlevel;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	boolean_t		mu_reorg_process;
+GBLREF	uint4			process_id;
+GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	unsigned int		t_tries;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	inctn_detail_t		inctn_detail;			/* holds detail to fill in to inctn jnl record */
+GBLREF	boolean_t		gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
+GBLREF	uint4			gtmDebugLevel;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_DBFILERR);
 error_def(ERR_DBFILEXT);
@@ -109,27 +112,6 @@ error_def(ERR_TOTALBLKMAX);
 error_def(ERR_WAITDSKSPACE);
 
 OS_PAGE_SIZE_DECLARE
-
-#if !defined(__sun) && !defined(__hpux)
-STATICFNDCL int extend_wait_for_fallocate(unix_db_info *udi, off_t new_size);
-STATICFNDEF int extend_wait_for_fallocate(unix_db_info *udi, off_t new_size)
-{
-	int to_wait, to_msg, wait_period, save_errno;
-
-	/* Attempt to fallocate every second, and send message to operator every 1/20 of cs_data->wait_disk_space */
-	wait_period = to_wait = DIVIDE_ROUND_UP(cs_data->wait_disk_space, CDB_STAGNATE + 1);
-	to_msg = (to_wait / 8) ? (to_wait / 8) : 1;		/* send around 8 messages during 1 wait_period */
-	do
-	{
-		if ((to_wait == cs_data->wait_disk_space) || (to_wait % to_msg == 0))
-			ISSUE_WAITDSKSPACE(to_wait, wait_period, send_msg_csa);
-		hiber_start(1000);
-		to_wait--;
-		save_errno = posix_fallocate(udi->fd, 0, new_size);
-	} while ((to_wait > 0) && (ENOSPC == save_errno));
-	return save_errno;
-}
-#endif
 
 STATICFNDCL int extend_wait_for_write(unix_db_info *udi, int blk_size, off_t new_eof);
 STATICFNDEF int extend_wait_for_write(unix_db_info *udi, int blk_size, off_t new_eof)
@@ -156,12 +138,12 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 {
 	sm_uc_ptr_t		old_base[2], mmap_retaddr;
 	boolean_t		was_crit, is_mm;
-	int			result, save_errno, status;
+	int			fd, result, save_errno, status, to_msg, to_wait, wait_period;
 	DEBUG_ONLY(int		first_save_errno);
 	uint4			new_bit_maps, bplmap, map, new_blocks, new_total, max_tot_blks, old_total;
 	uint4			jnl_status;
 	gtm_uint64_t		avail_blocks, mmap_sz;
-	off_t			new_eof, new_size;
+	off_t			new_eof, new_size, old_size;
 	trans_num		curr_tn;
 	unix_db_info		*udi;
 	inctn_opcode_t		save_inctn_opcode;
@@ -169,6 +151,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	cache_rec_ptr_t         cr;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_NOSPC_ENABLED */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -187,9 +170,6 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	   overflow and end up doing silly things.
 	*/
 	assert((blocks <= (MAXTOTALBLKS(cs_data) - cs_data->trans_hist.total_blks)) || WBTEST_ENABLED(WBTEST_FILE_EXTEND_ERROR));
-#	if defined(__sun) || defined(__hpux)
-	cs_data->defer_allocate = TRUE;
-#	endif
 	if (!blocks && (cs_data->defer_allocate || (TRANS_IN_PROG_TRUE == trans_in_prog)))
 		return (uint4)(NO_FREE_SPACE); /* should this be changed to show extension not enabled ? */
 	bplmap = cs_data->bplmap;
@@ -226,7 +206,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 			{
 				if (blocks > (uint4)avail_blocks)
 				{
-					if (!INST_FREEZE_ON_NOSPC_ENABLED(cs_addrs))
+					if (!INST_FREEZE_ON_NOSPC_ENABLED(cs_addrs, local_jnlpool))
 						return (uint4)(NO_FREE_SPACE);
 					else
 						send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_NOSPACEEXT), 4,
@@ -240,7 +220,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 #	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_MM_CONCURRENT_FILE_EXTEND) && dollar_tlevel && !MEMCMP_LIT(gv_cur_region->rname, "DEFAULT"))
 	{
-		SYSTEM("$gtm_dist/mumps -run $gtm_wbox_mrtn");
+		SYSTEM("$ydb_dist/mumps -run $gtm_wbox_mrtn");
 		assert(1 == cs_addrs->nl->wbox_test_seq_num);	/* should have been set by mubfilcpy */
 		cs_addrs->nl->wbox_test_seq_num = 2;	/* signal mupip backup to stop sleeping in mubfilcpy */
 	}
@@ -261,7 +241,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	 *	op_tcommit to invoke bm_getfree->gdsfilext, then we would have come here with a frozen region on which
 	 *	we hold crit.
 	 */
-	assert(!was_crit || !FROZEN_HARD(cs_data) || (dollar_tlevel && (CDB_STAGNATE <= t_tries)));
+	assert(!was_crit || !FROZEN_HARD(cs_addrs) || (dollar_tlevel && (CDB_STAGNATE <= t_tries)));
 	/*
 	 * If we are in the final retry and already hold crit, it is possible that csa->nl->wc_blocked is also set to TRUE
 	 * (by a concurrent process in phase2 which encountered an error in the midst of commit and secshr_db_clnup
@@ -275,19 +255,20 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		for ( ; ; )
 		{
 			grab_crit(gv_cur_region);
-			if (FROZEN_CHILLED(cs_data))
+			if (FROZEN_CHILLED(cs_addrs))
 				DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
+			assert(FROZEN(cs_data) || !cs_addrs->jnlpool || (cs_addrs->jnlpool == jnlpool));
 			if (!FROZEN(cs_data) && !IS_REPL_INST_FROZEN)
 				break;
 			rel_crit(gv_cur_region);
 			while (FROZEN(cs_data) || IS_REPL_INST_FROZEN)
 			{
 				hiber_start(1000);
-				if (FROZEN_CHILLED(cs_data) && CHILLED_AUTORELEASE(cs_data))
+				if (FROZEN_CHILLED(cs_addrs) && CHILLED_AUTORELEASE(cs_addrs))
 					break;
 			}
 		}
-	} else if (FROZEN_HARD(cs_data) && dollar_tlevel)
+	} else if (FROZEN_HARD(cs_addrs) && dollar_tlevel)
 	{	/* We don't want to continue with file extension as explained above. Hence return with an error code which
 		 * op_tcommit will recognize (as a cdb_sc_needcrit/cdb_sc_instancefreeze type of restart) and restart accordingly.
 		 */
@@ -296,6 +277,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		return (uint4)FINAL_RETRY_FREEZE_PROG;
 	} else
 		WAIT_FOR_REGION_TO_UNCHILL(cs_addrs, cs_data);
+	assert(!cs_addrs->jnlpool || (cs_addrs->jnlpool == jnlpool));
 	if (IS_REPL_INST_FROZEN && trans_in_prog)
 	{
 		assert(CDB_STAGNATE <= t_tries);
@@ -385,25 +367,42 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	CHECK_TN(cs_addrs, cs_data, cs_data->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 	new_total = old_total + new_blocks;
 	new_eof = BLK_ZERO_OFF(cs_data->start_vbn) + ((off_t)new_total * cs_data->blk_size);
-#	if !defined(__sun) && !defined(__hpux)
 	if (!cs_data->defer_allocate)
 	{
 		new_size = new_eof + cs_data->blk_size;
-		save_errno = posix_fallocate(udi->fd, 0, new_size);
+		old_size = new_blocks ? BLK_ZERO_OFF(cs_data->start_vbn) + ((off_t)old_total * cs_data->blk_size) : 0;
+		fd = udi->fd;
+		/* There seems to be a discrepancy between the manpage for posix_fallocate and the actual usage;
+		 * if you try to reserve space, it checks "current_size + len", versus "offset + len". This means that if
+		 * the file is more than half the size of the partition, the next posix_fallocate will fail
+		 * for a 0 increase use the documented way
+		 */
+		save_errno = posix_fallocate(fd, old_size, new_size - old_size);
 		DEBUG_ONLY(first_save_errno = save_errno);
 		if ((ENOSPC == save_errno) && IS_GTM_IMAGE)
-			save_errno = extend_wait_for_fallocate(udi, new_size);
+		{
+			/* Attempt to fallocate every second, and send message to operator every 1/20 of cs_data->wait_disk_space */
+			wait_period = to_wait = DIVIDE_ROUND_UP(cs_data->wait_disk_space, CDB_STAGNATE + 1);
+			to_msg = (to_wait / 8) ? (to_wait / 8) : 1;		/* send around 8 messages during 1 wait_period */
+			do
+			{
+				if ((to_wait == cs_data->wait_disk_space) || (to_wait % to_msg == 0))
+					ISSUE_WAITDSKSPACE(to_wait, wait_period, send_msg_csa);
+				hiber_start(1000);
+				to_wait--;
+				save_errno = posix_fallocate(fd, old_size, new_size - old_size);
+			} while ((to_wait > 0) && (ENOSPC == save_errno));
+		}
 		if (0 != save_errno)
 		{
 			GDSFILEXT_CLNUP;
 			assert(ENOSPC == save_errno);
 			if (ENOSPC != save_errno)
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_PREALLOCATEFAIL, 2, DB_LEN_STR(gv_cur_region),
-					     save_errno);
+					save_errno);
 			return (uint4)(NO_FREE_SPACE);
 		}
 	}
-#	endif
 	save_errno = db_write_eof_block(udi, udi->fd, cs_data->blk_size, new_eof, &(TREF(dio_buff)));
 	if ((ENOSPC == save_errno) && IS_GTM_IMAGE)
 		save_errno = extend_wait_for_write(udi, cs_data->blk_size, new_eof);
@@ -430,7 +429,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		{
 			GDSFILEXT_CLNUP;
 			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_DBFILERR, 5,
-						RTS_ERROR_LITERAL("fsync1()"), CALLFROM, status);
+				RTS_ERROR_LITERAL("fsync1()"), CALLFROM, status);
 			return (uint4)(NO_FREE_SPACE);
 		}
 	}
@@ -442,7 +441,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	DEBUG_ONLY(prev_extend_blks_to_upgrd = cs_data->blks_to_upgrd;)
 	/* inctn_detail.blks_to_upgrd_delta holds the increase in "csd->blks_to_upgrd" due to the file extension */
 	inctn_detail.blks2upgrd_struct.blks_to_upgrd_delta =
-			(IS_GDS_BLK_DOWNGRADE_NEEDED(cs_data->desired_db_format) ? new_bit_maps : 0);
+		(IS_GDS_BLK_DOWNGRADE_NEEDED(cs_data->desired_db_format) ? new_bit_maps : 0);
 	if (JNL_ENABLED(cs_data))
 	{
 		save_inctn_opcode = inctn_opcode;
@@ -451,7 +450,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		else
 			inctn_opcode = inctn_gdsfilext_gtm;
 		if (0 == jpc->pini_addr)
-			jnl_put_jrt_pini(cs_addrs);
+			jnl_write_pini(cs_addrs);
 		jnl_write_inctn_rec(cs_addrs);
 		inctn_opcode = save_inctn_opcode;
 		/* Harden INCTN to disk before updating/flushing database. This will ensure that any positive adjustment to the
@@ -575,6 +574,6 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_db_extends, 1);
 	if (!gtm_dbfilext_syslog_disable)
 		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), blocks, new_total,
-				&curr_tn);
+			&curr_tn);
 	return (SS_NORMAL);
 }

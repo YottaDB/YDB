@@ -1,0 +1,269 @@
+#################################################################
+#								#
+# Copyright 2001, 2012 Fidelity Information Services, Inc	#
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+	.sbttl	mval_def.si
+#	PAGE	+
+# -------------------------------------------
+# mval_def.si
+#
+#	This is an include file for
+#	SCO Unix 80386 masm assembler containing
+#	the macros for mval-related assembly routines.
+# -------------------------------------------
+
+mval_v_nm		=	0
+mval_v_int		=	1
+mval_v_str		=	2
+mval_v_num_approx	=	3
+mval_v_canonical	=	4
+mval_v_sym		=	5
+mval_v_sublit		=	6
+mval_v_retarg		=	7
+mval_v_utflen		=	8
+mval_v_aliascont	=	9
+
+mval_m_nm		=	0x001
+mval_m_int_without_nm	=	0x002
+mval_m_int		=	0x003
+mval_m_str		=	0x004
+mval_m_num_approx	=	0x008
+mval_m_canonical	=	0x010
+mval_m_sym		=	0x020
+mval_m_sublit		=	0x040
+mval_m_retarg		=	0x080
+mval_m_utflen		=	0x100
+mval_m_aliascont	=	0x200
+#
+#	Length of mval in bytes
+#
+mval_byte_len		=	32		/* If not multiple of 4, change op_fnget.s, op_forcenum.s, op_sto.s */
+#
+#	Offsets of type, exp, strlen, stradd, num in mval structure
+#
+mval_w_mvtype		=	0
+mval_b_exp		=	2
+mval_l_strlen		=	24
+mval_a_straddr		=	28
+#
+#	Address offset of number in mval
+#
+mvalnm_offs		=	12
+mval_l_m0		=	12
+mval_l_m1		=	16
+mval_esign_mask		=	0x080
+
+MV_BIAS			=	1000		/* 10**3 */
+MANT_LO			=	100000000	/* 10**8 */
+MANT_HI			=	1000000000	/* 10**9 */
+INT_HI			=	1000000		/* 10**6 */
+
+#	Stringpool structure offsets
+base			=	0
+free			=	4
+top			=	8
+
+# mvals passed to these macros must be registers
+
+	.sbttl	mval_def.si    mv_force_defined
+# ---------------------------------------
+#       mv_force_defined(reg)
+# ---------------------------------------
+.macro  mv_force_defined reg
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	mov	r4, #mval_m_str
+	add	r4, r4, #mval_m_nm
+	ands	r12, r4
+	bne	1f
+	mov	r0, \reg
+	bl	underr
+	mov	\reg, r0
+1:
+.endm
+
+	.sbttl	mval_def.si    mv_force_defined_strict
+# ---------------------------------------
+#       mv_force_defined_strict(reg)
+# ---------------------------------------
+.macro  mv_force_defined_strict reg
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	mov	r4, #mval_m_str
+	add	r4, r4, #mval_m_nm
+	ands	r12, r4
+	bne	1f
+	mov	r0, \reg
+	bl	underr_strict
+1:
+
+.endm
+
+	.sbttl	mval_def.si    mv_force_str
+# ---------------------------------------
+#	mv_force_str(reg)
+# ---------------------------------------
+.macro	mv_force_str	reg
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	ands	r4, r12, #mval_m_str
+	bne	1f
+	mov	r0, \reg
+	bl	n2s
+1:
+.endm
+
+	.sbttl	mval_def.si    mv_force_num
+# ---------------------------------------
+#	mv_force_num(reg)
+# ---------------------------------------
+.macro	mv_force_num	reg
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	ands	r4, r12, #mval_m_nm
+	bne	1f
+	mov	r0, \reg
+	bl	s2n
+1:
+.endm
+
+	.sbttl	mval_def.si    mv_force_str_if_num_approx
+# ---------------------------------------
+#	mv_force_str_if_num_approx(reg)
+# ---------------------------------------
+.macro	mv_force_str_if_num_approx	reg
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	ands	r4, r12, #mval_m_num_approx
+	beq	1f
+	mov	r0, \reg
+	bl	n2s
+1:
+.endm
+
+	.sbttl	mval_def.si    mv_i2mval
+# ---------------------------------------
+#	mv_i2mval(int, reg)
+# ---------------------------------------
+.macro	mv_i2mval	int, reg
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	ldr	r4, \int
+	mul	r4, r4, #MV_BIAS
+	str	r4, [\reg, +#mval_l_m1]
+.endm
+
+	.sbttl	mval_def.si    mv_if_string
+# ---------------------------------------
+#	mv_if_string(reg, label)
+# ---------------------------------------
+.macro	mv_if_string	reg, label
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	ands	r4, r12, #mval_m_str
+	bne	\label
+.endm
+
+	.sbttl	mval_def.si	mv_if_number
+# ---------------------------------------
+#	mv_if_number(reg, label)
+# ---------------------------------------
+.macro	mv_if_number	reg, label
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	ands	r4, r12, #mval_m_nm
+	bne	\label
+.endm
+
+	.sbttl	mval_def.si    mv_if_int
+# ---------------------------------------
+#	mv_if_int(reg, label)
+# ---------------------------------------
+.macro	mv_if_int	reg, label
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	ands	r4, r12, #mval_m_int_without_nm
+	bne	\label
+.endm
+
+	.sbttl	mval_def.si    mv_if_notstring
+# ---------------------------------------
+#	mv_if_notstring(reg, label)
+# ---------------------------------------
+.macro	mv_if_notstring	reg, label
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	ands	r4, r12, #mval_m_str
+	beq	\label
+.endm
+
+	.sbttl	mval_def.si    mv_if_notnumber
+# ---------------------------------------
+#	mv_if_notnumber(reg, label)
+# ---------------------------------------
+.macro	mv_if_notnumber	reg, label
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	ands	r4, r12, #mval_m_nm
+	beq	\label
+.endm
+
+	.sbttl	mval_def.si    mv_if_notint
+# ---------------------------------------
+#	mv_if_notint(reg, label)
+# ---------------------------------------
+.macro	mv_if_notint	reg, label
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	ands	r4, r12, #mval_m_int_without_nm
+	beq	\label
+.endm
+
+	.sbttl	mval_def.si    mv_if_defined
+# ---------------------------------------
+#	mv_if_defined(reg, label)
+# ---------------------------------------
+.macro	mv_if_defined	reg, label
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	mov	r4, #mval_m_str
+	add	r4, r4, #mval_m_nm
+	ands	r12, r4
+	bne	\label
+.endm
+
+	.sbttl	mval_def.si    mv_if_notdefined
+# ---------------------------------------
+#	mv_if_notdefined(reg, label)
+# ---------------------------------------
+.macro	mv_if_notdefined reg, label
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	mov	r4, #mval_m_str
+	add	r4, r4, #mval_m_nm
+	ands	r12, r4
+	beq	\label
+.endm
+
+	.sbttl	mval_def.si    mv_if_canonical
+# -------------------------------------------------------------
+# WARNING:
+# Following macro needs to be supplied with 2 extra labels that
+# are used by local branch instructions, tmp_label1 and tmp_label2
+# -------------------------------------------------------------
+#	mv_if_canonical(reg,mainlabel, tmp_label1, tmp_label2)
+# -------------------------------------------------------------
+.macro	mv_if_canonical	reg, mainlabel, tmp_label1, tmp_label2
+	ldr	r12, [\reg, +#mval_w_mvtype]
+	ands	r4, r12, #mval_m_nm
+	beq	\tmp_label1
+	ands	r4, r12, #mval_m_num_approx
+	bne	\tmp_label2
+	b	\mainlabel
+
+\tmp_label1:
+	mov	r0, \reg
+	bl	val_iscan
+	cmp	r0, #0
+	bne	\mainlabel
+
+\tmp_label2:
+.endm

@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +55,6 @@
 #include "buddy_list.h"
 #include "hashtab_int4.h"
 #include "tp.h"
-#include "init_secshr_addrs.h"
 #include "fork_init.h"
 #include "gtmio.h"
 #include "have_crit.h"
@@ -65,8 +67,6 @@
 #ifndef lint
 static char rcsid[] = "$Header:$";
 #endif
-
-GBLDEF	CLI_ENTRY	*cmd_ary = NULL; /* The GTCM server does not have any command tables so initialize command array to NULL */
 
 GBLREF short 			gtcm_ast_avail;
 GBLREF bool			licensed;
@@ -97,6 +97,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	char			msg[256];
 	int			save_errno, maxfds;
 
+	ASSERT_IS_LIBGTCM;
 	/*  Disassociate from the rest of the universe */
 	get_page_size();
 	gtm_wcswidth_fnptr = gtm_wcswidth;
@@ -172,7 +173,6 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	rts_stringpool = stringpool;
 	curr_pattern = pattern_list = &mumps_pattern;
 	pattern_typemask = mumps_pattern.typemask;
-	INVOKE_INIT_SECSHR_ADDRS;
 	initialize_pattern_table();
 	/* Preallocate some timer blocks. */
 	prealloc_gt_timers();
@@ -188,6 +188,7 @@ void gtcm_fail(int sig)
 	void rc_rundown();
         struct sigaction def;
 
+	ASSERT_IS_LIBGTCM;
 	FPRINTF(stderr,"GT.CM terminating on signal %d, cleaning up...\n", sig);
 	/* quickie cleanup */
 	rc_rundown();

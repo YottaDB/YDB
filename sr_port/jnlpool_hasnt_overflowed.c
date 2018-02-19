@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,9 +34,9 @@ boolean_t jnlpool_hasnt_overflowed(jnlpool_ctl_ptr_t jctl, uint4 jnlpool_size, q
 	 * to be read (including the jnl_data_header). To avoid such conditions, we should commit the order of shared memory
 	 * updates before and after the content is updated (see t_end.c, tp_tend.c). To ensure the source server reads content
 	 * that is correct, it should invalidate its cache before the read. After the read, to ensure that the content is correct
-	 * (not some that may have been overwritten), it has to invalidate its cache to fetch the latest value of early_write_addr.
+	 * (not some that may have been overwritten), it has to invalidate its cache to fetch the latest value of rsrv_write_addr.
 	 *
 	 */
-	SHM_READ_MEMORY_BARRIER; /* to fetch the latest early_write_addr */
-	return (jnlpool_size >= (jctl->early_write_addr - read_addr));
+	SHM_READ_MEMORY_BARRIER; /* to fetch the latest rsrv_write_addr */
+	return (jnlpool_size >= (jctl->rsrv_write_addr - read_addr));
 }

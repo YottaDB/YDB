@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,9 +34,9 @@ error_def(ERR_ERRWZTRAP);
 			errmsg = ERR_ERRWIOEXC;				\
 			break;						\
 		case SFT_ZTRAP:						\
-			if (err_act == &dollar_etrap.str)		\
+			if (&((TREF(dollar_etrap)).str) == err_act)	\
 				errmsg = ERR_ERRWETRAP;			\
-			else if (err_act == &dollar_ztrap.str)		\
+			else if (&(TREF(dollar_ztrap)).str == err_act)	\
 				errmsg = ERR_ERRWZTRAP;			\
 			else						\
 				assertpro(FALSE && err_act);		\

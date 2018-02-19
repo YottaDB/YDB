@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -56,8 +59,8 @@
 #include "mu_all_version_standalone.h"
 #include "db_write_eof_block.h"
 
-LITREF  char            	gtm_release_name[];
-LITREF  int4           		gtm_release_name_len;
+LITREF  char            	ydb_release_name[];
+LITREF  int4           		ydb_release_name_len;
 
 UNIX_ONLY(static sem_info	*sem_inf;)
 
@@ -213,7 +216,7 @@ void mupip_upgrade(void)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,
 					LEN_AND_LIT("Maximum master map size is now increased from 32K to 56K"));
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUPGRDSUCC, 6, db_fn_len, db_fn,
-					RTS_ERROR_LITERAL("upgraded"), gtm_release_name_len, gtm_release_name);
+					RTS_ERROR_LITERAL("upgraded"), ydb_release_name_len, ydb_release_name);
 			mupip_exit(SS_NORMAL);
 		}
 		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
@@ -268,7 +271,7 @@ void mupip_upgrade(void)
 	{
 		F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUUPGRDNRDY, 4, db_fn_len, db_fn,
-								gtm_release_name_len, gtm_release_name);
+								ydb_release_name_len, ydb_release_name);
 		mupip_exit(ERR_MUNOUPGRD);
 	}
 	max_max_rec_size = v15_csd.blk_size - SIZEOF(blk_hdr);
@@ -321,7 +324,7 @@ void mupip_upgrade(void)
 	F_CLOSE(channel, rc);	/* resets "channel" to FD_INVALID */
 	mu_all_version_release_standalone(sem_inf);
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_MUPGRDSUCC, 6, db_fn_len, db_fn, RTS_ERROR_LITERAL("upgraded"),
-		   								gtm_release_name_len, gtm_release_name);
+		   							ydb_release_name_len, ydb_release_name);
 	mupip_exit(SS_NORMAL);
 }
 

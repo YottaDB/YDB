@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -124,8 +124,11 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 			labname.len = 0;
 			break;
 		case TK_PLUS:
-			stx_error(ERR_LABELEXPECTED);
-			return NULL;
+			if (labref)
+			{	/* extrinsics require a label */
+				stx_error(ERR_LABELEXPECTED);
+				return NULL;
+			}	/* WARNING fallthrough possible */
 		default:
 			labname.len = 0;
 			label.oprclass = NO_REF;
@@ -205,7 +208,7 @@ triple *entryref(opctype op1, opctype op2, mint commargcode, boolean_t can_comma
 		}
 	} else
 	{
-		if ((NO_REF == label.oprclass) && (0 == labname.len))
+		if ((NO_REF == label.oprclass) && (0 == labname.len) && (NO_REF == offset.oprclass))
 		{
 			stx_error(ERR_LABELEXPECTED);
 			return NULL;

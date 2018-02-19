@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,7 +112,7 @@ void iorm_write_utf(mstr *v)
 	int4		inchars, char_count;		/* in characters */
 	int4		inlen, outbytes, mblen;		/* in bytes */
 	int4		availwidth, usedwidth, mbwidth;	/* in display columns */
-	int		status, padsize,fstat_res,save_errno;
+	int		status, padsize, fstat_res, save_errno;
 	wint_t		utf_code;
 	io_desc		*iod;
 	d_rm_struct	*rm_ptr;
@@ -164,6 +164,7 @@ void iorm_write_utf(mstr *v)
 			if (-1 == fstat_res)
 			{
 				save_errno = errno;
+				SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
 					      CALLFROM, save_errno);
 			}
@@ -249,7 +250,7 @@ void iorm_write_utf(mstr *v)
 					out_ptr = pvt_crypt_buf.addr;
 				} else
 					out_ptr = (char *)outstart;
-				if (rm_ptr->fifo || rm_ptr->pipe)
+				if (rm_ptr->fifo || rm_ptr->is_pipe)
 				{
 					WRITEPIPE(rm_ptr->fildes, rm_ptr->pipe_buff_size, out_ptr, outbytes, status);
 				} else
@@ -374,7 +375,7 @@ void iorm_write(mstr *v)
 
 	if (rm_ptr->read_only)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DEVICEREADONLY);
-	if ((!rm_ptr->fifo) && (!rm_ptr->pipe) && rm_ptr->output_encrypted)
+	if ((!rm_ptr->fifo) && (!rm_ptr->is_pipe) && rm_ptr->output_encrypted)
 	{
 		if (!iod->dollar.zeof)
 		{
@@ -396,11 +397,15 @@ void iorm_write(mstr *v)
 				if (-1 == fstat_res)
 				{
 					save_errno = errno;
+					SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
 						CALLFROM, save_errno);
 				}
 				if (0 != statbuf.st_size)
+				{
+					SET_DOLLARDEVICE_ERRSTR(iod, ONE_COMMA_CRYPTBADWRTPOS);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CRYPTBADWRTPOS);
+				}
 			}
 		}
 	}
@@ -412,36 +417,49 @@ void iorm_write(mstr *v)
 		flags = 0;
 		FCNTL2(rm_ptr->fildes, F_GETFL, flags);
 		if (0 > flags)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+		{
+			save_errno = errno;
+			SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, save_errno);
+		}
 		if (!(flags & O_NONBLOCK))
 		{
 			FCNTL3(rm_ptr->fildes, F_SETFL, (flags | O_NONBLOCK), fcntl_res);
 			if (0 > fcntl_res)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, errno);
+			{
+				save_errno = errno;
+				SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
+					save_errno);
+			}
 		}
 	}
 
-	if (!rm_ptr->fifo && !rm_ptr->pipe && !rm_ptr->fixed && (2 < rm_ptr->fildes) && (RM_WRITE != rm_ptr->lastop))
+	if (!rm_ptr->fifo && !rm_ptr->is_pipe && !rm_ptr->fixed && (2 < rm_ptr->fildes) && (RM_WRITE != rm_ptr->lastop))
 	{
 		/* need to do an lseek to set current location in file */
 		if ((off_t)-1 == (lseek(rm_ptr->fildes, rm_ptr->file_pos, SEEK_SET)))
 		{
+			save_errno = errno;
+			SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
-				      RTS_ERROR_LITERAL("iorm_write()"), CALLFROM, errno);
+				      RTS_ERROR_LITERAL("iorm_write()"), CALLFROM, save_errno);
 		}
 	}
 
 
 	/* if current file position is less than bom_num_bytes and it is a disk in utf mode and last op not a WRITE
 	   skip past the BOM */
-	if (!rm_ptr->fifo && !rm_ptr->pipe && IS_UTF_CHSET(iod->ochset) && (rm_ptr->file_pos < rm_ptr->bom_num_bytes) &&
+	if (!rm_ptr->fifo && !rm_ptr->is_pipe && IS_UTF_CHSET(iod->ochset) && (rm_ptr->file_pos < rm_ptr->bom_num_bytes) &&
 	    (2 < rm_ptr->fildes) && (RM_WRITE != rm_ptr->lastop))
 	{
 		/* need to do lseek to skip the BOM before writing*/
 		if ((off_t)-1 == (lseek(rm_ptr->fildes, (off_t)rm_ptr->bom_num_bytes, SEEK_SET)))
 		{
+			save_errno = errno;
+			SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
-				      RTS_ERROR_LITERAL("iorm_write()"), CALLFROM, errno);
+				      RTS_ERROR_LITERAL("iorm_write()"), CALLFROM, save_errno);
 		}
 	}
 
@@ -483,7 +501,7 @@ void iorm_write(mstr *v)
 			out_ptr = pvt_crypt_buf.addr;
 		} else
 			out_ptr = out;
-		if (rm_ptr->fifo || rm_ptr->pipe)
+		if (rm_ptr->fifo || rm_ptr->is_pipe)
 		{
 			WRITEPIPE(rm_ptr->fildes, rm_ptr->pipe_buff_size, out_ptr, len, status);
 		} else

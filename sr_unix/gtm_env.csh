@@ -3,6 +3,11 @@
 # Copyright (c) 2001-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -49,8 +54,13 @@
 
 # customization for non-GG environment
 setenv gtm_version_change 1
-setenv gtm_exe $gtm_dist
-setenv gtm_inc "$gtm_dist:h/inc"
+if (! $?ydb_dist) then
+	setenv ydb_dist $gtm_dist
+endif
+
+setenv gtm_exe $ydb_dist
+setenv gtm_inc "$ydb_dist:h/inc"
+
 # customization ends
 if ( $?gtm_version_change == "1" ) then
 
@@ -117,9 +127,9 @@ if ( $?gtm_version_change == "1" ) then
 	setenv	gt_ld_options_bta	"$gt_ld_options_common"
 	setenv	gt_ld_options_dbg	"$gt_ld_options_common"
 	setenv	gt_ld_options_pro	"$gt_ld_options_common"
-	setenv	gt_ld_options_gtmshr	""
+	setenv	gt_ld_options_yottadb	""
 # force the linker to retain gtmci.o & dependent modules even if not referenced.
-	setenv gt_ld_ci_u_option	"-Wl,-u,gtm_ci -Wl,-u,gtm_is_main_thread"
+	setenv gt_ld_ci_u_option	"-Wl,-u,ydb_ci -Wl,-u,gtm_is_main_thread"
 
 	setenv gt_ld_extra_libs		""		# platform specific GT.M libraries
 
@@ -234,7 +244,7 @@ endif
 # Platform-specific overrides, if any:
 # customization for non-GG environment
 if (! $?gtm_tools) then
-	set gtm_tools = $gtm_dist:h/tools
+	set gtm_tools = $ydb_dist:h/tools
 	set gtm_tools_set
 endif
 # customization ends
@@ -249,16 +259,16 @@ endif
 
 # Allow platform specific gt_ld_ci related symbol changes
 # force the linker to retain gtmci.o & dependent modules even if not referenced.
-setenv gt_ld_ci_options "$gt_ld_ci_u_option $gt_ld_options_gtmshr"
+setenv gt_ld_ci_options "$gt_ld_ci_u_option $gt_ld_options_yottadb"
 # customization for non-GG environment
 if !($?gt_as_option_I) then
-        setenv  gt_as_option_I  "-I$gtm_inc"
+	setenv	gt_as_option_I	"-I$gtm_inc"
 else
-        setenv  gt_as_option_I  "$gt_as_option_I -I$gtm_inc"
+	setenv	gt_as_option_I	"$gt_as_option_I -I$gtm_inc"
 endif
 if !($?gt_cc_option_I) then
-        setenv  gt_cc_option_I  "-I$gtm_inc"
+	setenv	gt_cc_option_I	"-I$gtm_inc"
 else
-        setenv  gt_cc_option_I  "$gt_cc_option_I -I$gtm_inc"
+	setenv	gt_cc_option_I	"$gt_cc_option_I -I$gtm_inc"
 endif
 # customization ends

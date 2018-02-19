@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,12 +42,9 @@ void gtcmd_cst_init(cm_region_head *ptr)
 	gd_region	*reg;
 	sgmnt_addrs	*csa;
 
+	ASSERT_IS_LIBGNPSERVER;
 	reg = ptr->reg;
-	if (VMS_ONLY(gtcm_ast_avail > 0) UNIX_ONLY(TRUE))
-		gvcst_init(reg);
-	else
-		rts_error(VARLSTCNT(1) CMERR_CMEXCDASTLM);
-	VMS_ONLY(gtcm_ast_avail--);
+	gvcst_init(reg, NULL);
 #	ifdef DEBUG
 	assert(gv_keysize >= DBKEYSIZE(reg->max_key_size));
 	csa = &FILE_INFO(reg)->s_addrs;

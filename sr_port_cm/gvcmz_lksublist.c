@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +40,7 @@ void gvcmz_lksublist(struct CLB *lnk)
 	unsigned short	len, msg_len;
 	uint4		status;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	hdr = ptr = lnk->mbf;
 	save_hdr = *hdr;
 	ptr += S_HDRSIZE + S_LAFLAGSIZE + 1;
@@ -45,7 +50,7 @@ void gvcmz_lksublist(struct CLB *lnk)
 	lk_walk = ((link_info *)(lnk->usr))->netlocks;
 	while (lk_walk)
 	{
-		len = 1 + 1 + 1 + lk_walk->total_length; /* regnum + translev + subsc count + key */
+		len = 1 + 1 + 1 + lk_walk->nref_length; /* regnum + translev + subsc count + key */
 		if (msg_len + len + SIZEOF(len) >= lnk->mbl)
 		{
 			*hdr = CMMS_L_LKREQNODE;
@@ -62,15 +67,15 @@ void gvcmz_lksublist(struct CLB *lnk)
 			count = 0;
 			ptr = list_len + 1;
 		}
-		len = 1 + 1 + 1 + lk_walk->total_length; /* regnum + translev + subsc count + key */
+		len = 1 + 1 + 1 + lk_walk->nref_length; /* regnum + translev + subsc count + key */
 		CM_PUT_USHORT(ptr, len, ((link_info *)(lnk->usr))->convert_byteorder);
 		ptr += SIZEOF(unsigned short);
 		*ptr++ = lk_walk->region->cmx_regnum;
 		*ptr++ = lk_walk->translev;
 		assert(256 > lk_walk->subscript_cnt); /* else the assignment "*ptr++ = lk_walk->subscript_cnt" could be lossy */
 		*ptr++ = lk_walk->subscript_cnt;
-		memcpy(ptr, lk_walk->value, lk_walk->total_length);
-		ptr += lk_walk->total_length;
+		memcpy(ptr, lk_walk->value, lk_walk->nref_length);
+		ptr += lk_walk->nref_length;
 		count++;
 		msg_len += len + SIZEOF(len);
 		lk_walk = lk_walk->next;

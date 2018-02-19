@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,6 +65,7 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
     char	*bptr, *eptr;
     char	*ag_name, *ag_pass, *s;
 
+	ASSERT_IS_LIBGTCM;
     bptr = buff;
 
 /*  Version numbers */
@@ -236,9 +240,9 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
     cptr->xptr += ss_len.value;
 
 /*  Implementation ID (out) */
-    len = SIZEOF(GTM_RELEASE_NAME) - 1;
+    len = SIZEOF(YDB_RELEASE_NAME) - 1;
     OMI_SI_WRIT(len, bptr);
-    (void) memcpy(bptr, GTM_RELEASE_NAME, len);
+    (void) memcpy(bptr, YDB_RELEASE_NAME, len);
     bptr += len;
 /*  Server name (out) */
     OMI_SI_WRIT(0, bptr);

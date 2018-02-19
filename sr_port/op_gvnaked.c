@@ -41,11 +41,12 @@
 #include "tp_set_sgm.h"
 #include "dpgbldir.h"
 
-GBLREF	uint4		dollar_tlevel;
+GBLREF	bool		undef_inhibit;
+GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_key		*gv_currkey;
 GBLREF	gv_namehead	*gv_target;
 GBLREF	sgmnt_addrs	*cs_addrs;
-GBLREF	gd_region	*gv_cur_region;
+GBLREF	uint4		dollar_tlevel;
 
 error_def(ERR_GVNAKED);
 error_def(ERR_MAXNRSUBSCRIPTS);
@@ -142,7 +143,7 @@ STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg
 	val = val_arg;
 	is_null = FALSE;
 	was_null = TREF(gv_some_subsc_null);
-	if (!val->mvtype)
+	if (!val->mvtype && !undef_inhibit)
 		gv_currkey->end = 0;
 	for ( ; ; )
 	{

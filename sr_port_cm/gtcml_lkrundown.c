@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +39,7 @@ void gtcml_lkrundown(void)
 	unsigned short	top,len;
 	uint4		status;
 
+	ASSERT_IS_LIBGNPSERVER;
 	cancel_timer((TID)curr_entry);	/* Cancel any outstanding lock starvation timer */
 	reg_walk = curr_entry->region_root;
 	curr_entry->state = 0;

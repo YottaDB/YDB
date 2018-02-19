@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -97,63 +100,15 @@ enum cdb_sc gvcst_expand_any_key (srch_blk_status *blk_stat, sm_uc_ptr_t rec_top
 				if (curptr >= rec_top)
 					break;
 			}
-		}
-		else /* a star record in index block */
+		} else /* a star record in index block */
 		{
-			if (curptr + *rec_size != rec_top || NULL == hist_ptr)
-			{
-				assert(t_tries < CDB_STAGNATE);
-				return cdb_sc_rmisalign;
-			}
-			while (0 != cur_level)
-			{
-				tblk_size = ((blk_hdr_ptr_t)blk_base)->bsiz;
-				GET_LONG(tblk_num, blk_base + tblk_size - SIZEOF(block_id));
-				if (0 == tblk_num  || cs_data->trans_hist.total_blks - 1 < tblk_num)
-				{
-					assert(t_tries < CDB_STAGNATE);
-					return cdb_sc_badlvl;
-				}
-				cur_level--;
-				hist_ptr->h[cur_level].tn =  cs_addrs->ti->curr_tn;
-				if (!(blk_base = t_qread(tblk_num, (sm_int_ptr_t)(&(hist_ptr->h[cur_level].cycle)),
-					&(hist_ptr->h[cur_level].cr) )))
-				{
-					assert(t_tries < CDB_STAGNATE);
-					return (enum cdb_sc)rdfail_detail;
-				}
-				if (((blk_hdr_ptr_t)blk_base)->levl != cur_level)
-				{
-					assert(t_tries < CDB_STAGNATE);
-					return cdb_sc_badlvl;
-				}
-				hist_ptr->h[cur_level].buffaddr = blk_base;
-				hist_ptr->h[cur_level].blk_num = tblk_num;
-				hist_ptr->h[cur_level].prev_rec.match = 0;
-				hist_ptr->h[cur_level].prev_rec.offset = 0;
-				hist_ptr->h[cur_level].curr_rec.match = 0;
-				hist_ptr->h[cur_level].curr_rec.offset = 0;
-			}
-			tblk_size = ((blk_hdr_ptr_t)blk_base)->bsiz;
-			/* expand *-key from right most leaf level block of the
-			   sub-tree, of which, the original block is root  */
-			if (cdb_sc_normal != (status = (gvcst_expand_any_key(&hist_ptr->h[cur_level], blk_base + tblk_size,
-				expanded_star_key, &star_rec_size, &star_keylen, &star_keycmpc, hist_ptr))))
-				return status;
-			if (*keylen + *keycmpc) /* Previous key exists */
-			{
-				GET_CMPC(*keycmpc, expanded_key, expanded_star_key);
-			}
-			memcpy(expanded_key, expanded_star_key, star_keylen + star_keycmpc);
-			*keylen = star_keylen + star_keycmpc - *keycmpc;
-			*rec_size = *keylen + *keycmpc + BSTAR_REC_SIZE;
-			return cdb_sc_normal;
-		} /* end else if *-record */
-	}/* end of "while" loop */
+			assert(NULL == hist_ptr);
+			assert(t_tries < CDB_STAGNATE);
+			return cdb_sc_rmisalign;
+		}	/* end else if *-record */
+	}	/* end of "while" loop */
 	if (curptr == rec_top)
-	{
 		return cdb_sc_normal;
-	}
 	else
 	{
 		assert(t_tries < CDB_STAGNATE);

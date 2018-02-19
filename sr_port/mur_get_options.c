@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -260,7 +263,7 @@ void	mur_get_options(void)
 	if (cli_present("REDIRECT") == CLI_PRESENT)
 	{
 		file_name_specified = (char *)malloc(MAX_FN_LEN + 1);
-		file_name_expanded = (char *)malloc(MAX_FN_LEN + 1);
+		file_name_expanded = (char *)malloc(YDB_PATH_MAX);
 		length = MAX_LINE;
 		if (!CLI_GET_STR_ALL("REDIRECT", qual_buffer, &length))
 			mupip_exit(ERR_MUPCLIERR);
@@ -297,10 +300,16 @@ void	mur_get_options(void)
 				rl_ptr->next = rl_ptr1;
 			rl_ptr = rl_ptr1;
 			file_name_specified_len = (unsigned int)(cptr - entry_ptr);
+			if (file_name_specified_len > (MAX_FN_LEN + 1))
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVREDIRQUAL, 2,
+ 							LEN_AND_LIT("Redirect DB filename too long: greater than 255"));
+				mupip_exit(ERR_MUPCLIERR);
+			}
 			memcpy(file_name_specified, entry, file_name_specified_len);
 			*(file_name_specified + file_name_specified_len)= '\0';
 			if (!get_full_path(file_name_specified, file_name_specified_len, file_name_expanded,
-				&file_name_expanded_len, MAX_FN_LEN, &ustatus))
+				&file_name_expanded_len, YDB_PATH_MAX, &ustatus))
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVREDIRQUAL, 2,
 									LEN_AND_LIT("Unable to find full pathname"));
@@ -324,6 +333,12 @@ void	mur_get_options(void)
 			rl_ptr->org_name[rl_ptr->org_name_len] = '\0';
 			entry_ptr = cptr + 1; /* skip the = */
 			file_name_specified_len = length - file_name_specified_len - 1; /* the rest of the entry);*/
+			if (file_name_specified_len > (MAX_FN_LEN + 1))
+                        {
+                                  gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVREDIRQUAL, 2,
+							LEN_AND_LIT("Redirect DB filename too long: greater than 255"));
+                                  mupip_exit(ERR_MUPCLIERR);
+                        }
 			memcpy(file_name_specified, entry_ptr, file_name_specified_len);
 			*(file_name_specified + file_name_specified_len)= '\0';
 			if (!get_full_path(file_name_specified, file_name_specified_len, file_name_expanded,

@@ -3,6 +3,12 @@
 # Copyright (c) 2013-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+# Copyright (c) 2017,2018 Stephen L Johnson.			#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -17,23 +23,21 @@ thirdparty = gcrypt
 algo = AES256CFB
 # If the machine has a libgcrypt version <= 1.4.1, then FIPS mode cannot be turned on.
 gcrypt_nofips = 0
-# Default HP-UX OpenSSL include/lib base directory.
-HPUX_OPENSSL_ROOT = /opt/openssl/1.0.1e/
 
-# Verify that $gtm_dist is defined
-ifndef gtm_dist
-$(error $$gtm_dist not defined!)
+# Verify that $ydb_dist is defined
+ifndef ydb_dist
+$(error $$ydb_dist not defined!)
 endif
 
-DISTDIR = $(gtm_dist)
+DISTDIR = $(ydb_dist)
 PLUGINDIR = $(DISTDIR)/plugin
 GTMCRYPTDIR = $(PLUGINDIR)/gtmcrypt
 CURDIR = `pwd`
 
-# Find out whether we are already in $gtm_dist/plugin/gtmcrypt directory.
+# Find out whether we are already in $ydb_dist/plugin/gtmcrypt directory.
 NOT_IN_GTMCRYPTDIR = $(shell [ "$(CURDIR)" = "$(GTMCRYPTDIR)" ] ; echo $$?)
 
-# Users may install GT.M without Unicode support
+# Users may install YottaDB without Unicode support
 HAVE_UNICODE = $(shell [ -d "$(DISTDIR)/utf8" ] ; echo $$?)
 
 # Determine machine and OS type.
@@ -43,7 +47,7 @@ MACHTYPE = $(shell uname -m)
 ifneq (,$(findstring Linux,$(UNAMESTR)))
 	FILEFLAG = -L
 endif
-# 64 bit version of GT.M? 0 for yes!
+# 64 bit version of YottaDB? 0 for yes!
 BIT64 = $(shell file $(FILEFLAG) $(DISTDIR)/mumps | grep -q -E '64-bit|ELF-64'; echo $$?)
 
 # Determine if GPG 2.1+ is installed
@@ -58,6 +62,8 @@ ifeq ($(HAVE_GPG21),1)
 	USE_LOOPBACK = "-DUSE_GPGME_PINENTRY_MODE_LOOPBACK"
 endif
 
+# Determine if libgcrypt is installed.
+HAVE_GPGCRYPT = $(shell which libgcrypt-config 2> /dev/null)
 
 # Default installation target. This allows for the build system to randomize `thirdparty' and `algo' thereby changing the default
 # gtmcrypt install link.
@@ -102,34 +108,16 @@ ifneq (,$(findstring Linux,$(UNAMESTR)))
 	# So that we can build shared library.
 	LDSHR = -shared
 	IFLAGS += -I /usr/local/ssl/include
+	IFLAGS += -I /usr/include/openssl-1.0
 	ifeq ($(BIT64),0)
 		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86_64-linux-gnu
+	else ifneq (,$(findstring arm,$(MACHTYPE)))
+		IFLAGS += -I /usr/include/openssl -I /usr/lib/arm-linux-gnueabihf
+		LIBFLAGS += -L /usr/lib/arm-linux-gnueabihf
 	else
 		LIBFLAGS += -L /usr/local/ssl/lib -L /usr/lib/x86-linux-gnu
 	endif
-endif
-
-# Solaris
-ifneq (,$(findstring Solaris,$(UNAMESTR)))
-	# -fPIC for Position Independent Code; -m64 for 64-bit
-	CFLAGS += -fPIC -m64
-	LDFLAGS = -Wl,-64 -m64
-	# So that dependent libraries are loaded from the parent library's load path at runtime
-	RPATHFLAGS = -Wl,-R,'$$ORIGIN'
-	LDSHR = -G
-endif
-
-# HP-UX
-ifneq (,$(findstring HP-UX,$(UNAMESTR)))
-	# +Z is for Position Independent Code; -Ae for Extended ANSI mode and +DD64 for 64-bit
-	CFLAGS += +Z -Ae  +DD64
-	LDFLAGS = +DD64
-	# So that dependent libraries are loaded from the parent library's load path at runtime
-	RPATHFLAGS = -Wl,+b,\$$ORIGIN
-	# -b for shared library and -B,symbolic for assigning protected export calls to symbols.
-	LDSHR = -Wl,-b,-B,symbolic
-	LIBFLAGS = -L $(HPUX_OPENSSL_ROOT)/lib
-	IFLAGS = -I $(HPUX_OPENSSL_ROOT)/include
+	LIBFLAGS += -L/usr/lib/openssl-1.0
 endif
 
 # AIX
@@ -157,10 +145,13 @@ ifneq (,$(findstring AIX,$(UNAMESTR)))
 	# On AIX, build maskpass and libgtmcryptutil.so with OpenSSL's libcrypto instead of libgcrypt.
 	default_thirdparty_CFLAGS = -DUSE_OPENSSL
 	default_thirdparty_LDFLAGS = -lcrypto
+	# Set the default library
+	thirdparty = openssl
+	install_targ = libgtmcrypt_$(thirdparty)_$(algo).so
 endif
 
 # Common header and library paths
-IFLAGS += -I /usr/local/include -I /usr/include -I $(gtm_dist) -I $(CURDIR)
+IFLAGS += -I /usr/local/include -I /usr/include -I $(ydb_dist) -I $(CURDIR)
 ifeq ($(BIT64),0)
 	LIBFLAGS += -L /usr/local/lib64
 	LIBFLAGS += -L /usr/local/lib -L /usr/lib64 -L /usr/lib -L /lib64 -L /lib -L `pwd`
@@ -196,12 +187,16 @@ maskpass: maskpass.c $(crypt_util_srcfiles) $(crypt_util_hdrfiles)
 	$(CC) $(CFLAGS) -DUSE_SYSLIB_FUNCS $(default_thirdparty_CFLAGS) maskpass.c $(crypt_util_srcfiles)	\
 		$(LDFLAGS) $@ $(default_thirdparty_LDFLAGS)
 
+ifneq ($(HAVE_GPGCRYPT),)
 gcrypt: libgtmcrypt_gcrypt_AES256CFB.so
 
 libgtmcrypt_gcrypt_AES256CFB.so: $(crypt_srcfiles) $(crypt_hdrfiles) libgtmcryptutil.so
 	@echo ; echo "Compiling $@..."
 	$(CC) $(CFLAGS) -DUSE_GCRYPT -DUSE_AES256CFB $(gcrypt_nofips_flag) $(crypt_srcfiles) $(LDSHR)		\
 		$(RPATHFLAGS) $(LDFLAGS) $@ -lgcrypt -lgpgme -lgpg-error $(COMMON_LIBS)
+else
+gcrypt:
+endif
 
 openssl: libgtmcrypt_openssl_AES256CFB.so
 
@@ -222,14 +217,14 @@ install: all
 	echo "unmaskpwd: gtm_status_t gc_mask_unmask_passwd(I:gtm_string_t*,O:gtm_string_t*[512])" >> $(PLUGINDIR)/gpgagent.tab
 	ln -fs ./$(install_targ) $(PLUGINDIR)/libgtmcrypt.so
 	cp -pf pinentry.m $(PLUGINDIR)/r
-	(cd $(PLUGINDIR)/o      && env gtm_chset=M     ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
+	(cd $(PLUGINDIR)/o      && env gtm_chset=M     ${ydb_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
 ifeq ($(NOT_IN_GTMCRYPTDIR),1)
 	cp -pf *.sh *.m $(GTMCRYPTDIR)/
 	cp -f maskpass $(GTMCRYPTDIR)/
 endif
 ifeq ($(HAVE_UNICODE),0)
 	@echo "UTF-8 mode library installation may fail if gtm_icu_version (${gtm_icu_version}) is not set"
-	(cd $(PLUGINDIR)/o/utf8 && env gtm_chset=UTF-8 ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
+	(cd $(PLUGINDIR)/o/utf8 && env gtm_chset=UTF-8 ${ydb_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
 endif
 
 uninstall:

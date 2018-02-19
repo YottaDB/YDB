@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -46,7 +49,7 @@
 #include "sgtm_putmsg.h"
 #include "copy.h"
 
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	gtmsource_state_t	gtmsource_state;
 GBLREF	boolean_t		gtmsource_logstats;
@@ -82,27 +85,27 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	time_t			temp_time;
 	gtm_time4_t		time4;
 
-	gtmsource_local = jnlpool.gtmsource_local;
+	gtmsource_local = jnlpool->gtmsource_local;
 	if (SHUTDOWN == gtmsource_local->shutdown)
 	{
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Shutdown signalled\n");
 		gtmsource_end(); /* Won't return */
 	}
-	if (jnlpool.jnlpool_ctl->freeze != last_seen_freeze_flag)
+	if (jnlpool->jnlpool_ctl->freeze != last_seen_freeze_flag)
 	{
-		last_seen_freeze_flag = jnlpool.jnlpool_ctl->freeze;
+		last_seen_freeze_flag = jnlpool->jnlpool_ctl->freeze;
 		if (last_seen_freeze_flag)
 		{
 			sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFROZEN, 1,
-					jnlpool.repl_inst_filehdr->inst_info.this_instname);
+					jnlpool->repl_inst_filehdr->inst_info.this_instname);
 			repl_log(gtmsource_log_fp, TRUE, FALSE, print_msg);
-			sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool.jnlpool_ctl->freeze_comment);
+			sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool->jnlpool_ctl->freeze_comment);
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		}
 		else
 		{
 			sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTUNFROZEN, 1,
-					jnlpool.repl_inst_filehdr->inst_info.this_instname);
+					jnlpool->repl_inst_filehdr->inst_info.this_instname);
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		}
 	}
@@ -177,7 +180,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 #else
 #error unsupported platform
 #endif
-			STRCPY(gtmsource_options.log_file, jnlpool.gtmsource_local->log_file);
+			STRCPY(gtmsource_options.log_file, jnlpool->gtmsource_local->log_file);
 		}
 	        if ( log_switched == TRUE )
         	        repl_log(gtmsource_log_fp, TRUE, TRUE, "Change log to %s successful\n", gtmsource_local->log_file);
@@ -198,10 +201,6 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "End statistics logging\n");
 	}
 	if ((gtmsource_filter & EXTERNAL_FILTER) && ('\0' == gtmsource_local->filter_cmd[0]))
-	{
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Stopping filter\n");
-		repl_stop_filter();
-		gtmsource_filter &= ~EXTERNAL_FILTER;
-	}
+		STOP_EXTERNAL_FILTER_IF_NEEDED(gtmsource_filter, gtmsource_log_fp, "GTMSOURCE_POLL_ACTIONS");
 	return (SS_NORMAL);
 }

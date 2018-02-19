@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +28,7 @@ void gtcm_gnp_cpktdmp(FILE *fp, struct CLB *lnk, int sta, unsigned char *buf, si
 {
     char newmsg[512];
 
+	ASSERT_IS_LIBGNPSERVER;
     if ((SIZEOF(newmsg)-strlen(msg)) > 25)
     {
     	newmsg[SIZEOF(newmsg)-1] = '\0';
@@ -55,6 +59,7 @@ void gtcm_gnp_pktdmp(FILE *fp, struct CLB *lnk, int sta, unsigned char *buf, siz
 	unsigned nibble;
 	char linebuf[32 + 1 + 16 + 1];
 
+	ASSERT_IS_LIBGNPSERVER;
 	switch (sta)
 	{
 	case CM_CLB_WRITE:

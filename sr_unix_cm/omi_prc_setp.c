@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,6 +44,7 @@ omi_prc_setp(cptr, xend, buff, bend)
     omi_si	 dllen;
     char	*dlptr;
 
+	ASSERT_IS_LIBGTCM;
 /*  Replicate flag */
     OMI_SI_READ(&replicate, cptr->xptr);
 

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -76,6 +79,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	int             len, node2;
 	gvnh_reg_t	*gvnh_reg;
 
+	ASSERT_IS_LIBGTCM;
 	GET_SHORT(dsid, &xdsid->dsid.value);
 	GET_SHORT(node, &xdsid->node.value);
 	if (!dsid_list)
@@ -106,7 +110,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		gv_cur_region->dyn.addr->fname_len = fpath2.len;
 		REG_ACC_METH(gv_cur_region) = dba_bg;
 		ESTABLISH_RET(rc_fnd_file_ch1, RC_SUCCESS);
-		gvcst_init(gv_cur_region);
+		gvcst_init(gv_cur_region, NULL);
 		REVERT;
 		change_reg();
 		/* check to see if this DB has the reserved bytes field set
@@ -206,7 +210,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		gv_cur_region->dyn.addr->fname_len = len;
 		REG_ACC_METH(gv_cur_region) = dba_bg;
 		ESTABLISH_RET(rc_fnd_file_ch2, RC_SUCCESS);
-		gvcst_init(gv_cur_region);
+		gvcst_init(gv_cur_region, NULL);
 		REVERT;
 		change_reg();
 		/* check to see if this DB has the reserved bytes field set
@@ -301,6 +305,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 /* clean up from gvcst_init() failure, when dsid_list was NULL (open first db) */
 static CONDITION_HANDLER(rc_fnd_file_ch1)
 {	/* undo setup */
+	ASSERT_IS_LIBGTCM;
 	START_CH(FALSE);
 	free(dsid_list->fname);
 	dsid_list = NULL;
@@ -314,6 +319,7 @@ static CONDITION_HANDLER(rc_fnd_file_ch1)
 /* clean up from gvcst_init() failure, when dsid_list was non-NULL (open new db) */
 static CONDITION_HANDLER(rc_fnd_file_ch2)
 {	/* undo setup */
+	ASSERT_IS_LIBGTCM;
 	START_CH(FALSE);
 	free(fdi_ptr->fname);
 	fdi_ptr->fname = NULL;

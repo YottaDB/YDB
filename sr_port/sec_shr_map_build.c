@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,7 +20,6 @@
 #include "gdsfhead.h"
 #include "gdscc.h"
 #include "gdsbml.h"
-#include "probe.h"
 #include "sec_shr_map_build.h"
 #include "min_max.h"
 #include "bit_set.h"
@@ -49,31 +48,10 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 	csd = csa->hdr;
 	cnl = csa->nl;
 	bplmap = csd->bplmap;
-	/* The following PROBE's are needed before DETERMINE_BML_FUNC, as the macro uses these pointers. */
-	if (!GTM_PROBE(SIZEOF(sgmnt_addrs), csa, READ))
-	{
-		assert(FALSE);
-		return FALSE;
-	}
-	if (!(GTM_PROBE(NODE_LOCAL_SIZE_DBS, csa->nl, WRITE)))
-	{
-		assert(FALSE);
-		return FALSE;
-	}
-	if (!GTM_PROBE(SIZEOF(sgmnt_data), csa->hdr, READ))
-	{
-		assert(FALSE);
-		return FALSE;
-	}
 	DETERMINE_BML_FUNC(bml_func, cs, csa);
 	DEBUG_ONLY(prev_bitnum = -1;)
 	for (;;)
 	{
-		if (!GTM_PROBE(SIZEOF(*array), array, READ))
-		{
-			assert(FALSE);
-			return FALSE;
-		}
 		bitnum = *array;
 		assert((uint4)bitnum < bplmap);	/* check that bitnum is positive and within 0 to bplmap */
 		if (0 == bitnum)
@@ -85,11 +63,6 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 		DEBUG_ONLY(prev_bitnum = (int4)bitnum);
 		setbit = bitnum * BML_BITS_PER_BLK;
 		ptr = base_addr + setbit / 8;
-		if (!GTM_PROBE(SIZEOF(*ptr), ptr, WRITE))
-		{
-			assert(FALSE);
-			return FALSE;
-		}
 		setbit &= 7;
 		if (bml_busy == bml_func)
 		{

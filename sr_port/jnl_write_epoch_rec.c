@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,17 +12,9 @@
 
 #include "mdef.h"
 
-#if defined(UNIX)
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "eintr_wrappers.h"
-#elif defined(VMS)
-#include <descrip.h> /* Required for gtmsource.h */
-#include <rms.h>
-#include <iodef.h>
-#include <efndef.h>
-#include "iosb_disk.h"
-#endif
 #include "gtm_inet.h"
 
 #include "gtm_time.h"
@@ -42,13 +34,10 @@
 #include "jnl_get_checksum.h"
 #include "anticipatory_freeze.h"
 
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF 	jnl_gbls_t		jgbl;
-GBLREF  jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	seq_num			seq_num_zero;
-
-#ifdef UNIX
 GBLREF	int4			strm_index;
-#endif
 
 error_def	(ERR_PREMATEOF);
 
@@ -58,16 +47,17 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	jnl_buffer_ptr_t	jb;
 	jnl_private_control	*jpc;
 	jnl_file_header		*header;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	unsigned char		hdr_base[REAL_JNL_HDR_LEN + MAX_IO_BLOCK_SIZE];
 	sgmnt_data_ptr_t	csd;
-#if defined(VMS)
-	io_status_block_disk	iosb;
-#endif
 	uint4			jnl_fs_block_size, read_write_size;
 	int			idx;
 
-	assert(csa->now_crit);
+	assert(!IN_PHASE2_JNL_COMMIT(csa));
 	jpc = csa->jnl;
+	save_jnlpool = jnlpool;
+	if (csa->jnlpool && (csa->jnlpool != jnlpool))
+		jnlpool = csa->jnlpool;
 	jb = jpc->jnl_buff;
 	assert((csa->ti->early_tn == csa->ti->curr_tn) || (csa->ti->early_tn == csa->ti->curr_tn + 1));
 	assert(0 != jpc->pini_addr);
@@ -90,10 +80,10 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 	/* we need to write epochs if jgbl.forw_phase_recovery so future recovers will have a closer turnaround point */
 	jb->next_epoch_time =  epoch_record.prefix.time + jb->epoch_interval;
 	epoch_record.prefix.checksum = INIT_CHECKSUM_SEED;
-	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csd, jnlpool_ctl);	/* debug-only sanity check between seqno of filehdr and jnlpool */
+	ASSERT_JNL_SEQNO_FILEHDR_JNLPOOL(csa, jnlpool);	/* debug-only sanity check between seqno of csa->hdr and jnlpool */
 	if (jgbl.forw_phase_recovery)
 	{	/* Set jnl-seqno of epoch record from the current seqno that rollback is playing. Note that in case of -recover
-		 * we dont actually care what seqnos get assigned to the epoch record so we go ahead and set it to the same
+		 * we don't actually care what seqnos get assigned to the epoch record so we go ahead and set it to the same
 		 * fields even though those might be 0 or not.
 		 */
 		epoch_record.jnl_seqno = jgbl.mur_jrec_seqno;
@@ -128,24 +118,21 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 			header->eov_tn = jb->eov_tn;
 			header->eov_timestamp = jb->eov_timestamp;
 			header->end_seqno = jb->end_seqno;
-#			ifdef UNIX
 			/* Keep header->strm_end_seqno[] uptodate as well if applicable */
 			if (INVALID_SUPPL_STRM != strm_index)
 			{
 				for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 					header->strm_end_seqno[idx] = jb->strm_end_seqno[idx];
 			}
-#			endif
 			JNL_DO_FILE_WRITE(csa, csd->jnl_file_name,
 				jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);
 			/* for abnormal status do not do anything. journal file header will have previous end_of_data */
 		}
 	}
-	jb->end_of_data = jb->freeaddr;
+	jb->end_of_data = jb->rsrv_freeaddr;
 	jb->eov_tn = csa->ti->curr_tn;
 	jb->eov_timestamp = jgbl.gbl_jrec_time;
 	jb->end_seqno = epoch_record.jnl_seqno;
-#	ifdef UNIX
 	/* Keep header->strm_end_seqno[] uptodate as well if applicable */
 	if (INVALID_SUPPL_STRM != strm_index)
 	{
@@ -163,10 +150,11 @@ void	jnl_write_epoch_rec(sgmnt_addrs *csa)
 		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 			jb->strm_end_seqno[idx] = csd->strm_reg_seqno[idx];
 	}
-#	endif
 	epoch_record.filler = 0;
 	epoch_record.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED,
 								(unsigned char *)&epoch_record, SIZEOF(struct_jrec_epoch));
-	jnl_write(jpc, JRT_EPOCH, (jnl_record *)&epoch_record, NULL, NULL, NULL);
-	jb->post_epoch_freeaddr = jb->freeaddr;
+	jnl_write(jpc, JRT_EPOCH, (jnl_record *)&epoch_record, NULL);
+	jb->post_epoch_freeaddr = jb->rsrv_freeaddr;
+	if (save_jnlpool != jnlpool)
+		jnlpool = save_jnlpool;
 }

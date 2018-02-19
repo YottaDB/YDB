@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,7 @@ int eval_expr(oprtype *a)
 	SETUP_THREADGBL_ACCESS;
 	if (!expratom(&optyp_1))
 	{	/* If didn't already add an error of our own, do so now with catch all expression error */
-		if (OC_RTERROR != (TREF(curtchain))->exorder.bl->exorder.bl->exorder.bl->opcode)
+		if (!ALREADY_RTERROR)
 			stx_error(ERR_EXPR);
 		return EXPR_FAIL;
 	}

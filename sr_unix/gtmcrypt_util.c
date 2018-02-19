@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -94,9 +97,10 @@ GBLDEF gtm_free_fnptr_t			gtm_free_fnptr;
 }
 #endif
 
-int gc_load_gtmshr_symbols()
+int gc_load_yottadb_symbols()
 {
-#	ifndef USE_SYSLIB_FUNCS
+/* CYGWIN TODO: This is to fix a linker error. Undo when it is fixed. */
+#	if !defined(USE_SYSLIB_FUNCS) && !defined(__CYGWIN__)
 	gtm_malloc_fnptr = &gtm_malloc;
 	gtm_free_fnptr = &gtm_free;
 #	endif
@@ -223,7 +227,7 @@ int gc_read_passwd(char *prompt, char *buf, int maxlen, void *tty)
  */
 int gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out)
 {
-	char		tmp[GTM_PASSPHRASE_MAX], mumps_exe[GTM_PATH_MAX], hash_in[GTM_PASSPHRASE_MAX], hash[GTMCRYPT_HASH_LEN];
+	char		tmp[GTM_PASSPHRASE_MAX], mumps_exe[YDB_PATH_MAX], hash_in[GTM_PASSPHRASE_MAX], hash[GTMCRYPT_HASH_LEN];
 	char 		*ptr, *mmap_addrs;
 	int		passwd_len, len, i, save_errno, fd, have_hash, status;
 	struct stat	stat_info;
@@ -258,12 +262,12 @@ int gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out)
 			return -1;
 		}
 		strncpy(hash_in, ptr, passwd_len);
-		if (!(ptr = getenv(GTM_DIST_ENV)))
+		if (!(ptr = getenv(YDB_DIST_ENV)))
 		{
-			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, GTM_DIST_ENV);
+			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, YDB_DIST_ENV);
 			return -1;
 		}
-		SNPRINTF(mumps_exe, GTM_PATH_MAX, "%s/%s", ptr, "mumps");
+		SNPRINTF(mumps_exe, YDB_PATH_MAX, "%s/%s", ptr, "mumps");
 		if (0 == stat(mumps_exe, &stat_info))
 		{
 			SNPRINTF(tmp, GTM_PASSPHRASE_MAX, "%ld", (long) stat_info.st_ino);

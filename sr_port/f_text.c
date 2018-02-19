@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -27,7 +30,7 @@ GBLREF boolean_t	run_time;
 GBLREF command_qualifier cmd_qlf;
 GBLREF mident		routine_name;
 
-STATICDEF char 		*suppressed_values[] = {"GTM$DMOD", "GTM$CI"};
+STATICDEF char 		*suppressed_values[] = {"GTM$DMOD"};
 
 error_def(ERR_RPARENMISSING);
 error_def(ERR_RTNNAME);
@@ -118,7 +121,7 @@ int f_text(oprtype *a, opctype op)
 				c = TREF(lexical_ptr) - STR_LIT_LEN("GTM$");
 				advancewindow();			/* parse to $ */
 				if (0 == memcmp(c, "GTM$", STR_LIT_LEN("GTM$")))
-				{	/* parse past GTM$DMOD or GTM$CI to prevent RPARENMISSING error */
+				{	/* parse past GTM$DMOD to prevent RPARENMISSING error */
 					advancewindow();		/* parse to end of ident */
 					len = TREF(lexical_ptr) - c - (TK_EOL == TREF(director_token) ? 0 : 1);
 					for (implicit_offset = 0; ARRAYSIZE(suppressed_values) > implicit_offset; implicit_offset++)

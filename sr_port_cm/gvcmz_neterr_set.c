@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +25,7 @@ void gvcmz_neterr_set(struct CLB *c)
 {
 	error_def(ERR_UNSOLCNTERR);
 
+	ASSERT_IS_LIBGNPCLIENT;
 	VMS_ONLY(
 		if (c->ios.status == MSG$_CONNECT || c->ios.status == MSG$_INTMSG || c->ios.status == MSG$_CONFIRM)
 		        return;

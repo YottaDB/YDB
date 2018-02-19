@@ -3,6 +3,9 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -31,3 +34,6 @@ ENTRY	op_linestart
         movq    REG64_ACCUM, msf_mpc_off(REG64_RET1)	# Save incoming return address in frame_pointer->mpc
 	movq    REG_PV, msf_ctxt_off(REG64_RET1)	# Save ctxt in frame_pointer
 	ret
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+# This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+.section        .note.GNU-stack,"",@progbits

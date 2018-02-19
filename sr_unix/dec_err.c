@@ -10,10 +10,11 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include <stdarg.h>
+
 #include "fao_parm.h"
 #include "error.h"
-#include "msg.h"
 #include "util.h"
 #include "util_out_print_vaparm.h"
 #include "gtmmsg.h"

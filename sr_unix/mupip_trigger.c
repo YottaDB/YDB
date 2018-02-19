@@ -35,6 +35,7 @@
 #include "targ_alloc.h"
 #include "gvcst_protos.h"
 #include "trigger_upgrade_protos.h"
+#include "restrict.h"
 
 GBLREF	gd_addr		*gd_header;
 GBLREF	boolean_t	is_replicator;
@@ -43,6 +44,7 @@ error_def(ERR_INVSTRLEN);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_NOSELECT);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TRIGMODREGNOTRW);
 
 void mupip_trigger(void)
@@ -71,6 +73,11 @@ void mupip_trigger(void)
 		{
 			util_out_print("Missing input file name", TRUE);
 			mupip_exit(ERR_MUPCLIERR);
+		}
+		if (RESTRICTED(trigger_mod))
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "MUPIP TRIGGER -TRIGGERFILE");
+			mupip_exit(ERR_MUNOACTION);
 		}
 		is_replicator = TRUE;
 		TREF(ok_to_see_statsdb_regs) = TRUE;
@@ -105,6 +112,11 @@ void mupip_trigger(void)
 	}
 	if (CLI_PRESENT == cli_present("UPGRADE"))
 	{	/* Invoke MUPIP TRIGGER -UPGRADE */
+		if (RESTRICTED(trigger_mod))
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "MUPIP TRIGGER -UPGRADE");
+			mupip_exit(ERR_MUNOACTION);
+		}
 		gvinit();
 		DEBUG_ONLY(TREF(in_trigger_upgrade) = TRUE;)
 		for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions; reg < reg_top; reg++)

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +14,7 @@
 #define __JNL_WRITE_PBLK_H__
 
 /* We do not put this in jnl.h, because it needs all including jnl.h must include gdsblk.h */
-void jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, blk_hdr_ptr_t buffer, uint4 com_csum);
+void jnl_write_pblk(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum);
 
 #endif
 

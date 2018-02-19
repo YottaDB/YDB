@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,9 +12,6 @@
 
 #include "mdef.h"
 
-#ifdef VMS
-#include <descrip.h> /* Required for gtmsource.h */
-#endif
 #include "gtm_inet.h"
 
 #include "gtm_time.h"
@@ -40,6 +37,7 @@ void    jnl_write_trunc_rec(sgmnt_addrs *csa, uint4 orig_total_blks, uint4 orig_
 	struct_jrec_trunc	trunc_rec;
 	jnl_private_control	*jpc;
 
+	assert(!IN_PHASE2_JNL_COMMIT(csa));
 	assert(csa->now_crit);
 	jpc = csa->jnl;
 	trunc_rec.prefix.jrec_type = JRT_TRUNC;
@@ -53,6 +51,6 @@ void    jnl_write_trunc_rec(sgmnt_addrs *csa, uint4 orig_total_blks, uint4 orig_
 	trunc_rec.orig_free_blocks = orig_free_blocks;
 	trunc_rec.total_blks_after_trunc = total_blks_after_trunc;
 	trunc_rec.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)&trunc_rec, SIZEOF(struct_jrec_trunc));
-	jnl_write(jpc, JRT_TRUNC, (jnl_record *)&trunc_rec, NULL, NULL, NULL);
+	jnl_write(jpc, JRT_TRUNC, (jnl_record *)&trunc_rec, NULL);
 }
 

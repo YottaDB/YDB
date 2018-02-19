@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,4 +12,4 @@
 
 /* Check that the latch is not stuck on a dead process */
 
-void performCASLatchCheck(sm_global_latch_ptr_t, boolean_t);
+boolean_t performCASLatchCheck(sm_global_latch_ptr_t, boolean_t);

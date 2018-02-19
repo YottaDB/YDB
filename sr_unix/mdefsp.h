@@ -2,6 +2,12 @@
  *                                                              *
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
+ * Copyright (c) 2017,2018 Stephen L Johnson.			*
+ * All rights reserved.						*
  *                                                              *
  *    This source code contains the intellectual property       *
  *    of its copyright holder(s), and is made available         *
@@ -56,8 +62,6 @@ typedef uint2 mach_inst;
 #define SHMDT(X) shmdt((char *)(X))
 typedef uint4 mach_inst;
 
-/* Use rc_mval2subsc only for sun until every DTM client (that needs 16-bit precision as opposed to 18-bit for GT.M) is gone */
-#define	mval2subsc	rc_mval2subsc
 #ifndef VAR_COPY
 #define VAR_COPY	va_copy
 #endif
@@ -178,6 +182,24 @@ typedef char  mach_inst;	/* machine instruction */
 #  else
 #    define INTERLOCK_ADD(X,Y,Z) (add_inter(Z, (sm_int_ptr_t)(X), (sm_global_latch_ptr_t)(Y)))
 #  endif
+#endif
+
+#if __arm__
+#  if __ARM_ARCH_6__
+#    define __armv6l__
+#  elif __ARM_ARCH_7A__
+#    define __armv7l__
+#  else
+#    error UNSUPPORTED PLATFORM
+#  endif
+
+#  define CACHELINE_SIZE		64
+#  define USHBIN_SUPPORTED
+#  define AUTORELINK_SUPPORTED
+#  define LINKAGE_PSECT_BOUNDARY	8
+#  define INO_T_LONG
+#  undef BIGENDIAN
+typedef uint4 mach_inst;	/* machine instruction */
 #endif
 
 /* On NON_USHBIN_ONLY platforms, reserve enough space in routine header for the dummy

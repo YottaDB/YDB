@@ -279,7 +279,7 @@ LITDEF struct
 			dqdel(triptr, exorder);				/* if it's TRUE, so just pretend it never appeared */
 		}
 		if (shifting = ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode)))
-		{	/* NOTE - assignent above */
+		{	/* NOTE - assignment above */
 			temp_expr_start = TREF(expr_start);
 			triptr = newtriple(OC_GVRECTARG);
 			triptr->operand[0] = put_tref(temp_expr_start);
@@ -289,6 +289,8 @@ LITDEF struct
 		advancewindow();
 	else if ((TK_EOL != TREF(window_token)) || !cmd_data[x].eol_ok)
 	{
+		if (NULL != oldchain)
+			setcurtchain(oldchain);
 		stx_error(ERR_SPOREOL);
 		return FALSE;
 	}
@@ -301,6 +303,8 @@ LITDEF struct
 		{	advancewindow();
 			if ((TK_SPACE == TREF(window_token)) || (TK_EOL == TREF(window_token)))
 			{
+				if (NULL != oldchain)
+					setcurtchain(oldchain);
 				stx_error(ERR_EXPR);
 				return FALSE;
 			}

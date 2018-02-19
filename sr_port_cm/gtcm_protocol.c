@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +28,7 @@ LITDEF	gtcm_proto_cpu_info_t	gtcm_proto_cpu_info[] =
 	{LIT_AND_LEN("RS6000"),			"PPC"},
 	{LIT_AND_LEN("AXP"),			"AXP"},
 	{LIT_AND_LEN("HP-PA"),			"PAR"},
+	{LIT_AND_LEN("armv7l"),			"ARMV7L"},
 	{LIT_AND_LEN("x86"),			"X86"},
 	{LIT_AND_LEN("x86_64"),			"X86_64"},
 	{LIT_AND_LEN("S390"),			"390"},
@@ -46,8 +50,7 @@ LITDEF	gtcm_proto_os_info_t	gtcm_proto_os_info[] =
 	{LIT_AND_LEN(GTCM_PROTO_BAD_OS),	GTCM_PROTO_BAD_OS}
 };
 
-LITREF	char		gtm_release_name[];
-LITREF	int4		gtm_release_name_len;
+LITREF	char		ydb_release_name[];
 LITREF	char		gtm_version[];
 LITREF	char 		cm_ver_name[];
 LITREF	int4		cm_ver_len;
@@ -57,6 +60,7 @@ static	protocol_msg	proto;
 
 void gtcm_protocol(protocol_msg *pro)
 {
+	ASSERT_IS_LIBCMISOCKETTCP;
 	if (!proto_built)
 	{
 		memcpy(proto.msg + CM_CPU_OFFSET, encode_cpu(), 3);
@@ -87,11 +91,13 @@ void gtcm_protocol(protocol_msg *pro)
 
 boolean_t gtcm_is_big_endian(protocol_msg *pro)
 {
+	ASSERT_IS_LIBCMISOCKETTCP;
 	return pro->msg[CM_ENDIAN_OFFSET] == GTCM_BIG_ENDIAN_INDICATOR;
 }
 
 boolean_t gtcm_protocol_match(protocol_msg *peer, protocol_msg *me)
 {
+	ASSERT_IS_LIBCMISOCKETTCP;
 	if (memcmp(peer->msg + CM_TYPE_OFFSET, me->msg + CM_TYPE_OFFSET, 3))
 		return FALSE;
 	assert(0 <= memcmp(me->msg, CMM_MIN_PEER_LEVEL, 3));
@@ -106,8 +112,9 @@ static char *encode_cpu()
 	unsigned char	*p;
 	int		count, cpuidx;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	count = 0;
-	p = (unsigned char *)gtm_release_name;
+	p = (unsigned char *)ydb_release_name;
 	/* fourth arg in release name string */
 	while (*p && count < 3)
 	{
@@ -133,8 +140,9 @@ static char *encode_os()
 	unsigned char	*p;
 	int		count, osidx;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	count = 0;
-	p = (unsigned char *)gtm_release_name;
+	p = (unsigned char *)ydb_release_name;
 	/* third arg in release name string */
 	while (*p && count < 2)
 	{

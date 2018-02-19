@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -11,6 +14,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include <stdarg.h>
 #include "gtm_stdio.h"
 #include <errno.h>
@@ -21,12 +25,15 @@
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
 #include "gtm_limits.h"
+
+#include <dlfcn.h>
+
 #include "cli.h"
 #include "stringpool.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mvalconv.h"
-#include "gtmxc_types.h"
+#include "libyottadb.h"
 #include "lv_val.h"
 #include "fgncal.h"
 #include "gtmci.h"
@@ -47,6 +54,7 @@
 #include "gtmmsg.h"
 #include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
+#include "gtmio.h"
 #ifdef GTM_TRIGGER
 # include "gdsroot.h"
 # include "gtm_facility.h"
@@ -68,8 +76,10 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "have_crit.h"
 #include "callg.h"
 #include "min_max.h"
+#include "alias.h"
+#include "parm_pool.h"
+#include "auto_zlink.h"
 
-GBLREF	parmblk_struct 		*param_list;
 GBLREF  stack_frame     	*frame_pointer;
 GBLREF  unsigned char		*msp;
 GBLREF  mv_stent         	*mv_chain;
@@ -87,10 +97,15 @@ GBLREF	boolean_t		gtm_jvm_process;
 GBLREF	pthread_t		gtm_main_thread_id;
 GBLREF	boolean_t		gtm_main_thread_id_set;
 #endif
-GBLREF	char			gtm_dist[GTM_PATH_MAX];
-GBLREF boolean_t		gtm_dist_ok_to_use;
+GBLREF	char			ydb_dist[YDB_PATH_MAX];
+GBLREF	boolean_t		ydb_dist_ok_to_use;
+GBLREF	int			dollar_truth;
+GBLREF	CLI_ENTRY		mumps_cmd_ary[];
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
+
 LITREF  gtmImageName            gtmImageNames[];
+
+void gtm_levl_ret_code(void);
 
 error_def(ERR_ACTLSTTOOLONG);
 error_def(ERR_CALLINAFTERXIT);
@@ -99,7 +114,8 @@ error_def(ERR_CINOENTRY);
 error_def(ERR_CIRCALLNAME);
 error_def(ERR_CITPNESTED);
 error_def(ERR_DISTPATHMAX);
-error_def(ERR_GTMDISTUNDEF);
+error_def(ERR_FMLLSTMISSING);
+error_def(ERR_YDBDISTUNDEF);
 error_def(ERR_GTMSECSHRPERM);
 error_def(ERR_INVGTMEXIT);
 error_def(ERR_JOBLABOFF);
@@ -171,9 +187,6 @@ error_def(ERR_SYSCALL);
  * and any other mv_stents no longer needed. This macro saves the current value of fgncal_stack on the M stack in an
  * MVST_STCK_SP type mv_stent. Note MVST_STCK_SP is chosen (instead of MVST_STCK) because MVST_STCK_SP doesn't get removed
  * if the frame is rewritten by a ZGOTO for instance.
- *
- * Note: If call-in's use of setjmp/longjmp for returns is changed to use the trigger method of actually unwinding the M
- * frames and returning "normally", then the usage of fgncal_stack likely becomes superfluous so should be looked at.
  */
 # define SAVE_FGNCAL_STACK								\
 {											\
@@ -184,7 +197,8 @@ error_def(ERR_SYSCALL);
 	}										\
 }
 
-static callin_entry_list* get_entry(const char* call_name)
+STATICFNDCL callin_entry_list* get_entry(const char *call_name);
+STATICFNDEF callin_entry_list* get_entry(const char *call_name)
 {	/* Lookup in a hashtable for entry corresponding to routine name */
 	ht_ent_str      *callin_entry;
 	stringkey       symkey;
@@ -199,20 +213,21 @@ static callin_entry_list* get_entry(const char* call_name)
 }
 
 /* Java-specific version of call-in handler. */
-int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
+int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
 		unsigned int *has_ret_value)
 {
 	boolean_t		need_rtnobj_shm_free;
 	callin_entry_list	*entry;
+	int4			*lnr_tab_ent;
 	mstr			label, routine;
 	int			has_return, i, len;
 	rhdtyp          	*base_addr;
+	char			*xfer_addr;
 	uint4			inp_mask, out_mask, mask;
 	mval			arg_mval, *arg_ptr;
-	enum gtm_types		arg_type;
-	gtm_string_t		*mstr_parm;
+	enum ydb_types		arg_type;
+	ydb_string_t		*mstr_parm;
 	parmblk_struct 		param_blk;
-	void 			op_extcall(), op_extexfun(), flush_pio(void);
 	volatile int		*save_var_on_cstack_ptr;	/* Volatile to match global var type */
 	int			status;
 	boolean_t 		added;
@@ -225,8 +240,10 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 
 	SETUP_THREADGBL_ACCESS;
 	added = FALSE;
-	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_ci to be
-	 * invoked after a gtm_exit
+	assert(NULL == TREF(gtmci_retval));
+	TREF(gtmci_retval) = NULL;
+	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_ci to be
+	 * invoked after a ydb_exit
 	 */
 	if (process_exiting)
 	{
@@ -234,9 +251,9 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
-	if (!gtm_startup_active || !(frame_pointer->flags & SFF_CI))
+	if (!gtm_startup_active || !(frame_pointer->type & SFT_CI))
 	{
-		if ((status = gtm_init()) != 0)		/* Note - sets fgncal_stack */
+		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
 			return status;
 	}
 	GTM_PTHREAD_ONLY(assert(gtm_main_thread_id_set && pthread_equal(gtm_main_thread_id, pthread_self())));
@@ -275,24 +292,31 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
 	 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
 	 */
-	if (!job_addr(&routine, &label, 0, (char **)&base_addr, NULL, &need_rtnobj_shm_free))
+	if (!job_addr(&routine, &label, 0, (char **)&base_addr, &xfer_addr, &need_rtnobj_shm_free))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
-	memset(&param_blk, 0, SIZEOF(param_blk));
-	param_blk.rtnaddr = (void *)(ARLINK_ONLY(0) NON_ARLINK_ONLY(base_addr));
-	/* lnr_entry below is a pointer to the code offset for this label from the
-	 * beginning of text base(on USHBIN platforms) or from the beginning of routine
-	 * header (on NON_USHBIN platforms).
-	 * On NON_USHBIN platforms -- 2nd argument to EXTCALL is this pointer
-	 * On USHBIN -- 2nd argument to EXTCALL is the pointer to this pointer (&lnr_entry)
+	/* Thejob_addr() call above has done a zlink of the routine we want to drive if needed and has give us
+	 * the routine header and execution address we need. But it did not do an autorelink check so do that now
+	 * before we put these values into a stackframe as this call may change what is needing to go there.
 	 */
-	/* Assign the address for line number entry storage, so that the adjacent address holds has_parms value. */
-	param_blk.labaddr = (void *)(ARLINK_ONLY(-1) NON_ARLINK_ONLY(&(TABENT_PROXY).LABENT_LNR_OFFSET));
+	explicit_relink_check(base_addr, TRUE);
+	if (base_addr != (TABENT_PROXY).rtnhdr_adr)
+	{	/* Routine was re-loaded - recompute execution address as well */
+		base_addr = (TABENT_PROXY).rtnhdr_adr;
+		lnr_tab_ent = find_line_addr(base_addr, &label, 0, NULL);
+		xfer_addr = (char *)LINE_NUMBER_ADDR(base_addr, lnr_tab_ent);
+	}
+	/* Verify that if we are calling a routine we believe to have parms, that it actually does expect a parameter
+	 * list. If not we need to raise an error.
+	 */
+	if ((0 < entry->argcnt) && !(TABENT_PROXY).has_parms)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FMLLSTMISSING, 2, (int)label.len, label.addr);
+	/* Fill in the param_blk to be passed to push_parm_ci() to set up routine arguments (if any) */
 	if (MAX_ACTUALS < entry->argcnt)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXACTARG);
 	if (entry->argcnt < count)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ACTLSTTOOLONG, 2, (int)label.len, label.addr);
 	param_blk.argcnt = count;
-	has_return = (gtm_void != entry->return_type);
+	has_return = (ydb_void != entry->return_type);
 	if (has_return)
 	{	/* Create mval slot for return value */
 		MV_INIT(&arg_mval);
@@ -322,38 +346,38 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		 * constants declared in GTMContainerType class in gtmji.jar: 0 for GTMBoolean, 1 for GTMInteger, and so on.
 		 */
 		arg_mval.mvtype = MV_XZERO;
-		switch (entry->parms[i])
+		switch(entry->parms[i])
 		{
-			case gtm_jboolean:
+			case ydb_jboolean:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 0, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 					i2mval(&arg_mval, *(int *)arg_blob_ptr);
 				break;
-			case gtm_jint:
+			case ydb_jint:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 1, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 					i2mval(&arg_mval, *(int *)arg_blob_ptr);
 				break;
-			case gtm_jlong:
+			case ydb_jlong:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 2, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 				i82mval(&arg_mval, *(gtm_int64_t *)arg_blob_ptr);
 				break;
-			case gtm_jfloat:
+			case ydb_jfloat:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 3, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 					float2mval(&arg_mval, *(float *)arg_blob_ptr);
 				break;
-			case gtm_jdouble:
+			case ydb_jdouble:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 4, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 					double2mval(&arg_mval, *(double *)arg_blob_ptr);
 				break;
-			case gtm_jstring:
+			case ydb_jstring:
 				CHECK_FOR_TYPES_MISMATCH(i + 1, 7, 5, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 				{
-					mstr_parm = *(gtm_string_t **)arg_blob_ptr;
+					mstr_parm = *(ydb_string_t **)arg_blob_ptr;
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
@@ -362,11 +386,11 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 					s2pool(&arg_mval.str);
 				}
 				break;
-			case gtm_jbyte_array:
+			case ydb_jbyte_array:
 				CHECK_FOR_TYPES_MISMATCH(i + 1, 8, 6, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 				{
-					mstr_parm = *(gtm_string_t **)arg_blob_ptr;
+					mstr_parm = *(ydb_string_t **)arg_blob_ptr;
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
@@ -375,11 +399,11 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 					s2pool(&arg_mval.str);
 				}
 				break;
-			case gtm_jbig_decimal:
+			case ydb_jbig_decimal:
 				CHECK_FOR_TYPE_MISMATCH(i + 1, 9, *java_arg_type);
 				if (MASK_BIT_ON(mask))
 				{
-					mstr_parm = *(gtm_string_t **)arg_blob_ptr;
+					mstr_parm = *(ydb_string_t **)arg_blob_ptr;
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
@@ -395,20 +419,27 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		}
 		param_blk.args[i] = push_lvval(&arg_mval);
 	}
-	param_blk.mask = out_mask;
-	param_blk.ci_rtn = (!has_return && param_blk.argcnt <= 0)
-		? (void (*)())CODE_ADDRESS_TYPE(op_extcall)
-		: (void (*)())CODE_ADDRESS_TYPE(op_extexfun);
-	/* The params block needs to be saved and restored across multiple GT.M environments. So, instead of storing it
-	 * explicitely, setting the global param_list to point to local param_blk will do the job.
+	/* Need to create the new stackframe this call will run in. Any mv_stents created on this frame's behalf by
+	 * push_parm_ci() or op_bindparm() will pop when this frame pops. All those mv_stents created above as part
+	 * of argument processing will stick around to be used in argument output processing once the call returns.
 	 */
-	param_list = &param_blk;
+#	ifdef HAS_LITERAL_SECT
+	new_stack_frame(base_addr, (unsigned char *)LINKAGE_ADR(base_addr), (unsigned char *)xfer_addr);
+#	else
+	/* Any platform that does not follow pv-based linkage model either
+	 *	(1) uses the following calculation to determine the context pointer value, or
+	 *	(2) doesn't need a context pointer
+	 * Such platforms are not currently supported by YottaDB (Linux32 and Cygwin32 fall in this category)
+	 */
+	assertpro(FALSE);
+#	endif
+	param_blk.mask = out_mask;
+	push_parm_ci(dollar_truth, &param_blk);		/* Set up the parameter block for op_bindparm() in callee */
 	old_intrpt_state = intrpt_ok_state;
 	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT;	/* Reset interrupt state for the new M session. */
 	save_var_on_cstack_ptr = var_on_cstack_ptr;
 	var_on_cstack_ptr = NULL;			/* Reset var_on_cstack_ptr for the new M environment. */
-	assert(frame_pointer->flags & SFF_CI);
-	frame_pointer->mpc = frame_pointer->ctxt = PTEXT_ADR(frame_pointer->rvector);
+	assert(frame_pointer->old_frame_pointer->type & SFT_CI);
 	REVERT;						/* Revert gtmci_ch. */
 	/*				*/
 	/* Drive the call_in routine	*/
@@ -419,13 +450,14 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	/*				*/
 	/* Return value processing	*/
 	/*				*/
+	assert(!stringpool_unusable);
+	TREF(gtmci_retval) = NULL;
 	intrpt_ok_state = old_intrpt_state;		/* Restore the old interrupt state. */
 	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr. */
 	if (1 != mumps_status)
 	{
 		/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
-		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
-		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
+		 * it is the unhandled error code propagated by $ZTRAP/$ETRAP (from mdb_condition_handler).
 		 */
 		return mumps_status;
 	}
@@ -442,6 +474,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 				continue;
 			}
 			arg_ptr = &((lv_val *)(param_blk.retaddr))->v;
+			op_exfunret(arg_ptr);		/* Validate return value specified and type */
 			mask = 1;
 			arg_type = entry->return_type;
 		} else
@@ -455,30 +488,30 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		 * parameters that are not modified by the M routine.
 		 */
 		if (MV_ON(mask, arg_ptr))
-		{	/* Process all output (O/IO) parameters modified by the M routine */
-			switch (arg_type)
+		{	/* Process all output (O/IO) and return parameters modified by the M routine */
+			switch(arg_type)
 			{
-				case gtm_jboolean:
+				case ydb_jboolean:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 0, *arg_types);
-					*(gtm_int_t *)arg_blob_ptr = mval2double(arg_ptr) ? 1 : 0;
+					*(ydb_int_t *)arg_blob_ptr = mval2double(arg_ptr) ? 1 : 0;
 					break;
-                                case gtm_jint:
+                                case ydb_jint:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 1, *arg_types);
-					*(gtm_int_t *)arg_blob_ptr = mval2i(arg_ptr);
+					*(ydb_int_t *)arg_blob_ptr = mval2i(arg_ptr);
 					break;
-				case gtm_jlong:
+				case ydb_jlong:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 2, *arg_types);
 					*(gtm_int64_t *)arg_blob_ptr = mval2i8(arg_ptr);
 					break;
-				case gtm_jfloat:
+				case ydb_jfloat:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 3, *arg_types);
-					*(gtm_float_t *)arg_blob_ptr = mval2double(arg_ptr);
+					*(ydb_float_t *)arg_blob_ptr = mval2double(arg_ptr);
 					break;
-				case gtm_jdouble:
+				case ydb_jdouble:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 4, *arg_types);
-					*(gtm_double_t *)arg_blob_ptr = mval2double(arg_ptr);
+					*(ydb_double_t *)arg_blob_ptr = mval2double(arg_ptr);
 					break;
-				case gtm_jstring:
+				case ydb_jstring:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 7, *arg_types);
 					MV_FORCE_STR(arg_ptr);
 					/* Since the ci_gateway.c code temporarily switches the character following the string's
@@ -488,19 +521,19 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 					if (!IS_IN_STRINGPOOL(arg_ptr->str.addr, arg_ptr->str.len))
 						s2pool(&arg_ptr->str);
 					ENSURE_STP_FREE_SPACE(1);
-					(*(gtm_string_t **)arg_blob_ptr)->address = arg_ptr->str.addr;
-					(*(gtm_string_t **)arg_blob_ptr)->length = arg_ptr->str.len;
+					(*(ydb_string_t **)arg_blob_ptr)->address = arg_ptr->str.addr;
+					(*(ydb_string_t **)arg_blob_ptr)->length = arg_ptr->str.len;
 					break;
-				case gtm_jbyte_array:
+				case ydb_jbyte_array:
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 8, *arg_types);
 					MV_FORCE_STR(arg_ptr);
-					(*(gtm_string_t **)arg_blob_ptr)->address = arg_ptr->str.addr;
-					(*(gtm_string_t **)arg_blob_ptr)->length = arg_ptr->str.len;
+					(*(ydb_string_t **)arg_blob_ptr)->address = arg_ptr->str.addr;
+					(*(ydb_string_t **)arg_blob_ptr)->length = arg_ptr->str.len;
 					break;
-				case gtm_jbig_decimal:	/* We currently do not support output for big decimal. */
+				case ydb_jbig_decimal:	/* We currently do not support output for big decimal. */
 					break;
 				default:
-					assertpro((arg_type >= gtm_jboolean) && (arg_type <= gtm_jbig_decimal));
+					assertpro((arg_type >= ydb_jboolean) && (arg_type <= ydb_jbig_decimal));
 			}
 		}
 	}
@@ -510,22 +543,23 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	return 0;
 }
 
-/* Common work-routine for gtm_ci() and gtm_cip() to drive callin */
-int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var)
+/* Common work-routine for ydb_ci() and ydb_cip() to drive callin */
+int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var)
 {
 	boolean_t		need_rtnobj_shm_free;
 	va_list			var;
 	callin_entry_list	*entry;
+	int4			*lnr_tab_ent;
 	mstr			label, routine;
 	int			has_return, i;
 	rhdtyp          	*base_addr;
+	char			*xfer_addr;
 	uint4			inp_mask, out_mask, mask;
 	mval			arg_mval, *arg_ptr;
-	enum gtm_types		arg_type;
-	gtm_string_t		*mstr_parm;
-	char			*gtm_char_ptr;
+	enum ydb_types		arg_type;
+	ydb_string_t		*mstr_parm;
+	char			*ydb_char_ptr;
 	parmblk_struct 		param_blk;
-	void 			op_extcall(), op_extexfun(), flush_pio(void);
 	volatile int		*save_var_on_cstack_ptr;	/* Volatile to match global var type */
 	int			status;
 	boolean_t 		added;
@@ -537,8 +571,10 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	SETUP_THREADGBL_ACCESS;
 	VAR_COPY(var, temp_var);
 	added = FALSE;
-	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_ci to be
-	 * invoked after a gtm_exit
+	assert(NULL == TREF(gtmci_retval));
+	TREF(gtmci_retval) = NULL;
+	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_ci to be
+	 * invoked after a ydb_exit
 	 */
 	if (process_exiting)
 	{
@@ -546,9 +582,9 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
-	if (!gtm_startup_active || !(frame_pointer->flags & SFF_CI))
+	if (!gtm_startup_active || !(frame_pointer->type & SFT_CI))
 	{
-		if ((status = gtm_init()) != 0)		/* Note - sets fgncal_stack */
+		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
 			return status;
 	}
 	assert(NULL == TREF(temp_fgncal_stack));
@@ -588,27 +624,33 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	} else
 		entry = callin_handle;
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
-	/* 3rd argument is NULL because we will get lnr_adr via TABENT_PROXY */
-	/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
+	/* 3rd argument is NULL because we don't support a line offset from a label in call-ins. Also,
+	 * see comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
 	 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
 	 */
-	if (!job_addr(&routine, &label, 0, (char **)&base_addr, NULL, &need_rtnobj_shm_free))
+	if (!job_addr(&routine, &label, 0, (char **)&base_addr, &xfer_addr, &need_rtnobj_shm_free))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
-	memset(&param_blk, 0, SIZEOF(param_blk));
-	param_blk.rtnaddr = (void *)(ARLINK_ONLY(0) NON_ARLINK_ONLY(base_addr));
-	/* lnr_entry below is a pointer to the code offset for this label from the
-	 * beginning of text base(on USHBIN platforms) or from the beginning of routine
-	 * header (on NON_USHBIN platforms).
-	 * On NON_USHBIN platforms -- 2nd argument to EXTCALL is this pointer
-	 * On USHBIN -- 2nd argument to EXTCALL is the pointer to this pointer (&lnr_entry)
-	 *
-	 * Assign the address for line number entry storage, so that the adjacent address holds has_parms value.
+	/* Thejob_addr() call above has done a zlink of the routine we want to drive if needed and has give us
+	 * the routine header and execution address we need. But it did not do an autorelink check so do that now
+	 * before we put these values into a stackframe as this call may change what is needing to go there.
 	 */
-	param_blk.labaddr = (void *)(ARLINK_ONLY(-1) NON_ARLINK_ONLY(&(TABENT_PROXY).LABENT_LNR_OFFSET));
+	explicit_relink_check(base_addr, TRUE);
+	if (base_addr != (TABENT_PROXY).rtnhdr_adr)
+	{	/* Routine was re-loaded - recompute execution address as well */
+		base_addr = (TABENT_PROXY).rtnhdr_adr;
+		lnr_tab_ent = find_line_addr(base_addr, &label, 0, NULL);
+		xfer_addr = (char *)LINE_NUMBER_ADDR(base_addr, lnr_tab_ent);
+	}
+	/* Verify that if we are calling a routine we believe to have parms, that it actually does expect a parameter
+	 * list. If not we need to raise an error.
+	 */
+	if ((0 < entry->argcnt) && !(TABENT_PROXY).has_parms)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FMLLSTMISSING, 2, (int)label.len, label.addr);
+	/* Fill in the param_blk to be passed to push_parm_ci() to set up routine arguments (if any) */
 	param_blk.argcnt = entry->argcnt;
 	if (MAX_ACTUALS < param_blk.argcnt)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXACTARG);
-	has_return = (gtm_void == entry->return_type) ? 0 : 1;
+	has_return = (ydb_void == entry->return_type) ? 0 : 1;
 	if (has_return)
 	{	/* Create mval slot for return value */
 		param_blk.retaddr = (void *)push_lvval(&arg_mval);
@@ -625,47 +667,29 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		arg_mval.mvtype = MV_XZERO;
 		if (MASK_BIT_ON(mask))
 		{ 	/* Output-only(O) params : advance va_arg pointer */
-			switch (entry->parms[i])
+			switch(entry->parms[i])
 			{
-				case gtm_int:
-					va_arg(var, gtm_int_t);
+				case ydb_int:				/* Int sizes are the same so group them */
+				case ydb_uint:
+					va_arg(var, ydb_int_t);
 					break;
-				case gtm_uint:
-					va_arg(var, gtm_uint_t);
+				case ydb_long:				/* Long sizes are the same so group them */
+				case ydb_ulong:
+					va_arg(var, ydb_long_t);
 					break;
-				case gtm_long:
-					va_arg(var, gtm_long_t);
+				case ydb_int_star:			/* Address-of sizes are the same so group them */
+				case ydb_uint_star:
+				case ydb_long_star:
+				case ydb_ulong_star:
+				case ydb_float_star:
+				case ydb_double_star:
+				case ydb_char_star:
+				case ydb_string_star:
+					va_arg(var, void *);
 					break;
-				case gtm_ulong:
-					va_arg(var, gtm_ulong_t);
-					break;
-				case gtm_int_star:
-					va_arg(var, gtm_int_t *);
-					break;
-				case gtm_uint_star:
-					va_arg(var, gtm_uint_t *);
-					break;
-				case gtm_long_star:
-					va_arg(var, gtm_long_t *);
-					break;
-				case gtm_ulong_star:
-					va_arg(var, gtm_ulong_t *);
-					break;
-				case gtm_float:
-				case gtm_double:
-					va_arg(var, gtm_double_t);
-					break;
-				case gtm_float_star:
-					va_arg(var, gtm_float_t *);
-					break;
-				case gtm_double_star:
-					va_arg(var, gtm_double_t *);
-					break;
-				case gtm_char_star:
-					va_arg(var, gtm_char_t *);
-					break;
-				case gtm_string_star:
-					va_arg(var, gtm_string_t *);
+				case ydb_float:
+				case ydb_double:
+					va_arg(var, ydb_double_t);
 					break;
 				default:
 					va_end(var);
@@ -673,63 +697,63 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 			}
 		} else
 		{ 	/* I/IO params: create mval for each native type param */
-			switch (entry->parms[i])
+			switch(entry->parms[i])
 			{
-                                case gtm_int:
-                                        i2mval(&arg_mval, va_arg(var, gtm_int_t));
+                                case ydb_int:
+                                        i2mval(&arg_mval, va_arg(var, ydb_int_t));
                                         break;
-                                case gtm_uint:
-                                        i2usmval(&arg_mval, va_arg(var, gtm_uint_t));
+                                case ydb_uint:
+                                        i2usmval(&arg_mval, va_arg(var, ydb_uint_t));
                                         break;
-				case gtm_long:
+				case ydb_long:
 #					ifdef GTM64
-					i82mval(&arg_mval, (gtm_int64_t)va_arg(var, gtm_long_t));
+					i82mval(&arg_mval, (gtm_int64_t)va_arg(var, ydb_long_t));
 #					else
-					i2mval(&arg_mval, (int)va_arg(var, gtm_long_t));
+					i2mval(&arg_mval, (int)va_arg(var, ydb_long_t));
 #					endif
 					break;
-				case gtm_ulong:
+				case ydb_ulong:
 #					ifdef GTM64
-					ui82mval(&arg_mval, (gtm_uint64_t)va_arg(var, gtm_ulong_t));
+					ui82mval(&arg_mval, (gtm_uint64_t)va_arg(var, ydb_ulong_t));
 #					else
-					i2usmval(&arg_mval, (int)va_arg(var, gtm_ulong_t));
+					i2usmval(&arg_mval, (int)va_arg(var, ydb_ulong_t));
 #					endif
 					break;
-                                case gtm_int_star:
-                                        i2mval(&arg_mval, *va_arg(var, gtm_int_t *));
+                                case ydb_int_star:
+                                        i2mval(&arg_mval, *va_arg(var, ydb_int_t *));
                                         break;
-                                case gtm_uint_star:
-                                        i2usmval(&arg_mval, *va_arg(var, gtm_uint_t *));
+                                case ydb_uint_star:
+                                        i2usmval(&arg_mval, *va_arg(var, ydb_uint_t *));
                                         break;
-				case gtm_long_star:
+				case ydb_long_star:
 #					ifdef GTM64
-					i82mval(&arg_mval, (gtm_int64_t)*va_arg(var, gtm_long_t *));
+					i82mval(&arg_mval, (gtm_int64_t)*va_arg(var, ydb_long_t *));
 #					else
-					i2mval(&arg_mval, (int)*va_arg(var, gtm_long_t *));
+					i2mval(&arg_mval, (int)*va_arg(var, ydb_long_t *));
 #					endif
 					break;
-				case gtm_ulong_star:
+				case ydb_ulong_star:
 #					ifdef GTM64
-					ui82mval(&arg_mval, (gtm_uint64_t)*va_arg(var, gtm_ulong_t *));
+					ui82mval(&arg_mval, (gtm_uint64_t)*va_arg(var, ydb_ulong_t *));
 #					else
-					i2usmval(&arg_mval, (int)*va_arg(var, gtm_ulong_t *));
+					i2usmval(&arg_mval, (int)*va_arg(var, ydb_ulong_t *));
 #					endif
 					break;
-				case gtm_float:
-					float2mval(&arg_mval, (gtm_float_t)va_arg(var, gtm_double_t));
+				case ydb_float:
+					float2mval(&arg_mval, (ydb_float_t)va_arg(var, ydb_double_t));
 					break;
-				case gtm_double:
-					double2mval(&arg_mval, va_arg(var, gtm_double_t));
+				case ydb_double:
+					double2mval(&arg_mval, va_arg(var, ydb_double_t));
 					break;
-				case gtm_float_star:
-					float2mval(&arg_mval, *va_arg(var, gtm_float_t *));
+				case ydb_float_star:
+					float2mval(&arg_mval, *va_arg(var, ydb_float_t *));
 					break;
-				case gtm_double_star:
-					double2mval(&arg_mval, *va_arg(var, gtm_double_t *));
+				case ydb_double_star:
+					double2mval(&arg_mval, *va_arg(var, ydb_double_t *));
 					break;
-				case gtm_char_star:
+				case ydb_char_star:
 					arg_mval.mvtype = MV_STR;
-					arg_mval.str.addr = va_arg(var, gtm_char_t *);
+					arg_mval.str.addr = va_arg(var, ydb_char_t *);
 					arg_mval.str.len = STRLEN(arg_mval.str.addr);
 					if (MAX_STRLEN < arg_mval.str.len)
 					{
@@ -738,8 +762,8 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 					}
 					s2pool(&arg_mval.str);
 					break;
-				case gtm_string_star:
-					mstr_parm = va_arg(var, gtm_string_t *);
+				case ydb_string_star:
+					mstr_parm = va_arg(var, ydb_string_t *);
 					arg_mval.mvtype = MV_STR;
 					if (MAX_STRLEN < (uint4)mstr_parm->length)
 					{
@@ -758,21 +782,27 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		param_blk.args[i] = push_lvval(&arg_mval);
 	}
 	va_end(var);
-	param_blk.mask = out_mask;
-	param_blk.ci_rtn = (!has_return && param_blk.argcnt <= 0)
-		? (void (*)())CODE_ADDRESS_TYPE(op_extcall)
-		: (void (*)())CODE_ADDRESS_TYPE(op_extexfun);
-	/* The params block needs to be stored & restored across multiple
-	 * gtm environments. So instead of storing explicitely, setting the
-	 * global param_list to point to local param_blk will do the job.
+	/* Need to create the new stackframe this call will run in. Any mv_stents created on this frame's behalf by
+	 * push_parm_ci() or op_bindparm() will pop when this frame pops. All those mv_stents created above as part
+	 * of argument processing will stick around to be used in argument output processing once the call returns.
 	 */
-	param_list = &param_blk;
+#	ifdef HAS_LITERAL_SECT
+	new_stack_frame(base_addr, (unsigned char *)LINKAGE_ADR(base_addr), (unsigned char *)xfer_addr);
+#	else
+	/* Any platform that does not follow pv-based linkage model either
+	 *	(1) uses the following calculation to determine the context pointer value, or
+	 *	(2) doesn't need a context pointer
+	 * Such platforms are not currently supported by YottaDB (Linux32 and Cygwin32 fall in this category)
+	 */
+	assertpro(FALSE);
+#	endif
+	param_blk.mask = out_mask;
+	push_parm_ci(dollar_truth, &param_blk);		/* Set up the parameter block for op_bindparm() in callee */
 	old_intrpt_state = intrpt_ok_state;
-	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT; /* reset interrupt state for the new M session */
+	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT; 	/* Reset interrupt state for the new M session */
 	save_var_on_cstack_ptr = var_on_cstack_ptr;
-	var_on_cstack_ptr = NULL; /* reset var_on_cstack_ptr for the new M environment */
-	assert(frame_pointer->flags & SFF_CI);
-	frame_pointer->mpc = frame_pointer->ctxt = PTEXT_ADR(frame_pointer->rvector);
+	var_on_cstack_ptr = NULL; 			/* Reset var_on_cstack_ptr for the new M environment */
+	assert(frame_pointer->old_frame_pointer->type & SFT_CI);
 	REVERT; /* gtmci_ch */
 	/*				*/
 	/* Drive the call_in routine	*/
@@ -783,8 +813,10 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	/*				*/
 	/* Return value processing	*/
 	/*				*/
-	intrpt_ok_state = old_intrpt_state; /* restore the old interrupt state */
-	var_on_cstack_ptr = save_var_on_cstack_ptr; /* restore the old environment's var_on_cstack_ptr */
+	assert(!stringpool_unusable);
+	TREF(gtmci_retval) = NULL;
+	intrpt_ok_state = old_intrpt_state; 		/* Restore the old interrupt state */
+	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr */
 	if (1 != mumps_status)
 	{
 		/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
@@ -802,6 +834,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 			if (!has_return)
 				continue;
 			arg_ptr = &((lv_val *)(param_blk.retaddr))->v;
+			op_exfunret(arg_ptr);		/* Validate return value specified and type */
 			mask = 1;
 			arg_type = entry->return_type;
 		} else
@@ -815,37 +848,37 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		 * parameters that are not modified by the M routine.
 		 */
 		if (MV_ON(mask, arg_ptr))
-		{	/* Process all output (O/IO) parameters modified by the M routine */
-			switch (arg_type)
+		{	/* Process all output (O/IO) and return parameters modified by the M routine */
+			switch(arg_type)
 			{
-                                case gtm_int_star:
-                                        *va_arg(temp_var, gtm_int_t *) = mval2i(arg_ptr);
+                                case ydb_int_star:
+                                        *va_arg(temp_var, ydb_int_t *) = mval2i(arg_ptr);
 					break;
-                                case gtm_uint_star:
-                                        *va_arg(temp_var, gtm_uint_t *) = mval2ui(arg_ptr);
+                                case ydb_uint_star:
+                                        *va_arg(temp_var, ydb_uint_t *) = mval2ui(arg_ptr);
 					break;
-				case gtm_long_star:
-					*va_arg(temp_var, gtm_long_t *) =
+				case ydb_long_star:
+					*va_arg(temp_var, ydb_long_t *) =
 						GTM64_ONLY(mval2i8(arg_ptr)) NON_GTM64_ONLY(mval2i(arg_ptr));
 					break;
-				case gtm_ulong_star:
-					*va_arg(temp_var, gtm_ulong_t *) =
+				case ydb_ulong_star:
+					*va_arg(temp_var, ydb_ulong_t *) =
 						GTM64_ONLY(mval2ui8(arg_ptr)) NON_GTM64_ONLY(mval2ui(arg_ptr));
 					break;
-				case gtm_float_star:
-					*va_arg(temp_var, gtm_float_t *) = mval2double(arg_ptr);
+				case ydb_float_star:
+					*va_arg(temp_var, ydb_float_t *) = mval2double(arg_ptr);
 					break;
-				case gtm_double_star:
-					*va_arg(temp_var, gtm_double_t *) = mval2double(arg_ptr);
+				case ydb_double_star:
+					*va_arg(temp_var, ydb_double_t *) = mval2double(arg_ptr);
 					break;
-				case gtm_char_star:
-					gtm_char_ptr = va_arg(temp_var, gtm_char_t *);
+				case ydb_char_star:
+					ydb_char_ptr = va_arg(temp_var, ydb_char_t *);
 					MV_FORCE_STR(arg_ptr);
-					memcpy(gtm_char_ptr, arg_ptr->str.addr, arg_ptr->str.len);
-					gtm_char_ptr[arg_ptr->str.len] = 0; /* trailing null */
+					memcpy(ydb_char_ptr, arg_ptr->str.addr, arg_ptr->str.len);
+					ydb_char_ptr[arg_ptr->str.len] = 0; /* trailing null */
 					break;
-				case gtm_string_star:
-					mstr_parm = va_arg(temp_var, gtm_string_t *);
+				case ydb_string_star:
+					mstr_parm = va_arg(temp_var, ydb_string_t *);
 					MV_FORCE_STR(arg_ptr);
 					mstr_parm->length = arg_ptr->str.len;
 					memcpy(mstr_parm->address, arg_ptr->str.addr, mstr_parm->length);
@@ -856,47 +889,29 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 			}
 		} else
 		{
-			switch (arg_type)
+			switch(arg_type)
 			{
-                                case gtm_int_star:
-                                        va_arg(temp_var, gtm_int_t *);
+                                case ydb_int_star:		/* All of the address types are same size so can lump together */
+                                case ydb_uint_star:
+				case ydb_long_star:
+				case ydb_ulong_star:
+				case ydb_float_star:
+				case ydb_double_star:
+				case ydb_char_star:
+				case ydb_string_star:
+					va_arg(temp_var, void *);
 					break;
-                                case gtm_uint_star:
-                                        va_arg(temp_var, gtm_uint_t *);
+                                case ydb_int:			/* The int sizes are the same so group them */
+                                case ydb_uint:
+                                        va_arg(temp_var, ydb_int_t);
 					break;
-				case gtm_long_star:
-					va_arg(temp_var, gtm_long_t *);
+ 				case ydb_long:			/* Long sizes are the same so group them */
+				case ydb_ulong:
+					va_arg(temp_var, ydb_long_t);
 					break;
-				case gtm_ulong_star:
-					va_arg(temp_var, gtm_ulong_t *);
-					break;
-				case gtm_float_star:
-					va_arg(temp_var, gtm_float_t *);
-					break;
-				case gtm_double_star:
-					va_arg(temp_var, gtm_double_t *);
-					break;
-				case gtm_char_star:
-					va_arg(temp_var, gtm_char_t *);
-					break;
-				case gtm_string_star:
-					va_arg(temp_var, gtm_string_t *);
-					break;
-                                case gtm_int:
-                                        va_arg(temp_var, gtm_int_t);
-					break;
-                                case gtm_uint:
-                                        va_arg(temp_var, gtm_uint_t);
-					break;
- 				case gtm_long:
-					va_arg(temp_var, gtm_long_t);
-					break;
-				case gtm_ulong:
-					va_arg(temp_var, gtm_ulong_t);
-					break;
-				case gtm_float:
-				case gtm_double:
-					va_arg(temp_var, gtm_double_t);
+				case ydb_float:
+				case ydb_double:
+					va_arg(temp_var, ydb_double_t);
 					break;
 				default:
 					va_end(temp_var);
@@ -912,47 +927,47 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 }
 
 /* Initial call-in driver version - does name lookup on each call */
-int gtm_ci(const char *c_rtn_name, ...)
+int ydb_ci(const char *c_rtn_name, ...)
 {
 	va_list var;
 
 	VAR_START(var, c_rtn_name);
-	return gtm_ci_exec(c_rtn_name, NULL, FALSE, var);
+	return ydb_ci_exec(c_rtn_name, NULL, FALSE, var);
 }
 
 /* Fast path call-in driver version - Adds a struct parm that contains name resolution info after first call
  * to speed up dispatching.
  */
-int gtm_cip(ci_name_descriptor* ci_info, ...)
+int ydb_cip(ci_name_descriptor* ci_info, ...)
 {
 	va_list var;
 
 	VAR_START(var, ci_info);
-	return gtm_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, var);
+	return ydb_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, var);
 }
 
 #ifdef GTM_PTHREAD
-/* Java flavor of gtm_init() */
-int gtm_jinit()
+/* Java flavor of ydb_init() */
+int ydb_jinit()
 {
 	gtm_jvm_process = TRUE;
-	return gtm_init();
+	return ydb_init();
 }
 #endif
 
-/* Initialization routine - can be called directly by call-in caller or can be driven by gtm_ci*() implicitly. But
- * if other GT.M services are to be used prior to a gtm_ci*() call (like timers, gtm_malloc/free, etc), this routine
+/* Initialization routine - can be called directly by call-in caller or can be driven by ydb_ci*() implicitly. But
+ * if other GT.M services are to be used prior to a ydb_ci*() call (like timers, gtm_malloc/free, etc), this routine
  * should be called first.
  */
-int gtm_init()
+int ydb_init()
 {
-	rhdtyp          	*base_addr;
 	unsigned char   	*transfer_addr;
-	char			*dist;
-	int			dist_len;
-	char			gtmsecshr_path[GTM_PATH_MAX];
-	int			gtmsecshr_path_len;
+	char			*dist, *tmp_ptr;
+	int			dist_len, tmp_len;
+	char			path[YDB_PATH_MAX];
+	int			path_len;
 	struct stat		stat_buf;
+	Dl_info			shlib_info;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -961,8 +976,8 @@ int gtm_init()
 		assert(!gtm_startup_active);
 		GTM_THREADGBL_INIT;
 	}
-	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_init to be
-	 * invoked after a gtm_exit
+	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_init to be
+	 * invoked after a ydb_exit
 	 */
 	if (process_exiting)
 	{
@@ -970,38 +985,70 @@ int gtm_init()
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
+	if (NULL == (dist = GETENV(YDB_DIST)))
+	{	/* In a call-in and "ydb_dist" env var is not defined. Set it to full path of libyottadb.so
+		 * that contains the currently invoked "ydb_init" function.
+		 */
+		if (0 == dladdr(&ydb_init, &shlib_info))
+		{	/* Could not find "common_startup_init" symbol in a shared library. Issue error. */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dladdr"), CALLFROM);
+		}
+		/* Temporarily copy shlib_info.dli_fname onto a local buffer as we cannot modify the former and we need to
+		 * to do that to remove the "/libyottadb.so" trailer before setting "$ydb_dist".
+		 */
+		tmp_ptr = path;
+		tmp_len = STRLEN(shlib_info.dli_fname);
+		assert(tmp_len);
+		if (tmp_len >= SIZEOF(path))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
+		memcpy(tmp_ptr, shlib_info.dli_fname, tmp_len);
+		tmp_ptr += tmp_len - 1;
+		/* Remove trailing "/libyottadb.so" from filename before setting $ydb_dist.
+		 * Note: The later call to "common_startup_init" will ensure the filename is libyottadb.so.
+		 */
+		for (; tmp_ptr >= path; tmp_ptr--)
+		{
+			if ('/' == *tmp_ptr)
+				break;
+		}
+		*tmp_ptr = '\0';
+		/* First check the executable name is libyottadb.so. If not issue error. */
+		setenv(YDB_DIST, path, TRUE);
+		setenv("gtm_dist", path, TRUE);
+	}
+	/* else : "ydb_dist" env var is defined. Use that for later verification done inside "common_startup_init" */
 	if (!gtm_startup_active)
 	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
-		common_startup_init(GTM_IMAGE);
+		common_startup_init(GTM_IMAGE, &mumps_cmd_ary[0]);
 		err_init(stop_image_conditional_core);
 		UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
-		/* Ensure that $gtm_dist exists */
-		if (NULL == (dist = (char *)GETENV(GTM_DIST)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
-		/* Ensure that $gtm_dist is non-zero and does not exceed GTM_DIST_PATH_MAX */
+		/* Ensure that $ydb_dist exists */
+		if (NULL == (dist = (char *)GETENV(YDB_DIST)))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDBDISTUNDEF);
+		/* Ensure that $ydb_dist is non-zero and does not exceed YDB_DIST_PATH_MAX */
 		dist_len = STRLEN(dist);
 		if (!dist_len)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
-		else if (GTM_DIST_PATH_MAX <= dist_len)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_DIST_PATH_MAX);
-		/* Verify that $gtm_dist/gtmsecshr is available with setuid root */
-		memcpy(gtmsecshr_path, gtm_dist, dist_len);
-		gtmsecshr_path[dist_len] =  '/';
-		memcpy(gtmsecshr_path + dist_len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
-		gtmsecshr_path_len = dist_len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
-		assertpro(GTM_PATH_MAX > gtmsecshr_path_len);
-		gtmsecshr_path[gtmsecshr_path_len] = '\0';
-		if (-1 == Stat(gtmsecshr_path, &stat_buf))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDBDISTUNDEF);
+		else if (YDB_DIST_PATH_MAX <= dist_len)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
+		/* Verify that $ydb_dist/gtmsecshr is available with setuid root */
+		memcpy(path, ydb_dist, dist_len);
+		path[dist_len] =  '/';
+		memcpy(path + dist_len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
+		path_len = dist_len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
+		assertpro(YDB_PATH_MAX > path_len);
+		path[path_len] = '\0';
+		if (-1 == Stat(path, &stat_buf))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("stat for $gtm_dist/gtmsecshr"), CALLFROM, errno);
-		/* Ensure that the call-in can execute $gtm_dist/gtmsecshr. This not sufficient for security purposes */
+					LEN_AND_LIT("stat for $ydb_dist/gtmsecshr"), CALLFROM, errno);
+		/* Ensure that the call-in can execute $ydb_dist/gtmsecshr. This not sufficient for security purposes */
 		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
 		else
-		{	/* $gtm_dist validated */
-			gtm_dist_ok_to_use = TRUE;
-			memcpy(gtm_dist, dist, dist_len);
+		{	/* $ydb_dist validated */
+			ydb_dist_ok_to_use = TRUE;
+			memcpy(ydb_dist, dist, dist_len);
 		}
 		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,
@@ -1014,20 +1061,22 @@ int gtm_init()
 	if (!gtm_startup_active)
 	{	/* GT.M is not active yet. Create GT.M startup environment */
 		invocation_mode = MUMPS_CALLIN;
-		init_gtm();			/* Note - this initializes fgncal_stackbase */
-		gtm_savetraps(); /* nullify default $ZTRAP handling */
+		init_gtm();			/* Note - this initializes fgncal_stackbase and creates the call-in
+						 * base-frame for the initial level.
+						 */
+		gtm_savetraps(); 		/* Nullify default $ZTRAP handling */
 		assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
 		assert(gtm_startup_active);
-		assert(frame_pointer->flags & SFF_CI);
+		assert(frame_pointer->type & SFT_CI);
 		TREF(gtmci_nested_level) = 1;
 		/* Now that GT.M is initialized. Mark the new stack pointer (msp) so that errors
 		 * while executing an M routine do not unwind stack below this mark. It important that
-		 * the call-in frames (SFF_CI) that hold nesting information (eg. $ECODE/$STACK data
+		 * the call-in frames (SFT_CI) that hold nesting information (eg. $ECODE/$STACK data
 		 * of the previous stack) are kept from being unwound.
 		 */
 		SAVE_FGNCAL_STACK;
-	} else if (!(frame_pointer->flags & SFF_CI))
-	{	/* Nested call-in: setup a new CI environment (SFF_CI frame on top of base-frame).
+	} else if (!(frame_pointer->type & SFT_CI))
+	{	/* Nested call-in: setup a new CI environment (additional SFT_CI base-frame).
 		 * Temporarily mark the beginning of the new stack so that initialization errors in
 		 * call-in frame do not unwind entries of the previous stack (see gtmci_ch). For the
 		 * duration that temp_fgncal_stack has a non-NULL value, it overrides fgncal_stack.
@@ -1042,13 +1091,11 @@ int gtm_init()
 		 */
 		if (dollar_tlevel)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CITPNESTED);
-		base_addr = make_cimode();
-		transfer_addr = PTEXT_ADR(base_addr);
-		gtm_init_env(base_addr, transfer_addr);
-		SET_CI_ENV(ci_ret_code_exit);
+		base_frame(NULL);			/* Filled in later */
+		SET_CI_ENV(gtm_levl_ret_code);
 		gtmci_isv_save();
 		(TREF(gtmci_nested_level))++;
-		/* Now that the base-frames for this call-in level have been created, we can create the mv_stent
+		/* Now that the base-frame for this call-in level has been created, we can create the mv_stent
 		 * to save the previous call-in level's fgncal_stack value and clear the override. When this call-in
 		 * level pops, fgncal_stack will be restored to the value for the previous level. When a given call
 		 * at *this* level finishes, this current value of fgncal_stack is where the stack is unrolled to to
@@ -1062,8 +1109,8 @@ int gtm_init()
 	return 0;
 }
 
-/* routine exposed to call-in user to exit from active GT.M environment */
-int gtm_exit()
+/* Routine exposed to call-in user to exit from active GT.M environment */
+int ydb_exit()
 {
         DCL_THREADGBL_ACCESS;
 
@@ -1072,13 +1119,13 @@ int gtm_exit()
 		return 0;		/* GT.M environment not setup yet - quietly return */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	assert(NULL != frame_pointer);
-	/* Do not allow gtm_exit() to be invoked from external calls */
-	if (!(SFF_CI & frame_pointer->flags) || !(MUMPS_CALLIN & invocation_mode) || (1 < TREF(gtmci_nested_level)))
+	/* Do not allow ydb_exit() to be invoked from external calls */
+	if (!(SFT_CI & frame_pointer->type) || !(MUMPS_CALLIN & invocation_mode) || (1 < TREF(gtmci_nested_level)))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVGTMEXIT);
 	/* Now get rid of the whole M stack - end of GT.M environment */
 	while (NULL != frame_pointer)
 	{
-		while ((NULL != frame_pointer) && !(frame_pointer->flags & SFF_CI))
+		while ((NULL != frame_pointer) && !(frame_pointer->type & SFT_CI))
 		{
 #			ifdef GTM_TRIGGER
 			if (SFT_TRIGR & frame_pointer->type)
@@ -1089,12 +1136,12 @@ int gtm_exit()
 		}
 		if (NULL != frame_pointer)
 		{	/* unwind the current invocation of call-in environment */
-			assert(frame_pointer->flags & SFF_CI);
+			assert(frame_pointer->type & SFT_CI);
 			ci_ret_code_quit();
 		}
 	}
 	gtm_exit_handler(); /* rundown all open database resource */
-	/* If libgtmshr was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
+	/* If libyottadb was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
 	 * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
 	 * 'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
 	 * our exit handler has already been called. Linux and Solaris don't need this, looking at the
@@ -1109,7 +1156,7 @@ int gtm_exit()
 }
 
 /* Routine to fetch $ZSTATUS after an error has been raised */
-void gtm_zstatus(char *msg, int len)
+void ydb_zstatus(char *msg, int len)
 {
 	int msg_len;
 	msg_len = (len <= dollar_zstatus.str.len) ? len - 1 : dollar_zstatus.str.len;
@@ -1118,12 +1165,12 @@ void gtm_zstatus(char *msg, int len)
 }
 
 #ifdef _AIX
-/* If libgtmshr was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
+/* If libyottadb was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
  * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
  * 'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
  * our exit handler has already been called. Linux and Solaris don't need this, looking at the
  * other platforms we support to see if resolutions can be found. This routine will be called
- * by the OS when libgtmshr is unloaded. Specified with the -binitfini loader option on AIX
+ * by the OS when libyottadb is unloaded. Specified with the -binitfini loader option on AIX
  * to be run when the shared library is unloaded. 06/2007 SE
  */
 void gtmci_cleanup(void)
@@ -1133,10 +1180,43 @@ void gtmci_cleanup(void)
 	/* If we have already run the exit handler, no need to do so again */
 	if (gtm_startup_active)
 	{
-		gtm_exit_handler();
+		ydb_exit_handler();
 		gtm_startup_active = FALSE;
 	}
 	/* Unregister exit handler .. AIX only for now */
 	unatexit(gtm_exit_handler);
 }
 #endif
+
+/* The java plug-in has some very direct references to some of these routines that
+ * cannot be changed by the pre-processor so for now, we have some stub routines
+ * that take care of the translation. These routines are exported along with their
+ * ydb_* variants. First - get rid of the pre-processor redirection via #defines.
+ */
+#undef gtm_jinit
+#undef gtm_exit
+#undef gtm_cij
+#undef gtm_zstatus
+#ifdef GTM_PTHREAD
+ydb_status_t gtm_jinit()
+{
+	gtm_jvm_process = TRUE;
+	return ydb_init();
+}
+#endif
+
+ydb_status_t gtm_exit()
+{
+	return ydb_exit();
+}
+
+ydb_status_t gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types,
+		     unsigned int *io_vars_mask, unsigned int *has_ret_value)
+{
+	return ydb_cij(c_rtn_name, arg_blob, count, arg_types, io_vars_mask, has_ret_value);
+}
+
+void gtm_zstatus(char* msg, int len)
+{
+	ydb_zstatus(msg, len);
+}

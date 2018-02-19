@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +27,7 @@ cmi_status_t cmj_set_async(int fd)
 	int rval;
 #if defined(FIOASYNC)
 	int val = 1;
+	ASSERT_IS_LIBCMISOCKETTCP;
 	rval = ioctl(fd, FIOASYNC, &val);
 #elif defined(O_ASYNC)
 	rval = fcntl(fd, F_SETFL, O_ASYNC|O_NONBLOCK);
@@ -42,8 +46,10 @@ int cmj_reset_async(int fd)
 	cmi_status_t rval;
 #if defined(FIOASYNC)
 	int val = 0;
+	ASSERT_IS_LIBCMISOCKETTCP;
 	rval = (cmi_status_t)ioctl(fd, FIOASYNC, &val);
 #elif defined(O_ASYNC) || defined(FASYNC)
+	ASSERT_IS_LIBCMISOCKETTCP;
 	rval = (cmi_status_t)fcntl(fd, F_SETFL, O_NONBLOCK);
 #else
 #error Can not set async state on platform

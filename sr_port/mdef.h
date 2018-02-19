@@ -3,6 +3,12 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
+ * Copyright (c) 2017-2018 Stephen L Johnson.			*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -93,11 +99,14 @@ typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 
 #include <inttypes.h>
 #include <stdarg.h>
+
 #include "mdefsa.h"
 #include "gtm_common_defs.h"
-#include <mdefsp.h>
+#include "mdefsp.h"
 #include "gtm_sizeof.h"
 #include "gtm_threadgbl.h"
+#include "ydbmerrors.h"
+#include "ydberrors.h"
 
 /* Anchor for thread-global structure rather than individual global vars */
 GBLREF void	*gtm_threadgbl;		/* Accessed through TREF macro in gtm_threadgbl.h */
@@ -224,7 +233,7 @@ typedef UINTPTR_T uintszofptr_t;
 #	define UNALIGNED_ACCESS_SUPPORTED
 #endif
 
-#if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun)
+#if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun) || defined(__armv6l__) || defined(__armv7l__)
 #	define GTM_PTHREAD
 #	define GTM_PTHREAD_ONLY(X) X
 #	define NON_GTM_PTHREAD_ONLY(X)
@@ -255,21 +264,44 @@ typedef UINTPTR_T uintszofptr_t;
 #define	IS_OFFSET_MATCH(TYPE1, MEMBER1, TYPE2, MEMBER2)	(OFFSETOF(TYPE1, MEMBER1) == OFFSETOF(TYPE2, MEMBER2))
 
 #ifdef __x86_64__
-#define X86_64_ONLY(x)		x
+#define X86_64_ONLY(x)			x
 #define NON_X86_64_ONLY(x)
 #else
 #define X86_64_ONLY(x)
-#define NON_X86_64_ONLY(x)    x
+#define NON_X86_64_ONLY(x)    		x
 #endif /* __x86_64__ */
+
+#if defined(__armv6l__) || defined(__armv7l__)
+#define ARM32_ONLY(x)			x
+#define NON_ARM32_ONLY(x)
+#else
+#define ARM32_ONLY(x)
+#define NON_ARM32_ONLY(x)    		x
+#endif /* __armv6l__ || __armv7l__ */
+
+#if defined(__x86_64__) || defined(__armv6l__) || defined(__armv7l__)
+#define	X86_64_OR_ARM32_ONLY(x)		x
+#define	NON_X86_64_OR_ARM32_ONLY(x)
+#else
+#define	X86_64_OR_ARM32_ONLY(x)
+#define	NON_X86_64_OR_ARM32_ONLY(x)	x
+#endif
 
 #if defined(__i386) || defined(__x86_64__) || defined(__ia64) || defined(__MVS__) || defined(Linux390)
 #define NON_RISC_ONLY(x)	x
 #define RISC_ONLY(x)
-#elif defined(__sparc) || defined(_AIX) || defined(__alpha)
-#define RISC_ONLY(x)	x
+#elif defined(__sparc) || defined(_AIX) || defined(__alpha) || defined(__armv6l__) || defined(__armv7l__)
+#define RISC_ONLY(x)		x
 #define NON_RISC_ONLY(x)
 #endif
 
+#if defined(__armv6l__) || defined(__armv7l__)
+#	define ARM_ONLY(x)	x
+#	define NON_ARM_ONLY(x)
+#else
+#	define ARM_ONLY(x)
+#	define NON_ARM_ONLY(x)	x
+#endif
 
 #ifdef _AIX
 #       define  AIX_ONLY(X) X
@@ -293,6 +325,7 @@ typedef UINTPTR_T uintszofptr_t;
 #define MAX_DIGITS_IN_EXP       2       /* maximum number of decimal digits in an exponent */
 #define MAX_HOST_NAME_LEN	256
 #define MAX_LONG_IN_DOUBLE	0xFFFFFFFFFFFFF /*Max Fraction part in IEEE double format*/
+#define MAX_INT_IN_BYTE		255
 
 #ifndef _AIX
 #	ifndef __sparc
@@ -345,7 +378,7 @@ typedef struct
  *
  */
 #if defined(__alpha) || defined(_AIX) || defined(__hpux) || defined(__sparc) || defined(__MVS__) || (defined(__linux__) &&  \
-	(defined(__ia64) || defined(__x86_64__) || defined(__s390__)))
+	(defined(__ia64) || defined(__x86_64__) || defined(__s390__) || defined(__armv6l__) || defined(__armv7l__)))
 #	define HAS_LITERAL_SECT
 #endif
 
@@ -490,6 +523,36 @@ mval *underr_strict(mval *start, ...);
 /* Note MV_FORCE_CANONICAL currently only used in op_add() when vars are known to be defined so no MV_FORCE_DEFINED()
    macro has been added. If uses are added, this needs to be revisited. 01/2008 se
 */
+#define MV_FORCE_MSTIMEOUT(TMV, TMS, NOTACID)	/* requires a flock of include files especially for TP */		\
+MBSTART {					/* also requires threaddef DCL and SETUP*/				\
+	double			tmpdouble;										\
+															\
+	GBLREF uint4		dollar_tlevel;										\
+	GBLREF uint4		dollar_trestart;									\
+															\
+	MV_FORCE_NUM(TMV);												\
+	if (NO_M_TIMEOUT == TMV->m[1])											\
+		TMS = NO_M_TIMEOUT;											\
+	else														\
+	{														\
+		assert(MV_BIAS >= 1000);        /* if formats change scale may need attention */			\
+		if (TMV->mvtype & MV_INT)										\
+		{	/* TMV is an integer. m[1] directly has the # of milliseconds we want.				\
+			 * If it is negative though, set timeout to 0.							\
+			 */												\
+			TMS = TMV->m[1];										\
+			if (0 > TMS)											\
+				TMS = 0;										\
+		} else if (0 == TMV->sgn) 	/* if sign is 0 it means TMV is positive */				\
+		{	/* Cap positive timeout at MAXPOSINT4 */							\
+			tmpdouble = mval2double(TMV) * (double)1000;							\
+			TMS = ((double)MAXPOSINT4 >= tmpdouble) ? (int)tmpdouble : (int)MAXPOSINT4;			\
+		} else													\
+			TMS = 0;		/* sign is not zero, implies TMV is negative, set timeout to 0 */	\
+	}														\
+	if ((TREF(tpnotacidtime)).m[1] < TMS)										\
+		TPNOTACID_CHECK(NOTACID);										\
+} MBEND
 #define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0 ? s2n(X) : 0 ) \
 				 ,((X)->mvtype & MV_NUM_APPROX ? (X)->mvtype &= MV_NUM_MASK : 0 ))
 #define MV_IS_NUMERIC(X)	(((X)->mvtype & MV_NM) != 0)
@@ -680,9 +743,9 @@ int4 timeout2msec(int4 timeout);
 
 #ifdef DEBUG
 /* Original debug code has been removed since it was superfluous and did not work on all platforms. SE 03/01 */
-# define SET_TRACEABLE_VAR(var,value) var = value;
+# define SET_TRACEABLE_VAR(var,value) var = value
 #else
-# define SET_TRACEABLE_VAR(var,value) var = value;
+# define SET_TRACEABLE_VAR(var,value) var = value
 #endif
 
 /* If this is unix, we have a faster sleep for short sleeps ( < 1 second) than doing a hiber start.
@@ -1326,6 +1389,18 @@ void suspend(int sig);
 mval *push_mval(mval *arg1);
 void mval_lex(mval *v, mstr *output);
 
+int dlopen_libyottadb(int argc, char **argv, char **envp, char *main_func);
+int gtm_main(int argc, char **argv, char **envp);
+int mupip_main(int argc, char **argv, char **envp);
+int dse_main(int argc, char **argv, char **envp);
+int lke_main(int argc, char **argv, char **envp);
+int gtcm_play_main(int argc, char **argv, char **envp);
+int gtcm_server_main(int argc, char **argv, char **envp);
+int gtcm_gnp_server_main(int argc, char **argv, char **envp);
+int gtcm_shmclean_main(int argc, char **argv, char **envp);
+int dbcertify_main(int argc, char **argv, char **envp);
+int ftok_main(int argc, char **argv, char **envp);
+
 #define ZTRAP_CODE	0x00000001
 #define ZTRAP_ENTRYREF	0x00000002
 #define ZTRAP_POP	0x00000004
@@ -1413,6 +1488,8 @@ typedef gtm_uint64_t	gtm_off_t;
 #define MAXUINT8	((gtm_uint64_t)-1)
 #define MAXUINT4	((uint4)-1)
 #define MAXUINT2	((unsigned short)-1)
+
+#define MAXINT4		(MAXUINT4/2)
 #define	MAXINT2		(MAXUINT2/2)
 
 /* On platforms that support native 8 byte operations (such as Alpha), an assignment to an 8 byte field is atomic. On other
@@ -1693,7 +1770,8 @@ typedef enum
 #define CHK_BOUNDARY_ALIGNMENT(pointer) (((UINTPTR_T)pointer) & (SIZEOF(UINTPTR_T) - 1))
 
 /* Encryption- and TLS-related macros */
-#if defined(__ia64) || defined(__i386) || defined(__x86_64__) || defined(__sparc) || defined(_AIX) || defined(__s390__)
+#if defined(__ia64) || defined(__i386) || defined(__x86_64__) || defined(__sparc) || defined(_AIX) || defined(__s390__)		\
+	|| defined(__armv6l__) || defined(__armv7l__)
 # define GTM_TLS
 # define GTMTLS_ONLY(X)			X
 # define GTMTLS_ONLY_COMMA(X)		, X
@@ -1743,6 +1821,18 @@ typedef struct gtm_num_range_struct
 /* Debug FPRINTF with pre and post requisite flushing of appropriate streams */
 #ifndef DBGFPF
 # define DBGFPF(x)	{flush_pio(); FPRINTF x; FFLUSH(stderr); FFLUSH(stdout);}
+#endif
+
+/* Macro used intermittently in code to debug alias code in general. Uncomment the #define below to
+ * enable the debugging.
+ */
+/* #define DEBUG_ALIAS */
+#ifdef DEBUG_ALIAS
+# define DBGALS(x) DBGFPF(x)
+# define DBGALS_ONLY(x) x
+#else
+# define DBGALS(x)
+# define DBGALS_ONLY(x)
 #endif
 
 /* Settings for lv_null_subs */
@@ -1819,6 +1909,26 @@ enum
 #define LIBPATH_ENV		"LIBPATH"
 #else
 #define LIBPATH_ENV		"LD_LIBRARY_PATH"
+#endif
+
+#ifdef DEBUG
+  /* Define macros that are helpful in verifying that functions in libyottadb.so are only invoked
+   * by the executables/utilities we expect and not by anything else. For example, libgnpclient.list
+   * used to have a list of modules that this library includes and was linked only by mumps and lke.
+   * Now libgnpclient.list is nixed (as part of changes that made all utilities use libyottadb.so
+   * and reduce their sizes) but we now have an ASSERT_IS_LIBGNPCLIENT check at function entry in all
+   * functions that were part of modules in that listing file. Same with the other asserts defined below.
+   */
+# include "gtmimagename.h"
+# define ASSERT_IS_LIBGNPCLIENT		assert(IS_LIBGNPCLIENT)
+# define ASSERT_IS_LIBGNPSERVER		assert(IS_LIBGNPSERVER)
+# define ASSERT_IS_LIBCMISOCKETTCP	assert(IS_LIBCMISOCKETTCP)
+# define ASSERT_IS_LIBGTCM		assert(IS_LIBGTCM)
+#else
+# define ASSERT_IS_LIBGNPCLIENT
+# define ASSERT_IS_LIBGNPSERVER
+# define ASSERT_IS_LIBCMISOCKETTCP
+# define ASSERT_IS_LIBGTCM
 #endif
 
 #endif /* MDEF_included */

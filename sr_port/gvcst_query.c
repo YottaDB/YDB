@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -130,7 +133,6 @@ boolean_t	gvcst_query2(void)
 	enum cdb_sc	status;
 	blk_hdr_ptr_t	bp;
 	rec_hdr_ptr_t	rp;
-	unsigned char	*c1, *c2;
 	srch_blk_status	*bh;
 	srch_hist	*rt_history;
 
@@ -203,19 +205,7 @@ boolean_t	gvcst_query2(void)
 		    	}
 			assert(cs_data == cs_addrs->hdr);
 			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_query, 1);
-			if (found)
-			{
-				c1 = &gv_altkey->base[0];
-				c2 = &gv_currkey->base[0];
-				for ( ; *c2; )
-				{
-					if (*c2++ != *c1++)
-						break;
-				}
-				if (!*c2 && !*c1)
-					return TRUE;
-			}
-			return FALSE;
+			return found;
 		}
 		t_retry(status);
 	}

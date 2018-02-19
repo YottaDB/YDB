@@ -108,7 +108,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	set_jnl_options		jnl_options;
 	boolean_t		curr_jnl_present,	/* for current state 2, is current journal present? */
 				jnl_points_to_db, keep_prev_link, safe_to_switch, newjnlfiles, jnlname_same,
-				this_iter_prevlinkcut_error, do_prevlinkcut_error;
+				this_iter_prevlinkcut_error, do_prevlinkcut_error, ok_to_standalone;
 	enum jnl_state_codes	jnl_curr_state;
 	enum repl_state_codes	repl_curr_state;
 	mstr 			jnlfile, jnldef, tmpjnlfile;
@@ -200,7 +200,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		}
 		fc = seg->file_cntl;
 		/* open shared to see what's possible */
-		gvcst_init(gv_cur_region);
+		gvcst_init(gv_cur_region, NULL);
 		tp_change_reg();
 		assert(!gv_cur_region->was_open);
 		rptr->sd = csd = cs_data;
@@ -213,12 +213,12 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			continue;
 		}
 		grab_crit(gv_cur_region);  /* corresponding rel_crit() is done in mupip_set_jnl_cleanup() */
-		if (FROZEN_CHILLED(cs_data))
+		if (FROZEN_CHILLED(cs_addrs))
 		{	/* While a FREEZE -ONLINE was in place, all processes exited, leaving the
 			 * shared memory up. Either autorelease, if enabled, or error out.
 			 */
 			DO_CHILLED_AUTORELEASE(cs_addrs, cs_data);
-			if (FROZEN_CHILLED(cs_data))
+			if (FROZEN_CHILLED(cs_addrs))
 			{
 				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(gv_cur_region));
 				exit_status |= EXIT_WRN;
@@ -266,6 +266,12 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			(repl_closed != repl_curr_state && repl_closed == rptr->repl_new_state) ||
 			(repl_closed == repl_curr_state && repl_open == rptr->repl_new_state))
 		{
+			/* If there was an online freeze and it was autoreleased, we need to keep shared memory up, but
+			 * if we go into standalone then the mupip_set_jnl_cleanup() below will call db_ipcs_reset() and
+			 * take it down. After gds_rundown() we don't have shared memory attached, so we don't have the
+			 * opportunity to check later.
+			 */
+			ok_to_standalone = !CHILLED_AUTORELEASE(REG2CSA(gv_cur_region));
 			/* Rundown the database file since we did "gvcst_init" and now will call "mu_rndwn_file".
 			 * Since we are going to reuse the udi etc. that was allocated, use CLEANUP_UDI_FALSE.
 			 */
@@ -281,7 +287,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			assert(NULL != seg->file_cntl->file_info);
 			if (EXIT_NRM != gds_rundown_status)		/* skip mu_rndwn_file (STANDALONE) */
 				continue;
-			if (STANDALONE(gv_cur_region))
+			if (ok_to_standalone && STANDALONE(gv_cur_region))
 			{
 				rptr->exclusive = TRUE;
 				fc->op = FC_OPEN;
@@ -360,6 +366,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 		assert(rptr->sd == cs_addrs->hdr);
 		cs_data = csd = rptr->sd;
+		assert((csd->read_only == 0) || (csd->read_only == 1));
 		jnl_curr_state = (enum jnl_state_codes)csd->jnl_state;
 		repl_curr_state = (enum repl_state_codes)csd->repl_state;
 		jnl_info.csd = csd;
@@ -530,6 +537,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			memcpy(jnl_info.jnl, tmpjnlfile.addr, tmpjnlfile.len);
 			jnl_info.jnl_len = tmpjnlfile.len; /* get_full_path() null terminates and limits tmpjnlfile to MAX_FN_LEN */
 			/* Note: At this point jnlfile should have expanded journal name with extension */
+			jnl_info.jnl[jnl_info.jnl_len] = 0;
 			jnlname_same = ((jnl_info.jnl_len == csd->jnl_file_len)
 					&& (0 == memcmp(jnl_info.jnl, csd->jnl_file_name, jnl_info.jnl_len))) ? TRUE : FALSE;
 			jnlfile.addr = (char *)csd->jnl_file_name;
@@ -795,7 +803,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		{	/* Journaling is to be disabled for this region. */
 			/* Mark the current journal as switched, if possible. */
 			if (jnl_open == csd->jnl_state)
-				jnl_set_cur_prior(gv_cur_region, NULL, csd);
+				jnl_set_cur_prior(gv_cur_region, cs_addrs, csd);
 			/* Reset all fields */
 			csd->jnl_before_image = FALSE;
 			csd->jnl_state = jnl_notallowed;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,8 +44,8 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 	}
 	while ((jnl_counter < jnl_len) && (pat_counter < pat_len))  /* main loop */
 	{
-		while (( *(pat_str + pat_counter) != '*') && ( *(pat_str + pat_counter) != '%') &&
-			(jnl_counter < jnl_len) && (pat_counter < pat_len))
+		while ((jnl_counter < jnl_len) && (pat_counter < pat_len)
+				&& (*(pat_str + pat_counter) != '*') && ( *(pat_str + pat_counter) != '%'))
 		{
 			asterisk_not_seen = TRUE;
 			if ( *(jnl_str + jnl_counter) != *(pat_str + pat_counter) )
@@ -56,24 +57,26 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 			}
 		}
 		/* break out of loop if wildcard seen */
-		if (( *(pat_str + pat_counter) == '%') && (pat_counter < pat_len) && (jnl_counter < jnl_len))
+		if ((pat_counter < pat_len) && (jnl_counter < jnl_len) && (*(pat_str + pat_counter) == '%'))
 		{	/* simple case of percent: increment pointers and continue */
 			jnl_counter++;
 			pat_counter++;
-		} else if ( *(pat_str + pat_counter) == '*') /* gets rough ,fasten seat belts */
+		} else if ((pat_counter < pat_len) && (*(pat_str + pat_counter) == '*')) /* gets rough ,fasten seat belts */
 		{
 			pat_counter++;
 			i = pat_counter;
-			while ((asterisk_not_seen) && (i < pat_len)) /* find the next occurrence of asterisk to memcmp */
+			while (asterisk_not_seen && (i < pat_len)) /* find the next occurrence of asterisk to memcmp */
 			{
 				if (*(pat_str + i) == '*')
-					asterisk_not_seen= FALSE;
+					asterisk_not_seen = FALSE;
 				else
 					i++;
 			}
 			if (i == pat_len)  /* no asterisk found after the current one */
 			{
-				if (!memcmp(jnl_str + (jnl_len - (i - pat_counter)),pat_str + pat_counter,i - pat_counter))
+				if ((i - pat_counter) > jnl_len)
+					return(FALSE);
+				if (!memcmp(jnl_str + (jnl_len - (i - pat_counter)), pat_str + pat_counter, i - pat_counter))
 					return(TRUE);
 				else    /* maybe they do not match or else it contains percent character */
 				{
@@ -101,14 +104,14 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 			} else if (i < pat_len)	/* another asterisk seen before end of string */
 			{
 				sav_jnl = jnl_counter;
-				while (memcmp(jnl_str + jnl_counter, pat_str + pat_counter, i - pat_counter)
-						&& (jnl_counter < jnl_len))
+				while ((jnl_counter < jnl_len)
+						&& memcmp(jnl_str + jnl_counter, pat_str + pat_counter, i - pat_counter))
 					jnl_counter++;
 				if (jnl_counter == jnl_len)
 				{
 					jcount = i - pat_counter;
 					index2 = pat_counter;
-					while (index2 <= (jnl_len - jcount)+1)
+					while (index2 <= (jnl_len - jcount) + 1)
 					{
 						if (( *(pat_str + pat_counter) == '%') ||
 						    ( *(pat_str + pat_counter) ==  *(jnl_str + sav_jnl)))
@@ -130,10 +133,11 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 						return(FALSE);
 				}
 				/* synchronize the character pointers after processing an asterisk */
-				if (i < (pat_len-1))
+				if (i < (pat_len - 1))
 					pat_counter = i + 1;
-				while ((* (jnl_str + jnl_counter) != *(pat_str + pat_counter)) &&
-						(jnl_counter < jnl_len) && (*(pat_str + pat_counter) != '%'))
+				while ((jnl_counter < jnl_len)
+						&& (*(jnl_str + jnl_counter) != *(pat_str + pat_counter))
+						&& (*(pat_str + pat_counter) != '%'))
 					jnl_counter++;
 				if (jnl_counter == jnl_len) /* if unable to synchronize */
 					return(FALSE);

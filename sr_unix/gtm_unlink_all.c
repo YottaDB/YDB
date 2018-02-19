@@ -3,6 +3,9 @@
  * Copyright (c) 2011-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -36,7 +39,6 @@
 #include "fileinfo.h"
 #include "gdsfhead.h"
 #include "srcline.h"
-#include "gtmci.h"	/* for GTM_CIMOD */
 #include "dm_setup.h"	/* for GTM_DMOD */
 #include "urx.h"
 #include "stringpool.h"
@@ -118,8 +120,8 @@ void gtm_unlink_all(void)
 	for (rtab = rtn_names_end; rtab > rtn_names; rtab--, rtn_names_end = rtab)
 	{	/* [0] is not used (for some reason) */
 		rtnhdr = rtab->rt_adr;
-		if ((0 == strcmp(rtnhdr->routine_name.addr, GTM_DMOD)) || (0 == strcmp(rtnhdr->routine_name.addr, GTM_CIMOD)))
-		{	/* If the routine is GTM$DMOD or GTM$CI, it is allocated in one chunk by make_*mode(). Release it in
+		if (0 == strcmp(rtnhdr->routine_name.addr, GTM_DMOD))
+		{	/* If the routine is GTM$DMOD, it is allocated in one chunk by make_*mode(). Release it in
 			 * one chunk too.
 			 */
 			GTM_TEXT_FREE(rtnhdr);

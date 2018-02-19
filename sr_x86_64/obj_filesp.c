@@ -3,6 +3,9 @@
  * Copyright (c) 2007-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -86,8 +89,8 @@ static char static_string_tbl[] = {
 
 #define SPACE_STRING_ALLOC_LEN  (SIZEOF(static_string_tbl) +    \
                                  SIZEOF(GTM_LANG) + 1 +         \
-                                 SIZEOF(GTM_PRODUCT) + 1 +      \
-                                 SIZEOF(GTM_RELEASE_NAME) + 1 + \
+                                 SIZEOF(YDB_PRODUCT) + 1 +      \
+                                 SIZEOF(YDB_RELEASE_NAME) + 1 + \
                                  SIZEOF(mident_fixed))
 
 /* Following constants has to be in sync with above static string array(static_string_tbl) */
@@ -98,9 +101,6 @@ static char static_string_tbl[] = {
 #define SEC_TEXT_INDX 1
 #define SEC_STRTAB_INDX 2
 #define SEC_SYMTAB_INDX 3
-
-LITREF char gtm_release_name[];
-LITREF int4 gtm_release_name_len;
 
 GBLREF mliteral 	literal_chain;
 GBLREF char 		source_file_name[];
@@ -160,11 +160,11 @@ void finish_object_file(void)
         strEntrySize = SIZEOF(GTM_LANG);
         memcpy((string_tbl + symIndex), GTM_LANG, strEntrySize);
         symIndex += strEntrySize;
-        strEntrySize = SIZEOF(GTM_PRODUCT);
-        memcpy((string_tbl + symIndex), GTM_PRODUCT, strEntrySize);
+        strEntrySize = SIZEOF(YDB_PRODUCT);
+        memcpy((string_tbl + symIndex), YDB_PRODUCT, strEntrySize);
         symIndex += strEntrySize;
-        strEntrySize = SIZEOF(GTM_RELEASE_NAME);
-        memcpy((string_tbl + symIndex), GTM_RELEASE_NAME, strEntrySize);
+        strEntrySize = SIZEOF(YDB_RELEASE_NAME);
+        memcpy((string_tbl + symIndex), YDB_RELEASE_NAME, strEntrySize);
 	symIndex += strEntrySize;
         gtm_obj_code = (char *)malloc(bufSize);
         /* At this point, we have only the GTM object written onto the file.

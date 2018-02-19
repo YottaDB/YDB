@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +20,7 @@ struct CLB *cmj_unit2clb(struct NTD *tsk, cmi_unit_t unit)
 	que_ent_ptr_t qp;
 	struct CLB *p;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	for (qp = RELQUE2PTR(tsk->cqh.fl) ; qp != &tsk->cqh ;
 			qp = RELQUE2PTR(p->cqe.fl))
 	{

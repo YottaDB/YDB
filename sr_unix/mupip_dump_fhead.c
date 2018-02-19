@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -37,16 +40,16 @@
 #include "mupip_dump_fhead.h"
 #include "gtm_stdlib.h"
 
-GBLREF char			gtm_dist[GTM_PATH_MAX];
-GBLREF boolean_t		gtm_dist_ok_to_use;
+GBLREF char			ydb_dist[YDB_PATH_MAX];
+GBLREF boolean_t		ydb_dist_ok_to_use;
 GBLREF tp_region		*grlist;
 
 error_def(ERR_DBNOREGION);
-error_def(ERR_GTMDISTUNVERIF);
+error_def(ERR_YDBDISTUNVERIF);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
 
-#define DUMPFHEAD_CMD_STRING_SIZE 	256 + GTM_PATH_MAX + GTM_PATH_MAX
+#define DUMPFHEAD_CMD_STRING_SIZE 	256 + YDB_PATH_MAX + YDB_PATH_MAX
 #define EXEC_GTMDUMPFHEAD		"%s/mumps -run %%XCMD 'do dumpfhead^%%DUMPFHEAD(\"%s\")'"
 
 int4 dumpfhead(int len, unsigned char *filepath);
@@ -55,14 +58,14 @@ void mupip_dump_fhead(void)
 {
 	int4		status;
 	tp_region	*rptr;
-	unsigned char	file[GTM_PATH_MAX + 1];
+	unsigned char	file[YDB_PATH_MAX + 1];
 	unsigned short	file_len = SIZEOF(file);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Verify gtm_dist, and make sure there is a parameter. */
-	if (!gtm_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_GTMDISTUNVERIF, 4, LEN_AND_STR(gtm_dist));
+	/* Verify ydb_dist, and make sure there is a parameter. */
+	if (!ydb_dist_ok_to_use)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_YDBDISTUNVERIF, 4, LEN_AND_STR(ydb_dist));
 	if (CLI_PRESENT == cli_present("REGION"))
 	{	/* region */
 		status = SS_NORMAL;
@@ -96,7 +99,7 @@ int4 dumpfhead(int len, unsigned char *file)
 #	endif
 
 	SNPRINTF(cmd_dmpfhead_string, SIZEOF(cmd_dmpfhead_string), EXEC_GTMDUMPFHEAD,
-		 gtm_dist, file);
+		 ydb_dist, file);
 
 #ifdef _BSD
 	assert(SIZEOF(wait_stat) == SIZEOF(int4));

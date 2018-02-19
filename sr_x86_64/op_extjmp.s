@@ -3,6 +3,9 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -13,7 +16,8 @@
 	.include "g_msf.si"
 	.include "linkage.si"
 	.include "gtm_threadgbl_deftypes_asm.si"
-	.include "debug.si"
+#	include "debug.si"
+
 #
 # op_extjmp transfers control to an external GT.M MUMPS routine with no arguments
 # by rewriting the existing M stack frame rather than stacking a new stack frame
@@ -47,8 +51,6 @@
 # macro so we need not save it separately.
 #
 	.data
-	.extern	ERR_GTMCHECK
-	.extern	ERR_LABELNOTFND
 	.extern	frame_pointer
 	.extern gtm_threadgbl
 
@@ -170,7 +172,7 @@ autorelink_check:
 # occurs
 #
 gtmcheck:
-	movl	ERR_GTMCHECK(REG_IP), REG32_ARG1
+	movl	$ERR_GTMCHECK, REG32_ARG1
 	movl	$1, REG32_ARG0
 	movb    $0, REG8_ACCUM             			# Variable length argument
 	call	rts_error
@@ -183,3 +185,6 @@ label_missing:
 	movq	stack_arg1(REG_SP), REG64_ARG0			# Index to linkage table and to linkage name table
 	call	laberror
 	jmp	retlab
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+# This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+.section        .note.GNU-stack,"",@progbits

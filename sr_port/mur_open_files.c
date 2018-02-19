@@ -128,7 +128,7 @@
 
 GBLREF	gd_addr			*gd_header;
 GBLREF	gd_region		*gv_cur_region;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF 	mur_gbls_t		murgbl;
 GBLREF	reg_ctl_list		*mur_ctl;
@@ -137,7 +137,6 @@ GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	int4			strm_index;
 GBLREF	jnl_gbls_t		jgbl;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			process_id;
 
@@ -267,27 +266,26 @@ boolean_t mur_open_files()
 		 * instance file nor do we look at jnlpool/recvpool during forward rollback so we skip this step.
 		 */
 		if (!repl_inst_get_name((char *)replpool_id.instfilename, &full_len, SIZEOF(replpool_id.instfilename),
-				issue_gtm_putmsg))
+				issue_gtm_putmsg, NULL))
 		{	/* appropriate gtm_putmsg would have already been issued by repl_inst_get_name */
 			return FALSE;
 		}
 		assert((int)NUM_SRC_SEMS == (int)NUM_RECV_SEMS);
 		ASSERT_DONOT_HOLD_REPLPOOL_SEMS;
-		assert(NULL == jnlpool.repl_inst_filehdr);
+		assert((NULL == jnlpool) || (NULL == jnlpool->repl_inst_filehdr));
 		if (!mu_rndwn_repl_instance(&replpool_id, FALSE, TRUE, &jnlpool_sem_created))
 			return FALSE;	/* mu_rndwn_repl_instance will have printed appropriate message in case of error */
-		assert(jnlpool.jnlpool_ctl == jnlpool_ctl);
-		assert(jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY || (NULL == jnlpool_ctl));
+		assert(jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY || ((NULL == jnlpool) || (NULL == jnlpool->jnlpool_ctl)));
 		ASSERT_HOLD_REPLPOOL_SEMS;
-		assert(NULL != jnlpool.repl_inst_filehdr);
-		assert(INVALID_SEMID != jnlpool.repl_inst_filehdr->jnlpool_semid);
-		assert(INVALID_SEMID != jnlpool.repl_inst_filehdr->recvpool_semid);
+		assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));
+		assert(INVALID_SEMID != jnlpool->repl_inst_filehdr->jnlpool_semid);
+		assert(INVALID_SEMID != jnlpool->repl_inst_filehdr->recvpool_semid);
 		murgbl.repl_standalone = TRUE;
 		/* Since rollback would not have necessarily done a jnlpool_init, it might not have initialized strm_index
 		 * to the correct value in case of a supplementary instance. So do it now. This code is similar to that in
 		 * jnlpool_init. Keep the two in sync (i.e. fix the other similarly if one changes).
 		 */
-		if (jnlpool.repl_inst_filehdr->is_supplementary)
+		if (jnlpool->repl_inst_filehdr->is_supplementary)
 		{
 			assert((INVALID_SUPPL_STRM == strm_index) || (0 == strm_index));
 			strm_index = 0;
@@ -352,7 +350,7 @@ boolean_t mur_open_files()
 			}
 			if (mur_options.update || mur_options.extr[GOOD_TN])
 			{
-	        		gvcst_init(rctl->gd);
+	        		gvcst_init(rctl->gd, NULL);
 				TP_CHANGE_REG(rctl->gd);
 				if (jgbl.onlnrlbk)
 				{
@@ -384,30 +382,30 @@ boolean_t mur_open_files()
 	}
 	assert(murgbl.reg_full_total == max_reg_total);
 	DEBUG_ONLY(curr = gld_db_files;)
-	assert(!jgbl.onlnrlbk || (0 != max_epoch_interval));
+	assert(!jgbl.onlnrlbk || (0 != max_epoch_interval) || (NULL == jnlpool) || (NULL == jnlpool->jnlpool_ctl));
 	if (jgbl.onlnrlbk)
 	{
 		inst_requires_rlbk = FALSE;
-		udi = FILE_INFO(jnlpool.jnlpool_dummy_reg);
+		udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ORLBKSTART, 4,
-			     LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
+			     LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ORLBKSTART, 4,
-			       LEN_AND_STR(jnlpool.repl_inst_filehdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
+			       LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
 		/* Need to get the gtmsource_srv_latch BEFORE grab_crit to avoid deadlocks */
-		if (NULL != jnlpool_ctl)
+		if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl))
 		{
-			assert(udi == FILE_INFO(jnlpool.jnlpool_dummy_reg));
+			assert(udi == FILE_INFO(jnlpool->jnlpool_dummy_reg));
 			csa = &udi->s_addrs;
 			ASSERT_VALID_JNLPOOL(csa);
-			assert(INVALID_SEMID != jnlpool.repl_inst_filehdr->jnlpool_semid);
-			assert(INVALID_SEMID != jnlpool.repl_inst_filehdr->recvpool_semid);
-			assert(INVALID_SEMID != jnlpool.repl_inst_filehdr->jnlpool_shmid);
-			gtmsourcelocal_ptr = &jnlpool.gtmsource_local_array[0];
+			assert(INVALID_SEMID != jnlpool->repl_inst_filehdr->jnlpool_semid);
+			assert(INVALID_SEMID != jnlpool->repl_inst_filehdr->recvpool_semid);
+			assert(INVALID_SEMID != jnlpool->repl_inst_filehdr->jnlpool_shmid);
+			gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
 			for (idx = 0; NUM_GTMSRC_LCL > idx; idx++, gtmsourcelocal_ptr++)
 			{	/* Get hold of all the gtmsource_srv_latch in all the source server slots in the journal pool. Hold
 				 * onto it until the end (in mur_close_files).
 				 */
-				jnlpool.gtmsource_local = gtmsourcelocal_ptr;
+				jnlpool->gtmsource_local = gtmsourcelocal_ptr;
 				if (!grab_gtmsource_srv_latch(&gtmsourcelocal_ptr->gtmsource_srv_latch,
 						2 * max_reg_total * max_epoch_interval, GRAB_GTMSOURCE_SRV_LATCH_ONLY))
 					assertpro(FALSE); /* should not reach here due to rts_error in the above function */
@@ -484,14 +482,24 @@ boolean_t mur_open_files()
 		 * pool and set the field in the journal pool indicating that online rollback is in progress and other
 		 * processes need to back off.
 		 */
-		if (NULL != jnlpool_ctl)
+		if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl))
 		{	/* Validate the journal pool is accessible and the offsets of various structures within it are intact */
-			grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+			grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 			csa->hold_onto_crit = TRUE;	/* No more unconditional rel_lock() */
-			assert(jnlpool.repl_inst_filehdr->crash); /* since we haven't removed the journal pool */
+			assert(jnlpool->repl_inst_filehdr->crash); /* since we haven't removed the journal pool */
+			/* Wait for any pending phase2 commits in jnlpool to finish */
+			while (jnlpool->jnlpool_ctl->phase2_commit_index1 != jnlpool->jnlpool_ctl->phase2_commit_index2)
+			{
+				repl_phase2_cleanup(jnlpool);
+				if (jnlpool->jnlpool_ctl->phase2_commit_index1 == jnlpool->jnlpool_ctl->phase2_commit_index2)
+					break;
+				JPL_TRACE_PRO(jnlpool->jnlpool_ctl, jnl_pool_write_sleep);
+				SLEEP_USEC(1, FALSE);
+			}
 			repl_inst_flush_jnlpool(FALSE, FALSE);
-			assert((0 == jnlpool_ctl->onln_rlbk_pid) || !is_proc_alive(jnlpool_ctl->onln_rlbk_pid, 0));
-			jnlpool_ctl->onln_rlbk_pid = process_id;
+			assert((0 == jnlpool->jnlpool_ctl->onln_rlbk_pid)
+				|| !is_proc_alive(jnlpool->jnlpool_ctl->onln_rlbk_pid, 0));
+			jnlpool->jnlpool_ctl->onln_rlbk_pid = process_id;
 		}
 		replinst_file_corrupt = TRUE;
 		/* Indicate to all other processes that ONLINE ROLLBACK is now in progress */
@@ -544,7 +552,8 @@ boolean_t mur_open_files()
 			if (NULL != cs_addrs->jnl)
 			{
 				jb = cs_addrs->jnl->jnl_buff;
-				assert((jb->freeaddr == jb->dskaddr) && (jb->dskaddr == jb->fsync_dskaddr));
+				assert((jb->freeaddr == jb->dskaddr) && (jb->dskaddr == jb->fsync_dskaddr)
+						&& (jb->rsrv_freeaddr == jb->rsrv_freeaddr));
 			}
 #			endif
 			if (cs_data->kill_in_prog)
@@ -578,7 +587,7 @@ boolean_t mur_open_files()
 									   * this shared memory until recover/rlbk cleanly exits */
 				}
 				assert(!JNL_ENABLED(csd) || 0 == csd->jnl_file_name[csd->jnl_file_len]);
-				rctl->db_ctl->file_info = rctl->gd->dyn.addr->file_cntl->file_info;
+				rctl->db_ctl->file_info = FILE_CNTL(rctl->gd)->file_info;
 				rctl->recov_interrupted = csd->recov_interrupted;
 				if (mur_options.update && rctl->recov_interrupted)
 				{	/* interrupted recovery might have changed current csd's jnl_state/repl_state.
@@ -710,7 +719,7 @@ boolean_t mur_open_files()
 					csd->repl_state = repl_closed;
 					csd->file_corrupt = TRUE;
 					/* flush the changed csd to disk */
-					fc = rctl->gd->dyn.addr->file_cntl;
+					fc = FILE_CNTL(rctl->gd);
 					fc->op = FC_WRITE;
 					/* Note: csd points to shared memory and is already aligned
 					 * appropriately even if db was opened using O_DIRECT.
@@ -815,7 +824,7 @@ boolean_t mur_open_files()
 		} /* End rctl->db_present */
 	} /* End for */
 	if (jgbl.mur_rollback && !mur_options.forward)
-		jnlpool.repl_inst_filehdr->file_corrupt = replinst_file_corrupt;
+		jnlpool->repl_inst_filehdr->file_corrupt = replinst_file_corrupt;
 	/* At this point mur_ctl[] has been created from the current global directory database file names
 	 * or from the journal file header's database names.
 	 * For star_specified == TRUE implicitly only current generation journal files are specified and already opened
@@ -990,7 +999,7 @@ boolean_t mur_open_files()
 	{
 		jctl = rctl->jctl_head;
 		if (rctl->db_present && (mur_options.update || mur_options.extr[GOOD_TN]))
-			rctl->csa->miscptr = (void *)rctl; /* needed by gdsfilext_nojnl/jnl_put_jrt_pini/mur_pini_addr_reset */
+			rctl->csa->miscptr = (void *)rctl; /* needed by gdsfilext_nojnl/jnl_write_pini/mur_pini_addr_reset */
 		if (mur_options.update)
 		{
 			csd = rctl->csd;

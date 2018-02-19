@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,13 +93,13 @@ error_def(ERR_STACKCRIT);
 void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
 			 int delimlen, unsigned char *delimptr, unsigned char *strend, unsigned char *buffer_start)
 {
-        int             i, tmplen, len;
-        unsigned char   *delimend, *outptr, *outtop;
+	int		 i, len, tmplen;
+	unsigned char   *delimend, *outptr, *outtop;
 	wint_t		*curptr32;
-        io_desc         *iod;
+	io_desc		*iod;
 
-        if (0 < datalen && NULL != dataptr32)
-        {       /* Return how much input we got */
+	if (0 < datalen && NULL != dataptr32)
+	{       /* Return how much input we got */
 		if (gtm_utf8_mode)
 		{
 			outptr = buffer_start;
@@ -113,30 +113,30 @@ void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
 		vmvalptr->str.addr = (char *)buffer_start;
 		if (IS_AT_END_OF_STRINGPOOL(buffer_start, 0))
 			stringpool.free += vmvalptr->str.len;	/* The BADCHAR error after this won't do this for us */
-        }
-        if (NULL != strend && NULL != delimptr)
-        {       /* First find the end of the delimiter (max of 4 bytes) */
-                if (0 == delimlen)
+	}
+	if (NULL != strend && NULL != delimptr)
+	{       /* First find the end of the delimiter (max of 4 bytes) */
+		if (0 == delimlen)
 		{
 			for (delimend = delimptr; 4 >= delimlen && delimend < strend; ++delimend, ++delimlen)
 			{
 				if (UTF8_VALID(delimend, strend, tmplen))
 					break;
 			}
-                }
-                if (0 < delimlen)
-                {       /* Set $ZB with the failing badchar */
-                        iod = io_curr_device.in;
-                        memcpy(iod->dollar.zb, delimptr, MIN(delimlen, ESC_LEN - 1));
-                        iod->dollar.zb[MIN(delimlen, ESC_LEN - 1)] = '\0';
-                        memcpy(iod->dollar.key, delimptr, MIN(delimlen, DD_BUFLEN - 1));
-                        iod->dollar.key[MIN(delimlen, DD_BUFLEN - 1)] = '\0';
-                }
-        }
+		}
+		if (0 < delimlen)
+		{       /* Set $ZB with the failing badchar */
+			iod = io_curr_device.in;
+			memcpy(iod->dollar.zb, delimptr, MIN(delimlen, ESC_LEN - 1));
+			iod->dollar.zb[MIN(delimlen, ESC_LEN - 1)] = '\0';
+			memcpy(iod->dollar.key, delimptr, MIN(delimlen, DD_BUFLEN - 1));
+			iod->dollar.key[MIN(delimlen, DD_BUFLEN - 1)] = '\0';
+		}
+	}
 }
 #endif
 
-int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
+int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseconds */
 {
 	boolean_t	ret, nonzerotimeout, timed, insert_mode, edit_mode, utf8_active, zint_restart, buffer_moved;
 	uint4		mask;
@@ -161,7 +161,6 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	int		keypad_len, backspace, delete;
 	int		up, down, right, left, insert_key;
 	boolean_t	escape_edit, empterm;
-	int4		msec_timeout;		/* timeout in milliseconds */
 	io_desc		*io_ptr;
 	d_tt_struct	*tt_ptr;
 	io_terminator	outofbands;
@@ -317,16 +316,16 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 	if (!zint_restart)
 		dx = dx_start;
 	nonzerotimeout = FALSE;
-	if (NO_M_TIMEOUT == timeout)
+	if (NO_M_TIMEOUT == msec_timeout)
 	{
 		timed = FALSE;
 		input_timeval.tv_sec = 100;
-		msec_timeout = NO_M_TIMEOUT;
+		input_timeval.tv_usec = 0;
 	} else
 	{
 		timed = TRUE;
-		input_timeval.tv_sec = timeout;
-		msec_timeout = timeout2msec(timeout);
+		input_timeval.tv_sec = msec_timeout / MILLISECS_IN_SEC;
+		input_timeval.tv_usec = (msec_timeout % MILLISECS_IN_SEC) * MICROSECS_IN_MSEC;
 		if (!msec_timeout)
 		{
 			if (!zint_restart)
@@ -339,7 +338,6 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
 		}
 	}
-	input_timeval.tv_usec = 0;
 	do
 	{
 		if (outofband)
@@ -520,7 +518,7 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 #ifdef UNICODE_SUPPORTED
 			}
 #endif
-                        GETASCII(asc_inchar,inchar);
+			GETASCII(asc_inchar,inchar);
 			if (!edit_mode && (dx >= ioptr_width) && io_ptr->wrap && !(mask & TRM_NOECHO))
 			{
 				DOWRITE(tt_ptr->fildes, NATIVE_TTEOL, STRLEN(NATIVE_TTEOL));
@@ -926,10 +924,10 @@ int	iott_readfl(mval *v, int4 length, int4 timeout)	/* timeout in seconds */
 						prin_in_dev_failure = TRUE;
 					else
 					{
-                                        	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
-                                        	stop_image_no_core();
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
+						stop_image_no_core();
 					}
-                                }
+				}
 				if (io_ptr->dollar.zeof)
 				{
 					io_ptr->dollar.za = 9;

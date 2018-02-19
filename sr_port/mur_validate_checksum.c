@@ -1,6 +1,6 @@
 /****************************************************************
  *
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,17 +35,19 @@
 boolean_t mur_validate_checksum(jnl_ctl_list *jctl)
 {
 	enum jnl_record_type 	rectype;
-	uint4			rec_csum, tmp_csum;
+	uint4			orig_csum, rec_csum, tmp_csum;
 	unsigned char		*start_ptr, *end_ptr;
 	jnl_record		*jnlrec;
 	reg_ctl_list		*rctl;
 	mur_read_desc_t		*mur_desc;
+	struct_jrec_align	*align_rec;
 
 	rec_csum = INIT_CHECKSUM_SEED;
 	rctl = jctl->reg_ctl;
 	mur_desc = rctl->mur_desc;
 	jnlrec = mur_desc->jnlrec;
 	rectype = (enum jnl_record_type)jnlrec->prefix.jrec_type;
+	orig_csum = GET_JREC_CHECKSUM(jnlrec, rectype);
 	if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))	/* TUPD/UUPD/FUPD/GUPD */
 	{
 		COMPUTE_COMMON_CHECKSUM(tmp_csum, jnlrec->prefix);
@@ -63,25 +65,24 @@ boolean_t mur_validate_checksum(jnl_ctl_list *jctl)
 		rec_csum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)start_ptr,
 								MIN(jnlrec->jrec_pblk.prefix.forwptr, jnlrec->jrec_pblk.bsiz));
 		COMPUTE_PBLK_CHECKSUM(rec_csum, &jnlrec->jrec_pblk, tmp_csum, rec_csum);
-	} else if (IS_FIXED_SIZE(rectype) || rectype == JRT_ALIGN)
+	} else if (IS_FIXED_SIZE(rectype))
 	{
-		tmp_csum = jnlrec->prefix.checksum;
 		jnlrec->prefix.checksum = INIT_CHECKSUM_SEED;
-		switch (rectype)
-		{
-		case JRT_ALIGN:
-			rec_csum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)&jnlrec->jrec_align, SIZEOF(jrec_prefix));
-			break;
-		default:
-			if (JRT_TRIPLE != rectype && JRT_HISTREC != rectype)
-			rec_csum = compute_checksum(INIT_CHECKSUM_SEED,
-							(unsigned char *)&jnlrec->jrec_set_kill, jnlrec->prefix.forwptr);
-			break;
-		}
-		jnlrec->prefix.checksum = tmp_csum;
-	}
+		assert(JRT_TRIPLE != rectype);
+		assert(JRT_HISTREC != rectype);
+		rec_csum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)jnlrec, jnlrec->prefix.forwptr);
+		jnlrec->prefix.checksum = orig_csum;
+	} else if (JRT_ALIGN == rectype)
+	{	/* Note: "struct_jrec_align" has a different layout (e.g. "checksum" at different offset etc.) than all
+		 * other jnl records. So handle this specially.
+		 */
+		align_rec = (struct_jrec_align *)jnlrec;
+		align_rec->checksum = INIT_CHECKSUM_SEED;
+		rec_csum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)align_rec, FIXED_ALIGN_RECLEN);
+		align_rec->checksum = orig_csum;
+	} else
+		assert(FALSE);
 	ADJUST_CHECKSUM(rec_csum, jctl->rec_offset, rec_csum);
 	ADJUST_CHECKSUM(rec_csum, jctl->jfh->checksum, rec_csum);
-	/* assert(jnlrec->prefix.checksum == rec_csum); Can fail only for journal after crash or with holes */
-	return (jnlrec->prefix.checksum == rec_csum);
+	return (orig_csum == rec_csum);
 }

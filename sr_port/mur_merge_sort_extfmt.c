@@ -3,6 +3,9 @@
  * Copyright (c) 2015-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -364,8 +367,8 @@ int mur_merge_sort_extfmt(void)
 				if (-1 == (sm_long_t)shm_ptr)
 				{
 					save_errno = errno;
-					SNPRINTF(errstr, SIZEOF(errstr),
-						"shmat() : shmid=%d shmsize=0x%llx", shmid, shm_rctl->jnlext_shm_size);
+					SNPRINTF(errstr, SIZEOF(errstr), "shmat() : shmid=%d shmsize=0x%llx",
+								shmid, (unsigned long long)shm_rctl->jnlext_shm_size);
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
 								ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
 					goto cleanup;
@@ -535,7 +538,7 @@ int mur_merge_sort_extfmt(void)
 					rctl = &rctl_start[index];
 					fn = ((fi_type *)rctl->file_info[recstat])->fn;
 					SNPRINTF(errstr, SIZEOF(errstr), "fread() : %s : Expected = %lld : Actual = %lld",
-													fn, jm_size, ret_size);
+										fn, (long long)jm_size, (long long)ret_size);
 					if (save_errno)
 					{	/* ERROR encountered during GTM_FREAD */
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
@@ -555,7 +558,7 @@ int mur_merge_sort_extfmt(void)
 					assert(FALSE);
 					assert(save_errno);
 					SNPRINTF(errstr, SIZEOF(errstr), "fwrite() : %s : Expected = %lld : Actual = %lld",
-												fn_out, jm_size, ret_size);
+										fn_out, (long long)jm_size, (long long)ret_size);
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
 								ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
 					goto cleanup;

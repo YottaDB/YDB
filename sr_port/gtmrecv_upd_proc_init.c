@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -48,7 +51,7 @@
 #include "gtmimagename.h"
 #include "wbox_test_init.h"
 
-#define UPDPROC_CMD_MAXLEN	GTM_PATH_MAX
+#define UPDPROC_CMD_MAXLEN	YDB_PATH_MAX
 #define UPDPROC_CMD		"%s/mupip"
 #define UPDPROC_CMD_FILE	"mupip"
 #define UPDPROC_CMD_ARG1	"replicate"
@@ -58,14 +61,14 @@
 GBLREF recvpool_addrs	recvpool;
 GBLREF int		recvpool_shmid;
 
-GBLREF char		gtm_dist[GTM_PATH_MAX];
-GBLREF boolean_t	gtm_dist_ok_to_use;
+GBLREF char		ydb_dist[YDB_PATH_MAX];
+GBLREF boolean_t	ydb_dist_ok_to_use;
 GBLREF int		gtmrecv_log_fd;
 GBLREF FILE		*gtmrecv_log_fp;
 GBLREF int		updproc_log_fd;
 LITREF gtmImageName	gtmImageNames[];
 
-error_def(ERR_GTMDISTUNVERIF);
+error_def(ERR_YDBDISTUNVERIF);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_REPLINFO);
@@ -115,19 +118,19 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	recvpool.upd_proc_local->upd_proc_shutdown = NO_SHUTDOWN;
 
 #ifdef UNIX
-	if (!gtm_dist_ok_to_use)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+	if (!ydb_dist_ok_to_use)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
-	if (WBTEST_ENABLED(WBTEST_MAXGTMDIST_UPDATE_PROCESS))
+	if (WBTEST_ENABLED(WBTEST_MAXYDBDIST_UPDATE_PROCESS))
 	{
-		memset(gtm_dist, 'a', GTM_PATH_MAX-2);
-		gtm_dist[GTM_PATH_MAX-1] = '\0';
+		memset(ydb_dist, 'a', YDB_PATH_MAX-2);
+		ydb_dist[YDB_PATH_MAX-1] = '\0';
 	}
-	upd_proc_cmd_len = SNPRINTF(upd_proc_cmd, UPDPROC_CMD_MAXLEN, UPDPROC_CMD, gtm_dist);
+	upd_proc_cmd_len = SNPRINTF(upd_proc_cmd, UPDPROC_CMD_MAXLEN, UPDPROC_CMD, ydb_dist);
 	if ((-1 == upd_proc_cmd_len) || (UPDPROC_CMD_MAXLEN <= upd_proc_cmd_len))
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UPDPROC, 0, ERR_TEXT, 2,
-			   RTS_ERROR_LITERAL("Could not find path of Update Process. Check value of $gtm_dist"));
+			   RTS_ERROR_LITERAL("Could not find path of Update Process. Check value of $ydb_dist"));
 		repl_errno = EREPL_UPDSTART_BADPATH;
 		return(UPDPROC_START_ERR);
 	}

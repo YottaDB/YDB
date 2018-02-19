@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -33,7 +36,6 @@
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"	/* for gtcmtr_protos.h */
 #include "util.h"
-#include "longcpy.h"
 #include "gtcmtr_protos.h"
 #include "lke.h"
 #include "lke_getcli.h"
@@ -113,7 +115,7 @@ void	lke_show(void)
 				/* Prevent any modification of the lock space while we make a local copy of it */
 				if (!nocrit)
 					GRAB_LOCK_CRIT(csa, reg, was_crit);
-				longcpy((uchar_ptr_t)ctl, (uchar_ptr_t)csa->lock_addrs[0], ls_len);
+				memcpy((uchar_ptr_t)ctl, (uchar_ptr_t)csa->lock_addrs[0], ls_len);
 				assert((ctl->max_blkcnt > 0) && (ctl->max_prccnt > 0) && ((ctl->subtop - ctl->subbase) > 0));
 				if (!nocrit)
 					REL_LOCK_CRIT(csa, reg, was_crit);
@@ -131,17 +133,14 @@ void	lke_show(void)
 				ls_free *= 100;	/* Scale to [0-100] range. (couldn't do this inside util_out_print) */
 				if (ls_free < 1) /* No memory? Notify user. */
 					gtm_putmsg_csa(NULL, VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, DB_LEN_STR(reg));
-				if (ls_free < 1 || memory)
-				{
-					if (ctl->subtop > ctl->subfree)
-						gtm_putmsg_csa(NULL, VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
-							   (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
-							   (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" not "));
-					else
-						gtm_putmsg_csa(NULL, VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
-							   (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
-							   (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" "));
-				}
+				if (ctl->subtop > ctl->subfree)
+					gtm_putmsg_csa(NULL, VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
+						   (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
+						   (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" not "));
+				else
+					gtm_putmsg_csa(NULL, VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
+						   (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
+						   (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" "));
 				free(ctl);
 			} else
 			{

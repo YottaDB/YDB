@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +27,7 @@
 #include <locale.h>		/* needed for setlocale() */
 #include <langinfo.h>		/* needed for nl_langinfo() */
 #ifdef _AIX
-#include <gtm_limits.h>		/* needed for GTM_PATH_MAX */
+#include <gtm_limits.h>		/* needed for YDB_PATH_MAX */
 #include <sys/ldr.h>		/* needed for loadquery */
 #include <libgen.h>		/* needed for basename */
 #include <gtm_stat.h>
@@ -42,8 +45,8 @@
 
 #ifdef _AIX
 # define DELIM			":"
-# define MAX_SEARCH_PATH_LEN	GTM_PATH_MAX * 4 /* Give enough room for loadquery to give the search paths in the first time */
-# define ICU_LIBNAME_LEN	GTM_PATH_MAX
+# define MAX_SEARCH_PATH_LEN	YDB_PATH_MAX * 4 /* Give enough room for loadquery to give the search paths in the first time */
+# define ICU_LIBNAME_LEN	YDB_PATH_MAX
 # define ICU_NOT_FOUND_ERR	"Cannot find ICU library in the standard system library path (/usr/lib, /usr/lib64 etc.) or LIBPATH"
 #endif
 
@@ -162,9 +165,9 @@ static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char *icusymv
 	int4		major_ver, minor_ver;
 	int		i;
 
-	if (NULL == icu_ver_buf)
+	if ((NULL == icu_ver_buf) || (0 == len))
 		return FALSE;	/* empty string */
-	
+
 	/* Deconstruct the two known forms of gtm_icu_version "[0-9].[0-9]" and "[0-9][0-9]" ignoring trailing values */
 	ptr = icu_ver_buf;
 	if (-1 == (major_ver = asc2i((uchar_ptr_t)ptr++, 1)))
@@ -218,7 +221,7 @@ void gtm_icu_init(void)
 	mstr		icu_ver, trans;
 #	ifdef _AIX
 	int		buflen, prev_dyn_size;
-	char            buf[ICU_LIBNAME_LEN], temp_path[GTM_PATH_MAX], real_path[GTM_PATH_MAX], search_paths[MAX_SEARCH_PATH_LEN];
+	char            buf[ICU_LIBNAME_LEN], temp_path[YDB_PATH_MAX], real_path[YDB_PATH_MAX], search_paths[MAX_SEARCH_PATH_LEN];
 	char		*ptr, *each_libpath, *dyn_search_paths = NULL, *search_path_ptr;
 	struct stat	real_path_stat;		/* To see if the resolved real_path exists or not */
 #	endif
@@ -311,7 +314,7 @@ void gtm_icu_init(void)
 		each_libpath = STRTOK_R(search_path_ptr, DELIM, &strtokptr);
 		while (NULL != each_libpath)
 		{
-			SNPRINTF(temp_path, GTM_PATH_MAX, "%s/%s", each_libpath, libname);
+			SNPRINTF(temp_path, YDB_PATH_MAX, "%s/%s", each_libpath, libname);
 			if (NULL == realpath(temp_path, real_path) && (0 != Stat(real_path, &real_path_stat)))
 			{
 				each_libpath = STRTOK_R(NULL, DELIM, &strtokptr);
@@ -325,7 +328,8 @@ void gtm_icu_init(void)
 			buflen = 0;
 			/* real_path = /usr/local/lib64/libicuio36.0.a */
 			ptr = basename(real_path);
-			SNPRINTF(buf, ICU_LIBNAME_LEN, "%s(%s", real_path, ptr); /* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.a */
+			/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.a */
+			SNPRINTF(buf, ICU_LIBNAME_LEN, "%s(%s", real_path, ptr);
 			buflen += (STRLEN(real_path) + STRLEN(ptr) + 1);
 			ptr = strrchr(buf, '.');
 			strcpy(ptr, ".so)");			/* buf = /usr/local/lib64/libicuio36.0.a(libicuio36.0.so) */
@@ -368,7 +372,7 @@ void gtm_icu_init(void)
 	}
 #	ifdef __hpux
 	/* HP-UX dlsym() doesn't allow lookup for symbols that are present in the nested dependent shared libraries
-	 * of ICU_LIBNAME. Workaround is to lookup within the global space (i.e. from invoking module libgtmshr)
+	 * of ICU_LIBNAME. Workaround is to lookup within the global space (i.e. from invoking module libyottadb)
 	 * where all symbols would have been brought in by previous dlopen() with the RTLD_GLOBAL flag.
 	 */
 	handle = dlopen(NULL, ICU_LIBFLAGS);

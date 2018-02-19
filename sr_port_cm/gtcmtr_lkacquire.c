@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +29,7 @@ bool gtcmtr_lkacquire(void)
 	unsigned char *ptr, return_val, action, incr;
 	cm_region_list *reg_walk;
 
+	ASSERT_IS_LIBGNPSERVER;
 	if (*curr_entry->clb_ptr->mbf == CMMS_L_LKCANCEL)
 		return CM_NOOP;
 

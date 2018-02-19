@@ -56,10 +56,12 @@
 
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF	mur_opt_struct	mur_options;
-GBLREF	int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF	int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	mur_shm_hdr_t	*mur_shm_hdr;	/* Pointer to mur_forward-specific header in shared memory */
 GBLREF	reg_ctl_list	*mur_ctl;
 GBLREF	readonly char 	*ext_file_type[];
+
+LITREF	mval		literal_zero;
 
 error_def(ERR_FILECREATE);
 error_def(ERR_FILENAMETOOLONG);
@@ -232,7 +234,7 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 		op_val.mvtype = MV_STR;
 		op_val.str.len = file_info->fn_len;
 		op_val.str.addr = (char *)file_info->fn;
-		if ((status = (*op_open_ptr)(&op_val, &op_pars, 0, NULL)) == 0)
+		if ((status = (*op_open_ptr)(&op_val, &op_pars, (mval *)&literal_zero, NULL)) == 0)
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) MAKE_MSG_ERROR(ERR_FILENOTCREATE), 4,
 					LEN_AND_STR(ext_file_type[recstat]), file_info->fn_len, file_info->fn, errno);

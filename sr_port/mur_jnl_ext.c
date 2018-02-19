@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -246,9 +246,11 @@ void	mur_extract_align(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record 
 		return;
 	EXT_DET_PREFIX(jctl);
 	EXTTIME(rec->prefix.time);
-	EXTQW(rec->prefix.tn);
+	EXTQW(0);
 	if (mur_options.detail)
-		EXTINT(rec->prefix.checksum);
+		EXTINT(((struct_jrec_align *)rec)->checksum);	/* Note: Cannot use "rec->prefix.checksum" as JRT_ALIGN
+								 * has checksum at a different offset than other records.
+								 */
 	EXTPID(plst);
 	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
@@ -295,7 +297,6 @@ void	mur_extract_epoch(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record 
 	EXTINT(rec->jrec_epoch.free_blocks);
 	EXTINT(rec->jrec_epoch.total_blks);
 	EXTINT(rec->jrec_epoch.fully_upgraded); /* actually boolean_t */
-#	ifdef UNIX
 	/* Extract upto 16 strm_seqno only if they are non-zero */
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
 	{
@@ -306,7 +307,6 @@ void	mur_extract_epoch(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record 
 			EXT_STRM_SEQNO(strm_seqno);
 		}
 	}
-#	endif
 	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 

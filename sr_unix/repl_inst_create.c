@@ -84,7 +84,7 @@ void repl_inst_create(void)
 	uint4			status2;
 	jnl_tm_t		now;
 
-	assertpro(repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error)); /* rts_error should prevent
+	assertpro(repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error, NULL)); /* rts_error should prevent
 												* return if there is a problem.
 												*/
 	/* Although the maximum length of an instance name is MAX_INSTNAME_LEN-1 characters, the input buffer needs to hold a lot
@@ -133,8 +133,8 @@ void repl_inst_create(void)
 		if ((INVALID_SEMID != repl_instance->jnlpool_semid) || (INVALID_SHMID != repl_instance->jnlpool_shmid)
 			|| (INVALID_SEMID != repl_instance->recvpool_semid) || (INVALID_SHMID != repl_instance->recvpool_shmid))
 		{
+			assert(FALSE || WBTEST_ENABLED(WBTEST_REPLINSTSTNDALN));
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_REPLINSTSTNDALN, 2, inst_fn_len, inst_fn);
-			assert(FALSE);
 		}
 		JNL_SHORT_TIME(now);
 		rename_fn_len = ARRAYSIZE(rename_fn);

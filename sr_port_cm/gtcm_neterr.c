@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +25,7 @@ void gtcm_neterr(struct NTD *tsk, struct CLB *lnk, cmi_reason_t msg)
 {
 	connection_struct *cnx;
 
+	ASSERT_IS_LIBGNPSERVER;
 	if (	msg == CMI_REASON_INTMSG ||
 		msg == CMI_REASON_DISCON ||
 		msg == CMI_REASON_ABORT ||

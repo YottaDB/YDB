@@ -165,6 +165,7 @@ GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		unhandled_stale_timer_pop;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		is_updproc;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 void fileheader_sync(gd_region *reg)
 {
@@ -290,9 +291,17 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 	sm_uc_ptr_t		chain_ptr, db_addr[2];
 	boolean_t 		write_to_snapshot_file;
 	snapshot_context_ptr_t	lcl_ss_ctx;
+#	ifdef DEBUG
+	jbuf_rsrv_struct_t	*jrs;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+#	ifdef DEBUG
+	/* Assert that we never start db commit until all journal records have been written out in phase2 */
+	jrs = dollar_tlevel ? cs_addrs->sgm_info_ptr->jbuf_rsrv_ptr : TREF(nontp_jbuf_rsrv);
+	assert((NULL == jrs) || !jrs->tot_jrec_len);
+#	endif
 	assert(cs_addrs->now_crit);
 	assert((gds_t_committed > cs->mode) && (gds_t_noop < cs->mode));
 	INCR_DB_CSH_COUNTER(cs_addrs, n_bgmm_updates, 1);
@@ -934,6 +943,12 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	}
 	/* Take backup of block in phase2 (outside of crit). */
 	cs->cr = cr;		/* note down "cr" so phase2 can find it easily (given "cs") */
+	/* If this is the first time the the database block has been written, we must write
+	 * the entire database block if gtm_fullblockwrites = 2 */
+	/* Note that the check for gtm_fullblockwrites happens when we decide to write the block,
+	 * not here; so if the block is new, mark as needing first write */
+	if (WAS_FREE(cs->blk_prior_state))
+		cs->cr->needs_first_write = TRUE;
 	cs->cycle = cr->cycle;	/* update "cycle" as well (used later in tp_clean_up to update cycle in history) */
 	cs->old_mode = -cs->old_mode;	/* negate it to indicate phase1 is complete for this cse (used by secshr_db_clnup) */
 	assert(0 > cs->old_mode);
@@ -970,6 +985,9 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	cache_que_heads_ptr_t	cache_state;
 	boolean_t 		write_to_snapshot_file;
 	snapshot_context_ptr_t	lcl_ss_ctx;
+#	ifdef DEBUG
+	jbuf_rsrv_struct_t	*jrs;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -989,6 +1007,11 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 	assert(-1 == cr->read_in_progress);
 	assert(LATCH_SET <= WRITE_LATCH_VAL(cr));	/* Assert that we hold the update lock on the cache-record */
 	csa = cs_addrs;		/* Local access copies */
+#	ifdef DEBUG
+	/* Assert that we never start phase2 of db commit until all journal records have been written out in phase2 */
+	jrs = dollar_tlevel ? csa->sgm_info_ptr->jbuf_rsrv_ptr : TREF(nontp_jbuf_rsrv);
+	assert((NULL == jrs) || !jrs->tot_jrec_len);
+#	endif
 	csd = csa->hdr;
 	cnl = csa->nl;
 	blkid = cs->blk;
@@ -1184,7 +1207,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 			return cdb_sc_cacheprob;
 		}
 	}
-	RESET_CR_IN_TEND_AFTER_PHASE2_COMMIT(cr);	/* resets cr->in_tend & cr->in_cw_set (for older twin too if needed) */
+	RESET_CR_IN_TEND_AFTER_PHASE2_COMMIT(cr, csa, csd); /* resets cr->in_tend & cr->in_cw_set (for older twin too if needed) */
 	VERIFY_QUEUE_LOCK(&cache_state->cacheq_active, &cnl->db_latch);
 	cs->old_mode = -cs->old_mode;	/* negate it back to indicate phase2 is complete for this cse (used by secshr_db_clnup) */
 	assert(0 < cs->old_mode);
@@ -1255,7 +1278,7 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 	{
 		EPOCH_TAPER_IF_NEEDED(csa, csd, cnl, reg, TRUE, buffs_per_flush, flush_target);
 	}
-	if ((flush_target  <= cnl->wcs_active_lvl) && !FROZEN_CHILLED(csd))
+	if ((flush_target  <= cnl->wcs_active_lvl) && !FROZEN_CHILLED(csa))
 	{	/* Already in need of a good flush */
 		BG_TRACE_PRO_ANY(csa, active_lvl_trigger);
 		wtstart_errno = wcs_wtstart(reg, buffs_per_flush, NULL, NULL);
@@ -1274,6 +1297,7 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	sgmnt_addrs		*csa, *save_csaddrs, *check_csaddrs;
 	sgmnt_data_ptr_t	csd, save_csdata;
 	gd_region		*reg;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	enum db_acc_method	acc_meth;
 	node_local_ptr_t	cnl;
 	jnl_private_control	*jpc;
@@ -1283,6 +1307,7 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	save_region = gv_cur_region;		/* Certain debugging calls expect gv_cur_region to be correct */
 	save_csaddrs = cs_addrs;
 	save_csdata = cs_data;
+	save_jnlpool = jnlpool;
 	check_csaddrs = (NULL == save_region || FALSE == save_region->open) ? NULL : &FILE_INFO(save_region)->s_addrs;
 		/* Save to see if we are in crit anywhere */
 	reg = *region;
@@ -1318,6 +1343,7 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 			gv_cur_region = save_region;
 			cs_addrs = save_csaddrs;
 			cs_data = save_csdata;
+			jnlpool = save_jnlpool;
 		}
 		return;
 	}
@@ -1347,7 +1373,6 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	if ((0 == crit_count) && !in_mutex_deadlock_check
 		&& ((NULL == check_csaddrs) || !T_IN_CRIT_OR_COMMIT_OR_WRITE(check_csaddrs))
 		&& (0 == fast_lock_count)
-		&& !FROZEN_CHILLED(csd)
 		&& (!(TREF(in_ext_call) && csd->is_encrypted))
 		&& OK_TO_INTERRUPT)
 	{
@@ -1355,13 +1380,20 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 		switch (acc_meth)
 		{
 			case dba_bg:
-				/* Flush at least some of our cache */
-				wcs_wtstart(reg, 0, NULL, NULL);
-				/* If there is no dirty buffer left in the active queue, then no need for new timer */
-				if (0 == csa->acc_meth.bg.cache_state->cacheq_active.fl)
-					need_new_timer = FALSE;
+				if (!FROZEN_CHILLED(csa))
+				{	/* Flush at least some of our cache */
+					wcs_wtstart(reg, 0, NULL, NULL);
+					/* If there is no dirty buffer left in the active queue, then no need for new timer */
+					if (0 == csa->acc_meth.bg.cache_state->cacheq_active.fl)
+						need_new_timer = FALSE;
+				}
+				else
+				{	/* We can't flush to the file, but we can flush the journal */
+					jnl_wait(reg);
+				}
 				break;
 			case dba_mm:
+				assert(!FROZEN_CHILLED(csa));
 				wcs_wtstart(reg, 0, NULL, NULL);
 				assert(csd == csa->hdr);
 				need_new_timer = FALSE;
@@ -1403,5 +1435,6 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	gv_cur_region = save_region;
 	cs_addrs = save_csaddrs;
 	cs_data = save_csdata;
+	jnlpool = save_jnlpool;
 	return;
 }

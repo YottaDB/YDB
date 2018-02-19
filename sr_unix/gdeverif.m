@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2016 Fidelity National Information		;
+; Copyright (c) 2006-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -17,6 +17,7 @@ ALL()	;external
 	s gqual="REGION" d ALLREG,usereg
 	s gqual="SEGMENT" d ALLSEG,useseg
 	d ALLTEM
+	s:('verified)&('$zstatus) $zstatus=gdeerr("VERIFY")
 	zm gdeerr("VERIFY"):$s(verified:"OK",1:"FAILED") w !
 	q verified
 
@@ -88,9 +89,9 @@ gblname1:
 	. . . d chkcoll^GDEPARSE(sval,GBLNAME,gnams(GBLNAME,"COLLVER"))
 	. . e  d chkcoll^GDEPARSE(sval,GBLNAME)
 	; now that all gblnames and names have been read, do some checks between them
-	; ASSERT : i $d(namrangeoverlap)  zsh "*"  h
+	; ASSERT : i $d(namrangeoverlap)  zsh "*"  zg 0
 	d gblnameeditchecks^GDEPARSE("*",0)	; check all name specifications are good given the gblname collation settings
-	; ASSERT : i $d(namrangeoverlap)  zsh "*"  h
+	; ASSERT : i $d(namrangeoverlap)  zsh "*"  zg 0
 	q
 REGION
 	i '$d(regs(REGION)) k verified zm $$info(gdeerr("OBJNOTFND")):"Region":REGION q

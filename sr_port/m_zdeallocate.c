@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +18,8 @@
 #include "indir_enum.h"
 #include "advancewindow.h"
 #include "cmd.h"
+
+LITREF	mval		literal_notimeout;
 
 error_def(ERR_RPARENMISSING);
 
@@ -62,6 +65,6 @@ int m_zdeallocate(void)
 		break;
 	}
 	ref = newtriple(OC_ZDEALLOCATE);
-	ref->operand[0] = put_ilit(NO_M_TIMEOUT);
+	ref->operand[0] = put_lit((mval *)&literal_notimeout);
 	return EXPR_GOOD;
 }

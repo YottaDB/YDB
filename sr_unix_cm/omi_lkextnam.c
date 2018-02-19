@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +41,7 @@ static char rcsid[] = "$Header:$";
 #include "mlk_pvtblk_insert.h"
 #include "dpgbldir.h"
 #include "mlk_region_lookup.h"
+#include "mmrhash.h"
 
 GBLREF mlk_pvtblk	*mlk_pvt_root;
 
@@ -58,6 +63,7 @@ omi_lkextnam(
     bool	 rv;
 
 
+	ASSERT_IS_LIBGTCM;
 /*  Pointers into the global reference */
     ptr = ref;
     end = ref + len;
@@ -95,21 +101,23 @@ omi_lkextnam(
     lck.mvtype = ext.mvtype = MV_STR;
     reg        = mlk_region_lookup(&lck, cptr->ga);
     OMI_SI_READ(&si, data);
-    r          = (mlk_pvtblk *)malloc(SIZEOF(mlk_pvtblk) + elen + si.value);
-    memset(r, 0, SIZEOF(mlk_pvtblk) - 1);
+    MLK_PVTBLK_ALLOC(elen, subcnt, si.value + 1, r);
     r->translev      = 1;
     r->subscript_cnt = subcnt;
-    r->total_length  = elen;
+    r->nref_length  = elen;
     memcpy(&r->value[0], lck.str.addr - 1, elen);
-    r->value[elen++] = si.value;
-    memcpy(&r->value[elen], data, si.value);
+    MLK_PVTBLK_TAIL(r)[0] = si.value;
+    memcpy(MLK_PVTBLK_TAIL(r) + 1, data, si.value);
+    MLK_PVTBLK_SUBHASH_GEN(r);
     r->region  = reg;
     sa         = &FILE_INFO(r->region)->s_addrs;
     r->ctlptr  = (mlk_ctldata *)sa->lock_addrs[0];
     if (!mlk_pvtblk_insert(r))
     {
-	if (r->value[r->total_length] == mlk_pvt_root->value[mlk_pvt_root->total_length]
-		&& !memcmp(&r->value[elen],&mlk_pvt_root->value[elen],r->value[r->total_length]))
+	MLK_PVTBLK_VALIDATE(r);
+	MLK_PVTBLK_VALIDATE(mlk_pvt_root);
+	if ((MLK_PVTBLK_TAIL(r)[0] == MLK_PVTBLK_TAIL(mlk_pvt_root)[0])
+		&& !memcmp(MLK_PVTBLK_TAIL(r) + 1, MLK_PVTBLK_TAIL(mlk_pvt_root) + 1, MLK_PVTBLK_TAIL(r)[0]))
 	{
 	    free(r);
 	    return TRUE;

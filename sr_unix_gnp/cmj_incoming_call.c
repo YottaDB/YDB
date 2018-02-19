@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +33,7 @@ void cmj_incoming_call(struct NTD *tsk)
 	GTM_SOCKLEN_TYPE sz = SIZEOF(struct sockaddr);
 	cmi_status_t status;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	while ((-1 == (rval = ACCEPT(tsk->listen_fd, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sz))) && EINTR == errno)
 		;
 	while (rval >= 0)

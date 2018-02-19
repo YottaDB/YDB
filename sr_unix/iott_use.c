@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,6 +39,9 @@
 #include "gtm_tputs.h"
 #include "gtm_tparm.h"
 #include "outofband.h"
+#include "restrict.h"
+#include "op.h"
+#include "indir_enum.h"
 
 LITDEF nametabent filter_names[] =
 {
@@ -87,7 +90,10 @@ void iott_use(io_desc *iod, mval *pp)
 	uint4			mask_in;
 	unsigned char		ch, len;
 	boolean_t		ch_set;
+	mval			mv;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	p_offset = 0;
 	assert(iod->state == dev_open);
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
@@ -138,7 +144,7 @@ void iott_use(io_desc *iod, mval *pp)
 					tt_ptr->ext_cap &= ~TT_EMPTERM;
 					break;
 				case iop_cenable:
-					if (!ctrlc_on)
+					if (!ctrlc_on && !RESTRICTED(cenable))
 					{	/* if it's already cenable, no need to change */
 						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
 						if (tt_ptr->fildes == temp_ptr->fildes)
@@ -152,7 +158,7 @@ void iott_use(io_desc *iod, mval *pp)
 					}
 					break;
 				case iop_nocenable:
-					if (ctrlc_on)
+					if (ctrlc_on && !RESTRICTED(cenable))
 					{	/* if it's already nocenable, no need to change */
 						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
 						if (tt_ptr->fildes == temp_ptr->fildes)
@@ -233,9 +239,7 @@ void iott_use(io_desc *iod, mval *pp)
 						gtm_tputs(CLR_EOL, 1, outc);
 					break;
 				case iop_exception:
-					iod->error_handler.len = *(pp->str.addr + p_offset);
-					iod->error_handler.addr = (char *)(pp->str.addr + p_offset + 1);
-					s2pool(&iod->error_handler);
+					DEF_EXCEPTION(pp, p_offset, iod);
 					break;
 				case iop_filter:
 					len = *(pp->str.addr + p_offset);
@@ -393,7 +397,7 @@ void iott_use(io_desc *iod, mval *pp)
 				case iop_ipchset:
 					{
 #						ifdef KEEP_zOS_EBCDIC
-						if ( (iconv_t)0 != iod->input_conv_cd )
+						if ((iconv_t)0 != iod->input_conv_cd)
 						{
 							ICONV_CLOSE_CD(iod->input_conv_cd);
 						}
@@ -415,7 +419,7 @@ void iott_use(io_desc *iod, mval *pp)
 				case iop_opchset:
 					{
 #						ifdef KEEP_zOS_EBCDIC
-						if ( (iconv_t)0 != iod->output_conv_cd)
+						if ((iconv_t)0 != iod->output_conv_cd)
 						{
 							ICONV_CLOSE_CD(iod->output_conv_cd);
 						}

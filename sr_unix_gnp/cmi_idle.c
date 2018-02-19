@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,6 +25,7 @@ void cmi_idle(uint4 hiber)
 	struct CLB *lnk;
 	int rc;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	/*
 	 * call housekeeping twice - once to catch the
 	 * async write completion, and another time

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +21,7 @@ void cmj_exception_interrupt(struct CLB *lnk, int signo)
 {
 	int rval;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	if (lnk->mun == -1)
 		return;
 	if (signo == SIGURG)

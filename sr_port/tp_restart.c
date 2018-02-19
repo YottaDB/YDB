@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -88,8 +91,9 @@ GBLREF	sgm_info		*first_sgm_info;
 GBLREF	unsigned int		t_tries;
 GBLREF	int			process_id;
 GBLREF	gd_region		*gv_cur_region;
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	bool			caller_id_flag;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
+GBLREF	boolean_t		caller_id_flag;
 GBLREF	unsigned char		*tpstackbase, *tpstacktop;
 GBLREF	trans_num		local_tn;	/* transaction number for THIS PROCESS */
 GBLREF	sgmnt_addrs		*cs_addrs;
@@ -147,12 +151,13 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	mv_stent		*mvc;
 	tp_region		*tr;
 	mval			beganHere;
-	sgmnt_addrs		*csa;
+	sgmnt_addrs		*csa, *jpl_csa;
 	int4			num_closed = 0;
 	boolean_t		tp_tend_status;
 	boolean_t		reset_clues_done = FALSE;
 	mstr			gvname_mstr, reg_mstr;
 	gd_region		*restart_reg, *reg;
+	jnlpool_addrs_ptr_t	save_jnlpool, local_jnlpool;
 	int			tprestart_rc, len;
 	gv_namehead		*gvt;
 	enum cdb_sc		status;
@@ -190,6 +195,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	}
 #	ifdef GTM_TRIGGER
 	DBGTRIGR((stderr, "tp_restart: Entry state: %d\n", tprestart_state));
+	save_jnlpool = jnlpool;
 	if (TPRESTART_STATE_NORMAL == tprestart_state)
 	{	/* Only do if a normal invocation - otherwise we've already done this code for this TP restart */
 #	endif
@@ -374,17 +380,33 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 								 * before retry */
 					}
 				}
-				DEBUG_ONLY(
+#				ifdef DEBUG
 					/* The journal pool crit lock is currently obtained only inside commit logic at
 					 * which point we will never signal a cdb_sc_needcrit restart code.
 					 * So no need to verify if we need to release crit there. Assert this though.
 					 */
-					if ((NULL != jnlpool.jnlpool_dummy_reg) && jnlpool.jnlpool_dummy_reg->open)
-					{
-						csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;
-						assert(!csa->now_crit);
+					if (jnlpool_head)
+					{	/* at least one jnlpool setup */
+						for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
+						{
+							reg = tr->reg;
+							if (reg->open)
+							{
+								csa = &FILE_INFO(reg)->s_addrs;
+								assert(csa);
+								assert(jnlpool);
+								if (csa && csa->jnlpool && (csa->jnlpool != jnlpool))
+									jnlpool = csa->jnlpool;
+								if (jnlpool && jnlpool->jnlpool_dummy_reg
+									&& jnlpool->jnlpool_dummy_reg->open)
+								{
+									jpl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
+									assert(!jpl_csa->now_crit);
+								}
+							}
+						}
 					}
-				)
+#				endif
 				/* If retry due to M-locks, sleep so needed locks have a chance to get released */
 				break;
 			case cdb_sc_reorg_encrypt:
@@ -454,6 +476,14 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			case cdb_sc_gvtrootmod2:
 			case cdb_sc_gvtrootnonzero:
 			case cdb_sc_optrestart:
+			/* Note: No additional action needed for "cdb_sc_phase2waitfail" since if we are in the final retry,
+			 * we would have set wc_blocked (as part of the SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED call done
+			 * in t_retry/tp_tend/op_tcommit) and the "tp_crit_all_regions" call done below will call
+			 * "grab_crit" & "wcs_recover" which will fix the phase2-commit/non-zero-"cr->in_tend" issue.
+			 */
+			case cdb_sc_phase2waitfail:
+			/* cdb_sc_wcs_recover is possible in final retry in TP (see comment in "tp_hist" */
+			case cdb_sc_wcs_recover:
 				assert(IS_FINAL_RETRY_CODE(status));
 				if (CDB_STAGNATE <= t_tries)
 				{
@@ -483,6 +513,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 						    || (WBTEST_TP_HIST_CDB_SC_BLKMOD != gtm_white_box_test_case_number))
 					)
 							gtm_fork_n_core();
+					if (save_jnlpool != jnlpool)
+						jnlpool = save_jnlpool;
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TPFAIL, 2, hist_index, t_fail_hist);
 					return 0; /* for the compiler only -- never executed */
 				} else
@@ -522,7 +554,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 					reg = tr->reg;
 					if (!reg->open)
 					{
-						gv_init_reg(reg);
+						gv_init_reg(reg, NULL);
 						assert(reg->open);
 					}
 				}
@@ -765,6 +797,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		 * be continued if an error handler has a mind to do that.
 		 */
 		GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart: Leaving tp_restart via TRESTNOT error - state reset to 0\n")));
+		if (save_jnlpool != jnlpool)
+			jnlpool = save_jnlpool;
 		if (IS_MCODE_RUNNING)
 		{
 			getzposition(&beganHere);
@@ -799,7 +833,9 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLONLNRLBK);
 	if (handle_errors_internally)
 		REVERT;
-	TREF(expand_prev_key) = FALSE;	/* in case we did a "t_retry" in the middle of "gvcst_zprevious2" */
+	TREF(expand_prev_key) = FALSE; /* in case we did a "t_retry" in the middle of "gvcst_zprevious2" or "gvcst_reversequery2" */
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart: completed\n")));
+	if (save_jnlpool != jnlpool)
+		jnlpool = save_jnlpool;
 	return 0;
 }

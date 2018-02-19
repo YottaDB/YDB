@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +15,6 @@
 
 #include "mdef.h"
 
-#if defined(UNIX)
 #include "gtm_stdio.h"
 #include <errno.h>
 #include "gtm_fcntl.h"
@@ -21,12 +23,6 @@
 #include "gtm_unistd.h"
 #include "min_max.h"
 #include "gtm_time.h"
-#elif defined(VMS)
-#include "gtm_stdlib.h"
-#include <ssdef.h>
-#include <descrip.h>
-#include <jpidef.h>
-#endif
 
 #include "gtm_ctype.h"
 #include "gtm_string.h"
@@ -58,9 +54,6 @@ STATICDEF gtm_uint64_t		process_system, process_user;	/* Store system and user C
 STATICDEF mstr			mprof_mstr;			/* Area to hold global and subscripts. */
 STATICDEF boolean_t 		use_realtime_flag = FALSE;	/* Indicates whether clock_gettime is unable to use CLOCK_MONOTONIC
 								 * flag and so should use CLOCK_REALTIME instead. */
-#ifdef __osf__
-STATICDEF struct rusage		last_usage = {0, 0};		/* Contains the last value obtained via getrusage() on Tru64. */
-#endif
 
 LITDEF  MIDENT_CONST(above_routine, "*above*");
 
@@ -72,25 +65,9 @@ LITDEF  MIDENT_CONST(above_routine, "*above*");
 #define PROCESS_TIME		"*RUN"		/* Label to store CPU time for current process. */
 #define MPROF_NULL_LABEL	"^"
 #define MPROF_FOR_LOOP		"FOR_LOOP"
-
-/* On VMS we do not record the child processes' time. */
-#ifdef UNIX
-#  define TIMES			times_usec
-#  define CHILDREN_TIMES	children_times_usec
-#  define MPROF_RTS_ERROR(x)	rts_error_csa x
-#elif defined(VMS)
-#  define TIMES			get_cputime
-#  define MPROF_RTS_ERROR(x)		\
-{					\
-	if (mdb_ch_set)			\
-		rts_error_csa x;	\
-	else				\
-	{				\
-		gtm_putmsg_csa x;	\
-		EXIT(EXIT_FAILURE);	\
-	}				\
-}
-#endif
+#define TIMES			times_usec
+#define CHILDREN_TIMES		children_times_usec
+#define MPROF_RTS_ERROR(x)	rts_error_csa x
 
 #define UPDATE_TIME(MPP)												\
 {															\
@@ -145,7 +122,6 @@ error_def(ERR_TEXT);
 error_def(ERR_TRACINGON);
 error_def(ERR_VIEWNOTFOUND);
 
-#ifdef UNIX
 STATICFNDEF void times_usec(ext_tms *curr)
 {
 	int		res;
@@ -155,25 +131,6 @@ STATICFNDEF void times_usec(ext_tms *curr)
 	res = getrusage(RUSAGE_SELF, &usage);
 	if (-1 == res)
 		MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("getrusage"), CALLFROM, errno));
-#	ifdef __osf__
-	/* On Tru64 getrusage sometimes fails to increment the seconds value when the microseconds wrap around at 1M. If we detect
-	 * this, we make a second call to getrusage if so. A more complete check would be to also verify whether the new seconds
-	 * value is less than the previous one, but we anyway have an assert in UPDATE_TIME that would catch that, and our testing
-	 * on Tru64 has not shown that type of faulty behavior.
-	 */
-	if (((usage.ru_utime.tv_sec == last_usage.ru_utime.tv_sec) && (usage.ru_utime.tv_usec < last_usage.ru_utime.tv_usec))
-	    || ((usage.ru_stime.tv_sec == last_usage.ru_stime.tv_sec) && (usage.ru_stime.tv_usec < last_usage.ru_stime.tv_usec)))
-	{
-		DEBUG_ONLY(last_usage = usage);
-		res = getrusage(RUSAGE_SELF, &usage);
-		if (-1 == res)
-			MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("getrusage"), CALLFROM, errno));
-		/* In debug also ensure that a subsequent call to getrusage restored the seconds value. */
-		assert((usage.ru_utime.tv_sec > last_usage.ru_utime.tv_sec)
-			|| (usage.ru_stime.tv_sec > last_usage.ru_stime.tv_sec));
-	}
-	last_usage = usage;
-#	endif
 	curr->tms_utime = (usage.ru_utime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_utime.tv_usec;
 	curr->tms_stime = (usage.ru_stime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_stime.tv_usec;
 	/* Also start recording the elapsed time. */
@@ -208,20 +165,6 @@ STATICFNDEF void child_times_usec(void)
 	child_system = (usage.ru_stime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_stime.tv_usec;
 	return;
 }
-#else
-STATICFNDEF void get_cputime (ext_tms *curr)
-{
-	int4	cpu_time_used;
-	int	status;
-	int	jpi_code = JPI$_CPUTIM;
-
-	if ((status = lib$getjpi(&jpi_code, &process_id, 0, &cpu_time_used, 0, 0)) != SS$_NORMAL)
-		MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("LIB$GETJPI"), CALLFROM, status));
-	curr->tms_utime = cpu_time_used;
-	curr->tms_stime = 0;
-	return;
-}
-#endif
 
 /* Enables tracing and ensures that all critical structures are initialized. */
 void turn_tracing_on(mval *gvn, boolean_t from_env, boolean_t save_gbl)
@@ -647,7 +590,7 @@ char *pcalloc(unsigned int n)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-#	if defined (GTM64) || defined(__osf__) || defined(VMS)
+#	ifdef GTM64
 	n = ((n + 7) & ~7); 	/* Same logic applied for alignment. */
 #	else
 	n = ((n + 3) & ~3); 	/* Make sure that it is quad-word aligned. */
@@ -774,7 +717,6 @@ void crt_gbl(mprof_tree *p, boolean_t is_for)
 		tmpnum++;
 		end = i2ascl(tmpnum, p->e.usr_time);
 		tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
-#		ifndef VMS
 		*tmpnum = ':';
 		tmpnum++;
 		end = i2ascl(tmpnum, p->e.sys_time);
@@ -787,7 +729,6 @@ void crt_gbl(mprof_tree *p, boolean_t is_for)
 		tmpnum++;
 		end = i2ascl(tmpnum, p->e.elp_time);
 		tmpnum += ((end - tmpnum) > 0) ? (end - tmpnum) : (tmpnum - end);
-#		endif
 	}
 	data.mvtype = MV_STR;
 	data.str.len = (((INTPTR_T)tmpnum - start_point) > 0)
@@ -876,14 +817,12 @@ STATICFNDEF void get_entryref_information(boolean_t line, trace_entry *tmp_trc_t
 	line_reset = FALSE;
 	for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 	{
-#		ifdef GTM_TRIGGER
-		if (fp->type & SFT_TRIGR)
+		if (fp->type & (GTMTRIG_ONLY(SFT_TRIGR) | SFT_CI))
 		{
 			assert(NULL == fp->old_frame_pointer);
-			/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by base_frame(). */
+			/* Have a trigger or call-in baseframe, pick up stack continuation frame_pointer stored by base_frame() */
 			fp = *(stack_frame **)(fp + 1);
 		}
-#		endif
 		assert(fp);
 		if (ADDR_IN_CODE(fp->mpc, fp->rvector))
 		{
@@ -976,6 +915,8 @@ STATICFNDEF void parse_gvn(mval *gvn)
 	spt = &(TREF(mprof_ptr))->subsc[0];
 	spt->mvtype = MV_STR;
 	spt->str.addr = mpsp;
+	if (c_ref >= c_top)
+		RTS_ERROR_VIEWNOTFOUND("Invalid global name");
 	ch = *mpsp++ = *c_ref++;
 	if (!ISALPHA_ASCII(ch) && ('%' != ch))
 		RTS_ERROR_VIEWNOTFOUND("Invalid global name");
@@ -1094,10 +1035,8 @@ void stack_leak_check(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-#	ifdef UNIX
 	if (GTMTRIG_ONLY((0 < gtm_trigger_depth) ||) (0 < TREF(gtmci_nested_level)))
 		return;
-#	endif
 	if (NULL == var_on_cstack_ptr)
 		var_on_cstack_ptr = &var_on_cstack;
 	if ((&var_on_cstack != var_on_cstack_ptr)
@@ -1105,6 +1044,6 @@ void stack_leak_check(void)
 	     && ((SIZEOF(var_on_cstack) * 2) < ABS(&var_on_cstack - var_on_cstack_ptr))
 #	     endif
 	     )
-	     	assertpro(FALSE);
+		assertpro(FALSE);
 	return;
 }

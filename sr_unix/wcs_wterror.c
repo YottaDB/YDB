@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016 Fidelity National Information		*
+ * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,8 +75,7 @@ void	wcs_wterror(gd_region *reg, int4 save_errno)
 				 * multiple times by different processes; the first one to swap dskspace_next_fire is the
 				 * only one to report the ENOSPC error. A blind interlock_add() would not prevent this.
 				 */
-				&& COMPSWAP_LOCK((sm_global_latch_ptr_t)&cnl->dskspace_next_fire,
-						 dskspace_next_fire, 0, time(NULL), 0))
+				&& COMPSWAP_LOCK((sm_global_latch_ptr_t)&cnl->dskspace_next_fire, dskspace_next_fire, time(NULL)))
 		{	/* Report ENOSPC errors for first time and every minute after that. */
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBIOERR, 2, DB_LEN_STR(reg),
 				 ERR_TEXT, 2, RTS_ERROR_TEXT("Error during flush write"), save_errno);
@@ -133,7 +135,7 @@ void	wcs_wterror(gd_region *reg, int4 save_errno)
 			} else
 			{	/* If the error string was set, then we can output the syscall that failed as well. */
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(15) ERR_DBIOERR, 4, REG_LEN_STR(reg), DB_LEN_STR(reg),
-						save_errno, ERR_SYSCALL, 5, LEN_AND_STR(aio_shim_errstr), CALLFROM,
+						ERR_SYSCALL, 5, LEN_AND_STR(aio_shim_errstr), CALLFROM,
 						save_errno);
 				aio_shim_errstr = NULL;
 			}

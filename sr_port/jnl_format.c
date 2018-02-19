@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@
  * update_num values for the ZTWORMHOLE and its corresponding SET or KILL record. So we should decrement the
  * update_num before returning from this function in the hope that the next time jnl_format is called for the SET
  * or KILL, update_num will be incremented thereby using the exact same value that was used for the ZTWORMHOLE record.
- * An exception is journal recovery forward phase in which case, we dont do any increments of jgbl.tp_ztp_jnl_upd_num
+ * An exception is journal recovery forward phase in which case, we don't do any increments of jgbl.tp_ztp_jnl_upd_num
  * so we should do no decrements either.
  */
 #define	ZTWORM_DECR_UPD_NUM	{ if (!jgbl.forw_phase_recovery) jgbl.tp_ztp_jnl_upd_num--; }
@@ -70,6 +70,9 @@ GBLREF	unsigned int		t_tries;
 #ifdef GTM_TRIGGER
 GBLREF	int4			gtm_trigger_depth;
 GBLREF	int4			tstart_trigger_depth;
+#endif
+#ifdef DEBUG
+GBLREF	boolean_t		is_replicator;
 #endif
 
 /* Do NOT define first dimension of jnl_opcode array to be JA_MAX_TYPES. Instead let compiler fill in the value according
@@ -121,6 +124,14 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 
 	SETUP_THREADGBL_ACCESS;
 #	endif
+	/* We are about to write a logical jnl record so caller better have set "is_replicator" for us to write to the
+	 * journal pool (if replication is turned on in this database). The only exceptions are
+	 *	a) forward phase of journal recovery which runs with replication turned off so "is_replicator" does not
+	 *		matter to it.
+	 *	b) MUPIP TRIGGER -UPGRADE which does an inline upgrade of the ^#t global with journaling but replication
+	 *		turned off.
+	 */
+	assert(is_replicator || jgbl.forw_phase_recovery || TREF(in_trigger_upgrade));
 	/* The below assert ensures that if ever jnl_format is interrupted by a signal, the interrupt handler never calls
 	 * jnl_format again. This is because jnl_format plays with global pointers and we would possibly end up in a bad
 	 * state if the interrupt handler calls jnl_format again.

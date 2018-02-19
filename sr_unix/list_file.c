@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,13 +28,15 @@
 
 #define LISTEXT ".lis"
 
-GBLREF int		(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF command_qualifier cmd_qlf;
 GBLREF mident		module_name;
 GBLREF io_pair 		io_curr_device;
 GBLREF list_params 	lst_param;
-
 GBLREF char rev_time_buf[20];
+
+LITREF	mval		literal_zero;
+
 static char print_time_buf[20];
 static io_pair dev_in_use;
 static readonly struct
@@ -91,7 +97,7 @@ void open_list_file(void)
 	file.str.addr = &fname[0];
 	parms.str.len = SIZEOF(open_params_list);
 	parms.str.addr = (char *)&open_params_list;
-	(*op_open_ptr)(&file, &parms, 30, 0);
+	(*op_open_ptr)(&file, &parms, (mval *)&literal_zero, 0);
 	parms.str.len = 1;
 	charspace = (char)iop_eol;
 	parms.str.addr = &charspace;
@@ -138,8 +144,8 @@ void list_cmd(void)
 }
 
 
-LITREF char gtm_release_name[];
-LITREF int4 gtm_release_name_len;
+LITREF char ydb_release_name[];
+LITREF int4 ydb_release_name_len;
 
 GBLREF char source_file_name[];
 GBLREF unsigned short source_name_len;
@@ -156,8 +162,8 @@ void list_head(bool newpage)
 		op_wtff();
 
 	head.mvtype = MV_STR;
-	head.str.addr = (char *)&gtm_release_name[0];
-	head.str.len = gtm_release_name_len;
+	head.str.addr = (char *)&ydb_release_name[0];
+	head.str.len = ydb_release_name_len;
 	op_write (&head);
 
 	op_wttab(col_2);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,22 +23,23 @@
 #include "gtm_utf8.h"
 #endif
 
-GBLREF	uint4		pat_allmaskbits;
-GBLREF	uint4		*pattern_typemask;
+GBLREF	boolean_t	gtm_utf8_mode;
+GBLREF	boolean_t	run_time;
 GBLREF	char		codelist[];
 GBLREF	int4		curalt_depth;					/* depth of alternation nesting */
 GBLREF	int4		do_patalt_calls[PTE_MAX_CURALT_DEPTH];		/* number of calls to do_patalt() */
 GBLREF	int4		do_patalt_hits[PTE_MAX_CURALT_DEPTH];		/* number of pte_csh hits in do_patalt() */
-GBLREF	pte_csh		*pte_csh_array[PTE_MAX_CURALT_DEPTH];		/* pte_csh array (per curalt_depth) */
 GBLREF	int4		pte_csh_cur_size[PTE_MAX_CURALT_DEPTH];		/* current pte_csh size (per curalt_depth) */
 GBLREF	int4		pte_csh_alloc_size[PTE_MAX_CURALT_DEPTH];	/* current allocated pte_csh size (per curalt_depth) */
 GBLREF	int4		pte_csh_entries_per_len[PTE_MAX_CURALT_DEPTH];	/* current number of entries per len */
 GBLREF	int4		pte_csh_tail_count[PTE_MAX_CURALT_DEPTH];	/* count of non 1-1 corresponding pte_csh_array members */
-GBLREF	pte_csh		*cur_pte_csh_array;			/* copy of pte_csh_array corresponding to curalt_depth */
-GBLREF	int4		cur_pte_csh_size;			/* copy of pte_csh_cur_size corresponding to curalt_depth */
+GBLREF	int4		cur_pte_csh_size;				/* copy of pte_csh_cur_size corresponding to curalt_depth */
 GBLREF	int4		cur_pte_csh_entries_per_len;		/* copy of pte_csh_entries_per_len corresponding to curalt_depth */
 GBLREF	int4		cur_pte_csh_tail_count;			/* copy of pte_csh_tail_count corresponding to curalt_depth */
-GBLREF	boolean_t	gtm_utf8_mode;
+GBLREF	pte_csh		*cur_pte_csh_array;				/* copy of pte_csh_array corresponding to curalt_depth */
+GBLREF	pte_csh		*pte_csh_array[PTE_MAX_CURALT_DEPTH];		/* pte_csh array (per curalt_depth) */
+GBLREF	uint4		pat_allmaskbits;
+GBLREF	uint4		*pattern_typemask;
 
 /* This procedure executes at "run-time". After a pattern in a MUMPS program has been compiled (by patstr and
  * 	its helper-procedures), this procedure can be called to evaluate "variable-length" patterns.
@@ -71,17 +72,18 @@ int do_pattern(mval *str, mval *pat)
 	uint4		code, tempuint;
 	uint4		*dfa_ptr, dfa_val;
 	uint4		*patptr;
-	uint4		mbit, flags;
+	uint4		flags;
 	int4		*min, *max, *size;
 	int4		mintmp, maxtmp, sizetmp;
-	int		alt, bit;
-	char		buf[CHAR_CLASSES];
+	int		alt;
 	boolean_t	pte_csh_init;
 	boolean_t	match;
 	UNICODE_ONLY(
 	wint_t		utf8_codepoint;
 	)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* set up information */
 	MV_FORCE_STR(str);
 	patptr = (uint4 *) pat->str.addr;
@@ -209,17 +211,7 @@ int do_pattern(mval *str, mval *pat)
 					}
 				} else if (!(code & PATM_STRLIT))
 				{	/* meta character pat atom */
-					if (!(code & pat_allmaskbits))
-					{	/* current table has no characters with this pattern code */
-						bytelen = 0;
-						for (bit = 0; bit < PAT_MAX_BITS; bit++)
-						{
-							mbit = (1 << bit);
-							if ((mbit & code & PATM_LONGFLAGS) && !(mbit & pat_allmaskbits))
-								buf[bytelen++] = codelist[patmaskseq(mbit)];
-						}
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PATNOTFOUND, 2, bytelen, buf);
-					}
+					ENSURE_PAT_IN_TABLE(code);
 					if (!gtm_utf8_mode)
 					{
 						for (unit = 0; unit < rept; unit++)

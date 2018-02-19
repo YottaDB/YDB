@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -49,6 +52,8 @@
 #include "gtm_trigger_trc.h"
 #include "tp_frame.h"
 #include "tp_restart.h"
+#include "is_file_identical.h"
+#include "anticipatory_freeze.h"
 
 /* Include prototypes */
 #include "gvcst_kill_blk.h"
@@ -72,6 +77,7 @@
 #include "have_crit.h"
 #include "error.h"
 #include "gtmimagename.h" /* needed for spanning nodes */
+#include "gtm_repl_multi_inst.h" /* for DISALLOW_MULTIINST_UPDATE_IN_TP */
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey, *gv_altkey;
@@ -83,11 +89,13 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*sgm_info_ptr;
+GBLREF	sgm_info		*first_sgm_info;
 GBLREF	unsigned char		cw_set_depth;
 GBLREF	unsigned int		t_tries;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	uint4			update_trans;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this global */
 GBLREF	stack_frame		*frame_pointer;
@@ -117,9 +125,6 @@ LITREF	mval	literal_null;
 LITREF	mval	*fndata_table[2][2];
 #endif
 LITREF	mval	literal_batch;
-
-#define SKIP_ASSERT_TRUE	TRUE
-#define SKIP_ASSERT_FALSE	FALSE
 
 #define	GOTO_RETRY(CDB_STATUS, SKIP_ASSERT)							\
 {												\
@@ -256,7 +261,7 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 			ztwormhole_used = FALSE;
 		}
 	)
-	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl);
+	JNLPOOL_INIT_IF_NEEDED(csa, csd, cnl, SCNDDBNOUPD_CHECK_TRUE);
 	if (!dollar_tlevel)
 	{
 		kill_set_head.next_kill_set = NULL;
@@ -270,6 +275,7 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 		prev_update_trans = sgm_info_ptr->update_trans;
 	assert(('\0' != gv_currkey->base[0]) && gv_currkey->end);
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
+	DISALLOW_MULTIINST_UPDATE_IN_TP(dollar_tlevel, jnlpool_head, csa, first_sgm_info, FALSE);
 	T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_GVKILLFAIL);
 	assert(NULL != update_array);
 	assert(NULL != update_array_ptr);
@@ -555,9 +561,21 @@ research:
 				left = &gvt_hist->h[lev];
 				right = &alt_hist->h[lev];
 				assert(0 != right->blk_num);
-				left_rec_stat = left_extra ? &left->prev_rec : &left->curr_rec;
+				/* Before using "left->prev_rec", ensure prev_rec.match & prev_rec.offset are initialized if needed.
+				 * If leaf level block, then it is guaranteed to be initialized as part of the "gvcst_search"
+				 * call above using "gv_currkey". If not a leaf level block, then the same "gvcst_search" call
+				 * above could have either used a clue or no clue. If no clue, then left->prev_rec would have been
+				 * initialized for sure. If using a clue, it is possible the clue came from a previous
+				 * $zprevious(^x("")) like call which skipped doing "gvcst_search_blk" on index blocks. If so
+				 * "left->prev_rec" would be uninitialized. But in that case, we would first descend into the
+				 * "else" block below and the "if (clue)" check there would succeed resulting in us restarting the
+				 * transaction which will discard the clue and search afresh thereby initializing "left->prev_rec".
+				 * Hence the ASSERT_PREV_REC_INITIALIZED usages below.
+				 */
 				if (left->blk_num == right->blk_num)
 				{
+					ASSERT_PREV_REC_INITIALIZED(left->prev_rec);
+					left_rec_stat = left_extra ? &left->prev_rec : &left->curr_rec;
 					cdb_status = gvcst_kill_blk(left, lev, gv_currkey, *left_rec_stat, right->curr_rec,
 									right_extra, &tp_cse);
 					assert(!dollar_tlevel || (NULL == tp_cse) || (left->cse == tp_cse));
@@ -588,6 +606,8 @@ research:
 					}
 					local_srch_rec.offset = ((blk_hdr_ptr_t)left->buffaddr)->bsiz;
 					local_srch_rec.match = 0;
+					ASSERT_PREV_REC_INITIALIZED(left->prev_rec);
+					left_rec_stat = left_extra ? &left->prev_rec : &left->curr_rec;
 					cdb_status = gvcst_kill_blk(left, lev, gv_currkey, *left_rec_stat,
 										local_srch_rec, FALSE, &tp_cse);
 					assert(!dollar_tlevel || (NULL == tp_cse) || (left->cse == tp_cse));
@@ -800,8 +820,14 @@ research:
 		if (!killing_chunks)
 			INCR_GVSTATS_COUNTER(csa, cnl, n_kill, 1);
 		if (gvt_root && (0 != gv_target->clue.end))
-		{	/* If clue is still valid, then the deletion was confined to a single block */
-			assert(gvt_hist->h[0].blk_num == alt_hist->h[0].blk_num);
+		{	/* If clue is still valid, then the deletion was confined to a single block. Assert that the block
+			 * numbers are identical. The only exception is if a GVTR_OP_TCOMMIT happened above causing
+			 * the blk_num in gvt_hist->h[0] to be assigned a valid block while alt_hist->h[0].blk_num stayed
+			 * an invalid block (the # that gets assigned to to-be-created block numbers while inside a TP fence).
+			 */
+			assert((gvt_hist->h[0].blk_num == alt_hist->h[0].blk_num)
+				|| (lcl_implicit_tstart && ((off_chain *)&alt_hist->h[0].blk_num)->flag
+					&& !((off_chain *)&gvt_hist->h[0].blk_num)->flag));
 			/* In this case, the "right hand" key (which was searched via gv_altkey) was the last search
 			 * and should become the clue.  Furthermore, the curr.match from this last search should be
 			 * the history's curr.match.  However, this record will have been shuffled to the position of

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +25,17 @@ int mu_replpool_release_sem(repl_inst_hdr_ptr_t repl_inst_filehdr, char pool_typ
 {															\
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLPOOLINST, 3, SHM_ID, LEN_AND_STR(INSTFILENAME));		\
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT(FAILED_OP), CALLFROM, SAVE_ERRNO);	\
+}
+
+#define SET_JNLPOOL_FROM_RECVPOOL_P(JNLPOOL)					\
+{										\
+	if (NULL == JNLPOOL)							\
+	{									\
+		JNLPOOL = malloc(SIZEOF(jnlpool_addrs));			\
+		memset(JNLPOOL, 0, SIZEOF(jnlpool_addrs));			\
+		JNLPOOL->jnlpool_dummy_reg = recvpool.recvpool_dummy_reg;	\
+		JNLPOOL->recv_pool = TRUE;					\
+	}									\
 }
 
 #endif /* MU_RNDWN_REPLPOOL_INCLUDED */

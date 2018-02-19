@@ -3,6 +3,9 @@
 ; Copyright (c) 2015-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -43,6 +46,7 @@
 	set anindexval="an index value",aregname="a region name"
 	set first=$piece(field,".",1)
 	set rest=$piece(field,".",2,$length(field,"."))
+	if ("sgmnt_data"=first)&("freeze_online"=rest) set first="node_local" ; cough, cough, kludge, kludge - temporarily hide move
 	do:""=rest error("NOFIELD")
 	set digits=$select("x86"=$p($zver," ",4):8,1:16)
 	set regindex=$get(regindex)
@@ -70,7 +74,7 @@
 	else  do error("UNSUPSTRUCT",first)
 	do
 	.	new $zgbldir
-	.	set $zgbldir=$ztrnlnm("gtm_dist")_"/gtmhelp.gld"
+	.	set $zgbldir=$ztrnlnm("ydb_dist")_"/gtmhelp.gld"
 	.	set typeindex=$get(^gtmtypfldindx(first,rest))
 	.	do:0=+typeindex error("INVALID",first,rest)
 	.	set type=^gtmtypes(first,typeindex,"type")
@@ -129,13 +133,18 @@ LIST(output)
 ; Iterate through names of the structures defined in ^gtmtypes and execute given command for each one
 listiterate(out)
 	new $zgbldir,fieldname,i,j,struct,write
-	set $zgbldir=$ztrnlnm("gtm_dist")_"/gtmhelp.gld"
+	set $zgbldir=$ztrnlnm("ydb_dist")_"/gtmhelp.gld"
 	set write=100>$zdata(out)
 	for i=1:1 set struct=$piece($text(struct+i),";",2) quit:""=struct  do
 	. for j=1:1  set fieldname=$get(^gtmtypes(struct,j,"name")) quit:""=fieldname  do
 	. . if 'write set out(fieldname)=^gtmtypes(struct,j,"type")_","_^gtmtypes(struct,j,"len")
 	. . else  write fieldname,!
 	quit
+
+data(field)
+	new $etrap set $etrap="set $ecode="""" quit:$quit 0 quit"
+	quit $data(^|"$ydb_dist/gtmhelp.gld"|gtmtypfldindx($piece(field,"."),$piece(field,".",2,$length(field,".")))) quit
+
 ; the below error definitions derived from merrors.msg are relatively complete so older version where they weren't defined get info
 ERRPBNPARMREQ		;150383746;"A first parameter value "_first_" requires a second parameter specified containing "_args
 ERRPBNNOPARM		;150383754;"First parameter "_first_" does not support a second parameter"

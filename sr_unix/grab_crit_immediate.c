@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,7 +92,7 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover)
 		 */
 		assert((0 == cnl->in_crit) || (FALSE == is_proc_alive(cnl->in_crit, 0)));
 		cnl->in_crit = process_id;
-		CRIT_TRACE(crit_ops_gw);		/* see gdsbt.h for comment on placement */
+		CRIT_TRACE(csa, crit_ops_gw);		/* see gdsbt.h for comment on placement */
 		crit_count = 0;
 	}
 	else

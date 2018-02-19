@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -82,8 +83,8 @@ int gtm_file_stat(mstr *file, mstr *def, mstr *ret, boolean_t check_prv, uint4 *
 		}
 	}
 	if (NULL != ret)
-		/* We asume ret->addr has MAX_FN_LEN bytes allocated */
-		if (!get_full_path((char *)tmpfile->addr,  tmpfile->len, ret->addr, (unsigned int *) &ret->len, MAX_FN_LEN, status))
+		/* ret->len has the max buffer allocated length, pass that to get_full_path */
+		if (!get_full_path((char *)tmpfile->addr,  tmpfile->len, ret->addr, (unsigned int *) &ret->len, ret->len, status))
 			 return FILE_STAT_ERROR;
 	if (file_not_found)
 		return FILE_NOT_FOUND;

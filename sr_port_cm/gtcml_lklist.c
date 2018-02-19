@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +34,7 @@
 #include "mlk_pvtblk_equ.h"
 #include "copy.h"
 #include "gtcm_find_region.h"
+#include "mmrhash.h"
 
 GBLREF connection_struct *curr_entry;
 
@@ -43,6 +47,7 @@ void gtcml_lklist(void)
 	mlk_pvtblk *inlist1, *inlist2;
 	bool new;
 
+	ASSERT_IS_LIBGNPSERVER;
 	ptr = curr_entry->clb_ptr->mbf;
 	ptr++; /* hdr */
 	ptr++; /* laflag */
@@ -59,8 +64,7 @@ void gtcml_lklist(void)
 		len--; /* subtract size of regnum */
 		translev = *ptr++; len--;
 		subcnt = *ptr++; len--;
-		new_entry = (mlk_pvtblk *)malloc(SIZEOF(mlk_pvtblk) + len - 1);
-		memset(new_entry, 0, SIZEOF(mlk_pvtblk));
+		MLK_PVTBLK_ALLOC(len, subcnt, 0, new_entry);
 		memcpy(&new_entry->value[0], ptr, len);
 		ptr += len;
 		reg_ref->oper = PENDING;
@@ -68,8 +72,8 @@ void gtcml_lklist(void)
 		new_entry->translev = translev;
 		new_entry->subscript_cnt = subcnt;
 		new_entry->level = 0;
-		new_entry->subscript_cnt = subcnt;
-		new_entry->total_length = len;
+		new_entry->nref_length = len;
+		MLK_PVTBLK_SUBHASH_GEN(new_entry);
 		new_entry->ctlptr = (mlk_ctldata *)FILE_INFO(new_entry->region)->s_addrs.lock_addrs[0];
 		if (!reg_ref->lockdata)
 		{

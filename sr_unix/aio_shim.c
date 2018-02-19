@@ -3,6 +3,9 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -90,24 +93,6 @@ enum
 	LAIO_EFD
 };
 
-/* checks that aiocb and iocb are equivalent */
-#define CHECK_OFFSETOF_FLD(x) ((offsetof(struct aiocb, x) == offsetof(struct iocb, x))			\
-				&& (SIZEOF(((struct aiocb *)0)->x) == SIZEOF(((struct iocb *)0)->x)))
-#define CHECK_STRUCT_AIOCB					\
-MBSTART {							\
-	assert(CHECK_OFFSETOF_FLD(aio_data) &&			\
-	       CHECK_OFFSETOF_FLD(aio_key) &&			\
-	       CHECK_OFFSETOF_FLD(aio_lio_opcode) &&		\
-	       CHECK_OFFSETOF_FLD(aio_reqprio) &&		\
-	       CHECK_OFFSETOF_FLD(aio_fildes) &&		\
-	       CHECK_OFFSETOF_FLD(aio_buf) &&			\
-	       CHECK_OFFSETOF_FLD(aio_nbytes) &&		\
-	       CHECK_OFFSETOF_FLD(aio_offset) &&		\
-	       CHECK_OFFSETOF_FLD(aio_reserved2) &&		\
-	       CHECK_OFFSETOF_FLD(aio_flags) &&			\
-	       CHECK_OFFSETOF_FLD(aio_resfd));			\
-} MBEND
-
 #define CLEANUP_AIO_SHIM_THREAD_INIT(GDI)				\
 MBSTART {								\
 	int 	ret, save_errno;					\
@@ -144,7 +129,7 @@ MBSTART {								\
 MBSTART {										\
 	mstr		*gldname;							\
 	mstr 		gld_str_tmp;							\
-	char		err_buffer[GTM_PATH_MAX + SIZEOF(ERROR_LIT) + 3];		\
+	char		err_buffer[YDB_PATH_MAX + SIZEOF(ERROR_LIT) + 3];		\
 	/* save errno in case SNPRINTF modifies errno and SAVE_ERRNO passed		\
 	 * in is "errno" in caller.							\
 	 */										\
@@ -297,7 +282,7 @@ STATICFNDCL void clean_wip_queue(unix_db_info *udi)
 			     (cstt != (cache_state_rec_ptr_t)que_head);
 			      cstt = (cache_state_rec_ptr_t)((sm_uc_ptr_t)cstt + cstt->state_que.fl))
 			{
-				if ((cstt->epid == process_id) && ((aiocbp = &cstt->aiocb)->aio_fildes == udi->fd))
+				if ((cstt->epid == process_id) && ((aiocbp = &cstt->aiocb)->sys_iocb.aio_fildes == udi->fd))
 				{
 					AIO_SHIM_ERROR(aiocbp, ret);
 					if (EINPROGRESS == ret)
@@ -378,7 +363,6 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 	struct gd_info	*gdi, tmp_gdi;
 	sigset_t	savemask;
 
-	CHECK_STRUCT_AIOCB;
 	DEBUG_ONLY(aio_shim_errstr = NULL;)
 	/* initialize fields of tmp_gdi */
 	tmp_gdi.exit_efd = FD_INVALID;

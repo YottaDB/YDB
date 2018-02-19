@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,8 +50,7 @@
 #include "gtm_repl.h"
 #endif
 
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	uint4			process_id;
 GBLREF	int			gtmsource_sock_fd;
 GBLREF	int			gtmsource_log_fd;
@@ -64,7 +66,7 @@ GBLREF	qw_num			repl_source_msg_sent;
 GBLREF	seq_num			seq_num_zero;
 GBLREF	repl_msg_ptr_t		gtmsource_msgp;
 GBLREF	uchar_ptr_t		repl_filter_buff;
-GBLREF	boolean_t		pool_init;
+GBLREF	int			pool_init;
 
 int gtmsource_end1(boolean_t auto_shutdown)
 {
@@ -76,33 +78,28 @@ int gtmsource_end1(boolean_t auto_shutdown)
 
 	SETUP_THREADGBL_ACCESS;
 	gtmsource_ctl_close();
-	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;)
+	DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;)
 	assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke and "rel_lock" unconditionally */
-	rel_lock(jnlpool.jnlpool_dummy_reg);
-	mutex_cleanup(jnlpool.jnlpool_dummy_reg);
+	rel_lock(jnlpool->jnlpool_dummy_reg);
+	mutex_cleanup(jnlpool->jnlpool_dummy_reg);
 	exit_status = NORMAL_SHUTDOWN;
 	if (!auto_shutdown)
-		jnlpool.gtmsource_local->shutdown = NORMAL_SHUTDOWN;
-	read_jnl_seqno = jnlpool.gtmsource_local->read_jnl_seqno;
-	jnlpool_seqno = jnlpool.jnlpool_ctl->jnl_seqno;
+		jnlpool->gtmsource_local->shutdown = NORMAL_SHUTDOWN;
+	read_jnl_seqno = jnlpool->gtmsource_local->read_jnl_seqno;
+	jnlpool_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
 	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
-		jnlpool_strm_seqno[idx] = jnlpool.jnlpool_ctl->strm_seqno[idx];
-	jnlpool.gtmsource_local->gtmsource_pid = 0;
-	jnlpool.gtmsource_local->gtmsource_state = GTMSOURCE_DUMMY_STATE;
+		jnlpool_strm_seqno[idx] = jnlpool->jnlpool_ctl->strm_seqno[idx];
+	jnlpool->gtmsource_local->gtmsource_pid = 0;
+	jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_DUMMY_STATE;
 	/* Detach from journal pool, except if IFOE is configured, in which case we need the journal pool attached
 	 * so that we can check for instance freeze in database rundown, or if auto_shutdown is set.
 	 * In those cases, the detach will happen automatically when the process terminates.
 	 */
 	if (!auto_shutdown && !INST_FREEZE_ON_ERROR_POLICY)
 	{
-		JNLPOOL_SHMDT(status, save_errno);
+		JNLPOOL_SHMDT(jnlpool, status, save_errno);
 		if (0 > status)
 			repl_log(gtmsource_log_fp, FALSE, TRUE, "Error detaching from journal pool : %s\n", STRERROR(save_errno));
-		jnlpool.repl_inst_filehdr = NULL;
-		jnlpool.gtmsrc_lcl_array = NULL;
-		jnlpool.gtmsource_local_array = NULL;
-		jnlpool.jnldata_base = NULL;
-		pool_init = FALSE;
 	}
 	gtmsource_free_msgbuff();
 	gtmsource_free_tcombuff();
@@ -138,8 +135,7 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	repl_log(gtmsource_log_fp, FALSE, TRUE, "  Number of unsent Seqno : %llu\n", 0 < diff_seqno ? diff_seqno : 0);
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Jnl Total : %llu  Msg Total : %llu  CmpMsg Total : %llu\n",
 		 repl_source_data_sent, repl_source_msg_sent, repl_source_cmp_sent);
-	if (gtmsource_filter & EXTERNAL_FILTER)
-		repl_stop_filter();
+	STOP_EXTERNAL_FILTER_IF_NEEDED(gtmsource_filter, gtmsource_log_fp, "GTMSOURCE_END");
 	gtm_event_log_close();
 	if (auto_shutdown)
 		return (exit_status);

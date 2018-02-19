@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +23,7 @@ cmi_status_t cmi_write(struct CLB *lnk)
 	struct NTD *tsk = lnk->ntd;
 	int rc;
 
+	ASSERT_IS_LIBCMISOCKETTCP;
 	CMI_DPRINT(("ENTER CMI_WRITE, AST 0x%x\n", lnk->ast));
 
 	SIGPROCMASK(SIG_BLOCK, &tsk->mutex_set, &oset, rc);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,6 +25,7 @@ GBLREF spdesc stringpool;
 
 error_def(ERR_INVSTRLEN);
 error_def(ERR_BADTRNPARAM);
+error_def(ERR_MAXSTRLEN);
 
 #define FULL 3
 #define LENGTH 4
@@ -53,16 +55,16 @@ void op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 	char		buf[MAX_TRANS_NAME_LEN];
 	char		*status;
 	int		item_code;
-	short		retlen;
+	uint4		retlen;
 
 	MV_FORCE_STR(name);
 	if (name->str.len >= MAX_TRANS_NAME_LEN)
-		rts_error(VARLSTCNT(4) ERR_INVSTRLEN, 2, name->str.len, MAX_TRANS_NAME_LEN - 1);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, name->str.len, MAX_TRANS_NAME_LEN - 1);
 	MV_FORCE_STR(item);
 	if (item->str.len)
 	{
 		if ((item_code = namelook(trnitm_index, trnitm_table, item->str.addr, item->str.len)) < 0) /* NOTE assignment */
-			rts_error(VARLSTCNT(4) ERR_BADTRNPARAM,2,item->str.len,item->str.addr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADTRNPARAM,2,item->str.len,item->str.addr);
 	} else
 		item_code = VALUE;
 	ret->mvtype = MV_STR;
@@ -76,6 +78,8 @@ void op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 			if (status)
 			{
 				retlen = strlen(status);
+				if (MAX_STRLEN < retlen)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 				ENSURE_STP_FREE_SPACE(retlen);
 				ret->str.addr = (char *)stringpool.free;
 				ret->str.len = retlen;

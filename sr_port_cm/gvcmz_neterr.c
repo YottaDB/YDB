@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +34,9 @@
 #include "callg.h"
 
 GBLREF	struct NTD	*ntd_root;
-GBLDEF	bool		neterr_pending;
+GBLREF	bool		neterr_pending;
+
+LITREF	mval		literal_notimeout;
 
 error_def(ERR_LCKSCANCELLED);
 
@@ -44,9 +50,9 @@ void	gvcmz_neterr(INTPTR_T *err)
 	INTPTR_T	err_buff[10];
 	boolean_t	locks = FALSE;
 
+	ASSERT_IS_LIBGNPCLIENT;
 	neterr_pending = FALSE;
-	if (NULL == ntd_root)
-		GTMASSERT;
+	assertpro(NULL != ntd_root);
 	for (p = (struct CLB *)RELQUE2PTR(ntd_root->cqh.fl);  p != (struct CLB *)ntd_root;  p = pn)
 	{
 		/* Get the forward link, in case a close removes the current entry */
@@ -88,9 +94,8 @@ void	gvcmz_neterr(INTPTR_T *err)
 							p1->mbf = temp;
 						}
 					}
-					op_lkinit();
 					op_unlock();
-					op_zdeallocate(NO_M_TIMEOUT);
+					op_zdeallocate((mval *)&literal_notimeout);
 				}
 			}
 			/* Cycle through all active global directories */
@@ -116,7 +121,7 @@ void	gvcmz_neterr(INTPTR_T *err)
 			err_buff[0] += 3;
 			callg_signal(err_buff);
 		} else
-			rts_error(VARLSTCNT(1) ERR_LCKSCANCELLED);
+			rts_error_csa(NULL, VARLSTCNT(1) ERR_LCKSCANCELLED);
 	} else  if (NULL != err)
 		callg_signal(err);
 

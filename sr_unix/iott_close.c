@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,6 +78,11 @@ void iott_close(io_desc *v, mval *pp)
 	{
 		free(ttptr->recall_buff.addr);
 		ttptr->recall_buff.addr = NULL;
+	}
+	if (v->dollar.devicebuffer)
+	{
+		free(v->dollar.devicebuffer);
+		v->dollar.devicebuffer = NULL;
 	}
 	REVERT_GTMIO_CH(&v->pair, ch_set);
 	return;

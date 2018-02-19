@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -188,13 +188,13 @@ int initialize_pattern_table(void)
 		pat_allmaskbits |= pattern_typemask[letter];	/* used in do_patfixed/do_pattern */
 	/* Locate default pattern file and load it. */
         status = TRANS_LOG_NAME(&pat_file, &transnam, buffer, SIZEOF(buffer), do_sendmsg_on_log2long);
-	if (SS_NORMAL != status)
+	if ((SS_NORMAL != status) || (0 == transnam.len))
 		return 0;
 	if (!load_pattern_table(transnam.len, transnam.addr))
 		return 0;
 	/* Establish default pattern table. */
 	status = TRANS_LOG_NAME(&pat_table,&transnam,buffer, SIZEOF(buffer), do_sendmsg_on_log2long);
-	if (SS_NORMAL != status)
+	if ((SS_NORMAL != status) || (0 == transnam.len))
 		return 0;
 	patname.len = transnam.len;
 	patname.addr = transnam.addr;

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -38,7 +41,7 @@
 #define WC_DEF_BUFFS 128
 #define WC_MIN_BUFFS 64
 
-#define MAX_LOCK_SPACE 65536 	/* need to change these whenever global directory defaults change */
+#define MAX_LOCK_SPACE 262144	/* need to change these whenever global directory defaults change */
 #define MIN_LOCK_SPACE 10
 
 #define MAX_REL_NAME	36
@@ -184,7 +187,7 @@ typedef struct
 	CACHELINE_PAD(SIZEOF(mutex_que_head), 9)
 } mutex_struct;
 
-typedef struct { /* keep this structure and member offsets defined in sr_avms/mutex.mar in sync */
+typedef struct {
 	int4	mutex_hard_spin_count;
 	int4	mutex_sleep_spin_count;
 	int4	mutex_spin_sleep_mask;			/* mask for maximum spin sleep time */
@@ -282,19 +285,7 @@ typedef struct
 #define	WCS_OPS_ARRAY_SIZE		1024
 #define	CRIT_OPS_ARRAY_SIZE		 512
 #define	LOCKHIST_ARRAY_SIZE		 512
-#define	SECSHR_OPS_ARRAY_SIZE		1023		/* 1 less than 1K to accommodate the variable secshr_ops_index */
 #define FTOK_OPS_ARRAY_SIZE		 512
-
-/* SECSHR_ACCOUNTING macro assumes csa->nl is dereferencible and does accounting if variable "do_accounting" is set to TRUE */
-#define		SECSHR_ACCOUNTING(value)								\
-{													\
-	if (do_accounting)										\
-	{												\
-		if (csa->nl->secshr_ops_index < SECSHR_OPS_ARRAY_SIZE)					\
-			csa->nl->secshr_ops_array[csa->nl->secshr_ops_index] = (gtm_uint64_t)(value);	\
-		csa->nl->secshr_ops_index++;								\
-	}												\
-}
 
 /*
  * Enable the GTM_CRYPT_UPDATES_REPORT define below to activate logging of encryption-related operations in shared memory. Those
@@ -538,7 +529,7 @@ typedef struct node_local_struct
 {
 	unsigned char   label[GDS_LABEL_SZ];			/* 12	signature for GDS shared memory */
 	unsigned char	fname[MAX_FN_LEN + 1];			/* 256	filename of corresponding database */
-	char		now_running[MAX_REL_NAME];		/* 36	current active GT.M version stamp */
+	char		now_running[MAX_REL_NAME];		/* 36	current active YottaDB version stamp */
 	char		machine_name[MAX_MCNAMELEN];		/* 256	machine name for clustering */
 	sm_off_t	bt_header_off;				/* (QW alignment) offset to hash table */
 	sm_off_t	bt_base_off;				/* bt first entry */
@@ -603,7 +594,6 @@ typedef struct node_local_struct
 	int4		dskread_ops_index;			/* "circular" index into dskread_ops_array */
 	int4		ftok_ops_index;				/* "circular" index into ftok_ops_array */
 	int4		wcs_ops_index;				/* "circular" index into wcs_ops_array */
-	NON_GTM64_ONLY(int4 filler_8byte_align2;) /* To align the following member at an 8-byte boundary on 32-bit platforms */
 	lockhist	lockhists[LOCKHIST_ARRAY_SIZE];		/* Keep lock histories here */
 	crit_trace	crit_ops_array[CRIT_OPS_ARRAY_SIZE];	/* space for CRIT_TRACE macro to record info */
 	dskread_trace	dskread_ops_array[DSKREAD_OPS_ARRAY_SIZE];	/* space for DSKREAD_TRACE macro to record info */
@@ -630,8 +620,6 @@ typedef struct node_local_struct
 	char		statsdb_fname[MAX_FN_LEN + 1];	/* Is empty-string if IS_RDBF_STATSDB(csd) is FALSE.
 							 * Is name of the statsdb corresponding to this basedb otherwise.
 							 */
-	int4		secshr_ops_index;
-	gtm_uint64_t	secshr_ops_array[SECSHR_OPS_ARRAY_SIZE]; /* taking up 8K */
 	gvstats_rec_t	gvstats_rec;
 	trans_num	last_wcsflu_tn;			/* curr_tn when last wcs_flu was done on this database */
 	trans_num	last_wcs_recover_tn;		/* csa->ti->curr_tn of most recent "wcs_recover" */
@@ -646,12 +634,12 @@ typedef struct node_local_struct
 	boolean_t	snapshot_in_prog;	 /* Tells GT.M if any snapshots are in progress */
 	uint4		num_snapshots_in_effect; /* how many snapshots are currently in place for this region */
 	uint4		wbox_test_seq_num;	 /* used to coordinate with sequential testing steps */
-	NON_GTM64_ONLY(int4 filler_8byte_align3;) /* To align the following member at an 8-byte boundary on 32-bit platforms */
+	uint4		freeze_online;		 /* for online db freezing, a.k.a. chill.  */
 	uint4		kip_pid_array[MAX_KIP_PID_SLOTS];	/* Processes actively doing kill (0 denotes empty slots) */
 	gtm_uint64_t	sec_size;	/* Upon going to larger shared memory sizes, we realized that this does not	*/
 					/* need	to be in the file header but the node local since it can be calculated	*/
 					/* from info in the file header.						*/
-	int4		jnlpool_shmid;	/* copy of jnlpool.repl_inst_filehdr->jnlpool_shmid to prevent mixing of multiple
+	int4		jnlpool_shmid;	/* copy of jnlpool->repl_inst_filehdr->jnlpool_shmid to prevent mixing of multiple
 					 * journal pools within the same database.
 					 */
 	boolean_t	lockspacefull_logged;			/* Avoids flooding syslog with LOCKSPACEFULL messages.
@@ -695,6 +683,7 @@ typedef struct node_local_struct
 	uint4			saved_lock_space_size;
 	int4			saved_jnl_buffer_size;
 	/* Miscellaneous flag */
+	trans_num	update_underway_tn;
 	boolean_t	lastwriterbypas_msg_issued;	/* whether a LASTWRITERBYPAS message has been once issued for this db */
 	boolean_t	first_writer_seen;	/* Has a process with read-write access to the database opened it yet */
 	boolean_t	first_nonbypas_writer_seen;	/* TRUE when first writer is seen that also does not bypass ftok/access */
@@ -708,14 +697,14 @@ typedef struct node_local_struct
 #	ifdef GTM_CRYPT_UPDATES_REPORT
 	blk_info	blk_infos[BLK_INFO_ARRAY_SIZE];
 	uint4		blk_info_cnt;
-	int4		filler_8byte_align5;
+	int4		filler_8byte_align2;
 #	endif
 	global_latch_t	freeze_latch;		/* Protect freeze/freeze_online field updates */
 	gtm_uint64_t	wcs_buffs_freed; /* this is a count of the number of buffers transitioned to the free "queue" */
 	volatile gtm_uint64_t	dskspace_next_fire;
 	global_latch_t	lock_crit;		/* mutex for LOCK processing */
 	volatile block_id	tp_hint;
-	int4		filler_8byte_align6;
+	int4		filler_8byte_align3;
 } node_local;
 
 #define	COPY_STATSDB_FNAME_INTO_STATSREG(statsDBreg, statsDBfname, statsDBfname_len)				\
@@ -742,8 +731,9 @@ MBSTART {														\
 	statsDBcsd->basedb_fname_len = fname_len;									\
 } MBEND
 
-#define	UNLINK_STATSDB_AT_BASEDB_RUNDOWN(CNL)										\
+#define	UNLINK_STATSDB_AT_BASEDB_RUNDOWN(CNL, CSD)									\
 MBSTART {														\
+	assert(!CNL->statsdb_created || !CSD->read_only);								\
 	if (CNL->statsdb_created && CNL->statsdb_rundown_clean)								\
 	{														\
 		assert(CNL->statsdb_fname_len);	/* "gvcst_init" would not have set CNL->statsdb_created otherwise */	\
@@ -789,23 +779,23 @@ MBSTART {								\
  * in order to to maximize the chances of gathering meaningful data, it seems better placed after grab_crit
  * and before rel_crit. Also we will increment the index first and cache it so we can shorten our exposure window.
  */
-#define CRIT_TRACE(X)							\
+#define CRIT_TRACE(CSA, X)						\
 MBSTART {								\
 	int4			coidx;					\
 	node_local_ptr_t	cnl;					\
 	boolean_t		in_ast;					\
 	unsigned int		ast_status;				\
 									\
-	assert((NULL != csa) && (NULL !=(csa->nl)));			\
-	cnl = csa->nl;							\
+	assert((NULL != CSA) && (NULL !=(CSA->nl)));			\
+	cnl = CSA->nl;							\
 	coidx = ++cnl->crit_ops_index;					\
 	if (CRIT_OPS_ARRAY_SIZE <= coidx)				\
 		cnl->crit_ops_index = coidx = 0;			\
 	cnl->crit_ops_array[coidx].call_from = (caddr_t)caller_id();	\
 	cnl->crit_ops_array[coidx].epid = process_id;			\
 	cnl->crit_ops_array[coidx].crit_act = (X);			\
-	cnl->crit_ops_array[coidx].curr_tn = (NULL != csa->hdr) ?	\
-		csa->hdr->trans_hist.curr_tn  : 0;			\
+	cnl->crit_ops_array[coidx].curr_tn = (NULL != CSA->hdr) ?	\
+		CSA->hdr->trans_hist.curr_tn  : 0;			\
 } MBEND
 
 /* The following macro checks that curr_tn and early_tn are equal right before beginning a transaction commit.
@@ -924,7 +914,7 @@ MBSTART {										\
 
 #define DUMP_LOCKHIST() dump_lockhist()
 #else
-#define CRIT_TRACE(X)
+#define CRIT_TRACE(CSA, X)
 #define	ASSERT_CURR_TN_EQUALS_EARLY_TN(csa, currtn)
 #define LOCK_HIST(OP, LOC, ID, CNT)
 #define WCS_OPS_TRACE(CSA, PID, TYPE, BLK, CR_OFF, CR_TN, DETAIL1, DETAIL2)
@@ -954,10 +944,9 @@ MBSTART {								\
 #define MAX_SLEEP_CNT				E_6		/* keep this in sync with any maxseg("SLEEP_CNT") in gdeinit.m */
 #define DEFAULT_SLEEP_CNT			0		/* keep this in sync with any tmpseg("SLEEP_CNT") in gdeget.m */
 #define SLEEP_SPIN_CNT(CSD)			(CSD)->mutex_spin_parms.mutex_sleep_spin_count
-#define MIN_SPIN_SLEEP				0		/* keep this in sync with gdeinit.m minseg("SPIN_SLEEP_LIMIT") */
-#define MAX_SPIN_SLEEP				E_9		/* keep this in sync with gdeinit.m maxseg("SPIN_SLEEP_LIMIT") */
-#define DEFAULT_SPIN_SLEEP			0		/* keep this in sync with gdeget.m tmpseg("SPIN_SLEEP_LIMIT") */
+#define MAX_SPIN_SLEEP_MASK			0x3FFFFFFF
 #define SPIN_SLEEP_MASK(CSD)			(CSD)->mutex_spin_parms.mutex_spin_sleep_mask
+#define HARD_SPIN_COUNT(CSD)			(CSD)->mutex_spin_parms.mutex_hard_spin_count
 #define MIN_CRIT_ENTRY				64		/* keep this in sync with gdeinit.m minseg("MUTEX_SLOTS") */
 #define MAX_CRIT_ENTRY				32768		/* keep this in sync with gdeinit.m maxseg("MUTEX_SLOTS") */
 #define DEFAULT_NUM_CRIT_ENTRY			1024		/* keep this in sync with gdeget.m tmpseg("MUTEX_SLOTS") */

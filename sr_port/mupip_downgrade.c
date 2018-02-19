@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -53,9 +56,6 @@
 #define	GTM_VER_LIT		"GT.M "
 #define	MAX_VERSION_LEN		16	/* 16 bytes enough to hold V63000A, longest -VERSION= value possible */
 
-LITREF  char     	 	gtm_release_name[];
-LITREF  int4            	gtm_release_name_len;
-
 static sem_info	*sem_inf;
 
 static void mupip_downgrade_cleanup(void);
@@ -82,7 +82,8 @@ error_def(ERR_TEXT);
 
 void mupip_downgrade(void)
 {
-	char		db_fn[MAX_FN_LEN + 1], ver_spec[MAX_VERSION_LEN], dwngrd_ver[MAX_VERSION_LEN + STR_LIT_LEN(GTM_VER_LIT)];
+	char		db_fn[MAX_FN_LEN + 1], ver_spec[MAX_VERSION_LEN + 1],
+			dwngrd_ver[MAX_VERSION_LEN + STR_LIT_LEN(GTM_VER_LIT)];
 	unsigned short	db_fn_len;	/* cli_get_str expects short */
 	unsigned short	ver_spec_len;
 	char		*hdr_ptr;
@@ -113,8 +114,9 @@ void mupip_downgrade(void)
 	db_fn[db_fn_len] = '\0';	/* Null terminate */
 	if (cli_present("VERSION"))
 	{
-		ver_spec_len = ARRAYSIZE(ver_spec);
+		ver_spec_len = ARRAYSIZE(ver_spec) - 1;		/* Ensure spare for nul */
 		cli_get_str("VERSION", ver_spec, &ver_spec_len);
+		ver_spec[ver_spec_len] = '\0';
 		cli_strupper(ver_spec);
 		if (0 == memcmp(ver_spec, "V4", ver_spec_len))
 		{	/* Downgrade file header to V4 format and downgrade EOF block from GDS-block to 512-byte block */

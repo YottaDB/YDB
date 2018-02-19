@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2002 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2002-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +26,7 @@
 
 GBLDEF	gd_region	*gv_cur_region;
 GBLDEF	gv_key		*gv_altkey, *gv_currkey;
-GBLDEF	bool		caller_id_flag = TRUE;
+GBLDEF	boolean_t	caller_id_flag = TRUE;
 
 #ifdef INT8_SUPPORTED
 	GBLDEF	const seq_num	seq_num_zero = 0;

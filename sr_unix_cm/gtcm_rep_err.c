@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -51,10 +54,11 @@ void gtcm_rep_err(char *msg, int errcode)
 	FILE	*fp;
 	char	outbuf[OUT_BUFF_SIZE];
 	time_t	now;
-	int	status, retval, gtm_dist_len;
+	int	status, retval;
 	char 	*filebuf, *tag_emsg, *tmp_time;
 	mstr	tn;
 
+	ASSERT_IS_LIBGTCM;
 	if ('\0' == msg[0])
 		sgtm_putmsg(outbuf, VARLSTCNT(2) errcode, 0);
 	else

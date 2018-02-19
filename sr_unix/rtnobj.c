@@ -1,7 +1,13 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2016 Fidelity National Information	*
+ * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
+ * Copyright (c) 2017,2018 Stephen L Johnson.			*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,11 +102,11 @@
 						rel_latch(&SHM_HDR->relinkctl_latch);						\
 					rel_latch(&RELINKREC->rtnobj_latch);							\
 					SNPRINTF(errstr, SIZEOF(errstr), "rtnobj2 shmat() failed for shmid=%d shmsize=0x%llx",	\
-						shr_shmid, shm_size);								\
+						shr_shmid, (unsigned long long)shm_size);					\
 					if (!SHM_REMOVED(save_errno))								\
 						ISSUE_RELINKCTLERR_SYSCALL(&LINKCTL->zro_entry_name, errstr, save_errno);	\
 					else											\
-						ISSUE_REQRLNKCTLRNDWN_SYSCALL(&LINKCTL->zro_entry_name, errstr, save_errno);	\
+						ISSUE_REQRLNKCTLRNDWN_SYSCALL(LINKCTL, errstr, save_errno);			\
 				}												\
 				assert(0 == ((UINTPTR_T)shm_base % 8));								\
 				LINKCTL->rtnobj_shmid[i] = shr_shmid;								\
@@ -120,7 +126,6 @@
 #ifdef AUTORELINK_SUPPORTED
 
 error_def(ERR_RELINKCTLERR);
-error_def(ERR_REQRLNKCTLRNDWN);
 error_def(ERR_RLNKRECLATCH);
 error_def(ERR_RLNKSHMLATCH);
 error_def(ERR_SYSCALL);
@@ -544,7 +549,8 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				save_errno = errno;
 				rel_latch(&shm_hdr->relinkctl_latch);
 				rel_latch(&relinkrec->rtnobj_latch);
-				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj shmget() failed for shmsize=0x%llx", shm_size);
+				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj shmget() failed for shmsize=0x%llx",
+											(unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
 			STAT_FILE(linkctl->zro_entry_name.addr, &dir_stat_buf, stat_res);
@@ -575,7 +581,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				rel_latch(&relinkrec->rtnobj_latch);
 				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
 				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj shmctl(IPC_STAT) failed for shmid=%d shmsize=0x%llx",
-					shmid, shm_size);
+					shmid, (unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
 			/* change uid, group-id and permissions if needed */
@@ -602,7 +608,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				rel_latch(&relinkrec->rtnobj_latch);
 				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
 				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj shmctl(IPC_SET) failed for shmid=%d shmsize=0x%llx",
-					shmid, shm_size);
+					shmid, (unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
 			shm_base = (sm_uc_ptr_t)do_shmat_exec_perm(shmid, shm_size, &save_errno);
@@ -613,7 +619,7 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 				rel_latch(&relinkrec->rtnobj_latch);
 				shm_rmid(shmid);	/* if error removing shmid we created, just move on */
 				SNPRINTF(errstr, SIZEOF(errstr), "rtnobj shmat() failed for shmid=%d shmsize=0x%llx",
-					shmid, shm_size);
+					shmid, (unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
 			assert(shm_index < NUM_RTNOBJ_SHM_INDEX);
@@ -885,8 +891,13 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 		shm_base = linkctl->rtnobj_shm_base[dbg_shm_index];
 		assert(NULL != shm_base);
 		shm_size = ((size_t)1 << (dbg_shm_index + MIN_RTNOBJ_SHM_INDEX));
+#		if defined(__armv6l__) || defined(__armv7l__)
+		if ((shm_base <= (uchar_ptr_t)rtnobj)
+		    && ((shm_base + shm_size) > (uchar_ptr_t)rtnobj))
+#		else
 		if (((gtm_uint64_t)shm_base <= (gtm_uint64_t)rtnobj)
 				&& (((gtm_uint64_t)shm_base + shm_size) > (gtm_uint64_t)rtnobj))
+#		endif
 			break;	/* shared memory corresponding to rtnobj is found */
 	}
 	assert(dbg_shm_index < max_index);

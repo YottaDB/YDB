@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +59,7 @@
 # include "min_max.h"
 # include "wbox_test_init.h"
 # include "get_fs_block_size.h"
+# include "min_max.h"
 #endif
 
 #if defined(__linux__) || defined(__CYGWIN__)
@@ -370,12 +374,12 @@ MBSTART {											\
 		RC = -1;		/* Something kept us from reading what we wanted */	\
 } MBEND
 
-#define LSEEKWRITEASYNCSTART(CSA, FDESC, FPTR, FBUFF, FBUFF_LEN, CR, RC)			\
-MBSTART {											\
-	memset(&CR->aiocb, 0, SIZEOF(struct aiocb));						\
-	CR->aiocb.aio_nbytes = (size_t) FBUFF_LEN;						\
-	CR->aiocb.aio_offset = (off_t) FPTR;							\
-	LSEEKWRITEASYNCRESTART(CSA, FDESC, FBUFF, CR, RC);					\
+#define LSEEKWRITEASYNCSTART(CSA, FDESC, FPTR, FBUFF, FBUFF_LEN, CR, RC)	\
+MBSTART {									\
+	memset(&CR->aiocb, 0, SIZEOF(struct aiocb));				\
+	SYS_IOCB(CR).aio_nbytes = (size_t) FBUFF_LEN;				\
+	SYS_IOCB(CR).aio_offset = (off_t) FPTR;					\
+	LSEEKWRITEASYNCRESTART(CSA, FDESC, FBUFF, CR, RC);			\
 } MBEND
 
 #define LSEEKWRITEASYNCRESTART(CSA, FDESC, FBUFF, CR, RC)					\
@@ -383,10 +387,10 @@ MBSTART {											\
 	GBLREF 	boolean_t	async_restart_got_eagain;					\
 	ssize_t			gtmioStatus;							\
 												\
-	CR->aiocb.aio_buf = IF_LIBAIO((unsigned long)) FBUFF;					\
-	CR->aiocb.aio_fildes = FDESC;								\
-	assert(0 < CR->aiocb.aio_nbytes);							\
-	assert(0 < CR->aiocb.aio_offset);							\
+	SYS_IOCB(CR).aio_buf = IF_LIBAIO((unsigned long)) FBUFF;				\
+	SYS_IOCB(CR).aio_fildes = FDESC;							\
+	assert(0 < SYS_IOCB(CR).aio_nbytes);							\
+	assert(0 < SYS_IOCB(CR).aio_offset);							\
 	AIO_SHIM_WRITE(CSA->region, &(CR->aiocb), gtmioStatus);					\
 	if (0 == gtmioStatus)									\
 		RC = 0;										\
@@ -523,7 +527,7 @@ MBSTART {													\
 						   loaded systems but timeout on incomplete reads.  		\
 						   Any characters						\
 						   read to this point will be returned. */ 			\
-						*MSEC_TIMEOUT = timeout2msec(1);				\
+						*MSEC_TIMEOUT = 1 * MILLISECS_IN_SEC;				\
 						start_timer(TIMER_ID, *MSEC_TIMEOUT, wake_alarm, 0, NULL);	\
 					}									\
 					gtmioBuffLen -= gtmioStatus;						\
@@ -670,31 +674,6 @@ MBSTART {											\
 		RC = 0;										\
 	else											\
 		RC = -1;		/* Something kept us from writing what we wanted */	\
-} MBEND
-
-#define DOLLAR_DEVICE_SET(DEVPTR,STATUS)							\
-MBSTART {											\
-	len = SIZEOF(ONE_COMMA) - 1;								\
-	memcpy(DEVPTR->dollar.device, ONE_COMMA, len);					\
-	errptr = (char *)STRERROR(STATUS);							\
-	/* make sure there is room for the 1, and the null at the end */			\
-	errlen = MIN(STRLEN(errptr), SIZEOF(DEVPTR->dollar.device) - SIZEOF(ONE_COMMA));	\
-	memcpy(&DEVPTR->dollar.device[len], errptr, errlen);				\
-	DEVPTR->dollar.device[len + errlen] = '\0';					\
-} MBEND
-
-#define DOLLAR_DEVICE_WRITE(DEVPTR,STATUS)						\
-MBSTART {										\
-	int	len;									\
-	int	errlen;									\
-	char	*errptr;								\
-	/* save error in $device */							\
-	if (EAGAIN == STATUS)								\
-	{										\
-		len = SIZEOF(ONE_COMMA_UNAVAILABLE);					\
-		memcpy(DEVPTR->dollar.device, ONE_COMMA_UNAVAILABLE, len);		\
-	} else										\
-		DOLLAR_DEVICE_SET(DEVPTR,STATUS);					\
 } MBEND
 
 #define DOWRITERL_RM(RM, FBUFF, FBUFF_LEN, RLEN)								\

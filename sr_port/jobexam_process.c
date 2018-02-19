@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +59,8 @@ GBLREF boolean_t        created_core;
 UNIX_ONLY(GBLREF sigset_t blockalrm;)
 DEBUG_ONLY(GBLREF boolean_t ok_to_UNWIND_in_exit_handling;)
 
+LITREF	mval		literal_zero;
+
 error_def(ERR_GTMASSERT);
 error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
@@ -65,7 +70,6 @@ error_def(ERR_MEMORY);
 error_def(ERR_OUTOFSPACE);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
-error_def(ERR_VMSMEMORY);
 
 void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 {
@@ -75,7 +79,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	boolean_t		saved_mv_stent;
 	char			saved_util_outbuff[OUT_BUFF_SIZE];
 	int			rc, saved_util_outbuff_len;
-	char			save_dump_file_name_buff[GTM_PATH_MAX];
+	char			save_dump_file_name_buff[YDB_PATH_MAX];
 #	ifdef UNIX
 	struct sigaction	new_action, prev_action;
 	sigset_t		savemask;
@@ -212,7 +216,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 	 */
 	if (process_exiting)
 	{
-		assert(GTM_PATH_MAX >= dump_file_spec->str.len);
+		assert(YDB_PATH_MAX >= dump_file_spec->str.len);
 		memcpy(fatal_file_name_buff, dump_file_spec->str.addr, dump_file_spec->str.len);
 		dump_file_spec->str.addr = fatal_file_name_buff;
 	}
@@ -221,7 +225,7 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 	parms.str.addr = (char *)dumpable_error_dump_file_parms;
 	parms.str.len = SIZEOF(dumpable_error_dump_file_parms);
 	/* Open, use, and zshow into new file, then close and reset current io device */
-	op_open(dump_file_spec, &parms, 0, 0);
+	op_open(dump_file_spec, &parms, (mval *)&literal_zero, 0);
 	op_use(dump_file_spec, &parms);
 	zshowall.mvtype = MV_STR;
 	zshowall.str.addr = "*";

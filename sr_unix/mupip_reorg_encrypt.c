@@ -3,6 +3,9 @@
  * Copyright (c) 2015-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -52,6 +55,8 @@
 #include "mupip_reorg_encrypt.h"
 #include "t_abort.h"
 #include "interlock.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
 GBLREF bool		error_mupip;
 GBLREF bool		mu_ctrlc_occurred;
@@ -140,7 +145,7 @@ MBSTART {														\
  */
 void mupip_reorg_encrypt(void)
 {
-	char			key[GTM_PATH_MAX], hash[GTMCRYPT_HASH_LEN];
+	char			key[YDB_PATH_MAX], hash[GTMCRYPT_HASH_LEN];
 	char			*db_name, *bml_lcl_buff;
 	int			db_name_len, gtmcrypt_errno, status, reg_status, status1;
 	int			reg_count, i, total_blks, cycle, lcnt, bml_status;
@@ -263,7 +268,7 @@ void mupip_reorg_encrypt(void)
 			continue;
 		}
 		mu_reorg_process = TRUE;	/* gvcst_init will use this value to use gtm_poollimit settings. */
-		gvcst_init(reg);
+		gvcst_init(reg, NULL);
 		mu_reorg_process = FALSE;
 		/* Note that db_init() does not release the access-control semaphore in case of MUPIP REORG -ENCRYPT (as determined
 		 * based on the mu_reorg_encrypt_in_prog variable), so no need to obtain it here.

@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,11 +45,11 @@
 #include "do_semop.h"
 #include "anticipatory_freeze.h"
 
-GBLREF	uint4		process_id;
-GBLREF	ipcs_mesg	db_ipcs;
-GBLREF	gd_region	*gv_cur_region;
-GBLREF	jnl_gbls_t	jgbl;
-GBLREF	jnlpool_addrs	jnlpool;
+GBLREF	uint4			process_id;
+GBLREF	ipcs_mesg		db_ipcs;
+GBLREF	gd_region		*gv_cur_region;
+GBLREF	jnl_gbls_t		jgbl;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def (ERR_TEXT);
 error_def (ERR_CRITSEMFAIL);
@@ -173,22 +176,27 @@ boolean_t db_ipcs_reset(gd_region *reg)
 			db_ipcs.gt_sem_ctime = 0;
 			db_ipcs.gt_shm_ctime = 0;
 			if (!get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, (unsigned int *)&db_ipcs.fn_len,
-					   GTM_PATH_MAX, &ustatus))
+					   YDB_PATH_MAX, &ustatus))
 			{
 				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_FILEPARSE, 2, DB_LEN_STR(reg), ustatus);
 				return FALSE;
 			}
 			db_ipcs.fn[db_ipcs.fn_len] = 0;
-			WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-			if (!csa->read_only_fs)
+			/* If db file header has READ_ONLY set OR if the file system holding the db is read-only,
+			 * then skip writing to db file header even through gtmsecshr. This also means we do not
+			 * need to wait for the instance to unfreeze (in case the instance is frozen).
+			 */
+			if (!csa->read_only_fs && !csd->read_only)
 			{
+				WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
 				status = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
 				if (0 != status)
 				{
 					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 					CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
 					if (0 != status)
-						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
+						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+							status);
 					return FALSE;
 				}
 			}
@@ -203,7 +211,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 	}
 	udi->grabbed_access_sem = FALSE;
 	udi->counter_acc_incremented = FALSE;
-	CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID */
+	CLOSEFILE_RESET(udi->fd, status);	/* resets "udi->fd" to FD_INVALID and does flock(LOCK_UN) if needed */
 	if (0 != status)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	/* Since we created the ftok semaphore in mu_rndwn_file, we release/remove it now. But, since we are exiting, we

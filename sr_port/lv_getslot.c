@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,13 +42,13 @@ lv_val *lv_getslot(symval *sym)
 	lv_val		*lv;
 	unsigned int	numElems, numUsed;
 
-	numElems = MAXUINT4;	/* maximum value */
 	if (lv = sym->lv_flist)
 	{
 		assert(NULL == LV_PARENT(lv));		/* stp_gcol relies on this for correct garbage collection */
 		sym->lv_flist = (lv_val *)lv->ptrs.free_ent.next_free;
 	} else
 	{
+		DEBUG_ONLY(numElems = MAXUINT4);	/* maximum value */
 		for (p = sym->lv_first_block; ; p = p->next)
 		{
 			if (NULL == p)
@@ -68,6 +71,8 @@ lv_val *lv_getslot(symval *sym)
 				p->numUsed++;
 				break;
 			}
+			assert(numElems >= p->numAlloc);
+			DEBUG_ONLY(numElems = p->numAlloc);
 		}
 	}
 	assert(lv);
@@ -82,13 +87,13 @@ lvTree *lvtree_getslot(symval *sym)
 	lvTree		*lvt;
 	unsigned int	numElems, numUsed;
 
-	numElems = MAXUINT4;	/* maximum value */
 	if (lvt = sym->lvtree_flist)
 	{
 		assert(NULL == LVT_GET_PARENT(lvt));
 		sym->lvtree_flist = (lvTree *)lvt->avl_root;
 	} else
 	{
+		DEBUG_ONLY(numElems = MAXUINT4);	/* maximum value */
 		for (p = sym->lvtree_first_block; ; p = p->next)
 		{
 			if (NULL == p)
@@ -123,13 +128,13 @@ lvTreeNode *lvtreenode_getslot(symval *sym)
 	lvTreeNode	*lv;
 	unsigned int	numElems, numUsed;
 
-	numElems = MAXUINT4;	/* maximum value */
 	if (lv = sym->lvtreenode_flist)
 	{
 		assert(NULL == LV_PARENT(lv));	/* stp_gcol relies on this for correct garbage collection */
 		sym->lvtreenode_flist = (lvTreeNode *)lv->sbs_child;
 	} else
 	{
+		DEBUG_ONLY(numElems = MAXUINT4);	/* maximum value */
 		for (p = sym->lvtreenode_first_block; ; p = p->next)
 		{
 			if (NULL == p)
@@ -138,7 +143,7 @@ lvTreeNode *lvtreenode_getslot(symval *sym)
 					numElems = p->numAlloc;
 				else
 					numElems = LV_NEWBLOCK_INIT_ALLOC;
-				lvtreenode_newblock(sym, numElems > 64 ? 128 : numElems * 2);
+				lvtreenode_newblock(sym, (numElems <= (MAXINT4 / 2)) ? (numElems * 2) : MAXINT4);
 				p = sym->lvtreenode_first_block;
 				assert(NULL != p);
 			}

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,6 +40,7 @@ bool gtcmtr_initreg(void)
 	unsigned short temp_short;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 
+	ASSERT_IS_LIBGNPSERVER;
 	assert(*curr_entry->clb_ptr->mbf == CMMS_S_INITREG);
 	region = gtcmd_ini_reg(curr_entry);
 	gtcm_add_region(curr_entry,region);

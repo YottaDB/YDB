@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,11 +13,6 @@
 #ifndef GTMMSG_H_INCLUDED
 #define GTMMSG_H_INCLUDED
 
-#ifdef VMS
-void gtm_getmsg(uint4 msgnum, mstr *msgbuf);
-void gtm_putmsg(int4 msgid, ...);
-#define gtm_putmsg_csa	gtm_putmsg
-#elif defined(UNIX)
 void gtm_getmsg(int4 msgnum, mstr *msgbuf);
 void gtm_putmsg(int argcnt, ...);
 void gtm_putmsg_csa(void *, int argcnt, ...);		/* Use CSA_ARG(CSA) for portability */
@@ -29,7 +24,16 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 /* If threads are in use, then do not use "gv_cur_region" as the thread could be operating on a region completely different
  * from the process-wide "gv_cur_region" variable. Assume a safe value of NULL as the csa.
  */
-#define	PTHREAD_CSA_FROM_GV_CUR_REGION ((CUSTOM_ERRORS_LOADED && !multi_thread_in_use) ? REG2CSA(gv_cur_region) : NULL)
+#define	PTHREAD_CSA_FROM_GV_CUR_REGION(CSA, LCL_JNLPOOL)		\
+{									\
+	if (!multi_thread_in_use)					\
+	{								\
+		CSA = REG2CSA(gv_cur_region);				\
+		if (CSA && !CUSTOM_ERRORS_LOADED_CSA(CSA, LCL_JNLPOOL))	\
+			CSA = NULL;					\
+	} else								\
+		CSA = NULL;						\
+}
 
 # define GET_MSG_IDX(MSG_ID, CTL, IDX)										\
 {														\
@@ -46,9 +50,5 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 	GET_MSG_IDX(MSG_ID, CTL, idx);										\
 	MSG_INFO = CTL->fst_msg + idx;										\
 }
-
-#else
-# error Unsupported platform
-#endif
 
 #endif /* GTMMSG_H_INCLUDED */

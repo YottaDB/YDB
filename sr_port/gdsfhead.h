@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -44,6 +47,7 @@ error_def(ERR_NCTCOLLSPGBL);
 error_def(ERR_OFRZAUTOREL);
 error_def(ERR_OFRZCRITREL);
 error_def(ERR_OFRZCRITSTUCK);
+error_def(ERR_REPLINSTACC);
 error_def(ERR_REPLINSTMISMTCH);
 error_def(ERR_REPLINSTNOSHM);
 error_def(ERR_REPLREQROLLBACK);
@@ -58,6 +62,15 @@ error_def(ERR_TNTOOLARGE);
 error_def(ERR_TNWARN);
 error_def(ERR_TPRETRY);
 error_def(ERR_UNIMPLOP);
+
+#define FULL_FILESYSTEM_WRITE 1
+#define FULL_DATABASE_WRITE 2
+
+#ifdef USE_LIBAIO
+#	define	SYS_IOCB(CR)	CR->aiocb.sys_iocb
+#else
+#	define	SYS_IOCB(CR)	CR->aiocb
+#endif
 
 /* Cache record */
 typedef struct cache_rec_struct
@@ -102,7 +115,7 @@ typedef struct cache_rec_struct
 					 * before-image for wcs_recover to backup.
 					 */
 	off_jnl_t	jnl_addr;	/* offset from bg_update to prevent wcs_wtstart from writing a block ahead of the journal */
-	uint4		stopped;	/* non-zero indicates to wcs_recover the pid that built the block using secshr_db_clnup */
+	boolean_t	stopped;	/* TRUE indicates to wcs_recover that secshr_db_clnup built the block */
 	global_latch_t	rip_latch;	/* for read_in_progress - note contains extra 16 bytes for HPPA. Usage note: this
 					   latch is used on those platforms where read_in_progress is not directly updated
 					   by atomic routines/instructions. As such there needs be no cache line padding between
@@ -138,7 +151,9 @@ typedef struct cache_rec_struct
 					 * in progress. This is used by wcs_recover to decide whether to place a cr into
 					 * the active or wip queue.
 					 */
-	bool		filler4bytealign[1];	/* Note: Make sure any changes here are reflected in "cache_state_rec" too */
+	bool		needs_first_write; 	/* If this block needs to be written to disk for the first time,
+						 *  note it (only applicable for gtm_fullblockwrites) */
+	/* bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
 } cache_rec;
 
 /* A note about cache line separation of the latches contained in these blocks. Because this block is duplicated
@@ -225,7 +240,9 @@ typedef struct
 					 * in progress. This is used by wcs_recover to decide whether to place a cr into
 					 * the active or wip queue.
 					 */
-	bool		filler4bytealign[1];	/* Note: Make sure any changes here are reflected in "cache_state_rec" too */
+	bool		needs_first_write; 	/* If this block needs to be written to disk for the first time,
+						 *  note it (only applicable for gtm_fullblockwrites) */
+	/*bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
 } cache_state_rec;
 
 #define		CR_BLKEMPTY		-1
@@ -320,7 +337,7 @@ MBSTART {										\
 	new_KEY = (gv_key *)malloc(SIZEOF(gv_key) - 1 + keySZ);				\
 	assert((DBKEYSIZE(MAX_KEY_SZ) == KEYSIZE)					\
 		|| ((GVKEY != gv_currkey) && (GVKEY != gv_altkey)));			\
-	if (NULL != old_KEY)								\
+	if ((NULL != old_KEY) && (PREV_KEY_NOT_COMPUTED != old_KEY->end))		\
 	{										\
 		/* Don't call GVKEY_INIT twice for same key. The only exception		\
 		 * is if we are called from COPY_PREV_KEY_TO_GVT_CLUE in a		\
@@ -330,7 +347,7 @@ MBSTART {										\
 		assert(TREF(donot_commit) | DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE);	\
 		assert(KEYSIZE >= old_KEY->top);					\
 		assert(old_KEY->top > old_KEY->end);					\
-		memcpy(new_KEY, old_KEY, SIZEOF(gv_key) + old_KEY->end);		\
+		memcpy(new_KEY, old_KEY, SIZEOF(gv_key) - 1 + old_KEY->end);		\
 		free(old_KEY);								\
 	} else										\
 	{										\
@@ -554,7 +571,7 @@ MBSTART {											\
 	{													\
 		STATSDBREG_TO_BASEDBREG(statsDBreg, baseDBreg);							\
 		if (!baseDBreg->open)										\
-			gv_init_reg(baseDBreg);									\
+			gv_init_reg(baseDBreg, NULL);								\
 		if (!statsDBreg->open)										\
 		{	/* statsDB did not get opened as part of baseDB open above. Possible if gtm_statshare	\
 			 * is not set to 1. But user could still do a ZWR ^%YGS which would try to open		\
@@ -614,6 +631,9 @@ MBSTART {											\
 
 #define WAS_OPEN_TRUE		TRUE
 #define WAS_OPEN_FALSE		FALSE
+
+#define SKIP_ASSERT_TRUE	TRUE
+#define SKIP_ASSERT_FALSE	FALSE
 
 /* Below macro sets open, opening and was_open fields of a given region after the corresponding
  * database for that region is opened. Also, if the region was not already open, the macro
@@ -727,8 +747,11 @@ MBSTART {					\
 		targ_free(GVT);			\
 } MBEND
 
-#define		T_COMMIT_CRIT_PHASE1	1	/* csa->t_commit_crit gets set to this in during bg_update_phase1 */
-#define		T_COMMIT_CRIT_PHASE2	2	/* csa->t_commit_crit gets set to this in during bg_update_phase2 */
+#define		T_COMMIT_CRIT_PHASE0	1	/* csa->t_commit_crit gets set to this when reserving space for jnl record writing.
+						 * The actual journal write happens after releasing crit in phase2 of commit for BG.
+						 */
+#define		T_COMMIT_CRIT_PHASE1	2	/* csa->t_commit_crit gets set to this during bg_update_phase1 for BG */
+#define		T_COMMIT_CRIT_PHASE2	3	/* csa->t_commit_crit gets set to this during bg_update_phase2 for BG */
 
 /* macro to check if we hold crit or are committing (with or without crit) */
 #define		T_IN_CRIT_OR_COMMIT(CSA)	((CSA)->now_crit || (CSA)->t_commit_crit)
@@ -747,8 +770,35 @@ MBSTART {					\
  */
 #define         T_IN_COMMIT_OR_WRITE(CSA)       ((CSA)->t_commit_crit || (CSA)->in_wtstart)
 
-/* macro to check if a database commit is past the point where it can be successfully rolled back */
-#define		T_UPDATE_UNDERWAY(CSA)	((CSA)->t_commit_crit)
+/* Macro to check if a database commit is past the point where it can be successfully rolled back.
+ * If t_commit_crit is T_COMMIT_CRIT_PHASE2, "bg_update_phase2" could have happened on at least one block
+ * and so we cannot roll back easily. If t_commit_crit is T_COMMIT_CRIT_PHASE1, "bg_update_phase1" could
+ * have started on at least one block and so we cannot roll back easily. If it is T_COMMIT_CRIT_PHASE0,
+ * only journal records have been written to the journal buffer and those should be easily rolled back.
+ */
+#define		T_UPDATE_UNDERWAY(CSA)	(T_COMMIT_CRIT_PHASE1 <= (CSA)->t_commit_crit)
+
+/* Below macro sets csa->t_commit_crit to T_COMMIT_CRIT_PHASE1 to signal start of phase1 of db commit.
+ * In addition, it also sets cnl->update_underway_tn which indicates to "mutex_salvage" that in case this process
+ * gets kill -9ed between now and end of commit, and replication is turned on in this region, the
+ * csa->jnl->jnl_buff->phase2_commit_array[] entry corresponding to this commit should be set up such that
+ * when "jnl_phase2_salvage" is called later, it will write a JRT_NULL record on behalf of this transaction.
+ * If a kill -9 happens between begin of commit and now, then a JRT_INCTN record will instead be written.
+ * For non-journaled regions, cnl->update_underway_tn does not matter currently.
+ */
+#define	SET_T_COMMIT_CRIT_PHASE1(CSA, CNL, TN)							\
+MBSTART {											\
+	CSA->t_commit_crit = T_COMMIT_CRIT_PHASE1;	/* phase1 : lock database buffers */	\
+	CNL->update_underway_tn = TN;								\
+} MBEND
+
+#define	SET_REG_SEQNO(CSA, SEQNO, SUPPLEMENTARY, STRM_INDEX, NEXT_STRM_SEQNO, SKIP_ASSERT)	\
+{												\
+	assert(SKIP_ASSERT || (CSA->hdr->reg_seqno < SEQNO));					\
+	CSA->hdr->reg_seqno = SEQNO;								\
+	if (SUPPLEMENTARY)									\
+		CSA->hdr->strm_reg_seqno[STRM_INDEX] = NEXT_STRM_SEQNO;				\
+}
 
 /* the file header has relative pointers to its data structures so each process will malloc
  * one of these and fill it in with absolute pointers upon file initialization.
@@ -798,6 +848,7 @@ MBSTART {														\
 	long			bufindx;										\
 	sm_uc_ptr_t		bufstart;										\
 	GBLREF	boolean_t	dse_running, write_after_image;								\
+	GBLREF	uint4		process_id;										\
 															\
 	assert((gds_t_write != cse->mode) && (gds_t_write_recycled != cse->mode) && gds_t_writemap != cse->mode		\
 		|| (NULL != cse->old_block));	/* don't miss writing a PBLK */						\
@@ -854,6 +905,7 @@ MBSTART {													\
 #define	DBG_CHECK_PINNED_CR_ARRAY_CONTENTS(csd, is_mm, crarray, crarrayindex)					\
 MBSTART {													\
 	GBLREF	boolean_t	write_after_image;								\
+	GBLREF	uint4		process_id;									\
 	cache_rec		*cr;										\
 	int4			crindex, bplmap;								\
 														\
@@ -906,6 +958,7 @@ MBSTART {													\
  */
 #define	TP_CHANGE_REG(reg)									\
 MBSTART {											\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
 	gv_cur_region = reg;									\
 	if (NULL == gv_cur_region || FALSE == gv_cur_region->open)				\
 	{											\
@@ -919,6 +972,8 @@ MBSTART {											\
 			case dba_bg:								\
 				cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;			\
 				cs_data = cs_addrs->hdr;					\
+				if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
+					jnlpool = cs_addrs->jnlpool;				\
 				break;								\
 			case dba_usr:								\
 			case dba_cm:								\
@@ -934,6 +989,7 @@ MBSTART {											\
 
 #define	TP_CHANGE_REG_IF_NEEDED(reg)								\
 MBSTART {											\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
 	assert(reg);										\
 	if (reg != gv_cur_region)								\
 	{											\
@@ -947,6 +1003,8 @@ MBSTART {											\
 				cs_data = cs_addrs->hdr;					\
 				assert((&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs)		\
 					&& cs_addrs->hdr == cs_data);				\
+				if (cs_addrs->jnlpool && (jnlpool != cs_addrs->jnlpool))	\
+					jnlpool = cs_addrs->jnlpool;				\
 				break;								\
 			case dba_usr:								\
 			case dba_cm:								\
@@ -960,19 +1018,21 @@ MBSTART {											\
 	}											\
 } MBEND
 
-#define PUSH_GV_CUR_REGION(reg, sav_reg, sav_cs_addrs, sav_cs_data)				\
+#define PUSH_GV_CUR_REGION(REG, SAV_REG, SAV_CS_ADDRS, SAV_CS_DATA, SAV_JNLPOOL)		\
 MBSTART {											\
-	sav_reg = gv_cur_region;								\
-	sav_cs_addrs = cs_addrs;								\
-	sav_cs_data = cs_data;									\
-	TP_CHANGE_REG(reg);									\
+	SAV_REG = gv_cur_region;								\
+	SAV_CS_ADDRS = cs_addrs;								\
+	SAV_CS_DATA = cs_data;									\
+	SAV_JNLPOOL = jnlpool;									\
+	TP_CHANGE_REG(REG);									\
 } MBEND
 
-#define POP_GV_CUR_REGION(sav_reg, sav_cs_addrs, sav_cs_data)					\
+#define POP_GV_CUR_REGION(SAV_REG, SAV_CS_ADDRS, SAV_CS_DATA, SAV_JNLPOOL)			\
 MBSTART {											\
-	gv_cur_region = sav_reg;								\
-	cs_addrs = sav_cs_addrs;								\
-	cs_data = sav_cs_data;									\
+	gv_cur_region = SAV_REG;								\
+	cs_addrs = SAV_CS_ADDRS;								\
+	cs_data = SAV_CS_DATA;									\
+	jnlpool = SAV_JNLPOOL;									\
 } MBEND
 
 /* The TP_TEND_CHANGE_REG macro is a special macro used in tp_tend.c to optimize out the unnecessary checks in
@@ -1129,7 +1189,7 @@ MBSTART {									\
 	}									\
 } MBEND
 
-#define	RESET_CR_IN_TEND_AFTER_PHASE2_COMMIT(CR)										\
+#define	RESET_CR_IN_TEND_AFTER_PHASE2_COMMIT(CR, CSA, CSD)									\
 {																\
 	cache_rec_ptr_t		cr_old;												\
 																\
@@ -1142,8 +1202,8 @@ MBSTART {									\
 		 * ready for replacement but "wcs_get_space/wcs_wtstart_fini/wcs_wtstart/wcs_wtfini" would not be able to flush	\
 		 * the new twin until the old twin has its "in_cw_set" cleared resulting in a livelock.				\
 		 */														\
-		assert(TWINNING_ON(csd));											\
-		cr_old = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, CR->twin);	/* get old twin */				\
+		assert(TWINNING_ON(CSD));											\
+		cr_old = (cache_rec_ptr_t)GDS_ANY_REL2ABS(CSA, CR->twin);	/* get old twin */				\
 		assert(!cr_old->bt_index);											\
 		assert(!cr_old->in_cw_set || cr_old->dirty);									\
 		assert(CR->bt_index);												\
@@ -1171,6 +1231,8 @@ MBSTART {									\
 #ifdef DEBUG
 #define ASSERT_CR_ARRAY_IS_UNPINNED(CSD, CRARRAY, CRARRAYINDEX)				\
 MBSTART {										\
+	GBLREF uint4		process_id;						\
+											\
 	int4			lcl_crarrayindex;					\
 	cache_rec_ptr_ptr_t	cr_ptr, cr_start;					\
 	cache_rec_ptr_t		cr;							\
@@ -1211,9 +1273,8 @@ MBSTART {										\
 
 #define VALIDATE_INITIALIZED_JNLPOOL(CSA, CNL, REG, JNLPOOL_USER, SCNDDBNOUPD_CHECK_NEEDED)					\
 MBSTART {															\
-	GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;										\
 	GBLREF	boolean_t		is_updproc;										\
-	GBLREF	jnlpool_addrs		jnlpool;										\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;										\
 																\
 	unsigned char			instfilename_copy[MAX_FN_LEN + 1];							\
 	sm_uc_ptr_t			jnlpool_instfilename;									\
@@ -1226,10 +1287,10 @@ MBSTART {															\
 	if (JNLPOOL_VALIDATED != jnlpool_validate_check)									\
 	{															\
 		do_REPLINSTMISMTCH_check = (!(REPLINSTMISMTCH_CHECK_DONE & jnlpool_validate_check) 				\
-						UNIX_ONLY(&& ((GTMRELAXED != JNLPOOL_USER) || !IS_GTM_IMAGE)));			\
+						&& ((GTMRELAXED != JNLPOOL_USER) || !IS_GTM_IMAGE));				\
 		if (!(SCNDDBNOUPD_CHECK_DONE & jnlpool_validate_check) && SCNDDBNOUPD_CHECK_NEEDED)				\
 		{														\
-			if (jnlpool_ctl->upd_disabled && !is_updproc)								\
+			if (jnlpool->jnlpool_ctl->upd_disabled && !is_updproc)							\
 			{	/* Updates are disabled in this journal pool. Issue error. Do NOT detach from journal pool	\
 				 * as that would cause us not to honor instance freeze (in case gtm_custom_errors env var is	\
 				 * non-null) for database reads that this process later does (for example reading a block	\
@@ -1242,9 +1303,9 @@ MBSTART {															\
 		}														\
 		if (do_REPLINSTMISMTCH_check)											\
 		{														\
-			jnlpool_instfilename = (sm_uc_ptr_t)jnlpool_ctl->jnlpool_id.instfilename;				\
+			jnlpool_instfilename = (sm_uc_ptr_t)jnlpool->jnlpool_ctl->jnlpool_id.instfilename;			\
 			if (STRCMP(CNL->replinstfilename, jnlpool_instfilename)							\
-				UNIX_ONLY(|| (CNL->jnlpool_shmid != jnlpool.repl_inst_filehdr->jnlpool_shmid)))			\
+				|| (CNL->jnlpool_shmid != jnlpool->repl_inst_filehdr->jnlpool_shmid))				\
 			{													\
 				/* Replication instance filename or jnlpool shmid mismatch. Two possibilities.			\
 				 * (a) Database has already been bound with a replication instance file name that is different	\
@@ -1256,15 +1317,12 @@ MBSTART {															\
 				 * Actually case (b) subsumes (a) so we assert that below. But in pro we handle both cases	\
 				 *	just in case.										\
 				 */												\
-				UNIX_ONLY(assert(CNL->jnlpool_shmid != jnlpool.repl_inst_filehdr->jnlpool_shmid);)		\
-				UNIX_ONLY(assert(SIZEOF(instfilename_copy) == SIZEOF(jnlpool_ctl->jnlpool_id.instfilename)));	\
+				assert(CNL->jnlpool_shmid != jnlpool->repl_inst_filehdr->jnlpool_shmid);			\
+				assert(SIZEOF(instfilename_copy) == SIZEOF(jnlpool->jnlpool_ctl->jnlpool_id.instfilename));	\
 				memcpy(&instfilename_copy[0], jnlpool_instfilename, SIZEOF(instfilename_copy));			\
 				assert(SIZEOF(jnlpool_shmid) == SIZEOF(CNL->jnlpool_shmid));					\
-				jnlpool_shmid = jnlpool.repl_inst_filehdr->jnlpool_shmid;					\
-				assert(NULL != jnlpool.jnlpool_ctl);								\
-				jnlpool_detach();										\
-				assert(NULL == jnlpool.jnlpool_ctl);								\
-				assert(FALSE == pool_init);									\
+				jnlpool_shmid = jnlpool->repl_inst_filehdr->jnlpool_shmid;					\
+				assert(NULL != jnlpool->jnlpool_ctl);								\
 				if (INVALID_SHMID == CNL->jnlpool_shmid)							\
 					rts_error_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_REPLINSTNOSHM, 2, DB_LEN_STR(REG));		\
 				else												\
@@ -1273,44 +1331,85 @@ MBSTART {															\
 						LEN_AND_STR(CNL->replinstfilename), CNL->jnlpool_shmid);			\
 			}													\
 			CSA->jnlpool_validate_check |= REPLINSTMISMTCH_CHECK_DONE;						\
+			CSA->jnlpool = jnlpool;											\
 		}														\
 	}															\
 } MBEND
 
-#define	JNLPOOL_INIT_IF_NEEDED(CSA, CSD, CNL)											\
+#define	JNLPOOL_INIT_IF_NEEDED(CSA, CSD, CNL, SCNDDBNOUPD_CHECK_NEEDED)								\
 MBSTART {															\
 	GBLREF	boolean_t		is_replicator;										\
-	GBLREF	boolean_t		pool_init;										\
 	GBLREF	gd_region		*gv_cur_region;										\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;										\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;										\
+	jnlpool_addrs_ptr_t		lcl_jnlpool = NULL, jnlpool_save;							\
+	gd_id				replfile_gdid, *tmp_gdid;								\
+	replpool_identifier		replpool_id;										\
+	unsigned int			full_len;										\
+	int4				status = -1;										\
+	boolean_t			jnlpool_found = FALSE;									\
 																\
 	if (REPL_ALLOWED(CSD) && is_replicator)											\
 	{															\
-		if (!pool_init)													\
-			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL);				\
-		assert(pool_init);												\
-		VALIDATE_INITIALIZED_JNLPOOL(CSA, CNL, gv_cur_region, GTMPROC, SCNDDBNOUPD_CHECK_TRUE);				\
+		jnlpool_save = jnlpool;												\
+		if (CSA->jnlpool && ((jnlpool_addrs_ptr_t)(CSA->jnlpool))->pool_init)						\
+		{														\
+			lcl_jnlpool = jnlpool = (jnlpool_addrs_ptr_t)CSA->jnlpool;						\
+			jnlpool_found = TRUE;											\
+		} else if (IS_GTM_IMAGE && REPL_INST_AVAILABLE(CSA->gd_ptr))							\
+		{														\
+			status = filename_to_id(&replfile_gdid, replpool_id.instfilename);					\
+			if (SS_NORMAL != status)										\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLINSTACC, 2, full_len, replpool_id.instfilename,\
+					ERR_TEXT, 2, RTS_ERROR_LITERAL("could not get file id"), status);			\
+			for (lcl_jnlpool = jnlpool_head; NULL != lcl_jnlpool; lcl_jnlpool = lcl_jnlpool->next)			\
+			{													\
+				if (lcl_jnlpool->pool_init)									\
+				{												\
+					tmp_gdid = &FILE_ID(lcl_jnlpool->jnlpool_dummy_reg);					\
+					if (!gdid_cmp(tmp_gdid, &replfile_gdid))						\
+					{											\
+						jnlpool = CSA->jnlpool = lcl_jnlpool;						\
+						jnlpool_found = TRUE;								\
+						break;										\
+					}											\
+				}												\
+			}													\
+		} else														\
+		{														\
+			lcl_jnlpool = jnlpool;											\
+			if (lcl_jnlpool && lcl_jnlpool->pool_init)								\
+				jnlpool_found = TRUE;										\
+		}														\
+		if (!jnlpool_found || (NULL == lcl_jnlpool) || !lcl_jnlpool->pool_init)						\
+		{														\
+			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL, CSA->gd_ptr);			\
+			if (jnlpool && jnlpool->pool_init)									\
+				CSA->jnlpool = jnlpool;										\
+		}														\
+		assert(jnlpool && jnlpool->pool_init);										\
+		VALIDATE_INITIALIZED_JNLPOOL(CSA, CNL, gv_cur_region, GTMPROC, SCNDDBNOUPD_CHECK_NEEDED);			\
 	}															\
 } MBEND
 
 #define ASSERT_VALID_JNLPOOL(CSA)										\
 MBSTART {													\
-	GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;								\
-	GBLREF	jnlpool_addrs		jnlpool;								\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;								\
 														\
 	assert(CSA && CSA->critical && CSA->nl); /* should have been setup in mu_rndwn_replpool */		\
-	assert(jnlpool_ctl && (jnlpool_ctl == jnlpool.jnlpool_ctl));						\
-	assert(CSA->critical == (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool.jnlpool_ctl + JNLPOOL_CTL_SIZE));	\
+	assert(jnlpool && jnlpool->jnlpool_ctl);								\
+	assert(CSA->critical == (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE));	\
 	assert(CSA->nl == (node_local_ptr_t) ((sm_uc_ptr_t)CSA->critical + JNLPOOL_CRIT_SPACE			\
 		+ SIZEOF(mutex_spin_parms_struct)));								\
-	assert(jnlpool_ctl->filehdr_off);									\
-	assert(jnlpool_ctl->srclcl_array_off > jnlpool.jnlpool_ctl->filehdr_off);				\
-	assert(jnlpool_ctl->sourcelocal_array_off > jnlpool.jnlpool_ctl->srclcl_array_off);			\
-	assert(jnlpool.repl_inst_filehdr == (repl_inst_hdr_ptr_t) ((sm_uc_ptr_t)jnlpool_ctl			\
-			+ jnlpool_ctl->filehdr_off));								\
-	assert(jnlpool.gtmsrc_lcl_array == (gtmsrc_lcl_ptr_t)((sm_uc_ptr_t)jnlpool_ctl				\
-			+ jnlpool_ctl->srclcl_array_off));							\
-	assert(jnlpool.gtmsource_local_array == (gtmsource_local_ptr_t)((sm_uc_ptr_t)jnlpool_ctl		\
-					+ jnlpool_ctl->sourcelocal_array_off));					\
+	assert(jnlpool->jnlpool_ctl->filehdr_off);								\
+	assert(jnlpool->jnlpool_ctl->srclcl_array_off > jnlpool->jnlpool_ctl->filehdr_off);			\
+	assert(jnlpool->jnlpool_ctl->sourcelocal_array_off > jnlpool->jnlpool_ctl->srclcl_array_off);		\
+	assert(jnlpool->repl_inst_filehdr == (repl_inst_hdr_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl		\
+			+ jnlpool->jnlpool_ctl->filehdr_off));							\
+	assert(jnlpool->gtmsrc_lcl_array == (gtmsrc_lcl_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl		\
+			+ jnlpool->jnlpool_ctl->srclcl_array_off));						\
+	assert(jnlpool->gtmsource_local_array == (gtmsource_local_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl	\
+			+ jnlpool->jnlpool_ctl->sourcelocal_array_off));					\
 } MBEND
 
 /* Explanation for why we need the following macro.
@@ -1514,7 +1613,6 @@ MBSTART {                                                                       
 	}                                                                       					\
 } MBEND
 
-/* the RET is meaningful only on UNIX */
 #define JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, num_bufs, cr2flush, CHILLWAIT, RET)		\
 MBSTART {       										\
 	if ((CHILLWAIT) && !FREEZE_LATCH_HELD(csa))						\
@@ -1590,9 +1688,7 @@ n_db_csh_acct_rec_types
 #undef TAB_DB_CSH_ACCT_REC
 
 #include "gvstats_rec.h"
-#ifdef UNIX
 #include "probecrit_rec.h"
-#endif
 
 #define	GVSTATS_SET_CSA_STATISTIC(CSA, COUNTER, VALUE)							\
 MBSTART {												\
@@ -1744,30 +1840,32 @@ MBSTART {												\
 } MBEND
 
 #define FROZEN(CSD)				((CSD)->freeze || FALSE)
-#define FROZEN_HARD(CSD)			((CSD)->freeze && !(CSD)->freeze_online)
-#define FROZEN_CHILLED(CSD)			((CSD)->freeze && (CSD)->freeze_online)
+#define FROZEN_HARD(CSA)			((CSA)->hdr->freeze && !(CSA)->nl->freeze_online)
+#define FROZEN_CHILLED(CSA)			((CSA)->hdr->freeze && (CSA)->nl->freeze_online)
 #define FREEZE_LATCH_HELD(CSA)			(process_id == (CSA)->nl->freeze_latch.u.parts.latch_pid)
-#define FREEZE_LATCH_TIMEOUT			(60 * 5)
 #define CHILLED_AUTORELEASE_MASK		0x02
 #define CHILLED_AUTORELEASE_REPORT_MASK		0x04
-#define CHILLED_AUTORELEASE(CSD)		(((CSD)->freeze_online & CHILLED_AUTORELEASE_MASK) || FALSE)
-#define CHILLED_AUTORELEASE_REPORTED(CSD)	(((CSD)->freeze_online & CHILLED_AUTORELEASE_REPORT_MASK) || FALSE)
+#define CHILLED_AUTORELEASE(CSA)		(((CSA)->nl->freeze_online & CHILLED_AUTORELEASE_MASK) || FALSE)
+#define CHILLED_AUTORELEASE_REPORTED(CSA)	(((CSA)->nl->freeze_online & CHILLED_AUTORELEASE_REPORT_MASK) || FALSE)
 #define DO_CHILLED_AUTORELEASE(CSA, CSD)										\
 MBSTART {														\
 	GBLREF uint4	process_id;											\
 	boolean_t	was_latch;											\
 															\
-	if (CHILLED_AUTORELEASE(CSD) && !CHILLED_AUTORELEASE_REPORTED(CSD))						\
+	if (CHILLED_AUTORELEASE(CSA) && !CHILLED_AUTORELEASE_REPORTED(CSA))						\
 	{														\
 		was_latch = FREEZE_LATCH_HELD(CSA);									\
 		if (!was_latch)												\
-			while(!grab_latch(&(CSA)->nl->freeze_latch, FREEZE_LATCH_TIMEOUT))				\
-				assert(FREEZE_LATCH_HELD(CSA));								\
-		if (CHILLED_AUTORELEASE(CSD) && !CHILLED_AUTORELEASE_REPORTED(CSD))					\
+		{	/* Return value of "grab_latch" does not need to be checked because we pass			\
+			 * in GRAB_LATCH_INDEFINITE_WAIT as the timeout.						\
+			 */												\
+			grab_latch(&(CSA)->nl->freeze_latch, GRAB_LATCH_INDEFINITE_WAIT);				\
+		}													\
+		if (CHILLED_AUTORELEASE(CSA) && !CHILLED_AUTORELEASE_REPORTED(CSA))					\
 		{													\
 			(CSD)->freeze = FALSE;										\
 			(CSD)->image_count = 0;										\
-			(CSD)->freeze_online = CHILLED_AUTORELEASE_MASK | CHILLED_AUTORELEASE_REPORT_MASK;		\
+			(CSA)->nl->freeze_online = CHILLED_AUTORELEASE_MASK | CHILLED_AUTORELEASE_REPORT_MASK;		\
 			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(9) ERR_OFRZAUTOREL, 2, REG_LEN_STR((CSA)->region),		\
 					ERR_ERRCALL, 3, CALLFROM);							\
 		}													\
@@ -1843,16 +1941,12 @@ typedef struct sgmnt_data_struct
 	char		filler_256[8];
 	/************* FIELDS SET WHEN DB IS OPEN ********************************/
 	char		now_running[MAX_REL_NAME];/* for active version stamp */
-#	ifdef VMS
-	uint4		owner_node;		/* Node on cluster that "owns" the file -- applies to VMS only */
-#	else
 	uint4		filler_owner_node;	/* 4-byte filler - since owner_node is maintained on VMS only */
-#	endif
 	uint4		image_count;		/* for db freezing. Set to "process_id" on Unix and "image_count" on VMS */
 	uint4		freeze;			/* for db freezing. Set to "getuid"     on Unix and "process_id"  on VMS */
 	int4		kill_in_prog;		/* counter for multi-crit kills that are not done yet */
 	int4		abandoned_kills;
-	uint4		freeze_online;		/* for online db freezing, a.k.a. chill.  */
+	uint4		unused_freeze_online_filler;	/* see field in node_local */
 	char		filler_320[4];
 	/************* FIELDS USED IN V4 <==> V5 COMPATIBILITY MODE ****************/
 	trans_num	tn_upgrd_blks_0;	/* TN when blks_to_upgrd becomes 0.
@@ -1909,7 +2003,6 @@ typedef struct sgmnt_data_struct
 	uint4		epoch_taper_time_pct;	/* in the last pct we start tapering for time */
 	uint4		epoch_taper_jnl_pct;	/* in the last pct we start tapering for jnl */
 	boolean_t	asyncio;		/* If TRUE, GT.M uses async I/O */
-	/* char		filler_512[0]; */
 	/************* FIELDS Used for update process performance improvement. Some may go away in later releases ********/
 	uint4		reserved_for_upd;	/* Percentage (%) of blocks reserved for update process disk read */
 	uint4		avg_blks_per_100gbl;	/* Number of blocks read on average for 100 global key read */
@@ -2078,7 +2171,8 @@ typedef struct sgmnt_data_struct
 	boolean_t	lock_crit_with_db;		/* flag controlling LOCK crit mechanism; see interlock.h */
 	uint4		basedb_fname_len;		/* byte length of filename stored in "basedb_fname[]" */
 	unsigned char	basedb_fname[256]; /* full path filaneme of corresponding baseDB if this is a statsDB */
-	char		filler_7k[444];
+	boolean_t	read_only;		/* If TRUE, GT.M uses a process-private mmap instead of IPC */
+	char		filler_7k[440];
 	char		filler_8k[1024];
 	/********************************************************/
 	/* Master bitmap immediately follows. Tells whether the local bitmaps have any free blocks or not. */
@@ -2330,6 +2424,11 @@ typedef struct gdr_name_struct
 	struct gd_addr_struct	*gd_ptr;
 } gdr_name;
 
+typedef struct gd_inst_info_struct
+{
+	char		instfilename[MAX_FN_LEN + 1];	/* + 1 for null */
+} gd_inst_info;
+
 typedef struct	gd_addr_struct
 {
 	struct gd_region_struct		*local_locks;
@@ -2343,6 +2442,7 @@ typedef struct	gd_addr_struct
 	struct gd_region_struct		*regions;
 	struct gd_segment_struct	*segments;
 	struct gd_gblname_struct	*gblnames;
+	struct gd_inst_info_struct	*instinfo;
 	struct gd_addr_struct		*link;
 	struct hash_table_mname_struct  *tab_ptr;
 	gd_id				*id;
@@ -2386,7 +2486,8 @@ typedef struct	gd_segment_struct
 	struct gd_region_struct	*repl_list;
 	uint4			is_encrypted;
 	boolean_t		asyncio;	/* copied over to csd->asyncio at db creation time */
-	char			filler[16];	/* filler to store runtime structures without changing gdeget/gdeput.m */
+	boolean_t		read_only;
+	char			filler[12];	/* filler to store runtime structures without changing gdeget/gdeput.m */
 } gd_segment;
 
 typedef union
@@ -2551,17 +2652,18 @@ typedef struct	sgmnt_addrs_struct
 	boolean_t	snapshot_in_prog;	/* true if snapshots are in progress for this region */
 	int4		ref_cnt;		/* count of number of times csa->nl->ref_cnt was incremented by this process */
 	int4		fid_index;		/* index for region ordering based on unique_id */
-	boolean_t	do_fullblockwrites;	/* This region enabled for full block writes */
+	int4		do_fullblockwrites;	/* This region enabled for full block writes */
 	int4		regnum;			/* Region number (region open counter) used by journaling so all tokens
 						   have a unique prefix per region (and all regions have same prefix)
 						*/
 	int4		n_pre_read_trigger;	/* For update process to keep track of progress and when to trigger pre-read */
 	uint4		jnlpool_validate_check;	/* See the comment above VALIDATE_INITIALIZED_JNLPOOL for details on this field */
 	int4		regcnt;			/* # of regions that have this as their csa */
-	boolean_t	t_commit_crit;		/* set to FALSE by default. set to TRUE if in the middle of database commit.
-						 * if access method is BG, this assumes a multi-state value.
-						 * FALSE -> T_COMMIT_CRIT_PHASE1 -> T_COMMIT_CRIT_PHASE2 -> FALSE
-						 *           (bg_update_phase1)      (bg_update_phase2)      (finish commit)
+	boolean_t	t_commit_crit;		/* FALSE by default. Non-zero value if in the middle of database commit.
+						 * This assumes the following additional values.
+						 *   = T_COMMIT_CRIT_PHASE0 if commit started and jnl records are being written
+						 *   = T_COMMIT_CRIT_PHASE1 just before calling "bg_update_phase1/mm_update"
+						 *   = T_COMMIT_CRIT_PHASE2 just before calling "bg_update_phase2"
 						 */
 	boolean_t	wcs_pidcnt_incremented;	/* set to TRUE if we incremented cnl->wcs_phase2_commit_pidcnt.
 						 * used by secshr_db_clnup to decrement the shared counter. */
@@ -2603,6 +2705,9 @@ typedef struct	sgmnt_addrs_struct
 							 * Is a copy of reg->statsDB_setup_completed but is present in "csa"
 							 * too to handle was_open regions.
 							 */
+	gd_inst_info	*gd_instinfo;		/* global directory not gtm_repl_instance */
+	gd_addr		*gd_ptr;		/* global directory for region */
+	struct jnlpool_addrs_struct	*jnlpool;	/* NULL until put, kill, or other function requiring jnlpool */
 } sgmnt_addrs;
 
 typedef struct gd_binding_struct
@@ -2798,7 +2903,7 @@ typedef struct	gv_namehead_struct
 	gv_key		clue;				/* Clue key, must be last in namehead struct because of hung buffer. */
 } gv_namehead;
 
-/* Below structure is allocated for every global name that spans across multiple regions in each global directory. */
+/* Below structure is allocated for every global name that spans across multiple regions in each global directory */
 typedef struct gvnh_spanreg_struct
 {
 	int		start_map_index;	/* index into the global directory "maps" array corresponding to the
@@ -2816,16 +2921,15 @@ typedef struct gvnh_spanreg_struct
 						 *	regions that the parent global name spans across lie AFTER
 						 *	this index in the "regions" array.
 						 */
-	int		max_reg_index;		/* index into the global directory "regions" array such that ALL
-						 *	regions that the parent global name spans across lie BEFORE
-						 *	this index in the "regions" array.
-						 *	"max_reg_index" - "min_reg_index" effectively determines the
+	int		max_reg_index;		/* index into the global directory "regions" array corresponding to
+						 *	the LAST region gv_target pointer for the spans of this global.
+						 *	The count (max_reg_index-min_reg_index)+1 effectively determines the
 						 *	size of the array allocated to store the corresponding
 						 *	gv_targets for each unique region the parent global name spans.
 						 */
 	gv_namehead	*gvt_array[1];		/* array of gv_targets corresponding to each region the global name spans.
 						 *	Although the array is defined to be size 1, the actual size allocated
-						 *	depends on "max_reg_index"-"min_reg_index" and having this defined as
+						 *	depends on (max_reg_index-min_reg_index)+1 and having this defined as
 						 *	an array lets us access the entire allocated size with an array index.
 						 *	Set to INVALID_GV_TARGET for array indices that correspond to regions
 						 *	which the parent global does NOT span across.
@@ -3363,6 +3467,58 @@ MBSTART {												\
 	DBG_CHECK_GVTARGET_INTEGRITY(GVT);								\
 } MBEND
 
+/* Need a special value to indicate the prev_rec.match and prev_rec.offset were not initialized in the
+ * index block search history as part of the most recent gvcst_search call. Store an impossible
+ * prev_rec.offset (and in turn prev_rec.match) value. Since they both are unsigned short quantities,
+ * and since sizeof(rec_hdr) is 4 bytes, prev_rec.offset can only be less than 64K-4. And so 64K-1
+ * (i.e. MAXUINT2) serves as a good impossible value for both.
+ */
+#define	PREV_REC_UNINITIALIZED	((unsigned short)MAXUINT2)
+
+/* Note that anytime bh->prev_rec.offset or bh->prev_rec.match is used in the code, one needs to prefix that
+ * usage with either an ASSERT_LEAF_BLK_PREV_REC_INITIALIZED or ASSERT_PREV_REC_INITIALIZED or INITIALIZE_PREV_REC_IF_NEEDED
+ * macro call. This is needed to handle the case where the offset/match could take on the special value PREV_REC_UNINITIALIZED
+ * in case of a special call path through $zprevious(^x("")). If the caller knows for sure it is leaf level block, then it
+ * should use ASSERT_LEAF_BLK_PREV_REC_INITIALIZED. If the caller knows prev_rec is initialized but not guaranteed it is a
+ * leaf level block, it should use ASSERT_PREV_REC_INITIALIZED. If neither, then it needs to use INITIALIZE_PREV_REC_IF_NEEDED.
+ * Currently this neither case is not possible (explanations in respective places where one of the above 2 asserts are used).
+ * So INITIALIZE_PREV_REC_IF_NEEDED macro is unused. Nevertheless, its definition is left alone to help when the first need arises.
+ */
+#define	ASSERT_PREV_REC_INITIALIZED(PREVREC)			\
+{								\
+	assert(PREV_REC_UNINITIALIZED != PREVREC.offset);	\
+	assert(PREV_REC_UNINITIALIZED != PREVREC.match);	\
+}
+
+#define	ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(SRCHBLKSTATUS)	\
+MBSTART {							\
+	assert(0 == SRCHBLKSTATUS->level);			\
+	ASSERT_PREV_REC_INITIALIZED(SRCHBLKSTATUS->prev_rec);	\
+} MBEND
+
+/* If prev_rec.match or prev_rec.offset are PREV_REC_UNINITIALIZED, then invoke "gvcst_search_blk" to initialize
+ * that. If failure during that, then invoke code fragment passed in as "STMT" variable.
+ */
+#define	INITIALIZE_PREV_REC_IF_NEEDED(SRCHBLKSTATUS, SRCHKEY, SRCHSTATUS, STMT)			\
+{												\
+	assert((PREV_REC_UNINITIALIZED != SRCHBLKSTATUS->prev_rec.match)			\
+		|| (PREV_REC_UNINITIALIZED == SRCHBLKSTATUS->prev_rec.offset));			\
+	assert((PREV_REC_UNINITIALIZED != SRCHBLKSTATUS->prev_rec.offset)			\
+		|| (PREV_REC_UNINITIALIZED == SRCHBLKSTATUS->prev_rec.match));			\
+	if (PREV_REC_UNINITIALIZED == SRCHBLKSTATUS->prev_rec.match)				\
+	{											\
+		SRCHSTATUS = gvcst_search_blk(SRCHKEY, SRCHBLKSTATUS);				\
+		assert((cdb_sc_normal != SRCHSTATUS)						\
+			|| ((PREV_REC_UNINITIALIZED != SRCHBLKSTATUS->prev_rec.offset)		\
+				&& (PREV_REC_UNINITIALIZED != SRCHBLKSTATUS->prev_rec.match)));	\
+		if (cdb_sc_normal != SRCHSTATUS)						\
+		{										\
+			assert(CDB_STAGNATE > t_tries);						\
+			STMT;									\
+		}										\
+	}											\
+}
+
 /* If SRC_KEY->end == 0, make sure to copy the first byte of SRC_KEY->base */
 #define MEMCPY_KEY(TARG_KEY, SRC_KEY)								\
 MBSTART {											\
@@ -3390,8 +3546,19 @@ MBSTART {															\
  */
 #define	GVT_CLUE_INVALIDATE_FIRST_REC(GVT)						\
 MBSTART {										\
+	gv_key *firstRec;								\
+											\
 	assert(GVT->clue.end);								\
-	*((short *)GVT->first_rec->base) = GVT_CLUE_FIRST_REC_UNRELIABLE;		\
+	firstRec = GVT->first_rec;							\
+	*((short *)firstRec->base) = GVT_CLUE_FIRST_REC_UNRELIABLE;			\
+	/* The below lines are needed by an assert in DEBUG_GVT_CLUE_VALIDATE macro	\
+	 * In pro, we only use first_rec->base and don't use first_rec->end and since	\
+	 * the first byte is 0xff (greater than first valid mname which is an alphabet)	\
+	 * we are guaranteed the memcmp will stop right after the first byte.		\
+	 */										\
+	DEBUG_ONLY(firstRec->base[2] = KEY_DELIMITER);					\
+	DEBUG_ONLY(firstRec->base[3] = KEY_DELIMITER);					\
+	DEBUG_ONLY(firstRec->end = 3);							\
 } MBEND
 
 #ifdef DEBUG
@@ -3435,10 +3602,12 @@ MBSTART {														\
 #define	DEBUG_GVT_CLUE_VALIDATE(GVT)
 #endif
 
-/* Macro used by $ZPREVIOUS to replace a NULL subscript at the end with the maximum possible subscript
- * that could exist in the database for this global name.
+#define	ZPREVIOUS_NULL_SUBS_LEVEL1	2	/* this value should be != FALSE and TRUE and is relied upon by "gvcst_search" */
+
+/* Macro to replace a NULL subscript at the end with the maximum possible subscript that could exist in the
+ * database for this global name. Used by $ZPREVIOUS, $QUERY(gvn,-1) etc.
  */
-#define GVZPREVIOUS_APPEND_MAX_SUBS_KEY(GVKEY, GVT)						\
+#define GV_APPEND_MAX_SUBS_KEY(GVKEY, GVT)							\
 MBSTART {											\
 	int		lastsubslen, keysize;							\
 	unsigned char	*ptr;									\
@@ -3464,6 +3633,52 @@ MBSTART {											\
 	assert(GVKEY->end == (ptr - &GVKEY->base[0]));						\
 	if (NULL != gv_target->gd_csa)								\
 		DBG_CHECK_GVTARGET_INTEGRITY(GVT);						\
+} MBEND
+
+#define	GTCMTR_SUBS2STR_XFORM_IF_NEEDED(GVT, GVKEY, KEY_TOP)						\
+{													\
+	unsigned char	*kprev, *kcur, *ktop;								\
+	boolean_t	last_sub_is_null;								\
+													\
+	if (GVT->collseq || GVT->nct)									\
+	{	/* Need to convert subscript representation from client side to string representation	\
+		 * so any collation transformations can happen on server side.				\
+		 * First check if last subscript of incoming key is a NULL subscript.			\
+		 * If so, client would have represented it using a sequence of FF, FF, FF, ...		\
+		 * Remove the representation temporarily before doing the gv_xform_key.			\
+		 * Introduce the NULL subscript after the transformation.				\
+		 * This is because we do NOT allow a null subsc to be transformed to a non null subsc	\
+		 * 	so no need for that be part of the transformation.				\
+		 */											\
+		last_sub_is_null = TRUE;								\
+		kprev = &GVKEY->base[GVKEY->prev];							\
+		for (kcur = kprev, ktop = &GVKEY->base[KEY_TOP] - 1; kcur < ktop; kcur++)		\
+		{											\
+			if (STR_SUB_MAXVAL != *kcur)							\
+			{										\
+				last_sub_is_null = FALSE;						\
+				break;									\
+			}										\
+		}											\
+		if (last_sub_is_null)									\
+		{											\
+			*kprev = KEY_DELIMITER;	/* remove the null subscript temporarily */		\
+			GVKEY->end = GVKEY->prev;							\
+		}											\
+		gv_xform_key(GVKEY, FALSE);	/* do collation transform on server side */		\
+		if (last_sub_is_null)									\
+			GV_APPEND_MAX_SUBS_KEY(GVKEY, GVT); /* Insert the NULL subscript back */	\
+	}												\
+}
+
+#define	GV_UNDO_APPEND_MAX_SUBS_KEY(GVKEY, REG)						\
+MBSTART {										\
+	assert(REG->std_null_coll || (STR_SUB_PREFIX == GVKEY->base[GVKEY->prev]));	\
+	if (REG->std_null_coll)								\
+		GVKEY->base[GVKEY->prev] = SUBSCRIPT_STDCOL_NULL;			\
+	GVKEY->base[GVKEY->prev + 1] = KEY_DELIMITER;					\
+	GVKEY->end = GVKEY->prev + 2;							\
+	GVKEY->base[GVKEY->end] = KEY_DELIMITER;					\
 } MBEND
 
 /* Bit masks for the update_trans & si->update_trans variables */
@@ -3520,13 +3735,15 @@ typedef enum
 	inctn_blkdwngrd,		/* 12 : similar to inctn_blkupgrd except that this is for DOWNGRADE */
 	inctn_blkdwngrd_fmtchng,	/* 13 : similar to inctn_blkupgrd_fmtchng except that this is for DOWNGRADE */
 	inctn_blkreencrypt,		/* 14 : written whenever a GDS block is (re)encrypted using MUPIP REORG -ENCRYPT */
+	inctn_jnlphase2salvage,		/* 15 : used by "jnl_phase2_salvage" to salvage a dead phase2 jnl commit */
 	/* the following opcodes do NOT populate the global variable "inctn_detail" */
-	inctn_opcode_total		/* 15 : MAX. All additions of inctn opcodes should be done BEFORE this line */
+	inctn_opcode_total		/* 16 : MAX. All additions of inctn opcodes should be done BEFORE this line */
 } inctn_opcode_t;
 
 /* macros to check curr_tn */
 #define MAX_TN_V4	((trans_num)(MAXUINT4 - TN_HEADROOM_V4))
 #define MAX_TN_V6	(MAXUINT8 - TN_HEADROOM_V6)
+#define TN_INVALID	(MAXUINT8)	/* impossible db tn */
 #define TN_HEADROOM_V4	(2 * MAXTOTALBLKS_V4)
 #define TN_HEADROOM_V6	(2 * MAXTOTALBLKS_V6)
 #define	HEADROOM_FACTOR	4
@@ -3645,18 +3862,6 @@ MBSTART {								\
 	DECR_CNT(&cnl->wcs_phase2_commit_pidcnt, &cnl->wc_var_lock);	\
 } MBEND
 
-/* The PROBE_DECR_WCS_PHASE2_COMMIT_PIDCNT macro is the same as the DECR_WCS_PHASE2_COMMIT_PIDCNT macro
- * except that it uses PROBE_DECR_CNT instead of DECR_CNT. This does alignment checks and is needed by
- * secshr_db_clnup as it runs in kernel mode in VMS. The two macros should be maintained in parallel.
- */
-#define	PROBE_DECR_WCS_PHASE2_COMMIT_PIDCNT(csa, cnl)				\
-MBSTART {									\
-	assert(csa->wcs_pidcnt_incremented);					\
-	csa->wcs_pidcnt_incremented = FALSE;					\
-	PROBE_DECR_CNT(&cnl->wcs_phase2_commit_pidcnt, &cnl->wc_var_lock);	\
-} MBEND
-
-#ifdef UNIX
 /* Insert the process_id into the list of process ids actively doing a kill */
 #define INSERT_KIP_PID(local_csa)						\
 MBSTART {									\
@@ -3732,10 +3937,6 @@ MBSTART {									\
 		}								\
 	}									\
 } MBEND
-#else
-#define INSERT_KIP_PID(local_csa)
-#define REMOVE_KIP_PID(local_csa)
-#endif
 
 #define DECR_KIP(CSD, CSA, KIP_CSA)						\
 MBSTART {									\
@@ -3755,7 +3956,6 @@ MBSTART {									\
 	DECR_CNT(&local_csd->kill_in_prog, &local_csa->nl->wc_var_lock);	\
 	REMOVE_KIP_PID(local_csa);						\
 } MBEND
-/* Note that the INCR_KIP and PROBE_INCR_KIP macros should be maintained in parallel */
 #define INCR_KIP(CSD, CSA, KIP_CSA)						\
 MBSTART {									\
 	sgmnt_data_ptr_t	local_csd;					\
@@ -3768,44 +3968,11 @@ MBSTART {									\
 	INSERT_KIP_PID(local_csa);						\
 	KIP_CSA = CSA;								\
 } MBEND
-/* The PROBE_INCR_KIP macro is the same as the INCR_KIP macro except that it uses PROBE_INCR_CNT instead of INCR_CNT.
- * This does alignment checks and is needed by secshr_db_clnup as it runs in kernel mode in VMS.
- * The INCR_KIP and PROBE_INCR_KIP macros should be maintained in parallel.
- */
-#define PROBE_INCR_KIP(CSD, CSA, KIP_CSA)						\
-MBSTART {										\
-	sgmnt_data_ptr_t	local_csd;						\
-	sgmnt_addrs		*local_csa;						\
-											\
-	local_csd = CSD;								\
-	local_csa = CSA;								\
-	assert(NULL == KIP_CSA);							\
-	PROBE_INCR_CNT(&local_csd->kill_in_prog, &local_csa->nl->wc_var_lock);	\
-	INSERT_KIP_PID(local_csa);							\
-	KIP_CSA = CSA;									\
-} MBEND
-#define PROBE_DECR_KIP(CSD, CSA, KIP_CSA)						\
-MBSTART {										\
-	sgmnt_data_ptr_t	local_csd;						\
-	sgmnt_addrs		*local_csa;						\
-											\
-	local_csd = CSD;								\
-	local_csa = CSA;								\
-	assert(NULL != KIP_CSA);							\
-	KIP_CSA = NULL;									\
-	PROBE_DECR_CNT(&local_csd->kill_in_prog, &local_csa->nl->wc_var_lock);	\
-	REMOVE_KIP_PID(local_csa);							\
-} MBEND
-/* Since abandoned_kills counter is only incremented in secshr_db_clnup it does not have its equivalent DECR_ABANDONED_KILLS */
-#define PROBE_INCR_ABANDONED_KILLS(CSD, CSA)				\
-MBSTART {								\
-        PROBE_INCR_CNT(&CSD->abandoned_kills, &CSA->nl->wc_var_lock);	\
-} MBEND
 
-#define INCR_INHIBIT_KILLS(CNL)					\
-MBSTART {							\
-	INCR_CNT(&CNL->inhibit_kills, &CNL->wc_var_lock);	\
-} MBEND
+/* Since abandoned_kills counter is only incremented in secshr_db_clnup it does not have its equivalent DECR_ABANDONED_KILLS */
+#define INCR_ABANDONED_KILLS(CSD, CSA)	INCR_CNT(&CSD->abandoned_kills, &CSA->nl->wc_var_lock)
+
+#define INCR_INHIBIT_KILLS(CNL)		INCR_CNT(&CNL->inhibit_kills, &CNL->wc_var_lock)
 
 #define DECR_INHIBIT_KILLS(CNL)						\
 MBSTART {								\
@@ -3858,15 +4025,14 @@ MBSTART {									\
  */
 #define MAXHARDCRITS		31
 
-#define	WAIT_FOR_REGION_TO_UNFREEZE(CSA, CSD)		\
+#define	WAIT_FOR_REGION_TO_UNFREEZE(CSA)		\
 MBSTART {						\
 	int	lcnt1;					\
 							\
-	assert(CSA->hdr == CSD);			\
 	assert(!CSA->now_crit);				\
 	for (lcnt1 = 1; ; lcnt1++)			\
 	{						\
-		if (!FROZEN_HARD(CSD))			\
+		if (!FROZEN_HARD(CSA))			\
 			break;				\
 		if (MAXHARDCRITS < lcnt1)       	\
 			wcs_backoff(lcnt1);     	\
@@ -3881,9 +4047,9 @@ MBSTART {														\
 	assert((CSA)->hdr == (CSD));											\
 	for (lcnt1 = 1; ; lcnt1++)											\
 	{														\
-		if (!FROZEN_CHILLED(CSD))										\
+		if (!FROZEN_CHILLED(CSA))										\
 			break;												\
-		if (CHILLED_AUTORELEASE(CSD))										\
+		if (CHILLED_AUTORELEASE(CSA))										\
 		{													\
 			DO_CHILLED_AUTORELEASE(CSA, CSD);								\
 			break;												\
@@ -3905,21 +4071,21 @@ MBSTART {														\
  * don't need that functionality but it does not hurt them so we leave it at that instead of forking this
  * macro into two versions (one using "grab_crit" and another using "grab_crit_encr_cycle_sync").
  */
-#define	GRAB_UNFROZEN_CRIT(reg, csa, csd)				\
+#define	GRAB_UNFROZEN_CRIT(reg, csa)					\
 MBSTART {								\
 	int	lcnt;							\
 									\
-	assert(&FILE_INFO(reg)->s_addrs == csa && csa->hdr == csd);	\
+	assert(&FILE_INFO(reg)->s_addrs == csa);			\
 	assert(csa->now_crit);						\
 	for (lcnt = 0; ; lcnt++)					\
 	{								\
-		if (!FROZEN_HARD(csd))					\
+		if (!FROZEN_HARD(csa))					\
 			break;						\
 		rel_crit(reg);						\
-		WAIT_FOR_REGION_TO_UNFREEZE(csa, csd);			\
+		WAIT_FOR_REGION_TO_UNFREEZE(csa);			\
 		grab_crit_encr_cycle_sync(reg);				\
 	}								\
-	assert(!FROZEN_HARD(csd) && csa->now_crit);			\
+	assert(!FROZEN_HARD(csa) && csa->now_crit);			\
 } MBEND
 
 /* remove "csa" from list of open regions (cs_addrs_list) */
@@ -4313,7 +4479,6 @@ typedef enum
 	REG_JNL_SWITCH_ERROR
 } freeze_status;
 
-#ifdef UNIX
 /* This structure holds state captured on entry into gvcst_redo_root_search which it restores on error or exit */
 typedef struct redo_root_search_context_struct
 {
@@ -4332,7 +4497,6 @@ typedef struct redo_root_search_context_struct
 	unsigned int	t_tries_dbg;
 #	endif
 } redo_root_search_context;
-#endif
 
 #define SET_GV_CURRKEY_FROM_GVT(GVT)						\
 MBSTART {									\
@@ -4648,7 +4812,7 @@ MBSTART {										\
 	GBLREF gv_namehead	*gv_target;						\
 											\
 	if (!REG->open)									\
-		gv_init_reg(REG);							\
+		gv_init_reg(REG, ADDR);							\
 	gvspan = GVNH_REG->gvspan;							\
 	assert(NULL != gvspan);								\
 	min_reg_index = gvspan->min_reg_index;						\
@@ -4689,16 +4853,16 @@ MBSTART {										\
 #define ASSERT_NO_ONLINE_ROLLBACK		0x02
 #define HANDLE_CONCUR_ONLINE_ROLLBACK		0x03
 
-#ifdef UNIX
 /* caller should have THREADGBL_ACCESS and gbl access to t_tries and t_fail_hist */
 # define LAST_RESTART_CODE			( (0 < t_tries) ? t_fail_hist[TREF(prev_t_tries)] : (enum cdb_sc)cdb_sc_normal )
 # define SYNC_ONLN_RLBK_CYCLES													\
 MBSTART {															\
 	GBLREF	sgmnt_addrs		*cs_addrs_list;										\
-	GBLREF	jnlpool_addrs		jnlpool;										\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;										\
 	GBLREF	boolean_t		mu_reorg_process;									\
 																\
 	sgmnt_addrs			*lcl_csa;										\
+	jnlpool_addrs_ptr_t		lcl_jnlpool;										\
 	DCL_THREADGBL_ACCESS;													\
 																\
 	SETUP_THREADGBL_ACCESS;													\
@@ -4711,10 +4875,13 @@ MBSTART {															\
 			/* Online rollback increments csa->hdr->db_trigger_cycle forcing a mismatch to reload triggers */	\
 			lcl_csa->db_trigger_cycle = lcl_csa->hdr->db_trigger_cycle;						\
 		}														\
-		if (NULL != jnlpool.jnlpool_ctl)										\
+		for (lcl_jnlpool = jnlpool_head; NULL != lcl_jnlpool; lcl_jnlpool = lcl_jnlpool->next)				\
 		{														\
-			lcl_csa = &FILE_INFO(jnlpool.jnlpool_dummy_reg)->s_addrs;						\
-			lcl_csa->onln_rlbk_cycle = jnlpool.jnlpool_ctl->onln_rlbk_cycle;					\
+			if (NULL != lcl_jnlpool->jnlpool_ctl)									\
+			{													\
+				lcl_csa = &FILE_INFO(lcl_jnlpool->jnlpool_dummy_reg)->s_addrs;					\
+				lcl_csa->onln_rlbk_cycle = lcl_jnlpool->jnlpool_ctl->onln_rlbk_cycle;				\
+			}													\
 		}														\
 	}															\
 } MBEND
@@ -4763,9 +4930,6 @@ MBSTART {															\
 		TN_ABORTED = TRUE;												\
 	}															\
 } MBEND
-#else
-# define ABORT_TRANS_IF_GBL_EXIST_NOMORE(LCL_T_TRIES, TN_ABORTED)
-#endif
 
 #define	SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY				\
 MBSTART {									\
@@ -4844,7 +5008,6 @@ typedef struct
 #	endif
 } span_parms;
 
-#ifdef UNIX
 # define DEFINE_NSB_CONDITION_HANDLER(gvcst_xxx_ch)							\
 	CONDITION_HANDLER(gvcst_xxx_ch)									\
 	{												\
@@ -4888,13 +5051,6 @@ MBSTART {	/* We've encountered a spanning node dummy value. Check if spanning no
 		}													\
 	}														\
 } MBEND
-#else
-# define DEFINE_NSB_CONDITION_HANDLER(gvcst_xxx_ch)
-# define IF_NSB_DUMMY_RETURN
-# define RTS_ERROR_IF_SN_DISALLOWED_AND_SPAN_IN_DB
-# define RETURN_NO_VAL_IF_SN_DISALLOWED
-# define RETURN_IF_SN_DISALLOWED(value)
-#endif
 
 #define MAX_NSBCTRL_SZ		30	/* Upper bound on size of ctrl value. 2*10 digs + 1 comma + 1 null + overhead */
 
@@ -5119,6 +5275,9 @@ MBSTART {												\
 /* Wait a max of 1 minute for pending async ios on a FD (e.g. database file) to be cleared.
  * Set TIMEDOUT variable to TRUE if we timed out. If not (i.e. async io cancellation is success) set it to FALSE.
  */
+#ifdef USE_NOAIO
+#define       WAIT_FOR_AIO_TO_BE_DONE(FD, TIMEDOUT)   /* NO op, N/A */
+#else
 #define	WAIT_FOR_AIO_TO_BE_DONE(FD, TIMEDOUT)								\
 MBSTART {												\
 	unsigned int	lcnt, ret, save_errno;								\
@@ -5138,6 +5297,7 @@ MBSTART {												\
 		wcs_sleep(lcnt);									\
 	}												\
 } MBEND
+#endif
 
 #define	OK_FOR_WCS_RECOVER_FALSE	FALSE
 #define	OK_FOR_WCS_RECOVER_TRUE		TRUE
@@ -5159,8 +5319,8 @@ void		grab_crit(gd_region *reg);
 boolean_t	grab_crit_encr_cycle_sync(gd_region *reg);
 boolean_t	grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover);
 boolean_t	grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_action);
-void		gv_init_reg(gd_region *reg);
-void		gvcst_init(gd_region *greg);
+void		gv_init_reg(gd_region *reg, gd_addr *addr);
+void		gvcst_init(gd_region *greg, gd_addr *addr);
 enum cdb_sc	gvincr_compute_post_incr(srch_blk_status *bh);
 enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_struct *cse, cache_rec_ptr_t cr);
 boolean_t	mupfndfil(gd_region *reg, mstr *mstr_addr, boolean_t log_error);
@@ -5210,8 +5370,8 @@ void	jnl_fsync(gd_region *reg, uint4 fsync_addr);
 void	jnl_oper_user_ast(gd_region *reg);
 void	jnl_wait(gd_region *reg);
 void	view_jnlfile(mval *dst, gd_region *reg);
-void	jnl_put_jrt_pfin(sgmnt_addrs *csa);
-void	jnl_put_jrt_pini(sgmnt_addrs *csa);
+void	jnl_write_pfin(sgmnt_addrs *csa);
+void	jnl_write_pini(sgmnt_addrs *csa);
 void	jnl_write_epoch_rec(sgmnt_addrs *csa);
 void	jnl_write_inctn_rec(sgmnt_addrs *csa);
 void	fileheader_sync(gd_region *reg);

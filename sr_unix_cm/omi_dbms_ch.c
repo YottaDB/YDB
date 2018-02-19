@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +34,7 @@ CONDITION_HANDLER(omi_dbms_ch)
     GBLREF int4	 omi_errno;
     int		dummy1, dummy2;
 
+	ASSERT_IS_LIBGTCM;
     START_CH(TRUE);
 
     PRN_ERROR;

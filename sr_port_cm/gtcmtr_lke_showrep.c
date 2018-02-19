@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -18,6 +21,8 @@
  */
 
 #include "mdef.h"
+
+#include "gtm_string.h"
 
 #include <stddef.h>
 
@@ -39,7 +44,6 @@
 #include "iosp.h"
 #include "gtcm_find_region.h"
 #include "gvcmz.h"
-#include "longcpy.h"
 #include "interlock.h"
 #include "rel_quant.h"
 
@@ -60,6 +64,7 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 	uint4			status;
 	boolean_t		was_crit;
 
+	ASSERT_IS_LIBGNPSERVER;
 	cur_region = gv_cur_region = gtcm_find_region(curr_entry, sreq->rnum)->reghead->reg;
 	if (IS_REG_BG_OR_MM(cur_region))
 	{
@@ -68,7 +73,7 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 		lke_ctl = (mlk_ctldata *)malloc(ls_len);
 		/* Prevent any modification of the lock space while we make a local copy of it */
 		GRAB_LOCK_CRIT(csa, gv_cur_region, was_crit);
-		longcpy((uchar_ptr_t)lke_ctl, csa->lock_addrs[0], ls_len);
+		memcpy((uchar_ptr_t)lke_ctl, csa->lock_addrs[0], ls_len);
 		REL_LOCK_CRIT(csa, gv_cur_region, was_crit);
 		util_cm_print(lnk, 0, NULL, RESET);
 		dnode.len = sreq->nodelength;

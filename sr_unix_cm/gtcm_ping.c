@@ -3,6 +3,11 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
+ * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -100,6 +105,7 @@ int init_ping(void)
 {
     struct protoent *proto;
 
+	ASSERT_IS_LIBGTCM;
     ident = getpid() & 0xFFFF;
     if (!(proto = getprotobyname("icmp")))
     {
@@ -133,6 +139,7 @@ int icmp_ping(int conn)
 	struct timeval		timeout;
 	int			cc;
 
+	ASSERT_IS_LIBGTCM;
 	if (pingsock < 0)
 	{
 		FPRINTF(stderr,"icmp_ping:  no ping socket.\n");
@@ -193,6 +200,7 @@ int get_ping_rsp(void)
 	struct icmp *icp;
 	struct ip *ip;
 
+	ASSERT_IS_LIBGTCM;
 	if (pingsock < 0)
 	{
 		FPRINTF(stderr,"icmp_ping:  no ping socket.\n");
@@ -212,7 +220,6 @@ int get_ping_rsp(void)
 	}
 	ip = (struct ip *) pingrcv;
 	icp = (struct icmp *)(pingrcv + ((ip->ip_hl) << 2));
-	/* xxxxxxx icp = (struct icmp *)(pingrcv + (ip->ip_hl << 2)); */
 #ifdef DEBUG_PING
 	{
 		char host[SA_MAXLEN];
@@ -243,6 +250,7 @@ int in_cksum(u_short *addr, int len)
 	register int sum = 0;
 	u_short answer = 0;
 
+	ASSERT_IS_LIBGTCM;
 	/* Our algorithm is simple, using a 32 bit accumulator (sum), we add
 	 * sequential 16 bit words to it, and at the end, fold back all the
 	 * carry bits from the top 16 bits into the lower 16 bits.

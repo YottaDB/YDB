@@ -1,7 +1,10 @@
 #################################################################
 #                                                               #
-# Copyright (c) 2010-2015 Fidelity National Information 	#
+# Copyright (c) 2010-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
+#								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
 #                                                               #
 #       This source code contains the intellectual property     #
 #       of its copyright holder(s), and is made available       #
@@ -49,8 +52,8 @@ fi
 if [ -n "$gtm_dist" ] ; then
     old_gtm_dist=$gtm_dist
     if [ -f $gtm_dist/_XCMD.m ] ; then
-	tmp_gtm_shlib=`basename $gtm_dist/libgtmshr.* | cut -d . -f 2` ; export tmp_gtm_shlib
-	if [ -f "$gtm_dist/libgtmutil.$tmp_gtm_shlib" ] ; then gtmroutines="$gtm_dist/libgtmutil.$tmp_gtm_shlib"
+	tmp_gtm_shlib=`basename $gtm_dist/libyottadb.* | cut -d . -f 2` ; export tmp_gtm_shlib
+	if [ -f "$gtm_dist/libyottadbutil.$tmp_gtm_shlib" ] ; then gtmroutines="$gtm_dist/libyottadbutil.$tmp_gtm_shlib"
 	else gtmroutines=$gtm_dist ; fi
 	export gtmroutines
         old_gtmver=`$gtm_dist/mumps -run %XCMD 'Write $Piece($ZVersion," ",2),"_",$Piece($ZVersion," ",4)'`
@@ -64,20 +67,26 @@ fi
 gtm_dist="GTMDIST" ; export gtm_dist
 
 # Determine name of shared library file name extension on this platform
-tmp_gtm_shlib=`basename $gtm_dist/libgtmshr.* | cut -d . -f 2` ; export tmp_gtm_shlib
+tmp_gtm_shlib=`basename $gtm_dist/libyottadb.* | cut -d . -f 2` ; export tmp_gtm_shlib
 
 # Idempotence says change the environment only if a new GT.M directory is being pointed to
 # otherwise just restore $gtmroutines and exit
 if [ $gtm_dist != "$old_gtm_dist" ] ; then
 
     # Force $gtmroutines to guarantee access to %XCMD for now; repaired later
-    if [ -f "$gtm_dist/libgtmutil.$tmp_gtm_shlib" ] ; then gtmroutines="$gtm_dist/libgtmutil.$tmp_gtm_shlib $gtm_dist"
+    if [ -f "$gtm_dist/libyottadbutil.$tmp_gtm_shlib" ] ; then gtmroutines="$gtm_dist/libyottadbutil.$tmp_gtm_shlib $gtm_dist"
     else gtmroutines=$gtm_dist ; fi
     export gtmroutines
     # Set $gtm_icu_version if icu-config is available - should be set before checking for UTF-8 mode
     if [ -z "$gtm_icu_version" -a -n "`which icu-config`" ] ; then
 	gtm_icu_version=`icu-config --version | gtm_chset=M $gtm_dist/mumps -run %XCMD 'Read x Write $FNumber(x*$Select(+x>5:.1,1:1),"",1)'`
         export gtm_icu_version
+	# Add library path to LD_LIBRARY_PATH
+	extendlibpath=`icu-config --libdir`
+	if [ "" = "$LD_LIBRARY_PATH" ]; then LD_LIBRARY_PATH="$extendlibpath"; else LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$extendlibpath";fi; export LD_LIBRARY_PATH
+	if [ "ibm" = "$arch" ]; then
+		if [ "" = "$LIBPATH" ]; then LIBPATH="$extendlibpath"; else LIBPATH="$LIBPATH:$extendlibpath";fi; export LIBPATH;
+	fi
     fi
 
     # If UTF-8 is selected, and UTF-8 mode works, set $gtm_dist to utf8 subdirectory
@@ -96,10 +105,10 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
     		LC_CTYPE=`locale -a | grep $binaryopt -iE '\.utf.?8$' | head -n1` ; export LC_CTYPE
     	fi
     	echo $LC_CTYPE | grep -i .utf > /dev/null
-    	if [ $? = 0 -a "`echo Halt | gtm_prompt='GTM>' $gtm_dist/utf8/mumps -dir | tail -n 1`" = 'GTM>' ] ; then
+    	if [ $? = 0 -a "`echo Halt | gtm_prompt='YDB>' $gtm_dist/utf8/mumps -dir | tail -n 1`" = 'YDB>' ] ; then
     		gtm_dist=$gtm_dist/utf8
-    		if [ -f "$gtm_dist/libgtmutil.$tmp_gtm_shlib" ] ; then
-    			gtmroutines="$gtm_dist/libgtmutil.$tmp_gtm_shlib $gtm_dist"
+    		if [ -f "$gtm_dist/libyottadbutil.$tmp_gtm_shlib" ] ; then
+    			gtmroutines="$gtm_dist/libyottadbutil.$tmp_gtm_shlib $gtm_dist"
     		else gtmroutines=$gtm_dist ; fi
     	fi
     fi
@@ -109,7 +118,7 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
 
     # Set $gtm_prompt - must be set after checking for UTF-8 mode since prompt may be based on gtm_dist
     if [ -z "$gtm_prompt" ] ; then
-        gtm_prompt="GTM>"
+        gtm_prompt="YDB>"
     else
         if [ -n "$old_gtm_dist" ] ; then
             gtm_prompt=`echo $gtm_prompt | sed "s;$old_gtm_dist;$gtm_dist;"`
@@ -144,7 +153,7 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
             gtmroutines=`echo $gtmroutines | sed "s;$old_gtmver;$gtmver;"`
         fi
     else
-	if [ -f "$gtm_dist/libgtmutil.$tmp_gtm_shlib" ] ; then gtmroutines="$gtm_dist/libgtmutil.$tmp_gtm_shlib $gtm_dist"
+	if [ -f "$gtm_dist/libyottadbutil.$tmp_gtm_shlib" ] ; then gtmroutines="$gtm_dist/libyottadbutil.$tmp_gtm_shlib $gtm_dist"
 	else gtmroutines=$gtm_dist ; fi
         if [ "utf8" = `basename $gtm_dist` ] ; then
 	    if [ -d $gtm_dist/plugin/o/utf8 ] ; then

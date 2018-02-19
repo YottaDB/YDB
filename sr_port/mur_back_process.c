@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -412,7 +415,7 @@ uint4 mur_back_processing(jnl_tm_t alt_tp_resolve_time)
 						|| (iterationcnt && (strm_seqno == murgbl.resync_strm_seqno[idx])));
 					MUR_SAVE_RESYNC_STRM_SEQNO(rctl, csd);
 					/* flush the changed csd to disk */
-					fc = rctl->gd->dyn.addr->file_cntl;
+					fc = FILE_CNTL(rctl->gd);
 					fc->op = FC_WRITE;
 					/* Note: csd points to shared memory and is already aligned
 					 * appropriately even if db was opened using O_DIRECT.
@@ -508,22 +511,36 @@ uint4	mur_back_phase1(reg_ctl_list *rctl)
 		 */
 		if ((JRT_EOF != rectype) && (JRT_EPOCH != rectype) && (jnlrec->prefix.time < jgbl.mur_tp_resolve_time))
 		{
-			rctl->jctl_error = jctl;
-			/* Assert that the new about-to-be-set TP resolve time does not differ by more than
-			 * twice the idle-EPOCH interval (which is defined by TIM_DEFER_DBSYNC). Twice is not a magic
-			 * number, but just to allow for some relaxation. The only exception is if this is an
-			 * interrupted recovery in which case the difference could be significant. One reason we
-			 * know why this could happen is because mur_close_files calls gds_rundown on all regions
-			 * AFTER resetting csd->intrpt_recov_tp_resolve_time to 0. So, if we get killed at
-			 * right AFTER doing gds_rundown on one region, but BEFORE doing gds_rundown on other
-			 * regions, then a subsequent ROLLBACK finds a higher TP resolve time on one region and
-			 * sets the value to jgbl.mur_tp_resolve_time but later finds other regions with records
-			 * having timestamps less than jgbl.mur_tp_resolve_time. See GTM-7204 for more details.
-			 */
-			assert(((TIM_DEFER_DBSYNC * 2) >= (jgbl.mur_tp_resolve_time - jnlrec->prefix.time))
-					|| ((WBTEST_CRASH_SHUTDOWN_EXPECTED  == gtm_white_box_test_case_number)
-						&& murgbl.intrpt_recovery));
-			return ERR_CHNGTPRSLVTM;
+			for ( ; JRT_PFIN == rectype; )
+			{	/* Skip over PFIN records at the end of the journal */
+				if (SS_NORMAL != (status = mur_prev(jctl, 0)))
+					break;
+				jnlrec = mur_desc->jnlrec;      /* keep jnlrec uptodate */
+				jctl->rec_offset -= mur_desc->jreclen;
+				assert(jctl->rec_offset >= mur_desc->cur_buff->dskaddr);
+				assert(JNL_HDR_LEN <= jctl->rec_offset);
+				rectype = (enum jnl_record_type)jnlrec->prefix.jrec_type;
+			}
+			assertpro(JRT_EOF != rectype); /* Cannot find an EOF anywhere but the last record of the journal */
+			if (JRT_EPOCH != rectype)
+			{
+				rctl->jctl_error = jctl;
+				/* Assert that the new about-to-be-set TP resolve time does not differ by more than
+				 * twice the idle-EPOCH interval (which is defined by TIM_DEFER_DBSYNC). Twice is not a magic
+				 * number, but just to allow for some relaxation. The only exception is if this is an
+				 * interrupted recovery in which case the difference could be significant. One reason we
+				 * know why this could happen is because mur_close_files calls gds_rundown on all regions
+				 * AFTER resetting csd->intrpt_recov_tp_resolve_time to 0. So, if we get killed at
+				 * right AFTER doing gds_rundown on one region, but BEFORE doing gds_rundown on other
+				 * regions, then a subsequent ROLLBACK finds a higher TP resolve time on one region and
+				 * sets the value to jgbl.mur_tp_resolve_time but later finds other regions with records
+				 * having timestamps less than jgbl.mur_tp_resolve_time. See GTM-7204 for more details.
+				 */
+				assert(((TIM_DEFER_DBSYNC * 2) >= (jgbl.mur_tp_resolve_time - jnlrec->prefix.time))
+						|| ((WBTEST_CRASH_SHUTDOWN_EXPECTED  == gtm_white_box_test_case_number)
+							&& murgbl.intrpt_recovery));
+				return ERR_CHNGTPRSLVTM;
+			}
 		}
 	}
 	/* Do intializations before invoking "mur_back_processing_one_region" function */
@@ -597,7 +614,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 	reg_ctl_list		*rctl;
 	seq_num			rec_token_seq, save_resync_seqno, save_strm_seqno, strm_seqno;
 	token_num		token, last_tcom_token;
-	trans_num		rec_tn;
+	trans_num		prev_tn, rec_tn;
 	uint4			max_blk_size, max_rec_size;
 	uint4			status, val_len;
 	unsigned short		max_key_size;
@@ -624,13 +641,15 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 	}
 	mur_desc = rctl->mur_desc;
 	jnlrec = mur_desc->jnlrec;
-	rec_tn = jnlrec->prefix.tn;
+	rectype = (enum jnl_record_type)jnlrec->prefix.jrec_type;
+	/* Note: JRT_ALIGN does not have a "prefix.tn" field so need to use GET_JREC_TN macro which handles that case */
+	rec_tn = GET_JREC_TN(jnlrec, rectype);
 	rec_token_seq = mur_back_options->rec_token_seq;
 	first_epoch = mur_back_options->first_epoch;
 	status = mur_back_options->status;
 	this_reg_resolved = FALSE;
 	apply_pblk_this_region = mur_back_apply_pblk && !rctl->jfh_recov_interrupted;
-	fc = rctl->gd->dyn.addr->file_cntl;
+	fc = FILE_CNTL(rctl->gd);
 	udi = FC2UDI(fc);
 	if (udi->fd_opened_with_o_direct)
 	{	/* Check if rctl->dio_buff is allocated. If not allocate it now before invoking "mur_output_pblk" */
@@ -648,6 +667,10 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 		assert(0 == jctl->turn_around_offset);
 		jnlrec = mur_desc->jnlrec;
 		rectype = (enum jnl_record_type)jnlrec->prefix.jrec_type;
+		prev_tn = rec_tn;
+		/* Note: JRT_ALIGN does not have a "prefix.tn" field so need to use GET_JREC_TN macro which handles that case */
+		rec_tn = GET_JREC_TN(jnlrec, rectype);
+		rec_time = jnlrec->prefix.time;
 		/* Even if -verify is NOT specified, if the journal file had a crash, do verification until
 		 * the first epoch is reached as the journal file could be corrupt anywhere until then
 		 * (mur_fread_eof on the journal file at the start might not have caught it).
@@ -656,11 +679,11 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 		{
 			if (!mur_validate_checksum(jctl))
 				MUR_BACK_PROCESS_ERROR(jctl, "Checksum validation failed");
-			if ((jnlrec->prefix.tn != rec_tn) && (jnlrec->prefix.tn != (rec_tn - 1)))
+			/* Note: If tn is TN_INVALID for current record or previous record (i.e. JRT_ALIGN), then skip the check */
+			if ((TN_INVALID != rec_tn) && (TN_INVALID != prev_tn) && (rec_tn != prev_tn) && (rec_tn != (prev_tn - 1)))
 			{
 				SNPRINTF(s, TRANS_OR_SEQ_NUM_CONT_CHK_FAILED_SZ, TRANS_NUM_CONT_CHK_FAILED,
-					jnlrec->prefix.tn, rec_tn);
-				rec_tn = jnlrec->prefix.tn;
+					rec_tn, prev_tn);
 				MUR_BACK_PROCESS_ERROR(jctl, s);
 			}
 			if (mur_options.rollback && REC_HAS_TOKEN_SEQ(rectype) && (GET_JNL_SEQNO(jnlrec) > rec_token_seq))
@@ -680,6 +703,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				{	/* Currently encryption operations are not thread-safe. Use lock to serialize */
 					PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder);
 					use_new_key = USES_NEW_KEY(jctl->jfh);
+					assert(TN_INVALID != rec_tn);
 					assert(NEEDS_NEW_KEY(jctl->jfh, rec_tn) == use_new_key);
 					MUR_DECRYPT_LOGICAL_RECS(
 							keystr,
@@ -771,8 +795,6 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				MUR_BACK_PROCESS_ERROR(jctl, "File extend for JRT_TRUNC record failed");
 			continue;
 		}
-		rec_tn = jnlrec->prefix.tn;
-		rec_time = jnlrec->prefix.time;
 		/* In journal records token_seq field is a union of jnl_seqno and token for TP, ZTP or unfenced records.
 		 * For non-replication (that is, doing recover) token_seq.token field is used as token in hash table.
 		 * For replication (that is, doing rollback) token_seq.jnl_seqno is used as token in hash table.
@@ -855,6 +877,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 			 * In this case we would have applied PBLKs from the interrupted recovery first before coming here
 			 * hence the check for a NULL rctl->jctl_apply_pblk in which case we skip the tn check.
 			 */
+			assert(TN_INVALID != rec_tn);
 			if (!mur_options.forward && first_epoch && !rctl->recov_interrupted && (NULL == rctl->jctl_apply_pblk)
 				&& (NULL != rctl->csd) && (rec_tn > rctl->csd->trans_hist.curr_tn))
 			{
@@ -876,7 +899,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				first_epoch = FALSE;
 			}
 			assert(mur_options.forward || murgbl.intrpt_recovery || (NULL == rctl->csd)
-				|| (jnlrec->prefix.tn <= rctl->csd->trans_hist.curr_tn));
+				|| (rec_tn <= rctl->csd->trans_hist.curr_tn));
 			if (rec_time < jgbl.mur_tp_resolve_time)
 			{	/* Reached EPOCH before resolve-time. Check if we have reached turnaround point.
 				 * For no rollback OR for simple rollback with -resync or -fetchresync NOT specified,
@@ -952,7 +975,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 		if (IS_FENCED(rectype))
 		{	/* Note for a ZTP if FSET/GSET is present before mur_options.before_time and
 			 * GUPD/ZTCOM are present after mur_options.before_time, it is considered broken. */
-			rec_fence = GET_REC_FENCE_TYPE(rectype);
+			rec_fence = (IS_TP(rectype) ? TPFENCE : ZTPFENCE);
 			assert(token == ((struct_jrec_upd *)jnlrec)->token_seq.token);
 			/* Get thread-lock before searching/adding in token hash table */
 			PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder);
@@ -962,14 +985,26 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				{
 					if (multi->fence != rec_fence)
 					{
-						assert(!mur_options.rollback);	/* jnl_seqno cannot be duplicate */
-						if (!(mur_report_error(jctl, MUR_DUPTOKEN)))
-						{
-							PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);
-							rctl->jctl_error = jctl;
-							return ERR_DUPTOKEN;
+						if (NULLFENCE != multi->fence)
+						{	/* See similar later check (TCOM record case) for why the NULLFENCE
+							 * check is needed here.
+							 */
+							assert(!mur_options.rollback);	/* jnl_seqno cannot be duplicate */
+							if (!(mur_report_error(jctl, MUR_DUPTOKEN)))
+							{
+								PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);
+								rctl->jctl_error = jctl;
+								return ERR_DUPTOKEN;
+							}
+						} else if (0 == multi->partner)
+						{	/* This is the first time a TPFENCE-type record is seen for a token
+							 * that was stored in the hash table first as a NULLFENCE type tn.
+							 * Use this to bump broken tn count in hashtable.
+							 */
+							murgbl.broken_cnt++;
 						}
 						SET_THIS_TN_AS_BROKEN(multi, reg_total); /* This is broken */
+						assert(multi->partner);
 						if (rec_time < multi->time)
 							multi->time = rec_time;
 					} else
@@ -1014,16 +1049,34 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				if (NULL != (multi = MUR_TOKEN_LOOKUP(token, rec_time, rec_fence)))
 				{
 					if ((last_tcom_token == token) || (multi->fence != rec_fence) || (0 == multi->partner))
-					{
-						assert(0 != multi->partner);
-						assert(!mur_options.rollback);	/* jnl_seqno cannot be duplicate */
-						if (!mur_report_error(jctl, MUR_DUPTOKEN))
+					{	/* The token corresponding to the TCOM record is already in the hashtable.
+						 * We expect then that this is a TP transaction with at least two regions
+						 * involved. Hence assert that multi->partner is > 0 (when the token was first
+						 * added, we would have set partner to nregions - 1). The only exception is if
+						 * a NULL record was written on behalf of one region's journal records (possible
+						 * in "jnl_phase2_salvage") but not on all regions. In that case we would have
+						 * a NULL record in some regions and TCOM records in some regions. Allow this
+						 * exception and treat this as a broken transaction in that case.
+						 */
+						if (NULLFENCE != multi->fence)
 						{
-							PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release thread lock */
-							jctl->reg_ctl->jctl_error = jctl;
-							return ERR_DUPTOKEN;
+							assert(0 != multi->partner);
+							assert(!mur_options.rollback); /* jnl_seqno cannot be duplicate */
+							if (!mur_report_error(jctl, MUR_DUPTOKEN))
+							{
+								PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);/* release thread lock */
+								jctl->reg_ctl->jctl_error = jctl;
+								return ERR_DUPTOKEN;
+							}
+						} else if (0 == multi->partner)
+						{	/* This is the first time a TPFENCE-type record is seen for a token
+							 * that was stored in the hash table first as a NULLFENCE type tn.
+							 * Use this to bump broken tn count in hashtable.
+							 */
+							murgbl.broken_cnt++;
 						}
 						SET_THIS_TN_AS_BROKEN(multi, reg_total); /* This is broken */
+						assert(multi->partner);
 						if (rec_time < multi->time)
 							multi->time = rec_time;
 					} else
@@ -1085,19 +1138,15 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 			}
 			if (!skip_rec)
 			{
-				rec_fence = GET_REC_FENCE_TYPE(rectype);
+				rec_fence = (JRT_NULL == rectype) ? NULLFENCE : NOFENCE;
 				assert(token == ((struct_jrec_upd *)jnlrec)->token_seq.token);
-				/* For rollback, pid/image_type/time are not necessary to establish uniqueness of token
-				 * as token (which is a seqno) is already guaranteed to be unique for an instance.
-				 */
 				/* Get thread-lock before searching/adding in token hash table */
 				PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder);
 				if (NULL == (multi = MUR_TOKEN_LOOKUP(token, 0, rec_fence)))
 				{	/* We reuse same token table. Most of the fields in multi_struct are unused */
-					MUR_TOKEN_ADD(multi, token, 0, 1, rec_fence, last_tcom_token);
-				} else
+					MUR_TOKEN_ADD(multi, token, rec_time, 1, rec_fence, last_tcom_token);
+				} else if (NULLFENCE != rec_fence)
 				{
-					assert(FALSE);
 					if (!(mur_report_error(jctl, MUR_DUPTOKEN)))
 					{
 						PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);
@@ -1105,6 +1154,11 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 						return ERR_DUPTOKEN;
 					}
 				}
+				/* else: if "NULLFENCE == rec_fence", then it is possible we see a NULL record with the same
+				 * seqno across MULTIPLE regions in case "jnl_phase2_salvage" wrote those records overriding
+				 * the reserved space in the jnl file when the process got kill9'ed in phase2 of commit.
+				 * So do not treat that as an error.
+				 */
 				PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);
 			}
 		}
@@ -1135,8 +1189,8 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 					jnlrec = mur_desc->jnlrec;
 					rectype = (enum jnl_record_type)jnlrec->prefix.jrec_type;
 					rec_time = jnlrec->prefix.time;
-					rec_token_seq = GET_JNL_SEQNO(jnlrec);
 					assert(JRT_EPOCH == rectype);
+					rec_token_seq = GET_JNL_SEQNO(jnlrec);
 					/* handle non-epoch (out-of-design) situation in pro nevertheless */
 					reached_trnarnd = (JRT_EPOCH == rectype)
 							&& (!murgbl.resync_seqno || (rec_token_seq <= murgbl.resync_seqno));
@@ -1209,8 +1263,8 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 			rectype = (enum jnl_record_type)jnlrec->prefix.jrec_type;
 			rec_time = jnlrec->prefix.time;
 			assert(rec_time >= jgbl.mur_tp_resolve_time);
-			rec_token_seq = GET_JNL_SEQNO(jnlrec);
 			assert(JRT_EPOCH == rectype);
+			rec_token_seq = GET_JNL_SEQNO(jnlrec);
 			assert(!murgbl.resync_seqno || (rec_token_seq <= murgbl.resync_seqno));	/* else RESYNCSEQNOLOW error
 												 * would have been issued.
 												 */

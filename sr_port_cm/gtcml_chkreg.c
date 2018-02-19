@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +36,7 @@ void gtcml_chkreg(void)
 {
 	cm_lckblkreg *reg, *reg1;
 
+	ASSERT_IS_LIBGNPSERVER;
 	sys_get_curr_time(&chkreg_time);	/* just once per pass */
 	reg1 = reg = blkdlist;
 

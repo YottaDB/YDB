@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -76,11 +79,12 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	cw_set_element		*cse;
 	off_chain		chain1, chain2;
 	srch_blk_status		*tp_srch_status, *srch_status, *leaf_blk_hist;
-	boolean_t		already_built, is_mm;
+	boolean_t		already_built, expand_prev_key, is_mm, skip_search_blk;
 	ht_ent_int4		*tabent;
 	sm_uc_ptr_t		buffaddr;
 	trans_num		blkhdrtn, oldest_hist_tn;
 	int			hist_size;
+	unsigned short		bsiz;
 #	ifdef DEBUG
 	boolean_t		save_donot_commit;
 #	endif
@@ -97,6 +101,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	SET_GVCST_SEARCH_CLUE(0);
 	INCR_DB_CSH_COUNTER(cs_addrs, n_gvcst_srches, 1);
 	pTargHist = ((NULL == pHist) ? &pTarg->hist : pHist);
+	expand_prev_key = TREF(expand_prev_key);
 	/* If FINAL RETRY and TP then we can safely use clues of gv_targets that have been referenced in this
 	 * TP transaction (read_local_tn == local_tn). While that is guaranteed to be true for all updates, it
 	 * does not hold good for READs since we allow a lot more reads to be done inside a transaction compared
@@ -343,7 +348,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 							 * that this clue update be done AFTER the gvcst_search_tail invocation
 							 * (as that needs to pass the previous clue key).
 							 */
-							COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(pTarg, pKey, TREF(expand_prev_key));
+							COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(pTarg, pKey, expand_prev_key);
 						}
 						INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_tail, 1);
 						return cdb_sc_normal;
@@ -365,7 +370,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 							 * invocation but for consistency with the gvcst_search_tail invocation
 							 * we keep it AFTER.
 							 */
-							COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(pTarg, pKey, TREF(expand_prev_key));
+							COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(pTarg, pKey, expand_prev_key);
 						}
 						INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_head, 1);
 						return cdb_sc_normal;
@@ -379,7 +384,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				 * dont have a prev_key computed as part of that search (because it was not a $zprevious
 				 * operation as well), we cannot use the clue. Instead we need to fall through.
 				 */
-				if (!TREF(expand_prev_key))
+				if (!expand_prev_key)
 				{
 					INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_same, 1);
 					return cdb_sc_normal;
@@ -427,6 +432,21 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_badlvl;
 	}
+	assert(FALSE != ZPREVIOUS_NULL_SUBS_LEVEL1);
+	assert(TRUE != ZPREVIOUS_NULL_SUBS_LEVEL1);
+	assert((FALSE == expand_prev_key) || (TRUE == expand_prev_key) || (ZPREVIOUS_NULL_SUBS_LEVEL1 == expand_prev_key));
+	/* If we are inside a $zprevious(^gblname("")) operation, gv_currkey has already been set to correspond to the highest
+	 * first subscript in the GVT. Therefore we are guaranteed that the highest existing first subscript can be found by
+	 * traversing down the rightmost path in the GVT i.e. descending down the *-records (last record) of index blocks.
+	 * And so we can go directly to the last record (*-record) in each index block as we descend down the tree and do a
+	 * "gvcst_search_blk" only for the leaf block. Set "skip_search_blk" accordingly. Note that this optimization means
+	 * pCurr->prev_rec.offset and pCurr->prev_rec.match would be set to a special value PREV_REC_UNINITIALIZED for index
+	 * blocks (i.e. pCurr->level > 0). If a caller of this function later needs to access prev_rec.match or prev_rec.offset
+	 * for an index block (e.g. gvcst_put as part of a block-split operation), they need to do the "gvcst_search_blk" call
+	 * then. This basically defers the call as much as possible and therefore can perform better in case the caller does not
+	 * need prev_rec for index blocks.
+	 */
+	skip_search_blk = (ZPREVIOUS_NULL_SUBS_LEVEL1 == expand_prev_key);
 	is_mm = (dba_mm == cs_data->acc_meth);
 	pTargHist->depth = (int)nLevl;
 	pCurr = &pTargHist->h[nLevl];
@@ -442,12 +462,28 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 		pCurr->cse = NULL;
 		pCurr->blk_num = nBlkId;
 		pCurr->buffaddr = pBlkBase;
-		if (cdb_sc_normal != (status = gvcst_search_blk(pKey, pCurr)))
-			return status;
-		if (0 == nLevl)
-			break;
-		if ((n0 = pCurr->curr_rec.offset) >= ((blk_hdr_ptr_t)pBlkBase)->bsiz)
-			n0 = pCurr->prev_rec.offset;
+		bsiz = ((blk_hdr_ptr_t)pBlkBase)->bsiz;
+		if (!skip_search_blk || (0 == nLevl))
+		{
+			if (cdb_sc_normal != (status = gvcst_search_blk(pKey, pCurr)))
+				return status;
+			if (0 == nLevl)
+				break;
+		} else
+		{
+			assert(PREV_REC_UNINITIALIZED == MAXUINT2);
+			assert(2 == SIZEOF(pCurr->prev_rec.offset));
+			assert(2 == SIZEOF(pCurr->prev_rec.match));
+			pCurr->prev_rec.offset = PREV_REC_UNINITIALIZED;
+			pCurr->prev_rec.match = PREV_REC_UNINITIALIZED;
+			pCurr->curr_rec.offset = bsiz - BSTAR_REC_SIZE;
+			pCurr->curr_rec.match = 0;
+		}
+		if ((n0 = pCurr->curr_rec.offset) >= bsiz)	/* Warning: Assignment */
+		{
+			assert(CDB_STAGNATE > t_tries);
+			return cdb_sc_blklenerr;
+		}
 		pRec = pBlkBase + n0;
 		GET_USHORT(n0, &((rec_hdr_ptr_t)pRec)->rsiz);
 		if (FALSE == CHKRECLEN(pRec, pBlkBase, n0))
@@ -482,44 +518,50 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	}
 	if (NULL == pHist)
 	{
-		if ((pCurr->curr_rec.offset < SIZEOF(blk_hdr)) ||
-			((pCurr->curr_rec.offset == SIZEOF(blk_hdr)) && (pCurr->curr_rec.match < nKeyLen)))
-		{	/* Clue less than first rec, invalidate */
-			pTarg->clue.end = 0;
-			return cdb_sc_normal;
-		}
-		pRec = pBlkBase + SIZEOF(blk_hdr);
-		GET_USHORT(n0, &((rec_hdr_ptr_t)pRec)->rsiz);
-		if (FALSE == CHKRECLEN(pRec, pBlkBase, n0))
+		assert(pCurr->curr_rec.offset >= SIZEOF(blk_hdr));
+		if ((pCurr->curr_rec.offset > SIZEOF(blk_hdr)) || (pCurr->curr_rec.match >= nKeyLen))
 		{
-			assert(CDB_STAGNATE > t_tries);
-			return cdb_sc_rmisalign;
-		}
-		c1 = pRec + SIZEOF(rec_hdr);
-		c2 = pTarg->first_rec->base;
-		if (n0 > (pTarg->first_rec->top))
-		{
-			n0 = pTarg->first_rec->top;
-			status = cdb_sc_keyoflow;
-		} else
-			status = cdb_sc_rmisalign;
-		if (0 != n0)
-		{
-			do
+			pRec = pBlkBase + SIZEOF(blk_hdr);
+			GET_USHORT(n0, &((rec_hdr_ptr_t)pRec)->rsiz);
+			if (FALSE == CHKRECLEN(pRec, pBlkBase, n0))
 			{
-				--n0;
-				if ((0 == (*c2++ = *c1++)) && (0 == *c1))
-					break;
-			} while (n0);
+				assert(CDB_STAGNATE > t_tries);
+				return cdb_sc_rmisalign;
+			}
+			c1 = pRec + SIZEOF(rec_hdr);
+			c2 = pTarg->first_rec->base;
+			if (n0 > (pTarg->first_rec->top))
+			{
+				n0 = pTarg->first_rec->top;
+				status = cdb_sc_keyoflow;
+			} else
+				status = cdb_sc_rmisalign;
+			if (0 != n0)
+			{
+				do
+				{
+					--n0;
+					if ((0 == (*c2++ = *c1++)) && (0 == *c1))
+						break;
+				} while (n0);
+			}
+			if (0 == n0)
+			{
+				assert(CDB_STAGNATE > t_tries);
+				return status;
+			}
+			assert(c2 < &pTarg->first_rec->base[pTarg->first_rec->top]); /* ensure we don't exceed allocated bounds */
+			*c2 = *c1;
+			DEBUG_ONLY(pTarg->first_rec->end = c2 - pTarg->first_rec->base;)
+		} else
+		{	/* Clue less than first rec, invalidate first_rec */
+			DEBUG_ONLY(pTarg->clue.end = pKey->end);	/* needed by an assert in GVT_CLUE_INVALIDATE_FIRST_REC.
+									 * in pro, this will be done later as part of the
+									 * COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE call.
+									 */
+			GVT_CLUE_INVALIDATE_FIRST_REC(pTarg);
+			/* Note that even though first rec is invalidated, last_rec is still usable so continue with setting it */
 		}
-		if (0 == n0)
-		{
-			assert(CDB_STAGNATE > t_tries);
-			return status;
-		}
-		assert(c2 < &pTarg->first_rec->base[pTarg->first_rec->top]);	/* make sure we don't exceed allocated bounds */
-		*c2 = *c1;
-		DEBUG_ONLY(pTarg->first_rec->end = c2 - pTarg->first_rec->base;)
 		if (NULL == pNonStar)
 		{
 			*((short *)pTarg->last_rec->base) = GVT_CLUE_LAST_REC_MAXKEY;
@@ -575,7 +617,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			*c2 = *c1;
 			DEBUG_ONLY(pTarg->last_rec->end = c2 - pTarg->last_rec->base;)
 		}
-		COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(pTarg, pKey, TREF(expand_prev_key));
+		COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(pTarg, pKey, expand_prev_key);
 	}
 	return cdb_sc_normal;
 }

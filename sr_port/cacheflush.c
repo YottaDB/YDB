@@ -1,6 +1,11 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
+ * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,5 +37,6 @@
 
 int	cacheflush (void *addr, long nbytes, int cache_select)
 {
+	ARM_ONLY(__builtin___clear_cache(addr, addr + nbytes));		/* GCC built-in */
 	return 0;	/* incr_link requires a zero return value for success */
 }

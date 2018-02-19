@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +17,7 @@
 #include "indir_enum.h"
 #include "advancewindow.h"
 
-error_def(ERR_VAREXPECTED);
+error_def(ERR_LKNAMEXPECTED);
 
 int nref(void)
 {
@@ -36,9 +37,7 @@ int nref(void)
 	case TK_LBRACKET:
 	case TK_IDENT:
 	case TK_VBAR:
-		if (!lkglvn(gbl))
-			return EXPR_FAIL;
-		return TRUE;
+		return lkglvn(gbl);
 	case TK_ATSIGN:
 		if (!indirection(&tmparg))
 			return EXPR_FAIL;
@@ -48,7 +47,7 @@ int nref(void)
 		ins_triple(ref);
 		return EXPR_INDR;
 	default:
-		stx_error(ERR_VAREXPECTED);
+		stx_error(ERR_LKNAMEXPECTED);
 		return EXPR_FAIL;
 	}
 }

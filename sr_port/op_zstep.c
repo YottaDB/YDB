@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +26,6 @@ GBLREF xfer_entry_t     xfer_table[];
 GBLREF stack_frame	*frame_pointer;
 GBLDEF unsigned char	*zstep_level;
 GBLREF mval		zstep_action;
-GBLREF mval		dollar_zstep;
 GBLREF bool		neterr_pending;
 GBLREF int4		outofband;
 GBLREF int		iott_write_error;
@@ -32,9 +35,11 @@ void op_zstep(uint4 code, mval *action)
 {
 	stack_frame	*fp;
 	int4		status;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (!action)
-		zstep_action = dollar_zstep;
+		zstep_action = TREF(dollar_zstep);
 	else
 	{	op_commarg(action,indir_linetail);
 		op_unwind();
@@ -53,12 +58,10 @@ void op_zstep(uint4 code, mval *action)
 			break;
 		case ZSTEP_OVER:
 		case ZSTEP_OUTOF:
-
-			fp = frame_pointer;
 			for (fp = frame_pointer; fp ; fp = fp->old_frame_pointer)
-			{	if (fp->type & SFT_COUNT)
-				{	break;
-				}
+			{
+				if (fp->type & SFT_COUNT)
+					break;
 			}
 			zstep_level = (unsigned char *) fp;
 			if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
@@ -82,6 +85,6 @@ void op_zstep(uint4 code, mval *action)
 			}
 			break;
 		default:
-			GTMASSERT;
+			assertpro(FALSE && code);
 	}
 }

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +28,6 @@ GBLREF mline			mline_root;
 GBLREF mliteral			literal_chain;
 GBLREF mvar			*mvartab;
 GBLREF mvax			*mvaxtab,*mvaxtab_end;
-GBLREF short int		block_level;
 GBLREF triple			t_orig;
 
 void tripinit(void)
@@ -66,8 +66,8 @@ void tripinit(void)
 	dqinit(&(t_orig.backptr), que);
 	dqinit(&literal_chain, que);
 	memset(&mline_root, 0, SIZEOF(mline_root));
-	mline_tail = & mline_root;
-	block_level = -1;
+	mline_tail = &mline_root;
+	TREF(block_level) = 0;
 	setcurtchain(&t_orig);
 	return;
 }

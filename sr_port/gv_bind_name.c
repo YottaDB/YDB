@@ -69,7 +69,7 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 		map = gv_srch_map(addr, gvname->var_name.addr, gvname->var_name.len, SKIP_BASEDB_OPEN_FALSE);
 		reg = map->reg.addr;
 		if (!reg->open)
-			gv_init_reg(reg);
+			gv_init_reg(reg, addr);
 		if (IS_STATSDB_REG(reg))
 		{	/* In case of a statsDB, it is possible that "gv_srch_map" or "gv_init_reg" calls above end up doing
 			 * a "op_gvname/gv_bind_name" if they in turn invoke "gvcst_init_statsDB". In that case, the hash table
@@ -107,7 +107,7 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 		reg = gvnh_reg->gd_reg;
 		if (!reg->open)
 		{
-			gv_init_reg(reg);	/* could modify gvnh_reg->gvt if multiple regions map to same db file */
+			gv_init_reg(reg, addr);	/* could modify gvnh_reg->gvt if multiple regions map to same db file */
 			assert((0 == gvnh_reg->gvt->clue.end) || IS_STATSDB_REG(reg)); /* A statsDB open writes to itself */
 		}
 		tmp_gvt = gvnh_reg->gvt;

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -14,8 +17,15 @@
  * Note: ***	Please add new entries to end of list so as not to cause execution problems for
  *		compilations from previous versions. Yes, they should have recompiled but we can
  *		avoid exploding by simply adding entries to end of list. ***
- * This comment and the preceeding empty lines put the first item at line 20, so adding 20 to an argcode
- * places you on the line with its information or subtracting 20 from a line gives the corresponding argcode
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ * This comment and the preceeding empty lines put the first item at line 30, so adding 30 to an argcode
+ * places you on the line with its information or subtracting 30 from a line gives the corresponding argcode
  */
 INDIR(indir_fndata,		f_data,		OC_FNDATA)
 ,INDIR(indir_fnnext,		f_next,		OC_FNNEXT)
@@ -65,7 +75,7 @@ INDIR(indir_fndata,		f_data,		OC_FNDATA)
 ,INDIR(indir_zwithdraw,		m_zwithdraw,	0)
 ,INDIR(indir_tstart,		m_tstart,	0)
 ,INDIR(indir_fnname,		f_name,		0)		/* f_name is really a dummy */
-,INDIR(indir_fnorder2,		f_order,	0)
+,INDIR(indir_fnorder2,		f_order,	0)	/* Is actually unused but don't want to delete per comment at top of file */
 ,INDIR(indir_fnzqgblmod,	f_zqgblmod,	OC_FNZQGBLMOD)
 ,INDIR(indir_trollback,		m_trollback,	0)
 ,INDIR(indir_devparms,		indirection,	0)
@@ -87,3 +97,4 @@ INDIR(indir_fndata,		f_data,		OC_FNDATA)
 #ifdef AUTORELINK_SUPPORTED
 ,INDIR(indir_zrupdate,		m_zrupdate,	0)
 #endif
+,INDIR(indir_fnreversequery1,	f_reversequery1,OC_FNREVERSEQUERY)

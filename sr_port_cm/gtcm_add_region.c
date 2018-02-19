@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,6 +32,7 @@ void gtcm_add_region(connection_struct *cnx,cm_region_head *rh)
 {
 	cm_region_list *ptr, *list_head;
 
+	ASSERT_IS_LIBGNPSERVER;
 	for (ptr = cnx->region_root; ptr ; ptr = ptr->next)
 		if (ptr->reghead == rh)
 			break;

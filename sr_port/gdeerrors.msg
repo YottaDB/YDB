@@ -3,6 +3,9 @@
 ! Copyright (c) 2001-2017 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
+! Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	!
+! All rights reserved.						!
+!								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
 !	under a license.  If you do not know the terms of	!
@@ -11,7 +14,7 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 	.FACILITY	GDE, 248 /PREFIX = GDE_
-	.TITLE		GDEERRORS Error Messages for GDE
+	.TITLE		GDEERRORS Error Messages For GDE
 
 BLKSIZ512	<Block size !AD rounds to !AD>/info/fao=4
 EXECOM		<Executing command file !AD>/info/fao=2
@@ -73,7 +76,7 @@ JNLALLOCGROW	<Increased Journal ALLOCATION from [!AD blocks] to [!AD blocks] to 
 KEYFORBLK	<But block size !AD and reserved bytes !AD limit key size to !AD>/info/fao=6
 STRMISSQUOTE	<Missing double-quote at end of string specification !AD>/error/fao=2
 GBLNAMEIS	<in gblname !AD>/info/fao=2
-NAMSUBSEMPTY	<Subscript #!UL is empty in name specification>/error/fao=3
+NAMSUBSEMPTY	<Subscript #!UL is empty in name specification>/error/fao=1
 NAMSUBSBAD	<Subscript #!UL with value !AD in name specification is an invalid number or string>/error/fao=3
 NAMNUMSUBSOFLOW	<Subscript #!UL with value !AD in name specification has a numeric overflow>/error/fao=3
 NAMNUMSUBNOTEXACT <Subscript #!UL with value !AD in name specification is not an exact GT.M number>/error/fao=3
@@ -94,9 +97,9 @@ GBLNAMCOLLUNDEF	<Error opening shared library of collation sequence #!UL for GBL
 NAMRANGEORDER	<Range in name specification !AD specifies out-of-order subscripts using collation sequence #!UL>/error/fao=3
 NAMRANGEOVERLAP	<Range in name specifications !AD and !AD overlap using collation sequence #!UL>/error/fao=5
 NAMGVSUBOFLOW	<Subscripted name !AD...!AD is too long to represent in the database using collation value #!UL>/error/fao=5
-GBLNAMCOLLRANGE	<Collation sequence #!UL is out of range (0 thru 255)>/error/fao=3
+GBLNAMCOLLRANGE	<Collation sequence #!UL is out of range (0 thru 255)>/error/fao=1
 STDNULLCOLLREQ	<Region !AD needs Standard Null Collation enabled because global !AD spans through it>/info/fao=4
 GBLNAMCOLLVER	<Global directory indicates GBLNAME !AD has collation sequence #!UL with a version #!UL but shared library reports different version #!UL>/error/fao=5
 GDEASYNCIONOMM	<!AD segment has ASYNCIO turned on. Cannot support MM access method.>/error/fao=2
-NOPERCENTY	<^%Y* is a reserved global name in GT.M>/error/fao=0
+NOPERCENTY	<^%Y* is a reserved global name in YottaDB>/error/fao=0
 	.end

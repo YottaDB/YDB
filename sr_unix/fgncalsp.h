@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2013 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -66,36 +70,36 @@ struct extcall_package_list
 	clnupfptr			package_clnup_rtn;
 };
 
-enum gtm_types
+enum ydb_types
 {
-	gtm_notfound,
-	gtm_void,
-	gtm_status,
-	gtm_int,
-	gtm_uint,
-	gtm_long,
-	gtm_ulong,
-	gtm_float,
-	gtm_double,
-	gtm_int_star,
-	gtm_uint_star,
-	gtm_long_star,
-	gtm_ulong_star,
-	gtm_string_star,
-	gtm_float_star,
-	gtm_char_star,
-	gtm_char_starstar,
-	gtm_double_star,
-	gtm_pointertofunc,
-	gtm_pointertofunc_star,
-	gtm_jboolean,
-	gtm_jint,
-	gtm_jlong,
-	gtm_jfloat,
-	gtm_jdouble,
-	gtm_jstring,
-	gtm_jbyte_array,
-	gtm_jbig_decimal
+	ydb_notfound,
+	ydb_void,
+	ydb_status,
+	ydb_int,
+	ydb_uint,
+	ydb_long,
+	ydb_ulong,
+	ydb_float,
+	ydb_double,
+	ydb_int_star,
+	ydb_uint_star,
+	ydb_long_star,
+	ydb_ulong_star,
+	ydb_string_star,
+	ydb_float_star,
+	ydb_char_star,
+	ydb_char_starstar,
+	ydb_double_star,
+	ydb_pointertofunc,
+	ydb_pointertofunc_star,
+	ydb_jboolean,
+	ydb_jint,
+	ydb_jlong,
+	ydb_jfloat,
+	ydb_jdouble,
+	ydb_jstring,
+	ydb_jbyte_array,
+	ydb_jbig_decimal
 };
 
 enum callintogtm_fncs
@@ -113,13 +117,13 @@ enum callintogtm_fncs
 struct extcall_entry_list
 {
 	struct extcall_entry_list	*next_entry;
-	enum gtm_types			return_type;	/* function return value */
+	enum ydb_types			return_type;	/* function return value */
 	int				ret_pre_alloc_val; /* amount of space to be pre-allocated for the return type */
 	uint4				input_mask;	/* is it an input parameter lsb = 1st parm */
 	uint4				output_mask;	/* is it an output parameter lsb = 1st parm */
 	int				parmblk_size;	/* size in bytes of parameter block to be allocated for call*/
 	int				argcnt;		/* number of arguments */
-	enum gtm_types			*parms;		/* pointer to parameter array */
+	enum ydb_types			*parms;		/* pointer to parameter array */
 	int				*param_pre_alloc_size; /* amount of space to be pre-allocated for the parameters */
 	fgnfnc				fcn;		/* address of runtime routine */
 	mstr				entry_name;	/* name of M entryref */
@@ -135,17 +139,16 @@ typedef struct callin_entry_list
 	uint4			input_mask;	/* input parameter? LSB = 1st parm */
 	uint4			output_mask;	/* output parameter? LSB = 1st parm */
 	unsigned short		argcnt;		/* number of arguments */
-	enum gtm_types		return_type;
-	enum gtm_types		*parms;		/* parameter types */
+	enum ydb_types		return_type;
+	enum ydb_types		*parms;		/* parameter types */
 	struct callin_entry_list	*next_entry;
 } callin_entry_list;
 
 /* parameter block that ci_restart uses to pass arguments to M routine */
 typedef struct parmblk_struct
 {
-	void	(*ci_rtn)(void);
+	void    *retaddr;
 	int4    argcnt;
-	void    *rtnaddr, *labaddr, *retaddr;
 	int4    mask;
 	lv_val	*args[MAX_ACTUALS];
 } parmblk_struct;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@
 #include "op.h"
 #include "fork_init.h"
 #include "geteditor.h"
+#include "restrict.h"
 #include "wbox_test_init.h"
 
 GBLREF	io_pair		io_std_device;
@@ -38,6 +39,7 @@ GBLREF	int4		dollar_zeditor;
 
 error_def(ERR_NOEDITOR);
 error_def(ERR_ZEDFILSPEC);
+error_def(ERR_RESTRICTEDOP);
 
 void op_zedit(mval *v, mval *p)
 {
@@ -154,6 +156,9 @@ void op_zedit(mval *v, mval *p)
 			es[ path_len ] = 0;
 		}
 	}
+
+	if (RESTRICTED(zedit_op))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZEDIT");
 
 	flush_pio();
 	if (tt == io_std_device.in->type)

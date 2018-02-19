@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,18 +38,23 @@ void op_gvquery (mval *v)
 {
 	int4			size;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, *glob_begin;
- 	boolean_t		found, ok_to_change_currkey;
+ 	boolean_t		currkey_has_special_meaning, found, ok_to_change_currkey, last_subsc_is_null;
 	enum db_acc_method 	acc_meth;
-	unsigned char		*extnamsrc, *extnamdst, *extnamtop;
+	unsigned char		ch1, ch2, *extnamsrc, *extnamdst, *extnamtop;
 	int			maxlen;
 	char			extnamdelim[] = "^|\"\"|";
 	mval			val;
+	gv_key			*last_gvquery_key;
 	gvnh_reg_t		*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* We want to turn QUERY into QUERYGET for all types of access methods so that we can cache the value of the key returned
-	 * by $QUERY. The value is very likely to be used shortly after $QUERY - Vinaya, Aug 13, 2001 */
+	last_gvquery_key = TREF(last_gvquery_key);
+	if (NULL == last_gvquery_key)
+	{
+		GVKEY_INIT(last_gvquery_key, DBKEYSIZE(MAX_KEY_SZ));
+		TREF(last_gvquery_key) = last_gvquery_key;
+	}
 	acc_meth = REG_ACC_METH(gv_cur_region);
 	/* Modify gv_currkey such that a gvcst_search of the resulting key will find the next available record in collation order.
 	 * But in case of dba_usr (the custom implementation of $ORDER which is overloaded for DDP now but could be more in the
@@ -56,12 +64,21 @@ void op_gvquery (mval *v)
 	if (ok_to_change_currkey)
 	{
 		if (TREF(gv_last_subsc_null) && (NEVER == gv_cur_region->std_null_coll))
-		{
-			assert(STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]);
-			gv_currkey->base[gv_currkey->prev] = 01;
+		{	/* Treat null subscript specification as a special meaning (to get the first subscript) */
+			if ((last_gvquery_key->end != gv_currkey->end)
+					|| memcmp(last_gvquery_key->base, gv_currkey->base, last_gvquery_key->end))
+			{
+				currkey_has_special_meaning = TRUE;
+				assert(STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]);
+				gv_currkey->base[gv_currkey->prev] = 01;
+			} else
+				currkey_has_special_meaning = FALSE;
 		} else
-		{	/* Note, gv_currkey->prev isn't changed here. We rely on this
-			 * in gtcmtr_query to distinguish different forms of the key.
+			currkey_has_special_meaning = FALSE;
+		if (!currkey_has_special_meaning)
+		{	/* Input key is to be treated as is. No special meaning like is the case for a null subscript.
+			 * Note, gv_currkey->prev isn't changed here. We rely on this in gtcmtr_query to distinguish
+			 * different forms of the key.
 			 */
 			gv_currkey->base[gv_currkey->end++]= 1;
 			gv_currkey->base[gv_currkey->end++] = KEY_DELIMITER;
@@ -91,7 +108,7 @@ void op_gvquery (mval *v)
 	}
 	if (ok_to_change_currkey)
 	{	/* Restore gv_currkey to what it was at function entry time */
-		if (TREF(gv_last_subsc_null) && (NEVER == gv_cur_region->std_null_coll))
+		if (currkey_has_special_meaning)
 		{
 			assert(01 == gv_currkey->base[gv_currkey->prev]);
 			gv_currkey->base[gv_currkey->prev] = STR_SUB_PREFIX;
@@ -146,8 +163,22 @@ void op_gvquery (mval *v)
 		assert (v->str.addr < (char *)stringpool.top && v->str.addr >= (char *)stringpool.base);
 		assert (v->str.addr + v->str.len <= (char *)stringpool.top &&
 			v->str.addr + v->str.len >= (char *)stringpool.base);
+		assert(2 <= gv_altkey->end);
+		ch1 = gv_altkey->base[gv_altkey->end - 2];
+		if ((STR_SUB_PREFIX == ch1) || (SUBSCRIPT_STDCOL_NULL == ch1))
+		{
+			assert(3 <= gv_altkey->end);
+			ch2 = gv_altkey->base[gv_altkey->end - 3];
+			last_subsc_is_null = (KEY_DELIMITER == ch2);
+		} else
+			last_subsc_is_null = FALSE;
+		if (last_subsc_is_null)
+			COPY_KEY(last_gvquery_key, gv_altkey);
 	} else /* !found */
+	{
 		v->str.len = 0;
+		last_gvquery_key->end = 0;
+	}
 	v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 	return;
 }

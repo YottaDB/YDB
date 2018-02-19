@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,16 +49,16 @@
 #include "stack_frame.h"
 #include "jobsp.h"
 
+GBLREF gd_region		*gv_cur_region;
+GBLREF gv_namehead		*gv_target;
+GBLREF gv_key			*gv_currkey;
+GBLREF int			merge_args;
 GBLREF lvzwrite_datablk	*lvzwrite_block;
-GBLREF zshow_out	*zwr_output;
-GBLREF gv_namehead	*gv_target;
-GBLREF gv_key		*gv_currkey;
-GBLREF int		merge_args;
-GBLREF merge_glvn_ptr	mglvnp;
-GBLREF gd_region	*gv_cur_region;
-GBLREF symval		*curr_symval;
-GBLREF zwr_hash_table	*zwrhtab;			/* Used to track aliases during zwrites */
-GBLREF uint4		zwrtacindx;			/* When creating $ZWRTACxxx vars for ZWRite, this holds xxx */
+GBLREF merge_glvn_ptr		mglvnp;
+GBLREF symval			*curr_symval;
+GBLREF uint4			zwrtacindx;		/* When creating $ZWRTACxxx vars for ZWRite, this holds xxx */
+GBLREF zshow_out		*zwr_output;
+GBLREF zwr_hash_table		*zwrhtab;		/* Used to track aliases during zwrites */
 
 LITDEF MSTR_CONST(semi_star, " ;*");
 LITDEF MSTR_CONST(dzwrtac_clean, "$ZWRTAC=\"\"");
@@ -72,15 +72,26 @@ void lvzwr_out_targkey(mstr *one);
 void lvzwr_out_targkey(mstr *one)
 {
 	int	n, nsubs;
+#	ifdef DEBUG
+	int4	length;
+#	endif
 
 	zshow_output(zwr_output, lvzwrite_block->curr_name);
 	nsubs = lvzwrite_block->curr_subsc;
 	if (nsubs)
 	{
+		DEBUG_ONLY(length = 0;)
 		*one->addr = '(';
 		zshow_output(zwr_output, one);
 		for (n = 0 ; ; )
-		{
+		{	/* the following check protects against an apparent bug in the system service managing (at least) terminal
+			 * output where it gets overwhelmed and hangs in __write_nocancel (cat does too, so it's not GT.M); because
+			 * zwrite does a subscript at a time, this should not be necessary, however, the check is consistent with
+			 * appropriate restrictions in op_putindx, op_fnname and op_fnquery
+			 */
+			DEBUG_ONLY(MV_FORCE_STR(((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual);)
+			assert(MAX_STRLEN	/* WARNING assignment below; check in op_putindx should assure this */
+				>= (length += ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual->str.len));
 			mval_write(zwr_output, ((zwr_sub_lst *)lvzwrite_block->sub)->subsc_list[n].actual, FALSE);
 			if (++n < nsubs)
 			{
@@ -180,7 +191,7 @@ void lvzwr_out(lv_val *lvp)
 				{	/* Put out "dummy" statement that will clear all the $ZWRTAC vars for a clean slate */
 					zwr_output->flush = TRUE;
 					zshow_output(zwr_output, &dzwrtac_clean);
-					UNIX_ONLY(MIDCHILD_SEND_VAR);
+					MIDCHILD_SEND_VAR;
 				}
 				MEMCPY_LIT(zwrt_varname.c, DOLLAR_ZWRTAC);
 				lastc = i2asc((uchar_ptr_t)zwrt_varname.c + STR_LIT_LEN(DOLLAR_ZWRTAC), zwrtacindx);
@@ -203,7 +214,7 @@ void lvzwr_out(lv_val *lvp)
 			zshow_output(zwr_output, &one);
 			zwr_output->flush = TRUE;
 			zshow_output(zwr_output, (const mstr *)&newzav->zwr_var);
-			UNIX_ONLY(MIDCHILD_SEND_VAR);
+			MIDCHILD_SEND_VAR;
 			if (dump_container)
 			{	/* We want to dump the entire container variable but the name doesn't match the var we are
 				 * currently dumping so push a new lvzwrite_block onto the stack, fill it in for the current var

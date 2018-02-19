@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +19,7 @@ mint		gvcmx_data(void);
 bool		gvcmx_get(mval *v);
 bool		gvcmx_order(void);
 bool		gvcmx_query(mval *val);
+bool		gvcmx_reversequery(mval *val);
 bool		gvcmx_reqremlk(unsigned char laflag, int4 time);
 bool		gvcmx_resremlk(unsigned char c);
 bool		gvcmx_zprevious(void);

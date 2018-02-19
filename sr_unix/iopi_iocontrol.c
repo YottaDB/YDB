@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2015 Fidelity National Information 	*
+ * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,7 @@ void	iopi_iocontrol(mstr *mn, int4 argcnt, va_list args)
 
 	d_rm = (d_rm_struct *) io_curr_device.out->dev_sp;
 	/* WRITE /EOF only applies to PIPE devices.  Sequential file and FIFO devices should be closed with CLOSE.*/
-	if (!d_rm->pipe)
+	if (!d_rm->is_pipe)
 		return;
 	/* we should not get here unless there is some string length after write / */
 	assertpro((int)mn->len);
@@ -78,15 +78,10 @@ void	iopi_iocontrol(mstr *mn, int4 argcnt, va_list args)
 void	iopi_dlr_device(mstr *d)
 {
 	io_desc		*iod;
-        int		len;
 
 	/* We will default to the input device for setting $device, since pipe uses both */
 	iod = io_curr_device.in;
-	len = STRLEN(iod->dollar.device);
-	/* verify internal buffer has enough space for $DEVICE string value */
-	assertpro((int)d->len > len);
-	memcpy(d->addr, iod->dollar.device, MIN(len,d->len));
-	d->len = len;
+	PUT_DOLLAR_DEVICE_INTO_MSTR(iod, d);
 	return;
 }
 
@@ -101,7 +96,7 @@ void	iopi_dlr_key(mstr *d)
 	/* verify internal buffer has enough space for $KEY string value */
 	assertpro((int)d->len > len);
 	if (len > 0)
-		memcpy(d->addr, iod->dollar.key, MIN(len,d->len));
+		memcpy(d->addr, iod->dollar.key, MIN(len, d->len));
 	d->len = len;
 	return;
 }
@@ -109,7 +104,7 @@ void	iopi_dlr_key(mstr *d)
 void	iopi_dlr_zkey(mstr *d)
 {
 	io_desc		*iod;
-	int		len;
+	int		len, save_errno;
 	d_rm_struct	*d_rm;
 	char		tname[MAX_FIXED_STRING];
 	gtm_int64_t	record_num;	/* record offset in fixed record file */
@@ -120,7 +115,7 @@ void	iopi_dlr_zkey(mstr *d)
 
 	iod = io_curr_device.in;
 	d_rm = (d_rm_struct *)(iod->dev_sp);
-	if (d_rm->fifo || d_rm->pipe || (2 >= d_rm->fildes))
+	if (d_rm->fifo || d_rm->is_pipe || (2 >= d_rm->fildes))
 		d->len = 0;
 	else
 	{
@@ -131,8 +126,10 @@ void	iopi_dlr_zkey(mstr *d)
 			cur_position = lseek(d_rm->fildes, 0, SEEK_CUR);
 			if ((off_t)-1 == cur_position)
 			{
+				save_errno = errno;
+				SET_DOLLARDEVICE_ONECOMMA_STRERROR(iod, save_errno);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
-					      RTS_ERROR_LITERAL("iopi_dlr_zkey()"), CALLFROM, errno);
+					      RTS_ERROR_LITERAL("iopi_dlr_zkey()"), CALLFROM, save_errno);
 			} else
 				d_rm->file_pos = cur_position;
 		}

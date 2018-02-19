@@ -1,0 +1,108 @@
+#################################################################
+#								#
+# Copyright 2001, 2012 Fidelity Information Services, Inc	#
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+	.sbttl	g_msf.si
+#	PAGE	+
+#-----------------------------------------------
+# Mumps stack frame manipulation macros
+#  for the GNU gas arm assembler version
+#-----------------------------------------------
+
+msf_rvector_off		=	 0
+msf_l_symtab_off	=	 4
+msf_mpc_off		=	 8
+msf_ctxt_off		=	12
+msf_literal_ptr_off	=	16
+msf_temps_ptr_off	=	20
+msf_vartab_ptr_off	=	24
+
+msf_vartab_len_off	=	28
+msf_temp_mvals_off	=	30
+msf_old_frame_off	=	32
+msf_typ_off		=	36
+msf_flags_off		=	38
+msf_for_ctrl_stack	=	40
+
+msf_frame_size		=	48
+
+SFT_COUNT		=	0x01
+SFT_DM			=	0x02
+SFT_REP_OP		=	0x04
+SFT_ZBRK_ACT		=	0x08
+SFT_DEV_ACT		=	0x10
+SFT_ZTRAP		=	0x20
+SFT_ZSTEP_ACT		=	0x80
+SFT_ZINTR		=	0x100
+
+SFF_INDCE		=	0x01
+SFF_ZTRAP_ERR		=	0x02
+SFF_DEV_ACT_ERR		=	0x04
+SFF_ETRAP_ERR		=	0x08
+
+
+	.sbttl	g_msf.si    putframe
+.macro putframe
+	ldr	r12, [r5]
+	str	r10, [r12, +#msf_l_symtab_off]
+	str	r9,  [r12, +#msf_temps_ptr_off]
+	str	r8,  [r12, +#msf_literal_ptr_off]
+	str	r6,  [r12, +#msf_ctxt_off]
+	str	lr,  [r12, +#msf_mpc_off]
+.endm
+
+.extern	error_return
+
+	.sbttl	g_msf.si    getframe
+.macro getframe
+	ldr	r12, [r5]
+	ldrb	r4,  [r12, +#msf_flags_off]
+	tst	r4,  #SFF_ETRAP_ERR
+	beq	1f
+	bl	error_return
+	ldr	r12, [r5]
+1:
+	ldr	r8,  [r12, +#msf_literal_ptr_off]
+	ldr	r9,  [r12, +#msf_temps_ptr_off]
+	ldr	r10, [r12, +#msf_l_symtab_off]
+	ldr	r6,  [r12, +#msf_ctxt_off]
+	ldr	lr,  [r12, +#msf_mpc_off]
+.endm
+
+
+	.sbttl	g_msf.si
+mrt_jsb			=	  0
+mrt_shlib_handle	=	 16
+mrt_src_len		=	 24
+mrt_src_addr		=	 28
+mrt_compiler_qlf	=	 32
+mrt_obj_label		=	 36
+mrt_rtn_len		=	 44
+mrt_rtn_addr		=	 48
+mrt_var_ptr		=	 52
+mrt_var_len		=	 56
+mrt_lab_ptr		=	 60
+mrt_lab_len		=	 64
+mrt_lnr_ptr		=	 68
+mrt_lnr_len		=	 72
+mrt_lit_ptr		=	 88
+mrt_lnk_ptr		=	 96
+mrt_ptext_adr		=	120
+mrt_checksum		=	128
+mrt_tmp_mv		=	132
+mrt_tmp_sz		=	136
+mrt_curr_ptr		=	144
+mrt_oldr_ptr		=	148
+mrt_zhist		=	180

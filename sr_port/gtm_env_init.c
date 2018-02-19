@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2015 Fidelity National Information 	*
+ * Copyright (c) 2004-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +51,7 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "cli.h"
+#include "repl_filter.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -56,11 +60,12 @@
 #endif
 
 #ifdef FULLBLOCKWRITES
-#  define DEFAULT_FBW_FLAG TRUE
+#  define DEFAULT_FBW_FLAG 1
 #else
-#  define DEFAULT_FBW_FLAG FALSE
+#  define DEFAULT_FBW_FLAG 0
 #endif
-#define SIZEOF_prombuf ggl_prombuf
+#define SIZEOF_prombuf		ggl_prombuf
+#define SIZEOF_ydbmsgprefixbuf	ggl_ydbmsgprefixbuf
 
 /* gtm_dirtree_collhdr_always is only used in dbg code and hence doesn't need checking in the D9I10002703 subtest
  * Hence this env var is not defined in gtm_logicals.h as that is what the D9I10002703 subtest looks at for a list of env vars.
@@ -70,7 +75,7 @@
 GBLREF	boolean_t	dollar_zquit_anyway;	/* if TRUE compile QUITs to not care whether or not they're from an extrinsic */
 GBLREF	uint4		gtmDebugLevel; 		/* Debug level (0 = using default sm module so with
 						   a DEBUG build, even level 0 implies basic debugging) */
-GBLREF	boolean_t	gtm_fullblockwrites;	/* Do full (not partial) database block writes T/F */
+GBLREF	int4		gtm_fullblockwrites;	/* Do full (not partial) database block writes */
 GBLREF	boolean_t	certify_all_blocks;
 GBLREF	uint4		gtm_blkupgrade_flag;	/* controls whether dynamic block upgrade is attempted or not */
 GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
@@ -83,16 +88,19 @@ GBLREF	block_id	gtm_tp_allocation_clue;	/* block# hint to start allocation for c
 GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
 GBLREF	boolean_t	ztrap_new;		/* Each time $ZTRAP is set it is automatically NEW'd */
 GBLREF	size_t		gtm_max_storalloc;	/* Used for testing: creates an allocation barrier */
+GBLREF	int		ydb_repl_filter_timeout;/* # of seconds that source server waits before issuing FILTERTIMEDOUT */
 
 void	gtm_env_init(void)
 {
-	mstr			val, trans;
 	boolean_t		ret, is_defined;
+	char			buf[MAX_TRANS_NAME_LEN];
+	double			time;
+	int			status2, i, j;
+	int4			status;
+	mstr			val, trans;
 	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
 	uint4			max_threads, max_procs;
-	int4			status;
-	int			status2;
-	char			buf[MAX_TRANS_NAME_LEN];
+	int4			temp_gtm_strpllim;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -113,6 +121,23 @@ void	gtm_env_init(void)
 			if (GDL_SmStorHog & tdbglvl)
 				tdbglvl |= GDL_SmBackfill | GDL_SmChkAllocBackfill;
 			gtmDebugLevel |= tdbglvl;
+		}
+		/* See if ydb_msgprefix is specified. If so store it in TREF(ydbmsgprefix).
+		 * Note: Default value is already stored in "gtm_threadgbl_init".
+		 * Do this initialization before most other variables so any error messages later issued in this module
+		 * have the correct msgprefix.
+		 */
+		val.addr = YDB_MSGPREFIX;
+		val.len = SIZEOF(YDB_MSGPREFIX) - 1;
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		{
+			assert(SIZEOF(buf) > trans.len);
+			if (SIZEOF_ydbmsgprefixbuf > trans.len)
+			{
+				(TREF(ydbmsgprefix)).len = trans.len;
+				memcpy((TREF(ydbmsgprefix)).addr, trans.addr, trans.len);
+				(TREF(ydbmsgprefix)).addr[trans.len] = '\0';	/* need null terminated "fac" in "gtm_getmsg" */
+			}
 		}
 		/* gtm_boolean environment/logical */
 		val.addr = GTM_BOOLEAN;
@@ -216,9 +241,26 @@ void	gtm_env_init(void)
 		/* Full Database-block Write mode */
 		val.addr = GTM_FULLBLOCKWRITES;
 		val.len = SIZEOF(GTM_FULLBLOCKWRITES) - 1;
-		gtm_fullblockwrites = logical_truth_value(&val, FALSE, &is_defined);
-		if (!is_defined)
+		gtm_fullblockwrites = (int)logical_truth_value(&val, FALSE, &is_defined);
+		if (!is_defined) /* Variable not defined */
 			gtm_fullblockwrites = DEFAULT_FBW_FLAG;
+		else if (!gtm_fullblockwrites) /* Set to false */
+			gtm_fullblockwrites = FALSE;
+		else /* Set to true, exam for FULL_DATABASE_WRITE */
+		{
+			gtm_fullblockwrites = trans_numeric(&val, &is_defined, TRUE);
+			switch(gtm_fullblockwrites)
+			{
+			case FULL_FILESYSTEM_WRITE:
+			case FULL_DATABASE_WRITE:
+				/* Both these values are valid */
+				break;
+			default:
+				/* Else, assume FULL_FILESYSTEM_WRITE */
+				gtm_fullblockwrites = FULL_FILESYSTEM_WRITE;
+				break;
+			}
+		}
 		/* GDS Block certification */
 		val.addr = GTM_GDSCERT;
 		val.len = SIZEOF(GTM_GDSCERT) - 1;
@@ -294,12 +336,18 @@ void	gtm_env_init(void)
 			}
 		}
 		/* Initialize tpnotacidtime */
-		TREF(tpnotacidtime) = TPNOTACID_DEFAULT_TIME;
+		(TREF(tpnotacidtime)).m[1] = TPNOTACID_DEFAULT_TIME;
 		val.addr = GTM_TPNOTACIDTIME;
 		val.len = SIZEOF(GTM_TPNOTACIDTIME) - 1;
-		if ((status = trans_numeric(&val, &is_defined, TRUE)) && (0 <= status)
-			&& (TPNOTACID_MAX_TIME >= status) && is_defined)
-				TREF(tpnotacidtime) = status;	 /* NOTE assignment above */
+		if (SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		{
+			assert(SIZEOF(buf) > trans.len);
+			*(char *)(buf + trans.len) = 0;
+			errno = 0;
+			time = strtod(buf, NULL);
+			if ((ERANGE != errno) && (TPNOTACID_MAX_TIME >= time))
+				(TREF(tpnotacidtime)).m[1] = time * MILLISECS_IN_SEC;
+		}	/* gtm_startup completes initialization of the tpnotacidtime mval */
 		/* Initialize $gtm_tprestart_log_first */
 		val.addr = GTM_TPRESTART_LOG_FIRST;
 		val.len = STR_LIT_LEN(GTM_TPRESTART_LOG_FIRST);
@@ -376,6 +424,24 @@ void	gtm_env_init(void)
 		gtm_mupjnl_parallel = trans_numeric(&val, &is_defined, TRUE);
 		if (!is_defined)
 			gtm_mupjnl_parallel = 1;
+		/* See if $gtm_string_pool_limit is set */
+		val.addr = GTM_STRPLLIM;
+		val.len = SIZEOF(GTM_STRPLLIM) - 1;
+		temp_gtm_strpllim = trans_numeric(&val, &is_defined, TRUE);
+		if (0 < temp_gtm_strpllim)
+			TREF(gtm_strpllim) = temp_gtm_strpllim;
+		/* See if ydb_repl_filter_timeout is specified */
+		val.addr = YDB_REPL_FILTER_TIMEOUT;
+		val.len = SIZEOF(YDB_REPL_FILTER_TIMEOUT) - 1;
+		ydb_repl_filter_timeout = trans_numeric(&val, &is_defined, TRUE);
+		if (!is_defined)
+			ydb_repl_filter_timeout = REPL_FILTER_TIMEOUT_DEF;
+		else if (REPL_FILTER_TIMEOUT_MIN > ydb_repl_filter_timeout)
+			ydb_repl_filter_timeout = REPL_FILTER_TIMEOUT_MIN;
+		else if (REPL_FILTER_TIMEOUT_MAX < ydb_repl_filter_timeout)
+			ydb_repl_filter_timeout = REPL_FILTER_TIMEOUT_MAX;
+		assert((REPL_FILTER_TIMEOUT_MIN <= ydb_repl_filter_timeout)
+				&& (REPL_FILTER_TIMEOUT_MAX >= ydb_repl_filter_timeout));
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 	}

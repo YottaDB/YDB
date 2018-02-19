@@ -3,6 +3,9 @@
 ; Copyright (c) 2016-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -63,6 +66,7 @@ getfields(fldarray,dbname)
 	set HexDigits="0123456789ABCDEF"
 	set TRUE=1,FALSE=0,BigEndian=1,LittleEndian=0
 	set platformendian("AIX","RS6000")=BigEndian
+	set platformendian("Linux","armv7l")=LittleEndian
 	set platformendian("Linux","x86")=LittleEndian
 	set platformendian("Linux","x86_64")=LittleEndian
 	set platformendian("Solaris","SPARC")=BigEndian
@@ -81,6 +85,7 @@ getfields(fldarray,dbname)
 	if $zlength(fhead)'=8192 do
 	. write "GETFIELDS: Error - unable to read fileheader from ",dbname,!
 	. write:0'=$data(fhead) "GETFIELDS: Read only ",$zlength(fhead)," bytes",!
+	. set $etrap="zgoto 0"
 	. zhalt 1
 	;
 	; Determine if this is a valid database header. Note that we don't
@@ -90,11 +95,12 @@ getfields(fldarray,dbname)
 	set label=$$formatfld($zextract(fhead,1,12),"char")
 	if (label'["GDSDYNUNX02")&(label'["GDSDYNUNX03") do
 	. write "GETFIELDS: Error - invalid fileheader format from ",dbname,!
+	. set $etrap="zgoto 0"
 	. zhalt 1
 	;
 	; Now parse out the fields
 	;
-	set $zgbldir="$gtm_dist/gtmhelp.gld"
+	set $zgbldir="$ydb_dist/gtmhelp.gld"
 	set skey="sgmnt_data"
 	for fldnum=1:1:^gtmtypes(skey,0) do
 	. set fldtype=^gtmtypes(skey,fldnum,"type")
@@ -119,6 +125,7 @@ eof
 	close dbname
 badopen
 	write "The file """,dbname,""" had error: "
+	set $etrap="zgoto 0"
 	zmessage +$zstatus
 	zhalt 1
 

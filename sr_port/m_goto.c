@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,8 @@ int m_goto(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (TREF(xecute_literal_parse))
+		return FALSE;
 	dqinit(&tmpchain, exorder);
 	oldchain = setcurtchain(&tmpchain);
 	if (!entryref(OC_JMP, OC_EXTJMP, (mint)indir_goto, TRUE, FALSE, FALSE))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,11 +19,11 @@
 #include <errno.h>
 #include "gtm_stdio.h"
 #include "gtm_string.h"
-
 #include "io.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"
 #include "error.h"
+#include "min_max.h"
 
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_NOSOCKETINDEV);
@@ -38,24 +38,20 @@ void iosocket_flush(io_desc *iod)
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
 	ssize_t		status;
-	int             on = 1, off = 0;
-        char            *errptr;
-        int4            errlen;
+	int		on = 1, off = 0;
+	char		*errptr;
+	int4		errlen;
 	boolean_t	ch_set;
 
 	assert(gtmsocket == iod->type);
-
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
-
 	if (0 >= dsocketptr->n_socket)
 	{
-#		ifndef VMS
 		if (iod == io_std_device.out)
 			ionl_flush(iod);
 		else
-#		endif
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
@@ -83,24 +79,6 @@ void iosocket_flush(io_desc *iod)
 		if ((0 < socketptr->obuffer_size) && ((0 >= status) || (0 != socketptr->obuffer_errno)))
 			iosocket_buffer_error(socketptr);	/* pre-existing error or error flushing buffer */
 	}
-#ifdef C9A06001531
-	/* pending change request C9A06001531 */
-        memcpy(iod->dollar.device, "0", SIZEOF("0"));
-        if ( -1 == setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &on, SIZEOF(on)) ||
-		(-1 == setsockopt(socketptr->sd, SOL_SOCKET, TCP_NODELAY, &off, SIZEOF(off))))
-        {
-		errptr = (char *)STRERROR(errno);
-                errlen = strlen(errptr);
-                iod->dollar.za = 9;
-		MEMCPY_LIT(iod->dollar.device, "1,");
-                memcpy(&iod->dollar.device[SIZEOF("1,") - 1], errptr, errlen + 1);	/* we want the null */
-		if (socketptr->ioerror)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SOCKWRITE, 0, ERR_TEXT, 2, errlen, errptr);
-		REVERT_GTMIO_CH(&iod->pair, ch_set);
-		return;
-        }
-
-#endif
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return;
 }

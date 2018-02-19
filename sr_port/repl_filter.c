@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,16 +21,10 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_select.h"
-#ifdef UNIX
 #include "gtm_ipc.h"
-#endif
 
-#ifdef UNIX
 #include <sys/mman.h>
 #include <sys/shm.h>
-#elif defined(VMS)
-#include <descrip.h>
-#endif
 #include <stddef.h>
 #include <errno.h>
 #include <sys/wait.h>
@@ -57,10 +54,8 @@
 #include "jnl_typedef.h"
 #include "gv_trigger_common.h" /* for HASHT* macros */
 #include "replgbl.h"
-#ifdef UNIX
 #include "gtm_c_stack_trace.h"
 #include "fork_init.h"
-#endif
 #include "wbox_test_init.h"
 #ifdef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 #include <sys/poll.h>
@@ -334,7 +329,7 @@
 	(PREFIX)->jrec_type = JRT_NULL;						\
 	(PREFIX)->forwptr = V17_NULL_RECLEN;					\
 	/* pini_addr, time, checksum and tn fields of "jrec_prefix" are not	\
-	 * used by update process so dont bother initializing them.		\
+	 * used by update process so don't bother initializing them.		\
 	 */									\
 	CB += JREC_PREFIX_SIZE;							\
 	/* Initialize the sequence number */					\
@@ -356,17 +351,15 @@
 	(PREFIX)->jrec_type = JRT_NULL;						\
 	(PREFIX)->forwptr = V24_NULL_RECLEN;					\
 	/* pini_addr, time, checksum and tn fields of "jrec_prefix" are not	\
-	 * used by update process so dont bother initializing them.		\
+	 * used by update process so don't bother initializing them.		\
 	 */									\
 	CB += JREC_PREFIX_SIZE;							\
 	/* Initialize "jnl_seqno" */						\
 	*(seq_num *)(CB) = SEQNO;						\
 	CB += SIZEOF(seq_num);							\
 	/* Initialize "strm_seqno" */						\
-	UNIX_ONLY(assert(IS_VALID_STRM_SEQNO(STRM_SEQNO));)			\
-	UNIX_ONLY(*(seq_num *)(CB) = STRM_SEQNO;)				\
-	VMS_ONLY(assert(0 == STRM_SEQNO));					\
-	VMS_ONLY(*(seq_num *)(CB) = 0;)						\
+	assert(IS_VALID_STRM_SEQNO(STRM_SEQNO));				\
+	*(seq_num *)(CB) = STRM_SEQNO;						\
 	CB += SIZEOF(seq_num);							\
 	/* Skip the filler */							\
 	CB += SIZEOF(uint4);							\
@@ -392,7 +385,7 @@
 #define MORE_TO_TRANSFER -99
 #define DUMMY_TCOMMIT_LENGTH 3	/* A dummy commit is 09\n */
 
-#define FILTER_HALF_TIMEOUT_TIME	(32 * MILLISECS_IN_SEC)
+#define REPL_FILTER_HALF_TIMEOUT	((ydb_repl_filter_timeout * MILLISECS_IN_SEC) / 2)
 
 /* repl_filter_recv receive state */
 
@@ -412,30 +405,32 @@ enum
 
 GBLDEF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
-	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V26 to V17) */
-	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V26 to V18) */
-	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V26 to V19) */
-	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V26 to V20) */
-	IF_24TO21,	/* Convert from filter format V24 to V21 (i.e., from jnl ver V26 to V21) */
-	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V26 to V22) */
-	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V26 to V23) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V26 to V24) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V26 to V25) */
-	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V26 to V26) */
+	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V27 to V17) */
+	IF_24TO17,	/* Convert from filter format V24 to V17 (i.e., from jnl ver V27 to V18) */
+	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V27 to V19) */
+	IF_24TO19,	/* Convert from filter format V24 to V19 (i.e., from jnl ver V27 to V20) */
+	IF_24TO21,	/* Convert from filter format V24 to V21 (i.e., from jnl ver V27 to V21) */
+	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V27 to V22) */
+	IF_24TO22,	/* Convert from filter format V24 to V22 (i.e., from jnl ver V27 to V23) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V24) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V25) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V26) */
+	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V27) */
 };
 
 GBLDEF	intlfltr_t repl_filter_old2cur[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1] =
 {
-	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V17 to V26) */
-	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V18 to V26) */
-	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V19 to V26) */
-	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V20 to V26) */
-	IF_21TO24,	/* Convert from filter format V21 to V24 (i.e., from jnl ver V21 to V26) */
-	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V22 to V26) */
-	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V23 to V26) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V24 to V26) */
-	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V26) */
-	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V26) */
+	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V17 to V27) */
+	IF_17TO24,	/* Convert from filter format V17 to V24 (i.e., from jnl ver V18 to V27) */
+	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V19 to V27) */
+	IF_19TO24,	/* Convert from filter format V19 to V24 (i.e., from jnl ver V20 to V27) */
+	IF_21TO24,	/* Convert from filter format V21 to V24 (i.e., from jnl ver V21 to V27) */
+	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V22 to V27) */
+	IF_22TO24,	/* Convert from filter format V22 to V24 (i.e., from jnl ver V23 to V27) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V24 to V27) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V25 to V27) */
+	IF_24TO24,	/* Convert from filter format V24 to V24 (i.e., from jnl ver V26 to V27) */
+	IF_24TO24	/* Convert from filter format V24 to V24 (i.e., from jnl ver V27 to V27) */
 };
 
 GBLREF	unsigned int		jnl_source_datalen, jnl_dest_maxdatalen;
@@ -446,12 +441,15 @@ GBLREF	gv_key			*gv_currkey, *gv_altkey; /* for jnl_extr_init() */
 GBLREF	uchar_ptr_t		repl_filter_buff;
 GBLREF	int			repl_filter_bufsiz;
 GBLREF	boolean_t		is_src_server, is_rcvr_server;
-#ifdef UNIX
 GBLREF	repl_conn_info_t	*this_side, *remote_side;
-#endif
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		err_same_as_out;
 GBLREF	volatile boolean_t	timer_in_handler;
+GBLREF	FILE			*gtmsource_log_fp;
+GBLREF	FILE			*gtmrecv_log_fp;
+GBLREF	int			gtmsource_filter;
+GBLREF	int			gtmrecv_filter;
+GBLREF	int			ydb_repl_filter_timeout;
 
 LITREF	char			*trigger_subs[];
 
@@ -481,7 +479,6 @@ static struct_jrec_null	null_jnlrec;
 static seq_num		save_jnl_seqno;
 static seq_num		save_strm_seqno;
 static boolean_t	is_nontp, is_null, select_valid;
-VMS_ONLY(int decc$set_child_standard_streams(int, int, int);)
 
 void jnl_extr_init(void)
 {
@@ -489,7 +486,7 @@ void jnl_extr_init(void)
 
 	SETUP_THREADGBL_ACCESS;
 	/* Should be a non-filter related function. But for now,... Needs GBLREFs gv_currkey and transform */
-	TREF(transform) = FALSE;      /* to avoid SIG-11 in "mval2subsc" as it expects gv_target to be set up and we dont set it */
+	TREF(transform) = FALSE;      /* to avoid SIG-11 in "mval2subsc" as it expects gv_target to be set up and we don't set it */
 	GVKEYSIZE_INIT_IF_NEEDED;
 }
 
@@ -567,16 +564,13 @@ int repl_filter_init(char *filter_cmd)
 		REPL_DPRINT2("Filter argc %d\n", index);
 	}
 	)
-	UNIX_ONLY(FORK(repl_filter_pid);)
-	VMS_ONLY(repl_filter_pid = vfork();)
+	FORK(repl_filter_pid);
 	if (0 < repl_filter_pid)
 	{	/* Server */
-		UNIX_ONLY(
-			F_CLOSE(repl_srv_filter_fd[READ_END], close_res); /* SERVER: WRITE only on server -> filter pipe;
+		F_CLOSE(repl_srv_filter_fd[READ_END], close_res); /* SERVER: WRITE only on server -> filter pipe;
 								* also resets "repl_srv_filter_fd[READ_END]" to FD_INVALID */
-			F_CLOSE(repl_filter_srv_fd[WRITE_END], close_res); /* SERVER: READ only on filter -> server pipe;
+		F_CLOSE(repl_filter_srv_fd[WRITE_END], close_res); /* SERVER: READ only on filter -> server pipe;
 								* also resets "repl_srv_filter_fd[WRITE_END]" to FD_INVALID */
-		)
 		/* Make sure the write-end of the pipe is set to non-blocking. This will make sure repl_filter_send gets a
 		 * EAGAIN error in case the write side of the pipe is full and waiting for the filter process to read it.
 		 * In that case, we need to switch to reading to see if the filter process has sent any data to process.
@@ -616,35 +610,24 @@ int repl_filter_init(char *filter_cmd)
 	}
 	if (0 == repl_filter_pid)
 	{	/* Filter */
-		UNIX_ONLY(
-			F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res); /* FILTER: READ only on server -> filter pipe;
-								* also resets "repl_srv_filter_fd[WRITE_END]" to FD_INVALID */
-			F_CLOSE(repl_filter_srv_fd[READ_END], close_res); /* FILTER: WRITE only on filter -> server pipe;
-								* also resets "repl_srv_filter_fd[READ_END]" to FD_INVALID */
-			/* Make the server->filter pipe stdin for filter */
-			DUP2(repl_srv_filter_fd[READ_END], 0, status);
-			assertpro(0 <= status);
-			/* Make the filter->server pipe stdout for filter */
-			DUP2(repl_filter_srv_fd[WRITE_END], 1, status);
-			assertpro(0 <= status);
-		)
-		VMS_ONLY(decc$set_child_standard_streams(repl_srv_filter_fd[READ_END], repl_filter_srv_fd[WRITE_END], -1));
+		F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res); /* FILTER: READ only on server -> filter pipe;
+							* also resets "repl_srv_filter_fd[WRITE_END]" to FD_INVALID */
+		F_CLOSE(repl_filter_srv_fd[READ_END], close_res); /* FILTER: WRITE only on filter -> server pipe;
+							* also resets "repl_srv_filter_fd[READ_END]" to FD_INVALID */
+		/* Make the server->filter pipe stdin for filter */
+		DUP2(repl_srv_filter_fd[READ_END], 0, status);
+		assertpro(0 <= status);
+		/* Make the filter->server pipe stdout for filter */
+		DUP2(repl_filter_srv_fd[WRITE_END], 1, status);
+		assertpro(0 <= status);
 		/* Start the filter */
 		if (0 > EXECV(argv[0], argv))
 		{	/* exec error, close all pipe fds */
 			repl_filter_close_all_pipes();
-			VMS_ONLY(
-				/* For vfork, there is no real child process. So, both ends of both the pipes have to be closed */
-				F_CLOSE(repl_srv_filter_fd[WRITE_END], close_res);
-					/* resets "repl_srv_filter_fd[WRITE_END]" to FD_INVALID */
-				F_CLOSE(repl_filter_srv_fd[READ_END], close_res);
-					/* resets "repl_filter_srv_fd[READ_END]" to FD_INVALID */
-			)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLFILTER, 0, ERR_TEXT, 2,
 					RTS_ERROR_LITERAL("Could not exec filter"), ERRNO);
 			repl_errno = EREPL_FILTERSTART_EXEC;
-			UNIX_ONLY(UNDERSCORE_EXIT(FILTERSTART_ERR);)
-			VMS_ONLY(return(FILTERSTART_ERR);) /* maintain existing for VMS */
+			UNDERSCORE_EXIT(FILTERSTART_ERR);
 		}
 	} else
 	{	/* Error in fork */
@@ -809,7 +792,6 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 					break;
 				}
 			}
-#			ifdef UNIX
 			/* Before starting the `read', note down the current heartbeat counter. This is used to break from the
 			 * read if the filter program takes too long to send records back to us. Do it only if send_done is TRUE
 			 * which indicates the end of a mini-transaction or a commit record for an actual transaction.
@@ -817,7 +799,7 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 			assert(-1 != repl_filter_pid);
 			half_timeout_done = FALSE;
 			if (send_done)
-				TIMEOUT_INIT(timedout, FILTER_HALF_TIMEOUT_TIME);
+				TIMEOUT_INIT(timedout, REPL_FILTER_HALF_TIMEOUT);
 			do
 			{
 				r_len = read(repl_filter_srv_fd[READ_END], srv_read_end, buff_remaining);
@@ -835,15 +817,15 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 					{	/* Half-timeout : take C-stack of the filter program. */
 						half_timeout_done = TRUE;
 						TIMEOUT_DONE(timedout);
-						TIMEOUT_INIT(timedout, FILTER_HALF_TIMEOUT_TIME);
+						TIMEOUT_INIT(timedout, REPL_FILTER_HALF_TIMEOUT);
 						GET_C_STACK_FROM_SCRIPT("FILTERTIMEDOUT_HALF_TIME", process_id, repl_filter_pid, 0);
 					}
 					assert(half_timeout_done);
-					/* GET_C_STACK_FROM_SCRIPT calls gtm_system(BYPASSOK) with interrupts deferredd. If the
-					 * stack trace takes more than 32 seconds, the next timeout interrupt will be deferred
-					 * until gtm_system(BYPASSOK) returns. At which point timedout will be TRUE and there will
-					 * be no signal received by GT.M to interrupt the blocking read() at the begining of the
-					 * loop.  So we handle the timeout now and skip the second stack trace.
+					/* GET_C_STACK_FROM_SCRIPT calls gtm_system(BYPASSOK) with interrupts deferred. If the
+					 * stack trace takes more than REPL_FILTER_HALF_TIMEOUT seconds, the next timeout
+					 * interrupt is deferred until gtm_system(BYPASSOK) returns. At which point timedout is
+					 * TRUE and there is no signal received by GT.M to interrupt the blocking read() at
+					 * the begining of the loop.  So we handle the timeout now and skip the second stack trace.
 					 */
 					if (half_timeout_done && timedout)
 					{	/* Full-timeout : take C-stack of the filter program. */
@@ -856,11 +838,6 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 			} while (TRUE);
 			if (send_done)
 				TIMEOUT_DONE(timedout);
-#			else
-			while (-1 == (r_len = read(repl_filter_srv_fd[READ_END], srv_read_end, buff_remaining))
-					&& (EINTR == errno || ENOMEM == errno))
-				;
-#			endif
 			if (0 < r_len) /* successful read */
 			{
 				/* if send is not done then need to do select/poll if we try read again */
@@ -1171,8 +1148,11 @@ int repl_stop_filter(void)
 
 void repl_filter_error(seq_num filter_seqno, int why)
 {
-	repl_log(stderr, TRUE, TRUE, "Stopping filter due to error\n");
-	repl_stop_filter();
+	assert(is_src_server || is_rcvr_server);
+	if (is_src_server)
+		STOP_EXTERNAL_FILTER_IF_NEEDED(gtmsource_filter, gtmsource_log_fp, "REPL_FILTER_ERROR");
+	else
+		STOP_EXTERNAL_FILTER_IF_NEEDED(gtmrecv_filter, gtmrecv_log_fp, "REPL_FILTER_ERROR");
 	switch (repl_errno)
 	{
 		case EREPL_FILTERNOTALIVE :
@@ -1202,16 +1182,15 @@ void repl_filter_error(seq_num filter_seqno, int why)
  * Check for (b) is not needed if the source server is VMS since cross-endian replication does not happen on VMS. In such a case,
  * the receiver server will do the appropriate check and shutdown replication if needed.
  */
-void repl_check_jnlver_compat(UNIX_ONLY(boolean_t same_endianness))
+void repl_check_jnlver_compat(boolean_t same_endianness)
 {	/* see comment in repl_filter.h about list of filter-formats, jnl-formats and GT.M versions */
-	UNIX_ONLY(const char	*other_side;)
+	const char	*other_side;
 
 	assert(is_src_server || is_rcvr_server);
 	assert(JNL_VER_EARLIEST_REPL <= REMOTE_JNL_VER);
 	if (JNL_VER_EARLIEST_REPL > REMOTE_JNL_VER)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Dual/Multi site replication not supported between these two GT.M versions"));
-#	ifdef UNIX
 	else if ((V18_JNL_VER > REMOTE_JNL_VER) && !same_endianness)
 	{	/* cross-endian replication is supported only from V5.3-003 onwards. Issue error and shutdown. */
 		if (is_src_server)
@@ -1223,7 +1202,6 @@ void repl_check_jnlver_compat(UNIX_ONLY(boolean_t same_endianness))
 			assertpro(is_src_server || is_rcvr_server);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLNOXENDIAN, 4, LEN_AND_STR(other_side), LEN_AND_STR(other_side));
 	}
-#	endif
 }
 
 /* The following code defines the functions that convert one jnl format to another.
@@ -1314,7 +1292,7 @@ void repl_check_jnlver_compat(UNIX_ONLY(boolean_t same_endianness))
  *	This means, we need to have 8 more bytes in the conversion buffer for NULL type of records.
  * (d) If the null collation is different between primary and secondary (null_subs_xform) then appropriate conversion
  *     is needed
- * (e) Note that V17 did not support triggers so dont need to check for ^#t or ZTRIG or ZTWORM or LGTRIG records.
+ * (e) Note that V17 did not support triggers so don't need to check for ^#t or ZTRIG or ZTWORM or LGTRIG records.
  * Reformat accordingly.
  */
 int jnl_v17TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz)
@@ -1362,7 +1340,7 @@ int jnl_v17TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 		assert(SIZEOF(token_seq_t) == SIZEOF(seq_num));
 		t_len = (JREC_PREFIX_SIZE + SIZEOF(token_seq_t));
 		memcpy(cb, jb, t_len);
-		((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr will be different between V17 and V24 due to new length */
+		((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr is different between V17 and V24 due to new length */
 		cb += t_len;
 		jb += t_len;
 		/* Initialize 8-byte "strm_seqno" (common to TCOM/NULL/SET/KILL/ZKILL/ZTRIG jnl records) to 0 */
@@ -1464,7 +1442,7 @@ int jnl_v24TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			assert(SIZEOF(token_seq_t) == SIZEOF(seq_num));
 			t_len = (JREC_PREFIX_SIZE + SIZEOF(token_seq_t));
 			memcpy(cb, jb, t_len);
-			((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr will be different between V17 and V24 */
+			((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr is different between V17 and V24 */
 			cb += t_len;
 			jb += t_len;
 			if (is_set_kill_zkill_ztrig)
@@ -1584,7 +1562,7 @@ int jnl_v24TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
  * (a) struct_jrec_upd, struct_jrec_tcom and struct_jrec_null in V24 is 8 bytes more than V19 (8 byte strm_seqno).
  *	This means, we need to have 8 more bytes in the conversion buffer for NULL/TCOM/SET/KILL/ZKILL type of records.
  * (b) If the receiver side does NOT support triggers, then skip ^#t/ZTWORM journal records & reset nodeflags (if set).
- *	Note that V19 did not support ZTRIG or LGTRIG records so dont need to check for them.
+ *	Note that V19 did not support ZTRIG or LGTRIG records so don't need to check for them.
  *	If the entire transaction consists of skipped records, send a NULL record instead.
  * (c) If receiver side does support triggers, then issue error if ^#t records are found as those are not allowed in
  *	the replication stream from V62001 onwards.
@@ -1613,7 +1591,7 @@ int jnl_v19TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	QWASSIGN(this_upd_seqno, seq_num_zero);
 	promote_uupd_to_tupd = FALSE;
 	assert(is_rcvr_server);
-	/* Since this filter function will be invoked only on the receiver side, the check for whether the receiver
+	/* Since this filter function is invoked only on the receiver side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the LOCAL side supports triggers.
 	 */
 	receiver_supports_triggers = LOCAL_TRIGGER_SUPPORT;
@@ -1806,7 +1784,7 @@ int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	promote_uupd_to_tupd = FALSE;
 	hasht_seen = FALSE;
 	assert(is_src_server);
-	/* Since this filter function will be invoked only on the source side, the check for whether the receiver
+	/* Since this filter function is invoked only on the source side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the REMOTE side supports triggers.
 	 */
 	receiver_supports_triggers = REMOTE_TRIGGER_SUPPORT;
@@ -1847,7 +1825,7 @@ int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			assert(SIZEOF(token_seq_t) == SIZEOF(seq_num));
 			t_len = (JREC_PREFIX_SIZE + SIZEOF(token_seq_t));
 			memcpy(cb, jb, t_len);
-			((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr will be different between V19 and V24 */
+			((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr is different between V19 and V24 */
 			assert((jb + t_len - jstart) == OFFSETOF(struct_jrec_upd, strm_seqno));
 			if (IS_SET_KILL_ZKILL_ZTWORM(rectype))
 			{
@@ -1967,7 +1945,7 @@ int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
  * (a) struct_jrec_upd, struct_jrec_tcom and struct_jrec_null in V24 is 8 bytes more than V21 due to 8 byte strm_seqno.
  *	This means, we need to have 8 more bytes in the conversion buffer for NULL/TCOM/SET/KILL/ZKILL/ZTRIG type of records.
  * (b) If the receiver side does NOT support triggers, then skip ^#t/ZTWORM/ZTRIG journal records & reset nodeflags (if set).
- *	Note that V21 did not support LGTRIG records so dont need to check for them.
+ *	Note that V21 did not support LGTRIG records so don't need to check for them.
  *	If the entire transaction consists of skipped records, send a NULL record instead.
  * (c) If receiver side does support triggers, then issue error if ^#t records are found as those are not allowed in
  *	the replication stream from V62001 onwards.
@@ -1996,7 +1974,7 @@ int jnl_v21TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	QWASSIGN(this_upd_seqno, seq_num_zero);
 	promote_uupd_to_tupd = FALSE;
 	assert(is_rcvr_server);
-	/* Since this filter function will be invoked only on the receiver side, the check for whether the receiver
+	/* Since this filter function is invoked only on the receiver side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the LOCAL side supports triggers.
 	 */
 	receiver_supports_triggers = LOCAL_TRIGGER_SUPPORT;
@@ -2189,7 +2167,7 @@ int jnl_v24TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	QWASSIGN(this_upd_seqno, seq_num_zero);
 	promote_uupd_to_tupd = FALSE;
 	assert(is_src_server);
-	/* Since this filter function will be invoked only on the source side, the check for whether the receiver
+	/* Since this filter function is invoked only on the source side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the REMOTE side supports triggers.
 	 */
 	receiver_supports_triggers = REMOTE_TRIGGER_SUPPORT;
@@ -2231,7 +2209,7 @@ int jnl_v24TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 			assert(SIZEOF(token_seq_t) == SIZEOF(seq_num));
 			t_len = (JREC_PREFIX_SIZE + SIZEOF(token_seq_t));
 			memcpy(cb, jb, t_len);
-			((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr will be different between V21 and V24 */
+			((jrec_prefix *)cb)->forwptr = conv_reclen; /* forwptr is different between V21 and V24 */
 			assert((jb + t_len - jstart) == OFFSETOF(struct_jrec_upd, strm_seqno));
 			if (IS_SET_KILL_ZKILL_ZTWORM_ZTRIG(rectype))
 			{
@@ -2352,7 +2330,7 @@ int jnl_v24TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 /* Convert a transaction from jnl version V22/V23 (V5.5-000 thru V6.1-000) to V24 (V6.2-000 onwards).
  * (a) If null-subscript collation is different between the primary and the secondary
  * (b) If the remote side does NOT support triggers, then skip ^#t/ZTWORM/ZTRIG journal records & reset nodeflags (if set).
- *	Note that V22 did not support LGTRIG records so dont need to check for them.
+ *	Note that V22 did not support LGTRIG records so don't need to check for them.
  * (c) If the entire transaction consists of skipped records, send a NULL record instead.
  * (d) If receiver side does support triggers, then issue error if ^#t records are found as those are not allowed in
  *	the replication stream from V62001 onwards.
@@ -2377,7 +2355,7 @@ int jnl_v22TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	this_upd_seqno = seq_num_zero;
 	promote_uupd_to_tupd = FALSE;
 	assert(is_rcvr_server);
-	/* Since this filter function will be invoked only on the receiver side, the check for whether the receiver
+	/* Since this filter function is invoked only on the receiver side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the LOCAL side supports triggers.
 	 */
 	receiver_supports_triggers = LOCAL_TRIGGER_SUPPORT;
@@ -2549,7 +2527,7 @@ int jnl_v24TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	this_upd_seqno = seq_num_zero;
 	promote_uupd_to_tupd = FALSE;
 	assert(is_src_server);
-	/* Since this filter function will be invoked only on the source side, the check for whether the receiver
+	/* Since this filter function is invoked only on the source side, the check for whether the receiver
 	 * supports triggers is equal to checking whether the REMOTE side supports triggers.
 	 */
 	receiver_supports_triggers = REMOTE_TRIGGER_SUPPORT;
@@ -2726,7 +2704,7 @@ int jnl_v24TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	promote_uupd_to_tupd = FALSE;
 	/* Since filter format V24 corresponds to journal formats V24, V25, or v26, in case of a V24 source and V2{5,6} receiver,
 	 * the source server will not do any filter transformations (because receiver jnl ver is higher). This means
-	 * jnl_v24TOv24 filter conversion function will be invoked on the receiver side to do V24 to V2{5,6} jnl format conversion.
+	 * jnl_v24TOv24 filter conversion function is invoked on the receiver side to do V24 to V2{5,6} jnl format conversion.
 	 * Therefore we cannot do an assert(is_src_server) which we otherwise would have had in case the latest filter
 	 * version corresponds to only ONE journal version.
 	 *	assert(is_src_server);
@@ -2734,7 +2712,7 @@ int jnl_v24TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	assert(is_src_server || is_rcvr_server);
 	receiver_supports_triggers = (is_src_server ? REMOTE_TRIGGER_SUPPORT : LOCAL_TRIGGER_SUPPORT);
 	GTMTRIG_ONLY(assert(receiver_supports_triggers);)	/* if receiver is V24 format, it should have been built
-								 * with trigger support enabled since we dont either build
+								 * with trigger support enabled since we don't either build
 								 * anymore OR replicate anymore to trigger unsupported platforms
 								 * (HPPA/Tru64/VMS) from trigger-supporting Unix platforms.
 								 */

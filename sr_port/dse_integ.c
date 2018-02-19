@@ -70,7 +70,7 @@ void dse_integ(void)
 			key_buff[key_len++] = *r_ptr;;
 		gvt = dse_find_gvt(gv_cur_region, (char *)key_buff, (key_len));
 	}
-	if (TRUE == cert_blk(gv_cur_region, blk, (blk_hdr_ptr_t)bp, 0, FALSE, gvt))
+	if (TRUE == cert_blk(gv_cur_region, blk, (blk_hdr_ptr_t)bp, 0, RTS_ERROR_ON_CERT_FAIL, gvt))
 		util_out_print("!/  No errors detected.!/", TRUE);
 	else
 		util_out_print(NULL, TRUE);

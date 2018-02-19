@@ -3,6 +3,9 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -13,7 +16,8 @@
 	.include "linkage.si"
 	.include "g_msf.si"
 	.include "gtm_threadgbl_deftypes_asm.si"
-	.include "debug.si"
+#	include "debug.si"
+
 #
 # op_mprofextexfun calls an external GT.M MUMPS routine with arguments and provides for
 # a return value in most instances. If the routine has not yet been linked into the
@@ -53,8 +57,6 @@
 # the version of new_stack_frame() it calls (calls new_stack_frame_sp() instead).
 #
 	.data
-	.extern	ERR_FMLLSTMISSING
-	.extern	ERR_GTMCHECK
 	.extern	dollar_truth
 	.extern	frame_pointer
 	.extern gtm_threadgbl
@@ -244,7 +246,7 @@ autorelink_check:
 # occurs
 #
 gtmcheck:
-	movl	ERR_GTMCHECK(REG_IP), REG32_ARG1
+	movl	$ERR_GTMCHECK, REG32_ARG1
 	movl	$1, REG32_ARG0
 	movb    $0, REG8_ACCUM					# Variable length argument
 	call	rts_error
@@ -262,8 +264,12 @@ label_missing:
 # Raise missing formal list error
 #
 fmllstmissing:
-	movl    ERR_FMLLSTMISSING(REG_IP), REG32_ARG1
+	movl    $ERR_FMLLSTMISSING, REG32_ARG1
         movl    $1, REG32_ARG0
 	movb	$0, REG8_ACCUM					# Variable length argument
 	call	rts_error
 	jmp	retlab
+#
+# Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
+# This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+.section        .note.GNU-stack,"",@progbits

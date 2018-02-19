@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2017 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	!
+! Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -13,7 +13,7 @@
 !								!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	.FACILITY	GTM,246/PREFIX=ERR_
-	.TITLE	MERRORS	Error Messages for GTM
+	.TITLE	MERRORS	Error Messages for YottaDB
 !
 !   The code numbers for the errors that have been
 !   standardized by the MUMPS Development Committee are
@@ -138,46 +138,48 @@
 !   M111, Invalid number of days for date
 !   M112, Invalid number of seconds for time
 !
-!  List of messages which are not reported by GT.M standard error routines(rts_error etc.) but
+!  List of messages which are not reported by YottaDB standard error routines(rts_error etc.) but
 !  by PRINTFs. NOTE: if the value of any these messages changes in future, all its non-standard
 !  usages should be reflected with the new value.
-!	ERR_GTMDISTUNDEF	150377714 (reported in gtm.c if $gtm_dist is not defined)
-!	ERR_DISTPATHMAX		150377682 (reported in gtm.c if $gtm_dist buffer is insufficient)
-!	ERR_DLLNOOPEN		150379250 (reported in gtm.c if libgtmshr cannot be opened)
-!	ERR_DLLNORTN		150379258 (reported in gtm.c if gtm_main is not found in libgtmshr)
+!	ERR_DISTPATHMAX		150377682 (reported in dlopen_libyottadb.c if $ydb_dist buffer is insufficient)
+!	ERR_DLLNOOPEN		150379250 (reported in dlopen_libyottadb.c if libyottadb cannot be opened)
+!	ERR_DLLNORTN		150379258 (reported in dlopen_libyottadb.c if a symbol name is not found in libyottadb)
 !	ERR_OPCOMMISSED		150381275 (sent via $SNDOPR in util_output.c if prior errors)
 !
-!  List of known undocumented messages follows (along with a comment)
+!  The following items must be followed by a tab (because they are parsed by tools/library/doc_tools/routines/diffm.m)
+!  List of known undocumented messages follows (along with a comment) (do not change "known undocumented" phrase)
 !	ERR_ACK			internal error (not displayed to the users)
 !	ERR_ASC2EBCDICCONV	not yet documented since zOS is not officially supported
+!	ERR_DBGLDMISMATCH	used internally to rectify an gld vs database characteristic mismatch in favor of the DB
 !	ERR_DEFEREVENT		referenced only if #define DEBUG is TRUE (i.e. for debug builds only)
+!	ERR_DRVLONGJMP		used internally in condition handler management
 !	ERR_ENQ			internal error (not displayed to the users)
+!	ERR_FAKENOSPCLEARED	for internal testing only
 !	ERR_FREEZEID		referenced only if #define DEBUG_FREEZE is TRUE.
 !	ERR_INVDBGLVL		referenced only if "gtmdbglvl" is set to non-zero value (which is a debugging feature)
 !	ERR_JNLREQUIRED		message referenced only in GT.CX code (not supported currently)
 !	ERR_JNLWRTNOWWRTR	internal error (not displayed to the users)
-!	ERR_JOBINTRRETRHOW	internal error (not displayed to users - drives rethrow of jobinterrupt)
+!	ERR_JOBINTRRETHROW	internal error (not displayed to users - drives rethrow of jobinterrupt)
 !	ERR_JOBINTRRQST		internal error (not displayed to users - drives jobinterrupt)
 !	ERR_LKSECINIT		message referenced only in GT.CX code (not supported currently)
+!	ERR_LVMONBADVAL		message used only in an undocumented feature (VIEW "LVMON...]" used for YottaDB debugging
 !	ERR_MUDESTROYFAIL	referenced only if #define IPCRM_FOR_SANCHEZ_ONLY is TRUE.
 !	ERR_MUDESTROYSUC	referenced only if #define IPCRM_FOR_SANCHEZ_ONLY is TRUE.
 !	ERR_REPEATERROR		internal error (not displayed to the users)
+!	ERR_REPLONLNRLBK	not issued to user (internal use only)
 !	ERR_SYSTEMVALUE		code is not executed (set $system won't reach op_svput at all to signal the error)
 !	ERR_TPRETRY		internal error (not displayed to the users)
 !	ERR_WILLEXPIRE		error triggered by the license management code which has been since disabled.
 !	ERR_YDIRTSZ		used by a percent utility, which is not documented intentionally
 !	ERR_ZDEFACTIVE		functionality not documented (GT.CM related weirdness)
 !	ERR_ZDEFOFLOW		functionality not documented (GT.CM related weirdness)
-!
-!
-!
+!	ERR_ZLINKBYPASS		to be documented when code is enabled
 ! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
 !
 !
 !
 !
-!
-!  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M since V4.2.
+!  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M/YottaDB since V4.2.
 !
 ACK		<>/success/fao=0!/ansi=0
 BREAKZST	<Break instruction encountered during ZSTEP action>/info/fao=0!/ansi=0
@@ -263,7 +265,7 @@ TRANSNEST	<Maximum transaction nesting levels exceeded>/error/fao=0!/ansi=0
 INDEXTRACHARS	<Indirection string contains extra trailing characters>/error/fao=0!/ansi=0
 CORRUPTNODE	<Corrupt input in Record # !UL, Key #!UL; resuming with next global node>/error/fao=2!/ansi=0
 INDRMAXLEN	<Maximum length !UL of an indirection argument was exceeded>/error/fao=1!/ansi=0
-INSFFBCNT	<Insufficient byte count quota left for requested operation>/error/fao=0!/ansi=0
+UNUSEDMSG268	<INSFFBCNT nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 INTEGERRS	<Database integrity errors>/error/fao=0!/ansi=0
 INVCMD		<Invalid command keyword encountered>/warning/fao=0!/ansi=0
 INVFCN		<Invalid function name>/error/fao=0!/ansi=0
@@ -272,7 +274,7 @@ INVSVN		<Invalid special variable name>/error/fao=0!/ansi=8
 IOEOF		<Attempt to read past an end-of-file>/error/fao=0!/ansi=0
 IONOTOPEN	<Attempt to USE an I/O device which has not been opened>/error/fao=0!/ansi=0
 MUPIPINFO	<!AD>/info/fao=2!/ansi=0
-IVTIME		<Invalid time specification: !AD>/error/fao=2!/ansi=0
+UNUSEDMSG277	<IVTIME nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 JOBFAIL		<JOB command failure>/error/fao=0!/ansi=0
 JOBLABOFF	<Label and offset not found in created process>/error/fao=0!/ansi=13
 JOBPARNOVAL	<This job parameter cannot take a value>/error/fao=0!/ansi=0
@@ -321,7 +323,7 @@ JNLCLOSE	<Error closing journal file !AD>/error/fao=2!/ansi=0
 NOTPRINCIO	<Output currently directed to device !AD>/warning/fao=2!/ansi=0
 NOTTOEOFONPUT	<Not positioned to EOF on write (sequential organization only)>/error/fao=0!/ansi=0
 NOZBRK		<No zbreak at that location>/info/fao=0!/ansi=0
-NULSUBSC	<Null subscripts are not allowed for region: !AD>/error/fao=2!/ansi=0
+NULSUBSC	<!AD Null subscripts are not allowed for current region>/error/fao=2!/ansi=0
 NUMOFLOW	<Numeric overflow>/error/fao=0!/ansi=92
 PARFILSPC	<Parameter: !AD  file specification: !AD>/error/fao=4!/ansi=0
 PATCLASS	<Illegal character class for pattern code>/error/fao=0!/ansi=0
@@ -370,7 +372,7 @@ UNIMPLOP	<Unimplemented construct encountered>/error/fao=0!/ansi=0
 VAREXPECTED	<Variable expected in this context>/error/fao=0!/ansi=39
 VARRECBLKSZ	<Blocksize must be at least record size + 4 bytes>/error/fao=0!/ansi=0
 MAXARGCNT	<Maximum number of arguments !UL exceeded>/error/fao=1!/ansi=0
-GTMSECSHRSEMGET	<semget error errno = !UL>/error/fao=1!/ansi=0
+GTMSECSHRSEMGET	<semget error errno = !UL>/fatal/fao=1!/ansi=0
 VIEWARGCNT	<View parameter !AD has inappropriate number of subparameters>/error/fao=2!/ansi=0
 GTMSECSHRDMNSTARTED	<gtmsecshr daemon started (key: 0x!XL) for version !AD from !AD>/info/fao=5!/ansi=0
 ZATTACHERR	<Error attaching to "!AD">/error/fao=2!/ansi=0
@@ -385,14 +387,14 @@ ZLINKFILE	<Error while zlinking "!AD">/error/fao=2!/ansi=0
 ZPARSETYPE	<Illegal TYPE argument to $ZPARSE(): !AD>/error/fao=2!/ansi=0
 ZPARSFLDBAD	<Illegal $ZPARSE() field parameter: !AD>/error/fao=2!/ansi=0
 ZPIDBADARG	<The tvexpr must be FALSE if last $ZPID() not found>/error/fao=0!/ansi=0
-ZPRIVARGBAD	<!AD is not a legal privilege for $ZPRIV()>/error/fao=2!/ansi=0
-ZPRIVSYNTAXERR	<Privilege string cannot end with a comma>/error/fao=0!/ansi=0
+UNUSEDMSG390	<ZPRIVARGBAD nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG391	<ZPRIVSYNTAXERR nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 ZPRTLABNOTFND	<Label not found in routine>/error/fao=0!/ansi=13
 VIEWAMBIG	<View parameter !AD is ambiguous>/error/fao=2!/ansi=0
 VIEWNOTFOUND	<View parameter !AD not valid>/error/fao=2!/ansi=0
-ZSETPRVARGBAD	<!AD is not a legal privilege for $ZSETPRIV()>/error/fao=2!/ansi=0
+UNUSEDMSG395	<ZSETPRVARGBAD nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 INVSPECREC	<Invalid global modifier record>/error/fao=0!/ansi=0
-ZSETPRVSYNTAX	<$ZSETPRIV() privileges string cannot end with a comma>/error/fao=0!/ansi=0
+UNUSEDMSG397	<ZSETPRVSYNTAX nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 ZSRCHSTRMCT	<Search stream identifier out of range>/error/fao=0!/ansi=0
 VERSION		<Version mismatch - This program must be recompiled>/error/fao=0!/ansi=0
 MUNOTALLSEC	<WARNING: not all global sections accessed were successfully rundown>/warning/fao=0!/ansi=0
@@ -415,8 +417,8 @@ ZCALLTABLE	<External call Table format error>/error/fao=0!/ansi=0
 ZCARGMSMTCH	<External call: Actual argument count, !UL, is greater than formal argument count, !UL>/error/fao=2!/ansi=58
 ZCCONMSMTCH	<External call: Too many input arguments>/error/fao=0!/ansi=58
 ZCOPT0		<External call: Qualifier OPTIONAL_0 can be used only with mechanisms REFERENCE or DESCRIPTOR>/error/fao=0!/ansi=0
-ZCSTATUS	<External call: Unsuccessful return status>/error/fao=0!/ansi=0
-ZCUSRRTN	<External call: Run-time error in user routine>/error/fao=0!/ansi=0
+UNUSEDMSG420	<ZCSTATUS nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG421	<ZCUSRRTN nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 ZCPOSOVR	<External call: Invalid overlapping of arguments in table position !UL>/error/fao=1!/ansi=0
 ZCINPUTREQ	<External call: Required input argument missing>/error/fao=0!/ansi=0
 JNLTNOUTOFSEQ	<End transaction [0x!16@XQ] of journal !AD different from Begin transaction [0x!16@XQ] of next generation journal !AD>/error/fao=6!/ansi=0
@@ -424,14 +426,14 @@ ACTRANGE	<Alternate Collating Type !UL is out of range>/error/fao=1!/ansi=0
 ZCCONVERT	<External call: error converting output argument>/error/fao=0!/ansi=0
 ZCRTENOTF	<External call routine !AD not found>/error/fao=2!/ansi=0
 GVRUNDOWN	<Error during global database rundown>/error/fao=0!/ansi=0
-LKRUNDOWN	<Error during lock database rundown>/error/fao=0!/ansi=0
+LKRUNDOWN	<Error during LOCK database rundown>/error/fao=0!/ansi=0
 IORUNDOWN	<Error during image rundown>/error/fao=0!/ansi=0
 FILENOTFND	<File !AD not found>/error/fao=2!/ansi=0
 MUFILRNDWNFL	<File !AD rundown failed>/error/fao=2!/ansi=0
 JNLTMQUAL1	<Time qualifier BEFORE_TIME="!AZ" is less than SINCE_TIME="!AZ">/error/fao=2!/ansi=0
 FORCEDHALT	<Image HALTed by MUPIP STOP>/fatal/fao=0!/ansi=0
 LOADEOF		<Load error: EOF reached prior to BEGIN record !UL.  No records loaded.>/error/fao=1!/ansi=0
-WILLEXPIRE	<This copy of GT.M will expire within one week>/info/fao=0!/ansi=0
+WILLEXPIRE	<This copy of YottaDB will expire within one week>/info/fao=0!/ansi=0
 LOADEDBG	<Load error: END smaller than BEGIN.  No records loaded.>/error/fao=0!/ansi=0
 LABELONLY	<Routine !AD was compiled for label-only entry>/error/fao=2!/ansi=0
 MUREORGFAIL	<MUPIP REORG failed.  Failure code: !AD.>/error/fao=2!/ansi=0
@@ -440,13 +442,13 @@ MULTFORMPARM	<This formal parameter is multiply defined>/error/fao=0!/ansi=21
 QUITARGUSE	<Quit cannot take an argument in this context>/error/fao=0!/ansi=16
 NAMEEXPECTED	<A local variable name is expected in this context>/error/fao=0!/ansi=0
 FALLINTOFLST	<Fall-through to a label with formallist is not allowed>/error/fao=0!/ansi=11
-NOTEXTRINSIC	<Quit does not return to an extrinsic function: argument not allowed>/error/fao=0!/ansi=16
-GTMSECSHRREMSEMFAIL	<error removing semaphore errno = !UL>/error/fao=1!/ansi=0
+NOTEXTRINSIC	<QUIT/ZHALT does not return to an extrinsic function: argument not allowed>/error/fao=0!/ansi=16
+GTMSECSHRREMSEMFAIL	<error removing semaphore errno = !UL>/warning/fao=1!/ansi=0
 FMLLSTMISSING	<The formal list is absent from a label called with an actual list: !AD>/error/fao=2!/ansi=20
 ACTLSTTOOLONG	<More actual parameters than formal parameters: !AD>/error/fao=2!/ansi=58
 ACTOFFSET	<Actuallist not allowed with offset>/error/fao=0!/ansi=0
 MAXACTARG	<Maximum number of actual arguments exceeded>/error/fao=0!/ansi=0
-GTMSECSHRREMSEM	<[client pid !UL] Semaphore (!UL) removed>/error/fao=2!/ansi=0
+GTMSECSHRREMSEM	<[client pid !UL] Semaphore (!UL) removed>/info/fao=2!/ansi=0
 JNLTMQUAL2	<Time qualifier LOOKBACK_TIME="!AZ" is later than SINCE_TIME="!AZ">/error/fao=2!/ansi=0
 GDINVALID	<Unrecognized Global Directory file format: !AD, expected label: !AD, found: !AD>/error/fao=6!/ansi=0
 ASSERT		<Assert failed in !AD line !UL for expression (!AD)>/fatal/fao=5!/ansi=0
@@ -515,7 +517,7 @@ LOADABORT	<Aborting load at record !UL>/error/fao=1!/ansi=0
 FNOTONSYS	<Function or special variable is not supported by this operating system>/error/fao=0!/ansi=0
 AMBISYIPARAM	<Parameter !AD is ambiguous to $ZGETSYI()>/error/fao=2!/ansi=0
 PREVJNLNOEOF	<A previous generation journal file !AD does not have valid EOF>/error/fao=2!/ansi=0
-LKSECINIT	<Error creating lock section for database !AD>/error/fao=2!/ansi=0
+LKSECINIT	<Error creating LOCK section for database !AD>/error/fao=2!/ansi=0
 MTDOSLAB	<Tape label is not in valid DOS-11 format>/error/fao=0!/ansi=0
 MTDOSFOR	<Use of DOS-11 labels requires stream format>/error/fao=0!/ansi=0
 MTINVLAB	<Invalid label type specified in magtape OPEN>/error/fao=0!/ansi=0
@@ -532,7 +534,7 @@ SUB2LONG	<Subscript invalid, too long>/error/fao=0!/ansi=0
 EXTRACTCTRLY	<User interrupt encountered during extract -- halting>/info/fao=0!/ansi=0
 CCENOWORLD	<CCE does not have WORLD privilege.  Information may be incomplete.>/warning/fao=0!/ansi=0
 GVQUERYFAIL	<Global variable $QUERY function failed.  Failure code: !AD.>/error/fao=2!/ansi=0
-LCKSCANCELLED	<Error on remote node holding locks or zallocates.  All locks and zallocates cancelled.>/error/fao=0!/ansi=0
+LCKSCANCELLED	<Error on remote node holding LOCKs or ZALLOCATEs.  All LOCKs and ZALLOCATEs cancelled.>/error/fao=0!/ansi=0
 INVNETFILNM	<Invalid file name following node designation in global directory>/error/fao=0!/ansi=0
 NETDBOPNERR	<Error while attempting to open database across net>/error/fao=0!/ansi=0
 BADSRVRNETMSG	<Invalid message received from GT.CM server>/error/fao=0!/ansi=0
@@ -555,7 +557,7 @@ BACKUPCTRL	<Control Y or control C encountered during backup, aborting backup>/i
 NOCCPPID	<Cannot find CCP process id>/error/fao=0!/ansi=0
 CCPJNLOPNERR	<Error opening journal file.  Database not opened.>/error/fao=0!/ansi=0
 LCKSGONE	<Locks selected for deletion removed>/success/fao=0!/ansi=0
-ZLKIDBADARG	<The tvexpr must be FALSE if last ZLKID not found>/error/fao=0!/ansi=0
+UNUSEDMSG560	<ZLKIDBADARG nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 DBFILOPERR	<Error doing database I/O to region !AD>/error/fao=2!/ansi=0
 CCERDERR	<Error reading from database file !AD>/error/fao=2!/ansi=0
 CCEDBCL		<Database file !AD is clustered>/info/fao=2!/ansi=0
@@ -570,7 +572,7 @@ CCECCPPID	<The cluster control program has PID 0x!XL>/info/fao=1!/ansi=0
 CCECLSTPRCS	<!UL processes are accessing clustered database files>/info/fao=1!/ansi=0
 ZSHOWBADFUNC	<An illegal function was specified for ZSHOW>/error/fao=0!/ansi=0
 NOTALLJNLEN	<Journaling disabled/off for !AD regions>/warning/fao=2!/ansi=0
-UNUSEDMSG570	<ZSHOWGLOSMALL last used in V6.2-002A>/error/fao=0!/ansi=0
+BADLOCKNEST	<Unsupported nesting of LOCK commands>/error/fao=0!/ansi=0
 NOLBRSRC	<Object libraries cannot have SRC paths associated>/error/fao=0!/ansi=0
 INVZSTEP	<Invalid ZSTEP qualifier>/error/fao=0!/ansi=0
 ZSTEPARG	<ZSTEP argument expected>/error/fao=0!/ansi=0
@@ -582,7 +584,7 @@ FILEDEL		<File !AD successfully deleted>/info/fao=2!/ansi=0
 JNLBADLABEL	<Journal file !AD has a bad GT.M Journal File Label. Expected !AD. Found !AD.>/error/fao=6!/ansi=0
 JNLREADEOF	<End of journal file encountered>/error/fao=0!/ansi=0
 JNLRECFMT	<Journal file record format error encountered>/error/fao=0!/ansi=0
-BLKTOODEEP	<Block level too deep>/error/fao=0!/ansi=0
+BLKTOODEEP	<Block level too deep>/warning/fao=0!/ansi=0
 NESTFORMP	<Formal parameter list cannot be combined with nested line>/error/fao=0!/ansi=0
 BINHDR		<!AD!/!/Date: !AD!/Time: !AD!/Extract Region Characteristics!/!_Blk Size: !AD!/!_Rec Size: !AD!/!_Key Size: !AD!/!_Std Null Coll: !AD!/!AD!/>/info/fao=16!/ansi=0
 GOQPREC		<Numeric precision in key error:  Blk #!UL, Key #!UL.  Record not loaded.>/info/fao=2!/ansi=0
@@ -590,7 +592,7 @@ LDGOQFMT	<Corrupt GOQ format header information!/>/error/fao=0!/ansi=0
 BEGINST		<Beginning LOAD at record number: !UL>/info/fao=1!/ansi=0
 INVMVXSZ	<Invalid block size for GOQ load format>/fatal/fao=0!/ansi=0
 JNLWRTNOWWRTR	<Journal writer attempting another write>/error/fao=0!/ansi=0
-GTMSECSHRSHMCONCPROC	<More than one process attached to Shared memory segment (!UL) not removed (!UL)>/error/fao=2!/ansi=0
+GTMSECSHRSHMCONCPROC	<More than one process attached to Shared memory segment (!UL) not removed (!UL)>/warning/fao=2!/ansi=0
 JNLINVALLOC	<Journal file allocation !UL is not within the valid range of !UL to !UL.  Journal file not created.>/warning/fao=3!/ansi=0
 JNLINVEXT	<Journal file extension !UL is greater than the maximum allowed size of !UL.  Journal file not created.>/warning/fao=2!/ansi=0
 MUPCLIERR	<Action not taken due to CLI errors>/error/fao=0!/ansi=0
@@ -619,7 +621,7 @@ WCWRNNOTCHG	<Not all specified database files were changed>/warning/fao=0!/ansi=
 ZCWRONGDESC	<A string longer than 65535 is passed via 32-bit descriptor>/error/fao=0!/ansi=0
 MUTNWARN	<Database file !AD has 0x!16@XQ more transactions to go before reaching the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/warning/fao=4!/ansi=0
 GTMSECSHRUPDDBHDR	<[client pid !UL] database fileheader (!AD) updated !AD>/info/fao=5!/ansi=0
-LCKSTIMOUT	<DAL timed lock request expired>/warning/fao=0!/ansi=0
+LCKSTIMOUT	<DAL timed LOCK request expired>/warning/fao=0!/ansi=0
 CTLMNEMAXLEN	<The maximum length of a control mnemonic has been exceeded>/error/fao=0!/ansi=0
 CTLMNEXPECTED	<Control mnemonic is expected in this context>/error/fao=0!/ansi=0
 USRIOINIT	<User-defined device driver not successfully initialized>/error/fao=0!/ansi=0
@@ -632,7 +634,7 @@ MTIOERR		<I/O Error with magnetic tape device !AD>/error/fao=2!/ansi=0
 RMWIDTHPOS	<File record size or width must be greater than zero>/error/fao=0!/ansi=72
 OFFSETINV	<Entry point !AD+!SL not valid>/error/fao=3!/ansi=13
 JOBPARTOOLONG	<Total parameter length is too long for job command>/error/fao=0!/ansi=0
-JOBARGMISSING	<Missing job argument !UL - can't skip non-trailing arguments to a JOB command in OpenVMS editions>/error/fao=1!/ansi=0
+UNUSEDMSG637	<JOBARGMISSING nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 RUNPARAMERR	<Error accessing parameter for run command>/error/fao=0!/ansi=0
 FNNAMENEG	<Depth argument to $NAME cannot be negative>/error/fao=0!/ansi=0
 ORDER2		<Invalid second argument to $ORDER.  Must be -1 or 1.>/error/fao=0!/ansi=0
@@ -643,7 +645,7 @@ TRIGNAMENF	<Trigger name !AD not found with the current default global directory
 TRIGZBREAKREM	<ZBREAK in trigger !AD removed due to trigger being reloaded>/warning/fao=2!/ansi=0
 TLVLZERO	<Transaction is not in progress>/error/fao=0!/ansi=44
 TRESTNOT	<Cannot TRESTART, transaction is not restartable>/error/fao=0!/ansi=27
-TPLOCK		<Cannot release lock(s) held prior to current TSTART>/error/fao=0!/ansi=41
+TPLOCK		<Cannot release LOCK(s) held prior to current TSTART>/error/fao=0!/ansi=41
 TPQUIT		<Cannot QUIT out of a routine with an active transaction>/error/fao=0!/ansi=42
 TPFAIL		<Transaction COMMIT failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 TPRETRY		<Restart transaction from non-concurrency DB failure>/error/fao=0!/ansi=0
@@ -670,7 +672,7 @@ CEBIGSKIP	<Compiler escape user routine skip count is too large>/error/fao=0!/an
 CETOOLONG	<Compiler escape substitution exceeds maximum line size>/error/fao=0!/ansi=0
 CENOINDIR	<Indirection type information not available for compiler escape feature>/error/fao=0!/ansi=0
 COLLATIONUNDEF	<Collation type !UL is not defined>/error/fao=1!/ansi=0
-UNUSEDMSG670	<RBWRNNOTCHG last used in V6.2-002A>/error/fao=0!/ansi=0
+UNUSEDMSG675	<RBWRNNOTCHG last used in V6.2-002A>/error/fao=0!/ansi=0
 GTMSECSHRSRVF	<!AD - !UL : Attempt to service request failed (retry = !UL)>/error/fao=4!/ansi=0
 FREEZECTRL	<Control Y or control C encountered during attempt to freeze the database. Aborting freeze.>/info/fao=0!/ansi=0
 JNLFLUSH	<Error flushing journal buffers to journal file !AD>/info/fao=2!/ansi=0
@@ -697,7 +699,7 @@ DBBMINV		<!AD Bit map contains an invalid pattern> /info /fao=2!/ansi=0
 DBBMMSTR	<!AD Bit map does not match master map> /info /fao=2!/ansi=0
 DBROOTBURN	<!AD Root block has data level> /info /fao=2!/ansi=0
 REPLSTATEERR	<Replication state cannot be changed to the specified value for database file !AD>/error/fao=2!/ansi=0
-VMSMEMORY	<Central memory exhausted during request for !UL bytes from 0x!XJ - check page file quota and page file size>/fatal/fao=2!/ansi=0
+UNUSEDMSG702	<VMSMEMORY nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 DBDIRTSUBSC	<!AD Directory tree block contains non name-level entries> /info /fao=2!/ansi=0
 TIMEROVFL	<Timer overflow; interval probably too large> /error /fao=0!/ansi=0
 GTMASSERT	<!AD - Assert failed !AD line !UL>/fatal/fao=5!/ansi=0
@@ -723,7 +725,7 @@ JNLWRERR	<Error writing journal file !AD.  Unable to update header.>/error/fao=2
 FILEIDMATCH	<Saved File ID does not match the current ID - the file appears to have been moved>/error/fao=0!/ansi=0
 EXTSRCLIN	<!_!AD!/!_!AD>/info/fao=4!/ansi=0
 EXTSRCLOC	<!_!_At column !UL, line !UL, source module !AD>/info/fao=4!/ansi=0
-BIGNOACL	<Existing file found when BIGRECORD specified with UDF format but no GT.M ACE, perhaps lost during COPY>/error/fao=0!/ansi=0
+UNUSEDMSG728	<BIGNOACL nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 ERRCALL		<Error called from !AD line !UL>/error/fao=3!/ansi=0
 ZCCTENV		<Environmental variable for external package !AD not set>/error/fao=2!/ansi=0
 ZCCTOPN		<Unable to open external call table: !AD>/error/fao=2!/ansi=0
@@ -750,7 +752,7 @@ BLKSIZ512	<Block size !UL rounds to !UL>/info/fao=2!/ansi=0
 MUTEXERR	<Mutual Exclusion subsystem failure>/error/fao=0!/ansi=0
 JNLVSIZE	<Journal File !AD has incorrect virtual_filesize !UL.  Allocation : !UL, Extension : !UL, Filesize : !UL, File system block size : !UL>/error/fao=7!/ansi=0
 MUTEXLCKALERT	<Mutual Exclusion subsystem ALERT - lock attempt threshold crossed for region !AD.  Process !UL is in crit cycle !UL.>/warning/fao=4!/ansi=0
-MUTEXFRCDTERM	<Mutual Exclusion subsystem detected forced termination of process !UL.  Crit salvaged from region !AD.>/warning/fao=3!/ansi=0
+MUTEXFRCDTERM	<Mutual Exclusion subsystem detected forced termination of process !UL.  Crit salvaged from database file !AD.>/warning/fao=3!/ansi=0
 GTMSECSHR	<!UL : Error during gtmsecshr operation>/error/fao=1!/ansi=0
 GTMSECSHRSRVFID	<!AD: !UL - Attempt to service request failed.!/ client id: !UL, mesg type: !UL, mesg data: !UL>/warning/fao=6!/ansi=0
 GTMSECSHRSRVFIL	<!AD: !UL - Attempt to service request failed.!/ client id: !UL, mesg type: !UL!/file: !AD>/warning/fao=7!/ansi=0
@@ -761,7 +763,7 @@ INVCTLMNE	<Invalid control mnemonics>/error/fao=0!/ansi=0
 SOCKLISTEN	<Error listening on a socket>/error/fao=0!/ansi=0
 LQLENGTHNA	<Listening queue length !UL not appropriate.  Must be between 1 and 5.>/error/fao=1!/ansi=0
 ADDRTOOLONG	<Socket address !AD of length !UL is longer than the maximum permissible length !UL>/error/fao=4!/ansi=0
-GTMSECSHRGETSEMFAIL	<error getting semaphore errno = !UL>/error/fao=1!/ansi=0
+GTMSECSHRGETSEMFAIL	<error getting semaphore errno = !UL>/warning/fao=1!/ansi=0
 CPBEYALLOC	<Attempt to copy beyond the allocated buffer>/error/fao=0!/ansi=0
 DBRDONLY	<Database file !AD read only>/error/fao=2!/ansi=0
 DUPTN		<Duplicate transaction found [TN = 0x!16@XQ] at offset 0x!XL in journal file !AD>/warning/fao=4!/ansi=0
@@ -776,7 +778,7 @@ KRNLKILL	<Process was terminated by SIGDANGER signal from the system -- System s
 MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
 BLKWRITERR	<Unable to queue disk write for block 0x!XL.  Will keep trying.>/info/fao=1!/ansi=0
-UNUSEDMSG776	<STOPTIMEOUT last used in V6.3-000A>/error/fao=0!/ansi=0
+UNUSEDMSG781	<STOPTIMEOUT last used in V6.3-000A>/error/fao=0!/ansi=0
 PINENTRYERR	<Custom pinentry program failure>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
 NOFORKCORE	<Unable to fork off process to create core.  Core creation postponed.>/warning/fao=0!/ansi=0
@@ -844,11 +846,11 @@ BADGBLSECVER	<Global Section !AD does not match the current database version>/er
 RECSIZENOTEVEN	<RECORDSIZE [!UL] needs to be a multiple of 2 if ICHSET or OCHSET is UTF-16, UTF-16LE or UTF-16BE>/error/fao=1!/ansi=0
 BUFFLUFAILED	<Error flushing buffers from !AD for database file !AD>/error/fao=4!/ansi=0
 MUQUALINCOMP	<Incompatible qualifiers - FILE and REGION>/error/fao=0!/ansi=0
-DISTPATHMAX	<$gtm_dist path is greater than maximum (!UL)>/error/fao=1!/ansi=0
+DISTPATHMAX	<Executable path length is greater than maximum (!UL)>/error/fao=1!/ansi=0
 FILEOPENFAIL	<Failed to open file !AD>/error/fao=2!/ansi=0
-IMAGENAME	<The executing module name should be !AD instead of !AD>/error/fao=4!/ansi=0
-GTMSECSHRPERM	<The gtmsecshr module in $gtm_dist does not have the correct permission and uid>/error/fao=0!/ansi=0
-GTMDISTUNDEF	<Environment variable $gtm_dist is not defined>/error/fao=0!/ansi=0
+UNUSEDMSG851	<IMAGENAME nixed in r1.20>/error/fao=0!/ansi=0
+GTMSECSHRPERM	<The gtmsecshr module in $ydb_dist does not have the correct permission and uid>/error/fao=0!/ansi=0
+YDBDISTUNDEF	<Environment variable $ydb_dist is not defined>/error/fao=0!/ansi=0
 SYSCALL		<Error received from system call !AD -- called from module !AD at line !UL>/error/fao=5!/ansi=0
 MAXGTMPATH	<The executing module path is greater than the maximum !UL>/error/fao=1!/ansi=0
 TROLLBK2DEEP	<Intended rollback(!SL) deeper than the current $tlevel(!UL)>/error/fao=2!/ansi=0
@@ -889,11 +891,11 @@ GTMSECSHRTMOUT	<gtmsecshr exiting due to idle timeout>/info/fao=0!/ansi=0
 GTMSECSHRRECVF	<gtmsecshr receive on server socket failed>/error/fao=0!/ansi=0
 GTMSECSHRSENDF	<gtmsecshr send on server socket failed>/error/fao=0!/ansi=0
 SIZENOTVALID8	<Size (in bytes) must be either 1, 2, 4, or 8>/error/fao=0!/ansi=0
-GTMSECSHROPCMP	<gtmsecshr operation may be compromised>/warning/fao=0!/ansi=0
+GTMSECSHROPCMP	<gtmsecshr operation may be compromised>/fatal/fao=0!/ansi=0
 GTMSECSHRSUIDF	<gtmsecshr server setuid to root failed>/warning/fao=0!/ansi=0
 GTMSECSHRSGIDF	<gtmsecshr server setgid to root failed>/warning/fao=0!/ansi=0
 GTMSECSHRSSIDF	<gtmsecshr server setsid failed>/warning/fao=0!/ansi=0
-GTMSECSHRFORKF	<gtmsecshr server unable to fork off a child process>/error/fao=0!/ansi=0
+GTMSECSHRFORKF	<gtmsecshr server unable to fork off a child process>/fatal/fao=0!/ansi=0
 DBFSYNCERR	<Error synchronizing database file !AD to disk>/error/fao=2!/ansi=0
 SECONDAHEAD	<Secondary ahead of primary. !/ Secondary database possibly updated by process other than the update process.  First perform rollback.>/error/fao=0!/ansi=0
 SCNDDBNOUPD	<Database Updates not allowed on the secondary>/error/fao=0!/ansi=0
@@ -983,22 +985,22 @@ NOSPACECRE	<Not enough space to create database file !AD.  !@ZQ blocks are neede
 LOWSPACECRE	<Disk space for database file !AD is not enough for !UL future extensions.  !@ZQ !UL-byte blocks are needed, only !@ZQ available.>/warning/fao=6!/ansi=0
 WAITDSKSPACE	<Process 0x!XL will wait !UL seconds for necessary disk space to become available for !AD >/info/fao=4!/ansi=0
 OUTOFSPACE	<Database file !AD ran out of disk space.  Detected by process !UL.  !/Exit without clearing shared memory due to the disk space constraints.  !/Make space and then perform mupip rundown to ensure database integrity.>/fatal/fao=3!/ansi=0
-JNLPVTINFO	<Pid 0x!XL!/     cycle 0x!XL fd_mismatch 0x!XL     channel 0x!XL sync_io 0x!XL!/ pini_addr 0x!XL  qio_active 0x!XL old_channel 0x!XL>/info/fao=8!/ansi=0
+JNLPVTINFO	<Pid 0x!XL cycle 0x!XL fd_mismatch 0x!XL channel 0x!XL sync_io 0x!XL pini_addr 0x!XL qio_active 0x!XL old_channel 0x!XL>/info/fao=8!/ansi=0
 NOSPACEEXT	<Not enough disk space for file !AD to extend.  !UL blocks needed.  !UL blocks available.>/error/fao=4!/ansi=0
 WCBLOCKED	<Field !AD is set by process !UL at transaction number 0x!16@XQ for database file !AD>/warning/fao=6!/ansi=0
 REPLJNLCLOSED	<Replication in jeopardy as journaling got closed for database file !AD. Current region seqno is !@ZQ [0x!16@XQ] and system seqno is !@ZQ [0x!16@XQ]>/error/fao=6!/ansi=0
 RENAMEFAIL	<Rename of file !AD to !AD failed>/warning/fao=4!/ansi=0
 FILERENAME	<File !AD is renamed to !AD>/info/fao=4!/ansi=0
-JNLBUFINFO	<Pid 0x!XL!/     dsk 0x!XL     free 0x!XL  bytcnt 0x!XL io_in_prog 0x!XL fsync_in_prog 0x!XL!/ dskaddr 0x!XL freeaddr 0x!XL  qiocnt 0x!XL now_writer 0x!XL     fsync_pid 0x!XL!/filesize 0x!XL    cycle 0x!XL  errcnt 0x!XL    wrtsize 0x!XL fsync_dskaddr 0x!XL>/info/fao=16!/ansi=0
+JNLBUFINFO	<Pid 0x!XL dsk 0x!XL free 0x!XL bytcnt 0x!XL io_in_prog 0x!XL fsync_in_prog 0x!XL dskaddr 0x!XL freeaddr 0x!XL qiocnt 0x!XL now_writer 0x!XL fsync_pid 0x!XL filesize 0x!XL cycle 0x!XL errcnt 0x!XL wrtsize 0x!XL fsync_dskaddr 0x!XL rsrv_free 0x!XL rsrv_freeaddr 0x!XL phase2_commit_index1 0x!XL phase2_commit_index2 0x!XL next_align_addr 0x!XL>/info/fao=21!/ansi=0
 SDSEEKERR	<Sequential device seek error - !AD>/error/fao=2!/ansi=0
 LOCALSOCKREQ	<LOCAL socket required>/error/fao=0!/ansi=0
-TPNOTACID	<!AD at !AD in a final TP retry violates ACID properties of a TRANSACTION; indefinite RESTARTs may occur !AD !AD>/info/fao=8!/ansi=0
+TPNOTACID	<!AD at !AD violates ACID properties of a TRANSACTION and could exceed !AD seconds; $TRESTART = !UL and indefinite RESTARTs may occur>/info/fao=7!/ansi=0
 JNLSETDATA2LONG	<SET journal record has data of length !UL.  Target system cannot handle data more than !UL bytes.>/error/fao=2!/ansi=0
 JNLNEWREC	<Target system cannot recognize journal record of type !UL, last recognized type is !UL>/error/fao=2!/ansi=0
 REPLFTOKSEM	<Error with replication semaphores for instance file !AD>/error/fao=2!/ansi=0
 SOCKNOTPASSED	<Socket message contained no passed socket descriptors>/error/fao=0!/ansi=0
-EXTRIOERR	<Error writing extract file !AD>/error/fao=2!/ansi=0
-EXTRCLOSEERR	<Error closing extract file !AD>/error/fao=2!/ansi=0
+UNUSEDMSG1002	<EXTRIOERR nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
+UNUSEDMSG1003	<EXTRCLOSEERR nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 CONNSOCKREQ	<Socket not connected>/error/fao=0!/ansi=0
 REPLEXITERR	<Replication process encountered an error while exiting>/error/fao=0!/ansi=0
 MUDESTROYSUC	<Global section (!AD) corresponding to file !AD successfully destroyed>/info/fao=4!/ansi=0
@@ -1007,7 +1009,7 @@ MUDESTROYFAIL	<Global section (!AD) corresponding to file !AD failed to be destr
 NOTALLDBOPN	<Not all required database files were opened>/fatal/fao=0!/ansi=0
 MUSELFBKUP	<Database file !AD can not be backed upon itself>/error/fao=2!/ansi=0
 DBDANGER	<Process !UL [0x!XL] killed while committing update for database file !AD.  Possibility of damage to block 0x!XL.>/warning/fao=5!/ansi=0
-TRUNCATEFAIL	<Truncating !AD from 0x!XL VMS blocks to 0x!XL blocks failed>/error/fao=4!/ansi=0
+UNUSEDMSG1012	<TRUNCATEFAIL nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 TCGETATTR	<Error while getting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 TCSETATTR	<Error while setting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 IOWRITERR	<IO Write by pid 0x!XL to blk 0x!XL of database file !AD failed.  Pid 0x!XL retrying the IO.>/error/fao=5!/ansi=0
@@ -1226,7 +1228,7 @@ MMNODYNDWNGRD	<Unable to use dynamic downgrade with MM access method for region 
 MMNODYNUPGRD	<Unable to use MM access method for region !AD until all database blocks are upgraded>/error/fao=2!/ansi=0
 MUDWNGRDNRDY	<Database !AD is not ready to downgrade - still !UL database blocks to downgrade>/error/fao=3!/ansi=0
 MUDWNGRDTN	<Transaction number 0x!16@XQ in database !AD is too big for MUPIP [REORG] DOWNGRADE. Renew database with MUPIP INTEG TN_RESET>/error/fao=3!/ansi=0
-MUDWNGRDNOTPOS	<Start VBN value is [!UL] while downgraded GT.M version can support only [!UL]. Downgrade not possible>/error/fao=2!/ansi=0
+MUDWNGRDNOTPOS	<Start VBN value is [!UL] while downgraded YottaDB version can support only [!UL]. Downgrade not possible>/error/fao=2!/ansi=0
 MUUPGRDNRDY	<Database !AD has not been certified as being ready to upgrade to !AD format>/error/fao=4!/ansi=0
 TNWARN		<Database file !AD has 0x!16@XQ more transactions to go before reaching the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/warning/fao=4!/ansi=0
 TNTOOLARGE	<Database file !AD has reached the transaction number limit (0x!16@XQ). Renew database with MUPIP INTEG TN_RESET>/error/fao=3!/ansi=0
@@ -1239,7 +1241,7 @@ OMISERVHANG	<GTCM OMI server is hung>/info/fao=0!/ansi=0
 RSVDBYTE2HIGH	<Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)>/error/fao=5!/ansi=0
 BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0
 BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0
-VMSMEMORY2	<Central storage exhausted during allocation of dynamic file descriptor with !UL bytes - check page file quota and page file size>/error/fao=1!/ansi=0
+UNUSEDMSG1244	<VMSMEMORY2 nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 LOADBGSZ2	<Load error: BEGIN too large.  No records loaded.>/error/fao=0!/ansi=0
 LOADEDSZ2	<Load error: END too large.  No records loaded.>/error/fao=0!/ansi=0
 REPLINSTMISMTCH	<Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)>/error/fao=8!/ansi=0
@@ -1291,7 +1293,7 @@ RLBKJNLNOBIMG	<Journal file !AD has NOBEFORE_IMAGE journaling>/info/fao=2!/ansi=
 RLBKLOSTTNONLY	<ROLLBACK will only create a lost transaction file (database and journal files will not be modified)>/info/fao=0!/ansi=0
 KILLBYSIGSINFO3	<!AD process !UL has been killed by a signal !UL accessing vaddress 0x!XJ>/fatal/fao=5!/ansi=0
 GTMSECSHRTMPPATH	<gtmsecshr path is !AD>/info/fao=2!/ansi=0
-GTMERREXIT	<GTM image has exited with errors>/error/fao=0!/ansi=0
+UNUSEDMSG1296	<GTMERREXIT nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 INVMEMRESRV	<Could not allocate YottaDB memory reserve (!AD)>/warning/fao=2!/ansi=0
 OPCOMMISSED	<!UL errors and !UL MBFULLs sending prior operator messages>/info/fao=2!/ansi=0
 COMMITWAITSTUCK	<Pid !UL timed out after waiting !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
@@ -1316,7 +1318,7 @@ CRYPTOPFAILED		<Encrypt/Decrypt operation failed for file !AD. !AD>/error/fao=4!
 CRYPTDLNOOPEN		<Could not load encryption library while opening encrypted file !AD. !AD>/error/fao=4!/ansi=0
 CRYPTNOV4		<!AD is an encrypted database. Cannot downgrade(to V4) with Encryption option enabled.>/error/fao=2!/ansi=0
 CRYPTNOMM		<!AD is an encrypted database. Cannot support MM access method.>/error/fao=2!/ansi=0
-UNUSEDMSG1316	<Last used in V6.2-002A>/error/fao=0!/ansi=0
+READONLYNOBG		<Read-only cannot be enabled on non-MM databases>/error/fao=0!/ansi=0
 CRYPTKEYFETCHFAILED	<Could not retrieve encryption key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
 CRYPTKEYFETCHFAILEDNF	<Could not retrieve encryption key during !AD operation key. !AD>/error/fao=4!/ansi=0
 CRYPTHASHGENFAILED	<Could not generate cryptographic hash for symmetric key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
@@ -1357,7 +1359,7 @@ TRIGNAMEUNIQ	<Unable to make trigger name !AD unique beyond !UL versions already
 ZTRIGINVACT	<Missing or invalid parameter in position !UL given to $ZTRIGGER()>/error/fao=1!/ansi=0
 INDRCOMPFAIL	<Compilation of indirection failed>/error/fao=0!/ansi=0
 QUITALSINV	<QUIT * return when the extrinsic was not invoked with SET *>/error/fao=0!/ansi=0
-PROCTERM	<!AD process termination due to !AD (return code !UL) from !AD>/warning/fao=7!/ansi=0
+PROCTERM	<!AD process termination due to !AZ (return code !UL) from !AD>/warning/fao=6!/ansi=0
 SRCLNNTDSP	<Source lines exceeding !UL character width are not displayed>/info/fao=1!/ansi=0
 ARROWNTDSP	<Unable to display ^----- due to length of source line>/info/fao=0!/ansi=0
 TRIGDEFBAD	<Trigger initialization failed for global ^!AD. Error while processing ^#t("!AD",!AD)>/error/fao=6!/ansi=0
@@ -1374,19 +1376,19 @@ GVZTRIGFAIL	<ZTRIGGER of a global variable failed.  Failure code: !AD.>/error/fa
 MUUSERLBK	<Abnormal shutdown of replication-enabled database !AD detected>/error/fao=2!/ansi=0
 SETINSETTRIGONLY	<ISV !AD can only be modified in a 'SET' type trigger>/error/fao=2!/ansi=0
 DZTRIGINTRIG	<$ZTRIGGER() is not allowed inside trigger context. Trigger name: !AD>/error/fao=2!/ansi=0
-UNUSEDMSG1374	<SECNODZTRIGINTP : Last used in V6.2-000>/error/fao=0!/ansi=0
+LSINSERTED	<Line !UL, source module !AD exceeds maximum source line length; line seperator inserted, terminating scope of any prior IF, ELSE, or FOR>/warning/fao=3!/ansi=0
 BOOLSIDEFFECT	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in Boolean expression>/warning/fao=0!/ansi=0
 DBBADUPGRDSTATE	<Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.>/warning/fao=4!/ansi=0
 WRITEWAITPID	<PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD>/error/fao=6!/ansi=0
 ZGOCALLOUTIN	<ZGOTO level 0 with entry ref not valid when using call-ins>/error/fao=0!/ansi=0
-REPLNOXENDIAN	<!AD side is running on a GT.M version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue>/error/fao=4!/ansi=0
+REPLNOXENDIAN	<!AD side is running on a GT.M/YottaDB version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue>/error/fao=4!/ansi=0
 REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ>/error/fao=3!/ansi=0
-ZGOTOINVLVL2	<ZGOTO 0:entryref is not valid on VMS (UNLINK is a UNIX only feature)>/error/fao=0!/ansi=0
+UNUSEDMSG1386	<ZGOTOINVLVL2 nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/error/fao=2!/ansi=0
 JNLORDBFLU	<Error flushing database blocks to !AD. See related messages in the operator log>/error/fao=2!/ansi=0
 ZCCLNUPRTNMISNG	<External call: Cleanup routine name missing. Cannot continue>/error/fao=0!/ansi=0
 ZCINVALIDKEYWORD	<External call: Invalid keyword found. Cannot continue>/error/fao=0!/ansi=0
-UNUSEDMSG1386	<REPLNOMULTILINETRG : Last used in V6.2-000>/error/fao=0!/ansi=0
+REPLMULTINSTUPDATE	<Previous updates in the current transaction are to !AD so updates to !AD (in !AD) not allowed>/error/fao=6!/ansi=0
 DBSHMNAMEDIFF	<Database file !AD points to shared memory (id = !UL) which points to a different database file !AZ>/error/fao=4!/ansi=0
 SHMREMOVED	<Removed Shared Memory id !UL corresponding to file !AD>/info/fao=3!/ansi=0
 DEVICEWRITEONLY	<Cannot read from a write-only device>/error/fao=0!/ansi=0
@@ -1413,7 +1415,7 @@ INSUNKNOWN	<Supplementary Instance !AD has no instance definition for non-Supple
 NORESYNCSUPPLONLY	<NORESYNC only supported for Supplementary Instances>/error/fao=0!/ansi=0
 NORESYNCUPDATERONLY	<NORESYNC qualifier only allowed on a Supplementary Instance which allows local updates>/error/fao=0!/ansi=0
 NOSUPPLSUPPL	<Instance !AD is configured to perform local updates so it cannot receive from Supplementary Instance !AD>/error/fao=4!/ansi=0
-REPL2OLD	<Instance !AD uses a GT.M version that does not support connection with the current version on instance !AD>/error/fao=4!/ansi=0
+REPL2OLD	<Instance !AD uses a GT.M/YottaDB version that does not support connection with the current version on instance !AD>/error/fao=4!/ansi=0
 EXTRFILEXISTS	<Error opening output file: !AD -- File exists>/error/fao=2!/ansi=0
 MUUSERECOV	<Abnormal shutdown of journaled database !AD detected>/error/fao=2!/ansi=0
 SECNOTSUPPLEMENTARY	<!AD is a Supplementary Instance and so cannot act as a source to non-Supplementary Instance !AD >/error/fao=4!/ansi=0
@@ -1483,9 +1485,9 @@ DBSPANCHUNKORD	<!AD Chunk of !UL blocks is out of order>/error/fao=3!/ansi=0
 DBDATAMX	<!AD Record too large>/error/fao=2!/ansi=0
 DBIOERR		<Error while doing write operation on region !AD (!AD)>/error/fao=4!/ansi=0
 INITORRESUME	<UPDATERESYNC on a Supplementary Instance must additionally specify INITIALIZE or RESUME>/error/fao=0!/ansi=0
-GTMSECSHRNOARG0	<gtmsecshr cannot identify its origin - argv[0] is null>/error/fao=0!/ansi=0
-GTMSECSHRISNOT	<gtmsecshr is not running as gtmsecshr but !AD - must be gtmsecshr>/error/fao=2!/ansi=0
-GTMSECSHRBADDIR	<gtmsecshr is not running from $gtm_dist/gtmsecshrdir or $gtm_dist cannot be determined>/error/fao=0!/ansi=0
+GTMSECSHRNOARG0	<gtmsecshr cannot identify its origin - argv[0] is null>/fatal/fao=0!/ansi=0
+GTMSECSHRISNOT	<gtmsecshr is not running as gtmsecshr but !AD - must be gtmsecshr>/fatal/fao=2!/ansi=0
+GTMSECSHRBADDIR	<gtmsecshr is not running from $ydb_dist/gtmsecshrdir or $ydb_dist cannot be determined>/fatal/fao=0!/ansi=0
 JNLBUFFREGUPD	<Journal file buffer size for region !AD has been adjusted from !UL to !UL.>/warning/fao=4!/ansi=0
 JNLBUFFDBUPD	<Journal file buffer size for database file !AD has been adjusted from !UL to !UL.>/warning/fao=4!/ansi=0
 LOCKINCR2HIGH	<Attempt to increment a LOCK more than !UL times>/error/fao=1!/ansi=0
@@ -1523,13 +1525,13 @@ NULLENTRYREF	<JOB command did not specify entryref>/error/fao=0!/ansi=0
 ZPEEKNORPLINFO	<$ZPEEK() unable to access requested replication structure>/error/fao=0!/ansi=0
 MMREGNOACCESS	<Region !AD (!AD) is no longer accessible. See prior error messages in the operator and application error logs>/error/fao=4!/ansi=0
 MALLOCMAXUNIX	<Exceeded maximum allocation defined by $gtm_max_storalloc>/error/fao=0!/ansi=0
-MALLOCMAXVMS	<Exceeded maximum allocation defined by GTM_MAX_STORALLOC>/error/fao=0!/ansi=0
+UNUSEDMSG1528	<MALLOCMAXVMS nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 HOSTCONFLICT	<Host !AD could not open database file !AD because it is marked as already open on node !AD>/error/fao=6!/ansi=0
 GETADDRINFO	<Error in getting address info>/error/fao=0!/ansi=0
 GETNAMEINFO	<Error in getting name info>/error/fao=0!/ansi=0
 SOCKBIND	<Error in binding socket>/error/fao=0!/ansi=0
 INSTFRZDEFER	<Instance Freeze initiated by !AD error on region !AD deferred due to critical resource conflict>/info/fao=4!/ansi=0
-UNUSEDMSG1529	<REGOPENRETRY last used in V6.3-000A>/error/fao=0!/ansi=0
+UNUSEDMSG1534	<REGOPENRETRY last used in V6.3-000A>/error/fao=0!/ansi=0
 REGOPENFAIL	<Failed to open region !AD (!AD) due to conflicting database shutdown activity>/error/fao=4!/ansi=0
 REPLINSTNOSHM	<Database !AD has no active connection to a replication journal pool>/error/fao=2!/ansi=0
 DEVPARMTOOSMALL	<Deviceparameter must be greater than zero (0)>/error/fao=0!/ansi=0
@@ -1539,7 +1541,7 @@ ACTCOLLMISMTCH	<Global ^!AD inherits alternative collation sequence #!UL from gl
 GBLNOMAPTOREG	<Global !AD does not map to region !AD in current global directory>/error/fao=4!/ansi=0
 ISSPANGBL	<Operation cannot be performed on global ^!AD as it spans multiple regions in current global directory>/error/fao=2!/ansi=0
 TPNOSUPPORT	<Operation cannot be performed while inside of a TP transaction>/error/fao=0!/ansi=0
-UNUSEDMSG1539	<GVSUBSERR last used in V6.3-000A>/error/fao=0!/ansi=0
+UNUSEDMSG1544	<GVSUBSERR last used in V6.3-000A>/error/fao=0!/ansi=0
 ZATRANSERR	<The input string is too long to convert>/error/fao=0!/ansi=0
 FILTERTIMEDOUT	<Replication server timed out attempting to read seqno !16@XQ from external filter>/error/fao=1!/ansi=0
 TLSDLLNOOPEN	<Failed to load YottaDB TLS/SSL library for secure communication>/error/fao=0!/ansi=0
@@ -1566,7 +1568,7 @@ DSEMAXBLKSAV	<DSE cannot SAVE another block as it already has the maximum of !UL
 BLKINVALID	<!XL is not a valid block as database file !AD has !XL total blocks>/error/fao=4!/ansi=0
 CANTBITMAP	<Can't perform this operation on a bit map (block at a 200 hexadecimal boundary)>/error/fao=0!/ansi=0
 AIMGBLKFAIL	<After image build for block !XL in region !AD failed in DSE or MUPIP>/error/fao=3!/ansi=0
-GTMDISTUNVERIF	<Environment variable $gtm_dist (!AD) could not be verified against the executables path (!AD)>/error/fao=4!/ansi=0
+YDBDISTUNVERIF	<Environment variable $ydb_dist (!AD) could not be verified against the executables path (!AD)>/error/fao=4!/ansi=0
 CRYPTNOAPPEND	<APPEND disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
 CRYPTNOSEEK	<SEEK disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
 CRYPTNOTRUNC	<Not positioned at file start or EOF. TRUNCATE disallowed on the encrypted file !AD>/error/fao=2!/ansi=0
@@ -1583,7 +1585,7 @@ HLPPROC		<Helper Process error>/error/fao=0!/ansi=0
 REPLNOHASHTREC	<Sequence number 0x!16@XQ contains trigger definition updates. !AD side must be at least V6.2-000 for replication to continue>/error/fao=3!/ansi=0
 REMOTEDBNOTRIG	<Trigger operations on global !AD not supported as it maps to database region !AD that points to a remote file>/error/fao=4!/ansi=0
 NEEDTRIGUPGRD	<Cannot do trigger operation on database file !AD until it is upgraded; Run MUPIP TRIGGER -UPGRADE first>/error/fao=2!/ansi=0
-REQRLNKCTLRNDWN	<Error accessing relinkctl file for $ZROUTINES directory !AD. Must be rundown>/error/fao=2!/ansi=0
+REQRLNKCTLRNDWN	<Error accessing relinkctl file !AZ for $ZROUTINES directory !AD. Must be rundown>/error/fao=3!/ansi=0
 RLNKCTLRNDWNSUC	<Relinkctl file for $ZROUTINES directory !AD successfully rundown>/info/fao=2!/ansi=0
 RLNKCTLRNDWNFL	<Relinkctl file for $ZROUTINES directory !AD failed to rundown as it is open by !UL process(es)>/error/fao=3!/ansi=0
 MPROFRUNDOWN	<Error during M-profiling rundown>/error/fao=0!/ansi=0
@@ -1619,7 +1621,7 @@ CRYPTKEYRELEASEFAILED	<Could not safely release encryption key corresponding to 
 MUREENCRYPTSTART	<Database !AD : MUPIP REORG ENCRYPT started by pid !UL at transaction number [0x!16@XQ]>/info/fao=4!/ansi=0
 MUREENCRYPTV4NOALLOW	<Database (re)encryption supported only on fully upgraded V5 databases. !AD has V4 format blocks>/error/fao=2!/ansi=0
 ENCRYPTCONFLT	<MUPIP REORG -ENCRYPT and MUPIP EXTRACT -FORMAT=BIN cannot run concurrently - skipping !AD on region: !AD, file: !AD>/error/fao=6!/ansi=0
-JNLPOOLRECOVERY	<The size of the data written to the journal pool (!UL) does not match the size of the data in the journal record (!UL) for the replication instance file !AZ. The journal pool has been recovered.>/error/fao=3!/ansi=0
+JNLPOOLRECOVERY	<The size of the data written to the journal pool (!UL) does not match the size of the data in the journal files (!UL) at journal sequence number [0x!16@XQ] for the replication instance file !AZ. The journal pool has been recovered.>/error/fao=4!/ansi=0
 LOCKTIMINGINTP	<A LOCK at !AD within a TP transaction is waiting in a final TP retry, which may lead to a general response gap>/warning/fao=2!/ansi=0
 PBNUNSUPTYPE	<$ZPEEK() does not support type !AD>/error/fao=2!/ansi=0
 DBFHEADLRU	<Database file !AD LRU pointer: 0x!16@XQ is outside of range: 0x!16@XQ to 0x!16@XQ or misaligned>/info/fao=5!/ansi=0
@@ -1629,17 +1631,17 @@ DBGLDMISMATCH	<Database file !AD has !AZ whereas !AZ !AD in global directory !AD
 DBBLKSIZEALIGN	<Database file !AD has AIO=ON and block_size=!UL which is not a multiple of filesystem block size !UL>/error/fao=4!/ansi=0
 ASYNCIONOMM	<Database file !AD!AD cannot !AD>/error/fao=6!/ansi=0
 RESYNCSEQLOW	<MUPIP JOURNAL -ROLLBACK -FORWARD -RESYNC=!@ZQ [0x!16@XQ] requested is lower than !@ZQ [0x!16@XQ] which is the starting sequence number of the instance>/error/fao=4!/ansi=0
-DBNULCOL	<NULL collation representation for record !UL in block !UL is !AD which differs from the database file header settings of !AD>/error/fao=6!/ansi=0
+DBNULCOL	<!AD NULL collation representation differs from the database file header setting>/error/fao=2!/ansi=0
 UTF16ENDIAN	<The device previously set UTF-16 endianness to !AD and cannot change to !AD>/error/fao=4!/ansi=0
 OFRZACTIVE	<Region !AD has an Online Freeze>/warning/fao=2!/ansi=0
-OFRZAUTOREL	<Online Freeze automatically released for region !AD>/warning/fao=2!/ansi=0
+OFRZAUTOREL	<Online Freeze automatically released for database file !AD>/warning/fao=2!/ansi=0
 OFRZCRITREL	<Proceeding with a write to region !AD after Online Freeze while holding crit>/warning/fao=2!/ansi=0
 OFRZCRITSTUCK	<Unable to proceed with a write to region !AD with Online Freeze while holding crit. Region stuck until freeze is removed.>/warning/fao=2!/ansi=0
 OFRZNOTHELD	<Online Freeze had been automatically released for at least one region>/warning/fao=0!/ansi=0
 AIOBUFSTUCK	<Waited !UL minutes for PID: !UL to finish AIO disk write of block: !UL [0x!XL] aio_error=!UL>/error/fao=5!/ansi=0
 DBDUPNULCOL	<Discarding !AD=!AD key due to duplicate null collation record>/error/fao=4!/ansi=0
-CHANGELOGINTERVAL	<!AD Server now logging to !AD with a !UL second interval>/info/fao=5!/ansi=0
-DBNONUMSUBS	<!AD key contains a numeric form of subscript in a global defined to collate all subscripts as strings>/error/fao=2!/ansi=0
+CHANGELOGINTERVAL	<!AD Server is now logging to !AD every !UL transactions>/info/fao=5!/ansi=0
+DBNONUMSUBS	<!AD Key contains a numeric form of subscript in a global defined to collate all subscripts as strings>/error/fao=2!/ansi=0
 AUTODBCREFAIL	<Automatic creation of database file !AD associated with region !AD failed; see associated messages for details>/error/fao=4!/ansi=0
 RNDWNSTATSDBFAIL	<Rundown of statistics database region !AD (DB !AD) failed at/in !AD with following error: !AD>/error/fao=8!/ansi=0
 STATSDBNOTSUPP	<Attempted operation is not supported on statistics database file !AD>/error/fao=2!/ansi=0
@@ -1661,6 +1663,17 @@ STATSDBFNERR	<This database has no accessible statistics database due to the fol
 JNLSWITCHRETRY	<Retrying previously abandoned switch of journal file !AD for database !AD>/info/fao=4!/ansi=0
 JNLSWITCHFAIL	<Failed to switch journal file !AD for database file !AD>/error/fao=4!/ansi=0
 CLISTRTOOLONG	<!AZ specified is !UL bytes long which is greater than the allowed maximum of !UL bytes>/error/fao=3!/ansi=0
+LVMONBADVAL	<Value for local variable !AD changed inappropriately between two points for indexes !UL and !UL - expected value: !AD  actual value: !AD - Generating core>/error/fao=8!/ansi=0
+RESTRICTEDOP	<Attempt to perform a restricted operation: !AZ>/error/fao=1!/ansi=0
+RESTRICTSYNTAX	<Syntax error in file !AD at line number !UL. All facilities restricted for process.>/error/fao=3!/ansi=0
+MUCREFILERR	<Error in/at !AD creating database !AD (region !AD)>/error/fao=6!/ansi=0
+JNLBUFFPHS2SALVAGE	<Salvaged journal records from process !UL for database file !AD at transaction number [0x!16@XQ] and journal-sequence-number/unique-token [0x!16@XQ] with journal file starting offset [0x!XL] and length [0x!XL]>/info/fao=7!/ansi=0
+JNLPOOLPHS2SALVAGE	<Salvaged journal records from process !UL for replication instance file !AD at journal sequence number [0x!16@XQ] with journal pool starting offset [0x!16@XQ] and length [0x!XL]>/info/fao=6!/ansi=0
+MURNDWNARGLESS	<Argumentless MUPIP RUNDOWN started with process id !UL by userid !UL from directory !AD>/info/fao=4!/ansi=0
+DBFREEZEON	<Region !AD is FROZEN (!AZOVERRIDE !AZONLINE !AZAUTOREL)>/info/fao=5!/ansi=0
+DBFREEZEOFF	<Region !AD is UNFROZEN (!AZOVERRIDE !AZAUTOREL)>/info/fao=4!/ansi=0
+STPCRIT		<String pool space critical>/error/fao=0!/ansi=0
+STPOFLOW	<String pool space overflow>/fatal/fao=0!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

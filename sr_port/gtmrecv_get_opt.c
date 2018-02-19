@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -224,12 +224,13 @@ int gtmrecv_get_opt(void)
 	}
 	if (gtmrecv_options.statslog)
 	{
-		statslog_val_len = 4; /* max(strlen("ON"), strlen("OFF")) + 1 */
+		statslog_val_len = 3; /* max(strlen("ON"), strlen("OFF")) */
 		if (!cli_get_str("STATSLOG", statslog_val, &statslog_val_len))
 		{
 			util_out_print("Error parsing STATSLOG qualifier", TRUE);
 			return (-1);
 		}
+		statslog_val[statslog_val_len] = '\0';
 		cli_strupper(statslog_val);
 		if (0 == STRCMP(statslog_val, "ON"))
 			gtmrecv_options.statslog = TRUE;

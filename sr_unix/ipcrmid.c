@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,12 +60,14 @@ int sem_rmid(int ipcid)
 				SNPRINTF(buff, 128, "semctl(IPC_RMID, %d)", ipcid);
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_STR(buff), CALLFROM, save_errno);
 				errno = save_errno;
+				assert(FALSE);
 				return -1;
 			} else
 			{
 				if (0 != (status = REMIPC(REMOVE_SEM, ipcid)))
 				{
 					errno = status;
+					assert(FALSE);
 					return -1;
 				}
 			}
@@ -72,6 +77,7 @@ int sem_rmid(int ipcid)
 	else if (0 != (status = REMIPC(REMOVE_SEM, ipcid)))
 	{
 		errno = status;
+		assert(FALSE);
 		return -1;
 	}
 #	endif

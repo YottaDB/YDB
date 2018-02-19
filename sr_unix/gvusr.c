@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +22,10 @@
 #include "gvusr.h"
 #include "gvusr_queryget.h"
 
-/* this module is just a set of stubs */
+/* This file defines various stub functions for executables that link to functions related to the dba_usr access method
+ * (unused DDP) but are guaranteed to never use/need them. Utilities like MUPIP/DSE/LKE etc. never need access to the
+ * client-side functions of a DDP server so all such functions are included here.
+ */
 
 void gvusr_init(gd_region *reg, gd_region **creg, gv_key **ckey, gv_key **akey)
 {
@@ -42,6 +48,11 @@ int gvusr_order(void)
 }
 
 int gvusr_query(mval *v)
+{
+	return 1;
+}
+
+int gvusr_reversequery(mval *v)
 {
 	return 1;
 }

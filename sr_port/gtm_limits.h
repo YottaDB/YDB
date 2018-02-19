@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,14 +24,14 @@
 
 /* The value 1023 for PATH_MAX is derived using pathconf("path", _PC_PATH_MAX) on z/OS and
  * we figure other POSIX platforms are at least as capable if they don't define PATH_MAX.
- * Since we can't afford to call a function on each use of PATH_MAX/GTM_PATH_MAX, this
+ * Since we can't afford to call a function on each use of PATH_MAX/YDB_PATH_MAX, this
  * value is hardcoded here.
  *
  * Note on Linux (at least), PATH_MAX is actually defined in <sys/param.h>. We would include
  * that here unconditionally but on AIX, param.h includes limits.h. Note that regardless of where
  * it gets defined, PATH_MAX needs to be defined prior to including stdlib.h. This is because in a
  * pro build, at least Linux verifies the 2nd parm of realpath() is PATH_MAX bytes or more.
- * Since param.h sets PATH_MAX to 4K on Linux, this can cause structures defined as GTM_PATH_MAX
+ * Since param.h sets PATH_MAX to 4K on Linux, this can cause structures defined as YDB_PATH_MAX
  * to raise an error when used in the 2nd argument of realpath().
  */
 #ifndef PATH_MAX
@@ -39,18 +42,19 @@
 #  endif
 #endif
 /* Now define our version which includes space for a terminating NULL byte */
-#define	GTM_PATH_MAX	PATH_MAX + 1
-/* The maximum path to the GT.M distribution is complicated by the paths underneath $gtm_dist.
- * At the top level, there is libgtmshr.{so,sl,dll} which is roughly 12 characters plus 1 for the
+#define	YDB_PATH_MAX	PATH_MAX + 1
+#define GTM_PATH_MAX	YDB_PATH_MAX	/* so defined because GTM_PATH_MAX is required by Java plugin */
+/* The maximum path to the YottaDB distribution is complicated by the paths underneath $ydb_dist.
+ * At the top level, there is libyottadb.so which is roughly 12 characters plus 1 for the
  * slash. The path length of gtmsecshrdir/gtmsecshr doesn't  come into play because
- * $gtm_dist/gtmsecshr will change directory to $gtm_dist/gtmsecshrdir (13 characters including the
+ * $ydb_dist/gtmsecshr will change directory to $ydb_dist/gtmsecshrdir (13 characters including the
  * leading slash) and then exec gtmsecshr, avoiding the maximum path issue. Going to "UTF-8" mode adds
  * another 5 characters ("utf8/") to the path name. The encryption library path,
- * $gtm_dist/plubin/libgtmcrypt.so is a symlink to some much longer named files which the code will
+ * $ydb_dist/plubin/libgtmcrypt.so is a symlink to some much longer named files which the code will
  * realpath() before dlopen()ing. As it stands, the longest path is 47 characters (including the "UTF-8"
  * directory. Thus PATH_MAX - 50 characters should be a good compromise for today and future expansion.
- * Just in case, the build script verify that nothing past $gtm_dist is more than 50 characters long. */
-#define	GTM_DIST_PATH_MAX	GTM_PATH_MAX - 50
+ * Just in case, the build script verify that nothing past $ydb_dist is more than 50 characters long. */
+#define	YDB_DIST_PATH_MAX	YDB_PATH_MAX - 50
 
 #if defined(LLONG_MAX)		/* C99 and others */
 #define GTM_INT64_MIN LLONG_MIN

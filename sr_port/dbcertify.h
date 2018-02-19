@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -13,42 +16,27 @@
 #define DBCERTIFY_H_INCLUDED
 
 #include "gtm_stdio.h"
-#ifdef UNIX
-#  include "mu_all_version_standalone.h"
-#endif
+#include "mu_all_version_standalone.h"
 
-#ifdef VMS
-#  define OPTDELIM	"/"
-#  define DEFAULT_OUTFILE_SUFFIX "_DBCERTSCAN"
-#  define TMPCMDFILSFX	".com"
-#  define SETDISTLOGENV	"$ DEFINE/NOLOG "GTM_DIST" "
-#  define DSE_START	"$ RUN "GTM_DIST":DSE.EXE"
-#  define DSE_FIND_REG_ALL "FIND /REG"
-#  define MUPIP_START	"$ RUN "GTM_DIST":MUPIP.EXE"
-#  define RUN_CMD	"@"
-#  define RESULT_ASGN	"$ DEFINE SYS$OUTPUT "
-#  define DUMPRSLTFILE	"TYPE "
-#  define RMS_OPEN_BIN        ,"rfm=fix","mrs=512","ctx=bin"
-#else
-#  define SHELL_START	"#!/bin/sh"
-#  define SETDISTLOGENV	GTM_DIST"="
-#  define DSE_START_PIPE_RSLT1	"$"GTM_DIST"/dse << EOF > "
-#  define DSE_START_PIPE_RSLT2	" 2>&1"
-#  define OPTDELIM	"-"
-#  define DEFAULT_OUTFILE_SUFFIX ".dbcertscan"
-#  define TMPCMDFILSFX	".sh"
-#  define DSE_FIND_REG_ALL	"find -reg"
-#  define MUPIP_START	"$"GTM_DIST"/mupip << EOF"
-#  define RUN_CMD	"./"
-#  define DUMPRSLTFILE	"cat "
-#  define RMS_OPEN_BIN
-#endif
+#define SHELL_START	"#!/bin/sh"
+#define SETDISTLOGENV	YDB_DIST"="
+#define DSE_START_PIPE_RSLT1	"$"YDB_DIST"/dse << EOF > "
+#define DSE_START_PIPE_RSLT2	" 2>&1"
+#define OPTDELIM	"-"
+#define DEFAULT_OUTFILE_SUFFIX ".dbcertscan"
+#define TMPCMDFILSFX	".sh"
+#define DSE_FIND_REG_ALL	"find -reg"
+#define MUPIP_START	"$"YDB_DIST"/mupip << EOF"
+#define RUN_CMD	"./"
+#define DUMPRSLTFILE	"cat "
+#define RMS_OPEN_BIN
+
 #define DSE_BFLUSH	"buffer_flush"
 #define DSE_QUIT	"quit"
 #define DSE_OPEN_RSLT	"OPEN "OPTDELIM"FILE="TMPRSLTFILE
 #define DSE_CLOSE_RSLT	"CLOSE"
 #define DSE_PROMPT	"DSE> "
-#define DSE_REG_LIST_START UNIX_ONLY(DSE_PROMPT)"List of global directory:"
+#define DSE_REG_LIST_START DSE_PROMPT"List of global directory:"
 #define MUPIP_EXTEND	"EXTEND "
 #define MUPIP_BLOCKS	" "OPTDELIM"BLOCKS="
 #define TMPFILEPFX	"dbcmdx"
@@ -216,7 +204,7 @@ typedef struct
 	boolean_t	dbc_debug;		/* The -debug flag was specified */
 	boolean_t	tmp_file_names_gend;	/* Whether we have figured out what our temp file names are */
 	boolean_t	keep_temp_files;	/* Leave temp files instead of delete on exit */
-	UNIX_ONLY(sem_info sem_inf[FTOK_ID_CNT];)	/* Ftok keys for id 43 and 1 (both used by older versions) */
+	sem_info	sem_inf[FTOK_ID_CNT];	/* Ftok keys for id 43 and 1 (both used by older versions) */
 	volatile boolean_t dbc_critical;	/* Critical section indicator for condition/signal/exit handlers */
 	volatile boolean_t dbc_fhdr_dirty;	/* If fileheader has been modified, flag it */
 	uchar_ptr_t	curr_lbmap_buff;	/* Buffer holding current local bit map block */
@@ -314,13 +302,9 @@ void dbcertify_parse_and_dispatch(int argc, char **argv);
 void dbcertify_scan_phase(void);
 void dbcertify_certify_phase(void);
 void dbcertify_dbfilop(phase_static_area *psa);
-#ifdef UNIX
 #include <signal.h>
 void dbcertify_signal_handler(int sig, siginfo_t *info, void *context);
 void dbcertify_deferred_signal_handler(void);
-#else
-void dbcertify_exit_handler(void);
-#endif
 /* Routines in dbcertify_funcs.c */
 void dbc_gen_temp_file_names(phase_static_area *psa);
 void dbc_open_command_file(phase_static_area *psa);
@@ -346,9 +330,7 @@ void dbc_init_db(phase_static_area *psa);
 void dbc_close_db(phase_static_area *psa);
 void dbc_scan_phase_cleanup(void);
 void dbc_certify_phase_cleanup(void);
-#ifdef UNIX
 void dbc_aquire_standalone_access(phase_static_area *psa);
 void dbc_release_standalone_access(phase_static_area *psa);
-#endif
 
 #endif

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -101,7 +104,11 @@ boolean_t	gvcst_zprevious2(void)
 
 	SETUP_THREADGBL_ACCESS;
 	T_BEGIN_READ_NONTP_OR_TP(ERR_GVORDERFAIL);
-	TREF(expand_prev_key) = TRUE;	/* this will cause "gv_altkey" to contain fully expanded previous key */
+	/* Set TREF(expand_prev_key) to one of 2 possible values to kick in optimizations as needed */
+	if (((gv_target->gvname.var_name.len + 1) == gv_currkey->prev) && TREF(gv_last_subsc_null))
+		TREF(expand_prev_key) = ZPREVIOUS_NULL_SUBS_LEVEL1;
+	else
+		TREF(expand_prev_key) = TRUE;	/* this will cause "gv_altkey" to contain fully expanded previous key */
 	/* Note that "t_retry" usage below could transfer control out of this function if dollar_tlevel > 0. If so,
 	 * we need to remember to reset TREF(expand_prev_key) to FALSE since this zprevious action has terminated.
 	 * We do that reset in tp_restart.
@@ -114,6 +121,10 @@ boolean_t	gvcst_zprevious2(void)
 		{
 			found = TRUE;
 			bh = gv_target->hist.h;
+			/* Before using "bh->prev_rec", assert that it is usable. Can assert this since bh is a leaf level block
+			 * and prev_rec is always initialized for leaf blocks in "gvcst_search".
+			 */
+			ASSERT_LEAF_BLK_PREV_REC_INITIALIZED(bh);
 			if (0 == bh->prev_rec.offset)
 			{
 				two_histories = TRUE;

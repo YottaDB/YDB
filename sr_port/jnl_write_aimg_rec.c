@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,47 +37,38 @@ GBLREF	mstr			pvt_crypt_buf;
 
 void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 {
-	struct_jrec_blk		aimg_record;
-	int			tmp_jrec_size, jrec_size, zero_len;
-	jnl_format_buffer 	blk_trailer;	/* partial record after the aimg block */
-	char			local_buff[JNL_REC_START_BNDRY + JREC_SUFFIX_SIZE];
-	jrec_suffix		*suffix;
 	blk_hdr_ptr_t		buffer, save_buffer;
+	boolean_t		in_phase2;
+	boolean_t		use_new_key;
+	char			*in, *out;
+	gd_segment		*seg;
+	int			in_len, gtmcrypt_errno;
+	int			tmp_jrec_size;
 	jnl_private_control	*jpc;
 	sgmnt_data_ptr_t	csd;
+	struct_jrec_blk		aimg_record;
 	uint4			cursum;
-	char			*in, *out;
-	int			in_len, gtmcrypt_errno;
-	gd_segment		*seg;
-	boolean_t		use_new_key;
 
 	csd = csa->hdr;
-	assert(csa->now_crit);
 	jpc = csa->jnl;
 	assert(0 != jpc->pini_addr);
 	aimg_record.prefix.jrec_type = JRT_AIMG;
 	aimg_record.prefix.pini_addr = (0 == jpc->pini_addr) ? JNL_HDR_LEN : jpc->pini_addr;
-	aimg_record.prefix.tn = csa->ti->curr_tn;
+	in_phase2 = IN_PHASE2_JNL_COMMIT(csa);
+	aimg_record.prefix.tn = JB_CURR_TN_APPROPRIATE(in_phase2, jpc, csa);
 	/* At this point jgbl.gbl_jrec_time should be set by the caller */
 	assert(jgbl.gbl_jrec_time);
 	aimg_record.prefix.time = jgbl.gbl_jrec_time;
 	aimg_record.prefix.checksum = INIT_CHECKSUM_SEED;
 	aimg_record.blknum = cse->blk;
-	/* in case we have a bad block-size, we dont want to write an AIMG larger than the GDS block size (maximum block size) */
+	/* in case we have a bad block-size, we don't want to write an AIMG larger than the GDS block size (maximum block size) */
 	buffer = (blk_hdr_ptr_t)cse->new_buff;
 	assert(buffer->bsiz <= csd->blk_size);
 	assert(buffer->bsiz >= SIZEOF(blk_hdr));
 	aimg_record.bsiz = MIN(csd->blk_size, buffer->bsiz);
 	aimg_record.ondsk_blkver = cse->ondsk_blkver;
 	tmp_jrec_size = (int)FIXED_AIMG_RECLEN + aimg_record.bsiz + JREC_SUFFIX_SIZE;
-	jrec_size = ROUND_UP2(tmp_jrec_size, JNL_REC_START_BNDRY);
-	zero_len = jrec_size - tmp_jrec_size;
-	blk_trailer.buff = local_buff + (JNL_REC_START_BNDRY - zero_len);
-	memset(blk_trailer.buff, 0, zero_len);
-	blk_trailer.record_size = zero_len + JREC_SUFFIX_SIZE;
-	suffix = (jrec_suffix *)&local_buff[JNL_REC_START_BNDRY];
-	aimg_record.prefix.forwptr = suffix->backptr = jrec_size;
-	suffix->suffix_code = JNL_REC_SUFFIX_CODE;
+	aimg_record.prefix.forwptr = ROUND_UP2(tmp_jrec_size, JNL_REC_START_BNDRY);
 	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
 	save_buffer = buffer;
 	in_len = aimg_record.bsiz - SIZEOF(*buffer);
@@ -102,6 +93,5 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 	}
 	cursum = jnl_get_checksum(buffer, NULL, aimg_record.bsiz);
 	COMPUTE_AIMG_CHECKSUM(cursum, &aimg_record, com_csum, aimg_record.prefix.checksum);
-	jnl_write(jpc, JRT_AIMG, (jnl_record *)&aimg_record, buffer, &blk_trailer, NULL);
-	buffer = save_buffer;
+	jnl_write(jpc, JRT_AIMG, (jnl_record *)&aimg_record, buffer);
 }

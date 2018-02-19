@@ -107,7 +107,7 @@ fi
 lib_search_path="/usr/local/lib64 /usr/local/lib /usr/lib64 /usr/lib /lib64 /lib /usr/local/ssl/lib /usr/lib/x86_64-linux-gnu"
 lib_search_path="$lib_search_path /usr/lib/i386-linux-gnu /lib/x86_64-linux-gnu /lib/i386-linux-gnu /opt/openssl/0.9.8/lib/hpux64"
 include_search_path="/usr/include /usr/local/include /usr/local/include/gpgme /usr/local/ssl/include /opt/openssl/0.9.8/include"
-include_search_path="$include_search_path /usr/include/x86_64-linux-gnu"
+include_search_path="$include_search_path /usr/include/i386-linux-gnu /usr/include/x86_64-linux-gnu"
 bin_search_path="/usr/bin /usr/local/bin /bin"
 
 mandate_headers="gpgme.h gpg-error.h"

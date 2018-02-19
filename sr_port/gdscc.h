@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,8 +46,8 @@
  * operation) to a different data block (that also had the same index block as an ancestor) which resulted in a block split
  * causing the index block to be updated. In this case there is no reason to restart. The index block could have been
  * modified by other operations as well (e.g. M-kill, REORG coalesce or swap operations or any DSE command or a block split
- * operation that caused the height of the global variable tree to increase [C9B11-001813]). In these cases, we dont want
- * this optimization to take effect as we cant be sure everything that was relied upon for the TP transaction was still valid.
+ * operation that caused the height of the global variable tree to increase [C9B11-001813]). In these cases, we don't want
+ * this optimization to take effect as we can't be sure everything that was relied upon for the TP transaction was still valid.
  * These disallowed operations are generically referred to as "kill" type of operations. This optimization is implemented by
  * having a field "killtn" (name derived from "kill" type of operations) in the bt (block-table) structure for each block.
  * This field is assigned the same value as the "tn" whenever an index block gets updated due to one of the disallowed operations.
@@ -216,5 +216,13 @@ typedef struct cw_set_element_struct
 	/*blk_prior_state:the block was in global variable tree/directory tree and was free/busy before update*/
 	uint4		blk_prior_state;
 } cw_set_element;
+
+#ifdef DEBUG
+GBLREF	uint4		dollar_tlevel;
+#endif
+
+/* See comment in tp_tend where this macro is used for details */
+#define	IS_BG_PHASE2_COMMIT_IN_CRIT(CSE, MODE) (DBG_ASSERT(dollar_tlevel || (NULL == CSE->recompute_list_head))		\
+					(gds_t_writemap == MODE) || (CSE->recompute_list_head && (gds_t_write == MODE)))
 
 #endif

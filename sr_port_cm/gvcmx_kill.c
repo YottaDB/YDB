@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +21,7 @@
 
 void gvcmx_kill(bool do_subtree)
 {
+	ASSERT_IS_LIBGNPCLIENT;
 	if (do_subtree)
 		gvcmz_doop(CMMS_Q_KILL, CMMS_R_KILL, 0);
 	else

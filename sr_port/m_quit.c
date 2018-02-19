@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +37,8 @@ int m_quit(void)
 
 	SETUP_THREADGBL_ACCESS;
 	arg = ((TK_EOL != TREF(window_token)) && (TK_SPACE != TREF(window_token)));
+	if (TREF(xecute_literal_parse))
+		return FALSE;
 	if (TREF(for_stack_ptr) == TADR(for_stack))
 	{	/* not FOR */
 		if (!arg)

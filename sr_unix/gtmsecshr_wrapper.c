@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2016 Fidelity National Information	*
+ * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,7 +61,7 @@
 #define ASCIICTLMAX	32  /* space character */
 #define ASCIICTLMIN	0   /* NULL character */
 #define GTM_TMP		"gtm_tmp"
-#define GTM_DIST	"gtm_dist"
+#define YDB_DIST	"ydb_dist"
 #define	SUB_PATH_TO_GTMSECSHRDIR "/gtmsecshrdir"
 #define	REL_PATH_TO_CURDIR "."
 #define	REL_PATH_TO_GTMSECSHR "./gtmsecshr"
@@ -95,20 +98,20 @@ extern	char	**environ;
 	"%%GTM-W-SECSHRCHDIRFAILED2, chdir failed on %s, errno %d. gtmsecshr will be started with GMT timezone\n"
 #define ERR_SECSHREXECLFAILED			\
 	"%%GTM-E-SECSHREXECLFAILED, execl of %s failed\n"
-#define ERR_SECSHRGTMDIST2LONG			\
-	"%%GTM-E-SECSHRGTMDIST2LONG, gtm_dist env var too long. gtmsecshr will not be started\n"
+#define ERR_SECSHRYDBDIST2LONG			\
+	"%%GTM-E-SECSHRYDBDIST2LONG, ydb_dist env var too long. gtmsecshr will not be started\n"
 #define ERR_SECSHRGTMTMP2LONG			\
 	"%%GTM-E-SECSHRGTMTMP2LONG, gtm_tmp env var too long. gtmsecshr will not be started\n"
-#define ERR_SECSHRNOGTMDIST			\
-	"%%GTM-E-SECSHRNOGTMDIST, gtm_dist env var does not exist. gtmsecshr will not be started\n"
+#define ERR_SECSHRNOYDBDIST			\
+	"%%GTM-E-SECSHRNOYDBDIST, ydb_dist env var does not exist. gtmsecshr will not be started\n"
 #define ERR_SECSHRNOTOWNEDBYROOT		\
 	"%%GTM-E-SECSHRNOTOWNEDBYROOT, %s not owned by root. gtmsecshr will not be started\n"
 #define ERR_SECSHRNOTSETUID			\
 	"%%GTM-E-SECSHRNOTSETUID, %s not set-uid. gtmsecshr will not be started\n"
 #define ERR_SECSHRPERMINCRCT			\
 	"%%GTM-E-SECSHRPERMINCRCT, %s permissions incorrect (%04o). gtmsecshr will not be started\n"
-#define ERR_SECSHRSETGTMDISTFAILED		\
-	"%%GTM-E-SECSHRSETGTMDISTFAILED, setenv for gtm_dist failed. gtmsecshr will not be started\n"
+#define ERR_SECSHRSETYDBDISTFAILED		\
+	"%%GTM-E-SECSHRSETYDBDISTFAILED, setenv for ydb_dist failed. gtmsecshr will not be started\n"
 #define ERR_SECSHRSETGTMTMPFAILED		\
 	"%%GTM-E-SECSHRSETGTMTMPFAILED, setenv for gtm_tmp failed. gtmsecshr will not be started\n"
 #define ERR_SECSHRSETUIDFAILED			\
@@ -130,13 +133,13 @@ SECSHRCHDIRFAILED1	<chdir failed on !AD, errno !UL. gtmsecshr will not be starte
 SECSHRCHDIRFAILED2	<chdir failed on !AD, errno !UL. gtmsecshr will be started with GMT timezone>/warning/fao=3!/ansi=0
 SECSHRCLEARENVFAILED	<clearenv failed. gtmsecshr will not be started>/error/fao=0!/ansi=0
 SECSHREXECLFAILED	<execl of !AD failed>/error/fao=2!/ansi=0
-SECSHRGTMDIST2LONG	<gtm_dist env var too long. gtmsecshr will not be started>/error/fao=0!/ansi=0
+SECSHRYDBDIST2LONG	<ydb_dist env var too long. gtmsecshr will not be started>/error/fao=0!/ansi=0
 SECSHRGTMTMP2LONG	<gtm_tmp env var too long. gtmsecshr will not be started>/error/fao=0!/ansi=0
-SECSHRNOGTMDIST		<gtm_dist env var does not exist. gtmsecshr will not be started>/error/fao=0!/ansi=0
+SECSHRNOYDBDIST		<ydb_dist env var does not exist. gtmsecshr will not be started>/error/fao=0!/ansi=0
 SECSHRNOTOWNEDBYROOT	<!AD not owned by root. gtmsecshr will not be started>/error/fao=3!/ansi=0
 SECSHRNOTSETUID		<!AD not set-uid. gtmsecshr will not be started>/error/fao=2!/ansi=0
 SECSHRPERMINCRCT	<!AD permissions incorrect (0!UL). gtmsecshr will not be started>/error/fao=3!/ansi=0
-SECSHRSETGTMDISTFAILED	<setenv for gtm_dist failed. gtmsecshr will not be started>/error/fao=0!/ansi=0
+SECSHRSETYDBDISTFAILED	<setenv for ydb_dist failed. gtmsecshr will not be started>/error/fao=0!/ansi=0
 SECSHRSETGTMTMPFAILED	<setenv for gtm_tmp failed. gtmsecshr will not be started>/error/fao=0!/ansi=0
 SECSHRSETUIDFAILED	<setuid failed. gtmsecshr will not be started>/error/fao=0!/ansi=0
 SECSHRSTATFAILED	<stat failed on !AD, errno !UL. gtmsecshr will not be started>/error/fao=3!/ansi=0
@@ -169,7 +172,7 @@ int main()
 	char 		*env_var_ptr;
 	struct stat	gtm_secshrdir_stat;
 	struct stat	gtm_secshr_stat;
-	char 		gtm_dist_val[MAX_ENV_VAR_VAL_LEN];
+	char 		ydb_dist_val[MAX_ENV_VAR_VAL_LEN];
 	char 		gtm_tmp_val[MAX_ENV_VAR_VAL_LEN];
 	char 		gtm_secshrdir_path[MAX_ENV_VAR_VAL_LEN];
 	char 		gtm_secshrdir_path_display[MAX_ENV_VAR_VAL_LEN];
@@ -302,16 +305,16 @@ int main()
 #	endif /* _AIX */
 	ret = 0; /* start positive */
 	/* get the ones we need */
-	if (env_var_ptr = getenv(GTM_DIST))		/* Warning - assignment */
+	if (env_var_ptr = getenv(YDB_DIST))		/* Warning - assignment */
 	{
 		if (MAX_ALLOWABLE_LEN < (strlen(env_var_ptr) + STR_LIT_LEN(SUB_PATH_TO_GTMSECSHRDIR)
 		    + STR_LIT_LEN(GTMSECSHR_BASENAME)))
 		{
-			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRGTMDIST2LONG);
+			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRYDBDIST2LONG);
 			ret = -1;
 		} else
 		{
-			strcpy(gtm_dist_val, env_var_ptr);
+			strcpy(ydb_dist_val, env_var_ptr);
 			/* point the path to the real gtmsecshr - for display purposes only */
 			strcpy(gtm_secshr_path, env_var_ptr);
 			strcat(gtm_secshr_path, SUB_PATH_TO_GTMSECSHRDIR);
@@ -324,7 +327,7 @@ int main()
 		}
 	} else
 	{
-		SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRNOGTMDIST);
+		SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRNOYDBDIST);
 		ret = -1;
 	}
 	if (env_var_ptr = getenv(GTM_TMP))		/* Warning - assignment */
@@ -341,7 +344,7 @@ int main()
 	}
 	if (!ret)
 	{	/* clear all */
-#		ifdef SUNOS
+#		if defined(SUNOS) || defined(__CYGWIN__)
 		environ = NULL;
           	status = 0;
 #		else
@@ -353,10 +356,10 @@ int main()
 			ret = -1;
 		}
 		/* add the ones we need */
-		status = setenv(GTM_DIST, gtm_dist_val, TRUE);
+		status = setenv(YDB_DIST, ydb_dist_val, TRUE);
 		if (status)
 		{
-			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSETGTMDISTFAILED);
+			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSETYDBDISTFAILED);
 			ret = -1;
 		}
 		if (gtm_tmp_exists)
@@ -415,7 +418,7 @@ int main()
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSETUIDFAILED);
 		else
 		{	/* call the real gtmsecshr, but have ps display the original gtmsecshr location */
-			strcpy(gtm_secshr_orig_path, gtm_dist_val);
+			strcpy(gtm_secshr_orig_path, ydb_dist_val);
 			strcat(gtm_secshr_orig_path, GTMSECSHR_BASENAME);
 			ret = execl(REL_PATH_TO_GTMSECSHR, gtm_secshr_orig_path, NULL);
 			if (-1 == ret)

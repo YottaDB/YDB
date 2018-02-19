@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,20 +15,15 @@
 #include "mdef.h"
 #include "error.h"
 
-VMS_ONLY(LITREF)UNIX_ONLY(GBLREF) err_ctl merrors_ctl;
-VMS_ONLY(LITREF)UNIX_ONLY(GBLREF) err_ctl cmerrors_ctl;
-VMS_ONLY(LITREF)UNIX_ONLY(GBLREF) err_ctl cmierrors_ctl;
-VMS_ONLY(LITREF)UNIX_ONLY(GBLREF) err_ctl gdeerrors_ctl;
-#ifdef VMS
-LITREF err_ctl laerrors_ctl; /* Roger thinks that this one is obsolete */
-LITREF err_ctl lperrors_ctl; /* Roger thinks that this one may be obsolete */
-#endif
+GBLREF err_ctl merrors_ctl;
+GBLREF err_ctl cmerrors_ctl;
+GBLREF err_ctl cmierrors_ctl;
+GBLREF err_ctl gdeerrors_ctl;
+GBLREF err_ctl ydberrors_ctl;
 
 STATICDEF const err_ctl *all_errors[] = { &merrors_ctl, &gdeerrors_ctl,
 		&cmierrors_ctl, &cmerrors_ctl,
-#ifdef VMS
-		&laerrors_ctl, &lperrors_ctl,
-#endif
+		&ydberrors_ctl,
 		NULL };
 
 /* Returns the error control struct corresponding to the errornum if it is valid, otherwise

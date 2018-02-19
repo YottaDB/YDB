@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +19,7 @@
 #include "gt_timer.h"
 #include "iosocketdef.h"
 
-int	iosocket_read(mval *v, int4 timeout)
+int	iosocket_read(mval *v, int4 msec_timeout)
 {
-	return iosocket_readfl(v, 0, timeout); /* 0 means not fixed length */
+	return iosocket_readfl(v, 0, msec_timeout); /* 0 means not fixed length */
 }

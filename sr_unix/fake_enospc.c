@@ -34,8 +34,8 @@
 #endif
 #include "fake_enospc.h"
 #ifdef DEBUG
-GBLREF		jnlpool_addrs	jnlpool;
-GBLREF		volatile int4	gtmMallocDepth;
+GBLREF		jnlpool_addrs_ptr_t	jnlpool;
+GBLREF		volatile int4		gtmMallocDepth;
 
 STATICDEF	uint4		syslog_deferred = 0;
 
@@ -74,6 +74,7 @@ void fake_enospc(void)
 	gd_region	*r_local, *r_top;
 	int		i;
 	sgmnt_addrs	*csa;
+	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_NOSPC_ENABLED */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -85,7 +86,12 @@ void fake_enospc(void)
 		syslog_deferred = 0;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FAKENOSPCLEARED, 1, deferred_count);
 	}
-	if (syslog_deferred || (!ok_to_interrupt && !IS_REPL_INST_FROZEN) || !CUSTOM_ERRORS_LOADED)
+	/* If ok_to_interrupt is FALSE and intrpt_ok_state == INTRPT_IN_SHMDT, it is possible we have detached
+	 * from the shared memory (i.e. in the middle of the shmdt()) when the timer interrupt occurs and so
+	 * we cannot do a IS_REPL_INST_FROZEN check which looks at a field inside jnlpool_ctl. Account for that below.
+	 */
+	if (syslog_deferred
+		|| (!ok_to_interrupt && ((INTRPT_IN_SHMDT == intrpt_ok_state) || !IS_REPL_INST_FROZEN)) || !CUSTOM_ERRORS_LOADED)
 	{	/* We have to skip this because we have just fallen into deferred zone or we are currently in it */
 		/* Try again in a second */
 		start_timer((TID)fake_enospc, ENOSPC_RETRY_INTERVAL, fake_enospc, 0, NULL);
@@ -129,7 +135,7 @@ void fake_enospc(void)
 		if (!IS_REG_BG_OR_MM(r_local))
 			continue;
 		csa = REG2CSA(r_local);
-		if ((NULL != csa) && (NULL != csa->nl) && INST_FREEZE_ON_NOSPC_ENABLED(csa))
+		if ((NULL != csa) && (NULL != csa->nl) && INST_FREEZE_ON_NOSPC_ENABLED(csa, local_jnlpool))
 		{
 			syslog_msg = NULL;
 			switch(enospc_enable_list[i])

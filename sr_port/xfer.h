@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +75,6 @@ XFER(xf_fnchar, op_fnchar),
 XFER(xf_fnfind, op_fnfind),
 XFER(xf_indset, opp_indset),
 XFER(xf_fnascii, op_fnascii),
-XFER(xf_halt, op_halt),
 XFER(xf_mul, op_mul),
 XFER(xf_indtext, opp_indtext),
 XFER(xf_indglvn, opp_indglvn),
@@ -316,4 +318,9 @@ XFER(xf_zrupdate, op_zrupdate),
 XFER(xf_currhd, op_currhd),
 #endif
 XFER(xf_fnzcollate, op_fnzcollate),
-XFER(xf_fnzatransform, op_fnzatransform)
+XFER(xf_fnzatransform, op_fnzatransform),
+XFER(xf_fnreversequery, op_fnreversequery),
+XFER(xf_gvreversequery, op_gvreversequery),
+XFER(xf_fnq2, op_fnq2),
+XFER(xf_gvq2, op_gvq2),
+XFER(xf_indq2, op_indq2)

@@ -179,7 +179,11 @@ int wcs_wtstart_fini(gd_region *reg, int nbuffs, cache_rec_ptr_t cr2flush)
 			rel_crit(reg);
 		if (prewtfinifreedlevel == cnl->wcs_buffs_freed)
 		{
-			wcs_sleep(1); /* wtfini did not make any progress so wait a while */
+			wcs_sleep(1);	/* wtfini did not make any progress so wait a while.
+					 * Note: The sleep time of 1 msec here is factored into the calculation
+					 * of MAX_WTSTART_FINI_SLEEPS (it has a MAXSLPTIME multiplicative factor).
+					 * Any changes to the 1 parameter need corresponding changes in the macro.
+					 */
 			num_sleeps++;
 		} else
 			num_sleeps = 0; /* we are making progress so reset the clock */

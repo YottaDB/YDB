@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +22,7 @@ cm_region_list *gtcm_find_region(connection_struct *cnx, unsigned char rnum)
 {
 	error_def(CMERR_REGNTFND);
 
+	ASSERT_IS_LIBGNPSERVER;
 	if (rnum > cnx->maxregnum || !cnx->region_array[rnum])
 		rts_error(VARLSTCNT(1) CMERR_REGNTFND);
 	else

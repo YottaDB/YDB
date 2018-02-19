@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -17,7 +20,7 @@
 /* Warning: A consideration is that reordering these values reorders the output in v53003/D9I10002703 as well */
 /* -------------------------- Common to UNIX and VMS --------------------------  */
 
-#define	GTM_DIST_LOG			"$gtm_dist"
+#define	YDB_DIST_LOG			"$ydb_dist"
 
 /* Database */
 #define	GTM_BLKUPGRADE_FLAG		"$gtm_blkupgrade_flag"
@@ -152,4 +155,9 @@
 #define GTM_LOCALE			"$gtm_locale"
 #define GTM_UTFCGR_STRINGS		"$gtm_utfcgr_strings"
 #define GTM_UTFCGR_STRING_GROUPS	"$gtm_utfcgr_string_groups"
+#define GTM_STRPLLIM			"$gtm_string_pool_limit"
+
+/* YottaDB specified variables */
+#define	YDB_REPL_FILTER_TIMEOUT		"$ydb_repl_filter_timeout"
+#define	YDB_MSGPREFIX			"$ydb_msgprefix"
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,17 +35,9 @@
 #include "gtm_limits.h"
 #include "gtm_un.h"
 #include "gtm_signal.h"
-
 #include <sys/time.h>
-#ifdef VMS
-# include <descrip.h>		/* Required for gtmsource.h */
-# include <ssdef.h>
-# include <fab.h>
-# include "desblk.h"
-#endif
-#ifdef UNIX
-# include <glob.h>
-#endif
+#include <glob.h>
+
 #include "cache.h"
 #include "gtm_multi_thread.h"
 #include "hashtab_addr.h"
@@ -89,9 +81,6 @@
 #include "zbreak.h"
 #include "fnpc.h"
 #include "mmseg.h"
-#ifndef VMS
-# include "gtmsiginfo.h"
-#endif
 #include "gtmimagename.h"
 #include "gt_timer.h"
 #include "iosocketdef.h"	/* needed for socket_pool and MAX_N_SOCKETS*/
@@ -112,6 +101,7 @@
 #include "util.h"		/* for util_outbuff manipulations */
 #include "nametabtyp.h"
 #include "gtm_reservedDB.h"
+#include "localvarmonitor.h"
 
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
@@ -124,22 +114,14 @@
 #include "gvname_info.h"
 #include "op_merge.h"
 
-#ifdef UNIX
-# include "cli.h"
-# include "invocation_mode.h"
-# include "fgncal.h"
-# include "parse_file.h"	/* for MAX_FBUFF */
-# include "repl_sem.h"
-# include "gtm_zlib.h"
-# include "zro_shlibs.h"
-#endif
-
+#include "cli.h"
+#include "invocation_mode.h"
+#include "fgncal.h"
+#include "parse_file.h"	/* for MAX_FBUFF */
+#include "repl_sem.h"
+#include "gtm_zlib.h"
+#include "zro_shlibs.h"
 #include "jnl_typedef.h"
-
-#ifdef VMS
-# include "gtm_logicals.h"	/* for GTM_MEMORY_NOACCESS_COUNT */
-#endif
-
 #include "gds_blk_upgrade.h"	/* for UPGRADE_IF_NEEDED flag */
 #include "cws_insert.h"		/* for CWS_REORG_ARRAYSIZE */
 
@@ -164,7 +146,12 @@
 
 #include "gtm_threadgbl_init.h"
 
-#define	DEFAULT_PROMPT	"YDB>"
+#define	DEFAULT_PROMPT		"YDB>"
+#define	DEFAULT_MSGPREFIX	"YDB"
+
+#ifdef DEBUG
+# define SIZEOF_ydbmsgprefixbuf	ggl_ydbmsgprefixbuf
+#endif
 
 GBLDEF void	*gtm_threadgbl;		/* Anchor for thread global for this thread */
 
@@ -194,13 +181,18 @@ GBLREF int4 			*aligned_source_buffer;
  */
 
 error_def(ERR_MEMORY);
-error_def(ERR_VMSMEMORY);
 error_def(ERR_GTMASSERT);
 
 void gtm_threadgbl_init(void)
 {
 	void	*lcl_gtm_threadgbl;
 
+	if (NULL != gtm_threadgbl)
+	{	/* Has already been initialized. Return right away. Caller will later invoke "common_startup_init"
+		 * which will issue MIXIMAGE error.
+		 */
+		return;
+	}
 	if (SIZEOF(gtm_threadgbl_true_t) != size_gtm_threadgbl_struct)
 	{	/* Size mismatch with gtm_threadgbl_deftypes.h - no error handling yet available so do
 		 * the best we can.
@@ -208,16 +200,11 @@ void gtm_threadgbl_init(void)
 		FPRINTF(stderr, "GTM-F-GTMASSERT gtm_threadgbl_true_t and gtm_threadgbl_t are different sizes\n");
 		EXIT(ERR_GTMASSERT);
 	}
-	if (NULL != gtm_threadgbl)
-	{	/* has already been initialized - don't re-init */
-		FPRINTF(stderr, "GTM-F-GTMASSERT gtm_threadgbl is already initialized\n");
-		EXIT(ERR_GTMASSERT);
-	}
 	gtm_threadgbl = lcl_gtm_threadgbl = malloc(size_gtm_threadgbl_struct);
 	if (NULL == gtm_threadgbl)
 	{	/* Storage was not allocated for some reason - no error handling yet still */
 		perror("GTM-F-MEMORY Unable to allocate startup thread structure");
-		EXIT(UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY));
+		EXIT(ERR_MEMORY);
 	}
 	memset(gtm_threadgbl, 0, size_gtm_threadgbl_struct);
 	gtm_threadgbl_true = (gtm_threadgbl_true_t *)gtm_threadgbl;
@@ -227,10 +214,10 @@ void gtm_threadgbl_init(void)
 	TREF(for_stack_ptr) = TADR(for_stack);
 	(TREF(gtmprompt)).addr = TADR(prombuf);
 	(TREF(gtmprompt)).len = SIZEOF(DEFAULT_PROMPT) - 1;
+	MEMCPY_LIT(TADR(prombuf), DEFAULT_PROMPT);
 	TREF(lv_null_subs) = LVNULLSUBS_OK;	/* UNIX: set in gtm_env_init_sp(), VMS: set in gtm$startup() - init'd here
 							 * in case alternative invocation methods bypass gtm_startup()
 							 */
-	MEMCPY_LIT(TADR(prombuf), DEFAULT_PROMPT);
 	(TREF(replgbl)).jnl_release_timeout = DEFAULT_JNL_RELEASE_TIMEOUT;
 	(TREF(window_ident)).addr = TADR(window_string);
 	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
@@ -238,4 +225,11 @@ void gtm_threadgbl_init(void)
 	TREF(util_outptr) = TREF(util_outbuff_ptr);
 	(TREF(source_buffer)).addr = (char *)&aligned_source_buffer;
 	(TREF(source_buffer)).len = MAX_SRCLINE;
+	assert(SIZEOF_ydbmsgprefixbuf >= SIZEOF(DEFAULT_MSGPREFIX));
+	(TREF(ydbmsgprefix)).addr = TADR(ydbmsgprefixbuf);
+	(TREF(ydbmsgprefix)).len = STR_LIT_LEN(DEFAULT_MSGPREFIX);	/* STR_LIT_LEN does not include terminating null byte */
+	MEMCPY_LIT(TADR(ydbmsgprefixbuf), DEFAULT_MSGPREFIX);
+	(TREF(ydbmsgprefix)).addr[(TREF(ydbmsgprefix)).len] = '\0';	/* need null terminated "fac" in "gtm_getmsg" */
+	/* Point "merrors_ctl" facility name to the ydb_msgprefix env var (default or user-specified value) */
+	merrors_ctl.facname = (TREF(ydbmsgprefix)).addr;
 }

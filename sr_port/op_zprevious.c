@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -12,7 +15,7 @@
 
 #include "mdef.h"
 
-#include <stddef.h>		/* for offsetof macro in VMS */
+#include <stddef.h>			/* for offsetof macro in VMS */
 
 #include "gtm_string.h"
 
@@ -23,31 +26,35 @@
 #include "gdsfhead.h"
 #include "stringpool.h"
 #include "op.h"
-#include "gvcst_protos.h"	/* for gvcst_data,gvcst_zprevious prototype */
+#include "gvcst_protos.h"		/* for gvcst_data,gvcst_zprevious prototype */
 #include "change_reg.h"
 #include "gvsub2str.h"
 #include "gvcmx.h"
 #include "gvusr.h"
 #include "filestruct.h"
 #include "hashtab_mname.h"
-#include "targ_alloc.h"		/* for GV_BIND_SUBSREG macro which needs "targ_alloc" prototype */
+#include "targ_alloc.h"			/* for GV_BIND_SUBSREG macro which needs "targ_alloc" prototype */
 #include "gtmimagename.h"
-#include "collseq.h"		/* for STD_NULL_COLL_FALSE */
+#include "collseq.h"			/* for STD_NULL_COLL_FALSE */
 #include "mvalconv.h"
 #include "gdscc.h"			/* needed for tp.h */
 #include "gdskill.h"			/* needed for tp.h */
-#include "buddy_list.h"		/* needed for tp.h */
+#include "buddy_list.h"			/* needed for tp.h */
 #include "hashtab_int4.h"		/* needed for tp.h */
 #include "jnl.h"			/* needed for tp.h */
 #include "tp.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
-GBLREF gd_region	*gv_cur_region;
-GBLREF gv_namehead	*gv_target;
-GBLREF gv_key		*gv_altkey, *gv_currkey;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF sgmnt_data_ptr_t	cs_data;
-GBLREF sgm_info		*sgm_info_ptr;
-GBLREF spdesc		stringpool;
+
+GBLREF gd_region		*gv_cur_region;
+GBLREF gv_namehead		*gv_target;
+GBLREF gv_key			*gv_altkey, *gv_currkey;
+GBLREF sgmnt_addrs		*cs_addrs;
+GBLREF sgmnt_data_ptr_t		cs_data;
+GBLREF sgm_info			*sgm_info_ptr;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;
+GBLREF spdesc			stringpool;
 
 /* op_gvorder should generally be maintained in parallel */
 
@@ -66,6 +73,7 @@ void op_zprevious(mval *v)
 	mname_entry		gvname;
 	mval			tmpmval, *datamval;
 	sgm_info		*save_sgm_info_ptr;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -95,7 +103,7 @@ void op_zprevious(mval *v)
 			assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->prev + 1]);
 			assert(gv_currkey->end == gv_currkey->prev + 2);
 			assert(gv_currkey->end < gv_currkey->top); /* need "<" (not "<=") to account for terminating 0x00 */
-			GVZPREVIOUS_APPEND_MAX_SUBS_KEY(gv_currkey, gv_target);
+			GV_APPEND_MAX_SUBS_KEY(gv_currkey, gv_target);
 		}
 		if (IS_ACC_METH_BG_OR_MM(acc_meth))
 		{
@@ -139,12 +147,7 @@ void op_zprevious(mval *v)
 		v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 		if (TREF(gv_last_subsc_null) && ok_to_change_currkey)
 		{	/* Restore gv_currkey to what it was at function entry time */
-			gv_currkey->base[gv_currkey->prev + 1] = KEY_DELIMITER;
-			if (gv_cur_region->std_null_coll)
-				gv_currkey->base[gv_currkey->prev] = SUBSCRIPT_STDCOL_NULL;
-			assert(gv_cur_region->std_null_coll || (STR_SUB_PREFIX == gv_currkey->base[gv_currkey->prev]));
-			gv_currkey->end = gv_currkey->prev + 2;
-			gv_currkey->base[gv_currkey->end] = KEY_DELIMITER;
+			GV_UNDO_APPEND_MAX_SUBS_KEY(gv_currkey, gv_cur_region);
 		}
 		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
 	} else
@@ -153,7 +156,7 @@ void op_zprevious(mval *v)
 		assert(gv_currkey->end < (MAX_MIDENT_LEN + 2));	/* until names are not in midents */
 		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
 		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 1]);
-		SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+		SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 		gd_targ = TREF(gd_targ_addr);
 		gd_map_start = gd_targ->maps;
 		map = gv_srch_map(gd_targ, (char *)&gv_currkey->base[0], gv_currkey->end - 1, SKIP_BASEDB_OPEN_FALSE);
@@ -175,7 +178,7 @@ void op_zprevious(mval *v)
 			if (IS_BASEDB_REGNAME(gv_cur_region))
 			{	/* Non-statsDB region */
 				if (!gv_cur_region->open)
-					gv_init_reg(gv_cur_region);
+					gv_init_reg(gv_cur_region, NULL);
 				change_reg();
 				/* Entries in directory tree could have empty GVT in which case move on to previous entry */
 				acc_meth = REG_ACC_METH(gv_cur_region);
@@ -273,7 +276,7 @@ void op_zprevious(mval *v)
 			v->str.len = 0;
 		v->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 		/* No need to restore gv_currkey (to what it was at function entry) as it is already set to NULL */
-		RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+		RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 	}
 	return;
 }

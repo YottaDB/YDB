@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +16,12 @@
 #ifndef PARM_POOL_H_INCLUDED
 #define PARM_POOL_H_INCLUDED
 
+#include "fgncalsp.h"		/* For parmblk_struct */
+
 #ifdef DEBUG
 #  define PARM_POOL_INIT_CAP		2				/* Initial debug capacity */
 #  define MAX_SET_COUNT			3				/* Max parameter sets stored at one time */
-#  define MAX_TOTAL_SLOTS		(MAX_SET_COUNT * MAX_ACTUALS)	/* Max total slots allowed in the pool */
+#  define MAX_TOTAL_SLOTS		129	/* CAPACITY_ROUND_UP2(PARM_POOL_INIT_CAP, (MAX_SET_COUNT * MAX_ACTUALS) + 1) */
 #else
 #  define PARM_POOL_INIT_CAP		8				/* Initial pro capacity */
 #endif
@@ -94,5 +100,7 @@ typedef struct
 
 STATICFNDCL void parm_pool_init(unsigned int init_capacity);
 STATICFNDCL void parm_pool_expand(int slots_needed, int slots_copied);
+void push_parm(unsigned int totalcnt, int truth_value, ...);
+void push_parm_ci(int truth_value, parmblk_struct *ci_parms);
 
 #endif	/* PARM_POOL_H_INCLUDED */

@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,16 +46,14 @@
 # include "gtm_trigger.h"
 #endif
 
-#define POP_SPECIFIED 	((ztrap_form & ZTRAP_POP) && (level2go = MV_FORCE_INTD(&ztrap_pop2level))) /* note: assignment */
+#define POP_SPECIFIED 	(ZTRAP_POP & (TREF(ztrap_form)) && (level2go = MV_FORCE_INTD(&ztrap_pop2level))) /* note: assignment */
 
 GBLREF stack_frame	*frame_pointer, *zyerr_frame, *error_frame;
 GBLREF unsigned short	proc_act_type;
 GBLREF spdesc		rts_stringpool, stringpool, indr_stringpool;
 GBLREF mstr		*err_act;
 GBLREF boolean_t	is_tracing_on;
-GBLREF mval		dollar_zyerror, dollar_ztrap, ztrap_pop2level;
-GBLREF int		ztrap_form;
-GBLREF mval		dollar_etrap;
+GBLREF mval		dollar_zyerror, ztrap_pop2level;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char	*restart_pc, *restart_ctxt;
@@ -66,7 +68,6 @@ error_def(ERR_MEMORY);
 error_def(ERR_OUTOFSPACE);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
-error_def(ERR_VMSMEMORY);
 
 /* After researching the usability of the extra ztrap frame, it is found that
  * the extra frame is not really necessary and hence no more pushed onto the stack.
@@ -135,8 +136,8 @@ CONDITION_HANDLER(trans_code_ch)
 	    || (int)ERR_STACKCRIT == SIGNAL 	/* Successfully compiled ${Z,E}TRAP code but encountered STACK error while
 						 * attempting to push new frame, OR, STACK error while executing $ZTRAP entryref
 						 */
-	    || !(ztrap_form & ZTRAP_ENTRYREF)	/* User doesn't want ENTRYREF form for $ZTRAP */
-	    || !(ztrap_form & ZTRAP_CODE)	/* Error during $ZTRAP ENTRYREF processing */
+	    || !(ZTRAP_ENTRYREF & TREF(ztrap_form))	/* User doesn't want ENTRYREF form for $ZTRAP */
+	    || !(ZTRAP_CODE & TREF(ztrap_form))	/* Error during $ZTRAP ENTRYREF processing */
 	    || IS_ETRAP)			/* Error compiling $ETRAP code */
 	{
 		NEXTCH;
@@ -202,7 +203,7 @@ void trans_code(void)
 	 */
 	if (IS_ETRAP)
 		SET_ERROR_FRAME(frame_pointer);	/* reset error_frame to point to frame_pointer */
-	if (!(ztrap_form & ZTRAP_CODE) && !IS_ETRAP && POP_SPECIFIED)
+	if (!(ZTRAP_CODE & TREF(ztrap_form)) && !IS_ETRAP && POP_SPECIFIED)
 	{
 		GOLEVEL(level2go, TRUE);
 	}
@@ -210,15 +211,13 @@ void trans_code(void)
 	dummy.str = *err_act;
 	TREF(trans_code_pop) = push_mval(&dummy);
 	ESTABLISH(trans_code_ch);
-	op_commarg(TREF(trans_code_pop), ((ztrap_form & ZTRAP_CODE) || IS_ETRAP) ? indir_linetail : indir_goto);
+	op_commarg(TREF(trans_code_pop), (ZTRAP_CODE & (TREF(ztrap_form)) || IS_ETRAP) ? indir_linetail : indir_goto);
 	REVERT;
 	if (NULL != gtm_err_dev)
 	{
-#		ifdef UNIX
 		if (gtmsocket != gtm_err_dev->type)
 			remove_rms(gtm_err_dev);
-#		endif
-		if ((gtmsocket == gtm_err_dev->type) && gtm_err_dev->newly_created)
+		else if (gtm_err_dev->newly_created)
 		{
 			assert(gtm_err_dev->state != dev_open);
 			iosocket_destroy(gtm_err_dev);

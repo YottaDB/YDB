@@ -57,6 +57,8 @@
 #include "hashtab_mname.h"
 #include "tp_frame.h"
 #include "tp_restart.h"
+#include "repl_msg.h"			/* for gtmsource.h */
+#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
@@ -68,7 +70,8 @@ GBLREF	gv_key			*gv_altkey;
 GBLREF	io_pair			io_curr_device;
 GBLREF	io_pair			io_std_device;			/* standard device */
 GBLREF	sgm_info		*sgm_info_ptr;
-GBLREF	int			(*op_open_ptr)(mval *v, mval *p, int t, mval *mspace);
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	uint4			dollar_tlevel;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 #ifdef DEBUG
@@ -620,7 +623,7 @@ boolean_t trigger_select_tpwrap(char *select_list, uint4 select_list_len, char *
 		op_pars.str.addr = (char *)open_params_list;
 		op_val.str.len = file_name_len;
 		op_val.str.addr = (char *)file_name;
-		(*op_open_ptr)(&op_val, &op_pars, 0, 0);
+		(*op_open_ptr)(&op_val, &op_pars, (mval *)&literal_zero, NULL);
 	}
 	save_io_curr_device = io_curr_device;
 	op_use(&op_val, &op_pars);
@@ -728,6 +731,7 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	boolean_t		select_status;
 	gvnh_reg_t		*gvnh_reg;
 	gd_binding		*map, *start_map, *end_map;
@@ -788,7 +792,7 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 				/* Skip only if the previous global is the same as the current */
 				if ((prev_len == gbl_len) && (0 == memcmp(prev_ptr, ptr1, gbl_len)))
 					continue;
-				SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+				SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 				prev_ptr = ptr1;
 				prev_len = gbl_len;
 				start_map = gv_srch_map(gd_header, ptr1, gbl_len, SKIP_BASEDB_OPEN_FALSE);
@@ -853,7 +857,7 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 					len1--;	/* drop the trailing # sign */
 				gvname.var_name.addr = sel_ptr;
 				gvname.var_name.len = len1;
-				SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+				SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 				for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions; reg < reg_top; reg++)
 				{
 					if (IS_STATSDB_REGNAME(reg))
@@ -867,7 +871,7 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 					write_gbls_or_names(gvname.var_name.addr, gvname.var_name.len, trig_name);
 				}
 			}
-			RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr);
+			RESTORE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
 		} while (NULL != (sel_ptr = STRTOK_R(NULL, ",", &strtok_ptr)));	/* Embedded assignment is intended */
 	}
 	return select_status;

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -44,6 +47,7 @@ bool gtcmtr_terminate(bool cm_err)
 	struct CLB	*clb;
 	intrpt_state_t	prev_intrpt_state;
 
+	ASSERT_IS_LIBGNPSERVER;
 	if (curr_entry)
 	{
 		/* We are about to rundown databases, clean up structures. Defer MUPIP STOP/signal handling until function end. */

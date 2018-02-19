@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -25,6 +28,8 @@
 #include "dpgbldir.h"
 #include "filestruct.h"
 #include "jnl.h"
+#include "repl_msg.h"		/* for gtmsource.h */
+#include "gtmsource.h"		/* for jnlpool_addrs_ptr_t */
 #include "view.h"
 #include "stringpool.h"
 #include "cmd_qlf.h"
@@ -48,12 +53,11 @@
 #include "gvnh_spanreg.h"
 #include "targ_alloc.h"
 #include "change_reg.h"
-#ifdef UNIX
-# include "gtmlink.h"
-#endif
+#include "gtmlink.h"
 #include "gtm_ctype.h"		/* for ISDIGIT_ASCII macro */
 #include "gvn2gds.h"
 #include "io.h"
+#include "interlock.h"
 
 GBLREF spdesc		stringpool;
 GBLREF int4		cache_hits, cache_fails;
@@ -65,6 +69,7 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
 GBLREF jnl_fence_control jnl_fence_ctl;
+GBLREF jnlpool_addrs_ptr_t	jnlpool;
 GBLREF bool		undef_inhibit;
 GBLREF int4		break_message_mask;
 GBLREF command_qualifier cmd_qlf;
@@ -77,7 +82,10 @@ GBLREF int		gv_fillfactor;
 GBLREF int4		gtm_max_sockets;
 GBLREF gv_key		*gv_currkey;
 GBLREF boolean_t	is_gtm_chset_utf8;
-UNIX_ONLY(GBLREF	boolean_t		dmterm_default;)
+GBLREF int4		gtm_trigger_depth;
+GBLREF uint4		process_id;
+GBLREF boolean_t	dmterm_default;
+GBLREF mstr		extnam_str;
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_GBLNOMAPTOREG);
@@ -89,15 +97,21 @@ LITREF	mstr		relink_allowed_mstr[];
 LITREF	mval		literal_zero;
 LITREF	mval		literal_one;
 
-#define		MM_RES			"MM"
-#define		BG_RES			"BG"
-#define		CM_RES			"CM"
-#define		USR_RES			"USR"
-#define		GTM_BOOL_RES		"GT.M Boolean short-circuit"
-#define		STD_BOOL_RES		"Standard Boolean evaluation side effects"
-#define		WRN_BOOL_RES		"Standard Boolean with side-effect warning"
-#define		STATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
-#define		STATS_KEYWD_SIZE	(3 + 1 + 1)	/* 3 character mnemonic, colon and comma */
+/* Define possible return values for "ENVIRONMENT" */
+#define	ENV_MUMPS		"MUMPS"
+#define ENV_CALLIN		"CALLIN"
+#define ENV_MUPIP		"MUPIP"
+#define ENV_TRIGGER		"TRIGGER"
+
+#define	MM_RES			"MM"
+#define	BG_RES			"BG"
+#define	CM_RES			"CM"
+#define	USR_RES			"USR"
+#define	GTM_BOOL_RES		"GT.M Boolean short-circuit"
+#define	STD_BOOL_RES		"Standard Boolean evaluation side effects"
+#define	WRN_BOOL_RES		"Standard Boolean with side-effect warning"
+#define	STATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
+#define	STATS_KEYWD_SIZE	(3 + 1 + 1)	/* 3 character mnemonic, colon and comma */
 
 #define STATS_PUT_PARM(TXT, CNTR, BASE)					\
 {									\
@@ -109,9 +123,8 @@ LITREF	mval		literal_one;
 	assert(stringpool.free <= stringpool.top);			\
 }
 
-void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
+void	op_fnview(int numarg, mval *dst, ...)
 {
-	VMS_ONLY(int	numarg;)
 	boolean_t	save_transform;
 	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	unsigned char	*key;
@@ -123,7 +136,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	gv_namehead	temp_gv_target;
 	gvnh_reg_t	*gvnh_reg;
 	gvnh_spanreg_t	*gvspan;
-	int		n, tl, newlevel, res, reg_index, collver, nct, act, ver;
+	int		n, tl, newlevel, res, reg_index, collver, nct, act, ver, trigdepth, cidepth;
 	lv_val		*lv;
 	gd_gblname	*gname;
 	mstr		tmpstr, commastr, *gblnamestr;
@@ -139,7 +152,6 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	VMS_ONLY(va_count(numarg));
 	assertpro(2 <= numarg);
 	VAR_START(var, dst);
 	keyword = va_arg(var, mval *);
@@ -219,7 +231,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			assert(gd_header);
 			assert(parmblk.gv_ptr);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr);
+				gv_init_reg(parmblk.gv_ptr, NULL);
 			assert(parmblk.gv_ptr->open);
 			switch (REG_ACC_METH(parmblk.gv_ptr))
 			{
@@ -274,7 +286,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			assert(gd_header);
 			assert(parmblk.gv_ptr);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr);
+				gv_init_reg(parmblk.gv_ptr, NULL);
 			tmpstr.addr = (char *)parmblk.gv_ptr->dyn.addr->fname;
 			tmpstr.len = parmblk.gv_ptr->dyn.addr->fname_len;
 			s2pool(&tmpstr);
@@ -312,7 +324,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			if (parmblk.gv_ptr)
 			{
 				if (!parmblk.gv_ptr->open)
-					gv_init_reg(parmblk.gv_ptr);
+					gv_init_reg(parmblk.gv_ptr, NULL);
 				csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 				if (NULL != csa->hdr)
 					n = csa->hdr->jnl_state;
@@ -326,11 +338,26 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			if (parmblk.gv_ptr)
 			{
 				if (!parmblk.gv_ptr->open)
-					gv_init_reg(parmblk.gv_ptr);
+					gv_init_reg(parmblk.gv_ptr, NULL);
 				csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 				if (NULL != csa->hdr)
 					view_jnlfile(dst, parmblk.gv_ptr);
 				else
+					dst->str.len = 0;
+			} else
+				dst->str.len = 0;
+			break;
+		case VTK_JNLPOOL:
+			if (jnlpool)
+			{
+				reg = jnlpool->jnlpool_dummy_reg;
+				if (reg && reg->dyn.addr)
+				{
+					tmpstr.addr = (char *)reg->dyn.addr->fname;
+					tmpstr.len = reg->dyn.addr->fname_len;
+					s2pool(&tmpstr);
+					dst->str = tmpstr;
+				} else
 					dst->str.len = 0;
 			} else
 				dst->str.len = 0;
@@ -359,25 +386,78 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			assert(NULL != gd_header);	/* view_arg_convert would have done this for VTK_POOLLIMIT */
 			reg = parmblk.gv_ptr;
 			if (!reg->open)
-				gv_init_reg(reg);
+				gv_init_reg(reg, NULL);
 			csa = &FILE_INFO(reg)->s_addrs;
 			n = csa->gbuff_limit;
 			break;
+#ifdef TESTPOLLCRIT
+		case VTK_GRABCRIT:
+		case VTK_RELCRIT:
+		case VTK_GRABLOCK:
+		case VTK_RELLOCK:
+		case VTK_GRABJNLPH2:
+		case VTK_RELJNLPH2:
+		case VTK_RELJNLPOOLPH2:
+		case VTK_GRABJNLPOOLPH2:
+		case VTK_GRABJNLQIO:
+		case VTK_RELJNLQIO:
+			reg = parmblk.gv_ptr;
+			if (!reg->open)
+				gv_init_reg(reg, NULL);
+			csa = &FILE_INFO(reg)->s_addrs;
+			if (NULL != csa->hdr)
+			{
+				if (VTK_GRABCRIT == vtp->keycode)
+					grab_crit(reg);
+				else if (VTK_RELCRIT == vtp->keycode)
+					rel_crit(reg);
+				else if (VTK_GRABLOCK == vtp->keycode)
+				{
+					assert(NULL != jnlpool);
+					if (jnlpool)
+						grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
+				} else if (VTK_RELLOCK == vtp->keycode)
+				{
+					assert(NULL != jnlpool);
+					if (jnlpool)
+						rel_lock(jnlpool->jnlpool_dummy_reg);
+				} else if (VTK_GRABJNLPH2 == vtp->keycode)
+					grab_latch(&csa->jnl->jnl_buff->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT);
+				else if (VTK_RELJNLPH2 == vtp->keycode)
+					rel_latch(&csa->jnl->jnl_buff->phase2_commit_latch);
+				else if (VTK_GRABJNLPOOLPH2 == vtp->keycode)
+				{
+					assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));
+					if (jnlpool && jnlpool->jnlpool_ctl)
+						grab_latch(&jnlpool->jnlpool_ctl->phase2_commit_latch, GRAB_LATCH_INDEFINITE_WAIT);
+				} else if (VTK_RELJNLPOOLPH2 == vtp->keycode)
+				{
+					assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));
+					if (jnlpool && jnlpool->jnlpool_ctl)
+						rel_latch(&jnlpool->jnlpool_ctl->phase2_commit_latch);
+				} else if (VTK_GRABJNLQIO == vtp->keycode)
+				{
+					while (!GET_SWAPLOCK(&csa->jnl->jnl_buff->io_in_prog_latch))
+						SHORT_SLEEP(1);
+				} else if (VTK_RELJNLQIO == vtp->keycode)
+					RELEASE_SWAPLOCK(&csa->jnl->jnl_buff->io_in_prog_latch);
+			}
+			break;
+#endif
 		case VTK_PROBECRIT:
 			assert(NULL != gd_header);	/* view_arg_convert would have done this for VTK_POOLLIMIT */
 			reg = parmblk.gv_ptr;
 			if (!reg->open)
-				gv_init_reg(reg);
+				gv_init_reg(reg, NULL);
 			csa = &FILE_INFO(reg)->s_addrs;
 			if (NULL != csa->hdr)
 			{
-				UNIX_ONLY(csa->crit_probe = TRUE);
+				csa->crit_probe = TRUE;
 				grab_crit(reg);
-				UNIX_ONLY(csa->crit_probe = FALSE);
+				csa->crit_probe = FALSE;
 				if (!WBTEST_ENABLED(WBTEST_HOLD_CRIT_ENABLED))
 					rel_crit(reg);
 				dst->str.len = 0;
-#				ifdef UNIX
 				ENSURE_STP_FREE_SPACE(n_probecrit_rec_types * (STATS_MAX_DIGITS + STATS_KEYWD_SIZE));
 				dst->str.addr = (char *)stringpool.free;
 				/* initialize csa->proberit_rec.p_crit_success field from cnl->gvstats_rec */
@@ -388,7 +468,6 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				assert(stringpool.free < stringpool.top);
 				/* subtract one to remove extra trailing comma delimiter */
 				dst->str.len = INTCAST((char *)stringpool.free - dst->str.addr - 1);
-#				endif
 			}
 			break;
 		case VTK_REGION:
@@ -458,7 +537,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case VTK_BLFREE:
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr);
+				gv_init_reg(parmblk.gv_ptr, NULL);
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			if (NULL != csa->hdr)
 				n = csa->hdr->trans_hist.free_blocks;
@@ -468,7 +547,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case VTK_BLTOTAL:
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr);
+				gv_init_reg(parmblk.gv_ptr, NULL);
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			if (NULL != csa->hdr)
 			{
@@ -480,7 +559,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case VTK_FREEZE:
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr);
+				gv_init_reg(parmblk.gv_ptr, NULL);
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			if (NULL != csa->hdr)
 				n = csa->hdr->freeze;
@@ -490,7 +569,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case VTK_GVSTATS:
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr);
+				gv_init_reg(parmblk.gv_ptr, NULL);
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			if (NULL != csa->hdr)
 			{
@@ -580,7 +659,9 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			}
 			break;
 		case VTK_YDIRTREE:
+			n = extnam_str.len;		/* internal use of op_gvname should not disturb extended reference */
 			op_gvname(VARLSTCNT(1) parmblk.value);
+			extnam_str.len = n;
 			if (NULL != arg2)
 			{
 				view_arg_convert(vtp, VTP_DBREGION, arg2, &parmblk2, IS_DOLLAR_VIEW_TRUE);
@@ -630,7 +711,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			n = 0;
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr);
+				gv_init_reg(parmblk.gv_ptr, NULL);
 			reg = parmblk.gv_ptr;
 			if (dba_cm == REG_ACC_METH(reg))
 				n = ((link_info *)reg->dyn.addr->cm_blk->usr)->buffer_size;
@@ -639,7 +720,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			n = 0;
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr);
+				gv_init_reg(parmblk.gv_ptr, NULL);
 			reg = parmblk.gv_ptr;
 			if (dba_cm == REG_ACC_METH(reg))
 				n = ((link_info *)reg->dyn.addr->cm_blk->usr)->buffered_count;
@@ -648,7 +729,7 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			n = 0;
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr);
+				gv_init_reg(parmblk.gv_ptr, NULL);
 			reg = parmblk.gv_ptr;
 			if (dba_cm == REG_ACC_METH(reg))
 				n = ((link_info *)reg->dyn.addr->cm_blk->usr)->buffer_used;
@@ -685,7 +766,6 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case VTK_LOGNONTP:
 			n = TREF(nontprestart_log_delta);
 			break;
-#		ifdef UNIX
 		case VTK_JNLERROR:
 			n = TREF(error_on_jnl_file_lost);
 			break;
@@ -697,9 +777,45 @@ void	op_fnview(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case VTK_DMTERM:
 			n = dmterm_default;
 			break;
-#		endif
 		case VTK_STATSHARE:
 			n = TREF(statshare_opted_in) ? TRUE : FALSE;
+			break;
+		case VTK_ENVIRONMENT:
+			trigdepth = gtm_trigger_depth;
+			cidepth = TREF(gtmci_nested_level);
+			dst->mvtype = vtp->restype;
+			if (IS_MUMPS_IMAGE)
+			{	/* Running MUMPS image */
+				tmpstr.addr = ENV_MUMPS;
+				tmpstr.len = sizeof(ENV_MUMPS) - 1;
+				s2pool(&tmpstr);
+				dst->str = tmpstr;
+			} else if (IS_MUPIP_IMAGE)
+			{	/* Running in a MUPIP image */
+				tmpstr.addr = ENV_MUPIP;
+				tmpstr.len = sizeof(ENV_MUPIP) - 1;
+				s2pool(&tmpstr);
+				dst->str = tmpstr;
+			} else
+				assertpro(FALSE);
+			if (0 < trigdepth)
+			{	/* Operating in a trigger environment */
+				tmpstr.addr = ENV_TRIGGER;
+				tmpstr.len = sizeof(ENV_TRIGGER) - 1;
+				commastr.len = 1;
+				commastr.addr = ",";
+				s2pool_concat(dst, &commastr);
+				s2pool_concat(dst, &tmpstr);
+			}
+			if (0 < cidepth)
+			{	/* Operating in a CALL-IN */
+				tmpstr.addr = ENV_CALLIN;
+				tmpstr.len = sizeof(ENV_CALLIN) - 1;
+				commastr.len = 1;
+				commastr.addr = ",";
+				s2pool_concat(dst, &commastr);
+				s2pool_concat(dst, &tmpstr);
+			}
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWFN);

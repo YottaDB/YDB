@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -29,15 +32,16 @@
 #include "op.h"
 #include "tp_timeout.h"
 #include "ctrlc_handler.h"
-#include "gtm_startup_chk.h"
+#include "ydb_chk_dist.h"
 #include "gtm_startup.h"
 #include "jobchild_init.h"
 #include "cli_parse.h"
 #include "invocation_mode.h"
-#include "gtm_main.h"		/* for "gtm_main" prototype */
 #include "io.h"
 #include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
+#include "job.h"
+#include "restrict.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -52,8 +56,8 @@
 GBLREF	IN_PARMS			*cli_lex_in_ptr;
 GBLREF	char				cli_token_buf[];
 GBLREF	char				cli_err_str[];
-GBLREF	boolean_t			gtm_dist_ok_to_use;
-GBLREF	char				gtm_dist[GTM_PATH_MAX];
+GBLREF	boolean_t			ydb_dist_ok_to_use;
+GBLREF	char				ydb_dist[YDB_PATH_MAX];
 GBLREF	CLI_ENTRY			mumps_cmd_ary[];
 GBLREF	boolean_t			skip_dbtriggers;
 #if defined (GTM_TRIGGER) && (DEBUG)
@@ -63,21 +67,8 @@ GBLREF	ch_ret_type			(*ch_at_trigger_init)();
 GBLREF	u_casemap_t 			gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 
-GBLDEF	CLI_ENTRY			*cmd_ary = &mumps_cmd_ary[0]; /* Define cmd_ary to be the MUMPS specific cmd table */
-
 #define GTMCRYPT_ERRLIT			"during GT.M startup"
 #define GTMXC_gblstat			"GTMXC_gblstat=%s/gtmgblstat.xc"
-
-#ifdef __osf__
- /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
-  * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
-  * the only exception and, in particular because the operating system does not support such an exception, the argv
-  * array passed to the main program is an array of 64-bit pointers.  Thus the C program needs to declare argv[]
-  * as an array of 64-bit pointers and needs to do the same for any pointer it sets to an element of argv[].
-  */
-# pragma pointer_size (save)
-# pragma pointer_size (long)
-#endif
 
 GBLDEF	char 				**gtmenvp;
 
@@ -85,17 +76,15 @@ error_def(ERR_CRYPTDLNOOPEN);
 error_def(ERR_CRYPTDLNOOPEN2);
 error_def(ERR_CRYPTINIT);
 error_def(ERR_CRYPTINIT2);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TEXT);
 error_def(ERR_TLSDLLNOOPEN);
 error_def(ERR_TLSINIT);
 
-int gtm_main (int argc, char **argv, char **envp)
-#ifdef __osf__
-# pragma pointer_size (restore)
-#endif
+int gtm_main(int argc, char **argv, char **envp)
 {
 	char			*ptr, *eq, **p;
-	char			gtmlibxc[GTM_PATH_MAX];
+	char			gtmlibxc[YDB_PATH_MAX];
 	int             	eof, parse_ret;
 	int			gtmcrypt_errno;
 	int			status;
@@ -107,12 +96,12 @@ int gtm_main (int argc, char **argv, char **envp)
 
 	GTM_THREADGBL_INIT;
 	gtmenvp = envp;
-	gtm_dist_ok_to_use = TRUE;
-	common_startup_init(GTM_IMAGE);
+	common_startup_init(GTM_IMAGE, &mumps_cmd_ary[0]);
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
 	err_init(stop_image_conditional_core);
 	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
+	ydb_chk_dist(argv[0]);
 	cli_lex_setup(argc, argv);
 	/* put the arguments into buffer, then clean up the token buffer
 	 * cli_gettoken() copies all arguments except the first one argv[0]
@@ -144,13 +133,19 @@ int gtm_main (int argc, char **argv, char **envp)
 	if (parse_ret && (EOF != parse_ret))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
 	if (cli_present("DIRECT_MODE"))
+	{
+		if (!((ptr = GETENV(CHILD_FLAG_ENV)) && strlen(ptr)) && (RESTRICTED(dmode))) /* note assignment */
+		{	/* first tell them it's a no-no without engaging the condition handling so we keep control */
+			dec_err(VARLSTCNT(3) MAKE_MSG_SEVERE(ERR_RESTRICTEDOP), 1, "mumps -direct");
+			stop_image_no_core();		/* then kill them off without further delay */
+		}
 		invocation_mode = MUMPS_DIRECT;
+	}
 	else if (cli_present("RUN"))
 		invocation_mode = MUMPS_RUN;
-	gtm_chk_dist(argv[0]);
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	init_gtm();
-	SNPRINTF(gtmlibxc, GTM_PATH_MAX, GTMXC_gblstat, gtm_dist);
+	SNPRINTF(gtmlibxc, YDB_PATH_MAX, GTMXC_gblstat, ydb_dist);
 	PUTENV(status, gtmlibxc);
 #	ifdef GTM_TLS
 	if (MUMPS_COMPILE != invocation_mode)

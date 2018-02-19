@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -141,7 +144,7 @@ void	repl_inst_dump_filehdr(repl_inst_hdr_ptr_t repl_instance)
 	assert(dstlen <= 3);
 	util_out_print( PREFIX_FILEHDR "Minor Version                                      !R3AD", TRUE, dstlen, dststr);
 
-	/* Assert that the endianness of the instance file matches the endianness of the GT.M version
+	/* Assert that the endianness of the instance file matches the endianness of the YottaDB version
 	 * as otherwise we would have errored out long before reaching here.
 	 */
 #	ifdef BIGENDIAN
@@ -570,7 +573,7 @@ void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 	}
 
 	PRINT_OFFSET_PREFIX(offsetof(replpool_identifier, now_running[0]), SIZEOF(jnlpool_ctl->jnlpool_id.now_running));
-	util_out_print( PREFIX_JNLPOOLCTL "GT.M Version            !R30AZ", TRUE, jnlpool_ctl->jnlpool_id.now_running);
+	util_out_print( PREFIX_JNLPOOLCTL "YottaDB Version         !R30AZ", TRUE, jnlpool_ctl->jnlpool_id.now_running);
 
 	PRINT_OFFSET_PREFIX(offsetof(replpool_identifier, instfilename[0]), SIZEOF(jnlpool_ctl->jnlpool_id.instfilename));
 	if (22 >= strlen(jnlpool_ctl->jnlpool_id.instfilename))
@@ -600,17 +603,13 @@ void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 	util_out_print( PREFIX_JNLPOOLCTL "Journal Pool Size (in bytes)                !10UL [0x!XL]", TRUE,
 		jnlpool_ctl->jnlpool_size, jnlpool_ctl->jnlpool_size);
 
-	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, early_write_addr), SIZEOF(jnlpool_ctl->early_write_addr));
-	util_out_print( PREFIX_JNLPOOLCTL "Early Write Offset                !20@UQ [0x!16@XQ]", TRUE,
-		&jnlpool_ctl->early_write_addr, &jnlpool_ctl->early_write_addr);
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, rsrv_write_addr), SIZEOF(jnlpool_ctl->rsrv_write_addr));
+	util_out_print( PREFIX_JNLPOOLCTL "Reserved Write Offset             !20@UQ [0x!16@XQ]", TRUE,
+		&jnlpool_ctl->rsrv_write_addr, &jnlpool_ctl->rsrv_write_addr);
 
 	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, write_addr), SIZEOF(jnlpool_ctl->write_addr));
 	util_out_print( PREFIX_JNLPOOLCTL "Absolute Write Offset             !20@UQ [0x!16@XQ]", TRUE,
 		&jnlpool_ctl->write_addr, &jnlpool_ctl->write_addr);
-
-	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, write), SIZEOF(jnlpool_ctl->write));
-	util_out_print( PREFIX_JNLPOOLCTL "Relative Write Offset                       !10UL [0x!XL]", TRUE,
-		jnlpool_ctl->write, jnlpool_ctl->write);
 
 	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, upd_disabled), SIZEOF(jnlpool_ctl->upd_disabled));
 	PRINT_BOOLEAN(PREFIX_JNLPOOLCTL "Updates Disabled                !R22AZ", jnlpool_ctl->upd_disabled, -1);
@@ -653,7 +652,7 @@ void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 				SIZEOF(this_side->trigger_supported));
 	PRINT_BOOLEAN(PREFIX_JNLPOOLCTL "Trigger Supported               !R22AZ", this_side->trigger_supported, -1);
 
-	/* The following 3 members of "this_side" dont make sense as the structure reflects properties of this instance whereas
+	/* The following 3 members of "this_side" don't make sense as the structure reflects properties of this instance whereas
 	 * these 3 members require connection with the remote side in order to make sense. So skip dumping them.
 	 *	this_side->cross_endian
 	 *	this_side->endianness_known
@@ -697,10 +696,36 @@ void	repl_inst_dump_jnlpoolctl(jnlpool_ctl_ptr_t jnlpool_ctl)
 		else
 			util_out_print( PREFIX_JNLPOOLCTL "Freeze Comment: !AZ", TRUE, jnlpool_ctl->freeze_comment);
 	}
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, instfreeze_environ_inited),
+			SIZEOF(jnlpool_ctl->instfreeze_environ_inited));
+	PRINT_BOOLEAN( PREFIX_JNLPOOLCTL  "Custom Errors Loaded                        !R10AZ",
+			jnlpool_ctl->instfreeze_environ_inited, -1);
 	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, ftok_counter_halted), SIZEOF(jnlpool_ctl->ftok_counter_halted));
 	PRINT_BOOLEAN( PREFIX_JNLPOOLCTL  "FTOK Counter Halted                         !R10AZ",
 									jnlpool_ctl->ftok_counter_halted, -1);
-
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, phase2_commit_index1), SIZEOF(jnlpool_ctl->phase2_commit_index1));
+	util_out_print( PREFIX_JNLPOOLCTL "Phase2 Commit Index1                        !10UL [0x!XL]", TRUE,
+		jnlpool_ctl->phase2_commit_index1, jnlpool_ctl->phase2_commit_index1);
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, phase2_commit_index2), SIZEOF(jnlpool_ctl->phase2_commit_index2));
+	util_out_print( PREFIX_JNLPOOLCTL "Phase2 Commit Index2                        !10UL [0x!XL]", TRUE,
+		jnlpool_ctl->phase2_commit_index2, jnlpool_ctl->phase2_commit_index2);
+	PRINT_OFFSET_PREFIX(0, 0);
+	util_out_print( PREFIX_JNLPOOLCTL "Phase2 Commit IndexMax                      !10UL [0x!XL]", TRUE,
+		JPL_PHASE2_COMMIT_ARRAY_SIZE, JPL_PHASE2_COMMIT_ARRAY_SIZE);
+	PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, phase2_commit_latch), SIZEOF(jnlpool_ctl->phase2_commit_latch));
+	util_out_print( PREFIX_JNLPOOLCTL "Phase2 Commit Latch Pid                     !10UL [0x!XL]", TRUE,
+		jnlpool_ctl->phase2_commit_latch.u.parts.latch_pid, jnlpool_ctl->phase2_commit_latch.u.parts.latch_pid);
+#	define TAB_JPL_TRC_REC(A,B)										\
+	{													\
+		PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, B.cntr), SIZEOF(jnlpool_ctl->B.cntr));		\
+		util_out_print( PREFIX_JNLPOOLCTL A " Cntr               !10UL [0x!XL]", TRUE,			\
+			jnlpool_ctl->B.cntr, jnlpool_ctl->B.cntr);						\
+		PRINT_OFFSET_PREFIX(offsetof(jnlpool_ctl_struct, B.seqno), SIZEOF(jnlpool_ctl->B.seqno));	\
+		util_out_print( PREFIX_JNLPOOLCTL A " Seqno              !10UL [0x!XL]", TRUE,			\
+			jnlpool_ctl->B.seqno, jnlpool_ctl->B.seqno);						\
+	}
+#	include "tab_jpl_trc_rec.h"
+#	undef TAB_JPL_TRC_REC
 }
 
 void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
@@ -819,7 +844,7 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, read_state), SIZEOF(gtmsourcelocal_ptr->read_state));
 		string = (READ_POOL == gtmsourcelocal_ptr->read_state) ? "POOL" :
 				((READ_FILE == gtmsourcelocal_ptr->read_state) ? "FILE" : "UNKNOWN");
-		if (MEMCMP_LIT(string, "UNKNOWN"))
+		if (STRNCMP_LIT(string, "UNKNOWN"))
 			util_out_print( PREFIX_SOURCELOCAL "Currently Reading from     !R21AZ", TRUE, idx, string);
 		else
 		{

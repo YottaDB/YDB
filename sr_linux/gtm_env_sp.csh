@@ -3,6 +3,12 @@
 # Copyright (c) 2001-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+# Copyright (c) 2017,2018 Stephen L Johnson.			#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -40,8 +46,8 @@ if (!($?OBJECT_MODE)) then
 endif
 
 ### 64bit vs 32bit builds
-# The only 32 bit targets are cygwin, ia32 and x86_64 with specific settings
-if ( ( "ia32" == $mach_type ) ||  ( "cywgin" == $platform_only ) ) then
+# The only 32 bit targets are cygwin, ia32, armv6l, armv7l, and x86_64 with specific settings
+if ( ( "ia32" == $mach_type ) ||  ( "cywgin" == $platform_only )  ||  ( "armv6l" == $mach_type )  ||  ( "armv7l" == $mach_type )) then
 	setenv gt_build_type 32
 # build 32 bit on x86_64 when $gtm_inc/x86_64.h does not exist with comlist.csh OR when OBJECT_MODE is set to 32 with comlist.mk
 else if ( "x86_64" == $mach_type && ((! -e $gtm_inc/x86_64.h && "inc" == "${gtm_inc:t}") || "32" == $OBJECT_MODE)) then
@@ -104,6 +110,12 @@ if ( $?gtm_version_change == "1" ) then
 	    else if ( "cygwin" == $platform_only ) then
 	        setenv gt_as_options_common	"--defsym cygwin=1"
 	    	setenv gt_as_option_debug	"--gdwarf-2"
+	    else if ("armv6l" == $mach_type) then
+	        setenv gt_as_options_common	"-Wa,-march=armv6"
+		setenv gt_as_option_debug	"--gdwarf-2"
+	    else if ("armv7l" == $mach_type) then
+	        setenv gt_as_options_common	"-Wa,-march=armv7-a"
+		setenv gt_as_option_debug	"--gdwarf-2"
 	    else
         	setenv gt_as_option_debug      "--gstabs"
 	    endif
@@ -139,6 +151,17 @@ if ( $?gtm_version_change == "1" ) then
 		setenv gt_cc_options_common     "-c -ansi "
 	endif
 
+	if ( "armv6l" == $mach_type ) then
+		setenv	gt_ld_m_shl_linker	"cc"
+		setenv  gt_ld_m_shl_options     "-shared"
+		setenv  gt_cc_options_common    "$gt_cc_options_common -marm -march=armv6 "
+	endif
+	if ( "armv7l" == $mach_type ) then
+		setenv	gt_ld_m_shl_linker	"cc"
+		setenv  gt_ld_m_shl_options     "-shared"
+		setenv  gt_cc_options_common    "$gt_cc_options_common -marm -march=armv7-a "
+	endif
+
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 "
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_XOPEN_SOURCE=600 -fsigned-char -Wreturn-type -Wpointer-sign "
 
@@ -167,6 +190,7 @@ if ( $?gtm_version_change == "1" ) then
             		setenv gt_cc_options_common "$gt_cc_options_common -DNeedInAddrPort"
         	endif
 		if ( "x86_64" == $mach_type ) then
+			set nonomatch
 			# Add flags for warnings that we want and don't want.
 			set desired_warnings = ( -Wall )
 			# The following warnings would be desirable, but together can result in megabytes of warning messages. We
@@ -184,7 +208,7 @@ if ( $?gtm_version_change == "1" ) then
 			endif
 			# If our compiler happens not to support --help=warnings, the following will produce junk, but it is
 			# unlikely that the junk will match the warning options of interest, so it shouldn't be a problem.
-			set -f supported_warnings = `cc --help=warnings | & awk '$1 ~ /^-/ {print $1}'`
+			set -f supported_warnings = `cc --help=warnings | & awk '$1 ~ /^-[^=]*$/ {print $1}'`
 			foreach w ($desired_warnings)
 				# Add the warning to a copy of the supported list, discarding duplicates.
 				set -f tmp_warnings = ($supported_warnings $w)
@@ -201,6 +225,7 @@ if ( $?gtm_version_change == "1" ) then
 					setenv gt_cc_options_common "$gt_cc_options_common -Wno-${w:s/-W//}"
 				endif
 			end
+			unset nonomatch
 		endif
 	endif
 
@@ -210,7 +235,7 @@ if ( $?gtm_version_change == "1" ) then
 	# -fno-omit-frame-pointer so %rbp always gets set up (required by caller_id()). Default changed in gcc 4.6.
 	if ( "ia64" != $mach_type ) then
 		setenv	gt_cc_option_optimize	"-O2 -fno-defer-pop -fno-strict-aliasing -ffloat-store -fno-omit-frame-pointer"
-		if ( "32" == $gt_build_type ) then
+		if ( ( "32" == $gt_build_type ) && ( "armv6l" != $mach_type ) && ( "armv7l" != $mach_type ) ) then
 			# applies to 32bit x86_64, ia32 and cygwin
 			# Compile 32-bit x86 GT.M using 586 instruction set rather than 686 as the new Intel Quark
 			# low power system-on-a-chip uses the 586 instruction set rather than the 686 instruction set
@@ -228,10 +253,10 @@ if ( $?gtm_version_change == "1" ) then
 
 	# -M		generate link map onto standard output
 	setenv	gt_ld_options_common	"-Wl,-M"
-	setenv 	gt_ld_options_gtmshr	"-Wl,-u,accumulate -Wl,-u,is_big_endian -Wl,-u,to_ulong"
-	setenv 	gt_ld_options_gtmshr	"$gt_ld_options_gtmshr -Wl,-u,gtm_filename_to_id -Wl,--version-script,gtmshr_symbols.export"
+	setenv 	gt_ld_options_yottadb	"-Wl,-u,accumulate -Wl,-u,is_big_endian -Wl,-u,to_ulong"
+	setenv 	gt_ld_options_yottadb	"$gt_ld_options_yottadb -Wl,-u,gtm_filename_to_id -Wl,--version-script,yottadb_symbols.export"
 	setenv 	gt_ld_options_all_exe	"-rdynamic -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_zstatus"
-	setenv	gt_ld_options_all_exe	"$gt_ld_options_all_exe -Wl,--version-script,gtmexe_symbols.export"
+	setenv	gt_ld_options_all_exe	"$gt_ld_options_all_exe -Wl,--version-script,ydbexe_symbols.export"
 
   	# optimize for all 64bit platforms
  	#
@@ -239,7 +264,7 @@ if ( $?gtm_version_change == "1" ) then
  	# Add -lc in front of -lpthread to avoid linking in thread-safe versions
  	# of libc routines from libpthread.
         setenv	gt_ld_syslibs		" -lelf -lncurses -lm -ldl -lc -lpthread -lrt"
-	if ( 32 == $gt_build_type ) then
+	if ( ( 32 == $gt_build_type ) && ( "armv6l" != $mach_type ) && ( "armv7l" != $mach_type ) ) then
 		# 32bit x86_64 and ia32 - decided at the beginning of the file
 		setenv  gt_ld_syslibs           " -lncurses -lm -ldl -lc -lpthread -lrt"
 	endif
@@ -263,7 +288,7 @@ if ( $?gtm_version_change == "1" ) then
 	# over-ride option.
         if ( "x86_64" == $mach_type && "32" == $gt_build_type ) then
 		setenv  gt_cc_options_common 	"$gt_cc_options_common -m32"
-		setenv  gt_ld_options_gtmshr	"$gt_ld_options_gtmshr -m32"
+		setenv  gt_ld_options_yottadb	"$gt_ld_options_yottadb -m32"
                 setenv  gt_cc_shl_options	"$gt_cc_shl_options -m32"
                 setenv  gt_ld_shl_options	"$gt_ld_shl_options -m32"
                 setenv  gt_ld_options_common	"$gt_ld_options_common -m32"

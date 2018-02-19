@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,13 +48,13 @@ GBLREF mstr 			gtmsecshr_pathname;
 GBLREF boolean_t		gtmsecshr_sock_init_done;
 GBLREF uint4			process_id;
 GBLREF int			gtmsecshr_sockfd;
-GBLREF char			gtm_dist[GTM_PATH_MAX];
-GBLREF boolean_t		gtm_dist_ok_to_use;
+GBLREF char			ydb_dist[YDB_PATH_MAX];
+GBLREF boolean_t		ydb_dist_ok_to_use;
 
 LITREF gtmImageName            gtmImageNames[];
 
-static char			gtmsecshr_sockpath[GTM_PATH_MAX];
-static char			gtmsecshr_path[GTM_PATH_MAX];
+static char			gtmsecshr_sockpath[YDB_PATH_MAX];
+static char			gtmsecshr_path[YDB_PATH_MAX];
 static char hex_table[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 
 unsigned char		*mypid2ascx(unsigned char *, pid_t);
@@ -62,7 +65,7 @@ unsigned char		*mypid2ascx(unsigned char *, pid_t);
 #  define EXACT_SIZE_SOCKNAME
 #endif
 
-error_def(ERR_GTMDISTUNVERIF);
+error_def(ERR_YDBDISTUNVERIF);
 error_def(ERR_GTMSECSHRSOCKET);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_TEXT);
@@ -77,20 +80,20 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 
 	if (!process_id)
 		getjobnum();
-	if (!gtm_dist_ok_to_use)
+	if (!ydb_dist_ok_to_use)
 		if (SERVER == caller)
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 					gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 		else
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMDISTUNVERIF, 4, STRLEN(gtm_dist), gtm_dist,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 					gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	secshrsock_lognam.addr = GTMSECSHR_SOCK_DIR;
 	secshrsock_lognam.len = SIZEOF(GTMSECSHR_SOCK_DIR) - 1;
 	/* Get the maximum size of the path excluding the socket filename */
 	max_sock_path_len = SIZEOF(gtmsecshr_sock_name.sun_path) - MAX_SECSHR_SOCKFILE_NAME_LEN;
 	/* Make sure this length is atmost equal to the size of the buffer that will hold the socket path */
-	if (GTM_PATH_MAX < max_sock_path_len)
-		max_sock_path_len = GTM_PATH_MAX - MAX_SECSHR_SOCKFILE_NAME_LEN;
+	if (YDB_PATH_MAX < max_sock_path_len)
+		max_sock_path_len = YDB_PATH_MAX - MAX_SECSHR_SOCKFILE_NAME_LEN;
 	/* Get the value of the GTMSECSHR_SOCK_DIR logical from the environment. status will be SS_LOG2LONG if
 	 * the value is greater than max_sock_path_len
 	 */
@@ -145,13 +148,13 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 		gtmsecshr_pathname.len = execpathln + STRLEN(GTMSECSHR_EXECUTABLE);
 	} else
 	{	/* Discover path name */
-		len = STRLEN(gtm_dist);
-		memcpy(gtmsecshr_path, gtm_dist, len);
+		len = STRLEN(ydb_dist);
+		memcpy(gtmsecshr_path, ydb_dist, len);
 		gtmsecshr_path[len] = '/';
 		memcpy(gtmsecshr_path + len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
 		gtmsecshr_pathname.addr = gtmsecshr_path;
 		gtmsecshr_pathname.len = len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
-		assertpro(GTM_PATH_MAX > gtmsecshr_pathname.len);
+		assertpro(YDB_PATH_MAX > gtmsecshr_pathname.len);
 		gtmsecshr_path[gtmsecshr_pathname.len] = '\0';
 	}
 	/* We have different project id here. This guarantees to avoid deadlock, if only one gtm installation is there */
@@ -290,8 +293,8 @@ int4 gtmsecshr_sock_init(int caller)
 				ret_status = BINDERR;
 			} else if ('\0' != suffix)
 				ret_status = ONETIMESOCKET;
-			/* If ret_status is zero do the following checks if $gtm_dist/libgtmshr.so is not world accessible
-			 * then set mode to 0660 and change the gid to the gid of $gtm_dist/libgtmshr.so if different from
+			/* If ret_status is zero do the following checks if $ydb_dist/libyottadb.so is not world accessible
+			 * then set mode to 0660 and change the gid to the gid of $ydb_dist/libyottadb.so if different from
 			 * current user.
 			 */
 			if (!ret_status)

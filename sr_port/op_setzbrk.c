@@ -1,7 +1,12 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
+ * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +38,7 @@
 #include "compiler.h"
 #include "min_max.h"
 #include "dm_setup.h"
+#include "restrict.h"
 #ifdef GTM_TRIGGER
 # include "gdsroot.h"			/* for gdsfhead.h */
 # include "gdsbt.h"			/* for gdsfhead.h */
@@ -55,8 +61,8 @@ error_def(ERR_INVZBREAK);
 error_def(ERR_MEMORY);
 error_def(ERR_NOPLACE);
 error_def(ERR_NOZBRK);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TRIGNAMENF);
-error_def(ERR_VMSMEMORY);
 error_def(ERR_ZBREAKFAIL);
 error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLMODULE);
@@ -70,7 +76,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 	mident		rname, lname;
 	mstr		*obj, tmprtnname;
 	rhdtyp		*routine;
-	zb_code		*addr, tmp_xf_code;
+	zb_code		*addr, *addrx, tmp_xf_code;
 	int4		*line_offset_addr, *next_line_offset_addr;
 	ssize_t		addr_off;
 	zbrk_struct	*z_ptr;
@@ -80,6 +86,9 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 	icode_str	indir_src;
 	boolean_t	deleted;
 	GTMTRIG_ONLY(boolean_t	is_trigger);
+
+	if (RESTRICTED(zbreak_op))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZBREAK");
 
 	MV_FORCE_STR(rtn);
 	MV_FORCE_STR(lab);
@@ -94,8 +103,12 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 		zr_remove_zbrks(NULL, NOBREAKMSG);
 	else
 	{
-		GTMTRIG_ONLY(IS_TRIGGER_RTN(&rtn->str, is_trigger));
+#		ifdef GTM_TRIGGER
+		IS_TRIGGER_RTN(&rtn->str, is_trigger);
+		if (is_trigger && (RESTRICTED(trigger_mod)))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZBREAK");
 		DBGIFTRIGR((stderr, "op_setzbrk: Setting/clearing a zbreak in a trigger\n"));
+#		endif
 		flush_pio();
 		if (WANT_CURRENT_RTN(rtn))
 			routine = CURRENT_RHEAD_ADR(frame_pointer->rvector);
@@ -175,7 +188,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 						addr = (zb_code *)(routine->ptext_adr + addr_off);
 					else
 					{
-						assert(UNIX_ONLY(ERR_MEMORY) VMS_ONLY(ERR_VMSMEMORY) == status);
+						assert(ERR_MEMORY == status);
 						/* Convert to label+offset^routine to be presented to the user */
 						rname.len = rtn->str.len;
 						rname.addr = rtn->str.addr;

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,32 +35,31 @@ error_def(ERR_ORDER2);
 error_def(ERR_SIDEEFFECTEVAL);
 error_def(ERR_VAREXPECTED);
 
-LITDEF	opctype order_opc[LAST_OBJECT][LAST_DIRECTION] =
-{
-	/* FORWARD	BACKWARD	TBD */
-	{ OC_GVORDER,	OC_ZPREVIOUS,	OC_GVO2		},	/* GLOBAL */
-	{ OC_FNORDER,	OC_FNZPREVIOUS, OC_FNO2		},	/* LOCAL */
-	{ OC_FNLVNAME,	OC_FNLVPRVNAME, OC_FNLVNAMEO2	},	/* LOCAL_NAME */
-	{ OC_INDFUN,	OC_INDFUN,	OC_INDO2	}	/* INDIRECT */
-};
-
 int f_order(oprtype *a, opctype op)
 {
-	boolean_t	ok, used_glvn_slot;
+	boolean_t	ok;
 	enum order_dir	direction;
 	enum order_obj	object;
 	int4		intval;
 	opctype		gv_oc;
 	oprtype		control_slot, dir_opr, *dir_oprptr, *next_oprptr;
 	short int	column;
-	triple		*oldchain, *r, *sav_dirref, *sav_gv1, *sav_gvn, *sav_lvn, *sav_ref, *share, *triptr;
+	triple		*oldchain, *r, *sav_dirref, *sav_gv1, *sav_gvn, *sav_lvn, *sav_ref, *triptr;
 	triple		*chain2, *obp, tmpchain2;
 	save_se		save_state;
+	static opctype order_opc[LAST_OBJECT][LAST_DIRECTION] =
+	{
+		/* FORWARD	BACKWARD	TBD */
+		{ OC_GVORDER,	OC_ZPREVIOUS,	OC_GVO2		},	/* GLOBAL */
+		{ OC_FNORDER,	OC_FNZPREVIOUS, OC_FNO2		},	/* LOCAL */
+		{ OC_FNLVNAME,	OC_FNLVPRVNAME, OC_FNLVNAMEO2	},	/* LOCAL_NAME */
+		{ OC_INDFUN,	OC_INDFUN,	OC_INDO2	}	/* INDIRECT */
+	};
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	/* Note: The below code is similar to f_order.c. Any changes here might need to be made there and vice versa */
 	oldchain = sav_dirref = NULL;			/* default to no direction and no shifting indirection */
-	used_glvn_slot = FALSE;
 	r = maketriple(OC_NOOP);			/* We'll fill in the opcode later, when we figure out what it is */
 	switch (TREF(window_token))
 	{
@@ -158,6 +160,7 @@ int f_order(oprtype *a, opctype op)
 				assert((OC_GVNAME == gv_oc) || (OC_GVNAKED == gv_oc) || (OC_GVEXTNAM == gv_oc));
 				TREF(temp_subs) = TRUE;
 				create_temporaries(sav_gvn, gv_oc);
+				ins_triple(r);
 				break;
 			case LOCAL:		/* Additionally need to move srchindx triple to after potential side effect */
 				triptr = newtriple(OC_PARAMETER);
@@ -187,10 +190,10 @@ int f_order(oprtype *a, opctype op)
 					dqins(sav_lvn, exorder, triptr);		/* NOTE: violation of info hiding */
 					next_oprptr->oprval.tref->operand[0].oprval.tref = triptr;
 				}
+				ins_triple(r);
 				break;
 			case INDIRECT:		/* Save and restore the variable lookup for true left-to-right evaluation */
 				*next_oprptr = *dir_oprptr;
-				used_glvn_slot = TRUE;
 				dqinit(&tmpchain2, exorder);
 				chain2 = setcurtchain(&tmpchain2);
 				INSERT_INDSAVGLVN(control_slot, r->operand[0], ANY_SLOT, 1);
@@ -198,18 +201,16 @@ int f_order(oprtype *a, opctype op)
 				obp = sav_ref->exorder.bl;	/* insert before second arg */
 				dqadd(obp, &tmpchain2, exorder);
 				r->operand[0] = control_slot;
+				ins_triple(r);
+				triptr = newtriple(OC_GLVNPOP);
+				triptr->operand[0] = control_slot;
 				break;
 			case LOCAL_NAME:	/* left argument is a string - side effect can't screw it up */
 				*next_oprptr = *dir_oprptr;
+				ins_triple(r);
 				break;
 			default:
 				assert(FALSE);
-			}
-			ins_triple(r);
-			if (used_glvn_slot)
-			{
-				triptr = newtriple(OC_GLVNPOP);
-				triptr->operand[0] = control_slot;
 			}
 			if (SE_WARN_ON && (TREF(side_effect_base))[TREF(expr_depth)])
 				ISSUE_SIDEEFFECTEVAL_WARNING(column - 1);

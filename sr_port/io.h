@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,10 +17,6 @@
 #define _OSF_SOURCE
 #include <iconv.h>
 #undef _OSF_SOURCE
-#else /* no iconv.h - must define size_t on VMS platform */
-#ifdef VMS
-#include <sys/types.h>
-#endif
 #endif
 #include <stdarg.h>
 
@@ -44,6 +40,18 @@ error_def(ERR_UTF16ENDIAN);
 #define IO_ESC			0x1b
 #define MAX_DEV_TYPE_LEN	7
 #define DD_BUFLEN		80
+
+#define ASCII_ESC 		27	/*	this ASCII value is needed on any platform	*/
+#define EBCDIC_ESC		39
+#define ASCII_CR		13
+#define EBCDIC_CR		13
+#define ASCII_LF		10
+#define EBCDIC_LF		37
+#define ASCII_FF		12
+#define EBCDIC_FF		12
+#define ASCII_BS		8
+#define EBCDIC_BS		22
+#define VT			11
 
 #define CHAR_FILTER 128
 #define ESC1 1
@@ -80,16 +88,14 @@ typedef unsigned char params;
  */
 enum io_dev_type
 {	tt,		/* terminal	*/
-	mt,		/* mag tape	*/
+	mt,		/* mag tape - obsolete but left so devices aren't renumbered - could reuse */
 	rm,		/* rms		*/
 	us,		/* user device driver */
-	mb,		/* mail box	*/
+	mb,		/* mail box - obsolete but left so devices aren't renumbered - could reuse */
 	nl,		/* null device	*/
 	ff,		/* fifo device  */
 	gtmsocket,	/* socket device, socket is already used by sys/socket.h */
-#ifdef UNIX
 	pi,		/* pipe */
-#endif
 	n_io_dev_types	/* terminator	*/
 };
 
@@ -99,14 +105,6 @@ enum io_dev_state
 	dev_open,
 	n_io_dev_states
 };
-
-#ifdef VMS
-enum code_set_type
-{
-	ascii,
-	ebcdic
-};
-#endif
 
 typedef struct
 {
@@ -135,11 +133,13 @@ typedef struct io_desc_struct
 		unsigned char	zb[ESC_LEN];
  		char		key[DD_BUFLEN];
  		char		device[DD_BUFLEN];
+		char		*devicebuffer;
+		int		devicebufferlen;
 	}dollar;
 	unsigned char			esc_state;
 	void				*dev_sp;
 	struct dev_dispatch_struct	*disp_ptr;
-#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
+#if defined(KEEP_zOS_EBCDIC)
 	iconv_t				input_conv_cd;
 	iconv_t				output_conv_cd;
 	enum code_set_type		in_code_set;
@@ -218,37 +218,36 @@ void io_init(boolean_t term_ctrl);
 bool io_is_rm(mstr *name);
 bool io_is_sn(mstr *tn);
 struct mv_stent_struct *io_find_mvstent(io_desc *io_ptr, boolean_t clear_mvstent);
-bool io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 timeout, mval *mspace);
+boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_timeout, mval *mspace);
 enum io_dev_type io_type(mstr *tn);
 void io_init_name(void);
 
-#define ioxx_open(X)		short io##X##_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
-#define ioxx_dummy(X)		short io##X##_dummy(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
+#define ioxx_open(X)		short io##X##_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 msec_timeout)
+#define ioxx_dummy(X)		short io##X##_dummy(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 msec_timeout)
 #define ioxx_close(X)		void io##X##_close(io_desc *iod, mval *pp)
 #define ioxx_use(X)		void io##X##_use(io_desc *iod, mval *pp)
-#define ioxx_read(X)		int io##X##_read(mval *v, int4 t)
-#define ioxx_rdone(X)		int io##X##_rdone (mint *v, int4 timeout)
+#define ioxx_read(X)		int io##X##_read(mval *v, int4 msec_timeout)
+#define ioxx_rdone(X)		int io##X##_rdone (mint *v, int4 msec_timeout)
 #define ioxx_write(X)		void io##X##_write(mstr *v)
 #define ioxx_wtone(X)		void io##X##_wtone(int c)
 #define ioxx_wteol(X)		void io##X##_wteol(int4 cnt, io_desc *iod)
 #define ioxx_wtff(X)		void io##X##_wtff(void)
 #define ioxx_wttab(X)		void io##X##_wttab(int4 x)
 #define ioxx_flush(X)		void io##X##_flush(io_desc *iod)
-#define ioxx_readfl(X)		int io##X##_readfl(mval *v, int4 width, int4 timeout)
+#define ioxx_readfl(X)		int io##X##_readfl(mval *v, int4 width, int4 msec_timeout)
 #define xx_iocontrol(X)		void X##_iocontrol(mstr *mn, int4 argcnt, va_list args)
 #define xx_dlr_device(X)	void X##_dlr_device(mstr *d)
 #define xx_dlr_key(X)		void X##_dlr_key(mstr *d)
 #define xx_dlr_zkey(X)		void X##_dlr_zkey(mstr *d)
 
 /* Following definitions have a pattern that most of the routines follow. Only exceptions are:
- *      1. ioff_open() is an extra routine
- *      2. iopi_open() is an extra routine on unix
- *	3. iopi_iocontrol() is an extra routine on unix to handle write /writeof
+ *	1. ioff_open() is an extra routine
+ *	2. iopi_open() is an extra routine
+ *	3. iopi_iocontrol()  to handle write /writeof
  *	4. iosocket_dlr_zkey() is only for sockets
  */
 
-#define ioxx(X) ioxx_##X(tt); ioxx_##X(mt); ioxx_##X(rm); VMS_ONLY(ioxx_##X(mb);) ioxx_##X(nl); \
-	ioxx_##X(us); ioxx_##X(tcp); ioxx_##X(socket)
+#define ioxx(X) ioxx_##X(tt); ioxx_##X(mt); ioxx_##X(rm); ioxx_##X(nl); ioxx_##X(us); ioxx_##X(socket)
 #define xxdlr(X) xx_iocontrol(X); xx_dlr_device(X); xx_dlr_key(X)
 #define xxdlrzk(X) xx_iocontrol(X); xx_dlr_device(X); xx_dlr_key(X); xx_dlr_zkey(X)
 
@@ -270,16 +269,14 @@ xxdlrzk(nil);
 xxdlr(ious);
 xxdlrzk(iosocket);
 ioxx_open(ff);
-#ifdef UNIX
 ioxx_open(pi);
 xxdlrzk(iopi);	/* we need iopi_iocontrol(), iopi_dlr_device(), iopi_dlr_key() and iopi_dlr_zkey() */
 xxdlr(iott);	/* we need iott_iocontrol(), iott_dlr_device() and iott_dlr_key() */
-#endif
 ioxx_wttab(us);
 /* iott_ prototypes */
 uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr);
 
-/* iomt_ prototypes */
+/* iomt_ prototypes which need to stay until we nix the iomt routines */
 void iomt_getrec(io_desc *dv);
 void iomt_rdstream(uint4 len, void *str, io_desc *dv);
 int iomt_readblk(io_desc *dv);
@@ -301,23 +298,15 @@ void iomt_skiprecord(io_desc *dev, int count);
 void iomt_tm(io_desc *dev);
 void iomt_wtdoslab(io_desc *dv);
 
-
 /* iosocket_ prototypes */
 boolean_t iosocket_listen(io_desc *iod, unsigned short len);
 boolean_t iosocket_wait(io_desc *iod, int4 timepar);
 void iosocket_poolinit(void);
-#ifndef VMS
 void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_list args);
 void iosocket_accept_local(io_desc *iod, mval *handlevar, pid_t pid, int4 timeout, int argcnt, va_list args);
-#endif
 
-/* tcp_ prototypes */
+/* tcp_ prototypes used by mupip */
 int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive);
-
-/* iomb_ prototypes */
-#ifdef VMS
-int iomb_dataread (int timeout);
-#endif
 
 bool same_device_check(mstr tname, char *buf);
 
@@ -332,11 +321,7 @@ bool same_device_check(mstr tname, char *buf);
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL	\
 }
 
-#ifdef __sparc
-int outc(char ch);
-#else
 int outc(int ch);
-#endif
 
 void get_dlr_device(mval *v);
 void get_dlr_key(mval *v);
@@ -353,10 +338,11 @@ dev_dispatch_struct *io_get_fgn_driver(mstr *s);
 
 #define MAX_CHSET_NAME	64
 #define TAB_BUF_SZ	128
+#define READTIMESTR	"READ"
 
 LITREF unsigned char spaces_block[];
 
-#if defined(KEEP_zOS_EBCDIC) || defined(VMS)
+#if defined(KEEP_zOS_EBCDIC)
 
 LITREF unsigned char ebcdic_spaces_block[];
 
@@ -381,12 +367,12 @@ LITREF unsigned char ebcdic_spaces_block[];
 
 #endif /* __MVS__ */
 
-#else /* !KEEP_zOS_EBCDIC && !VMS*/
+#else /* !KEEP_zOS_EBCDIC */
 
 #define SPACES_BLOCK spaces_block
 #define RM_SPACES_BLOCK spaces_block
 
-#endif /* KEEP_zOS_EBCDIC || VMS */
+#endif /* KEEP_zOS_EBCDIC */
 
 #define ICONV_OPEN_CD(DESC_CD, CODE_SRC, CODE_TARGET)		\
 {								\
@@ -464,7 +450,7 @@ LITREF unsigned char ebcdic_spaces_block[];
 																\
 	intrpt_state_t		prev_intrpt_state;										\
 																\
-	if ((&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)								\
+	if (CHANDLER_EXISTS && (&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)						\
 			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out))					\
 	{															\
 		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
@@ -484,7 +470,7 @@ LITREF unsigned char ebcdic_spaces_block[];
 																\
 	intrpt_state_t		prev_intrpt_state;										\
 																\
-	if ((&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)								\
+	if (CHANDLER_EXISTS && (&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)						\
 			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out))					\
 	{															\
 		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
@@ -515,4 +501,110 @@ LITREF unsigned char ebcdic_spaces_block[];
 	}															\
 }
 
+#define DEF_EXCEPTION(PP, P_OFF, IOD)					\
+MBSTART {								\
+	mval	MV;							\
+									\
+	MV.mvtype = MV_STR;						\
+	MV.str.len = (int)(*(PP->str.addr + P_OFF));			\
+	MV.str.addr = (char *)(PP->str.addr + P_OFF + 1);		\
+	if (!(ZTRAP_ENTRYREF & TREF(ztrap_form)))			\
+	{								\
+		op_commarg(&MV, indir_linetail);			\
+		op_unwind();						\
+	}								\
+	IOD->error_handler = MV.str;					\
+	s2pool(&IOD->error_handler);					\
+} MBEND
+
+#define	ONE_COMMA		"1,"
+#define DEVICE_BUFFER_FULL	"dollar.device BUFFER FULL! CHECK dollar.devicebuffer"
+
+#define ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, LEN, WRITEBUFFER_SET)			\
+MBSTART {											\
+	/* This macro checks if there's enough space in dollar.device[] buffer to accommodate	\
+	 * 	the error message (length = LEN). If not, it allocates dollar.devicebuffer, 	\
+	 * 	but first tries to reuse if allocated before, and LEN will fit in.		\
+	 * It then sets WRITEBUFFER_SET to the appropriate buffer to be written into. 		\
+	 */											\
+	if (DD_BUFLEN < LEN)	/* Won't fit into the buffer. allocate space. */		\
+	{											\
+		/* Reuse previously allocated buffer if the new STR fits in */			\
+		if (IOD->dollar.devicebuffer && (LEN > IOD->dollar.devicebufferlen))		\
+		{										\
+			free(IOD->dollar.devicebuffer);						\
+			IOD->dollar.devicebuffer = NULL;					\
+		}										\
+		if (!IOD->dollar.devicebuffer)							\
+		{										\
+			IOD->dollar.devicebuffer = malloc(LEN);					\
+			IOD->dollar.devicebufferlen = LEN;					\
+		}										\
+		WRITEBUFFER_SET = IOD->dollar.devicebuffer;					\
+		MEMCPY_LIT(&IOD->dollar.device[0], DEVICE_BUFFER_FULL);				\
+	} else											\
+		WRITEBUFFER_SET = &IOD->dollar.device[0];					\
+} MBEND
+
+#define SET_DOLLARDEVICE_ERRSTR(IOD, ERRSTR)							\
+MBSTART {											\
+	int errlen;										\
+	char *writebuffer;									\
+	errlen = STRLEN(ERRSTR) + 1;	/* +1 for NULL */					\
+	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, errlen, writebuffer);			\
+	memcpy(writebuffer, ERRSTR, errlen);							\
+} MBEND
+
+#define SET_DOLLARDEVICE_ONECOMMA_ERRSTR(IOD, ERRSTR)						\
+MBSTART {											\
+	char *writebuffer;									\
+	int errlen, prefixlen, len;								\
+	prefixlen = STR_LIT_LEN(ONE_COMMA);							\
+	errlen = STRLEN(ERRSTR) + 1;	/* +1 for NULL */					\
+	len = prefixlen + errlen;								\
+	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, len, writebuffer);			\
+	memcpy(writebuffer, ONE_COMMA, prefixlen);						\
+	memcpy(&writebuffer[prefixlen], ERRSTR, errlen);					\
+} MBEND
+
+#define SET_DOLLARDEVICE_ONECOMMA_ERRSTR1_ERRSTR2(IOD, ERRSTR1, ERRSTR2)			\
+MBSTART {											\
+	char *writebuffer;									\
+	int errlen1, errlen2, prefixlen, len;							\
+	prefixlen = STR_LIT_LEN(ONE_COMMA);							\
+	errlen1 = STRLEN(ERRSTR1);	/* No NULL char */					\
+	errlen2 = STRLEN(ERRSTR2) + 1;	/* +1 for NULL */					\
+	len = prefixlen + errlen1 + errlen2;							\
+	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, len, writebuffer);			\
+	memcpy(writebuffer, ONE_COMMA, prefixlen);						\
+	memcpy(&writebuffer[prefixlen], ERRSTR1, errlen1);					\
+	memcpy(&writebuffer[prefixlen + errlen1], ERRSTR2, errlen2);				\
+} MBEND
+
+#define SET_DOLLARDEVICE_ONECOMMA_STRERROR(IOD, ERRNO)						\
+MBSTART {											\
+	char *errstring, *writebuffer;								\
+	int errlen, prefixlen, len;								\
+	prefixlen = STR_LIT_LEN(ONE_COMMA);							\
+	errstring = STRERROR(ERRNO);								\
+	errlen = STRLEN(errstring) + 1;	/* +1 for NULL */					\
+	len = prefixlen + errlen;								\
+	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, len, writebuffer);			\
+	memcpy(writebuffer, ONE_COMMA, prefixlen);						\
+	memcpy(&writebuffer[prefixlen], errstring, errlen);					\
+} MBEND
+
+#define PUT_DOLLAR_DEVICE_INTO_MSTR(IOD, MSTR)							\
+MBSTART {											\
+	if (memcmp(IOD->dollar.device, DEVICE_BUFFER_FULL, STR_LIT_LEN(DEVICE_BUFFER_FULL)))	\
+	{											\
+		MSTR->len = STRLEN(IOD->dollar.device);						\
+		MSTR->addr = IOD->dollar.device;						\
+	} else											\
+	{											\
+		assert(IOD->dollar.devicebuffer);						\
+		MSTR->addr = IOD->dollar.devicebuffer;						\
+		MSTR->len = STRLEN(IOD->dollar.devicebuffer);					\
+	}											\
+} MBEND
 #endif /* IO_H */

@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2011 Fidelity National Information 	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +27,7 @@
 #include "io.h"
 #include "send_msg.h"
 
-#define BASE_FRAME(fp) ((fp->type & SFT_DM) || (fp->flags & SFF_CI))
+#define BASE_FRAME(fp) ((fp->type & SFT_DM) || (fp->type & SFT_CI))
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	unsigned short		proc_act_type;
@@ -91,7 +95,7 @@ void error_return(void)
 	 */
 	if (rethrow_needed && BASE_FRAME(curframe))
 	{	/* If the computed frame is a base frame for call-ins, we cannot do rethrow and must use MUM_TSTART to return to
-		 * the call-in invocation code (gtm_ci()).
+		 * the call-in invocation code (ydb_ci[p]()).
 		 */
 		rethrow_needed = FALSE;
 		DBGEHND((stderr, "error_return: rethrow_needed set to FALSE due to call-in base frame"));
@@ -105,13 +109,12 @@ void error_return(void)
 		send_msg(VARLSTCNT(3) ERR_JIUNHNDINT, 2, dollar_zstatus.str.len, dollar_zstatus.str.addr);
 	}
 	parent_counted_frame = curframe;	/* Not parent frame for device errors -- still at error counted frame */
-	/* Exit if we are at the bottom of the stack */
+	/* Exit if we are at the bottom of the (entire) stack and this is not CI mode */
 	parent_level = dollar_zlevel() - 1;
-	if ((NULL == parent_counted_frame) || (1 > parent_level))
+	if ((NULL == parent_counted_frame) || (!(SFT_CI & parent_counted_frame->type) && (1 > parent_level)))
 	{
 		EXIT(dollar_ecode.error_last_ecode);
 	}
-	assert(0 < parent_level);
 	DBGEHND((stderr, "error_return: unwcnt: %d  rethrow_needed: %d  dev_act_err: %d\n", unwcnt, rethrow_needed, dev_act_err));
 	GOFRAMES(unwcnt, FALSE, FALSE);
 	assert(parent_counted_frame == frame_pointer);
@@ -126,7 +129,7 @@ void error_return(void)
 	gtm_err_dev = NULL;
 	if (!zintrframe)
 	{
-		if (parent_counted_frame->flags & SFF_CI)	/* Unhandled error in call-in: return to gtm_ci */
+		if (parent_counted_frame->type & SFT_CI)	/* Unhandled error in call-in: return to ydb_ci() */
 			mumps_status = dollar_ecode.error_last_ecode;
 		MUM_TSTART;
 	}

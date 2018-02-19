@@ -1,6 +1,11 @@
 #################################################################
 #								#
-#	Copyright 2001, 2011 Fidelity Information Services, Inc	#
+# Copyright 2001, 2011 Fidelity Information Services, Inc	#
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -57,7 +62,7 @@ setenv	gtm_vrt		$vernam			# /translate=(concealed) on VMS
 setenv	gtm_tools	$gtm_vrt/tools
 setenv	gtm_inc		$gtm_vrt/inc
 
-source	$gtm_tools/synch_env_version.csh	# set up dependent environment variables
+####### source	$gtm_tools/synch_env_version.csh	# set up dependent environment variables
 
 setenv	gtm_exe		$gtm_dbg		# the active version (initially debug)
 setenv	gtmsrc_last_exe	$gtm_exe		# initial value for use by gtmsrc.csh

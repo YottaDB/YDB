@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,49 +29,57 @@
 #include "gtm_permissions.h"
 #include "send_msg.h"
 #include "eintr_wrappers.h"
+#include "gtmimagename.h"
 
-GBLREF		char		gtm_dist[GTM_PATH_MAX];
-GBLREF		boolean_t	gtm_dist_ok_to_use;
-STATICDEF	gid_t		*gid_list = NULL;
-STATICDEF	int		gid_list_len = 0;
+GBLDEF		gid_t		*gid_list = NULL;
+GBLDEF		int		gid_list_len = 0;
 
-#if defined(__MVS__)
-#	define LIBGTMSHR "%s/libgtmshr.dll"
-#else
-#	define LIBGTMSHR "%s/libgtmshr.so"
-#endif
+GBLREF		char		ydb_dist[YDB_PATH_MAX];
+GBLREF		boolean_t	ydb_dist_ok_to_use;
 
 /* Get the process's group list and stash the information to avoid repeated calls */
-#define GETGROUPS								\
-MBSTART {									\
-	int	tmp_gid_list_len;						\
-	if (NULL == gid_list)							\
-	{	/* Obtain the supplementary gid list */				\
-		tmp_gid_list_len = getgroups(0, NULL);				\
-		assert(0 <= tmp_gid_list_len);					\
-		if (0 < tmp_gid_list_len)					\
-		{								\
-			gid_list = malloc(tmp_gid_list_len * SIZEOF(gid_t));	\
-			gid_list_len = getgroups(tmp_gid_list_len, gid_list);	\
-			assert(gid_list_len == tmp_gid_list_len);		\
-			if (gid_list_len != tmp_gid_list_len)			\
-			{							\
-				gid_list_len = 0;				\
-				free(gid_list);					\
-				gid_list = NULL;				\
-			}							\
-		}								\
-	}									\
-} MBEND
+void gtm_init_gid_list(void)
+{
+	int	tmp_gid_list_len;
 
-/* Return the group id of the distribution based on libgtmshr.xx[x]. If there is some
- * problem accessing that file then return INVALID_GID which signals no change to group.  Otherwise,
- * the pointer to the stat buffer will contain the result of the call to STAT_FILE.
+	assert(NULL == gid_list);
+	tmp_gid_list_len = getgroups(0, NULL);
+	assert(0 <= tmp_gid_list_len);
+	if (0 < tmp_gid_list_len)
+	{
+		gid_list = malloc(tmp_gid_list_len * SIZEOF(gid_t));
+		gid_list_len = getgroups(tmp_gid_list_len, gid_list);
+		assert(gid_list_len == tmp_gid_list_len);
+		if (gid_list_len != tmp_gid_list_len)
+		{
+			gid_list_len = 0;
+			free(gid_list);
+			gid_list = NULL;
+		}
+	}
+}
+
+/* Search through the supplementary gid list for a match */
+boolean_t	gtm_gid_in_gid_list(gid_t gid)
+{
+	int	i;
+
+	assert(NULL != gid_list);
+	if (NULL == gid_list)
+		return FALSE;
+	for (i = 0; i < gid_list_len; i++)
+		if (gid == gid_list[i])
+			return TRUE;
+	return FALSE;
+}
+/* Return the group id of the distribution based on libyottadb.so.
+ * If there is some problem accessing that file then return INVALID_GID which signals no change to group.
+ * Otherwise, the pointer to the stat buffer will contain the result of the call to STAT_FILE.
  */
 gid_t	gtm_get_group_id(struct stat *stat_buff)
 {
 	int			ret_stat;
-	char			temp[GTM_PATH_MAX];
+	char			temp[YDB_PATH_MAX];
 	static boolean_t	first_time = TRUE;
 	static struct stat	st_buff;
 
@@ -77,10 +88,10 @@ gid_t	gtm_get_group_id(struct stat *stat_buff)
 		*stat_buff = st_buff;
 		return st_buff.st_gid;
 	}
-	if (gtm_dist_ok_to_use)
+	if (ydb_dist_ok_to_use)
 	{
-		/* build a path to libgtmshr.so or .sl on hpux or .dll on zos */
-		SNPRINTF(temp, SIZEOF(temp), LIBGTMSHR, gtm_dist);
+		/* build a path to libyottadb.so */
+		SNPRINTF(temp, SIZEOF(temp), LIBYOTTADBDOTSO, ydb_dist);
 		STAT_FILE(temp, stat_buff, ret_stat);
 		if (0 == ret_stat)
 		{
@@ -89,7 +100,7 @@ gid_t	gtm_get_group_id(struct stat *stat_buff)
 			return(stat_buff->st_gid);
 		}
 	}
-	/* return INVALID_GID if STAT_FILE returned a -1 or gtm_dist has not been validated */
+	/* return INVALID_GID if STAT_FILE returned a -1 or ydb_dist has not been validated */
 	return (INVALID_GID);
 }
 
@@ -100,12 +111,12 @@ boolean_t gtm_member_group_id(uid_t uid, gid_t gid, struct perm_diag_data *pdd)
 {
 	struct group	*grp;
 	struct passwd	*pwd;
-	int		i;
 
 #	ifdef DEBUG
 	if (WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
 	{
-		GETGROUPS;
+		if (NULL == gid_list)
+			gtm_init_gid_list();
 		return FALSE;
 	}
 #	endif
@@ -114,13 +125,8 @@ boolean_t gtm_member_group_id(uid_t uid, gid_t gid, struct perm_diag_data *pdd)
 	{	/* Effective group is gid? */
 		if (GETEGID() == gid)
 			return(TRUE);
-		GETGROUPS;
-		/* Search through the supplementary gid list for a match */
-		for (i = 0; i < gid_list_len; i++)
-			if (gid == gid_list[i])
-				return (TRUE);
-		/* EUID == uid but gid is not in any groups associated with the process */
-		return FALSE;
+		/* EUID == uid but check if gid is in any groups associated with the process */
+		return GID_IN_GID_LIST(gid);
 	}
 	/* Get "uid" details */
 	pwd = getpwuid(uid);
@@ -154,7 +160,7 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 {
 	uid_t		this_uid, file_uid;
 	gid_t		this_gid, file_gid;
-	gid_t		gtm_dist_gid = INVALID_GID;
+	gid_t		ydb_dist_gid = INVALID_GID;
 	struct stat	dist_stat_buff;
 	int		this_uid_is_file_owner;
 	int		this_uid_is_root;
@@ -238,9 +244,9 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 			new_other_perms = file_other_perms;
 		}
 		/* Find restricted group, if any */
-		gtm_dist_gid = gtm_get_group_id(&dist_stat_buff);
+		ydb_dist_gid = gtm_get_group_id(&dist_stat_buff);
 		dir_mode = dist_stat_buff.st_mode;
-		gtm_group_restricted = ((INVALID_GID != gtm_dist_gid) && !(dir_mode & 01)); /* not other executable */
+		gtm_group_restricted = ((INVALID_GID != ydb_dist_gid) && !(dir_mode & 01)); /* not other executable */
 		if ((this_uid_is_file_owner && this_uid_in_file_group) || this_uid_is_root)
 		{
 			if (this_uid_is_root)		/* otherwise, use default uid */
@@ -257,8 +263,8 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 			if (gtm_group_restricted)
 			{
 				assert((WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
-						|| gtm_member_group_id(this_uid, gtm_dist_gid, pdd));
-				*group_id = gtm_dist_gid;	/* use restricted group */
+						|| gtm_member_group_id(this_uid, ydb_dist_gid, pdd));
+				*group_id = ydb_dist_gid;	/* use restricted group */
 				*perm = new_owner_perms | new_group_perms;
 			} else
 			{
@@ -288,8 +294,8 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 			} else if (gtm_group_restricted)
 			{
 				assert((WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
-						|| gtm_member_group_id(this_uid, gtm_dist_gid, pdd));
-				*group_id = gtm_dist_gid;	/* use restricted group */
+						|| gtm_member_group_id(this_uid, ydb_dist_gid, pdd));
+				*group_id = ydb_dist_gid;	/* use restricted group */
 				new_group_perms = (new_group_perms | (new_other_perms << 3));
 				/* "owner" gets group permissions if in group, otherwise "other" permissions */
 				new_owner_perms = this_uid_in_file_group ? (new_group_perms << 3) : (new_other_perms << 6);
@@ -325,7 +331,7 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 		pdd->this_gid = this_gid;
 		pdd->file_uid = file_uid;	/* get owning file uid */
 		pdd->file_gid = file_gid;	/* get owning file gid */
-		pdd->lib_gid  = gtm_dist_gid;
+		pdd->lib_gid  = ydb_dist_gid;
 		SNPRINTF(pdd->file_perm, SIZEOF(pdd->file_perm), "%04o", st_mode & 07777);
 		SNPRINTF(pdd->lib_perm, SIZEOF(pdd->lib_perm), "%04o", dir_mode  & 07777);
 		if (gid_list_len > 0)

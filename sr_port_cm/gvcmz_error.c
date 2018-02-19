@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +43,7 @@ void gvcmz_error(char code, uint4 status)
 	error_def(ERR_NETLCKFAIL);
 	error_def(ERR_NETFAIL);
 
+	ASSERT_IS_LIBGNPCLIENT;
 	switch(code)
 	{
 		case CMMS_L_LKCANALL:

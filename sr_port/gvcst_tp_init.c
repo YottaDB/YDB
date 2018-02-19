@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,6 +97,7 @@ void gvcst_tp_init(gd_region *greg)
 			 */
 			initialize_list(si->format_buff_list, JFB_ELE_SIZE,
 					DIVIDE_ROUND_UP(JNL_FORMAT_BUFF_INIT_ALLOC, JFB_ELE_SIZE));
+			ALLOC_JBUF_RSRV_STRUCT(si->jbuf_rsrv_ptr, csa);
 		}
 	} else if (NULL != si->jnl_tail)
 	{	/* journaling is currently disallowed although it was allowed (non-zero si->jnl_tail)
@@ -103,6 +105,8 @@ void gvcst_tp_init(gd_region *greg)
 		 */
 		FREEUP_BUDDY_LIST(si->jnl_list);
 		FREEUP_BUDDY_LIST(si->format_buff_list);
+		assert(NULL != si->jbuf_rsrv_ptr);
+		FREE_JBUF_RSRV_STRUCT(si->jbuf_rsrv_ptr);
 		si->jnl_tail = NULL;
 	}
 }

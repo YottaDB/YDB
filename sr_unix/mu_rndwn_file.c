@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -23,6 +26,7 @@
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <errno.h>
+#include <sys/file.h>	/* for "flock" */
 
 #include "gtm_sem.h"
 #include "gdsroot.h"
@@ -103,8 +107,8 @@ static boolean_t	sem_created;
 static boolean_t	no_shm_exists;
 static boolean_t	shm_status_confirmed;
 
-LITREF char             gtm_release_name[];
-LITREF int4             gtm_release_name_len;
+LITREF char             ydb_release_name[];
+LITREF int4             ydb_release_name_len;
 
 error_def(ERR_BADDBVER);
 error_def(ERR_DBFILERR);
@@ -459,6 +463,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 			return FALSE;
 		}
+		seg->read_only = tsd->read_only;
 		SYNC_RESERVEDDBFLAGS_REG_CSA_CSD(reg, csa, tsd, ((node_local_ptr_t)NULL));
 		if (!IS_AIO_DBGLDMISMATCH(seg, tsd))
 			break;
@@ -532,7 +537,12 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			 * otherwise.
 			 */
 			need_statsdb_rundown = statsDBudi->grabbed_ftok_sem;
-			assert(!need_statsdb_rundown || !baseDBrundown_status);
+			/* Note: It is possible that need_statsdb_rundown is TRUE and baseDBrundown_status is also TRUE
+			 * in case the baseDB has already been run down but statsDB has not been rundown and
+			 * the gtm_statsdir env var used to create this statsDB is different from the current value of
+			 * the gtm_statsdir env var. Therefore continue running down the statsDB as long as that is
+			 * needed, irrespective of the rundown status of the baseDB.
+			 */
 			if (!need_statsdb_rundown)
 			{
 				mu_gv_cur_reg_free();
@@ -556,13 +566,25 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 		return FALSE;
 	}
-	override_present = (cli_present("OVERRIDE") == CLI_PRESENT);
-	if (FROZEN_CHILLED(tsd) && !standalone && !override_present)
-	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(reg));
-		MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-		return FALSE;
+	if (tsd->read_only)
+	{	/* Get a non-blocking (LOCK_NB) exclusive (LOCK_EX) lock on the database file.
+		 * If not possible to get right away, it means someone else is holding a shared lock on the file.
+		 * Error out in that case.
+		 * Hold on to this lock for the entire life of this process (until the READ_ONLY flag in db file hdr is changed).
+		 * This will ensure any process that concurrently tries to open this database file using a potentially stale
+		 * READ_ONLY field in the db file header errors out with READONLYLKFAIL in "db_init".
+		 */
+		FLOCK(udi->fd, LOCK_EX | LOCK_NB, rc);
+		if (-1 == rc)
+		{
+			save_errno = errno;
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_READONLYLKFAIL, 4,
+							LEN_AND_LIT("exclusive"), DB_LEN_STR(reg), save_errno);
+			MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
+			return FALSE;
+		}
 	}
+	override_present = (cli_present("OVERRIDE") == CLI_PRESENT);
 	csa->hdr = tsd;
 	csa->region = gv_cur_region;
 	/* At this point, we have not yet attached to the database shared memory so we do not know if the ftok counter got halted
@@ -817,7 +839,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 					db_ipcs.shmid = tsd->shmid;
 					db_ipcs.gt_shm_ctime = tsd->gt_shm_ctime.ctime;
 					if (!get_full_path((char *)DB_STR_LEN(reg), db_ipcs.fn, &db_ipcs.fn_len,
-											MAX_TRANS_NAME_LEN, &status_msg))
+											YDB_PATH_MAX, &status_msg))
 					{
 						gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(1) status_msg);
 						RNDWN_ERR("!AD -> get_full_path failed.", reg);
@@ -825,15 +847,23 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 						return FALSE;
 					}
 					db_ipcs.fn[db_ipcs.fn_len] = 0;
-					WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-					secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
-					csa->read_only_fs = (EROFS == secshrstat);
-					if ((0 != secshrstat) && !csa->read_only_fs)
+					if (!tsd->read_only)
 					{
-						RNDWN_ERR("!AD -> gtmsecshr was unable to write header to disk.", reg);
-						MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-						return FALSE;
-					}
+						WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
+						secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
+						csa->read_only_fs = (EROFS == secshrstat);
+						if ((0 != secshrstat) && !csa->read_only_fs)
+						{
+							RNDWN_ERR("!AD -> gtmsecshr was unable to write header to disk.", reg);
+							MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created,		\
+										udi->counter_acc_incremented);
+							return FALSE;
+						}
+					} else
+						csa->read_only_fs = TRUE;	/* We never want to write to READ_ONLY db file.
+										 * So treat this as if the underlying file system
+										 * is read-only.
+										 */
 				}
 				if (!ftok_sem_release(reg, FALSE, FALSE))
 				{
@@ -879,7 +909,10 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		}
 		assert(!standalone);
 		ALIGN_BUFF_IF_NEEDED_FOR_DIO(udi, buff, tsd, tsd_size);	/* sets "buff" */
-		DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, buff, tsd_size, status);
+		if (!tsd->read_only)
+			DB_LSEEKWRITE(csa, udi, udi->fn, udi->fd, (off_t)0, buff, tsd_size, status);
+		else
+			status = 0;
 		if (0 != status)
 		{
 			RNDWN_ERR("!AD -> Unable to write header to disk.", reg);
@@ -937,9 +970,9 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	SEG_SHMATTACH(0, reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 	assert(csa == cs_addrs);
 	csa->nl = cnl = (node_local_ptr_t)csa->db_addrs[0];
-	/* The following checks for GDS_LABEL_GENERIC, gtm_release_name, and cnl->glob_sec_init ensure that the
+	/* The following checks for GDS_LABEL_GENERIC, ydb_release_name, and cnl->glob_sec_init ensure that the
 	 * shared memory under consideration is valid.  First, since cnl->label is in the same place for every
-	 * version, a failing check means it is most likely NOT a GT.M created shared memory, so no attempt will be
+	 * version, a failing check means it is most likely NOT a YottaDB created shared memory, so no attempt will be
 	 * made to delete it. Next a successful match of the currently running release will guarantee that all fields in
 	 * the structure are where they're expected to be -- without this check the glob_sec_init check should not be done
 	 * as this field is at different offsets in different versions. Finally, we can check the glob_sec_init flag to
@@ -956,10 +989,10 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		is_gtm_shm = TRUE;
 		remove_shmid = TRUE;
 		memcpy(now_running, cnl->now_running, MAX_REL_NAME);
-		if (memcmp(now_running, gtm_release_name, gtm_release_name_len + 1))
+		if (memcmp(now_running, ydb_release_name, ydb_release_name_len + 1))
 		{
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_VERMISMATCH, 6, DB_LEN_STR(reg), gtm_release_name_len,
-				   gtm_release_name, LEN_AND_STR(now_running));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_VERMISMATCH, 6, DB_LEN_STR(reg), ydb_release_name_len,
+				   ydb_release_name, LEN_AND_STR(now_running));
 			MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 			return FALSE;
 		}
@@ -1215,6 +1248,21 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
 				return FALSE;
 			}
+			if (FROZEN_CHILLED(csa) && !override_present)
+			{	/* If there is an online freeze, we can't do the file writes, so autorelease or give up. */
+				DO_CHILLED_AUTORELEASE(csa, csd);
+				if (FROZEN_CHILLED(csa))
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(reg));
+					MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
+					return FALSE;
+				}
+			}
+			/* If there was an online freeze and it was autoreleased, we don't want to take down the shared memory
+			 * and lose the freeze_online state.
+			 */
+			if (CHILLED_AUTORELEASE(csa) && !override_present)
+				remove_shmid = FALSE;
 			db_common_init(reg, csa, csd); /* do initialization common to "db_init" and "mu_rndwn_file" */
 			do_crypt_init = USES_ENCRYPTION(csd->is_encrypted);
 			crypt_warning = FALSE;
@@ -1388,7 +1436,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		 * of statsdb requires ftok lock on the basedb). In that case, we leave it as is. And when the basedb is next
 		 * opened, we will remove this statsdb and create a new one.
 		 */
-		UNLINK_STATSDB_AT_BASEDB_RUNDOWN(cnl);
+		UNLINK_STATSDB_AT_BASEDB_RUNDOWN(cnl, csd);
 		break;
 	}
 	/* Detach from shared memory whether it is a GT.M shared memory or not */

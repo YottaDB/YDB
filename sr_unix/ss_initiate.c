@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -198,8 +201,8 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 {
 	boolean_t		debug_mupip = FALSE;
 	boolean_t		final_retry, wait_for_zero_kip;
-	char			*tempfilename, eof_marker[EOF_MARKER_SIZE], tempdir_trans_buffer[GTM_PATH_MAX];
-	char			tempdir_full_buffer[GTM_PATH_MAX], tempnamprefix[MAX_FN_LEN + 1];
+	char			*tempfilename, eof_marker[EOF_MARKER_SIZE], tempdir_trans_buffer[YDB_PATH_MAX];
+	char			tempdir_full_buffer[YDB_PATH_MAX], tempnamprefix[MAX_FN_LEN + 1];
 	char			time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	enum db_acc_method	acc_meth;
 	gtm_uint64_t		db_file_size, native_size;
@@ -264,7 +267,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	assert(ss_lock_held_by_us(reg));
 	ss_release_lock(reg);
 	/* For a readonly database for the current process, we better have the region frozen */
-	assert(!reg->read_only || FROZEN_HARD(csd));
+	assert(!reg->read_only || FROZEN_HARD(csa));
 	/* ============================ STEP 1 : Shadow file name construction ==============================
 	 *
 	 * --> Directory is taken from GTM_SNAPTMPDIR, if available, else GTM_BAK_TEMPDIR_LOG_NAME_UC, if available,
@@ -289,6 +292,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	tempdir_log.addr = GTM_SNAPTMPDIR;
 	tempdir_log.len = STR_LIT_LEN(GTM_SNAPTMPDIR);
 	tempfilename = tempdir_full.addr = tempdir_full_buffer;
+	tempdir_full.len = SIZEOF(tempdir_full_buffer);
 	/* Check if the  environment variable is defined or not.
 	 * Side-effect: tempdir_trans.addr = tempdir_trans_buffer irrespective of whether TRANS_LOG_NAME
 	 * succeeded or not.
@@ -325,7 +329,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		UNFREEZE_REGION_IF_NEEDED(csd, reg);
 		return FALSE;
 	}
-	SNPRINTF(tempfilename + tempdir_full.len, GTM_PATH_MAX, "/%s_XXXXXX", tempnamprefix);
+	SNPRINTF(tempfilename + tempdir_full.len, YDB_PATH_MAX, "/%s_XXXXXX", tempnamprefix);
 	/* ========================== STEP 2 : Create the shadow file ======================== */
 	/* get a unique temporary file name. The file gets created on success */
 	DEFER_INTERRUPTS(INTRPT_IN_SS_INITIATE, prev_intrpt_state); /* Defer MUPIP STOP till the file is created */
@@ -372,7 +376,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	lcl_ss_ctx->shdw_fd = shdw_fd;
 	ENABLE_INTERRUPTS(INTRPT_IN_SS_INITIATE, prev_intrpt_state);
 	tempdir_full.len = STRLEN(tempdir_full.addr); /* update the length */
-	assert(GTM_PATH_MAX >= tempdir_full.len);
+	assert(YDB_PATH_MAX >= tempdir_full.len);
 	/* give temporary files the group and permissions as other shared resources - like journal files */
 	FSTAT_FILE(((unix_db_info *)(reg->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
 	assert(-1 != fstat_res);

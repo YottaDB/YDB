@@ -1,7 +1,10 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,9 +13,6 @@
  *								*
  ****************************************************************/
 /* defines opcodes and their associated octypes */
-
-
-
 
 
 
@@ -93,7 +93,6 @@ OPCODE_DEF(OC_NOR, (OCT_BOOL | OCT_NEGATED))
 OPCODE_DEF(OC_COM, (OCT_BOOL | OCT_UNARY))
 OPCODE_DEF(OC_BREAK, (OCT_NULL))
 OPCODE_DEF(OC_CLOSE, (OCT_NULL))
-OPCODE_DEF(OC_HALT, (OCT_NULL))
 OPCODE_DEF(OC_HANG, (OCT_NULL))
 OPCODE_DEF(OC_JOB, (OCT_NULL))
 OPCODE_DEF(OC_KILL, (OCT_NULL))
@@ -165,7 +164,7 @@ OPCODE_DEF(OC_CLRTEST, (OCT_NULL))
 OPCODE_DEF(OC_FORLOOP, (OCT_NULL))
 OPCODE_DEF(OC_JMPTSET, (OCT_JUMP))
 OPCODE_DEF(OC_JMPTCLR, (OCT_JUMP))
-OPCODE_DEF(OC_NUMCMP, (OCT_BOOL))
+OPCODE_DEF(OC_NUMCMP, (OCT_BOOL | OCT_REL))
 OPCODE_DEF(OC_JMPEQU, (OCT_JUMP))
 OPCODE_DEF(OC_JMPNEQ, (OCT_JUMP))
 OPCODE_DEF(OC_JMPGTR, (OCT_JUMP))
@@ -348,5 +347,10 @@ OPCODE_DEF(OC_ZRUPDATE, (OCT_NULL))
 OPCODE_DEF(OC_CDIDX, (OCT_MINT | OCT_CGSKIP | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZCOLLATE, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZATRANSFORM, (OCT_MVAL | OCT_EXPRLEAF))
-OPCODE_DEF(OC_JMPTRUE, (OCT_JUMP))
-OPCODE_DEF(OC_JMPFALSE, (OCT_JUMP))
+OPCODE_DEF(OC_FNREVERSEQUERY, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_GVREVERSEQUERY, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_FNQ2, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_GVQ2, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_INDQ2, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_LASTOPCODE, (OCT_CGSKIP))
+/* insert new opcodes before OC_LASTOPCODE */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2015 Fidelity National Information 	*
+ * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,8 @@
 #include "gtm_unistd.h"
 #include "gtm_pwd.h"
 #include "gtm_signal.h"	/* for SIGPROCMASK */
+#include "gtm_string.h"
+#include "wbox_test_init.h"
 
 #undef	getpwuid	/* since we are going to use the system level "getpwuid" function, undef the alias to "gtm_getpwuid" */
 
@@ -28,8 +30,11 @@ GBLREF	struct		passwd getpwuid_struct;	/* cached copy of "getpwuid" to try avoid
  */
 struct passwd	*gtm_getpwuid(uid_t uid)
 {
+	struct passwd	temp_passwd;
 	struct passwd	*retval;
 	sigset_t	savemask;
+	char		*buff;
+	size_t		buff_size;
 	int		rc;
 	DEBUG_ONLY(static boolean_t	first_time = TRUE;)
 
@@ -39,14 +44,33 @@ struct passwd	*gtm_getpwuid(uid_t uid)
 		assert(blocksig_initialized);	/* the set of blocking signals should be initialized at process startup */
 		if (blocksig_initialized)	/* In pro, dont take chances and handle case where it is not initialized */
 			SIGPROCMASK(SIG_BLOCK, &block_sigsent, &savemask, rc);
-		retval = getpwuid(uid);
+		buff_size = sysconf(_SC_GETPW_R_SIZE_MAX);
+		if (-1 == buff_size)
+			buff_size = 2048;
+		buff = malloc(buff_size);
+		if (NULL == buff)
+		{
+			return NULL;
+		}
+		getpwuid_r(uid, &temp_passwd, buff, buff_size, &retval);
 		if (blocksig_initialized)
 			SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 		if (NULL == retval)
 			return NULL;	/* error or "uid" record not found */
-		/* Cache return from "getpwuid" call and avoid future calls to this function */
 		getpwuid_struct = *retval;
-		DEBUG_ONLY(first_time = FALSE;)
+		/* Cache return from "getpwuid" call and avoid future calls to this function */
+#ifdef DEBUG
+		if (gtm_white_box_test_case_enabled &&
+			(WBTEST_GETPWUID_CHECK_OVERWRITE == gtm_white_box_test_case_number))
+		{
+			/* White box test case for the issue GTM-8415. getpwuid_struct should not
+		   	overwrite by calling getpwuid */
+			/* uid 1 is a daemon process id */
+			retval = getpwuid((uid_t)1);
+			assert(STRCMP(getpwuid_struct.pw_name, retval->pw_name));
+		}
+		first_time = FALSE;
+#endif
 	}
 	return &getpwuid_struct;
 }

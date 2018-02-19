@@ -3,6 +3,9 @@
  * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -64,9 +67,7 @@ GBLREF	uint4			log_interval;
 GBLREF	volatile time_t		gtmrecv_now;
 GBLREF	boolean_t		gtmrecv_send_cmp2uncmp;
 GBLREF	repl_conn_info_t	*remote_side;
-GBLREF	jnlpool_addrs		jnlpool;
-GBLREF	jnlpool_ctl_ptr_t	jnlpool_ctl;
-GBLREF	jnlpool_addrs		jnlpool;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_REPLCOMM);
@@ -86,18 +87,27 @@ enum
 	STOP_POLL
 };
 
+
+/* The below structure defines variables that maintain state of the current connection (e.g. if an xoff needs to be sent etc.)
+ * All these need to be cleared if/when the current connection gets closed.
+ */
+typedef struct
+{
+	boolean_t	send_xoff;
+	boolean_t	xoff_sent;
+	seq_num		send_seqno;
+	boolean_t	log_draining_msg;
+	boolean_t	send_badtrans;
+	boolean_t	send_cmp2uncmp;
+	boolean_t	upd_shut_too_early_logged;
+} conn_state_t;
+
 int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned char *buffp)
 {
 	static int		report_cnt = 1;
 	static int		next_report_at = 1;
-	static boolean_t	send_xoff = FALSE;
-	static boolean_t	xoff_sent = FALSE;
-	static seq_num		send_seqno;
-	static boolean_t	log_draining_msg = FALSE;
-	static boolean_t	send_badtrans = FALSE;
-	static boolean_t	send_cmp2uncmp = FALSE;
-	static boolean_t	upd_shut_too_early_logged = FALSE;
 	static time_t		last_reap_time = 0;
+	static conn_state_t	curr_conn_state;
 	repl_msg_t		xoff_msg;
 	repl_badtrans_msg_t	bad_trans_msg;
 	boolean_t		alert = FALSE, info = FALSE;
@@ -161,7 +171,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 					"INFO : Update process not running due to user initiated shutdown\n");
 			if (1 == report_cnt)
 			{
-				send_xoff = TRUE;
+				curr_conn_state.send_xoff = TRUE;
 				recvpool_ctl->old_jnl_seqno = recvpool_ctl->jnl_seqno;
 				recvpool_ctl->jnl_seqno = 0;
 				/* Even though we have identified that the update process is NOT alive, a waitpid on the update
@@ -202,24 +212,24 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		 * REPL_XOFF source side and drain the replication pipe
 		 */
 		onln_rlbk_flg_set = TRUE;
-		send_xoff = TRUE;
-	} else if (!send_cmp2uncmp && gtmrecv_send_cmp2uncmp)
+		curr_conn_state.send_xoff = TRUE;
+	} else if (!curr_conn_state.send_cmp2uncmp && gtmrecv_send_cmp2uncmp)
 	{
-		send_xoff = TRUE;
-		send_seqno = recvpool_ctl->jnl_seqno;
-		send_cmp2uncmp = TRUE;
-	} else if (!send_badtrans && upd_proc_local->bad_trans)
+		curr_conn_state.send_xoff = TRUE;
+		curr_conn_state.send_seqno = recvpool_ctl->jnl_seqno;
+		curr_conn_state.send_cmp2uncmp = TRUE;
+	} else if (!curr_conn_state.send_badtrans && upd_proc_local->bad_trans)
 	{
-		send_xoff = TRUE;
-		send_seqno = upd_proc_local->read_jnl_seqno;
-		send_badtrans = TRUE;
+		curr_conn_state.send_xoff = TRUE;
+		curr_conn_state.send_seqno = upd_proc_local->read_jnl_seqno;
+		curr_conn_state.send_badtrans = TRUE;
 		bad_trans_detected = TRUE;
-	} else if (!upd_proc_local->bad_trans && send_badtrans && 1 != report_cnt)
+	} else if (!upd_proc_local->bad_trans && curr_conn_state.send_badtrans && (1 != report_cnt))
 	{
-		send_badtrans = FALSE;
+		curr_conn_state.send_badtrans = FALSE;
 		bad_trans_detected = FALSE;
 	}
-	if (send_xoff && !xoff_sent)
+	if (curr_conn_state.send_xoff && !curr_conn_state.xoff_sent)
 	{	/* Send XOFF_ACK_ME if the receiver has a connection to the source. Do not attempt to send it if we dont even
 		 * know the endianness of the remote side. In that case, we are guaranteed no initial handshake occurred and
 		 * so no point sending the XOFF too. This saves us lots of trouble in case of cross-endian replication connections.
@@ -227,17 +237,17 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		assert((FD_INVALID  != gtmrecv_sock_fd) || repl_connection_reset);
 		if ((FD_INVALID != gtmrecv_sock_fd) && remote_side->endianness_known)
 		{
-			send_seqno = upd_proc_local->read_jnl_seqno;
+			curr_conn_state.send_seqno = upd_proc_local->read_jnl_seqno;
 			if (!remote_side->cross_endian)
 			{
 				xoff_msg.type = REPL_XOFF_ACK_ME;
 				xoff_msg.len = MIN_REPL_MSGLEN;
-				memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&send_seqno, SIZEOF(seq_num));
+				memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&curr_conn_state.send_seqno, SIZEOF(seq_num));
 			} else
 			{
 				xoff_msg.type = GTM_BYTESWAP_32(REPL_XOFF_ACK_ME);
 				xoff_msg.len = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
-				temp_send_seqno = GTM_BYTESWAP_64(send_seqno);
+				temp_send_seqno = GTM_BYTESWAP_64(curr_conn_state.send_seqno);
 				memcpy((uchar_ptr_t)&xoff_msg.msg[0], (uchar_ptr_t)&temp_send_seqno, SIZEOF(seq_num));
 			}
 			REPL_SEND_LOOP(gtmrecv_sock_fd, &xoff_msg, MIN_REPL_MSGLEN, REPL_POLL_NOWAIT)
@@ -250,8 +260,8 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 							"Status = %d ; %s\n", status, STRERROR(status));
 					repl_close(&gtmrecv_sock_fd);
 					repl_connection_reset = TRUE;
-					xoff_sent = FALSE;
-					send_badtrans = FALSE;
+					/* Now that current connection is lost, clear all statics maintained for this connection */
+					memset(&curr_conn_state, 0, SIZEOF(curr_conn_state));
 
 				} else if (EREPL_SEND == repl_errno)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
@@ -266,27 +276,27 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				}
 			} else
 			{
-				xoff_sent = TRUE;
-				log_draining_msg = TRUE;
+				curr_conn_state.xoff_sent = TRUE;
+				curr_conn_state.log_draining_msg = TRUE;
 			}
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_XOFF_ACK_ME sent due to upd shutdown/crash or bad trans "
 					"or ONLINE_ROLLBACK\n");
-			send_xoff = FALSE;
+			curr_conn_state.send_xoff = FALSE;
 		} else
 		{	/* Connection has been lost OR initial handshake needs to happen again, so no point sending XOFF/BADTRANS */
-			send_xoff = FALSE;
-			send_badtrans = FALSE;
+			curr_conn_state.send_xoff = FALSE;
+			curr_conn_state.send_badtrans = FALSE;
 		}
 	}
 	/* Drain pipe */
-	if (xoff_sent)
+	if (curr_conn_state.xoff_sent)
 	{
-		if (log_draining_msg)
+		if (curr_conn_state.log_draining_msg)
 		{	/* avoid multiple logs per instance */
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Draining replication pipe due to %s\n",
-					send_cmp2uncmp ? "CMP2UNCMP" : (send_badtrans ? "BAD_TRANS" :
+					curr_conn_state.send_cmp2uncmp ? "CMP2UNCMP" : (curr_conn_state.send_badtrans ? "BAD_TRANS" :
 							(onln_rlbk_flg_set ? "ONLINE_ROLLBACK" : "UPD shutdown/crash")));
-			log_draining_msg = FALSE;
+			curr_conn_state.log_draining_msg = FALSE;
 		}
 		if (0 != *buff_unprocessed)
 		{	/* Throw away the current contents of the buffer */
@@ -359,8 +369,8 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 			{
 				repl_log(gtmrecv_log_fp, TRUE, TRUE,
 						"REPL INFO - XOFF_ACK received. Drained replication pipe completely\n");
-				upd_shut_too_early_logged = FALSE;
-				xoff_sent = FALSE;
+				curr_conn_state.upd_shut_too_early_logged = FALSE;
+				curr_conn_state.xoff_sent = FALSE;
 				return_status = STOP_POLL;
 			}
 		} else if (SS_NORMAL == status)
@@ -382,11 +392,11 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 					; /* Empty Body */
 			}
 			*buff_unprocessed = 0; *pending_data_len = 0;
-			if (SS_NORMAL == status && info && !upd_shut_too_early_logged)
+			if (SS_NORMAL == status && info && !curr_conn_state.upd_shut_too_early_logged)
 			{
 				repl_log(gtmrecv_log_fp, TRUE, TRUE, "ALERT : User initiated shutdown of Update Process done "
 						"when there was data in the replication pipe\n");
-				upd_shut_too_early_logged = TRUE;
+				curr_conn_state.upd_shut_too_early_logged = TRUE;
 			}
 			return_status = CONTINUE_POLL;
 		}
@@ -400,8 +410,8 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 							"Status = %d ; %s\n", status, STRERROR(status));
 					repl_close(&gtmrecv_sock_fd);
 					repl_connection_reset = TRUE;
-					xoff_sent = FALSE;
-					send_badtrans = FALSE;
+					/* Now that current connection is lost, clear all statics maintained for this connection */
+					memset(&curr_conn_state, 0, SIZEOF(curr_conn_state));
 					return_status = STOP_POLL;
 				} else
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
@@ -419,33 +429,35 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 	 * the endianness of the other side. If not, no point in sending one anyways and saves us trouble in
 	 * case of cross-endian replication connections.
 	 */
-	if ((STOP_POLL == return_status) && (send_badtrans || send_cmp2uncmp)
+	if ((STOP_POLL == return_status) && (curr_conn_state.send_badtrans || curr_conn_state.send_cmp2uncmp)
 		&& (FD_INVALID != gtmrecv_sock_fd) && remote_side->endianness_known)
 	{	/* Send REPL_BADTRANS or REPL_CMP2UNCMP message */
 		if (!remote_side->cross_endian)
 		{
-			bad_trans_msg.type = send_cmp2uncmp ? REPL_CMP2UNCMP : REPL_BADTRANS;
+			bad_trans_msg.type = curr_conn_state.send_cmp2uncmp ? REPL_CMP2UNCMP : REPL_BADTRANS;
 			bad_trans_msg.len  = MIN_REPL_MSGLEN;
-			bad_trans_msg.start_seqno = send_seqno;
+			bad_trans_msg.start_seqno = curr_conn_state.send_seqno;
 		} else
 		{
-			bad_trans_msg.type = send_cmp2uncmp ? GTM_BYTESWAP_32(REPL_CMP2UNCMP) : GTM_BYTESWAP_32(REPL_BADTRANS);
+			bad_trans_msg.type = curr_conn_state.send_cmp2uncmp ? GTM_BYTESWAP_32(REPL_CMP2UNCMP) : GTM_BYTESWAP_32(REPL_BADTRANS);
 			bad_trans_msg.len  = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
-			bad_trans_msg.start_seqno = GTM_BYTESWAP_64(send_seqno);
+			bad_trans_msg.start_seqno = GTM_BYTESWAP_64(curr_conn_state.send_seqno);
 		}
 		REPL_SEND_LOOP(gtmrecv_sock_fd, &bad_trans_msg, bad_trans_msg.len, REPL_POLL_NOWAIT)
 			; /* Empty Body */
 		if (SS_NORMAL == status)
 		{
-			if (send_cmp2uncmp)
-				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_CMP2UNCMP message sent with seqno %llu\n", send_seqno);
+			if (curr_conn_state.send_cmp2uncmp)
+				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_CMP2UNCMP message sent with seqno %llu\n",
+												curr_conn_state.send_seqno);
 			else
-				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_BADTRANS message sent with seqno %llu\n", send_seqno);
+				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL_BADTRANS message sent with seqno %llu\n",
+												curr_conn_state.send_seqno);
 		} else
 		{
 			if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
 			{
-				if (send_cmp2uncmp)
+				if (curr_conn_state.send_cmp2uncmp)
 				{
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending REPL_CMP2UNCMP. "
 							"Status = %d ; %s\n", status, STRERROR(status));
@@ -456,6 +468,8 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				}
 				repl_close(&gtmrecv_sock_fd);
 				repl_connection_reset = TRUE;
+				/* Now that current connection is lost, clear all statics maintained for this connection */
+				memset(&curr_conn_state, 0, SIZEOF(curr_conn_state));
 				return_status = STOP_POLL;
 			} else if (EREPL_SEND == repl_errno)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
@@ -467,15 +481,15 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 					LEN_AND_LIT("Error sending REPL_BADTRANS/REPL_CMP2UNCMP. Error in select"), status);
 			}
 		}
-		send_badtrans = FALSE;
-		if (send_cmp2uncmp)
+		curr_conn_state.send_badtrans = FALSE;
+		if (curr_conn_state.send_cmp2uncmp)
 		{
 			REPL_DPRINT1("gtmrecv_poll_actions : Setting gtmrecv_wait_for_jnl_seqno to TRUE because this receiver"
 				"server requested a fall-back from compressed to uncompressed operation\n");
 			gtmrecv_wait_for_jnl_seqno = TRUE;/* set this to TRUE to break out and go back to a fresh "do_main_loop" */
 			gtmrecv_bad_trans_sent = TRUE;
 			gtmrecv_send_cmp2uncmp = FALSE;
-			send_cmp2uncmp = FALSE;
+			curr_conn_state.send_cmp2uncmp = FALSE;
 		}
 	}
 	if ((upd_proc_local->bad_trans && bad_trans_detected) || onln_rlbk_flg_set
@@ -492,7 +506,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		/* Reset last_rcvd_histinfo, last_valid_histinfo etc. as they reflect context from unprocessed data
 		 * in the receive pool and those are no longer valid because we have drained the receive pool.
 		 */
-		GTMRECV_CLEAR_CACHED_HISTINFO(recvpool.recvpool_ctl, jnlpool, jnlpool_ctl, INSERT_STRM_HISTINFO_FALSE);
+		GTMRECV_CLEAR_CACHED_HISTINFO(recvpool.recvpool_ctl, jnlpool, INSERT_STRM_HISTINFO_FALSE);
 		if (UPDPROC_START == upd_proc_local->start_upd)
 		{
 			/* Attempt starting the update process */
@@ -521,11 +535,11 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 					     "upd restart\n");
 				gtmrecv_wait_for_jnl_seqno = TRUE;
 				report_cnt = next_report_at = 1;
-				if (send_xoff && (FD_INVALID == gtmrecv_sock_fd))
+				if (curr_conn_state.send_xoff && (FD_INVALID == gtmrecv_sock_fd))
 				{
 					/* Update start command was issued before connection was established,
 					 * no point in sending XOFF.  */
-					send_xoff = FALSE;
+					curr_conn_state.send_xoff = FALSE;
 				}
 			} else
 			{
@@ -537,25 +551,25 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 			gtmrecv_wait_for_jnl_seqno = TRUE;/* set this to TRUE to break out and go back to a fresh "do_main_loop" */
 			if (onln_rlbk_flg_set)
 			{
-				assert(NULL != jnlpool_ctl);
+				assert(jnlpool && (NULL != jnlpool->jnlpool_ctl));
 				repl_log(gtmrecv_log_fp, TRUE, TRUE, "Closing connection due to ONLINE ROLLBACK\n");
  				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Current Jnlpool Seqno : %llu\n",
- 						jnlpool_ctl->jnl_seqno);
+ 						jnlpool->jnlpool_ctl->jnl_seqno);
 				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n",
 						recvpool_ctl->jnl_seqno);
 				repl_close(&gtmrecv_sock_fd);
 				repl_connection_reset = TRUE;
-				xoff_sent = FALSE;
-				send_badtrans = FALSE;
+				/* Now that current connection is lost, clear all statics maintained for this connection */
+				memset(&curr_conn_state, 0, SIZEOF(curr_conn_state));
 				upd_proc_local->onln_rlbk_flg = FALSE;
 				/* Before restarting afresh, sync the online rollback cycles. This way any future grab_lock that
 				 * we do after restarting should not realize an unhandled online rollback.  For receiver, it is
 				 * just syncing the journal pool cycles as the databases are not opened. But, to be safe, grab
 				 * the lock and sync the cycles.
 				 */
-				grab_lock(jnlpool.jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
+				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);
 				SYNC_ONLN_RLBK_CYCLES;
-				rel_lock(jnlpool.jnlpool_dummy_reg);
+				rel_lock(jnlpool->jnlpool_dummy_reg);
 				return_status = STOP_POLL;
 				recvpool_ctl->jnl_seqno = 0;
 			} else

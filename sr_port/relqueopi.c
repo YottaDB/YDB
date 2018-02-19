@@ -3,6 +3,11 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
+ * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -113,7 +118,7 @@ int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 	{
 		for (spins = maxspins; 0 < spins; spins--)
 		{
-                        if (GET_SWAPLOCK(&base->latch))
+			if (GET_SWAPLOCK(&base->latch))
 			{
 				LOCK_HIST("OBTN", &base->latch, process_id, retries);
 				VERIFY_QUEUE(base);

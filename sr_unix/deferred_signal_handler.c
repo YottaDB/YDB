@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -37,12 +40,13 @@ GBLREF	void			(*call_on_signal)();
 GBLREF	int			forced_exit_err;
 GBLREF	uint4			process_id;
 GBLREF	gtmsiginfo_t		signal_info;
-GBLREF	gtmImageName		gtmImageNames[];
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		gtm_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 GBLREF  intrpt_state_t          intrpt_ok_state;
+
+LITREF	gtmImageName		gtmImageNames[];
 
 error_def(ERR_FORCEDHALT);
 error_def(ERR_KILLBYSIG);

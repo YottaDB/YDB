@@ -1,7 +1,10 @@
 #!/bin/sh
 #################################################################
 #								#
-#	Copyright 2012 Fidelity Information Services, Inc	#
+# Copyright 2012 Fidelity Information Services, Inc		#
+#								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -10,13 +13,13 @@
 #								#
 #################################################################
 
-if [ "x" = x"$gtm_dist" ]; then
-	echo "Environment variable - gtm_dist not defined."
+if [ "x" = x"$ydb_dist" ]; then
+	echo "Environment variable - ydb_dist not defined."
 	exit 1
 fi
 
-if [ ! -d $gtm_dist/plugin ]; then
-	echo "Unable to locate $gtm_dist/plugin. Exiting..."
+if [ ! -d $ydb_dist/plugin ]; then
+	echo "Unable to locate $ydb_dist/plugin. Exiting..."
 	exit 1
 fi
 
@@ -27,10 +30,10 @@ if [ "OS/390" = $platform_name ]; then ext=".dll" ; fi
 base_libname="libgtmcrypt"
 generic_libname=$base_libname$ext
 if [ "x" = x"$gtm_crypt_plugin" ]; then
-	shared_object="$gtm_dist/plugin/$generic_libname"
-	txt="symbolic link pointed by $gtm_dist/plugin/$generic_libname"
+	shared_object="$ydb_dist/plugin/$generic_libname"
+	txt="symbolic link pointed by $ydb_dist/plugin/$generic_libname"
 else
-	shared_object="$gtm_dist/plugin/$gtm_crypt_plugin"
+	shared_object="$ydb_dist/plugin/$gtm_crypt_plugin"
 	txt='$gtm_crypt_plugin'
 fi
 if [ ! -f $shared_object ] ; then

@@ -172,7 +172,8 @@ void zshow_devices(zshow_out *output)
 		if (l->iod->trans_name == l)
 		{
 			/* If it is an rm type we don't want to output the device if it is the stderr device for a pipe device */
-			if ((rm_ptr = (d_rm_struct*)l->iod->dev_sp) && rm == l->iod->type && rm_ptr->pipe && rm_ptr->stderr_parent)
+			if ((rm_ptr = (d_rm_struct*)l->iod->dev_sp) && (rm == l->iod->type)
+					&& rm_ptr->is_pipe && rm_ptr->stderr_parent)
 				continue;
 			if (l->iod->pair.in != l->iod->pair.out)
 			{
@@ -376,7 +377,7 @@ void zshow_devices(zshow_out *output)
 
 					if (rm_ptr->fifo)
 						ZS_STR_OUT(&v,fifo_text);
-					else if (!rm_ptr->pipe)
+					else if (!rm_ptr->is_pipe)
 					{
 						ZS_STR_OUT(&v,rmsfile_text);
 						if (rm_ptr->follow)

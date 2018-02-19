@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,7 +48,7 @@ void mu_rndwn_rlnkctl(void)
 	relinkrec_t		*linkrec;
 	relinkctl_data		*hdr;
 	rtnobjshm_hdr_t		*rtnobj_shm_hdr;
-	char			objdir[GTM_PATH_MAX];
+	char			objdir[YDB_PATH_MAX];
 	int			i, j, recnum, n_records, shmid, shm_stat, save_errno, objcnt, stat_res;
 	unsigned short		param_len;
 	mstr			dir;

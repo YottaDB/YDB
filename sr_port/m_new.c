@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +46,8 @@ int m_new(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (TREF(xecute_literal_parse))
+		return FALSE;
 	switch (TREF(window_token))
 	{
 	case TK_IDENT:
@@ -104,7 +107,7 @@ int m_new(void)
 			{	/* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
 				 * (invoked by stx_error). No need to do anything else.
 				 */
-				assert(OC_RTERROR == (TREF(curtchain))->exorder.bl->exorder.bl->exorder.bl->opcode);
+				assert(ALREADY_RTERROR);
 			}
 			return TRUE;
 		}

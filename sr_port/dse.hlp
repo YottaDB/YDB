@@ -1,22 +1,22 @@
 1 Operations
    Operations
 
-   The GT.M Database Structure Editor, DSE, is primarily a tool for
-   authorized GT.M consultants to examine and, under unusual circumstances,
-   repair GT.M Database Structure (GDS) databases. With DSE, it is possible
-   to see and change most of the attributes of a GT.M database.
+   The YottaDB Database Structure Editor, DSE, is primarily a tool for
+   authorized YottaDB consultants to examine and, under unusual circumstances,
+   repair YottaDB Database Structure (GDS) databases. With DSE, it is possible
+   to see and change most of the attributes of a YottaDB database.
 
    DSE gives all possible control over a database and therefore, it may cause
    irreparable damage when used without knowing the consequences. Therefore,
    you unless you have extensive experience, you should always get guidance
-   from FIS or an equivalently knowledgeable support resource before running
+   from YottaDB or an equivalently knowledgeable support resource before running
    any DSE command that changes any attribute of any production database or
    other database you value. However, you can use those DSE commands that let
    you see the attributes of your database for collecting database metrics
    and monitoring status.
 
-   GT.M installation procedure places the DSE utility program in a directory
-   specified by the environment variable gtm_dist.
+   YottaDB installation procedure places the DSE utility program in a directory
+   specified by the environment variable ydb_dist.
 
    Invoke DSE using the "dse" command at the shell prompt. If this does not
    work, consult your system manager to investigate setup and file access
@@ -24,7 +24,7 @@
 
    Example:
 
-   $gtm_dist/dse
+   $ydb_dist/dse
    File/usr/name/mumps.dat
    Region  DEFAULT
    DSE>
@@ -41,7 +41,7 @@
 
    Example:
 
-   $gtm_dist/dse dump -fileheader
+   $ydb_dist/dse dump -fileheader
 
    This command displays the fileheader of the region that stands first in
    the list of regions arranged in alphabetical order and then returns to the
@@ -63,9 +63,9 @@
    have taken steps to protect yourself against mistakes, both inadvertent
    and resulting from an incomplete understanding of the commands you issue.
    Change commands are not required for normal operation, and are usually
-   only used under the direction of FIS support to recover from the
+   only used under the direction of YottaDB support to recover from the
    unanticipated consequences of failures not adequately planned for (for
-   example, you should configure GT.M applications such that you never need a
+   example, you should configure YottaDB applications such that you never need a
    Change command to recover from a system crash).
 
    Inquiry commands let you see the attributes of your database. You may
@@ -103,7 +103,7 @@
    SP[AWN]
 
    Although DSE can operate concurrently with other processes that access the
-   same database file, FIS strongly recommends using DSE in standalone mode
+   same database file, YottaDB strongly recommends using DSE in standalone mode
    when using Change commands. Some DSE operations can adversely impact the
    database when they occur during active use of the database. Other DSE
    operations may be difficult to perform in a logically sound fashion
@@ -116,9 +116,9 @@
    version, DSE issues an informational message and continues. At this point,
    you should exit DSE and find the version of DSE that matches the database.
    You should continue after this warning if and only if you are certain that
-   the DSE is indeed from the GT.M version that has the database open (and
+   the DSE is indeed from the YottaDB version that has the database open (and
    hence the error results from a damaged database file header or shared
-   memory that you intend to repair, following instructions from FIS).
+   memory that you intend to repair, following instructions from YottaDB).
 
    Use the DSE EXIT, or QUIT command to leave DSE.
 
@@ -313,7 +313,7 @@
    -ALL
 
    Displays additional information on the database most of which is useful
-   for FIS in diagnosing issues.
+   for YottaDB in diagnosing issues.
 
    Meaningful only with: -D[UMP]
 
@@ -558,8 +558,8 @@
    -FR[EEZE]=value
    -FU[LLY_UPGRADED]=boolean
    -GV[STATSRESET]
-   -HARD_SPIN_CPUNT=Mutex-hard-spin-sount
-   -[HEXLOCATION]=value
+   -HA[RD_SPIN_COUNT]=Mutex-hard-spin-count
+   -HE[XLOCATION]=value
    -INT[ERRUPTED_RECOV]=boolean
    -JNL_YIELD_LIMIT=journal-yeild-limit
    -KE[Y_MAX_SIZE]=key-max-size
@@ -710,9 +710,9 @@
    -AB[ANDONED_KILLS]=value
 
    Changes the value of the Abandoned Kills field. The value can be "NONE" or
-   a positive integer.
+   a decimal positive integer.
 
-   Use only with: -FILEHEADER; decimal
+   Use only with: -FILEHEADER
 
    -BLK[_SIZE]=block_size
 
@@ -722,7 +722,7 @@
        value. It always rounds the block size to the next higher multiple of
        512.
      o Use the CHANGE -BLK_SIZE qualifier only upon receiving instructions
-       from FIS and only in conjunction with the -FILEHEADER qualifier. This
+       from YottaDB and only in conjunction with the -FILEHEADER qualifier. This
        DSE command cannot change the working block size of a database and is
        useful only under very limited and extrordinary circumstances. If you
        need to change the block size on a database file, unload the data with
@@ -735,7 +735,7 @@
 
    -BLO[CKS_FREE]=free blocks
 
-   Changes the free blocks field of the current file.
+   Changes the hexidecimal free blocks field of the current file.
 
    Use this to correct a value that MUPIP INTEG reports as needing a
    correction, but note that the "correct" value reported by INTEG may go
@@ -755,15 +755,15 @@
 
    -D[ATABASE]=transaction_number
 
-   Changes the transaction number in the file header of the last
+   Changes the hexidecimal transaction number in the file header of the last
    comprehensive backup to the value specified. Use this qualifier only in
    conjunction with the -FILEHEADER qualifier. For compatibility issues with
    prior versions, this can still be specified as -B_COMPREHENSIVE.
 
    -B_R[ECORD]=transaction_number
 
-   Changes the transaction number in the file header field that maintains
-   this information about the last -RECORD backup.
+   Changes the hexidecimal transaction number in the file header field that
+   maintains this information about the last -RECORD backup.
 
    -CO[RRUPT_FILE]=boolean
 
@@ -774,12 +774,12 @@
    CORRUPT_FILE is set to TRUE, the DSE DUMP command displays a message like
    the following:
 
-   %GTM-W-DBFLCORRP, /home/gtmnode1/mumps.dat Header indicates database file is corrupt
+   %YDB-W-DBFLCORRP, /home/gtmnode1/mumps.dat Header indicates database file is corrupt
 
    **Caution**
 
    After a CHANGE -FILEHEADER -CORRUPT=TRUE, the file is unavailable to
-   future GT.M access other than DSE. Under normal conditions, there should
+   future YottaDB access other than DSE. Under normal conditions, there should
    never be a need to change this flag manually. A MUPIP SET
    -PARTIAL_BYPASS_RECOV sets this flag to false.
 
@@ -787,14 +787,14 @@
 
    -COM[MITWAIT_SPIN_COUNT]=value
 
-   Specifies the number of times a GT.M process waiting for control of a
-   block to complete a block update should spin before yielding the CPU when
-   GT.M runs on SMP machines. When run on a uniprocessor system, GT.M ignores
-   this parameter. On SMP systems, when a process needs a critical section
-   that another process has, if critical sections are short (as they are by
-   design in GT.M), spinning a little with the expectation that the process
-   with the critical section will release it shortly provides a way to
-   enhance performance at the cost of increased CPU usage. Eventually, a
+   Specifies the decimal number of times a YottaDB process waiting for control
+   of a block to complete a block update should spin before yielding the CPU
+   when YottaDB runs on SMP machines. When run on a uniprocessor system, YottaDB
+   ignores this parameter. On SMP systems, when a process needs a critical
+   section that another process has, if critical sections are short (as they
+   are by design in YottaDB), spinning a little with the expectation that the
+   process with the critical section will release it shortly provides a way
+   to enhance performance at the cost of increased CPU usage. Eventually, a
    process awaiting a critical section yields the CPU if spinning for a
    little does not get it the needed critical section. Note that on heavily
    loaded systems, increasing COMMITWAIT_SPIN_COUNT may not trade off CPU for
@@ -808,7 +808,7 @@
 
    -CU[RRENT_TN]=transaction_number
 
-   Changes the current transaction number for the current region.
+   Changes the hexidecimal current transaction number for the current region.
 
      o Raising the -CURRENT_TN can correct "block transaction number too
        large" errors
@@ -821,10 +821,10 @@
 
    -DECLOCATION
 
-   Specifies an offset with the file header. If -VALUE is specified, GT.M
-   puts it at that location.
+   Specifies an offset with the file header. If -VALUE is specified (in
+   decimal), YottaDB puts it at that location.
 
-   Use only with: -FILEHEADER; decimal
+   Use only with: -FILEHEADER
 
    -E[NCRYPTION_HASH]
 
@@ -886,10 +886,10 @@
 
    -HEXLOCATION
 
-   Specifies an offset with the file header. If -VALUE is specified, GT.M
-   puts it at that location.
+   Specifies a hexadecimal offset with the file header. If -VALUE is
+   specified, YottaDB puts it at that location.
 
-   Use only with: -FILEHEADER; hexadecimal
+   Use only with: -FILEHEADER
 
    -INT[ERRUPTED_RECOV]=boolean
 
@@ -902,7 +902,7 @@
    -K[EY_MAX_SIZE]=key_max_size
 
    Changes the decimal value for the maximum allowable key size. Reducing
-   KEY_MAX_SIZE can restrict access to existing data and cause GT.M to report
+   KEY_MAX_SIZE can restrict access to existing data and cause YottaDB to report
    errors. Do not create incompatible key and record sizes.
 
    Before permanently changing the key size using DSE, use GDE to check that
@@ -910,23 +910,23 @@
    region. This prepares for future MUPIP CREATEs and performs a consistency
    check on the key and record size values.
 
-   Use only with: -FILEHEADER; decimal
+   Use only with: -FILEHEADER
 
    -KI[LL_IN_PROG]=value
 
    Changes the value of the KILLs in progress field. The value can be "NONE"
-   or a positive integer.
+   or a positive decimal integer.
 
-   Use only with: -FILEHEADER; decimal
+   Use only with: -FILEHEADER
 
    -N[ULL_SUBSCRIPTS]=value
 
-   Controls whether GT.M accepts null subscripts in database keys.
+   Controls whether YottaDB accepts null subscripts in database keys.
 
      o value can either be T[RUE], F[ALSE], ALWAYS, NEVER, or EXISTING. See
        GDE book for more information on these values of null_subscript.
      o Prohibiting null subscripts can restrict access to existing data and
-       cause GT.M to report errors.
+       cause YottaDB to report errors.
      o The default value is never.
      o DSE cannot change the null subscript collation order. Instead, use GDE
        to change the null subscript collation order, MUPIP EXTRACT the
@@ -951,7 +951,7 @@
    Changes the decimal value for the maximum allowable record size. Use the
    -RECORD_MAX_SIZE qualifier only in conjunction with the -FILEHEADER
    qualifier. Reducing RECORD_MAX_SIZE can restrict access to existing data
-   and cause GT.M to report errors. Do not create incompatible key and record
+   and cause YottaDB to report errors. Do not create incompatible key and record
    sizes.
 
    Before making a permanent change to the records size using DSE, use GDE to
@@ -976,52 +976,64 @@
 
    -RESYNC_S[EQNO]=sequence-number
 
-   In an LMS environment, this sets the "Resync Seqno" field.
+   In an LMS environment, this sets the hexidecimal value of the "Resync
+   Seqno" field.
 
    -RESYNC_T[N]=sequence-number
 
-   In an LMS environment, this sets the "Resync transaction" field.
+   In an LMS environment, this sets the hexidecimal value ofthe "Resync
+   transaction" field.
 
    -SPIN_SLEEP_MASK]=hexadecimal-mask
 
-   Changes the Spin sleep time mask that controls the maximum time in
-   nanoseconds the process sleeps on a sleep spin; zero (0), the default
-   causes the process to just yield to the OS scheduler.
+   Changes the hexadecimal Spin sleep time mask that controls the maximum
+   time in nanoseconds the process sleeps on a sleep spin; zero (0), the
+   default causes the process to just yield to the OS scheduler.
 
-   Use only with: -FILEHEADER; hexa
+   Use only with: -FILEHEADER
 
    -SLEE[P_SPIN_COUNT]=integer
 
-   Changes the Mutex Sleep Spin Count that controls the number of times a
-   process waiting on a shared resource (usually a database) suspends its
-   activity after exhausting its Mutex Hard Spin Count and before enquing
+   Changes the hexadecimal Mutex Sleep Spin Count that controls the number of
+   times a process waiting on a shared resource (usually a database) suspends
+   its activity after exhausting its Mutex Hard Spin Count and before enquing
    itself to be awakened by a process releasing the resource
 
-   Use only with: -FILEHEADER; hexa
+   Use only with: -FILEHEADER
+
+   -[NO]STD[NULLCOL]
+
+   Changes the collation of empty string ("NULL") subscripts for the database
+   file. Although it is not the default, STDNULLCOLL is required with certain
+   other characteristics, and highly recommended in any case. If you change
+   this when there are existing "NULL" subscripts the results may be
+   problematic. YottaDB recommends you establish this characteristic with GDE and
+   load data with a consistent setting.
+
+   Use only with: -FILEHEADER
 
    -STRM_NUM=stream-number -STRM_R[EG_SEQNO]=str_num's_region_sequence_number
 
-   Changes the Stream and its Reg Seqno. Use -STRM_NUM and -STRM_REG_SEQNO
-   together as part of the same CHANGE -FILEHEADER command.
+   Changes the hexadecimal values of Stream and its Reg Seqno. Use -STRM_NUM
+   and -STRM_REG_SEQNO together as part of the same CHANGE -FILEHEADER
+   command.
 
-   Use only with: -FILEHEADER; hexa
+   Use only with: -FILEHEADER
 
    -TI[MERS_PENDING]=timers_pending
 
-   -TI[MERS_PENDING]=timers_pending
-
-   Sets a field that tracks the number of processes considering a timed
-   flush. Proper values are 0, 1, and 2.
+   Sets a field that tracks the decimal number of processes considering a
+   timed flush. Proper values are 0, 1, and 2.
 
    Use the CHANGE -TIMERS_PENDING qualifier only upon receiving instructions
-   from FIS.
+   from YottaDB.
 
-   Use only with: -FILEHEADER; decimal
+   Use only with: -FILEHEADER
 
    -TO[TAL_BLKS]=total_blocks
 
-   Changes the total blocks field of the current file. Use only with:
-   -FILEHEADER; decimal
+   Changes the hexidecimal total blocks field of the current file. Use only
+   with: -FILEHEADER
 
    **Caution**
 
@@ -1035,7 +1047,7 @@
    flushing the cache-modified queue.
 
    Use the CHANGE -TRIGGER_FLUSH qualifier only upon receiving instructions
-   from FIS, and only in conjunction with the -FILEHEADER qualifier.
+   from YottaDB, and only in conjunction with the -FILEHEADER qualifier.
 
    -WR[ITES_PER_FLUSH]=writes_per_flush
 
@@ -1066,7 +1078,7 @@
 
    This command changes the compression count of the key ^CUS(Jones,Vic) to
    10. It is assumed that the key CUS(Jones,Tom) already exists. The
-   following table illustrates how GT.M calculates the value of CMPC in this
+   following table illustrates how YottaDB calculates the value of CMPC in this
    case.
 
    +----------------------------------------------------------------+
@@ -1336,9 +1348,9 @@
 
    Reinitializes the critical section.
 
-     o The -INIT and -RESET qualifiers together cause all GT.M processes
+     o The -INIT and -RESET qualifiers together cause all YottaDB processes
        actively accessing that database file to signal an error.
-     o FIS recommends against using -INIT without the -RESET parameter when
+     o YottaDB recommends against using -INIT without the -RESET parameter when
        other processes are actively accessing the region because it risks
        damaging the database.
 
@@ -1367,14 +1379,14 @@
 
    Terminates any write ownership of the critical section. Use this when the
    critical section is owned by a process that is nonexistent or is known to
-   no longer be running a GT.M image.
+   no longer be running a YottaDB image.
 
    Use alone.
 
    **Caution**
 
    Using CRITICAL -REMOVE when the write owner of a critical section is an
-   active GT.M process may cause structural database damage.
+   active YottaDB process may cause structural database damage.
 
    -RES[ET]
 
@@ -1382,7 +1394,7 @@
    online reinitialization.
 
    Using -RESET with -INIT causes an error for processes that are attempting
-   to get the critical section of the region. Under the guidance of FIS, use
+   to get the critical section of the region. Under the guidance of YottaDB, use
    -RESET -INIT as a way to clear certain types of hangs.
 
    Use only with: -INIT
@@ -1445,7 +1457,7 @@
    -A[LL]
 
    When used with -FILEHEADER, the -A[LL] qualifier displays additional
-   information on the database most of which is useful for FIS in diagnosing
+   information on the database most of which is useful for YottaDB in diagnosing
    issues. A complete description of all the elements that show up with the
    DSE DUMP -FILEHEADER -ALL command are beyond the scope of this book.
 
@@ -1477,7 +1489,7 @@
    -G[LO]
 
    Dumps the specified record or blocks into the current output file in
-   Global Output (GO) format. FIS strongly suggests using -ZWR rather than
+   Global Output (GO) format. YottaDB strongly suggests using -ZWR rather than
    -GLO as the ZWR format handles all possible content values, including some
    that are problematic with -GLO.[The GLO format is not supported for UTF-8
    mode - use the ZWR format with UTF-8 mode.
@@ -2510,7 +2522,7 @@
 
    Use the WCINIT command to reinitialize the global buffers of the current
    region. Because it cleans out the cache, the WCINIT command should not be
-   used except under the guidance of FIS.
+   used except under the guidance of YottaDB.
 
    **Caution**
 
@@ -2530,7 +2542,7 @@
         No action taken, enter yes at the CONFIRMATION prompt to initialize global buffers.
 
      o WCINIT operations are more safely performed by MUPIP RUNDOWN. Use this
-       command only under instructions from FIS.
+       command only under instructions from YottaDB.
 
 1 Summary
    Summary
@@ -2936,7 +2948,7 @@
    | W[CINIT]    | -                                  | -                   |
    +------------------------------------------------------------------------+
 
-   * Use these qualifiers only with instructions from FIS.
+   * Use these qualifiers only with instructions from YottaDB.
 
 1 Copyright
    Copyright
@@ -2946,25 +2958,29 @@
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
 
+   Copyright 2017-2018 YottaDB LLC and/or its subsidiaries. All Rights Reserved.
+
    Permission is granted to copy, distribute and/or modify this document
    under the terms of the GNU Free Documentation License, Version 1.3 or any
    later version published by the Free Software Foundation; with no Invariant
    Sections, no Front-Cover Texts and no Back-Cover Texts.
 
    GT.M(TM) is a trademark of Fidelity National Information Services, Inc.
+
+   YottaDB(TM) is a trademark of YottaDB LLC.
+
    Other trademarks are the property of their respective owners.
 
-   This document contains a description of GT.M and the operating
+   This document contains a description of YottaDB and the operating
    instructions pertaining to the various functions that comprise the system.
-   This document does not contain any commitment of FIS. FIS believes the
-   information in this publication is accurate as of its publication date;
-   such information is subject to change without notice. FIS is not
-   responsible for any errors or defects.
+   This document does not contain any commitment of YottaDB. YottaDB believes
+   the information in this publication is accurate as of its publication
+   date; such information is subject to change without notice.  YottaDB is
+   not responsible for any errors or defects.
 
    **Note**
 
-   This help file is a concise representation of revision V6.3-001 of the
-   UNIX Administration and Operations Guide. To obtain a copy of the current
-   revision, go to www.fis-gtm.com and then click on the User Documentation
-   tab.
+   This help file is a concise representation of the revision r1.20 of the
+   Administration and Operations Guide. To obtain a copy of the current
+   revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
 
