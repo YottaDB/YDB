@@ -680,11 +680,8 @@ foreach(f
   gtcm_run.gtc
   gtcm_slist.gtc
   gdedefaults.gtc
-  gtmcshrc.gtc
-  gtmprofile.gtc
-  gtmprofile_preV54000.gtc
-  gtmstart.gtc
-  gtmstop.gtc
+  ydb_env_set.gtc
+  ydb_env_unset.gtc
   dse.hlp
   gde.hlp
   lke.hlp
@@ -706,8 +703,7 @@ install(FILES ${files} DESTINATION ${YDB_INSTALL_DIR})
 
 set(scripts)
 foreach(f
-  gtm.gtc
-  gtmbase.gtc
+  ydb.gtc
   )
   select_file(src ${f})
   list(APPEND scripts ${src})
