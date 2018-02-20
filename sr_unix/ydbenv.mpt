@@ -85,7 +85,7 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. . if $zsearch("./gdedefaults",$increment(zstmp)) write dist,"/mumps -run GDE <gdedefaults",!
 	. . else  write dist,"/mumps -run GDE <"_dist,"/gdedefaults",!
 	. . write dist,"/mupip create",!
-	. . write dist,"/mupip set -journal=""on,before,"" -region ""*""",!
+	. . write dist,"/mupip set -journal=""enable,on,before"" -region ""*""",!
 	. . write /eof
 	. . for  read tmp1 quit:$zeof
 	. . use "dbcreateerr" for  read tmp2 quit:$zeof
