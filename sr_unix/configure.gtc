@@ -428,6 +428,7 @@ cat << SEDSCRIPT > sedin$$
 s|ARCH|$arch|g
 s|ECHO|"$echo"|g
 s|GTMDIST|${install_dest}|g
+s|YDBDIST|${install_dest}|g
 s|SERVERID|$server_id|g
 SEDSCRIPT
 for i in $pathmods
