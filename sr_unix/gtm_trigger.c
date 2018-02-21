@@ -764,11 +764,14 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 					 * if we did an implicit tstart. mdb_condition_handler will try to unwind further,
 					 * and the process will inadvertently exit. Assert below that there is one more
 					 * mdb_condition_handler behind the currently established handler (which we already
-					 * asserted above that it is "mdb_condition_handler").
+					 * asserted above that it is "mdb_condition_handler"). If not, there should be at least
+					 * one "ydb_simpleapi_ch" behind the currently established handler. In this case, the
+					 * caller who established this handler (e.g. "ydb_set_s", "ydb_get_s", "ydb_tp_s" etc.)
+					 * knows how to handle a ERR_TPRETRY error code.
 					 */
 					for (tmpctxt = ctxt - 1; tmpctxt >= &chnd[0]; tmpctxt--)
 					{
-						if (&mdb_condition_handler == tmpctxt->ch)
+						if ((&mdb_condition_handler == tmpctxt->ch) || (&ydb_simpleapi_ch == tmpctxt->ch))
 							break;
 					}
 					assert(tmpctxt >= &chnd[0]);
