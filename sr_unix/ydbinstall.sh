@@ -24,8 +24,6 @@
 # NOTE: This script requires the GNU wget program to download
 # distribution files that are not on the local file system.
 
-# CAUTION - this script is still experimental.
-
 # Revision history
 #
 # 2011-02-15  0.01 K.S. Bhaskar - Initial version for internal use
@@ -42,7 +40,8 @@
 # 2017-07-16  0.15 Sam Habiel   - --yottadb or --distrib https://github.com/YottaDB/YottaDB to install YottaDB
 # 2017-08-12  0.16 Christopher Edwards - Default to YottaDB
 # 2017-10-xx  0.17 Narayanan Iyer - See git commit message for description of changes.
-#	Going forward, this script is maintained in a git repository so no need to add Revision history manually.
+#	Going forward, this script is maintained at https://github.com/YottaDB/YottaDB/blob/master/sr_unix/ydbinstall.sh
+#	and there is no revision history in this file.
 
 # Turn on debugging if set
 if [ "Y" = "$ydb_debug" ] ; then set -x ; fi
@@ -572,18 +571,18 @@ echo $product_name version $ydb_version installed successfully at $ydb_installdi
 
 # Create copies of environment scripts and gtm executable
 if [ -d "$gtm_linkenv" ] ; then
-    ( cd $gtm_linkenv ; ln -s $ydb_installdir/gtmprofile $ydb_installdir/gtmcshrc ./ )
+    ( cd $gtm_linkenv ; ln -s $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked env ; ls -l $gtm_linkenv ; fi
 else if [ -d "$gtm_copyenv" ] ; then
-        ( cd $gtm_copyenv ; cp $ydb_installdir/gtmprofile $ydb_installdir/gtmcshrc ./ )
+        ( cd $gtm_copyenv ; cp -P $ydb_installdir/ydb_env_set $ydb_installdir/ydb_env_unset $ydb_installdir/gtmprofile ./ )
         if [ "Y" = "$gtm_verbose" ] ; then echo Copied env ; ls -l $gtm_copyenv ; fi
      fi
 fi
 if [ -d "$gtm_linkexec" ] ; then
-    ( cd $gtm_linkexec ; ln -s $ydb_installdir/gtm ./ )
+    ( cd $gtm_linkexec ; ln -s $ydb_installdir/ydb $ydb_installdir/gtm ./ )
     if [ "Y" = "$gtm_verbose" ] ; then echo Linked exec ; ls -l $gtm_linkexec ; fi
 else if [ -d "$gtm_copyexec" ] ; then
-        ( cd $gtm_copyexec ; cp $ydb_installdir/gtm ./ )
+        ( cd $gtm_copyexec ; cp -P $ydb_installdir/ydb $ydb_installdir/gtm ./ )
         if [ "Y" = "$gtm_verbose" ] ; then echo Copied exec ; ls -l $gtm_copyexec ; fi
      fi
 fi
