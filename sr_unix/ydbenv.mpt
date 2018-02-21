@@ -122,7 +122,6 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. write "export ydb_prompt=",tmp3,!,"export gtm_prompt=$ydb_prompt",!
 	else  write "export gtm_prompt=$ydb_prompt",!
 	set tmp1=$ztrnlnm("LD_LIBRARY_PATH")
-	write "export ydb_tmp_debug1=",tmp1,!
 	write:'($zlength(tmp1,dist)-1) "export LD_LIBRARY_PATH=""",dist,$select($zlength(dist):":"_tmp1,1:""),"""",!
 	write "alias dse=$ydb_dist/dse",!
 	write "alias gde=""$ydb_dist/mumps -run GDE""",!
