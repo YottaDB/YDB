@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,6 +46,7 @@ GBLDEF unsigned char	*fgncal_stack;
 GBLREF unsigned char	*stackbase, *stacktop, *stackwarn, *msp;
 GBLREF mv_stent		*mv_chain;
 GBLREF stack_frame	*frame_pointer;
+GBLREF	tp_frame	*tp_pointer;
 
 error_def(ERR_STACKUNDERFLO);
 
@@ -57,6 +61,8 @@ void fgncal_unwind(void)
 	assert((mv_chain <= (mv_stent *)stackbase) && (mv_chain > (mv_stent *)stacktop));
 	assert((frame_pointer <= (stack_frame*)stackbase) && (frame_pointer > (stack_frame *)stacktop));
 	local_fgncal_stack = FGNCAL_STACK;
+	if ((NULL != tp_pointer) && ((unsigned char *)tp_pointer->mvc < local_fgncal_stack))
+		local_fgncal_stack = (unsigned char *)tp_pointer->mvc;
 	while (frame_pointer && (frame_pointer < (stack_frame *)local_fgncal_stack))
 	{
 #		ifdef GTM_TRIGGER
