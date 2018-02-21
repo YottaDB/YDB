@@ -9,7 +9,7 @@
 #       the license, please stop and do not read further.       #
 #                                                               #
 #################################################################
-# Usage: source "YDBDIST"/ydb_env_set # change for distribution
+# Usage: source "YDBDIST"/ydb_env_set
 # Sets up environment for single-user use of YottaDB with reasonable defaults.
 # Explicitly specify ydb_chset=UTF-8 before running this for UTF-8 mode.
 # System administrators should adapt as appropriate for more complex multi-user and production environments.
@@ -36,12 +36,10 @@ unset ydb_chset ydb_passwd gtm_chset gtm_passwd
 
 # Set environment variables needed for correct operation of %YDBENV, which exports
 # values that may, and likely will, override these.
-# ** Change the following for distribution to allow the configure script to set it **
 export ydb_dist="YDBDIST"
 export gtm_dist="$ydb_dist"
-# ** Change the following for distribution to omit . **
-if [ -s "$ydb_dist/libyottadbutil.so" ] ; then export ydb_routines=". $ydb_dist/libyottadbutil.so"
-elif [ -s "$ydb_dist/libgtmutil.so" ] ; then export ydb_routines=". $ydb_dist/libgtmutil.so"
+if [ -s "$ydb_dist/libyottadbutil.so" ] ; then export ydb_routines="$ydb_dist/libyottadbutil.so"
+elif [ -s "$ydb_dist/libgtmutil.so" ] ; then export ydb_routines="$ydb_dist/libgtmutil.so"
 else export ydb_routines="$ydb_dist"
 fi
 export gtmroutines="$ydb_routines"

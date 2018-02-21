@@ -91,11 +91,13 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. . use "dbcreateerr" for  read tmp2 quit:$zeof
 	. . use io close "dbcreate"
 	set path=path_"/o"_$select("UTF-8"=chset:"/utf8",1:"")_"*("_env("ydb_dir")_"/"_env("ydb_rel")_"/r "_env("ydb_dir")_"/r)"
-	set tmp1=dist_"/plugin/o"_$select("UTF-8"=chset:"/utf8",1:"")_"*.so"
+	set tmp1=dist_"/plugin/o"_$select("UTF-8"=chset:"/utf8",1:"")_"/*.so"
 	set tmp2=$zsearch(tmp1,$increment(zstmp))
-	for  quit:""=tmp2  set path=path_" tmp2",tmp2=$zsearch(tmp1,zstmp)
-	set tmp1=$ztrnlnm("ydb_routines")
-	set path=path_" "_tmp1_$select("UTF-8"=chset:"/utf8",1:"")
+	for  quit:""=tmp2  set path=path_" "_tmp2,tmp2=$zsearch(tmp1,zstmp)
+	set tmp1=dist_$select("UTF-8"=chset:"/utf8",1:"")
+	set tmp2=$zsearch(tmp1_"/libyottadbutil.so",$increment(zstmp))
+	set:'$zlength(tmp2) tmp2=tmp2=$zsearch(tmp1_"/libgtmutil.so",$increment(zstmp))
+	set path=path_" "_tmp2
 	write "export ydb_routines=""",path,"""",!,"export gtmroutines=$ydb_routines",!
 	set tmp1=$ztrnlnm("ydb_repl_instance"),tmp2=$ztrnlnm("gtm_repl_instance")
 	write:'($zlength(tmp1)!$zlength(tmp2)) "export ydb_repl_instance=$ydb_dir/$ydb_rel/g/yottadb.repl",!,"export gtm_repl_instance=$ydb_repl_instance",!
