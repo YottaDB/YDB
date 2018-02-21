@@ -121,6 +121,9 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. set tmp3=$zpiece(tmp2,"GTM",1) for i=2:1:$zlength(tmp2,"GTM") set tmp3=tmp3_"YDB"_$zpiece(tmp2,"GTM",i)
 	. write "export ydb_prompt=",tmp3,!,"export gtm_prompt=$ydb_prompt",!
 	else  write "export gtm_prompt=$ydb_prompt",!
+	set tmp1=$ztrnlnm("LD_LIBRARY_PATH")
+	write "export ydb_tmp_debug1=",tmp1,!
+	write:'($zlength(tmp1,dist)-1) "export LD_LIBRARY_PATH=""",dist,$select($zlength(dist):":"_tmp1,1:""),"""",!
 	write "alias dse=$ydb_dist/dse",!
 	write "alias gde=""$ydb_dist/mumps -run GDE""",!
 	write "alias gtm=$ydb_dist/ydb",!
@@ -129,6 +132,20 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	write "alias mupip=$ydb_dist/mupip",!
 	write "alias ydb=$ydb_dist/ydb",!
 	write "alias yottadb=$ydb_dist/ydb",!
+	quit
+
+unset	; Unset the environment set by entryref set
+	new dist,i,ldpath,tmp
+	set dist=$ztrnlnm("ydb_dist")_":"
+	set ldpath=$ztrnlnm("LD_LIBRARY_PATH")_":"
+	if dist=ldpath write "unset LD_LIBRARY_PATH",!
+	else  do
+	. set tmp=$zpiece(ldpath,dist,1) for i=2:1:$zlength(ldpath,dist) set tmp=tmp_$zpiece(ldpath,dist,i)
+	. write "export LD_LIBRARY_PATH=",$extract(tmp,1,$zlength(tmp)-1),!
+	write "unset ydb_chset ydb_dir ydb_dist ydb_etrap ydb_gbldir ydb_icu_version ydb_log ydb_rel ydb_repl_instance ydb_retention",!
+	write "unset ydb_routines ydb_tmp gtm_chset gtmdir gtm_dist gtm_etrap gtmgbldir gtm_icu_version gtm_log gtm_repl_instance",!
+	write "unset gtm_retention gtmroutines gtm_tmp gtmver",!
+	write "unalias dse gde lke gtm mumps mupip ydb yottadb 2>/dev/null",!
 	quit
 
 DirEnsure(ydbvar,gtmvar)

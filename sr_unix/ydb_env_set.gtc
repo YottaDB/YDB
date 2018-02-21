@@ -49,7 +49,9 @@ export gtmroutines="$ydb_routines"
 # Run command to generate environment
 ydb_tmp_env=`mktemp -d -t ydb_env_$$_XXXXXX`
 $ydb_dist/mumps -run set^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err
-if [ -s $ydb_tmp_env/err ] ; then cat $ydb_tmp_env/err
+if [ -s $ydb_tmp_env/err ] ; then
+    echo Error file at $ydb_tmp_env is:
+    cat $ydb_tmp_env/err
 else
     . $ydb_tmp_env/out
     if [ "UTF-8" = "$ydb_chset" ] ; then
