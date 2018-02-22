@@ -66,4 +66,4 @@ if [ ! -z "${ydb_tmp_passwd+isset}" ] ; then
 fi
 
 # Clear temporary variables used in this file
-unset ydb_tmp_chset ydb_tmp_gtmver ydb_tmp_rel ydb_tmp_passwd
+unset ydb_tmp_chset ydb_tmp_env ydb_tmp_gtmver ydb_tmp_passwd ydb_tmp_rel
