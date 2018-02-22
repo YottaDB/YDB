@@ -23,3 +23,7 @@ if [ -x "$ydb_dist/mumps" ] ; then
 	rm -rf $ydb_tmp_env
     fi
 fi
+unset ydb_chset ydb_dir ydb_dist ydb_etrap ydb_gbldir ydb_icu_version ydb_log ydb_rel ydb_repl_instance ydb_retention
+unset ydb_routines ydb_tmp gtm_chset gtmdir gtm_dist gtm_etrap gtmgbldir gtm_icu_version gtm_log gtm_repl_instance
+unset gtm_retention gtmroutines gtm_tmp gtmver
+unalias dse gde lke gtm mumps mupip ydb yottadb 2>/dev/null
