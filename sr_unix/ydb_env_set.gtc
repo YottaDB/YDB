@@ -9,7 +9,7 @@
 #       the license, please stop and do not read further.       #
 #                                                               #
 #################################################################
-# Usage: source "YDBDIST"/ydb_env_set # change for distribution
+# Usage: source "YDBDIST"/ydb_env_set
 # Sets up environment for single-user use of YottaDB with reasonable defaults.
 # Explicitly specify ydb_chset=UTF-8 before running this for UTF-8 mode.
 # System administrators should adapt as appropriate for more complex multi-user and production environments.
@@ -36,12 +36,10 @@ unset ydb_chset ydb_passwd gtm_chset gtm_passwd
 
 # Set environment variables needed for correct operation of %YDBENV, which exports
 # values that may, and likely will, override these.
-# ** Change the following for distribution to allow the configure script to set it **
 export ydb_dist="YDBDIST"
 export gtm_dist="$ydb_dist"
-# ** Change the following for distribution to omit . **
-if [ -s "$ydb_dist/libyottadbutil.so" ] ; then export ydb_routines=". $ydb_dist/libyottadbutil.so"
-elif [ -s "$ydb_dist/libgtmutil.so" ] ; then export ydb_routines=". $ydb_dist/libgtmutil.so"
+if [ -s "$ydb_dist/libyottadbutil.so" ] ; then export ydb_routines="$ydb_dist/libyottadbutil.so"
+elif [ -s "$ydb_dist/libgtmutil.so" ] ; then export ydb_routines="$ydb_dist/libgtmutil.so"
 else export ydb_routines="$ydb_dist"
 fi
 export gtmroutines="$ydb_routines"
@@ -49,7 +47,9 @@ export gtmroutines="$ydb_routines"
 # Run command to generate environment
 ydb_tmp_env=`mktemp -d -t ydb_env_$$_XXXXXX`
 $ydb_dist/mumps -run set^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err
-if [ -s $ydb_tmp_env/err ] ; then cat $ydb_tmp_env/err
+if [ -s $ydb_tmp_env/err ] ; then
+    echo Error file at $ydb_tmp_env is:
+    cat $ydb_tmp_env/err
 else
     . $ydb_tmp_env/out
     if [ "UTF-8" = "$ydb_chset" ] ; then
@@ -66,4 +66,4 @@ if [ ! -z "${ydb_tmp_passwd+isset}" ] ; then
 fi
 
 # Clear temporary variables used in this file
-unset ydb_tmp_chset ydb_tmp_gtmver ydb_tmp_rel ydb_tmp_passwd
+unset ydb_tmp_chset ydb_tmp_env ydb_tmp_gtmver ydb_tmp_passwd ydb_tmp_rel
