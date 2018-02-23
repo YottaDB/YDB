@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +23,7 @@
 #include "continue_handler.h"
 #include "sig_init.h"
 #include "gtmci_signals.h"
+#include "invocation_mode.h"
 
 #ifdef GTM_PTHREAD
 GBLREF	boolean_t		gtm_jvm_process;
@@ -29,8 +33,7 @@ void	null_handler(int sig);
 
 void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)(), void (*continue_handler)())
 {
-	struct sigaction 	ignore, null_action, def_action, susp_action,
-				gen_action, ctrlc_action, cont_action;
+	struct sigaction 	ignore, null_action, def_action, susp_action, gen_action, ctrlc_action, cont_action, check;
 	int			sig;
         DCL_THREADGBL_ACCESS;
 
@@ -79,20 +82,34 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 				break;
 			case SIGINT:
 				/* If supplied with a control-C handler, install it now. */
-				if (NULL != ctrlc_handler)
-					sigaction(sig, &ctrlc_action, NULL);
-				else
-					sigaction(sig, &ignore, NULL);
+				if (MUMPS_CALLIN != invocation_mode)
+				{
+					if (NULL != ctrlc_handler)
+						sigaction(sig, &ctrlc_action, NULL);
+					else
+						sigaction(sig, &ignore, NULL);
+				} else
+				{	/* ^C for both call-ins and simpleapi allow the user to set a handler prior to making a
+					 * call that would cause the YottaDB runtime to initialize and not have YDB override it.
+					 * So if we find a handler defined other than the default, we allow it to remain.
+					 * untouched.
+					 */
+					sigaction(sig, NULL, &check);			/* Fetch current ^C handler */
+					if (SIG_DFL == check.sa_handler)
+					{	/* No handler defined - it gets a NULL handler instead */
+						sigaction(sig, &ignore, NULL);
+					} /* else we leave the handler alone */
+				}
 				break;
 			case SIGCONT:
 				/* Special handling for SIGCONT. */
 				if (NULL != continue_handler)
 				{
 #					ifndef DISABLE_SIGCONT_PROCESSING
-						if (FALSE == TREF(disable_sigcont))
-							sigaction(SIGCONT, &cont_action, NULL);
+					if (FALSE == TREF(disable_sigcont))
+						sigaction(SIGCONT, &cont_action, NULL);
 #					else
-						TREF(disable_sigcont) = TRUE;
+					TREF(disable_sigcont) = TRUE;
 #					endif
 				} else
 				{
@@ -102,34 +119,34 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 				break;
 			case SIGSEGV:
 #				ifdef GTM_PTHREAD
-					if (gtm_jvm_process)
-						break;
+				if (gtm_jvm_process)
+					break;
 #				endif
 			case SIGABRT:
 #				ifdef GTM_PTHREAD
-					if (gtm_jvm_process)
-						break;
+				if (gtm_jvm_process)
+					break;
 #				endif
 			case SIGBUS:
 #			ifdef _AIX
-				case SIGDANGER:
+			case SIGDANGER:
 #			endif
 			case SIGFPE:
 #			ifdef __MVS__
-				case SIGABND:
+			case SIGABND:
 #			else
 				/* On Linux SIGIOT is commonly same as SIGABRT, so to avoid duplicate cases, check for that. */
 #				if !defined(__CYGWIN__) && defined (SIGIOT) && (SIGIOT != SIGABRT)
-					case SIGIOT:
+			case SIGIOT:
 #				endif
 #				ifndef __linux__
-					case SIGEMT:
+			case SIGEMT:
 #				endif
 #			endif
 			case SIGILL:
 			case SIGQUIT:
 #			ifndef __linux__
-				case SIGSYS:
+			case SIGSYS:
 #			endif
 			case SIGTERM:
 			case SIGTRAP:

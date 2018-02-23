@@ -496,7 +496,6 @@ CONDITION_HANDLER(mdb_condition_handler)
 		{
 			MUMPS_EXIT;	/* Do a clean exit rather than messy core exit */
 		}
-		gtm_dump();
 		TERMINATE;
 	}
 #	ifdef GTM_TRIGGER

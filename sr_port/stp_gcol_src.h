@@ -838,28 +838,30 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		 */
 		if (NULL != frame_pointer)
 		{
-			for (sf = frame_pointer; sf < (stack_frame *)stackbase; sf = sf->old_frame_pointer)
-			{	/* Cover temp mvals in use */
-				if (NULL == sf->old_frame_pointer)
-				{	/* If trigger enabled, may need to jump over a base frame */
-					/* TODO - fix this to jump over call-ins base frames as well */
-#					ifdef GTM_TRIGGER
-					if (SFT_TRIGR & sf->type)
-					{	/* We have a trigger base frame, back up over it */
+			for (sf = frame_pointer; sf && (sf < (stack_frame *)stackbase); sf = sf->old_frame_pointer)
+			{	/* Move temp mvals in use to stringpool
+				 *
+				 * While running through the stack, we need to skip over base frames so we process the
+				 * entire stack with the following caveats:
+				 *   1. The original base frame (has a type of SFT_COUNT but is otherwise unmarked) is the
+				 *	 absolute bottom of the stack so breaks the loop. This will only be seen when the
+				 *	 base frame (for execution) is a call-in frame either for simpleAPI or for call-ins.
+				 *   2. When running mumps, a different base frame, similar in construction to the original
+				 *	base frame described above, that also has a type of SFT_COUNT should stop rearward
+				 *	 stack travel and break the loop.
+				 */
+				while (NULL == sf->old_frame_pointer)
+				{	/* We may need to jump over a base frame to get the rest of the M stack */
+					if ((GTMTRIG_ONLY(SFT_TRIGR |) SFT_CI) & sf->type)
+					{	/* We have a trigger or call-in base frame, back up over it */
 						sf = *(stack_frame **)(sf + 1);
-						assert(sf);
-						/* Note that "sf->old_frame_pointer" could be NULL in case "sf" is a
-						 * frame created by a simpleAPI call. Handle that case.
-						 */
-						if (NULL == sf->old_frame_pointer)
-						{
-							assert(SFT_CI & sf->type);	/* simpleAPI uses the call-in stack frame */
-							break;
-						}
-					} else
-#					endif
-						break;
+						continue;
+					}
+					/* Either origin frame or mumps/updproc base frame */
+					break;
 				}
+				if (NULL == sf)
+					break;
 				assert(sf->temps_ptr);
 				if (sf->temps_ptr >= (unsigned char *)sf)
 					continue;

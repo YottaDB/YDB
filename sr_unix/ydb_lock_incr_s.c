@@ -57,13 +57,15 @@ int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int 
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
-	/* First step, initialize the private lock list */
-	op_lkinit();
+	if (YDB_MAX_LOCKTIME < nsec_timeout)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TIMEOUT2LONG);
 	/* Setup and validate the varname */
 	VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
 	/* ISV references are not supported for this call */
 	if (LYDB_VARREF_ISV == var_type)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+	/* Initialize the private lock list */
+	op_lkinit();
 	/* Setup parameter list for callg() invocation of op_lkname() */
 	plist.arg[0] = NULL;				/* First arg is extended reference that simpleAPI doesn't support */
 	varname_mval.mvtype = MV_STR;

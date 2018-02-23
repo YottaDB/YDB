@@ -19271,7 +19271,7 @@
    else it returns the $ZSTATUS error code.
 
    ydb_exit() cannot be called from an external call function. YottaDB reports
-   the error YDB-E-INVGTMEXIT if an external call function invokes
+   the error YDB-E-INVYDBEXIT if an external call function invokes
    ydb_exit(). Since the YottaDB run-time system must be operational even after
    the external call function returns, ydb_exit() is meant to be called only
    once during a process lifetime, and only from the base C/C++ program when

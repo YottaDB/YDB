@@ -53,6 +53,13 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
+	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
+	if (error_encountered)
+	{
+		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
+		REVERT;
+		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
+	}
 	save_dollar_tlevel = dollar_tlevel;
 	/* Ready "transid" for passing to "op_tstart" */
 	tid.mvtype = MV_STR;
@@ -86,6 +93,8 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 					      LEN_AND_STR(buff), LEN_AND_LIT(buff));
 			}
+			if (YDB_MAX_IDENT < curvarname->len_used)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);
 			VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used);
 			/* Note the variable name is put in the stringpool. Needed if this variable does not yet exist in the
 			 * current symbol table, a pointer to this string is added in op_tstart as part of the
@@ -106,6 +115,10 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 		TREF(sapi_mstrs_for_gc_indx) = 0; /* mstrs in this array (added by RECORD_MSTR_FOR_GC) no longer need protection */
 	}
 	assert(dollar_tlevel);
+	/* Now that op_tstart has been done, revert our previous handler (which had an error return up top) in favor of
+	 * re-establishing the handler so it returns here so we can deal with errors within the transaction differently.
+	 */
+	REVERT;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	tpfn_status = YDB_OK;
 	if (error_encountered)
@@ -143,6 +156,7 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 	if (YDB_OK == tpfn_status)
 	{
 		tpfn_status = (*tpfn)(tpfnparm);
+		TREF(libyottadb_active_rtn) = LYDB_RTN_TP;		/* Restore our routine indicator */
 		assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
 	}
 	if (YDB_OK == tpfn_status)

@@ -32,6 +32,10 @@ LITDEF	err_msg ydberrors[] = {
 	{ "INVNAMECOUNT", "Invalid value for namecount parameter in a !AD call", 2 },
 	{ "MSGBUF2SMALL", "Message buffer for ydb_message() must be at least !UL bytes", 1 },
 	{ "UNKNOWN", "Unknown error code specified", 0 },
+	{ "TIMEOUT2LONG", "Timeout value exceeds supported maximum", 0 },
+	{ "VARNAME2LONG", "Variable name length exceeds maximum allowed (!UL)", 1 },
+	{ "FATALERROR1", "Fatal error raised. Generating core and terminating process. Error: !AD", 2 },
+	{ "FATALERROR2", "Fatal error raised. Bypassing core generation and terminating process. Error: !AD", 2 },
 };
 
 
@@ -39,4 +43,4 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	15};
+	19};

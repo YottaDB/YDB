@@ -154,6 +154,8 @@ MBSTART {														\
 	char	ctype;													\
 	int	index, lenUsed;												\
 															\
+	if (IS_INVALID_YDB_BUFF_T(VARNAMEP))										\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);						\
 	lenUsed = (VARNAMEP)->len_used;											\
 	if (0 == lenUsed)												\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);						\
@@ -163,7 +165,9 @@ MBSTART {														\
 	{														\
 		case TK_CIRCUMFLEX:											\
 			lenUsed--;											\
-			if ((YDB_MAX_IDENT < lenUsed) || (0 == lenUsed))						\
+			if (YDB_MAX_IDENT < lenUsed)									\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);		\
+			if (0 == lenUsed)										\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);				\
 			VARTYPE = LYDB_VARREF_GLOBAL;									\
 			VALIDATE_MNAME_C1((VARNAMEP)->buf_addr + 1, lenUsed);						\
@@ -172,7 +176,7 @@ MBSTART {														\
 		case TK_UPPER:												\
 		case TK_PERCENT: 											\
 			if (YDB_MAX_IDENT < lenUsed)									\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVVARNAME);				\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);		\
 			VARTYPE = LYDB_VARREF_LOCAL;									\
 			VALIDATE_MNAME_C2((VARNAMEP)->buf_addr + 1, lenUsed - 1);					\
 			break;												\
@@ -247,8 +251,8 @@ MBSTART {															\
 } MBEND
 
 /* Macro to check whether input to ydb_*_s() function from the user is a valid "ydb_buffer_t" structure */
-#define	IS_INVALID_YDB_BUFF_T(ydbBuff)	((ydbBuff->len_alloc < ydbBuff->len_used)				\
-						|| ((NULL == ydbBuff->buf_addr) && (0 != ydbBuff->len_used)))
+#define	IS_INVALID_YDB_BUFF_T(YDBBUFF)	(((YDBBUFF)->len_alloc < (YDBBUFF)->len_used)				\
+					 || ((NULL == (YDBBUFF)->buf_addr) && (0 != (YDBBUFF)->len_used)))
 
 /* Macro to set a supplied ydb_buffer_t value into an mval */
 #define SET_MVAL_FROM_YDB_BUFF_T(MVALP, YDBBUFF)							\
@@ -344,7 +348,8 @@ MBSTART	{													\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,				\
 				      LEN_AND_STR(buff), LEN_AND_LIT(PARAM2));					\
 		}												\
-		SET_MVAL_FROM_YDB_BUFF_T(mvalp, subs);								\
+		CHECK_MAX_STR_LEN(subs);									\
+		SET_MVAL_FROM_YDB_BUFF_T(mvalp, subs);	/* Generates error if subscript too long */		\
 		if (REBUFFER)											\
 		{												\
 			s2pool(&(mvalp->str));	/* Rebuffer in stringpool for protection */			\
@@ -354,6 +359,15 @@ MBSTART	{													\
 	}	       	 											\
 	PLIST.n = (COUNT) + (STARTIDX);		/* Bump to include varname lv_val as 2nd parm (after count) */	\
 	DBG_DUMP_PLIST_STRUCT(PLIST);										\
+} MBEND
+
+/* Macro to check the length of a ydb_buff_t and verify the len_used field does not exceed YDB_MAX_STR (the
+ * maximum length of a string in YDB).
+ */
+#define CHECK_MAX_STR_LEN(YDBBUFF)										\
+MBSTART {													\
+	if (YDB_MAX_STR < (YDBBUFF)->len_used)									\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, (YDBBUFF)->len_used, YDB_MAX_STR);	\
 } MBEND
 
 /* Macro to record the address of a given mstr so garbage collection knows where to find it to fix it up if needbe */
