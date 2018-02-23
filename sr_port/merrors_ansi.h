@@ -1000,7 +1000,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* INVZROENT */
 	   0,	/* DDPLOGERR */
 	   0,	/* GETSOCKNAMERR */
-	   0,	/* INVGTMEXIT */
+	   0,	/* INVYDBEXIT */
 	   0,	/* CIMAXPARAM */
 	   0,	/* CITPNESTED */
 	   0,	/* CIMAXLEVELS */

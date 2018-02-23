@@ -23,7 +23,8 @@
 #define LIBYOTTADB_TYPES_H
 
 #include <sys/types.h>	/* For intptr_t */
-#include "inttypes.h"	/* .. ditto (defined different places in different platforms) .. */
+#include <inttypes.h>	/* .. ditto (defined different places in different platforms) .. */
+#include <stdlib.h>	/* For abs() */
 
 /* Enumerated parameter values */
 typedef enum
@@ -32,11 +33,22 @@ typedef enum
 	YDB_DEL_NODE,
 } ydb_delete_method;
 
+enum ydb_error_severity
+{
+	YDB_ERRSEV_WARNING = 0,		/* Warning - Something is potentially incorrect */
+	YDB_ERRSEV_SUCCESS = 1,		/* Success */
+	YDB_ERRSEV_ERROR = 2,		/* Error - Something is definitely incorrect */
+	YDB_ERRSEV_INFORMATIONAL = 3,	/* Informational - won't see these returned as they continue running */
+	YDB_ERRSEV_FATAL = 4		/* Fatal - Something happened that is so bad, YottaDB cannot continue */
+};
+
 /* Maximum values */
-#define YDB_MAX_SUBS	31	/* Maximum subscripts currently supported */
-#define YDB_MAX_IDENT	31	/* Maximum size of global/local name (not including '^') */
-#define YDB_MAX_NAMES	255	/* Maximum number of variable names can be specified in a single ydb_*_s() call */
+#define YDB_MAX_IDENT		31	/* Maximum size of global/local name (not including '^') */
+#define YDB_MAX_NAMES		255	/* Maximum number of variable names can be specified in a single ydb_*_s() call */
 /* Note YDB_MAX_NAMES may be temporary and currently only relates to ydb_delete_excl_s() and ydb_tp_s() */
+#define YDB_MAX_STR		(1 * 1000 * 1000)	/* Maximum YottaDB string length */
+#define YDB_MAX_SUBS		31	/* Maximum subscripts currently supported */
+#define YDB_MAX_LOCKTIME	(0x7fffffffllu * 1000llu * 1000llu)	/* Max lock time in (long long) nanoseconds */
 
 /* Minimum values */
 #define YDB_MIN_ERROR_BUF_LEN	30	/* Min length of buffer for ydb_message() -- needed for error processing */
@@ -47,7 +59,7 @@ typedef enum
  * (e.g. EINTR etc. all of which are mostly <= 1024). Can use INT_MAX but not sure if that will change
  * in the future to a higher value in <limits.h> so set YDB_INT_MAX to the hardcoded fixed value of ((2**31)-1).
  */
-#define YDB_INT_MAX		((int)2147483647)
+#define YDB_INT_MAX		((int)0x7fffffff)
 #define	YDB_TP_RESTART		(YDB_INT_MAX - 1)
 #define	YDB_TP_ROLLBACK		(YDB_INT_MAX - 2)
 #define YDB_NODE_END		(YDB_INT_MAX - 3)
@@ -146,6 +158,21 @@ typedef enum
 		ydb_fork_n_core();												\
 		exit(1);		/* Shouldn't return but just in case */							\
 	}															\
+}
+
+/* Macro to determine severity of error returned from simpleapi call. Note a possible return value is an errno value. These
+ * errno values do not follow the same rules as YottaDB generated errors so this macro does not work on them. YottaDB
+ * generated errors numbers are all (absolute value) LARGER than 2**27 so anything under that is not supported by this macro.
+ */
+#define YDB_ERROR_SEVERITY(MSGNUM, SEVERITY)										\
+{															\
+	/* Minor subtrifuge because YDB_OK is 0 (per normal UNIX return code) but the rest of the codes, when the	\
+	 * error is out of the range of errno values, have 1 as a success value.					\
+	 */														\
+	if (YDB_OK == (MSGNUM))												\
+		SEVERITY = YDB_ERRSEV_SUCCESS;										\
+	else														\
+		SEVERITY = ((int)abs(MSGNUM) & 7);	/* Negation turns msg code into actual code used internally */	\
 }
 
 /* If only want assertions in DEBUG mode (-DDEBUG option specified), use this macro instead */

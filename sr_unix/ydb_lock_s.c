@@ -63,6 +63,8 @@ int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
+	if (YDB_MAX_LOCKTIME < nsec_timeout)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TIMEOUT2LONG);
 	if (0 > namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, RTS_ERROR_LITERAL("ydb_lock_s()"));
 	/* First step in this routine is to release all the locks */
@@ -89,7 +91,10 @@ int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 		VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
 		/* ISV references are not supported for this call */
 		if (LYDB_VARREF_ISV == var_type)
+		{
+			va_end(var);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+		}
 		plist.arg[0] = NULL;				/* First arg is extended reference that simpleAPI doesn't support */
 		varname_mval.str.addr = varname->buf_addr;	/* Second arg is varname */
 		varname_mval.str.len = varname->len_used;
@@ -101,6 +106,7 @@ int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 		COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2, "ydb_lock_s()");
 		callg((callgfnptr)op_lkname, &plist);
 	}
+	va_end(var);
 	/* At this point, all of the private lock blocks have been created. Remaining task before calling "op_lock2" is to
 	 * convert the timeout value from microseconds to milliseconds.
 	 */

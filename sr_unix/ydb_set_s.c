@@ -70,9 +70,13 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 		null_ydb_buff.len_used = 0;
 		null_ydb_buff.buf_addr = NULL;
 		value = &null_ydb_buff;
-	} else if (IS_INVALID_YDB_BUFF_T(value))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-				LEN_AND_LIT("Invalid value"), LEN_AND_LIT("ydb_set_s()"));
+	} else
+	{
+		if (IS_INVALID_YDB_BUFF_T(value))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+				      LEN_AND_LIT("Invalid value"), LEN_AND_LIT("ydb_set_s()"));
+		CHECK_MAX_STR_LEN(value);		/* Generates error is value is too long */
+	}
 	/* Separate actions depending on the type of SET being done */
 	switch(set_type)
 	{

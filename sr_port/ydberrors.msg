@@ -19,7 +19,7 @@
 	.FACILITY	YDB,256/PREFIX=ERR_
 	.TITLE		YDBERRORS Error Messages for YottaDB
 !
-! Note: This file is similar to sr_port/merrors.msg in layout abcd
+! Note: This file is similar to sr_port/merrors.msg in layout.
 !
 QUERY2		<Invalid second argument to $QUERY. Must be -1 or 1.>/error/fao=0
 MIXIMAGE	<Cannot load !AD image on process that already has !AD image loaded>/error/fao=4
@@ -36,3 +36,7 @@ TOOMANYVARNAMES	<Number of varnames specified exceeds maximum (!UL)>/error/fao=1
 INVNAMECOUNT	<Invalid value for namecount parameter in a !AD call>/error/fao=2
 MSGBUF2SMALL	<Message buffer for ydb_message() must be at least !UL bytes>/error/fao=1
 UNKNOWN		<Unknown error code specified>/error/fao=0
+TIMEOUT2LONG	<Timeout value exceeds supported maximum>/error/fao=0
+VARNAME2LONG	<Variable name length exceeds maximum allowed (!UL)>/error/fao=1
+FATALERROR1	<Fatal error raised. Generating core and terminating process. Error: !AD>/error/fao=2
+FATALERROR2	<Fatal error raised. Bypassing core generation and terminating process. Error: !AD>/error/fao=2

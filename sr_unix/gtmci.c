@@ -117,7 +117,7 @@ error_def(ERR_DISTPATHMAX);
 error_def(ERR_FMLLSTMISSING);
 error_def(ERR_YDBDISTUNDEF);
 error_def(ERR_GTMSECSHRPERM);
-error_def(ERR_INVGTMEXIT);
+error_def(ERR_INVYDBEXIT);
 error_def(ERR_JOBLABOFF);
 error_def(ERR_MAXACTARG);
 error_def(ERR_MAXSTRLEN);
@@ -1129,7 +1129,7 @@ int ydb_exit()
 	assert(NULL != frame_pointer);
 	/* Do not allow ydb_exit() to be invoked from external calls */
 	if (!(SFT_CI & frame_pointer->type) || !(MUMPS_CALLIN & invocation_mode) || (1 < TREF(gtmci_nested_level)))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVGTMEXIT);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
 	/* Now get rid of the whole M stack - end of GT.M environment */
 	while (NULL != frame_pointer)
 	{

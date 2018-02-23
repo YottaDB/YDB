@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -223,6 +223,7 @@ void gtm_startup(struct startup_vector *svec)
 	/* Put a base frame on the stack. One assumes this base frame is so there is *something* on the stack in case an error
 	 * or some such gets driven that looks at the stack. Needs to be at least one frame there. However, once we invoke
 	 * gtm_init_env (via jobchild_init()), this frame is no longer reachable since it builds the "real" base frame.
+	 * Note the last sentence does not apply to call-ins or to the simpleapi which do not call gtm_init_env().
 	 */
 	msp -= SIZEOF(stack_frame);
 	frame_pointer_lcl = (stack_frame *)msp;

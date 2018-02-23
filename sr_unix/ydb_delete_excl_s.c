@@ -76,7 +76,9 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 				      LEN_AND_STR(buff), LEN_AND_LIT(buff));
 		}
-		VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used);	/* Validates varname and that it is a local var */
+		if (YDB_MAX_IDENT < curvarname->len_used)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);
+  		VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used);	/* Validates varname and that it is a local var */
 		SET_MVAL_FROM_YDB_BUFF_T(mvalp, curvarname);
 		*parmp = mvalp;
 	}
