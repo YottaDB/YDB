@@ -87,6 +87,7 @@
 # include "gv_trigger.h"
 # include "gtm_trigger.h"
 #endif
+#include "libyottadb.h"
 
 GBLREF	boolean_t		ctrlc_on, created_core, dont_want_core, in_gvcst_incr, run_time;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
@@ -376,6 +377,14 @@ CONDITION_HANDLER(mdb_condition_handler)
 			 */
 			if (!(SFT_TRIGR & frame_pointer->type) && tp_pointer && tp_pointer->implicit_tstart)
 			{
+				if (tp_pointer->ydb_tp_s_tstart)
+				{	/* This is a TP transaction started by a "ydb_tp_s" call. Since "mdb_condition_handler"
+					 * is handling the TPRESTART error, it is a call-in. So set return code to YDB_TP_RESTART
+					 * that way the "ydb_ci" call can return this to the caller and that can take
+					 * appropriate action.
+					 */
+					rc = YDB_TP_RESTART;
+				}
 				mumps_status = rc;
 				DBGEHND((stderr, "mdb_condition_handler: Returning to implicit TSTART originator\n"));
 				UNWIND(NULL, NULL);
