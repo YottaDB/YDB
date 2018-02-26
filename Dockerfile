@@ -47,7 +47,7 @@ FROM ubuntu as ydb-release
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
- && apt-get install -y file libelf-dev libicu-dev locales \
+ && apt-get install -y file binutils libelf-dev libicu-dev locales \
  && apt-get clean
 RUN locale-gen en_US.UTF-8
 WORKDIR /data
@@ -61,7 +61,8 @@ RUN cd /tmp/yottadb-release  \
       --installdir /opt/yottadb/`cat /tmp/yottadb-release/.yottadb.vsn`-`uname -p` \
  && cd /opt/yottadb \
  && ln -s `cat /tmp/yottadb-release/.yottadb.vsn`-`uname -p` current \
- && rm -rf /tmp/yottadb-release
+ && rm -rf /tmp/yottadb-release \
+ && mkdir -p /data/r
 ENV gtmdir=/data \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
