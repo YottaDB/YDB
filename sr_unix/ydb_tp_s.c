@@ -24,10 +24,25 @@
 #include "tp_restart.h"
 #include "preemptive_db_clnup.h"
 #include "stringpool.h"
+#ifdef DEBUG
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "gdscc.h"
+#include "gdskill.h"
+#include "jnl.h"
+#include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
+#include "tp.h"
+#endif
 
 GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int	t_tries;
+GBLREF	int		tprestart_state;
+GBLREF	sgm_info	*first_sgm_info;
 
 /* Routine to invoke a user-specified function "tpfn" inside a TP transaction (i.e. TSTART/TCOMMIT fence).
  *
@@ -141,15 +156,23 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 			 * But before restarting the transaction cleanup database state of the partially completed transaction
 			 * using "preemptive_db_clnup". This is normally done by "mdb_condition_handler" in the case of YottaDB
 			 * runtime (since a TPRETRY is also an error) but that is not invoked by the simpleAPI and so we need this.
+			 * Note that if a restartable situation is detected inside of a call-in, it is possible the "tp_restart"
+			 * call happened right there. In that case, we need to skip the "tp_restart" call here. That is
+			 * detected by the "if" check below.
 			 */
-			preemptive_db_clnup(ERROR);	/* Cleanup "reset_gv_target", TREF(expand_prev_key) etc. */
-			if (cdb_sc_normal == t_fail_hist[t_tries])
-			{	/* User-induced TP restart. In that case, simulate TRESTART command in M.
-				 * This is relied upon by an assert in "tp_restart".
-				 */
-				op_trestart_set_cdb_code();
+			if (!t_tries || (TREF(prev_t_tries) >= t_tries) || (TPRESTART_STATE_NORMAL != tprestart_state)
+				|| (NULL != first_sgm_info))
+			{
+				preemptive_db_clnup(ERROR);	/* Cleanup "reset_gv_target", TREF(expand_prev_key) etc. */
+				if (cdb_sc_normal == t_fail_hist[t_tries])
+				{	/* User-induced TP restart. In that case, simulate TRESTART command in M.
+					 * This is relied upon by an assert in "tp_restart".
+					 */
+					op_trestart_set_cdb_code();
+				}
+				rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
+				assert((0 == rc) && (TPRESTART_STATE_NORMAL == tprestart_state));
 			}
-			rc = tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 			tpfn_status = YDB_OK;	/* Now that the restart processing is complete, clear status back to normal */
 		}
 	}
