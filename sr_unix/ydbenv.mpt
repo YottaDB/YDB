@@ -96,7 +96,7 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	for  quit:""=tmp2  set path=path_" "_tmp2,tmp2=$zsearch(tmp1,zstmp)
 	set tmp1=dist_$select("UTF-8"=chset:"/utf8",1:"")
 	set tmp2=$zsearch(tmp1_"/libyottadbutil.so",$increment(zstmp))
-	set:'$zlength(tmp2) tmp2=tmp2=$zsearch(tmp1_"/libgtmutil.so",$increment(zstmp))
+	set:'$zlength(tmp2) tmp2=$zsearch(tmp1_"/libgtmutil.so",$increment(zstmp))
 	set path=path_" "_tmp2
 	write "export ydb_routines=""",path,"""",!,"export gtmroutines=$ydb_routines",!
 	set tmp1=$ztrnlnm("ydb_repl_instance"),tmp2=$ztrnlnm("gtm_repl_instance")
