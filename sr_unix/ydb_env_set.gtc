@@ -1,0 +1,69 @@
+#################################################################
+#                                                               #
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#                                                               #
+#       This source code contains the intellectual property     #
+#       of its copyright holder(s), and is made available       #
+#       under a license.  If you do not know the terms of       #
+#       the license, please stop and do not read further.       #
+#                                                               #
+#################################################################
+# Usage: source "YDBDIST"/ydb_env_set
+# Sets up environment for single-user use of YottaDB with reasonable defaults.
+# Explicitly specify ydb_chset=UTF-8 before running this for UTF-8 mode.
+# System administrators should adapt as appropriate for more complex multi-user and production environments.
+
+# Function to save selected environment variables
+
+# Save ydb_passwd / gtm_passwd and ydb_chset / gtm_chset if defined because
+# this script executes in M mode and makes no database accesses
+# Need to distinguish between $ydb_passwd / $gtm_passwd not set at all vs. set to null string
+if [ ! -z "${ydb_passwd+isset}" ] ; then ydb_tmp_passwd=$ydb_passwd
+elif [ ! -z "${gtm_passwd+isset}" ] ; then ydb_tmp_passwd=$gtm_passwd
+else unset ydb_tmp_passwd
+fi
+if [ ! -z "$ydb_chset" ] ; then export ydb_tmp_chset=$ydb_chset
+elif [ ! -z "$gtm_chset " ] ; then export ydb_tmp_chset=$gtm_chset
+fi
+
+# Save environment variables if they exist, which may be needed for tmp and log directories
+if [ ! -z "$ydb_rel" ] ; then export ydb_tmp_rel=$ydb_rel ; fi
+if [ ! -z "$gtmver" ] ; then export ydb_tmp_gtmver=$gtmver ; fi
+
+# Clear environment variables that might interfere with correct operation of %YDBENV
+unset ydb_chset ydb_passwd gtm_chset gtm_passwd
+
+# Set environment variables needed for correct operation of %YDBENV, which exports
+# values that may, and likely will, override these.
+export ydb_dist="YDBDIST"
+export gtm_dist="$ydb_dist"
+if [ -s "$ydb_dist/libyottadbutil.so" ] ; then export ydb_routines="$ydb_dist/libyottadbutil.so"
+elif [ -s "$ydb_dist/libgtmutil.so" ] ; then export ydb_routines="$ydb_dist/libgtmutil.so"
+else export ydb_routines="$ydb_dist"
+fi
+export gtmroutines="$ydb_routines"
+
+# Run command to generate environment
+ydb_tmp_env=`mktemp -d -t ydb_env_$$_XXXXXX`
+$ydb_dist/mumps -run set^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err
+if [ -s $ydb_tmp_env/err ] ; then
+    echo Error file at $ydb_tmp_env is:
+    cat $ydb_tmp_env/err
+else
+    . $ydb_tmp_env/out
+    if [ "UTF-8" = "$ydb_chset" ] ; then
+	export ydb_icu_version=`icu-config --version`
+	export gtm_icu_version=$ydb_icu_version
+    else unset ydb_icu_version gtm_icu_version
+    fi
+    rm -rf $ydb_tmp_env
+fi
+
+# Restore ydb_passwd / gtm_passwd if it was set
+if [ ! -z "${ydb_tmp_passwd+isset}" ] ; then
+    export ydb_passwd=$ydb_tmp_passwd ; export gtm_passwd=$ydb_tmp_passwd
+fi
+
+# Clear temporary variables used in this file
+unset ydb_tmp_chset ydb_tmp_env ydb_tmp_gtmver ydb_tmp_passwd ydb_tmp_rel

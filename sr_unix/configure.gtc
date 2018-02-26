@@ -76,10 +76,10 @@ fi
 binaries="mupip mumps libyottadb$ext lke dse  geteuid ftok semstat2"
 
 # Normal scripts - executed by anyone
-nscripts="gtmbase lowerc_cp"
+nscripts="lowerc_cp"
 
 # Root scripts - only executed by root
-rscripts="gtmstart gtmstop"
+rscripts=""
 if [ $deliver_gtcm = "yes" ]; then
 	rscripts="$rscripts gtcm_run gtcm_slist"
 	binaries="$binaries gtcm_server gtcm_pkdisp gtcm_play gtcm_shmclean"
@@ -95,7 +95,7 @@ hlpfiles="*help.dat *help.gld *.h"
 ofiles="$hlpfiles"
 
 # Files that need to have $ydb_dist, $echo, etc. set in them.
-pathmods="gtmbase.gtc gtmstart.gtc gtmstop.gtc gtmcshrc.gtc gtmprofile.gtc gtm.gtc gtmprofile_preV54000.gtc gdedefaults.gtc"
+pathmods="ydb.gtc ydb_env_set.gtc ydb_env_unset.gtc gdedefaults.gtc"
 
 if [ $deliver_gtcm = "yes" ]; then
 	pathmods="$pathmods gtcm_run.gtc gtcm_slist.gtc"
@@ -428,6 +428,7 @@ cat << SEDSCRIPT > sedin$$
 s|ARCH|$arch|g
 s|ECHO|"$echo"|g
 s|GTMDIST|${install_dest}|g
+s|YDBDIST|${install_dest}|g
 s|SERVERID|$server_id|g
 SEDSCRIPT
 for i in $pathmods
@@ -450,8 +451,12 @@ fi
 
 # Install libgtmshr.so as a soft link to libyottadb.so for backward compatibility purposes just in case
 ln -s ./libyottadb$ext $ydbdist/libgtmshr$ext || echo ln -s ./libyottadb$ext $ydbdist/libgtmshr$ext
+ln -s ./ydb_env_set $ydbdist/gtmprofile || echo ln -s ./ydb_env_set $ydbdist/gtmprofile
+ln -s ./ydb $ydbdist/gtm || echo ln -s ./ydb $ydbdist/gtm
 if [ "$doutf8" -ne 0 ]; then
 	ln -s ./libyottadb$ext $ydbdist/utf8/libgtmshr$ext || echo ln -s ./libyottadb$ext $ydbdist/utf8/libgtmshr$ext
+	ln -s ./ydb_env_set $ydbdist/utf8/gtmprofile || echo ln -s ./ydb_env_set $ydbdist/utf8/gtmprofile
+	ln -s ./ydb $ydbdist/utf8/gtm || echo ln -s ./ydb $ydbdist/utf8/gtm
 fi
 
 # Install COPYING as well as README.md (YottaDB) or README.txt (GT.M) if it is applicable
@@ -483,7 +488,7 @@ do
 	fi
 done
 
-for i in gtmprofile gtmprofile_preV54000 gtm gtmcshrc
+for i in ydb ydb_env_set ydb_env_unset gtmcshrc
 do
 	if [ -e $i ]; then
 		cp -p $i $ydbdist

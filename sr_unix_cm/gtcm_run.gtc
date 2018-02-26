@@ -1,7 +1,10 @@
 #!/bin/sh
 #################################################################
 #								#
-#	Copyright 2001, 2012 Fidelity Information Services, Inc #
+# Copyright 2001, 2012 Fidelity Information Services, Inc	#
+#								#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -9,8 +12,7 @@
 #	the license, please stop and do not read further.	#
 #								#
 #################################################################
-# gtcm_run - This script is used to start an invidiaul GTCM server
-# Usually this is called from gtmstart script
+# gtcm_run - This script is used to start an individual GTCM server
 #
 # If the GTCM_RESTART environment variable is set to 1, this script will
 # restart the server if some event causes it to stop running.
@@ -49,7 +51,6 @@ do
         esac
         shift
 done
-# In case, instead of running gtmstart, this script is run directly to start gtcm server,
 # $logdir may not be present, so create it
 if [ ! -d $logdir ]
 then

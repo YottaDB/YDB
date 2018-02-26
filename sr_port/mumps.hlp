@@ -1755,7 +1755,7 @@
    | Error   | entered at the direct | If needed, error handlers can        |
    | Handler | mode prompt           | include appropriate error            |
    |         |                       | notification to $PRINCIPAL. For      |
-   |         | The default           | example, the gtmprofile script sets  |
+   |         | The default           | example, the ydb_set_env script sets |
    |         | $ZTRAP="B" brings a   | a default $ETRAP value of            |
    |         | process to the Direct | "Write:(0=$STACK) ""Error occurred:  |
    |         | Mode for debugging.   | "",$ZStatus,!" which you can         |
@@ -20730,9 +20730,9 @@
 
    The environment variable gtm_etrap specifies an initial value of $ETRAP to
    override the default value of "B" for $ZTRAP as the base level error
-   handler. The gtmprofile script sets gtm_etrap to "Write:(0=$STACK) ""Error
-   occurred: "",$ZStatus,!" which you can customize to suit your needs. For
-   more information, refer to "Processing Errors".
+   handler. The ydbenv "percent" utility sets gtm_etrap to
+   "Write:(0=$STACK) ""Error occurred: "",$ZStatus,!" which you can customize
+   to suit your needs. For more information, refer to "Processing Errors".
 
 2 Program_Handling_of_Errors
    Program Handling of Errors

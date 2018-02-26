@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -214,13 +217,6 @@ void iott_use(io_desc *iod, mval *pp)
 					if (io_curr_device.in == io_std_device.in)
 					{	/* $PRINCIPAL only */
 						tt_ptr->ext_cap |= TT_EDITING;
-						if (!tt_ptr->recall_buff.addr)
-						{
-							assert(tt_ptr->in_buf_sz);
-							tt_ptr->recall_buff.addr = malloc(tt_ptr->in_buf_sz);
-							tt_ptr->recall_size = tt_ptr->in_buf_sz;
-							tt_ptr->recall_buff.len = 0;    /* nothing in buffer */
-						}
 					}
 					break;
 				case iop_noediting:

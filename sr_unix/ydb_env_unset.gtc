@@ -1,0 +1,29 @@
+#################################################################
+#                                                               #
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#                                                               #
+#       This source code contains the intellectual property     #
+#       of its copyright holder(s), and is made available       #
+#       under a license.  If you do not know the terms of       #
+#       the license, please stop and do not read further.       #
+#                                                               #
+#################################################################
+# Usage: source "YDBDIST"/ydb_env_unset # change for distribution
+# Clears environment variables set by ydb_env_set
+# This uses an M program to remove $ydb_dist from LD_LIBRARY_PATH
+if [ -x "$ydb_dist/mumps" ] ; then
+    ydb_tmp_env=`mktemp -d -t ydb_env_$$_XXXXXX`
+    $ydb_dist/mumps -run unset^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err
+    if [ -s $ydb_tmp_env/err ] ; then
+	echo Error file at $ydb_tmp_env is:
+	cat $ydb_tmp_env/err
+    else
+	. $ydb_tmp_env/out
+	rm -rf $ydb_tmp_env
+    fi
+fi
+unset ydb_chset ydb_dir ydb_dist ydb_etrap ydb_gbldir ydb_icu_version ydb_log ydb_rel ydb_repl_instance ydb_retention
+unset ydb_routines ydb_tmp gtm_chset gtmdir gtm_dist gtm_etrap gtmgbldir gtm_icu_version gtm_log gtm_repl_instance
+unset gtm_retention gtmroutines gtm_tmp gtmver
+unalias dse gde lke gtm mumps mupip ydb yottadb 2>/dev/null

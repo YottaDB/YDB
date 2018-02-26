@@ -1,0 +1,35 @@
+#!/bin/sh
+#################################################################
+# Copyright (c) 2014-2017 Fidelity National Information         #
+# Services, Inc. and/or its subsidiaries. All rights reserved.  #
+#								#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+if [ ! -f "YDBDIST"/ydb_env_set ] ; then echo Cannot find file "YDBDIST"/ydb_env_set to source
+else
+    . "YDBDIST"/ydb_env_set
+    timestamp=`date -u +%Y%m%d%H%M%S`"UTC"
+    ( cd `dirname $ydb_gbldir` ; \
+	$ydb_dist/mupip journal -recover -backward "*" 2>$ydb_tmp/"$USER"_$timestamp"_mupip_recover" && \
+	$ydb_dist/mupip set -journal="on,before" -region "*" 2>$ydb_tmp/"$USER"_$timestamp"_mupip_set" && \
+	find . -name \*.mjl_\* -mtime +$ydb_retention -exec rm -f {} \; )
+    if [ 0 = $# ] ; then
+	$ydb_dist/mumps -direct
+    elif [ "-help" = "$1" -o "-h" = "$1" -o "-?" = "$1" ] ; then
+	echo "ydb -dir[ect] to enter direct mode (halt returns to shell)"
+	echo "ydb -run <entryref> to start executing at an entryref"
+	echo "ydb -help / ydb -h / ydb -? to display this text"
+    else
+	$ydb_dist/mumps $*
+    fi
+    ( cd `dirname $ydb_gbldir` \
+	$ydb_dist/mupip rundown -region "*" 2>$ydb_tmp/"$USER"_$timestamp"-"`date -u +%Y%m%d%H%M%S`"UTC_mupip_rundown" )
+    find $ydb_tmp -name "$USER"_\* -mtime +$ydb_retention -exec rm -f {} \;
+fi
