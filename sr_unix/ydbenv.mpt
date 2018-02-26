@@ -90,6 +90,7 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. . for  read tmp1 quit:$zeof
 	. . use "dbcreateerr" for  read tmp2 quit:$zeof
 	. . use io close "dbcreate"
+	zsy "mkdir -p "_env("ydb_dir")_"/r"
 	set path=path_"/o"_$select("UTF-8"=chset:"/utf8",1:"")_"*("_env("ydb_dir")_"/"_env("ydb_rel")_"/r "_env("ydb_dir")_"/r)"
 	set tmp1=dist_"/plugin/o"_$select("UTF-8"=chset:"/utf8",1:"")_"/*.so"
 	set tmp2=$zsearch(tmp1,$increment(zstmp))
