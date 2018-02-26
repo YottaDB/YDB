@@ -61,8 +61,7 @@ RUN cd /tmp/yottadb-release  \
       --installdir /opt/yottadb/`cat /tmp/yottadb-release/.yottadb.vsn`-`uname -p` \
  && cd /opt/yottadb \
  && ln -s `cat /tmp/yottadb-release/.yottadb.vsn`-`uname -p` current \
- && rm -rf /tmp/yottadb-release \
- && mkdir -p /data/r
+ && rm -rf /tmp/yottadb-release
 ENV gtmdir=/data \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
