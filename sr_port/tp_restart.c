@@ -106,12 +106,10 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	sgmnt_addrs		*cs_addrs_list;
 GBLREF	boolean_t		is_updproc;
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
-#ifdef GTM_TRIGGER
 GBLREF	int			tprestart_state;	/* When triggers restart, multiple states possible. See tp_restart.h */
 GBLREF	mval			dollar_ztwormhole;	/* Previous value (mval) restored on restart */
 GBLREF	mval			dollar_ztslate;
 LITREF	mval			literal_null;
-#endif
 
 error_def(ERR_GVFAILCORE);
 error_def(ERR_REPLONLNRLBK);
@@ -190,12 +188,10 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TLVLZERO);
 		return 0; /* for the compiler only -- never executed */
 	}
-#	ifdef GTM_TRIGGER
 	DBGTRIGR((stderr, "tp_restart: Entry state: %d\n", tprestart_state));
 	save_jnlpool = jnlpool;
 	if (TPRESTART_STATE_NORMAL == tprestart_state)
 	{	/* Only do if a normal invocation - otherwise we've already done this code for this TP restart */
-#	endif
 		/* Increment restart counts for each region in this transaction */
 		for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
 		{
@@ -603,11 +599,9 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				}
 			}
 		}
-#	ifdef GTM_TRIGGER
 	} else
 		status = LAST_RESTART_CODE;
 	DBGTRIGR((stderr, "tp_restart: past initial normal state processing\n"));
-#	endif
 	/* The below code to determine the rollback point depends on tp_frame sized blocks being pushed on the TP
 	 * stack. If ever other sized blocks are pushed on, a different method will need to be found.
 	 */
@@ -615,10 +609,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	tf = (tp_frame *)(tpstackbase - SIZEOF(tp_frame));
 	assert(NULL != tf);
 	assert(tpstacktop < (unsigned char *)tf);
-#	ifdef GTM_TRIGGER
 	if (TPRESTART_STATE_NORMAL == tprestart_state)
 	{	/* Only if normal tp_restart call - else we've already done this for this tp_restart */
-#	endif
 		/* Before we get too far unwound here, if this is a nonrestartable transaction,
 		 * let's record where we are for the message later on.
 		 */
@@ -645,14 +637,12 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			default:
 				break;
 		}
-#	ifdef GTM_TRIGGER
 	}
 	if (TPRESTART_STATE_TPUNW >= tprestart_state)
 	{	/* Either this is a normal tp_restart call or we ran into a trigger base frame while "tp_unwind"
 		 * was running which required M and C stack unwinding before we could proceed so this call is
 		 * being restarted.
 		 */
-#	endif
 		/* Note that this form of "tp_unwind" will not only unwind the TP stack but also most if not all of
 		 * the M stackframe and mv_stent chain as well.
 		 */
@@ -676,7 +666,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			memcpy(extnam_str.addr, (TREF(gv_tporig_extnam_str)).addr, len);
 		}
 		extnam_str.len = len;
-#		ifdef GTM_TRIGGER
 		/* Maintenance of SSF_NORET_VIA_MUMTSTART stack frame flag:
 		 * - Set by gtm_trigger when trigger base frame is created. Purpose to prevent MUM_TSTART from restarting
 		 *   a frame making a call-in to a trigger (flag is checked in MUM_TSTART macro) because the mpc in the
@@ -698,14 +687,11 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			tf->fp->flags &= SSF_NORET_VIA_MUMTSTART_OFF;
 			DBGTRIGR((stderr, "tp_restart: Removing SSF_NORET_VIA_MUMTSTART in frame 0x"lvaddr"\n", tf->fp));
 		}
-#		endif
 		tf->fp->mpc = tf->restart_pc;
 		tf->fp->ctxt = tf->restart_ctxt;
-#		ifdef GTM_TRIGGER
 	} else
 		assert(TPRESTART_STATE_MSTKUNW == tprestart_state);
 	/* From here on, all states run */
-#	endif
 	/* Make sure everything else added to the stack since the transaction started is unwound. Note this loop only
 	 * has work to do if there were NO local vars to restore. Otherwise tp_unwind would have already unwound the
 	 * stack for us.
@@ -713,7 +699,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 	GTMTRIG_ONLY(DBGTRIGR((stderr, "tp_restart: beginning frame unwinds (state %d)\n", tprestart_state)));
 	while (frame_pointer < tf->fp)
 	{
-#		ifdef GTM_TRIGGER
 		if (SFT_TRIGR & frame_pointer->type)
 		{	/* We have encountered a trigger base frame. We cannot unroll it because there are C frames
 			 * associated with it so we must interrupt this tp_restart and return to gtm_trigger() so
@@ -724,7 +709,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			DBGTRIGR((stderr, "tp_restart: Encountered trigger base frame in M-stack unwind - rethrowing\n"));
 			INVOKE_RESTART;
 		}
-#		endif
 		op_unwind();
 	}
 	/* From here on, no further rethrows of tp_restart() - the final finishing touches */
@@ -748,13 +732,11 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		 msp, mvc, INTCAST((unsigned char *)mvc - msp)));
 	mv_chain = mvc;
 	msp = (unsigned char *)mvc;
-#	ifdef GTM_TRIGGER
 	/* Revert $ZTWormhole to its previous value */
 	DBGTRIGR((stderr, "tp_restart: Restoring $ZTWORMHOLE and NULLifying $ZTSLATE (state %d)\n", tprestart_state));
 	memcpy(&dollar_ztwormhole, &mvc->mv_st_cont.mvs_tp_holder.ztwormhole_save, SIZEOF(mval));
 	if (1 == newlevel)
 		memcpy(&dollar_ztslate, &literal_null, SIZEOF(mval));	/* Zap $ZTSLate at (re)start of lvl 1 transaction */
-#	endif
 	assert(curr_symval == tf->sym);
 	if (frame_pointer->flags & SFF_UNW_SYMVAL)
 	{	/* A symval was popped in THIS stackframe by one of our last mv_stent unwinds which means
