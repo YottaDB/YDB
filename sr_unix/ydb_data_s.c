@@ -66,6 +66,7 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 	if (error_encountered)
 	{
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
+		LIBYOTTADB_DONE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -134,6 +135,7 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 	}
 	*ret_value = mval2i(&data_value);
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
+	LIBYOTTADB_DONE;
 	REVERT;
 	return YDB_OK;
 }

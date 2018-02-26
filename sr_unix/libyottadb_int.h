@@ -24,41 +24,38 @@
 #include "funsvn.h"
 #include "error.h"
 #include "send_msg.h"
+#include "gtmmsg.h"
 #include "stack_frame.h"
 #include "lv_val.h"
 #include "libydberrors.h"	/* Define YDB_ERR_* errors */
+#include "gtm_string.h"		/* for strlen in LIBYOTTADB_INIT in RTS_ERROR_TEXT macro */
 
 #define MAX_SAPI_MSTR_GC_INDX	YDB_MAX_NAMES
 
 GBLREF	symval		*curr_symval;
 GBLREF	stack_frame	*frame_pointer;
+GBLREF	uint4		process_id;
 
 LITREF	char		ctypetab[NUM_CHARS];
 LITREF	nametabent	svn_names[];
 LITREF	unsigned char	svn_index[];
 LITREF	svn_data_type	svn_data[];
+LITREF	char 		*lydbrtnnames[];
+LITREF	int		lydbrtnpkg[];
 
+#define LYDB_NONE	0				/* Routine is part of no package */
+#define LYDB_UTILITY 	1				/* Routine is a utility routine */
+#define LYDB_SIMPLEAPI	2				/* Routine is part of the simpleAPI */
+
+/* Values for TREF(libyottadb_active_rtn) */
+#define LYDBRTN(a, b, c) a
 typedef enum
 {
-	LYDB_RTN_DATA = 1,		/* "ydb_data_s" is running */
-	LYDB_RTN_DELETE,		/* "ydb_delete_s" is running */
-	LYDB_RTN_DELETE_EXCL,		/* "ydb_delete_excl_s" is running */
-	LYDB_RTN_GET,			/* "ydb_get_s" is running */
-	LYDB_RTN_SET,			/* "ydb_set_s" is running */
-	LYDB_RTN_LOCK,			/* "ydb_lock_s" is running */
-	LYDB_RTN_LOCK_INCR,		/* "ydb_lock_incr_s" is running */
-	LYDB_RTN_LOCK_DECR,		/* "ydb_lock_decr_s" is running */
-	LYDB_RTN_SUBSCRIPT_NEXT,	/* "ydb_subscript_next_s" is running */
-	LYDB_RTN_SUBSCRIPT_PREVIOUS,	/* "ydb_subscript_previous_s" is running */
-	LYDB_RTN_NODE_NEXT,		/* "ydb_node_next_s" is running */
-	LYDB_RTN_NODE_PREVIOUS,		/* "ydb_node_previous_s" is running */
-	LYDB_RTN_INCR,			/* "ydb_incr_s" is running */
-	LYDB_RTN_TP,			/* "ydb_tp_s" is running */
-	LYDB_RTN_STR2ZWR,		/* "ydb_str2zwr_s" is running */
-	LYDB_RTN_ZWR2STR,		/* "ydb_zwr2str_s" is running */
-	LYDB_RTN_CHILDINIT,		/* "ydb_child_init" is running */
+#include "libyottadb_rtns.h"
 } libyottadb_routines;
+#undef LYDBRTN
 
+/* Returned values for VARTYPE in VALIDATE-VARNAME() macro */
 typedef enum
 {
 	LYDB_VARREF_GLOBAL = 1,		/* Referencing a global variable */
@@ -66,7 +63,11 @@ typedef enum
 	LYDB_VARREF_ISV			/* Referencing an ISV (Intrinsic Special Variable) */
 } ydb_var_types;
 
-/* Initialization macro for most simpleAPI calls */
+/* Initialization and cleanup macros for main simpleAPI calls. Having a value in TREF(libyottadb_active_rtn)
+ * denotes a simpleAPI routine is active and no other simpleAPI routine can be started - i.e. calls cannot be
+ * nested with the exception of ydb_tp_s() which clears this indicator just before it engages the call-back
+ * routine which has a high probability of calling more simpleAPI routines.
+ */
 #define LIBYOTTADB_INIT(ROUTINE)										\
 MBSTART	{													\
 	int		status;											\
@@ -82,6 +83,7 @@ MBSTART	{													\
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);					\
 		return YDB_ERR_CALLINAFTERXIT;									\
 	}													\
+	/* No threadgbl usage in this macro until the following block completes */				\
 	if (!gtm_startup_active || !(frame_pointer->type & SFT_CI))						\
 	{	/* Have to initialize things before we can establish an error handler */			\
 		if (0 != (status = ydb_init()))		/* Note - sets fgncal_stack */				\
@@ -92,8 +94,22 @@ MBSTART	{													\
 		 */												\
 		SETUP_THREADGBL_ACCESS;										\
 	}		       											\
+	/* If we detect a problem here, the routine has not yet established the condition handler to take	\
+	 * care of these issues so we invoke it directly.							\
+	 */													\
+	if ((LYDB_RTN_NONE != TREF(libyottadb_active_rtn)) && (LYDB_SIMPLEAPI == lydbrtnpkg[ROUTINE]))		\
+	{													\
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SIMPLEAPINEST, 4,					\
+			       RTS_ERROR_TEXT(lydbrtnnames[TREF(libyottadb_active_rtn)]),			\
+			       RTS_ERROR_TEXT(lydbrtnnames[ROUTINE])); 						\
+		SET_ERROR_CONDITION(ERR_SIMPLEAPINEST);								\
+		ydb_simpleapi_ch(ERR_SIMPLEAPINEST);								\
+		assertpro(FALSE);										\
+	}		       											\
 	TREF(libyottadb_active_rtn) = ROUTINE;									\
 } MBEND
+
+#define LIBYOTTADB_DONE	TREF(libyottadb_active_rtn) = LYDB_RTN_NONE
 
 /* Macros to promote checking an mname as being a valid mname. There are two flavors - one where
  * the first character needs to be checked and one where the first character has already been

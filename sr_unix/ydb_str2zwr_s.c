@@ -40,6 +40,7 @@ int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr)
 	if (error_encountered)
 	{
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have been cleared by "ydb_simpleapi_ch" */
+		LIBYOTTADB_DONE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -53,6 +54,7 @@ int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr)
 	op_fnzwrite(FALSE, &src, &dst);
 	SET_YDB_BUFF_T_FROM_MVAL(zwr, &dst, "NULL zwr->buf_addr", "ydb_str2zwr_s()");
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
+	LIBYOTTADB_DONE;
 	REVERT;
 	return YDB_OK;
 }

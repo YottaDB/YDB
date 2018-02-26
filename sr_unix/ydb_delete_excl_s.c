@@ -54,6 +54,7 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have never become non-zero and even if it did,
 								 * it should have been cleared by "ydb_simpleapi_ch".
 								 */
+		LIBYOTTADB_DONE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -87,6 +88,7 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 	callg((callgfnptr)op_xkill, &plist);
 	/* All done - return to caller */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
+	LIBYOTTADB_DONE;
 	REVERT;
 	return YDB_OK;
 }

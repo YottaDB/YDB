@@ -67,6 +67,7 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have never become non-zero and even if it did,
 								 * it should have been cleared by "ydb_simpleapi_ch".
 								 */
+		LIBYOTTADB_DONE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -160,6 +161,7 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 			assertpro(FALSE);
 	}
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
+	LIBYOTTADB_DONE;
 	REVERT;
 	return YDB_OK;
 }

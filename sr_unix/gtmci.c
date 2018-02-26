@@ -33,7 +33,7 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mvalconv.h"
-#include "libyottadb.h"
+#include "libyottadb_int.h"
 #include "lv_val.h"
 #include "fgncal.h"
 #include "gtmci.h"
@@ -1076,6 +1076,7 @@ int ydb_init()
 		assert(gtm_startup_active);
 		assert(frame_pointer->type & SFT_CI);
 		TREF(gtmci_nested_level) = 1;
+		TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;
 		/* Now that GT.M is initialized. Mark the new stack pointer (msp) so that errors
 		 * while executing an M routine do not unwind stack below this mark. It important that
 		 * the call-in frames (SFT_CI) that hold nesting information (eg. $ECODE/$STACK data

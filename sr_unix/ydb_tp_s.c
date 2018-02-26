@@ -148,6 +148,7 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 			{	/* We were already inside a transaction when we entered this "ydb_tp_s" invocation.
 				 * So pass the TPRETRY to the caller until we go back to the outermost "ydb_tp_s" invocation.
 				 */
+				LIBYOTTADB_DONE;
 				REVERT;
 				assert(dollar_tlevel);
 				return YDB_TP_RESTART;
@@ -176,12 +177,14 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 			tpfn_status = YDB_OK;	/* Now that the restart processing is complete, clear status back to normal */
 		}
 	}
+	LIBYOTTADB_DONE;		/* Shutoff active rtn indicator while call callback routine */
 	if (YDB_OK == tpfn_status)
 	{
 		tpfn_status = (*tpfn)(tpfnparm);
 		TREF(libyottadb_active_rtn) = LYDB_RTN_TP;		/* Restore our routine indicator */
 		assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
 	}
+	TREF(libyottadb_active_rtn) = LYDB_RTN_TP;	/* Re-enable active routine flag */
 	if (YDB_OK == tpfn_status)
 	{
 		op_tcommit();
@@ -208,6 +211,7 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 		}
 	}
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* The counter should have been reset in this function */
+	LIBYOTTADB_DONE;
 	REVERT;
 	return tpfn_status;
 }
