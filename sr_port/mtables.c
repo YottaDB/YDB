@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017,2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,7 @@
 #include "gtm_reservedDB.h"
 #include "mtables.h"
 #include "iotimer.h"
+#include "libyottadb_int.h"
 
 LITDEF char ctypetab[NUM_CHARS] =
 {
@@ -422,7 +423,6 @@ LITDEF int ht_sizes[] =
 	24978257, 29168903, 34062629, 39777391, 46450931, 54244103, 0
 };
 
-#ifdef UNIX
 /* Primarily used by gtm_trigger_complink() */
 LITDEF char 	alphanumeric_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
 					'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
@@ -458,13 +458,26 @@ GBLDEF casemap_t casemaps[MAX_CASE_IDX] =
 	{"L", &upper_to_lower, NULL},
 	{"T", &str_to_title, NULL}
 };
-#endif
 
-#ifdef UNIX
 /* Used as the value for "regular" key (i.e., the one with no hidden subscripts) of a spanning node. */
 LITDEF mstr	nsb_dummy = {0, 1, "\0"};
 /*LITDEF mstr	nsb_dummy = {0, LEN_AND_LIT("dummy")};*/
-#endif
+
+/* Names of the libyottadb routines */
+#define LYDBRTN(a, b, c) c
+LITDEF char *lydbrtnnames[] =
+{
+#include "libyottadb_rtns.h"
+};
+#undef LYDBRTN
+
+/* What package the libyottadb routines below to */
+#define LYDBRTN(a, b, c) b
+LITDEF int lydbrtnpkg[] =
+{
+#include "libyottadb_rtns.h"
+};
+#undef LYDBRTN
 
 #define	ENUM_ENTRY(NAME)	#NAME
 LITDEF char *mdb_ver_names[] =

@@ -60,6 +60,7 @@ int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 	if (error_encountered)
 	{
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
+		LIBYOTTADB_DONE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -71,6 +72,7 @@ int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 	op_unlock();
 	if (0 == namecount)
 	{	/* If no names were specified, we're done after the unlock */
+		LIBYOTTADB_DONE;
 		REVERT;
 		return YDB_OK;
 	}
@@ -118,6 +120,7 @@ int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 	/* The generated code typically calls "op_lock" but that routine just calls "op_lock2" */
 	lock_rc = op_lock2(&timeout_mval, CM_LOCKS);
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
+	LIBYOTTADB_DONE;
 	REVERT;
 	return lock_rc ? YDB_OK : YDB_LOCK_TIMEOUT;
 }

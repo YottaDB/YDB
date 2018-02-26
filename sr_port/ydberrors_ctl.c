@@ -36,6 +36,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "VARNAME2LONG", "Variable name length exceeds maximum allowed (!UL)", 1 },
 	{ "FATALERROR1", "Fatal error raised. Generating core and terminating process. Error: !AD", 2 },
 	{ "FATALERROR2", "Fatal error raised. Bypassing core generation and terminating process. Error: !AD", 2 },
+	{ "SIMPLEAPINEST", "Attempt to nest call of !AD with a call to !AD - nesting calls is not permitted in simpleAPI - process terminating", 4 },
 };
 
 
@@ -43,4 +44,4 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	19};
+	20};

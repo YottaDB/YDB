@@ -48,6 +48,8 @@
 #include "gdskill.h"
 #include "tp.h"
 #include "gtmdbglvl.h"
+#include "util.h"
+#include "libyottadb_int.h"
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	boolean_t		created_core;
@@ -78,6 +80,8 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	gd_addr			*addr_ptr;
 	gd_region		*reg_top, *reg_local;
 	jnlpool_addrs_ptr_t	local_jnlpool;
+	char			zstatus_buffer[OUT_BUFF_SIZE];
+	int			zstatus_buffer_len;
 
 	START_CH(TRUE);
 	if (ERR_REPEATERROR == SIGNAL)
@@ -150,22 +154,28 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	/* If this is a fatal error, create a core file and close up shop so the runtime cannot be called again.
 	 */
 	if ((DUMPABLE) && !SUPPRESS_DUMP)
-	{	/* Fatal errors need to create a core dump */
+	{	/* Fatal errors need to create a core dump. The message we were invoked with has already been
+		 * sent to the user's console, which reset the end pointer back to the beginning so we have to
+		 * use strlen() to get the correct length.
+		 */
+		zstatus_buffer_len = strlen(TREF(util_outbuff_ptr));
+		memcpy(zstatus_buffer, TREF(util_outbuff_ptr), zstatus_buffer_len);	/* Save zstatus */
 		process_exiting = TRUE;
 		CANCEL_TIMERS;
 		if (!(GDL_DumpOnStackOFlow & gtmDebugLevel) &&
 		    ((int)ERR_STACKOFLOW == SIGNAL || (int)ERR_STACKOFLOW == arg
 		     || (int)ERR_MEMORY == SIGNAL || (int)ERR_MEMORY == arg))
 		{
-			dont_want_core = TRUE;		/* Do a clean exit rather than messy core exit */
-			need_core = FALSE;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FATALERROR1, 2, RTS_ERROR_MVAL(&dollar_zstatus));
+			dont_want_core = FALSE;
+			need_core = TRUE;
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FATALERROR2, 2, zstatus_buffer_len, zstatus_buffer);
 		} else
 		{
-			need_core = TRUE;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FATALERROR2, 2, RTS_ERROR_MVAL(&dollar_zstatus));
+			dont_want_core = TRUE;		/* Do a clean exit rather than messy core exit */
+			need_core = FALSE;
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FATALERROR1, 2, zstatus_buffer_len, zstatus_buffer);
 		}
-		TERMINATE;
+		TERMINATE;				/* Conditionally creates core depending on flags */
 	}
 	UNDO_ACTIVE_LV(actlv_ydb_simpleapi_ch);
 	/*
@@ -257,5 +267,6 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	/* If this message was SUCCESS or INFO, just return to caller. Else UNWIND back to where we were established */
 	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
 		CONTINUE;
+	LIBYOTTADB_DONE;
 	UNWIND(NULL, NULL); 		/* Return back to ESTABLISH_NORET() in caller */
 }

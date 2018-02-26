@@ -40,3 +40,4 @@ TIMEOUT2LONG	<Timeout value exceeds supported maximum>/error/fao=0
 VARNAME2LONG	<Variable name length exceeds maximum allowed (!UL)>/error/fao=1
 FATALERROR1	<Fatal error raised. Generating core and terminating process. Error: !AD>/error/fao=2
 FATALERROR2	<Fatal error raised. Bypassing core generation and terminating process. Error: !AD>/error/fao=2
+SIMPLEAPINEST	<Attempt to nest call of !AD with a call to !AD - nesting calls is not permitted in simpleAPI - process terminating>/fatal/fao=4
