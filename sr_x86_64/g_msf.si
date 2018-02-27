@@ -51,7 +51,7 @@ REG64_ARG2		=	%rdx
 REG64_ARG3		=	%rcx
 REG64_ARG4		=	%r8
 REG64_ARG5		=	%r9
-#REG64_SCRATCH0		=	%r10     # Note same as REG64_RET1
+REG64_SCRATCH0		=	%r10     # Note same as REG64_RET1
 REG64_SCRATCH1		=	%r11
 
 REG64_OUT_ARG0		=	%rdi
