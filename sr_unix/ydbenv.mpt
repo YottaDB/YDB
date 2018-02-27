@@ -90,7 +90,6 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. . for  read tmp1 quit:$zeof
 	. . use "dbcreateerr" for  read tmp2 quit:$zeof
 	. . use io close "dbcreate"
-	zsy "mkdir -p "_env("ydb_dir")_"/r"
 	set path=path_"/o"_$select("UTF-8"=chset:"/utf8",1:"")_"*("_env("ydb_dir")_"/"_env("ydb_rel")_"/r "_env("ydb_dir")_"/r)"
 	set tmp1=dist_"/plugin/o"_$select("UTF-8"=chset:"/utf8",1:"")_"/*.so"
 	set tmp2=$zsearch(tmp1,$increment(zstmp))
@@ -240,6 +239,7 @@ FileTypeEnsure(envvar,followlink)
 	. set env(envvar,"path")=$zsearch(env(envvar),$increment(zstmp))
 	. if $zlength(env(envvar,"path")) do
 	. . set env(envvar,"type")=$$FileType(env(envvar,"path"),+$get(followlink))
+	. . zsy "mkdir -p "_env(envvar,"path")_"/r"
 	. . set:"other"=env(envvar,"type") $ecode=",U254,"	; error if it exists and is not a link or a directory
 	. else  kill env(envvar,"path")	   			; path does not exist
 	else  zwithdraw:flag env(envvar)			; remove null value if set by this function
