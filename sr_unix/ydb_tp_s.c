@@ -161,7 +161,7 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 			 * detected by the "if" check below.
 			 */
 			if (!t_tries || (TREF(prev_t_tries) >= t_tries) || (TPRESTART_STATE_NORMAL != tprestart_state)
-				|| (NULL != first_sgm_info))
+				|| (NULL != first_sgm_info) || (cdb_sc_normal == t_fail_hist[t_tries]))
 			{
 				preemptive_db_clnup(ERROR);	/* Cleanup "reset_gv_target", TREF(expand_prev_key) etc. */
 				if (cdb_sc_normal == t_fail_hist[t_tries])
