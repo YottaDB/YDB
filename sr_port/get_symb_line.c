@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -62,26 +65,20 @@ unsigned char *get_symb_line(unsigned char *out, unsigned char **b_line, unsigne
 				line_reset = TRUE;
 		}
 	}
+	assert(NULL == fp);
 	/* At this point, we were unable to discover what was executing from the M stack. It is possible this error
 	 * occurred either while GT.M was shutting down thus the stack could be completely unwound. Or this may not
 	 * even be a mumps process (could be update process driving a trigger). Or this could have nothing to do with
-	 * generated code and could occur in most any of the utility modules - especially replication processes. Do
-	 * what we can to indicate where the problem occurred.
+	 * generated code and could occur in most any of the utility modules - especially replication processes.
+	 * Or this could be in a simpleAPI process. Do what we can to indicate where the problem occurred.
 	 */
-	if (process_exiting || !IS_MCODE_RUNNING)
-	{	/* Show which image is running */
-		memcpy(out, gtmImageNames[image_type].imageName, gtmImageNames[image_type].imageNameLen);
-		out_addr = out + gtmImageNames[image_type].imageNameLen;
-		if (process_exiting)
-		{	/* Add the information that this process was exiting */
-			MEMCPY_LIT(out_addr, PROCESS_EXITING);
-			out_addr += STR_LIT_LEN(PROCESS_EXITING);
-		}
-		return out_addr;
+	/* Show which image is running */
+	memcpy(out, gtmImageNames[image_type].imageName, gtmImageNames[image_type].imageNameLen);
+	out_addr = out + gtmImageNames[image_type].imageNameLen;
+	if (process_exiting)
+	{	/* Add the information that this process was exiting */
+		MEMCPY_LIT(out_addr, PROCESS_EXITING);
+		out_addr += STR_LIT_LEN(PROCESS_EXITING);
 	}
-	/* At this point we know the process was not exiting, was executing M code, but we *still* couldn't find where
-	 * on the M stack. This is an out of design situation so we cause an assert failure.
-	 */
-	assertpro(fp);
-	return NULL;	/* For the compiler */
+	return out_addr;
 }
