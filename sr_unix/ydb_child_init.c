@@ -121,6 +121,7 @@ int	ydb_child_init(void *param)
 		ydb_child_init_sem_incrcnt(reg, RECVPOOL_REG, NULL);
 	skip_exit_handler = FALSE; /* Now that the child process database state is set up correctly, it is safe to "gds_rundown" */
 	assert(NULL == ftok_sem_reg);
+	LIBYOTTADB_DONE;
 	REVERT;
 	return YDB_OK;
 }
