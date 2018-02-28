@@ -114,7 +114,11 @@ void op_unwind(void)
 		unw_mv_ent(mvc);
 		mvc = (mv_stent *)(mvc->mv_st_next + (char *)mvc);
 	}
-	TREF(trig_forced_unwind) = FALSE;	/* reset this global right away in case we hit an error codepath below */
+	TREF(trig_forced_unwind) = FALSE;	/* Again, turn this global flag off while it is not needed in case of error below.
+						 * Note that even though "unw_mv_ent" could clear this global in case it unwound
+						 * a MVST_TRGR mv_stent, we are not guaranteed an MVST_TRGR mv_stent is there on
+						 * the M-stack in all calls to "op_unwind" and hence clear this here too.
+						 */
 	if (0 <= frame_pointer->dollar_test)		/* get dollar_test if it has been set */
 		dollar_truth = frame_pointer->dollar_test;
 	if (is_tracing_on GTMTRIG_ONLY( && !(frame_pointer->type & SFT_TRIGR)))
