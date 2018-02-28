@@ -481,12 +481,13 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 	{
 		tf->implicit_tstart = implicit_tstart;
 		GTMTRIG_ONLY(tf->implicit_trigger = implicit_trigger);
+		tf->ydb_tp_s_tstart = (0 != (tstart_flag & YDB_TP_S_TSTART));
 	} else
 	{
 		tf->implicit_tstart = tp_pointer->implicit_tstart;
 		GTMTRIG_ONLY(tf->implicit_trigger = tp_pointer->implicit_trigger);
+		tf->ydb_tp_s_tstart = tp_pointer->ydb_tp_s_tstart;
 	}
-	tf->ydb_tp_s_tstart = (0 != (tstart_flag & YDB_TP_S_TSTART));
 	GTMTRIG_ONLY(tf->cannot_commit = FALSE;)
 	tf->vars = (tp_var *)NULL;
 	tf->old_tp_frame = tp_pointer;

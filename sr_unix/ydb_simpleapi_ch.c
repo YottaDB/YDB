@@ -50,6 +50,8 @@
 #include "gtmdbglvl.h"
 #include "util.h"
 #include "libyottadb_int.h"
+#include "tp_restart.h"
+#include "tp_frame.h"
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	boolean_t		created_core;
@@ -68,6 +70,16 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	uint4			gtmDebugLevel;		/* Debug level */
 GBLREF	mval			dollar_zstatus;
+GBLREF	int			tprestart_state;	/* When triggers restart, multiple states possible - see tp_restart.h */
+GBLREF	int4			gtm_trigger_depth;
+#ifdef DEBUG
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
+#endif
+GBLREF	int			mumps_status;
+GBLREF	uint4			dollar_trestart;
+GBLREF	uint4			simpleapi_dollar_trestart;
+GBLREF	tp_frame		*tp_pointer;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 
 /* Condition handler for simpleAPI environment. This routine catches all errors thrown by the YottaDB engine. The error
  * is basically returned to the user as the negative of the error to differentiate those errors from positive (success
@@ -82,6 +94,7 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	jnlpool_addrs_ptr_t	local_jnlpool;
 	char			zstatus_buffer[OUT_BUFF_SIZE];
 	int			zstatus_buffer_len;
+	int			rc;
 
 	START_CH(TRUE);
 	if (ERR_REPEATERROR == SIGNAL)
@@ -100,9 +113,43 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 		 */
 		NULLIFY_MERGE_ZWRITE_CONTEXT;
 	}
+	TREF(ydb_error_code) = arg;			/* Record error code for caller */
+	/* If TPRETRY error, unwind C stack back to caller and bubble the TPRETRY error up until outermost "ydb_tp_s" */
+	if ((int)ERR_TPRETRY == SIGNAL)
+	{	/* the below code is similar to that in "mdb_condition_handler" */
+		assert(!donot_INVOKE_MUMTSTART || gtm_trigger_depth);
+		TRIGGER_BASE_FRAME_UNWIND_IF_NOMANSLAND;
+		/* Some of the below code is similar to that in "ydb_tp_s" */
+		assert(!tp_pointer->ydb_tp_s_tstart
+			|| (simpleapi_dollar_trestart == dollar_trestart) || (simpleapi_dollar_trestart == (dollar_trestart - 1)));
+		if (!tp_pointer->ydb_tp_s_tstart || (simpleapi_dollar_trestart == dollar_trestart))
+		{
+			preemptive_db_clnup(ERROR);	/* Cleanup "reset_gv_target", TREF(expand_prev_key) etc. */
+			if (cdb_sc_normal == t_fail_hist[t_tries])
+			{	/* User-induced TP restart. In that case, simulate TRESTART command in M.
+				 * This is relied upon by an assert in "tp_restart".
+				 */
+				op_trestart_set_cdb_code();
+			}
+			rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS);
+			if (0 != rc)
+			{	/* The only time "tp_restart" will return non-zero is if the error needs to be
+				 * rethrown. To accomplish that, we will unwind this handler which will return to
+				 * the inner most initiating dm_start() with the return code set to whatever mumps_status
+				 * is set to.
+				 */
+				assert(TPRESTART_STATE_NORMAL != tprestart_state);
+				assert(rc == SIGNAL);
+				assertpro((SFT_TRIGR & frame_pointer->type) && (0 < gtm_trigger_depth));
+				mumps_status = rc;
+				assert(active_ch[1].dollar_tlevel >= dollar_tlevel);
+				DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;)
+			}
+		}
+		UNWIND(NULL, NULL);
+	}
 	if (ERR_REPEATERROR != SIGNAL)
 		set_zstatus(NULL, arg, NULL, FALSE);
-	TREF(ydb_error_code) = arg;			/* Record error code for caller */
 	/* Ensure gv_target and cs_addrs are in sync. If not, make them so. */
 	if (NULL != gv_target)
 	{
