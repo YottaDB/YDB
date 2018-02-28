@@ -1019,7 +1019,10 @@ int ydb_init()
 				break;
 		}
 		*tmp_ptr = '\0';
-		/* First check the executable name is libyottadb.so. If not issue error. */
+		/* Note that we still have not checked if the executable name is libyottadb.so.
+		 * We will do that a little later in "common_startup_init" below (after setting <ydb_dist>
+		 * env var) and issue a LIBYOTTAMISMTCH error if needed.
+		 */
 		setenv(YDB_DIST, path, TRUE);
 		setenv("gtm_dist", path, TRUE);
 	}
