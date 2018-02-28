@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -459,26 +459,29 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				TREF(dollar_ztrap) = mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save;
 				ztrap_explicit_null = mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save;
 			}
-			DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
-			CHECKHIGHBOUND(mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
-			CHECKLOWBOUND(mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
-			ctxt = mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save;
-			/* same assert as in gtm_trigger.c */
-			assert(((0 == gtm_trigger_depth)
-					&& (((ch_at_trigger_init == ctxt->ch)
-						|| ((ch_at_trigger_init == (ctxt - 1)->ch)
-							&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
-								|| (&gvcst_spr_kill_ch == ctxt->ch))))))
-				|| ((0 < gtm_trigger_depth)
-					&& (((&mdb_condition_handler == ctxt->ch)
-						|| ((&mdb_condition_handler == (ctxt - 1)->ch)
-							&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
-								|| (&gvcst_spr_kill_ch == ctxt->ch)))))));
-			active_ch = ctxt;
-			ctxt->ch_active = FALSE;
-			ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
-			if (tp_timeout_deferred && !((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT))
-			    && !dollar_zininterrupt)
+			if (TREF(trig_forced_unwind))
+			{	/* This is a forced unwind of the trigger context so reset the condition handler stack too */
+				DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
+				CHECKHIGHBOUND(mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
+				CHECKLOWBOUND(mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
+				ctxt = mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save;
+				/* same assert as in gtm_trigger.c */
+				assert(((0 == gtm_trigger_depth)
+						&& (((ch_at_trigger_init == ctxt->ch)
+							|| ((ch_at_trigger_init == (ctxt - 1)->ch)
+								&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
+									|| (&gvcst_spr_kill_ch == ctxt->ch))))))
+					|| ((0 < gtm_trigger_depth)
+						&& (((&mdb_condition_handler == ctxt->ch)
+							|| ((&mdb_condition_handler == (ctxt - 1)->ch)
+								&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
+									|| (&gvcst_spr_kill_ch == ctxt->ch)))))));
+				active_ch = ctxt;
+				ctxt->ch_active = FALSE;
+				ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
+				TREF(trig_forced_unwind) = FALSE;
+			}
+			if (tp_timeout_deferred && !((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)) && !dollar_zininterrupt)
 			{	/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and/or we are no
 				 * longer in a job interrupt, the timeout can no longer be deferred and needs to be
 				 * recognized.

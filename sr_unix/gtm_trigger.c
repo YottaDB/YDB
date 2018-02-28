@@ -810,12 +810,17 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
  */
 void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	/* Would normally be an assert but potential frame stack damage so severe and resulting debug difficulty that we
 	 * assertpro() instead.
 	 */
 	assertpro(frame_pointer->type & SFT_TRIGR);
+	TREF(trig_forced_unwind) = forced_unwind;	/* used by "op_unwind" */
 	/* Unwind the trigger base frame */
 	op_unwind();
+	assert(FALSE == TREF(trig_forced_unwind));	/* should have been reset by "op_unwind" */
 	/* restore frame_pointer stored at msp (see base_frame.c) */
         frame_pointer = *(stack_frame**)msp;
 	msp += SIZEOF(stack_frame *);           /* Remove frame save pointer from stack */
