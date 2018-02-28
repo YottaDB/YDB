@@ -496,6 +496,7 @@ THREADGBLAR1DEF(ydbmsgprefixbuf,		char,	32)	/* The message prefix buffer size is
 								 * 8 4-byte unicode characters or 32 ascii characters.
 								 */
 THREADGBLDEF(ydbmsgprefix,			mstr)		/* mstr pointing to msgprefixbuf containing the YDB prompt */
+THREADGBLDEF(trig_forced_unwind,		boolean_t)	/* set/used by "gtm_trigger_fini", "op_unwind" and "unw_mv_ent" */
 
 /* Debug values */
 #ifdef DEBUG
