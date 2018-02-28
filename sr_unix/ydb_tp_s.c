@@ -30,6 +30,7 @@ GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int	t_tries;
 GBLREF	int		tprestart_state;
 GBLREF	uint4		dollar_trestart;
+GBLREF	uint4		simpleapi_dollar_trestart;
 
 /* Routine to invoke a user-specified function "tpfn" inside a TP transaction (i.e. TSTART/TCOMMIT fence).
  *
@@ -47,7 +48,6 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 	mval		varnamearray[YDB_MAX_NAMES], *mv, *mv_top;
 	ydb_buffer_t	*curvarname;
 	char		buff[256];			/* sprintf() buffer */
-	uint4		lcl_dollar_trestart;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -86,9 +86,7 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 		 */
 		if (YDB_MAX_NAMES < namecount)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TOOMANYVARNAMES, 1, YDB_MAX_NAMES);
-		for (curvarname = varnames, mv = varnamearray, mv_top = mv + namecount;
-		     mv < mv_top;
-		     curvarname++, mv++)
+		for (curvarname = varnames, mv = varnamearray, mv_top = mv + namecount; mv < mv_top; curvarname++, mv++)
 		{
 			if (IS_INVALID_YDB_BUFF_T(curvarname))
 			{
@@ -149,13 +147,14 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 			 * call happened right there. In that case, we need to skip the "tp_restart" call here. That is
 			 * detected by the "if" check below.
 			 */
-			assert((lcl_dollar_trestart == dollar_trestart) || (lcl_dollar_trestart == (dollar_trestart - 1)));
+			assert((simpleapi_dollar_trestart == dollar_trestart)
+				|| (simpleapi_dollar_trestart == (dollar_trestart - 1)));
 			/* If the global "dollar_trestart" is different from what we noted down at the start of this try/retry
-			 * of this transaction ("lcl_dollar_trestart"), then it means we are done with "tp_restart" call
+			 * of this transaction ("simpleapi_dollar_trestart"), then it means we are done with "tp_restart" call
 			 * (since "dollar_trestart++" is done at the end of "tp_restart"). So use that as the basis of
 			 * the check to determine if a "tp_restart" is still needed or not.
 			 */
-			if (lcl_dollar_trestart == dollar_trestart)
+			if (simpleapi_dollar_trestart == dollar_trestart)
 			{
 				preemptive_db_clnup(ERROR);	/* Cleanup "reset_gv_target", TREF(expand_prev_key) etc. */
 				if (cdb_sc_normal == t_fail_hist[t_tries])
@@ -171,7 +170,12 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 		}
 	}
 	LIBYOTTADB_DONE;		/* Shutoff active rtn indicator while call callback routine */
-	lcl_dollar_trestart = dollar_trestart; /* Note down global to help later decide whether "tp_restart" processing is needed */
+	if (!save_dollar_tlevel)
+	{	/* This is the outermost TP. Note down "simpleapi_dollar_trestart" for later use
+		 * by "ydb_tp_s"/"ydb_simpleapi_ch" to help decide whether "tp_restart" processing is needed.
+		 */
+		simpleapi_dollar_trestart = dollar_trestart;
+	}
 	if (YDB_OK == tpfn_status)
 	{
 		tpfn_status = (*tpfn)(tpfnparm);

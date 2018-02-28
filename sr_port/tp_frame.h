@@ -81,10 +81,12 @@ typedef struct tp_frame_struct
 								 */
 	unsigned int			implicit_trigger : 1;	/* The implicit tstart is for a trigger which means some minor
 								 * deviations in dealing with TP restarts in some circumstances.
+								 * Field is inherited across nested op_tstarts.
 								 */
 	unsigned int			ydb_tp_s_tstart : 1;	/* This TP frame was set up by a call to "op_tstart"
 								 * from "ydb_tp_s". Used by "gtm_trigger_fini" to know whether to
 								 * do a "op_trollback" or not before returning to caller.
+								 * Field is inherited across nested op_tstarts.
 								 */
 	unsigned int			filler : 23;
 	unsigned char 			*restart_pc;
