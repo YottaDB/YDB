@@ -67,6 +67,7 @@ getfields(fldarray,dbname)
 	set TRUE=1,FALSE=0,BigEndian=1,LittleEndian=0
 	set platformendian("AIX","RS6000")=BigEndian
 	set platformendian("Linux","armv7l")=LittleEndian
+	set platformendian("Linux","armv6l")=LittleEndian
 	set platformendian("Linux","x86")=LittleEndian
 	set platformendian("Linux","x86_64")=LittleEndian
 	set platformendian("Solaris","SPARC")=BigEndian
