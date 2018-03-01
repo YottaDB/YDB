@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,8 +39,7 @@ error_def(ERR_STACKOFLOW);
 
 CONDITION_HANDLER(gtmci_ch)
 {
-	char	src_buf[MAX_ENTRYREF_LEN];
-	mstr	src_line;
+	mstr	entryref;
 
 	START_CH(TRUE);
 	if (DUMPABLE)
@@ -45,9 +47,9 @@ CONDITION_HANDLER(gtmci_ch)
 		gtm_dump();
 		TERMINATE;
 	}
-	src_line.len = 0;
-	src_line.addr = &src_buf[0];
-	set_zstatus(&src_line, SIGNAL, NULL, FALSE);
+	entryref.addr = CALL_IN_M_ENTRYREF;
+	entryref.len = STR_LIT_LEN(CALL_IN_M_ENTRYREF);
+	set_zstatus(&entryref, SIGNAL, NULL, FALSE);
 	if (msp < FGNCAL_STACK) /* restore stack to the last marked position */
 		fgncal_unwind();
 	else TREF(temp_fgncal_stack) = NULL;	/* If fgncal_unwind() didn't run to clear this, we have to */
