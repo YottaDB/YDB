@@ -58,6 +58,7 @@ int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int 
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
+	assert(MAXPOSINT4 == (YDB_MAX_LOCKTIME / NANOSECS_IN_MSEC));
 	if (YDB_MAX_LOCKTIME < nsec_timeout)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TIMEOUT2LONG);
 	/* Setup and validate the varname */
@@ -83,8 +84,7 @@ int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int 
 	 * convert the timeout value from microseconds to milliseconds.
 	 */
 	msec_timeout = (nsec_timeout / NANOSECS_IN_MSEC);
-	if (MAXPOSINT4 < msec_timeout)
-		msec_timeout = MAXPOSINT4;		/* MAXPOSINT4 is maximum possible timeout in milliseconds */
+	assert(MAXPOSINT4 > msec_timeout);      /* or else a TIMEOUT2LONG error would have been issued above */
 	timeoutms = (int)msec_timeout;
 	i2mval(&timeout_mval, timeoutms);
 	lock_rc = op_incrlock(&timeout_mval);
