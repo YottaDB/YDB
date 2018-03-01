@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -122,6 +122,9 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFF_ETRAP_ERR_OFF		~(SFF_ETRAP_ERR)		/* Mask to turn off SFF_ETRAP_ERR */
 #define SFF_UNW_SYMVAL_OFF		~(SFF_UNW_SYMVAL)		/* Mask to turn off SFF_UNW_SYMVAL */
 #define SSF_NORET_VIA_MUMTSTART_OFF	~(SSF_NORET_VIA_MUMTSTART)	/* Mask to turn off SSF_NORET_VIA_MUMTSTART */
+
+#define	CALL_IN_M_ENTRYREF	"(Call-In Level Entry)"	/* M entryref equivalent for Call-In. Filled in $zstatus, ZSHOW "S" etc. */
+#define	SIMPLEAPI_M_ENTRYREF	"(SimpleAPI)"		/* M entryref equivalent for simpleAPI. Filled in $zstatus */
 
 #define	ADJUST_FRAME_POINTER(fptr, shift)			\
 {								\

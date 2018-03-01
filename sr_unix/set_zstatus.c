@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -44,14 +47,17 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 	int		save_arg;
 	size_t		util_len ;
 	mval		*status_loc;
-	boolean_t 	trans_frame;
+	boolean_t 	trans_frame, copy_entryref;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	b_line = NULL;
 	if (!need_rtsloc)
+	{
 	 	trans_frame = FALSE;
-	else
+		assert(src->len);
+		copy_entryref = TRUE;
+	} else
 	{	/* get the line address of the last "known" MUMPS code that was executed.  MUMPS
 		 * indirection constitutes MUMPS code that is "unknown" is the sense that there is no
 		 * line address for it.
@@ -64,18 +70,19 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 			SET_ERR_CODE(frame_pointer, arg);
 		}
 		src->len = INTCAST(get_symb_line((unsigned char*)src->addr, &b_line, ctxtp) - (unsigned char*)src->addr);
+		copy_entryref = (NULL != b_line);
 	}
 	MV_FORCE_MVAL(&val, arg);
 	n2s(&val);
 	memcpy(zstatus_buff, val.str.addr, val.str.len);
 	zstatus_bptr = zstatus_buff + val.str.len;
 	*zstatus_bptr++ = ',';
-	if (NULL != b_line)
+	if (copy_entryref)
 	{
 		memcpy(zstatus_bptr, src->addr, src->len);
 		zstatus_bptr += src->len;
-		*zstatus_bptr++ = ',';
 	}
+	*zstatus_bptr++ = ',';
 	zstatus_iter = zstatus_bptr;
 	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 	util_len = TREF(util_outptr) - TREF(util_outbuff_ptr);

@@ -95,6 +95,7 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	char			zstatus_buffer[OUT_BUFF_SIZE];
 	int			zstatus_buffer_len;
 	int			rc;
+	mstr			entryref;
 
 	START_CH(TRUE);
 	if (ERR_REPEATERROR == SIGNAL)
@@ -149,7 +150,11 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 		UNWIND(NULL, NULL);
 	}
 	if (ERR_REPEATERROR != SIGNAL)
-		set_zstatus(NULL, arg, NULL, FALSE);
+	{
+		entryref.addr = SIMPLEAPI_M_ENTRYREF;
+		entryref.len = STR_LIT_LEN(SIMPLEAPI_M_ENTRYREF);
+		set_zstatus(&entryref, arg, NULL, FALSE);
+	}
 	/* Ensure gv_target and cs_addrs are in sync. If not, make them so. */
 	if (NULL != gv_target)
 	{
