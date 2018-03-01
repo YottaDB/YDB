@@ -43,6 +43,9 @@ int ydb_message(ydb_int_t status, ydb_buffer_t *msg_buff)
 	if (YDB_MIN_ERROR_BUF_LEN > msg_buff->len_alloc)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MSGBUF2SMALL, 1, YDB_MIN_ERROR_BUF_LEN);
 	l_x = status;
+	/* If user supplied a return code from a simpleAPI call, it could be negative. Handle that here. */
+	if (0 > l_x)
+		l_x = -l_x;
 	msg.len = msg_buff->len_alloc;
 	msg.addr = msg_buff->buf_addr;
 	gtm_getmsg(l_x, &msg);		/* Writes result to user buffer */
