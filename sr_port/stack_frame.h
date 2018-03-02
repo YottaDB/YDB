@@ -123,7 +123,7 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFF_UNW_SYMVAL_OFF		~(SFF_UNW_SYMVAL)		/* Mask to turn off SFF_UNW_SYMVAL */
 #define SSF_NORET_VIA_MUMTSTART_OFF	~(SSF_NORET_VIA_MUMTSTART)	/* Mask to turn off SSF_NORET_VIA_MUMTSTART */
 
-#define	CALL_IN_M_ENTRYREF	"(Call-In Level Entry)"	/* M entryref equivalent for Call-In. Filled in $zstatus, ZSHOW "S" etc. */
+#define	CALL_IN_M_ENTRYREF	"(Call-In)"	/* M entryref equivalent for Call-In. Filled in $zstatus, ZSHOW "S" etc. */
 #define	SIMPLEAPI_M_ENTRYREF	"(SimpleAPI)"		/* M entryref equivalent for simpleAPI. Filled in $zstatus */
 
 #define	ADJUST_FRAME_POINTER(fptr, shift)			\
