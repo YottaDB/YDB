@@ -34,7 +34,6 @@ SUBSARRAYNULL	<Non-zero number of subscripts [!UL] specified but subscript array
 MISSINGVARNAMES	<At least one variable name must be specified>/error/fao=0
 TOOMANYVARNAMES	<Number of varnames specified exceeds maximum (!UL)>/error/fao=1
 INVNAMECOUNT	<Invalid value for namecount parameter in a !AD call>/error/fao=2
-MSGBUF2SMALL	<Message buffer for ydb_message() must be at least !UL bytes>/error/fao=1
 UNKNOWN		<Unknown error code specified>/error/fao=0
 TIMEOUT2LONG	<Timeout value exceeds supported maximum>/error/fao=0
 VARNAME2LONG	<Variable name length exceeds maximum allowed (!UL)>/error/fao=1
