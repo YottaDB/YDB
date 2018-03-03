@@ -54,7 +54,6 @@ ydb_lock_decr_s
 ydb_lock_incr_s
 ydb_lock_s
 ydb_malloc
-ydb_message
 ydb_node_next_s
 ydb_node_next_s
 ydb_node_previous_s

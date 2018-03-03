@@ -51,7 +51,6 @@ enum ydb_error_severity
 #define YDB_MAX_LOCKTIME	(0x7fffffffllu * 1000llu * 1000llu)	/* Max lock time in (long long) nanoseconds */
 
 /* Minimum values */
-#define YDB_MIN_ERROR_BUF_LEN	30	/* Min length of buffer for ydb_message() -- needed for error processing */
 
 /* Non-error return codes (all positive) */
 #define YDB_OK		0		/* Successful return code */
@@ -262,7 +261,6 @@ void 		*ydb_malloc(size_t);
 void 		ydb_free(void *);
 void		ydb_fork_n_core(void);
 int		ydb_child_init(void *param);
-int		ydb_message(ydb_int_t status, ydb_buffer_t *msg_buff);
 int		ydb_stdout_stderr_adjust(void);
 
 typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
