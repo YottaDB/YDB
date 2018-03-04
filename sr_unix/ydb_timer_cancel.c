@@ -13,9 +13,29 @@
 #include "mdef.h"
 
 #include "gtmxc_types.h"
+#include "error.h"
+#include "send_msg.h"
+#include "libydberrors.h"
 
 /* Simple YottaDB wrapper for gtm_cancel_timer() */
-void ydb_cancel_timer(ydb_tid_t tid)
+void ydb_timer_cancel(ydb_tid_t tid)
 {
+	boolean_t	error_encountered;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	if (process_exiting)
+	{	/* YDB runtime environment not setup/available, no driving of errors */
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
+		return;
+	}
+	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
+	if (error_encountered)
+	{	/* Some error occurred - just return to the caller ($ZSTATUS is set) */
+		REVERT;
+		return;
+	}
 	gtm_cancel_timer(tid);
+	REVERT;
+	return;
 }

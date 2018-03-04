@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,17 +19,19 @@
 #include "iosp.h"		/* for SS_NORMAL */
 
 /* Checks whether the two fileids passed are identical  */
-xc_status_t gtm_is_file_identical(xc_fileid_ptr_t fileid1, xc_fileid_ptr_t fileid2)
+ydb_status_t gtm_is_file_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2)
 {
-	if (!fileid1 || (!fileid2)) return FALSE;
+	if (!fileid1 || (!fileid2))
+		return FALSE;
 	return is_gdid_identical((gd_id_ptr_t) fileid1, (gd_id_ptr_t) fileid2);
 }
 
 /* Converts given filename to unique file id. Uses filename_to_id internally for getting the unique id. Note that,
  * the allocation of the fileid structure is done here and the caller needs to worry only about free'ing the
  * allocated pointer via gtm_xcfileid_free. */
-xc_status_t gtm_filename_to_id(xc_string_t *filename, xc_fileid_ptr_t *fileid)
+ydb_status_t gtm_filename_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid)
 {
+	int		actstatus;
 	boolean_t	status;
 	gd_id_ptr_t	tmp_fileid;
 
@@ -34,14 +39,21 @@ xc_status_t gtm_filename_to_id(xc_string_t *filename, xc_fileid_ptr_t *fileid)
 		return FALSE;
 	assert(fileid && !*fileid);
 	tmp_fileid = (gd_id_ptr_t)malloc(SIZEOF(gd_id));
-	status = (SS_NORMAL == filename_to_id(tmp_fileid, filename->address));
-	*fileid = (xc_fileid_ptr_t)tmp_fileid;
-	return status;
+	actstatus = filename_to_id(tmp_fileid, filename->address);
+	status = (SS_NORMAL == actstatus);
+	if (status)
+		*fileid = (ydb_fileid_ptr_t)tmp_fileid;
+	else
+	{	/* There was an error */
+		free(tmp_fileid);
+		*fileid = NULL;
+	}
+	return status ? YDB_OK : actstatus;
 }
 
-/* Allocation of xc_fileid_ptr_t happens in gtm_filename_to_id. During the close time, encryption library  needs to free these
+/* Allocation of ydb_fileid_ptr_t happens in gtm_filename_to_id. During the close time, encryption library  needs to free these
  * externally allocated resources and this is done through this function. */
-void gtm_xcfileid_free(xc_fileid_ptr_t fileid)
+void gtm_xcfileid_free(ydb_fileid_ptr_t fileid)
 {
 	if (NULL != fileid)
 		free(fileid);

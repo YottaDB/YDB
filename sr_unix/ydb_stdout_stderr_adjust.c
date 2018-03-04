@@ -16,6 +16,8 @@
 #include "gtmimagename.h"
 #include "cenable.h"
 #include "io.h"
+#include "send_msg.h"
+#include "libydberrors.h"
 
 /* This function initializes the IO devices in preparation for a later call-in invocation.
  * This usually needs to be invoked from a C program using simpleAPI after having manipulated the stdout/stderr
@@ -33,6 +35,11 @@ int	ydb_stdout_stderr_adjust(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (process_exiting)
+	{	/* YDB runtime environment not setup/available, no driving of errors */
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
+		return YDB_ERR_CALLINAFTERXIT;
+	}
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{

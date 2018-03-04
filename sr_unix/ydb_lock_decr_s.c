@@ -22,6 +22,9 @@
 #include "callg.h"
 #include "mvalconv.h"
 #include "namelook.h"
+#include "outofband.h"
+
+GBLREF	volatile int4	outofband;
 
 /* Routine to incrementally release a lock (not unlocking everything first).
  *
@@ -56,6 +59,9 @@ int ydb_lock_decr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
+	/* Check if an outofband action that might care about has popped up */
+	if (outofband)
+		outofband_action(FALSE);
 	/* First step, initialize the private lock list */
 	op_lkinit();
 	/* Setup and validate the varname */

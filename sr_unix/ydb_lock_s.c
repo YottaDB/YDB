@@ -24,6 +24,9 @@
 #include "callg.h"
 #include "mvalconv.h"
 #include "namelook.h"
+#include "outofband.h"
+
+GBLREF	volatile int4	outofband;
 
 /* Routine to obtain a lock (unlocking everything first).
  *
@@ -65,6 +68,9 @@ int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
 	assert(MAXPOSINT4 == (YDB_MAX_LOCKTIME / NANOSECS_IN_MSEC));
+	/* Check if an outofband action that might care about has popped up */
+	if (outofband)
+		outofband_action(FALSE);
 	if (YDB_MAX_LOCKTIME < nsec_timeout)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TIMEOUT2LONG);
 	if (0 > namecount)

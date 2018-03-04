@@ -19,6 +19,9 @@
 #include "op.h"
 #include "error.h"
 #include "stringpool.h"
+#include "outofband.h"
+
+GBLREF	volatile int4	outofband;
 
 /* Routine to get local, global and ISV values
  *
@@ -58,6 +61,9 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
+	/* Check if an outofband action that might care about has popped up */
+	if (outofband)
+		outofband_action(FALSE);
 	if (0 >= namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MISSINGVARNAMES);
 	if (YDB_MAX_NAMES < namecount)

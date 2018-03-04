@@ -1131,8 +1131,9 @@ int ydb_exit()
 		return 0;		/* GT.M environment not setup yet - quietly return */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	assert(NULL != frame_pointer);
-	/* Do not allow ydb_exit() to be invoked from external calls */
-	if (!(SFT_CI & frame_pointer->type) || !(MUMPS_CALLIN & invocation_mode) || (1 < TREF(gtmci_nested_level)))
+	/* Do not allow ydb_exit() to be invoked from external calls (unless process_exiting) */
+	if (process_exiting || (!(SFT_CI & frame_pointer->type) || !(MUMPS_CALLIN & invocation_mode)
+				|| (1 < TREF(gtmci_nested_level))))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
 	/* Now get rid of the whole M stack - end of GT.M environment */
 	while (NULL != frame_pointer)

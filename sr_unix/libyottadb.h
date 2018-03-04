@@ -46,7 +46,7 @@ enum ydb_error_severity
 #define YDB_MAX_IDENT		31	/* Maximum size of global/local name (not including '^') */
 #define YDB_MAX_NAMES		255	/* Maximum number of variable names can be specified in a single ydb_*_s() call */
 /* Note YDB_MAX_NAMES may be temporary and currently only relates to ydb_delete_excl_s() and ydb_tp_s() */
-#define YDB_MAX_STR		(1 * 1000 * 1000)	/* Maximum YottaDB string length */
+#define YDB_MAX_STR		(1 * 1024 * 1024)	/* Maximum YottaDB string length */
 #define YDB_MAX_SUBS		31	/* Maximum subscripts currently supported */
 #define YDB_MAX_LOCKTIME	(0x7fffffffllu * 1000llu * 1000llu)	/* Max lock time in (long long) nanoseconds */
 
@@ -248,20 +248,19 @@ ydb_status_t	ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *ar
 void 		ydb_zstatus(char* msg, int len);
 
 /* Utility entry points accessable in libyottadb.so */
-ydb_status_t	ydb_file_name_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
-void		ydb_hiber_start(unsigned long long mssleep);
-void		ydb_hiber_start_wait_any(unsigned long long mssleep);
-void		ydb_start_timer(ydb_tid_t tid, unsigned long long time_to_expir, void (*handler)(), ydb_int_t hdata_len,
-				void *hdata);
-void		ydb_cancel_timer(ydb_tid_t tid);
-ydb_status_t	ydb_is_file_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
-void		ydb_file_id_free(ydb_fileid_ptr_t fileid);
-int		ydb_is_main_thread(void);
-void 		*ydb_malloc(size_t);
-void 		ydb_free(void *);
-void		ydb_fork_n_core(void);
-int		ydb_child_init(void *param);
-int		ydb_stdout_stderr_adjust(void);
+int	ydb_file_name_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
+void	ydb_hiber_start(unsigned long long mssleep);
+void	ydb_hiber_start_wait_any(unsigned long long mssleep);
+void	ydb_timer_start(ydb_tid_t tid, unsigned long long time_to_expir, void (*handler)(), ydb_int_t hdata_len, void *hdata);
+void	ydb_timer_cancel(ydb_tid_t tid);
+int	ydb_file_is_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
+int	ydb_file_id_free(ydb_fileid_ptr_t fileid);
+int	ydb_thread_is_main(void);
+void 	*ydb_malloc(size_t);
+void	ydb_free(void *);
+void	ydb_fork_n_core(void);
+int	ydb_child_init(void *param);
+int	ydb_stdout_stderr_adjust(void);
 
 typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
 

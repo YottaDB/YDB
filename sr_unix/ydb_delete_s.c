@@ -29,6 +29,9 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "mvalconv.h"
+#include "outofband.h"
+
+GBLREF	volatile int4	outofband;
 
 /* Routine to delete/kill an lvn/gvn.
  *
@@ -70,6 +73,9 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
+	/* Check if an outofband action that might care about has popped up */
+	if (outofband)
+		outofband_action(FALSE);
 	/* If the varname pointer is null, this implies a local var kill-all. Check for that before attempting to
 	 * validate a name that may not be specified.
 	 */

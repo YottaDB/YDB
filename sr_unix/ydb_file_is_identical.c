@@ -17,25 +17,26 @@
 #include "send_msg.h"
 #include "libydberrors.h"
 
-/* Simple YottaDB wrapper for gtm_free() */
-void ydb_free(void *storadr)
+/* Simple YottaDB wrapper for the gtm_is_file_identical() utility function */
+int ydb_file_is_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2)
 {
 	boolean_t	error_encountered;
+	int		status;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (process_exiting)
 	{	/* YDB runtime environment not setup/available, no driving of errors */
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		return;
+		return YDB_ERR_CALLINAFTERXIT;
 	}
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
-	{	/* Some error occurred - just return to the caller ($ZSTATUS is set) */
+	{	/* Some error occurred - return the error code to the caller ($ZSTATUS is set) */
 		REVERT;
-		return;
+		return -(TREF(ydb_error_code));
 	}
-	gtm_free(storadr);
+	status = gtm_is_file_identical(fileid1, fileid2);
 	REVERT;
-	return;
+	return status ? YDB_OK : -1;
 }

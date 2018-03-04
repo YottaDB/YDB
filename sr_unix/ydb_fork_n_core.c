@@ -30,6 +30,10 @@ GBLREF	boolean_t	gtm_startup_active;
  * fully initialized. It is inappropriate to expect this routine to run that initialization prior to creating
  * a core as it is usually called when the situation is already bad and running something as large as YottaDB
  * initialization is almost certain to make it worse.
+ *
+ * Note no errors are raised by gtm_fork_n_core() and no user parameter pointers are being handled so no
+ * condition handler wrapper has been added. It also already protects itself against being re-entered after
+ * ydb_exit() because gtm_startup_active is cleared in that case.
  */
 
 void ydb_fork_n_core(void)

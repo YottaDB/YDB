@@ -29,7 +29,6 @@ lke_main
 mupip_main
 op_read
 to_ulong
-ydb_cancel_timer
 ydb_child_init
 ydb_ci
 ydb_cij
@@ -39,6 +38,7 @@ ydb_delete_excl_s
 ydb_delete_s
 ydb_exit
 ydb_file_id_free
+ydb_file_is_identical
 ydb_file_name_to_id
 ydb_fork_n_core
 ydb_free
@@ -47,8 +47,6 @@ ydb_hiber_start
 ydb_hiber_start_wait_any
 ydb_incr_s
 ydb_init
-ydb_is_file_identical
-ydb_is_main_thread
 ydb_jinit
 ydb_lock_decr_s
 ydb_lock_incr_s
@@ -58,12 +56,14 @@ ydb_node_next_s
 ydb_node_next_s
 ydb_node_previous_s
 ydb_set_s
-ydb_start_timer
 ydb_stdout_stderr_adjust
 ydb_str2zwr_s
 ydb_str2zwr_s
 ydb_subscript_next_s
 ydb_subscript_previous_s
+ydb_thread_is_main
+ydb_timer_cancel
+ydb_timer_start
 ydb_tp_s
 ydb_zstatus
 ydb_zwr2str_s

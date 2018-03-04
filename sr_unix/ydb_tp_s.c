@@ -24,7 +24,9 @@
 #include "tp_restart.h"
 #include "preemptive_db_clnup.h"
 #include "stringpool.h"
+#include "outofband.h"
 
+GBLREF	volatile int4	outofband;
 GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int	t_tries;
@@ -63,6 +65,9 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
+	/* Check if an outofband action that might care about has popped up */
+	if (outofband)
+		outofband_action(FALSE);
 	save_dollar_tlevel = dollar_tlevel;
 	/* Ready "transid" for passing to "op_tstart" */
 	tid.mvtype = MV_STR;
