@@ -22,6 +22,9 @@
 #include "callg.h"
 #include "mvalconv.h"
 #include "namelook.h"
+#include "outofband.h"
+
+GBLREF	volatile int4	outofband;
 
 /* Routine to incrementally obtain a lock (not unlocking everything first).
  *
@@ -58,6 +61,9 @@ int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int 
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
+	/* Check if an outofband action that might care about has popped up */
+	if (outofband)
+		outofband_action(FALSE);
 	assert(MAXPOSINT4 == (YDB_MAX_LOCKTIME / NANOSECS_IN_MSEC));
 	if (YDB_MAX_LOCKTIME < nsec_timeout)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TIMEOUT2LONG);

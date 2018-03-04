@@ -17,8 +17,8 @@
 #include "send_msg.h"
 #include "libydberrors.h"
 
-/* Simple YottaDB wrapper for gtm_free() */
-void ydb_free(void *storadr)
+/* Simple YottaDB wrapper for gtm_start_timer() */
+void	ydb_timer_start(ydb_tid_t tid, unsigned long long time_to_expir, void (*handler)(), ydb_int_t hdata_len, void *hdata)
 {
 	boolean_t	error_encountered;
 	DCL_THREADGBL_ACCESS;
@@ -35,7 +35,7 @@ void ydb_free(void *storadr)
 		REVERT;
 		return;
 	}
-	gtm_free(storadr);
+	gtm_start_timer(tid, time_to_expir, handler, hdata_len, hdata);
 	REVERT;
 	return;
 }

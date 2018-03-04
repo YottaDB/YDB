@@ -29,8 +29,11 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "mvalconv.h"
+#include "outofband.h"
 
-LITREF	mval	literal_zero;
+GBLREF	volatile int4	outofband;
+
+LITREF	mval		literal_zero;
 
 /* Routine to return existance of given nodes and existence of descendants
  *
@@ -70,6 +73,9 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
+	/* Check if an outofband action that might care about has popped up */
+	if (outofband)
+		outofband_action(FALSE);
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, data_type, data_svn_index, FALSE);
 	if (0 > subs_used)

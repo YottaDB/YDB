@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,10 +15,12 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
+
 #include "io.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "outofband.h"
+#include "libyottadb_int.h"
 
 GBLREF io_pair		io_std_device;
 GBLREF stack_frame	*frame_pointer;
@@ -41,24 +46,30 @@ void outofband_action(boolean_t lnfetch_or_start)
 		}
 		switch(outofband)
 		{
-			case (ctrly):
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLY);
+			case (ctrly):		/* This signal is ignored in simpleAPI */
+				if (!(IS_SIMPLEAPI_MODE))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLY);
 				break;
 			case (ctrlc):
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
+				if (!(IS_SIMPLEAPI_MODE))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
+				else
+					exit(ERR_CTRLC);
 				break;
-			case (ctrap):
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
+			case (ctrap):		/* This signal is ignored in simpleAPI */
+				if (!(IS_SIMPLEAPI_MODE))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
 				break;
 			case (tptimeout):
-				/*
-				 * Currently following is nothing but an rts_error.
-				 * Function pointer is used flexibility.
+				/* Currently following is nothing but an rts_error. Function pointer is used flexibility.
+				 *
+				 * Note this is the only outofband currently allowed for simpleAPI functions.
 				 */
 				(*tp_timeout_action_ptr)();
 				break;
-			case (jobinterrupt):
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBINTRRQST);
+			case (jobinterrupt):	/* This signal is ignored in simpleAPI */
+				if (!(IS_SIMPLEAPI_MODE))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBINTRRQST);
 				break;
 			default:
 				assertpro(FALSE);

@@ -24,6 +24,9 @@
 #include "namelook.h"
 #include "stringpool.h"
 #include "libyottadb_int.h"
+#include "outofband.h"
+
+GBLREF	volatile int4	outofband;
 
 /* Routine to set local, global and ISV values
  *
@@ -60,6 +63,9 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
+	/* Check if an outofband action that might care about has popped up */
+	if (outofband)
+		outofband_action(FALSE);
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, set_type, set_svn_index, TRUE);
 	if (0 > subs_used)

@@ -17,9 +17,10 @@
 #include "send_msg.h"
 #include "libydberrors.h"
 
-/* Simple YottaDB wrapper for gtm_free() */
-void ydb_free(void *storadr)
+/* Simple YottaDB wrapper for gtm_is_main_thread() */
+int ydb_thread_is_main(void)
 {
+	int		status;
 	boolean_t	error_encountered;
 	DCL_THREADGBL_ACCESS;
 
@@ -27,15 +28,15 @@ void ydb_free(void *storadr)
 	if (process_exiting)
 	{	/* YDB runtime environment not setup/available, no driving of errors */
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		return;
+		return YDB_ERR_CALLINAFTERXIT;
 	}
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
-	{	/* Some error occurred - just return to the caller ($ZSTATUS is set) */
+	{	/* Some error occurred - return the error code to the caller ($ZSTATUS is set) */
 		REVERT;
-		return;
+		return -(TREF(ydb_error_code));
 	}
-	gtm_free(storadr);
+	status = gtm_is_main_thread();
 	REVERT;
-	return;
+	return status ? YDB_OK : -1;
 }

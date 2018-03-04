@@ -29,6 +29,9 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "outofband.h"
+
+GBLREF	volatile int4	outofband;
 
 /* Routine to locate the next node at any level (i.e. forward $query).
  *
@@ -71,6 +74,9 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
+	/* Check if an outofband action that might care about has popped up */
+	if (outofband)
+		outofband_action(FALSE);
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, nodenext_type, nodenext_svn_index, FALSE);
 	if (0 > subs_used)

@@ -96,8 +96,8 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 					 */
 					sigaction(sig, NULL, &check);			/* Fetch current ^C handler */
 					if (SIG_DFL == check.sa_handler)
-					{	/* No handler defined - it gets a NULL handler instead */
-						sigaction(sig, &ignore, NULL);
+					{	/* No handler defined - it gets the passed in handler instead */
+						sigaction(sig, &ctrlc_action, NULL);
 					} /* else we leave the handler alone */
 				}
 				break;

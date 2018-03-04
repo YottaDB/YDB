@@ -14,9 +14,29 @@
 
 #include "gt_timer.h"
 #include "libyottadb.h"
+#include "error.h"
+#include "send_msg.h"
+#include "libydberrors.h"
 
 /* Simple YottaDB wrapper for gtm_hiber_start_wait_any() */
-void	ydb_hiber_start_wait_any(unsigned long long ussleep)
+void ydb_hiber_start_wait_any(unsigned long long ussleep)
 {
+	boolean_t	error_encountered;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	if (process_exiting)
+	{	/* YDB runtime environment not setup/available, no driving of errors */
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
+		return;
+	}
+	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
+	if (error_encountered)
+	{	/* Some error occurred - just return to the caller ($ZSTATUS is set) */
+		REVERT;
+		return;
+	}
 	hiber_start_wait_any((ydb_uint_t)(ussleep / NANOSECS_IN_MSEC));
+	REVERT;
+	return;
 }

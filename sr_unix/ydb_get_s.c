@@ -30,6 +30,9 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "outofband.h"
+
+GBLREF	volatile int4	outofband;
 
 /* Routine to get local, global and ISV values
  *
@@ -72,6 +75,9 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
+	/* Check if an outofband action that might care about has popped up */
+	if (outofband)
+		outofband_action(FALSE);
 	/* Do some validation */
 	VALIDATE_VARNAME(varname, get_type, get_svn_index, FALSE);
 	if (0 > subs_used)
