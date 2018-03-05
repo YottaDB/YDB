@@ -85,7 +85,7 @@ NOTE: You must have at least docker 17.05 as [multi-stage](https://docs.docker.c
 
 ### Image information
 
-The docker image is built using the generic ```gtm``` script that gives the user some sane defaults to begin exploring YottaDB. This isn't meant for production usage.
+The docker image is built using the generic ```ydb``` script that gives the user some sane defaults to begin exploring YottaDB. This isn't meant for production usage.
 
 The commands below assume that you want to remove the docker container after running the command, which means that if you don't mount a volume that contains your database and routines they will be lost. If you want the container to persist remove the ```--rm``` parameter from the ```docker``` command.
 
