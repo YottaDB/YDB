@@ -42,6 +42,10 @@
 /* 	GTM_DIRTREE_COLLHDR_ALWAYS	"$gtm_dirtree_collhdr_always"	dbg-only use in gvcst_put hence no #define for it or
 									else the D9I10002703 subtest will need changes for this.
 									*/
+/* YDB Database (YDB versions of above */
+#define YDB_GBLDIR			"$ydb_gbldir"
+#define YDB_ZMAXTPTIME			"$ydb_zmaxtptime"
+
 /* White-box testing */
 #define	GTM_WHITE_BOX_TEST_CASE_COUNT	"$gtm_white_box_test_case_count"
 #define	GTM_WHITE_BOX_TEST_CASE_ENABLE	"$gtm_white_box_test_case_enable"
@@ -70,7 +74,7 @@
 
 /* Miscellaneous */
 #define	ZCOMPILE			"$gtmcompile"
-#define	GTM_DEBUG_LEVEL_ENVLOG		"$gtmdbglvl"
+#define	GTM_DBGLVL			"$gtmdbglvl"
 #define	GTM_ZROUTINES			"$gtmroutines"
 #define	GTM_BOOLEAN			"$gtm_boolean"
 #define	DISABLE_ALIGN_STRINGS		"$gtm_disable_alignstr"
@@ -91,6 +95,9 @@
 #define	ZTRAP_NEW			"$gtm_ztrap_new"
 #define	ZYERROR				"$gtm_zyerror"
 #define	GTM_ZSTEP			"$gtm_zstep"
+
+/* YDB Miscellaneous (may be YDB variations of GTM logicals */
+#define YDB_DBGLVL			"$ydb_dbglvl"
 
 /* -------------------------- UNIX only --------------------------  */
 

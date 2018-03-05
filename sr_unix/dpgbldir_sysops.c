@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -15,6 +18,7 @@
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
+#include "gtm_stdlib.h"
 #include "gtm_stat.h"
 
 #include <errno.h>
@@ -174,8 +178,15 @@ void dpzgbini(void)
 	uint4		status;
 	parse_blk	pblk;
 
-	temp_mstr.addr = GTM_GBLDIR;
-	temp_mstr.len = SIZEOF(GTM_GBLDIR) - 1;
+	if (NULL != getenv(YDB_GBLDIR))
+	{
+		temp_mstr.addr = YDB_GBLDIR;
+		temp_mstr.len = SIZEOF(YDB_GBLDIR) - 1;
+	} else
+	{
+		temp_mstr.addr = GTM_GBLDIR;
+		temp_mstr.len = SIZEOF(GTM_GBLDIR) - 1;
+	}
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = temp_buff;
 	pblk.buff_size = MAX_FBUFF;
@@ -184,8 +195,8 @@ void dpzgbini(void)
 	status = parse_file(&temp_mstr, &pblk);
 
 	dollar_zgbldir.mvtype = MV_STR;
-	dollar_zgbldir.str.len = SIZEOF(GTM_GBLDIR) - 1;
-	dollar_zgbldir.str.addr = GTM_GBLDIR;
+	dollar_zgbldir.str.len = temp_mstr.len;
+	dollar_zgbldir.str.addr = temp_mstr.addr;
 	if (status & 1)
 	{
 		dollar_zgbldir.str.len = pblk.b_esl;

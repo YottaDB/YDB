@@ -111,9 +111,16 @@ void	gtm_env_init(void)
 		 * to be initialized before any mallocs are done in the system.
 		 */
 		gtmDebugLevel = INITIAL_DEBUG_LEVEL;
-		val.addr = GTM_DEBUG_LEVEL_ENVLOG;
-		val.len = SIZEOF(GTM_DEBUG_LEVEL_ENVLOG) - 1;
-		if (tdbglvl = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
+		val.addr = YDB_DBGLVL;
+		val.len = SIZEOF(YDB_DBGLVL) - 1;
+		tdbglvl = trans_numeric(&val, &is_defined, TRUE);
+		if (!is_defined)
+		{	/* $ydb_dbglvl not defined, try $gtmdbglvl */
+			val.addr = GTM_DBGLVL;
+			val.len = SIZEOF(GTM_DBGLVL) - 1;
+			tdbglvl = trans_numeric(&val, &is_defined, TRUE);
+		}
+		if (is_defined)
 		{	/* Some kind of debugging was asked for.. */
 			tdbglvl |= GDL_Simple;			/* Make sure simple debugging turned on if any is */
 			if ((GDL_SmChkFreeBackfill | GDL_SmChkAllocBackfill) & tdbglvl)
@@ -406,10 +413,17 @@ void	gtm_env_init(void)
 		TREF(jnl_extract_nocol) = trans_numeric(&val, &is_defined, TRUE);
 #		endif
 		/* Initialize dollar_zmaxtptime */
-		val.addr = GTM_ZMAXTPTIME;
-		val.len = SIZEOF(GTM_ZMAXTPTIME) - 1;
-		if ((status = trans_numeric(&val, &is_defined, TRUE)) && (0 <= status) && (TPTIMEOUT_MAX_TIME >= status))
-			TREF(dollar_zmaxtptime) = status;	 /* NOTE assignment above */
+		val.addr = YDB_ZMAXTPTIME;
+		val.len = SIZEOF(YDB_ZMAXTPTIME) - 1;
+		status = trans_numeric(&val, &is_defined, TRUE);
+		if (!is_defined)
+		{
+			val.addr = GTM_ZMAXTPTIME;
+			val.len = SIZEOF(GTM_ZMAXTPTIME) - 1;
+			status = trans_numeric(&val, &is_defined, TRUE);
+		}
+		if (is_defined && (0 <= status) && (TPTIMEOUT_MAX_TIME >= status))
+			TREF(dollar_zmaxtptime) = status;
 		/* See if $gtm_ztrap_new/GTM_ZTRAP_NEW has been specified */
 		val.addr = ZTRAP_NEW;
 		val.len = SIZEOF(ZTRAP_NEW) - 1;

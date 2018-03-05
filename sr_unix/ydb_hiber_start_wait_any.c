@@ -19,9 +19,11 @@
 #include "libydberrors.h"
 
 /* Simple YottaDB wrapper for gtm_hiber_start_wait_any() */
-void ydb_hiber_start_wait_any(unsigned long long ussleep)
+void ydb_hiber_start_wait_any(unsigned long long sleep_nsec)
 {
-	boolean_t	error_encountered;
+	int			timeoutms;
+	unsigned long long	timeout_msec;
+	boolean_t		error_encountered;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -36,7 +38,12 @@ void ydb_hiber_start_wait_any(unsigned long long ussleep)
 		REVERT;
 		return;
 	}
-	hiber_start_wait_any((ydb_uint_t)(ussleep / NANOSECS_IN_MSEC));
+	if (YDB_MAX_TIME < sleep_nsec)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME);
+	timeout_msec = (sleep_nsec / NANOSECS_IN_MSEC);
+	assert(MAXPOSINT4 > timeout_msec);      	/* Or else a TIME2LONG error would have been issued above */
+	timeoutms = (int)timeout_msec;
+	hiber_start_wait_any(timeoutms);
 	REVERT;
 	return;
 }

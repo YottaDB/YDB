@@ -64,8 +64,16 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 	/* Check if an outofband action that might care about has popped up */
 	if (outofband)
 		outofband_action(FALSE);
+	/* If the varname count is zero, this implies a local var kill-all. Check for that before attempting to
+	 * validate a name that may not be specified.
+	 */
 	if (0 >= namecount)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MISSINGVARNAMES);
+	{	/* Special case - no varname supplied so drive kill-all of local variables */
+		op_killall();
+		LIBYOTTADB_DONE;
+		REVERT;
+		return YDB_OK;
+	}
 	if (YDB_MAX_NAMES < namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TOOMANYVARNAMES, 1, YDB_MAX_NAMES);
 	/* Run through the array creating mvals to hold the list of names to be excluded. Note, normally, we would use

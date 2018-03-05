@@ -18,7 +18,7 @@
 #include "libydberrors.h"
 
 /* Simple YottaDB wrapper for gtm_cancel_timer() */
-void ydb_timer_cancel(ydb_tid_t tid)
+void ydb_timer_cancel(int timer_id)
 {
 	boolean_t	error_encountered;
 	DCL_THREADGBL_ACCESS;
@@ -35,7 +35,7 @@ void ydb_timer_cancel(ydb_tid_t tid)
 		REVERT;
 		return;
 	}
-	gtm_cancel_timer(tid);
+	gtm_cancel_timer(timer_id);
 	REVERT;
 	return;
 }

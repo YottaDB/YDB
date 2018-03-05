@@ -47,7 +47,7 @@ GBLREF	volatile int4	outofband;
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
  * YottaDB runtime routines.
  */
-int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_delete_method delete_method)
+int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int deltype)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;
@@ -76,16 +76,9 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 	/* Check if an outofband action that might care about has popped up */
 	if (outofband)
 		outofband_action(FALSE);
-	/* If the varname pointer is null, this implies a local var kill-all. Check for that before attempting to
-	 * validate a name that may not be specified.
-	 */
+	/* No varames specified is an error */
 	if (NULL == varname)
-	{	/* Special case - no varname supplied so drive kill-all of local variables */
-		op_killall();
-		LIBYOTTADB_DONE;
-		REVERT;
-		return YDB_OK;
-	}
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MISSINGVARNAME);
 	/* We should have a variable name - check it out and determine type */
 	VALIDATE_VARNAME(varname, delete_type, delete_svn_index, FALSE);
 	if (0 > subs_used)
@@ -117,7 +110,7 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, "ydb_delete_s()");
 				src_lv = (lv_val *)callg((callgfnptr)op_srchindx, &plist);	/* Locate node */
 			}
-			switch(delete_method)
+			switch(deltype)
 			{	/* Drive the appropriate deletion routine depending on whether we are deleting just a node or the
 				 * node plus descendants (tree).
 				 */
@@ -128,7 +121,7 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 					op_lvzwithdraw(src_lv);
 					break;
 				default:
-					assertpro(FALSE);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 			}
 			break;
 		case LYDB_VARREF_GLOBAL:
@@ -148,7 +141,7 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to  key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
-			switch(delete_method)
+			switch(deltype)
 			{	/* Drive the appropriate deletion routine depending on whether we are deleting just a node or the
 				 * node plus descendants (tree).
 				 */
@@ -159,7 +152,7 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 					op_gvzwithdraw();
 					break;
 				default:
-					assertpro(FALSE);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 			}
 			break;
 		case LYDB_VARREF_ISV:

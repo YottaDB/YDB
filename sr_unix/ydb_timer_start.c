@@ -18,9 +18,12 @@
 #include "libydberrors.h"
 
 /* Simple YottaDB wrapper for gtm_start_timer() */
-void	ydb_timer_start(ydb_tid_t tid, unsigned long long time_to_expir, void (*handler)(), ydb_int_t hdata_len, void *hdata)
+void	ydb_timer_start(int timer_id, unsigned long long limit_nsec, ydb_funcptr_retvoid_t handler, unsigned int hdata_len,
+			void *hdata)
 {
-	boolean_t	error_encountered;
+	int			timeoutms;
+	unsigned long long	timeout_msec;
+	boolean_t		error_encountered;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -35,7 +38,12 @@ void	ydb_timer_start(ydb_tid_t tid, unsigned long long time_to_expir, void (*han
 		REVERT;
 		return;
 	}
-	gtm_start_timer(tid, time_to_expir, handler, hdata_len, hdata);
+	if (YDB_MAX_TIME < limit_nsec)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME);
+	timeout_msec = (limit_nsec / NANOSECS_IN_MSEC);
+	assert(MAXPOSINT4 > timeout_msec);      	/* Or else a TIME2LONG error would have been issued above */
+	timeoutms = (int)timeout_msec;
+	gtm_start_timer(timer_id, timeoutms, handler, hdata_len, hdata);
 	REVERT;
 	return;
 }

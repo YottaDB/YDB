@@ -31,6 +31,7 @@
 #include "trans_code_cleanup.h"
 #include "util.h"
 #include "gtmmsg.h"
+#include "libyottadb_int.h"
 
 GBLREF mval		dollar_zstatus, dollar_zerror;
 GBLREF stack_frame	*zyerr_frame, *frame_pointer;
@@ -123,7 +124,7 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
          * (further down the pike) is likely to load the text of the module into storage if it can. So we bypass
          * ecode setting for these two fatal errors. 02/2008 se
 	 */
-	if (ERR_MEMORY != arg)
+	if ((ERR_MEMORY != arg) && !IS_SIMPLEAPI_MODE)
 		ecode_set(arg);
 	return (b_line);
 }
