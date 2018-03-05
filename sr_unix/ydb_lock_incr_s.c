@@ -29,12 +29,12 @@ GBLREF	volatile int4	outofband;
 /* Routine to incrementally obtain a lock (not unlocking everything first).
  *
  * Parameters:
- *   - nsec_timeout - Causes the lock attempt to timeout after the given time (in nanoseconds) has elapsed.
+ *   - timeout_nsec - Causes the lock attempt to timeout after the given time (in nanoseconds) has elapsed.
  *   - varname      - Contains the basevar name (local or global). Must be a valid variable name.
  *   - subs_used    - The number of subscripts specified in the subsarray parm
  *   - subsarray    - An array of 'subs_used' ydb_buffer_t structures containing the definitions of the subscripts.
  */
-int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray)
+int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray)
 {
 	va_list			var;
 	int			parmidx, timeoutms, lock_rc;
@@ -42,7 +42,7 @@ int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int 
 	boolean_t		error_encountered;
 	mval			timeout_mval, varname_mval;
 	mval			plist_mvals[YDB_MAX_SUBS + 1];
-	unsigned long long	msec_timeout;
+	unsigned long long	timeout_msec;
 	ydb_var_types		var_type;
 	int			var_svn_index;
 	DCL_THREADGBL_ACCESS;
@@ -64,9 +64,9 @@ int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int 
 	/* Check if an outofband action that might care about has popped up */
 	if (outofband)
 		outofband_action(FALSE);
-	assert(MAXPOSINT4 == (YDB_MAX_LOCKTIME / NANOSECS_IN_MSEC));
-	if (YDB_MAX_LOCKTIME < nsec_timeout)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TIMEOUT2LONG);
+	assert(MAXPOSINT4 == (YDB_MAX_TIME / NANOSECS_IN_MSEC));
+	if (YDB_MAX_TIME < timeout_nsec)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME);
 	/* Setup and validate the varname */
 	VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
 	/* ISV references are not supported for this call */
@@ -89,12 +89,12 @@ int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int 
 	/* At this point, the private lock block has been created. Remaining task before calling "op_incrlock" is to
 	 * convert the timeout value from microseconds to milliseconds.
 	 */
-	msec_timeout = (nsec_timeout / NANOSECS_IN_MSEC);
-	assert(MAXPOSINT4 > msec_timeout);      /* or else a TIMEOUT2LONG error would have been issued above */
-	timeoutms = (int)msec_timeout;
+	timeout_msec = (timeout_nsec / NANOSECS_IN_MSEC);
+	assert(MAXPOSINT4 > timeout_msec);      	/* Or else a TIME2LONG error would have been issued above */
+	timeoutms = (int)timeout_msec;
 	i2mval(&timeout_mval, timeoutms);
 	lock_rc = op_incrlock(&timeout_mval);
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* The counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;
 	return lock_rc ? YDB_OK : YDB_LOCK_TIMEOUT;

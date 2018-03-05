@@ -18,7 +18,7 @@
 #include "libydberrors.h"
 
 /* Simple YottaDB wrapper for gtm_free() */
-void ydb_free(void *storadr)
+void ydb_free(void *ptr)
 {
 	boolean_t	error_encountered;
 	DCL_THREADGBL_ACCESS;
@@ -35,7 +35,7 @@ void ydb_free(void *storadr)
 		REVERT;
 		return;
 	}
-	gtm_free(storadr);
+	gtm_free(ptr);
 	REVERT;
 	return;
 }

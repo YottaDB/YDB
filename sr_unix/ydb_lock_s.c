@@ -31,14 +31,14 @@ GBLREF	volatile int4	outofband;
 /* Routine to obtain a lock (unlocking everything first).
  *
  * Parameters:
- *   - nsec_timeout - Causes the lock attempt to timeout after the given time (in nanoseconds) has elapsed.
+ *   - timeout_nsec - Causes the lock attempt to timeout after the given time (in nanoseconds) has elapsed.
  *   - namecount    - Count of "parm-triples" (varname, subcnt, sublist) or 0 if unlocking all.
  *   repeating parm-triples made up of:
  *   - varname	    - Lock varname
  *   - subs_used    - Number of subscripts
  *   - subsarray    - Array of subscripts
  */
-int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
+int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 {
 	va_list			var;
 	int			parmidx, timeoutms, lock_rc;
@@ -48,7 +48,7 @@ int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 	mval			plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_buffer_t		*varname, *subsarray;
 	int			subs_used;
-	unsigned long long	msec_timeout;
+	unsigned long long	timeout_msec;
 	ydb_var_types		var_type;
 	int			var_svn_index;
 	DCL_THREADGBL_ACCESS;
@@ -67,12 +67,12 @@ int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
-	assert(MAXPOSINT4 == (YDB_MAX_LOCKTIME / NANOSECS_IN_MSEC));
+	assert(MAXPOSINT4 == (YDB_MAX_TIME / NANOSECS_IN_MSEC));
 	/* Check if an outofband action that might care about has popped up */
 	if (outofband)
 		outofband_action(FALSE);
-	if (YDB_MAX_LOCKTIME < nsec_timeout)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TIMEOUT2LONG);
+	if (YDB_MAX_TIME < timeout_nsec)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME);
 	if (0 > namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, RTS_ERROR_LITERAL("ydb_lock_s()"));
 	/* First step in this routine is to release all the locks */
@@ -119,9 +119,9 @@ int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...)
 	/* At this point, all of the private lock blocks have been created. Remaining task before calling "op_lock2" is to
 	 * convert the timeout value from microseconds to milliseconds.
 	 */
-	msec_timeout = (nsec_timeout / NANOSECS_IN_MSEC);
-	assert(MAXPOSINT4 > msec_timeout);	/* or else a TIMEOUT2LONG error would have been issued above */
-	timeoutms = (int)msec_timeout;
+	timeout_msec = (timeout_nsec / NANOSECS_IN_MSEC);
+	assert(MAXPOSINT4 > timeout_msec);	/* or else a TIMEOUT2LONG error would have been issued above */
+	timeoutms = (int)timeout_msec;
 	i2mval(&timeout_mval, timeoutms);
 	/* The generated code typically calls "op_lock" but that routine just calls "op_lock2" */
 	lock_rc = op_lock2(&timeout_mval, CM_LOCKS);

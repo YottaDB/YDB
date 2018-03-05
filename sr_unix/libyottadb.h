@@ -48,7 +48,7 @@ enum ydb_error_severity
 /* Note YDB_MAX_NAMES may be temporary and currently only relates to ydb_delete_excl_s() and ydb_tp_s() */
 #define YDB_MAX_STR		(1 * 1024 * 1024)	/* Maximum YottaDB string length */
 #define YDB_MAX_SUBS		31	/* Maximum subscripts currently supported */
-#define YDB_MAX_LOCKTIME	(0x7fffffffllu * 1000llu * 1000llu)	/* Max lock time in (long long) nanoseconds */
+#define YDB_MAX_TIME		(0x7fffffffllu * 1000llu * 1000llu)	/* Max specified time in (long long) nanoseconds */
 
 /* Minimum values */
 
@@ -191,6 +191,7 @@ typedef	float		ydb_float_t;
 typedef	double		ydb_double_t;
 typedef	char		ydb_char_t;
 typedef int		(*ydb_pointertofunc_t)();
+typedef void		(*ydb_funcptr_retvoid_t)();
 
 /* Structure for passing (non-NULL-terminated) character arrays whose length corresponds to the value of the
  * 'length' field. Note that for output-only ydb_string_t * arguments the 'length' field is set to the
@@ -249,15 +250,16 @@ void 		ydb_zstatus(char* msg, int len);
 
 /* Utility entry points accessable in libyottadb.so */
 int	ydb_file_name_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
-void	ydb_hiber_start(unsigned long long mssleep);
-void	ydb_hiber_start_wait_any(unsigned long long mssleep);
-void	ydb_timer_start(ydb_tid_t tid, unsigned long long time_to_expir, void (*handler)(), ydb_int_t hdata_len, void *hdata);
-void	ydb_timer_cancel(ydb_tid_t tid);
+void	ydb_hiber_start(unsigned long long sleep_nsec);
+void	ydb_hiber_start_wait_any(unsigned long long sleep_nsec);
+void	ydb_timer_start(int timer_id, unsigned long long limit_nsec, ydb_funcptr_retvoid_t handler, unsigned int hdata_len,
+			void *hdata);
+void	ydb_timer_cancel(int timer_id);
 int	ydb_file_is_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
 int	ydb_file_id_free(ydb_fileid_ptr_t fileid);
 int	ydb_thread_is_main(void);
-void 	*ydb_malloc(size_t);
-void	ydb_free(void *);
+void 	*ydb_malloc(size_t size);
+void	ydb_free(void *ptr);
 void	ydb_fork_n_core(void);
 int	ydb_child_init(void *param);
 int	ydb_stdout_stderr_adjust(void);
@@ -266,10 +268,10 @@ typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
 
 /* Simple API routine declarations */
 int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, unsigned int *ret_value);
-int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_delete_method delete_method);
+int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int deltype);
 int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames);
-int ydb_lock_s(unsigned long long nsec_timeout, int namecount, ...);
-int ydb_lock_incr_s(unsigned long long nsec_timeout, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
+int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...);
+int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
 int ydb_lock_decr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
 int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *value);
 int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
