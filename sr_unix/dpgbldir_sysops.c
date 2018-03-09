@@ -178,7 +178,7 @@ void dpzgbini(void)
 	uint4		status;
 	parse_blk	pblk;
 
-	if (NULL != getenv(YDB_GBLDIR))
+	if (NULL != getenv(YDB_GBLDIR + 1))		/* + 1 to get past '$' this call doesn't use */
 	{
 		temp_mstr.addr = YDB_GBLDIR;
 		temp_mstr.len = SIZEOF(YDB_GBLDIR) - 1;

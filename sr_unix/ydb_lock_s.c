@@ -40,17 +40,17 @@ GBLREF	volatile int4	outofband;
  */
 int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 {
-	va_list			var;
-	int			parmidx, timeoutms, lock_rc;
+	va_list			var, varcpy;
+	int			parmidx, timeoutms, lock_rc, sub_idx, var_svn_index;
 	gparam_list		plist;
 	boolean_t		error_encountered;
 	mval			timeout_mval, varname_mval;
 	mval			plist_mvals[YDB_MAX_SUBS + 1];
-	ydb_buffer_t		*varname, *subsarray;
+	ydb_buffer_t		*varname, *subsarray, *subptr;
 	int			subs_used;
 	unsigned long long	timeout_msec;
 	ydb_var_types		var_type;
-	int			var_svn_index;
+	char			buff[256];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -75,6 +75,49 @@ int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME);
 	if (0 > namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, RTS_ERROR_LITERAL("ydb_lock_s()"));
+	/* Need to validate all parms before we can do the unlock of all locks held by us */
+	VAR_START(var, namecount);
+	VAR_COPY(varcpy, var);		/* Used to validate parms, then var is used to process them */
+	for (parmidx = 0; parmidx < namecount; parmidx++)
+	{	/* Simplified version of the processing loop below that validates things */
+		varname = va_arg(varcpy, ydb_buffer_t *);
+		subs_used = va_arg(varcpy, int);
+		if (0 > subs_used)
+		{
+			va_end(varcpy);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
+		}
+		subsarray = va_arg(varcpy, ydb_buffer_t *);
+		if ((0 < subs_used) && (NULL == subsarray))
+		{       /* Count of subscripts is non-zero but no subscript specified - error */
+			va_end(varcpy);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SUBSARRAYNULL, 3, subs_used, LEN_AND_LIT("ydb_lock_s"));
+		}
+		/* Validate the varname */
+		VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
+		/* ISV references are not supported for this call */
+		if (LYDB_VARREF_ISV == var_type)
+		{
+			va_end(varcpy);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
+		}
+		/* Now validate each subscript */
+		for (sub_idx = 1, subptr = subsarray; sub_idx <= subs_used; sub_idx++, subptr++)
+		{	/* Pull each subscript descriptor out of param list and put in our parameter buffer.
+			 * A subscript has been specified - copy it to the associated mval and put its address
+			 * in the param list. But before that, do validity checks on input ydb_buffer_t.
+			 */
+			if (IS_INVALID_YDB_BUFF_T(subptr))
+			{
+				SPRINTF(buff, "Invalid subsarray (index %d)", subptr - subsarray);
+				va_end(varcpy);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+					      LEN_AND_STR(buff), LEN_AND_LIT("op_lock_s()"));
+			}
+			CHECK_MAX_STR_LEN(subptr);
+		}
+	}
+	va_end(varcpy);
 	/* First step in this routine is to release all the locks */
 	op_unlock();
 	if (0 == namecount)
@@ -89,21 +132,11 @@ int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 	 * lock block and accumulates these before passing the list to op_lock2 to actually perform the locking.
 	 */
 	varname_mval.mvtype = MV_STR;
-	VAR_START(var, namecount);
 	for (parmidx = 0; parmidx < namecount; parmidx++)
-	{
-		/* Fetch our parms for this lock variable from the parm vector */
+	{	/* Fetch our parms for this lock variable from the parm vector */
 		varname = va_arg(var, ydb_buffer_t *);
 		subs_used = va_arg(var, int);
 		subsarray = va_arg(var, ydb_buffer_t *);
-		/* Validate the varname */
-		VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
-		/* ISV references are not supported for this call */
-		if (LYDB_VARREF_ISV == var_type)
-		{
-			va_end(var);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
-		}
 		plist.arg[0] = NULL;				/* First arg is extended reference that simpleAPI doesn't support */
 		varname_mval.str.addr = varname->buf_addr;	/* Second arg is varname */
 		varname_mval.str.len = varname->len_used;

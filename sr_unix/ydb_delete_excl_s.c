@@ -67,7 +67,9 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 	/* If the varname count is zero, this implies a local var kill-all. Check for that before attempting to
 	 * validate a name that may not be specified.
 	 */
-	if (0 >= namecount)
+	if (0 > namecount)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, RTS_ERROR_LITERAL("ydb_delete_excl_s()"));
+	if (0 == namecount)
 	{	/* Special case - no varname supplied so drive kill-all of local variables */
 		op_killall();
 		LIBYOTTADB_DONE;

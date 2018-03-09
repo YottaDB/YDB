@@ -30,13 +30,12 @@ LITDEF	err_msg ydberrors[] = {
 	{ "MISSINGVARNAMES", "At least one variable name must be specified", 0 },
 	{ "TOOMANYVARNAMES", "Number of varnames specified exceeds maximum (!UL)", 1 },
 	{ "INVNAMECOUNT", "Invalid value for namecount parameter in a !AD call", 2 },
-	{ "UNKNOWN", "Unknown error code specified", 0 },
+	{ "MISSINGVARNAME", "Required varname not specified", 0 },
 	{ "TIME2LONG", "Specified time value exceeds supported maximum (!UL)", 1 },
 	{ "VARNAME2LONG", "Variable name length exceeds maximum allowed (!UL)", 1 },
 	{ "FATALERROR1", "Fatal error raised. Generating core and terminating process. Error: !AD", 2 },
 	{ "FATALERROR2", "Fatal error raised. Bypassing core generation and terminating process. Error: !AD", 2 },
 	{ "SIMPLEAPINEST", "Attempt to nest call of !AD with a call to !AD - nesting calls is not permitted in simpleAPI - process terminating", 4 },
-	{ "MISSINGVARNAME", "Required varname not specified", 0 },
 };
 
 
@@ -44,4 +43,4 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	20};
+	19};

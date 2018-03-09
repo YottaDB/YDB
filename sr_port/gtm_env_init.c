@@ -413,8 +413,8 @@ void	gtm_env_init(void)
 		TREF(jnl_extract_nocol) = trans_numeric(&val, &is_defined, TRUE);
 #		endif
 		/* Initialize dollar_zmaxtptime */
-		val.addr = YDB_ZMAXTPTIME;
-		val.len = SIZEOF(YDB_ZMAXTPTIME) - 1;
+		val.addr = YDB_MAXTPTIME;
+		val.len = SIZEOF(YDB_MAXTPTIME) - 1;
 		status = trans_numeric(&val, &is_defined, TRUE);
 		if (!is_defined)
 		{

@@ -44,7 +44,7 @@
 									*/
 /* YDB Database (YDB versions of above */
 #define YDB_GBLDIR			"$ydb_gbldir"
-#define YDB_ZMAXTPTIME			"$ydb_zmaxtptime"
+#define YDB_MAXTPTIME			"$ydb_maxtptime"
 
 /* White-box testing */
 #define	GTM_WHITE_BOX_TEST_CASE_COUNT	"$gtm_white_box_test_case_count"

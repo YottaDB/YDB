@@ -27,25 +27,24 @@
 #include <stdlib.h>	/* For abs() */
 
 /* Enumerated parameter values */
-typedef enum
+enum
 {
 	YDB_DEL_TREE = 1,
 	YDB_DEL_NODE,
-} ydb_delete_method;
+};
 
-enum ydb_error_severity
+enum
 {
-	YDB_ERRSEV_WARNING = 0,		/* Warning - Something is potentially incorrect */
-	YDB_ERRSEV_SUCCESS = 1,		/* Success */
-	YDB_ERRSEV_ERROR = 2,		/* Error - Something is definitely incorrect */
-	YDB_ERRSEV_INFORMATIONAL = 3,	/* Informational - won't see these returned as they continue running */
-	YDB_ERRSEV_FATAL = 4		/* Fatal - Something happened that is so bad, YottaDB cannot continue */
+	YDB_SEVERITY_WARNING = 0,	/* Warning - Something is potentially incorrect */
+	YDB_SEVERITY_SUCCESS = 1,	/* Success */
+	YDB_SEVERITY_ERROR = 2,		/* Error - Something is definitely incorrect */
+	YDB_SEVERITY_INFORMATIONAL = 3,	/* Informational - won't see these returned as they continue running */
+	YDB_SEVERITY_FATAL = 4		/* Fatal - Something happened that is so bad, YottaDB cannot continue */
 };
 
 /* Maximum values */
 #define YDB_MAX_IDENT		31	/* Maximum size of global/local name (not including '^') */
-#define YDB_MAX_NAMES		255	/* Maximum number of variable names can be specified in a single ydb_*_s() call */
-/* Note YDB_MAX_NAMES may be temporary and currently only relates to ydb_delete_excl_s() and ydb_tp_s() */
+#define YDB_MAX_NAMES		35	/* Maximum number of variable names can be specified in a single ydb_*_s() call */
 #define YDB_MAX_STR		(1 * 1024 * 1024)	/* Maximum YottaDB string length */
 #define YDB_MAX_SUBS		31	/* Maximum subscripts currently supported */
 #define YDB_MAX_TIME		(0x7fffffffllu * 1000llu * 1000llu)	/* Max specified time in (long long) nanoseconds */
@@ -163,13 +162,13 @@ enum ydb_error_severity
  * errno values do not follow the same rules as YottaDB generated errors so this macro does not work on them. YottaDB
  * generated errors numbers are all (absolute value) LARGER than 2**27 so anything under that is not supported by this macro.
  */
-#define YDB_ERROR_SEVERITY(MSGNUM, SEVERITY)										\
+#define YDB_SEVERITY(MSGNUM, SEVERITY)											\
 {															\
 	/* Minor subtrifuge because YDB_OK is 0 (per normal UNIX return code) but the rest of the codes, when the	\
 	 * error is out of the range of errno values, have 1 as a success value.					\
 	 */														\
 	if (YDB_OK == (MSGNUM))												\
-		SEVERITY = YDB_ERRSEV_SUCCESS;										\
+		SEVERITY = YDB_SEVERITY_SUCCESS;									\
 	else														\
 		SEVERITY = ((int)abs(MSGNUM) & 7);	/* Negation turns msg code into actual code used internally */	\
 }
@@ -199,8 +198,8 @@ typedef void		(*ydb_funcptr_retvoid_t)();
  */
 typedef struct
 {
-	ydb_ulong_t	length;
-	ydb_char_t	*address;
+	unsigned long	length;
+	char		*address;
 } ydb_string_t;
 
 /* Structure for interfacing with simple API routines. Meant to be used with the YDB_* macros defined
@@ -208,9 +207,9 @@ typedef struct
  */
 typedef struct
 {
-	ydb_uint_t	len_alloc;
-	ydb_uint_t	len_used;
-	ydb_char_t	*buf_addr;
+	unsigned int	len_alloc;
+	unsigned int	len_used;
+	char		*buf_addr;
 } ydb_buffer_t;
 
 typedef intptr_t	ydb_tid_t;		/* Timer id */
@@ -223,7 +222,7 @@ typedef void		*ydb_fileid_ptr_t;
 typedef struct
 {
         ydb_string_t	rtn_name;
-        void*		handle;
+        void		*handle;
 } ci_name_descriptor;
 
 /* Java types with special names for clarity. */
@@ -237,16 +236,16 @@ typedef ydb_char_t	ydb_jbyte_array_t;
 typedef ydb_char_t	ydb_jbig_decimal_t;
 
 /* Call-in interface. */
-ydb_status_t 	ydb_ci(const char *c_rtn_name, ...);
-ydb_status_t 	ydb_cip(ci_name_descriptor *ci_info, ...);
-ydb_status_t 	ydb_init(void);
-#ifdef GTM_PTHREAD
-ydb_status_t 	ydb_jinit(void);
-#endif
-ydb_status_t 	ydb_exit(void);
-ydb_status_t	ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
-			unsigned int *has_ret_value);
-void 		ydb_zstatus(char* msg, int len);
+int 	ydb_ci(const char *c_rtn_name, ...);
+int 	ydb_cip(ci_name_descriptor *ci_info, ...);
+int 	ydb_init(void);
+#	ifdef GTM_PTHREAD
+int 	ydb_jinit(void);
+#	endif
+int 	ydb_exit(void);
+int	ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
+		unsigned int *has_ret_value);
+void 	ydb_zstatus(char* msg, int len);
 
 /* Utility entry points accessable in libyottadb.so */
 int	ydb_file_name_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid);

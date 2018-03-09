@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -119,7 +122,7 @@ MBSTART {										\
 											\
 	assert(0 < MICROSECONDS);							\
 	req.tv_sec = (time_t)((MICROSECONDS) / E_6);					\
-	req.tv_nsec = (long)((usecs = (MICROSECONDS) % E_6) * 1000); /* Assignment! */	\
+	req.tv_nsec = (long)((usecs = (MICROSECONDS) % E_6) * 1000L); /* Assignment! */	\
 	assert(E_9 > req.tv_nsec);							\
 	if (RESTART)									\
 	{										\
@@ -127,7 +130,7 @@ MBSTART {										\
 		while ((-1 == (status = nanosleep(&req, NULL))) && (EINTR == errno))	\
 		{	/* This macro will break the loop when it is time. */		\
 			UPDATE_REM_TIME_OR_BREAK(now, expir, req.tv_sec, usecs);	\
-			req.tv_nsec = (long)(usecs * 1000);				\
+			req.tv_nsec = (long)(usecs * 1000L);				\
 		}									\
 	} else										\
 		nanosleep(&req, NULL);							\
