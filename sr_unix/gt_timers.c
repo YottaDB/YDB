@@ -345,7 +345,7 @@ void hiber_start(uint4 hiber)
 	{	/* normally, if SIGALRMs are blocked, we must already be inside a timer handler, but someone can actually disable
 		 * SIGALRMs, in which case we do not want this assert to trip in pro */
 		assert(1 <= timer_stack_count);
-		SLEEP_USEC(hiber * 1000, TRUE);
+		SLEEP_USEC((long)(hiber * 1000L), TRUE);
 	} else
 	{
 		assertpro(1 > timer_stack_count);	/* if SIGALRMs are not blocked, we cannot be inside a timer handler */

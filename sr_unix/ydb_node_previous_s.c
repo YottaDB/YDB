@@ -91,10 +91,10 @@ int ydb_node_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subs
 	{
 		case LYDB_VARREF_LOCAL:
 			/* Get the given local variable value storing it in the provided buffer (if it fits) */
-			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, LVUNDEF_OK_FALSE); /* Locate base lv_val */
+			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, ERR_LVUNDEF_OK_FALSE); /* Locate base lv_val */
 			if (NULL == lvvalp)
-			{	/* Base local variable does not exist (LVUNDEF_OK_FALSE above is to ensure we do not
-				 * issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
+			{	/* Base local variable does not exist (ERR_LVUNDEF_OK_FALSE above is to ensure
+				 * we do not issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
 				 * Return 0 for "ydb_node_previous_s" result.
 				 */
 				*ret_subs_used = YDB_NODE_END;

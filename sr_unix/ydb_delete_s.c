@@ -90,9 +90,9 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 	{
 		case LYDB_VARREF_LOCAL:
 			/* Find status of the given local variable. Locate base var lv_val in curr_symval */
-			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, LVUNDEF_OK_FALSE);
+			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, ERR_LVUNDEF_OK_FALSE);
 			if (NULL == lvvalp)
-			{	/* Base local variable does not exist (LVUNDEF_OK_FALSE above is to ensure we do not
+			{	/* Base local variable does not exist (ERR_LVUNDEF_OK_FALSE above is to ensure we do not
 				 * issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro). Nothing to kill. Return right away.
 				 */
 				break;

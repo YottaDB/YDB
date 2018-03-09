@@ -238,11 +238,11 @@ MBSTART {															\
 	VARLVVALP = (VARTABENTP)->value;											\
 } MBEND
 
-#define	LVUNDEF_OK_FALSE	FALSE
-#define	LVUNDEF_OK_TRUE		TRUE
+#define	ERR_LVUNDEF_OK_FALSE	FALSE
+#define	ERR_LVUNDEF_OK_TRUE	TRUE
 
 /* Now the NOUPD version */
-#define FIND_BASE_VAR_NOUPD(VARNAMEP, VARMNAMEP, VARTABENTP, VARLVVALP, LVUNDEF_OK)						\
+#define FIND_BASE_VAR_NOUPD(VARNAMEP, VARMNAMEP, VARTABENTP, VARLVVALP, ERR_LVUNDEF_OK)						\
 MBSTART {															\
 	lv_val		*lv;													\
 																\
@@ -253,7 +253,7 @@ MBSTART {															\
 	(VARTABENTP) = lookup_hashtab_mname(&curr_symval->h_symtab, (VARMNAMEP));						\
 	if ((NULL == (VARTABENTP)) || (NULL == (lv_val *)((VARTABENTP)->value)))						\
 	{															\
-		if (LVUNDEF_OK)													\
+		if (ERR_LVUNDEF_OK)												\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVUNDEF);							\
 		else														\
 			VARLVVALP = NULL;											\

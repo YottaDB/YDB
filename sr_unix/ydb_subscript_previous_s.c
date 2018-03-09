@@ -106,11 +106,13 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 				 *     call to op_fnorder().
 				 *   - If only one subscript, skip the call to op_srchindx() and just call op_fnorder() with
 				 *     the single supplied subscript.
+				 *
+				 * First - locate the base lv_val.
 				 */
-				FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, LVUNDEF_OK_FALSE); /* Locate base lv_val */
+				FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, ERR_LVUNDEF_OK_FALSE);
 				if (NULL == lvvalp)
-				{	/* Base local variable does not exist (LVUNDEF_OK_FALSE above is to ensure we do not
-					 * issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
+				{	/* Base local variable does not exist (ERR_LVUNDEF_OK_FALSE above is to ensure
+					 * we do not issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
 					 * Return 0 for "ydb_subscript_previous_s" result.
 					 */
 					SET_YDB_BUFF_T_FROM_MVAL(ret_value, (mval *)&literal_zero,

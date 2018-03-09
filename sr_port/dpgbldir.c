@@ -85,7 +85,7 @@ gd_addr *zgbldir(mval *v)
 			return name->gd_ptr;
 	if (!v->str.len)
 	{
-		if (NULL != getenv(YDB_GBLDIR))
+		if (NULL != getenv(YDB_GBLDIR + 1))		/* + 1 to get past '$' this call doesn't use */
 		{
 			temp_mstr.addr = YDB_GBLDIR;
 			temp_mstr.len = SIZEOF(YDB_GBLDIR);

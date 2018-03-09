@@ -68,6 +68,8 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 	/* Check if an outofband action that might care about has popped up */
 	if (outofband)
 		outofband_action(FALSE);
+	if (0 > namecount)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, RTS_ERROR_LITERAL("ydb_lock_s()"));
 	save_dollar_tlevel = dollar_tlevel;
 	/* Ready "transid" for passing to "op_tstart" */
 	tid.mvtype = MV_STR;
