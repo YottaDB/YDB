@@ -33,24 +33,24 @@
 2 Identifying_the_Current_Global_Directory
    Identifying the Current Global Directory
 
-   At process startup, the environment variable gtmgbldir identifies the
+   At process startup, the environment variable ydb_gbldir identifies the
    global directory to the process. M application code can access and change
    the global directory through the $ZGBLDIR intrinsic special variable,
-   which is initialized from $gtmgbldir at process startup. M application
+   which is initialized from $ydb_gbldir at process startup. M application
    code can also use extended global references with the || or {} syntax.
 
-   Note that $gtmgbldir / $ZGBLDIR are pathnames. If they do not start with a
+   Note that $ydb_gbldir / $ZGBLDIR are pathnames. If they do not start with a
    "/", then the pathname is relative and YottaDB searches for the global
    directory starting in the current working directory.
 
    To change the Global Directory used by processes, specify a new value for
-   gtmgbldir.
+   ydb_gbldir.
 
    Example:
 
-   $ export gtmgbldir=/home/jdoe/node1/prod.gld
+   $ export ydb_gbldir=/home/jdoe/node1/prod.gld
 
-   When you invoke GDE and no Global Directory exists for gtmgbldir, GDE
+   When you invoke GDE and no Global Directory exists for ydb_gbldir, GDE
    creates a minimal default Global Directory that is a starting point or
    template for building global directories for your specific needs.
 
@@ -59,12 +59,12 @@
 
    Example:
 
-   $ export gtmgbldir=/home/jdoe/node1/prod.gld
+   $ export ydb_gbldir=/home/jdoe/node1/prod.gld
 
 2 Creating_a_Default_Global_Directory
    Creating a Default Global Directory
 
-   When you invoke GDE and no Global Directory exists for gtmgbldir, GDE
+   When you invoke GDE and no Global Directory exists for ydb_gbldir, GDE
    produces a default Global Directory that contains a minimal set of
    required components and values for database characteristics. It can be
    used for purposes such as development and testing work. A default Global
@@ -76,8 +76,8 @@
 
    Example:
 
-   $ gtmgbldir=/usr/accntg/jones/mumps.gld
-   $ export gtmgbldir
+   $ ydb_gbldir=/usr/accntg/jones/mumps.gld
+   $ export ydb_gbldir
    $ $ydb_dist/mumps -dir
    GTM>do ^GDE
    %GDE-I-GDUSEDEFS, Using defaults for Global Directory
@@ -341,7 +341,7 @@
 
    **Note**
 
-   Even when invoked from within YottaDB, GDE always uses the gtmgbldir
+   Even when invoked from within YottaDB, GDE always uses the ydb_gbldir
    environment variable to identify its target
 
    To leave GDE:

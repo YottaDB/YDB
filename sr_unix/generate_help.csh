@@ -65,7 +65,7 @@ foreach hlp (${hlpdir}/*.hlp)
 	# Define the global directory with the same prefix as the HLP file and
 	# use ${ydb_dist} in the file name to ensure dynamic lookup of the DAT
 	# for help information
-	setenv gtmgbldir ${ydb_dist}/${prefix}help.gld
+	setenv ydb_gbldir ${ydb_dist}/${prefix}help.gld
 	${ydb_dist}/mumps -run GDE <<GDE_in_help
 Change -segment DEFAULT	-block=2048	-file=\$ydb_dist/${prefix}help.dat
 Change -region DEFAULT -record=1020 -key=255 -qdbrundown -nostats

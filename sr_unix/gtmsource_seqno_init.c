@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -49,7 +52,7 @@ void gtmsource_seqno_init(boolean_t this_side_std_null_coll)
 	sm_uc_ptr_t		gld_fn;
 	unix_db_info		*udi;
 
-	/* Unix and VMS have different field names for now, but will both be soon changed to instfilename instead of gtmgbldir */
+	/* Unix and VMS have different field names for now, but will both be soon changed to instfilename instead of ydb_gbldir */
 	gld_fn = (sm_uc_ptr_t)jnlpool->jnlpool_ctl->jnlpool_id.instfilename;
 	zqgblmod_seqno = 0;
 	region_top = gd_header->regions + gd_header->n_regions;

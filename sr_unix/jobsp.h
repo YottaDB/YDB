@@ -3,6 +3,9 @@
  * Copyright (c) 2001, 2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -26,7 +29,7 @@
 
 #define CHILD_FLAG_ENV		"gtmj0"
 #define CLEAR_CHILD_FLAG_ENV  	"gtmj0="""
-#define GBLDIR_ENV		"gtmgbldir"
+#define GBLDIR_ENV		"ydb_gbldir"
 #define CWD_ENV			"gtmj2"
 #define IN_FILE_ENV		"gtmj3"
 #define OUT_FILE_ENV		"gtmj4"

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,6 @@
 
 #include "mdef.h"
 
-#include "gtm_stdlib.h"
 #include "gtm_string.h"
 #ifdef DEBUG
 #include "gtm_ctype.h"
@@ -85,15 +84,8 @@ gd_addr *zgbldir(mval *v)
 			return name->gd_ptr;
 	if (!v->str.len)
 	{
-		if (NULL != getenv(YDB_GBLDIR + 1))		/* + 1 to get past '$' this call doesn't use */
-		{
-			temp_mstr.addr = YDB_GBLDIR;
-			temp_mstr.len = SIZEOF(YDB_GBLDIR);
-		} else
-		{
-			temp_mstr.addr = GTM_GBLDIR;
-			temp_mstr.len = SIZEOF(GTM_GBLDIR) - 1;
-		}
+		temp_mstr.addr = YDB_GBLDIR;
+		temp_mstr.len = SIZEOF(YDB_GBLDIR) - 1;
 		tran_name = get_name(&temp_mstr);
 	} else
 		tran_name = get_name(&v->str);

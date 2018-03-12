@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -352,8 +355,8 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 			gv_target->act = cs_addrs->hdr->def_coll;
 			gv_target->ver = cs_addrs->hdr->def_coll_ver;
 		}
-		/* If DSE, a runtime global directory is created and hence $gtmgbldir is not as effective as it is for GT.M.
-		 * Hence exclude DSE from the below errors which are related to $gtmgbldir.
+		/* If DSE, a runtime global directory is created and hence $ydb_gbldir is not as effective as it is for YottaDB.
+		 * Hence exclude DSE from the below errors which are related to $ydb_gbldir.
 		 */
 		if (!IS_DSE_IMAGE)
 		{

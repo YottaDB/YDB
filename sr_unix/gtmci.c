@@ -27,6 +27,7 @@
 #include "gtm_limits.h"
 
 #include <dlfcn.h>
+#include <errno.h>
 
 #include "cli.h"
 #include "stringpool.h"
@@ -972,6 +973,8 @@ int ydb_init()
 	int			dist_len, tmp_len;
 	char			path[YDB_PATH_MAX];
 	int			path_len;
+	int			save_errno;
+	int			status;
 	struct stat		stat_buf;
 	Dl_info			shlib_info;
 	rhdtyp          	*base_addr;
@@ -1024,7 +1027,21 @@ int ydb_init()
 		 * env var) and issue a LIBYOTTAMISMTCH error if needed.
 		 */
 		setenv(YDB_DIST, path, TRUE);
+		if (status)
+		{
+			assert(-1 == status);
+			save_errno = errno;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				RTS_ERROR_LITERAL("setenv(ydb_dist)"), CALLFROM, save_errno);
+		}
 		setenv("gtm_dist", path, TRUE);
+		if (status)
+		{
+			assert(-1 == status);
+			save_errno = errno;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				RTS_ERROR_LITERAL("setenv(gtm_dist)"), CALLFROM, save_errno);
+		}
 	}
 	/* else : "ydb_dist" env var is defined. Use that for later verification done inside "common_startup_init" */
 	if (!gtm_startup_active)

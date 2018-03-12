@@ -476,7 +476,7 @@ syntabi:
 UNIX:
 	s hdrlab="GTCGBDUNX012"         ; must be concurrently maintained in gbldirnam.h!!!
 	i (gtm64=TRUE) s hdrlab="GTCGBDUNX112" ; the high order digit is a 64-bit flag
-	s tfile="$gtmgbldir"
+	s tfile="$ydb_gbldir"
 	s accmeth="\BG\MM"
 	s helpfile="$ydb_dist/gdehelp.gld"
 	s defdb="mumps.dat"

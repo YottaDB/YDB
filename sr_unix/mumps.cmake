@@ -19,7 +19,7 @@ foreach(v
     gtm_icu_version
     gtm_inc
     gtm_tools
-    gtmgbldir
+    ydb_gbldir
     LC_ALL
     )
   if(DEFINED ${v})

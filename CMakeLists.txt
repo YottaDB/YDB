@@ -807,7 +807,7 @@ Halt")
   set(env
     -D ydb_dist=${YDB_BINARY_DIR}
     -D gtmroutines=.
-    -D gtmgbldir=${YDB_BINARY_DIR}/${help}help
+    -D ydb_gbldir=${YDB_BINARY_DIR}/${help}help
     )
   add_custom_command(
     OUTPUT ${help}help.dat ${help}help.gld
@@ -840,7 +840,7 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND}
     -D ydb_dist=${YDB_BINARY_DIR}
     -D gtmroutines=.
-    -D gtmgbldir=${YDB_BINARY_DIR}/gtmhelp
+    -D ydb_gbldir=${YDB_BINARY_DIR}/gtmhelp
     -D mumps=$<TARGET_FILE:mumps>
     -D "args=-run;GTMDEFINEDTYPESTODB"
     -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
@@ -858,7 +858,7 @@ exit")
   set(env
     -D ydb_dist=${YDB_BINARY_DIR}
     -D gtmroutines=.
-    -D gtmgbldir=${YDB_BINARY_DIR}/${help}help
+    -D ydb_gbldir=${YDB_BINARY_DIR}/${help}help
     )
   add_custom_command(
     OUTPUT ${YDB_BINARY_DIR}/${help}help.dat_ro
@@ -883,7 +883,7 @@ exit")
   set(env
     -D ydb_dist=${YDB_BINARY_DIR}
     -D gtmroutines=.
-    -D gtmgbldir=${YDB_BINARY_DIR}/${help}help
+    -D ydb_gbldir=${YDB_BINARY_DIR}/${help}help
     )
   add_custom_command(
     OUTPUT ${YDB_BINARY_DIR}/${help}help.dat_noro

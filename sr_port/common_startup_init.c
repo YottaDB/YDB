@@ -20,6 +20,7 @@
 #include "gtm_string.h"
 
 #include <dlfcn.h>
+#include <errno.h>
 
 #include "gt_timer.h"
 #include "gtm_env_init.h"
@@ -32,6 +33,7 @@
 #include "cli.h"
 #include "gdsroot.h"
 #include "is_file_identical.h"
+#include "gtm_logicals.h"
 
 GBLREF	boolean_t		skip_dbtriggers;
 GBLREF	boolean_t		is_replicator;
@@ -53,8 +55,10 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 	char		*dist;
 	int		len;
 	int		nbytes;
+	int		ret_value;
+	int		save_errno;
 	Dl_info		shlib_info;
-	char		comparison[YDB_PATH_MAX];
+	char		comparison[YDB_PATH_MAX], *envptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -142,6 +146,36 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 							 * Specific MUPIP commands will override this later.
 							 */
 	}
+	/* Check if ydb_gbldir env var is set.  If so set gtmgbldir env var to the same value.
+	 * If ydb_gbldir env var is not set and if gtmgbldir env var is set, set ydb_gbldir to gtmgbldir.
+	 * That way
+	 *	a) ydb_gbldir overrides gtmgbldir
+	 *	b) "dpzgbini" and "zgbldir" functions in this process can use YDB_GBLDIR (instead of GTM_GBLDIR) AND
+	 *	c) Child processes see both env vars set to the same value too.
+	 */
+	if (NULL != (envptr = GETENV(YDB_GBLDIR + 1)))	/* + 1 to get past '$' this call doesn't use */
+	{	/* ydb_gbldir env var is set. Set gtmgbldir env var to same value. */
+		ret_value = setenv(GTM_GBLDIR + 1, envptr, TRUE);
+		if (ret_value)
+		{
+			assert(-1 == ret_value);
+			save_errno = errno;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				RTS_ERROR_LITERAL("setenv(gtmgbldir)"), CALLFROM, save_errno);
+		}
+	} else if (NULL != (envptr = GETENV(GTM_GBLDIR + 1)))
+	{	/* gtmgbldir env var is set. Set ydb_gbldir env var to same value. */
+		ret_value = setenv(YDB_GBLDIR + 1, envptr, TRUE);
+		if (ret_value)
+		{
+			assert(-1 == ret_value);
+			save_errno = errno;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				RTS_ERROR_LITERAL("setenv(ydb_gbldir)"), CALLFROM, save_errno);
+		}
+	}
+	/* else: YDB_GBLDIR and GTM_GBLDIR are both undefined (and therefore in sync with each other) */
+	/* At this point, the env vars YDB_GBLDIR and GTM_GBLDIR are guaranteed to be equal to each other */
 	return;
 }
 
