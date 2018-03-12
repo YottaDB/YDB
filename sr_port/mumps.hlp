@@ -2267,8 +2267,8 @@
 
    Example:
 
-   $ gtmgbldir=Test.GLD
-   $ export gtmgbldir
+   $ ydb_gbldir=Test.GLD
+   $ export ydb_gbldir
    $ GTM
 
    YDB>WRITE $ZGBLDIR
@@ -2281,7 +2281,7 @@
    TEST.GLD
    YDB>HALT
 
-   $ echo gtmgbldir
+   $ echo ydb_gbldir
    TEST.GLD
 
    The statement WRITE ^|"M1.GLD"|A writes variable ^A using the Global
@@ -4128,11 +4128,11 @@
    GBL[DIR]=strlit
 
    The string literal specifies a value for the environment variable
-   gtmgbldir.
+   ydb_gbldir.
 
    The maximum string length is 255 characters.
 
-   By default, the job uses the same specification for gtmgbldir as that
+   By default, the job uses the same specification for ydb_gbldir as that
    defined in $ZGBLDIR for the process using the JOB command.
 
 4 IN[PUT]=strlit
@@ -11720,18 +11720,18 @@
    successfully perform database operations.
 
    YottaDB initializes $ZGBLDIR to the translation of the environment variable
-   gtmgbldir. The value of the gtmgbldir environment variable may include a
-   reference to another environment variable. If gtmgbldir is not defined,
+   ydb_gbldir. The value of the ydb_gbldir environment variable may include a
+   reference to another environment variable. If ydb_gbldir is not defined,
    YottaDB initializes $ZGBLDIR to null. When $ZGBLDIR is null, YottaDB constructs
-   a file name for the Global Directory using the name $gtmgbldir and the
+   a file name for the Global Directory using the name $ydb_gbldir and the
    extension .gld in the current working directory.
 
    $ZGBLDIR is a read-write Intrinsic Special Variable, (i.e., it can appear
    on the left side of the equal sign (=) in the argument to the SET
    command). SET $ZGBLDIR="" causes YottaDB to assign $ZGBLDIR to the
-   translation of gtmgbldir if that environment variable is defined. If it is
+   translation of ydb_gbldir if that environment variable is defined. If it is
    not defined, then SET $ZGBLDIR="" causes YottaDB to construct a file name
-   using the name $gtmgbldir.gld in the current directory. YottaDB permits
+   using the name $ydb_gbldir.gld in the current directory. YottaDB permits
    $ZGBLDIR to be NEW'd. A $ZGBLDIR value may include an environment
    variable.
 
@@ -11740,17 +11740,17 @@
    error without changing the value of $ZGBLDIR.
 
    To establish a value for $ZGBLDIR outside of M, use the appropriate shell
-   command to assign a translation to gtmgbldir. Defining gtmgbldir provides
+   command to assign a translation to ydb_gbldir. Defining ydb_gbldir provides
    a convenient way to use the same Global Directory during a session where
    you repeatedly invoke and leave YottaDB.
 
    Changes to the value of $ZGBLDIR during a YottaDB invocation only last for
-   the current invocation and do not change the value of gtmgbldir.
+   the current invocation and do not change the value of ydb_gbldir.
 
    Example:
 
-   $ gtmgbldir=test.gld
-   $ export gtmgbldir
+   $ ydb_gbldir=test.gld
+   $ export ydb_gbldir
    $ gtm
    YDB>WRITE $zgbldir
    /usr/dev/test.gld
@@ -11758,13 +11758,13 @@
    YDB>WRITE $zgbldir
    mumps.gld
    YDB>HALT
-   $ echo $gtmgbldir
+   $ echo $ydb_gbldir
    test.gld
 
-   This example defines the environment variable gtmgbldir. Upon entering
-   YottaDB Direct Mode, $ZGBLDIR has the value supplied by gtmgbldir. The SET
+   This example defines the environment variable ydb_gbldir. Upon entering
+   YottaDB Direct Mode, $ZGBLDIR has the value supplied by ydb_gbldir. The SET
    command changes the value. After the YottaDB image terminates, the echo
-   command demonstrates that gtmgbldir was not modified by the M SET command.
+   command demonstrates that ydb_gbldir was not modified by the M SET command.
 
    $ ls test.gld
    test.gld not found
@@ -15230,7 +15230,7 @@
    cd /path/to/workarea
    export ydb_dist=/usr/local/gtm
    export gtmroutines="/var/myApp/o(/var/myApp/r) $ydb_dist"
-   export gtmgbldir=/var/myApp/g/mumps.dat
+   export ydb_gbldir=/var/myApp/g/mumps.dat
    $ydb_dist/mumps -r start^server
 
    When start^server begins, the $PRINCIPAL device is the current device

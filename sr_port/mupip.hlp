@@ -40,9 +40,9 @@
    using any MUPIP commands other than EXIT, INTRPT, JOURNAL, RESTORE, STOP
    and the -file option of any command that has that option.
 
-   The environment variable gtmgbldir specifies the active global directory.
+   The environment variable ydb_gbldir specifies the active global directory.
 
-   A gtmgbldir value of mumps.gld tells MUPIP to look for a global directory
+   A ydb_gbldir value of mumps.gld tells MUPIP to look for a global directory
    file mumps.gld in the current directory.
 
    **Important**
@@ -521,7 +521,7 @@
 
    $ mupip backup -bytestream REPTILES,BIRDS bkup
 
-   Suppose that the environment variable gtmgbldir has regions REPTILES and
+   Suppose that the environment variable ydb_gbldir has regions REPTILES and
    BIRDS that map to files called REPTILES.DAT and BIRDS.DAT (no matter which
    directory or directories the files reside in). Then the above example
    creates bytestream backup files REPTILES.DAT and BIRDS.DAT in the bkup
@@ -761,7 +761,7 @@
        occurs in M (ASCII) collation order.
      o The region-list argument may specify more than one region of the
        current Global Directory in a list separated with commas. DUMPFHEAD
-       -REGION requires the environment variable gtmgbldir to specify a valid
+       -REGION requires the environment variable ydb_gbldir to specify a valid
        Global Directory.
      o The -REGION qualifier is incompatible with the -FILE qualifier.
 
@@ -778,7 +778,7 @@
    $ mupip dumpfhead -region "*"
 
    This command lists information about all the database files mapped by the
-   global directory specified by $gtmgbldir.
+   global directory specified by $ydb_gbldir.
 
 2 ENDIANCVT
    ENDIANCVT
@@ -1799,7 +1799,7 @@
        occurs in M (ASCII) collation order.
      o The region-list argument may specify more than one region of the
        current Global Directory in a list separated with commas. INTEG
-       -REGION requires the environment variable gtmgbldir to specify a valid
+       -REGION requires the environment variable ydb_gbldir to specify a valid
        Global Directory.
      o Because a KILL may briefly defer marking the blocks it releases "free"
        in the bit maps, INTEG -REGION may report spurious block incorrectly
@@ -3659,7 +3659,7 @@
 
    Before you run the MUPIP TRIGGER command:
 
-    1. Set the value of the environment variable gtmgbldir: to specify the
+    1. Set the value of the environment variable ydb_gbldir: to specify the
        value of a current global directory.
     2. Ensure that the key size, record size, block size of your database is
        sufficient for storing all planned trigger definitions. You may have

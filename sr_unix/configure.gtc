@@ -672,11 +672,11 @@ fi
 chmod 755 $ydbdist/mumps $ydbdist/libyottadb$ext
 
 gtmroutines=$ydbdist
-gtmgbldir=$ydbdist/mumps.gld
+ydb_gbldir=$ydbdist/mumps.gld
 ydb_dist=$ydbdist
 export ydb_dist
 export gtmroutines
-export gtmgbldir
+export ydb_gbldir
 
 $echo ""
 $echo "Compiling all of the MUMPS routines. This may take a moment."

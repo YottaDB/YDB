@@ -245,7 +245,7 @@ boolean_t mur_open_files()
 	 * That is, journal file names specified must be from current global directory.
 	 */
 	if (star_specified || mur_options.update)
-	{	/* "*" is specified or it is -recover or -rollback. We require gtmgbldir to be set in all these cases */
+	{	/* "*" is specified or it is -recover or -rollback. We require ydb_gbldir to be set in all these cases */
 		assert(NULL == gd_header);
 		gvinit();	/* read in current global directory */
 		assert(NULL != gd_header);

@@ -729,7 +729,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 *
 		 * then the environment array passed is as follows
 		 *	 gtmj0=			// parent pid
-		 *	 gtmgbldir=mumps.gld	// current global directory
+		 *	 ydb_gbldir=mumps.gld	// current global directory
 		 *	 gtmj3=/dev/null	// input file parameter to job command
 		 *	 gtmj4=x.mjo		// output file parameter to job command
 		 *	 gtmj5=x.mje		// error file parameter to job command

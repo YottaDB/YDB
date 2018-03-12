@@ -26,7 +26,10 @@
 #include "gtm_strings.h"
 #include "gtm_stdlib.h"
 #include "gtm_limits.h"
+
 #include <dlfcn.h>
+#include <errno.h>
+
 #include "ydb_chk_dist.h"
 
 #ifdef DEBUG
@@ -47,7 +50,7 @@ typedef int (*exe_main_t)(int argc, char **argv, char **envp);
 
 int dlopen_libyottadb(int argc, char **argv, char **envp, char *main_func)
 {
-	int		status, pathlen;
+	int		status, pathlen, save_errno;
 	char		*pathptr, *tmpptr;	/* Includes null terminator char */
 	char		curr_exe_realpath[YDB_PATH_MAX], libyottadb_realpath[YDB_PATH_MAX];
 	void_ptr_t	handle;
@@ -88,8 +91,24 @@ int dlopen_libyottadb(int argc, char **argv, char **envp, char *main_func)
 	/* Now set "ydb_dist" (and "gtm_dist") to the obtained canonical path. "pathptr" points to that. */
 	assert(DIR_SEPARATOR == *tmpptr);
 	*tmpptr = '\0';
-	setenv(YDB_DIST, pathptr, TRUE);
-	setenv("gtm_dist", pathptr, TRUE);
+	status = setenv(YDB_DIST, pathptr, TRUE);
+	if (status)
+	{
+		assert(-1 == status);
+		save_errno = errno;
+		FPRINTF(stderr, "%%YDB-E-SYSCALL, Error received from system call setenv(ydb_dist) -- called from module "
+			"%s at line %d\n%%SYSTEM-E-ENO%d, %s\n", __FILE__, __LINE__, save_errno, STRERROR(save_errno));
+		return ERR_SYSCALL;
+	}
+	status = setenv("gtm_dist", pathptr, TRUE);
+	if (status)
+	{
+		assert(-1 == status);
+		save_errno = errno;
+		FPRINTF(stderr, "%%YDB-E-SYSCALL, Error received from system call setenv(gtm_dist) -- called from module "
+			"%s at line %d\n%%SYSTEM-E-ENO%d, %s\n", __FILE__, __LINE__, save_errno, STRERROR(save_errno));
+		return ERR_SYSCALL;
+	}
 	/* Get curr_exe_realpath back to its correct form (with the executable name at the end) */
 	*tmpptr++ = DIR_SEPARATOR;
 	/* Now open libyottadb.so */

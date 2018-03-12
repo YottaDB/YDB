@@ -1,13 +1,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;                                                               ;
-; Copyright (c) 2017 Fidelity National Information              ;
-; Services, Inc. and/or its subsidiaries. All rights reserved.  ;
-;                                                               ;
-;       This source code contains the intellectual property     ;
-;       of its copyright holder(s), and is made available       ;
-;       under a license.  If you do not know the terms of       ;
-;       the license, please stop and do not read further.       ;
-;                                                               ;
+;								;
+; Copyright (c) 2017 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
+;								;
+; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %YGBLSTAT
 	; Gather and report statistics shared by GT.M processes
@@ -31,7 +34,7 @@ help    ; Usage: mumps -run %YGBLSTAT [--help] [--pid pidlist] [--reg reglist] [
 	;  --pid pid       - pid whose statistics are to be reported.
 	;                    "*" or default is all pids.
 	;  --reg reglist   - region whose statistics are to be reported/
-	;                    "*" or default is all regions in $gtmgbldir.
+	;                    "*" or default is all regions in $ydb_gbldir.
 	;  --stat statlist - comma separated list of statistics
 	;                    (subset) of ZSHOW "G" to print. Default is "*"
 	;                    for all statistics. Statistics are always
