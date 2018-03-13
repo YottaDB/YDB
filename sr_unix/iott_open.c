@@ -141,9 +141,6 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			if (gtm_isanlp(tt_ptr->fildes) == 0)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
-		if (IS_GTM_IMAGE)
-			/* Only the true runtime runs with the modified terminal settings */
-			setterm(ioptr);
 		status = getcaps(tt_ptr->fildes);
 		if (1 != status)
 		{

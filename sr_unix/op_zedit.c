@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -31,6 +34,7 @@
 #include "geteditor.h"
 #include "restrict.h"
 #include "wbox_test_init.h"
+#include "iottdef.h"
 
 GBLREF	io_pair		io_std_device;
 GBLREF	mval 		dollar_zsource;
@@ -57,6 +61,7 @@ void op_zedit(mval *v, mval *p)
 	mstr		src;
 	zro_ent		*sp, *srcdir;
 	struct		sigaction act, intr;
+	boolean_t	resetterm_done_by_me;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -161,8 +166,12 @@ void op_zedit(mval *v, mval *p)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZEDIT");
 
 	flush_pio();
-	if (tt == io_std_device.in->type)
+	if (IS_SETTERM_DONE(io_std_device.in))
+	{
 		resetterm(io_std_device.in);
+		resetterm_done_by_me = TRUE;
+	} else
+		resetterm_done_by_me = FALSE;
 	/* ignore interrupts */
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
@@ -190,7 +199,7 @@ void op_zedit(mval *v, mval *p)
 			dollar_zeditor = errno;
 		/* restore interrupt handler */
 		sigaction(SIGINT, &intr, 0);
-		if (tt == io_std_device.in->type)
+		if (resetterm_done_by_me)
 			setterm(io_std_device.in);
 	} else
 	{

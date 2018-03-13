@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -117,6 +120,7 @@ void iott_write(mstr *v)
 		str = v->addr;
 		io_ptr = io_curr_device.out;
 		tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
+		SETTERM_IF_NEEDED(io_ptr, tt_ptr);
 		if (tt_ptr->mupintr)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);

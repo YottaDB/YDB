@@ -185,6 +185,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 	io_ptr = io_curr_device.in;
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	tt_ptr = (d_tt_struct *)(io_ptr->dev_sp);
+	SETTERM_IF_NEEDED(io_ptr, tt_ptr);
 	assert(dev_open == io_ptr->state);
 	iott_flush(io_curr_device.out);
 	insert_mode = !(TT_NOINSERT & tt_ptr->ext_cap);	/* get initial mode */

@@ -91,6 +91,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 	assert(io_ptr->state == dev_open);
 	iott_flush(io_curr_device.out);
 	tt_ptr = (d_tt_struct*) io_ptr->dev_sp;
+	SETTERM_IF_NEEDED(io_ptr, tt_ptr);
 	timer_id = (TID) iott_rdone;
 	*v = -1;
 	dc1 = (char) 17;
