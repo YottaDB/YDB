@@ -95,13 +95,10 @@ LITREF gtmImageName	gtmImageNames[];
 #define MAX_LAB_LEN		  32	/* Maximum Label string length */
 #define MAX_RTN_LEN		  32	/* Maximum Routine string length */
 #define TEMP_BUFF_SIZE		1024
-#define PARM_STRING_SIZE	   9
 #define MAX_NUM_LEN		  10	/* Maximum length number will be when converted to string */
 #define MAX_JOB_QUALS		  12	/* Maximum environ variables set for job qualifiers */
 #define	MUMPS_EXE_STR		"/mumps"
 #define	MUMPS_DIRECT_STR	"-direct"
-#define GTMJ_FMT		"gtmj%03d="
-#define PARM_STR		"gtmj000="
 #define	JOB_CONTINUE		1
 #define JOB_EXIT		0
 
@@ -728,19 +725,19 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 * 	job ^x(1,2):(output="x.mjo":error="x.mje")
 		 *
 		 * then the environment array passed is as follows
-		 *	 gtmj0=			// parent pid
+		 *	 ydb_j0=		// parent pid
 		 *	 ydb_gbldir=mumps.gld	// current global directory
-		 *	 gtmj3=/dev/null	// input file parameter to job command
-		 *	 gtmj4=x.mjo		// output file parameter to job command
-		 *	 gtmj5=x.mje		// error file parameter to job command
-		 *	 gtmj7=x		// routine name to job off
-		 *	 gtmj8=			// label name to job off
-		 *	 gtmj9=0		// offset to job off
-		 *	 gtmja=			// base priority;
-		 *	 gtmjb=			// startup parameter to job command
-		 *	 gtmj000=1		// parameter 1 to routine ^x
-		 *	 gtmj001=2		// parameter 2 to routine ^x
-		 *	 gtmjcnt=2		// number of parameters to routine ^x
+		 *	 ydb_j3=/dev/null	// input file parameter to job command
+		 *	 ydb_j4=x.mjo		// output file parameter to job command
+		 *	 ydb_j5=x.mje		// error file parameter to job command
+		 *	 ydb_j7=x		// routine name to job off
+		 *	 ydb_j8=		// label name to job off
+		 *	 ydb_j9=0		// offset to job off
+		 *	 ydb_ja=		// base priority;
+		 *	 ydb_jb=		// startup parameter to job command
+		 *	 ydb_j000=1		// parameter 1 to routine ^x
+		 *	 ydb_j001=2		// parameter 2 to routine ^x
+		 *	 ydb_jcnt=2		// number of parameters to routine ^x
 		 *	 env1=one		// old environment
 		 *	 env2=two		// old environment
 		 *
@@ -793,16 +790,16 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		new_env_top = env_ind;
 		old_env_top = &environ[environ_count];
 		DEBUG_ONLY(
-			/* check that all new environment variables begin with the string "gtm".
+			/* check that all new environment variables begin with the string "ydb_".
 			 * this assumption is used later in the for loop below.
 			 */
 			for (new_env_cur = env_ary; new_env_cur < new_env_top; new_env_cur++)
-				assert(!STRNCMP_LIT(*new_env_cur, "gtm"));
+				assert(!STRNCMP_LIT(*new_env_cur, "ydb_"));
 		)
 		for (old_env_cur = environ; old_env_cur < old_env_top; old_env_cur++)
 		{
 			env_end = strchr(*old_env_cur, '=');
-			if ((NULL != env_end) && !STRNCMP_LIT(*old_env_cur, "gtm"))
+			if ((NULL != env_end) && !STRNCMP_LIT(*old_env_cur, "ydb_"))
 			{
 				env_len = (int)(env_end - *old_env_cur + 1);	/* include the '=' too */
 				assert(env_len <= strlen(*old_env_cur));
