@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,8 +58,6 @@ void continue_handler(int sig, siginfo_t *info, void *context)
 			 * suspended and being continued. SE 7/01
 			 */
 			send_msg(VARLSTCNT(4) ERR_REQ2RESUME, 2, sig_info.send_pid, sig_info.send_uid);
-			if (NULL != io_std_device.in && tt == io_std_device.in->type)
-				setterm(io_std_device.in);
 			/* Fall through */
 		case DEFER_SUSPEND:
 			/* If suspend was deferred, this continue/resume overrides/cancels it */

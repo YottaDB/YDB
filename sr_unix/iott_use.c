@@ -453,7 +453,10 @@ void iott_use(io_desc *iod, mval *pp)
 		temp_ptr = (d_tt_struct *)d_in->dev_sp;
 		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
 		if (0 != status)
+		{
+			assert(FALSE);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
+		}
 		if (tt == d_in->type)
 		{
 			temp_ptr->term_ctrl = mask_in;

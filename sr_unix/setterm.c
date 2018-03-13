@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -16,6 +19,7 @@
 
 #include "gtm_termios.h"
 #include "gtm_signal.h"	/* for SIGPROCMASK used inside Tcsetattr */
+#include "gtm_unistd.h"
 
 #include "io.h"
 #include "iosp.h"
@@ -24,6 +28,8 @@
 #include "eintr_wrappers.h"
 #include "setterm.h"
 #include "gtm_isanlp.h"
+
+GBLREF	uint4		process_id;
 
 error_def(ERR_TCSETATTR);
 
@@ -34,7 +40,12 @@ void setterm(io_desc *ioptr)
 	struct termios	t;
 	d_tt_struct	*tt_ptr;
 
-	tt_ptr = (d_tt_struct *) ioptr->dev_sp;
+	tt_ptr = (d_tt_struct *)ioptr->dev_sp;
+	if (0 != tt_ptr->setterm_done_by)
+	{
+		assert(process_id == tt_ptr->setterm_done_by);
+		return;	/* "setterm" already done */
+	}
 	t = *tt_ptr->ttio_struct;
 	if (tt_ptr->canonical)
 	{	t.c_lflag &= ~(ECHO);
@@ -51,6 +62,7 @@ void setterm(io_desc *ioptr)
 		if (gtm_isanlp(tt_ptr->fildes) == 0)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 	}
+	tt_ptr->setterm_done_by = process_id;
 	return;
 }
 

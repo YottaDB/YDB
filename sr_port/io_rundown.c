@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -12,40 +15,64 @@
 
 #include "mdef.h"
 
+#include "gtm_unistd.h"
+
 #include "io.h"
 #include "iosp.h"
 #include "io_params.h"
 #include "error.h"
+#include "iottdef.h"
+#include "setterm.h"
 
-GBLREF io_log_name	*io_root_log_name;
-
-GBLREF io_pair		io_std_device;
-GBLREF bool		prin_in_dev_failure;
-GBLREF bool		prin_out_dev_failure;
+GBLREF	io_log_name	*io_root_log_name;
+GBLREF	int		process_exiting;
+GBLREF	uint4		process_id;
+GBLREF	io_pair		io_std_device;
+GBLREF	bool		prin_in_dev_failure;
+GBLREF	bool		prin_out_dev_failure;
 
 void io_dev_close(io_log_name *d);
 
 void io_rundown (int rundown_type)
 {
 	io_log_name	*l;		/* logical name pointer	*/
+	io_desc		*ioptr, *iod[2];
+	int		i;
 
 	if (NULL == io_root_log_name)
 		return;
 	for (l = io_root_log_name;  NULL != l; free(l), l = io_root_log_name)
 	{
 		io_root_log_name = l->next;
-		if ((NULL != l->iod) && (n_io_dev_types == l->iod->type))
+		ioptr = l->iod;
+		if (NULL == ioptr)
+			continue;
+		if (n_io_dev_types == ioptr->type)
 		{	/* Device setup has started but did not complete (e.g. SIG-15 during device set up took us to exit handler)
 			 * Not much can be done in terms of rundown of this device so skip it.
 			 */
 			continue;
 		}
-		if (NULL != l->iod)
-		{
-			if ((NORMAL_RUNDOWN == rundown_type)
+		if ((NORMAL_RUNDOWN == rundown_type)
 				|| ((RUNDOWN_EXCEPT_STD == rundown_type)
-					&& ((l->iod->pair.in != io_std_device.in) && (l->iod->pair.out != io_std_device.out))))
-				io_dev_close(l);
+					&& ((ioptr->pair.in != io_std_device.in) && (ioptr->pair.out != io_std_device.out))))
+			io_dev_close(l);
+		else if (process_exiting)
+		{	/* ioptr could have input or output pointing to a terminal. And YottaDB might have set some terminal
+			 * settings as part of writing to terminal. If so, reset those before exiting YottaDB code.
+			 */
+			iod[0] = ioptr->pair.in;
+			iod[1] = ioptr->pair.out;
+			for (i = 0; i < 2; i++)
+			{
+				ioptr = iod[i];
+				/* If standard device is a terminal and is open, check if "setterm" had been done.
+				 * If so do "resetterm" to restore terminal to what it was (undo whatever stty settings
+				 * YottaDB changed in terminal).
+				 */
+				if (IS_SETTERM_DONE(ioptr))
+					resetterm(ioptr);
+			}
 		}
 	}
 }

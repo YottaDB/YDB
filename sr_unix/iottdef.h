@@ -19,6 +19,7 @@
 #include "gtm_termios.h"
 #include "gtm_stdio.h"
 #include "compiler.h"
+#include "setterm.h"
 
 #define TERM_MSK	0x08002400	/* CR LF ESC */
 #define TERM_MSK_UTF8_0	0x08003400	/* add FF */
@@ -59,6 +60,20 @@
 		}									\
 	}										\
 }
+
+GBLREF	uint4	process_id;
+
+#define	IS_SETTERM_DONE(IOPTR)	((tt == IOPTR->type) && (dev_open == IOPTR->state)				\
+					&& (NULL != IOPTR->dev_sp)						\
+					&& (process_id == ((d_tt_struct *)IOPTR->dev_sp)->setterm_done_by))
+
+/* If we are going to read or write to the terminal, and "setterm" has not yet been done, do it first */
+#define	SETTERM_IF_NEEDED(ioPtr, ttPtr)							\
+MBSTART {										\
+	/* Only the true runtime runs with the modified terminal settings */		\
+	if (IS_GTM_IMAGE && (0 == ttPtr->setterm_done_by))				\
+		setterm(ioPtr);								\
+} MBEND
 
 enum	tt_which
 {
@@ -152,6 +167,9 @@ typedef struct
 	boolean_t		discard_lf;		/* UTF8 mode - previous char was CR so ignore following LF */
 	boolean_t		default_mask_term;	/* mask_term is the default */
 	boolean_t		done_1st_read;		/* UTF8 mode - check for BOM if not */
+	pid_t			setterm_done_by;	/* if non-zero, points to pid that did "setterm";
+							 * used to later invoke "resetterm" if needed.
+							 */
 }d_tt_struct;
 
 void iott_flush_buffer(io_desc *ioptr, boolean_t new_write_flag);
