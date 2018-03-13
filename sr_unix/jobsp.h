@@ -27,20 +27,19 @@
 
 #define TIMEOUT_ERROR		(MAX_SYSERR + 1)	/* a special value to differentiate it from the rest of errno's */
 
-#define CHILD_FLAG_ENV		"gtmj0"
-#define CLEAR_CHILD_FLAG_ENV  	"gtmj0="""
+#define CHILD_FLAG_ENV		"ydb_j0"
+#define CLEAR_CHILD_FLAG_ENV  	"ydb_j0="""
 #define GBLDIR_ENV		"ydb_gbldir"
-#define CWD_ENV			"gtmj2"
-#define IN_FILE_ENV		"gtmj3"
-#define OUT_FILE_ENV		"gtmj4"
-#define ERR_FILE_ENV		"gtmj5"
-#define LOG_FILE_ENV		"gtmj6"
-#define ROUTINE_ENV		"gtmj7"
-#define LABEL_ENV		"gtmj8"
-#define OFFSET_ENV		"gtmj9"
-#define PRIORITY_ENV		"gtmja"
-#define STARTUP_ENV		"gtmjb"
-#define GTMJCNT_ENV		"gtmjcnt"
+#define CWD_ENV			"ydb_j2"
+#define IN_FILE_ENV		"ydb_j3"
+#define OUT_FILE_ENV		"ydb_j4"
+#define ERR_FILE_ENV		"ydb_j5"
+#define LOG_FILE_ENV		"ydb_j6"
+#define ROUTINE_ENV		"ydb_j7"
+#define LABEL_ENV		"ydb_j8"
+#define OFFSET_ENV		"ydb_j9"
+#define PRIORITY_ENV		"ydb_ja"
+#define STARTUP_ENV		"ydb_jb"
 
 #define JOB_SOCKET_PREFIX		"SOCKET:"
 #define IS_JOB_SOCKET(ADDR, LEN)	((LEN >= SIZEOF(JOB_SOCKET_PREFIX)) && (0 == STRNCMP_LIT(ADDR, JOB_SOCKET_PREFIX)))
