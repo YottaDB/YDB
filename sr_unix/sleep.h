@@ -122,7 +122,7 @@ MBSTART {										\
 											\
 	assert(0 < MICROSECONDS);							\
 	req.tv_sec = (time_t)((MICROSECONDS) / E_6);					\
-	req.tv_nsec = (long)((usecs = (MICROSECONDS) % E_6) * 1000L); /* Assignment! */	\
+	req.tv_nsec = ((usecs = (MICROSECONDS) % E_6) * 1000); /* Assignment! */	\
 	assert(E_9 > req.tv_nsec);							\
 	if (RESTART)									\
 	{										\
@@ -130,7 +130,7 @@ MBSTART {										\
 		while ((-1 == (status = nanosleep(&req, NULL))) && (EINTR == errno))	\
 		{	/* This macro will break the loop when it is time. */		\
 			UPDATE_REM_TIME_OR_BREAK(now, expir, req.tv_sec, usecs);	\
-			req.tv_nsec = (long)(usecs * 1000L);				\
+			req.tv_nsec = (usecs * 1000);					\
 		}									\
 	} else										\
 		nanosleep(&req, NULL);							\
