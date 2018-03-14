@@ -1026,7 +1026,7 @@ int ydb_init()
 		 * We will do that a little later in "common_startup_init" below (after setting <ydb_dist>
 		 * env var) and issue a LIBYOTTAMISMTCH error if needed.
 		 */
-		setenv(YDB_DIST, path, TRUE);
+		status = setenv(YDB_DIST, path, TRUE);
 		if (status)
 		{
 			assert(-1 == status);
@@ -1034,7 +1034,7 @@ int ydb_init()
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 				RTS_ERROR_LITERAL("setenv(ydb_dist)"), CALLFROM, save_errno);
 		}
-		setenv("gtm_dist", path, TRUE);
+		status = setenv("gtm_dist", path, TRUE);
 		if (status)
 		{
 			assert(-1 == status);
