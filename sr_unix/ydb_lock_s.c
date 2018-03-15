@@ -41,14 +41,14 @@ GBLREF	volatile int4	outofband;
 int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 {
 	va_list			var, varcpy;
-	int			parmidx, timeoutms, lock_rc, sub_idx, var_svn_index;
+	int			parmidx, lock_rc, sub_idx, var_svn_index;
 	gparam_list		plist;
 	boolean_t		error_encountered;
 	mval			timeout_mval, varname_mval;
 	mval			plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_buffer_t		*varname, *subsarray, *subptr;
 	int			subs_used;
-	unsigned long long	timeout_msec;
+	unsigned long long	timeout_sec;
 	ydb_var_types		var_type;
 	char			buff[256];
 	DCL_THREADGBL_ACCESS;
@@ -150,12 +150,11 @@ int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 	}
 	va_end(var);
 	/* At this point, all of the private lock blocks have been created. Remaining task before calling "op_lock2" is to
-	 * convert the timeout value from microseconds to milliseconds.
+	 * convert the timeout value from microseconds to seconds.
 	 */
-	timeout_msec = (timeout_nsec / NANOSECS_IN_MSEC);
-	assert(MAXPOSINT4 > timeout_msec);	/* or else a TIMEOUT2LONG error would have been issued above */
-	timeoutms = (int)timeout_msec;
-	i2mval(&timeout_mval, timeoutms);
+	assert(MAXPOSINT4 > (timeout_nsec / NANOSECS_IN_MSEC));	/* Or else a TIME2LONG error would have been issued above */
+	timeout_sec = (timeout_nsec / NANOSECS_IN_SEC);
+	i2mval(&timeout_mval, (int)timeout_sec);
 	/* The generated code typically calls "op_lock" but that routine just calls "op_lock2" */
 	lock_rc = op_lock2(&timeout_mval, CM_LOCKS);
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */

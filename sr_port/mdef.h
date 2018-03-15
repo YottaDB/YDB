@@ -1456,6 +1456,7 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define MICROSEC_IN_SEC		1000000	/* microseconds in a second */
 #define MICROSECS_IN_MSEC	1000	/* microseconds in a millisecond */
 #define NANOSEC_IN_SEC		1000000000	/* nanoseconds in a second */
+#define NANOSECS_IN_SEC		1000000000	/* nanoseconds in a second */
 #define NANOSECS_IN_MSEC	1000000		/* nanoseconds in a millisecond */
 #define NANOSECS_IN_USEC	1000		/* nanoseconds in a microsecond */
 #define E_6			1000000

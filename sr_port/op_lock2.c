@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -132,7 +135,7 @@ STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr)
  *	the $T variable by the caller if timeout is specified.
  * -----------------------------------------------
  */
-int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in milliseconds */
+int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 {
 	boolean_t		blocked, timer_on;
 	signed char		gotit;

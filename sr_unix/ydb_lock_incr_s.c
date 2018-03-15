@@ -42,7 +42,7 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int 
 	boolean_t		error_encountered;
 	mval			timeout_mval, varname_mval;
 	mval			plist_mvals[YDB_MAX_SUBS + 1];
-	unsigned long long	timeout_msec;
+	unsigned long long	timeout_sec;
 	ydb_var_types		var_type;
 	int			var_svn_index;
 	DCL_THREADGBL_ACCESS;
@@ -87,12 +87,11 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int 
 	COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2, "ydb_lock_incr_s()");
 	callg((callgfnptr)op_lkname, &plist);
 	/* At this point, the private lock block has been created. Remaining task before calling "op_incrlock" is to
-	 * convert the timeout value from microseconds to milliseconds.
+	 * convert the timeout value from nanoseconds to seconds
 	 */
-	timeout_msec = (timeout_nsec / NANOSECS_IN_MSEC);
-	assert(MAXPOSINT4 > timeout_msec);      	/* Or else a TIME2LONG error would have been issued above */
-	timeoutms = (int)timeout_msec;
-	i2mval(&timeout_mval, timeoutms);
+	assert(MAXPOSINT4 > (timeout_nsec / NANOSECS_IN_MSEC));	/* Or else a TIME2LONG error would have been issued above */
+	timeout_sec = (timeout_nsec / NANOSECS_IN_SEC);
+	i2mval(&timeout_mval, (int)timeout_sec);
 	lock_rc = op_incrlock(&timeout_mval);
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* The counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
