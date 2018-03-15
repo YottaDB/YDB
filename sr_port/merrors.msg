@@ -649,7 +649,7 @@ TPLOCK		<Cannot release LOCK(s) held prior to current TSTART>/error/fao=0!/ansi=
 TPQUIT		<Cannot QUIT out of a routine with an active transaction>/error/fao=0!/ansi=42
 TPFAIL		<Transaction COMMIT failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 TPRETRY		<Restart transaction from non-concurrency DB failure>/error/fao=0!/ansi=0
-TPTOODEEP	<$TLEVEL cannot exceed 127>/error/fao=0!/ansi=0
+TPTOODEEP	<$TLEVEL cannot exceed 126>/error/fao=0!/ansi=0
 ZDEFACTIVE	<ZDEFER already active>/error/fao=0!/ansi=0
 ZDEFOFLOW	<ZDEFER Buffer overflow to node !AD>/error/fao=2!/ansi=0
 MUPRESTERR	<MUPIP restore aborted due to preceding errors>/error/fao=0!/ansi=0

@@ -485,7 +485,7 @@ LITDEF	err_msg merrors[] = {
 	{ "TPQUIT", "Cannot QUIT out of a routine with an active transaction", 0 },
 	{ "TPFAIL", "Transaction COMMIT failed.  Failure code: !AD.", 2 },
 	{ "TPRETRY", "Restart transaction from non-concurrency DB failure", 0 },
-	{ "TPTOODEEP", "$TLEVEL cannot exceed 127", 0 },
+	{ "TPTOODEEP", "$TLEVEL cannot exceed 126", 0 },
 	{ "ZDEFACTIVE", "ZDEFER already active", 0 },
 	{ "ZDEFOFLOW", "ZDEFER Buffer overflow to node !AD", 2 },
 	{ "MUPRESTERR", "MUPIP restore aborted due to preceding errors", 0 },
