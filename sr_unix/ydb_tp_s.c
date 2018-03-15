@@ -186,14 +186,12 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 	if (YDB_OK == tpfn_status)
 	{
 		tpfn_status = (*tpfn)(tpfnparm);
-		TREF(libyottadb_active_rtn) = LYDB_RTN_TP;		/* Restore our routine indicator */
 		assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
 	}
-	TREF(libyottadb_active_rtn) = LYDB_RTN_TP;	/* Re-enable active routine flag */
+	TREF(libyottadb_active_rtn) = LYDB_RTN_TP;		/* Restore our routine indicator */
 	if (YDB_OK == tpfn_status)
-	{
 		op_tcommit();
-	} else if (YDB_TP_RESTART == tpfn_status)
+	else if (YDB_TP_RESTART == tpfn_status)
 	{	/* Need to do an implicit or explicit TP restart. Do it by issuing a TPRETRY error which will
 		 * invoke "ydb_simpleapi_ch" and transfer control to the "if (error_encountered)" block above.
 		 */
