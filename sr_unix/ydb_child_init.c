@@ -95,7 +95,8 @@ int	ydb_child_init(void *param)
 	/* Re-initialize mutex socket, memory semaphore etc. with child's pid if already done by parent */
 	if (mutex_per_process_init_pid)
 		mutex_per_process_init();
-	jnl_prc_vector(prc_vec);	/* Reinitialize prc_vec based on new process_id */
+	if (NULL != prc_vec)
+		jnl_prc_vector(prc_vec);	/* Reinitialize prc_vec based on new process_id */
 	/* Record the fact that this process is interested in the relinkctl files inherited from the parent by
 	 * incrementing the linkctl->hdr->nattached count. Just like is done in "ojstartchild".
 	 */
