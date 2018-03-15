@@ -666,7 +666,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		if (!repeat_error)
 			/* This has already been done if we are re-throwing the error */
 			outofband_clear();
-		if (!trans_action && !ctrlc_on && !(frame_pointer->type & SFT_DM))
+		if (!trans_action && !dm_action && !(frame_pointer->type & SFT_DM))
 		{
 			if (!repeat_error)
 			{
