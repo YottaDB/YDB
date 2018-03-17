@@ -77,6 +77,7 @@ GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
 GBLREF	int			mumps_status;
 GBLREF	uint4			dollar_trestart;
+GBLREF	trans_num		local_tn;
 GBLREF	uint4			simpleapi_dollar_trestart;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
@@ -143,10 +144,14 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 				assert(rc == SIGNAL);
 				assertpro((SFT_TRIGR & frame_pointer->type) && (0 < gtm_trigger_depth));
 				mumps_status = rc;
-				assert(active_ch[1].dollar_tlevel >= dollar_tlevel);
-				DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;)
 			}
 		}
+		/* The "tp_restart" call above can change dollar_tlevel. In that case, the UNWIND that is done below
+		 * would assert fail the expression "((active_ch+1)->dollar_tlevel == dollar_tlevel)".
+		 * So fix active_ch[1].dollar_tlevel to avoid the assert.
+		 */
+		assert(active_ch[1].dollar_tlevel >= dollar_tlevel);
+		DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;)
 		UNWIND(NULL, NULL);
 	}
 	if (ERR_REPEATERROR != SIGNAL)
