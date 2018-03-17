@@ -16,7 +16,7 @@ LYDBRTN(LYDB_RTN_DATA, 			LYDB_SIMPLEAPI,		"ydb_data_s()"),		/* "ydb_data_s" is 
 LYDBRTN(LYDB_RTN_DELETE, 		LYDB_SIMPLEAPI,		"ydb_delete_s()"),		/* "ydb_delete_s" is running */
 LYDBRTN(LYDB_RTN_DELETE_EXCL, 		LYDB_SIMPLEAPI,		"ydb_delete_excl_s()"),		/* "ydb_delete_excl_s" is running */
 LYDBRTN(LYDB_RTN_GET, 			LYDB_SIMPLEAPI,		"ydb_get_s()"),			/* "ydb_get_s" is running */
-LYDBRTN(LYDB_RTN_INCR,			LYDB_SIMPLEAPI,		"ydb_inc_s()"),			/* "ydb_incr_s" is running */
+LYDBRTN(LYDB_RTN_INCR,			LYDB_SIMPLEAPI,		"ydb_incr_s()"),		/* "ydb_incr_s" is running */
 LYDBRTN(LYDB_RTN_LOCK, 			LYDB_SIMPLEAPI,		"ydb_lock_s()"),		/* "ydb_lock_s" is running */
 LYDBRTN(LYDB_RTN_LOCK_DECR, 		LYDB_SIMPLEAPI,		"ydb_lock_decr_s()"),		/* "ydb_lock_decr_s" is running */
 LYDBRTN(LYDB_RTN_LOCK_INCR, 		LYDB_SIMPLEAPI,		"ydb_lock_incr_s()"),		/* "ydb_lock_incr_s" is running */

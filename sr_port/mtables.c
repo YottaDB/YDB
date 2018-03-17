@@ -463,14 +463,6 @@ GBLDEF casemap_t casemaps[MAX_CASE_IDX] =
 LITDEF mstr	nsb_dummy = {0, 1, "\0"};
 /*LITDEF mstr	nsb_dummy = {0, LEN_AND_LIT("dummy")};*/
 
-/* Names of the libyottadb routines */
-#define LYDBRTN(a, b, c) c
-LITDEF char *lydbrtnnames[] =
-{
-#include "libyottadb_rtns.h"
-};
-#undef LYDBRTN
-
 /* What package the libyottadb routines below to */
 #define LYDBRTN(a, b, c) b
 LITDEF int lydbrtnpkg[] =
