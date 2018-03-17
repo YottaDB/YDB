@@ -40,7 +40,6 @@ LITREF	char		ctypetab[NUM_CHARS];
 LITREF	nametabent	svn_names[];
 LITREF	unsigned char	svn_index[];
 LITREF	svn_data_type	svn_data[];
-LITREF	char 		*lydbrtnnames[];
 LITREF	int		lydbrtnpkg[];
 
 #define LYDB_NONE	0				/* Routine is part of no package */
@@ -95,15 +94,10 @@ MBSTART	{													\
 		SETUP_THREADGBL_ACCESS;										\
 	}		       											\
 	/* If we detect a problem here, the routine has not yet established the condition handler to take	\
-	 * care of these issues so we invoke it directly. Veryify routines are not nesting.			\
+	 * care of these issues so we invoke it directly. Verify routines are not nesting.			\
 	 */													\
 	if ((LYDB_RTN_NONE != TREF(libyottadb_active_rtn)) && (LYDB_SIMPLEAPI == lydbrtnpkg[ROUTINE]))		\
-	{													\
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_SIMPLEAPINEST, 4,					\
-			     RTS_ERROR_TEXT(lydbrtnnames[TREF(libyottadb_active_rtn)]),				\
-			     RTS_ERROR_TEXT(lydbrtnnames[ROUTINE]));						\
 		return YDB_ERR_SIMPLEAPINEST;									\
-	}		       											\
 	TREF(libyottadb_active_rtn) = ROUTINE;									\
 } MBEND
 
