@@ -88,6 +88,7 @@
 # include "gtm_trigger.h"
 #endif
 #include "libyottadb.h"
+#include "setup_error.h"
 
 GBLREF	boolean_t		ctrlc_on, created_core, dont_want_core, in_gvcst_incr, run_time;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
@@ -160,7 +161,6 @@ error_def(ERR_TPTIMEOUT);
 error_def(ERR_UNSOLCNTERR);
 
 boolean_t clean_mum_tstart(void);
-void setup_error(sgmnt_addrs *csa, int argcnt, ...);
 
 /* When we restart generated code after handling an error, verify that we are not in the frame or one created on its
  * behalf that invoked a trigger or spanning node and caused a dynamic TSTART to be done on its behalf. This can happen
@@ -227,18 +227,6 @@ boolean_t clean_mum_tstart(void)
 		return TRUE;
 	}
 	return (NULL != err_act);
-}
-
-/* Routine to setup an error in util_outbuff as if rts_error had put it there. Used when we morph ERR_TPRETRY
- * to ERR_TPRESTNESTERR. Requires a va_list var containing the args so do this in this separate routine.
- */
-void setup_error(sgmnt_addrs *csa, int argcnt, ...)
-{
-	va_list		var;
-
-	VAR_START(var, argcnt);
-	gtm_putmsg_list(csa, argcnt, var);
-	va_end(var);
 }
 
 CONDITION_HANDLER(mdb_condition_handler)

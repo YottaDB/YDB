@@ -29,6 +29,7 @@
 #include "lv_val.h"
 #include "libydberrors.h"	/* Define YDB_ERR_* errors */
 #include "gtm_string.h"		/* for strlen in LIBYOTTADB_INIT in RTS_ERROR_TEXT macro */
+#include "setup_error.h"
 
 #define MAX_SAPI_MSTR_GC_INDX	YDB_MAX_NAMES
 
@@ -41,6 +42,7 @@ LITREF	nametabent	svn_names[];
 LITREF	unsigned char	svn_index[];
 LITREF	svn_data_type	svn_data[];
 LITREF	int		lydbrtnpkg[];
+LITREF	char 		*lydbrtnnames[];
 
 #define LYDB_NONE	0				/* Routine is part of no package */
 #define LYDB_UTILITY 	1				/* Routine is a utility routine */
@@ -69,7 +71,8 @@ typedef enum
  */
 #define LIBYOTTADB_INIT(ROUTINE)										\
 MBSTART	{													\
-	int		status;											\
+	int		status, errcode;									\
+	mstr		entryref;										\
 														\
 	GBLREF	stack_frame	*frame_pointer;									\
 	GBLREF 	boolean_t	gtm_startup_active;								\
@@ -93,11 +96,22 @@ MBSTART	{													\
 		 */												\
 		SETUP_THREADGBL_ACCESS;										\
 	}		       											\
-	/* If we detect a problem here, the routine has not yet established the condition handler to take	\
-	 * care of these issues so we invoke it directly. Verify routines are not nesting.			\
+	/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet	\
+	 * established the condition handler to take care of these issues so we simulate it's effect by		\
+	 * doing the "set_zstatus", setting TREF(ydb_error_code) and returning the error code.			\
 	 */													\
 	if ((LYDB_RTN_NONE != TREF(libyottadb_active_rtn)) && (LYDB_SIMPLEAPI == lydbrtnpkg[ROUTINE]))		\
+	{													\
+		errcode = ERR_SIMPLEAPINEST;									\
+		setup_error(CSA_ARG(NULL) VARLSTCNT(6) ERR_SIMPLEAPINEST, 4,					\
+				RTS_ERROR_TEXT(lydbrtnnames[TREF(libyottadb_active_rtn)]),			\
+				RTS_ERROR_TEXT(lydbrtnnames[ROUTINE]));						\
+		entryref.addr = SIMPLEAPI_M_ENTRYREF;								\
+		entryref.len = STR_LIT_LEN(SIMPLEAPI_M_ENTRYREF);						\
+		set_zstatus(&entryref, errcode, NULL, FALSE);							\
+		TREF(ydb_error_code) = errcode;									\
 		return YDB_ERR_SIMPLEAPINEST;									\
+	}													\
 	TREF(libyottadb_active_rtn) = ROUTINE;									\
 } MBEND
 

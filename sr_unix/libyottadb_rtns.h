@@ -25,6 +25,6 @@ LYDBRTN(LYDB_RTN_NODE_PREVIOUS, 	LYDB_SIMPLEAPI,		"ydb_node_previous_s()"),	/* "
 LYDBRTN(LYDB_RTN_SET, 			LYDB_SIMPLEAPI,		"ydb_set_s()"),			/* "ydb_set_s" is running */
 LYDBRTN(LYDB_RTN_STR2ZWR,		LYDB_SIMPLEAPI,		"ydb_str2zwr_s()"),		/* "ydb_str2zwr_s" is running */
 LYDBRTN(LYDB_RTN_SUBSCRIPT_NEXT, 	LYDB_SIMPLEAPI,		"ydb_subscript_next_s()"),	/* "ydb_subscript_next_s" is running */
-LYDBRTN(LYDB_RTN_SUBSCRIPT_PREVIOUS, 	LYDB_SIMPLEAPI,		"ydb_subscript_next_s()"),	/* "ydb_subscript_previous_s" is running */
+LYDBRTN(LYDB_RTN_SUBSCRIPT_PREVIOUS, 	LYDB_SIMPLEAPI,		"ydb_subscript_previous_s()"),	/* "ydb_subscript_previous_s" is running */
 LYDBRTN(LYDB_RTN_TP,			LYDB_SIMPLEAPI,		"ydb_tp_s()"),			/* "ydb_tp_s" is running */
 LYDBRTN(LYDB_RTN_ZWR2STR,		LYDB_SIMPLEAPI,		"ydb_zwr2str_s()")		/* "ydb_zwr2str_s" is running */
