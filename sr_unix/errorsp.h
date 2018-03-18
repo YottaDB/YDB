@@ -584,6 +584,7 @@ void ch_cond_core(void);
 void ch_overrun(void);
 void util_cond_flush(void);
 void stop_image_ch(void);
+
 CONDITION_HANDLER(dbopen_ch);
 CONDITION_HANDLER(gtmci_ch);
 CONDITION_HANDLER(gtmci_init_ch);
