@@ -32,4 +32,6 @@ const static readonly int error_ansi[] = {
 	   0,	/* FATALERROR1 */
 	   0,	/* FATALERROR2 */
 	   0,	/* SIMPLEAPINEST */
+	   0,	/* CALLINTCOMMIT */
+	   0,	/* CALLINTROLLBACK */
 	};

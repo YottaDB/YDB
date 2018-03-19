@@ -108,6 +108,7 @@ GBLREF	int4			tstart_trigger_depth;
 GBLREF	mval			dollar_ztslate;
 LITREF	mval			literal_null;
 #endif
+GBLREF	int4			tstart_gtmci_nested_level;
 #ifdef VMS
 GBLREF	boolean_t		tp_has_kill_t_cse; /* cse->mode of kill_t_write or kill_t_create got created in this transaction */
 #endif
@@ -272,6 +273,7 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 				/* should have been NULL almost always except for a small window in gvcst_put/gvcst_kill */
 			tstart_trigger_depth = gtm_trigger_depth; /* note down what trigger depth an outermost tstart occurs in */
 		)
+		tstart_gtmci_nested_level = TREF(gtmci_nested_level);
 		memset(tcom_record.jnl_tid, 0, TID_STR_SIZE);
 		if (0 != tid->str.len)
 		{

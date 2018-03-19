@@ -830,6 +830,8 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
 		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
 		 */
+		if (ERR_TPRETRY == mumps_status)	/* If call-in got a TPRETRY error, bubble it up to caller */
+			INVOKE_RESTART;
 		return mumps_status;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
