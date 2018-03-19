@@ -1222,3 +1222,7 @@ GBLDEF	char		image_id[256]= "image_id";
 GBLDEF	int		ydb_repl_filter_timeout;	/* # of seconds that source server waits before issuing FILTERTIMEDOUT
 							 * error if it sees no response from the external filter program.
 							 */
+GBLDEF	int4		tstart_gtmci_nested_level;	/* TREF(gtmci_nested_level) at the time of the outermost "op_tstart"
+							 * This should be used only if dollar_tlevel is non-zero as it is not
+							 * otherwise maintained.
+							 */
