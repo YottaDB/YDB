@@ -354,8 +354,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 				 * prevents an assert failure in UNWIND. START_CH would have done a active_ch-- So we need a
 				 * active_ch[1] to get at the desired active_ch. See similar code in tp_restart.c.
 				 */
-				UNIX_ONLY(assert(active_ch[1].dollar_tlevel >= dollar_tlevel);)
-				UNIX_ONLY(DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;))
+				assert(active_ch[1].dollar_tlevel >= dollar_tlevel);
+				DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel);
 				UNWIND(NULL, NULL);
 			}
 			/* "tp_restart" has succeeded so we have unwound back to the return point but check if the
@@ -375,6 +375,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 				}
 				mumps_status = rc;
 				DBGEHND((stderr, "mdb_condition_handler: Returning to implicit TSTART originator\n"));
+				/* Do dbg-only dollar_tlevel adjustment just like done in previous UNWIND invocation */
+				assert(active_ch[1].dollar_tlevel >= dollar_tlevel);
+				DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel);
 				UNWIND(NULL, NULL);
 			}
 			assert(!donot_INVOKE_MUMTSTART);
