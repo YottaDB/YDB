@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -117,7 +120,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	uint4			gtmDebugLevel;
+GBLREF	uint4			ydbDebugLevel;
 #ifdef DEBUG
 GBLREF	boolean_t		in_mu_cre_file;
 #endif
@@ -285,7 +288,7 @@ unsigned char mu_cre_file(void)
 				* ((DIVIDE_ROUND_UP(EXTEND_WARNING_FACTOR * (gtm_uint64_t)seg->ext_blk_count,
 						    BLKS_PER_LMAP - 1))
 				   + EXTEND_WARNING_FACTOR * (gtm_uint64_t)seg->ext_blk_count));
-	if (!(gtmDebugLevel & GDL_IgnoreAvailSpace))
+	if (!(ydbDebugLevel & GDL_IgnoreAvailSpace))
 	{	/* Bypass this space check if debug flag above is on. Allows us to create a large sparse DB
 		 * in space it could never fit it if wasn't sparse. Needed for some tests.
 		 * Also, if the anticipatory freeze scheme is in effect at this point, we would have issued

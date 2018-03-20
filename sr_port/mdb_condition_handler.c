@@ -114,7 +114,7 @@ GBLREF	spdesc			indr_stringpool, rts_stringpool, stringpool;
 GBLREF	stack_frame		*frame_pointer, *zyerr_frame, *error_frame;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	tp_region		*tp_reg_list;		/* Chained list of regions in this transaction not cleared on tp_restart */
-GBLREF	uint4			gtmDebugLevel;		/* Debug level */
+GBLREF	uint4			ydbDebugLevel;		/* Debug level */
 GBLREF	uint4			process_id;
 GBLREF	unsigned char		*msp, *restart_ctxt, *restart_pc, *stacktop, *stackwarn, *tp_sp, *tpstacktop, *tpstackwarn;
 GBLREF	unsigned short		proc_act_type;
@@ -481,7 +481,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		 * case methods exist in the future for this module to be driven without invoking cond_core_ch
 		 * first.
 		 */
-		if (!(GDL_DumpOnStackOFlow & gtmDebugLevel) &&
+		if (!(GDL_DumpOnStackOFlow & ydbDebugLevel) &&
 		    ((int)ERR_STACKOFLOW == SIGNAL || (int)ERR_STACKOFLOW == arg
 		     || (int)ERR_MEMORY == SIGNAL || (int)ERR_MEMORY == arg))
 		{

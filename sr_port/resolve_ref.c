@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -28,7 +31,7 @@ GBLREF boolean_t		run_time;
 GBLREF command_qualifier	cmd_qlf;
 GBLREF mlabel			*mlabtab;
 GBLREF triple			t_orig;
-GBLREF uint4			gtmDebugLevel;
+GBLREF uint4			ydbDebugLevel;
 
 error_def(ERR_ACTLSTTOOLONG);
 error_def(ERR_FMLLSTMISSING);

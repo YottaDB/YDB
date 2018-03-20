@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -69,7 +72,7 @@ GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			dollar_tlevel;
-GBLREF	uint4			gtmDebugLevel;
+GBLREF	uint4			ydbDebugLevel;
 GBLREF	uint4			process_id;
 GBLREF	unsigned int		cr_array_index;
 GBLREF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover" */
@@ -224,7 +227,7 @@ void wcs_recover(gd_region *reg)
 		BG_TRACE_PRO_ANY(csa, wc_blocked_wcs_verify_passed);
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBCNTRLERR, 2, DB_LEN_STR(reg));
 	}
-	if (gtmDebugLevel)
+	if (ydbDebugLevel)
 		verifyAllocatedStorage();
 	/* Before recovering the cache, set early_tn to curr_tn + 1 to indicate to have_crit that we are in a situation that
 	 * is equivalent to being in the midst of a database commit and therefore defer exit handling in case of a MUPIP STOP.

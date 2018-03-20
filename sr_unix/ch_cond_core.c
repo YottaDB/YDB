@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +21,7 @@
 GBLREF boolean_t		created_core;
 GBLREF boolean_t		dont_want_core;
 GBLREF boolean_t		need_core;
-GBLREF uint4			gtmDebugLevel;
+GBLREF uint4			ydbDebugLevel;
 
 /* Create our own version of the DUMP macro that does not include stack overflow. This
    error is handled better inside mdb_condition_handler which should be the top level
@@ -53,7 +56,7 @@ void ch_cond_core(void)
 	boolean_t	cond_core_signal;
 
 	cond_core_signal = (ERR_STACKOFLOW == SIGNAL) || (ERR_MEMORY == SIGNAL);
-	if (DUMPABLE && ((cond_core_signal && (GDL_DumpOnStackOFlow & gtmDebugLevel)) || !cond_core_signal) && !SUPPRESS_DUMP)
+	if (DUMPABLE && ((cond_core_signal && (GDL_DumpOnStackOFlow & ydbDebugLevel)) || !cond_core_signal) && !SUPPRESS_DUMP)
 	{
 		need_core = TRUE;
 		gtm_fork_n_core();
