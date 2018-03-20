@@ -47,7 +47,7 @@ enum
 #define YDB_MAX_NAMES		35	/* Maximum number of variable names can be specified in a single ydb_*_s() call */
 #define YDB_MAX_STR		(1 * 1024 * 1024)	/* Maximum YottaDB string length */
 #define YDB_MAX_SUBS		31	/* Maximum subscripts currently supported */
-#define YDB_MAX_TIME		(0x7fffffffllu * 1000llu * 1000llu)	/* Max specified time in (long long) nanoseconds */
+#define YDB_MAX_TIME_NSEC	(0x7fffffffllu * 1000llu * 1000llu)	/* Max specified time in (long long) nanoseconds */
 
 /* Minimum values */
 

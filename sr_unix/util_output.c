@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,6 +48,7 @@
 #include "gtm_logicals.h"
 #include "have_crit.h"
 #include "gtm_multi_proc.h"
+#include "get_syslog_flags.h"
 
 #ifdef UNICODE_SUPPORTED
 #include "gtm_icu_api.h"
@@ -737,7 +741,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 			}
 		}
 		DEFER_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);
-		(void)OPENLOG(facility, LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
+		(void)OPENLOG(facility, get_syslog_flags(), LOG_USER);
 		ENABLE_INTERRUPTS(INTRPT_IN_LOG_FUNCTION, prev_intrpt_state);
 	}
 	/* When syslog is processing and a signal occurs, the signal processing might eventually lead to another syslog

@@ -64,9 +64,9 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int 
 	/* Check if an outofband action that might care about has popped up */
 	if (outofband)
 		outofband_action(FALSE);
-	assert(MAXPOSINT4 == (YDB_MAX_TIME / NANOSECS_IN_MSEC));
-	if (YDB_MAX_TIME < timeout_nsec)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME);
+	assert(MAXPOSINT4 == (YDB_MAX_TIME_NSEC / NANOSECS_IN_MSEC));
+	if (YDB_MAX_TIME_NSEC < timeout_nsec)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME_NSEC);
 	/* Setup and validate the varname */
 	VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
 	/* ISV references are not supported for this call */
