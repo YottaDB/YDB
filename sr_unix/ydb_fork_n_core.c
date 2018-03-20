@@ -15,6 +15,7 @@
 #include "gtm_syslog.h"
 
 #include "libyottadb_int.h"
+#include "get_syslog_flags.h"
 
 #define YDBNOTACTIVE "YDB-F-YDBNOTACTIVE The ydb_fork_n_core() facility is not available until the YottaDB runtime "	\
 		     "is initialized - Core generation request denied\n"
@@ -40,7 +41,7 @@ void ydb_fork_n_core(void)
 {
 	if (!gtm_startup_active)
 	{
-		openlog("YottaDB/SimpleAPI", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
+		OPENLOG("YottaDB/SimpleAPI", get_syslog_flags(), LOG_USER);
 		syslog(LOG_USER | LOG_INFO, YDBNOTACTIVE);
 		closelog();
 		fprintf(stderr, YDBNOTACTIVE);		/* TODO - review - echo to stderr as well? Or no? */

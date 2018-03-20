@@ -57,7 +57,7 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, c
 	*ret_subs_used = 0;
 	for (mstrp = TREF(sapi_query_node_subs), mstrp_top = mstrp + TREF(sapi_query_node_subs_cnt),
 		     outsubp = ret_subsarray, outsubp_top = outsubp + outsubs;
-	     mstrp < mstrp_top;
+	     outsubp < outsubp_top;
 	     mstrp++, outsubp++)
 	{
 		if (outsubp_top <= outsubp)

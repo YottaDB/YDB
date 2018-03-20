@@ -53,6 +53,7 @@
 				 */
 #include "wbox_test_init.h"
 #include "gtm_limits.h"
+#include "get_syslog_flags.h"
 
 #define ROOTUID 0
 #define ROOTGID 0
@@ -196,7 +197,7 @@ int main()
 	 */
 	sigemptyset(&mask);
 	sigprocmask(SIG_SETMASK, &mask, NULL);	/* BYPASSOK(sigprocmask) */
-	OPENLOG("GTMSECSHRINIT", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_USER);
+	OPENLOG("GTMSECSHRINIT", get_syslog_flags(), LOG_USER);
 #	ifdef _AIX
 #	ifdef DEBUG
 	/* Use some very simplistic processing to obtain values for $gtm_white_box_test_case_enable/number since we are basically

@@ -38,8 +38,8 @@ void ydb_hiber_start_wait_any(unsigned long long sleep_nsec)
 		REVERT;
 		return;
 	}
-	if (YDB_MAX_TIME < sleep_nsec)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME);
+	if (YDB_MAX_TIME_NSEC < sleep_nsec)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME_NSEC);
 	timeout_msec = (sleep_nsec / NANOSECS_IN_MSEC);
 	assert(MAXPOSINT4 > timeout_msec);      	/* Or else a TIME2LONG error would have been issued above */
 	timeoutms = (int)timeout_msec;

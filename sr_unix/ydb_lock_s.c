@@ -67,12 +67,12 @@ int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
-	assert(MAXPOSINT4 == (YDB_MAX_TIME / NANOSECS_IN_MSEC));
+	assert(MAXPOSINT4 == (YDB_MAX_TIME_NSEC / NANOSECS_IN_MSEC));
 	/* Check if an outofband action that might care about has popped up */
 	if (outofband)
 		outofband_action(FALSE);
-	if (YDB_MAX_TIME < timeout_nsec)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME);
+	if (YDB_MAX_TIME_NSEC < timeout_nsec)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME_NSEC);
 	if (0 > namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, RTS_ERROR_LITERAL("ydb_lock_s()"));
 	/* Need to validate all parms before we can do the unlock of all locks held by us */

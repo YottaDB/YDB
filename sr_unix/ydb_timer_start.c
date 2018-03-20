@@ -38,8 +38,8 @@ void	ydb_timer_start(int timer_id, unsigned long long limit_nsec, ydb_funcptr_re
 		REVERT;
 		return;
 	}
-	if (YDB_MAX_TIME < limit_nsec)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME);
+	if (YDB_MAX_TIME_NSEC < limit_nsec)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME_NSEC);
 	timeout_msec = (limit_nsec / NANOSECS_IN_MSEC);
 	assert(MAXPOSINT4 > timeout_msec);      	/* Or else a TIME2LONG error would have been issued above */
 	timeoutms = (int)timeout_msec;
