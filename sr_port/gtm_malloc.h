@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2003, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,10 +77,10 @@ void printMallocDump(void);
  */
 #define VERIFY_STORAGE_CHAINS			\
 {						\
-	GBLREF uint4	gtmDebugLevel;		\
-	if (GDL_SmAllocVerf & gtmDebugLevel)	\
+	GBLREF uint4	ydbDebugLevel;		\
+	if (GDL_SmAllocVerf & ydbDebugLevel)	\
 		verifyAllocatedStorage();	\
-	if (GDL_SmFreeVerf & gtmDebugLevel)	\
+	if (GDL_SmFreeVerf & ydbDebugLevel)	\
 		verifyFreeStorage();		\
 }
 

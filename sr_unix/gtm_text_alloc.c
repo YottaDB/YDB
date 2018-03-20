@@ -3,6 +3,9 @@
  * Copyright (c) 2007-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,7 +48,7 @@
 
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
-GBLREF	uint4		gtmDebugLevel;
+GBLREF	uint4		ydbDebugLevel;
 GBLREF	size_t		gtm_max_storalloc;		/* Max value for $ZREALSTOR or else memory error is raised */
 
 OS_PAGE_SIZE_DECLARE
@@ -94,9 +97,9 @@ error_def(ERR_TRNLOGFAIL);
 #define SET_ELEM_MAX(idx) SET_MAX(freeElemMax[idx], freeElemCnt[idx])
 #define CALLERID ((unsigned char *)caller_id())
 #ifdef DEBUG
-#  define TRACE_TXTALLOC(addr,len) {if (GDL_SmTrace & gtmDebugLevel) \
+#  define TRACE_TXTALLOC(addr,len) {if (GDL_SmTrace & ydbDebugLevel) \
  			FPRINTF(stderr, "TxtAlloc at 0x"lvaddr" of %ld bytes from 0x"lvaddr"\n", addr, len, CALLERID);}
-#  define TRACE_TXTFREE(addr,len)   {if (GDL_SmTrace & gtmDebugLevel) \
+#  define TRACE_TXTFREE(addr,len)   {if (GDL_SmTrace & ydbDebugLevel) \
 			FPRINTF(stderr, "TxtFree at 0x"lvaddr" of %ld bytes from 0x"lvaddr"\n", addr, len, CALLERID);}
 #else
 #  define TRACE_TXTALLOC(addr, len)

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,7 +108,7 @@ GBLREF	boolean_t		gvdupsetnoop;	/* If TRUE, duplicate SETs update journal but no
 GBLREF	boolean_t		badchar_inhibit;
 GBLREF	int			gv_fillfactor;
 GBLREF	symval			*curr_symval;
-GBLREF	uint4			gtmDebugLevel;
+GBLREF	uint4			ydbDebugLevel;
 GBLREF	boolean_t		lvamon_enabled;
 GBLREF	spdesc			stringpool;
 GBLREF	boolean_t		is_updproc;
@@ -676,13 +676,13 @@ void	op_view(int numarg, mval *keyword, ...)
 				rel_crit(gv_cur_region);
 			} else		/* If we do the white box test, avoid the rest */
 #			endif
-			if (gtmDebugLevel)
+			if (ydbDebugLevel)
 			{	/* gtmdbglvl must be non-zero to have hope of printing a storage dump */
-				dbgdmpenabled = (GDL_SmDump & gtmDebugLevel);
-				gtmDebugLevel |= GDL_SmDump;		/* Turn on indicator to force print */
+				dbgdmpenabled = (GDL_SmDump & ydbDebugLevel);
+				ydbDebugLevel |= GDL_SmDump;		/* Turn on indicator to force print */
 				printMallocDump();
 				if (!dbgdmpenabled)
-					gtmDebugLevel &= (~GDL_SmDump);	/* Shut indicator back off */
+					ydbDebugLevel &= (~GDL_SmDump);	/* Shut indicator back off */
 			}
 			break;
 		case VTK_LOGTPRESTART:

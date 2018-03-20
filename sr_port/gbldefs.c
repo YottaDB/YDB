@@ -255,7 +255,7 @@ GBLDEF	gvt_container	*gvt_pending_list;	/* list of gvts that need to be re-exami
 GBLDEF	buddy_list	*gvt_pending_buddy_list;/* buddy_list for maintaining memory for gv_targets to be re-examined/allocated */
 GBLDEF	buddy_list	*noisolation_buddy_list;	/* a buddy_list for maintaining the globals that are noisolated */
 GBLDEF	int4		exi_condition;
-GBLDEF	uint4		gtmDebugLevel;
+GBLDEF	uint4		ydbDebugLevel;
 GBLDEF	caddr_t		smCallerId;			/* Caller of top level malloc/free */
 GBLDEF	int		process_exiting;
 GBLDEF	int4		dollar_zsystem;

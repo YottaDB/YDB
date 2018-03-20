@@ -73,7 +73,7 @@
 #define	GTM_DIRTREE_COLLHDR_ALWAYS	"$gtm_dirtree_collhdr_always"
 
 GBLREF	boolean_t	dollar_zquit_anyway;	/* if TRUE compile QUITs to not care whether or not they're from an extrinsic */
-GBLREF	uint4		gtmDebugLevel; 		/* Debug level (0 = using default sm module so with
+GBLREF	uint4		ydbDebugLevel; 		/* Debug level (0 = using default sm module so with
 						   a DEBUG build, even level 0 implies basic debugging) */
 GBLREF	int4		gtm_fullblockwrites;	/* Do full (not partial) database block writes */
 GBLREF	boolean_t	certify_all_blocks;
@@ -107,10 +107,10 @@ void	gtm_env_init(void)
 	if (!TREF(gtm_env_init_started))
 	{
 		TREF(gtm_env_init_started) = TRUE;
-		/* See if a debug level has been specified. Do this first since gtmDebugLevel needs
+		/* See if a debug level has been specified. Do this first since ydbDebugLevel needs
 		 * to be initialized before any mallocs are done in the system.
 		 */
-		gtmDebugLevel = INITIAL_DEBUG_LEVEL;
+		ydbDebugLevel = INITIAL_DEBUG_LEVEL;
 		val.addr = YDB_DBGLVL;
 		val.len = SIZEOF(YDB_DBGLVL) - 1;
 		tdbglvl = trans_numeric(&val, &is_defined, TRUE);
@@ -127,7 +127,7 @@ void	gtm_env_init(void)
 				tdbglvl |= GDL_SmBackfill;	/* Can't check it unless it's filled in */
 			if (GDL_SmStorHog & tdbglvl)
 				tdbglvl |= GDL_SmBackfill | GDL_SmChkAllocBackfill;
-			gtmDebugLevel |= tdbglvl;
+			ydbDebugLevel |= tdbglvl;
 		}
 		/* See if ydb_msgprefix is specified. If so store it in TREF(ydbmsgprefix).
 		 * Note: Default value is already stored in "gtm_threadgbl_init".

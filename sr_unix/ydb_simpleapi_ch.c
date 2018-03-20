@@ -68,7 +68,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF  dollar_ecode_type 	dollar_ecode;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	jnl_gbls_t		jgbl;
-GBLREF	uint4			gtmDebugLevel;		/* Debug level */
+GBLREF	uint4			ydbDebugLevel;		/* Debug level */
 GBLREF	mval			dollar_zstatus;
 GBLREF	int			tprestart_state;	/* When triggers restart, multiple states possible - see tp_restart.h */
 GBLREF	int4			gtm_trigger_depth;
@@ -219,7 +219,7 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 		memcpy(zstatus_buffer, TREF(util_outbuff_ptr), zstatus_buffer_len);	/* Save zstatus */
 		process_exiting = TRUE;
 		CANCEL_TIMERS;
-		if (!(GDL_DumpOnStackOFlow & gtmDebugLevel) &&
+		if (!(GDL_DumpOnStackOFlow & ydbDebugLevel) &&
 		    ((int)ERR_STACKOFLOW == SIGNAL || (int)ERR_STACKOFLOW == arg
 		     || (int)ERR_MEMORY == SIGNAL || (int)ERR_MEMORY == arg))
 		{

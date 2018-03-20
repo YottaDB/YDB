@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -19,7 +22,7 @@
 #include "gtm_memcpy_validate_and_execute.h"
 
 #ifdef DEBUG	/* Is only a debugging routine - nothing to see here for a production build - move along */
-GBLREF uint4	gtmDebugLevel;
+GBLREF uint4	ydbDebugLevel;
 
 /* Identify memcpy() invocations that should be memmove() instead. If this routine assert fails, the arguments
  * overlap so should be converted to memmove(). One exception to that rule which is currently bypassed is when
@@ -30,7 +33,7 @@ GBLREF uint4	gtmDebugLevel;
 void *gtm_memcpy_validate_and_execute(void *target, const void *src, size_t len)
 {
 	/* Unless specifically bypassed, in DEBUG, disallow memcpy() larger than max positive integer (2GB) */
-	assert((GDL_AllowLargeMemcpy & gtmDebugLevel) || ((0 <= (signed)len) && (MAXPOSINT4 >= len)));
+	assert((GDL_AllowLargeMemcpy & ydbDebugLevel) || ((0 <= (signed)len) && (MAXPOSINT4 >= len)));
 	if (target == src)	/* Allow special case to go through but avoid actual memcpy() call */
 		return target;
 	assert(((char *)(target) > (char *)(src))

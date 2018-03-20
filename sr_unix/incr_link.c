@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,7 +103,7 @@ static rhdtyp		*hdr;
 
 GBLREF mident_fixed	zlink_mname;
 GBLREF mach_inst	jsb_action[JSB_ACTION_N_INS];
-GBLREF uint4		gtmDebugLevel;
+GBLREF uint4		ydbDebugLevel;
 GBLREF boolean_t	gtm_utf8_mode;
 #ifdef DEBUG_ARLINK
 GBLREF mval		dollar_zsource;
@@ -699,7 +699,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 		hdr->src_full_name.addr = (char *)newaddr;
 		hdr->routine_name.addr = (char *)(newaddr + hdr->src_full_name.len);
 	}
-	if (GDL_PrintEntryPoints & gtmDebugLevel)
+	if (GDL_PrintEntryPoints & ydbDebugLevel)
 	{	/* Prepare name and address for announcement.. */
 		name_buf_len = (PATH_MAX > hdr->src_full_name.len) ? hdr->src_full_name.len : PATH_MAX;
 		memcpy(name_buf, hdr->src_full_name.addr, name_buf_len);

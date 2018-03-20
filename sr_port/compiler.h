@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -295,7 +295,7 @@ error_def(ERR_SVNOSET);
 #endif
 
 #ifdef DEBUG
-#	 define COMPDBG(x)	if (gtmDebugLevel & GDL_DebugCompiler) {x}
+#	 define COMPDBG(x)	if (ydbDebugLevel & GDL_DebugCompiler) {x}
 #else
 #	 define COMPDBG(x)
 #endif

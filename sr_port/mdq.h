@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -59,7 +62,7 @@
 #  include "compiler.h"
 #  include "gtm_string.h"
 #  include "gtmdbglvl.h"
-GBLREF	uint4		gtmDebugLevel;
+GBLREF	uint4		ydbDebugLevel;
 /* q: head of queue to check; n: the name of queue; b: whether to check main exorder (from curtchain) and any expr_start queue */
 #  define CHKTCHAIN(q, n, b)								\
 MBSTART {										\
@@ -68,7 +71,7 @@ MBSTART {										\
 											\
 	SETUP_THREADGBL_ACCESS;							\
 					/* memcmp() is fast and 3 chars sufficient */	\
- 	if ((gtmDebugLevel & GDL_DebugCompiler) && (0 == memcmp(#n, "exorder", 3)))	\
+ 	if ((ydbDebugLevel & GDL_DebugCompiler) && (0 == memcmp(#n, "exorder", 3)))	\
 	{										\
 		if ((triple *)-1 != (triple *)q) /* to avoid post-checking deletes */	\
 			chktchain((triple *)q);					\

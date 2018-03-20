@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +31,7 @@
 GBLREF int4		curr_addr, code_size;
 GBLREF char		cg_phase;	/* code generation phase */
 GBLREF triple		t_orig;		/* head of triples */
-GBLREF uint4		gtmDebugLevel;
+GBLREF uint4		ydbDebugLevel;
 LITREF octabstruct	oc_tab[];	/* op-code table */
 
 /* Certain triples need to have their expansions shrunk down to be optimal. Current
@@ -56,7 +59,7 @@ void shrink_trips(void)
 	SETUP_THREADGBL_ACCESS;
 #	ifdef DEBUG
 	/* If debug and compiler debugging enabled, run through triples again to show where we are just before we modify them. */
-	if (gtmDebugLevel & GDL_DebugCompiler)
+	if (ydbDebugLevel & GDL_DebugCompiler)
 	{
 		PRINTF(" \n\n\n\n************************************ Begin pre-shrink_trips dump *****************************\n");
 		dqloop(&t_orig, exorder, ct)
@@ -127,7 +130,7 @@ void shrink_trips(void)
 	code_size += TREF(codegen_padlen);
 #	ifdef DEBUG
 	/* If debug and compiler debuggingenabled, run through the triples again to show what we did to them */
-	if (gtmDebugLevel & GDL_DebugCompiler)
+	if (ydbDebugLevel & GDL_DebugCompiler)
 	{
 		dqloop(&t_orig, exorder, ct)
 		{

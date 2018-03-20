@@ -25,7 +25,7 @@
 #include "create_fatal_error_zshow_dmp.h"
 
 GBLREF	int4		exi_condition;
-GBLREF	uint4		gtmDebugLevel;
+GBLREF	uint4		ydbDebugLevel;
 GBLREF	volatile int4	gtmMallocDepth;
 GBLREF	uint4		process_id;
 GBLREF	int		process_exiting;
@@ -43,7 +43,7 @@ void create_fatal_error_zshow_dmp(int4 signal)
 	PRN_ERROR;
 	assert(process_exiting);
 	if (0 == gtmMallocDepth && ((SIGBUS != exi_condition && SIGSEGV != exi_condition)
-				    || (GDL_ZSHOWDumpOnSignal & gtmDebugLevel)))
+				    || (GDL_ZSHOWDumpOnSignal & ydbDebugLevel)))
 	{	/* For this dumpable condition, create a ZSHOW "*" dump for review. First, build the name we
 		 * want the report to have.
 		 */
