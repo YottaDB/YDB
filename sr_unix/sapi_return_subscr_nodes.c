@@ -48,7 +48,15 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, c
 	}
 	if (NULL == ret_subsarray)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-							LEN_AND_LIT("NULL ret_subsarray"), LEN_AND_STR(ydb_caller_fn));
+			      LEN_AND_LIT("NULL ret_subsarray"), LEN_AND_STR(ydb_caller_fn));
+	if (*ret_subs_used < TREF(sapi_query_node_subs_cnt))
+	{	/* We have run out of subscripts - set the output subscript count to what it should
+		 * be and drive our error.
+		 */
+		*ret_subs_used = TREF(sapi_query_node_subs_cnt);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_INSUFFSUBS, 3,
+			      LEN_AND_STR(ydb_caller_fn), TREF(sapi_query_node_subs_cnt));
+	}
 	/* Results from the lower level routine doing the work for our simpleAPI call should be in the global
 	 * output array TREF(sapi_query_node_subs). The mstrs here are know to G/C. Copy the mstr data to the
 	 * user's supplied buffers stopping when/if we hit an error to return what we have.
@@ -60,14 +68,6 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, c
 	     outsubp < outsubp_top;
 	     mstrp++, outsubp++)
 	{
-		if (outsubp_top <= outsubp)
-		{	/* We have run out of subscripts - set the output subscript count to what it should
-			 * be and drive our error.
-			 */
-			*ret_subs_used = TREF(sapi_query_node_subs_cnt);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_INSUFFSUBS, 3,
-				      RTS_ERROR_LITERAL("ydb_node_next_s()"), *ret_subs_used);
-		}
 		/* We have an output subscript, now see if its buffer is big enough */
 		outsubp->len_used = mstrp->len;	/* How big it needs to be (set no matter what) */
 		if (mstrp->len > outsubp->len_alloc)
