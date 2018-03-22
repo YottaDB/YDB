@@ -206,14 +206,14 @@ set_source_list(gtcm_pkdisp      gtcm_pkdisp omi_extstr)
 set_source_list(gtcm_play        gtcm_play dlopen_libyottadb)
 set_source_list(gtcm_server      gtcm_server dlopen_libyottadb)
 set_source_list(gtcm_shmclean    gtcm_shmclean dlopen_libyottadb)
-set_source_list(gtmsecshr        gtmsecshr_wrapper get_syslog_flags)
-set_source_list(gtmsecshr_real   gtmsecshr get_syslog_flags)
+set_source_list(gtmsecshr        gtmsecshr_wrapper)
+set_source_list(gtmsecshr_real   gtmsecshr)
 set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_util)
 set_source_list(libgtmtls        gtm_tls_impl gtmcrypt_util)
 set_source_list(libyottadb       gtm_main mupip_main mupip_cmd dse_main dse_cmd lke_main lke_cmd)
 set_source_list(libyottadb       gtcm_play_main omi_srvc_xct omi_extstr)
 set_source_list(libyottadb       gtcm_server_main gtcm_gnp_server_main gtcm_gnp_clitab gtcm_shmclean_main)
-set_source_list(libyottadb       dbcertify_main dbcertify_cmd ftok_main get_syslog_flags)
+set_source_list(libyottadb       dbcertify_main dbcertify_cmd ftok_main)
 set_source_list(lke              lke dlopen_libyottadb)
 set_source_list(maskpass         maskpass gtmcrypt_util)
 set_source_list(mumps            gtm dlopen_libyottadb)
@@ -406,6 +406,8 @@ add_executable(geteuid			${geteuid_SOURCES})
 target_link_libraries(geteuid		libmumps)	# needed for few functions (e.g. gtm_printf etc.)
 
 add_executable(gtmsecshr		${gtmsecshr_SOURCES})
+target_link_libraries(gtmsecshr		libmumps)	# needed for static linking since this is a setuid executable
+							# and does not do a dlopen of libyottadb.so
 
 add_executable(gtmsecshr_real		${gtmsecshr_real_SOURCES})
 set_target_properties(gtmsecshr_real PROPERTIES
