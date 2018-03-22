@@ -64,9 +64,9 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, c
 	outsubs = *ret_subs_used;
 	*ret_subs_used = 0;
 	for (mstrp = TREF(sapi_query_node_subs), mstrp_top = mstrp + TREF(sapi_query_node_subs_cnt),
-		     outsubp = ret_subsarray, outsubp_top = outsubp + outsubs;
-	     outsubp < outsubp_top;
-	     mstrp++, outsubp++)
+			outsubp = ret_subsarray, outsubp_top = outsubp + outsubs;
+		mstrp < mstrp_top;
+			mstrp++, outsubp++)
 	{
 		/* We have an output subscript, now see if its buffer is big enough */
 		outsubp->len_used = mstrp->len;	/* How big it needs to be (set no matter what) */
