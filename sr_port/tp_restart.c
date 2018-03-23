@@ -109,6 +109,9 @@ GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 GBLREF	int			tprestart_state;	/* When triggers restart, multiple states possible. See tp_restart.h */
 GBLREF	mval			dollar_ztwormhole;	/* Previous value (mval) restored on restart */
 GBLREF	mval			dollar_ztslate;
+GBLREF	int4			tstart_gtmci_nested_level;
+GBLREF	int			mumps_status;
+
 LITREF	mval			literal_null;
 
 error_def(ERR_GVFAILCORE);
@@ -638,6 +641,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				break;
 		}
 	}
+	assert(tstart_gtmci_nested_level <= TREF(gtmci_nested_level));
 	if (TPRESTART_STATE_TPUNW >= tprestart_state)
 	{	/* Either this is a normal tp_restart call or we ran into a trigger base frame while "tp_unwind"
 		 * was running which required M and C stack unwinding before we could proceed so this call is
@@ -708,6 +712,16 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			tprestart_state = TPRESTART_STATE_MSTKUNW;
 			DBGTRIGR((stderr, "tp_restart: Encountered trigger base frame in M-stack unwind - rethrowing\n"));
 			INVOKE_RESTART;
+		}
+		/* If we unwound to a call-in base frame, and the outermost TSTART happened before the call-in base frame
+		 * was created, we need to return to ydb_ci[p]() with the ERR_TPRETRY error code so this retry code
+		 * can be bubbled up the caller of the call-in.
+		 */
+		if ((SFT_CI & frame_pointer->type) && (tstart_gtmci_nested_level != TREF(gtmci_nested_level)))
+		{
+			mumps_status = ERR_TPRETRY;
+			tprestart_state = TPRESTART_STATE_MSTKUNW;
+			MUM_TSTART;
 		}
 		op_unwind();
 	}

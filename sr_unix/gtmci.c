@@ -831,7 +831,13 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
 		 */
 		if (ERR_TPRETRY == mumps_status)	/* If call-in got a TPRETRY error, bubble it up to caller */
+		{	/* Before doing INVOKE_RESTART (which does an rts_error_csa of ERR_TPRETRY), establish "gtmci_ch"
+			 * as the condition handler as that does the needed call-in-related cleanup.
+			 */
+			ESTABLISH_RET(gtmci_ch, mumps_status);
 			INVOKE_RESTART;
+			assert(FALSE);
+		}
 		return mumps_status;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);

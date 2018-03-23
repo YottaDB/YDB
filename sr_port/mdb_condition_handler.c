@@ -367,11 +367,13 @@ CONDITION_HANDLER(mdb_condition_handler)
 			{
 				if (tp_pointer->ydb_tp_s_tstart)
 				{	/* This is a TP transaction started by a "ydb_tp_s" call. Since "mdb_condition_handler"
-					 * is handling the TPRESTART error, it is a call-in. So set return code to YDB_TP_RESTART
+					 * is handling the TPRESTART error, it is a call-in. So set return code to ERR_TPRETRY
 					 * that way the "ydb_ci" call can return this to the caller and that can take
-					 * appropriate action.
+					 * appropriate action. Note that we should not use YDB_TP_RESTART here as that
+					 * is a negative value returned only by the simpleAPI (ydb_*_s*() functions) and
+					 * not "ydb_ci".
 					 */
-					rc = YDB_TP_RESTART;
+					rc = ERR_TPRETRY;
 				}
 				mumps_status = rc;
 				DBGEHND((stderr, "mdb_condition_handler: Returning to implicit TSTART originator\n"));

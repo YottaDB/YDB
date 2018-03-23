@@ -704,7 +704,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 
 void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
 {
-	boolean_t	java = FALSE, save_in_ext_call;
+	boolean_t	java = FALSE, save_in_ext_call, is_tpretry;
 	char		*free_string_pointer, *free_string_pointer_start;
 	char		str_buffer[MAX_NAME_LENGTH], *tmp_buff_ptr, *xtrnl_table_name;
 	int		i, pre_alloc_size, rslt, save_mumps_status;
@@ -997,6 +997,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	TREF(in_ext_call) = save_in_ext_call;
+	is_tpretry = (ERR_TPRETRY == mumps_status);	/* note down whether the callg invocation had a TPRETRY error code */
 	mumps_status = save_mumps_status;
 
 	/* Exit from the residual call-in environment(SFT_CI base frame) which might
@@ -1057,5 +1058,12 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	}
 	free(param_list);
 	check_for_timer_pops();
+	if (is_tpretry)
+	{	/* A TPRETRY error code occurred inside the "callg" invocation.
+		 * Now that all cleanup (free of param_list etc.) has happened,
+		 * it is okay to bubble the ERR_TPRETRY error upto the caller.
+		 */
+		INVOKE_RESTART;
+	}
 	return;
 }
