@@ -23,14 +23,12 @@ const static readonly int error_ansi[] = {
 	   0,	/* INSUFFSUBS */
 	   0,	/* MINNRSUBSCRIPTS */
 	   0,	/* SUBSARRAYNULL */
-	   0,	/* MISSINGVARNAMES */
-	   0,	/* TOOMANYVARNAMES */
+	   0,	/* FATALERROR1 */
+	   0,	/* NAMECOUNTTOOHI */
 	   0,	/* INVNAMECOUNT */
-	   0,	/* MISSINGVARNAME */
+	   0,	/* FATALERROR2 */
 	   0,	/* TIME2LONG */
 	   0,	/* VARNAME2LONG */
-	   0,	/* FATALERROR1 */
-	   0,	/* FATALERROR2 */
 	   0,	/* SIMPLEAPINEST */
 	   0,	/* CALLINTCOMMIT */
 	   0,	/* CALLINTROLLBACK */

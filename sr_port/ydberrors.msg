@@ -31,14 +31,12 @@ PARAMINVALID	<!AD parameter specified in !AD call>/error/fao=4
 INSUFFSUBS	<Return subscript array for !AD call too small - needs at least !UL entries for this call>/error/fao=3
 MINNRSUBSCRIPTS	<Number of subscripts cannot be a negative number>/error/fao=0
 SUBSARRAYNULL	<Non-zero number of subscripts [!UL] specified but subscript array parameter is NULL in !AD call>/error/fao=3
-MISSINGVARNAMES	<At least one variable name must be specified>/error/fao=0
-TOOMANYVARNAMES	<Number of varnames specified exceeds maximum (!UL)>/error/fao=1
-INVNAMECOUNT	<namecount parameter in a !AD call cannot be a negative number>/error/fao=2
-MISSINGVARNAME	<Required varname not specified>/error/fao=0
+FATALERROR1	<Fatal error raised. Generating core and terminating process. Error: !AD>/error/fao=2
+NAMECOUNTTOOHI	<Number of varnames (namecount parameter in a !AD call) exceeds maximum (!UL)>/error/fao=3
+INVNAMECOUNT	<Number of varnames (namecount parameter in a !AD call) cannot be less than zero>/error/fao=2
+FATALERROR2	<Fatal error raised. Bypassing core generation and terminating process. Error: !AD>/error/fao=2
 TIME2LONG	<Specified time value [0x!16@XQ] exceeds supported maximum [0x!16@XQ]>/error/fao=2
 VARNAME2LONG	<Variable name length exceeds maximum allowed (!UL)>/error/fao=1
-FATALERROR1	<Fatal error raised. Generating core and terminating process. Error: !AD>/error/fao=2
-FATALERROR2	<Fatal error raised. Bypassing core generation and terminating process. Error: !AD>/error/fao=2
 SIMPLEAPINEST	<Attempt to nest call of !AD with a call to !AD - nesting calls is not permitted in simpleAPI>/error/fao=4
 CALLINTCOMMIT	<TCOMMIT at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL>/error/fao=2!/ansi=0
 CALLINTROLLBACK	<TROLLBACK at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL>/error/fao=2!/ansi=0
