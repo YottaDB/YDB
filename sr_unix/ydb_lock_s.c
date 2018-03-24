@@ -74,6 +74,8 @@ int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 	ISSUE_TIME2LONG_ERROR_IF_NEEDED(timeout_nsec);
 	if (0 > namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, RTS_ERROR_LITERAL("ydb_lock_s()"));
+	if (YDB_MAX_NAMES < namecount)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNTTOOHI, 3, RTS_ERROR_LITERAL("ydb_lock_s()"), YDB_MAX_NAMES);
 	/* Need to validate all parms before we can do the unlock of all locks held by us */
 	VAR_START(var, namecount);
 	VAR_COPY(varcpy, var);		/* Used to validate parms, then var is used to process them */

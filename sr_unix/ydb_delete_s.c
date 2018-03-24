@@ -76,9 +76,6 @@ int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, 
 	/* Check if an outofband action that might care about has popped up */
 	if (outofband)
 		outofband_action(FALSE);
-	/* No varames specified is an error */
-	if (NULL == varname)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MISSINGVARNAME);
 	/* We should have a variable name - check it out and determine type */
 	VALIDATE_VARNAME(varname, delete_type, delete_svn_index, FALSE);
 	if (0 > subs_used)
