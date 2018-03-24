@@ -31,7 +31,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "TOOMANYVARNAMES", "Number of varnames specified exceeds maximum (!UL)", 1 },
 	{ "INVNAMECOUNT", "Invalid value for namecount parameter in a !AD call", 2 },
 	{ "MISSINGVARNAME", "Required varname not specified", 0 },
-	{ "TIME2LONG", "Specified time value exceeds supported maximum (!UL)", 1 },
+	{ "TIME2LONG", "Specified time value [0x!16@XQ] exceeds supported maximum [0x!16@XQ]", 2 },
 	{ "VARNAME2LONG", "Variable name length exceeds maximum allowed (!UL)", 1 },
 	{ "FATALERROR1", "Fatal error raised. Generating core and terminating process. Error: !AD", 2 },
 	{ "FATALERROR2", "Fatal error raised. Bypassing core generation and terminating process. Error: !AD", 2 },

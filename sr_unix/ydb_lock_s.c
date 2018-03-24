@@ -71,8 +71,7 @@ int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 	/* Check if an outofband action that might care about has popped up */
 	if (outofband)
 		outofband_action(FALSE);
-	if (YDB_MAX_TIME_NSEC < timeout_nsec)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME_NSEC);
+	ISSUE_TIME2LONG_ERROR_IF_NEEDED(timeout_nsec);
 	if (0 > namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, RTS_ERROR_LITERAL("ydb_lock_s()"));
 	/* Need to validate all parms before we can do the unlock of all locks held by us */
@@ -152,7 +151,7 @@ int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 	/* At this point, all of the private lock blocks have been created. Remaining task before calling "op_lock2" is to
 	 * convert the timeout value from microseconds to seconds.
 	 */
-	assert(MAXPOSINT4 > (timeout_nsec / NANOSECS_IN_MSEC));	/* Or else a TIME2LONG error would have been issued above */
+	assert(MAXPOSINT4 >= (timeout_nsec / NANOSECS_IN_MSEC));	/* Or else a TIME2LONG error would have been issued above */
 	timeout_sec = (timeout_nsec / NANOSECS_IN_SEC);
 	i2mval(&timeout_mval, (int)timeout_sec);
 	/* The generated code typically calls "op_lock" but that routine just calls "op_lock2" */

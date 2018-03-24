@@ -249,9 +249,9 @@ void 	ydb_zstatus(char* msg, int len);
 
 /* Utility entry points accessable in libyottadb.so */
 int	ydb_file_name_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
-void	ydb_hiber_start(unsigned long long sleep_nsec);
-void	ydb_hiber_start_wait_any(unsigned long long sleep_nsec);
-void	ydb_timer_start(int timer_id, unsigned long long limit_nsec, ydb_funcptr_retvoid_t handler, unsigned int hdata_len,
+int	ydb_hiber_start(unsigned long long sleep_nsec);
+int	ydb_hiber_start_wait_any(unsigned long long sleep_nsec);
+int	ydb_timer_start(int timer_id, unsigned long long limit_nsec, ydb_funcptr_retvoid_t handler, unsigned int hdata_len,
 			void *hdata);
 void	ydb_timer_cancel(int timer_id);
 int	ydb_file_is_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);

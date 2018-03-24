@@ -64,9 +64,7 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int 
 	/* Check if an outofband action that might care about has popped up */
 	if (outofband)
 		outofband_action(FALSE);
-	assert(MAXPOSINT4 == (YDB_MAX_TIME_NSEC / NANOSECS_IN_MSEC));
-	if (YDB_MAX_TIME_NSEC < timeout_nsec)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TIME2LONG, 1, YDB_MAX_TIME_NSEC);
+	ISSUE_TIME2LONG_ERROR_IF_NEEDED(timeout_nsec);
 	/* Setup and validate the varname */
 	VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
 	/* ISV references are not supported for this call */
@@ -89,7 +87,7 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int 
 	/* At this point, the private lock block has been created. Remaining task before calling "op_incrlock" is to
 	 * convert the timeout value from nanoseconds to seconds
 	 */
-	assert(MAXPOSINT4 > (timeout_nsec / NANOSECS_IN_MSEC));	/* Or else a TIME2LONG error would have been issued above */
+	assert(MAXPOSINT4 >= (timeout_nsec / NANOSECS_IN_MSEC));	/* Or else a TIME2LONG error would have been issued above */
 	timeout_sec = (timeout_nsec / NANOSECS_IN_SEC);
 	i2mval(&timeout_mval, (int)timeout_sec);
 	lock_rc = op_incrlock(&timeout_mval);
