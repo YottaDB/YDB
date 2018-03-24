@@ -20,7 +20,7 @@
 
 #define GTM_VERSION	"V6.3"
 #define	GTM_ZVERSION	"V6.3-003A"
-#define	YDB_ZYRELEASE	"r1.10"
+#define	YDB_ZYRELEASE	"r1.20"
 
 #if defined(__x86_64__)
 # define YDB_PLATFORM		"Linux x86_64"
