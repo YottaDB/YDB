@@ -29,7 +29,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "SUBSARRAYNULL", "Non-zero number of subscripts [!UL] specified but subscript array parameter is NULL in !AD call", 3 },
 	{ "MISSINGVARNAMES", "At least one variable name must be specified", 0 },
 	{ "TOOMANYVARNAMES", "Number of varnames specified exceeds maximum (!UL)", 1 },
-	{ "INVNAMECOUNT", "Invalid value for namecount parameter in a !AD call", 2 },
+	{ "INVNAMECOUNT", "namecount parameter in a !AD call cannot be a negative number", 2 },
 	{ "MISSINGVARNAME", "Required varname not specified", 0 },
 	{ "TIME2LONG", "Specified time value [0x!16@XQ] exceeds supported maximum [0x!16@XQ]", 2 },
 	{ "VARNAME2LONG", "Variable name length exceeds maximum allowed (!UL)", 1 },
