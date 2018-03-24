@@ -417,6 +417,20 @@ MBSTART	{													\
  */
 #define IS_SIMPLEAPI_MODE (frame_pointer->type & SFT_CI)
 
+#define	ISSUE_TIME2LONG_ERROR_IF_NEEDED(INPUT_TIME_IN_NANOSECONDS)				\
+MBSTART {											\
+	unsigned long long	max_time_nsec;							\
+												\
+	assert(SIZEOF(unsigned long long) == SIZEOF(INPUT_TIME_IN_NANOSECONDS));		\
+	assert(MAXPOSINT4 == (YDB_MAX_TIME_NSEC / NANOSECS_IN_MSEC));				\
+	if (YDB_MAX_TIME_NSEC < INPUT_TIME_IN_NANOSECONDS)					\
+	{											\
+		max_time_nsec = YDB_MAX_TIME_NSEC;						\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TIME2LONG, 2,			\
+			(unsigned long long *)&INPUT_TIME_IN_NANOSECONDS, &max_time_nsec);	\
+	}											\
+} MBEND
+
 void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn);
 void sapi_save_targ_key_subscr_nodes(void);
 
