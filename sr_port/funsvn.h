@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,6 +12,8 @@
  *								*
  ****************************************************************/
 
+#ifndef FUNSVN_H
+#define FUNSVN_H
 
 typedef struct {
 	opctype opcode;
@@ -21,3 +26,4 @@ typedef struct{
     char os_syst;
 } fun_data_type;
 
+#endif /*  FUNSVN_H */

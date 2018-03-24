@@ -16,9 +16,9 @@
 	Write "GTM-E-GTMSDFILE This routine (",$TEXT(+0),") should not be manually invoked",!
 	Quit
 ;
-; Entry point used by gdeinit.m to define GTM structure fields
+; Entry point used by gdeinit.m to define YottaDB structure fields
 ;
 Init
-	; GT.M structure and field definitions
+	; YottaDB structure and field definitions
 	Set SIZEOF("gvstats")=472
 	Quit

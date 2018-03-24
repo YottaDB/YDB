@@ -136,10 +136,10 @@ help_exit()
     echo "version is defaulted from mumps file if one exists in the same directory as the installer"
     echo "This version must run as root."
     echo ""
-    echo "Example usages are (assumes latest YottaDB release is r1.10 and latest GT.M version is V6.3-002)"
-    echo "  ydbinstall.sh                          # installs latest YottaDB release (r1.10) at /usr/local/lib/yottadb/r110"
-    echo "  ydbinstall.sh --utf8 default           # installs YottaDB release r1.10 with added support for UTF-8"
-    echo "  ydbinstall.sh --installdir /r110 r1.10 # installs YottaDB r1.10 at /r110"
+    echo "Example usages are (assumes latest YottaDB release is r1.20 and latest GT.M version is V6.3-002)"
+    echo "  ydbinstall.sh                          # installs latest YottaDB release (r1.20) at /usr/local/lib/yottadb/r120"
+    echo "  ydbinstall.sh --utf8 default           # installs YottaDB release r1.20 with added support for UTF-8"
+    echo "  ydbinstall.sh --installdir /r120 r1.20 # installs YottaDB r1.20 at /r120"
     echo "  ydbinstall.sh --gtm                    # installs latest GT.M version (V6.3-002) at /usr/local/lib/fis-gtm/V6.3-002_x86_64"
     echo ""
     exit 1
@@ -443,8 +443,8 @@ else
 			if [ $platform = "linux" ] ; then
 				# If the current host is a RHEL box then set the OS to RHEL (not Linux) as there is a RHEL-specific tarball.
 				# We check that it is a RHEL box by the existence of the file /etc/redhat-release.
-				# But note that RHEL-specific releases of YottaDB happened only starting r1.10 so do this only
-				# if the requested version is not r1.00 (the only YottaDB release prior to r1.10)
+				# But note that RHEL-specific releases of YottaDB happened only starting r1.20 so do this only
+				# if the requested version is not r1.00 (the only YottaDB release prior to r1.20)
 				if [ -e /etc/redhat-release -a "r1.00" != ${ydb_version} ] ; then
 					platform="rhel"
 				fi
@@ -540,7 +540,7 @@ if [ "Y" = "$gtm_verbose" ] ; then echo Prepared configuration file ; cat $gtm_c
 if [ "$ydb_distrib" != "$gtm_tmp" ] ; then
     chmod +w $gtm_tmp/tmp
     cd $gtm_tmp/tmp
-    # Starting YottaDB r1.10, unpacking the binary tarball creates an additional directory (e.g. yottadb_r110)
+    # Starting YottaDB r1.20, unpacking the binary tarball creates an additional directory (e.g. yottadb_r120)
     # before the untar so cd into that subdirectory to get at the "configure" script from the distribution.
     if [ "N" = "$gtm_gtm" -a "r1.00" != ${ydb_version} ] ; then
         cd yottadb_r*
