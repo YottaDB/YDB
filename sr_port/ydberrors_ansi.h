@@ -24,7 +24,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MINNRSUBSCRIPTS */
 	   0,	/* SUBSARRAYNULL */
 	   0,	/* FATALERROR1 */
-	   0,	/* NAMECOUNTTOOHI */
+	   0,	/* NAMECOUNT2HI */
 	   0,	/* INVNAMECOUNT */
 	   0,	/* FATALERROR2 */
 	   0,	/* TIME2LONG */
