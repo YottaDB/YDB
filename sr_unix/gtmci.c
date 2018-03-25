@@ -80,6 +80,15 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "alias.h"
 #include "parm_pool.h"
 #include "auto_zlink.h"
+#include "fileinfo.h"
+#include "filestruct.h"
+#include "gdscc.h"
+#include "gdskill.h"
+#include "jnl.h"
+#include "tp_frame.h"
+#include "buddy_list.h"                /* needed for tp.h */
+#include "hashtab_int4.h"      /* needed for tp.h and cws_insert.h */
+#include "tp.h"
 
 GBLREF  stack_frame     	*frame_pointer;
 GBLREF  unsigned char		*msp;
@@ -102,6 +111,7 @@ GBLREF	char			ydb_dist[YDB_PATH_MAX];
 GBLREF	boolean_t		ydb_dist_ok_to_use;
 GBLREF	int			dollar_truth;
 GBLREF	CLI_ENTRY		mumps_cmd_ary[];
+GBLREF	tp_frame		*tp_pointer;
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
 
 LITREF  gtmImageName            gtmImageNames[];
@@ -237,6 +247,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	intrpt_state_t		old_intrpt_state;
 	char			**arg_blob_ptr;
 	int			*java_arg_type;
+	boolean_t		ci_ret_code_quit_needed = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -252,10 +263,28 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
-	if (!gtm_startup_active || !(frame_pointer->type & SFT_CI))
+	if (!gtm_startup_active)
 	{
 		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
 			return status;
+	} else if (!(frame_pointer->type & SFT_CI))
+	{	/* "ydb_init" has already set up a call-in base frame (either for simpleAPI or for a call-in).
+		 * But the current frame is not a call-in base frame. So set a new/nested call-in base frame up.
+		 */
+		ydb_nested_callin();            /* Note - sets fgncal_stack */
+	} else if (dollar_tlevel && (tp_pointer->fp == frame_pointer) && tp_pointer->ydb_tp_s_tstart)
+	{	/* Current frame is already a call-in frame. If we are already in a TP transaction and simpleAPI/"ydb_tp_s"
+		 * had started this TP and the current "frame_pointer" was the current even at the time of "ydb_tp_s"
+		 * we need to create a nested call-in frame as part of this "ydb_ci" invocation (in order to detect a
+		 * CALLINTCOMMIT or CALLINTROLLBACK situation since simpleAPI and call-ins both create the same SFT_CI
+		 * type of call-in base frame).
+		 */
+		ydb_nested_callin();            /* Note - sets fgncal_stack */
+		/* Since this is a nested call-in created just for this "ydb_ci" invocation, we need to unwind this call-in
+		 * frame/stack when returning (unlike a regular "ydb_ci" invocation where, as a performance thing,
+		 * we keep the environment as is in the hope of future "ydb_ci" calls).
+		 */
+		ci_ret_code_quit_needed = TRUE;
 	}
 	GTM_PTHREAD_ONLY(assert(gtm_main_thread_id_set && pthread_equal(gtm_main_thread_id, pthread_self())));
 	assert(NULL == TREF(temp_fgncal_stack));
@@ -456,10 +485,32 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	intrpt_ok_state = old_intrpt_state;		/* Restore the old interrupt state. */
 	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr. */
 	if (1 != mumps_status)
-	{
-		/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
-		 * it is the unhandled error code propagated by $ZTRAP/$ETRAP (from mdb_condition_handler).
+	{	/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
+		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
+		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
 		 */
+		if (mumps_status)
+		{	/* This is an error codepath. Do cleanup of frames (including the call-in base frame)
+			 * and rethrow error if needed. Currently only the following error(s) need rethrow.
+			 *	ERR_TPRETRY
+			 * The above 3 errors indicate there is a parent M frame or ydb_tp_s frame at a lower
+			 * callin depth that needs to see this error.
+			 */
+			FGNCAL_UNWIND_CLEANUP;	/* Unwind all frames up to the call-in base frame */
+			assert(SFT_CI & frame_pointer->type);
+			if (NULL != frame_pointer)
+			{
+				ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
+				ci_ret_code_quit_needed = FALSE;
+			}
+			if (ERR_TPRETRY == mumps_status)
+			{	/* These error(s) need to be rethrown. */
+				DRIVECH(mumps_status);
+				assert(FALSE);
+			}
+		}
+		if (ci_ret_code_quit_needed)
+			ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
 		return mumps_status;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
@@ -541,6 +592,8 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	REVERT;
 	assert(NULL == TREF(temp_fgncal_stack));
 	FGNCAL_UNWIND;
+	if (ci_ret_code_quit_needed)
+		ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
 	return 0;
 }
 
@@ -567,13 +620,14 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	stringkey       	symkey;
 	ht_ent_str		*syment;
 	intrpt_state_t		old_intrpt_state;
+	boolean_t		ci_ret_code_quit_needed = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	VAR_COPY(var, temp_var);
 	added = FALSE;
 	/* Do the "ydb_init" (if needed) first as it would set gtm_threadgbl etc. which is needed to use TREF later */
-	if (!gtm_startup_active || !(frame_pointer->type & SFT_CI))
+	if (!gtm_startup_active)
 	{
 		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
 			return status;
@@ -582,6 +636,24 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		 * needs to be redone to set "lcl_gtm_threadgbl" to point to this new "gtm_threadgbl".
 		 */
 		SETUP_THREADGBL_ACCESS;
+	} else if (!(frame_pointer->type & SFT_CI))
+	{	/* "ydb_init" has already set up a call-in base frame (either for simpleAPI or for a call-in).
+		 * But the current frame is not a call-in base frame. So set a new/nested call-in base frame up.
+		 */
+		ydb_nested_callin();            /* Note - sets fgncal_stack */
+	} else if (dollar_tlevel && (tp_pointer->fp == frame_pointer) && tp_pointer->ydb_tp_s_tstart)
+	{	/* Current frame is already a call-in frame. If we are already in a TP transaction and simpleAPI/"ydb_tp_s"
+		 * had started this TP and the current "frame_pointer" was the current even at the time of "ydb_tp_s"
+		 * we need to create a nested call-in frame as part of this "ydb_ci" invocation (in order to detect a
+		 * CALLINTCOMMIT or CALLINTROLLBACK situation since simpleAPI and call-ins both create the same SFT_CI
+		 * type of call-in base frame).
+		 */
+		ydb_nested_callin();            /* Note - sets fgncal_stack */
+		/* Since this is a nested call-in created just for this "ydb_ci" invocation, we need to unwind this call-in
+		 * frame/stack when returning (unlike a regular "ydb_ci" invocation where, as a performance thing,
+		 * we keep the environment as is in the hope of future "ydb_ci" calls).
+		 */
+		ci_ret_code_quit_needed = TRUE;
 	}
 	assert(NULL == TREF(gtmci_retval));
 	TREF(gtmci_retval) = NULL;
@@ -825,19 +897,32 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	intrpt_ok_state = old_intrpt_state; 		/* Restore the old interrupt state */
 	var_on_cstack_ptr = save_var_on_cstack_ptr;	/* Restore the old environment's var_on_cstack_ptr */
 	if (1 != mumps_status)
-	{
-		/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
+	{	/* dm_start() initializes mumps_status to 1 before execution. If mumps_status is not 1,
 		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
 		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
 		 */
-		if (ERR_TPRETRY == mumps_status)	/* If call-in got a TPRETRY error, bubble it up to caller */
-		{	/* Before doing INVOKE_RESTART (which does an rts_error_csa of ERR_TPRETRY), establish "gtmci_ch"
-			 * as the condition handler as that does the needed call-in-related cleanup.
+		if (mumps_status)
+		{	/* This is an error codepath. Do cleanup of frames (including the call-in base frame)
+			 * and rethrow error if needed. Currently only the following error(s) need rethrow.
+			 *	ERR_TPRETRY
+			 * The above 3 errors indicate there is a parent M frame or ydb_tp_s frame at a lower
+			 * callin depth that needs to see this error.
 			 */
-			ESTABLISH_RET(gtmci_ch, mumps_status);
-			INVOKE_RESTART;
-			assert(FALSE);
+			FGNCAL_UNWIND_CLEANUP;	/* Unwind all frames up to the call-in base frame */
+			assert(SFT_CI & frame_pointer->type);
+			if (NULL != frame_pointer)
+			{
+				ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
+				ci_ret_code_quit_needed = FALSE;
+			}
+			if (ERR_TPRETRY == mumps_status)
+			{	/* These error(s) need to be rethrown. */
+				DRIVECH(mumps_status);
+				assert(FALSE);
+			}
 		}
+		if (ci_ret_code_quit_needed)
+			ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
 		return mumps_status;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
@@ -938,6 +1023,8 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	REVERT;
 	assert(NULL == TREF(temp_fgncal_stack));
 	FGNCAL_UNWIND;
+	if (ci_ret_code_quit_needed)
+		ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
 	return 0;
 }
 
@@ -985,7 +1072,6 @@ int ydb_init()
 	int			status;
 	struct stat		stat_buf;
 	Dl_info			shlib_info;
-	rhdtyp          	*base_addr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1112,32 +1198,40 @@ int ydb_init()
 		 */
 		SAVE_FGNCAL_STACK;
 	} else if (!(frame_pointer->type & SFT_CI))
-	{	/* Nested call-in: setup a new CI environment (additional SFT_CI base-frame).
-		 * Temporarily mark the beginning of the new stack so that initialization errors in
-		 * call-in frame do not unwind entries of the previous stack (see gtmci_ch). For the
-		 * duration that temp_fgncal_stack has a non-NULL value, it overrides fgncal_stack.
-		 */
-		TREF(temp_fgncal_stack) = msp;
-		/* Generate CIMAXLEVELS error if gtmci_nested_level > CALLIN_MAX_LEVEL */
-		if (CALLIN_MAX_LEVEL < TREF(gtmci_nested_level))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CIMAXLEVELS, 1, TREF(gtmci_nested_level));
-		base_addr = make_dmode();
-		base_frame(base_addr);			/* More fields filled in by following SET_CI_ENV macro */
-		SET_CI_ENV(gtm_levl_ret_code);
-		gtmci_isv_save();
-		(TREF(gtmci_nested_level))++;
-		/* Now that the base-frame for this call-in level has been created, we can create the mv_stent
-		 * to save the previous call-in level's fgncal_stack value and clear the override. When this call-in
-		 * level pops, fgncal_stack will be restored to the value for the previous level. When a given call
-		 * at *this* level finishes, this current value of fgncal_stack is where the stack is unrolled to to
-		 * be ready for the next call.
-		 */
-		SAVE_FGNCAL_STACK;
-		TREF(temp_fgncal_stack) = NULL;		/* Drop override */
-	}
+		ydb_nested_callin();	/* Nested call-in: setup a new CI environment (additional SFT_CI base-frame) */
 	REVERT;
 	assert(NULL == TREF(temp_fgncal_stack));
 	return 0;
+}
+
+/* Nested call-in: setup a new CI environment (additional SFT_CI base-frame) */
+void ydb_nested_callin(void)
+{
+	rhdtyp          	*base_addr;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	/* Temporarily mark the beginning of the new stack so that initialization errors in
+	 * call-in frame do not unwind entries of the previous stack (see gtmci_ch). For the
+	 * duration that temp_fgncal_stack has a non-NULL value, it overrides fgncal_stack.
+	 */
+	TREF(temp_fgncal_stack) = msp;
+	/* Generate CIMAXLEVELS error if gtmci_nested_level > CALLIN_MAX_LEVEL */
+	if (CALLIN_MAX_LEVEL < TREF(gtmci_nested_level))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CIMAXLEVELS, 1, TREF(gtmci_nested_level));
+	base_addr = make_dmode();
+	base_frame(base_addr);			/* More fields filled in by following SET_CI_ENV macro */
+	SET_CI_ENV(gtm_levl_ret_code);
+	gtmci_isv_save();
+	(TREF(gtmci_nested_level))++;
+	/* Now that the base-frame for this call-in level has been created, we can create the mv_stent
+	 * to save the previous call-in level's fgncal_stack value and clear the override. When this call-in
+	 * level pops, fgncal_stack will be restored to the value for the previous level. When a given call
+	 * at *this* level finishes, this current value of fgncal_stack is where the stack is unrolled to to
+	 * be ready for the next call.
+	 */
+	SAVE_FGNCAL_STACK;
+	TREF(temp_fgncal_stack) = NULL;		/* Drop override */
 }
 
 /* Routine exposed to call-in user to exit from active GT.M environment */

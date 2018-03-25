@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,7 @@ void	ci_ret_code_quit(void);
 void	gtmci_isv_save(void);
 void	gtmci_isv_restore(void);
 int 	ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list var);
+void	ydb_nested_callin(void);
 #ifdef _AIX
 void	gtmci_cleanup(void);
 #endif
