@@ -136,11 +136,11 @@ help_exit()
     echo "version is defaulted from mumps file if one exists in the same directory as the installer"
     echo "This version must run as root."
     echo ""
-    echo "Example usages are (assumes latest YottaDB release is r1.20 and latest GT.M version is V6.3-002)"
+    echo "Example usages are (assumes latest YottaDB release is r1.20 and latest GT.M version is V6.3-003A)"
     echo "  ydbinstall.sh                          # installs latest YottaDB release (r1.20) at /usr/local/lib/yottadb/r120"
     echo "  ydbinstall.sh --utf8 default           # installs YottaDB release r1.20 with added support for UTF-8"
     echo "  ydbinstall.sh --installdir /r120 r1.20 # installs YottaDB r1.20 at /r120"
-    echo "  ydbinstall.sh --gtm                    # installs latest GT.M version (V6.3-002) at /usr/local/lib/fis-gtm/V6.3-002_x86_64"
+    echo "  ydbinstall.sh --gtm                    # installs latest GT.M version (V6.3-003A) at /usr/local/lib/fis-gtm/V6.3-003A_x86_64"
     echo ""
     exit 1
 }

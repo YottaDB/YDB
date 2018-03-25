@@ -1452,16 +1452,15 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define MINUTE			60	/* seconds in a minute */
 #define HOUR			3600	/* one hour in seconds 60 * 60 */
 #define ONEDAY			86400	/* seconds in a day */
-#define MILLISECS_IN_SEC	1000	/* millseconds in a second */
-#define MICROSEC_IN_SEC		1000000	/* microseconds in a second */
-#define MICROSECS_IN_MSEC	1000	/* microseconds in a millisecond */
-#define NANOSEC_IN_SEC		1000000000	/* nanoseconds in a second */
-#define NANOSECS_IN_SEC		1000000000	/* nanoseconds in a second */
-#define NANOSECS_IN_MSEC	1000000		/* nanoseconds in a millisecond */
-#define NANOSECS_IN_USEC	1000		/* nanoseconds in a microsecond */
-#define E_6			1000000
-#define E_9			1000000000
-#define E_18			1000000000000000000LL
+#define MILLISECS_IN_SEC	((int)1E3)	/* millseconds in a second */
+#define MICROSEC_IN_SEC		((int)1E6)	/* microseconds in a second */
+#define MICROSECS_IN_MSEC	((int)1E3)	/* microseconds in a millisecond */
+#define NANOSECS_IN_SEC		((int)1E9)	/* nanoseconds in a second */
+#define NANOSECS_IN_MSEC	((int)1E6)	/* nanoseconds in a millisecond */
+#define NANOSECS_IN_USEC	((int)1E3)	/* nanoseconds in a microsecond */
+#define E_6			((int)1E6)
+#define E_9			((int)1E9)
+#define E_18			((long long)1E18)
 
 #define ASSERT_IN_RANGE(low, x, high)	assert((low <= x) && (x <= high))
 

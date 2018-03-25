@@ -83,13 +83,12 @@ rhdtyp *make_dmode (void)
 	base_address->labtab_len = 1;
 	code = (CODEBUF_TYPE *)base_address->ptext_adr;	/* start of executable code */
 	GEN_CALL(dmode->func_ptr1);			/* line 0,1 */
-        GEN_CALL(dmode->func_ptr2);
-        GEN_CALL(dmode->func_ptr3); 			/* line 2 */
+	GEN_CALL(dmode->func_ptr2);
+	GEN_CALL(dmode->func_ptr3); 			/* line 2 */
 	lnr = LNRTAB_ADR(base_address);
-	*lnr++ = 0;								/* line 0 */
-	*lnr++ = 0;								/* line 1 */
-	IA64_ONLY(*lnr++ = 2 * CALL_SIZE + EXTRA_INST_SIZE;)			/* line 2 */
-	NON_IA64_ONLY(*lnr++ = 2 * CALL_SIZE + EXTRA_INST * SIZEOF(int);)	/* line 2 */
+	*lnr++ = 0;						/* line 0 */
+	*lnr++ = 0;						/* line 1 */
+	*lnr++ = 2 * CALL_SIZE + EXTRA_INST * SIZEOF(int);	/* line 2 */
 	lbl = base_address->labtab_adr;
 	lbl->lnr_adr = base_address->lnrtab_adr;
 	base_address->current_rhead_adr = base_address;

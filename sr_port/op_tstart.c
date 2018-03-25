@@ -198,7 +198,7 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 	if (0 != jnl_fence_ctl.level)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
 	if (dollar_tlevel + 1 >= TP_MAX_NEST)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPTOODEEP);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TPTOODEEP, 1, TP_MAX_NEST - 1);
 	va_start(varlst, tstart_flag);	/* no argument count first */
 	serial = va_arg(varlst, int);
 	tid = va_arg(varlst, mval *);

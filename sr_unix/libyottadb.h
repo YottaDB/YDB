@@ -85,7 +85,7 @@ enum
 
 /* Below macro returns TRUE if two input ydb_buffer_t structures pointer to the same string and FALSE otherwise. */
 #define YDB_BUFFER_IS_SAME(BUFFERP1, BUFFERP2)										\
-	((BUFFERP1->len_used == BUFFERP2->len_used) && !memcmp(BUFFERP1->buf_addr, BUFFERP2->buf_addr, BUFFERP2->len_used))
+	(((BUFFERP1)->len_used == (BUFFERP2)->len_used) && !memcmp((BUFFERP1)->buf_addr, (BUFFERP2)->buf_addr, (BUFFERP2)->len_used))
 
 /* Below macro copies SRC ydb_buffer_t to DST ydb_buffer_t.
  * If DST does not have space allocated to hold SRC->len_used, then no copy is done
@@ -162,16 +162,16 @@ enum
  * errno values do not follow the same rules as YottaDB generated errors so this macro does not work on them. YottaDB
  * generated errors numbers are all (absolute value) LARGER than 2**27 so anything under that is not supported by this macro.
  */
-#define YDB_SEVERITY(MSGNUM, SEVERITY)											\
-{															\
-	/* Minor subtrifuge because YDB_OK is 0 (per normal UNIX return code) but the rest of the codes, when the	\
-	 * error is out of the range of errno values, have 1 as a success value.					\
-	 */														\
-	if (YDB_OK == (MSGNUM))												\
-		SEVERITY = YDB_SEVERITY_SUCCESS;									\
-	else														\
-		SEVERITY = ((int)abs(MSGNUM) & 7);	/* Negation turns msg code into actual code used internally */	\
-}
+#define YDB_SEVERITY(MSGNUM, SEVERITY)										\
+MBSTART {													\
+	/* Minor subterfuge because YDB_OK is 0 (per normal UNIX return code) but the rest of the codes,	\
+	 * when the error is out of the range of errno values, have 1 as a success value.			\
+	 */													\
+	if (YDB_OK == (MSGNUM))											\
+		SEVERITY = YDB_SEVERITY_SUCCESS;								\
+	else													\
+		SEVERITY = ((int)abs(MSGNUM) & 7);	/* Doing abs so always have positive version */		\
+} MBEND
 
 /* If only want assertions in DEBUG mode (-DDEBUG option specified), use this macro instead */
 #ifdef DEBUG

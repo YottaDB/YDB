@@ -20,7 +20,7 @@
 GBLDEF uint4		dollar_tlevel;
 GBLDEF uint4		bml_save_dollar_tlevel; /* if non-zero holds actual dollar_tlevel */
 GBLDEF uint4		dollar_trestart;
-GBLDEF uint4		simpleapi_dollar_trestart;	/* copy of dollar_trestart taken by "ydb_tp_s",
+GBLDEF uint4		simpleapi_dollar_trestart;	/* copy of dollar_trestart taken by outermost "ydb_tp_s",
 							 * used also by "ydb_simpleapi_ch".
 							 */
 GBLDEF unsigned char	*tpstackbase, *tpstacktop, *tpstackwarn, *tp_sp;
