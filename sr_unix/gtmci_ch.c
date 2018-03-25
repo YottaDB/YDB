@@ -50,9 +50,7 @@ CONDITION_HANDLER(gtmci_ch)
 	entryref.addr = CALL_IN_M_ENTRYREF;
 	entryref.len = STR_LIT_LEN(CALL_IN_M_ENTRYREF);
 	set_zstatus(&entryref, SIGNAL, NULL, FALSE);
-	if (msp < FGNCAL_STACK) /* restore stack to the last marked position */
-		fgncal_unwind();
-	else TREF(temp_fgncal_stack) = NULL;	/* If fgncal_unwind() didn't run to clear this, we have to */
+	FGNCAL_UNWIND_CLEANUP;
 	mumps_status = SIGNAL;
 	UNWIND(NULL, NULL);
 }
