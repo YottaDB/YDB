@@ -92,7 +92,7 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 		 * First do some error checking on input.
 		 */
 		if (YDB_MAX_NAMES < namecount)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNTTOOHI, 3,
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNT2HI, 3,
 								RTS_ERROR_LITERAL("ydb_tp_s()"), YDB_MAX_NAMES);
 		for (curvarname = varnames, mv = varnamearray, mv_top = mv + namecount; mv < mv_top; curvarname++, mv++)
 		{

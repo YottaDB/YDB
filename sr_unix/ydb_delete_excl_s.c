@@ -77,7 +77,7 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 		return YDB_OK;
 	}
 	if (YDB_MAX_NAMES < namecount)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNTTOOHI, 3,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNT2HI, 3,
 						RTS_ERROR_LITERAL("ydb_delete_excl_s()"), YDB_MAX_NAMES);
 	/* Run through the array creating mvals to hold the list of names to be excluded. Note, normally, we would use
 	 * the COPY_PAMS_TO_CALLG_BUFFER() macro for this but in this case, we also need to validate each mval that it has
