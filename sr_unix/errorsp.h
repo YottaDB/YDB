@@ -461,7 +461,7 @@ MBSTART {													\
 					CHTRACEPOINT;										\
 					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);					\
 					chnd[current_ch].ch_active = FALSE;							\
-					assert((active_ch+1)->dollar_tlevel == dollar_tlevel);					\
+					assert((active_ch + 1)->dollar_tlevel == dollar_tlevel);					\
 					active_ch++;										\
 					CHECKHIGHBOUND(active_ch);								\
 					ctxt = active_ch;									\

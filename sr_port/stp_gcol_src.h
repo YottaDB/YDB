@@ -844,11 +844,11 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 				 * While running through the stack, we need to skip over base frames so we process the
 				 * entire stack with the following caveats:
 				 *   1. The original base frame (has a type of SFT_COUNT but is otherwise unmarked) is the
-				 *	 absolute bottom of the stack so breaks the loop. This will only be seen when the
-				 *	 base frame (for execution) is a call-in frame either for simpleAPI or for call-ins.
+				 *	absolute bottom of the stack so breaks the loop. This will only be seen when the
+				 *	base frame (for execution) is a call-in frame either for simpleAPI or for call-ins.
 				 *   2. When running mumps, a different base frame, similar in construction to the original
 				 *	base frame described above, that also has a type of SFT_COUNT should stop rearward
-				 *	 stack travel and break the loop.
+				 *	stack travel and break the loop.
 				 */
 				while (NULL == sf->old_frame_pointer)
 				{	/* We may need to jump over a base frame to get the rest of the M stack */

@@ -22,6 +22,9 @@
 #define	DECR_CNT_TRUE		TRUE
 #define	DECR_CNT_SAFE		2
 
+/* Below macros are used to pass values for the "immediate" parameter in ftok_sem* functions.
+ * Using IMMEDIATE_FALSE instead of FALSE in the caller code makes it more readable.
+ */
 #define	IMMEDIATE_FALSE		FALSE
 #define	IMMEDIATE_TRUE		TRUE
 

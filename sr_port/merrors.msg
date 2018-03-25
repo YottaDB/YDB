@@ -649,7 +649,7 @@ TPLOCK		<Cannot release LOCK(s) held prior to current TSTART>/error/fao=0!/ansi=
 TPQUIT		<Cannot QUIT out of a routine with an active transaction>/error/fao=0!/ansi=42
 TPFAIL		<Transaction COMMIT failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 TPRETRY		<Restart transaction from non-concurrency DB failure>/error/fao=0!/ansi=0
-TPTOODEEP	<$TLEVEL cannot exceed 126>/error/fao=0!/ansi=0
+TPTOODEEP	<$TLEVEL cannot exceed !UL>/error/fao=1!/ansi=0
 ZDEFACTIVE	<ZDEFER already active>/error/fao=0!/ansi=0
 ZDEFOFLOW	<ZDEFER Buffer overflow to node !AD>/error/fao=2!/ansi=0
 MUPRESTERR	<MUPIP restore aborted due to preceding errors>/error/fao=0!/ansi=0
@@ -1166,7 +1166,7 @@ DLLVERSION	<Routine !AD in library !AD was compiled with an incompatible version
 INVZROENT	<!AD is neither a directory nor an object library(DLL)>/error/fao=2!/ansi=0
 DDPLOGERR	<!AD: !AD>/error/fao=4!/ansi=0
 GETSOCKNAMERR	<Getting the socket name failed from getsockname(): (errno==!UL) !AD>/error/fao=3!/ansi=0
-INVYDBEXIT	<Inappropriate invocation of ydb_exit. ydb_exit cannot be invoked from external calls.>/error/fao=0!/ansi=0
+INVYDBEXIT	<Inappropriate invocation of ydb_exit(). Calls to ydb_exit() cannot be made from external calls.>/error/fao=0!/ansi=0
 CIMAXPARAM	<Exceeded maximum number of parameters in the call-in table entry. An M routine cannot accept more than 32 parameters.>/error/fao=0!/ansi=0
 CITPNESTED	<Call-ins can not be used inside a TP transaction>/error/fao=0!/ansi=0
 CIMAXLEVELS	<Too many nested Call-ins. Nested resources exhausted at level !UL.>/error/fao=1!/ansi=0
@@ -1327,7 +1327,7 @@ BADTAG		<Unable to use file !AD (CCSID !UL) with CCSID !UL>/error/fao=4!/ansi=0
 ICUVERLT36	<!AD !UL.!UL. ICU version greater than or equal to 3.6 should be used>/error/fao=4!/ansi=0
 ICUSYMNOTFOUND	<Symbol !AD not found in the ICU libraries. ICU needs to be built with symbol-renaming disabled or gtm_icu_version environment variable needs to be properly specified>/error/fao=2!/ansi=0
 STUCKACT	<Process stuck script invoked: !AD : !AD>/info/fao=4!/ansi=0
-CALLINAFTERXIT	<After a ydb_exit, a process can never create a valid YottaDB context>/error/fao=0!/ansi=0
+CALLINAFTERXIT	<After a ydb_exit(), a process cannot create a valid YottaDB context>/error/fao=0!/ansi=0
 LOCKSPACEFULL	<No more room for LOCK slots on database file !AD>/error/fao=2!/ansi=0
 IOERROR		<Error occured while doing !AD in !AD operation -- called from module !AD at line !UL>/error/fao=7!/ansi=0
 MAXSSREACHED	<Maximum snapshots - !UL - for region !AD reached. Please wait for the existing snapshots to complete before starting a new one.>/error/fao=3!/ansi=0

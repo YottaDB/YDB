@@ -186,7 +186,7 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 	}
 	if (YDB_OK == tpfn_status)
 	{
-		tpfn_status = (*tpfn)(tpfnparm);
+		tpfn_status = (*tpfn)(tpfnparm);	/* Drive the user-specified transaction routine (C function) here */
 		assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
 	}
 	TREF(libyottadb_active_rtn) = LYDB_RTN_TP;		/* Restore our routine indicator */

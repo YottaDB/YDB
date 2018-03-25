@@ -51,6 +51,9 @@ void outofband_action(boolean_t lnfetch_or_start)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLY);
 				break;
 			case (ctrlc):
+				/* Note this outofband is currently allowed for simpleAPI functions.
+				 * It exits the process in simpleAPI mode.
+				 */
 				if (!(IS_SIMPLEAPI_MODE))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 				else
@@ -61,9 +64,9 @@ void outofband_action(boolean_t lnfetch_or_start)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
 				break;
 			case (tptimeout):
-				/* Currently following is nothing but an rts_error. Function pointer is used flexibility.
-				 *
-				 * Note this is the only outofband currently allowed for simpleAPI functions.
+				/* Currently following is nothing but an rts_error.
+				 * Function pointer is used for flexibility.
+				 * Note this outofband is currently allowed for simpleAPI functions.
 				 */
 				(*tp_timeout_action_ptr)();
 				break;

@@ -102,10 +102,11 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	is_simpleapi_mode = IS_SIMPLEAPI_MODE;
 	if (NULL == lvt)
 	{
-		if (is_simpleapi_mode)
-			return;				/* Array size of zero is the signal there is nothing else */
-		dst->mvtype = MV_STR;
-		dst->str.len = 0;
+		if (!is_simpleapi_mode)
+		{	/* Array size of zero is the signal there is nothing else */
+			dst->mvtype = MV_STR;
+			dst->str.len = 0;
+		}
 		return;
 	}
 	h1 = history;
@@ -257,10 +258,11 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 			assert(h1 >= &history[0]);
 			if (h1 == &history[0])
 			{
-				if (is_simpleapi_mode)
-					return;			/* Array size of zero is the signal there is nothing else */
-				dst->mvtype = MV_STR;
-				dst->str.len = 0;
+				if (!is_simpleapi_mode)
+				{	/* Array size of zero is the signal there is nothing else */
+					dst->mvtype = MV_STR;
+					dst->str.len = 0;
+				}
 				return;
 			}
 			node = *h1;
@@ -298,14 +300,13 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	 * generated code or a ydb_node_next_s() call from the simpleAPI. Fork that difference here.
 	 */
 	if (is_simpleapi_mode)
-	{	/* SimpleAPI mode - return a list of subscripts in an array of ydb_buffer_t structures which have pre-allocated
-		 * buffers in them (no stringpool complications). Also, all values are returned as (unquoted) strings eliminating
-		 * some display formatting issues.
-		 *
-		 * That all said, we do need at least one protected mval so we can run n2s to convert numeric subscripts to the
-		 * string values we need to return.
+	{	/* SimpleAPI mode - This routine returns (in a C global variable) a list of mstr blocks describing
+		 * the subscripts to return. These are later (different routine) used to populate the caller's
+		 * ydb_buffer_t array. Also, all values are returned as (unquoted) strings eliminating some
+		 * display formatting issues. That all said, we do need at least one protected mval so we can
+		 * run n2s to convert numeric subscripts to the string values we need to return.
 		 */
-		assert(NULL == dst);				/* Output is via TREF(sapi_query_node_subs) instead */
+		assert(NULL == dst);			/* Output is via TREF(sapi_query_node_subs) instead */
 		PUSH_MV_STENT(MVST_MVAL);
 		v2 = &mv_chain->mv_st_cont.mvs_mval;
 		v2->mvtype = 0;	/* Initialize it to 0 to avoid "stp_gcol" from getting confused if it gets invoked before v2 has
