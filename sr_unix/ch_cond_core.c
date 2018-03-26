@@ -17,11 +17,12 @@
 #include "mdef.h"
 #include "error.h"
 #include "gtmdbglvl.h"
+#include "libyottadb_int.h"
 
-GBLREF boolean_t		created_core;
-GBLREF boolean_t		dont_want_core;
-GBLREF boolean_t		need_core;
-GBLREF uint4			ydbDebugLevel;
+GBLREF boolean_t	created_core;
+GBLREF boolean_t	dont_want_core;
+GBLREF boolean_t	need_core;
+GBLREF uint4		ydbDebugLevel;
 
 /* Create our own version of the DUMP macro that does not include stack overflow. This
    error is handled better inside mdb_condition_handler which should be the top level
@@ -41,7 +42,7 @@ GBLREF uint4			ydbDebugLevel;
 #define DUMP	(   SIGNAL == (int)ERR_ASSERT		\
 		 || SIGNAL == (int)ERR_GTMASSERT	\
 		 || SIGNAL == (int)ERR_GTMASSERT2	\
-		    || SIGNAL == (int)ERR_GTMCHECK)	/* BYPASSOK */
+		 || SIGNAL == (int)ERR_GTMCHECK)	/* BYPASSOK */
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
@@ -56,7 +57,8 @@ void ch_cond_core(void)
 	boolean_t	cond_core_signal;
 
 	cond_core_signal = (ERR_STACKOFLOW == SIGNAL) || (ERR_MEMORY == SIGNAL);
-	if (DUMPABLE && ((cond_core_signal && (GDL_DumpOnStackOFlow & ydbDebugLevel)) || !cond_core_signal) && !SUPPRESS_DUMP)
+	if (DUMPABLE && ((cond_core_signal && (GDL_DumpOnStackOFlow & ydbDebugLevel) && !IS_SIMPLEAPI_MODE) || !cond_core_signal)
+	    && !SUPPRESS_DUMP)
 	{
 		need_core = TRUE;
 		gtm_fork_n_core();

@@ -283,7 +283,7 @@ int dollar_quit(void)
 	else
 	{	/* Something weird afoot - had parm block can can't locate EXFUNRET[ALS] opcode. This can happen if
 		 * a fatal error occurs during a call before the callee stack frame is actually pushed and we are
-		 * called during GTM_FATAL_ERROR.* file creation. Assert that this is the case, else, we just pretend
+		 * called during YDB_FATAL_ERROR.* file creation. Assert that this is the case, else, we just pretend
 		 * we didn't find a parm block..
 		 */
 		assert(process_exiting);

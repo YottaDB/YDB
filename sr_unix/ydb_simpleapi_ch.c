@@ -208,9 +208,10 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 		}
 	}
 	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSA_TRUE);
-	/* If this is a fatal error, create a core file and close up shop so the runtime cannot be called again.
+	/* If this is a fatal error, create a core file (if not already done or otherwise suppressed) and close up shop so the
+	 * runtime cannot be called again.
 	 */
-	if ((DUMPABLE) && !SUPPRESS_DUMP)
+	if (DUMPABLE)
 	{	/* Fatal errors need to create a core dump. The message we were invoked with has already been
 		 * sent to the user's console, which reset the end pointer back to the beginning so we have to
 		 * use strlen() to get the correct length.
@@ -219,18 +220,18 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 		memcpy(zstatus_buffer, TREF(util_outbuff_ptr), zstatus_buffer_len);	/* Save zstatus */
 		process_exiting = TRUE;
 		CANCEL_TIMERS;
-		if (!(GDL_DumpOnStackOFlow & ydbDebugLevel) &&
-		    ((int)ERR_STACKOFLOW == SIGNAL || (int)ERR_STACKOFLOW == arg
-		     || (int)ERR_MEMORY == SIGNAL || (int)ERR_MEMORY == arg))
+		if (!(SUPPRESS_DUMP) && (GDL_DumpOnStackOFlow & ydbDebugLevel)
+		    && (((int)ERR_STACKOFLOW == SIGNAL) || ((int)ERR_STACKOFLOW == arg)
+			|| ((int)ERR_MEMORY == SIGNAL) || ((int)ERR_MEMORY == arg)))
 		{
 			dont_want_core = FALSE;
 			need_core = TRUE;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FATALERROR2, 2, zstatus_buffer_len, zstatus_buffer);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FATALERROR1, 2, zstatus_buffer_len, zstatus_buffer);
 		} else
 		{
 			dont_want_core = TRUE;		/* Do a clean exit rather than messy core exit */
 			need_core = FALSE;
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FATALERROR1, 2, zstatus_buffer_len, zstatus_buffer);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FATALERROR2, 2, zstatus_buffer_len, zstatus_buffer);
 		}
 		TERMINATE;				/* Conditionally creates core depending on flags */
 	}
