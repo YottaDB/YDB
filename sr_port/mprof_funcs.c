@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -817,12 +817,7 @@ STATICFNDEF void get_entryref_information(boolean_t line, trace_entry *tmp_trc_t
 	line_reset = FALSE;
 	for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 	{
-		if (fp->type & (GTMTRIG_ONLY(SFT_TRIGR) | SFT_CI))
-		{
-			assert(NULL == fp->old_frame_pointer);
-			/* Have a trigger or call-in baseframe, pick up stack continuation frame_pointer stored by base_frame() */
-			fp = *(stack_frame **)(fp + 1);
-		}
+		SKIP_BASE_FRAMES(fp);		/* Updates fp */
 		assert(fp);
 		if (ADDR_IN_CODE(fp->mpc, fp->rvector))
 		{

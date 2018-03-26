@@ -28,10 +28,13 @@ ydb_status_t gtm_is_file_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fi
 
 /* Converts given filename to unique file id. Uses filename_to_id internally for getting the unique id. Note that,
  * the allocation of the fileid structure is done here and the caller needs to worry only about free'ing the
- * allocated pointer via gtm_xcfileid_free. */
+ * allocated pointer via gtm_xcfileid_free.
+ *
+ * Note, a reimplementation of this routine exists in ydb_file_name_to_id() so any changes here need to be
+ * reflected there.
+ */
 ydb_status_t gtm_filename_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid)
 {
-	int		actstatus;
 	boolean_t	status;
 	gd_id_ptr_t	tmp_fileid;
 
@@ -39,16 +42,9 @@ ydb_status_t gtm_filename_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid
 		return FALSE;
 	assert(fileid && !*fileid);
 	tmp_fileid = (gd_id_ptr_t)malloc(SIZEOF(gd_id));
-	actstatus = filename_to_id(tmp_fileid, filename->address);
-	status = (SS_NORMAL == actstatus);
-	if (status)
-		*fileid = (ydb_fileid_ptr_t)tmp_fileid;
-	else
-	{	/* There was an error */
-		free(tmp_fileid);
-		*fileid = NULL;
-	}
-	return status ? YDB_OK : actstatus;
+	status = (SS_NORMAL == filename_to_id(tmp_fileid, filename->address));
+	*fileid = (ydb_fileid_ptr_t)tmp_fileid;
+	return status;
 }
 
 /* Allocation of ydb_fileid_ptr_t happens in gtm_filename_to_id. During the close time, encryption library  needs to free these

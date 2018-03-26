@@ -67,7 +67,7 @@ void zshow_stack(zshow_out *output, boolean_t show_checksum)
 			zshow_output(output, &v);
 			v.len = 0;
 		}
-		fp = SKIP_BASE_FRAME(fp);
+		SKIP_BASE_FRAMES(fp);			/* Updates fp */
 		if (NULL == fp->old_frame_pointer)
 			break; /* Endpoint.. */
 		if (!(fp->type & SFT_COUNT) || ((fp->type & SFT_ZINTR) && (fp->flags & SFF_INDCE)))

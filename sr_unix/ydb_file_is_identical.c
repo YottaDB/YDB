@@ -38,5 +38,5 @@ int ydb_file_is_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2)
 	}
 	status = gtm_is_file_identical(fileid1, fileid2);
 	REVERT;
-	return status ? YDB_OK : -1;
+	return status ? YDB_OK : YDB_NOTOK;
 }

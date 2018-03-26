@@ -899,7 +899,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 		 */
 		for (fp = frame_pointer; NULL != fp; fp = fp->old_frame_pointer)
 		{
-			fp = SKIP_BASE_FRAME(fp);	/* Separate from for above so SKIP_BASE_FRAME runs on first value */
+			SKIP_BASE_FRAMES(fp);		/* Updates rp */
 			rtnhdr = CURRENT_RHEAD_ADR(fp->rvector);
 			if ((NULL != rtnhdr) && rtnhdr->rtn_relinked && rtnhdr->shared_object)
 			{

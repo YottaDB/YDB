@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,14 +29,10 @@
 #include "gtmimagename.h"
 #include "linktrc.h"
 #include "gtm_unlink_all.h"
-#ifdef GTM_TRIGGER
 #include "gtm_trigger_trc.h"
-#endif
 
 GBLREF	stack_frame	*frame_pointer;
-#ifdef GTM_TRIGGER
 GBLREF	boolean_t	goframes_unwound_trigger;
-#endif
 
 LITREF	gtmImageName 	gtmImageNames[];
 
@@ -120,7 +116,6 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	lnrptr = op_labaddr(rtnhdr, &lblname, offset);
 #	endif
 	assert(NULL != lnrptr);
-#	ifdef GTM_TRIGGER
 	if (!IS_GTM_IMAGE && (1 >= level))
 		/* In MUPIP (or other utility that gets trigger support in the future), levels 0 and 1 refer to
 		 * the pseudo baseframe and initial stack levels which are not rewritable (in the case where an
@@ -128,7 +123,6 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		 * permit ZGOTOs to these levels in a utility.
 		 */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZGOTOINVLVL, 3, GTMIMAGENAMETXT(image_type), level);
-#	endif
 	/* One last check if we are unlinking, make sure no call-in frames exist on our stack */
 	if (0 == level)
 	{
@@ -142,14 +136,12 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOCALLOUTIN);
 			if (NULL == fpprev)
 			{	/* Next frame is some sort of base frame */
-#				ifdef GTM_TRIGGER
 				if (fp->type & SFT_TRIGR)
 				{	/* Have a trigger baseframe, pick up stack continuation frame_pointer stored by
 					 *base_frame() */
 					fpprev = *(stack_frame **)(fp + 1);
 					continue;
 				} else
-#				endif
 					break;			/* Some other base frame that stops us */
 			}
 		}
@@ -194,7 +186,6 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 	NON_USHBIN_ONLY((* frame_func)(rtnhdr, (unsigned char *)LINKAGE_ADR(rtnhdr),
 		(unsigned char *)((int)rtnhdr + *(int *)((int)rtnhdr + *lnrptr))));
 	DBGEHND((stderr, "op_zgoto: Resuming at frame 0x"lvaddr" with type 0x%04lx\n", frame_pointer, frame_pointer->type));
-#	ifdef GTM_TRIGGER
 	if (goframes_unwound_trigger)
 	{	/* If goframes() called by golevel unwound a trigger base frame, we must use MUM_TSTART to unroll the
 		 * C stack before invoking the return frame. Otherwise we can just return and avoid the overhead that
@@ -202,5 +193,4 @@ void op_zgoto(mval *rtn_name, mval *lbl_name, int offset, int level)
 		 */
 		MUM_TSTART;
 	}
-#	endif
 }

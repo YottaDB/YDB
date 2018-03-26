@@ -3,7 +3,7 @@
  * Copyright (c) 2009, 2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -296,16 +296,9 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 		fp = fp->old_frame_pointer;	/* Bump to prev frame and check if found a call-in base frame */
 		if (done)
 			break;
-		if ((NULL != fp) && (SFT_CI & fp->type))
-		{	/* Callins needs to be able to crawl past apparent end of stack to earlier stack segments.
-			 * We should be in the base frame now. See if an earlier frame exists.
-			 * Note we don't worry about trigger base frames here because triggers *always* have a
-			 * different symbol table - previous symbol tables and stack levels are not affected.
-			 */
-			fp = *(stack_frame **)(fp + 1);	/* Backups up to "prev pointer" created by base_frame() */
-			if ((NULL == fp) || (fp >= (stack_frame *)stackbase) || (fp < (stack_frame *)stacktop))
-				break;	/* Pointer not within the stack -- must be earliest occurence */
-		}
+		SKIP_BASE_FRAMES(fp);		/* Updates fp */
+		if ((NULL == fp) || (fp >= (stack_frame *)stackbase) || (fp < (stack_frame *)stacktop))
+			break;	/* Pointer not within the stack -- must be earliest occurence */
 	} while(fp);
 	/* Next, check the mv_stents for the stackframes we processed. Certain mv_stents also have hash
 	 * table references in them that need repair.
