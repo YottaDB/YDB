@@ -300,9 +300,11 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	 * generated code or a ydb_node_next_s() call from the simpleAPI. Fork that difference here.
 	 */
 	if (is_simpleapi_mode)
-	{	/* SimpleAPI mode - This routine returns (in a C global variable) a list of mstr blocks describing
-		 * the subscripts to return. These are later (different routine) used to populate the caller's
-		 * ydb_buffer_t array. Also, all values are returned as (unquoted) strings eliminating some
+	{	/* SimpleAPI mode - This routine fills in the mstr array located at TREF(sapi_query_node_subs)
+		 * (count is kept in TREF(sapi_query_node_subs_cnt)). The caller of this routine will invoke
+		 * sapi_return_subscr_nodes() which takes the the mstr subscript array in TREF(sapi_query_node_subs)
+		 * created by this routine and stuffs it into the caller's ydb_buffer_t buffers where pre-allocated
+		 * memory is anchored. Also, all values are returned as (unquoted) strings eliminating some
 		 * display formatting issues. That all said, we do need at least one protected mval so we can
 		 * run n2s to convert numeric subscripts to the string values we need to return.
 		 */
