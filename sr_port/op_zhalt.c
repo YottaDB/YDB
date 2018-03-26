@@ -112,7 +112,7 @@ void op_zhalt(int4 retcode, boolean_t is_zhalt)
 				halt_time = cur_time;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, is_zhalt ? "ZHALT" : "HALT");
 		}
-		/* if 2nd in less than SAFE_iNTERVAL, give FATAL message & GTM_FATAL file, but no core, to stop nasty loops */
+		/* if 2nd in less than SAFE_iNTERVAL, give FATAL message & YDB_FATAL file, but no core, to stop nasty loops */
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_SEVERE(ERR_RESTRICTEDOP), 1, is_zhalt ? "ZHALT" : "HALT");
 		if (IS_GTM_IMAGE)
 		{
@@ -133,7 +133,7 @@ void op_zhalt(int4 retcode, boolean_t is_zhalt)
 	} else
 		assert(IS_GTM_IMAGE);
 #	endif
-	process_exiting = TRUE;			/* do a little dance to leave a GTM_FATAL file but no core file */
+	process_exiting = TRUE;			/* do a little dance to leave a YDB_FATAL file but no core file */
 	if (retcode && !is_zhalt)
 		EXIT(0); 			/* unless this is a op_dmode or dm_read exit */
 	create_fatal_error_zshow_dmp(MAKE_MSG_SEVERE(ERR_RESTRICTEDOP));

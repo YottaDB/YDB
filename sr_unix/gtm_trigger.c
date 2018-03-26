@@ -251,7 +251,7 @@ CONDITION_HANDLER(gtm_trigger_ch)
 {	/* Condition handler for trigger execution - This handler is pushed on first for a given trigger level, then
 	 * mdb_condition_handler is pushed on so will appear multiple times as trigger depth increases. There is
 	 * always an mdb_condition_handler behind us for an earlier trigger level and we let it handle severe
-	 * errors for us as it gives better diagnostics (e.g. GTM_FATAL_ERROR dumps) in addition to the file core dump.
+	 * errors for us as it gives better diagnostics (e.g. YDB_FATAL_ERROR dumps) in addition to the file core dump.
 	 */
 	START_CH(TRUE);	/* Note: "prev_intrpt_state" variable is defined/declared inside START_CH macro */
 	DBGTRIGR((stderr, "gtm_trigger_ch: Failsafe condition cond handler entered with SIGNAL = %d\n", SIGNAL));
