@@ -715,7 +715,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		}
 		/* If we unwound to a call-in base frame, and the outermost TSTART happened before the call-in base frame
 		 * was created, we need to return to ydb_ci[p]() with the ERR_TPRETRY error code so this retry code
-		 * can be bubbled up the caller of the call-in.
+		 * can be bubbled up to the caller of the call-in.
 		 */
 		if ((SFT_CI & frame_pointer->type) && (tstart_gtmci_nested_level != TREF(gtmci_nested_level)))
 		{
