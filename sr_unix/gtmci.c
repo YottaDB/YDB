@@ -281,8 +281,8 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		 */
 		ydb_nested_callin();            /* Note - sets fgncal_stack */
 		/* Since this is a nested call-in created just for this "ydb_ci" invocation, we need to unwind this call-in
-		 * frame/stack when returning (unlike a regular "ydb_ci" invocation where, as a performance thing,
-		 * we keep the environment as is in the hope of future "ydb_ci" calls).
+		 * frame/stack when returning (unlike a regular "ydb_ci" invocation where we keep the environment as is
+		 * in the hope of future "ydb_ci" calls).
 		 */
 		ci_ret_code_quit_needed = TRUE;
 	}
@@ -490,7 +490,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
 		 */
 		if (mumps_status)
-		{	/* This is an error codepath. Do cleanup of frames (including the call-in base frame)
+		{	/* This is an error codepath. Do cleanup of frames (including the call-in base frame for some errors)
 			 * and rethrow error if needed. Currently only the following error(s) need rethrow.
 			 *	ERR_TPRETRY
 			 * The above 3 errors indicate there is a parent M frame or ydb_tp_s frame at a lower
@@ -498,13 +498,13 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 			 */
 			FGNCAL_UNWIND_CLEANUP;	/* Unwind all frames up to the call-in base frame */
 			assert(SFT_CI & frame_pointer->type);
-			if (NULL != frame_pointer)
-			{
-				ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
-				ci_ret_code_quit_needed = FALSE;
-			}
 			if (ERR_TPRETRY == mumps_status)
-			{	/* These error(s) need to be rethrown. */
+			{	/* These error(s) need to be rethrown. But before that unwind the call-in base frame */
+				if (NULL != frame_pointer)
+				{
+					ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
+					ci_ret_code_quit_needed = FALSE;
+				}
 				DRIVECH(mumps_status);
 				assert(FALSE);
 			}
@@ -650,8 +650,8 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		 */
 		ydb_nested_callin();            /* Note - sets fgncal_stack */
 		/* Since this is a nested call-in created just for this "ydb_ci" invocation, we need to unwind this call-in
-		 * frame/stack when returning (unlike a regular "ydb_ci" invocation where, as a performance thing,
-		 * we keep the environment as is in the hope of future "ydb_ci" calls).
+		 * frame/stack when returning (unlike a regular "ydb_ci" invocation where we keep the environment as is
+		 * in the hope of future "ydb_ci" calls).
 		 */
 		ci_ret_code_quit_needed = TRUE;
 	}
@@ -910,13 +910,13 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 			 */
 			FGNCAL_UNWIND_CLEANUP;	/* Unwind all frames up to the call-in base frame */
 			assert(SFT_CI & frame_pointer->type);
-			if (NULL != frame_pointer)
-			{
-				ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
-				ci_ret_code_quit_needed = FALSE;
-			}
 			if (ERR_TPRETRY == mumps_status)
-			{	/* These error(s) need to be rethrown. */
+			{	/* These error(s) need to be rethrown. But before that unwind the call-in base frame */
+				if (NULL != frame_pointer)
+				{
+					ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
+					ci_ret_code_quit_needed = FALSE;
+				}
 				DRIVECH(mumps_status);
 				assert(FALSE);
 			}
