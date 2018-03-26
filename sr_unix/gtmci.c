@@ -1244,28 +1244,32 @@ int ydb_exit()
 		return 0;		/* GT.M environment not setup yet - quietly return */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	assert(NULL != frame_pointer);
-	/* Do not allow ydb_exit() to be invoked from external calls (unless process_exiting) */
-	if (process_exiting || (!(SFT_CI & frame_pointer->type) || !(MUMPS_CALLIN & invocation_mode)
-				|| (1 < TREF(gtmci_nested_level))))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
-	/* Now get rid of the whole M stack - end of GT.M environment */
-	while (NULL != frame_pointer)
-	{
-		while ((NULL != frame_pointer) && !(frame_pointer->type & SFT_CI))
+	/* If process_exiting is set and the YottaDB environment is still active, shortcut some of the checks
+	 * and cleanups we are making in this routine as they are not particularly useful. If the environment
+	 * is not active though, that's still an error.
+	 */
+	if (!process_exiting && gtm_startup_active)
+	{	/* Do not allow ydb_exit() to be invoked from external calls (unless process_exiting) */
+		if (!(SFT_CI & frame_pointer->type) || !(MUMPS_CALLIN & invocation_mode) || (1 < TREF(gtmci_nested_level)))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
+		/* Now get rid of the whole M stack - end of GT.M environment */
+		while (NULL != frame_pointer)
 		{
-#			ifdef GTM_TRIGGER
-			if (SFT_TRIGR & frame_pointer->type)
-				gtm_trigger_fini(TRUE, FALSE);
-			else
-#			endif
-				op_unwind();
+			while ((NULL != frame_pointer) && !(frame_pointer->type & SFT_CI))
+			{
+				if (SFT_TRIGR & frame_pointer->type)
+					gtm_trigger_fini(TRUE, FALSE);
+				else
+					op_unwind();
+			}
+			if (NULL != frame_pointer)
+			{	/* unwind the current invocation of call-in environment */
+				assert(frame_pointer->type & SFT_CI);
+				ci_ret_code_quit();
+			}
 		}
-		if (NULL != frame_pointer)
-		{	/* unwind the current invocation of call-in environment */
-			assert(frame_pointer->type & SFT_CI);
-			ci_ret_code_quit();
-		}
-	}
+	} else if (!gtm_startup_active)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
 	gtm_exit_handler(); /* rundown all open database resource */
 	/* If libyottadb was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
 	 * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing

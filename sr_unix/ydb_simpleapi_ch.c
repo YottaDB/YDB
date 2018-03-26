@@ -52,6 +52,7 @@
 #include "libyottadb_int.h"
 #include "tp_restart.h"
 #include "tp_frame.h"
+#include "create_fatal_error_zshow_dmp.h"
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	boolean_t		created_core;
@@ -219,6 +220,8 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 		zstatus_buffer_len = strlen(TREF(util_outbuff_ptr));
 		memcpy(zstatus_buffer, TREF(util_outbuff_ptr), zstatus_buffer_len);	/* Save zstatus */
 		process_exiting = TRUE;
+		/* Create the ZSHOW dump file if it can be created */
+		create_fatal_error_zshow_dmp(SIGNAL);
 		CANCEL_TIMERS;
 		if (!(SUPPRESS_DUMP) && (GDL_DumpOnStackOFlow & ydbDebugLevel)
 		    && (((int)ERR_STACKOFLOW == SIGNAL) || ((int)ERR_STACKOFLOW == arg)

@@ -850,16 +850,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 				 *	base frame described above, that also has a type of SFT_COUNT should stop rearward
 				 *	stack travel and break the loop.
 				 */
-				while (NULL == sf->old_frame_pointer)
-				{	/* We may need to jump over a base frame to get the rest of the M stack */
-					if ((GTMTRIG_ONLY(SFT_TRIGR |) SFT_CI) & sf->type)
-					{	/* We have a trigger or call-in base frame, back up over it */
-						sf = *(stack_frame **)(sf + 1);
-						continue;
-					}
-					/* Either origin frame or mumps/updproc base frame */
-					break;
-				}
+				SKIP_BASE_FRAMES(sf);		/* Updates sf */
 				if (NULL == sf)
 					break;
 				assert(sf->temps_ptr);

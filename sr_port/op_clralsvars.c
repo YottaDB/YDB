@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2014 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -107,14 +107,19 @@ void op_clralsvars(lv_val *rslt)
 			if (done)
 				break;
 			if (SFT_CI & fp->type)
-			{	/* Callins needs to be able to crawl past apparent end of stack (due to call-in base frame)
-				 * to earlier stack segments. Base frames hide the stack continue address behind them so
+			{	/* For call-ins we need to be able to crawl past apparent end of stack (due to call-in base
+				 * frame) to earlier stack segments. Base frames hide the stack continue address behind them so
 				 * pick that up and see if it allows us to continue the unroll.
 				 *
 				 * Note no check for triggers here as their locals are isolated so hitting a trigger base
-				 * frame stops this search back through the stack.
+				 * frame stops this search back through the stack. Because of that, we do not use the
+				 * SKIP_BASE_FRAMES() macro here.
 				 */
-				fp = *(stack_frame **)(fp + 1);	/* Backups up to "prev pointer" created by base_frame() */
+				assert(NULL == fp->old_frame_pointer);
+				while ((NULL == fp->old_frame_pointer) && (SFT_CI & fp->type))
+				{
+					fp = *(stack_frame **)(fp + 1);	/* Load "prev pointer" created by base_frame() */
+				}
 				if ((NULL == fp) || (fp >= (stack_frame *)stackbase) || (fp < (stack_frame *)stacktop))
 					break;	/* Pointer not within the stack -- must be earliest occurence */
 			} else

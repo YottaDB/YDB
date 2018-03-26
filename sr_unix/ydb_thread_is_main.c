@@ -38,5 +38,5 @@ int ydb_thread_is_main(void)
 	}
 	status = gtm_is_main_thread();
 	REVERT;
-	return status ? YDB_OK : -1;
+	return status ? YDB_OK : YDB_NOTOK;
 }

@@ -48,6 +48,8 @@ enum
 #define YDB_MAX_STR		(1 * 1024 * 1024)	/* Maximum YottaDB string length */
 #define YDB_MAX_SUBS		31	/* Maximum subscripts currently supported */
 #define YDB_MAX_TIME_NSEC	(0x7fffffffllu * 1000llu * 1000llu)	/* Max specified time in (long long) nanoseconds */
+#define YDB_MIN_YDBERR		(2 ** 27)	/* Minimum (absolute) value for a YottaDB error */
+#define YDB_MAX_YDBERR		(2 ** 30)	/* Maximum (absolute) value for a YottaDB error */
 
 /* Minimum values */
 
@@ -62,6 +64,7 @@ enum
 #define	YDB_TP_ROLLBACK		(YDB_INT_MAX - 2)
 #define YDB_NODE_END		(YDB_INT_MAX - 3)
 #define YDB_LOCK_TIMEOUT	(YDB_INT_MAX - 4)
+#define YDB_NOTOK		(YDB_INT_MAX - 5)
 
 /* Miscellaneous defines */
 #ifndef TRUE
@@ -158,12 +161,15 @@ enum
 	}															\
 }
 
+/* Macro to determine if a return code is a YottaDB error/message code or not */
+#define YDB_IS_YDB_ERRCODE(MSGNUM) ((YDB_MIN_YDBERR <= abs(MSGNUM)) && (YDB_MAX_YDBERR >= abs(MSGNUM)))
+
 /* Macro to determine severity of error returned from simpleapi call. Note a possible return value is an errno value. These
  * errno values do not follow the same rules as YottaDB generated errors so this macro does not work on them. YottaDB
  * generated errors numbers are all (absolute value) LARGER than 2**27 so anything under that is not supported by this macro.
  */
 #define YDB_SEVERITY(MSGNUM, SEVERITY)										\
-MBSTART {													\
+{													\
 	/* Minor subterfuge because YDB_OK is 0 (per normal UNIX return code) but the rest of the codes,	\
 	 * when the error is out of the range of errno values, have 1 as a success value.			\
 	 */													\
@@ -171,7 +177,7 @@ MBSTART {													\
 		SEVERITY = YDB_SEVERITY_SUCCESS;								\
 	else													\
 		SEVERITY = ((int)abs(MSGNUM) & 7);	/* Doing abs so always have positive version */		\
-} MBEND
+}
 
 /* If only want assertions in DEBUG mode (-DDEBUG option specified), use this macro instead */
 #ifdef DEBUG

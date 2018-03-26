@@ -932,13 +932,13 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 	/* Verify trigger routine we want to remove is not currently active. If it is, we need to assert fail.
 	 * Triggers are not like regular routines since they should only ever be referenced from the stack during a
 	 * transaction. Likewise, we should only ever load the triggers as the first action in that transaction.
-	 * Note, we can use SKIP_BASE_FRAME in the "for" statement here where we cannot in other places. In those
-	 * other places, we want the checks done in SKIP_BASE_FRAME to be applicable to "fp" in the first iteration
-	 * but here it is impossible for the first frame we look at to be either a trigger or call-in frame.
 	 */
 #	ifdef DEBUG
-	for (fp = frame_pointer; NULL != fp; fp = SKIP_BASE_FRAME(fp->old_frame_pointer))
+	for (fp = frame_pointer; NULL != fp; fp = fp->old_frame_pointer)
+	{
+		SKIP_BASE_FRAMES(fp);
 		assert(fp->rvector != rtnhdr);
+	}
 #	endif
 	/* Locate the routine in the routine table while all the pieces are available. Then remove from routine table
 	 * after the routine is unlinked.
