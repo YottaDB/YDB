@@ -92,7 +92,7 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 		{
 			SPRINTF(buff, "Invalid varname array (index %d)", curvarname - varnames);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-				      LEN_AND_STR(buff), LEN_AND_LIT(buff));
+				      LEN_AND_STR(buff), LEN_AND_LIT("ydb_delete_excl_s()"));
 		}
 		if (YDB_MAX_IDENT < curvarname->len_used)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);
