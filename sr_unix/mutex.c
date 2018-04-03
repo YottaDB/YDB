@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1062,12 +1062,20 @@ void mutex_salvage(gd_region *reg)
 				 * Step CMT08 (see secshr_db_clnup.c) when it would have set cnl->update_underway_tn.
 				 * If so, undo any changes done in Step CMT06 (UPDATE_JBP_RSRV_FREEADDR).
 				 * Effectively rolling back the aborted commit in this region.
+				 * Notice that early_tn != curr_tn almost always implies a process in t_end/tp_tend
+				 * but in rare cases could also mean a process in the midst of a "wcs_recover". In the
+				 * latter case, we do not have any CMTxx steps to undo/redo. We identify the latter case
+				 * by checking if "cnl->last_wcs_recover_tn" is the same as "csd->trans_hist.curr_tn".
 				 */
 				assert((csd->trans_hist.early_tn == csd->trans_hist.curr_tn)
 					|| (csd->trans_hist.early_tn == (csd->trans_hist.curr_tn + 1)));
-				assert(cnl->update_underway_tn <= csd->trans_hist.curr_tn);
+				assert((cnl->update_underway_tn <= csd->trans_hist.curr_tn)
+					|| ((cnl->update_underway_tn == (csd->trans_hist.curr_tn + 1))
+						&& (csd->trans_hist.early_tn == (csd->trans_hist.curr_tn + 1))
+						&& (cnl->last_wcs_recover_tn == csd->trans_hist.curr_tn)));
 				assert(csd->trans_hist.early_tn >= cnl->update_underway_tn);
-				if (JNL_ENABLED(csd) && (csd->trans_hist.early_tn != csd->trans_hist.curr_tn))
+				if (JNL_ENABLED(csd) && (csd->trans_hist.early_tn != csd->trans_hist.curr_tn)
+					&& (cnl->last_wcs_recover_tn != csd->trans_hist.curr_tn))
 				{	/* i.e. Process was killed after CMT04 but before CMT12. It is represented as
 					 *	CMT04 < killed < CMT12
 					 */
