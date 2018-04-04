@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -256,7 +259,7 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 		if (key_reset)
 			multi_proc_key = NULL;	/* reset key until it can be set to rctl's region-name again */
 		/* Record the fact that this child process created an extract file in shared memory
-		 * so parent can clean it up later in case the child process dies abruptly (e.g. GTM-F-MEMORY)
+		 * so parent can clean it up later in case the child process dies abruptly (e.g. YDB-F-MEMORY)
 		 * before it does the full copy of needed information at the end of "mur_forward_multi_proc".
 		 */
 		rctl_index = rctl - &mur_ctl[0];
