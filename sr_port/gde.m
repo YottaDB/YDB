@@ -60,11 +60,11 @@ comline:
 	d GDEPARSE^GDEPARSE
 	q
 CTRL
-	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(3) encountered" do  zg @resume(comlevel)
+	i $p($zs,",",3,999)["-E-CTRAP, Character trap $C(3) encountered" do  zg @resume(comlevel)
 	. i comlevel>0 d comeof ; if we take a ctrl-c in a command file then get out of that command file
-	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(25) encountered" d GETOUT^GDEEXIT h
-	i $p($zs,",",3,999)["%GTM-E-CTRAP, Character trap $C(26) encountered" d EXIT^GDEEXIT
-	i $p($zs,",",3,999)="%GTM-E-IOEOF, Attempt to read past an end-of-file" d
+	i $p($zs,",",3,999)["-E-CTRAP, Character trap $C(25) encountered" d GETOUT^GDEEXIT h
+	i $p($zs,",",3,999)["-E-CTRAP, Character trap $C(26) encountered" d EXIT^GDEEXIT
+	i $p($zs,",",3,999)["-E-IOEOF, Attempt to read past an end-of-file" d
 	. s $ecode=""	; clear IOEOF condition (not an error) so later GDE can exit with 0 status
 	. d comexit
 	i $zeof d EXIT^GDEEXIT
@@ -92,7 +92,7 @@ comfile:
 comeof	c comfile s comlevel=$select(comlevel>1:comlevel-1,1:0)
 	i comlevel>0 s comfile=comfile(comlevel) zm gdeerr("EXECOM"):comfile
 	e  u @useio
-	i $p($zs,",",3)'["%GTM-E-IOEOF",$p($zs,",",3)'["FILENOTFND" w !,$p($zs,",",3,9999),!
+	i $p($zs,",",3)'["-E-IOEOF",$p($zs,",",3)'["FILENOTFND" w !,$p($zs,",",3,9999),!
 	e  s ($ecode,$zstatus)=""	; clear IOEOF condition (not an error) so later GDE can exit with 0 status
 	q
 SCRIPT:
