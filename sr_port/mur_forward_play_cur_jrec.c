@@ -108,7 +108,7 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	if (multi_proc_in_use)
 	{	/* Set key to print this rctl's region-name as prefix in case this forked off process prints any output.
 		 * e.g. If this function ends up calling t_end/op_tcommit which in turn needs to do a jnl autoswitch
-		 * inside jnl_file_extend and prints a GTM-I-FILERENAME message.
+		 * inside jnl_file_extend and prints a YDB-I-FILERENAME message.
 		 */
 		MUR_SET_MULTI_PROC_KEY(rctl, multi_proc_key);
 	}
