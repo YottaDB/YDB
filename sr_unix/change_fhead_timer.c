@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +40,7 @@ void change_fhead_timer(char *timer_name, sm_int_ptr_t timer_address, int defaul
 		{
 			if ((ONE_HOUR < value) || ((0 == value) && (FALSE == zero_is_ok)))
 				rts_error(VARLSTCNT(1) ERR_TIMRBADVAL);
-			else	/* the above error is of type GTM-I- */
+			else	/* the above error is of type YDB-I- */
 				timer_address[0] = value;
 
                } else

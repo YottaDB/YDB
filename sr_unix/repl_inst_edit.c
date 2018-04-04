@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -148,7 +151,7 @@ void	repl_inst_edit(void)
 	{
 		detail_specified = (CLI_PRESENT == cli_present("DETAIL"));
 		repl_inst_read(inst_fn, (off_t)0, (sm_uc_ptr_t)buff, REPL_INST_HDR_SIZE + GTMSRC_LCL_SIZE);
-		util_out_print("GTM-I-MUREPLSHOW, SHOW output for replication instance file !AD", TRUE, inst_fn_len, inst_fn);
+		util_out_print("YDB-I-MUREPLSHOW, SHOW output for replication instance file !AD", TRUE, inst_fn_len, inst_fn);
 		repl_instance = (repl_inst_hdr_ptr_t)&buff[0];
 		section_offset = 0;
 		repl_inst_dump_filehdr(repl_instance);

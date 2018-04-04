@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -22,7 +25,7 @@ boolean_t util_is_log_open(void);
 
 #define SNDOPR_TRIES 3
 #define SNDOPR_DELAY 10
-#define GTMOPCOMMISSED1 "%GTM-I-OPCOMMISSED "
+#define GTMOPCOMMISSED1 "%YDB-I-OPCOMMISSED "
 #define GTMOPCOMMISSED2 " errors and "
 #define GTMOPCOMMISSED3 " MBFULLs sending prior operator messages"
 
