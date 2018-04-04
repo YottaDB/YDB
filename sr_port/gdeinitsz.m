@@ -13,7 +13,7 @@
 ;
 ; Note this file should not be manually invoked
 ;
-	Write "GTM-E-GTMSDFILE This routine (",$TEXT(+0),") should not be manually invoked",!
+	Write "This routine (",$TEXT(+0),") should not be manually invoked",!
 	Quit
 ;
 ; Entry point used by gdeinit.m to define YottaDB structure fields

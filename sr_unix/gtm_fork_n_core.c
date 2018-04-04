@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -202,7 +205,7 @@ void gtm_fork_n_core(void)
 		if (-1 == waitrc)
 		{	/* If got error from waitpid, core may or may not have been taken. Assume worst & don't set flag */
 			errno = save_errno;
-			PERROR("GTM-E-FORKCOREWAIT");
+			PERROR("YDB-E-FORKCOREWAIT");
 		} else
 			created_core = TRUE;
 	} else

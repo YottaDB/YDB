@@ -422,7 +422,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				if (NULL != first_sgm_info)
 				{
 					si = csa->sgm_info_ptr;
-					/* Note that it is possible "si" is NULL in case of a GTM-E-MEMORY error in gvcst_init.
+					/* Note that it is possible "si" is NULL in case of a YDB-E-MEMORY error in gvcst_init.
 					 * Handle that accordingly in the code below.
 					 */
 					/* Since the kill process cannot be completed, we need to decerement KIP count

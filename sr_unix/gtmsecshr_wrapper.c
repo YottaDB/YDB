@@ -92,37 +92,37 @@ extern	char	**environ;
  * in the syslog.
  */
 #define ERR_SECSHRCLEARENVFAILED		\
-	"%%GTM-E-SECSHRCLEARENVFAILED, clearenv failed. gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRCLEARENVFAILED, clearenv failed. gtmsecshr will not be started\n"
 #define ERR_SECSHRCHDIRFAILED1			\
-	"%%GTM-E-SECSHRCHDIRFAILED1, chdir failed on %s, errno %d. gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRCHDIRFAILED1, chdir failed on %s, errno %d. gtmsecshr will not be started\n"
 #define ERR_SECSHRCHDIRFAILED2			\
 	"%%GTM-W-SECSHRCHDIRFAILED2, chdir failed on %s, errno %d. gtmsecshr will be started with GMT timezone\n"
 #define ERR_SECSHREXECLFAILED			\
-	"%%GTM-E-SECSHREXECLFAILED, execl of %s failed\n"
+	"%%YDB-E-SECSHREXECLFAILED, execl of %s failed\n"
 #define ERR_SECSHRYDBDIST2LONG			\
-	"%%GTM-E-SECSHRYDBDIST2LONG, ydb_dist env var too long. gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRYDBDIST2LONG, ydb_dist env var too long. gtmsecshr will not be started\n"
 #define ERR_SECSHRGTMTMP2LONG			\
-	"%%GTM-E-SECSHRGTMTMP2LONG, gtm_tmp env var too long. gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRGTMTMP2LONG, gtm_tmp env var too long. gtmsecshr will not be started\n"
 #define ERR_SECSHRNOYDBDIST			\
-	"%%GTM-E-SECSHRNOYDBDIST, ydb_dist env var does not exist. gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRNOYDBDIST, ydb_dist env var does not exist. gtmsecshr will not be started\n"
 #define ERR_SECSHRNOTOWNEDBYROOT		\
-	"%%GTM-E-SECSHRNOTOWNEDBYROOT, %s not owned by root. gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRNOTOWNEDBYROOT, %s not owned by root. gtmsecshr will not be started\n"
 #define ERR_SECSHRNOTSETUID			\
-	"%%GTM-E-SECSHRNOTSETUID, %s not set-uid. gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRNOTSETUID, %s not set-uid. gtmsecshr will not be started\n"
 #define ERR_SECSHRPERMINCRCT			\
-	"%%GTM-E-SECSHRPERMINCRCT, %s permissions incorrect (%04o). gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRPERMINCRCT, %s permissions incorrect (%04o). gtmsecshr will not be started\n"
 #define ERR_SECSHRSETYDBDISTFAILED		\
-	"%%GTM-E-SECSHRSETYDBDISTFAILED, setenv for ydb_dist failed. gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRSETYDBDISTFAILED, setenv for ydb_dist failed. gtmsecshr will not be started\n"
 #define ERR_SECSHRSETGTMTMPFAILED		\
-	"%%GTM-E-SECSHRSETGTMTMPFAILED, setenv for gtm_tmp failed. gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRSETGTMTMPFAILED, setenv for gtm_tmp failed. gtmsecshr will not be started\n"
 #define ERR_SECSHRSETUIDFAILED			\
-	"%%GTM-E-SECSHRSETUIDFAILED, setuid failed. gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRSETUIDFAILED, setuid failed. gtmsecshr will not be started\n"
 #define ERR_SECSHRSTATFAILED			\
-	"%%GTM-E-SECSHRSTATFAILED, stat failed on %s, errno %d. gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRSTATFAILED, stat failed on %s, errno %d. gtmsecshr will not be started\n"
 #define ERR_SECSHRTZFAIL			\
 	"%%GTM-W-SECSHRTZFAIL, %s %d. gtmsecshr will start with TZ set to GMT\n"
 #define ERR_SECSHRWRITABLE			\
-	"%%GTM-E-SECSHRWRITABLE, %s writable. gtmsecshr will not be started\n"
+	"%%YDB-E-SECSHRWRITABLE, %s writable. gtmsecshr will not be started\n"
 
 /*
 Make sure these are synced with the above. We need this comment for the InfoHub tools to generate message

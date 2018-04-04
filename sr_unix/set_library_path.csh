@@ -3,6 +3,9 @@
 # Copyright (c) 2010-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -35,7 +38,7 @@ else
 # Redhat/SuSE way:	/lib		32bit
 #			/lib64		64bit
 	if !($?gtm_inc) then
-		echo "GTM-E-ERROR : gtm_inc not defined!"
+		echo "YDB-E-ERROR : gtm_inc not defined!"
 		exit
 	endif
 

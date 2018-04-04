@@ -3,6 +3,9 @@
 ; Copyright (c) 2010-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -49,7 +52,7 @@ pinentry; Custom pinentry that returns an unobfuscated password if $gtm_passwd i
 error	kill
 	new $etrap set $etrap="set $etrap=""zgoto 0"" zhalt +$zstatus"
 	new i,info
-	set errmsg="%GTM-E-PINENTRYERR, Custom pinentry program failure. "_$zstatus_"; from "_$zdirectory
+	set errmsg="%YDB-E-PINENTRYERR, Custom pinentry program failure. "_$zstatus_"; from "_$zdirectory
 	if $zsyslog(errmsg)
 	set pinlog=$ztrnlnm("gtm_pinentry_log")
 	if $zlength(pinlog) do

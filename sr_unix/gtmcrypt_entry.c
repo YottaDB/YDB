@@ -145,7 +145,7 @@ uint4 gtmcrypt_entry()
 
 	if(!ydb_dist_ok_to_use)
 	{
-		SNPRINTF(dl_err, MAX_ERRSTR_LEN, "%%GTM-E-YDBDISTUNVERIF, Environment variable $ydb_dist (%s) "
+		SNPRINTF(dl_err, MAX_ERRSTR_LEN, "%%YDB-E-YDBDISTUNVERIF, Environment variable $ydb_dist (%s) "
 				"could not be verified against the executables path", ydb_dist);
 		return ERR_CRYPTDLNOOPEN;
 	}

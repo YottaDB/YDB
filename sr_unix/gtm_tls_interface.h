@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,7 +48,7 @@
 #define GTM_PASSPHRASE_MAX            512     /* obfuscated */
 #define GTM_PASSPHRASE_MAX_ASCII      (GTM_PASSPHRASE_MAX / 2)
 #elif GTM_PASSPHRASE_MAX != 512
-#error "GTM-E-GTMTLSINTERFACE different values for GTM_PASSPHRASE_MAX"
+#error "YDB-E-GTMTLSINTERFACE different values for GTM_PASSPHRASE_MAX"
 #endif
 
 /* Note these flags may be in either the ctx or ssl structures but not all

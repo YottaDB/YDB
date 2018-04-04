@@ -82,7 +82,7 @@ if ( "$version" =~ *ibm-aix* ) then
 	unsetenv gtm_icu_version
 endif
 
-# Unset gtm_custom_errors to prevent some errors, especially %GTM-E-FTOKERR if $gtm_repl_instance is set in the environment
+# Unset gtm_custom_errors to prevent some errors, especially %YDB-E-FTOKERR if $gtm_repl_instance is set in the environment
 unsetenv gtm_custom_errors
 
 @ comlist_status = 0

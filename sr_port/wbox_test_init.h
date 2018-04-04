@@ -148,7 +148,7 @@ typedef enum {
 	WBTEST_HOLD_GTMSOURCE_SRV_LATCH,	/* 99 : Hold the source server latch until rollback process issues a SIGCONT */
 	WBTEST_KILL_ROLLBACK,			/* 100 : Kill in the middle of rollback */
 	WBTEST_INFO_HUB_SEND_ZMESS,		/* 101 : Print messages triggered via ZMESSAGE to the syslog */
-	WBTEST_SKIP_CORE_FOR_MEMORY_ERROR,	/* 102 : Do not generate core file in case of GTM-E-MEMORY fatal error */
+	WBTEST_SKIP_CORE_FOR_MEMORY_ERROR,	/* 102 : Do not generate core file in case of YDB-E-MEMORY fatal error */
 	WBTEST_EXTFILTER_INDUCE_ERROR,		/* 103 : Do not assert in case of external filter error (test induces that) */
 	WBTEST_BADEXEC_UPDATE_PROCESS,		/* 104 : Prevent the update process from EXECing */
 	WBTEST_BADEXEC_HELPER_PROCESS,		/* 105 : Prevent the helper processes from EXECing */
