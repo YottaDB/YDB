@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -369,9 +369,9 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZROUTINES:
 			/* If we are in the process of exiting and come here (e.g. to do ZSHOW dump as part of creating
-			 * the fatal zshow dump file due to a fatal GTM-F-MEMORY error), do not invoke zro_init() as that
+			 * the fatal zshow dump file due to a fatal YDB-F-MEMORY error), do not invoke zro_init() as that
 			 * might in turn require more memory (e.g. attach to relinkctl shared memory etc.) and we dont
-			 * want to get a nested GTM-F-MEMORY error.
+			 * want to get a nested YDB-F-MEMORY error.
 			 */
 			if (!TREF(zro_root) && !process_exiting)
 				zro_init();

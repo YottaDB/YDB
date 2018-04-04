@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -165,7 +168,7 @@ void zshow_devices(zshow_out *output)
 		}
 		if (NULL == l->iod)
 		{
-			assert(process_exiting); /* GTM-F-MEMORY occurred during device setup & we are creating zshow dump file */
+			assert(process_exiting); /* YDB-F-MEMORY occurred during device setup & we are creating zshow dump file */
 			assert(TREF(jobexam_counter));
 			continue;
 		}

@@ -198,13 +198,13 @@ void gtm_threadgbl_init(void)
 	{	/* Size mismatch with gtm_threadgbl_deftypes.h - no error handling yet available so do
 		 * the best we can.
 		 */
-		FPRINTF(stderr, "GTM-F-GTMASSERT gtm_threadgbl_true_t and gtm_threadgbl_t are different sizes\n");
+		FPRINTF(stderr, "YDB-F-GTMASSERT gtm_threadgbl_true_t and gtm_threadgbl_t are different sizes\n");
 		EXIT(ERR_GTMASSERT);
 	}
 	gtm_threadgbl = lcl_gtm_threadgbl = malloc(size_gtm_threadgbl_struct);
 	if (NULL == gtm_threadgbl)
 	{	/* Storage was not allocated for some reason - no error handling yet still */
-		perror("GTM-F-MEMORY Unable to allocate startup thread structure");
+		perror("YDB-F-MEMORY Unable to allocate startup thread structure");
 		EXIT(ERR_MEMORY);
 	}
 	memset(gtm_threadgbl, 0, size_gtm_threadgbl_struct);

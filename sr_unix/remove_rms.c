@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -87,7 +90,7 @@ void remove_rms (io_desc *ciod)
 			continue;
 		}
 		iod = lp->iod;
-		/* Handle case where iod can be NULL (e.g. if GTM-F-MEMORY occurred during device setup & we are creating
+		/* Handle case where iod can be NULL (e.g. if YDB-F-MEMORY occurred during device setup & we are creating
 		 * zshow dump file).
 		 */
 		assert((NULL != iod) || (process_exiting && TREF(jobexam_counter)));
