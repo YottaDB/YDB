@@ -1021,7 +1021,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	INIT_DEFERRED_DB_ENCRYPTION_IF_NEEDED(reg, csa, csd);
 	/* gds_rundown if invoked from now on will take care of cleaning up the shared memory segment */
 	/* The below code, until the ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state), can do mallocs which in turn
-	 * can issue a GTM-E-MEMORY error which would invoke rts_error. Hence these have to be done AFTER the
+	 * can issue a YDB-E-MEMORY error which would invoke rts_error. Hence these have to be done AFTER the
 	 * DBG_MARK_RTS_ERROR_USABLE call. Since these are only private memory initializations, it is safe to
 	 * do these after reg->open is set. Any rts_errors from now on still do the needful cleanup of shared memory in
 	 * gds_rundown since reg->open is already TRUE.

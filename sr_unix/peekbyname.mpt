@@ -36,7 +36,7 @@
 ;        This argument overrides the automatic format detection by the %PEEKBYNAME utility.
 
 %PEEKBYNAME(field,regindex,format)
-	if '$quit write "GTM-E-EXTRINSIC Use $$ rather than DO to invoke ",$text(+0) quit
+	if '$quit write "YDB-E-EXTRINSIC Use $$ rather than DO to invoke ",$text(+0) quit
 	new anindexval,aregname,digits,etrap,first,ishexnum,land,length,mnemonicandreg,offset,pattern,rest,type,typeindex
 	new dim,ret,idx,off
 	set etrap=$etrap
@@ -115,7 +115,7 @@ error(err,first,args)
 	if ("PARMREQ"=err)!("INVALID"=err) set args=""""_first_""":"""_args_""""
 	else  if ("NOPARM"=err)!("UNSUPSTRUCT"=err)!("UNSUPTYPE"=err) set args=""""_first_""""
 	else  set args=""""""
-	set $etrap="if $zstatus[""UNKNOWN"" set $zstatus=""%GTM-E-""_str_x zgoto land"	; in case of older versions
+	set $etrap="if $zstatus[""UNKNOWN"" set $zstatus=""%YDB-E-""_str_x zgoto land"	; in case of older versions
 	xecute "zmessage "_$translate(str,",",":")_args	; XECUTE because indirection exploded in older versions
 	zgoto land
 

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -1125,7 +1128,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 					/* Scan the global for two reasons :
 					 * (a) Need to setup gv_currkey->prev as update process can invoke triggers which
 					 * could use naked references which relies on gv_currkey->prev being properly set
-					 * (b) Set gv_some_subsc_null and gv_last_subsc_null accordingly to issue GTM-E-NULSUSBC
+					 * (b) Set gv_some_subsc_null and gv_last_subsc_null accordingly to issue YDB-E-NULSUSBC
 					 * if needed.
 					 */
 					key = (char *)(gv_currkey->base);

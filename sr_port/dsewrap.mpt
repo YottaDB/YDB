@@ -156,7 +156,7 @@ parsefhead(output,active)
 	. if ($test=0)&($length(line(i))=0) write !
 	. set line=$tr($$FUNC^%TRIM(line(i)),$c(10,13),"")
 	. quit:($length(line)=0)
-	. if line["%GTM-E-" set error=1 if $data(%DSEWRAP("debug")) set debug(debug,"error")=line
+	. if line["%YDB-E-" set error=1 if $data(%DSEWRAP("debug")) set debug(debug,"error")=line
 	. if line?1"DSE>".E kill region,file quit			; DSE prompt means reset header information
 	. quit:line["Error:  already in region: "			; ignore already in region error
 	. if line?1"File"1." ".E set fcnt=$length(line," "),file=$piece(line," ",fcnt) quit
