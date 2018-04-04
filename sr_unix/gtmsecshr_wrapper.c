@@ -96,7 +96,7 @@ extern	char	**environ;
 #define ERR_SECSHRCHDIRFAILED1			\
 	"%%YDB-E-SECSHRCHDIRFAILED1, chdir failed on %s, errno %d. gtmsecshr will not be started\n"
 #define ERR_SECSHRCHDIRFAILED2			\
-	"%%GTM-W-SECSHRCHDIRFAILED2, chdir failed on %s, errno %d. gtmsecshr will be started with GMT timezone\n"
+	"%%YDB-W-SECSHRCHDIRFAILED2, chdir failed on %s, errno %d. gtmsecshr will be started with GMT timezone\n"
 #define ERR_SECSHREXECLFAILED			\
 	"%%YDB-E-SECSHREXECLFAILED, execl of %s failed\n"
 #define ERR_SECSHRYDBDIST2LONG			\
@@ -120,7 +120,7 @@ extern	char	**environ;
 #define ERR_SECSHRSTATFAILED			\
 	"%%YDB-E-SECSHRSTATFAILED, stat failed on %s, errno %d. gtmsecshr will not be started\n"
 #define ERR_SECSHRTZFAIL			\
-	"%%GTM-W-SECSHRTZFAIL, %s %d. gtmsecshr will start with TZ set to GMT\n"
+	"%%YDB-W-SECSHRTZFAIL, %s %d. gtmsecshr will start with TZ set to GMT\n"
 #define ERR_SECSHRWRITABLE			\
 	"%%YDB-E-SECSHRWRITABLE, %s writable. gtmsecshr will not be started\n"
 
