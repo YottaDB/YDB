@@ -664,7 +664,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 		first_syslog = FALSE;
 
 		offset = facility;
-		BUILD_FACILITY("GTM");
+		BUILD_FACILITY("YDB");
 		INSERT_MARKER;
 		switch (image_type)
 		{
