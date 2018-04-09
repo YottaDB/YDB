@@ -36,4 +36,9 @@ execute_process(
   COMMAND ${mumps} ${args}
   ${input_file}
   ${output_file}
+  RESULT_VARIABLE res_var
   )
+if(NOT "${res_var}" STREQUAL "0")
+  # do something here about the failed "process" call...
+  message(FATAL_ERROR "Command <${mumps} ${args} ${input_file} ${output_file}> failed with result ='${res_var}'")
+endif()
