@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	trans_num		start_tn;
 GBLREF	uint4			t_err;
 GBLREF	unsigned char		cw_set_depth;
+GBLREF	unsigned char		t_fail_hist;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			update_trans;
 GBLREF	boolean_t		write_after_image;
@@ -50,6 +51,8 @@ void	t_begin_crit(uint4 err)	/* err - error code for current gvcst_routine */
 	start_tn = cs_addrs->ti->curr_tn;
 	cw_set_depth = 0;
 	t_tries = CDB_STAGNATE;
+	memset(&t_fail_hist, 0, SIZEOF(t_fail_hist));	/* keep garbage out of messages when GT.M skips to the final retry */
+	assert(0 == TREF(tprestart_syslog_delta));	/* should be no need to clear arrays associated with tprestart reports */
 	/* since this is mainline code and we know fast_lock_count should be 0 at this point reset it just in case it is not.
 	 * having fast_lock_count non-zero will defer the database flushing logic and other critical parts of the system.
 	 * hence this periodic reset at the beginning of each transaction.

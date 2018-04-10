@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -149,7 +149,7 @@ uint4 jnl_file_open(gd_region *reg, boolean_t init)
 #			endif
 			if ((0 != sts) && switch_and_retry)
 			{	/* Switch to a new journal file and retry, but only once */
-				sts = jnl_file_open_switch(reg, sts);
+				sts = jnl_file_open_switch(reg, sts, buff);
 				if (0 == sts)
 				{
 					switch_and_retry = FALSE;

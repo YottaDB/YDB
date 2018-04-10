@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ * Copyright (c) 2017 Fidelity National Information 		*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,19 +10,9 @@
  *								*
  ****************************************************************/
 
-#include "mdef.h"
-#include "io.h"
+#ifndef RMV_MUL_SLSH_H_INCLUDED
+#define RMV_MUL_SLSH_H_INCLUDED
 
-GBLREF boolean_t gtm_utf8_mode;
+unsigned int rmv_mul_slsh(char *src, unsigned int src_len);
 
-void iomt_wtone(int ch)
-{
-	mstr	temp;
-	char	c;
-
-	c = (int)ch;
-	temp.len = 1;
-	temp.addr = &c;
-	iomt_write(&temp);
-	return;
-}
+#endif /* RMV_MUL_SLSH_H_INCLUDED */

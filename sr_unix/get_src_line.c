@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -373,6 +373,9 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 				{
 					FCLOSE(fp, fclose_res);
 					assert(!fclose_res);
+					if (src_tbl->srcbuff)
+						free(src_tbl->srcbuff);
+					free(src_tbl);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TXTSRCFMT, 0, errno);
 					assert(FALSE);
 				} else
@@ -386,8 +389,8 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 				size = (int)STRLEN(buff);
 				prev_srcptr = srcptr;
 				srcptr += size;
-				if (srcptr > (src_tbl->srcbuff + srcsize))
-				{	/* source file has been concurrently overwritten (and extended) */
+				if ((NULL == src_tbl->srcbuff) || (srcptr > (src_tbl->srcbuff + srcsize)))
+				{	/* source file has been concurrently overwritten (and extended or truncated) */
 					srcstat |= CHECKSUMFAIL;
 					eof_seen = TRUE;
 					size = 0;

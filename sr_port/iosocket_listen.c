@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,13 +31,11 @@
 
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_LISTENPASSBND);
-error_def(ERR_LQLENGTHNA);
 error_def(ERR_NOSOCKETINDEV);
 error_def(ERR_SOCKLISTEN);
 error_def(ERR_TEXT);
 
 #define LISTENING		"LISTENING"
-#define MAX_LISTEN_QUEUE_LENGTH	5
 
 boolean_t iosocket_listen(io_desc *iod, unsigned short len)
 {
@@ -72,11 +70,6 @@ boolean_t iosocket_listen_sock(socket_struct *socketptr, unsigned short len)
 	int4		errlen;
 	d_socket_struct	*dsocketptr;
 
-	if (MAX_LISTEN_QUEUE_LENGTH < len)
-	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LQLENGTHNA, 1, len);
-		return FALSE;
-	}
 	if (((socketptr->state != socket_bound) && (socketptr->state != socket_listening)) || (TRUE != socketptr->passive))
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LISTENPASSBND);

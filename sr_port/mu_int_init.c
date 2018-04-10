@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,7 @@ GBLREF	sgmnt_data		mu_int_data;
 GBLREF	unsigned char		*mu_int_master;
 GBLREF	int			mu_int_skipreg_cnt;
 GBLREF	enc_handles		mu_int_encr_handles;
+GBLREF	boolean_t		mu_region_found;
 
 error_def(ERR_DBFSTHEAD);
 error_def(ERR_MUNODBNAME);
@@ -61,6 +62,7 @@ boolean_t mu_int_init(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	mu_region_found = TRUE;
 	mu_gv_cur_reg_init();	/* Creates a dummy segment with seg->asyncio FALSE so no DIO alignment issues to worry about
 				 * in the FC_OPEN/FC_READ below
 				 */
@@ -71,7 +73,8 @@ boolean_t mu_int_init(void)
 	if (!STANDALONE(gv_cur_region))
 	{
 		csa = &FILE_INFO(gv_cur_region)->s_addrs;
-		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(gv_cur_region));
+		if (mu_region_found)
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUSTANDALONE, 2, DB_LEN_STR(gv_cur_region));
 		mu_int_skipreg_cnt++;
 		return (FALSE);
 	}

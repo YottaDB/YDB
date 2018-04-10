@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -98,6 +98,7 @@ error_def(ERR_SETEXTRENV);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_SYSCALL);
 error_def(ERR_TPRETRY);
+error_def(ERR_JNLEXTRCTSEQNO);
 
 void		gtm_ret_code();
 
@@ -202,6 +203,16 @@ void	mupip_recover(void)
 		mur_output_show();
 		murgbl.clean_exit = TRUE;
 		mupip_exit(SS_NORMAL);
+	}
+	/* When replication is OFF, Journal Extracts based on sequence numbers are restricted to only a single region */
+	if ((1 < reg_total) && mur_options.seqno)
+	{
+		for (regno = 0; regno < reg_total; regno++)
+		{
+			rctl = &mur_ctl[regno];
+			if (!REPL_ALLOWED(rctl->csd))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLEXTRCTSEQNO);
+		}
 	}
 	all_gen_properly_closed = TRUE;
 	intrrupted_recov_processing = murgbl.intrpt_recovery = FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ *	Copyright 2002 Sanchez Computer Associates, Inc.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,20 +9,13 @@
  *								*
  ****************************************************************/
 
-/* UNIX gtm_mtio.h - File to include the appropriate mag tape files for UNIX.
-    We are not supporting mag tape on os390 at this time.
- */
+#ifndef MSTACK_SIZE_INIT_H_INCLUDED
+#define MSTACK_SIZE_INIT_H_INCLUDED
 
-#include <sys/types.h>
+#define MSTACK_MIN_SIZE 25
+#define MSTACK_MAX_SIZE 10000
+#define MSTACK_DEF_SIZE 272
 
-#ifdef _SYSTYPE_SVR4
-#include <s2/mtio.h>
-#else
-#ifndef __MVS__
-#include <sys/mtio.h>
-#endif	/* MVS */
-#endif	/* SVR4 */
+void mstack_size_init(struct startup_vector *svec);
 
-#include <sys/ioctl.h>
-
-
+#endif /* MSTACK_SIZE_INIT_H_INCLUDED */

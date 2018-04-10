@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,6 +120,8 @@ error_def(ERR_ZDIROUTOFSYNC);
 LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
+LITREF char		gtm_release_stamp[];
+LITREF int4		gtm_release_stamp_len;
 
 void op_svget(int varnum, mval *v)
 {
@@ -398,6 +400,11 @@ void op_svget(int varnum, mval *v)
 			v->mvtype = MV_STR;
 			v->str.addr = (char *)gtm_release_name;
 			v->str.len = gtm_release_name_len;
+			break;
+		case SV_ZRELDATE:
+			v->mvtype = MV_STR;
+			v->str.addr = (char *)gtm_release_stamp;
+			v->str.len = gtm_release_stamp_len;
 			break;
 		case SV_ZSYSTEM:
 			MV_FORCE_MVAL(v, dollar_zsystem);

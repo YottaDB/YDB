@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -494,6 +494,7 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 		} else
 		{
 			rec2_len = rec2_rlen = 0;	/* There is no second record */
+			rec2_ptr = NULL;		/* 4SCA: Assigned value is garbage or undefined even but rec2_rlen is 0 */
 			assert(0 == blk_levl);		/* And thus this is supposed to be lvl0 data block */
 		}
 		if (rec1_len > psa->dbc_cs_data->max_rec_size)

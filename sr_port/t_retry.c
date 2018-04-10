@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,9 +91,6 @@ GBLREF	uint4			t_err;
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	boolean_t		is_dollar_incr;
 GBLREF	uint4			update_trans;
-GBLREF	block_id		t_fail_hist_blk[];
-GBLREF	int4			blkmod_fail_type;
-GBLREF	int4			blkmod_fail_level;
 GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 
 #ifdef GTM_TRIGGER
@@ -246,16 +243,17 @@ void t_retry(enum cdb_sc failure)
 				t_restart_entryref.str.addr = NULL;
 				t_restart_entryref.str.len = 0;
 			}
-			assert(('L' != t_fail_hist[t_tries]) || (0 != t_fail_hist_blk[t_tries]));
+			assert(('L' != t_fail_hist[t_tries]) || (0 != TAREF1(t_fail_hist_blk, t_tries)));
 			if (cdb_sc_blkmod != failure)
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_NONTPRESTART, 11, reg_mstr.len, reg_mstr.addr,
-					     t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
-					     0, tp_blkmod_nomod, t_restart_entryref.str.len, t_restart_entryref.str.addr);
+					t_tries + 1, t_fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
+					gvname_mstr.addr, 0, tp_blkmod_nomod, t_restart_entryref.str.len,
+					t_restart_entryref.str.addr);
 			else
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_NONTPRESTART, 11, reg_mstr.len, reg_mstr.addr,
-					     t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
-					     blkmod_fail_level, blkmod_fail_type, t_restart_entryref.str.len,
-					     t_restart_entryref.str.addr);
+					t_tries + 1, t_fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
+					gvname_mstr.addr, TREF(blkmod_fail_level), TREF(blkmod_fail_type),
+					t_restart_entryref.str.len, t_restart_entryref.str.addr);
 			caller_id_flag = TRUE;
 		}
 		/* If the restart code is something that should not increment t_tries, handle that by decrementing t_tries

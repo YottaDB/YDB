@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,6 +69,8 @@ GBLREF	gid_t	group_id, effective_group_id;
 	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
 }
 
+
+#define CONFSTR gtm_confstr
 #endif
 
 #ifndef UNICODE_SUPPORTED
@@ -117,5 +119,6 @@ int gtm_close(int fd);
 int gtm_pipe1(int pipefd[2]);
 int gtm_dup(int oldfd);
 int gtm_dup2(int oldfd, int newfd);
+int gtm_confstr(char *command, int maxsize);
 
 #endif

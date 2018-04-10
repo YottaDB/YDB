@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -455,7 +455,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 			if (cli_lex_str)
 				cli_lex_in_ptr->tp = retptr;
 		} else if (cli_lex_str)
-			cli_lex_in_ptr->tp = NULL;
+			cli_lex_in_ptr->tp = retptr = NULL;
 	} else
 	{
 #	endif
@@ -601,10 +601,10 @@ int cli_get_string_token(int *eof)
 		/* convert arguments into array */
 		while(arg_no < cli_lex_in_ptr->argc)
 		{
+			if ((strlen(cli_lex_in_ptr->in_str) + strlen(cli_lex_in_ptr->argv[arg_no]) + 1) > MAX_LINE)
+				break;
 			if (arg_no > 1)
 				strcat(cli_lex_in_ptr->in_str, " ");
-			if (strlen(cli_lex_in_ptr->in_str) + strlen(cli_lex_in_ptr->argv[arg_no]) > MAX_LINE)
-				break;
 			if (cli_has_space(cli_lex_in_ptr->argv[arg_no]))
 			{
 				from = cli_lex_in_ptr->argv[arg_no++];

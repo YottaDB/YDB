@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,6 +25,7 @@
 #define USER_ENV			"USER"
 #define ENV_UNDEF_ERROR			"Environment variable %s not set"
 #define ENV_EMPTY_ERROR			"Environment variable %s set to empty string"
+#define ENV_TOOLONG_ERROR		"Environment variable %s is too long (%d)"
 
 #define MAX_GTMCRYPT_STR_ARG_LEN	256
 #define MAX_GTMCRYPT_ERR_STRLEN		2048

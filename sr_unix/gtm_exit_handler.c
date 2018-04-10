@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -177,7 +177,7 @@ void gtm_exit_handler(void)
 	actual_exi_condition = 0;
 	ESTABLISH_NORET(exi_ch, error_seen);	/* "error_seen" is initialized inside this macro */
 #ifdef DEBUG
-	if (WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) && (TRUE == TREF(statshare_opted_in)))
+	if (WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) && (NO_STATS_OPTIN != TREF(statshare_opted_in)))
 	{	/* Forced to FALSE when killing processes and we may need to rundown statsdbs */
 		stringpool_unusable = FALSE;
 		stringpool_unexpandable = FALSE;

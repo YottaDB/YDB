@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2016 Fidelity National Information	*
+ * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,7 +77,7 @@ void gtm_zlib_init(void)
 		{
 			COPY_DLLERR_MSG(err_str, err_msg);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNORTN, 2, LEN_AND_STR(zlib_fname[findx]),
-					ERR_TEXT, 2, LEN_AND_STR(err_str));
+					ERR_TEXT, 2, LEN_AND_STR(err_msg));
 			gtm_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* dont use compression */
 			return;
 		}

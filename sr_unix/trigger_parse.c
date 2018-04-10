@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,10 +38,10 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF CLI_ENTRY                trigger_cmd_ary[];
 GBLREF	volatile boolean_t	timer_in_handler;
 
-#define BITS_PER_INT		(SIZEOF(uint4) * 8)	/* Number of bits in an integer */
-#define MAX_PIECE_VALUE		(BITS_PER_INT * 1024)	/* Largest value allowed in -pieces string */
-#define MAX_PIECE_INT		(MAX_PIECE_VALUE / 32)	/* Number of integers it takes to hold MAX_PIECE_VALUE bits */
-#define	MAX_PIECE_CHARS		(MAX_PIECE_INT * 4)	/* Number of 8-bit bytes in MAX_PIECE_INT integers */
+#define BITS_PER_INT		(SIZEOF(uint4) * 8)		/* Number of bits in an integer */
+#define MAX_PIECE_VALUE		((BITS_PER_INT * 1024) - 1)	/* Largest value allowed in -pieces string */
+#define MAX_PIECE_INT		((MAX_PIECE_VALUE + 1) / 32)	/* Number of integers it takes to hold MAX_PIECE_VALUE bits */
+#define	MAX_PIECE_CHARS		(MAX_PIECE_INT * 4)		/* Number of 8-bit bytes in MAX_PIECE_INT integers */
 #define MAX_LVN_COUNT		MAX_GVSUBSCRIPTS	/* Maximum number of "lvn=" in trigger subscript */
 #define MAX_OPTIONS_LEN		1024			/* Maximum size of the "options" string */
 #define MAX_DCHAR_LEN		1024			/* Maximum size of $C or $ZCH string */

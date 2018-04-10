@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2017 Fidelity National Information	*
+ * Copyright (c) 2004-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,8 +74,6 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val);
 	STATEMENT;					\
 }
 
-void		gvcst_statshare_optin(void);
-void		gvcst_statshare_optout(void);
 void		gvcst_tp_init(gd_region *);
 boolean_t	gvcst_zprevious(void);
 boolean_t	gvcst_zprevious2(void);

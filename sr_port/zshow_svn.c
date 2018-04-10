@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -136,6 +136,7 @@ static readonly char ztwormhole_text[] = "$ZTWORMHOLE";
 #endif
 static readonly char zusedstor_text[] = "$ZUSEDSTOR";
 static readonly char zversion_text[] = "$ZVERSION";
+static readonly char zreldate_text[] = "$ZRELDATE";
 static readonly char zyerror_text[] = "$ZYERROR";
 static readonly char zonlnrlbk_text[] = "$ZONLNRLBK";
 static readonly char zclose_text[] = "$ZCLOSE";
@@ -187,6 +188,8 @@ GBLREF mstr		dollar_zpout;
 LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
+LITREF char		gtm_release_stamp[];
+LITREF int4		gtm_release_stamp_len;
 
 #define ZWRITE_DOLLAR_PRINCIPAL(MVAL, X, TEXT, OUTPUT)					\
 {											\
@@ -679,6 +682,14 @@ void zshow_svn(zshow_out *output, int one_sv)
 			count = (int)totalRmalloc;	/* WARNING: downcasting possible 64bit value to 32bits */
 			MV_FORCE_UMVAL(&var, (unsigned int)count);
 			ZS_VAR_EQU(&x, zrealstor_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		case SV_ZRELDATE:
+			var.mvtype = MV_STR;
+			var.str.addr = (char *)gtm_release_stamp;
+			var.str.len = gtm_release_stamp_len;
+			ZS_VAR_EQU(&x, zreldate_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;

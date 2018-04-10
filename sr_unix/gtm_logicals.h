@@ -146,6 +146,7 @@
 #define	GTMDBGFLAGS			"$gtmdbgflags"
 #define	GTMDBGFLAGS_FREQ		"$gtmdbgflags_freq"
 #define GTM_MAX_STORALLOC		"$gtm_max_storalloc"
+#define GTM_MSTACK_SIZE			"$gtm_mstack_size"
 #define GTM_IPV4_ONLY			"$gtm_ipv4_only"
 #define GTM_DMTERM			"$gtm_dmterm"
 #define	GTM_MUPJNL_PARALLEL		"$gtm_mupjnl_parallel"

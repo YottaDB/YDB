@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,6 @@ GBLREF	boolean_t		jnlpool_init_needed;
 
 error_def(ERR_DBOPNERR);
 error_def(ERR_DBRDONLY);
-error_def(ERR_JNLFILOPN);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNODBNAME);
 error_def(ERR_NOREGION);
@@ -121,9 +120,6 @@ void mupip_extend(void)
 	}
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 	cs_data = cs_addrs->hdr;
-#	if defined(__sun) || defined(__hpux)
-	cs_data->defer_allocate = TRUE;
-#	endif
 	defer_alloc = cs_data->defer_allocate;
 	if (cli_get_int("BLOCKS",&tblocks))
 	{	/* tblocks can be 0 if defer_alloc is FALSE because the goal is to fully allocate an existing database */

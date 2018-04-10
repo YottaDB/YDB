@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -662,6 +662,13 @@ typedef struct long_list_struct
 	bool			exclude;
 } long_list;
 
+typedef struct long_long_list_struct
+{
+	struct long_long_list_struct *next;
+	seq_num			seqno;
+	boolean_t		exclude;
+} long_long_list;
+
 typedef struct
 {
 	jnl_proc_time		lookback_time,
@@ -702,6 +709,7 @@ typedef struct
 				*global,
 				*process;
 	long_list		*id;
+	long_long_list		*seqno;
 	char			*extr_fn[TOT_EXTR_TYPES];
 	int			extr_fn_len[TOT_EXTR_TYPES];
 	boolean_t		extr_fn_is_stdout[TOT_EXTR_TYPES];
@@ -712,6 +720,7 @@ typedef struct onln_rlbk_reg_list_struct
 	struct onln_rlbk_reg_list_struct	*fPtr;
 	struct gd_region_struct		*reg;
 	gd_id				unique_file_id;
+	int4				fid_index;
 	struct reg_ctl_list_struct	*rctl;
 } onln_rlbk_reg_list;
 

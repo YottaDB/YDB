@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -762,7 +762,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	 */
 	have_standalone_access = udi->grabbed_access_sem;
 	init_status = 0;
-	crypt_warning = FALSE;
+	crypt_warning = TREF(mu_set_file_noencryptable);
 	udi->shm_deleted = udi->sem_deleted = FALSE;
 	if (!have_standalone_access)
 	{

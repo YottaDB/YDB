@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,6 @@ error_def(ERR_VIEWLVN);
 
 void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *parmblk, boolean_t is_dollar_view)
 {
-	static	int4		first_time = TRUE;
 	char			*cptr;
 	char			*strtokptr;
 	gd_binding		*gd_map;
@@ -59,12 +58,15 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 	gvnh_spanreg_t		*gvspan;
 	gv_namehead		*tmp_gvt;
 	ht_ent_mname		*tabent;
-	int			n, reg_index;
+	int			cmp, done, n, reg_index;
 	mident_fixed		lcl_buff;
 	mname_entry		gvent, lvent;
 	mstr			namestr, tmpstr;
+	tp_region		*vr, *vr_nxt;
 	unsigned char 		*c, *c_top, *dst, *dst_top, global_names[1024], *nextsrc, *src, *src_top, stashed, y;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	switch (vtp_parm)
 	{
 		case VTP_NULL:
@@ -73,54 +75,118 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			break;
 		case (VTP_NULL | VTP_VALUE):
-			if (NULL == parm)
+			if ((NULL == parm) && (VTK_JNLERROR != vtp->keycode))
 			{
 				parmblk->value = (mval *)&literal_one;
 				break;
 			}
 			/* caution:  fall through */
 		case VTP_VALUE:
-			if (NULL == parm)
+			if ((NULL == parm) && (VTK_JNLERROR != vtp->keycode))
 				rts_error_csa(CSA_ARG(NULL)
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			parmblk->value = parm;
-			break;
+			if (is_dollar_view || (VTK_JNLERROR != vtp->keycode))
+				break;
+			parm = NULL;							/* WARNING: fall through for JNLERROR */
 		case (VTP_NULL | VTP_DBREGION):
-			if (!is_dollar_view && ((NULL == parm) || ((1 == parm->str.len) && ('*' == *parm->str.addr))))
+			switch (vtp->keycode)
 			{
+			case VTK_DBFLUSH:
+			case VTK_DBSYNC:
+			case VTK_EPOCH:
+			case VTK_FLUSH:
+			case VTK_GVSRESET:
+			case VTK_JNLERROR:
+			case VTK_JNLFLUSH:
+			case VTK_NOSTATSHARE:
+			case VTK_POOLLIMIT:
+			case VTK_STATSHARE:
+				for (vr = TREF(view_region_list); NULL != vr; vr = vr_nxt)
+				{	/* start with empty list, place all existing entries on free list */
+					TREF(view_region_list) = vr_nxt = vr->fPtr;	/* Remove from queue */
+					vr->fPtr = TREF(view_region_free_list);
+					TREF(view_region_free_list) = vr; 		/* Place on free queue */
+				}
 				parmblk->gv_ptr = NULL;
+				if (!is_dollar_view && (NULL != parm)
+					&& ((0 == parm->str.len) || ((1 == parm->str.len) && ('*' == parm->str.addr[0]))))
+					parm = NULL;					/* WARNING: fall through */
+			default:
 				break;
 			}
-			/* caution:  fall through */
+			if ((NULL == parm) && is_dollar_view && (VTK_STATSHARE == vtp->keycode))
+				break;
+			if (!is_dollar_view && (NULL == parm))
+			{
+				if (!gd_header)		/* IF GD_HEADER == 0 THEN OPEN GBLDIR */
+					gvinit();
+				for (r_ptr = gd_header->regions, r_top = r_ptr + gd_header->n_regions; r_ptr < r_top; r_ptr++)
+				{	/* Operate on all qualifying regions  */
+					if ((IS_REG_BG_OR_MM(r_ptr)) && (!(IS_STATSDB_REG(r_ptr))))
+					{
+						if (!r_ptr->open)
+							gv_init_reg(r_ptr, NULL);
+						insert_region(r_ptr, &TREF(view_region_list), &(TREF(view_region_free_list)),
+							SIZEOF(tp_region));
+					}
+				}
+				parmblk->gv_ptr = (gd_region *)TREF(view_region_list);
+				break;
+			}/* WARNING: possible fall through - to operate on 1 or more selected regions */
 		case VTP_DBREGION:
-			if (NULL == parm)
+			if ((NULL == parm) && (VTK_JNLERROR != vtp->keycode))
 				rts_error_csa(CSA_ARG(NULL)
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
-			if (!gd_header)		/* IF GD_HEADER ==0 THEN OPEN GBLDIR */
+			if (!gd_header)		/* IF GD_HEADER == 0 THEN OPEN GBLDIR */
 				gvinit();
-			r_ptr = gd_header->regions;
-			if (!parm->str.len && vtp->keycode == VTK_GVNEXT)	/* "" => 1st region */
-				parmblk->gv_ptr = r_ptr;
+			if (!parm->str.len && vtp->keycode == VTK_GVNEXT)		/* "" => 1st region */
+				parmblk->gv_ptr = gd_header->regions;
 			else
 			{
-				for (cptr = parm->str.addr, n = 0; n < parm->str.len; cptr++, n++)
-					lcl_buff.c[n] = TOUPPER(*cptr);		/* Region names are upper-case ASCII */
-				namestr.len = n;
 				namestr.addr = &lcl_buff.c[0];
-				for (r_top = r_ptr + gd_header->n_regions; ; r_ptr++)
+				for (cptr = parm->str.addr, done = n = 0; ; cptr++)
 				{
-					if (r_ptr >= r_top)
+					lcl_buff.c[n++] = TOUPPER(*cptr);		/* Region names are upper-case ASCII */
+					if (',' == *cptr)
+						namestr.len = n - 1 - done;		/* back off the comma */
+					else if (n == parm->str.len)
+						namestr.len = n - done;
+					else
+						continue;
+					for (r_ptr = gd_header->regions, r_top = r_ptr + gd_header->n_regions; ; r_ptr++)
 					{
-						format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION,2, n, global_names);
+						if ((r_ptr >= r_top) || (done && is_dollar_view))
+						{
+							if (is_dollar_view)
+							{
+								namestr.addr = lcl_buff.c;
+								namestr.len = n;
+							}
+							format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len, global_names, &n);
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION,2, n, global_names);
+						}
+						tmpstr.len = r_ptr->rname_len;
+						tmpstr.addr = (char *)r_ptr->rname;
+						MSTR_CMP(tmpstr, namestr, cmp);
+						if (0 == cmp)
+						{
+							if (!is_dollar_view)
+							{
+								if (!r_ptr->open)
+									gv_init_reg(r_ptr, NULL);
+								insert_region(r_ptr, &(TREF(view_region_list)),
+									&(TREF(view_region_free_list)), SIZEOF(tp_region));
+							}
+							break;
+						}
 					}
-					tmpstr.len = r_ptr->rname_len;
-					tmpstr.addr = (char *)r_ptr->rname;
-					MSTR_CMP(tmpstr, namestr, n);
-					if (0 == n)
+					if (n == parm->str.len)
 						break;
+					namestr.addr = &lcl_buff.c[n];
+					done = n;
 				}
-				parmblk->gv_ptr = r_ptr;
+				parmblk->gv_ptr = is_dollar_view ? r_ptr : (gd_region *)TREF(view_region_list);
 			}
 			break;
 		case VTP_DBKEY:
@@ -171,13 +237,12 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			if (!gd_header)
 				gvinit();
-			if (first_time)
+			if (NULL == noisolation_buddy_list)
 			{
 				noisolation_buddy_list = (buddy_list *)malloc(SIZEOF(buddy_list));
 				initialize_list(noisolation_buddy_list, SIZEOF(noisolation_element), NOISOLATION_INIT_ALLOC);
 				gvt_pending_buddy_list = (buddy_list *)malloc(SIZEOF(buddy_list));
 				initialize_list(gvt_pending_buddy_list, SIZEOF(gvt_container), NOISOLATION_INIT_ALLOC);
-				first_time = FALSE;
 			}
 			assertpro(SIZEOF(global_names) > parm->str.len);
 			tmpstr.len = parm->str.len;	/* we need to change len and should not change parm->str, so take a copy */

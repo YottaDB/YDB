@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -158,7 +158,8 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 			assertpro(ulen == dstlen);
 			RELEASE_IF_NOT_LOCAL(dst_ustr_ptr, dst_ustr);
 		}
-	}
+	} else
+		dstbase = NULL;	/* 4SCA: Assigned value is garbage or undefined, but below memcpy protected by dstlen */
 	MV_INIT_STRING(dst, dstlen, dstbase);
 	stringpool.free += dstlen;
 	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,6 +79,7 @@
 
 #ifndef __vms
 #  define DIR_SEPARATOR		'/'
+#  define UNALIAS		"unalias -a; "
 #endif
 
 /* the LITERAL version of the macro should be used over STRING whenever possible for efficiency reasons */

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +11,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "rmv_mul_slsh.h"
 
 #include <sys/param.h>
 #include <errno.h>
@@ -86,6 +88,8 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 		}
 	}
 	*full_len = length;
-	full_fn[length] = '\0';
+	/*Remove multiple slash occurances*/
+        *full_len = rmv_mul_slsh(full_fn, *full_len);
+	full_fn[*full_len] = '\0';
 	return TRUE;
 }

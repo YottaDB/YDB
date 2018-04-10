@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -252,6 +252,7 @@ GBLDEF	buddy_list	*gvt_pending_buddy_list;/* buddy_list for maintaining memory f
 GBLDEF	buddy_list	*noisolation_buddy_list;	/* a buddy_list for maintaining the globals that are noisolated */
 GBLDEF	int4		exi_condition;
 GBLDEF	uint4		gtmDebugLevel;
+GBLDEF	boolean_t	gtmSystemMalloc;
 GBLDEF	caddr_t		smCallerId;			/* Caller of top level malloc/free */
 GBLDEF	int		process_exiting;
 GBLDEF	int4		dollar_zsystem;

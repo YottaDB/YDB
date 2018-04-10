@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,6 @@ GBLREF	short			crash_count;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			process_id;
-GBLREF	boolean_t		tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
 GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		dse_running;
 GBLREF	boolean_t		disk_blk_read;
@@ -316,18 +315,15 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		 */
 		assert(!was_crit || (cnl->reorg_encrypt_cycle == encr_ptr->reorg_encrypt_cycle));
 		seg = gv_cur_region->dyn.addr;
-		issued_db_init_crypt_warning = encr_ptr->issued_db_init_crypt_warning;
+		/* Concurrent REORGs can induce crypt warnings. Only error out if reorg_encrypt_cycle matches */
+		issued_db_init_crypt_warning = ((cnl->reorg_encrypt_cycle == encr_ptr->reorg_encrypt_cycle) ?
+							encr_ptr->issued_db_init_crypt_warning : FALSE);
 		if (!IS_BITMAP_BLK(blk) && issued_db_init_crypt_warning)
 		{	/* A non-GT.M process is attempting to read a non-bitmap block, yet it has previously encountered an error
 			 * during db_init (because it did not have access to the encryption keys) and reported it with a -W-
 			 * severity. Since the block it is attempting to read can be in the unencrypted shared memory (read from
 			 * disk by another process with access to the encryption keys), we cannot let it access it without a valid
 			 * handle, so issue an rts_error.
-			 *
-			 * TODO: DSE and LKE could bypass getting the ftok semaphore. LKE is not an issue, but DSE does care about
-			 *       the csa->reorg_encrypt_cycle. So it means DSE could get an inconsistent copy of reorg_encrypt_cycle
-			 *       and associated hashes if it had done a bypass and a concurrent REORG -ENCRYPT is holding the ftok
-			 *       semaphore and changing these values at the same time.
 			 */
 			assert(!IS_GTM_IMAGE);	/* GT.M would have error'ed out in db_init */
 			gtmcrypt_errno = SET_REPEAT_MSG_MASK(SET_CRYPTERR_MASK(ERR_CRYPTBADCONFIG));

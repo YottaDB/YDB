@@ -586,63 +586,42 @@ STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
  */
 STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 {
-	ABS_TIME eltime;
-	GT_TIMER *tpop;
+	ABS_TIME	eltime;
+	GT_TIMER	*tpop;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	DUMP_TIMER_INFO("At the start of start_first_timer()");
+	deferred_timers_check_needed = FALSE;
 	if ((1 < timer_stack_count) || (TRUE == timer_in_handler))
-	{
-		deferred_timers_check_needed = FALSE;
 		return;
-	}
-	if (SAFE_FOR_TIMER_START)
-	{	/* Check if some timer expired while this function was getting invoked. */
-		while (timeroot)
-		{
-			eltime = sub_abs_time((ABS_TIME *)&timeroot->expir_time, curr_time);
-			if (((0 <= eltime.at_sec) && !((0 == eltime.at_sec) && (0 == eltime.at_usec))))
-			{	/* Timer isn't due yet, so set signal to fire at proper time. */
-				deferred_timers_check_needed = FALSE;
-				SYS_SETTIMER(timeroot, &eltime);
+	for (tpop = (GT_TIMER *)timeroot ; tpop ; tpop = tpop->next)
+	{
+		eltime = sub_abs_time((ABS_TIME *)&tpop->expir_time, curr_time);
+		if ((0 > eltime.at_sec) || ((0 == eltime.at_sec) && (0 == eltime.at_usec)))
+		{	/* Timer has expired. Handle safe timers, defer unsafe timers. */
+			if (tpop->safe || (SAFE_FOR_TIMER_START && (1 > timer_stack_count)
+						&& !(TREF(in_ext_call) && (wcs_stale_fptr == tpop->handler))))
+			{
+				timer_handler(DUMMY_SIG_NUM);
+				/* At this point all timers should have been handled, including a recursive call to
+				 * start_first_timer(), if needed, and deferred_timers_check_needed set to the appropriate
+				 * value, so we are done.
+				 */
 				break;
-			}
-			else if (0 < timer_stack_count)
-			{	/* Timer has expired, but we can't fire it now, so defer. */
-				deferred_timers_check_needed = TRUE;
-				break;
-			}
-			/* Otherwise, drive the handler. */
-			timer_handler(DUMMY_SIG_NUM);
-		}
-	} else if (0 < safe_timer_cnt)
-	{	/* There are some safe timers on the queue. */
-		tpop = (GT_TIMER *)timeroot;
-		while (tpop)
-		{
-			eltime = sub_abs_time((ABS_TIME *)&tpop->expir_time, curr_time);
-			if ((0 > eltime.at_sec) || ((0 == eltime.at_sec) && (0 == eltime.at_usec)))
-			{	/* Timer has expired. Handle safe timers, defer unsafe timers. */
-				if (tpop->safe)
-				{
-					timer_handler(DUMMY_SIG_NUM);
-					break;	/* timer_handler() handles all expired, so we are done. */
-				} else
-				{
-					deferred_timers_check_needed = TRUE;
-					tpop->block_int = intrpt_ok_state;
-					tpop = tpop->next;	/* Check next timer */
-				}
 			} else
-			{	/* Set system timer to wake on unexpired timer. */
-				SYS_SETTIMER(tpop, &eltime);
-				break;	/* System timer will handle subsequent timers, so we are done. */
+			{
+				deferred_timers_check_needed = TRUE;
+				tpop->block_int = intrpt_ok_state;
 			}
+		} else
+		{	/* Set system timer to wake on unexpired timer. */
+			SYS_SETTIMER(tpop, &eltime);
+			break;	/* System timer will handle subsequent timers, so we are done. */
 		}
+		assert(deferred_timers_check_needed);
 	}
-	else
-		deferred_timers_check_needed = (NULL != timeroot);
+	assert(timeroot || !deferred_timers_check_needed);
 	DUMP_TIMER_INFO("At the end of start_first_timer()");
 }
 
@@ -735,8 +714,9 @@ STATICFNDEF void timer_handler(int why)
 #		endif
 		/* A timer might pop while we are in the non-zero intrpt_ok_state zone, which could cause collisions. Instead,
 		 * we will defer timer events and drive them once the deferral is removed, unless the timer is safe.
+		 * Handle wcs_stale timers during external calls similarly.
 		 */
-		if (safe_for_timer_pop || tpop->safe)
+		if ((safe_for_timer_pop && !(TREF(in_ext_call) && (wcs_stale_fptr == tpop->handler))) || tpop->safe)
 		{
 			if (NULL != tpop_prev)
 				tpop_prev->next = tpop->next;
@@ -832,8 +812,8 @@ STATICFNDEF void timer_handler(int why)
 			tpop->block_int = intrpt_ok_state;
 			tpop_prev = tpop;
 			tpop = tpop->next;
-			if (0 == safe_timer_cnt)	/* no more safe timers left, so quit */
-				break;
+			if ((0 == safe_timer_cnt) && !(TREF(in_ext_call) && (wcs_stale_fptr == tpop_prev->handler)))
+				break;		/* no more safe timers left, and not special case, so quit */
 		}
 	}
 	if (safe_for_timer_pop)

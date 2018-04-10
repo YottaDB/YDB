@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,8 +87,8 @@ typedef enum
 	joberr_io_stderr_socket_dup,
 	joberr_io_setup_op_write,
 	joberr_io_setup_write,
-	joberr_stp,			/* These three should stay at the end of the enum. */
 	joberr_sig,
+	joberr_stp,			/* These two should stay at the end of the enum. */
 	joberr_end
 } joberr_t;
 

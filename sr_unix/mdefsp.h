@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *    This source code contains the intellectual property       *
@@ -169,7 +169,7 @@ typedef char  mach_inst;	/* machine instruction */
 #ifdef Linux390
 #  define INTERLOCK_ADD(X,Y,Z)	(interlock_add(Z, (sm_int_ptr_t)(X)))
 #else
-#  ifdef __x86_64__
+#  ifdef __linux__
 #    ifdef __atomic_add_fetch
 #      define INTERLOCK_ADD(X,Y,Z)	(__atomic_add_fetch(X, Z, __ATOMIC_SEQ_CST))
 #    else

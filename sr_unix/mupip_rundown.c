@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -109,7 +109,7 @@ void mupip_rundown(void)
 	TREF(skip_file_corrupt_check) = TRUE;	/* rundown the database even if csd->file_corrupt is TRUE */
 	TREF(ok_to_see_statsdb_regs) = TRUE;
 	/* No need to do the following set (like is done in mupip_integ.c) since we call "mu_rndwn_file" (not "gvcst_init")
-	 *	TREF(statshare_opted_in) = FALSE;	// Do not open statsdb automatically when basedb is opened
+	 *	TREF(statshare_opted_in) = NO_STATS_OPTIN;	// Do not open statsdb automatically when basedb is opened
 	 */
 	arg_present = (0 != TREF(parms_cnt));
 	if ((file == region) && (TRUE == file))

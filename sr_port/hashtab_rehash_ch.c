@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +24,7 @@ CONDITION_HANDLER(hashtab_rehash_ch)
 	/* If we cannot alloc memory during rehashing, just continue in normal program flow */
 	START_CH(TRUE);
 	/* If we cannot allocate memory or any error while doing rehash, just abort any more rehashing.
-	 *  We will continue with old table. Note that we do not ignore VMSMEMORY errors because if a
-	 *  VMS_MEMORY error occurred, gtm_malloc is going to have released the memory cache trying to get
-	 *  through process exit cleanly. We have no option to ignore the memory error on VMS
+	 *  We will continue with old table.
 	 */
 	if (ERR_HTOFLOW == SIGNAL || ERR_MEMORY == SIGNAL || ERR_MEMORYRECURSIVE == SIGNAL)
 	{

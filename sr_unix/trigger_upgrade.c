@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2017 Fidelity National Information	*
+ * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,6 +48,7 @@
 #include "t_begin.h"
 #include "repl_sp.h"			/* for F_CLOSE (used by JNL_FD_CLOSE) */
 #include "gtmio.h"			/* for CLOSEFILE_RESET macro */
+#include "util.h"
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	uint4		dollar_tlevel;
@@ -190,6 +191,7 @@ void	trigger_upgrade(gd_region *reg)
 	hash128_state_t		hash_state, kill_hash_state;
 	uint4			hash_totlen, kill_hash_totlen;
 	int			trig_protected_mval_push_count;
+	char			buff[OUT_BUFF_SIZE];
 #	ifdef DEBUG
 	int			save_dollar_tlevel;
 #	endif
@@ -564,7 +566,7 @@ void	trigger_upgrade(gd_region *reg)
 			assert(SS_NORMAL == sts);	/* because we should have done jnl_ensure_open already
 							 * in which case set_jnl_file_close has no way of erroring out.
 							 */
-			sts = jnl_file_open_switch(reg, 0);
+			sts = jnl_file_open_switch(reg, 0, buff);
 			if (sts)
 			{
 				jpc = csa->jnl;

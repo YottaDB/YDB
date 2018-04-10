@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -832,7 +832,8 @@ boolean_t	tp_tend()
 							|| (cdb_sc_normal != recompute_upd_array(t1, cse)) || !++leafmods)
 						{
 							status = cdb_sc_blkmod;
-							TP_TRACE_HIST(t1->blk_num, t1->blk_target);
+							TP_TRACE_HIST_MOD(t1->blk_num, t1->blk_target, tp_blkmod_tp_tend, csd,
+								t1->tn, 0, t1->level);
 							DEBUG_ONLY(continue;)
 							PRO_ONLY(goto failed;)
 						}

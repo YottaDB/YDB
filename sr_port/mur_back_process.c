@@ -616,7 +616,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 	uint4			status, val_len;
 	unsigned short		max_key_size;
 	int			gtmcrypt_errno;
-	boolean_t		use_new_key;
+	boolean_t		use_new_key, is_trigger;
 	char			s[TRANS_OR_SEQ_NUM_CONT_CHK_FAILED_SZ];	/* for appending sequence or transaction number */
 	uint4			cur_total, old_total;
 	file_control		*fc;
@@ -731,14 +731,16 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 #					endif
 				} else
 				{	/* SET or KILL or ZTRIG type */
+					is_trigger = (STRNCMP_LIT((char *) keystr->text, "#t") == 0) ? TRUE : FALSE;
 					if (keystr->length > max_key_size)
-						MUR_BACK_PROCESS_ERROR(jctl, "Key size check failed");
+						if (!is_trigger || ((is_trigger && (keystr->length > (MAX_KEY_SZ - 4)))))
+							MUR_BACK_PROCESS_ERROR(jctl, "Key size check failed");
 					if (0 != keystr->text[keystr->length - 1])
 						MUR_BACK_PROCESS_ERROR(jctl, "Key null termination check failed");
 					if (IS_SET(rectype))
 					{
 						GET_MSTR_LEN(val_len, &keystr->text[keystr->length]);
-						if (val_len > max_rec_size)
+						if ((val_len > max_rec_size) && !is_trigger)
 							MUR_BACK_PROCESS_ERROR(jctl, "Record size check failed");
 					}
 				}

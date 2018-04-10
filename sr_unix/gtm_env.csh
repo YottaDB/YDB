@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2016 Fidelity National Information		#
+# Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -187,7 +187,11 @@ alias	gt_cpp			'$gt_cpp_compiler $gt_cpp_options_common $gt_cc_option_I'
 alias	gt_cc			'$gt_cc_compiler $gt_cc_options_common $gt_cc_option_I'
 alias	gt_cc_bta		'gt_cc $gt_cc_option_DBTABLD $gt_cc_option_debug $gt_cc_option_nooptimize'
 alias	gt_cc_dbg		'gt_cc $gt_cc_option_DDEBUG $gt_cc_option_debug $gt_cc_option_nooptimize'
-alias	gt_cc_pro		'gt_cc $gt_cc_option_optimize'
+if ( "$HOSTOS" == "Linux" ) then
+	alias	gt_cc_pro		'gt_cc $gt_cc_option_optimize $gt_cc_option_debug'
+else
+	alias	gt_cc_pro		'gt_cc $gt_cc_option_optimize'
+endif
 
 
 # Generic linker invocation:

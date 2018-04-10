@@ -95,7 +95,7 @@ IFLAGS =
 # Linux
 ifneq (,$(findstring Linux,$(UNAMESTR)))
 	# -fPIC for Position Independent Code.
-	CFLAGS += -fPIC
+	CFLAGS += -fPIC -std=c99 -D_GNU_SOURCE -D_XOPEN_SOURCE=600
 	LDFLAGS =
 	# So that dependent libraries are loaded from the parent library's load path at runtime
 	RPATHFLAGS = -Wl,-rpath,'$$ORIGIN'
@@ -119,7 +119,7 @@ ifneq (,$(findstring AIX,$(UNAMESTR)))
 	# -qro places string literals in read-only storage.
 	# -qroconst places constants in read-only storage.
 	# -q64 forces 64-bit object generation
-	CFLAGS += -qro -qroconst -q64
+	CFLAGS += -qro -qroconst -q64 -qlanglvl=stdc99
 	# -q64 for 64-bit object generation
 	# -brtl for allowing both '.a' and '.so' to be searched at runtime.
 	# -bhalt:5 is to disable warnings about duplicate symbols that come from

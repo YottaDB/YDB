@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,19 +39,13 @@ void iorm_wtone(int ch)
 		switch (io_curr_device.out->ochset)
 		{
 			case CHSET_UTF8:
+			case CHSET_UTF16:
+			case CHSET_UTF16BE:
+			case CHSET_UTF16LE:
 				endptr = UTF8_WCTOMB(ch, uni_buf);
 				break;
-			case CHSET_UTF16:
-				/* iorm_write will write BE BOM if first write */
-				/* continue as if UTF16BE */
-			case CHSET_UTF16BE:
-				endptr = UTF16BE_WCTOMB(ch, uni_buf);
-				break;
-			case CHSET_UTF16LE:
-				endptr = UTF16LE_WCTOMB(ch, uni_buf);
-				break;
 			default:
-				GTMASSERT;
+				assertpro(FALSE && io_curr_device.out->ochset);
 		}
 		temp.addr = (char *)uni_buf;
 		temp.len = INTCAST(endptr - uni_buf);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2017 Fidelity National Information	*
+ * Copyright (c) 2011-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 {
 	boolean_t			need_stacktrace, indefinite_wait;
 	char				*msgstr;
-	int				status = SS_NORMAL, save_errno, sem_pid, semval, i, sopcnt;
+	int				status = SS_NORMAL, save_errno, sem_pid = 0, semval, i, sopcnt;
 	uint4				loopcnt = 0, max_hrtbt_delta, lcl_hrtbt_cntr, stuck_cnt = 0;
 	boolean_t			stacktrace_issued = FALSE, ok_to_bypass;
 	struct sembuf			sop[3];

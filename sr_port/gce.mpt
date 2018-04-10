@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1989, 2003 Sanchez Computer Associates, Inc.	;
+; Copyright (c) 1987-2018 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -11,6 +12,7 @@
 %GCE	;GT.M %GCE utility - global change every occurrence
 	;
 	n c,g,gn,m,n,ns,os,s,sc,sn,%ZD,%ZG,x
+	i ('$d(%ZQ)) n %ZQ s %ZQ=0
 	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%GCE" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%GCE")
 	w !,"Global Change Every occurrence",!
 	d base
@@ -48,15 +50,17 @@ noopen	. w !,$p($ZS,",",2,999),! c %ZD s %ZD=""
 	. u %ZD w $zd($h,"DD-MON-YEAR 24:60:SS"),!,"Global Change Every occurrence of:",!,">",os,"<",!,"To:",!,">",ns,"<",! u $p
 	f  s gn=$o(%ZG(gn)) q:gn=""  d search
 	q
-search	w:$x>70 ! w gn,?$x\10+1*10
+search	n wrotegn s wrotegn=0
+	i '%ZQ s wrotegn=1 w:$x>70 ! w gn,?$x\10+1*10
 	s g=gn,(m,n)=0 u %ZD
 	i ($d(@g)#10=1) s n=1 d:@g[os change
 	f  s g=$q(@g) q:g=""  s n=n+1 d:@g[os change
 	i m w !!,m," changes made in total ",n," nodes.",!
-	e  w !!,"No changes made in total ",n," nodes.",!
+	e  w:'%ZQ !!,"No changes made in total ",n," nodes.",!
 	u $p
 	q
-change	w:sc !,g,!,"Was : ",@g
+change	i 'wrotegn s wrotegn=1 w:$x>70 ! w gn,?$x\10+1*10
+	w:sc !,g,!,"Was : ",@g
 	s s=@g,sn="",c=$l(s,os)
 	f i=1:1:c-1 s sn=sn_$p(s,os,i)_ns
 	s @g=sn_$p(s,os,c),m=m+i
@@ -72,4 +76,8 @@ ERR	i $d(%ZD),%ZD'=$p c %ZD
 	q
 LOOP	i $d(%ZD),%ZD'=$p c %ZD
 	d base
+	q
+QUIET	n %ZQ
+	s %ZQ=1
+	d %GCE
 	q

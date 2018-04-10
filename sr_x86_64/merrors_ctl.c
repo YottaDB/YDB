@@ -130,7 +130,7 @@ LITDEF	err_msg merrors[] = {
 	{ "TRANSMINUS", "Negative numbers not allowed with ZTCOMMIT", 0 },
 	{ "MAXNRSUBSCRIPTS", "Maximum number of subscripts exceeded", 0 },
 	{ "MAXSTRLEN", "Maximum string length exceeded", 0 },
-	{ "JNLDBERR", "Journal file !AD does not correspond to database file !AD", 4 },
+	{ "ENCRYPTCONFLT2", "A concurrent MUPIP REORG -ENCRYPT changed the encryption key for !AD before the process could initialize it. !AD", 4 },
 	{ "JNLFILOPN", "Error opening journal file !AD for database file !AD", 4 },
 	{ "MBXRDONLY", "Mailbox is read only, cannot write to it", 0 },
 	{ "JNLINVALID", "!AD is not a valid journal file !/ for database file: !AD", 4 },
@@ -519,7 +519,7 @@ LITDEF	err_msg merrors[] = {
 	{ "SOCKINIT", "Error initializing socket: (errno == !UL) !AD", 3 },
 	{ "OPENCONN", "Error opening socket connection", 0 },
 	{ "DEVNOTIMP", "!AD device not implemented on in this environment", 2 },
-	{ "JNLEXTR", "Error writing journal extract file: !AD", 2 },
+	{ "UNUSEDMSG688", "JNLEXTR last sometime prior to V4.4-002", 0 },
 	{ "DBREMOTE", "Database region !AD is remote; perform maintenance on the server node", 2 },
 	{ "JNLREQUIRED", "Journaling is required for clustered operation with file !AD", 2 },
 	{ "TPMIXUP", "!AZ transaction cannot be started within !AZ transaction", 2 },
@@ -593,7 +593,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DELIMSIZNA", "Delimiter size is not appropriate", 0 },
 	{ "INVCTLMNE", "Invalid control mnemonics", 0 },
 	{ "SOCKLISTEN", "Error listening on a socket", 0 },
-	{ "LQLENGTHNA", "Listening queue length !UL not appropriate.  Must be between 1 and 5.", 1 },
+	{ "UNUSEDMSG762", "LQLENGTHNA last used in V6.3-003A", 0 },
 	{ "ADDRTOOLONG", "Socket address !AD of length !UL is longer than the maximum permissible length !UL", 4 },
 	{ "GTMSECSHRGETSEMFAIL", "error getting semaphore errno = !UL", 1 },
 	{ "CPBEYALLOC", "Attempt to copy beyond the allocated buffer", 0 },
@@ -656,7 +656,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUNOFINISH", "MUPIP unable to finish all requested actions", 0 },
 	{ "DBFILEXT", "Database file !AD extended from 0x!XL blocks to 0x!XL at transaction 0x!16@XQ", 5 },
 	{ "JNLFSYNCERR", "Error synchronizing journal file !AD to disk", 2 },
-	{ "FSYNCTIMOUT", "Timed out on fsync for journal file !AD", 2 },
+	{ "UNUSEDMSG825", "FSYNCTIMOUT last used in V6.0-001", 0 },
 	{ "ZCPREALLVALINV", "The pre-allocation value exceeded the maximum string length", 0 },
 	{ "NEWJNLFILECREAT", "Journal file !AD nearing maximum size.  New journal file created.", 2 },
 	{ "DSKSPACEFLOW", "Disk Space for file !AD nearing maximum size.  !UL blocks available.", 3 },
@@ -1274,7 +1274,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DSEWCREINIT", "Database cache reinitialized by DSE for region !AD", 2 },
 	{ "MURNDWNOVRD", "OVERRIDE qualifier used with MUPIP RUNDOWN on database file !AD", 2 },
 	{ "REPLONLNRLBK", "ONLINE ROLLBACK detected. Starting afresh", 0 },
-	{ "SRVLCKWT2LNG", "PID !UL is holding the source server lock. Waited for !UL minute(s). Now exiting", 2 },
+	{ "SRVLCKWT2LNG", "PID !UL is holding the source server lock. Waited for !UL seconds. Now exiting", 2 },
 	{ "IGNBMPMRKFREE", "Ignoring bitmap free-up operation for region !AD (!AD) due to concurrent ONLINE ROLLBACK", 4 },
 	{ "PERMGENFAIL", "Failed to determine access permissions to use for creation of !AD for file !AD", 4 },
 	{ "PERMGENDIAG", "Permissions: Proc(uid:!UL,gid:!UL!AD), DB File(uid:!UL,gid:!UL,perm:!AD), Lib File(gid:!UL,perm:!AD)", 11 },
@@ -1504,6 +1504,10 @@ LITDEF	err_msg merrors[] = {
 	{ "DBFREEZEOFF", "Region !AD is UNFROZEN (!AZOVERRIDE !AZAUTOREL)", 4 },
 	{ "STPCRIT", "String pool space critical", 0 },
 	{ "STPOFLOW", "String pool space overflow", 0 },
+	{ "SYSUTILCONF", "Error determining the path for system utility. !AD", 2 },
+	{ "MSTACKSZNA", "User-specified M stack size of !UL KiB not appropriate; must be between !UL KiB and !UL KiB; reverting to !UL KiB", 4 },
+	{ "JNLEXTRCTSEQNO", "Journal Extracts based on sequence numbers are restricted to a single region when replication is OFF", 0 },
+	{ "INVSEQNOQUAL", "Invalid SEQNO qualifier value !AD", 2 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -1623,7 +1627,7 @@ LITDEF	int ERR_MAXFORARGS = 150373266;
 LITDEF	int ERR_TRANSMINUS = 150373274;
 LITDEF	int ERR_MAXNRSUBSCRIPTS = 150373282;
 LITDEF	int ERR_MAXSTRLEN = 150373290;
-LITDEF	int ERR_JNLDBERR = 150373298;
+LITDEF	int ERR_ENCRYPTCONFLT2 = 150373296;
 LITDEF	int ERR_JNLFILOPN = 150373306;
 LITDEF	int ERR_MBXRDONLY = 150373314;
 LITDEF	int ERR_JNLINVALID = 150373322;
@@ -2012,7 +2016,7 @@ LITDEF	int ERR_SOCKACPT = 150376378;
 LITDEF	int ERR_SOCKINIT = 150376386;
 LITDEF	int ERR_OPENCONN = 150376394;
 LITDEF	int ERR_DEVNOTIMP = 150376402;
-LITDEF	int ERR_JNLEXTR = 150376410;
+LITDEF	int ERR_UNUSEDMSG688 = 150376410;
 LITDEF	int ERR_DBREMOTE = 150376418;
 LITDEF	int ERR_JNLREQUIRED = 150376426;
 LITDEF	int ERR_TPMIXUP = 150376434;
@@ -2086,7 +2090,7 @@ LITDEF	int ERR_PROTNOTSUP = 150376970;
 LITDEF	int ERR_DELIMSIZNA = 150376978;
 LITDEF	int ERR_INVCTLMNE = 150376986;
 LITDEF	int ERR_SOCKLISTEN = 150376994;
-LITDEF	int ERR_LQLENGTHNA = 150377002;
+LITDEF	int ERR_UNUSEDMSG762 = 150377002;
 LITDEF	int ERR_ADDRTOOLONG = 150377010;
 LITDEF	int ERR_GTMSECSHRGETSEMFAIL = 150377016;
 LITDEF	int ERR_CPBEYALLOC = 150377026;
@@ -2149,7 +2153,7 @@ LITDEF	int ERR_RDFLTOOLONG = 150377474;
 LITDEF	int ERR_MUNOFINISH = 150377482;
 LITDEF	int ERR_DBFILEXT = 150377491;
 LITDEF	int ERR_JNLFSYNCERR = 150377498;
-LITDEF	int ERR_FSYNCTIMOUT = 150377506;
+LITDEF	int ERR_UNUSEDMSG825 = 150377506;
 LITDEF	int ERR_ZCPREALLVALINV = 150377514;
 LITDEF	int ERR_NEWJNLFILECREAT = 150377523;
 LITDEF	int ERR_DSKSPACEFLOW = 150377531;
@@ -2997,9 +3001,13 @@ LITDEF	int ERR_DBFREEZEON = 150384259;
 LITDEF	int ERR_DBFREEZEOFF = 150384267;
 LITDEF	int ERR_STPCRIT = 150384274;
 LITDEF	int ERR_STPOFLOW = 150384284;
+LITDEF	int ERR_SYSUTILCONF = 150384290;
+LITDEF	int ERR_MSTACKSZNA = 150384299;
+LITDEF	int ERR_JNLEXTRCTSEQNO = 150384306;
+LITDEF	int ERR_INVSEQNOQUAL = 150384314;
 
 GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1491};
+	1495};

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,10 +51,6 @@ char *gtm_getenv(char *varname);
 # if INT_MAX < LONG_MAX	/* like Tru64 */
 #  define STRTO64L	strtol
 #  define STRTOU64L	strtoul
-# elif defined(__hpux)
-#  include <inttypes.h>
-#  define STRTO64L	strtoimax
-#  define STRTOU64L	strtoumax
 # else
 #  define STRTO64L	strtoll
 #  define STRTOU64L	strtoull
@@ -67,12 +63,13 @@ char *gtm_getenv(char *varname);
 	mkstemp_res = mkstemp(template);				\
 	ENABLE_INTERRUPTS(INTRPT_IN_MKSTEMP, prev_intrpt_state);	\
 }
-# if defined(VMS) || defined(STATIC_ANALYSIS)
+# if defined(STATIC_ANALYSIS)
 #  define SYSTEM	system
 # else
 #  define SYSTEM	gtm_system
    int gtm_system(const char *cmdline);
 # endif
+int gtm_system_internal(const char *sh, const char *opt, const char *rtn, const char *cmdline);
 
 void gtm_image_exit(int status);
 
