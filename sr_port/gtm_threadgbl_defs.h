@@ -334,13 +334,10 @@ THREADGBLDEF(statshare_opted_in,		uint4)				/* Flag controlling stats collection
 THREADGBLDEF(trans_code_pop,			mval *)				/* trans_code holder for $ZTRAP popping */
 THREADGBLDEF(view_ydirt_str,			char *)				/* op_view working storage for ydir* ops */
 THREADGBLDEF(view_ydirt_str_len,		int4)				/* Part of op_view working storage for ydir* ops */
-<<<<<<< HEAD
-THREADGBLDEF(ydb_error_code,			int)				/* Error reflected back to condition handler - it
-										 * is saved here so the ESTABLISHer has access */
-=======
 THREADGBLDEF(view_region_list,			tp_region *)			/* used by view_arg_convert and op_view/view_dbop */
 THREADGBLDEF(view_region_free_list,		tp_region *)			/* used by view_arg_convert and op_view/view_dbop */
->>>>>>> 83bc0ab... GT.M V6.3-004
+THREADGBLDEF(ydb_error_code,			int)				/* Error reflected back to condition handler - it
+										 * is saved here so the ESTABLISHer has access */
 THREADGBLDEF(zdate_form,			int4)				/* Control for default $zdate() format */
 THREADGBLAR1DEF(zintcmd_active,			zintcmd_active_info,	ZINTCMD_LAST)	/* Interrupted timed commands */
 THREADGBLDEF(zro_root,				zro_ent *)			/* Anchor for zroutines structure entry array */

@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,14 +67,8 @@
 #  define OFFSETOF(X,Y)		offsetof(X,Y)
 #endif
 
-<<<<<<< HEAD
 #define DIR_SEPARATOR		'/'
-=======
-#ifndef __vms
-#  define DIR_SEPARATOR		'/'
-#  define UNALIAS		"unalias -a; "
-#endif
->>>>>>> 83bc0ab... GT.M V6.3-004
+#define UNALIAS			"unalias -a; "
 
 /* the LITERAL version of the macro should be used over STRING whenever possible for efficiency reasons */
 #define	STR_LIT_LEN(LITERAL)			(SIZEOF(LITERAL) - 1)

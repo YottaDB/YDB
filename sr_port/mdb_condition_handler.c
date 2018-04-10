@@ -669,11 +669,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		if (!repeat_error)
 			/* This has already been done if we are re-throwing the error */
 			outofband_clear();
-<<<<<<< HEAD
 		if (!trans_action && !dm_action && !(frame_pointer->type & SFT_DM))
-=======
-		if (!trans_action && !(frame_pointer->type & SFT_DM))
->>>>>>> 83bc0ab... GT.M V6.3-004
 		{
 			if (!repeat_error)
 			{

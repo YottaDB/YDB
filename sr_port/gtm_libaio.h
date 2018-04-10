@@ -15,17 +15,11 @@
 #ifndef GTM_LIBAIO_H_INCLUDED
 #define GTM_LIBAIO_H_INCLUDED
 
-<<<<<<< HEAD
 /* Enable LIBAIO only on 64-bit linux. We disable LIBAIO on 32-bit linux
  * for non-technical reasons.
  */
 #if defined(__linux__) && defined(__x86_64__)
 #	define USE_LIBAIO
-=======
-/* Enable LIBAIO only on Linux. */
-#if defined(__linux__)
-#define USE_LIBAIO
->>>>>>> 83bc0ab... GT.M V6.3-004
 #elif defined(__CYGWIN__)
 #	define USE_NOAIO
 #endif

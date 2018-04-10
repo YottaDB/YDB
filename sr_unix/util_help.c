@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
-=======
- * Copyright (c) 2013-2018 Fidelity National Information	*
- * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 83bc0ab... GT.M V6.3-004
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,15 +28,10 @@ LITREF	gtmImageName		gtmImageNames[];
 error_def(ERR_TEXT);
 error_def(ERR_YDBDISTUNVERIF);
 
-<<<<<<< HEAD
-#define HELP_CMD_STRING_SIZE 256 + YDB_PATH_MAX + YDB_PATH_MAX
-#define EXEC_GTMHELP	"%s/mumps -run %%XCMD 'do ^GTMHELP(\"%s\",\"%s/%shelp.gld\")'",
-=======
-#define MUMPS_CMD_STRING_SIZE 8 + GTM_PATH_MAX
-#define EXEC_MUMPS	"%s/mumps"
-#define HELP_CMD_STRING_SIZE 256 + GTM_PATH_MAX
-#define EXEC_GTMHELP	"do ^GTMHELP(\"%s\",\"%s/%shelp.gld\")",
->>>>>>> 83bc0ab... GT.M V6.3-004
+#define MUMPS_CMD_STRING_SIZE	8 + YDB_PATH_MAX
+#define EXEC_MUMPS		"%s/mumps"
+#define HELP_CMD_STRING_SIZE	256 + YDB_PATH_MAX
+#define EXEC_GTMHELP		"do ^GTMHELP(\"%s\",\"%s/%shelp.gld\")",
 
 #define UTIL_HELP_IMAGES	5
 /* We need the first two entries for compatibility */
@@ -78,17 +69,12 @@ void util_help(void)
 		help_option = (TAREF1(parm_ary, TREF(parms_cnt) - 1));
 	}
 	/* if help_cmd_string is not long enough, the following command will fail */
-	SNPRINTF(mumps_cmd_string, SIZEOF(mumps_cmd_string), EXEC_MUMPS, gtm_dist);
+	SNPRINTF(mumps_cmd_string, SIZEOF(mumps_cmd_string), EXEC_MUMPS, ydb_dist);
 	SNPRINTF(help_cmd_string, SIZEOF(help_cmd_string), EXEC_GTMHELP
-<<<<<<< HEAD
-			ydb_dist, help_option, ydb_dist, utilImageGLDs[image_type]);
-	rc = SYSTEM(help_cmd_string);
-=======
-			help_option, gtm_dist, utilImageGLDs[image_type]);
+			help_option, ydb_dist, utilImageGLDs[image_type]);
 	rc = gtm_system_internal(mumps_cmd_string, "-run", "%XCMD", help_cmd_string);
 	if (WIFEXITED(rc))
 		rc = WEXITSTATUS(rc);
->>>>>>> 83bc0ab... GT.M V6.3-004
 	if (0 != rc)
 		rts_error_csa(NULL, VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("HELP command error"), rc);
 }

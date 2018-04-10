@@ -308,18 +308,6 @@ LITDEF mval *fnzqgblmod_table[2] =
 	&literal_zero, &literal_one
 };
 
-<<<<<<< HEAD
-LITDEF char gtm_release_name[]   = GTM_RELEASE_NAME;
-LITDEF int4 gtm_release_name_len = SIZEOF(GTM_RELEASE_NAME) - 1;
-LITDEF char gtm_product[]        = GTM_PRODUCT;
-LITDEF int4 gtm_product_len      = SIZEOF(GTM_PRODUCT) - 1;
-LITDEF char gtm_version[]        = GTM_VERSION;
-LITDEF int4 gtm_version_len      = SIZEOF(GTM_VERSION) - 1;
-LITDEF char ydb_release_name[]   = YDB_RELEASE_NAME;
-LITDEF int4 ydb_release_name_len = SIZEOF(YDB_RELEASE_NAME) - 1;
-LITDEF char ydb_product[]        = YDB_PRODUCT;
-LITDEF int4 ydb_product_len      = SIZEOF(YDB_PRODUCT) - 1;
-=======
 LITDEF char gtm_release_name[]    = GTM_RELEASE_NAME;
 LITDEF int4 gtm_release_name_len  = SIZEOF(GTM_RELEASE_NAME) - 1;
 LITDEF char gtm_product[]         = GTM_PRODUCT;
@@ -328,7 +316,10 @@ LITDEF char gtm_version[]         = GTM_VERSION;
 LITDEF int4 gtm_version_len       = SIZEOF(GTM_VERSION) - 1;
 LITDEF char gtm_release_stamp[]   = GTM_RELEASE_STAMP;
 LITDEF int4 gtm_release_stamp_len = SIZEOF(GTM_RELEASE_STAMP) - 1;
->>>>>>> 83bc0ab... GT.M V6.3-004
+LITDEF char ydb_release_name[]    = YDB_RELEASE_NAME;
+LITDEF int4 ydb_release_name_len  = SIZEOF(YDB_RELEASE_NAME) - 1;
+LITDEF char ydb_product[]         = YDB_PRODUCT;
+LITDEF int4 ydb_product_len       = SIZEOF(YDB_PRODUCT) - 1;
 
 /* Indexed by enum db_ver in gdsdbver.h. Note that a db_ver value can be -1 but only in
  * the internal context of incremental/stream backup so the value should never appear where
@@ -435,8 +426,6 @@ LITDEF int default_ht_sizes[] =
 	        0
 };
 
-<<<<<<< HEAD
-=======
 LITDEF int extended_ht_sizes[] =
 {
 	13, 37, 53, 97, 193, 389, 769, 1543,   3079,       6151,    12289,    24593,    49157,
@@ -453,8 +442,6 @@ LITDEF int extended_ht_sizes[] =
 
 GBLDEF int *ht_sizes = (int *)&default_ht_sizes;
 
-#ifdef UNIX
->>>>>>> 83bc0ab... GT.M V6.3-004
 /* Primarily used by gtm_trigger_complink() */
 LITDEF char 	alphanumeric_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
 					'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
@@ -517,7 +504,6 @@ LITDEF char *mdb_ver_names[] =
 #include "gdsdbver_sp.h"
 };
 #undef	ENUM_ENTRY
-
 
 #ifdef DEBUG
 /* These instructions follow the definitions made
