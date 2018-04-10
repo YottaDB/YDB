@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,6 +50,7 @@
 #include "rtn_src_chksum.h"
 #include "cmd_qlf.h"
 #include "arlinkdbg.h"
+#include "io.h"		/* for ASCII_CR */
 
 #define RT_TBL_SZ 20
 
@@ -398,6 +399,9 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 					memcpy(prev_srcptr, buff, size);
 					/* Strip trailing '\n' if any (if at least one byte was read in) */
 					if (size && ('\n' == buff[size - 1]))
+						size--;
+					/* Strip trailing CR if any (if at least one byte is left) */
+					if (size && (ASCII_CR == buff[size - 1]))
 						size--;
 				}
 			}
