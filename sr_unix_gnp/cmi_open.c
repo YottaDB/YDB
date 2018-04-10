@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -74,6 +74,7 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	lnk->sta = CM_CLB_DISCONNECT;
 	lnk->err = NULL;
 	lnk->ast = NULL;
+	save_errno = 0;		/* 4SCA: Garbage return value */
 	for(ai_ptr = ai_head; NULL != ai_ptr; ai_ptr = ai_ptr->ai_next)
 	{
 		if (FD_INVALID != (new_fd = socket(ai_ptr->ai_family, ai_ptr->ai_socktype, ai_ptr->ai_protocol)))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -140,6 +140,7 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	boolean_t		gv_play_duplicate_kills;
 GBLREF		int4		strm_index;
 STATICDEF	boolean_t	set_onln_rlbk_flg;
+LITREF	char			*jrt_label[JRT_RECTYPES];
 
 static	boolean_t		updproc_continue = TRUE;
 
@@ -544,7 +545,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	boolean_t		incr_seqno;
 	seq_num			jnlpool_ctl_seqno, rec_strm_seqno, strm_seqno;
 	char			*val_ptr;
-	jnl_string		*keystr;
+	jnl_string		*keystr = NULL;
 	mname_entry		gvname;
 	char			*key, *keytop;
 	gv_key			*gv_failed_key = NULL, *gv_failed_key_ptr;
@@ -1084,6 +1085,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				incr_seqno = TRUE;
 			} else if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 			{
+				assert(keystr); /* 4SCA: Assigned value is garbage or undefined */
 				key = keystr->text;
 				UPD_GV_BIND_NAME_APPROPRIATE(gd_header, gvname, key, key_len, gvnh_reg);
 					/* if ^#t do special processing */
@@ -1373,8 +1375,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 		{
 			if (jnl_seqno - lastlog_seqno >= log_interval)
 			{
-				repl_log(updproc_log_fp, TRUE, TRUE, "Rectype = %d Committed Jnl seq no is : "
-					INT8_FMT" "INT8_FMTX"\n", rectype, INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno));
+				repl_log(updproc_log_fp, TRUE, TRUE, "Jnl seq no : "INT8_FMT" "INT8_FMTX
+						 ";Rectype : %2d - %s\n", INT8_PRINT(jnl_seqno), INT8_PRINTX(jnl_seqno),
+						rectype, jrt_label[rectype]);
 				lastlog_seqno = jnl_seqno;
 			}
 			upd_proc_local->read_jnl_seqno = ++jnl_seqno;

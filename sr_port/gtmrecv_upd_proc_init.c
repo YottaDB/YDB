@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -136,7 +136,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	}
 	/* Destroy/Reinitialize the mutex.
 	 * Needed here in case the update process exited while holding the mutex, and the system didn't clean it up.
-	 * Robust mutexes should handle this case, in theory, but they are unreliable, at least on Ubuntu 12.04.
+	 * Robust mutexes should handle this case, in theory, but that does not appear to be the case in practice.
 	 */
 	pthread_mutex_destroy(&recvpool.recvpool_ctl->write_updated_ctl);
 	status = pthread_mutexattr_init(&write_updated_ctl_attr);
@@ -147,6 +147,12 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	if (0 != status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("pthread_mutexattr_setpshared"), CALLFROM, status, 0);
+#	ifdef __linux__
+	status = pthread_mutexattr_setrobust(&write_updated_ctl_attr, PTHREAD_MUTEX_ROBUST);
+	if (0 != status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_mutexattr_setrobust"), CALLFROM, status, 0);
+#	endif
 	status = pthread_mutex_init(&recvpool.recvpool_ctl->write_updated_ctl, &write_updated_ctl_attr);
 	if (0 != status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,

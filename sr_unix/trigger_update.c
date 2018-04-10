@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1954,42 +1954,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 			SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_STR(trigvn, trigvn_len, *trigger_count,
 				trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), values[sub_indx],
 				value_len[sub_indx], result);
-			if (XECUTE_SUB != sub_indx)
-			{
-				IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(result);
-			} else
-			{	/* XECUTE_SUB == sub_indx */
-				max_len = value_len[XECUTE_SUB];
-				assert(0 < max_len);
-				if (PUT_SUCCESS != result)
-				{	/* xecute string does not fit in one record, break it up */
-					i2mval(&xecute_size, max_len);
-					num = 0;
-					ptr1 = values[XECUTE_SUB];
-					i2mval(&xecute_index, num);
-					/* set ^#t(GVN,trigger_count,"XECUTE",0) = xecute string length */
-					BUILD_HASHT_SUB_MSUB_SUB_MSUB_CURRKEY(trigvn, trigvn_len, *trigger_count,
-						trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), xecute_index);
-					SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MSUB_MVAL(trigvn, trigvn_len, *trigger_count,
-						trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), xecute_index,
-						xecute_size, result);
-					IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(result);
-					while (0 < max_len)
-					{
-						i2mval(&xecute_index, ++num);
-						BUILD_HASHT_SUB_MSUB_SUB_MSUB_CURRKEY(trigvn, trigvn_len, *trigger_count,
-							trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), xecute_index);
-						offset = MIN(gv_cur_region->max_rec_size, max_len);
-						/* set ^#t(GVN,trigger_count,"XECUTE",num) = xecute string[offset] */
-						SET_TRIGGER_GLOBAL_SUB_MSUB_SUB_MSUB_STR(trigvn, trigvn_len, *trigger_count,
-							trigger_subs[sub_indx], STRLEN(trigger_subs[sub_indx]), xecute_index,
-							ptr1, offset, result);
-						IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(result);
-						ptr1 += offset;
-						max_len -= offset;
-					}
-				}
-			}
+			IF_ERROR_THEN_TOO_LONG_ERROR_MSG_AND_RETURN_FAILURE(result);
 		}
 		result = add_trigger_hash_entry(trigvn, trigvn_len, values[CMD_SUB], set_index, TRUE, kill_trigger_hash,
 				set_trigger_hash);

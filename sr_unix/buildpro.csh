@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2015 Fidelity National Information		#
+# Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -27,4 +27,16 @@ endif
 
 version $1 p
 $gtm_tools/buildbdp.csh $1 pro $gtm_vrt/pro
+# Extract the debug symbols from each executable
+if ( "$HOSTOS" == "Linux" ) then
+	rm stripping_log.txt >& /dev/null
+	echo "Stripping debug symbols and generating .debug files. Leaving log at `pwd`/stripping_log.txt"
+	foreach file (`find ../ -executable -type f`)
+		echo "Stripping $file"
+		objcopy --only-keep-debug $file $file.debug >> stripping_log.txt
+		strip -g $file >> stripping_log.txt
+		objcopy --add-gnu-debuglink=$file.debug $file >> stripping_log.txt
+	end
+endif
+
 exit $status

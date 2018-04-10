@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,6 @@ STATICDEF	int		jnl_write_recursion_depth;
 
 error_def(ERR_JNLEXTEND);
 error_def(ERR_JNLWRTNOWWRTR);
-error_def(ERR_JNLWRTDEFER);
 
 #define	JNL_PUTSTR(lcl_free, lcl_buff, src, len, lcl_size)			\
 {										\

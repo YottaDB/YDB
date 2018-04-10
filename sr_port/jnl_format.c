@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -354,7 +354,8 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 			SET_PREV_ZTWORM_JFB_IF_NEEDED(is_ztworm_rec, (jfb->alt_buff + FIXED_UPD_RECLEN));
 		}
 		ASSERT_ENCRYPTION_INITIALIZED;
-		use_new_key = USES_NEW_KEY(encr_ptr);
+		use_new_key = (encr_ptr->reorg_encrypt_cycle != csa->nl->reorg_encrypt_cycle) ? FALSE : USES_NEW_KEY(encr_ptr);
+		assert((!use_new_key && (NULL != csa->encr_key_handle)) || (use_new_key && (NULL != csa->encr_key_handle2)));
 		/* Encrypt the logical portion of the record, which eventually gets written to the journal buffer/file */
 		if (use_new_key || encr_ptr->non_null_iv)
 			PREPARE_LOGICAL_REC_IV(jrec_size, iv);

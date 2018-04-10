@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -98,6 +99,7 @@ int gtmrecv_comm_init(in_port_t port)
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				 RTS_ERROR_LITERAL("Could not bind local address"), ERRNO);
+		freeaddrinfo(ai_ptr);
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		return (-1);
 	}
@@ -106,9 +108,11 @@ int gtmrecv_comm_init(in_port_t port)
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 				 RTS_ERROR_LITERAL("Could not listen"), ERRNO);
+		freeaddrinfo(ai_ptr);
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
 		return (-1);
 	}
 
+	freeaddrinfo(ai_ptr);
 	return (0);
 }

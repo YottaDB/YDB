@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -363,7 +363,9 @@ boolean_t mur_open_files()
 							       REG_LEN_STR(gv_cur_region), DB_LEN_STR(gv_cur_region));
 						return FALSE;
 					}
-					max_epoch_interval = MAX(cs_data->epoch_interval, max_epoch_interval);
+					/* Only select epoch_interval values (for timed epochs) which are sane. */
+					if (MAX_EPOCH_INTERVAL >= cs_data->epoch_interval)
+						max_epoch_interval = MAX(cs_data->epoch_interval, max_epoch_interval);
 					assert(!cs_addrs->hold_onto_crit);
 					rctl->standalone = TRUE;
 				}

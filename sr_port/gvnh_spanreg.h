@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,6 +21,7 @@
 											\
 	GBLREF	buddy_list	*noisolation_buddy_list;				\
 											\
+	assert(NULL != noisolation_buddy_list);						\
 	gvnh_entry = (noisolation_element *)get_new_element(noisolation_buddy_list, 1);	\
 	gvnh_entry->gvnh = GVT;								\
 	gvnh_entry->next = PARMBLK->ni_list.gvnh_list;					\

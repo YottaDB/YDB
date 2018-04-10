@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,13 +42,9 @@ int	iosocket_rdone(mint *v, int4 msec_timeout)
 					codepoint = (unsigned char)tmp.str.addr[0];
 					break;
 				case CHSET_UTF8:
-					UTF8_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
-					break;
 				case CHSET_UTF16BE:
-					UTF16BE_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
-					break;
 				case CHSET_UTF16LE:
-					UTF16LE_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
+					UTF8_MBTOWC(tmp.str.addr, tmp.str.addr + tmp.str.len, codepoint);
 					break;
 				default:
 					assertpro(ichset != ichset);

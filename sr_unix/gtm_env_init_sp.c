@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2017 Fidelity National Information	*
+ * Copyright (c) 2004-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -517,8 +517,7 @@ void	gtm_env_init_sp(void)
 	val.addr = GTM_STATSHARE;
 	val.len = SIZEOF(GTM_STATSHARE) - 1;
 	ret = logical_truth_value(&val, FALSE, &is_defined);
-	if (is_defined)
-		TREF(statshare_opted_in) = ret;
+	TREF(statshare_opted_in) = (!is_defined) ? NO_STATS_OPTIN : ret ? ALL_STATS_OPTIN : NO_STATS_OPTIN;
 	/* Pull in specified gtm_statsdir if specified, else default to gtm_tmp or its default. Note we don't validate the directory
 	 * here. It need not exist until a database is opened. If gtm_statsdir does not exist, find an appropriate default and
 	 * set it so it is always resolvable.

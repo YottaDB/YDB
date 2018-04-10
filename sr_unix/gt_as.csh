@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2015 Fidelity National Information		#
+# Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -43,7 +43,7 @@ set mach_type = `uname -m`
 set asmlist=($*)
 set cmdfile="$gtm_log/gt_as_$$__batch.csh"
 set background="&"
-if ($HOST:r:r:r =~ {snail,turtle,lespaul,pfloyd,strato}) set background=""
+if ($HOST:r:r:r =~ {strato}) set background=""
 
 echo 'alias gt_as_local "$comlist_gt_as"' >> $cmdfile
 

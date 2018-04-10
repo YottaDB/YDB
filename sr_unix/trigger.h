@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -333,35 +333,31 @@ typedef enum
 	TREF(gv_some_subsc_null) = was_null;							\
 }
 
-#define	TRIGGER_GLOBAL_ASSIGNMENT_STR(TRIG_VAL, VALUE, LEN, RES)	\
-{									\
-	STR2MVAL(TRIG_VAL, VALUE, LEN);					\
-	if (LEN > gv_cur_region->max_rec_size)				\
-		RES = VAL_TOO_LONG;					\
-	else if (gv_currkey->end + 1 > gv_cur_region->max_key_size)	\
-		RES = KEY_TOO_LONG;					\
-	else								\
-	{								\
-		gvcst_put(&TRIG_VAL);					\
-		RES = PUT_SUCCESS;					\
-	}								\
+#define	TRIGGER_GLOBAL_ASSIGNMENT_STR(TRIG_VAL, VALUE, LEN, RES)							\
+{															\
+	STR2MVAL(TRIG_VAL, VALUE, LEN);											\
+	if (gv_currkey->end + 1 > MAX_KEY_SZ - 4)									\
+		RES = KEY_TOO_LONG;											\
+	else														\
+	{														\
+		gvcst_put(&TRIG_VAL);											\
+		RES = PUT_SUCCESS;											\
+	}														\
 }
 
-#define	TRIGGER_GLOBAL_ASSIGNMENT_MVAL(VALUE, RES)			\
-{									\
-	mval		*lcl_mv_ptr;					\
-									\
-	lcl_mv_ptr = &VALUE;						\
-	MV_FORCE_STR(lcl_mv_ptr);					\
-	if (lcl_mv_ptr->str.len > gv_cur_region->max_rec_size)		\
-		RES = VAL_TOO_LONG;					\
-	else if (gv_currkey->end + 1 > gv_cur_region->max_key_size)	\
-		RES = KEY_TOO_LONG;					\
-	else								\
-	{								\
-		gvcst_put(lcl_mv_ptr);					\
-		RES = PUT_SUCCESS;					\
-	}								\
+#define	TRIGGER_GLOBAL_ASSIGNMENT_MVAL(VALUE, RES)									\
+{															\
+	mval		*lcl_mv_ptr;											\
+															\
+	lcl_mv_ptr = &VALUE;												\
+	MV_FORCE_STR(lcl_mv_ptr);											\
+	if (gv_currkey->end + 1 > MAX_KEY_SZ - 4)									\
+		RES = KEY_TOO_LONG;											\
+	else														\
+	{														\
+		gvcst_put(lcl_mv_ptr);											\
+		RES = PUT_SUCCESS;											\
+	}														\
 }
 
 #define BUILD_HASHT_SUB_CURRKEY(SUB, LEN)								\

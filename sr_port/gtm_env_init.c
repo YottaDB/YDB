@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2017 Fidelity National Information	*
+ * Copyright (c) 2004-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -75,6 +75,7 @@
 GBLREF	boolean_t	dollar_zquit_anyway;	/* if TRUE compile QUITs to not care whether or not they're from an extrinsic */
 GBLREF	uint4		ydbDebugLevel; 		/* Debug level (0 = using default sm module so with
 						   a DEBUG build, even level 0 implies basic debugging) */
+GBLREF	boolean_t	gtmSystemMalloc;	/* Use the system's malloc() instead of our own */
 GBLREF	int4		gtm_fullblockwrites;	/* Do full (not partial) database block writes */
 GBLREF	boolean_t	certify_all_blocks;
 GBLREF	uint4		gtm_blkupgrade_flag;	/* controls whether dynamic block upgrade is attempted or not */
@@ -127,6 +128,7 @@ void	gtm_env_init(void)
 				tdbglvl |= GDL_SmBackfill;	/* Can't check it unless it's filled in */
 			if (GDL_SmStorHog & tdbglvl)
 				tdbglvl |= GDL_SmBackfill | GDL_SmChkAllocBackfill;
+<<<<<<< HEAD
 			ydbDebugLevel |= tdbglvl;
 		}
 		/* See if ydb_msgprefix is specified. If so store it in TREF(ydbmsgprefix).
@@ -145,6 +147,14 @@ void	gtm_env_init(void)
 				memcpy((TREF(ydbmsgprefix)).addr, trans.addr, trans.len);
 				(TREF(ydbmsgprefix)).addr[trans.len] = '\0';	/* need null terminated "fac" in "gtm_getmsg" */
 			}
+=======
+			gtmDebugLevel |= tdbglvl;
+			gtmSystemMalloc = ((GDL_UseSystemMalloc & gtmDebugLevel) || FALSE);
+			if (gtmSystemMalloc)
+				gtmDebugLevel &= !(GDL_SmStats | GDL_SmTrace | GDL_SmDumpTrace | GDL_SmAllocVerf | GDL_SmFreeVerf
+							| GDL_SmBackfill | GDL_SmChkAllocBackfill | GDL_SmChkFreeBackfill
+							| GDL_SmStorHog | GDL_SmDump );
+>>>>>>> 83bc0ab... GT.M V6.3-004
 		}
 		/* gtm_boolean environment/logical */
 		val.addr = GTM_BOOLEAN;

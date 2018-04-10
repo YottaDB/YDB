@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,6 @@
 #include "gt_timer.h"
 #include "copy.h"
 #include "iottdef.h"
-#include "iomtdef.h"
 #include "io_dev_dispatch.h"
 #include "iormdef.h"
 #include "eintr_wrappers.h"
@@ -87,7 +86,6 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 	struct stat	outbuf;
 	char		*buf, namebuf[LOGNAME_LEN + 1];
 	unsigned char	dev_type[MAX_DEV_TYPE_LEN];
-	d_mt_struct	*mt_ptr;
 	iosb		io_status_blk;
 	mstr		chset_mstr;
 	int		umask_orig, umask_creat;
@@ -111,7 +109,6 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 
 	SETUP_THREADGBL_ACCESS;
 	iod = naml->iod;
-	mt_ptr = NULL;
 	char_or_block_special = FALSE;
 	out_of_time = FALSE;
 	file_des = -2;

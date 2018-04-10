@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -93,6 +93,7 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	mur_opt_struct		mur_options;
 GBLREF	mval			dollar_zgbldir;
+GBLREF 	boolean_t		mu_region_found;
 #ifdef DEBUG
 GBLREF	boolean_t		in_mu_rndwn_file;
 #endif
@@ -364,6 +365,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	mu_region_found = TRUE;
 	mu_rndwn_file_standalone = standalone;
 	rc_cpt_removed = FALSE;
 	sem_created = FALSE;
@@ -392,6 +394,8 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 		if (SS_NORMAL != status)
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) status, 2, DB_LEN_STR(reg), errno);
+			if (ENOENT == errno)
+				mu_region_found = FALSE;
 			if (0 == iter)
 			{
 				if (FD_INVALID != udi->fd)	/* Since dbfilop failed, close udi->fd only if it was opened */
@@ -594,7 +598,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	 * and is better than incorrectly deleting it while live processes are concurrently using it.
 	 */
 	udi->counter_ftok_incremented = !ftok_counter_halted && (INVALID_SHMID == udi->shmid);
-	if (USES_ENCRYPTION(tsd->is_encrypted))
+	if (USES_ENCRYPTION(tsd->is_encrypted) && !TREF(mu_set_file_noencryptable))
 	{
 		INIT_PROC_ENCRYPTION(csa, gtmcrypt_errno);
 		if (0 == gtmcrypt_errno)

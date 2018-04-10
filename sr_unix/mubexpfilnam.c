@@ -31,7 +31,7 @@ void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list)
 {
 	char	*c1;
 	mstr	file;
-	char	tmp_mstr_addr[MAX_FN_LEN];
+	char	tmp_mstr_addr[MAX_FN_LEN + 1];
 
 
 	file.len = MAX_FN_LEN;

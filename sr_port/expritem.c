@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -102,7 +102,8 @@ LITDEF nametabent svn_names[] =
 	,{ 5, "ZPROC*" }
 	,{ 5, "ZPROM*" }
 	,{ 2, "ZQ*" }
-	,{ 3, "ZRE*" }
+	,{ 3, "ZRE" }, {4, "ZREA*" }
+	,{ 4, "ZREL*" }
 	,{ 3, "ZRO*" }
 	,{ 3, "ZSO*" }
 	,{ 2, "ZS" }, { 4, "ZSTA*" }
@@ -133,7 +134,11 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
+<<<<<<< HEAD
 	22, 28, 34 ,34, 34, 34, 35, 36, 100	/* s t u v w x y z ~ */
+=======
+	22, 28, 34 ,34, 34, 34, 35, 36, 101	/* s t u v w x y z ~ */
+>>>>>>> 83bc0ab... GT.M V6.3-004
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -191,7 +196,8 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZPROC, FALSE, ALL_SYS }
 	,{ SV_PROMPT, TRUE, ALL_SYS }
 	,{ SV_ZQUIT, TRUE, ALL_SYS }
-	,{ SV_ZREALSTOR, FALSE, ALL_SYS }
+	,{ SV_ZREALSTOR, FALSE, ALL_SYS }, { SV_ZREALSTOR, FALSE, ALL_SYS }
+	,{ SV_ZRELDATE, FALSE, ALL_SYS }
 	,{ SV_ZROUTINES, TRUE, ALL_SYS }
 	,{ SV_ZSOURCE, TRUE, ALL_SYS }
 	,{ SV_ZSTATUS, TRUE, ALL_SYS }, { SV_ZSTATUS, TRUE, ALL_SYS }
@@ -647,9 +653,10 @@ int expritem(oprtype *a)
 						case SV_TEST:
 							*a = put_tref(newtriple(OC_GETTRUTH));
 							break;
-						case SV_ZVERSION:	/* making these literals at compile time assumes code is */
-						case SV_ZCHSET:		/* generated for/in the environment where it runs, which */
-							op_svget(sv_opcode, &v);	/* relies on appropriate code management */
+						case SV_ZCHSET:		/* making these literals at compile time assumes code is */
+						case SV_ZRELDATE:	/* generated for/in the environment where it runs, which */
+						case SV_ZVERSION:	/* relies on appropriate code management */
+							op_svget(sv_opcode, &v);
 							assert(MVTYPE_IS_NUMERIC(v.mvtype) && MVTYPE_IS_STRING(v.mvtype));
 							ENSURE_STP_FREE_SPACE(v.str.len);
 							memcpy((char *)stringpool.free, v.str.addr, v.str.len);

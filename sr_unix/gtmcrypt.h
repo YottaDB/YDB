@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -113,8 +113,8 @@ error_def(ERR_CRYPTOPFAILED);
 
 #define CORE_ON_CRYPTOPFAILED													\
 MBSTART {															\
-	/* if we are not expecting nor forcing CRYPTOPFAILED get a core for analysis */						\
-	if (!WBTEST_ENABLED(WBTEST_EXPECT_CRYPTOPFAILED) && !ENCR_WBOX_ENABLED)							\
+	/* Except for white box testing capture CRYPTOPFAILED cores for analysis */						\
+	if (!ENCR_WBOX_ENABLED)													\
 		gtm_fork_n_core();												\
 } MBEND
 

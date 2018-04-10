@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,8 +47,8 @@ LITDEF joberr_msg joberrs[] = {
 	{ LIT_AND_LEN("Job error in copying ERROR socket descriptor") },
 	{ LIT_AND_LEN("Job error sending setup command") },
 	{ LIT_AND_LEN("Job error sending setup data") },
-	{ LIT_AND_LEN("Job child was stopped by signal") },
 	{ LIT_AND_LEN("Job child terminated due to signal") },
+	{ LIT_AND_LEN("Job child was stopped by signal") },
 	{ LIT_AND_LEN("") } 	/* this is used internally to determine try-again situations */
 };
 

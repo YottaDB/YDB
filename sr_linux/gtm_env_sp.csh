@@ -148,7 +148,7 @@ if ( $?gtm_version_change == "1" ) then
 #	on Cygwin, -ansi defines __STRICT_ANSI__ which suppresses many prototypes
 		setenv gt_cc_options_common     "-c "
 	else
-		setenv gt_cc_options_common     "-c -ansi "
+		setenv gt_cc_options_common     "-c -std=c99 "
 	endif
 
 	if ( "armv6l" == $mach_type ) then

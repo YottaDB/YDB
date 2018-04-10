@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,12 +32,12 @@ void iosocket_destroy (io_desc *ciod)
 	assertpro(NULL != dsocketptr);
 	for (lpp = &io_root_log_name, lp = *lpp; lp; lp = *lpp)
 	{
-		if ((NULL != lp->iod) && (n_io_dev_types == lp->iod->type))
+		if ((NULL == lp->iod) || (n_io_dev_types == lp->iod->type))
 		{
-			assert(FALSE);
-			continue;       /* skip it on pro */
+			assert(NULL == lp->iod);	/* Can be NULL if we are forced to exit during device setup */
+			/* skip it on pro */
 		}
-		if (lp->iod->pair.in == ciod)
+		else if (lp->iod->pair.in == ciod)
 		{
 			/* The only device that may be "split" is the principal device. Since it is permanently open,
 			 * it will never get here.
@@ -46,9 +46,9 @@ void iosocket_destroy (io_desc *ciod)
 			assert(lp->iod->pair.out == ciod);
 			*lpp = (*lpp)->next;
 			free(lp);
+			continue;	/* lpp already points at next, so skip the dereference below. */
 		}
-		else
-			lpp = &lp->next;
+		lpp = &lp->next;
 	}
 	if (ciod->dollar.devicebuffer)
 	{

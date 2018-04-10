@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1988, 2003 Sanchez Computer Associates, Inc.	;
+; Copyright (c) 1987-2018 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -14,6 +15,7 @@
 	;			%ZD an optional device to receive a trail
 	;
 	n cnt1,cnt2,cnt3,fnd,h,i,o,out,outd,r,tf,x,xn,%ZC,%ZD,%ZF,%ZN,%ZR
+	i ('$d(%ZQ)) n %ZQ s %ZQ=0
 	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%RCE" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%RCE")
 	d init,MAIN
 	u $p:(ctrap="":exc="")
@@ -21,8 +23,9 @@
 CALL	i '$l($g(%ZF)) q
 	n zc,zd s zc=$G(%ZC),zd=$G(%ZD)
 	n cnt1,cnt2,cnt3,fnd,h,i,o,out,outd,r,tf,x,xn,%ZD,%ZC,lzd n:'$d(%ZN) %ZN
+	i ('$d(%ZQ)) n %ZQ s %ZQ=0
 	s %ZC=zc,%ZD=zd
-	s %ZD=$g(%ZD),%ZN=$g(%ZN),(cnt1,cnt2,cnt3,out,outd)=0,tf=$j_"rce.tmp",lzd=$l(%ZD) s:'lzd %ZD=$P
+	s %ZD=$g(%ZD),%ZN=$g(%ZN),(cnt1,cnt2,cnt3,out)=0,tf=$j_"rce.tmp",lzd=$l(%ZD),outd=%ZQ s:'lzd %ZD=$P
 	s:%ZC outd=$l(%ZD) s:'outd %ZD=$p s:'lzd %ZD=$P s %ZC=1
 	i $d(%ZR)<10 d CALL^%RSEL
 	d work
@@ -72,14 +75,15 @@ work	s %ZR="",r=$zsearch("__")
 	w cnt2," occurrence",$s(cnt2=1:" ",1:"s "),$s(%ZC:"changed",1:"found")," in ",cnt3," routine",$s(cnt3=1:".",1:"s."),!
 	c %ZD
 	q
-scan	s r=%ZR(%ZR)_$tr($e(%ZR),"%","_")_$e(%ZR,2,9999)_".m",o=$zsearch(r),fnd=0
+scan	n wrotezr
+	s r=%ZR(%ZR)_$tr($e(%ZR),"%","_")_$e(%ZR,2,9999)_".m",o=$zsearch(r),fnd=0,wrotezr=0
 	u $p i out,%ZD'=$p!'outd w:$x>70 ! w %ZR,?$x\10+1*10
-	i outd u %ZD w !!,r
 	o:%ZC tf:(newversion:exception="s fnd=0 g reof") o o:(readonly:record=2048:rewind:exception="g rnoopen")
 	u o:exception="g reof"
 	s cnt1=cnt1+1
 	f  u o r x s h=$l(x,%ZF) d
-	. i h=1 d:%ZC  q
+	. i ('wrotezr),outd,(('%ZQ)!(1'=h)) u %ZD w !!,r s wrotezr=1
+	. i 1=h d:%ZC  q
 	. . u tf w x,!
 	. s fnd=fnd+h-1
 	. i %ZC d  q
@@ -119,4 +123,12 @@ LOOP	i $d(tf) c tf:delete
 	i $d(%ZD),%ZD'=$p c %ZD
 	d MAIN
 	u $p:(ctrap="":exception="")
+	q
+QUIET	n %ZQ
+	s %ZQ=1
+	d %RCE
+	q
+QCALL	n %ZQ
+	s %ZQ=1
+	d CALL
 	q

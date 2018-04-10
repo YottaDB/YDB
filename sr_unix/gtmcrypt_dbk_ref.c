@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2017 Fidelity National Information	*
+ * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -181,8 +181,8 @@ int gtmcrypt_getkey_by_keyname(char *key_name, char *key_path, gtm_keystore_t **
  */
 int gtmcrypt_getkey_by_hash(unsigned char *hash, char *db_path, gtm_keystore_t **entry)
 {
-	int	err_caused_by_gpg, error;
-	char	save_err[MAX_GTMCRYPT_ERR_STRLEN], hex_buff[GTMCRYPT_HASH_HEX_LEN + 1];
+	int	err_caused_by_gpg, error, errorlen;
+	char	save_err[MAX_GTMCRYPT_ERR_STRLEN + 1], hex_buff[GTMCRYPT_HASH_HEX_LEN + 1];
 	char	*alert_msg;
 
 	if (NULL != db_path)
@@ -204,7 +204,11 @@ int gtmcrypt_getkey_by_hash(unsigned char *hash, char *db_path, gtm_keystore_t *
 				GC_HEX(hash, hex_buff, GTMCRYPT_HASH_HEX_LEN);
 				if (err_caused_by_gpg)
 				{
-					strncpy(save_err, gtmcrypt_err_string, MAX_GTMCRYPT_ERR_STRLEN);
+					errorlen = STRLEN(gtmcrypt_err_string);
+					if (MAX_GTMCRYPT_ERR_STRLEN < errorlen)
+						errorlen = MAX_GTMCRYPT_ERR_STRLEN;
+					strncpy(save_err, gtmcrypt_err_string, errorlen);
+					save_err[errorlen] = '\0';
 					UPDATE_ERROR_STRING("Expected hash - " STR_ARG " - %s. %s",
 						ELLIPSIZE(hex_buff), save_err, alert_msg);
 				} else
@@ -540,13 +544,22 @@ STATICFNDEF gtm_keystore_t *gtmcrypt_decrypt_key(char *key_path, int path_length
 	gtm_keystore_t		*node;
 	unsigned char		raw_key[SYMMETRIC_KEY_MAX];
 	int			raw_key_length;
+	int			gpgerr, gpg_attempt;
 
 	/* If we have seen a key with the same path, do not re-read it. */
 	if (NULL == (node = keystore_lookup_by_keypath(key_path)))
 	{	/* Now that we have the name of the symmetric key file, try to decrypt it. If gc_pk_get_decrypted_key returns a
 		 * non-zero status, it should have already populated the error string.
 		 */
-		if (0 != gc_pk_get_decrypted_key(key_path, raw_key, &raw_key_length))
+		gpg_attempt = 2;				/* Retry the libgpgme decryption request once */
+		do {
+			gpgerr = gc_pk_get_decrypted_key(key_path, raw_key, &raw_key_length);
+			if (GPG_ERR_DECRYPT_FAILED == gpgerr)	/* Cipher is not valid, which cannot be the case. */
+				gpg_attempt--;			/* Assume it's a gpg bug and retry */
+			else
+				gpg_attempt = 0;
+		} while (gpg_attempt);
+		if (0 != gpgerr)
 			return NULL;
 		if (0 == raw_key_length)
 		{
@@ -588,7 +601,7 @@ STATICFNDEF gtm_keystore_t *gtmcrypt_decrypt_key(char *key_path, int path_length
  */
 STATICFNDEF int keystore_refresh(void)
 {
-	int		n_mappings, status, just_read;
+	int		n_mappings, status, just_read, envvar_len;
 	char		*config_env;
 	struct stat	stat_info;
 	static long	last_modified_s, last_modified_ns;
@@ -605,9 +618,14 @@ STATICFNDEF int keystore_refresh(void)
 	{	/* First, make sure we have a proper environment varible and a regular configuration file. */
 		if (NULL != (config_env = getenv("gtmcrypt_config")))
 		{
-			if (0 == strlen(config_env))
+			if (0 == (envvar_len = strlen(config_env))) /* inline assignment */
 			{
 				UPDATE_ERROR_STRING(ENV_EMPTY_ERROR, "gtmcrypt_config");
+				return -1;
+			}
+			if (GTM_PATH_MAX <= envvar_len)
+			{
+				UPDATE_ERROR_STRING(ENV_TOOLONG_ERROR, "gtmcrypt_config", status);
 				return -1;
 			}
 			if (0 != stat(config_env, &stat_info))

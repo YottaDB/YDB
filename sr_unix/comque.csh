@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2001-2017 Fidelity National Information		#
+# Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -109,6 +109,9 @@ case "[Pp]*":
 			"$gt_as_options_common $gt_as_option_I $gt_as_option_optimize"
 		set comque_cc_options_default = \
 			"$gt_cc_options_common $gt_cc_option_I $gt_cc_option_optimize"
+		if ( "$HOSTOS" == "Linux" ) then
+			set comque_cc_options_default = "$comque_cc_options_default $gt_cc_option_debug"
+		endif
 		breaksw
 
 endsw

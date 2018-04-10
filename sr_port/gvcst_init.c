@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -89,12 +89,17 @@ MBSTART {														\
 	int		fn_len;												\
 	char		*fn;												\
 	boolean_t	do_crypt_init;											\
+	boolean_t	shoulda_crypt_init;											\
 	DEBUG_ONLY(boolean_t	was_gtmcrypt_initialized = gtmcrypt_initialized);					\
 															\
 	do_crypt_init = ((USES_ENCRYPTION(CSD->is_encrypted)) && !IS_LKE_IMAGE && CSA->encr_ptr				\
 				&& (GTMCRYPT_INVALID_KEY_HANDLE == (CSA)->encr_key_handle)				\
 				&& !(CSA->encr_ptr->issued_db_init_crypt_warning)					\
 				&& (CSA->encr_ptr->reorg_encrypt_cycle == CSA->nl->reorg_encrypt_cycle));		\
+	/* Concurrent REORG ENCRYPT has invalidated previously acquired key information */				\
+	shoulda_crypt_init = ((USES_ENCRYPTION(CSD->is_encrypted)) && !IS_LKE_IMAGE && CSA->encr_ptr			\
+				&& (GTMCRYPT_INVALID_KEY_HANDLE == (CSA)->encr_key_handle)				\
+				&& !(CSA->encr_ptr->issued_db_init_crypt_warning));					\
 	if (do_crypt_init)												\
 	{														\
 		assert(was_gtmcrypt_initialized);									\
@@ -111,7 +116,22 @@ MBSTART {														\
 				GTMCRYPT_REPORT_ERROR(MAKE_MSG_WARNING(init_status), gtm_putmsg, fn_len, fn);		\
 				CSA->encr_ptr->issued_db_init_crypt_warning = TRUE;					\
 			}												\
+		} else if (0 != init_status)										\
+		{ /* CSA->encr_ptr cannot be trusted */									\
+			memset(CSA->encr_ptr, 0, SIZEOF(enc_info_t));							\
+			CSA->encr_ptr->reorg_encrypt_cycle = -1;							\
+			/* Send the warning to syslog, which does not count as issued_db_init_crypt_warning */		\
+			GTMCRYPT_REPORT_ERROR(MAKE_MSG_WARNING(init_status), send_msg, fn_len, fn);			\
 		}													\
+	} else if (shoulda_crypt_init)											\
+	{ /* CSA->encr_ptr cannot be trusted */										\
+		memset(CSA->encr_ptr, 0, SIZEOF(enc_info_t));								\
+		CSA->encr_ptr->reorg_encrypt_cycle = -1;                                               			\
+		assert(was_gtmcrypt_initialized);									\
+		fn = (char *)(REG->dyn.addr->fname);									\
+		fn_len = REG->dyn.addr->fname_len;									\
+		/* Send the warning to syslog, which does not count as issued_db_init_crypt_warning */			\
+		GTMCRYPT_REPORT_ERROR(SET_CRYPTERR_MASK(ERR_ENCRYPTCONFLT2), send_msg, fn_len, fn);			\
 	}														\
 } MBEND
 
@@ -188,6 +208,7 @@ error_def(ERR_DBROLLEDBACK);
 error_def(ERR_DBVERPERFWARN1);
 error_def(ERR_DBVERPERFWARN2);
 error_def(ERR_DRVLONGJMP);	/* Generic internal only error used to drive longjump() in a queued condition handler */
+error_def(ERR_ENCRYPTCONFLT2);
 error_def(ERR_INVSTATSDB);
 error_def(ERR_MMNODYNUPGRD);
 error_def(ERR_REGOPENFAIL);
@@ -363,7 +384,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 				return;
 			}
 			/* At this point, the baseDB is open but the statsDB is not automatically opened. This is possible if
-			 *	a) TREF(statshare_opted_in) is FALSE. In that case, this call to "gvcst_init" is coming through
+			 *	a) TREF(statshare_opted_in) is NO. In that case, this call to "gvcst_init" is coming through
 			 *		a direct reference to the statsDB (e.g. ZWR ^%YGS). OR
 			 *	b) baseDBreg->was_open is TRUE. In that case, the statsDB open would have been short-circuited
 			 *		in "gvcst_init".
@@ -373,7 +394,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			 *		would silently adjust gld map entries so they do not point to this statsDB anymore
 			 *		(NOSTATS should already be set in the baseDB in this case, assert that).
 			 */
-			if (TREF(statshare_opted_in) && !baseDBreg->was_open)
+			if ((NO_STATS_OPTIN != TREF(statshare_opted_in)) && !baseDBreg->was_open)
 			{
 				assert(RDBF_NOSTATS & baseDBreg->reservedDBFlags);
 				return;
@@ -1226,7 +1247,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		cs_addrs_list = csa;
 		/* Also update tp_reg_list fid_index's as insert_region relies on it */
 		for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
-			tr->file.fid_index = (&FILE_INFO(tr->reg)->s_addrs)->fid_index;
+			tr->fid_index = (&FILE_INFO(tr->reg)->s_addrs)->fid_index;
 		DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
 		TREF(max_fid_index) = max_fid_index;
 	}
@@ -1300,7 +1321,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	 */
 	if (!IS_DSE_IMAGE)
 	{	/* DSE does not open statsdb automatically. It does it only when asked to */
-		if (TREF(statshare_opted_in))
+		if (NO_STATS_OPTIN != TREF(statshare_opted_in))
 		{
 			if (!is_statsDB)
 			{	/* This is a baseDB - so long as NOSTATS is *not* turned on, we should initialize the statsDB */
