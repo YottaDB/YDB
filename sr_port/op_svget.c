@@ -123,8 +123,8 @@ error_def(ERR_ZDIROUTOFSYNC);
 LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
-LITREF char		gtm_release_stamp[];
-LITREF int4		gtm_release_stamp_len;
+LITREF char		ydb_release_stamp[];
+LITREF int4		ydb_release_stamp_len;
 LITREF char		ydb_release_name[];
 LITREF int4		ydb_release_name_len;
 
@@ -403,8 +403,8 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZRELDATE:
 			v->mvtype = MV_STR;
-			v->str.addr = (char *)gtm_release_stamp;
-			v->str.len = gtm_release_stamp_len;
+			v->str.addr = (char *)ydb_release_stamp;
+			v->str.len = ydb_release_stamp_len;
 			break;
 		case SV_ZVERSION:
 			v->mvtype = MV_STR;
