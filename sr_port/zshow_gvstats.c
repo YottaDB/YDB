@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,9 +39,9 @@ MSTR_CONST(regkeyword, REG_KEYWORD);
 MSTR_CONST(keywordseparator, KEYWORD_SEPARATOR);
 MSTR_CONST(keywordterminator, KEYWORD_TERMINATOR);
 
-STATICFNDCL void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *regname, gvstats_rec_t *gvstats);
+STATICFNDCL void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *regname, gvstats_rec_t *gvstats, boolean_t current);
 
-STATICFNDEF void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *regname, gvstats_rec_t *gvstats)
+STATICFNDEF void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *regname, gvstats_rec_t *gvstats, boolean_t current)
 {
 	unsigned char	valstr[MAX_DIGITS_IN_INT8];
 	uchar_ptr_t	ptr;
@@ -66,22 +66,29 @@ STATICFNDEF void zshow_gvstats_output(zshow_out *output, mstr *gldname, mstr *re
 }
 #	include "tab_gvstats_rec.h"
 #	undef TAB_GVSTATS_REC
-	valmstr.len = 0;
+	if (!current)
+	{
+		valstr[0] = '?';
+		valmstr.addr = (char *)&valstr[0];
+		valmstr.len = 1;
+	} else
+		valmstr.len = 0;
 	output->flush = TRUE;
-	zshow_output(output,&valmstr);
+	zshow_output(output, &valmstr);
 }
 
 void zshow_gvstats(zshow_out *output, boolean_t total_only)
 {
-	mstr			gldname;
-	mstr			regname;
-	gvstats_rec_t		cumul_gvstats;	/* statistics for ("*","*") */
+	boolean_t		current;
+	enum db_acc_method	acc_meth;
 	gd_addr			*addr_ptr;
 	gd_region		*reg, *r_top;
-	sgmnt_addrs		*csa;
-	enum db_acc_method	acc_meth;
+	gvstats_rec_t		cumul_gvstats;	/* statistics for ("*","*") */
+	mstr			gldname, regname;
+	sgmnt_addrs             *csa;
 
 	memset(&cumul_gvstats, 0, SIZEOF(gvstats_rec_t));
+	current = TRUE;
 	/* First determine aggregated statistics across ALL <gld,reg> combinations */
 	for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
 	{
@@ -93,13 +100,15 @@ void zshow_gvstats(zshow_out *output, boolean_t total_only)
 			if (!IS_ACC_METH_BG_OR_MM(acc_meth))
 				continue;
 			csa = &FILE_INFO(reg)->s_addrs;
+			if ((RDBF_NOSTATS & csa->reservedDBFlags) && !(RDBF_NOSTATS & csa->hdr->reservedDBFlags))
+				current = FALSE;
 #			define TAB_GVSTATS_REC(COUNTER,TEXT1,TEXT2) cumul_gvstats.COUNTER += csa->gvstats_rec_p->COUNTER;
 #			include "tab_gvstats_rec.h"
 #			undef TAB_GVSTATS_REC
 		}
  	}
 	cumul_gvstats.db_curr_tn = 0;	/* nullify CTN field as it has no meaning in the "aggregated" sense */
-	zshow_gvstats_output(output, &stargldname, &starregname, &cumul_gvstats);
+	zshow_gvstats_output(output, &stargldname, &starregname, &cumul_gvstats, current);
 	if (!total_only)
 	{
 		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
@@ -115,7 +124,8 @@ void zshow_gvstats(zshow_out *output, boolean_t total_only)
 				csa = &FILE_INFO(reg)->s_addrs;
 				regname.len = reg->rname_len;
 				regname.addr = (char *)&reg->rname[0];
-				zshow_gvstats_output(output, &gldname, &regname, csa->gvstats_rec_p);
+				current = !((RDBF_NOSTATS & csa->reservedDBFlags) && !(RDBF_NOSTATS & csa->hdr->reservedDBFlags));
+				zshow_gvstats_output(output, &gldname, &regname, csa->gvstats_rec_p, current);
 			}
 		}
 	}

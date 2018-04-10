@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,8 @@
 THREADGBLDEF(grabbing_crit, 			gd_region *)			/* Region currently grabbing crit in (if any) */
 
 /* Compiler */
+THREADGBLDEF(blkmod_fail_level,		int4)				/* TP trace reporting element */
+THREADGBLDEF(blkmod_fail_type,			int4)				/* TP trace reporting element */
 THREADGBLDEF(block_level,			int4)				/* used to check embedded subroutine levels */
 THREADGBLDEF(boolchain,				triple)				/* anchor for chain used by bx_boolop  */
 THREADGBLDEF(boolchain_ptr,			triple *)			/* pointer to anchor for chain used by bx_boolop  */
@@ -180,6 +182,11 @@ THREADGBLDEF(tp_restart_entryref,		mval)				/* tp_restart position for reporting
 THREADGBLDEF(tp_restart_failhist_indx,		int4)				/* tp_restart dbg restart history index */
 THREADGBLDEF(tprestart_syslog_delta,		int4)				/* defines every n-th restart to be logged for tp */
 THREADGBLDEF(tprestart_syslog_first,		int4)				/* # of TP restarts logged unconditionally */
+THREADGBLAR1DEF(t_fail_hist_blk,		block_id,	(CDB_MAX_TRIES))/* array for TP tracing */
+THREADGBLAR1DEF(tp_fail_bttn,			trans_num,	(CDB_MAX_TRIES))/* array for TP tracing */
+THREADGBLAR1DEF(tp_fail_histtn,		trans_num,	(CDB_MAX_TRIES))/* array for TP tracing */
+THREADGBLAR1DEF(tp_fail_hist,			gv_namehead *,	(CDB_MAX_TRIES))/* array for TP tracing */
+THREADGBLAR1DEF(tp_fail_hist_reg,		gd_region *,	(CDB_MAX_TRIES))/* array for TP tracing */
 THREADGBLDEF(transform,				boolean_t)			/* flag collation transform eligible */
 THREADGBLDEF(wcs_recover_done,			boolean_t)			/* TRUE if wcs_recover was ever invoked in this
 										 * process. */
@@ -313,10 +320,12 @@ THREADGBLDEF(set_zroutines_cycle,		uint4)				/* Informs us if we changed $ZROUTI
 										 * linking a routine and invoking it
 										 */
 THREADGBLDEF(statsDB_init_defer_anchor,		statsDB_deferred_init_que_elem *) /* Anchor point for deferred init of statsDBs */
-THREADGBLDEF(statshare_opted_in,		boolean_t)			/* Flag when true shared stats collection active */
+THREADGBLDEF(statshare_opted_in,		uint4)				/* Flag controlling stats collection */
 THREADGBLDEF(trans_code_pop,			mval *)				/* trans_code holder for $ZTRAP popping */
 THREADGBLDEF(view_ydirt_str,			char *)				/* op_view working storage for ydir* ops */
 THREADGBLDEF(view_ydirt_str_len,		int4)				/* Part of op_view working storage for ydir* ops */
+THREADGBLDEF(view_region_list,			tp_region *)			/* used by view_arg_convert and op_view/view_dbop */
+THREADGBLDEF(view_region_free_list,		tp_region *)			/* used by view_arg_convert and op_view/view_dbop */
 THREADGBLDEF(zdate_form,			int4)				/* Control for default $zdate() format */
 THREADGBLAR1DEF(zintcmd_active,			zintcmd_active_info,	ZINTCMD_LAST)	/* Interrupted timed commands */
 THREADGBLDEF(zro_root,				zro_ent *)			/* Anchor for zroutines structure entry array */
@@ -325,7 +334,7 @@ THREADGBLDEF(ztrap_form,			int4)				/* ztrap type indicator */
 THREADGBLDEF(poll_fds_buffer,			char *)				/* Buffer for poll() argument */
 THREADGBLDEF(poll_fds_buffer_size,		size_t)				/* Current allocated size of poll_fds_buffer */
 THREADGBLDEF(socket_handle_counter,		int)				/* Counter for generated socket handles */
-
+THREADGBLDEF(mu_set_file_noencryptable,		boolean_t)			/* Disabling encryption relaxes encr errors */
 /* Larger structures and char strings */
 THREADGBLAR1DEF(director_string,		char,	SIZEOF(mident_fixed)*2)	/* Buffer for director_ident */
 THREADGBLDEF(fnpca,				fnpc_area)			/* $Piece cache structure area */

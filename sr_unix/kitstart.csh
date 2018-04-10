@@ -239,6 +239,26 @@ foreach image ($imagetype)
 	cp ${cpflags} ${gtm_ver}/${image}/* . || exit 8
 	# Put pinentry into the plugin directory so that it ends up in the final package
 	cp ${gtm_pct}/pinentry.m ./plugin/gtmcrypt/
+	# Move debug symbols out of the way if they exist
+	set debug_symbol_dir = "${tmp_dist}/${image}_DBG/"
+	mkdir -p "$debug_symbol_dir"
+	if ( -f ${tmp_dist}/${image}/mumps.debug ) then
+		mv ${tmp_dist}/${image}/*.debug $debug_symbol_dir
+		pushd $debug_symbol_dir
+		set dist_file = "${dist}/${dist_prefix}_${image}_DBG.${package_ext}"
+		echo ""
+		echo "Packaging debug symbols to ${dist_file}"
+		cp $gtm_tools/install_debug_symbols_sh.txt install_debug_symbols.sh
+		chmod +x install_debug_symbols.sh
+		$package $dist_file *.debug install_debug_symbols.sh || exit 10
+		rm install_debug_symbols.sh
+		echo "Gzipping $dist_file"
+		gzip $dist_file || exit 11
+		# Move debug symbols out of the way before other packages get made
+		echo "Moving debug symbols to $debug_symbol_dir during kitstart"
+		popd
+
+	endif
 	echo ""
 	echo "Removing files that are not distributed (${notdistributed} ${mnotdistributed})"
 	/bin/rm -rf ${notdistributed} ${mnotdistributed} || exit 9
@@ -590,6 +610,23 @@ CONFIGURE_EOF
 		(source ${install}/defgroup/${image}/gtmcshrc ; $gtm_dist/mumps -r %XCMD 'zsystem "$gtm_dist/gtmpcat "_$job')
 		(source ${install}/${image}/gtmcshrc ; $gtm_dist/mumps -r %XCMD 'zsystem "$gtm_dist/gtmpcat "_$job')
 		popd
+
+		# install debug symbols
+		if ( "`uname`" == "Linux" ) then
+			pushd ${tmp_dist}/${image}_DBG/
+			yes | env gtm_dist=${install}/${image} sh ./install_debug_symbols.sh
+			popd
+
+			# Test debug symbols
+			set result=`source ${install}/${image}/gtmcshrc ; gdb $gtm_exe/mumps -ex quit | grep mumps.debug | wc -l`
+			echo ""
+			echo ""
+			if ( $result ) then
+				echo "Test of installation of debug symbols ${version}/${image} PASSED"
+			else
+				echo "Test of installation of debug symbols ${version}/${image} FAILED"
+			endif
+		endif
 
 	end
 endif

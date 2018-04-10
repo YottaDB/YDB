@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -231,7 +231,9 @@ void gtm_icu_init(void)
 #	endif
 	locale = setlocale(LC_CTYPE, "");
 	chset = nl_langinfo(CODESET);
-	if ((NULL == locale) || (NULL == chset) || ((0 != strcasecmp(chset, "utf-8")) && (0 != strcasecmp(chset, "utf8"))))
+	if (NULL == chset)	/* 4SCA : null return nl_langinfo not possible */
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_LIT("<undefined>"));
+	if ((NULL == locale) || (0 != strcasecmp(chset, "utf-8")) && (0 != strcasecmp(chset, "utf8")))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_STR(chset));
 	/* By default, GT.M will henceforth expect that ICU has been built with symbol renaming disabled. If that is not the case,
 	 * GT.M can be notified of this through an environment variable (macro GTM_ICU_VERSION).  The variable should contain the

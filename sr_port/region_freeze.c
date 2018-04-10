@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,6 +49,9 @@ GBLREF	boolean_t	debug_mupip;
 GBLREF	jnl_gbls_t	jgbl;
 GBLREF	gd_region	*gv_cur_region;
 
+STATICDEF	int4			rf_epoch_interval_sav;
+STATICDEF	sgmnt_data_ptr_t	rf_csd_sav;
+
 # define FREEZE_ID	((0 == user_id) ? FROZEN_BY_ROOT : user_id)
 # define FREEZE_MATCH	process_id
 # define OWNERSHIP	(in_mupip_freeze ? (csd->freeze == freeze_id) : (csd->image_count == FREEZE_MATCH))
@@ -69,6 +72,8 @@ error_def(ERR_FREEZEID);
 
 error_def(ERR_DBFREEZEON);
 error_def(ERR_DBFREEZEOFF);
+
+CONDITION_HANDLER(region_freeze_jnl_switch_ch);
 
 freeze_status	region_freeze(gd_region *region, boolean_t freeze, boolean_t override, boolean_t wait_for_kip,
 				uint4 online, boolean_t flush_sync)
@@ -94,11 +99,10 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 	unix_db_info    	*udi;
 	uint4			standalone;
 	uint4			jnl_status;
-	int4			epoch_interval_sav;
 	int			dummy_errno, save_errno;
 	uint4			was_online;
 	char			time_str[CTIME_BEFORE_NL + 2];       /* for GET_CUR_TIME macro */
-	boolean_t		cleanup_autorelease, jnl_switch_done, was_crit;
+	boolean_t		cleanup_autorelease, jnl_switch_done, was_crit, jnl_switch_err;
 	freeze_status		rval;
 	unsigned int		lcnt;
 
@@ -207,12 +211,16 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 				 * be copied to jfh->epoch_interval, and we restore it below. The restored value will
 				 * then appear in the next journal file to which we will switch on the unfreeze.
 				 */
-				epoch_interval_sav = csd->epoch_interval;
+				rf_epoch_interval_sav = csd->epoch_interval;
+				rf_csd_sav = csd;
+				ESTABLISH_NORET(region_freeze_jnl_switch_ch, jnl_switch_err);
+				assert(!jnl_switch_err);
 				csd->epoch_interval = MIN(jgbl.gbl_jrec_time, INT_MAX) - MAX_EPOCH_DELAY;
 				jnl_switch_done = TRUE;
 				if (EXIT_ERR == SWITCH_JNL_FILE(jpc))
 					rval = REG_JNL_SWITCH_ERROR;
-				csd->epoch_interval = epoch_interval_sav;
+				csd->epoch_interval = rf_epoch_interval_sav;
+				REVERT;
 			} else
 				rval = REG_JNL_OPEN_ERROR;
 		}
@@ -340,4 +348,11 @@ freeze_status region_freeze_post(gd_region *region)
 		csa->needs_post_freeze_flushsync = FALSE;
 	}
 	return rval;
+}
+
+CONDITION_HANDLER(region_freeze_jnl_switch_ch)
+{
+	START_CH(TRUE);
+	rf_csd_sav->epoch_interval = rf_epoch_interval_sav;
+	NEXTCH;
 }

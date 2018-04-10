@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -238,7 +238,11 @@ STATICFNDCL int io_getevents_internal(aio_context_t ctx)
 		num_ios += ret;
 		for (i = 0; i < ret; ++i)
 		{
+#			ifdef __i386
+			aiocbp = (struct aiocb *)(unsigned long)event[i].obj;
+#			else
 			aiocbp = (struct aiocb *)event[i].obj;
+#			endif
 			if (0 <= event[i].res)
 				AIOCBP_SET_FLDS(aiocbp, event[i].res, event[i].res2);
 			/* res < 0 means LIBAIO is providing a negated errno through

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,8 +45,6 @@
 GBLREF	uint4		process_id;
 GBLREF	jnl_gbls_t	jgbl;
 
-error_def(ERR_FSYNCTIMOUT);
-error_def(ERR_JNLFRCDTERM);
 error_def(ERR_JNLFSYNCERR);
 error_def(ERR_JNLFSYNCLSTCK);
 error_def(ERR_TEXT);

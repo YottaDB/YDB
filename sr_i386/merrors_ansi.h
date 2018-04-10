@@ -128,7 +128,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* TRANSMINUS */
 	   0,	/* MAXNRSUBSCRIPTS */
 	  75,	/* MAXSTRLEN */
-	   0,	/* JNLDBERR */
+	   0,	/* ENCRYPTCONFLT2 */
 	   0,	/* JNLFILOPN */
 	   0,	/* MBXRDONLY */
 	   0,	/* JNLINVALID */
@@ -517,7 +517,7 @@ const static readonly int error_ansi[] = {
 	  80,	/* SOCKINIT */
 	  81,	/* OPENCONN */
 	   0,	/* DEVNOTIMP */
-	   0,	/* JNLEXTR */
+	   0,	/* UNUSEDMSG688 */
 	   0,	/* DBREMOTE */
 	   0,	/* JNLREQUIRED */
 	   0,	/* TPMIXUP */
@@ -591,7 +591,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DELIMSIZNA */
 	   0,	/* INVCTLMNE */
 	   0,	/* SOCKLISTEN */
-	   0,	/* LQLENGTHNA */
+	   0,	/* UNUSEDMSG762 */
 	   0,	/* ADDRTOOLONG */
 	   0,	/* GTMSECSHRGETSEMFAIL */
 	   0,	/* CPBEYALLOC */
@@ -654,7 +654,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUNOFINISH */
 	   0,	/* DBFILEXT */
 	   0,	/* JNLFSYNCERR */
-	   0,	/* FSYNCTIMOUT */
+	   0,	/* UNUSEDMSG825 */
 	   0,	/* ZCPREALLVALINV */
 	   0,	/* NEWJNLFILECREAT */
 	   0,	/* DSKSPACEFLOW */
@@ -1502,4 +1502,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBFREEZEOFF */
 	   0,	/* STPCRIT */
 	   0,	/* STPOFLOW */
+	   0,	/* SYSUTILCONF */
+	   0,	/* MSTACKSZNA */
+	   0,	/* JNLEXTRCTSEQNO */
+	   0,	/* INVSEQNOQUAL */
 	};

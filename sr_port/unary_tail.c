@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,10 +39,10 @@ void unary_tail(oprtype *opr)
 	SETUP_THREADGBL_ACCESS;
 	assert(TRIP_REF == opr->oprclass);
 	t = ta = t2 = opr->oprval.tref;
-	pending_coerce = OC_NOOP;
 	assert(OCT_UNARY & oc_tab[t->opcode].octype);
 	assert((TRIP_REF == t->operand[0].oprclass) && (NO_REF == t->operand[1].oprclass));
 	com = comval = drop = neg = num = 0;
+	pending_coerce = OC_NOOP;
 	do
 	{
 		t1 = t2;
@@ -83,7 +83,13 @@ void unary_tail(oprtype *opr)
 					t2 = t1->operand[0].oprval.tref;
 					t1->opcode = c = t2->opcode;	/* slide next opcode & operand back before deleting it */
 					t1->operand[0] = t2->operand[0];
-					dqdel(t2, exorder);
+					if (TREF(expr_start_orig) != t2)
+						dqdel(t2, exorder);
+					else
+					{	/* if it's anchoring the expr_start chain, must NOOP it rather than delete it */
+						t2->opcode = OC_NOOP;
+						t2->operand[0].oprclass = NO_REF;
+					}
 				}
 				assert(OC_LIT == c);
 				t = ta;
@@ -232,7 +238,7 @@ void unary_tail(oprtype *opr)
 					if (t2 != ta)
 					{	/* we did drop something to get to this negation, so slide it to the "front" */
 						t->operand[0].oprval.tref = t1->operand[0].oprval.tref;
-						t->opcode = c = OC_NEG;
+						t->opcode = OC_NEG;
 						dqdel(t1, exorder);
 					}
 					t1 = ta->operand[0].oprval.tref;
@@ -261,7 +267,7 @@ void unary_tail(oprtype *opr)
 						{	/* no (outer) negation, so OC_COMVAL leads things off */
 							assert(drop);
 							t->operand[0].oprval.tref = t2;
-							t->opcode = c = OC_COMVAL;
+							t->opcode = OC_COMVAL;
 							dqdel(t1, exorder);
 							t1 = t;
 						} else
@@ -297,7 +303,7 @@ void unary_tail(oprtype *opr)
 								break;
 							}
 							t->operand[0].oprval.tref = t2;
-							t->opcode = c = OC_COM;
+							t->opcode = OC_COM;
 							t->operand[0] = t1->operand[0];
 							dqdel(t1, exorder);
 							t1 = t;
@@ -344,7 +350,7 @@ void unary_tail(oprtype *opr)
 					{	/* no (outer) negation, OC_COMVAL or OC_COM - OC_COBOOL leads things off */
 						assert(drop);
 						t->operand[0].oprval.tref = t2;
-						t->opcode = c = OC_COBOOL;
+						t->opcode = OC_COBOOL;
 						dqdel(t1, exorder);
 						t1 = t;
 					} else

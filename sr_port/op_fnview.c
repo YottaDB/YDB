@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -121,7 +121,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 	unsigned char	buff[MAX_ZWR_KEY_SZ];
 	collseq		*csp;
 	gd_binding	*map, *start_map, *end_map;
-	gd_region	*reg, *reg_start;
+	gd_region	*reg, *reg_start, *statsDBreg;
 	gv_key		*gvkey;
 	gv_namehead	temp_gv_target;
 	gvnh_reg_t	*gvnh_reg;
@@ -564,7 +564,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			if (NULL != csa->hdr)
 			{
-				ENSURE_STP_FREE_SPACE(n_gvstats_rec_types * (STATS_MAX_DIGITS + STATS_KEYWD_SIZE));
+				ENSURE_STP_FREE_SPACE(n_gvstats_rec_types * (STATS_MAX_DIGITS + STATS_KEYWD_SIZE) + 1);
 				dst->str.addr = (char *)stringpool.free;
 				/* initialize cnl->gvstats_rec.db_curr_tn field from file header */
 				csa->nl->gvstats_rec.db_curr_tn = csa->hdr->trans_hist.curr_tn;
@@ -572,8 +572,11 @@ void	op_fnview(int numarg, mval *dst, ...)
 #				include "tab_gvstats_rec.h"
 #				undef TAB_GVSTATS_REC
 				assert(stringpool.free < stringpool.top);
-				/* subtract one to remove extra trailing delimiter */
-				dst->str.len = INTCAST((char *)stringpool.free - dst->str.addr - 1);
+				if ((RDBF_NOSTATS & csa->reservedDBFlags) && !(RDBF_NOSTATS & csa->hdr->reservedDBFlags))
+					*(stringpool.free - 1) = '?';	/* mark as questionable */
+				else
+					stringpool.free--;		/* subtract one to remove extra trailing delimiter */
+				dst->str.len = INTCAST((char *)stringpool.free - dst->str.addr);
 			} else
 				dst->str.len = 0;
 			break;
@@ -769,7 +772,22 @@ void	op_fnview(int numarg, mval *dst, ...)
 			n = dmterm_default;
 			break;
 		case VTK_STATSHARE:
-			n = TREF(statshare_opted_in) ? TRUE : FALSE;
+			if (!(n = (NO_STATS_OPTIN != TREF(statshare_opted_in))) || (NULL == parmblk.gv_ptr)) /* WARNING assign */
+				break;							/* no optin or no region specified */
+			assert(gd_header);
+			if (!(n = parmblk.gv_ptr->open))
+			{
+				if (ALL_STATS_OPTIN != TREF(statshare_opted_in))
+					break;						/* not open and not all_optin */
+				gv_init_reg(parmblk.gv_ptr, NULL);
+			}
+			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
+			assert(NULL != csa->hdr);
+			if (!(n = !(RDBF_NOSTATS & csa->reservedDBFlags)))
+				break;							/* region not doing statshare */
+			BASEDBREG_TO_STATSDBREG((gd_region *)parmblk.gv_ptr, statsDBreg);
+			csa = &FILE_INFO(statsDBreg)->s_addrs;
+			n = csa->statsDB_setup_completed;
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWFN);

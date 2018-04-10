@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -757,7 +757,7 @@ int gtmsource_process(void)
 	for (reg = gd_header->regions, region_top = gd_header->regions + gd_header->n_regions; reg < region_top; reg++)
 	{
 		csa = &FILE_INFO(reg)->s_addrs;
-		if (max_epoch_interval < csa->hdr->epoch_interval)
+		if ((max_epoch_interval < csa->hdr->epoch_interval) && (MAX_EPOCH_INTERVAL >= csa->hdr->epoch_interval))
 			max_epoch_interval = csa->hdr->epoch_interval;
 	}
 	/* Since we want to wait at least a couple of minutes before timing out on the latch, ensure max_epoch_interval

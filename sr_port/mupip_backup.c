@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,7 +147,6 @@ error_def(ERR_FILEPARSE);
 error_def(ERR_FREEZECTRL);
 error_def(ERR_JNLCREATE);
 error_def(ERR_JNLDISABLE);
-error_def(ERR_JNLFILOPN);
 error_def(ERR_JNLFNF);
 error_def(ERR_JNLNOCREATE);
 error_def(ERR_JNLPOOLSETUP);
@@ -258,7 +257,9 @@ void mupip_backup(void)
 	sgmnt_addrs		*csa;
 	repl_inst_hdr		repl_instance, *save_inst_hdr;
 	unsigned char		*cmdptr;
-	unsigned char 		command[(GTM_PATH_MAX) * 2 + 5]; /*2 files in the cmd, 5 == SIZEOF("cp") + 2 (space) + 1 (NULL)*/
+	/* UNALIAS + 2 files in the cmd, 5 == SIZEOF("cp") + 2 (space) + 1 (NULL)*/
+	unsigned char 		command[(STR_LIT_LEN(UNALIAS)) + (GTM_PATH_MAX) * 2 + 5];
+	char			cp_cmd[MAX_FN_LEN] = "cp ";
 	struct shmid_ds		shm_buf;
 	struct semid_ds		semstat;
 	union semun		semarg;
@@ -1029,9 +1030,18 @@ repl_inst_bkup_done1:
 			assert(udi == FILE_INFO(jnlpool->jnlpool_dummy_reg));
 			seg = jnlpool->jnlpool_dummy_reg->dyn.addr; /* re-initialize (for pool_init == TRUE case) */
 			cmdptr = &command[0];
-			assert(SIZEOF(command) >= (5 + seg->fname_len + mu_repl_inst_reg_list->backup_file.len));
-			memcpy(cmdptr, "cp ", 3);
-			cmdptr += 3;
+			assert(SIZEOF(command) >= (STR_LIT_LEN(UNALIAS) + 5 + seg->fname_len +
+								mu_repl_inst_reg_list->backup_file.len));
+			MEMCPY_LIT(cmdptr, UNALIAS);
+			cmdptr += STR_LIT_LEN(UNALIAS);
+			rv = CONFSTR(cp_cmd, MAX_FN_LEN);
+			if (0 != rv)
+			{
+				error_mupip = TRUE;
+				goto repl_inst_bkup_done2;
+			}
+			memcpy(cmdptr, cp_cmd, STRLEN(cp_cmd));
+			cmdptr += STRLEN(cp_cmd);
 			memcpy(cmdptr, seg->fname, seg->fname_len);
 			cmdptr[seg->fname_len] = ' ';
 			cmdptr += seg->fname_len + 1;

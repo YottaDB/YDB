@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,7 +93,7 @@
 # include "gtm_trigger.h"
 #endif
 
-GBLREF	boolean_t		ctrlc_on, created_core, dont_want_core, in_gvcst_incr, run_time;
+GBLREF	boolean_t		created_core, dont_want_core, in_gvcst_incr, run_time;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
 GBLREF	dollar_ecode_type	dollar_ecode;			/* structure containing $ECODE related information */
 GBLREF	dollar_stack_type	dollar_stack;
@@ -729,7 +729,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 		if (!repeat_error)
 			/* This has already been done if we are re-throwing the error */
 			outofband_clear();
-		if (!trans_action && !ctrlc_on && !(frame_pointer->type & SFT_DM))
+		if (!trans_action && !(frame_pointer->type & SFT_DM))
 		{
 			if (!repeat_error)
 			{

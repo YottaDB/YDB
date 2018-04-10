@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,7 @@
 														\
 		TAREF1(parm_ary_len, PARM_ARY_INDEX) = TAREF1(parm_str_len, PARM_ARY_INDEX);			\
 	}													\
+	assert(NULL != (TAREF1(parm_ary, PARM_ARY_INDEX))); /* 4SCA: parm_ary_len ensure this */		\
 }
 
 #if MAX_OPT_LEN > MAX_LINE

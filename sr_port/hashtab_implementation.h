@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,10 +42,25 @@ Restrictions :
 #include "bit_set.h"
 #include "gtmio.h"
 #include "have_crit.h"
+#include "caller_id.h"
 
-LITREF	int		ht_sizes[];
+GBLREF	int		*ht_sizes;
 
 #define DEBUGHASHTABLE 0
+
+#define CALLERID ((unsigned char *)caller_id())
+
+/* For manual calls to raise_gtmmemory_error() */
+#define SET_GTMMEMORY_ERROR_VARS(SIZE, ERROR)		\
+{							\
+	GBLREF	size_t		gtmMallocErrorSize;	\
+	GBLREF	unsigned char	*gtmMallocErrorCallerid;\
+	GBLREF	int		gtmMallocErrorErrno;	\
+							\
+	gtmMallocErrorSize = SIZE;			\
+	gtmMallocErrorCallerid = CALLERID;		\
+	gtmMallocErrorErrno = ERROR;			\
+}
 
 #if defined(INT4_HASH)
 
@@ -409,8 +425,9 @@ STATICFNDEF void INIT_HASHTAB_INTL(HASH_TABLE *table, int minsize, HASH_TABLE *o
 	} else
 	{
 		DBGHASHTAB((stderr, "INIT_HASHTAB:HTOFLOW: minsize(%d) cur_ht_size(%d)\n", minsize, cur_ht_size));
- 		send_msg(VARLSTCNT(3) ERR_HTOFLOW, 1, minsize);
- 		rts_error(VARLSTCNT(3) ERR_HTOFLOW, 1, minsize);
+		SET_GTMMEMORY_ERROR_VARS(minsize, ERR_HTOFLOW);
+ 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_HTOFLOW, 1, minsize);
+ 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_HTOFLOW, 1, minsize);
 	}
 }
 /* Description:
@@ -540,7 +557,7 @@ STATICFNDEF boolean_t ADD_HASHTAB_INTL(HASH_TABLE *table, HT_KEY_T *key, void *v
 		INSERT_HTENT(table, *tabentptr, key, value);
 		return TRUE;
 	}
-	GTMASSERT;
+	assertpro(FALSE);
 	return FALSE; /* to prevent warnings */
 }
 
@@ -643,7 +660,7 @@ void FREE_HASHTAB(HASH_TABLE *table)
 }
 
 /*
- * Returns TRUE, if key found and deleted successfully or already deleted.
+ * Reinitialize hash table
  */
 void REINITIALIZE_HASHTAB(HASH_TABLE *table)
 {
@@ -669,7 +686,7 @@ void COMPACT_HASHTAB(HASH_TABLE *table)
 		EXPAND_HASHTAB(table, HT_REHASH_TABLE_SIZE(table));
 		if (oldbase == (table)->base) /* rehash failed */
 		{	/* We will continue but performance will likely suffer */
-			send_msg(VARLSTCNT(1) ERR_HTSHRINKFAIL);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_HTSHRINKFAIL);
 			(table)->cmp_trigger_size = (table)->size;
 		}
 	}

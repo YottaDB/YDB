@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2017 Fidelity National Information	*
+ * Copyright (c) 2004-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,6 +70,7 @@
 GBLREF	boolean_t	dollar_zquit_anyway;	/* if TRUE compile QUITs to not care whether or not they're from an extrinsic */
 GBLREF	uint4		gtmDebugLevel; 		/* Debug level (0 = using default sm module so with
 						   a DEBUG build, even level 0 implies basic debugging) */
+GBLREF	boolean_t	gtmSystemMalloc;	/* Use the system's malloc() instead of our own */
 GBLREF	int4		gtm_fullblockwrites;	/* Do full (not partial) database block writes */
 GBLREF	boolean_t	certify_all_blocks;
 GBLREF	uint4		gtm_blkupgrade_flag;	/* controls whether dynamic block upgrade is attempted or not */
@@ -115,6 +116,11 @@ void	gtm_env_init(void)
 			if (GDL_SmStorHog & tdbglvl)
 				tdbglvl |= GDL_SmBackfill | GDL_SmChkAllocBackfill;
 			gtmDebugLevel |= tdbglvl;
+			gtmSystemMalloc = ((GDL_UseSystemMalloc & gtmDebugLevel) || FALSE);
+			if (gtmSystemMalloc)
+				gtmDebugLevel &= !(GDL_SmStats | GDL_SmTrace | GDL_SmDumpTrace | GDL_SmAllocVerf | GDL_SmFreeVerf
+							| GDL_SmBackfill | GDL_SmChkAllocBackfill | GDL_SmChkFreeBackfill
+							| GDL_SmStorHog | GDL_SmDump );
 		}
 		/* gtm_boolean environment/logical */
 		val.addr = GTM_BOOLEAN;

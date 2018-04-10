@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,7 +80,13 @@ GBLREF	uint4			restore_read_errno;
 LITREF	char			*gtm_dbversion_table[];
 LITREF	char			*mdb_ver_names[];
 
+#define GTMCRYPT_ERRLIT		"during GT.M startup"
+
 error_def(ERR_BADTAG);
+error_def(ERR_CRYPTDLNOOPEN);
+error_def(ERR_CRYPTDLNOOPEN2);
+error_def(ERR_CRYPTINIT);
+error_def(ERR_CRYPTINIT2);
 error_def(ERR_IOEOF);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_MUPRESTERR);
@@ -347,6 +353,20 @@ void mupip_restore(void)
 		if (!SAME_ENCRYPTION_SETTINGS(&inhead, &old_data))
 		{
 			same_encr_settings = FALSE;
+			INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+			if (0 != gtmcrypt_errno)
+			{
+				CLEAR_CRYPTERR_MASK(gtmcrypt_errno);
+				assert(!IS_REPEAT_MSG_MASK(gtmcrypt_errno));
+				assert((ERR_CRYPTDLNOOPEN == gtmcrypt_errno) || (ERR_CRYPTINIT == gtmcrypt_errno));
+				if (ERR_CRYPTDLNOOPEN == gtmcrypt_errno)
+					gtmcrypt_errno = ERR_CRYPTDLNOOPEN2;
+				else if (ERR_CRYPTINIT == gtmcrypt_errno)
+					gtmcrypt_errno = ERR_CRYPTINIT2;
+				gtmcrypt_errno = SET_CRYPTERR_MASK(gtmcrypt_errno);
+				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, SIZEOF(GTMCRYPT_ERRLIT) - 1,
+						GTMCRYPT_ERRLIT);
+			}
 			INIT_DB_OR_JNL_ENCRYPTION(&in_encr_handles, &inhead, 0, NULL, gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
 			{

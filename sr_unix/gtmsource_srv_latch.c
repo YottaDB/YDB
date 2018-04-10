@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,7 @@ error_def(ERR_TEXT);
  */
 boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeout_in_secs, uint4 onln_rlbk_action)
 {
-	int			spins, maxspins, retries, max_retries;
+	uint4			spins, maxspins, retries, max_retries;
 	unix_db_info		*udi;
 	sgmnt_addrs		*repl_csa;
 	boolean_t		cycle_mismatch;
@@ -63,7 +63,8 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 	udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 	repl_csa = &udi->s_addrs;
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
-	max_retries = max_timeout_in_secs * 4 * 1000; /* outer-loop : X minutes, 1 loop in 4 is sleep of 1 ms */
+	/* outer-loop : X minutes, 1 loop in 4 is sleep of 1 ms */
+	max_retries = (max_timeout_in_secs < (UINT32_MAX / 4 / 1000)) ? (max_timeout_in_secs * 4 * 1000) : UINT32_MAX;
 	for (retries = max_retries - 1; 0 < retries; retries--)
 	{	/* seems like it should be a mutex */
 		for (spins = maxspins; 0 < spins; spins--)
@@ -115,7 +116,8 @@ boolean_t	grab_gtmsource_srv_latch(sm_global_latch_ptr_t latch, uint4 max_timeou
 	DUMP_LOCKHIST();
 	assert(FALSE);
 	assert(jnlpool->gtmsource_local && jnlpool->gtmsource_local->gtmsource_pid);
-	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SRVLCKWT2LNG, 2, max_timeout_in_secs, jnlpool->gtmsource_local->gtmsource_pid);
+	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SRVLCKWT2LNG, 2, jnlpool->gtmsource_local->gtmsource_pid,
+			max_timeout_in_secs);
 	return FALSE; /* to keep the compiler happy */
 }
 

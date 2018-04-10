@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,6 +46,7 @@ GBLREF	backup_reg_list		*mu_repl_inst_reg_list;
 GBLREF 	bool			error_mupip;
 GBLREF 	bool			in_backup;
 GBLREF	boolean_t		mu_star_specified;
+GBLREF	boolean_t		mu_region_found;
 GBLREF	gd_addr			*gd_header;
 GBLREF	tp_region		*grlist;
 
@@ -176,6 +177,7 @@ void mu_getlst(char *name, int4 size)
 					if (NULL == (list = insert_region(reg, &(grlist), NULL, size)))
 					{
 						error_mupip = TRUE;
+						mu_region_found = FALSE;
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, REG_LEN_STR(reg));
 						continue;
 					}

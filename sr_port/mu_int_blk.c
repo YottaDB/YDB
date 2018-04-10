@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -689,7 +689,8 @@ boolean_t mu_int_blk(
 			if (!level && !master_dir)
 			{
 				rval_len = rec_size - SIZEOF(rec_hdr) - key_size;
-				if (mu_int_data.max_rec_size < rval_len)
+				boolean_t is_trigger = (STRCMP(top_key, "#t") == 0 || STRCMP(bot_key, "#t") == 0) ? TRUE : FALSE;
+				if (mu_int_data.max_rec_size < rval_len && !is_trigger)
 				{
 					mu_int_err(ERR_DBDATAMX, TRUE, TRUE, buff, comp_length,
 							top_key, top_len, (unsigned int)blk_levl);
@@ -697,7 +698,10 @@ boolean_t mu_int_blk(
 					return FALSE;
 				}
 				span_key = buff + buff_length - SPAN_SUBS_LENGTH - 1;
-				max_allowed_key_size = mu_int_data.max_key_size;
+				if (is_trigger)
+					max_allowed_key_size = MAX_KEY_SZ - 4;
+				else
+					max_allowed_key_size = mu_int_data.max_key_size;
 				if ((SPAN_SUBS_LENGTH < key_size + rec_cmpc) && (KEY_DELIMITER == *span_key++)
 						&& (SPAN_START_BYTE == *span_key))
 				{	/* Hidden subscript detected */
@@ -890,7 +894,15 @@ boolean_t mu_int_blk(
 		{
 			if (master_dir)
 			{
-				for (c0 = c_base = (uchar_ptr_t)rec_base + SIZEOF(rec_hdr);  *c0;  c0++);
+				for (c0 = c_base = (uchar_ptr_t)rec_base + SIZEOF(rec_hdr), cc = MAX_MIDENT_LEN;
+							*c0 && cc;  c0++, cc--);
+				if (!cc && *c0) /*Key value too long*/
+				{
+					mu_int_err(ERR_DBKEYMX, TRUE, TRUE, buff, comp_length, top_key, top_len,
+							(unsigned int)blk_levl);
+					free(free_blk_base);
+					return FALSE;
+				}
 				GET_LONG(root_pointer, ((block_id *)(c0 + 2)));
 				if (root_pointer > mu_int_data.trans_hist.total_blks || root_pointer < 2)
 				{	/* 0=master map, 1=dir root*/
@@ -900,10 +912,26 @@ boolean_t mu_int_blk(
 				}
 				c1 = temp_buff;
 				if (rec_cmpc)
-					for (c2 = muint_temp_buff, cc = 0;  *c2 && (cc < rec_cmpc);  cc++)
+				{
+					if (rec_cmpc > MAX_MIDENT_LEN)
+					{
+						mu_int_err(ERR_DBCMPBAD, TRUE, TRUE, buff, comp_length, top_key, top_len,
+										(unsigned int)blk_levl);
+						free(free_blk_base);
+						return FALSE;
+					}
+					for (c2 = muint_temp_buff, cc = 0;  *c2 && cc < rec_cmpc;  cc++)
 						*c1++ = *c2++;
-				for (;  c_base < c0;)
+				}
+				for (cc = (c1 - temp_buff);  ((c_base < c0) && (cc <= MAX_MIDENT_LEN)); cc++)
 					*c1++ = *c_base++;
+				if (cc > MAX_MIDENT_LEN)
+				{
+					mu_int_err(ERR_DBKEYMX, TRUE, TRUE, buff, comp_length, top_key, top_len,
+							(unsigned int)blk_levl);
+					free(free_blk_base);
+					return FALSE;
+				}
 				*c1 = 0;
 				assert(SIZEOF(muint_temp_buff) == SIZEOF(temp_buff));
 				memcpy(muint_temp_buff, temp_buff, SIZEOF(temp_buff));

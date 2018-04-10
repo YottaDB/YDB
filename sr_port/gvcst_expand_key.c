@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,9 +74,9 @@ enum cdb_sc	gvcst_expand_key(srch_blk_status *pStat, int4 rec_top, gv_key *key)
 			{
 				if (dollar_tlevel)
 					TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch, cs_data,
-							  pStat->tn, ((blk_hdr_ptr_t)bp)->tn, pStat->level)
+							  pStat->tn, ((blk_hdr_ptr_t)bp)->tn, pStat->level);
 				else
-					NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_expand_key)
+					NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_expand_key);
 				return cdb_sc_blkmod;
 			}
 			assert(NULL != expKeyUnCmp);
@@ -101,9 +101,9 @@ enum cdb_sc	gvcst_expand_key(srch_blk_status *pStat, int4 rec_top, gv_key *key)
 		{
 			if (dollar_tlevel)
 				TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch, cs_data, pStat->tn,
-						  ((blk_hdr_ptr_t)bp)->tn, pStat->level)
+						  ((blk_hdr_ptr_t)bp)->tn, pStat->level);
 			else
-				NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_expand_key)
+				NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_expand_key);
 			return cdb_sc_blkmod;
 		}
 		/* It is now safe to do *tmpPtr and *++tmpPtr without worry about exceeding block bounds */
@@ -117,9 +117,9 @@ enum cdb_sc	gvcst_expand_key(srch_blk_status *pStat, int4 rec_top, gv_key *key)
 	{
 		if (dollar_tlevel)
 			TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch, cs_data, pStat->tn,
-					  ((blk_hdr_ptr_t)bp)->tn, pStat->level)
+					  ((blk_hdr_ptr_t)bp)->tn, pStat->level);
 		else
-			NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_expand_key)
+			NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_expand_key);
 		return cdb_sc_blkmod;
 	}
 	memcpy(tmpPtr, expKeyUnCmp, expKeyUnCmpLen);

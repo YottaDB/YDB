@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,24 +44,23 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	boolean_t		in_jnl_file_autoswitch;
 
+error_def(ERR_DBFILERR);
+error_def(ERR_DSKSPACEFLOW);
 error_def(ERR_JNLEXTEND);
+error_def(ERR_JNLFILEXTERR);
+error_def(ERR_JNLNOCREATE);
+error_def(ERR_JNLRDERR);
 error_def(ERR_JNLREADEOF);
 error_def(ERR_JNLSPACELOW);
-error_def(ERR_NEWJNLFILECREAT);
-error_def(ERR_DSKSPACEFLOW);
-error_def(ERR_JNLFILEXTERR);
-error_def(ERR_DBFILERR);
-error_def(ERR_NOSPACEEXT);
-error_def(ERR_JNLRDERR);
 error_def(ERR_JNLWRERR);
-error_def(ERR_JNLNOCREATE);
-error_def(ERR_PREMATEOF);
+error_def(ERR_NEWJNLFILECREAT);
+error_def(ERR_NOSPACEEXT);
 
 uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 {
 	file_control		*fc;
 	boolean_t		need_extend;
-	jnl_buffer_ptr_t     	jb;
+	jnl_buffer_ptr_t	jb;
 	jnl_create_info 	jnl_info;
 	jnl_file_header		*header;
 	unsigned char		hdr_buff[REAL_JNL_HDR_LEN + MAX_IO_BLOCK_SIZE];
@@ -126,7 +125,6 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 			warn_blocks = (csd->jnl_alq + csd->jnl_deq > csd->autoswitchlimit)
 					? ((csd->jnl_deq > csd->autoswitchlimit) ? csd->jnl_deq : csd->autoswitchlimit)
 					: new_blocks;
-
 			if ((warn_blocks * EXTEND_WARNING_FACTOR) > avail_blocks)
 			{
 				if (new_blocks > avail_blocks)
@@ -321,7 +319,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	if (SS_NORMAL == jpc->status)
 		jpc->status = ERR_JNLREADEOF;
 	jnl_file_lost(jpc, ERR_JNLEXTEND);
-       	return EXIT_ERR;
+	return EXIT_ERR;
 }
 
 CONDITION_HANDLER(jnl_file_autoswitch_ch)

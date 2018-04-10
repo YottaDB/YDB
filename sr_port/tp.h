@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -190,29 +190,6 @@ typedef struct
 #endif
 } off_chain;
 
-/* The following struct is built into a separate list for each transaction
-   because it is not thrown away if a transaction restarts. The list keeps
-   growing so we can lock down all the necessary regions in the correct order
-   in case one attempt doesn't get very far while later attempts get further.
-   Items will be put on the list sorted in unique_id order so that they will always
-   be grab-crit'd in the same order thus avoiding deadlocks. */
-
-/* The structure backup_region_list defined in mupipbckup.h needs to have its first four fields
-   identical to the first three fields in this structure */
-typedef struct tp_region_struct
-{
-	struct	tp_region_struct *fPtr;		/* Next in list */
-	gd_region	*reg;			/* Region pointer. Note that it is not necessarily unique since multiple
-						 * regions could point to the same physical file (with all but one of them
-						 * having reg->was_open set to TRUE.and hence have the same tp_region structure.
-						 */
-	union					/* we will either use file_id or index */
-	{
-		gd_id		file_id;
-		int4		fid_index;	/* copy of csa->fid_index for this region */
-	} file;
-} tp_region;
-
 #ifdef	DEBUG
 /* Macro to check that the tp_reg_list linked list is sorted properly on the file-id */
 #define	DBG_CHECK_TP_REG_LIST_SORTING(REGLIST)						\
@@ -225,8 +202,8 @@ typedef struct tp_region_struct
 	{										\
 		if (tr->reg->open)							\
 		{									\
-			assert(prev_index < tr->file.fid_index);			\
-			DEBUG_ONLY(prev_index = tr->file.fid_index);			\
+			assert(prev_index < tr->fid_index);				\
+			prev_index = tr->fid_index;					\
 		}									\
 	}										\
 }
@@ -426,22 +403,6 @@ typedef struct trans_restart_hist_struct
 #else
 # define TRACE_TRANS_RESTART(RETRY_CODE)
 #endif	/* DEBUG */
-
-#define TP_TRACE_HIST(X, Y) 										\
-{													\
-	GBLREF	gd_region	*tp_fail_hist_reg[];							\
-	GBLREF	gv_namehead	*tp_fail_hist[];							\
-	GBLREF	block_id	t_fail_hist_blk[];							\
-	DCL_THREADGBL_ACCESS;										\
-													\
-	SETUP_THREADGBL_ACCESS;										\
-	if (TREF(tprestart_syslog_delta))								\
-	{												\
-		tp_fail_hist_reg[t_tries] = gv_cur_region;						\
-		t_fail_hist_blk[t_tries] = ((block_id)X); 						\
-		tp_fail_hist[t_tries] = (gv_namehead *)(((int)X & ~(-BLKS_PER_LMAP)) ? Y : NULL);	\
-	}												\
-}
 
 #define	ASSERT_IS_WITHIN_TP_HIST_ARRAY_BOUNDS(FIRST_TP_SRCH_STATUS, SGM_INFO_PTR)	\
 {											\
@@ -983,7 +944,6 @@ void tp_start_timer_dummy(int4 timeout_seconds);
 void tp_clear_timeout_dummy(void);
 void tp_timeout_action_dummy(void);
 
-tp_region	*insert_region(gd_region *reg, tp_region **reg_list, tp_region **reg_free_list, int4 size);
 boolean_t	tp_tend(void);
 boolean_t	tp_crit_all_regions(void);
 

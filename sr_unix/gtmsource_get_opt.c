@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -125,6 +125,7 @@ int gtmsource_get_opt(void)
 		 * 	Mandatory : START, ACTIVATE, DEACTIVATE, STOPSOURCEFILTER, CHANGELOG, STATSLOG, NEEDRESTART,
 		 *	Optional  : CHECKHEALTH, SHOWBACKLOG or SHUTDOWN
 		 */
+		inst_name_len = 0; /* 4SCA: Even though this is guarded by gtmsource_options.instsecondary */
 		if (gtmsource_options.start || gtmsource_options.activate || gtmsource_options.deactivate
 			|| gtmsource_options.stopsourcefilter || gtmsource_options.changelog
 			|| gtmsource_options.statslog || gtmsource_options.needrestart

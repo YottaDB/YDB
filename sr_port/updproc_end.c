@@ -113,6 +113,12 @@ void  updproc_stop(boolean_t exit)
 		pool_init--;
 	}
 	recvpool.upd_proc_local->upd_proc_shutdown = NORMAL_SHUTDOWN;
+	/* In case we hold the write_updated_ctl mutex, we need to release it before detaching the recvpool.
+	 * The robust mutex handling can't work if the memory no longer exists in the process' address space,
+	 * which is why we have to do it manually.
+	 * Ignore errors, as we may not have held it, and we're exiting anyway.
+	 */
+	pthread_mutex_unlock(&recvpool.recvpool_ctl->write_updated_ctl);
 	/* The receiver server needs to do a WAITPID on the update process so that the STOPed update process can be
 	 * reaped by the OS and don't go into the defunct state. So, do not reset the upd_proc_pid
 	 */

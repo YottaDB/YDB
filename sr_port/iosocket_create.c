@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -220,8 +220,6 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 			/* protooffset is after colon */
 			SOCKET_ALLOC(socketptr);
 			socketptr->protocol = socket_local;
-			sa_un_ptr = malloc(SIZEOF(struct sockaddr_un));
-			sa_un_ptr->sun_family = AF_UNIX;
 			MV_INIT_STRING(&localpath, protooffset - 1, sockaddr);
 			trans_status = TRANS_LOG_NAME(&localpath.str, &transpath, sa_un_trans.sun_path,
 				(int)SIZEOF(sa_un_trans.sun_path), dont_sendmsg_on_log2long);
@@ -232,6 +230,8 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 					localpath.str.len, SIZEOF(sa_un_trans.sun_path));
 				return NULL;
 			}
+			sa_un_ptr = malloc(SIZEOF(struct sockaddr_un));
+			sa_un_ptr->sun_family = AF_UNIX;
 			memcpy(sa_un_ptr->sun_path, transpath.addr, transpath.len);
 			sa_un_ptr->sun_path[transpath.len] = '\0';
 			if (listen_specified)

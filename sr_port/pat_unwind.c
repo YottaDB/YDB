@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,6 +63,7 @@ boolean_t pat_unwind(
 		} else
 		{
 			pattern_mask = 0;
+			offset = 0;	/* 4SCA: Assigned value is garbage or undefined FIXME: Test possible? */
 			for (charpos = 0; leaves->letter[leaf_cnt][charpos] >= 0; charpos++)
 			{
 				assert(MAX_DFA_STRLEN > charpos);

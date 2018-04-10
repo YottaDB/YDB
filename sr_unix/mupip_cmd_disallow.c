@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2002-2017 Fidelity National Information	*
+ * Copyright (c) 2002-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -195,6 +195,7 @@ boolean_t cli_disallow_mupip_journal(void)
 	disallow_return_value =  (d_c_cli_present("GLOBAL")
 					|| d_c_cli_present("USER")
 					|| d_c_cli_present("ID")
+					|| d_c_cli_present("SEQNO")
 					|| d_c_cli_present("TRANSACTION")) && (d_c_cli_present("RECOVER")
 										|| d_c_cli_present("ROLLBACK")
 										|| d_c_cli_present("VERIFY"));

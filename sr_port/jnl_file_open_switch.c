@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,7 @@
 #include "jnl.h"
 #include "send_msg.h"
 #include "gtmio.h"
+#include "sgtm_putmsg.h"
 #include "repl_sp.h"
 #include "iosp.h"	/* for SS_NORMAL */
 #include "wbox_test_init.h"
@@ -35,9 +36,10 @@ error_def(ERR_JNLSWITCHFAIL);
 error_def(ERR_JNLSWITCHRETRY);
 error_def(ERR_PREVJNLLINKCUT);
 
-uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
+uint4 jnl_file_open_switch(gd_region *reg, uint4 sts, char *err_str)
 {
 	sgmnt_addrs		*csa;
+	sgmnt_data_ptr_t	csd;
 	jnl_private_control	*jpc;
 	jnl_create_info		create;
 	char			prev_jnl_fn[JNL_NAME_SIZE];
@@ -48,6 +50,7 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
 	SETUP_THREADGBL_ACCESS;
 #	endif
 	csa = &FILE_INFO(reg)->s_addrs;
+	csd = csa->hdr;
 	jpc = csa->jnl;
 	assert(sts GTMTRIG_ONLY(|| TREF(in_trigger_upgrade)));
 	assert(!sts || ((ERR_JNLFILOPN != sts) && (NOJNL != jpc->channel)) || ((ERR_JNLFILOPN == sts) && (NOJNL == jpc->channel))
@@ -75,15 +78,16 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts)
 	{
 		jpc->status = create.status;
 		jpc->status2 = create.status2;
+		sgtm_putmsg(err_str, VARLSTCNT(7) ERR_JNLSWITCHFAIL, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);
+		jpc->err_str = err_str;
 		return ERR_JNLSWITCHFAIL;
-	} else
-	{
-		jpc->status = SS_NORMAL;
-		csa->hdr->jnl_checksum = create.checksum;
-		csa->hdr->jnl_eovtn = csa->hdr->trans_hist.curr_tn;
 	}
-	send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csa->hdr), DB_LEN_STR(reg));
-	assert(csa->hdr->jnl_file_len == create.jnl_len);
-	assert(0 == memcmp(csa->hdr->jnl_file_name, create.jnl, create.jnl_len));
+	jpc->status = SS_NORMAL;
+	csd->jnl_checksum = create.checksum;
+	csd->jnl_eovtn = csd->trans_hist.curr_tn;
+	if (create.no_prev_link)
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_PREVJNLLINKCUT, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+	assert(csd->jnl_file_len == create.jnl_len);
+	assert(0 == memcmp(csd->jnl_file_name, create.jnl, create.jnl_len));
 	return 0;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,6 +147,7 @@ STATICFNDEF void *get_memory(size_t n)
 		else
 		{
 			heap_base = (void *)malloc(SPACE_BLOCK_SIZE);
+			assert(NULL != heap_base); /* 4SCA: NULL return */
 			space_remaining = SPACE_BLOCK_SIZE;
 		}
 	}
@@ -386,6 +387,7 @@ STATICFNDEF void put_mstr(mstr *src, mstr *dst)
 
 	assert(n >= 0);
 	dst->addr = cp = (char *)get_memory((size_t)(n + 1));
+	assertpro(NULL != dst->addr); /* 4SCA: NULL return */
 	if (0 < n)
 		memcpy(dst->addr, src->addr, dst->len);
 	dst->addr[n] = 0;

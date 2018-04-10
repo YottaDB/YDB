@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,7 +100,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	mu_set_rlist		*rptr, dummy_rlist, *next_rptr;
 	sgmnt_data_ptr_t	csd;
 	uint4			status,	exit_status = EXIT_NRM, gds_rundown_status = EXIT_NRM;
-	seq_num			max_reg_seqno;
 	unsigned int		fn_len;
 	unsigned char		tmp_full_jnl_fn[MAX_FN_LEN + 1], prev_jnl_fn[MAX_FN_LEN + 1];
 	char			*db_reg_name, db_or_reg[DB_OR_REG_SIZE];
@@ -132,7 +131,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	assert(SGMNT_HDR_LEN == ROUND_UP(SIZEOF(sgmnt_data), DISK_BLOCK_SIZE));
 	memset(&jnl_info, 0, SIZEOF(jnl_info));
 	jnl_info.status = jnl_info.status2 = SS_NORMAL;
-	max_reg_seqno = 1;
 	if (!mupip_set_journal_parse(&jnl_options, &jnl_info))
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
@@ -345,8 +343,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				ADJUST_GBL_JREC_TIME(jgbl, jbp);
 			}
 		}
-		if (max_reg_seqno < csd->reg_seqno)
-			max_reg_seqno = csd->reg_seqno;
 	}
 	DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
 	jgbl.dont_reset_gbl_jrec_time = TRUE;
@@ -461,7 +457,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 			if (!jnl_options.epoch_interval_specified)
 				jnl_info.epoch_interval = (0 == csd->epoch_interval) ? DEFAULT_EPOCH_INTERVAL : csd->epoch_interval;
 			JNL_MAX_RECLEN(&jnl_info, csd);
-			jnl_info.reg_seqno = max_reg_seqno;
+			jnl_info.reg_seqno = csd->reg_seqno;
 			jnl_info.prev_jnl = (char *)prev_jnl_fn;
 			jnl_info.prev_jnl_len = 0;
 			if (csd->jnl_file_len)

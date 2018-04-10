@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2017 Fidelity National Information	*
+ * Copyright (c) 2011-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,7 @@
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gd_addr			*gd_header;
-GBLREF	rtn_tabent		*rtn_names_end;
+GBLREF	rtn_tabent		*rtn_names, *rtn_names_end;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gd_region		*gv_cur_region;
@@ -158,8 +158,10 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 		}
 	}
 	if (NULL != *rtn_vec)
+	{
 		rtn_vector = *rtn_vec;
-	else if (find_rtn_tabent(&rttabent, trigname))
+		rttabent = rtn_names;
+	} else if (find_rtn_tabent(&rttabent, trigname))
 		rtn_vector = rttabent->rt_adr;
 	else
 		rtn_vector = NULL;

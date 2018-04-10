@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -216,7 +216,10 @@ STATICFNDEF void job_term_handler(int sig)
 			return;
 		else if (0 > ret)
 		{
-			assert(FALSE);
+			if (job_errno == ECHILD)
+				exit_status = joberr_sig;
+			else
+				assert(FALSE);
 			UNDERSCORE_EXIT(exit_status);
 		} else
 			return;
@@ -523,7 +526,9 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			assert(FALSE);
 			UNDERSCORE_EXIT(joberr);
 		}
-
+		/* Kill ourselves before we fork again */
+		if (WBTEST_ENABLED(WBTEST_SIGTERM_IN_JOB_CHILD))
+			kill(getpid(), SIGTERM);
 		/* clone self and exit */
 		FORK_RETRY(child_pid);
 		if (child_pid)

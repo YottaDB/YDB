@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +49,7 @@ uint4	repl_logfileinfo_get(char *logfile, repl_logfile_info_msg_t *msgp, boolean
 			SNPRINTF(fullpath, GTM_PATH_MAX, "Could not obtain current working directory");
 		}
 		fullpath_len = STRLEN(fullpath);
-	} else if (!get_full_path(STR_AND_LEN(logfile), fullpath, &fullpath_len, GTM_PATH_MAX + 1, &status))
+	} else if (!get_full_path(STR_AND_LEN(logfile), fullpath, &fullpath_len, GTM_PATH_MAX, &status))
 	{	/* Either GETCWD failed or buffer not large enough to hold the expanded logfile path. In either case, we don't want
 		 * to error out as this is just a supplementary message. Copy whatever possible.
 		 */

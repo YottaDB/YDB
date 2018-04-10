@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,17 +52,21 @@
 #define TMPDIR_CREATE_MODE	S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH
 #define	COMMAND_ARRAY_SIZE	1024
 #define	MV_CMD			"mv "
-#define	MKDIR_CMD		"mkdir "
-#define	RMDIR_CMD		"rm -r "
+#define	RMDIR_CMD		"rm "
+#define	RMDIR_OPT		"-r "
 #define	CD_CMD			"cd "
 #define CMD_SEPARATOR		" && "
 #ifdef __linux__
-#	define	CP_CMD		"cp --sparse=always "
+#	define	CP_CMD		"cp "
+#	define	CP_OPT		"--sparse=always "
 #elif defined(_AIX)
-#	define	CP_CMD		"pax -r -w "
+#	define	CP_CMD		"pax "
+#	define	CP_OPT		"-r -w "
 #else
 #	define	CP_CMD		"cp "
+#       define  CP_OPT          ""
 #endif
+#define	NUM_CMD			3
 
 #define	FREE_COMMAND_STR_IF_NEEDED		\
 {						\
@@ -77,14 +81,19 @@
 {												\
 	int	rc;										\
 	int4	rv2, tmpcmdlen;									\
-	char	tmpcmd[MAX_FN_LEN + STR_LIT_LEN(RMDIR_CMD) + 1];				\
+	char	tmpcmd[(MAX_FN_LEN) * 2 + STR_LIT_LEN(UNALIAS) + 1];				\
 												\
 	if (FD_INVALID != backup_fd)								\
 		CLOSEFILE_RESET(backup_fd, rc);	/* resets "backup_fd" to FD_INVALID */		\
 	if (!debug_mupip)									\
 	{ /* An error happened. We are not sure if the temp dir is empty. Can't use rmdir() */	\
-		MEMCPY_LIT(tmpcmd, RMDIR_CMD);							\
-		tmpcmdlen = STR_LIT_LEN(RMDIR_CMD);						\
+		MEMCPY_LIT(tmpcmd, UNALIAS);							\
+		tmpcmdlen = STR_LIT_LEN(UNALIAS);						\
+		cmdpathlen = STRLEN(fulpathcmd[2]);						\
+		memcpy(&tmpcmd[tmpcmdlen], fulpathcmd[2], cmdpathlen);				\
+		tmpcmdlen += cmdpathlen;							\
+		MEMCPY_LIT(&tmpcmd[tmpcmdlen], RMDIR_OPT);					\
+		tmpcmdlen += STR_LIT_LEN(RMDIR_OPT);						\
 		memcpy(&tmpcmd[tmpcmdlen], tempdir, tmpdirlen);					\
 		tmpcmdlen += tmpdirlen;								\
 		rv2 = SYSTEM((char *)tmpcmd);							\
@@ -123,6 +132,7 @@ bool	mubfilcpy (backup_reg_list *list)
 {
 	mstr			*file, tempfile;
 	unsigned char		cmdarray[COMMAND_ARRAY_SIZE], *command = &cmdarray[0];
+	char 			fulpathcmd[NUM_CMD][MAX_FN_LEN] = {{CP_CMD}, {MV_CMD}, {RMDIR_CMD}};
 	sgmnt_data_ptr_t	header_cpy;
 	int4			backup_fd = FD_INVALID, counter, hdrsize, rsize, ntries;
 	ssize_t                 status;
@@ -133,7 +143,7 @@ bool	mubfilcpy (backup_reg_list *list)
 	char 			*inbuf, *ptr, *errptr, *sourcefilename, *sourcedirname;
 	char			tempfilename[MAX_FN_LEN + 1], tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN];
 	char			tmpsrcfname[MAX_FN_LEN], tmpsrcdirname[MAX_FN_LEN], realpathname[PATH_MAX];
-	int                     fstat_res;
+	int                     fstat_res, i, cmdpathlen;
 	uint4			ustatus, size;
 	muinc_blk_hdr_ptr_t	sblkh_p;
 	ZOS_ONLY(int		realfiletag;)
@@ -246,20 +256,32 @@ bool	mubfilcpy (backup_reg_list *list)
 	 * commands to be executed :
  		pushd sourcedir && CP_CMD fname tempfilename
 	*/
-	cmdlen = STR_LIT_LEN(CD_CMD) + sourcedirlen + STR_LIT_LEN(CMD_SEPARATOR);
-	cmdlen += STR_LIT_LEN(CP_CMD) + sourcefilelen + 1 /* space */ + realpathlen + 1 /* terminating NULL byte */;
+	for (i = 0; i < NUM_CMD; i++)
+	{
+		rv = CONFSTR(fulpathcmd[i], MAX_FN_LEN);
+		if (0 != rv)
+                	CLEANUP_AND_RETURN_FALSE;
+        }
+	cmdlen = STR_LIT_LEN(UNALIAS) + STR_LIT_LEN(CD_CMD) + sourcedirlen + STR_LIT_LEN(CMD_SEPARATOR);
+	cmdlen += STR_LIT_LEN(fulpathcmd[0]) + STR_LIT_LEN(CP_OPT) + sourcefilelen + 1 /* space */
+								+ realpathlen + 1 /* terminating NULL byte */;
 	if (cmdlen > SIZEOF(cmdarray))
 		command = malloc(cmdlen);	/* allocate memory and use that instead of local array "cmdarray" */
-	/* pushd */
-	MEMCPY_LIT(command, CD_CMD);
-	cmdlen = STR_LIT_LEN(CD_CMD);
+	/* cd */
+	MEMCPY_LIT(command, UNALIAS);
+	cmdlen = STR_LIT_LEN(UNALIAS);
+	MEMCPY_LIT(&command[cmdlen], CD_CMD);
+	cmdlen += STR_LIT_LEN(CD_CMD);
 	memcpy(&command[cmdlen], sourcedirname, sourcedirlen);
 	cmdlen += sourcedirlen;
 	MEMCPY_LIT(&command[cmdlen], CMD_SEPARATOR);
 	cmdlen += STR_LIT_LEN(CMD_SEPARATOR);
 	/* cp */
-	MEMCPY_LIT(&command[cmdlen], CP_CMD);
-	cmdlen += STR_LIT_LEN(CP_CMD);
+	cmdpathlen = STRLEN(fulpathcmd[0]);
+	memcpy(&command[cmdlen], fulpathcmd[0], cmdpathlen);
+	cmdlen += cmdpathlen;
+	MEMCPY_LIT(&command[cmdlen], CP_OPT);
+	cmdlen += STR_LIT_LEN(CP_OPT);
 	memcpy(&command[cmdlen], sourcefilename, sourcefilelen);
 	cmdlen += sourcefilelen;
 	command[cmdlen++] = ' ';
@@ -568,12 +590,16 @@ bool	mubfilcpy (backup_reg_list *list)
 	assert(command == &cmdarray[0]);
 	tmplen = file->len;
 	/* Command to be executed : mv tempfilename backup_file */
-	cmdlen = STR_LIT_LEN(MV_CMD) + tempfilelen + 1 /* space */ + tmplen + 1 /* terminating NULL byte */;
+	cmdlen = STR_LIT_LEN(UNALIAS) + STR_LIT_LEN(fulpathcmd[1]);
+	cmdlen += tempfilelen + 1 /* space */ + tmplen + 1 /* terminating NULL byte */;
 	if (cmdlen > SIZEOF(cmdarray))
 		command = malloc(cmdlen);	/* allocate memory and use that instead of local array "cmdarray" */
 	/* mv tmpfile destfile */
-	MEMCPY_LIT(command, MV_CMD);
-	cmdlen = STR_LIT_LEN(MV_CMD);
+	MEMCPY_LIT(command, UNALIAS);
+	cmdlen = STR_LIT_LEN(UNALIAS);
+	cmdpathlen = STRLEN(fulpathcmd[1]);
+	memcpy(&command[cmdlen], fulpathcmd[1], cmdpathlen);
+	cmdlen += cmdpathlen;
 	memcpy(&command[cmdlen], tempfilename, tempfilelen);
 	cmdlen += tempfilelen;
 	command[cmdlen++] = ' ';

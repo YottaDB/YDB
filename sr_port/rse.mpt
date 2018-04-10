@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1988, 2003 Sanchez Computer Associates, Inc.	;
+; Copyright (c) 1988-2018 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -12,7 +13,10 @@
 	;invoke ^%RSE to get interaction
 	;invoke CALL^%RSE with %ZF - string to find, %ZR - routine array or name, %ZD a device to receive a trail
 	;
-	n cnt1,cnt2,cnt3,flen,fnd,gtmvt,h,i,o,out,outd,p,r,rl,sx,tics,x,xn,%ZC,%ZD,%ZF,%ZR
+	d MAIN
+	q
+MAIN	n cnt1,cnt2,cnt3,flen,fnd,gtmvt,h,i,o,out,outd,p,r,rl,sx,tics,x,xn,%ZC,%ZD,%ZF,%ZR
+	i ('$d(%ZQ)) n %ZQ s %ZQ=0
 	w !,"Routine Search for Every occurrence",!
 	s %ZC=0,(cnt1,cnt2,cnt3)=0,(out,outd)=1
 	i '$d(%zdebug) n $et s $et="zg "_$zl_":ERR^%RCE" u $p:(ctrap=$c(3):exc="zg "_$zl_":LOOP^%RCE")
@@ -21,7 +25,16 @@
 	q
 CALL	i '$l($g(%ZF)) q
 	n %ZC,cnt1,cnt2,cnt3,flen,fnd,gtmvt,h,i,o,out,outd,p,r,rl,sx,tics,x,xn n:'$d(%ZD) %ZD
+	i ('$d(%ZQ)) n %ZQ s %ZQ=0
 	s %ZD=$g(%ZD),(%ZC,cnt1,cnt2,cnt3,out)=0,outd=$l(%ZD)
 	i $d(%ZR)<10 d CALL^%RSEL
 	d work^%RCE
+	q
+QUIET	n %ZQ
+	s %ZQ=1
+	d MAIN
+	q
+QCALL	n %ZQ
+	s %ZQ=1
+	d CALL
 	q

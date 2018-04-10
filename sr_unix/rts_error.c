@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,7 +64,7 @@ int rts_error_va(void *csa, int argcnt, va_list var);
  *  =======	zero MUST be specified if there are no parameters.
  * ----------------------------------------------------------------------------------------
  */
-
+/* coverity[+kill] */
 int rts_error(int argcnt, ...)
 {
 	va_list		var;
@@ -78,6 +78,7 @@ int rts_error(int argcnt, ...)
 	return rts_error_va(csa, argcnt, var);
 }
 
+/* coverity[+kill] */
 int rts_error_csa(void *csa, int argcnt, ...)
 {
 	va_list		var;

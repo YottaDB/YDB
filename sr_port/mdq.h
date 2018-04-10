@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,8 +76,8 @@ MBSTART {										\
 		{									\
 			c = TREF(curtchain);						\
 			chktchain(c);		/* this might be redundant, or not! */	\
-			c = TREF(expr_start);						\
-			if (NULL != c)							\
+			c = TREF(expr_start_orig);					\
+			if ((NULL != c) && (c != TREF(expr_start)))			\
 				chktchain(c);	/* this extra has been rewarding */	\
 		}									\
 	}										\

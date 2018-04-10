@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -315,6 +315,11 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 							if (ETIMEDOUT == save_errno || ECONNREFUSED == save_errno
 								|| ENOENT == save_errno)
 								need_connect = need_socket = TRUE;
+							else if (socket_local == sockptr->protocol)
+							{	/* AF_UNIX sockets do not continue the connect in background */
+								need_connect = TRUE;
+								need_socket = need_select = FALSE;
+							}
 							save_errno = 0;
 							res = -1;	/* do the outer loop again */
 						}

@@ -66,6 +66,7 @@
 #include "zyerror_init.h"
 #include "trap_env_init.h"
 #include "zdate_form_init.h"
+#include "mstack_size_init.h"
 #include "dollar_system_init.h"
 #include "sig_init.h"
 #include "gtm_startup.h"
@@ -145,7 +146,6 @@ void gtm_startup(struct startup_vector *svec)
 	mstr		log_name;
 	stack_frame 	*frame_pointer_lcl;
 	static char 	other_mode_buf[] = "OTHER";
-	unsigned char	*mstack_ptr;
 	void		gtm_ret_code();
 	DCL_THREADGBL_ACCESS;
 
@@ -161,12 +161,7 @@ void gtm_startup(struct startup_vector *svec)
 	stpgc_ch = &stp_gcol_ch;
 	rtn_fst_table = rtn_names = (rtn_tabent *)svec->rtn_start;
 	rtn_names_end = rtn_names_top = (rtn_tabent *)svec->rtn_end;
-	if (svec->user_stack_size < 4096)
-		svec->user_stack_size = 4096;
-	if (svec->user_stack_size > 8388608)
-		svec->user_stack_size = 8388608;
-	mstack_ptr = (unsigned char *)malloc(svec->user_stack_size);
-	msp = stackbase = mstack_ptr + svec->user_stack_size - mvs_size[MVST_STORIG];
+	mstack_size_init(svec);
 	/* mark the stack base so that if error occur during call-in gtm_init(), the unwind
 	 * logic in gtmci_ch() will get rid of the stack completely
 	 */
@@ -175,8 +170,6 @@ void gtm_startup(struct startup_vector *svec)
 	mv_chain->mv_st_type = MVST_STORIG;	/* Initialize first (anchor) mv_stent so doesn't do anything */
 	mv_chain->mv_st_next = 0;
 	mv_chain->mv_st_cont.mvs_storig = 0;
-	stacktop = mstack_ptr + 2 * mvs_size[MVST_NTAB];
-	stackwarn = stacktop + (16 * 1024);
 	break_message_mask = svec->break_message_mask;
 	if (svec->user_strpl_size < STP_INITSIZE)
 		svec->user_strpl_size = STP_INITSIZE;
