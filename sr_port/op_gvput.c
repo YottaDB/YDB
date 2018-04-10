@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,7 @@ void op_gvput(mval *var)
 	gd_region	*save_reg;
 	int		temp;
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
+	boolean_t	is_trigger;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -58,9 +59,13 @@ void op_gvput(mval *var)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	if ((TREF(gv_last_subsc_null) || TREF(gv_some_subsc_null)) && (ALWAYS != gv_cur_region->null_subs))
 		sgnl_gvnulsubsc();
-	assert(gv_currkey->end + 1 <= gv_cur_region->max_key_size);
+	is_trigger = (STRNCMP_LIT((char *) gv_currkey->base, "#t") == 0) ? TRUE : FALSE;
+	if(is_trigger)
+		assert(gv_currkey->end + 1 <= MAX_KEY_SZ - 4);
+	else
+		assert(gv_currkey->end + 1 <= gv_cur_region->max_key_size);
 	MV_FORCE_STR(var);
-	if (var->str.len <= gv_cur_region->max_rec_size)
+	if (var->str.len <= gv_cur_region->max_rec_size || is_trigger)
 	{
 		switch (gv_cur_region->dyn.addr->acc_meth)
 		{
@@ -85,8 +90,9 @@ void op_gvput(mval *var)
 		while (gv_cur_region = gv_cur_region->dyn.addr->repl_list) /* set replicated segments */
 		{
 			if (gv_cur_region->open && !gv_cur_region->read_only
-				&& ((temp = gv_currkey->end + 1) <= gv_cur_region->max_key_size)
-				&& (temp + var->str.len + SIZEOF(rec_hdr) <= gv_cur_region->max_rec_size))
+				&& (((temp = gv_currkey->end + 1) <= gv_cur_region->max_key_size)
+					|| (is_trigger && (gv_currkey->end + 1 <= MAX_KEY_SZ - 4)))
+				&& ((temp + var->str.len + SIZEOF(rec_hdr) <= gv_cur_region->max_rec_size) || is_trigger))
 			{
 				change_reg();
 				put_var(var);

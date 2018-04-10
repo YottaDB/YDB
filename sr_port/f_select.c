@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,12 +29,15 @@ error_def(ERR_SELECTFALSE);
 LITREF octabstruct oc_tab[];
 
 #define SELECT_CLEANUP					\
-{							\
+MBSTART {						\
 	free(TREF(side_effect_base));			\
 	TREF(side_effect_base) = save_se_base;		\
 	TREF(side_effect_depth) = save_se_depth;	\
 	TREF(expr_depth) = save_expr_depth;		\
-}
+	TREF(expr_start) = save_start;			\
+	TREF(expr_start_orig) = save_start_orig;	\
+	TREF(shift_side_effects) = save_shift;		\
+} MBEND
 
 int f_select(oprtype *a, opctype op)
 /* drive parsing for the $select function
@@ -133,6 +136,13 @@ int f_select(oprtype *a, opctype op)
 			{	/* it's TRUE: take this argument and disregard any following */
 				assert(!throwing && (NULL == savechain));
 				got_true = TRUE;
+				if (first_time && shifting)
+				{
+					setcurtchain(oldchain);
+					DECREMENT_EXPR_DEPTH;
+					shifting = FALSE;
+					TREF(expr_start) = TREF(expr_start_orig) = NULL;
+				}
 			}
 		}
 		if (EXPR_FAIL == expr(&tmparg, MUMPS_EXPR))
@@ -211,6 +221,7 @@ int f_select(oprtype *a, opctype op)
 				loop_save_start = TREF(expr_start);
 				loop_save_start_orig = TREF(expr_start_orig);
 			}
+			assert((dmpchain.exorder.fl == dmpchain.exorder.bl) && (dmpchain.exorder.fl == &dmpchain));
 			savechain = setcurtchain(&dmpchain);	/* discard arguments after a compile time TRUE */
 		}
 		cnd = NULL;
@@ -231,6 +242,7 @@ int f_select(oprtype *a, opctype op)
 		{	/* if all values were literals and FALSE, supply a dummy evaluation so we reach the error gracefully */
 			PUT_LITERAL_TRUTH(FALSE, r);
 			r->opcode = OC_LIT;
+			ins_triple(r);
 		}
 		ref = newtriple(OC_RTERROR);
 		ref->operand[0] = tmparg;
@@ -242,12 +254,9 @@ int f_select(oprtype *a, opctype op)
 	if (shifting)
 		DECREMENT_EXPR_DEPTH;				/* clean up */
 	assert(!TREF(expr_depth));
-	TREF(expr_start) = save_start;
-	TREF(expr_start_orig) = save_start_orig;
-	TREF(shift_side_effects) = save_shift;
 	save_se_base[save_expr_depth] |= (TREF(side_effect_base))[TREF(expr_depth)];
 	TREF(saw_side_effect) = saw_se_in_select | save_saw_side;
-	SELECT_CLEANUP;	/* restores TREF(expr_depth), TREF(side_effect_base) and TREF(side_effect_depth) */
+	SELECT_CLEANUP;	/* restores seven TREFs - see the top of this module */
 	if (shifting)
 	{
 		shifting = ((1 < save_expr_depth) || ((save_start != save_start_orig) && (OC_NOOP != save_start->opcode)));

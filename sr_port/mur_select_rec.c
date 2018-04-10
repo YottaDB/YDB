@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,13 +27,17 @@
 #include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"
 #include "copy.h"
+#include "error.h"
 #include "min_max.h"
 #include "format_targ_key.h"
 #include "jnl_typedef.h"
 #include "iosp.h"		/* for SS_NORMAL */
 #include "real_len.h"		/* for real_len() prototype */
 
-GBLREF	mur_opt_struct	mur_options;
+GBLREF	mur_opt_struct		mur_options;
+GBLREF	mur_gbls_t		murgbl;
+
+error_def(ERR_JNLEXTRCTSEQNO);
 
 boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 {
@@ -47,10 +51,12 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 	jnl_process_vector	*pv;
 	enum jnl_record_type	rectype;
 	long_list		*ll_ptr;
+	long_long_list		*lll_ptr;
 	select_list		*sl_ptr;
 	jnl_string		*keystr;
 	uint4			status;
 	int4			pv_len, sl_len;
+	seq_num			rec_token_seq;
 
 	assert(mur_options.selection);
 	rec = jctl->reg_ctl->mur_desc->jnlrec;
@@ -63,6 +69,9 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 	if (SS_NORMAL != status)
 		return TRUE;
 	pv = &plst->jpv;
+	/* Sequence number of this record */
+	rec_token_seq = REC_HAS_TOKEN_SEQ(rectype)
+		? ((jctl->reg_ctl->csd && REPL_ALLOWED(jctl->reg_ctl->csd)) ? GET_JNL_SEQNO(rec) : rec->prefix.tn) : 0;
 	if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 	{	/* Translate internal format of jnl_record key to ascii */
 		keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
@@ -147,6 +156,24 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 			if (wildcard_match || (pv_len == sl_len) && (0 == memcmp(pv->jpv_prcnam, sl_ptr->buff, sl_len)))
 			{
 				if (sl_ptr->exclude)
+					exc_item_seen = TRUE;
+				else
+					inc_item_seen = TRUE;
+			}
+		}
+		if (exc_item_seen || (inc_seen && !inc_item_seen))
+			return FALSE;
+	}
+	if ((NULL != mur_options.seqno) && (0 != rec_token_seq))
+	{
+		inc_seen = inc_item_seen = exc_item_seen = FALSE;
+		for (lll_ptr = mur_options.seqno;  NULL != lll_ptr;  lll_ptr = lll_ptr->next)
+		{
+			if (!lll_ptr->exclude)
+				inc_seen = TRUE;
+			if (lll_ptr->seqno == rec_token_seq)
+			{
+				if (lll_ptr->exclude)
 					exc_item_seen = TRUE;
 				else
 					inc_item_seen = TRUE;

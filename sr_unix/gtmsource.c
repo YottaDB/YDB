@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -285,7 +285,7 @@ int gtmsource()
 	OPENFILE("/dev/null", O_RDONLY, null_fd);
 	if (0 > null_fd)
 		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
-	FCNTL3(null_fd, F_DUPFD, 0, rc);
+	DUP2(null_fd, 0, rc);
 	if (0 > rc)
 		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
 	CLOSEFILE(null_fd, rc);

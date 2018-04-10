@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -19,6 +19,12 @@
 
 #ifndef MDEF_included
 #define MDEF_included
+
+#ifdef __clang__
+#define CLANG_SCA_ANALYZER_NORETURN __attribute__((analyzer_noreturn))
+#else
+#define CLANG_SCA_ANALYZER_NORETURN
+#endif
 
 /* mstr needs to be defined before including "mdefsp.h".  */
 typedef int mstr_len_t;
@@ -111,7 +117,7 @@ typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 /* Anchor for thread-global structure rather than individual global vars */
 GBLREF void	*gtm_threadgbl;		/* Accessed through TREF macro in gtm_threadgbl.h */
 
-#ifdef DEBUG
+#if defined(DEBUG) || defined(STATIC_ANALYSIS_NORETURN)
 error_def(ERR_ASSERT);
 # define assert(x) ((x) ? 1 : rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ASSERT, 5, LEN_AND_LIT(__FILE__), __LINE__,		\
 						(SIZEOF(#x) - 1), (#x)))
@@ -673,8 +679,8 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 #define PADLEN(value, bndry) (int)(ROUND_UP2((sm_long_t)(value), bndry) - (sm_long_t)(value))
 
 #define CALLFROM	LEN_AND_LIT(__FILE__), __LINE__
-void gtm_assert(int file_name_len, char file_name[], int line_no);
-int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[], int line_no);
+void gtm_assert(int file_name_len, char file_name[], int line_no)				CLANG_SCA_ANALYZER_NORETURN;
+int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[], int line_no)	CLANG_SCA_ANALYZER_NORETURN;
 #define GTMASSERT	(gtm_assert(CALLFROM))
 #define assertpro(x) ((x) ? 1 : gtm_assert2((SIZEOF(#x) - 1), (#x), CALLFROM))
 #ifdef UNIX
@@ -692,8 +698,8 @@ int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[]
 #define	DBG_MARK_RTS_ERROR_UNUSABLE
 #endif
 
-int	rts_error(int argcnt, ...);
-int	rts_error_csa(void *csa, int argcnt, ...);		/* Use CSA_ARG(CSA) for portability */
+int	rts_error(int argcnt, ...)			CLANG_SCA_ANALYZER_NORETURN;
+int	rts_error_csa(void *csa, int argcnt, ...)	CLANG_SCA_ANALYZER_NORETURN;	/* Use CSA_ARG(CSA) for portability */
 #define CSA_ARG(CSA)	(CSA),
 void	dec_err(uint4 argcnt, ...);
 #elif defined(VMS)

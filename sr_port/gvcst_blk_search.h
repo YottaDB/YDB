@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2017 Fidelity National Information	*
+ * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -244,9 +244,9 @@ GBLREF	uint4			dollar_tlevel;
 						if (dollar_tlevel)
 							TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch,
 									  cs_data, pStat->tn, ((blk_hdr_ptr_t)pBlkBase)->tn,
-									  pStat->level)
+									  pStat->level);
 						else
-							NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch)
+							NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch);
 						return cdb_sc_blkmod;
 					}
 #					ifdef GVCST_SEARCH_TAIL
@@ -357,9 +357,9 @@ GBLREF	uint4			dollar_tlevel;
 			{
 				if (dollar_tlevel)
 					TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch, cs_data,
-							  pStat->tn, ((blk_hdr_ptr_t)pBlkBase)->tn, pStat->level)
+							  pStat->tn, ((blk_hdr_ptr_t)pBlkBase)->tn, pStat->level);
 				else
-					NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch)
+					NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch);
 				return cdb_sc_blkmod;
 			}
 			/* It is now safe to do *tmpPtr and *++tmpPtr without worry about exceeding array bounds */
@@ -373,9 +373,9 @@ GBLREF	uint4			dollar_tlevel;
 		{
 			if (dollar_tlevel)
 				TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch, cs_data, pStat->tn,
-						  ((blk_hdr_ptr_t)pBlkBase)->tn, pStat->level)
+						  ((blk_hdr_ptr_t)pBlkBase)->tn, pStat->level);
 			else
-				NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch)
+				NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch);
 			return cdb_sc_blkmod;
 		}
 		memcpy(prevKeyStart, prevKeyUnCmp, prevKeyUnCmpLen);

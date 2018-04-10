@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -477,6 +477,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	ESTABLISH_RET(stop_image_conditional_core, mumps_status);
 	dm_start(); 	/* Kick off execution */
 	REVERT;
+	param_list = NULL; /* 4SCA: Stack address stored in global */
 	/*				*/
 	/* Return value processing	*/
 	/*				*/
@@ -889,6 +890,7 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	ESTABLISH_RET(stop_image_conditional_core, mumps_status);
 	dm_start(); 	/* Kick off execution */
 	REVERT;
+	param_list = NULL; /* 4SCA: Stack address stored in global */
 	/*				*/
 	/* Return value processing	*/
 	/*				*/

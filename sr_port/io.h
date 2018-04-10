@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,6 +73,8 @@ error_def(ERR_UTF16ENDIAN);
 
 #define TCPDEF_WIDTH	255
 #define TCPDEF_LENGTH	66
+
+#define MAX_BLK_SZ	65535
 
 #define DLRZKEYLEN	1024
 
@@ -275,28 +277,6 @@ xxdlr(iott);	/* we need iott_iocontrol(), iott_dlr_device() and iott_dlr_key() *
 ioxx_wttab(us);
 /* iott_ prototypes */
 uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr);
-
-/* iomt_ prototypes which need to stay until we nix the iomt routines */
-void iomt_getrec(io_desc *dv);
-void iomt_rdstream(uint4 len, void *str, io_desc *dv);
-int iomt_readblk(io_desc *dv);
-void iomt_vlflush(io_desc *dv);
-void iomt_wrtblk(io_desc *dv);
-int iomt_wrtinit(io_desc *dv);
-void iomt_wtansilab(io_desc *dv, uint4 labs);
-uint4 iomt_reopen(io_desc *dv, unsigned short mode, int rewind);
-void iomt_closesp(int4 channel);
-void iomt_eof(io_desc *dev);
-void iomt_erase(io_desc *dev);
-void iomt_qio(io_desc *iod, uint4 mask, uint4 parm);
-void iomt_rddoslab(io_desc *dv);
-void iomt_rdansiend(io_desc *dv);
-void iomt_rdansistart(io_desc *dv);
-void iomt_rewind(io_desc *dev);
-void iomt_skipfile(io_desc *dev, int count);
-void iomt_skiprecord(io_desc *dev, int count);
-void iomt_tm(io_desc *dev);
-void iomt_wtdoslab(io_desc *dv);
 
 /* iosocket_ prototypes */
 boolean_t iosocket_listen(io_desc *iod, unsigned short len);

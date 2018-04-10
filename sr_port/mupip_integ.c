@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -109,6 +109,7 @@ GBLDEF boolean_t		muint_subsc = FALSE;
 GBLDEF boolean_t		mu_int_err_ranges;
 GBLDEF boolean_t		tn_reset_specified;	/* use this to avoid recomputing cli_present("TN_RESET") in the loop */
 GBLDEF boolean_t		tn_reset_this_reg;
+GBLDEF boolean_t		mu_region_found;
 GBLDEF block_id			mu_int_adj_prev[MAX_BT_DEPTH + 1];
 GBLDEF block_id			mu_int_path[MAX_BT_DEPTH + 1];
 GBLDEF global_list		*trees_tail;
@@ -202,6 +203,7 @@ void mupip_integ(void)
 	SETUP_THREADGBL_ACCESS;
 	sndata = &span_node_data;
 	error_mupip = FALSE;
+	mu_region_found = TRUE;
 	if (NULL == gv_target)
 		gv_target = (gv_namehead *)targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL, NULL);
 	if (CLI_PRESENT == (cli_status = cli_present("MAXKEYSIZE")))
@@ -275,9 +277,9 @@ void mupip_integ(void)
 		if (CLI_PRESENT == cli_present("STATS"))
 		{
 			TREF(ok_to_see_statsdb_regs) = TRUE;
-			TREF(statshare_opted_in) = FALSE;	/* Do not open statsdb automatically when basedb is opened.
-								 * This is needed in the "mu_int_reg" calls done below.
-								 */
+			TREF(statshare_opted_in) = NO_STATS_OPTIN;	/* Do not open statsdb automatically when basedb is opened.
+									 * This is needed in the "mu_int_reg" calls done below.
+									 */
 			stats_specified = TRUE;
 		}
 		gvinit(); /* side effect: initializes gv_altkey (used by code below) & gv_currkey (not used by below code) */
@@ -291,6 +293,8 @@ void mupip_integ(void)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DBNOREGION);
 			mupip_exit(ERR_MUNOACTION);
 		}
+		if (!mu_region_found)
+			error_mupip = FALSE;
 		rptr = grlist;
 	} else
 		GVKEY_INIT(gv_altkey, DBKEYSIZE(MAX_KEY_SZ));	/* used by code below */
@@ -378,7 +382,7 @@ void mupip_integ(void)
 				 * only "insert_region" knows to insert based on that ordering but that is not possible
 				 * for statsdb region because the statsdb file location is not known at "mu_getlst" time).
 				 */
-				assert(FALSE == TREF(statshare_opted_in));	/* So we only open basedb & not statsdb */
+				assert(NO_STATS_OPTIN == TREF(statshare_opted_in));	/* So we only open basedb & not statsdb */
 				mu_int_reg(reg, &retvalue_mu_int_reg, RETURN_AFTER_DB_OPEN_TRUE);	/* sets "gv_cur_region" */
 				/* Copy statsdb file name into statsdb region and then do "mupfndfil" to check if the file exists */
 				if (retvalue_mu_int_reg)
@@ -424,7 +428,12 @@ void mupip_integ(void)
 		{
 			region_was_frozen = FALSE; /* For INTEG -FILE, region is not frozen as we would have standalone access */
 			if (FALSE == mu_int_init())	/* sets "gv_cur_region" */
-				mupip_exit(ERR_INTEGERRS);
+			{
+				if (mu_region_found)
+					mupip_exit(ERR_INTEGERRS);
+				else
+					mupip_exit(ERR_MUNOACTION); /* Database file not found, no zero exit status */
+			}
 			csa = NULL;
 			/* Since we have standalone access, there is no need for cs_addrs->hdr. So, use mu_int_data for
 			 * verifications
@@ -876,5 +885,7 @@ void mupip_integ(void)
 		mupip_exit(ERR_INTEGERRS);
 	if (0 != mu_int_skipreg_cnt)
 		mupip_exit(ERR_MUNOTALLINTEG);
+	if (!mu_region_found)
+		mupip_exit(ERR_MUNOACTION);
 	mupip_exit(SS_NORMAL);
 }

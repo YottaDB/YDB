@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Copyright (c) 2005-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -113,7 +113,7 @@ typedef enum {
 	/* Begin ANTIFREEZE related white box test cases */
 	WBTEST_ANTIFREEZE_JNLCLOSE,		/* 69 :  */
 	WBTEST_ANTIFREEZE_DBBMLCORRUPT,		/* 70 :  */
-	WBTEST_EXPECT_CRYPTOPFAILED,		/* 71 :  set when expecting CRYPTOPFAILED so we don't take a core*/
+	WBTEST_UNUSED71,			/* 71 :  UNUSED - GTM-8919 removed the only place to test this */
 	WBTEST_ANTIFREEZE_DBFSYNCERR,		/* 72 :	 */
 	WBTEST_ANTIFREEZE_GVDATAFAIL,		/* 73 :  */
 	WBTEST_ANTIFREEZE_GVGETFAIL,		/* 74 :  */
@@ -185,7 +185,8 @@ typedef enum {
 	WBTEST_GETPWUID_CHECK_OVERWRITE,	/* 136 : Check for getpwuid_struct variable overwrite condition */
 	WBTEST_NO_REPLINSTMULTI_FAIL,		/* 137 : Unless specified tests should not fail with REPLMULTINSTUPDATE */
 	WBTEST_DOLLARDEVICE_BUFFER,		/* 138 : Force larger error messages for $device to exceed DD_BUFLEN */
-	WBTEST_LOWERED_JNLEPOCH			/* 139 : Force larger error messages for $device to exceed DD_BUFLEN */
+	WBTEST_LOWERED_JNLEPOCH,		/* 139 : Force larger error messages for $device to exceed DD_BUFLEN */
+	WBTEST_SIGTERM_IN_JOB_CHILD		/* 140 : Generate Sigterm  by killing ourselves before the child fork */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

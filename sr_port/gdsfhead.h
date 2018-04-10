@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -1191,7 +1191,9 @@ MBSTART {									\
 
 #define	RESET_CR_IN_TEND_AFTER_PHASE2_COMMIT(CR, CSA, CSD)									\
 {																\
-	cache_rec_ptr_t		cr_old;												\
+	cache_rec_ptr_t			cr_old;											\
+	DEBUG_ONLY(cache_rec		lcl_cr_curr);										\
+	DEBUG_ONLY(cache_rec		lcl_cr_old);										\
 																\
 	GBLREF	uint4		process_id;											\
 																\
@@ -1204,6 +1206,8 @@ MBSTART {									\
 		 */														\
 		assert(TWINNING_ON(CSD));											\
 		cr_old = (cache_rec_ptr_t)GDS_ANY_REL2ABS(CSA, CR->twin);	/* get old twin */				\
+		DEBUG_ONLY(lcl_cr_old = *cr_old);	/* In case the following assert trips capture the CR contents */	\
+		DEBUG_ONLY(lcl_cr_curr = *CR);											\
 		assert(!cr_old->bt_index);											\
 		assert(!cr_old->in_cw_set || cr_old->dirty);									\
 		assert(CR->bt_index);												\
@@ -2743,6 +2747,27 @@ typedef struct gd_gblname_struct
 #define	STATSDB_EXTENSION	2050	/* the EXTENSION computed by GDE for every statsdb region */
 #define	STATSDB_MAX_KEY_SIZE	64	/* the MAX_KEY_SIZE computed by GDE for every statsdb region */
 #define	STATSDB_MAX_REC_SIZE	(STATSDB_BLK_SIZE - SIZEOF(blk_hdr)) /* the MAX_REC_SIZE computed by GDE for every statsdb region */
+
+/* The following struct is built into a separate list for each transaction because it is not thrown away if a transaction restarts.
+ * The list keeps growing so we can lock down all the necessary regions in the correct order in case one attempt doesn't get very
+ * far while later attempts get further. Items will be put on the list sorted in unique_id order so that they will always be
+ * grab-crit'd in the same order thus avoiding deadlocks.
+ * The structure and the insert_region function that maintains it are also abused/used by mupip and by view_arg_convert on behalf
+ * of op_view - the secondary adopters us a different anchor from the tp_reg_list GBLREF and a hence different list.
+ */
+
+/* The structure backup_region_list defined in mupipbckup.h needs to have its first four fields
+   identical to the first three fields in this structure */
+typedef struct tp_region_struct
+{
+	struct	tp_region_struct *fPtr;		/* Next in list */
+	gd_region	*reg;			/* Region pointer. Note that it is not necessarily unique since multiple
+						 * regions could point to the same physical file (with all but one of them
+						 * having reg->was_open set to TRUE.and hence have the same tp_region structure.
+						 */
+	gd_id		file_id;
+	int4		fid_index;		/* copy of csa->fid_index for this region */
+} tp_region;
 
 typedef struct
 {
@@ -5353,6 +5378,7 @@ cache_rec_ptr_t db_csh_get(block_id block);
 cache_rec_ptr_t db_csh_getn(block_id block);
 
 enum cdb_sc tp_hist(srch_hist *hist1);
+tp_region	*insert_region(gd_region *reg, tp_region **reg_list, tp_region **reg_free_list, int4 size);
 
 sm_uc_ptr_t get_lmap(block_id blk, unsigned char *bits, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr);
 
@@ -5389,6 +5415,10 @@ void act_in_gvt(gv_namehead *gvt);
 
 #define FILE_TYPE_REPLINST	"replication instance"
 #define FILE_TYPE_DB		"database"
+
+#define NO_STATS_OPTIN		0
+#define ALL_STATS_OPTIN		1
+#define SOME_STATS_OPTIN	2
 
 #include "gdsfheadsp.h"
 

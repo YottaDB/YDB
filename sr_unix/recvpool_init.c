@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -408,6 +408,15 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("pthread_mutexattr_setpshared"), CALLFROM, status, 0);
 		}
+#		ifdef __linux__
+		status = pthread_mutexattr_setrobust(&write_updated_ctl_attr, PTHREAD_MUTEX_ROBUST);
+		if (0 != status)
+		{
+			jnlpool = save_jnlpool;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_mutexattr_setrobust"), CALLFROM, status, 0);
+		}
+#		endif
 		status = pthread_mutex_init(&recvpool.recvpool_ctl->write_updated_ctl, &write_updated_ctl_attr);
 		if (0 != status)
 		{

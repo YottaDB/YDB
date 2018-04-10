@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
@@ -42,7 +42,6 @@
 #include "gvcst_expand_key.h"
 
 GBLREF	boolean_t		mu_reorg_process;
-GBLREF	boolean_t		tp_restart_syslog;	/* for the TP_TRACE_HIST_MOD macro */
 GBLREF	char			gvcst_search_clue;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_altkey;

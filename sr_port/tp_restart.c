@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -67,12 +67,7 @@
 #include "caller_id.h"
 #endif
 
-GBLDEF	trans_num		tp_fail_histtn[CDB_MAX_TRIES], tp_fail_bttn[CDB_MAX_TRIES];
-GBLDEF	int4			blkmod_fail_type, blkmod_fail_level;
 GBLDEF	int4			n_pvtmods, n_blkmods;
-GBLDEF	gv_namehead		*tp_fail_hist[CDB_MAX_TRIES];
-GBLDEF	block_id		t_fail_hist_blk[CDB_MAX_TRIES];
-GBLDEF	gd_region		*tp_fail_hist_reg[CDB_MAX_TRIES];
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			dollar_trestart;
@@ -237,7 +232,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		if (TREF(tprestart_syslog_delta) && (((TREF(tp_restart_count))++ < TREF(tprestart_syslog_first))
 			|| (0 == ((TREF(tp_restart_count) - TREF(tprestart_syslog_first)) % TREF(tprestart_syslog_delta)))))
 		{
-			gvt = tp_fail_hist[t_tries];
+			gvt = TAREF1(tp_fail_hist, t_tries);
 			if (NULL == gvt)
 			{
 				gvname_mstr.addr = (char *)gvname_unknown;
@@ -258,7 +253,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			assert(0 == cdb_sc_normal);
 			if (cdb_sc_normal == status)
 				t_fail_hist[t_tries] = '0';	/* temporarily reset just for pretty printing */
-			restart_reg = tp_fail_hist_reg[t_tries];
+			restart_reg = TAREF1(tp_fail_hist_reg, t_tries);
 			if (NULL != restart_reg)
 			{
 				reg_mstr.len = restart_reg->dyn.addr->fname_len;
@@ -279,22 +274,21 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			if (cdb_sc_blkmod != status)
 			{
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(18) ERR_TPRESTART, 16, reg_mstr.len, reg_mstr.addr,
-					t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
-					0, 0, 0, tp_blkmod_nomod,
+					t_tries + 1, t_fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
+					gvname_mstr.addr, 0, 0, 0, tp_blkmod_nomod,
 					(NULL != sgm_info_ptr) ? sgm_info_ptr->num_of_blks : 0,
 					(NULL != sgm_info_ptr) ? sgm_info_ptr->cw_set_depth : 0, &local_tn,
 					(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
 			} else
 			{
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(18) ERR_TPRESTART, 16, reg_mstr.len, reg_mstr.addr,
-					t_tries + 1, t_fail_hist, t_fail_hist_blk[t_tries], gvname_mstr.len, gvname_mstr.addr,
-					n_pvtmods, n_blkmods, blkmod_fail_level, blkmod_fail_type,
-					sgm_info_ptr->num_of_blks,
-					sgm_info_ptr->cw_set_depth, &local_tn,
+					t_tries + 1, t_fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
+					gvname_mstr.addr, n_pvtmods, n_blkmods, TREF(blkmod_fail_level), TREF(blkmod_fail_type),
+					sgm_info_ptr->num_of_blks, sgm_info_ptr->cw_set_depth, &local_tn,
 					(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
 			}
-			tp_fail_hist_reg[t_tries] = NULL;
-			tp_fail_hist[t_tries] = NULL;
+			TAREF1(tp_fail_hist, t_tries) = NULL;
+			TAREF1(tp_fail_hist_reg, t_tries) = NULL;
 			if ('0' == t_fail_hist[t_tries])
 				t_fail_hist[t_tries] = cdb_sc_normal;	/* get back to where it was */
 			caller_id_flag = TRUE;

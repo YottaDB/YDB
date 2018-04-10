@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,13 +30,13 @@
 #define HT_REHASH_FACTOR (HT_LOAD_FACTOR/2)
 #define HT_REHASH_TABLE_SIZE(table) 	MIN(table->size, table->count * 4)
 #define INSERT_HTENT(table, tabent, hkey, value)				\
-{										\
+MBSTART {									\
 	if (HT_DELETED_ENTRY == (tabent)->value)				\
 		(table)->del_count--; 						\
 	(tabent)->key = *hkey; 							\
 	(tabent)->value = value;						\
 	(table)->count++;							\
-}
+} MBEND
 
 #define COMPACT_NEEDED(table) ((!(table)->dont_compact) && (((table)->del_count > (table)->cmp_trigger_size) || \
 	(((table)->initial_size < (table)->size ) && ((table)->count < ((table)->cmp_trigger_size / 2)))))
@@ -49,9 +49,9 @@
  * will be leaked.
  */
 #define DEFER_BASE_REL_HASHTAB(table, deferit)					\
-{										\
+MBSTART {									\
 	(table)->defer_base_release = deferit;					\
-}
+} MBEND
 
 /*
  * This macro is used by callers outside of the hash table implementation to indicate
@@ -61,10 +61,10 @@
  * much later time if we are using a spare base.
  */
 #define FREE_BASE_HASHTAB(table, base)						\
-{										\
+MBSTART {									\
 	if ((table)->dont_keep_spare_table)					\
 		free(base);							\
-}
+} MBEND
 
 /* For string hashing, ELF hash was found to be the best during the V5.0-000 longnames project.
  * During V6.2-001, Murmur3 hash was found to be much better than ELF in terms of # of collisions.
@@ -82,18 +82,18 @@
 #define	STR_PHASH_INIT(STATE, TOTLEN)			HASH128_STATE_INIT(STATE, 0); TOTLEN = 0
 #define	STR_PHASH_PROCESS(STATE, TOTLEN, KEY, LEN)	gtmmrhash_128_ingest(&STATE, KEY, LEN); TOTLEN += LEN
 #define	STR_PHASH_RESULT(STATE, TOTLEN, OUT4)			\
-{								\
+MBSTART {							\
 	gtm_uint16	out16;					\
 								\
 	gtmmrhash_128_result(&STATE, TOTLEN, &out16);		\
 	OUT4 = (uint4)out16.one;				\
-}
+} MBEND
 #else
 #define STR_HASH ELF_HASH
 #endif
 
 #define ELF_HASH(sptr, len, hash, init_hashval)						\
-{											\
+MBSTART {										\
 	uint4	tempint;								\
 	char	*curr, *top;								\
 	uint4	hcode;									\
@@ -105,6 +105,11 @@
 		hcode &= ~tempint;							\
 	}										\
 	hash = hcode;									\
-}
+} MBEND
 
+/* Use the ended hash table size. Currently used only by MUPIP ROLLBACK/RECOVER */
+#define USE_EXTENDED_HASHTAB			\
+MBSTART {					\
+	ht_sizes = (int *)&extended_ht_sizes;	\
+} MBEND
 #endif

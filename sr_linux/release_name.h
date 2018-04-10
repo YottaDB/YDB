@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -17,6 +17,7 @@
  ****************************************************************/
 
 #ifndef GTM_RELEASE_NAME
+<<<<<<< HEAD
 
 #define GTM_VERSION	"V6.3"
 #define	GTM_ZVERSION	"V6.3-003A"
@@ -30,12 +31,30 @@
 # define YDB_PLATFORM		"Linux armv7l"
 #else
 # define YDB_PLATFORM		"Linux x86"
+=======
+#ifdef __CYGWIN__
+#define GTM_RELEASE_NAME 	"GT.M V6.3-004 CYGWIN x86"
+#elif defined(__ia64)
+#define GTM_RELEASE_NAME 	"GT.M V6.3-004 Linux IA64"
+#elif defined(__x86_64__)
+#define GTM_RELEASE_NAME 	"GT.M V6.3-004 Linux x86_64"
+#elif defined(__s390__)
+#define GTM_RELEASE_NAME 	"GT.M V6.3-004 Linux S390X"
+#else
+#define GTM_RELEASE_NAME 	"GT.M V6.3-004 Linux x86"
+#endif
+>>>>>>> 83bc0ab... GT.M V6.3-004
 #endif
 
 #define GTM_RELEASE_NAME 	"GT.M" " " GTM_ZVERSION " " YDB_PLATFORM
 #define YDB_RELEASE_NAME 	"YottaDB" " " YDB_ZYRELEASE " " YDB_PLATFORM
 #define	YDB_AND_GTM_RELEASE_NAME	GTM_RELEASE_NAME " " "YottaDB" " " YDB_ZYRELEASE
 #define GTM_PRODUCT 		"GT.M"
+<<<<<<< HEAD
 #define YDB_PRODUCT		"YottaDB"
 
 #endif
+=======
+#define GTM_VERSION		"V6.3"
+#define GTM_RELEASE_STAMP	"20180316 15:27"
+>>>>>>> 83bc0ab... GT.M V6.3-004

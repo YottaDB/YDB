@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +35,8 @@
 #include "muprec.h"
 #include "mur_read_file.h"
 
+LITREF	int	 	extended_ht_sizes[];
+GBLREF	int		*ht_sizes;
 GBLREF 	jnl_gbls_t	jgbl;
 GBLREF	mur_gbls_t	murgbl;
 GBLREF	void		(*call_on_signal)();
@@ -73,6 +76,7 @@ void mur_init(void)
 	murgbl.multi_list = (buddy_list *)malloc(SIZEOF(buddy_list));
 	initialize_list(murgbl.multi_list, SIZEOF(multi_struct), MUR_MULTI_LIST_INIT_ALLOC);
 	murgbl.forw_multi_list = (buddy_list *)malloc(SIZEOF(buddy_list));
+	USE_EXTENDED_HASHTAB;
 	initialize_list(murgbl.forw_multi_list, SIZEOF(forw_multi_struct), MUR_MULTI_LIST_INIT_ALLOC);
 	init_hashtab_int8(&murgbl.token_table, MUR_MULTI_HASHTABLE_INIT_ELEMS, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
 	init_hashtab_int8(&murgbl.forw_token_table, MUR_MULTI_HASHTABLE_INIT_ELEMS, HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);

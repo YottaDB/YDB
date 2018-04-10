@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -428,6 +428,7 @@ static	CLI_ENTRY	mup_journal_qual[] = {
 { "RESYNC",            mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
 { "ROLLBACK",          mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "RSYNC_STRM",        mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
+{ "SEQNO",             mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "SHOW",              mupip_recover, 0, mup_jnl_show_parm,     mup_jnl_show_qual,     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
 { "SINCE",             mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "TRANSACTION",       mupip_recover, 0, 0,                     mup_trans_qual,        0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },

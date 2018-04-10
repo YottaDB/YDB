@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2017 Fidelity National Information	*
+ * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -244,9 +244,15 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 			new_other_perms = file_other_perms;
 		}
 		/* Find restricted group, if any */
+<<<<<<< HEAD
 		ydb_dist_gid = gtm_get_group_id(&dist_stat_buff);
 		dir_mode = dist_stat_buff.st_mode;
 		gtm_group_restricted = ((INVALID_GID != ydb_dist_gid) && !(dir_mode & 01)); /* not other executable */
+=======
+		gtm_dist_gid = gtm_get_group_id(&dist_stat_buff);
+		dir_mode = (INVALID_GID != gtm_dist_gid) ? dist_stat_buff.st_mode : 0;	/* 4SCA: Assigned value is garbage */
+		gtm_group_restricted = ((INVALID_GID != gtm_dist_gid) && !(dir_mode & 01)); /* not other executable */
+>>>>>>> 83bc0ab... GT.M V6.3-004
 		if ((this_uid_is_file_owner && this_uid_in_file_group) || this_uid_is_root)
 		{
 			if (this_uid_is_root)		/* otherwise, use default uid */

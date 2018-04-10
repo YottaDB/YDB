@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,43 +51,51 @@ GBLREF	boolean_t	is_final_retry_code_lchar[];
 #define UPDATE_CAN_RETRY(TRIES, CURRSTATUS)							\
 	((CDB_STAGNATE > TRIES) || (IS_FINAL_RETRY_CODE(CURRSTATUS)))
 
-#define TP_TRACE_HIST_MOD(BLK_NUM, BLK_TARGET, N, CSD, HISTTN, BTTN, LEVEL)						\
-{															\
-	GBLREF	block_id		t_fail_hist_blk[];								\
-	GBLREF	gd_region		*tp_fail_hist_reg[];								\
-	GBLREF	gv_namehead		*tp_fail_hist[];								\
-	GBLREF	int4			blkmod_fail_type;								\
-	GBLREF	int4			blkmod_fail_level;								\
-	GBLREF	trans_num		tp_fail_histtn[], tp_fail_bttn[];						\
-	DEBUG_ONLY(GBLREF	uint4	dollar_tlevel;)									\
-	DCL_THREADGBL_ACCESS;												\
-															\
-	SETUP_THREADGBL_ACCESS;												\
-	assert(dollar_tlevel);												\
-	if (TREF(tprestart_syslog_delta))										\
-	{														\
-		tp_fail_hist_reg[t_tries] = gv_cur_region;								\
-		t_fail_hist_blk[t_tries] = ((block_id)BLK_NUM);								\
-		tp_fail_hist[t_tries] = (gv_namehead *)(((int)BLK_NUM & ~(-BLKS_PER_LMAP)) ? BLK_TARGET : NULL);	\
-		(CSD)->tp_cdb_sc_blkmod[(N)]++;										\
-		blkmod_fail_type = (N);											\
-		blkmod_fail_level = (LEVEL);										\
-		tp_fail_histtn[t_tries] = (HISTTN);									\
-		tp_fail_bttn[t_tries] = (BTTN);										\
-	}														\
-}
+#define TP_TRACE_HIST_MOD(BLK_NUM, BLK_TARGET, N, CSD, HISTTN, BTTN, LEVEL)							\
+MBSTART {															\
+	DEBUG_ONLY(GBLREF	uint4	dollar_tlevel;)										\
+	DCL_THREADGBL_ACCESS;													\
+																\
+	SETUP_THREADGBL_ACCESS;													\
+	if (TREF(tprestart_syslog_delta))											\
+	{	/* next 4 lines of code are identical to TP_TRACE_HIST (below), but repetion saves an if when it matters */	\
+		assert(dollar_tlevel);												\
+		TAREF1(t_fail_hist_blk, t_tries) = ((block_id)BLK_NUM);								\
+		TAREF1(tp_fail_hist, t_tries) = (gv_namehead *)(((int)BLK_NUM & ~(-BLKS_PER_LMAP)) ? BLK_TARGET : NULL);	\
+		TAREF1(tp_fail_hist_reg, t_tries) = gv_cur_region;								\
+		(CSD)->tp_cdb_sc_blkmod[(N)]++;											\
+		TREF(blkmod_fail_level) = (LEVEL);										\
+		TREF(blkmod_fail_type) = (N);											\
+		TAREF1(tp_fail_bttn, t_tries) = (BTTN);										\
+		TAREF1(tp_fail_histtn, t_tries) = (HISTTN);									\
+	}															\
+} MBEND
 
-#define NONTP_TRACE_HIST_MOD(BLK_SRCH_STAT, N)			\
-{								\
-	GBLREF	int4		blkmod_fail_type;		\
-	GBLREF	int4		blkmod_fail_level;		\
-	GBLREF	block_id	t_fail_hist_blk[];		\
-	DEBUG_ONLY(GBLREF	uint4	dollar_tlevel;)		\
-								\
-	assert(!dollar_tlevel);					\
-	t_fail_hist_blk[t_tries] = (BLK_SRCH_STAT)->blk_num;	\
-	blkmod_fail_type = (N);					\
-	blkmod_fail_level = (BLK_SRCH_STAT)->level;		\
-}
+#define NONTP_TRACE_HIST_MOD(BLK_SRCH_STAT, N)				\
+MBSTART {								\
+	DEBUG_ONLY(GBLREF	uint4	dollar_tlevel;)			\
+	DCL_THREADGBL_ACCESS;						\
+									\
+	SETUP_THREADGBL_ACCESS;						\
+	assert(!dollar_tlevel);						\
+	TREF(blkmod_fail_type) = (N);					\
+	TREF(blkmod_fail_level) = (BLK_SRCH_STAT)->level;		\
+	TAREF1(t_fail_hist_blk, t_tries) = (BLK_SRCH_STAT)->blk_num;	\
+} MBEND
+
+#define TP_TRACE_HIST(BLK_NUM, BLK_TARGET) 											\
+MBSTART {															\
+	DEBUG_ONLY(GBLREF	uint4	dollar_tlevel;)										\
+	DCL_THREADGBL_ACCESS;													\
+																\
+	SETUP_THREADGBL_ACCESS;													\
+	if (TREF(tprestart_syslog_delta))											\
+	{															\
+		assert(dollar_tlevel);												\
+		TAREF1(t_fail_hist_blk, t_tries) = ((block_id)BLK_NUM);								\
+		TAREF1(tp_fail_hist, t_tries) = (gv_namehead *)(((int)BLK_NUM & ~(-BLKS_PER_LMAP)) ? BLK_TARGET : NULL);	\
+		TAREF1(tp_fail_hist_reg, t_tries) = gv_cur_region;								\
+	}															\
+} MBEND
 
 #endif

@@ -76,7 +76,7 @@ else()
   #   See http://stackoverflow.com/questions/21689124/mkstemp-and-fdopen-in-cygwin-1-7-28
   # Cygwin warns if you add -fPIC that the compiled code is already position
   # independent. So don't add -fPIC
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ansi -fPIC ")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -fPIC ")
 endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign")
 # Add flags for warnings that we want and don't want.

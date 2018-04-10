@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2017 Fidelity National Information		!
+! Copyright (c) 2001-2018 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 ! Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	!
@@ -298,7 +298,7 @@ MAXFORARGS	<Maximum number of arguments to a single FOR command exceeded>/error/
 TRANSMINUS	<Negative numbers not allowed with ZTCOMMIT>/error/fao=0!/ansi=0
 MAXNRSUBSCRIPTS	<Maximum number of subscripts exceeded>/error/fao=0!/ansi=0
 MAXSTRLEN	<Maximum string length exceeded>/error/fao=0!/ansi=75
-JNLDBERR	<Journal file !AD does not correspond to database file !AD>/error/fao=4!/ansi=0
+ENCRYPTCONFLT2	<A concurrent MUPIP REORG -ENCRYPT changed the encryption key for !AD before the process could initialize it. !AD>/warning/fao=4!/ansi=0
 JNLFILOPN	<Error opening journal file !AD for database file !AD>/error/fao=4!/ansi=0
 MBXRDONLY	<Mailbox is read only, cannot write to it>/error/fao=0!/ansi=0
 JNLINVALID	<!AD is not a valid journal file !/ for database file: !AD>/error/fao=4!/ansi=0
@@ -687,7 +687,7 @@ SOCKACPT	<Error accepting socket connection>/error/fao=0!/ansi=81
 SOCKINIT	<Error initializing socket: (errno == !UL) !AD>/error/fao=3!/ansi=80
 OPENCONN	<Error opening socket connection>/error/fao=0!/ansi=81
 DEVNOTIMP	<!AD device not implemented on in this environment>/error/fao=2!/ansi=0
-JNLEXTR		<Error writing journal extract file: !AD>/error/fao=2!/ansi=0
+UNUSEDMSG688	<JNLEXTR last sometime prior to V4.4-002>/error/fao=0!/ansi=0
 DBREMOTE	<Database region !AD is remote; perform maintenance on the server node>/error/fao=2!/ansi=0
 JNLREQUIRED	<Journaling is required for clustered operation with file !AD>/error/fao=2!/ansi=0
 TPMIXUP		<!AZ transaction cannot be started within !AZ transaction>/error/fao=2!/ansi=0
@@ -761,7 +761,7 @@ PROTNOTSUP	<Protocol !AD not supported>/error/fao=2!/ansi=0
 DELIMSIZNA	<Delimiter size is not appropriate>/error/fao=0!/ansi=0
 INVCTLMNE	<Invalid control mnemonics>/error/fao=0!/ansi=0
 SOCKLISTEN	<Error listening on a socket>/error/fao=0!/ansi=0
-LQLENGTHNA	<Listening queue length !UL not appropriate.  Must be between 1 and 5.>/error/fao=1!/ansi=0
+UNUSEDMSG762	<LQLENGTHNA last used in V6.3-003A>/error/fao=0!/ansi=0
 ADDRTOOLONG	<Socket address !AD of length !UL is longer than the maximum permissible length !UL>/error/fao=4!/ansi=0
 GTMSECSHRGETSEMFAIL	<error getting semaphore errno = !UL>/warning/fao=1!/ansi=0
 CPBEYALLOC	<Attempt to copy beyond the allocated buffer>/error/fao=0!/ansi=0
@@ -824,7 +824,7 @@ RDFLTOOLONG	<Length specified for fixed length read exceeds the maximum string s
 MUNOFINISH	<MUPIP unable to finish all requested actions>/error/fao=0!/ansi=0
 DBFILEXT	<Database file !AD extended from 0x!XL blocks to 0x!XL at transaction 0x!16@XQ>/info/fao=5!/ansi=0
 JNLFSYNCERR	<Error synchronizing journal file !AD to disk>/error/fao=2!/ansi=0
-FSYNCTIMOUT	<Timed out on fsync for journal file !AD>/error/fao=2!/ansi=0
+UNUSEDMSG825	<FSYNCTIMOUT last used in V6.0-001>/error/fao=0!/ansi=0
 ZCPREALLVALINV	<The pre-allocation value exceeded the maximum string length>/error/fao=0!/ansi=0
 NEWJNLFILECREAT	<Journal file !AD nearing maximum size.  New journal file created.>/info/fao=2!/ansi=0
 DSKSPACEFLOW	<Disk Space for file !AD nearing maximum size.  !UL blocks available.>/info/fao=3!/ansi=0
@@ -1444,7 +1444,7 @@ MURNDWNOVRD	<OVERRIDE qualifier used with MUPIP RUNDOWN on database file !AD>/in
 ! The following error message is NOT issued to the user and is only internal to YottaDB
 REPLONLNRLBK	<ONLINE ROLLBACK detected. Starting afresh>/error/fao=0!/ansi=0
 !
-SRVLCKWT2LNG	<PID !UL is holding the source server lock. Waited for !UL minute(s). Now exiting>/error/fao=2!/ansi=0
+SRVLCKWT2LNG	<PID !UL is holding the source server lock. Waited for !UL seconds. Now exiting>/error/fao=2!/ansi=0
 IGNBMPMRKFREE	<Ignoring bitmap free-up operation for region !AD (!AD) due to concurrent ONLINE ROLLBACK>/info/fao=4!/ansi=0
 PERMGENFAIL	<Failed to determine access permissions to use for creation of !AD for file !AD>/error/fao=4!/ansi=0
 PERMGENDIAG	<Permissions: Proc(uid:!UL,gid:!UL!AD), DB File(uid:!UL,gid:!UL,perm:!AD), Lib File(gid:!UL,perm:!AD)>/info/fao=11!/ansi=0
@@ -1674,6 +1674,10 @@ DBFREEZEON	<Region !AD is FROZEN (!AZOVERRIDE !AZONLINE !AZAUTOREL)>/info/fao=5!
 DBFREEZEOFF	<Region !AD is UNFROZEN (!AZOVERRIDE !AZAUTOREL)>/info/fao=4!/ansi=0
 STPCRIT		<String pool space critical>/error/fao=0!/ansi=0
 STPOFLOW	<String pool space overflow>/fatal/fao=0!/ansi=0
+SYSUTILCONF	<Error determining the path for system utility. !AD>/error/fao=2!/ansi=0
+MSTACKSZNA	<User-specified M stack size of !UL KiB not appropriate; must be between !UL KiB and !UL KiB; reverting to !UL KiB>/info/fao=4!/ansi=0
+JNLEXTRCTSEQNO	<Journal Extracts based on sequence numbers are restricted to a single region when replication is OFF>/error/fao=0!/ansi=0
+INVSEQNOQUAL	<Invalid SEQNO qualifier value !AD>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

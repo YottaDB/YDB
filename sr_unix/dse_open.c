@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -184,6 +184,7 @@ boolean_t dse_fdmp_output (void *addr, int4 len)
 	}
 	if (len)
 	{
+		assert(buffer); /* 4SCA: Even though len acts as a guard */
 		memcpy(buffer, addr, len);
 		buffer[len] = 0;
 		val.mvtype = MV_STR;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2017 Fidelity National Information	*
+ * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -445,7 +445,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	grab_crit(reg);
 	INCR_INHIBIT_KILLS(cnl);
 	kip_pids_arr_ptr = cnl->kip_pid_array;
-	prev_ss_shmsize = 0;
+	prev_ss_shmsize = ss_shmsize = 0;
 	crit_counter = 1;
 	for (retries = 0; MAX_TRY_FOR_TOT_BLKS >= retries; ++retries)
 	{

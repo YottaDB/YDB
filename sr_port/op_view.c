@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -117,6 +117,7 @@ GBLREF	uint4			dollar_tlevel;
 GBLREF	boolean_t		dmterm_default;
 GBLREF mstr			extnam_str;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+DEBUG_ONLY(GBLREF  tp_region	*tp_reg_list;)	/* Ptr to list of tp_regions for a TP transaction */
 
 error_def(ERR_ACTRANGE);
 error_def(ERR_COLLATIONUNDEF);
@@ -240,6 +241,10 @@ void	op_view(int numarg, mval *keyword, ...)
 			outval.mvtype = MV_STR;
 			view_debug4 = (0 != MV_FORCE_INT(parmblk.value));
 			break;
+		case VTK_NOSTATSHARE:
+		case VTK_STATSHARE:
+			TREF(statshare_opted_in) = (NULL != arg) ? SOME_STATS_OPTIN : (VTK_STATSHARE == vtp->keycode)
+				? ALL_STATS_OPTIN : NO_STATS_OPTIN;			/* WARNING fallthough */
 		case VTK_DBFLUSH:
 		case VTK_DBSYNC:
 		case VTK_EPOCH:
@@ -297,14 +302,17 @@ void	op_view(int numarg, mval *keyword, ...)
 			 * the receiver server so replication can resume from wherever we last left. On the other hand,
 			 * automatically turning off journaling (and hence replication) (like is a choice for GT.M)
 			 * would make resumption of replication much more effort for the user.
+			 * This keyword is not documented and appears unused by the test system except to verify that it "works."
+			 * The implementation is a hack because it applies a value to all regions, so view_arg_convert supplies
+			 * the regions after throwing away the value, which this code picks up straight from arg rather than
+			 * from parmblk.value
 			 */
 			assert(!is_updproc || (JNL_FILE_LOST_ERRORS == TREF(error_on_jnl_file_lost)));
 			if (!is_updproc)
 			{
-				TREF(error_on_jnl_file_lost) = MV_FORCE_INT(parmblk.value);
+				TREF(error_on_jnl_file_lost) = (NULL != arg) ? MV_FORCE_BOOL(arg) : TRUE;
 				if (MAX_JNL_FILE_LOST_OPT < TREF(error_on_jnl_file_lost))
 					TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_TURN_OFF;
-				parmblk.gv_ptr = NULL;
 				view_dbop(vtp->keycode, &parmblk, (mval *)NULL);
 			}
 			break;
@@ -774,28 +782,6 @@ void	op_view(int numarg, mval *keyword, ...)
 			op_wteol(1);
 			break;
 #		endif
-		case VTK_STATSHARE:
-			if (!TREF(statshare_opted_in))
-			{	/* Don't both to opt-in if already opted-in - it just confuses things */
-				if (0 < dollar_tlevel)
-				{	/* Can't do this in TP */
-					va_end(var);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPNOSTATSHARE);
-				}
-				gvcst_statshare_optin();
-			}
-			break;
-		case VTK_NOSTATSHARE:
-			if (TREF(statshare_opted_in))
-			{	/* Don't both to opt-out if already opted-out - it just confuses things */
-				if (0 < dollar_tlevel)
-				{	/* Can't do this in TP */
-					va_end(var);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPNOSTATSHARE);
-				}
-				gvcst_statshare_optout();
-			}
-			break;
 		case VTK_LVMON:
 			if (0 < numarg)
 			{	/* A variable list was supplied - Need a new table but first free any existing old table first */
@@ -875,32 +861,30 @@ STATICFNDEF void lvmon_release(void)
 STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg)
 {
 	boolean_t		was_crit;
-	gd_region		*reg, *r_top, *save_reg;
+	gd_region		*reg, *r_top, *save_reg, *statsDBreg;
 	jnlpool_addrs_ptr_t	save_jnlpool;
 	int			icnt, lcnt, save_errno, status;
 	int4			nbuffs;
 	jnl_buffer_ptr_t	jb;
+	tp_region		*region_list, *rg;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	uint4			jnl_status, dummy_errno, wcsflu_parms;
 	unix_db_info		*udi;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (NULL == gd_header)		/* Open gbldir */
 		gvinit();
 	save_reg = gv_cur_region;
 	save_jnlpool = jnlpool;
-	if (NULL == parmblkptr->gv_ptr)
-	{	/* Operate on all regions */
-		reg = gd_header->regions;
-		r_top = reg + gd_header->n_regions - 1;
-	} else	/* Operate on selected region */
-		r_top = reg = parmblkptr->gv_ptr;
-	for (; reg <= r_top; reg++)
+	region_list = (tp_region *)parmblkptr->gv_ptr;
+	assert((NULL != region_list) && (region_list != tp_reg_list));
+	for (rg = region_list; NULL != rg; rg = rg->fPtr)
 	{
-		if (IS_STATSDB_REG(reg))
-			continue;	/* Skip statsdb regions for the VIEW command */
-		if (!reg->open)
-			gv_init_reg(reg, NULL);
+		reg = rg->reg;
+		assert(!(IS_STATSDB_REG(reg)));		/* taken care of by view_arg_convert */
+		assert(reg->open);			/* taken care of by view_arg_convert */
 		TP_CHANGE_REG(reg);
 		/* note that the jnlpool needs to be initialized and validated for options which could write to the database
 		 * so instance freeze can be honored.  No data is writtern just file header, etc. so OK on secondary
@@ -1014,6 +998,26 @@ STATICFNDEF void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *th
 				csa = cs_addrs;
 				csd = csa->hdr;
 				set_gbuff_limit(&csa, &csd, thirdarg);
+				break;
+			case VTK_STATSHARE:
+				assert(!IS_STATSDB_REG(reg));
+				BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
+				if (!(RDBF_NOSTATS & cs_addrs->hdr->reservedDBFlags))
+				{
+					if (0 < dollar_tlevel)		/* Can't do this in TP */
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPNOSTATSHARE);
+					gvcst_init_statsDB(reg, DO_STATSDB_INIT_TRUE);
+				}
+				break;
+			case VTK_NOSTATSHARE:
+				assert(!IS_STATSDB_REG(reg));
+				BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
+				if (statsDBreg->statsDB_setup_completed)
+				{	/* Don't bother to opt-out if not set up - it just confuses things */
+					if (0 < dollar_tlevel)		/* Can't do this in TP */
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPNOSTATSHARE);
+					gvcst_remove_statsDB_linkage(reg);
+				}
 				break;
 		}
 	}

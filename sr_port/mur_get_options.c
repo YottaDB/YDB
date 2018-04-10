@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -27,6 +27,7 @@
 #include "gtm_string.h"
 #include "filestruct.h"
 #include "jnl.h"
+#include "rmv_mul_slsh.h"
 #include "buddy_list.h"
 #include "hashtab_int4.h"	/* needed for muprec.h */
 #include "hashtab_int8.h"	/* needed for muprec.h */
@@ -48,6 +49,7 @@ GBLREF	boolean_t	mupip_jnl_recover;
 error_def(ERR_INVERRORLIM);
 error_def(ERR_INVGLOBALQUAL);
 error_def(ERR_INVIDQUAL);
+error_def(ERR_INVSEQNOQUAL);
 error_def(ERR_INVQUALTIME);
 error_def(ERR_INVREDIRQUAL);
 error_def(ERR_INVTRNSQUAL);
@@ -56,7 +58,8 @@ error_def(ERR_NOTPOSITIVE);
 error_def(ERR_RSYNCSTRMVAL);
 
 #define EXCLUDE_CHAR	'~'
-#define STR2PID asc2i
+#define STR2PID	asc2i
+#define STR2SEQNO	asc2l
 #define	MAX_PID_LEN	10	/* maximum number of decimal digits in the process-id */
 #define REDIRECT_STR		"specify as \"old-file-name=new-file-name,...\""
 #define	WILDCARD_CHAR1	'*'
@@ -84,6 +87,7 @@ void	mur_get_options(void)
 	int		extr_type, top, onln_rlbk_val, status2;
 	boolean_t	global_exclude;
 	long_list	*ll_ptr, *ll_ptr1;
+	long_long_list	*seqno_list, *seqno_list1;
 	redirect_list	*rl_ptr, *rl_ptr1, *tmp_rl_ptr;
 	select_list	*sl_ptr, *sl_ptr1;
 	boolean_t	interactive, parse_error;
@@ -176,7 +180,9 @@ void	mur_get_options(void)
 				mur_options.extr_fn_len[extr_type] = length;
 				mur_options.extr_fn[extr_type] = (char *)malloc(mur_options.extr_fn_len[extr_type] + 1);
 				strncpy(mur_options.extr_fn[extr_type], qual_buffer, length);
-				mur_options.extr_fn[extr_type][length] = '\0';
+				/*Remove multiple slashes from journal file*/
+                                mur_options.extr_fn_len[extr_type] = rmv_mul_slsh(mur_options.extr_fn[extr_type],length);
+				mur_options.extr_fn[extr_type][mur_options.extr_fn_len[extr_type]] = '\0';
 				mur_options.extr_fn_is_stdout[extr_type] =
 					(0 == STRNCASECMP(qual_buffer, JNL_STDO_EXTR, SIZEOF(JNL_STDO_EXTR)));
 			}
@@ -597,6 +603,79 @@ void	mur_get_options(void)
 			sl_ptr->has_wildcard = FALSE;
 			sl_ptr->has_wildcard += ((NULL == memchr(sl_ptr->buff, WILDCARD_CHAR1, length)) ? FALSE : TRUE);
 			sl_ptr->has_wildcard += ((NULL == memchr(sl_ptr->buff, WILDCARD_CHAR2, length)) ? FALSE : TRUE);
+		}
+		mur_options.selection = TRUE;
+	}
+	/*-----		-SEQNO=(list of sequence numbers)	-----*/
+	if (cli_present("SEQNO") == CLI_PRESENT)
+	{
+		length = MAX_LINE;
+		if (!CLI_GET_STR_ALL("SEQNO", qual_buffer, &length))
+			mupip_exit(ERR_MUPCLIERR);
+		qual_buffer_ptr = qual_buffer;
+		global_exclude = FALSE;
+		if ('"' == *qual_buffer_ptr )
+		{
+			++qual_buffer_ptr;
+			--length;
+			if ('"' == qual_buffer_ptr[length-1])
+				qual_buffer_ptr[--length] = '\0';
+		}
+		if (EXCLUDE_CHAR == *qual_buffer_ptr)
+		{
+			global_exclude = TRUE;
+			++qual_buffer_ptr;
+			--length;
+		}
+		if ('(' == *qual_buffer_ptr)
+		{
+			++qual_buffer_ptr;
+			--length;
+		} else if (global_exclude)
+		{
+			--qual_buffer_ptr;
+			++length;
+			global_exclude = FALSE;
+		}
+		if (')' == qual_buffer_ptr[length - 1])
+			qual_buffer_ptr[--length] = '\0';
+		for (ctop = qual_buffer_ptr + length; qual_buffer_ptr < ctop;)
+		{
+			if (!cli_get_str_ele(qual_buffer_ptr, entry, &length, FALSE))
+				mupip_exit(ERR_MUPCLIERR);
+			qual_buffer_ptr += length;
+			assert(',' == *qual_buffer_ptr || !(*qual_buffer_ptr));	/* either comma separator or end of option list */
+			if (',' == *qual_buffer_ptr)
+				qual_buffer_ptr++;  /* skip separator */
+			entry_ptr = entry;
+			seqno_list1 = (long_long_list *)malloc(SIZEOF(long_long_list));
+			seqno_list1->next = NULL;
+			if (NULL == mur_options.seqno)
+				mur_options.seqno = seqno_list1;
+			else
+				seqno_list->next = seqno_list1;
+			seqno_list = seqno_list1;
+			if ('"' == entry_ptr[length - 1])
+				--length;
+			if ('"' == *entry_ptr)
+			{
+				entry_ptr++;
+				length--;
+			}
+			if (EXCLUDE_CHAR == *entry_ptr)
+			{
+				++entry_ptr;
+				length--;
+				seqno_list->exclude = TRUE;
+			} else
+				seqno_list->exclude = FALSE;
+			if (global_exclude)
+				seqno_list->exclude = !seqno_list->exclude;
+			if ((seqno_list->seqno = STR2SEQNO((uchar_ptr_t)entry_ptr, length)) == (seq_num) - 1)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSEQNOQUAL, 2, length, entry_ptr);
+				mupip_exit(ERR_MUPCLIERR);
+			}
 		}
 		mur_options.selection = TRUE;
 	}

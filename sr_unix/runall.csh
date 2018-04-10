@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2017 Fidelity National Information		#
+# Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
@@ -216,6 +216,9 @@ rm -f ${TMP_DIR}_src_files >& /dev/null
 rm -f ${TMP_DIR}_latest_exe
 touch ${TMP_DIR}_inc_files
 touch ${TMP_DIR}_src_files
+
+	echo "Modifying release_name.h"
+	$cms_tools/edrelnam.csh $RUNALL_VERSION
 
 # For all builds, gtm_threadgbl_deftypes.h needs to be generated unless we are bypassing.
 # This only updates gtm_threadgbl_deftypes.h in $gtm_inc if generation shows it changed.
