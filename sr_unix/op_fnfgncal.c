@@ -611,18 +611,13 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	verifyAllocatedStorage();		/* GTM-8669 verify that argument placement did not trash allocated memory */
 #endif
 	save_mumps_status = mumps_status; 	/* Save mumps_status as a callin from external call may change it. */
-<<<<<<< HEAD
 	save_in_ext_call = TREF(in_ext_call);
-	TREF(in_ext_call) = TRUE;
-	status = callg((callgfnptr)entry_ptr->fcn, param_list);
-	TREF(in_ext_call) = save_in_ext_call;
-=======
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);		/* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
-	TREF(in_ext_call) = FALSE;
-	DEFERRED_EXIT_HANDLING_CHECK;					/* Check for deferred wcs_stale() timer */
->>>>>>> 83bc0ab... GT.M V6.3-004
+	TREF(in_ext_call) = save_in_ext_call;
+	if (!save_in_ext_call)
+		DEFERRED_EXIT_HANDLING_CHECK;					/* Check for deferred wcs_stale() timer */
 	mumps_status = save_mumps_status;
 	/* The first byte of the type description argument gets set to 0xFF in case error happened in JNI glue code,
 	 * so check for that and act accordingly.
@@ -767,13 +762,8 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	/* Entry not found */
 	if ((NULL == entry_ptr) || (NULL == entry_ptr->fcn) || (NULL == entry_ptr->call_name.addr))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCRTENOTF, 2, extref->str.len, extref->str.addr);
-<<<<<<< HEAD
 	/* Detect a call-out to Java. The java plugin still has references to "gtm_xcj" (not "ydb_xcj") hence the below check. */
-	if ((NULL != entry_ptr->call_name.addr) && !strncmp(entry_ptr->call_name.addr, "gtm_xcj", 7))
-=======
-	/* Detect a call-out to Java. */
 	if (!strncmp(entry_ptr->call_name.addr, "gtm_xcj", 7))
->>>>>>> 83bc0ab... GT.M V6.3-004
 	{
 		java = TRUE;
 		argcnt -= 2;

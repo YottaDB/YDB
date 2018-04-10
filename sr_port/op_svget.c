@@ -123,13 +123,10 @@ error_def(ERR_ZDIROUTOFSYNC);
 LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
-<<<<<<< HEAD
-LITREF char		ydb_release_name[];
-LITREF int4		ydb_release_name_len;
-=======
 LITREF char		gtm_release_stamp[];
 LITREF int4		gtm_release_stamp_len;
->>>>>>> 83bc0ab... GT.M V6.3-004
+LITREF char		ydb_release_name[];
+LITREF int4		ydb_release_name_len;
 
 void op_svget(int varnum, mval *v)
 {
@@ -404,22 +401,20 @@ void op_svget(int varnum, mval *v)
 		case SV_KEY:
 			get_dlr_key(v);
 			break;
+		case SV_ZRELDATE:
+			v->mvtype = MV_STR;
+			v->str.addr = (char *)gtm_release_stamp;
+			v->str.len = gtm_release_stamp_len;
+			break;
 		case SV_ZVERSION:
 			v->mvtype = MV_STR;
 			v->str.addr = (char *)gtm_release_name;
 			v->str.len = gtm_release_name_len;
 			break;
-<<<<<<< HEAD
 		case SV_ZYRELEASE:
 			v->mvtype = MV_STR;
 			v->str.addr = (char *)ydb_release_name;
 			v->str.len = ydb_release_name_len;
-=======
-		case SV_ZRELDATE:
-			v->mvtype = MV_STR;
-			v->str.addr = (char *)gtm_release_stamp;
-			v->str.len = gtm_release_stamp_len;
->>>>>>> 83bc0ab... GT.M V6.3-004
 			break;
 		case SV_ZSYSTEM:
 			MV_FORCE_MVAL(v, dollar_zsystem);

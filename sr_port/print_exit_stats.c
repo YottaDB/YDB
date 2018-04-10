@@ -41,12 +41,7 @@
 # define PMAPSTR	"pmap "
 #endif
 
-<<<<<<< HEAD
-
 GBLREF	uint4		ydbDebugLevel;		/* Debug level (0 = using default sm module so with
-=======
-GBLREF	uint4		gtmDebugLevel;		/* Debug level (0 = using default sm module so with
->>>>>>> 83bc0ab... GT.M V6.3-004
 						 * a DEBUG build, even level 0 implies basic debugging).
 						 */
 GBLREF	boolean_t	gtm_utf8_mode;

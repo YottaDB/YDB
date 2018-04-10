@@ -115,7 +115,7 @@
 #  define MALLOC(size, addr) 										\
 {													\
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);									\
-	if (!gtmSystemMalloc											\
+	if (!ydbSystemMalloc											\
 		&& (0 < gtm_max_storalloc) && ((size + totalRmalloc + totalRallocGta) > gtm_max_storalloc))	\
 	{	/* Boundary check for $gtm_max_storalloc (if set) */					\
 		gtmMallocErrorSize = size;								\
@@ -309,7 +309,7 @@ GBLDEF unsigned int outOfMemorySmTn;			/* smTN when ran out of memory */
 GBLREF	uint4		ydbDebugLevel;			/* Debug level (0 = using default sm module so with
 							 * a DEBUG build, even level 0 implies basic debugging)
 							 */
-GBLREF	boolean_t	gtmSystemMalloc;		/* Use the system's malloc() instead of our own */
+GBLREF	boolean_t	ydbSystemMalloc;		/* Use the system's malloc() instead of our own */
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	gtmMallocDepth;			/* Recursion indicator. Volatile so it gets stored immediately */
 GBLREF	volatile void	*outOfMemoryMitigation;		/* Reserve that we will freed to help cleanup if run out of memory */
@@ -648,7 +648,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 	intrpt_state_t	prev_intrpt_state;
 	void		*rval;
 
-	if (gtmSystemMalloc)
+	if (ydbSystemMalloc)
 	{
 		if (0 == size)
 			return &NullStruct.nullStr[0];
@@ -832,7 +832,7 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 	boolean_t	was_holder;
 	intrpt_state_t	prev_intrpt_state;
 
-	if (gtmSystemMalloc)
+	if (ydbSystemMalloc)
 	{
 		if (&NullStruct.nullStr[0] == addr)
 			return;
@@ -1120,7 +1120,7 @@ size_t gtm_bestfitsize(size_t size)
 	int	hdrSize, sizeIndex;
 
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
-	if (gtmSystemMalloc)
+	if (ydbSystemMalloc)
 		return size;
 #	ifndef DEBUG
 	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
@@ -1284,7 +1284,7 @@ void verifyFreeStorage(void)
 	uint4		i;
 	int		hdrSize;
 
-	if (gtmSystemMalloc)
+	if (ydbSystemMalloc)
 		return;
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
 	hdrSize = OFFSETOF(storElem, userStorage);
@@ -1317,7 +1317,7 @@ void verifyAllocatedStorage(void)
 	uint4		i;
 	int		hdrSize;
 
-	if (gtmSystemMalloc)
+	if (ydbSystemMalloc)
 		return;
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
 	hdrSize = OFFSETOF(storElem, userStorage);

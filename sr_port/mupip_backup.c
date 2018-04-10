@@ -257,13 +257,9 @@ void mupip_backup(void)
 	sgmnt_addrs		*csa;
 	repl_inst_hdr		repl_instance, *save_inst_hdr;
 	unsigned char		*cmdptr;
-<<<<<<< HEAD
-	unsigned char 		command[(YDB_PATH_MAX) * 2 + 5]; /*2 files in the cmd, 5 == SIZEOF("cp") + 2 (space) + 1 (NULL)*/
-=======
 	/* UNALIAS + 2 files in the cmd, 5 == SIZEOF("cp") + 2 (space) + 1 (NULL)*/
-	unsigned char 		command[(STR_LIT_LEN(UNALIAS)) + (GTM_PATH_MAX) * 2 + 5];
+	unsigned char 		command[(STR_LIT_LEN(UNALIAS)) + (YDB_PATH_MAX) * 2 + 5];
 	char			cp_cmd[MAX_FN_LEN] = "cp ";
->>>>>>> 83bc0ab... GT.M V6.3-004
 	struct shmid_ds		shm_buf;
 	struct semid_ds		semstat;
 	union semun		semarg;
