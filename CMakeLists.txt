@@ -929,3 +929,11 @@ endforeach()
 
 add_custom_target(place_files ALL DEPENDS ${files_to_place})
 add_custom_target(make_read_only ALL DEPENDS ${targets_to_run} place_files)
+
+#-----------------------------------------------------------------------------
+# Get the current build time and pass it as a macro to a C program (release_name.h)
+string(TIMESTAMP BUILD_TIMESTAMP "%Y%m%d %H:%M")
+
+# Make the build timestamp available to a C program (release_name.h)
+add_definitions("-DYDB_RELEASE_STAMP=\"${BUILD_TIMESTAMP}\"")
+

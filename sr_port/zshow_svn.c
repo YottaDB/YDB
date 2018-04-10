@@ -192,8 +192,8 @@ GBLREF mstr		dollar_zpout;
 LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
-LITREF char		gtm_release_stamp[];
-LITREF int4		gtm_release_stamp_len;
+LITREF char		ydb_release_stamp[];
+LITREF int4		ydb_release_stamp_len;
 LITREF char		ydb_release_name[];
 LITREF int4		ydb_release_name_len;
 
@@ -693,8 +693,8 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		case SV_ZRELDATE:
 			var.mvtype = MV_STR;
-			var.str.addr = (char *)gtm_release_stamp;
-			var.str.len = gtm_release_stamp_len;
+			var.str.addr = (char *)ydb_release_stamp;
+			var.str.len = ydb_release_stamp_len;
 			ZS_VAR_EQU(&x, zreldate_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)

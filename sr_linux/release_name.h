@@ -20,8 +20,12 @@
 
 #define GTM_VERSION		"V6.3"
 #define	GTM_ZVERSION		"V6.3-004"
-#define GTM_RELEASE_STAMP	"20180316 15:27"
 #define	YDB_ZYRELEASE		"r1.21"
+
+/* Note: YDB_RELEASE_STAMP is set as part of the cmake build process.
+ * Example values are
+ *	#define YDB_RELEASE_STAMP	"20180316 15:27"
+ */
 
 #if defined(__x86_64__)
 # define YDB_PLATFORM		"Linux x86_64"
