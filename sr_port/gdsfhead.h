@@ -2753,7 +2753,7 @@ typedef struct gd_gblname_struct
  * far while later attempts get further. Items will be put on the list sorted in unique_id order so that they will always be
  * grab-crit'd in the same order thus avoiding deadlocks.
  * The structure and the insert_region function that maintains it are also abused/used by mupip and by view_arg_convert on behalf
- * of op_view - the secondary adopters us a different anchor from the tp_reg_list GBLREF and a hence different list.
+ * of op_view - the secondary adopters use a different anchor from the tp_reg_list GBLREF and a hence different list.
  */
 
 /* The structure backup_region_list defined in mupipbckup.h needs to have its first four fields

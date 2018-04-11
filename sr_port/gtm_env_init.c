@@ -129,7 +129,7 @@ void	gtm_env_init(void)
 			if (GDL_SmStorHog & tdbglvl)
 				tdbglvl |= GDL_SmBackfill | GDL_SmChkAllocBackfill;
 			ydbDebugLevel |= tdbglvl;
-			ydbSystemMalloc = ((GDL_UseSystemMalloc & ydbDebugLevel) || FALSE);
+			ydbSystemMalloc = (GDL_UseSystemMalloc & ydbDebugLevel);
 			if (ydbSystemMalloc)
 				ydbDebugLevel &= !(GDL_SmStats | GDL_SmTrace | GDL_SmDumpTrace | GDL_SmAllocVerf | GDL_SmFreeVerf
 							| GDL_SmBackfill | GDL_SmChkAllocBackfill | GDL_SmChkFreeBackfill
