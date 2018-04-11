@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -36,8 +39,7 @@ void iosocket_destroy (io_desc *ciod)
 		{
 			assert(NULL == lp->iod);	/* Can be NULL if we are forced to exit during device setup */
 			/* skip it on pro */
-		}
-		else if (lp->iod->pair.in == ciod)
+		} else if (lp->iod->pair.in == ciod)
 		{
 			/* The only device that may be "split" is the principal device. Since it is permanently open,
 			 * it will never get here.
