@@ -59,7 +59,7 @@ int gtmrecv_comm_init(in_port_t port)
 	char			port_buffer[NI_MAXSERV];
 	int			port_buffer_len;
 	int			temp_sock_fd;
-	int			af;
+	int			af, save_errno;
 
 	if (FD_INVALID != gtmrecv_listen_sock_fd) /* Initialization done already */
 		return (0);
@@ -70,8 +70,9 @@ int gtmrecv_comm_init(in_port_t port)
 		af = AF_INET;
 		if (FD_INVALID == (temp_sock_fd = socket(af, SOCK_STREAM, IPPROTO_TCP)))
 		{
+			save_errno = ERRNO;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					RTS_ERROR_LITERAL("Error with receiver server socket create"), ERRNO);
+					RTS_ERROR_LITERAL("Error with receiver server socket create"), save_errno);
 			return (-1);
 		}
 	}
@@ -90,31 +91,35 @@ int gtmrecv_comm_init(in_port_t port)
 	gtmrecv_listen_sock_fd = temp_sock_fd;
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
 	{
+		save_errno = ERRNO;
 		freeaddrinfo(ai_ptr);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Error with receiver server listen socket disable linger"), ERRNO);
+				RTS_ERROR_LITERAL("Error with receiver server listen socket disable linger"), save_errno);
 	}
 	if (0 > setsockopt(gtmrecv_listen_sock_fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&enable_reuseaddr,
 			SIZEOF(enable_reuseaddr)))
 	{
+		save_errno = ERRNO;
 		freeaddrinfo(ai_ptr);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				RTS_ERROR_LITERAL("Error with receiver server listen socket enable reuseaddr"), ERRNO);
+				RTS_ERROR_LITERAL("Error with receiver server listen socket enable reuseaddr"), save_errno);
 	}
 	if (0 > BIND(gtmrecv_listen_sock_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen))
 	{
+		save_errno = ERRNO;
 		freeaddrinfo(ai_ptr);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				 RTS_ERROR_LITERAL("Could not bind local address"), ERRNO);
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				 RTS_ERROR_LITERAL("Could not bind local address"), save_errno);
 		return (-1);
 	}
 	if (0 > listen(gtmrecv_listen_sock_fd, 5))
 	{
+		save_errno = ERRNO;
 		freeaddrinfo(ai_ptr);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-				 RTS_ERROR_LITERAL("Could not listen"), ERRNO);
 		CLOSEFILE_RESET(gtmrecv_listen_sock_fd, rc);	/* resets "gtmrecv_listen_sock_fd" to FD_INVALID */
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				 RTS_ERROR_LITERAL("Could not listen"), save_errno);
 		return (-1);
 	}
 	freeaddrinfo(ai_ptr);
