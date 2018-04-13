@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -51,7 +54,7 @@
 #define READ	"READ"
 
 GBLREF volatile int4		outofband;
-GBLREF int4			gtm_max_sockets;
+GBLREF int4			ydb_max_sockets;
 GBLREF int			socketus_interruptus;
 GBLREF boolean_t		dollar_zininterrupt;
 GBLREF stack_frame  	        *frame_pointer;
@@ -480,9 +483,9 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	struct sockaddr_storage	peer;           /* socket address + port */
 	struct sockaddr		*peer_sa_ptr;
 
-	if (gtm_max_sockets <= dsocketptr->n_socket)
+	if (ydb_max_sockets <= dsocketptr->n_socket)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, ydb_max_sockets);
 		return -1;
 	}
 	peer_sa_ptr = ((struct sockaddr *)(&peer));

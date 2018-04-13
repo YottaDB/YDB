@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -12,20 +15,18 @@
 
 #include "mdef.h"
 #include "iosp.h"		/* for SS_ */
-#include "gtm_logicals.h"
 #include "min_max.h"
 #include "gtm_string.h"
 #include "gtm_strings.h" 	/* for STRNCASECMP */
-#include "trans_log_name.h"
 #include "trap_env_init.h"
 #include "gtmio.h"
 #include "gtmimagename.h"
-#include "trans_numeric.h"
-#include "logical_truth_value.h"
+#include "ydb_logical_truth_value.h"
 #include "compiler.h"
 #include "op.h"
 #include "stack_frame.h"
 #include "indir_enum.h"
+#include "ydb_trans_log_name.h"
 
 #define ZTRAP_FORM_CODE				"code"
 #define ZTRAP_FORM_ENTRYREF			"entryref"
@@ -49,7 +50,7 @@ static readonly unsigned char init_break[1] = {'B'};
 void trap_env_init(void)
 {
 	int4		status;
-	mstr		val, trans;
+	mstr		trans;
 	char		buf[MAX_SRCLINE + 1], *buf_ptr = &buf[0];
 	DCL_THREADGBL_ACCESS;
 
@@ -58,9 +59,8 @@ void trap_env_init(void)
 	assert(run_time || is_updproc);
 	run_time = TRUE;							/* so updproc gets a pass if there's an error */
 	/* Initialize which ever error trap we are using (ignored in the utilities except the update process) */
-	val.addr = GTM_ETRAP;
-	val.len = SIZEOF(GTM_ETRAP) - 1;
-	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long))) && (0 < trans.len))
+	if ((SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_ETRAP, &trans, buf, SIZEOF(buf), IGNORE_ERRORS_TRUE, NULL)))
+				&& (0 < trans.len))
 	{
 		(TREF(dollar_etrap)).str.addr = malloc(trans.len + 1);		/* +1 for '\0'; This memory is never freed */
 		memcpy((TREF(dollar_etrap)).str.addr, trans.addr, trans.len);
@@ -77,25 +77,24 @@ void trap_env_init(void)
 		(TREF(dollar_ztrap)).str.addr = (char *)init_break;
 	}
 #	ifdef GTM_TRIGGER
-	val.addr = GTM_TRIGGER_ETRAP;
-	val.len = SIZEOF(GTM_TRIGGER_ETRAP) - 1;
-	(TREF(gtm_trigger_etrap)).mvtype = MV_STR;
-	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long))) && (0 < trans.len))
+	(TREF(ydb_trigger_etrap)).mvtype = MV_STR;
+	if ((SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_TRIGGER_ETRAP, &trans, buf, SIZEOF(buf),
+										IGNORE_ERRORS_TRUE, NULL)))
+		&& (0 < trans.len))
 	{
-		(TREF(gtm_trigger_etrap)).str.addr = malloc(trans.len + 1);	 /* +1 for '\0'; This memory is never freed */
-		memcpy((TREF(gtm_trigger_etrap)).str.addr, trans.addr, trans.len);
-		(TREF(gtm_trigger_etrap)).str.addr[trans.len] = '\0';
-		(TREF(gtm_trigger_etrap)).str.len = trans.len;
-		TREF(ind_source) = &(TREF(gtm_trigger_etrap));
+		(TREF(ydb_trigger_etrap)).str.addr = malloc(trans.len + 1);	 /* +1 for '\0'; This memory is never freed */
+		memcpy((TREF(ydb_trigger_etrap)).str.addr, trans.addr, trans.len);
+		(TREF(ydb_trigger_etrap)).str.addr[trans.len] = '\0';
+		(TREF(ydb_trigger_etrap)).str.len = trans.len;
+		TREF(ind_source) = &(TREF(ydb_trigger_etrap));
 		op_commarg(TREF(ind_source), indir_linetail);
 		op_unwind();
 	} else if (IS_MUPIP_IMAGE)
-		(TREF(gtm_trigger_etrap))= default_etrap;
+		(TREF(ydb_trigger_etrap))= default_etrap;
 #	endif
-	/* Initialize $ZSTEP from $gtm_zstep enviroment variable. */
-	val.addr = GTM_ZSTEP;
-	val.len = SIZEOF(GTM_ZSTEP) - 1;
-	if ((SS_NORMAL == (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long))) && (0 < trans.len))
+	/* Initialize $ZSTEP from $ydb_zstep enviroment variable. */
+	if ((SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_ZSTEP, &trans, buf, SIZEOF(buf), IGNORE_ERRORS_TRUE, NULL)))
+		&& (0 < trans.len))
 	{
 		(TREF(dollar_zstep)).str.addr = malloc(trans.len + 1); 		/* +1 for '\0'; This memory is never freed */
 		memcpy((TREF(dollar_zstep)).str.addr, trans.addr, trans.len);
@@ -114,16 +113,10 @@ void trap_env_init(void)
 	run_time = !is_updproc;							/* restore to appropriate state */
 	TREF(ind_source) = NULL;						/* probably superfluous, but profilactic */
 	TREF(ztrap_form) = ZTRAP_CODE;						/* default */
-	val.addr = ZTRAP_FORM;
-	val.len = STR_LIT_LEN(ZTRAP_FORM);
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &trans, buf, SIZEOF(buf), dont_sendmsg_on_log2long)))
+	if (SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_ZTRAP_FORM, &trans, buf, SIZEOF(buf), IGNORE_ERRORS_FALSE, NULL)))
 	{
-		if (SS_NOLOGNAM == status)
-			return;
-		else if (SS_LOG2LONG == status)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf) - 1);
-		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(ZTRAP_FORM), status);
+		assert(SS_NOLOGNAM == status);
+		return;
 	}
 	if ((STR_LIT_LEN(ZTRAP_FORM_POP) < trans.len) && !STRNCASECMP(buf_ptr, ZTRAP_FORM_POP, STR_LIT_LEN(ZTRAP_FORM_POP)))
 	{	/* "pop" can be a prefix to both entryref and adaptive */

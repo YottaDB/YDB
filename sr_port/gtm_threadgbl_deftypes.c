@@ -119,10 +119,6 @@
 
 #include "jnl_typedef.h"
 
-#ifdef VMS
-# include "gtm_logicals.h"	/* for GTM_MEMORY_NOACCESS_COUNT */
-#endif
-
 #include "gds_blk_upgrade.h"	/* for UPGRADE_IF_NEEDED flag */
 #include "cws_insert.h"		/* for CWS_REORG_ARRAYSIZE */
 

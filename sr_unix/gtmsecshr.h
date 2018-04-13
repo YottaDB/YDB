@@ -57,7 +57,6 @@
 #define SERVER				0
 #define CLIENT				1
 
-#define GTMSECSHR_SOCK_DIR		GTM_TMP_ENV
 #define DEFAULT_GTMSECSHR_SOCK_DIR	DEFAULT_GTM_TMP
 #define GTMSECSHR_SOCK_PREFIX		"gtm_secshr"
 #define GTMSECSHR_DIR_SUFFIX		"/gtmsecshrdir"
@@ -96,7 +95,7 @@ typedef struct gtmsecshr_mesg_struct
 					 * From gtmsecshr: return code (0 or errno).
 					 */
 	unsigned int	comkey;		/* Unique key per version keeps from having cross-version issues */
-	boolean_t	usesecshr;	/* Copy of client's gtm_usesecshr flag. Only used in debug build but always kept
+	boolean_t	usesecshr;	/* Copy of client's ydb_usesecshr flag. Only used in debug build but always kept
 					 * for alignment.
 					 */
 	pid_t		pid;		/* Process id of sender */

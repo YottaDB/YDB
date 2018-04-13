@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -24,13 +27,12 @@
 
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-#include "gtm_logicals.h"
-#include "trans_log_name.h"
 #include "io.h"
 #include "iosp.h"
 #include "stringpool.h"
 #include "jobinterrupt_init.h"
 #include "jobinterrupt_event.h"
+#include "ydb_trans_log_name.h"
 
 GBLREF	mval	dollar_zinterrupt;
 
@@ -38,7 +40,6 @@ GBLREF	mval	dollar_zinterrupt;
 
 void jobinterrupt_init(void)
 {
-	mstr	envvar_logical;
 	char	trans_bufr[MAX_TRANS_NAME_LEN];
 	DCL_THREADGBL_ACCESS;
 	struct sigaction new_action;
@@ -52,10 +53,9 @@ void jobinterrupt_init(void)
 	sigaction(SIGUSR1, &new_action, NULL);
 
 	/* Provide initial setting for $ZINTERRUPT */
-	envvar_logical.addr = GTM_ZINTERRUPT;
-	envvar_logical.len = SIZEOF(GTM_ZINTERRUPT) - 1;
-	if ((SS_NORMAL != TRANS_LOG_NAME(&envvar_logical, &dollar_zinterrupt.str, trans_bufr, SIZEOF(trans_bufr),
-						do_sendmsg_on_log2long)) || (0 == dollar_zinterrupt.str.len))
+	if ((SS_NORMAL != ydb_trans_log_name(YDBENVINDX_ZINTERRUPT, &dollar_zinterrupt.str,
+								trans_bufr, SIZEOF(trans_bufr), IGNORE_ERRORS_TRUE, NULL))
+		|| (0 == dollar_zinterrupt.str.len))
 	{	/* Translation failed - use default */
 		dollar_zinterrupt.str.addr = DEF_ZINTERRUPT;
 		dollar_zinterrupt.str.len = SIZEOF(DEF_ZINTERRUPT) - 1;

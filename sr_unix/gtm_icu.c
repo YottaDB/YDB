@@ -38,8 +38,7 @@
 #include "error.h"
 #include "io.h"
 #include "iosp.h"
-#include "gtm_logicals.h"	/* needed for GTM_ICU_VERSION */
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "real_len.h"		/* for COPY_DLERR_MSG */
 #include "fgncal.h"		/* needed for COPY_DLLERR_MSG() */
 
@@ -53,13 +52,16 @@
 ZOS_ONLY(GBLREF	char	*gtm_utf8_locale_object;)
 GBLREF	volatile boolean_t	timer_in_handler;
 
+LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];
+LITREF	char	*gtmenvname[YDBENVINDX_MAX_INDEX];
+
 typedef void (*icu_func_t)();	/* a generic pointer type to the ICU function */
 
 /* For now the minimum ICU version supported is 3.6 */
 #define	ICU_MINIMUM_SUPPORTED_VER	"3.6"
 #define IS_ICU_VER_GREATER_THAN_MIN_VER(major_ver, minor_ver) ((3 < major_ver) || ((3 == major_ver) && (6 <= minor_ver)))
 
-/* ICU function to query for the ICU version. Used only if GTM_ICU_VERSION is not set. */
+/* ICU function to query for the ICU version. Used only if $ydb_icu_version is not set. */
 #define GET_ICU_VERSION_FNAME	"u_getVersion"
 
 /* Indicates the maximum size of the array that is given as input to u_getVersion. The corresponding MACRO
@@ -72,7 +74,7 @@ typedef void (*icu_func_t)();	/* a generic pointer type to the ICU function */
  */
 #define MAX_ICU_VERSION_STRLEN	20
 
-/* Maintain max length of all the ICU function names that GT.M uses. This is currently 20 so we keep max at 24 to be safe.
+/* Maintain max length of all the ICU function names that YottaDB uses. This is currently 20 so we keep max at 24 to be safe.
  * In case a new function that has a name longer than 24 chars gets added, an assert below will fail so we are protected.
  */
 #define MAX_ICU_FNAME_LEN	24
@@ -80,15 +82,14 @@ typedef void (*icu_func_t)();	/* a generic pointer type to the ICU function */
 /* The function u_getVersion which queries for the version number of installed ICU library expects
  * UVersionInfo which is typefed to uint8_t. To avoid including unicode/uversion.h that defines UVersionInfo
  * do explicit typedef of uint8_t to UVersionInfo here. We don't expect UVersionInfo type to change as it is
- * tagged as @stable ICU 2.4 and GT.M will only support ICU versions >= 3.6
+ * tagged as @stable ICU 2.4 and YottaDB will only support ICU versions >= 3.6
  */
 typedef uint8_t UVersionInfo[MAX_ICU_VERSION_LENGTH];
 
-/* The first parameter to ICUVERLT36 can be either ICU_LIBNAME or $gtm_icu_version. Depending on the choice
+/* The first parameter to ICUVERLT36 can be either ICU_LIBNAME or $ydb_icu_version. Depending on the choice
  * of the first parameter, different suffix is chosen.
  */
 #define ICU_LIBNAME_SUFFIX		" has version"
-#define GTM_ICU_VERSION_SUFFIX		" is"
 
 /* Declare enumerators for all functions */
 #define ICU_DEF(x) x##_,
@@ -156,19 +157,19 @@ error_def(ERR_ICUVERLT36);
  * As of ICU 4.4, the version number extension changed to (note the missing underscore)
  * 	_<major><minor>
  *
- * The function below parses gtm_icu_version to determine the strings used in the library and symbol versions
+ * The function below parses ydb_icu_version to determine the strings used in the library and symbol versions
  */
-static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char *icusymver, char *iculibver)
+static boolean_t parse_ydb_icu_version(char *icu_ver_buf, int len, char *icusymver, char *iculibver, boolean_t is_ydb_env_match)
 {
 	char		*ptr;
-	char		tmp_errstr[SIZEOF(GTM_ICU_VERSION) + STR_LIT_LEN(GTM_ICU_VERSION_SUFFIX)]; /* "$gtm_icu_version is" */
+	char		tmp_errstr[128]; /* "$ydb_icu_version is" */
 	int4		major_ver, minor_ver;
 	int		i;
 
 	if ((NULL == icu_ver_buf) || (0 == len))
 		return FALSE;	/* empty string */
 
-	/* Deconstruct the two known forms of gtm_icu_version "[0-9].[0-9]" and "[0-9][0-9]" ignoring trailing values */
+	/* Deconstruct the two known forms of ydb_icu_version "[0-9].[0-9]" and "[0-9][0-9]" ignoring trailing values */
 	ptr = icu_ver_buf;
 	if (-1 == (major_ver = asc2i((uchar_ptr_t)ptr++, 1)))
 		return FALSE;
@@ -196,7 +197,8 @@ static boolean_t parse_gtm_icu_version(char *icu_ver_buf, int len, char *icusymv
 	if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(major_ver, minor_ver)))
 	{
 		/* Construct the first part of the ICUVERLT36 error message. */
-		SPRINTF(tmp_errstr, "%s%s", GTM_ICU_VERSION, GTM_ICU_VERSION_SUFFIX);
+		SPRINTF(tmp_errstr, "%s is",
+			(is_ydb_env_match ?  ydbenvname[YDBENVINDX_ICU_VERSION] : gtmenvname[YDBENVINDX_ICU_VERSION]));
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), major_ver, minor_ver);
 	}
 	return TRUE;
@@ -218,13 +220,15 @@ void gtm_icu_init(void)
 	int		findx;
 	boolean_t	icu_getversion_found = FALSE, gtm_icu_ver_defined, symbols_renamed;
 	UVersionInfo	icu_version;
-	mstr		icu_ver, trans;
+	mstr		trans;
+	char		*envname;
 #	ifdef _AIX
 	int		buflen, prev_dyn_size;
 	char            buf[ICU_LIBNAME_LEN], temp_path[YDB_PATH_MAX], real_path[YDB_PATH_MAX], search_paths[MAX_SEARCH_PATH_LEN];
 	char		*ptr, *each_libpath, *dyn_search_paths = NULL, *search_path_ptr;
 	struct stat	real_path_stat;		/* To see if the resolved real_path exists or not */
 #	endif
+	boolean_t	is_ydb_env_match;
 
 	assert(!gtm_utf8_mode);
 #	ifdef __MVS__
@@ -238,22 +242,21 @@ void gtm_icu_init(void)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_LIT("<undefined>"));
 	if ((NULL == locale) || (0 != strcasecmp(chset, "utf-8")) && (0 != strcasecmp(chset, "utf8")))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_STR(chset));
-	/* By default, GT.M will henceforth expect that ICU has been built with symbol renaming disabled. If that is not the case,
-	 * GT.M can be notified of this through an environment variable (macro GTM_ICU_VERSION).  The variable should contain the
+	/* By default, YottaDB will henceforth expect that ICU has been built with symbol renaming disabled. If that is not the case,
+	 * YottaDB can be notified of this through an environment variable ($ydb_icu_version).  The variable should contain the
 	 * icu version number formatted as "<major-ver>.<minor-ver>". Example would be "3.6" to indicate ICU 3.6.
-	 * Given the above environment variable, GT.M will try to dlopen the version specific icu library directly
+	 * Given the above environment variable, YottaDB will try to dlopen the version specific icu library directly
 	 * (i.e. libicuio.so.36 instead of libicuio.so). In that case, it will try both renamed and non-renamed symbols and
-	 * whichever works it will use that. But if the environment variable is not specified, GT.M will assume that ICU has
+	 * whichever works it will use that. But if the environment variable is not specified, YottaDB will assume that ICU has
 	 * been built with no renaming of symbols. Any value of the environment variable not conforming to the above formatting
 	 * will be treated as if this environment variable was not set at all and the default behavior (which is to query for
 	 * symbols without appended version numbers) will be used.
 	 */
-	icu_ver.addr = GTM_ICU_VERSION;
-	icu_ver.len = STR_LIT_LEN(GTM_ICU_VERSION);
 	gtm_icu_ver_defined = FALSE;
-	if (SS_NORMAL == TRANS_LOG_NAME(&icu_ver, &trans, icu_ver_buf, SIZEOF(icu_ver_buf), do_sendmsg_on_log2long))
-	{	/* GTM_ICU_VERSION is defined. Do edit check on the value before considering it really defined */
-		gtm_icu_ver_defined = parse_gtm_icu_version(trans.addr, trans.len, icusymver, iculibver);
+	if (SS_NORMAL == ydb_trans_log_name(YDBENVINDX_ICU_VERSION, &trans, icu_ver_buf, SIZEOF(icu_ver_buf),
+											IGNORE_ERRORS_TRUE, &is_ydb_env_match))
+	{	/* $ydb_icu_version is defined. Do edit check on the value before considering it really defined */
+		gtm_icu_ver_defined = parse_ydb_icu_version(trans.addr, trans.len, icusymver, iculibver, is_ydb_env_match);
 	}
 	if (gtm_icu_ver_defined)
 	{	/* User explicitly specified an ICU version. So load version specific icu file (e.g. libicuio.so.36) */
@@ -401,7 +404,7 @@ void gtm_icu_init(void)
 			fptr = (icu_func_t)dlsym(handle, icu_final_fname);
 #endif
 		if (NULL == fptr)
-		{	/* If gtm_icu_version is defined to a proper value, then try function name with <major_ver>_<minor_ver> */
+		{	/* If ydb_icu_version is defined to a proper value, then try function name with <major_ver>_<minor_ver> */
 			if (gtm_icu_ver_defined && ((0 == findx) || symbols_renamed))
 			{
 				memcpy(&icu_final_fname[icu_final_fname_len], icusymver, icusymver_len);
@@ -417,7 +420,11 @@ void gtm_icu_init(void)
 			if (NULL == fptr)
 			{
 				COPY_DLLERR_MSG(err_str, err_msg);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ICUSYMNOTFOUND, 2, LEN_AND_STR(cur_icu_fname),
+				envname = (char *)(is_ydb_env_match
+							? ydbenvname[YDBENVINDX_ICU_VERSION]
+							: gtmenvname[YDBENVINDX_ICU_VERSION]) + 1;	/* + 1 to skip past '$' */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10)
+					ERR_ICUSYMNOTFOUND, 4, LEN_AND_STR(cur_icu_fname), LEN_AND_STR(envname),
 					ERR_TEXT, 2, LEN_AND_STR(err_msg));
 			}
 			if (0 == findx)	/* record the fact that the symbols ARE renamed */
@@ -427,10 +434,10 @@ void gtm_icu_init(void)
 		assert((0 == findx) || icu_getversion_found || gtm_icu_ver_defined); /* u_getVersion should have been dlsym'ed */
 		*icu_fptr[findx] = fptr;
 		/* If the current function that is dlsym'ed is u_getVersion, then we use fptr to query for the library's ICU
-		 * version. If it is less than the least ICU version that GT.M supports we issue an error. If not, we continue
+		 * version. If it is less than the least ICU version that YottaDB supports we issue an error. If not, we continue
 		 * dlsym the rest of the functions. To facilitate issuing wrong version error early, the ICU function getVersion
 		 * should be the first function in gtm_icu.h. This way dlsym on u_getVersion will happen as the first thing in
-		 * this loop. But do all this only if gtm_icu_version is not defined in the environment. If it's defined to an
+		 * this loop. But do all this only if ydb_icu_version is not defined in the environment. If it's defined to an
 		 * an appropriate value in the environment then the version check would have happened before and there isn't any
 		 * need to repeat it again.
 		 */

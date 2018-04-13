@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -48,23 +51,23 @@ uint4	jnl_flush(gd_region *reg)
 	jb->blocked = process_id;
 	assert(jb->rsrv_freeaddr >= jb->freeaddr);
 	assert((jb->rsrv_freeaddr >= jb->dskaddr)
-		|| (gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
+		|| (ydb_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)));
 	if (jb->rsrv_freeaddr != jb->dskaddr)
 	{
 		status = jnl_write_attempt(jpc, jb->rsrv_freeaddr);
 		if (SS_NORMAL == status)
 		{
 			assert((jb->rsrv_freeaddr == jb->freeaddr)
-				|| (gtm_white_box_test_case_enabled
-					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
+				|| (ydb_white_box_test_case_enabled
+					&& (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)));
 			cnl = csa->nl;
 			INCR_GVSTATS_COUNTER(csa, cnl, n_jnl_flush, 1);
 		}
 	} else
 		status = SS_NORMAL;
 	assert(((SS_NORMAL == status) && (jb->dskaddr == jb->rsrv_freeaddr) && (jb->freeaddr == jb->rsrv_freeaddr))
-		|| TREF(gtm_test_fake_enospc)
-		|| (gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
+		|| TREF(ydb_test_fake_enospc)
+		|| (ydb_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)));
 	jb->blocked = 0;
 	return status;
 }

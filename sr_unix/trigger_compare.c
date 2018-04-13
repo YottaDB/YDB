@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -170,7 +173,7 @@ boolean_t search_trigger_hash(char *trigvn, int trigvn_len, stringkey *trigger_h
 		{	/* There has to be a #TRHASH entry or else it is a retry situation (due to concurrent updates) */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
@@ -180,7 +183,7 @@ boolean_t search_trigger_hash(char *trigvn, int trigvn_len, stringkey *trigger_h
 		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
@@ -250,7 +253,7 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 		{	/* There has to be a #TRHASH entry or else it is a retry situation (due to concurrent updates) */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
@@ -260,7 +263,7 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
@@ -271,7 +274,7 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 			 */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
@@ -360,7 +363,7 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 			} else
 			{
 				assert((first_match_kill_cmp != kill_cmp) || !kill_cmp ||
-						(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number));
+						(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number));
 				/* We have TWO matches. Pick the more appropriate one. */
 				if (doing_set != kill_cmp)
 				{	/* Current trigger matches input trigger type. Overwrite first_match */

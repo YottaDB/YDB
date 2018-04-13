@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -213,7 +216,7 @@ boolean_t convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsig
 					/* STRTOUL will stop at the ',' or ')' */
 					num = (int4)STRTOUL(&gvn->str.addr[isrc], NULL, 10);
 #					ifdef UNICODE_SUPPORTED
-					if (!is_zchar && is_gtm_chset_utf8)
+					if (!is_zchar && is_ydb_chset_utf8)
 						op_fnchar(2, &dollarcharmval, num);
 					else
 #					endif

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -99,7 +102,7 @@ void gv_rundown(void)
 #				ifdef DEBUG
 				if (is_jnlpool_creator
 					&& INST_FREEZE_ON_NOSPC_ENABLED(REG2CSA(r_local), local_jnlpool)
-					&& TREF(gtm_test_fake_enospc))
+					&& TREF(ydb_test_fake_enospc))
 				{	/* Clear ENOSPC faking now that we are running down */
 					csa = REG2CSA(r_local);
 					assert((NULL == csa->jnlpool) || (jnlpool == csa->jnlpool));

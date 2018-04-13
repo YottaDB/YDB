@@ -3,6 +3,9 @@
  * Copyright (c) 2007-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -71,7 +74,7 @@ boolean_t	wcs_read_in_progress_wait(cache_rec_ptr_t cr, wbtest_code_t wbox_test_
 					RELEASE_BUFF_READ_LOCK(cr);
 				} else
 				{
-					assert(gtm_white_box_test_case_enabled);
+					assert(ydb_white_box_test_case_enabled);
 					return FALSE;
 				}
 			} else

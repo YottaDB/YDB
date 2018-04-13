@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,9 +25,8 @@
 #include "io.h"
 #include "iosp.h"
 #include "gtmmsg.h"
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "error.h"
-#include "gtm_logicals.h"
 
 #define MAXARGSIZE	1024
 
@@ -32,25 +34,25 @@ static boolean_t	gtm_do_event_log = FALSE;
 static fgnfnc		gtm_event_log_func;
 static void_ptr_t	gtm_event_log_handle;
 
+LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];
+LITREF	char	*gtmenvname[YDBENVINDX_MAX_INDEX];
+
 int gtm_event_log_init(void)
 {
 	/* External log initializations */
-
-	mstr	name, trans_name;
-	char    log_name[MAX_TRANS_NAME_LEN],
-		shared_lib[MAX_TRANS_NAME_LEN],
-		log_func[MAX_TRANS_NAME_LEN];
-	int	status, index, save_errno;
-	char	print_msg[1024], *args;
+	mstr		trans_name;
+	char		log_name[MAX_TRANS_NAME_LEN], shared_lib[MAX_TRANS_NAME_LEN], log_func[MAX_TRANS_NAME_LEN];
+	int		status, index, save_errno;
+	char		print_msg[1024], *args;
+	boolean_t	is_ydb_env_match;
 
 	error_def(ERR_EVENTLOGERR);
 	error_def(ERR_TEXT);
 
 	if (gtm_do_event_log) /* Already initialized */
 		return(SS_NORMAL);
-	name.len = SIZEOF(GTM_EVENT_LOG_LIB_ENV) - 1;
-	name.addr = GTM_EVENT_LOG_LIB_ENV;
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(&name, &trans_name, log_name, SIZEOF(log_name), do_sendmsg_on_log2long))
+	if (SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_EVENT_LOG_LIBPATH, &trans_name,
+								log_name, SIZEOF(log_name), IGNORE_ERRORS_TRUE, &is_ydb_env_match))
 			|| (0 == trans_name.len))
 		return(status);
 	memcpy(shared_lib, trans_name.addr, trans_name.len);
@@ -58,24 +60,24 @@ int gtm_event_log_init(void)
 	if (NULL == (gtm_event_log_handle = fgn_getpak(shared_lib, INFO)))
 	{
 		SPRINTF(print_msg, "Could not open shared library specified in %s - %s. No event logging done",
-			GTM_EVENT_LOG_LIB_ENV, shared_lib);
+			(is_ydb_env_match ? ydbenvname[YDBENVINDX_EVENT_LOG_LIBPATH] : gtmenvname[YDBENVINDX_EVENT_LOG_LIBPATH]),
+			shared_lib);
 		gtm_putmsg(VARLSTCNT(6) ERR_EVENTLOGERR, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 		return(-1);
 	}
-#ifdef GTM_EVENT_LOG_HARDCODE_RTN_NAME
+#	ifdef GTM_EVENT_LOG_HARDCODE_RTN_NAME
 	trans_name.len = SIZEOF(GTM_EVENT_LOG_RTN) - 1;
 	trans_name.addr = GTM_EVENT_LOG_RTN;
-#else
-	name.len = SIZEOF(GTM_EVENT_LOG_RTN_ENV) - 1;
-	name.addr = GTM_EVENT_LOG_RTN_ENV;
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(&name, &trans_name, log_name, SIZEOF(log_name), do_sendmsg_on_log2long))
+#	else
+	if (SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_EVENT_LOG_RTN, &trans_name,
+								log_name, SIZEOF(log_name), IGNORE_ERRORS_TRUE, NULL))
 		|| (0 == trans_name.len))
 	{
 		SPRINTF(print_msg, "%s not set or null. No event logging done", GTM_EVENT_LOG_RTN_ENV);
 		gtm_putmsg(VARLSTCNT(6) ERR_EVENTLOGERR, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
 		return(status);
 	}
-#endif
+#	endif
 	memcpy(log_func, trans_name.addr, trans_name.len);
 	log_func[trans_name.len] = '\0';
 

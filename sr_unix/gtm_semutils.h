@@ -29,8 +29,8 @@
 #define DB_COUNTER_SEM		1
 #define	DEFAULT_DB_COUNTER_SEM_INCR	1
 #ifdef DEBUG
-GBLREF	int	gtm_db_counter_sem_incr;
-# define	DB_COUNTER_SEM_INCR	gtm_db_counter_sem_incr
+GBLREF	int	ydb_db_counter_sem_incr;
+# define	DB_COUNTER_SEM_INCR	ydb_db_counter_sem_incr
 #else
 #define		DB_COUNTER_SEM_INCR	DEFAULT_DB_COUNTER_SEM_INCR
 #endif
@@ -77,7 +77,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 
 #define SENDMSG_SEMOP_SUCCESS_IF_NEEDED(STACKTRACE_ISSUED, SEMTYPE)								 \
 MBSTART {																 \
-	if (TREF(gtm_environment_init) && STACKTRACE_ISSUED)									 \
+	if (TREF(ydb_environment_init) && STACKTRACE_ISSUED)									 \
 	{															 \
 		const char		*lcl_msgstr = NULL;									 \
 																 \

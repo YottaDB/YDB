@@ -602,7 +602,7 @@ MBSTART {													\
 		DOWRITERC(RM->fildes, FBUFF, FBUFF_LEN, RC);							\
 	else													\
 	{													\
-		GBLREF	int	gtm_non_blocked_write_retries;							\
+		GBLREF	int	ydb_non_blocked_write_retries;							\
 		ssize_t		gtmioStatus;									\
 		size_t		gtmioBuffLen;									\
 		sm_uc_ptr_t	gtmioBuff;									\
@@ -627,7 +627,7 @@ MBSTART {													\
 				break;										\
 			else if (EAGAIN == errno)								\
 			{											\
-				if (gtm_non_blocked_write_retries <= block_cnt)					\
+				if (ydb_non_blocked_write_retries <= block_cnt)					\
 					break;									\
 				SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);						\
 				block_cnt++;									\
@@ -642,7 +642,7 @@ MBSTART {													\
 
 #define DOWRITERC(FDESC, FBUFF, FBUFF_LEN, RC)							\
 MBSTART {											\
-	GBLREF	int	gtm_non_blocked_write_retries;						\
+	GBLREF	int	ydb_non_blocked_write_retries;						\
 	ssize_t		gtmioStatus;								\
 	size_t		gtmioBuffLen;								\
 	sm_uc_ptr_t	gtmioBuff;								\
@@ -662,7 +662,7 @@ MBSTART {											\
 			break;									\
 		else if (EAGAIN == errno)							\
 		{										\
-			if (gtm_non_blocked_write_retries <= block_cnt)				\
+			if (ydb_non_blocked_write_retries <= block_cnt)				\
 				break;								\
 			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
 			block_cnt++;								\
@@ -688,7 +688,7 @@ MBSTART {													\
 		int		block_cnt = 0;									\
 		intrpt_state_t	prev_intrpt_state;								\
 														\
-		GBLREF	int	gtm_non_blocked_write_retries;							\
+		GBLREF	int	ydb_non_blocked_write_retries;							\
 														\
 		gtmioBuffLen = FBUFF_LEN;									\
 		gtmioBuff = (sm_uc_ptr_t)(FBUFF);								\
@@ -708,7 +708,7 @@ MBSTART {													\
 				break;										\
 			else if (EAGAIN == errno)								\
 			{											\
-				if (gtm_non_blocked_write_retries <= block_cnt)					\
+				if (ydb_non_blocked_write_retries <= block_cnt)					\
 					break;									\
 				SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);						\
 				block_cnt++;									\
@@ -728,7 +728,7 @@ MBSTART {											\
 	sm_uc_ptr_t	gtmioBuff;								\
 	int		block_cnt = 0;								\
 												\
-	GBLREF	int	gtm_non_blocked_write_retries;						\
+	GBLREF	int	ydb_non_blocked_write_retries;						\
 												\
 	gtmioBuffLen = FBUFF_LEN;								\
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
@@ -745,7 +745,7 @@ MBSTART {											\
 			break;									\
 		else if (EAGAIN == errno)							\
 		{										\
-			if (gtm_non_blocked_write_retries <= block_cnt)				\
+			if (ydb_non_blocked_write_retries <= block_cnt)				\
 				break;								\
 			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
 			block_cnt++;								\
@@ -793,7 +793,7 @@ typedef struct
  */
 #define WRITEPIPE(FDESC, PIPESZ, FBUFF, FBUFF_LEN, RC)						\
 MBSTART {											\
-	GBLREF	int	gtm_non_blocked_write_retries;						\
+	GBLREF	int	ydb_non_blocked_write_retries;						\
 	ssize_t		gtmioStatus;								\
 	size_t		gtmioBuffLen;								\
 	size_t		shortBuffLen;								\
@@ -815,7 +815,7 @@ MBSTART {											\
 			break;									\
 		else if (EAGAIN == errno)							\
 		{										\
-			if (gtm_non_blocked_write_retries <= block_cnt)				\
+			if (ydb_non_blocked_write_retries <= block_cnt)				\
 				break;								\
 			SHORT_SLEEP(WAIT_FOR_BLOCK_TIME);					\
 			block_cnt++;								\

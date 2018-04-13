@@ -46,7 +46,6 @@
 #include "error.h"
 #include "gt_timer.h"
 #include "trans_log_name.h"
-#include "gtm_logicals.h"
 #include "dbfilop.h"
 #include "set_num_additional_processors.h"
 #include "have_crit.h"

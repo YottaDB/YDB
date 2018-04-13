@@ -49,10 +49,9 @@
 #include "interlock.h"
 #include "add_inter.h"
 #include "sleep_cnt.h"
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "mupint.h"
 #include "memcoherency.h"
-#include "gtm_logicals.h"
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
@@ -211,7 +210,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	int			save_errno, shdw_fd, ss_shmsize, ss_shm_vbn, status, tmpfd, user_id;
 	ZOS_ONLY(int		realfiletag;)
 	long			ss_shmid = INVALID_SHMID;
-	mstr			tempdir_full, tempdir_log, tempdir_trans;
+	mstr			tempdir_full, tempdir_trans;
 	uint4			*kip_pids_arr_ptr;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -289,30 +288,26 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	memcpy(tempnamprefix + tempnamprefix_len, reg->rname, reg->rname_len);
 	tempnamprefix_len += reg->rname_len;
 	SNPRINTF(&tempnamprefix[tempnamprefix_len], MAX_FN_LEN, "_%x", process_id);
-	tempdir_log.addr = GTM_SNAPTMPDIR;
-	tempdir_log.len = STR_LIT_LEN(GTM_SNAPTMPDIR);
 	tempfilename = tempdir_full.addr = tempdir_full_buffer;
 	tempdir_full.len = SIZEOF(tempdir_full_buffer);
 	/* Check if the  environment variable is defined or not.
-	 * Side-effect: tempdir_trans.addr = tempdir_trans_buffer irrespective of whether TRANS_LOG_NAME
+	 * Side-effect: tempdir_trans.addr = tempdir_trans_buffer irrespective of whether ydb_trans_log_name
 	 * succeeded or not.
 	 */
-	status = TRANS_LOG_NAME(&tempdir_log,
+	status = ydb_trans_log_name(YDBENVINDX_SNAPTMPDIR,
 				&tempdir_trans,
 				tempdir_trans_buffer,
 				SIZEOF(tempdir_trans_buffer),
-				do_sendmsg_on_log2long);
+				IGNORE_ERRORS_TRUE, NULL);
 	if (SS_NORMAL == status && (NULL != tempdir_trans.addr) && (0 != tempdir_trans.len))
 		*(tempdir_trans.addr + tempdir_trans.len) = 0;
 	else
 	{	/* Not found - try GTM_BAK_TEMPDIR_LOG_NAME_UC instead */
-		tempdir_log.addr = GTM_BAK_TEMPDIR_LOG_NAME_UC;
-		tempdir_log.len = STR_LIT_LEN(GTM_BAK_TEMPDIR_LOG_NAME_UC);
-		status = TRANS_LOG_NAME(&tempdir_log,
+		status = ydb_trans_log_name(YDBENVINDX_BAKTMPDIR_UC,
 					&tempdir_trans,
 					tempdir_trans_buffer,
 					SIZEOF(tempdir_trans_buffer),
-					do_sendmsg_on_log2long);
+					IGNORE_ERRORS_TRUE, NULL);
 		if (SS_NORMAL == status && (NULL != tempdir_trans.addr) && (0 != tempdir_trans.len))
 			*(tempdir_trans.addr + tempdir_trans.len) = 0;
 		else

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +21,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal);
 {													\
 	boolean_t	retvalue;									\
 													\
-	assert(gtm_white_box_test_case_enabled);							\
+	assert(ydb_white_box_test_case_enabled);							\
 	retvalue = t_commit_cleanup(status, 0);								\
 	/* return value of TRUE implies	secshr_db_clnup has done commit for us */			\
 	assert(retvalue);										\

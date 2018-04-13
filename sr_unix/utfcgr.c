@@ -3,6 +3,9 @@
  * Copyright (c) 2015-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -208,13 +211,13 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 		utfcgrp = (utfcgr *)((char *)(TREF(utfcgra)).utfcgrs + ((TREF(utfcgra)).utfcgrsize * utfcgridx));
 		tcharcnt = tbyteidx = 0;				/* Init counters */
 		/* Validate cache entry for this string still intact (index valid, string addr/len the same) */
-		if ((TREF(gtm_utfcgr_strings) > utfcgridx) && (utfcgrp->last_str.addr == mv->str.addr)
+		if ((TREF(ydb_utfcgr_strings) > utfcgridx) && (utfcgrp->last_str.addr == mv->str.addr)
 		    && (utfcgrp->last_str.len == mv->str.len))
 		{	/* Cache validated */
 			DUMP_UTFCACHE_START(mv, utfcgrp);
 			COUNT_UTF_EVENT(hit);
 			utfcgrp->reference = TRUE;			/* Mark element recently used */
-			pcentmax = &utfcgrp->entry[TREF(gtm_utfcgr_string_groups)]; /* Pointer to last entry + 1 in this row */
+			pcentmax = &utfcgrp->entry[TREF(ydb_utfcgr_string_groups)]; /* Pointer to last entry + 1 in this row */
 			pcuentmax = &utfcgrp->entry[utfcgrp->ngrps];	/* Pointer to last used entry + 1 in this row */
 			assert(pcentmax >= pcuentmax);
 			utfcgrep0 = &utfcgrp->entry[0];
@@ -250,7 +253,7 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 			{
 				COUNT_UTF_EVENT(pskip);			/* Counting "skipped" groups */
 				assert(0 != utfcgrep->typflags);	/* Should be *some* indication of content */
-				assert(TREF(gtm_utfcgr_string_groups) >= ++utfcgrepcnt); /* Check we're not overflowing array */
+				assert(TREF(ydb_utfcgr_string_groups) >= ++utfcgrepcnt); /* Check we're not overflowing array */
 				if (utf_parse_blk->stoponbadchar && (UTFCGR_BADCHAR & utfcgrep->typflags))
 				{	/* Found BADCHARs in the string and this scan can't tolerate them */
 					DBGUTFC((stderr, "  utfcgr_scanforcharN: Returning due to BADCHAR\n"));
@@ -401,7 +404,7 @@ boolean_t utfcgr_scanforcharN(int char_num, utfscan_parseblk *utf_parse_blk)
 			COUNT_UTF_EVENT(miss);
 			utfcgrp = utfcgr_getcache(utf_parse_blk->mv);
 			utfcgrep = utfcgrep0 = &utfcgrp->entry[0];	/* Point to first entry to add */
-			pcentmax = &utfcgrp->entry[TREF(gtm_utfcgr_string_groups)]; /* Pointer to last entry + 1 in this row */
+			pcentmax = &utfcgrp->entry[TREF(ydb_utfcgr_string_groups)]; /* Pointer to last entry + 1 in this row */
 			utfcgrp->reference = TRUE;
 			scanptr = (unsigned char *)mv->str.addr;
 			lchar_typflags = UTFCGR_NONE;			/* No type set yet */

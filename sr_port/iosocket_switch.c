@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +25,7 @@
 #include "gt_timer.h"
 #include "iosocketdef.h"
 
-GBLREF  int4	gtm_max_sockets;
+GBLREF  int4	ydb_max_sockets;
 
 error_def(ERR_SOCKNOTFND);
 error_def(ERR_SOCKETEXIST);
@@ -48,9 +51,9 @@ boolean_t iosocket_switch(char *handle, int handle_len, d_socket_struct *from, d
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SOCKETEXIST, 2, handle_len, handle);
 			return FALSE;
 		}
-                if (gtm_max_sockets <= to->n_socket)
+                if (ydb_max_sockets <= to->n_socket)
                 {
-                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
+                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, ydb_max_sockets);
                         return FALSE;
                 }
 		socketptr = from->socket[index];

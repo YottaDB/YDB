@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -42,7 +45,7 @@ GBLREF	d_socket_struct		*socket_pool;
 GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	spdesc			stringpool;
 GBLREF	UConverter  		*chset_desc[];
-GBLREF	int4			gtm_max_sockets;
+GBLREF	int4			ydb_max_sockets;
 GBLREF	d_socket_struct		*newdsocket;
 GBLREF	boolean_t		dollar_zininterrupt;
 
@@ -384,7 +387,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 		return;
 	}
 	/* ------------------ make a local copy of device structure to play with -------------------- */
-	d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (gtm_max_sockets - 1));
+	d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (ydb_max_sockets - 1));
 	memcpy(newdsocket, dsocketptr, d_socket_struct_len);
 	/* --------------- handle the two special cases attach/detach first ------------------------- */
 	if (detach_specified)
@@ -439,12 +442,12 @@ void	iosocket_use(io_desc *iod, mval *pp)
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return;
 		}
-		if (gtm_max_sockets <= newdsocket->n_socket)
+		if (ydb_max_sockets <= newdsocket->n_socket)
 		{
 			if (FD_INVALID != socketptr->temp_sd)
 				close(socketptr->temp_sd);
 			SOCKET_FREE(socketptr);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, ydb_max_sockets);
 			return;
 		}
 		/* give the new socket a handle */

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,14 +17,14 @@
 #include "gtm_stdlib.h"
 
 #include "collseq.h"
-#include <rtnhdr.h>
+#include "rtnhdr.h"
 #include "lv_val.h"		/* needed for "fgncal.h" */
 #include "fgncal.h"
 #include "iosp.h"
 #include "io.h"
-#include "trans_log_name.h"
 #include "error.h"
 #include "gtmmsg.h"
+#include "ydb_getenv.h"
 
 #define ERR_FGNSYM				\
 {						\
@@ -34,14 +37,14 @@ error_def(ERR_COLLFNMISSING);
 /* Maps all the collation related symbols from the act shared library.
  * Return TRUE/FALSE based on mapping success.
  */
-boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
+boolean_t map_collseq(int act, collseq *ret_collseq)
 {
-	mstr   		fspec_trans;
-	char   		buffer[MAX_TRANS_NAME_LEN];
 	int    		status;
+	char		*envptr;
 	void_ptr_t 	handle;
 	boolean_t	coll_lib_found;
-
+	mstr		tmpmst;
+	char		tmpbuff[32];	/* 32 bytes should be a lot more to hold the string representation of an integer "act" */
 	static MSTR_CONST(xform_sym_1, "gtm_ac_xform_1");
 	static MSTR_CONST(xback_sym_1, "gtm_ac_xback_1");
 	static MSTR_CONST(xform_sym, "gtm_ac_xform");
@@ -52,9 +55,17 @@ boolean_t map_collseq(mstr *fspec, collseq *ret_collseq)
 
 	SETUP_THREADGBL_ACCESS;
 	coll_lib_found = FALSE;
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(fspec, &fspec_trans, buffer, SIZEOF(buffer), do_sendmsg_on_log2long)))
+	tmpmst.len = SNPRINTF(tmpbuff, SIZEOF(tmpbuff), "%d", act);
+	if ((0 > tmpmst.len) || (SIZEOF(tmpbuff) <= tmpmst.len))
+	{
+		assert(FALSE);
+		return FALSE;	/* SNPRINTF returned error or truncated result */
+	}
+	tmpmst.addr = tmpbuff;
+	envptr = ydb_getenv(YDBENVINDX_COLLATE_PREFIX, &tmpmst, NULL_IS_YDB_ENV_MATCH);
+	if (NULL == envptr)
 		return FALSE;
-	if (NULL == (handle = fgn_getpak(buffer, INFO)))
+	if (NULL == (handle = fgn_getpak(envptr, INFO)))
 		return FALSE;
 	if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym_1, SUCCESS)))
 	{

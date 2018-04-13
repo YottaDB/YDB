@@ -359,7 +359,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 			}
 			if (mident_suffix_p1 == mident_suffix_top)
 			{	/* Phase 3: Punt */
-				assert(WBTEST_HELPOUT_TRIGNAMEUNIQ == gtm_white_box_test_case_number);
+				assert(WBTEST_HELPOUT_TRIGNAMEUNIQ == ydb_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TRIGNAMEUNIQ, 3,
 						trigdsc->rtn_desc.rt_name.len - 2, trigdsc->rtn_desc.rt_name.addr,
 						((alphanumeric_table_len + 1) * alphanumeric_table_len) + 1);
@@ -643,9 +643,9 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 			mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save = ztrap_explicit_null;
 			(TREF(dollar_ztrap)).str.len = 0;
 			ztrap_explicit_null = FALSE;
-			if (NULL != (TREF(gtm_trigger_etrap)).str.addr)
+			if (NULL != (TREF(ydb_trigger_etrap)).str.addr)
 				/* An etrap was defined for the trigger environment - Else existing $etrap persists */
-				TREF(dollar_etrap) = TREF(gtm_trigger_etrap);
+				TREF(dollar_etrap) = TREF(ydb_trigger_etrap);
 		}
 		mv_st_ent->mv_st_cont.mvs_trigr.mumps_status_save = mumps_status;
 		mv_st_ent->mv_st_cont.mvs_trigr.run_time_save = run_time;

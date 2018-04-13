@@ -44,6 +44,7 @@
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
 #include "iottdef.h"
+#include "ydb_getenv.h"
 
 #define	ZSYSTEMSTR	"ZSYSTEM"
 
@@ -88,7 +89,7 @@ void op_zsystem(mval *v)
 		cmd_buf[v->str.len] = '\0';
 	} else
 	{
-		cmd_buf = GETENV("SHELL");
+		cmd_buf = ydb_getenv(YDBENVINDX_GENERIC_SHELL, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 		cmd_buf = (NULL == cmd_buf || '\0' == *cmd_buf) ? "/bin/sh" : cmd_buf;
 	}
 	dollar_zsystem = SYSTEM(cmd_buf);

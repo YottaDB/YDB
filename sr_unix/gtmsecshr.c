@@ -56,7 +56,6 @@
 #endif
 #include "cli.h"
 #include "error.h"
-#include "gtm_logicals.h"
 #include "io.h"
 #include "gtmsecshr.h"
 #include "gdsroot.h"
@@ -93,6 +92,7 @@
 #endif
 #include "getjobnum.h"
 #include "ydb_chk_dist.h"
+#include "ydb_getenv.h"
 
 #define intent_open		"for open"	/* FLUSH_DB_IPCS_INFO types */
 #define intent_close		"for close"
@@ -314,7 +314,7 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	struct sembuf	sop[4];
 	gtmsecshr_mesg	mesg;
 	struct stat	stat_buf;
-	char		*gtm_tmp_ptr;
+	char		*ydb_tmp_ptr;
 	int		status;
 	int		lib_gid;
 	struct stat	dist_stat_buff;
@@ -486,10 +486,10 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) MAKE_MSG_WARNING(ERR_GTMSECSHRSTART), 3,
 			RTS_ERROR_LITERAL("Server 8"), process_id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("server already running"), errno);
-		/* If gtm_tmp is not defined, show default path */
-		if (gtm_tmp_ptr = GETENV("gtm_tmp"))		/* Warning - assignment */
+		/* If ydb_tmp is not defined, show default path */
+		if (ydb_tmp_ptr = ydb_getenv(YDBENVINDX_TMP_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))	/* Warning - assignment */
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2,
-				RTS_ERROR_TEXT(gtm_tmp_ptr), ERR_TEXT, 2, RTS_ERROR_TEXT("(from $gtm_tmp)"));
+				RTS_ERROR_TEXT(ydb_tmp_ptr), ERR_TEXT, 2, RTS_ERROR_TEXT("(from $ydb_tmp/$gtm_tmp)"));
 		else
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GTMSECSHRTMPPATH, 2, RTS_ERROR_TEXT("/tmp"));
 		gtmsecshr_exit(SEMAPHORETAKEN, FALSE);
@@ -729,7 +729,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 				 * 1. File exists.
 				 * 2. File is a socket.
 				 * 3. Has a name prefix GT.M would use
-				 * 4. File is resident in expected directory ($gtm_tmp or /tmp).
+				 * 4. File is resident in expected directory ($ydb_tmp or /tmp).
 				 *
 				 */
 				STAT_FILE(buf->mesg.path, &statbuf, stat_res);

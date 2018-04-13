@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +21,7 @@
 #include "eintr_wrappers.h"
 #include "geteditor.h"
 #include "wbox_test_init.h"
+#include "ydb_getenv.h"
 
 GBLDEF mstr editor;
 
@@ -34,7 +38,7 @@ void geteditor(void)
 				0			/* this array should be terminated by a 0 */
 			};
 
-	edt = GETENV("EDITOR");
+	edt = ydb_getenv(YDBENVINDX_GENERIC_EDITOR, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 	pedt = &editor_list[0];
 	do {
 		if (0 == ACCESS(edt, (F_OK|X_OK))) /* if the file exists and is executable we are good */

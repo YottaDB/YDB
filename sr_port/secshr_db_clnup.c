@@ -374,8 +374,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					cache_state = csa->acc_meth.bg.cache_state;
 					RELEASE_LATCH_IF_OWNER(&cache_state->cacheq_active.latch);
 #					ifdef DEBUG
-					if (gtm_white_box_test_case_enabled && (reg == gd_hdr->regions)
-						&& (WBTEST_SIGTSTP_IN_T_QREAD == gtm_white_box_test_case_number))
+					if (ydb_white_box_test_case_enabled && (reg == gd_hdr->regions)
+						&& (WBTEST_SIGTSTP_IN_T_QREAD == ydb_white_box_test_case_number))
 					{
 						assert((NULL != TREF(block_now_locked))
 							&& ((TREF(block_now_locked))->r_epid == process_id));

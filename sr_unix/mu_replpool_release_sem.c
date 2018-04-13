@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -33,7 +36,6 @@
 #include "gtmrecv.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
-#include "gtm_logicals.h"
 #include "jnl.h"
 #include "repl_sem.h"
 #include "repl_shutdcode.h"

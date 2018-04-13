@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -14,7 +17,7 @@
 
 enum gtm_bool_type
 {
-	GTM_BOOL = 0,		/* original GT.M short-circuit Boolean evaluation with naked maintenance */
+	YDB_BOOL = 0,		/* original GT.M short-circuit Boolean evaluation with naked maintenance */
 	FULL_BOOL,		/* standard behavior - evaluate everything with a side effect */
 	FULL_BOOL_WARN		/* like FULL_BOOL but give compiler warnings when it makes a difference */
 };

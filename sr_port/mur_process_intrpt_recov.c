@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -141,7 +144,7 @@ uint4 mur_process_intrpt_recov()
 				csd->db_trigger_cycle = 1;	/* Don't allow cycle set to 0 which means uninitialized */
 		}
 #		endif
-		assert((WBTEST_ALLOW_ARBITRARY_FULLY_UPGRADED == gtm_white_box_test_case_number) ||
+		assert((WBTEST_ALLOW_ARBITRARY_FULLY_UPGRADED == ydb_white_box_test_case_number) ||
 			(FALSE == jctl->turn_around_fullyupgraded) || (TRUE == jctl->turn_around_fullyupgraded));
 		/* Set csd->fully_upgraded to FALSE if:
 		 * a) The turn around EPOCH had the fully_upgraded field set to FALSE

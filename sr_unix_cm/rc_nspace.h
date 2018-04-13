@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +16,6 @@
 #define RC_NSPACE_DSID_STR "768"
 #define RC_DEF_SERV_ID 42
 #define RC_DEF_SERV_ID_STR "42"
-#define RC_NSPACE_PATH "$gtmdtndbd"
 #define RC_NSPACE_GLOB "nspace"
 #define RC_NSPACE_GLOB_LEN SIZEOF(RC_NSPACE_GLOB)
 #define RC_NSPACE_DSI_SUB "dsi"

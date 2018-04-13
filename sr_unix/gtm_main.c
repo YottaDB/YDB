@@ -51,6 +51,7 @@
 #include "gtmcrypt.h"
 #ifdef GTM_TLS
 #include "gtm_tls.h"
+#include "ydb_getenv.h"
 #endif
 
 GBLREF	IN_PARMS			*cli_lex_in_ptr;
@@ -68,7 +69,7 @@ GBLREF	u_casemap_t 			gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitl
 #endif
 
 #define GTMCRYPT_ERRLIT			"during GT.M startup"
-#define GTMXC_gblstat			"GTMXC_gblstat=%s/gtmgblstat.xc"
+#define YDBXC_gblstat			"ydb_xc_gblstat=%s/gtmgblstat.xc"
 
 GBLDEF	char 				**gtmenvp;
 
@@ -134,7 +135,7 @@ int gtm_main(int argc, char **argv, char **envp)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
 	if (cli_present("DIRECT_MODE"))
 	{
-		if (!((ptr = GETENV(CHILD_FLAG_ENV)) && strlen(ptr)) && (RESTRICTED(dmode))) /* note assignment */
+		if (!((ptr = getenv(CHILD_FLAG_ENV)) && strlen(ptr)) && (RESTRICTED(dmode))) /* note assignment */
 		{	/* first tell them it's a no-no without engaging the condition handling so we keep control */
 			dec_err(VARLSTCNT(3) MAKE_MSG_SEVERE(ERR_RESTRICTEDOP), 1, "mumps -direct");
 			stop_image_no_core();		/* then kill them off without further delay */
@@ -145,12 +146,13 @@ int gtm_main(int argc, char **argv, char **envp)
 		invocation_mode = MUMPS_RUN;
 	/* this should be after cli_lex_setup() due to S390 A/E conversion in cli_lex_setup   */
 	init_gtm();
-	SNPRINTF(gtmlibxc, YDB_PATH_MAX, GTMXC_gblstat, ydb_dist);
+	SNPRINTF(gtmlibxc, YDB_PATH_MAX, YDBXC_gblstat, ydb_dist);
 	PUTENV(status, gtmlibxc);
 #	ifdef GTM_TLS
 	if (MUMPS_COMPILE != invocation_mode)
 	{
-		if ((NULL != (ptr = (char *)getenv(GTM_PASSWD_ENV))) && (0 == strlen(ptr)))
+		if ((NULL != (ptr = ydb_getenv(YDBENVINDX_PASSWD, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
+			&& (0 == strlen(ptr)))
 		{
 			INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
@@ -172,16 +174,19 @@ int gtm_main(int argc, char **argv, char **envp)
 		 * But, since SSL support for Socket devices is not yet implemented, this logic need not be enabled as of this
 		 * writing. When SSL support for socket devices is implemented, the surrounding #ifdef can be removed.
 		 */
-		if (NULL != getenv("gtmcrypt_config"))
+		if (NULL != ydb_getenv(YDBENVINDX_CRYPT_CONFIG, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))
 		{	/* Environment is configured for SSL/TLS (and/or encryption). Check if any environment variable of the form
-			 * `gtmtls_passwd_*' is set to NULL string. If so, nudge the SSL/TLS library to read password(s) from the
-			 * user.
+			 * `ydb_tls_passwd_* or gtmtls_passwd_*' is set to NULL string. If so, nudge the SSL/TLS library to read
+			 * password(s) from the user.
 			 */
 			for (p = envp; *p; p++)
 			{
 				ptr = *p;
+				assert(FALSE);	/* When this assert fails, the below GTMTLS_PASSWD_ENV_PREFIX usage needs to be
+						 * fixed to use "ydb_getenv" instead of a hardcoded name.
+						 */
 				if (0 == MEMCMP_LIT(ptr, GTMTLS_PASSWD_ENV_PREFIX))
-				{	/* At least one environment variable of $gtmtls_passwd_* is found. */
+				{	/* At least one environment variable of $ydb_tls_passwd_* or $gtmtls_passwd_* is found. */
 					eq = strchr(ptr, '=');
 					if (0 != strlen(eq + 1))
 						break; /* Set to non-empty string. No need to initialize the library now. */

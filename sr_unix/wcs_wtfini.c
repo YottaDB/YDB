@@ -3,6 +3,9 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -167,9 +170,9 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
                                                 {       /* Did not get the csr we intended so something must be wrong with cache.
                                                          * Kill -9 can cause this. Assert that we were doing a crash shutdown.
                                                          */
-							assert(gtm_white_box_test_case_enabled
+							assert(ydb_white_box_test_case_enabled
 								&& (WBTEST_CRASH_SHUTDOWN_EXPECTED
-								== gtm_white_box_test_case_number));
+								== ydb_white_box_test_case_number));
 							SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 							ret_value = ERR_DBCCERR;
 							break;

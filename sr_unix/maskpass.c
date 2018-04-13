@@ -26,6 +26,7 @@
 #include "gtmxc_types.h"
 
 #include "gtmcrypt_util.h"
+#include "ydb_getenv.h"
 
 static struct termios *tty = NULL;
 
@@ -42,14 +43,14 @@ int main()
 	/* Since the obfuscated password depends on $USER and the inode of $ydb_dist/mumps, make sure all the pre-requisites are
 	 * available to this process.
 	 */
-	if (NULL == (env_ptr = (char *)getenv(USER_ENV)))
+	if (NULL == (env_ptr = ydb_getenv(YDBENVINDX_GENERIC_USER, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 	{
 		printf(ENV_UNDEF_ERROR "\n", USER_ENV);
 		exit(EXIT_FAILURE);
 	}
-	if (NULL == (env_ptr = (char *)getenv(YDB_DIST_ENV)))
+	if (NULL == (env_ptr = ydb_getenv(YDBENVINDX_DIST, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 	{
-		printf(ENV_UNDEF_ERROR "\n", YDB_DIST_ENV);
+		printf(ENV_UNDEF_ERROR2 "\n", YDB_DIST_ENV, GTM_DIST_ENV);
 		exit(EXIT_FAILURE);
 	}
 	SNPRINTF(mumps_exe, YDB_PATH_MAX, "%s/%s", env_ptr, "mumps");

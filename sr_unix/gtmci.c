@@ -86,9 +86,10 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "gdskill.h"
 #include "jnl.h"
 #include "tp_frame.h"
-#include "buddy_list.h"                /* needed for tp.h */
-#include "hashtab_int4.h"      /* needed for tp.h and cws_insert.h */
+#include "buddy_list.h"		/* needed for tp.h */
+#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
+#include "ydb_getenv.h"
 
 GBLREF  stack_frame     	*frame_pointer;
 GBLREF  unsigned char		*msp;
@@ -293,7 +294,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
-	if (!TREF(ci_table))	/* Load the call-in table only once from env variable GTMCI. */
+	if (!TREF(ci_table))	/* Load the call-in table only once from env variable ydb_ci/GTMCI. */
 	{
 		TREF(ci_table) = citab_parse();
 		if (!TREF(callin_hashtab))
@@ -672,7 +673,7 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
-	if (!TREF(ci_table))	/* load the call-in table only once from env variable GTMCI  */
+	if (!TREF(ci_table))	/* load the call-in table only once from env variable ydb_ci/GTMCI  */
 	{
 		TREF(ci_table) = citab_parse();
 		if (!TREF(callin_hashtab))
@@ -1089,7 +1090,7 @@ int ydb_init()
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
-	if (NULL == (dist = GETENV(YDB_DIST)))
+	if (NULL == (dist = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 	{	/* In a call-in and "ydb_dist" env var is not defined. Set it to full path of libyottadb.so
 		 * that contains the currently invoked "ydb_init" function.
 		 */
@@ -1120,7 +1121,7 @@ int ydb_init()
 		 * We will do that a little later in "common_startup_init" below (after setting <ydb_dist>
 		 * env var) and issue a LIBYOTTAMISMTCH error if needed.
 		 */
-		status = setenv(YDB_DIST, path, TRUE);
+		status = setenv(ydbenvname[YDBENVINDX_DIST] + 1, path, TRUE);	/* + 1 to skip leading $ */
 		if (status)
 		{
 			assert(-1 == status);
@@ -1128,7 +1129,7 @@ int ydb_init()
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 				RTS_ERROR_LITERAL("setenv(ydb_dist)"), CALLFROM, save_errno);
 		}
-		status = setenv("gtm_dist", path, TRUE);
+		status = setenv(gtmenvname[YDBENVINDX_DIST] + 1, path, TRUE);	/* + 1 to skip leading $ */
 		if (status)
 		{
 			assert(-1 == status);
@@ -1145,7 +1146,7 @@ int ydb_init()
 		UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 		/* Ensure that $ydb_dist exists */
-		if (NULL == (dist = (char *)GETENV(YDB_DIST)))
+		if (NULL == (dist = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDBDISTUNDEF);
 		/* Ensure that $ydb_dist is non-zero and does not exceed YDB_DIST_PATH_MAX */
 		dist_len = STRLEN(dist);

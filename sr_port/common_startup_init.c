@@ -33,7 +33,8 @@
 #include "cli.h"
 #include "gdsroot.h"
 #include "is_file_identical.h"
-#include "gtm_logicals.h"
+#include "ydb_logicals.h"
+#include "ydb_getenv.h"
 
 GBLREF	boolean_t		skip_dbtriggers;
 GBLREF	boolean_t		is_replicator;
@@ -50,7 +51,7 @@ error_def(ERR_MIXIMAGE);
 
 void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 {
-	boolean_t	is_gtcm;
+	boolean_t	is_gtcm, is_ydb_env_match;
 	boolean_t	status;
 	char		*dist;
 	int		len;
@@ -73,7 +74,7 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 	/* At this point, $ydb_dist should be set by "dlopen_libyottadb" (mumps/mupip/dse etc.) or "ydb_init" (call_ins).
 	 * Read the env var "ydb_dist" and set the "ydb_dist" buffer based on that.
 	 */
-	if (NULL == (dist = GETENV(YDB_DIST)))
+	if (NULL == (dist = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDBDISTUNDEF);
 	len = STRLEN(dist);
 	len = (YDB_PATH_MAX < len) ? YDB_PATH_MAX : len;
@@ -146,36 +147,39 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 							 * Specific MUPIP commands will override this later.
 							 */
 	}
-	/* Check if ydb_gbldir env var is set.  If so set gtmgbldir env var to the same value.
-	 * If ydb_gbldir env var is not set and if gtmgbldir env var is set, set ydb_gbldir to gtmgbldir.
-	 * That way
-	 *	a) ydb_gbldir overrides gtmgbldir
-	 *	b) "dpzgbini" and "zgbldir" functions in this process can use YDB_GBLDIR (instead of GTM_GBLDIR) AND
-	 *	c) Child processes see both env vars set to the same value too.
-	 */
-	if (NULL != (envptr = GETENV(YDB_GBLDIR + 1)))	/* + 1 to get past '$' this call doesn't use */
-	{	/* ydb_gbldir env var is set. Set gtmgbldir env var to same value. */
-		ret_value = setenv(GTM_GBLDIR + 1, envptr, TRUE);
-		if (ret_value)
-		{
-			assert(-1 == ret_value);
-			save_errno = errno;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				RTS_ERROR_LITERAL("setenv(gtmgbldir)"), CALLFROM, save_errno);
-		}
-	} else if (NULL != (envptr = GETENV(GTM_GBLDIR + 1)))
-	{	/* gtmgbldir env var is set. Set ydb_gbldir env var to same value. */
-		ret_value = setenv(YDB_GBLDIR + 1, envptr, TRUE);
-		if (ret_value)
-		{
-			assert(-1 == ret_value);
-			save_errno = errno;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				RTS_ERROR_LITERAL("setenv(ydb_gbldir)"), CALLFROM, save_errno);
+	envptr = ydb_getenv(YDBENVINDX_GBLDIR, NULL_SUFFIX, &is_ydb_env_match);
+	if (NULL != envptr)
+	{	/* Check if ydb_gbldir env var is set.
+		 * If ydb_gbldir env var is not set and if gtmgbldir env var is set, set ydb_gbldir to gtmgbldir.
+		 * That way
+		 *	a) ydb_gbldir overrides gtmgbldir
+		 *	b) "dpzgbini" and "zgbldir" functions in this process can use YDB_GBLDIR (instead of GTM_GBLDIR) AND
+		 *	c) Child processes see both env vars set to the same value too.
+		 */
+		if (is_ydb_env_match)
+		{	/* ydb_gbldir env var is set. Set gtmgbldir env var to same value. */
+			ret_value = setenv(GTM_GBLDIR + 1, envptr, TRUE);
+			if (ret_value)
+			{
+				assert(-1 == ret_value);
+				save_errno = errno;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					RTS_ERROR_LITERAL("setenv(ydb_gbldir)"), CALLFROM, save_errno);
+			}
+		} else
+		{	/* gtmgbldir env var is set. Set ydb_gbldir env var to same value. */
+			ret_value = setenv(YDB_GBLDIR + 1, envptr, TRUE);
+			if (ret_value)
+			{
+				assert(-1 == ret_value);
+				save_errno = errno;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					RTS_ERROR_LITERAL("setenv(ydb_gbldir)"), CALLFROM, save_errno);
+			}
 		}
 	}
-	/* else: YDB_GBLDIR and GTM_GBLDIR are both undefined (and therefore in sync with each other) */
-	/* At this point, the env vars YDB_GBLDIR and GTM_GBLDIR are guaranteed to be equal to each other */
+	/* else: envptr is NULL which means $ydb_gbldir and $gtmgbldir are both undefined (and therefore in sync with each other) */
+	/* At this point, the env vars $ydb_gbldir and $gtmgbldir are guaranteed to be equal to each other */
 	return;
 }
 

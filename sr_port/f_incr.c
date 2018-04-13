@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -95,7 +98,7 @@ int f_incr(oprtype *a, opctype op)
 		triptr = newtriple(OC_GVRECTARG);	/* restore the result of the last gvn to preserve $referece (the naked) */
 		triptr->operand[0] = put_tref(TREF(expr_start));
 	}
-	if (!TREF(shift_side_effects) || (GTM_BOOL != TREF(gtm_fullbool)) || (OC_INDINCR != r->opcode))
+	if (!TREF(shift_side_effects) || (YDB_BOOL != TREF(ydb_fullbool)) || (OC_INDINCR != r->opcode))
 	{	/* put it on the end of the main chain as there's no reason to play more with the ordering */
 		setcurtchain(oldchain);
 		triptr = (TREF(curtchain))->exorder.bl;

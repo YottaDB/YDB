@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -84,7 +87,7 @@ int mu_op_open(mval *v, mval *p, mval *t, mval *mspace)
 		if (!licensed || LP_CONFIRM(lid,lkid)==LP_NOTACQ)
 			licensed= FALSE ;
 #		endif
-		switch (stat = TRANS_LOG_NAME(&v->str, &tn, &buf1[0], SIZEOF(buf1), dont_sendmsg_on_log2long))
+		switch (stat = trans_log_name(&v->str, &tn, &buf1[0], SIZEOF(buf1), dont_sendmsg_on_log2long))
 		{
 		case SS_NORMAL:
 			tl = get_log_name(&tn, INSERT);

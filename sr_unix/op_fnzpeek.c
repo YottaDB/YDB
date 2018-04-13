@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -545,7 +548,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			}
 			/* PO_GDRREG opcode examines only the region's fields so does not need the region to be open.
 			 * All the rest need it to be open. If there are any errors in the open (e.g. statsdb specified
-			 * and gtm_statsdir env var is too long etc.) then handle it by issuing an error.
+			 * and ydb_statsdir env var is too long etc.) then handle it by issuing an error.
 			 */
 			if ((PO_GDRREG != mnemonic_opcode) && !r_ptr->open)
 			{

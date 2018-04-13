@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -189,9 +192,26 @@ typedef struct gtmsrc_lcl_struct
 
 #define GET_INSTFILE_NAME(sendmsg, err_act)										\
 {															\
-	if (((SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, temp_inst_fn,				\
-					SIZEOF(temp_inst_fn), sendmsg))) || (inst_from_gld && (SS_NOLOGNAM == status)))	\
-		&& (0 != trans_name.len))										\
+	boolean_t	is_ydb_env_match;										\
+															\
+	LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];								\
+	LITREF	char	*gtmenvname[YDBENVINDX_MAX_INDEX];								\
+															\
+	if (NULL == log_nam.addr)											\
+	{	/* Special signal from SETUP_INST_INFO macro to use ydb_repl_instance env var */			\
+		assert((dont_sendmsg_on_log2long == sendmsg) || (do_sendmsg_on_log2long == sendmsg));			\
+		status = ydb_trans_log_name(YDBENVINDX_REPL_INSTANCE, &trans_name,					\
+				temp_inst_fn, SIZEOF(temp_inst_fn),							\
+				(dont_sendmsg_on_log2long == sendmsg) ? IGNORE_ERRORS_NOSENDMSG : IGNORE_ERRORS_TRUE,	\
+				&is_ydb_env_match);									\
+		/* Set log_nam.addr to point to matched env var name (caller relies on this) */				\
+		log_nam.addr = (char *) (is_ydb_env_match								\
+						? ydbenvname[YDBENVINDX_REPL_INSTANCE]					\
+						: gtmenvname[YDBENVINDX_REPL_INSTANCE]);				\
+		log_nam.len = STRLEN(log_nam.addr);									\
+	} else														\
+		status = trans_log_name(&log_nam, &trans_name, temp_inst_fn, SIZEOF(temp_inst_fn), sendmsg);		\
+	if ((SS_NORMAL == status) || (inst_from_gld && (SS_NOLOGNAM == status)) && (0 != trans_name.len))		\
 	{														\
 		temp_inst_fn[trans_name.len] = '\0';									\
 		if (!get_full_path(trans_name.addr, trans_name.len, fn, fn_len, bufsize, &ustatus) && err_act)		\
@@ -208,12 +228,15 @@ typedef struct gtmsrc_lcl_struct
 	if (IS_MUMPS_IMAGE && GDPTR && GDPTR->instinfo)			\
 	{	/* use global directory information */			\
 		LOGNAM.addr = GDPTR->instinfo->instfilename;		\
+		assert(NULL != LOGNAM.addr);				\
 		LOGNAM.len = STRLEN(GDPTR->instinfo->instfilename);	\
 		INSTFROMGLD = TRUE;					\
 	} else								\
-	{								\
-		LOGNAM.addr = GTM_REPL_INSTANCE;			\
-		LOGNAM.len = SIZEOF(GTM_REPL_INSTANCE) - 1;		\
+	{	/* Use ydb_repl_instance/gtm_repl_instance env var.	\
+		 * Signal to GET_INSTFILE_NAME for special handling.	\
+		 */							\
+		LOGNAM.addr = NULL;					\
+		LOGNAM.len = 0;						\
 		INSTFROMGLD = FALSE;					\
 	}								\
 }

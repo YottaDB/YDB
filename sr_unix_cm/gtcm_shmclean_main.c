@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,7 @@ void	clean_mem(char *name)
 
 	path1.len = STRLEN(name);
 	path1.addr = name;
-	if (SS_NORMAL != TRANS_LOG_NAME(&path1, &path2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
+	if (SS_NORMAL != trans_log_name(&path1, &path2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 		FPRINTF(stderr, "Error translating path: %s\n", name);
 	else
 	{

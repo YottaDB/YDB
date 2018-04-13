@@ -280,7 +280,7 @@ $echo ""
 
 # keep the utf8 libicu search code in gtm_test_install.csh in sync with the following!
 if [ -d "utf8" ]; then
-	unset gtm_icu_version
+	unset ydb_icu_version
 	# If package has utf8 directory, see if system has libicu and locale
 	# Setup library path (in prep for looking for libicu and crypto libs)
 	# Please keep in sync with sr_unix/set_library_path.csh and sr_unix/gtm_test_install.csh
@@ -301,19 +301,19 @@ if [ -d "utf8" ]; then
 		if [ ! -t 0 ] ; then echo "$resp"; fi
 		if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 			$echo "Enter ICU version (at least ICU version 3.6 is required. Enter as <major-ver>.<minor-ver>): \c"
-			read gtm_icu_version
-			if [ ! -t 0 ] ; then echo "$gtm_icu_version"; fi
-			maj=`$echo $gtm_icu_version | cut -f 1 -d "."`
+			read ydb_icu_version
+			if [ ! -t 0 ] ; then echo "$ydb_icu_version"; fi
+			maj=`$echo $ydb_icu_version | cut -f 1 -d "."`
 			if [ "$maj" -ge "49" ] ; then
 				# Assuming the input is of the form 52.1. As of ICU 49 (aka 4.9),
 				# the version reported by icu-config --version is <major><minor>.<milli> and not <major>.<minor>
 				majmin=$maj
 			else
 				# Assuming the input is of the form 4.2.1
-				majmin=`$echo $gtm_icu_version | cut -d "." -f 1,2 | sed 's/\.//'`
+				majmin=`$echo $ydb_icu_version | cut -d "." -f 1,2 | sed 's/\.//'`
 			fi
 			if [ "$majmin" -lt "36" ] ; then
-				$echo "WARNING: ICU version $gtm_icu_version is less than 3.6. \c"
+				$echo "WARNING: ICU version $ydb_icu_version is less than 3.6. \c"
 				$echo "UTF-8 support will not be installed"
 				would_like_utf8=0
 				doutf8=0
@@ -333,7 +333,7 @@ if [ -d "utf8" ]; then
 		for libpath in $library_path
 		do
 			icu_lib_found=0
-			if [ "$gtm_icu_version" = "" -a -f "$libpath/libicuio$icu_ext" ] ; then
+			if [ "$ydb_icu_version" = "" -a -f "$libpath/libicuio$icu_ext" ] ; then
 				icu_lib_found=1
 				# Find the actual version'ed library to which libicuio.{so,sl,a} points to
 				icu_versioned_lib=`ls -l $libpath/libicuio$icu_ext | awk '{print $NF}'`
@@ -350,7 +350,7 @@ if [ -d "utf8" ]; then
 					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio\.//g'`
 					majmin=`$echo $full_icu_ver_string | cut -f 2 -d '.'`
 				fi
-			elif [ "$gtm_icu_version" != "" ] ; then
+			elif [ "$ydb_icu_version" != "" ] ; then
 				# If the user specified a desired version number, then check if the ICU
 				# library with that version number exists.
 				# AIX and z/OS reference ICU as libicuioVERSION.{so,a}
@@ -382,20 +382,20 @@ if [ -d "utf8" ]; then
 				# The default ICU library on AIX is unversioned
 				if [ "$found_icu" -eq 1 -a "$majmin" = "" ] ; then majmin=0; fi
 				# If we have everything we want, then save the libpath that contains the proper ICU library and
-				# set the gtm_icu_version
+				# set the ydb_icu_version
 				if [ "$found_icu" -eq 1 -a "$majmin" -ge 36 ] ; then
 					save_icu_libpath="$libpath"
 					minorver=`expr $majmin % 10`
 					majorver=`expr $majmin / 10`
-					gtm_icu_version="$majorver.$minorver"
-					export gtm_icu_version
+					ydb_icu_version="$majorver.$minorver"
+					export ydb_icu_version
 					break
 				fi
 			fi
 		done
 		if [ "$found_icu" -eq 0 ] ; then
 			if [ "$majmin" != "" ] ; then
-				$echo "WARNING: ICU version $gtm_icu_version not found. Not installing UTF-8 support."
+				$echo "WARNING: ICU version $ydb_icu_version not found. Not installing UTF-8 support."
 			else
 				$echo "WARNING: Default ICU version not found. Not installing UTF-8 support."
 			fi
@@ -560,6 +560,7 @@ gtmcryptsrcfiles="Makefile README gtmcrypt_ref.c gtmcrypt_ref.h gtmcrypt_interfa
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_dbk_ref.c gtmcrypt_dbk_ref.h gtmcrypt_pk_ref.c gtmcrypt_pk_ref.h"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_sym_ref.h gtmcrypt_sym_ref.c gtm_tls_interface.h gtm_tls_impl.h"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtm_tls_impl.c gtmcrypt_util.c gtmcrypt_util.h $gtmcryptmfile"
+gtmcryptsrcfiles="$gtmcryptsrcfiles minimal_gbldefs.c ydb_getenv.c ydb_getenv.h ydb_logicals.h ydb_logicals_tab.h"
 
 dogtmcrypt=0
 if [ -d "$plugin_gtmcrypt" ]; then
@@ -671,11 +672,11 @@ fi
 # Change mode to executable for mumps and libyottadb to do the compiles
 chmod 755 $ydbdist/mumps $ydbdist/libyottadb$ext
 
-gtmroutines=$ydbdist
+ydb_routines=$ydbdist
 ydb_gbldir=$ydbdist/mumps.gld
 ydb_dist=$ydbdist
 export ydb_dist
-export gtmroutines
+export ydb_routines
 export ydb_gbldir
 
 $echo ""
@@ -683,8 +684,8 @@ $echo "Compiling all of the MUMPS routines. This may take a moment."
 $echo ""
 
 # Ensure we are NOT in UTF-8 mode
-gtm_chset="M"
-export gtm_chset
+ydb_chset="M"
+export ydb_chset
 (cd $ydbdist; ./mumps -noignore *.m; $echo $?>compstat ; $ldcmd $ldflags -o libyottadbutil$ext *.o )
 
 # Now work on UTF-8 mode
@@ -700,8 +701,8 @@ if [ "$doutf8" -ne 0 ]; then
 		LC_CTYPE=$utflocale
 		export LC_CTYPE
 		unset LC_ALL
-		gtm_chset="UTF-8"
-		export gtm_chset
+		ydb_chset="UTF-8"
+		export ydb_chset
 		if [ $arch = "ibm" ]; then
 			export LIBPATH=$save_icu_libpath
 		else
@@ -747,11 +748,11 @@ if [ "$doutf8" -ne 0 ]; then
 fi
 
 if [ -f $ydb_dist/libyottadbutil$ext ] ; then
-    gtmroutines="$ydb_dist/libyottadbutil$ext $ydbdist"
+    ydb_routines="$ydb_dist/libyottadbutil$ext $ydbdist"
 else
-    gtmroutines="$ydbdist"
+    ydb_routines="$ydbdist"
 fi
-export gtmroutines
+export ydb_routines
 
 other_object_files=""
 csh_script_files=""

@@ -120,7 +120,7 @@ error_def(ERR_TEXT);
  * 	Otherwise, use INST_FREEZE_ON_ERROR_POLICY.
  * Use INST_FREEZE_ON_ERROR_POLICY to select alternative journal pool attach/detach behavior.
  */
-#define CUSTOM_ERRORS_AVAILABLE			(0 != (TREF(gtm_custom_errors)).len)
+#define CUSTOM_ERRORS_AVAILABLE			(0 != (TREF(ydb_custom_errors)).len)
 #define CUSTOM_ERRORS_LOADED			((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl)				\
 							&& jnlpool->jnlpool_ctl->instfreeze_environ_inited)
 #define CUSTOM_ERRORS_LOADED_CSA(CSA, LCL_JNLPOOL)								\
@@ -336,11 +336,11 @@ MBSTART {															\
 		if (WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC))									\
 		{	/* This test case is only used by mupip */								\
 			gtm_wbox_input_test_case_count++;									\
-			if ((0 != gtm_white_box_test_case_count)								\
-			    && (gtm_white_box_test_case_count <= gtm_wbox_input_test_case_count))				\
+			if ((0 != ydb_white_box_test_case_count)								\
+			    && (ydb_white_box_test_case_count <= gtm_wbox_input_test_case_count))				\
 			{													\
 				LCL_STATUS = ENOSPC;										\
-				if (gtm_white_box_test_case_count == gtm_wbox_input_test_case_count)				\
+				if (ydb_white_box_test_case_count == gtm_wbox_input_test_case_count)				\
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2,					\
 					     LEN_AND_LIT("Turning on fake ENOSPC for exit status test"));			\
 			}													\

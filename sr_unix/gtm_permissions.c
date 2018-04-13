@@ -113,7 +113,7 @@ boolean_t gtm_member_group_id(uid_t uid, gid_t gid, struct perm_diag_data *pdd)
 	struct passwd	*pwd;
 
 #	ifdef DEBUG
-	if (WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
+	if (WBTEST_HELPOUT_FAILGROUPCHECK == ydb_white_box_test_case_number)
 	{
 		if (NULL == gid_list)
 			gtm_init_gid_list();
@@ -262,7 +262,7 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 			new_group_perms = (new_group_perms | (new_other_perms << 3));
 			if (ydb_group_restricted)
 			{
-				assert((WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
+				assert((WBTEST_HELPOUT_FAILGROUPCHECK == ydb_white_box_test_case_number)
 						|| gtm_member_group_id(this_uid, ydb_dist_gid, pdd));
 				*group_id = ydb_dist_gid;	/* use restricted group */
 				*perm = new_owner_perms | new_group_perms;
@@ -293,7 +293,7 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 				*perm = new_owner_perms | new_group_perms | new_other_perms;
 			} else if (ydb_group_restricted)
 			{
-				assert((WBTEST_HELPOUT_FAILGROUPCHECK == gtm_white_box_test_case_number)
+				assert((WBTEST_HELPOUT_FAILGROUPCHECK == ydb_white_box_test_case_number)
 						|| gtm_member_group_id(this_uid, ydb_dist_gid, pdd));
 				*group_id = ydb_dist_gid;	/* use restricted group */
 				new_group_perms = (new_group_perms | (new_other_perms << 3));

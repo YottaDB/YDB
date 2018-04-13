@@ -21,8 +21,8 @@
 	; As all strings contain only ASCII, code uses "Z" functions to
 	; ensure performance even in UTF-8 mode. As this is a utility
 	; program that is part of GT.M, it assumes it is compiled with
-	; short-circuit expression evaluation ($gtm_side_effects &
-	; $gtm_full_boolean set to 0 or not defined).
+	; short-circuit expression evaluation ($ydb_side_effects &
+	; $ydb_boolean set to 0 or not defined).
 
 help    ; Usage: mumps -run %YGBLSTAT [--help] [--pid pidlist] [--reg reglist] [--stat statlist]
 	; Program to report statistics shared by processes that have

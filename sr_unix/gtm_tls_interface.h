@@ -42,7 +42,6 @@
 #define GTMTLS_WANT_READ		-2
 #define GTMTLS_WANT_WRITE		-3
 
-#define GTMTLS_PASSWD_ENV_PREFIX	"gtmtls_passwd_"
 /* below also defined in gtmcrypt_util.h so prevent redefinition in gtm_tls_impl.h */
 #ifndef GTM_PASSPHRASE_MAX
 #define GTM_PASSPHRASE_MAX            512     /* obfuscated */
@@ -74,7 +73,7 @@
 #define GTMTLS_OP_ABSENT_VERIFYMODE	0x00000100
 /* Server requested renegotiation without waiting for handshake */
 #define GTMTLS_OP_RENEGOTIATE_REQUESTED	0x00000200
-/* No gtmcrypt_config  or tls in config needed for client only use */
+/* No ydb_crypt_config  or tls in config needed for client only use */
 #define GTMTLS_OP_ABSENT_CONFIG		0x00000400
 /* No environment variable for password - used by gc_update_passwd so must be same in gtmcrypt_interface.h */
 #define GTMTLS_OP_NOPWDENVVAR		0x00000800
@@ -151,7 +150,7 @@ const char		*gtm_tls_get_error(void);
 int		gtm_tls_errno(void);
 
 /* Initializes the SSL/TLS context for a process. Typically invoked only once (unless the previous attempt failed). Attributes
- * necessary to initialize the SSL/TLS context are obtained from the configuration file pointed to by `$gtmcrypt_config'.
+ * necessary to initialize the SSL/TLS context are obtained from the configuration file pointed to by `$ydb_crypt_config'.
  *
  * Arguments:
  *   `version' : The API version that the caller understands. Current version is 0x1.
@@ -170,7 +169,7 @@ gtm_tls_ctx_t	*gtm_tls_init(int version, int flags);
  * Arguments:
  *    `tls_ctx'  : The SSL/TLS context corresponding to this process.
  *    `tlsid'    : identifier of config file section to select the private key corresponding to this password.
- *    `obs_passwd' : obfuscated password in the same format as a gtmtls_passwd_
+ *    `obs_passwd' : obfuscated password in the same format as a ydb_tls_passwd_
  environment variable's value.
  *
  * Returns:
@@ -200,14 +199,14 @@ int gtm_tls_add_config(gtm_tls_ctx_t *tls_ctx, const char *idstr, const char *co
  *    `tls_ctx'  : The SSL/TLS context corresponding to this process.
  *    `env_name' : The name of the environment variable that corresponds to the private key in question. The SSL/TLS API identifies
  *                 a private key by a name that is specified in the configuration file. The name of the environment variable is then
- *                 obtained by prefixing "gtmtls_passwd_" to the identifier. So, if the identifier is `PRODUCTION', then the name
- *                 of the environment variable is "gtmtls_passwd_PRODUCTION".
+ *                 obtained by prefixing "ydb_tls_passwd_" to the identifier. So, if the identifier is `PRODUCTION',
+ *                 then the name of the environment variable is "ydb_tls_passwd_PRODUCTION".
  *
  * No return value. Since this is only an attempt to prefetch the password, no error is reported. Another attempt will be made,
  * later to acquire the password when actually decrypting the private key.
  *
  * Note 1: This function is typically invoked whenever the application detects that an environment variable of the form
- * "gtmtls_passwd_<identifier>" is present in the environment but doesn't have any assoicated value. In such a case the below
+ * "ydb_tls_passwd_<identifier>" is present in the environment but doesn't have any assoicated value. In such a case the below
  * function prompts the user to provide the password before continuing any further. The password is not validated, but is stored
  * for future use.
  *
@@ -223,7 +222,7 @@ void		gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name);
  *    `prev_socket` : Pointer to an existing `gtm_tls_socket_t' structure. A non-null value indicates reuse.
  *    `sockfd'      : The Unix TCP/IP socket identifier.
  *    `tls_id' : Identifier corresponding to the private key and certificate pair that should be used for future communication.
- *               The plugin searches for the identifier in the configuration file pointed to by `$gtmcrypt_config' to get other
+ *               The plugin searches for the identifier in the configuration file pointed to by `$ydb_crypt_config' to get other
  *               information corresponding to this connection (like, path to the private key, certificate and the format of the
  *               private key).
  *    `flags'  : Additional configuration options. See GTMTLS_OP* macros for more details.

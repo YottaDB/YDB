@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -108,14 +111,16 @@ void stx_error_va(int in_error, va_list args)
 		if (TREF(for_stack_ptr) > (oprtype **)TADR(for_stack))
 			FOR_POP(BLOWN_FOR);
 		if (&(TREF(dollar_etrap)) == TREF(ind_source))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) in_error, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("in $gtm_etrap" ));
-		#	ifdef GTM_TRIGGER
-		if (&(TREF(gtm_trigger_etrap)) == TREF(ind_source))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) in_error, 0,
+				ERR_TEXT, 2, RTS_ERROR_TEXT("in $ydb_etrap/$gtm_etrap" ));
+		#ifdef GTM_TRIGGER
+		if (&(TREF(ydb_trigger_etrap)) == TREF(ind_source))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) in_error, 0, ERR_TEXT, 2,
-				RTS_ERROR_TEXT("in $gtm_trigger_etrap" ));
-#		endif
+				RTS_ERROR_TEXT("in $ydb_trigger_etrap/$gtm_trigger_etrap" ));
+		#endif
 		if (&(TREF(dollar_zstep)) == TREF(ind_source))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) in_error, 0, ERR_TEXT, 2, RTS_ERROR_TEXT("in $gtm_zstep" ));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) in_error, 0,
+				ERR_TEXT, 2, RTS_ERROR_TEXT("in $ydb_zstep/$gtm_zstep" ));
 		if (ERR_BADCHAR == in_error)
 		{
 			cnt = va_arg(args, VA_ARG_TYPE);

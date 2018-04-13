@@ -32,6 +32,7 @@
 #include "eintr_wrappers.h"
 #include "gtm_zos_io.h"
 #endif
+#include "ydb_getenv.h"
 
 GBLREF omi_conn		*curr_conn;
 GBLREF char		*omi_service;
@@ -112,7 +113,7 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 	SNPRINTF(tbuf, 16, "%02d%02d%02d%02d",ltime->tm_mon + 1,ltime->tm_mday,
 		ltime->tm_hour,ltime->tm_min);
 
-	if (ydb_dist=getenv("ydb_dist"))
+	if (ydb_dist = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))
 	{
 	    	char subdir[YDB_PATH_MAX];
 		struct stat buf;
@@ -122,19 +123,16 @@ void gtcm_pktdmp(char *ptr, int length, char *msg)
 		 * Otherwise...place the file in $ydb_dist/log.
 		 */
 		SNPRINTF(subdir, YDB_PATH_MAX, "%s/log/%s", ydb_dist, omi_service);
-		if (stat(subdir,&buf) == 0
-		    && S_ISDIR(buf.st_mode))
+		if (stat(subdir,&buf) == 0 && S_ISDIR(buf.st_mode))
 		{
 		    SNPRINTF(fileName, YDB_PATH_MAX,"%s/%s_%s.%d", subdir, omi_service,
 			tbuf, fileID++);
-		}
-		else
+		} else
 		{
 		    SNPRINTF(fileName, YDB_PATH_MAX,"%s/log/%s_%s.%d", ydb_dist, omi_service,
 			    tbuf, fileID++);
 		}
-	}
-	else
+	} else
 		SNPRINTF(fileName, YDB_PATH_MAX,"/usr/tmp/%s_%s.%d", omi_service,
 			tbuf, fileID++);
 

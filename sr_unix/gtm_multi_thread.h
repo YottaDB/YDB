@@ -3,6 +3,9 @@
  * Copyright (c) 2015 Fidelity National Information 		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -26,7 +29,7 @@ GBLREF	pthread_mutex_t	thread_mutex;			/* mutex structure used to ensure seriali
 GBLREF	pthread_t	thread_mutex_holder;		/* pid/tid of the thread that has "thread_mutex" currently locked */
 GBLREF	pthread_key_t	thread_gtm_putmsg_rname_key;	/* points to region name corresponding to each running thread */
 GBLREF	boolean_t	thread_block_sigsent;		/* TRUE => block external signals SIGINT/SIGQUIT/SIGTERM/SIGTSTP/SIGCONT */
-GBLREF	int		gtm_mupjnl_parallel;		/* Maximum # of concurrent threads or procs to use in "gtm_multi_thread" */
+GBLREF	int		ydb_mupjnl_parallel;		/* Maximum # of concurrent threads or procs to use in "gtm_multi_thread" */
 #ifdef DEBUG
 GBLREF	boolean_t	in_nondeferrable_signal_handler;
 

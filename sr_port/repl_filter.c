@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -736,7 +736,7 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 			/* First 2 bytes must be in valid journal extract format */
 			if ((0 > exttype) || (MUEXT_MAX_TYPES <= exttype))
 			{
-				assert(WBTEST_EXTFILTER_INDUCE_ERROR == gtm_white_box_test_case_number);
+				assert(WBTEST_EXTFILTER_INDUCE_ERROR == ydb_white_box_test_case_number);
 				return (repl_errno = EREPL_FILTERBADCONV);
 			} else
 				return SS_NORMAL;
@@ -951,7 +951,7 @@ STATICFNDEF int repl_filter_recv(seq_num tr_num, unsigned char **tr, int *tr_len
 			{
 				if (DUMMY_TCOMMIT_LENGTH == tcom_len)
 				{
-					assert(WBTEST_EXTFILTER_INDUCE_ERROR == gtm_white_box_test_case_number);
+					assert(WBTEST_EXTFILTER_INDUCE_ERROR == ydb_white_box_test_case_number);
 					return (repl_errno = EREPL_FILTERBADCONV);
 				}
 			}

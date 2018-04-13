@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -321,7 +321,7 @@ int gtmsource()
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Source server error in setsid"), errno);
 #	endif /* REPL_DEBUG_NOBACKGROUND */
-	if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
+	if (ZLIB_CMPLVL_NONE != ydb_zlib_cmp_level)
 		gtm_zlib_init();	/* Open zlib shared library for compression/decompression */
 	REPL_DPRINT1("Setting up regions\n");
 	gvinit();
@@ -444,7 +444,7 @@ int gtmsource()
 #	ifdef DEBUG
 	if (is_jnlpool_creator)
 	{
-		if (TREF(gtm_test_fake_enospc) && CUSTOM_ERRORS_LOADED)
+		if (TREF(ydb_test_fake_enospc) && CUSTOM_ERRORS_LOADED)
 		{	/* Only the journal pool creator drives fake_enospc */
 			srand(time(NULL));
 			start_timer((TID)fake_enospc, ENOSPC_INIT_DURATION, fake_enospc, 0, NULL);

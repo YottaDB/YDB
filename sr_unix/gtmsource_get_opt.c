@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -38,8 +41,7 @@
 #include "util.h"
 #include "repl_log.h"
 #include "gtmmsg.h"		/* for "gtm_putmsg" prototype */
-#include "gtm_logicals.h"	/* for GTM_REPL_INSTSECONDARY */
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "iosp.h"		/* for SS_NORMAL */
 #include "gtm_zlib.h"
 #ifdef GTM_TLS
@@ -56,6 +58,9 @@ GBLREF	repl_tls_info_t		repl_tls;
 #endif
 GBLREF	volatile boolean_t	timer_in_handler;
 
+LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];
+LITREF	char	*gtmenvname[YDBENVINDX_MAX_INDEX];
+
 error_def(ERR_GETADDRINFO);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_REPLINSTSECLEN);
@@ -65,6 +70,7 @@ error_def(ERR_TEXT);
 int gtmsource_get_opt(void)
 {
 	boolean_t	connect_parms_badval, dotted_notation, log, log_interval_specified, plaintext_fallback, secondary;
+	boolean_t	is_ydb_env_match;
 	char		*c, *connect_parm, *connect_parms_str, *connect_parm_token_str;
 	char		tmp_connect_parms_str[GTMSOURCE_CONN_PARMS_LEN + 1];
 	char		freeze_comment[SIZEOF(gtmsource_options.freeze_comment)];
@@ -75,10 +81,11 @@ int gtmsource_get_opt(void)
 	char		update_val[SIZEOF("DISABLE")]; /* "ENABLE" or "DISABLE" */
 	gtm_int64_t	buffsize;
 	int		connect_parms_index, errcode, index = 0, port_len, renegotiate_interval, status, tries, timeout_status;
-	mstr		log_nam, trans_name;
+	mstr		trans_name;
 	struct hostent	*sec_hostentry;
 	unsigned short	connect_parms_str_len, filter_cmd_len, freeze_comment_len, freeze_val_len, inst_name_len, log_file_len;
 	unsigned short	secondary_len, statslog_val_len, tlsid_len, update_val_len;
+	char		*envname;
 
 	memset((char *)&gtmsource_options, 0, SIZEOF(gtmsource_options));
 	gtmsource_options.start = (CLI_PRESENT == cli_present("START"));
@@ -120,7 +127,7 @@ int gtmsource_get_opt(void)
 			return(-1);
 		}
 	} else
-	{	/* Check if environment variable "gtm_repl_instsecondary" is defined.
+	{	/* Check if environment variable "ydb_repl_instsecondary" is defined.
 		 * Do that only if any of the following qualifiers is present as these are the only ones that honour it.
 		 * 	Mandatory : START, ACTIVATE, DEACTIVATE, STOPSOURCEFILTER, CHANGELOG, STATSLOG, NEEDRESTART,
 		 *	Optional  : CHECKHEALTH, SHOWBACKLOG or SHUTDOWN
@@ -131,26 +138,28 @@ int gtmsource_get_opt(void)
 			|| gtmsource_options.statslog || gtmsource_options.needrestart
 			|| gtmsource_options.checkhealth || gtmsource_options.showbacklog || gtmsource_options.shut_down)
 		{
-			log_nam.addr = GTM_REPL_INSTSECONDARY;
-			log_nam.len = SIZEOF(GTM_REPL_INSTSECONDARY) - 1;
 			trans_name.addr = &inst_name[0];
-			if (SS_NORMAL == (status = TRANS_LOG_NAME(&log_nam, &trans_name, inst_name, SIZEOF(inst_name),
-									do_sendmsg_on_log2long)))
+			if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_REPL_INSTSECONDARY, &trans_name, inst_name, SIZEOF(inst_name),
+									IGNORE_ERRORS_TRUE, &is_ydb_env_match)))
 			{
 				gtmsource_options.instsecondary = TRUE;
 				inst_name_len = trans_name.len;
 			} else if (!gtmsource_options.checkhealth && !gtmsource_options.showbacklog && !gtmsource_options.shut_down)
 			{
 				if (SS_LOG2LONG == status)
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr,
-						SIZEOF(inst_name) - 1);
+				{
+					envname = (char *)(is_ydb_env_match ? ydbenvname[YDBENVINDX_REPL_INSTSECONDARY]
+									: gtmenvname[YDBENVINDX_REPL_INSTSECONDARY]);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3,
+						LEN_AND_STR(envname), SIZEOF(inst_name) - 1);
+				}
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLINSTSECUNDF);
 				return (-1);
 			}
 		}
 	}
 	if (gtmsource_options.instsecondary)
-	{	/* Secondary instance name specified either through -INSTSECONDARY or "gtm_repl_instsecondary" */
+	{	/* Secondary instance name specified either through -INSTSECONDARY or "ydb_repl_instsecondary" */
 		inst_name[inst_name_len] = '\0';
 		if ((MAX_INSTNAME_LEN <= inst_name_len) || (0 == inst_name_len))
 		{
@@ -329,10 +338,10 @@ int gtmsource_get_opt(void)
 				util_out_print("Error parsing CMPLVL qualifier", TRUE);
 				return(-1);
 			}
-			if (GTM_CMPLVL_OUT_OF_RANGE(gtmsource_options.cmplvl))
+			if (YDB_CMPLVL_OUT_OF_RANGE(gtmsource_options.cmplvl))
 				gtmsource_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
-			/* CMPLVL qualifier should override any value specified in the environment variable gtm_zlib_cmp_level */
-			gtm_zlib_cmp_level = gtmsource_options.cmplvl;
+			/* CMPLVL qualifier should override any value specified in the environment variable ydb_zlib_cmp_level */
+			ydb_zlib_cmp_level = gtmsource_options.cmplvl;
 		} else
 			gtmsource_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
 		/* Check if SSL/TLS secure communication is requested. */

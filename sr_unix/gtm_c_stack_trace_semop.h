@@ -3,6 +3,9 @@
  * Copyright (c) 2011-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,8 +35,8 @@
 	{													\
 		sems_val = semctl(SEMID, SEMNUM, GETVAL);							\
 		if (-1 != sems_val)										\
-			assert((sems_val >= abs(SEM_OP)) || (gtm_white_box_test_case_enabled &&			\
-				(WBTEST_MUR_ABNORMAL_EXIT_EXPECTED == gtm_white_box_test_case_number)));	\
+			assert((sems_val >= abs(SEM_OP)) || (ydb_white_box_test_case_enabled &&			\
+				(WBTEST_MUR_ABNORMAL_EXIT_EXPECTED == ydb_white_box_test_case_number)));	\
 	}													\
 }
 #else

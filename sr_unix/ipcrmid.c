@@ -50,7 +50,7 @@ int sem_rmid(int ipcid)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	DEBUG_ONLY(if (!TREF(gtm_usesecshr)))
+	DEBUG_ONLY(if (!TREF(ydb_usesecshr)))
 	{
 		if (-1 == semctl(ipcid, 0, IPC_RMID))
 		{
@@ -92,7 +92,7 @@ int shm_rmid(int ipcid)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	DEBUG_ONLY(if (!TREF(gtm_usesecshr)))
+	DEBUG_ONLY(if (!TREF(ydb_usesecshr)))
 	{
 		if (-1 == shmctl(ipcid, IPC_RMID, NULL))
 		{

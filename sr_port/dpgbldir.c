@@ -35,7 +35,7 @@
 #include "gtmio.h"
 #include "dpgbldir_sysops.h"
 #include "targ_alloc.h"
-#include "gtm_logicals.h"
+#include "ydb_logicals.h"
 #include "zshow.h"
 #ifdef DEBUG
 #include "gtm_caseconv.h"
@@ -84,8 +84,8 @@ gd_addr *zgbldir(mval *v)
 			return name->gd_ptr;
 	if (!v->str.len)
 	{
-		temp_mstr.addr = YDB_GBLDIR;
-		temp_mstr.len = SIZEOF(YDB_GBLDIR) - 1;
+		temp_mstr.addr = (char *)YDB_GBLDIR;
+		temp_mstr.len = STRLEN(YDB_GBLDIR);
 		tran_name = get_name(&temp_mstr);
 	} else
 		tran_name = get_name(&v->str);

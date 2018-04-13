@@ -21,7 +21,7 @@
  * See the headers of those modules for explanations of how the storage
  * manager build is actually accomplished.
  *
- * Debugging is controlled via the "gtmdbglvl" environment variable in the Unix environment.
+ * Debugging is controlled via the "ydb_dbglvl" environment variable in the Unix environment.
  * If this variable is set to a non-zero value, the debugging environment
  * is enabled. The debugging features turned on will correspond to the bit
  * values defined gtmdbglvl.h. Note that this mechanism is versatile enough
@@ -70,7 +70,6 @@
 #include "gtmmsg.h"
 #include "print_exit_stats.h"
 #include "mmemory.h"
-#include "gtm_logicals.h"
 #include "cache.h"
 #include "gtm_malloc.h"
 #include "have_crit.h"
@@ -79,7 +78,7 @@
 #include "deferred_signal_handler.h"
 
 /* This routine is compiled twice, once as debug and once as pro and put into the same pro build. The alternative
- * memory manager is selected with the debug flags (any non-zero gtmdbglvl setting invokes debug memory manager in
+ * memory manager is selected with the debug flags (any non-zero ydb_dbglvl setting invokes debug memory manager in
  * a pro build). So the global variables (defined using the STATICD macro) have to be two different fields.
  * One for pro, one for dbg. The fields have different values and different sizes between the two compiles but
  * exist in the same build. They cannot coexist. That is why STATICD is defined to be static for PRO and GBLDEF for DBG.
@@ -112,25 +111,25 @@
 #endif
 
 /* #GTM_THREAD_SAFE : The below macro (MALLOC) is thread-safe because caller ensures serialization with locks */
-#  define MALLOC(size, addr) 										\
-{													\
+#  define MALLOC(size, addr)											\
+{														\
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);									\
 	if (!ydbSystemMalloc											\
-		&& (0 < gtm_max_storalloc) && ((size + totalRmalloc + totalRallocGta) > gtm_max_storalloc))	\
-	{	/* Boundary check for $gtm_max_storalloc (if set) */					\
-		gtmMallocErrorSize = size;								\
-		gtmMallocErrorCallerid = CALLERID;							\
-		gtmMallocErrorErrno = ERR_MALLOCMAXUNIX;						\
-		raise_gtmmemory_error();								\
-	}												\
-	addr = (void *)malloc(size);									\
-	if (NULL == (void *)addr)									\
-	{												\
-		gtmMallocErrorSize = size;								\
-		gtmMallocErrorCallerid = CALLERID;							\
-		gtmMallocErrorErrno = errno;								\
-		raise_gtmmemory_error();								\
-	}												\
+		&& (0 < ydb_max_storalloc) && ((size + totalRmalloc + totalRallocGta) > ydb_max_storalloc))	\
+	{	/* Boundary check for $ydb_max_storalloc (if set) */						\
+		gtmMallocErrorSize = size;									\
+		gtmMallocErrorCallerid = CALLERID;								\
+		gtmMallocErrorErrno = ERR_MALLOCMAXUNIX;							\
+		raise_gtmmemory_error();									\
+	}													\
+	addr = (void *)malloc(size);										\
+	if (NULL == (void *)addr)										\
+	{													\
+		gtmMallocErrorSize = size;									\
+		gtmMallocErrorCallerid = CALLERID;								\
+		gtmMallocErrorErrno = errno;									\
+		raise_gtmmemory_error();									\
+	}													\
 }
 #  define FREE(size, addr) free(addr);
 #define MAXBACKFILL (16 * 1024)			/* Maximum backfill of large structures */
@@ -317,7 +316,7 @@ GBLREF	uint4		outOfMemoryMitigateSize;	/* Size of above reserve in Kbytes */
 GBLREF	int		mcavail;
 GBLREF	mcalloc_hdr	*mcavailptr, *mcavailbase;
 GBLREF	size_t		totalRallocGta;			/* Size allocated by gtm_text_alloc if at all */
-GBLREF	size_t		gtm_max_storalloc;		/* Max value for $ZREALSTOR or else memory error is raised */
+GBLREF	size_t		ydb_max_storalloc;		/* Max value for $ZREALSTOR or else memory error is raised */
 GBLREF	void		(*cache_table_relobjs)(void);	/* Function pointer to call cache_table_rebuild() */
 GBLREF	ch_ret_type	(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch */
 GBLREF	ch_ret_type	(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
@@ -524,8 +523,8 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 		if (NULL == outOfMemoryMitigation)
 		{
 			save_errno = errno;
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_INVMEMRESRV, 2, RTS_ERROR_LITERAL("$gtm_memory_reserve"),
-				   save_errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5)
+				ERR_INVMEMRESRV, 2, RTS_ERROR_LITERAL("$ydb_memory_reserve/$gtm_memory_reserve"), save_errno);
 			EXIT(save_errno);
 		}
 	}
@@ -718,7 +717,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 #				endif
 				/* The difference between $ZALLOCSTOR and $ZUSEDSTOR (totalAlloc and totalUsed global vars)  is
 				 * that when you allocate, say 16 bytes, that comes out of a 32 byte chunk (with the pro storage
-				 * mgr) with the rest being unusable. In a debug build (or a pro build with $gtmdbglvl set to
+				 * mgr) with the rest being unusable. In a debug build (or a pro build with $ydb_dbglvl set to
 				 * something non-zero), $ZUSEDSTOR is incremented by 16 bytes (the requested allocation) while
 				 * $ZALLOCSTOR is incremented by 32 bytes (the actual allocation). But, in a pro build using
 				 * the pro memory manager, we do not track the user-allocated size anywhere. We know it when
@@ -727,7 +726,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 				 * the free to be consistent with the allocation, we have to use the one value we know at both
 				 * malloc and free times - 32 bytes. The net result is that $ZALLOCSTOR and $ZUSEDSTOR report
 				 * the same value in a pro build with the pro stmgr while they will be quite different in a
-				 * debug build or a pro build with $gtmdbglvl engaged. The difference between them shows the
+				 * debug build or a pro build with $ydb_dbglvl engaged. The difference between them shows the
 				 * allocation overhead of gtm_malloc itself.
 				 */
 				if (MAXTWO >= tSize)

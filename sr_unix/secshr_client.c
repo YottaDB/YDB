@@ -56,11 +56,11 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include "gtm_logicals.h"
 #include "secshr_client.h"
 #include "hashtab.h"		/* for STR_HASH macro */
 #include "fork_init.h"
 #include "wbox_test_init.h"
+#include "ydb_getenv.h"
 
 GBLREF struct sockaddr_un       gtmsecshr_sock_name;
 GBLREF key_t                    gtmsecshr_key;
@@ -186,7 +186,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	gtmsecshr_mesg		mesg;
 	TID			timer_id;
 	int4			msec_timeout;
-	char			*gtm_tmp_ptr;
+	char			*ydb_tmp_ptr;
 	struct stat		stat_buf;
 	struct shmid_ds		shm_info;
 	int			len;
@@ -222,7 +222,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	}
 	if (!gtmsecshr_sock_init_done && (0 < (init_ret_code = gtmsecshr_sock_init(CLIENT))))	/* Note assignment */
 		return init_ret_code;
-	DEBUG_ONLY(mesg.usesecshr = TREF(gtm_usesecshr));	/* Flag ignored in PRO build */
+	DEBUG_ONLY(mesg.usesecshr = TREF(ydb_usesecshr));	/* Flag ignored in PRO build */
 	while (MAX_COMM_ATTEMPTS >= loop_count)
 	{	/* first, try the sendto */
 		req_code = mesg.code = code;
@@ -417,11 +417,10 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_GTMSECSHRSRVF, 4,
 				RTS_ERROR_TEXT("Client"), process_id, loop_count - 1,
 			   	ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to communicate with gtmsecshr"));
-		/* If gtm_tmp is not defined, show default path */
-		if (gtm_tmp_ptr = GETENV("gtm_tmp"))
+		/* If ydb_tmp is not defined, show default path */
+		if (ydb_tmp_ptr = ydb_getenv(YDBENVINDX_TMP, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRTMPPATH, 2,
-				RTS_ERROR_TEXT(gtm_tmp_ptr),
-				ERR_TEXT, 2, RTS_ERROR_TEXT("(from $gtm_tmp)"));
+				RTS_ERROR_TEXT(ydb_tmp_ptr), ERR_TEXT, 2, RTS_ERROR_TEXT("(from $ydb_tmp/$gtm_tmp)"));
 		else
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4)
 					ERR_GTMSECSHRTMPPATH, 2, RTS_ERROR_TEXT("/tmp"));

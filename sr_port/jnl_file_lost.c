@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -62,8 +65,8 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 	}
 	assert(csa->now_crit);
 	/* We issue an rts_error (instead of shutting off journaling) in the following cases :			{BYPASSOK}
-	 * 1) $gtm_error_on_jnl_file_lost is set to issue runtime error (if not already issued) in case of journaling issues.
-	 * 2) The process has the given message set in $gtm_custom_errors (indicative of instance freeze on error setup)
+	 * 1) $ydb_error_on_jnl_file_lost is set to issue runtime error (if not already issued) in case of journaling issues.
+	 * 2) The process has the given message set in $ydb_custom_errors (indicative of instance freeze on error setup)
 	 *    in which case the goal is to never shut-off journaling
 	 */
 	assert((NULL == jnlpool) || (NULL != jnlpool->jnlpool_ctl));

@@ -266,10 +266,10 @@ void	op_view(int numarg, mval *keyword, ...)
 
 			if ((VTK_NOFULLBOOL == vtp->keycode) && (OLD_SE != TREF(side_effect_handling)))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SEFCTNEEDSFULLB);
-			old_bool = TREF(gtm_fullbool);
-			TREF(gtm_fullbool) = (VTK_FULLBOOL == vtp->keycode) ? FULL_BOOL
-				: (VTK_FULLBOOLWARN == vtp->keycode) ? FULL_BOOL_WARN : GTM_BOOL;
-			if (old_bool != TREF(gtm_fullbool))
+			old_bool = TREF(ydb_fullbool);
+			TREF(ydb_fullbool) = (VTK_FULLBOOL == vtp->keycode) ? FULL_BOOL
+				: (VTK_FULLBOOLWARN == vtp->keycode) ? FULL_BOOL_WARN : YDB_BOOL;
+			if (old_bool != TREF(ydb_fullbool))
 				cache_table_rebuild();
 			break;
 		case VTK_GDSCERT:
@@ -665,8 +665,8 @@ void	op_view(int numarg, mval *keyword, ...)
 			break;
 		case VTK_STORDUMP:
 #			ifdef DEBUG
-			if (gtm_white_box_test_case_enabled
-				&& (WBTEST_HOLD_CRIT_TILL_LCKALERT == gtm_white_box_test_case_number))
+			if (ydb_white_box_test_case_enabled
+				&& (WBTEST_HOLD_CRIT_TILL_LCKALERT == ydb_white_box_test_case_number))
 			{	/* Hold crit for a long enough interval to generate lock alert which then does a continue_proc */
 				grab_crit(gv_cur_region);
 				icnt = TREF(continue_proc_cnt);
@@ -685,7 +685,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			} else		/* If we do the white box test, avoid the rest */
 #			endif
 			if (ydbDebugLevel)
-			{	/* gtmdbglvl must be non-zero to have hope of printing a storage dump */
+			{	/* ydb_dbglvl must be non-zero to have hope of printing a storage dump */
 				dbgdmpenabled = (GDL_SmDump & ydbDebugLevel);
 				ydbDebugLevel |= GDL_SmDump;		/* Turn on indicator to force print */
 				printMallocDump();

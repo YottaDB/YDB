@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +24,8 @@
 #include "trans_log_name.h"
 #include "send_msg.h"
 
-/* Allocate a buffer to be used for passing a null-terminated environment-variable to GETENV.
- * If more space is needed, we will expand later. Need to statically allocate space to hold "$gtmdbglvl"
+/* Allocate a buffer to be used for passing a null-terminated environment-variable to getenv.
+ * If more space is needed, we will expand later. Need to statically allocate space to hold "$ydb_dbglvl"
  * since this is the first environment variable that will be passed to trans_log_name and needs
  * to be translated BEFORE doing any mallocs hence the initial static allocation of MAX_TRANS_NAME_LEN bytes.
  */
@@ -67,7 +70,7 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 			for ( ; (s_ptr < s_top) && (ch = *s_ptr, ('_' == ch) || ISALNUM_ASCII(ch)); s_ptr++)
 				;
 			s_len = (int)(s_ptr - s_start) - 1;
-			/* Copy it into "temporary-buffer" so we can null-terminate it and pass to GETENV */
+			/* Copy it into "temporary-buffer" so we can null-terminate it and pass to getenv */
 			if (trans_log_name_buflen <= s_len)
 			{	/* Currently allocated buffer is not enough. Expand it. */
 				assert(NULL != trans_log_name_buff);
@@ -79,7 +82,7 @@ int4 trans_log_name(mstr *log, mstr *trans, char *buffer, int4 buffer_len, trans
 			memcpy(trans_log_name_buff, s_start + 1, s_len);
 			trans_log_name_buff[s_len] = 0;
 			/* try to convert it */
-			if (NULL != (tran_buff = GETENV(trans_log_name_buff)))
+			if (NULL != (tran_buff = getenv(trans_log_name_buff)))
 			{
 				s_start = tran_buff;
 				s_len = STRLEN(tran_buff);

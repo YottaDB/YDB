@@ -327,8 +327,8 @@
 	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);			\
-	if (gtm_white_box_test_case_enabled					\
-		&& (WBTEST_SYSCONF_WRAPPER == gtm_white_box_test_case_number))	\
+	if (ydb_white_box_test_case_enabled					\
+		&& (WBTEST_SYSCONF_WRAPPER == ydb_white_box_test_case_number))	\
 	{									\
 		DBGFPF((stderr, "will sleep indefinitely now\n"));		\
 		while (TRUE)							\

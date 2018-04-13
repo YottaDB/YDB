@@ -14,9 +14,9 @@
 #################################################################
 foreach(v
     ydb_dist
-    gtmroutines
-    gtm_chset
-    gtm_icu_version
+    ydb_routines
+    ydb_chset
+    ydb_icu_version
     gtm_inc
     gtm_tools
     ydb_gbldir

@@ -142,13 +142,13 @@ void op_svget(int varnum, mval *v)
 
 	SETUP_THREADGBL_ACCESS;
 #	if defined(UNIX) && defined(DEBUG)
-	if (gtm_white_box_test_case_enabled && (WBTEST_HUGE_ALLOC == gtm_white_box_test_case_number))
+	if (ydb_white_box_test_case_enabled && (WBTEST_HUGE_ALLOC == ydb_white_box_test_case_number))
 	{
-		if (1 == gtm_white_box_test_case_count)
+		if (1 == ydb_white_box_test_case_count)
 			totalAlloc = totalAllocGta = totalRmalloc = totalRallocGta = totalUsed = totalUsedGta = 0xffff;
-		else if (2 == gtm_white_box_test_case_count)
+		else if (2 == ydb_white_box_test_case_count)
 			totalAlloc = totalAllocGta = totalRmalloc = totalRallocGta = totalUsed = totalUsedGta = 0xfffffff;
-		else if (3 == gtm_white_box_test_case_count)
+		else if (3 == ydb_white_box_test_case_count)
 		{
 #			ifdef GTM64
 			if (8 == SIZEOF(size_t))

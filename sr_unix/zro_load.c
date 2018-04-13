@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -141,10 +144,10 @@ void zro_load(mstr *str)
 				si = oi + 2;
 #				ifdef AUTORELINK_SUPPORTED
 #					ifdef DEBUG
-					/* If env var gtm_test_autorelink_always is set in dbg version, treat every
+					/* If env var ydb_test_autorelink_always is set in dbg version, treat every
 					 * object directory specified in $zroutines as if * has been additionally specified.
 					 */
-					if (TREF(gtm_test_autorelink_always))
+					if (TREF(ydb_test_autorelink_always))
 						arlink_thisdir_enable = TRUE;
 #					endif
 				if (arlink_thisdir_enable)
@@ -158,7 +161,7 @@ void zro_load(mstr *str)
 					{	/* If zro_load() is called as a part of MUPIP RUNDOWN -RELINKCTL, then we do not
 						 * want to do relinkctl_attach() on all relinkctl files at once because we leave
 						 * the function holding the linkctl lock, which might potentially cause a deadlock
-						 * if multiple processes are run concurrently with different $gtmroutines. However,
+						 * if multiple processes are run concurrently with different $ydb_routines. However,
 						 * we need a way to tell mu_rndwn_rlnkctl() which object directories are autorelink-
 						 * enabled. For that we set a negative number to the presently unused count field of
 						 * object directory entries in the zro_ent linked list. If we ever decide to make

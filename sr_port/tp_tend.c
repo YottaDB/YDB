@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -704,7 +704,7 @@ boolean_t	tp_tend()
 					{
 						assert(cnl->wc_blocked);	/* only reason we currently know
 										 * why wcs_get_space could fail */
-						assert(gtm_white_box_test_case_enabled);
+						assert(ydb_white_box_test_case_enabled);
 						SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 						BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_wcsgetspace);
 						SET_CACHE_FAIL_STATUS(status, csd);

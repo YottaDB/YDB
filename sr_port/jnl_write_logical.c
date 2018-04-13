@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -58,7 +61,7 @@ void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum)
 	 */
 	jpc = csa->jnl;
 	assert((0 != jpc->pini_addr) || REPL_WAS_ENABLED(csa)
-		|| (gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
+		|| (ydb_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)));
 	assert(jgbl.gbl_jrec_time || REPL_WAS_ENABLED(csa));
 	assert(IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(jfb->rectype) || (JRT_NULL == jfb->rectype));
 	assert(!IS_ZTP(jfb->rectype));

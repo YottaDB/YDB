@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -152,7 +155,7 @@ void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 				jpc->status);
 		}
 #		ifdef DEBUG
-		if (!gtm_white_box_test_case_enabled || (WBTEST_JNL_FILE_LOST_DSKADDR != gtm_white_box_test_case_number))
+		if (!ydb_white_box_test_case_enabled || (WBTEST_JNL_FILE_LOST_DSKADDR != ydb_white_box_test_case_number))
 		{
 			assert(jb->rsrv_freeaddr == jb->freeaddr);
 			assert(jb->dskaddr == jb->freeaddr);
@@ -160,7 +163,7 @@ void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 #		endif
 		jnl_fsync(reg, jb->dskaddr);
 		assert((jb->freeaddr == jb->fsync_dskaddr)
-			|| (gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
+			|| (ydb_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)));
 		read_write_size = ROUND_UP2(REAL_JNL_HDR_LEN, jnl_fs_block_size);
 		assert((unsigned char *)header + read_write_size <= ARRAYTOP(hdr_base));
 		DO_FILE_READ(jpc->channel, 0, header, read_write_size, jpc->status, jpc->status2);

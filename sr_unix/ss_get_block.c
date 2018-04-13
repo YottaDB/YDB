@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ * Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +56,7 @@ boolean_t ss_get_block(sgmnt_addrs *csa, block_id blk, sm_uc_ptr_t blk_buff_ptr)
 	 * failed while initializing snapshot resources and hence refrained from writing before images. Include whitebox
 	 * test case to account for invalid snapshot
 	 */
-	assert((blk < ss_shm_ptr->ss_info.total_blks) || (WBTEST_INVALID_SNAPSHOT_EXPECTED == gtm_white_box_test_case_number));
+	assert((blk < ss_shm_ptr->ss_info.total_blks) || (WBTEST_INVALID_SNAPSHOT_EXPECTED == ydb_white_box_test_case_number));
 	if (blk >= ss_shm_ptr->ss_info.total_blks)
 		return FALSE;
 	if (ss_chk_shdw_bitmap(csa, lcl_ss_ctx, blk))

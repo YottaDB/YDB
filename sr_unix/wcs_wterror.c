@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,7 +123,7 @@ void	wcs_wterror(gd_region *reg, int4 save_errno)
 			 * well as tests which could trigger a CRYPTOPFAILED inside the encryption plugin.
 			 * Neither of those are real IO errors.
 			 */
-			assert(gtm_white_box_test_case_enabled
+			assert(ydb_white_box_test_case_enabled
 				|| (SET_REPEAT_MSG_MASK(SET_CRYPTERR_MASK(ERR_CRYPTOPFAILED)) == save_errno));
 #ifdef 			USE_LIBAIO
 			if (NULL == aio_shim_errstr)

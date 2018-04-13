@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,7 +48,7 @@ int gvn(void)
 	advancewindow();
 	sb1 = sb2 = subscripts;
 	ox = 0;
-	if (shifting = (TREF(shift_side_effects) && (!TREF(saw_side_effect) || (GTM_BOOL == TREF(gtm_fullbool)
+	if (shifting = (TREF(shift_side_effects) && (!TREF(saw_side_effect) || (YDB_BOOL == TREF(ydb_fullbool)
 		&& (OLD_SE == TREF(side_effect_handling))))))
 	{	/* NOTE assignment above */
 		dqinit(&tmpchain, exorder);
@@ -169,7 +172,7 @@ int gvn(void)
 	SUBS_ARRAY_2_TRIPLES(ref, sb1, sb2, subscripts, 0);
 	if (shifting)
 	{
-		if (TREF(saw_side_effect) && ((GTM_BOOL != TREF(gtm_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
+		if (TREF(saw_side_effect) && ((YDB_BOOL != TREF(ydb_fullbool)) || (OLD_SE != TREF(side_effect_handling))))
 		{	/* saw a side effect in a subscript - time to stop shifting */
 			setcurtchain(oldchain);
 			triptr = (TREF(curtchain))->exorder.bl;

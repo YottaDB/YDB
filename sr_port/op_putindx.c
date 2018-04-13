@@ -37,10 +37,6 @@
 #include "toktyp.h"
 #include "valid_mname.h"
 #include "stack_frame.h"
-#ifdef DEBUG
-#include "gtm_ctype.h"
-#include "trans_numeric.h"
-#endif
 
 #ifdef DEBUG
 #define	ACTIVELV_DBG_ARRAY_SIZE_DEF	64

@@ -448,7 +448,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	if (!(IS_GTM_IMAGE))
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT (6) ERR_FILERENAME, 4, info->jnl_len, info->jnl, rename_fn_len, rename_fn);
 #	ifdef DEBUG
-	if (gtm_white_box_test_case_enabled && (WBTEST_JNL_CREATE_INTERRUPT == gtm_white_box_test_case_number))
+	if (ydb_white_box_test_case_enabled && (WBTEST_JNL_CREATE_INTERRUPT == ydb_white_box_test_case_number))
 	{
 		DBGFPF((stderr, "CRE_JNL_FILE: started a wait\n"));
 		LONG_SLEEP(600);

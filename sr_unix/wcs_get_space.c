@@ -3,6 +3,9 @@
  * Copyright (c) 2007-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -60,12 +63,12 @@ error_def(ERR_GBLOFLOW);
 #define WCS_GET_SPACE_RETURN_FAIL(TRACEARRAY, CR)								\
 {														\
 	/* A failure occurred. Ignored for WB test case */							\
-	assert(FALSE || (gtm_white_box_test_case_enabled							\
-				&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));		\
+	assert(FALSE || (ydb_white_box_test_case_enabled							\
+				&& (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)));		\
 	get_space_fail_cr = CR;											\
 	get_space_fail_array = TRACEARRAY;									\
-	if (TREF(gtm_environment_init) DEBUG_ONLY(&& !(gtm_white_box_test_case_enabled				\
-				&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number))))		\
+	if (TREF(ydb_environment_init) DEBUG_ONLY(&& !(ydb_white_box_test_case_enabled				\
+				&& (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number))))		\
 		gtm_fork_n_core();	/* take a snapshot in case running in-house */				\
 	return FALSE;												\
 }
@@ -214,7 +217,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 			 */
 			if (cnl->wc_blocked)
 			{
-				assert(gtm_white_box_test_case_enabled);
+				assert(ydb_white_box_test_case_enabled);
 				return FALSE;
 			}
 			/* loop till the active queue is exhausted OR desired cr becomes non-dirty */
@@ -277,10 +280,10 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 			/* Reduce the wait time to encounter errors associated with
 			 * WBTEST_JNL_FILE_LOST_DSKADDR faster
 			 */
-			if (gtm_white_box_test_case_enabled
-					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)
-					&& (0 < gtm_white_box_test_case_count)
-					&& (lcnt >= gtm_white_box_test_case_count))
+			if (ydb_white_box_test_case_enabled
+					&& (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)
+					&& (0 < ydb_white_box_test_case_count)
+					&& (lcnt >= ydb_white_box_test_case_count))
 				lcnt += UNIX_GETSPACEWAIT;
 #			endif
 		}

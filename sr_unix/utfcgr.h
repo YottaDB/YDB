@@ -3,6 +3,9 @@
  * Copyright (c) 2015 Fidelity National Information 		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -59,15 +62,15 @@ MBSTART {											\
 /* Define defaults and limits of the utfcgr structures. Note the defaults here are not chosen by any scientific
  * principles but are our current best guess at what will work for the largest group of customers.
  */
-#define GTM_UTFCGR_STRINGS_DEFAULT	 50	/* Default max number of strings to cache scan results for ($gtm_utfcgr_strings) */
+#define GTM_UTFCGR_STRINGS_DEFAULT	 50	/* Default max number of strings to cache scan results for ($ydb_utfcgr_strings) */
 #define GTM_UTFCGR_STRINGS_MAX		 254	/* Value is a single byte and 255 is used as "invalid value" flag */
-#define GTM_UTFCGR_STRING_GROUPS_DEFAULT 32	/* Default max char groups cached per string ($gtm_utfcgr_string_groups) */
+#define GTM_UTFCGR_STRING_GROUPS_DEFAULT 32	/* Default max char groups cached per string ($ydb_utfcgr_string_groups) */
 #define UTFCGR_STRLEN_MIN		 33	/* Minimum (byte) length string that creates a cache */
 #define UTFCGR_MAX_UTF_LEN (UTFCGR_STRLEN_MIN * 2)	/* Maximum byte length for a UTF8 group in cache - promotes scanning
 							 * as have to scan at most this many bytes in a group - allows approx
 							 * UTFCGR_STRLEN_MIN UTF8 chars in a string averaging 2 bytes each.
 							 */
-#define UTFCGR_MAXLOOK_DIVISOR		 5	/* Value to divide into TREF(gtm_utfcgr_strings) to get number of spins to locate
+#define UTFCGR_MAXLOOK_DIVISOR		 5	/* Value to divide into TREF(ydb_utfcgr_strings) to get number of spins to locate
 						 * an available cache line (skipping slots with reserve flag set) before we
 						 * simply overwrite one. Used to compute TREF(utfcgr_string_lookmax).
 						 */
@@ -104,7 +107,7 @@ typedef struct utfcgr_struct
 	unsigned short	idx;			/* The index of this group in the entry[] array */
 	boolean_t	reference;		/* Reference bit(s) to prevent overwrite if possible */
 	utfcgr_entry	entry[1]; 		/* Table of  char groups for this string. This is a variable dimension
-						 * field - dimension is in TREF(gtm_utfcgr_string_groups).
+						 * field - dimension is in TREF(ydb_utfcgr_string_groups).
 						 */
 } utfcgr;
 /* Structure for the entire allocation for UTF scan cache */
@@ -112,8 +115,8 @@ typedef struct
 {
 	utfcgr		*utfcgrsteal;		/* Last stolen cache element */
 	utfcgr		*utfcgrmax;		/* (use addrs to avoid array indexing) */
-	utfcgr		*utfcgrs;		/* Ptr to variable dimension array which has TREF(gtm_utfcgr_strings) entries */
-	uint4		utfcgrsize;		/* Size of 1 utfcgr entry (varies depending on TREF(gtm_utfcgr_string_groups) */
+	utfcgr		*utfcgrs;		/* Ptr to variable dimension array which has TREF(ydb_utfcgr_strings) entries */
+	uint4		utfcgrsize;		/* Size of 1 utfcgr entry (varies depending on TREF(ydb_utfcgr_string_groups) */
 } utfcgr_area;
 /* This structure is for the scan descriptor used by the UTF scanning/parsing routines */
 typedef struct

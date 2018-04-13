@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -213,7 +216,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			nl = get_log_name(&dollar_prin_log, NO_INSERT);
 		if (NULL == nl)
 		{
-			stat = TRANS_LOG_NAME(&devicename->str, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
+			stat = trans_log_name(&devicename->str, &tn, buf1, SIZEOF(buf1), dont_sendmsg_on_log2long);
 			if (SS_NORMAL != stat)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IONOTOPEN);
 			else

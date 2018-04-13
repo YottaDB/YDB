@@ -35,6 +35,7 @@
 #include "gtmcrypt_util.h"
 
 #include "gtmcrypt_interface.h"
+#include "ydb_getenv.h"
 
 /* Define the global error string here. Since this module gets linked into libgtmcryptutil.so, the error string global gets
  * into the shared library automatically and is shared across all different libraries that comprise the encryption reference
@@ -210,7 +211,7 @@ int gc_read_passwd(char *prompt, char *buf, int maxlen, void *tty)
  *
  * XOR MASK:
  * --------
- * If the gtm_obfuscation_key exists and points to a file that has readable contents, the XOR mask is the SHA-512 hash of the
+ * If the ydb_obfuscation_key exists and points to a file that has readable contents, the XOR mask is the SHA-512 hash of the
  * contents of that file.
  * Otherwise, within a pre-zero'ed buffer (of size equal to the length of the password), the value of $USER (from the environment)
  * is left-justified and the decimal representation of the inode of the mumps executable is right-justified. The XOR mask is the
@@ -235,12 +236,12 @@ int gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out)
 	have_hash = FALSE;
 	passwd_len = in->length < GTM_PASSPHRASE_MAX ? in->length : GTM_PASSPHRASE_MAX;
 
-	if (NULL != (ptr = getenv(GTM_OBFUSCATION_KEY)))
+	if (NULL != (ptr = ydb_getenv(YDBENVINDX_OBFUSCATION_KEY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 	{
 		if (-1 != (fd = open(ptr, O_RDONLY)))
 		{
 			if ((-1 != fstat(fd, &stat_info)) && S_ISREG(stat_info.st_mode))
-			{	/* File pointed by $gtm_obfuscation_key exists and is a regular file */
+			{	/* File pointed by $ydb_obfuscation_key exists and is a regular file */
 				mmap_addrs = mmap(0, stat_info.st_size, PROT_READ, MAP_SHARED, fd, 0);
 				if (MAP_FAILED != mmap_addrs)
 				{
@@ -256,15 +257,15 @@ int gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out)
 	}
 	if (!have_hash)
 	{
-		if (!(ptr = getenv(USER_ENV)))
+		if (!(ptr = ydb_getenv(YDBENVINDX_GENERIC_USER, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 		{
 			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, USER_ENV);
 			return -1;
 		}
 		strncpy(hash_in, ptr, passwd_len);
-		if (!(ptr = getenv(YDB_DIST_ENV)))
+		if (!(ptr = ydb_getenv(YDBENVINDX_DIST, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 		{
-			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, YDB_DIST_ENV);
+			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR2, YDB_DIST_ENV, GTM_DIST_ENV);
 			return -1;
 		}
 		SNPRINTF(mumps_exe, YDB_PATH_MAX, "%s/%s", ptr, "mumps");
@@ -305,40 +306,64 @@ void gc_freeup_pwent(passwd_entry_t *pwent)
 	FREE(pwent);
 }
 
-int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int interactive)
+int gc_update_passwd(ydbenvindx_t envindx, char *suffix, passwd_entry_t **ppwent, char *prompt, int interactive)
 {
-	char		*env_name, *env_value, *passwd, *lpasswd, tmp_passwd[GTM_PASSPHRASE_MAX];
+	char		*env_value, *passwd, *lpasswd, tmp_passwd[GTM_PASSPHRASE_MAX];
+	char		*env_name, envname1[PASSPHRASE_ENVNAME_MAX], envname2[PASSPHRASE_ENVNAME_MAX], tmpsuffix[1];
+	char		*snprintf_suffix;
+	boolean_t	is_ydb_env_match;
 	int		len, status;
 	gtm_string_t	passwd_str, tmp_passwd_str;
 	passwd_entry_t	*pwent;
+	mstr		mst_suffix, *mst_suffix_ptr;
 
+	if (NULL == suffix)
+	{
+		tmpsuffix[0] = '\0';
+		snprintf_suffix = tmpsuffix;	/* Do not use NULL pointer in snprintf */
+	} else
+		snprintf_suffix = suffix;
 	pwent = *ppwent;
 	if (!(GTMCRYPT_OP_NOPWDENVVAR & interactive))
 	{
-		if (!(lpasswd = getenv(name)))
+		if (NULL != suffix)
 		{
-			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, name);
+			mst_suffix.addr = suffix;
+			mst_suffix.len = STRLEN(suffix);
+			mst_suffix_ptr = &mst_suffix;
+		} else
+			mst_suffix_ptr = NULL;
+		if (!(lpasswd = ydb_getenv(envindx, mst_suffix_ptr, &is_ydb_env_match)))
+		{
+			SNPRINTF(envname1, SIZEOF(envname1), "%s%s", ydbenvname[envindx] + 1, snprintf_suffix);
+			SNPRINTF(envname2, SIZEOF(envname2), "%s%s", gtmenvname[envindx] + 1, snprintf_suffix);
+			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR2, envname1, envname2);
 			return -1;
 		}
 		if ((NULL != pwent) && (0 == strcmp(pwent->env_value, lpasswd)))
 			return 0;	/* No change in the environment value. Nothing more to do. */
 	} else
 	{
+		is_ydb_env_match = TRUE;
 		if ((NULL != pwent) && (NULL != pwent->env_value))
 			lpasswd = pwent->env_value;
 		else
 		{
-			UPDATE_ERROR_STRING("No passphrase provided for %s", name);
+			SNPRINTF(envname1, SIZEOF(envname1), "%s%s", ydbenvname[envindx] + 1, snprintf_suffix);
+			UPDATE_ERROR_STRING("No passphrase provided for %s", envname1);
 			if (NULL != pwent)
 				gc_freeup_pwent(pwent);
 			return -1;
 		}
 	}
+	SNPRINTF(envname1, SIZEOF(envname1), "%s%s",
+		(char *)(is_ydb_env_match ? ydbenvname[envindx] : gtmenvname[envindx]) + 1 , snprintf_suffix);
+	env_name = envname1;
 	len = STRLEN(lpasswd);
 	if (0 != (len % 2))
 	{
 		UPDATE_ERROR_STRING("Environment variable %s must be a valid hexadecimal string of even length less than %d. "
-			"Length is odd", name, GTM_PASSPHRASE_MAX);
+			"Length is odd", env_name, GTM_PASSPHRASE_MAX);
 		if (NULL != pwent)
 			gc_freeup_pwent(pwent);
 		return -1;
@@ -346,7 +371,7 @@ int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int inte
 	if ((GTM_PASSPHRASE_MAX * 2) <= len)
 	{
 		UPDATE_ERROR_STRING("Environment variable %s must be a valid hexadecimal string of even length less than %d. "
-			"Length is %d", name, GTM_PASSPHRASE_MAX, len);
+			"Length is %d", env_name, GTM_PASSPHRASE_MAX, len);
 		if (NULL != pwent)
 			gc_freeup_pwent(pwent);
 		return -1;
@@ -356,12 +381,14 @@ int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int inte
 		if (NULL != pwent)
 			gc_freeup_pwent(pwent);
 		pwent = MALLOC(SIZEOF(passwd_entry_t));
+		pwent->envindx = envindx;
 		pwent->env_value = MALLOC(len ? len + 1 : GTM_PASSPHRASE_MAX * 2 + 1);
-		env_name = pwent->env_name;
-		strncpy(env_name, name, SIZEOF(pwent->env_name));
-		env_name[SIZEOF(pwent->env_name) - 1] = '\0';
-	} else
-		env_name = pwent->env_name;
+		if (NULL != suffix)
+			strncpy(pwent->suffix, suffix, SIZEOF(pwent->suffix));
+		else
+			pwent->suffix[0] = '\0';
+		pwent->suffix[SIZEOF(pwent->suffix) - 1] = '\0';
+	}
 	pwent->passwd_len = len ? len / 2 + 1 : GTM_PASSPHRASE_MAX + 1;
 	pwent->passwd = MALLOC(pwent->passwd_len);
 	env_value = pwent->env_value;
@@ -373,7 +400,8 @@ int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int inte
 		if (len < 0)
 		{
 			UPDATE_ERROR_STRING("Environment variable %s must be a valid hexadecimal string of even length "
-				"less than %d. '%c' is not a valid digit (0-9, a-f, or A-F)", name, GTM_PASSPHRASE_MAX, passwd[0]);
+				"less than %d. '%c' is not a valid digit (0-9, a-f, or A-F)", env_name,
+				GTM_PASSPHRASE_MAX, passwd[0]);
 			if (NULL != pwent)
 				gc_freeup_pwent(pwent);
 			return -1;

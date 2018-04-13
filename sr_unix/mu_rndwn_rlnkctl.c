@@ -90,7 +90,7 @@ void mu_rndwn_rlnkctl(void)
 	} else
 	{	/* Unlike other callers of zro_init(), MUPIP RUNDOWN -RELINKCTL does not want it to do relinkctl_attach() on all
 		 * relinkctl files at once because we leave the attach logic holding the linkctl lock, which might potentially cause
-		 * a deadlock if multiple processes are run concurrently with different $gtmroutines. So, zro_init() / zro_load()
+		 * a deadlock if multiple processes are run concurrently with different $ydb_routines. So, zro_init() / zro_load()
 		 * set the count field of each autorelink-enabled object directory to a negative number based on the
 		 * TREF(is_mu_rndwn_rlnkctl) global, and we look at the count to decide whether to attach to an individual segment.
 		 */
@@ -108,7 +108,7 @@ void mu_rndwn_rlnkctl(void)
 			assert(0 >= op->count);
 			if (0 > op->count)
 			{	/* Third parameter is 0 because the object directories are stored in fully resolved format in the
-				 * gtmroutines object, so there is no need to update the string.
+				 * ydb_routines object, so there is no need to update the string.
 				 */
 				linkctl = relinkctl_attach(&op->str, NULL, 0);
 				assert(linkctl == TREF(open_relinkctl_list));

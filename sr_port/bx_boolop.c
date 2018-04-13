@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -87,7 +90,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		*p = put_tjmp(t);
 	} else
 		p = addr;
-	if (!TREF(saw_side_effect) || (GTM_BOOL == TREF(gtm_fullbool)))
+	if (!TREF(saw_side_effect) || (YDB_BOOL == TREF(ydb_fullbool)))
 	{	/* nice simple short circuit */
 		assert(NULL == TREF(boolchain_ptr));
 		bx_tail(t->operand[0].oprval.tref, jmp_type_one, p);

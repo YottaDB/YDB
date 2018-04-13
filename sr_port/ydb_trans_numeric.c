@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2004, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,12 +16,13 @@
 
 #include "gtm_ctype.h"
 #include "gtm_stdlib.h"
+#include "gtm_stdio.h"
 
-#include "trans_log_name.h"
 #include "iosp.h"
-#include "trans_numeric.h"
+#include "ydb_trans_numeric.h"
+#include "ydb_trans_log_name.h"
 
-uint4 trans_numeric(mstr *log, boolean_t *is_defined,  boolean_t ignore_errors)
+uint4 ydb_trans_numeric(ydbenvindx_t envindx, boolean_t *is_defined, boolean_t ignore_errors, boolean_t *is_ydb_env_match)
 {
 	/* return
 	 * - 0 on error if ignore_errors is set (otherwise error is raised and no return is made) or
@@ -32,12 +36,9 @@ uint4 trans_numeric(mstr *log, boolean_t *is_defined,  boolean_t ignore_errors)
 	mstr		tn;
 	char		buf[MAX_TRANS_NAME_LEN], *endptr;
 
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_TRNLOGFAIL);
-
+	assert((YDBENVINDX_MIN_INDEX < envindx) && (YDBENVINDX_MAX_INDEX > envindx));
 	*is_defined = FALSE;
-	if (SS_NORMAL == (status = TRANS_LOG_NAME(log, &tn, buf, SIZEOF(buf),
-							ignore_errors ? do_sendmsg_on_log2long : dont_sendmsg_on_log2long)))
+	if (SS_NORMAL == (status = ydb_trans_log_name(envindx, &tn, buf, SIZEOF(buf), ignore_errors, is_ydb_env_match)))
 	{	/* Translation was successful */
 		*is_defined = TRUE;
 		assert(tn.len < SIZEOF(buf));
@@ -51,18 +52,8 @@ uint4 trans_numeric(mstr *log, boolean_t *is_defined,  boolean_t ignore_errors)
 		   (if any) was gleened..
 		*/
 		return value;
-
 	} else if (SS_NOLOGNAM == status)	/* Not defined */
 		return 0;
-
-	if (!ignore_errors)
-	{	/* Only give errors if we can handle them */
-#		ifdef UNIX
-		if (SS_LOG2LONG == status)
-			rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, log->len, log->addr, SIZEOF(buf) - 1);
-		else
-#		endif
-			rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, log->len, log->addr, status);
-	}
+	assert(ignore_errors);	/* "ydb_trans_log_name" should have done the rts_error in the "!ignore_errors" case */
 	return 0;
 }

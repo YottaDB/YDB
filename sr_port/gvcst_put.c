@@ -905,10 +905,10 @@ tn_restart:
 			 * header for now in debug mode. Note that this can be safely done only for globals that have collation #0.
 			 * When V7 is released and the directory tree leaf records are all upgraded to contain the 4-byte collation
 			 * header unconditionally, this randomization will need to be removed.
-			 * Note that if the env var "gtm_dirtree_collhdr_always" is true, then disable this behavior (this is
+			 * Note that if the env var "ydb_dirtree_collhdr_always" is true, then disable this behavior (this is
 			 * usually set by tests that rely on a fixed DT leaf block layout and will fail if the layout changes).
 			 */
-			if (TREF(gtm_dirtree_collhdr_always))
+			if (TREF(ydb_dirtree_collhdr_always))
 				no_4byte_collhdr = 0;
 			else
 			{
@@ -960,7 +960,7 @@ tn_restart:
 		}
 #		endif
 #		if defined(DEBUG)
-		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVINCRPUTFAIL == gtm_white_box_test_case_number)
+		if (ydb_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVINCRPUTFAIL == ydb_white_box_test_case_number)
 			&& !IS_STATSDB_REG(gv_cur_region))
 		{
 			status = cdb_sc_blknumerr;

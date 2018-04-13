@@ -42,8 +42,7 @@
 #include "gtmrecv.h"
 #include "iosp.h"
 #include "gtmio.h"
-#include "gtm_logicals.h"
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "gtmmsg.h"
 #include "repl_sem.h"
 #include "repl_instance.h"
@@ -105,7 +104,7 @@ error_def(ERR_TEXT);
  *	bufsize: the buffer size caller gives. If exceeded, it trucates file name.
  *	gd_ptr: global directory for extended reference, otherwise NULL.
  * Return Value:
- *	non NULL, on success - 1 if from gtm_repl_instance, otherwise global directory
+ *	non NULL, on success - 1 if from ydb_repl_instance, otherwise global directory
  *	NULL, otherwise.
  */
 struct gd_addr_struct *repl_inst_get_name(char *fn, unsigned int *fn_len, unsigned int bufsize, instname_act error_action,

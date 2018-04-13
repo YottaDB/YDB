@@ -83,7 +83,7 @@ error_def(ERR_RLNKRECLATCH);	/* needed for the RELINKCTL_CYCLE_INCR macro */
  */
 #define	RTNOBJ_SHMID_INDEX_MAXBITS	6	/* Max # of bits needed to store NUM_RTNOBJ_SHM_INDEX */
 #define	MIN_RTNOBJ_SHM_INDEX	20	/* Minimum size of shared memory segment created to store .o (rtnobj) files is 2**20.
-					 * Do not change this macro as gtm_autorelink_shm env var is specified in a multiple of
+					 * Do not change this macro as ydb_autorelink_shm env var is specified in a multiple of
 					 * 2**MIN_RTNOBJ_SHM_INDEX bytes and will have user doc implications.
 					 */
 #define	MAX_RTNOBJ_SHM_INDEX	58	/* Maximum size of shared memory segment created to store .o (rtnobj) files is 2**57 */
@@ -230,7 +230,7 @@ typedef struct relinkshm_hdr
 							 * If no rtnobj_shmhdr[i] has valid shmid, this will be set to 0.
 							 */
 	boolean_t	rndwn_adjusted_nattch;		/* MUPIP RUNDOWN -RELINKCTL did adjust nattached */
-	boolean_t	skip_rundown_check;		/* TRUE if at least one process with gtm_autorelink_keeprtn=1 opened this */
+	boolean_t	skip_rundown_check;		/* TRUE if at least one process with ydb_autorelink_keeprtn=1 opened this */
 	rtnobjshm_hdr_t	rtnobj_shmhdr[NUM_RTNOBJ_SHM_INDEX];
 	/* CACHELINE_PAD macro usages surrounding the actual latch below provides spacing so updates to the latch do not interfere
 	 * with updates to adjoining fields which can happen if they fall in the same data cacheline of a processor. No

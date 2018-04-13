@@ -20,9 +20,6 @@
 
 /* This module defines the interface for a GT.M encryption plug-in implementation. Refer to the function comments for details. */
 
-/* Environment variable containing the obfuscated password for the key ring with which the symmetric keys are encrypted. */
-#define GTM_PASSWD_ENV			"gtm_passwd"
-
 /* Length of the plain and in-hex hash string for a symmetric key. We are currently using SHA-512, so the length is 64 bytes. */
 #define GTMCRYPT_HASH_LEN		64
 #define GTMCRYPT_HASH_HEX_LEN		GTMCRYPT_HASH_LEN * 2

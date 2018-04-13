@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -242,7 +245,7 @@ boolean_t		init_anticipatory_freeze_errors()
 	assert(jnlpool && jnlpool->jnlpool_ctl && !jnlpool->jnlpool_ctl->instfreeze_environ_inited);
 	assert(holds_sem[SOURCE][JNL_POOL_ACCESS_SEM]);		/* should hold journal pool access control semaphore */
 	/* Now, read the custom errors file and populate the journal pool */
-	custom_err_file = TREF(gtm_custom_errors);
+	custom_err_file = TREF(ydb_custom_errors);
 	Fopen(handle, custom_err_file.addr, "r");
 	if (NULL == handle)
 	{

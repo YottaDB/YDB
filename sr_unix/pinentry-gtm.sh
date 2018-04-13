@@ -17,7 +17,7 @@
 #############################################################################################
 #
 #       pinentry-gtm.sh - This script is used as a "pinentry-program" in gpg-agent.conf.
-#	If the gtm_passwd environment variable exists and a usable mumps exists, run
+#	If the ydb_passwd/gtm_passwd environment variable exists and a usable mumps exists, run
 #	pinentry.m to get the passphrase from the environment variable.
 #
 #############################################################################################
@@ -27,44 +27,51 @@ punt=1
 
 if [ -z "$ydb_dist" ] ; then
 	# $ydb_dist is not set in the environment. See if we can use dirname to find one
-	if [ "`echo $gtm_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
+	if [ "`echo $ydb_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
+		ydb_dist=$dir/../../utf8
+		export ydb_dist
+	elif [ "`echo $gtm_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
 		ydb_dist=$dir/../../utf8
 		export ydb_dist
 	elif [ -x "$dir/../../mumps" ] ; then
 		ydb_dist=$dir/../..
-		gtm_chset=M
-		export ydb_dist gtm_chset
+		ydb_chset=M
+		export ydb_dist ydb_chset
 	fi
 fi
 
-if [ -n "$gtm_passwd" -a -x "$ydb_dist/mumps" ] ; then
+if [ [-n "$ydb_passwd" -o -n "$gtm_passwd"] -a -x "$ydb_dist/mumps" ] ; then
 	pinentry=pinentry
 	# Password and MUMPS exists, perform some extended setup checks
-	if [ -z "$gtmroutines" ] ; then
+	if [ [ -z "$ydb_routines" ] -a [ -z "$gtmroutines" ] ] ; then
 		utfodir=""
-		if [ "`echo $gtm_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
+		if [ "`echo $ydb_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
+			utfodir="/utf8"
+		elif [ "`echo $gtm_chset | tr utf UTF`" = "UTF-8" -a -x "$dir/../../utf8/mumps" ] ; then
 			utfodir="/utf8"
 		fi
-		# $gtmroutines is not set in the environment, attempt to pick it up from libyottadbutil.so,
+		# $ydb_routines & $gtmroutines is not set in the environment, attempt to pick it up from libyottadbutil.so,
 		# $ydb_dist, $ydb_dist/plugin/o
 		if [ -e "$ydb_dist/libyottadbutil.so" ] ; then
-			gtmroutines="$ydb_dist/libyottadbutil.so"
-			export gtmroutines
+			ydb_routines="$ydb_dist/libyottadbutil.so"
+			export ydb_routines
 		elif [ -e "$ydb_dist/PINENTRY.o" ] ; then
 			pinentry=PINENTRY
-			gtmroutines="$ydb_dist"
-			export gtmroutines
+			ydb_routines="$ydb_dist"
+			export ydb_routines
 		elif [ -e "$ydb_dist/plugin/o${utfodir}/pinentry.o" ] ; then
-			gtmroutines="$ydb_dist $ydb_dist/plugin/o${utfodir}"
-			export gtmroutines
+			ydb_routines="$ydb_dist $ydb_dist/plugin/o${utfodir}"
+			export ydb_routines
 		fi
 	fi
 
-	# Protect the pinentry program from other env vars
+	# Protect the pinentry program from other env vars (unsetenv both ydb* and corresponding gtm* names)
+	ydb_env_translate= ydb_etrap= ydb_local_collate= ydb_sysid= ydb_trace_gbl_name= ydb_zdate_form= ydb_zstep= ydb_ztrap_form=code ydb_zyerror= ydb_compile= ydb_dbglvl= LD_PRELOAD=	#BYPASSOKLENGTH
+	export ydb_env_translate ydb_etrap ydb_local_collate ydb_sysid ydb_trace_gbl_name ydb_zdate_form ydb_zstep ydb_ztrap_form ydb_zyerror ydb_compile ydb_dbglvl LD_PRELOAD		#BYPASSOKLENGTH
 	gtm_env_translate= gtm_etrap= gtm_local_collate= gtm_sysid= gtm_trace_gbl_name= gtm_zdate_form= gtm_zstep= gtm_ztrap_form=code gtm_zyerror= gtmcompile= gtmdbglvl= LD_PRELOAD=	#BYPASSOKLENGTH
 	export gtm_env_translate gtm_etrap gtm_local_collate gtm_sysid gtm_trace_gbl_name gtm_zdate_form gtm_zstep gtm_ztrap_form gtm_zyerror gtmcompile gtmdbglvl LD_PRELOAD		#BYPASSOKLENGTH
 
-	# Validate gtmroutines. Redirect output or it will affect the password protocol
+	# Validate ydb_routines. Redirect output or it will affect the password protocol
 	printf 'zhalt (0=$zlength($text(pinentry^'$pinentry')))' | $ydb_dist/mumps -direct >> /dev/null 2>&1
 	needsprivroutines=$?
 
@@ -81,8 +88,8 @@ if [ -n "$gtm_passwd" -a -x "$ydb_dist/mumps" ] ; then
 		pinentry_in="$dir"
 		if [ -e "$ydb_dist/plugin/r/pinentry.m" ] ; then pinentry_in="$pinentry_in $ydb_dist/plugin/r"; fi
 		if [ -e "$ydb_dist/plugin/gtmcrypt/pinentry.m" ] ; then pinentry_in="$pinentry_in $ydb_dist/plugin/gtmcrypt"; fi
-		gtmroutines="$tmpdir($pinentry_in)"
-		export gtmroutines
+		ydb_routines="$tmpdir($pinentry_in)"
+		export ydb_routines
 	fi
 
 	$ydb_dist/mumps -run $pinentry

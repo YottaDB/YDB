@@ -47,6 +47,7 @@
 #include "wbox_test_init.h"
 #include "op.h"
 #include "indir_enum.h"
+#include "ydb_getenv.h"
 
 LITREF	unsigned char		io_params_size[];
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
@@ -140,7 +141,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	int pathsize, path_len;
 	int cmd_string_size;
 
-	path = GETENV("PATH");
+	path = ydb_getenv(YDBENVINDX_GENERIC_PATH, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 	if (NULL != path)
 	{
 		path_len = STRLEN(path);
@@ -197,7 +198,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 				for (env_inc = 1; '/' != *(token2 + env_inc); env_inc++)
 					temp[env_inc - 1] = *(token2 + env_inc);
 				temp[env_inc - 1] = '\0';
-				env_var = GETENV(temp);
+				env_var = getenv(temp);
 				if (NULL != env_var)
 				{	/* build a translated path to command */
 					assert(pathsize > (STRLEN(token2 + env_inc) + STRLEN(env_var)));
@@ -588,7 +589,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		if (0 == slen[PSHELL])
 		{
 			/* get SHELL environment */
-			sh = GETENV("SHELL");
+			sh = ydb_getenv(YDBENVINDX_GENERIC_SHELL, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 			/* use bourne shell as default if SHELL not set in environment*/
 			if (!sh)
 			{

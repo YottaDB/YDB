@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,7 +39,7 @@ void gvcst_map_build(uint4 *array, sm_uc_ptr_t base_addr, cw_set_element *cs, tr
 #ifdef DEBUG
 	int4		prev_bitnum, actual_cnt = 0;
 
-	if (!gtm_white_box_test_case_enabled || (WBTEST_ANTIFREEZE_DBBMLCORRUPT != gtm_white_box_test_case_number))
+	if (!ydb_white_box_test_case_enabled || (WBTEST_ANTIFREEZE_DBBMLCORRUPT != ydb_white_box_test_case_number))
 	{
 		VALIDATE_BM_BLK(cs->blk, (blk_hdr_ptr_t)base_addr, cs_addrs, gv_cur_region, status);
 		assert(status); /* assert it is a valid bitmap block */

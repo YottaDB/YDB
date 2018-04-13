@@ -1219,7 +1219,7 @@
    the default for this database file. The number can be any integer from 0
    to 255. The number you assign as a value must match the number of a
    defined collation sequence that resides in the shared library pointed to
-   by the environment variable gtm_collate_n. For information on defining
+   by the environment variable ydb_collate_n. For information on defining
    this environment variable and creating an alternate collation sequence,
    refer to the "Internationalization" chapter in the M Programmer's Guide.
 
@@ -1602,11 +1602,11 @@
        CIO mount option drops support for the file buffer cache (unused by
        asynchronous IO), and also eliminates a lock that is a potential
        bottleneck to YottaDB performance on the AIX jfs2 filesystem.
-     o For Linux x86_64, the gtm_aio_nr_events environment variable controls
+     o For Linux x86_64, the ydb_aio_nr_events environment variable controls
        the number of structures a process has per global directory to manage
        asynchronous writes, and therefore determines the number of concurrent
        writes a process can manage across all regions within a global
-       directory. If not specified, the value controlled by gtm_aio_nr_events
+       directory. If not specified, the value controlled by ydb_aio_nr_events
        defaults to 128. If a process encounters a situation where it needs to
        perform an asynchronous write, but has no available slots with which
        to manage an additional one, it either falls back to synchronous
@@ -1614,14 +1614,14 @@
        the write until a slot becomes available as other writes complete.
        Linux allocates the structures on a system-wide basis with the setting
        of /proc/sys/fs/aio-max-nr. Therefore you should configure this
-       parameter to account for the needs (as determined by gtm_aio_nr_events
+       parameter to account for the needs (as determined by ydb_aio_nr_events
        or the default) of all processes using asynchronous I/O. When
        processes use multiple global directories with asynchronous I/O, their
        need for the system resources increases accordingly. For example, if
        an environment runs 10,000 processes each of which open two global
        directories and /proc/sys/fs/aio-max-nr is set to a value of 200,000
-       then gtm_aio_nr_events needs to be set to a value <= 200,000 / (10,000
-       * 2) = 10. Conversely if gtm_aio_nr_events is set to a value of 20,
+       then ydb_aio_nr_events needs to be set to a value <= 200,000 / (10,000
+       * 2) = 10. Conversely if ydb_aio_nr_events is set to a value of 20,
        then aio-max-nr needs to be bumped up to (10,000 * 2 * 20) = 400,000.
        YottaDB captures the number of errors encountered when attempting to
        write database blocks for a region, and, barring problems with the
@@ -1957,8 +1957,8 @@
        directory with a replication instance file.
      o When a global directory is use, the mapping set with CHANGE -INSTANCE
        FILE_NAME=repl_inst_filename overrides any setting of the
-       gtm_repl_instance environment variable. However, other utilities
-       (MUPIP, LKE, and DSE) use the setting of the gtm_repl_instance
+       ydb_repl_instance environment variable. However, other utilities
+       (MUPIP, LKE, and DSE) use the setting of the ydb_repl_instance
        environment variable.
 
 1 Summary

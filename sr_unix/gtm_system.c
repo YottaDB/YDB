@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,8 +24,8 @@
 
 #include "have_crit.h"
 #include "fork_init.h"
-
 #include "eintr_wrappers.h"
+#include "ydb_getenv.h"
 
 #define RESTOREMASK(RC)					\
 {							\
@@ -81,7 +84,7 @@ int gtm_system_internal(const char *sh, const char *opt, const char *rtn, const 
 	if (NULL == opt)
 		opt = "-c";
 	if (NULL == sh)
-		sh = GETENV("SHELL");
+		sh = ydb_getenv(YDBENVINDX_GENERIC_SHELL, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 	sh = (NULL == sh) || ('\0' == *sh) ? "/bin/sh" : sh;
 	/* Below FORK is not used as interrupts are already disabled at the
 	 * beginning of this function

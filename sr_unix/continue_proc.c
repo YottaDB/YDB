@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +32,7 @@ int continue_proc(pid_t pid)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	DEBUG_ONLY(if (!TREF(gtm_usesecshr)))	/* Cause debug builds to talk to gtmsecshr more often */
+	DEBUG_ONLY(if (!TREF(ydb_usesecshr)))	/* Cause debug builds to talk to gtmsecshr more often */
 	{
 		if (WBTEST_ENABLED(WBTEST_HOLD_GTMSOURCE_SRV_LATCH))
 		{

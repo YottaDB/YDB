@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -118,9 +121,9 @@ MBSTART {														\
 				 * a little over a minute) we wait for twice the time in the debug version.		\
 				 */											\
 				GET_C_STACK_MULTIPLE_PIDS("WRITERSTUCK", CNL->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);	\
-				assert((gtm_white_box_test_case_enabled)						\
-					&& ((WBTEST_BUFOWNERSTUCK_STACK == gtm_white_box_test_case_number)		\
-						|| (WBTEST_SLEEP_IN_WCS_WTSTART == gtm_white_box_test_case_number)));	\
+				assert((ydb_white_box_test_case_enabled)						\
+					&& ((WBTEST_BUFOWNERSTUCK_STACK == ydb_white_box_test_case_number)		\
+						|| (WBTEST_SLEEP_IN_WCS_WTSTART == ydb_white_box_test_case_number)));	\
 				CNL->wcsflu_pid = 0;									\
 				SIGNAL_WRITERS_TO_RESUME(CNL);								\
 				if (!WAS_CRIT)										\
@@ -130,7 +133,7 @@ MBSTART {														\
 				part of the exit handling process, the control once agin comes to wcs_flu		\
 				and at that time we do not want the WBTEST_BUFOWNERSTUCK_STACK white box		\
 				mechanism to kick in.*/									\
-				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, gtm_white_box_test_case_enabled, FALSE);	\
+				GTM_WHITE_BOX_TEST(WBTEST_BUFOWNERSTUCK_STACK, ydb_white_box_test_case_enabled, FALSE);	\
 				send_msg_csa(CSA_ARG(CSA) VARLSTCNT(5) ERR_WRITERSTUCK, 3, CNL->in_wtstart,		\
 						DB_LEN_STR(REG));							\
 				return FALSE;										\
@@ -385,7 +388,7 @@ boolean_t wcs_flu(uint4 options)
 				return FALSE;
 			}
 #			ifdef DEBUG
-			if (!gtm_white_box_test_case_enabled || (WBTEST_JNL_FILE_LOST_DSKADDR != gtm_white_box_test_case_number))
+			if (!ydb_white_box_test_case_enabled || (WBTEST_JNL_FILE_LOST_DSKADDR != ydb_white_box_test_case_number))
 			{
 				assert(jb->rsrv_freeaddr == jb->dskaddr);
 				assert(jb->rsrv_freeaddr == jb->freeaddr);
@@ -434,8 +437,8 @@ boolean_t wcs_flu(uint4 options)
 		assert(was_crit || in_commit || !cnl->wcs_phase2_commit_pidcnt);
 		if (WBTEST_ENABLED(WBTEST_WCS_FLU_FAIL) || (cnl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL)))
 		{
-			assert((WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number) /* see wcs_phase2_commit_wait.c */
-					|| (WBTEST_WCS_FLU_FAIL == gtm_white_box_test_case_number));
+			assert((WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number) /* see wcs_phase2_commit_wait.c */
+					|| (WBTEST_WCS_FLU_FAIL == ydb_white_box_test_case_number));
 			REL_CRIT_BEFORE_RETURN(cnl, reg);
 			return FALSE;	/* We expect the caller to trigger cache-recovery which will fix this counter */
 		}
@@ -505,7 +508,7 @@ boolean_t wcs_flu(uint4 options)
 				GTM_WHITE_BOX_TEST(WBTEST_WCS_FLU_IOERR, cnl->wcs_active_lvl, 1);
 				GTM_WHITE_BOX_TEST(WBTEST_WCS_FLU_IOERR, wtstart_or_wtfini_errno, ENOENT);
 			}
-			if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_OUTOFSPACE == gtm_white_box_test_case_number))
+			if (ydb_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_OUTOFSPACE == ydb_white_box_test_case_number))
 			{	/* Simulate an ENOSPC return from "wcs_wtstart" or "wcs_wtfini" (if asyncio is TRUE) */
 				cnl->wcs_active_lvl = 1;
 				wtstart_or_wtfini_errno = ENOSPC;
@@ -563,16 +566,16 @@ boolean_t wcs_flu(uint4 options)
 					 *    forces wcs_wtstart invocations to end up with I/O errors.
 					 */
 					WCS_OPS_TRACE(csa, process_id, wcs_ops_flu7, 0, 0, 0, wtstart_or_wtfini_errno, 0);
-					assert((WBTEST_BG_UPDATE_PHASE2FAIL == gtm_white_box_test_case_number)
-						|| (WBTEST_BG_UPDATE_BTPUTNULL == gtm_white_box_test_case_number)
-						|| (WBTEST_BG_UPDATE_DBCSHGET_INVALID == gtm_white_box_test_case_number)
-						|| (WBTEST_BG_UPDATE_DBCSHGETN_INVALID == gtm_white_box_test_case_number)
-						|| (WBTEST_BG_UPDATE_DBCSHGETN_INVALID2 == gtm_white_box_test_case_number)
-						|| (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number)
-						|| (WBTEST_WCS_FLU_IOERR == gtm_white_box_test_case_number)
-						|| (WBTEST_WCS_WTSTART_IOERR == gtm_white_box_test_case_number)
-						|| (WBTEST_ANTIFREEZE_JNLCLOSE == gtm_white_box_test_case_number)
-						|| ((WBTEST_ANTIFREEZE_OUTOFSPACE == gtm_white_box_test_case_number) && asyncio));
+					assert((WBTEST_BG_UPDATE_PHASE2FAIL == ydb_white_box_test_case_number)
+						|| (WBTEST_BG_UPDATE_BTPUTNULL == ydb_white_box_test_case_number)
+						|| (WBTEST_BG_UPDATE_DBCSHGET_INVALID == ydb_white_box_test_case_number)
+						|| (WBTEST_BG_UPDATE_DBCSHGETN_INVALID == ydb_white_box_test_case_number)
+						|| (WBTEST_BG_UPDATE_DBCSHGETN_INVALID2 == ydb_white_box_test_case_number)
+						|| (WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number)
+						|| (WBTEST_WCS_FLU_IOERR == ydb_white_box_test_case_number)
+						|| (WBTEST_WCS_WTSTART_IOERR == ydb_white_box_test_case_number)
+						|| (WBTEST_ANTIFREEZE_JNLCLOSE == ydb_white_box_test_case_number)
+						|| ((WBTEST_ANTIFREEZE_OUTOFSPACE == ydb_white_box_test_case_number) && asyncio));
 					if (0 == wtstart_or_wtfini_errno)
 					{
 						SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
@@ -669,7 +672,7 @@ boolean_t wcs_flu(uint4 options)
 		 * The basic requirement is that we shouldn't write the epoch out until we have synced the database.
 		 */
 #		ifdef DEBUG
-		if (!gtm_white_box_test_case_enabled || (WBTEST_JNL_FILE_LOST_DSKADDR != gtm_white_box_test_case_number))
+		if (!ydb_white_box_test_case_enabled || (WBTEST_JNL_FILE_LOST_DSKADDR != ydb_white_box_test_case_number))
 		{
 			assert(jb->rsrv_freeaddr == jb->fsync_dskaddr);
 			assert(jb->rsrv_freeaddr == jb->freeaddr);

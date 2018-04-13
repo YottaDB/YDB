@@ -49,7 +49,7 @@
 GBLREF  int		process_exiting;		/* Process is on it's way out */
 GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
 GBLREF	uint4		ydbDebugLevel;
-GBLREF	size_t		gtm_max_storalloc;		/* Max value for $ZREALSTOR or else memory error is raised */
+GBLREF	size_t		ydb_max_storalloc;		/* Max value for $ZREALSTOR or else memory error is raised */
 
 OS_PAGE_SIZE_DECLARE
 
@@ -199,8 +199,8 @@ void gtm_text_free(void *addr)
 #  define TEXT_ALLOC(rsize, addr)										\
 {														\
 	int	save_errno;											\
-	if ((0 < gtm_max_storalloc) && ((rsize + totalRmalloc + totalRallocGta) > gtm_max_storalloc))		\
-	{	/* Boundary check for $gtm_max_storalloc (if set) */						\
+	if ((0 < ydb_max_storalloc) && ((rsize + totalRmalloc + totalRallocGta) > ydb_max_storalloc))		\
+	{	/* Boundary check for $ydb_max_storalloc (if set) */						\
 		--gtaSmDepth;											\
 		--fast_lock_count;										\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MEMORY, 2, rsize, CALLERID, ERR_MALLOCMAXUNIX);	\

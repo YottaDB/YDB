@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@
 #include "gvcst_protos.h"	/* for gvcst_get,gvcst_init prototype */
 #include "change_reg.h"
 #include "mvalconv.h"
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "hashtab_mname.h"
 #include "hashtab.h"
 #include "gtmio.h"
@@ -65,6 +65,9 @@ static int		rc_overflow_size = 0;
 static CONDITION_HANDLER(rc_fnd_file_ch1);
 static CONDITION_HANDLER(rc_fnd_file_ch2);
 
+LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];
+LITREF	char	*gtmenvname[YDBENVINDX_MAX_INDEX];
+
 short rc_fnd_file(rc_xdsid *xdsid)
 {
 	gv_namehead	*g;
@@ -72,12 +75,13 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	gd_binding	*map;
 	gd_addr		*addr;
 	char		buff[1024], *cp, *cp1;
-	mstr		fpath1, fpath2;
+	mstr		fpath2;
 	mval		v;
 	mname_entry	gvname;
 	int		i, keysize;
 	int             len, node2;
 	gvnh_reg_t	*gvnh_reg;
+	boolean_t	is_ydb_env_match;
 
 	ASSERT_IS_LIBGTCM;
 	GET_SHORT(dsid, &xdsid->dsid.value);
@@ -88,12 +92,12 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		dsid_list = (rc_dsid_list *)malloc(SIZEOF(rc_dsid_list));
 		dsid_list->dsid = RC_NSPACE_DSID;
 		dsid_list->next = NULL;
-		fpath1.addr = RC_NSPACE_PATH;
-		fpath1.len = SIZEOF(RC_NSPACE_PATH);
-		if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
+		if (SS_NORMAL != ydb_trans_log_name(YDBENVINDX_DTNDBD, &fpath2, buff, SIZEOF(buff),
+								IGNORE_ERRORS_TRUE, &is_ydb_env_match))
 		{
 			char msg[256];
-			SPRINTF(msg, "Invalid DB filename, \"%s\"", fpath1.addr);
+			SPRINTF(msg, "Invalid DB filename, \"%s\"", is_ydb_env_match ? ydbenvname[YDBENVINDX_EVENT_LOG_LIBPATH]
+											: gtmenvname[YDBENVINDX_EVENT_LOG_LIBPATH]);
 			gtcm_rep_err(msg, errno);
 			return RC_BADFILESPEC;
 		}

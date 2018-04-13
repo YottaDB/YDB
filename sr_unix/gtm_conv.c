@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -56,7 +59,7 @@ int32_t gtm_strToTitle(UChar *dst, int32_t dstlen, const UChar *src, int32_t src
 		const char *locale, UErrorCode *status)
 {
 #       ifdef DEBUG
-	if (gtm_white_box_test_case_enabled && (WBTEST_OPFNZCONVERT_FILE_ACCESS_ERROR == gtm_white_box_test_case_number))
+	if (ydb_white_box_test_case_enabled && (WBTEST_OPFNZCONVERT_FILE_ACCESS_ERROR == ydb_white_box_test_case_number))
 	{
 		*status = U_FILE_ACCESS_ERROR;
 		return -1;

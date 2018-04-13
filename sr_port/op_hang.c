@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -123,7 +126,7 @@ void op_hang(mval* num)
 			ms +=2;		/* push a bit (in milliseconds) */
 #		endif
 #		if defined(DEBUG)
-		if (WBTEST_ENABLED(WBTEST_DEFERRED_TIMERS) && (3 > gtm_white_box_test_case_count) && (123000 == ms))
+		if (WBTEST_ENABLED(WBTEST_DEFERRED_TIMERS) && (3 > ydb_white_box_test_case_count) && (123000 == ms))
 		{	/* LONG_SLEEP messes with signals */
 			DEFER_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
 			DBGFPF((stderr, "OP_HANG: will sleep for 20 seconds\n"));
@@ -132,13 +135,13 @@ void op_hang(mval* num)
 			ENABLE_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
 			return;
 		}
-		if (WBTEST_ENABLED(WBTEST_BREAKMPC)&& (0 == gtm_white_box_test_case_count) && (999 == ms))
+		if (WBTEST_ENABLED(WBTEST_BREAKMPC)&& (0 == ydb_white_box_test_case_count) && (999 == ms))
 		{
 			frame_pointer->old_frame_pointer->mpc = (unsigned char *)GTM64_ONLY(0xdeadbeef12345678)
 				NON_GTM64_ONLY(0xdead1234);
 			return;
 		}
-		if (WBTEST_ENABLED(WBTEST_UTIL_OUT_BUFFER_PROTECTION) && (0 == gtm_white_box_test_case_count) && (999 == ms))
+		if (WBTEST_ENABLED(WBTEST_UTIL_OUT_BUFFER_PROTECTION) && (0 == ydb_white_box_test_case_count) && (999 == ms))
 		{	/* Upon seeing a .999s hang this white-box test launches a timer that pops with a period of
 		 	 * UTIL_OUT_SYSLOG_INTERVAL and prints a long message via util_out_ptr.
 			 */

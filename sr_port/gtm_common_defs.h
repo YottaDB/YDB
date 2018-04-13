@@ -145,4 +145,17 @@ MBSTART {					\
 /* Shared between GT.M and external plugins */
 #define EXT_NEW 		"_%YGTM"
 
+/* Define types that are needed by external plugins (e.g. encryption plugin) here (and not in mdef.h) */
+
+/* mstr needs to be defined before including "mdefsp.h".  */
+typedef int mstr_len_t;
+typedef struct
+{
+	unsigned int	char_len;	/* Character length */
+	mstr_len_t	len;
+	char		*addr;
+} mstr;
+
+typedef int		boolean_t;
+
 #endif /* GTM_COMMON_DEFS_H */

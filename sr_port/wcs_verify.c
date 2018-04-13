@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -233,7 +236,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		cr_base = GDS_ANY_ABS2REL(csa, cr_lo);
 		cr_top = GDS_ANY_ABS2REL(csa, cr_hi);
 #		ifdef DEBUG
-		if (gtm_white_box_test_case_enabled && (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number))
+		if (ydb_white_box_test_case_enabled && (WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number))
 		{	/* if we are crashing anyway mess with the lru pointer to demonstrate the test below gives an error */
 			op_fnrandom(E_9, &rand_lru);
 			GTM_WHITE_BOX_TEST(WBTEST_CRASH_SHUTDOWN_EXPECTED, cnl->cur_lru_cache_rec_off, rand_lru.m[1])

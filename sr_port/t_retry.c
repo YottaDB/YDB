@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -432,7 +435,7 @@ void t_retry(enum cdb_sc failure)
 						   ERR_GVIS, 2, end-buff, buff, ERR_GVFAILCORE);
 #				ifdef DEBUG
 				/* Core is not needed. We intentionally create this error. */
-				if (!gtm_white_box_test_case_enabled)
+				if (!ydb_white_box_test_case_enabled)
 #				endif
 				gtm_fork_n_core();
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) t_err, 2, local_t_tries, t_fail_hist, ERR_GVIS, 2, end-buff,

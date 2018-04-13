@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,18 +19,16 @@
 #include "iosp.h"
 #include "collseq.h"
 #include "error.h"
-#include "trans_log_name.h"
-#include "gtm_logicals.h"
+#include "ydb_trans_log_name.h"
 
 int find_local_colltype(void)
 {
 	int	lct, status;
 	char	transbuf[MAX_TRANS_NAME_LEN];
-	mstr	lognam, transnam;
+	mstr	transnam;
 
-	lognam.len = SIZEOF(LCT_PREFIX) - 1;
-	lognam.addr = LCT_PREFIX;
-	status = TRANS_LOG_NAME(&lognam, &transnam, transbuf, SIZEOF(transbuf), do_sendmsg_on_log2long);
+	status = ydb_trans_log_name(YDBENVINDX_LOCAL_COLLATE, &transnam, transbuf, SIZEOF(transbuf),
+										IGNORE_ERRORS_TRUE, NULL);
 	if (SS_NORMAL != status)
 		return 0;
 	lct = asc2i((uchar_ptr_t)transnam.addr, transnam.len);
@@ -36,11 +37,7 @@ int find_local_colltype(void)
 
 collseq *ready_collseq(int act)
 {
-	unsigned char	filespec[SIZEOF(CT_PREFIX) + 4];	/* '4' to hold the chars in the max allowable
-								 * collation sequence (255) plus the terminating null */
-	unsigned char	*fsp;
 	collseq		temp_csp, *csp;
-	mstr		fspec;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -55,12 +52,7 @@ collseq *ready_collseq(int act)
 		/* If not found, create a structure and attempt to map in the collating support package.*/
 		temp_csp.act = act;
 		temp_csp.flink = TREF(collseq_list);
-		memcpy(filespec, CT_PREFIX, SIZEOF(CT_PREFIX));
-		fsp = i2asc(&filespec[SIZEOF(CT_PREFIX) - 1], act);
-		*fsp = 0;
-		fspec.len =  INTCAST(fsp - filespec);
-		fspec.addr = (char *)filespec;
-		if (!map_collseq(&fspec, &temp_csp))
+		if (!map_collseq(act, &temp_csp))
 			return NULL;
 		csp = (collseq *) malloc(SIZEOF(collseq));
 		*csp = temp_csp;

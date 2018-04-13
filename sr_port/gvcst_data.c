@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,7 +135,7 @@ mint	gvcst_data2(void)
 		rt_history = gv_target->alt_hist;
 		rt_history->h[0].blk_num = 0;
 #if defined(DEBUG) && defined(UNIX)
-		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVDATAFAIL == gtm_white_box_test_case_number))
+		if (ydb_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVDATAFAIL == ydb_white_box_test_case_number))
 		{
 			t_retry(cdb_sc_blknumerr);
 			continue;

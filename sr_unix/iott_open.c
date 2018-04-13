@@ -16,6 +16,7 @@
 #include "mdef.h"
 
 #include <errno.h>
+
 #include "gtm_fcntl.h"
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
@@ -33,9 +34,10 @@
 #include "gtm_conv.h"
 #include "gtmimagename.h"
 #include "error.h"
+#include "ydb_getenv.h"
 
 GBLREF int		COLUMNS, GTM_LINES, AUTO_RIGHT_MARGIN;
-GBLREF uint4		gtm_principal_editing_defaults;
+GBLREF uint4		ydb_principal_editing_defaults;
 GBLREF io_pair		io_std_device;
 GBLREF	boolean_t	gtm_utf8_mode;
 LITREF unsigned char	io_params_size[];
@@ -146,7 +148,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			if (status == 0)
 			{
-				env_term = GETENV("TERM");
+				env_term = ydb_getenv(YDBENVINDX_GENERIC_TERM, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 				if (!env_term)
 				{
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOTERMENV);
@@ -164,7 +166,7 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		tt_ptr->discard_lf = FALSE;
 		if (!io_std_device.in || io_std_device.in == ioptr->pair.in)	/* io_std_device.in not set yet in io_init */
 		{	/* $PRINCIPAL */
-			tt_ptr->ext_cap = gtm_principal_editing_defaults;
+			tt_ptr->ext_cap = ydb_principal_editing_defaults;
 			ioptr->ichset = ioptr->ochset = gtm_utf8_mode ? CHSET_UTF8 : CHSET_M;	/* default */
 		} else
 			tt_ptr->ext_cap = 0;

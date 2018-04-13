@@ -3,6 +3,9 @@
  * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -60,8 +63,8 @@ struct passwd	*gtm_getpwuid(uid_t uid)
 		getpwuid_struct = *retval;
 		/* Cache return from "getpwuid" call and avoid future calls to this function */
 #ifdef DEBUG
-		if (gtm_white_box_test_case_enabled &&
-			(WBTEST_GETPWUID_CHECK_OVERWRITE == gtm_white_box_test_case_number))
+		if (ydb_white_box_test_case_enabled &&
+			(WBTEST_GETPWUID_CHECK_OVERWRITE == ydb_white_box_test_case_number))
 		{
 			/* White box test case for the issue GTM-8415. getpwuid_struct should not
 		   	overwrite by calling getpwuid */

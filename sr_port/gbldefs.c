@@ -181,7 +181,7 @@ GBLDEF	boolean_t	is_updproc,
 			is_replicator,		/* TRUE => this process can write jnl records to the jnlpool for replicated db */
 	                tp_in_use,		/* TRUE => TP has been used by this process and is thus initialized */
 			dollar_truth = TRUE,
-			gtm_stdxkill,		/* TRUE => Use M Standard X-KILL - FALSE use historical GTM X-KILL (default) */
+			ydb_stdxkill,		/* TRUE => Use M Standard X-KILL - FALSE use historical GTM X-KILL (default) */
 			in_timed_tn,		/* TRUE => Timed TP transaction in progress */
 			tp_timeout_deferred;	/* TRUE => A TP timeout has occurred but is deferred */
 GBLDEF	uint4		is_updhelper;		/* = UPD_HELPER_READER if reader helper, = UPD_HELPER_WRITER if writer helper,
@@ -218,7 +218,9 @@ GBLDEF	mstr		*comline_base,
 			**stp_array,
 			extnam_str,
 			env_gtm_env_xlate;
-GBLDEF MSTR_CONST(default_sysid, "gtm_sysid");
+GBLDEF MSTR_CONST(default_sysid, "gtm_sysid");	/* Keep this as "gtm_sysid" and not "ydb_sysid" for backward compatibility
+						 * with GT.M applications that migrate to YottaDB.
+						 */
 GBLDEF	mval		dollar_zgbldir,
 			dollar_zsource = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0),
 			dollar_zstatus,
@@ -452,7 +454,7 @@ GBLDEF	int	u_parhscan;			/* Number of partial scans after filled slots (debug) *
 GBLDEF z_records	zbrk_recs;
 GBLDEF	ipcs_mesg	db_ipcs;		/* For requesting gtmsecshr to update ipc fields */
 GBLDEF	gd_region	*ftok_sem_reg;		/* Last region for which ftok semaphore is grabbed */
-GBLDEF	int		gtm_non_blocked_write_retries; /* number of retries for non-blocked write to pipe */
+GBLDEF	int		ydb_non_blocked_write_retries; /* number of retries for non-blocked write to pipe */
 GBLDEF	boolean_t		write_after_image;	/* true for after-image jnlrecord writing by recover/rollback */
 GBLDEF	int			iott_write_error;
 GBLDEF	int4			write_filter;
@@ -470,7 +472,7 @@ GBLDEF	pattern		*pattern_list;
 GBLDEF	pattern		*curr_pattern;
 /* Unicode related data */
 GBLDEF	boolean_t	gtm_utf8_mode;		/* Is GT.M running with Unicode Character Set; Set only after ICU initialization */
-GBLDEF	boolean_t	is_gtm_chset_utf8;	/* Is gtm_chset environment variable set to UTF8 */
+GBLDEF	boolean_t	is_ydb_chset_utf8;	/* Is ydb_chset environment variable set to UTF8 */
 GBLDEF	boolean_t	utf8_patnumeric;	/* Should patcode N match non-ASCII numbers in pattern match ? */
 GBLDEF	boolean_t	badchar_inhibit;	/* Suppress malformed UTF-8 characters by default */
 GBLDEF  MSTR_DEF(dollar_zchset, 1, "M");
@@ -714,7 +716,7 @@ GBLDEF	boolean_t	gvdupsetnoop = TRUE;	/* if TRUE, duplicate SETs do not change G
 						 * incremented and logical SET journal records will be written. By default, this
 						 * behavior is turned ON. GT.M has a way of turning it off with a VIEW command.
 						 */
-GBLDEF  int4		gtm_fullblockwrites;	/* Do full (not partial) 1. file system block writes, or 2. database block writes */
+GBLDEF  int4		ydb_fullblockwrites;	/* Do full (not partial) 1. file system block writes, or 2. database block writes */
 GBLDEF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover", used by "bt_put" and "generic_exit_handler" */
 GBLDEF	boolean_t	in_gvcst_incr;		/* set to TRUE by gvcst_incr, set to FALSE by gvcst_put
 						 * distinguishes to gvcst_put, if the current db operation is a SET or $INCR */
@@ -759,13 +761,13 @@ GBLDEF	trans_num	mu_reorg_upgrd_dwngrd_blktn;	/* tn in blkhdr of current block p
 GBLDEF	inctn_opcode_t	inctn_opcode = inctn_invalid_op;
 GBLDEF	inctn_detail_t	inctn_detail;			/* holds detail to fill in to inctn jnl record */
 GBLDEF	uint4		region_open_count;		/* Number of region "opens" we have executed */
-GBLDEF	uint4		gtm_blkupgrade_flag = UPGRADE_IF_NEEDED;	/* by default upgrade only if necessary */
+GBLDEF	uint4		ydb_blkupgrade_flag = UPGRADE_IF_NEEDED;	/* by default upgrade only if necessary */
 GBLDEF	boolean_t	disk_blk_read;
-GBLDEF	boolean_t	gtm_dbfilext_syslog_disable;	/* by default, log every file extension message */
+GBLDEF	boolean_t	ydb_dbfilext_syslog_disable;	/* by default, log every file extension message */
 GBLDEF	int4		cws_reorg_remove_index;			/* see mu_swap_blk.c for comments on the need for these two */
 GBLDEF	block_id	cws_reorg_remove_array[CWS_REORG_REMOVE_ARRAYSIZE];
 GBLDEF	uint4		log_interval;
-GBLDEF	uint4		gtm_principal_editing_defaults;	/* ext_cap flags if tt */
+GBLDEF	uint4		ydb_principal_editing_defaults;	/* ext_cap flags if tt */
 GBLDEF	boolean_t	in_repl_inst_edit;		/* used by an assert in repl_inst_read/repl_inst_write */
 GBLDEF	boolean_t	in_repl_inst_create;		/* used by repl_inst_read/repl_inst_write */
 GBLDEF	boolean_t	holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];	/* whether a particular replication semaphore is being held
@@ -774,7 +776,7 @@ GBLDEF	boolean_t	detail_specified;	/* Set to TRUE if -DETAIL is specified in MUP
 GBLDEF	boolean_t	in_mupip_ftok;		/* Used by an assert in repl_inst_read */
 GBLDEF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
 GBLDEF	uint4		mutex_per_process_init_pid;	/* pid that invoked "mutex_per_process_init" */
-GBLDEF	boolean_t	gtm_quiet_halt;		/* Suppress FORCEDHALT message */
+GBLDEF	boolean_t	ydb_quiet_halt;		/* Suppress FORCEDHALT message */
 #ifdef UNICODE_SUPPORTED
 /* Unicode line terminators.  In addition to the following
  * codepoints, the sequence CR LF is considered a single
@@ -830,7 +832,7 @@ LITDEF signed int utf8_followlen[] =
 };
 GBLDEF	gtm_wcswidth_fnptr_t	gtm_wcswidth_fnptr;	/* see comment in gtm_utf8.h about this typedef */
 #endif
-GBLDEF	uint4			gtm_max_sockets;	/* Maximum sockets per socket device supported by this process */
+GBLDEF	uint4			ydb_max_sockets;	/* Maximum sockets per socket device supported by this process */
 GBLDEF	d_socket_struct		*newdsocket;		/* Commonly used temp socket area */
 GBLDEF	boolean_t		dse_all_dump;		/* TRUE if DSE ALL -DUMP is specified */
 GBLDEF	int			socketus_interruptus;	/* How many times socket reads have been interrutped */
@@ -889,8 +891,7 @@ GBLDEF	mval		*alias_retarg;			/* Points to an alias return arg created by a "QUI
 #ifdef DEBUG_ALIAS
 GBLDEF	boolean_t	lvamon_enabled;			/* Enable lv_val/alias monitoring */
 #endif
-GBLDEF	block_id	gtm_tp_allocation_clue;		/* block# hint to start allocation for created blocks in TP */
-GBLDEF	int4		gtm_zlib_cmp_level;		/* zlib compression level specified at process startup */
+GBLDEF	int4		ydb_zlib_cmp_level;		/* zlib compression level specified at process startup */
 GBLDEF	int4		repl_zlib_cmp_level;		/* zlib compression level currently in use in replication pipe.
 							 * This is a source-server specific variable and is non-zero only
 							 * if compression is enabled and works in the receiver server as well.
@@ -929,9 +930,9 @@ GBLDEF	sgmnt_addrs	*reorg_encrypt_restart_csa;	/* Pointer to the region which ca
 
 #ifdef DEBUG
 /* Following definitions are related to white_box testing */
-GBLDEF	boolean_t	gtm_white_box_test_case_enabled;
-GBLDEF	int		gtm_white_box_test_case_number;
-GBLDEF	int		gtm_white_box_test_case_count;
+GBLDEF	boolean_t	ydb_white_box_test_case_enabled;
+GBLDEF	int		ydb_white_box_test_case_number;
+GBLDEF	int		ydb_white_box_test_case_count;
 GBLDEF	int 		gtm_wbox_input_test_case_count; /* VMS allows maximum 31 characters for external identifer */
 GBLDEF	boolean_t	stringpool_unusable;		/* Set to TRUE by any function that does not expect any of its function
 							 * callgraph to use/expand the stringpool. */
@@ -1085,8 +1086,8 @@ GBLDEF	boolean_t	gtm_main_thread_id_set;		/* Indicates whether the thread ID is 
 							 */
 GBLDEF	boolean_t	gtm_jvm_process;		/* Indicates whether we are running with JVM or stand-alone. */
 #endif
-GBLDEF	size_t		gtm_max_storalloc;		/* Maximum that GTM allows to be allocated - used for testing */
-GBLDEF	boolean_t	ipv4_only;			/* If TRUE, only use AF_INET. Reflects the value of the gtm_ipv4_only
+GBLDEF	size_t		ydb_max_storalloc;		/* Maximum that YottaDB allows to be allocated - used for testing */
+GBLDEF	boolean_t	ipv4_only;			/* If TRUE, only use AF_INET. Reflects the value of the ydb_ipv4_only
 							 * environment variable, so is process wide.
 							 */
 GBLDEF void (*stx_error_fptr)(int in_error, ...);	/* Function pointer for stx_error() so gtm_utf8.c can avoid pulling
@@ -1144,7 +1145,7 @@ GBLDEF	boolean_t	forced_thread_exit;		/* TRUE => signal threads to exit (likely 
 							 * exited with an error or the main process got a SIGTERM etc.)
 							 */
 GBLDEF	int		next_task_index;		/* "next" task index waiting for a thread to be assigned */
-GBLDEF	int		gtm_mupjnl_parallel;		/* Maximum # of concurrent threads or procs to use in "gtm_multi_thread"
+GBLDEF	int		ydb_mupjnl_parallel;		/* Maximum # of concurrent threads or procs to use in "gtm_multi_thread"
 							 *		or in forward phase of mupip recover.
 							 *	0 => Use one thread/proc per region.
 							 *	1 => Serial execution (no threads)
@@ -1154,7 +1155,7 @@ GBLDEF	int		gtm_mupjnl_parallel;		/* Maximum # of concurrent threads or procs to
 							 */
 GBLDEF	boolean_t	ctrlc_on;			/* TRUE in cenable mode; FALSE in nocenable mode */
 #ifdef DEBUG
-GBLDEF	int		gtm_db_counter_sem_incr;	/* Value used to bump the counter semaphore by every process.
+GBLDEF	int		ydb_db_counter_sem_incr;	/* Value used to bump the counter semaphore by every process.
 							 * Default is 1. Higher values exercise the ERANGE code better
 							 * when the ftok/access/jnlpool counter semaphore overflows.
 							 */

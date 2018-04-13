@@ -211,10 +211,9 @@
      o It takes approximately one (1) minute (per region) for BACKUP -ONLINE
        to give up and bypass a KILLs in progress; backup does not wait for
        Abandoned Kills to clear.
-     o The environment variable gtm_baktmpdir specifies the directory where
-       mupip backup creates temporary files. If gtm_baktmpdir is not defined,
-       YottaDB uses the deprecated GTM_BAKTMPDIR environment variable if
-       defined, and otherwise uses the current working directory.
+     o The environment variable ydb_baktmpdir specifies the directory where
+       mupip backup creates temporary files. If ydb_baktmpdir is not defined,
+       YottaDB uses the current working directory.
      o When you restrict access to a database file, YottaDB propagates those
        restrictions to shared resources associated with the database file,
        such as semaphores, shared memory, journals and temporary files used
@@ -231,12 +230,11 @@
    Perform the following tasks before you begin a database backup.
 
      * Ensure adequate disk space for target location and temporary files.
-       Set the environment variable gtm_baktmpdir to specify the directory
-       where MUPIP BACKUP creates temporary files. If gtm_baktmpdir is not
-       defined, YottaDB uses the deprecated GTM_BAKTMPDIR environment variable
-       if defined, and otherwise uses the current working directory. Do not
-       place temporary files in the current directory for large databases in
-       production environments.
+       Set the environment variable ydb_baktmpdir to specify the directory
+       where MUPIP BACKUP creates temporary files. If ydb_baktmpdir is not
+       defined, uses the current working directory. Do not place temporary
+       files in the current directory for large databases in production
+       environments.
      * When using replication, ensure that the Source/Receiver process is
        alive (MUPIP REPLIC -SOURCE/-RECEIVER -CHECKHEALTH). Always backup the
        replicating instance file with the database (BACKUP -REPLINST).
@@ -938,7 +936,7 @@
      o In UTF-8 mode, MUPIP EXTRACT write sequential output file in the UTF-8
        character encoding. Ensure that MUPIP EXTRACT commands and
        corresponding MUPIP LOAD commands execute with the same setting for
-       the environment variable gtm_chset.
+       the environment variable ydb_chset.
      o The GO format is not supported for UTF-8 mode. Use BINARY or ZWR
        formats with UTF-8 mode.
 
@@ -1744,10 +1742,10 @@
        when it completes. Note: a command such as ls -l command shows sparse
        files at their full size, but does not show actual disk usage. Use a
        command such as du -sh to see actual disk usage.
-     o The environment variable gtm_snaptmpdir can be used to indicate a
+     o The environment variable ydb_snaptmpdir can be used to indicate a
        directory where MUPIP should place the snapshot files (used by MUPIP
-       INTEG -ONLINE). If gtm_snaptmpdir does not exist, INTEG uses the
-       location specified by gtm_baktmpdir and if neither of those
+       INTEG -ONLINE). If ydb_snaptmpdir does not exist, INTEG uses the
+       location specified by ydb_baktmpdir and if neither of those
        environment variables is defined, INTEG places the snapshot files in
        the current directory at the time you issue the INTEG command. MUPIP
        and YottaDB processes automatically cleans up these temporary snapshot
@@ -2081,9 +2079,9 @@
        be a UNIX file on any device that supports such files.
      o LOAD accepts files with DOS style termination.
      o MUPIP LOAD command considers a sequential file as encoded in UTF-8 if
-       the environment variable gtm_chset is set to UTF-8. Ensure that MUPIP
+       the environment variable ydb_chset is set to UTF-8. Ensure that MUPIP
        EXTRACT commands and corresponding MUPIP LOAD commands execute with
-       the same setting for the environment variable gtm_chset.
+       the same setting for the environment variable ydb_chset.
      o For information on loading with an M "percent utility," refer to the
        %GI section of the "M Utility Routines" chapter in YottaDB Programmer's
        Guide. LOAD is typically faster, but the %GI utility can be
@@ -2287,7 +2285,7 @@
 
    If the optional parameter dir1 is not specified, MUPIP RCTLDUMP dumps
    information on all its active auto-relink-enabled directories (those with
-   with a *-suffix) identified by $gtmroutines. With a directory path
+   with a *-suffix) identified by $ydb_routines. With a directory path
    specified for dir1, MUPIP RCTLDUMP reports information on the one
    directory. An example output follows. It lists the full path of the Object
    directory; its corresponding relinkctl file name; the number of routines
@@ -2380,7 +2378,7 @@
        YottaDB database engine has a daemonless architecture, attempts to reduce
        the impact by reducing the priority of REORG can (perhaps
        counter-intuitively) exacerbate rather than alleviate the impact. To
-       reduce the impact REORG has on other processes, use the gtm_poollimit
+       reduce the impact REORG has on other processes, use the ydb_poollimit
        environment variable to limit the number of global buffers used by the
        REORG.
      o MUPIP REORG does not change the logical contents of the database, and
@@ -2473,7 +2471,7 @@
 
    MUPIP provides <key> to the encryption plugin. The reference
    implementation of the plugin expects a key with the specified name in the
-   encryption configuration file identified by $gtmcrypt_config. The
+   encryption configuration file identified by $ydb_crypt_config. The
    configuration file must contain an entry in the database section for each
    database file mapping to a region specified in <region-list> that names
    the specified key as its key. The -ENCRYPT flag is incompatible with all
@@ -2487,7 +2485,7 @@
    in each database file, its operations take a material amount of time on
    the databases of typical applications, and furthermore add an additional
    IO load to the system on which it runs. You can use the environment
-   variable gtm_poollimit to ameliorate, but not eliminate, the impact, at
+   variable ydb_poollimit to ameliorate, but not eliminate, the impact, at
    the cost of extending execution times. To minimize impact on production
    instances, YottaDB recommends running this operation on replicating secondary
    instances, rather than on originating primary instances.
@@ -2930,7 +2928,7 @@
    segments.
 
    If the optional dir1 is not specified, MUPIP RUNDOWN -RELINKCTL examines
-   the environment variable $gtmroutines, attempts to verify and correct
+   the environment variable $ydb_routines, attempts to verify and correct
    their attach counts and runs down all its inactive auto-relink-enabled
    directories (those with with a *-suffix). Alternatively, one can specify a
    directory path for the parameter dir1 and MUPIP RUNDOWN -RELINKCTL treats
@@ -3688,15 +3686,15 @@
        as comments and ignores their content.
      o MUPIP TRIGGER compiles the XECUTE action string and rejects the load
        if the compilation has errors.
-     o Always specify the same value for the environment variable gtm_chset
+     o Always specify the same value for the environment variable ydb_chset
        during loading and executing triggers. If you specify different values
-       of gtm_chset during loading and executing triggers, MUPIP TRIGGER
+       of ydb_chset during loading and executing triggers, MUPIP TRIGGER
        generates a run-time error (TRIGINVCHSET). YottaDB does not prevent a
        process from updating different nodes with triggers using a different
        character set, however, YottaDB prevents a process from updating the same
        triggering node with different character sets. Your coding practice,
        for all database updates, should be to ensure that you provide the
-       same value for gtm_chset during load compilation and run-time
+       same value for ydb_chset during load compilation and run-time
        compilation.
      o MUPIP TRIGGER replicate trigger definitions as logical actions from an
        originating/primary instance to a replicating/secondary instance based
@@ -3793,7 +3791,7 @@
 
    This section provides step-by-step instructions for creating, modifying,
    and deleting triggers. Triggers affect all processes updating a database
-   unlike, for example, environment variables such as $gtmroutines which work
+   unlike, for example, environment variables such as $ydb_routines which work
    on a per process basis. Therefore, YottaDB recommends that you should always
    have carefully planned procedures for changing triggers in your production
    environment.
@@ -4739,11 +4737,11 @@
 
    If a database having custom collation is inaccessible or the replication
    instance is frozen with a critical section required for the access held by
-   another process and the environment variable gtm_extract_nocol is defined
+   another process and the environment variable ydb_extract_nocol is defined
    and evaluates to a non-zero integer or any case-independent string or
    leading substrings of "TRUE" or "YES", MUPIP JOURNAL -EXTRACT issues the
    DBCOLLREQ warning and proceeds with the extract using the default
-   collation. If gtm_extract_nocol is not set or evaluates to a value other
+   collation. If ydb_extract_nocol is not set or evaluates to a value other
    than a positive integer or any case-independent string or leading
    substrings of "FALSE" or "NO", MUPIP JOURNAL -EXTRACT exits with the
    SETEXTRENV error if it encounters such a situation. Note that if default
@@ -4779,9 +4777,9 @@
    MUPIP allocates one thread or processes in an order determined by
    timestamps in the journal records.
 
-   The environment variable gtm_mupjnl_parallel provides a value when the
+   The environment variable ydb_mupjnl_parallel provides a value when the
    MUPIP JOURNAL command has no explicit -PARALLEL qualifier; when defined
-   with no value gtm_mupjnl_parallel acts like -PARALLEL with no value.
+   with no value ydb_mupjnl_parallel acts like -PARALLEL with no value.
 
 4 RECover
    RECover
@@ -4999,7 +4997,7 @@
    database and the replication instance file.
 
    Any utility/command attempted while MUPIP JOURNAL -ONLINE -ROLLBACK
-   operates waits for ROLLBACK to complete; the $gtm_db_startup_max_wait
+   operates waits for ROLLBACK to complete; the $ydb_db_startup_max_wait
    environment variable configures the wait period.
 
    **Note**
@@ -5826,7 +5824,7 @@
    of YottaDB, the label is GDSJEX07 for a simple journal extract file. This
    label is necessary to identify the format of the file.
 
-   If the environment variable gtm_chset is set of UTF-8, then file format
+   If the environment variable ydb_chset is set of UTF-8, then file format
    label is followed by another label called "UTF-8" to indicate UTF-8 mode.
 
    After this label, the journal record extracts follow. These journal record
@@ -6233,7 +6231,7 @@
 
    Creates a replication instance file. mupip replicate -instance_create
    takes the file name of the replication instance file from the environment
-   variable gtm_repl_instance.
+   variable ydb_repl_instance.
 
    If an instance file already exists, YottaDB renames it with a timestamp
    suffix, and creates a new replication instance file. This behavior is
@@ -6246,7 +6244,7 @@
    Specifies the instance name that uniquely identifies the instance and is
    immutable. The instance name can be from 1 to 16 characters. YottaDB takes
    the instance name (not the same as instance file name) from the
-   environment variable gtm_repl_instname. If gtm_repl_instname is not set
+   environment variable ydb_repl_instname. If ydb_repl_instname is not set
    and -name is not specified, YottaDB produces an error.
 
    -noreplace
@@ -6294,13 +6292,13 @@
 
    Example:
 
-   $ export gtm_repl_instance=mutisite.repl
-   $ export gtm_repl_instname=America
+   $ export ydb_repl_instance=mutisite.repl
+   $ export ydb_repl_instname=America
    $ mupip replicate -instance_create
 
    This example creates a replication instance file called multisite.repl
-   specified by gtm_repl_instance with an instance name America specified by
-   environment variable gtm_repl_instname.
+   specified by ydb_repl_instance with an instance name America specified by
+   environment variable ydb_repl_instname.
 
 2 Edit_instance
    Edit instance
@@ -6448,7 +6446,7 @@
    If, in your environment, the same hostname is used for both IPv4 and IPv6,
    YottaDB defaults to IPv6. If you wish to use IPv4, perhaps because you have a
    Receiver Server running a pre-V6.0-003 version of YottaDB that does not
-   support IPv6, set the environment variable gtm_ipv4_only to "TRUE", "YES",
+   support IPv6, set the environment variable ydb_ipv4_only to "TRUE", "YES",
    or a non-zero integer in order to force YottaDB to use IPv4.
 
    -passive
@@ -6598,10 +6596,10 @@
    data.
 
    With no -instsecondary specified, the Source Server uses the environment
-   variable gtm_repl_instsecondary for the name of the replicating instance.
+   variable ydb_repl_instsecondary for the name of the replicating instance.
 
    With no -instsecondary specified and environment variable
-   gtm_repl_instsecondary not set, mupip replicate -source -checkhealth looks
+   ydb_repl_instsecondary not set, mupip replicate -source -checkhealth looks
    at all the Source Servers (Active or Passive) that are alive and running
    and those that were abnormally shutdown (kill -9ed). Any Source Server
    that was kill -15ed or MUPIP STOPped is ignored because YottaDB considers
@@ -6616,7 +6614,7 @@
    as long as each of them specifies a different name for -instsecondary.
 
    Specify -instsecondary explicitly (by providing a value) or implicitly
-   (through the environment variable gtm_repl_instsecondary) even for
+   (through the environment variable ydb_repl_instsecondary) even for
    starting a Passive Source Server. Whenever it activates, a Passive Source
    Server connects to this replicating instance.
 
@@ -6683,7 +6681,7 @@
    to one originating instance and multiple replicating instance (without any
    further replicating instances downstream).
 
-   $ export gtm_repl_instance=multisite.repl
+   $ export ydb_repl_instance=multisite.repl
    $ mupip set -journal="enable,before,on" -replication=on -region "*"
    $ mupip replicate -instance_create -name=America
    $ mupip replicate -source -start -buffsize=$jnlpool_size -secondary=localhost:1234 -log=A2B.log -instsecondary=Brazil
@@ -6731,7 +6729,7 @@
    determines the actual level, any legal non-zero value enables compressed
    operation at the receiver.
 
-   Alternatively, the environment variable gtm_zlib_cmp_level can specify the
+   Alternatively, the environment variable ydb_zlib_cmp_level can specify the
    desired compression level (in the same value range as N above) and the
    source server can then be started without -cmplvl. This has the same
    effect as starting it with -cmplvl specified. An explicitly specified
@@ -6794,13 +6792,13 @@
 
    Instructs the Source or Receiver Server to use the TLS certificate and
    private key pairs having <label> as the TLSID in the configuration file
-   pointed to by the gtmcrypt_config environment variable. TLSID is a
+   pointed to by the ydb_crypt_config environment variable. TLSID is a
    required parameter if TLS/SSL is to be used to secure replication
    connection between instances. If private keys are encrypted, an
-   environment variable of the form gtmtls_passwd_<label> specifies their
+   environment variable of the form ydb_tls_passwd_<label> specifies their
    obfuscated password. You can obfuscate passwords using the 'maskpass'
    utility provided along with the encryption plugin. If you use unencrypted
-   private keys, set the gtmtls_passwd_<label> environment variable to a
+   private keys, set the ydb_tls_passwd_<label> environment variable to a
    non-null dummy value; this prevents inappropriate prompting for a
    password.
 
@@ -6891,7 +6889,7 @@
    connects after activation.
 
    With no -instsecondary specified, the passive Source Server uses the
-   environment variable gtm_repl_instsecondary as the value of
+   environment variable ydb_repl_instsecondary as the value of
    -instsecondary.
 
    -rootprimary
@@ -6946,7 +6944,7 @@
    Identifies the active Source Server to transition to the passive (standby)
    state.
 
-   With no -instsecondary specified, $gtm_repl_instsecondary determines the
+   With no -instsecondary specified, $ydb_repl_instsecondary determines the
    active Source Server.
 
    -rootprimary
@@ -7197,7 +7195,7 @@
    on the new originating instance before applying lost transactions. Specify
    -instsecondary to provide the instance name of the replicating instance
    where the lost transaction file was generated. If not, the environment
-   variable gtm_repl_instsecondary is implicitly assumed to hold the name of
+   variable ydb_repl_instsecondary is implicitly assumed to hold the name of
    the replicating instance.
 
    If the lost transaction file was generated from the same instance to which
@@ -7452,13 +7450,13 @@
 
    Instructs the Source or Receiver Server to use the TLS certificate and
    private key pairs having <label> as the TLSID in the configuration file
-   pointed to by the gtmcrypt_config environment variable. TLSID is a
+   pointed to by the ydb_crypt_config environment variable. TLSID is a
    required parameter if TLS/SSL is to be used to secure replication
    connection between instances. If private keys are encrypted, an
-   environment variable of the form gtmtls_passwd_<label> specifies their
+   environment variable of the form ydb_tls_passwd_<label> specifies their
    obfuscated password. You can obfuscate passwords using the 'maskpass'
    utility provided along with the encryption plugin. If you use unencrypted
-   private keys, set the gtmtls_passwd_<label> environment variable to a
+   private keys, set the ydb_tls_passwd_<label> environment variable to a
    non-null dummy value; this prevents inappropriate prompting for a
    password.
 

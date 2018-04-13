@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -138,10 +141,10 @@ int gtmrecv_get_opt(void)
 				util_out_print("Error parsing CMPLVL qualifier", TRUE);
 				return(-1);
 			}
-			if (GTM_CMPLVL_OUT_OF_RANGE(gtmrecv_options.cmplvl))
+			if (YDB_CMPLVL_OUT_OF_RANGE(gtmrecv_options.cmplvl))
 				gtmrecv_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
-			/* CMPLVL qualifier should override any value specified in the environment variable gtm_zlib_cmp_level */
-			gtm_zlib_cmp_level = gtmrecv_options.cmplvl;
+			/* CMPLVL qualifier should override any value specified in the environment variable ydb_zlib_cmp_level */
+			ydb_zlib_cmp_level = gtmrecv_options.cmplvl;
 		} else
 			gtmrecv_options.cmplvl = ZLIB_CMPLVL_MIN;	/* no compression in this case */
 		if (filter = (CLI_PRESENT == cli_present("FILTER")))

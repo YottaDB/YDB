@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -305,8 +308,8 @@ boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t
 					val_span = &mv_chain->mv_st_cont.mvs_mval;
 				}
 #				ifdef DEBUG
-				if (gtm_white_box_test_case_enabled &&
-					(WBTEST_MUEXTRACT_GVCST_RETURN_FALSE == gtm_white_box_test_case_number))
+				if (ydb_white_box_test_case_enabled &&
+					(WBTEST_MUEXTRACT_GVCST_RETURN_FALSE == ydb_white_box_test_case_number))
 				{	/* white box case to simulate concurrent change, Sleeping for 10 seconds
 					 * to kill the second variable.
 					 */

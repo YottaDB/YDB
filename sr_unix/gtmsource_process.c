@@ -705,7 +705,7 @@ int gtmsource_process(void)
 	gtmsource_local = jnlpool->gtmsource_local;
 	gtmsource_msgp = NULL;
 	gtmsource_msgbufsiz = MAX_REPL_MSGLEN;
-	if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
+	if (ZLIB_CMPLVL_NONE != ydb_zlib_cmp_level)
 		gtmsource_cmpmsgp = NULL;
 
 	assert(REPL_POLL_WAIT < MILLISECS_IN_SEC);
@@ -1307,7 +1307,7 @@ int gtmsource_process(void)
 		 * previously sent a REPL_CMP2UNCMP message.
 		 */
 		gtmsource_local->repl_zlib_cmp_level = repl_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* no compression by default */
-		if (!gtmsource_received_cmp2uncmp_msg && (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level))
+		if (!gtmsource_received_cmp2uncmp_msg && (ZLIB_CMPLVL_NONE != ydb_zlib_cmp_level))
 		{
 			if (REPL_PROTO_VER_MULTISITE_CMP <= remote_side->proto_ver)
 			{	/* Receiver server is running a version of GT.M that supports compression of replication stream.

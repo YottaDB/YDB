@@ -152,7 +152,7 @@ typedef struct cache_rec_struct
 					 * the active or wip queue.
 					 */
 	bool		needs_first_write; 	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for gtm_fullblockwrites) */
+						 *  note it (only applicable for ydb_fullblockwrites) */
 	/* bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
 } cache_rec;
 
@@ -241,7 +241,7 @@ typedef struct
 					 * the active or wip queue.
 					 */
 	bool		needs_first_write; 	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for gtm_fullblockwrites) */
+						 *  note it (only applicable for ydb_fullblockwrites) */
 	/*bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
 } cache_state_rec;
 
@@ -573,7 +573,7 @@ MBSTART {											\
 		if (!baseDBreg->open)										\
 			gv_init_reg(baseDBreg, NULL);								\
 		if (!statsDBreg->open)										\
-		{	/* statsDB did not get opened as part of baseDB open above. Possible if gtm_statshare	\
+		{	/* statsDB did not get opened as part of baseDB open above. Possible if ydb_statshare	\
 			 * is not set to 1. But user could still do a ZWR ^%YGS which would try to open		\
 			 * statsDB in caller (who is not equipped to handle errors) so do the open of the	\
 			 * statsDB now and silently handle errors like is done in "gvcst_init".	Any errors	\
@@ -1296,7 +1296,7 @@ MBSTART {															\
 		{														\
 			if (jnlpool->jnlpool_ctl->upd_disabled && !is_updproc)							\
 			{	/* Updates are disabled in this journal pool. Issue error. Do NOT detach from journal pool	\
-				 * as that would cause us not to honor instance freeze (in case gtm_custom_errors env var is	\
+				 * as that would cause us not to honor instance freeze (in case ydb_custom_errors env var is	\
 				 * non-null) for database reads that this process later does (for example reading a block	\
 				 * might require us to flush a dirty buffer to disk which should pause if the instance is	\
 				 * frozen).					 						\
@@ -1717,7 +1717,7 @@ MBSTART {														\
 	{														\
 		reservedDBFlags = CSD->reservedDBFlags;	/* sgmnt_data is flag authority */				\
 		/* If this is a base DB (i.e. not a statsdb), but we could not successfully create the statsdb		\
-		 * (e.g. $gtm_statsdir issues etc.) then disable RDBF_STATSDB in the region. So this db continues	\
+		 * (e.g. $ydb_statsdir issues etc.) then disable RDBF_STATSDB in the region. So this db continues	\
 		 * without statistics gathering.									\
 		 */													\
 		if (!IS_RDBF_STATSDB(CSD) && (NULL != CNL) && !CNL->statsdb_fname_len)					\
@@ -2709,7 +2709,7 @@ typedef struct	sgmnt_addrs_struct
 							 * Is a copy of reg->statsDB_setup_completed but is present in "csa"
 							 * too to handle was_open regions.
 							 */
-	gd_inst_info	*gd_instinfo;		/* global directory not gtm_repl_instance */
+	gd_inst_info	*gd_instinfo;		/* global directory not ydb_repl_instance */
 	gd_addr		*gd_ptr;		/* global directory for region */
 	struct jnlpool_addrs_struct	*jnlpool;	/* NULL until put, kill, or other function requiring jnlpool */
 } sgmnt_addrs;

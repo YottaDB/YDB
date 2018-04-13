@@ -85,7 +85,7 @@ void jobchild_init(void)
 	/* Check if environment variable ppid - job parent pid exists. If it does not, we are a regular
 	 * gtm process; else, we are a child process of a job command.
 	 */
-	if ((c = GETENV(CHILD_FLAG_ENV)) && strlen(c))
+	if ((c = getenv(CHILD_FLAG_ENV)) && strlen(c))
 	{	/* We are a Jobbed process Get Job parameters and set up environment to run the Job command. */
 		/* read parameters into parameter structure  - references CHILD_FLAG_ENV */
 		ojchildparms(&jparms, &job_arglist, job_args);

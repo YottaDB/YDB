@@ -216,7 +216,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 					if ((0 != sem_pid) && (sem_pid != process_id))
 					{
 						GET_C_STACK_FROM_SCRIPT(msgstr, process_id, sem_pid, stuck_cnt);
-						if (TREF(gtm_environment_init))
+						if (TREF(ydb_environment_init))
 							stacktrace_issued = TRUE;
 					}
 				}
@@ -228,7 +228,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 		} while (indefinite_wait || !*timedout);
 		if ((0 == loopcnt) || (EINTR == save_errno))
 		{	/* the timer has expired */
-			if (!indefinite_wait && !TREF(gtm_environment_init))
+			if (!indefinite_wait && !TREF(ydb_environment_init))
 				RETURN_SEMWAIT_FAILURE(retstat, 0, op_invalid_sem_syscall, ERR_SEMWT2LONG, 0, sem_pid);
 			SEMOP(semid, sop, sopcnt, status, NO_WAIT); /* ignore EINTR if asked for indefinite wait or run in-house */
 			if (-1 != status)
@@ -237,7 +237,7 @@ boolean_t do_blocking_semop(int semid, enum gtm_semtype semtype, boolean_t *stac
 				return TRUE;
 			}
 			save_errno = errno;
-			if (TREF(gtm_environment_init) && SEM_REMOVED(save_errno))
+			if (TREF(ydb_environment_init) && SEM_REMOVED(save_errno))
 			{	/* If the semaphore is removed (possible by a concurrent gds_rundown), the caller will retry
 				 * by doing semget once again. In most cases this will succeed and the process will get hold
 				 * of the semaphore and so the SEM_REMOVED condition can be treated as if the semop succeeded

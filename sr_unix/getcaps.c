@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,30 +12,19 @@
  *								*
  ****************************************************************/
 
-/* ------------------------------------------------------
- * mdef.h not included because the definition of bool
- * conflicts with that in curses.h in the AIX platform
- * also mdef.h is not required here except for the GBLDEF and assert
- * ------------------------------------------------------
- */
+#include "mdef.h"
 
 #include "gtm_stdlib.h"
+
 #include <curses.h>		/* must be before term.h */
+
 #include "gtm_term.h"
 #include "getcaps.h"
 #include "gtm_sizeof.h"
-#ifdef DEBUG
-#include <assert.h>
-#endif
 #if defined(__MVS__) && __CHARSET_LIB==1	/* -qascii */
 #include "ebc_xlat.h"
 #endif
-
-#ifndef assert
-#define assert(x)
-#endif
-
-#define GBLDEF
+#include "ydb_getenv.h"
 
 #undef	KEY_UP
 #undef	KEY_DOWN
@@ -125,7 +117,7 @@ int	getcaps(int fildes)
 #endif
 	int		status;
 
-	cap = GETENV("TERM");
+	cap = ydb_getenv(YDBENVINDX_GENERIC_TERM, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 	if (!cap)
 		cap = "unknown";
 

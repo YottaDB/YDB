@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2004, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,7 +66,7 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 			break;
 		case TK_ATSIGN:
 			TREF(saw_side_effect) = TREF(shift_side_effects);
-			if (TREF(shift_side_effects) && (GTM_BOOL == TREF(gtm_fullbool)))
+			if (TREF(shift_side_effects) && (YDB_BOOL == TREF(ydb_fullbool)))
 			{
 				dqinit(&tmpchain, exorder);
 				oldchain = setcurtchain(&tmpchain);

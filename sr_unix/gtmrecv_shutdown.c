@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -146,7 +149,7 @@ int gtmrecv_shutdown(boolean_t auto_shutdown, int exit_status)
 		/* Sleep for a few seconds to test for concurrent argument-less RUNDOWN to ensure that the latter doesn't remove
 		 * the RECV_POOL_ACCESS_SEM under the assumption that it is orphaned.
 		 */
-		if (gtm_white_box_test_case_enabled && (WBTEST_LONGSLEEP_IN_REPL_SHUTDOWN == gtm_white_box_test_case_number))
+		if (ydb_white_box_test_case_enabled && (WBTEST_LONGSLEEP_IN_REPL_SHUTDOWN == ydb_white_box_test_case_number))
 		{
 			DBGFPF((stderr, "GTMRECV_SHUTDOWN is about to start long sleep\n"));
 			LONG_SLEEP(10);

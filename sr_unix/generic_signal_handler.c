@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -70,7 +73,7 @@ GBLREF	volatile unsigned int	core_in_progress;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	void			(*call_on_signal)();
-GBLREF	boolean_t		gtm_quiet_halt;
+GBLREF	boolean_t		ydb_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 GBLREF	volatile boolean_t	timer_active;
 GBLREF	sigset_t		block_sigsent;
@@ -172,7 +175,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					SET_FORCED_EXIT_STATE;
 					exit_state++;		/* Make exit pending, may still be tolerant though */
 					assert(!IS_GTMSECSHR_IMAGE);
-					if (exit_handler_active && !gtm_quiet_halt)
+					if (exit_handler_active && !ydb_quiet_halt)
 						SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
 					return;
 				}
@@ -181,7 +184,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				SET_PROCESS_EXITING_TRUE; 	/* Set this BEFORE cancelling timers as wcs_phase2_commit_wait
 								 * relies on this.
 								 */
-				if (ERR_FORCEDHALT != forced_exit_err || !gtm_quiet_halt)
+				if (ERR_FORCEDHALT != forced_exit_err || !ydb_quiet_halt)
 					SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
 			} else
 			{	/* Special case for gtmsecshr - no deferral just exit */

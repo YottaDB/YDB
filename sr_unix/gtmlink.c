@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -18,7 +21,7 @@
 
 LITDEF mstr relink_allowed_mstr[] = {
 	{0, LEN_AND_LIT("NORECURSIVE")},
-	{0, LEN_AND_LIT("RECURSIVE")},		/* if env var $gtm_link = "RECURSIVE", then recursive relink is enabled */
+	{0, LEN_AND_LIT("RECURSIVE")},		/* if env var $ydb_link = "RECURSIVE", then recursive relink is enabled */
 	{0, LEN_AND_LIT("")}
 };
 

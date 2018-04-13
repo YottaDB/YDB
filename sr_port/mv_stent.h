@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -98,7 +101,7 @@ typedef struct
 	mval			*ztupdate_save;
 	condition_handler	*ctxt_save;		/* Where condition handler stack should end up when unwound */
 	int4			gtm_trigger_depth_save;	/* Where our depth guage should end up when unwound */
-	mval			dollar_etrap_save;	/* If $gtm_trigger_etrap is specified, save dollar_etrap here */
+	mval			dollar_etrap_save;	/* If $ydb_trigger_etrap is specified, save dollar_etrap here */
 	mval			dollar_ztrap_save;	/* .. likewise if saving $etrap, save $ztrap too */
 	boolean_t		ztrap_explicit_null_save; /* Just save it rather than figuring out what to restore */
 	int4			mumps_status_save;	/* Each invocation has its own return code */

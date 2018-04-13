@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,12 +16,13 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include <stdarg.h>
 #include "gtm_stdio.h"
-#include <errno.h>
 #include "gtm_stdlib.h"
 #include "gtm_ctype.h"
 #include "gtm_stat.h"
+
+#include <stdarg.h>
+#include <errno.h>
 
 #include "copy.h"
 #include "libyottadb.h"
@@ -34,6 +35,7 @@
 #include "gtm_malloc.h"
 #include "trans_log_name.h"
 #include "iosp.h"
+#include "ydb_getenv.h"
 
 #define	CR			0x0A		/* Carriage return */
 #define	NUM_TABS_FOR_GTMERRSTR	2
@@ -433,36 +435,43 @@ struct extcall_package_list *exttab_parse(mval *package)
 	mstr		callnam, rtnnam, clnuprtn;
 	mstr 		val, trans;
 	void_ptr_t	pakhandle;
+	int		nbytes;
 	enum ydb_types	ret_tok, parameter_types[MAX_ACTUALS], pr;
 	char		str_buffer[MAX_TABLINE_LEN], *tbp, *end;
 	char		str_temp_buffer[MAX_TABLINE_LEN];
 	FILE		*ext_table_file_handle;
+	boolean_t	is_ydb_env_match;
 	struct extcall_package_list	*pak;
 	struct extcall_entry_list	*entry_ptr;
 
 	/* First, construct package name environment variable */
-	memcpy(str_buffer, PACKAGE_ENV_PREFIX, SIZEOF(PACKAGE_ENV_PREFIX));
-	tbp = &str_buffer[SIZEOF(PACKAGE_ENV_PREFIX) - 1];
 	if (package->str.len)
-	{
-		/* guaranteed by compiler */
-		assert(package->str.len < MAX_NAME_LENGTH - SIZEOF(PACKAGE_ENV_PREFIX) - 1);
-		*tbp++ = '_';
-		memcpy(tbp, package->str.addr, package->str.len);
-		tbp += package->str.len;
-	}
-	*tbp = 0;
-	/* Now we have the environment name, lookup file name */
-	ext_table_file_name = GETENV(str_buffer);
+		ext_table_file_name = ydb_getenv(YDBENVINDX_XC_PREFIX, &package->str, &is_ydb_env_match);
+	else
+		ext_table_file_name = ydb_getenv(YDBENVINDX_XC, NULL_SUFFIX, &is_ydb_env_match);
 	if (NULL == ext_table_file_name)
-	{
-		/* Environment variable for the package not found */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
+	{	/* Environment variable for the package not found */
+		if (package->str.len)
+			nbytes = SNPRINTF(str_buffer, SIZEOF(str_buffer), "%s%.*s/%s%.*s",
+					ydbenvname[YDBENVINDX_XC_PREFIX] + 1, package->str.len, package->str.addr,
+					gtmenvname[YDBENVINDX_XC_PREFIX] + 1, package->str.len, package->str.addr);
+		else
+			nbytes = SNPRINTF(str_buffer, SIZEOF(str_buffer), "%s/%s",
+					ydbenvname[YDBENVINDX_XC] + 1,
+					gtmenvname[YDBENVINDX_XC] + 1);
+		if ((0 < nbytes) && (SIZEOF(str_buffer) > nbytes))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
+		else
+		{
+			assert(FALSE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("SNPRINTF(exttab_parse)"), CALLFROM, errno);
+		}
 	}
+	/* Now we have the environment name, lookup file name */
 	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (NULL == ext_table_file_handle)
-	{
-		/* Package's external call table could not be found */
+	{	/* Package's external call table could not be found */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTOPN, 2, LEN_AND_STR(ext_table_file_name));
 	}
 	ext_source_line_num = 0;
@@ -477,13 +486,13 @@ struct extcall_package_list *exttab_parse(mval *package)
 	val.addr = str_temp_buffer;
 	val.len = STRLEN(str_temp_buffer);
 	/* Need to copy the str_buffer into another temp variable since
-	 * TRANS_LOG_NAME requires input and output buffers to be different.
-	 * If there is an env variable present in the pathname, TRANS_LOG_NAME
+	 * trans_log_name requires input and output buffers to be different.
+	 * If there is an env variable present in the pathname, trans_log_name
 	 * expands it and return SS_NORMAL. Else it returns SS_NOLOGNAM.
 	 * Instead of checking 2 return values, better to check against SS_LOG2LONG
 	 * which occurs if the pathname is too long after any kind of expansion.
  	 */
-	if (SS_LOG2LONG == TRANS_LOG_NAME(&val, &trans, str_buffer, SIZEOF(str_buffer), dont_sendmsg_on_log2long))
+	if (SS_LOG2LONG == trans_log_name(&val, &trans, str_buffer, SIZEOF(str_buffer), dont_sendmsg_on_log2long))
 	{
 		/* Env variable expansion in the pathname caused buffer overflow */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(str_buffer) - 1);
@@ -714,11 +723,20 @@ callin_entry_list* citab_parse (void)
 	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end;
 	FILE			*ext_table_file_handle;
 	callin_entry_list	*entry_ptr = NULL, *save_entry_ptr = NULL;
+	boolean_t		is_ydb_env_match;
+	int			nbytes;
+	char			tmpbuff[256];
 
-	ext_table_file_name = GETENV(CALLIN_ENV_NAME);
+	ext_table_file_name = ydb_getenv(YDBENVINDX_CI, NULL_SUFFIX, &is_ydb_env_match);
 	if (!ext_table_file_name) /* environment variable not set */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(CALLIN_ENV_NAME));
-
+	{
+		nbytes = SNPRINTF(tmpbuff, SIZEOF(tmpbuff), "%s/%s", ydbenvname[YDBENVINDX_CI] + 1, gtmenvname[YDBENVINDX_CI] + 1);
+		if ((0 < nbytes) && (SIZEOF(str_buffer) > nbytes))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(tmpbuff));
+		else
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("SNPRINTF(citab_parse)"), CALLFROM, errno);
+	}
 	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (!ext_table_file_handle) /* call-in table not found */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name),

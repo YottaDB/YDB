@@ -50,7 +50,7 @@
 #define dqloop(q, n, i) DQLOOP(q, n, i)
 #define dqinit(q, n)	DQINIT(q, n)
 
-/*#define DEBUG_TRIPLES / * Uncomment this to do triple debugging, which is also tied to gtmdbglvl, as of this writing: 0x4000 */
+/*#define DEBUG_TRIPLES / * Uncomment this to do triple debugging, which is also tied to ydb_dbglvl, as of this writing: 0x4000 */
 #ifndef DEBUG_TRIPLES
 #  define dqdel(x, n)		DQDEL(x, n)
 #  define dqdelchain(q, x, n)	DQDELCHAIN(q, x, n)

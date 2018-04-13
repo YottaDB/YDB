@@ -3,6 +3,9 @@
  * Copyright (c) 2007-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -12,7 +15,6 @@
 
 #include "mdef.h"
 
-#include "gtm_stdlib.h"		/* for GETENV */
 #include "gtm_ipc.h"
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
@@ -465,7 +467,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_BTPUTNULL, bt, NULL);
 	if (NULL == bt)
 	{
-		assert(gtm_white_box_test_case_enabled);
+		assert(ydb_white_box_test_case_enabled);
 		return cdb_sc_cacheprob;
 	}
 	if (cs->write_type & GDS_WRITE_KILLTN)
@@ -485,11 +487,11 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			cr = db_csh_getn(blkid);
 #			ifdef DEBUG
 			save_cr = NULL;
-			if (gtm_white_box_test_case_enabled)
+			if (ydb_white_box_test_case_enabled)
 			{
 				save_cr = cr;	/* save cr for r_epid cleanup before setting it to INVALID */
 				/* stop self to test sechshr_db_clnup clears the read state */
-				if (WBTEST_SIGTSTP_IN_T_QREAD == gtm_white_box_test_case_number)
+				if (WBTEST_SIGTSTP_IN_T_QREAD == ydb_white_box_test_case_number)
 				{	/* this should never fail, but because of the way we developed the test we got paranoid */
 					dummy = kill(process_id, SIGTERM);
 					assert(0 == dummy);
@@ -501,7 +503,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_DBCSHGETN_INVALID, cr, (cache_rec_ptr_t)CR_NOTVALID);
 			if ((cache_rec_ptr_t)CR_NOTVALID == cr)
 			{
-				assert(gtm_white_box_test_case_enabled);
+				assert(ydb_white_box_test_case_enabled);
 #				ifdef DEBUG
 				if (NULL != save_cr)
 				{	/* release the r_epid lock on the valid cache-record returned from db_csh_getn */
@@ -522,7 +524,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			assert(0 == cr->in_cw_set);
 		} else if ((cache_rec_ptr_t)CR_NOTVALID == cr)
 		{
-			assert(gtm_white_box_test_case_enabled);
+			assert(ydb_white_box_test_case_enabled);
 			BG_TRACE_PRO(wcb_t_end_sysops_cr_invcr);
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_t_end_sysops_cr_invcr"),
 				process_id, &ctn, DB_LEN_STR(gv_cur_region));
@@ -572,7 +574,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			write_finished = wcs_write_in_progress_wait(cnl, cr, WBTEST_BG_UPDATE_DIRTYSTUCK1);
 			if (!write_finished)
 			{
-				assert(gtm_white_box_test_case_enabled);
+				assert(ydb_white_box_test_case_enabled);
 				BG_TRACE_PRO(wcb_t_end_sysops_dirtystuck1);
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED,
 						6, LEN_AND_LIT("wcb_t_end_sysops_dirtystuck1"), process_id, &ctn,
@@ -605,7 +607,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_INTENDSTUCK, intend_finished, 0);
 			if (!intend_finished)
 			{
-				assert(gtm_white_box_test_case_enabled);
+				assert(ydb_white_box_test_case_enabled);
 				BG_TRACE_PRO(wcb_t_end_sysops_intend_wait);
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED,
 						6, LEN_AND_LIT("wcb_t_end_sysops_intend_wait"),
@@ -635,7 +637,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				write_finished = wcs_write_in_progress_wait(cnl, cr, WBTEST_BG_UPDATE_DIRTYSTUCK2);
 				if (!write_finished)
 				{
-					assert(gtm_white_box_test_case_enabled);
+					assert(ydb_white_box_test_case_enabled);
 					BG_TRACE_PRO(wcb_t_end_sysops_dirtystuck2);
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED,
 							6, LEN_AND_LIT("wcb_t_end_sysops_dirtystuck2"),
@@ -668,13 +670,13 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 				cr_new = db_csh_getn(blkid);
 #				ifdef DEBUG
 				save_cr = NULL;
-				if (gtm_white_box_test_case_enabled)
+				if (ydb_white_box_test_case_enabled)
 					save_cr = cr_new;	/* save cr for r_epid cleanup before setting to INVALID */
 #				endif
 				GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_DBCSHGETN_INVALID2, cr_new, (cache_rec *)CR_NOTVALID);
 				if ((cache_rec *)CR_NOTVALID == cr_new)
 				{
-					assert(gtm_white_box_test_case_enabled);
+					assert(ydb_white_box_test_case_enabled);
 #					ifdef DEBUG
 					if (NULL != save_cr)
 					{	/* Since we are simulating a "db_csh_getn" failure return,
@@ -834,7 +836,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 			read_finished = wcs_read_in_progress_wait(cr, WBTEST_BG_UPDATE_READINPROGSTUCK2);
 			if (!read_finished)
 			{
-				assert(gtm_white_box_test_case_enabled);
+				assert(ydb_white_box_test_case_enabled);
 				BG_TRACE_PRO(wcb_t_end_sysops_dirtyripwait);
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
 					LEN_AND_LIT("wcb_t_end_sysops_dirtyripwait"),
@@ -944,8 +946,8 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	/* Take backup of block in phase2 (outside of crit). */
 	cs->cr = cr;		/* note down "cr" so phase2 can find it easily (given "cs") */
 	/* If this is the first time the the database block has been written, we must write
-	 * the entire database block if gtm_fullblockwrites = 2 */
-	/* Note that the check for gtm_fullblockwrites happens when we decide to write the block,
+	 * the entire database block if ydb_fullblockwrites = 2 */
+	/* Note that the check for ydb_fullblockwrites happens when we decide to write the block,
 	 * not here; so if the block is new, mark as needing first write */
 	if (WAS_FREE(cs->blk_prior_state))
 		cs->cr->needs_first_write = TRUE;
@@ -1029,7 +1031,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 #	ifdef DEBUG
 	if (NULL == cr)
 	{
-		assert(gtm_white_box_test_case_enabled);
+		assert(ydb_white_box_test_case_enabled);
 		return cdb_sc_cacheprob;
 	}
 #	endif
@@ -1177,7 +1179,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_INSQTIFAIL, n, INTERLOCK_FAIL);
 		if (INTERLOCK_FAIL == n)
 		{
-			assert(gtm_white_box_test_case_enabled);
+			assert(ydb_white_box_test_case_enabled);
 			BG_TRACE_PRO(wcb_bg_update_lckfail1);
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bg_update_lckfail1"),
 				process_id, &ctn, DB_LEN_STR(gv_cur_region));
@@ -1200,7 +1202,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 		GTM_WHITE_BOX_TEST(WBTEST_BG_UPDATE_INSQHIFAIL, n, INTERLOCK_FAIL);
 		if (INTERLOCK_FAIL == n)
 		{
-			assert(gtm_white_box_test_case_enabled);
+			assert(ydb_white_box_test_case_enabled);
 			BG_TRACE_PRO(wcb_bg_update_lckfail2);
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bg_update_lckfail2"),
 				process_id, &ctn, DB_LEN_STR(gv_cur_region));

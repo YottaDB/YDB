@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,7 +38,6 @@
 
 #define WRTPND_LSBIT_MASK 		1
 
-#define MUTEX_SOCK_DIR                  GTM_TMP_ENV
 #define DEFAULT_MUTEX_SOCK_DIR          DEFAULT_GTM_TMP
 #define MUTEX_SOCK_FILE_PREFIX          "gtm_mutex"
 #define MAX_MUTEX_SOCKFILE_NAME_LEN	(SIZEOF(MUTEX_SOCK_FILE_PREFIX) + MAX_DIGITS_IN_INT)
