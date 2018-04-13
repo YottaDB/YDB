@@ -684,7 +684,7 @@ GBLREF	int4		tstart_trigger_depth;
 		t_retry(cdb_sc_triggermod);							\
 	else											\
 	{											\
-		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
+		assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);		\
 		/* format "INDEX,SUBSCRIPT" of ^#t(GVN,INDEX,SUBSCRIPT) in the error message */	\
 		SET_PARAM_STRING(util_buff, util_len, INDEX, SUBSCRIPT);			\
 		rts_error_csa(CSA_ARG(CSA) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,	\

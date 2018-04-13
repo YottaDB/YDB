@@ -3,6 +3,9 @@
  * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -44,7 +47,7 @@ void gtm_zlib_init(void)
 	int		findx;
 	void		*fptr;
 
-	assert(gtm_zlib_cmp_level);
+	assert(ydb_zlib_cmp_level);
 #ifdef _AIX
 	/* Attempt to load the AIX packaged zlib first */
 	if (NULL == (handle = dlopen(ZLIB_AIXLIBNAME, ZLIB_LIBFLAGS | RTLD_MEMBER))) /* inline assignment */
@@ -64,7 +67,7 @@ void gtm_zlib_init(void)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname),
 					ERR_TEXT, 2, LEN_AND_STR(err_msg));
 #		endif
-			gtm_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* dont use compression */
+			ydb_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* dont use compression */
 			return;
 		}
 #ifdef _AIX
@@ -78,7 +81,7 @@ void gtm_zlib_init(void)
 			COPY_DLLERR_MSG(err_str, err_msg);
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNORTN, 2, LEN_AND_STR(zlib_fname[findx]),
 					ERR_TEXT, 2, LEN_AND_STR(err_msg));
-			gtm_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* dont use compression */
+			ydb_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* dont use compression */
 			return;
 		}
 		*zlib_fptr[findx] = fptr;

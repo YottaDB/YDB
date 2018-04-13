@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -454,7 +457,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	assert(lcl_buff[lcl_orig_free] == rectype);
 	assert(lcl_orig_free < lcl_free  ||  lcl_free < jb->dsk);
 	assert((lcl_freeaddr >= jb->dskaddr)
-		|| (gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
+		|| (ydb_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)));
 	jpc->new_freeaddr = new_freeaddr;
 	INCR_GVSTATS_COUNTER(csa, cnl, n_jbuff_bytes, rlen);
 	assert(lcl_free == jpc->new_freeaddr % lcl_size);

@@ -1123,8 +1123,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				{
 					bad_trans_type = upd_bad_key_size;
 					tmpcsa = csa;
-					assert(gtm_white_box_test_case_enabled
-						&& (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number));
+					assert(ydb_white_box_test_case_enabled
+						&& (WBTEST_UPD_PROCESS_ERROR == ydb_white_box_test_case_number));
 				} else
 				{
 					/* Scan the global for two reasons :
@@ -1204,8 +1204,8 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						{
 							bad_trans_type = upd_bad_val_size;
 							tmpcsa = csa;
-							assert(gtm_white_box_test_case_enabled
-								&& (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number));
+							assert(ydb_white_box_test_case_enabled
+								&& (WBTEST_UPD_PROCESS_ERROR == ydb_white_box_test_case_number));
 						} else
 						op_gvput(&val_mv);
 					}

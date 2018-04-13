@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2013 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,9 +19,6 @@
 /* fgncalsp.h - UNIX foreign calls (d &package.label) */
 
 #define MAX_NAME_LENGTH		255	/* Maximum length of file name */
-#define PACKAGE_ENV_PREFIX	"GTMXC"	/* Prefix for environemnt variable containing
-					 * external call table name */
-#define CALLIN_ENV_NAME		"GTMCI"	/* Call-in table environment variable */
 #define MAX_ERRSTR_LEN		1024	/* Maximum length of the error string returned
 					 * by dlerror(). Couldn't find any system
 					 * defined length, 1024 is just arbitrary */

@@ -29,7 +29,7 @@
 
 #define CHILD_FLAG_ENV		"ydb_j0"
 #define CLEAR_CHILD_FLAG_ENV  	"ydb_j0="""
-#define GBLDIR_ENV		"ydb_gbldir"
+#define GBLDIR_ENV		(ydbenvname[YDBENVINDX_GBLDIR] + 1)	/* + 1 to skip leading $ in env var name */
 #define CWD_ENV			"ydb_j2"
 #define IN_FILE_ENV		"ydb_j3"
 #define OUT_FILE_ENV		"ydb_j4"

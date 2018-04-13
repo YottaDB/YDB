@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -132,7 +135,7 @@ boolean_t gvcst_queryget2(mval *val, unsigned char *sn_ptr)
 	{
 		two_histories = FALSE;
 #		if defined(DEBUG) && defined(UNIX)
-		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVQUERYGETFAIL == gtm_white_box_test_case_number))
+		if (ydb_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVQUERYGETFAIL == ydb_white_box_test_case_number))
 		{
 			status = cdb_sc_blknumerr;
 			t_retry(status);

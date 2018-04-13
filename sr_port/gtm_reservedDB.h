@@ -3,6 +3,9 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -30,17 +33,17 @@ enum
 {
 	FNERR_NOERR = 0,			/* No error recorded */
 	FNERR_NOSTATS,				/* BaseDB has NOSTATS set - (should never happen) */
-	FNERR_STATSDIR_TRNFAIL,			/* Unable to translate $gtm_statsdir (should never happen) */
-	FNERR_STATSDIR_TRN2LONG,		/* Translation of $gtm_statsdir too long (should never happen) */
+	FNERR_STATSDIR_TRNFAIL,			/* Unable to translate $ydb_statsdir (should never happen) */
+	FNERR_STATSDIR_TRN2LONG,		/* Translation of $ydb_statsdir too long (should never happen) */
 	FNERR_INV_BASEDBFN,			/* BaseDBfn had no '/' making parse fail (should never happen) */
 	FNERR_FTOK_FAIL,			/* The STAT() in gtm_ftok() failed (no rc) (should never hapen) */
 	FNERR_FNAMEBUF_OVERFLOW			/* Not enough space to add the statsdb fname to fname buffer */
 };
 #define FNERR_NOSTATS_TEXT 		"The base database has NOSTATS set - should not be trying to open statistics database"
-#define FNERR_STATSDIR_TRNFAIL_TEXT	"Error attempting to translate $gtm_statsdir"
-#define FNERR_STATSDIR_TRN2LONG_TEXT	"Translation of $gtm_statsdir was too long to fit in buffer"
+#define FNERR_STATSDIR_TRNFAIL_TEXT	"Error attempting to translate $ydb_statsdir"
+#define FNERR_STATSDIR_TRN2LONG_TEXT	"Translation of $ydb_statsdir was too long to fit in buffer"
 #define FNERR_INV_BASEDBFN_TEXT		"Unable to parse the base database filename"
-#define FNERR_FTOK_FAIL_TEXT		"Failure generating FTOK value for $gtm_statsdir"
+#define FNERR_FTOK_FAIL_TEXT		"Failure generating FTOK value for $ydb_statsdir"
 #define FNERR_FNAMEBUF_OVERFLOW_TEXT	"Buffer overflow detected adding statistics database filename (hash.<dbname>.gst) to " \
 					"filename buffer"
 
@@ -51,7 +54,7 @@ enum
 #define RESERVED_NAMESPACE	"%Y"
 #define RESERVED_NAMESPACE_LEN	(SIZEOF(RESERVED_NAMESPACE) - 1)
 
-/* The maximum size of $gtm_statsdir is MAX_FN_LEN minus a minimal statsDB fname */
+/* The maximum size of $ydb_statsdir is MAX_FN_LEN minus a minimal statsDB fname */
 #define MAX_STATSDIR_LEN	(MAX_FN_LEN - 8 /* hash */ - STRLEN(".a.dat") - STRLEN(STATSDB_FNAME_SUFFIX))
 
 /* Size of the minimum additional record that can fit in a statsDB block after a record has been added to it. Use this

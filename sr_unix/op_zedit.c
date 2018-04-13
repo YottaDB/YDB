@@ -35,6 +35,7 @@
 #include "restrict.h"
 #include "wbox_test_init.h"
 #include "iottdef.h"
+#include "ydb_getenv.h"
 
 GBLREF	io_pair		io_std_device;
 GBLREF	mval 		dollar_zsource;
@@ -68,7 +69,7 @@ void op_zedit(mval *v, mval *p)
 	geteditor();
 	if (!editor.len)
 	{
-		edt = GETENV("EDITOR");
+		edt = ydb_getenv(YDBENVINDX_GENERIC_EDITOR, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 		if (!edt)
 			edt = "editor";
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOEDITOR, 2, LEN_AND_STR(edt));

@@ -39,7 +39,7 @@
 #include "is_file_identical.h"
 #include "dpgbldir.h"
 #include "dpgbldir_sysops.h"
-#include "gtm_logicals.h"
+#include "ydb_logicals.h"
 
 char LITDEF gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE] =
 {
@@ -177,8 +177,9 @@ void dpzgbini(void)
 	uint4		status;
 	parse_blk	pblk;
 
-	temp_mstr.addr = YDB_GBLDIR;
-	temp_mstr.len = SIZEOF(YDB_GBLDIR) - 1;
+	temp_mstr.addr = (char *)YDB_GBLDIR;
+	temp_mstr.len = STRLEN(YDB_GBLDIR);
+	dollar_zgbldir.str.len = temp_mstr.len;
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = temp_buff;
 	pblk.buff_size = MAX_FBUFF;
@@ -187,8 +188,7 @@ void dpzgbini(void)
 	status = parse_file(&temp_mstr, &pblk);
 
 	dollar_zgbldir.mvtype = MV_STR;
-	dollar_zgbldir.str.len = SIZEOF(YDB_GBLDIR) - 1;
-	dollar_zgbldir.str.addr = YDB_GBLDIR;
+	dollar_zgbldir.str.addr = (char *)YDB_GBLDIR;
 	if (status & 1)
 	{
 		dollar_zgbldir.str.len = pblk.b_esl;

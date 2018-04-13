@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +21,8 @@
 #define LOGICAL_FALSE	"FALSE"
 #define LOGICAL_NO	"NO"
 
-boolean_t logical_truth_value(mstr *logical, boolean_t negate, boolean_t *is_defined);
+#include "ydb_logicals.h"	/* for "ydbenvindx_t" */
+
+boolean_t ydb_logical_truth_value(ydbenvindx_t envindx, boolean_t negate, boolean_t *is_defined);
 
 #endif /* LOGICAL_TRUTH_VALUE_H_INCLUDED */

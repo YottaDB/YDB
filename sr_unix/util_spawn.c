@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,6 +16,7 @@
 #include "gtm_stdlib.h"
 #include "cli.h"
 #include "util_spawn.h"
+#include "ydb_getenv.h"
 
 void util_spawn(void)
 {
@@ -24,7 +28,7 @@ void util_spawn(void)
 	assert(1 >= TREF(parms_cnt));
 	if (0 == TREF(parms_cnt))
 	{
-		cmd = GETENV("SHELL");
+		cmd = ydb_getenv(YDBENVINDX_GENERIC_SHELL, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 		if (!cmd)
 			cmd = "/bin/sh";
 		rc = SYSTEM(cmd);

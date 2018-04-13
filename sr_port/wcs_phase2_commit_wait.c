@@ -3,6 +3,9 @@
  * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -130,7 +133,7 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 		/* we better not deadlock wait for ourself */
 		if (!was_crit && (process_id == start_in_tend))
 		{
-			assert(gtm_white_box_test_case_enabled);
+			assert(ydb_white_box_test_case_enabled);
 			return TRUE;
 		}
 		assertpro(process_id != start_in_tend);	/* should not deadlock on our self */
@@ -331,6 +334,6 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	 * resetting cnl->wcs_phase2_commit_pidcnt. But, ONLINE ROLLBACK called in a crash situation is done only with
 	 * whitebox test cases. So, assert accordingly.
 	 */
-	assert(cnl->wc_blocked || (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number));
+	assert(cnl->wc_blocked || (WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number));
 	return FALSE;
 }

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -43,7 +46,7 @@ void bx_relop(triple *t, opctype cmp, opctype tst, oprtype *addr)
 			RETURN_IF_RTS_ERROR;
 			if ((NULL != TREF(boolchain_ptr)) && (OC_COMVAL == (comv = p->oprval.tref)->opcode))
 			{	/* RELOP needed a BOOLINIT/BOOLFINI/COMVAL, which now must move to the boolchain */
-				assert(TREF(saw_side_effect) && (GTM_BOOL != TREF(gtm_fullbool)));
+				assert(TREF(saw_side_effect) && (YDB_BOOL != TREF(ydb_fullbool)));
 				assert(OC_BOOLINIT == comv->operand[0].oprval.tref->opcode);
 				assert(OC_BOOLFINI == comv->exorder.bl->opcode);
 				assert(comv->operand[0].oprval.tref == comv->exorder.bl->operand[0].oprval.tref);

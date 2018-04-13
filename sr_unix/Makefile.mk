@@ -166,8 +166,8 @@ LDFLAGS += $(LIBFLAGS) -o
 COMMON_LIBS = -lgtmcryptutil -lconfig
 
 # Lists of all files needed for building the encryption plugin.
-crypt_util_srcfiles = gtmcrypt_util.c
-crypt_util_hdrfiles = gtmcrypt_util.h gtmcrypt_interface.h
+crypt_util_srcfiles = gtmcrypt_util.c minimal_gbldefs.c ydb_getenv.c
+crypt_util_hdrfiles = gtmcrypt_util.h gtmcrypt_interface.h ydb_getenv.h ydb_logicals.h ydb_logicals_tab.h
 crypt_srcfiles = gtmcrypt_ref.c gtmcrypt_pk_ref.c gtmcrypt_dbk_ref.c gtmcrypt_sym_ref.c
 crypt_hrdfiles = gtmcrypt_ref.h gtmcrypt_pk_ref.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_interface.h
 tls_srcfiles = gtm_tls_impl.c
@@ -217,14 +217,14 @@ install: all
 	echo "unmaskpwd: gtm_status_t gc_mask_unmask_passwd(I:gtm_string_t*,O:gtm_string_t*[512])" >> $(PLUGINDIR)/gpgagent.tab
 	ln -fs ./$(install_targ) $(PLUGINDIR)/libgtmcrypt.so
 	cp -pf pinentry.m $(PLUGINDIR)/r
-	(cd $(PLUGINDIR)/o      && env gtm_chset=M     ${ydb_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
+	(cd $(PLUGINDIR)/o      && env ydb_chset=M     ${ydb_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
 ifeq ($(NOT_IN_GTMCRYPTDIR),1)
 	cp -pf *.sh *.m $(GTMCRYPTDIR)/
 	cp -f maskpass $(GTMCRYPTDIR)/
 endif
 ifeq ($(HAVE_UNICODE),0)
-	@echo "UTF-8 mode library installation may fail if gtm_icu_version (${gtm_icu_version}) is not set"
-	(cd $(PLUGINDIR)/o/utf8 && env gtm_chset=UTF-8 ${ydb_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
+	@echo "UTF-8 mode library installation may fail if ydb_icu_version/gtm_icu_version (${ydb_icu_version}/${gtm_icu_version}) is not set"
+	(cd $(PLUGINDIR)/o/utf8 && env ydb_chset=UTF-8 ${ydb_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
 endif
 
 uninstall:

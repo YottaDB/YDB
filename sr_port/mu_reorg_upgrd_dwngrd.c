@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -199,7 +202,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			status = ERR_MUNOFINISH;
 			continue;
 		}
-		mu_reorg_process = TRUE;	/* gvcst_init will use this value to use gtm_poollimit settings. */
+		mu_reorg_process = TRUE;	/* gvcst_init will use this value to use ydb_poollimit settings. */
 		gvcst_init(reg, NULL);
 		mu_reorg_process = FALSE;
 		assert(update_array != NULL);

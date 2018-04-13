@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -78,8 +81,7 @@
 #include "io.h"
 #include "eintr_wrappers.h"
 #include "util.h"
-#include "trans_log_name.h"
-#include "gtm_logicals.h"
+#include "ydb_trans_log_name.h"
 
 #define	MAXPATNAM	256
 #define	MAX_FILE	256
@@ -172,8 +174,6 @@ int initialize_pattern_table(void)
 	char	buffer[MAX_TRANS_NAME_LEN];
 	int	status, letter;
 	mstr	patname, transnam;
-	static MSTR_CONST(pat_file,  PAT_FILE);
-	static MSTR_CONST(pat_table, PAT_TABLE);
 
 	/* Initialize the pattern/typemask table size. Note that in UTF-8 mode, we
 	 * only use the lower half of the table (0 - 127). Although we do not extend
@@ -187,13 +187,13 @@ int initialize_pattern_table(void)
 	for (pat_allmaskbits = 0, letter = 0; letter < max_patents; letter++)
 		pat_allmaskbits |= pattern_typemask[letter];	/* used in do_patfixed/do_pattern */
 	/* Locate default pattern file and load it. */
-        status = TRANS_LOG_NAME(&pat_file, &transnam, buffer, SIZEOF(buffer), do_sendmsg_on_log2long);
+        status = ydb_trans_log_name(YDBENVINDX_PATTERN_FILE, &transnam, buffer, SIZEOF(buffer), IGNORE_ERRORS_TRUE, NULL);
 	if ((SS_NORMAL != status) || (0 == transnam.len))
 		return 0;
 	if (!load_pattern_table(transnam.len, transnam.addr))
 		return 0;
 	/* Establish default pattern table. */
-	status = TRANS_LOG_NAME(&pat_table,&transnam,buffer, SIZEOF(buffer), do_sendmsg_on_log2long);
+	status = ydb_trans_log_name(YDBENVINDX_PATTERN_TABLE, &transnam,buffer, SIZEOF(buffer), IGNORE_ERRORS_TRUE, NULL);
 	if ((SS_NORMAL != status) || (0 == transnam.len))
 		return 0;
 	patname.len = transnam.len;

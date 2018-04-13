@@ -3,6 +3,9 @@
  * Copyright (c) 2008-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -61,7 +64,7 @@ GBLREF	zlib_uncmp_func_t	zlib_uncompress_fnptr;
 
 #define	ZLIB_NUM_DLSYMS		2	/* number of function names that we need to dlsym (compress2 and uncompress) */
 
-GBLREF	int4			gtm_zlib_cmp_level;	/* zlib compression level specified at process startup */
+GBLREF	int4			ydb_zlib_cmp_level;	/* zlib compression level specified at process startup */
 GBLREF	int4			repl_zlib_cmp_level;	/* zlib compression level currently in use in replication pipe */
 
 #define	ZLIB_CMPLVL_MIN		0
@@ -69,7 +72,7 @@ GBLREF	int4			repl_zlib_cmp_level;	/* zlib compression level currently in use in
 					 * future versions of zlib so we dont do any edit checks on this value inside of GT.M */
 #define	ZLIB_CMPLVL_NONE	ZLIB_CMPLVL_MIN
 
-#define	GTM_CMPLVL_OUT_OF_RANGE(x)	(ZLIB_CMPLVL_MIN > x)
+#define	YDB_CMPLVL_OUT_OF_RANGE(x)	(ZLIB_CMPLVL_MIN > x)
 
 void gtm_zlib_init(void);
 

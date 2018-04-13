@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -144,7 +147,7 @@ uint4 jnl_file_open(gd_region *reg, boolean_t init)
 			}
 #			ifdef DEBUG
 			/* Will fail if Source Server would need to switch journal files. */
-			assert((gtm_white_box_test_case_enabled && (WBTEST_JNL_SWITCH_EXPECTED == gtm_white_box_test_case_number))
+			assert((ydb_white_box_test_case_enabled && (WBTEST_JNL_SWITCH_EXPECTED == ydb_white_box_test_case_number))
 					|| (0 == sts) || (!is_src_server));
 #			endif
 			if ((0 != sts) && switch_and_retry)
@@ -217,9 +220,9 @@ uint4 jnl_file_open(gd_region *reg, boolean_t init)
 			} else
 			{	/* not init and file moved */
 				SET_JPC_ERR_STR(ERR_JNLOPNERR, ERR_JNLMOVED, buff);
-				assert(gtm_white_box_test_case_enabled
-					&& ((WBTEST_JNLOPNERR_EXPECTED == gtm_white_box_test_case_number)
-						|| (WBTEST_JNL_CREATE_FAIL == gtm_white_box_test_case_number)));
+				assert(ydb_white_box_test_case_enabled
+					&& ((WBTEST_JNLOPNERR_EXPECTED == ydb_white_box_test_case_number)
+						|| (WBTEST_JNL_CREATE_FAIL == ydb_white_box_test_case_number)));
 			}
 		} else
 		{	/* stat failed */

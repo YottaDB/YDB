@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +27,7 @@
 #define SPACE_NEEDED (SIZEOF(blk_hdr) - SIZEOF(v15_blk_hdr))
 
 GBLREF	boolean_t	gtm_blkupgrade_override;
-GBLREF	uint4		gtm_blkupgrade_flag;	/* control whether dynamic upgrade is attempted or not */
+GBLREF	uint4		ydb_blkupgrade_flag;	/* control whether dynamic upgrade is attempted or not */
 
 error_def(ERR_DYNUPGRDFAIL);
 
@@ -47,14 +50,14 @@ int4 gds_blk_upgrade(sm_uc_ptr_t gds_blk_src, sm_uc_ptr_t gds_blk_trg, int4 blks
 	assert(0 == ((long)gds_blk_trg & 0x7));
 	v15bp = (v15_blk_hdr_ptr_t)gds_blk_src;
 	bp = (blk_hdr_ptr_t)gds_blk_trg;
-	assert((SIZEOF(v15_blk_hdr) <= v15bp->bsiz) || (UPGRADE_ALWAYS == gtm_blkupgrade_flag));
+	assert((SIZEOF(v15_blk_hdr) <= v15bp->bsiz) || (UPGRADE_ALWAYS == ydb_blkupgrade_flag));
 	UNIX_ONLY(v15tn = v15bp->tn);
 	VMS_ONLY(GET_ULONG(v15tn, &v15bp->tn));
 	v15bsiz = v15bp->bsiz;
 	if (v15bsiz > blksize) /* Exceeds maximum block size. Not a valid V4 block. Return without upgrading */
 	{
-		assert(UPGRADE_NEVER != gtm_blkupgrade_flag);
-		if (UPGRADE_IF_NEEDED == gtm_blkupgrade_flag)
+		assert(UPGRADE_NEVER != ydb_blkupgrade_flag);
+		if (UPGRADE_IF_NEEDED == ydb_blkupgrade_flag)
 		{
 			if (NULL != ondsk_blkver)
 				*ondsk_blkver = GDSV6;

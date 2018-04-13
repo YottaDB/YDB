@@ -39,6 +39,7 @@
 #include "min_max.h"
 #include "have_crit.h"
 #include "gtm_malloc.h"		/* for verifyAllocatedStorage */
+#include "ydb_getenv.h"
 
 /******************************************************************************
  *
@@ -378,7 +379,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 {
 	boolean_t	error_in_xc = FALSE, save_in_ext_call;
 	char		*free_string_pointer, *free_string_pointer_start, jtype_char;
-	char		str_buffer[MAX_NAME_LENGTH], *tmp_buff_ptr, *jni_err_buf;
+	char		*jni_err_buf;
 	char		*types_descr_ptr, *types_descr_dptr, *xtrnl_table_name;
 	gparam_list	*param_list;
 	gtm_long_t	*free_space_pointer;
@@ -677,23 +678,11 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 				extarg2mval((void *)status, entry_ptr->return_type, dst, TRUE, FALSE);
 			else
 			{
-				memcpy(str_buffer, PACKAGE_ENV_PREFIX, SIZEOF(PACKAGE_ENV_PREFIX));
-				tmp_buff_ptr = &str_buffer[SIZEOF(PACKAGE_ENV_PREFIX) - 1];
 				if (package->str.len)
-				{
-					assert(package->str.len < MAX_NAME_LENGTH - SIZEOF(PACKAGE_ENV_PREFIX) - 1);
-					*tmp_buff_ptr++ = '_';
-					memcpy(tmp_buff_ptr, package->str.addr, package->str.len);
-					tmp_buff_ptr += package->str.len;
-				}
-				*tmp_buff_ptr = '\0';
-				xtrnl_table_name = GETENV(str_buffer);
-				if (NULL == xtrnl_table_name)
-				{ 	/* Environment variable for the package not found. This part of code is for more safety.
-					 * We should not come into this path at all.
-					 */
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
-				}
+					xtrnl_table_name = ydb_getenv(YDBENVINDX_XC_PREFIX, &package->str, NULL_IS_YDB_ENV_MATCH);
+				else
+					xtrnl_table_name = ydb_getenv(YDBENVINDX_XC, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
+				assert(NULL != xtrnl_table_name);	/* or else a ZCCTENV error would have been issued earlier */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_XCVOIDRET, 4,
 					  LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
 			}
@@ -709,7 +698,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 {
 	boolean_t	java = FALSE, save_in_ext_call, is_tpretry;
 	char		*free_string_pointer, *free_string_pointer_start;
-	char		str_buffer[MAX_NAME_LENGTH], *tmp_buff_ptr, *xtrnl_table_name;
+	char		*xtrnl_table_name;
 	int		i, pre_alloc_size, rslt, save_mumps_status;
 	int4 		callintogtm_vectorindex, n;
 	gparam_list	*param_list;
@@ -1038,23 +1027,11 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 			extarg2mval((void *)status, entry_ptr->return_type, dst, FALSE, FALSE);
 		else
 		{
-			memcpy(str_buffer, PACKAGE_ENV_PREFIX, SIZEOF(PACKAGE_ENV_PREFIX));
-			tmp_buff_ptr = &str_buffer[SIZEOF(PACKAGE_ENV_PREFIX) - 1];
 			if (package->str.len)
-			{
-				assert(package->str.len < MAX_NAME_LENGTH - SIZEOF(PACKAGE_ENV_PREFIX) - 1);
-				*tmp_buff_ptr++ = '_';
-				memcpy(tmp_buff_ptr, package->str.addr, package->str.len);
-				tmp_buff_ptr += package->str.len;
-			}
-			*tmp_buff_ptr = '\0';
-			xtrnl_table_name = GETENV(str_buffer);
-			if (NULL == xtrnl_table_name)
-			{	/* Environment variable for the package not found. This part of code is for more safety.
-				 * We should not come into this path at all.
-				 */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTENV, 2, LEN_AND_STR(str_buffer));
-			}
+				xtrnl_table_name = ydb_getenv(YDBENVINDX_XC_PREFIX, &package->str, NULL_IS_YDB_ENV_MATCH);
+			else
+				xtrnl_table_name = ydb_getenv(YDBENVINDX_XC, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
+			assert(NULL != xtrnl_table_name);	/* or else a ZCCTENV error would have been issued earlier */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_XCVOIDRET, 4,
 				  LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
 		}

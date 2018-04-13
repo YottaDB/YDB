@@ -153,7 +153,7 @@ boolean_t db_ipcs_reset(gd_region *reg)
 		 * BEFORE removing the semaphore as otherwise the waiting process in db_init will notice the semaphore removal
 		 * first and will read the file header and can potentially notice the stale semid/shmid values.
 		 */
-		if (!reg->read_only DEBUG_ONLY(&& !TREF(gtm_usesecshr)))
+		if (!reg->read_only DEBUG_ONLY(&& !TREF(ydb_usesecshr)))
 		{
 			csd->semid = INVALID_SEMID;
 			csd->shmid = INVALID_SHMID;

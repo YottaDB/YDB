@@ -367,8 +367,8 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 #	endif
 
 #	ifdef DEBUG
-	if (gtm_white_box_test_case_enabled
-		&& (WBTEST_SENDTO_EPERM == gtm_white_box_test_case_number))
+	if (ydb_white_box_test_case_enabled
+		&& (WBTEST_SENDTO_EPERM == ydb_white_box_test_case_number))
 	{
 		FPRINTF(stderr, "MUPIP BACKUP is about to start long sleep\n");
 	}
@@ -1210,7 +1210,7 @@ void mutex_salvage(gd_region *reg)
 			/* The process might have been STOPPED (kill -SIGSTOP). Send SIGCONT and nudge the stopped process forward.
 			 * However, skip this call in case of SENDTO_EPERM white-box test, because we do not want the intentionally
 			 * stuck process to be awakened prematurely. */
-			DEBUG_ONLY(if (!gtm_white_box_test_case_enabled || WBTEST_SENDTO_EPERM != gtm_white_box_test_case_number))
+			DEBUG_ONLY(if (!ydb_white_box_test_case_enabled || WBTEST_SENDTO_EPERM != ydb_white_box_test_case_number))
 				continue_proc(holder_pid);
 		}
 		/* Record salvage event in db file header if applicable.

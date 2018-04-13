@@ -3,6 +3,9 @@
  * Copyright (c) 2017 Fidelity National Information 		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -102,7 +105,7 @@ void lvmon_pull_values(int lvmon_ary_idx)
 		{	/* We have a string, see about storing it in a malloc'd buffer. Since we are going
 			 * to be monitoring stringpool garbage collection, it is best to keep our comparison
 			 * values out of the stringpool so we can avoid having "stp_gcol" process our value
-			 * array. Note every $gtm_white_box_test_case_count times, we will copy he wrong value
+			 * array. Note every $ydb_white_box_test_case_count times, we will copy he wrong value
 			 * to force an error to occur.
 			 */
 #			ifdef DEBUG

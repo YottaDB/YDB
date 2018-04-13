@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@ GBLREF	uint4			process_id;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		exit_handler_active;
-GBLREF	boolean_t		gtm_quiet_halt;
+GBLREF	boolean_t		ydb_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 GBLREF  intrpt_state_t          intrpt_ok_state;
 
@@ -77,7 +77,7 @@ void deferred_signal_handler(void)
 	 * This routine will output those delayed messages from the appropriate structures to both the
 	 * user and the system console.
 	 */
-	if (ERR_FORCEDHALT != forced_exit_err || !gtm_quiet_halt) /* No HALT messages if quiet halt is requested */
+	if (ERR_FORCEDHALT != forced_exit_err || !ydb_quiet_halt) /* No HALT messages if quiet halt is requested */
 		forced_exit_err_display();
 	assert(OK_TO_INTERRUPT);
 	/* Signal intent to exit BEFORE driving condition handlers. This avoids checks that will otherwise fail (for example
@@ -88,8 +88,8 @@ void deferred_signal_handler(void)
 	 */
 	SET_PROCESS_EXITING_TRUE;
 #	ifdef DEBUG
-	if (gtm_white_box_test_case_enabled && (WBTEST_DEFERRED_TIMERS == gtm_white_box_test_case_number)
-		&& (2 == gtm_white_box_test_case_count))
+	if (ydb_white_box_test_case_enabled && (WBTEST_DEFERRED_TIMERS == ydb_white_box_test_case_number)
+		&& (2 == ydb_white_box_test_case_count))
 	{
 		DEFER_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
 		DBGFPF((stderr, "DEFERRED_SIGNAL_HANDLER: will sleep for 20 seconds\n"));

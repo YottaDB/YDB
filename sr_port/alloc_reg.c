@@ -110,7 +110,7 @@ void alloc_reg(void)
 				 */
 				for (c = temphigh[TVAL_REF]; 0 <= c; c--)
 				{
-					assert((GTM_BOOL != TREF(gtm_fullbool)) || (0 == tempcont[TVAL_REF][c]));
+					assert((YDB_BOOL != TREF(ydb_fullbool)) || (0 == tempcont[TVAL_REF][c]));
 					tempcont[TVAL_REF][c] = 0;	/* prevent leaking TVAL temps */
 				}
 				if (OC_LINESTART == opc)

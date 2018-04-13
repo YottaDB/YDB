@@ -38,6 +38,7 @@
 
 #include "gtm_tls_interface.h"
 #include "gtm_tls_impl.h"
+#include "ydb_getenv.h"
 
 GBLDEF	int			tls_errno;
 GBLDEF	gtmtls_passwd_list_t	*gtmtls_passwd_listhead;
@@ -517,11 +518,11 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	/* Read the configuration file for more configuration parameters. */
 	cfg = &gtm_tls_cfg;
 	config_init(cfg);
-	if (NULL == (config_env = getenv("gtmcrypt_config")))
+	if (NULL == (config_env = ydb_getenv(YDBENVINDX_CRYPT_CONFIG, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 	{
 		if (!(GTMTLS_OP_INTERACTIVE_MODE & flags))
 		{	/* allow no config file if interactive for simple client usage */
-			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, "gtmcrypt_config");
+			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, "ydb_crypt_config/gtmcrypt_config");
 			SSL_CTX_free(ctx);
 			return NULL;
 		} else
@@ -726,20 +727,19 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	return gtm_tls_ctx;
 }
 
-STATICFNDEF gtmtls_passwd_list_t *gtm_tls_find_pwent(const char *input_env_name)
+STATICFNDEF gtmtls_passwd_list_t *gtm_tls_find_pwent(ydbenvindx_t envindx, char *input_suffix)
 {
 	gtmtls_passwd_list_t	*pwent_node;
-	char			*env_name_ptr;
-	int			len, inputlen;
+	char			*suffix;
+	int			suffixlen, input_suffixlen;
 
-	inputlen = STRLEN(input_env_name);
+	input_suffixlen = (NULL != input_suffix) ? STRLEN(input_suffix) : 0;
 	for (pwent_node = gtmtls_passwd_listhead; NULL != pwent_node; pwent_node = pwent_node->next)
 	{	/* Lookup to see if we already have a password for the tlsid. */
-		env_name_ptr = pwent_node->pwent->env_name;
-		len = STRLEN(env_name_ptr);
-		assert(len < PASSPHRASE_ENVNAME_MAX);
-		assert(len > SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1);
-		if ((len == inputlen) && (0 == strcmp(input_env_name, env_name_ptr)))
+		suffix = pwent_node->pwent->suffix;
+		suffixlen = STRLEN(suffix);
+		assert(PASSPHRASE_ENVNAME_MAX > (STRLEN(ydbenvname[envindx]) + suffixlen));
+		if ((suffixlen == input_suffixlen) && (0 == strcmp(input_suffix, suffix)))
 			break;	/* We already have a password for the tlsid. */
 	}
 	return pwent_node;
@@ -747,8 +747,7 @@ STATICFNDEF gtmtls_passwd_list_t *gtm_tls_find_pwent(const char *input_env_name)
 
 int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *obs_passwd)
 {
-	char			*env_name_ptr, env_name[PASSPHRASE_ENVNAME_MAX];
-	int			env_name_len, obs_len;
+	int			obs_len;
 	gtmtls_passwd_list_t	*pwent_node;
 	passwd_entry_t		*pwent;
 
@@ -756,17 +755,10 @@ int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *
 	if (!(GTMTLS_OP_INTERACTIVE_MODE & tls_ctx->flags))
 		return 0;	/* Not running in an interactive mode. */
 	assert(NULL != tlsid);
-	env_name_len = STRLEN(tlsid);
-	assert(0 < env_name_len);
-	assert(PASSPHRASE_ENVNAME_MAX >= ((SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1) + env_name_len));
-	assert(PASSPHRASE_ENVNAME_MAX > env_name_len);
-	env_name_ptr = env_name;
-	strcpy(env_name_ptr, GTMTLS_PASSWD_ENV_PREFIX);
-	env_name_ptr += (SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1);
-	strncpy(env_name_ptr, tlsid, (PASSPHRASE_ENVNAME_MAX - (SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1)));
-	env_name[PASSPHRASE_ENVNAME_MAX - 1] = '\0';
+	assert(0 < STRLEN(tlsid));
+	assert(PASSPHRASE_ENVNAME_MAX > ((STRLEN(ydbenvname[YDBENVINDX_TLS_PASSWD_PREFIX]) + STRLEN(tlsid))));
 	obs_len = STRLEN(obs_passwd);
-	pwent_node = gtm_tls_find_pwent(env_name);
+	pwent_node = gtm_tls_find_pwent(YDBENVINDX_TLS_PASSWD_PREFIX, (char *)tlsid);
 	if (NULL != pwent_node)
 	{
 		pwent = pwent_node->pwent;
@@ -775,12 +767,13 @@ int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *
 	}
 	/* Either no entry for tlsid or need to replace with new value */
 	pwent = MALLOC(SIZEOF(passwd_entry_t));
-	strcpy(pwent->env_name, env_name);
+	pwent->envindx = YDBENVINDX_TLS_PASSWD_PREFIX;
+	strcpy(pwent->suffix, tlsid);
 	pwent->env_value = MALLOC(obs_len + 1);
 	memcpy(pwent->env_value, obs_passwd, obs_len + 1);	/* include null */
 	pwent->passwd = NULL;
 	pwent->passwd_len = 0;
-	if (0 == gc_update_passwd(pwent->env_name, &pwent, NULL, GTMTLS_OP_NOPWDENVVAR))
+	if (0 == gc_update_passwd(YDBENVINDX_TLS_PASSWD_PREFIX, (char *)tlsid, &pwent, NULL, GTMTLS_OP_NOPWDENVVAR))
 	{
 		pwent_node = MALLOC(SIZEOF(gtmtls_passwd_list_t));
 		pwent_node->next = gtmtls_passwd_listhead;
@@ -797,6 +790,11 @@ void gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
 	gtmtls_passwd_list_t	*pwent_node;
 	passwd_entry_t		*pwent;
 
+	assert(FALSE);	/* This assert replaces the below assert which is commented since this code is currently
+			 * not invoked by anyone (which is what the new assert checks) but if/when this code
+			 * is invoked, the above "getenv" call needs to be converted to an appropriate "ydb_getenv" call.
+			 */
+#	ifdef GTM_SOCKET_SSL_SUPPORT
 	assert((NULL != (env_value = getenv(env_name))) && (0 == STRLEN(env_value)));
 	if (!(GTMTLS_OP_INTERACTIVE_MODE & tls_ctx->flags))
 		return;	/* Not running in an interactive mode. Cannot prompt for password. */
@@ -806,7 +804,10 @@ void gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
 	env_name_ptr += (SIZEOF(GTMTLS_PASSWD_ENV_PREFIX) - 1);
 	SNPRINTF(prompt, GTM_PASSPHRASE_MAX_ASCII, "Enter passphrase for TLSID %s: ", env_name_ptr);
 	pwent = NULL;
-	if (0 == gc_update_passwd(env_name, &pwent, prompt, TRUE))
+	assert(FALSE);	/* this is for the NULL use in the 2nd parameter below. It needs to be a non-null suffix string
+			 * but not sure what that is now since this is unused code. Fix it if/when this assert fails.
+			 */
+	if (0 == gc_update_passwd(YDBENVINDX_TLS_PASSWD_PREFIX, NULL, &pwent, prompt, TRUE))
 	{
 		pwent_node = MALLOC(SIZEOF(gtmtls_passwd_list_t));
 		pwent_node->next = gtmtls_passwd_listhead;
@@ -816,6 +817,7 @@ void gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
 	/* else, something went wrong while acquiring the password. Don't report it now. Later, `gtm_tls_socket' makes another
 	 * attempt to acquire the password.
 	 */
+#	endif
 }
 
 static int copy_tlsid_elem(const config_t *tmpcfg, config_t *cfg, config_setting_t *tlsid, const char *idstr, const char *elemname,
@@ -934,7 +936,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 #	else
 	long int		verify_depth, session_timeout;
 #	endif
-	char			cfg_path[MAX_CONFIG_LOOKUP_PATHLEN], input_env_name[PASSPHRASE_ENVNAME_MAX + 1], *env_name_ptr;
+	char			cfg_path[MAX_CONFIG_LOOKUP_PATHLEN], *env_name_ptr;
 	char			prompt[GTM_PASSPHRASE_MAX_ASCII + 1];
 	const char		*cert, *private_key, *format, *cipher_list, *options_string, *verify_mode_string;
 	const char		*verify_level_string, *session_id_hex, *CAfile = NULL;
@@ -1137,14 +1139,13 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 				return NULL;
 			}
 			/* Before setting up the private key, check-up on the password for the private key. */
-			SNPRINTF(input_env_name, PASSPHRASE_ENVNAME_MAX, GTMTLS_PASSWD_ENV_PREFIX "%s", id);
 			/* Lookup to see if we have already prefetched the password. */
-			pwent_node = gtm_tls_find_pwent(input_env_name);
+			pwent_node = gtm_tls_find_pwent(YDBENVINDX_TLS_PASSWD_PREFIX, id);
 			if (NULL == pwent_node)
 			{	/* Lookup failed. Create a new entry for the given id. */
 				pwent = NULL;
 				SNPRINTF(prompt, GTM_PASSPHRASE_MAX_ASCII, "Enter passphrase for TLSID %s:", id);
-				if (0 != gc_update_passwd(input_env_name, &pwent, prompt, 0))
+				if (0 != gc_update_passwd(YDBENVINDX_TLS_PASSWD_PREFIX, id, &pwent, prompt, 0))
 				{
 					SSL_free(ssl);
 					return NULL;

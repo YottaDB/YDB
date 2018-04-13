@@ -443,11 +443,11 @@ sm_uc_ptr_t rtnobj_shm_malloc(zro_hist *zhist, int fd, off_t objSize, gtm_uint64
 		if ((rtnobj_sm_off_t)NULL_RTNOBJ_SM_OFF_T != shm_index_off)
 		{	/* If found return */
 			assert(rtnobj->initialized);
-			/* If gtm_autorelink_keeprtn is FALSE (i.e. we maintain reference counts even on process exit),
+			/* If ydb_autorelink_keeprtn is FALSE (i.e. we maintain reference counts even on process exit),
 			 * we do not expect refcnt to go to high values as it is the # of processes concurrently running
 			 * and actively using this buffer and that cannot be close to 2**31 which is the max value for refcnt.
 			 */
-			assert(TREF(gtm_autorelink_keeprtn) || (REFCNT_INACCURATE != rtnobj->refcnt));
+			assert(TREF(ydb_autorelink_keeprtn) || (REFCNT_INACCURATE != rtnobj->refcnt));
 			if (REFCNT_INACCURATE != rtnobj->refcnt)
 				rtnobj->refcnt++;	/* increment refcnt while holding the rtnobj_lock */
 			if (has_relinkctl_lock)
@@ -909,7 +909,7 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 				ERR_RLNKRECLATCH, 3, relinkrec->rtnname_fixed.c, RTS_ERROR_MSTR(&linkctl->zro_entry_name));
 	}
 	assert(0 < rtnobj->refcnt);
-	assert(TREF(gtm_autorelink_keeprtn) || (REFCNT_INACCURATE != rtnobj->refcnt));
+	assert(TREF(ydb_autorelink_keeprtn) || (REFCNT_INACCURATE != rtnobj->refcnt));
 	if (REFCNT_INACCURATE != rtnobj->refcnt)
 		rtnobj->refcnt--;	/* decrement refcnt while holding the rtnobj_lock */
 	if (rtnobj->refcnt)

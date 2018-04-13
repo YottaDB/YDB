@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -303,7 +306,7 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 					header, read_write_size, jpc->status, jpc->status2);
 			if (SS_NORMAL != jpc->status)
 			{
-				assert(WBTEST_RECOVER_ENOSPC == gtm_white_box_test_case_number);
+				assert(WBTEST_RECOVER_ENOSPC == ydb_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLWRERR, 2, JNL_LEN_STR(csd), jpc->status);
 			}
 			jb->filesize = new_alq;	/* Actually this is virtual file size blocks */

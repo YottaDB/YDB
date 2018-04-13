@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,6 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "gtmrecv.h"
-#include "gtm_logicals.h"
 #include "min_max.h"
 #include "util.h"
 #include "mu_rndwn_replpool.h"

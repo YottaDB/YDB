@@ -88,10 +88,13 @@ int dlopen_libyottadb(int argc, char **argv, char **envp, char *main_func)
 		FPRINTF(stderr, "%%YDB-E-DISTPATHMAX, Executable path length is greater than maximum (%d)\n", YDB_DIST_PATH_MAX);
 		return ERR_DISTPATHMAX;
 	}
-	/* Now set "ydb_dist" (and "gtm_dist") to the obtained canonical path. "pathptr" points to that. */
+	/* Now set "ydb_dist" (and "gtm_dist") to the obtained canonical path. "pathptr" points to that.
+	 * Note that we cannot ydbenvname[YDBENVINDX_DIST] and gtmenvname[YDBENVINDX_DIST] like is used in gtmci.c
+	 * because those are available in libyottadb.so which is not yet open at this point.
+	 */
 	assert(DIR_SEPARATOR == *tmpptr);
 	*tmpptr = '\0';
-	status = setenv(YDB_DIST, pathptr, TRUE);
+	status = setenv("ydb_dist", pathptr, TRUE);
 	if (status)
 	{
 		assert(-1 == status);

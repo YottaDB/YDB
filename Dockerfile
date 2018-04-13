@@ -1,3 +1,14 @@
+#################################################################
+#								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
 # See README.md for more information about this Dockerfile
 # Simple build/running directions are below:
 #
@@ -5,7 +16,7 @@
 #   $ docker build -t yottadb/yottadb:latest .
 #
 # Use with data persistence:
-#   $ docker run --rm -e gtm_chset=utf-8 -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
+#   $ docker run --rm -e ydb_chset=utf-8 -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
 
 # Stage 1: YottaDB build image
 FROM ubuntu as ydb-release-builder

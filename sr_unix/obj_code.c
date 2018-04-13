@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,12 +48,6 @@
 
 GBLDEF uint4 			lits_text_size, lits_mval_size;
 
-IA64_DEBUG_ONLY(GBLREF int4 	generated_count;)
-IA64_DEBUG_ONLY(GBLREF int4	calculated_count;)
-IA64_DEBUG_ONLY(GBLREF struct inst_count 	generated_details[MAX_CODE_COUNT];)
-IA64_DEBUG_ONLY(GBLREF struct inst_count	calculated_details[MAX_CODE_COUNT];)
-IA64_ONLY(GBLREF int4      	generated_code_size;)
-IA64_ONLY(GBLREF int4		calculated_code_size;)
 GBLREF int4			curr_addr, code_size;
 GBLREF char			cg_phase;	/* code generation phase */
 GBLREF char			cg_phase_last;	/* previous code generation phase */
@@ -150,19 +147,12 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	curr_addr = PTEXT_OFFSET;
 	cg_phase = CGP_APPROX_ADDR;
 	cg_phase_last = CGP_NOSTATE;
-	IA64_ONLY(calculated_code_size = 0);
-	IA64_DEBUG_ONLY(calculated_count = 0);
 	code_gen();
 	code_size = curr_addr;
 	cg_phase = CGP_ADDR_OPT;
 	comp_lits(&rhead);
 	old_code_size = code_size;
 	shrink_trips();
-	IA64_ONLY
-	(
-		if (old_code_size != code_size)
-			calculated_code_size -= ((old_code_size - code_size)/16);
-	)
 	if ((cmd_qlf.qlf & CQ_MACHINE_CODE))
 	{
 		cg_phase = CGP_ASSEMBLY;
@@ -171,7 +161,6 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	if (!(cmd_qlf.qlf & CQ_OBJECT))
 		return;
 	/* Executable code offset setup */
-	IA64_ONLY(assert(!(PTEXT_OFFSET % SECTION_ALIGN_BOUNDARY)));
 	rhead.ptext_adr = (unsigned char *)PTEXT_OFFSET;
 	rhead.ptext_end_adr = (unsigned char *)(size_t)code_size;
 	/* Line number table offset setup */
@@ -243,31 +232,7 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	create_object_file(&rhead);
 	ENABLE_INTERRUPTS(INTRPT_IN_OBJECT_FILE_COMPILE, prev_intrpt_state);
 	cg_phase = CGP_MACHINE;
-	IA64_ONLY(generated_code_size = 0);
-	IA64_DEBUG_ONLY(generated_count = 0);
 	code_gen();
-	IA64_DEBUG_ONLY(
-	if (calculated_code_size != generated_code_size)
-	{
-		if (getenv("DUMP_CODE_SIZE_DIFFERENCE"))
-		{
-			PRINTF("Here is the instruction count for each triple type :\n");
-			for (i = 0; i < MAX(calculated_count, generated_count); i++)
-			{
-				if (calculated_details[i].size != generated_details[i].size ||
-				    calculated_details[i].sav_in != generated_details[i].sav_in)
-					PRINTF("[X]");
-				else
-					PRINTF("[ ]");
-			}
-			PRINTF("calculated (size = %d save_in = 0x%x)  gen (size = %d save_in = 0x%x)\n",
-			       calculated_details[i].size, calculated_details[i].sav_in, generated_details[i].size,
-			       generated_details[i].sav_in);
-		} else
-			PRINTF("Set the env variable - DUMP_CODE_SIZE_DIFFERENCE - to see more details about the difference\n");
-	}
-	)
-	IA64_ONLY(assert(calculated_code_size == generated_code_size));
 	/* External entry definitions (line number table */
 	offset = (int4)(mline_root.externalentry->rtaddr - PTEXT_OFFSET);
 	emit_immed((char *)&offset, SIZEOF(offset));	/* line 0 */

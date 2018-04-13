@@ -76,9 +76,8 @@
 #include "svnames.h"
 #include "jobinterrupt_init.h"
 #include "zco_init.h"
-#include "gtm_logicals.h"	/* for DISABLE_ALIGN_STRINGS */
 #include "suspsigs_handler.h"
-#include "logical_truth_value.h"
+#include "ydb_logical_truth_value.h"
 #include "gtm_utf8.h"
 #include "gtm_icu_api.h"	/* for u_strToUpper and u_strToLower */
 #include "gtm_conv.h"
@@ -203,9 +202,7 @@ void gtm_startup(struct startup_vector *svec)
 #	endif
 	gtm_utf8_init(); /* Initialize the runtime for Unicode */
 	/* Initialize alignment requirement for the runtime stringpool */
-	log_name.addr = DISABLE_ALIGN_STRINGS;
-	log_name.len = STR_LIT_LEN(DISABLE_ALIGN_STRINGS);
-	/* mstr_native_align = logical_truth_value(&log_name, FALSE, NULL) ? FALSE : TRUE; */
+	/* mstr_native_align = ydb_logical_truth_value(YDBENVINDX_DISABLE_ALIGNSTR, FALSE, NULL) ? FALSE : TRUE; */
 	mstr_native_align = FALSE; /* TODO: remove this line and uncomment the above line */
 	getjobname();
 	getzprocess();
@@ -319,19 +316,19 @@ void gtm_utf8_init(void)
 		 * structure where both dimensions are variable.
 		 */
 #       	ifdef UNICODE_SUPPORTED
-		utfcgr_size = OFFSETOF(utfcgr, entry) + (SIZEOF(utfcgr_entry) * TREF(gtm_utfcgr_string_groups));
-		alloc_size = utfcgr_size * TREF(gtm_utfcgr_strings);
+		utfcgr_size = OFFSETOF(utfcgr, entry) + (SIZEOF(utfcgr_entry) * TREF(ydb_utfcgr_string_groups));
+		alloc_size = utfcgr_size * TREF(ydb_utfcgr_strings);
 		(TREF(utfcgra)).utfcgrs = utfcgrp = (utfcgr *)malloc(alloc_size);
 		memset((char *)utfcgrp, 0, alloc_size);			/* Init to zeros */
-		for (i = 0, p = utfcgrp; TREF(gtm_utfcgr_strings) > i; i++, p = (utfcgr *)((INTPTR_T)p + utfcgr_size))
+		for (i = 0, p = utfcgrp; TREF(ydb_utfcgr_strings) > i; i++, p = (utfcgr *)((INTPTR_T)p + utfcgr_size))
 			/* Initialize cache structure for UTF8 string scan lookaside cache */
 			p->idx = i;					/* Initialize index value */
 		(TREF(utfcgra)).utfcgrsize = utfcgr_size;
 		(TREF(utfcgra)).utfcgrsteal = utfcgrp;			/* Starting place to look for cache reuse */
 		/* Pointer to the last usable utfcgr struct */
-		(TREF(utfcgra)).utfcgrmax = (utfcgr *)((UINTPTR_T)utfcgrp + ((TREF(gtm_utfcgr_strings) - 1) * utfcgr_size));
+		(TREF(utfcgra)).utfcgrmax = (utfcgr *)((UINTPTR_T)utfcgrp + ((TREF(ydb_utfcgr_strings) - 1) * utfcgr_size));
 		/* Spins to find non-(recently)-referenced cache slot before we overwrite an entry */
-		TREF(utfcgr_string_lookmax) = TREF(gtm_utfcgr_strings) / UTFCGR_MAXLOOK_DIVISOR;
+		TREF(utfcgr_string_lookmax) = TREF(ydb_utfcgr_strings) / UTFCGR_MAXLOOK_DIVISOR;
 #		endif /* UNICODE_SUPPORTED */
 	}
 }

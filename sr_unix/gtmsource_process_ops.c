@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -375,7 +375,7 @@ int gtmsource_alloc_msgbuff(int maxbuffsize, boolean_t discard_oldbuff)
 			free(oldmsgp);
 		}
 		gtmsource_msgbufsiz = maxbuffsize;
-		if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
+		if (ZLIB_CMPLVL_NONE != ydb_zlib_cmp_level)
 		{	/* Compression is enabled. Allocate parallel buffers to hold compressed journal records.
 			 * Allocate extra space just in case compression actually expands the data (needed only in rare cases).
 			 */
@@ -397,7 +397,7 @@ void gtmsource_free_msgbuff(void)
 		free(gtmsource_msgp);
 		gtmsource_msgp = NULL;
 		gtmsource_msgbufsiz = 0;
-		if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
+		if (ZLIB_CMPLVL_NONE != ydb_zlib_cmp_level)
 		{	/* Compression is enabled. Free up compression buffer as well. */
 			assert(NULL != gtmsource_cmpmsgp);
 			free(gtmsource_cmpmsgp);
@@ -918,7 +918,7 @@ int gtmsource_get_jnlrecs(uchar_ptr_t buff, int *data_len, int maxbufflen, boole
 				assert(total_tr_len >= (SIZEOF(jnldata_hdr_struct) + SIZEOF(jrec_prefix)));
 				if (JRT_BAD != ((jrec_prefix *)buff)->jrec_type)
 					return (total_tr_len);
-				assert((0 != TREF(gtm_test_jnlpool_sync)) && (0 == (read_jnl_seqno % TREF(gtm_test_jnlpool_sync))));
+				assert((0 != TREF(ydb_test_jnlpool_sync)) && (0 == (read_jnl_seqno % TREF(ydb_test_jnlpool_sync))));
 				*data_len = -1;	/* so we do fall through to READ_FILE code below */
 			}
 			if (0 < *data_len)
@@ -1193,7 +1193,7 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(gtm_zlib_cmp_level);
+	assert(ydb_zlib_cmp_level);
 	/*************** Send REPL_CMP_TEST message ***************/
 	memset(&test_msg, 0, SIZEOF(test_msg));
 	test_msg.type = REPL_CMP_TEST;
@@ -1206,7 +1206,7 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 		inputdata[index] = (start + index) % REPL_MSG_CMPDATALEN;
 	/* Compress the data */
 	cmplen = SIZEOF(cmpbuf);	/* initialize it to the available compressed buffer space */
-	ZLIB_COMPRESS(&cmpbuf[0], cmplen, inputdata, REPL_MSG_CMPDATALEN, gtm_zlib_cmp_level, cmpret);
+	ZLIB_COMPRESS(&cmpbuf[0], cmplen, inputdata, REPL_MSG_CMPDATALEN, ydb_zlib_cmp_level, cmpret);
 	switch(cmpret)
 	{
 		case Z_MEM_ERROR:
@@ -1222,7 +1222,7 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 		case Z_STREAM_ERROR:
 			/* level was incorrectly specified. Default to NO compression. */
 			repl_log(gtmsource_log_fp, TRUE, FALSE, "Compression level %d invalid; Error from compress function"
-				" before sending REPL_CMP_TEST message\n", gtm_zlib_cmp_level);
+				" before sending REPL_CMP_TEST message\n", ydb_zlib_cmp_level);
 			break;
 	}
 	if (Z_OK != cmpret)
@@ -1248,20 +1248,20 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 	/* for in-house testing, set up a timer that would cause assert failure if REPL_CMP_SOLVE is not received
 	 * within 1 or 15 minutes, depending on whether this is a white-box test or not */
 #	ifdef REPL_CMP_SOLVE_TESTING
-	if (TREF(gtm_environment_init))
+	if (TREF(ydb_environment_init))
 			start_timer((TID)repl_cmp_solve_src_timeout, 15 * 60 * 1000, repl_cmp_solve_src_timeout, 0, NULL);
 #	endif
 	/*************** Receive REPL_CMP_SOLVE message ***************/
 	if (!gtmsource_repl_recv((repl_msg_ptr_t)&solve_msg, REPL_MSG_CMPINFOLEN, REPL_CMP_SOLVE, "REPL_CMP_SOLVE"))
 	{
 #		ifdef REPL_CMP_SOLVE_TESTING
-		if (TREF(gtm_environment_init))
+		if (TREF(ydb_environment_init))
 			cancel_timer((TID)repl_cmp_solve_src_timeout);
 #		endif
 		return FALSE; /* recv did not succeed */
 	}
 #	ifdef REPL_CMP_SOLVE_TESTING
-	if (TREF(gtm_environment_init))
+	if (TREF(ydb_environment_init))
 		cancel_timer((TID)repl_cmp_solve_src_timeout);
 #	endif
 	assert(REPL_CMP_SOLVE == solve_msg.type);
@@ -1286,8 +1286,8 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 		assert(solve_msg.proto_ver == remote_side->proto_ver);
 		assert(REPL_PROTO_VER_MULTISITE_CMP <= solve_msg.proto_ver);
 		repl_log(gtmsource_log_fp, TRUE, FALSE, "Receiver server was able to decompress successfully\n");
-		*repl_zlib_cmp_level_ptr = gtm_zlib_cmp_level;
-		repl_log(gtmsource_log_fp, TRUE, FALSE, "Using zlib compression level %d for replication\n", gtm_zlib_cmp_level);
+		*repl_zlib_cmp_level_ptr = ydb_zlib_cmp_level;
+		repl_log(gtmsource_log_fp, TRUE, FALSE, "Using zlib compression level %d for replication\n", ydb_zlib_cmp_level);
 	} else
 	{
 		repl_log(gtmsource_log_fp, TRUE, FALSE, "Receiver server could not decompress successfully\n");

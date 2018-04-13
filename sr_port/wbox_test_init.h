@@ -24,9 +24,9 @@
 #else
 # define REFTYPE GBLREF
 #endif
-REFTYPE	boolean_t	gtm_white_box_test_case_enabled;
-REFTYPE	int		gtm_white_box_test_case_number;
-REFTYPE	int		gtm_white_box_test_case_count;
+REFTYPE	boolean_t	ydb_white_box_test_case_enabled;
+REFTYPE	int		ydb_white_box_test_case_number;
+REFTYPE	int		ydb_white_box_test_case_count;
 REFTYPE	int 		gtm_wbox_input_test_case_count;
 
 void wbox_test_init(void);
@@ -83,7 +83,7 @@ typedef enum {
 	WBTEST_FAIL_ON_SHMGET,			/* 44 : Unix only.  Cause db_init() to fail on shmget */
 	WBTEST_EXTEND_JNL_FSYNC,		/* 45 : enter a long loop upon trying to do jnl_fsync */
 	WBTEST_TRIGR_TPRESTART_MSTOP,		/* 46 : Trigger being restarted gets a MUPIP STOP - shouldn't fail */
-	WBTEST_SENDTO_EPERM,			/* 47 : Will sleep in grab_crit depending on gtm_white_box_test_case_number */
+	WBTEST_SENDTO_EPERM,			/* 47 : Will sleep in grab_crit depending on ydb_white_box_test_case_number */
 	WBTEST_ALLOW_ARBITRARY_FULLY_UPGRADED,	/* 48 : Allows csd->fully_upgraded to take arbitrary values (via DSE) and prevents
 						 *      assert in mur_process_intrpt_recov.c */
 	WBTEST_HOLD_ONTO_FTOKSEM_IN_DBINIT,	/* 49 : Sleep in db_init after getting hold of the ftok semaphore */
@@ -194,13 +194,13 @@ typedef enum {
 } wbtest_code_t;
 
 #ifdef DEBUG
-/* Make sure to setenv gtm_white_box_test_case_count if you are going to use GTM_WHITE_BOX_TEST */
+/* Make sure to setenv ydb_white_box_test_case_count if you are going to use GTM_WHITE_BOX_TEST */
 #define GTM_WHITE_BOX_TEST(input_test_case_num, lhs, rhs)						\
 {													\
-	if (gtm_white_box_test_case_enabled && (gtm_white_box_test_case_number == input_test_case_num))	\
+	if (ydb_white_box_test_case_enabled && (ydb_white_box_test_case_number == input_test_case_num))	\
 	{												\
 		gtm_wbox_input_test_case_count++;							\
-		if (gtm_white_box_test_case_count == gtm_wbox_input_test_case_count)			\
+		if (ydb_white_box_test_case_count == gtm_wbox_input_test_case_count)			\
 		{											\
 			lhs = rhs;									\
 			gtm_wbox_input_test_case_count = 0;						\
@@ -212,7 +212,7 @@ typedef enum {
 #endif
 
 #ifdef DEBUG
-#define WBTEST_ENABLED(WBTEST_NUMBER)	(gtm_white_box_test_case_enabled && (WBTEST_NUMBER == gtm_white_box_test_case_number))
+#define WBTEST_ENABLED(WBTEST_NUMBER)	(ydb_white_box_test_case_enabled && (WBTEST_NUMBER == ydb_white_box_test_case_number))
 #define ENABLE_WBTEST_ABANDONEDKILL									\
 {													\
 	int	sleep_counter;										\
@@ -221,14 +221,14 @@ typedef enum {
 	GTM_WHITE_BOX_TEST(WBTEST_ABANDONEDKILL, sleep_counter, SLEEP_ONE_MIN);				\
 	if (SLEEP_ONE_MIN == sleep_counter)								\
 	{												\
-		assert(gtm_white_box_test_case_enabled);						\
+		assert(ydb_white_box_test_case_enabled);						\
 		util_out_print("!/INFO : WBTEST_ABANDONEDKILL waiting in Phase II of Kill",TRUE);	\
 		while (1 <= sleep_counter)								\
 			wcs_sleep(sleep_counter--);							\
 	}												\
 }
-#define WB_PHASE1_COMMIT_ERR	(WBTEST_BG_UPDATE_BTPUTNULL == gtm_white_box_test_case_number)
-#define WB_PHASE2_COMMIT_ERR	(WBTEST_BG_UPDATE_PHASE2FAIL == gtm_white_box_test_case_number)
+#define WB_PHASE1_COMMIT_ERR	(WBTEST_BG_UPDATE_BTPUTNULL == ydb_white_box_test_case_number)
+#define WB_PHASE2_COMMIT_ERR	(WBTEST_BG_UPDATE_PHASE2FAIL == ydb_white_box_test_case_number)
 #define WB_COMMIT_ERR_ENABLED	(WB_PHASE1_COMMIT_ERR || WB_PHASE2_COMMIT_ERR)	/* convoluted definition to simplify usage */
 #define WBTEST_ASSIGN_ONLY(WBTEST_NUMBER, LHS, RHS)							\
 {													\

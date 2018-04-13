@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -146,7 +149,7 @@ LITREF	mval	literal_null;
  * added to the gvt_tp_list which means if a trollback/tprestart occurs we would not undo this gvt's trigger related
  * cycles. To avoid this issue, we add this gvt to the gvt_tp_list always. The macro anyways does nothing if this gvt
  * has already been added so we should be fine correctness and performance wise.
- */														
+ */
 #define	GVTR_HASHTGBL_READ_CLEANUP(do_gvtr_cleanup)									\
 {															\
 	/* Restore gv_target, gv_currkey & gv_altkey */									\
@@ -280,7 +283,7 @@ LITREF	mval	literal_null;
 		t_retry(cdb_sc_triggermod);							\
 	} else											\
 	{											\
-		assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
+		assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);		\
 		SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);				\
 		GVTR_HASHTGBL_READ_CLEANUP(TRUE);						\
 		/* format "INDEX,SUBSCRIPT" of ^#t(GVN,INDEX,SUBSCRIPT) in the error message */	\
@@ -306,7 +309,7 @@ LITREF	mval	literal_null;
 
 #define HASHT_DEFINITION_ERROR(SUBSCRIPT,MOREINFO,CSA)					\
 {											\
-	assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);		\
+	assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);		\
 	SAVE_VAR_NAME(save_var_name, save_var_name_len, gvt);				\
 	GVTR_HASHTGBL_READ_CLEANUP(TRUE);						\
 	rts_error_csa(CSA_ARG(CSA) VARLSTCNT(12) ERR_TRIGDEFBAD, 6, save_var_name_len,	\
@@ -1094,7 +1097,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 			}
 			assert(index == num_pieces);
 		}
-		/* Read in ^#t("GBL",1,"CHSET")="UTF-8". If CHSET does not match gtm_chset issue error. */
+		/* Read in ^#t("GBL",1,"CHSET")="UTF-8". If CHSET does not match ydb_chset issue error. */
 		is_defined =  gvtr_get_hasht_gblsubs((mval *)&literal_chset, ret_mval);
 		if (!is_defined)
 			GVTR_HASHT_GVN_DEFINITION_RETRY_OR_ERROR(trigidx,",\"CHSET\"", csa);

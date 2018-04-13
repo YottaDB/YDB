@@ -124,7 +124,7 @@ add_definitions(
   )
 
 # Linker
-set(gtm_link  "-Wl,-u,gtm_filename_to_id -Wl,-u,ydb_zstatus -Wl,--version-script,\"${YDB_BINARY_DIR}/ydbexe_symbols.export\"")
+set(ydb_link  "-Wl,-u,gtm_filename_to_id -Wl,-u,ydb_zstatus -Wl,--version-script,\"${YDB_BINARY_DIR}/ydbexe_symbols.export\"")
 set(gtm_dep   "${YDB_BINARY_DIR}/ydbexe_symbols.export")
 
 set(libyottadb_link "-Wl,-u,ydb_ci -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_is_main_thread")

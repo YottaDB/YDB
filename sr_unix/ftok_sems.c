@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -230,12 +233,12 @@ boolean_t ftok_sem_lock(gd_region *reg, boolean_t immediate)
 			if (-1 == status)			/* We couldn't get it at all.. */
 			{
 				save_errno = errno;
-				GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
+				GTM_SEM_CHECK_EINVAL(TREF(ydb_environment_init), save_errno, udi);
 				ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()/semctl()", save_errno);
 			}
 		} else
 		{
-			GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
+			GTM_SEM_CHECK_EINVAL(TREF(ydb_environment_init), save_errno, udi);
 			ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 		}
 	}
@@ -287,7 +290,7 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 			if (-1 == (ftok_semval = semctl(udi->ftok_semid, DB_COUNTER_SEM, GETVAL)))
 			{
 				save_errno = errno;
-				GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
+				GTM_SEM_CHECK_EINVAL(TREF(ydb_environment_init), save_errno, udi);
 				ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 			}
 			/* Below checks against 0, in case already we decremented semaphore number 1 */
@@ -296,7 +299,7 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 				if (0 != sem_rmid(udi->ftok_semid))
 				{
 					save_errno = errno;
-					GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
+					GTM_SEM_CHECK_EINVAL(TREF(ydb_environment_init), save_errno, udi);
 					ISSUE_CRITSEMFAIL_AND_RETURN(reg, "sem_rmid()", save_errno);
 				}
 				udi->ftok_semid = INVALID_SEMID;
@@ -311,14 +314,14 @@ boolean_t ftok_sem_release(gd_region *reg,  boolean_t decr_cnt, boolean_t immedi
 		 */
 		if (0 != (save_errno = do_semop(udi->ftok_semid, DB_COUNTER_SEM, -DB_COUNTER_SEM_INCR, (SEM_UNDO | IPC_NOWAIT))))
 		{
-			GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
+			GTM_SEM_CHECK_EINVAL(TREF(ydb_environment_init), save_errno, udi);
 			ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 		}
 		udi->counter_ftok_incremented = FALSE;
 	}
 	if (0 != (save_errno = do_semop(udi->ftok_semid, DB_CONTROL_SEM, -1, semflag)))
 	{
-		GTM_SEM_CHECK_EINVAL(TREF(gtm_environment_init), save_errno, udi);
+		GTM_SEM_CHECK_EINVAL(TREF(ydb_environment_init), save_errno, udi);
 		ISSUE_CRITSEMFAIL_AND_RETURN(reg, "semop()", save_errno);
 	}
 	udi->grabbed_ftok_sem = FALSE;

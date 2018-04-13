@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -431,7 +434,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				if (CR_NOTVALID == (sm_long_t)cr)
 				{
 					assert(cnl->wc_blocked); /* only reason we currently know wcs_get_space could fail */
-					assert(gtm_white_box_test_case_enabled);
+					assert(ydb_white_box_test_case_enabled);
 					SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 					BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_db_csh_getn_invalid_blk);
 					set_wc_blocked = TRUE;
@@ -455,8 +458,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				buffaddr = (sm_uc_ptr_t)GDS_REL2ABS(cr->buffaddr);
 #				ifdef DEBUG
 				/* stop self to test sechshr_db_clnup clears the read state */
-				if (gtm_white_box_test_case_enabled
-					&& (WBTEST_SIGTSTP_IN_T_QREAD == gtm_white_box_test_case_number))
+				if (ydb_white_box_test_case_enabled
+					&& (WBTEST_SIGTSTP_IN_T_QREAD == ydb_white_box_test_case_number))
 				{	/* this should never fail, but because of the way we developed the test we got paranoid */
 					dummy = kill(process_id, SIGTERM);
 					assert(0 == dummy);

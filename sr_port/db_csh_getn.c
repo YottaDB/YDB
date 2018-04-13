@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -309,7 +312,7 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			{	/* failed to flush it out - force a rebuild */
 				BG_TRACE_PRO(wc_blocked_db_csh_getn_wcsstarvewrt);
 				assert(csa->nl->wc_blocked); /* only reason we currently know why wcs_get_space could fail */
-				assert(gtm_white_box_test_case_enabled);
+				assert(ydb_white_box_test_case_enabled);
 				break;
 			}
 			assert(0 == cr->dirty);

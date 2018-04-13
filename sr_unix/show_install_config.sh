@@ -29,12 +29,15 @@ if [ "OS/390" = $platform_name ]; then ext=".dll" ; fi
 
 base_libname="libgtmcrypt"
 generic_libname=$base_libname$ext
-if [ "x" = x"$gtm_crypt_plugin" ]; then
-	shared_object="$ydb_dist/plugin/$generic_libname"
-	txt="symbolic link pointed by $ydb_dist/plugin/$generic_libname"
-else
+if [ "x" != x"$ydb_crypt_plugin" ]; then
+	shared_object="$ydb_dist/plugin/$ydb_crypt_plugin"
+	txt='$ydb_crypt_plugin'
+elif [ "x" != x"$gtm_crypt_plugin" ]; then
 	shared_object="$ydb_dist/plugin/$gtm_crypt_plugin"
 	txt='$gtm_crypt_plugin'
+else
+	shared_object="$ydb_dist/plugin/$generic_libname"
+	txt="symbolic link pointed by $ydb_dist/plugin/$generic_libname"
 fi
 if [ ! -f $shared_object ] ; then
 	echo "Cannot find $shared_object. Exiting..."

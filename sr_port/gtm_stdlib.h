@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -16,15 +19,9 @@
 
 #include <stdlib.h>
 
-#ifndef __CYGWIN__
-#  define GETENV	getenv
-#else
-char *gtm_getenv(char *varname);
-#  define GETENV 	gtm_getenv
-#endif
-#define ATOI		atoi
-#define ATOL		atol
-#define ATOF		atof
+#define ATOI	atoi
+#define ATOL	atol
+#define ATOF	atof
 
 #ifdef UNIX
 /* If interrupted, this function has previously caused hangs to do a subsequent syslog() invocation from generic_signal_handler(),

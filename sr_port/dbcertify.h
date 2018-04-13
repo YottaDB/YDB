@@ -19,14 +19,14 @@
 #include "mu_all_version_standalone.h"
 
 #define SHELL_START	"#!/bin/sh"
-#define SETDISTLOGENV	YDB_DIST"="
-#define DSE_START_PIPE_RSLT1	"$"YDB_DIST"/dse << EOF > "
+#define SETDISTLOGENV	"ydb_dist="
+#define DSE_START_PIPE_RSLT1	"$ydb_dist/dse << EOF > "
 #define DSE_START_PIPE_RSLT2	" 2>&1"
 #define OPTDELIM	"-"
 #define DEFAULT_OUTFILE_SUFFIX ".dbcertscan"
 #define TMPCMDFILSFX	".sh"
 #define DSE_FIND_REG_ALL	"find -reg"
-#define MUPIP_START	"$"YDB_DIST"/mupip << EOF"
+#define MUPIP_START	"$ydb_dist/mupip << EOF"
 #define RUN_CMD	"./"
 #define DUMPRSLTFILE	"cat "
 #define RMS_OPEN_BIN

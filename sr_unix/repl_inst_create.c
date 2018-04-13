@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -40,8 +43,7 @@
 #include "gtmrecv.h"
 #include "iosp.h"
 #include "gtmio.h"
-#include "gtm_logicals.h"
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "gtmmsg.h"
 #include "repl_sem.h"
 #include "repl_instance.h"
@@ -80,7 +82,7 @@ void repl_inst_create(void)
 	struct stat		stat_buf;
 	repl_inst_hdr_ptr_t	repl_instance;
 	gtmsrc_lcl_ptr_t	gtmsrc_lcl_array;
-	mstr			log_nam, trans_name;
+	mstr			trans_name;
 	uint4			status2;
 	jnl_tm_t		now;
 
@@ -98,17 +100,12 @@ void repl_inst_create(void)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, RTS_ERROR_TEXT("Error parsing NAME qualifier"));
 	} else
 	{
-		log_nam.addr = GTM_REPL_INSTNAME;
-		log_nam.len = SIZEOF(GTM_REPL_INSTNAME) - 1;
 		trans_name.addr = &inst_name[0];
-		if (SS_NORMAL != (status = TRANS_LOG_NAME(&log_nam, &trans_name, inst_name, SIZEOF(inst_name),
-								dont_sendmsg_on_log2long)))
+		if (SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_REPL_INSTNAME, &trans_name, inst_name, SIZEOF(inst_name),
+								IGNORE_ERRORS_FALSE, NULL)))
 		{
-			if (SS_LOG2LONG == status)
-				rts_error_csa(CSA_ARG(NULL)
-					VARLSTCNT(5) ERR_LOGTOOLONG, 3, log_nam.len, log_nam.addr, SIZEOF(inst_name) - 1);
-			else
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
+			assert(SS_NOLOGNAM == status);	/* or else we would have issued an error inside "ydb_trans_log_name" */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLINSTNMUNDEF);
 		}
 		inst_name_len = trans_name.len;
 	}

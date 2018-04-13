@@ -40,6 +40,7 @@
 #include "gtmcrypt_dbk_ref.h"
 #include "gtmcrypt_sym_ref.h"
 #include "gtmcrypt_pk_ref.h"
+#include "ydb_getenv.h"
 
 #define CHECK_IV_LENGTH(IV)									\
 {												\
@@ -108,8 +109,8 @@ gtm_status_t gtmcrypt_init(gtm_int_t flags)
 		return -1;
 #	endif
 	GC_PK_INIT;
-	/* Update $gtm_passwd for future invocation */
-	if (0 != gc_update_passwd(GTM_PASSWD_ENV, &gtmcrypt_pwent, GTMCRYPT_DEFAULT_PASSWD_PROMPT,
+	/* Update $ydb_passwd/$gtm_passwd for future invocation */
+	if (0 != gc_update_passwd(YDBENVINDX_PASSWD, NULL_SUFFIX, &gtmcrypt_pwent, GTMCRYPT_DEFAULT_PASSWD_PROMPT,
 					GTMCRYPT_OP_INTERACTIVE_MODE & flags))
 	{
 		return -1;

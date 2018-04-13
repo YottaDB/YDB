@@ -13,14 +13,16 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-pinentry; Custom pinentry that returns an unobfuscated password if $gtm_passwd is defined in the environment
+pinentry; Custom pinentry that returns an unobfuscated password if $ydb_passwd/$gtm_passwd is defined in the environment
 	;
 	; See the following link for non-authoritative information on the pinentry protocol:
 	; http://info2html.sourceforge.net/cgi-bin/info2html-demo/info2html/info2html?%28pinentry%29Protocol
 	;
+	new envvar
 	set $etrap="do error^"_$text(+0),$zinterrupt=$etrap
-	; gtm_passwd is validated as non-null by pinentry-gtm.sh
-	set obfpwd=$zconvert($ztrnlnm("gtm_passwd"),"U"),obfpwdlen=$zlength(obfpwd)
+	; ydb_passwd/gtm_passwd is validated as non-null by pinentry-gtm.sh
+	set envvar=$select(""'=$ztrnlnm("ydb_passwd"):"ydb_passwd",1:"gtm_passwd")
+	set obfpwd=$zconvert($ztrnlnm(envvar),"U"),obfpwdlen=$zlength(obfpwd)
 	; Avoid NOBADCHAR on $PRINCIPAL and other functions
 	use $principal:(chset="M") view "NOBADCHAR"
 	; Unmask the password ahead of initiating the pinentry protocol. If the external call is not

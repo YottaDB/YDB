@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,13 +17,11 @@
 #include "gtm_string.h"
 
 #include "io.h"
-#include "gtm_logicals.h"
 
 #include "gtm_unistd.h"
 
 GBLDEF mstr	sys_input;
 GBLDEF mstr	sys_output;
-GBLDEF mstr	gtm_principal;
 
 void io_init_name(void)
 {
@@ -35,8 +36,7 @@ void io_init_name(void)
 		sys_input.addr = (char*) malloc(i);
 		memcpy(sys_input.addr,temp, i);
 		sys_input.len = i - 1;
-	}
-	else
+	} else
 	{
 		sys_input.addr = "0";
 		sys_input.len = 1;
@@ -54,8 +54,5 @@ void io_init_name(void)
 		sys_output.addr = "&";
 		sys_output.len = 1;
 	}
-	gtm_principal.addr = GTM_PRINCIPAL;
-	gtm_principal.len = STR_LIT_LEN(GTM_PRINCIPAL);
 	return;
 }
-

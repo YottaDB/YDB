@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -180,7 +183,7 @@ boolean_t gvcst_get2(mval *v, unsigned char *sn_ptr)
 	for (;;)
 	{
 #		if defined(DEBUG)
-		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVGETFAIL == gtm_white_box_test_case_number)
+		if (ydb_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVGETFAIL == ydb_white_box_test_case_number)
 			&& !IS_STATSDB_REG(gv_cur_region))
 		{
 			status = cdb_sc_blknumerr;

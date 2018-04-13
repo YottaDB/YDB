@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -11,11 +14,11 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "io.h"
 #include "iosp.h"
-#include "gtm_logicals.h"
 #include "zyerror_init.h"
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "stringpool.h"
 
 GBLREF	mval	dollar_zyerror;
@@ -26,20 +29,14 @@ error_def(ERR_TRNLOGFAIL);
 void zyerror_init(void)
 {
 	int4		status;
-	mstr		val, tn;
+	mstr		tn;
 	char		buf[1024];
 
-	val.addr = ZYERROR;
-	val.len = SIZEOF(ZYERROR) - 1;
 	dollar_zyerror.str.len = 0; /* default */
-	if (SS_NORMAL != (status = TRANS_LOG_NAME(&val, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long)))
+	if (SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_ZYERROR, &tn, buf, SIZEOF(buf), IGNORE_ERRORS_FALSE, NULL)))
 	{
-		if (SS_NOLOGNAM == status)
-			return;
-		else if (SS_LOG2LONG == status)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, val.len, val.addr, SIZEOF(buf) - 1);
-		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(ZYERROR), status);
+		assert(SS_NOLOGNAM == status);
+		return;
 	}
 	if (0 == tn.len)
 		return;

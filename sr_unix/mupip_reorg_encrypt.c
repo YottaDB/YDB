@@ -267,7 +267,7 @@ void mupip_reorg_encrypt(void)
 			status = reg_status = ERR_MUNOFINISH;
 			continue;
 		}
-		mu_reorg_process = TRUE;	/* gvcst_init will use this value to use gtm_poollimit settings. */
+		mu_reorg_process = TRUE;	/* gvcst_init will use this value to use ydb_poollimit settings. */
 		gvcst_init(reg, NULL);
 		mu_reorg_process = FALSE;
 		/* Note that db_init() does not release the access-control semaphore in case of MUPIP REORG -ENCRYPT (as determined
@@ -425,15 +425,15 @@ void mupip_reorg_encrypt(void)
 #		ifdef DEBUG
 		if (WBTEST_ENABLED(WBTEST_SLEEP_IN_MUPIP_REORG_ENCRYPT))
 		{
-			if (2 > gtm_white_box_test_case_count)
+			if (2 > ydb_white_box_test_case_count)
 			{
 				util_out_print("Starting the sleep", TRUE);
-				if (0 == gtm_white_box_test_case_count)
+				if (0 == ydb_white_box_test_case_count)
 				{
 					LONG_SLEEP(60);
 				}
 			} else
-				reencryption_count = gtm_white_box_test_case_count;
+				reencryption_count = ydb_white_box_test_case_count;
 		}
 #		endif
 		udi = FILE_INFO(reg);
@@ -695,7 +695,7 @@ void mupip_reorg_encrypt(void)
 					{
 #						ifdef DEBUG
 						if (WBTEST_ENABLED(WBTEST_SLEEP_IN_MUPIP_REORG_ENCRYPT)
-								&& (2 <= gtm_white_box_test_case_count))
+								&& (2 <= ydb_white_box_test_case_count))
 						{
 							reencryption_count--;
 							if (0 == reencryption_count)

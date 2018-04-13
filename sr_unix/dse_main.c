@@ -145,7 +145,7 @@ int dse_main(int argc, char **argv, char **envp)
 	gd_header = NULL;
 	OPERATOR_LOG_MSG;
 #	ifdef DEBUG
-	if ((gtm_white_box_test_case_enabled && (WBTEST_SEMTOOLONG_STACK_TRACE == gtm_white_box_test_case_number) ))
+	if ((ydb_white_box_test_case_enabled && (WBTEST_SEMTOOLONG_STACK_TRACE == ydb_white_box_test_case_number) ))
 	{
 		sgmnt_addrs     * csa;
 		node_local_ptr_t cnl;

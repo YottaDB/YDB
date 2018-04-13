@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -11,11 +14,6 @@
  ****************************************************************/
 
 #include "mdef.h"
-
-#ifdef VMS
-#include <devdef.h>
-#include <rms.h>
-#endif
 
 #include "io.h"
 #include "iosp.h"
@@ -44,7 +42,7 @@ void op_close(mval *v, mval *p)
 
 	MV_FORCE_STR(v);
 	MV_FORCE_STR(p);
-	stat = TRANS_LOG_NAME(&v->str, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long);
+	stat = trans_log_name(&v->str, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long);
 	if (SS_NORMAL == stat)
 	{
 	        if (0 == (tl = get_log_name(&tn, NO_INSERT)))

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -283,8 +286,8 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		gv_cur_region = r_save;
 		tp_change_reg();
 		assert((NOJNL != tmp_fd)
-				|| ((status != SS_NORMAL) && gtm_white_box_test_case_enabled
-					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)));
+				|| ((status != SS_NORMAL) && ydb_white_box_test_case_enabled
+					&& (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)));
 	} else
 		status = repl_open_jnl_file_by_name(tmp_ctl, jnl_fn_len, jnl_fn, &tmp_fd, &stat_buf);
 	if (status == SS_NORMAL)

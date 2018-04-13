@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -250,9 +250,9 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
 			}
 			jnlfile_lost = FALSE;
-			assert((gtm_white_box_test_case_enabled
-				&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number))
-			       || TREF(gtm_test_fake_enospc) || WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC));
+			assert((ydb_white_box_test_case_enabled
+				&& (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number))
+			       || TREF(ydb_test_fake_enospc) || WBTEST_ENABLED(WBTEST_RECOVER_ENOSPC));
 			if (JNL_ENABLED(csa->hdr))
 			{	/* We ignore the return value of jnl_file_lost() since we always want to report the journal
 				 * error, whatever its error handling method is.  Also, an operator log will be sent by some

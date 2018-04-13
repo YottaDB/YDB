@@ -35,18 +35,19 @@
 #include "gtmcrypt_dbk_ref.h"
 #include "gtmcrypt_sym_ref.h"
 #include "gtmcrypt_pk_ref.h"
+#include "ydb_getenv.h"
 
-#define	UNRES_KEY_FILE				0	/* Key is for device encryption. */
-#define	UNRES_KEY_UNRES_DB			1	/* Key is for a database that does not yet exist. */
-#define	UNRES_KEY_RES_DB			2	/* Key is for a database that already exists. */
+#define	UNRES_KEY_FILE		0	/* Key is for device encryption. */
+#define	UNRES_KEY_UNRES_DB	1	/* Key is for a database that does not yet exist. */
+#define	UNRES_KEY_RES_DB	2	/* Key is for a database that already exists. */
 
-#define	SEARCH_BY_KEYNAME			0	/* Searching for an unresolved key by name. */
-#define	SEARCH_BY_KEYPATH			1	/* Searching for an unresolved key by path. */
-#define	SEARCH_BY_HASH				2	/* Searching for an unresolved key by hash. */
+#define	SEARCH_BY_KEYNAME	0	/* Searching for an unresolved key by name. */
+#define	SEARCH_BY_KEYPATH	1	/* Searching for an unresolved key by path. */
+#define	SEARCH_BY_HASH		2	/* Searching for an unresolved key by hash. */
 
-#define CONFIG_FILE_UNREAD			('\0' == gc_config_filename[0])
-#define GPG_MESSAGE				"Verify encrypted key file and your GNUPGHOME settings"
-#define NON_GPG_MESSAGE				"Verify encryption key in configuration file pointed to by $gtmcrypt_config"
+#define CONFIG_FILE_UNREAD	('\0' == gc_config_filename[0])
+#define GPG_MESSAGE		"Verify encrypted key file and your GNUPGHOME settings"
+#define NON_GPG_MESSAGE		"Verify encryption key in configuration file pointed to by $ydb_crypt_config/$gtmcrypt_config"
 
 /* On certain platforms the st_mtime field of the stat structure got replaced by a timespec st_mtim field, which in turn has tv_sec
  * and tv_nsec fields. For compatibility reasons, those platforms define an st_mtime macro which points to st_mtim.tv_sec. Whenever
@@ -604,28 +605,41 @@ STATICFNDEF int keystore_refresh(void)
 	int		n_mappings, status, just_read, envvar_len;
 	char		*config_env;
 	struct stat	stat_info;
+	boolean_t	is_ydb_env_match;
 	static long	last_modified_s, last_modified_ns;
 
 	just_read = FALSE;
-	/* Check and update the value of gtm_passwd if it has changed since we last checked. This way, if the user had originally
-	 * entered a wrong password, but later changed the value (possible in MUMPS using external call), we read the up-to-date
-	 * value instead of issuing an error.
+	/* Check and update the value of ydb_passwd/gtm_passwd if it has changed since we last checked. This way, if the user
+	 * had originally entered a wrong password, but later changed the value (possible in MUMPS using external call), we
+	 * read the up-to-date value instead of issuing an error.
 	 */
-	if (0 != gc_update_passwd(GTM_PASSWD_ENV, &gtmcrypt_pwent, GTMCRYPT_DEFAULT_PASSWD_PROMPT,
+	if (0 != gc_update_passwd(YDBENVINDX_PASSWD, NULL_SUFFIX, &gtmcrypt_pwent, GTMCRYPT_DEFAULT_PASSWD_PROMPT,
 					GTMCRYPT_OP_INTERACTIVE_MODE & gtmcrypt_init_flags))
 		return -1;
 	if (CONFIG_FILE_UNREAD)
 	{	/* First, make sure we have a proper environment varible and a regular configuration file. */
-		if (NULL != (config_env = getenv("gtmcrypt_config")))
+		if (NULL != (config_env = ydb_getenv(YDBENVINDX_CRYPT_CONFIG, NULL_SUFFIX, &is_ydb_env_match)))
 		{
 			if (0 == (envvar_len = strlen(config_env))) /* inline assignment */
 			{
-				UPDATE_ERROR_STRING(ENV_EMPTY_ERROR, "gtmcrypt_config");
+				if (is_ydb_env_match)
+				{
+					UPDATE_ERROR_STRING(ENV_EMPTY_ERROR, ydbenvname[YDBENVINDX_CRYPT_CONFIG] + 1);
+				} else
+				{
+					UPDATE_ERROR_STRING(ENV_EMPTY_ERROR, gtmenvname[YDBENVINDX_CRYPT_CONFIG] + 1);
+				}
 				return -1;
 			}
 			if (GTM_PATH_MAX <= envvar_len)
 			{
-				UPDATE_ERROR_STRING(ENV_TOOLONG_ERROR, "gtmcrypt_config", status);
+				if (is_ydb_env_match)
+				{
+					UPDATE_ERROR_STRING(ENV_TOOLONG_ERROR, ydbenvname[YDBENVINDX_CRYPT_CONFIG] + 1, status);
+				} else
+				{
+					UPDATE_ERROR_STRING(ENV_TOOLONG_ERROR, gtmenvname[YDBENVINDX_CRYPT_CONFIG] + 1, status);
+				}
 				return -1;
 			}
 			if (0 != stat(config_env, &stat_info))
@@ -641,10 +655,10 @@ STATICFNDEF int keystore_refresh(void)
 			}
 		} else
 		{
-			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, "gtmcrypt_config");
+			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, "ydb_crypt_config/gtmcrypt_config");
 			return -1;
 		}
-		/* The gtmcrypt_config variable is defined and accessible. Copy it to a global for future references. */
+		/* The ydb_crypt_config variable is defined and accessible. Copy it to a global for future references. */
 		strncpy(gc_config_filename, config_env, YDB_PATH_MAX);
 		just_read = TRUE;
 	}

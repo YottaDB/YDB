@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -75,7 +78,7 @@ void op_use(mval *v, mval *p)
 		nl = get_log_name(&dollar_prin_log, NO_INSERT);
 	if (!nl)
 	{
-		stat = TRANS_LOG_NAME(&v->str, &tn, buf1, SIZEOF(buf1), do_sendmsg_on_log2long);
+		stat = trans_log_name(&v->str, &tn, buf1, SIZEOF(buf1), do_sendmsg_on_log2long);
 		if (stat != SS_NORMAL)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IONOTOPEN);
 		else

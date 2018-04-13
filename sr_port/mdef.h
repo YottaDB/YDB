@@ -26,30 +26,10 @@
 #define CLANG_SCA_ANALYZER_NORETURN
 #endif
 
-/* mstr needs to be defined before including "mdefsp.h".  */
-typedef int mstr_len_t;
-#ifndef __vms
-typedef struct
-{
-	unsigned int	char_len;	/* Character length */
-	mstr_len_t	len;
-	char		*addr;
-} mstr;
 #  define MSTR_CONST(name, string)		mstr name = {0, LEN_AND_LIT(string)}
 #  define MSTR_DEF(name, length, string)	mstr name = {0, length, string}
 #  define MIDENT_CONST(name, string)	    mident name = {0, LEN_AND_LIT(string)}
 #  define MIDENT_DEF(name, length, string)      mident name = {0, length, string}
-#else
-typedef struct
-{
-	mstr_len_t	len;		/* Byte length */
-	char		*addr;
-} mstr;
-#  define MSTR_CONST(name, string)		mstr name = {LEN_AND_LIT(string)}
-#  define MSTR_DEF(name, length, string)	mstr name = {length, string}
-#  define MIDENT_CONST(name, string)	    mident name = {LEN_AND_LIT(string)}
-#  define MIDENT_DEF(name, length, string)      mident name = {length, string}
-#endif
 
 #define GET_MSTR_LEN(X, Y)	GET_ULONG(X, Y)
 #define PUT_MSTR_LEN(X, Y)	PUT_ULONG(X, Y)
@@ -333,11 +313,6 @@ typedef UINTPTR_T uintszofptr_t;
 #define MAX_LONG_IN_DOUBLE	0xFFFFFFFFFFFFF /*Max Fraction part in IEEE double format*/
 #define MAX_INT_IN_BYTE		255
 
-#ifndef _AIX
-#	ifndef __sparc
-	typedef int		boolean_t;
-#	endif
-#endif
 typedef char		bool;
 typedef unsigned char	mreg;
 typedef int4		mint;
@@ -1873,7 +1848,7 @@ enum
 #define OPERATOR_LOG_MSG												\
 {															\
 	error_def(ERR_TEXT);	/* BYPASSOK */										\
-	if (gtm_white_box_test_case_enabled && (WBTEST_OPER_LOG_MSG == gtm_white_box_test_case_number))			\
+	if (ydb_white_box_test_case_enabled && (WBTEST_OPER_LOG_MSG == ydb_white_box_test_case_number))			\
 	{														\
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_LIT("Send message to operator log"));	\
 	}														\
@@ -1916,12 +1891,6 @@ enum
 
 /* Ensures that the argument is defined if it was not skipped. */
 #define MV_FORCE_DEFINED_UNLESS_SKIPARG(V)	((!M_ARG_SKIPPED(V)) ? (MV_FORCE_DEFINED(V)) : (V))
-
-#ifdef _AIX
-#define LIBPATH_ENV		"LIBPATH"
-#else
-#define LIBPATH_ENV		"LD_LIBRARY_PATH"
-#endif
 
 #ifdef DEBUG
   /* Define macros that are helpful in verifying that functions in libyottadb.so are only invoked

@@ -228,7 +228,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 		 * to white box test cases. Assert accordingly.
 		 */
 		assert(!mupip_jnl_recover || WB_COMMIT_ERR_ENABLED ||
-				(WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
+				(WBTEST_TP_HIST_CDB_SC_BLKMOD == ydb_white_box_test_case_number));
 		if (TREF(tprestart_syslog_delta) && (((TREF(tp_restart_count))++ < TREF(tprestart_syslog_first))
 			|| (0 == ((TREF(tp_restart_count) - TREF(tprestart_syslog_first)) % TREF(tprestart_syslog_delta)))))
 		{
@@ -504,14 +504,14 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 					hist_index = t_tries;
 					t_tries = 0;
 					assert(0 != have_crit(CRIT_HAVE_ANY_REG)); /* we should still be holding crit */
-					assert(gtm_white_box_test_case_enabled
-					    && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
+					assert(ydb_white_box_test_case_enabled
+					    && (WBTEST_TP_HIST_CDB_SC_BLKMOD == ydb_white_box_test_case_number));
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TPFAIL, 2, hist_index, t_fail_hist,
 							ERR_GVFAILCORE);
 					/* Generate core only if not triggering this codepath using white-box tests */
 					DEBUG_ONLY(
-						if (!gtm_white_box_test_case_enabled
-						    || (WBTEST_TP_HIST_CDB_SC_BLKMOD != gtm_white_box_test_case_number))
+						if (!ydb_white_box_test_case_enabled
+						    || (WBTEST_TP_HIST_CDB_SC_BLKMOD != ydb_white_box_test_case_number))
 					)
 							gtm_fork_n_core();
 					if (save_jnlpool != jnlpool)

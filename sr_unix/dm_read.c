@@ -286,7 +286,7 @@ void	dm_read (mval *v)
 	}
 	mask = tt_ptr->term_ctrl;
 	if (dmterm_default)
-	{	/* $view("DMTERM") or gtm_dmterm is set. Ignore the customized terminators; use the default terinators */
+	{	/* $view("DMTERM") or ydb_dmterm is set. Ignore the customized terminators; use the default terinators */
 		memset(&mask_term.mask[0], 0, SIZEOF(io_termmask));
 		if (utf8_active)
 		{

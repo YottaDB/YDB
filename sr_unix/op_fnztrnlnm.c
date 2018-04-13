@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -70,7 +73,7 @@ void op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 	ret->mvtype = MV_STR;
 	memcpy(buf, name->str.addr, name->str.len);
 	buf[name->str.len] = 0;
-	status = GETENV(buf);
+	status = getenv(buf);
 	switch (item_code)
 	{
 		case FULL:

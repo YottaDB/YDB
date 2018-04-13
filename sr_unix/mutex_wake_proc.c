@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,8 +70,8 @@ mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance)
 	msg.pid = process_id;
 	msg.mutex_wake_instance = mutex_wake_instance;
 #	ifdef DEBUG
-	if (gtm_white_box_test_case_enabled
-		&& (WBTEST_SENDTO_EPERM == gtm_white_box_test_case_number))
+	if (ydb_white_box_test_case_enabled
+		&& (WBTEST_SENDTO_EPERM == ydb_white_box_test_case_number))
 	{
 		FPRINTF(stderr, "PATH TO SOCKET IS\n%s\n", mutex_wake_this_proc.sun_path);
 		LONG_SLEEP(20);
@@ -98,8 +101,8 @@ mutex_wake_proc(sm_int_ptr_t pid, int mutex_wake_instance)
 		if (EACCES == status)
 			continue_proc(*pid);
 #		ifdef DEBUG
-		if (gtm_white_box_test_case_enabled
-			&& (WBTEST_SENDTO_EPERM == gtm_white_box_test_case_number))
+		if (ydb_white_box_test_case_enabled
+			&& (WBTEST_SENDTO_EPERM == ydb_white_box_test_case_number))
 		{
 			FPRINTF(stderr, "CALLED CONTINUE_PROC() ON THE OTHER PROCESS\n");
 			LONG_SLEEP(20);

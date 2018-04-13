@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,10 +37,9 @@
 #include "secshr_client.h"
 #include "gtmsecshr.h"
 #include "iosp.h"
-#include "gtm_logicals.h"
 #include "eintr_wrappers.h"
 #include "send_msg.h"
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 
 GBLREF uint4			process_id;
 GBLREF int			mutex_sock_fd;
@@ -55,7 +57,7 @@ error_def(ERR_TEXT);
 
 void mutex_sock_init(void)
 {
-	mstr		mutex_sock_dir_lognam, mutex_sock_dir_transnam;
+	mstr		mutex_sock_dir_transnam;
 	int		mutex_sock_path_len;
 	uint4		mutex_sock_trans_status;
 	char		mutex_sock_path[MAX_TRANS_NAME_LEN];
@@ -75,10 +77,8 @@ void mutex_sock_init(void)
 			      RTS_ERROR_TEXT("Error with mutex socket create"), errno);
 	memset((char *)&mutex_sock_address, 0, SIZEOF(mutex_sock_address));
 	/* Get the socket path */
-	mutex_sock_dir_lognam.len = SIZEOF(MUTEX_SOCK_DIR) - 1;
-	mutex_sock_dir_lognam.addr = MUTEX_SOCK_DIR;
-	mutex_sock_trans_status = TRANS_LOG_NAME(&mutex_sock_dir_lognam, &mutex_sock_dir_transnam,
-						 mutex_sock_path, SIZEOF(mutex_sock_path), do_sendmsg_on_log2long);
+	mutex_sock_trans_status = ydb_trans_log_name(YDBENVINDX_TMP, &mutex_sock_dir_transnam,
+						 mutex_sock_path, SIZEOF(mutex_sock_path), IGNORE_ERRORS_TRUE, NULL);
 	if (mutex_sock_trans_status != SS_NORMAL)
 	{
 		strcpy(mutex_sock_path, DEFAULT_MUTEX_SOCK_DIR);
@@ -106,7 +106,7 @@ void mutex_sock_init(void)
 	mutex_sock_address.sun_family = AF_UNIX;
 	strcpy(mutex_sock_address.sun_path, mutex_sock_path);
 	mutex_sock_len = SIZEOF(mutex_sock_address.sun_family) + mutex_sock_path_len + 1; /* Include NULL byte in length */
-	DEBUG_ONLY(if (!TREF(gtm_usesecshr)))
+	DEBUG_ONLY(if (!TREF(ydb_usesecshr)))
 	{
 		status = UNLINK(mutex_sock_address.sun_path);	/* in case it was left from last time */
 		save_errno = (-1 == status) ? errno : 0;
@@ -116,15 +116,15 @@ void mutex_sock_init(void)
 		if (ENOENT != save_errno)
 		{
 #			ifdef DEBUG
-			/* If using gtm_usesecshr, can get a log of bogus MUTEXRSRCCLNUP messages so see if the socket
+			/* If using ydb_usesecshr, can get a log of bogus MUTEXRSRCCLNUP messages so see if the socket
 			 * actually exists or not so can supress the message if not (but still push it through secshr).
 			 */
-			if (TREF(gtm_usesecshr))
+			if (TREF(ydb_usesecshr))
 			{
 				STAT_FILE(mutex_sock_address.sun_path, &mutex_sock_stat_buf, status);
 				existed = (0 == status) ? TRUE : FALSE;
 			} else
-				existed = TRUE;		/* If no gtm_usesecshr, wouldn't be here unless existed */
+				existed = TRUE;		/* If no ydb_usesecshr, wouldn't be here unless existed */
 #			endif
 			if (0 == (status = send_mesg2gtmsecshr(REMOVE_FILE, (unsigned int)-1, mutex_sock_address.sun_path,
 							       mutex_sock_path_len + 1)))

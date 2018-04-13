@@ -1685,7 +1685,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 	{
 		assert(gtmrecv_max_repl_uncmpmsglen);
 		destlen = gtmrecv_max_repl_uncmpmsglen;
-		if (ZLIB_CMPLVL_NONE == gtm_zlib_cmp_level)
+		if (ZLIB_CMPLVL_NONE == ydb_zlib_cmp_level)
 		{	/* Receiver does not have compression enabled in the first place but yet source server has sent
 			 * compressed records. Stop source server from sending compressed records.
 			 */
@@ -1708,8 +1708,8 @@ STATICFNDEF void process_tr_buff(int msg_type)
 						GTM_ZLIB_UNCMP_ERR_SEQNO_STR, recv_jnl_seqno, recv_jnl_seqno);
 					break;
 				case Z_DATA_ERROR:
-					assert(gtm_white_box_test_case_enabled
-						&& (WBTEST_REPL_TR_UNCMP_ERROR == gtm_white_box_test_case_number));
+					assert(ydb_white_box_test_case_enabled
+						&& (WBTEST_REPL_TR_UNCMP_ERROR == ydb_white_box_test_case_number));
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, GTM_ZLIB_Z_DATA_ERROR_STR
 						GTM_ZLIB_UNCMP_ERR_SEQNO_STR, recv_jnl_seqno, recv_jnl_seqno);
 					break;
@@ -1720,8 +1720,8 @@ STATICFNDEF void process_tr_buff(int msg_type)
 				GTM_WHITE_BOX_TEST(WBTEST_REPL_TR_UNCMP_ERROR, destlen, gtmrecv_repl_uncmpmsglen - 1);
 				if (destlen != gtmrecv_repl_uncmpmsglen)
 				{	/* decompression did not yield precompressed data length */
-					assert(gtm_white_box_test_case_enabled
-						&& (WBTEST_REPL_TR_UNCMP_ERROR == gtm_white_box_test_case_number));
+					assert(ydb_white_box_test_case_enabled
+						&& (WBTEST_REPL_TR_UNCMP_ERROR == ydb_white_box_test_case_number));
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, GTM_ZLIB_UNCMPLEN_ERROR_STR
 						GTM_ZLIB_UNCMP_ERR_SEQNO_STR, destlen, gtmrecv_repl_uncmpmsglen,
 						recv_jnl_seqno, recv_jnl_seqno);
@@ -1990,8 +1990,8 @@ STATICFNDEF void process_tr_buff(int msg_type)
 				assert(old_triple_content.start_seqno >= recvpool.upd_proc_local->read_jnl_seqno);
 				assert((old_triple_content.start_seqno > recvpool_ctl->last_valid_histinfo.start_seqno)
 					 || ((old_triple_content.start_seqno == recvpool_ctl->last_valid_histinfo.start_seqno)
-						&& gtm_white_box_test_case_enabled
-						&& (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number)));
+						&& ydb_white_box_test_case_enabled
+						&& (WBTEST_UPD_PROCESS_ERROR == ydb_white_box_test_case_number)));
 				cur_histinfo = &tmp_histjrec.histcontent;
 				memcpy(cur_histinfo->root_primary_instname, old_triple_content.instname, MAX_INSTNAME_LEN - 1);
 				cur_histinfo->root_primary_instname[MAX_INSTNAME_LEN - 1] = '\0';
@@ -2073,8 +2073,8 @@ STATICFNDEF void process_tr_buff(int msg_type)
 				{
 					assert((pool_histinfo->start_seqno > recvpool_ctl->last_valid_histinfo.start_seqno)
 						 || ((pool_histinfo->start_seqno == recvpool_ctl->last_valid_histinfo.start_seqno)
-							&& gtm_white_box_test_case_enabled
-							&& (WBTEST_UPD_PROCESS_ERROR == gtm_white_box_test_case_number)));
+							&& ydb_white_box_test_case_enabled
+							&& (WBTEST_UPD_PROCESS_ERROR == ydb_white_box_test_case_number)));
 					assert(pool_histinfo->start_seqno >= cur_histinfo->start_seqno);
 				} else
 				{
@@ -2938,7 +2938,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 			return;
 #		ifdef REPL_CMP_SOLVE_TESTING
 		/* Received communication from the source server, so we can cancel the timer */
-		if (TREF(gtm_environment_init) && repl_cmp_solve_timer_set)
+		if (TREF(ydb_environment_init) && repl_cmp_solve_timer_set)
 		{
 			cancel_timer((TID)repl_cmp_solve_rcv_timeout);
 			repl_cmp_solve_timer_set = FALSE;
@@ -3244,13 +3244,13 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					{
 						repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received REPL_CMP_TEST message\n");
 						uncmpfail = FALSE;
-						if (ZLIB_CMPLVL_NONE == gtm_zlib_cmp_level)
+						if (ZLIB_CMPLVL_NONE == ydb_zlib_cmp_level)
 						{	/* Receiver does not have compression enabled in the first place.
 							 * Send dummy REPL_CMP_SOLVE response message.
 							 */
 							repl_log(gtmrecv_log_fp, TRUE, TRUE, "Environment variable "
-								"gtm_zlib_cmp_level specifies NO decompression (set to %d)\n",
-								gtm_zlib_cmp_level);
+								"ydb_zlib_cmp_level/gtm_zlib_cmp_level specifies "
+								"NO decompression (set to %d)\n", ydb_zlib_cmp_level);
 							uncmpfail = TRUE;
 						}
 						assert(remote_side->endianness_known); /* ensure remote_side->cross_endian
@@ -3295,9 +3295,9 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 										GTM_ZLIB_UNCMP_ERR_SOLVE_STR);
 									break;
 								case Z_DATA_ERROR:
-									assert(gtm_white_box_test_case_enabled
+									assert(ydb_white_box_test_case_enabled
 										&& (WBTEST_REPL_TEST_UNCMP_ERROR
-											== gtm_white_box_test_case_number));
+											== ydb_white_box_test_case_number));
 									repl_log(gtmrecv_log_fp, TRUE, TRUE,
 										GTM_ZLIB_Z_DATA_ERROR_STR
 										GTM_ZLIB_UNCMP_ERR_SOLVE_STR);
@@ -3313,9 +3313,9 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 								REPL_MSG_CMPDATALEN - 1);
 							if (REPL_MSG_CMPDATALEN != cmpsolve_msg.datalen)
 							{	/* decompression did not yield precompressed data length */
-								assert(gtm_white_box_test_case_enabled
+								assert(ydb_white_box_test_case_enabled
 									&& (WBTEST_REPL_TEST_UNCMP_ERROR
-										== gtm_white_box_test_case_number));
+										== ydb_white_box_test_case_number));
 								repl_log(gtmrecv_log_fp, TRUE, TRUE, GTM_ZLIB_UNCMPLEN_ERROR_STR
 									"\n", cmpsolve_msg.datalen, REPL_MSG_CMPDATALEN);
 								uncmpfail = TRUE;
@@ -3330,7 +3330,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 							cmpsolve_msg.datalen = GTM_BYTESWAP_32(cmpsolve_msg.datalen);
 						cmpsolve_msg.proto_ver = REPL_PROTO_VER_THIS;
 #						ifdef REPL_CMP_SOLVE_TESTING
-						if (TREF(gtm_environment_init))
+						if (TREF(ydb_environment_init))
 						{
 							start_timer((TID)repl_cmp_solve_rcv_timeout, 15 * 60 * 1000,
 									repl_cmp_solve_rcv_timeout, 0, NULL);
@@ -3342,7 +3342,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 						if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)
 							return;
 						if (!uncmpfail)
-							repl_zlib_cmp_level = gtm_zlib_cmp_level;
+							repl_zlib_cmp_level = ydb_zlib_cmp_level;
 					}
 					break;
 
@@ -3758,7 +3758,7 @@ void gtmrecv_process(boolean_t crash_restart)
 	upd_proc_local_ptr_t	upd_proc_local;
 	gtmrecv_local_ptr_t	gtmrecv_local;
 
-	if (ZLIB_CMPLVL_NONE != gtm_zlib_cmp_level)
+	if (ZLIB_CMPLVL_NONE != ydb_zlib_cmp_level)
 		gtm_zlib_init();	/* Open zlib shared library for compression/decompression */
 #	ifdef GTM_TLS
 	if (REPL_TLS_REQUESTED)

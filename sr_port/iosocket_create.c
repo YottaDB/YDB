@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -40,9 +43,7 @@
 #include "min_max.h"
 #include "gtm_caseconv.h"
 #include "util.h"
-#ifndef VMS
 #include "trans_log_name.h"
-#endif
 
 error_def(ERR_ADDRTOOLONG);
 error_def(ERR_GETSOCKNAMERR);
@@ -70,12 +71,10 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 	const char		*errptr;
 	struct addrinfo		*ai_ptr;
 	struct addrinfo		hints, *addr_info_ptr = NULL;
-#ifndef VMS
 	struct sockaddr_un	*sa_un_ptr, sa_un_trans;
 	mval			localpath;
 	mstr			transpath;
 	int			trans_status;
-#endif
 	enum socket_protocol	protocol;
 	int			af;
 	int			sd;
@@ -122,10 +121,8 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 		lower_to_upper((uchar_ptr_t)protocolstr, (uchar_ptr_t)&sockaddr[protooffset], tmplen);
 		if (((SIZEOF("TCP") - 1) == tmplen) && (0 == MEMCMP_LIT(protocolstr, "TCP")))
 			protocol = socket_tcpip;
-#		ifndef VMS
 		else if (((SIZEOF("LOCAL") - 1) == tmplen) && (0 == MEMCMP_LIT(protocolstr, "LOCAL")))
 			protocol = socket_local;
-#		endif
 		else
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_PROTNOTSUP, 2, tmplen , &sockaddr[protooffset]);
@@ -213,7 +210,6 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				socketptr->remote.port = port;
 				socketptr->sd = socketptr->temp_sd = FD_INVALID; /* don't mess with 0 */
 			}
-#		ifndef VMS
 		} else if (socket_local == protocol)
 		{	/* should we get_full_path first */
 			/* check protooffset < sizeof sun_path */
@@ -221,7 +217,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 			SOCKET_ALLOC(socketptr);
 			socketptr->protocol = socket_local;
 			MV_INIT_STRING(&localpath, protooffset - 1, sockaddr);
-			trans_status = TRANS_LOG_NAME(&localpath.str, &transpath, sa_un_trans.sun_path,
+			trans_status = trans_log_name(&localpath.str, &transpath, sa_un_trans.sun_path,
 				(int)SIZEOF(sa_un_trans.sun_path), dont_sendmsg_on_log2long);
 			if (SS_LOG2LONG == trans_status)
 			{	/* if LOG2LONG, returned len not valid so report untranslated length */
@@ -261,7 +257,6 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				socketptr->remote.ai.ai_addrlen = (size_t)((struct sockaddr_un *)0)->sun_path + protooffset;
 				socketptr->sd = socketptr->temp_sd = FD_INVALID; /* don't mess with 0 */
 			}
-#		endif
 		} else
 			assertpro(socket_tcpip == protocol || socket_local == protocol);	/* protocol already checked */
 		socketptr->state = socket_created;
@@ -281,14 +276,12 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 		if (-1 == getsockname(socketptr->sd, SOCKET_LOCAL_ADDR(socketptr), &tmp_addrlen))
 		{
 			save_errno = errno;
-#			if !defined(VMS)
 			if (IS_SOCKNAME_UNIXERROR(save_errno))
 			{
 				SOCKET_LOCAL_ADDR(socketptr)->sa_family = AF_UNIX;
 				((struct sockaddr_un *)SOCKET_LOCAL_ADDR(socketptr))->sun_path[0] = '\0';
 				tmp_addrlen = SIZEOF(struct sockaddr_un);
 			} else
-#			endif
 			{
 				errptr = (char *)STRERROR(save_errno);
 				tmplen = STRLEN(errptr);
@@ -296,20 +289,14 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 				return NULL;
 			}
-		}
-#		if !defined(VMS)
-		else if (((size_t) (((struct sockaddr *) 0)->sa_data) >= tmp_addrlen)
-			|| (0 == SOCKET_LOCAL_ADDR(socketptr)->sa_family))
+		} else if (((size_t) (((struct sockaddr *) 0)->sa_data) >= tmp_addrlen)
+						|| (0 == SOCKET_LOCAL_ADDR(socketptr)->sa_family))
 		{
 			SOCKET_LOCAL_ADDR(socketptr)->sa_family = AF_UNIX;
 			((struct sockaddr_un *)SOCKET_LOCAL_ADDR(socketptr))->sun_path[0] = '\0';
 			tmp_addrlen = SIZEOF(struct sockaddr_un);
 		}
-		if (AF_UNIX == SOCKET_LOCAL_ADDR(socketptr)->sa_family)
-			protocol = socket_local;
-		else
-#		endif
-			protocol = socket_tcpip;
+		protocol = (AF_UNIX == SOCKET_LOCAL_ADDR(socketptr)->sa_family) ? socket_local : socket_tcpip;
 		ai_ptr->ai_addrlen = tmp_addrlen;
 		ai_ptr->ai_family = SOCKET_LOCAL_ADDR(socketptr)->sa_family;
 		ai_ptr->ai_socktype = SOCK_STREAM;
@@ -335,15 +322,12 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_GETSOCKNAMERR, 3, save_errno, tmplen, errptr);
 				return NULL;
 			}
-		}
-#		if !defined(VMS)
-		else if (socket_local == protocol)
+		} else if (socket_local == protocol)
 		{
 			SOCKET_REMOTE_ADDR(socketptr)->sa_family = AF_UNIX;
 			((struct sockaddr_un *)SOCKET_REMOTE_ADDR(socketptr))->sun_path[0] = '\0';
 			tmp_addrlen = SIZEOF(struct sockaddr_un);
 		}
-#		endif
 		socketptr->remote.ai.ai_addrlen = tmp_addrlen;
 		assert(0 != SOCKET_REMOTE_ADDR(socketptr)->sa_family);
 		socketptr->remote.ai.ai_family = SOCKET_REMOTE_ADDR(socketptr)->sa_family;

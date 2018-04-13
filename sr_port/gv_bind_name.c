@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -79,7 +82,7 @@ gvnh_reg_t *gv_bind_name(gd_addr *addr, mname_entry *gvname)
 		} else
 		{	/* If not a statsDB, then the above calls to "gv_srch_map" or "gv_init_reg" should not have changed
 			 * the hashtable status of "gvname". There is an exception in that if gvname is "%YGS" (STATSDB_GBLNAME),
-			 * then it is possible that the open of the statsDB failed (e.g. gtm_statsdir env var too long etc.) in
+			 * then it is possible that the open of the statsDB failed (e.g. ydb_statsdir env var too long etc.) in
 			 * which case the gvname would have been dynamically remapped to the baseDB. Assert that.
 			 * Since we want to avoid a memcmp against STATSDB_GBLNAME, we check if the hashtable count has changed
 			 * since we noted it down at function entry and if so redo the lookup hashtab in pro. Since only additions

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,7 +38,7 @@ int expr(oprtype *a, int m_type)
 	if (TREF(expr_start) != TREF(expr_start_orig) && (OC_NOOP != (TREF(expr_start))->opcode))
 	{
 		assert((OC_GVSAVTARG == (TREF(expr_start))->opcode));
-		if ((OC_GVSAVTARG == (TREF(expr_start))->opcode) && ((GTM_BOOL == TREF(gtm_fullbool)) || !TREF(saw_side_effect)))
+		if ((OC_GVSAVTARG == (TREF(expr_start))->opcode) && ((YDB_BOOL == TREF(ydb_fullbool)) || !TREF(saw_side_effect)))
 		{
 			if ((OC_GVRECTARG != (TREF(curtchain))->exorder.bl->opcode)
 				|| ((TREF(curtchain))->exorder.bl->operand[0].oprval.tref != TREF(expr_start)))

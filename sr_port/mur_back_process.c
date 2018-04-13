@@ -448,7 +448,7 @@ uint4 mur_back_processing(jnl_tm_t alt_tp_resolve_time)
 	 * For interrupted recovery we also considered previous recovery's jgbl.mur_tp_resolve_time.)
 	 * For rollback command (with resync or fetchresync qualifier) we resolve only upto jgbl.mur_tp_resolve_time.
 	 */
-	status = gtm_multi_thread((gtm_pthread_fnptr_t)&mur_back_phase1, murgbl.reg_total, gtm_mupjnl_parallel,
+	status = gtm_multi_thread((gtm_pthread_fnptr_t)&mur_back_phase1, murgbl.reg_total, ydb_mupjnl_parallel,
 				murgbl.thr_array, murgbl.ret_array, (void *)mur_ctl, SIZEOF(reg_ctl_list));
 	if (SS_NORMAL != status)
 		return status;
@@ -465,7 +465,7 @@ uint4 mur_back_processing(jnl_tm_t alt_tp_resolve_time)
 		assert(mur_options.rollback && !mur_options.forward); /* a RSYNC_STRM spec is possible only in backward rollback */
 		assert(murgbl.resync_strm_seqno_nonzero);
 		JNL_PUT_MSG_PROGRESS("Backward processing Round-II started");
-		status = gtm_multi_thread((gtm_pthread_fnptr_t)&mur_back_phase2, murgbl.reg_total, gtm_mupjnl_parallel,
+		status = gtm_multi_thread((gtm_pthread_fnptr_t)&mur_back_phase2, murgbl.reg_total, ydb_mupjnl_parallel,
 					murgbl.thr_array, murgbl.ret_array, (void *)mur_ctl, SIZEOF(reg_ctl_list));
 		if (SS_NORMAL != status)
 			return status;
@@ -537,7 +537,7 @@ uint4	mur_back_phase1(reg_ctl_list *rctl)
 				 * having timestamps less than jgbl.mur_tp_resolve_time. See GTM-7204 for more details.
 				 */
 				assert(((TIM_DEFER_DBSYNC * 2) >= (jgbl.mur_tp_resolve_time - jnlrec->prefix.time))
-						|| ((WBTEST_CRASH_SHUTDOWN_EXPECTED  == gtm_white_box_test_case_number)
+						|| ((WBTEST_CRASH_SHUTDOWN_EXPECTED  == ydb_white_box_test_case_number)
 							&& murgbl.intrpt_recovery));
 				return ERR_CHNGTPRSLVTM;
 			}

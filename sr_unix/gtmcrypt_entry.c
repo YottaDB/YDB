@@ -16,9 +16,6 @@
 
 #include <dlfcn.h>
 #include <errno.h>
-#ifdef _AIX
-#include <sys/ldr.h>
-#endif
 
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
@@ -30,14 +27,12 @@
 #include "fgncal.h"		/* needed for COPY_DLLERR_MSG() */
 #include "gtmmsg.h"
 #include "iosp.h"		/* for SS_NORMAL */
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "gdsroot.h"
 #include "is_file_identical.h"
 
 #define	GTMCRYPT_LIBNAME		"libgtmcrypt.so"
 #define MAX_GTMCRYPT_PLUGIN_STR_LEN	(SIZEOF(GTMCRYPT_LIBNAME) * 4)
-
-#define GTM_CRYPT_PLUGIN		"$gtm_crypt_plugin"
 
 typedef void (*gtmcrypt_func_t)();	/* A generic pointer type to the gtmcrypt functions exposed by the plugin */
 
@@ -65,57 +60,6 @@ error_def(ERR_CRYPTDLNOOPEN);
 uint4 gtmcrypt_entry(void);
 boolean_t verify_lib_loadpath(const char *libname, char *loadpath);
 
-#ifdef _AIX
-/* On AIX, there is no known way to specify that dependent libraries (in this case "libgtmcryptutil.so") should also be searched in
- * the same directory from which the parent library is loaded ($ORIGIN on Linux, HP-UX and Solaris). To work-around that, we
- * explicitly prefix LIBPATH with "$ydb_dist/plugin" before invoking dlopen. But, to ensure that "libgtmcryptutil.so" was indeed
- * loaded from "$ydb_dist/plugin", we use loadquery to get the list of loaded modules along with the path from which they are loaded
- * from and verify against it.
- */
-boolean_t verify_lib_loadpath(const char *libname, char *loadpath)
-{
-	struct ld_xinfo		*ldxinfo;
-	char			*bufptr, *ptr, cmpptr[YDB_PATH_MAX], buf[YDB_PATH_MAX];
-	int			ret, cmplen, buflen, save_errno;
-
-	buflen = YDB_PATH_MAX;
-	bufptr = &buf[0];
-	while (-1 == loadquery(L_GETXINFO, bufptr, buflen))
-	{
-		save_errno = errno;
-		if (ENOMEM != save_errno)
-		{
-			assert(FALSE);
-			SNPRINTF(dl_err, MAX_ERRSTR_LEN, "System call `loadquery' failed. %s", STRERROR(save_errno));
-			return FALSE;
-		}
-		if (bufptr != &buf[0])
-			free(bufptr);
-		buflen *= 2;
-		bufptr = malloc(buflen);
-	}
-	ldxinfo = (struct ld_xinfo *)bufptr;
-	ret = FALSE;
-	SNPRINTF(cmpptr, YDB_PATH_MAX, "%s/%s", loadpath, libname);
-	while (ldxinfo->ldinfo_next)
-	{
-		/* Point to the offset at which the path of the loaded module is present. */
-		ptr = (char *)ldxinfo + ldxinfo->ldinfo_filename;
-		if (is_file_identical(cmpptr, ptr))
-		{
-			ret = TRUE;
-			break;
-		}
-		ldxinfo = (struct ld_xinfo *)((sm_long_t)ldxinfo + ldxinfo->ldinfo_next);
-	}
-	if (bufptr != &buf[0])
-		free(bufptr);
-	if (!ret)
-		SNPRINTF(dl_err, MAX_ERRSTR_LEN, "Dependent shared library %s was not loaded relative to %s.", libname, loadpath);
-	return ret;
-}
-#endif
-
 uint4 gtmcrypt_entry()
 {
 	/* Initialize the table of symbol names to be used in dlsym() */
@@ -136,12 +80,9 @@ uint4 gtmcrypt_entry()
 	char_ptr_t		err_str, libname_ptr;
 	gtmcrypt_func_t		fptr;
 	int			findx, plugin_dir_len, save_errno;
-#	ifdef _AIX
-	char			new_libpath_env[YDB_PATH_MAX], *save_libpath_ptr, save_libpath[YDB_PATH_MAX];
-#	endif
 	char			libpath[YDB_PATH_MAX], buf[MAX_GTMCRYPT_PLUGIN_STR_LEN], plugin_dir_path[YDB_PATH_MAX];
 	char			resolved_libpath[YDB_PATH_MAX], resolved_plugin_dir_path[YDB_PATH_MAX];
-	mstr			trans, env_var = {0, LEN_AND_LIT(GTM_CRYPT_PLUGIN)};
+	mstr			trans;
 
 	if(!ydb_dist_ok_to_use)
 	{
@@ -157,13 +98,14 @@ uint4 gtmcrypt_entry()
 		return ERR_CRYPTDLNOOPEN;
 	}
 	plugin_dir_len = STRLEN(resolved_plugin_dir_path);
-	if ((SS_NORMAL != TRANS_LOG_NAME(&env_var, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)) || (0 >= trans.len))
-	{	/* Either $gtm_crypt_plugin is not defined in the environment variable OR it is set to null-string. Fall-back to
+	if ((SS_NORMAL != ydb_trans_log_name(YDBENVINDX_CRYPT_PLUGIN, &trans, buf, SIZEOF(buf), IGNORE_ERRORS_TRUE, NULL))
+		|| (0 >= trans.len))
+	{	/* Either $ydb_crypt_plugin is not defined in the environment variable OR it is set to null-string. Fall-back to
 		 * using libgtmcrypt.so
 		 */
 		libname_ptr = GTMCRYPT_LIBNAME;
 	} else
-		libname_ptr = &buf[0];		/* value of $gtm_crypt_plugin */
+		libname_ptr = &buf[0];		/* value of $ydb_crypt_plugin */
 	SNPRINTF(libpath, YDB_PATH_MAX, "%s/%s", plugin_dir_path, libname_ptr);
 	if (NULL == realpath(libpath, resolved_libpath))
 	{
@@ -178,32 +120,12 @@ uint4 gtmcrypt_entry()
 			libpath, plugin_dir_path);
 		return ERR_CRYPTDLNOOPEN;
 	}
-#	ifdef _AIX
-	if (NULL == (save_libpath_ptr = getenv(LIBPATH_ENV)))
-		SNPRINTF(new_libpath_env, YDB_PATH_MAX, "%s", plugin_dir_path);
-	else
-	{
-		/* Since the setenv below can potentially thrash the save_libpath_ptr, take a copy of it for later restore. */
-		strncpy(save_libpath, save_libpath_ptr, SIZEOF(save_libpath));
-		save_libpath[SIZEOF(save_libpath) - 1] = '\0';
-		SNPRINTF(new_libpath_env, YDB_PATH_MAX, "%s:%s", plugin_dir_path, save_libpath_ptr);
-	}
-	setenv(LIBPATH_ENV, new_libpath_env, TRUE);
-#	endif
 	handle = dlopen(&resolved_libpath[0], RTLD_NOW | RTLD_GLOBAL);
 	if (NULL == handle)
 	{
 		COPY_DLLERR_MSG(err_str, dl_err);
 		return ERR_CRYPTDLNOOPEN;
 	}
-#	ifdef _AIX
-	if (NULL == save_libpath_ptr)
-		unsetenv(LIBPATH_ENV);
-	else
-		setenv(LIBPATH_ENV, save_libpath, TRUE);
-	if (!verify_lib_loadpath(GTMCRYPT_UTIL_LIBNAME, plugin_dir_path))
-		return ERR_CRYPTDLNOOPEN;
-#	endif
 	for (findx = 0; findx < gtmcrypt_func_n; ++findx)
 	{
 		fptr = (gtmcrypt_func_t)dlsym(handle, gtmcrypt_fname[findx]);

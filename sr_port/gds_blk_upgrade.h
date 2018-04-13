@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +21,7 @@
 
 int4 gds_blk_upgrade(sm_uc_ptr_t gds_blk_src, sm_uc_ptr_t gds_blk_trg, int4 bsiz, enum db_ver *ondsk_blkver);
 
-GBLREF	uint4		gtm_blkupgrade_flag;	/* control whether dynamic upgrade is attempted or not */
+GBLREF	uint4		ydb_blkupgrade_flag;	/* control whether dynamic upgrade is attempted or not */
 GBLREF	boolean_t	dse_running;
 
 /* See if block needs to be converted to current version. Assume buffer is at least short aligned.
@@ -30,7 +33,7 @@ GBLREF	boolean_t	dse_running;
 #define GDS_BLK_UPGRADE_IF_NEEDED(blknum, srcbuffptr, trgbuffptr, curcsd, ondskblkver, upgrdstatus, fully_upgraded)		\
 {																\
 	/* In order to detect if a block needs to be upgraded or not, we do the following series of tests.			\
-	 * If DSE, the variable "gtm_blkupgrade_flag" controls whether upgrade is attempted or not.				\
+	 * If DSE, the variable "ydb_blkupgrade_flag" controls whether upgrade is attempted or not.				\
 	 *	If it is UPGRADE_NEVER, we never attempt upgrade.								\
 	 *	Likewise, if it is UPGRADE_ALWAYS, we unconditionally upgrade.							\
 	 *	If it is UPGRADE_IF_NEEDED, then the following checks are done.							\
@@ -68,7 +71,7 @@ GBLREF	boolean_t	dse_running;
 	 *															\
 	 * Note the clearing of srcbuffptr is done as a flag that gds_blk_upgrd was run (used by dsk_read).			\
 	 */															\
-	if (!dse_running || (UPGRADE_IF_NEEDED == gtm_blkupgrade_flag))								\
+	if (!dse_running || (UPGRADE_IF_NEEDED == ydb_blkupgrade_flag))								\
 	{															\
 		if ((fully_upgraded) || (SIZEOF(v15_blk_hdr) > ((v15_blk_hdr_ptr_t)(srcbuffptr))->bsiz))			\
 		{														\
@@ -82,12 +85,12 @@ GBLREF	boolean_t	dse_running;
                         if (srcbuffptr != trgbuffptr)										\
                                 srcbuffptr = NULL;										\
 		}														\
-	} else if (UPGRADE_NEVER == gtm_blkupgrade_flag)									\
+	} else if (UPGRADE_NEVER == ydb_blkupgrade_flag)									\
 	{															\
 		upgrdstatus = SS_NORMAL;											\
 		if (NULL != (void *)(ondskblkver))										\
 			*(ondskblkver) = GDSV6;											\
-	} else if (UPGRADE_ALWAYS == gtm_blkupgrade_flag)									\
+	} else if (UPGRADE_ALWAYS == ydb_blkupgrade_flag)									\
 	{															\
 		upgrdstatus = gds_blk_upgrade((sm_uc_ptr_t)(srcbuffptr), (sm_uc_ptr_t)(trgbuffptr),				\
 					      (curcsd)->blk_size, (ondskblkver));						\

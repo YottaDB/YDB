@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -109,7 +112,7 @@ CONDITION_HANDLER(mupip_recover_ch)
 	START_CH(TRUE);
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
-		assert(gtm_white_box_test_case_enabled && (WBTEST_TP_HIST_CDB_SC_BLKMOD == gtm_white_box_test_case_number));
+		assert(ydb_white_box_test_case_enabled && (WBTEST_TP_HIST_CDB_SC_BLKMOD == ydb_white_box_test_case_number));
 		rc = tp_restart(1, TP_RESTART_HANDLES_ERRORS);	/* This SHOULD generate an error (TPFAIL or other) */
 		GTMTRIG_ONLY(assert(ERR_TPRETRY != rc));
 		assertpro(ERR_TPRETRY != SIGNAL);		/* (signal value undisturbed) */
@@ -340,12 +343,12 @@ void	mupip_recover(void)
 		assert(!mur_options.rollback_losttnonly);
 		murgbl.ok_to_update_db = TRUE;	/* Allow db to be updated by the PBLKs */
 		assert(!multi_thread_in_use);
-		if (0 != gtm_multi_thread((gtm_pthread_fnptr_t)&mur_apply_pblk, murgbl.reg_total, gtm_mupjnl_parallel,
+		if (0 != gtm_multi_thread((gtm_pthread_fnptr_t)&mur_apply_pblk, murgbl.reg_total, ydb_mupjnl_parallel,
 					murgbl.thr_array, murgbl.ret_array, (void *)mur_ctl, SIZEOF(reg_ctl_list)))
 			mupip_exit(ERR_MUNOACTION);
 		assert(!multi_thread_in_use);
 		murgbl.ok_to_update_db = FALSE;	/* Reset flag until it is safe to allow updates to the db */
-		if (0 != gtm_multi_thread((gtm_pthread_fnptr_t)&mur_jctl_from_next_gen, murgbl.reg_total, gtm_mupjnl_parallel,
+		if (0 != gtm_multi_thread((gtm_pthread_fnptr_t)&mur_jctl_from_next_gen, murgbl.reg_total, ydb_mupjnl_parallel,
 					murgbl.thr_array, murgbl.ret_array, (void *)mur_ctl, SIZEOF(reg_ctl_list)))
 			mupip_exit(ERR_MUNOACTION);
 	}
@@ -523,7 +526,7 @@ void	mupip_recover(void)
 			}
 			murgbl.mur_state = MUR_STATE_BEFORE_IMAGE;
 			assert(!multi_thread_in_use);
-			if (0 != gtm_multi_thread((gtm_pthread_fnptr_t)&mur_apply_pblk, murgbl.reg_total, gtm_mupjnl_parallel,
+			if (0 != gtm_multi_thread((gtm_pthread_fnptr_t)&mur_apply_pblk, murgbl.reg_total, ydb_mupjnl_parallel,
 						murgbl.thr_array, murgbl.ret_array, (void *)mur_ctl, SIZEOF(reg_ctl_list)))
 				mupip_exit(ERR_MUNOACTION);
 			/* PHASE 5 : Update journal file header with current state of recover, so that if this process

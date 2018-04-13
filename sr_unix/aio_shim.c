@@ -338,7 +338,7 @@ STATICFNDCL int	aio_shim_setup(aio_context_t *ctx)
 
 	SETUP_THREADGBL_ACCESS;
 	/* initialize num_requests from the environment variable or otherwise */
-	nr_events = TREF(gtm_aio_nr_events);
+	nr_events = TREF(ydb_aio_nr_events);
 	/* We try io_setup() in a loop, and each failed attempt we reduce the amount of space
 	 * we're asking for. If there is no space to give, just return -1 EAGAIN
 	 */

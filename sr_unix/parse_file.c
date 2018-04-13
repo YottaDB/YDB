@@ -79,7 +79,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	 * allocate buffers that contain one more byte (for the terminating '\0') but dont set that in buff_size. Use
 	 * that extra byte for the trans_log_name call.
 	 */
-	status = TRANS_LOG_NAME(file, &trans, pblk->buffer, pblk->buff_size + 1, dont_sendmsg_on_log2long);
+	status = trans_log_name(file, &trans, pblk->buffer, pblk->buff_size + 1, dont_sendmsg_on_log2long);
 	if (SS_LOG2LONG == status)
 		return ERR_PARBUFSM;
 	assert(trans.addr == pblk->buffer);

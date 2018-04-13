@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -1913,9 +1916,9 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 		/* Move to the next region, now that the tr has been found or will not be found */
 		*brkn_trans = (*brkn_trans && (TR_WILL_NOT_BE_FOUND == found));
 	}
-	assert(!*brkn_trans || (gtm_white_box_test_case_enabled &&
-				((WBTEST_REPLBRKNTRANS == gtm_white_box_test_case_number)
-					|| (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number))));
+	assert(!*brkn_trans || (ydb_white_box_test_case_enabled &&
+				((WBTEST_REPLBRKNTRANS == ydb_white_box_test_case_number)
+					|| (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number))));
 	return (cumul_read);
 }
 

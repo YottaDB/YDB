@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,7 +24,7 @@
 #define ZRO_RBR 		')'	/* Right parenthesis denoting source directory list end */
 #define ZRO_ALF			'*'	/* Auto-relink flag/indicator */
 
-/* Value to use in the count field of a zro_ent structure to mark a particular directory in $gtmroutines as autorelink-enabled for
+/* Value to use in the count field of a zro_ent structure to mark a particular directory in $ydb_routines as autorelink-enabled for
  * subsequent traversal in MUPIP RUNDOWN -RELINKCTL. The value must be negative to be distinguishable from a real count.
  */
 #define ZRO_DIR_ENABLE_AR	-1

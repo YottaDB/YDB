@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -147,7 +150,7 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 				assert(csd_cycle > gvt_cycle);
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 				trgindx = mval2i(&index);
 				SET_PARAM_STRING(util_buff, util_len, trgindx, ",\"XECUTE\"");
 				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
@@ -164,7 +167,7 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 			DBGTRIGR((stderr, "trigger_gbl_fill_xecute_buffer: problem getting multiline record count, retry\n"));
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 			trgindx = mval2i(&index);
 			SET_PARAM_STRING(util_buff, util_len, trgindx, ",\"XECUTE\"");
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
@@ -190,7 +193,7 @@ char *trigger_gbl_fill_xecute_buffer(char *trigvn, int trigvn_len, mval *trig_in
 				free(xecute_buff);
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 				SET_PARAM_STRING(util_buff, util_len, num, ",\"XECUTE\"");
 				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 						trigvn_len, trigvn, util_len, util_buff);

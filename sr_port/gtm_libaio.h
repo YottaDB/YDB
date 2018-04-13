@@ -60,7 +60,7 @@
 #	define IO_SETUP_ERRSTR_ARRAYSIZE (MAX_TRANS_NAME_LEN + 11)
 	/* We add 12 to the MAX_TRANS_NAME_LEN to make space for the
 	 * message, "io_setup(%d)\x00", where "%d" represents a
-	 * number that was parsed by trans_numeric(), hence the
+	 * number that was parsed by "ydb_trans_numeric", hence the
 	 * MAX_TRANS_NAME_LEN usage.
 	 */
 #	define IO_SETUP_FMT "io_setup(%d)"

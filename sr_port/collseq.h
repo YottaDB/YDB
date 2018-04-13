@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -97,7 +100,7 @@ typedef struct collseq_struct {
 	int			argtype;
 } collseq;
 
-boolean_t map_collseq(mstr *fspec, collseq *ret_collseq);
+boolean_t map_collseq(int act, collseq *ret_collseq);
 collseq *ready_collseq(int act);
 int4 do_verify(collseq *csp, unsigned char type, unsigned char ver);
 int find_local_colltype(void);

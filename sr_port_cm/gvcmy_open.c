@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,6 +39,7 @@
 #include "error.h"
 #include "op.h"
 #include "gtmimagename.h"
+#include "ydb_getenv.h"
 
 GBLREF spdesc stringpool;
 
@@ -49,22 +50,20 @@ error_def(ERR_NETDBOPNERR);
 error_def(ERR_REMOTEDBNOSPGBL);
 error_def(ERR_SYSCALL);
 
-#define GTCM_ENVVAR_PFX "GTCM_"
-#define GTCM_ENVVAR_PFXLEN (SIZEOF(GTCM_ENVVAR_PFX) - 1)
-
 void gvcmy_open(gd_region *reg, parse_blk *pb)
 {
 	struct CLB	*clb_ptr;
 	link_info	*li;
 	unsigned char	*ptr, *top, *fn, *libuff;
-	char		*trans_name;
+	char		*trans_name, *tmpptr;
 	bool		new = FALSE;
-	int		len;
+	int		len, nbytes;
 	int4		status;
 	cmi_descriptor	node;
-	mstr		task1, task2;
-	unsigned char	buff[256], lbuff[MAX_HOST_NAME_LEN + GTCM_ENVVAR_PFXLEN];
+	mstr		task2;
+	unsigned char	buff[256];
 	short		temp_short;
+	boolean_t	is_ydb_env_match;
 	MSTR_DEF(task, 0, NULL);
 	DCL_THREADGBL_ACCESS;		/* needed by TREF usage inside SET_REGION_OPEN_TRUE macro */
 
@@ -82,22 +81,16 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVNETFILNM);
 	fn = (unsigned char *)pb->l_dir;
 	top = fn + pb->b_esl - pb->b_node; 	/* total length except node gives end of string */
-	/*
-	   The "task" value for unix comes from a logical of the form GTCM_<hostname>. This value
-	   has the form of "<hostname or ip:>portnum". If the optional hostname or ip is specified
-	   as part of the value, it will override the node value from the global directory. That
-	   processing is handled down in the CMI layer.
-	*/
+	/* The "task" value for unix comes from an env var of the form ydb_cm_<hostname> or GTCM_<hostname>.
+	 * This value has the form of "<hostname or ip:>portnum". If the optional hostname or ip is specified
+	 * as part of the value, it will override the node value from the global directory.
+	 * That processing is handled down in the CMI layer.
+	 */
 	node.addr = pb->l_node;
 	node.len = pb->b_node - 1;
-	memcpy(lbuff, GTCM_ENVVAR_PFX, GTCM_ENVVAR_PFXLEN);
-	memcpy(lbuff + GTCM_ENVVAR_PFXLEN, node.addr, node.len);
-	task1.addr = (char *)lbuff;
-	task1.len = node.len + (int)GTCM_ENVVAR_PFXLEN;
-	lbuff[task1.len] = '\0';
 	task2.addr = (char *)buff;
 	task2.len = 0;
-	if (NULL != (trans_name = GETENV((const char *)lbuff)))
+	if (NULL != (trans_name = ydb_getenv(YDBENVINDX_CM_PREFIX, &node, &is_ydb_env_match)))
 	{
 		status = SS_NORMAL;
 		task2.len = STRLEN(trans_name);
@@ -112,9 +105,17 @@ void gvcmy_open(gd_region *reg, parse_blk *pb)
 		if (SS_NORMAL != status)
 		{
 			if (SS_LOG2LONG == status)
-				rts_error_csa(CSA_ARG(NULL)
-					VARLSTCNT(5) ERR_LOGTOOLONG, 3, task1.len, task1.addr, SIZEOF(buff) - 1);
-			else
+			{
+				tmpptr = (char *)(is_ydb_env_match ? ydbenvname[YDBENVINDX_CM_PREFIX]
+								: gtmenvname[YDBENVINDX_CM_PREFIX]);
+				nbytes = SNPRINTF((char *)buff, SIZEOF(buff), "%s%.*s", tmpptr, node.len, node.addr);
+				if ((0 < nbytes) && (SIZEOF(buff) > nbytes))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
+								ERR_LOGTOOLONG, 3, nbytes, tmpptr, SIZEOF(buff) - 1);
+				else
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+							LEN_AND_LIT("SNPRINTF(gvcmy_open)"), CALLFROM, errno);
+			} else
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 		task.addr = (char *)task2.addr;

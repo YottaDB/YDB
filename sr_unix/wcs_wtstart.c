@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -84,13 +87,13 @@ STATICDEF	int		wcs_wtstart_count;
 #  define SLEEP_ON_WBOX_COUNT(COUNT)								\
 {												\
 	if (WBTEST_ENABLED(WBTEST_SLEEP_IN_WCS_WTSTART)						\
-		&& (COUNT == (gtm_white_box_test_case_count % 100)))				\
+		&& (COUNT == (ydb_white_box_test_case_count % 100)))				\
 	{											\
-		if ((gtm_white_box_test_case_count / 100) == ++wcs_wtstart_count)		\
+		if ((ydb_white_box_test_case_count / 100) == ++wcs_wtstart_count)		\
 		{	/* Resetting this allows us to avoid redundant sleeps while having the	\
 			 * white-box logic variables still enabled (to avoid asserts).		\
 			 */									\
-			gtm_white_box_test_case_count = 0;					\
+			ydb_white_box_test_case_count = 0;					\
 			DBGFPF((stderr, "WCS_WTSTART: STARTING SLEEP\n"));			\
 			while (TRUE)								\
 			{									\
@@ -294,9 +297,9 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
                                                 {	/* Did not get the csr we intended so something must be wrong with cache.
 							 * Kill -9 can cause this. Assert that we were doing a crash shutdown.
 							 */
-                                                        assert(gtm_white_box_test_case_enabled
+                                                        assert(ydb_white_box_test_case_enabled
                                                                 && (WBTEST_CRASH_SHUTDOWN_EXPECTED
-                                                                == gtm_white_box_test_case_number));
+                                                                == ydb_white_box_test_case_number));
                                                         SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
                                                         err_status = ERR_DBCCERR;
                                                         break;
@@ -512,8 +515,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			 * check for bver == 0 and returns immediately in that case so it is okay to call it with a 0 bver in pro.
 			 */
 			assert(((blk_hdr_ptr_t)bp)->bver
-				|| (gtm_white_box_test_case_enabled
-					&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number)));
+				|| (ydb_white_box_test_case_enabled
+					&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number)));
 			if (IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver))
 			{	/* Need to downgrade/reformat this block back to a previous format. */
 				assert(!csd->asyncio);	/* asyncio & V4 format are not supported together */

@@ -37,7 +37,6 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "gtmrecv.h"
-#include "gtm_logicals.h"
 #include "mutex.h"
 #include "jnl.h"
 #include "repl_sem.h"
@@ -303,7 +302,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			} else
 				assert(repl_gld == tmp_jnlpool->gd_ptr);
 		} else if (NULL == tmp_jnlpool->gd_ptr)
-		{	/* instance file from gtm_repl_instance environment variable */
+		{	/* instance file from ydb_repl_instance environment variable */
 			tmp_jnlpool->gd_ptr = local_gdptr;
 			tmp_jnlpool->gd_instinfo = NULL;
 		}

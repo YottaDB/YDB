@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -64,7 +67,7 @@ typedef struct
  * stream. When the iop processing is modified to handle a larger string, these options will be useful. But for right
  * now, they are way overkill..
  */
-#define MAX_N_SOCKET			64		/* Initial default for gtm_max_sockets in gbldefs.c */
+#define MAX_N_SOCKET			64		/* Initial default for ydb_max_sockets in gbldefs.c */
 #define MAX_MAX_N_SOCKET		(1024 * 1024)	/* Values higher than this absurd value are most likely wrong */
 #define MAX_N_DELIMITER			64
 #define MAX_DELIM_LEN			(MAX_N_DELIMITER * GTM_MB_LEN_MAX)  /* worst case byte length for 64 UTF-8 characters */
@@ -376,7 +379,7 @@ typedef struct d_socket_struct_type
 	gtm_chset_t			ichset_utf16_variant;		/* Save the UTF-16 variant (BE/LE) for reuse */
 	gtm_chset_t			ochset_utf16_variant;		/* Save the UTF-16 variant (BE/LE) for reuse */
 	struct io_desc_struct		*iod;				/* Point back to main IO descriptor block */
-	struct socket_struct_type 	*socket[1];			/* Array size determined by gtm_max_sockets */
+	struct socket_struct_type 	*socket[1];			/* Array size determined by ydb_max_sockets */
 } d_socket_struct;
 
 boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz, boolean_t newversion);

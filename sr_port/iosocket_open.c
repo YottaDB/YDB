@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -41,7 +44,7 @@
 GBLREF	d_socket_struct		*socket_pool, *newdsocket;
 GBLREF	io_pair			io_std_device;	/* standard device */
 GBLREF	boolean_t		gtm_utf8_mode;
-GBLREF	int4			gtm_max_sockets;
+GBLREF	int4			ydb_max_sockets;
 GBLREF	boolean_t		dollar_zininterrupt;
 GBLREF	UConverter		*chset_desc[];
 
@@ -131,7 +134,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			ioptr->state = dev_never_opened;
 		}
 	}
-	d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (gtm_max_sockets - 1));
+	d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (ydb_max_sockets - 1));
 	if (ioptr->state == dev_never_opened)
 	{
 		dsocketptr = ioptr->dev_sp = (void *)malloc(d_socket_struct_len);
@@ -466,13 +469,13 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			socketptr->handle_len = handle_len;
 			memcpy(socketptr->handle, sock_handle, handle_len);
 			/* connects newdsocket and socketptr (the new socket) */
-			if (gtm_max_sockets <= newdsocket->n_socket)
+			if (ydb_max_sockets <= newdsocket->n_socket)
 			{
 				assert(ioptr->newly_created == FALSE);
 				if (FD_INVALID != socketptr->temp_sd)
 						close(socketptr->temp_sd);
 					SOCKET_FREE(socketptr);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, ydb_max_sockets);
 					return FALSE;
 				}
 			socketptr->dev = newdsocket;

@@ -26,7 +26,6 @@
 #include "gtm_socket.h"
 #include "gtm_limits.h"
 
-#include "gtm_logicals.h"
 #include "io.h"
 #include "error.h"
 #include "gtmsecshr.h"
@@ -35,7 +34,7 @@
 #include "send_msg.h"
 #include "getjobnum.h"
 #include "gtmmsg.h"
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "eintr_wrappers.h"
 #include "gtm_permissions.h"
 
@@ -74,7 +73,7 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 {
 	int			ret_status = 0, status, len;
 	char			*error_mesg;
-	mstr			secshrsock_lognam, secshrsock_transnam;
+	mstr			secshrsock_transnam;
 	struct stat		buf;
 	int4			max_sock_path_len;
 
@@ -87,29 +86,18 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 		else
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 					gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
-	secshrsock_lognam.addr = GTMSECSHR_SOCK_DIR;
-	secshrsock_lognam.len = SIZEOF(GTMSECSHR_SOCK_DIR) - 1;
 	/* Get the maximum size of the path excluding the socket filename */
 	max_sock_path_len = SIZEOF(gtmsecshr_sock_name.sun_path) - MAX_SECSHR_SOCKFILE_NAME_LEN;
 	/* Make sure this length is atmost equal to the size of the buffer that will hold the socket path */
 	if (YDB_PATH_MAX < max_sock_path_len)
 		max_sock_path_len = YDB_PATH_MAX - MAX_SECSHR_SOCKFILE_NAME_LEN;
-	/* Get the value of the GTMSECSHR_SOCK_DIR logical from the environment. status will be SS_LOG2LONG if
-	 * the value is greater than max_sock_path_len
+	/* Get the value of the "ydb_tmp/gtm_tmp" env var. status will be SS_LOG2LONG if
+	 * the value is greater than max_sock_path_len.
 	 */
-	status = TRANS_LOG_NAME(&secshrsock_lognam, &secshrsock_transnam, gtmsecshr_sockpath, max_sock_path_len,
-				do_sendmsg_on_log2long);
+	status = ydb_trans_log_name(YDBENVINDX_TMP, &secshrsock_transnam, gtmsecshr_sockpath, max_sock_path_len,
+											IGNORE_ERRORS_TRUE, NULL);
 	if ((SS_NORMAL != status) || !ABSOLUTE_PATH(gtmsecshr_sockpath))
 	{
-		if (SS_LOG2LONG == status)
-		{
-			if (SERVER == caller)
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3,
-						secshrsock_lognam.len, secshrsock_lognam.addr, max_sock_path_len);
-			else
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3,
-						secshrsock_lognam.len, secshrsock_lognam.addr, max_sock_path_len);
-		}
 		ret_status = INVLOGNAME;
 		strcpy(gtmsecshr_sockpath, DEFAULT_GTMSECSHR_SOCK_DIR);
 		gtmsecshr_sockpath_len = SIZEOF(DEFAULT_GTMSECSHR_SOCK_DIR) - 1;
@@ -120,7 +108,7 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 		if (ret_status)
 			error_mesg = "Unable to locate default tmp directory";
 		else
-			error_mesg = "$gtm_tmp not a directory";
+			error_mesg = "$ydb_tmp/$gtm_tmp not a directory";
 		if (SERVER == caller)
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3,
 				 RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,

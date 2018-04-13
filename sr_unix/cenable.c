@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ * Copyright 2009 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,8 +20,7 @@
 #include "io.h"
 #include "io_params.h"
 #include "op.h"
-#include "gtm_logicals.h"
-#include "logical_truth_value.h"
+#include "ydb_logical_truth_value.h"
 #include "cenable.h"
 
 GBLREF io_pair		io_std_device;			/* standard device	*/
@@ -36,9 +38,7 @@ void cenable(void)
 
 	if (io_std_device.in->type == tt)
 	{
-		valstr.len = SIZEOF(GTM_NOCENABLE) - 1;
-		valstr.addr = GTM_NOCENABLE;
-		if (!logical_truth_value(&valstr, FALSE, &is_defined))
+		if (!ydb_logical_truth_value(YDBENVINDX_NOCENABLE, FALSE, &is_defined))
 		{	/* if they don't ask for nocenable, the default is enable */
 			pars.str.len = SIZEOF(cenable_params_list);
 			pars.str.addr = (char *)cenable_params_list;

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -132,7 +135,7 @@ boolean_t	gvcst_order2(void)
 		assert(t_tries < CDB_STAGNATE || cs_addrs->now_crit);	/* we better hold crit in the final retry (TP & non-TP) */
 		two_histories = FALSE;
 #if defined(DEBUG) && defined(UNIX)
-		if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVORDERFAIL == gtm_white_box_test_case_number))
+		if (ydb_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVORDERFAIL == ydb_white_box_test_case_number))
 		{
 			status = cdb_sc_blknumerr;
 			t_retry(status);

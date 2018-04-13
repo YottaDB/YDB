@@ -59,7 +59,6 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "mu_rndwn_replpool.h"
-#include "gtm_logicals.h"
 #include <sys/sem.h>
 #include "tp.h"			/* for "insert_region" prototype */
 #include "gtm_time.h"

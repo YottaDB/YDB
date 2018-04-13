@@ -3,6 +3,9 @@
  * Copyright (c) 2016-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -36,8 +39,8 @@
 #include "hashtab_mname.h"
 #include "send_msg.h"
 #include "error.h"
-#include "gtm_logicals.h"
-#include "trans_log_name.h"
+#include "ydb_logicals.h"
+#include "ydb_trans_log_name.h"
 #include "iosp.h"
 #include "parse_file.h"
 #include "getzposition.h"
@@ -703,7 +706,7 @@ void	gvcst_set_statsdb_fname(sgmnt_data_ptr_t csd, gd_region *baseDBreg, char *s
 	int		int_status;
 	key_t		hash_ftok;
 	gd_segment	*baseDBseg;
-	mstr		dbfile, trans, val;
+	mstr		dbfile, trans;
 	parse_blk	pblk;
 	DCL_THREADGBL_ACCESS;
 
@@ -739,21 +742,20 @@ void	gvcst_set_statsdb_fname(sgmnt_data_ptr_t csd, gd_region *baseDBreg, char *s
 			break;
 		}
 		/* This db has stats turned on. Store the full path name of the stats db when base db shm is created.
-		 * The stats db file name is of the form "$gtm_statsdir/<hash>.BASEDB-FILE-NAME.gst" where "$gtm_statsdir"
+		 * The stats db file name is of the form "$ydb_statsdir/<hash>.BASEDB-FILE-NAME.gst" where "$ydb_statsdir"
 		 * evaluates to a directory, <hash> is the ftok of the BASEDB-ABSOLUTE-PATH and BASEDB-FILE-NAME is the
 		 * file name minus the path. For example, if the basedb is "/a/a.dat", the corresponding statsdb file name
-		 * is "$gtm_statsdir/<hash>.a.dat.gst" where <hash> is the ftok of the directory "/a".
+		 * is "$ydb_statsdir/<hash>.a.dat.gst" where <hash> is the ftok of the directory "/a".
 		 * Note: The stats db will be created later when it actually needs to be opened by a process that has
-		 * opted in (VIEW STATSHARE or $gtm_statshare env var set).
+		 * opted in (VIEW STATSHARE or $ydb_statshare env var set).
 		 */
-		val.addr = GTM_STATSDIR;
-		val.len = SIZEOF(GTM_STATSDIR) - 1;
 		statsBuf = &tmp_fname[0];
 		/* Note: "gtm_env_init_sp" already processed GTM_STATSDIR to make it default to GTM_TMP_ENV etc. */
-		int_status = TRANS_LOG_NAME(&val, &trans, statsBuf, MAX_STATSDIR_LEN, do_sendmsg_on_log2long);
+		int_status = ydb_trans_log_name(YDBENVINDX_STATSDIR, &trans, statsBuf, MAX_STATSDIR_LEN,
+										IGNORE_ERRORS_TRUE, NULL);
 		if (SS_NORMAL != int_status)
 		{
-			assert(FALSE);	/* Same TRANS_LOG_NAME in "gtm_env_init_sp" succeeded so this cannot fail */
+			assert(FALSE);	/* Same ydb_trans_log_name in "gtm_env_init_sp" succeeded so this cannot fail */
 			TREF(statsdb_fnerr_reason) = FNERR_STATSDIR_TRNFAIL;
 			statsdb_off = TRUE;
 			break;

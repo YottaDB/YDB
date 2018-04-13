@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -76,7 +79,7 @@
 
 GBLREF	d_socket_struct		*socket_pool;
 GBLREF	io_pair			io_std_device;
-GBLREF	int4			gtm_max_sockets;
+GBLREF	int4			ydb_max_sockets;
 GBLREF	spdesc			stringpool;
 GBLREF	int			dollar_truth;
 GBLREF	bool			out_of_time;
@@ -468,7 +471,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_SOCKNOTPASSED, 0);
 		return;
 	}
-	if (gtm_max_sockets <= (socket_pool->n_socket + fdcount))
+	if (ydb_max_sockets <= (socket_pool->n_socket + fdcount))
 	{
 		if ((NO_M_TIMEOUT != msec_timeout) && !out_of_time)
 			cancel_timer(timer_id);
@@ -476,7 +479,7 @@ void iosocket_accept_local(io_desc *iod, mval *handlesvar, pid_t pid, int4 msec_
 		{
 			CLOSE(fds[fdn], rval);
 		}
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, ydb_max_sockets);
 		return;
 	}
 	for (fdn=0; fdn < fdcount; fdn++)

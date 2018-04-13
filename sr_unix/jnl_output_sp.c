@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -96,13 +99,13 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	 * the function could also be called with aligned_write being TRUE. This could lead to sending SIGTSTP
 	 * twice. Hence ensure that SIGTSTP is sent only for the unaligned write.
 	 */
-	if (gtm_white_box_test_case_enabled && (WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == gtm_white_box_test_case_number)
+	if (ydb_white_box_test_case_enabled && (WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == ydb_white_box_test_case_number)
 				&& !aligned_write)
 		kill(process_id, SIGTSTP);
 #	endif
 	if (jb->dsk != (jb->dskaddr % jb->size))
 	{
-		assert(gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number));
+		assert(ydb_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number));
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 		jnl_qio_in_prog--;
 		assert(0 <= jnl_qio_in_prog);

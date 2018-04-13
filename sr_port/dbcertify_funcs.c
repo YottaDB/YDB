@@ -53,7 +53,7 @@
 #include "min_max.h"
 #include "error.h"
 #include "jnl.h"
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "have_crit.h"
 #include "dbcertify.h"
 
@@ -86,24 +86,14 @@ void dbc_open_command_file(phase_static_area *psa)
 	int		rc, save_errno;
 	int4		status;
 	char		*dist_ptr;
-	mstr		ydb_dist_m, ydb_dist_path;
+	mstr		ydb_dist_path;
 	char		ydb_dist_path_buff[MAX_FN_LEN + 1];
 
 	assert(NULL != psa && NULL == psa->tcfp);
 	if (!psa->tmp_file_names_gend)
 		dbc_gen_temp_file_names(psa);
-	ydb_dist_m.addr = UNIX_ONLY("$")YDB_DIST;
-	ydb_dist_m.len = SIZEOF(UNIX_ONLY("$")YDB_DIST) - 1;
-	status = TRANS_LOG_NAME(&ydb_dist_m, &ydb_dist_path, ydb_dist_path_buff, SIZEOF(ydb_dist_path_buff),
-					dont_sendmsg_on_log2long);
-#ifdef UNIX
-	if (SS_LOG2LONG == status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3,
-				ydb_dist_m.len, ydb_dist_m.addr, SIZEOF(ydb_dist_path_buff) - 1);
-	else
-#endif
-	if (SS_NORMAL != status)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDBDISTUNDEF);
+	status = ydb_trans_log_name(YDBENVINDX_DIST_ONLY, &ydb_dist_path, ydb_dist_path_buff, SIZEOF(ydb_dist_path_buff),
+											IGNORE_ERRORS_FALSE, NULL);
 	assert(0 < ydb_dist_path.len);
 	VMS_ONLY(dbc_remove_command_file(psa));	/* If we don't do this, the command files versions pile up fast */
 	Fopen(psa->tcfp, (char_ptr_t)psa->tmpcmdfile, "w");
@@ -189,8 +179,8 @@ void dbc_run_command_file(phase_static_area *psa, char_ptr_t cmdname, char_ptr_t
 		}
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_DBCCMDFAIL, 7, rc, cmd_len, cmdbuf1, RTS_ERROR_TEXT(cmdname),
 			  RTS_ERROR_TEXT(cmdargs), ERR_TEXT, 2,
-			  RTS_ERROR_LITERAL("Note that the "UNIX_ONLY("environment variable $")VMS_ONLY("logical ")YDB_DIST
-					    " must point to the current GT.M V4 installation"));
+			  RTS_ERROR_LITERAL("Note that the environment variable $ydb_dist/$gtm_dist "
+			  			"must point to the current GT.M V4 installation"));
 	}
 }
 

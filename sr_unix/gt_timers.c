@@ -704,8 +704,8 @@ STATICFNDEF void timer_handler(int why)
 			break;
 #		if defined(DEBUG) && !defined(_AIX) && !defined(__armv6l__) && !defined(__armv7l__)
 		if (tpop->safe && (TREF(continue_proc_cnt) == last_continue_proc_cnt)
-			&& !(gtm_white_box_test_case_enabled
-				&& (WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == gtm_white_box_test_case_number)))
+			&& !(ydb_white_box_test_case_enabled
+				&& (WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == ydb_white_box_test_case_number)))
 		{	/* Check if the timer is extremely overdue, with the following exceptions:
 			 *	- Unsafe timers can be delayed indefinitely.
 			 *	- AIX and ARM systems tend to arbitrarily delay processes when loaded.
@@ -736,8 +736,8 @@ STATICFNDEF void timer_handler(int why)
 			if (NULL != tpop->handler)	/* if there is a handler, call it */
 			{
 #				ifdef DEBUG
-				if (gtm_white_box_test_case_enabled
-					&& (WBTEST_DEFERRED_TIMERS == gtm_white_box_test_case_number)
+				if (ydb_white_box_test_case_enabled
+					&& (WBTEST_DEFERRED_TIMERS == ydb_white_box_test_case_number)
 					&& ((void *)tpop->handler != (void*)jnl_file_close_timer_ptr))
 				{
 					DBGFPF((stderr, "TIMER_HANDLER: handled a timer\n"));
@@ -779,8 +779,8 @@ STATICFNDEF void timer_handler(int why)
 		{
 			timer_defer_cnt++;
 #			ifdef DEBUG
-			if (gtm_white_box_test_case_enabled
-				&& (WBTEST_DEFERRED_TIMERS == gtm_white_box_test_case_number))
+			if (ydb_white_box_test_case_enabled
+				&& (WBTEST_DEFERRED_TIMERS == ydb_white_box_test_case_number))
 			{
 				if (!deferred_tids)
 				{

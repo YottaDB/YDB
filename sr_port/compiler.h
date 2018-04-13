@@ -366,7 +366,7 @@ typedef struct
 }
 
 /* note assignment below */
-#define SHIFT_SIDE_EFFECTS	((TREF(saw_side_effect) = TREF(shift_side_effects)) && (GTM_BOOL == TREF(gtm_fullbool)))
+#define SHIFT_SIDE_EFFECTS	((TREF(saw_side_effect) = TREF(shift_side_effects)) && (YDB_BOOL == TREF(ydb_fullbool)))
 
 #define INITIAL_SIDE_EFFECT_DEPTH 33	/* initial allocation for expression nesting to track side effects */
 
@@ -377,8 +377,8 @@ typedef struct
 	if (TREF(shift_side_effects))									\
 	{												\
 		TREF(saw_side_effect) = TRUE;								\
-		if (!run_time && (FULL_BOOL_WARN == TREF(gtm_fullbool)))				\
-		{	/* warnings requested by by gtm_fullbool and enabled by eval_expr */		\
+		if (!run_time && (FULL_BOOL_WARN == TREF(ydb_fullbool)))				\
+		{	/* warnings requested by by ydb_fullbool and enabled by eval_expr */		\
 			show_source_line(TRUE);								\
 			dec_err(VARLSTCNT(1) ERR_BOOLSIDEFFECT);					\
 		}											\

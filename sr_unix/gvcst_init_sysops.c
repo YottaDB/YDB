@@ -361,7 +361,7 @@ MBSTART {											\
 	gv_cur_region = SAVE_REG;			\
 }
 
-GBLREF	int4			gtm_fullblockwrites;	/* Do full (not partial) database block writes */
+GBLREF	int4			ydb_fullblockwrites;	/* Do full (not partial) database block writes */
 GBLREF	boolean_t		is_src_server;
 GBLREF  boolean_t               mupip_jnl_recover;
 GBLREF	gd_region		*gv_cur_region, *db_init_region;
@@ -1745,7 +1745,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		udi->counter_ftok_incremented = FALSE;
 		assert(-1 != status);	/* since we hold the access control lock, we do not expect any errors */
 	}
-	if (gtm_fullblockwrites)
+	if (ydb_fullblockwrites)
 	{	/* We have been asked to do FULL BLOCK WRITES for this database. On *NIX, attempt to get the filesystem
 		 * blocksize from statvfs. This allows a full write of a blockwithout the OS having to fetch the old
 		 * block for a read/update operation. We will round the IOs to the next filesystem blocksize if the
@@ -1763,7 +1763,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		fbwsize = get_fs_block_size(udi->fd);
 		dblksize = csd->blk_size;
 		if (0 != fbwsize && (0 == dblksize % fbwsize) && (0 == (BLK_ZERO_OFF(csd->start_vbn)) % fbwsize))
-			csa->do_fullblockwrites = gtm_fullblockwrites;		/* This region is fullblockwrite enabled */
+			csa->do_fullblockwrites = ydb_fullblockwrites;		/* This region is fullblockwrite enabled */
 		/* Report this length in DSE even if not enabled */
 		csa->fullblockwrite_len = fbwsize;		/* Length for rounding fullblockwrite */
 	}

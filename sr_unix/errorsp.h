@@ -50,7 +50,7 @@
  */
 #ifdef DEBUG
 #  define CONDSTK_INITIAL_INCR	5	/* Lower initial limit for DEBUG to exercise extensions. Note that values below 5 cause
-					 * issues with nested malloc()s when using certain gtmdbglvl values. */
+					 * issues with nested malloc()s when using certain ydb_dbglvl values. */
 #else
 #  define CONDSTK_INITIAL_INCR	8	/* Initial increment value used when expanding condition handler stack */
 #endif

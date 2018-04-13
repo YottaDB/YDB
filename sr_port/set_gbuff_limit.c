@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,7 +24,7 @@
 #include "set_gbuff_limit.h"
 
 /* sets the value of gbuff_limit (in struct sgmnt_addrs), depending on the value of the poollimit settings
- * (which in turn is set using environment var "gtm_poollimit", and has a default value in case of MUPIP REORG.
+ * (which in turn is set using environment var "ydb_poollimit", and has a default value in case of MUPIP REORG.
  */
 void set_gbuff_limit(sgmnt_addrs **csaptr, sgmnt_data_ptr_t *csdptr, mval *poollimit_arg)
 {

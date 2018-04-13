@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -552,7 +555,7 @@ typedef struct jnlpool_addrs_struct
 	boolean_t		recv_pool;		/* this jnlpool is the same instance as recvpool */
 	boolean_t		relaxed;		/* created with jnlpool_user GTMRELAXED */
 	struct jnlpool_addrs_struct	*next;
-	gd_inst_info		*gd_instinfo;		/* global directory not gtm_repl_instance */
+	gd_inst_info		*gd_instinfo;		/* global directory not ydb_repl_instance */
 	gd_addr			*gd_ptr;		/* pointer to global directory */
 } jnlpool_addrs;
 
@@ -653,16 +656,16 @@ MBSTART {													\
 							% JNLPOOL->jnlpool_ctl->jnlpool_size));			\
 		assert(JRT_BAD != prefix->jrec_type);								\
 		if ((JNLPOOL->jrs.write_total != tot_jrec_len)							\
-			DEBUG_ONLY(|| ((0 != TREF(gtm_test_jnlpool_sync))					\
-					&& (0 == (phs2cmt->jnl_seqno % TREF(gtm_test_jnlpool_sync))))))		\
+			DEBUG_ONLY(|| ((0 != TREF(ydb_test_jnlpool_sync))					\
+					&& (0 == (phs2cmt->jnl_seqno % TREF(ydb_test_jnlpool_sync))))))		\
 		{	/* This is an out-of-sync situation. "tot_jrec_len" (computed in phase1) is not equal	\
 			 * to "write_total" (computed in phase2). Not sure how this can happen but recover	\
 			 * from this situation by replacing the first record in the reserved space with a	\
 			 * JRT_BAD rectype. That way the source server knows this is a transaction that it	\
 			 * has to read from the jnlfiles and not the jnlpool.					\
 			 */											\
-			assert((0 != TREF(gtm_test_jnlpool_sync))						\
-					&& (0 == (phs2cmt->jnl_seqno % TREF(gtm_test_jnlpool_sync))));		\
+			assert((0 != TREF(ydb_test_jnlpool_sync))						\
+					&& (0 == (phs2cmt->jnl_seqno % TREF(ydb_test_jnlpool_sync))));		\
 			assert(tot_jrec_len >= (SIZEOF(jnldata_hdr_struct) + SIZEOF(jrec_prefix)));		\
 			/* Note that it is possible jnl_header is 8 bytes shy of the jnlpool end in which case	\
 			 * "prefix" below would end up going outside the jnlpool range hence a simple		\

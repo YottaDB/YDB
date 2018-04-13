@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -145,7 +145,7 @@ uint4	mur_forward(jnl_tm_t min_broken_time, seq_num min_broken_seqno, seq_num lo
 							      * an assert in mur_close_files later checks this did not change.
 							      */
 	assert(!mur_options.rollback || (murgbl.losttn_seqno <= murgbl.min_broken_seqno));
-	max_procs = gtm_mupjnl_parallel;
+	max_procs = ydb_mupjnl_parallel;
 	if (!max_procs || (max_procs > murgbl.reg_total))
 		max_procs = murgbl.reg_total;
 	mur_forw_mp_hash_buckets = getprime(murgbl.reg_total + 32);	/* Add 32 to get bigger prime # and in turn better hash */

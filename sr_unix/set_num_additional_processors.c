@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -53,8 +56,8 @@ void set_num_additional_processors(void)
 	DEFER_INTERRUPTS(INTRPT_IN_SET_NUM_ADD_PROCS, prev_intrpt_state);
 
 #		ifdef DEBUG
-		if (gtm_white_box_test_case_enabled
-			&& (WBTEST_SYSCONF_WRAPPER == gtm_white_box_test_case_number))
+		if (ydb_white_box_test_case_enabled
+			&& (WBTEST_SYSCONF_WRAPPER == ydb_white_box_test_case_number))
 		{
 			DBGFPF((stderr, "will sleep indefinitely now\n"));
 			while (TRUE)
@@ -73,8 +76,8 @@ void set_num_additional_processors(void)
 #	  ifdef __MVS__
 #	    ifdef DEBUG
 	DEFER_INTERRUPTS(INTRPT_IN_SET_NUM_ADD_PROCS);
-	if (gtm_white_box_test_case_enabled
-		&& (WBTEST_SYSCONF_WRAPPER == gtm_white_box_test_case_number))
+	if (ydb_white_box_test_case_enabled
+		&& (WBTEST_SYSCONF_WRAPPER == ydb_white_box_test_case_number))
 	{
 		DBGFPF((stderr, "will sleep indefinitely now\n"));
 		while (TRUE)

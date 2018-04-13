@@ -79,9 +79,9 @@ GBLREF int4		zdir_form;
 GBLREF boolean_t	badchar_inhibit;
 GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database blocks */
 GBLREF int		gv_fillfactor;
-GBLREF int4		gtm_max_sockets;
+GBLREF int4		ydb_max_sockets;
 GBLREF gv_key		*gv_currkey;
-GBLREF boolean_t	is_gtm_chset_utf8;
+GBLREF boolean_t	is_ydb_chset_utf8;
 GBLREF int4		gtm_trigger_depth;
 GBLREF uint4		process_id;
 GBLREF boolean_t	dmterm_default;
@@ -257,9 +257,9 @@ void	op_fnview(int numarg, mval *dst, ...)
 			dst->str = tmpstr;
 			break;
 		case VTK_FULLBOOL:
-			switch (TREF(gtm_fullbool))
+			switch (TREF(ydb_fullbool))
 			{
-				case GTM_BOOL:
+				case YDB_BOOL:
 					tmpstr.addr = GTM_BOOL_RES;
 					tmpstr.len = SIZEOF(GTM_BOOL_RES)-1;
 					break;
@@ -272,7 +272,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 					tmpstr.len = SIZEOF(WRN_BOOL_RES)-1;
 					break;
 				default:
-					assertpro(FALSE && TREF(gtm_fullbool));
+					assertpro(FALSE && TREF(ydb_fullbool));
 			}
 			dst->str = tmpstr;
 			break;
@@ -744,7 +744,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			n = gv_fillfactor;
 			break;
 		case VTK_MAXSOCKETS:
-			n = gtm_max_sockets;
+			n = ydb_max_sockets;
 			break;
 		case VTK_LVCREF:
 			lv = (lv_val *)parmblk.value;

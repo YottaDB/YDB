@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +33,6 @@ uint4 bml_busy(uint4 setbusy, sm_uc_ptr_t map)
 	ret1 = bit_clear(setbusy + 1, map);
 	/* In case of a valid snapshot, assert that only a RECYCLED or FREE block gets marked as BUSY (dse is an exception). */
 	assert((ret && ret1) || (ret && !ret1) || dse_running
-		|| (WBTEST_INVALID_SNAPSHOT_EXPECTED == gtm_white_box_test_case_number));
+		|| (WBTEST_INVALID_SNAPSHOT_EXPECTED == ydb_white_box_test_case_number));
 	return ret;
 }

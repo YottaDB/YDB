@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,6 +30,8 @@
 #include "send_msg.h"
 #include "have_crit.h"
 #include "eintr_wrappers.h"
+#include "iosp.h"
+#include "ydb_trans_log_name.h"
 
 #define	COREDUMPFILTERFN	"/proc/%i/coredump_filter"
 #define	FILTERPARMFMTSTR	"0x%08x"
@@ -54,6 +56,9 @@ void err_init(void (*x)())
 	char		filter[FILTERPARMSIZE], *filterend;			/* Value read in & written out */
 	char		*rcc, *bytes_buf;
 	FILE		*filterstrm;						/* filter stream file block */
+	mstr		trans;
+	char		buf[1024];
+	int4		status;
 #	endif
 	chnd = (condition_handler *)malloc((CONDSTK_INITIAL_INCR + CONDSTK_RESERVE) * SIZEOF(condition_handler));
 	chnd[0].ch_active = FALSE;
@@ -77,19 +82,17 @@ void err_init(void (*x)())
 	 * be able to properly use the *print*() wrapper functions.
 	 *
 	 */
-	bytes_buf = GETENV("gtm_coredump_filter");
-	if ((NULL == bytes_buf) || (0 != strncmp("-1", bytes_buf, 3)))
+	status = ydb_trans_log_name(YDBENVINDX_COREDUMP_FILTER, &trans, buf, SIZEOF(buf), IGNORE_ERRORS_TRUE, NULL);
+	if ((SS_NOLOGNAM == status) || ((SS_NORMAL == status) && (0 != strncmp("-1", buf, 3))))
 	{
-
 		rc = snprintf(procfn, SIZEOF(procfn), COREDUMPFILTERFN, getpid());
 		if (0 > rc)
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("sprintf()"), CALLFROM, rc);
 			return;
 		}
-		if (NULL == bytes_buf)
-		{
-			/* If $gtm_coredump_filter is not defined, set the filter to provide a full dump  including huge pages */
+		if (SS_NOLOGNAM == status)
+		{	/* If coredump filter env var is not defined, set the filter to provide a full dump including huge pages */
 			Fopen(filterstrm, procfn, "r");
 			if (NULL == filterstrm)
 			{
@@ -120,7 +123,8 @@ void err_init(void (*x)())
 			}
 			snprintf(filter, FILTERPARMSIZE, FILTERPARMFMTSTR, filterbits);
 			bytes_buf = filter;
-		}
+		} else
+			bytes_buf = buf;
 		Fopen(filterstrm, procfn, "w");
 		if (NULL == filterstrm)
 		{
@@ -145,5 +149,6 @@ void err_init(void (*x)())
 		}
 
 	}
+	/* else : SS_LOG2LONG or some other error. Do no changes to coredump filter settings in that case. */
 #	endif
 }

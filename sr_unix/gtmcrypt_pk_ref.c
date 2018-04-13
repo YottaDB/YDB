@@ -40,6 +40,7 @@
 #include "gtmcrypt_dbk_ref.h"
 #include "gtmcrypt_sym_ref.h"
 #include "gtmcrypt_pk_ref.h"
+#include "ydb_getenv.h"
 
 GBLDEF	passwd_entry_t	*gtmcrypt_pwent;
 GBLDEF	gpgme_ctx_t	pk_crypt_ctx;
@@ -54,7 +55,7 @@ void gc_pk_scrub_passwd()
 }
 
 /* This function is called whenever gpg needs the passphrase with which the secret key is encrypted. In this case, the passphrase
- * is obtained from the ENVIRONMENT VARIABLE - $gtm_passwd or by invoking the mumps engine during the "gtmcrypt_init()".
+ * is obtained from the ENVIRONMENT VARIABLE - $ydb_passwd/$gtm_passwd or by invoking the mumps engine during the "gtmcrypt_init()".
  * In either ways, it's guaranteed that when this function is called, the passphrase is already set in the global variable.
  */
 int gc_pk_crypt_passphrase_callback(void *opaque, const char *uid_hint, const char *passphrase_info, int last_was_bad, int fd)
@@ -88,7 +89,8 @@ int gc_pk_crypt_retrieve_plain_text(gpgme_data_t plain_data, unsigned char *plai
 	memset(plain_text, 0, SYMMETRIC_KEY_MAX);
 	gpgme_data_seek(plain_data, 0, SEEK_SET);
 	ret = (int)gpgme_data_read(plain_data, plain_text, SYMMETRIC_KEY_MAX);
-	assert(ret || (NULL != getenv("gtm_white_box_test_case_enable"))); /* || needed for "encryption/key_file_enc" subtest */
+	assert(ret || (NULL != ydb_getenv(YDBENVINDX_WHITE_BOX_TEST_CASE_ENABLE, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)));
+			/* || needed for "encryption/key_file_enc" subtest */
 	return ret;
 }
 
@@ -184,10 +186,10 @@ int gc_pk_gpghome_has_permissions()
 	int		gnupghome_set, perms, pathlen;
 
 	/* See if GNUPGHOME is set in the environment */
-	if (!(ptr = getenv(GNUPGHOME)))
+	if (!(ptr = ydb_getenv(YDBENVINDX_GENERIC_GNUPGHOME, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 	{	/* $GNUPGHOME is not set, use $HOME/.gnupg as the GPG home directory */
 		gnupghome_set = FALSE;
-		if (!(ptr = getenv(HOME)))
+		if (!(ptr = ydb_getenv(YDBENVINDX_GENERIC_HOME, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 		{
 			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, HOME);
 			return -1;

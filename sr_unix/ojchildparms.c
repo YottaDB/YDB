@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,7 +87,7 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 	char			*local_buff = NULL;
 	mval			*command_str;
 
-	if ((NULL == sp) && (!((sp = GETENV(CHILD_FLAG_ENV)) && sp[0]))) /* note assignment */
+	if ((NULL == sp) && (!((sp = getenv(CHILD_FLAG_ENV)) && sp[0]))) /* note assignment */
 		return;
 	setup_fd = (int)ATOL(sp);
 	if (NULL != g_args)

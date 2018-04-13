@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -47,8 +50,8 @@ boolean_t op_gvget(mval *v)
 	if (IS_REG_BG_OR_MM(gv_cur_region))
 	{
 	 	if (0 == gv_target->root)		/* global does not exist */
-		{	/* Assert that if gtm_gvundef_fatal is non-zero, then we better not be about to signal a GVUNDEF */
-			assert(!TREF(gtm_gvundef_fatal));
+		{	/* Assert that if ydb_gvundef_fatal is non-zero, then we better not be about to signal a GVUNDEF */
+			assert(!TREF(ydb_gvundef_fatal));
 			gotit = FALSE;
 		} else
 		{

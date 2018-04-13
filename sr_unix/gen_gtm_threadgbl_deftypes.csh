@@ -180,7 +180,7 @@ endif
 foreach image (pro dbg)
 	\rm -f gtm_threadgbl_deftypes_asm_${image}.fail
 	./gtm_threadgbl_deftypes_${image} > gtm_threadgbl_deftypes_asm_${image}.in
-	env ydb_dist=$currprofull gtm_chset="M" gtmroutines=". $currprofull" \
+	env ydb_dist=$currprofull ydb_chset="M" ydb_routines=". $currprofull" \
 		$currprofull/mumps -run gtmthreadgblasm ${accesstxt} gtm_threadgbl_deftypes_asm_${image}.in \
 			gtm_threadgbl_deftypes_asm_${image}.si || touch gtm_threadgbl_deftypes_asm_${image}.fail
 	if ( -e gtm_threadgbl_deftypes_asm_${image}.fail) then

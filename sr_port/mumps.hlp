@@ -777,16 +777,16 @@
    To represent and process strings that use international characters, YottaDB
    processes can use Unicode.
 
-   If the environment variable gtm_chset has a value of UTF-8 and either
+   If the environment variable ydb_chset has a value of UTF-8 and either
    LC_ALL or LC_CTYPE is set to a locale with UTF-8 support (for example,
    zh_CN.utf8), a YottaDB process interprets strings as containing characters
    encoded in the UTF-8 representation. In the UTF-8 mode, YottaDB no longer
    assumes that one character is one byte, or that the glyph display width of
    a character is one. Depending on how ICU is built on a computer system, in
    order to operate in UTF-8 mode, a YottaDB process may well also need a third
-   environment variable, gtm_icu_version set appropriately.
+   environment variable, ydb_icu_version set appropriately.
 
-   If the environment variable gtm_chset has no value, the string "M", or any
+   If the environment variable ydb_chset has no value, the string "M", or any
    value other than "UTF-8", YottaDB treats each 8-bit byte as a character,
    which suffices for English, and many single-language applications.
 
@@ -795,7 +795,7 @@
    should points to that directory for M mode processes. All Unicode-related
    components reside in the utf8 subdirectory and the environment variable
    ydb_dist should point to that subdirectory for UTF-8 mode processes. So,
-   in addition to the values of the environment variables gtm_chset and
+   in addition to the values of the environment variables ydb_chset and
    LC_ALL/LC_CTYPE, ydb_dist for a UTF-8 process should also point to the
    utf8 subdirectory.
 
@@ -881,7 +881,7 @@
    |------------------------+-----------------------------------------------|
    |                        | The read-only intrinsic special variable      |
    |                        | $ZCHSET takes its value from the environment  |
-   |                        | variable gtm_chset. An application can obtain |
+   |                        | variable ydb_chset. An application can obtain |
    | $ZCHset                | the character set used by a YottaDB process   |
    |                        | by the value of $ZCHSET. $ZCHSET can have     |
    |                        | only two values "M", or "UTF-8" and it cannot |
@@ -1029,7 +1029,7 @@
    |                        |                                               |
    |                        | 09-OCT-2006 04:27:53 ZWR                      |
    |                        |                                               |
-   |                        | YottaDB MUPIP EXTRACT UTF-8                      |
+   |                        | YottaDB MUPIP EXTRACT UTF-8                   |
    |                        |                                               |
    | MUPIP                  | ^A="************"                             |
    |                        |                                               |
@@ -1037,11 +1037,11 @@
    |                        |                                               |
    |                        | MUPIP LOAD command considers a sequential     |
    |                        | file as encoded in UTF-8 if the environment   |
-   |                        | variable gtm_chset is set to UTF-8. Ensure    |
+   |                        | variable ydb_chset is set to UTF-8. Ensure    |
    |                        | that MUPIP EXTRACT commands and corresponding |
    |                        | MUPIP LOAD commands execute with the same     |
    |                        | setting for the environment variable          |
-   |                        | gtm_chset. The M utility programs %GO and %GI |
+   |                        | ydb_chset. The M utility programs %GO and %GI |
    |                        | have the same requirement for mode matching.  |
    |                        | For more information on MUPIP EXTRACT and     |
    |                        | MUPIP LOAD, refer to the General Database     |
@@ -1192,7 +1192,7 @@
    **Important**
 
    Unless Unicode support is sought for a process (that is, unless the
-   environment variable gtm_chset is UTF8"), YottaDB processes do not need ICU.
+   environment variable ydb_chset is UTF8"), YottaDB processes do not need ICU.
    In other words, existing, non-Unicode, applications continue to work on
    supported platforms without ICU.
 
@@ -1215,10 +1215,10 @@
    YottaDB expects ICU to be compiled with symbol renaming disabled and will
    issue an error at startup if the available version of ICU is built with
    symbol renaming enabled. To use a version of ICU built with symbol
-   renaming enabled, the $gtm_icu_version environment variable indicates the
+   renaming enabled, the $ydb_icu_version environment variable indicates the
    MAJOR VERSION and MINOR VERSION numbers of the desired ICU formatted as
    MajorVersion.MinorVersion (for example "3.6" to denote ICU-3.6). When
-   $gtm_icu_version is so defined, YottaDB attempts to open the specific version
+   $ydb_icu_version is so defined, YottaDB attempts to open the specific version
    of ICU. In this case, YottaDB works regardless of whether or not symbols in
    this ICU have been renamed. A missing or ill-formed value for this
    environment variable causes YottaDB to only look for non-renamed ICU symbols.
@@ -1499,7 +1499,7 @@
    Instructs YottaDB to embeds routine source code in the object code. The
    default is NOEMBED_SOURCE. Like other YottaDB compilation qualifiers, this
    qualifier can be specified through the $ZCOMPILE intrinsic special
-   variable and gtmcompile environment variable. EMBED_SOURCE provides $TEXT
+   variable and ydb_compile environment variable. EMBED_SOURCE provides $TEXT
    and ZPRINT access to the correct source code, even if the original M
    source file has been edited or removed. Where the source code is not
    embedded in the object code, YottaDB attempts to locate the source code file.
@@ -1693,7 +1693,7 @@
 
    A ZLINK command that does not specify a directory uses $ZROUTINES to
    locate files. When $ZROUTINES is null, ZLINK uses the current directory.
-   $ZROUTINES is initialized to the value of the gtmroutines environment
+   $ZROUTINES is initialized to the value of the ydb_routines environment
    variable.
 
    When the file being linked includes an explicit directory, ZLINK and
@@ -1728,7 +1728,7 @@
    $ mumps -run ^filename
 
    The mumps command searches the directories specified by the environment
-   variable gtmroutines to locate the specified file name.
+   variable ydb_routines to locate the specified file name.
 
    Example:
 
@@ -1749,7 +1749,7 @@
    |---------+-----------------------+--------------------------------------|
    |         | Not invoked for code  | Errors are suppressed and cause a    |
    |         | entered at the direct | silent process exit. Set the         |
-   |         | mode prompt; Note     | environment variable gtm_etrap which |
+   |         | mode prompt; Note     | environment variable ydb_etrap which |
    |         | that XECUTE code is   | overrides the default $ZTRAP="B".    |
    |         | treated as not        |                                      |
    | Error   | entered at the direct | If needed, error handlers can        |
@@ -1946,7 +1946,7 @@
 
    When entering commands at the direct mode prompt, the insert mode can be
    toggled for that line by using the insert key. When YottaDB starts, insert
-   mode is enabled unless the value of the gtm_principal_editing environment
+   mode is enabled unless the value of the ydb_principal_editing environment
    variable includes the string NOINSERT. If insert mode is disabled or
    enabled for the $PRINCIPAL device by an USE statement before returning to
    direct mode, it will remain disabled or enabled at direct mode. The insert
@@ -3649,12 +3649,12 @@
 
      o Use VIEW [NO]LOGT[PRESTART][=intexpr] to enable or disable the logging
        of TPRESTART messages. Note that you can use the
-       gtm_tprestart_log_delta and gtm_tprestart_log_first environment
+       ydb_tprestart_log_delta and ydb_tprestart_log_first environment
        variables to set the frequency of TPRESTART messages.
      o Use VIEW [NO]LOGN[ONTP][=intexpr] to enable or disable the logging of
        NONTPRESTART messages. This facility is the analog of TPRESTART
        tracking, but for non-TP mini-transacstions. Note that you can use the
-       gtm_nontprestart_log_delta and gtm_nontprestart_log_first environment
+       ydb_nontprestart_log_delta and ydb_nontprestart_log_first environment
        variables to set the frequency of the NONTPRESTART messages.
      o For more information, refer to "Key Words" and the Environment
        Variables section of YottaDB Administration and Operations Guide.
@@ -4272,7 +4272,7 @@
    Example:
 
        kill *
-       write !,"gtm_stdxkill=",+$ztrnlnm("gtm_stdxkill"),!
+       write !,"ydb_stdxkill=",+$ztrnlnm("ydb_stdxkill"),!
        set (A,B,C,E)="input"
        do X(.A,.B)
        zwrite
@@ -4295,7 +4295,7 @@
 
    Produces the following output:
 
-   gtm_stdxkill=0
+   ydb_stdxkill=0
    A="output"
    B="output"
    C="input"
@@ -4922,9 +4922,9 @@
    functions encounter malformed byte sequences (illegal characters).
 
    At process startup, YottaDB initializes BADCHAR from the environment variable
-   gtm_badchar. Set the environment variable $gtm_badchar to a non-zero
+   ydb_badchar. Set the environment variable $ydb_badchar to a non-zero
    number or "YES" (or "Y") to enable VIEW "BADCHAR". Set the environment
-   variable $gtm_badchar to 0 or "NO" or "FALSE" (or "N" or "F") to enable
+   variable $ydb_badchar to 0 or "NO" or "FALSE" (or "N" or "F") to enable
    VIEW "NOBADCHAR". By default, YottaDB enables VIEW "BADCHAR".
 
    With VIEW "BADCHAR", YottaDB functions generate the BADCHAR error when they
@@ -4977,7 +4977,7 @@
    TERMINATOR deviceparameter changes for $PRINCIPAL. With VIEW "NODMTERM",
    TERMINATOR deviceparameter apply to both READs from $PRINCIPAL and direct
    mode interactions. A case-insensitive value of the environment variable
-   gtm_dmterm is "1", "yes", or "true" establishes a DMTERM state at process
+   ydb_dmterm is "1", "yes", or "true" establishes a DMTERM state at process
    initiation; all other values, including no value, result in the default
    VIEW "NODMTERM" behavior. $VIEW("DMTERM") returns 1 for DMTERM mode or 0
    for NODMTERM mode.
@@ -5031,7 +5031,7 @@
    functions, external calls and $INCREMENT().
 
    YottaDB picks up the value of [NO]FULL_BOOL[EAN][WARN] from the environment
-   variable gtm_boolean. If gtm_boolean is undefined or evaluates to an
+   variable ydb_boolean. If ydb_boolean is undefined or evaluates to an
    integer zero (0), the initial setting the default "NOFULL_BOOLEAN", if it
    evaluates to an integer one (1), the initial setting is "FULL_BOOLEAN" and
    if it evaluates to integer two (2) the initial setting is "FULL_BOOLWARN".
@@ -5039,8 +5039,8 @@
    VIEW "[NO]FULL_BOOL[EAN][WARN]" takes effect immediately for indirection
    and XECUTE.
 
-   VIEW "NOFULLBOOLEAN" produces an error when gtm_side_effects is on. For
-   more information on the gtm_side_effects environment variable, refer to
+   VIEW "NOFULLBOOLEAN" produces an error when ydb_side_effects is on. For
+   more information on the ydb_side_effects environment variable, refer to
    the Environment Variables section in the Basic Operations chapter of the
    Administration and Operations Guide.
 
@@ -5140,39 +5140,39 @@
 
    Allows a process to dynamically change the logging of NONTPRESTART
    messages to the operator log established at process startup by the
-   environment variables gtm_nontprestart_log_delta and
-   gtm_nontprestart_log_first.
+   environment variables ydb_nontprestart_log_delta and
+   ydb_nontprestart_log_first.
 
    VIEW "NOLOGNONTP" turns off the logging of NONTPRESTART messages to the
    operator log.
 
    VIEW "LOGNONTP"[=intexpr] turns on logging of NONTPRESTART messages to the
    operator log. If no intexpr is specified, YottaDB uses the value of
-   environment variable gtm_nontprestart_log_delta, if it is defined, and one
+   environment variable ydb_nontprestart_log_delta, if it is defined, and one
    otherwise (that is, every transaction restart will be logged). A negative
    value of intexpr turns off the logging of NONTPRESTART messages.
 
    Note that it is not possible to perform the operations of
-   gtm_nontprestart_log_first with VIEW "LOGNONTP"[=intexpr].
+   ydb_nontprestart_log_first with VIEW "LOGNONTP"[=intexpr].
 
 4 LOGTPRESTART
    LOGTPRESTART
 
    Allows a process to dynamically change the logging of TPRESTART messages
    to the operator log established at process startup by the environment
-   variables gtm_tprestart_log_delta and gtm_tprestart_log_first.
+   variables ydb_tprestart_log_delta and ydb_tprestart_log_first.
 
    VIEW "NOLOGTPRESTART" turns off the logging of TPRESTART messages to the
    operator log.
 
    VIEW "LOGTPRESTART"[=intexpr] turns on logging of TPRESTART messages to
    the operator log. If no intexpr is specified, YottaDB uses the value of
-   environment variable gtm_tprestart_log_delta, if it is defined, and one
+   environment variable ydb_tprestart_log_delta, if it is defined, and one
    otherwise (that is, every transaction restart will be logged). A negative
    value of intexpr turns off the logging of TPRESTART messages.
 
    Note that it is not possible to perform the operations of
-   gtm_tprestart_log_first with VIEW "LOGTPRESTART"[=intexpr].
+   ydb_tprestart_log_first with VIEW "LOGTPRESTART"[=intexpr].
 
 4 LV_GCOL
    LV_GCOL
@@ -5224,7 +5224,7 @@
    LVNULLSUBS allows local arrays to have empty string subscripts.
 
    At process startup, YottaDB initializes [NEVER][NO]LVNULLSUBS from
-   $gtm_lvnullsubs. Set the environment variable $gtm_lvnullsubsv to:
+   $ydb_lvnullsubs. Set the environment variable $ydb_lvnullsubsv to:
 
    **Important**
 
@@ -5283,10 +5283,10 @@
    limit in place. Note that this facility is designed for use by a
    relatively small subset of processes. In addition, MUPIP REORG uses this
    facility to limit its buffers to a value established by the UNIX
-   environment variable (or OpenVMS logical name) gtm_poollimit using the
+   environment variable (or OpenVMS logical name) ydb_poollimit using the
    syntax described for VIEW "POOLLIMIT" with a default of 64 if
-   gtm_poollimit is not specified. Note that this may slightly slow a
-   standalone REORG but can be overridden by defining gtm_poollimit as 0 or
+   ydb_poollimit is not specified. Note that this may slightly slow a
+   standalone REORG but can be overridden by defining ydb_poollimit as 0 or
    "100%".
 
 4 RCTLDUMP
@@ -5323,16 +5323,16 @@
    in or out with the VIEW "[NO]STATSHARE" command, defaulting to VIEW
    "NOSTATSHARE". At process startup, a value of 1, or any case-independent
    string or leading substrings of "TRUE" or "YES" in the environment
-   variable gtm_statshare provides an initial setting of VIEW "STATSHARE".
+   variable ydb_statshare provides an initial setting of VIEW "STATSHARE".
    When a process changes whether it is opting in or out, there is no change
    to the output of a ZSHOW "G" within that process. YottaDB does not permit
    this form of the VIEW command within a TP transaction. Monitoring the
    statistics of other processes does not require opting-in.
 
    Processes opted-in place their statistics as binary data in database files
-   located in the directory specified by the gtm_statsdir environment
+   located in the directory specified by the ydb_statsdir environment
    variable. All processes that share statistics MUST use the same value for
-   $gtm_statsdir. The ^%YGBLSTAT utility program gathers and reports
+   $ydb_statsdir. The ^%YGBLSTAT utility program gathers and reports
    statistics.
 
 4 STP_GCOL
@@ -5360,7 +5360,7 @@
    other words, YottaDB treats all variables appearing in expressions as if they
    were the argument of an implicit $GET(). UNDEF is the default.
 
-   The environment variable $gtm_noundef specifies the initial value value of
+   The environment variable $ydb_noundef specifies the initial value value of
    [NO]UNDEF at process startup. If it is defined, and evaluates to a
    non-zero integer or any case-independent string or leading substring of
    "TRUE" or "YES", then YottaDB treats undefined variables as having an
@@ -5389,12 +5389,12 @@
    The expression is optional when turning M-profiling off, if it exists, it
    overrides the global variable set when M-profiling was turned on.
 
-   gtm_trace_gbl_name enables YottaDB tracing at process startup. Setting
-   gtm_trace_gbl_name to a valid global variable name instructs YottaDB to
+   ydb_trace_gbl_name enables YottaDB tracing at process startup. Setting
+   ydb_trace_gbl_name to a valid global variable name instructs YottaDB to
    report the data in the specified global when a VIEW command disables the
    tracing, or implicitly at process termination. This setting behaves as if
    the process issued a VIEW "TRACE" command at process startup. However,
-   gtm_trace_gbl_name has a capability not available with the VIEW command,
+   ydb_trace_gbl_name has a capability not available with the VIEW command,
    such that if the environment variable is defined but evaluates to zero (0)
    or, only on UNIX, to the empty string, YottaDB collects the M-profiling data
    in memory and discards it when the process terminates (this feature is
@@ -5813,7 +5813,7 @@
    If no value is given with the VIEW command, it turns four digit code on.
    It is equivalent to the intrinsic special variable $ZDATEFORM. Use
    $ZDATEFORM to set this VIEW keyword. Also, logical name environment
-   variable gtm_zdate_form may be used to set the initial value to this
+   variable ydb_zdate_form may be used to set the initial value to this
    factor.
 
 3 Examples
@@ -6279,7 +6279,7 @@
    to integrating it with the process.
 
    With VIEW "LINK":"RECURSIVE" specified or by starting the process with the
-   environment variable gtm_link set to "RECURSIVE", the ZLINK command adds
+   environment variable ydb_link set to "RECURSIVE", the ZLINK command adds
    an executable routine even when a routine with the same name is active and
    available in the current stack. When a process links a routine with the
    same name as an existing routine, future calls use the new routine. Prior
@@ -6400,8 +6400,8 @@
 
    For each auto-relink enabled directory which a YottaDB process accesses while
    searching through $ZROUTINES, YottaDB creates a small control file
-   (Relinkctl) in the directory identified by $gtm_linktmpdir (defaulting to
-   $gtm_tmp, which in turn defaults to /tmp, if unspecified). The names of
+   (Relinkctl) in the directory identified by $ydb_linktmpdir (defaulting to
+   $ydb_tmp, which in turn defaults to /tmp, if unspecified). The names of
    these files are of the form gtm-relinkctl-<murmur> where <murmur> is a
    hash of the realpath() to an auto-relink directory; for example:
    /tmp/gtm-relinkctl-f0938d18ab001a7ef09c2bfba946f002). With each Relinkctl
@@ -6423,11 +6423,11 @@
    The MUPIP RCTLDUMP command reports information related to relinkctl files
    and their associated shared memory segments.
 
-   The environment variable gtm_autorelink_keeprtn if set to 1, t[rue], or
+   The environment variable ydb_autorelink_keeprtn if set to 1, t[rue], or
    y[es] causes exiting processes to leave auto-relinked object code in the
    shared memory repositories, while if undefined, 0, f[alse] or n[o] causes
    exiting processes to purge any routines currently use by no processes. All
-   values are case-independent. When gtm_autorelink_keeprtn is defined and
+   values are case-independent. When ydb_autorelink_keeprtn is defined and
    TRUE:
 
      o Process exit is simplified, with the performance gain - faster process
@@ -6624,7 +6624,7 @@
        in the case where one desires a currently shared object file (one that
        was accessed before it was deleted) to no longer be shared.
      o To effect auto-relink, YottaDB creates small temporary files in the
-       directory referred to by $gtm_linktmpdir (defaulting to $gtm_tmp,
+       directory referred to by $ydb_linktmpdir (defaulting to $ydb_tmp,
        which in turn defaults to /tmp, if unspecified). The names of these
        files are of the form gtm-relinkctl<md5sum> where <md5sum> is a hash
        of the realpath() to an auto-relink directory. The group and
@@ -6633,9 +6633,9 @@
        Security Philosophy) of the UNIX Administration and Operations Guide.
        YottaDB recommends that all processes that share a directory whose
        contents are subject to ZRUPDATE use the same value for
-       $gtm_linktmpdir so that all processes see update notifications - with
-       different values of $gtm_linktmpdir, a ZRUPDATE by a process with one
-       value of $gtm_linktmpdir would not be observed by a process with a
+       $ydb_linktmpdir so that all processes see update notifications - with
+       different values of $ydb_linktmpdir, a ZRUPDATE by a process with one
+       value of $ydb_linktmpdir would not be observed by a process with a
        different value of that environment variable.
      o ZRUPDATE always updates the existing shared memory relinkctl
        information for a file with an existing entry.
@@ -8683,7 +8683,7 @@
    |                   |              | effects" when it is not explicitly  |
    |                   |              | set, but that mode of operation is  |
    |                   |              | required by the setting of          |
-   |                   |              | gtm_side_effects, and "Standard     |
+   |                   |              | ydb_side_effects, and "Standard     |
    |                   |              | Boolean side-effect warning" when   |
    |                   |              | warnings have been specified.       |
    |-------------------+--------------+-------------------------------------|
@@ -8908,7 +8908,7 @@
    |                   |              | digit year code is active for       |
    | "ZDATE_FORM"      | none         | $ZDATE(); YottaDB defaults to 0     |
    |                   |              | (for "YY" format). Use the          |
-   |                   |              | environment variable gtm_zdate_form |
+   |                   |              | environment variable ydb_zdate_form |
    |                   |              | to set the initial value of this    |
    |                   |              | factor.                             |
    +------------------------------------------------------------------------+
@@ -10432,7 +10432,7 @@
    |-------+---------------------------------------------------------------------------------------|
    |       |the hexadecimal representation of the ssl-options selected by the combination of the   |
    |       |OpenSSL defaults, options set by the YottaDB TLS plugin, and options specified in the  |
-   |       |gtmcrypt_config configuration file prefixed by "O:", a comma, and the verify mode as   |
+   |       |ydb_crypt_config configuration file prefixed by "O:", a comma, and the verify mode as  |
    |       |two hexadecimal digits. Here is an example:                                            |
    |OPTIONS|                                                                                       |
    |       ||O:0000000001520004,01                                                                 |
@@ -10978,7 +10978,7 @@
 
    $ET[RAP] contains a string value that YottaDB invokes when an error occurs
    during routine execution. When a process is initiated, YottaDB assigns $ETRAP
-   the value of the gtm_etrap environment variable, if gtm_etrap is defined,
+   the value of the ydb_etrap environment variable, if ydb_etrap is defined,
    and otherwise the empty string, in which case $ZTRAP="B" controls initial
    error handling.
 
@@ -11121,7 +11121,7 @@
    the input or output.
 
    YottaDB provides a mechanism for the user to create a name for $PRINCIPAL in
-   the shell before invoking YottaDB. The environment variable gtm_principal, if
+   the shell before invoking YottaDB. The environment variable ydb_principal, if
    defined becomes a synonym for the actual device and the value for
    $PRINCIPAL. $IO holds the same value as $PRINCIPAL. $ZIO in this case,
    holds the fully expanded name of the actual device.
@@ -11247,8 +11247,8 @@
    Development Committee).
 
    $SYSTEM in YottaDB starts with "47" followed by a comma and the evaluation of
-   the environment variable gtm_sysid. If the name has no evaluation, the
-   value after the comma is gtm_sysid.
+   the environment variable ydb_sysid or gtm_sysid. If neither of the names have
+   any evaluation (i.e. both are undefined), the value after the comma is gtm_sysid.
 
 2 $Test
    $Test
@@ -11472,7 +11472,7 @@
    $ZCHset
 
    $ZCHSET is a read-only intrinsic special variable that takes its value
-   from the environment variable gtm_chset. An application can obtain the
+   from the environment variable ydb_chset. An application can obtain the
    character set used by a YottaDB process by the value of $ZCHSET. $ZCHSET can
    have only two values --"M", or "UTF-8".
 
@@ -11484,7 +11484,7 @@
 
    Example:
 
-   $ export gtm_chset=UTF-8
+   $ export ydb_chset=UTF-8
    $ /usr/lib/fis-gtm/V6.0-001_x86/gtm
    YDB>write $zchset
    UTF-8
@@ -11558,11 +11558,11 @@
    has the form of a list of M command qualifiers each separated by a space (
    ).
 
-   When the environment variable gtmcompile is defined, YottaDB initializes
-   $ZCOMPILE to the translation of gtmcompile. Otherwise YottaDB initializes
+   When the environment variable ydb_compile is defined, YottaDB initializes
+   $ZCOMPILE to the translation of ydb_compile. Otherwise YottaDB initializes
    $ZCOMPILE to null. Changes to the value of $ZCOMPILE during a YottaDB
    invocation only last for the current invocation and do not change the
-   value of the environment variable gtmcompile.
+   value of the environment variable ydb_compile.
 
    ZCOMPILE returns a status of 1 after any error in compilation.
 
@@ -11571,7 +11571,7 @@
 
    Example:
 
-   $ export gtmcompile="-LIST -LENGTH=56 -SPACE=2"
+   $ export ydb_compile="-LIST -LENGTH=56 -SPACE=2"
    $ gtm
    YDB>WRITE $ZCOMPILE
    -LIST -LENGTH=56 -SPACE=2
@@ -11580,15 +11580,15 @@
    -LIST -NOIGNORE
    YDB>ZLINK "A.m"
    YDB>HALT
-   $ echo $gtmcompile
+   $ echo $ydb_compile
    -LIST -LENGTH=56 -SPACE=2
 
-   This example uses the environment variable gtmcompile to set up $ZCOMPILE.
+   This example uses the environment variable ydb_compile to set up $ZCOMPILE.
    Then it modifies $ZCOMPILE with the SET command. The ZLINK argument
    specifies a file with a .m extension (type), which forces a compile. The
    compile produces a listing for routine A.m and does not produce an object
    module if A.m contains compilation errors. After YottaDB terminates, the
-   shell command echo $gtmcompile demonstrates that the SET command did not
+   shell command echo $ydb_compile demonstrates that the SET command did not
    change the environment variable.
 
 2 $ZCstatus
@@ -11618,7 +11618,7 @@
    $ZDA[TEFORM] contains an integer value, specifying the output year format
    of $ZDATE(). $ZDATEFORM can be modified using the SET command. YottaDB
    initializes $ZDATEFORM to the translation of the environment variable
-   gtm_zdate_form. If gtm_zdate_form is not defined, YottaDB initializes
+   ydb_zdate_form. If ydb_zdate_form is not defined, YottaDB initializes
    $ZDATEFORM to zero (0).
 
    Refer to "Functions" and "Utility Routines" chapters in the YottaDB
@@ -11871,7 +11871,7 @@
    and restored automatically.
 
    The initial value for $ZINTERRUPT is taken from the UNIX environment
-   variable gtm_zinterrupt if it is specified, otherwise it defaults to the
+   variable ydb_zinterrupt if it is specified, otherwise it defaults to the
    following string:
 
    IF $ZJOBEXAM()
@@ -12007,19 +12007,19 @@
    YottaDB does not permit the SET or NEW command to modify $ZIO.
 
    An example where $ZIO contains a value different from $IO is if the
-   environment variable gtm_principal is defined.
+   environment variable ydb_principal is defined.
 
    Example:
 
-   $ gtm_principal="foo"
-   $ export gtm_principal
+   $ ydb_principal="foo"
+   $ export ydb_principal
    YDB>WRITE $IO
    foo
    YDB>WRITE $ZIO
    /dev/pts/8
 
    Notice that $ZIO contains the actual terminal device name while $IO
-   contains the string pointed to by the environment variable gtm_principal.
+   contains the string pointed to by the environment variable ydb_principal.
 
 2 $ZJob
    $ZJob
@@ -12131,8 +12131,8 @@
 
    $ZMAXTPTIME can be SET but cannot be NEWed.
 
-   $ZMAXTPTIME takes its value from the environment variable gtm_zmaxtptime.
-   If gtm_zmaxtptime is not defined, the initial value of $ZMAXTPTIME is zero
+   $ZMAXTPTIME takes its value from the environment variable ydb_zmaxtptime.
+   If ydb_zmaxtptime is not defined, the initial value of $ZMAXTPTIME is zero
    (0) seconds which indicates "no timeout" (unlimited time). The value of
    $ZMAXTPTIME when a transaction's outermost TSTART operation executes
    determines the timeout setting for that transaction.
@@ -12232,14 +12232,14 @@
    as defined by UTF-8 encoding. With $ZPATNUMERIC="M", YottaDB restricts the
    patcode "N" to match only ASCII digits 0-9 (that is, ASCII 48-57). When a
    process starts in UTF-8 mode, intrinsic special variable $ZPATNUMERIC
-   takes its value from the environment variable gtm_patnumeric. YottaDB
+   takes its value from the environment variable ydb_patnumeric. YottaDB
    initializes the intrinsic special variable $ZPATNUMERIC to "UTF-8" if the
-   environment variable gtm_patnumeric is defined to "UTF-8". If the
-   environment variable gtm_patnumeric is not defined or set to a value other
+   environment variable ydb_patnumeric is defined to "UTF-8". If the
+   environment variable ydb_patnumeric is not defined or set to a value other
    than "UTF-8", YottaDB initializes $ZPATNUMERIC to "M".
 
    YottaDB populates $ZPATNUMERIC at process initialization from the environment
-   variable gtm_patnumeric and does not allow the process to change the
+   variable ydb_patnumeric and does not allow the process to change the
    value.
 
    **Warning**
@@ -12408,7 +12408,7 @@
    YottaDB truncates the $ZPROMPT value at the end of last character that
    completely fits within the 31 byte limit.
 
-   The environment gtm_prompt initializes $ZPROMPT at process startup.
+   The environment ydb_prompt initializes $ZPROMPT at process startup.
 
    Example:
 
@@ -12446,11 +12446,11 @@
    Paths used in $ZROUTINES to locate routines must not include embedded
    spaces, as $ZROUTINES uses spaces as delimiters.
 
-3 Establishing_the_Value_from_$gtmroutines
-   Establishing the Value from $gtmroutines
+3 Establishing_the_Value_from_$ydb_routines
+   Establishing the Value from $ydb_routines
 
-   When the environment variable gtmroutines is defined, YottaDB initializes
-   $ZROUTINES to the value of gtmroutines. Otherwise, YottaDB initializes
+   When the environment variable ydb_routines is defined, YottaDB initializes
+   $ZROUTINES to the value of ydb_routines. Otherwise, YottaDB initializes
    $ZROUTINES to ".". When $ZROUTINES is ".", YottaDB attempts to locate all
    source and object files in the current working directory. $ZROUTINES="" is
    equivalent to $ZROUTINES=".".
@@ -12485,11 +12485,11 @@
    qualified directory.
 
    To set $ZROUTINES outside of M, use the appropriate shell command to set
-   gtmroutines. Because gtmroutines is a list, enclose the value in quotation
+   ydb_routines. Because ydb_routines is a list, enclose the value in quotation
    marks (" ").
 
    Changes to the value of $ZROUTINES during a YottaDB invocation only last for
-   the current invocation, and do not change the value of gtmroutines.
+   the current invocation, and do not change the value of ydb_routines.
 
    Directory specifications may include an environment variable. When YottaDB
    SETs $ZROUTINES, it translates all environment variables and verifies the
@@ -12513,8 +12513,8 @@
 
    Example:
 
-   $ gtmroutines="/usr/jones /usr/smith"
-   $ export gtmroutines
+   $ ydb_routines="/usr/jones /usr/smith"
+   $ export ydb_routines
    $ gtm
    YDB>write $zroutines
    "/usr/jones /usr/smith"
@@ -12522,13 +12522,13 @@
    YDB>write $zroutines
    "/usr/jones/utl /usr/smith/utl"
    YDB>halt
-   $ echo $gtmroutines
+   $ echo $ydb_routines
    /usr/jones /usr/smith
 
-   This example defines the environment variable gtmroutines. Upon entering
-   YottaDB Direct Mode $zroutines has the value supplied by gtmroutines. The SET
+   This example defines the environment variable ydb_routines. Upon entering
+   YottaDB Direct Mode $zroutines has the value supplied by ydb_routines. The SET
    command changes the value. When the YottaDB image terminates, the shell echo
-   command demonstrates that gtmroutines has not been modified by the M SET
+   command demonstrates that ydb_routines has not been modified by the M SET
    command.
 
    Example:
@@ -12880,8 +12880,8 @@
    ZSTEP command. $ZSTEP provides the ZSTEP action only when the ZSTEP
    command does not specify an action.
 
-   $ZSTEP initially contains the the value of the $gtm_zstep environment
-   variable or string "B" if $gtm_zstep is not defined; note that the default
+   $ZSTEP initially contains the the value of the $ydb_zstep environment
+   variable or string "B" if $ydb_zstep is not defined; note that the default
    "B" causes the process to enter direct mode. $ZSTEP is a read-write
    Intrinsic Special Variable, (that is, it can appear on the left side of
    the equal sign (=) in the argument to the SET command).
@@ -12912,7 +12912,7 @@
    request for memory produces an STPOFLOW, unless subsequent to STPCRIT ,
    $ZSTRPLLIM has been set to the same or higher limit. Note that YottaDB
    allocates memory in large blocks so the interaction of $ZSTRPLLIM with
-   memory growth is not exact. When the gtm_string_pool_limit environment
+   memory growth is not exact. When the ydb_string_pool_limit environment
    variable specifies a positive value, YottaDB uses it for the initial value of
    $ZSTRPLLIM.
 
@@ -13040,7 +13040,7 @@
    image when an error occurs, SET $ZTRAP= generally follows immediately
    after NEW $ZTRAP. You may use this technique to construct error handling
    strategies corresponding to the nesting of your programs. If the
-   environment variable gtm_ztrap_new evaluates to boolean TRUE (case
+   environment variable ydb_ztrap_new evaluates to boolean TRUE (case
    insensitive string "TRUE", or case insensitive string "YES", or a non-zero
    number), $ZTRAP is NEWed when $ZTRAP is SET; otherwise $ZTRAP is not
    stacked when it is SET.
@@ -13063,16 +13063,16 @@
    YottaDB encounters an error before entering Direct Mode.
 
    There are four settings of $ZTRAP controlled by the UNIX environment
-   variable gtm_ztrap_form.
+   variable ydb_ztrap_form.
 
-   The four settings of gtm_ztrap_form are:
+   The four settings of ydb_ztrap_form are:
 
-     o code - If gtm_ztrap_form evaluates to "code" (or a value that is not
+     o code - If ydb_ztrap_form evaluates to "code" (or a value that is not
        one of the subsequently described values), then YottaDB treats $ZTRAP as
        code and handles it as previously described in the documentation.
-     o entryref - If gtm_ztrap_form evaluates to "entryref" then YottaDB treats
+     o entryref - If ydb_ztrap_form evaluates to "entryref" then YottaDB treats
        it as an entryref argument to an implicit GOTO command.
-     o adaptive - If gtm_ztrap_form evaluates to "adaptive" then if $ZTRAP
+     o adaptive - If ydb_ztrap_form evaluates to "adaptive" then if $ZTRAP
        does not compile to valid M code, then $ZTRAP is treated as just
        described for "entryref." Since there is little ambiguity, code and
        entryref forms of $ZTRAP can be intermixed in the same application.
@@ -13084,21 +13084,21 @@
        ZGOTO, or HANG as valid labels, be careful not to use such keywords as
        labels for error handling code in "adaptive" mode.
 
-     o pope[ntryref] / popa[daptive] - If gtm_ztrap_form evaluates to
+     o pope[ntryref] / popa[daptive] - If ydb_ztrap_form evaluates to
        "POPE[NTRYREF]" or "POPA[DAPTIVE]" (case insensitive) and $ZTRAP value
        is in the form of entryref, YottaDB unwinds the M stack from the level at
        which an error occurred to (but not including) the level at which
        $ZTRAP was last SET. Then, YottaDB transfers control to the entryref in
        $ZTRAP at the level where the $ZTRAP value was SET. If the UNIX
-       environment variable gtm_zyerror is defined to a valid entryref, YottaDB
-       transfers control to the entryref specified by GTM_ZYERROR (with an
+       environment variable ydb_zyerror is defined to a valid entryref, YottaDB
+       transfers control to the entryref specified by $ydb_zyerror (with an
        implicit DO) after unwinding the stack and before transferring control
        to the entyref specified in $ZTRAP.
 
    **Note**
 
    Like $ZTRAP values, invocation of device EXCEPTION values follow the
-   pattern specified by the current gtm_ztrap_form setting except that there
+   pattern specified by the current ydb_ztrap_form setting except that there
    is never any implicit popping with EXCEPTION action.
 
 2 $ZUSedstor
@@ -13377,7 +13377,7 @@
    | Intrinsic Special | Within Trigger |               Notes               |
    |     Variable      |    Context     |                                   |
    |-------------------+----------------+-----------------------------------|
-   |                   |                | Set to gtm_trigger_etrap or the   |
+   |                   |                | Set to ydb_trigger_etrap or the   |
    | $ETRAP            | Read / Write   | empty string when entering        |
    |                   |                | trigger context.                  |
    |-------------------+----------------+-----------------------------------|
@@ -13987,7 +13987,7 @@
      * The FIFO device does non-blocking writes. If a process tries to WRITE
        to a full FIFO and the WRITE would block, the device implicitly tries
        to complete the operation up to a default of 10 times. If the
-       gtm_non_blocked_write_retries environment variable is defined, this
+       ydb_non_blocked_write_retries environment variable is defined, this
        overrides the default number of retries. If the retries do not succeed
        (remain blocked), the WRITE sets $DEVICE to "1,Resource temporarily
        unavailable", $ZA to 9, and produces an error. If the YottaDB process has
@@ -14260,7 +14260,7 @@
    The PIPE device does non-blocking writes. If a process tries to WRITE to a
    full PIPE and the WRITE would block, the device implicitly tries to
    complete the operation up to a default of 10 times. If the
-   gtm_non_blocked_write_retries environment variable is defined, this
+   ydb_non_blocked_write_retries environment variable is defined, this
    overrides the default number of retries. If the retries do not succeed
    (remain blocked), the WRITE sets $DEVICE to "1,Resource temporarily
    unavailable", $ZA to 9, and produces an error. If the YottaDB process has
@@ -14692,7 +14692,7 @@
 
    SOCKET devices are used to access and manipulate sockets. A SOCKET device
    can have unlimited associated sockets. The default limit is 64. Set the
-   environment variable gtm_max_sockets to the number of maximum associated
+   environment variable ydb_max_sockets to the number of maximum associated
    sockets sockets that you wish to set for a YottaDB process.
    $VIEW("MAX_SOCKETS")returns the current value of the maximum number of
    associated sockets.
@@ -15017,7 +15017,7 @@
        sends a renegotiation request and waits for an acknowledgement before
        initiating the renegotiation.
      o tlsid refers to the name of a section in the configuration file
-       specified by the gtmcrypt_config environment variable. If tlsid is not
+       specified by the ydb_crypt_config environment variable. If tlsid is not
        specified with the "renegotiate" option and cfg-file-options are
        specified, YottaDB creates a virtual section by appending "-RENEGOTIATE"
        to the tlsid used to enable TLS on the socket. For the renegotiate
@@ -15223,13 +15223,13 @@
    details may be slightly different.
 
    The minimum variables are: $ydb_dist, which specifies the directory
-   containing the YottaDB distribution, and $gtmroutines, which specifies the
+   containing the YottaDB distribution, and $ydb_routines, which specifies the
    paths used to locate the YottaDB routines. As an example:
 
    #!/bin/bash
    cd /path/to/workarea
    export ydb_dist=/usr/local/gtm
-   export gtmroutines="/var/myApp/o(/var/myApp/r) $ydb_dist"
+   export ydb_routines="/var/myApp/o(/var/myApp/r) $ydb_dist"
    export ydb_gbldir=/var/myApp/g/mumps.dat
    $ydb_dist/mumps -r start^server
 
@@ -15477,7 +15477,7 @@
    Defines an error handler for an I/O device. The expression must contain a
    fragment of YottaDB code (for example, GOTO ERRFILE) that YottaDB XECUTEs when
    YottaDB detects an error, or an entryref to which YottaDB transfers control, as
-   appropriate for the current gtm_ztrap_form, setting except that there is
+   appropriate for the current ydb_ztrap_form, setting except that there is
    never any implicit popping with EXCEPTION action.
 
    A device EXCEPTION gets control after a non-fatal device error and
@@ -15532,7 +15532,7 @@
    [NO]EMPT[ERM] Applies to: TRM
 
    Allows an "Erase" character on an empty input line to terminate a READ or
-   READ # command. The default is NOEMPTERM. The gtm_principal_editing
+   READ # command. The default is NOEMPTERM. The ydb_principal_editing
    environment variable specifies the initial setting of [NO]EMPTERM. The
    TERMINFO specified by the current value of the TERM environment variable
    defines capnames values "kbs" and/or "kdch1" with character sequences for
@@ -15746,7 +15746,7 @@
    IKEY="key_name [IV]"
 
    key_name is case-sensitive and must match a key name in the "files"
-   section of the gtmcrypt_config file. The optional IV specifies an
+   section of the ydb_crypt_config file. The optional IV specifies an
    initialization vector to use for encryption and decryption.
 
    For more information, refer to the description of KEY deviceparameter of
@@ -15791,7 +15791,7 @@
    KEY="key_name [IV]"
 
    key_name is case-sensitive and must match a key name in the "files"
-   section of the gtmcrypt_config file. The optional IV specifies an
+   section of the ydb_crypt_config file. The optional IV specifies an
    initialization vector to use for encryption and decryption.
 
    To perform encryption and description, YottaDB calls an encryption plugin
@@ -15856,8 +15856,8 @@
    $ydb_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Thursday.key
    $ydb_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Friday.key
    $ydb_dist/plugin/gtmcrypt/gen_sym_key.sh 0 Saturday.key
-   echo -n "Enter password for gtm_passwd";export gtm_passwd="`$ydb_dist/plugin/gtmcrypt/maskpass|cut -f 3 -d " "`"
-   export gtmcrypt_config=mygtmcryptfile
+   echo -n "Enter password for ydb_passwd";export ydb_passwd="`$ydb_dist/plugin/gtmcrypt/maskpass|cut -f 3 -d " "`"
+   export ydb_crypt_config=mygtmcryptfile
    cat mygtmcryptfile
     files: {
     CustomerReportKey1: "Sunday.key";
@@ -16039,7 +16039,7 @@
    OKEY="key_name [IV]"
 
    key_name is case-sensitive and must match a key name in the "files"
-   section of the gtmcrypt_config file. The optional IV specifies an
+   section of the ydb_crypt_config file. The optional IV specifies an
    initialization vector to use for encryption and decryption.
 
    For more information, refer to the description of KEY deviceparameter of
@@ -17057,10 +17057,10 @@
    terminfo which is usually delete (ASCII 127). NOECHO disables EDITING
    mode.
 
-   Set the environment variable gtm_principal_editing to specify the mode for
-   EDITING. For example, gtm_principal_editing="EDITING" enables EDITING mode
+   Set the environment variable ydb_principal_editing to specify the mode for
+   EDITING. For example, ydb_principal_editing="EDITING" enables EDITING mode
    at YottaDB startup. You can also specify the mode for INSERT. For example,
-   gtm_principal_editing="NOINSERT:EDITING". If you specify both modes then
+   ydb_principal_editing="NOINSERT:EDITING". If you specify both modes then
    separate them with a colon (":") and put them in any order.
 
    By default, EDITING mode is disabled.
@@ -17086,7 +17086,7 @@
    [NO]EMPT[ERM] Applies to: TRM
 
    Allows an "Erase" character on an empty input line to terminate a READ or
-   READ # command. The default is NOEMPTERM. The gtm_principal_editing
+   READ # command. The default is NOEMPTERM. The ydb_principal_editing
    environment variable specifies the initial setting of [NO]EMPTERM. The
    TERMINFO specified by the current value of the TERM environment variable
    defines capnames values "kbs" and/or "kdch1" with character sequences for
@@ -17162,7 +17162,7 @@
    Defines an error handler for an I/O device. The expression must contain a
    fragment of YottaDB code (for example, GOTO ERRFILE) that YottaDB XECUTEs when
    the driver for the device detects an error, or an entryref to which YottaDB
-   transfers control, as appropriate for the current gtm_ztrap_form.
+   transfers control, as appropriate for the current ydb_ztrap_form.
 
 5 FILTER
    FILTER
@@ -17232,7 +17232,7 @@
    IKEY="key_name [IV]"
 
    key_name is case-sensitive and must match a key name in the "files"
-   section of the gtmcrypt_config file. The optional IV specifies an
+   section of the ydb_crypt_config file. The optional IV specifies an
    initialization vector to use for encryption and decryption.
 
    For more information, refer to the description of KEY deviceparameter of
@@ -17311,7 +17311,7 @@
    KEY="key_name [IV]"
 
    key_name is case-sensitive and must match a key name in the "files"
-   section of the gtmcrypt_config file. The optional IV specifies an
+   section of the ydb_crypt_config file. The optional IV specifies an
    initialization vector to use for encryption and decryption.
 
    For more information and an example, refer to the description of KEY
@@ -17379,7 +17379,7 @@
    OKEY="key_name [IV]"
 
    key_name is case-sensitive and must match a key name in the "files"
-   section of the gtmcrypt_config file. The optional IV specifies an
+   section of the ydb_crypt_config file. The optional IV specifies an
    initialization vector to use for encryption and decryption.
 
    For more information, refer to the description of KEY deviceparameter of
@@ -18531,7 +18531,7 @@
    ydb_status_t are:
 
      * gtmcrypt_init() performs initialization. If the environment variable
-       $gtm_passwd exists and has an empty string value, YottaDB calls
+       $ydb_passwd exists and has an empty string value, YottaDB calls
        gtmcrypt_init() before the first M program is loaded; otherwise it
        calls gtmcrypt_init() when it attempts the first operation on an
        encrypted database file.
@@ -18723,7 +18723,7 @@
    the following mechanisms:
 
      * While making an external call, YottaDB sets the environment variable
-       GTM_CALLIN_START to point to a string containing the start address
+       ydb_callin_start to point to a string containing the start address
        (decimal integer value) of the table described above. The external
        routine needs to read this environment variable, convert the string
        into an integer value and should index into the appropriate entry to
@@ -18781,16 +18781,16 @@
    foo: void bar (I:ydb_float_t*, O:ydb_float_t*)
 
    There is one external call table for each package. The environment
-   variable "GTMXC" must name the external call table file for the default
+   variable "ydb_xc" must name the external call table file for the default
    package. External call table files for packages other than the default
-   must be identified by environment variables of the form "GTMXC_name".
+   must be identified by environment variables of the form "ydb_xc_name".
 
    The first of the external call tables is the location of the shareable
    library. The location can include environment variable names.
 
    Example:
 
-   % echo $GTMXC_mathpak
+   % echo $ydb_xc_mathpak
    /user/joe/mathpak.xc
    % echo lib /usr/
    % cat mathpak.xc
@@ -18812,7 +18812,7 @@
 
    Example : For preallocation:
 
-   % echo $GTMXC_extcall
+   % echo $ydb_xc_extcall
    /usr/joe/extcall.xc
    % cat extcall.xc
    /usr/lib/extcall.sl
@@ -18829,7 +18829,7 @@
 
    Example : for call-back mechanism
 
-   % echo $GTMXC
+   % echo $ydb_xc
    /usr/joe/callback.xc
    % cat /usr/joe/callback.xc
    $MYLIB/callback.sl
@@ -18854,18 +18854,18 @@
    {
       char *start_address;
 
-      start_address = (char *)getenv("GTM_CALLIN_START");
+      start_address = (char *)getenv("ydb_callin_start");
 
       if (start_address == (char *)0)
       {
-              fprintf(stderr,"GTM_CALLIN_START is not set\n");
+              fprintf(stderr,"ydb_callin_start is not set\n");
          return;
       }
       functable = (void **)atoi(start_address);
       if (functable == (void **)0)
       {
         perror("atoi : ");
-        fprintf(stderr,"addresses defined by GTM_CALLIN_START not a number\n");
+        fprintf(stderr,"addresses defined by ydb_callin_start not a number\n");
         return;
       }
       sleep_uninterrupted = (void (*)(int )) functable[0];
@@ -18907,7 +18907,7 @@
 
    Example:gtm_malloc/gtm_free callbacks using ydb_pointertofunc_t
 
-   % echo $GTMXC
+   % echo $ydb_xc
    /usr/joe/callback.xc
    % cat /usr/joe/callback.xc
    /usr/lib/callback.sl
@@ -19058,7 +19058,7 @@
 
    The Call-In table file is a text file that contains the signatures of all
    M label references that get called from C. In order to pass the typed C
-   arguments to the type-less M formallist, the enviroment variable GTMCI
+   arguments to the type-less M formallist, the enviroment variable ydb_ci
    must be defined to point to the Call-In table file path. Each signature
    must be specified separately in a single line. YottaDB reads this file and
    interprets each line according to the following convention (specifications
@@ -19460,7 +19460,7 @@
 
      * A shared library containing the routines for each alternative
        collation sequence
-     * An environment variable of the form gtm_collate_n, specifying the
+     * An environment variable of the form ydb_collate_n, specifying the
        shared library containing the routines for alternative collation
        sequence n.
 
@@ -19508,12 +19508,12 @@
    Environment Variable
 
    YottaDB locates the alternative collation sequences through the environment
-   variable gtm_collate_n where n is an integer from 1 to 255 that identifies
+   variable ydb_collate_n where n is an integer from 1 to 255 that identifies
    the collation sequence, and pathname identifies the shared library
    containing the routines for that collation sequence, for example:
 
-   $ gtm_collate_1=/opt/fis-gtm/collation
-   $ export gtm_collate_1
+   $ ydb_collate_1=/opt/fis-gtm/collation
+   $ export ydb_collate_1
 
    Multiple alternative collation sequence definitions can co-exist.
 
@@ -19577,15 +19577,15 @@
    variables defined.
 
    To establish a default local collation sequence provide a numeric value to
-   the environment variable gtm_local_collate to select one of the collation
+   the environment variable ydb_local_collate to select one of the collation
    tables, for example:
 
-   $ gtm_local_collate=n
-   $ export gtm_local_collate
+   $ ydb_local_collate=n
+   $ export ydb_local_collate
 
    where n is the number of a collation sequence that matches a valid
    collation number defined by an environment variable in the form
-   gtm_collate_n.
+   ydb_collate_n.
 
    An active process can use the %LCLCOL utility to define the collation
    sequence for subscripts of local variables. %LCLCOL has these extrinsic
@@ -19624,7 +19624,7 @@
    that the effective local collation sequence is the standard M collation
    sequence.
 
-   If set^%LCLCOL is not specified and gtm_local_collate is not defined, or
+   If set^%LCLCOL is not specified and ydb_local_collate is not defined, or
    is invalid, the process uses M standard collation. The following would be
    considered invalid values:
 
@@ -20220,7 +20220,7 @@
 
        gcc -o altcoll.so -shared polish.o
 
-    6. Set $gtm_collate_1 to point to the location of altcoll.so.
+    6. Set $ydb_collate_1 to point to the location of altcoll.so.
     7. At the YDB> prompt execute the following command:
 
        YDB>Write $SELECT($$set^%GBLDEF("^G",0,1):"OK",1:"FAILED")
@@ -20283,9 +20283,9 @@
 
        gcc -o revcol.so -shared col_reverse_32.o
 
-    4. Set the environment variable gtm_collate_2 to point to the location of
+    4. Set the environment variable ydb_collate_2 to point to the location of
        revcol.so. To set the local variable collation to this alternative
-       collation sequence, set the environment variable gtm_local_collate to
+       collation sequence, set the environment variable ydb_local_collate to
        2.
     5. At the GTM prompt, execute the following command:
 
@@ -20451,17 +20451,17 @@
    To establish a default patcode table for a database define the environment
    variable:
 
-   $ gtm_pattern_file=pathname
-   $ export gtm_pattern_file
+   $ ydb_pattern_file=pathname
+   $ export ydb_pattern_file
 
    where filename is the text file containing the patcode table definition,
    and
 
-   $ gtm_pattern_table=tablename
-   $ export gtm_pattern_table
+   $ ydb_pattern_table=tablename
+   $ export ydb_pattern_table
 
    where tablename is the name of the patcode table within the file pointed
-   to by gtm_pattern_file.
+   to by ydb_pattern_file.
 
    **Warning**
 
@@ -20687,9 +20687,9 @@
 
    YottaDB checks the syntax of code assigned to $ETRAP, $ZSTEP, $ZTRAP, and
    EXCEPTION at the time they are specified. Note that $ZTRAP and EXCEPTION
-   are subject to gtm_ztrap_form, and, if that specifies entryref or
+   are subject to ydb_ztrap_form, and, if that specifies entryref or
    adaptive, YottaDB does not check the syntax. Also, the environment variables
-   $gtm_etrap, $gtm_trigger_etrap, and $gtm_zstep provide ways of setting
+   $ydb_etrap, $ydb_trigger_etrap, and $ydb_zstep provide ways of setting
    some of the ISVs, so their values are verified at process initiation.
    Further, a SET $ETRAP uses a temporary default value of "IF $ZJOBEXAM"
    when shifting from $ZTRAP to $ETRAP in case the specified value has
@@ -20728,9 +20728,9 @@
 
    **Note**
 
-   The environment variable gtm_etrap specifies an initial value of $ETRAP to
+   The environment variable ydb_etrap specifies an initial value of $ETRAP to
    override the default value of "B" for $ZTRAP as the base level error
-   handler. The ydbenv "percent" utility sets gtm_etrap to
+   handler. The ydbenv "percent" utility sets ydb_etrap to
    "Write:(0=$STACK) ""Error occurred: "",$ZStatus,!" which you can customize
    to suit your needs. For more information, refer to "Processing Errors".
 
@@ -20987,16 +20987,16 @@
    the value of $ETRAP is a non-empty one, $ETRAP is implicitly NEWed, and
    the value of $ETRAP becomes equal to the empty string; this ensures that
    at most one of $ETRAP and $ZTRAP is not the empty string. If the
-   environment variable gtm_ztrap_new evaluates to Boolean TRUE (case
+   environment variable ydb_ztrap_new evaluates to Boolean TRUE (case
    insensitive string "TRUE", or case insensitive string "YES", or a non-zero
    number), $ZTRAP is NEWed when $ZTRAP is SET; otherwise $ZTRAP is not
    stacked when it is SET.
 
    Other than the default behavior, $ZTRAP settings are controlled by the
-   environment variable gtm_ztrap_form as described in the following table.
+   environment variable ydb_ztrap_form as described in the following table.
 
    +------------------------------------------------------------------------+
-   | gtm_ztrap_form |             $ZTRAP and EXCEPTION Behavior             |
+   | ydb_ztrap_form |             $ZTRAP and EXCEPTION Behavior             |
    |----------------+-------------------------------------------------------|
    |                | Content is code executed after the error; in the      |
    |                | absence of GOTO, ZGOTO, or QUIT, execution resumes at |
@@ -21022,14 +21022,14 @@
 
    Although the "adaptive" and "popadaptive" behaviors permit mixing of two
    behaviors based on the current value of $ZTRAP, the $ZTRAP behavior type
-   is selected at process startup from gtm_ztrap_form and cannot be modified
+   is selected at process startup from ydb_ztrap_form and cannot be modified
    during the life of the process.
 
   Note
 
    Like $ZTRAP values, invocation of device EXCEPTION values, with the
    exception noted, follow the pattern specified by the current
-   gtm_ztrap_form setting.
+   ydb_ztrap_form setting.
 
 3 $ETRAP_and_$ZTRAP
    $ETRAP and $ZTRAP
@@ -21132,7 +21132,7 @@
    executes the EXCEPTION deviceparameter for the OPEN/USE/CLOSE commands. An
    EXCEPTION deviceparameter specifies an action to take when an error occurs
    in the operation of an I/O device. The form of the EXCEPTION action is
-   subject to the gtm_ztrap_form setting described for $ZTRAP, except that
+   subject to the ydb_ztrap_form setting described for $ZTRAP, except that
    there is never any implicit popping with EXCEPTION actions. If a device
    has no current EXCEPTION, YottaDB uses $ETRAP or $ZTRAP to handle an error
    from that device.
@@ -21740,12 +21740,12 @@ Appendix A. M Coding Standards - Do's and Don'ts
            Either auto-relink-enable or auto-relink-disable the directory in
            the $zroutines for the life of the process.
 
-           Use the same value of $gtm_linktmpdir for all processes. All
+           Use the same value of $ydb_linktmpdir for all processes. All
            processes that share a directory whose contents are subject to
-           ZRUPDATE use the same value for $gtm_linktmpdir so that all
+           ZRUPDATE use the same value for $ydb_linktmpdir so that all
            processes see update notifications - with different values of
-           $gtm_linktmpdir, a ZRUPDATE by a process with one value of
-           $gtm_linktmpdir would not be observed by a process with a
+           $ydb_linktmpdir, a ZRUPDATE by a process with one value of
+           $ydb_linktmpdir would not be observed by a process with a
            different value of that environment variable.
 
 3 Don'ts

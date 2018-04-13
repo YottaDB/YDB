@@ -23,10 +23,14 @@
 #include "gtm_sizeof.h"			/* For SIZEOF. */
 #include "gtm_limits.h"			/* For YDB_PATH_MAX. */
 #include "gtm_common_defs.h"		/* To import common macros implemented by GT.M */
+#include "ydb_logicals.h"		/* For ydbenvname and ydbenvindx_t */
 
-#define YDB_DIST_ENV			"ydb_dist"
-#define USER_ENV			"USER"
+#define	YDB_DIST_ENV			(ydbenvname[YDBENVINDX_DIST] + 1)		/* + 1 to skip leading $ */
+#define	GTM_DIST_ENV			(gtmenvname[YDBENVINDX_DIST] + 1)		/* + 1 to skip leading $ */
+#define USER_ENV			(ydbenvname[YDBENVINDX_GENERIC_USER] + 1)	/* + 1 to skip leading $ */
+
 #define ENV_UNDEF_ERROR			"Environment variable %s not set"
+#define ENV_UNDEF_ERROR2		"Environment variable %s/%s not set"
 #define ENV_EMPTY_ERROR			"Environment variable %s set to empty string"
 #define ENV_TOOLONG_ERROR		"Environment variable %s is too long (%d)"
 
@@ -38,10 +42,6 @@
 #define GTM_PASSPHRASE_MAX_ASCII	(GTM_PASSPHRASE_MAX / 2)
 #define PASSPHRASE_ENVNAME_MAX		64
 #define GTMCRYPT_DEFAULT_PASSWD_PROMPT	"Enter Passphrase: "
-
-#define GTM_OBFUSCATION_KEY		"gtm_obfuscation_key"
-
-#define GTMCRYPT_FIPS_ENV		"gtmcrypt_FIPS"
 
 #define GC_H2D(C, RES, MULT)							\
 {										\
@@ -125,22 +125,22 @@
 #define STR_ARG				"%." STR_WRAP(MAX_GTMCRYPT_STR_ARG_LEN) "s%s"
 #define ELLIPSIZE(STR)			STR, (strlen(STR) > MAX_GTMCRYPT_STR_ARG_LEN ? "..." : "")
 
-#define IS_FIPS_MODE_REQUESTED(RV)						\
-{										\
-	char *ptr;								\
-										\
-	RV = FALSE;								\
-	if (NULL != (ptr = getenv(GTMCRYPT_FIPS_ENV)))				\
-	{									\
-		if ((0 == strcasecmp(ptr, "YES"))				\
-			|| (0 == strcasecmp(ptr, "TRUE"))			\
-			|| (*ptr == '1')					\
-			|| (*ptr == 'Y')					\
-			|| (*ptr == 'y'))					\
-		{								\
-			RV = TRUE;						\
-		}								\
-	}									\
+#define IS_FIPS_MODE_REQUESTED(RV)									\
+{													\
+	char *ptr;											\
+													\
+	RV = FALSE;											\
+	if (NULL != (ptr = ydb_getenv(YDBENVINDX_CRYPT_FIPS, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))	\
+	{												\
+		if ((0 == strcasecmp(ptr, "YES"))							\
+			|| (0 == strcasecmp(ptr, "TRUE"))						\
+			|| (*ptr == '1')								\
+			|| (*ptr == 'Y')								\
+			|| (*ptr == 'y'))								\
+		{											\
+			RV = TRUE;									\
+		}											\
+	}												\
 }
 
 /* In OpenSSL versions prior to 1.0.1, "FIPS_mode_set", the function that enables/disables FIPS mode, is available only
@@ -225,10 +225,11 @@
 
 typedef struct
 {
-	char			env_name[PASSPHRASE_ENVNAME_MAX];
+	ydbenvindx_t		envindx;	/* Index into ydbenvname[] array pointing to environment variable name */
+	int			passwd_len;	/* Length of the password that's allocated. */
+	char			suffix[PASSPHRASE_ENVNAME_MAX];	/* Suffix to add to env var name ("envindx") if needed */
 	char			*env_value;	/* Obfuscated version of the password stored in the environment (as hex) */
 	char			*passwd;	/* Password in clear text. */
-	int			passwd_len;	/* Length of the password that's allocated. */
 } passwd_entry_t;
 
 typedef void *			(*gtm_malloc_fnptr_t)(size_t);
@@ -244,5 +245,6 @@ void 				gtm_gcry_log_handler(void *opaque, int level, const char *fmt, va_list 
 int				gc_read_passwd(char *prompt, char *buf, int maxlen, void *tty);
 int				gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out);
 void				gc_freeup_pwent(passwd_entry_t *pwent);
-int 				gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int interactive);
+int 				gc_update_passwd(ydbenvindx_t envindx, char *suffix, passwd_entry_t **ppwent,
+											char *prompt, int interactive);
 #endif

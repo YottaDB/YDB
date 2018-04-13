@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -53,8 +56,8 @@
 															\
 	assert(BITS_PER_UCHAR % BML_BITS_PER_BLK == 0);	/* assert this for the BM_MINUS_BLKHDR_SIZE macro */		\
 	if (IS_BITMAP_BLK(blk) && ((LCL_MAP_LEVL != (bp)->levl) || (BM_SIZE(csa->hdr->bplmap) != (bp)->bsiz))		\
-		UNIX_ONLY(DEBUG_ONLY(|| (gtm_white_box_test_case_enabled						\
-		&& (WBTEST_ANTIFREEZE_DBBMLCORRUPT == gtm_white_box_test_case_number)))))				\
+		UNIX_ONLY(DEBUG_ONLY(|| (ydb_white_box_test_case_enabled						\
+		&& (WBTEST_ANTIFREEZE_DBBMLCORRUPT == ydb_white_box_test_case_number)))))				\
 	{														\
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBBMLCORRUPT, 7, DB_LEN_STR(region),				\
 				blk, (bp)->bsiz, (bp)->levl, &(bp)->tn, &csa->ti->curr_tn);				\

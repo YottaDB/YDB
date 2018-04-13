@@ -807,8 +807,8 @@ void	mur_get_options(void)
 	/*-----		-PARALLEL=MAXTHREADS/MAXPROCS	-----*/
 	if (CLI_PRESENT == cli_present("PARALLEL"))
 	{
-		if (!cli_get_int("PARALLEL", &gtm_mupjnl_parallel))
-			gtm_mupjnl_parallel = 0; /* Treat -PARALLEL without any value as full parallelism */
+		if (!cli_get_int("PARALLEL", &ydb_mupjnl_parallel))
+			ydb_mupjnl_parallel = 0; /* Treat -PARALLEL without any value as full parallelism */
 	}
 	free(entry);
 	free(qual_buffer);

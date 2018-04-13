@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,7 +30,7 @@
 
 GBLREF symval		*curr_symval;
 GBLREF uint4		lvtaskcycle;
-GBLREF boolean_t	gtm_stdxkill;
+GBLREF boolean_t	ydb_stdxkill;
 
 void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 {
@@ -51,7 +54,7 @@ void op_xkill(UNIX_ONLY_COMMA(int n) mval *lvname_arg, ...)
 	 * both cases but in the M Standard variant, we will mark the hash table entry as not to be killed in the lower kill loop
 	 * while in the GTM variant, we will mark the lv_val instead.
 	 */
-	lcl_stdxkill = gtm_stdxkill;
+	lcl_stdxkill = ydb_stdxkill;
 	VAR_START(var, lvname_arg);
 	VMS_ONLY(va_count(n);)
 	lvname = lvname_arg;

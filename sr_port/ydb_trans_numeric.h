@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2004 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +15,8 @@
 #ifndef TRANS_NUMERIC_H_INCLUDED
 #define TRANS_NUMERIC_H_INCLUDED
 
-uint4 trans_numeric(mstr *log, boolean_t *is_defined, boolean_t ignore_errors);
+#include "ydb_logicals.h"	/* for "ydbenvindx_t" */
+
+uint4 ydb_trans_numeric(ydbenvindx_t envindx, boolean_t *is_defined, boolean_t ignore_errors, boolean_t *is_ydb_env_match);
 
 #endif

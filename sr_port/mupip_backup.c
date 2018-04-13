@@ -77,12 +77,11 @@
 #include "wcs_backoff.h"
 #include "wcs_sleep.h"
 #include "wcs_flu.h"
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "shmpool.h"
 #include "mupip_backup.h"
 #include "gvcst_protos.h"	/* for gvcst_init prototype */
 #include "add_inter.h"
-#include "gtm_logicals.h"
 #include "gtm_c_stack_trace.h"
 #include "have_crit.h"
 #include "repl_sem.h"
@@ -237,7 +236,7 @@ void mupip_backup(void)
 				tempnam_prefix[MAX_FN_LEN], tempdir_full_buffer[MAX_FN_LEN + 1];
 	char			*jnl_str_ptr, jnl_str[256], entry[256], prev_jnl_fn[JNL_NAME_SIZE];
 	int			index, jnl_fstat;
-	mstr			tempdir_log, tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
+	mstr			tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
 	uint4			jnl_status, temp_file_name_len, tempdir_trans_len, trans_log_name_status;
 	boolean_t		jnl_options[jnl_end_of_list] = {FALSE, FALSE, FALSE}, save_no_prev_link;
 	jnl_private_control	*jpc;
@@ -501,19 +500,14 @@ void mupip_backup(void)
 	tempdir_full.len = orig_buff_size;
 	if (TRUE == online)
 	{
-		tempdir_log.addr = GTM_BAK_TEMPDIR_LOG_NAME;
-		tempdir_log.len = STR_LIT_LEN(GTM_BAK_TEMPDIR_LOG_NAME);
-		trans_log_name_status =
-			TRANS_LOG_NAME(&tempdir_log, &tempdir_trans, tempdir_trans_buffer, SIZEOF(tempdir_trans_buffer),
-					do_sendmsg_on_log2long);
-		if ((SS_NORMAL != trans_log_name_status)
-		    || (NULL == tempdir_trans.addr) || (0 == tempdir_trans.len))
-		{	/* GTM_BAK_TEMPDIR_LOG_NAME not found, attempt GTM_BAK_TEMPDIR_LOG_NAME_UC instead */
-			tempdir_log.addr = GTM_BAK_TEMPDIR_LOG_NAME_UC;
-			tempdir_log.len = STR_LIT_LEN(GTM_BAK_TEMPDIR_LOG_NAME_UC);
-			trans_log_name_status =
-				TRANS_LOG_NAME(&tempdir_log, &tempdir_trans, tempdir_trans_buffer, SIZEOF(tempdir_trans_buffer),
-					       do_sendmsg_on_log2long);
+		trans_log_name_status = ydb_trans_log_name(YDBENVINDX_BAKTMPDIR, &tempdir_trans,
+								tempdir_trans_buffer, SIZEOF(tempdir_trans_buffer),
+								IGNORE_ERRORS_TRUE, NULL);
+		if ((SS_NORMAL != trans_log_name_status) || (NULL == tempdir_trans.addr) || (0 == tempdir_trans.len))
+		{	/* ydb_baktmpdir not found, attempt ydb_BAKTMPDIR instead */
+			trans_log_name_status = ydb_trans_log_name(YDBENVINDX_BAKTMPDIR_UC, &tempdir_trans,
+									tempdir_trans_buffer, SIZEOF(tempdir_trans_buffer),
+									IGNORE_ERRORS_TRUE, NULL);
 		}
 		/* save the length of the "base" so we can (restore it and) re-use the string in tempdir_trans.addr */
 		tempdir_trans_len = tempdir_trans.len;
@@ -1385,7 +1379,7 @@ repl_inst_bkup_done2:
 				 * tests hits the scenario where BKUPRUNNING message is printed. Note that sleep of 1 sec
 				 * is fine because it is the box boxes which are failing to hit the concurrency scenario.
 				 */
-				if (gtm_white_box_test_case_enabled && (WBTEST_CONCBKUP_RUNNING == gtm_white_box_test_case_number))
+				if (ydb_white_box_test_case_enabled && (WBTEST_CONCBKUP_RUNNING == ydb_white_box_test_case_number))
 					LONG_SLEEP(1);
 #				endif
 				/* Make sure that the backup queue does not have any remnants on it. Note that we do not

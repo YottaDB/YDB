@@ -250,7 +250,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 		{	/* There has to be a #LABEL */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
 					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#LABEL\""));
 		}
@@ -267,7 +267,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 		{	/* There has to be a #CYCLE */
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
 					gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#CYCLE\""));
 		}
@@ -289,7 +289,7 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 			{	/* There has to be a #NAME */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, gbl_name_len,
 						gbl_name, gbl_name_len, gbl_name, LEN_AND_LIT("\"#NAME\""));
 
@@ -478,7 +478,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			{	/* We expect $c(0) in the middle of addr. If we dont find it, this is a restartable situation */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
 						LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
 						mv_trigger_val.str.len, mv_trigger_val.str.addr);
@@ -489,7 +489,7 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 			{	/* We expect a valid index */
 				if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 					t_retry(cdb_sc_triggermod);
-				assert(WBTEST_HELPOUT_TRIGDEFBAD == gtm_white_box_test_case_number);
+				assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 				rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6,
 						LEN_AND_LIT("\"#TNAME\""), curr_name_len, curr_name,
 						mv_trigger_val.str.len, mv_trigger_val.str.addr);

@@ -465,7 +465,7 @@ research:
 		if (gvt_root)
 		{
 			#if defined(DEBUG)
-			if (gtm_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVKILLFAIL == gtm_white_box_test_case_number))
+			if (ydb_white_box_test_case_enabled && (WBTEST_ANTIFREEZE_GVKILLFAIL == ydb_white_box_test_case_number))
 			{
 				cdb_status = cdb_sc_blknumerr;
 				/* Skip assert inside GOTO_RETRY macro as the WBTEST_ANTIFREEZE_GVKILLFAIL white-box testcase

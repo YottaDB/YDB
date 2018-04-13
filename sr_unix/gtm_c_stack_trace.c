@@ -23,8 +23,7 @@
 #include "send_msg.h"
 #include "wbox_test_init.h"
 #include "gt_timer.h"
-#include "gtm_logicals.h"
-#include "trans_log_name.h"
+#include "ydb_trans_log_name.h"
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
@@ -36,7 +35,7 @@ error_def(ERR_STUCKACT);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 
-/* This looks up the environment variable gtm_procstuckexec, adds the calling information to it, passes it to a SYSTEM call
+/* This looks up the environment variable ydb_procstuckexec, adds the calling information to it, passes it to a SYSTEM call
  * and checks the returns from both the system and the invoked shell command
  */
 void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uint4 count)
@@ -45,7 +44,7 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 	char 	 	*command;
 	char		*currpos;
 	int		save_errno;
-	mstr		envvar_logical, trans;
+	mstr		trans;
 	char		buf[YDB_PATH_MAX];
 	int		status;
 #	ifdef _BSD
@@ -61,9 +60,8 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 	arr_len = GTM_MAX_DIR_LEN + messagelen + (3 * MAX_PIDSTR_LEN) + 5;	/* 4 spaces and a terminator */
 	if (!(TREF(gtm_waitstuck_script)).len)
 	{	/* uninitialized buffer - translate logical and move it to the buffer */
-		envvar_logical.addr = GTM_PROCSTUCKEXEC;
-		envvar_logical.len = SIZEOF(GTM_PROCSTUCKEXEC) - 1;
-		if (SS_NORMAL == (status = TRANS_LOG_NAME(&envvar_logical, &trans, buf, SIZEOF(buf), do_sendmsg_on_log2long)))
+		if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_PROCSTUCKEXEC, &trans,
+								buf, SIZEOF(buf), IGNORE_ERRORS_TRUE, NULL)))
 		{	/* the environmental variable is defined */
 			assert(SIZEOF(buf) > trans.len);
 			if (0 != trans.len)

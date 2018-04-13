@@ -61,6 +61,7 @@
 #include "zwrite.h"
 #include "gtm_maxstr.h"
 #include "getzdir.h"
+#include "ydb_logicals.h"	/* needed for GBLDIR_ENV use of "ydbenvname" */
 
 GBLREF	bool			jobpid;	/* job's output files should have the pid appended to them. */
 GBLREF	volatile boolean_t	ojtimeout;
