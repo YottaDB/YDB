@@ -241,13 +241,15 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			{
 				gvname_mstr.addr = (char *)gvname_dirtree;
 				gvname_mstr.len = gvname_dirtree_len;
-			} else if ((cdb_sc_blkmod == status) && (tp_blkmod_tp_tend == TREF(blkmod_fail_type)))
-			{	/* This is a BLKMOD restart with type tp_blkmod_tp_tend (note that we cannot check
-				 * TREF(blkmod_fail_type) unless it is a cdb_sc_blkmod). In tp_tend, "gv_currkey"
-				 * does not make sense as the validation there could have failed for a GDS block
-				 * corresponding to one or more global references that happened in the TP transaction
-				 * much before the TCOMMIT. All we can do is provide the unsubscripted global name of
-				 * interest in the TPRESTART syslog message.
+			} else if ((cdb_sc_blkmod != status) || (tp_blkmod_tp_tend == TREF(blkmod_fail_type)))
+			{	/* This is
+				 *   a) NOT a blkmod restart (i.e. a TP_TRACE_HIST call from "tp_tend") OR
+				 *   b) a BLKMOD restart with type tp_blkmod_tp_tend (i.e. a TP_TRACE_HIST_MOD call from "tp_tend")
+				 *      (note that we cannot check TREF(blkmod_fail_type) unless it is a cdb_sc_blkmod).
+				 * In either case, it is a call made from "tp_tend" where "gv_currkey" does not make sense
+				 * as the validation there could have failed for a GDS block corresponding to one or more
+				 * global references that happened in the TP transaction much before the TCOMMIT. All we
+				 * can do is provide the unsubscripted global name of interest in the TPRESTART syslog message.
 				 */
 				gvname_mstr = gvt->gvname.var_name;
 			} else
