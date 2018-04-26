@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,7 +24,7 @@ GBLREF io_pair		io_curr_device;
 GBLREF io_desc		*active_device;
 GBLREF io_log_name	*dollar_principal;
 GBLREF io_log_name	*io_root_log_name;	/* root of linked list	*/
-GBLREF io_pair		*io_std_device;
+GBLREF io_pair		io_std_device;
 GBLREF mstr		dollar_prin_log;
 GBLREF mstr	dollar_zpin;			/* contains "< /" */
 GBLREF mstr	dollar_zpout;			/* contains "> /" */
@@ -44,7 +47,7 @@ void op_use(mval *v, mval *p)
 	MV_FORCE_STR(p);
 
 	dollar_zpselect = 0;
-	if (io_std_device->in != io_std_device->out)
+	if (io_std_device.in != io_std_device.out)
 	{
 		/* if there is a split $P then determine from the name if it is the value of "$P< /" or "$P> /"
 		   if the first then it is $ZPIN so set dollar_zpselect to 1

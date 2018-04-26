@@ -151,7 +151,7 @@ GBLREF mval		dollar_zdir;
 GBLREF mval		dollar_zproc;
 GBLREF stack_frame	*frame_pointer;
 GBLREF io_pair		io_curr_device;
-GBLREF io_pair		*io_std_device;
+GBLREF io_pair		io_std_device;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF io_log_name	*dollar_principal;
 GBLREF mval		dollar_zgbldir;
@@ -632,7 +632,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZPIN:
-			if (io_std_device->in != io_std_device->out)
+			if (io_std_device.in != io_std_device.out)
 			{	/* ZPIN != ZPOUT print it */
 				ZWRITE_SPLIT_DOLLAR_P(var, zdir_error, ZDIR_ERR_LEN, x, dollar_zpin, principalin_text, output);
 			} else if (SV_ALL != one_sv)
@@ -651,7 +651,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZPOUT:
-			if (io_std_device->in != io_std_device->out)
+			if (io_std_device.in != io_std_device.out)
 			{	/* ZPOUT != ZPIN print it */
 				ZWRITE_SPLIT_DOLLAR_P(var, zdir_error, ZDIR_ERR_LEN, x, dollar_zpout, principalout_text, output);
 			} else if (SV_ALL != one_sv)

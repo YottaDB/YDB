@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -43,7 +46,7 @@ GBLREF spdesc		stringpool;
 GBLREF io_pair		io_curr_device;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF d_socket_struct	*socket_pool;
-GBLREF io_pair		*io_std_device;
+GBLREF io_pair		io_std_device;
 GBLREF io_log_name	*dollar_principal;
 GBLREF mstr		dollar_prin_log;
 GBLREF mstr		dollar_zpin;			/* contains "< /" */
@@ -186,7 +189,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		iod = io_curr_device.in;
 	else
 	{
-		if ((io_std_device->in != io_std_device->out))
+		if ((io_std_device.in != io_std_device.out))
 		{
 			tlp = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;
 			nlen = tlp->len;
@@ -228,8 +231,8 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		iod = nl->iod;
 	}
 	/* if iod is standard in device and it is a split device and it is $ZPOUT set iod to output device */
-	if ((2 == nldone) && (io_std_device->in == iod))
-		iod = io_std_device->out;
+	if ((2 == nldone) && (io_std_device.in == iod))
+		iod = io_std_device.out;
 	if (gtmsocket != iod->type)
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSOCKETNOTSOCK);

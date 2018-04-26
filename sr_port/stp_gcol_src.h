@@ -108,7 +108,7 @@ GBLREF int4			LVGC_interval;				/* dead data GC done every LVGC_interval stringp
 GBLREF boolean_t		suspend_lvgcol;
 GBLREF hash_table_str		*complits_hashtab;
 GBLREF mval			*alias_retarg;
-GBLREF io_pair			*io_std_device;
+GBLREF io_pair			io_std_device;
 GTMTRIG_ONLY(GBLREF mval 	dollar_ztwormhole;)
 DEBUG_ONLY(GBLREF   boolean_t	ok_to_UNWIND_in_exit_handling;)
 
@@ -685,7 +685,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 				MSTR_STPG_ADD(&l->iod->error_handler);
 				/* If this is a split $principal, protect error_handler defined on the output side */
 				if ((l->iod->pair.in != l->iod->pair.out)
-				    && (l->iod->pair.out == io_std_device->out))
+				    && (l->iod->pair.out == io_std_device.out))
 					MSTR_STPG_ADD(&l->iod->pair.out->error_handler);
 				rm_ptr = (rm == l->iod->type) ? (d_rm_struct *)l->iod->dev_sp : NULL;
 				if (NULL != rm_ptr)
