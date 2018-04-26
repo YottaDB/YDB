@@ -97,7 +97,7 @@ GBLREF size_t		totalUsedGta;
 GBLREF mstr		dollar_zchset;
 GBLREF mstr		dollar_zpatnumeric;
 GBLREF boolean_t	dollar_zquit_anyway;
-GBLREF io_pair		*io_std_device;
+GBLREF io_pair		io_std_device;
 GBLREF mstr		dollar_zpin;
 GBLREF mstr		dollar_zpout;
 GBLREF int		process_exiting;
@@ -179,7 +179,7 @@ void op_svget(int varnum, mval *v)
 			break;
 		case SV_ZPIN:
 			/* if not a split device then ZPIN and ZPOUT will fall through to ZPRINCIPAL */
-			if (io_std_device->in != io_std_device->out)
+			if (io_std_device.in != io_std_device.out)
 			{
 				tl = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;
 				/* will define zpin as $p contents followed by "< /", for instance: /dev/tty4< / */
@@ -197,7 +197,7 @@ void op_svget(int varnum, mval *v)
 			}
 		case SV_ZPOUT:
 			/* if not a split device then ZPOUT will fall through to ZPRINCIPAL */
-			if (io_std_device->in != io_std_device->out)
+			if (io_std_device.in != io_std_device.out)
 			{
 				tl = dollar_principal ? dollar_principal : io_root_log_name->iod->trans_name;
 				/* will define zpout as $p contents followed by "> /", for instance: /dev/tty4> / */

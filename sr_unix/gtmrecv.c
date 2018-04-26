@@ -62,6 +62,7 @@
 #include "mutex.h"
 #include "fork_init.h"
 #include "gtmio.h"
+#include "io.h"
 
 GBLDEF	boolean_t		gtmrecv_fetchreysnc;
 GBLDEF	boolean_t		gtmrecv_logstats = FALSE;
@@ -83,6 +84,8 @@ GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
+GBLREF	io_pair			io_std_device;
+
 LITREF	gtmImageName		gtmImageNames[];
 
 error_def(ERR_YDBDISTUNVERIF);
@@ -386,6 +389,7 @@ int gtmrecv(void)
 		gtmrecv_exit(gtmrecv_showbacklog() - NORMAL_SHUTDOWN);
 	else
 		gtmrecv_exit(gtmrecv_statslog() - NORMAL_SHUTDOWN);
+	io_std_device.out = NULL;	/* See comment in gtmsource.c (has similar initialization) for why this is needed) */
 	/* Point stdin to /dev/null */
 	OPENFILE("/dev/null", O_RDONLY, null_fd);
 	if (0 > null_fd)

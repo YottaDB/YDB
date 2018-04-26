@@ -52,7 +52,6 @@ GBLREF uint4		dollar_trestart;
 GBLREF io_log_name	*io_root_log_name;
 GBLREF bool		licensed;
 GBLREF int4		lkid, lid;
-GBLREF io_pair		*io_std_device;
 GBLREF io_log_name	*dollar_principal;
 GBLREF mstr		dollar_zpin;			/* contains "< /" */
 GBLREF mstr		dollar_zpout;			/* contains "> /" */

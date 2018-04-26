@@ -54,7 +54,7 @@ static readonly char	space_text[] = {' '};
 
 GBLREF boolean_t	ctrlc_on, gtm_utf8_mode;
 GBLREF io_log_name	*io_root_log_name;
-GBLREF io_pair		*io_std_device;
+GBLREF io_pair		io_std_device;
 GBLREF int		process_exiting;
 
 LITREF mstr		chset_names[];
@@ -199,7 +199,7 @@ void zshow_devices(zshow_out *output)
 					}
 				} else
 				{	/* plan to process the output side of $principal if it is std out */
-					if (l->iod->pair.out == io_std_device->out)
+					if (l->iod->pair.out == io_std_device.out)
 						savel = l;
 					tiod = l->iod;
 					v.str.addr = &l->dollar_io[0];
@@ -222,7 +222,7 @@ void zshow_devices(zshow_out *output)
 				case tt:
 					ZS_STR_OUT(&v, terminal_text);
 					tt_ptr = (d_tt_struct*)tiod->dev_sp;
-					if (!ctrlc_on && io_std_device->out == tiod) /* and standard input */
+					if (!ctrlc_on && io_std_device.out == tiod) /* and standard input */
 					{	ZS_PARM_SP(&v, zshow_nocene);
 					}
 					if (tt_ptr->enbld_outofbands.mask)

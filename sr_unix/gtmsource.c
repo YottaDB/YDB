@@ -65,6 +65,7 @@
 #include "gtm_zlib.h"
 #include "fork_init.h"
 #include "gtmio.h"
+#include "io.h"
 #ifdef GTM_TLS
 #include "gtm_repl.h"
 #endif
@@ -103,6 +104,7 @@ GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
+GBLREF	io_pair			io_std_device;
 
 error_def(ERR_JNLPOOLSETUP);
 error_def(ERR_MUPCLIERR);
@@ -281,6 +283,16 @@ int gtmsource()
 		 */
 		gtmsource_exit(isalive ? SRV_ALIVE : SRV_ERR);
 	}
+	/* At this point, the parent source server startup command would have done an "io_init" and attached to
+	 * fds = 0, 1 and 2. The child source server is going to close fd=0 here (i.e. point to /dev/null) and
+	 * about to close 1 and 2 a little later in repl_log_init (i.e. point to the source server log file).
+	 * Therefore any io initializations done in io_init (e.g. io_std_device etc.) are soon going to become
+	 * invalid. Since io_std_device.out is checked in the "util_out_print_vaparm" function to decide whether
+	 * to use M IO (write through the device opened by io_init) vs writing directly to stderr (fd=2), it is
+	 * best to clear io_std_device.out for the child process. That way any errors in case they occur go to
+	 * stderr (if available) instead of /dev/null.
+	 */
+	io_std_device.out = NULL;
 	/* Point stdin to /dev/null */
 	OPENFILE("/dev/null", O_RDONLY, null_fd);
 	if (0 > null_fd)
