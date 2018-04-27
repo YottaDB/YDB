@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -14,9 +17,8 @@
 #define HAVE_CRIT_H_INCLUDED
 
 #include <signal.h>				/* needed for VSIG_ATOMIC_T */
-#ifdef UNIX
 #include <deferred_signal_handler.h>
-#endif
+#include "gtmsiginfo.h"				/* for DEFER_SUSPEND */
 
 /* states of CRIT passed as argument to have_crit() */
 #define CRIT_HAVE_ANY_REG	0x00000001
@@ -112,8 +114,8 @@ GBLREF	boolean_t	deferred_timers_check_needed;
  * deferred events, from timers or other interrupts, anymore. Ensure that forced_exit state does not regress by asserting that the
  * current value is 0 or 1 before setting it to 2. Note that on UNIX forced_exit can progress to 2 only from 1, while on VMS it is
  * possible to generic_exit_handler or dbcertify_exit_handler to change forced_exit from 0 to 2 directly. This design ensures that
- * on VMS we will not invoke sys$exit from DEFERRED_EXIT_HANDLING_CHECK after we started exit processing; on UNIX process_exiting
- * flag servs the same purpose (and is also checked by DEFERRED_EXIT_HANDLING_CHECK), so it is not necessary for either
+ * on VMS we will not invoke sys$exit from DEFERRED_SIGNAL_HANDLING_CHECK after we started exit processing; on UNIX process_exiting
+ * flag servs the same purpose (and is also checked by DEFERRED_SIGNAL_HANDLING_CHECK), so it is not necessary for either
  * generic_signal_handler or dbcertify_signal_handler to set forced_exit to 2.
  */
 #define SET_FORCED_EXIT_STATE_ALREADY_EXITING							\
@@ -129,16 +131,17 @@ GBLREF	boolean_t	deferred_timers_check_needed;
 	forced_exit = 2;									\
 }
 
-/* Macro to be used whenever we want to handle any signals that we deferred handling and exit in the process.
+/* Macro to be used whenever we want to handle any signals that we deferred handling in the process.
  * In VMS, we dont do any signal handling, only exit handling.
  */
-#define	DEFERRED_EXIT_HANDLING_CHECK									\
+#define	DEFERRED_SIGNAL_HANDLING_CHECK									\
 {													\
 	char			*rname;									\
 													\
 	GBLREF	int		process_exiting;							\
 	GBLREF	VSIG_ATOMIC_T	forced_exit;								\
 	GBLREF	volatile int4	gtmMallocDepth;								\
+	GBLREF	volatile int	suspend_status;								\
 													\
 	/* The forced_exit state of 2 indicates that the exit is already in progress, so we do not	\
 	 * need to process any deferred events. Note if threads are running, check if forced_exit is	\
@@ -160,6 +163,16 @@ GBLREF	boolean_t	deferred_timers_check_needed;
 		{											\
 			if (!process_exiting && OK_TO_INTERRUPT)					\
 				check_for_deferred_timers();						\
+		}											\
+		/* Check if a Ctrl-Z signal handling was deferred and if it is safe to do so now */	\
+		if ((DEFER_SUSPEND == suspend_status) && OK_TO_INTERRUPT)				\
+		{	/* Reset the global "suspend_status" before doing the "suspend" call as the	\
+			 * latter can call some other function which has a deferred zone and in turn	\
+			 * invokes DEFERRED_SIGNAL_HANDLING_CHECK at which point we do not want to	\
+			 * again do a nested suspend(SIGSTOP) processing.				\
+			 */										\
+			suspend_status = NO_SUSPEND;							\
+			suspend(SIGSTOP);								\
 		}											\
 	}												\
 }
@@ -217,9 +230,10 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 		assert(OLDSTATE == intrpt_ok_state);								\
 		intrpt_ok_state = NEWSTATE;									\
 		if (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state)							\
-			DEFERRED_EXIT_HANDLING_CHECK;	/* check if signals were deferred in deferred zone */	\
+			DEFERRED_SIGNAL_HANDLING_CHECK;	/* check if signals were deferred in deferred zone */	\
 	}													\
 }
+
 #define	OK_TO_SEND_MSG	((INTRPT_IN_X_TIME_FUNCTION != intrpt_ok_state) 				\
 			&& (INTRPT_IN_LOG_FUNCTION != intrpt_ok_state)					\
 			&& (INTRPT_IN_FUNC_WITH_MALLOC != intrpt_ok_state)				\

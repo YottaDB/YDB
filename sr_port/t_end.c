@@ -1771,7 +1771,7 @@ skip_cr_array:
 	assert(!csa->now_crit || csa->hold_onto_crit);
 	assert(cdb_sc_normal == status);
 	REVERT;	/* no need for t_ch to be invoked if any errors occur after this point */
-	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
+	DEFERRED_SIGNAL_HANDLING_CHECK; /* now that crits are released, check if deferred signal/exit handling needs to be done */
 	assert(update_trans);
 	if (REPL_ALLOWED(csa) && IS_DSE_IMAGE)
 	{
@@ -1849,7 +1849,7 @@ failed_skip_revert:
 	 * is if hold_onto_crit is set to TRUE in which case t_commit_cleanup honors it. Assert accordingly.
 	 */
 	assert(!csa->now_crit || !NEED_TO_RELEASE_CRIT(t_tries, status) || csa->hold_onto_crit);
-	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
+	DEFERRED_SIGNAL_HANDLING_CHECK; /* now that crits are released, check if deferred signal/exit handling needs to be done */
 	t_retry(status);
 	/* Note that even though cw_stagnate is used only in the final retry, it is possible we restart in the final retry
 	 * (see "final_retry_ok" codes in cdb_sc_table.h) and so a CWS_RESET is necessary in that case. It is anyways a no-op

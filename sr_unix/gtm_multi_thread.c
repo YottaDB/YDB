@@ -3,6 +3,9 @@
  * Copyright (c) 2015 Fidelity National Information 		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -20,7 +23,7 @@
 
 #include "gtm_multi_thread.h"
 #include "iosp.h"		/* for SS_NORMAL */
-#include "have_crit.h"		/* for DEFERRED_EXIT_HANDLING_CHECK */
+#include "have_crit.h"		/* for DEFERRED_SIGNAL_HANDLING_CHECK */
 #include "gtmimagename.h"
 #ifdef DEBUG
 #include "wbox_test_init.h"
@@ -175,7 +178,7 @@ int	gtm_multi_thread(gtm_pthread_fnptr_t fnptr, int ntasks, int max_threads,
 		}
 	}
 	multi_thread_in_use = FALSE;
-	DEFERRED_EXIT_HANDLING_CHECK; /* Now that all threads have terminated, check for need of deferred signal/exit handling */
+	DEFERRED_SIGNAL_HANDLING_CHECK; /* Now that all threads have terminated, check for need of deferred signal/exit handling */
 	rc = pthread_attr_destroy(&attr);	/* Free attribute */
 	if (rc)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)

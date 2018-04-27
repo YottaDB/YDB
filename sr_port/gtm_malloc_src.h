@@ -789,7 +789,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 			TRACE_MALLOC(retVal, size, smTn);
 			--gtmMallocDepth;
 			--fast_lock_count;
-			DEFERRED_EXIT_HANDLING_CHECK;
+			DEFERRED_SIGNAL_HANDLING_CHECK;
 			PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
 			return retVal;
 		} else  /* Storage mgmt has not been initialized */
@@ -1025,7 +1025,7 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 		gtm_free_dbg(addr);
 	}
 #	endif
-	DEFERRED_EXIT_HANDLING_CHECK;
+	DEFERRED_SIGNAL_HANDLING_CHECK;
 }
 
 /* When an out-of-storage type error is encountered, besides releasing our memory reserve, we also
@@ -1096,7 +1096,7 @@ void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg wh
 		} else
 			--gtmMallocDepth;
 		--fast_lock_count;
-		DEFERRED_EXIT_HANDLING_CHECK;
+		DEFERRED_SIGNAL_HANDLING_CHECK;
 		was_holder = TRUE; /* caller (gtm_malloc/gtm_free) got the thread lock so release it before the rts_error */
 		PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MEMORY, 2, gtmMallocErrorSize, gtmMallocErrorCallerid,
