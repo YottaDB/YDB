@@ -1878,7 +1878,7 @@ failed:
 	}
 skip_failed:
 	REVERT;
-	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
+	DEFERRED_SIGNAL_HANDLING_CHECK; /* now that crits are released, check if deferred signal/exit handling needs to be done */
 	if (cdb_sc_normal == status)
 	{
 		if (save_jnlpool != jnlpool)

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -85,7 +88,5 @@ void	rel_lock(gd_region *reg)
 	} else
 		CRIT_TRACE(csa, crit_ops_nocrit);
 	/* Now that crit for THIS region is released, check if deferred signal/exit handling can be done and if so do it */
-	DEFERRED_EXIT_HANDLING_CHECK;
-	if ((DEFER_SUSPEND == suspend_status) && OK_TO_INTERRUPT)
-		suspend(SIGSTOP);
+	DEFERRED_SIGNAL_HANDLING_CHECK;
 }

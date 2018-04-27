@@ -613,12 +613,12 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 #endif
 	save_mumps_status = mumps_status; 	/* Save mumps_status as a callin from external call may change it. */
 	save_in_ext_call = TREF(in_ext_call);
-	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);		/* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
+	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);		/* Expected for DEFERRED_SIGNAL_HANDLING_CHECK below */
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	TREF(in_ext_call) = save_in_ext_call;
 	if (!save_in_ext_call)
-		DEFERRED_EXIT_HANDLING_CHECK;					/* Check for deferred wcs_stale() timer */
+		DEFERRED_SIGNAL_HANDLING_CHECK;					/* Check for deferred wcs_stale() timer */
 	mumps_status = save_mumps_status;
 	/* The first byte of the type description argument gets set to 0xFF in case error happened in JNI glue code,
 	 * so check for that and act accordingly.

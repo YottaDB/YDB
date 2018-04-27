@@ -554,7 +554,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			jnlpool = save_jnlpool;
 		}
 		/* It is possible we are exiting while in the middle of a transaction (e.g. called through "deferred_signal_handler"
-		 * in the DEFERRED_EXIT_HANDLING_CHECK macro). Since exit handling code can start new non-TP transactions
+		 * in the DEFERRED_SIGNAL_HANDLING_CHECK macro). Since exit handling code can start new non-TP transactions
 		 * (e.g. for statsdb rundown you need to kill ^%YGS node, for recording mprof stats you need to set a global node)
 		 * clean up the effects of any in-progress transaction before the "t_begin" call happens.
 		 */
