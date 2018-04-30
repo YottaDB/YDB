@@ -2364,6 +2364,25 @@ tn_restart:
 				if (i == bs1_2_len)
 				{
 					cp2 = (unsigned char *)bs1[3].addr;
+					if (NULL == cp2)
+					{	/* This means a restartable scenario. For example, this is possible if
+						 *	a) "new_rec_goes_to_right" is TRUE AND
+						 *	b) new_rec is TRUE AND
+						 *	c) value.len is 0 AND,
+						 *	d) the to-be-inserted key is the only record in the right side block AND
+						 *	e) temp_key (last key in left block) matches the first key in right block
+						 * Note that (e) does not align with "new_rec" being TRUE but is possible
+						 * if the to-be-inserted key was absent when we did the	"gvcst_search" above
+						 * but that key was inserted by a concurrent process before we did a later call
+						 * to "gvcst_expand_prev_key". And that in turn implies a restartable situation.
+						 * Since we cannot determine the key to pass on to parent index block with
+						 * a NULL value of bs1[3].addr (also, bs1[3].len is unreliable in that case),
+						 * we need to restart in this case.
+						 */
+						assert(CDB_STAGNATE > t_tries);
+						status = cdb_sc_mkblk;
+						GOTO_RETRY;
+					}
 					bs1_3_len = bs1[3].len;
 					for (j = 0; (j < bs1_3_len) && (*cp2 == *cp1); ++j)
 					{
