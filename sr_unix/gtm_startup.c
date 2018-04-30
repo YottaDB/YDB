@@ -95,6 +95,9 @@
 #ifdef UNICODE_SUPPORTED
 #include "utfcgr.h"
 #endif
+#include "ydb_getenv.h"
+
+#define	NOISOLATION_LITERAL	"NOISOLATION"
 
 GBLDEF void			(*restart)() = &mum_tstart;
 #ifdef __MVS__
@@ -149,6 +152,7 @@ void gtm_startup(struct startup_vector *svec)
 	stack_frame 	*frame_pointer_lcl;
 	static char 	other_mode_buf[] = "OTHER";
 	void		gtm_ret_code();
+	char		*ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -238,9 +242,7 @@ void gtm_startup(struct startup_vector *svec)
 	}
 	io_init(IS_MUPIP_IMAGE);		/* starts with nocenable for GT.M runtime, enabled for MUPIP */
 	if (!IS_MUPIP_IMAGE)
-	{
 		cenable();	/* cenable unless the environment indicates otherwise - 2 steps because this can report errors */
-	}
 	jobinterrupt_init();
 	getzdir();
 	dpzgbini();
@@ -286,6 +288,19 @@ void gtm_startup(struct startup_vector *svec)
 		ojchildparms(NULL, NULL, NULL);
 	if ((NULL != (TREF(mprof_env_gbl_name)).str.addr))
 		turn_tracing_on(TADR(mprof_env_gbl_name), TRUE, (TREF(mprof_env_gbl_name)).str.len > 0);
+	/* See if ydb_noisolation is specified */
+	if (NULL != (ptr = ydb_getenv(YDBENVINDX_APP_ENSURES_ISOLATION, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
+	{	/* Call the VIEW "NOISOLATION" command with the contents of the <ydb_app_ensures_isolation> env var */
+		mval 	noiso_lit, gbllist;
+
+		noiso_lit.mvtype = MV_STR;
+		noiso_lit.str.len = STR_LIT_LEN(NOISOLATION_LITERAL);
+		noiso_lit.str.addr = NOISOLATION_LITERAL;
+		gbllist.mvtype = MV_STR;
+		gbllist.str.len = STRLEN(ptr);
+		gbllist.str.addr = ptr;
+		op_view(VARLSTCNT(2) &noiso_lit, &gbllist);
+	}
 	return;
 }
 
