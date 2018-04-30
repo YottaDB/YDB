@@ -84,7 +84,7 @@ ZOS_ONLY(error_def(ERR_BADTAG);)
 ZOS_ONLY(error_def(ERR_TEXT);)
 
 
-#define SNAPSHOT_TMP_PREFIX	"gtm_snapshot_"
+#define SNAPSHOT_TMP_PREFIX	"ydb_snapshot_"
 #define ISSUE_WRITE_ERROR_AND_EXIT(reg, RC, csa, tempfilename)									\
 {																\
 	gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("write"), LEN_AND_STR(tempfilename), RC);	\
@@ -269,9 +269,9 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	assert(!reg->read_only || FROZEN_HARD(csa));
 	/* ============================ STEP 1 : Shadow file name construction ==============================
 	 *
-	 * --> Directory is taken from GTM_SNAPTMPDIR, if available, else GTM_BAK_TEMPDIR_LOG_NAME_UC, if available,
+	 * --> Directory is taken from ydb_snaptmpdir, if available, else ydb_baktmpdir, if available,
 	 *     else use current directory.
-	 * --> use the template - gtm_snapshot_<region_name>_<pid_in_hex>_XXXXXX
+	 * --> use the template - ydb_snapshot_<region_name>_<pid_in_hex>_XXXXXX
 	 * --> the last six characters will be replaced by MKSTEMP below
 	 * Note: MUPIP RUNDOWN will rely on the above template to do the cleanup if there were a
 	 * crash that led to the improper shutdown of the snapshot process. So, if the above template
