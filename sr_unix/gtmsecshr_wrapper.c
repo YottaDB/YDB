@@ -76,8 +76,6 @@
 #define GTM_TZ				"TZ"
 #define TZLOCATOR			"TZ="
 #define NEWLINE				0x0a
-#define GTM_WHITE_BOX_TEST_CASE_ENABLE	"gtm_white_box_test_case_enable"
-#define GTM_WHITE_BOX_TEST_CASE_NUMBER	"ydb_white_box_test_case_number"
 #define GTMETCDIRPATH			"/etc"
 #define BADGTMETCDIRPATH		"/bogusdirnotetc"
 #define GTMENVIRONFILE			"environment"
@@ -200,7 +198,7 @@ int main()
 	OPENLOG("GTMSECSHRINIT", get_syslog_flags(), LOG_USER);
 #	ifdef _AIX
 #	ifdef DEBUG
-	/* Use some very simplistic processing to obtain values for $gtm_white_box_test_case_enable/number since we are basically
+	/* Use some very simplistic processing to obtain values for $ydb_white_box_test_case_enable/number since we are basically
 	 * standalone in this routine without the ability to call into other mumps routines. We fetch the value and convert it
 	 * numerically as best as possible. For the boolean enable flag, If it's non-zero - it's true else false. No errors raised
 	 * here for conversions.

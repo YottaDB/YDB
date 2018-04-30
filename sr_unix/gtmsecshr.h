@@ -58,7 +58,7 @@
 #define CLIENT				1
 
 #define DEFAULT_GTMSECSHR_SOCK_DIR	DEFAULT_GTM_TMP
-#define GTMSECSHR_SOCK_PREFIX		"gtm_secshr"
+#define GTMSECSHR_SOCK_PREFIX		"ydb_secshr"
 #define GTMSECSHR_DIR_SUFFIX		"/gtmsecshrdir"
 #define GTMSECSHR_EXECUTABLE		"gtmsecshr"
 
