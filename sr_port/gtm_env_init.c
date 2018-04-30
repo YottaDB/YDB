@@ -52,6 +52,10 @@
 #include "tp.h"
 #include "cli.h"
 #include "repl_filter.h"
+#include "ydb_getenv.h"
+#include "op.h"
+
+#define	NOISOLATION_LITERAL	"NOISOLATION"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -96,6 +100,7 @@ void	gtm_env_init(void)
 	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
 	uint4			max_threads, max_procs;
 	int4			temp_strpllim;
+	char			*ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -381,6 +386,19 @@ void	gtm_env_init(void)
 			ydb_repl_filter_timeout = REPL_FILTER_TIMEOUT_MAX;
 		assert((REPL_FILTER_TIMEOUT_MIN <= ydb_repl_filter_timeout)
 				&& (REPL_FILTER_TIMEOUT_MAX >= ydb_repl_filter_timeout));
+		/* See if ydb_noisolation is specified */
+		if (NULL != (ptr = ydb_getenv(YDBENVINDX_APP_ENSURES_ISOLATION, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
+		{	/* Call the VIEW "NOISOLATION" command with the contents of the <ydb_app_ensures_isolation> env var */
+			mval 	noiso_lit, gbllist;
+
+			noiso_lit.mvtype = MV_STR;
+			noiso_lit.str.len = STR_LIT_LEN(NOISOLATION_LITERAL);
+			noiso_lit.str.addr = NOISOLATION_LITERAL;
+			gbllist.mvtype = MV_STR;
+			gbllist.str.len = STRLEN(ptr);
+			gbllist.str.addr = ptr;
+			op_view(VARLSTCNT(2) &noiso_lit, &gbllist);
+		}
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 	}

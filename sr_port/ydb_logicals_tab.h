@@ -31,6 +31,7 @@
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MIN_INDEX,                  "",                                "")
 
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_AIO_NR_EVENTS,              "$ydb_aio_nr_events",              "$gtm_aio_nr_events")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_APP_ENSURES_ISOLATION,      "$ydb_app_ensures_isolation",      "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_AUTORELINK_CTLMAX,          "$ydb_autorelink_ctlmax",          "$gtm_autorelink_ctlmax")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_AUTORELINK_KEEPRTN,         "$ydb_autorelink_keeprtn",         "$gtm_autorelink_keeprtn")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_AUTORELINK_SHM,             "$ydb_autorelink_shm",             "$gtm_autorelink_shm")
