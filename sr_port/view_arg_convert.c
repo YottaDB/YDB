@@ -59,7 +59,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 	gvnh_spanreg_t		*gvspan;
 	gv_namehead		*tmp_gvt;
 	ht_ent_mname		*tabent;
-	int			cmp, done, i, n, reg_index;
+	int			cmp, i, n, reg_index;
 	mname_entry		gvent, lvent;
 	mident_fixed		lcl_buff;
 	mstr			namestr, tmpstr;
@@ -168,7 +168,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 						lcl_buff.c[i] = TOUPPER(cptr_start[i]);	/* Region names are upper-case ASCII */
 					for (r_ptr = gd_header->regions, r_top = r_ptr + gd_header->n_regions; ; r_ptr++)
 					{
-						if ((r_ptr >= r_top) || (done && is_dollar_view))
+						if ((r_ptr >= r_top) || ((cptr_start != parm->str.addr) && is_dollar_view))
 						{
 							assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
 								/* so below "format2zwr" is guaranteed not to overflow */
