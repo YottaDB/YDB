@@ -12,9 +12,9 @@ versions of packages from the distribution repositories.
 
 ## How to build
 
-1. Fulfill the pre-requisites
+1. Fulfill the prerequisites
 
-   Install developement libraries
+   Install development libraries
 
    ```sh
     Ubuntu Linux OR Raspbian Linux OR Beagleboard Debian
