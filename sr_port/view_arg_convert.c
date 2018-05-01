@@ -312,10 +312,10 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				src++;				/* skip initial '^' */
 				namestr.addr = (char *)src;
 				namestr.len = nextsrc - src;
+				if (MAX_MIDENT_LEN < namestr.len)
+					namestr.len = MAX_MIDENT_LEN;	/* to avoid overflow in "format2zwr" */
 				if (!valid_mname(&namestr))
 				{
-					if (MAX_MIDENT_LEN < namestr.len)
-						namestr.len = MAX_MIDENT_LEN;	/* to avoid overflow in "format2zwr" */
 					assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
 						/* so below "format2zwr" is guaranteed not to overflow */
 					format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len, global_names, &n);
