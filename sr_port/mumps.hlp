@@ -531,7 +531,7 @@
 
    Example:
 
-   $ /usr/lib/fis-gtm/V5.4-002B_x86/gtm -run ^killalias
+   $ /usr/local/lib/yottadb/r122/ydb -run ^killalias
    killalias ; Demonstrate Kill * of pass-by-reference
           ZPrint ; Print this program
           Set A=1,C=3
@@ -592,7 +592,7 @@
 
    Example:
 
-   $ /usr/lib/fis-gtm/V5.4-002B/gtm -run ^tprestart
+   $ /usr/local/lib/yottadb/r122/ydb -run ^tprestart
    tprestart ; Transaction restart variable association also restored on restart
      zprint ; Print this program
      set A="Malvern",C="Pennsylvania",E="USA"
@@ -647,7 +647,7 @@
 
    Note that TROLLBACK does not restore alias variables:
 
-   /usr/lib/fis-gtm/V5.4-002B_x86/gtm -run ^tprollback
+   /usr/local/lib/yottadb/r122/ydb -run ^tprollback
    tprollback ;
      zprint ; Print this program
      set A(1)=1,A(2)=2,A(3)=3
@@ -709,7 +709,7 @@
 
    Example:
 
-   $ /usr/lib/fis-gtm/V5.4-002B_x86/gtm -run ^aliasexample; Extended annotated alias example
+   $ /usr/local/lib/yottadb/r122/ydb -run ^aliasexample; Extended annotated alias example
        zprint
        write "------------",!
        set x="name level",x(1)=1,x(1,2)="1,2",x("foo")="bar"
@@ -1868,7 +1868,7 @@
    Example:
 
    YDB>write $zgbldir
-   /usr/lib/fis-gtm/V5.4-002B_x86/mumps.gld
+   /usr/local/lib/yottadb/r122/mumps.gld
    YDB>set $zgbldir="test.gld"
    YDB>set a=10
    YDB>set b=a
@@ -4485,7 +4485,7 @@
 
    Example:
 
-   /usr/lib/fis-gtm/V5.4-002B_x86/gtm -run ^stackalias
+   /usr/local/lib/yottadb/r122/ydb -run ^stackalias
    stackalias ; Demonstrate New with alias
      ZPrint ; Print this program
      Set A=1,*B=A,*C(2)=A ; Create some aliases
@@ -4530,7 +4530,7 @@
    The following is essentially the same as the prior example but using an
    exclusive NEW:
 
-   $ /usr/lib/fis-gtm/V5.4-002B_x86/gtm -run ^stackalias1
+   $ /usr/local/lib/yottadb/r122/ydb -run ^stackalias1
    stackalias1 ; Demonstrate New with alias
      ZPrint ; Print this program
      Set A=1,*B=A,*C(2)=A ; Create some aliases
@@ -5836,7 +5836,7 @@
    YDB>ZLink "NOSENSE"
    %YDB-E-LABELMISSING Label referenced but
    not defined:lab
-   %YDB-I-SRCNAM in source module /home/gtmuser1/.fis-gtm/V5.4-002B_x86/r/
+   %YDB-I-SRCNAM in source module /home/gtmuser1/.yottadb/r122_x86_64/r/
    NOSENSE.m
    YDB>ZPrint ^NOSENSE
    NOSENSE;
@@ -6402,9 +6402,9 @@
    searching through $ZROUTINES, YottaDB creates a small control file
    (Relinkctl) in the directory identified by $ydb_linktmpdir (defaulting to
    $ydb_tmp, which in turn defaults to /tmp, if unspecified). The names of
-   these files are of the form gtm-relinkctl-<murmur> where <murmur> is a
+   these files are of the form ydb-relinkctl-<murmur> where <murmur> is a
    hash of the realpath() to an auto-relink directory; for example:
-   /tmp/gtm-relinkctl-f0938d18ab001a7ef09c2bfba946f002). With each Relinkctl
+   /tmp/ydb-relinkctl-f0938d18ab001a7ef09c2bfba946f002). With each Relinkctl
    file, YottaDB creates and associates a block of shared memory that contains
    associated control structures. Among the structures is a cycle number
    corresponding to each routine found in the routine directory; a change in
@@ -6626,7 +6626,7 @@
      o To effect auto-relink, YottaDB creates small temporary files in the
        directory referred to by $ydb_linktmpdir (defaulting to $ydb_tmp,
        which in turn defaults to /tmp, if unspecified). The names of these
-       files are of the form gtm-relinkctl<md5sum> where <md5sum> is a hash
+       files are of the form ydb-relinkctl<md5sum> where <md5sum> is a hash
        of the realpath() to an auto-relink directory. The group and
        permissions match those for the directory as described in the section
        Shared Resources Authorization Permissions in Appendix E (YottaDB
@@ -6850,7 +6850,7 @@
    NTW:203,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,TBW:2,TBR:6,
    TR0:0,TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0,ZTR:0,DFL:0,DFS:0,JFL:0,JFS:0,JBB:0,JFB:0,JFW:0,JRL:0,JRP:0,
    JRE:0,JRI:0,JRO:0,JEX:0,DEX:0,CAT:4,CFE:0,CFS:0,CFT:0,CQS:0,CQT:0,CYS:0,CYT:0,BTD:0
-   GLD:/home/gtmuser1/.fis-gtm/V5.4-002B_x86/g/mumps.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,
+   GLD:/home/gtmuser1/.yottadb/r122_x86_64/g/mumps.gld,REG:DEFAULT,SET:205,KIL:0,GET:1,
    DTA:0,ORD:0,ZPR:0,QRY:0,LKS:0,LKF:0,CTN:411,DRD:9,DWT:15,NTW:2
    03,NTR:4,NBW:212,NBR:414,NR0:0,NR1:0,NR2:0,NR3:0,TTW:1,TTR:0,TRB:0,TBW:2,TBR:6,TR0:0,
    TR1:0,TR2:0,TR3:0,TR4:0,TC0:0,TC1:0,TC2:0,TC3:0,TC4:0
@@ -8432,7 +8432,7 @@
 
    Example:
 
-   /usr/lib/fis-gtm/V5.4-002B_x86/gtm -run ^dstackex
+   /usr/local/lib/yottadb/r122/ydb -run ^dstackex
    dstackex;
      zprint ^dstackex
      write !,$STACK
@@ -9022,7 +9022,7 @@
    variable with an agreed prefix (e.g., "%") and its $ZAHANDLE() as a
    suffix. The handle can be returned as the value.
 
-   $ /usr/lib/fis-gtm/V5.4-002B_x86/gtm -run retval
+   $ /usr/local/lib/yottadb/r122/ydb -run retval
    retval        ; Return an array / object from a function
        ;;Data for the object array
        ;;Albert Einstein,14-March-1879
@@ -9902,10 +9902,10 @@
 
    YDB>set x=$zjobexam()
    YDB>write x
-   /home/gtmuser1/.fis-gtm/V5.4-002B_x86/r/GTM_JOBEXAM.ZSHOW_DMP_28760_1
+   /home/gtmuser1/.yottadb/r122_x86_64/r/GTM_JOBEXAM.ZSHOW_DMP_28760_1
    YDB>set x=$zjobexam("test.file")
    YDB>write x
-   /home/gtmuser1/.fis-gtm/V5.4-002B_x86/r/test.file
+   /home/gtmuser1/.yottadb/r122_x86_64/r/test.file
    YDB>
 
    Shows default file name and type of the files created containing the zshow
@@ -10117,7 +10117,7 @@
    Example:
 
    $ cd /usr/work/me
-   $ /usr/lib/fis-gtm/V5.4-002B_x86/gtm
+   $ /usr/local/lib/yottadb/r122/ydb
    YDB>For i="DIRECTORY","NAME","TYPE","" Write $ZPARSE("test.m",i),!
    /usr/work/me/
    test
@@ -10777,7 +10777,7 @@
    Example:
 
    YDB>write $ztrnlnm("ydb_dist","","","","","VALUE")
-   /usr/lib/fis-gtm/V6.0-000_x86_64/utf8
+   /usr/local/lib/yottadb/r122/utf8
    YDB>
 
    This uses $ZTRNLNM() to display the translation value for ydb_dist.
@@ -11485,7 +11485,7 @@
    Example:
 
    $ export ydb_chset=UTF-8
-   $ /usr/lib/fis-gtm/V6.0-001_x86/gtm
+   $ /usr/local/lib/yottadb/r122/ydb
    YDB>write $zchset
    UTF-8
    YDB>
@@ -12942,7 +12942,7 @@
    Example:
 
    $ export sigusrval=10
-   $ /usr/lib/fis-gtm/V6.1-000_x86_64/gtm
+   $ /usr/local/lib/yottadb/r122/ydb
    YDB>zprint ^ztran
    foo;
      set $ztexit=1
@@ -15413,7 +15413,7 @@
    "<host>:<port>:TCP", where host is an IPv4 or IPv6 address optionally
    encapsulated by square-brackets ([]) like "127.0.0.1", "::1",
    "[127.0.0.1]", or "[::1]" or a IPv4 or IPv6 hostname like
-   server.fis-gtm.com. When a hostname is specified, YottaDB uses the IP version
+   yottadb.com. When a hostname is specified, YottaDB uses the IP version
    of the first address returned by DNS:
 
      o that is supported by the operating system, and
@@ -19512,7 +19512,7 @@
    the collation sequence, and pathname identifies the shared library
    containing the routines for that collation sequence, for example:
 
-   $ ydb_collate_1=/opt/fis-gtm/collation
+   $ ydb_collate_1=/opt/yottadb/collation
    $ export ydb_collate_1
 
    Multiple alternative collation sequence definitions can co-exist.

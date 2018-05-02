@@ -1558,9 +1558,9 @@
 
    This command displays an output like the following:
 
-   File    /home/jdoe/.fis-gtm/V6.1-000_x86_64/g/gtm.dat
+   File    /home/jdoe/.yottadb/r1.20_x86_64/g/yottadb.dat
    Region  DEFAULT
-   File            /home/jdoe/.fis-gtm/V6.1-000_x86_64/g/gtm.dat
+   File            /home/jdoe/.yottadb/r1.20_x86_64/g/yottadb.dat
    Region          DEFAULT
    Date/Time       27-JAN-2014 03:13:40 [$H = 63214,11620]
      Access method                          MM  Global Buffers                1024

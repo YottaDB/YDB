@@ -72,7 +72,7 @@ STATICFNDCL void relinkctl_unmap(open_relinkctl_sgm *linkctl);
 STATICFNDCL int relinkctl_fcntl_lock(int fd, int l_type);
 STATICFNDCL void relinkctl_delete(open_relinkctl_sgm *linkctl);
 
-#define SLASH_GTM_RELINKCTL	"/gtm-relinkctl-"
+#define SLASH_GTM_RELINKCTL	"/ydb-relinkctl-"
 #define SLASH_GTM_RELINKCTL_LEN	STRLEN(SLASH_GTM_RELINKCTL)
 #define MAX_RCTL_OPEN_RETRIES	16
 
@@ -613,7 +613,7 @@ void relinkctl_incr_nattached(boolean_t rtnobj_refcnt_incr_cnt)
 }
 
 /* Routine to generate unique key for a $ZROUTINES entry name used to create relinkctl file for that entry in the directory
- * $ydb_linktmpdir (e.g. /testarea1/gtm/temp --> $ydb_linktmpdir/gtm-relinkctl-d0f3d074c724430bc1c7679141b96411).
+ * $ydb_linktmpdir (e.g. /testarea1/gtm/temp --> $ydb_linktmpdir/ydb-relinkctl-d0f3d074c724430bc1c7679141b96411).
  * Theoretically, we'd need a scheme to resolve hash collisions. Say, append -<collision_id> to the key.
  * But since this is 128-bit MurmurHash3, we can assume a collision will never happen in practice, so we do not
  * handle the extremely unlikely event of a hash collision for the few $ZROUTINES entries used by processes using
@@ -621,7 +621,7 @@ void relinkctl_incr_nattached(boolean_t rtnobj_refcnt_incr_cnt)
  *
  * Parameters:
  *
- *   key            - Generated as $ydb_linktmpdir/gtm-relinkctl-<hash>. Buffer should be YDB_PATH_MAX bytes (output).
+ *   key            - Generated as $ydb_linktmpdir/ydb-relinkctl-<hash>. Buffer should be YDB_PATH_MAX bytes (output).
  *   zro_entry_name - Address of mstr containing the fully expanded zroutines entry directory name.
  */
 int relinkctl_get_key(char key[YDB_PATH_MAX], mstr *zro_entry_name)
