@@ -257,7 +257,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			}
 			tmpstr.len = parm->str.len;	/* we need to change len and should not change parm->str, so take a copy */
 			tmpstr.addr = parm->str.addr;
-			if (tmpstr.len)
+			if (0 != tmpstr.len)
 			{
 				switch (*tmpstr.addr)
 				{
