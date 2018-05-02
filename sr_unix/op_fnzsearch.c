@@ -312,9 +312,13 @@ STATICFNDEF int pop_top(lv_val *src, mval *res)
 			file_name[res->str.len] = '\0';
 			STAT_FILE(file_name, &statbuf, stat_res);
 			if (-1 == stat_res)
-			{
-				if (ENOENT != errno)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
+			{	/* The file existed at the time of the "glob" but might have been deleted (ENOENT == stat_res)
+				 * or * might be a soft link to a file that in turn links back to us (ELOOP == stat_res) etc.
+				 * Or permission of one of the parent directories was changed in between the "glob"
+				 * and the STAT_FILE call (EACCESS == stat_res). Or some other error. In all cases, we treat
+				 * the file as if it was absent when the "glob" happened and don't issue any error but move
+				 * on to the next file in the list returned by "glob".
+				 */
 				continue;
 			}
 		} else
