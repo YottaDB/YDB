@@ -201,7 +201,6 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMV63001:
 				/* GT.M V63003 introduced read-only databases */
 				csd->read_only = 0;
-				break;
 			case GDSMV63003:
 				/* YottaDB r122 introduced "reorg_sleep_nsec" to slow down reorg update rate by user */
 				csd->reorg_sleep_nsec = 0;
