@@ -108,14 +108,6 @@ void db_auto_upgrade(gd_region *reg)
 			} else
 				csd->db_got_to_v5_once = TRUE;	/* db was created by V5 so safe to set this */
 		}
-		/* When adding a new minor version, the following template should be maintained
-		 * a) Remove the penultimate 'break'
-		 * b) Remove the assert(FALSE) in the last case (most recent minor version)
-		 * c) If there are any file header fields added in the new minor version, initialize the fields to default values
-		 *    in the last case
-		 * d) Add a new case with the new minor version
-		 * e) Add assert(FALSE) and break (like it was before)
-		 */
 		switch (csd->minor_dbver)
 		{	/* Note that handling for any fields introduced in a version will not go in the "switch-case" block
 			 * of code introduced for the new version but will go in the PREVIOUS "switch-case" block.
@@ -205,6 +197,14 @@ void db_auto_upgrade(gd_region *reg)
 				/* YottaDB r122 introduced "reorg_sleep_nsec" to slow down reorg update rate by user */
 				csd->reorg_sleep_nsec = 0;
 				break;
+		/* When adding a new minor version, the following template should be maintained
+		 * a) Remove the above 'break'
+		 * b) Remove the assert(FALSE) in the last case (not "default:") below (most recent minor version)
+		 * c) If there are any file header fields added in the new minor version, initialize the fields to default values
+		 *    in the last case
+		 * d) Add a new case with the new minor version
+		 * e) Add assert(FALSE) and break (like it was before)
+		 */
 			case GDSMR122:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
