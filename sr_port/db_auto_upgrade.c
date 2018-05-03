@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -203,6 +203,10 @@ void db_auto_upgrade(gd_region *reg)
 				csd->read_only = 0;
 				break;
 			case GDSMV63003:
+				/* YottaDB r122 introduced "reorg_sleep_nsec" to slow down reorg update rate by user */
+				csd->reorg_sleep_nsec = 0;
+				break;
+			case GDSMR122:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

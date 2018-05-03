@@ -758,10 +758,10 @@ STATICFNDEF void timer_handler(int why)
 					rel_time = sub_abs_time(&at, &old_at);
 					late_time.at_sec += rel_time.at_sec;
 					late_time.at_usec += rel_time.at_usec;
-					if (late_time.at_usec > MICROSEC_IN_SEC)
+					if (late_time.at_usec > MICROSECS_IN_SEC)
 					{
 						late_time.at_sec++;
-						late_time.at_usec -= MICROSEC_IN_SEC;
+						late_time.at_usec -= MICROSECS_IN_SEC;
 					}
 #					endif
 				}

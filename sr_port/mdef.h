@@ -1434,7 +1434,7 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define HOUR			3600	/* one hour in seconds 60 * 60 */
 #define ONEDAY			86400	/* seconds in a day */
 #define MILLISECS_IN_SEC	((int)1E3)	/* millseconds in a second */
-#define MICROSEC_IN_SEC		((int)1E6)	/* microseconds in a second */
+#define MICROSECS_IN_SEC		((int)1E6)	/* microseconds in a second */
 #define MICROSECS_IN_MSEC	((int)1E3)	/* microseconds in a millisecond */
 #define NANOSECS_IN_SEC		((int)1E9)	/* nanoseconds in a second */
 #define NANOSECS_IN_MSEC	((int)1E6)	/* nanoseconds in a millisecond */

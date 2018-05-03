@@ -65,7 +65,7 @@
 
 #define MAX_ATTEMPTS_FOR_FETCH_RESYNC	60 /* max-wait in seconds for source server response after connection is established */
 #define MAX_WAIT_FOR_FETCHRESYNC_CONN	60 /* max-wait in seconds to establish connection with the source server */
-#define FETCHRESYNC_PRIMARY_POLL	(MICROSEC_IN_SEC - 1) /* micro seconds, almost 1 second */
+#define FETCHRESYNC_PRIMARY_POLL	(MICROSECS_IN_SEC - 1) /* micro seconds, almost 1 second */
 
 #define CHECK_SEND_RECV_LOOP_ERROR(STATUS, WAIT_COUNT, MESSAGE)									\
 {																\
