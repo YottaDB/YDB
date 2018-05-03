@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,6 +95,12 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 #		endif
 #		ifdef GVCST_EXPAND_CURR_KEY
 		/* This means the block changed since we did the search. Return abnormal status so retry occurs. */
+		if (dollar_tlevel)
+			TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target, tp_blkmod_gvcst_srch,
+					  pStat->blk_target->gd_csa->hdr, pStat->tn, ((blk_hdr_ptr_t)pStat->buffaddr)->tn,
+					  pStat->level);
+		else
+			NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch);
 		return cdb_sc_blkmod;
 #		endif
 	}

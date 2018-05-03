@@ -480,6 +480,17 @@ enum cdb_sc	op_tcommit(void)
 			if (cdb_sc_normal != status)
 			{
 				t_fail_hist[t_tries] = status;
+				if (cdb_sc_blkmod == status)
+				{	/* It is possible the call to "t_qread" (in "bm_getfree" or in "op_tcommit")
+					 * caused the cdb_sc_blkmod status. In this case, it would have invoked the
+					 * TP_TRACE_HIST_MOD macro to note down restart related details but would have
+					 * used a blkmod type of "tp_blkmod_t_qread". But we need to differentiate this
+					 * from a call to "t_qread" outside of the TCOMMIT which can cause the same blkmod.
+					 * Hence using a separate type (tp_blkmod_op_tcommit) to indicate this is a call
+					 * to "t_qread" inside "op_tcommit".
+					 */
+					TREF(blkmod_fail_type) = tp_blkmod_op_tcommit;
+				}
 				SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, cnl, status);
 				TP_RETRY_ACCOUNTING(csa, cnl);
 			}

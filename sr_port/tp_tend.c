@@ -279,6 +279,7 @@ boolean_t	tp_tend()
 	jnl_tm_t		save_gbl_jrec_time;
 	uint4			max_upd_num, prev_upd_num, upd_num, upd_num_end, upd_num_start;
 #	endif
+	int4			tprestart_syslog_delta;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -497,6 +498,7 @@ boolean_t	tp_tend()
 	assert(NULL == tr);
 #	endif
 	assert(cdb_sc_normal == status);
+	tprestart_syslog_delta = TREF(tprestart_syslog_delta);	/* take a local copy to speed up multiple uses below */
 	/* The following section of code (initial part of the for loop) is similar to the function "tp_crit_all_regions".
 	 * The duplication is there only because of performance reasons. The latter function has to go through tp_reg_list
 	 * linked list while here we can go through first_tp_si_by_ftok list which offers a performance advantage.
@@ -538,7 +540,7 @@ boolean_t	tp_tend()
 				|| (gvdupsetnoop && (!JNL_ENABLED(csa) || (NULL != si->jnl_head))));
 			leafmods = indexmods = 0;
 			is_mm = (dba_mm == csd->acc_meth);
-			if (TREF(tprestart_syslog_delta))
+			if (tprestart_syslog_delta)
 				n_blkmods = n_pvtmods = 0;
 			/* If we already hold crit (possible if we are in the final retry), do not invoke grab_crit as it will
 			 * invoke wcs_recover unconditionally if cnl->wc_blocked is set to TRUE. In that case, we want to
@@ -891,13 +893,15 @@ boolean_t	tp_tend()
 							}
 							if (cdb_sc_normal != status)
 							{
-								if (TREF(tprestart_syslog_delta))
+								if (tprestart_syslog_delta)
 								{
 									n_blkmods++;
 									if (cse)
 										n_pvtmods++;
+									#ifdef DEBUG
 									if (1 != n_blkmods)
 										continue;
+									#endif
 								}
 								assert(CDB_STAGNATE > t_tries);
 								status = cdb_sc_blkmod;

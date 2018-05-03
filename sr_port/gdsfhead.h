@@ -1764,6 +1764,7 @@ enum tp_ntp_blkmod_type		/* used for accounting in cs_data->tp_cdb_sc_blkmod[] *
 	tp_blkmod_t_qread,
 	tp_blkmod_tp_tend,
 	tp_blkmod_tp_hist,
+	tp_blkmod_op_tcommit,
 	n_tp_blkmod_types,
 	/* NON-TP transactions */
 	t_blkmod_nomod,
