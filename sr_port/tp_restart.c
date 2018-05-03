@@ -241,15 +241,27 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			{
 				gvname_mstr.addr = (char *)gvname_dirtree;
 				gvname_mstr.len = gvname_dirtree_len;
-			} else if ((cdb_sc_blkmod != status) || (tp_blkmod_tp_tend == TREF(blkmod_fail_type)))
+			} else if ((cdb_sc_blkmod != status) || (tp_blkmod_tp_tend == TREF(blkmod_fail_type))
+								|| (tp_blkmod_op_tcommit == TREF(blkmod_fail_type)))
 			{	/* This is
-				 *   a) NOT a blkmod restart (i.e. a TP_TRACE_HIST call from "tp_tend") OR
+				 *   a) NOT a blkmod restart (i.e. a TP_TRACE_HIST call before or during TCOMMIT) OR
 				 *   b) a BLKMOD restart with type tp_blkmod_tp_tend (i.e. a TP_TRACE_HIST_MOD call from "tp_tend")
 				 *      (note that we cannot check TREF(blkmod_fail_type) unless it is a cdb_sc_blkmod).
-				 * In either case, it is a call made from "tp_tend" where "gv_currkey" does not make sense
-				 * as the validation there could have failed for a GDS block corresponding to one or more
-				 * global references that happened in the TP transaction much before the TCOMMIT. All we
-				 * can do is provide the unsubscripted global name of interest in the TPRESTART syslog message.
+				 *   c) a BLKMOD restart with type tp_blkmod_op_tcommit (i.e. a TP_TRACE_HIST_MOD call from
+				 *	"t_qread" inside "op_tcommit").
+				 * In case (a), "gv_currkey" makes sense if the TP_TRACE_HIST call was done in "t_retry" but
+				 *	does not make sense if the TP_TRACE_HIST call was done in "tp_tend" (i.e. TCOMMIT time).
+				 *	Since most restarts in case (a) are expected to happen in "tp_tend", it is not considered
+				 *	worth the time (at least now) to enhance TP_TRACE_HIST to pass gv_currkey from each
+				 *	individual caller and store it in a global and use that later in "tp_restart" for the
+				 *	TPRESTART message.
+				 * In case (b) and (c), we are in TCOMMIT and at that time "gv_currkey" does not make sense.
+				 * Therefore, in all these cases, we only provide the unsubscripted global name of interest
+				 *	in the TPRESTART syslog message.
+				 *
+				 * Note: At TCOMMIT time, we are looking at a list of blocks for validation with no specific
+				 *	current search key like is the case in database operations before TCOMMIT.
+				 *	Hence the "does not make sense" notion.
 				 */
 				gvname_mstr = gvt->gvname.var_name;
 			} else
