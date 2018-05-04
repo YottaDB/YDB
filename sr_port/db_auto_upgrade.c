@@ -204,6 +204,7 @@ void db_auto_upgrade(gd_region *reg)
 		 *    in the last case
 		 * d) Add a new case with the new minor version
 		 * e) Add assert(FALSE) and break (like it was before)
+		 * f) Move this entire comment block (a) thru (f) to just before the newly added "case ...:" block.
 		 */
 			case GDSMR122:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
