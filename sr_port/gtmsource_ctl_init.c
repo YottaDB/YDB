@@ -17,19 +17,7 @@
 
 #include "gtm_string.h"
 
-#ifdef UNIX
 #include "gtm_stat.h"
-#elif defined(VMS)
-#include <fab.h>
-#include <iodef.h>
-#include <nam.h>
-#include <rmsdef.h>
-#include <ssdef.h>
-#include <descrip.h> /* Required for gtmsource.h */
-#include <efndef.h>
-#else
-#error Unsupported platform
-#endif
 #include <errno.h>
 #include "gtm_fcntl.h"
 #include "gtm_unistd.h"
@@ -49,9 +37,7 @@
 #include "repl_ctl.h"
 #include "repl_errno.h"
 #include "repl_dbg.h"
-#ifdef UNIX
 #include "gtmio.h"
-#endif
 #include "iosp.h"
 #include "eintr_wrappers.h"
 #include "repl_sp.h"
@@ -77,10 +63,8 @@ GBLREF int			gtmsource_log_fd;
 GBLREF FILE			*gtmsource_log_fp;
 GBLREF int			gtmsource_statslog_fd;
 GBLREF FILE			*gtmsource_statslog_fp;
-#ifdef UNIX
 GBLREF gtmsource_state_t	gtmsource_state;
 GBLREF uint4			process_id;
-#endif
 
 error_def(ERR_JNLFILRDOPN);
 error_def(ERR_JNLNOREPL);
@@ -115,21 +99,13 @@ int repl_open_jnl_file_by_name(repl_ctl_element *tmp_ctl, int jnl_fn_len, char *
 {
 	int		tmp_fd;
 	int		status;
-#ifdef UNIX
 	struct stat	stat_buf;
-#elif defined(VMS)
-	struct FAB	fab;
-	struct NAM	stat_buf;
-#else
-#error Unsupported platform
-#endif
 
 	tmp_ctl->jnl_fn_len = jnl_fn_len;
 	memcpy(tmp_ctl->jnl_fn, jnl_fn, jnl_fn_len);
 	tmp_ctl->jnl_fn[jnl_fn_len] = '\0';
 	status = SS_NORMAL;
 	/* Open Journal File */
-#	ifdef UNIX
 	OPENFILE_CLOEXEC(tmp_ctl->jnl_fn, O_RDONLY, tmp_fd);
 	if (0 > tmp_fd)
 	{
@@ -152,26 +128,6 @@ int repl_open_jnl_file_by_name(repl_ctl_element *tmp_ctl, int jnl_fn_len, char *
 #		endif
 	}
 	*((struct stat *)stat_buf_ptr) = stat_buf;
-#	elif defined(VMS)
-	fab = cc$rms_fab;
-	fab.fab$l_fna = tmp_ctl->jnl_fn;
-	fab.fab$b_fns = tmp_ctl->jnl_fn_len;
-	fab.fab$l_fop = FAB$M_UFO;
-	fab.fab$b_fac = FAB$M_GET | FAB$M_PUT | FAB$M_BIO;
-	fab.fab$b_shr = FAB$M_SHRPUT | FAB$M_SHRGET | FAB$M_UPI;
-	stat_buf      = cc$rms_nam;
-	fab.fab$l_nam = &stat_buf;
-	fab.fab$l_dna = JNL_EXT_DEF;
-	fab.fab$b_dns = SIZEOF(JNL_EXT_DEF) - 1;
-	status = sys$open(&fab);
-	if (RMS$_NORMAL == status)
-	{
-		status = SS_NORMAL;
-		tmp_fd = fab.fab$l_stv;
-	}
-	assert(SS_NORMAL == status);
-	*((struct NAM *)stat_buf_ptr) = stat_buf;
-#	endif
 	REPL_DPRINT2("CTL INIT :  Direct open of file %s\n", tmp_ctl->jnl_fn);
 	*fd_ptr = tmp_fd;
 	return status;
@@ -190,17 +146,10 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	int			status;
 	int 			gtmcrypt_errno;
 	uint4			jnl_status;
-	boolean_t		did_jnl_ensure_open = FALSE, was_crit;
+	boolean_t		did_jnl_ensure_open = FALSE, open_jnl_file_by_name, was_crit;
 	int4			lcl_jnl_fn_len;
 	char			lcl_jnl_fn[JNL_NAME_SIZE];
-#ifdef UNIX
 	struct stat	stat_buf;
-#elif defined(VMS)
-	struct NAM	stat_buf;
-	short		iosb[4];	/* needed by the F_READ_BLK_ALIGNED macro */
-#else
-#error Unsupported platform
-#endif
 	uint4			jnl_fs_block_size;
 
 	status = SS_NORMAL;
@@ -221,7 +170,6 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		was_crit = csa->now_crit;
 		if (!was_crit)
 			grab_crit(reg);
-#		ifdef UNIX
 		if (csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle)
 		{	/* Concurrent online rollback. Possible only if we are called from gtmsource_update_zqgblmod_seqno_and_tn
 			 * in which case we don't hold the gtmsource_srv_latch. Assert that.
@@ -233,7 +181,6 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 				rel_crit(reg);
 			return -1;
 		}
-#		endif
 		/* Although replication may be WAS_ON, it is possible that source server has not yet sent records
 		 * that were generated when replication was ON. We have to open and read this journal file to
 		 * cover such a case. But in the WAS_ON case, do not ask for a jnl_ensure_open to be done since
@@ -246,38 +193,53 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		 */
 		csd = csa->hdr;
 		assert(REPL_ALLOWED(csd));
-		if (!REPL_WAS_ENABLED(csd))
+		if (REPL_WAS_ENABLED(csd))
+			open_jnl_file_by_name = TRUE;
+		else
 		{
 			/* replication is allowed and has not gone into the WAS_ON state so journaling is expected to be ON*/
 			assert(JNL_ENABLED(csd));
-			did_jnl_ensure_open = TRUE;
 			jnl_status = jnl_ensure_open(reg, csa);
-			if (0 != jnl_status)
+			if (0 == jnl_status)
 			{
+				open_jnl_file_by_name = FALSE;
+				did_jnl_ensure_open = TRUE;
+				tmp_ctl->jnl_fn_len = csd->jnl_file_len;
+				memcpy(tmp_ctl->jnl_fn, csd->jnl_file_name, tmp_ctl->jnl_fn_len);
+				tmp_ctl->jnl_fn[tmp_ctl->jnl_fn_len] = '\0';
+				/* stash the shared fileid into private storage before rel_crit
+				 * as it is used in JNL_GDID_PVT macro below.
+				 */
+				jpc->fileid = csa->nl->jnl_file.u;
+				REPL_DPRINT2("CTL INIT :  Open of file %s thru jnl_ensure_open\n", tmp_ctl->jnl_fn);
+				tmp_fd = jpc->channel;
+			} else if (ERR_JNLSWITCHRETRY == jnl_status)
+			{	/* This is a case where the latest generation journal file was properly closed in shared
+				 * memory but a new journal file was not created (in the middle of a journal autoswitch)
+				 * due to operational issues (e.g. no permissions to create journal files etc.).
+				 * In this case, we are guaranteed the latest generation journal file will not be opened
+				 * in shared memory (as "jfh->is_not_latest_jnl" is set in its file header). Therefore
+				 * open this journal file regularly just like one would do if this was a WAS_ON situation
+				 * while we still hold crit.
+				 */
+				open_jnl_file_by_name = TRUE;
+			} else
+			{	/* Some other error inside "jnl_ensure_open". Have to error out. */
 				if (!was_crit)
 					rel_crit(reg);
-				/* jnl_status may be ERR_JNLSWITCHRETRY, which has a severity of INFO, but we want to
-				 * treat it (or any other non-zero status) as an ERROR, so force it.
-				 */
+				/* In case jnl_status has a severity of INFO, treat that as an ERROR so force it below */
 				if (SS_NORMAL != jpc->status)
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) MAKE_MSG_TYPE(jnl_status, ERROR), 4,
 						JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);
 				else
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) MAKE_MSG_TYPE(jnl_status, ERROR), 4,
 						JNL_LEN_STR(csd), DB_LEN_STR(reg));
-			} else
-			{
-				tmp_ctl->jnl_fn_len = csd->jnl_file_len;
-				memcpy(tmp_ctl->jnl_fn, csd->jnl_file_name, tmp_ctl->jnl_fn_len);
-				tmp_ctl->jnl_fn[tmp_ctl->jnl_fn_len] = '\0';
+				assert(FALSE);
 			}
-			/* stash the shared fileid into private storage before rel_crit as it is used in JNL_GDID_PVT macro below */
-			VMS_ONLY (jpc->fileid = csa->nl->jnl_file.jnl_file_id;)
-			UNIX_ONLY(jpc->fileid = csa->nl->jnl_file.u;)
-			REPL_DPRINT2("CTL INIT :  Open of file %s thru jnl_ensure_open\n", tmp_ctl->jnl_fn);
-			tmp_fd = jpc->channel;
-		} else
+		}
+		if (open_jnl_file_by_name)
 		{	/* Note that we hold crit so it is safe to pass csd->jnl_file_name (no one else will be changing it) */
+			assert(csa->now_crit);
 			status = repl_open_jnl_file_by_name(tmp_ctl, csd->jnl_file_len, (char *)csd->jnl_file_name,
 													&tmp_fd, &stat_buf);
 		}
@@ -358,7 +320,6 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	{
 		F_COPY_GDID_FROM_STAT(tmp_ctl->repl_buff->fc->id, stat_buf);  /* For VMS stat_buf is a NAM structure */
 	}
-
 	QWASSIGN(tmp_ctl->min_seqno, seq_num_zero);
 	QWASSIGN(tmp_ctl->max_seqno, seq_num_zero);
 	QWASSIGN(tmp_ctl->seqno, seq_num_zero);
@@ -372,7 +333,6 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	tmp_ctl->max_seqno_dskaddr = 0;
 	tmp_ctl->next = tmp_ctl->prev = NULL;
 	*ctl = tmp_ctl;
-
 	return (SS_NORMAL);
 }
 
@@ -392,7 +352,7 @@ int gtmsource_ctl_init(void)
 	repl_ctl_list = (repl_ctl_element *)malloc(SIZEOF(repl_ctl_element));
 	memset((char_ptr_t)repl_ctl_list, 0, SIZEOF(*repl_ctl_list));
 	prev_ctl = repl_ctl_list;
-	UNIX_ONLY(assert(GTMSOURCE_HANDLE_ONLN_RLBK != gtmsource_state)); /* can't come here without handling online rollback */
+	assert(GTMSOURCE_HANDLE_ONLN_RLBK != gtmsource_state); /* can't come here without handling online rollback */
 	region_top = gd_header->regions + gd_header->n_regions;
 	last_rctl = NULL;
 	for (reg = gd_header->regions; reg < region_top; reg++)
@@ -403,11 +363,9 @@ int gtmsource_ctl_init(void)
 		if (REPL_ALLOWED(csd))
 		{
 			status = repl_ctl_create(&tmp_ctl, reg, 0, NULL, TRUE);
-			assert((SS_NORMAL == status) UNIX_ONLY(|| (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)));
-			UNIX_ONLY(
-				if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
-					return -1;
-			)
+			assert((SS_NORMAL == status) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state));
+			if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
+				return -1;
 			prev_ctl->next = tmp_ctl;
 			tmp_ctl->prev = prev_ctl;
 			tmp_ctl->next = NULL;
@@ -476,7 +434,7 @@ int gtmsource_ctl_close(void)
 	int			status;
 	repl_rctl_elem_t	*repl_rctl;
 
-	UNIX_ONLY(gtmsource_stop_jnl_release_timer();)
+	gtmsource_stop_jnl_release_timer();
 	if (repl_ctl_list)
 	{
 		for (ctl = repl_ctl_list->next; NULL != ctl; ctl = repl_ctl_list->next)
