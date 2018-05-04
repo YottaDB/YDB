@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -721,9 +724,10 @@ static	CLI_ENTRY	mup_set_qual[] = {
 { "PARTIAL_RECOV_BYPASS", mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
 { "PREVJNLFILE",          mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
 { "QDBRUNDOWN",           mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-{ "READ_ONLY",            mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
+{ "READ_ONLY",            mupip_set, 0, 0,                      0,                              0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
 { "RECORD_SIZE",          mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "REGION",               mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
+{ "REORG_SLEEP_NSEC",     mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  VAL_DCM },
 { "REPLICATION",          mupip_set, 0, 0,			mup_repl_qual,			0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
 { "REPL_STATE",           mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
 { "RESERVED_BYTES",       mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },

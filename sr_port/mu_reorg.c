@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -230,6 +233,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 	jnl_buffer_ptr_t	jbp;
 	trans_num		ret_tn;
 	mstr			*gn;
+	uint4			sleep_nsec;
 #	ifdef UNIX
 	DEBUG_ONLY(unsigned int	lcl_t_tries;)
 #	endif
@@ -627,7 +631,14 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 			gv_currkey->end =  gv_currkey_next_reorg->end;
 			SAVE_REORG_RESTART;
 		}
-	}		/* ================ END MAIN LOOP ================ */
+		/* Check if we need to be nice to other processes (i.e. not slowing them down if they are restarting due
+		 * to reorg's changes to the database file header).
+		 */
+		sleep_nsec = cs_data->reorg_sleep_nsec;
+		assert((0 <= sleep_nsec) && (NANOSECS_IN_SEC > sleep_nsec));
+		if (sleep_nsec)
+			NANOSLEEP(sleep_nsec, RESTART_TRUE);
+	}	/* ================ END MAIN LOOP ================ */
 
 	/* =========== START REDUCE LEVEL ============== */
 	memcpy(&gv_currkey->base[0], gn->addr, gn->len);

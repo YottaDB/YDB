@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -74,10 +77,10 @@ void	add_int_to_abs_time(ABS_TIME *atps, int4 ival,ABS_TIME *atpd)
 	ival_sec  = ival / MILLISECS_IN_SEC;					/* milliseconds -> seconds */
 	ival_usec = (ival - (ival_sec * MILLISECS_IN_SEC)) * MICROSECS_IN_MSEC;	/* microsecond remainder */
 	atpd->at_sec = atps->at_sec + ival_sec;
-	if ((atpd->at_usec = atps->at_usec + ival_usec) >= MICROSEC_IN_SEC)
+	if ((atpd->at_usec = atps->at_usec + ival_usec) >= MICROSECS_IN_SEC)
 	{
 		/* microsecond overflow */
-		atpd->at_usec -= MICROSEC_IN_SEC;
+		atpd->at_usec -= MICROSECS_IN_SEC;
 		atpd->at_sec  += 1;		/* carry */
 	}
 }
@@ -107,7 +110,7 @@ ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2)
 
 	if (atp2->at_usec > atp1->at_usec)
 	{
-		dat.at_usec += MICROSEC_IN_SEC;
+		dat.at_usec += MICROSECS_IN_SEC;
 		dat.at_sec--;
 	}
 	return (dat);

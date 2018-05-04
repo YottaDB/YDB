@@ -2175,10 +2175,12 @@ typedef struct sgmnt_data_struct
 	boolean_t	filler_access_counter_halted;	/* Used only in V6.3-000. Kept as a filler just to be safe */
 	boolean_t	lock_crit_with_db;		/* flag controlling LOCK crit mechanism; see interlock.h */
 	uint4		basedb_fname_len;		/* byte length of filename stored in "basedb_fname[]" */
-	unsigned char	basedb_fname[256]; /* full path filaneme of corresponding baseDB if this is a statsDB */
+	unsigned char	basedb_fname[256];	/* full path filaneme of corresponding baseDB if this is a statsDB */
 	boolean_t	read_only;		/* If TRUE, GT.M uses a process-private mmap instead of IPC */
 	char		filler_7k[440];
-	char		filler_8k[1024];
+	/************** YottaDB specific fields *********************/
+	uint4		reorg_sleep_nsec;	/* Time a MUPIP REORG sleeps before starting to process a GDS block */
+	char		filler_8k[1020];
 	/********************************************************/
 	/* Master bitmap immediately follows. Tells whether the local bitmaps have any free blocks or not. */
 } sgmnt_data;
