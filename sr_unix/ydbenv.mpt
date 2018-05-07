@@ -68,6 +68,7 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. set:'("UTF-8"=chset!("M"=chset)) $ecode=",U249,"
 	. write:"UTF-8"=chset "export ydb_dist=",dist,"/utf8",!,"export gtm_dist=$ydb_dist",!
 	. write "export ydb_chset=",chset,!,"export gtm_chset=$ydb_chset",!
+	; gbldir is set here
 	set path=env("ydb_dir")_"/"_env("ydb_rel")
 	set tmp2=path_"/g/yottadb.gld",tmp1=$zsearch(tmp2,$increment(zstmp))
 	if $zlength(tmp1) write "export ydb_gbldir=",tmp1,!,"export gtmgbldir=$ydb_gbldir",!
@@ -98,7 +99,9 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	set tmp2=$zsearch(tmp1_"/libyottadbutil.so",$increment(zstmp))
 	set:'$zlength(tmp2) tmp2=$zsearch(tmp1_"/libgtmutil.so",$increment(zstmp))
 	set path=path_" "_tmp2
-	write "export ydb_routines=""",path,"""",!,"export gtmroutines=""$ydb_routines""",!
+	; ydb/gtm routines is set here
+	set tmp1=$ztrnlnm("ydb_routines"),tmp2=$ztrnlnm("gtmroutines")
+	write:'($zlength(tmp1)!$zlength(tmp2)) "export ydb_routines=""",path,"""",!,"export gtmroutines=""$ydb_routines""",!
 	set tmp1=$ztrnlnm("ydb_repl_instance"),tmp2=$ztrnlnm("gtm_repl_instance")
 	write:'($zlength(tmp1)!$zlength(tmp2)) "export ydb_repl_instance=$ydb_dir/$ydb_rel/g/yottadb.repl",!,"export gtm_repl_instance=$ydb_repl_instance",!
 	write "export ydb_log="
