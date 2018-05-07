@@ -145,17 +145,12 @@ uint4 jnl_file_open(gd_region *reg, boolean_t init)
 				} else
 					sts = jnl_file_open_common(reg, (off_jnl_t) stat_buf.st_size, buff);
 			}
-#			ifdef DEBUG
-			/* Will fail if Source Server would need to switch journal files. */
-			assert((ydb_white_box_test_case_enabled && (WBTEST_JNL_SWITCH_EXPECTED == ydb_white_box_test_case_number))
-					|| (0 == sts) || (!is_src_server));
-#			endif
 			if ((0 != sts) && switch_and_retry)
 			{	/* Switch to a new journal file and retry, but only once */
 				sts = jnl_file_open_switch(reg, sts, buff);
 				if (0 == sts)
 				{
-					switch_and_retry = FALSE;
+					switch_and_retry = FALSE;	/* retry only once */
 					continue;
 				}
 			}

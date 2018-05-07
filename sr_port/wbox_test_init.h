@@ -88,7 +88,7 @@ typedef enum {
 						 *      assert in mur_process_intrpt_recov.c */
 	WBTEST_HOLD_ONTO_FTOKSEM_IN_DBINIT,	/* 49 : Sleep in db_init after getting hold of the ftok semaphore */
 	WBTEST_HOLD_ONTO_ACCSEM_IN_DBINIT,	/* 50 : Sleep in db_init after getting hold of the access control semaphore */
-	WBTEST_JNL_SWITCH_EXPECTED,		/* 51 : We expect an automatic journal file switch in jnl_file_open */
+	WBTEST_UNUSED51,			/* 51 : UNUSED - YDB#235 removed the only place to test this */
 	WBTEST_SYSCONF_WRAPPER,			/* 52 : Will sleep in SYSCONF wrapper to let us verify that first two MUPIP STOPs
 						 *	are indeed deferred in the interrupt-deferred zone, but the third isn't */
         WBTEST_DEFERRED_TIMERS,			/* 53 : Will enter a long loop upon specific WRITE or MUPIP STOP command */
