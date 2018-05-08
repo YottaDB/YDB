@@ -30,8 +30,8 @@ fi
 # Save ydb_routines / gtmroutines if defined because
 # this script will overwrite ydb_routines if defined
 # to make sure there is a path to the required routine
-if [ ! -z "$gtmroutines" ] ; then ydb_tmp_routines="$gtmroutines" fi
-if [ ! -z "$ydb_routines" ] ; then ydb_tmp_routines="$ydb_routines" fi
+if [ ! -z "$gtmroutines" ] ; then ydb_tmp_routines="$gtmroutines" ; fi
+if [ ! -z "$ydb_routines" ] ; then ydb_tmp_routines="$ydb_routines" ; fi
 
 # Save environment variables if they exist, which may be needed for tmp and log directories
 if [ ! -z "$ydb_rel" ] ; then export ydb_tmp_rel=$ydb_rel ; fi
