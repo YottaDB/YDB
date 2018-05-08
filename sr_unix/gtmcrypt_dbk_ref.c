@@ -208,7 +208,7 @@ int gtmcrypt_getkey_by_hash(unsigned char *hash, char *db_path, gtm_keystore_t *
 					errorlen = STRLEN(gtmcrypt_err_string);
 					if (MAX_GTMCRYPT_ERR_STRLEN < errorlen)
 						errorlen = MAX_GTMCRYPT_ERR_STRLEN;
-					strncpy(save_err, gtmcrypt_err_string, errorlen);
+					memcpy(save_err, gtmcrypt_err_string, errorlen);
 					save_err[errorlen] = '\0';
 					UPDATE_ERROR_STRING("Expected hash - " STR_ARG " - %s. %s",
 						ELLIPSIZE(hex_buff), save_err, alert_msg);
@@ -325,7 +325,7 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_keyname_plus(char *keyname, char 
 	ynew_ext = keyname + keynamelen - STRLEN(EXT_NEW);
 	if ((ynew_ext >= keyname) && (0 == strcmp(ynew_ext, EXT_NEW)))
 	{	/* This is an autodb, fixup the path */
-		strncpy(lcl_keyname, keyname, keynamelen - STRLEN(EXT_NEW));
+		memcpy(lcl_keyname, keyname, keynamelen - STRLEN(EXT_NEW));
 		lcl_keyname[keynamelen - STRLEN(EXT_NEW)] = '\0';
 		keyname = lcl_keyname;
 	}
@@ -400,7 +400,7 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 				 * is a fully resolved path.
 				 */
 				isautodb = TRUE;
-				strncpy(name_search_field_buff, search_field1, search_field_len - STRLEN(EXT_NEW));
+				memcpy(name_search_field_buff, search_field1, search_field_len - STRLEN(EXT_NEW));
 				name_search_field_buff[search_field_len - STRLEN(EXT_NEW)] = '\0';
 				name_search_field_ptr = name_search_field_buff;
 			}
@@ -659,7 +659,7 @@ STATICFNDEF int keystore_refresh(void)
 			return -1;
 		}
 		/* The ydb_crypt_config variable is defined and accessible. Copy it to a global for future references. */
-		strncpy(gc_config_filename, config_env, YDB_PATH_MAX);
+		SNPRINTF(gc_config_filename, SIZEOF(gc_config_filename), "%s", config_env);
 		just_read = TRUE;
 	}
 	assert(!CONFIG_FILE_UNREAD);
@@ -916,9 +916,9 @@ STATICFNDEF void insert_unresolved_key_link(char *keyname, char *keypath, int in
 
 	node = (gtm_keystore_unres_key_link_t *)MALLOC(SIZEOF(gtm_keystore_unres_key_link_t));
 	memset(node->key_name, 0, YDB_PATH_MAX);
-	strncpy(node->key_name, keyname, YDB_PATH_MAX);
+	SNPRINTF(node->key_name, SIZEOF(node->key_name), "%s", keyname);
 	memset(node->key_path, 0, YDB_PATH_MAX);
-	strncpy(node->key_path, keypath, YDB_PATH_MAX);
+	SNPRINTF(node->key_path, SIZEOF(node->key_path), "%s", keypath);
 	node->next = keystore_by_unres_key_head;
 	node->index = index;
 	node->status = status;

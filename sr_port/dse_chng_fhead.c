@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -229,8 +232,8 @@ void dse_chng_fhead(void)
 					*(qw_num_ptr_t)chng_ptr = value;
 			} else
 				value = old_value;
-			SPRINTF(temp_str1, "Location !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
-				temp_str, temp_str);
+			SNPRINTF(temp_str1, SIZEOF(temp_str1),
+				"Location !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]", temp_str, temp_str);
 			if (SIZEOF(int4) >= size)
 				util_out_print(temp_str1, TRUE, location, location, (uint4)old_value, (uint4)old_value,
 					(uint4)value, (uint4)value, size, size);

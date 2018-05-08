@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -25,9 +25,9 @@
 
 #define STRERROR	strerror
 #define	STRCPY(DEST, SOURCE)		strcpy((char *)(DEST), (char *)(SOURCE))
-#define STRNCPY_LIT(DEST, LITERAL)	strncpy((char *)(DEST), (char *)(LITERAL), SIZEOF(LITERAL) - 1)	/* BYPASSOK */
+#define STRNCPY_LIT(DEST, LITERAL)	memcpy((char *)(DEST), (char *)(LITERAL), SIZEOF(LITERAL) - 1)	/* BYPASSOK */
 #define STRNCPY_LIT_FULL(DEST, LITERAL)	strncpy((char *)(DEST), (char *)(LITERAL), SIZEOF(LITERAL))	/* BYPASSOK */
-#define	STRNCPY_STR(DEST, STRING, LEN)	strncpy((char *)(DEST), (char *)(STRING), LEN)
+#define	STRNCPY_STR(DEST, STRING, LEN)	SNPRINTF((char *)(DEST), LEN, "%s", (char *)(STRING))
 #define	STRCMP(SOURCE, DEST)		strcmp((char *)(SOURCE), (char *)(DEST))
 #define	STRNCMP_LIT(SOURCE, LITERAL)	strncmp(SOURCE, LITERAL, SIZEOF(LITERAL) - 1)		/* BYPASSOK */
 /* Make sure that SIZEOF(SOURCE) > 0 or SOURCE != NULL before running. */

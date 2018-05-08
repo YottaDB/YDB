@@ -209,7 +209,7 @@ int gc_pk_gpghome_has_permissions()
 			return -1;
 		}
 		gnupghome_set = TRUE;
-		strncpy(pathname, ptr, pathlen);
+		memcpy(pathname, ptr, pathlen);
 		pathname[pathlen] = '\0';
 	}
 	if (-1 != (perms = access(pathname, R_OK | X_OK)))

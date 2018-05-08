@@ -351,7 +351,7 @@ MBSTART {															\
 					gtmcrypt_badhash_size_msg = (char *)malloc(1024);					\
 				SNPRINTF(gtmcrypt_badhash_size_msg, 1023, "Specified symmetric key hash has "			\
 					"length %d, which is different from the expected hash length %d",			\
-					hash_string.length, GTMCRYPT_HASH_LEN);							\
+					(int)hash_string.length, GTMCRYPT_HASH_LEN);						\
 				RC = SET_CRYPTERR_MASK(ERR_CRYPTHASHGENFAILED);							\
 			} else													\
 			{	/* Note that the copy is not NULL-terminated. */						\
