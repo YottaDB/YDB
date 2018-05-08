@@ -107,7 +107,7 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	set:'$zlength(tmp2) tmp2=$zsearch(tmp1_"/libgtmutil.so",$increment(zstmp))
 	set path=path_" "_tmp2
 	set tmp1=$ztrnlnm("ydb_routines"),tmp2=$ztrnlnm("gtmroutines")
-	write:(($g(tmp1)="$ydb_dist/libgtmutil.so")!($g(tmp2)="$ydb_dist/libgtmutil.so")) "export ydb_routines=""",path,"""",!,"export gtmroutines=""$ydb_routines""",!
+	write:"$ydb_dist/libgtmutil.so"=tmp1!("$ydb_dist/libgtmutil.so"=tmp2) "export ydb_routines=""",path,"""",!,"export gtmroutines=""$ydb_routines""",!
 	set tmp1=$ztrnlnm("ydb_repl_instance"),tmp2=$ztrnlnm("gtm_repl_instance")
 	write:'($zlength(tmp1)!$zlength(tmp2)) "export ydb_repl_instance=$ydb_dir/$ydb_rel/g/yottadb.repl",!,"export gtm_repl_instance=$ydb_repl_instance",!
 	write "export ydb_log="
