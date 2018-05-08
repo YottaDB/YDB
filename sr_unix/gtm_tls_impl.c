@@ -1349,7 +1349,7 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 	socket->flags = flags;
 	socket->ssl = ssl;
 	socket->gtm_ctx = tls_ctx;
-	strncpy(socket->tlsid, (const char *)id, SIZEOF(socket->tlsid));
+	SNPRINTF(socket->tlsid, SIZEOF(socket->tlsid), "%s", (const char *)id);
 	/* Now, store the `socket' structure in the `SSL' structure so that we can get it back in a callback that receives an
 	 * `SSL' structure. Ideally, we should be using SSL_set_ex_data/SSL_get_ex_data family of functions. But, these functions
 	 * operate on a specific index (obtained by calling SSL_get_ex_new_index). But, since the library should potentially
@@ -1671,7 +1671,7 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 					assert(FALSE && ssl_version);
 					break;
 			}
-			strncpy(conn_info->protocol, ssl_version_ptr, MAX_ALGORITHM_LEN);
+			SNPRINTF(conn_info->protocol, SIZEOF(conn_info->protocol), "%s", ssl_version_ptr);
 			/* SSL-Session Cipher Algorithm */
 			cipher = SSL_get_current_cipher(ssl);
 			SNPRINTF(conn_info->session_algo, SIZEOF(conn_info->session_algo), "%s", SSL_CIPHER_get_name(cipher));

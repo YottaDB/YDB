@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -589,7 +592,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 		while (NULL != ptr_next_val)
 		{
 			len_str= STRLEN(ptr_next_val);
-			strncpy(tmp_str, ptr_next_val, len_str);
+			memcpy(tmp_str, ptr_next_val, len_str);
 			tmp_str[len_str] = 0;
 			tmp_str_ptr = tmp_str;
 			ptr_next_comma = strchr(tmp_str_ptr, ',');

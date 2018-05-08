@@ -274,9 +274,9 @@ int gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out)
 			SNPRINTF(tmp, GTM_PASSPHRASE_MAX, "%ld", (long) stat_info.st_ino);
 			len = (int)STRLEN(tmp);
 			if (len < passwd_len)
-				strncpy(hash_in + (passwd_len - len), tmp, len);
+				memcpy(hash_in + (passwd_len - len), tmp, len);
 			else
-				strncpy(hash_in, tmp, passwd_len);
+				memcpy(hash_in, tmp, passwd_len);
 		} else
 		{
 			save_errno = errno;
