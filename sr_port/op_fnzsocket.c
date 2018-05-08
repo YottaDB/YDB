@@ -529,13 +529,13 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				memcpy(charptr, ONE_COMMA, len);
 				charptr += len;
 				len = SIZEOF(TLSCLIENTSTR) - 1;
-				STRNCPY_STR(charptr, (GTMTLS_OP_CLIENT_MODE & tls_sock->flags) ? TLSCLIENTSTR : TLSSERVERSTR, len);
+				memcpy(charptr, (GTMTLS_OP_CLIENT_MODE & tls_sock->flags) ? TLSCLIENTSTR : TLSSERVERSTR, len);
 				charptr += len;
 				len = STRLEN(tls_sock->tlsid);
 				if (0 < len)
 				{
 					*charptr++ = ',';
-					STRNCPY_STR(charptr, tls_sock->tlsid, len);
+					memcpy(charptr, tls_sock->tlsid, len);
 					charptr += len;
 				}
 				if (0 < len2)
@@ -545,12 +545,12 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 						STRCPY(charptr, "|P:");
 						charptr += OPTIONPREFIXLEN;
 						len2 = STRLEN(conn_info.protocol);
-						STRNCPY_STR(charptr, conn_info.protocol, len2);
+						memcpy(charptr, conn_info.protocol, len2);
 						charptr += len2;
 						STRCPY(charptr, "|C:");
 						charptr += OPTIONPREFIXLEN;
 						len2 = STRLEN(conn_info.session_algo);
-						STRNCPY_STR(charptr, conn_info.session_algo, len2);
+						memcpy(charptr, conn_info.session_algo, len2);
 						charptr += len2;
 					}
 					if (TLS_OPTIONS_OPTIONS & tls_options_mask)
@@ -580,7 +580,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 							*charptr++ = ',';
 							STRCPY(charptr, "SESSID:");
 							charptr += 7;
-							STRNCPY_STR(charptr, conn_info.session_id, len2);
+							memcpy(charptr, conn_info.session_id, len2);
 							charptr += len2;
 						}
 						if (-1 != conn_info.session_expiry_timeout)

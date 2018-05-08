@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -94,12 +97,8 @@ boolean_t iosocket_listen_sock(socket_struct *socketptr, unsigned short len)
 	dsocketptr->iod->dollar.key[len++] = '|';
 	if (socket_local != socketptr->protocol)
 		SPRINTF(&dsocketptr->iod->dollar.key[len], "%d", socketptr->local.port);
-#	ifndef VMS
 	else
-	{
-		STRNCPY_STR(&dsocketptr->iod->dollar.key[len],
-			((struct sockaddr_un *)(socketptr->local.sa))->sun_path, DD_BUFLEN - len - 1);
-	}
-#	endif
+		SNPRINTF(&dsocketptr->iod->dollar.key[len], DD_BUFLEN - len, "%s",
+					((struct sockaddr_un *)(socketptr->local.sa))->sun_path);
 	return TRUE;
 }

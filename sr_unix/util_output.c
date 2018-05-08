@@ -93,19 +93,19 @@ error_def(ERR_TEXT);
 }
 
 /* #GTM_THREAD_SAFE : The below macro (INSERT_MARKER) is thread-safe because caller ensures serialization with locks */
-#define INSERT_MARKER									\
-{											\
-	assert(IS_PTHREAD_LOCKED_AND_HOLDER);						\
-	STRNCPY_STR(offset, "-", STRLEN("-"));						\
-	offset += STRLEN("-");								\
+#define INSERT_MARKER						\
+{								\
+	assert(IS_PTHREAD_LOCKED_AND_HOLDER);			\
+	STRNCPY_LIT(offset, "-");				\
+	offset += STRLEN("-");					\
 }
 
 /* #GTM_THREAD_SAFE : The below macro (BUILD_FACILITY) is thread-safe because caller ensures serialization with locks */
-#define BUILD_FACILITY(strptr)								\
-{											\
-	assert(IS_PTHREAD_LOCKED_AND_HOLDER);						\
-	STRNCPY_STR(offset, strptr, STRLEN(strptr));					\
-	offset += STRLEN(strptr);							\
+#define BUILD_FACILITY(strptr)					\
+{								\
+	assert(IS_PTHREAD_LOCKED_AND_HOLDER);			\
+	memcpy(offset, strptr, STRLEN(strptr));			\
+	offset += STRLEN(strptr);				\
 }
 
 /*
