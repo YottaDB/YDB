@@ -12,6 +12,15 @@
 # Usage: source "YDBDIST"/ydb_env_unset # change for distribution
 # Clears environment variables set by ydb_env_set
 # This uses an M program to remove $ydb_dist from LD_LIBRARY_PATH
+
+# reset ydb_routines to include utility routines to ensure %YDBENV
+# executes
+if [ -s "$ydb_dist/libyottadbutil.so" ] ; then export ydb_routines="$ydb_dist/libyottadbutil.so"
+elif [ -s "$ydb_dist/libgtmutil.so" ] ; then export ydb_routines="$ydb_dist/libgtmutil.so"
+else export ydb_routines="$ydb_dist"
+fi
+
+export gtmroutines="$ydb_routines"
 if [ -x "$ydb_dist/mumps" ] ; then
     ydb_tmp_env=`mktemp -d -t ydb_env_$$_XXXXXX`
     $ydb_dist/mumps -run unset^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err

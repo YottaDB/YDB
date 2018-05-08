@@ -70,27 +70,34 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. write "export ydb_chset=",chset,!,"export gtm_chset=$ydb_chset",!
 	; gbldir is set here
 	set path=env("ydb_dir")_"/"_env("ydb_rel")
-	set tmp2=path_"/g/yottadb.gld",tmp1=$zsearch(tmp2,$increment(zstmp))
-	if $zlength(tmp1) write "export ydb_gbldir=",tmp1,!,"export gtmgbldir=$ydb_gbldir",!
-	else  do
-	. set tmp1=$zsearch(path_"/g/*.gld",$increment(zstmp))
+	set tmp1=$ztrnlnm("ydb_gbldir"),tmp2=$ztrnlnm("gtmgbldir")
+	if '($zlength(tmp1)!$zlength(tmp2)) do  ; global directories are not defined - figure it out below
+	. set tmp2=path_"/g/yottadb.gld",tmp1=$zsearch(tmp2,$increment(zstmp))
 	. if $zlength(tmp1) write "export ydb_gbldir=",tmp1,!,"export gtmgbldir=$ydb_gbldir",!
-	. else  do	    		 		; need to create default global directory (and database)
-	. . write "export ydb_gbldir=",tmp2,!,"export gtmgbldir=$ydb_gbldir",!
-	. . ; need to feed lines to shell process because of YottaDB deviceparameter limit
-	. . open "dbcreate":(shell="/bin/sh":command="/bin/sh":stderr="dbcreateerr")::"pipe"
-	. . use "dbcreate"
-	. . write "export ydb_gbldir=",tmp2,!,"export gtmgbldir=$ydb_gbldir",!
-	. . write "export ydb_dir=",env("ydb_dir"),!,"export gtmdir=",env("gtmdir"),!
-	. . write "export ydb_rel="_env("ydb_rel"),!,"export gtmver=",env("gtmver"),!
-	. . if $zsearch("./gdedefaults",$increment(zstmp)) write dist,"/mumps -run GDE <gdedefaults",!
-	. . else  write dist,"/mumps -run GDE <"_dist,"/gdedefaults",!
-	. . write dist,"/mupip create",!
-	. . write dist,"/mupip set -journal=""enable,on,before"" -region ""*""",!
-	. . write /eof
-	. . for  read tmp1 quit:$zeof
-	. . use "dbcreateerr" for  read tmp2 quit:$zeof
-	. . use io close "dbcreate"
+	. else  do
+	. . set tmp1=$zsearch(path_"/g/*.gld",$increment(zstmp))
+	. . if $zlength(tmp1) write "export ydb_gbldir=",tmp1,!,"export gtmgbldir=$ydb_gbldir",!
+	. . else  do	    		 		; need to create default global directory (and database)
+	. . . write "export ydb_gbldir=",tmp2,!,"export gtmgbldir=$ydb_gbldir",!
+	. . . ; need to feed lines to shell process because of YottaDB deviceparameter limit
+	. . . open "dbcreate":(shell="/bin/sh":command="/bin/sh":stderr="dbcreateerr")::"pipe"
+	. . . use "dbcreate"
+	. . . write "export ydb_gbldir=",tmp2,!,"export gtmgbldir=$ydb_gbldir",!
+	. . . write "export ydb_dir=",env("ydb_dir"),!,"export gtmdir=",env("gtmdir"),!
+	. . . write "export ydb_rel="_env("ydb_rel"),!,"export gtmver=",env("gtmver"),!
+	. . . if $zsearch("./gdedefaults",$increment(zstmp)) write dist,"/mumps -run GDE <gdedefaults",!
+	. . . else  write dist,"/mumps -run GDE <"_dist,"/gdedefaults",!
+	. . . write dist,"/mupip create",!
+	. . . write dist,"/mupip set -journal=""enable,on,before"" -region ""*""",!
+	. . . write /eof
+	. . . for  read tmp1 quit:$zeof
+	. . . use "dbcreateerr" for  read tmp2 quit:$zeof
+	. . . use io close "dbcreate"
+	else  do ; global directories defined, re-export them
+	. ; ydb_gbldir and gtmgbldir are the same with regards to $ztrnlnm, so there is no need
+	. ; to grab both. Always re-export both of them as we don't know which one is set
+	. set tmp1=$ztrnlnm("ydb_gbldir")
+	. write "export ydb_gbldir="_tmp1,!,"export gtmgbldir=$ydb_gbldir",!
 	set path=path_"/o"_$select("UTF-8"=chset:"/utf8",1:"")_"*("_env("ydb_dir")_"/"_env("ydb_rel")_"/r "_env("ydb_dir")_"/r)"
 	set tmp1=dist_"/plugin/o"_$select("UTF-8"=chset:"/utf8",1:"")_"/*.so"
 	set tmp2=$zsearch(tmp1,$increment(zstmp))
@@ -99,9 +106,8 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	set tmp2=$zsearch(tmp1_"/libyottadbutil.so",$increment(zstmp))
 	set:'$zlength(tmp2) tmp2=$zsearch(tmp1_"/libgtmutil.so",$increment(zstmp))
 	set path=path_" "_tmp2
-	; ydb/gtm routines is set here
 	set tmp1=$ztrnlnm("ydb_routines"),tmp2=$ztrnlnm("gtmroutines")
-	write:'($zlength(tmp1)!$zlength(tmp2)) "export ydb_routines=""",path,"""",!,"export gtmroutines=""$ydb_routines""",!
+	write:(($g(tmp1)="$ydb_dist/libgtmutil.so")!($g(tmp2)="$ydb_dist/libgtmutil.so")) "export ydb_routines=""",path,"""",!,"export gtmroutines=""$ydb_routines""",!
 	set tmp1=$ztrnlnm("ydb_repl_instance"),tmp2=$ztrnlnm("gtm_repl_instance")
 	write:'($zlength(tmp1)!$zlength(tmp2)) "export ydb_repl_instance=$ydb_dir/$ydb_rel/g/yottadb.repl",!,"export gtm_repl_instance=$ydb_repl_instance",!
 	write "export ydb_log="
