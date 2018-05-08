@@ -81,6 +81,19 @@ static	seq_num			last_ack_seqno = {0, 0};
 
 #define GTMRECV_NEXT_REPORT_FACTOR	2
 
+/* Macro to close the socket connection and clear all globals associated with the closed connection */
+#define	REPL_CLOSE_CONNECTION(SOCKFD, REPLCONNRESET, CURRCONNSTATE, GTMRECVSENDCMP2UNCMP)		\
+MBSTART {												\
+	repl_close(&SOCKFD);										\
+	REPLCONNRESET = TRUE;										\
+	/* Now that current connection is lost, clear all statics maintained for this connection */	\
+	memset(&CURRCONNSTATE, 0, SIZEOF(CURRCONNSTATE));						\
+	/* GTMRECVSENDCMP2UNCMP needs to be in sync with CURRCONNSTATE.send_cmp2ump and since we	\
+	 * cleared the latter as part of the memset above, clear the former too.			\
+	 */												\
+	GTMRECVSENDCMP2UNCMP = FALSE;									\
+} MBEND
+
 enum
 {
 	CONTINUE_POLL,
@@ -258,10 +271,8 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				{
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending XOFF_ACK_ME. "
 							"Status = %d ; %s\n", status, STRERROR(status));
-					repl_close(&gtmrecv_sock_fd);
-					repl_connection_reset = TRUE;
-					/* Now that current connection is lost, clear all statics maintained for this connection */
-					memset(&curr_conn_state, 0, SIZEOF(curr_conn_state));
+					REPL_CLOSE_CONNECTION(gtmrecv_sock_fd, repl_connection_reset, curr_conn_state,	\
+												gtmrecv_send_cmp2uncmp);
 
 				} else if (EREPL_SEND == repl_errno)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
@@ -408,10 +419,8 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				{
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while receiving XOFF_ACK. "
 							"Status = %d ; %s\n", status, STRERROR(status));
-					repl_close(&gtmrecv_sock_fd);
-					repl_connection_reset = TRUE;
-					/* Now that current connection is lost, clear all statics maintained for this connection */
-					memset(&curr_conn_state, 0, SIZEOF(curr_conn_state));
+					REPL_CLOSE_CONNECTION(gtmrecv_sock_fd, repl_connection_reset, curr_conn_state,	\
+												gtmrecv_send_cmp2uncmp);
 					return_status = STOP_POLL;
 				} else
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
@@ -466,10 +475,8 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending REPL_BADTRANS. "
 							"Status = %d ; %s\n", status, STRERROR(status));
 				}
-				repl_close(&gtmrecv_sock_fd);
-				repl_connection_reset = TRUE;
-				/* Now that current connection is lost, clear all statics maintained for this connection */
-				memset(&curr_conn_state, 0, SIZEOF(curr_conn_state));
+				REPL_CLOSE_CONNECTION(gtmrecv_sock_fd, repl_connection_reset, curr_conn_state,	\
+											gtmrecv_send_cmp2uncmp);
 				return_status = STOP_POLL;
 			} else if (EREPL_SEND == repl_errno)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
@@ -557,10 +564,8 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
  						jnlpool->jnlpool_ctl->jnl_seqno);
 				repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Current Receive Pool Seqno : %llu\n",
 						recvpool_ctl->jnl_seqno);
-				repl_close(&gtmrecv_sock_fd);
-				repl_connection_reset = TRUE;
-				/* Now that current connection is lost, clear all statics maintained for this connection */
-				memset(&curr_conn_state, 0, SIZEOF(curr_conn_state));
+				REPL_CLOSE_CONNECTION(gtmrecv_sock_fd, repl_connection_reset, curr_conn_state,	\
+											gtmrecv_send_cmp2uncmp);
 				upd_proc_local->onln_rlbk_flg = FALSE;
 				/* Before restarting afresh, sync the online rollback cycles. This way any future grab_lock that
 				 * we do after restarting should not realize an unhandled online rollback.  For receiver, it is
