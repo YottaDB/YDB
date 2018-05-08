@@ -27,6 +27,12 @@ if [ ! -z "$ydb_chset" ] ; then export ydb_tmp_chset=$ydb_chset
 elif [ ! -z "$gtm_chset " ] ; then export ydb_tmp_chset=$gtm_chset
 fi
 
+# Save ydb_routines / gtmroutines if defined because
+# this script will overwrite ydb_routines if defined
+# to make sure there is a path to the required routine
+if [ ! -z "$ydb_routines" ] ; then ydb_tmp_routines="$ydb_routines" fi
+if [ ! -z "$gtmroutines" ] ; then ydb_tmp_routines="$gtmroutines" fi
+
 # Save environment variables if they exist, which may be needed for tmp and log directories
 if [ ! -z "$ydb_rel" ] ; then export ydb_tmp_rel=$ydb_rel ; fi
 if [ ! -z "$gtmver" ] ; then export ydb_tmp_gtmver=$gtmver ; fi
@@ -38,6 +44,7 @@ unset ydb_chset ydb_passwd gtm_chset gtm_passwd
 # values that may, and likely will, override these.
 export ydb_dist="YDBDIST"
 export gtm_dist="$ydb_dist"
+
 if [ -s "$ydb_dist/libyottadbutil.so" ] ; then export ydb_routines="$ydb_dist/libyottadbutil.so"
 elif [ -s "$ydb_dist/libgtmutil.so" ] ; then export ydb_routines="$ydb_dist/libgtmutil.so"
 else export ydb_routines="$ydb_dist"
@@ -65,5 +72,10 @@ if [ ! -z "${ydb_tmp_passwd+isset}" ] ; then
     export ydb_passwd=$ydb_tmp_passwd ; export gtm_passwd=$ydb_tmp_passwd
 fi
 
+# Restore ydb_routines / gtmroutines if it was set
+if [ ! -z "$ydb_tmp_routines" ] ; then
+    export ydb_routines="$ydb_tmp_routines" ; export gtmroutines="$ydb_tmp_routines"
+fi
+
 # Clear temporary variables used in this file
-unset ydb_tmp_chset ydb_tmp_env ydb_tmp_gtmver ydb_tmp_passwd ydb_tmp_rel
+unset ydb_tmp_chset ydb_tmp_env ydb_tmp_gtmver ydb_tmp_passwd ydb_tmp_rel ydb_tmp_routines
