@@ -158,6 +158,18 @@ mktmpdir()
 }
 
 # Defaults that can be over-ridden by command line options to follow
+# YottaDB prefixed versions:
+if [ -n "$ydb_buildtype" ] ; then gtm_buildtype="$ydb_buildtype" ; fi
+if [ -n "$ydb_keep_obj" ] ; then gtm_keep_obj="$ydb_keep_obj" ; fi
+if [ -n "$ydb_dryrun" ] ; then gtm_dryrun="$ydb_dryrun" ; fi
+if [ -n "$ydb_group_restriction" ] ; then gtm_group_restriction="$ydb_group_restriction" ; fi
+if [ -n "$ydb_gtm" ] ; then gtm_gtm="$ydb_gtm" ; fi
+if [ -n "$ydb_lcase_utils" ] ; then gtm_lcase_utils="$ydb_lcase_utils" ; fi
+if [ -n "$ydb_overwrite_existing" ] ; then gtm_overwrite_existing="$ydb_overwrite_existing" ; fi
+if [ -n "$ydb_prompt_for_group" ] ; then gtm_prompt_for_group="$ydb_prompt_for_group" ; fi
+if [ -n "$ydb_verbose" ] ; then gtm_verbose="$ydb_verbose" ; fi
+if [ -z "$ydb_change_removeipc" ] ; then ydb_change_removeipc="yes" ; fi
+# GTM prefixed versions (for backwards compatibility)
 if [ -z "$gtm_buildtype" ] ; then gtm_buildtype="pro" ; fi
 if [ -z "$gtm_keep_obj" ] ; then gtm_keep_obj="N" ; fi
 if [ -z "$gtm_dryrun" ] ; then gtm_dryrun="N" ; fi
@@ -167,7 +179,7 @@ if [ -z "$gtm_lcase_utils" ] ; then gtm_lcase_utils="Y" ; fi
 if [ -z "$gtm_overwrite_existing" ] ; then gtm_overwrite_existing="N" ; fi
 if [ -z "$gtm_prompt_for_group" ] ; then gtm_prompt_for_group="N" ; fi
 if [ -z "$gtm_verbose" ] ; then gtm_verbose="N" ; fi
-if [ -z "$ydb_change_removeipc" ] ; then ydb_change_removeipc="yes" ; fi
+
 
 # Initializing internal flags
 gtm_group_already="N"
