@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,10 +49,6 @@ typedef	ucontext_t		gtm_sigcontext_t;
 #endif
 
 void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gtmsiginfo_t *gtmsi);
-
-#define NO_SUSPEND		0	/* Suspend not pending */
-#define DEFER_SUSPEND		1	/* Suspend deferred */
-#define NOW_SUSPEND		2	/* Suspend now; will indicate that we "suspended" ourselves when woken up */
 
 /* States of exit_state
  *

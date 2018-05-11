@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +25,6 @@
 
 #define MAXINOUT	16
 
-GBLREF	volatile int		suspend_status;
 GBLREF	uint4			process_id;
 GBLREF	volatile int4		exit_state;
 GBLREF	volatile int4		gtmMallocDepth; 	/* Recursion indicator */
@@ -43,7 +45,7 @@ void suspsigs_handler(int sig, siginfo_t* info, void *context)
 				if ((EXIT_NOTPENDING < exit_state) || !OK_TO_INTERRUPT)
 				{	/* Let the process run in the foreground till it finishes the terminal I/O */
 					if (EXIT_NOTPENDING == exit_state)
-						suspend_status = DEFER_SUSPEND;
+						SET_DEFERRED_CTRLZ_CHECK_NEEDED;
 					status = kill(process_id, SIGCONT);
 					assert(0 == status);
 					/*
@@ -77,7 +79,7 @@ void suspsigs_handler(int sig, siginfo_t* info, void *context)
 				{
 					if (!OK_TO_INTERRUPT)
 					{
-						suspend_status = DEFER_SUSPEND;
+						SET_DEFERRED_CTRLZ_CHECK_NEEDED;
 						break;
 					}
 					suspend(sig);

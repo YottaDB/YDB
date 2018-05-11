@@ -34,9 +34,7 @@
 
 GBLREF	volatile int4		crit_count;
 GBLREF	uint4 			process_id;
-GBLREF	volatile int		suspend_status;
 GBLREF	node_local_ptr_t	locknl;
-GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 GBLREF	jnl_gbls_t		jgbl;
 
 error_def(ERR_CRITRESET);

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,7 +24,7 @@
 #include "send_msg.h"
 #include "setterm.h"
 
-GBLREF volatile int 	suspend_status;
+GBLREF volatile int 	is_suspended;	/* TRUE if this process is currently suspended */
 GBLREF io_pair		io_std_device;
 GBLREF uint4		process_id;
 GBLREF uint4 		sig_count;
@@ -34,7 +37,7 @@ void suspend(int sig)
 	int	status;
 
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SUSPENDING, 1, sig);
-	suspend_status = NOW_SUSPEND;
+	is_suspended = TRUE;
 	/* Dont call flush_pio() if the received signal is SIGTTOU OR if the received signal is SIGTTIN
 	 * and the $P.out is terminal. Arrival of SIGTTIN and SIGTTOU indicates that current process is
 	 * in the background. Hence it does not make sense to do flush_pio() $P.out is terminal.
