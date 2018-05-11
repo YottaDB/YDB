@@ -190,8 +190,6 @@ GBLDEF	volatile int4		timer_stack_count = 0;
 GBLDEF	volatile boolean_t	timer_in_handler = FALSE;
 GBLDEF	void			(*wcs_clean_dbsync_fptr)();	/* Reference to wcs_clean_dbsync() to be used in gt_timers.c. */
 GBLDEF	void			(*wcs_stale_fptr)();		/* Reference to wcs_stale() to be used in gt_timers.c. */
-GBLDEF 	boolean_t		deferred_timers_check_needed;	/* Indicator whether check_for_deferred_timers() should be called
-								 * upon leaving deferred zone. */
 
 GBLREF	boolean_t	blocksig_initialized;			/* Set to TRUE when blockalrm, block_ttinout, and block_sigsent are
 								 * initialized. */
@@ -546,7 +544,7 @@ void clear_timers(void)
 		assert((FALSE == timer_in_handler) || process_exiting);
 		assert(FALSE == timer_active);
 		assert(FALSE == oldjnlclose_started);
-		assert(FALSE == deferred_timers_check_needed);
+		assert(FALSE == GET_DEFERRED_TIMERS_CHECK_NEEDED);
 		return;
 	}
 	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
@@ -555,7 +553,7 @@ void clear_timers(void)
 	timer_in_handler = FALSE;
 	timer_active = FALSE;
 	oldjnlclose_started = FALSE;
-	deferred_timers_check_needed = FALSE;
+	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 	DUMP_TIMER_INFO("After invoking clear_timers()");
 	return;
@@ -598,7 +596,7 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 
 	SETUP_THREADGBL_ACCESS;
 	DUMP_TIMER_INFO("At the start of start_first_timer()");
-	deferred_timers_check_needed = FALSE;
+	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
 	if ((1 < timer_stack_count) || (TRUE == timer_in_handler))
 		return;
 	for (tpop = (GT_TIMER *)timeroot ; tpop ; tpop = tpop->next)
@@ -611,13 +609,13 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 			{
 				timer_handler(DUMMY_SIG_NUM);
 				/* At this point all timers should have been handled, including a recursive call to
-				 * start_first_timer(), if needed, and deferred_timers_check_needed set to the appropriate
-				 * value, so we are done.
+				 * start_first_timer(), if needed, and SET_DEFERRED_TIMERS_CHECK_NEEDED invoked if
+				 * appropriate, so we are done.
 				 */
 				break;
 			} else
 			{
-				deferred_timers_check_needed = TRUE;
+				SET_DEFERRED_TIMERS_CHECK_NEEDED;
 				tpop->block_int = intrpt_ok_state;
 			}
 		} else
@@ -625,9 +623,9 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 			SYS_SETTIMER(tpop, &eltime);
 			break;	/* System timer will handle subsequent timers, so we are done. */
 		}
-		assert(deferred_timers_check_needed);
+		assert(GET_DEFERRED_TIMERS_CHECK_NEEDED);
 	}
-	assert(timeroot || !deferred_timers_check_needed);
+	assert(timeroot || !GET_DEFERRED_TIMERS_CHECK_NEEDED);
 	DUMP_TIMER_INFO("At the end of start_first_timer()");
 }
 
@@ -674,7 +672,7 @@ STATICFNDEF void timer_handler(int why)
 	if (0 < timer_stack_count)
 		return;
 	timer_stack_count++;
-	deferred_timers_check_needed = FALSE;
+	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
 	save_errno = errno;
 	save_error_condition = error_condition;	/* aka SIGNAL */
 	timer_active = FALSE;				/* timer has popped; system timer not active anymore */
@@ -827,7 +825,7 @@ STATICFNDEF void timer_handler(int why)
 	if (safe_for_timer_pop || (0 < safe_timer_cnt))
 		start_first_timer(&at);
 	else if ((NULL != timeroot) || (0 < timer_defer_cnt))
-		deferred_timers_check_needed = TRUE;
+		SET_DEFERRED_TIMERS_CHECK_NEEDED;
 	/* Restore mainline error_condition global variable. This way any gtm_putmsg or rts_errors that occurred inside interrupt
 	 * code do not affect the error_condition global variable that mainline code was relying on. For example, not doing this
 	 * restore caused the update process (in updproc_ch) to issue a GTMASSERT (GTM-7526). BYPASSOK.
@@ -967,7 +965,7 @@ STATICFNDEF void remove_timer(TID tid)
 		{
 			timeroot = tp->next;
 			if (NULL == timeroot)
-				deferred_timers_check_needed = FALSE;	/* assert in fast path of "clear_timers" relies on this */
+				CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;	/* assert in fast path of "clear_timers" relies on this */
 		}
 		if (tp->safe)
 			safe_timer_cnt--;
@@ -1042,7 +1040,7 @@ void cancel_unsafe_timers(void)
 		}
 	} else
 	{
-		deferred_timers_check_needed = FALSE;
+		CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
 		/* There are no timers left, but the system timer was active, so cancel it. */
 		if (timer_active)
 			sys_canc_timer();
@@ -1091,7 +1089,7 @@ void check_for_deferred_timers(void)
 	char		*rname;
 
 	assert(!INSIDE_THREADED_CODE(rname));	/* below code is not thread safe as it does SIGPROCMASK() etc. */
-	deferred_timers_check_needed = FALSE;
+	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
 	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
 	timer_handler(DUMMY_SIG_NUM);
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */

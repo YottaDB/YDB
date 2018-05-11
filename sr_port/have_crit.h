@@ -18,7 +18,6 @@
 
 #include <signal.h>				/* needed for VSIG_ATOMIC_T */
 #include <deferred_signal_handler.h>
-#include "gtmsiginfo.h"				/* for DEFER_SUSPEND */
 
 /* states of CRIT passed as argument to have_crit() */
 #define CRIT_HAVE_ANY_REG	0x00000001
@@ -84,14 +83,42 @@ typedef enum
 } intrpt_state_t;
 
 GBLREF	intrpt_state_t	intrpt_ok_state;
-GBLREF	boolean_t	deferred_timers_check_needed;
+
+GBLREF	boolean_t	deferred_signal_handling_needed; /* a bitmask of the below DEFERRED_SIGNAL_HANDLING_NEEDED_* macros */
+
+#define	DEFERRED_SIGNAL_HANDLING_TIMERS	(1 << 0)	/* Bit in "deferred_signal_handling_neeed" global variable that
+							 * indicates whether deferred timer(s) needs to be handled
+							 * upon leaving deferred zone.
+							 */
+#define	DEFERRED_SIGNAL_HANDLING_CTRLZ	(1 << 1)	/* Bit in "deferred_signal_handling_neeed" global variable that
+							 * indicates whether deferred Ctrl-Z needs to be handled
+							 * upon leaving deferred zone.
+							 */
+#define	DEFERRED_SIGNAL_HANDLING_EXIT	(1 << 2)	/* Bit in "deferred_signal_handling_neeed" global variable that
+							 * indicates whether deferred signals (that will cause us to exit)
+							 * needs to be handled upon leaving deferred zone.
+							 */
+
+#define	GET_DEFERRED_TIMERS_CHECK_NEEDED	(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_TIMERS)
+#define	SET_DEFERRED_TIMERS_CHECK_NEEDED	(deferred_signal_handling_needed |= (DEFERRED_SIGNAL_HANDLING_TIMERS))
+#define	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED	(deferred_signal_handling_needed &= (~DEFERRED_SIGNAL_HANDLING_TIMERS))
+
+#define	GET_DEFERRED_CTRLZ_CHECK_NEEDED		(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_CTRLZ)
+#define	SET_DEFERRED_CTRLZ_CHECK_NEEDED		(deferred_signal_handling_needed |= (DEFERRED_SIGNAL_HANDLING_CTRLZ))
+#define	CLEAR_DEFERRED_CTRLZ_CHECK_NEEDED	(deferred_signal_handling_needed &= (~DEFERRED_SIGNAL_HANDLING_CTRLZ))
+
+#define	GET_DEFERRED_EXIT_CHECK_NEEDED		(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_EXIT)
+#define	SET_DEFERRED_EXIT_CHECK_NEEDED		(deferred_signal_handling_needed |= (DEFERRED_SIGNAL_HANDLING_EXIT))
+#define	CLEAR_DEFERRED_EXIT_CHECK_NEEDED	(deferred_signal_handling_needed &= (~DEFERRED_SIGNAL_HANDLING_EXIT))
+
+GBLREF	volatile int4	gtmMallocDepth;
 
 /* Macro to check if we are in a state that is ok to interrupt (or to do deferred signal handling). We do not want to interrupt if
  * the global variable intrpt_ok_state indicates it is not ok to interrupt, if we are in the midst of a malloc, if we are holding
  * crit, or if we are in the midst of a commit.
  */
-#define	OK_TO_INTERRUPT	((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (0 == gtmMallocDepth)			\
-				&& (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)))
+#define	OK_TO_INTERRUPT	((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && OK_TO_INTERRUPT_TRIMMED)
+#define	OK_TO_INTERRUPT_TRIMMED	((0 == gtmMallocDepth) && (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)))
 
 /* Set the value of forced_exit to 1. This should indicate that we want a deferred signal handler to be invoked first upon leaving
  * the current deferred window. Since we do not want forced_exit state to ever regress, and there might be several signals delivered
@@ -106,6 +133,8 @@ GBLREF	boolean_t	deferred_timers_check_needed;
 	assert(!INSIDE_THREADED_CODE(rname));							\
 	assert((0 == forced_exit) || (1 == forced_exit));					\
 	forced_exit = 1;									\
+	/* Whenever "forced_exit" gets set to 1, set the corresponding deferred event too */	\
+	SET_DEFERRED_EXIT_CHECK_NEEDED;								\
 	SET_FORCED_THREAD_EXIT; /* Signal any running threads to stop */			\
 	SET_FORCED_MULTI_PROC_EXIT; /* Signal any parallel processes to stop */			\
 }
@@ -129,6 +158,8 @@ GBLREF	boolean_t	deferred_timers_check_needed;
 	assert(1 == forced_exit);								\
 	assert(forced_thread_exit);								\
 	forced_exit = 2;									\
+	/* Whenever "forced_exit" gets set to 2, clear the corresponding deferred event */	\
+	CLEAR_DEFERRED_EXIT_CHECK_NEEDED;							\
 }
 
 /* Macro to be used whenever we want to handle any signals that we deferred handling in the process.
@@ -138,43 +169,37 @@ GBLREF	boolean_t	deferred_timers_check_needed;
 {													\
 	char			*rname;									\
 													\
+	if (INSIDE_THREADED_CODE(rname))								\
+	{												\
+		PTHREAD_EXIT_IF_FORCED_EXIT;								\
+	} else if (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state)						\
+		DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED;							\
+}
+
+/* This is a trimmed down version of the DEFERRED_SIGNAL_HANDLING_CHECK macro which is called
+ * when the following conditions are true.
+ *	a) multi_thread_in_use is FALSE
+ *	b) intrpt_ok_state == INTRPT_OK_TO_INTERRUPT
+ * This lets us call the trimmed down macro directly from the ENABLE_INTERRUPTS macro
+ * (which is used in a lot of places e.g. from the REVERT macro).
+ */
+#define	DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED								\
+{													\
+	DEBUG_ONLY(char		*rname;)								\
+													\
 	GBLREF	int		process_exiting;							\
 	GBLREF	VSIG_ATOMIC_T	forced_exit;								\
-	GBLREF	volatile int4	gtmMallocDepth;								\
-	GBLREF	volatile int	suspend_status;								\
 													\
 	/* The forced_exit state of 2 indicates that the exit is already in progress, so we do not	\
 	 * need to process any deferred events. Note if threads are running, check if forced_exit is	\
 	 * non-zero and if so exit the thread (using pthread_exit) otherwise skip deferred event	\
 	 * processing. A similar check will happen once threads stop running.				\
 	 */												\
-	if (INSIDE_THREADED_CODE(rname))								\
-	{												\
-		PTHREAD_EXIT_IF_FORCED_EXIT;								\
-	} else if (2 > forced_exit)									\
-	{	/* If forced_exit was set while in a deferred state, disregard any deferred timers and	\
-		 * invoke deferred_signal_handler directly.						\
-		 */											\
-		if (forced_exit)									\
-		{											\
-			if (!process_exiting && OK_TO_INTERRUPT)					\
-				deferred_signal_handler();						\
-		} else if (deferred_timers_check_needed)						\
-		{											\
-			if (!process_exiting && OK_TO_INTERRUPT)					\
-				check_for_deferred_timers();						\
-		}											\
-		/* Check if a Ctrl-Z signal handling was deferred and if it is safe to do so now */	\
-		if ((DEFER_SUSPEND == suspend_status) && OK_TO_INTERRUPT)				\
-		{	/* Reset the global "suspend_status" before doing the "suspend" call as the	\
-			 * latter can call some other function which has a deferred zone and in turn	\
-			 * invokes DEFERRED_SIGNAL_HANDLING_CHECK at which point we do not want to	\
-			 * again do a nested suspend(SIGSTOP) processing.				\
-			 */										\
-			suspend_status = NO_SUSPEND;							\
-			suspend(SIGSTOP);								\
-		}											\
-	}												\
+	assert(!INSIDE_THREADED_CODE(rname));								\
+	assert(!GET_DEFERRED_EXIT_CHECK_NEEDED || (1 == forced_exit));					\
+	assert(GET_DEFERRED_EXIT_CHECK_NEEDED || (1 != forced_exit));					\
+	if (deferred_signal_handling_needed)								\
+		handle_deferred_signal();								\
 }
 
 GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => not in use */
@@ -223,15 +248,16 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 }
 
 /* Restore deferrable interrupts back to the state it was at time of corresponding DEFER_INTERRUPTS call */
-#define ENABLE_INTERRUPTS(OLDSTATE, NEWSTATE)									\
-{														\
-	if (!multi_thread_in_use)										\
-	{													\
-		assert(OLDSTATE == intrpt_ok_state);								\
-		intrpt_ok_state = NEWSTATE;									\
-		if (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state)							\
-			DEFERRED_SIGNAL_HANDLING_CHECK;	/* check if signals were deferred in deferred zone */	\
-	}													\
+#define ENABLE_INTERRUPTS(OLDSTATE, NEWSTATE)							\
+{												\
+	if (!multi_thread_in_use)								\
+	{											\
+		assert(OLDSTATE == intrpt_ok_state);						\
+		intrpt_ok_state = NEWSTATE;							\
+		if (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state)					\
+			DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED;					\
+				/* check if signals were deferred in deferred zone */		\
+	}											\
 }
 
 #define	OK_TO_SEND_MSG	((INTRPT_IN_X_TIME_FUNCTION != intrpt_ok_state) 				\
@@ -239,6 +265,7 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 			&& (INTRPT_IN_FUNC_WITH_MALLOC != intrpt_ok_state)				\
 			&& (INTRPT_IN_FORK_OR_SYSTEM != intrpt_ok_state))
 
-uint4 have_crit(uint4 crit_state);
+uint4	have_crit(uint4 crit_state);
+void	handle_deferred_signal(void);
 
 #endif /* HAVE_CRIT_H_INCLUDED */

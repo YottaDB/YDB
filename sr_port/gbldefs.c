@@ -412,7 +412,7 @@ GBLDEF	volatile int4		gtmMallocDepth;		/* Recursion indicator */
 GBLDEF	d_socket_struct		*socket_pool;
 GBLDEF	boolean_t		mu_star_specified;
 GBLDEF	backup_reg_list		*mu_repl_inst_reg_list;
-GBLDEF	volatile int		suspend_status = NO_SUSPEND;
+GBLDEF	volatile int		is_suspended;		/* TRUE if this process is currently suspended */
 GBLDEF	gv_namehead		*reset_gv_target = INVALID_GV_TARGET;
 GBLDEF	VSIG_ATOMIC_T		util_interrupt;
 GBLDEF	sgmnt_addrs		*kip_csa;
@@ -1228,3 +1228,6 @@ GBLDEF	int4		tstart_gtmci_nested_level;	/* TREF(gtmci_nested_level) at the time 
 							 * This should be used only if dollar_tlevel is non-zero as it is not
 							 * otherwise maintained.
 							 */
+GBLDEF	boolean_t	deferred_signal_handling_needed;	/* if non-zero, it means the DEFERRED_SIGNAL_HANDLING_CHECK
+								 * macro needs to do some work.
+								 */
