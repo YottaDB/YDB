@@ -32,11 +32,11 @@ versions of packages from the distribution repositories.
 
 2. Unpack the YottaDB sources
 
-   The YottaDB source tarball extracts to a directory with the version number in the name, i.e. ```yottadb_r120```
+   The YottaDB source tarball extracts to a directory with the version number in the name, i.e. ```yottadb_r122```
 
    ```sh
-   $ tar xfz yottadb_r120_src.tar.gz
-   $ cd yottadb_r120_src
+   $ tar xfz yottadb_r122_src.tar.gz
+   $ cd yottadb_r122_src
    ```
 
    You should find this README, LICENSE, COPYING and CMakeLists.txt file and sr_* source directories.
@@ -57,13 +57,13 @@ versions of packages from the distribution repositories.
    $ cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
    $ make -j `grep -c ^processor /proc/cpuinfo`
    $ make install
-   $ cd yottadb_r120
+   $ cd yottadb_r122
    ```
 
   Note that the make install done above does not create the final installed YottaDB.
   Instead, it stages YottaDB for distribution.
 
-  Now you are ready to install YottaDB. The default installation path is ```/usr/local/lib/yottadb/r120```
+  Now you are ready to install YottaDB. The default installation path is ```/usr/local/lib/yottadb/r122```
   but can be controlled using the --installdir option. Run ```./ydbinstall --help``` for a list of options.
 
   ```sh

@@ -1558,9 +1558,9 @@
 
    This command displays an output like the following:
 
-   File    /home/jdoe/.yottadb/r1.20_x86_64/g/yottadb.dat
+   File    /home/jdoe/.yottadb/r1.22_x86_64/g/yottadb.dat
    Region  DEFAULT
-   File            /home/jdoe/.yottadb/r1.20_x86_64/g/yottadb.dat
+   File            /home/jdoe/.yottadb/r1.22_x86_64/g/yottadb.dat
    Region          DEFAULT
    Date/Time       27-JAN-2014 03:13:40 [$H = 63214,11620]
      Access method                          MM  Global Buffers                1024
@@ -2980,7 +2980,7 @@
 
    **Note**
 
-   This help file is a concise representation of the revision r1.20 of the
+   This help file is a concise representation of the revision r1.22 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
 
