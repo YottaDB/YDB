@@ -69,7 +69,7 @@
 #include "jnl_typedef.h"
 #include "memcoherency.h"
 #include "have_crit.h"			/* needed for ZLIB_UNCOMPRESS */
-#include "deferred_signal_handler.h"	/* needed for ZLIB_UNCOMPRESS */
+#include "deferred_exit_handler.h"	/* needed for ZLIB_UNCOMPRESS */
 #include "gtm_zlib.h"
 #include "wbox_test_init.h"
 #ifdef GTM_TRIGGER

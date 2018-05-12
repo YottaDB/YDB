@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -97,7 +100,7 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 	 * exception to this is if the nested call to send_msg is done by exit handling code in which case the
 	 * latest send_msg call prevails and it is ok since we will never return to the original send_msg call
 	 * again. The other exception is if enable interrupts in util_out_send_oper results in a new send_msg
-	 * in deferred_signal_handler.
+	 * in deferred_exit_handler.
 	 */
 	assert((0 == nesting_level) || ((2 > nesting_level) && timer_in_handler)
 		|| (EXIT_IMMED == exit_state) || (2 == forced_exit));

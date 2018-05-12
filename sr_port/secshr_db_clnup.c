@@ -224,7 +224,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				 * a "gds_rundown" of all open regions) BEFORE "secshr_db_clnup" gets called. In that case,
 				 * even if "si" and "csa" are accessible, db shared memory is not and so we should not
 				 * attempt to finish any commits that might seem unfinished in case this process got a SIG-15
-				 * and handled it as part of "deferred_signal_handler" in "t_end"/"tp_tend".
+				 * and handled it as part of "deferred_exit_handler" in "t_end"/"tp_tend".
 				 */
 				continue;
 			}
@@ -553,8 +553,8 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 			}
 			jnlpool = save_jnlpool;
 		}
-		/* It is possible we are exiting while in the middle of a transaction (e.g. called through "deferred_signal_handler"
-		 * in the DEFERRED_SIGNAL_HANDLING_CHECK macro). Since exit handling code can start new non-TP transactions
+		/* It is possible we are exiting while in the middle of a transaction (e.g. called through "deferred_exit_handler"
+		 * in the DEFERRED_SIGNAL_HANDLING_CHECK* macros). Since exit handling code can start new non-TP transactions
 		 * (e.g. for statsdb rundown you need to kill ^%YGS node, for recording mprof stats you need to set a global node)
 		 * clean up the effects of any in-progress transaction before the "t_begin" call happens.
 		 */

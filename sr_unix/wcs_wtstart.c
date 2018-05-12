@@ -51,7 +51,7 @@
 #include "gtm_string.h"
 #include "have_crit.h"
 #include "gds_blk_downgrade.h"
-#include "deferred_signal_handler.h"
+#include "deferred_exit_handler.h"
 #include "memcoherency.h"
 #include "wbox_test_init.h"
 #include "wcs_clean_dbsync.h"

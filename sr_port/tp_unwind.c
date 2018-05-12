@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@
 #include "tp.h"
 #include "tp_restart.h"
 #ifdef UNIX
-# include "deferred_signal_handler.h"
+# include "deferred_exit_handler.h"
 #endif
 #ifdef GTM_TRIGGER
 # include "gv_trigger.h"

@@ -43,7 +43,7 @@
 #include "ftok_sems.h"
 #include "repl_instance.h"
 #include "mu_rndwn_repl_instance.h"
-#include "deferred_signal_handler.h"
+#include "deferred_exit_handler.h"
 #include "mu_rndwn_file.h"
 #include "read_db_files_from_gld.h"
 #include "mur_db_files_from_jnllist.h"

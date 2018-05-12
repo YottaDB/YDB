@@ -32,7 +32,7 @@
 #include "io.h"
 #include "gtm_stdio.h"
 #include "wcs_sleep.h"
-#include "deferred_signal_handler.h"
+#include "deferred_exit_handler.h"
 #include "wbox_test_init.h"
 #endif
 

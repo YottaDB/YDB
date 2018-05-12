@@ -27,7 +27,7 @@
 #include "filestruct.h"
 #include "gtmsiginfo.h"
 #include "mutex.h"
-#include "deferred_signal_handler.h"
+#include "deferred_exit_handler.h"
 #include "have_crit.h"
 #include "caller_id.h"
 #include "jnl.h"

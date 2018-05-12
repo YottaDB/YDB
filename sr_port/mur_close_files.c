@@ -223,7 +223,7 @@ boolean_t mur_close_files(void)
 		assert(!rctl->db_updated || murgbl.clean_exit || !jgbl.onlnrlbk);
 		reg = rctl->gd;
 		/* reg could be NULL at this point in some rare cases (e.g. if we come to mur_close_files through
-		 * deferred_signal_handler as part of call_on_signal invocation and run down this region but encounter
+		 * deferred_exit_handler as part of call_on_signal invocation and run down this region but encounter
 		 * an error while running down another region, we could re-enter mur_close_files as part of exit handling.
 		 * In this case, since this region has already been rundown, skip running this down.
 		 */

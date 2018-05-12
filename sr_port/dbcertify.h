@@ -304,7 +304,7 @@ void dbcertify_certify_phase(void);
 void dbcertify_dbfilop(phase_static_area *psa);
 #include <signal.h>
 void dbcertify_signal_handler(int sig, siginfo_t *info, void *context);
-void dbcertify_deferred_signal_handler(void);
+void dbcertify_deferred_exit_handler(void);
 /* Routines in dbcertify_funcs.c */
 void dbc_gen_temp_file_names(phase_static_area *psa);
 void dbc_open_command_file(phase_static_area *psa);

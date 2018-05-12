@@ -1228,6 +1228,6 @@ GBLDEF	int4		tstart_gtmci_nested_level;	/* TREF(gtmci_nested_level) at the time 
 							 * This should be used only if dollar_tlevel is non-zero as it is not
 							 * otherwise maintained.
 							 */
-GBLDEF	boolean_t	deferred_signal_handling_needed;	/* if non-zero, it means the DEFERRED_SIGNAL_HANDLING_CHECK
+GBLDEF	uint4		deferred_signal_handling_needed;	/* if non-zero, it means the DEFERRED_SIGNAL_HANDLING_CHECK
 								 * macro needs to do some work.
 								 */

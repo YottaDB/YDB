@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -218,7 +218,7 @@ int	gtm_multi_proc(gtm_multi_proc_fnptr_t fnptr, int ntasks, int max_procs,
 			{	/* The child process should operate as a regular process so re-enable interrupts.
 				 * But before that, set "process_id" to a value different from the parent
 				 * as the ENABLE_INTERRUPTS macro could end up calling
-				 * deferred_signal_handler -> forced_exit_err_display -> gtm_putmsg_csa -> grab_latch
+				 * deferred_exit_handler -> forced_exit_err_display -> gtm_putmsg_csa -> grab_latch
 				 * and grab_latch would fail an assert otherwise.
 				 */
 				getjobnum();    /* set "process_id" to a value different from parent */

@@ -17,7 +17,7 @@
 GBLREF	int		process_exiting;
 GBLREF	VSIG_ATOMIC_T	forced_exit;
 
-void	handle_deferred_signal(void)
+void	deferred_signal_handler(void)
 {
 	DEBUG_ONLY(char *dummy_rname;)
 
@@ -25,7 +25,11 @@ void	handle_deferred_signal(void)
 	assert(DEFERRED_SIGNAL_HANDLING_CTRLZ < DEFERRED_SIGNAL_HANDLING_EXIT);
 	assert(!INSIDE_THREADED_CODE(dummy_rname));		/* DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED ensures this */
 	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);	/* DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED ensures this */
-	assert(deferred_signal_handling_needed);		/* DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED ensures this */
+	/* Even though "deferred_signal_handling_needed" was TRUE when this function was called in the
+	 * DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED macro, it is possible a timer pop happens between then
+	 * and here and clears the global in case it only had the DEFERRED_SIGNAL_HANDLING_TIMERS bit set.
+	 * Hence we cannot assert anything about this global here.
+	 */
 	assert(!GET_DEFERRED_EXIT_CHECK_NEEDED || (1 == forced_exit));
 	assert(GET_DEFERRED_EXIT_CHECK_NEEDED || (1 != forced_exit));
 	if (process_exiting)
@@ -33,12 +37,12 @@ void	handle_deferred_signal(void)
 	if (!OK_TO_INTERRUPT_TRIMMED)
 		return;	/* Not in a position to allow interrupt to happen. Defer interrupt handling to later. */
 	/* If forced_exit was set while in a deferred state, disregard any deferred timers or deferred Ctrl-Zs
-	 * and invoke deferred_signal_handler directly (note: this can cause us to terminate the process).
+	 * and invoke deferred_exit_handler directly (note: this can cause us to terminate/exit the process).
 	 */
 	if (forced_exit)
 	{
 		if (GET_DEFERRED_EXIT_CHECK_NEEDED)
-			deferred_signal_handler();
+			deferred_exit_handler();
 	} else
 	{
 		if (GET_DEFERRED_TIMERS_CHECK_NEEDED)

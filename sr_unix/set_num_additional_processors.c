@@ -40,7 +40,7 @@
 #include "gtm_stdio.h"
 #include "wcs_sleep.h"
 #include "wbox_test_init.h"
-#include "deferred_signal_handler.h"
+#include "deferred_exit_handler.h"
 #endif
 
 GBLREF int	num_additional_processors;

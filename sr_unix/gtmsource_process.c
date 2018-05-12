@@ -63,7 +63,7 @@
 #include "gtmmsg.h"
 #include "repl_sem.h"
 #include "have_crit.h"			/* needed for ZLIB_COMPRESS */
-#include "deferred_signal_handler.h"	/* needed for ZLIB_COMPRESS */
+#include "deferred_exit_handler.h"	/* needed for ZLIB_COMPRESS */
 #include "gtm_zlib.h"
 #include "repl_sort_tr_buff.h"
 #include "replgbl.h"

@@ -17,7 +17,7 @@
 #define HAVE_CRIT_H_INCLUDED
 
 #include <signal.h>				/* needed for VSIG_ATOMIC_T */
-#include <deferred_signal_handler.h>
+#include <deferred_exit_handler.h>
 
 /* states of CRIT passed as argument to have_crit() */
 #define CRIT_HAVE_ANY_REG	0x00000001
@@ -84,7 +84,7 @@ typedef enum
 
 GBLREF	intrpt_state_t	intrpt_ok_state;
 
-GBLREF	boolean_t	deferred_signal_handling_needed; /* a bitmask of the below DEFERRED_SIGNAL_HANDLING_NEEDED_* macros */
+GBLREF	uint4		deferred_signal_handling_needed; /* a bitmask of the below DEFERRED_SIGNAL_HANDLING_NEEDED_* macros */
 
 #define	DEFERRED_SIGNAL_HANDLING_TIMERS	(1 << 0)	/* Bit in "deferred_signal_handling_neeed" global variable that
 							 * indicates whether deferred timer(s) needs to be handled
@@ -199,7 +199,7 @@ GBLREF	volatile int4	gtmMallocDepth;
 	assert(!GET_DEFERRED_EXIT_CHECK_NEEDED || (1 == forced_exit));					\
 	assert(GET_DEFERRED_EXIT_CHECK_NEEDED || (1 != forced_exit));					\
 	if (deferred_signal_handling_needed)								\
-		handle_deferred_signal();								\
+		deferred_signal_handler();								\
 }
 
 GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => not in use */
@@ -266,6 +266,6 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 			&& (INTRPT_IN_FORK_OR_SYSTEM != intrpt_ok_state))
 
 uint4	have_crit(uint4 crit_state);
-void	handle_deferred_signal(void);
+void	deferred_signal_handler(void);
 
 #endif /* HAVE_CRIT_H_INCLUDED */
