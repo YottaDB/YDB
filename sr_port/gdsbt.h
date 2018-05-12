@@ -1002,7 +1002,7 @@ MBSTART	{															\
 	/* Determine if we are in the journal autoswitch (space-based) epoch taper) */						\
 	relative_space_taper = 0;												\
 	jnl_autoswitchlimit = CSD->autoswitchlimit;										\
-	jnl_space_remaining = MAX(1,jnl_autoswitchlimit - (etjb->dskaddr / DISK_BLOCK_SIZE));					\
+	jnl_space_remaining = MAX(1, jnl_autoswitchlimit - (etjb->dskaddr / DISK_BLOCK_SIZE));					\
 	jnl_space_taper_interval = (jnl_autoswitchlimit * CSD->epoch_taper_jnl_pct) / 128;					\
 	if (jnl_space_remaining < jnl_space_taper_interval)									\
 		relative_space_taper = MAX(MIN(129 - ((jnl_space_remaining * 128) / jnl_space_taper_interval), 128), 0);	\
@@ -1012,7 +1012,14 @@ MBSTART	{															\
 		/* This starting point only needs to be approximate so no locking is needed */					\
 		if (0 == CNL->epoch_taper_start_dbuffs)										\
 			CNL->epoch_taper_start_dbuffs = CNL->wcs_active_lvl;							\
-		tmp_epoch_taper_start_dbuffs = MAX(1,CNL->epoch_taper_start_dbuffs); /* stable value for all calculations */	\
+		/* Note, the below cannot use MAX(1, CNL->epoch_taper_start_dbuffs) since the result could end up being 0	\
+		 * in case CNL->epoch_taper_start_dbuffs is > 1 initially when the MAX(a,b) macro does the "if (a>b)" check	\
+		 * but could concurrently be changed to 0 by another process (executing this same macro but going through	\
+		 * the else block instead of "if (relative_overall_taper)") before the MAX macro returns b.			\
+		 */														\
+		tmp_epoch_taper_start_dbuffs = CNL->epoch_taper_start_dbuffs;	/* stable value for all calculations */		\
+		if (0 == tmp_epoch_taper_start_dbuffs)										\
+			tmp_epoch_taper_start_dbuffs = 1;	/* want to avoid divide-by-zero later */			\
 		if ((relative_overall_taper > 64) && (relative_overall_taper < 96)) 						\
 			CNL->epoch_taper_need_fsync = TRUE;									\
 		if (DO_FSYNC && (relative_overall_taper > 96) && CNL->epoch_taper_need_fsync)					\
