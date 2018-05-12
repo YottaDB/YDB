@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -1464,7 +1467,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 		psa->dbc_critical = FALSE;
 		if (forced_exit)
 		{	/* Our exit was deferred until we cleared the critical section area */
-			UNIX_ONLY(dbcertify_deferred_signal_handler());
+			UNIX_ONLY(dbcertify_deferred_exit_handler());
 			VMS_ONLY(sys$exit(exi_condition));
 		}
 		/* Update the transaction number in the fileheader for the next transaction */

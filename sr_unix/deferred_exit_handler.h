@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +12,9 @@
  *								*
  ****************************************************************/
 
-#ifndef DEFERRED_SIGNAL_HANDLER_INCLUDED
-#define DEFERRED_SIGNAL_HANDLER_INCLUDED
+#ifndef DEFERRED_EXIT_HANDLER_INCLUDED
+#define DEFERRED_EXIT_HANDLER_INCLUDED
 
-void deferred_signal_handler(void);
+void deferred_exit_handler(void);
 
-#endif /* DEFERRED_SIGNAL_HANDLER_INCLUDED */
+#endif /* DEFERRED_EXIT_HANDLER_INCLUDED */

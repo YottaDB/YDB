@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -23,7 +26,7 @@
 #include "filestruct.h"
 #include "send_msg.h"
 #include "mutex.h"
-#include "deferred_signal_handler.h"
+#include "deferred_exit_handler.h"
 #include "caller_id.h"
 #include "is_proc_alive.h"
 #include "gtmimagename.h"

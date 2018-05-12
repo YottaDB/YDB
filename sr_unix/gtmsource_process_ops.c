@@ -66,7 +66,7 @@
 #include "gtmmsg.h"
 #include "wbox_test_init.h"
 #include "have_crit.h"			/* needed for ZLIB_COMPRESS */
-#include "deferred_signal_handler.h"	/* needed for ZLIB_COMPRESS */
+#include "deferred_exit_handler.h"	/* needed for ZLIB_COMPRESS */
 #include "gtm_zlib.h"
 #include "replgbl.h"
 #include "repl_inst_dump.h"		/* for "repl_dump_histinfo" prototype */

@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -10,9 +13,9 @@
  *								*
  ****************************************************************/
 
-/* Perform necessary functions for signal handling that was deferred.
-   Based on deferred_signal_handler() but without references to have_crit()
-   that pull in half of the GT.M world.
+/* Perform necessary functions for exit signal handling that were deferred.
+   Based on deferred_exit_handler() but without references to have_crit()
+   that pull in a lot of other helper modules/functions.
 */
 #include "mdef.h"
 
@@ -46,7 +49,7 @@ GBLREF	boolean_t		exit_handler_active;
 
 LITREF	gtmImageName		gtmImageNames[];
 
-void dbcertify_deferred_signal_handler(void)
+void dbcertify_deferred_exit_handler(void)
 {
 	/* To avoid nested calls to this routine, we advance the status of forced_exit. */
 	SET_FORCED_EXIT_STATE_ALREADY_EXITING;

@@ -27,7 +27,7 @@
 #include "send_msg.h"
 #include "mutex.h"
 #include "wcs_recover.h"
-#include "deferred_signal_handler.h"
+#include "deferred_exit_handler.h"
 #include "caller_id.h"
 #include "is_proc_alive.h"
 #ifdef DEBUG

@@ -77,7 +77,7 @@
 #endif
 
 #include "gtmrecv.h"
-#include "deferred_signal_handler.h"
+#include "deferred_exit_handler.h"
 #include "repl_instance.h"
 #include "shmpool.h"
 #include "db_snapshot.h"

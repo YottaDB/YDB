@@ -25,7 +25,7 @@
 #include "send_msg.h"
 #include "gtmio.h"
 #include "have_crit.h"
-#include "deferred_signal_handler.h"
+#include "deferred_exit_handler.h"
 #include "gtmmsg.h"
 #include "forced_exit_err_display.h"
 #ifdef DEBUG
@@ -55,7 +55,7 @@ error_def(ERR_KILLBYSIGSINFO2);
 error_def(ERR_KILLBYSIGSINFO3);
 error_def(ERR_KILLBYSIGUINFO);
 
-void deferred_signal_handler(void)
+void deferred_exit_handler(void)
 {
 	void		(*signal_routine)();
 	char		*rname;

@@ -19,7 +19,7 @@
 #include "gtmxc_types.h"
 #include "gtmimagename.h"
 #include "have_crit.h"
-#include "deferred_signal_handler.h"
+#include "deferred_exit_handler.h"
 #include "wbox_test_init.h"
 #include "gtmmsg.h"
 #include "error.h"					/* for MAKE_MSG_WARNING macro */

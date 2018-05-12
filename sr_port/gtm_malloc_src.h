@@ -75,7 +75,7 @@
 #include "have_crit.h"
 #include "gtm_env_init.h"
 #include "gtmio.h"
-#include "deferred_signal_handler.h"
+#include "deferred_exit_handler.h"
 
 /* This routine is compiled twice, once as debug and once as pro and put into the same pro build. The alternative
  * memory manager is selected with the debug flags (any non-zero ydb_dbglvl setting invokes debug memory manager in
