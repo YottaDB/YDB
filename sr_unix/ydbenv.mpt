@@ -106,8 +106,7 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	set tmp2=$zsearch(tmp1_"/libyottadbutil.so",$increment(zstmp))
 	set:'$zlength(tmp2) tmp2=$zsearch(tmp1_"/libgtmutil.so",$increment(zstmp))
 	set path=path_" "_tmp2
-	set tmp1=$ztrnlnm("ydb_routines"),tmp2=$ztrnlnm("gtmroutines")
-	write:"$ydb_dist/libgtmutil.so"=tmp1!("$ydb_dist/libgtmutil.so"=tmp2) "export ydb_routines=""",path,"""",!,"export gtmroutines=""$ydb_routines""",!
+	write "export ydb_routines=""",path,"""",!,"export gtmroutines=""$ydb_routines""",!
 	set tmp1=$ztrnlnm("ydb_repl_instance"),tmp2=$ztrnlnm("gtm_repl_instance")
 	write:'($zlength(tmp1)!$zlength(tmp2)) "export ydb_repl_instance=$ydb_dir/$ydb_rel/g/yottadb.repl",!,"export gtm_repl_instance=$ydb_repl_instance",!
 	write "export ydb_log="
@@ -276,7 +275,7 @@ PathSame(path1,path2)
 	set io=$io
 	open "realpath":(shell="/bin/sh":command="realpath "_path1_" "_path2:readonly)::"pipe"
 	use "realpath" read realpath1,realpath2 use io close "realpath"
-	quit realpath1=realpath2	
+	quit realpath1=realpath2
 
 ; End of code in routine - what follows are defaults and errors
 
