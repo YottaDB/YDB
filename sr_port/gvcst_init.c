@@ -859,6 +859,12 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			reg->jnl_before_image = csd->jnl_before_image;
 			reg->dyn.addr->asyncio = csd->asyncio;
 			reg->dyn.addr->read_only = csd->read_only;
+			/* reg->read_only would have already been set to TRUE or FALSE depending on the file permissions.
+			 * Now check if the READ_ONLY flag in the db file header is TRUE, if so set reg->read_only also
+			 * to TRUE (just like is done in "db_init").
+			 */
+			if (csd->read_only)
+				reg->read_only = TRUE;
 			assert(csa->reservedDBFlags == csd->reservedDBFlags);	/* Should be same already */
 			SYNC_RESERVEDDBFLAGS_REG_CSA_CSD(reg, csa, csd, ((node_local_ptr_t)NULL));
 			SET_REGION_OPEN_TRUE(reg, WAS_OPEN_TRUE);
