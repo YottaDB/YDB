@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -143,7 +146,7 @@ boolean_t updproc_preread(void)
 {
 	boolean_t		good_record, was_wrapped;
 	uint4			pre_read_offset;
-	int			rec_len, cnt, retries, spins, maxspins, key_len;
+	int			rec_len, cnt, retries, spins, maxspins, maxtries, key_len;
 	enum jnl_record_type	rectype;
 	mstr_len_t		val_len;
 	mname_entry		gvname;
@@ -174,6 +177,7 @@ boolean_t updproc_preread(void)
 
 	SETUP_THREADGBL_ACCESS;
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
+	maxtries = MAX_LOCK_TRIES(LOCK_TRIES_50sec);
 	upd_proc_local = recvpool.upd_proc_local;
 	recvpool_ctl = recvpool.recvpool_ctl;
 	gtmrecv_local = recvpool.gtmrecv_local;
@@ -196,7 +200,7 @@ boolean_t updproc_preread(void)
 				pre_read_offset, upd_proc_local->read, recvpool_ctl->write);
 			return TRUE;
 		}
-		for (retries = LOCK_TRIES - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
+		for (retries = maxtries - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
 		{	/* seems like this might be a legitimate spin lock - might could use some work to tighten it up */
 			for (spins = maxspins; 0 < spins; spins--)
 			{
