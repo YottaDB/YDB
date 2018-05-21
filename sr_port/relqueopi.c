@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -63,12 +63,13 @@ GBLREF	int		num_additional_processors;
 
 int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 {
-	int	retries, spins, maxspins;
+	int	retries, spins, maxspins, maxtries;
 	uint4	stuck_cnt = 0;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
-	for (retries = LOCK_TRIES - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
+	maxtries = MAX_LOCK_TRIES(LOCK_TRIES_50sec);
+	for (retries = maxtries - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
 	{
 		for (spins = maxspins; 0 < spins; spins--)
 		{
@@ -109,12 +110,13 @@ int insqhi2(que_ent_ptr_t new, que_head_ptr_t base)
 
 int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 {
-	int	retries, spins, maxspins;
+	int	retries, spins, maxspins, maxtries;
 	uint4	stuck_cnt = 0;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
-	for (retries = LOCK_TRIES - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
+	maxtries = MAX_LOCK_TRIES(LOCK_TRIES_50sec);
+	for (retries = maxtries - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
 	{
 		for (spins = maxspins; 0 < spins; spins--)
 		{
@@ -155,13 +157,14 @@ int insqti2(que_ent_ptr_t new, que_head_ptr_t base)
 
 void_ptr_t remqhi1(que_head_ptr_t base)
 {
-	int		retries, spins, maxspins;
+	int		retries, spins, maxspins, maxtries;
 	que_ent_ptr_t	ret;
 	uint4		stuck_cnt = 0;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
-	for (retries = LOCK_TRIES - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
+	maxtries = MAX_LOCK_TRIES(LOCK_TRIES_50sec);
+	for (retries = maxtries - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
 	{
 		for (spins = maxspins; 0 < spins; spins--)
 		{
@@ -209,13 +212,14 @@ void_ptr_t remqhi1(que_head_ptr_t base)
 
 void_ptr_t remqti1(que_head_ptr_t base)
 {
-	int		retries, spins, maxspins;
+	int		retries, spins, maxspins, maxtries;
 	que_ent_ptr_t	ret;
 	uint4		stuck_cnt = 0;
 
 	++fast_lock_count;			/* Disable wcs_stale for duration */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
-	for (retries = LOCK_TRIES - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
+	maxtries = MAX_LOCK_TRIES(LOCK_TRIES_50sec);
+	for (retries = maxtries - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
 	{
 		for (spins = maxspins; 0 < spins; spins--)
 		{

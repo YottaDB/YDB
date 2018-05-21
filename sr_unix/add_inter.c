@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,14 +43,15 @@ error_def(ERR_ERRCALL);
 
 int4	add_inter(int val, sm_int_ptr_t addr, sm_global_latch_ptr_t latch)
 {
-	int4			cntrval, newcntrval, spins, maxspins, retries;
+	int4			cntrval, newcntrval, spins, maxspins, maxtries, retries;
 	boolean_t		cswpsuccess;
 	sm_int_ptr_t volatile	cntrval_p;	/* Need volatile context especially on Itanium */
 
 	++fast_lock_count;
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
+	maxtries = MAX_LOCK_TRIES(LOCK_TRIES_50sec);
 	cntrval_p = addr;
-        for (retries = LOCK_TRIES - 1; 0 < retries; retries--)  /* - 1 so do rel_quant 3 times first */
+        for (retries = maxtries - 1; 0 < retries; retries--)  /* - 1 so do rel_quant 3 times first */
         {	/* seems like a legitinate spin which could take advantage of transactional memory */
 		for (spins = maxspins; 0 < spins; spins--)
 		{
@@ -79,7 +80,7 @@ int4	add_inter(int val, sm_int_ptr_t addr, sm_global_latch_ptr_t latch)
 		{
 			/* On every 4th pass, we bide for awhile */
 			wcs_sleep(LOCK_SLEEP);
-			assert(0 == (LOCK_TRIES % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
+			assert(0 == (maxtries % 4)); /* assures there are 3 rel_quants prior to first wcs_sleep() */
 		}
 	}
 	--fast_lock_count;

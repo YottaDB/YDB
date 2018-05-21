@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -50,7 +53,7 @@ GBLREF	gd_region		*gv_cur_region;
 
 boolean_t ss_get_lock(gd_region *reg)
 {
-	int			retries, spins, maxspins;
+	int			retries, spins, maxspins, maxtries;
 	int4			max_sleep_mask;
 	sm_global_latch_ptr_t	latch;
 	sgmnt_addrs		*csa;
@@ -61,9 +64,10 @@ boolean_t ss_get_lock(gd_region *reg)
 	latch = &cnl->snapshot_crit_latch;
 	max_sleep_mask = -1;	/* initialized to -1 to defer memory reference until needed */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
-	/* Since LOCK_TRIES is approx 50 seconds, give us 4X that long since IO is involved */
+	maxtries = MAX_LOCK_TRIES(LOCK_TRIES_50sec);
+	/* Since maxtries is approx 50 seconds (on multi-cpu systems), give us 4X that long since IO is involved */
 	++fast_lock_count;			 /* Disable wcs_stale for duration */
-	for (retries = (LOCK_TRIES * 4) - 1; 0 < retries; retries--)
+	for (retries = (maxtries * 4) - 1; 0 < retries; retries--)
 	{	/* this should use a mutex rather than a spin lock */
 		for (spins = maxspins; 0 < spins; spins--)
 		{	/* We better not hold it if trying to get it */

@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -305,7 +308,7 @@ void shmpool_abandoned_blk_chk(gd_region *reg, boolean_t force)
 /* Lock the shared memory buffer pool header. If cannot get the lock, return FALSE, else TRUE. */
 boolean_t shmpool_lock_hdr(gd_region *reg)
 {
-	int			retries, spins, maxspins;
+	int			retries, spins, maxspins, maxtries;
 	sm_global_latch_ptr_t	latch;
 	shmpool_buff_hdr_ptr_t	sbufh_p;
 	sgmnt_addrs		*csa;
@@ -315,8 +318,9 @@ boolean_t shmpool_lock_hdr(gd_region *reg)
 	latch = &sbufh_p->shmpool_crit_latch;
 	++fast_lock_count;			/* Disable wcs_stale for duration */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
-	/* Since LOCK_TRIES is approx 50 seconds, give us 4X that long since IO is involved */
-	for (retries = (LOCK_TRIES * 4) - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
+	maxtries = MAX_LOCK_TRIES(LOCK_TRIES_50sec);
+	/* Since maxtries is approx 50 seconds (on multi-cpu systems), give us 4X that long since IO is involved */
+	for (retries = (maxtries * 4) - 1; 0 < retries; retries--)	/* - 1 so do rel_quant 3 times first */
 	{
 		for (spins = maxspins; 0 < spins; spins--)
 		{	/* We better not hold it if trying to get it */
