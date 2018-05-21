@@ -101,9 +101,10 @@ typedef enum
  * timeouts seen so far have been on a single region database. For multi-region databases, wait
  * for a max of one and a half minute per region. If ever we see timeouts with multi-region
  * databases, this value needs to be bumped as well.
+ * On ARM boxes, we have seen cases where the shutdown took a little more than 2 minutes for a single region.
+ * So set the maxtimeout of the 1-region case for ARM at 4 minutes.
  */
-
-#define	GTMSOURCE_MAX_SHUTDOWN_WAITLOOP(gdheader)	(MAX(120, (gdheader->n_regions) * 90))
+#define	GTMSOURCE_MAX_SHUTDOWN_WAITLOOP(gdheader)	(MAX(ARM_ONLY(240) NON_ARM_ONLY(120), (gdheader->n_regions) * 90))
 
 #define GTMSOURCE_SHUTDOWN_PAD_TIME		5 /* seconds */
 
