@@ -18,6 +18,8 @@
 
 #include "min_max.h"
 
+GBLREF int	num_additional_processors;	/* needed by a few macros below */
+
 /* Note: GT.M code *MUST*NOT* make use of the sleep() function because use of the sleep() function	(BYPASSOK - sleep())
  * causes problems with GT.M's timers on some platforms. Specifically, the sleep() function
  * causes the SIGARLM handler to be silently deleted on Solaris systems (through Solaris 9 at least).
@@ -53,7 +55,11 @@
 #define MAX_WTSTART_FINI_SLEEPS	(4 * SLEEP_ONE_MIN * MAXSLPTIME)/* After this many sleeps (each 1 msec in duration)
 								 * without progress, request cache recovery.
 								 */
-#define	PHASE2_COMMIT_WAIT	SLEEP_ONE_MIN
+/* On the ARMV6L (Raspberry Pi Zero) architecture where there is just one CPU, we have seen the below timeout
+ * of 1 minute (for phase2 commit wait) as not enough in in-house testing. So bump the timeout to 4 times the 1 minute
+ * in the hope that would be enough. Do this for all single-cpu systems.
+ */
+#define	PHASE2_COMMIT_WAIT	(num_additional_processors ? SLEEP_ONE_MIN : (SLEEP_ONE_MIN * 4))
 
 #define	SLEEP_INSTFREEZEWAIT	100		/* 100-msec wait between re-checks of instance freeze status */
 #define	SLEEP_IORETRYWAIT	500		/* 500-msec wait between retries of the same write operation */
