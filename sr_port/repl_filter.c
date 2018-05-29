@@ -803,7 +803,7 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 			do
 			{
 				r_len = read(repl_filter_srv_fd[READ_END], srv_read_end, buff_remaining);
-				if (0 < r_len)
+				if (0 <= r_len)
 					break;
 				save_errno = errno;
 				if ((ENOMEM != save_errno) && (EINTR != save_errno))
