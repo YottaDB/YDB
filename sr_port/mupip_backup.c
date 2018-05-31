@@ -89,6 +89,11 @@
 #include "anticipatory_freeze.h"
 
 #define PATH_DELIM		'/'
+/* Note: Use %08x for process_id in the format string below to ensure we have 8 hex digits always irrespective of the
+ * actual value of process_id. Makes the length deterministic instead of %x which would
+ * make the length dependent on the process_id and makes it harder for testing as well as the user.
+ */
+#define	TEMP_FILE_FMT_STRING	"%.*s/%.*s_%08x_XXXXXX"
 
 #define TMPDIR_ACCESS_MODE	(R_OK | W_OK | X_OK)
 
@@ -217,7 +222,7 @@ void mupip_backup_call_on_signal(void)
 void mupip_backup(void)
 {
 	bool			journal;
-	char			*tempfilename, *ptr;
+	char			*ptr;
 	uint4			status, ret, kip_count;
 	unsigned short		s_len, length;
 	int4			size, crit_counter, save_errno, rv, orig_buff_size;
@@ -232,8 +237,9 @@ void mupip_backup(void)
 	unsigned char		since_buff[50];
 	jnl_create_info		jnl_info;
 	file_control		*fc;
-	char			tempdir_trans_buffer[MAX_TRANS_NAME_LEN],
-				tempnam_prefix[MAX_FN_LEN], tempdir_full_buffer[MAX_FN_LEN + 1];
+	char			tempdir_trans_buffer[MAX_TRANS_NAME_LEN];
+	char			tempfilename[MAX_FN_LEN + 1], *tempfilename2;
+	char			tempdir_full_buffer[MAX_FN_LEN + 1];
 	char			*jnl_str_ptr, jnl_str[256], entry[256], prev_jnl_fn[JNL_NAME_SIZE];
 	int			index, jnl_fstat;
 	mstr			tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
@@ -273,6 +279,7 @@ void mupip_backup(void)
 	seq_num			jnl_seqno;
 	char			time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
 	struct perm_diag_data	pdd;
+	int			nbytes, nbytes2;
 	ZOS_ONLY(int		realfiletag;)
 
 	/* ==================================== STEP 1. Initialization ======================================= */
@@ -495,7 +502,7 @@ void mupip_backup(void)
 	halt_ptr = grlist;
 	size = ROUND_UP(SIZEOF_FILE_HDR_MAX, DISK_BLOCK_SIZE);
 	ESTABLISH(mu_freeze_ch);
-	tempfilename = tempdir_full.addr = tempdir_full_buffer;
+	tempdir_full.addr = tempdir_full_buffer;
 	orig_buff_size = SIZEOF(tempdir_full_buffer);
 	tempdir_full.len = orig_buff_size;
 	if (TRUE == online)
@@ -562,9 +569,6 @@ void mupip_backup(void)
 		rptr->backup_hdr = (sgmnt_data_ptr_t)malloc(size);
 		if (TRUE == online)
 		{	/* determine the directory name and prefix for the temp file */
-			memset(tempnam_prefix, 0, MAX_FN_LEN);
-			memcpy(tempnam_prefix, gv_cur_region->rname, gv_cur_region->rname_len);
-			SPRINTF(&tempnam_prefix[gv_cur_region->rname_len], "_%x", process_id);
 			if ((SS_NORMAL == trans_log_name_status)
 					&& (NULL != tempdir_trans.addr) && (0 != tempdir_trans.len))
 				*(tempdir_trans.addr + tempdir_trans.len) = 0;
@@ -587,11 +591,10 @@ void mupip_backup(void)
 					{
 						memcpy(tempdir_trans_buffer, rptr->backup_file.addr, tempdir_trans.len);
 						tempdir_trans_buffer[tempdir_trans.len] = '\0';
-					}
-					else
+					} else
 					{
 						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2,
-						  rptr->backup_file.len, rptr->backup_file.addr);
+									rptr->backup_file.len, rptr->backup_file.addr);
                                 		mubclnup(rptr, need_to_del_tempfile);
                                 		mupip_exit(ERR_FILENAMETOOLONG);
 					}
@@ -612,21 +615,32 @@ void mupip_backup(void)
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ustatus);
 			}
-			/*creating temp filename here , check if we have the required space*/
-			if (orig_buff_size <= (tempdir_full.len + strlen(tempnam_prefix) + SIZEOF(uint4)))
-			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, tempdir_trans.len,
-						tempdir_trans.addr);
+			/* Creating temp filename here. Check if we have the required space */
+			nbytes = SNPRINTF(tempfilename, SIZEOF(tempfilename), TEMP_FILE_FMT_STRING,
+				tempdir_full.len, tempdir_full.addr, gv_cur_region->rname_len, gv_cur_region->rname, process_id);
+			if ((0 > nbytes) || (nbytes >= SIZEOF(tempfilename)))
+			{	/* Error return from SNPRINTF */
+				if (0 > nbytes)
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+							ERR_SYSCALL, 5, RTS_ERROR_LITERAL("SNPRINTF)"), CALLFROM, errno);
+				else
+				{	/* Buffer was not enough. Print the too-long file name but allocate memory first */
+					tempfilename2 = malloc(nbytes + 1);	/* + 1 is for terminating null */
+					nbytes2 = SNPRINTF(tempfilename2, nbytes + 1, TEMP_FILE_FMT_STRING,
+								tempdir_full.len, tempdir_full.addr,
+								gv_cur_region->rname_len, gv_cur_region->rname, process_id);
+					assert((0 < nbytes2) && (nbytes2 < (nbytes + 1)));
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, nbytes2, tempfilename2);
+					free(tempfilename2);
+				}
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ERR_FILENAMETOOLONG);
 			}
-			SPRINTF(tempfilename + tempdir_full.len,"/%s_XXXXXX",tempnam_prefix);
 			MKSTEMP(tempfilename, rptr->backup_fd);
 			if (FD_INVALID == rptr->backup_fd)
 			{
 				status = errno;
-				if ((NULL != tempdir_full.addr) &&
-					(0 != ACCESS(tempdir_full.addr, TMPDIR_ACCESS_MODE)))
+				if ((NULL != tempdir_full.addr) && (0 != ACCESS(tempdir_full.addr, TMPDIR_ACCESS_MODE)))
 				{
 					status = errno;
 					util_out_print("!/Do not have full access to directory for temporary files: !AD", TRUE,
@@ -664,14 +678,15 @@ void mupip_backup(void)
 			}
 			/* Now that the temporary file has been opened successfully, close the fd returned by mkstemp */
 			F_CLOSE(tmpfd, fclose_res);	/* resets "tmpfd" to FD_INVALID */
-			tempdir_full.len = STRLEN(tempdir_full.addr); /* update the length */
+			tempdir_full.len = STRLEN(tempfilename); /* update the length */
 #			ifdef __MVS__
 			if (-1 == gtm_zos_tag_to_policy(rptr->backup_fd, TAG_BINARY, &realfiletag))
 				TAG_POLICY_GTM_PUTMSG(tempfilename, realfiletag, TAG_BINARY, errno);
 #			endif
 			if (debug_mupip)
-				util_out_print("!/MUPIP INFO:   Temp file name: !AD", TRUE,tempdir_full.len, tempdir_full.addr);
-			memcpy(&rptr->backup_tempfile[0], tempdir_full.addr, tempdir_full.len);
+				util_out_print("!/MUPIP INFO:   Temp file name: !AD", TRUE, tempdir_full.len, tempfilename);
+			assert(SIZEOF(rptr->backup_tempfile) == SIZEOF(tempfilename));
+			memcpy(&rptr->backup_tempfile[0], tempfilename, tempdir_full.len);
 			rptr->backup_tempfile[tempdir_full.len] = 0;
 			/* give temporary files the group and permissions as other shared resources - like journal files */
 			FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
