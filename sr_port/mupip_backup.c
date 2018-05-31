@@ -610,11 +610,10 @@ void mupip_backup(void)
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ustatus);
 			}
-			/* Creating temp filename here , check if we have the required space*/
-			assert('/' == tempdir_full.addr[tempdir_full.len - 1]);
-			nbytes = SNPRINTF(tempfilename, SIZEOF(tempfilename), "%.*s%.*s_%x_XXXXXX",
+			/* Creating temp filename here. Check if we have the required space. */
+			nbytes = SNPRINTF(tempfilename, SIZEOF(tempfilename), "%.*s/%.*s_%4x_XXXXXX",
 				tempdir_full.len, tempdir_full.addr, gv_cur_region->rname_len, gv_cur_region->rname, process_id);
-			if ((0 > nbytes) || (nbytes >= orig_buff_size))
+			if ((0 > nbytes) || (nbytes >= SIZEOF(tempfilename)))
 			{	/* Error return from SNPRINTF */
 				if (0 > nbytes)
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
@@ -636,8 +635,7 @@ void mupip_backup(void)
 			if (FD_INVALID == rptr->backup_fd)
 			{
 				status = errno;
-				if ((NULL != tempdir_full.addr) &&
-					(0 != ACCESS(tempdir_full.addr, TMPDIR_ACCESS_MODE)))
+				if ((NULL != tempdir_full.addr) && (0 != ACCESS(tempdir_full.addr, TMPDIR_ACCESS_MODE)))
 				{
 					status = errno;
 					util_out_print("!/Do not have full access to directory for temporary files: !AD", TRUE,
@@ -675,14 +673,15 @@ void mupip_backup(void)
 			}
 			/* Now that the temporary file has been opened successfully, close the fd returned by mkstemp */
 			F_CLOSE(tmpfd, fclose_res);	/* resets "tmpfd" to FD_INVALID */
-			tempdir_full.len = STRLEN(tempdir_full.addr); /* update the length */
+			tempdir_full.len = STRLEN(tempfilename); /* update the length */
 #			ifdef __MVS__
 			if (-1 == gtm_zos_tag_to_policy(rptr->backup_fd, TAG_BINARY, &realfiletag))
 				TAG_POLICY_GTM_PUTMSG(tempfilename, realfiletag, TAG_BINARY, errno);
 #			endif
 			if (debug_mupip)
-				util_out_print("!/MUPIP INFO:   Temp file name: !AD", TRUE,tempdir_full.len, tempdir_full.addr);
-			memcpy(&rptr->backup_tempfile[0], tempdir_full.addr, tempdir_full.len);
+				util_out_print("!/MUPIP INFO:   Temp file name: !AD", TRUE, tempdir_full.len, tempfilename);
+			assert(SIZEOF(rptr->backup_tempfile) == SIZEOF(tempfilename));
+			memcpy(&rptr->backup_tempfile[0], tempfilename, tempdir_full.len);
 			rptr->backup_tempfile[tempdir_full.len] = 0;
 			/* give temporary files the group and permissions as other shared resources - like journal files */
 			FSTAT_FILE(((unix_db_info *)(gv_cur_region->dyn.addr->file_cntl->file_info))->fd, &stat_buf, fstat_res);
