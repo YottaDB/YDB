@@ -217,7 +217,7 @@ void mupip_backup_call_on_signal(void)
 void mupip_backup(void)
 {
 	bool			journal;
-	char			*tempfilename, *ptr;
+	char			*ptr;
 	uint4			status, ret, kip_count;
 	unsigned short		s_len, length;
 	int4			size, crit_counter, save_errno, rv, orig_buff_size;
@@ -232,8 +232,9 @@ void mupip_backup(void)
 	unsigned char		since_buff[50];
 	jnl_create_info		jnl_info;
 	file_control		*fc;
-	char			tempdir_trans_buffer[MAX_TRANS_NAME_LEN],
-				tempnam_prefix[MAX_FN_LEN], tempdir_full_buffer[MAX_FN_LEN + 1];
+	char			tempdir_trans_buffer[MAX_TRANS_NAME_LEN];
+	char			tempfilename[MAX_FN_LEN + 1], *tempfilename2;
+	char			tempdir_full_buffer[MAX_FN_LEN + 1];
 	char			*jnl_str_ptr, jnl_str[256], entry[256], prev_jnl_fn[JNL_NAME_SIZE];
 	int			index, jnl_fstat;
 	mstr			tempdir_trans, *file, *rfile, *replinstfile, tempdir_full, filestr;
@@ -273,6 +274,7 @@ void mupip_backup(void)
 	seq_num			jnl_seqno;
 	char			time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
 	struct perm_diag_data	pdd;
+	int			nbytes, nbytes2;
 	ZOS_ONLY(int		realfiletag;)
 
 	/* ==================================== STEP 1. Initialization ======================================= */
@@ -495,7 +497,7 @@ void mupip_backup(void)
 	halt_ptr = grlist;
 	size = ROUND_UP(SIZEOF_FILE_HDR_MAX, DISK_BLOCK_SIZE);
 	ESTABLISH(mu_freeze_ch);
-	tempfilename = tempdir_full.addr = tempdir_full_buffer;
+	tempdir_full.addr = tempdir_full_buffer;
 	orig_buff_size = SIZEOF(tempdir_full_buffer);
 	tempdir_full.len = orig_buff_size;
 	if (TRUE == online)
@@ -562,9 +564,6 @@ void mupip_backup(void)
 		rptr->backup_hdr = (sgmnt_data_ptr_t)malloc(size);
 		if (TRUE == online)
 		{	/* determine the directory name and prefix for the temp file */
-			memset(tempnam_prefix, 0, MAX_FN_LEN);
-			memcpy(tempnam_prefix, gv_cur_region->rname, gv_cur_region->rname_len);
-			SPRINTF(&tempnam_prefix[gv_cur_region->rname_len], "_%x", process_id);
 			if ((SS_NORMAL == trans_log_name_status)
 					&& (NULL != tempdir_trans.addr) && (0 != tempdir_trans.len))
 				*(tempdir_trans.addr + tempdir_trans.len) = 0;
@@ -587,11 +586,10 @@ void mupip_backup(void)
 					{
 						memcpy(tempdir_trans_buffer, rptr->backup_file.addr, tempdir_trans.len);
 						tempdir_trans_buffer[tempdir_trans.len] = '\0';
-					}
-					else
+					} else
 					{
 						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2,
-						  rptr->backup_file.len, rptr->backup_file.addr);
+									rptr->backup_file.len, rptr->backup_file.addr);
                                 		mubclnup(rptr, need_to_del_tempfile);
                                 		mupip_exit(ERR_FILENAMETOOLONG);
 					}
@@ -612,15 +610,28 @@ void mupip_backup(void)
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ustatus);
 			}
-			/*creating temp filename here , check if we have the required space*/
-			if (orig_buff_size <= (tempdir_full.len + strlen(tempnam_prefix) + SIZEOF(uint4)))
-			{
-				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, tempdir_trans.len,
-						tempdir_trans.addr);
+			/* Creating temp filename here , check if we have the required space*/
+			assert('/' == tempdir_full.addr[tempdir_full.len - 1]);
+			nbytes = SNPRINTF(tempfilename, SIZEOF(tempfilename), "%.*s%.*s_%x_XXXXXX",
+				tempdir_full.len, tempdir_full.addr, gv_cur_region->rname_len, gv_cur_region->rname, process_id);
+			if ((0 > nbytes) || (nbytes >= orig_buff_size))
+			{	/* Error return from SNPRINTF */
+				if (0 > nbytes)
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8)
+							ERR_SYSCALL, 5, RTS_ERROR_LITERAL("SNPRINTF)"), CALLFROM, errno);
+				else
+				{	/* Buffer was not enough. Print the too-long file name but allocate memory first */
+					tempfilename2 = malloc(nbytes + 1);	/* + 1 is for terminating null */
+					nbytes2 = SNPRINTF(tempfilename2, nbytes + 1, "%.*s%.*s_%x_XXXXXX",
+								tempdir_full.len, tempdir_full.addr,
+								gv_cur_region->rname_len, gv_cur_region->rname, process_id);
+					assert((0 < nbytes2) && (nbytes2 < (nbytes + 1)));
+					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, nbytes2, tempfilename2);
+					free(tempfilename2);
+				}
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ERR_FILENAMETOOLONG);
 			}
-			SPRINTF(tempfilename + tempdir_full.len,"/%s_XXXXXX",tempnam_prefix);
 			MKSTEMP(tempfilename, rptr->backup_fd);
 			if (FD_INVALID == rptr->backup_fd)
 			{
