@@ -207,6 +207,14 @@
 #  define SHM_READ_MEMORY_BARRIER	SHM_WRITE_MEMORY_BARRIER
 #  define MM_WRITE_MEMORY_BARRIER	SHM_WRITE_MEMORY_BARRIER
 
+#elif defined(__aarch64__)
+
+  /* ############################### ARM architecture ################################## */
+
+#  define SHM_WRITE_MEMORY_BARRIER	__asm__ volatile ("dmb ish" ::: "memory")
+#  define SHM_READ_MEMORY_BARRIER	SHM_WRITE_MEMORY_BARRIER
+#  define MM_WRITE_MEMORY_BARRIER	SHM_WRITE_MEMORY_BARRIER
+
 #else
   /* ############################### SPARC, I386, S390 architecture ################################## */
 
