@@ -34,6 +34,8 @@
 #  include "ia64.h"
 #elif defined(__armv6l__) || defined(__armv7l__)
 #  include "arm.h"
+#elif defined(__aarch64__)
+#  include "aarch64.h"
 #endif
 
 GBLREF	int	process_exiting;
@@ -266,6 +268,26 @@ int dollar_quit(void)
 			}
 		}
 		if (0xE597 != *(ptrs.instr_type + 1))
+		{
+			xfer_index = -1;
+		}
+	}
+#	elif defined(__aarch64__)			/* xxxxxxx this is armv7 with minimal changes */
+	{
+#		define	MAX_SKIP	10
+		int4	skip;
+
+		/* There can be between 1 and 5 instructions to skip past */
+		for (ptrs.instr = sf->mpc,skip = 0; skip < MAX_SKIP; ptrs.instr += 4,skip++)
+		{
+			if (0xF940 == *(ptrs.instr_type + 1))		/* Check upper half of instruction */
+			{
+				/* ldr of return address from xfer table */
+				xfer_index = (*ptrs.xfer_offset_16 & AARCH64_MASK_IMM12) / SIZEOF(void *);
+				break;
+			}
+		}
+		if (0xF940 != *(ptrs.instr_type + 1))
 		{
 			xfer_index = -1;
 		}
