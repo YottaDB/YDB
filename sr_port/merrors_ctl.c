@@ -394,7 +394,7 @@ LITDEF	err_msg merrors[] = {
 	{ "CCPJNLOPNERR", "Error opening journal file.  Database not opened.", 0 },
 	{ "LCKSGONE", "Locks selected for deletion removed", 0 },
 	{ "UNUSEDMSG560", "ZLKIDBADARG nixed in r1.20 because it is a VMS only error", 0 },
-	{ "DBFILOPERR", "Error doing database I/O to region !AD", 2 },
+	{ "DBFILOPERR", "Error doing database I/O to database file !AD", 2 },
 	{ "CCERDERR", "Error reading from database file !AD", 2 },
 	{ "CCEDBCL", "Database file !AD is clustered", 2 },
 	{ "CCEDBNTCL", "Database file !AD is not clustered", 2 },
