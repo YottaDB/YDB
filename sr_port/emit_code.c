@@ -440,16 +440,16 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					 * which will be in EAX for x86_64 and r0 for arm.
 					 */
 					X86_64_ONLY(GEN_CMP_EAX_IMM32(0));
-					ARM32_ONLY(GEN_CMP_REG_IMM(GTM_REG_R0, 0));
+					ARM_ONLY(GEN_CMP_REG_IMM(reg, 0));
 					if (VXI_BLBC == sav_in)
 					{
-						X86_64_OR_ARM32_ONLY(emit_jmp(GENERIC_OPCODE_BEQ, &inst, 0));
-						NON_X86_64_OR_ARM32_ONLY(emit_jmp(GENERIC_OPCODE_BLBC, &inst, reg));
+						X86_64_OR_ARM_ONLY(emit_jmp(GENERIC_OPCODE_BEQ, &inst, 0));
+						NON_X86_64_OR_ARM_ONLY(emit_jmp(GENERIC_OPCODE_BLBC, &inst, reg));
 					} else
 					{
 						assert(VXI_BLBS == sav_in);
-						X86_64_OR_ARM32_ONLY(emit_jmp(GENERIC_OPCODE_BNE, &inst, 0));
-						NON_X86_64_OR_ARM32_ONLY(emit_jmp(GENERIC_OPCODE_BLBS, &inst, reg));
+						X86_64_OR_ARM_ONLY(emit_jmp(GENERIC_OPCODE_BNE, &inst, 0));
+						NON_X86_64_OR_ARM_ONLY(emit_jmp(GENERIC_OPCODE_BLBS, &inst, reg));
 					}
 					break;
 				case VXI_BRB:
@@ -634,7 +634,7 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					assert(VXT_VAL == *inst);
 					inst++;
 					emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_LDA, MOVC3_TRG_REG);
-#					if defined(__MVS__) || defined(Linux390) || defined(__armv6l__) || defined(__armv7l__)
+#					if defined(__MVS__) || defined(Linux390) || defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
 					/* The MVC instruction on zSeries facilitates memory copy(mval in this case)
 					 * in a single instruction instead of multiple 8/4 byte copies.
 					 * On the ARM, the macro GEN_MVAL_COPY takes care of doing multiple 4-byte copies.
@@ -1196,19 +1196,23 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 						if (GENERIC_OPCODE_LDA == generic_inst)
 						{
 							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg));
-							RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg));
+							AARCH64_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg));
+							NON_AARCH64_RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg));
 							if (TVAR_REF == opr->oprclass)
 							{
 								EMIT_BASE_OFFSET_LOAD(trg_reg, offsetof(ht_ent_mname, value));
 								NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg));
-								RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg));
+								AARCH64_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg));
+								NON_AARCH64_RISC_ONLY(code_buf[code_idx++]
+											|= IGEN_LOAD_NATIVE_REG(trg_reg));
 							}
 							inst_emitted = TRUE;
 						} else
 						{
 							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP));
-							RISC_ONLY(code_buf[code_idx++]
-									|= IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP));
+							AARCH64_RISC_ONLY(IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP));
+							NON_AARCH64_RISC_ONLY(code_buf[code_idx++]
+										|= IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP));
 							EMIT_BASE_OFFSET_EITHER(GTM_REG_CODEGEN_TEMP, 0, generic_inst);
 						}
 					}
@@ -1244,7 +1248,8 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 			if (!inst_emitted)
 			{
 				NON_RISC_ONLY(IGEN_GENERIC_REG(generic_inst, trg_reg));
-				RISC_ONLY(code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg));
+				AARCH64_RISC_ONLY(IGEN_GENERIC_REG(generic_inst, trg_reg));
+				NON_AARCH64_RISC_ONLY(code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg));
 			}
 			break;
 #		ifdef DEBUG
@@ -1412,19 +1417,23 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					{
 						if (GENERIC_OPCODE_LDA == generic_inst)
 						{
-							RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg));
+							NON_AARCH64_RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg));
+							AARCH64_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg));
 							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg));
 							if (TVAR_REF == opr->oprclass)
 							{
 								EMIT_BASE_OFFSET_LOAD(trg_reg, offsetof(ht_ent_mname, value));
 								NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg));
-								RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg));
+								AARCH64_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg));
+								NON_AARCH64_RISC_ONLY(code_buf[code_idx++]
+											|= IGEN_LOAD_NATIVE_REG(trg_reg));
 							}
 							inst_emitted = TRUE;
 						} else
 						{
-							RISC_ONLY(code_buf[code_idx++]
-									|= IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP));
+							NON_AARCH64_RISC_ONLY(code_buf[code_idx++]
+										|= IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP));
+							AARCH64_RISC_ONLY(IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP));
 							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP));
 							EMIT_BASE_OFFSET_EITHER(GTM_REG_CODEGEN_TEMP, 0, generic_inst);
 						}
@@ -1445,7 +1454,8 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 			}
 			if (!inst_emitted)
 			{
-				RISC_ONLY(code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg));
+				NON_AARCH64_RISC_ONLY(code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg));
+				AARCH64_RISC_ONLY(IGEN_GENERIC_REG(generic_inst, trg_reg));
 				NON_RISC_ONLY(IGEN_GENERIC_REG(generic_inst, trg_reg));
 			}
 			*obpt++ = ',';
@@ -1557,19 +1567,23 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 					{
 						if (GENERIC_OPCODE_LDA == generic_inst)
 						{
-							RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg));
+							NON_AARCH64_RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg));
+							AARCH64_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg));
 							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg));
 							if (TVAR_REF == opr->oprclass)
 							{
 								EMIT_BASE_OFFSET_LOAD(trg_reg, offsetof(ht_ent_mname, value));
 								NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg));
-								RISC_ONLY(code_buf[code_idx++] |= IGEN_LOAD_NATIVE_REG(trg_reg));
+								AARCH64_RISC_ONLY(IGEN_LOAD_NATIVE_REG(trg_reg));
+								NON_AARCH64_RISC_ONLY(code_buf[code_idx++]
+											|= IGEN_LOAD_NATIVE_REG(trg_reg));
 							}
 							inst_emitted = TRUE;
 						} else
 						{
-							RISC_ONLY(code_buf[code_idx++]
-									|= IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP));
+							NON_AARCH64_RISC_ONLY(code_buf[code_idx++]
+										|= IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP));
+							AARCH64_RISC_ONLY(IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP));
 							NON_RISC_ONLY(IGEN_LOAD_NATIVE_REG(GTM_REG_CODEGEN_TEMP));
 							EMIT_BASE_OFFSET_EITHER(GTM_REG_CODEGEN_TEMP, 0, generic_inst);
 						}
@@ -1591,7 +1605,8 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 			/* If we haven't emitted a finished instruction already, finish it now */
 			if (!inst_emitted)
 			{
-				RISC_ONLY(code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg));
+				NON_AARCH64_RISC_ONLY(code_buf[code_idx++] |= IGEN_GENERIC_REG(generic_inst, trg_reg));
+				AARCH64_RISC_ONLY(IGEN_GENERIC_REG(generic_inst, trg_reg));
 				NON_RISC_ONLY(IGEN_GENERIC_REG(generic_inst, trg_reg));
 			}
 			break;
@@ -1716,7 +1731,7 @@ void emit_push(int reg)
 		case CGP_ADDR_OPT:
 			if (MACHINE_REG_ARGS <= vax_pushes_seen)
 			{
-#				if defined(__armv6l__) || defined(__armv7l__)
+#				if defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
 				assert(reg == GTM_REG_ACCUM);
 				stack_offset = STACK_ARG_OFFSET((vax_number_of_arguments - MACHINE_REG_ARGS - 1));
 				GEN_STORE_ARG(reg, stack_offset);		/* Store arg on stack */
