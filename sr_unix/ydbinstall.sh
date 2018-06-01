@@ -331,6 +331,8 @@ case ${gtm_hostos}_${gtm_arch} in
         ydb_flavor="armv6l" ;;
     linux_armv7l)
         ydb_flavor="armv7l" ;;
+    linux_aarch64)
+        ydb_flavor="aarch64" ;;
     *) echo Architecture `uname -o` on `uname -m` not supported by this script ; err_exit ;;
 esac
 
