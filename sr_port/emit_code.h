@@ -55,6 +55,9 @@ int	gtm_reg(int vax_reg);
 #elif defined(__armv7l__)
 #  define CODE_TYPE uint4
 #  define NUM_BUFFERRED_INSTRUCTIONS 25
+#elif defined(__aarch64__)
+#  define CODE_TYPE uint4
+#  define NUM_BUFFERRED_INSTRUCTIONS 25
 #else
 #  define CODE_TYPE uint4
 #  define NUM_BUFFERRED_INSTRUCTIONS 25
@@ -63,8 +66,8 @@ int	gtm_reg(int vax_reg);
 #define ASM_OUT_BUFF 	256
 #define PUSH_LIST_SIZE	500
 
-#if defined(__vms) || defined(_AIX) || defined(__sparc) || defined(__hpux) || (defined(__linux__) && defined(__ia64))	\
-	|| defined(__MVS__)
+#if defined(__vms) || defined(_AIX) || defined(__sparc) || defined(__hpux)						\
+	|| (defined(__linux__) && defined(__ia64) || defined(__aarch64__)) || defined(__MVS__)
 #  define TRUTH_IN_REG
 #elif defined(__osf__) || (defined(__linux__) && defined(__x86_64__)) || defined(Linux390)				\
 	|| (defined(__CYGWIN__) && defined(__x86_64__))									\
