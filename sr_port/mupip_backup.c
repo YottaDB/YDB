@@ -89,6 +89,11 @@
 #include "anticipatory_freeze.h"
 
 #define PATH_DELIM		'/'
+/* Note: Use %08x for process_id in the format string below to ensure we have 8 hex digits always irrespective of the
+ * actual value of process_id. Makes the length deterministic instead of %x which would
+ * make the length dependent on the process_id and makes it harder for testing as well as the user.
+ */
+#define	TEMP_FILE_FMT_STRING	"%.*s/%.*s_%08x_XXXXXX"
 
 #define TMPDIR_ACCESS_MODE	(R_OK | W_OK | X_OK)
 
@@ -610,12 +615,8 @@ void mupip_backup(void)
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ustatus);
 			}
-			/* Creating temp filename here. Check if we have the required space.
-			 * Use %04x (instead of %x) for process_id to ensure we have 4 bytes always even if process_id
-			 * is a small number (< 2**24 etc.) and is 0-filled on the left if needed. Makes the length
-			 * deterministic instead of being dependent on the process_id.
-			 */
-			nbytes = SNPRINTF(tempfilename, SIZEOF(tempfilename), "%.*s/%.*s_%04x_XXXXXX",
+			/* Creating temp filename here. Check if we have the required space */
+			nbytes = SNPRINTF(tempfilename, SIZEOF(tempfilename), TEMP_FILE_FMT_STRING,
 				tempdir_full.len, tempdir_full.addr, gv_cur_region->rname_len, gv_cur_region->rname, process_id);
 			if ((0 > nbytes) || (nbytes >= SIZEOF(tempfilename)))
 			{	/* Error return from SNPRINTF */
@@ -625,7 +626,7 @@ void mupip_backup(void)
 				else
 				{	/* Buffer was not enough. Print the too-long file name but allocate memory first */
 					tempfilename2 = malloc(nbytes + 1);	/* + 1 is for terminating null */
-					nbytes2 = SNPRINTF(tempfilename2, nbytes + 1, "%.*s%.*s_%x_XXXXXX",
+					nbytes2 = SNPRINTF(tempfilename2, nbytes + 1, TEMP_FILE_FMT_STRING,
 								tempdir_full.len, tempdir_full.addr,
 								gv_cur_region->rname_len, gv_cur_region->rname, process_id);
 					assert((0 < nbytes2) && (nbytes2 < (nbytes + 1)));
