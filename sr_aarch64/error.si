@@ -1,0 +1,60 @@
+#################################################################
+#								#
+# Copyright 2001, 2014 Fidelity Information Services, Inc	#
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+#-----------------------------------------------
+# Mumps error condition handler macros
+#-----------------------------------------------
+chnd_size	 =	344	/* sizeof(condition_handler) */
+chnd_save_active =	0
+chnd_ch_active	 =	8
+chnd_ch		 =	16
+chnd_jmp	 =	24
+
+	.data
+	.extern	ctxt
+	.extern	active_ch
+
+	.text
+
+	.extern	__sigsetjmp
+	.extern gtm_asm_establish
+
+.macro ESTABLISH
+        bl	gtm_asm_establish		/* Bulk of ESTABLISH macro */
+	ldr	x0, =ctxt
+	ldr	x0, [x0]
+	ldr	x2, =mdb_condition_handler
+	str	x2, [x0, #chnd_ch]		/* ctxt->ch = x */
+	mov	x1, xzr				/* setjmp(ctxt->jmp) */
+	add	x0, x0, #chnd_jmp
+	bl 	__sigsetjmp
+	adds	w0, w0, #1
+	b.ne	1f
+	REVERT
+	b	return
+1:
+.endm
+
+.macro REVERT
+	ldr	x3, =ctxt			/* active_ch = ctxt->save_active_c */
+	ldr	x0, [x3]
+	ldr	x2, [x0, #chnd_save_active]
+	ldr	x1, =active_ch
+	ldr	x1, [x1]
+	str	x2, [x1]
+	sub	x0, x0, #chnd_size		/* ctxt-- */
+	str	x0, [x3]
+.endm

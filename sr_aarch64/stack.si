@@ -1,0 +1,76 @@
+#################################################################
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+
+/*
+ * If sp is not 16 byte aligned (probably because of arguments pushed on the stack), adjust it
+ */
+.macro	SET_STACK_ALIGNMENT
+	tst	sp, #0xf
+	beq	1f
+	sub	sp, sp, #8
+1:
+.endm
+
+
+/*
+ * If pushing an even number of args on the stack (number is in "reg") plus the count, there will be an odd number
+ * in total, so the stack pointer will need aligning. sp is adjusted before the args are pushed, so the stack
+ * is only padded, no shifting of contents is necessary.
+ */
+.macro ADJ_STACK_ALIGN_EVEN_ARGS reg
+	tst	\reg, #1				/* check if an even number of arguments on the stack */
+	bne	1f
+	sub	sp, sp, #8				/* if even number, we need to adjust sp so stack will be 16 byte aligned */
+1:
+.endm
+
+/*
+ * If pushing an odd number of args on the stack (number is in "reg"), the stack pointer will need aligning.
+ * sp is adjusted before the args are pushed, so the stack is only padded, no shifting of contents is necessary.
+ */
+.macro ADJ_STACK_ALIGN_ODD_ARGS reg
+	tst	\reg, #1				/* check if an odd number of arguments on the stack */
+	beq	1f
+	sub	sp, sp, #8				/* if an odd number, we need to adjust sp so stack will be 16 byte aligned */
+1:
+.endm
+
+/*
+ * If one arg has been pushed on the stack, simply copy it to one word lower, and adjust sp
+ */
+.macro SHIFT_STACK_ONE_ARG_ALIGN
+       ldr	x12, [sp]				/* Get top of stack entry */
+       str	x12, [sp, #-8]!				/* Store entry down one word and update sp */
+.endm
+
+
+/*
+ * Args may have already been pushed onto the stack. First, check stack alignment - if OK, done.
+ * If alignment is off, shift args down one word to get alignment back.
+ */ 
+.macro SHIFT_STACK_ALIGN_ARGS
+	tst	sp, #0xf				/* See if stack is 16 byte aligned */
+	beq	2f  					/* If stack is aligned, done */
+	mov	x14, sp					/* where to copy from */
+	sub	sp, sp, #8
+	mov	x15, sp					/* where to copy to */
+1:
+	ldr	x13, [x14], #8
+	str	x13, [x15], #8
+	cmp	x14, x29				/* copy until the last stack argument (at fp - 4) */
+	b.lt	1b
+	ldr	x19, =frame_pointer			/* put r5 back as frame pointer value */
+2:
+.endm

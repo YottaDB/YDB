@@ -1,0 +1,267 @@
+#################################################################
+#								#
+# Copyright 2001, 2012 Fidelity Information Services, Inc	#
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+# -------------------------------------------
+# mval_def.si
+#
+# This is an include file for aarch64 assembler routines containing
+# the macros for mval-related assembly routines.
+# -------------------------------------------
+
+mval_v_nm		=	0
+mval_v_int		=	1
+mval_v_str		=	2
+mval_v_num_approx	=	3
+mval_v_canonical	=	4
+mval_v_sym		=	5
+mval_v_sublit		=	6
+mval_v_retarg		=	7
+mval_v_utflen		=	8
+mval_v_aliascont	=	9
+
+mval_m_nm		=	0x001
+mval_m_int_without_nm	=	0x002
+mval_m_int		=	0x003
+mval_m_str		=	0x004
+mval_m_num_approx	=	0x008
+mval_m_canonical	=	0x010
+mval_m_sym		=	0x020
+mval_m_sublit		=	0x040
+mval_m_retarg		=	0x080
+mval_m_utflen		=	0x100
+mval_m_aliascont	=	0x200
+
+mval_byte_len		=	32				/* Length of mval in bytes */
+mval_qword_len		=	((mval_byte_len + 7) / 8)	/* Length of mval in quadwords (8 byte words) */
+
+#
+# Offsets of type, exp, strlen, stradd, num in mval structure
+#
+mval_w_mvtype		=	0
+mval_b_exp		=	2
+mval_l_strlen		=	20
+mval_a_straddr		=	24
+
+#
+# Address offset of number in mval
+#
+mvalnm_offs		=	8
+mval_l_m0		=	8
+mval_l_m1		=	12
+
+mval_esign_mask		=	0x080
+
+MV_BIAS			=	1000		/* 10**3 */
+MANT_LO			=	100000000	/* 10**8 */
+MANT_HI			=	1000000000	/* 10**9 */
+INT_HI			=	1000000		/* 10**6 */
+
+#
+# Stringpool structure offsets
+#
+base			=	0
+free			=	8
+top			=	16
+
+#
+# mvals passed to these macros must be registers
+#
+
+# ---------------------------------------
+#       mv_force_defined(reg)
+# ---------------------------------------
+.macro  mv_force_defined reg
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	mov	w15, #mval_m_str
+	add	w15, w15, #mval_m_nm
+	tst	w14, w15
+	/* xxxxxxx ands	w14, w14, w15 */
+	b.ne	1f
+	mov	x0, \reg
+	bl	underr
+	mov	\reg, x0
+1:
+.endm
+
+# ---------------------------------------
+#       mv_force_defined_strict(reg)
+# ---------------------------------------
+.macro  mv_force_defined_strict reg
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	mov	w15, #mval_m_str
+	add	w15, w15, #mval_m_nm
+	/* xxxxxxx ands	w14, w14, w15 */
+	tst	w14, w15
+	b.ne	1f
+	mov	x0, \reg
+	bl	underr_strict
+1:
+
+.endm
+
+# ---------------------------------------
+#	mv_force_str(reg)
+# ---------------------------------------
+.macro	mv_force_str	reg
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	/* xxxxxxx ands	w15, w14, #mval_m_str */
+	tst	w14, #mval_m_str
+	b.ne	1f
+	mov	x0, \reg
+	bl	n2s
+1:
+.endm
+
+# ---------------------------------------
+#	mv_force_num(reg)
+# ---------------------------------------
+.macro	mv_force_num	reg
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	/* xxxxxxx ands	w15, w14, #mval_m_nm */
+	tst	w14, #mval_m_nm
+	b.ne	1f
+	mov	x0, \reg
+	bl	s2n
+1:
+.endm
+
+# ---------------------------------------
+#	mv_force_str_if_num_approx(reg)
+# ---------------------------------------
+.macro	mv_force_str_if_num_approx	reg
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	/* xxxxxxx ands	w15, w14, #mval_m_num_approx */
+	tst	w14, #mval_m_num_approx
+	b.eq	1f
+	mov	x0, \reg
+	bl	n2s
+1:
+.endm
+
+# ---------------------------------------
+#	mv_i2mval(int, reg)
+# ---------------------------------------
+.macro	mv_i2mval	int, reg
+	mov	w13, #mval_m_int
+	strh	w13, [\reg, #mval_w_mvtype]
+	ldr	w15, \int
+	mul	w15, w15, #MV_BIAS
+	str	w15, [\reg, #mval_l_m1]
+.endm
+
+# ---------------------------------------
+#	mv_if_string(reg, label)
+# ---------------------------------------
+.macro	mv_if_string	reg, label
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	/* xxxxxxx ands	w15, w14, #mval_m_str */
+	tst	w14, #mval_m_str
+	b.ne	\label
+.endm
+
+# ---------------------------------------
+#	mv_if_number(reg, label)
+# ---------------------------------------
+.macro	mv_if_number	reg, label
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	/* xxxxxxx ands	w15, w14, #mval_m_nm */
+	tst	w14, #mval_m_nm
+	b.ne	\label
+.endm
+
+# ---------------------------------------
+#	mv_if_int(reg, label)
+# ---------------------------------------
+.macro	mv_if_int	reg, label
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	/* xxxxxxx ands	w15, w14, #mval_m_int_without_nm */
+	tst	w14, #mval_m_int_without_nm
+	b.ne	\label
+.endm
+
+# ---------------------------------------
+#	mv_if_notstring(reg, label)
+# ---------------------------------------
+.macro	mv_if_notstring	reg, label
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	/* xxxxxxx ands	w15, w14, #mval_m_str */
+	tst	w14, #mval_m_str
+	b.eq	\label
+.endm
+
+# ---------------------------------------
+#	mv_if_notnumber(reg, label)
+# ---------------------------------------
+.macro	mv_if_notnumber	reg, label
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	/* xxxxxxx ands	w15, w14, #mval_m_nm */
+	tst	w14, #mval_m_nm
+	b.eq	\label
+.endm
+
+# ---------------------------------------
+#	mv_if_notint(reg, label)
+# ---------------------------------------
+.macro	mv_if_notint	reg, label
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	/* xxxxxxx ands	w15, w14, #mval_m_int_without_nm */
+	tst	w14, #mval_m_int_without_nm
+	b.eq	\label
+.endm
+
+# ---------------------------------------
+#	mv_if_defined(reg, label)
+# ---------------------------------------
+.macro	mv_if_defined	reg, label
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	mov	w15, #mval_m_str
+	add	w15, w15, #mval_m_nm
+	/* xxxxxxx ands	w14, w14, w15 */
+	tst	w14, w15
+	b.ne	\label
+.endm
+
+# ---------------------------------------
+#	mv_if_notdefined(reg, label)
+# ---------------------------------------
+.macro	mv_if_notdefined reg, label
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	mov	w15, #mval_m_str
+	add	w15, w15, #mval_m_nm
+	/* xxxxxxx ands	w14, w14, w15 */
+	tst	w14, w15
+	b.eq	\label
+.endm
+
+# -------------------------------------------------------------
+#	mv_if_canonical(reg,mainlabel)
+# -------------------------------------------------------------
+.macro	mv_if_canonical	reg, mainlabel, tmp_label1, tmp_label2
+	ldrh	w14, [\reg, #mval_w_mvtype]
+	/* xxxxxxx ands	w15, w14, #mval_m_nm */
+	tst	w14, #mval_m_nm
+	b.eq	1f
+	/* xxxxxxx ands	w15, w14, #mval_m_num_approx */
+	tst	w14, #mval_m_num_approx
+	b.ne	2f
+	b	\mainlabel
+1:
+	mov	x0, \reg
+	bl	val_iscan
+	cmp	x0, xzr
+	b.ne	\mainlabel
+2:
+.endm

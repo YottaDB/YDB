@@ -1,0 +1,196 @@
+#################################################################
+#								#
+# Copyright 2001, 2012 Fidelity Information Services, Inc	#
+#								#
+# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+/* Register definitions */
+
+REG_SP			=	sp
+
+REG_RET0		=	x0
+REG_RET1		=	x1
+REG64_RET0		=	x0
+REG64_RET1		=	x1
+REG32_RET0		=	w0
+REG32_RET1		=	w1
+
+REG64_ACCUM		=	x0
+REG32_ACCUM		=	w0
+
+REG_XFER_TABLE		=	x23
+REG_FRAME_POINTER	=	x19
+C_FRAME_POINTER		=	x29
+
+REG_PV			=	x24
+REG_FRAME_TMP_PTR	=	x21
+REG_FRAME_VAR_PTR	=	x20
+REG_LITERAL_BASE	=	x22
+
+REG64_ZERO		=	xzr
+REG32_ZERO		=	wzr
+REG16_ZERO		=	wzr
+REG8_ZERO		=	wzr
+
+REG64_ARG0		=	x0
+REG64_ARG1		=	x1
+REG64_ARG2		=	x2
+REG64_ARG3		=	x3
+REG64_ARG4		=	x4
+REG64_ARG5		=	x5
+REG64_ARG6		=	x6
+REG64_ARG7		=	x7
+
+REG64_SAVE0		=	x27
+REG64_SAVE1		=	x28
+
+REG64_OUT_ARG0		=	x0
+REG64_OUT_ARG1		=	x1
+REG64_OUT_ARG2		=	x2
+REG64_OUT_ARG3		=	x3
+REG64_OUT_ARG4		=	x4
+REG64_OUT_ARG5		=	x5
+REG64_OUT_ARG6		=	x6
+REG64_OUT_ARG7		=	x7
+
+REG32_ARG0		=	w0
+REG32_ARG1		=	w1
+REG32_ARG2		=	w2
+REG32_ARG3		=	w3
+REG32_ARG4		=	w4
+REG32_ARG5		=	w5
+REG32_ARG6		=	w6
+REG32_ARG7		=	w7
+
+REG32_SAVE0		=	w27
+REG32_SAVE1		=	w28
+
+REG32_OUT_ARG0		=	w0
+REG32_OUT_ARG1		=	w1
+REG32_OUT_ARG2		=	w2
+REG32_OUT_ARG3		=	w3
+REG32_OUT_ARG4		=	w4
+REG32_OUT_ARG5		=	w5
+REG32_OUT_ARG6		=	w6
+REG32_OUT_ARG7		=	w7
+
+REG16_SAVE0		=	w27
+REG16_SAVE1		=	w28
+
+REG8_SAVE0		=	w27
+REG8_SAVE1		=	w28
+
+/* Temporary registers */
+REG64_TMP0		=	x9
+REG64_TMP1		=	x10
+REG64_TMP2		=	x11
+REG64_TMP3		=	x12
+REG64_TMP4		=	x13
+REG64_TMP5		=	x14
+REG64_TMP6		=	x15
+
+REG32_TMP0		=	w9
+REG32_TMP1		=	w10
+REG32_TMP2		=	w11
+REG32_TMP3		=	w12
+REG32_TMP4		=	w13
+REG32_TMP5		=	w14
+REG32_TMP6		=	w15
+
+#-----------------------------------------------
+# Mumps stack frame manipulation macros
+#  for the GNU gas arm assembler version
+#-----------------------------------------------
+
+msf_rvector_off		=	0
+msf_l_symtab_off	=	8
+msf_mpc_off		=	16
+msf_ctxt_off		=	24
+msf_literal_ptr_off	=	32
+msf_temps_ptr_off	=	40
+msf_vartab_ptr_off	=	48
+
+msf_old_frame_off	=	56
+msf_vartab_len_off	=	64
+msf_temp_mvals_off	=	66
+msf_typ_off		=	68
+msf_flags_off		=	70
+msf_for_ctrl_stack	=	72
+
+msf_frame_size		=	88
+
+SFT_COUNT		=	0x01
+SFT_DM			=	0x02
+SFT_REP_OP		=	0x04
+SFT_ZBRK_ACT		=	0x08
+SFT_DEV_ACT		=	0x10
+SFT_ZTRAP		=	0x20
+SFT_ZSTEP_ACT		=	0x80
+SFT_ZINTR		=	0x100
+
+SFF_INDCE		=	0x01
+SFF_ZTRAP_ERR		=	0x02
+SFF_DEV_ACT_ERR		=	0x04
+SFF_ETRAP_ERR		=	0x08
+
+.macro putframe 
+	ldr	x9, [x19]
+	str	x21, [x9, #msf_temps_ptr_off]
+	str	x20, [x9, #msf_l_symtab_off]
+	str	x22, [x9, #msf_literal_ptr_off]
+	str	x24, [x9, #msf_ctxt_off]
+	str	X30, [x9, #msf_mpc_off]
+.endm
+
+.extern	error_return
+
+.macro getframe
+	ldr	x9, [x19]
+	ldrb	w13, [x9, #msf_flags_off]
+	tst	w13,  #SFF_ETRAP_ERR
+	beq	1f
+	bl	error_return
+	ldr	x9, [x19]
+1:
+	ldr	x21, [x9, #msf_temps_ptr_off]
+	ldr	x20, [x9, #msf_l_symtab_off]
+	ldr	x22, [x9, #msf_literal_ptr_off]
+	ldr	x24, [x9, #msf_ctxt_off]
+	ldr	X30, [x9, #msf_mpc_off]
+.endm
+
+#
+# Field for routine header - offsets must match rtnhdr.h
+#
+mrt_jsb			=	0
+mrt_shlib_handle	=	16
+mrt_src_len		=	28
+mrt_src_addr		=	32
+mrt_compiler_qlf	=	40
+mrt_obj_label		=	44
+mrt_rtn_len		=	52
+mrt_rtn_addr		=	56
+mrt_var_ptr		=	64
+mrt_var_len		=	72
+mrt_lab_ptr		=	80
+mrt_lab_len		=	88
+mrt_lnr_ptr		=	96
+mrt_lnr_len		=	104
+mrt_lit_ptr		=	128
+mrt_lnk_ptr		=	144
+mrt_ptext_adr		=	176
+mrt_tmp_mv		=	196
+mrt_tmp_sz		=	200
+mrt_curr_ptr		=	208
+mrt_oldr_ptr		=	216
+mrt_zhist		=	264
