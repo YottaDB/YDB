@@ -37,6 +37,7 @@ GDEINIT
 	s endian("S390","OS390")=TRUE,endian("S390X","Linux")=TRUE,glo("OS390")=1024
 	s endian("armv6l","Linux")=FALSE,glo("Linux")=1024
 	s endian("armv7l","Linux")=FALSE,glo("Linux")=1024
+	s endian("aarch64","Linux")=FALSE,glo("Linux")=1024
 	; The following line is for support of AIX V3.2.5 only and can (and should)
 	; be removed (along with this comment) as soon as we drop support for
 	; AIX V3.2.5.  This change is needed to correspond to the change in
@@ -44,7 +45,7 @@ GDEINIT
 	s glo("AIX325")=glo("AIX")
 	s HEX(0)=1
 	s gtm64=$p($zver," ",4)
-	i "/IA64/RS6000/SPARC/x86_64/x86/S390/S390X"[("/"_gtm64) s encsupportedplat=TRUE,gtm64=$s("x86"=gtm64:FALSE,1:TRUE)
+	i "/IA64/RS6000/SPARC/x86_64/x86/S390/S390X/aarch64"[("/"_gtm64) s encsupportedplat=TRUE,gtm64=$s("x86"=gtm64:FALSE,1:TRUE)
 	e  s (encsupportedplat,gtm64)=FALSE
 	i (gtm64=TRUE) d
 	. f x=1:1:16 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
