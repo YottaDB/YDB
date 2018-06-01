@@ -33,6 +33,8 @@
 # define YDB_PLATFORM		"Linux armv6l"
 #elif defined(__armv7l__)
 # define YDB_PLATFORM		"Linux armv7l"
+#elif defined(__aarch64__)
+# define YDB_PLATFORM		"Linux aarch64"
 #else
 # define YDB_PLATFORM		"Linux x86"
 #endif
