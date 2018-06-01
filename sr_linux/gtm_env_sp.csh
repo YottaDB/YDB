@@ -116,6 +116,9 @@ if ( $?gtm_version_change == "1" ) then
 	    else if ("armv7l" == $mach_type) then
 	        setenv gt_as_options_common	"-Wa,-march=armv7-a"
 		setenv gt_as_option_debug	"--gdwarf-2"
+	    else if ("aarch64" == $mach_type) then
+	        setenv gt_as_options_common	"-Wa,-march=armv8-a"
+		setenv gt_as_option_debug	"--gdwarf"
 	    else
         	setenv gt_as_option_debug      "--gstabs"
 	    endif
@@ -160,6 +163,11 @@ if ( $?gtm_version_change == "1" ) then
 		setenv	gt_ld_m_shl_linker	"cc"
 		setenv  gt_ld_m_shl_options     "-shared"
 		setenv  gt_cc_options_common    "$gt_cc_options_common -marm -march=armv7-a "
+	endif
+	if ( "aarch64" == $mach_type ) then
+		setenv	gt_ld_m_shl_linker	"cc"
+		setenv  gt_ld_m_shl_options     "-shared"
+		setenv  gt_cc_options_common    "$gt_cc_options_common -marm -march=armv8-a "
 	endif
 
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 "
