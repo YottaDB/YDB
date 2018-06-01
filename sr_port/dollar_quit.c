@@ -272,7 +272,7 @@ int dollar_quit(void)
 			xfer_index = -1;
 		}
 	}
-#	elif defined(__aarch64__)			/* xxxxxxx this is armv7 with minimal changes */
+#	elif defined(__aarch64__)
 	{
 #		define	MAX_SKIP	10
 		int4	skip;
