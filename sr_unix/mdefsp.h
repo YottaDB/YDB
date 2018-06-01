@@ -199,7 +199,17 @@ typedef char  mach_inst;	/* machine instruction */
 #  define LINKAGE_PSECT_BOUNDARY	8
 #  define INO_T_LONG
 #  undef BIGENDIAN
-typedef uint4 mach_inst;	/* machine instruction */
+typedef uint4 mach_inst;				/* machine instruction */
+#endif
+
+#if defined(__aarch64__)
+#  define CACHELINE_SIZE		64		/* xxxxxxx */
+#  define USHBIN_SUPPORTED
+#  define AUTORELINK_SUPPORTED
+#  define LINKAGE_PSECT_BOUNDARY	8		/* xxxxxxx */
+#  define INO_T_LONG
+#  undef BIGENDIAN
+typedef uint4 mach_inst;				/* machine instruction */
 #endif
 
 /* On NON_USHBIN_ONLY platforms, reserve enough space in routine header for the dummy
