@@ -558,7 +558,7 @@ NOCCPPID	<Cannot find CCP process id>/error/fao=0!/ansi=0
 CCPJNLOPNERR	<Error opening journal file.  Database not opened.>/error/fao=0!/ansi=0
 LCKSGONE	<Locks selected for deletion removed>/success/fao=0!/ansi=0
 UNUSEDMSG560	<ZLKIDBADARG nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
-DBFILOPERR	<Error doing database I/O to region !AD>/error/fao=2!/ansi=0
+DBFILOPERR	<Error doing database I/O to database file !AD>/error/fao=2!/ansi=0
 CCERDERR	<Error reading from database file !AD>/error/fao=2!/ansi=0
 CCEDBCL		<Database file !AD is clustered>/info/fao=2!/ansi=0
 CCEDBNTCL	<Database file !AD is not clustered>/info/fao=2!/ansi=0
