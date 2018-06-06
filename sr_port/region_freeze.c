@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -254,7 +257,7 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		SEND_FREEZEID("FREEZE", csa);
 #		endif
 		rel_latch(&cnl->freeze_latch);
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBFREEZEON, 5, REG_LEN_STR(region), NEG_STR(override), NEG_STR(online),
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBFREEZEON, 5, DB_LEN_STR(region), NEG_STR(override), NEG_STR(online),
 								NEG_STR(online & CHILLED_AUTORELEASE_MASK));
 		return rval;
 	}
@@ -290,7 +293,7 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		{
 			csa->needs_post_freeze_flushsync = TRUE;
 		}
-		send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFREEZEOFF, 4, REG_LEN_STR(region), NEG_STR(override),
+		send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFREEZEOFF, 4, DB_LEN_STR(region), NEG_STR(override),
 								NEG_STR(cleanup_autorelease));
 		return rval;
 	} else
