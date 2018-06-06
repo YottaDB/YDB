@@ -1670,8 +1670,8 @@ MUCREFILERR	<Error in/at !AD creating database !AD (region !AD)>/error/fao=6!/an
 JNLBUFFPHS2SALVAGE	<Salvaged journal records from process !UL for database file !AD at transaction number [0x!16@XQ] and journal-sequence-number/unique-token [0x!16@XQ] with journal file starting offset [0x!XL] and length [0x!XL]>/info/fao=7!/ansi=0
 JNLPOOLPHS2SALVAGE	<Salvaged journal records from process !UL for replication instance file !AD at journal sequence number [0x!16@XQ] with journal pool starting offset [0x!16@XQ] and length [0x!XL]>/info/fao=6!/ansi=0
 MURNDWNARGLESS	<Argumentless MUPIP RUNDOWN started with process id !UL by userid !UL from directory !AD>/info/fao=4!/ansi=0
-DBFREEZEON	<Region !AD is FROZEN (!AZOVERRIDE !AZONLINE !AZAUTOREL)>/info/fao=5!/ansi=0
-DBFREEZEOFF	<Region !AD is UNFROZEN (!AZOVERRIDE !AZAUTOREL)>/info/fao=4!/ansi=0
+DBFREEZEON	<Database file !AD is FROZEN (!AZOVERRIDE !AZONLINE !AZAUTOREL)>/info/fao=5!/ansi=0
+DBFREEZEOFF	<Database file !AD is UNFROZEN (!AZOVERRIDE !AZAUTOREL)>/info/fao=4!/ansi=0
 STPCRIT		<String pool space critical>/error/fao=0!/ansi=0
 STPOFLOW	<String pool space overflow>/fatal/fao=0!/ansi=0
 SYSUTILCONF	<Error determining the path for system utility. !AD>/error/fao=2!/ansi=0
