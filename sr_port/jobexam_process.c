@@ -39,7 +39,7 @@
 #include "util.h"
 #include "mv_stent.h"
 
-#define DEFAULT_DUMP_FILENAME "GTM_JOBEXAM.ZSHOW_DMP"
+#define DEFAULT_DUMP_FILENAME "YDB_JOBEXAM.ZSHOW_DMP"
 /* + 3 below is for for 2 intervening '_' chars and 1 extra */
 #define DEFAULT_DUMP_FILE_TOTSIZE (SIZEOF(DEFAULT_DUMP_FILENAME) + (MAX_DIGITS_IN_INT * 2) + 3)
 #define NOCONCEAL_OPTION "NO_CONCEAL"
