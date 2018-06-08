@@ -79,7 +79,7 @@
    $ ydb_gbldir=/usr/accntg/jones/mumps.gld
    $ export ydb_gbldir
    $ $ydb_dist/mumps -dir
-   GTM>do ^GDE
+   YDB>do ^GDE
    %GDE-I-GDUSEDEFS, Using defaults for Global Directory
    /usr/accntg/jones/mumps.gld
    GDE> EXIT
@@ -321,9 +321,9 @@
 
    To invoke GDE:
 
-   from within GTM, use the command:
+   from within YottaDB, use the command:
 
-   GTM>do ^GDE
+   YDB>do ^GDE
 
    from the shell, enter:
 

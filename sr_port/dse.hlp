@@ -457,7 +457,7 @@
 
    The first command freezes all regions of the current global directory. The
    second command creates an child (shell) process and executes the "mumps
-   -dir" command. Then type S ^A=1 at GTM prompt. Notice that the command
+   -dir" command. Then type S ^A=1 at YottaDB prompt. Notice that the command
    hangs because of the DSE FREEZE in place.
 
    Example:

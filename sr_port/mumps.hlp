@@ -2269,7 +2269,7 @@
 
    $ ydb_gbldir=Test.GLD
    $ export ydb_gbldir
-   $ GTM
+   $ $ydb_dist/mumps -direct
 
    YDB>WRITE $ZGBLDIR
    TEST.GLD
@@ -5405,8 +5405,9 @@
    Example:
 
    YDB>zprint ^profiling
-   ; In this example, query^profiling, order^profiling, and merge^profling perform the same operation -- store even-numbered subscripts of a global to a subscripted loc
-   al variable. M-profiling results show which yields the fastest execution between the three.
+   ; In this example, query^profiling, order^profiling, and merge^profling perform the same operation
+   ; -- store even-numbered subscripts of a global to a subscripted local variable.
+   ; M-profiling results show which yields the fastest execution between the three.
    profiling
      kill ^TMP,^trc
      view "trace":1:"^trc"
@@ -5445,8 +5446,7 @@
      .      kill:i#2 merval(i)
      quit
 
-   On a Ubuntu system running GTM V6.1-000_x86_64, this example produces an
-   output like the following:
+   This example would produce an output like the following:
 
    YDB>do ^profiling
    ^trc("*CHILDREN")="0:0:0"
@@ -6239,7 +6239,7 @@
 2 ZHelp
    ZHelp
 
-   The ZHELP command accesses the help information from the GTM help library
+   The ZHELP command accesses the help information from the YottaDB help library
    or from any help library specified in the command argument.
 
    The format of the ZHELP command is:
@@ -9880,7 +9880,7 @@
    specification as the target for the ZSHOW. The preprocessing is equivalent
    to $ZPARSE(), as illustrated by the following M code:
 
-   set deffn="GTM_JOBEXAMINE.ZSHOW_DMP_"_$JOB_"_"_<cntr>
+   set deffn="YDB_JOBEXAMINE.ZSHOW_DMP_"_$JOB_"_"_<cntr>
    set filespec=$zparse(expr1,"",deffn)
 
    The $ZJOBEXAM()does not trigger error processing except when there is a
@@ -9902,7 +9902,7 @@
 
    YDB>set x=$zjobexam()
    YDB>write x
-   /home/gtmuser1/.yottadb/r122_x86_64/r/GTM_JOBEXAM.ZSHOW_DMP_28760_1
+   /home/gtmuser1/.yottadb/r122_x86_64/r/YDB_JOBEXAM.ZSHOW_DMP_28760_1
    YDB>set x=$zjobexam("test.file")
    YDB>write x
    /home/gtmuser1/.yottadb/r122_x86_64/r/test.file
@@ -12506,7 +12506,7 @@
 
    YDB>s $zroutines=".(../src) $ydb_dist"
 
-   This example directs GTM to look for object modules first in your current
+   This example directs YottaDB to look for object modules first in your current
    directory, then in the distribution directory that contains the percent
    routines. YottaDB locates sources for objects in your current directory in
    the sibling /src directory.
@@ -12993,19 +12993,19 @@
 
    YDB>w $zinterrupt
    "IF $ZJOBEXAM()"
-   YDB>zsystem "ls GTM*"
+   YDB>zsystem "ls YDB*"
    ls: No match.
    YDB>do bar^ztran
    Begin Transaction
    interrupt sent...
    End Transaction
-   YDB>zsystem "ls GTM*"
-   GTM_JOBEXAM.ZSHOW_DMP_3951_1  GTM_JOBEXAM.ZSHOW_DMP_3951_2
+   YDB>zsystem "ls YDB*"
+   YDB_JOBEXAM.ZSHOW_DMP_3951_1  YDB_JOBEXAM.ZSHOW_DMP_3951_2
    YDB>
 
    This uses the default value of $ZINTERRUPT to service interrupts issued to
    the process. The $ZJOBEXAM function executes a ZSHOW "*", and stores the
-   output in each GTM_ZJOBEXAM_ZSHOW_DMP for the initial interrupt, and at
+   output in each YDB_JOBEXAM_ZSHOW_DMP for the initial interrupt, and at
    tcommit when the interrupt is rethrown.
 
 3 $ZTrap
@@ -13364,7 +13364,7 @@
    data it contains for use by the update process on the replicating node.
    While you can change $ZTWORMHOLE within trigger code, because of the
    arbitrary ordering of triggers on the same node, such an approach requires
-   careful design and implementation. GTM allows $ZTWORMHOLE to be NEW'd.
+   careful design and implementation. YottaDB allows $ZTWORMHOLE to be NEW'd.
    NEWing $ZTWORMHOLE is slightly different from NEWing other ISVs/variables
    in the sense that the former retains its original value whereas the latter
    does not. However, like other NEWs, YottaDB restores $ZTWORMHOLE's value when
@@ -20287,7 +20287,7 @@
        revcol.so. To set the local variable collation to this alternative
        collation sequence, set the environment variable ydb_local_collate to
        2.
-    5. At the GTM prompt, execute the following command:
+    5. At the YottaDB prompt, execute the following command:
 
        YDB>Write $SELECT($$set^%GBLDEF("^E",0,2):"OK",1:"FAILED")
        OK
