@@ -85,7 +85,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 	int			colon_cnt, protooffset;
 	char			*last_2colon = NULL;
 	int			addrlen;
-	GTM_SOCKLEN_TYPE	tmp_addrlen;
+	GTM_SOCKLEN_TYPE	socketbuflen, tmp_addrlen;
 
 	if (0 > file_des)
 	{	/* no socket descriptor yet */
@@ -328,29 +328,51 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 			((struct sockaddr_un *)SOCKET_REMOTE_ADDR(socketptr))->sun_path[0] = '\0';
 			tmp_addrlen = SIZEOF(struct sockaddr_un);
 		}
-		socketptr->remote.ai.ai_addrlen = tmp_addrlen;
-		assert(0 != SOCKET_REMOTE_ADDR(socketptr)->sa_family);
-		socketptr->remote.ai.ai_family = SOCKET_REMOTE_ADDR(socketptr)->sa_family;
-		socketptr->remote.ai.ai_socktype = SOCK_STREAM;
-		assert((socket_tcpip != protocol) || (0 != SOCKET_REMOTE_ADDR(socketptr)->sa_family));
-		if (socket_tcpip == protocol)
+		/* Even though the socket might be inherited from a JOB command or xinetd, it is possible the socket
+		 * is a LISTENING or a CONNECTED socket. Determine that before assigning the state of this socket.
+		 */
+		socketbuflen = SIZEOF(socketptr->bufsiz);
+		if (-1 == getsockopt(socketptr->sd, SOL_SOCKET, SO_ACCEPTCONN, &socketptr->bufsiz, &socketbuflen))
 		{
-			GETNAMEINFO(SOCKET_REMOTE_ADDR(socketptr), socketptr->remote.ai.ai_addrlen, host_buffer, NI_MAXHOST,
-				 port_buffer, NI_MAXSERV, NI_NUMERICHOST|NI_NUMERICSERV, errcode);
-			if (0 != errcode)
-			{
-				SOCKET_FREE(socketptr);
-				RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
-				return NULL;
-			}
-			STRNDUP(host_buffer, NI_MAXHOST, socketptr->remote.saddr_ip);
-			socketptr->remote.port = ATOI(port_buffer);
+			save_errno = errno;
+			errptr = (char *)STRERROR(save_errno);
+			errlen = STRLEN(errptr);
+			SOCKET_FREE(socketptr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GETSOCKOPTERR, 5,
+				RTS_ERROR_LITERAL("SO_ACCEPTCONN"), save_errno, errlen, errptr);
+			return NULL;
+		} else if (socketptr->bufsiz)
+		{
+			socketptr->state = socket_listening;
+			socketptr->passive = TRUE;
 		} else
-			assertpro(socket_tcpip == protocol || socket_local == protocol);	/* protocol already checked */
-		socketptr->state = socket_connected;
+		{
+			socketptr->state = socket_connected;
+			socketptr->passive = FALSE;
+		}
+		if (socket_connected == socketptr->state)
+		{
+			socketptr->remote.ai.ai_addrlen = tmp_addrlen;
+			assert(0 != SOCKET_REMOTE_ADDR(socketptr)->sa_family);
+			socketptr->remote.ai.ai_family = SOCKET_REMOTE_ADDR(socketptr)->sa_family;
+			socketptr->remote.ai.ai_socktype = SOCK_STREAM;
+			assert((socket_tcpip != protocol) || (0 != SOCKET_REMOTE_ADDR(socketptr)->sa_family));
+			if (socket_tcpip == protocol)
+			{
+				GETNAMEINFO(SOCKET_REMOTE_ADDR(socketptr), socketptr->remote.ai.ai_addrlen, host_buffer,
+					NI_MAXHOST, port_buffer, NI_MAXSERV, NI_NUMERICHOST|NI_NUMERICSERV, errcode);
+				if (0 != errcode)
+				{
+					SOCKET_FREE(socketptr);
+					RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
+					return NULL;
+				}
+				STRNDUP(host_buffer, NI_MAXHOST, socketptr->remote.saddr_ip);
+				socketptr->remote.port = ATOI(port_buffer);
+			}
+		}
 		socketptr->protocol = protocol;
 		SOCKET_BUFFER_INIT(socketptr, bfsize);
-		socketptr->passive = passive;
 		socketptr->howcreated = (2 >= file_des) ? creator_principal : creator_passed;
 		socketptr->moreread_timeout = DEFAULT_MOREREAD_TIMEOUT;
 		return socketptr;
