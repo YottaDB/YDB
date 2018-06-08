@@ -433,7 +433,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 				REVERT_GTMIO_CH(&ioptr->pair, ch_set);
 				return FALSE;
 			}
-			assert(listen_specified == socketptr->passive);
+			assert((listen_specified == socketptr->passive) || (!listen_specified && is_principal));
 			if (ioerror_specified)
 				socketptr->ioerror = ('T' == ioerror || 't' == ioerror);
 			socketptr->nodelay = nodelay_specified;		/* defaults to DELAY */

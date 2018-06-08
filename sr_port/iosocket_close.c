@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -54,7 +57,10 @@ error_def(ERR_SOCKNOTFND);
 error_def(ERR_SYSCALL);
 error_def(ERR_TLSIOERROR);
 
-void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boolean_t socket_delete, boolean_t socket_specified);
+#define	SOCKET_DELETE_FALSE	FALSE
+#define	SOCKET_DELETE_TRUE	TRUE
+
+void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boolean_t socket_delete);
 
 void iosocket_close(io_desc *iod, mval *pp)
 {
@@ -66,7 +72,6 @@ void iosocket_close(io_desc *iod, mval *pp)
 	int4		start, end, index;
 	int		p_offset = 0;
 	boolean_t	socket_destroy = FALSE;
-	boolean_t	socket_delete = FALSE;
 	boolean_t	ch_set;
 	DCL_THREADGBL_ACCESS;
 
@@ -117,8 +122,6 @@ void iosocket_close(io_desc *iod, mval *pp)
 			socket_destroy = FALSE;
 			break;
 		case iop_delete:
-			socket_delete = TRUE;
-			break;
 		default:
 			break;
 		}
@@ -139,7 +142,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 		start = dsocketptr->n_socket - 1;
 		end = 0;
 	}
-	iosocket_close_range(dsocketptr, start, end, socket_delete, socket_specified);
+	iosocket_close_range(dsocketptr, start, end, SOCKET_DELETE_TRUE);
 	/* "forget" the UTF-16 CHSET variant if no sockets are connected */
 	if (0 >= dsocketptr->n_socket)
 	{
@@ -158,7 +161,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 }
 
-void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boolean_t socket_delete, boolean_t socket_specified)
+void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boolean_t socket_delete)
 {
 	int4		ii,jj;
 	int		rc, save_fd, save_rc = 0, save_errno;
@@ -173,8 +176,8 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 	{
 		socketptr = dsocketptr->socket[ii];
 		/* Don't reap if in a child process creating a new job or pipe device */
-		if ((socket_local == socketptr->protocol) && socketptr->passive && !gtm_pipe_child)
-		{	/* only delete if passive/listening */
+		if ((socket_local == socketptr->protocol) && socketptr->passive && !gtm_pipe_child && socket_delete)
+		{	/* only delete if passive/listening and caller wants us to delete this socket */
 			assertpro(socketptr->local.sa);
 			path = ((struct sockaddr_un *)(socketptr->local.sa))->sun_path;
 			FSTAT_FILE(socketptr->sd, &fstatbuf, res);
@@ -246,5 +249,10 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 
 void iosocket_close_one(d_socket_struct *dsocketptr, int index)
 {
-	iosocket_close_range(dsocketptr, index, index, FALSE, TRUE);
+	/* This function is called to pass sockets to another process or to the JOB command (as stdin/stdout/stderr).
+	 * In either case, if the socket is a unix domain socket and is still in the listening state (i.e. not a connected
+	 * socket), we should NOT delete the socket file (that is used to establish a connection). It will be deleted by
+	 * the process that takes ownership of this listening socket.
+	 */
+	iosocket_close_range(dsocketptr, index, index, SOCKET_DELETE_FALSE);
 }
