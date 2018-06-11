@@ -117,7 +117,6 @@ void iott_use(io_desc *iod, mval *pp)
 		if (0 != status)
 		{
 			save_errno = errno;
-			ISSUE_NOPRINCIO_IF_NEEDED_TT(io_curr_device.out);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		flush_input = FALSE;
@@ -454,7 +453,7 @@ void iott_use(io_desc *iod, mval *pp)
 		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
 		if (0 != status)
 		{
-			assert(FALSE);
+			assert(WBTEST_KILL_TERMINAL == ydb_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		if (tt == d_in->type)
