@@ -92,7 +92,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 	socket_interrupt	*sockintr;
 	char            	*errptr, *charptr;
 	int4            	errlen, ii, jj;
-	int4			nselect, nlisten, nconnected, rlisten, rconnected;
+	int4			nselect, rlisten, rconnected;
 	int4			oldestconnectedcycle, oldestconnectedindex;
 	int4			oldestlistencycle, oldestlistenindex;
 	int4			oldesteventcycle, oldesteventindex;
@@ -170,7 +170,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 	{
 		POLL_ONLY(poll_nfds = 0);
 		SELECT_ONLY(select_max_fd = 0);
-		nselect = nlisten = nconnected = rlisten = rconnected = 0;
+		nselect = rlisten = rconnected = 0;
 		rv = 0;
 		for (ii = 0; ii < dsocketptr->n_socket; ii++)
 		{
@@ -178,8 +178,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 			if ((socket_listening == socketptr->state) || (socket_connected == socketptr->state))
 			{
 				if (socket_connected == socketptr->state)
-				{ /* if buffer not empty set flag but not FD_SET */
-					nconnected++;
+				{	/* Connected socket */
+					/* if buffer not empty set flag but not FD_SET */
 					if (0 < socketptr->buffered_length)
 					{	/* something in the buffer so ready now */
 						if (!socketptr->pendingevent)
@@ -191,8 +191,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 						continue;
 					}
 				} else
-				{
-					nlisten++;
+				{	/* Listening socket */
 					if (socketptr->pendingevent)
 					{
 						rlisten++;
@@ -333,12 +332,9 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 		{	/* nothing to select and no pending events */
 			iod->dollar.key[0] = '\0';
 			if (NO_M_TIMEOUT != msec_timeout)
-			{
 				dollar_truth = FALSE;
-				REVERT_GTMIO_CH(&iod->pair, ch_set);
-				return FALSE;
-			} else
-				continue;
+			REVERT_GTMIO_CH(&iod->pair, ch_set);
+			return FALSE;
 		}
 		/* find out which sockets are ready */
 		oldestlistencycle = oldestconnectedcycle = oldesteventcycle = 0;
