@@ -81,6 +81,7 @@ uint4 jnl_file_open(gd_region *reg, boolean_t init)
 	int			close_res;
 	boolean_t		switch_and_retry;
 	char			buff[OUT_BUFF_SIZE];
+	uint4			status;
 	ZOS_ONLY(int		realfiletag;)
 
 	csa = &FILE_INFO(reg)->s_addrs;
@@ -100,7 +101,11 @@ uint4 jnl_file_open(gd_region *reg, boolean_t init)
 		assert(JNL_NAME_SIZE == ARRAYSIZE(csd->jnl_file_name));
 		assert(256 == JNL_NAME_SIZE);
 		nameptr[csd->jnl_file_len] = 0;
-		cre_jnl_file_intrpt_rename(csa);
+		status = cre_jnl_file_intrpt_rename(csa);
+		if (is_src_server && ((ERR_RENAMEFAIL == status) || (ERR_FILEDELFAIL == status)))
+		{	/* These two errors are specially handled for the source server in caller ("repl_ctl_create"). */
+			return status;
+		}
 		/* although "jnl_file_close" would have reset jnl_file.u.inode and device to 0 and incremented cycle, it
 		 * might have got shot in the middle of executing those instructions. we redo it here just to be safe.
 		 */

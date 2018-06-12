@@ -25,6 +25,10 @@
 #include "gtm_zos_io.h"
 #endif
 
+#ifdef DEBUG
+#include <libgen.h>
+#endif
+
 #include "gtm_file_stat.h"
 #include "gtm_rename.h"
 #include "error.h"
@@ -420,6 +424,20 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	 * So system will have a.mjl_timestamp and a.mjl_new for a crash after this call
 	 */
 	WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);	/* wait for instance freeze before journal file renames */
+#	ifdef DEBUG
+	if (ydb_white_box_test_case_enabled && (WBTEST_YDB_FILEDELFAIL == ydb_white_box_test_case_number) && IS_MUMPS_IMAGE)
+	{	/* Turn off write permissions on the directory containing journal file that way ensuring
+		 * the "gtm_rename" call below fails. This will exercise the FILEDELFAIL codepath in "cre_jnl_file_intrpt_rename".
+		 */
+		char	dirname_buff[MAX_FN_LEN + 1], *dirname_ret;
+		int	ret;
+
+		strcpy(dirname_buff, (char *)info->jnl);
+		dirname_ret = dirname(dirname_buff);
+		ret = chmod(dirname_ret, 0555);
+		assert(0 == ret);
+	}
+#	endif
 	if (SS_NORMAL != (info->status = gtm_rename((char *)info->jnl, (int)info->jnl_len,
 						    (char *)rename_fn, rename_fn_len, &info->status2)))
 	{
@@ -434,6 +452,20 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	 * So system will have a.mjl_timestamp as previous generation and a.mjl as new/current journal file
 	 */
 	WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);	/* wait for instance freeze before journal file renames */
+#	ifdef DEBUG
+	if (ydb_white_box_test_case_enabled && (WBTEST_YDB_RENAMEFAIL == ydb_white_box_test_case_number) && IS_MUMPS_IMAGE)
+	{	/* Turn off write permissions on the directory containing journal file that way ensuring
+		 * the "gtm_rename" call below fails. This will exercise the RENAMEFAIL codepath in "cre_jnl_file_intrpt_rename".
+		 */
+		char	dirname_buff[MAX_FN_LEN + 1], *dirname_ret;
+		int	ret;
+
+		strcpy(dirname_buff, (char *)info->jnl);
+		dirname_ret = dirname(dirname_buff);
+		ret = chmod(dirname_ret, 0555);
+		assert(0 == ret);
+	}
+#	endif
 	if (SS_NORMAL !=  (info->status = gtm_rename((char *)create_fn, create_fn_len,
 						     (char *)info->jnl, (int)info->jnl_len, &info->status2)))
 	{

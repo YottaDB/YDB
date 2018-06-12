@@ -88,7 +88,7 @@ typedef enum {
 						 *      assert in mur_process_intrpt_recov.c */
 	WBTEST_HOLD_ONTO_FTOKSEM_IN_DBINIT,	/* 49 : Sleep in db_init after getting hold of the ftok semaphore */
 	WBTEST_HOLD_ONTO_ACCSEM_IN_DBINIT,	/* 50 : Sleep in db_init after getting hold of the access control semaphore */
-	WBTEST_KILL_TERMINAL,			/* 51 : Terminal is killed so accept errors due to this */
+	WBTEST_UNUSED51,			/* 51 : UNUSED - YDB#235 removed the only place to test this */
 	WBTEST_SYSCONF_WRAPPER,			/* 52 : Will sleep in SYSCONF wrapper to let us verify that first two MUPIP STOPs
 						 *	are indeed deferred in the interrupt-deferred zone, but the third isn't */
         WBTEST_DEFERRED_TIMERS,			/* 53 : Will enter a long loop upon specific WRITE or MUPIP STOP command */
@@ -186,11 +186,17 @@ typedef enum {
 	WBTEST_NO_REPLINSTMULTI_FAIL,		/* 137 : Unless specified tests should not fail with REPLMULTINSTUPDATE */
 	WBTEST_DOLLARDEVICE_BUFFER,		/* 138 : Force larger error messages for $device to exceed DD_BUFLEN */
 	WBTEST_LOWERED_JNLEPOCH,		/* 139 : Force larger error messages for $device to exceed DD_BUFLEN */
-	WBTEST_SIGTERM_IN_JOB_CHILD		/* 140 : Generate Sigterm  by killing ourselves before the child fork */
+	WBTEST_SIGTERM_IN_JOB_CHILD,		/* 140 : Generate Sigterm  by killing ourselves before the child fork */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.
 	 */
+	/* Start section for YDB-only white-box test cases with a higher number so we do not interfere with
+	 * GT.M additions to the above list of cases.
+	 */
+	WBTEST_YDB_KILL_TERMINAL = 200,		/* 200 : Terminal is killed so accept errors due to this */
+	WBTEST_YDB_FILEDELFAIL,			/* 201 : Exercise FILEDELFAIL error codepath in "cre_jnl_file_intrpt_rename" */
+	WBTEST_YDB_RENAMEFAIL,			/* 202 : Exercise RENAMEFAIL error codepath in "cre_jnl_file_intrpt_rename" */
 } wbtest_code_t;
 
 #ifdef DEBUG

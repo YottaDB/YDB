@@ -453,7 +453,7 @@ void iott_use(io_desc *iod, mval *pp)
 		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno);
 		if (0 != status)
 		{
-			assert(WBTEST_KILL_TERMINAL == ydb_white_box_test_case_number);
+			assert(WBTEST_YDB_KILL_TERMINAL == ydb_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCSETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		if (tt == d_in->type)
