@@ -1847,7 +1847,7 @@ void	jnl_prc_vector(jnl_process_vector *pv);
 void	jnl_send_oper(jnl_private_control *jpc, uint4 status);
 uint4	cre_jnl_file(jnl_create_info *info);
 uint4 	cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_len);
-void	cre_jnl_file_intrpt_rename(sgmnt_addrs *csa);
+uint4	cre_jnl_file_intrpt_rename(sgmnt_addrs *csa);
 void	jfh_from_jnl_info (jnl_create_info *info, jnl_file_header *header);
 uint4	jnl_ensure_open(gd_region *reg, sgmnt_addrs *csa);
 void	set_jnl_info(gd_region *reg, jnl_create_info *set_jnl_info);

@@ -48,6 +48,7 @@
 #ifdef __MVS__
 #include "gtm_zos_io.h"
 #endif
+#include "gtm_rename.h"
 
 GBLDEF repl_ctl_element		*repl_ctl_list = NULL;
 GBLDEF repl_rctl_elem_t		*repl_rctl_list = NULL;
@@ -149,8 +150,16 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	boolean_t		did_jnl_ensure_open = FALSE, open_jnl_file_by_name, was_crit;
 	int4			lcl_jnl_fn_len;
 	char			lcl_jnl_fn[JNL_NAME_SIZE];
-	struct stat	stat_buf;
+	struct stat		stat_buf;
 	uint4			jnl_fs_block_size;
+	int			fn_len;
+	unsigned char		*fn;
+	int			ext_new_jnl_fn_len;
+	unsigned char		ext_new_jnl_fn[MAX_FN_LEN + STR_LIT_LEN(EXT_NEW) + 1];
+	uint4			status1, status2, ustatus;
+	int			fd, save_errno;
+	unsigned char		hdr_buff[REAL_JNL_HDR_LEN + 8];
+	jnl_file_header		*header;
 
 	status = SS_NORMAL;
 	jnl_status = 0;
@@ -193,6 +202,8 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		 */
 		csd = csa->hdr;
 		assert(REPL_ALLOWED(csd));
+		fn = csd->jnl_file_name;
+		fn_len = csd->jnl_file_len;
 		if (REPL_WAS_ENABLED(csd))
 			open_jnl_file_by_name = TRUE;
 		else
@@ -223,6 +234,57 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 				 * while we still hold crit.
 				 */
 				open_jnl_file_by_name = TRUE;
+			} else if (ERR_FILEDELFAIL == jnl_status)
+			{	/* This is a case where mumps.mjl_%YGTM and mumps.mjl exists but deleting mumps.mjl_%YGTM
+				 * failed (see "cre_jnl_file_intrpt_rename" for more details). In this case, open mumps.mjl
+				 * (the name stored in the db file header csd->jnl_fn) just like the ERR_JNLSWITCHRETRY case.
+				 */
+				open_jnl_file_by_name = TRUE;
+			} else if (ERR_RENAMEFAIL == jnl_status)
+			{	/* This is a case where rename of mumps.mjl_%YGTM to mumps.mjl failed (see
+				 * "cre_jnl_file_intrpt_rename" for more details). In this case, open mumps.mjl_%YGTM
+				 * (the name stored in the db file header i.e. csd->jnl_fn) and read the file header
+				 * and find out the previous journal file name from there and open that journal file
+				 * by name (e.g. mumps.mjl_2018144122944). Note that there is no point opening mumps.mjl_%YGTM
+				 * since it is guaranteed to contain no data (by the fact that its name still has the _%YGTM
+				 * suffix). Hence opening the immediately previous generation journal file in case it has not
+				 * yet been seen by the source server. In case it already opened this file, it anyways has a
+				 * check of "is_gdid_gdid_identical"in "open_newer_gener_jnlfiles" to avoid duplicate opens.
+				 * Note: Some of below code is similar to "cre_jnl_file_intrpt_rename" and "jnl_file_open_common".
+				 */
+				ext_new_jnl_fn_len = ARRAYSIZE(ext_new_jnl_fn);
+				status1 = prepare_unique_name((char *)fn, fn_len, "", EXT_NEW,
+								(char *)ext_new_jnl_fn, &ext_new_jnl_fn_len, 0, &ustatus);
+				/* We have allocated enough space in ext_new_jnl_fn array to store EXT_NEW suffix.
+				 * So no way the above "prepare_unique_name" call can fail. Hence the below assert.
+				 */
+				assert(SS_NORMAL == status1);
+				assert('\0' == ext_new_jnl_fn[ext_new_jnl_fn_len]);
+				OPENFILE((char *)ext_new_jnl_fn, O_RDONLY, fd);
+				if (FD_INVALID == fd)
+				{
+					save_errno = errno;
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_JNLFILEOPNERR, 2, ext_new_jnl_fn_len,
+						ext_new_jnl_fn, ERR_SYSCALL, 5, LEN_AND_STR("open"), CALLFROM, save_errno);
+				}
+				header = (jnl_file_header *)(ROUND_UP2((uintszofptr_t)hdr_buff, 8));
+				DO_FILE_READ(fd, 0, header, SIZEOF(jnl_file_header), status1, status2);
+				if (SS_NORMAL != status1)
+				{
+					save_errno = errno;
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLREAD, 3,
+									ext_new_jnl_fn_len, ext_new_jnl_fn, 0, save_errno);
+				}
+				CHECK_JNL_FILE_IS_USABLE(header, status1, FALSE, 0, NULL);	/* FALSE => NO gtm_putmsg
+												 * even if errors.
+												 */
+				if (SS_NORMAL != status1)
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_JNLOPNERR, 4,
+								ext_new_jnl_fn_len, ext_new_jnl_fn, DB_LEN_STR(reg), status1);
+				CLOSEFILE_RESET(fd, status1);
+				fn_len = header->prev_jnl_file_name_length;
+				fn = header->prev_jnl_file_name;
+				open_jnl_file_by_name = TRUE;
 			} else
 			{	/* Some other error inside "jnl_ensure_open". Have to error out. */
 				if (!was_crit)
@@ -240,8 +302,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		if (open_jnl_file_by_name)
 		{	/* Note that we hold crit so it is safe to pass csd->jnl_file_name (no one else will be changing it) */
 			assert(csa->now_crit);
-			status = repl_open_jnl_file_by_name(tmp_ctl, csd->jnl_file_len, (char *)csd->jnl_file_name,
-													&tmp_fd, &stat_buf);
+			status = repl_open_jnl_file_by_name(tmp_ctl, fn_len, (char *)fn, &tmp_fd, &stat_buf);
 		}
 		if (!was_crit)
 			rel_crit(reg);
