@@ -7,14 +7,12 @@ MacPorts:
 ```
 sudo port install cmake
 sudo port install icu
-sudo port install libelf
 ```
 
 Homebrew:
 ```
 brew install cmake
 brew install icu4c
-brew install libelf
 brew install libconfig
 brew install libgcrypt
 brew link icu4c --force
