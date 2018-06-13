@@ -27,6 +27,21 @@
 #include <jpidef.h>
 #endif
 
+/* OSE/SMH - Extra defs for Macs (which are also UNIX) */
+#ifdef __APPLE__
+/*
+http://stackoverflow.com/questions/5167269/clock-gettime-alternative-in-mac-os-x
+https://developer.apple.com/library/mac/qa/qa1398/_index.html
+*/
+#include <mach/mach_time.h> /* mach_absolute_time */
+#include <mach/mach.h>      /* host_get_clock_service, mach_... */
+#include <mach/clock.h>     /* clock_get_time */
+
+#define BILLION 1000000000L
+#define MILLION 1000000L
+#endif
+
+
 #include "gtm_ctype.h"
 #include "gtm_string.h"
 #include "error.h"
@@ -138,26 +153,15 @@ error_def(ERR_TEXT);
 error_def(ERR_TRACINGON);
 error_def(ERR_VIEWNOTFOUND);
 
-#ifdef __APPLE__
-/* TODO
-http://stackoverflow.com/questions/5167269/clock-gettime-alternative-in-mac-os-x
-https://developer.apple.com/library/mac/qa/qa1398/_index.html
-*/
-#define CLOCK_REALTIME 1
-#define CLOCK_MONOTONIC 1
-typedef clock_t clockid_t;
-int clock_gettime(clockid_t clk_id, struct timespec *tp);
-int clock_gettime(clockid_t clk_id, struct timespec *tp)
-{
-}
-#endif
-
 #ifdef UNIX
 STATICFNDEF void times_usec(ext_tms *curr)
 {
 	int		res;
 	struct rusage	usage;
-        struct timespec	elp_time;
+	struct timespec	elp_time;
+#ifdef __APPLE__
+	static mach_timebase_info_data_t timebase = { 0, 0 };
+#endif
 
 	res = getrusage(RUSAGE_SELF, &usage);
 	if (-1 == res)
@@ -184,6 +188,19 @@ STATICFNDEF void times_usec(ext_tms *curr)
 	curr->tms_utime = (usage.ru_utime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_utime.tv_usec;
 	curr->tms_stime = (usage.ru_stime.tv_sec * (gtm_uint64_t)1000000) + usage.ru_stime.tv_usec;
 	/* Also start recording the elapsed time. */
+#ifdef __APPLE__
+	if (mach_timebase_info(&timebase) != 0)
+				MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("mach_timebase_info"), CALLFROM, errno));
+
+	gtm_uint64_t mac_clock = mach_absolute_time();
+	gtm_uint64_t nano = mac_clock * (gtm_uint64_t)timebase.numer / (gtm_uint64_t)timebase.denom;
+	elp_time.tv_sec  = nano / BILLION;
+	elp_time.tv_nsec = nano % BILLION; 
+	/* DEBUG */
+	/* fprintf(stderr,"%ld %ld",elp_time.tv_sec, elp_time.tv_nsec); */
+	/* DEBUG */
+#else
 	while (TRUE)
 	{
 		res = clock_gettime(use_realtime_flag ? CLOCK_REALTIME : CLOCK_MONOTONIC, &elp_time);
@@ -199,6 +216,7 @@ STATICFNDEF void times_usec(ext_tms *curr)
 		}
 		break;
 	}
+#endif
 	curr->tms_etime = (elp_time.tv_sec * (gtm_uint64_t)1000000) + (elp_time.tv_nsec / 1000);
 	return;
 }
