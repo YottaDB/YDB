@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -182,8 +185,9 @@ uint4 mur_next_rec(jnl_ctl_list **jjctl)
 			return status;
 		if (!mur_options.update)
 		{	/* only allow EXTRACT/SHOW/VERIFY to proceed after printing the error if error_limit permits */
-			if (!mur_report_error(jctl, MUR_JNLBADRECFMT)) /* Issue error because mur_next_rec is called  from
-								  * mur_forward(), from which errors are unexpected */
+			if (!mur_report_error(jctl, MUR_JNLBADRECFMT))	/* Issue error because mur_next_rec is called from
+									 * mur_forward(), from which errors are unexpected.
+									 */
 				return status;
 			/* continue in distress, look for other valid records */
 			return mur_valrec_next(jctl, jctl->rec_offset + rec_size);
@@ -295,10 +299,19 @@ uint4 mur_prev(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 						return status;
 					}
 				} else
-				{
-					gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3,
-						jctl->jnl_fn_len, jctl->jnl_fn, dskaddr, ERR_TEXT, 2,
-						LEN_AND_LIT("Requested offset beyond end of file [prev] (dskaddr > 0)"));
+				{	/* If this is a MUPIP JOURNAL EXTRACT/SHOW/VERIFY, it is acceptable to see an EOF
+					 * record getting overwritten by concurrent updates to journal files. Do not issue
+					 * JNLUNXPCTERR error in that case but return JNLBADRECFMT error. The callers
+					 * "mur_valrec_prev" and "mur_back_phase1" know to handle this and adjust the end
+					 * of file to just before where the EOF record was seen.
+					 */
+					if (mur_options.update)
+					{
+						assert(FALSE);
+						gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3,
+							jctl->jnl_fn_len, jctl->jnl_fn, dskaddr, ERR_TEXT, 2,
+							LEN_AND_LIT("Requested offset beyond end of file [prev] (dskaddr > 0)"));
+					}
 					return ERR_JNLBADRECFMT;
 				}
 			}
@@ -487,11 +500,14 @@ uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 					/* is the record available in its entirety? */
 			if (!good_prefix)
 			{
+				if (!mur_options.update && (jctl->lvrec_off == dskaddr))
+					return ERR_JNLREADEOF;
 				gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len,
 						jctl->jnl_fn, dskaddr, ERR_TEXT, 2,
 						LEN_AND_LIT("Requested offset beyond end of file [next] (dskaddr > 0)"));
 				return ERR_JNLBADRECFMT;
 			}
+
 		} /* end good_prefix */
 	} else
 	{ /* dskaddr == 0, locate the next record in the buffer, reading from disk if necessary */
@@ -577,14 +593,14 @@ uint4 mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr)
 			}
 		} else
 		{
-			if (!jctl->tail_analysis)
-			{
-				gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len,
-					jctl->jnl_fn, jctl->rec_offset,
-					ERR_TEXT, 2, LEN_AND_LIT("Requested offset beyond end of file [next] (dskaddr == 0)"));
-				return ERR_JNLBADRECFMT;
-			}
-			return ERR_JNLREADEOF;
+			if (jctl->tail_analysis)
+				return ERR_JNLREADEOF;
+			if (!mur_options.update && (jctl->lvrec_off == (jctl->rec_offset + mur_desc->jreclen)))
+				return ERR_JNLREADEOF;
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLUNXPCTERR, 3, jctl->jnl_fn_len,
+				jctl->jnl_fn, jctl->rec_offset,
+				ERR_TEXT, 2, LEN_AND_LIT("Requested offset beyond end of file [next] (dskaddr == 0)"));
+			return ERR_JNLBADRECFMT;
 		}
 	} /* end of dskaddr == 0 */
 	if (good_prefix && IS_VALID_JNLREC(mur_desc->jnlrec, jctl->jfh))
@@ -875,13 +891,17 @@ uint4 mur_valrec_prev(jnl_ctl_list *jctl, off_jnl_t lo_off, off_jnl_t hi_off)
 	jctl->rec_offset = rec_offset;
 	/* now set mur_desc fields to point to valid record */
 	assert(rec_offset);
-	/* Since valid record may have been overwritten we must do this.
-	 * We call mur_prev, not mur_next, although both position mur_desc to the same
-	 * record (when called with non zero arg) to make sure no assumptions in
-	 * successive calls to mur_prev(jctl, 0) are violated.
-	 */
-	assertpro(SS_NORMAL == mur_prev(jctl, rec_offset));
-	return SS_NORMAL;
+	if (SS_NORMAL != (status = mur_prev(jctl, rec_offset)))
+	{	/* The only known case of an abnormal status is if an EOF record got overwritten
+		 * while a MUPIP JOURNAL EXTRACT etc. (non-invasive operation) had the journal file open
+		 * and was in "mur_fread_eof_crash" (i.e. jctl->tail_analysis). Assert that below.
+		 */
+		assert((ERR_JNLBADRECFMT == status) && jctl->tail_analysis && lo_off && !mur_options.update);
+		assert(jctl->rec_offset == rec_offset);
+		status = mur_prev(jctl, 0);
+		assert(SS_NORMAL == status);
+	}
+	return status;
 }
 
 /*
