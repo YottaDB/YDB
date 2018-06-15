@@ -43,7 +43,7 @@
 #include "gtm_syslog.h"
 #include "main_pragma.h"
 #include "gtm_signal.h"
-#ifndef __MVS__
+#if !defined(__MVS__) || !defined(__APPLE__)
 #  include <malloc.h>
 #endif
 #include <errno.h>

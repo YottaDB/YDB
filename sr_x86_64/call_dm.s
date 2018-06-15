@@ -18,18 +18,18 @@
 #	include "debug.si"
 
 	.text
-	.extern	op_oldvar
-	.extern	opp_dmode
+	.extern	_op_oldvar
+	.extern	_opp_dmode
 
 #
 # Note call_dm is only ever branched to so does not have a return address pushed on the stack throwing off the
 # needed 16 byte alignment of the stack. Verify that first thing on each iteration.
 #
-ENTRY	call_dm
+ENTRY	_call_dm
 newcmd:
 	CHKSTKALIGN			# Verify stack alignment
-	call	opp_dmode
-	call	op_oldvar
+	call	_opp_dmode
+	call	_op_oldvar
 	jmp	newcmd
 
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.

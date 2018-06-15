@@ -18,7 +18,7 @@
 	.include "g_msf.si"
 
 	.data
-	.extern	frame_pointer
+	.extern	_frame_pointer
 
 	.text
 
@@ -28,14 +28,14 @@
 # Note since this routine makes no calls, stack alignment is not critical. If ever a call is added then this
 # routine should take care to align the stack to 16 bytes and add a CHKSTKALIGN macro.
 #
-ENTRY	op_currtn
-	movw	$mval_m_str, mval_w_mvtype(REG64_RET1)
-	movq	frame_pointer(REG_IP), REG64_SCRATCH1
-	movq	msf_rvector_off(REG64_SCRATCH1), REG64_RET0
-	movl	mrt_rtn_len(REG64_RET0), REG32_SCRATCH1
-	movl	REG32_SCRATCH1, mval_l_strlen(REG64_RET1)
-	movq	mrt_rtn_addr(REG64_RET0), REG64_SCRATCH1
-	movq	REG64_SCRATCH1, mval_a_straddr(REG64_RET1)
+ENTRY	_op_currtn
+	movw	$mval_m_str, mval_w_mvtype(%r10)
+	movq	_frame_pointer(%rip), %r11
+	movq	msf_rvector_off(%r11), %rax
+	movl	mrt_rtn_len(%rax), %r11d
+	movl	%r11d, mval_l_strlen(%r10)
+	movq	mrt_rtn_addr(%rax), %r11
+	movq	%r11, mval_a_straddr(%r10)
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.

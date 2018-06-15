@@ -94,7 +94,7 @@ typedef unsigned short	in_port_t; /* GCC needs this on PARISC */
 typedef uint4 mach_inst;	/* machine instruction */
 #endif /* __hpux */
 
-#if defined(__linux__) || defined(__CYGWIN__)
+#if defined(__linux__) || defined(__APPLE__) || defined(__CYGWIN__)
 #define OFF_T_LONG
 #ifdef NeedInAddrPort
 typedef unsigned short	in_port_t;

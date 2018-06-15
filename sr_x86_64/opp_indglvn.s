@@ -18,16 +18,16 @@
 #	include "debug.si"
 
 	.data
-	.extern	frame_pointer
+	.extern	_frame_pointer
 
 	.text
-	.extern	op_indglvn
+	.extern	_op_indglvn
 
-ENTRY	opp_indglvn
+ENTRY	_opp_indglvn
 	putframe
-	addq	$8, REG_SP		# Burn return PC & 16 byte align
+	addq	$8, %rsp		# Burn return PC & 16 byte align
 	CHKSTKALIGN			# Verify stack alignment
-	call	op_indglvn
+	call	_op_indglvn
 	getframe
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.

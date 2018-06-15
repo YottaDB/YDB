@@ -55,7 +55,11 @@ if [ -d utf8 ]; then
 fi
 
 # Native shared library extension.
-ext=".so"
+if [ $arch = "darwin" ]; then
+	ext=".dylib"
+else
+	ext=".so"
+fi
 
 isarm_ydb=`file mumps | grep -w "ARM" | wc -l`
 is64bit_ydb=`file mumps | grep -c "64-bit"`
@@ -69,6 +73,7 @@ elif [ "linux" = $arch ] ; then
 	else
 		ldcmd="ld" # Linux - all platforms
 	fi
+elif [ "darwin" = $arch ] ; then ldflags="-dylib" ; ldcmd="ld" # Mac OS X
 else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
@@ -177,8 +182,13 @@ if [ "" != "$issystemd" ] ; then
 fi
 # Native super user and group
 rootuser=root
-bingroup=root
-defowner=root
+if [ $arch = "darwin" ] ; then
+	bingroup=admin
+	defowner=root
+else
+	bingroup=bin
+	defowner=bin
+fi
 
 # create temporary file to test for valid user and group names
 touch tmp_owngrp
@@ -239,7 +249,6 @@ if [ ! -t 0 ] ; then echo "$ydbdist"; fi
 
 if [ `$echo $ydbdist | grep -c '^/'` -eq 0 ] ; then
     ydbdist=`pwd`/$ydbdist
-fi
 
 # ensure that canonical paths do not exceed PATH_MAX
 getconf PATH_MAX $ydbdist | \
@@ -328,6 +337,8 @@ if [ -d "utf8" ]; then
 	icu_ext=".so"
 	if [ $arch = "ibm" ] ; then
 		icu_ext=".a"
+	elif [ $arch = "darwin" ] ; then
+		icu_ext=".dylib"
 	fi
 	if [ "$would_like_utf8" -eq 1 ] ; then
 		for libpath in $library_path
@@ -346,6 +357,10 @@ if [ -d "utf8" ]; then
 					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio//g'`
 					# Extract 36 from 36.0.a
 					majmin=`$echo $full_icu_ver_string | cut -f 1 -d '.'`
+				elif [ $arch = "darwin" ]; then
+					#libicuio.55.1.dylib -> 55.1
+					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio\.//g'`
+					majmin=`$echo $full_icu_ver_string | cut -f 1,2 -d '.'`
 				else
 					full_icu_ver_string=`$echo $icu_versioned_lib | sed 's/libicuio\.//g'`
 					majmin=`$echo $full_icu_ver_string | cut -f 2 -d '.'`
@@ -370,6 +385,9 @@ if [ -d "utf8" ]; then
 					icu_full_ver_lib=`ls -l $libpath/libicuio$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
 					icu_full_ver_lib=`basename $icu_full_ver_lib`
 					is64bit_icu=`nm -X64 $libpath/$icu_full_ver_lib 2>/dev/null | head -n 1 | wc -l`
+				elif [ $arch = "darwin" ]; then
+					icu_full_ver_lib=`ls -l $libpath/libicuio.$majmin$icu_ext 2>/dev/null | awk '{print $NF}'`
+					is64bit_icu=`file $icu_full_ver_lib 2>/dev/null | grep "64-bit" | wc -l`
 				fi
 				# Make sure both YottaDB and ICU are in sync with object mode compatibility (eg both are 32 bit/64 bit )
 				if [ "$is64bit_ydb" -eq 1 -a "$is64bit_icu" -ne 0 ] ; then
@@ -383,7 +401,11 @@ if [ -d "utf8" ]; then
 				if [ "$found_icu" -eq 1 -a "$majmin" = "" ] ; then majmin=0; fi
 				# If we have everything we want, then save the libpath that contains the proper ICU library and
 				# set the ydb_icu_version
-				if [ "$found_icu" -eq 1 -a "$majmin" -ge 36 ] ; then
+				if [ $arch = "darwin" ] ; then
+					export ydb_icu_version=$majmin
+					save_icu_libpath="$libpath"
+					break
+				elif [ "$found_icu" -eq 1 -a "$majmin" -ge 36 ] ; then
 					save_icu_libpath="$libpath"
 					minorver=`expr $majmin % 10`
 					majorver=`expr $majmin / 10`
@@ -516,7 +538,7 @@ done
 # Install the normal binaries
 for i in $binaries
 do
-	if [ $arch = "linux" ]; then
+	if [ $arch = "linux" -o $arch = "darwin" ]; then
 		install -g $bingroup -o $owner -m 644 $i $ydbdist
 	elif [ $arch = "ibm" ]; then
 		/usr/bin/install -f $ydbdist -M 644 -O $owner -G $bingroup $i
@@ -805,7 +827,7 @@ chmod 700 $tgtmsecshrdir
 chgrp $bingroup $tgtmsecshrdir
 
 # Install gtmsecshr and the wrapper with special permissions
-if [ $arch = "linux" ]; then
+if [ $arch = "linux" -o $arch = "darwin" ]; then
 	install -m 4555 -o root -g $bingroup gtmsecshr $ydbdist
 	install -m 4500 -o root -g $bingroup gtmsecshrdir/gtmsecshr $tgtmsecshrdir/gtmsecshr
 elif [ $arch = "ibm" ]; then

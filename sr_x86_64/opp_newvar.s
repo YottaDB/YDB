@@ -18,16 +18,16 @@
 #	include "debug.si"
 
 	.data
-	.extern	frame_pointer
+	.extern	_frame_pointer
 
 	.text
-	.extern	op_newvar
+	.extern	_op_newvar
 
-ENTRY	opp_newvar
+ENTRY	_opp_newvar
 	putframe
-	addq	$8, REG_SP		# Burn return address & 16 byte align stack
+	addq	$8, %rsp		# Burn return address & 16 byte align stack
 	CHKSTKALIGN			# Verify stack alignment
-	call	op_newvar
+	call	_op_newvar
 	getframe
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.

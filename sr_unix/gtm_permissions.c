@@ -59,6 +59,7 @@ void gtm_init_gid_list(void)
 	}
 }
 
+<<<<<<< HEAD
 /* Search through the supplementary gid list for a match */
 boolean_t	gtm_gid_in_gid_list(gid_t gid)
 {

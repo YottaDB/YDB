@@ -18,16 +18,16 @@
 #	include "debug.si"
 
 	.data
-	.extern	frame_pointer
+	.extern	_frame_pointer
 
 	.text
-	.extern	op_tcommit
+	.extern	_op_tcommit
 
-ENTRY	opp_tcommit
+ENTRY	_opp_tcommit
 	putframe
-	addq	$8, REG_SP		# Burn return PC & 16 byte align stack
+	addq	$8, %rsp		# Burn return PC & 16 byte align stack
 	CHKSTKALIGN			# Verify stack alignment
-	call	op_tcommit
+	call	_op_tcommit
 	getframe
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.

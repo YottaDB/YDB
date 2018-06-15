@@ -1,0 +1,35 @@
+Install MacPorts: https://www.macports.org
+Alternatively Install homebrew: http://brew.sh
+
+Then install cmake, icu, and libelf.
+
+MacPorts:
+```
+sudo port install cmake
+sudo port install icu
+```
+
+Homebrew:
+```
+brew install cmake
+brew install icu4c
+brew install libconfig
+brew install libgcrypt
+brew link icu4c --force
+```
+
+Note: if you get a linking error from homebrew change the permissions on /usr/local/include and /usr/local/lib to allow your user to write to the directory:
+```
+sudo chmod ugo+rw /usr/local/include
+sudo chmod ugo+rw /usr/local/lib
+```
+
+Now go ahead and make:
+```
+   $ make -j16
+   
+   # WARNING WARNING WARNING
+   # The build leaves the terminal in a pretty bad shape. Do the following to
+   # restore sanity
+   $ stty sane
+```

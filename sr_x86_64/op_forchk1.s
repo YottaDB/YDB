@@ -22,7 +22,7 @@
 # check stack alignment (which is off due to the return address on the stack). If ever a call is
 # added then this routine should take care to align the stack to 16 bytes and add a CHKSTKALIGN macro.
 #
-ENTRY	op_forchk1
+ENTRY	_op_forchk1
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.

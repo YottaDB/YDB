@@ -31,7 +31,7 @@
 
 void m_usleep(int useconds);
 
-#if !defined(__linux__)
+#if !defined(__linux__) && !defined(__APPLE__)
 #      error "Unsure of support for sleep functions on this platform"
 #endif
 

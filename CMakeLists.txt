@@ -18,7 +18,8 @@
 # CMake 2.8.4 introduced LINK_DEPENDS target property
 # CMake 2.8.4 introduced generator expressions in custom commands
 # CMake 2.8.5 introduced use of C compiler as the assembler
-cmake_minimum_required(VERSION 2.8.5)
+# CMake 2.8.12 Adds MacOSX RPATH
+cmake_minimum_required(VERSION 2.8.12)
 project(YDB C ASM)
 
 # Max optimization level is -O2
@@ -72,6 +73,8 @@ elseif("${CMAKE_SYSTEM_NAME}" MATCHES "AIX")
   include(sr_aix/platform.cmake)
 elseif("${CMAKE_SYSTEM_NAME}" MATCHES "SunOS")
   include(sr_sun/platform.cmake)
+elseif("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+  include(sr_darwin/platform.cmake)
 else()
   message(FATAL_ERROR "--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
@@ -221,6 +224,7 @@ set_source_list(maskpass         ydb_getenv minimal_gbldefs)
 set_source_list(mumps            gtm dlopen_libyottadb)
 set_source_list(mupip            mupip dlopen_libyottadb)
 set_source_list(semstat2         semstat2)
+set_source_list(dtgbldir         dtgbldir)
 
 #-----------------------------------------------------------------------------
 # libmumps gets leftover sources, so compute the remaining list.
@@ -368,6 +372,14 @@ foreach(exp ydbexe yottadb)
     DEPENDS ${in} gen_gtm_threadgbl_deftypes
     COMMAND tcsh -f ${YDB_SOURCE_DIR}/sr_linux/genexport.csh ${in} ${out}
     )
+  # Add underscores to symbols for Mac OS X
+  elseif("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+  add_custom_command(
+    OUTPUT ${out}
+    DEPENDS ${in} gen_gtm_threadgbl_deftypes
+    COMMAND sed 's/^/_/' ${in} > ${out}
+    )
+  endif()
 endforeach()
 
 add_custom_target(gen_export DEPENDS ydbexe_symbols.export yottadb_symbols.export)
@@ -453,6 +465,9 @@ set_target_properties(libyottadb PROPERTIES
 add_dependencies(libyottadb gen_export)
 add_dependencies(mumps libyottadb)
 
+set(CMAKE_LIBRARY_PATH /lib /usr/lib /usr/local/lib /opt/local/lib)
+
+if(0)
 # Iterate over the list of GPG related libraries
 foreach(gpglib gpg-error gpgme gcrypt config)
   # For each library, we need a new CMake variable, hence GPGLIB_${gpglib}
@@ -724,6 +739,8 @@ install(FILES ${scripts}
   PERMISSIONS ${install_permissions_script}
   )
 
+set(GTM_SET_ICU_VERSION 1 CACHE BOOL "By default search for the ICU version number")
+if(GTM_SET_ICU_VERSION)
 find_program(ICUCONFIG NAMES icu-config)
 if(ICUCONFIG)
   execute_process(
@@ -737,10 +754,10 @@ if(ICUCONFIG)
   elseif("x${icu_version}" MATCHES "^x([0-9]+\\.[0-9]+)")
     set(ydb_icu_version "${CMAKE_MATCH_1}")
   else()
-    message(FATAL_ERROR "Command\n ${ICUCONFIG} --version\nproduced unrecognized output:\n ${icu_version}")
+    message(FATAL_ERROR "Unable to find 'icu-config'.  Set ICUCONFIG in CMake cache.")
   endif()
 else()
-  message(FATAL_ERROR "Unable to find 'icu-config'.  Set ICUCONFIG in CMake cache.")
+  message("Not setting gtm_icu_version")
 endif()
 
 find_program(LOCALECFG NAMES locale)
@@ -943,4 +960,3 @@ string(TIMESTAMP BUILD_TIMESTAMP "%Y%m%d %H:%M")
 
 # Make the build timestamp available to a C program (release_name.h)
 add_definitions("-DYDB_RELEASE_STAMP=\"${BUILD_TIMESTAMP}\"")
-
