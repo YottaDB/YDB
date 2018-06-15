@@ -21,7 +21,7 @@ set(gen_xfer_desc 1)
 #enable_language(ASM_NASM)
 set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I") # gcc -I does not make it to "as"
 #set(CMAKE_SHARED_MODULE_CREATE_C_FLAGS "${CMAKE_SHARED_MODULE_CREATE_C_FLAGS} -flat_namespace -undefined suppress")
-#list(APPEND CMAKE_ASM_COMPILE_OBJECT "objcopy --prefix-symbols=_ <OBJECT>")
+list(APPEND CMAKE_ASM_COMPILE_OBJECT "gobjcopy --prefix-symbols=_ <OBJECT>")
 
 # Compiler
 set(CMAKE_C_FLAGS
@@ -51,6 +51,8 @@ include_directories(${CURSES_INCLUDE_PATH})
 find_package(Zlib REQUIRED)   # FindZLIB.cmake
 include_directories(${ZLIB_INCLUDE_DIRS})
 
+include_directories("/usr/local/opt/openssl/include")
+
 find_path(LIBICU_INCLUDE_PATH NAMES uchar.h unicode/uchar.h)
 include_directories(${LIBICU_INCLUDE_PATH})
 
@@ -61,9 +63,9 @@ set(CMAKE_MACOSX_RPATH 1)
 # Found these on the web: CMAKE_OSX_ARCHITECTURES, CMAKE_OSX_DEPLOYMENT_TARGET, CMAKE_OSX_SYSROOT
 
 # Linker
-set(gtm_link  "-Wl,-U,gtm_filename_to_id -Wl,-U,gtm_zstatus -Wl,-v -Wl,-exported_symbols_list \"${GTM_BINARY_DIR}/gtmexe_symbols.export\"")
-set(libgtmshr_link "-Wl,-U,gtm_ci -Wl,-U,gtm_filename_to_id -Wl,-exported_symbols_list \"${GTM_BINARY_DIR}/gtmshr_symbols.export\"")
-set(libgtmshr_dep  "${GTM_BINARY_DIR}/gtmexe_symbols.export")
-set(libgtmsec_link "-Wl,-root_safe -Wl,-setuid_safe")
+set(ydb_link  "-Wl,-U,gtm_filename_to_id -Wl,-U,ydb_zstatus -Wl,-v -Wl,-exported_symbols_list \"${YDB_BINARY_DIR}/ydbexe_symbols.export\"")
+set(libyottadb_link "-Wl,-U,gtm_ci -Wl,-U,gtm_filename_to_id -Wl,-exported_symbols_list \"${YDB_BINARY_DIR}/yottadb_symbols.export\"")
+set(libyottadb_dep  "${YDB_BINARY_DIR}/ydbexe_symbols.export")
+#set(libgtmsec_link "-Wl,-root_safe -Wl,-setuid_safe")
 set(libmumpslibs "-lm -ldl -lc -lpthread ${CURSES_NCURSES_LIBRARY}")
 

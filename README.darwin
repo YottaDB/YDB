@@ -15,8 +15,13 @@ brew install cmake
 brew install icu4c
 brew install libconfig
 brew install libgcrypt
+brew install gpgme
+brew install openssl
+brew install binutils
 brew link icu4c --force
 ```
+
+Note to future self: need info on how to link openssl in cmake: /usr/local/opt/openssl/liblibssl.dylib
 
 Note: if you get a linking error from homebrew change the permissions on /usr/local/include and /usr/local/lib to allow your user to write to the directory:
 ```

@@ -57,11 +57,13 @@ l2:
 	movq	arg0_save(%rsp), %rsi
 comp:
 	call	numcmp
-	addq	$FRAME_SIZE, REG_SP			# Unwind stack frame savearea
+	addq	$FRAME_SIZE, %rsp			# Unwind stack frame savearea
 	movq	frame_pointer(%rip), %r11
-	pushq	msf_mpc_off(%r11)		# Push return addr back on stack
+	pushq	msf_mpc_off(%r11)			# Push return addr back on stack
 	cmpl	$0, %eax				# Set condition code for caller
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

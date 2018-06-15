@@ -22,23 +22,25 @@
 #	include "debug.si"
 
 	.data
-	.extern	_frame_pointer
-	.extern	_proc_act_type
-	.extern _xfer_table
+	.extern	frame_pointer
+	.extern	proc_act_type
+	.extern xfer_table
 
 	.text
-	.extern	_trans_code
+	.extern	trans_code
 
-ENTRY	_mum_tstart
+ENTRY	mum_tstart
 	addq	$8, %rsp			# Back up over return address (stack should now be 16 byte aligned)
 	CHKSTKALIGN				# Verify stack alignment
-	cmpw	$0, _proc_act_type(%rip)
+	cmpw	$0, proc_act_type(%rip)
 	je	notrans
-	call	_trans_code
+	call	trans_code
 notrans:
 	getframe				# Pushes return addr on stack
-	leaq	_xfer_table(%rip), %rbx
+	leaq	xfer_table(%rip), %rbx
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

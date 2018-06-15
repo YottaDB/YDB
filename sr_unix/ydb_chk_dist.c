@@ -103,9 +103,18 @@ int ydb_chk_dist(char *image)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDBDISTUNDEF);
 	}
 	/* Get currently running executable */
+	#if defined(__APPLE__)
+	uint32_t size = YDB_PATH_MAX;
+	if (_NSGetExecutablePath(image_real_path, &size) < 0)
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX); /* Error return from _NSGetExecutablePath */
+	}
+	#elif defined(__linux__)
 	nbytes = SNPRINTF(image_real_path, YDB_PATH_MAX, PROCSELF);
+
 	if ((0 > nbytes) || (nbytes >= YDB_PATH_MAX))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX); /* Error return from SNPRINTF */
+	#endif
 	/* Create the comparison path (ydb_dist + '/' + exename + '\0') and compare it to image_real_path */
 	exename = strrchr(image, '/');
 	if (!exename)	/* no slash found, then image is just the exe's name */

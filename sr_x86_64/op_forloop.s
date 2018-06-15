@@ -26,13 +26,13 @@
 #		loop address
 #
 	.data
-	.extern	_frame_pointer
+	.extern	frame_pointer
 ten_dd:	.long	10
 
 	.text
-	.extern	_add_mvals
-	.extern	_numcmp
-	.extern	_s2n
+	.extern	add_mvals
+	.extern	numcmp
+	.extern	s2n
 
 indx		= -8
 step		= -16
@@ -40,8 +40,8 @@ term		= -24
 loop		= -32
 FRAME_SIZE	= 40					# Includes 8 bytes padding to 16 byte align stack
 
-ENTRY	_op_forloop
-	movq	_frame_pointer(%rip), %r11
+ENTRY	op_forloop
+	movq	frame_pointer(%rip), %r11
 	popq	msf_mpc_off(%r11)
 	pushq	%rbp					# Save %rbp (aka GTM_FRAME_POINTER)
 	movq	%rsp, %rbp				# Copy of stack pointer
@@ -96,7 +96,7 @@ L66:
 	movl	$0, %edx
 	movq	%rdi, %rsi
 	movq	%rcx, %rdi
-	call	_add_mvals
+	call	add_mvals
 	movq	indx(%rbp), %rsi
 L63:
 	movq	step(%rbp), %rdi
@@ -128,7 +128,7 @@ e:
 	jmp	tcmp
 ccmp:
 	xchgq	%rdi, %rsi
-	call	_numcmp
+	call	numcmp
 	cmpl	$0, %eax
 tcmp:
 	jle	newiter
@@ -171,11 +171,11 @@ l66:
 	movl	$1, %edx
 	movq	%rdi, %rsi
 	movq	%rcx, %rdi			# First and fourth args are same
-	call	_add_mvals
+	call	add_mvals
 done:
 	movq	%rbp, %rsp				# Unwind save frame
 	popq	%rbp					# Restore caller's %rbp
-	movq	_frame_pointer(%rip), %r11
+	movq	frame_pointer(%rip), %r11
 	pushq	msf_mpc_off(%r11)		# End of loop - return to caller
 	ret
 newiter:
@@ -189,4 +189,6 @@ newiter:
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

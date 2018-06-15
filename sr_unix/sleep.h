@@ -19,6 +19,10 @@
 #define	RESTART_FALSE	FALSE
 #define	RESTART_TRUE	TRUE
 
+#ifdef __APPLE__
+#include "timing_mach.h"
+#endif
+
 /* Note: GT.M code *MUST NOT* use the sleep function because it causes problems with GT.M's timers on some platforms. Specifically,
  * the sleep function results in SIGARLM handler being silently deleted on Solaris systems (through Solaris 9 at least). This leads
  * to lost timer pops and has the potential for system hangs. The proper long sleep mechanism is hiber_start which can be accessed
@@ -58,7 +62,7 @@ MBSTART {											\
 	}											\
 	do											\
 	{											\
-		STATUS = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &REQTIM, NULL);	\
+		STATUS = clock_nanosleep_abstime(&REQTIM);					\
 		if (!RESTART || (0 == STATUS))							\
 			break;									\
 		assertpro (EINTR == STATUS);							\

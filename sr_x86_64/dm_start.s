@@ -29,7 +29,7 @@
 	.text
 	.extern	mdb_condition_handler
 	.extern	op_unwind
-	.extern __sigsetjmp			# setjmp() is really __sigsetjmp(env,0)
+	.extern _sigsetjmp			# setjmp() is really __sigsetjmp(env,0)
 
 ENTRY	dm_start
 	pushq	%rbp				# Preserve caller's %rbp register (aka REG_STACK_FRAME) which 16 byte aligns stack
@@ -38,7 +38,7 @@ ENTRY	dm_start
 	CHKSTKALIGN				# Verify stack alignment
 	movq    %rbp, REG_FRAME_POINTER_SAVE_OFF(%rsp)  # Save the %rbp value, as that will be trashed in the runtime
 	movq	%rbx, REG_XFER_TABLE_SAVE_OFF(%rsp)
-	movl    $1, _mumps_status(%rip)
+	movl    $1, mumps_status(%rip)
 	leaq	xfer_table(%rip), %rbx
 	movl	$1, dollar_truth(%rip)
 	ESTABLISH l30
@@ -69,4 +69,6 @@ ENTRY	gtm_levl_ret_code
 	jmp	return
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

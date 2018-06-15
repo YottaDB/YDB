@@ -18,12 +18,12 @@
 #	include "debug.si"
 
 	.data
-	.extern	_dollar_truth
-	.extern	_frame_pointer
+	.extern	dollar_truth
+	.extern	frame_pointer
 
 	.text
-	.extern	_exfun_frame
-	.extern	_push_tval
+	.extern	exfun_frame
+	.extern	push_tval
 
 #
 # op_callsp - Used to build a new stack level for argumentless DO (also saves $TEST)
@@ -35,22 +35,24 @@
 # Note this routine calls exfun_frame() instead of copy_stack_frame() because this routine needs to provide a
 # separate set of compiler temps for use by the new frame. Particularly when it called on same line with FOR.
 #
-ENTRY	_op_callspl
-ENTRY	_op_callspw
-ENTRY	_op_callspb
+ENTRY	op_callspl
+ENTRY	op_callspw
+ENTRY	op_callspb
 	movq	(%rsp), %rax			# Save return addr in reg
 	subq	$8, %rsp				# Bump stack for 16 byte alignment
 	CHKSTKALIGN					# Verify stack alignment
-	movq	_frame_pointer(%rip), %r11
+	movq	frame_pointer(%rip), %r11
 	movq	%rax, msf_mpc_off(%r11) # Save return addr in M frame
 	addq	%rdi, msf_mpc_off(%r11) # Add in return offset
-	call	_exfun_frame				# Copies stack frame and creates new temps
-	movl	_dollar_truth(%rip), %edi
-	call	_push_tval
-	movq	_frame_pointer(%rip), %rbp
+	call	exfun_frame				# Copies stack frame and creates new temps
+	movl	dollar_truth(%rip), %edi
+	call	push_tval
+	movq	frame_pointer(%rip), %rbp
 	movq	msf_temps_ptr_off(%rbp), %r14
 	addq	$8, %rsp				# Remove stack alignment bump
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

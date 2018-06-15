@@ -19,17 +19,17 @@
 #	include "debug.si"
 
 	.data
-	.extern	_undef_inhibit
+	.extern	undef_inhibit
 
 	.text
-	.extern	_underr
+	.extern	underr
 
 #
 # Routine to compare input mval (passed in %rax) to see if it is the NULL string. Primary return is setting
 # the condition code for a conditional branch in the caller. If caller wants/needs it, the return (int) value is
 # also set.
 #
-ENTRY	_op_equnul
+ENTRY	op_equnul
 	subq	$8, %rsp				# Bump stack for 16 byte alignment
 	CHKSTKALIGN					# Verify stack alignment
 	mv_if_notdefined %rax, undefmval
@@ -57,12 +57,14 @@ done:
 	# Else, raise the undef error.
 	#
 undefmval:
-	cmpb	$0, _undef_inhibit(%rip)		# Test undef_inhibit setting
+	cmpb	$0, undef_inhibit(%rip)		# Test undef_inhibit setting
 	jne	nullstr					# It's set, return as if was NULL
 	movq	%rax, %rdi			# Move mval to arg register
 	movb    $0, %al             		# Variable length argumentt
-	call	_underr					# Give undef error
+	call	underr					# Give undef error
 	jmp	done					# Should never return but if do - at least return
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

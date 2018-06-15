@@ -18,20 +18,22 @@
 #	include "debug.si"
 
 	.text
-	.extern	_op_oldvar
-	.extern	_opp_dmode
+	.extern	op_oldvar
+	.extern	opp_dmode
 
 #
 # Note call_dm is only ever branched to so does not have a return address pushed on the stack throwing off the
 # needed 16 byte alignment of the stack. Verify that first thing on each iteration.
 #
-ENTRY	_call_dm
+ENTRY	call_dm
 newcmd:
 	CHKSTKALIGN			# Verify stack alignment
-	call	_opp_dmode
-	call	_op_oldvar
+	call	opp_dmode
+	call	op_oldvar
 	jmp	newcmd
 
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

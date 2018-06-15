@@ -18,33 +18,35 @@
 #	include "debug.si"
 
 	.data
-	.extern	_frame_pointer
-	.extern	_neterr_pending
+	.extern	frame_pointer
+	.extern	neterr_pending
 
 	.text
-	.extern	_gtm_fetch
-	.extern	_gvcmz_neterr
-	.extern	_outofband_clear
-	.extern	_async_action
+	.extern	gtm_fetch
+	.extern	gvcmz_neterr
+	.extern	outofband_clear
+	.extern	async_action
 
-ENTRY	_op_fetchintrrpt
-	movq	_frame_pointer(%rip), %r11
+ENTRY	op_fetchintrrpt
+	movq	frame_pointer(%rip), %r11
 	popq	msf_mpc_off(%r11)		# Save return addr in M frame, also aligns stack to 16 bytes
 	CHKSTKALIGN					# Verify stack alignment
 	movq    %r15, msf_ctxt_off(%r11)
 	movb    $0, %al             		# Variable length argument
-	call	_gtm_fetch
-	cmpb	$0, _neterr_pending(%rip)
+	call	gtm_fetch
+	cmpb	$0, neterr_pending(%rip)
 	je	l1
-	call	_outofband_clear
+	call	outofband_clear
 	movq 	$0, %rdi
-	call	_gvcmz_neterr
+	call	gvcmz_neterr
 l1:
 	movl	$1, %edi
-	call	_async_action
-	movq	_frame_pointer(%rip), %r11
+	call	async_action
+	movq	frame_pointer(%rip), %r11
 	pushq	msf_mpc_off(%r11)		# Push return address for current frame back on stack
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

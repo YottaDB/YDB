@@ -19,8 +19,8 @@
 #	include "debug.si"
 
 	.text
-	.extern	_s2n
-	.extern _underr
+	.extern	s2n
+	.extern underr
 
 save_ret1	= 8
 save_ret0	= 0
@@ -32,7 +32,7 @@ FRAME_SIZE	= 24					# This size 16 byte aligns the stack
 #	%r10 - source mval      = &v
 #	%rax - destination mval = &u
 #
-ENTRY	_op_neg
+ENTRY	op_neg
 	subq	$FRAME_SIZE, %rsp			# Create save area and 16 byte align stack
 	CHKSTKALIGN					# Verify stack alignment
 	movq	%rax, save_ret0(%rsp)		# Save dest mval addr across potential call
@@ -40,7 +40,7 @@ ENTRY	_op_neg
 	mv_if_number %r10, numer			# Branch if numeric
 	movq	%r10, save_ret1(%rsp)		# Save src mval (may not be original if noundef set)
 	movq	%r10, %rdi			# Move src mval to parm reg for s2n()
-	call	_s2n
+	call	s2n
 	movq	save_ret1(%rsp), %r10		# Restore source mval addr
 numer:
 	movq	save_ret0(%rsp), %rax		# Restore destination mval addr
@@ -64,4 +64,6 @@ done:
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

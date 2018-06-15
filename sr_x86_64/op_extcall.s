@@ -170,7 +170,7 @@ autorelink_check:
 # occurs
 #
 gtmcheck:
-	movl	$ERR_GTMCHECK, REG32_ARG1			#CETODO ORIG: movl	_ERR_GTMCHECK(%rip), %esi
+	movl	$ERR_GTMCHECK, %esi				#CETODO ORIG: movl	_ERR_GTMCHECK(%rip), %esi
 	movl	$1, %edi
 	movb    $0, %al						# Variable length argument
 	call	rts_error
@@ -185,4 +185,6 @@ label_missing:
 	jmp	retlab
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

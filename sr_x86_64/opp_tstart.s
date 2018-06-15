@@ -18,10 +18,10 @@
 #	include "debug.si"
 
 	.data
-	.extern	_frame_pointer
+	.extern	frame_pointer
 
 	.text
-	.extern	_op_tstart
+	.extern	op_tstart
 
 save_arg5	= -16
 save_arg4	= -8
@@ -43,7 +43,7 @@ FRAME_SIZE	= 16
 # 8 from FRAME_SIZE because this routine pops the return address after putframe saves it. So instead of removing the
 # stack space for the return address then adding 16 bytes for save area, just reduce by the difference.
 #
-ENTRY	_opp_tstart
+ENTRY	opp_tstart
         putframe
 	leaq	8(%rsp), %rbp				# Address of start of parameter list on stack
         subq    $FRAME_SIZE-8, %rsp 			# Burn the return pc, add 16 byte save area and 16 byte align stack
@@ -105,10 +105,12 @@ no_arg:
         movq	%rdi, %rsi
         movl	$0, %edi				# arg0: NOT an implicit op_tstart() call
         movb	$0, %al				# Variable length argument
-        call    _op_tstart
+        call    op_tstart
 	movq	%rbp, %rsp				# Restore stack pointer unwinding save/parm area
         getframe					# Get frame pointers and push return addr
         ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

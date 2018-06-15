@@ -19,10 +19,10 @@
 #	include "debug.si"
 
 	.text
-	.extern	_do_patfixed
-	.extern	_do_pattern
+	.extern	do_patfixed
+	.extern	do_pattern
 
-ENTRY	_op_pattern
+ENTRY	op_pattern
 	subq	$8, %rsp				# Bump stack for 16 byte alignment
 	CHKSTKALIGN					# Verify stack alignment
 	movq	%r10, %rsi
@@ -37,14 +37,16 @@ ENTRY	_op_pattern
 	#
 	cmpb	$0, 0(%rax)			# Little endian compare of low order byte
 	je	l1
-	call	_do_patfixed
+	call	do_patfixed
 	jmp	l2
 l1:
-	call	_do_pattern
+	call	do_pattern
 l2:
 	addq	$8, %rsp				# Remove stack alignment bump
 	cmpl	$0, %eax				# Set condition code for generated code
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

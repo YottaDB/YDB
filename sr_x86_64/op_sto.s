@@ -40,15 +40,17 @@ done:
 	addq	$8, %rsp					# Remove stack alignment bump
 	ret
 notdef:
-	cmpb	$0, _undef_inhibit(%rip)
+	cmpb	$0, undef_inhibit(%rip)
 	je	clab
-	leaq	_literal_null(%rip), %r10
+	leaq	literal_null(%rip), %r10
 	jmp	nowdef
 clab:
 	movq	%r10, %rdi
 	movb    $0, %al             			# Variable length argument
-	call	_underr
+	call	underr
 	jmp	done
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

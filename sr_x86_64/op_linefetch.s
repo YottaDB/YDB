@@ -18,10 +18,10 @@
 #	include "debug.si"
 
 	.data
-	.extern	_frame_pointer
+	.extern	frame_pointer
 
 	.text
-	.extern	_gtm_fetch
+	.extern	gtm_fetch
 
 	#
 	# This routine does local variable fetch for all variables on a given line of code, or alternatively, all
@@ -29,16 +29,18 @@
 	#
 	# Since this routine pops its return address off the stack, the stack becomes 16 byte aligned. Verify that.
 	#
-ENTRY	_op_linefetch
-	movq	_frame_pointer(%rip), %rax
+ENTRY	op_linefetch
+	movq	frame_pointer(%rip), %rax
 	popq	msf_mpc_off(%rax)		# Save incoming return PC in frame_pointer->mpc
 	movq	%r15, msf_ctxt_off(%rax)	# Save linkage pointer
 	CHKSTKALIGN					# Verify stack alignment
 	movb    $0, %al				# No variable length arguments
-	call	_gtm_fetch
-	movq	_frame_pointer(%rip), %rax
+	call	gtm_fetch
+	movq	frame_pointer(%rip), %rax
 	pushq	msf_mpc_off(%rax)		# Push return address back on stack for return
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

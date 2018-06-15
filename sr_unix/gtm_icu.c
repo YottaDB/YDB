@@ -280,12 +280,8 @@ void gtm_icu_init(void)
 		memcpy(&icu_libname[icu_libname_len], ICU_LIBNAME_ROOT, len);
 		icu_libname_len += len;
 		icu_libname[icu_libname_len++] = '.';
-		memcpy(&icu_libname[icu_libname_len], major_ver_ptr, major_ver_len);
-		icu_libname_len += major_ver_len;
-		icu_libname[icu_libname_len++] = '.';
-		memcpy(&icu_libname[icu_libname_len], minor_ver_ptr, minor_ver_len);
-		icu_libname_len += minor_ver_len;
-		icu_libname[icu_libname_len++] = '.';
+		memcpy(&icu_libname[icu_libname_len], iculibver, iculibver_len);
+		icu_libname_len += iculibver_len;
 		len = STR_LIT_LEN(ICU_LIBNAME_EXT);
 		memcpy(&icu_libname[icu_libname_len], ICU_LIBNAME_EXT, len);
 		icu_libname_len += len;

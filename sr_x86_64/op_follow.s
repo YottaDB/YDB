@@ -22,10 +22,10 @@ sav_rax	=	-8
 sav_rdx	=	-16
 
 	.text
-	.extern	_memvcmp
-	.extern	_n2s
+	.extern	memvcmp
+	.extern	n2s
 
-ENTRY	_op_follow
+ENTRY	op_follow
 	pushq	%rbp				# Save %rbp (aka %rbp) - aligns stack to 16 bytes
 	movq	%rsp, %rbp
 	subq	$16, %rsp			# Get 16 byte save area
@@ -44,11 +44,13 @@ ENTRY	_op_follow
 	movq 	mval_a_straddr(%r10), %rdx
 	movl    mval_l_strlen(%rax), %esi
 	movq	mval_a_straddr(%rax), %rdi
-	call	_memvcmp
+	call	memvcmp
 	addq	$16, %rsp
 	popq	%rbp
 	cmpl	$0, %eax			# Set condition code for use by caller
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

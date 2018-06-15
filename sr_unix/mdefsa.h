@@ -46,7 +46,6 @@ MBSTART {							\
 #	define YOTTADB_IMAGE_NAME	"libyottadb.so"
 #	define GTMSHR_IMAGE_NAME	"libgtmshr.so"
 #	define ICU_LIBNAME_EXT		"so"
-#	endif
 #endif
 #define	ICU_LIBNAME		ICU_LIBNAME_ROOT "." ICU_LIBNAME_EXT
 

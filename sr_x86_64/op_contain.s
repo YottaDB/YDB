@@ -25,10 +25,10 @@ arg6		= -32
 SAVE_SIZE	= 32
 
 	.text
-	.extern	_matchc
-	.extern	_n2s
+	.extern	matchc
+	.extern	n2s
 
-ENTRY	_op_contain
+ENTRY	op_contain
 	pushq	%rbp					# Save %rbp (aka %rbp) - aligns stack to 16 bytes
 	movq	%rsp, %rbp				# Save current stack pointer to %rbp
 	subq	$SAVE_SIZE, %rsp			# Get 16 byte save area and room for two parms
@@ -50,7 +50,7 @@ ENTRY	_op_contain
 	movl	mval_l_strlen(%rax), %edx	# 3rd Argument
 	movq	mval_a_straddr(%r10), %rsi	# 2nd Argument
 	movl	mval_l_strlen(%r10), %edi
-	call	_matchc
+	call	matchc
 	movl	arg5(%rbp), %eax    		# Return int arg5 value
 	addq	$SAVE_SIZE, %rsp
 	popq	%rbp
@@ -58,4 +58,6 @@ ENTRY	_op_contain
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

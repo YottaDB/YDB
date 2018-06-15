@@ -230,7 +230,7 @@ ENTRY	opp_zst_over_retarg
 	movq	%r10, save1(%rsp)
 	call	op_zst_over_retarg_helper
 	movq	frame_pointer(%rip), %rax
-	movw	msf_old_frame_off(%rax), %rax
+	movq	msf_old_frame_off(%rax), %rax
 	movq	zstep_level(%rip), %rdx
 	cmpq	%rax, %rdx
 	jg	l12
@@ -242,4 +242,6 @@ l12:
 	jmp	op_retarg
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

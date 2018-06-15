@@ -26,21 +26,23 @@
 #	include "debug.si"
 
 	.text
-	.extern	_mval2i
-	.extern	_s2n
-	.extern	_underr
-	.extern	_underr_strict
+	.extern	mval2i
+	.extern	s2n
+	.extern	underr
+	.extern	underr_strict
 
-ENTRY	_mval2mint
+ENTRY	mval2mint
 	subq	$8, %rsp			# Allocate area to align stack to 16 bytes
 	CHKSTKALIGN				# Verify stack alignment
 	mv_force_defined %r10, isdefined
 	movq	%r10, 0(%rsp)		# Save mval ptr - mv_force_defined may have re-defined it
         mv_force_num %r10, skip_conv
 	movq	0(%rsp), %rdi		# Move saved value to arg reg
-	call	_mval2i
+	call	mval2i
 	addq	$8, %rsp			# Remove save area
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

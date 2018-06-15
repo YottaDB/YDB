@@ -18,17 +18,19 @@
 #	include "debug.si"
 
 	.text
-	.extern	_is_equ
+	.extern	is_equ
 
-ENTRY	_op_equ
+ENTRY	op_equ
 	subq	$8, %rsp				# Bump stack for 16 byte alignment
 	CHKSTKALIGN					# Verify stack alignment
 	movq	%r10, %rsi
 	movq	%rax, %rdi
-	call	_is_equ
+	call	is_equ
 	addq	$8, %rsp				# Remove stack alignment bump
 	cmpl	$0, %eax
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

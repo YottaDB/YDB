@@ -18,18 +18,20 @@
 #	include "debug.si"
 
 	.data
-	.extern	_frame_pointer
+	.extern	frame_pointer
 
 	.text
-	.extern	_op_newvar
+	.extern	op_newvar
 
-ENTRY	_opp_newvar
+ENTRY	opp_newvar
 	putframe
 	addq	$8, %rsp		# Burn return address & 16 byte align stack
 	CHKSTKALIGN			# Verify stack alignment
-	call	_op_newvar
+	call	op_newvar
 	getframe
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

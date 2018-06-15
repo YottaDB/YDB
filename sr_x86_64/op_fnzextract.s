@@ -33,9 +33,9 @@ dest		= -32
 FRAME_SIZE	= 32
 
 	.text
-	.extern	_n2s
+	.extern	n2s
 
-ENTRY	_op_fnzextract
+ENTRY	op_fnzextract
 	pushq	%rbp					# Preserve caller's %rpb register (aka REG_STACK_FRAME)
 	movq	%rsp, %rbp				# Save current stack pointer to %rbp
 	subq	$FRAME_SIZE, %rsp			# Allocate save area for parameters
@@ -80,4 +80,6 @@ retlab:
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif

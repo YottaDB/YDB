@@ -44,9 +44,9 @@
 	.extern	frame_pointer
 
 	.text
-	.extern	_exfun_frame
-	.extern	_push_parm
-	.extern	_rts_error
+	.extern	exfun_frame
+	.extern	push_parm
+	.extern	rts_error
 
 arg2_off	= -48
 arg1_off	= -40
@@ -144,4 +144,6 @@ error:
 	jmp	done					# Shouldn't return but in case..
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.
 # This marking is not an issue in Linux but is in Windows Subsystem on Linux (WSL) which does not enable executable stack.
+#ifndef __APPLE__
 .section        .note.GNU-stack,"",@progbits
+#endif
