@@ -361,7 +361,7 @@ add_custom_command(
   )
 
 add_custom_target(gen_gtm_threadgbl_deftypes
- DEPENDS ${YDB_BINARY_DIR}/${gtmthreadgblasmhdr} ${YDB_BINARY_DIR}/${gtmthreadgblasmfile})
+  DEPENDS ${YDB_BINARY_DIR}/${gtmthreadgblasmhdr} ${YDB_BINARY_DIR}/${gtmthreadgblasmfile})
 
 foreach(exp ydbexe yottadb)
   set(out ${exp}_symbols.export)
@@ -419,19 +419,19 @@ list(APPEND with_export dse)
 add_executable(dbcertify		${dbcertify_SOURCES})
 
 add_executable(geteuid			${geteuid_SOURCES})
-target_link_libraries(geteuid		libmumps)       # needed for few functions (e.g. gtm_printf etc.)
+target_link_libraries(geteuid		libmumps)	# needed for few functions (e.g. gtm_printf etc.)
 
 add_executable(gtmsecshr		${gtmsecshr_SOURCES})
-target_link_libraries(gtmsecshr		libmumps)       # needed for static linking since this is a setuid executable
-                                                       # and does not do a dlopen of libyottadb.so
+target_link_libraries(gtmsecshr		libmumps)	# needed for static linking since this is a setuid executable
+                                                	# and does not do a dlopen of libyottadb.so
 
 add_executable(gtmsecshr_real		${gtmsecshr_real_SOURCES})
 set_target_properties(gtmsecshr_real PROPERTIES
   OUTPUT_NAME gtmsecshr
   RUNTIME_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/gtmsecshrdir
   )
-target_link_libraries(gtmsecshr_real	libmumps)       # needed for static linking since this is a setuid executable
-                                                       # and does not do a dlopen of libyottadb.so
+target_link_libraries(gtmsecshr_real	libmumps)	# needed for static linking since this is a setuid executable
+                                                	# and does not do a dlopen of libyottadb.so
 
 add_executable(mupip			${mupip_SOURCES})
 list(APPEND with_export mupip)
@@ -451,11 +451,11 @@ list(APPEND with_export gtcm_play)
 
 add_executable(gtcm_pkdisp		${gtcm_pkdisp_SOURCES})
 
-add_executable(gtcm_shmclean		${gtcm_shmclean_SOURCES})
+add_executable(gtcm_shmclean 		${gtcm_shmclean_SOURCES})
 
-add_executable(semstat2			${semstat2_SOURCES})
+add_executable(semstat2		 	${semstat2_SOURCES})
 
-add_executable(ftok			${ftok_SOURCES})
+add_executable(ftok 			${ftok_SOURCES})
 
 add_library(libyottadb MODULE ${libyottadb_SOURCES})
 set_property(TARGET libyottadb PROPERTY OUTPUT_NAME yottadb)
