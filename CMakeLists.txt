@@ -423,7 +423,7 @@ target_link_libraries(geteuid		libmumps)	# needed for few functions (e.g. gtm_pr
 
 add_executable(gtmsecshr		${gtmsecshr_SOURCES})
 target_link_libraries(gtmsecshr		libmumps)	# needed for static linking since this is a setuid executable
-                                                	# and does not do a dlopen of libyottadb.so
+							# and does not do a dlopen of libyottadb.so
 
 add_executable(gtmsecshr_real		${gtmsecshr_real_SOURCES})
 set_target_properties(gtmsecshr_real PROPERTIES
@@ -431,7 +431,7 @@ set_target_properties(gtmsecshr_real PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/gtmsecshrdir
   )
 target_link_libraries(gtmsecshr_real	libmumps)	# needed for static linking since this is a setuid executable
-                                                	# and does not do a dlopen of libyottadb.so
+							# and does not do a dlopen of libyottadb.so
 
 add_executable(mupip			${mupip_SOURCES})
 list(APPEND with_export mupip)
