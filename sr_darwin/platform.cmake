@@ -20,7 +20,7 @@ set(srdir "sr_darwin")
 set(arch "x86_64")
 set(bits 64)
 
-set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -include ${YDB_SOURCE_DIR}/sr_port/ydbmerrors.h")
+#set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-I${YDB_SOURCE_DIR}/sr_port/ydbmerrors.h")
 
 set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -x assembler-with-cpp")
 # Platform directories
@@ -31,7 +31,9 @@ set(gen_xfer_desc 1)
 set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I") # gcc -I does not make it to "as"
 # For Darwin, we need to change the assembly symbols to start with _.
 # See http://www.drpaulcarter.com/pcasm/faq.php, esp. the examples in the zip files.
-list(APPEND CMAKE_ASM_COMPILE_OBJECT "gobjcopy --prefix-symbols=_ <OBJECT>")
+#list(APPEND CMAKE_ASM_COMPILE_OBJECT "gobjcopy --prefix-symbols=_ <OBJECT>")
+list(APPEND CMAKE_ASM_COMPILE_OBJECT "objconv -nu+ <OBJECT> <OBJECT>.rename")
+list(APPEND CMAKE_ASM_COMPILE_OBJECT "mv <OBJECT>.rename <OBJECT>")
 
 # Compiler
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -fPIC ")
@@ -121,9 +123,9 @@ set(CMAKE_MACOSX_RPATH 1)
 
 # https://cmake.org/pipermail/cmake/2009-June/029929.html
 SET(CMAKE_C_CREATE_STATIC_LIBRARY
-  #"<CMAKE_AR> cr <TARGET> <LINK_FLAGS> <OBJECTS> "
-  #"<CMAKE_RANLIB> -c <TARGET> "
-  "lipo -create <OBJECTS> -output <TARGET>" 
+  #"<CMAKE_AR> cr <TARGET> <LINK_FLAGS> <OBJECTS>"
+  #"<CMAKE_RANLIB> -c <TARGET>"
+  "libtool -static <OBJECTS> -o <TARGET>"
   )
 # SET(CMAKE_C_ARCHIVE_CREATE   "<CMAKE_AR> Scr <TARGET> <LINK_FLAGS> <OBJECTS>")
 # SET(CMAKE_C_CREATE_STATIC_LIBRARY   "<CMAKE_AR> cr <TARGET> <LINK_FLAGS> <OBJECTS>")

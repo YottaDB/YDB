@@ -20,7 +20,8 @@
 # CMake 2.8.5 introduced use of C compiler as the assembler
 # CMake 2.8.12 Adds MacOSX RPATH
 cmake_minimum_required(VERSION 2.8.12)
-project(YDB C ASM)
+# Switch languages around as on Darwin it will pass a -arch flag if the language is C or F
+project(YDB ASM C)
 
 # Max optimization level is -O2
 get_property(languages GLOBAL PROPERTY ENABLED_LANGUAGES)
@@ -229,7 +230,8 @@ set_source_list(semstat2         semstat2)
 #-----------------------------------------------------------------------------
 # libmumps gets leftover sources, so compute the remaining list.
 set(source_used_dtgbldir 1) # exclude unused source
-set_source_list(libmumps ydb_getenv minimal_gbldefs)
+#set_source_list(libmumps ydb_getenv minimal_gbldefs)
+set_source_list(libmumps minimal_gbldefs)
 foreach(d ${gt_src_list})
   foreach(s ${sources_${d}})
     get_filename_component(snoext ${s} NAME_WE)
@@ -548,7 +550,7 @@ set_target_properties(maskpass PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/plugin/gtmcrypt
   )
 install(TARGETS maskpass DESTINATION ${YDB_INSTALL_DIR}/plugin/gtmcrypt)
-endif()
+
 
 # Always copy files into the plugin directory
 foreach(f
@@ -598,6 +600,7 @@ foreach(f
   install(FILES "${f_out}" DESTINATION ${YDB_INSTALL_DIR}/plugin/gtmcrypt ${permissions})
   list(APPEND files_to_place "${f_out}")
 endforeach()
+endif() #if(0)
 
 install(TARGETS
   mumps
@@ -933,11 +936,12 @@ exit")
     list(APPEND targets_to_run ${YDB_BINARY_DIR}/${help}help.dat_noro)
 endforeach()
 #-----------------------------------------------------------------------------
-
+if(0)
 configure_file(sr_unix/gpgagent.tab.in plugin/gpgagent.tab @ONLY)
 set(YDB_TOP "$ENV{PWD}/${YDB_INSTALL_DIR}")
 configure_file(sr_unix/gpgagent.tab.in CMakeFiles/plugin/gpgagent.tab @ONLY)
 install(FILES ${YDB_BINARY_DIR}/CMakeFiles/plugin/gpgagent.tab DESTINATION ${YDB_INSTALL_DIR}/plugin)
+endif() #if(0)
 
 install(FILES sr_unix/configure.gtc DESTINATION ${YDB_INSTALL_DIR}
   PERMISSIONS ${install_permissions_script}

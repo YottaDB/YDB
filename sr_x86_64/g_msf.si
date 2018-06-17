@@ -18,8 +18,8 @@
 #  for the GNU gas x86-64 assembler version
 #-----------------------------------------------
 
-.extern	_underr
-.extern	_underr_strict
+.extern	underr
+.extern	underr_strict
 
 
 msf_rvector_off		=	0
@@ -87,7 +87,7 @@ ARG_COUNT_OFFSET	   =   ARG_SAVE_OFFSET - (8 * NO_REG_SAVED)
 .endm
 
 .macro putframe
-	movq	_frame_pointer(%rip), %rbp
+	movq	frame_pointer(%rip), %rbp
 	movq	%r14, msf_temps_ptr_off(%rbp)
 	movq	%r13, msf_l_symtab_off(%rbp)
 	movq	%r12, msf_literal_ptr_off(%rbp)
@@ -99,12 +99,12 @@ ARG_COUNT_OFFSET	   =   ARG_SAVE_OFFSET - (8 * NO_REG_SAVED)
 .extern	_error_return
 
 .macro getframe
-	movq	_frame_pointer(%rip), %rbp
+	movq	frame_pointer(%rip), %rbp
 	movb	msf_flags_off(%rbp), %r11b
 	andb	$SFF_ETRAP_ERR, %r11b
 	jz	1f
-	call	_error_return
-	movq	_frame_pointer(%rip), %rbp
+	call	error_return
+	movq	frame_pointer(%rip), %rbp
 1:
 	movq	msf_temps_ptr_off(%rbp), %r14
 	movq	msf_l_symtab_off(%rbp), %r13

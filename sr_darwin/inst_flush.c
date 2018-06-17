@@ -11,7 +11,9 @@
 
 /* STUB FILE only for non-ia64 versions */
 #include "mdef.h"
+
 #include "inst_flush.h"
+#include "cacheflush.h"
 
 void inst_flush(void *start, int4 len)
 {

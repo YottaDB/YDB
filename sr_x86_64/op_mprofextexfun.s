@@ -246,7 +246,7 @@ autorelink_check:
 # occurs
 #
 gtmcheck:
-	movl	$ERR_GTMCHECK, %esi 			#CETODO ORIG: movl	ERR_GTMCHECK(%rip), %esi
+	movl	ERR_GTMCHECK(%rip), %esi
 	movl	$1, %edi
 	movb    $0, %al					# Variable length argument
 	call	rts_error
@@ -264,7 +264,7 @@ label_missing:
 # Raise missing formal list error
 #
 fmllstmissing:
-	movl    $ERR_FMLLSTMISSING, %esi		#CETODO ORIG: ERR_FMLLSTMISSING(%rip), %esi
+	movl    ERR_FMLLSTMISSING(%rip), %esi
         movl    $1, %edi
 	movb	$0, %al					# Variable length argument
 	call	rts_error

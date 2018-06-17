@@ -139,7 +139,7 @@ done:
 	ret
 
 error:
-	movl	$ERR_GTMCHECK, %esi			#CETODO ORIG: movl	_ERR_GTMCHECK(%rip), %esi
+	movl	ERR_GTMCHECK(%rip), %esi
 	movl	$1, %edi
 	movb	$0, %al             			# Variable length argument
 	call	rts_error

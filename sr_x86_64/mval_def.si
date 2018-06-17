@@ -84,7 +84,7 @@ top			=	16
         jne     \label
         movq    \mval, %rdi
 	movb	$0, %al	#variable argument list
-        call    _underr
+        call    underr
         movq    %rax, \mval
 \label:
 .endm
@@ -97,7 +97,7 @@ top			=	16
 	jne     \label
 	movq    \mval, %rdi
 	movb	$0, %al	#variable argument list
-	call    _underr_strict
+	call    underr_strict
 \label:
 .endm
 
@@ -108,7 +108,7 @@ top			=	16
 	testw	$mval_m_str, mval_w_mvtype(\mval)
 	jne	\label
 	movq	\mval, %rdi
-	call	_n2s
+	call	n2s
 \label:
 .endm
 
@@ -119,7 +119,7 @@ top			=	16
 	testw	$mval_m_nm, mval_w_mvtype(\mval)
 	jne	\label
 	movq	\mval, %rdi
-	call	_s2n
+	call	s2n
 \label:
 .endm
 
@@ -130,7 +130,7 @@ top			=	16
 	testw	$mval_m_num_approx, mval_w_mvtype(\mval)
 	je	\label
 	movq	\mval, %rdi
-	call	_n2s
+	call	n2s
 \label:
 .endm
 
