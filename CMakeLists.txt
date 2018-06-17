@@ -43,7 +43,8 @@ endif()
 # If CMAKE_BUILD_TYPE is set to Debug, then CMAKE_C_FLAGS_DEBUG variable contents will be added at the end of
 # CMAKE_C_FLAGS during compilation (likewise with CMAKE_ASM_FLAGS_DEBUG). Keep these debug variables defined and ready.
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
-set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,--defsym,DEBUG=1")
+#set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,--defsym,DEBUG=1")
+set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG}")
 
 set(install_permissions_script
   OWNER_READ OWNER_EXECUTE OWNER_WRITE
@@ -404,7 +405,9 @@ endif()
 
 function(add_executable target)
   _add_executable(${target} ${ARGN})
-  set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map")
+  # Darwin Port
+  #set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map")
+  set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-map,${target}.map")
   # Since all utilities now dlopen() libyottadb.so at startup, add a dependency to not build the utilities
   # until libyottadb.so was built. And that in turn relies on threadgbl_deftypes being built so add that too.
   add_dependencies(${target} libyottadb gen_gtm_threadgbl_deftypes)
@@ -463,7 +466,9 @@ set_property(TARGET libyottadb PROPERTY OUTPUT_NAME yottadb)
 set_target_properties(libyottadb PROPERTIES SUFFIX ".dylib")
 target_link_libraries(libyottadb libmumps)
 set_target_properties(libyottadb PROPERTIES
-  LINK_FLAGS "${libyottadb_link} -Wl,-Map=libyottadb.map"
+  # Darwin Port
+  #LINK_FLAGS "${libyottadb_link} -Wl,-Map=libyottadb.map"
+  LINK_FLAGS "${libyottadb_link} -Wl,-map,libyottadb.map"
   LINK_DEPENDS "${libyottadb_dep}"
   )
 add_dependencies(libyottadb gen_export)
