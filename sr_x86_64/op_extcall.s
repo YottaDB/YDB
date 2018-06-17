@@ -17,6 +17,7 @@
 	.include "g_msf.si"
 	.include "gtm_threadgbl_deftypes_asm.si"
 #	include "debug.si"
+#	include "ydbmerrors.h"
 
 #
 # op_extcall calls an external GT.M MUMPS routine with no arguments. If the routine
@@ -49,6 +50,7 @@
 # macro so we need not save it separately.
 #
 	.data
+	.extern	_ERR_GTMCHECK
 	.extern	frame_pointer
 	.extern gtm_threadgbl
 

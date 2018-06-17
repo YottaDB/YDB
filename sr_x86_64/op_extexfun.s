@@ -17,6 +17,7 @@
 	.include "g_msf.si"
 	.include "gtm_threadgbl_deftypes_asm.si"
 #	include "debug.si"
+#	include "ydbmerrors.h"
 
 #
 # op_extexfun calls an external GT.M MUMPS routine with arguments and provides for
@@ -54,6 +55,8 @@
 # macro so we need not save it separately.
 #
 	.data
+	.extern	ERR_FMLLSTMISSING
+	.extern	ERR_GTMCHECK
 	.extern	dollar_truth
 	.extern	frame_pointer
 	.extern gtm_threadgbl

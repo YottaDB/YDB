@@ -17,6 +17,7 @@
 	.include "linkage.si"
 	.include "gtm_threadgbl_deftypes_asm.si"
 #	include "debug.si"
+#	include "ydbmerrors.h"
 
 #
 # op_extjmp transfers control to an external GT.M MUMPS routine with no arguments
@@ -51,6 +52,7 @@
 # macro so we need not save it separately.
 #
 	.data
+	.extern	ERR_GTMCHECK
 	.extern	frame_pointer
 	.extern gtm_threadgbl
 

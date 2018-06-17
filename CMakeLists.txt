@@ -216,6 +216,10 @@ set_source_list(gtmsecshr_real   gtmsecshr)
 set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_util)
 set_source_list(libgtmcrypt      ydb_getenv minimal_gbldefs)
 set_source_list(libgtmtls        gtm_tls_impl gtmcrypt_util)
+#Darwin Port
+# This sets the order in which things are linked. Darwin/llvm is picky about this
+set_source_list(libyottadb       tpdefs repl_errno)
+#end
 set_source_list(libyottadb       gtm_main mupip_main mupip_cmd dse_main dse_cmd lke_main lke_cmd)
 set_source_list(libyottadb       gtcm_play_main omi_srvc_xct omi_extstr)
 set_source_list(libyottadb       gtcm_server_main gtcm_gnp_server_main gtcm_gnp_clitab gtcm_shmclean_main)
@@ -230,8 +234,7 @@ set_source_list(semstat2         semstat2)
 #-----------------------------------------------------------------------------
 # libmumps gets leftover sources, so compute the remaining list.
 set(source_used_dtgbldir 1) # exclude unused source
-#set_source_list(libmumps ydb_getenv minimal_gbldefs)
-set_source_list(libmumps minimal_gbldefs)
+set_source_list(libmumps ydb_getenv minimal_gbldefs)
 foreach(d ${gt_src_list})
   foreach(s ${sources_${d}})
     get_filename_component(snoext ${s} NAME_WE)

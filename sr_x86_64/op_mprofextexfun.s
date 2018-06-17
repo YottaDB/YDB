@@ -17,6 +17,7 @@
 	.include "g_msf.si"
 	.include "gtm_threadgbl_deftypes_asm.si"
 #	include "debug.si"
+#	include "ydbmerrors.h"
 
 #
 # op_mprofextexfun calls an external GT.M MUMPS routine with arguments and provides for
@@ -57,6 +58,8 @@
 # the version of new_stack_frame() it calls (calls new_stack_frame_sp() instead).
 #
 	.data
+	.extern	ERR_FMLLSTMISSING
+	.extern	ERR_GTMCHECK
 	.extern	dollar_truth
 	.extern	frame_pointer
 	.extern gtm_threadgbl

@@ -16,6 +16,7 @@
 	.include "g_msf.si"
 	.include "linkage.si"
 #	include "debug.si"
+#	include "ydbmerrors.h"
 
 #
 # Routine to set up the stack frame for a local (same routine) invocation. It can
@@ -40,6 +41,7 @@
 #
 
 	.data
+	.extern	ERR_GTMCHECK
 	.extern	dollar_truth
 	.extern	frame_pointer
 

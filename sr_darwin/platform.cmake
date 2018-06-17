@@ -20,7 +20,7 @@ set(srdir "sr_darwin")
 set(arch "x86_64")
 set(bits 64)
 
-#set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-I${YDB_SOURCE_DIR}/sr_port/ydbmerrors.h")
+set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -I${YDB_SOURCE_DIR}/sr_port")
 
 set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -x assembler-with-cpp")
 # Platform directories
@@ -121,18 +121,9 @@ set(GTM_SET_ICU_VERSION 0 CACHE BOOL "Unless you want ICU from MacPorts/other av
 set(CMAKE_MACOSX_RPATH 1)
 # Found these on the web: CMAKE_OSX_ARCHITECTURES, CMAKE_OSX_DEPLOYMENT_TARGET, CMAKE_OSX_SYSROOT
 
-# https://cmake.org/pipermail/cmake/2009-June/029929.html
 SET(CMAKE_C_CREATE_STATIC_LIBRARY
-  #"<CMAKE_AR> cr <TARGET> <LINK_FLAGS> <OBJECTS>"
-  #"<CMAKE_RANLIB> -c <TARGET>"
   "libtool -static <OBJECTS> -o <TARGET>"
   )
-# SET(CMAKE_C_ARCHIVE_CREATE   "<CMAKE_AR> Scr <TARGET> <LINK_FLAGS> <OBJECTS>")
-# SET(CMAKE_C_CREATE_STATIC_LIBRARY   "<CMAKE_AR> cr <TARGET> <LINK_FLAGS> <OBJECTS>")
-# SET(CMAKE_CXX_ARCHIVE_CREATE "<CMAKE_AR> Scr <TARGET> <LINK_FLAGS> <OBJECTS>")
-# SET(CMAKE_C_ARCHIVE_FINISH   "<CMAKE_RANLIB> -no_warning_for_no_symbols -c <TARGET>")
-# SET(CMAKE_CXX_ARCHIVE_FINISH "<CMAKE_RANLIB> -no_warning_for_no_symbols -c <TARGET>")
-
 
 # Linker
 set(ydb_link  "-Wl,-U,gtm_filename_to_id -Wl,-U,ydb_zstatus -Wl,-exported_symbols_list,\"${YDB_BINARY_DIR}/ydbexe_symbols.export\"")
@@ -171,3 +162,5 @@ set(libyottadb_link "${libyottadb_link} -Wl,-U,ydb_tp_s")
 set(libyottadb_link "${libyottadb_link} -Wl,-U,ydb_zwr2str_s")
 set(libyottadb_link "${libyottadb_link} -Wl,-exported_symbols_list,\"${YDB_BINARY_DIR}/yottadb_symbols.export\"")
 set(libyottadb_dep  "${YDB_BINARY_DIR}/ydbexe_symbols.export")
+
+set(libsyslibs "-lncurses -lm -ldl -lc -lpthread")

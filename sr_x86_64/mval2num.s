@@ -31,7 +31,7 @@
 	.extern	underr
 	.extern	underr_strict
 
-ENTRY	_mval2num
+ENTRY	mval2num
 	subq	$8, %rsp				# Allocate area to align stack to 16 bytes
 	CHKSTKALIGN					# Verify stack alignment
 	mv_force_defined %r10, isdefined
