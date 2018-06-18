@@ -495,8 +495,6 @@ endif()
 add_dependencies(libyottadb gen_export)
 add_dependencies(mumps libyottadb)
 
-set(CMAKE_LIBRARY_PATH /lib /usr/lib /usr/local/lib /opt/local/lib)
-
 # Iterate over the list of GPG related libraries
 foreach(gpglib gpg-error gpgme gcrypt config)
   # For each library, we need a new CMake variable, hence GPGLIB_${gpglib}
@@ -587,7 +585,6 @@ set_target_properties(maskpass PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/plugin/gtmcrypt
   )
 install(TARGETS maskpass DESTINATION ${YDB_INSTALL_DIR}/plugin/gtmcrypt)
-
 
 # Always copy files into the plugin directory
 foreach(f

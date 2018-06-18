@@ -97,7 +97,6 @@ find_package(Zlib REQUIRED)   # FindZLIB.cmake
 include_directories(${ZLIB_INCLUDE_DIRS})
 
 # default homebrew location for openssl includes
-# TODO: fix this so it isn't hard coded
 include_directories("/usr/local/opt/openssl/include")
 
 find_path(LIBICU_INCLUDE_PATH NAMES uchar.h unicode/uchar.h)
