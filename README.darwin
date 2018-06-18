@@ -1,25 +1,11 @@
-Install MacPorts: https://www.macports.org
-Alternatively Install homebrew: http://brew.sh
-
-Then install cmake, icu, and libelf.
-
-MacPorts:
-```
-sudo port install cmake
-sudo port install icu
-```
+Install homebrew: http://brew.sh
 
 Homebrew:
 ```
-brew install cmake
-brew install icu4c
-brew install libconfig
-brew install libgcrypt
-brew install gpgme
-brew install openssl
-brew install binutils
+brew install cmake icu4c libconfig libgcrypt gpgme openssl
 brew link icu4c --force
 ```
+Need to install [objconv](http://www.agner.org/optimize/#objconv). This requires a manual compile and copy to somewhere in your path
 
 Note to future self: need info on how to link openssl in cmake: /usr/local/opt/openssl/liblibssl.dylib
 
@@ -31,10 +17,6 @@ sudo chmod ugo+rw /usr/local/lib
 
 Now go ahead and make:
 ```
-   $ make -j16
-   
-   # WARNING WARNING WARNING
-   # The build leaves the terminal in a pretty bad shape. Do the following to
-   # restore sanity
-   $ stty sane
+   mkdir build && cd build && cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
+   make -j16
 ```
