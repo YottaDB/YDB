@@ -94,6 +94,10 @@
 #include "ydb_chk_dist.h"
 #include "ydb_getenv.h"
 
+#ifdef __APPLE__
+# include <mach-o/dyld.h>
+#endif
+
 #define intent_open		"for open"	/* FLUSH_DB_IPCS_INFO types */
 #define intent_close		"for close"
 

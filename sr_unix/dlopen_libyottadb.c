@@ -32,6 +32,10 @@
 
 #include "ydb_chk_dist.h"
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+
 #ifdef DEBUG
 # include <sys/types.h>	/* needed by "assert" macro */
 # include <signal.h>	/* needed by "assert" macro */

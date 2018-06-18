@@ -53,6 +53,10 @@
 #include "gtmimagename.h"
 #include "have_crit.h"
 
+#ifdef __APPLE__
+# include <mach-o/dyld.h>
+#endif
+
 GBLREF	char		ydb_dist[YDB_PATH_MAX];
 GBLREF	boolean_t	ydb_dist_ok_to_use;
 
