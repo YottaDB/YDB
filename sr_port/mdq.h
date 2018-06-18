@@ -14,7 +14,7 @@
  ****************************************************************/
 
 #ifndef MDQ_H_DEFINED
-#define HDQ_H_DEFINED
+#define MDQ_H_DEFINED
 
 /* Define basic working macros for queue management of doubly linked list is defined using elements "n.fl" and "n.bl".
  * The DSRINS insert at tail rather than head and so work FIFO rather than LIFO with DQLOOP and associated macros

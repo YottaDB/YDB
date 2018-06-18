@@ -279,7 +279,7 @@ void	op_zg1(int4 level);
 void	op_zgoto(mval *rtnname, mval *lblname, int offset, int level);
 void    op_zrupdate(int argcnt, ...);
 void	op_ztrigger(void);
-void	op_zhalt(boolean_t is_zhalt, int4 retcode);
+void	op_zhalt(int4 is_zhalt, int4 retcode);
 void	op_zhelp_xfr(mval *subject, mval *lib);
 void	op_zhorolog(mval *s);
 void	op_zlink(mval *v, mval *quals);
