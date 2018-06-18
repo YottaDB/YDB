@@ -249,6 +249,7 @@ if [ ! -t 0 ] ; then echo "$ydbdist"; fi
 
 if [ `$echo $ydbdist | grep -c '^/'` -eq 0 ] ; then
     ydbdist=`pwd`/$ydbdist
+fi
 
 # ensure that canonical paths do not exceed PATH_MAX
 getconf PATH_MAX $ydbdist | \
