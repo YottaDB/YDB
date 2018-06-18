@@ -20,8 +20,7 @@
 # CMake 2.8.5 introduced use of C compiler as the assembler
 # CMake 2.8.12 Adds MacOSX RPATH
 cmake_minimum_required(VERSION 2.8.12)
-# Switch languages around as on Darwin it will pass a -arch flag if the language is C or F
-project(YDB ASM C)
+project(YDB C ASM)
 
 # Max optimization level is -O2
 get_property(languages GLOBAL PROPERTY ENABLED_LANGUAGES)
@@ -44,8 +43,11 @@ endif()
 # If CMAKE_BUILD_TYPE is set to Debug, then CMAKE_C_FLAGS_DEBUG variable contents will be added at the end of
 # CMAKE_C_FLAGS during compilation (likewise with CMAKE_ASM_FLAGS_DEBUG). Keep these debug variables defined and ready.
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
-#set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,--defsym,DEBUG=1")
-set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG}")
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+  set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG}")
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,--defsym,DEBUG=1")
+endif()
 
 set(install_permissions_script
   OWNER_READ OWNER_EXECUTE OWNER_WRITE
@@ -216,10 +218,9 @@ set_source_list(gtmsecshr_real   gtmsecshr)
 set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_util)
 set_source_list(libgtmcrypt      ydb_getenv minimal_gbldefs)
 set_source_list(libgtmtls        gtm_tls_impl gtmcrypt_util)
-#Darwin Port
-# This sets the order in which things are linked. Darwin/llvm is picky about this
-set_source_list(libyottadb       tpdefs repl_errno)
-#end
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+  set_source_list(libyottadb       tpdefs repl_errno)
+endif()
 set_source_list(libyottadb       gtm_main mupip_main mupip_cmd dse_main dse_cmd lke_main lke_cmd)
 set_source_list(libyottadb       gtcm_play_main omi_srvc_xct omi_extstr)
 set_source_list(libyottadb       gtcm_server_main gtcm_gnp_server_main gtcm_gnp_clitab gtcm_shmclean_main)
@@ -410,9 +411,11 @@ endif()
 
 function(add_executable target)
   _add_executable(${target} ${ARGN})
-  # Darwin Port
-  #set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map")
-  set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-map,${target}.map")
+  if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-map,${target}.map")
+  elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map")
+  endif()
   # Since all utilities now dlopen() libyottadb.so at startup, add a dependency to not build the utilities
   # until libyottadb.so was built. And that in turn relies on threadgbl_deftypes being built so add that too.
   add_dependencies(${target} libyottadb gen_gtm_threadgbl_deftypes)
@@ -467,15 +470,22 @@ add_executable(ftok 			${ftok_SOURCES})
 
 add_library(libyottadb MODULE ${libyottadb_SOURCES})
 set_property(TARGET libyottadb PROPERTY OUTPUT_NAME yottadb)
-# Mac Port
-set_target_properties(libyottadb PROPERTIES SUFFIX ".dylib")
+
+if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+  set_target_properties(libyottadb PROPERTIES SUFFIX ".dylib")
+endif()
 target_link_libraries(libyottadb libmumps)
-set_target_properties(libyottadb PROPERTIES
-  # Darwin Port
-  #LINK_FLAGS "${libyottadb_link} -Wl,-Map=libyottadb.map"
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+  set_target_properties(libyottadb PROPERTIES
   LINK_FLAGS "${libyottadb_link} -Wl,-map,libyottadb.map"
   LINK_DEPENDS "${libyottadb_dep}"
   )
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  set_target_properties(libyottadb PROPERTIES
+  LINK_FLAGS "${libyottadb_link} -Wl,-Map=libyottadb.map"
+  LINK_DEPENDS "${libyottadb_dep}"
+  )
+endif()
 add_dependencies(libyottadb gen_export)
 add_dependencies(mumps libyottadb)
 

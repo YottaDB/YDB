@@ -87,7 +87,7 @@ endif()
 
 # On ARM Linux, gcc by default does not include -funwind-tables whereas it does on x86_64 Linux.
 # This is needed to get backtrace() (used by caller_id.c etc.) working correctly.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -funwind-tables -v")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -funwind-tables")
 
 add_definitions(
   #-DNOLIBGTMSHR #gt_cc_option_DBTABLD=-DNOLIBGTMSHR
