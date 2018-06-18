@@ -28,10 +28,8 @@ list(APPEND gt_src_list sr_darwin gt_src_list sr_x86_64 sr_x86_regs)
 set(gen_xfer_desc 1)
 
 # Assembler
-set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I") # gcc -I does not make it to "as"
+set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I")
 # For Darwin, we need to change the assembly symbols to start with _.
-# See http://www.drpaulcarter.com/pcasm/faq.php, esp. the examples in the zip files.
-#list(APPEND CMAKE_ASM_COMPILE_OBJECT "gobjcopy --prefix-symbols=_ <OBJECT>")
 list(APPEND CMAKE_ASM_COMPILE_OBJECT "objconv -nu+ <OBJECT> <OBJECT>.rename")
 list(APPEND CMAKE_ASM_COMPILE_OBJECT "mv <OBJECT>.rename <OBJECT>")
 
@@ -53,10 +51,10 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -W
 
 # Darwin port:
 # Unsupported warning flags:
-# * -Wno-maybe-uninitialized => -Wno-uninitialized
+# * -Wno-maybe-uninitialized => -Wno-sometimes-uninitialized
 # * -Wno-unused-but-set-variable => -Wno-unused-const-variable
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-char-subscripts")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-char-subscripts -Wno-sometimes-uninitialized")
 
 # Below is an optimization flag related description copied from sr_linux/gtm_env_sp.csh
 #	-fno-defer-pop to prevent problems with assembly/generated code with optimization
@@ -73,31 +71,23 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-char-subscripts")
 #
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-strict-aliasing -fno-omit-frame-pointer")
 
-# Darwin required flag
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mmacosx-version-min=10.11")
-
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-	# Newer versions of Linux by default include -fstack-protector in gcc. This causes the build to slightly bloat
-	# in size. Avoid that for production builds of YottaDB.
+	# This causes the build to slightly bloat in size. Avoid that for
+	# production builds of YottaDB.
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-protector")
 else()
 	# In Debug builds though, keep stack-protection on for ALL functions.
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector-all")
 endif()
 
-# On ARM Linux, gcc by default does not include -funwind-tables whereas it does on x86_64 Linux.
 # This is needed to get backtrace() (used by caller_id.c etc.) working correctly.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -funwind-tables")
 
 add_definitions(
-  #-DNOLIBGTMSHR #gt_cc_option_DBTABLD=-DNOLIBGTMSHR
   -D_GNU_SOURCE
   -D_FILE_OFFSET_BITS=64
   -D_XOPEN_SOURCE=600
-  # Darwin required flag
-  #-D_XOPEN_SOURCE=600L
   -D_LARGEFILE64_SOURCE
-  # Darwin required flag
   -D_DARWIN_C_SOURCE
   )
 
@@ -117,11 +107,9 @@ include_directories(${LIBICU_INCLUDE_PATH})
 
 set(GTM_SET_ICU_VERSION 0 CACHE BOOL "Unless you want ICU from MacPorts/other avoid setting gtm_icu_version to get Apple's undocumented ICU library")
 
-# Set some MOSX specific stuff 
 set(CMAKE_MACOSX_RPATH 1)
-# Found these on the web: CMAKE_OSX_ARCHITECTURES, CMAKE_OSX_DEPLOYMENT_TARGET, CMAKE_OSX_SYSROOT
 
-SET(CMAKE_C_CREATE_STATIC_LIBRARY
+set(CMAKE_C_CREATE_STATIC_LIBRARY
   "libtool -static <OBJECTS> -o <TARGET>"
   )
 
