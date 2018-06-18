@@ -43,9 +43,9 @@ endif()
 # If CMAKE_BUILD_TYPE is set to Debug, then CMAKE_C_FLAGS_DEBUG variable contents will be added at the end of
 # CMAKE_C_FLAGS during compilation (likewise with CMAKE_ASM_FLAGS_DEBUG). Keep these debug variables defined and ready.
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
-if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG}")
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+elseif("${CMAKE_C_COMPILER_ID}" MATCHES "GNU")
   set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,--defsym,DEBUG=1")
 endif()
 
@@ -214,20 +214,17 @@ set_source_list(gtcm_play        gtcm_play dlopen_libyottadb)
 set_source_list(gtcm_server      gtcm_server dlopen_libyottadb)
 set_source_list(gtcm_shmclean    gtcm_shmclean dlopen_libyottadb)
 set_source_list(gtmsecshr        gtmsecshr_wrapper)
-if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
         set_source_list(gtmsecshr_real   gtm_icu)
 endif()
 set_source_list(gtmsecshr_real   gtmsecshr)
-if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
-        #set_source_list(libgtmcrypt   gtm_icu gtm_malloc)
-endif()
 set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_util)
 set_source_list(libgtmcrypt      ydb_getenv minimal_gbldefs)
-if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
         set_source_list(libgtmtls   minimal_gbldefs ydb_getenv)
 endif()
 set_source_list(libgtmtls        gtm_tls_impl gtmcrypt_util)
-if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
   set_source_list(libyottadb       gtm_icu tpdefs repl_errno)
 endif()
 set_source_list(libyottadb       gtm_main mupip_main mupip_cmd dse_main dse_cmd lke_main lke_cmd)
@@ -420,9 +417,9 @@ endif()
 
 function(add_executable target)
   _add_executable(${target} ${ARGN})
-  if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+  if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
     set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-map,${target}.map")
-  elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  elseif("${CMAKE_C_COMPILER_ID}" MATCHES "GNU")
     set_target_properties(${target} PROPERTIES LINK_FLAGS "-Wl,-Map=${target}.map")
   endif()
   # Since all utilities now dlopen() libyottadb.so at startup, add a dependency to not build the utilities
@@ -484,12 +481,12 @@ if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
   set_target_properties(libyottadb PROPERTIES SUFFIX ".dylib")
 endif()
 target_link_libraries(libyottadb libmumps)
-if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
   set_target_properties(libyottadb PROPERTIES
   LINK_FLAGS "${libyottadb_link} -Wl,-map,libyottadb.map"
   LINK_DEPENDS "${libyottadb_dep}"
   )
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+elseif("${CMAKE_C_COMPILER_ID}" MATCHES "GNU")
   set_target_properties(libyottadb PROPERTIES
   LINK_FLAGS "${libyottadb_link} -Wl,-Map=libyottadb.map"
   LINK_DEPENDS "${libyottadb_dep}"
@@ -527,7 +524,7 @@ set_target_properties(libgtmcrypt_gcrypt_AES256CFB PROPERTIES
   COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_AES256CFB"
   LIBRARY_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/plugin
   )
-if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set_target_properties(libgtmcrypt_gcrypt_AES256CFB PROPERTIES SUFFIX ".dylib")
 else()
   set_target_properties(libgtmcrypt_gcrypt_AES256CFB PROPERTIES SUFFIX ".so")
@@ -537,7 +534,7 @@ target_link_libraries(libgtmcrypt_gcrypt_AES256CFB ${GPG_LIBRARIES})
 install(TARGETS libgtmcrypt_gcrypt_AES256CFB DESTINATION ${YDB_INSTALL_DIR}/plugin)
 
 # Establish the default encryption link
-if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set(default_encr_link   ${YDB_BINARY_DIR}/plugin/libgtmcrypt.dylib)
 else()
   set(default_encr_link   ${YDB_BINARY_DIR}/plugin/libgtmcrypt.so)
