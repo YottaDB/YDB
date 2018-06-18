@@ -218,8 +218,14 @@ if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
         set_source_list(gtmsecshr_real   gtm_icu)
 endif()
 set_source_list(gtmsecshr_real   gtmsecshr)
+if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+        #set_source_list(libgtmcrypt   gtm_icu gtm_malloc)
+endif()
 set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref gtmcrypt_sym_ref gtmcrypt_util)
 set_source_list(libgtmcrypt      ydb_getenv minimal_gbldefs)
+if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+        set_source_list(libgtmtls   minimal_gbldefs ydb_getenv)
+endif()
 set_source_list(libgtmtls        gtm_tls_impl gtmcrypt_util)
 if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
   set_source_list(libyottadb       gtm_icu tpdefs repl_errno)
@@ -495,7 +501,6 @@ add_dependencies(mumps libyottadb)
 set(CMAKE_LIBRARY_PATH /lib /usr/lib /usr/local/lib /opt/local/lib)
 
 # Iterate over the list of GPG related libraries
-if(0)
 foreach(gpglib gpg-error gpgme gcrypt config)
   # For each library, we need a new CMake variable, hence GPGLIB_${gpglib}
   find_library(GPGLIB_${gpglib} NAME ${gpglib} PATHS ${CMAKE_LIBRARY_PATH})
@@ -516,19 +521,28 @@ endforeach()
 
 # Library=GCRYPT Algorithm=AES256CFB
 include_directories (/usr/local/ssl/include)
-add_library(libgtmcrypt_gcrypt_AES256CFB.so MODULE ${libgtmcrypt_SOURCES})
-set_target_properties(libgtmcrypt_gcrypt_AES256CFB.so PROPERTIES
+add_library(libgtmcrypt_gcrypt_AES256CFB MODULE ${libgtmcrypt_SOURCES})
+set_target_properties(libgtmcrypt_gcrypt_AES256CFB PROPERTIES
   OUTPUT_NAME gtmcrypt_gcrypt_AES256CFB
   COMPILE_DEFINITIONS "USE_GCRYPT -DUSE_AES256CFB"
   LIBRARY_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/plugin
   )
-add_dependencies(libgtmcrypt_gcrypt_AES256CFB.so gen_gtm_threadgbl_deftypes)
-target_link_libraries(libgtmcrypt_gcrypt_AES256CFB.so ${GPG_LIBRARIES})
-install(TARGETS libgtmcrypt_gcrypt_AES256CFB.so DESTINATION ${YDB_INSTALL_DIR}/plugin)
+if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+  set_target_properties(libgtmcrypt_gcrypt_AES256CFB PROPERTIES SUFFIX ".dylib")
+else()
+  set_target_properties(libgtmcrypt_gcrypt_AES256CFB PROPERTIES SUFFIX ".so")
+endif()
+add_dependencies(libgtmcrypt_gcrypt_AES256CFB gen_gtm_threadgbl_deftypes)
+target_link_libraries(libgtmcrypt_gcrypt_AES256CFB ${GPG_LIBRARIES})
+install(TARGETS libgtmcrypt_gcrypt_AES256CFB DESTINATION ${YDB_INSTALL_DIR}/plugin)
 
 # Establish the default encryption link
-set(default_encr_link   ${YDB_BINARY_DIR}/plugin/libgtmcrypt.so)
-set(default_encr_target libgtmcrypt_gcrypt_AES256CFB.so)
+if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+  set(default_encr_link   ${YDB_BINARY_DIR}/plugin/libgtmcrypt.dylib)
+else()
+  set(default_encr_link   ${YDB_BINARY_DIR}/plugin/libgtmcrypt.so)
+endif()
+set(default_encr_target libgtmcrypt_gcrypt_AES256CFB)
 add_custom_command(
 	OUTPUT ${default_encr_link}
 	COMMAND ${CMAKE_COMMAND} -E create_symlink "${default_encr_target}" "${default_encr_link}"
@@ -545,6 +559,11 @@ set_target_properties(libgtmcrypt_openssl_AES256CFB PROPERTIES
   COMPILE_DEFINITIONS "USE_OPENSSL -DUSE_AES256CFB"
   LIBRARY_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/plugin
   )
+if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+  set_target_properties(libgtmcrypt_openssl_AES256CFB PROPERTIES SUFFIX ".dylib")
+else()
+  set_target_properties(libgtmcrypt_openssl_AES256CFB PROPERTIES SUFFIX ".so")
+endif()
 target_link_libraries(libgtmcrypt_openssl_AES256CFB ${GPG_LIBRARIES} ${TLS_LIBRARIES})
 add_dependencies(libgtmcrypt_openssl_AES256CFB gen_gtm_threadgbl_deftypes)
 install(TARGETS libgtmcrypt_openssl_AES256CFB DESTINATION ${YDB_INSTALL_DIR}/plugin)
@@ -555,6 +574,11 @@ set_target_properties(libgtmtls PROPERTIES
   COMPILE_DEFINITIONS "USE_OPENSSL"
   LIBRARY_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/plugin
   )
+if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
+  set_target_properties(libgtmtls PROPERTIES SUFFIX ".dylib")
+else()
+  set_target_properties(libgtmtls PROPERTIES SUFFIX ".so")
+endif()
 target_link_libraries(libgtmtls ${TLS_LIBRARIES})
 add_dependencies(libgtmtls gen_gtm_threadgbl_deftypes)
 install(TARGETS libgtmtls DESTINATION ${YDB_INSTALL_DIR}/plugin)
@@ -616,7 +640,6 @@ foreach(f
   install(FILES "${f_out}" DESTINATION ${YDB_INSTALL_DIR}/plugin/gtmcrypt ${permissions})
   list(APPEND files_to_place "${f_out}")
 endforeach()
-endif() #if(0)
 
 install(TARGETS
   mumps
@@ -952,12 +975,10 @@ exit")
     list(APPEND targets_to_run ${YDB_BINARY_DIR}/${help}help.dat_noro)
 endforeach()
 #-----------------------------------------------------------------------------
-if(0)
 configure_file(sr_unix/gpgagent.tab.in plugin/gpgagent.tab @ONLY)
 set(YDB_TOP "$ENV{PWD}/${YDB_INSTALL_DIR}")
 configure_file(sr_unix/gpgagent.tab.in CMakeFiles/plugin/gpgagent.tab @ONLY)
 install(FILES ${YDB_BINARY_DIR}/CMakeFiles/plugin/gpgagent.tab DESTINATION ${YDB_INSTALL_DIR}/plugin)
-endif() #if(0)
 
 install(FILES sr_unix/configure.gtc DESTINATION ${YDB_INSTALL_DIR}
   PERMISSIONS ${install_permissions_script}
