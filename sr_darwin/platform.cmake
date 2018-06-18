@@ -50,9 +50,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
 
 # Darwin port:
-# Unsupported warning flags:
-# * -Wno-maybe-uninitialized => -Wno-sometimes-uninitialized
-# * -Wno-unused-but-set-variable => -Wno-unused-const-variable
+# * -Wno-unused-but-set-variable =>
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-char-subscripts -Wno-sometimes-uninitialized")
 
