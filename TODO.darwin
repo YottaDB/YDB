@@ -2,21 +2,9 @@
 
  * Make custom commands to massage GAS assembler files into something LLVM would use
  * Assembler macros for sigsetjmp and label jump g_msf.si.
- * Mach-O object files
+ * Mach-O object files (done)(ld to create dynamic libraries doesn't work though)
  * Shared autolink routine libraries don't work b/c of mprotect issue on shared memory.
- * Import V6.3-000A sources
- * get clock time for Mac /* OSE/SMH I just fixed this. See prev commit. Not sure if there are others */
- * Some defines overwrote MVS defines
  * Some files in sr_darwin are common; we don't need separate copies
  * sr_unix/extract_signal_info.c - FIXME, I just copied this
- * sr_unix/mu_cre_file.c - Mac OS X does not support posix_fallocate()
- * sr_unix/mutex.c - That #ifdef 0 should have probably just deleted the code since the variable
-   wake_this_pid is not even defined
- * Current cmake file links against ncurses in ports, but we need to link
-   against ncurses in the system libs so that we don't need macports on
-   a Mac when just installing GT.M. Currently, that's the only reason
-   we need MacPorts.
-
-
-
-
+ * sr_unix/mu_cre_file.c (double check -- not a problem) - Mac OS X does not support posix_fallocate()
+ * sr_unix/mutex.c (code just needs to be deleted) - That #ifdef 0 should have probably just deleted the code since the variable wake_this_pid is not even defined
