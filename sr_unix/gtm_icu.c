@@ -282,6 +282,7 @@ void gtm_icu_init(void)
 		icu_libname[icu_libname_len++] = '.';
 		memcpy(&icu_libname[icu_libname_len], iculibver, iculibver_len);
 		icu_libname_len += iculibver_len;
+		icu_libname[icu_libname_len++] = '.';
 		len = STR_LIT_LEN(ICU_LIBNAME_EXT);
 		memcpy(&icu_libname[icu_libname_len], ICU_LIBNAME_EXT, len);
 		icu_libname_len += len;
