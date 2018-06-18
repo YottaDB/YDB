@@ -30,7 +30,7 @@ set(gen_xfer_desc 1)
 # Assembler
 set(CMAKE_INCLUDE_FLAG_ASM "-Wa,-I")
 # For Darwin, we need to change the assembly symbols to start with _.
-list(APPEND CMAKE_ASM_COMPILE_OBJECT "objconv -nu+ <OBJECT> <OBJECT>.rename")
+list(APPEND CMAKE_ASM_COMPILE_OBJECT "objconv -nu+ -v0 <OBJECT> <OBJECT>.rename")
 list(APPEND CMAKE_ASM_COMPILE_OBJECT "mv <OBJECT>.rename <OBJECT>")
 
 # Compiler
