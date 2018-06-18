@@ -219,7 +219,7 @@ set_source_list(libgtmcrypt      gtmcrypt_ref gtmcrypt_pk_ref gtmcrypt_dbk_ref g
 set_source_list(libgtmcrypt      ydb_getenv minimal_gbldefs)
 set_source_list(libgtmtls        gtm_tls_impl gtmcrypt_util)
 if("${CMAKE_SYSTEM_NAME}" MATCHES "Darwin")
-  set_source_list(libyottadb       tpdefs repl_errno)
+  set_source_list(libyottadb       gtm_icu tpdefs repl_errno)
 endif()
 set_source_list(libyottadb       gtm_main mupip_main mupip_cmd dse_main dse_cmd lke_main lke_cmd)
 set_source_list(libyottadb       gtcm_play_main omi_srvc_xct omi_extstr)
