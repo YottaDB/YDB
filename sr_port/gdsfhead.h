@@ -4069,8 +4069,8 @@ MBSTART {						\
 
 #define	WAIT_FOR_REGION_TO_UNCHILL(CSA, CSD)										\
 MBSTART {														\
-	int		lcnt1;												\
-	boolean_t	crit_stuck = FALSE;										\
+	int			lcnt1;											\
+	boolean_t		crit_stuck = FALSE;									\
 															\
 	assert((CSA)->hdr == (CSD));											\
 	for (lcnt1 = 1; ; lcnt1++)											\
@@ -4083,7 +4083,16 @@ MBSTART {														\
 			break;												\
 		}													\
 		else if ((CSA)->now_crit && !crit_stuck)								\
-		{													\
+		{	/* Assert that we do not hold the ftok or access semaphore as that can cause deadlocks		\
+			 * while we have crit and wait below for freeze to be lifted, since the process to lift		\
+			 * the freeze off (MUPIP FREEZE -OFF) would need access to the ftok semaphore.			\
+			 */												\
+			DEBUG_ONLY(unix_db_info	*udi;)									\
+															\
+			DEBUG_ONLY(udi = (unix_db_info *)CSA;)								\
+			assert(CSA == &udi->s_addrs);									\
+			assert(!udi->grabbed_ftok_sem);									\
+			assert(!udi->grabbed_access_sem);								\
 			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_OFRZCRITSTUCK, 2, REG_LEN_STR((CSA)->region));	\
 			crit_stuck = TRUE;										\
 		}													\
