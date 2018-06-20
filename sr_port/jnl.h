@@ -172,6 +172,9 @@ error_def(ERR_JNLENDIANLITTLE);
 					 * written record. This is necessary for some callers (e.g. update process writing
 					 * an epoch for the -noresync startup case).
 					 */
+#define	WCSFLU_RET_IF_OFRZ     512	/* Return if an online freeze is detected (instead of waiting indefinitely for freeze
+					 * to be lifted off in WAIT_FOR_REGION_TO_UNCHILL macro).
+					 */
 /* options for error_on_jnl_file_lost */
 #define JNL_FILE_LOST_TURN_OFF	0	/* Turn off journaling. */
 #define JNL_FILE_LOST_ERRORS	1	/* Throw an rts_error. */

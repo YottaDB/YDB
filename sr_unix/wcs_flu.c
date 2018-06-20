@@ -297,7 +297,20 @@ boolean_t wcs_flu(uint4 options)
 		}
 	}
 	if (!FREEZE_LATCH_HELD(csa))
+	{
+		if (!was_crit && (options & WCSFLU_RET_IF_OFRZ) && FROZEN_CHILLED(csa))
+		{	/* This means an online freeze on the db happened just before we got crit in this function
+			 * AND caller wants us to return (WCSFLU_RET_IF_OFRZ) so we return prematurely from "wcs_flu"
+			 * without flushing the db. Just flush any journal activity by this process in the current
+			 * journal file so we keep (if journal file has switched since we last wrote to it, no need to flush,
+			 * whoever did the switch would have).
+			 */
+			if ((NULL !=jpc) && !JNL_FILE_SWITCHED(jpc))
+				jnl_wait(reg);
+			return FALSE;	/* to indicate "wcs_flu" did not finish its job */
+		}
 		WAIT_FOR_REGION_TO_UNCHILL(csa, csd);
+	}
 	/* jnl_enabled is an overloaded variable. It is TRUE only if JNL_ENABLED(csd) is TRUE
 	 * and if the journal file has been opened in shared memory. If the journal file hasn't
 	 * been opened in shared memory, we needn't (and shouldn't) do any journal file activity.
