@@ -4087,7 +4087,7 @@ MBSTART {														\
 			 * while we have crit and wait below for freeze to be lifted, since the process to lift		\
 			 * the freeze off (MUPIP FREEZE -OFF) would need access to the ftok semaphore.			\
 			 */												\
-			DEBUG_ONLY(unix_db_info	*udi;)									\
+			DEBUG_ONLY(unix_db_info	*udi);									\
 															\
 			DEBUG_ONLY(udi = (unix_db_info *)CSA;)								\
 			assert(CSA == &udi->s_addrs);									\
