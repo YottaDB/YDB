@@ -94,6 +94,7 @@
 #include "gvcst_jrt_null.h"	/* for gvcst_jrt_null prototype */
 #include "preemptive_db_clnup.h"
 #include "trap_env_init.h"
+#include "dpgbldir_sysops.h"
 #ifdef DEBUG
 #include "repl_filter.h"	/* needed by an assert in UPD_GV_BIND_NAME_APPROPRIATE macro */
 #endif
@@ -1235,10 +1236,17 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 						}
 					}
 					/* Triggers can change the GLD references. Verify and restore as needed */
-					if (gd_header != starting_gd_header)
+					if ((gd_header != starting_gd_header) || (TREF(gd_targ_addr) != gd_header))
+					{
+						dpzgbini();	/* Equivalent of SET $ZGBLDIR="", needed in case triggers
+								 * did a SET $ZGBLDIR=... that has to be undone once trigger
+								 * returns. Not doing so can cause future SET $ZGBLDIR= to
+								 * incorrectly return prematurely because dollar_zgbldir
+								 * was not maintained in sync with gd_header.
+								 */
 						gd_header = starting_gd_header;
-					if (TREF(gd_targ_addr) != gd_header)
 						TREF(gd_targ_addr) = gd_header;
+					}
 #					endif
 					if ((upd_good_record == bad_trans_type) && !IS_TP(rectype))
 						incr_seqno = TRUE;
