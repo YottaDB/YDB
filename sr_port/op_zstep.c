@@ -14,6 +14,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "zstep.h"
 #include <rtnhdr.h>
 #include "stack_frame.h"
@@ -21,6 +22,7 @@
 #include "indir_enum.h"
 #include "op.h"
 #include "fix_xfer_entry.h"
+#include "restrict.h"
 
 GBLREF xfer_entry_t     xfer_table[];
 GBLREF stack_frame	*frame_pointer;
@@ -29,7 +31,7 @@ GBLREF mval		zstep_action;
 GBLREF bool		neterr_pending;
 GBLREF int4		outofband;
 GBLREF int		iott_write_error;
-IA64_ONLY(int function_type(char*);)
+GBLREF int4		gtm_trigger_depth;
 
 void op_zstep(uint4 code, mval *action)
 {
@@ -38,6 +40,8 @@ void op_zstep(uint4 code, mval *action)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if ((0 < gtm_trigger_depth) && RESTRICTED(trigger_mod))
+		return;
 	if (!action)
 		zstep_action = TREF(dollar_zstep);
 	else
