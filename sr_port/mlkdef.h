@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -67,11 +70,14 @@ typedef struct
 					 * shrblk/shrsub chain
 					 */
 	uint4		usedmap;	/* Bitmap representing the bucket neighborhood, with bit N set if (bucket+N) % nbuckets
-					 * is an overflow from this bucket (or the bucket itself, for N=0.)
+					 * is an overflow from this bucket (or the bucket itself, for N=0).
+					 * N == MLK_SHRHASH_HIGHBIT is a special case indicating a bucket full situation was
+					 * encountered and so a linear search has to be used when searching.
 					 */
 } mlk_shrhash;
 
-#define MLK_SHRHASH_NEIGHBORS	(SIZEOF(((mlk_shrhash *)0)->usedmap) * BITS_PER_UCHAR)
+#define MLK_SHRHASH_NEIGHBORS	((SIZEOF(((mlk_shrhash *)0)->usedmap) * BITS_PER_UCHAR) - 1)
+#define	MLK_SHRHASH_HIGHBIT	MLK_SHRHASH_NEIGHBORS
 
 typedef struct				/* the subscript value of a single node in a tree.  Stored separately so that
 					 * the mlk_shrblk's can all have fixed positions, and yet we can

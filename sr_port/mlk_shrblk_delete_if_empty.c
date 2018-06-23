@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -77,25 +80,44 @@ void mlk_shrhash_delete(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d)
 	bi = hash % num_buckets;
 	bucket = &shrhash[bi];
 	usedmap = bucket->usedmap;
-	for (si = bi ; 0 != usedmap ; (si = (si + 1) % num_buckets), (usedmap >>= 1))
-	{
-		if (0 == (usedmap & 1U))
-			continue;
-		search_bucket = &shrhash[si];
-		if (search_bucket->hash != hash)
-			continue;
-		assert(0 != search_bucket->shrblk);
-		search_shrblk = (mlk_shrblk_ptr_t)R2A(search_bucket->shrblk);
-		if (d == search_shrblk)
+	if (0 == (usedmap & (1U << MLK_SHRHASH_HIGHBIT)))
+	{	/* High bit is not set. We can use Hopscotch hash algorithm to speedily search */
+		for (si = bi ; 0 != usedmap ; (si = (si + 1) % num_buckets), (usedmap >>= 1))
 		{
+			if (0 == (usedmap & 1U))
+				continue;
+			search_bucket = &shrhash[si];
+			if (search_bucket->hash != hash)
+				continue;
+			assert(0 != search_bucket->shrblk);
+			search_shrblk = (mlk_shrblk_ptr_t)R2A(search_bucket->shrblk);
+			if (d != search_shrblk)
+				continue;
 			assert(0 != (bucket->usedmap & (1U << ((num_buckets + si - bi) % num_buckets))));
-			search_bucket->shrblk = 0;
-			search_bucket->hash = 0;
 			bucket->usedmap &= ~(1U << ((num_buckets + si - bi) % num_buckets));
-			return;
+			break;
+		}
+		assert(usedmap);
+	} else
+	{	/* This is a bucket full situation. We need to do a slower linear search across entire hash bucket array. */
+		for (si = bi; ; )
+		{
+			search_bucket = &shrhash[si];
+			if (search_bucket->hash == hash)
+			{
+				assert(0 != search_bucket->shrblk);
+				search_shrblk = (mlk_shrblk_ptr_t)R2A(search_bucket->shrblk);
+				if (d != search_shrblk)
+					continue;
+				break;
+			}
+			si = (si + 1) % num_buckets;
+			assert(si != bi); /* We should have seen the shrblk BEFORE the end of one full scan of the hash array */
 		}
 	}
-	assert(usedmap);
+	search_bucket->shrblk = 0;
+	search_bucket->hash = 0;
+	return;
 }
 
 /* Build the hash value for a shrblk by following parent pointers recursively and hashing the shrsubs from the top.
