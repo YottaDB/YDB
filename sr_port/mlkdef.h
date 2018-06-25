@@ -130,6 +130,16 @@ typedef mlk_shrsub	*mlk_shrsub_ptr_t;
 typedef mlk_ctldata	*mlk_ctldata_ptr_t;
 typedef mlk_shrhash	*mlk_shrhash_ptr_t;
 
+/* Uncomment the below line if you want to turn on lock hash debugging.
+ * #define MLK_SHRHASH_DEBUG
+ */
+#ifdef MLK_SHRHASH_DEBUG
+#	define SHRHASH_DEBUG_ONLY(x) x
+	void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
+#else
+#	define SHRHASH_DEBUG_ONLY(x)
+#endif
+
 #ifdef DB64
 # ifdef __osf__
 #  pragma pointer_size(restore)

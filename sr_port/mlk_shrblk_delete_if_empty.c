@@ -117,6 +117,7 @@ void mlk_shrhash_delete(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d)
 	}
 	search_bucket->shrblk = 0;
 	search_bucket->hash = 0;
+	SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(ctl));
 	return;
 }
 

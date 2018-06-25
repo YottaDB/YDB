@@ -22,16 +22,7 @@
 #include "copy.h"
 #include "mlk_shrblk_create.h"
 
-#ifdef MLK_SHRHASH_DEBUG
-#define SHRHASH_DEBUG_ONLY(x) x
-#else
-#define SHRHASH_DEBUG_ONLY(x)
-#endif
-
 void mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum);
-#ifdef MLK_SHRHASH_DEBUG
-void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
-#endif
 
 mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 				   unsigned char *val,		/* the subscript */
@@ -188,10 +179,12 @@ void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl)
 
 	shrhash = (mlk_shrhash_ptr_t)R2A(ctl->blkhash);
 	num_buckets = ctl->num_blkhash;
-	for (bi=0; bi < num_buckets; bi++)
+	for (bi = 0; bi < num_buckets; bi++)
 	{
 		bucket = &shrhash[bi];
-		for ((usedmap = bucket->usedmap), (ni = bi); usedmap; (usedmap >>= 1), (ni = (ni + 1) % num_buckets))
+		usedmap = bucket->usedmap;
+		usedmap = usedmap & ~(1U << MLK_SHRHASH_HIGHBIT);
+		for (ni = bi; usedmap; (usedmap >>= 1), (ni = (ni + 1) % num_buckets))
 		{
 			if (usedmap & 1U)
 			{
@@ -205,9 +198,11 @@ void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl)
 		else
 		{
 			obi = bucket->hash % num_buckets;
-			assert(MLK_SHRHASH_NEIGHBORS > ((num_buckets + bi - obi) % num_buckets));
 			original_bucket = &shrhash[obi];
-			assert(0 != (original_bucket->usedmap & (1U << ((num_buckets + bi - obi) % num_buckets))));
+			if (MLK_SHRHASH_NEIGHBORS > ((num_buckets + bi - obi) % num_buckets))
+				assert(0 != (original_bucket->usedmap & (1U << ((num_buckets + bi - obi) % num_buckets))));
+			else
+				assert(original_bucket->usedmap & (1U << MLK_SHRHASH_HIGHBIT));
 		}
 	}
 }
