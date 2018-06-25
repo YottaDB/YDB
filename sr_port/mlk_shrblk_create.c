@@ -13,14 +13,22 @@
  *								*
  ****************************************************************/
 
-#include <stddef.h>
 #include "mdef.h"
+
+#include <stddef.h>
 
 #include "gtm_string.h"
 
 #include "mlkdef.h"
 #include "copy.h"
 #include "mlk_shrblk_create.h"
+#include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "gdsbgtr.h"
 
 void mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum);
 
@@ -125,7 +133,12 @@ void mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum)
 			 * table is in shared memory, it cannot be resized (needs shared memory size change which
 			 * is not easily possible). Degenerate to linear search scheme for just this bucket.
 			 */
+			sgmnt_addrs	*csa;
+
 			bucket_full = TRUE;
+			csa = &FILE_INFO(p->region)->s_addrs;
+			/* Record this rare event in the file header */
+			BG_TRACE_PRO_ANY(csa, lock_hash_bucket_full);
 			break;
 		}
 		/* Move the bucket from the mapped bucket to the free bucket */
