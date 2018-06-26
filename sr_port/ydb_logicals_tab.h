@@ -171,6 +171,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DBGFLAGS_FREQ,              "$ydb_dbgflags_fr
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DB_COUNTER_SEM_INCR,        "$ydb_db_counter_sem_incr",        "$gtm_db_counter_sem_incr")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_DIRTREE_COLLHDR_ALWAYS,     "$ydb_dirtree_collhdr_always",     "$gtm_dirtree_collhdr_always")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GVUNDEF_FATAL,              "$ydb_gvundef_fatal",              "$gtm_gvundef_fatal")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_LOCKHASH_N_BITS,            "$ydb_lockhash_n_bits",            "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TEST_AUTORELINK_ALWAYS,     "$ydb_test_autorelink_always",     "$gtm_test_autorelink_always")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TEST_FAKE_ENOSPC,           "$ydb_test_fake_enospc",           "$gtm_test_fake_enospc")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TEST_JNLPOOL_SYNC,          "$ydb_test_jnlpool_sync",          "$gtm_test_jnlpool_sync")
