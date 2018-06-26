@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -159,3 +162,10 @@ TAB_BG_TRC_REC("  LseekAIORestart EAGAIN", async_restart_eagain)
 TAB_BG_TRC_REC("  JnlBuff Phs2Cmt Full  ", jnlbuff_phs2cmt_array_full)
 TAB_BG_TRC_REC("  JnlPhs2ClnupIfPossible", jnl_phase2_cleanup_if_possible)
 TAB_BG_TRC_REC("  JnlBuff Phs2Cmt PrcAlv", jnlbuff_phs2cmt_isprcalv)
+/* Add next YottaDB specific entry backwards from end of filler section (currently two entries).
+ * This way YottaDB additions won't collide with GT.M additions (if any) as they happen from the beginning
+ * of the filler section.
+ */
+TAB_BG_TRC_REC("                        ", filler1)
+TAB_BG_TRC_REC("                        ", filler2)
+TAB_BG_TRC_REC("  Lock Hash Bucket Full ", lock_hash_bucket_full)
