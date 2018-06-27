@@ -232,23 +232,48 @@ MBSTART {													\
 /* compute the location of the Nth subscript's hash */
 #define MLK_PVTBLK_SUBHASH(PVTBLK, N) (((uint4 *)&(PVTBLK)->value[ROUND_UP((PVTBLK)->nref_length, SIZEOF(uint4))])[N])
 
-/* populate hash data from nref data - keep in sync with the versions in mlk_pvtblk_create() and mlk_shrhash_delete() */
-#define MLK_PVTBLK_SUBHASH_GEN(PVTBLK)							\
-MBSTART {										\
-	unsigned char		*cp;							\
-	int			hi;							\
-	hash128_state_t		accstate, tmpstate;					\
-	gtm_uint16		hashres;						\
+#ifdef DEBUG
+# define	DBG_LOCKHASH_N_BITS(HASH)						\
+{											\
+	DCL_THREADGBL_ACCESS;								\
 											\
-	HASH128_STATE_INIT(accstate, 0);						\
-	for (cp = (PVTBLK)->value, hi = 0; hi < (PVTBLK)->subscript_cnt; hi++)		\
+	SETUP_THREADGBL_ACCESS;								\
+	/* In dbg code, restrict hash to N bits where N can be anywhere from 0 to 32.	\
+	 * This lets us test codepaths where there are lots of hash collisions.		\
+	 */										\
+	if (TREF(ydb_lockhash_n_bits))							\
 	{										\
-		gtmmrhash_128_ingest(&accstate, cp, *cp + 1);				\
-		cp += *cp + 1;								\
-		tmpstate = accstate;							\
-		gtmmrhash_128_result(&tmpstate, (cp - (PVTBLK)->value), &hashres);	\
-		MLK_PVTBLK_SUBHASH(PVTBLK, hi) = (uint4)hashres.one;			\
+		assert(32 >= TREF(ydb_lockhash_n_bits));				\
+		HASH = HASH & (((gtm_uint8)1 << TREF(ydb_lockhash_n_bits)) - 1);	\
+		/* If HASH ends up being 0, then set it to a non-zero value as		\
+		 * 0 hash value has other issues.					\
+		 */									\
+		if (0 == HASH)								\
+			HASH = 1;							\
 	}										\
+}
+#else
+# define	DBG_LOCKHASH_N_BITS(X)
+#endif
+
+/* populate hash data from nref data - keep in sync with the versions in mlk_pvtblk_create() and mlk_shrhash_delete() */
+#define MLK_PVTBLK_SUBHASH_GEN(PVTBLK)										\
+MBSTART {													\
+	unsigned char		*cp;										\
+	int			hi;										\
+	hash128_state_t		accstate, tmpstate;								\
+	gtm_uint16		hashres;									\
+														\
+	HASH128_STATE_INIT(accstate, 0);									\
+	for (cp = (PVTBLK)->value, hi = 0; hi < (PVTBLK)->subscript_cnt; hi++)					\
+	{													\
+		gtmmrhash_128_ingest(&accstate, cp, *cp + 1);							\
+		cp += *cp + 1;											\
+		tmpstate = accstate;										\
+		gtmmrhash_128_result(&tmpstate, (cp - (PVTBLK)->value), &hashres);				\
+		DBG_LOCKHASH_N_BITS(hashres.one);								\
+		MLK_PVTBLK_SUBHASH(PVTBLK, hi) = (uint4)hashres.one;						\
+	}													\
 } MBEND
 
 /* compute the address immediately after the pvtblk */

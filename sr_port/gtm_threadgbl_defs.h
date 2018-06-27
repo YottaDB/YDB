@@ -540,6 +540,7 @@ THREADGBLAR1DEF(trans_restart_hist_array,	trans_restart_hist_t, TRANS_RESTART_HI
 THREADGBLDEF(trans_restart_hist_index,		uint4)
 THREADGBLDEF(skip_mv_num_approx_assert,		boolean_t)		/* TRUE if mval2subsc is invoked from op_fnview */
 THREADGBLDEF(ydb_gvundef_fatal,			boolean_t)			/* core and die intended for testing */
+THREADGBLDEF(ydb_lockhash_n_bits,		uint4)		/* = N => Restrict hash of lock subscripts to at most N bits */
 THREADGBLDEF(ydb_dirtree_collhdr_always,	boolean_t)	/* Initialize 4-byte collation header in directory tree always.
 								 * Used by tests that are sensitive to DT leaf block layout.
 								 */

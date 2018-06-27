@@ -76,6 +76,7 @@ void mlk_shrhash_delete(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d)
 	HASH128_STATE_INIT(hs, 0);
 	mlk_shrhash_val_build(d, &total_len, &hs);
 	gtmmrhash_128_result(&hs, total_len, &hashres);
+	DBG_LOCKHASH_N_BITS(hashres.one);
 	hash = (uint4)hashres.one;
 	bi = hash % num_buckets;
 	bucket = &shrhash[bi];
@@ -107,9 +108,8 @@ void mlk_shrhash_delete(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d)
 			{
 				assert(0 != search_bucket->shrblk);
 				search_shrblk = (mlk_shrblk_ptr_t)R2A(search_bucket->shrblk);
-				if (d != search_shrblk)
-					continue;
-				break;
+				if (d == search_shrblk)
+					break;
 			}
 			si = (si + 1) % num_buckets;
 			assert(si != bi); /* We should have seen the shrblk BEFORE the end of one full scan of the hash array */

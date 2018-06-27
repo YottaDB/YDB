@@ -212,6 +212,13 @@ void	gtm_env_init(void)
 		ret = ydb_logical_truth_value(YDBENVINDX_GVUNDEF_FATAL, FALSE, &is_defined);
 		if (is_defined)
 			TREF(ydb_gvundef_fatal) = ret; /* if logical is not defined, ydb_gvundef_fatal takes the default value */
+		/* ydb_lockhash_n_bits environment/logical */
+		TREF(ydb_lockhash_n_bits) = ydb_trans_numeric(YDBENVINDX_LOCKHASH_N_BITS, &is_defined, IGNORE_ERRORS_TRUE, NULL);
+		if (!is_defined)
+			TREF(ydb_lockhash_n_bits) = 0;	/* Do not tamper with hash value in dbg */
+		else if (32 < TREF(ydb_lockhash_n_bits))
+			TREF(ydb_lockhash_n_bits) = 32;	/* Keep all 32-bits of hash value in dbg */
+		/* else Keep only at most N bits of hash value in dbg where TREF(ydb_lockhash_n_bits) == N */
 		/* ydb_dirtree_collhdr_always environment/logical */
 		assert(FALSE == TREF(ydb_dirtree_collhdr_always));	/* should have been set to FALSE by gtm_threadgbl_defs */
 		ret = ydb_logical_truth_value(YDBENVINDX_DIRTREE_COLLHDR_ALWAYS, FALSE, &is_defined);
