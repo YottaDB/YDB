@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -65,7 +68,7 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 {
 	uint4			status;
 	zro_ent			*op, *sp, *op_result, *sp_result;
-	char			objfn[PATH_MAX], srcfn[PATH_MAX], *obp, *sbp, save_char;
+	char			objfn[PATH_MAX], srcfn[PATH_MAX], *obp, *sbp;
 	int			objcnt, srccnt;
 	struct stat		outbuf;
 	int			stat_res;
@@ -96,15 +99,6 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 					memcpy(objfn, objstr->addr, rtnname.len);
 					objfn[rtnname.len] = 0;
 					rtnname.addr = objfn;
-#					ifdef DEBUG
-					save_char = rtnname.addr[0];
-					if ('_' == save_char)
-						rtnname.addr[0] = '%';
-							/* Temporary adjustment for "valid_mname" to not assert fail */
-					assert(valid_mname(&rtnname));
-					if ('_' == save_char)
-						rtnname.addr[0] = save_char;	/* restore */
-#					endif
 					if (NULL != (op->shrsym = (void *)fgn_getrtn(op->shrlib, &rtnname, SUCCESS)))
 						/* Note assignment above */
 						op_result = op;
