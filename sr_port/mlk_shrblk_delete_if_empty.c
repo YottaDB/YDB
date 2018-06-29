@@ -68,7 +68,7 @@ void mlk_shrhash_delete(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d)
 	gtm_uint16		hashres;
 	uint4			hash, total_len = 0, num_buckets, usedmap;
 	mlk_shrblk_ptr_t	search_shrblk;
-	int			bi, si;
+	int			bi, si, bitnum;
 	mlk_shrhash_ptr_t	shrhash, bucket, search_bucket;
 
 	shrhash = (mlk_shrhash_ptr_t)R2A(ctl->blkhash);
@@ -94,8 +94,8 @@ void mlk_shrhash_delete(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d)
 			search_shrblk = (mlk_shrblk_ptr_t)R2A(search_bucket->shrblk);
 			if (d != search_shrblk)
 				continue;
-			assert(0 != (bucket->usedmap & (1U << ((num_buckets + si - bi) % num_buckets))));
-			bucket->usedmap &= ~(1U << ((num_buckets + si - bi) % num_buckets));
+			bitnum = (num_buckets + si - bi) % num_buckets;
+			assert(MLK_SHRHASH_HIGHBIT > bitnum);
 			break;
 		}
 		assert(usedmap);
@@ -109,7 +109,11 @@ void mlk_shrhash_delete(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d)
 				assert(0 != search_bucket->shrblk);
 				search_shrblk = (mlk_shrblk_ptr_t)R2A(search_bucket->shrblk);
 				if (d == search_shrblk)
+				{
+					bitnum = (num_buckets + si - bi) % num_buckets;
+					/* Note that it is possible bitnum is less than or greater than MLK_SHRHASH_HIGHBIT */
 					break;
+				}
 			}
 			si = (si + 1) % num_buckets;
 			assert(si != bi); /* We should have seen the shrblk BEFORE the end of one full scan of the hash array */
@@ -117,6 +121,12 @@ void mlk_shrhash_delete(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d)
 	}
 	search_bucket->shrblk = 0;
 	search_bucket->hash = 0;
+	if (MLK_SHRHASH_HIGHBIT > bitnum)
+	{	/* Clear neighbor bit as long as it is within a the valid list of neighbor bits */
+		assert(0 != (bucket->usedmap & (1U << bitnum)));
+		bucket->usedmap &= ~(1U << bitnum);
+	} else
+		assert(bucket->usedmap & (1U << MLK_SHRHASH_HIGHBIT));
 	SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(ctl));
 	return;
 }
