@@ -10,18 +10,20 @@
  *								*
  ****************************************************************/
 
+#include "mdef.h"
+
 #include "main_pragma.h"
 
 #include <sys/types.h>
 
-#include <stdio.h>
-#include <unistd.h>
+#include "gtm_stdio.h"
+#include "gtm_unistd.h"
 
 int main(int argc, char **argv)
 {
 	if (geteuid() == 0)
-		printf("root\n");
+		PRINTF("root\n");
 	else
-		printf("other\n");
+		PRINTF("other\n");
 	return 0;
 }

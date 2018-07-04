@@ -27,7 +27,6 @@
 #include <sys/mman.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
-#include <sys/types.h>
 #include <sys/time.h>
 #include <errno.h>
 

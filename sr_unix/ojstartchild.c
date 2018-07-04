@@ -82,7 +82,7 @@ static	pid_t			child_pid;
 #ifndef SYS_ERRLIST_INCLUDE
 /* currently either stdio.h or errno.h both of which are included above needed by TIMEOUT_ERROR in jobsp.h */
 #ifdef __APPLE__
-GBLREF	__const int			sys_nerr;
+GBLREF	__const int		sys_nerr;
 #elif !defined(__sun) && !defined(___MVS__)
 GBLREF	int			sys_nerr;
 #endif

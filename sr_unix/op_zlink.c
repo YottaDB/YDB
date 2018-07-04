@@ -60,10 +60,10 @@ typedef enum
  * on those two architectures, so we choose our mapping accordingly.
  */
 #if defined st_mtime
-# ifndef __APPLE__
-#   define st_nmtime		st_mtim.tv_nsec
-# else
+# ifdef __APPLE__
 #   define st_nmtime		st_mtimespec.tv_nsec
+# else
+#   define st_nmtime		st_mtim.tv_nsec
 # endif 
 #elif defined(_AIX)
 #  define st_nmtime		st_mtime_n
