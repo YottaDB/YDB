@@ -27,7 +27,7 @@ static char rcsid[] = "$Header:$";
 
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__MVS__)
 #include <crypt.h> /* for crypt(), actually it is in unistd.h */
 #endif
 #include "gtm_unistd.h" /* for crypt() */
