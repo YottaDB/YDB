@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -67,11 +70,14 @@ typedef struct
 					 * shrblk/shrsub chain
 					 */
 	uint4		usedmap;	/* Bitmap representing the bucket neighborhood, with bit N set if (bucket+N) % nbuckets
-					 * is an overflow from this bucket (or the bucket itself, for N=0.)
+					 * is an overflow from this bucket (or the bucket itself, for N=0).
+					 * N == MLK_SHRHASH_HIGHBIT is a special case indicating a bucket full situation was
+					 * encountered and so a linear search has to be used when searching.
 					 */
 } mlk_shrhash;
 
-#define MLK_SHRHASH_NEIGHBORS	(SIZEOF(((mlk_shrhash *)0)->usedmap) * BITS_PER_UCHAR)
+#define MLK_SHRHASH_NEIGHBORS	((SIZEOF(((mlk_shrhash *)0)->usedmap) * BITS_PER_UCHAR) - 1)
+#define	MLK_SHRHASH_HIGHBIT	MLK_SHRHASH_NEIGHBORS
 
 typedef struct				/* the subscript value of a single node in a tree.  Stored separately so that
 					 * the mlk_shrblk's can all have fixed positions, and yet we can
@@ -123,6 +129,16 @@ typedef mlk_shrblk	*mlk_shrblk_ptr_t;
 typedef mlk_shrsub	*mlk_shrsub_ptr_t;
 typedef mlk_ctldata	*mlk_ctldata_ptr_t;
 typedef mlk_shrhash	*mlk_shrhash_ptr_t;
+
+/* Uncomment the below line if you want to turn on lock hash debugging.
+ * #define MLK_SHRHASH_DEBUG
+ */
+#ifdef MLK_SHRHASH_DEBUG
+#	define SHRHASH_DEBUG_ONLY(x) x
+	void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
+#else
+#	define SHRHASH_DEBUG_ONLY(x)
+#endif
 
 #ifdef DB64
 # ifdef __osf__
@@ -216,23 +232,48 @@ MBSTART {													\
 /* compute the location of the Nth subscript's hash */
 #define MLK_PVTBLK_SUBHASH(PVTBLK, N) (((uint4 *)&(PVTBLK)->value[ROUND_UP((PVTBLK)->nref_length, SIZEOF(uint4))])[N])
 
-/* populate hash data from nref data - keep in sync with the versions in mlk_pvtblk_create() and mlk_shrhash_delete() */
-#define MLK_PVTBLK_SUBHASH_GEN(PVTBLK)							\
-MBSTART {										\
-	unsigned char		*cp;							\
-	int			hi;							\
-	hash128_state_t		accstate, tmpstate;					\
-	gtm_uint16		hashres;						\
+#ifdef DEBUG
+# define	DBG_LOCKHASH_N_BITS(HASH)						\
+{											\
+	DCL_THREADGBL_ACCESS;								\
 											\
-	HASH128_STATE_INIT(accstate, 0);						\
-	for (cp = (PVTBLK)->value, hi = 0; hi < (PVTBLK)->subscript_cnt; hi++)		\
+	SETUP_THREADGBL_ACCESS;								\
+	/* In dbg code, restrict hash to N bits where N can be anywhere from 0 to 32.	\
+	 * This lets us test codepaths where there are lots of hash collisions.		\
+	 */										\
+	if (TREF(ydb_lockhash_n_bits))							\
 	{										\
-		gtmmrhash_128_ingest(&accstate, cp, *cp + 1);				\
-		cp += *cp + 1;								\
-		tmpstate = accstate;							\
-		gtmmrhash_128_result(&tmpstate, (cp - (PVTBLK)->value), &hashres);	\
-		MLK_PVTBLK_SUBHASH(PVTBLK, hi) = (uint4)hashres.one;			\
+		assert(32 >= TREF(ydb_lockhash_n_bits));				\
+		HASH = HASH & (((gtm_uint8)1 << TREF(ydb_lockhash_n_bits)) - 1);	\
+		/* If HASH ends up being 0, then set it to a non-zero value as		\
+		 * 0 hash value has other issues.					\
+		 */									\
+		if (0 == HASH)								\
+			HASH = 1;							\
 	}										\
+}
+#else
+# define	DBG_LOCKHASH_N_BITS(X)
+#endif
+
+/* populate hash data from nref data - keep in sync with the versions in mlk_pvtblk_create() and mlk_shrhash_delete() */
+#define MLK_PVTBLK_SUBHASH_GEN(PVTBLK)										\
+MBSTART {													\
+	unsigned char		*cp;										\
+	int			hi;										\
+	hash128_state_t		accstate, tmpstate;								\
+	gtm_uint16		hashres;									\
+														\
+	HASH128_STATE_INIT(accstate, 0);									\
+	for (cp = (PVTBLK)->value, hi = 0; hi < (PVTBLK)->subscript_cnt; hi++)					\
+	{													\
+		gtmmrhash_128_ingest(&accstate, cp, *cp + 1);							\
+		cp += *cp + 1;											\
+		tmpstate = accstate;										\
+		gtmmrhash_128_result(&tmpstate, (cp - (PVTBLK)->value), &hashres);				\
+		DBG_LOCKHASH_N_BITS(hashres.one);								\
+		MLK_PVTBLK_SUBHASH(PVTBLK, hi) = (uint4)hashres.one;						\
+	}													\
 } MBEND
 
 /* compute the address immediately after the pvtblk */

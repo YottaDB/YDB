@@ -554,15 +554,15 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				 * also ensures that the db is fsynced. We don't want to use it in the calls to
 				 * "wcs_flu" from "t_end" and "tp_tend" since we can defer it to out-of-crit there.
 				 * In this case, since we are running down, we don't have any such option.
-				 * If we are in safe_mode, we won't get here, so no need to check for online freeze.
+				 * Note that it is possible an online freeze is concurrently enabled on this db just before
+				 * the below call to "wcs_flu" gets crit. In that case, we want to skip the "wcs_flu" but
+				 * just do a "jnl_wait" to ensure the jnl file is uptodate. This is because we are holding
+				 * the udi->ftok_semid and udi->semid locks at this point and can cause a deadlock with the
+				 * MUPIP FREEZE -OFF process (that turns off the online freeze) if we wait indefinitely
+				 * inside "wcs_flu" for the online freeze to be lifted off. Hence the WCSFLU_RET_IF_OFRZ usage.
 				 */
-				if (!FROZEN_CHILLED(csa))
-					cnl->remove_shm = wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-				else
-				{
-					jnl_wait(reg);
-					cnl->remove_shm = FALSE;
-				}
+				cnl->remove_shm = wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH
+													| WCSFLU_RET_IF_OFRZ);
 				if (!cnl->remove_shm)
 				{	/* If "wcs_flu" call fails, then we should not remove shm or reset anything in the db
 					 * fileheader. So reset "we_are_last_writer" variable itself as that makes it more safer
@@ -601,11 +601,9 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				 * But before that, check if a wcs_flu is really necessary. If not, skip the heavyweight call.
 				 */
 				db_needs_flushing = (cnl->last_wcsflu_tn < csa->ti->curr_tn);
+				/* See comment before prior usage for why WCSFLU_RET_IF_OFRZ is used below */
 				if (db_needs_flushing)
-					if (!FROZEN_CHILLED(csa))
-						wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
-					else
-						jnl_wait(reg);
+					wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH | WCSFLU_RET_IF_OFRZ);
 				/* Same as above "wcs_flu" */
 				IF_LIBAIO(aio_shim_destroy(udi->owning_gd);)
 				assert(is_mm || (csd == cs_data));
