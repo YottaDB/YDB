@@ -34,7 +34,7 @@
 #include "gtcm.h"
 #include "omi.h"
 #include "io.h"
-#include "gvcst_protos.h"	/* for gvcst_get,gvcst_init prototype */
+#include "gvcst_protos.h"	/* for "gvcst_get", "gvcst_init" prototype */
 #include "change_reg.h"
 #include "mvalconv.h"
 #include "ydb_trans_log_name.h"
@@ -114,7 +114,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		gv_cur_region->dyn.addr->fname_len = fpath2.len;
 		REG_ACC_METH(gv_cur_region) = dba_bg;
 		ESTABLISH_RET(rc_fnd_file_ch1, RC_SUCCESS);
-		gvcst_init(gv_cur_region, NULL);
+		gvcst_init(gv_cur_region);
 		REVERT;
 		change_reg();
 		/* check to see if this DB has the reserved bytes field set
@@ -214,7 +214,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		gv_cur_region->dyn.addr->fname_len = len;
 		REG_ACC_METH(gv_cur_region) = dba_bg;
 		ESTABLISH_RET(rc_fnd_file_ch2, RC_SUCCESS);
-		gvcst_init(gv_cur_region, NULL);
+		gvcst_init(gv_cur_region);
 		REVERT;
 		change_reg();
 		/* check to see if this DB has the reserved bytes field set
@@ -306,7 +306,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	return RC_SUCCESS;
 }
 
-/* clean up from gvcst_init() failure, when dsid_list was NULL (open first db) */
+/* clean up from "gvcst_init" failure, when dsid_list was NULL (open first db) */
 static CONDITION_HANDLER(rc_fnd_file_ch1)
 {	/* undo setup */
 	ASSERT_IS_LIBGTCM;
@@ -320,7 +320,7 @@ static CONDITION_HANDLER(rc_fnd_file_ch1)
 	NEXTCH;
 }
 
-/* clean up from gvcst_init() failure, when dsid_list was non-NULL (open new db) */
+/* clean up from "gvcst_init" failure, when dsid_list was non-NULL (open new db) */
 static CONDITION_HANDLER(rc_fnd_file_ch2)
 {	/* undo setup */
 	ASSERT_IS_LIBGTCM;

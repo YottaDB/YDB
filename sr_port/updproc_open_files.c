@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -89,7 +92,7 @@ boolean_t updproc_open_files(gld_dbname_list **gld_db_files, seq_num *start_jnl_
 		reg = curr->gd;
 		fn = (char *)reg->dyn.addr->fname;
 		csa = &FILE_INFO(reg)->s_addrs;	/* Work of dbfilopn - assigning file_cntl already done db_files_from_gld */
-		gvcst_init(reg, NULL);
+		gvcst_init(reg);
 		csd = csa->hdr;
 		/* Check whether all regions have same null collation order */
 		if (this_side_std_null_coll != csd->std_null_coll)

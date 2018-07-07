@@ -571,7 +571,7 @@ MBSTART {											\
 	{													\
 		STATSDBREG_TO_BASEDBREG(statsDBreg, baseDBreg);							\
 		if (!baseDBreg->open)										\
-			gv_init_reg(baseDBreg, NULL);								\
+			gv_init_reg(baseDBreg);									\
 		if (!statsDBreg->open)										\
 		{	/* statsDB did not get opened as part of baseDB open above. Possible if ydb_statshare	\
 			 * is not set to 1. But user could still do a ZWR ^%YGS which would try to open		\
@@ -1340,60 +1340,33 @@ MBSTART {															\
 	}															\
 } MBEND
 
-#define	JNLPOOL_INIT_IF_NEEDED(CSA, CSD, CNL, SCNDDBNOUPD_CHECK_NEEDED)								\
-MBSTART {															\
-	GBLREF	boolean_t		is_replicator;										\
-	GBLREF	gd_region		*gv_cur_region;										\
-	GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;										\
-	GBLREF	jnlpool_addrs_ptr_t	jnlpool;										\
-	jnlpool_addrs_ptr_t		lcl_jnlpool = NULL, jnlpool_save;							\
-	gd_id				replfile_gdid, *tmp_gdid;								\
-	replpool_identifier		replpool_id;										\
-	unsigned int			full_len;										\
-	int4				status = -1;										\
-	boolean_t			jnlpool_found = FALSE;									\
-																\
-	if (REPL_ALLOWED(CSD) && is_replicator)											\
-	{															\
-		jnlpool_save = jnlpool;												\
-		if (CSA->jnlpool && ((jnlpool_addrs_ptr_t)(CSA->jnlpool))->pool_init)						\
-		{														\
-			lcl_jnlpool = jnlpool = (jnlpool_addrs_ptr_t)CSA->jnlpool;						\
-			jnlpool_found = TRUE;											\
-		} else if (IS_GTM_IMAGE && REPL_INST_AVAILABLE(CSA->gd_ptr))							\
-		{														\
-			status = filename_to_id(&replfile_gdid, replpool_id.instfilename);					\
-			if (SS_NORMAL != status)										\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLINSTACC, 2, full_len, replpool_id.instfilename,\
-					ERR_TEXT, 2, RTS_ERROR_LITERAL("could not get file id"), status);			\
-			for (lcl_jnlpool = jnlpool_head; NULL != lcl_jnlpool; lcl_jnlpool = lcl_jnlpool->next)			\
-			{													\
-				if (lcl_jnlpool->pool_init)									\
-				{												\
-					tmp_gdid = &FILE_ID(lcl_jnlpool->jnlpool_dummy_reg);					\
-					if (!gdid_cmp(tmp_gdid, &replfile_gdid))						\
-					{											\
-						jnlpool = CSA->jnlpool = lcl_jnlpool;						\
-						jnlpool_found = TRUE;								\
-						break;										\
-					}											\
-				}												\
-			}													\
-		} else														\
-		{														\
-			lcl_jnlpool = jnlpool;											\
-			if (lcl_jnlpool && lcl_jnlpool->pool_init)								\
-				jnlpool_found = TRUE;										\
-		}														\
-		if (!jnlpool_found || (NULL == lcl_jnlpool) || !lcl_jnlpool->pool_init)						\
-		{														\
-			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL, CSA->gd_ptr);			\
-			if (jnlpool && jnlpool->pool_init)									\
-				CSA->jnlpool = jnlpool;										\
-		}														\
-		assert(jnlpool && jnlpool->pool_init);										\
-		VALIDATE_INITIALIZED_JNLPOOL(CSA, CNL, gv_cur_region, GTMPROC, SCNDDBNOUPD_CHECK_NEEDED);			\
-	}															\
+#define	JNLPOOL_INIT_IF_NEEDED(CSA, CSD, CNL, SCNDDBNOUPD_CHECK_NEEDED)						\
+MBSTART {													\
+	GBLREF	boolean_t		is_replicator;								\
+	GBLREF	gd_region		*gv_cur_region;								\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;								\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;								\
+														\
+	gd_addr				*gdPtr;									\
+														\
+	if (REPL_ALLOWED(CSD) && is_replicator)									\
+	{													\
+		jnlpool_addrs_ptr_t	lcl_jnlpool;								\
+														\
+		lcl_jnlpool = (jnlpool_addrs_ptr_t)CSA->jnlpool;						\
+		gdPtr = CSA->gd_ptr;										\
+		if (NULL == lcl_jnlpool)									\
+			lcl_jnlpool = gdPtr->gd_runtime->jnlpool;						\
+		if ((NULL == lcl_jnlpool) || !lcl_jnlpool->pool_init)						\
+		{												\
+			jnlpool_init((jnlpool_user)GTMPROC, (boolean_t)FALSE, (boolean_t *)NULL, gdPtr);	\
+			assert((NULL != jnlpool) && jnlpool->pool_init);					\
+		} else												\
+			jnlpool = lcl_jnlpool;									\
+		VALIDATE_INITIALIZED_JNLPOOL(CSA, CNL, gv_cur_region, GTMPROC, SCNDDBNOUPD_CHECK_NEEDED);	\
+		assert(CSA->jnlpool == jnlpool);								\
+		assert(gdPtr->gd_runtime->jnlpool == jnlpool);							\
+	}													\
 } MBEND
 
 #define ASSERT_VALID_JNLPOOL(CSA)										\
@@ -2436,6 +2409,17 @@ typedef struct gd_inst_info_struct
 	char		instfilename[MAX_FN_LEN + 1];	/* + 1 for null */
 } gd_inst_info;
 
+/* Structure that holds all information that is relevant only at runtime.
+ * The gld has space allotted for a pointer in the file and we use that to point to this structure at runtime.
+ * This lets us freely add to this structure without affecting the gld format and yet maintain gld-specific information
+ * (e.g. whether a jnlpool for this gld has been inited or not, info on multiplexing thread for linux AIO etc.).
+ */
+typedef struct gd_runtime
+{
+	struct gd_info			*thread_gdi;	/* has information on the multiplexing thread - only used on linux AIO */
+	struct jnlpool_addrs_struct	*jnlpool;	/* pointer to jnlpool corresponding to this gld if one exists */
+} gd_runtime_t;
+
 typedef struct	gd_addr_struct
 {
 	struct gd_region_struct		*local_locks;
@@ -2464,8 +2448,9 @@ typedef struct	gd_addr_struct
 #else
 	char				filler[6];
 #endif
-	struct gd_info			*thread_gdi;	/* has information on the multiplexing thread - only used on linux AIO */
+	gd_runtime_t			*gd_runtime;
 } gd_addr;
+
 typedef gd_addr *(*gd_addr_fn_ptr)();
 
 typedef struct	gd_segment_struct
@@ -4849,7 +4834,7 @@ MBSTART {										\
 	GBLREF gv_namehead	*gv_target;						\
 											\
 	if (!REG->open)									\
-		gv_init_reg(REG, ADDR);							\
+		gv_init_reg(REG);							\
 	gvspan = GVNH_REG->gvspan;							\
 	assert(NULL != gvspan);								\
 	min_reg_index = gvspan->min_reg_index;						\
@@ -5260,7 +5245,7 @@ MBSTART {						\
 #define SYNC_OWNING_GD(reg)									\
 MBSTART {											\
 	/* Either udi->owning_gd was already set to the right value, or it is NULL.		\
-	 * This could be because gvcst_init() was called previously, as in mupip_set()		\
+	 * This could be because "gvcst_init" was called previously, as in "mupip_set"		\
 	 */											\
 	assert((NULL != reg->owning_gd) && (NULL == FILE_INFO(reg)->owning_gd)			\
 			|| (FILE_INFO(reg)->owning_gd == reg->owning_gd)			\
@@ -5356,8 +5341,7 @@ void		grab_crit(gd_region *reg);
 boolean_t	grab_crit_encr_cycle_sync(gd_region *reg);
 boolean_t	grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover);
 boolean_t	grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_action);
-void		gv_init_reg(gd_region *reg, gd_addr *addr);
-void		gvcst_init(gd_region *greg, gd_addr *addr);
+void		gv_init_reg(gd_region *reg);
 enum cdb_sc	gvincr_compute_post_incr(srch_blk_status *bh);
 enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_struct *cse, cache_rec_ptr_t cr);
 boolean_t	mupfndfil(gd_region *reg, mstr *mstr_addr, boolean_t log_error);

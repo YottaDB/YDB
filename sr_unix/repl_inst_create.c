@@ -51,6 +51,7 @@
 
 GBLREF	boolean_t	in_repl_inst_create;	/* used by repl_inst_read/repl_inst_write */
 GBLREF	uint4		process_id;
+GBLREF	gd_addr		*gd_header;
 
 error_def(ERR_FILEEXISTS);
 error_def(ERR_FILERENAME);
@@ -86,9 +87,8 @@ void repl_inst_create(void)
 	uint4			status2;
 	jnl_tm_t		now;
 
-	assertpro(repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error, NULL)); /* rts_error should prevent
-												* return if there is a problem.
-												*/
+	assertpro(repl_inst_get_name(inst_fn, &inst_fn_len, MAX_FN_LEN + 1, issue_rts_error, gd_header));
+							/* rts_error should prevent return if there is a problem */
 	/* Although the maximum length of an instance name is MAX_INSTNAME_LEN-1 characters, the input buffer needs to hold a lot
 	 * more since the input instance name might be longer. Hence inst_name (containing MAX_FN_LEN+1 = 257 bytes) is used.
 	 */

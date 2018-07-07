@@ -391,7 +391,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				assert(IS_FINAL_RETRY_CODE(status));
 				assert(CDB_STAGNATE == t_tries);
 				for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
-				{	/* regions might not have been opened if we t_retried in gvcst_init(). dont
+				{	/* regions might not have been opened if we t_retried in "gvcst_init". dont
 					 * rel_crit in that case.
 					 */
 					reg = tr->reg;
@@ -571,13 +571,13 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			if (num_closed)
 			{
 				for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
-				{	/* to open region use gv_init_reg() instead of gvcst_init() since that does extra
+				{	/* to open region use gv_init_reg() instead of "gvcst_init" since that does extra
 					 * manipulations with gv_keysize, gv_currkey and gv_altkey.
 					 */
 					reg = tr->reg;
 					if (!reg->open)
 					{
-						gv_init_reg(reg, NULL);
+						gv_init_reg(reg);
 						assert(reg->open);
 					}
 				}

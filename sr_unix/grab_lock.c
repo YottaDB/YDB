@@ -127,7 +127,7 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 		 * rundown. Assert that this is the only case we know of for the cycles to be out-of-sync. In PRO
 		 * jnlpool_ctl->onln_rlbk_cycle is used only by the replication servers (which GT.CM is not) and so even if it
 		 * continues with an out-of-sync csa->onln_rlbk_cycle, t_end logic does the right thing. The other exception is if
-		 * GT.M initialized journal pool while opening database (belonging to a different instance) in gvcst_init (for
+		 * GT.M initialized journal pool while opening database (belonging to a different instance) in "gvcst_init" (for
 		 * anticipatory freeze) followed by an online rollback which increments the jnlpool_ctl->onln_rlbk_cycle but leaves
 		 * the repl_csa->onln_rlbk_cycle out-of-sync. At this point, if a replicated database is open for the first time,
 		 * we'll reach t_end to commit the update but will end up failing the below assert due to the out-of-sync

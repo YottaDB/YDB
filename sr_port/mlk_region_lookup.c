@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -27,6 +30,7 @@
 #include "gv_trigger_common.h"	/* for *HASHT* macros used inside GVNH_REG_INIT macro */
 #include "filestruct.h"		/* needed for "jnl.h" used by next line */
 #include "jnl.h"		/* needed for "jgbl" used inside GVNH_REG_INIT macro */
+#include "gvcst_protos.h"	/* for "gvcst_init" */
 
 #define DIR_ROOT 1
 
@@ -47,7 +51,7 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 	{
 		reg = addr->maps->reg.addr; 	/* local lock map is first */
 		if (!reg->open)
-			gv_init_reg (reg, NULL);
+			gv_init_reg(reg);
 	} else
 	{
 		p++;
@@ -64,14 +68,14 @@ gd_region *mlk_region_lookup(mval *ptr, gd_addr *addr)
 			if (!reg->open)
 			{
 				targ->clue.end = 0;
-				gv_init_reg(reg, NULL);
+				gv_init_reg(reg);
 			}
 		} else
 		{
 			map = gv_srch_map(addr, gvent.var_name.addr, gvent.var_name.len, SKIP_BASEDB_OPEN_FALSE);
 			reg = map->reg.addr;
 			if (!reg->open)
-				gv_init_reg(reg, NULL);
+				gv_init_reg(reg);
 			targ = (gv_namehead *)targ_alloc(reg->max_key_size, &gvent, reg);
 			GVNH_REG_INIT(addr, addr->tab_ptr, map, targ, reg, gvnh_reg, tabent);
 		}

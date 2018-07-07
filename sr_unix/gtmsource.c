@@ -139,12 +139,14 @@ int gtmsource()
 	ESTABLISH_RET(gtmsource_ch, SS_NORMAL);
 	if (-1 == gtmsource_get_opt())
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUPCLIERR);
+	gvinit();
+	assert(NULL != gd_header);
 	if (gtmsource_options.shut_down)
 	{
 		if (gtmsource_options.zerobacklog)
 		{
 			gtmsource_options.shut_down = FALSE; /* for getbacklog need init but can't hold ftok for time */
-			jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator, NULL);
+			jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator, gd_header);
 			gtmsource_options.shut_down = TRUE; /* restore actual value after the jnlpool_init */
 			if (0 < gtmsource_options.shutdown_time)
 			{
@@ -189,8 +191,6 @@ int gtmsource()
 		 * issues with later db open since we will try to hold the db ftok as part of db open and the ftok logic
 		 * currently has assumptions that a process holds only one ftok at any point in time.
 		 */
-		assert(NULL == gd_header);
-		gvinit();
 		all_files_open = region_init(FALSE);
 		if (!all_files_open)
 		{
@@ -198,7 +198,8 @@ int gtmsource()
 			gtmsource_exit(ABNORMAL_SHUTDOWN);
 		}
 	}
-	jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator, NULL);
+	assert((NULL == jnlpool) || !jnlpool->pool_init);
+	jnlpool_init(GTMSOURCE, gtmsource_options.start, &is_jnlpool_creator, gd_header);
 	/* is_jnlpool_creator == TRUE ==> this process created the journal pool
 	 * is_jnlpool_creator == FALSE ==> journal pool already existed and this process simply attached to it.
 	 */

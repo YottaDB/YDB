@@ -231,7 +231,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			assert(gd_header);
 			assert(parmblk.gv_ptr);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr, NULL);
+				gv_init_reg(parmblk.gv_ptr);
 			assert(parmblk.gv_ptr->open);
 			switch (REG_ACC_METH(parmblk.gv_ptr))
 			{
@@ -286,7 +286,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			assert(gd_header);
 			assert(parmblk.gv_ptr);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr, NULL);
+				gv_init_reg(parmblk.gv_ptr);
 			tmpstr.addr = (char *)parmblk.gv_ptr->dyn.addr->fname;
 			tmpstr.len = parmblk.gv_ptr->dyn.addr->fname_len;
 			s2pool(&tmpstr);
@@ -324,7 +324,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			if (parmblk.gv_ptr)
 			{
 				if (!parmblk.gv_ptr->open)
-					gv_init_reg(parmblk.gv_ptr, NULL);
+					gv_init_reg(parmblk.gv_ptr);
 				csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 				if (NULL != csa->hdr)
 					n = csa->hdr->jnl_state;
@@ -338,7 +338,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			if (parmblk.gv_ptr)
 			{
 				if (!parmblk.gv_ptr->open)
-					gv_init_reg(parmblk.gv_ptr, NULL);
+					gv_init_reg(parmblk.gv_ptr);
 				csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 				if (NULL != csa->hdr)
 					view_jnlfile(dst, parmblk.gv_ptr);
@@ -398,7 +398,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			assert(NULL != gd_header);	/* view_arg_convert would have done this for VTK_POOLLIMIT */
 			reg = parmblk.gv_ptr;
 			if (!reg->open)
-				gv_init_reg(reg, NULL);
+				gv_init_reg(reg);
 			csa = &FILE_INFO(reg)->s_addrs;
 			n = csa->gbuff_limit;
 			break;
@@ -415,7 +415,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_RELJNLQIO:
 			reg = parmblk.gv_ptr;
 			if (!reg->open)
-				gv_init_reg(reg, NULL);
+				gv_init_reg(reg);
 			csa = &FILE_INFO(reg)->s_addrs;
 			if (NULL != csa->hdr)
 			{
@@ -460,7 +460,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			assert(NULL != gd_header);	/* view_arg_convert would have done this for VTK_POOLLIMIT */
 			reg = parmblk.gv_ptr;
 			if (!reg->open)
-				gv_init_reg(reg, NULL);
+				gv_init_reg(reg);
 			csa = &FILE_INFO(reg)->s_addrs;
 			if (NULL != csa->hdr)
 			{
@@ -549,7 +549,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_BLFREE:
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr, NULL);
+				gv_init_reg(parmblk.gv_ptr);
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			if (NULL != csa->hdr)
 				n = csa->hdr->trans_hist.free_blocks;
@@ -559,7 +559,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_BLTOTAL:
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr, NULL);
+				gv_init_reg(parmblk.gv_ptr);
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			if (NULL != csa->hdr)
 			{
@@ -571,7 +571,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_FREEZE:
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr, NULL);
+				gv_init_reg(parmblk.gv_ptr);
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			if (NULL != csa->hdr)
 				n = csa->hdr->freeze;
@@ -581,7 +581,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_GVSTATS:
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr, NULL);
+				gv_init_reg(parmblk.gv_ptr);
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			if (NULL != csa->hdr)
 			{
@@ -729,7 +729,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			n = 0;
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr, NULL);
+				gv_init_reg(parmblk.gv_ptr);
 			reg = parmblk.gv_ptr;
 			if (dba_cm == REG_ACC_METH(reg))
 				n = ((link_info *)reg->dyn.addr->cm_blk->usr)->buffer_size;
@@ -738,7 +738,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			n = 0;
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr, NULL);
+				gv_init_reg(parmblk.gv_ptr);
 			reg = parmblk.gv_ptr;
 			if (dba_cm == REG_ACC_METH(reg))
 				n = ((link_info *)reg->dyn.addr->cm_blk->usr)->buffered_count;
@@ -747,7 +747,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			n = 0;
 			assert(gd_header);
 			if (!parmblk.gv_ptr->open)
-				gv_init_reg(parmblk.gv_ptr, NULL);
+				gv_init_reg(parmblk.gv_ptr);
 			reg = parmblk.gv_ptr;
 			if (dba_cm == REG_ACC_METH(reg))
 				n = ((link_info *)reg->dyn.addr->cm_blk->usr)->buffer_used;
@@ -804,7 +804,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			{
 				if (!(n = (ALL_STATS_OPTIN != TREF(statshare_opted_in))))
 					break;
-				gv_init_reg(parmblk.gv_ptr, NULL);
+				gv_init_reg(parmblk.gv_ptr);
 			}
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			assert(NULL != csa->hdr);

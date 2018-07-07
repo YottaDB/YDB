@@ -56,6 +56,7 @@
 #include "wcs_flu.h"
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
+#include "gvcst_protos.h"		/* for "gvcst_init" */
 
 #define	REORG_CONTINUE	1
 #define	REORG_BREAK	2
@@ -203,7 +204,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 			continue;
 		}
 		mu_reorg_process = TRUE;	/* gvcst_init will use this value to use ydb_poollimit settings. */
-		gvcst_init(reg, NULL);
+		gvcst_init(reg);
 		mu_reorg_process = FALSE;
 		assert(update_array != NULL);
 		/* access method stored in global directory and database file header might be different in which case

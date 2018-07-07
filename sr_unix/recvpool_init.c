@@ -62,6 +62,7 @@ GBLREF	repl_conn_info_t	*this_side, *remote_side;
 GBLREF	int4			strm_index;
 GBLREF	char			repl_instfilename[MAX_FN_LEN + 1];	/* save first instance */
 GBLREF	char			repl_inst_name[MAX_INSTNAME_LEN];	/* for syslog */
+GBLREF	gd_addr			*gd_header;
 
 LITREF	char			ydb_release_name[];
 LITREF	int4			ydb_release_name_len;
@@ -106,7 +107,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
         if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, status))
                 rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
 	/* rts_error should be issued by repl_inst_get_name */
-	assertpro(repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1, issue_rts_error, NULL));
+	assertpro(repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1, issue_rts_error, gd_header));
 	/* look through jnlpool_head list for matching instfilename */
 	for (tmp_jnlpool = jnlpool_head; tmp_jnlpool && !tmp_jnlpool->recv_pool; tmp_jnlpool = tmp_jnlpool->next)
 	{

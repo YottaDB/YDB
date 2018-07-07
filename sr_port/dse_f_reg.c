@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -84,7 +87,7 @@ void dse_f_reg(void)
 			BASEDBREG_TO_STATSDBREG(regptr, statsDBreg);
 			assert(NULL != statsDBreg);
 			if (!statsDBreg->open)
-				gv_init_reg(statsDBreg, NULL);
+				gv_init_reg(statsDBreg);
 			regptr = statsDBreg;
 		} else
 		{
@@ -123,6 +126,6 @@ void dse_f_reg(void)
 	util_out_print("!/File  !_!AD", TRUE, DB_LEN_STR(gv_cur_region));
 	util_out_print("Region!_!AD!/", TRUE, REG_LEN_STR(gv_cur_region));
 	patch_curr_blk = get_dir_root();
-	gv_init_reg(gv_cur_region, NULL);
+	gv_init_reg(gv_cur_region);
 	return;
 }

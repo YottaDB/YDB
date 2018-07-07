@@ -57,6 +57,7 @@
 #include "interlock.h"
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
+#include "gvcst_protos.h"		/* for "gvcst_init" */
 
 GBLREF bool		error_mupip;
 GBLREF bool		mu_ctrlc_occurred;
@@ -267,8 +268,8 @@ void mupip_reorg_encrypt(void)
 			status = reg_status = ERR_MUNOFINISH;
 			continue;
 		}
-		mu_reorg_process = TRUE;	/* gvcst_init will use this value to use ydb_poollimit settings. */
-		gvcst_init(reg, NULL);
+		mu_reorg_process = TRUE;	/* "gvcst_init" will use this value to use ydb_poollimit settings. */
+		gvcst_init(reg);
 		mu_reorg_process = FALSE;
 		/* Note that db_init() does not release the access-control semaphore in case of MUPIP REORG -ENCRYPT (as determined
 		 * based on the mu_reorg_encrypt_in_prog variable), so no need to obtain it here.
@@ -342,7 +343,7 @@ void mupip_reorg_encrypt(void)
 			}
 #			ifdef DEBUG
 			/* In case the database is at all encrypted now, we will need the encryption handle to decrypt existing
-			 * blocks. It should have been set up by gvcst_init(). Assert that.
+			 * blocks. It should have been set up by "gvcst_init". Assert that.
 			 */
 			assert(NULL != csa->encr_key_handle);
 			GTMCRYPT_HASH_CHK(csa, csd->encryption_hash, db_name_len, db_name, gtmcrypt_errno);
