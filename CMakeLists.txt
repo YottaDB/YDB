@@ -200,7 +200,6 @@ set_source_list(gtm_threadgbl_deftypes gtm_threadgbl_deftypes)
 set_source_list(dbcertify        dbcertify dlopen_libyottadb)
 set_source_list(dse              dse dlopen_libyottadb)
 set_source_list(ftok             ftok dlopen_libyottadb)
-set_source_list(geteuid          geteuid)
 set_source_list(gtcm_gnp_server  gtcm_gnp_server dlopen_libyottadb)
 set_source_list(gtcm_pkdisp      gtcm_pkdisp omi_extstr)
 set_source_list(gtcm_play        gtcm_play dlopen_libyottadb)
@@ -404,9 +403,6 @@ list(APPEND with_export dse)
 
 add_executable(dbcertify ${dbcertify_SOURCES})
 
-add_executable(geteuid ${geteuid_SOURCES})
-target_link_libraries(geteuid libmumps) # needed for few functions (e.g. gtm_printf etc.)
-
 add_executable(gtmsecshr ${gtmsecshr_SOURCES})
 target_link_libraries(gtmsecshr libmumps) # needed for static linking since this is a setuid executable
                                           # and does not do a dlopen of libyottadb.so
@@ -578,7 +574,6 @@ install(TARGETS
   mumps
   dse
   lke
-  geteuid
   gtcm_server
   gtcm_gnp_server
   gtcm_pkdisp
