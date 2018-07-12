@@ -92,8 +92,8 @@ ENTRY op_extjmp
 								/* .. should never happen for indirects */
 	cmp	x1, #-1						/* Using proxy table, label index must be -1 */
 	b.ne	gtmcheck
-	ldr	x1, [x12, #8]					/* ->label table code offset ptr */
-	cbz	x1, gtmcheck					/* If labaddr == 0 && rhdaddr != 0, label does not exist */
+	ldr	x15, [x12, #8]					/* ->label table code offset ptr */
+	cbz	x15, gtmcheck					/* If labaddr == 0 && rhdaddr != 0, label does not exist */
 								/* .. which also should never happen for indirects */
 	b	justgo						/* Bypass autorelink check for indirects (done by caller) */
 	/*
@@ -118,19 +118,19 @@ loadandgo:
 	cbnz	x15, autorelink_check				/* Need autorelink check */
 getlabeloff:
 	lsl	x1, x1, #3					/* arg * 8 = offset for label offset ptr */
-	add	x15, x12, x1
-	ldr	x15, [x15]					/* See if defined */
-	cbz	x15, label_missing
-	ldr	x1, [x15]					/* -> label table code offset */
+	add	x12, x12, x1
+	ldr	x12, [x12]					/* See if defined */
+	cbz	x12, label_missing
+	mov	x1, x12						/* -> label table code offset */
+	ldr	x15, [x1]					/* &(code_offset) for this label (usually & of lntabent) */
 	/*
 	 * Create stack frame and invoke routine
 	 */
 justgo:
-	mov	x12, x1						/* &(code_offset) for this label (usually & of lntabent) */
-	cbz	x12, label_missing
-	ldr	w2, [x12]					/* Code offset for this label */
-	ldr	x15, [x0, #mrt_ptext_adr]
-	add	x2, x15, w2, sxtw				/* Transfer address: codebase reg + offset to label */
+	cbz	x15, label_missing
+	ldr	w2, [x15]					/* Code offset for this label */
+	ldr	x1, [x0, #mrt_ptext_adr]
+	add	x2, x1, w2, sxtw				/* Transfer address: codebase reg + offset to label */
 	ldr	x1, [x0, #mrt_lnk_ptr]				/* Linkage table address (context pointer) */
 	bl	flush_jmp
 retlab:								/* If error, return to caller, else "return" to callee */
@@ -173,6 +173,6 @@ gtmcheck:
  * Make call so we can raise the appropriate LABELMISSING error for the not-found label.
  */
 label_missing:
-	mov	x0, x27						/* Index to linkage table and to linkage name table */
+	mov	x0, x28						/* Index to linkage table and to linkage name table */
 	bl	laberror
 	b	retlab
