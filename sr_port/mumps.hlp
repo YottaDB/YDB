@@ -120,7 +120,7 @@
 2 Copyright
    Copyright
 
-   Copyright 1987 - 2003, 2013 - 2017
+   Copyright 1987 - 2003, 2013 - 2018
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -4947,7 +4947,7 @@
 4 DBFLUSH
    DBFLUSH
 
-   "DBFLUSH"[:REGION[:N]]
+   DBFLUSH[:<region_list>[:N]]
 
    When using the BG access method, writes modified blocks in the global
    buffers to the database file. By default, this command option operates on
@@ -4960,7 +4960,7 @@
 4 DBSYNC
    DBSYNC
 
-   "DBSYNC":REGION
+   "DBSYNC":<region_list>
 
    Performs a file system hardening sync - fsync() - operation on the
    database file. By default, this command option operates on all regions
@@ -4985,7 +4985,7 @@
 4 EPOCH
    EPOCH
 
-   "EPOCH"[:REGION]
+   "EPOCH"[:<region_list>]
 
    Flushes the database buffers and, if journaling is enabled, writes an
    EPOCH record. By default, this command option operates on all regions
@@ -4999,7 +4999,7 @@
 4 FLUSH
    FLUSH
 
-   "FLUSH"[:REGION]
+   "FLUSH"[:<region_list>]
 
    Flushes dirty global buffers from the global buffer pool. If journaling is
    turned on, "FLUSH" writes an EPOCH record and flushes dirty journal
@@ -5030,8 +5030,13 @@
    expressions with side effects after the first Boolean operator - extrinsic
    functions, external calls and $INCREMENT().
 
+<<<<<<< HEAD
    YottaDB picks up the value of [NO]FULL_BOOL[EAN][WARN] from the environment
    variable ydb_boolean. If ydb_boolean is undefined or evaluates to an
+=======
+   GT.M picks up the value of [NO]FULL_BOOL[EAN|WARN] from the environment
+   variable gtm_boolean. If gtm_boolean is undefined or evaluates to an
+>>>>>>> df1555e... GT.M V6.3-005
    integer zero (0), the initial setting the default "NOFULL_BOOLEAN", if it
    evaluates to an integer one (1), the initial setting is "FULL_BOOLEAN" and
    if it evaluates to integer two (2) the initial setting is "FULL_BOOLWARN".
@@ -5312,12 +5317,15 @@
    particularly useful for long running processes which would periodically
    like to restart the counting without requiring a shut down and restart.
 
-4 [NO]STATSHARE
-   [NO]STATSHARE
+4 STATSHARE
+   STATSHARE
 
-   Opt in or out of sharing process statistics for monitoring by other
-   processes.
+   VIEW "[NO]STATSHARE"[:<region-list>] enables or disables database
+   statistics sharing for listed regions which permit such sharing. Without
+   the region-list, the command acts on all regions enabled for sharing. When
+   a targeted region has sharing disabled, STATSHARE has no effect.
 
+<<<<<<< HEAD
    YottaDB provides a fast and efficient mechanism for processes to share their
    database access statistics for other processes to monitor. Processes opt
    in or out with the VIEW "[NO]STATSHARE" command, defaulting to VIEW
@@ -5334,6 +5342,34 @@
    variable. All processes that share statistics MUST use the same value for
    $ydb_statsdir. The ^%YGBLSTAT utility program gathers and reports
    statistics.
+=======
+   This provides a fast and efficient mechanism for processes to share their
+   database access statistics for other processes to monitor. Processes opt
+   in or out with the VIEW "[NO]STATSHARE"[:<region-list>] command,
+   defaulting to VIEW "NOSTATSHARE". At process startup, a value of 1, or any
+   case-independent string or leading substrings of "TRUE" or "YES" in the
+   environment variable gtm_statshare provides an initial setting of VIEW
+   "STATSHARE". When a process changes whether it is opting in or out, there
+   is no change to the output of a ZSHOW "G" within that process. GT.M does
+   not permit this form of the VIEW command within a TP transaction.
+   Monitoring the statistics of other processes does not require opting-in.
+
+   The processes which opt-in for STATSHARE place their statistics as binary
+   data in database files located in the directory specified by the
+   gtm_statsdir environment variable. All processes that share statistics
+   MUST use the same value for $gtm_statsdir. The ^%YGBLSTAT utility program
+   gathers and reports statistics.
+
+   **Note**
+
+   A VIEW "[NO]STATSHARE" with no region sub-argument opens any unopened
+   mapped regions and any enabled associated statsDB regions; the
+   $gtm_statshare environment variable applies to databases as the
+   application first uses them. When the last VIEW "[NO]STATSHARE" had no
+   region sub-argument, regions implicitly share when the process first
+   references them, but after a VIEW specifies selective sharing, regions
+   don't implicitly share as they open.
+>>>>>>> df1555e... GT.M V6.3-005
 
 4 STP_GCOL
    STP_GCOL
@@ -6673,7 +6709,9 @@
    D: displays device information
 
    G: displays the access statistics for global variables and access to
-   database file since process startup
+   database file since process startup. When the process does not have access
+   to the current shared statistics, ZSHOW "G" return a question-mark (?) at
+   the end of the output strings.
 
    I: displays the current values of all intrinsic special variables
 
@@ -6685,7 +6723,8 @@
    S: displays the YottaDB invocation stack
 
    T: displays the cross-region summary (total) lines associated with G and L
-   codes
+   codes. Lines associated with G end with a question-mark (?) when the
+   process does not have access to the current shared statistics.
 
    V: displays local and alias variables
 
@@ -6712,24 +6751,15 @@
    YottaDB numeric representation precision threshold, their use in arithmetic
    expressions in YottaDB results in loss of precision. The mnemonics are:
 
-   SET : # of SET operations (TP and non-TP)
-   KIL : # of KILl operations (kill as well as zwithdraw, TP and non-TP)
-   GET : # of GET operations (TP and non-TP)
-   CAT : total of critical section acquisitions successes
-   CFE : total attempts in CFT caused by epochs
-   CFS : sum of squares of blocked critical section acquisitions
-   CFT : total of blocked critical section acquisitions
-   CQS : sum of squares of critical section acquisition queued sleeps
-   CQT : total of critical section acquisition queued sleeps
-   CYS : sum of squares of critical section acquisition processor yields
-   CYT : total of critical section acquisition processor yields
-   DTA : # of DaTA operations (TP and non-TP)
-   ORD : # of $ORDer() operations (TP and non-TP). The count of $Order(xxx,1) operations are reported under this item.
-   ZPR : # of $ZPRevious() (reverse order) operations (TP and non-TP). The count of $Order(xxx,-1) operations are reported under this item.
-   QRY : # of $QueRY() operations (TP and non-TP)
-   LKS : # of LocK calls (mapped to this db) that Succeeded
-   LKF : # of LocK calls (mapped to this db) that Failed
+   BTD : # of database Block Transitions to Dirty
+   CAT : Critical section Total Acquisitions successes
+   CFE : Critical section Failed (blocked) acquisition total caused by Epochs
+   CFS : Critical section Failed (blocked) acquisition sum of Squares
+   CFT : Critical section Failed (blocked) acquisition Total
+   CQS : Critical section acquisition Queued sleeps sum of Squares
+   CQT : Critical section acquisition Queued sleeps Total
    CTN : Current Transaction Number of the database for the last committed read-write transaction (TP and non-TP)
+<<<<<<< HEAD
    DRD : # of Disk ReaDs from the database file (TP and non-TP, committed and rolled-back).This does not include reads that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. YottaDB always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
    DWT : # of Disk WriTes to the database file (TP and non-TP, committed and rolled-back). This does not include writes that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. YottaDB always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
    NTW : # of Non-TP committed Transactions that were read-Write on this database
@@ -6769,31 +6799,60 @@
    JRO : # of all journal records other than logical, PBLK, AIMG and EPOCH records written to the journal file (for example, PINI, PFIN, and so on.)
    JEX : # of times a process extends the journal file
    DEX : # of times a process extends the database file
+=======
+   CYS : Critical section acquisition processor Yields sum of Squares
+   CYT : Critical section acquisition processor Yields Total
+   DEX : # of Database file EXtentions
+   DFL : # of Database FLushes of the entire set of dirty global buffers in shared memory to disk
+   DFS : # of times a process does an fsync of the database file. For example: a) after writing an epoch journal record, b) as part of database file extension c) during database rundown d) as part of mupip reorg -truncate etc.
+   DRD : # of Disk ReaDs from the database file (TP and non-TP, committed and rolled-back).This does not include reads that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. GT.M always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
+   DTA : # of DaTA operations (TP and non-TP)
+   DWT : # of Disk WriTes to the database file (TP and non-TP, committed and rolled-back). This does not include writes that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. GT.M always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
+   GET : # of GET operations (TP and non-TP)
+   JBB : # of Journal Buffer Bytes updated in shared memory
+   JEX : # of Journal file EXtentions
+   JFB : # of Journal File Bytes written to the journal file on disk. For performance reasons, GT.M always aligns the beginning of these writes to file system block size boundaries. JFB counts all bytes including those needed for alignment in order to reflect the actual IO load on the journal file. Since the bytes required to achieve alignment may have already been counted as part of the previous JFB, processes may write the same bytes more than once, causing the JFB counter to typically be higher than JBB.
+   JFL : # of Journal FLushes of all dirty journal buffers in shared memory to disk. For example: when switching journal files etc.
+   JFS : # of Journal FSync operations on the journal file. For example: when writing an epoch record, switching a journal file etc.
+   JFW : # of Journal File Write system calls
+   JRE : # of Journal Regular Epoch records written to the journal file (only seen in a -detail journal extract); these are written every time an epoch-interval boundary is crossed while processing updates
+   JRI : # of JouRnal Idle epoch journal records written to the journal file (only seen in a -detail journal extract); these are written when a burst of updates is followed by an idle period, around 5 seconds of no updates after the database flush timer has flushed all dirty global buffers to the database file on disk
+   JRL : # of Journal Records with a Logical record type (e.g. SET, KILL etc.) written to the journal file
+   JRO : # of Journal Records with a type Other than logical written to the journal file (e.g. AIMG, EPOCH, PBLK, PFIN, PINI, and so on)
+   JRP : # of Journal Records with a Physical record type (i.e. PBLK, AIMG) written to the journal file (these records are seen only in a -detail journal extract)
+   KIL : # of KILl operations (kill as well as zwithdraw, TP and non-TP)
+   LKF : # of LocK calls (mapped to this db) that Failed
+   LKS : # of LocK calls (mapped to this db) that Succeeded
+   NBR : # of Non-tp committed transaction induced Block Reads on this database
+   NBW : # of Non-tp committed transaction induced Block Writes on this database
+   NR0 : # of Non-tp transaction Restarts at try 0
+   NR1 : # of Non-tp transaction Restarts at try 1
+   NR2 : # of Non-tp transaction Restarts at try 2
+   NR3 : # of Non-tp transaction Restarts at try 3
+   NTR : # of Non-tp committed Transactions that were Read-only on this database
+   NTW : # of Non-tp committed Transactions that were read-Write on this database
+   ORD : # of $ORDer(,1) (forward) operations (TP and non-TP); the count of $Order(,-1) operations are reported under ZPR.
+   QRY : # of $QueRY() operations (TP and non-TP)
+   SET : # of SET operations (TP and non-TP)
+   TBR : # of Tp transaction induced Block Reads on this database
+   TBW : # of Tp transaction induced Block Writes on this database
+   TC0 : # of Tp transaction Conflicts at try 0 (counted only for that region which caused the TP transaction restart)
+   TC1 : # of Tp transaction Conflicts at try 1 (counted only for that region which caused the TP transaction restart)
+   TC2 : # of Tp transaction Conflicts at try 2 (counted only for that region which caused the TP transaction restart)
+   TC3 : # of Tp transaction Conflicts at try 3 (counted only for that region which caused the TP transaction restart)
+   TC4 : # of Tp transaction Conflicts at try 4 and above (counted only for that region which caused the TP transaction restart)
+   TR0 : # of Tp transaction Restarts at try 0 (counted for all regions participating in restarting TP transaction)
+   TR1 : # of Tp transaction Restarts at try 1 (counted for all regions participating in restarting TP transaction)
+   TR2 : # of Tp transaction Restarts at try 2 (counted for all regions participating in restarting TP transaction)
+   TR3 : # of Tp transaction Restarts at try 3 (counted for all regions participating in restarting TP transaction)
+   TR4 : # of Tp transaction Restarts at try 4 and above (restart counted for all regions participating in restarting TP transaction)
+   TRB : # of Tp read-only or read-write transactions Rolled Back (excluding incremental rollbacks)
+   TTR : # of Tp committed Transactions that were Read-only on this database
+   TTW : # of Tp committed Transactions that were read-Write on this database
+   ZPR : # of $order(,-1) or $ZPRevious() (reverse order) operations (TP and non-TP). The count of $Order(,1) operations are reported under ORD.
+   ZTR : # of ZTRigger command operations
+>>>>>>> df1555e... GT.M V6.3-005
    [NT]B[WR] mnemonics are satisfied by either disk access or, for databases that use the BG (buffered global) access method, global buffers in shared memory.
-   ZTR : # of ZTRIGGER command operations
-   DFL : # of Database FLushes
-   DFS : # of Database FSyncs
-   JFL : # of Journal FLushes
-   JFS : # of Journal FSyncs
-   JBB : # of Bytes written to Journal Buffer
-   JFB : # of Bytes written to Journal File
-   JFW : # of Journal File Writes
-   JRL : # of Logical Journal Records
-   JRP : # of Pblk Journal Records
-   JRE : # of Regular Epoch Journal Records
-   JRI : # of Idle epoch Journal Records
-   JRO : # of Other Journal Records
-   JEX : # of Journal file EXtensions
-   DEX : # of Database file EXtensions
-   CAT : # of crit acquired total successes
-   CFE : # of attempts in CFT caused by epochs
-   CFS : sum of squares grab crit failed
-   CFT : # of grab crit failures
-   CQS : sum of squares grab crit queued sleeps
-   CQT : # of grab crit queued sleeps
-   CYS : sum of squares grab crit yields
-   CYT : # of grab crit yields
-   BTD : # of Block Transitions to Dirty
 
    When $PRINCIPAL input and output are different devices, ZSHOW "D" shows
    them as separate items identified as 0 for input and 0-out for output.
@@ -6936,6 +6995,86 @@
    Suppose a process runs LOCK (^SUCCESS1,^SUCCESS2) which succeeds and a
    LOCK +^FAIL:1 which times out due to another process holding that lock. A
    ZSHOW "L" at this point displays the following output.
+
+   Example:
+
+   GTM>ZSHOW "I"
+   $DEVICE=""
+   $ECODE=""
+   $ESTACK=0
+   $ETRAP=""
+   $HOROLOG="64813,13850"
+   $IO="/dev/pts/0"
+   $JOB=20264
+   $KEY=""
+   $PRINCIPAL="/dev/pts/0"
+   $QUIT=0
+   $REFERENCE=""
+   $STACK=0
+   $STORAGE=2147483647
+   $SYSTEM="47,gtm_sysid"
+   $TEST=1
+   $TLEVEL=0
+   $TRESTART=0
+   $X=0
+   $Y=20
+   $ZA=0
+   $ZALLOCSTOR=671584
+   $ZB=""
+   $ZCHSET="M"
+   $ZCLOSE=0
+   $ZCMDLINE=""
+   $ZCOMPILE=""
+   $ZCSTATUS=0
+   $ZDATEFORM=0
+   $ZDIRECTORY="/path/to/the/current/directory"
+   $ZEDITOR=0
+   $ZEOF=0
+   $ZERROR="Unprocessed $ZERROR, see $ZSTATUS"
+   $ZGBLDIR="/path/to/the/global/directory/$gtmgbldir.gld"
+   $ZHOROLOG="64813,13850,790453,14400"
+   $ZININTERRUPT=0
+   $ZINTERRUPT="IF $ZJOBEXAM()"
+   $ZIO="/dev/pts/0"
+   $ZJOB=0
+   $ZKEY=""
+   $ZLEVEL=1
+   $ZMAXTPTIME=0
+   $ZMODE="INTERACTIVE"
+   $ZONLNRLBK=0
+   $ZPATNUMERIC="M"
+   $ZPIN="/dev/pts/0"
+   $ZPOSITION="+1^GTM$DMOD"
+   $ZPOUT="/dev/pts/0"
+   $ZPROMPT="GTM>"
+   $ZQUIT=0
+   $ZREALSTOR=694280
+   $ZRELDATE="20180614 00:33"
+   $ZROUTINES=". /usr/lib/fis-gtm/V6.3-005_x86_64 /usr/lib/fis-gtm/V6.3-005_x86_64/plugin/o(/usr/lib/fis-gtm/V6.3-005_x86_64/plugin/r)"
+   $ZSOURCE=""
+   $ZSTATUS=""
+   $ZSTEP="B"
+   $ZSTRPLLIM=0
+   $ZSYSTEM=0
+   $ZTDATA=0
+   $ZTDELIM=""
+   $ZTEXIT=""
+   $ZTLEVEL=0
+   $ZTNAME=""
+   $ZTOLDVAL=""
+   $ZTRAP="B"
+   $ZTRIGGEROP=""
+   $ZTSLATE=""
+   $ZTUPDATE=""
+   $ZTVALUE=""
+   $ZTWORMHOLE=""
+   $ZUSEDSTOR=666047
+   $ZUT=1528962650791332
+   $ZVERSION="GT.M V6.3-005 Linux x86_64"
+   $ZYERROR=""
+
+   This example displays the current value of all intrinsic special
+   variables.
 
 3 ZSHOW_Destination_Variables
    ZSHOW Destination Variables
@@ -8713,16 +8852,14 @@
    |                   |              | that the global directory defines   |
    |                   |              | no additional regions.              |
    |-------------------+--------------+-------------------------------------|
-   |                   |              | When read-only processes are the    |
-   |                   |              | active in a database, they cannot   |
-   |                   |              | update the database including the   |
+   |                   |              | A read-only process cannot update   |
+   |                   |              | the database including the database |
    |                   |              | file header where GVSTATS are       |
-   | "GVSTAT"          | region       | stored. Therefore their counts are  |
-   |                   |              | only stored in associated shared    |
-   |                   |              | memory and must be flushed to the   |
-   |                   |              | file header by a process with write |
-   |                   |              | access, which might be a MUPIP      |
-   |                   |              | RUNDOWN.                            |
+   | "GVSTAT"          | region       | stored. Another process with write  |
+   |                   |              | access to a database, such as MUPIP |
+   |                   |              | RUNDOWN, can flush its read         |
+   |                   |              | statistics from the associated      |
+   |                   |              | shared memory to GVSTATS.           |
    |-------------------+--------------+-------------------------------------|
    |                   |              | Number of indirection cache hits    |
    |                   |              | since YottaDB process startup.      |
@@ -8878,7 +9015,28 @@
    |                   |              | subsequently uses a significantly   |
    |                   |              | reduced amount.                     |
    |-------------------+--------------+-------------------------------------|
+<<<<<<< HEAD
    | "STKSIZ"          | none         | Returns the YottaDB stack size in   |
+=======
+   |                   |              | Returns 0 when the process has      |
+   |                   |              | sharing disabled, 1 when it has     |
+   |                   |              | sharing enabled, and 2 when sharing |
+   |                   |              | is enabled selectively for regions. |
+   |                   |              | For a process to store statistics   |
+   |                   |              | in the stats db, the database must  |
+   |                   |              | be enabled for sharing and the      |
+   | "STATSHARE"       | region       | process must have opted in to       |
+   |                   |              | share. VIEW "STATSHARE" with no     |
+   |                   |              | region argument enables sharing for |
+   |                   |              | all regions and VIEW                |
+   |                   |              | "STATSHARE":"REGION_NAME" enables   |
+   |                   |              | sharing selectively for a region.   |
+   |                   |              | $VIEW("STATSHARE","REGION_NAME")    |
+   |                   |              | returns whether a process has opted |
+   |                   |              | to share statistics for a region.   |
+   |-------------------+--------------+-------------------------------------|
+   | "STKSIZ"          | none         | Returns the GT.M stack size in      |
+>>>>>>> df1555e... GT.M V6.3-005
    |                   |              | bytes.                              |
    |-------------------+--------------+-------------------------------------|
    | "TOTALBLOCKS"     | region       | Total number of database blocks in  |
@@ -10759,7 +10917,7 @@
    interoperability between UNIX and OpenVMS versions, $ZTRNLNM() on UNIX
    accepts these expressions and ignores them.
 
-   expr6 specifies any one of the following keywords:
+   The optional expr6 specifies any one of the following keywords:
 
    +-----------------------------------------------------+
    | ITEM KEYWORD |            DATA RETURNED             |
@@ -10776,11 +10934,22 @@
 
    Example:
 
+<<<<<<< HEAD
    YDB>write $ztrnlnm("ydb_dist","","","","","VALUE")
    /usr/local/lib/yottadb/r122/utf8
    YDB>
 
    This uses $ZTRNLNM() to display the translation value for ydb_dist.
+=======
+   GTM>write $ztrnlnm("gtm_dist","","","","","VALUE")
+   /usr/lib/fis-gtm/V6.3-004_x86_64/utf8
+   GTM>write $ztrnlnm("gtm_dist")
+   /usr/lib/fis-gtm/V6.3-004_x86_64/utf8
+   GTM>
+
+   These example use $ZTRNLNM() to display the translation value for
+   gtm_dist.
+>>>>>>> df1555e... GT.M V6.3-005
 
 2 $ZWidth()
    $ZWidth()
@@ -12426,6 +12595,14 @@
    can help identify storage related problems. YottaDB does not permit
    $ZREALSTOR to be SET or NEWed.
 
+2 $ZRELdate
+   $ZRELdate
+
+   $ZRELDATE provides the UTC date / time of the build GT.M build in the form
+   YYYYMMDD 24:60 (using $ZDATE() notation). While $ZVERSION is probably a
+   better identifier for most uses, $ZRELDATE may be a helpful alternative
+   for those testing pre-release builds.
+
 2 $ZROutines
    $ZROutines
 
@@ -12777,6 +12954,51 @@
    directory [./obj] in $ZROUTINES. The example assumes the shared library
    (libshare.so) has been built using shell commands.
 
+2 $ZQuit
+   $ZQuit
+
+   $ZQUIT indicates whether the functionality associated with the
+   gtm_zquit_anyway environment variable is enabled. If the environment
+   variable gtm_zquit_anyway is defined and evaluates to 1 or any
+   case-independent string or leading substrings of "TRUE" or "YES", GT.M
+   sets $ZQUIT to 1 and executes code of the form QUIT <expr< as if it were
+   SET <tmp>=<expr> QUIT:$QUIT tmp QUIT, where <tmp> is a temporary local
+   variable in the GT.M runtime system that is not visible to the application
+   code. The value of $ZQUIT is a compile time setting, that is it can be set
+   during run-time but it has no effect on the behavior existing object code
+   - it only effects code generated by auto-ZLINK or the ZCOMPILE command.
+   This setting has no effect on late bound code such as that in XECUTE
+   arguments, $ETRAP, $ZTRAP device EXCEPTIONS.
+
+   If gtm_zquit_anyway is not defined or evaluates to 0 or any
+   case-independent string or leading substrings of "FALSE" or "NO", GT.M set
+   $ZQUIT to 0 executes QUIT <expr> as specified by the standard. This
+   feature is helpful when you want to run a block of code both as a routine
+   and as an extrinsic function. Consider the following example:
+
+   GTM>zprint ^rtnasfunc
+   rtnasfunc(expr1)
+     write "Hello ",expr1,!
+     quit
+
+   When the gtm_zquit_anyway functionality is diabled, extrinsic function
+   invocations return an error as per the standard.
+
+   GTM>write $zquit
+   0
+   GTM>write $$^rtnasfunc("jdoe")
+   Hello jdoe
+     %GTM-E-QUITARGREQD, Quit from an extrinsic must have an argument
+
+   However, if you enable the gtm_zquit_anyway feature, extrinsic function
+   invocations do not return an error.
+
+   GTM>write $zquit
+   1
+   GTM>write $$^rtnasfunc("jdoe")
+   Hello jdoe
+   GTM>
+
 2 $ZSOurce
    $ZSOurce
 
@@ -13008,7 +13230,7 @@
    output in each YDB_JOBEXAM_ZSHOW_DMP for the initial interrupt, and at
    tcommit when the interrupt is rethrown.
 
-3 $ZTrap
+2 $ZTrap
    $ZTrap
 
    $ZT[RAP] contains a string value that YottaDB XECUTEs when an error occurs
@@ -14910,9 +15132,11 @@
 
    /L[ISTEN][(numexpr)]
 
-   where numexpr is in the range 1-5 and specifies the listen queue depth for
-   a listening socket. By default, an OPEN or USE with LISTEN immediately
-   sets the listen queue size to 1.
+   where numexpr specifies the listen queue depth for a listening socket. The
+   value of numexpr must be between 1 and the system-enforced maximum. By
+   default, an OPEN or USE with LISTEN immediately sets the listen queue size
+   to 1. For vendor-specific information on how to change your system's
+   maximum queue length, refer to the listen manpage.
 
    /W[AIT][(timeout)]
 
@@ -15777,8 +16001,21 @@
    This example opens a socket connection and specifies that I/O errors on
    the device raises error conditions.
 
-   If $LENGTH(strexpr)&("Tt"[$EXTRACT(strexpr)) then Error Trapping is
-   enabled; otherwise the application must check $DEVICE for errors.
+   If $LENGTH(expr)&("Tt"[$EXTRACT(expr)) then Error Trapping is enabled;
+   otherwise the application must check $DEVICE and other ISVs for errors.
+
+   Note that an OPEN command does not change the current device. Therefore,
+   $DEVICE does not have the status information when an error occurs on OPEN.
+   An application should check $TEST and other ISVs for errors on OPEN.
+
+   $DEVICE holds status information only after a socket is successfully
+   ATTACHed to a socket device. To properly trap IOERRORs related to
+   connection handling, it is best to create an empty SOCKET device (with
+   something like open tcpdev::timeout:"SOCKET") before opening a socket
+   connection with the OPEN (with LISTEN or CONNECT deviceparameters)
+   command. Then, use ATTACH to bring it to the current SOCKET device. This
+   method ensures that a device exists that would update $DEVICE with status
+   information.
 
 5 KEY
    KEY
@@ -21801,4 +22038,16 @@ Appendix A. M Coding Standards - Do's and Don'ts
            ZWRITE output more useful but are not supported for any other
            purpose. They are only mentioned here because you may see them in
            the output of ZWRITE and ZSHOW "V".
+
+           You can use SET @ to process ZWRITE or ZSHOW "V" output containing
+           $ZWRTACn variables for restoring an alias container variable to a
+           prior state. While processing the output, never attempt to inject
+           or manipulate $ZWRTACn lines as it may lead to unintended
+           consequences or undermine the benefit you might achieve from using
+           alias containers. Lines containing SET $ZWRTACn=<value> are no-ops
+           unless they have a preceding SET $ZWRTAC="" and an alias container
+           variable association. In the ZWRITE or ZSHOW "V" output of an
+           alias container, SET $ZWRTAC lines appear in the order that GT.M
+           expects for restoration. FIS can change the use of $ZWRTAC in GT.M
+           at any time.
 

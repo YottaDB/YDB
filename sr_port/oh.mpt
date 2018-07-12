@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987,2001 Sanchez Computer Associates, Inc.	;
+; Copyright (c) 1987-2018 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -23,8 +24,4 @@ FUNC(o)
 	q:o<0 ""
 	q:o'?1.N ""
 	q:o[8!(o[9) ""
-	n d,dg,h
-	s d=0,h="",o=+o
-	f dg=1:1:$l(o) s d=d*8+$e(o,dg)
-	f  q:'d  s h=$e("0123456789ABCDEF",d#16+1)_h,d=d\16
-	q h
+	q $$CONVERTBASE^%CONVBASEUTIL(o,8,16)

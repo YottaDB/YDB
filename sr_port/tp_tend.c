@@ -83,6 +83,7 @@
 #include "db_snapshot.h"
 #include "is_proc_alive.h"
 #include "process_reorg_encrypt_restart.h"
+#include "gtmsource_inline.h"
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			dollar_trestart;
@@ -1496,6 +1497,10 @@ boolean_t	tp_tend()
 		jnl_write_reserve(csa, jrs, JRT_TCOM, TCOM_RECLEN, &tcom_record);
 		jbp = jpc->jnl_buff;
 		assert(JNL_ALLOWED(csa));
+#ifdef DEBUG
+		if ((WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06)) && (gtm_white_box_test_case_count == 0))
+			gtm_white_box_test_case_count = 2;
+#endif
 		if (JNL_ENABLED(csa))	/* Need "if" check to handle WAS_ON scenario */
 			UPDATE_JRS_RSRV_FREEADDR(csa, jpc, jbp, jrs, jpl, jnl_fence_ctl, replication);/* sets jbp->rsrv_freeaddr.
 												       * Step CMT06.

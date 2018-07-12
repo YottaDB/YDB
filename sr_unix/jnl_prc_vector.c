@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> df1555e... GT.M V6.3-005
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,9 +62,15 @@ void jnl_prc_vector (jnl_process_vector *pv)
 	GETPWUID(eff_uid, pw);
 	if (pw)
 	{
+<<<<<<< HEAD
 		SNPRINTF(pv->jpv_user, SIZEOF(pv->jpv_user), "%s", pw->pw_name);
 		SNPRINTF(pv->jpv_prcnam, SIZEOF(pv->jpv_prcnam), "%s", pw->pw_name);
 #		ifdef UNICODE
+=======
+		SNPRINTF(pv->jpv_user, JPV_LEN_USER, "%s", pw->pw_name);
+		SNPRINTF(pv->jpv_prcnam, JPV_LEN_PRCNAM, "%s", pw->pw_name);
+#		ifdef UNICODE_SUPPORTED
+>>>>>>> df1555e... GT.M V6.3-005
 		/* In UTF8 mode, trim the string (if necessary) to contain only as many valid multi-byte characters as can fit in */
 		if (gtm_utf8_mode)
 		{
@@ -70,9 +81,13 @@ void jnl_prc_vector (jnl_process_vector *pv)
 	} else
 	{
 #		ifdef DEBUG
+<<<<<<< HEAD
 		SNPRINTF(pv->jpv_user, SIZEOF(pv->jpv_user), "%s", "ERROR=");
 		if (errno < 1000)               /* protect against overflow */
 			c = i2asc((uchar_ptr_t)pv->jpv_user + 6, errno);  /* past = above */
+=======
+		SNPRINTF(pv->jpv_user, JPV_LEN_USER, "ERROR=%d", (errno < 1000) ? errno : 1000);
+>>>>>>> df1555e... GT.M V6.3-005
 #		endif
 	}
 	endpwent();                        /* close passwd file to free channel */
@@ -86,6 +101,10 @@ void jnl_prc_vector (jnl_process_vector *pv)
 				break;
 			}
 		}
+<<<<<<< HEAD
 		SNPRINTF(pv->jpv_terminal, SIZEOF(pv->jpv_terminal), "%s", (char *)s);
+=======
+		SNPRINTF(pv->jpv_terminal, JPV_LEN_TERMINAL, "%s", (char *)s);
+>>>>>>> df1555e... GT.M V6.3-005
 	}
 }

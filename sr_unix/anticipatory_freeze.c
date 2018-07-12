@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -81,6 +81,7 @@ GBLREF	boolean_t		multi_thread_in_use;
  */
 STATICFNDCL char	*scan_space(FILE *handle, char *buff, char *buffptr, char *buff_top);
 STATICFNDCL int		get_mnemonic_offset(hash_table_str **err_hashtab, char *mnemonic_buf, int mnemonic_len);
+STATICFNDCL boolean_t	is_message_excluded(int msg_id);
 
 /* Scan through whitespace in the current buffer (read more if required) */
 STATICFNDEF char 	*scan_space(FILE *handle, char *buff, char *buffptr, char *buff_top)
@@ -147,6 +148,19 @@ STATICFNDEF int		get_mnemonic_offset(hash_table_str **err_hashtab, char *mnemoni
 	msg_info = (err_msg *)(err_htent->value);
 	assert(msg_info >= msg_beg && msg_info < msg_top);
 	return msg_info - msg_beg;
+}
+
+/* Determine if the given msg_id has been explicitly excluded from being able to effectualte an anticipatory freeze */
+STATICFNDCL boolean_t	is_message_excluded(int msg_offset)
+{
+	int		cnt;
+
+	/* See if msg_id is one of the undocumented messages */
+	for (cnt = 0; cnt < merrors_ctl.undocmsg_cnt; cnt++)	/* small list of 25-30 messages */
+		if (msg_offset == merrors_ctl.undocmsg[cnt])
+			return TRUE;
+	assert(cnt == merrors_ctl.undocmsg_cnt);
+	return FALSE;
 }
 
 /* Determine whether a given msg_id qualifies for an anticipatory freeze or not */
@@ -323,7 +337,8 @@ boolean_t		init_anticipatory_freeze_errors()
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CUSTERRNOTFND, 2, mnemonic_len, mnemonic_buf);
 				return FALSE;
 			}
-			jnlpool->jnlpool_ctl->merrors_array[offset] |= AFREEZE_MASK; /* duplicate entries are not an error */
+			if (!is_message_excluded(offset))
+				jnlpool->jnlpool_ctl->merrors_array[offset] |= AFREEZE_MASK; /* duplicate entries are not error */
 		}
 		assert(ISSPACE_ASCII(*buffptr) || (COMMENT_DELIMITER == *buffptr));
 		if (EOL_REACHED == (buffptr = scan_space(handle, buff, buffptr, buff_top)))

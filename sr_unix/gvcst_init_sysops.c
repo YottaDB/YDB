@@ -219,10 +219,10 @@ MBSTART {														\
 	}														\
 	DO_ERR_PROC_ENCRYPTION_IF_NEEDED(REG, DO_CRYPT_INIT, INIT_STATUS, CRYPT_WARNING);				\
 } MBEND
-#define INIT_PROC_ENCRYPTION_IF_NEEDED(CSA, DO_CRYPT_INIT, INIT_STATUS)							\
+#define INIT_PROC_ENCRYPTION_IF_NEEDED(DO_CRYPT_INIT, INIT_STATUS)							\
 MBSTART {														\
 	if (DO_CRYPT_INIT)												\
-		INIT_PROC_ENCRYPTION(CSA, INIT_STATUS);									\
+		INIT_PROC_ENCRYPTION(INIT_STATUS);									\
 } MBEND
 
 #define DO_ERR_PROC_ENCRYPTION_IF_NEEDED(REG, DO_CRYPT_INIT, INIT_STATUS, CRYPT_WARNING)				\
@@ -437,6 +437,7 @@ gd_region *dbfilopn(gd_region *reg)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	db_init_region = reg;
 	seg = reg->dyn.addr;
 	assert(IS_ACC_METH_BG_OR_MM(seg->acc_meth));
 	FILE_CNTL_INIT_IF_NULL(seg);
@@ -726,7 +727,6 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_NOUNWIND(dbinit_ch);
-	db_init_region = reg;	/* initialized for dbinit_ch */
 	assert(INTRPT_IN_GVCST_INIT == intrpt_ok_state); /* we better be called from gvcst_init */
 	read_only = reg->read_only;
 	udi = FILE_INFO(reg);
@@ -773,7 +773,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	{
 		gld_do_crypt_init = (IS_ENCRYPTED(reg->dyn.addr->is_encrypted) && !IS_LKE_IMAGE);
 		assert(!TO_BE_ENCRYPTED(reg->dyn.addr->is_encrypted));
-		INIT_PROC_ENCRYPTION_IF_NEEDED(csa, gld_do_crypt_init, init_status); /* heavyweight so do it before ftok */
+		INIT_PROC_ENCRYPTION_IF_NEEDED(gld_do_crypt_init, init_status); /* heavyweight so do it before ftok */
 		max_hrtbt_delta = TREF(dbinit_max_delta_secs);
 		indefinite_wait = (INDEFINITE_WAIT_ON_EAGAIN == max_hrtbt_delta);
 		if (!indefinite_wait)
@@ -814,7 +814,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 				 */
 				if (!bypassed_ftok && !ftok_sem_release(reg, FALSE, FALSE))
 					RTS_ERROR(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
-				INIT_PROC_ENCRYPTION_IF_NEEDED(csa, db_do_crypt_init, init_status); /* redo initialization */
+				INIT_PROC_ENCRYPTION_IF_NEEDED(db_do_crypt_init, init_status); /* redo initialization */
 				bypassed_ftok = ok_to_bypass;
 				if (!indefinite_wait)
 				{	/* restart timer to reflect time lost in encryption initialization */
@@ -1130,7 +1130,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		RETURN_IF_ERROR(err_ret, err_ret, indefinite_wait, sem_stacktrace_time, sem_timedout);
 		tsd_read_only = tsd->read_only;
 		db_do_crypt_init = (USES_ENCRYPTION(tsd->is_encrypted) && !IS_LKE_IMAGE);
-		INIT_PROC_ENCRYPTION_IF_NEEDED(csa, db_do_crypt_init, init_status);
+		INIT_PROC_ENCRYPTION_IF_NEEDED(db_do_crypt_init, init_status);
 		INIT_DB_ENCRYPTION_IF_NEEDED(db_do_crypt_init, init_status, reg, csa, tsd, crypt_warning);
 		CSD2UDI(tsd, udi);
 		/* Make sure "mu_rndwn_file" has created semaphore for standalone access */
@@ -1700,10 +1700,39 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 					  ERR_TEXT, 2, LEN_AND_LIT("gtmsecshr failed to update database file header"));
 			}
 		}
+<<<<<<< HEAD
 	} else
 		csa->read_only_fs = TRUE;	/* We never want to write to READ_ONLY db file. So treat this as if
 						 * the underlying file system is read-only.
 						 */
+=======
+	} else if (read_only && new_shm_ipc)
+	{	/* For read-only process if shared memory and semaphore created for first time,
+		 * semaphore and shared memory id, and semaphore creation time are written to disk.
+		 */
+		db_ipcs.open_fd_with_o_direct = udi->fd_opened_with_o_direct;
+		db_ipcs.semid = tsd->semid;	/* use tsd instead of csd in order for MM to work too */
+		db_ipcs.shmid = tsd->shmid;
+		db_ipcs.gt_sem_ctime = tsd->gt_sem_ctime.ctime;
+		db_ipcs.gt_shm_ctime = tsd->gt_shm_ctime.ctime;
+		db_ipcs.fn_len = reg->dyn.addr->fname_len;
+		memcpy(db_ipcs.fn, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
+		db_ipcs.fn[reg->dyn.addr->fname_len] = 0;
+		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
+		if(!tsd->read_only)
+		{
+			secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
+			csa->read_only_fs = (EROFS == secshrstat);
+		}
+		if ((0 != secshrstat) && !csa->read_only_fs && !tsd->read_only)
+		{
+			if (save_jnlpool != jnlpool)
+				jnlpool = save_jnlpool;
+			RTS_ERROR(VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+				  ERR_TEXT, 2, LEN_AND_LIT("gtmsecshr failed to update database file header"));
+		}
+	}
+>>>>>>> df1555e... GT.M V6.3-005
 	if (save_jnlpool != jnlpool)
 		jnlpool = save_jnlpool;
 	if (ftok_counter_halted || access_counter_halted)

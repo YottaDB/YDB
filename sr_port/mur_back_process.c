@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -961,9 +961,12 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 						this_reg_resolved = TRUE;
 					}
 					if (!mur_options.forward)
+					{
 						save_turn_around_point(rctl, jctl, apply_pblk_this_region);
-					PRINT_VERBOSE_STAT(jctl, "mur_back_processing:save_turn_around_point");
-					break;
+						PRINT_VERBOSE_STAT(jctl, "mur_back_processing:save_turn_around_point");
+					}
+					if (!mur_options.forward || !mur_options.verify)
+						break;		/* verify continues till the beginning of journal file */
 				}
 			}
 			continue;

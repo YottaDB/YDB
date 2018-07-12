@@ -36,8 +36,14 @@ void suspend(int sig)
 {
 	int	status;
 
+<<<<<<< HEAD
 	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SUSPENDING, 1, sig);
 	is_suspended = TRUE;
+=======
+	/* Clear suspend_status first to prevent recursion */
+	suspend_status = NOW_SUSPEND;
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SUSPENDING, 1, sig);
+>>>>>>> df1555e... GT.M V6.3-005
 	/* Dont call flush_pio() if the received signal is SIGTTOU OR if the received signal is SIGTTIN
 	 * and the $P.out is terminal. Arrival of SIGTTIN and SIGTTOU indicates that current process is
 	 * in the background. Hence it does not make sense to do flush_pio() $P.out is terminal.

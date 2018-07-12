@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@ GBLREF uint4			process_id;
 GBLREF uint4			crit_deadlock_check_cycle;
 GBLREF uint4			dollar_tlevel;
 GBLREF unsigned int		t_tries;
-#if defined(UNIX) && defined(DEBUG)
+#ifdef DEBUG
 GBLREF jnl_gbls_t		jgbl;
 #endif
 
@@ -65,11 +65,10 @@ uint4 have_crit(uint4 crit_state)
 	/* in order to proper release the necessary regions, CRIT_RELEASE implies going through all the regions */
 	if (crit_state & CRIT_RELEASE)
 	{
-		UNIX_ONLY(assert(!jgbl.onlnrlbk)); /* should not request crit to be released if online rollback */
-		assert(0 == crit_count);	/* Make sure we dont return right away in the next "if" block in case of release */
+		assert(!jgbl.onlnrlbk);		/* should not request crit to be released if online rollback */
 		crit_state |= CRIT_ALL_REGIONS;
 	}
-	if ((0 != crit_count) && (crit_state & CRIT_HAVE_ANY_REG))
+	if ((INTRPT_IN_CRIT_FUNCTION == intrpt_ok_state) && (crit_state & CRIT_HAVE_ANY_REG))
 	{
 		crit_reg_cnt++;
 		if (0 == (crit_state & CRIT_ALL_REGIONS))

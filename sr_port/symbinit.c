@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,9 +58,9 @@ int4 symbinit(void)
 		{
 			msp_save = msp;
 			msp -= ls_size;
-		   	if (msp <= stackwarn)
+			if (msp <= stackwarn || msp > stackbase)
 		   	{
-				if (msp <= stacktop)
+				if (msp <= stacktop || msp > stackbase)
 		   		{
 					msp = msp_save;
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);

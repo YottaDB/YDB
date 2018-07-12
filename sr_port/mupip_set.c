@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -44,7 +44,7 @@ error_def(ERR_MUNODBNAME);
 void mupip_set(void)
 {
 	boolean_t	file, jnlfile;
-	char		db_fn[MAX_FN_LEN + 1], jnl_fn[JNL_NAME_SIZE];
+	char		db_fn[MAX_FN_LEN + 1], jnl_fn[JNL_NAME_SIZE + 1];
 	unsigned short	db_fn_len, jnl_fn_len;
 	uint4		status;
 	int 		cli_stat;
@@ -74,10 +74,10 @@ void mupip_set(void)
 	} else
 	{
 		assert(jnlfile);
-		jnl_fn_len = SIZEOF(jnl_fn);
-		memset(jnl_fn, 0, jnl_fn_len);
+		jnl_fn_len = JNL_NAME_SIZE;
 		if (!cli_get_str("WHAT", jnl_fn, &jnl_fn_len))
 			mupip_exit(ERR_MUNOACTION);
+		jnl_fn[jnl_fn_len] = '\0';
 		status = mupip_set_jnlfile(jnl_fn, SIZEOF(jnl_fn));
 		mupip_exit(status);
 	}

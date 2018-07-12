@@ -1,10 +1,15 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2014 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> df1555e... GT.M V6.3-005
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,6 +47,10 @@
 #include "have_crit.h"
 
 #define FILE_NAME_SIZE	255
+
+#if defined(__x86_64__)
+	extern void opp_ciret();
+#endif
 
 LITDEF char 		interactive_mode_buf[] = "INTERACTIVE";
 LITDEF char 		other_mode_buf[] = "OTHER";
@@ -169,10 +178,19 @@ void jobchild_init(void)
 	}
 	if (MUMPS_CALLIN & invocation_mode)
 	{
+<<<<<<< HEAD
 		base_frame(base_addr);			/* More fields filled in by following SET_CI_ENV macro */
 		SET_CI_ENV(gtm_levl_ret_code);
 	} else
 		gtm_init_env(base_addr, transfer_addr);
+=======
+#if defined(__x86_64__)
+		SET_CI_ENV(opp_ciret);
+#else
+		SET_CI_ENV(ci_ret_code_exit);
+#endif
+	}
+>>>>>>> df1555e... GT.M V6.3-005
 	if (job_arglist.callargs)
 		callg((INTPTR_T (*)(intszofptr_t cnt, ...))push_parm, (gparam_list *)&job_arglist);
 	REVERT;

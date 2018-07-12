@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,6 +43,7 @@ int m_if(void)
 	jmpchn		*jmpchain, *nxtjmp;
 	oprtype		*ta_opr, x, y;
 	triple		ifpos_in_chain, *jmpref, *ref1, *ref2, *oldchain, tmpchain, *triptr;
+	mval		*v;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -69,7 +70,11 @@ int m_if(void)
 		{
 			ta_opr = (oprtype *)mcalloc(SIZEOF(oprtype));
 			if (!bool_expr(TRUE, ta_opr))
-				return FALSE;
+			{
+				if (NULL != oldchain)
+					setcurtchain(oldchain);					/* reset from discard chain */
+				 return FALSE;
+			}
 			for (triptr = (TREF(curtchain))->exorder.bl; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
 				;
 			if ((OC_JMPNEQ == triptr->opcode)					/* WARNING: assignments */
@@ -85,8 +90,9 @@ int m_if(void)
 			if (OC_LIT == triptr->opcode)
 			{	/* it is a literal so we optimize it */
 				dqdel(triptr, exorder);
-				unuse_literal(&triptr->operand[0].oprval.mlit->v);
-				if (t_set = (0 == triptr->operand[0].oprval.mlit->v.m[1]))	/* WARNING: assignment */
+				v = &triptr->operand[0].oprval.mlit->v;
+				unuse_literal(v);
+				if (t_set = (0 == MV_FORCE_BOOL(v)))	/* WARNING: assignment */
 				{	/* it's FALSE, insert clear of $TEST */
 					newtriple(OC_CLRTEST);
 					if (TK_SPACE == TREF(director_token))			/* if there are trailing spaces */
@@ -104,8 +110,6 @@ int m_if(void)
 					newtriple(OC_SETTEST);
 					if (TK_COMMA != TREF(window_token))
 						break;
-					if (TK_EOL == TREF(window_token))
-						return TRUE;
 					advancewindow();
 					continue;	/* leave first_time in case next arg is also a literal */
 				}
@@ -148,6 +152,8 @@ int m_if(void)
 	{
 		while (TK_SPACE == TREF(window_token))		/* Eat up trailing white space */
 			advancewindow();
+		if (NULL != oldchain)
+			setcurtchain(oldchain);			/* reset from discard chain */
 		if (TK_EOL != TREF(window_token))
 		{
 			stx_error(ERR_INDEXTRACHARS);
@@ -163,7 +169,8 @@ int m_if(void)
 		return FALSE;
 	}
 	if (!linetail())
-	{	tnxtarg(&x);
+	{
+		tnxtarg(&x);
 		dqloop(jmpchain,link,nxtjmp)
 		{
 			ref1 = nxtjmp->jmptrip;

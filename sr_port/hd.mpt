@@ -1,9 +1,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
+<<<<<<< HEAD
 ; Copyright 1987,2001 Sanchez Computer Associates, Inc.		;
 ;								;
 ; Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	;
 ; All rights reserved.						;
+=======
+; Copyright (c) 1987-2018 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
+>>>>>>> df1555e... GT.M V6.3-005
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -21,9 +26,15 @@
 INT	r !,"Hexadecimal: ",%HD s %HD=$$FUNC(%HD)
 	q
 FUNC(h)
+<<<<<<< HEAD
 	q:"-"=$ze(h,1) ""
 	n d,i,p,x,y
 	s d=$ze(h,1,2) s:"0x"=d!("0X"=d) h=$ze(h,3,$zlength(h))
 	s y=$ztr(h,"0123456789ABCDEFabcdef"_$zch(0)_$zch(1)_$zch(2)_$zch(3)_$zch(4)_$zch(5)_$zch(6)_$zch(7)_$zch(8)_$zch(9)_$zch(10)_$zch(11)_$zch(12)_$zch(13)_$zch(14)_$zch(15),$zch(0)_$zch(1)_$zch(2)_$zch(3)_$zch(4)_$zch(5)_$zch(6)_$zch(7)_$zch(8)_$zch(9)_$zch(10)_$zch(11)_$zch(12)_$zch(13)_$zch(14)_$zch(15)_$zch(10)_$zch(11)_$zch(12)_$zch(13)_$zch(14)_$zch(15))
 	s d=0,p=1/16 f i=$zl(y):-1:1 s x=$za($ze(y,i)) s p=p*16,d=p*x+d s:15<x d=0,p=1/16
 	q d
+=======
+	q:$tr(h,"E","e")<0 ""
+	s h=$tr(h,"abcdef","ABCDEF")
+	q $$CONVERTBASE^%CONVBASEUTIL(h,16,10)
+>>>>>>> df1555e... GT.M V6.3-005

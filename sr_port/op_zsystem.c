@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -39,14 +39,25 @@
 #include "change_reg.h"
 #include "setterm.h"
 #include "getzposition.h"
-#include "restrict.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
+<<<<<<< HEAD
 #include "iottdef.h"
 #include "ydb_getenv.h"
+=======
+#include "gtmxc_types.h"
+#include "gtm_filter_command.h"
+#include "restrict.h"
+>>>>>>> df1555e... GT.M V6.3-005
 
 #define	ZSYSTEMSTR	"ZSYSTEM"
+/* If command buffer was allocated (which will be only when a non NULL command came
+ * in), free it before returning
+ */
+#define CHECK_N_FREE				\
+if (v->str.len)					\
+	free(cmd_buf);				\
 
 GBLREF	uint4		dollar_trestart;
 GBLREF	int4		dollar_zsystem;			/* exit status of child */
@@ -56,6 +67,7 @@ GBLREF	uint4           trust;
 error_def(ERR_INVSTRLEN);
 error_def(ERR_RESTRICTEDOP);
 error_def(ERR_SYSCALL);
+error_def(ERR_COMMFILTERERR);
 
 void op_zsystem(mval *v)
 {
@@ -65,12 +77,16 @@ void op_zsystem(mval *v)
 #else
         int4            wait_stat;
 #endif
+<<<<<<< HEAD
 	boolean_t	resetterm_done_by_me;
+=======
+	gtm_string_t	filtered_command;
+>>>>>>> df1555e... GT.M V6.3-005
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (RESTRICTED(zsystem_op))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZSYSTEM");
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, ZSYSTEMSTR);
 	TPNOTACID_CHECK(ZSYSTEMSTR);
 	MV_FORCE_STR(v);
 	flush_pio();
@@ -83,18 +99,53 @@ void op_zsystem(mval *v)
 		resetterm_done_by_me = FALSE;
 	if (v->str.len)
 	{
-		/* Copy the commander to a new buffer and append a '\0' */
-		cmd_buf = (char*)malloc(v->str.len+1);
+		/* Copy the command to a new buffer and append a '\0' */
+		cmd_buf = (char*)malloc(v->str.len + 1);
 		memcpy(cmd_buf, v->str.addr, v->str.len);
 		cmd_buf[v->str.len] = '\0';
-	} else
+	} else	/* No command , get the shell from env */
 	{
 		cmd_buf = ydb_getenv(YDBENVINDX_GENERIC_SHELL, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
 		cmd_buf = (NULL == cmd_buf || '\0' == *cmd_buf) ? "/bin/sh" : cmd_buf;
 	}
+	/*Filter the command first, if required*/
+	if (RESTRICTED(zsy_filter))
+	{
+		filtered_command = gtm_filter_command(cmd_buf, ZSYSTEMSTR);
+		if (filtered_command.length)
+		{
+			if (!strlen(filtered_command.address)) /*empty command returned*/
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4, LEN_AND_LIT(ZSYSTEMSTR),
+								LEN_AND_LIT("Empty return command"));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4, LEN_AND_LIT(ZSYSTEMSTR),
+								LEN_AND_LIT("Empty return command"));
+				CHECK_N_FREE;
+				return;
+			}
+			/* If a command argument came in and command buffer allocated above,
+			 * free the buffer and copy the filtered command into it, else
+			 * just assign the buffer to the returned filtered command.
+			 */
+			if (v->str.len)
+			{	/* Free original cmd, malloc a replacement; CHECK_N_FREE uses
+				 * v->str.len as flag to later free it.
+				 */
+				free(cmd_buf);
+				cmd_buf = (char*)malloc(filtered_command.length + 1);
+				memcpy(cmd_buf, filtered_command.address, filtered_command.length);
+				cmd_buf[filtered_command.length] = '\0';
+			} else
+				cmd_buf = filtered_command.address;
+		} else /* Error case */
+		{
+			CHECK_N_FREE;
+			return; /* Error would have been printed in the filter execution routine*/
+		}
+	}
+
 	dollar_zsystem = SYSTEM(cmd_buf);
-	if (v->str.len)
-		free(cmd_buf);
+	CHECK_N_FREE;
 	if (-1 == dollar_zsystem)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("system"), CALLFROM, errno);
 #ifdef _BSD

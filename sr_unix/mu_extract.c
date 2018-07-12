@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,6 +85,7 @@ error_def(ERR_EXTRACTFILERR);
 error_def(ERR_ENCRYPTCONFLT);
 error_def(ERR_EXTRFILEXISTS);
 error_def(ERR_EXTRINTEGRITY);
+error_def(ERR_ICUNOTENABLED);
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
@@ -199,7 +200,7 @@ void mu_extract(void)
 	int				reg_max_rec, reg_max_key, reg_max_blk, reg_std_null_coll;
 	int				iter, format, local_errno, int_nlen;
 	boolean_t			freeze, override, logqualifier, success, success2;
-	char				format_buffer[FORMAT_STR_MAX_SIZE],  ch_set_name[MAX_CHSET_NAME], cli_buff[MAX_LINE],
+	char				format_buffer[FORMAT_STR_MAX_SIZE],  ch_set_name[MAX_CHSET_NAME + 1], cli_buff[MAX_LINE],
 					label_buff[LABEL_STR_MAX_SIZE];
 	glist				gl_head, *gl_ptr, *next_gl_ptr;
 	gd_region			*reg, *region_top;
@@ -240,25 +241,30 @@ void mu_extract(void)
 	mu_outofband_setup();
 	if (CLI_PRESENT == cli_present("OCHSET"))
 	{
-		ch_set_len = SIZEOF(ch_set_name);
-		if (cli_get_str("OCHSET", ch_set_name, &ch_set_len))
+		if (gtm_utf8_mode)
 		{
-			if (0 == ch_set_len)
-				mupip_exit(ERR_MUNOACTION);	/* need to change to OPCHSET error when added */
-			ch_set_name[ch_set_len] = '\0';
-#			ifdef KEEP_zOS_EBCDIC
-   			if ( (iconv_t)0 != active_device->output_conv_cd)
-   			        ICONV_CLOSE_CD(active_device->output_conv_cd);
-   			if (DEFAULT_CODE_SET != active_device->out_code_set)
-   				ICONV_OPEN_CD(active_device->output_conv_cd, INSIDE_CH_SET, ch_set_name);
-#			else
-			chset_mstr.addr = ch_set_name;
-			chset_mstr.len = ch_set_len;
-			SET_ENCODING(active_device->ochset, &chset_mstr);
-			get_chset_desc(&chset_names[active_device->ochset]);
+			ch_set_len = MAX_CHSET_NAME;
+			if (cli_get_str("OCHSET", ch_set_name, &ch_set_len))
+			{
+				if (0 == ch_set_len)
+					mupip_exit(ERR_MUNOACTION);	/* need to change to OCHSET error when added */
+				ch_set_name[ch_set_len] = '\0';
+#				ifdef KEEP_zOS_EBCDIC
+				if ( (iconv_t)0 != active_device->output_conv_cd)
+					ICONV_CLOSE_CD(active_device->output_conv_cd);
+				if (DEFAULT_CODE_SET != active_device->out_code_set)
+					ICONV_OPEN_CD(active_device->output_conv_cd, INSIDE_CH_SET, ch_set_name);
+#				else
+				chset_mstr.addr = ch_set_name;
+				chset_mstr.len = ch_set_len;
+				SET_ENCODING(active_device->ochset, &chset_mstr);
+				get_chset_desc(&chset_names[active_device->ochset]);
 #			endif
-			ochset_set = TRUE;
-		}
+				ochset_set = TRUE;
+			}
+		} else
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ICUNOTENABLED, 0, ERR_TEXT, 2,
+						LEN_AND_LIT("Cannot use the -OCHSET qualifier. Continuing without it."));
 	}
 	region = FALSE;
 	if (CLI_PRESENT == cli_present("REGION"))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -144,9 +144,9 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 		dbsync_defer_timer = TRUE;
 		if (!mupip_jnl_recover
 			GTM_MALLOC_NO_RENT_ONLY(&& 0 == gtmMallocDepth)
-			&& (0 == crit_count) && !in_mutex_deadlock_check
+			&& (INTRPT_IN_CRIT_FUNCTION != intrpt_ok_state) && !in_mutex_deadlock_check
 			&& (0 == fast_lock_count)
-			&& (!jnl_qio_in_prog) && (!db_fsync_in_prog)
+			&& (!db_fsync_in_prog)
 			&& (!jpc || (LOCK_AVAILABLE == jbp->fsync_in_prog_latch.u.parts.latch_pid))
 			&& (0 == TREF(crit_reg_count))
 			&& ((NULL == check_csaddrs) || !T_IN_COMMIT_OR_WRITE(check_csaddrs))
@@ -210,7 +210,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 			dbsync_defer_timer = FALSE;
 			assert(!csa->hold_onto_crit); /* this ensures we can safely do unconditional rel_crit */
 			rel_crit(reg);
-			DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp); /* Do equivalent of WCSFLU_SYNC_EPOCH out of crit */
+			DO_JNL_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp); /* Do equivalent of WCSFLU_SYNC_EPOCH out of crit */
 		}
 	}
 	if (dbsync_defer_timer)

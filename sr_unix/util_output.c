@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -93,6 +93,7 @@ error_def(ERR_TEXT);
 }
 
 /* #GTM_THREAD_SAFE : The below macro (INSERT_MARKER) is thread-safe because caller ensures serialization with locks */
+<<<<<<< HEAD
 #define INSERT_MARKER						\
 {								\
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);			\
@@ -106,6 +107,21 @@ error_def(ERR_TEXT);
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);			\
 	memcpy(offset, strptr, STRLEN(strptr));			\
 	offset += STRLEN(strptr);				\
+=======
+#define INSERT_MARKER									\
+{											\
+	assert(IS_PTHREAD_LOCKED_AND_HOLDER);						\
+	MEMCPY_LIT(offset, "-");							\
+	offset += STRLEN("-");								\
+}
+
+/* #GTM_THREAD_SAFE : The below macro (BUILD_FACILITY) is thread-safe because caller ensures serialization with locks */
+#define BUILD_FACILITY(strptr)								\
+{											\
+	assert(IS_PTHREAD_LOCKED_AND_HOLDER);						\
+	memcpy(offset, strptr, STRLEN(strptr));						\
+	offset += STRLEN(strptr);							\
+>>>>>>> df1555e... GT.M V6.3-005
 }
 
 /*

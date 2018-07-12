@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -28,9 +28,9 @@
 
 #include "have_crit.h"
 #include "gt_timer.h"
+#include "gtm_stdio.h"
 #if defined(DEBUG) && defined(UNIX)
 #include "io.h"
-#include "gtm_stdio.h"
 #include "wcs_sleep.h"
 #include "deferred_exit_handler.h"
 #include "wbox_test_init.h"
@@ -366,18 +366,17 @@
 		elems_to_read -= elems_read;					\
 		if (0 == elems_to_read)						\
 			break;							\
-		RC = feof(fp);							\
+		RC = feof(FP);							\
 		if (RC)								\
 		{	/* Reached EOF. No error. */				\
 			RC = 0;							\
 			break;							\
 		}								\
-		RC = ferror(fp);						\
+		RC = ferror(FP);						\
 		assert(RC);							\
-		assert(errno == RC);						\
-		clearerr(fp);	/* reset error set by the "fread" */		\
+		clearerr(FP);	/* reset error set by the "fread" */		\
 		/* In case of EINTR, retry "fread" */				\
-		if (EINTR != RC)						\
+		if (EINTR != errno)						\
 			break;							\
 	}									\
 	NREAD = NELEMS - elems_to_read;						\
@@ -389,30 +388,33 @@
  * Macro is named GTM_FWRITE instead of FWRITE because AIX defines a macro by the same name in fcntl.h.
  */
 #define GTM_FWRITE(BUFF, ELEMSIZE, NELEMS, FP, NWRITTEN, RC)			\
-{										\
-	size_t		elems_to_write, elems_written;				\
-	intrpt_state_t	prev_intrpt_state;					\
-										\
-	DEFER_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);		\
-	elems_to_write = NELEMS;						\
-	for (;;)								\
-	{									\
-		elems_written = fwrite(BUFF, ELEMSIZE, elems_to_write, FP);	\
-		assert(elems_written <= elems_to_write);			\
-		elems_to_write -= elems_written;				\
-		if (0 == elems_to_write)					\
-			break;							\
-		assert(!feof(fp));						\
-		RC = ferror(fp);						\
-		assert(RC);							\
-		assert(errno == RC);						\
-		clearerr(fp);	/* reset error set by the "fwrite" */		\
-		/* In case of EINTR, retry "fwrite" */				\
-		if (EINTR != RC)						\
-			break;							\
-	}									\
-	NWRITTEN = NELEMS - elems_to_write;					\
-	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);		\
+		RC = gtm_fwrite(BUFF, ELEMSIZE, NELEMS, FP, &(NWRITTEN));
+
+static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE *fp, size_t *nwritten)
+{
+	size_t		elems_to_write, elems_written, rc = 0;
+	intrpt_state_t	prev_intrpt_state;
+
+	DEFER_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);
+	elems_to_write = nelems;
+	for ( ; (0 != elems_to_write) && (0 != elemsize) ; )
+	{
+		elems_written = fwrite(buff, elemsize, elems_to_write, fp);
+		assert(elems_written <= elems_to_write);
+		elems_to_write -= elems_written;
+		if (0 == elems_to_write)
+			break;
+		assert(!feof(fp));
+		rc = ferror(fp);
+		assert(rc);
+		clearerr(fp);	/* reset error set by the "fwrite" */
+		/* In case of EINTR, retry "fwrite" */
+		if (EINTR != errno)
+			break;
+	}
+	*nwritten = nelems - elems_to_write;
+	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);
+	return rc;
 }
 
 #endif

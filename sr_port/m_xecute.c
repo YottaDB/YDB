@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,6 +40,7 @@ int m_xecute(void)
 	mstr		*src;
 	oprtype		*cr, x;
 	triple		*obp, *oldchain, *ref0, *ref1, tmpchain, *triptr;
+	mval		*v;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -133,9 +134,10 @@ int m_xecute(void)
 			;
 		if (OC_LIT == triptr->opcode)
 		{	/* it is a literal so optimize it */
-			unuse_literal(&triptr->operand[0].oprval.mlit->v);
+			v = &triptr->operand[0].oprval.mlit->v;
+			unuse_literal(v);
 			dqdel(triptr, exorder);
-			if (0 == triptr->operand[0].oprval.mlit->v.m[1])
+			if (0 == MV_FORCE_BOOL(v))
 				setcurtchain(oldchain);	/* it's FALSE so just discard the whole thing */
 			else
 			{	/* it's TRUE so treat as if no argument postconditional */

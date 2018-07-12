@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -227,7 +227,7 @@ unsigned char mu_cre_file(void)
 	if (IS_ENCRYPTED(gv_cur_region->dyn.addr->is_encrypted))
 	{
 		assert(!TO_BE_ENCRYPTED(gv_cur_region->dyn.addr->is_encrypted));
-		INIT_PROC_ENCRYPTION(cs_addrs, gtmcrypt_errno);
+		INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);

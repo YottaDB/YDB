@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -72,7 +73,7 @@ void dse_over(void)
 
 	blk_segment	*bs1, *bs_ptr;
 	block_id	blk;
-	char		chset_name[MAX_CHSET_NAME];
+	char		chset_name[MAX_CHSET_NAME + 1];
 	int		cvt_len, data_len, size;
 	int4		blk_seg_cnt, blk_size;
 	mstr		chset_mstr, cvt_src;
@@ -91,10 +92,10 @@ void dse_over(void)
 		return;
 	if (CLI_PRESENT == cli_present("OCHSET"))
 	{
-		name_len = SIZEOF(chset_name);
+		name_len = MAX_CHSET_NAME;
 		if (cli_get_str("OCHSET", chset_name, &name_len) && 0 != name_len)
 		{
-			chset_name[name_len] = 0;
+			chset_name[name_len] = '\0';
 #			if defined(KEEP_zOS_EBCDIC) || defined(VMS)
 			if ( (iconv_t)0 != dse_over_cvtcd )
 			{

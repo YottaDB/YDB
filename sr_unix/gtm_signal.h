@@ -18,7 +18,7 @@
 #include "gtm_multi_thread.h"	/* for INSIDE_THREADED_CODE macro */
 
 #define SIGPROCMASK(FUNC, NEWSET, OLDSET, RC)							\
-{												\
+MBSTART {											\
 	GBLREF	boolean_t	multi_thread_in_use;						\
 												\
 	char	*rname;										\
@@ -29,6 +29,6 @@
 	else											\
 		RC = pthread_sigmask(FUNC, NEWSET, OLDSET);					\
 	assert(0 == RC);									\
-}
+} MBEND
 
 #endif

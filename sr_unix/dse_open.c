@@ -56,10 +56,11 @@ LITREF	mval		literal_zero;
 #pragma pointer_size (restore)
 #endif
 
+#define		PATCH_FILE_MAX 255
 static int	patch_fd;
-static char	patch_ofile[256];
+static char	patch_ofile[PATCH_FILE_MAX + 1];
 static short	patch_len;
-static char	ch_set_name[MAX_CHSET_NAME];
+static char	ch_set_name[MAX_CHSET_NAME + 1];
 
 GBLREF enum dse_fmt	dse_dmp_format;
 
@@ -102,7 +103,7 @@ void	dse_open (void)
 			util_out_print("Current output file:  !AD", TRUE, strlen(patch_ofile), &patch_ofile[0]);
 			return;
 		}
-		cli_len = SIZEOF(patch_ofile);
+		cli_len = PATCH_FILE_MAX;
 		if (!cli_get_str("FILE", patch_ofile, &cli_len))
 			return;
 		if (0 == cli_len)
@@ -127,7 +128,7 @@ void	dse_open (void)
 
 		if (CLI_PRESENT == cli_present("OCHSET"))
 		{
-			cli_len = SIZEOF(ch_set_name);
+			cli_len = MAX_CHSET_NAME;
 			if (cli_get_str("OCHSET", ch_set_name, &cli_len))
 			{
 				if (0 == cli_len)
@@ -136,7 +137,7 @@ void	dse_open (void)
 					return;
 				}
 #ifdef KEEP_zOS_EBCDIC
-                      		ch_set_name[cli_len] = 0;
+                      		ch_set_name[cli_len] = '\0';
                                 ch_set_len = cli_len;
                                 if ( (iconv_t)0 != dse_over_cvtcd )
                                 {

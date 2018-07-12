@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -14,6 +14,8 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "have_crit.h"
+#include "eintr_wrappers.h"
 
 #include "gtm_stdio.h"
 #include "gtm_signal.h"
@@ -59,23 +61,34 @@ int gtm_printf(const char *format, ...)
 	return retval;
 }
 
-/* Wrapper for fprintf() - implements signal blocking */
+/* Wrapper for fprintf() */
 int gtm_fprintf(FILE *stream, const char *format, ...)
 {
-	va_list		printargs;
-	int		retval;
+	va_list		printargs, pa_copy;
+	size_t		retval, buflen;
 	sigset_t	savemask;
+	intrpt_state_t	prev_intrpt_state;
 
+<<<<<<< HEAD
 	/* Note: cannot use SIGPROCMASK below because this function is used by "gtmsecshr" and using SIGPROCMASK
 	 * pulls in a lot of stuff from libyottadb.so (due to asserts) and we want minimal stuff in "gtmsecshr".
 	 */
 	if (blocksig_initialized)
 		sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);	/* BYPASSOK(sigprocmask) */
+=======
+	retval = 0;
+>>>>>>> df1555e... GT.M V6.3-005
 	va_start(printargs, format);
-	VFPRINTF(stream, format, printargs, retval);
+	VAR_COPY(pa_copy, printargs);
+	VSNPRINTF(NULL, 0, format, pa_copy, buflen);	/* C99: NULL string just returns size */
+	va_end(pa_copy);
+	{
+		char buf[buflen + 1];			/* C99: Variable Length Array, avoids malloc. */
+
+		VSNPRINTF(buf, SIZEOF(buf), format, printargs, buflen);
+		GTM_FWRITE(buf, buflen, 1, stream, buflen, retval);
+	}
 	va_end(printargs);
-	if (blocksig_initialized)
-		sigprocmask(SIG_SETMASK, &savemask, NULL);	/* BYPASSOK(sigprocmask) */
 	return retval;
 }
 

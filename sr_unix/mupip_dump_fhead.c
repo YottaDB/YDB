@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -58,8 +58,13 @@ void mupip_dump_fhead(void)
 {
 	int4		status;
 	tp_region	*rptr;
+<<<<<<< HEAD
 	unsigned char	file[YDB_PATH_MAX + 1];
 	unsigned short	file_len = SIZEOF(file);
+=======
+	unsigned char	file[GTM_PATH_MAX];
+	unsigned short	file_len = GTM_PATH_MAX - 1;
+>>>>>>> df1555e... GT.M V6.3-005
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

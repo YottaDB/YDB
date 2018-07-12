@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -774,9 +774,11 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 				 * could have been shot in the middle of bg_update_phase1 where things are still not in sync.
 				 */
 				assert((0 == cr->bt_index) || (0 == cr_tmp->bt_index)	/* one has to be zero */
-							|| WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED));
+							|| WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
+							|| WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
 				assert((0 != cr->bt_index) || (0 != cr_tmp->bt_index)	/* one has to be non-zero */
-							|| WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED));
+							|| WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
+							|| WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
 			}
 			/* If asyncio=OFF, we do not expect any concurrent writers. Check that.
 			 * If asyncio=ON, it is possible to have concurrent writers. Do not check epid in that case.

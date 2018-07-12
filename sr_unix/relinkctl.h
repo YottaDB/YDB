@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -185,6 +185,7 @@ typedef struct relinkctl_data_struct
 	int		zro_entry_name_len;	/* strlen of the null-terminated "zro_entry_name" */
 	int		relinkctl_max_rtn_entries;	/* One relinkctl file can contain at most this many of routines */
 	int		relinkctl_hash_buckets;		/* The first prime # above relinkctl_max_rtn_entries */
+	pthread_mutex_t	exclu;				/* Protect the file while mmap'd */
 } relinkctl_data;
 
 /* Process private structure - describes a relinkctl file. Process private so can be linked into a list in $ZROUTINES order */
@@ -298,6 +299,7 @@ int			relinkctl_get_key(char key[YDB_PATH_MAX], mstr *zro_entry_name);
 relinkrec_t		*relinkctl_find_record(open_relinkctl_sgm *linkctl, mstr *rtnname, uint4 hash, uint4 *prev_hash_index);
 relinkrec_t		*relinkctl_insert_record(open_relinkctl_sgm *linkctl, mstr *rtnname);
 int			relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t obj_file_missing);
+void			relinkctl_init_exclu(open_relinkctl_sgm* linkctl);
 void			relinkctl_lock_exclu(open_relinkctl_sgm *linkctl);
 void			relinkctl_unlock_exclu(open_relinkctl_sgm *linkctl);
 void			relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free);

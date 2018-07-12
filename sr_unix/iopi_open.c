@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -47,9 +47,17 @@
 #include "wbox_test_init.h"
 #include "op.h"
 #include "indir_enum.h"
+<<<<<<< HEAD
 #include "ydb_getenv.h"
+<<<<<<< a78302f040b4018d3844f95630e82a87cbe8179a
 #include "min_max.h"
 #include "ident.h"
+=======
+=======
+#include "gtmxc_types.h"
+#include "gtm_filter_command.h"
+>>>>>>> df1555e... GT.M V6.3-005
+>>>>>>> [V63005] Merge GT.M V6.3-005 into YottaDB mainline (with conflicts)
 
 LITREF	unsigned char		io_params_size[];
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
@@ -62,6 +70,7 @@ error_def(ERR_DEVOPENFAIL);
 error_def(ERR_RESTRICTEDOP);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
+error_def(ERR_COMMFILTERERR);
 ZOS_ONLY(error_def(ERR_BADTAG);)
 
 enum
@@ -272,8 +281,9 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	iod->type = rm;\
 }
 
-#define INVALID_CMD "Invalid command string: "
-#define INVALID_CMD2 "$PATH undefined, Invalid command string: "
+#define INVALID_CMD	"Invalid command string: "
+#define INVALID_CMD2	"$PATH undefined, Invalid command string: "
+#define	PIPEOPENSTR	"PIPEOPEN"
 
 short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
 {
@@ -321,8 +331,13 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	boolean_t	textflag;
 	int		ccsid, status, realfiletag;
 #endif
+<<<<<<< a78302f040b4018d3844f95630e82a87cbe8179a
         char		dev_name_buf[LOGNAME_LEN];
 	mstr		dev_mstr;
+=======
+	gtm_string_t    filtered_command;
+
+>>>>>>> [V63005] Merge GT.M V6.3-005 into YottaDB mainline (with conflicts)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -397,10 +412,34 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			}
 		}
 	}
-
 	/* The above code is just syntax checking. Any actual operation should be below here. */
 	if (RESTRICTED(pipe_open))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "OPEN PIPE");
+	/*Filter the command first, if required*/
+	if (RESTRICTED(pipe_filter))
+	{
+		filtered_command = gtm_filter_command(pcommand, "PIPE");
+		if (filtered_command.length)
+		{
+			if (!strlen(filtered_command.address)) /*empty command returned*/
+			{
+				PIPE_ERROR_INIT();
+				send_msg(VARLSTCNT(6) ERR_COMMFILTERERR, 4, LEN_AND_LIT(PIPEOPENSTR),
+					LEN_AND_LIT("Empty return command"));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4,
+						LEN_AND_LIT(PIPEOPENSTR),LEN_AND_LIT("Empty return command"));
+			}
+			free(pcommand);
+			pcommand = (char*)malloc(filtered_command.length+1);
+			memcpy(pcommand, filtered_command.address, filtered_command.length);
+			pcommand[filtered_command.length] = '\0';
+		} else
+		{
+			PIPE_ERROR_INIT();
+			return FALSE;	/* Error would have been printed in the filter execution routine */
+		}
+	}
+
 
 	/* check the shell device parameter before the fork/exec
 	   It is not required, but must not be null if entered */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,9 +38,9 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	assert((frame_pointer < frame_pointer->old_frame_pointer) || (NULL == frame_pointer->old_frame_pointer));
 	msp_save = msp;
 	sf = (stack_frame *)(msp -= SIZEOF(stack_frame));
-	if (msp <= stackwarn)
+	if (msp <= stackwarn || msp > stackbase)
 	{
-		if (msp <= stacktop)
+		if (msp <= stacktop || msp > stackbase)
 		{
 			msp = msp_save;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
@@ -67,9 +67,9 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	sf->type = SFT_COUNT;
 	msp -= x2 = rtn_base->vartab_len * SIZEOF(ht_ent_mname *);
 	sf->l_symtab = (ht_ent_mname **)msp;
-	if (msp <= stackwarn)
+	if (msp <= stackwarn || msp > stackbase)
 	{
-		if (msp <= stacktop)
+		if (msp <= stacktop || msp > stackbase)
 		{
 			msp = msp_save;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,43 +63,20 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	volatile boolean_t	in_mutex_deadlock_check;
-GBLREF	volatile int4		crit_count;
-VMS_ONLY(GBLREF	sgmnt_addrs	*vms_mutex_check_csa;)
 
-#ifdef VMS /* VMS calls this function from mutex.mar which does not pass *csa as a parameter */
-void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr)
-#else
 void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr, sgmnt_addrs *csa)
-#endif
 {
 	tp_region	*tr;
 	sgmnt_addrs	*tp_list_csa_element, *repl_csa;
 	int4		save_crit_count;
 	boolean_t	passed_cur_region;
 	gd_region	*region;
-#	ifdef VMS
-	sgmnt_addrs	*csa;
-
-	csa = vms_mutex_check_csa; /* vms_mutex_check_csa should be set by mutex_lock* callers */
-#	endif
+	intrpt_state_t		prev_intrpt_state;
 	assert(csa);
 	if (in_mutex_deadlock_check)
 		return;
 	in_mutex_deadlock_check = TRUE;
-	/* A zero value of "crit_count" implies asynchronous activities can occur (e.g. db flush timer, periodic epoch timers etc.).
-	 * At this point, although we are here through grab_crit()/grab_lock() (which would have incremented "crit_count"), we are
-	 * 	in a safe and consistent state as far as the mutex structures go so it is ok to set "crit_count" to 0 implying we
-	 * 	are now in an interruptible state (of course, we need to restore "crit_count" to what it was before returning).
-	 * The other alternative of not changing "crit_count" presents us with complex situations wherein recursion
-	 * 	of grab_crit/rel_crit might occur (through direct or indirect calls from mutex_deadlock_check())
-	 * 	causing crit_count to be > 1 and in turn causing the crit_count-reset-logic in grab_crit/rel_crit to
-	 * 	do a "crit_count--" (instead of "crit_count = 0"). This suffers from the problem that in case of an error code path
-	 * 	crit_count might not get decremented appropriately and hence become out-of-sync (i.e. a positive value instead
-	 * 	of zero) and a non-zero value might cause indefinite deferrals of asynchronous events.
-	 */
-	assert(1 == crit_count);
-	save_crit_count = crit_count;
-	crit_count = 0;
+	DEFER_INTERRUPTS(INTRPT_IN_DEADLOCK_CHECK, prev_intrpt_state);
 
 	/* Need to determine who should and should not go through the deadlock checker.
 	 *
@@ -119,10 +96,10 @@ void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr, sgmnt_addrs *csa)
 	if (is_replicator || mu_reorg_process)
 	{
 		++crit_deadlock_check_cycle;
-		repl_csa = ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open)
+		repl_csa = ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg))
 			? &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs : NULL;
 		assert(!jnlpool || !jnlpool->jnlpool_dummy_reg || jnlpool->jnlpool_dummy_reg->open
-			 || (repl_csa->critical != criticalPtr));
+			 || (repl_csa->critical != criticalPtr) || (NULL == cs_addrs));
 		if (!dollar_tlevel)
 		{
 			if ((NULL != repl_csa) && (repl_csa->critical == criticalPtr))
@@ -182,6 +159,6 @@ void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr, sgmnt_addrs *csa)
 	 * Because the ordering is important, to avoid compiler optimizer from prefetching them out of order, we declare
 	 * both "crit_count" and "in_mutex_deadlock_check" as "volatile".
 	 */
-	crit_count = save_crit_count;
+	ENABLE_INTERRUPTS(INTRPT_IN_DEADLOCK_CHECK, prev_intrpt_state);
 	in_mutex_deadlock_check = FALSE;
 }

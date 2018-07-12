@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 Fidelity National Information		*
+ * Copyright (c) 2017-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,7 @@ void secshr_rel_crit(gd_region *reg, boolean_t is_exiting, boolean_t is_repl_reg
 	sgmnt_addrs		*csa;
 	node_local_ptr_t	cnl;
 	int			crashcnt;
+	intrpt_state_t		prev_intrpt_state;
 
 #	ifdef DEBUG
 	if (!is_repl_reg)
@@ -67,8 +68,7 @@ void secshr_rel_crit(gd_region *reg, boolean_t is_exiting, boolean_t is_repl_reg
 	{	/* Release crit but since it involves modifying more than one field, make sure we prevent interrupts while
 		 * in this code. The global variable "crit_count" does this for us. See similar usage in rel_crit.c.
 		 */
-		assert(0 == crit_count);
-		crit_count++;	/* prevent interrupts */
+		DEFER_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 		CRIT_TRACE(csa, crit_ops_rw); /* see gdsbt.h for comment on placement */
 		if (cnl->in_crit == process_id)
 			cnl->in_crit = 0;
@@ -78,6 +78,6 @@ void secshr_rel_crit(gd_region *reg, boolean_t is_exiting, boolean_t is_repl_reg
 		mutex_unlockw(reg, crashcnt);	/* roll forward Step (CMT15) */
 		assert(!csa->now_crit);
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
-		crit_count = 0;
+		ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 	}
 }

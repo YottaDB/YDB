@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -529,7 +529,14 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 				memcpy(charptr, ONE_COMMA, len);
 				charptr += len;
 				len = SIZEOF(TLSCLIENTSTR) - 1;
+<<<<<<< HEAD
 				memcpy(charptr, (GTMTLS_OP_CLIENT_MODE & tls_sock->flags) ? TLSCLIENTSTR : TLSSERVERSTR, len);
+=======
+				if (GTMTLS_OP_CLIENT_MODE & tls_sock->flags)
+					MEMCPY_LIT(charptr, TLSCLIENTSTR);
+				else
+					MEMCPY_LIT(charptr, TLSSERVERSTR);
+>>>>>>> df1555e... GT.M V6.3-005
 				charptr += len;
 				len = STRLEN(tls_sock->tlsid);
 				if (0 < len)

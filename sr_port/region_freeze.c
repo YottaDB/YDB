@@ -18,6 +18,7 @@
 #include "gtm_stdio.h"
 
 #include "gdsroot.h"
+#include "gdsbgtr.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
@@ -46,6 +47,7 @@
 #ifdef DEBUG_FREEZE
 GBLREF	boolean_t	caller_id_flag;
 #endif
+GBLREF  volatile int4	db_fsync_in_prog;
 GBLREF	bool		in_mupip_freeze;
 GBLREF	uint4		process_id;
 GBLREF	boolean_t	debug_mupip;
@@ -252,7 +254,11 @@ freeze_status	region_freeze_main(gd_region *region, boolean_t freeze, boolean_t 
 		if (!was_crit)
 			rel_crit(region);
 		if (flush_sync)
-			DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(region, csa, jpc, jpc->jnl_buff); /* Do WCSFLU_SYNC_EPOCH out of crit */
+		{
+			assert(!csa->now_crit);
+			DO_JNL_FSYNC_OUT_OF_CRIT_IF_NEEDED(region, csa, jpc, jpc->jnl_buff); /* Do WCSFLU_SYNC_EPOCH out of crit */
+			DB_FSYNC(region, udi, csa, db_fsync_in_prog, save_errno);
+		}
 #		ifdef DEBUG_FREEZE
 		SEND_FREEZEID("FREEZE", csa);
 #		endif

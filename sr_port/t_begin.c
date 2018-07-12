@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -119,7 +119,7 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 	 * having fast_lock_count non-zero will defer the database flushing logic and other critical parts of the system.
 	 * hence this periodic reset at the beginning of each transaction.
 	 */
-	assert(0 == fast_lock_count);
+	assert((0 == fast_lock_count) || process_exiting);
 	fast_lock_count = 0;
 	t_tries = 0;
 	if (non_tp_jfb_ptr)

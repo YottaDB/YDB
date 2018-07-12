@@ -1,6 +1,8 @@
+
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,3 +16,4 @@
 #define DEVBREAK_MASK			(1 << 2)
 #define ZSTBREAK_MASK			(1 << 3)
 #define TRIGGER_ZBREAK_REMOVED_MASK	(1 << 4)
+#define BREAK_MASK_END			(1 << 5)
