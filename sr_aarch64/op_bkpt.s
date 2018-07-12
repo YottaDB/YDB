@@ -235,7 +235,7 @@ ENTRY opp_zst_over_ret
 	b.eq	l11
 	ldr	x2, =zstep_level
 	ldr	x2, [x2]
-	ldr	x0, [x0, #msf_old_frame_off]
+	ldr	x0, [x10, #msf_old_frame_off]
 	cmp	x2, x0
 	b.gt	l11
 	bl	op_zstepret
