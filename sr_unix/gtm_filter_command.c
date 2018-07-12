@@ -3,6 +3,9 @@
  * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -33,7 +36,7 @@ GBLREF boolean_t	is_tracing_on;
 {														\
 	gtm_status_t	stat;											\
 	gtm_long_t	quit_return;										\
-	gtm_char_t	err_str[2 * OUT_BUFF_SIZE]; /* Same as Max buffer for zstatus */				\
+	gtm_char_t	err_str[2 * OUT_BUFF_SIZE]; /* Same as Max buffer for zstatus */			\
 	stat = gtm_ci_filter(ROUTINE, &quit_return, COMMAND, &RET_COMM);					\
 	if (quit_return == -1)											\
 	{													\
@@ -53,8 +56,8 @@ GBLREF boolean_t	is_tracing_on;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4, LEN_AND_LIT(ROUTINE), 		\
 							strlen(err_str), err_str);				\
 		returned_command.length = 0;									\
-		if (frame_pointer->flags & SFF_CI)								\
-			ci_ret_code_quit();										\
+		if (frame_pointer->type & SFT_CI)								\
+			ci_ret_code_quit();									\
 	}													\
 }
 

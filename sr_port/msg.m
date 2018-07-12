@@ -48,7 +48,6 @@
  Set cnt=0,undocmsgcnt=0,lineno=0
  Open in:readonly,out:newversion
  Set ansiopen=0
-<<<<<<< HEAD
  Use out Do chdr		; Create <fn>_ctl.c file and its prologue
  set ydbfn=$select("ydberrors"=fn:"ydberrors.h",1:"ydb"_fn_".h") ; Avoid naming it ydbydberrors.h
  open ydbfn:newversion		; Create ydb<fn>.h file and its prologue
@@ -70,11 +69,7 @@
  . use libydberrorsfn
  . do chdr
  ;
- For  Use in Read msg Quit:$TRanslate(msg,lo,up)?.E1".FACILITY".E
-=======
- Use out Do hdr
  For  Use in Read msg Set lineno=lineno+1 Quit:$TRanslate(msg,lo,up)?.E1".FACILITY".E
->>>>>>> df1555e... GT.M V6.3-005
  Set err=0 Do  Quit:err
  . New i1,i2,upmsg
  . ; Expect a line like:
@@ -205,23 +200,14 @@
  . Use outansi Write $Char(9),$Justify(ansi,4),",",$Char(9),"/* ",outmsg(cnt)," */",!
  . Quit
  Use out
-<<<<<<< HEAD
  Write "};",!!
  Write !,"GBLDEF",$Char(9),"err_ctl "_fn_"_ctl = {",!
-=======
- Do:'vms
- . Write "};",!!
- . For i1=1:1:cnt Write "LITDEF",$Char(9),"int ",prefix,outmsg(i1)," = ",outmsg(i1,"code"),";",!
- . Quit
  Do
  . Use out
  . Write !!,"LITDEF"_$Char(9)_"int "_undocarr_"[] = {",!
  . For i1=1:1:undocmsgcnt  Write $char(9)_undocmnemonic(i1,"code")_","_$char(9)_"/* "_undocmnemonic(i1)_" */",!
  . Write "};",!!
  . Quit
- ; VMS can have addresses in constants, most Unix platforms cannot.
- Write !,$Select(vms:"LITDEF",1:"GBLDEF"),$Char(9),"err_ctl "_fn_"_ctl = {",!
->>>>>>> df1555e... GT.M V6.3-005
  Write $Char(9),facnum,",",!
  Write $Char(9),""""_facility_""",",!
  Write $Char(9),$Select(vms:"NULL,",1:"&"_fn_"[0],"),!

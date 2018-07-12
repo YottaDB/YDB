@@ -701,12 +701,8 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			/* Now that we know what the new STATS setting is going to be, check for READ_ONLY */
 			if (CLI_PRESENT == read_only_status)
 			{
-<<<<<<< HEAD
 				/* Check if new access method is MM. If so issue error */
 				if (dba_mm != pvt_csd->acc_meth)
-=======
-				if (dba_mm != pvt_csd->acc_meth && CLI_NEGATED != read_only_status)
->>>>>>> df1555e... GT.M V6.3-005
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_READONLYNOBG);
 					reg_exit_stat |= EXIT_WRN;

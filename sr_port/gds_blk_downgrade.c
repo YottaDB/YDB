@@ -55,14 +55,9 @@ void gds_blk_downgrade(v15_blk_hdr_ptr_t gds_blk_trg, blk_hdr_ptr_t gds_blk_src)
 		 * See comment in wcs_wtstart.c against similar assert (as below) for when this is possible.
 		 */
 		assert(0 == bsiz);
-<<<<<<< HEAD
 		assert(ydb_white_box_test_case_enabled
-			&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number));
-=======
-		assert(gtm_white_box_test_case_enabled
-			&& ((WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number)
-				|| (WBTEST_MURUNDOWN_KILLCMT06 == gtm_white_box_test_case_number)));
->>>>>>> df1555e... GT.M V6.3-005
+			&& ((WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number)
+				|| (WBTEST_MURUNDOWN_KILLCMT06 == ydb_white_box_test_case_number)));
 		return;
 	}
 	assert(GDSVCURR == gds_blk_src->bver);

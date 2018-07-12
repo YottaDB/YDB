@@ -143,12 +143,8 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			if ((NULL == parm) && (VTK_JNLERROR != vtp->keycode))
 				rts_error_csa(CSA_ARG(NULL)
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
-<<<<<<< HEAD
 			assert(NULL != parm);
-			if (!gd_header)		/* IF GD_HEADER == 0 THEN OPEN GBLDIR */
-=======
 			if (!gd_header)							/* IF GD_HEADER == 0 THEN OPEN GBLDIR */
->>>>>>> df1555e... GT.M V6.3-005
 				gvinit();
 			if (!parm->str.len)
 			{								/* No region */
@@ -158,13 +154,9 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			} else
 			{
 				namestr.addr = &lcl_buff.c[0];
-<<<<<<< HEAD
 				cptr = parm->str.addr;
 				cptr_top = cptr + parm->str.len;
 				for ( ; ; )
-=======
-				for (cptr = parm->str.addr, done = n = 0; n < parm->str.len; cptr++)
->>>>>>> df1555e... GT.M V6.3-005
 				{
 					cptr_start = cptr;
 					for ( ; ; )
@@ -185,24 +177,10 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					{
 						if ((r_ptr >= r_top) || ((cptr_start != parm->str.addr) && is_dollar_view))
 						{
-<<<<<<< HEAD
 							assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
 								/* so below "format2zwr" is guaranteed not to overflow */
 							format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len, global_names, &n);
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION,2, n, global_names);
-=======
-							PUSH_MV_STENT(MVST_MVAL);
-							tmpmv = &mv_chain->mv_st_cont.mvs_mval;
-							tmpmv->mvtype = MV_STR;
-							ENSURE_STP_FREE_SPACE(ZWR_EXP_RATIO(namestr.len));
-							tmpmv->str.addr = (char *)stringpool.free;
-							format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len,
-								(uchar_ptr_t)stringpool.free, &n);
-							stringpool.free += n;
-							tmpmv->str.len = n;
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, n,
-								tmpmv->str.addr);
->>>>>>> df1555e... GT.M V6.3-005
 						}
 						tmpstr.len = r_ptr->rname_len;
 						tmpstr.addr = (char *)r_ptr->rname;
@@ -247,26 +225,11 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			if (MAX_MIDENT_LEN < parmblk->str.len)
 				parmblk->str.len = MAX_MIDENT_LEN;
 			if (!valid_mname(&parmblk->str))
-<<<<<<< HEAD
 			{
 				assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
 					/* so below "format2zwr" is guaranteed not to overflow */
 				format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
-=======
-			{	/* here & 2 other places use stringpool because we use format2zwr to ensure the message is graphic
-				 * & we don't return from the rts_error, so a fixed or malloc'd location seems even less attractive
-				 */
-				PUSH_MV_STENT(MVST_MVAL);
-				tmpmv = &mv_chain->mv_st_cont.mvs_mval;
-				tmpmv->mvtype = MV_STR;
-				ENSURE_STP_FREE_SPACE(ZWR_EXP_RATIO(parm->str.len));
-				tmpmv->str.addr = (char *)stringpool.free;
-				format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, (uchar_ptr_t)stringpool.free, &n);
-				stringpool.free += n;
-				tmpmv->str.len = n;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);
->>>>>>> df1555e... GT.M V6.3-005
 			}
 			break;
 		case VTP_RTNAME:
@@ -335,7 +298,6 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				assert(src < src_top);
 				for ( ; ; )
 				{
-<<<<<<< HEAD
 					if (',' == *nextsrc)
 						break;
 					nextsrc++;
@@ -390,44 +352,6 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					 * case this gvt gets reallocated (due to different keysizes between gld and db).
 					 */
 					if (NULL == (gvspan = gvnh_reg->gvspan))
-=======
-					nextsrc = (unsigned char *)STRTOK_R(NULL, ",", &strtokptr);
-					if (NULL == nextsrc)
-						nextsrc = &global_names[tmpstr.len + 1];
-					if (nextsrc - src >= 2 && '^' == *src)
-					{
-						namestr.addr = (char *)src + 1;		/* skip initial '^' */
-						namestr.len = INTCAST(nextsrc - src - 2); /* don't count initial ^ and trailing 0 */
-						if (namestr.len > MAX_MIDENT_LEN)
-							namestr.len = MAX_MIDENT_LEN;
-						if (valid_mname(&namestr))
-						{
-							memcpy(&lcl_buff.c[0], namestr.addr, namestr.len);
-							gvent.var_name.len = namestr.len;
-						} else
-						{
-							memcpy(&lcl_buff.c[0], src, nextsrc - src - 1);
-							format2zwr((sm_uc_ptr_t)&lcl_buff.c, nextsrc - src - 1, global_names, &n);
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
-						}
-					} else
-					{
-						memcpy(&lcl_buff.c[0], src, (n = nextsrc - src - 1));
-						PUSH_MV_STENT(MVST_MVAL);
-						tmpmv = &mv_chain->mv_st_cont.mvs_mval;
-						tmpmv->mvtype = MV_STR;
-						ENSURE_STP_FREE_SPACE(ZWR_EXP_RATIO(n));
-						tmpmv->str.addr = (char *)stringpool.free;
-						format2zwr((sm_uc_ptr_t)&lcl_buff.c, n, (uchar_ptr_t)stringpool.free, &n);
-						stringpool.free += n;
-						tmpmv->str.len = n;
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);
-					}
-					tmp_gvt = NULL;
-					gvent.var_name.addr = &lcl_buff.c[0];
-					COMPUTE_HASH_MNAME(&gvent);
-					if (NULL != (tabent = lookup_hashtab_mname(gd_header->tab_ptr, &gvent)))
->>>>>>> df1555e... GT.M V6.3-005
 					{
 						ADD_TO_GVT_PENDING_LIST_IF_REG_NOT_OPEN(r_ptr, &gvnh_reg->gvt, NULL);
 					} else

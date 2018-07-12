@@ -69,15 +69,7 @@ int gtm_fprintf(FILE *stream, const char *format, ...)
 	sigset_t	savemask;
 	intrpt_state_t	prev_intrpt_state;
 
-<<<<<<< HEAD
-	/* Note: cannot use SIGPROCMASK below because this function is used by "gtmsecshr" and using SIGPROCMASK
-	 * pulls in a lot of stuff from libyottadb.so (due to asserts) and we want minimal stuff in "gtmsecshr".
-	 */
-	if (blocksig_initialized)
-		sigprocmask(SIG_BLOCK, &block_sigsent, &savemask);	/* BYPASSOK(sigprocmask) */
-=======
 	retval = 0;
->>>>>>> df1555e... GT.M V6.3-005
 	va_start(printargs, format);
 	VAR_COPY(pa_copy, printargs);
 	VSNPRINTF(NULL, 0, format, pa_copy, buflen);	/* C99: NULL string just returns size */

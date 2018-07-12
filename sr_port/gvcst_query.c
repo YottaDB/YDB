@@ -210,24 +210,7 @@ boolean_t	gvcst_query2(void)
 				}
 		    	}
 			assert(cs_data == cs_addrs->hdr);
-<<<<<<< HEAD
-			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_query, 1);
 			return found;
-=======
-			if (found)
-			{
-				c1 = &gv_altkey->base[0];
-				c2 = &gv_currkey->base[0];
-				for ( ; *c2; )
-				{
-					if (*c2++ != *c1++)
-						break;
-				}
-				if (!*c2 && !*c1)
-					return TRUE;
-			}
-			return FALSE;
->>>>>>> df1555e... GT.M V6.3-005
 		}
 		t_retry(status);
 	}

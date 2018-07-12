@@ -113,13 +113,9 @@ void append_filter(char * fpath, FILE * fp, char * c_call_name, char * m_ref_nam
 
 void restrict_init(void)
 {
-<<<<<<< HEAD
-	char		rfpath[YDB_PATH_MAX], linebuf[MAX_READ_SZ+1], *lbp, facility[MAX_FACILITY_LEN+1], group[MAX_GROUP_LEN+1];
-=======
-	char		rfpath[GTM_PATH_MAX], rcfpath[GTM_PATH_MAX];
+	char		rfpath[YDB_PATH_MAX], rcfpath[YDB_PATH_MAX];
 	char		linebuf[MAX_READ_SZ+1], *lbp, facility[MAX_FACILITY_LEN+1], group_or_flname[MAX_GROUP_LEN+1];
 	char		errstr[MAX_FN_LEN + 1];
->>>>>>> df1555e... GT.M V6.3-005
 	int		save_errno, fields, status, lineno;
 	uint4		statrm;
 	FILE		*rfp, *rcfp;
@@ -132,16 +128,9 @@ void restrict_init(void)
 	time_t 		rmtime, fmtime;
 
 	assert(!restrict_initialized);
-<<<<<<< HEAD
 	assert(ydb_dist_ok_to_use);
 	SNPRINTF(rfpath, YDB_PATH_MAX, "%s/%s", ydb_dist, RESTRICT_FILENAME);
-=======
-	assert(gtm_dist_ok_to_use);
-	SNPRINTF(rfpath, GTM_PATH_MAX, "%s/%s", gtm_dist, RESTRICT_FILENAME);
-	SNPRINTF(rcfpath, GTM_PATH_MAX, "%s/%s", gtm_dist, COMM_FILTER_FILENAME);
-
-
->>>>>>> df1555e... GT.M V6.3-005
+	SNPRINTF(rcfpath, YDB_PATH_MAX, "%s/%s", ydb_dist, COMM_FILTER_FILENAME);
 	if (-1 == ACCESS(rfpath, W_OK))
 	{	/* Write access implies no restrictions. Otherwise try reading the file for facilities to restrict. */
 		save_errno = errno;

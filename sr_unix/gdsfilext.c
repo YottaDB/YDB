@@ -574,12 +574,8 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
  	}
 	GDSFILEXT_CLNUP;
 	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_db_extends, 1);
-<<<<<<< HEAD
 	if (!ydb_dbfilext_syslog_disable)
-=======
-	if (!gtm_dbfilext_syslog_disable)
 	{
->>>>>>> df1555e... GT.M V6.3-005
 		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), blocks, new_total,
 			&curr_tn);
 		if ((NULL != gv_cur_region) && (NULL != gv_cur_region->dyn.addr) && (NULL != gv_cur_region->dyn.addr->fname))

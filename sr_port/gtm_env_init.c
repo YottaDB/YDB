@@ -114,19 +114,10 @@ void	gtm_env_init(void)
 				tdbglvl |= GDL_SmBackfill;	/* Can't check it unless it's filled in */
 			if (GDL_SmStorHog & tdbglvl)
 				tdbglvl |= GDL_SmBackfill | GDL_SmChkAllocBackfill;
-<<<<<<< HEAD
 			ydbDebugLevel |= tdbglvl;
 			ydbSystemMalloc = (GDL_UseSystemMalloc & ydbDebugLevel);
 			if (ydbSystemMalloc)
-				ydbDebugLevel &= !(GDL_SmStats | GDL_SmTrace | GDL_SmDumpTrace | GDL_SmAllocVerf | GDL_SmFreeVerf
-							| GDL_SmBackfill | GDL_SmChkAllocBackfill | GDL_SmChkFreeBackfill
-							| GDL_SmStorHog | GDL_SmDump );
-=======
-			gtmDebugLevel |= tdbglvl;
-			gtmSystemMalloc = ((GDL_UseSystemMalloc & gtmDebugLevel) || FALSE);
-			if (gtmSystemMalloc)
-				gtmDebugLevel &= !GDL_SmAllMallocDebug;
->>>>>>> df1555e... GT.M V6.3-005
+				ydbDebugLevel &= !GDL_SmAllMallocDebug;
 		}
 		/* See if ydb_msgprefix is specified. If so store it in TREF(ydbmsgprefix).
 		 * Note: Default value is already stored in "gtm_threadgbl_init".

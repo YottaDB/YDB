@@ -85,9 +85,4 @@ void	rel_lock(gd_region *reg)
 		ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 	} else
 		CRIT_TRACE(csa, crit_ops_nocrit);
-<<<<<<< HEAD
-	/* Now that crit for THIS region is released, check if deferred signal/exit handling can be done and if so do it */
-	DEFERRED_SIGNAL_HANDLING_CHECK;
-=======
->>>>>>> df1555e... GT.M V6.3-005
 }

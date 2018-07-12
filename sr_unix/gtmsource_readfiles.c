@@ -1916,16 +1916,10 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 		/* Move to the next region, now that the tr has been found or will not be found */
 		*brkn_trans = (*brkn_trans && (TR_WILL_NOT_BE_FOUND == found));
 	}
-<<<<<<< HEAD
 	assert(!*brkn_trans || (ydb_white_box_test_case_enabled &&
 				((WBTEST_REPLBRKNTRANS == ydb_white_box_test_case_number)
+					|| (WBTEST_MURUNDOWN_KILLCMT06 == ydb_white_box_test_case_number)
 					|| (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number))));
-=======
-	assert(!*brkn_trans || (gtm_white_box_test_case_enabled &&
-				((WBTEST_REPLBRKNTRANS == gtm_white_box_test_case_number)
-					|| (WBTEST_MURUNDOWN_KILLCMT06 == gtm_white_box_test_case_number)
-					|| (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number))));
->>>>>>> df1555e... GT.M V6.3-005
 	return (cumul_read);
 }
 

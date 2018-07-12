@@ -169,7 +169,6 @@ GBLREF	volatile int4	gtmMallocDepth;
 /* Macro to be used whenever we want to handle any signals that we deferred handling in the process.
  * In VMS, we dont do any signal handling, only exit handling.
  */
-<<<<<<< HEAD
 #define	DEFERRED_SIGNAL_HANDLING_CHECK									\
 {													\
 	char			*rname;									\
@@ -206,10 +205,6 @@ GBLREF	volatile int4	gtmMallocDepth;
 	if (deferred_signal_handling_needed)								\
 		deferred_signal_handler();								\
 }
-=======
-#define	DEFERRED_EXIT_HANDLING_CHECK									\
-		deferred_exit_handling_check()
->>>>>>> df1555e... GT.M V6.3-005
 
 GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => not in use */
 
@@ -276,40 +271,5 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 
 uint4	have_crit(uint4 crit_state);
 void	deferred_signal_handler(void);
-
-/* Inline functions */
-
-static inline void deferred_exit_handling_check(void)
-{
-	char			*rname;
-
-	GBLREF	int		process_exiting;
-	GBLREF	VSIG_ATOMIC_T	forced_exit;
-	GBLREF	volatile int4	gtmMallocDepth;
-	GBLREF	volatile int	suspend_status;
-
-	/* The forced_exit state of 2 indicates that the exit is already in progress, so we do not
-	 * need to process any deferred events. Note if threads are running, check if forced_exit is
-	 * non-zero and if so exit the thread (using pthread_exit) otherwise skip deferred event
-	 * processing. A similar check will happen once threads stop running.
-	 */
-	if (INSIDE_THREADED_CODE(rname))
-	{
-		PTHREAD_EXIT_IF_FORCED_EXIT;
-	} else if ((2 > forced_exit) && !process_exiting)
-	{	/* If forced_exit was set while in a deferred state, disregard any deferred timers and
-		 * invoke deferred_signal_handler directly.
-		 */
-		if (forced_exit && OK_TO_INTERRUPT)
-			deferred_signal_handler();
-		else
-		{
-			if ((DEFER_SUSPEND == suspend_status) && OK_TO_INTERRUPT)
-				suspend(SIGSTOP);
-			if (deferred_timers_check_needed && OK_TO_INTERRUPT)
-				check_for_deferred_timers();
-		}
-	}
-}
 
 #endif /* HAVE_CRIT_H_INCLUDED */

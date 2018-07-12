@@ -558,14 +558,9 @@ void clear_timers(void)
 	timer_in_handler = FALSE;
 	timer_active = FALSE;
 	oldjnlclose_started = FALSE;
-<<<<<<< HEAD
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
-	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
-=======
-	deferred_timers_check_needed = FALSE;
 	if (1 > timer_stack_count)
 		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
->>>>>>> df1555e... GT.M V6.3-005
 	DUMP_TIMER_INFO("After invoking clear_timers()");
 	return;
 }
@@ -689,16 +684,11 @@ STATICFNDEF void timer_handler(int why)
 	 */
 	if (1 < INTERLOCK_ADD(&timer_stack_count, UNUSED, 1))
 	{
-		deferred_timers_check_needed = TRUE;
+		SET_DEFERRED_TIMERS_CHECK_NEEDED;
 		INTERLOCK_ADD(&timer_stack_count, UNUSED, -1);
 		return;
-<<<<<<< HEAD
-	timer_stack_count++;
-	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
-=======
 	}
-	deferred_timers_check_needed = FALSE;
->>>>>>> df1555e... GT.M V6.3-005
+	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
 	save_errno = errno;
 	save_error_condition = error_condition;	/* aka SIGNAL */
 	timer_active = FALSE;				/* timer has popped; system timer not active anymore */
@@ -728,14 +718,9 @@ STATICFNDEF void timer_handler(int why)
 			break;
 #		if defined(DEBUG) && !defined(_AIX) && !defined(__armv6l__) && !defined(__armv7l__)
 		if (tpop->safe && (TREF(continue_proc_cnt) == last_continue_proc_cnt)
-<<<<<<< HEAD
 			&& !(ydb_white_box_test_case_enabled
-				&& (WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == ydb_white_box_test_case_number)))
-=======
-			&& !(gtm_white_box_test_case_enabled
-				&& ((WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == gtm_white_box_test_case_number)
-					|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number))))
->>>>>>> df1555e... GT.M V6.3-005
+				&& ((WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == ydb_white_box_test_case_number)
+					|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number))))
 		{	/* Check if the timer is extremely overdue, with the following exceptions:
 			 *	- Unsafe timers can be delayed indefinitely.
 			 *	- AIX and ARM systems tend to arbitrarily delay processes when loaded.
@@ -1123,12 +1108,7 @@ void check_for_deferred_timers(void)
 	char		*rname;
 
 	assert(!INSIDE_THREADED_CODE(rname));	/* below code is not thread safe as it does SIGPROCMASK() etc. */
-<<<<<<< HEAD
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
-	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
-=======
-	deferred_timers_check_needed = FALSE;
->>>>>>> df1555e... GT.M V6.3-005
 	timer_handler(DUMMY_SIG_NUM);
 }
 

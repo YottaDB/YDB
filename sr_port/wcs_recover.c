@@ -323,12 +323,8 @@ void wcs_recover(gd_region *reg)
 					 * all following cr's. If r_epid is 0 and also read in progress, we identify
 					 * this as corruption and fixup up this cr and proceed to the next cr.
 					 */
-<<<<<<< HEAD
-					assert(WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number);
-=======
 					assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
 						|| WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
->>>>>>> df1555e... GT.M V6.3-005
 					if (!((0 == r_epid) || (epid == r_epid)))
 					{
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_INVALIDRIP, 2, DB_LEN_STR(reg));
@@ -383,12 +379,7 @@ void wcs_recover(gd_region *reg)
 			if (!jgbl.mur_rollback)
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->data_invalid, cr->data_invalid,
 						DB_LEN_STR(reg), cr->blk);
-<<<<<<< HEAD
-			assert(ydb_white_box_test_case_enabled
-				&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number));
-=======
 			assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
->>>>>>> df1555e... GT.M V6.3-005
 			cr->data_invalid = 0;
 			if (!cr->tn)
 				cr->dirty = 0;
@@ -410,14 +401,9 @@ void wcs_recover(gd_region *reg)
 				 * And mupip/mu_rundown_splcase which crashes the primary and secondary. So allow these
 				 * additional condition here. Other places where DBDANGER is issued should not have this ||.
 				 */
-<<<<<<< HEAD
 				assert(ydb_white_box_test_case_enabled
 					&& ((WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number)
-=======
-				assert(gtm_white_box_test_case_enabled
-					&& ((WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number)
-						|| (WBTEST_MURUNDOWN_KILLCMT06 == gtm_white_box_test_case_number)
->>>>>>> df1555e... GT.M V6.3-005
+						|| (WBTEST_MURUNDOWN_KILLCMT06 == ydb_white_box_test_case_number)
 						|| (dse_running
 							&& (WBTEST_BG_UPDATE_BTPUTNULL == ydb_white_box_test_case_number))));
 			}
@@ -512,12 +498,7 @@ void wcs_recover(gd_region *reg)
 			if (!jgbl.mur_rollback)
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_DBDANGER, 5, cr->in_tend, cr->in_tend,
 						DB_LEN_STR(reg), cr->blk);
-<<<<<<< HEAD
-			assert(ydb_white_box_test_case_enabled
-				&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number));
-=======
 			assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
->>>>>>> df1555e... GT.M V6.3-005
 			cr->in_tend= 0;
 			blk_ptr = (blk_hdr_ptr_t)GDS_ANY_REL2ABS(csa, cr->buffaddr);
 			if (!blk_ptr->bsiz)
@@ -631,13 +612,8 @@ void wcs_recover(gd_region *reg)
 			 * both crs into active queue for the same block) but since kill -9 is not officially supported
 			 * and this is a rare scenario even within that, it is considered okay for now.
 			 */
-<<<<<<< HEAD
-			assert(cr_alt->epid || cr->epid || (ydb_white_box_test_case_enabled
-					&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number)));
-=======
 			assert(cr_alt->epid || cr->epid ||
 				WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
->>>>>>> df1555e... GT.M V6.3-005
 			if (cr_alt->epid)
 			{
 				cr_old = cr_alt;

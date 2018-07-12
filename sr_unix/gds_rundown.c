@@ -785,7 +785,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			db_ipcs.fn[seg->fname_len] = 0;
 			/* request gtmsecshr to flush. read_only cannot flush itself */
 			WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-			if (!csa->read_only_fs)
+			if (!csa->read_only_fs && !csd->read_only)
 			{
 				secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
 				if (0 != secshrstat)
@@ -793,7 +793,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 						ERR_TEXT, 2, RTS_ERROR_TEXT("gtmsecshr failed to update database file header"));
 			}
 		}
-<<<<<<< HEAD
 		if (!is_mm && csd->asyncio)
 		{	/* Cancel ALL pending async ios for this region by this process. Need to do this BEFORE detaching from db
 			 * shared memory OR closing the file descriptor (udi->fd) as the in-progress asyncio buffers/fd point there.
@@ -814,19 +813,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			 */
 			aio_shim_destroy(udi->owning_gd);
 #			endif
-=======
-		db_ipcs.fn_len = seg->fname_len;
-		memcpy(db_ipcs.fn, seg->fname, seg->fname_len);
-		db_ipcs.fn[seg->fname_len] = 0;
- 		/* request gtmsecshr to flush. read_only cannot flush itself */
-		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-		if (!csa->read_only_fs && !csd->read_only)
-		{
-			secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
-			if (0 != secshrstat)
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-					      ERR_TEXT, 2, RTS_ERROR_TEXT("gtmsecshr failed to update database file header"));
->>>>>>> df1555e... GT.M V6.3-005
 		}
 	} else
 	{
