@@ -29,14 +29,14 @@
 
 ENTRY op_mproflinefetch
 	CHKSTKALIGN						/* Verify stack alignment */
-	mov	x15, x0						/* Save arg count */
+	mov	x28, x0						/* Save arg count */
 	ldr	x27, [x19]
 	str	x30, [x27, #msf_mpc_off]			/* save return address in frame_pointer->mpc */
 	str	x24, [x27, #msf_ctxt_off]			/* save linkage pointer */
 	bl	gtm_fetch
 	bl	pcurrpos
-	cmp	x15, #8						/* Any args pushed on stack? */
-	b.le	b1
+	cmp	x28, #8						/* Any args pushed on stack? */
+	b.lt	b1
 	mov	sp, x29						/* If args on stack, we need to put sp where it was before
 								 * calling op_linefetch - otherwise stack_leak_check will complain.
 								 * But after returning to generated code, the stack pointer will be
