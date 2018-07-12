@@ -1520,8 +1520,6 @@ LITDEF	err_msg merrors[] = {
 };
 
 
-GBLDEF	err_ctl merrors_ctl = {
-
 
 LITDEF	int merrors_undocarr[] = {
 	0,	/* ACK */
@@ -1552,6 +1550,8 @@ LITDEF	int merrors_undocarr[] = {
 	1189,	/* ZLINKBYPASS */
 };
 
+
+GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],

@@ -19,6 +19,10 @@
 	.FACILITY	YDB,256/PREFIX=ERR_
 	.TITLE		YDBERRORS Error Messages for YottaDB
 !
+!  List of known undocumented messages follows (along with a comment) (do not change "known undocumented" phrase)
+! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
+!
+!
 ! Note: This file is similar to sr_port/merrors.msg in layout.
 !
 QUERY2		<Invalid second argument to $QUERY. Must be -1 or 1.>/error/fao=0
@@ -40,3 +44,7 @@ VARNAME2LONG	<Variable name length exceeds maximum allowed (!UL)>/error/fao=1
 SIMPLEAPINEST	<Attempt to nest call of !AD with a call to !AD - nesting calls is not permitted in simpleAPI>/error/fao=4
 CALLINTCOMMIT	<TCOMMIT at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL>/error/fao=2!/ansi=0
 CALLINTROLLBACK	<TROLLBACK at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL>/error/fao=2!/ansi=0
+!
+! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
+!
+	.end
