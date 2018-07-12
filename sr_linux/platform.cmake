@@ -48,7 +48,7 @@ else()
   if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
     set(bits 64)
     set(arch "aarch64")
-    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -march=armv8-a")
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -march=armv8-a -mcpu=cortex-a53")		#xxxxxxx cortex part
     set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -Wa,-march=armv8-a")
     set(CMAKE_ASM_FLAGS_DEBUG "-Wa,-ggdb3 ${CMAKE_ASM_FLAGS_DEBUG}")
   else()
