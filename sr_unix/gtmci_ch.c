@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,6 +52,8 @@ CONDITION_HANDLER(gtmci_ch)
 	if (msp < FGNCAL_STACK) /* restore stack to the last marked position */
 		fgncal_unwind();
 	else TREF(temp_fgncal_stack) = NULL;	/* If fgncal_unwind() didn't run to clear this, we have to */
+	if (TREF(comm_filter_init))
+		TREF(comm_filter_init) = FALSE;  /* Exiting from filters */
 	mumps_status = SIGNAL;
 	UNWIND(NULL, NULL);
 }

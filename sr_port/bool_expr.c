@@ -1,6 +1,6 @@
 /****************************************************************
  *                                                              *
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -61,7 +61,8 @@ int bool_expr(boolean_t sense, oprtype *addr)
 	{	/* returning literals directly simplifies things for all callers, so swap the sense */
 		v = &t2->operand[0].oprval.mlit->v;
 		unuse_literal(v);
-		PUT_LITERAL_TRUTH(0 != v->m[1], t2);
+		MV_FORCE_NUMD(v);
+		PUT_LITERAL_TRUTH(MV_FORCE_BOOL(v), t2);
 		dqdel(t1, exorder);
 		DECREMENT_EXPR_DEPTH;
 		return TRUE;

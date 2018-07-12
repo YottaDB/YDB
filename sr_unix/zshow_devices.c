@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -733,17 +733,7 @@ void zshow_devices(zshow_out *output)
 								mval_write(output, &m, FALSE);
 							}
 							ZS_ONE_OUT(&v, space_text);
-							if (NULL != socketptr->local.saddr_ip)
-							{
-								ZS_STR_OUT(&v, local_text);
-								v.str.addr = socketptr->local.saddr_ip;
-								v.str.len = STRLEN(socketptr->local.saddr_ip);
-								zshow_output(output, &v.str);
-								ZS_ONE_OUT(&v, at_text);
-								tmpport = (int)socketptr->local.port;
-								MV_FORCE_MVAL(&m, tmpport);
-								mval_write(output, &m, FALSE);
-							} else if (socket_local == socketptr->protocol)
+							if (socket_local == socketptr->protocol)
 							{
 								ZS_STR_OUT(&v, local_text);
 								if (NULL != socketptr->local.sa)
@@ -757,6 +747,16 @@ void zshow_devices(zshow_out *output)
 										   (socketptr->remote.sa))->sun_path;
 									ZS_VAR_STR_OUT(&v, charptr);
 								}
+							} else if (NULL != socketptr->local.saddr_ip)
+							{
+								ZS_STR_OUT(&v, local_text);
+								v.str.addr = socketptr->local.saddr_ip;
+								v.str.len = STRLEN(socketptr->local.saddr_ip);
+								zshow_output(output, &v.str);
+								ZS_ONE_OUT(&v, at_text);
+								tmpport = (int)socketptr->local.port;
+								MV_FORCE_MVAL(&m, tmpport);
+								mval_write(output, &m, FALSE);
 							}
 						}
 						ZS_ONE_OUT(&v, space_text);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,6 +62,7 @@
 #include "dpgbldir.h"		/* for "get_next_gdr" */
 #include "t_abort.h"
 #include "have_crit.h"
+#include "gtmsource_inline.h"
 
 #define FLUSH 1
 

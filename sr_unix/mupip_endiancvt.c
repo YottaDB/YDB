@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -443,7 +443,7 @@ void mupip_endiancvt(void)
 	{	/* Database is encrypted. Initialize encryption and setup the keys to be used in later encryption/decryption */
 		info.database_fn = &db_name[0];
 		info.database_fn_len = n_len;
-		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+		INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 		if (0 == gtmcrypt_errno)
 		{
 			info.encr_handles.encr_key_handle = GTMCRYPT_INVALID_KEY_HANDLE;

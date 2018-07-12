@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -155,12 +155,13 @@ MBSTART {											\
 												\
 	assert(0 < (NANOSECONDS));								\
 	clock_gettime(CLOCK_MONOTONIC, &REQTIM);						\
-	REQTIM.tv_nsec += (long)(NANOSECONDS);							\
-	if (E_9 <= REQTIM.tv_nsec)								\
+	if (E_9 <= (NANOSECONDS) + REQTIM.tv_nsec)						\
 	{											\
-		REQTIM.tv_sec += (time_t)(REQTIM.tv_nsec / E_9);				\
-		REQTIM.tv_nsec %= E_9;								\
+		REQTIM.tv_sec += (time_t)(((NANOSECONDS) + REQTIM.tv_nsec) / E_9);		\
+		REQTIM.tv_nsec = ((NANOSECONDS) + REQTIM.tv_nsec) % E_9;			\
 	}											\
+	else											\
+		REQTIM.tv_nsec += (long)(NANOSECONDS);						\
 	do											\
 	{											\
 		STATUS = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &REQTIM, NULL);	\

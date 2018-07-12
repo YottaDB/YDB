@@ -58,6 +58,7 @@
 #include "ftok_sem_incrcnt.h"
 #include "mutex.h"
 #include "fork_init.h"
+#include "io.h"
 #include "gtmio.h"
 
 GBLDEF	boolean_t		gtmrecv_fetchreysnc;
@@ -109,6 +110,7 @@ int gtmrecv(void)
 	repl_inst_hdr		updresync_inst_hdr;
 	uint4			gtmrecv_pid;
 	int			idx, semval, status, save_upd_status, upd_start_status, upd_start_attempts;
+	struct stat		stat_buf;
 	char			print_msg[1024], tmpmsg[1024];
 	pid_t			pid, procgp;
 	int			exit_status, waitpid_res, save_errno;
@@ -383,16 +385,6 @@ int gtmrecv(void)
 		gtmrecv_exit(gtmrecv_showbacklog() - NORMAL_SHUTDOWN);
 	else
 		gtmrecv_exit(gtmrecv_statslog() - NORMAL_SHUTDOWN);
-	/* Point stdin to /dev/null */
-	OPENFILE("/dev/null", O_RDONLY, null_fd);
-	if (0 > null_fd)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
-	DUP2(null_fd, 0, rc);
-	if (0 > rc)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
-	CLOSEFILE(null_fd, rc);
-	if (0 > rc)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
 	assert(!holds_sem[RECV][RECV_POOL_ACCESS_SEM]);
 	assert(holds_sem[RECV][RECV_SERV_OPTIONS_SEM]);
 	is_rcvr_server = TRUE;
@@ -462,6 +454,23 @@ int gtmrecv(void)
 	if (-1 == (procgp = setsid()))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			  RTS_ERROR_LITERAL("Receiver server error in setsid"), errno);
+	/* Point stdin to /dev/null */
+	OPENFILE("/dev/null", O_RDONLY, null_fd);
+	if (0 > null_fd)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
+	assert(null_fd > 2);
+	/* Detached from the initiating process, now detach from the starting IO */
+	io_rundown(NORMAL_RUNDOWN);
+	FSTAT_FILE(gtmrecv_log_fd, &stat_buf, log_init_status);
+	assertpro(!log_init_status);	/* io_rundown should not affect the log file */
+	DUP2(null_fd, 0, rc);
+	if (0 > rc)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
+	/* Re-init IO now that we have opened the log file and set stdin to /dev/null */
+	io_init(IS_MUPIP_IMAGE);
+	CLOSEFILE(null_fd, rc);
+	if (0 > rc)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
 	gtm_event_log_init();
 	gtmrecv_local->recv_serv_pid = process_id;
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));

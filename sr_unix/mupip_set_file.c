@@ -174,7 +174,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		need_standalone = TRUE;
 		if (CLI_PRESENT == encryptable_status)
 		{	/* When turning on encryption, validate the encryption setup */
-			INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+			INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
 			{
 				CLEAR_CRYPTERR_MASK(gtmcrypt_errno);
@@ -671,7 +671,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			}
 			if (read_only_status)
 			{
-				if (dba_mm != pvt_csd->acc_meth)
+				if (dba_mm != pvt_csd->acc_meth && CLI_NEGATED != read_only_status)
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_READONLYNOBG);
 					reg_exit_stat |= EXIT_WRN;

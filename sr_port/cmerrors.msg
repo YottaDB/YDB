@@ -1,6 +1,7 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001 Sanchez Computer Associates, Inc.	!
+! Copyright (c) 2001-2018 Fidelity National Information		!
+! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -10,6 +11,10 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	.FACILITY	GTCM,249/PREFIX=CMERR_
 	.TITLE	CMERRORS	Error Messages for GTCM, VAX/VMS EDITION
+!
+!  List of known undocumented messages follows (along with a comment) (do not change "known undocumented" phrase)
+! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
+!
 INVPROT		<Invalid protocol specified by remote partner>/error/fao=0
 REGNTFND	<Region referenced not initialized>/error/fao=0
 CMINTQUE	<Interlock failure accessing GT.CM server queue>/fatal/fao=0

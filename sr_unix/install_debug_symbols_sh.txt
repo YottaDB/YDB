@@ -58,5 +58,6 @@ fi
 # Do the copy
 
 cp ${package_dir}/*.debug $gtm_dist/
+ls -ald $gtm_dist/*.debug
 echo ""
-echo "Done. Please check the permissions on the listed files and directories and change them as appropriate."
+echo "Done. Please check the permissions on the listed files and change them as appropriate."

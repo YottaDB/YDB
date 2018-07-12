@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -767,7 +767,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		db_ipcs.fn[seg->fname_len] = 0;
  		/* request gtmsecshr to flush. read_only cannot flush itself */
 		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-		if (!csa->read_only_fs)
+		if (!csa->read_only_fs && !csd->read_only)
 		{
 			secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
 			if (0 != secshrstat)

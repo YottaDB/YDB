@@ -44,5 +44,9 @@
 #define GDL_IgnoreAvailSpace	0x00100000	/* (1048576) Allow gdsfilext/mu_cre_file (UNIX) to ignore available space */
 #define GDL_PrintPMAPStats	0x00200000	/* (2097152) Print process memory map on exit (using pmap or procmap utility) */
 #define GDL_AllowLargeMemcpy	0x00400000	/* (4194304) Bypass the 1GB sanity check in gtm_memcpy_validate_and_execute() */
-#define GDL_UseSystemMalloc	0x80000000	/* (1879048192) Use the system's malloc(), disabling all the above GDL_Sm options */
+#define GDL_UseSystemMalloc	0x80000000	/* (2147483648) Use the system's malloc(), disabling all the above GDL_Sm options */
+
+#define GDL_SmAllMallocDebug	(GDL_Simple | GDL_SmStats | GDL_SmTrace | GDL_SmDumpTrace | GDL_SmAllocVerf			\
+					| GDL_SmFreeVerf | GDL_SmBackfill | GDL_SmChkAllocBackfill | GDL_SmChkFreeBackfill	\
+					| GDL_SmStorHog | GDL_SmDump | GDL_SmInitAlloc)
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,10 +42,11 @@ void coerce(oprtype *a, unsigned short new_type)
 	if ((OC_COMVAL == old_op) || (OC_COMINT == old_op) || (OC_FORCENUM == old_op))
 	{
 		assert(TRIP_REF == ref->operand[0].oprclass);
-		if ((OC_FORCENUM != old_op) || (OC_LIT == ref->operand[0].oprval.tref->opcode))
-		{	/* because compiler generated literals include their numeric form, we don't need to coerce */
-			assert(MV_NM & ref->operand[0].oprval.tref->operand[0].oprval.mlit->v.mvtype);
+		if ((OC_FORCENUM != old_op) || (OC_LIT == (conv = ref->operand[0].oprval.tref->opcode)))	/* WARNING assign */
+		{	/* because compiler generated literals should include their numeric form, we don't need to coerce */
 			assert(ref->operand[0].oprval.tref == ref->exorder.bl);
+			if (OC_LIT == conv)
+				MV_FORCE_NUMD(&ref->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 			dqdel(ref, exorder);
 			ref = ref->operand[0].oprval.tref;
 			old_op = ref->opcode;

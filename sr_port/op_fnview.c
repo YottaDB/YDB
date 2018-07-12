@@ -55,33 +55,35 @@
 #include "gvn2gds.h"
 #include "io.h"
 #include "interlock.h"
+#include "cache.h"
+#include "hashtab_objcode.h"
 
-GBLREF spdesc		stringpool;
-GBLREF int4		cache_hits, cache_fails;
-GBLREF unsigned char	*stackbase, *stacktop;
-GBLREF gd_addr		*gd_header;
-GBLREF boolean_t	certify_all_blocks;
-GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gd_region	*gv_cur_region;
-GBLREF gv_namehead	*gv_target;
-GBLREF gv_namehead	*reset_gv_target;
-GBLREF jnl_fence_control jnl_fence_ctl;
+GBLREF spdesc			stringpool;
+GBLREF int4			cache_hits, cache_fails, max_cache_entries;
+GBLREF unsigned char		*stackbase, *stacktop;
+GBLREF gd_addr			*gd_header;
+GBLREF boolean_t		certify_all_blocks;
+GBLREF sgmnt_addrs		*cs_addrs;
+GBLREF gd_region		*gv_cur_region;
+GBLREF gv_namehead		*gv_target;
+GBLREF gv_namehead		*reset_gv_target;
+GBLREF jnl_fence_control	 jnl_fence_ctl;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
-GBLREF bool		undef_inhibit;
-GBLREF int4		break_message_mask;
-GBLREF command_qualifier cmd_qlf;
+GBLREF bool			undef_inhibit;
+GBLREF int4			break_message_mask;
+GBLREF command_qualifier	 cmd_qlf;
 GBLREF tp_frame		*tp_pointer;
-GBLREF uint4		dollar_tlevel;
-GBLREF int4		zdir_form;
-GBLREF boolean_t	badchar_inhibit;
-GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database blocks */
-GBLREF int		gv_fillfactor;
-GBLREF int4		gtm_max_sockets;
-GBLREF gv_key		*gv_currkey;
-GBLREF boolean_t	is_gtm_chset_utf8;
-GBLREF	uint4		process_id;
-GBLREF mstr		extnam_str;
-GBLREF	boolean_t	dmterm_default;
+GBLREF uint4			dollar_tlevel;
+GBLREF int4			zdir_form;
+GBLREF boolean_t		badchar_inhibit;
+GBLREF boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database blocks */
+GBLREF int			gv_fillfactor;
+GBLREF int4			gtm_max_sockets;
+GBLREF gv_key			*gv_currkey;
+GBLREF boolean_t		is_gtm_chset_utf8;
+GBLREF	uint4			process_id;
+GBLREF mstr			extnam_str;
+GBLREF	boolean_t		dmterm_default;
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_GBLNOMAPTOREG);
@@ -100,6 +102,7 @@ LITREF	mval		literal_one;
 #define		GTM_BOOL_RES		"GT.M Boolean short-circuit"
 #define		STD_BOOL_RES		"Standard Boolean evaluation side effects"
 #define		WRN_BOOL_RES		"Standard Boolean with side-effect warning"
+#define		NO_REPLINST		"No replication instance defined"
 #define		STATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
 #define		STATS_KEYWD_SIZE	(3 + 1 + 1)	/* 3 character mnemonic, colon and comma */
 
@@ -114,35 +117,33 @@ LITREF	mval		literal_one;
 }
 
 void	op_fnview(int numarg, mval *dst, ...)
-{
-	boolean_t	save_transform;
-	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
-	unsigned char	*key;
-	unsigned char	buff[MAX_ZWR_KEY_SZ];
+{	boolean_t	save_transform;
+	char		instfilename[MAX_FN_LEN + 1 + 1];	/* 1 for possible flag character */
 	collseq		*csp;
 	gd_binding	*map, *start_map, *end_map;
-	gd_region	*reg, *reg_start, *statsDBreg;
+	gd_gblname	*gname;
+	gd_region	*reg, *reg_start, *reg_top, *statsDBreg;
 	gv_key		*gvkey;
+	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gv_namehead	temp_gv_target;
 	gvnh_reg_t	*gvnh_reg;
 	gvnh_spanreg_t	*gvspan;
 	int		n, tl, newlevel, res, reg_index, collver, nct, act, ver;
 	lv_val		*lv;
-	gd_gblname	*gname;
 	mstr		tmpstr, commastr, *gblnamestr;
 	mval		*arg1, *arg2, tmpmval;
 	mval		*keyword;
 	sgmnt_addrs	*csa;
 	tp_frame	*tf;
 	trans_num	gd_targ_tn, *tn_array;
-	unsigned char	*c, *c_top;
+	unsigned char	*c, *c_top, *key;
+	unsigned char	buff[MAX_ZWR_KEY_SZ];
 	va_list		var;
 	viewparm	parmblk, parmblk2;
 	viewtab_entry	*vtp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	VMS_ONLY(va_count(numarg));
 	assertpro(2 <= numarg);
 	VAR_START(var, dst);
 	keyword = va_arg(var, mval *);
@@ -169,11 +170,9 @@ void	op_fnview(int numarg, mval *dst, ...)
 	view_arg_convert(vtp, (int)vtp->parm, arg1, &parmblk, IS_DOLLAR_VIEW_TRUE);
 	switch (vtp->keycode)
 	{
-#		ifdef UNICODE_SUPPORTED
 		case VTK_BADCHAR:
 			n = badchar_inhibit ? 0 : 1;
 			break;
-#		endif
 		case VTK_RCHITS:
 			n = 0;
 			break;
@@ -187,7 +186,7 @@ void	op_fnview(int numarg, mval *dst, ...)
 			n = (int)(stackbase - stacktop);
 			break;
 		case VTK_ICSIZE:
-			n = 0;	/* must change run-time structure */
+			n = max_cache_entries;
 			break;
 		case VTK_ICHITS:
 			n = cache_hits;
@@ -339,19 +338,30 @@ void	op_fnview(int numarg, mval *dst, ...)
 				dst->str.len = 0;
 			break;
 		case VTK_JNLPOOL:
-			if (jnlpool)
+			tmpstr.addr = NO_REPLINST;
+			tmpstr.len = SIZEOF(NO_REPLINST)-1;
+			if (!jnlpool)
+			{
+				if (!gd_header)		/* IF GD_HEADER == 0 THEN OPEN GBLDIR */
+					gvinit();
+				if (NULL != (gd_addr *)repl_inst_get_name(instfilename, (unsigned int *)&tmpstr.len, MAX_FN_LEN + 1,
+						return_on_error, gd_header))
+				{
+					tmpstr.addr = &instfilename[0];
+					tmpstr.addr[tmpstr.len++] = '*';
+				}
+			} else
 			{
 				reg = jnlpool->jnlpool_dummy_reg;
 				if (reg && reg->dyn.addr)
 				{
 					tmpstr.addr = (char *)reg->dyn.addr->fname;
 					tmpstr.len = reg->dyn.addr->fname_len;
-					s2pool(&tmpstr);
-					dst->str = tmpstr;
-				} else
-					dst->str.len = 0;
-			} else
-				dst->str.len = 0;
+				}
+			}
+			s2pool(&tmpstr);
+			dst->str = tmpstr;
+			dst->mvtype = vtp->restype;
 			break;
 		case VTK_JNLTRANSACTION:
 			n = jnl_fence_ctl.level;
@@ -365,7 +375,8 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_NOISOLATION:
 			if (NOISOLATION_NULL != parmblk.ni_list.type || NULL == parmblk.ni_list.gvnh_list
 			    || NULL != parmblk.ni_list.gvnh_list->next)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWFN);
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(4) ERR_VIEWFN, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			n = parmblk.ni_list.gvnh_list->gvnh->noisolation;
 			break;
 		case VTK_PATCODE:
@@ -653,6 +664,9 @@ void	op_fnview(int numarg, mval *dst, ...)
 			}
 			break;
 		case VTK_YDIRTREE:
+			if (!parmblk.value->str.len)
+				rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(4) ERR_VIEWFN, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			n = extnam_str.len;		/* internal use of op_gvname should not disturb extended reference */
 			op_gvname(VARLSTCNT(1) parmblk.value);
 			extnam_str.len = n;
@@ -681,18 +695,22 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_YGDS2GVN:
 			n = (NULL != arg2) ? mval2i(arg2) : 0;
 			key = gds2gvn(arg1, &buff[0], n);
+			if (!n)
+				key = &buff[0];
 			COPY_ARG_TO_STRINGPOOL(dst, key, &buff[0]);
 			break;
 		case VTK_YGVN2GDS:
 			n = (NULL != arg2) ? mval2i(arg2) : 0;
 			gvkey = &save_currkey[0];
 			key = gvn2gds(arg1, gvkey, n);
+			if (!n)
+				key = &gvkey->base[0];
 			/* If input has error at some point, copy whatever subscripts (+ gblname) have been successfully parsed */
 			COPY_ARG_TO_STRINGPOOL(dst, key, &gvkey->base[0]);
 			break;
 		case VTK_YLCT:
 			n = -1;
-			if (arg1)
+			if ((arg1) && (0 != arg1->str.len))
 			{
 				if (0 == MEMCMP_LIT(arg1->str.addr, "nct"))
 					n = TREF(local_coll_nums_as_strings) ? 1 : 0;
@@ -772,25 +790,22 @@ void	op_fnview(int numarg, mval *dst, ...)
 			n = dmterm_default;
 			break;
 		case VTK_STATSHARE:
-			if (!(n = (NO_STATS_OPTIN != TREF(statshare_opted_in))) || (NULL == parmblk.gv_ptr)) /* WARNING assign */
-				break;							/* no optin or no region specified */
+			/* 0 == n -> no share; 1 == n -> share; 2 == n -> some share (no reg) or reg not open */
+			if (!(n = TREF(statshare_opted_in)) || (NULL == parmblk.gv_ptr))	/* WARNING assignment */
+				break;								/* no region - use general result */
 			assert(gd_header);
 			if (!(n = parmblk.gv_ptr->open))
 			{
-				if (ALL_STATS_OPTIN != TREF(statshare_opted_in))
-					break;						/* not open and not all_optin */
+				if (!(n = (ALL_STATS_OPTIN != TREF(statshare_opted_in))))
+					break;
 				gv_init_reg(parmblk.gv_ptr, NULL);
 			}
 			csa = &FILE_INFO(parmblk.gv_ptr)->s_addrs;
 			assert(NULL != csa->hdr);
-			if (!(n = !(RDBF_NOSTATS & csa->reservedDBFlags)))
-				break;							/* region not doing statshare */
-			BASEDBREG_TO_STATSDBREG((gd_region *)parmblk.gv_ptr, statsDBreg);
-			csa = &FILE_INFO(statsDBreg)->s_addrs;
-			n = csa->statsDB_setup_completed;
+			n = !(RDBF_NOSTATS & csa->reservedDBFlags);
 			break;
 		default:
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_VIEWFN);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWFN, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 	}
 	dst->mvtype = vtp->restype;
 	if (MV_NM == vtp->restype)

@@ -383,7 +383,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 				return;
 			}
 			/* At this point, the baseDB is open but the statsDB is not automatically opened. This is possible if
-			 *	a) TREF(statshare_opted_in) is NO. In that case, this call to "gvcst_init" is coming through
+			 *	a) TREF(statshare_opted_in) is not ALL. In that case, this call to "gvcst_init" is coming through
 			 *		a direct reference to the statsDB (e.g. ZWR ^%YGS). OR
 			 *	b) baseDBreg->was_open is TRUE. In that case, the statsDB open would have been short-circuited
 			 *		in "gvcst_init".
@@ -393,16 +393,16 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			 *		would silently adjust gld map entries so they do not point to this statsDB anymore
 			 *		(NOSTATS should already be set in the baseDB in this case, assert that).
 			 */
-			if ((NO_STATS_OPTIN != TREF(statshare_opted_in)) && !baseDBreg->was_open)
+			if ((ALL_STATS_OPTIN == TREF(statshare_opted_in)) && !baseDBreg->was_open)
 			{
 				assert(RDBF_NOSTATS & baseDBreg->reservedDBFlags);
 				return;
 			}
 		} else if (RDBF_NOSTATS & baseDBreg->reservedDBFlags)
 		{	/* The baseDB was already open and the statsDB was NOT open. This could be because of either the baseDB
-			 * has NOSTATS set in it or it could be that NOSTATS was set when we attempted before to open the statsDB
-			 * but failed for whatever reason (privs, noexistant directory, space, etc). In either case, return
-			 * right away (for same reason as described before the "if" block above).
+			 * has NOSTATS set in it or it could be that ALL_STATS_OPTIN wasn't in place when we attempted before to
+			 * open the statsDB but failed for whatever reason (privs, noexistant directory, space, etc). In either
+			 * return right away (for same reason as described before the "if" block above).
 			 */
 			return;
 		}
@@ -859,7 +859,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			reg->jnl_before_image = csd->jnl_before_image;
 			reg->dyn.addr->asyncio = csd->asyncio;
 			reg->dyn.addr->read_only = csd->read_only;
-			assert(csa->reservedDBFlags == csd->reservedDBFlags);	/* Should be same already */
+			assert((RDBF_NOSTATS & csd->reservedDBFlags) ? (csa->reservedDBFlags == csd->reservedDBFlags)
+				: ((~RDBF_NOSTATS & csa->reservedDBFlags) == csd->reservedDBFlags));	/* suitably aligned*/
 			SYNC_RESERVEDDBFLAGS_REG_CSA_CSD(reg, csa, csd, ((node_local_ptr_t)NULL));
 			SET_REGION_OPEN_TRUE(reg, WAS_OPEN_TRUE);
 			assert(1 <= csa->regcnt);
@@ -1323,8 +1324,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		if (NO_STATS_OPTIN != TREF(statshare_opted_in))
 		{
 			if (!is_statsDB)
-			{	/* This is a baseDB - so long as NOSTATS is *not* turned on, we should initialize the statsDB */
-				if (!(RDBF_NOSTATS & reg->reservedDBFlags))
+			{	/* This is a baseDB - so long if all in, we should initialize the statsDB */
+				if (!(RDBF_NOSTATS & reg->reservedDBFlags) && (ALL_STATS_OPTIN == TREF(statshare_opted_in)))
 				{
 					BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
 					assert(NULL != statsDBreg);
@@ -1336,7 +1337,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 						statsDBreg->statsDB_setup_started = TRUE;
 						gvcst_init_statsDB(reg, DO_STATSDB_INIT_TRUE);
 					}
-				}
+				} else
+					csa->reservedDBFlags |= RDBF_NOSTATS;
 			}
 		} else if (is_statsDB)
 		{	/* We are opening a statsDB file but not as a statsDB (i.e. not opted-in) but we still need to set the

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2017 Fidelity National Information	*
+ * Copyright (c) 2007-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1370,7 +1370,7 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	   Note: Please ensure the terms in the "if" below appear in descending order based upon likelihood
 	      of their being FALSE. Any terms that call functions should be at the end.
 	   **************************************************************************************************/
-	if ((0 == crit_count) && !in_mutex_deadlock_check
+	if (!in_mutex_deadlock_check
 		&& ((NULL == check_csaddrs) || !T_IN_CRIT_OR_COMMIT_OR_WRITE(check_csaddrs))
 		&& (0 == fast_lock_count)
 		&& (!(TREF(in_ext_call) && csd->is_encrypted))

@@ -111,6 +111,7 @@
 /* #GTM_THREAD_SAFE : The below macro (MALLOC) is thread-safe because caller ensures serialization with locks */
 #  define MALLOC(size, addr) 										\
 {													\
+	intrpt_state_t  prev_intrpt_state;								\
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);									\
 	if (!gtmSystemMalloc											\
 		&& (0 < gtm_max_storalloc) && ((size + totalRmalloc + totalRallocGta) > gtm_max_storalloc))	\
@@ -120,7 +121,9 @@
 		gtmMallocErrorErrno = ERR_MALLOCMAXUNIX;						\
 		raise_gtmmemory_error();								\
 	}												\
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);				\
 	addr = (void *)malloc(size);									\
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);				\
 	if (NULL == (void *)addr)									\
 	{												\
 		gtmMallocErrorSize = size;								\
@@ -445,6 +448,7 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	char		*ascNum;
 	storElem	*uStor;
 	int		i, sizeIndex, testSize, blockSize, save_errno;
+	intrpt_state_t  prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -517,7 +521,9 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	if (0 < outOfMemoryMitigateSize)
 	{
 		assert(NULL == outOfMemoryMitigation);
+		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		outOfMemoryMitigation = malloc(outOfMemoryMitigateSize * 1024);
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		if (NULL == outOfMemoryMitigation)
 		{
 			save_errno = errno;
@@ -664,7 +670,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 	 * if this is the normal (default/optimized) case we will fall into the code
 	 * and handle the rerouting at the end.
 	 */
-	if (GDL_None == gtmDebugLevel)
+	if (!(gtmDebugLevel & GDL_SmAllMallocDebug))
 	{
 #	endif
 		/* Note that this if is also structured for maximum fallthru. The else will
@@ -807,7 +813,10 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 		}
 #	ifndef DEBUG
 	} else
-	{	/* We have a non-DEBUG module but debugging is turned on so redirect the call to the appropriate module */
+	{	/* We have a non-DEBUG module but debugging is turned on so redirect the call to the appropriate module.
+		 * Stash the caller id for later use, as we can't be sure whether the call to gtm_malloc_dbg() will add
+		 * a stack frame, disrupting later caller_id() requests.
+		 */
 		smCallerId = (unsigned char *)caller_id();
 		return (void *)gtm_malloc_dbg(size);
 	}
@@ -1016,6 +1025,8 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 	} else
 	{	/* If not a debug module and debugging is enabled, reroute call to
 		 * the debugging version.
+		 * Stash the caller id for later use, as we can't be sure whether the call to gtm_malloc_dbg() will add
+		 * a stack frame, disrupting later caller_id() requests.
 		 */
 		smCallerId = (unsigned char *)caller_id();
 		gtm_free_dbg(addr);

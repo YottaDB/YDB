@@ -112,6 +112,17 @@ error_def(ERR_DBFILERR);
 error_def(ERR_DYNUPGRDFAIL);
 error_def(ERR_GVPUTFAIL);
 
+/**
+ * Returns pointer to the global buffer containing block blk.
+ *
+ * Checks to see if the block is already in a global buffer, or reads it from disk
+ *  if it is not.
+ *
+ * @param[in] blk The block id to read from disk
+ * @param[in] cycle Used to determine if the shared memory segment has updated since the last t_qread
+ * @param[out] cr_out The cache record which contains a pointer to the buffer (and other information) will be stored in *cr_out
+ * @return A pointer the location in shared memory which contains the database block
+ */
 sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out)
 	/* cycle is used in t_end to detect if the buffer has been refreshed since the t_qread */
 {

@@ -357,10 +357,10 @@ static void cli_lex_in_expand(int in_len)
 {
 	IN_PARMS	*new_cli_lex_in_ptr;
 
-	new_cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + in_len);
+	new_cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + in_len + 1);
 	new_cli_lex_in_ptr->argc = cli_lex_in_ptr->argc;
 	new_cli_lex_in_ptr->argv = cli_lex_in_ptr->argv;
-	new_cli_lex_in_ptr->buflen = in_len;		/* in_str[1] accounts for null */
+	new_cli_lex_in_ptr->buflen = in_len;		/* + 1 above accounts for null */
 	free(cli_lex_in_ptr);
 	cli_lex_in_ptr = new_cli_lex_in_ptr;
 }

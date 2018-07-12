@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information 		*
+ * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,15 @@ MBSTART {									\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
 	(RVAL) = pthread_cond_signal(COND);					\
+	ENABLE_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
+} MBEND
+
+#define PTHREAD_COND_TIMEDWAIT(COND, MUTEX, TIMEOUT, RVAL)			\
+MBSTART {									\
+	intrpt_state_t		prev_intrpt_state;				\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
+	(RVAL) = pthread_cond_timedwait(COND, MUTEX, TIMEOUT);			\
 	ENABLE_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
 } MBEND
 

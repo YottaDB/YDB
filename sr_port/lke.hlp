@@ -302,7 +302,7 @@
 
    -A[LL]
    -L[OCK]
-   -[NO]C[RIT]
+   -[NO]C[RITICAL]
    -O[UTPUT]="file-name"
    -P[ID]=pid
    -R[EGION]=region-name
@@ -360,7 +360,7 @@
      o When used with the SHOW command, the LOCK qualifier provides a precise
        way to examine the specified lock and any descendant LOCKed resources.
 
-   -[NO]C[RIT]
+   -[NO]C[RITICAL]
 
    Allows the SHOW command to work even if another process is holding a
    critical section.
@@ -555,7 +555,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2017
+   Copyright 2018
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -577,7 +577,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.3-003 of the
+   This help file is a concise representation of revision V6.3-005 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

@@ -48,6 +48,7 @@
 #include "db_snapshot.h"
 #include "mupint.h"
 #include "mu_gv_cur_reg_init.h"
+#include "warn_db_sz.h"
 
 #define DUMMY_GLOBAL_VARIABLE		"%D%DUMMY_VARIABLE"
 #define DUMMY_GLOBAL_VARIABLE_LEN	SIZEOF(DUMMY_GLOBAL_VARIABLE)
@@ -195,6 +196,8 @@ void mupip_integ(void)
 	gd_region		*baseDBreg, *reg;
 	sgmnt_addrs		*baseDBcsa;
 	node_local_ptr_t	baseDBnl;
+	sgmnt_addrs 		*tcsa;
+	char 			*db_file_name;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -884,5 +887,15 @@ void mupip_integ(void)
 		mupip_exit(ERR_MUNOTALLINTEG);
 	if (!mu_region_found)
 		mupip_exit(ERR_MUNOACTION);
+	tcsa = REG2CSA(gv_cur_region);
+	if ((NULL != tcsa) && (NULL != tcsa->ti) && (0 != tcsa->ti->total_blks) && (NULL != tcsa->hdr)
+		&& (0 != MAXTOTALBLKS(tcsa->hdr)))
+	{
+		if ((NULL != gv_cur_region->dyn.addr) && (NULL != gv_cur_region->dyn.addr->fname))
+                        db_file_name = (char *)gv_cur_region->dyn.addr->fname;
+		else
+			db_file_name = "";
+		warn_db_sz(db_file_name, 0, tcsa->ti->total_blks, MAXTOTALBLKS(tcsa->hdr));
+	}
 	mupip_exit(SS_NORMAL);
 }

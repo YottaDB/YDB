@@ -92,14 +92,10 @@ boolean_t iosocket_listen_sock(socket_struct *socketptr, unsigned short len)
 	memcpy(&dsocketptr->iod->dollar.key[len], socketptr->handle, socketptr->handle_len);
 	len += socketptr->handle_len;
 	dsocketptr->iod->dollar.key[len++] = '|';
-	if (socket_local != socketptr->protocol)
-		SPRINTF(&dsocketptr->iod->dollar.key[len], "%d", socketptr->local.port);
-#	ifndef VMS
+	if (socket_local == socketptr->protocol)
+		SNPRINTF(&dsocketptr->iod->dollar.key[len], DD_BUFLEN - len, "%s",
+					((struct sockaddr_un *)(socketptr->local.sa))->sun_path);
 	else
-	{
-		STRNCPY_STR(&dsocketptr->iod->dollar.key[len],
-			((struct sockaddr_un *)(socketptr->local.sa))->sun_path, DD_BUFLEN - len - 1);
-	}
-#	endif
+		SNPRINTF(&dsocketptr->iod->dollar.key[len], DD_BUFLEN - len, "%d", socketptr->local.port);
 	return TRUE;
 }

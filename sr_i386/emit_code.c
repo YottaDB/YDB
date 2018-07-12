@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -833,7 +833,6 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 			assert(val_output);
 			offset = sa_temps_offset[opr->oprclass];
 			offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
-			assertpro((0 <= offset) && (65535 >= offset));
 			emit_op_base_offset(op, I386_REG_EDI, offset, use_reg);
 			break;
 		case TCAD_REF:
@@ -841,7 +840,6 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 		case TVAR_REF:
 			offset = sa_temps_offset[opr->oprclass];
 			offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
-			assertpro((0 <= offset) && (65535 >= offset));
 			if (opr->oprclass == TVAR_REF)
 				base_reg = I386_REG_ESI;
 			else
@@ -1030,7 +1028,6 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 			assert(val_output);
 			offset = sa_temps_offset[opr->oprclass];
 			offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
-			assertpro((0 <= offset) && (65535 >= offset));
 			emit_op_base_offset(op, I386_REG_EDI, offset, use_reg);
 			break;
 		case TCAD_REF:
@@ -1038,7 +1035,6 @@ void emit_trip(generic_op op, oprtype *opr, bool val_output, unsigned char use_r
 		case TVAR_REF:
 			offset = sa_temps_offset[opr->oprclass];
 			offset -= (sa_temps[opr->oprclass] - opr->oprval.temp) * sa_class_sizes[opr->oprclass];
-			assertpro((0 <= offset) && (65535 >= offset));
 			if (opr->oprclass == TVAR_REF)
 				base_reg = I386_REG_ESI;
 			else

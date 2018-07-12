@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2017 Fidelity National Information		!
+! Copyright (c) 2001-2018 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
@@ -12,7 +12,10 @@
 
 	.FACILITY	GDE, 248 /PREFIX = GDE_
 	.TITLE		GDEERRORS Error Messages for GDE
-
+!
+!  List of known undocumented messages follows (along with a comment) (do not change "known undocumented" phrase)
+! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
+!
 BLKSIZ512	<Block size !AD rounds to !AD>/info/fao=4
 EXECOM		<Executing command file !AD>/info/fao=2
 FILENOTFND	<File !AD not found>/error/fao=2

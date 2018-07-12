@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,7 +93,7 @@ error_def(ERR_TEXT);
 #define INSERT_MARKER									\
 {											\
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);						\
-	STRNCPY_STR(offset, "-", STRLEN("-"));						\
+	MEMCPY_LIT(offset, "-");							\
 	offset += STRLEN("-");								\
 }
 
@@ -101,7 +101,7 @@ error_def(ERR_TEXT);
 #define BUILD_FACILITY(strptr)								\
 {											\
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);						\
-	STRNCPY_STR(offset, strptr, STRLEN(strptr));					\
+	memcpy(offset, strptr, STRLEN(strptr));						\
 	offset += STRLEN(strptr);							\
 }
 

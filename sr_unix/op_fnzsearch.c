@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@
 
 LITREF		mval	literal_null;
 
-STATICFNDCL	int	pop_top(lv_val *src, mval *res);
+STATICFNDCL	int	pop_top(lv_val *src, mval *res, mint mfunc);
 
 error_def(ERR_INVSTRLEN);
 error_def(ERR_MEMORY);
@@ -228,7 +228,7 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 	}
 	/* If we have placed something into a local (now or in a prior invocation), obtain it. */
 	if (TREF(fnzsearch_lv_vars))
-		pret.p.pint = pop_top(TREF(fnzsearch_lv_vars), ret);
+		pret.p.pint = pop_top(TREF(fnzsearch_lv_vars), ret, mfunc);
 	else
 	{
 		ret->str.len = 0;
@@ -288,7 +288,7 @@ void zsrch_clr(int indx)
  *          in each of its bytes the length of one of the matching entry's characteristics: length of the directory path, length of
  *          the (file) name, and length of the extension. For more details, refer to parse_file.h.
  */
-STATICFNDEF int pop_top(lv_val *src, mval *res)
+STATICFNDEF int pop_top(lv_val *src, mval *res, mint mfunc)
 {
 	lv_val		*tmp;
 	plength		pret;
@@ -310,7 +310,7 @@ STATICFNDEF int pop_top(lv_val *src, mval *res)
 			STAT_FILE(file_name, &statbuf, stat_res);
 			if (-1 == stat_res)
 			{
-				if (ENOENT != errno)
+				if ((ENOENT != errno) && (mfunc || (ELOOP != errno)))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				continue;
 			}

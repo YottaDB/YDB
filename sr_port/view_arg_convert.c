@@ -33,6 +33,9 @@
 #include "filestruct.h"		/* needed for "jnl.h" */
 #include "jnl.h"		/* needed for "jgbl" */
 #include "zshow.h"		/* needed for format2zwr */
+#include "cli.h"
+#include "stringpool.h"
+#include "mv_stent.h"
 
 LITREF mval 		literal_one;
 
@@ -62,8 +65,9 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 	mident_fixed		lcl_buff;
 	mname_entry		gvent, lvent;
 	mstr			namestr, tmpstr;
+	mval			*tmpmv;
 	tp_region		*vr, *vr_nxt;
-	unsigned char 		*c, *c_top, *dst, *dst_top, global_names[1024], *nextsrc, *src, *src_top, stashed, y;
+	unsigned char 		*c, *c_top, *dst, *dst_top, global_names[MAX_PARMS], *nextsrc, *src, *src_top, stashed, y;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -138,14 +142,17 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			if ((NULL == parm) && (VTK_JNLERROR != vtp->keycode))
 				rts_error_csa(CSA_ARG(NULL)
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
-			if (!gd_header)		/* IF GD_HEADER == 0 THEN OPEN GBLDIR */
+			if (!gd_header)							/* IF GD_HEADER == 0 THEN OPEN GBLDIR */
 				gvinit();
-			if (!parm->str.len && vtp->keycode == VTK_GVNEXT)		/* "" => 1st region */
-				parmblk->gv_ptr = gd_header->regions;
-			else
+			if (!parm->str.len)
+			{								/* No region */
+				if (vtp->keycode != VTK_GVNEXT)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, LEN_AND_LIT("\"\""));
+				parmblk->gv_ptr = gd_header->regions;	 		/* "" => 1st region */
+			} else
 			{
 				namestr.addr = &lcl_buff.c[0];
-				for (cptr = parm->str.addr, done = n = 0; ; cptr++)
+				for (cptr = parm->str.addr, done = n = 0; n < parm->str.len; cptr++)
 				{
 					lcl_buff.c[n++] = TOUPPER(*cptr);		/* Region names are upper-case ASCII */
 					if (',' == *cptr)
@@ -158,13 +165,17 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					{
 						if ((r_ptr >= r_top) || (done && is_dollar_view))
 						{
-							if (is_dollar_view)
-							{
-								namestr.addr = lcl_buff.c;
-								namestr.len = n;
-							}
-							format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len, global_names, &n);
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION,2, n, global_names);
+							PUSH_MV_STENT(MVST_MVAL);
+							tmpmv = &mv_chain->mv_st_cont.mvs_mval;
+							tmpmv->mvtype = MV_STR;
+							ENSURE_STP_FREE_SPACE(ZWR_EXP_RATIO(namestr.len));
+							tmpmv->str.addr = (char *)stringpool.free;
+							format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len,
+								(uchar_ptr_t)stringpool.free, &n);
+							stringpool.free += n;
+							tmpmv->str.len = n;
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, n,
+								tmpmv->str.addr);
 						}
 						tmpstr.len = r_ptr->rname_len;
 						tmpstr.addr = (char *)r_ptr->rname;
@@ -209,9 +220,18 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			if (MAX_MIDENT_LEN < parmblk->str.len)
 				parmblk->str.len = MAX_MIDENT_LEN;
 			if (!valid_mname(&parmblk->str))
-			{
-				format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
+			{	/* here & 2 other places use stringpool because we use format2zwr to ensure the message is graphic
+				 * & we don't return from the rts_error, so a fixed or malloc'd location seems even less attractive
+				 */
+				PUSH_MV_STENT(MVST_MVAL);
+				tmpmv = &mv_chain->mv_st_cont.mvs_mval;
+				tmpmv->mvtype = MV_STR;
+				ENSURE_STP_FREE_SPACE(ZWR_EXP_RATIO(parm->str.len));
+				tmpmv->str.addr = (char *)stringpool.free;
+				format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, (uchar_ptr_t)stringpool.free, &n);
+				stringpool.free += n;
+				tmpmv->str.len = n;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);
 			}
 			break;
 		case VTP_RTNAME:
@@ -295,9 +315,16 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 						}
 					} else
 					{
-						memcpy(&lcl_buff.c[0], src, nextsrc - src - 1);
-						format2zwr((sm_uc_ptr_t)&lcl_buff.c, nextsrc - src - 1, global_names, &n);
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
+						memcpy(&lcl_buff.c[0], src, (n = nextsrc - src - 1));
+						PUSH_MV_STENT(MVST_MVAL);
+						tmpmv = &mv_chain->mv_st_cont.mvs_mval;
+						tmpmv->mvtype = MV_STR;
+						ENSURE_STP_FREE_SPACE(ZWR_EXP_RATIO(n));
+						tmpmv->str.addr = (char *)stringpool.free;
+						format2zwr((sm_uc_ptr_t)&lcl_buff.c, n, (uchar_ptr_t)stringpool.free, &n);
+						stringpool.free += n;
+						tmpmv->str.len = n;
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);
 					}
 					tmp_gvt = NULL;
 					gvent.var_name.addr = &lcl_buff.c[0];

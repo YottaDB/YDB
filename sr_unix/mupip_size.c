@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,7 @@
 #include "mu_outofband_setup.h"
 #include "gtmmsg.h"
 #include "mu_getlst.h"
+#include "warn_db_sz.h"
 
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
@@ -87,6 +88,8 @@ void mupip_size(void)
 	mupip_size_cfg_t	mupip_size_cfg = { impsample, 1000, 1, 0 };	/* configuration default values */
 	uint4			status = EXIT_NRM;
 	unsigned short		BUFF_LEN = SIZEOF(buff), n_len;
+	sgmnt_addrs 		*tcsa;
+	char 			*db_file_name;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -204,6 +207,19 @@ void mupip_size(void)
 		}
 		if (mu_ctrlc_occurred || mu_ctrly_occurred)
 			mupip_exit(ERR_MUNOFINISH);
+	}
+	if ((NULL != grlist) && (NULL != grlist->reg))
+	{
+		tcsa = REG2CSA(grlist->reg);
+		if ((NULL != tcsa) && (NULL != tcsa->ti) && (0 != tcsa->ti->total_blks) && (NULL != tcsa->hdr)
+			&& (0 !=  MAXTOTALBLKS(tcsa->hdr)))
+		{
+			if ((NULL != grlist->reg->dyn.addr) && (NULL != grlist->reg->dyn.addr->fname))
+				db_file_name = (char *)grlist->reg->dyn.addr->fname;
+			else
+				db_file_name = "";
+			warn_db_sz(db_file_name, 0, tcsa->ti->total_blks, MAXTOTALBLKS(tcsa->hdr));
+		}
 	}
 	mupip_exit(status ==  EXIT_NRM ? SS_NORMAL : ERR_MUNOFINISH);
 }

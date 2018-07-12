@@ -213,7 +213,7 @@ MBSTART {															\
 }
 
 /* Process specific initialization - dlopen libgtmcrypt.so and invoke gtmcrypt_init() */
-#define INIT_PROC_ENCRYPTION(CSA, RC)												\
+#define INIT_PROC_ENCRYPTION(RC)												\
 {																\
 	intrpt_state_t prev_intrpt_state;											\
 																\

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2012-2017 Fidelity National Information		#
+# Copyright (c) 2012-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -27,7 +27,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version V6.3-004)
+set(version V6.3-005)
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()

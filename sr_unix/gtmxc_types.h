@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,6 +87,7 @@ typedef gtm_char_t		gtm_jbig_decimal_t;
 
 /* Call-in interface. */
 gtm_status_t 	gtm_ci(const char *c_rtn_name, ...);
+gtm_status_t	gtm_ci_filter(const char *c_rtn_name, ...);
 gtm_status_t 	gtm_cip(ci_name_descriptor *ci_info, ...);
 gtm_status_t 	gtm_init(void);
 #ifdef GTM_PTHREAD

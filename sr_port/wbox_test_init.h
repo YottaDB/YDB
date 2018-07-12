@@ -111,7 +111,7 @@ typedef enum {
 	/* Begin ANTIFREEZE related white box test cases */
 	WBTEST_ANTIFREEZE_JNLCLOSE,		/* 69 :  */
 	WBTEST_ANTIFREEZE_DBBMLCORRUPT,		/* 70 :  */
-	WBTEST_UNUSED71,			/* 71 :  UNUSED - GTM-8919 removed the only place to test this */
+	WBTEST_CUSTERR_FREEZE,			/* 71 :  Force an undocumented error and see if it freezes an instance */
 	WBTEST_ANTIFREEZE_DBFSYNCERR,		/* 72 :	 */
 	WBTEST_ANTIFREEZE_GVDATAFAIL,		/* 73 :  */
 	WBTEST_ANTIFREEZE_GVGETFAIL,		/* 74 :  */
@@ -160,7 +160,7 @@ typedef enum {
 	WBTEST_BADEXEC_PIPE_PROCESS,		/* 113 : Prevent the SECSHR process from being EXEC'ed */
 	WBTEST_MAXGTMDIST_UPDATE_PROCESS,	/* 114 : Make gtm_dist too big for update process */
 	WBTEST_MAXGTMDIST_HELPER_PROCESS,	/* 115 : Make gtm_dist too big for helper process */
-	WBTEST_MAX_TRIGNAME_SEQ_NUM,		/* 116 : Induce "too many triggers" error sooner (MAX_TRIGNAME_SEQ_NUM) */
+	WBTEST_QUERY_HANG,			/* 116 : Hangs to verify that statsdb doesn't decrement */
 	WBTEST_RELINKCTL_MAX_ENTRIES,		/* 117 : Bring down the maximum number of relink control entries in one file */
 	WBTEST_FAKE_BIG_KEY_COUNT,		/* 118 : Fake large increase in mupip load key count to show it does not overflow */
 	WBTEST_TEND_GBLJRECTIME_SLEEP,		/* 119 : Sleep in t_end after SET_GBL_JREC_TIME to induce GTM-8332 */
@@ -184,7 +184,12 @@ typedef enum {
 	WBTEST_NO_REPLINSTMULTI_FAIL,		/* 137 : Unless specified tests should not fail with REPLMULTINSTUPDATE */
 	WBTEST_DOLLARDEVICE_BUFFER,		/* 138 : Force larger error messages for $device to exceed DD_BUFLEN */
 	WBTEST_LOWERED_JNLEPOCH,		/* 139 : Force larger error messages for $device to exceed DD_BUFLEN */
-	WBTEST_SIGTERM_IN_JOB_CHILD		/* 140 : Generate Sigterm  by killing ourselves before the child fork */
+	WBTEST_SIGTERM_IN_JOB_CHILD,		/* 140 : Generate Sigterm  by killing ourselves before the child fork */
+	WBTEST_DB_BLOCKS_WARN,			/* 141 : Force approaching X% of total block limit warning */
+	WBTEST_JNL_WRITE_HANG,			/* 142 : Hang after a number of journal writes */
+	WBTEST_DB_WRITE_HANG,			/* 143 : Hang after a number of database writes */
+	WBTEST_EXPECT_IO_HANG,			/* 144 : Like the above two cases, but using external tools to cause the hang. */
+	WBTEST_MURUNDOWN_KILLCMT06		/* 145 : Kill an update process in CMT06, to test a special case */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.
@@ -205,8 +210,16 @@ typedef enum {
 		}											\
 	}												\
 }
+#define WBTEST_ONLY(WBTEST_NUMBER, ...)						\
+{													\
+	if (WBTEST_ENABLED(WBTEST_NUMBER))								\
+	{												\
+		__VA_ARGS__										\
+	}												\
+}
 #else
 #define GTM_WHITE_BOX_TEST(input_test_case_num, lhs, rhs)
+#define WBTEST_ONLY(WBTEST_NUMBER, ...)
 #endif
 
 #ifdef DEBUG

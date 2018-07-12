@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016 Fidelity National Information		*
+ * Copyright (c) 2016-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,7 @@ int m_goto_postcond(triple *oldchain, triple *tmpchain)
 {
 	oprtype	*cr;
 	triple	*obp, *ref0, *ref1, *triptr;
+	mval	*v;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -35,9 +36,10 @@ int m_goto_postcond(triple *oldchain, triple *tmpchain)
 		;
 	if (OC_LIT == triptr->opcode)
 	{	/* it's a literal so optimize it */
-		unuse_literal(&triptr->operand[0].oprval.mlit->v);
+		v = &triptr->operand[0].oprval.mlit->v;
+		unuse_literal(v);
 		dqdel(triptr, exorder);
-		if (0 == triptr->operand[0].oprval.mlit->v.m[1])
+		if (0 == MV_FORCE_BOOL(v))
 			setcurtchain(oldchain);			/* it's a FALSE so just discard the argument */
 		else
 		{	/* it's TRUE so treat as if there was no argument postconditional */

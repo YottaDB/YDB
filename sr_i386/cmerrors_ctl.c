@@ -28,8 +28,17 @@ LITDEF	int CMERR_INVINTMSG = 150568994;
 LITDEF	int CMERR_CMEXCDASTLM = 150569002;
 LITDEF	int CMERR_CMSYSSRV = 150569010;
 
+
+LITDEF	int cmerrors_undocarr[] = {
+};
+
+
 GBLDEF	err_ctl cmerrors_ctl = {
 	249,
 	"GTCM",
 	&cmerrors[0],
-	6};
+	6,
+	&cmerrors_undocarr[0],
+	0
+};
+

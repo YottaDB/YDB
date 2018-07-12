@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -107,7 +107,7 @@ boolean_t ftok_sem_get_common(gd_region *reg, boolean_t incr_cnt, int project_id
 	union semun		semarg;
 	sgmnt_addrs             *csa;
 	node_local_ptr_t        cnl;
-	boolean_t		shared_mem_available;
+	boolean_t		shared_mem_available, sem_known_removed;
 	int4			lcl_ftok_ops_index;
 	key_t			ftokid;
 	struct sembuf		ftok_sop[3];
@@ -127,25 +127,40 @@ boolean_t ftok_sem_get_common(gd_region *reg, boolean_t incr_cnt, int project_id
 	 * semget but BEFORE semop locks it, in which case we should retry.
 	 */
 	*ftok_counter_halted = FALSE;
+	sem_known_removed = FALSE;
 	for (lcnt = 0; MAX_SEMGET_RETRIES > lcnt; lcnt++)
-	{
-		if (INVALID_SEMID == (udi->ftok_semid = semget(udi->key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT)))
+	{	/* Try to find an existing sem if we haven't already discovered that there isn't one. */
+		if (!sem_known_removed
+			&& (INVALID_SEMID == (ftokid = udi->ftok_semid = semget(udi->key, FTOK_SEM_PER_ID, RWDALL))))
 		{
 			save_errno = errno;
-			RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semget, 0, ERR_CRITSEMFAIL, 0);
+			if (ENOENT == save_errno)
+				sem_known_removed = TRUE;
+			else
+				RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semget, 0, ERR_CRITSEMFAIL, 0);
 		}
-		ftokid = udi->ftok_semid;
-		SET_GTM_ID_SEM(ftokid, status); /* Set 3rd semaphore's value to GTM_ID = 43 */
-		if (-1 == status)
+		/* If we found there is no sem, create and initialize one. */
+		if (sem_known_removed)
 		{
-			save_errno = errno;
-			if (SEM_REMOVED(save_errno))
-			{	/* start afresh for next iteration of for loop with new semid and initial operations */
-				*ftok_counter_halted = FALSE;
-				SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
-				continue;
+			if (INVALID_SEMID == (ftokid = udi->ftok_semid = semget(udi->key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT)))
+			{
+				save_errno = errno;
+				RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semget, 0, ERR_CRITSEMFAIL, 0);
 			}
-			RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semctl, 0, ERR_CRITSEMFAIL, 0);
+			sem_known_removed = FALSE;
+			SET_GTM_ID_SEM(ftokid, status); /* Set 3rd semaphore's value to GTM_ID = 43 */
+			if (-1 == status)
+			{
+				save_errno = errno;
+				if (SEM_REMOVED(save_errno))
+				{	/* start afresh for next iteration of for loop with new semid and initial operations */
+					*ftok_counter_halted = FALSE;
+					SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
+					sem_known_removed = TRUE;
+					continue;
+				}
+				RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semctl, 0, ERR_CRITSEMFAIL, 0);
+			}
 		}
 		/* First try is always non-blocking */
 		SEMOP(ftokid, ftok_sop, ftok_sopcnt, status, NO_WAIT);
@@ -196,6 +211,7 @@ boolean_t ftok_sem_get_common(gd_region *reg, boolean_t incr_cnt, int project_id
 		{	/* start afresh for next iteration of for loop with new semid and ftok_sopcnt */
 			*ftok_counter_halted = FALSE;
 			SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
+			sem_known_removed = TRUE;
 			continue;
 		}
 		assert(EINTR != save_errno);

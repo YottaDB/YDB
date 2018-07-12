@@ -26,6 +26,8 @@ typedef struct err_ctl_struct
 	char		*facname;
 	const err_msg	*fst_msg; /* For VMS, this pointer is not used, and its value will typically be NULL */
 	int		msg_cnt;
+	const int	*undocmsg;
+	int		undocmsg_cnt;
 } err_ctl;
 
 #include "wbox_test_init.h"	/* needed for DUMPABLE macro which uses WBTEST_ENABLED */

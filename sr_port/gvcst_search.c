@@ -54,6 +54,17 @@ GBLREF	unsigned int		t_tries;
 
 #define	SET_GVCST_SEARCH_CLUE(X)	gvcst_search_clue = X;
 
+/**
+ * Searches for pKey and records the path through the b-tree in pHist
+ *
+ * In some cases, also fills out gv_altkey. It also uses "clues" to optimize, and a large chunk
+ *  of the code here is to handle the verification of the clues validity (~400 lines).
+ *
+ * @param[in] pKey The key search the database for
+ * @param[out] pHist History buffer which will contain the list of records leading the pKey;
+ * 	the first element ([0]) will contain the leaf node if NULL, clue information
+ * 	is filled out in gv_target
+ */
 enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			     srch_hist *pHist)		/* History to fill in*/
 {
@@ -288,7 +299,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			if (!is_mm)
 				oldest_hist_tn = OLDEST_HIST_TN(cs_addrs);
 			for (srch_status = &pTargHist->h[0]; HIST_TERMINATOR != srch_status->blk_num; srch_status++)
-			{
+			{	/* Do the actual verification of each history block */
 				assert(srch_status->level == srch_status - &pTargHist->h[0]);
 				assert(is_mm || (NULL == srch_status->cr) || (NULL != srch_status->buffaddr));
 				cr = srch_status->cr;

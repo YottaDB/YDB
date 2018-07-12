@@ -202,7 +202,7 @@ GBLDEF	int4		backup_close_errno,
 			forced_exit_err,
 			exit_state,
 			restore_read_errno;
-GBLDEF	volatile int4	outofband, crit_count;
+GBLDEF	volatile int4	outofband;
 GBLDEF	int		mumps_status = SS_NORMAL,
 			stp_array_size;
 GBLDEF	gvzwrite_datablk	*gvzwrite_block;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2017 Fidelity National Information	*
+ * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -215,7 +215,7 @@ void mupip_reorg_encrypt(void)
 		/* Initialize encryption once. */
 		if (grlist == rptr)
 		{
-			INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+			INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
 			{
 				GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, db_name_len, db_name);

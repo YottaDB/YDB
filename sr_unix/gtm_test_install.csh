@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2011-2017 Fidelity National Information		#
+# Copyright (c) 2011-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -252,7 +252,7 @@ else
 	echo "mupip integ returned a 0 status - as expected" >>&! $save_gtm_dist/gtm_test_install.out
 endif
 $gtm_dist/gtmsecshr				>>&! $save_gtm_dist/gtm_test_install.out
-$gtm_com/IGS $gtm_dist/gtmsecshr "STOP"
+$gtm_com/IGS $save_gtm_dist/gtmsecshr "STOP"	 # gtm_dist points to utf8/ and gtmsecshr is a softlink to $save_gtm_dist/gtmsecshr
 
 echo "Build test the encryption plugin"									>>&! $save_gtm_dist/gtm_test_install.out #BYPASSOKLENGTH
 mkdir -p $save_gtm_dist/plugin/buildcrypt

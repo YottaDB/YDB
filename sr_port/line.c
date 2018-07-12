@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -196,8 +196,11 @@ boolean_t line(uint4 *lnc)
 		if ((TREF(block_level) + (int4)(mline_tail->block_ok)) < dot_count)
 		{
 			dot_count = TREF(block_level);
-			show_source_line(TRUE);
-			dec_err(VARLSTCNT(1) ERR_BLKTOODEEP);
+			if (!(TREF(compile_time) && !(cmd_qlf.qlf & CQ_WARNINGS)))
+			{
+				show_source_line(TRUE);
+				dec_err(VARLSTCNT(1) ERR_BLKTOODEEP);
+			}
 			TREF(source_error_found) = TRUE;
 			success = FALSE;
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,13 +20,15 @@
 #include "util.h"
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
+#include "cmd_qlf.h"
 
-GBLREF	boolean_t	badchar_inhibit;
-GBLREF	boolean_t	gtm_utf8_mode;
-GBLREF	void		(*stx_error_fptr)(int in_error, ...);	/* Function pointer for stx_error() so gtm_utf8.c can avoid pulling
-								 * in stx_error() in gtmsecshr.
-								 */
-GBLREF	void		(*show_source_line_fptr)(boolean_t warn); /* Func ptr for show_source_line() for same reason as above */
+GBLREF command_qualifier	cmd_qlf;
+GBLREF	boolean_t		badchar_inhibit;
+GBLREF	boolean_t		gtm_utf8_mode;
+GBLREF	void			(*stx_error_fptr)(int in_error, ...);	/* Function pointer for stx_error() so gtm_utf8.c can avoid
+									 * pulling in stx_error() in gtmsecshr.
+									 */
+GBLREF	void			(*show_source_line_fptr)(boolean_t warn); /* Func ptr for show_source_line() same reason as above */
 
 error_def(ERR_BADCHAR);
 
@@ -290,7 +292,8 @@ STATICFNDEF void utf8_badchar_real(utf8_err_type err_type, int len, unsigned cha
 	if (err_dec == err_type)
 	{
 		assert(NULL != show_source_line_fptr);
-		(*show_source_line_fptr)(TRUE);	/* Prints errant source line and pointer to where parsing detected the error */
+		if (!(TREF(compile_time) && !(cmd_qlf.qlf & CQ_WARNINGS)))
+			(*show_source_line_fptr)(TRUE);	/* Print errant src line and pointer to where parsing detected the error */
 	}
 	if (0 < chset_len)
 	{
@@ -305,8 +308,10 @@ STATICFNDEF void utf8_badchar_real(utf8_err_type err_type, int len, unsigned cha
 				(*stx_error_fptr)(ERR_BADCHAR, 4, (outstr - &errtxt[0]), &errtxt[0], chset_len, chset);
 				break;
 			case err_dec:
-				dec_err(VARLSTCNT(6) (TREF(compile_time) ? MAKE_MSG_TYPE(ERR_BADCHAR, WARNING)  : ERR_BADCHAR),
-					4, (outstr - &errtxt[0]), &errtxt[0], chset_len, chset);
+				if (!(TREF(compile_time) && !(cmd_qlf.qlf & CQ_WARNINGS)))
+					dec_err(VARLSTCNT(6) (TREF(compile_time)
+						? MAKE_MSG_TYPE(ERR_BADCHAR, WARNING) : ERR_BADCHAR),
+						4, (outstr - &errtxt[0]), &errtxt[0], chset_len, chset);
 				break;
 			default:
 				assertpro(FALSE /* Invalid error type */);
@@ -325,7 +330,9 @@ STATICFNDEF void utf8_badchar_real(utf8_err_type err_type, int len, unsigned cha
 				(*stx_error_fptr)(ERR_BADCHAR, 4, (outstr - &errtxt[0]), &errtxt[0], LEN_AND_LIT(UTF8_NAME));
 				break;
 			case err_dec:
-				dec_err(VARLSTCNT(6) (TREF(compile_time) ? MAKE_MSG_TYPE(ERR_BADCHAR, WARNING) : ERR_BADCHAR),
+				if (!(TREF(compile_time) && !(cmd_qlf.qlf & CQ_WARNINGS)))
+					dec_err(VARLSTCNT(6) (TREF(compile_time)
+					? MAKE_MSG_TYPE(ERR_BADCHAR, WARNING): ERR_BADCHAR),
 					4, (outstr - &errtxt[0]), &errtxt[0], LEN_AND_LIT(UTF8_NAME));
 				break;
 			default:

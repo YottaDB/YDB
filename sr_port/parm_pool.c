@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2015 Fidelity National Information 	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,9 +112,18 @@ STATICFNDEF void parm_pool_init(unsigned int init_capacity)
 	(*(TREF(parm_pool_ptr))->parms).mask_and_cnt.actualcnt = SAFE_TO_OVWRT;
 }
 
-/* Push lv_val parameters into our pool, taking proper care of unread parameters. An important note is that
- * op_bindparm() should increase actualcnt of the read set of parameters by a value of SAFE_TO_OVWRT, to
- * indicate that it is OK to overwrite those parameters, since they have already been read and bound.
+/**
+ * Push lv_val parameters into our pool, taking proper care of unread parameters. An important note is that
+ * 	op_bindparm() should increase actualcnt of the read set of parameters by a value of SAFE_TO_OVWRT, to
+ * 	indicate that it is OK to overwrite those parameters, since they have already been read and bound.
+ * @param totalcnt [in] the total number of parameters being allocated
+ * @param truth_value [in] the value for $TEST that gets stored in the stack frame
+ * @param ret_value [out] the location where the return value should go
+ * @param mask [in] a bitmask indicating arguments passed by reference (1 is passed-by-reference, else copy)
+ * @param actualcnt [in] the number of actuals
+ * @param ... [in] a list of lv_val* representing the arguments
+ * @side_effects allocates space in TREF(parm_pool_ptr) for the arguments and sets space equal to the arguments, with the last two
+ * 	slots being filled as described above. If needed, expands the parameter pool
  */
 void push_parm(UNIX_ONLY_COMMA(unsigned int totalcnt) int truth_value, ...)
 {

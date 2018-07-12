@@ -353,7 +353,7 @@ void mupip_restore(void)
 		if (!SAME_ENCRYPTION_SETTINGS(&inhead, &old_data))
 		{
 			same_encr_settings = FALSE;
-			INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+			INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
 			{
 				CLEAR_CRYPTERR_MASK(gtmcrypt_errno);

@@ -376,8 +376,11 @@ THREADGBLDEF(util_outptr,			char *)				/* Pointer within util output buffer */
 /* GTM Call-in related globals */
 THREADGBLDEF(callin_hashtab, 			hash_table_str *)		/* Callin hash table */
 THREADGBLDEF(ci_table, 				callin_entry_list *)		/* Callin table in the form of a linked list */
+THREADGBLDEF(ci_filter_hashtab,			hash_table_str *)		/* Filter hash table */
+THREADGBLDEF(ci_filter_table,			callin_entry_list *)		/* Filter table list*/
 THREADGBLDEF(extcall_package_root,		struct extcall_package_list *)	/* External call table package list */
 THREADGBLDEF(gtmci_nested_level,		unsigned int)			/* Current nested depth of callin environments */
+THREADGBLDEF(comm_filter_init,			boolean_t)			/* Signifying that the filter is in use */
 THREADGBLDEF(temp_fgncal_stack,			unsigned char *)		/* Override for fgncal_stack when non-NULL */
 THREADGBLDEF(midchild_send_locals,		boolean_t)			/* The middle child will send the locals to the
 										 * grandchild using ojmidchild_send_var() if TRUE.

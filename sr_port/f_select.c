@@ -52,6 +52,7 @@ int f_select(oprtype *a, opctype op)
 	triple		dmpchain, *loop_save_start, *loop_save_start_orig, *oldchain, *r, *ref, *savechain, *save_start,
 			*save_start_orig, tmpchain, *triptr;
 	uint4		save_expr_depth, save_se_depth;
+	mval		*v;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -125,10 +126,11 @@ int f_select(oprtype *a, opctype op)
 			;	/* get back, get back to where we once belonged - to find an indicator of the actual result */
 		if (!got_true && OC_LIT == triptr->opcode)
 		{	/* it is a literal not following an already optimizing TRUE, so optimize it */
+			v = &triptr->operand[0].oprval.mlit->v;
 			dqdel(triptr, exorder);
-			unuse_literal(&triptr->operand[0].oprval.mlit->v);
+			unuse_literal(v);
 			dqinit(&dmpchain, exorder);
-			if (0 == triptr->operand[0].oprval.mlit->v.m[1])
+			if (0 == MV_FORCE_BOOL(v))
 			{	/* it's FALSE: discard the corresponding value */
 				throwing = TRUE;
 				savechain = setcurtchain(&dmpchain);

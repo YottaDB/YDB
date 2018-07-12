@@ -588,9 +588,8 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 		ptr_next_val = local_str;
 		while (NULL != ptr_next_val)
 		{
-			len_str= STRLEN(ptr_next_val);
-			strncpy(tmp_str, ptr_next_val, len_str);
-			tmp_str[len_str] = 0;
+			len_str = STRLEN(ptr_next_val);
+			strncpy(tmp_str, ptr_next_val, SIZEOF(tmp_str));
 			tmp_str_ptr = tmp_str;
 			ptr_next_comma = strchr(tmp_str_ptr, ',');
 			if (NULL == ptr_next_comma)

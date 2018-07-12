@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1071,7 +1071,7 @@ uint4	mur_fopen(jnl_ctl_list *jctl, reg_ctl_list *rctl)
 	{
 		csa = JCTL2CSA(jctl);	/* need JCTL2CSA macro instead of jctl->reg_ctl->csa because rctl could be NULL */
 		PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder);
-		INIT_PROC_ENCRYPTION(csa, gtmcrypt_errno);
+		INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 		if (0 == gtmcrypt_errno)
 			INIT_DB_OR_JNL_ENCRYPTION(jctl, jfh, 0, NULL, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)

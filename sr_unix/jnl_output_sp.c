@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,9 +38,10 @@
 #include "gtm_dbjnl_dupfd_check.h"
 #include "anticipatory_freeze.h"
 
-GBLREF	volatile int4	db_fsync_in_prog;
-GBLREF	volatile int4	jnl_qio_in_prog;
-GBLREF	uint4		process_id;
+GBLREF	volatile int4		db_fsync_in_prog;
+GBLREF	volatile int4		jnl_qio_in_prog;
+GBLREF	uint4			process_id;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
 error_def(ERR_DBFSYNCERR);
 error_def(ERR_ENOSPCQIODEFER);
@@ -75,6 +76,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	sm_uc_ptr_t		aligned_base;
 	uint4			jnl_fs_block_size, new_dsk, new_dskaddr;
 	gd_region		*reg;
+	intrpt_state_t		prev_intrpt_state;
 
 	assert(NULL != jpc);
 	reg = jpc->region;
@@ -83,11 +85,16 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	jb = jpc->jnl_buff;
 	if (jb->io_in_prog_latch.u.parts.latch_pid == process_id)	/* We already have the lock? */
 		return ERR_JNLWRTNOWWRTR;			/* timer driven io in progress */
-	jnl_qio_in_prog++;
+	DEFER_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 	if (!GET_SWAPLOCK(&jb->io_in_prog_latch))
 	{
-		jnl_qio_in_prog--;
-		assert(0 <= jnl_qio_in_prog);
+		ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
+		return ERR_JNLWRTDEFER;
+	}
+	if (IS_REPL_INST_FROZEN)
+	{
+		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
+		ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 		return ERR_JNLWRTDEFER;
 	}
 #	ifdef DEBUG
@@ -104,8 +111,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	{
 		assert(gtm_white_box_test_case_enabled && (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number));
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
-		jnl_qio_in_prog--;
-		assert(0 <= jnl_qio_in_prog);
+		ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 		return ERR_JNLCNTRL;
 	}
 	if (!JNL_FILE_SWITCHED(jpc))
@@ -114,8 +120,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 	{	/* journal file has been switched; release io_in_prog lock and return */
 		jpc->fd_mismatch = TRUE;
 		RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
-		jnl_qio_in_prog--;
-		assert(0 <= jnl_qio_in_prog);
+		ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 		return SS_NORMAL;
 	}
 	/* Currently we overload io_in_prog_latch to perform the db fsync too. Anyone trying to do a
@@ -131,8 +136,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		if (0 != save_errno)
 		{
 			RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
-			jnl_qio_in_prog--;
-			assert(0 <= jnl_qio_in_prog);
+			ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 			/* DBFSYNCERR can potentially cause syslog flooding. Remove the following line if we it becomes an issue. */
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);
 			rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_DBFSYNCERR, 2, DB_LEN_STR(reg), save_errno);
@@ -171,8 +175,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 			if (SS_NORMAL != jpc->status)
 			{
 				RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
-				jnl_qio_in_prog--;
-				assert(0 <= jnl_qio_in_prog);
+				ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 				jpc->status2 = SS_NORMAL;
 				jnl_send_oper(jpc, ERR_JNLRDERR);
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLRDERR, 2, JNL_LEN_STR(csa->hdr), jpc->status);
@@ -291,8 +294,7 @@ uint4 jnl_sub_qio_start(jnl_private_control *jpc, boolean_t aligned_write)
 		JNL_FD_CLOSE(jpc->channel, close_res);	/* sets jpc->channel to NOJNL */
 		jpc->pini_addr = 0;
 	}
-	jnl_qio_in_prog--;
-	assert(0 <= jnl_qio_in_prog);
+	ENABLE_INTERRUPTS(INTRPT_IN_JNL_QIO, prev_intrpt_state);
 	return status;
 }
 

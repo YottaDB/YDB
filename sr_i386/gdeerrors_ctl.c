@@ -188,8 +188,17 @@ LITDEF	int GDE_GBLNAMCOLLVER = 150504098;
 LITDEF	int GDE_GDEASYNCIONOMM = 150504106;
 LITDEF	int GDE_NOPERCENTY = 150504114;
 
+
+LITDEF	int gdeerrors_undocarr[] = {
+};
+
+
 GBLDEF	err_ctl gdeerrors_ctl = {
 	248,
 	"GDE",
 	&gdeerrors[0],
-	86};
+	86,
+	&gdeerrors_undocarr[0],
+	0
+};
+

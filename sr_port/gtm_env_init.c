@@ -118,9 +118,7 @@ void	gtm_env_init(void)
 			gtmDebugLevel |= tdbglvl;
 			gtmSystemMalloc = ((GDL_UseSystemMalloc & gtmDebugLevel) || FALSE);
 			if (gtmSystemMalloc)
-				gtmDebugLevel &= !(GDL_SmStats | GDL_SmTrace | GDL_SmDumpTrace | GDL_SmAllocVerf | GDL_SmFreeVerf
-							| GDL_SmBackfill | GDL_SmChkAllocBackfill | GDL_SmChkFreeBackfill
-							| GDL_SmStorHog | GDL_SmDump );
+				gtmDebugLevel &= !GDL_SmAllMallocDebug;
 		}
 		/* gtm_boolean environment/logical */
 		val.addr = GTM_BOOLEAN;

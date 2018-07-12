@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,6 +49,7 @@
 #include "hashtab_mname.h"
 #include "min_max.h"
 #include "mu_interactive.h"
+#include "mupip_load_reg_list.h"
 
 #define LAST_NEGATIVE_SUBSCRIPT 127
 
@@ -61,11 +62,14 @@ GBLREF gd_addr		*gd_header;
 GBLREF gv_key		*gv_altkey;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
+GBLREF gd_region	*gv_cur_region;
 GBLREF int4		gv_keysize;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF int		onerror;
 GBLREF io_pair		io_curr_device;
+GBLREF gd_region	*db_init_region;
+GBLREF int4		error_condition;
 
 LITREF boolean_t mu_int_possub[16][16];
 LITREF boolean_t mu_int_negsub[16][16];
@@ -87,6 +91,12 @@ error_def(ERR_RECLOAD);
 error_def(ERR_GVFAILCORE);
 error_def(ERR_NULSUBSC);
 error_def(ERR_DBDUPNULCOL);
+error_def(ERR_FAILEDRECCOUNT);
+error_def(ERR_LOADRECCNT);
+error_def(ERR_DBFILERR);
+error_def(ERR_STATSDBNOTSUPP);
+error_def(ERR_JNLFILOPN);
+error_def(ERR_DBPRIVERR);
 
 #define	BIN_PUT		0
 #define	BIN_BIND	1
@@ -108,6 +118,11 @@ error_def(ERR_DBDUPNULCOL);
 		{														\
 			free(tmp_gvkey);											\
 			tmp_gvkey = NULL;											\
+		}														\
+		if (NULL != encr_key_handles)											\
+		{														\
+			free(encr_key_handles);											\
+			encr_key_handles = NULL;										\
 		}														\
 		return;														\
 	}															\
@@ -232,9 +247,10 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	unsigned short		rec_len, next_cmpc, numsubs, num_subscripts;
 	int			len, current, last, max_key, max_rec, fmtd_key_len;
 	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size;
-	uint4			max_data_len, max_subsc_len, gblsize, data_len;
+	uint4			max_data_len, max_subsc_len, gblsize, data_len, num_of_reg = 0;
 	ssize_t			subsc_len, extr_std_null_coll;
 	gtm_uint64_t		iter, key_count, rec_count, tmp_rec_count, global_key_count;
+	gtm_uint64_t		first_failed_rec_count, failed_record_count;
 	off_t			last_sn_error_offset = 0, file_offset_base = 0, file_offset = 0;
 	boolean_t		need_xlation, new_gvn, utf8_extract;
 	boolean_t		is_hidden_subscript, ok_to_put = TRUE, putting_a_sn = FALSE, sn_incmp_gbl_already_killed = FALSE;
@@ -253,11 +269,11 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	int			in_len, gtmcrypt_errno, n_index, encrypted_hash_array_len, null_iv_array_len;
 	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr, *null_iv_array_ptr, null_iv_char;
 	int4			index;
-	gtmcrypt_key_t		*encr_key_handles;
+	gtmcrypt_key_t		*encr_key_handles = NULL;
 	boolean_t		encrypted_version, mixed_encryption, valid_gblname;
 	char			index_err_buf[1024];
 	gvnh_reg_t		*gvnh_reg;
-	gd_region		*dummy_reg;
+	gd_region		*dummy_reg, *reg_ptr = NULL;
 	sub_num			subtocheck;
 	sgmnt_data_ptr_t	csd;
 	boolean_t		discard_nullcoll_mismatch_record, update_nullcoll_mismatch_record;
@@ -265,11 +281,20 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	unsigned int		null_subscript_cnt, k, sub_index[MAX_GVSUBSCRIPTS];
 	static unsigned char	key_buffer[MAX_ZWR_KEY_SZ];
 	unsigned char		*temp, coll_typr_char;
+	boolean_t		switch_db, mu_load_error = FALSE;
+	gd_binding		*map;
+	ht_ent_mname		*tabent;
+	hash_table_mname	*tab_ptr;
+	char			msg_buff[MAX_RECLOAD_ERR_MSG_SIZE];
+	gd_region		**reg_list;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(4 == SIZEOF(coll_hdr));
 	gvinit();
+	reg_list = (gd_region **)malloc(gd_header->n_regions * SIZEOF(gd_region *));
+	for (index = 0; index < gd_header->n_regions; index++)
+		reg_list[index] = NULL;
 	v.mvtype = MV_STR;
 	file_offset_base = 0;
 	/* line1_ptr & line1_len are initialized as part of get_load_format using a read of the binary extract file which
@@ -353,7 +378,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		n_index = encrypted_hash_array_len / GTMCRYPT_HASH_LEN;
 		encr_key_handles = (gtmcrypt_key_t *)malloc(SIZEOF(gtmcrypt_key_t) * n_index);
 		memset(encr_key_handles, 0, SIZEOF(gtmcrypt_key_t) * n_index);
-		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+		INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 		GC_BIN_LOAD_ERR(gtmcrypt_errno);
 		mixed_encryption = FALSE;
 		for (index = 0; index < n_index; index++)
@@ -438,8 +463,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		{
 			util_out_print("!AD:!_  Key cnt: !@UQ  max subsc len: !UL  max data len: !UL", TRUE,
 				LEN_AND_LIT("LOAD TOTAL"), &key_count, max_subsc_len, max_data_len);
-			tmp_rec_count = key_count ? (rec_count - 1) : 0;
-			util_out_print("Last LOAD record number: !@UQ", TRUE, &tmp_rec_count);
+			tmp_rec_count = (rec_count == begin) ? rec_count : rec_count - 1;
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_INFO(ERR_LOADRECCNT), 1, &tmp_rec_count);
 			mu_gvis();
 			util_out_print(0, TRUE);
 			mu_ctrlc_occurred = FALSE;
@@ -470,12 +495,14 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 							SNPRINTF(index_err_buf, SIZEOF(index_err_buf),
 								"Encryption handle expected in the range [0; %d) but found %d",
 								n_index, index);
-							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_SEVERE(ERR_RECLOAD),
-								1, &rec_count, ERR_TEXT, 2, RTS_ERROR_TEXT(index_err_buf),
-								ERR_GVFAILCORE);
+							SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld", rec_count );
+							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) MAKE_MSG_SEVERE(ERR_RECLOAD),
+								2, LEN_AND_STR(msg_buff), ERR_TEXT, 2,
+								RTS_ERROR_TEXT(index_err_buf), ERR_GVFAILCORE);
 							gtm_fork_n_core();
-							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) MAKE_MSG_SEVERE(ERR_RECLOAD),
-								1, &rec_count, ERR_TEXT, 2, RTS_ERROR_TEXT(index_err_buf));
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_SEVERE(ERR_RECLOAD),
+								2, LEN_AND_STR(msg_buff), msg_buff, ERR_TEXT, 2,
+								RTS_ERROR_TEXT(index_err_buf));
 							return;
 						}
 #						ifdef DEBUG
@@ -543,6 +570,13 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				continue;
 			gvname.var_name.len = MIN(gvname.var_name.len, MAX_MIDENT_LEN);
 			COMPUTE_HASH_MNAME(&gvname);
+			if (mu_load_error)
+			{
+				switch_db = check_db_status_for_global(&gvname, MU_FMT_BINARY, &failed_record_count, rec_count,
+								&first_failed_rec_count, reg_list, num_of_reg);
+				if (!switch_db)
+					continue;
+			}
 			gvnh_reg = bin_call_db(BIN_BIND, (INTPTR_T)gd_header, (INTPTR_T)&gvname);
 			/* "gv_cur_region" will be set at this point in case the global does NOT span regions.
 			 * For globals that do span regions, "gv_cur_region" will be set just before the call to op_gvput.
@@ -550,9 +584,22 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			 */
 			if (mupip_error_occurred)
 			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RECLOAD, 1, &rec_count);
+				if ((ERR_DBFILERR == error_condition) || (ERR_STATSDBNOTSUPP == error_condition))
+				{
+					insert_reg_to_list(reg_list, db_init_region, &num_of_reg);
+					first_failed_rec_count = rec_count;
+					mu_load_error = TRUE;
+				} else
+				{
+					failed_record_count = 0;
+					SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld", rec_count);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RECLOAD, 2, LEN_AND_STR(msg_buff));
+				}
+				failed_record_count++;
 				ONERROR_PROCESS;
 			}
+			mu_load_error= FALSE;
+			first_failed_rec_count = 0;
 			max_key = gvnh_reg->gd_reg->max_key_size;
 			max_rec = gvnh_reg->gd_reg->max_rec_size;
 			db_collhdr.act = gv_target->act;
@@ -827,8 +874,6 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			 *		the value from sn_hold_buff.
 			 */
 			CHECK_HIDDEN_SUBSCRIPT(gv_currkey,is_hidden_subscript);
-			if (!is_hidden_subscript && (max_subsc_len < (gv_currkey->end + 1)))
-				max_subsc_len = gv_currkey->end + 1;
 			v.str.addr = (char*)cp1;
 			v.str.len =INTCAST(rec_len - (cp1 - (unsigned char *)rp));
 			if (expected_sn_chunk_number && !is_hidden_subscript)
@@ -1039,8 +1084,6 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					v.str.addr = sn_hold_buff;
 					v.str.len = sn_hold_buff_pos;
 				}
-				if (max_data_len < v.str.len)
-					max_data_len = v.str.len;
 				if (gvnh_reg->gvspan)
 					bin_call_db(BIN_PUT_GVSPAN, (INTPTR_T)&v, (INTPTR_T)gvnh_reg);
 				else
@@ -1049,14 +1092,29 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				{
 					if (!mupip_DB_full)
 					{
-						bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
-						file_offset = file_offset_base + ((unsigned char *)rp - ptr_base);
-						util_out_print("!_!_at File offset : [0x!16@XQ]", TRUE, &file_offset);
-						DISPLAY_CURRKEY;
-						DISPLAY_VALUE("!_!_Value :");
+						if ((ERR_JNLFILOPN == error_condition) || (ERR_DBPRIVERR == error_condition))
+						{
+							first_failed_rec_count = rec_count;
+							mu_load_error = TRUE;
+							break;
+						} else
+						{
+							first_failed_rec_count = 0;
+							bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+							file_offset = file_offset_base + ((unsigned char *)rp - ptr_base);
+							util_out_print("!_!_at File offset : [0x!16@XQ]", TRUE, &file_offset);
+							DISPLAY_CURRKEY;
+							DISPLAY_VALUE("!_!_Value :");
+						}
 					}
+					failed_record_count++;
 					ONERROR_PROCESS;
 				}
+				mu_load_error = FALSE;
+				if (!is_hidden_subscript && (max_subsc_len < (gv_currkey->end + 1)))
+					max_subsc_len = gv_currkey->end + 1;
+				if (max_data_len < v.str.len)
+					max_data_len = v.str.len;
 				if (putting_a_sn)
 					putting_a_sn = FALSE;
 				else
@@ -1086,10 +1144,20 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	if (NULL != sn_hold_buff)
 		free(sn_hold_buff);
 	file_input_close();
+	tmp_rec_count = (rec_count == begin) ? rec_count : rec_count - 1;
+	if (0 != first_failed_rec_count)
+	{
+		if (tmp_rec_count > first_failed_rec_count)
+			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld to %lld", first_failed_rec_count, tmp_rec_count);
+		else
+			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld", tmp_rec_count);
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RECLOAD, 2, LEN_AND_STR(msg_buff));
+	}
 	util_out_print("LOAD TOTAL!_!_Key Cnt: !@UQ  Max Subsc Len: !UL  Max Data Len: !UL", TRUE, &key_count, max_subsc_len,
 			max_data_len);
-	tmp_rec_count = key_count ? (rec_count - 1) : 0;
-	util_out_print("Last LOAD record number: !@UQ\n", TRUE, &tmp_rec_count);
+	if (failed_record_count)
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FAILEDRECCOUNT, 1, &failed_record_count);
+	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_INFO(ERR_LOADRECCNT), 1, &tmp_rec_count);
 	if (mu_ctrly_occurred)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LOADCTRLY);

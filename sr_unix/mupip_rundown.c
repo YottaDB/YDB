@@ -130,7 +130,7 @@ void mupip_rundown(void)
 	{
 		mu_gv_cur_reg_init();
 		seg = gv_cur_region->dyn.addr;
-		seg->fname_len = SIZEOF(seg->fname);
+		seg->fname_len = MAX_FN_LEN;
 		if (!cli_get_str("WHAT",  (char *)&seg->fname[0], &seg->fname_len))
 			mupip_exit(ERR_MUNODBNAME);
 		seg->fname[seg->fname_len] = '\0';

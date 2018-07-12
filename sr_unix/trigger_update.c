@@ -1082,9 +1082,6 @@ STATICFNDEF int4 gen_trigname_sequence(char *trigvn, int trigvn_len, mval *trigg
 				LITERAL_HASHSEQNUM, STR_LIT_LEN(LITERAL_HASHSEQNUM));
 			seq_num = gvcst_get(val_ptr) ? mval2i(val_ptr) + 1 : 1;
 			max_seq_num = MAX_TRIGNAME_SEQ_NUM;
-			/* If dbg & white-box test then reduce limit to 1000 (instead of 1 million) auto-generated trigger names */
-			if (WBTEST_ENABLED(WBTEST_MAX_TRIGNAME_SEQ_NUM))
-				max_seq_num = 999;
 			if (max_seq_num < seq_num)
 				return TOO_MANY_TRIGGERS;
 		} else

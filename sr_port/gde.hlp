@@ -1439,7 +1439,9 @@
    -[NO][STA[TS]
 
    Specifies whether GT.M should permit processes to share their database
-   access statistics for other processes to monitor. There may be operational
+   access statistics for other processes to monitor. When on, this
+   characteristic causes GT.M to create a small MM database for the
+   associated region to hold the shared statistics. There may be operational
    or security reasons to prohibit sharing of statistics. For example, GT.M
    does not share statistics on database files that exist solely to support
    GT.M features.
@@ -2166,7 +2168,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2017
+   Copyright 2018
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -2188,7 +2190,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.3-003 of the
+   This help file is a concise representation of revision V6.3-005 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

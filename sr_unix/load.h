@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,13 @@
 
 #ifndef LOAD_INCLUDED
 #define LOAD_INCLUDED
+
+/*
+ * RECLOAD error message is used in 2 cases.
+ * 1. Range of records ( Eg: Error loading record number: 3 to 10 )
+ * 2. Single record ( Eg: Error loading record number: 3 )
+ */
+#define MAX_RECLOAD_ERR_MSG_SIZE ((SIZEOF(E_9) *2) + SIZEOF(" to ") + 1)
 
 #define ONERROR_STOP		0
 #define ONERROR_PROCEED		1

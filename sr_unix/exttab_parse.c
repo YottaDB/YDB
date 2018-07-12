@@ -32,6 +32,10 @@
 #include "gtm_malloc.h"
 #include "trans_log_name.h"
 #include "iosp.h"
+#include "gtm_limits.h"
+#include "restrict.h"
+
+GBLREF	char 			gtm_dist[GTM_PATH_MAX];
 
 #define	CR			0x0A		/* Carriage return */
 #define	NUM_TABS_FOR_GTMERRSTR	2
@@ -187,10 +191,29 @@ STATICFNDEF char *scan_ident(char *c)
 STATICFNDEF char *scan_labelref(char *c)
 {
 	char	*b = c;
+	uint4	state = 0;
 
-	for ( ; (ISALNUM_ASCII(*b) || '_' == *b || '^' == *b || '%' == *b); b++,ext_source_column++)
-		;
-	return (b == c) ? 0 : b;
+	for ( ; ; b++, ext_source_column++)
+	{
+		if (ISALNUM_ASCII(*b))
+			continue;
+		if ('%' == *b)
+		{
+			if (1 & state)
+				break;
+			state++;
+			continue;
+		}
+		if ('^' == *b)
+		{
+			if (2 & state)
+				break;
+			state = 2;
+			continue;
+		}
+		break;
+	}
+	return (('(' != *b) && (' ' != *b)) ? 0 : b;
 }
 
 STATICFNDEF enum gtm_types scan_keyword(char **c)
@@ -689,19 +712,27 @@ struct extcall_package_list *exttab_parse(mval *package)
 	return pak;
 }
 
-callin_entry_list* citab_parse (void)
+callin_entry_list* citab_parse (boolean_t internal_use)
 {
 	int			parameter_count, i, fclose_res;
 	uint4			inp_mask, out_mask, mask;
 	mstr			labref, callnam;
 	enum gtm_types		ret_tok, parameter_types[MAX_ACTUALS], pr;
-	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end;
+	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end, rcfpath[GTM_PATH_MAX];
 	FILE			*ext_table_file_handle;
 	callin_entry_list	*entry_ptr = NULL, *save_entry_ptr = NULL;
 
-	ext_table_file_name = GETENV(CALLIN_ENV_NAME);
-	if (!ext_table_file_name) /* environment variable not set */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(CALLIN_ENV_NAME));
+	if (!internal_use)
+	{
+		ext_table_file_name = GETENV(CALLIN_ENV_NAME);
+		if (!ext_table_file_name) /* environment variable not set */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(CALLIN_ENV_NAME));
+	}
+	else
+	{
+		SNPRINTF(rcfpath, GTM_PATH_MAX, "%s/%s", gtm_dist, COMM_FILTER_FILENAME);
+		ext_table_file_name = rcfpath;
+	}
 
 	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (!ext_table_file_handle) /* call-in table not found */

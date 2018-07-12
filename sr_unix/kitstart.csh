@@ -245,13 +245,12 @@ foreach image ($imagetype)
 	if ( -f ${tmp_dist}/${image}/mumps.debug ) then
 		mv ${tmp_dist}/${image}/*.debug $debug_symbol_dir
 		pushd $debug_symbol_dir
-		set dist_file = "${dist}/${dist_prefix}_${image}_DBG.${package_ext}"
+		set dist_file = "${dist}/${product}-debug_${version}_${osname}_${arch}_${image}.${package_ext}"
 		echo ""
 		echo "Packaging debug symbols to ${dist_file}"
 		cp $gtm_tools/install_debug_symbols_sh.txt install_debug_symbols.sh
 		chmod +x install_debug_symbols.sh
 		$package $dist_file *.debug install_debug_symbols.sh || exit 10
-		rm install_debug_symbols.sh
 		echo "Gzipping $dist_file"
 		gzip $dist_file || exit 11
 		# Move debug symbols out of the way before other packages get made
@@ -400,7 +399,6 @@ if (-f $gtm_tools/gtmpcat.m) then
 		$package $dist_file gtmpcat.m $fldbld install_gtmpcat.sh gtmpcat.sh || exit 10
 		chown ${prev_user}:${prev_group} gtmpcat.m $fldbld
 		chmod ${prev_perm} gtmpcat.m $fldbld
-		rm -f gtmpcat.sh install_gtmpcat.sh
 		echo ""
 		echo "Gzipping $dist_file"
 		gzip $dist_file || exit 11
@@ -607,18 +605,28 @@ CONFIGURE_EOF
 
 		# Test gtmpcat
 		pushd /tmp
-		(source ${install}/defgroup/${image}/gtmcshrc ; $gtm_dist/mumps -r %XCMD 'zsystem "$gtm_dist/gtmpcat "_$job')
-		(source ${install}/${image}/gtmcshrc ; $gtm_dist/mumps -r %XCMD 'zsystem "$gtm_dist/gtmpcat "_$job')
+		foreach dir (defgroup/${image} ${image})
+			set gtmpcatout = "${install}/$dir/invoke_gtmpcat.out"
+			set gtmcshrc = "$install/$dir/gtmcshrc"
+			(source $gtmcshrc ; $gtm_dist/mumps -r %XCMD 'zsystem "$gtm_dist/gtmpcat "_$job') |& tee $gtmpcatout
+			grep -q 'GTMPCAT Complete' $gtmpcatout
+			if (0 == $status) then
+				echo "Test of installation of gtmpcat ${version}/$dir PASSED"
+			else
+				echo "Test of installation of gtmpcat ${version}/$dir FAILED"
+			endif
+		end
+
 		popd
 
 		# install debug symbols
-		if ( "`uname`" == "Linux" ) then
+		if ( ( "`uname`" == "Linux" ) && ("pro" == "$image") ) then
 			pushd ${tmp_dist}/${image}_DBG/
 			yes | env gtm_dist=${install}/${image} sh ./install_debug_symbols.sh
 			popd
 
 			# Test debug symbols
-			set result=`source ${install}/${image}/gtmcshrc ; gdb $gtm_exe/mumps -ex quit | grep mumps.debug | wc -l`
+			set result=`source ${install}/${image}/gtmcshrc ; gdb $gtm_dist/mumps -ex quit | grep mumps.debug | wc -l`
 			echo ""
 			echo ""
 			if ( $result ) then
@@ -639,6 +647,7 @@ if (! $leavedir) then
 	echo ""
 	echo ""
 	/bin/rm -rf ${tmp_dist} ${install}
+	/bin/rm -f $gtm_tools/{gtmpcat.sh,install_gtmpcat.sh}
 	exit 0
 endif
 

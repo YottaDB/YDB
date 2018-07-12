@@ -888,8 +888,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 		if (!repeat_error)
 		{
 			SAVE_ZSTATUS_INTO_RTS_STRINGPOOL(dollar_ecode.error_last_b_line, &context);
+			assert(NULL != dollar_ecode.error_last_b_line);
 		}
-		assert(NULL != dollar_ecode.error_last_b_line);
 	}
 	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
 	{

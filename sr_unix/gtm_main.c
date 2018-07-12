@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -167,7 +167,7 @@ int gtm_main (int argc, char **argv, char **envp)
 	{
 		if ((NULL != (ptr = (char *)getenv(GTM_PASSWD_ENV))) && (0 == strlen(ptr)))
 		{
-			INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+			INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
 			{
 				CLEAR_CRYPTERR_MASK(gtmcrypt_errno);

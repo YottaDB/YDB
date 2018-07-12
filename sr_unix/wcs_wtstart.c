@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -294,9 +294,8 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
                                                 {	/* Did not get the csr we intended so something must be wrong with cache.
 							 * Kill -9 can cause this. Assert that we were doing a crash shutdown.
 							 */
-                                                        assert(gtm_white_box_test_case_enabled
-                                                                && (WBTEST_CRASH_SHUTDOWN_EXPECTED
-                                                                == gtm_white_box_test_case_number));
+                                                        assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
+                                                                || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
                                                         SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
                                                         err_status = ERR_DBCCERR;
                                                         break;
@@ -512,8 +511,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			 * check for bver == 0 and returns immediately in that case so it is okay to call it with a 0 bver in pro.
 			 */
 			assert(((blk_hdr_ptr_t)bp)->bver
-				|| (gtm_white_box_test_case_enabled
-					&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == gtm_white_box_test_case_number)));
+				|| WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
 			if (IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver))
 			{	/* Need to downgrade/reformat this block back to a previous format. */
 				assert(!csd->asyncio);	/* asyncio & V4 format are not supported together */

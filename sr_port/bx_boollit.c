@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,10 +76,11 @@ void bx_boollit(triple *t)
 			if (OC_COM == t->operand[j].oprval.tref->opcode)
 			{       /* any complement reduces the literal value to [unsigned] 1 or 0 */
 				unuse_literal(v[j]);
-				tv[j] = (0 == v[j]->m[1]);
+				tv[j] = !MV_FORCE_BOOL(v[j]);
 				assert(ref0 == optrip[j]);
 				PUT_LITERAL_TRUTH(tv[j], ref0);
 				v[j] = &ref0->operand[0].oprval.mlit->v;
+				MV_FORCE_NUMD(v[j]);
 				num = 0;							/* any complement trumps num */
 			}
 			neg = OC_NEG == t->operand[j].oprval.tref->opcode;
@@ -139,7 +140,7 @@ void bx_boollit(triple *t)
 		for (j = 0;  j < ARRAYSIZE(v); j++)
 		{	/* both arguments are literals, so try the operation at compile time */
 			v[j] = &optrip[j]->operand[0].oprval.mlit->v;
-			tv[j] = (0 != v[j]->m[1]);
+			tv[j] = MV_FORCE_BOOL(v[j]);
 		}
 		switch (t->opcode)
 		{	/* optimize the Boolean operations here */

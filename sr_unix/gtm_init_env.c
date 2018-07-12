@@ -14,12 +14,14 @@
 #include "stack_frame.h"
 #include "startup.h"
 #include "gtm_startup.h"
+#include "error.h"
 
 GBLREF	stack_frame	*frame_pointer;
 
 void gtm_init_env(rhdtyp *base_addr, unsigned char *transfer_addr)
 {
 	assert(CURRENT_RHEAD_ADR(base_addr) == base_addr);
+	ESTABLISH(mdb_condition_handler);
 	base_frame(base_addr);
 
 #ifdef HAS_LITERAL_SECT
@@ -31,4 +33,5 @@ void gtm_init_env(rhdtyp *base_addr, unsigned char *transfer_addr)
 	 */
 	new_stack_frame(base_addr, PTEXT_ADR(base_addr), transfer_addr);
 #endif
+	REVERT;
 }

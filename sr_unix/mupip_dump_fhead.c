@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,8 +55,8 @@ void mupip_dump_fhead(void)
 {
 	int4		status;
 	tp_region	*rptr;
-	unsigned char	file[GTM_PATH_MAX + 1];
-	unsigned short	file_len = SIZEOF(file);
+	unsigned char	file[GTM_PATH_MAX];
+	unsigned short	file_len = GTM_PATH_MAX - 1;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

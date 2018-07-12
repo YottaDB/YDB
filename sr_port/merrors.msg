@@ -241,7 +241,7 @@ JNLACCESS	<Error accessing journal file !AD>/error/fao=2!/ansi=0
 TRANSNOSTART	<ZTCOMMIT(s) issued without corresponding ZTSTART(s)>/error/fao=0!/ansi=44
 FNUMARG		<$FNUMBER format specifier "!AD" contains an illegal character: "!AD">/error/fao=4!/ansi=0
 FOROFLOW	<FOR commands nested more than !UL deep on a line>/error/fao=1!/ansi=0
-YDIRTSZ		<Size of YDIRT data too large>/error/fao=0!/ansi=0
+YDIRTSZ		<Improper size of YDIRT data: !UL>/error/fao=1!/ansi=0
 JNLSUCCESS	<!AD successful>/success/fao=2!/ansi=0
 GBLNAME		<Either an identifier or a left parenthesis is expected after a ^ in this context>/error/fao=0!/ansi=29
 GBLOFLOW	<Database segment is full>/error/fao=0!/ansi=0
@@ -302,16 +302,16 @@ MBXRDONLY	<Mailbox is read only, cannot write to it>/error/fao=0!/ansi=0
 JNLINVALID	<!AD is not a valid journal file !/ for database file: !AD>/error/fao=4!/ansi=0
 MBXWRTONLY	<Mailbox is write only, cannot read from it>/error/fao=0!/ansi=0
 MEMORY		<Central memory exhausted during request for !UJ bytes from 0x!XJ>/fatal/fao=2!/ansi=0
-MTBLKTOOBIG	<Magtape BLOCK_SIZE exceeds maximum size allowed>/error/fao=0!/ansi=70
-MTBLKTOOSM	<Magtape BLOCK_SIZE is less than !UL bytes>/error/fao=1!/ansi=70
-MTFIXRECSZ	<BLOCK_SIZE !UL must be multiple of fixed record size !UL>/error/fao=2!/ansi=70
-MTIS		<Magnetic tape: !AD>/info/fao=2!/ansi=0
-MTRDBADBLK	<Block read too small, contained only !UL bytes, block size = !UL>/error/fao=2!/ansi=0
-MTRDONLY	<Cannot write to a READONLY magtape>/error/fao=0!/ansi=62
-MTRDTHENWRT	<Attempt to read after a write to a magtape>/error/fao=0!/ansi=0
-MTRECGTRBLK	<Magtape record size cannot exceed block size>/error/fao=0!/ansi=71
-MTRECTOOBIG	<Magtape record size exceeds maximum allowed>/error/fao=0!/ansi=72
-MTRECTOOSM	<Magtape record size is too small for record type>/error/fao=0!/ansi=72
+UNUSEDMSG305	<MTBLKTOOBIG last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+UNUSEDMSG306	<MTBLKTOOSM last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+UNUSEDMSG307	<MTFIXRECSZ last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+UNUSEDMSG308	<MTIS last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+UNUSEDMSG309	<MTRDBADBLK last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+UNUSEDMSG310	<MTRDONLY last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+UNUSEDMSG311	<MTRDTHENWRT last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+UNUSEDMSG312	<MTRECGTRBLK last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+UNUSEDMSG313	<MTRECTOOBIG last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+UNUSEDMSG314	<MTRECTOOSM last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
 JNLTMQUAL3	<Time qualifier BEFORE_TIME="!AZ" is less than the journal file(s) minimum timestamp="!AZ">/error/fao=2!/ansi=0
 MULTLAB		<This label has been previously defined>/error/fao=0!/ansi=57
 BLKCNT		<Last LOAD Block/RMS Record number: !UL>/info/fao=1!/ansi=0
@@ -337,7 +337,7 @@ DBPRIVERR	<No privilege for attempted update operation for file: !AD>/error/fao=
 REC2BIG		<Record size (!UL) is greater than maximum (!UL) for region: !AD>/error/fao=4!/ansi=75
 RHMISSING	<Right-hand side of expression expected>/error/fao=0!/ansi=0
 DEVICEREADONLY	<Cannot write to read-only device>/error/fao=0!/ansi=62
-COLLDATAEXISTS	<Collation type cannot be changed while data exists>/error/fao=0!/ansi=0
+COLLDATAEXISTS	<Collation type cannot be changed while !AD!AD data exists>/error/fao=4!/ansi=0
 ROUTINEUNKNOWN	<Routine could not be found>/error/fao=0!/ansi=88
 RPARENMISSING	<Right parenthesis expected>/error/fao=0!/ansi=0
 RTNNAME		<Routine name expected here>/error/fao=0!/ansi=0
@@ -356,11 +356,11 @@ STACKOFLOW	<Stack overflow>/fatal/fao=0!/ansi=0
 STACKUNDERFLO	<Stack underflow>/error/fao=0!/ansi=0
 STRINGOFLOW	<String pool overflow>/error/fao=0!/ansi=0
 SVNOSET		<Cannot SET this special variable>/error/fao=0!/ansi=0
-VIEWFN		<View parameter is not valid with $VIEW()>/error/fao=0!/ansi=0
+VIEWFN		<View parameter !AD is not valid with the $VIEW() function>/error/fao=2!/ansi=0
 TERMASTQUOTA	<Process AST quota exceeded, cannot open terminal>/error/fao=0!/ansi=0
 TEXTARG		<Invalid argument to $TEXT function>/error/fao=0!/ansi=5
 TMPSTOREMAX	<Maximum space for temporary values exceeded>/error/fao=0!/ansi=0
-VIEWCMD		<View parameter is not valid with VIEW command>/error/fao=0!/ansi=0
+VIEWCMD		<View parameter !AD is not valid with the VIEW command>/error/fao=2!/ansi=0
 JNI		<!AD>/error/fao=2!/ansi=0
 TXTSRCFMT	<$TEXT encountered an invalid source program file format>/error/fao=0!/ansi=0
 UIDMSG		<Unidentified message received>/error/fao=0!/ansi=0
@@ -516,9 +516,9 @@ FNOTONSYS	<Function or special variable is not supported by this operating syste
 AMBISYIPARAM	<Parameter !AD is ambiguous to $ZGETSYI()>/error/fao=2!/ansi=0
 PREVJNLNOEOF	<A previous generation journal file !AD does not have valid EOF>/error/fao=2!/ansi=0
 LKSECINIT	<Error creating LOCK section for database !AD>/error/fao=2!/ansi=0
-MTDOSLAB	<Tape label is not in valid DOS-11 format>/error/fao=0!/ansi=0
-MTDOSFOR	<Use of DOS-11 labels requires stream format>/error/fao=0!/ansi=0
-MTINVLAB	<Invalid label type specified in magtape OPEN>/error/fao=0!/ansi=0
+UNUSEDMSG519	<MTDOSLAB last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+UNUSEDMSG520	<MTDOSFOR last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+UNUSEDMSG521	<MTINVLAB last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
 TXTSRCMAT	<M object module and source file do not match>/error/fao=0!/ansi=0
 CCENOGROUP	<CCE does not have GROUP privilege.  Information may be incomplete.>/warning/fao=0!/ansi=0
 BADDBVER	<Incorrect database version: !AD>/error/fao=2!/ansi=0
@@ -541,8 +541,8 @@ SERVERERR	<Severe error on server: !AD>/error/fao=2!/ansi=0
 NETFAIL		<Failure of Net operation>/error/fao=0!/ansi=0
 NETLCKFAIL	<Lock operation across Net failed>/error/fao=0!/ansi=0
 TTINVFILTER	<Invalid FILTER argument>/info/fao=0!/ansi=0
-MTANSILAB	<Tape label is not in valid ANSI format>/error/fao=0!/ansi=0
-MTANSIFOR	<Use of ANSI labels does not allow stream format>/error/fao=0!/ansi=0
+UNUSEDMSG544	<MTANSILAB last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+UNUSEDMSG545	<MTANSIFOR last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
 BADTRNPARAM	<!AD is not a legal parameter to $ZTRNLNM>/error/fao=2!/ansi=0
 DSEONLYBGMM	<!AD is supported only for BG/MM access methods>/warning/fao=2!/ansi=0
 DSEINVLCLUSFN	<Specified function is invalid for clustered databases>/warning/fao=0!/ansi=0
@@ -628,7 +628,7 @@ TERMWRITE	<Error writing to terminal>/error/fao=0!/ansi=0
 COLLTYPVERSION	<Collation type !UL, version !UL mismatch>/error/fao=2!/ansi=0
 LVNULLSUBS	<Null subscripts not allowed in local variables>/error/fao=0!/ansi=0
 GVREPLERR	<Error replicating global in region !AD>/error/fao=2!/ansi=0
-MTIOERR		<I/O Error with magnetic tape device !AD>/error/fao=2!/ansi=0
+UNUSEDMSG631	<MTIOERR last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
 RMWIDTHPOS	<File record size or width must be greater than zero>/error/fao=0!/ansi=72
 OFFSETINV	<Entry point !AD+!SL not valid>/error/fao=3!/ansi=13
 JOBPARTOOLONG	<Total parameter length is too long for job command>/error/fao=0!/ansi=0
@@ -670,7 +670,7 @@ CEBIGSKIP	<Compiler escape user routine skip count is too large>/error/fao=0!/an
 CETOOLONG	<Compiler escape substitution exceeds maximum line size>/error/fao=0!/ansi=0
 CENOINDIR	<Indirection type information not available for compiler escape feature>/error/fao=0!/ansi=0
 COLLATIONUNDEF	<Collation type !UL is not defined>/error/fao=1!/ansi=0
-UNUSEDMSG673	<RBWRNNOTCHG last used in V6.2-002A>/error/fao=0!/ansi=0
+MSTACKCRIT	<User-specified M stack size critical threshold of !UL not appropriate; must be between !UL and !UL; reverting to !UL>/error/fao=4!/ansi=0
 GTMSECSHRSRVF	<!AD - !UL : Attempt to service request failed (retry = !UL)>/error/fao=4!/ansi=0
 FREEZECTRL	<Control Y or control C encountered during attempt to freeze the database. Aborting freeze.>/info/fao=0!/ansi=0
 JNLFLUSH	<Error flushing journal buffers to journal file !AD>/info/fao=2!/ansi=0
@@ -685,7 +685,7 @@ SOCKACPT	<Error accepting socket connection>/error/fao=0!/ansi=81
 SOCKINIT	<Error initializing socket: (errno == !UL) !AD>/error/fao=3!/ansi=80
 OPENCONN	<Error opening socket connection>/error/fao=0!/ansi=81
 DEVNOTIMP	<!AD device not implemented on in this environment>/error/fao=2!/ansi=0
-UNUSEDMSG688	<JNLEXTR last sometime prior to V4.4-002>/error/fao=0!/ansi=0
+PATALTER2LARGE	<Pattern match alternation exceeded the !UL repetition limit on prospective matches>/error/fao=1!/ansi=0
 DBREMOTE	<Database region !AD is remote; perform maintenance on the server node>/error/fao=2!/ansi=0
 JNLREQUIRED	<Journaling is required for clustered operation with file !AD>/error/fao=2!/ansi=0
 TPMIXUP		<!AZ transaction cannot be started within !AZ transaction>/error/fao=2!/ansi=0
@@ -810,7 +810,7 @@ MUKILLIP	<Kill in progress indicator is set for file !AD - this !AD operation is
 JNLRDONLY	<Journal file !AD read only>/error/fao=2!/ansi=0
 ANCOMPTINC	<Deviceparameter !AD is not compatible with any other deviceparameters in the !AD command>/error/fao=4!/ansi=0
 ABNCOMPTINC	<Deviceparameter !AD and deviceparameter !AD are not compatible in the !AD command>/error/fao=6!/ansi=0
-RECLOAD		<Error loading record number: !@UQ!/>/error/fao=1!/ansi=0
+RECLOAD		<Error loading record number: !AD>/error/fao=2!/ansi=0
 SOCKNOTFND	<Socket !AD not found>/error/fao=2!/ansi=0
 CURRSOCKOFR	<Current socket of index !UL is out of range.  There are only !UL sockets.>/error/fao=2!/ansi=0
 SOCKETEXIST	<Socket !AD already exists>/error/fao=2!/ansi=79
@@ -822,7 +822,7 @@ RDFLTOOLONG	<Length specified for fixed length read exceeds the maximum string s
 MUNOFINISH	<MUPIP unable to finish all requested actions>/error/fao=0!/ansi=0
 DBFILEXT	<Database file !AD extended from 0x!XL blocks to 0x!XL at transaction 0x!16@XQ>/info/fao=5!/ansi=0
 JNLFSYNCERR	<Error synchronizing journal file !AD to disk>/error/fao=2!/ansi=0
-UNUSEDMSG825	<FSYNCTIMOUT last used in V6.0-001>/error/fao=0!/ansi=0
+ICUNOTENABLED	<ICU libraries not loaded>/warning/fao=0!/ansi=0
 ZCPREALLVALINV	<The pre-allocation value exceeded the maximum string length>/error/fao=0!/ansi=0
 NEWJNLFILECREAT	<Journal file !AD nearing maximum size.  New journal file created.>/info/fao=2!/ansi=0
 DSKSPACEFLOW	<Disk Space for file !AD nearing maximum size.  !UL blocks available.>/info/fao=3!/ansi=0
@@ -1676,6 +1676,11 @@ SYSUTILCONF	<Error determining the path for system utility. !AD>/error/fao=2!/an
 MSTACKSZNA	<User-specified M stack size of !UL KiB not appropriate; must be between !UL KiB and !UL KiB; reverting to !UL KiB>/info/fao=4!/ansi=0
 JNLEXTRCTSEQNO	<Journal Extracts based on sequence numbers are restricted to a single region when replication is OFF>/error/fao=0!/ansi=0
 INVSEQNOQUAL	<Invalid SEQNO qualifier value !AD>/error/fao=2!/ansi=0
+LOWSPC		<WARNING: Database !AD has less than !UL% of the total block space remaining. Blocks Used: !UL Total Blocks Available: !UL>/info/fao=5!/ansi=0
+FAILEDRECCOUNT	<LOAD unable to process !@UQ records>/error/fao=1!/ansi=0
+LOADRECCNT	<Last EXTRACT record processed by LOAD: !@UQ>/info/fao=1!/ansi=0
+COMMFILTERERR	<Error executing the command filter for !AD. !AD>/error/fao=4!/ansi=0
+NOFILTERNEST	<Filter nesting not allowed>/error/fao=0!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -74,6 +75,10 @@ boolean_t	gvcst_order(void)
 
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	found = gvcst_order2();
+	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_order, (gtm_uint64_t) 1);
+	WBTEST_ONLY(WBTEST_QUERY_HANG,
+		LONG_SLEEP(2);
+	);
 #	ifdef UNIX
 	assert(save_dollar_tlevel == dollar_tlevel);
 	CHECK_HIDDEN_SUBSCRIPT_AND_RETURN(found, gv_altkey, is_hidden);
@@ -86,7 +91,6 @@ boolean_t	gvcst_order(void)
 		op_tstart((IMPLICIT_TSTART), TRUE, &literal_batch, 0);
 		ESTABLISH_NORET(gvcst_order_ch, est_first_pass);
 		GVCST_ROOT_SEARCH_AND_PREP(est_first_pass);
-		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_order, (gtm_uint64_t) -1);
 		found = gvcst_order2();
 	} else
 		sn_tpwrapped = FALSE;
@@ -98,8 +102,9 @@ boolean_t	gvcst_order(void)
 			 * gvcst_order2 will give us the next non-hidden subscript.
 			 */
 			REPLACE_HIDDEN_SUB_TO_HIGHEST(gv_altkey, gv_currkey);	/* uses gv_altkey to modify gv_currkey */
-			/* fix up since it should only be externally counted as one $order */
-			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_order, (gtm_uint64_t) -1);
+			WBTEST_ONLY(WBTEST_QUERY_HANG,
+				LONG_SLEEP(2);
+			);
 			found = gvcst_order2();
 		}
 	}
@@ -229,7 +234,6 @@ boolean_t	gvcst_order2(void)
 				}
 			}
 			assert(cs_data == cs_addrs->hdr);
-			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_order, 1);
 			return (found && (bh->curr_rec.match >= gv_currkey->prev));
 		}
 restart:	t_retry(status);
