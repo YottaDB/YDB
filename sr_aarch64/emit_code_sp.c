@@ -486,7 +486,7 @@ void 	format_machine_inst(void)
 				}
 				break;
 			case 0x10:	/* ADR */
-				memcpy(obpt, ADR_INST, SIZEOF(SUB_INST) - 1);
+				memcpy(obpt, ADR_INST, SIZEOF(ADR_INST) - 1);
 				obpt += OPSPC;
 				fmt_rd_raw_imm16(1);
 				break;
@@ -650,8 +650,9 @@ void 	format_machine_inst(void)
 				memcpy(obpt, SUB_INST, SIZEOF(SUB_INST) - 1);
 				obpt += OPSPC;
 				fmt_rd_rn_rm(1);
-				if (0x2 == (ains >> AARCH64_SHIFT_OP_20) & 0xf)
-				{
+				if (0x2 == ((ains >> AARCH64_SHIFT_OP_20) & 0xe))
+				{	/* SUB extended register */
+					shift = ((ains >> AARCH64_SHIFT_IMM3) & AARCH64_MASK_IMM3);
 					*obpt++ = ',';
 					obpt++;
 					*obpt++ = 'L';
