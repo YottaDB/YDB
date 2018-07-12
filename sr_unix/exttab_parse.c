@@ -35,14 +35,11 @@
 #include "gtm_malloc.h"
 #include "trans_log_name.h"
 #include "iosp.h"
-<<<<<<< HEAD
 #include "ydb_getenv.h"
-=======
 #include "gtm_limits.h"
 #include "restrict.h"
 
-GBLREF	char 			gtm_dist[GTM_PATH_MAX];
->>>>>>> df1555e... GT.M V6.3-005
+GBLREF	char 			ydb_dist[YDB_PATH_MAX];
 
 #define	CR			0x0A		/* Carriage return */
 #define	NUM_TABS_FOR_GTMERRSTR	2
@@ -745,44 +742,32 @@ callin_entry_list* citab_parse (boolean_t internal_use)
 	int			parameter_count, i, fclose_res;
 	uint4			inp_mask, out_mask, mask;
 	mstr			labref, callnam;
-<<<<<<< HEAD
 	enum ydb_types		ret_tok, parameter_types[MAX_ACTUALS], pr;
-	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end;
-=======
-	enum gtm_types		ret_tok, parameter_types[MAX_ACTUALS], pr;
-	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end, rcfpath[GTM_PATH_MAX];
->>>>>>> df1555e... GT.M V6.3-005
+	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end, rcfpath[YDB_PATH_MAX];
 	FILE			*ext_table_file_handle;
 	callin_entry_list	*entry_ptr = NULL, *save_entry_ptr = NULL;
 	boolean_t		is_ydb_env_match;
 	int			nbytes;
 	char			tmpbuff[256];
 
-<<<<<<< HEAD
-	ext_table_file_name = ydb_getenv(YDBENVINDX_CI, NULL_SUFFIX, &is_ydb_env_match);
-	if (!ext_table_file_name) /* environment variable not set */
-	{
-		nbytes = SNPRINTF(tmpbuff, SIZEOF(tmpbuff), "%s/%s", ydbenvname[YDBENVINDX_CI] + 1, gtmenvname[YDBENVINDX_CI] + 1);
-		if ((0 < nbytes) && (SIZEOF(str_buffer) > nbytes))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(tmpbuff));
-		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("SNPRINTF(citab_parse)"), CALLFROM, errno);
-	}
-=======
 	if (!internal_use)
 	{
-		ext_table_file_name = GETENV(CALLIN_ENV_NAME);
+		ext_table_file_name = ydb_getenv(YDBENVINDX_CI, NULL_SUFFIX, &is_ydb_env_match);
 		if (!ext_table_file_name) /* environment variable not set */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(CALLIN_ENV_NAME));
-	}
-	else
+		{
+			nbytes = SNPRINTF(tmpbuff, SIZEOF(tmpbuff), "%s/%s",
+						ydbenvname[YDBENVINDX_CI] + 1, gtmenvname[YDBENVINDX_CI] + 1);
+			if ((0 < nbytes) && (SIZEOF(str_buffer) > nbytes))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(tmpbuff));
+			else
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+						LEN_AND_LIT("SNPRINTF(citab_parse)"), CALLFROM, errno);
+		}
+	} else
 	{
-		SNPRINTF(rcfpath, GTM_PATH_MAX, "%s/%s", gtm_dist, COMM_FILTER_FILENAME);
+		SNPRINTF(rcfpath, YDB_PATH_MAX, "%s/%s", ydb_dist, COMM_FILTER_FILENAME);
 		ext_table_file_name = rcfpath;
 	}
-
->>>>>>> df1555e... GT.M V6.3-005
 	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (!ext_table_file_handle) /* call-in table not found */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name),

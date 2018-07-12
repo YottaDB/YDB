@@ -82,9 +82,5 @@ void	rel_crit(gd_region *reg)
 	} else
 		CRIT_TRACE(csa, crit_ops_nocrit);
 	/* Now that crit for THIS region is released, check if deferred signal/exit handling can be done and if so do it */
-<<<<<<< HEAD
 	DEFERRED_SIGNAL_HANDLING_CHECK;
-=======
-	DEFERRED_EXIT_HANDLING_CHECK;
->>>>>>> df1555e... GT.M V6.3-005
 }

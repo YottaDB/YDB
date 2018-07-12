@@ -853,17 +853,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 						return FALSE;
 					}
 					db_ipcs.fn[db_ipcs.fn_len] = 0;
-<<<<<<< HEAD
 					if (!tsd->read_only)
-=======
-					WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-					if (!tsd->read_only)
-					{	/* Respect read-only databases */
-						secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
-						csa->read_only_fs = (EROFS == secshrstat);
-					}
-					if ((0 != secshrstat) && !csa->read_only_fs && !tsd->read_only)
->>>>>>> df1555e... GT.M V6.3-005
 					{
 						WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
 						secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);

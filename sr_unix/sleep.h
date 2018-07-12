@@ -50,18 +50,10 @@ MBSTART {											\
 												\
 	assert(0 < (NANOSECONDS));								\
 	clock_gettime(CLOCK_MONOTONIC, &REQTIM);						\
-<<<<<<< HEAD
-	REQTIM.tv_nsec += (long)(NANOSECONDS);							\
-	if (NANOSECS_IN_SEC <= REQTIM.tv_nsec)							\
+	if (NANOSECS_IN_SEC <= (NANOSECONDS) + REQTIM.tv_nsec)					\
 	{											\
-		REQTIM.tv_sec += (time_t)(REQTIM.tv_nsec / NANOSECS_IN_SEC);			\
-		REQTIM.tv_nsec %= NANOSECS_IN_SEC;						\
-=======
-	if (E_9 <= (NANOSECONDS) + REQTIM.tv_nsec)						\
-	{											\
-		REQTIM.tv_sec += (time_t)(((NANOSECONDS) + REQTIM.tv_nsec) / E_9);		\
-		REQTIM.tv_nsec = ((NANOSECONDS) + REQTIM.tv_nsec) % E_9;			\
->>>>>>> df1555e... GT.M V6.3-005
+		REQTIM.tv_sec += (time_t)(((NANOSECONDS) + REQTIM.tv_nsec) / NANOSECS_IN_SEC);	\
+		REQTIM.tv_nsec = ((NANOSECONDS) + REQTIM.tv_nsec) % NANOSECS_IN_SEC;		\
 	}											\
 	else											\
 		REQTIM.tv_nsec += (long)(NANOSECONDS);						\

@@ -5030,13 +5030,8 @@
    expressions with side effects after the first Boolean operator - extrinsic
    functions, external calls and $INCREMENT().
 
-<<<<<<< HEAD
    YottaDB picks up the value of [NO]FULL_BOOL[EAN][WARN] from the environment
    variable ydb_boolean. If ydb_boolean is undefined or evaluates to an
-=======
-   GT.M picks up the value of [NO]FULL_BOOL[EAN|WARN] from the environment
-   variable gtm_boolean. If gtm_boolean is undefined or evaluates to an
->>>>>>> df1555e... GT.M V6.3-005
    integer zero (0), the initial setting the default "NOFULL_BOOLEAN", if it
    evaluates to an integer one (1), the initial setting is "FULL_BOOLEAN" and
    if it evaluates to integer two (2) the initial setting is "FULL_BOOLWARN".
@@ -5325,51 +5320,32 @@
    the region-list, the command acts on all regions enabled for sharing. When
    a targeted region has sharing disabled, STATSHARE has no effect.
 
-<<<<<<< HEAD
-   YottaDB provides a fast and efficient mechanism for processes to share their
-   database access statistics for other processes to monitor. Processes opt
-   in or out with the VIEW "[NO]STATSHARE" command, defaulting to VIEW
-   "NOSTATSHARE". At process startup, a value of 1, or any case-independent
-   string or leading substrings of "TRUE" or "YES" in the environment
-   variable ydb_statshare provides an initial setting of VIEW "STATSHARE".
-   When a process changes whether it is opting in or out, there is no change
-   to the output of a ZSHOW "G" within that process. YottaDB does not permit
-   this form of the VIEW command within a TP transaction. Monitoring the
-   statistics of other processes does not require opting-in.
-
-   Processes opted-in place their statistics as binary data in database files
-   located in the directory specified by the ydb_statsdir environment
-   variable. All processes that share statistics MUST use the same value for
-   $ydb_statsdir. The ^%YGBLSTAT utility program gathers and reports
-   statistics.
-=======
    This provides a fast and efficient mechanism for processes to share their
    database access statistics for other processes to monitor. Processes opt
    in or out with the VIEW "[NO]STATSHARE"[:<region-list>] command,
    defaulting to VIEW "NOSTATSHARE". At process startup, a value of 1, or any
    case-independent string or leading substrings of "TRUE" or "YES" in the
-   environment variable gtm_statshare provides an initial setting of VIEW
+   environment variable ydb_statshare provides an initial setting of VIEW
    "STATSHARE". When a process changes whether it is opting in or out, there
-   is no change to the output of a ZSHOW "G" within that process. GT.M does
+   is no change to the output of a ZSHOW "G" within that process. YottaDB does
    not permit this form of the VIEW command within a TP transaction.
    Monitoring the statistics of other processes does not require opting-in.
 
    The processes which opt-in for STATSHARE place their statistics as binary
    data in database files located in the directory specified by the
-   gtm_statsdir environment variable. All processes that share statistics
-   MUST use the same value for $gtm_statsdir. The ^%YGBLSTAT utility program
+   ydb_statsdir environment variable. All processes that share statistics
+   MUST use the same value for $ydb_statsdir. The ^%YGBLSTAT utility program
    gathers and reports statistics.
 
    **Note**
 
    A VIEW "[NO]STATSHARE" with no region sub-argument opens any unopened
    mapped regions and any enabled associated statsDB regions; the
-   $gtm_statshare environment variable applies to databases as the
+   $ydb_statshare environment variable applies to databases as the
    application first uses them. When the last VIEW "[NO]STATSHARE" had no
    region sub-argument, regions implicitly share when the process first
    references them, but after a VIEW specifies selective sharing, regions
    don't implicitly share as they open.
->>>>>>> df1555e... GT.M V6.3-005
 
 4 STP_GCOL
    STP_GCOL
@@ -6759,59 +6735,18 @@
    CQS : Critical section acquisition Queued sleeps sum of Squares
    CQT : Critical section acquisition Queued sleeps Total
    CTN : Current Transaction Number of the database for the last committed read-write transaction (TP and non-TP)
-<<<<<<< HEAD
-   DRD : # of Disk ReaDs from the database file (TP and non-TP, committed and rolled-back).This does not include reads that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. YottaDB always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
-   DWT : # of Disk WriTes to the database file (TP and non-TP, committed and rolled-back). This does not include writes that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. YottaDB always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
-   NTW : # of Non-TP committed Transactions that were read-Write on this database
-   NTR : # of Non-TP committed Transactions that were Read-only on this database
-   NBW : # of Non-TP committed transaction induced Block Writes on this database
-   NBR : # of Non-TP committed transaction induced Block Reads on this database
-   NR0 : # of Non-TP transaction Restarts at try 0
-   NR1 : # of Non-TP transaction Restarts at try 1
-   NR2 : # of Non-TP transaction Restarts at try 2
-   NR3 : # of Non-TP transaction Restarts at try 3
-   TTW : # of TP committed Transactions that were read-Write on this database
-   TTR : # of TP committed Transactions that were Read-only on this database
-   TRB : # of TP read-only or read-write transactions that got Rolled Back (incremental rollbacks are not counted)
-   TBW : # of TP transaction induced Block Writes on this database
-   TBR : # of TP transaction induced Block Reads on this database
-   TR0 : # of TP transaction Restarts at try 0 (counted for all regions participating in restarting TP transaction)
-   TR1 : # of TP transaction Restarts at try 1 (counted for all regions participating in restarting TP transaction)
-   TR2 : # of TP transaction Restarts at try 2 (counted for all regions participating in restarting TP transaction)
-   TR3 : # of TP transaction Restarts at try 3 (counted for all regions participating in restarting TP transaction)
-   TR4 : # of TP transaction Restarts at try 4 and above (restart counted for all regions participating in restarting TP transaction)
-   TC0 : # of TP transaction Conflicts at try 0 (counted only for that region which caused the TP transaction restart)
-   TC1 : # of TP transaction Conflicts at try 1 (counted only for that region which caused the TP transaction restart)
-   TC2 : # of TP transaction Conflicts at try 2 (counted only for that region which caused the TP transaction restart)
-   TC3 : # of TP transaction Conflicts at try 3 (counted only for that region which caused the TP transaction restart)
-   TC4 : # of TP transaction Conflicts at try 4 and above (counted only for that region which caused the TP transaction restart)
-   DFL : # of times a process flushes the entire set of dirty database global buffers in shared memory to disk.
-   DFS : # of times a process does an fsync of the database file. For example: a) after writing an epoch journal record, b) as part of database file extension c) during database rundown d) as part of mupip reorg -truncate etc.
-   JFL : # of times a process flushes all dirty journal buffers in shared memory to disk. For example: when switching journal files etc.
-   JFS : # of times a process does an fsync of the journal file. For example: when writing an epoch record, switching a journal file etc.
-   JBB : # of bytes written to the journal buffer in shared memory.
-   JFB : # of bytes written to the journal file on disk. For performance reasons, YottaDB always aligns the beginning of these writes to file system block size boundaries. On Unix, JFB counts all bytes including those needed for alignment in order to reflect the actual IO load on the journal file. Since the bytes required to achieve alignment may have already been counted as part of the previous JFB, processes may write the same bytes more than once, causing the JFB counter to typically be higher than JBB.
-   JFW : # of times a process invokes a write system call for a journal file.
-   JRL : # of logical journal records (e.g. SET, KILL etc.)
-   JRP : # of PBLK and AIMG journal records written to the journal file (these records are seen only in a -detail journal extract)
-   JRE : # of regular EPOCH journal records written to the journal file (only seen in a -detail journal extract); these are written every time an epoch-interval boundary is crossed while processing updates
-   JRI : # of idle EPOCH journal records written to the journal file (only seen in a -detail journal extract); these are written when a burst of updates is followed by an idle period, around 5 seconds of no updates after the database flush timer has flushed all dirty global buffers to the database file on disk
-   JRO : # of all journal records other than logical, PBLK, AIMG and EPOCH records written to the journal file (for example, PINI, PFIN, and so on.)
-   JEX : # of times a process extends the journal file
-   DEX : # of times a process extends the database file
-=======
    CYS : Critical section acquisition processor Yields sum of Squares
    CYT : Critical section acquisition processor Yields Total
    DEX : # of Database file EXtentions
    DFL : # of Database FLushes of the entire set of dirty global buffers in shared memory to disk
    DFS : # of times a process does an fsync of the database file. For example: a) after writing an epoch journal record, b) as part of database file extension c) during database rundown d) as part of mupip reorg -truncate etc.
-   DRD : # of Disk ReaDs from the database file (TP and non-TP, committed and rolled-back).This does not include reads that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. GT.M always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
+   DRD : # of Disk ReaDs from the database file (TP and non-TP, committed and rolled-back).This does not include reads that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. YottaDB always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
    DTA : # of DaTA operations (TP and non-TP)
-   DWT : # of Disk WriTes to the database file (TP and non-TP, committed and rolled-back). This does not include writes that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. GT.M always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
+   DWT : # of Disk WriTes to the database file (TP and non-TP, committed and rolled-back). This does not include writes that are satisfied by buffered globals for databases that use the BG (Buffered Global) access method. YottaDB always reports 0 for databases that use the MM (memory-mapped) access method as this has no real meaning in that mode.
    GET : # of GET operations (TP and non-TP)
    JBB : # of Journal Buffer Bytes updated in shared memory
    JEX : # of Journal file EXtentions
-   JFB : # of Journal File Bytes written to the journal file on disk. For performance reasons, GT.M always aligns the beginning of these writes to file system block size boundaries. JFB counts all bytes including those needed for alignment in order to reflect the actual IO load on the journal file. Since the bytes required to achieve alignment may have already been counted as part of the previous JFB, processes may write the same bytes more than once, causing the JFB counter to typically be higher than JBB.
+   JFB : # of Journal File Bytes written to the journal file on disk. For performance reasons, YottaDB always aligns the beginning of these writes to file system block size boundaries. JFB counts all bytes including those needed for alignment in order to reflect the actual IO load on the journal file. Since the bytes required to achieve alignment may have already been counted as part of the previous JFB, processes may write the same bytes more than once, causing the JFB counter to typically be higher than JBB.
    JFL : # of Journal FLushes of all dirty journal buffers in shared memory to disk. For example: when switching journal files etc.
    JFS : # of Journal FSync operations on the journal file. For example: when writing an epoch record, switching a journal file etc.
    JFW : # of Journal File Write system calls
@@ -6851,7 +6786,7 @@
    TTW : # of Tp committed Transactions that were read-Write on this database
    ZPR : # of $order(,-1) or $ZPRevious() (reverse order) operations (TP and non-TP). The count of $Order(,1) operations are reported under ORD.
    ZTR : # of ZTRigger command operations
->>>>>>> df1555e... GT.M V6.3-005
+
    [NT]B[WR] mnemonics are satisfied by either disk access or, for databases that use the BG (buffered global) access method, global buffers in shared memory.
 
    When $PRINCIPAL input and output are different devices, ZSHOW "D" shows
@@ -9015,9 +8950,6 @@
    |                   |              | subsequently uses a significantly   |
    |                   |              | reduced amount.                     |
    |-------------------+--------------+-------------------------------------|
-<<<<<<< HEAD
-   | "STKSIZ"          | none         | Returns the YottaDB stack size in   |
-=======
    |                   |              | Returns 0 when the process has      |
    |                   |              | sharing disabled, 1 when it has     |
    |                   |              | sharing enabled, and 2 when sharing |
@@ -9035,8 +8967,7 @@
    |                   |              | returns whether a process has opted |
    |                   |              | to share statistics for a region.   |
    |-------------------+--------------+-------------------------------------|
-   | "STKSIZ"          | none         | Returns the GT.M stack size in      |
->>>>>>> df1555e... GT.M V6.3-005
+   | "STKSIZ"          | none         | Returns the YottaDB stack size in   |
    |                   |              | bytes.                              |
    |-------------------+--------------+-------------------------------------|
    | "TOTALBLOCKS"     | region       | Total number of database blocks in  |
@@ -10934,22 +10865,13 @@
 
    Example:
 
-<<<<<<< HEAD
+   YDB>write $ztrnlnm("ydb_dist")
+   /usr/lib/fis-gtm/V6.3-004_x86_64/utf8
    YDB>write $ztrnlnm("ydb_dist","","","","","VALUE")
    /usr/local/lib/yottadb/r122/utf8
    YDB>
 
    This uses $ZTRNLNM() to display the translation value for ydb_dist.
-=======
-   GTM>write $ztrnlnm("gtm_dist","","","","","VALUE")
-   /usr/lib/fis-gtm/V6.3-004_x86_64/utf8
-   GTM>write $ztrnlnm("gtm_dist")
-   /usr/lib/fis-gtm/V6.3-004_x86_64/utf8
-   GTM>
-
-   These example use $ZTRNLNM() to display the translation value for
-   gtm_dist.
->>>>>>> df1555e... GT.M V6.3-005
 
 2 $ZWidth()
    $ZWidth()

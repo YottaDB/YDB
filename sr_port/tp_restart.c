@@ -109,11 +109,6 @@ GBLREF	int4			tstart_gtmci_nested_level;
 GBLREF	int			mumps_status;
 
 LITREF	mval			literal_null;
-<<<<<<< HEAD
-=======
-#endif
-GBLREF int  			mumps_status;
->>>>>>> df1555e... GT.M V6.3-005
 
 error_def(ERR_GVFAILCORE);
 error_def(ERR_REPLONLNRLBK);
@@ -745,7 +740,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			DBGTRIGR((stderr, "tp_restart: Encountered trigger base frame in M-stack unwind - rethrowing\n"));
 			INVOKE_RESTART;
 		}
-<<<<<<< HEAD
 		/* If we unwound to a call-in base frame, and the outermost TSTART happened before the call-in base frame
 		 * was created, we need to return to ydb_ci[p]() with the ERR_TPRETRY error code so this retry code
 		 * can be bubbled up to the caller of the call-in.
@@ -755,9 +749,8 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			mumps_status = ERR_TPRETRY;
 			tprestart_state = TPRESTART_STATE_MSTKUNW;
 			MUM_TSTART;
-=======
-#		endif
-		if (frame_pointer->flags & SFF_CI) /*Call-ins first level frame from filters,and we have to still unwind*/
+		}
+		if (frame_pointer->type & SFT_CI) /*Call-ins first level frame from filters,and we have to still unwind*/
 		{
 			TREF(comm_filter_init) = FALSE;	/* Exiting from filter */
 			op_unwind();			/* Unwind till the base level of CI */
@@ -769,7 +762,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			mumps_status = ERR_TPRETRY;
                         tprestart_state = TPRESTART_STATE_MSTKUNW;
 			MUM_TSTART; /* Trigger the base CI frame */
->>>>>>> df1555e... GT.M V6.3-005
 		}
 		op_unwind();
 	}

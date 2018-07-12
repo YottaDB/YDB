@@ -94,6 +94,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MAX_SOCKETS,                "$ydb_max_sockets
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MAX_STORALLOC,              "$ydb_max_storalloc",              "$gtm_max_storalloc")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MEMORY_RESERVE,             "$ydb_memory_reserve",             "$gtm_memory_reserve")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MSGPREFIX,                  "$ydb_msgprefix",                  "")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MSTACK_CRIT_THRESHOLD,      "$ydb_mstack_crit_threshold",      "$gtm_mstack_crit_threshold")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MSTACK_SIZE,                "$ydb_mstack_size",                "$gtm_mstack_size")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_MUPJNL_PARALLEL,            "$ydb_mupjnl_parallel",            "$gtm_mupjnl_parallel")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_NOCENABLE,                  "$ydb_nocenable",                  "$gtm_nocenable")

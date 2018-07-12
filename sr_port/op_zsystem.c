@@ -42,14 +42,11 @@
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
-<<<<<<< HEAD
 #include "iottdef.h"
 #include "ydb_getenv.h"
-=======
 #include "gtmxc_types.h"
 #include "gtm_filter_command.h"
 #include "restrict.h"
->>>>>>> df1555e... GT.M V6.3-005
 
 #define	ZSYSTEMSTR	"ZSYSTEM"
 /* If command buffer was allocated (which will be only when a non NULL command came
@@ -77,11 +74,8 @@ void op_zsystem(mval *v)
 #else
         int4            wait_stat;
 #endif
-<<<<<<< HEAD
 	boolean_t	resetterm_done_by_me;
-=======
 	gtm_string_t	filtered_command;
->>>>>>> df1555e... GT.M V6.3-005
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

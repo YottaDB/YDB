@@ -198,21 +198,13 @@ boolean_t line(uint4 *lnc)
 		}
 		if ((TREF(block_level) + (int4)(mline_tail->block_ok)) < dot_count)
 		{
-			boolean_t	warn;
-
 			dot_count = TREF(block_level);
-<<<<<<< HEAD
-			warn = (0 != (cmd_qlf.qlf & CQ_WARNINGS));
-			show_source_line(warn);
-			if (warn)
-				dec_err(VARLSTCNT(1) ERR_BLKTOODEEP);
-=======
-			if (!(TREF(compile_time) && !(cmd_qlf.qlf & CQ_WARNINGS)))
+			assert(TREF(compile_time));
+			if (cmd_qlf.qlf & CQ_WARNINGS)
 			{
 				show_source_line(TRUE);
 				dec_err(VARLSTCNT(1) ERR_BLKTOODEEP);
 			}
->>>>>>> df1555e... GT.M V6.3-005
 			TREF(source_error_found) = TRUE;
 			success = FALSE;
 		}

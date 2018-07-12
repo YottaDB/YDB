@@ -95,18 +95,10 @@ boolean_t iosocket_listen_sock(socket_struct *socketptr, unsigned short len)
 	memcpy(&dsocketptr->iod->dollar.key[len], socketptr->handle, socketptr->handle_len);
 	len += socketptr->handle_len;
 	dsocketptr->iod->dollar.key[len++] = '|';
-<<<<<<< HEAD
-	if (socket_local != socketptr->protocol)
-		SPRINTF(&dsocketptr->iod->dollar.key[len], "%d", socketptr->local.port);
-	else
-		SNPRINTF(&dsocketptr->iod->dollar.key[len], DD_BUFLEN - len, "%s",
-					((struct sockaddr_un *)(socketptr->local.sa))->sun_path);
-=======
 	if (socket_local == socketptr->protocol)
 		SNPRINTF(&dsocketptr->iod->dollar.key[len], DD_BUFLEN - len, "%s",
 					((struct sockaddr_un *)(socketptr->local.sa))->sun_path);
 	else
 		SNPRINTF(&dsocketptr->iod->dollar.key[len], DD_BUFLEN - len, "%d", socketptr->local.port);
->>>>>>> df1555e... GT.M V6.3-005
 	return TRUE;
 }

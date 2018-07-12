@@ -672,11 +672,7 @@ CEBIGSKIP	<Compiler escape user routine skip count is too large>/error/fao=0!/an
 CETOOLONG	<Compiler escape substitution exceeds maximum line size>/error/fao=0!/ansi=0
 CENOINDIR	<Indirection type information not available for compiler escape feature>/error/fao=0!/ansi=0
 COLLATIONUNDEF	<Collation type !UL is not defined>/error/fao=1!/ansi=0
-<<<<<<< HEAD
-UNUSEDMSG675	<RBWRNNOTCHG last used in V6.2-002A>/error/fao=0!/ansi=0
-=======
 MSTACKCRIT	<User-specified M stack size critical threshold of !UL not appropriate; must be between !UL and !UL; reverting to !UL>/error/fao=4!/ansi=0
->>>>>>> df1555e... GT.M V6.3-005
 GTMSECSHRSRVF	<!AD - !UL : Attempt to service request failed (retry = !UL)>/error/fao=4!/ansi=0
 FREEZECTRL	<Control Y or control C encountered during attempt to freeze the database. Aborting freeze.>/info/fao=0!/ansi=0
 JNLFLUSH	<Error flushing journal buffers to journal file !AD>/info/fao=2!/ansi=0

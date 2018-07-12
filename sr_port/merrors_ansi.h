@@ -506,11 +506,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* CETOOLONG */
 	   0,	/* CENOINDIR */
 	   0,	/* COLLATIONUNDEF */
-<<<<<<< HEAD:sr_port/merrors_ansi.h
-	   0,	/* UNUSEDMSG675 */
-=======
 	   0,	/* MSTACKCRIT */
->>>>>>> df1555e... GT.M V6.3-005:sr_i386/merrors_ansi.h
 	   0,	/* GTMSECSHRSRVF */
 	   0,	/* FREEZECTRL */
 	   0,	/* JNLFLUSH */

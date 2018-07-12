@@ -111,9 +111,10 @@
 #endif
 
 /* #GTM_THREAD_SAFE : The below macro (MALLOC) is thread-safe because caller ensures serialization with locks */
-<<<<<<< HEAD
 #  define MALLOC(size, addr)											\
 {														\
+	intrpt_state_t  prev_intrpt_state;									\
+														\
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);									\
 	if (!ydbSystemMalloc											\
 		&& (0 < ydb_max_storalloc) && ((size + totalRmalloc + totalRallocGta) > ydb_max_storalloc))	\
@@ -123,7 +124,9 @@
 		gtmMallocErrorErrno = ERR_MALLOCMAXUNIX;							\
 		raise_gtmmemory_error();									\
 	}													\
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);					\
 	addr = (void *)malloc(size);										\
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);					\
 	if (NULL == (void *)addr)										\
 	{													\
 		gtmMallocErrorSize = size;									\
@@ -131,30 +134,6 @@
 		gtmMallocErrorErrno = errno;									\
 		raise_gtmmemory_error();									\
 	}													\
-=======
-#  define MALLOC(size, addr) 										\
-{													\
-	intrpt_state_t  prev_intrpt_state;								\
-	assert(IS_PTHREAD_LOCKED_AND_HOLDER);									\
-	if (!gtmSystemMalloc											\
-		&& (0 < gtm_max_storalloc) && ((size + totalRmalloc + totalRallocGta) > gtm_max_storalloc))	\
-	{	/* Boundary check for $gtm_max_storalloc (if set) */					\
-		gtmMallocErrorSize = size;								\
-		gtmMallocErrorCallerid = CALLERID;							\
-		gtmMallocErrorErrno = ERR_MALLOCMAXUNIX;						\
-		raise_gtmmemory_error();								\
-	}												\
-	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);				\
-	addr = (void *)malloc(size);									\
-	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);				\
-	if (NULL == (void *)addr)									\
-	{												\
-		gtmMallocErrorSize = size;								\
-		gtmMallocErrorCallerid = CALLERID;							\
-		gtmMallocErrorErrno = errno;								\
-		raise_gtmmemory_error();								\
-	}												\
->>>>>>> df1555e... GT.M V6.3-005
 }
 #  define FREE(size, addr) free(addr);
 #define MAXBACKFILL (16 * 1024)			/* Maximum backfill of large structures */
@@ -695,11 +674,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 	 * if this is the normal (default/optimized) case we will fall into the code
 	 * and handle the rerouting at the end.
 	 */
-<<<<<<< HEAD
-	if (GDL_None == ydbDebugLevel)
-=======
-	if (!(gtmDebugLevel & GDL_SmAllMallocDebug))
->>>>>>> df1555e... GT.M V6.3-005
+	if (!(ydbDebugLevel & GDL_SmAllMallocDebug))
 	{
 #	endif
 		/* Note that this if is also structured for maximum fallthru. The else will

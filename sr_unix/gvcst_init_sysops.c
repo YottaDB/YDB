@@ -1700,39 +1700,10 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 					  ERR_TEXT, 2, LEN_AND_LIT("gtmsecshr failed to update database file header"));
 			}
 		}
-<<<<<<< HEAD
 	} else
 		csa->read_only_fs = TRUE;	/* We never want to write to READ_ONLY db file. So treat this as if
 						 * the underlying file system is read-only.
 						 */
-=======
-	} else if (read_only && new_shm_ipc)
-	{	/* For read-only process if shared memory and semaphore created for first time,
-		 * semaphore and shared memory id, and semaphore creation time are written to disk.
-		 */
-		db_ipcs.open_fd_with_o_direct = udi->fd_opened_with_o_direct;
-		db_ipcs.semid = tsd->semid;	/* use tsd instead of csd in order for MM to work too */
-		db_ipcs.shmid = tsd->shmid;
-		db_ipcs.gt_sem_ctime = tsd->gt_sem_ctime.ctime;
-		db_ipcs.gt_shm_ctime = tsd->gt_shm_ctime.ctime;
-		db_ipcs.fn_len = reg->dyn.addr->fname_len;
-		memcpy(db_ipcs.fn, reg->dyn.addr->fname, reg->dyn.addr->fname_len);
-		db_ipcs.fn[reg->dyn.addr->fname_len] = 0;
-		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-		if(!tsd->read_only)
-		{
-			secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
-			csa->read_only_fs = (EROFS == secshrstat);
-		}
-		if ((0 != secshrstat) && !csa->read_only_fs && !tsd->read_only)
-		{
-			if (save_jnlpool != jnlpool)
-				jnlpool = save_jnlpool;
-			RTS_ERROR(VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
-				  ERR_TEXT, 2, LEN_AND_LIT("gtmsecshr failed to update database file header"));
-		}
-	}
->>>>>>> df1555e... GT.M V6.3-005
 	if (save_jnlpool != jnlpool)
 		jnlpool = save_jnlpool;
 	if (ftok_counter_halted || access_counter_halted)

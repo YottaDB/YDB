@@ -342,14 +342,10 @@ MBSTART {														\
 	assert(!CSA_LOCAL || !CSA_LOCAL->region || FILE_INFO(CSA_LOCAL->region)->grabbed_access_sem			\
 			|| !(CSA_LOCAL)->nl || !FROZEN_CHILLED(CSA_LOCAL) || FREEZE_LATCH_HELD(CSA_LOCAL));		\
 	DBG_CHECK_DIO_ALIGNMENT(UDI, OFFSET, BUFF, SIZE);								\
-<<<<<<< HEAD
 	/* We should never write to a READ_ONLY db file header unless we hold standalone access on the db */		\
 	assert((0 != OFFSET) || !((sgmnt_data_ptr_t)BUFF)->read_only || (NULL == UDI) || UDI->grabbed_access_sem);	\
-	DO_LSEEKWRITE(CSA_LOCAL, DB_FN, FD, OFFSET, BUFF, SIZE, STATUS, fake_db_enospc, LSEEKWRITE_IS_TO_DB);		\
-=======
 	DO_LSEEKWRITE(CSA_LOCAL, DB_FN, FD, OFFSET, BUFF, SIZE, STATUS, fake_db_enospc, DB_LSEEKWRITE_HANG(CSA),	\
 			LSEEKWRITE_IS_TO_DB);										\
->>>>>>> df1555e... GT.M V6.3-005
 } MBEND
 
 /* This is similar to DB_LSEEKWRITE except that this is used by GTMSECSHR and since that is root-owned we do not want

@@ -75,33 +75,19 @@ GBLREF jnlpool_addrs_ptr_t	jnlpool;
 GBLREF bool			undef_inhibit;
 GBLREF int4			break_message_mask;
 GBLREF command_qualifier	 cmd_qlf;
-GBLREF tp_frame		*tp_pointer;
-<<<<<<< HEAD
-GBLREF uint4		dollar_tlevel;
-GBLREF int4		zdir_form;
-GBLREF boolean_t	badchar_inhibit;
-GBLREF boolean_t	gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database blocks */
-GBLREF int		gv_fillfactor;
-GBLREF int4		ydb_max_sockets;
-GBLREF gv_key		*gv_currkey;
-GBLREF boolean_t	is_ydb_chset_utf8;
-GBLREF int4		gtm_trigger_depth;
-GBLREF uint4		process_id;
-GBLREF boolean_t	dmterm_default;
-GBLREF mstr		extnam_str;
-=======
+GBLREF tp_frame			*tp_pointer;
 GBLREF uint4			dollar_tlevel;
 GBLREF int4			zdir_form;
 GBLREF boolean_t		badchar_inhibit;
 GBLREF boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database blocks */
 GBLREF int			gv_fillfactor;
-GBLREF int4			gtm_max_sockets;
+GBLREF int4			ydb_max_sockets;
 GBLREF gv_key			*gv_currkey;
-GBLREF boolean_t		is_gtm_chset_utf8;
-GBLREF	uint4			process_id;
+GBLREF boolean_t		is_ydb_chset_utf8;
+GBLREF int4			gtm_trigger_depth;
+GBLREF uint4			process_id;
+GBLREF boolean_t		dmterm_default;
 GBLREF mstr			extnam_str;
-GBLREF	boolean_t		dmterm_default;
->>>>>>> df1555e... GT.M V6.3-005
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_GBLNOMAPTOREG);
@@ -113,23 +99,12 @@ LITREF	mstr		relink_allowed_mstr[];
 LITREF	mval		literal_zero;
 LITREF	mval		literal_one;
 
-<<<<<<< HEAD
 /* Define possible return values for "ENVIRONMENT" */
-#define	ENV_MUMPS		"MUMPS"
-#define ENV_CALLIN		"CALLIN"
-#define ENV_MUPIP		"MUPIP"
-#define ENV_TRIGGER		"TRIGGER"
+#define		ENV_MUMPS		"MUMPS"
+#define		ENV_CALLIN		"CALLIN"
+#define		ENV_MUPIP		"MUPIP"
+#define		ENV_TRIGGER		"TRIGGER"
 
-#define	MM_RES			"MM"
-#define	BG_RES			"BG"
-#define	CM_RES			"CM"
-#define	USR_RES			"USR"
-#define	GTM_BOOL_RES		"GT.M Boolean short-circuit"
-#define	STD_BOOL_RES		"Standard Boolean evaluation side effects"
-#define	WRN_BOOL_RES		"Standard Boolean with side-effect warning"
-#define	STATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
-#define	STATS_KEYWD_SIZE	(3 + 1 + 1)	/* 3 character mnemonic, colon and comma */
-=======
 #define		MM_RES			"MM"
 #define		BG_RES			"BG"
 #define		CM_RES			"CM"
@@ -140,7 +115,6 @@ LITREF	mval		literal_one;
 #define		NO_REPLINST		"No replication instance defined"
 #define		STATS_MAX_DIGITS	MAX_DIGITS_IN_INT8
 #define		STATS_KEYWD_SIZE	(3 + 1 + 1)	/* 3 character mnemonic, colon and comma */
->>>>>>> df1555e... GT.M V6.3-005
 
 #define STATS_PUT_PARM(TXT, CNTR, BASE)					\
 {									\

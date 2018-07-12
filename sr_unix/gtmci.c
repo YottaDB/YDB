@@ -1,4 +1,3 @@
-
 /****************************************************************
  *								*
  * Copyright (c) 2001-2018 Fidelity National Information	*
@@ -78,11 +77,9 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "have_crit.h"
 #include "callg.h"
 #include "min_max.h"
-<<<<<<< HEAD
 #include "alias.h"
 #include "parm_pool.h"
 #include "auto_zlink.h"
-#include "fileinfo.h"
 #include "filestruct.h"
 #include "gdscc.h"
 #include "gdskill.h"
@@ -92,19 +89,6 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "ydb_getenv.h"
-=======
-#include "filestruct.h"
-#include "gdscc.h"
-#include "jnl.h"
-#include "gdskill.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
-#include "buddy_list.h"		/* needed for tp.h */
-#include "tp.h"
-
-#if defined(__x86_64__)
-extern	void	opp_ciret();
-#endif
->>>>>>> df1555e... GT.M V6.3-005
 
 GBLREF  stack_frame     	*frame_pointer;
 GBLREF  unsigned char		*msp;
@@ -224,12 +208,8 @@ error_def(ERR_SYSCALL);
 	}										\
 }
 
-<<<<<<< HEAD
-STATICFNDCL callin_entry_list* get_entry(const char *call_name);
-STATICFNDEF callin_entry_list* get_entry(const char *call_name)
-=======
-static callin_entry_list* get_entry(const char* call_name, int internal)
->>>>>>> df1555e... GT.M V6.3-005
+STATICFNDCL callin_entry_list* get_entry(const char *call_name, int internal);
+STATICFNDEF callin_entry_list* get_entry(const char *call_name, int internal)
 {	/* Lookup in a hashtable for entry corresponding to routine name */
 	ht_ent_str      *callin_entry;
 	stringkey       symkey;
@@ -620,14 +600,8 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	return 0;
 }
 
-<<<<<<< HEAD
 /* Common work-routine for ydb_ci() and ydb_cip() to drive callin */
-int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var)
-=======
-/* Common work-routine for gtm_ci() and gtm_cip() to drive callin */
-int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var,
-										boolean_t internal_use)
->>>>>>> df1555e... GT.M V6.3-005
+int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var, boolean_t internal_use)
 {
 	boolean_t		need_rtnobj_shm_free;
 	va_list			var;
@@ -649,16 +623,19 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	stringkey       	symkey;
 	ht_ent_str		*syment;
 	intrpt_state_t		old_intrpt_state;
-<<<<<<< HEAD
 	boolean_t		ci_ret_code_quit_needed = FALSE;
-=======
 	boolean_t		unwind_here = FALSE;
->>>>>>> df1555e... GT.M V6.3-005
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	VAR_COPY(var, temp_var);
 	added = FALSE;
+	if (internal_use)
+	{
+		TREF(comm_filter_init) = TRUE;
+		if (!(frame_pointer->type & SFT_CI))
+			unwind_here = TRUE;
+	}
 	/* Do the "ydb_init" (if needed) first as it would set gtm_threadgbl etc. which is needed to use TREF later */
 	if (!gtm_startup_active)
 	{
@@ -699,35 +676,15 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
-<<<<<<< HEAD
-=======
-	if (internal_use)
-	{
-		TREF(comm_filter_init) = TRUE;
-		if (!(frame_pointer->flags & SFF_CI))
-			unwind_here = TRUE;
-	}
-	if (!gtm_startup_active || !(frame_pointer->flags & SFF_CI))
-	{
-		if ((status = gtm_init()) != 0)		/* Note - sets fgncal_stack */
-			return status;
-		if (NULL == lcl_gtm_threadgbl) /*This will happen when user did not call gtm_init() earlier*/
-                          SETUP_THREADGBL_ACCESS;
-	}
->>>>>>> df1555e... GT.M V6.3-005
 	assert(NULL == TREF(temp_fgncal_stack));
 	FGNCAL_UNWIND;		/* note - this is outside the establish since gtmci_ch calso calls fgncal_unwind() which,
 				 * if this failed, would lead to a nested error which we'd like to avoid */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
-<<<<<<< HEAD
-	if (!TREF(ci_table))	/* load the call-in table only once from env variable ydb_ci/GTMCI  */
-=======
 	if (!internal_use)
->>>>>>> df1555e... GT.M V6.3-005
 	{
-		if (!TREF(ci_table))	/* load the call-in table only once from env variable GTMCI  */
+		if (!TREF(ci_table))	/* load the call-in table only once from env variable ydb_ci/GTMCI  */
 		{
 			TREF(ci_table) = citab_parse(internal_use);
 			if (!TREF(callin_hashtab))
@@ -983,7 +940,8 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
 		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
 		 */
-<<<<<<< HEAD
+		if (internal_use)
+			TREF(comm_filter_init) = FALSE;  /*exiting from filters*/
 		if (mumps_status)
 		{	/* This is an error codepath. Do cleanup of frames (including the call-in base frame)
 			 * and rethrow error if needed. Currently only the following error(s) need rethrow.
@@ -1006,15 +964,6 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		}
 		if (ci_ret_code_quit_needed)
 			ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
-=======
-		if (internal_use)
-			TREF(comm_filter_init) = FALSE;  /*exiting from filters*/
-		if (ERR_TPRETRY == mumps_status)
-		{
-                          ci_ret_code_quit(); /*Unwind the whole CI frame and frame_pointer points to the caller now*/
-                          DRIVECH(mumps_status);
-		}
->>>>>>> df1555e... GT.M V6.3-005
 		return mumps_status;
 	}
 	ESTABLISH_RET(gtmci_ch, mumps_status);
@@ -1115,21 +1064,14 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	REVERT;
 	assert(NULL == TREF(temp_fgncal_stack));
 	FGNCAL_UNWIND;
-<<<<<<< HEAD
-	if (ci_ret_code_quit_needed)
-		ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
-=======
-	/* Added below, since GTMCI only unwinds back to current CI frame,
+	/* Added below, since ydb_ci/GTMCI only unwinds back to current CI frame,
 	 * to unwind the two frames (current + base)
 	 * in normal scenarios, gtm_exit is called
 	 */
 	if (internal_use)
-	{
 		TREF(comm_filter_init) = FALSE;  /* Exiting from filters */
-		if (unwind_here)
-			ci_ret_code_quit();
-	}
->>>>>>> df1555e... GT.M V6.3-005
+	if (ci_ret_code_quit_needed || unwind_here)
+		ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
 	return 0;
 }
 
@@ -1139,11 +1081,7 @@ int ydb_ci(const char *c_rtn_name, ...)
 	va_list var;
 
 	VAR_START(var, c_rtn_name);
-<<<<<<< HEAD
-	return ydb_ci_exec(c_rtn_name, NULL, FALSE, var);
-=======
-	return gtm_ci_exec(c_rtn_name, NULL, FALSE, var, FALSE);
->>>>>>> df1555e... GT.M V6.3-005
+	return ydb_ci_exec(c_rtn_name, NULL, FALSE, var, FALSE);
 }
 
 /* Fast path call-in driver version - Adds a struct parm that contains name resolution info after first call
@@ -1154,10 +1092,7 @@ int ydb_cip(ci_name_descriptor* ci_info, ...)
 	va_list var;
 
 	VAR_START(var, ci_info);
-<<<<<<< HEAD
-	return ydb_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, var);
-=======
-	return gtm_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, var, FALSE);
+	return ydb_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, var, FALSE);
 }
 
 int gtm_ci_filter(const char *c_rtn_name, ...)
@@ -1165,8 +1100,7 @@ int gtm_ci_filter(const char *c_rtn_name, ...)
 	va_list var;
 
 	VAR_START(var, c_rtn_name);
-	return gtm_ci_exec(c_rtn_name, NULL, FALSE, var, TRUE);
->>>>>>> df1555e... GT.M V6.3-005
+	return ydb_ci_exec(c_rtn_name, NULL, FALSE, var, TRUE);
 }
 
 #ifdef GTM_PTHREAD
@@ -1318,47 +1252,8 @@ int ydb_init()
 		 * of the previous stack) are kept from being unwound.
 		 */
 		SAVE_FGNCAL_STACK;
-<<<<<<< HEAD
 	} else if (!(frame_pointer->type & SFT_CI))
 		ydb_nested_callin();	/* Nested call-in: setup a new CI environment (additional SFT_CI base-frame) */
-=======
-	} else if (!(frame_pointer->flags & SFF_CI))
-	{	/* Nested call-in: setup a new CI environment (SFF_CI frame on top of base-frame).
-		 * Temporarily mark the beginning of the new stack so that initialization errors in
-		 * call-in frame do not unwind entries of the previous stack (see gtmci_ch). For the
-		 * duration that temp_fgncal_stack has a non-NULL value, it overrides fgncal_stack.
-		 */
-		TREF(temp_fgncal_stack) = msp;
-		/* Generate CIMAXLEVELS error if gtmci_nested_level > CALLIN_MAX_LEVEL */
-		if (CALLIN_MAX_LEVEL < TREF(gtmci_nested_level))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CIMAXLEVELS, 1, TREF(gtmci_nested_level));
-		/* Disallow call-ins within a TP boundary since TP restarts are not supported
-		 * currently across nested call-ins. When we implement TP restarts across call-ins,
-		 * this error needs be changed to a Warning or Notification. Tp allowed if a filter
-		 * call is being made from inside GT.M.
-		 */
-		if (dollar_tlevel && ((!TREF(comm_filter_init)) || (TREF(gtmci_nested_level))))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CITPNESTED);
-		base_addr = make_cimode();
-		transfer_addr = PTEXT_ADR(base_addr);
-		gtm_init_env(base_addr, transfer_addr);
-#if defined(__x86_64__)
-		SET_CI_ENV(opp_ciret);
-#else
-		SET_CI_ENV(ci_ret_code_exit);
-#endif
-		gtmci_isv_save();
-		(TREF(gtmci_nested_level))++;
-		/* Now that the base-frames for this call-in level have been created, we can create the mv_stent
-		 * to save the previous call-in level's fgncal_stack value and clear the override. When this call-in
-		 * level pops, fgncal_stack will be restored to the value for the previous level. When a given call
-		 * at *this* level finishes, this current value of fgncal_stack is where the stack is unrolled to to
-		 * be ready for the next call.
-		 */
-		SAVE_FGNCAL_STACK;
-		TREF(temp_fgncal_stack) = NULL;		/* Drop override */
-	}
->>>>>>> df1555e... GT.M V6.3-005
 	REVERT;
 	assert(NULL == TREF(temp_fgncal_stack));
 	return 0;

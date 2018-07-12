@@ -160,15 +160,9 @@ typedef enum {
 	WBTEST_BADDUP_PIPE_STDERR1,		/* 111 : Prevent dup2() of stderr in forked piped process */
 	WBTEST_BADDUP_PIPE_STDERR2,		/* 112 : Prevent second dup2() of stderr in forked piped process */
 	WBTEST_BADEXEC_PIPE_PROCESS,		/* 113 : Prevent the SECSHR process from being EXEC'ed */
-<<<<<<< HEAD
 	WBTEST_MAXYDBDIST_UPDATE_PROCESS,	/* 114 : Make ydb_dist too big for update process */
 	WBTEST_MAXYDBDIST_HELPER_PROCESS,	/* 115 : Make ydb_dist too big for helper process */
-	WBTEST_MAX_TRIGNAME_SEQ_NUM,		/* 116 : Induce "too many triggers" error sooner (MAX_TRIGNAME_SEQ_NUM) */
-=======
-	WBTEST_MAXGTMDIST_UPDATE_PROCESS,	/* 114 : Make gtm_dist too big for update process */
-	WBTEST_MAXGTMDIST_HELPER_PROCESS,	/* 115 : Make gtm_dist too big for helper process */
 	WBTEST_QUERY_HANG,			/* 116 : Hangs to verify that statsdb doesn't decrement */
->>>>>>> df1555e... GT.M V6.3-005
 	WBTEST_RELINKCTL_MAX_ENTRIES,		/* 117 : Bring down the maximum number of relink control entries in one file */
 	WBTEST_FAKE_BIG_KEY_COUNT,		/* 118 : Fake large increase in mupip load key count to show it does not overflow */
 	WBTEST_TEND_GBLJRECTIME_SLEEP,		/* 119 : Sleep in t_end after SET_GBL_JREC_TIME to induce GTM-8332 */
@@ -193,14 +187,11 @@ typedef enum {
 	WBTEST_DOLLARDEVICE_BUFFER,		/* 138 : Force larger error messages for $device to exceed DD_BUFLEN */
 	WBTEST_LOWERED_JNLEPOCH,		/* 139 : Force larger error messages for $device to exceed DD_BUFLEN */
 	WBTEST_SIGTERM_IN_JOB_CHILD,		/* 140 : Generate Sigterm  by killing ourselves before the child fork */
-<<<<<<< HEAD
-=======
 	WBTEST_DB_BLOCKS_WARN,			/* 141 : Force approaching X% of total block limit warning */
 	WBTEST_JNL_WRITE_HANG,			/* 142 : Hang after a number of journal writes */
 	WBTEST_DB_WRITE_HANG,			/* 143 : Hang after a number of database writes */
 	WBTEST_EXPECT_IO_HANG,			/* 144 : Like the above two cases, but using external tools to cause the hang. */
-	WBTEST_MURUNDOWN_KILLCMT06		/* 145 : Kill an update process in CMT06, to test a special case */
->>>>>>> df1555e... GT.M V6.3-005
+	WBTEST_MURUNDOWN_KILLCMT06,		/* 145 : Kill an update process in CMT06, to test a special case */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

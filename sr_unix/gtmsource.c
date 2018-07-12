@@ -64,7 +64,6 @@
 #include "mutex.h"
 #include "gtm_zlib.h"
 #include "fork_init.h"
-#include "io.h"
 #include "gtmio.h"
 #include "io.h"
 #ifdef GTM_TLS
@@ -122,7 +121,6 @@ error_def(ERR_TEXT);
 int gtmsource()
 {
 	int			status, log_init_status, waitpid_res, save_errno;
-	struct stat		stat_buf;
 	char			print_msg[1024], tmpmsg[1024];
 	gd_region		*reg, *region_top;
 	sgmnt_addrs		*csa, *repl_csa;
@@ -285,7 +283,6 @@ int gtmsource()
 		 */
 		gtmsource_exit(isalive ? SRV_ALIVE : SRV_ERR);
 	}
-<<<<<<< HEAD
 	/* At this point, the parent source server startup command would have done an "io_init" and attached to
 	 * fds = 0, 1 and 2. The child source server is going to close fd=0 here (i.e. point to /dev/null) and
 	 * about to close 1 and 2 a little later in repl_log_init (i.e. point to the source server log file).
@@ -306,8 +303,6 @@ int gtmsource()
 	CLOSEFILE(null_fd, rc);
 	if (0 > rc)
 		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
-=======
->>>>>>> df1555e... GT.M V6.3-005
 	/* The parent process (source server startup command) will be holding the ftok semaphore and jnlpool access semaphore
 	 * at this point. The variables that indicate this would have been copied over to the child during the fork. This will
 	 * make the child think it is actually holding them as well when actually it is not. Reset those variables in the child
@@ -337,23 +332,6 @@ int gtmsource()
 	if (-1 == (procgp = setsid()))
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 				RTS_ERROR_LITERAL("Source server error in setsid"), errno);
-	/* Point stdin to /dev/null */
-	OPENFILE("/dev/null", O_RDONLY, null_fd);
-	if (0 > null_fd)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
-	assert(null_fd > 2);
-	/* Detached from the initiating process, now detach from the starting IO */
-	io_rundown(NORMAL_RUNDOWN);
-	FSTAT_FILE(gtmsource_log_fd, &stat_buf, log_init_status);
-	assertpro(!log_init_status);	/* io_rundown should not affect the log file */
-	DUP2(null_fd, 0, rc);
-	if (0 > rc)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
-	/* Re-init IO now that we have opened the log file and set stdin to /dev/null */
-	io_init(IS_MUPIP_IMAGE);
-	CLOSEFILE(null_fd, rc);
-	if (0 > rc)
-		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
 #	endif /* REPL_DEBUG_NOBACKGROUND */
 	if (ZLIB_CMPLVL_NONE != ydb_zlib_cmp_level)
 		gtm_zlib_init();	/* Open zlib shared library for compression/decompression */

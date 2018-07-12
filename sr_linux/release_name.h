@@ -17,10 +17,9 @@
  ****************************************************************/
 
 #ifndef GTM_RELEASE_NAME
-<<<<<<< HEAD
 
 #define GTM_VERSION		"V6.3"
-#define	GTM_ZVERSION		"V6.3-004"
+#define	GTM_ZVERSION		"V6.3-005"
 #define	YDB_ZYRELEASE		"r1.23"
 
 /* Note: YDB_RELEASE_STAMP is set as part of the cmake build process.
@@ -36,30 +35,12 @@
 # define YDB_PLATFORM		"Linux armv7l"
 #else
 # define YDB_PLATFORM		"Linux x86"
-=======
-#ifdef __CYGWIN__
-#define GTM_RELEASE_NAME 	"GT.M V6.3-005 CYGWIN x86"
-#elif defined(__ia64)
-#define GTM_RELEASE_NAME 	"GT.M V6.3-005 Linux IA64"
-#elif defined(__x86_64__)
-#define GTM_RELEASE_NAME 	"GT.M V6.3-005 Linux x86_64"
-#elif defined(__s390__)
-#define GTM_RELEASE_NAME 	"GT.M V6.3-005 Linux S390X"
-#else
-#define GTM_RELEASE_NAME 	"GT.M V6.3-005 Linux x86"
-#endif
->>>>>>> df1555e... GT.M V6.3-005
 #endif
 
 #define GTM_RELEASE_NAME 	"GT.M" " " GTM_ZVERSION " " YDB_PLATFORM
 #define YDB_RELEASE_NAME 	"YottaDB" " " YDB_ZYRELEASE " " YDB_PLATFORM
 #define	YDB_AND_GTM_RELEASE_NAME	GTM_RELEASE_NAME " " "YottaDB" " " YDB_ZYRELEASE
 #define GTM_PRODUCT 		"GT.M"
-<<<<<<< HEAD
 #define YDB_PRODUCT		"YottaDB"
 
 #endif
-=======
-#define GTM_VERSION		"V6.3"
-#define GTM_RELEASE_STAMP	"20180625 11:40"
->>>>>>> df1555e... GT.M V6.3-005

@@ -1,15 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
-=======
- * Copyright (c) 2001-2018 Fidelity National Information	*
- * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> df1555e... GT.M V6.3-005
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,13 +44,8 @@
 void	ci_ret_code_quit(void);
 void	gtmci_isv_save(void);
 void	gtmci_isv_restore(void);
-<<<<<<< HEAD
-int 	ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list var);
 void	ydb_nested_callin(void);
-=======
-rhdtyp 	*make_cimode(void);
-int 	gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list var, boolean_t internal_use);
->>>>>>> df1555e... GT.M V6.3-005
+int 	ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list var, boolean_t internal_use);
 #ifdef _AIX
 void	gtmci_cleanup(void);
 #endif

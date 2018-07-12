@@ -145,14 +145,6 @@ boolean_t ftok_sem_get_common(gd_region *reg, boolean_t incr_cnt, int project_id
 		/* If we found there is no sem, create and initialize one. */
 		if (sem_known_removed)
 		{
-<<<<<<< HEAD
-			save_errno = errno;
-			if (SEM_REMOVED(save_errno))
-			{	/* start afresh for next iteration of for loop with new semid and initial operations */
-				*ftok_counter_halted = FALSE;
-				SET_YDB_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
-				continue;
-=======
 			if (INVALID_SEMID == (ftokid = udi->ftok_semid = semget(udi->key, FTOK_SEM_PER_ID, RWDALL | IPC_CREAT)))
 			{
 				save_errno = errno;
@@ -166,12 +158,11 @@ boolean_t ftok_sem_get_common(gd_region *reg, boolean_t incr_cnt, int project_id
 				if (SEM_REMOVED(save_errno))
 				{	/* start afresh for next iteration of for loop with new semid and initial operations */
 					*ftok_counter_halted = FALSE;
-					SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
+					SET_YDB_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
 					sem_known_removed = TRUE;
 					continue;
 				}
 				RETURN_SEMWAIT_FAILURE(retstat, save_errno, op_semctl, 0, ERR_CRITSEMFAIL, 0);
->>>>>>> df1555e... GT.M V6.3-005
 			}
 		}
 		/* First try is always non-blocking */
@@ -222,12 +213,8 @@ boolean_t ftok_sem_get_common(gd_region *reg, boolean_t incr_cnt, int project_id
 		if (SEM_REMOVED(save_errno))
 		{	/* start afresh for next iteration of for loop with new semid and ftok_sopcnt */
 			*ftok_counter_halted = FALSE;
-<<<<<<< HEAD
 			SET_YDB_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
-=======
-			SET_GTM_SOP_ARRAY(ftok_sop, ftok_sopcnt, incr_cnt, (SEM_UNDO | IPC_NOWAIT));
 			sem_known_removed = TRUE;
->>>>>>> df1555e... GT.M V6.3-005
 			continue;
 		}
 		assert(EINTR != save_errno);

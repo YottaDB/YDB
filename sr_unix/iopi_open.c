@@ -47,24 +47,19 @@
 #include "wbox_test_init.h"
 #include "op.h"
 #include "indir_enum.h"
-<<<<<<< HEAD
-#include "ydb_getenv.h"
-<<<<<<< a78302f040b4018d3844f95630e82a87cbe8179a
-#include "min_max.h"
-#include "ident.h"
-=======
-=======
 #include "gtmxc_types.h"
 #include "gtm_filter_command.h"
->>>>>>> df1555e... GT.M V6.3-005
->>>>>>> [V63005] Merge GT.M V6.3-005 into YottaDB mainline (with conflicts)
+#include "ydb_getenv.h"
+#include "min_max.h"
+#include "ident.h"
 
-LITREF	unsigned char		io_params_size[];
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
 GBLREF	boolean_t		gtm_pipe_child;
 GBLREF	char			ydb_dist[YDB_PATH_MAX];
 GBLREF	boolean_t		ydb_dist_ok_to_use;
 GBLREF  volatile boolean_t      timer_in_handler;
+
+LITREF	unsigned char		io_params_size[];
 
 error_def(ERR_DEVOPENFAIL);
 error_def(ERR_RESTRICTEDOP);
@@ -331,13 +326,9 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	boolean_t	textflag;
 	int		ccsid, status, realfiletag;
 #endif
-<<<<<<< a78302f040b4018d3844f95630e82a87cbe8179a
         char		dev_name_buf[LOGNAME_LEN];
 	mstr		dev_mstr;
-=======
 	gtm_string_t    filtered_command;
-
->>>>>>> [V63005] Merge GT.M V6.3-005 into YottaDB mainline (with conflicts)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

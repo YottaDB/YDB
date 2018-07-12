@@ -170,14 +170,8 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
                                                 {       /* Did not get the csr we intended so something must be wrong with cache.
                                                          * Kill -9 can cause this. Assert that we were doing a crash shutdown.
                                                          */
-<<<<<<< HEAD
-							assert(ydb_white_box_test_case_enabled
-								&& (WBTEST_CRASH_SHUTDOWN_EXPECTED
-								== ydb_white_box_test_case_number));
-=======
 							assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
 								|| WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
->>>>>>> df1555e... GT.M V6.3-005
 							SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 							ret_value = ERR_DBCCERR;
 							break;
