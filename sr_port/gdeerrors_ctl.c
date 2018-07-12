@@ -106,12 +106,12 @@ LITDEF	err_msg gdeerrors[] = {
 };
 
 
-GBLDEF	err_ctl gdeerrors_ctl = {
-
 
 LITDEF	int gdeerrors_undocarr[] = {
 };
 
+
+GBLDEF	err_ctl gdeerrors_ctl = {
 	248,
 	"GDE",
 	&gdeerrors[0],

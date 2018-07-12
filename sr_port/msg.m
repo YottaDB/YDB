@@ -201,13 +201,13 @@
  . Quit
  Use out
  Write "};",!!
- Write !,"GBLDEF",$Char(9),"err_ctl "_fn_"_ctl = {",!
  Do
  . Use out
  . Write !!,"LITDEF"_$Char(9)_"int "_undocarr_"[] = {",!
  . For i1=1:1:undocmsgcnt  Write $char(9)_undocmnemonic(i1,"code")_","_$char(9)_"/* "_undocmnemonic(i1)_" */",!
  . Write "};",!!
  . Quit
+ Write !,"GBLDEF",$Char(9),"err_ctl "_fn_"_ctl = {",!
  Write $Char(9),facnum,",",!
  Write $Char(9),""""_facility_""",",!
  Write $Char(9),$Select(vms:"NULL,",1:"&"_fn_"[0],"),!
