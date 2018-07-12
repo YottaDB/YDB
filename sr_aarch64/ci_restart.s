@@ -41,6 +41,8 @@ ENTRY ci_restart
 	mov	x29, sp					/* save sp here - to be restored after op_extexfun or op_extcall */
 	ldr	w9, [x13, #argcnt]			/* argcnt */
 	ADJ_STACK_ALIGN_EVEN_ARGS w9
+	mov	x28, sp					/* xxxxxxx Use x28 instead of sp for store since sp needs 16-byte alignment
+							 * At the end, sp will be properly aligned */
 	mov	w14, w9
 	cmp	w9, wzr					/* if (argcnt > 0) { */
 	b.le	L0
@@ -50,13 +52,16 @@ ENTRY ci_restart
 	add	x12, x12, x10				/* point at last arg */
 L1:
 	ldr	w10, [x12], #-8				/* push arguments backwards to stack */
-	sub	sp, sp, #8
-	str	x10, [sp]
+	str	w10, [x28, #-8]!
+/* xxxxxxx	sub	sp, sp, #8
+	str	x10, [sp] */
 	subs	w9, w9, #1
 	b.ne	L1					/* } */
 L0:
-	sub	sp, sp, #8				/* push arg count on stack */
-	str	x14, [sp]
+	str	x14, [x28, #-8]!				/* push arg count on stack */
+/* xxxxxxx	sub	sp, sp, #8 */				/* push arg count on stack */
+	/* xxxxxxx	str	x14, [sp] */
+	mov	sp, x28						/* Restore actual sp */
 	ldr	x12, [x13, #mask]
 	ldr	w11, [x13, #retaddr]
 	ldr	w10, [x13, #labaddr]
