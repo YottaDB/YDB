@@ -120,11 +120,11 @@ ENTRY op_mprofextexfun
 								/* .. should never happen for indirects */
 	cmp	x1, #-1						/* Using proxy table, label index must be -1 */
 	b.ne	gtmcheck
-	ldr	x1, [x3, #8]					/* ->label table code offset ptr */
-	cbz	x1, gtmcheck					/* If labaddr == 0 && rhdaddr != 0, label does not exist */
+	ldr	x15, [x3, #8]					/* ->label table code offset ptr */
+	cbz	x15, gtmcheck					/* If labaddr == 0 && rhdaddr != 0, label does not exist */
 								/* .. which also should never happen for indirects */
-	ldr	x15, [x3, #16]					/* See if a parameter list was supplied */
-	cbz	x15, fmllstmissing				/* If not, raise error */
+	ldr	x12, [x3, #16]					/* See if a parameter list was supplied */
+	cbz	x12, fmllstmissing				/* If not, raise error */
 
 	b	justgo						/* Bypass autorelink check for indirects (done by caller) */
 	/*
@@ -152,17 +152,18 @@ getlabeloff:
 	add	x2, x1, x3
 	ldr	x2, [x2]					/* See if defined */
 	cbz	x2, label_missing
-	ldr	x1, [x2]					/* -> label table code offset */
+	mov	x1, x2						/* -> label table code offset */
 	ldr	w15, [x1, #8]
 	cbz	w15, fmllstmissing				/* If has_parms == 0, then issue an error */
+	ldr	x15, [x1]					/* &(code_offset) for this label (usually & of lntabent) */
 	/*
 	 * Create stack frame and invoke routine
 	 */
 justgo:
-	cbz	x1, label_missing
-	ldr	w2, [x1]					/* Code offset for this label */
+	cbz	x15, label_missing
+	ldr	w2, [x15]					/* Code offset for this label */
 	ldr	x1, [x0, #mrt_ptext_adr]
-	add	x2, x1, w2, sxtw					/* Transfer address: codebase reg + offset to label */
+	add	x2, x1, w2, sxtw				/* Transfer address: codebase reg + offset to label */
 	ldr	x1, [x0, #mrt_lnk_ptr]				/* Linkage table address (context pointer) */
 	bl	new_stack_frame_sp
 	/*
@@ -244,7 +245,7 @@ gtmcheck:
  * Make call so we can raise the appropriate LABELMISSING error for the not-found label.
  */
 label_missing:
-	mov	x0, x27						/* Index to linkage table and to linkage name table */
+	mov	x0, x28						/* Index to linkage table and to linkage name table */
 	bl	laberror
 	b	retlab
 /*
