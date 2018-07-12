@@ -104,8 +104,8 @@ ENTRY op_extcall
 								/* .. should never happen for indirects */
 	cmp	x1, #-1						/* Using proxy table, label index must be -1 */
 	b.ne	gtmcheck
-	ldr	x1, [x3, #8]					/* ->label table code offset ptr */
-	cbz	x1, gtmcheck					/* If labaddr == 0 && rhdaddr != 0, label does not exist */
+	ldr	x15, [x3, #8]					/* ->label table code offset ptr */
+	cbz	x15, gtmcheck					/* If labaddr == 0 && rhdaddr != 0, label does not exist */
 								/* .. which also should never happen for indirects */
 	b	justgo						/* Bypass autorelink check for indirects (done by caller) */
 	/*
@@ -133,13 +133,14 @@ getlabeloff:
 	add	x2, x1, x3
 	ldr	x2, [x2]					/* See if defined */
 	cbz	x2, label_missing
-	ldr	x1, [x2]					/* -> label table code offset */
+	mov	x1, x2						/* -> label table code offset */
+	ldr	x15, [x1]					/* &(code_offset) for this label (usually & of lntabent) */
 	/*
 	 * Create stack frame and invoke routine
 	 */
 justgo:
-	cbz	x1, label_missing
-	ldr	w2, [x1]					/* Code offset for this label */
+	cbz	x15, label_missing
+	ldr	w2, [x15]					/* Code offset for this label */
 	ldr	x1, [x0, #mrt_ptext_adr]
 	add	x2, x1, w2, sxtw				/* Transfer address: codebase reg + offset to label */
 	ldr	x1, [x0, #mrt_lnk_ptr]				/* Linkage table address (context pointer) */
