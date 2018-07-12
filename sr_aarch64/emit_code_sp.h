@@ -318,7 +318,7 @@ xxxxxxx */
 #define GEN_LOAD_WORD_EMIT(reg)		emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_LOAD, reg)
 
 #define GEN_SUBTRACT_REGS(src1, src2, trgt)											\
-	code_buf[code_idx++] = CODE_BUF_GEN_DNM(AARCH64_INS_SUB_REG, trgt, src1, src2);
+	code_buf[code_idx++] = CODE_BUF_GEN_DNM(AARCH64_INS_SUB_REG | 0x20000000, trgt, src1, src2);
 
 #define GEN_ADD_IMMED(reg, imval)												\
 {																\
@@ -365,14 +365,15 @@ xxxxxxx */
 		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP, offset);			\
 		if (MAX_16BIT < offset)												\
 		{														\
-			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP, (offset & 0xffff0000) >> 16, 1); \
+			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP,		\
+									  (offset & 0xffff0000) >> 16, 1);			\
 		}														\
 		/* Divide offset by 16, add 1, and multiply it by 16 -- multiply is done within the subtract */			\
-		/* The ((offset / 16) + 1) * 16 is to ensure 16 byte stack alignment xxxxxxx 0x206000 */			\
+		/* The ((offset / 16) + 1) * 16 is to ensure 16 byte stack alignment */						\
 		code_buf[code_idx++] = CODE_BUF_GEN_DN_IMMR(AARCH64_INS_LSR, GTM_REG_CODEGEN_TEMP, GTM_REG_CODEGEN_TEMP, 4);	\
 		code_buf[code_idx++] = CODE_BUF_GEN_DN_IMM12(AARCH64_INS_ADD_IMM, GTM_REG_CODEGEN_TEMP, GTM_REG_CODEGEN_TEMP, 1);\
-		code_buf[code_idx++] = CODE_BUF_GEN_DNM_IMM6(AARCH64_INS_SUB_REG | 0x206000, AARCH64_REG_SP,			\
-							     AARCH64_REG_SP, GTM_REG_CODEGEN_TEMP, 4, AARCH64_SHIFT_TYPE_LSL);	\
+		code_buf[code_idx++] = CODE_BUF_GEN_DNM_IMM6(AARCH64_INS_SUB_XREG, AARCH64_REG_SP, AARCH64_REG_SP,		\
+							     GTM_REG_CODEGEN_TEMP, 4, AARCH64_SHIFT_TYPE_LSL);			\
 	}															\
 	code_buf[code_idx++] = CODE_BUF_GEN_TN1_IMM12(AARCH64_INS_STR_X, reg, AARCH64_REG_SP, offset);				\
 }
