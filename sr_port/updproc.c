@@ -692,13 +692,16 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			if (0 != status)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 						LEN_AND_LIT("clock_gettime"), CALLFROM, errno, 0);
-			waketime.tv_sec += 10;
-			status = pthread_cond_timedwait(&recvpool.recvpool_ctl->write_updated,
-							&recvpool.recvpool_ctl->write_updated_ctl,
-							&waketime);
+			waketime.tv_sec += 4;
+			PTHREAD_COND_TIMEDWAIT(&recvpool.recvpool_ctl->write_updated,
+						&recvpool.recvpool_ctl->write_updated_ctl,
+						&waketime, status);
 			if ((0 != status) && (ETIMEDOUT != status))
+			{
+				assert(EINVAL != status);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-						LEN_AND_LIT("pthread_mutex_timedwait"), CALLFROM, status, 0);
+						LEN_AND_LIT("pthread_cond_timedwait"), CALLFROM, status, 0);
+			}
 			if (!upd_proc_local->onln_rlbk_flg && (repl_csa->onln_rlbk_cycle != jnlpool->jnlpool_ctl->onln_rlbk_cycle))
 			{	/* A concurrent online rollback happened. Start afresh */
 				grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, GRAB_LOCK_ONLY);

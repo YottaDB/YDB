@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,6 +37,7 @@ GBLREF	int4		cur_pte_csh_entries_per_len;		/* copy of pte_csh_entries_per_len co
 GBLREF	int4		cur_pte_csh_tail_count;			/* copy of pte_csh_tail_count corresponding to curalt_depth */
 GBLREF	boolean_t	gtm_utf8_mode;
 
+error_def (ERR_PATALTER2LARGE);
 /* Example compiled pattern for an alternation pattern
  *	Pattern = P0_P1
  *	----------------
@@ -169,6 +171,8 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 	pte_csh		*tmp_pte;
 	unsigned char	*strtmp, *strnext;
 
+	if (PTE_MAX_ENTRIES <= repcnt)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_PATALTER2LARGE, 1, PTE_MAX_ENTRIES);
 	if (PTE_MAX_CURALT_DEPTH > curalt_depth)
 	{	/* try to find it in the current pattern evaluation cache (cur_pte_csh_array) itself */
 		tmp_do_patalt_calls = ++do_patalt_calls[curalt_depth];

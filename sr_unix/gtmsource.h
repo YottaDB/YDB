@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -624,6 +624,7 @@ MBSTART {													\
 error_def(ERR_JNLPOOLRECOVERY);
 
 #define	JPL_PHASE2_WRITE_COMPLETE(JNLPOOL)									\
+<<<<<<< HEAD
 MBSTART {													\
 	int			index;										\
 	jpl_phase2_in_prog_t	*phs2cmt;									\
@@ -703,6 +704,9 @@ MBSTART {													\
 	if (!index || ((JPL_PHASE2_COMMIT_ARRAY_SIZE / 2) == index))						\
 		repl_phase2_cleanup(JNLPOOL);									\
 } MBEND
+=======
+		jpl_phase2_write_complete(JNLPOOL)
+>>>>>>> df1555e... GT.M V6.3-005
 
 #if defined(__osf__) && defined(__alpha)
 # pragma pointer_size(save)

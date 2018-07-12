@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -53,6 +53,7 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover)
 	node_local_ptr_t	cnl;
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
+	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -62,15 +63,14 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover)
 	cnl = csa->nl;
 	if (!csa->now_crit)
 	{
-		assert(0 == crit_count);
-		crit_count++;	/* prevent interrupts */
+		DEFER_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csd->mutex_spin_parms;
 		status = gtm_mutex_lock(reg, mutex_spin_parms, crash_count, MUTEX_LOCK_WRITE_IMMEDIATE);
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
 		{
-			crit_count = 0;
+			ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 			switch (status)
 			{
 				case cdb_sc_nolock:
@@ -96,7 +96,7 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover)
 		assert((0 == cnl->in_crit) || (FALSE == is_proc_alive(cnl->in_crit, 0)));
 		cnl->in_crit = process_id;
 		CRIT_TRACE(csa, crit_ops_gw);		/* see gdsbt.h for comment on placement */
-		crit_count = 0;
+		ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 	}
 	else
 		assert(FALSE);

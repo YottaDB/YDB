@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2017 Fidelity National Information	*
+ * Copyright (c) 2011-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -71,6 +71,7 @@ void op_zg1(int4 level)
 			/* Couldn't get to the level we were trying to unwind to */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZGOTOTOOBIG);
 	}
+<<<<<<< HEAD
 	if ((0 == level) && (0 == TREF(gtmci_nested_level)))
 	{	/* For ZGOTO 0, if this is MUPIP, exit after sending an oplog message recording the uncommon exit method.
 		 * Otherwise, if $ZTRAP is active or ""=$ECODE return a status of 0, else return the last error in $ECODE
@@ -79,16 +80,34 @@ void op_zg1(int4 level)
 		 */
 		exi_cond = (((TREF(dollar_ztrap)).str.len) || !(dollar_ecode.index)) ? 0 : dollar_ecode.error_last_ecode;
 		if (IS_MUPIP_IMAGE)
+=======
+	/* For ZGOTO 0, if this is MUPIP, exit after sending an oplog message recording the uncommon exit method.
+	 * Otherwise, if $ZTRAP is active or ""=$ECODE return a status of 0, else return the last error in $ECODE
+	 */
+	if (0 == level)
+	{
+		for (fp = frame_pointer; NULL != fp; fp = fpprev)
+>>>>>>> df1555e... GT.M V6.3-005
 		{
-			zposition.mvtype = 0;	/* It's not an mval yet till getzposition fills it in */
-			getzposition(&zposition);
-			assert(MV_IS_STRING(&zposition) && (0 < zposition.str.len));
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_PROCTERM, 6, GTMIMAGENAMETXT(image_type), "ZGOTO 0", exi_cond,
-				zposition.str.len, zposition.str.addr);
-			EXIT(ERR_PROCTERM);
+			fpprev = fp->old_frame_pointer;
+			if (fp->flags & SFF_CI)	/* We have a call-in frame, dont exit and let it unroll*/
+				break;
 		}
-		assert(IS_GTM_IMAGE);
-		EXIT(exi_cond);
+		if (!fp) /*No GTMCI frame*/
+		{
+			exi_cond = (((TREF(dollar_ztrap)).str.len) || !(dollar_ecode.index)) ? 0 : dollar_ecode.error_last_ecode;
+			if (IS_MUPIP_IMAGE)
+			{
+				zposition.mvtype = 0;	/* It's not an mval yet till getzposition fills it in */
+				getzposition(&zposition);
+				assert(MV_IS_STRING(&zposition) && (0 < zposition.str.len));
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_PROCTERM, 6, GTMIMAGENAMETXT(image_type),
+					"ZGOTO 0", exi_cond, zposition.str.len, zposition.str.addr);
+				EXIT(ERR_PROCTERM);
+			}
+			assert(IS_GTM_IMAGE);
+			EXIT(exi_cond);
+		}
 	}
 	/* Find the frame we are unwinding to while counting the frames we need to unwind (which we will feed to
 	 * GOFRAMES(). As we unwind, keep track of how many trigger base frames we encounter (if triggers are supported)

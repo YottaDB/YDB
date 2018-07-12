@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -120,7 +121,7 @@ typedef struct
 
 	char    *tp;            /* token pointer */
 	int	buflen;		/* length of in_str */
-	char    in_str[1];	/* input string buffer. The real length is computed and added to this block */
+	char    in_str[];	/* input string buffer. The real length is computed and added to this block */
 } IN_PARMS;
 
 /* include platform independent prototypes */

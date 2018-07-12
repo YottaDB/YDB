@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001, 2015 Fidelity National Information	;
+; Copyright (c) 2001-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	;
@@ -44,9 +44,11 @@
  Set out=outansi_"_ctl.c",outansi=outansi_"_ansi.h"
  Set fn=$ZPARSE(fn,"NAME")
  Set fn=$TRanslate(fn,up,lo)
- Set cnt=0
+ Set undocarr=fn_"_undocarr"
+ Set cnt=0,undocmsgcnt=0,lineno=0
  Open in:readonly,out:newversion
  Set ansiopen=0
+<<<<<<< HEAD
  Use out Do chdr		; Create <fn>_ctl.c file and its prologue
  set ydbfn=$select("ydberrors"=fn:"ydberrors.h",1:"ydb"_fn_".h") ; Avoid naming it ydbydberrors.h
  open ydbfn:newversion		; Create ydb<fn>.h file and its prologue
@@ -69,6 +71,10 @@
  . do chdr
  ;
  For  Use in Read msg Quit:$TRanslate(msg,lo,up)?.E1".FACILITY".E
+=======
+ Use out Do hdr
+ For  Use in Read msg Set lineno=lineno+1 Quit:$TRanslate(msg,lo,up)?.E1".FACILITY".E
+>>>>>>> df1555e... GT.M V6.3-005
  Set err=0 Do  Quit:err
  . New i1,i2,upmsg
  . ; Expect a line like:
@@ -102,13 +108,39 @@
  . Write "#include ""error.h""",!!
  . Write:'vms "LITDEF"_$Char(9)_"err_msg "_fn_"[] = {",!
  . Quit
+ ; Read all the comments until the start of "undocumented errors" section. It assumes there are only comments upto now.
+ ; Read the ".TITLE" line
+ Use in Read comment Set lineno=lineno+1
+ Set undocmsgstart="known undocumented messages",undocmsgend="new undocumented error messages"
+ For  Use in Read comment  Quit:(($ZEOF)!($Extract(comment,1)'="!")!(comment[undocmsgstart))  Set lineno=lineno+1
+ If comment'[undocmsgstart  Do
+ . Use $Principal Write !!,"Message file format error in ",in,":"
+ . Write "Expected the section of undocumented errors starting with """_undocmsgstart_"""",!
+ . Write "Line ("_lineno_") : ",comment,!
+ . Quit
+ ; Now the "undocumented errors" section starts. Create the array of Mnemonics
+ For  Use in Read comment Set lineno=lineno+1 Quit:(($ZEOF)!($Extract(comment,1)'="!")!(comment[undocmsgend))  Do
+ . Set undocmsgcnt=undocmsgcnt+1  If undocmsgcnt>4095 Do  Quit
+ . . Use $Principal Write !!,"Message file format error in ",in,":"
+ . . Write !,"Cannot process more than 4095 messages."
+ . . Write !,"Overflow occurred at:",!,comment
+ . ; Expect a line like:
+ . ; !<TAB>MNEMONIC<TAB><TAB>...<error message text>
+ . If $Extract(comment,1)'="!",$Extract(comment,2)'=$Char(9) Do  Quit
+ . . Use $Principal Write !!,"Message file format error in ",in,":"
+ . . Write !,comment,!,"^-----^",!,"Expected: '!<TAB>'.",!
+ . Set i1=$Find($TRanslate(comment,$Char(9)," "),"ERR_")
+ . Set i2=$Find($TRanslate(comment,$Char(9)," ")," ",i1-1)
+ . If 'i2  Do  Quit
+ . . Use $Principal Write !!,"Message file format error in ",in,":"
+ . . Write !,comment,!,"      ^-----^",!,"Expected: a mnemonic starting with ERR_",!
+ . Set undocmnemonic(undocmsgcnt)=$Extract(comment,i1,i2-2)
  For  Use in Quit:$ZEOF  Read msg Do:$Extract(msg,1)?1u
  . New delim,i1,lomsg
- . Set cnt=cnt+1 If cnt>4095 Do
+ . Set cnt=cnt+1 If cnt>4095 Do  Quit
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,"Cannot process more than 4095 messages."
  . . Write !,"Overflow occurred at:",!,msg
- . . Quit
  . ; Expect a line like:
  . ; MNEMONIC <error message text>/severity/fao=###!/ansi=### ! comment
  . ;   or:
@@ -128,7 +160,7 @@
  . . New key,ok,s,val
  . . If $Extract(lomsg,1,2)="!/" Set lomsg=$Extract(lomsg,2,$Length(lomsg)) Quit
  . . If $Extract(lomsg,1)="!" Set lomsg="" Quit
- . . If $Extract(lomsg,1)'="/" Do
+ . . If $Extract(lomsg,1)'="/" Do  Quit
  . . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . . Write !,"All options must be preceded by a forward slash (/), Found:",!,msg
  . . . Write !,"Error encountered at: ",lomsg
@@ -162,6 +194,7 @@
  . . Write !,"Format item count (fao) not specified."
  . . Quit
  . Set outmsg(cnt,"code")=(facnum+2048)*65536+((cnt+4096)*8)+severity
+ . For msgcnt=1:1:undocmsgcnt  If outmsg(cnt)=undocmnemonic(msgcnt)  Set undocmnemonic(msgcnt,"code")=cnt-1 Quit
  . If 'vms Use out Write $Char(9),"{ """,outmsg(cnt),""", ",text,", ",fao," },",!
  . If ansiopen,ansi="none" Set ansi=0 ; Make !/ansi= specification optional (except for first one)
  . Quit:ansi="none"
@@ -172,12 +205,29 @@
  . Use outansi Write $Char(9),$Justify(ansi,4),",",$Char(9),"/* ",outmsg(cnt)," */",!
  . Quit
  Use out
+<<<<<<< HEAD
  Write "};",!!
  Write !,"GBLDEF",$Char(9),"err_ctl "_fn_"_ctl = {",!
+=======
+ Do:'vms
+ . Write "};",!!
+ . For i1=1:1:cnt Write "LITDEF",$Char(9),"int ",prefix,outmsg(i1)," = ",outmsg(i1,"code"),";",!
+ . Quit
+ Do
+ . Use out
+ . Write !!,"LITDEF"_$Char(9)_"int "_undocarr_"[] = {",!
+ . For i1=1:1:undocmsgcnt  Write $char(9)_undocmnemonic(i1,"code")_","_$char(9)_"/* "_undocmnemonic(i1)_" */",!
+ . Write "};",!!
+ . Quit
+ ; VMS can have addresses in constants, most Unix platforms cannot.
+ Write !,$Select(vms:"LITDEF",1:"GBLDEF"),$Char(9),"err_ctl "_fn_"_ctl = {",!
+>>>>>>> df1555e... GT.M V6.3-005
  Write $Char(9),facnum,",",!
  Write $Char(9),""""_facility_""",",!
  Write $Char(9),$Select(vms:"NULL,",1:"&"_fn_"[0],"),!
- Write $Char(9),cnt_"};",!
+ Write $Char(9),cnt_",",!
+ Write $Char(9),"&"_undocarr_"[0],",!
+ Write $Char(9),undocmsgcnt,!,"};",!!
  If ansiopen Use outansi Write $Char(9),"};",! Close outansi
  ;
  ; Now that we know all the error codes, write them out to the header file associated with the error file we read

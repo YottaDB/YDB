@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 Fidelity National Information		*
+ * Copyright (c) 2017-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,10 @@
 
 #define RESTRICTED(FACILITY)											\
 		(!restrict_initialized ? (restrict_init(), restrictions.FACILITY) : restrictions.FACILITY)
+
+#define COMM_FILTER_FILENAME     	"filter_commands.tab"
+#define PIPE_C_CALL_NAME		"gtmpipeopen"
+#define ZSY_C_CALL_NAME			"gtmzsystem"
 
 struct restrict_facilities
 {
@@ -27,6 +31,8 @@ struct restrict_facilities
 	boolean_t	zcmdline;
 	boolean_t	halt_op;
 	boolean_t	zhalt_op;
+	boolean_t	zsy_filter;
+	boolean_t	pipe_filter;
 };
 
 GBLREF	struct restrict_facilities	restrictions;

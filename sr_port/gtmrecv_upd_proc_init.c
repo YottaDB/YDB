@@ -17,6 +17,7 @@
 
 #include "gtm_time.h"
 #include "gtm_fcntl.h"
+#include "gtm_string.h"
 #include "gtm_unistd.h"
 #include "gtm_inet.h"
 #ifdef UNIX
@@ -92,6 +93,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	$DESCRIPTOR(cmd_desc, UPDPROC_CMD_STR);
 #endif
 	pthread_mutexattr_t	write_updated_ctl_attr;
+	pthread_condattr_t	write_updated_attr;
 
 	/* Check if the update process is alive */
 	if ((upd_status = is_updproc_alive()) == SRV_ERR)
@@ -134,7 +136,7 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 		repl_errno = EREPL_UPDSTART_BADPATH;
 		return(UPDPROC_START_ERR);
 	}
-	/* Destroy/Reinitialize the mutex.
+	/* Destroy/Reinitialize the mutex/cond.
 	 * Needed here in case the update process exited while holding the mutex, and the system didn't clean it up.
 	 * Robust mutexes should handle this case, in theory, but that does not appear to be the case in practice.
 	 */
@@ -157,6 +159,19 @@ int gtmrecv_upd_proc_init(boolean_t fresh_start)
 	if (0 != status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("pthread_mutex_init"), CALLFROM, status, 0);
+	memset(&recvpool.recvpool_ctl->write_updated, 0, SIZEOF(recvpool.recvpool_ctl->write_updated));
+	status = pthread_condattr_init(&write_updated_attr);
+	if (0 != status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_condattr_init"), CALLFROM, status, 0);
+	status = pthread_condattr_setpshared(&write_updated_attr, PTHREAD_PROCESS_SHARED);
+	if (0 != status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_condattr_setpshared"), CALLFROM, status, 0);
+	status = pthread_cond_init(&recvpool.recvpool_ctl->write_updated, &write_updated_attr);
+	if (0 != status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				LEN_AND_LIT("pthread_cond_init"), CALLFROM, status, 0);
 	FORK(upd_pid);
 	if (0 > upd_pid)
 	{

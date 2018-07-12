@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2018 Fidelity National Information		*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,10 +9,7 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
-#ifndef __DO_WRITE_H__
-#define __DO_WRITE_H__
-
-int4 do_write (int4 fdesc, off_t fptr, sm_uc_ptr_t fbuff, size_t fbuff_len);
-
-#endif
+#ifndef WARN_DB_SZ_H_INCLUDED
+#define WARN_DB_SZ_H_INCLUDED
+void warn_db_sz(char *db_fname, uint4 prev_blocks, uint4 curr_blocks, int4 tot_blocks);
+#endif /* WARN_DB_SZ_H_INCLUDED */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -55,7 +55,6 @@ void op_bindparm(int frmc, int frmp_arg, ...)
 	int		actc;
 	unsigned int	*prev_count_ptr;
 	unsigned int	prev_count;
-	boolean_t	error = FALSE;
 	lv_val		**actp;		/* actual pointer */
 	lv_val		*new_var;
 	mvs_ntab_struct	*ntab;
@@ -97,8 +96,8 @@ void op_bindparm(int frmc, int frmp_arg, ...)
 	/* This would also guarantee that actc > 0 */
 	if (actc > frmc)
 	{
-		error = TRUE;
-		*prev_count_ptr += SAFE_TO_OVWRT;
+		if (prev_count_ptr != &((TREF(parm_pool_ptr))->start_idx))
+			*prev_count_ptr += SAFE_TO_OVWRT;
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ACTLSTTOOLONG);
 	}
 	VAR_START(var, frmp_arg);
@@ -147,7 +146,13 @@ void op_bindparm(int frmc, int frmp_arg, ...)
 	/* Incrementing the actual count in parameter pool by a special value, so that we know that it is safe to
 	 * overwrite the current params and there is no need to save them; if an error occurred earlier or actc
 	 * is 0, then this addition has already been taken care of above.
+	 *
+	 * When curr_slot == TREF(parm_pool_ptr)->parms, we risk setting prev_count_ptr equal
+	 *  to TREF(parm_pool_ptr)->start_idx; if we add SAFE_TO_OVWRT to this value, we could access
+	 *  uninit'd memory in push_parm. We check at each exit if this pointer is equal to
+	 *  TREF(parm_pool_ptr)->start_idx as a way of preventing that from happening. This happens below
+	 *  and in the error case above
 	 */
-	if (actc && !error)
+	if ((0 == prev_count || actc) && prev_count_ptr != &((TREF(parm_pool_ptr))->start_idx))
 		*prev_count_ptr += SAFE_TO_OVWRT;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -252,6 +252,8 @@ int main()
 				 */
 				save_errno = errno;
 #				if DEBUG
+				/* Since we may have come here via the white box tests, let's ensure gtm_TZ_found is FALSE */
+				gtm_TZ_found = FALSE;
 				/* Separately test for some white box conditions before testing the real return codes */
 				if (WBTEST_ENABLED(WBTEST_SECSHRWRAP_NOTZREC_READERR))
 					SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRTZFAIL, "FGETS() failure reading /etc/environment "

@@ -1,6 +1,6 @@
 /****************************************************************
  *
- * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Copyright (c) 2005-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 	reg_total = murgbl.reg_total;
 	if (mur_options.forward)
 	{
-		if (mur_options.verify)
+		if (mur_options.verify && !mur_options.rollback)
 		{
 			jgbl.mur_tp_resolve_time = 0; /* verify continues till the beginning of journal file */
 			return;

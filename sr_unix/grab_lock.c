@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -59,6 +59,7 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 	sgmnt_addrs		*csa;
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
+	intrpt_state_t		prev_intrpt_state;
 	char			scndry_msg[OUT_BUFF_SIZE];
 #	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
@@ -71,8 +72,7 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 	assert(!csa->now_crit);
 	if (!csa->now_crit)
 	{
-		assert(0 == crit_count);
-		crit_count++;	/* prevent interrupts */
+		DEFER_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 		DEBUG_ONLY(locknl = csa->nl);	/* for DEBUG_ONLY LOCK_HIST macro */
 		assert(jnlpool && jnlpool->jnlpool_ctl);	/* pool_init not yet set when called from jnlpool_init */
 		assert(reg == jnlpool->jnlpool_dummy_reg);
@@ -86,7 +86,7 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 		DEBUG_ONLY(locknl = NULL);	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
 		{
-			crit_count = 0;
+			ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 			switch(status)
 			{
 				case cdb_sc_critreset: /* As of 10/07/98, this return value is not possible */
@@ -108,7 +108,7 @@ boolean_t grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_
 		assert((0 == csa->nl->in_crit) || (FALSE == is_proc_alive(csa->nl->in_crit, 0)));
 		csa->nl->in_crit = process_id;
 		CRIT_TRACE(csa, crit_ops_gw);		/* see gdsbt.h for comment on placement */
-		crit_count = 0;
+		ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 		if (jnlpool && jnlpool->repl_inst_filehdr && jnlpool->repl_inst_filehdr->file_corrupt && !jgbl.onlnrlbk)
 		{	/* Journal pool indicates an abnormally terminated online rollback. Cannot continue until the rollback
 			 * command is re-run to bring the journal pool/file and instance file to a consistent state.

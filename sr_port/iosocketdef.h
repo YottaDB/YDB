@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -124,7 +124,8 @@ typedef struct
 #define SOCKET_ADDR(SOCKPTR, SOCKEND)										\
 	((sockaddr_ptr)(SOCKPTR->SOCKEND.sa									\
 		? SOCKPTR->SOCKEND.sa										\
-		: (SOCKPTR->SOCKEND.sa = (struct sockaddr *)malloc(SIZEOF(struct sockaddr_storage)))))
+		: (SOCKPTR->SOCKEND.sa = (struct sockaddr *)malloc(SIZEOF(struct sockaddr_storage)),		\
+			memset(SOCKPTR->SOCKEND.sa, 0, SIZEOF(struct sockaddr_storage)), SOCKPTR->SOCKEND.sa)))
 
 #define SOCKET_LOCAL_ADDR(SOCKPTR)	SOCKET_ADDR(SOCKPTR, local)
 #define SOCKET_REMOTE_ADDR(SOCKPTR)	SOCKET_ADDR(SOCKPTR, remote)

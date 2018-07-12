@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -50,6 +50,7 @@ void	rel_lock(gd_region *reg)
 	unix_db_info 		*udi;
 	sgmnt_addrs  		*csa;
 	enum cdb_sc		status;
+	intrpt_state_t		prev_intrpt_state;
 
 	udi = FILE_INFO(reg);
 	csa = &udi->s_addrs;
@@ -60,8 +61,7 @@ void	rel_lock(gd_region *reg)
 	assert(!csa->hold_onto_crit || (process_exiting && jgbl.onlnrlbk));
 	if (csa->now_crit)
 	{
-		assert(0 == crit_count);
-		crit_count++;	/* prevent interrupts */
+		DEFER_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 		assert(csa->nl->in_crit == process_id || csa->nl->in_crit == 0);
 		CRIT_TRACE(csa, crit_ops_rw);		/* see gdsbt.h for comment on placement */
 		csa->nl->in_crit = 0;
@@ -72,7 +72,7 @@ void	rel_lock(gd_region *reg)
 		if (status != cdb_sc_normal)
 		{
 			csa->now_crit = FALSE;
-			crit_count = 0;
+			ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 			if (status == cdb_sc_critreset)
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
 			else
@@ -82,9 +82,12 @@ void	rel_lock(gd_region *reg)
 			}
 			return;
 		}
-		crit_count = 0;
+		ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 	} else
 		CRIT_TRACE(csa, crit_ops_nocrit);
+<<<<<<< HEAD
 	/* Now that crit for THIS region is released, check if deferred signal/exit handling can be done and if so do it */
 	DEFERRED_SIGNAL_HANDLING_CHECK;
+=======
+>>>>>>> df1555e... GT.M V6.3-005
 }

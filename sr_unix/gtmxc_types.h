@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -72,11 +72,19 @@ void		gtm_hiber_start(ydb_uint_t mssleep);
 void		gtm_hiber_start_wait_any(ydb_uint_t mssleep);
 void		gtm_start_timer(ydb_tid_t tid, ydb_int_t time_to_expir, void (*handler)(), ydb_int_t hdata_len, void *hdata);
 
+<<<<<<< HEAD
 /* The java plug-in has some very direct references to some of these routines that
  * cannot be changed by the pre-processor so for now, we have some stub routines
  * that take care of the translation. These routines are exported along with their
  * ydb_* variants.
  */
+=======
+/* Call-in interface. */
+gtm_status_t 	gtm_ci(const char *c_rtn_name, ...);
+gtm_status_t	gtm_ci_filter(const char *c_rtn_name, ...);
+gtm_status_t 	gtm_cip(ci_name_descriptor *ci_info, ...);
+gtm_status_t 	gtm_init(void);
+>>>>>>> df1555e... GT.M V6.3-005
 #ifdef GTM_PTHREAD
 ydb_status_t 	gtm_jinit(void);
 #endif

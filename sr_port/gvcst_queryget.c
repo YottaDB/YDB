@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -80,9 +80,14 @@ boolean_t gvcst_queryget(mval *val)
 
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	found = gvcst_queryget2(val, NULL);
+	WBTEST_ONLY(WBTEST_QUERY_HANG,
+		LONG_SLEEP(2);
+	);
 #	ifdef UNIX
 	assert(save_dollar_tlevel == dollar_tlevel);
 	CHECK_HIDDEN_SUBSCRIPT(gv_altkey, is_hidden);
+	if (found)
+		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) 1);
 	if (found && IS_SN_DUMMY(val->str.len, val->str.addr))
 		is_dummy = TRUE;
 	if (!found || (!is_dummy && !is_hidden))
@@ -98,13 +103,17 @@ boolean_t gvcst_queryget(mval *val)
 	} else
 		sn_tpwrapped = FALSE;
 	found = gvcst_query();
+	WBTEST_ONLY(WBTEST_QUERY_HANG,
+			LONG_SLEEP(2);
+	);
 	if (found)
 	{
 		COPY_KEY(gv_currkey, gv_altkey); /* set gv_currkey to gv_altkey */
 		found = gvcst_get(val);
-		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) -1); /* only counted externally as one get */
+		WBTEST_ONLY(WBTEST_QUERY_HANG,
+				LONG_SLEEP(2);
+		);
 	}
-	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_query, (gtm_uint64_t) -1);
 	if (sn_tpwrapped)
 	{
 		op_tcommit();
@@ -222,7 +231,6 @@ boolean_t gvcst_queryget2(mval *val, unsigned char *sn_ptr)
 				val->str.addr = (char *)stringpool.free;
 				val->str.len = data_len;
 				stringpool.free += data_len;
-				INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, 1);
 			}
 			return found;
 		}

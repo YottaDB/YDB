@@ -17,6 +17,7 @@
 
 #include "error.h"
 #include "util.h"
+#include "gtm_multi_thread.h"
 
 error_def(ERR_MEMORY);
 error_def(ERR_MEMORYRECURSIVE);
@@ -32,7 +33,14 @@ CONDITION_HANDLER(hashtab_rehash_ch)
 	if (ERR_HTOFLOW == SIGNAL || ERR_MEMORY == SIGNAL || ERR_MEMORYRECURSIVE == SIGNAL)
 	{
 		UNIX_ONLY(util_out_print("", RESET));	/* Prevents error message from being flushed later by rts_error() */
-		UNWIND(NULL, NULL);
+		char *rname;
+		if (INSIDE_THREADED_CODE(rname))
+		{
+			GTM_PTHREAD_EXIT(SIGNAL);
+		} else
+		{
+			UNWIND(NULL, NULL);
+		}
 	} else
 	{
 		NEXTCH; /* non memory related error */

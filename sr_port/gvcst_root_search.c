@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -181,10 +181,14 @@ CONDITION_HANDLER(gvcst_redo_root_search_ch)
 	NEXTCH;
 }
 
+/**
+ * Called when a root block is out-of-sync with the database (such as if it has been moved during a reorg).
+ */
 void gvcst_redo_root_search()
 {
 	DEBUG_ONLY(boolean_t	dbg_now_crit;)
 	uint4			lcl_onln_rlbkd_cycle;
+	boolean_t		expand_prev_key;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -194,6 +198,12 @@ void gvcst_redo_root_search()
 						   * discarded and the outer root search correctly sets gv_target->root.
 						   */
 	TREF(in_gvcst_redo_root_search) = TRUE;
+	/* If TREF(expand_prev_key) is true (as it is in gvcst_zprevious2), it can wreck havoc in gvcst_search in some cases;
+	 *  this is put here to guard against such a thing happening. The known case of havod is in gvcst_zprevious2,
+	 *  but changes more local to that file did not address all cases, so this is put in
+	 */
+	expand_prev_key = TREF(expand_prev_key);
+	TREF(expand_prev_key) = FALSE;
 	assert(0 < t_tries);
 	assert(!is_src_server && !is_rcvr_server);
 	assert(!jgbl.onlnrlbk);
@@ -210,9 +220,15 @@ void gvcst_redo_root_search()
 	assert(cs_addrs->now_crit == dbg_now_crit); /* ensure crit state remains same AFTER gvcst_root_search */
 	/* restore global variables now that we are continuing with the original transaction */
 	RESTORE_ROOTSRCH_ENTRY_STATE;
+	TREF(expand_prev_key) = expand_prev_key;
 	REVERT;
 }
 
+/**
+ * Searches through the database for the root block pointed to by cs_addrs->dir_tree
+ *
+ * @param[in] donot_restart if true, prevents gvcst_root_search from calling t_retry on a failure
+ */
 enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 {
 	srch_blk_status	*h0;
@@ -251,22 +267,23 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 		gbl_target_was_set = FALSE;
 		reset_gv_target = save_targ;
 	}
-	gv_target = cs_addrs->dir_tree;
 	T_BEGIN_READ_NONTP_OR_TP(ERR_GVGETFAIL);
 	/* We better hold crit in the final retry (TP & non-TP). Only exception is journal recovery */
 	assert((t_tries < CDB_STAGNATE) || cs_addrs->now_crit || mupip_jnl_recover);
 	for (;;)
-	{
+	{	/* for provides convenient mechanism to exit if failure */
 		lcl_root = 0; /* set lcl_root to 0 at the start of every iteration (this way even retry will get fresh value) */
 		hdr_len = rlen = 0;
 		gv_target = cs_addrs->dir_tree;
 		if (dollar_trestart)
 			gv_target->clue.end = 0;
 		assert(0 == save_targ->root);
-		if (cdb_sc_normal == (status = gvcst_search(gv_altkey, 0)))
+		if (cdb_sc_normal == (status = gvcst_search(gv_altkey, NULL)))
 		{
 			if (gv_altkey->end + 1 == gv_target->hist.h[0].curr_rec.match)
-			{
+			{	/* End effectively represents the size of the subscript;
+				 * curr_rec.match should be that size if we found the key
+				 */
 				h0 = gv_target->hist.h;
 				rp = (h0->buffaddr + h0->curr_rec.offset);
 				hdr_len = SIZEOF(rec_hdr) + gv_altkey->end + 1 - EVAL_CMPC((rec_hdr_ptr_t)rp);

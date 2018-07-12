@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Copyright (c) 2005-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -148,7 +148,7 @@ int updhelper_writer(void)
 					if (((jbp->next_epoch_time - UPDHELPER_EARLY_EPOCH) <= jgbl.gbl_jrec_time)
 						 && !FROZEN_CHILLED(csa))
 					{
-						DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp);
+						DO_JNL_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp);
 						if (grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_TRUE))
 						{
 							if ((jbp->next_epoch_time - UPDHELPER_EARLY_EPOCH) <= jgbl.gbl_jrec_time)
@@ -161,7 +161,7 @@ int updhelper_writer(void)
 							}
 							rel_crit(reg);
 							/* Do equivalent of WCSFLU_SYNC_EPOCH now out of crit */
-							DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp);
+							DO_JNL_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp);
 						}
 					}
 				 }

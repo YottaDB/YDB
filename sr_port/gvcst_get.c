@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -80,6 +80,10 @@ boolean_t gvcst_get(mval *v)
 
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	gotit = gvcst_get2(v, NULL);
+	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) 1);
+	WBTEST_ONLY(WBTEST_QUERY_HANG,
+		LONG_SLEEP(2);
+	);
 	DEBUG_ONLY(debug_len = (int)v->str.len); /* Ensure v isn't garbage pointer by actually accessing it */
 	if (gotit && IS_SN_DUMMY(v->str.len, v->str.addr))
 	{	/* Start TP transaction to piece together value */
@@ -90,8 +94,9 @@ boolean_t gvcst_get(mval *v)
 			op_tstart((IMPLICIT_TSTART), TRUE, &literal_batch, 0);
 			ESTABLISH_NORET(gvcst_get_ch, est_first_pass);
 			GVCST_ROOT_SEARCH_AND_PREP(est_first_pass);
-			/* fix up since it should only be externally counted as one get */
-			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) -1);
+			WBTEST_ONLY(WBTEST_QUERY_HANG,
+				LONG_SLEEP(2);
+			);
 			gotdummy = gvcst_get2(v, NULL);        /* Will be returned if not currently a spanning node */
 		} else
 		{
@@ -100,8 +105,9 @@ boolean_t gvcst_get(mval *v)
 		}
 		oldend = gv_currkey->end;
 		APPEND_HIDDEN_SUB(gv_currkey);
-		/* fix up since it should only be externally counted as one get */
-		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, (gtm_uint64_t) -1);
+		WBTEST_ONLY(WBTEST_QUERY_HANG,
+			LONG_SLEEP(2);
+		);
 		gotspan = gvcst_get2(&val_ctrl, NULL); /* Search for control subscript */
 		if (gotspan)
 		{	/* Spanning node indeed, as expected. Piece it together */
@@ -237,7 +243,6 @@ boolean_t gvcst_get2(mval *v, unsigned char *sn_ptr)
 					{
 						v->str.addr = (char *)stringpool.free;
 						stringpool.free += data_len;
-						INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, 1);
 					} else
 						v->str.addr = (char *)sn_ptr;
 					return TRUE;
@@ -263,7 +268,6 @@ boolean_t gvcst_get2(mval *v, unsigned char *sn_ptr)
 					}
 				}
 				assert(FALSE == TREF(ready2signal_gvundef));	/* t_end/tp_hist should have reset this up front */
-				INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_get, 1);
 				return FALSE;
 			}
 		}

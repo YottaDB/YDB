@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -662,11 +662,13 @@ typedef struct node_local_struct
 						   concurrent online rollback or too many MUMPS processes */
 	boolean_t	fastinteg_in_prog;	/* Tells GT.M if fast integrity is in progress */
 	uint4           wtstart_errcnt;
-	/* Note that although the below two fields are dbg-only, they are defined for pro since we want to keep the shared
+	/* Note that although the below fields are dbg-only, they are defined for pro since we want to keep the shared
 	 * memory layout the same for both pro and dbg. There is some code that relies on this assumption.
 	 */
 	boolean_t	fake_db_enospc;		/* used only by dbg versions to simulate ENOSPC scenarios in the database file */
 	boolean_t	fake_jnl_enospc;	/* used only by dbg versions to simulate ENOSPC scenarios in the journal  file */
+	uint4		jnl_writes;		/* used only by dbg versions to count the number of journal write operations */
+	uint4		db_writes;		/* used only by dbg versions to count the number of database write operations */
 	boolean_t	doing_epoch;		/* set when performing an epoch */
 	uint4		epoch_taper_start_dbuffs; /* wcs_active_lvl at start of taper */
 	boolean_t	epoch_taper_need_fsync;
