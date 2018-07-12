@@ -280,14 +280,18 @@ int dollar_quit(void)
 		/* There can be between 1 and 5 instructions to skip past */
 		for (ptrs.instr = sf->mpc,skip = 0; skip < MAX_SKIP; ptrs.instr += 4,skip++)
 		{
-			if (0xF940 == *(ptrs.instr_type + 1))		/* Check upper half of instruction */
+			/* Check for opcode of 0xf94 (ldr) with offset off of register x23 (xfer table register)
+			*	That is -- looking for "ldr  xxx, [x23, #xfer_index]" */
+			if ((0xF94 == ((*(ptrs.xfer_offset_32) >> AARCH64_SHIFT_OP_20) & AARCH64_MASK_OP_10)) &&
+				(23 == ((*(ptrs.xfer_offset_32) >> AARCH64_SHIFT_RN) & AARCH64_MASK_REG)))
 			{
-				/* ldr of return address from xfer table */
-				xfer_index = (*ptrs.xfer_offset_16 & AARCH64_MASK_IMM12) / SIZEOF(void *);
+				/* ldr offset from xfer table (offset in instruction is already divided by 8) */
+				xfer_index = ((*ptrs.xfer_offset_32) >> AARCH64_SHIFT_IMM12) & AARCH64_MASK_IMM12;
 				break;
 			}
 		}
-		if (0xF940 != *(ptrs.instr_type + 1))
+		if ((0xF94 != ((*(ptrs.xfer_offset_32) >> AARCH64_SHIFT_OP_20) & AARCH64_MASK_OP_10)) ||
+			(23 != ((*(ptrs.xfer_offset_32) >> AARCH64_SHIFT_RN) & AARCH64_MASK_REG)))
 		{
 			xfer_index = -1;
 		}
