@@ -56,6 +56,7 @@
 #define AARCH64_INS_STR_X	((unsigned)0xf90 << AARCH64_SHIFT_OP_20)
 #define AARCH64_INS_SUB_IMM	((unsigned)0xd1 << AARCH64_SHIFT_OP_24)
 #define AARCH64_INS_SUB_REG	((unsigned)0xcb << AARCH64_SHIFT_OP_24)
+#define AARCH64_INS_SUB_XREG	((unsigned)0xcb << AARCH64_SHIFT_OP_24) | (0x206000)
 #define AARCH64_INS_SUB		((unsigned)0x00 << AARCH64_SHIFT_OP_24)			/* xxxxxxx */
 
 
@@ -118,7 +119,7 @@
 #define	AARCH64_SHIFT_RT		0
 #define	AARCH64_SHIFT_RT2		10
 
-#define AARCH64_SHIFT_IMM3		3
+#define AARCH64_SHIFT_IMM3		10
 #define AARCH64_SHIFT_IMM6		10
 #define AARCH64_SHIFT_IMMR		16
 #define AARCH64_SHIFT_IMM7		15
@@ -135,13 +136,14 @@
 
 #define	AARCH64_MASK_OP			0xff		/* 8 bit opcode */
 #define	AARCH64_MASK_OP_8		0xff		/* 8 bit opcode */
+#define	AARCH64_MASK_OP_10		0xffc		/* 10 bit opcode shifted 22 */
 #define	AARCH64_MASK_OP_12		0xfff		/* 12 bit opcode */
 #define	AARCH64_MASK_REG		0x1f		/* register */
 #define AARCH64_MASK_COND		0xf		/* conditional */
 
 #define AARCH64_MASK_SHIFT_TYPE		0x3
 
-#define AARCH64_MASK_IMM3		0x3
+#define AARCH64_MASK_IMM3		0x7
 #define AARCH64_MASK_IMM6		0x3f
 #define AARCH64_MASK_IMMR		0x3f
 #define AARCH64_MASK_IMM7		0x7f
@@ -208,6 +210,7 @@
 #define STP_INST	"stp"
 #define STR_INST	"str"
 #define SUB_INST	"sub"
+#define SUBS_INST	"subs"
 #define INV_INST	"<invalid instruction>"
 
 #define LSL_SHIFT_TYPE	"lsl"
