@@ -29,6 +29,6 @@ ENTRY op_iretmvad
 	CHKSTKALIGN				/* Verify stack alignment */
 	mov	x28, x1				/* Save input mval * value across call to op_unwind */
 	bl	op_unwind
-	mov	x0, x29				/* Return input mval* */
+	mov	x0, x28				/* Return input mval* */
 	getframe				/* Pick up new stack frame regs and return address */
 	ret
