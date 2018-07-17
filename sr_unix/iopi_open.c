@@ -48,6 +48,8 @@
 #include "op.h"
 #include "indir_enum.h"
 #include "ydb_getenv.h"
+#include "min_max.h"
+#include "ident.h"
 
 LITREF	unsigned char		io_params_size[];
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
@@ -319,6 +321,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	boolean_t	textflag;
 	int		ccsid, status, realfiletag;
 #endif
+        char		dev_name_buf[LOGNAME_LEN];
+	mstr		dev_mstr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -526,11 +530,18 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		}
 		if (return_stderr)
 			CLOSEFILE_RESET(pfd_read_stderr[0], rc); /* Close unused read end for stderr return; Set fd to FD_INVALID */
-		/* need to let iorm_close() know not to reap any pipe devices during io_rundown.  They should only
-		 be reaped by the parent process. */
+		/* Need to let iorm_close() know not to reap any pipe devices during io_rundown.
+		 * They should only be reaped by the parent process.
+		 */
 		gtm_pipe_child = TRUE;
 
-		/* rundown io devices in child */
+		/* Rundown io devices in child. But before that take a copy of "dev_name->len" and "dev_name->dollar_io"
+		 * as that would be needed later if we need to send a DEVOPENFAIL error to the syslog.
+		 */
+		assert(SIZEOF(dev_name_buf) > dev_name->len);	/* "get_log_name" issues an INVSTRLEN error otherwise */
+		CONVERT_IDENT(dev_name_buf, dev_name->dollar_io, dev_name->len);
+		dev_mstr.len = MIN(dev_name->len, SIZEOF(dev_name_buf));	/* use MIN just in case */
+		dev_mstr.addr = dev_name_buf;
 		io_rundown(RUNDOWN_EXCEPT_STD);
 
 		/* do common cleanup in child */
@@ -542,7 +553,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			save_errno = errno;
 			PIPE_ERROR_INIT();
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_mstr.len, dev_mstr.addr,
 				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_write[0]) failed in child"));
 			UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 		}
@@ -554,7 +565,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			{
 				save_errno = errno;
 				PIPE_ERROR_INIT();
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_mstr.len, dev_mstr.addr,
 					  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_read[1],1) failed in child"));
 				UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 			}
@@ -567,7 +578,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 					save_errno = errno;
 					PIPE_ERROR_INIT();
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
-							dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
+							dev_mstr.len, dev_mstr.addr, ERR_TEXT, 2,
 							LEN_AND_LIT("PIPE - dup2(pfd_read[1],2) failed in child"));
 					UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 				}
@@ -581,7 +592,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				save_errno = errno;
 				PIPE_ERROR_INIT();
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
-						dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
+						dev_mstr.len, dev_mstr.addr, ERR_TEXT, 2,
 						LEN_AND_LIT("PIPE - dup2(pfd_read_stderr[1],2) failed in child"));
 				UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 			}
@@ -605,10 +616,11 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			save_errno = errno;
 			PIPE_ERROR_INIT();
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_mstr.len, dev_mstr.addr,
 				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - execl() failed in child"));
 			UNDERSCORE_EXIT(-1);
 		}
+		assert(FALSE);	/* we should never reach here since we do an "execl" or "_exit" above */
 	} else
 	{	/* in parent */
 		DEBUG_ONLY(TREF(fork_without_child_wait) = TRUE);	/* set variable to help assert in "relinkctl_rundown()" */

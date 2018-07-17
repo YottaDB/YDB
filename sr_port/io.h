@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -80,6 +83,8 @@ error_def(ERR_UTF16ENDIAN);
 
 #define BADCHAR_DEVICE_MSG "BADCHAR error raised on input"
 #define UNAVAILABLE_DEVICE_MSG "Resource temporarily unavailable"
+
+#define LOGNAME_LEN 255	/* Maximum possible length of name in "io_log_name.dollar_io[]". Enforced by "get_log_name". */
 
 typedef unsigned char params;
 
