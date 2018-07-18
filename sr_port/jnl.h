@@ -1276,10 +1276,10 @@ MBSTART {							\
 #ifdef DEBUG
 #define DECR_INDEX2_AND_KILL(IDX2, IDX1)									\
 MBSTART {													\
-	/* gtm_white_box_test_case_count is set to 1/0 by test system. Then in t_end/tp_tend (if it's 0)	\
-	 * or in jnl_write (if it's 1), gtm_white_box_test_case_count is set to 2 : to kill the process.	\
+	/* ydb_white_box_test_case_count is set to 1/0 by test system. Then in t_end/tp_tend (if it's 0)	\
+	 * or in jnl_write (if it's 1), ydb_white_box_test_case_count is set to 2 : to kill the process.	\
 	 */													\
-	if (2 == gtm_white_box_test_case_count)									\
+	if (2 == ydb_white_box_test_case_count)									\
 	{													\
 		DECR_PHASE2_COMMIT_INDEX(IDX2, JNL_PHASE2_COMMIT_ARRAY_SIZE);					\
 		assert(IDX2 == IDX1);										\

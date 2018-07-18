@@ -3,6 +3,9 @@
  * Copyright (c) 2007-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -96,8 +99,8 @@ boolean_t	wcs_write_in_progress_wait(node_local_ptr_t cnl, cache_rec_ptr_t cr, w
 							cr->epid, cr->blk, DB_LEN_STR(gv_cur_region));
 #						endif
 					}
-					assert((WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)
-						|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number));
+					assert((WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)
+						|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number));
 					return FALSE;
 				}
 			}

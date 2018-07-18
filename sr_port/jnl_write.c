@@ -468,8 +468,8 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 			/* Keep jb->prev_jrec_time up to date */
 		jpc->curr_tn = csa->ti->curr_tn;	/* needed below by UPDATE_JBP_RSRV_FREEADDR */
 #ifdef DEBUG
-		if ((WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06)) && (gtm_white_box_test_case_count == 1))
-			gtm_white_box_test_case_count = 2;
+		if ((WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06)) && (ydb_white_box_test_case_count == 1))
+			ydb_white_box_test_case_count = 2;
 #endif
 		UPDATE_JBP_RSRV_FREEADDR(csa, jpc, jb, NULL, rlen, commit_index, FALSE, 0, 0, FALSE); /* sets "commit_index" */
 		assert(jb->phase2_commit_array[commit_index].curr_tn == jpc->curr_tn);

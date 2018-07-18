@@ -297,8 +297,8 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	if (ENOSPC == save_errno)
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WAITDSKSPACE, 4, process_id, to_wait, DB_LEN_STR(reg), save_errno);
 	else
-		assert((WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)
-			|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number));
+		assert((WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)
+			|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number));
 	INVOKE_C_STACK_APPROPRIATE(cr, csa, 2);
 	WCS_GET_SPACE_RETURN_FAIL(wcs_conflict_trace, cr);
 }
