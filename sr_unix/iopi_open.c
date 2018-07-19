@@ -554,7 +554,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			save_errno = errno;
 			PIPE_ERROR_INIT();
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_mstr.len, dev_mstr.addr,
-				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_write[0]) failed in child"));
+				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_write[0]) failed in child"), save_errno);
 			UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 		}
 		if (return_stdout)
@@ -566,7 +566,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				save_errno = errno;
 				PIPE_ERROR_INIT();
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_mstr.len, dev_mstr.addr,
-					  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_read[1],1) failed in child"));
+					  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_read[1],1) failed in child"), save_errno);
 				UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 			}
 			/* stderr also becomes pfd_read[1] if return_stderr is false*/
@@ -579,7 +579,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 					PIPE_ERROR_INIT();
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
 							dev_mstr.len, dev_mstr.addr, ERR_TEXT, 2,
-							LEN_AND_LIT("PIPE - dup2(pfd_read[1],2) failed in child"));
+							LEN_AND_LIT("PIPE - dup2(pfd_read[1],2) failed in child"), save_errno);
 					UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 				}
 			}
@@ -593,7 +593,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				PIPE_ERROR_INIT();
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
 						dev_mstr.len, dev_mstr.addr, ERR_TEXT, 2,
-						LEN_AND_LIT("PIPE - dup2(pfd_read_stderr[1],2) failed in child"));
+						LEN_AND_LIT("PIPE - dup2(pfd_read_stderr[1],2) failed in child"), save_errno);
 				UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 			}
 		}
@@ -617,7 +617,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			save_errno = errno;
 			PIPE_ERROR_INIT();
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_mstr.len, dev_mstr.addr,
-				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - execl() failed in child"));
+				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - execl() failed in child"), save_errno);
 			UNDERSCORE_EXIT(-1);
 		}
 		assert(FALSE);	/* we should never reach here since we do an "execl" or "_exit" above */
