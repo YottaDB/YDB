@@ -3,6 +3,9 @@
 ; Copyright (c) 2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -40,9 +43,8 @@ MULTIPLYBYNUMBER(num,x,base)
 	quit res
 CONVERTBASE(val,frombase,tobase)
 	new m,res,power
-	quit:'($$VERIFYNUM(val,frombase)) "0"
-	set res="0"
-	set m=$length(val),power=1
+	set m=$$VALIDLEN(val,frombase)
+	set res="0",power=1
 	for  quit:m<1  do
 	. set res=$$ADDVAL(res,$$MULTIPLYBYNUMBER($extract(val,m),power,tobase),tobase)
 	. set power=$$MULTIPLYBYNUMBER(frombase,power,tobase),m=$increment(m,-1)
@@ -60,9 +62,10 @@ CONVNEG(v,base)
 	set:i'=$length(v) ns=$extract(v,1,$length(v)-i)_ns
 	set:$find(($extract(charmap,1,(base/2))),$extract(ns,1)) ns=($extract(charmap,$length(charmap)))_ns
 	quit ns
-;Verifies every character in the passed string is a valid character in the given base (works up to base 16)
-VERIFYNUM(val,base)
-	new i,valbasechar,valid
-	set valbasechar=$extract("0123456789ABCDEF",1,base),valid=1
-	for i=1:1:$length(val)  set:'($find(valbasechar,($extract(val,i)))) valid=0 quit:'valid
-	quit valid
+;Returns length of string until which all characters are valid for the given base (works up to base 16)
+VALIDLEN(val,base)
+	new i,valbasechar,invalidi,len
+	set valbasechar=$extract("0123456789ABCDEF",1,base),len=$length(val)
+	quit:'len 0
+	for i=1:1:$length(val)  set invalidi='($find(valbasechar,($extract(val,i))))  quit:invalidi
+	quit $select($get(invalidi):i-1,1:i)
