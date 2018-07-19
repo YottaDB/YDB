@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -305,17 +308,17 @@ static readonly CLI_ENTRY dse_map_qual[] = {
 };
 
 static readonly CLI_ENTRY dse_open_qual[] = {
-{ "FILE",   0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
-{ "OCHSET", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0 },
+{ "FILE",   0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0 },
+{ "OCHSET", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0 },
 { "" }
 };
 
 
 static readonly CLI_ENTRY dse_over_qual[] = {
-{ "BLOCK",  0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "DATA",   0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0       },
-{ "OFFSET", 0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "OCHSET", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_NUM, 0       },
+{ "BLOCK",  0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "DATA",   0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0       },
+{ "OFFSET", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "OCHSET", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0       },
 { "" }
 };
 
