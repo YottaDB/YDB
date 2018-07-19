@@ -705,16 +705,12 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_YGDS2GVN:
 			n = (NULL != arg2) ? mval2i(arg2) : 0;
 			key = gds2gvn(arg1, &buff[0], n);
-			if (!n)
-				key = &buff[0];
 			COPY_ARG_TO_STRINGPOOL(dst, key, &buff[0]);
 			break;
 		case VTK_YGVN2GDS:
 			n = (NULL != arg2) ? mval2i(arg2) : 0;
 			gvkey = &save_currkey[0];
 			key = gvn2gds(arg1, gvkey, n);
-			if (!n)
-				key = &gvkey->base[0];
 			/* If input has error at some point, copy whatever subscripts (+ gblname) have been successfully parsed */
 			COPY_ARG_TO_STRINGPOOL(dst, key, &gvkey->base[0]);
 			break;
