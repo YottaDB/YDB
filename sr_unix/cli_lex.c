@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -165,7 +168,7 @@ void	cli_lex_setup (int argc, char **argv)
 	{	/* We have the cure for a missing or unusable buffer */
 		if (cli_lex_in_ptr)
 			free(cli_lex_in_ptr);
-		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + parmlen);
+		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + parmlen + 1);	/* + 1 needed for NULL byte */
 		cli_lex_in_ptr->buflen = parmlen;
 	}
 	cli_lex_in_ptr->argc = argc;
@@ -184,7 +187,7 @@ void cli_str_setup(int addrlen, char *addr)
 	{	/* We have the cure for a missing or unusable buffer */
 		if (cli_lex_in_ptr)
 			free(cli_lex_in_ptr);
-		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + alloclen);
+		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + alloclen + 1);	/* + 1 needed for NULL byte */
 		cli_lex_in_ptr->buflen = alloclen;
 	}
 	cli_lex_in_ptr->argv = NULL;
@@ -357,10 +360,10 @@ static void cli_lex_in_expand(int in_len)
 {
 	IN_PARMS	*new_cli_lex_in_ptr;
 
-	new_cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + in_len + 1);
+	new_cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + in_len + 1);	/* + 1 needed for NULL byte */
 	new_cli_lex_in_ptr->argc = cli_lex_in_ptr->argc;
 	new_cli_lex_in_ptr->argv = cli_lex_in_ptr->argv;
-	new_cli_lex_in_ptr->buflen = in_len;		/* + 1 above accounts for null */
+	new_cli_lex_in_ptr->buflen = in_len;		/* + 1 above accounts for NULL byte */
 	free(cli_lex_in_ptr);
 	cli_lex_in_ptr = new_cli_lex_in_ptr;
 }
