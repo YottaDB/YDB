@@ -65,7 +65,7 @@ int gtm_printf(const char *format, ...)
 int gtm_fprintf(FILE *stream, const char *format, ...)
 {
 	va_list		printargs, pa_copy;
-	size_t		retval, buflen;
+	size_t		retval, buflen, retlen;
 	sigset_t	savemask;
 	intrpt_state_t	prev_intrpt_state;
 
@@ -78,7 +78,12 @@ int gtm_fprintf(FILE *stream, const char *format, ...)
 		char buf[buflen + 1];			/* C99: Variable Length Array, avoids malloc. */
 
 		VSNPRINTF(buf, SIZEOF(buf), format, printargs, buflen);
-		GTM_FWRITE(buf, buflen, 1, stream, buflen, retval);
+		GTM_FWRITE(buf, 1, buflen, stream, retlen, retval);
+		if (retlen < buflen)
+		{	/* Error from "GTM_FWRITE". "retval" contains "errno". */
+			assert(errno == retval);
+			retval = -1;	/* Now that "errno" has been set, return -1 just like "fprintf" would in case of error */
+		}
 	}
 	va_end(printargs);
 	return retval;
