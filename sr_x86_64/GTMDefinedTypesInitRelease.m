@@ -301,7 +301,7 @@ Init
 	Set gtmtypfldindx("IN_PARMS","buflen")=4
 	Set gtmtypes("IN_PARMS",5,"name")="IN_PARMS.in_str"
 	Set gtmtypes("IN_PARMS",5,"off")=28
-	Set gtmtypes("IN_PARMS",5,"len")=0
+	Set gtmtypes("IN_PARMS",5,"len")=1
 	Set gtmtypes("IN_PARMS",5,"type")="char"
 	Set gtmtypfldindx("IN_PARMS","in_str")=5
 	;
