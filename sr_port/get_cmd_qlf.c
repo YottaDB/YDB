@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,50 +65,52 @@ void get_cmd_qlf(command_qualifier *qualif)
 			}
 		} else
 			s->len = len;
-	} else if (cli_negated("OBJECT") == TRUE)
+	} else if (cli_negated("OBJECT"))
 		qualif->qlf &= ~CQ_OBJECT;
 
 
 	if (cli_present("CROSS_REFERENCE") == CLI_PRESENT)
 		qualif->qlf |= CQ_CROSS_REFERENCE;
-	else if (cli_negated("CROSS_REFERENCE") == TRUE)
+	else if (cli_negated("CROSS_REFERENCE"))
 		qualif->qlf &= ~CQ_CROSS_REFERENCE;
 
-	if (cli_negated("IGNORE") == TRUE)
+	if (cli_negated("IGNORE"))
 		qualif->qlf &= ~CQ_IGNORE;
 	else
 		qualif->qlf |= CQ_IGNORE;
 
 	if (cli_present("DEBUG") == CLI_PRESENT)
 		qualif->qlf |= CQ_DEBUG;
-	else if (cli_negated("DEBUG") == TRUE)
+	else if (cli_negated("DEBUG"))
 		qualif->qlf &= ~CQ_DEBUG;
 
-	if (cli_negated("LINE_ENTRY") == TRUE)
+	if (cli_negated("LINE_ENTRY"))
 		qualif->qlf &= ~CQ_LINE_ENTRY;
 
-	if (cli_negated("INLINE_LITERALS") == TRUE)
+	if (cli_negated("INLINE_LITERALS"))
 		qualif->qlf &= ~CQ_INLINE_LITERALS;
 
-	if (cli_negated("ALIGN_STRINGS") == TRUE)
+	if (cli_negated("ALIGN_STRINGS"))
 		qualif->qlf &= ~CQ_ALIGN_STRINGS;
 
 #ifdef DEBUG
 	if (cli_present("MACHINE_CODE") == CLI_PRESENT)
 		qualif->qlf |= CQ_MACHINE_CODE;
-	else if (cli_negated("MACHINE_CODE") == TRUE)
+	else if (cli_negated("MACHINE_CODE"))
 		qualif->qlf &= ~CQ_MACHINE_CODE;
 #else
 	qualif->qlf &= ~CQ_MACHINE_CODE;
 #endif
 
-	if (cli_negated("WARNINGS") == TRUE)
+	if (cli_negated("WARNINGS"))
 		qualif->qlf &= ~CQ_WARNINGS;
-	else
+	else if (cli_present("WARNINGS"))
+	{
+		assert(CLI_PRESENT == cli_present("WARNINGS"));
 		qualif->qlf |= CQ_WARNINGS;
+	}
 
-
-	if (cli_negated("LIST") == TRUE)
+	if (cli_negated("LIST"))
 		qualif->qlf &= (~CQ_LIST & ~CQ_MACHINE_CODE);
 	else if (cli_present("LIST") == CLI_PRESENT)
 	{
@@ -168,7 +173,7 @@ void get_cmd_qlf(command_qualifier *qualif)
 			}
 		} else
 			s->len = len;
-	} else if (cli_negated("CE_PREPROCESS") == TRUE)
+	} else if (cli_negated("CE_PREPROCESS"))
 		qualif->qlf &= ~CQ_CE_PREPROCESS;
 #	ifdef USHBIN_SUPPORTED
 	if (CLI_PRESENT == cli_present("DYNAMIC_LITERALS"))
