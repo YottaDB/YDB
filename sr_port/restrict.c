@@ -71,11 +71,11 @@ error_def(ERR_TEXT);
 	if (!ACCESS(FPATH,F_OK))		/*Filter file exists, now check modified time*/			\
 	{													\
 		Stat(RPATH, &rTime);										\
-		rmtime = rTime.st_mtime;									\
+		rmtime = rTime.st_mtim;										\
 		Stat(FPATH, &fTime);										\
-		fmtime = fTime.st_mtime;									\
-		if (rmtime > fmtime)	/*Delete the older mapping file and recreate new if required*/		\
-		{												\
+		fmtime = fTime.st_mtim;										\
+		if ((rmtime.tv_sec > fmtime.tv_sec) || (rmtime.tv_nsec >= fmtime.tv_nsec))			\
+		{	/*Delete the older mapping file and recreate new if required*/				\
 			created_now = TRUE;									\
 			gtm_file_remove(FPATH, strlen(FPATH), &STAT_RM);					\
 			append_filter(FPATH, FP, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);			\
@@ -125,7 +125,7 @@ void restrict_init(void)
 	size_t		grpbufsz;
 	boolean_t	created_now = FALSE;
 	struct stat 	rTime, fTime;
-	time_t 		rmtime, fmtime;
+	struct timespec	rmtime, fmtime;
 
 	assert(!restrict_initialized);
 	assert(ydb_dist_ok_to_use);
