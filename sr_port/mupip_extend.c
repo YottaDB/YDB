@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -111,7 +114,7 @@ void mupip_extend(void)
 		assert((FILE_INFO(gv_cur_region))->grabbed_access_sem); /* we should have standalone access */
 	}
 #	endif
-	gvcst_init(gv_cur_region, NULL);
+	gvcst_init(gv_cur_region);
 	if (gv_cur_region->was_open)
 	{	/* This should not happen as extend works on only one region at a time, but handle for safety */
 		gtm_putmsg_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(4) ERR_DBOPNERR, 2, DB_LEN_STR(gv_cur_region));

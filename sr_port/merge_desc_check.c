@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -145,14 +148,14 @@ boolean_t merge_desc_check(void)
 					OPEN_BASEREG_IF_STATSREG(map);
 					reg = map->reg.addr;
 					if (!reg->open)
-						gv_init_reg(reg, NULL);
+						gv_init_reg(reg);
 				}
 				for (map = start_map2; map <= end_map2; map++)
 				{
 					OPEN_BASEREG_IF_STATSREG(map);
 					reg = map->reg.addr;
 					if (!reg->open)
-						gv_init_reg(reg, NULL);
+						gv_init_reg(reg);
 				}
 				/* At this point, all regions involved in the merge ^gvn1(subs1)=^gvn2(subs2) are open
 				 * so we can use max_fid_index without issues.

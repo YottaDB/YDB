@@ -196,7 +196,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			 * (user-invisible) and the caller will modify gld map entries and/or switch baseDB to NOSTATS if any
 			 * errors occur thereby preventing future access to this statsDB database file.
 			 */
-			gvcst_init(statsDBreg_located, NULL);
+			gvcst_init(statsDBreg_located);
 			if (statsDBreg_located->open)		/* do the check just in case */
 			{
 				statsDBcsa = &FILE_INFO(statsDBreg_located)->s_addrs;
@@ -233,7 +233,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			 * and "OPEN_BASEREG_IF_STATSREG" rely on this open to happen here (and catch errors) so they
 			 * can take appropriate action (see comment in OPEN_BASEREG_IF_STATSREG for example reason).
 			 */
-			gvcst_init(statsDBreg_located, NULL);
+			gvcst_init(statsDBreg_located);
 			break;
 		}
 		save_cur_region = gv_cur_region;
@@ -363,7 +363,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			statsDBrec_mval.mvtype = MV_STR;
 			statsDBrec_mval.str.addr = statsDBinitrec;
 			statsDBrec_mval.str.len = padsize + SIZEOF(gvstats_rec_t);
-			/* If this statsDB was previously opened by direct references to ^%YGS, gvcst_init() will have set the DB
+			/* If this statsDB was previously opened by direct references to ^%YGS, "gvcst_init" will have set the DB
 			 * to R/O mode so if it was previously opened, we need to set it back to write-mode to add the needed
 			 * gvstats record.
 			 */

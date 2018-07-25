@@ -28,7 +28,6 @@
 #include "gdsfhead.h"
 #include "gbldirnam.h"
 #include "hashtab_mname.h"
-#include "iosize.h"
 #include "dpgbldir.h"
 #include "filestruct.h"
 #include "aio_shim.h"
@@ -211,8 +210,8 @@ gd_addr *gd_load(mstr *v)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GDINVALID, 6, v->len, v->addr, LEN_AND_LIT(GDE_LABEL_LITERAL),
 				disp_len, disp_head.label);
 	}
-	size = LEGAL_IO_SIZE(temp_head.filesize);
-	header = (header_struct *)malloc(size);
+	size = temp_head.filesize;
+	header = (header_struct *)malloc(size + SIZEOF(gd_runtime_t));
 	file_read(file_ptr, size, (uchar_ptr_t)header, 1);			/* Read in body of file */
 	table = (gd_addr *)((char *)header + SIZEOF(header_struct));
         table->local_locks = (struct gd_region_struct *)((UINTPTR_T)table->local_locks + (UINTPTR_T)table);
@@ -236,7 +235,9 @@ gd_addr *gd_load(mstr *v)
 #		endif
 		reg->owning_gd = table; /* set backpointer from region to owning gbldir */
 	}
-	IF_LIBAIO(table->thread_gdi = NULL;)
+	table->gd_runtime = (gd_runtime_t *)((char *)header + size);
+	assert((UINTPTR_T)table->gd_runtime >= (UINTPTR_T)table->end);
+	memset(table->gd_runtime, 0, SIZEOF(gd_runtime_t));
 #	ifdef DEBUG
 	prevMapIsSpanning = FALSE;
 	currMapIsSpanning = FALSE;

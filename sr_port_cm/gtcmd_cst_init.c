@@ -29,6 +29,7 @@
 #include "gtcmd.h"
 #include "targ_alloc.h"
 #include "dpgbldir.h"
+#include "gvcst_protos.h"		/* for "gvcst_init" */
 
 GBLREF int4		gv_keysize;
 GBLREF gv_key		*gv_currkey;
@@ -44,7 +45,7 @@ void gtcmd_cst_init(cm_region_head *ptr)
 
 	ASSERT_IS_LIBGNPSERVER;
 	reg = ptr->reg;
-	gvcst_init(reg, NULL);
+	gvcst_init(reg);
 #	ifdef DEBUG
 	assert(gv_keysize >= DBKEYSIZE(reg->max_key_size));
 	csa = &FILE_INFO(reg)->s_addrs;

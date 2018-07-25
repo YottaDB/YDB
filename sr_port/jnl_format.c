@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -175,7 +178,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	/* Allocate a jfb structure */
 	if (!dollar_tlevel)
 	{
-		jfb = non_tp_jfb_ptr; /* already malloced in gvcst_init() */
+		jfb = non_tp_jfb_ptr; /* already malloced in "gvcst_init" */
 		jgbl.cumul_jnl_rec_len = 0;
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
 	} else

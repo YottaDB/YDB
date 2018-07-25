@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -253,7 +256,7 @@ void mupip_reorg(void)
 		/* mu_reorg_process can't be set before gv_select above as the assert(!mu_reorg_process) fails in gvcst_search.
 		 * The option to set mu_reorg_process before calling gv_select and clearing it after being used in gvcst_init,
 		 *  can't be taken up as gvcst_init is called multiple times, once for each region.
-		 * This means gvcst_init() doesn't set csa->gbuff and we need to set csa->gbuff_limit explicitly now. */
+		 * This means "gvcst_init" doesn't set csa->gbuff and we need to set csa->gbuff_limit explicitly now. */
 		if (0 == (TREF(gbuff_limit)).str.len)
 		{
 			(TREF(gbuff_limit)).str.len = SIZEOF(REORG_GBUFF_LIMIT);

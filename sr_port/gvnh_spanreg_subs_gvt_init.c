@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -85,7 +88,7 @@ void gvnh_spanreg_subs_gvt_init(gvnh_reg_t *gvnh_reg, gd_addr *addr, viewparm *p
 			 * as we are going to add it to the gvt_pending_list anyways.
 			 */
 			if ((NULL == parmblk) && !reg->open)
-				gv_init_reg(reg, NULL);
+				gv_init_reg(reg);
 			gvt = (gv_namehead *)targ_alloc(reg->max_key_size, &name_gvt->gvname, reg);
 			COPY_ACT_FROM_GVNH_REG_TO_GVT(gvnh_reg, gvt, reg);
 			/* See comment in GVNH_REG_INIT macro for why the below assignment is

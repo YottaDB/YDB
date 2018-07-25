@@ -131,7 +131,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					if ((IS_REG_BG_OR_MM(r_ptr)) && (!(IS_STATSDB_REG(r_ptr))))
 					{
 						if (!r_ptr->open)
-							gv_init_reg(r_ptr, NULL);
+							gv_init_reg(r_ptr);
 						insert_region(r_ptr, &TREF(view_region_list), &(TREF(view_region_free_list)),
 							SIZEOF(tp_region));
 					}
@@ -190,7 +190,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 							if (!is_dollar_view)
 							{
 								if (!r_ptr->open)
-									gv_init_reg(r_ptr, NULL);
+									gv_init_reg(r_ptr);
 								insert_region(r_ptr, &(TREF(view_region_list)),
 									&(TREF(view_region_free_list)), SIZEOF(tp_region));
 							}

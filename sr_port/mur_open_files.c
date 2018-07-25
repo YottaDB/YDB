@@ -74,6 +74,7 @@
 #include "wcs_recover.h"
 #include "is_proc_alive.h"
 #include "anticipatory_freeze.h"
+#include "gvcst_protos.h"		/* for "gvcst_init" */
 
 #define RELEASE_ACCESS_CONTROL(REGLIST)												\
 {																\
@@ -268,7 +269,7 @@ boolean_t mur_open_files()
 		 * instance file nor do we look at jnlpool/recvpool during forward rollback so we skip this step.
 		 */
 		if (!repl_inst_get_name((char *)replpool_id.instfilename, &full_len, SIZEOF(replpool_id.instfilename),
-				issue_gtm_putmsg, NULL))
+				issue_gtm_putmsg, gd_header))
 		{	/* appropriate gtm_putmsg would have already been issued by repl_inst_get_name */
 			return FALSE;
 		}
@@ -352,7 +353,7 @@ boolean_t mur_open_files()
 			}
 			if (mur_options.update || mur_options.extr[GOOD_TN])
 			{
-	        		gvcst_init(rctl->gd, NULL);
+	        		gvcst_init(rctl->gd);
 				TP_CHANGE_REG(rctl->gd);
 				if (jgbl.onlnrlbk)
 				{

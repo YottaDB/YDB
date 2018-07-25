@@ -240,7 +240,7 @@ unsigned char mu_cre_file(void)
 		 * STATSDBs.
 		 */
 		save_errno = errno;
-		TREF(mu_cre_file_openrc) = errno;		/* Save for gvcst_init() */
+		TREF(mu_cre_file_openrc) = errno;		/* Save for "gvcst_init" */
 		/* If this is an AUTODB (but not a STATSDB) and the file already exists, this is not an error (some other
 		 * process created the file. This is ok so return as if we created it.
 		 */

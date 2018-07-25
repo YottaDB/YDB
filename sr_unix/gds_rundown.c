@@ -824,7 +824,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	 * cleaned up as part of the "aio_shim_destroy" done in "gds_rundown" of the basedb but that will happen only after
 	 * the statsdb rundown completes. So account for that in the below assert.
 	 */
-	assert((NULL == udi->owning_gd->thread_gdi) || is_statsDB);
+	assert((NULL == udi->owning_gd->gd_runtime->thread_gdi) || is_statsDB);
 	udi->owning_gd = NULL;
 	/* Done with file now, close it */
 	CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID and does flock(LOCK_UN) if needed */

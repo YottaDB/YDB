@@ -85,6 +85,7 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	IN_PARMS		*cli_lex_in_ptr;
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	io_pair			io_std_device;
+GBLREF	gd_addr			*gd_header;
 
 LITREF	gtmImageName		gtmImageNames[];
 
@@ -132,8 +133,10 @@ int gtmrecv(void)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
 	if (gtmrecv_options.start || gtmrecv_options.shut_down)
-	{
-		jnlpool_init(GTMRECEIVE, (boolean_t)FALSE, (boolean_t *)NULL, NULL);
+	{	/* Use "gd_header" for consistency across all "jnlpool_init" usages in the codebase
+		 * even though it is NULL in the case of the receiver server.
+		 */
+		jnlpool_init(GTMRECEIVE, (boolean_t)FALSE, (boolean_t *)NULL, gd_header);
 		assert(NULL != jnlpool);
 		assert(NULL != jnlpool->repl_inst_filehdr);
 		assert(NULL != jnlpool->jnlpool_ctl);

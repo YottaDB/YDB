@@ -362,7 +362,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	tmp_ctl->repl_buff->fc->fd = tmp_fd;
 	if (USES_ANY_KEY(tmp_jfh))
 	{
-		ASSERT_ENCRYPTION_INITIALIZED;	/* should be done in db_init (gtmsource() -> gvcst_init() -> db_init()) */
+		ASSERT_ENCRYPTION_INITIALIZED;	/* should be done in db_init ("gtmsource" -> "gvcst_init" -> "db_init") */
 		INIT_DB_OR_JNL_ENCRYPTION(tmp_ctl, tmp_jfh, reg->dyn.addr->fname_len, (char *)reg->dyn.addr->fname, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, tmp_ctl->jnl_fn_len, tmp_ctl->jnl_fn);

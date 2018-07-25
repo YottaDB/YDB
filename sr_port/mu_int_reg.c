@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -88,7 +91,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 		mu_int_skipreg_cnt++;
 		return;
 	}
-	gvcst_init(gv_cur_region, NULL);
+	gvcst_init(gv_cur_region);
 	if (gv_cur_region->was_open)
 	{	/* already open under another name */
 		gv_cur_region->open = FALSE;

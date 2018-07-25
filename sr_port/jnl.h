@@ -320,7 +320,7 @@ MBSTART {						\
 }
 
 /* Token generation used in non-replicated journaled environment. Note the assumption here
-   that SIZEOF(token_split_t) == SIZEOF(token_build) which will be asserted in gvcst_init().
+   that SIZEOF(token_split_t) == SIZEOF(token_build) which will be asserted in "gvcst_init".
    The TOKEN_SET macro below depends on this assumption.
 */
 typedef struct token_split_t_struct
