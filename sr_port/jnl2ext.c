@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -36,7 +39,6 @@
 #include "real_len.h"		/* for real_len() prototype */
 
 #define	DELIMIT_CURR	*curr++ = '\\';
-#define ZERO_TIME_DELIM	"0,0\\"
 #define PIDS_DELIM	"0\\0\\"
 
 #define	JNL2EXT_STRM_SEQNO(CURR, STRM_SEQNO)				\
@@ -135,8 +137,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 			GET_SHORTP(curr, &muext_code[MUEXT_TSTART][0]);
 			curr += 2;
 			DELIMIT_CURR;
-			MEMCPY_LIT(curr, ZERO_TIME_DELIM);
-			curr += STR_LIT_LEN(ZERO_TIME_DELIM);
+			curr += exttime(rec->prefix.time, curr, 0);
 			curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_set_kill.prefix.tn);
 			DELIMIT_CURR;
 			MEMCPY_LIT(curr, PIDS_DELIM);
@@ -158,8 +159,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 			GET_SHORTP(curr, &muext_code[MUEXT_TCOMMIT][0]);
 			curr += 2;
 			DELIMIT_CURR;
-			MEMCPY_LIT(curr, ZERO_TIME_DELIM);
-			curr += STR_LIT_LEN(ZERO_TIME_DELIM);
+			curr += exttime(rec->prefix.time, curr, 0);
 			curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_tcom.prefix.tn);
 			DELIMIT_CURR;
 			MEMCPY_LIT(curr, PIDS_DELIM);
@@ -199,8 +199,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 	}
 	curr += 2;
 	DELIMIT_CURR;
-	MEMCPY_LIT(curr, ZERO_TIME_DELIM);
-	curr += STR_LIT_LEN(ZERO_TIME_DELIM);
+	curr += exttime(rec->prefix.time, curr, 0);
 	curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_set_kill.prefix.tn);
 	DELIMIT_CURR;
 	MEMCPY_LIT(curr, PIDS_DELIM);
