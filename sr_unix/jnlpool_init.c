@@ -624,7 +624,8 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			RTS_ERROR_LITERAL("Error with journal pool shmat"), save_errno);
 	}
 	assert(jnlpool == tmp_jnlpool);
-	assert((NULL == gd_ptr) || (NULL == gd_ptr->gd_runtime->jnlpool));
+	assert((NULL == gd_ptr) || (NULL == gd_ptr->gd_runtime->jnlpool)
+		|| (!new_tmp_jnlpool && (tmp_jnlpool == gd_ptr->gd_runtime->jnlpool) && !tmp_jnlpool->pool_init));
 	ADD_TO_JNLPOOL_HEAD_LIST(new_tmp_jnlpool, jnlpool, jnlpool_head, gd_ptr);
 	jnlpool->jnlpool_ctl = tmp_jnlpool_ctl;
 	/* Now that we have attached to the journal pool, fix udi->counter_ftok_incremented back to an accurate value */
