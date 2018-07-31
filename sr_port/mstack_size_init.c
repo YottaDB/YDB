@@ -61,7 +61,7 @@ void mstack_size_init(struct startup_vector *svec)
 							MSTACK_MIN_SIZE, MSTACK_MAX_SIZE, ydb_mstack_size);
 	ydb_mstack_crit_threshold = ydb_trans_numeric(YDBENVINDX_MSTACK_CRIT_THRESHOLD, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 	invalid_value = 0;
-	if (0 == ydb_mstack_crit_threshold)
+	if (!is_defined)
 		ydb_mstack_crit_threshold = MSTACK_CRIT_DEF_THRESHOLD;
 	else if (MSTACK_CRIT_MIN_THRESHOLD > ydb_mstack_crit_threshold)
 	{
