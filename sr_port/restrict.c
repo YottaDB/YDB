@@ -75,10 +75,10 @@ error_def(ERR_TEXT);
 		Stat(FPATH, &fTime);										\
 		fmtime = fTime.st_mtim;										\
 		/* Check if restrict.txt file modification time (rmtime) is newer than				\
-		 * filter_commands.tab file modificatoin time (fmtime). If so, recreate filter_commands.tab.	\
+		 * filter_commands.tab file modification time (fmtime). If so, recreate filter_commands.tab.	\
 		 */												\
 		if ((rmtime.tv_sec > fmtime.tv_sec)								\
-			|| (rmtime.tv_sec == fmtime.tv_sec) && (rmtime.tv_nsec >= fmtime.tv_nsec))		\
+			|| ((rmtime.tv_sec == fmtime.tv_sec) && (rmtime.tv_nsec >= fmtime.tv_nsec)))		\
 		{	/* Delete the older mapping file and recreate new if required */			\
 			created_now = TRUE;									\
 			gtm_file_remove(FPATH, strlen(FPATH), &STAT_RM);					\
