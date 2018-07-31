@@ -68,30 +68,31 @@ error_def(ERR_TEXT);
 
 #define	PUT_FLNAME_IN_MAPPING_FILE(RPATH, FPATH, FP, C_CALL_NAME, M_REF_NAME, STAT_RM, SAVE_ERRNO, ERR_STR)	\
 {														\
-	if (!ACCESS(FPATH,F_OK))		/*Filter file exists, now check modified time*/			\
+	if (!ACCESS(FPATH, F_OK))		/* Filter file exists, now check modified time */		\
 	{													\
 		Stat(RPATH, &rTime);										\
 		rmtime = rTime.st_mtim;										\
 		Stat(FPATH, &fTime);										\
 		fmtime = fTime.st_mtim;										\
-		if ((rmtime.tv_sec > fmtime.tv_sec) || (rmtime.tv_nsec >= fmtime.tv_nsec))			\
-		{	/*Delete the older mapping file and recreate new if required*/				\
+		/* Check if restrict.txt file modification time (rmtime) is newer than				\
+		 * filter_commands.tab file modificatoin time (fmtime). If so, recreate filter_commands.tab.	\
+		 */												\
+		if ((rmtime.tv_sec > fmtime.tv_sec)								\
+			|| (rmtime.tv_sec == fmtime.tv_sec) && (rmtime.tv_nsec >= fmtime.tv_nsec))		\
+		{	/* Delete the older mapping file and recreate new if required */			\
 			created_now = TRUE;									\
 			gtm_file_remove(FPATH, strlen(FPATH), &STAT_RM);					\
 			append_filter(FPATH, FP, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);			\
-		}												\
-		else if(created_now) /*This process created a new file,append to it*/				\
+		} else if (created_now) /* This process created a new file,append to it */			\
 		{												\
 			append_filter(FPATH, FP, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);			\
 		}												\
-	}													\
-	else /*File does not exist, create and write mapping*/							\
+	} else /* File does not exist, create and write mapping */						\
 	{													\
 		created_now = TRUE;										\
 		append_filter(FPATH, FP, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);				\
 	}													\
 }
-
 
 void append_filter(char * fpath, FILE * fp, char * c_call_name, char * m_ref_name, int * save_errno, char * errstr)
 {
