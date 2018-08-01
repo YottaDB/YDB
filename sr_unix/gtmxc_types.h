@@ -71,7 +71,6 @@ void 		gtm_free(void *);
 void		gtm_hiber_start(ydb_uint_t mssleep);
 void		gtm_hiber_start_wait_any(ydb_uint_t mssleep);
 void		gtm_start_timer(ydb_tid_t tid, ydb_int_t time_to_expir, void (*handler)(), ydb_int_t hdata_len, void *hdata);
-gtm_status_t	gtm_ci_filter(const char *c_rtn_name, ...);
 
 /* The java plug-in has some very direct references to some of these routines that
  * cannot be changed by the pre-processor so for now, we have some stub routines

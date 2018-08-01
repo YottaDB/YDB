@@ -1287,7 +1287,7 @@ void gvcst_init(gd_region *reg)
 		if (NO_STATS_OPTIN != TREF(statshare_opted_in))
 		{
 			if (!is_statsDB)
-			{	/* This is a baseDB - so long if all in, we should initialize the statsDB */
+			{	/* This is a baseDB - if all-in, we should initialize the statsDB */
 				if (!(RDBF_NOSTATS & reg->reservedDBFlags) && (ALL_STATS_OPTIN == TREF(statshare_opted_in)))
 				{
 					BASEDBREG_TO_STATSDBREG(reg, statsDBreg);

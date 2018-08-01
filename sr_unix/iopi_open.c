@@ -328,7 +328,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 #endif
         char		dev_name_buf[LOGNAME_LEN];
 	mstr		dev_mstr;
-	gtm_string_t    filtered_command;
+	ydb_string_t    filtered_command;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

@@ -50,4 +50,8 @@ int 	ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handl
 void	gtmci_cleanup(void);
 #endif
 
+#include "gtmxc_types.h"	/* for "gtm_status_t" */
+
+gtm_status_t	gtm_ci_filter(const char *c_rtn_name, ...);
+
 #endif
