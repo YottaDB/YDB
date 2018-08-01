@@ -234,6 +234,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	unsigned char		*cp, *context;
 	boolean_t		dm_action;	/* did the error occur on a action from direct mode */
 	boolean_t		trans_action;	/* did the error occur during "transcendental" code */
+	boolean_t		prev_frame_is_indce;	/* used to compute "dm_action" */
 	char			src_line[MAX_ENTRYREF_LEN];
 	mstr			src_line_d;
 	io_desc			*err_dev;
@@ -599,8 +600,28 @@ CONDITION_HANDLER(mdb_condition_handler)
 #	endif
  	err_dev = active_device;
 	active_device = (io_desc *)NULL;
-	dm_action = (frame_pointer->old_frame_pointer->type & SFT_DM)
-		|| (TREF(compile_time) && (frame_pointer->type & SFT_DM));
+	/* Determine if the error occurred on a action from direct mode.
+	 * Go back until we find a counted frame. If we see a SFF_INDCE frame and a SFT_DM frame
+	 * before then, we are in direct mode. Else we are not in direct mode.
+	 * Note that it is also possible for a compilation error before the SFF_INDCE frame is created in op_commarg.
+	 * That is also a direct mode error so take that into account separately (TREF(compile_time) usage below).
+	 */
+	dm_action = FALSE;
+	prev_frame_is_indce = TREF(compile_time);
+	for (fp = frame_pointer; ; fp = fp->old_frame_pointer)
+	{
+		assert(!(fp->type & SFT_COUNT) || !(fp->type & SFT_DM));
+		if (fp->type & SFT_COUNT)
+			break;
+		if (fp->type & SFT_DM)
+		{
+			if (prev_frame_is_indce)
+				dm_action = TRUE;
+			break;
+		}
+		prev_frame_is_indce = (fp->flags & SFF_INDCE);
+		assert(NULL != fp->old_frame_pointer);
+	}
 	/* The errors are said to be transcendental when they occur during compilation/execution
 	 * of the error trap ({z,e}trap, device exception) or $zinterrupt. The errors in other
 	 * indirect code frames (zbreak, zstep, xecute etc.) aren't defined to be trancendental
