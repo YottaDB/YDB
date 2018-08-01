@@ -6927,12 +6927,6 @@
 
    Example:
 
-   Suppose a process runs LOCK (^SUCCESS1,^SUCCESS2) which succeeds and a
-   LOCK +^FAIL:1 which times out due to another process holding that lock. A
-   ZSHOW "L" at this point displays the following output.
-
-   Example:
-
    GTM>ZSHOW "I"
    $DEVICE=""
    $ECODE=""
@@ -6966,7 +6960,7 @@
    $ZEDITOR=0
    $ZEOF=0
    $ZERROR="Unprocessed $ZERROR, see $ZSTATUS"
-   $ZGBLDIR="/path/to/the/global/directory/$gtmgbldir.gld"
+   $ZGBLDIR="/path/to/the/global/directory/mumps.gld"
    $ZHOROLOG="64813,13850,790453,14400"
    $ZININTERRUPT=0
    $ZINTERRUPT="IF $ZJOBEXAM()"
@@ -6985,7 +6979,7 @@
    $ZQUIT=0
    $ZREALSTOR=694280
    $ZRELDATE="20180614 00:33"
-   $ZROUTINES=". /usr/lib/fis-gtm/V6.3-005_x86_64 /usr/lib/fis-gtm/V6.3-005_x86_64/plugin/o(/usr/lib/fis-gtm/V6.3-005_x86_64/plugin/r)"
+   $ZROUTINES=". /home/user/.yottadb/r1.22_x86_64/o*(/home/user/.yottadb/r1.22_x86_64/r /home/user/.yottadb/r) /usr/local/lib/yottadb/r122/libyottadbutil.so"
    $ZSOURCE=""
    $ZSTATUS=""
    $ZSTEP="B"
@@ -7007,6 +7001,7 @@
    $ZUT=1528962650791332
    $ZVERSION="GT.M V6.3-005 Linux x86_64"
    $ZYERROR=""
+   $ZYRELEASE="YottaDB r1.22 Linux x86_64"
 
    This example displays the current value of all intrinsic special
    variables.
@@ -10866,7 +10861,7 @@
    Example:
 
    YDB>write $ztrnlnm("ydb_dist")
-   /usr/lib/fis-gtm/V6.3-004_x86_64/utf8
+   /usr/local/lib/yottadb/r122/utf8
    YDB>write $ztrnlnm("ydb_dist","","","","","VALUE")
    /usr/local/lib/yottadb/r122/utf8
    YDB>

@@ -75,7 +75,7 @@ void op_zsystem(mval *v)
         int4            wait_stat;
 #endif
 	boolean_t	resetterm_done_by_me;
-	gtm_string_t	filtered_command;
+	ydb_string_t	filtered_command;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
