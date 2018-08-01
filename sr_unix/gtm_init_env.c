@@ -13,11 +13,12 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include <rtnhdr.h>
+
 #include "stack_frame.h"
 #include "startup.h"
 #include "gtm_startup.h"
-#include "error.h"
 
 GBLREF	stack_frame	*frame_pointer;
 
