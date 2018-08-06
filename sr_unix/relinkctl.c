@@ -964,6 +964,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 		}
 		if (decr_attached)
 		{	/* MUPIP RUNDOWN -RELINKCTL should still hold a lock. */
+			shm_hdr = NULL;
 			assert(linkctl->locked == is_mu_rndwn_rlnkctl);
 			if (!is_mu_rndwn_rlnkctl)
 				relinkctl_lock_exclu(linkctl);
@@ -1095,12 +1096,19 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 						shm_rmid(shmid); /* If error removing shmid, not much we can do. Just move on */
 					}
 				}
-				SHMDT(shm_hdr);		/* If error detaching, not much we can do. Just move on */
+				if (-1 == SHMDT(shm_hdr))	/* If error detaching, not much we can do, log msg and move on */
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmdt()"),
+						       CALLFROM, errno);
 				shmid = hdr->relinkctl_shmid;
 				shm_rmid(shmid);	/* If error removing shmid, not much we can do. Just move on */
 			} else
 			{
-				SHMDT(shm_hdr);		/* If error detaching, not much we can do. Just move on */
+				if (NULL != shm_hdr)
+				{
+					if (-1 == SHMDT(shm_hdr)) /* If error detaching, not much can do, log msg and move on */
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+							       RTS_ERROR_LITERAL("shmdt()"), CALLFROM, errno);
+				}
 			}
 			if (remove_rctl)
 			{

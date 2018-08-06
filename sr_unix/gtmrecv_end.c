@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -189,11 +189,14 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 	assert(NULL == tls_ctx);
 #	endif
 	repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Current Jnlpool Seqno : %llu\n", jnlpool_seqno);
-	for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+	if (0 != jnlpool_seqno)
 	{
-		if (jnlpool_strm_seqno[idx])
-			repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Stream # %d : Current Jnlpool Stream Seqno : %llu\n",
-				idx, jnlpool_strm_seqno[idx]);
+		for (idx = 0; idx < MAX_SUPPL_STRMS; idx++)
+		{
+			if (jnlpool_strm_seqno[idx])
+				repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Stream # %d : Current Jnlpool Stream Seqno :"
+					 " %llu\n", idx, jnlpool_strm_seqno[idx]);
+		}
 	}
 	if (0 < strm_idx)
 		repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Receiver server has Stream # %d\n", strm_idx);

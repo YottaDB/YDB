@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -77,7 +80,7 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 	sm_uc_ptr_t	bmp;
 	block_id	bml, hint_cycled, hint_limit;
 	block_id_ptr_t	b_ptr;
-	int		cw_set_top, depth, lcnt;
+	int		cw_set_top, depth = 0, lcnt;
 	unsigned int	local_maps, map_size, n_decrements = 0, total_blks;
 	trans_num	ctn;
 	int4		free_bit, offset;

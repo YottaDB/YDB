@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,10 +49,12 @@ struct CLB *cmu_getclb(cmi_descriptor *node, cmi_descriptor *task)
 			if (0 == memcpy(ai_ptr->ai_addr, (sockaddr_ptr)(&p->peer_sas), ai_ptr->ai_addrlen))
 			{
 				SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
+				freeaddrinfo(ai_ptr);
 				return p;
 			}
 		}
 		SIGPROCMASK(SIG_SETMASK, &oset, NULL, rc);
 	}
+	freeaddrinfo(ai_ptr);
 	return NULL;
 }

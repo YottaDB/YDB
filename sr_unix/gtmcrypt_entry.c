@@ -132,6 +132,7 @@ uint4 gtmcrypt_entry()
 		if (NULL == fptr)
 		{
 			COPY_DLLERR_MSG(err_str, dl_err);
+			dlclose(handle);
 			return ERR_CRYPTDLNOOPEN;
 		}
 		*gtmcrypt_fnptr[findx] = fptr;

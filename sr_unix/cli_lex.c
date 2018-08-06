@@ -484,7 +484,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 			if (cli_lex_str)
 				cli_lex_in_ptr->tp = destbuffer;
 		} else if (cli_lex_str)
-			cli_lex_in_ptr->tp = NULL;
+			cli_lex_in_ptr->tp = retptr = NULL;
 #	ifdef UNICODE_SUPPORTED
 	}
 #	endif

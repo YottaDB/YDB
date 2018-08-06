@@ -71,7 +71,7 @@ void gtcm_open_cmerrlog(void)
 					RTS_ERROR_LITERAL("SNPRINTF)"), CALLFROM, errno);
 			len += lfn2.len;
 			if (len >= SIZEOF(lfn_path))	/* Output from SNPRINTF was truncated. */
-				len = SIZEOF(lfn_path);
+				len = SIZEOF(lfn_path) - 1;	/* Leave room to add null below */
 			lfn2.len = len;
 		}
 	}

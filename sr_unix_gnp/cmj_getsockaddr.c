@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -156,6 +156,7 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 		SERVER_HINTS(hints, (ipv4_only ? AF_INET : AF_UNSPEC));
 		if (0 != (errcode = getaddrinfo(NULL, GTCM_SERVER_NAME, &hints, &ai_ptr)))
 		{
+			freeaddrinfo(ai_ptr);
 			return CMI_NOSERVENT;
 		}
 	}

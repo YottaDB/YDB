@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -207,7 +210,7 @@ void	mur_output_show()
 	int			rectype, size;
 	pini_list_struct	*plst;
 	ht_ent_int4 		*tabent, *topent;
-	boolean_t		first_time, ok_to_show[NUM_SHW_TYPES], release_latch;
+	boolean_t		first_time = TRUE, ok_to_show[NUM_SHW_TYPES], release_latch;
 	int			index;
 	jnl_proc_time		tmp_jpv_time;
 	multi_proc_shm_hdr_t	*mp_hdr;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */

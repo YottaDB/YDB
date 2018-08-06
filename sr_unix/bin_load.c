@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -114,10 +117,10 @@ error_def(ERR_DBPRIVERR);
 		io_log = io_curr_device.in->name;										\
 		GTMCRYPT_REPORT_ERROR(GTMCRYPT_ERRNO, gtm_putmsg, io_log->len, io_log->dollar_io);				\
 		mupip_error_occurred = TRUE;											\
-		if (NULL != tmp_gvkey)												\
+		for (i = 0; i < (sizeof(malloc_fields) / sizeof(char **)); i++)							\
 		{														\
-			free(tmp_gvkey);											\
-			tmp_gvkey = NULL;											\
+			if (NULL != *(malloc_fields[i]))									\
+				free(*(malloc_fields[i]));									\
 		}														\
 		if (NULL != encr_key_handles)											\
 		{														\
@@ -246,7 +249,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	unsigned char		*end_buff, *gvn_char, *subs, mych;
 	unsigned short		rec_len, next_cmpc, numsubs, num_subscripts;
 	int			len, current, last, max_key, max_rec, fmtd_key_len;
-	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size;
+
+	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size, i;
 	uint4			max_data_len, max_subsc_len, gblsize, data_len, num_of_reg = 0;
 	ssize_t			subsc_len, extr_std_null_coll;
 	gtm_uint64_t		iter, key_count, rec_count, tmp_rec_count, global_key_count;
@@ -265,7 +269,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	gv_key			*sn_savekey = NULL; /* null-initialize at start, will be malloced later */
 	gv_key			*save_orig_key = NULL; /* null-initialize at start, will be malloced later */
 	gv_key			*orig_gv_currkey_ptr = NULL;
-	char			std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff = NULL, *sn_hold_buff_temp = NULL;
+	char			std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff, *sn_hold_buff_temp;
 	int			in_len, gtmcrypt_errno, n_index, encrypted_hash_array_len, null_iv_array_len;
 	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr, *null_iv_array_ptr, null_iv_char;
 	int4			index;
@@ -287,9 +291,23 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	hash_table_mname	*tab_ptr;
 	char			msg_buff[MAX_RECLOAD_ERR_MSG_SIZE];
 	gd_region		**reg_list;
+	/* Array to help track malloc'd storage during this routine and release prior to error out or return */
+	char			**malloc_fields[] = {
+		(char **)&tmp_gvkey,
+		(char **)&sn_gvkey,
+		(char **)&sn_savekey,
+		(char **)&save_orig_key,
+		(char **)&encrypted_hash_array_ptr,
+		(char **)&encr_key_handles,
+		(char **)&null_iv_array_ptr,
+		&sn_hold_buff,
+		&sn_hold_buff_temp
+	};
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	for (i = 0; i < (sizeof(malloc_fields) / sizeof(char *)); i++)
+		*(malloc_fields[i]) = NULL;		/* Make sure all pointers are cleared to start */
 	assert(4 == SIZEOF(coll_hdr));
 	gvinit();
 	reg_list = (gd_region **)malloc(gd_header->n_regions * SIZEOF(gd_region *));
@@ -352,8 +370,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		{
 			memcpy(std_null_coll, ptr + BIN_HEADER_NULLCOLLOFFSET, BIN_HEADER_NUMSZ);
 			std_null_coll[BIN_HEADER_NUMSZ] = '\0';
-		}
-		else
+		} else
 		{
 			memcpy(std_null_coll, ptr + V5_BIN_HEADER_NULLCOLLOFFSET, V5_BIN_HEADER_NUMSZ);
 			std_null_coll[V5_BIN_HEADER_NUMSZ] = '\0';
@@ -942,7 +959,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 							sn_hold_buff_size = sn_hold_buff_size * 2;
 							sn_hold_buff_temp = (char *)malloc(sn_hold_buff_size);
 							memcpy(sn_hold_buff_temp, sn_hold_buff, sn_hold_buff_pos);
-							free (sn_hold_buff);
+							free(sn_hold_buff);
 							sn_hold_buff = sn_hold_buff_temp;
 						}
 						memcpy(sn_hold_buff + sn_hold_buff_pos, v.str.addr, v.str.len);
@@ -1131,18 +1148,20 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	if (encrypted_version)
 	{
 		assert(NULL != encrypted_hash_array_ptr);
-		free(encrypted_hash_array_ptr);
 		if ('9' == hdr_lvl)
 		{
 			assert(NULL != null_iv_array_ptr);
-			free(null_iv_array_ptr);
+		}
+		assert(NULL != encr_key_handles);
+	}
+	for (i = 0; i < (sizeof(malloc_fields) / sizeof(char **)); i++)
+	{
+		if (NULL != *(malloc_fields[i]))
+		{
+			free(*(malloc_fields[i]));
+			*(malloc_fields[i]) = NULL;
 		}
 	}
-	free(tmp_gvkey);
-	free(sn_gvkey);
-	free(save_orig_key);
-	if (NULL != sn_hold_buff)
-		free(sn_hold_buff);
 	file_input_close();
 	tmp_rec_count = (rec_count == begin) ? rec_count : rec_count - 1;
 	if (0 != first_failed_rec_count)

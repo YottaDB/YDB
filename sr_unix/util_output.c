@@ -347,6 +347,9 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					case 'Z': /* null teminated string */
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
 						length = c ? STRLEN(c) : 0;
+						break;
+					default:
+						assert(FALSE);
 				}
 				/* Since gtmsecshr does not load ICU libraries (since dlopen() with LD_LIBRARY_PATH
 				 * does not work for root setuid executables), avoid calling gtm_wcswidth() and

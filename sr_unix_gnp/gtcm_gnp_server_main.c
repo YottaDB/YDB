@@ -130,11 +130,11 @@ static uint4			closewait;
 #define CM_SERV_WAIT_FOR_INPUT	100 /* ms */
 #define CM_CLB_POOL_SIZE		32
 
-static void gtcm_gnp_server_actions(void);
-static void gtcm_gnp_switch_interrupt(int sig);
-static void gtcm_gnp_trace(struct CLB *lnk, int sta, unsigned char *buf, size_t len);
-static void gtcm_gnp_trace_on(int sig);
-static void gtcm_gnp_trace_off(int sig);
+STATICFNDCL void gtcm_gnp_server_actions(void);
+STATICFNDCL void gtcm_gnp_switch_interrupt(int sig);
+STATICFNDCL void gtcm_gnp_trace(struct CLB *lnk, int sta, unsigned char *buf, size_t len);
+STATICFNDCL void gtcm_gnp_trace_on(int sig);
+STATICFNDCL void gtcm_gnp_trace_off(int sig);
 
 static VSIG_ATOMIC_T switch_log = FALSE;
 static VSIG_ATOMIC_T trace_on = FALSE;
@@ -144,7 +144,7 @@ error_def(ERR_BADGTMNETMSG);
 error_def(ERR_NETFAIL);
 error_def(ERR_TEXT);
 
-static void gtcm_gnp_server_actions(void)
+STATICFNDEF void gtcm_gnp_server_actions(void)
 {
 	int4			status;
 	unsigned short		value;
@@ -282,14 +282,10 @@ static void gtcm_gnp_server_actions(void)
 				case CMMS_Q_INCREMENT:
 					reply = gtcmtr_increment();
 					break;
-				default:
+				default:		/* not a valid msg */
 					reply = FALSE;
-					if (SS_NORMAL == status)
-					{
-						GET_LONG(status, curr_entry->clb_ptr->mbf);
-                                                rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_BADGTMNETMSG, 1, status);
-					}
-					break;
+					GET_LONG(status, curr_entry->clb_ptr->mbf);	/* Fetch error value from msg */
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_BADGTMNETMSG, 1, status);
 			}
 			if (curr_entry)		/* curr_entry can be NULL if went through gtcmtr_terminate */
 			{
@@ -324,22 +320,22 @@ static void gtcm_gnp_server_actions(void)
 	return;
 }
 
-static void gtcm_gnp_trace(struct CLB *lnk, int sta, unsigned char *buf, size_t len)
+STATICFNDEF void gtcm_gnp_trace(struct CLB *lnk, int sta, unsigned char *buf, size_t len)
 {
 	gtcm_gnp_cpktdmp(gtcm_errfs, lnk, sta, buf, len, "");
 }
 
-static void gtcm_gnp_trace_on(int sig)
+STATICFNDEF void gtcm_gnp_trace_on(int sig)
 {
 	trace_on = TRUE;
 }
 
-static void gtcm_gnp_trace_off(int sig)
+STATICFNDEF void gtcm_gnp_trace_off(int sig)
 {
 	trace_on = FALSE;
 }
 
-static void gtcm_gnp_switch_interrupt(int sig)
+STATICFNDEF void gtcm_gnp_switch_interrupt(int sig)
 {
 	switch_log = TRUE;
 }

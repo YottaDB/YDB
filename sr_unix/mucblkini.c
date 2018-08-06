@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -78,6 +81,8 @@ void mucblkini(void)
 	free(bmp);
 	if (0 != status)
 	{
+		free(bp1);
+		free(bp2);
 		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4, LEN_AND_LIT("writing out first bitmap"),
 				  DB_LEN_STR(gv_cur_region), status));
 		return;
@@ -100,11 +105,14 @@ void mucblkini(void)
 	if (0 != status)
 	{
 		if (IS_MUMPS_IMAGE)
+		{
+			free(bp2);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_AUTODBCREFAIL, 4, DB_LEN_STR(gv_cur_region),
 				      REG_LEN_STR(gv_cur_region), status);
-		else
+		} else
 		{
 			PERROR("Error writing to disk");
+			free(bp2);
 			EXIT(status);
 		}
 	}

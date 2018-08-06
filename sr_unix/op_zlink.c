@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -223,8 +226,6 @@ void op_zlink (mval *v, mval *quals)
 		}
 		if (!expdir)
 		{	/* No full or relative directory specified on file to link - fill it in */
-			srcstr.addr = srcnamebuf;
-			srcstr.len = srcnamelen;
 			objstr.addr = objnamebuf;
 			objstr.len = objnamelen;
 			if (OBJ == type)
@@ -236,12 +237,16 @@ void op_zlink (mval *v, mval *quals)
 						      dollar_zsource.str.addr);
 			} else if (SRC == type)
 			{	/* Explicit ZLINK of source - locate both source and object*/
+				srcstr.addr = srcnamebuf;
+				srcstr.len = srcnamelen;
 				zro_search(&objstr, &objdir, &srcstr, &srcdir, SKIP_SHLIBS);
 				if (NULL == srcdir)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf,
 						      ERR_FILENOTFND, 2, srcnamelen, srcnamebuf);
 			} else
 			{	/* Explicit ZLINK no file type specified - locate both source and object */
+				srcstr.addr = srcnamebuf;
+				srcstr.len = srcnamelen;
 				zro_search(&objstr, &objdir, &srcstr, &srcdir, PROBE_SHLIBS);
 				if ((NULL == objdir) && (NULL == srcdir))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len,

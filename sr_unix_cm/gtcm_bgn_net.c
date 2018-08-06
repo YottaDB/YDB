@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc 	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,6 +140,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return save_errno;
 	}
+	freeaddrinfo(ai_ptr);
 	/*  Initialize the listen queue */
 	if (listen(fd, 5) < 0)
 	{

@@ -36,6 +36,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "SIMPLEAPINEST", "Attempt to nest call of !AD with a call to !AD - nesting calls is not permitted in simpleAPI", 4 },
 	{ "CALLINTCOMMIT", "TCOMMIT at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL", 2 },
 	{ "CALLINTROLLBACK", "TROLLBACK at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL", 2 },
+	{ "TCPCONNTIMEOUT", "Connection wait timeout (!UL seconds) has expired", 2 },
 };
 
 
@@ -48,7 +49,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	19,
+	20,
 	&ydberrors_undocarr[0],
 	0
 };

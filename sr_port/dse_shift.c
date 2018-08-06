@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -62,6 +65,7 @@ void dse_shift(void)
 	uchar_ptr_t	lbp;
 	uint4		offset, shift;
 
+	lbp = NULL;	/* Initialize */
         if (gv_cur_region->read_only)
                 rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
@@ -91,7 +95,6 @@ void dse_shift(void)
 			return;
                 }
 		forward = FALSE;
-		lbp = (unsigned char *)0;
 	}
 	if (!shift)
 	{

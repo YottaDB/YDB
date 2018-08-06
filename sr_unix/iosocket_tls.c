@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -76,7 +79,6 @@ typedef enum
 void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *password, mval *extraarg)
 {
 	int4			devlen, flags, len, length, save_errno, status, status2, timeout, tls_errno;
-	int4			errlen, errlen2;
 	io_desc			*iod;
 	d_socket_struct 	*dsocketptr;
 	socket_struct		*socketptr;
@@ -192,7 +194,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				errp = gtm_tls_get_error();
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
 				if (socketptr->ioerror)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, errlen, errp);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 				if (NO_M_TIMEOUT != msec_timeout)
 					dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
@@ -229,7 +231,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				free(extrastr);
 				errp = gtm_tls_get_error();
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 				return;
 			} else
 				free(extrastr);
@@ -247,7 +249,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				socketptr->tlsenabled = FALSE;
 				errp = gtm_tls_get_error();
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 				return;
 			}
 		}
@@ -258,7 +260,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			errp = gtm_tls_get_error();
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
 			if (socketptr->ioerror)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
 			if (NO_M_TIMEOUT != msec_timeout)
 				dollar_truth = FALSE;
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
@@ -327,7 +329,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
 				if (socketptr->ioerror)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
-						ERR_TEXT, 2, errlen, errp);
+						      ERR_TEXT, 2, LEN_AND_STR(errp));
 				if (NO_M_TIMEOUT != msec_timeout)
 					dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
@@ -394,8 +396,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			errp = UNREAD_INPUT;
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
 			if (socketptr->ioerror)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
-					ERR_TEXT, 2, errlen, errp);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,	ERR_TEXT, 2, LEN_AND_STR(errp));
 			if (NO_M_TIMEOUT != msec_timeout)
 				dollar_truth = FALSE;
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
@@ -414,7 +415,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR1_ERRSTR2(iod, errp, errp2);
 				if (socketptr->ioerror)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_TLSRENEGOTIATE, 0,
-						ERR_TEXT, 2, errlen, errp, ERR_TEXT, 2, errlen2, errp2);
+						      ERR_TEXT, 2, LEN_AND_STR(errp), ERR_TEXT, 2, LEN_AND_STR(errp2));
 				if (NO_M_TIMEOUT != msec_timeout)
 					dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
@@ -451,7 +452,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 		} else
 			extrastr = NULL;
 		status = gtm_tls_renegotiate_options((gtm_tls_socket_t *)socketptr->tlssocket, msec_timeout, idstr,
-				extrastr, (NULL != tlsid));
+						     extrastr, (NULL != tlsid));
 		if (NULL != extrastr)
 			free(extrastr);
 		if (0 != status)
@@ -464,7 +465,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
 			if (socketptr->ioerror)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
-					ERR_TEXT, 2, errlen, errp);
+					      ERR_TEXT, 2, LEN_AND_STR(errp));
 			if (NO_M_TIMEOUT != msec_timeout)
 				dollar_truth = FALSE;
 			REVERT_GTMIO_CH(&iod->pair, ch_set);

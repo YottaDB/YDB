@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -82,15 +85,12 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 	LSEEKREAD(shdw_fd, SNAPSHOT_HDR_SIZE, (sm_uc_ptr_t)(bitmap_buffer), bitmap_size, status);
 	if (0 != status)
 	{
+		free(bitmap_buffer);
 		if (-1 != status)
-		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("read"), flen, filename, status);
-			return;
-		} else
-		{
+		else
 			util_out_print("!/Premature EOF with !AD", TRUE, flen, filename);
-			return;
-		}
+		return;
 	}
 	tot_blks = ss_filhdr.ss_info.total_blks;
 	shadow_vbn = ss_filhdr.ss_info.shadow_vbn;
@@ -111,17 +111,14 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 			LSEEKREAD(shdw_fd, blk_offset, bp, db_blk_size, status);
 			if (0 != status)
 			{
+				free(bitmap_buffer);
 				if (-1 != status)
-				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("read"),
-													flen, filename, status);
-					return;
-				} else
-				{
+						       flen, filename, status);
+				else
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSPREMATEOF, 5, blkno,
-											db_blk_size, blk_offset, flen, filename);
-					return;
-				}
+						       db_blk_size, blk_offset, flen, filename);
+				return;
 			}
 			ss_print_blk_details(blkno, bp);
 		}

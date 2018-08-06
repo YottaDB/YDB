@@ -17,7 +17,7 @@
  * W A R N I N G  ---  W A R N I N G  --- W A R N I N G --- W A R N I N G --- W A R N I N G *
  *											    *
  * This routine (gtmsecshr) runs as setuid to root to perform various functions on behalf   *
- * of GT.M processes. Extreme care must be taken to prevent all forms of deceptive access,  *
+ * of YDB processes. Extreme care must be taken to prevent all forms of deceptive access,   *
  * linking with unauthorized libraries, etc. Same applies to anything it calls.		    *
  *											    *
  * W A R N I N G  ---  W A R N I N G  --- W A R N I N G --- W A R N I N G --- W A R N I N G *
@@ -1023,12 +1023,14 @@ int validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sav
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_GTMSECSHRSRVFID, 6,
 			RTS_ERROR_LITERAL("Server 37"), process_id, buf->pid, save_code, buf->mesg.id, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Could not read /proc/<pid>/cmdline"), save_errno);
-		return save_errno;
 	}
 	FCLOSE(procstrm, clrv);
 	if (-1 == clrv)
 		/* Not a functional issue so just warn about it in op-log */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_WARNING(ERR_SYSCALL), 5, LEN_AND_LIT("fclose()"), CALLFROM, errno);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_WARNING(ERR_SYSCALL), 5, LEN_AND_LIT("fclose()"),
+			     CALLFROM, errno);
+	if (NULL == csrv)
+		return save_errno;
 	lnln = STRLEN(cmdbuf);
 	/* Look from the end backwards to find the last '/' to isolate the directory */
 	for (cptr = cmdbuf + lnln - 1; (cptr >= cmdbuf) && ('/' != *cptr); cptr--)

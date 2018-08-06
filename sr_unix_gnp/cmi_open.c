@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,13 +38,13 @@ error_def(CMI_NETFAIL);
 
 cmi_status_t cmi_open(struct CLB *lnk)
 {
-	cmi_status_t status;
-	int rval;
-	unsigned char *cp;
-	char hn[MAX_HOST_NAME_LEN];
-	struct addrinfo	*ai_ptr, *ai_head;
-	sigset_t oset;
-	int new_fd, rc, save_errno;
+	cmi_status_t		status;
+	int			rval;
+	unsigned char		*cp;
+	char			hn[MAX_HOST_NAME_LEN];
+	struct addrinfo		*ai_ptr, *ai_head;
+	sigset_t		oset;
+	int			new_fd, rc, save_errno;
 	int			sockerror;
 	GTM_SOCKLEN_TYPE	sockerrorlen;
 	fd_set			writefds;
@@ -58,12 +58,9 @@ cmi_status_t cmi_open(struct CLB *lnk)
 			return status;
 	}
 	lnk->ntd = ntd_root;
-
 	status = cmj_getsockaddr(&lnk->nod, &lnk->tnd, &ai_head);
 	if (CMI_ERROR(status))
 		return status;
-
-
 	lnk->mun = -1;
 	memset((void *)&lnk->cqe, 0, SIZEOF(lnk->cqe));
 	memset((void *)&lnk->ios, 0, SIZEOF(lnk->ios));
@@ -88,10 +85,10 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	}
 	rval = connect(new_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen);		/* BYPASSOK(connect) */
 	if ((-1 == rval) && ((EINTR == errno) || (EINPROGRESS == errno)
-#if (defined(__osf__) && defined(__alpha)) || defined(__sun) || defined(__vms)
-            || (EWOULDBLOCK == errno)
-#endif
-		))
+#	if (defined(__osf__) && defined(__alpha)) || defined(__sun) || defined(__vms)
+			     || (EWOULDBLOCK == errno)
+#	endif
+			     ))
 	{	/* connection attempt will continue so wait for completion */
 		assertpro(FD_SETSIZE > new_fd);
 		do
@@ -120,6 +117,7 @@ cmi_status_t cmi_open(struct CLB *lnk)
 	{
 		save_errno = errno;
 		CLOSEFILE_RESET(new_fd, rc);	/* resets "new_fd" to FD_INVALID */
+		freeaddrinfo(ai_head);
 		return save_errno;
 	}
 	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &oset, rc);
