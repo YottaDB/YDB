@@ -122,7 +122,7 @@ list(APPEND gt_src_list
 foreach(d ${gt_src_list})
   set(source_dir_${d} ${YDB_SOURCE_DIR}/${d})
   file(GLOB sources_${d} RELATIVE ${source_dir_${d}}
-	  ${d}/*.c ${d}/*.s ${d}/*.si ${d}/*.txt)
+    ${d}/*.c ${d}/*.s ${d}/*.si ${d}/*.txt)
 endforeach()
 # Prefer generated sources over all other locations.
 file(MAKE_DIRECTORY ${YDB_BINARY_DIR}/genused)
@@ -170,12 +170,12 @@ macro(set_source_list target)
     set(src "")
     foreach(d ${gt_src_list})
       if(";${sources_${d}};" MATCHES ";(${name}\\.(c|s|si));")
-      	set(fname ${CMAKE_MATCH_1})
-	set(src ${d}/${fname})
-	get_filename_component(fnoext ${fname} NAME_WE)
-	set("source_used_${fnoext}" 1)
-	list(APPEND sources_used ${source_dir_${d}}/${fname})
-	break()
+        set(fname ${CMAKE_MATCH_1})
+        set(src ${d}/${fname})
+        get_filename_component(fnoext ${fname} NAME_WE)
+        set("source_used_${fnoext}" 1)
+        list(APPEND sources_used ${source_dir_${d}}/${fname})
+        break()
       endif()
     endforeach()
     if(src)
@@ -383,7 +383,7 @@ endforeach()
 
 # TODO: find_package or find_library for system libs?
 include_directories (/usr/local/include)
-target_link_libraries(libmumps		${libsyslibs})
+target_link_libraries(libmumps ${libsyslibs})
 if(gen_xfer_desc)
   add_dependencies(libmumps gen_xfer_desc)
 endif()
@@ -395,53 +395,53 @@ function(add_executable target)
   # until libyottadb.so was built. And that in turn relies on threadgbl_deftypes being built so add that too.
   add_dependencies(${target} libyottadb gen_gtm_threadgbl_deftypes)
   # And add system libraries as a target library for all utilities (e.g. dlopen() etc.).
-  target_link_libraries(${target}	${libsyslibs})
+  target_link_libraries(${target} ${libsyslibs})
 endfunction()
-add_executable(mumps			${mumps_SOURCES})
+add_executable(mumps ${mumps_SOURCES})
 
-add_executable(dse			${dse_SOURCES})
+add_executable(dse ${dse_SOURCES})
 list(APPEND with_export dse)
 
-add_executable(dbcertify		${dbcertify_SOURCES})
+add_executable(dbcertify ${dbcertify_SOURCES})
 
-add_executable(geteuid			${geteuid_SOURCES})
-target_link_libraries(geteuid		libmumps)	# needed for few functions (e.g. gtm_printf etc.)
+add_executable(geteuid ${geteuid_SOURCES})
+target_link_libraries(geteuid libmumps) # needed for few functions (e.g. gtm_printf etc.)
 
-add_executable(gtmsecshr		${gtmsecshr_SOURCES})
-target_link_libraries(gtmsecshr		libmumps)	# needed for static linking since this is a setuid executable
-							# and does not do a dlopen of libyottadb.so
+add_executable(gtmsecshr ${gtmsecshr_SOURCES})
+target_link_libraries(gtmsecshr libmumps) # needed for static linking since this is a setuid executable
+                                          # and does not do a dlopen of libyottadb.so
 
-add_executable(gtmsecshr_real		${gtmsecshr_real_SOURCES})
+add_executable(gtmsecshr_real ${gtmsecshr_real_SOURCES})
 set_target_properties(gtmsecshr_real PROPERTIES
   OUTPUT_NAME gtmsecshr
   RUNTIME_OUTPUT_DIRECTORY ${YDB_BINARY_DIR}/gtmsecshrdir
   )
-target_link_libraries(gtmsecshr_real	libmumps)	# needed for static linking since this is a setuid executable
-							# and does not do a dlopen of libyottadb.so
+target_link_libraries(gtmsecshr_real libmumps) # needed for static linking since this is a setuid executable
+                                               # and does not do a dlopen of libyottadb.so
 
-add_executable(mupip			${mupip_SOURCES})
+add_executable(mupip ${mupip_SOURCES})
 list(APPEND with_export mupip)
 
-add_executable(lke			${lke_SOURCES})
+add_executable(lke ${lke_SOURCES})
 list(APPEND with_export lke)
 
 
-add_executable(gtcm_server		${gtcm_server_SOURCES})
+add_executable(gtcm_server ${gtcm_server_SOURCES})
 list(APPEND with_export gtcm_server)
 
-add_executable(gtcm_gnp_server		${gtcm_gnp_server_SOURCES})
+add_executable(gtcm_gnp_server ${gtcm_gnp_server_SOURCES})
 list(APPEND with_export gtcm_gnp_server)
 
-add_executable(gtcm_play		${gtcm_play_SOURCES})
+add_executable(gtcm_play ${gtcm_play_SOURCES})
 list(APPEND with_export gtcm_play)
 
-add_executable(gtcm_pkdisp		${gtcm_pkdisp_SOURCES})
+add_executable(gtcm_pkdisp ${gtcm_pkdisp_SOURCES})
 
-add_executable(gtcm_shmclean 		${gtcm_shmclean_SOURCES})
+add_executable(gtcm_shmclean ${gtcm_shmclean_SOURCES})
 
-add_executable(semstat2		 	${semstat2_SOURCES})
+add_executable(semstat2 ${semstat2_SOURCES})
 
-add_executable(ftok 			${ftok_SOURCES})
+add_executable(ftok ${ftok_SOURCES})
 
 add_library(libyottadb MODULE ${libyottadb_SOURCES})
 set_property(TARGET libyottadb PROPERTY OUTPUT_NAME yottadb)
@@ -488,11 +488,11 @@ install(TARGETS libgtmcrypt_gcrypt_AES256CFB.so DESTINATION ${YDB_INSTALL_DIR}/p
 set(default_encr_link   ${YDB_BINARY_DIR}/plugin/libgtmcrypt.so)
 set(default_encr_target libgtmcrypt_gcrypt_AES256CFB.so)
 add_custom_command(
-	OUTPUT ${default_encr_link}
-	COMMAND ${CMAKE_COMMAND} -E create_symlink "${default_encr_target}" "${default_encr_link}"
-	DEPENDS ${YDB_BINARY_DIR}/plugin/${default_encr_target}
-	COMMENT "Generating default_encr symbolic link"
-	)
+  OUTPUT ${default_encr_link}
+  COMMAND ${CMAKE_COMMAND} -E create_symlink "${default_encr_target}" "${default_encr_link}"
+  DEPENDS ${YDB_BINARY_DIR}/plugin/${default_encr_target}
+  COMMENT "Generating default_encr symbolic link"
+)
 add_custom_target(install_default_encr ALL DEPENDS ${default_encr_link})
 install(FILES ${default_encr_link} DESTINATION ${YDB_INSTALL_DIR}/plugin)
 
@@ -526,38 +526,38 @@ set_target_properties(maskpass PROPERTIES
 install(TARGETS maskpass DESTINATION ${YDB_INSTALL_DIR}/plugin/gtmcrypt)
 
 # Always copy files into the plugin directory
-foreach(f
-      Makefile.mk
-      encrypt_sign_db_key.sh
-      gen_keypair.sh
-      gen_sym_hash.sh
-      gen_sym_key.sh
-      gtm_tls_impl.c
-      gtm_tls_impl.h
-      gtm_tls_interface.h
-      gtmcrypt_dbk_ref.c
-      gtmcrypt_dbk_ref.h
-      gtmcrypt_interface.h
-      gtmcrypt_pk_ref.c
-      gtmcrypt_pk_ref.h
-      gtmcrypt_ref.c
-      gtmcrypt_ref.h
-      gtmcrypt_sym_ref.c
-      gtmcrypt_sym_ref.h
-      gtmcrypt_util.c
-      gtmcrypt_util.h
-      import_and_sign_key.sh
-      maskpass.c
-      minimal_gbldefs.c
-      pinentry-gtm.sh
-      pinentry.m
-      show_install_config.sh
-      ydb_getenv.c
-      ydb_getenv.h
-      ydb_logicals.h
-      ydb_logicals_tab.h
+foreach(f_in
+      ${YDB_SOURCE_DIR}/sr_unix/Makefile.mk
+      ${YDB_SOURCE_DIR}/sr_unix/encrypt_sign_db_key.sh
+      ${YDB_SOURCE_DIR}/sr_unix/gen_keypair.sh
+      ${YDB_SOURCE_DIR}/sr_unix/gen_sym_hash.sh
+      ${YDB_SOURCE_DIR}/sr_unix/gen_sym_key.sh
+      ${YDB_SOURCE_DIR}/sr_unix/gtm_tls_impl.c
+      ${YDB_SOURCE_DIR}/sr_unix/gtm_tls_impl.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtm_tls_interface.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_dbk_ref.c
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_dbk_ref.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_interface.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_pk_ref.c
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_pk_ref.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_ref.c
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_ref.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_sym_ref.c
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_sym_ref.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_util.c
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_util.h
+      ${YDB_SOURCE_DIR}/sr_unix/import_and_sign_key.sh
+      ${YDB_SOURCE_DIR}/sr_unix/maskpass.c
+      ${YDB_SOURCE_DIR}/sr_port/minimal_gbldefs.c
+      ${YDB_SOURCE_DIR}/sr_unix/pinentry-gtm.sh
+      ${YDB_SOURCE_DIR}/sr_unix/pinentry.m
+      ${YDB_SOURCE_DIR}/sr_unix/show_install_config.sh
+      ${YDB_SOURCE_DIR}/sr_port/ydb_getenv.c
+      ${YDB_SOURCE_DIR}/sr_port/ydb_getenv.h
+      ${YDB_SOURCE_DIR}/sr_port/ydb_logicals.h
+      ${YDB_SOURCE_DIR}/sr_port/ydb_logicals_tab.h
     )
-  set(f_in "${YDB_SOURCE_DIR}/*/${f}")
+  get_filename_component(f ${f_in} NAME)
   string(REGEX REPLACE ".mk$" "" f_mod "${f}")
   set(f_out "${YDB_BINARY_DIR}/plugin/gtmcrypt/${f_mod}")
   add_custom_command(
@@ -640,12 +640,13 @@ foreach(d ${gt_src_list})
           COMMAND ${CMAKE_COMMAND} -E copy ${YDB_SOURCE_DIR}/${d}/${m} "${m_out}"
           )
         list(APPEND files_to_place "${m_out}")
+        list(APPEND m_routines "${m_out}")
         list(APPEND ydb_chset_routines_${ydb_chset} "${m_out}")
       endforeach()
     else()
       if(";${m_name};" MATCHES ";GTMDefinedTypesInit[a-zA-Z]*;")
-	set(m_out "${YDB_BINARY_DIR}/${m_name}.m")
-	set(${m_name}_found 1)
+        set(m_out "${YDB_BINARY_DIR}/${m_name}.m")
+        set(${m_name}_found 1)
       else()
         set(m_out "${YDB_BINARY_DIR}/${m_upper}.m")
       endif()
@@ -656,6 +657,7 @@ foreach(d ${gt_src_list})
         )
       install(FILES "${m_out}" DESTINATION ${YDB_INSTALL_DIR})
       list(APPEND files_to_place "${m_out}")
+      list(APPEND m_routines "${m_out}")
     endif()
   endforeach()
   foreach(m ${mpt_files_${d}})
@@ -668,6 +670,7 @@ foreach(d ${gt_src_list})
       )
     install(FILES "${m_out}" DESTINATION ${YDB_INSTALL_DIR})
     list(APPEND files_to_place "${m_out}")
+    list(APPEND m_routines "${m_out}")
   endforeach()
 endforeach()
 
@@ -823,6 +826,7 @@ Halt")
     DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
             ${YDB_BINARY_DIR}/${help}help.in1
             ${YDB_BINARY_DIR}/${help}help.in2
+            ${m_routines}
     COMMAND ${CMAKE_COMMAND} -E remove ${help}help.dat ${help}help.gld
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mumps> -D "args=-run;GDE"
@@ -860,7 +864,7 @@ endif(GTMDefinedTypesInit${CMAKE_BUILD_TYPE}_found)
 
 foreach(help gtm gde mupip dse lke)
   set(CMAKE_CONFIGURABLE_FILE_CONTENT
-	  "SET -ACC=MM -READ_ONLY -reg \"*\"
+    "SET -ACC=MM -READ_ONLY -reg \"*\"
 exit")
   configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
                  ${YDB_BINARY_DIR}/${help}help.in3)
@@ -873,7 +877,7 @@ exit")
     OUTPUT ${YDB_BINARY_DIR}/${help}help.dat_ro
     DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
             ${YDB_BINARY_DIR}/${help}help.in3
-	    ${help}help.dat ${help}help.gld ${help}help.dat_noro
+            ${help}help.dat ${help}help.gld ${help}help.dat_noro
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mupip>
       -D input_file=${YDB_BINARY_DIR}/${help}help.in3
@@ -885,7 +889,7 @@ endforeach()
 
 foreach(help gtm gde mupip dse lke)
   set(CMAKE_CONFIGURABLE_FILE_CONTENT
-	  "SET -ACC=MM -NOREAD_ONLY -reg \"*\"
+    "SET -ACC=MM -NOREAD_ONLY -reg \"*\"
 exit")
   configure_file(${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in
                  ${YDB_BINARY_DIR}/${help}help.in4)
@@ -898,7 +902,7 @@ exit")
     OUTPUT ${YDB_BINARY_DIR}/${help}help.dat_noro
     DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
             ${YDB_BINARY_DIR}/${help}help.in4
-	    ${help}help.dat ${help}help.gld
+            ${help}help.dat ${help}help.gld
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mupip>
       -D input_file=${YDB_BINARY_DIR}/${help}help.in4
