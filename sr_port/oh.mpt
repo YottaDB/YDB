@@ -3,6 +3,9 @@
 ; Copyright (c) 1987-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -21,7 +24,7 @@ INT	r !,"Octal: ",%OH s %OH=$$FUNC(%OH)
 	q
 FUNC(o)
 	q:o=0 0
-	q:o<0 ""
+	q:"-"=$ze(o,1) ""
 	q:o'?1.N ""
 	q:o[8!(o[9) ""
 	q $$CONVERTBASE^%CONVBASEUTIL(o,8,16)
