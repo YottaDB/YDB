@@ -526,38 +526,38 @@ set_target_properties(maskpass PROPERTIES
 install(TARGETS maskpass DESTINATION ${YDB_INSTALL_DIR}/plugin/gtmcrypt)
 
 # Always copy files into the plugin directory
-foreach(f
-      Makefile.mk
-      encrypt_sign_db_key.sh
-      gen_keypair.sh
-      gen_sym_hash.sh
-      gen_sym_key.sh
-      gtm_tls_impl.c
-      gtm_tls_impl.h
-      gtm_tls_interface.h
-      gtmcrypt_dbk_ref.c
-      gtmcrypt_dbk_ref.h
-      gtmcrypt_interface.h
-      gtmcrypt_pk_ref.c
-      gtmcrypt_pk_ref.h
-      gtmcrypt_ref.c
-      gtmcrypt_ref.h
-      gtmcrypt_sym_ref.c
-      gtmcrypt_sym_ref.h
-      gtmcrypt_util.c
-      gtmcrypt_util.h
-      import_and_sign_key.sh
-      maskpass.c
-      minimal_gbldefs.c
-      pinentry-gtm.sh
-      pinentry.m
-      show_install_config.sh
-      ydb_getenv.c
-      ydb_getenv.h
-      ydb_logicals.h
-      ydb_logicals_tab.h
+foreach(f_in
+      ${YDB_SOURCE_DIR}/sr_unix/Makefile.mk
+      ${YDB_SOURCE_DIR}/sr_unix/encrypt_sign_db_key.sh
+      ${YDB_SOURCE_DIR}/sr_unix/gen_keypair.sh
+      ${YDB_SOURCE_DIR}/sr_unix/gen_sym_hash.sh
+      ${YDB_SOURCE_DIR}/sr_unix/gen_sym_key.sh
+      ${YDB_SOURCE_DIR}/sr_unix/gtm_tls_impl.c
+      ${YDB_SOURCE_DIR}/sr_unix/gtm_tls_impl.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtm_tls_interface.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_dbk_ref.c
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_dbk_ref.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_interface.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_pk_ref.c
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_pk_ref.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_ref.c
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_ref.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_sym_ref.c
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_sym_ref.h
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_util.c
+      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_util.h
+      ${YDB_SOURCE_DIR}/sr_unix/import_and_sign_key.sh
+      ${YDB_SOURCE_DIR}/sr_unix/maskpass.c
+      ${YDB_SOURCE_DIR}/sr_port/minimal_gbldefs.c
+      ${YDB_SOURCE_DIR}/sr_unix/pinentry-gtm.sh
+      ${YDB_SOURCE_DIR}/sr_unix/pinentry.m
+      ${YDB_SOURCE_DIR}/sr_unix/show_install_config.sh
+      ${YDB_SOURCE_DIR}/sr_port/ydb_getenv.c
+      ${YDB_SOURCE_DIR}/sr_port/ydb_getenv.h
+      ${YDB_SOURCE_DIR}/sr_port/ydb_logicals.h
+      ${YDB_SOURCE_DIR}/sr_port/ydb_logicals_tab.h
     )
-  set(f_in "${YDB_SOURCE_DIR}/*/${f}")
+  get_filename_component(f ${f_in} NAME)
   string(REGEX REPLACE ".mk$" "" f_mod "${f}")
   set(f_out "${YDB_BINARY_DIR}/plugin/gtmcrypt/${f_mod}")
   add_custom_command(
@@ -640,6 +640,7 @@ foreach(d ${gt_src_list})
           COMMAND ${CMAKE_COMMAND} -E copy ${YDB_SOURCE_DIR}/${d}/${m} "${m_out}"
           )
         list(APPEND files_to_place "${m_out}")
+	list(APPEND m_routines "${m_out}")
         list(APPEND ydb_chset_routines_${ydb_chset} "${m_out}")
       endforeach()
     else()
@@ -656,6 +657,7 @@ foreach(d ${gt_src_list})
         )
       install(FILES "${m_out}" DESTINATION ${YDB_INSTALL_DIR})
       list(APPEND files_to_place "${m_out}")
+      list(APPEND m_routines "${m_out}")
     endif()
   endforeach()
   foreach(m ${mpt_files_${d}})
@@ -668,6 +670,7 @@ foreach(d ${gt_src_list})
       )
     install(FILES "${m_out}" DESTINATION ${YDB_INSTALL_DIR})
     list(APPEND files_to_place "${m_out}")
+    list(APPEND m_routines "${m_out}")
   endforeach()
 endforeach()
 
@@ -823,6 +826,7 @@ Halt")
     DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
             ${YDB_BINARY_DIR}/${help}help.in1
             ${YDB_BINARY_DIR}/${help}help.in2
+	    ${m_routines}
     COMMAND ${CMAKE_COMMAND} -E remove ${help}help.dat ${help}help.gld
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mumps> -D "args=-run;GDE"
