@@ -320,35 +320,6 @@ case $gtm_hostos in
 esac
 gtm_shlib_support="Y"
 case ${gtm_hostos}_${gtm_arch} in
-    aix*) # no Source Forge dirname
-        gtm_arch="rs6000" # uname -m is not useful on AIX
-        gtm_ftp_dirname="aix"
-        ydb_flavor="rs6000"
-        gtm_install_flavor="RS6000" ;;
-    hpux_ia64) # no Source Forge dirname
-        gtm_ftp_dirname="hpux_ia64"
-        ydb_flavor="ia64"
-        gtm_install_flavor="IA64" ;;
-    linux_i586)
-        gtm_sf_dirname="GT.M-x86-Linux"
-        gtm_ftp_dirname="linux"
-        ydb_flavor="i586"
-        gtm_install_flavor="x86"
-        gtm_shlib_support="N" ;;
-    linux_i686)
-        gtm_sf_dirname="GT.M-x86-Linux"
-        gtm_ftp_dirname="linux"
-        ydb_flavor="i686"
-        gtm_install_flavor="x86"
-        gtm_shlib_support="N" ;;
-    linux_ia64) # no Source Forge dirname
-        gtm_ftp_dirname="linux_ia64"
-        ydb_flavor="ia64"
-        gtm_install_flavor="IA" ;;
-    linux_s390x) # no Source Forge dirname
-        gtm_ftp_dirname="linux_s390x"
-        ydb_flavor="s390x"
-        gtm_install_flavor="S390X" ;;
     linux_x8664)
         gtm_sf_dirname="GT.M-amd64-Linux"
         gtm_ftp_dirname="linux_x8664"
@@ -358,10 +329,6 @@ case ${gtm_hostos}_${gtm_arch} in
         ydb_flavor="armv6l" ;;
     linux_armv7l)
         ydb_flavor="armv7l" ;;
-    solaris_sparc) # no Source Forge dirname
-        gtm_ftp_dirname="sun"
-        ydb_flavor="sparc"
-        gtm_install_flavor="SPARC" ;;
     *) echo Architecture `uname -o` on `uname -m` not supported by this script ; err_exit ;;
 esac
 
