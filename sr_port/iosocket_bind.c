@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -176,9 +179,9 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 msec_timeout, boolean_t u
 					{
 						sys_get_curr_time(&cur_time);
 						cur_time = sub_abs_time(&end_time, &cur_time);
-						msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+						msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
 							/* Round up in order to prevent premature timeouts */
-							DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+							DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
 						if (msec_timeout > 0)
 							no_time_left = FALSE;
 					} else

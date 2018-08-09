@@ -50,7 +50,7 @@ LITREF	gtmImageName	gtmImageNames[];
 STATICDEF	ABS_TIME	halt_time;
 STATICDEF	ABS_TIME	zhalt_time;
 
-#define		SAFE_INTERVAL	500000		/* microseconds */
+#define		SAFE_INTERVAL	500000000		/* nanoseconds */
 
 error_def(ERR_PROCTERM);
 error_def(ERR_RESTRICTEDOP);
@@ -100,11 +100,11 @@ void op_zhalt(int4 retcode, boolean_t is_zhalt)
 	if (is_zhalt ? RESTRICTED(zhalt_op) : retcode ? FALSE : RESTRICTED(halt_op))
 	{	/* if the operation is restricted and not from op_dmode or dm_read proclaim the restriction */
 		sys_get_curr_time(&cur_time);
-		if ((is_zhalt ? ((zhalt_time.at_usec) || (zhalt_time.at_sec)) : ((halt_time.at_usec) || (halt_time.at_sec))))
+		if ((is_zhalt ? ((zhalt_time.tv_nsec) || (zhalt_time.tv_sec)) : ((halt_time.tv_nsec) || (halt_time.tv_sec))))
 			interval = sub_abs_time(&cur_time, is_zhalt ? &zhalt_time : &halt_time);
 		else
-			interval.at_usec = interval.at_sec = 0;
-		if ((interval.at_sec) || (0 == interval.at_usec) || (SAFE_INTERVAL < interval.at_usec))
+			interval.tv_nsec = interval.tv_sec = 0;
+		if ((interval.tv_sec) || (0 == interval.tv_nsec) || (SAFE_INTERVAL < interval.tv_nsec))
 		{
 			if (is_zhalt)
 				zhalt_time = cur_time;

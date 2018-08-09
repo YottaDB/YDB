@@ -17,11 +17,7 @@
 #ifdef GTM_TLS
 
 #include <errno.h>
-#ifdef USE_POLL
 #include "gtm_poll.h"
-#else
-#include "gtm_select.h"
-#endif
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
@@ -89,12 +85,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 	tls_option		option;
 	gtm_tls_socket_t	*tlssocket;
 	ABS_TIME		cur_time, end_time;
-#	ifdef USE_POLL
 	struct pollfd		fds;
-#	else
-	fd_set			fds, *readfds, *writefds;
-	struct timeval		*timeout_ptr, timeout_spec;
-#	endif
 	boolean_t		ch_set;
 
 	iod = io_curr_device.out;
@@ -267,35 +258,14 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			return;
 		}
 		status = 0;
-#		ifndef	USE_POLL
-		if (NO_M_TIMEOUT == msec_timeout)
-			timeout_ptr = NULL;
-		else
-		{
-			timeout_spec.tv_sec = msec_timeout / MILLISECS_IN_SEC;
-			/* remainder in millsecs to microsecs */
-			timeout_spec.tv_usec = (msec_timeout % MILLISECS_IN_SEC) * MICROSECS_IN_MSEC;
-			timeout_ptr = &timeout_spec;
-		}
-#		endif
 		do
 		{
 			status2 = 0;
 			if (0 != status)
 			{
-#				ifdef USE_POLL
 				fds.fd = socketptr->sd;
 				fds.events = (GTMTLS_WANT_READ == status) ? POLLIN : POLLOUT;
-#				else
-				readfds = writefds = NULL;
-				assertpro(FD_SETSIZE > socketptr->sd);
-				FD_ZERO(&fds);
-				FD_SET(socketptr->sd, &fds);
-				writefds = (GTMTLS_WANT_WRITE == status) ? &fds : NULL;
-				readfds = (GTMTLS_WANT_READ == status) ? &fds : NULL;
-#				endif
-				POLL_ONLY(if (-1 == (status2 = poll(&fds, 1, (NO_M_TIMEOUT == msec_timeout) ? -1 : msec_timeout))))
-				SELECT_ONLY(if (-1 == (status2 = select(socketptr->sd + 1, readfds, writefds, NULL, timeout_ptr))))
+				if (-1 == (status2 = poll(&fds, 1, (NO_M_TIMEOUT == msec_timeout) ? -1 : msec_timeout)))
 				{
 					save_errno = errno;
 					if (EAGAIN == save_errno)
@@ -341,7 +311,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				{
 					sys_get_curr_time(&cur_time);
 					cur_time = sub_abs_time(&end_time, &cur_time);
-					if (0 >= cur_time.at_sec)
+					if (0 >= cur_time.tv_sec)
 					{	/* no more time */
 						gtm_tls_session_close((gtm_tls_socket_t **)&socketptr->tlssocket);
 						socketptr->tlsenabled = FALSE;
@@ -350,13 +320,8 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 						return;
 					} else
 					{	/* adjust msec_timeout for poll/select */
-#					ifdef	USE_POLL
-						msec_timeout = (cur_time.at_sec * MILLISECS_IN_SEC) +
-							DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC);
-#					else
-						timeout_spec.tv_sec = cur_time.at_sec;
-						timeout_spec.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
-#					endif
+						msec_timeout = (cur_time.tv_sec * MILLISECS_IN_SEC) +
+								DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC);
 					}
 				} else if (0 == msec_timeout)
 				{	/* only one chance */

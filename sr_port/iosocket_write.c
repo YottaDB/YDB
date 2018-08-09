@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -15,11 +18,7 @@
 #include "mdef.h"
 
 #include <errno.h>
-#ifdef USE_POLL
 #include "gtm_poll.h"
-#else
-#include "gtm_select.h"
-#endif
 #include "gtm_socket.h"
 #include "gtm_inet.h"
 #include "gtm_stdio.h"
@@ -161,12 +160,7 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 #	ifdef GTM_TLS
 	int		tlspolldirection = 0;
 #	endif
-#	ifdef USE_POLL
 	struct pollfd	fds;
-#	else
-	fd_set		fds, *readfds, *writefds;
-	struct timeval	timeout_spec;
-#	endif
 
 	if (!socketptr->obuffer_output_active)
 		return 0;		/* how did we get here */
@@ -177,13 +171,6 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 		timeout = 0;		/* no waiting in poll */
 	} else
 		timeout = socketptr->obuffer_wait_time;
-#	ifndef USE_POLL
-	FD_ZERO(&fds);
-	FD_SET(socketptr->sd, &fds);
-	timeout = timeout * 1000;	/* convert milli to micro seconds */
-	timeout_spec.tv_sec = 0;
-	timeout_spec.tv_usec = timeout;
-#	endif
 	llen = length;
 	status = 0;
 	lbuffer = buffer;
@@ -195,22 +182,9 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 		else
 #		endif
 			pollwrite = TRUE;
-#		ifdef USE_POLL
 		fds.fd = socketptr->sd;
 		fds.events = pollwrite ? POLLOUT : POLLIN;
 		istatus = poll(&fds, 1, timeout);
-#		else
-		if (pollwrite)
-		{
-			writefds = &fds;
-			readfds = NULL;
-		} else
-		{
-			readfds = &fds;
-			writefds = NULL;
-		}
-		istatus = select(socketptr->sd + 1, readfds, writefds, NULL, &timeout_spec);
-#		endif
 		if (-1 == istatus)
 		{
 			save_errno = errno;
@@ -227,10 +201,6 @@ ssize_t iosocket_output(socket_struct *socketptr, char *buffer, size_t length, b
 				status = -1;
 				break;
 			}
-#			ifndef USE_POLL
-			timeout_spec.tv_usec = timeout;
-			FD_SET(socketptr->sd, &fds);
-#			endif
 			continue;
 		}
 #		ifdef GTM_TLS

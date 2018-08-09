@@ -183,7 +183,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 				{
 					sys_get_curr_time(&cur_time);
 					cur_time = sub_abs_time(&end_time, &cur_time);
-					if (0 >= (utimeout.tv_sec = cur_time.at_sec))
+					if (0 >= (utimeout.tv_sec = cur_time.tv_sec))
 					{
 						rv = 0;
 						break;
@@ -324,7 +324,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			{
 				sys_get_curr_time(&cur_time);
 				cur_time = sub_abs_time(&end_time, &cur_time);
-				if (cur_time.at_sec <= 0)
+				if (cur_time.tv_sec <= 0)
 					no_time_left = TRUE;
 			}
 			SHORT_SLEEP(NAP_LENGTH);               /* Sleep for NAP_LENGTH ms */

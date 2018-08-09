@@ -120,7 +120,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 			mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 			mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 		}
-		DBGSOCK((stdout, "socconn: mv_stent found - endtime: %d/%d\n", end_time.at_sec, end_time.at_usec));
+		DBGSOCK((stdout, "socconn: mv_stent found - endtime: %d/%d\n", end_time.tv_sec,			\
+									end_time.tv_nsec / NANOSECS_IN_USEC));
 		real_dsocketptr->mupintr = dsocketptr->mupintr = FALSE;
 		real_sockintr->who_saved = sockintr->who_saved = sockwhich_invalid;
 	} else if (NO_M_TIMEOUT != msec_timeout)
@@ -304,9 +305,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 						{
 							sys_get_curr_time(&cur_time);
 							cur_time = sub_abs_time(&end_time, &cur_time);
-							msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+							msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
 								/* Round up in order to prevent premature timeouts */
-								DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+								DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
 							if (0 >= msec_timeout)
 								msec_timeout = 0;
 						}
@@ -344,9 +345,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 				{
 					sys_get_curr_time(&cur_time);
 					cur_time = sub_abs_time(&end_time, &cur_time);
-					msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+					msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
 						/* Round up in order to prevent premature timeouts */
-						DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+						DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
 					if (0 < msec_timeout)
 						sel_time = (struct timeval *)&cur_time;
 					else
@@ -496,7 +497,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 			mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
 			socketus_interruptus++;
 			DBGSOCK((stdout, "socconn: mv_stent queued - endtime: %d/%d  interrupts: %d\n",
-				 end_time.at_sec, end_time.at_usec, socketus_interruptus));
+				 end_time.tv_sec, end_time.tv_nsec / NANOSECS_IN_USEC, socketus_interruptus));
 			outofband_action(FALSE);
 			assertpro(FALSE);      /* Should *never* return from outofband_action */
 			return FALSE;   /* For the compiler.. */

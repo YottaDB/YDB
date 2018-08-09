@@ -37,13 +37,13 @@ error_def(ERR_TIMEROVFL);
  */
 int4	abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2)
 {
-	if (atp1->at_sec > atp2->at_sec)
+	if (atp1->tv_sec > atp2->tv_sec)
 		return (1);
-	if (atp1->at_sec < atp2->at_sec)
+	if (atp1->tv_sec < atp2->tv_sec)
 		return (-1);
-	if (atp1->at_usec == atp2->at_usec)
+	if (atp1->tv_nsec == atp2->tv_nsec)
 		return (0);
-	if (atp1->at_usec > atp2->at_usec)
+	if (atp1->tv_nsec > atp2->tv_nsec)
 		return (1);
 	return (-1);
 }
@@ -52,7 +52,7 @@ int4	abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2)
 /*
  * ---------------------------------------------------------------------
  * Add integer to absolute time
- *	Absolute time structure is seconds & microseconds.
+ *	Absolute time structure is seconds & nanoseconds.
  *	Integer value is in milliseconds.
  *
  * Arguments:
@@ -63,7 +63,7 @@ int4	abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2)
  */
 void	add_int_to_abs_time(ABS_TIME *atps, int4 ival,ABS_TIME *atpd)
 {
-	int4	ival_sec, ival_usec;
+	gtm_uint8	ival_sec, ival_nsec;
 
 	if (ival < 0)
 	{
@@ -75,13 +75,13 @@ void	add_int_to_abs_time(ABS_TIME *atps, int4 ival,ABS_TIME *atpd)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TIMEROVFL);
 	}
 	ival_sec  = ival / MILLISECS_IN_SEC;					/* milliseconds -> seconds */
-	ival_usec = (ival - (ival_sec * MILLISECS_IN_SEC)) * MICROSECS_IN_MSEC;	/* microsecond remainder */
-	atpd->at_sec = atps->at_sec + ival_sec;
-	if ((atpd->at_usec = atps->at_usec + ival_usec) >= MICROSECS_IN_SEC)
+	ival_nsec = (ival - (ival_sec * MILLISECS_IN_SEC)) * NANOSECS_IN_MSEC;	/* nanosecond remainder */
+	atpd->tv_sec = atps->tv_sec + ival_sec;
+	if ((atpd->tv_nsec = atps->tv_nsec + ival_nsec) >= NANOSECS_IN_SEC)
 	{
-		/* microsecond overflow */
-		atpd->at_usec -= MICROSECS_IN_SEC;
-		atpd->at_sec  += 1;		/* carry */
+		/* nanosecond overflow */
+		atpd->tv_nsec -= NANOSECS_IN_SEC;
+		atpd->tv_sec  += 1;		/* carry */
 	}
 }
 
@@ -105,13 +105,13 @@ ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2)
 	ABS_TIME	dat;
 	int4		ival;
 
-	dat.at_sec = atp1->at_sec - atp2->at_sec;
-	dat.at_usec = atp1->at_usec - atp2->at_usec;
+	dat.tv_sec = atp1->tv_sec - atp2->tv_sec;
+	dat.tv_nsec = atp1->tv_nsec - atp2->tv_nsec;
 
-	if (atp2->at_usec > atp1->at_usec)
+	if (atp2->tv_nsec > atp1->tv_nsec)
 	{
-		dat.at_usec += MICROSECS_IN_SEC;
-		dat.at_sec--;
+		dat.tv_nsec += NANOSECS_IN_SEC;
+		dat.tv_sec--;
 	}
 	return (dat);
 }

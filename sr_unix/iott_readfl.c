@@ -1170,13 +1170,13 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		{
 			sys_get_curr_time(&cur_time);
 			cur_time = sub_abs_time(&end_time, &cur_time);
-			if (0 > cur_time.at_sec)
+			if (0 > cur_time.tv_sec)
 			{
 				ret = FALSE;
 				break;
 			}
-			input_timeval.tv_sec = cur_time.at_sec;
-			input_timeval.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
+			input_timeval.tv_sec = cur_time.tv_sec;
+			input_timeval.tv_usec = (gtm_tv_usec_t)(cur_time.tv_nsec / NANOSECS_IN_USEC);
 		}
 	} while (outlen < length);
 	*zb_ptr++ = 0;

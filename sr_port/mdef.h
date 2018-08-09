@@ -147,16 +147,6 @@ error_def(ERR_ASSERT);
 #	define	FD_INVALID_NONPOSIX	 0	/* fd of 0 is invalid in VMS if using RMS sys$open calls (non-posix interface) */
 #endif
 
-#if defined(UNIX)
-#	define	USE_POLL
-#	define	POLL_ONLY(X)	X
-#	define	SELECT_ONLY(X)
-#else
-#	define	USE_SELECT
-#	define	POLL_ONLY(X)
-#	define	SELECT_ONLY(X)	X
-#endif
-
 /* INTPTR_T is an integer that has the same length as a pointer on each platform.  Its basic use is for arithmetic
  * or generic parameters.
  */

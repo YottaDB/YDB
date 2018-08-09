@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -30,28 +33,14 @@ typedef void (*timer_hndlr)();	/* Timer handler type */
  * the ABS_TIME format, and from then on, all
  * timer related code uses this format.
  */
-typedef struct tag_abs_time
-{
-#ifndef __osf__
-	long	at_sec;		/* seconds */
-	long	at_usec;	/* and microseconds */
-#else	/* avoid  8 byte alignment issues */
-	intszofptr_t	at_sec;		/* seconds */
-	intszofptr_t	at_usec;	/* and microseconds */
-#endif
-} ABS_TIME;
+typedef struct timespec ABS_TIME;
 
 #include <sys/time.h>
 
 /* Type that corresponds to the tv_usec field in a timeval struct.  Valid across all platforms */
-#if defined(__linux__) || defined(__ia64) || defined(__sparc) || defined(_AIX) || defined(__MVS__) \
-|| defined(__CYGWIN__)
+#if defined(__linux__) || defined(__MVS__) || defined(__CYGWIN__)
     typedef     suseconds_t     gtm_tv_usec_t;
-#elif defined(__hppa)
-    typedef     long            gtm_tv_usec_t;
-#elif defined(__osf__)
-    typedef     int             gtm_tv_usec_t;
-#elif !defined(VMS)
+#else
 #   error unsupported platform
 #endif
 
@@ -190,11 +179,11 @@ MBSTART {									\
 		FPRINTF(stderr, "  - timer #%d:\n"						\
 			"      handler:    %s\n"						\
 			"      safe:       %d\n"						\
-			"      start_time: [at_sec: %ld; at_usec: %ld]\n"			\
-			"      expir_time: [at_sec: %ld; at_usec: %ld]\n",			\
+			"      start_time: [tv_sec: %ld; tv_nsec: %ld]\n"			\
+			"      expir_time: [tv_sec: %ld; tv_nsec: %ld]\n",			\
 			i, handler, cur_timer->safe,						\
-			cur_timer->start_time.at_sec, cur_timer->start_time.at_usec,		\
-			cur_timer->expir_time.at_sec, cur_timer->expir_time.at_usec);		\
+			cur_timer->start_time.tv_sec, cur_timer->start_time.tv_nsec,		\
+			cur_timer->expir_time.tv_sec, cur_timer->expir_time.tv_nsec);		\
 		FFLUSH(stderr);									\
 		cur_timer = cur_timer->next;							\
 		i++;										\

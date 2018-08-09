@@ -29,12 +29,7 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "gtm_unistd.h"
-#ifdef USE_POLL
 #include <sys/poll.h>
-#endif
-#ifdef USE_SELECT
-#include "gtm_select.h"
-#endif
 #include "io_params.h"
 #include "gt_timer.h"
 #include "io.h"
@@ -75,17 +70,11 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 {
 	struct 	timeval  	utimeout, *utimeoutptr;
 	ABS_TIME		cur_time, end_time;
-#ifdef USE_POLL
 	nfds_t			poll_nfds;
 	struct pollfd		*poll_fds;
 	socket_struct		**poll_socketptr;	/* matching poll_fds */
 	size_t			poll_fds_size;
 	int			poll_timeout, poll_fd;
-#endif
-#ifdef USE_SELECT
-	int			select_max_fd;
-	fd_set			select_fdset;
-#endif
 	d_socket_struct 	*dsocketptr;
 	socket_struct   	*socketptr;
 	socket_interrupt	*sockintr;
@@ -142,14 +131,14 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 				mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 			}
 			zint_restart = TRUE;
-			DBGSOCK((stdout, "socwait: mv_stent found - endtime: %d/%d\n", end_time.at_sec, end_time.at_usec));
+			DBGSOCK((stdout, "socwait: mv_stent found - endtime: %d/%d\n",		\
+					end_time.tv_sec, end_time.tv_nsec / NANOSECS_IN_MSEC));
 		} else
 			DBGSOCK((stdout, "socwait: no mv_stent found !!\n"));
 		dsocketptr->mupintr = FALSE;
 		sockintr->who_saved = sockwhich_invalid;
 	}
 	/* check for events */
-#ifdef USE_POLL
 	poll_fds_size = dsocketptr->n_socket * (SIZEOF(struct pollfd) + SIZEOF(socket_struct *));
 	if (NULL == TREF(poll_fds_buffer))
 	{
@@ -163,12 +152,9 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 	}
 	poll_fds = (struct pollfd *) TREF(poll_fds_buffer);
 	poll_socketptr = (socket_struct **)((char *)poll_fds + (dsocketptr->n_socket * SIZEOF(struct pollfd)));
-#endif
-	SELECT_ONLY(FD_ZERO(&select_fdset));
 	while (TRUE)
 	{
-		POLL_ONLY(poll_nfds = 0);
-		SELECT_ONLY(select_max_fd = 0);
+		poll_nfds = 0;
 		nselect = rlisten = rconnected = 0;
 		rv = 0;
 		for (ii = 0; ii < dsocketptr->n_socket; ii++)
@@ -197,17 +183,10 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 						continue;	/* ready for ACCEPT now */
 					}
 				}
-#ifdef USE_POLL
 				poll_fds[poll_nfds].fd = socketptr->sd;
 				poll_fds[poll_nfds].events = POLLIN;
 				poll_socketptr[poll_nfds] = socketptr;
 				poll_nfds++;
-#endif
-#ifdef USE_SELECT
-				assertpro(FD_SETSIZE > socketptr->sd);
-				FD_SET(socketptr->sd, &select_fdset);
-				select_max_fd = MAX(select_max_fd, socketptr->sd);
-#endif
 				nselect++;
 			}
 		}
@@ -226,9 +205,9 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 					*/
 					DBGSOCK((stdout, "socwait: Taking timeout end time from wait restart data\n"));
 					cur_time = sub_abs_time(&end_time, &cur_time);
-					msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+					msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
 						/* Round up in order to prevent premature timeouts */
-						DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+						DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
 					if (0 > msec_timeout)
 					{
 						msec_timeout = -1;
@@ -236,15 +215,14 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 						utimeout.tv_usec = 0;
 					} else
 					{
-						utimeout.tv_sec = cur_time.at_sec;
-						utimeout.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
+						utimeout.tv_sec = cur_time.tv_sec;
+						utimeout.tv_usec = (gtm_tv_usec_t)(cur_time.tv_nsec / NANOSECS_IN_USEC);
 					}
 				}
 			}
 			zint_restart = sockintr->end_time_valid = FALSE;
 			for ( ; ; )
 			{
-#ifdef USE_POLL
 				if ((0 < rconnected) || (0 <rlisten))
 					poll_timeout = 0;
 				else if (NO_M_TIMEOUT == msec_timeout)
@@ -254,15 +232,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 						DIVIDE_ROUND_UP(utimeout.tv_usec, MICROSECS_IN_MSEC);
 				poll_fd = -1;
 				rv = poll(poll_fds, poll_nfds, poll_timeout);
-#endif
-#ifdef USE_SELECT
-				utimeoutptr = &utimeout;
-				if ((0 < rconnected) || (0 <rlisten))
-					utimeout.tv_sec = utimeout.tv_usec = 0;
-				else if (NO_M_TIMEOUT == msec_timeout)
-					utimeoutptr = (struct timeval *)NULL;
-				rv = select(select_max_fd + 1, (void *)&select_fdset, (void *)0, (void *)0, utimeoutptr);
-#endif
 				if (0 > rv && EINTR == errno)
 				{
 					if (0 != outofband)
@@ -284,8 +253,8 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 							dsocketptr->mupintr = TRUE;
 							socketus_interruptus++;
 							DBGSOCK((stdout, "socwait: mv_stent queued - endtime: %d/%d"
-								"  interrupts: %d\n", end_time.at_sec, end_time.at_usec,
-								socketus_interruptus));
+								"  interrupts: %d\n", end_time.tv_sec,
+								end_time.tv_nsec / NANOSECS_IN_USEC, socketus_interruptus));
 						}
 						REVERT_GTMIO_CH(&iod->pair, ch_set);
 						outofband_action(FALSE);
@@ -296,16 +265,16 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 					{
 						sys_get_curr_time(&cur_time);
 						cur_time = sub_abs_time(&end_time, &cur_time);
-						msec_timeout = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+						msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
 							/* Round up in order to prevent premature timeouts */
-							DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+							DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
 						if (0 >msec_timeout)
 						{
 							rv = 0;		/* time out */
 							break;
 						}
-						utimeout.tv_sec = cur_time.at_sec;
-						utimeout.tv_usec = (gtm_tv_usec_t)cur_time.at_usec;
+						utimeout.tv_sec = cur_time.tv_sec;
+						utimeout.tv_usec = (gtm_tv_usec_t)(cur_time.tv_nsec / NANOSECS_IN_USEC);
 					}
 				} else
 					break;	/* either other error or done */
@@ -343,7 +312,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 			socketptr = dsocketptr->socket[ii];
 			if ((socket_listening != socketptr->state) && (socket_connected != socketptr->state))
 				continue;	/* not a candidate for /WAIT */
-#ifdef USE_POLL
 			for (jj = 0; jj < poll_nfds; jj++)
 			{
 				if (socketptr == poll_socketptr[jj])
@@ -351,11 +319,6 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 			}
 			assertpro((0 == jj) || (jj <= poll_nfds));	/* equal poll_nfds if not polled */
 			if (nselect && (jj != poll_nfds) && (socketptr->sd == poll_fds[jj].fd) && poll_fds[jj].revents)
-#endif
-#ifdef USE_SELECT
-			assertpro(FD_SETSIZE > socketptr->sd);
-			if (nselect && (0 != FD_ISSET(socketptr->sd, &select_fdset)))
-#endif
 			{	/* set flag in socketptr and keep going */
 				socketptr->pendingevent = TRUE;
 				socketptr->readycycle = dsocketptr->waitcycle;
@@ -465,13 +428,8 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	int4            	errlen;
 	int			rv, len, errcode, save_errno;
 	char			port_buffer[NI_MAXSERV], ipaddr[SA_MAXLEN + 1];
-#ifdef USE_POLL
 	struct pollfd		poll_fds;
 	int			poll_fd;
-#endif
-#ifdef USE_SELECT
-	fd_set			select_fdset;
-#endif
 	struct timeval		utimeout;
 	GTM_SOCKLEN_TYPE	size, addrlen;
 	socket_struct		*newsocketptr;
@@ -486,17 +444,9 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 	peer_sa_ptr = ((struct sockaddr *)(&peer));
 	if (selectfirst || (dsocketptr->waitcycle > socketptr->readycycle))
 	{	/* if not selected this time do a select first to check if connection still there */
-#ifdef USE_POLL
 		poll_fds.fd = socketptr->sd;
 		poll_fds.events = POLLIN;
 		rv = poll(&poll_fds, 1, 0);
-#endif
-#ifdef USE_SELECT
-		FD_ZERO(&select_fdset);
-		FD_SET(socketptr->sd, &select_fdset);
-		utimeout.tv_sec = utimeout.tv_usec = 0;
-		rv = select(socketptr->sd + 1, (void *)&select_fdset, (void *)0, (void *)0, &utimeout);
-#endif
 		if (0 > rv)
 		{
 			errptr = (char *)STRERROR(errno);

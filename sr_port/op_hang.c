@@ -161,10 +161,10 @@ void op_hang(mval* num)
 			assert(ms == mv_zintcmd->mv_st_cont.mvs_zintcmd.ms);
 			end_time = mv_zintcmd->mv_st_cont.mvs_zintcmd.end_or_remain;
 			cur_time = sub_abs_time(&end_time, &cur_time);	/* get remaining time to sleep */
-			if (0 <= cur_time.at_sec)
-				ms = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
+			if (0 <= cur_time.tv_sec)
+				ms = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
 					    /* Round up in order to prevent premature timeouts */
-					    DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
+					    DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
 			else
 				ms = 0;		/* all done */
 			/* restore/pop previous zintcmd_active[ZINTCMD_HANG] hints */

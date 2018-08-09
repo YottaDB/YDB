@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -169,7 +172,7 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 
 	DBGSOCK2((stdout, "socsnrio: Socket read request - socketptr: 0x"lvaddr"  buffer: 0x"lvaddr"  maxlength: %d  flags: %d  ",
 		  socketptr, buffer, maxlength, flags));
-	DBGSOCK2((stdout, "time_for_read->at_sec: %d  usec: %d\n", time_for_read->at_sec, time_for_read->at_usec));
+	DBGSOCK2((stdout, "time_for_read->tv_sec: %d  usec: %d\n", time_for_read->tv_sec, time_for_read->tv_nsec / NANOSECS_IN_USEC));
 	DEBUG_ONLY(gettimeofday(&tvbefore, NULL);)
 #ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 	assertpro(FD_SETSIZE > socketptr->sd);
@@ -191,8 +194,8 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 #			ifndef GTM_USE_POLL_FOR_SUBSECOND_SELECT
 			FD_SET(socketptr->sd, &tcp_fd);
 			assert(0 != FD_ISSET(socketptr->sd, &tcp_fd));
-			lcl_time_for_read.tv_sec = time_for_read->at_sec;
-			lcl_time_for_read.tv_usec = (gtm_tv_usec_t)time_for_read->at_usec;
+			lcl_time_for_read.tv_sec = time_for_read->tv_sec;
+			lcl_time_for_read.tv_usec = (gtm_tv_usec_t)(time_for_read->tv_nsec / NANOSECS_IN_USEC);
 			if (pollread)
 			{
 				readfds = &tcp_fd;
@@ -207,7 +210,7 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 			poll_fdlist[0].fd = socketptr->sd;
 			poll_fdlist[0].events = pollread ? POLLIN : POLLOUT;
 			poll_nfds = 1;
-			poll_timeout = DIVIDE_ROUND_UP(time_for_read->at_usec, MICROSECS_IN_MSEC);	/* convert to millisecs */
+			poll_timeout = DIVIDE_ROUND_UP(time_for_read->tv_nsec, NANOSECS_IN_MSEC);	/* convert to millisecs */
 			status = poll(&poll_fdlist[0], poll_nfds, poll_timeout);
 #			endif
 			real_errno = errno;

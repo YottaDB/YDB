@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -54,7 +57,7 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 	{
 		sys_get_curr_time(&cur_time);
 		add_int_to_abs_time(&cur_time, max_timeout_in_secs * 1000, &end_time);
-		remain_time.at_sec = 0;		/* ensure one try */
+		remain_time.tv_sec = 0;		/* ensure one try */
 	}
 	/* Define number of hard-spins the inner loop does */
 	maxspins = num_additional_processors ? MAX_LOCK_SPINS(LOCK_SPINS, num_additional_processors) : 1;
@@ -79,7 +82,7 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 			REST_FOR_LATCH(latch, USEC_IN_NSEC_MASK, retries);
 			sys_get_curr_time(&cur_time);
 			remain_time = sub_abs_time(&end_time, &cur_time);
-			if (0 > remain_time.at_sec)
+			if (0 > remain_time.tv_sec)
 				break;
 		} else
 		{	/* Indefinite wait for lock. Periodically check if latch is held by dead pid. If so get it back. */
