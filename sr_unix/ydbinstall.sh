@@ -136,11 +136,11 @@ help_exit()
     echo "version is defaulted from mumps file if one exists in the same directory as the installer"
     echo "This version must run as root."
     echo ""
-    echo "Example usages are (assumes latest YottaDB release is r1.22 and latest GT.M version is V6.3-003A)"
+    echo "Example usages are (assumes latest YottaDB release is r1.22 and latest GT.M version is V6.3-005)"
     echo "  ydbinstall.sh                          # installs latest YottaDB release (r1.22) at /usr/local/lib/yottadb/r122"
     echo "  ydbinstall.sh --utf8 default           # installs YottaDB release r1.22 with added support for UTF-8"
     echo "  ydbinstall.sh --installdir /r122 r1.22 # installs YottaDB r1.22 at /r122"
-    echo "  ydbinstall.sh --gtm                    # installs latest GT.M version (V6.3-003A) at /usr/local/lib/fis-gtm/V6.3-003A_x86_64"
+    echo "  ydbinstall.sh --gtm                    # installs latest GT.M version (V6.3-005) at /usr/local/lib/fis-gtm/V6.3-005_x86_64"
     echo ""
     exit 1
 }
@@ -155,6 +155,33 @@ mktmpdir()
         *) tmpdirname=`mktemp -d` ;;
     esac
     echo $tmpdirname
+}
+
+# This function is invoked whenever we detect an option that requires a value (e.g. --utf8) that is not
+# immediately followed by a =. In that case, the next parameter in the command line ($2) is the value.
+# We check if this parameter starts with a "--" as well and if so it denotes a different option and not a value.
+#
+# Input
+# -----
+# $1 for this function is the # of parameters remaining to be processed in command line
+# $2 for this function is the next parameter in the command line immediately after the current option (which has a -- prefix).
+#
+# Output
+# ------
+# returns 0 in case $2 is non-null and does not start with a "--"
+# returns 1 otherwise.
+#
+isvaluevalid()
+{
+	if [ 1 -lt "$1" ] ; then
+		# bash might have a better way for checking whether $2 starts with "--" than the grep done below
+		# but we want this script to run with sh so go with the approach that will work on all shells.
+		retval=`echo "$2" | grep -c '^--'`
+	else
+		# option (e.g. --utf8) is followed by no other parameters in the command line
+		retval=1
+	fi
+	echo $retval
 }
 
 # Defaults that can be over-ridden by command line options to follow
@@ -189,13 +216,13 @@ while [ $# -gt 0 ] ; do
     case "$1" in
         --build-type*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_buildtype=$tmp
-            else if [ 1 -lt "$#" ] ; then gtm_buildtype=$2 ; shift
-                else echo "--buildtype needs a value" ; err_exit
+            else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_buildtype=$2 ; shift
+                else echo "--build-type needs a value" ; err_exit
                 fi
             fi ;;
         --copyenv*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_copyenv=$tmp
-            else if [ 1 -lt "$#" ] ; then gtm_copyenv=$2 ; shift
+            else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_copyenv=$2 ; shift
                 else echo "--copyenv needs a value" ; err_exit
                 fi
             fi
@@ -203,7 +230,7 @@ while [ $# -gt 0 ] ; do
             shift ;;
         --copyexec*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_copyexec=$tmp
-            else if [ 1 -lt "$#" ] ; then gtm_copyexec=$2 ; shift
+            else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_copyexec=$2 ; shift
                 else echo "--copyexec needs a value" ; err_exit
                 fi
             fi
@@ -212,7 +239,7 @@ while [ $# -gt 0 ] ; do
         --debug) ydb_debug="Y" ; set -x ; shift ;;
         --distrib*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then ydb_distrib=$tmp
-            else if [ 1 -lt "$#" ] ; then ydb_distrib=$2 ; shift
+            else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then ydb_distrib=$2 ; shift
                 else echo "--distrib needs a value" ; err_exit
                 fi
             fi
@@ -224,7 +251,7 @@ while [ $# -gt 0 ] ; do
         --group-restriction) gtm_group_restriction="Y" ; shift ;; # must come before group*
         --group*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_group=$tmp
-            else if [ 1 -lt "$#" ] ; then gtm_group=$2 ; shift
+            else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_group=$2 ; shift
                 else echo "--group needs a value" ; err_exit
                 fi
             fi
@@ -232,7 +259,7 @@ while [ $# -gt 0 ] ; do
         --help) help_exit ;;
         --installdir*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then ydb_installdir=$tmp
-            else if [ 1 -lt "$#" ] ; then ydb_installdir=$2 ; shift
+            else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then ydb_installdir=$2 ; shift
                 else echo "--installdir needs a value" ; err_exit
                 fi
             fi
@@ -240,7 +267,7 @@ while [ $# -gt 0 ] ; do
         --keep-obj) gtm_keep_obj="Y" ; shift ;;
         --linkenv*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_linkenv=$tmp
-            else if [ 1 -lt "$#" ] ; then gtm_linkenv=$2 ; shift
+            else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_linkenv=$2 ; shift
                 else echo "--linkenv needs a value" ; err_exit
                 fi
             fi
@@ -248,7 +275,7 @@ while [ $# -gt 0 ] ; do
             shift ;;
         --linkexec*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_linkexec=$tmp
-            else if [ 1 -lt "$#" ] ; then gtm_linkexec=$2 ; shift
+            else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_linkexec=$2 ; shift
                 else echo "--linkexec needs a value" ; err_exit
                 fi
             fi
@@ -260,14 +287,14 @@ while [ $# -gt 0 ] ; do
         --ucaseonly-utils) gtm_lcase_utils="N" ; shift ;;
         --user*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_user=$tmp
-            else if [ 1 -lt "$#" ] ; then gtm_user=$2 ; shift
+            else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then gtm_user=$2 ; shift
                 else echo "--user needs a value" ; err_exit
                 fi
             fi
             shift ;;
         --utf8*) tmp=`echo $1 | cut -s -d = -f 2- | tr DEFAULT default`
             if [ -n "$tmp" ] ; then ydb_icu_version=$tmp
-            else if [ 1 -lt "$#" ] ; then ydb_icu_version=`echo $2 | tr DEFAULT default`; shift
+            else retval=`isvaluevalid $# $2` ; if [ "$retval" -eq 0 ] ; then ydb_icu_version=`echo $2 | tr DEFAULT default`; shift
                 else echo "--utf8 needs a value" ; err_exit
                 fi
             fi
@@ -293,35 +320,6 @@ case $gtm_hostos in
 esac
 gtm_shlib_support="Y"
 case ${gtm_hostos}_${gtm_arch} in
-    aix*) # no Source Forge dirname
-        gtm_arch="rs6000" # uname -m is not useful on AIX
-        gtm_ftp_dirname="aix"
-        ydb_flavor="rs6000"
-        gtm_install_flavor="RS6000" ;;
-    hpux_ia64) # no Source Forge dirname
-        gtm_ftp_dirname="hpux_ia64"
-        ydb_flavor="ia64"
-        gtm_install_flavor="IA64" ;;
-    linux_i586)
-        gtm_sf_dirname="GT.M-x86-Linux"
-        gtm_ftp_dirname="linux"
-        ydb_flavor="i586"
-        gtm_install_flavor="x86"
-        gtm_shlib_support="N" ;;
-    linux_i686)
-        gtm_sf_dirname="GT.M-x86-Linux"
-        gtm_ftp_dirname="linux"
-        ydb_flavor="i686"
-        gtm_install_flavor="x86"
-        gtm_shlib_support="N" ;;
-    linux_ia64) # no Source Forge dirname
-        gtm_ftp_dirname="linux_ia64"
-        ydb_flavor="ia64"
-        gtm_install_flavor="IA" ;;
-    linux_s390x) # no Source Forge dirname
-        gtm_ftp_dirname="linux_s390x"
-        ydb_flavor="s390x"
-        gtm_install_flavor="S390X" ;;
     linux_x8664)
         gtm_sf_dirname="GT.M-amd64-Linux"
         gtm_ftp_dirname="linux_x8664"
@@ -331,10 +329,6 @@ case ${gtm_hostos}_${gtm_arch} in
         ydb_flavor="armv6l" ;;
     linux_armv7l)
         ydb_flavor="armv7l" ;;
-    solaris_sparc) # no Source Forge dirname
-        gtm_ftp_dirname="sun"
-        ydb_flavor="sparc"
-        gtm_install_flavor="SPARC" ;;
     *) echo Architecture `uname -o` on `uname -m` not supported by this script ; err_exit ;;
 esac
 
@@ -519,6 +513,11 @@ if [ -z "$ydb_installdir" ] ; then
     else ydb_installdir=/usr/local/lib/fis-gtm/${ydb_version}_${gtm_install_flavor}
     fi
 fi
+# if install directory is relative then need to make it absolute before passing it to configure
+# (or else configure will create a subdirectory under $tmpdir (/tmp/.*) and install YottaDB there which is not what we want)
+if [ `echo $ydb_installdir | grep -c '^/'` -eq 0 ] ; then
+    ydb_installdir=`pwd`/$ydb_installdir
+fi
 if [ -d "$ydb_installdir" -a "Y" != "$gtm_overwrite_existing" ] ; then
     echo $ydb_installdir exists and --overwrite-existing not specified ; err_exit
 fi
@@ -571,7 +570,7 @@ chmod +x configure.sh
 # Stop here if this is a dry run
 if [ "Y" = "$gtm_dryrun" ] ; then echo Installation prepared in $gtm_tmpdir ; exit ; fi
 
-./configure.sh <$gtm_configure_in 1> $gtm_tmpdir/configure_${timestamp}.out 2>$gtm_tmpdir/configure_${timestamp}.err
+sh -x ./configure.sh <$gtm_configure_in 1> $gtm_tmpdir/configure_${timestamp}.out 2>$gtm_tmpdir/configure_${timestamp}.err
 if [ $? -gt 0 ] ; then echo "configure.sh failed. Output follows"; cat $gtm_tmpdir/configure_${timestamp}.out $gtm_tmpdir/configure_${timestamp}.err ; exit 1; fi
 rm -rf $tmpdir	# Now that install is successful, remove temporary directory
 if [ "Y" = "$gtm_gtm" ] ; then

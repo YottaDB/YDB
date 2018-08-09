@@ -165,7 +165,6 @@ mupip mupip
 mupip_cmd mupip
 lke lke
 lke_cmd lke
-geteuid geteuid
 gtm mumps
 gtmsecshr gtmsecshr
 gtmsecshr_wrapper gtmsecshr

@@ -3,6 +3,9 @@
 # Copyright (c) 2001-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
 #	under a license.  If you do not know the terms of	#
@@ -176,7 +179,7 @@ foreach i ( $lintgtm_liblist )
 		# Exclude files that define the same externals (e.g., "main" and the VMS CLI [command line interpreter]
 		# emulator arrays):
 		pwd
-		rm -f gtm.c lke.c lke_cmd.c dse.c dse_cmd.c mupip.c mupip_cmd.c daemon.c gtmsecshr.c geteuid.c semstat2.c ftok.c
+		rm -f gtm.c lke.c lke_cmd.c dse.c dse_cmd.c mupip.c mupip_cmd.c daemon.c gtmsecshr.c semstat2.c ftok.c
 		gt_lint ${gt_lint_option_output}$i $gt_lint_options $gt_lint_options_library *.c >>& llib-l$i.log
 		rm *.c
 		breaksw
@@ -196,9 +199,6 @@ gt_lint $gt_lint_options gtm.c llib-l{mumps,stub}.ln $gt_lint_syslibs \
 # $shell $gtm_tools/lintaux.csh $p1	# for true parallelism, the following commands would be in lingaux.csh
 cp $gtm_src/{dse,dse_cmd}.c .
 gt_lint $gt_lint_options {dse,dse_cmd}.c llib-l{dse,mumps,stub}.ln $gt_lint_syslibs >& lint.dse.log
-
-cp $gtm_src/geteuid.c .
-gt_lint $gt_lint_options geteuid.c llib-lmumps.ln $gt_lint_syslibs >& lint.geteuid.log
 
 cp $gtm_src/gtmsecshr.c .
 gt_lint $gt_lint_options gtmsecshr.c llib-lmumps.ln $gt_lint_syslibs >& lint.gtmsecshr.log
