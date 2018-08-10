@@ -74,14 +74,15 @@ int dlopen_libyottadb(int argc, char **argv, char **envp, char *main_func)
 	/* Get currently running executable */
 	#if defined(__APPLE__)
 	uint32_t size = YDB_PATH_MAX;
-	if (_NSGetExecutablePath(curr_exe_realpath, &size) < 0)
+	char curr_exe_path[YDB_PATH_MAX];
+	if (_NSGetExecutablePath(curr_exe_path, &size) < 0)
 	{
 		FPRINTF(stderr, "%%YDB-E-DISTPATHMAX, Executable path length is greater than maximum (%d)\n", YDB_DIST_PATH_MAX);
 		return ERR_DISTPATHMAX;
 	}
 	else
 	{
-		pathptr = curr_exe_realpath;
+		pathptr = realpath(curr_exe_path,curr_exe_realpath);
 		pathlen = STRLEN(curr_exe_realpath);
 		assert(DIR_SEPARATOR == curr_exe_realpath[0]);
 		assert(pathlen);
@@ -91,8 +92,8 @@ int dlopen_libyottadb(int argc, char **argv, char **envp, char *main_func)
 		assert(tmpptr >= curr_exe_realpath);
 		/* At this point "tmpptr" points to the last '/' */
 		/* At this point "pathptr" points to the pathname. Now check if PATH + "/libyottadb.so" can fit in YDB_PATH_MAX */
-		/*if (YDB_DIST_PATH_MAX < ((tmpptr - curr_exe_realpath) + STR_LIT_LEN(DIR_SEPARATOR) + STR_LIT_LEN(YOTTADB_IMAGE_NAME) + 1)) */
-			/*curr_exe_realpath = NULL;	/* so we issue a DISTPATHMAX error below */
+		if (YDB_DIST_PATH_MAX < ((tmpptr - curr_exe_realpath) + STR_LIT_LEN(DIR_SEPARATOR) + STR_LIT_LEN(YOTTADB_IMAGE_NAME) + 1))
+			pathptr = NULL; /* so we issue a DISTPATHMAX error below */
 	}
 	#elif defined(__linux__)
 	pathptr = realpath(PROCSELF, curr_exe_realpath);
