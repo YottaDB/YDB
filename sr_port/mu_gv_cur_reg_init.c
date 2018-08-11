@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,6 +24,8 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "mu_gv_cur_reg_init.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gd_region	*ftok_sem_reg;
@@ -45,9 +50,10 @@ void mu_gv_cur_reg_init(void)
 
 void mu_gv_cur_reg_free(void)
 {
-	gd_addr		*gdhdr;
-	gd_region	*basedb_reg, *statsdb_reg;
-	gd_segment	*basedb_seg, *statsdb_seg;
+	gd_addr			*gdhdr;
+	gd_region		*basedb_reg, *statsdb_reg;
+	gd_segment		*basedb_seg, *statsdb_seg;
+	jnlpool_addrs_ptr_t	tmp_jnlpool;
 
 	basedb_reg = gv_cur_region;
 	gdhdr = basedb_reg->owning_gd;
@@ -80,5 +86,9 @@ void mu_gv_cur_reg_free(void)
 		free(gdhdr->tab_ptr);
 		gdhdr->tab_ptr = NULL;
 	}
+	tmp_jnlpool = gdhdr->gd_runtime->jnlpool;
+	/* If gld that is about to be freed has a pointer to a jnlpool and that back points to this gld, clear the back-pointer */
+	if ((NULL != tmp_jnlpool) && (gdhdr == tmp_jnlpool->gd_ptr))
+		tmp_jnlpool->gd_ptr = NULL;
 	free(gdhdr);
 }

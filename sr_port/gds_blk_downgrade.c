@@ -56,7 +56,8 @@ void gds_blk_downgrade(v15_blk_hdr_ptr_t gds_blk_trg, blk_hdr_ptr_t gds_blk_src)
 		 */
 		assert(0 == bsiz);
 		assert(ydb_white_box_test_case_enabled
-			&& (WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number));
+			&& ((WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number)
+				|| (WBTEST_MURUNDOWN_KILLCMT06 == ydb_white_box_test_case_number)));
 		return;
 	}
 	assert(GDSVCURR == gds_blk_src->bver);

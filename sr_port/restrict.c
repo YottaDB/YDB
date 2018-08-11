@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 Fidelity National Information		*
+ * Copyright (c) 2017-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -27,6 +27,8 @@
 #include "gtm_permissions.h"
 #include "send_msg.h"
 #include "restrict.h"
+#include "gtm_file_remove.h"
+#include "gtm_time.h"
 
 #define RESTRICT_FILENAME		"restrict.txt"
 #define RESTRICT_BREAK			"BREAK"
@@ -41,13 +43,15 @@
 #define RESTRICT_ZCMDLINE		"ZCMDLINE"
 #define RESTRICT_HALT			"HALT"
 #define RESTRICT_ZHALT			"ZHALT"
+#define ZSYSTEM_FILTER			"ZSYSTEM_FILTER"
+#define PIPE_FILTER			"PIPE_FILTER"
 #define MAX_READ_SZ			1024	/* Restrict Mnemonic shouldn't exceed this limit */
 #define MAX_FACILITY_LEN		64
 #define MAX_GROUP_LEN			64
 #define STRINGIFY(S)			#S
 #define BOUNDED_FMT(LIMIT,TYPE)		"%" STRINGIFY(LIMIT) TYPE
 #define FACILITY_FMTSTR			BOUNDED_FMT(MAX_FACILITY_LEN, "[A-Za-z0-9_]")
-#define GROUP_FMTSTR			BOUNDED_FMT(MAX_GROUP_LEN, "[A-Za-z0-9_]")
+#define GROUP_FMTSTR			BOUNDED_FMT(MAX_GROUP_LEN, "[A-Za-z0-9_^%]")
 
 GBLDEF	struct restrict_facilities	restrictions;
 GBLDEF	boolean_t			restrict_initialized;
@@ -57,22 +61,90 @@ GBLREF	boolean_t			ydb_dist_ok_to_use;
 #endif
 GBLREF	char				ydb_dist[YDB_PATH_MAX];
 
+STATICFNDCL void append_filter(char *, FILE *, char *, char *, int *, char *);
+
 error_def(ERR_RESTRICTSYNTAX);
 error_def(ERR_TEXT);
 
+#define	PUT_FLNAME_IN_MAPPING_FILE(RPATH, FPATH, FP, C_CALL_NAME, M_REF_NAME, STAT_RM,					\
+						CREATED_NOW, CREATED_NOW_INITIALIZED, SAVE_ERRNO, ERR_STR)		\
+{															\
+	if (CREATED_NOW_INITIALIZED)											\
+	{														\
+		/* Note: "CREATED_NOW" is initialized/usable only if "CREATED_NOW_INITIALIZED" is TRUE */		\
+		if (CREATED_NOW)											\
+		{	/* We created this file in a prior invocation of PUT_FLNAME_IN_MAPPING_FILE			\
+			 * so append all future macro invocations into the same file.					\
+			 */												\
+			append_filter(FPATH, FP, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);				\
+		}													\
+		/* else : We have already determined restrict.txt and filter_commands.tab are in sync time wise.	\
+		 *        No need to do any more file modification checks.						\
+		 */													\
+	} else if (ACCESS(FPATH, F_OK))											\
+	{	/* File does not exist, create and write mapping */							\
+		CREATED_NOW = TRUE;											\
+		CREATED_NOW_INITIALIZED = TRUE;										\
+		append_filter(FPATH, FP, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);					\
+	} else														\
+	{	/* Filter file exists. Check modified time */								\
+		Stat(RPATH, &rTime);											\
+		rmtime = rTime.st_mtim;											\
+		Stat(FPATH, &fTime);											\
+		fmtime = fTime.st_mtim;											\
+		/* Check if restrict.txt file modification time (rmtime) is newer than					\
+		 * filter_commands.tab file modification time (fmtime). If so, recreate filter_commands.tab.		\
+		 */													\
+		if ((rmtime.tv_sec > fmtime.tv_sec)									\
+			|| ((rmtime.tv_sec == fmtime.tv_sec) && (rmtime.tv_nsec >= fmtime.tv_nsec)))			\
+		{	/* Delete the older mapping file and recreate new if required */				\
+			CREATED_NOW = TRUE;										\
+			gtm_file_remove(FPATH, strlen(FPATH), &STAT_RM);						\
+			append_filter(FPATH, FP, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);				\
+		} else													\
+			CREATED_NOW = FALSE;										\
+		CREATED_NOW_INITIALIZED = TRUE;										\
+	}														\
+}
+
+void append_filter(char * fpath, FILE * fp, char * c_call_name, char * m_ref_name, int * save_errno, char * errstr)
+{
+	Fopen(fp, fpath, "a+");
+	if (NULL != fp)
+	{
+		fprintf(fp, "%s : gtm_long_t* %s(I:gtm_char_t*, O:gtm_string_t*)\n",
+							c_call_name, m_ref_name);
+		fclose(fp);
+	}
+	else
+	{
+		*save_errno = errno;
+		SNPRINTF(errstr, SIZEOF(errstr), "fopen() : %s", COMM_FILTER_FILENAME);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+                                         LEN_AND_STR(errstr), CALLFROM, save_errno);
+	}
+}
+
 void restrict_init(void)
 {
-	char		rfpath[YDB_PATH_MAX], linebuf[MAX_READ_SZ+1], *lbp, facility[MAX_FACILITY_LEN+1], group[MAX_GROUP_LEN+1];
+	char		rfpath[YDB_PATH_MAX], rcfpath[YDB_PATH_MAX];
+	char		linebuf[MAX_READ_SZ+1], *lbp, facility[MAX_FACILITY_LEN+1], group_or_flname[MAX_GROUP_LEN+1];
+	char		errstr[MAX_FN_LEN + 1];
 	int		save_errno, fields, status, lineno;
-	FILE		*rfp;
+	uint4		statrm;
+	FILE		*rfp, *rcfp;
 	boolean_t	restrict_one, restrict_all = FALSE;
 	struct group	grp, *grpres;
 	char		*grpbuf = NULL;
 	size_t		grpbufsz;
+	boolean_t	created_now, created_now_initialized = FALSE;
+	struct stat 	rTime, fTime;
+	struct timespec	rmtime, fmtime;
 
 	assert(!restrict_initialized);
 	assert(ydb_dist_ok_to_use);
 	SNPRINTF(rfpath, YDB_PATH_MAX, "%s/%s", ydb_dist, RESTRICT_FILENAME);
+	SNPRINTF(rcfpath, YDB_PATH_MAX, "%s/%s", ydb_dist, COMM_FILTER_FILENAME);
 	if (-1 == ACCESS(rfpath, W_OK))
 	{	/* Write access implies no restrictions. Otherwise try reading the file for facilities to restrict. */
 		save_errno = errno;
@@ -97,7 +169,8 @@ void restrict_init(void)
 					if (NULL != lbp)
 					{
 						lineno++;
-						fields = SSCANF(linebuf, FACILITY_FMTSTR " : " GROUP_FMTSTR, facility, group);
+						fields = SSCANF(linebuf, FACILITY_FMTSTR " : " GROUP_FMTSTR,
+											facility, group_or_flname);
 						if (0 == fields)
 							continue;	/* Ignore blank lines */
 						else if (1 == fields)
@@ -110,7 +183,25 @@ void restrict_init(void)
 								grpbuf = malloc(grpbufsz);
 							}
 							assert(NULL != grpbuf);
-							status = getgrnam_r(group, &grp, grpbuf, grpbufsz, &grpres);
+							if (0 == STRNCASECMP(facility, ZSYSTEM_FILTER, SIZEOF(ZSYSTEM_FILTER)))
+							{
+								restrictions.zsy_filter = TRUE;
+								PUT_FLNAME_IN_MAPPING_FILE(rfpath, rcfpath, rcfp,
+									ZSY_C_CALL_NAME, group_or_flname, statrm,
+									created_now, created_now_initialized,
+									&save_errno, errstr);
+								continue;
+							}
+							if (0 == STRNCASECMP(facility, PIPE_FILTER, SIZEOF(PIPE_FILTER)))
+							{
+								restrictions.pipe_filter = TRUE;
+								PUT_FLNAME_IN_MAPPING_FILE(rfpath, rcfpath, rcfp,
+									PIPE_C_CALL_NAME, group_or_flname, statrm,
+									created_now, created_now_initialized,
+									&save_errno, errstr);
+								continue;
+							}
+							status = getgrnam_r(group_or_flname, &grp, grpbuf, grpbufsz, &grpres);
 							if (0 == status)
 							{
 								if (NULL == grpres)

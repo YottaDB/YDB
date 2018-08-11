@@ -88,7 +88,7 @@ MBSTART {														\
 	int		fn_len;												\
 	char		*fn;												\
 	boolean_t	do_crypt_init;											\
-	boolean_t	shoulda_crypt_init;											\
+	boolean_t	shoulda_crypt_init;										\
 	DEBUG_ONLY(boolean_t	was_gtmcrypt_initialized = gtmcrypt_initialized);					\
 															\
 	do_crypt_init = ((USES_ENCRYPTION(CSD->is_encrypted)) && !IS_LKE_IMAGE && CSA->encr_ptr				\
@@ -317,13 +317,12 @@ CONDITION_HANDLER(gvcst_init_autoDB_ch)
 	NEXTCH;
 }
 
-void gvcst_init(gd_region *reg, gd_addr *addr)
+void gvcst_init(gd_region *reg)
 {
 	gd_segment		*seg;
 	sgmnt_addrs		*baseDBcsa, *csa, *prevcsa, *regcsa;
 	sgmnt_data_ptr_t	csd;
 	sgmnt_data		statsDBcsd;
-	jnlpool_addrs_ptr_t	save_jnlpool;
 	uint4			segment_update_array_size;
 	int4			bsize, padsize;
 	boolean_t		is_statsDB, realloc_alt_buff, retry_dbinit;
@@ -338,7 +337,6 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	mstr			log_nam, trans_log_nam;
 	char			trans_buff[MAX_FN_LEN + 1], statsdb_path[MAX_FN_LEN + 1], *errrsn_text;
 	unique_file_id		*reg_fid, *tmp_reg_fid;
-	gd_id			replfile_gdid, *tmp_gdid;
 	tp_region		*tr;
 	ua_list			*tmp_ua;
 	time_t			curr_time;
@@ -346,13 +344,10 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	unsigned int            minus1 = (unsigned)-1;
 	enum db_acc_method	reg_acc_meth;
 	boolean_t		onln_rlbk_cycle_mismatch = FALSE;
-	boolean_t		replpool_valid = FALSE, replfilegdid_valid = FALSE, jnlpool_found = FALSE;
 	intrpt_state_t		save_intrpt_ok_state;
-	replpool_identifier	replpool_id;
-	unsigned int		full_len;
+	replpool_identifier	replpool_id;	/* needed by REPL_INST_AVAILABLE */
+	unsigned int		full_len;	/* needed by REPL_INST_AVAILABLE */
 	int4			db_init_retry;
-	srch_blk_status		*bh;
-	mstr			*gld_str;
 	node_local_ptr_t	baseDBnl;
 	unsigned char		cstatus;
 	statsdb_recreate_errors	statsdb_rcerr;
@@ -360,6 +355,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	intrpt_state_t		prev_intrpt_state;
 	key_t			ftok_key;
 	int			ftok_semid;
+	gd_addr			*owning_gd;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -375,7 +371,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		if (!baseDBreg->open)
 		{
 			DBGRDB((stderr, "gvcst_init: !baseDBreg->open (NOT open)\n"));
-			gvcst_init(baseDBreg, addr);
+			gvcst_init(baseDBreg);
 			assert(baseDBreg->open);
 			if (reg->open)	/* statsDB was opened as part of opening baseDB. No need to do anything more here */
 			{
@@ -383,7 +379,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 				return;
 			}
 			/* At this point, the baseDB is open but the statsDB is not automatically opened. This is possible if
-			 *	a) TREF(statshare_opted_in) is NO. In that case, this call to "gvcst_init" is coming through
+			 *	a) TREF(statshare_opted_in) is not ALL. In that case, this call to "gvcst_init" is coming through
 			 *		a direct reference to the statsDB (e.g. ZWR ^%YGS). OR
 			 *	b) baseDBreg->was_open is TRUE. In that case, the statsDB open would have been short-circuited
 			 *		in "gvcst_init".
@@ -393,16 +389,16 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			 *		would silently adjust gld map entries so they do not point to this statsDB anymore
 			 *		(NOSTATS should already be set in the baseDB in this case, assert that).
 			 */
-			if ((NO_STATS_OPTIN != TREF(statshare_opted_in)) && !baseDBreg->was_open)
+			if ((ALL_STATS_OPTIN == TREF(statshare_opted_in)) && !baseDBreg->was_open)
 			{
 				assert(RDBF_NOSTATS & baseDBreg->reservedDBFlags);
 				return;
 			}
 		} else if (RDBF_NOSTATS & baseDBreg->reservedDBFlags)
 		{	/* The baseDB was already open and the statsDB was NOT open. This could be because of either the baseDB
-			 * has NOSTATS set in it or it could be that NOSTATS was set when we attempted before to open the statsDB
-			 * but failed for whatever reason (privs, noexistant directory, space, etc). In either case, return
-			 * right away (for same reason as described before the "if" block above).
+			 * has NOSTATS set in it or it could be that ALL_STATS_OPTIN wasn't in place when we attempted before to
+			 * open the statsDB but failed for whatever reason (privs, noexistant directory, space, etc). In either
+			 * return right away (for same reason as described before the "if" block above).
 			 */
 			return;
 		}
@@ -830,6 +826,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	assert(268 == OFFSETOF(node_local, now_running[0]));
  	assert(36 == SIZEOF(((node_local *)NULL)->now_running));
 	assert(36 == MAX_REL_NAME);
+	owning_gd = reg->owning_gd;
 	for (loopcnt = 0; loopcnt < MAX_DBFILOPN_RETRY_CNT; loopcnt++)
 	{
 		prev_reg = dbfilopn(reg);
@@ -865,7 +862,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 			 */
 			if (csd->read_only)
 				reg->read_only = TRUE;
-			assert(csa->reservedDBFlags == csd->reservedDBFlags);	/* Should be same already */
+			assert((RDBF_NOSTATS & csd->reservedDBFlags) ? (csa->reservedDBFlags == csd->reservedDBFlags)
+				: ((~RDBF_NOSTATS & csa->reservedDBFlags) == csd->reservedDBFlags));	/* suitably aligned*/
 			SYNC_RESERVEDDBFLAGS_REG_CSA_CSD(reg, csa, csd, ((node_local_ptr_t)NULL));
 			SET_REGION_OPEN_TRUE(reg, WAS_OPEN_TRUE);
 			assert(1 <= csa->regcnt);
@@ -906,18 +904,18 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		csa->regcnt = 1;	/* At this point, only one region points to this csa */
 		csa->db_addrs[0] = csa->db_addrs[1] = NULL;
 		csa->lock_addrs[0] = csa->lock_addrs[1] = NULL;
-		csa->gd_ptr = addr ? addr : gd_header;
+		csa->gd_ptr = owning_gd;
 		if (csa->gd_ptr)
 			csa->gd_instinfo = csa->gd_ptr->instinfo;
-		if ((IS_GTM_IMAGE || !pool_init) && jnlpool_init_needed && CUSTOM_ERRORS_AVAILABLE && REPL_ALLOWED(csa)
-				&& REPL_INST_AVAILABLE(addr))
+		/* Note: REPL_ALLOWED(csa) is usable below since "dbfilopn" has special code set csa->repl_state
+		 * in case CUSTOM_ERRORS_AVAILABLE && jnlpool_init_needed
+		 */
+		if (CUSTOM_ERRORS_AVAILABLE && jnlpool_init_needed && REPL_ALLOWED(csa)
+			&& (NULL == owning_gd->gd_runtime->jnlpool)
+			&& REPL_INST_AVAILABLE(owning_gd))	/* replpool_id.instfilename set by REPL_INST_AVAILABLE */
 		{
-			replpool_valid = TRUE;
-			jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL, addr);
-			status = filename_to_id(&replfile_gdid, replpool_id.instfilename);	/* set by REPL_INST_AVAILABLE */
-			replfilegdid_valid = (SS_NORMAL == status);
-		} else
-			replpool_valid = replfilegdid_valid = FALSE;
+			jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL, owning_gd);
+		}
 		/* Any LSEEKWRITEs hence forth will wait if the instance is frozen. To aid in printing the region information before
 		 * and after the wait, csa->region is referenced. Since it is NULL at this point, set it to reg. This is a safe
 		 * thing to do since csa->region is anyways set in db_common_init (few lines below).
@@ -1256,7 +1254,10 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		DBG_CHECK_TP_REG_LIST_SORTING(tp_reg_list);
 		TREF(max_fid_index) = max_fid_index;
 	}
-	if (pool_init && REPL_ALLOWED(csd) && jnlpool_init_needed)
+	/* Validate jnlpool (if attached) against currently opened replicated database.
+	 * Do this only for utilities. For mumps, this will be done at the time of database update (SET/KILL etc.).
+	 */
+	if (!IS_GTM_IMAGE && pool_init && REPL_ALLOWED(csd) && jnlpool_init_needed)
 	{
 		/* Last parameter to VALIDATE_INITIALIZED_JNLPOOL is TRUE if the process does logical updates and FALSE otherwise.
 		 * This parameter governs whether the macro can do SCNDDBNOUPD check or not. All the utilities that sets
@@ -1268,51 +1269,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		 * SCNDDBNOUPD error message here. But, eventually when this process goes to gvcst_{put,kill} or op_ztrigger,
 		 * SCNDDBNOUPD is issued.
 		 */
-		save_jnlpool = jnlpool;
-		if (IS_GTM_IMAGE)
-		{	/* csa->jnlpool not set until validate jnlpool so need to compare gd_id of instance file */
-			if (!replfilegdid_valid)
-			{
-				assertpro(replpool_valid || REPL_INST_AVAILABLE(addr));	/* if any pool inited this should succeed */
-				status = filename_to_id(&replfile_gdid, replpool_id.instfilename);
-				replfilegdid_valid = (SS_NORMAL == status);
-			}
-			if (replfilegdid_valid)
-			{
-				if (jnlpool && jnlpool->pool_init)
-				{
-					tmp_gdid = &FILE_ID(jnlpool->jnlpool_dummy_reg);
-					if (!gdid_cmp(tmp_gdid, &replfile_gdid))
-						jnlpool_found = TRUE;
-				}
-				if (!jnlpool_found)
-					for (jnlpool = jnlpool_head; jnlpool; jnlpool = jnlpool->next)
-						if (jnlpool->pool_init)
-						{
-							tmp_gdid = &FILE_ID(jnlpool->jnlpool_dummy_reg);
-							if (!gdid_cmp(tmp_gdid, &replfile_gdid))
-							{
-								jnlpool_found = TRUE;
-								break;
-							}
-						}
-				if (!jnlpool_found)
-				{
-					jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL, addr);
-					tmp_gdid = &FILE_ID(jnlpool->jnlpool_dummy_reg);
-					if (!gdid_cmp(tmp_gdid, &replfile_gdid))
-						jnlpool_found = TRUE;
-				}
-			}
-		} else
-		{
-			assertpro(jnlpool);	/* only one for utilities */
-			jnlpool_found = TRUE;
-		}
-		if (jnlpool_found)
-			VALIDATE_INITIALIZED_JNLPOOL(csa, csa->nl, reg, GTMRELAXED, SCNDDBNOUPD_CHECK_FALSE);
-		if (save_jnlpool != jnlpool)
-			jnlpool = save_jnlpool;
+		assertpro(jnlpool);	/* only one for utilities */
+		VALIDATE_INITIALIZED_JNLPOOL(csa, csa->nl, reg, GTMRELAXED, SCNDDBNOUPD_CHECK_FALSE);
 	}
 	/* At this point, the database is officially open but one of two condition can exist here where we need to do more work:
 	 *   1. This was a normal database open and this process has opted-in for global shared stats so we need to also open
@@ -1329,8 +1287,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		if (NO_STATS_OPTIN != TREF(statshare_opted_in))
 		{
 			if (!is_statsDB)
-			{	/* This is a baseDB - so long as NOSTATS is *not* turned on, we should initialize the statsDB */
-				if (!(RDBF_NOSTATS & reg->reservedDBFlags))
+			{	/* This is a baseDB - if all-in, we should initialize the statsDB */
+				if (!(RDBF_NOSTATS & reg->reservedDBFlags) && (ALL_STATS_OPTIN == TREF(statshare_opted_in)))
 				{
 					BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
 					assert(NULL != statsDBreg);
@@ -1342,7 +1300,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 						statsDBreg->statsDB_setup_started = TRUE;
 						gvcst_init_statsDB(reg, DO_STATSDB_INIT_TRUE);
 					}
-				}
+				} else
+					csa->reservedDBFlags |= RDBF_NOSTATS;
 			}
 		} else if (is_statsDB)
 		{	/* We are opening a statsDB file but not as a statsDB (i.e. not opted-in) but we still need to set the

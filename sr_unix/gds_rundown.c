@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -785,7 +785,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			db_ipcs.fn[seg->fname_len] = 0;
 			/* request gtmsecshr to flush. read_only cannot flush itself */
 			WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
-			if (!csa->read_only_fs)
+			if (!csa->read_only_fs && !csd->read_only)
 			{
 				secshrstat = send_mesg2gtmsecshr(FLUSH_DB_IPCS_INFO, 0, (char *)NULL, 0);
 				if (0 != secshrstat)
@@ -824,7 +824,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	 * cleaned up as part of the "aio_shim_destroy" done in "gds_rundown" of the basedb but that will happen only after
 	 * the statsdb rundown completes. So account for that in the below assert.
 	 */
-	assert((NULL == udi->owning_gd->thread_gdi) || is_statsDB);
+	assert((NULL == udi->owning_gd->gd_runtime->thread_gdi) || is_statsDB);
 	udi->owning_gd = NULL;
 	/* Done with file now, close it */
 	CLOSEFILE_RESET(udi->fd, rc);	/* resets "udi->fd" to FD_INVALID and does flock(LOCK_UN) if needed */

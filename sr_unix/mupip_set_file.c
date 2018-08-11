@@ -53,7 +53,7 @@
 #include "mupip_exit.h"
 #include "ipcrmid.h"
 #include "mu_gv_cur_reg_init.h"
-#include "gvcst_protos.h"	/* for gvcst_init prototype */
+#include "gvcst_protos.h"	/* for "gvcst_init" prototype */
 #include "timers.h"
 #include "db_ipcs_reset.h"
 #include "wcs_flu.h"
@@ -178,7 +178,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		need_standalone = TRUE;
 		if (CLI_PRESENT == encryptable_status)
 		{	/* When turning on encryption, validate the encryption setup */
-			INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+			INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 			if (0 != gtmcrypt_errno)
 			{
 				CLEAR_CRYPTERR_MASK(gtmcrypt_errno);
@@ -742,7 +742,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				 * as appropriate.
 				 */
 			}
-			gvcst_init(gv_cur_region, NULL);
+			gvcst_init(gv_cur_region);
 			change_reg();	/* sets cs_addrs and cs_data */
 			if (gv_cur_region->read_only)
 			{

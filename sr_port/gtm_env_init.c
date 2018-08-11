@@ -117,9 +117,7 @@ void	gtm_env_init(void)
 			ydbDebugLevel |= tdbglvl;
 			ydbSystemMalloc = (GDL_UseSystemMalloc & ydbDebugLevel);
 			if (ydbSystemMalloc)
-				ydbDebugLevel &= !(GDL_SmStats | GDL_SmTrace | GDL_SmDumpTrace | GDL_SmAllocVerf | GDL_SmFreeVerf
-							| GDL_SmBackfill | GDL_SmChkAllocBackfill | GDL_SmChkFreeBackfill
-							| GDL_SmStorHog | GDL_SmDump );
+				ydbDebugLevel &= !GDL_SmAllMallocDebug;
 		}
 		/* See if ydb_msgprefix is specified. If so store it in TREF(ydbmsgprefix).
 		 * Note: Default value is already stored in "gtm_threadgbl_init".

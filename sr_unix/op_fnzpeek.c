@@ -412,7 +412,7 @@ CONDITION_HANDLER(op_fnzpeek_getpool_ch)
 STATICFNDEF boolean_t op_fnzpeek_attach_jnlpool(void)
 {
 	ESTABLISH_RET(op_fnzpeek_getpool_ch, FALSE);
-	jnlpool_init(GTMRELAXED, FALSE, NULL, NULL);		/* Attach to journal pool */
+	jnlpool_init(GTMRELAXED, FALSE, NULL, gd_header);		/* Attach to journal pool */
 	REVERT;
 	return pool_init;
 }
@@ -552,7 +552,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			 */
 			if ((PO_GDRREG != mnemonic_opcode) && !r_ptr->open)
 			{
-				gv_init_reg(r_ptr, NULL);
+				gv_init_reg(r_ptr);
 				if (!r_ptr->open)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
 						      RTS_ERROR_LITERAL("mnemonic argument (region name could not be opened)"));
@@ -611,7 +611,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_NLREPL:
 		case PO_RIHREPL:
 			/* Make sure jnlpool_addrs are availble */
-			if (!REPL_INST_AVAILABLE(NULL))
+			if (!REPL_INST_AVAILABLE(gd_header))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
 			if (!pool_init)
 			{
@@ -645,7 +645,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_UPLREPL:
 		case PO_UHCREPL:
 			/* Make sure recvpool_addrs are available */
-			if (!REPL_INST_AVAILABLE(NULL))
+			if (!REPL_INST_AVAILABLE(gd_header))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZPEEKNORPLINFO);
 			if (NULL == recvpool.recvpool_ctl)
 			{

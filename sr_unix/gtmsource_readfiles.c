@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -1918,6 +1918,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 	}
 	assert(!*brkn_trans || (ydb_white_box_test_case_enabled &&
 				((WBTEST_REPLBRKNTRANS == ydb_white_box_test_case_number)
+					|| (WBTEST_MURUNDOWN_KILLCMT06 == ydb_white_box_test_case_number)
 					|| (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number))));
 	return (cumul_read);
 }

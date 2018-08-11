@@ -66,6 +66,7 @@
 #ifdef DEBUG
 #include "caller_id.h"
 #endif
+#include "gtmci.h"
 
 GBLDEF	int4			n_pvtmods, n_blkmods;
 
@@ -117,6 +118,8 @@ error_def(ERR_TPRESTART);
 error_def(ERR_TPRETRY);
 error_def(ERR_TRESTLOC);
 error_def(ERR_TRESTNOT);
+
+void gtm_levl_ret_code(void);
 
 CONDITION_HANDLER(tp_restart_ch)
 {
@@ -233,11 +236,11 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			|| (0 == ((TREF(tp_restart_count) - TREF(tprestart_syslog_first)) % TREF(tprestart_syslog_delta)))))
 		{
 			gvt = TAREF1(tp_fail_hist, t_tries);
-			if (NULL == gvt)
+			if ((NULL == gvt) || (NULL == gvt->gd_csa))
 			{
 				gvname_mstr.addr = (char *)gvname_unknown;
 				gvname_mstr.len = gvname_unknown_len;
-			} else if ((NULL != gvt->gd_csa) && (gvt->gd_csa->dir_tree == gvt))
+			} else if (gvt->gd_csa->dir_tree == gvt)
 			{
 				gvname_mstr.addr = (char *)gvname_dirtree;
 				gvname_mstr.len = gvname_dirtree_len;
@@ -266,11 +269,18 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				gvname_mstr = gvt->gvname.var_name;
 			} else
 			{
-				if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
-					end = &buff[MAX_ZWR_KEY_SZ - 1];
-				assert(buff[0] == '^');
-				gvname_mstr.addr = (char*)(buff + 1);
-				gvname_mstr.len = end - buff - 1;
+				if (0 == gvt->clue.end)
+				{	/* the clue has been invalidated - just use the unsubscripted name */
+					gvname_mstr.addr = gvt->gvname.var_name.addr;
+					gvname_mstr.len = gvt->gvname.var_name.len;
+				} else
+				{
+					if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, &gvt->clue, TRUE)))
+						end = &buff[MAX_ZWR_KEY_SZ - 1];
+					assert(buff[0] == '^');
+					gvname_mstr.addr = (char*)(buff + 1);
+					gvname_mstr.len = end - buff - 1;
+				}
 			}
 			caller_id_flag = FALSE;		/* don't want caller_id in the operator log */
 			assert(0 == cdb_sc_normal);
@@ -381,7 +391,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				assert(IS_FINAL_RETRY_CODE(status));
 				assert(CDB_STAGNATE == t_tries);
 				for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
-				{	/* regions might not have been opened if we t_retried in gvcst_init(). dont
+				{	/* regions might not have been opened if we t_retried in "gvcst_init". dont
 					 * rel_crit in that case.
 					 */
 					reg = tr->reg;
@@ -561,13 +571,13 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			if (num_closed)
 			{
 				for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
-				{	/* to open region use gv_init_reg() instead of gvcst_init() since that does extra
+				{	/* to open region use gv_init_reg() instead of "gvcst_init" since that does extra
 					 * manipulations with gv_keysize, gv_currkey and gv_altkey.
 					 */
 					reg = tr->reg;
 					if (!reg->open)
 					{
-						gv_init_reg(reg, NULL);
+						gv_init_reg(reg);
 						assert(reg->open);
 					}
 				}
@@ -739,6 +749,19 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			mumps_status = ERR_TPRETRY;
 			tprestart_state = TPRESTART_STATE_MSTKUNW;
 			MUM_TSTART;
+		}
+		if (frame_pointer->type & SFT_CI) /*Call-ins first level frame from filters,and we have to still unwind*/
+		{
+			TREF(comm_filter_init) = FALSE;	/* Exiting from filter */
+			op_unwind();			/* Unwind till the base level of CI */
+			/* Below will return back to gtm_ci_exec, via the base frame.
+			 * Since the base frame would be unwound it is ok to do so.
+			 */
+			frame_pointer->mpc = CODE_ADDRESS(gtm_levl_ret_code);
+                	frame_pointer->ctxt = GTM_CONTEXT(gtm_levl_ret_code);
+			mumps_status = ERR_TPRETRY;
+                        tprestart_state = TPRESTART_STATE_MSTKUNW;
+			MUM_TSTART; /* Trigger the base CI frame */
 		}
 		op_unwind();
 	}

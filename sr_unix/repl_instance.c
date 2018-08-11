@@ -112,14 +112,13 @@ struct gd_addr_struct *repl_inst_get_name(char *fn, unsigned int *fn_len, unsign
 {
 	char		temp_inst_fn[MAX_FN_LEN + 1];
 	mstr		log_nam, trans_name;
-	gd_addr		*gd_local;
 	uint4		ustatus;
 	int4		status;
 	boolean_t	ret, inst_from_gld;
 
 	/* check global directory first */
-	gd_local = (NULL == gd_ptr) ? gd_header : (gd_addr *)gd_ptr;
-	SETUP_INST_INFO(gd_local, log_nam, inst_from_gld);	/* set log_nam from gld or environment variable */
+	assert((NULL != gd_ptr) || (NULL == gd_header));	/* Caller should have ensured they use "gd_header" */
+	SETUP_INST_INFO(gd_ptr, log_nam, inst_from_gld);	/* set log_nam from gld or environment variable */
 	trans_name.addr = temp_inst_fn;
 	trans_name.len = 0;
 	ret = FALSE;
@@ -155,12 +154,12 @@ struct gd_addr_struct *repl_inst_get_name(char *fn, unsigned int *fn_len, unsign
 	{	/* save information from first instance for syslog */
 		memcpy(repl_instfilename, fn, *fn_len + 1);	/* include null from get_full_path */
 		if (inst_from_gld)
-			repl_inst_from_gld = gd_local;		/* got from global directory */
+			repl_inst_from_gld = gd_ptr;		/* got from global directory */
 	}
 	if (FALSE == ret)
 		return NULL;
 	else if (inst_from_gld)
-		return gd_local;
+		return gd_ptr;
 	else
 		return INST_NOT_GLD;
 }

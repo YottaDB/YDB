@@ -93,7 +93,9 @@ void unary_tail(oprtype *opr)
 				}
 				assert(OC_LIT == c);
 				t = ta;
+				assert(MLIT_REF == t1->operand[0].oprclass);
 				v = &t1->operand[0].oprval.mlit->v;
+				MV_FORCE_NUMD(v);
 				if (OC_NOOP != pending_coerce && OC_COMVAL != pending_coerce)
 				{	/* add back a coercion if we need it;
 					 * a COMVAL preceding a LIT is unneeded (and will cause an error).
@@ -112,7 +114,7 @@ void unary_tail(oprtype *opr)
 				}
 				if (com)
 				{	/* any complement reduces the literal value to [unsigned] 1 or 0 */
-					PUT_LITERAL_TRUTH((!(1 & com) ? (0 != v->m[1]) : (0 == v->m[1])), t);
+					PUT_LITERAL_TRUTH((!(1 & com) ? MV_FORCE_BOOL(v) : !MV_FORCE_BOOL(v)), t);
 					v = &t->operand[0].oprval.mlit->v;
 					if (neg)
 						unuse_literal(v);	/* need to negate the literal just added above */

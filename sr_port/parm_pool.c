@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2015 Fidelity National Information 	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -115,8 +115,6 @@ STATICFNDEF void parm_pool_init(unsigned int init_capacity)
 	(TREF(parm_pool_ptr))->start_idx = 0;
 	(*(TREF(parm_pool_ptr))->parms).mask_and_cnt.actualcnt = SAFE_TO_OVWRT;
 }
-
-
 
 /* Expand the allocation for the parameter pool. */
 STATICFNDEF void parm_pool_expand(int slots_needed, int slots_copied)

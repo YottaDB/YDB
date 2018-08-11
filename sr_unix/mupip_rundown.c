@@ -71,6 +71,7 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	boolean_t		holds_sem[NUM_SEM_SETS][NUM_SRC_SEMS];
 GBLREF	boolean_t		argumentless_rundown;
 GBLREF	semid_queue_elem	*keep_semids;
+GBLREF	gd_addr			*gd_header;
 
 error_def(ERR_MUFILRNDWNSUC);
 error_def(ERR_MUJPOOLRNDWNFL);
@@ -133,7 +134,7 @@ void mupip_rundown(void)
 	{
 		mu_gv_cur_reg_init();
 		seg = gv_cur_region->dyn.addr;
-		seg->fname_len = SIZEOF(seg->fname);
+		seg->fname_len = MAX_FN_LEN;
 		if (!cli_get_str("WHAT",  (char *)&seg->fname[0], &seg->fname_len))
 			mupip_exit(ERR_MUNODBNAME);
 		seg->fname[seg->fname_len] = '\0';
@@ -148,7 +149,7 @@ void mupip_rundown(void)
 		if ((jnlpool_rndwn_required = (region && mu_star_specified)) || anticipatory_freeze_available) /* note:assigmnent */
 		{
 			/* sets replpool_id/full_len; note: assignment */
-			if (DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE(NULL))
+			if (DEBUG_ONLY(repl_inst_available = )REPL_INST_AVAILABLE(gd_header))
 			{
 				instfilename = &replpool_id.instfilename[0];
 				if (!mu_rndwn_repl_instance(&replpool_id, !anticipatory_freeze_available, TRUE,

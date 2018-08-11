@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -334,6 +334,7 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	 * resetting cnl->wcs_phase2_commit_pidcnt. But, ONLINE ROLLBACK called in a crash situation is done only with
 	 * whitebox test cases. So, assert accordingly.
 	 */
-	assert(cnl->wc_blocked || (WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number));
+	assert(cnl->wc_blocked || WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06)
+			|| WBTEST_ENABLED(WBTEST_DB_WRITE_HANG) || WBTEST_ENABLED(WBTEST_EXPECT_IO_HANG));
 	return FALSE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -123,7 +123,9 @@ MBSTART {														\
 				GET_C_STACK_MULTIPLE_PIDS("WRITERSTUCK", CNL->wtstart_pid, MAX_WTSTART_PID_SLOTS, 1);	\
 				assert((ydb_white_box_test_case_enabled)						\
 					&& ((WBTEST_BUFOWNERSTUCK_STACK == ydb_white_box_test_case_number)		\
-						|| (WBTEST_SLEEP_IN_WCS_WTSTART == ydb_white_box_test_case_number)));	\
+						|| (WBTEST_SLEEP_IN_WCS_WTSTART == ydb_white_box_test_case_number)	\
+						|| (WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)		\
+						|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number)));		\
 				CNL->wcsflu_pid = 0;									\
 				SIGNAL_WRITERS_TO_RESUME(CNL);								\
 				if (!WAS_CRIT)										\
@@ -267,7 +269,7 @@ boolean_t wcs_flu(uint4 options)
 	jpc = csa->jnl;
 	if (!(was_crit = csa->now_crit))	/* Caution: assignment */
 	{
-		DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jpc->jnl_buff);
+		DO_JNL_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jpc->jnl_buff);
 		grab_crit_encr_cycle_sync(reg);
 		/* If it is safe to invoke "wcs_recover" (indicated by the in_commit variable being 0), do that right away
 		 * to fix any dead phase2 commits if needed.
@@ -451,7 +453,9 @@ boolean_t wcs_flu(uint4 options)
 		if (WBTEST_ENABLED(WBTEST_WCS_FLU_FAIL) || (cnl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL)))
 		{
 			assert((WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number) /* see wcs_phase2_commit_wait.c */
-					|| (WBTEST_WCS_FLU_FAIL == ydb_white_box_test_case_number));
+					|| (WBTEST_WCS_FLU_FAIL == ydb_white_box_test_case_number)
+					|| (WBTEST_MURUNDOWN_KILLCMT06 == ydb_white_box_test_case_number));
+							/* WBTEST_MURUNDOWN_KILLCMT06 is same as WBTEST_CRASH_SHUTDOWN_EXPECTED */
 			REL_CRIT_BEFORE_RETURN(cnl, reg);
 			return FALSE;	/* We expect the caller to trigger cache-recovery which will fix this counter */
 		}
@@ -585,6 +589,7 @@ boolean_t wcs_flu(uint4 options)
 						|| (WBTEST_BG_UPDATE_DBCSHGETN_INVALID == ydb_white_box_test_case_number)
 						|| (WBTEST_BG_UPDATE_DBCSHGETN_INVALID2 == ydb_white_box_test_case_number)
 						|| (WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number)
+						|| (WBTEST_MURUNDOWN_KILLCMT06 == ydb_white_box_test_case_number)
 						|| (WBTEST_WCS_FLU_IOERR == ydb_white_box_test_case_number)
 						|| (WBTEST_WCS_WTSTART_IOERR == ydb_white_box_test_case_number)
 						|| (WBTEST_ANTIFREEZE_JNLCLOSE == ydb_white_box_test_case_number)

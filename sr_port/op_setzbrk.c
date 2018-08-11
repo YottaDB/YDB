@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -140,7 +140,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 		}
 		lab_name = NULL;
 		if (NULL == (line_offset_addr = find_line_addr(routine, &lab->str, offset, &lab_name)))
-			dec_err(VARLSTCNT(1) ERR_NOPLACE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPLACE);
 		else if (CANCEL_ONE == cnt)	/* Cancel ZBREAK */
 		{
 			addr = (zb_code *)LINE_NUMBER_ADDR(CURRENT_RHEAD_ADR(routine), line_offset_addr);
@@ -148,7 +148,7 @@ void	op_setzbrk(mval *rtn, mval *lab, int offset, mval *act, int cnt)
 			if (NULL != (z_ptr = zr_find(&zbrk_recs, addr, RETURN_CLOSEST_MATCH_FALSE)))
 				zr_remove_zbreak(&zbrk_recs, z_ptr);
 			else
-				dec_err(VARLSTCNT(1) ERR_NOZBRK);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOZBRK);
 		} else if (0 <= cnt)		/* Set ZBREAK */
 		{
 #			ifdef ZB_AT_COMMENT_INFO

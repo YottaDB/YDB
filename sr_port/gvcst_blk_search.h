@@ -96,9 +96,9 @@ GBLREF	uint4			dollar_tlevel;
 	if (0 == pStat->prev_rec.offset)
 		return gvcst_search_blk(pKey, pStat);	/* nice clean start at the begining of a block */
 #	endif
-	/* The following load code (and code in a few other places) is coded in a "assember" style
+	/* The following load code (and code in a few other places) is coded in a "assembler" style
 	 * in an attempt to encourage the compiler to get it efficient.
-	 * For instance, memory and non-memory instructions are interlaced to encourge pipelining.
+	 * For instance, memory and non-memory instructions are interlaced to encourage pipelining.
 	 * Of course a great compiler doesn't need help, but this is portable code and ...
 	 */
 	DBG_CHECK_SRCH_HIST_AND_CSE_BUFFER_MATCH(pStat);

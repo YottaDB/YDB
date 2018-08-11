@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -64,6 +64,7 @@ void	grab_crit(gd_region *reg)
 	sgmnt_data_ptr_t	csd;
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
+	intrpt_state_t		prev_intrpt_state;
 #	ifdef DEBUG
 	sgmnt_addrs		*jnlpool_csa;
 	jnlpool_addrs_ptr_t	local_jnlpool, save_jnlpool;
@@ -106,8 +107,7 @@ void	grab_crit(gd_region *reg)
 			assert(!jnlpool_csa->now_crit);
 		}
 #		endif
-		assert(0 == crit_count);
-		crit_count++;	/* prevent interrupts */
+		DEFER_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 		TREF(grabbing_crit) = reg;
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 		mutex_spin_parms = (mutex_spin_parms_ptr_t)&csd->mutex_spin_parms;
@@ -132,7 +132,7 @@ void	grab_crit(gd_region *reg)
 		if (save_jnlpool != jnlpool)
 			jnlpool = save_jnlpool;
 #		endif
-			crit_count = 0;
+			ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 			TREF(grabbing_crit) = NULL;
 			switch(status)
 			{
@@ -154,7 +154,7 @@ void	grab_crit(gd_region *reg)
 		cnl->in_crit = process_id;
 		CRIT_TRACE(csa, crit_ops_gw);	/* see gdsbt.h for comment on placement */
 		TREF(grabbing_crit) = NULL;
-		crit_count = 0;
+		ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 	}
 	/* Commands/Utilties that plays with the file_corrupt flags (DSE/MUPIP SET -PARTIAL_RECOV_BYPASS/RECOVER/ROLLBACK) should
 	 * NOT issue DBFLCORRP. Use skip_file_corrupt_check global variable for this purpose

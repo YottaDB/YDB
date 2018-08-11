@@ -65,13 +65,15 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 	sgmnt_addrs		*csa;
 	jnl_buffer_ptr_t	jb;
 	unsigned int		status;
-	boolean_t		was_crit, exact_check;
+	boolean_t		was_crit, exact_check, freeze_waiter = FALSE, freeze_cleared;
 	/**** Note static/local */
 	static uint4		loop_image_count, writer;	/* assumes calls from one loop at a time */
 	uint4			new_dskaddr, new_dsk;
 	uint4			dskaddr, freeaddr, free, rsrv_freeaddr;
 	uint4			phase2_commit_index1;
 	static uint4		stuck_cnt = 0;
+	jnlpool_addrs_ptr_t	local_jnlpool;
+	intrpt_state_t		prev_intrpt_state;
 
 	/* Some callers of jnl_sub_write_attempt (jnl_flush->jnl_write_attempt, jnl_write->jnl_write_attempt) are in
 	 * crit, and some other (jnl_wait->jnl_write_attempt) are not. Callers in crit do not need worry about journal
@@ -94,12 +96,36 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			RELEASE_SWAPLOCK(&jb->io_in_prog_latch);
 		}
 		if (!jb->io_in_prog_latch.u.parts.latch_pid)
+		{
+			if (freeze_waiter)
+			{
+				CLEAR_ANTICIPATORY_FREEZE(freeze_cleared);			/* sets freeze_cleared */
+				REPORT_INSTANCE_UNFROZEN(freeze_cleared);
+				ENABLE_INTERRUPTS(INTRPT_IN_RETRY_LOOP, prev_intrpt_state);
+				freeze_waiter = FALSE;
+			}
 			status = jnl_qio_start(jpc);
+		}
 		if (SS_NORMAL == status)
 			break;
 		assert(ERR_JNLWRTNOWWRTR != status);	/* don't have asynchronous jnl writes in Unix */
 		if ((ERR_JNLWRTNOWWRTR != status) && (ERR_JNLWRTDEFER != status))
+		{
+			assert(!freeze_waiter);
 			return status;
+		}
+		if (freeze_waiter)
+		{
+			if (!IS_REPL_INST_FROZEN)
+			{	/* Somehow the freeze was lifted by someone else */
+				ENABLE_INTERRUPTS(INTRPT_IN_RETRY_LOOP, prev_intrpt_state);
+				freeze_waiter = FALSE;
+			} else
+			{
+				wcs_sleep(*lcnt);
+				continue;
+			}
+		}
 		if ((writer != CURRENT_JNL_IO_WRITER(jb)) || (1 == *lcnt))
 		{
 			writer = CURRENT_JNL_IO_WRITER(jb);
@@ -130,12 +156,29 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 				rel_crit(jpc->region);
 			/* this is the interesting case: a process is stuck */
 			BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_stuck);
+			if (IS_REPL_INST_FROZEN)
+			{	/* Restart if instance frozen. */
+				*lcnt = 1;
+				continue;
+			}
 			jpc->status = status;
 			jnl_send_oper(jpc, ERR_JNLFLUSH);
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(3) ERR_JNLPROCSTUCK, 1, writer);
 			stuck_cnt++;
+			if (IS_REPL_INST_FROZEN)
+			{	/* The instance wasn't frozen above, but it is now, so most likely we froze it.
+				 * Note the fact.
+				 * Deferring interrupts here prevents possible hangs in GET_C_STACK_FROM_SCRIPT.
+				 */
+				DEFER_INTERRUPTS(INTRPT_IN_RETRY_LOOP, prev_intrpt_state);
+				freeze_waiter = TRUE;
+			}
 			GET_C_STACK_FROM_SCRIPT("JNLPROCSTUCK", process_id, writer, stuck_cnt);
 			*lcnt = 1;	/* ??? is it necessary to limit this, and if so, how ??? */
+			if (freeze_waiter)
+			{	/* We are frozen, so restart. */
+				continue;
+			}
 			status = ERR_JNLPROCSTUCK;
 			continue_proc(writer);
 			break;
@@ -147,6 +190,12 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 		 * If we don't have crit, a journal switch could have occurred, so not an error condition.
 		 */
 		status = ERR_JNLCNTRL;
+	}
+	if (freeze_waiter)
+	{
+		CLEAR_ANTICIPATORY_FREEZE(freeze_cleared);			/* sets freeze_cleared */
+		REPORT_INSTANCE_UNFROZEN(freeze_cleared);
+		ENABLE_INTERRUPTS(INTRPT_IN_RETRY_LOOP, prev_intrpt_state);
 	}
 	return status;
 }
@@ -278,14 +327,12 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 			}
 		}
 		if (ERR_JNLWRTDEFER == status)
-		{
-			if (DBG_ASSERT(!csa->jnlpool || (csa->jnlpool == jnlpool)) IS_REPL_INST_FROZEN_JPL(csa->jnlpool))
-			{	/* Check if the write was deferred because the instance is frozen.
-				 * In that case, wait until the freeze is lifted instead of wasting time spinning on the latch
-				* in jnl_qio.
-				*/
-				WAIT_FOR_REPL_INST_UNFREEZE(csa);
-			}
+		{	/* Check if the write was deferred because the instance is frozen.
+			 * In that case, wait until the freeze is lifted instead of wasting time spinning on the latch
+			 * in jnl_qio.
+			 */
+			assert(!csa->jnlpool || (csa->jnlpool == jnlpool));
+			WAIT_FOR_REPL_INST_UNFREEZE_SAFE(csa);
 		}
 		if ((ERR_JNLWRTDEFER != status) && (ERR_JNLWRTNOWWRTR != status) && (ERR_JNLPROCSTUCK != status))
 		{	/* If holding crit, then jnl_sub_write_attempt would have invoked jnl_file_lost which would have

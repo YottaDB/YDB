@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -47,19 +47,25 @@
 #include "wbox_test_init.h"
 #include "op.h"
 #include "indir_enum.h"
+#include "gtmxc_types.h"
+#include "gtm_filter_command.h"
 #include "ydb_getenv.h"
+#include "min_max.h"
+#include "ident.h"
 
-LITREF	unsigned char		io_params_size[];
 ZOS_ONLY(GBLREF boolean_t	gtm_tag_utf8_as_ascii;)
 GBLREF	boolean_t		gtm_pipe_child;
 GBLREF	char			ydb_dist[YDB_PATH_MAX];
 GBLREF	boolean_t		ydb_dist_ok_to_use;
 GBLREF  volatile boolean_t      timer_in_handler;
 
+LITREF	unsigned char		io_params_size[];
+
 error_def(ERR_DEVOPENFAIL);
 error_def(ERR_RESTRICTEDOP);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
+error_def(ERR_COMMFILTERERR);
 ZOS_ONLY(error_def(ERR_BADTAG);)
 
 enum
@@ -270,8 +276,9 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	iod->type = rm;\
 }
 
-#define INVALID_CMD "Invalid command string: "
-#define INVALID_CMD2 "$PATH undefined, Invalid command string: "
+#define INVALID_CMD	"Invalid command string: "
+#define INVALID_CMD2	"$PATH undefined, Invalid command string: "
+#define	PIPEOPENSTR	"PIPEOPEN"
 
 short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
 {
@@ -319,6 +326,9 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	boolean_t	textflag;
 	int		ccsid, status, realfiletag;
 #endif
+        char		dev_name_buf[LOGNAME_LEN];
+	mstr		dev_mstr;
+	ydb_string_t    filtered_command;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -393,10 +403,34 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			}
 		}
 	}
-
 	/* The above code is just syntax checking. Any actual operation should be below here. */
 	if (RESTRICTED(pipe_open))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "OPEN PIPE");
+	/*Filter the command first, if required*/
+	if (RESTRICTED(pipe_filter))
+	{
+		filtered_command = gtm_filter_command(pcommand, "PIPE");
+		if (filtered_command.length)
+		{
+			if (!strlen(filtered_command.address)) /*empty command returned*/
+			{
+				PIPE_ERROR_INIT();
+				send_msg(VARLSTCNT(6) ERR_COMMFILTERERR, 4, LEN_AND_LIT(PIPEOPENSTR),
+					LEN_AND_LIT("Empty return command"));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4,
+						LEN_AND_LIT(PIPEOPENSTR),LEN_AND_LIT("Empty return command"));
+			}
+			free(pcommand);
+			pcommand = (char*)malloc(filtered_command.length+1);
+			memcpy(pcommand, filtered_command.address, filtered_command.length);
+			pcommand[filtered_command.length] = '\0';
+		} else
+		{
+			PIPE_ERROR_INIT();
+			return FALSE;	/* Error would have been printed in the filter execution routine */
+		}
+	}
+
 
 	/* check the shell device parameter before the fork/exec
 	   It is not required, but must not be null if entered */
@@ -526,11 +560,18 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		}
 		if (return_stderr)
 			CLOSEFILE_RESET(pfd_read_stderr[0], rc); /* Close unused read end for stderr return; Set fd to FD_INVALID */
-		/* need to let iorm_close() know not to reap any pipe devices during io_rundown.  They should only
-		 be reaped by the parent process. */
+		/* Need to let iorm_close() know not to reap any pipe devices during io_rundown.
+		 * They should only be reaped by the parent process.
+		 */
 		gtm_pipe_child = TRUE;
 
-		/* rundown io devices in child */
+		/* Rundown io devices in child. But before that take a copy of "dev_name->len" and "dev_name->dollar_io"
+		 * as that would be needed later if we need to send a DEVOPENFAIL error to the syslog.
+		 */
+		assert(SIZEOF(dev_name_buf) > dev_name->len);	/* "get_log_name" issues an INVSTRLEN error otherwise */
+		CONVERT_IDENT(dev_name_buf, dev_name->dollar_io, dev_name->len);
+		dev_mstr.len = MIN(dev_name->len, SIZEOF(dev_name_buf));	/* use MIN just in case */
+		dev_mstr.addr = dev_name_buf;
 		io_rundown(RUNDOWN_EXCEPT_STD);
 
 		/* do common cleanup in child */
@@ -542,8 +583,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			save_errno = errno;
 			PIPE_ERROR_INIT();
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_write[0]) failed in child"));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_mstr.len, dev_mstr.addr,
+				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_write[0]) failed in child"), save_errno);
 			UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 		}
 		if (return_stdout)
@@ -554,8 +595,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			{
 				save_errno = errno;
 				PIPE_ERROR_INIT();
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-					  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_read[1],1) failed in child"));
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_mstr.len, dev_mstr.addr,
+					  ERR_TEXT, 2, LEN_AND_LIT("PIPE - dup2(pfd_read[1],1) failed in child"), save_errno);
 				UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 			}
 			/* stderr also becomes pfd_read[1] if return_stderr is false*/
@@ -567,8 +608,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 					save_errno = errno;
 					PIPE_ERROR_INIT();
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
-							dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
-							LEN_AND_LIT("PIPE - dup2(pfd_read[1],2) failed in child"));
+							dev_mstr.len, dev_mstr.addr, ERR_TEXT, 2,
+							LEN_AND_LIT("PIPE - dup2(pfd_read[1],2) failed in child"), save_errno);
 					UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 				}
 			}
@@ -581,8 +622,8 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				save_errno = errno;
 				PIPE_ERROR_INIT();
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
-						dev_name->len, dev_name->dollar_io, ERR_TEXT, 2,
-						LEN_AND_LIT("PIPE - dup2(pfd_read_stderr[1],2) failed in child"));
+						dev_mstr.len, dev_mstr.addr, ERR_TEXT, 2,
+						LEN_AND_LIT("PIPE - dup2(pfd_read_stderr[1],2) failed in child"), save_errno);
 				UNDERSCORE_EXIT(ERR_DEVOPENFAIL);
 			}
 		}
@@ -605,10 +646,11 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			save_errno = errno;
 			PIPE_ERROR_INIT();
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
-				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - execl() failed in child"));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_mstr.len, dev_mstr.addr,
+				  ERR_TEXT, 2, LEN_AND_LIT("PIPE - execl() failed in child"), save_errno);
 			UNDERSCORE_EXIT(-1);
 		}
+		assert(FALSE);	/* we should never reach here since we do an "execl" or "_exit" above */
 	} else
 	{	/* in parent */
 		DEBUG_ONLY(TREF(fork_without_child_wait) = TRUE);	/* set variable to help assert in "relinkctl_rundown()" */

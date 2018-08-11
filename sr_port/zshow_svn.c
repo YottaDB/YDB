@@ -450,7 +450,6 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
-#		ifdef UNIX
 		case SV_ZCLOSE:
 			count = (int)(TREF(dollar_zclose));
 			MV_FORCE_MVAL(&var, count);
@@ -458,7 +457,6 @@ void zshow_svn(zshow_out *output, int one_sv)
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
-#		endif
 		/* CAUTION: fall through */
 		case SV_ZCMDLINE:
 			get_command_line(&var, TRUE);	/* TRUE indicates $ZCMDLINE (i.e. processed not actual command line) */
@@ -613,7 +611,6 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
-#		ifdef UNIX
 		case SV_ZONLNRLBK:
 			count = (int)(TREF(dollar_zonlnrlbk));
 			MV_FORCE_MVAL(&var, count);
@@ -621,7 +618,6 @@ void zshow_svn(zshow_out *output, int one_sv)
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
-#		endif
 		/* CAUTION: fall through */
 		case SV_ZPATNUMERIC:
 			var.mvtype = MV_STR;
@@ -635,10 +631,10 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (io_std_device.in != io_std_device.out)
 			{	/* ZPIN != ZPOUT print it */
 				ZWRITE_SPLIT_DOLLAR_P(var, zdir_error, ZDIR_ERR_LEN, x, dollar_zpin, principalin_text, output);
-			} else if (SV_ALL != one_sv)
+			} else
 			{	/* Print $principal for a ZWRite request if ZPIN == ZPOUT */
 				ZWRITE_DOLLAR_PRINCIPAL(var, x, principalin_text, output);
-			}	/* Else, ignore this for zshow when ZPIN == ZPOUT */
+			}
 			var.mvtype = 0;
 			if (SV_ALL != one_sv)
 				break;
@@ -654,17 +650,11 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (io_std_device.in != io_std_device.out)
 			{	/* ZPOUT != ZPIN print it */
 				ZWRITE_SPLIT_DOLLAR_P(var, zdir_error, ZDIR_ERR_LEN, x, dollar_zpout, principalout_text, output);
-			} else if (SV_ALL != one_sv)
+			} else
 			{	/* Print $principal for a ZWRite request if ZPOUT == ZPIN */
 				ZWRITE_DOLLAR_PRINCIPAL(var, x, principalout_text, output);
-			}	/* Else, ignore this for zshow when ZPOUT == ZPIN */
+			}
 			var.mvtype = 0;
-			if (SV_ALL != one_sv)
-				break;
-		/* CAUTION: fall through */
-		case SV_ZPROC:
-			ZS_VAR_EQU(&x, zproc_text);
-			mval_write(output, &dollar_zproc, TRUE);
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
@@ -744,21 +734,6 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 #		ifdef GTM_TRIGGER
-		case SV_ZTCODE:		/* deprecated */
-		/* CAUTION: fall through */
-		case SV_ZTNAME:
-			if (NULL != dollar_ztname)
-			{
-				var.mvtype = MV_STR;
-				var.str.addr = dollar_ztname->addr;
-				var.str.len = dollar_ztname->len;
-			} else
-				memcpy(&var, &literal_null, SIZEOF(mval));
-			ZS_VAR_EQU(&x, ztname_text);
-			mval_write(output, &var, TRUE);
-			if (SV_ALL != one_sv)
-				break;
-		/* CAUTION: fall through */
 		case SV_ZTDATA:
 			if (NULL != dollar_ztdata)
 			{
@@ -796,6 +771,20 @@ void zshow_svn(zshow_out *output, int one_sv)
 		case SV_ZTLEVEL:
 			MV_FORCE_MVAL(&var, gtm_trigger_depth);
 			ZS_VAR_EQU(&x, ztlevel_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZTNAME:
+		case SV_ZTCODE:		/* deprecated */
+			if (NULL != dollar_ztname)
+			{
+				var.mvtype = MV_STR;
+				var.str.addr = dollar_ztname->addr;
+				var.str.len = dollar_ztname->len;
+			} else
+				memcpy(&var, &literal_null, SIZEOF(mval));
+			ZS_VAR_EQU(&x, ztname_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;

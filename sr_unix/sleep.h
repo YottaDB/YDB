@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -54,12 +54,13 @@ MBSTART {											\
 												\
 	assert(0 < (NANOSECONDS));								\
 	clock_gettime(CLOCK_MONOTONIC, &REQTIM);						\
-	REQTIM.tv_nsec += (long)(NANOSECONDS);							\
-	if (NANOSECS_IN_SEC <= REQTIM.tv_nsec)							\
+	if (NANOSECS_IN_SEC <= (NANOSECONDS) + REQTIM.tv_nsec)					\
 	{											\
-		REQTIM.tv_sec += (time_t)(REQTIM.tv_nsec / NANOSECS_IN_SEC);			\
-		REQTIM.tv_nsec %= NANOSECS_IN_SEC;						\
+		REQTIM.tv_sec += (time_t)(((NANOSECONDS) + REQTIM.tv_nsec) / NANOSECS_IN_SEC);	\
+		REQTIM.tv_nsec = ((NANOSECONDS) + REQTIM.tv_nsec) % NANOSECS_IN_SEC;		\
 	}											\
+	else											\
+		REQTIM.tv_nsec += (long)(NANOSECONDS);						\
 	do											\
 	{											\
 		STATUS = clock_nanosleep_abstime(&REQTIM);					\

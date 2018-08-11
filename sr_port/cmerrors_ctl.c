@@ -26,8 +26,17 @@ LITDEF	err_msg cmerrors[] = {
 };
 
 
+
+LITDEF	int cmerrors_undocarr[] = {
+};
+
+
 GBLDEF	err_ctl cmerrors_ctl = {
 	249,
 	"GTCM",
 	&cmerrors[0],
-	6};
+	6,
+	&cmerrors_undocarr[0],
+	0
+};
+

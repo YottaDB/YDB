@@ -3,6 +3,9 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -84,7 +87,7 @@ MBSTART {								\
 MBSTART {														\
 	struct gd_info 	*gdi, tmp;											\
 															\
-	gdi = udi->owning_gd->thread_gdi;										\
+	gdi = udi->owning_gd->gd_runtime->thread_gdi;									\
 	if ((NULL != gdi) && (gdi->save_errno != 0))									\
 	{	/* We close everything related to the worker thread, in hopes that when it is retried later there	\
 		 * will be no more error										\

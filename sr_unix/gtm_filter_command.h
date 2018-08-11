@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,19 +9,7 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+#include "gtmxc_types.h"
+#include "gtm_common_defs.h"
 
-#include "main_pragma.h"
-
-#include <sys/types.h>
-
-#include <stdio.h>
-#include <unistd.h>
-
-int main(int argc, char **argv)
-{
-	if (geteuid() == 0)
-		printf("root\n");
-	else
-		printf("other\n");
-	return 0;
-}
+gtm_string_t gtm_filter_command(char * command, char * caller_name);

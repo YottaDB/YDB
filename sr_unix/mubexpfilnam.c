@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -26,6 +29,7 @@
 
 GBLREF	bool		error_mupip;
 GBLREF	backup_reg_list	*mu_repl_inst_reg_list;
+GBLREF	gd_addr		*gd_header;
 
 void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list)
 {
@@ -46,7 +50,7 @@ void mubexpfilnam(char *dirname, unsigned int dirlen, backup_reg_list *list)
 		}
 	} else
 	{	/* Replication instance region */
-		if (!repl_inst_get_name(file.addr, (unsigned int *)&file.len, MAX_FN_LEN, issue_rts_error, NULL))
+		if (!repl_inst_get_name(file.addr, (unsigned int *)&file.len, MAX_FN_LEN, issue_rts_error, gd_header))
 			assertpro(FALSE);	/* rts_error should have been issued by repl_inst_get_name */
 	}
 	for (c1 = file.addr + file.len; (*c1 != '/') && (c1 != file.addr); c1--)

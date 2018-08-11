@@ -39,8 +39,17 @@ LITDEF	err_msg ydberrors[] = {
 };
 
 
+
+LITDEF	int ydberrors_undocarr[] = {
+};
+
+
 GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	19};
+	19,
+	&ydberrors_undocarr[0],
+	0
+};
+

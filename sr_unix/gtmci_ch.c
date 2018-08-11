@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -51,6 +52,8 @@ CONDITION_HANDLER(gtmci_ch)
 	entryref.len = STR_LIT_LEN(CALL_IN_M_ENTRYREF);
 	set_zstatus(&entryref, SIGNAL, NULL, FALSE);
 	FGNCAL_UNWIND_CLEANUP;
+	if (TREF(comm_filter_init))
+		TREF(comm_filter_init) = FALSE;  /* Exiting from filters */
 	mumps_status = SIGNAL;
 	UNWIND(NULL, NULL);
 }

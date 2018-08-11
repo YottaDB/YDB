@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2016 Fidelity National Information	*
+ * Copyright (c) 2007-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -64,11 +64,15 @@ error_def(ERR_GBLOFLOW);
 {														\
 	/* A failure occurred. Ignored for WB test case */							\
 	assert(FALSE || (ydb_white_box_test_case_enabled							\
-				&& (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)));		\
+				&& ((WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)		\
+					|| (WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)		\
+					|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number))));	\
 	get_space_fail_cr = CR;											\
 	get_space_fail_array = TRACEARRAY;									\
 	if (TREF(ydb_environment_init) DEBUG_ONLY(&& !(ydb_white_box_test_case_enabled				\
-				&& (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number))))		\
+				&& ((WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)		\
+					|| (WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)		\
+					|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number)))))	\
 		gtm_fork_n_core();	/* take a snapshot in case running in-house */				\
 	return FALSE;												\
 }
@@ -293,7 +297,8 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	if (ENOSPC == save_errno)
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WAITDSKSPACE, 4, process_id, to_wait, DB_LEN_STR(reg), save_errno);
 	else
-		assert(FALSE);
+		assert((WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)
+			|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number));
 	INVOKE_C_STACK_APPROPRIATE(cr, csa, 2);
 	WCS_GET_SPACE_RETURN_FAIL(wcs_conflict_trace, cr);
 }

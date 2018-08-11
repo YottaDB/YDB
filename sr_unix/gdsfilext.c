@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -65,6 +65,7 @@
 #include "wcs_wt.h"
 #include "db_write_eof_block.h"
 #include "interlock.h"
+#include "warn_db_sz.h"
 
 #define	GDSFILEXT_CLNUP						\
 MBSTART {							\
@@ -152,6 +153,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	jnl_buffer_ptr_t	jbp;
 	cache_rec_ptr_t         cr;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_NOSPC_ENABLED */
+	char			*db_file_name = "";
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -575,7 +577,14 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	GDSFILEXT_CLNUP;
 	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_db_extends, 1);
 	if (!ydb_dbfilext_syslog_disable)
+	{
 		send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_DBFILEXT, 5, DB_LEN_STR(gv_cur_region), blocks, new_total,
 			&curr_tn);
+		if ((NULL != gv_cur_region) && (NULL != gv_cur_region->dyn.addr) && (NULL != gv_cur_region->dyn.addr->fname))
+			db_file_name = (char *)gv_cur_region->dyn.addr->fname;
+		else
+			db_file_name = "";
+		warn_db_sz(db_file_name, blocks, new_total, MAXTOTALBLKS(cs_data));
+	}
 	return (SS_NORMAL);
 }

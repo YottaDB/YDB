@@ -79,7 +79,7 @@ LITDEF	err_msg merrors[] = {
 	{ "TRANSNOSTART", "ZTCOMMIT(s) issued without corresponding ZTSTART(s)", 0 },
 	{ "FNUMARG", "$FNUMBER format specifier \"!AD\" contains an illegal character: \"!AD\"", 4 },
 	{ "FOROFLOW", "FOR commands nested more than !UL deep on a line", 1 },
-	{ "YDIRTSZ", "Size of YDIRT data too large", 0 },
+	{ "YDIRTSZ", "Improper size of YDIRT data: !UL", 1 },
 	{ "JNLSUCCESS", "!AD successful", 2 },
 	{ "GBLNAME", "Either an identifier or a left parenthesis is expected after a ^ in this context", 0 },
 	{ "GBLOFLOW", "Database segment is full", 0 },
@@ -140,16 +140,16 @@ LITDEF	err_msg merrors[] = {
 	{ "JNLINVALID", "!AD is not a valid journal file !/ for database file: !AD", 4 },
 	{ "MBXWRTONLY", "Mailbox is write only, cannot read from it", 0 },
 	{ "MEMORY", "Central memory exhausted during request for !UJ bytes from 0x!XJ", 2 },
-	{ "MTBLKTOOBIG", "Magtape BLOCK_SIZE exceeds maximum size allowed", 0 },
-	{ "MTBLKTOOSM", "Magtape BLOCK_SIZE is less than !UL bytes", 1 },
-	{ "MTFIXRECSZ", "BLOCK_SIZE !UL must be multiple of fixed record size !UL", 2 },
-	{ "MTIS", "Magnetic tape: !AD", 2 },
-	{ "MTRDBADBLK", "Block read too small, contained only !UL bytes, block size = !UL", 2 },
-	{ "MTRDONLY", "Cannot write to a READONLY magtape", 0 },
-	{ "MTRDTHENWRT", "Attempt to read after a write to a magtape", 0 },
-	{ "MTRECGTRBLK", "Magtape record size cannot exceed block size", 0 },
-	{ "MTRECTOOBIG", "Magtape record size exceeds maximum allowed", 0 },
-	{ "MTRECTOOSM", "Magtape record size is too small for record type", 0 },
+	{ "UNUSEDMSG305", "MTBLKTOOBIG last used in V6.3-003 Dec. 2017", 0 },
+	{ "UNUSEDMSG306", "MTBLKTOOSM last used in V6.3-003 Dec. 2017", 0 },
+	{ "UNUSEDMSG307", "MTFIXRECSZ last used in V6.3-003 Dec. 2017", 0 },
+	{ "UNUSEDMSG308", "MTIS last used in V6.3-003 Dec. 2017", 0 },
+	{ "UNUSEDMSG309", "MTRDBADBLK last used in V6.3-003 Dec. 2017", 0 },
+	{ "UNUSEDMSG310", "MTRDONLY last used in V6.3-003 Dec. 2017", 0 },
+	{ "UNUSEDMSG311", "MTRDTHENWRT last used in V6.3-003 Dec. 2017", 0 },
+	{ "UNUSEDMSG312", "MTRECGTRBLK last used in V6.3-003 Dec. 2017", 0 },
+	{ "UNUSEDMSG313", "MTRECTOOBIG last used in V6.3-003 Dec. 2017", 0 },
+	{ "UNUSEDMSG314", "MTRECTOOSM last used in V6.3-003 Dec. 2017", 0 },
 	{ "JNLTMQUAL3", "Time qualifier BEFORE_TIME=\"!AZ\" is less than the journal file(s) minimum timestamp=\"!AZ\"", 2 },
 	{ "MULTLAB", "This label has been previously defined", 0 },
 	{ "BLKCNT", "Last LOAD Block/RMS Record number: !UL", 1 },
@@ -175,7 +175,7 @@ LITDEF	err_msg merrors[] = {
 	{ "REC2BIG", "Record size (!UL) is greater than maximum (!UL) for region: !AD", 4 },
 	{ "RHMISSING", "Right-hand side of expression expected", 0 },
 	{ "DEVICEREADONLY", "Cannot write to read-only device", 0 },
-	{ "COLLDATAEXISTS", "Collation type cannot be changed while data exists", 0 },
+	{ "COLLDATAEXISTS", "Collation type cannot be changed while !AD!AD data exists", 4 },
 	{ "ROUTINEUNKNOWN", "Routine could not be found", 0 },
 	{ "RPARENMISSING", "Right parenthesis expected", 0 },
 	{ "RTNNAME", "Routine name expected here", 0 },
@@ -194,11 +194,11 @@ LITDEF	err_msg merrors[] = {
 	{ "STACKUNDERFLO", "Stack underflow", 0 },
 	{ "STRINGOFLOW", "String pool overflow", 0 },
 	{ "SVNOSET", "Cannot SET this special variable", 0 },
-	{ "VIEWFN", "View parameter is not valid with $VIEW()", 0 },
+	{ "VIEWFN", "View parameter !AD is not valid with the $VIEW() function", 2 },
 	{ "TERMASTQUOTA", "Process AST quota exceeded, cannot open terminal", 0 },
 	{ "TEXTARG", "Invalid argument to $TEXT function", 0 },
 	{ "TMPSTOREMAX", "Maximum space for temporary values exceeded", 0 },
-	{ "VIEWCMD", "View parameter is not valid with VIEW command", 0 },
+	{ "VIEWCMD", "View parameter !AD is not valid with the VIEW command", 2 },
 	{ "JNI", "!AD", 2 },
 	{ "TXTSRCFMT", "$TEXT encountered an invalid source program file format", 0 },
 	{ "UIDMSG", "Unidentified message received", 0 },
@@ -354,9 +354,9 @@ LITDEF	err_msg merrors[] = {
 	{ "AMBISYIPARAM", "Parameter !AD is ambiguous to $ZGETSYI()", 2 },
 	{ "PREVJNLNOEOF", "A previous generation journal file !AD does not have valid EOF", 2 },
 	{ "LKSECINIT", "Error creating LOCK section for database !AD", 2 },
-	{ "MTDOSLAB", "Tape label is not in valid DOS-11 format", 0 },
-	{ "MTDOSFOR", "Use of DOS-11 labels requires stream format", 0 },
-	{ "MTINVLAB", "Invalid label type specified in magtape OPEN", 0 },
+	{ "UNUSEDMSG519", "MTDOSLAB last used in V6.3-003 Dec. 2017", 0 },
+	{ "UNUSEDMSG520", "MTDOSFOR last used in V6.3-003 Dec. 2017", 0 },
+	{ "UNUSEDMSG521", "MTINVLAB last used in V6.3-003 Dec. 2017", 0 },
 	{ "TXTSRCMAT", "M object module and source file do not match", 0 },
 	{ "CCENOGROUP", "CCE does not have GROUP privilege.  Information may be incomplete.", 0 },
 	{ "BADDBVER", "Incorrect database version: !AD", 2 },
@@ -379,8 +379,8 @@ LITDEF	err_msg merrors[] = {
 	{ "NETFAIL", "Failure of Net operation", 0 },
 	{ "NETLCKFAIL", "Lock operation across Net failed", 0 },
 	{ "TTINVFILTER", "Invalid FILTER argument", 0 },
-	{ "MTANSILAB", "Tape label is not in valid ANSI format", 0 },
-	{ "MTANSIFOR", "Use of ANSI labels does not allow stream format", 0 },
+	{ "UNUSEDMSG544", "MTANSILAB last used in V6.3-003 Dec. 2017", 0 },
+	{ "UNUSEDMSG545", "MTANSIFOR last used in V6.3-003 Dec. 2017", 0 },
 	{ "BADTRNPARAM", "!AD is not a legal parameter to $ZTRNLNM", 2 },
 	{ "DSEONLYBGMM", "!AD is supported only for BG/MM access methods", 2 },
 	{ "DSEINVLCLUSFN", "Specified function is invalid for clustered databases", 0 },
@@ -466,7 +466,7 @@ LITDEF	err_msg merrors[] = {
 	{ "COLLTYPVERSION", "Collation type !UL, version !UL mismatch", 2 },
 	{ "LVNULLSUBS", "Null subscripts not allowed in local variables", 0 },
 	{ "GVREPLERR", "Error replicating global in region !AD", 2 },
-	{ "MTIOERR", "I/O Error with magnetic tape device !AD", 2 },
+	{ "UNUSEDMSG631", "MTIOERR last used in V6.3-003 Dec. 2017", 0 },
 	{ "RMWIDTHPOS", "File record size or width must be greater than zero", 0 },
 	{ "OFFSETINV", "Entry point !AD+!SL not valid", 3 },
 	{ "JOBPARTOOLONG", "Total parameter length is too long for job command", 0 },
@@ -508,7 +508,7 @@ LITDEF	err_msg merrors[] = {
 	{ "CETOOLONG", "Compiler escape substitution exceeds maximum line size", 0 },
 	{ "CENOINDIR", "Indirection type information not available for compiler escape feature", 0 },
 	{ "COLLATIONUNDEF", "Collation type !UL is not defined", 1 },
-	{ "UNUSEDMSG675", "RBWRNNOTCHG last used in V6.2-002A", 0 },
+	{ "MSTACKCRIT", "User-specified M stack size critical threshold of !UL not appropriate; must be between !UL and !UL; reverting to !UL", 4 },
 	{ "GTMSECSHRSRVF", "!AD - !UL : Attempt to service request failed (retry = !UL)", 4 },
 	{ "FREEZECTRL", "Control Y or control C encountered during attempt to freeze the database. Aborting freeze.", 0 },
 	{ "JNLFLUSH", "Error flushing journal buffers to journal file !AD", 2 },
@@ -523,7 +523,7 @@ LITDEF	err_msg merrors[] = {
 	{ "SOCKINIT", "Error initializing socket: (errno == !UL) !AD", 3 },
 	{ "OPENCONN", "Error opening socket connection", 0 },
 	{ "DEVNOTIMP", "!AD device not implemented on in this environment", 2 },
-	{ "UNUSEDMSG688", "JNLEXTR last sometime prior to V4.4-002", 0 },
+	{ "PATALTER2LARGE", "Pattern match alternation exceeded the !UL repetition limit on prospective matches", 1 },
 	{ "DBREMOTE", "Database region !AD is remote; perform maintenance on the server node", 2 },
 	{ "JNLREQUIRED", "Journaling is required for clustered operation with file !AD", 2 },
 	{ "TPMIXUP", "!AZ transaction cannot be started within !AZ transaction", 2 },
@@ -648,7 +648,7 @@ LITDEF	err_msg merrors[] = {
 	{ "JNLRDONLY", "Journal file !AD read only", 2 },
 	{ "ANCOMPTINC", "Deviceparameter !AD is not compatible with any other deviceparameters in the !AD command", 4 },
 	{ "ABNCOMPTINC", "Deviceparameter !AD and deviceparameter !AD are not compatible in the !AD command", 6 },
-	{ "RECLOAD", "Error loading record number: !@UQ!/", 1 },
+	{ "RECLOAD", "Error loading record number: !AD", 2 },
 	{ "SOCKNOTFND", "Socket !AD not found", 2 },
 	{ "CURRSOCKOFR", "Current socket of index !UL is out of range.  There are only !UL sockets.", 2 },
 	{ "SOCKETEXIST", "Socket !AD already exists", 2 },
@@ -660,7 +660,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUNOFINISH", "MUPIP unable to finish all requested actions", 0 },
 	{ "DBFILEXT", "Database file !AD extended from 0x!XL blocks to 0x!XL at transaction 0x!16@XQ", 5 },
 	{ "JNLFSYNCERR", "Error synchronizing journal file !AD to disk", 2 },
-	{ "UNUSEDMSG825", "FSYNCTIMOUT last used in V6.0-001", 0 },
+	{ "ICUNOTENABLED", "ICU libraries not loaded", 0 },
 	{ "ZCPREALLVALINV", "The pre-allocation value exceeded the maximum string length", 0 },
 	{ "NEWJNLFILECREAT", "Journal file !AD nearing maximum size.  New journal file created.", 2 },
 	{ "DSKSPACEFLOW", "Disk Space for file !AD nearing maximum size.  !UL blocks available.", 3 },
@@ -1512,6 +1512,42 @@ LITDEF	err_msg merrors[] = {
 	{ "MSTACKSZNA", "User-specified M stack size of !UL KiB not appropriate; must be between !UL KiB and !UL KiB; reverting to !UL KiB", 4 },
 	{ "JNLEXTRCTSEQNO", "Journal Extracts based on sequence numbers are restricted to a single region when replication is OFF", 0 },
 	{ "INVSEQNOQUAL", "Invalid SEQNO qualifier value !AD", 2 },
+	{ "LOWSPC", "WARNING: Database !AD has less than !UL% of the total block space remaining. Blocks Used: !UL Total Blocks Available: !UL", 5 },
+	{ "FAILEDRECCOUNT", "LOAD unable to process !@UQ records", 1 },
+	{ "LOADRECCNT", "Last EXTRACT record processed by LOAD: !@UQ", 1 },
+	{ "COMMFILTERERR", "Error executing the command filter for !AD. !AD", 4 },
+	{ "NOFILTERNEST", "Filter nesting not allowed", 0 },
+};
+
+
+
+LITDEF	int merrors_undocarr[] = {
+	0,	/* ACK */
+	656,	/* ASC2EBCDICCONV */
+	1444,	/* DBGLDMISMATCH */
+	621,	/* DEFEREVENT */
+	1472,	/* DRVLONGJMP */
+	44,	/* ENQ */
+	1332,	/* FAKENOSPCLEARED */
+	595,	/* FREEZEID */
+	703,	/* INVDBGLVL */
+	508,	/* JNLREQUIRED */
+	410,	/* JNLWRTNOWWRTR */
+	989,	/* JOBINTRRETHROW */
+	938,	/* JOBINTRRQST */
+	336,	/* LKSECINIT */
+	1480,	/* LVMONBADVAL */
+	824,	/* MUDESTROYFAIL */
+	822,	/* MUDESTROYSUC */
+	895,	/* REPEATERROR */
+	1260,	/* REPLONLNRLBK */
+	898,	/* SYSTEMVALUE */
+	467,	/* TPRETRY */
+	252,	/* WILLEXPIRE */
+	62,	/* YDIRTSZ */
+	469,	/* ZDEFACTIVE */
+	470,	/* ZDEFOFLOW */
+	1189,	/* ZLINKBYPASS */
 };
 
 
@@ -1519,4 +1555,8 @@ GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1495};
+	1500,
+	&merrors_undocarr[0],
+	26
+};
+

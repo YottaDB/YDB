@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,7 +35,7 @@ GBLREF gv_key		*gv_currkey;
 GBLREF gv_key		*gv_altkey;
 GBLREF gd_region	*gv_cur_region;
 
-void gv_init_reg (gd_region *reg, gd_addr *addr)
+void gv_init_reg (gd_region *reg)
 {
 #	ifdef NOLICENSE
 	licensed = TRUE;
@@ -50,7 +53,7 @@ void gv_init_reg (gd_region *reg, gd_addr *addr)
 		case dba_mm:
 		case dba_bg:
 			if (!reg->open)
-				gvcst_init(reg, addr);
+				gvcst_init(reg);
 			break;
 		default:
 		assertpro(reg->dyn.addr->acc_meth != reg->dyn.addr->acc_meth);

@@ -80,7 +80,6 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "alias.h"
 #include "parm_pool.h"
 #include "auto_zlink.h"
-#include "fileinfo.h"
 #include "filestruct.h"
 #include "gdscc.h"
 #include "gdskill.h"
@@ -209,8 +208,8 @@ error_def(ERR_SYSCALL);
 	}										\
 }
 
-STATICFNDCL callin_entry_list* get_entry(const char *call_name);
-STATICFNDEF callin_entry_list* get_entry(const char *call_name)
+STATICFNDCL callin_entry_list* get_entry(const char *call_name, int internal);
+STATICFNDEF callin_entry_list* get_entry(const char *call_name, int internal)
 {	/* Lookup in a hashtable for entry corresponding to routine name */
 	ht_ent_str      *callin_entry;
 	stringkey       symkey;
@@ -220,7 +219,10 @@ STATICFNDEF callin_entry_list* get_entry(const char *call_name)
 	symkey.str.addr = (char *)call_name;
 	symkey.str.len = STRLEN(call_name);
 	COMPUTE_HASH_STR(&symkey);
-	callin_entry = lookup_hashtab_str(TREF(callin_hashtab), &symkey);
+	if (!internal)
+		callin_entry = lookup_hashtab_str(TREF(callin_hashtab), &symkey);
+	else
+		callin_entry = lookup_hashtab_str(TREF(ci_filter_hashtab), &symkey);
 	return (callin_entry ? callin_entry->value : NULL);
 }
 
@@ -296,7 +298,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
 	if (!TREF(ci_table))	/* Load the call-in table only once from env variable ydb_ci/GTMCI. */
 	{
-		TREF(ci_table) = citab_parse();
+		TREF(ci_table) = citab_parse(FALSE);
 		if (!TREF(callin_hashtab))
 		{
 			TREF(callin_hashtab) = (hash_table_str *)malloc(SIZEOF(hash_table_str));
@@ -316,7 +318,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 			assert(syment->value == entry);
 		}
 	}
-	if (!(entry = get_entry(c_rtn_name)))	/* c_rtn_name not found in the table. */
+	if (!(entry = get_entry(c_rtn_name, FALSE)))	/* c_rtn_name not found in the table. */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	/* The 3rd argument is NULL because we will get lnr_adr via TABENT_PROXY. */
@@ -599,7 +601,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 }
 
 /* Common work-routine for ydb_ci() and ydb_cip() to drive callin */
-int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var)
+int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var, boolean_t internal_use)
 {
 	boolean_t		need_rtnobj_shm_free;
 	va_list			var;
@@ -622,11 +624,18 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	ht_ent_str		*syment;
 	intrpt_state_t		old_intrpt_state;
 	boolean_t		ci_ret_code_quit_needed = FALSE;
+	boolean_t		unwind_here = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	VAR_COPY(var, temp_var);
 	added = FALSE;
+	if (internal_use)
+	{
+		TREF(comm_filter_init) = TRUE;
+		if (!(frame_pointer->type & SFT_CI))
+			unwind_here = TRUE;
+	}
 	/* Do the "ydb_init" (if needed) first as it would set gtm_threadgbl etc. which is needed to use TREF later */
 	if (!gtm_startup_active)
 	{
@@ -673,31 +682,59 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
-	if (!TREF(ci_table))	/* load the call-in table only once from env variable ydb_ci/GTMCI  */
+	if (!internal_use)
 	{
-		TREF(ci_table) = citab_parse();
-		if (!TREF(callin_hashtab))
+		if (!TREF(ci_table))	/* load the call-in table only once from env variable ydb_ci/GTMCI  */
 		{
-			TREF(callin_hashtab) = (hash_table_str *)malloc(SIZEOF(hash_table_str));
-			(TREF(callin_hashtab))->base = NULL;
-			/* Need to initialize hash table */
-			init_hashtab_str(TREF(callin_hashtab), CALLIN_HASHTAB_SIZE,
-				HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
-			assert((TREF(callin_hashtab))->base);
+			TREF(ci_table) = citab_parse(internal_use);
+			if (!TREF(callin_hashtab))
+			{
+				TREF(callin_hashtab) = (hash_table_str *)malloc(SIZEOF(hash_table_str));
+				(TREF(callin_hashtab))->base = NULL;
+				/* Need to initialize hash table */
+				init_hashtab_str(TREF(callin_hashtab), CALLIN_HASHTAB_SIZE,
+					HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+				assert((TREF(callin_hashtab))->base);
+			}
+			for (entry = TREF(ci_table); NULL != entry; entry = entry->next_entry)
+			{	/* Loop over the list and populate the hash table */
+				symkey.str.addr = entry->call_name.addr;
+				symkey.str.len = entry->call_name.len;
+				COMPUTE_HASH_STR(&symkey);
+				added = add_hashtab_str(TREF(callin_hashtab), &symkey, entry, &syment);
+				assert(added);
+				assert(syment->value == entry);
+			}
 		}
-		for (entry = TREF(ci_table); NULL != entry; entry = entry->next_entry)
-		{	/* Loop over the list and populate the hash table */
-			symkey.str.addr = entry->call_name.addr;
-			symkey.str.len = entry->call_name.len;
-			COMPUTE_HASH_STR(&symkey);
-			added = add_hashtab_str(TREF(callin_hashtab), &symkey, entry, &syment);
-			assert(added);
-			assert(syment->value == entry);
+	}
+	else /* Call from the filter command*/
+	{
+		if (!TREF(ci_filter_table))
+		{
+			TREF(ci_filter_table) = citab_parse(internal_use);
+			if (!TREF(ci_filter_hashtab))
+			{
+				TREF(ci_filter_hashtab) = (hash_table_str *)malloc(SIZEOF(hash_table_str));
+				(TREF(ci_filter_hashtab))->base = NULL;
+				/* Need to initialize hash table */
+				init_hashtab_str(TREF(ci_filter_hashtab), CALLIN_HASHTAB_SIZE,
+					HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+				assert((TREF(ci_filter_hashtab))->base);
+			}
+			for (entry = TREF(ci_filter_table); NULL != entry; entry = entry->next_entry)
+			{	/* Loop over the list and populate the hash table */
+				symkey.str.addr = entry->call_name.addr;
+				symkey.str.len = entry->call_name.len;
+				COMPUTE_HASH_STR(&symkey);
+				added = add_hashtab_str(TREF(ci_filter_hashtab), &symkey, entry, &syment);
+				assert(added);
+				assert(syment->value == entry);
+			}
 		}
 	}
 	if (NULL == callin_handle)
 	{
-		if (!(entry = get_entry(c_rtn_name)))	/* c_rtn_name not found in the table */
+		if (!(entry = get_entry(c_rtn_name, internal_use)))	/* c_rtn_name not found in the table */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
 		if (populate_handle)
 			callin_handle = entry;
@@ -733,6 +770,7 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	has_return = (ydb_void == entry->return_type) ? 0 : 1;
 	if (has_return)
 	{	/* Create mval slot for return value */
+		MV_INIT(&arg_mval);
 		param_blk.retaddr = (void *)push_lvval(&arg_mval);
 		va_arg(var, void *);	/* advance va_arg */
 	} else
@@ -902,6 +940,8 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		 * it is either the unhandled error code propaged by $ZT/$ET (from mdb_condition_handler)
 		 * or zero on returning from ZGOTO 0 (ci_ret_code_quit).
 		 */
+		if (internal_use)
+			TREF(comm_filter_init) = FALSE;  /*exiting from filters*/
 		if (mumps_status)
 		{	/* This is an error codepath. Do cleanup of frames (including the call-in base frame)
 			 * and rethrow error if needed. Currently only the following error(s) need rethrow.
@@ -1024,7 +1064,13 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	REVERT;
 	assert(NULL == TREF(temp_fgncal_stack));
 	FGNCAL_UNWIND;
-	if (ci_ret_code_quit_needed)
+	/* Added below, since ydb_ci/GTMCI only unwinds back to current CI frame,
+	 * to unwind the two frames (current + base)
+	 * in normal scenarios, gtm_exit is called
+	 */
+	if (internal_use)
+		TREF(comm_filter_init) = FALSE;  /* Exiting from filters */
+	if (ci_ret_code_quit_needed || unwind_here)
 		ci_ret_code_quit();	/* Unwind the current invocation of call-in environment */
 	return 0;
 }
@@ -1035,7 +1081,7 @@ int ydb_ci(const char *c_rtn_name, ...)
 	va_list var;
 
 	VAR_START(var, c_rtn_name);
-	return ydb_ci_exec(c_rtn_name, NULL, FALSE, var);
+	return ydb_ci_exec(c_rtn_name, NULL, FALSE, var, FALSE);
 }
 
 /* Fast path call-in driver version - Adds a struct parm that contains name resolution info after first call
@@ -1046,7 +1092,15 @@ int ydb_cip(ci_name_descriptor* ci_info, ...)
 	va_list var;
 
 	VAR_START(var, ci_info);
-	return ydb_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, var);
+	return ydb_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, var, FALSE);
+}
+
+int gtm_ci_filter(const char *c_rtn_name, ...)
+{
+	va_list var;
+
+	VAR_START(var, c_rtn_name);
+	return ydb_ci_exec(c_rtn_name, NULL, FALSE, var, TRUE);
 }
 
 #ifdef GTM_PTHREAD

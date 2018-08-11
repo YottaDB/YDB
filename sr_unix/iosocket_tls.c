@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2017 Fidelity National Information	*
+ * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -212,15 +212,15 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			length = extraarg->str.len;
 			extrastr = malloc(length + 1 + SIZEOF(TLSLABEL) - 1 + tlsid->str.len + SIZEOF(COLONBRACKET) - 1
 				+ SIZEOF(BRACKETSSEMIS) - 1);
-			STRNCPY_LIT(extrastr, TLSLABEL);
+			MEMCPY_LIT(extrastr, TLSLABEL);
 			extraptr = extrastr + SIZEOF(TLSLABEL) - 1;
 			memcpy(extraptr, tlsid->str.addr, tlsid->str.len);
 			extraptr += tlsid->str.len;
-			STRNCPY_LIT(extraptr, COLONBRACKET);
+			MEMCPY_LIT(extraptr, COLONBRACKET);
 			extraptr = extraptr + SIZEOF(COLONBRACKET) - 1;
 			STRNCPY_STR(extraptr, extraarg->str.addr, length);
 			extraptr += length;
-			STRNCPY_LIT(extraptr, BRACKETSSEMIS);
+			MEMCPY_LIT(extraptr, BRACKETSSEMIS);
 			extraptr += SIZEOF(BRACKETSSEMIS) - 1;
 			*extraptr = '\0';
 			if (0 > gtm_tls_add_config(tls_ctx, idstr, extrastr))
@@ -430,22 +430,22 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				len = STRLEN(charptr);
 				assertpro(MAX_TLSID_LEN >= len);
 				STRNCPY_STR(idstr, charptr, MAX_TLSID_LEN);
-				STRNCPY_LIT(&idstr[len], "-" RENEGOTIATE);	/* append dash RENEGOTIATE */
+				MEMCPY_LIT(&idstr[len], "-" RENEGOTIATE);	/* append dash RENEGOTIATE */
 				len += SIZEOF(RENEGOTIATE);	/* null accounts for dash */
 				idstr[len] = '\0';
 			} else
 				len = STRLEN(idstr);
 			extrastr = malloc(length + 1 + SIZEOF(TLSLABEL) - 1 + len + SIZEOF(COLONBRACKET) - 1
 				+ SIZEOF(BRACKETSSEMIS) - 1);
-			STRNCPY_LIT(extrastr, TLSLABEL);
+			MEMCPY_LIT(extrastr, TLSLABEL);
 			extraptr = extrastr + SIZEOF(TLSLABEL) - 1;
 			STRCPY(extraptr, idstr);
 			extraptr += len;
-			STRNCPY_LIT(extraptr, COLONBRACKET);
+			MEMCPY_LIT(extraptr, COLONBRACKET);
 			extraptr = extraptr + SIZEOF(COLONBRACKET) - 1;
 			STRNCPY_STR(extraptr, extraarg->str.addr, length);
 			extraptr += length;
-			STRNCPY_LIT(extraptr, BRACKETSSEMIS);
+			MEMCPY_LIT(extraptr, BRACKETSSEMIS);
 			extraptr += SIZEOF(BRACKETSSEMIS) - 1;
 			*extraptr = '\0';
 		} else

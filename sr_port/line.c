@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -198,13 +198,13 @@ boolean_t line(uint4 *lnc)
 		}
 		if ((TREF(block_level) + (int4)(mline_tail->block_ok)) < dot_count)
 		{
-			boolean_t	warn;
-
 			dot_count = TREF(block_level);
-			warn = (0 != (cmd_qlf.qlf & CQ_WARNINGS));
-			show_source_line(warn);
-			if (warn)
+			assert(TREF(compile_time));
+			if (cmd_qlf.qlf & CQ_WARNINGS)
+			{
+				show_source_line(TRUE);
 				dec_err(VARLSTCNT(1) ERR_BLKTOODEEP);
+			}
 			TREF(source_error_found) = TRUE;
 			success = FALSE;
 		}

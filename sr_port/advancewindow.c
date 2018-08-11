@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,7 @@
 #include "gtm_string.h"
 
 #include "compiler.h"
+#include "cmd_qlf.h"
 #include "toktyp.h"
 #include "stringpool.h"
 #include "gtm_caseconv.h"
@@ -26,10 +27,11 @@
 #include "gtm_icu_api.h"	/* U_ISPRINT() needs this header */
 #endif
 
-GBLREF	int		source_column;
-GBLREF	spdesc		stringpool;
-GBLREF	boolean_t	gtm_utf8_mode;
-GBLREF	boolean_t	run_time;
+GBLREF command_qualifier	cmd_qlf;
+GBLREF	int			source_column;
+GBLREF	spdesc			stringpool;
+GBLREF	boolean_t		gtm_utf8_mode;
+GBLREF	boolean_t		run_time;
 
 LITREF	char		ctypetab[NUM_CHARS];
 
@@ -103,7 +105,6 @@ void advancewindow(void)
 						TREF(director_token) = TREF(window_token) = TK_ERROR;
 						return;
 					}
-					show_source_line(TRUE);
 					if (!gtm_utf8_mode)
 						charlen = 1;			/* always one character in M mode */
 #					ifdef UNICODE_SUPPORTED
@@ -119,7 +120,11 @@ void advancewindow(void)
 						*error++ = ',';
 					}
 					error--;				/* do not include the last comma */
-					dec_err(VARLSTCNT(4) ERR_LITNONGRAPH, 2, (error - errtxt), errtxt);
+					if (!(TREF(compile_time) && !(cmd_qlf.qlf & CQ_WARNINGS)))
+					{
+						show_source_line(TRUE);
+						dec_err(VARLSTCNT(4) ERR_LITNONGRAPH, 2, (error - errtxt), errtxt);
+					}
 				}
 			}
 			if ('\"' == x)

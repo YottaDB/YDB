@@ -66,6 +66,8 @@ GBLREF	jnlpool_addrs_ptr_t			jnlpool_head;
 GBLREF	recvpool_addrs				recvpool;
 GBLREF	uint4					process_id;
 GBLREF	gd_region				*gv_cur_region;
+GBLREF	sgmnt_addrs				*cs_addrs;
+GBLREF	sgmnt_data_ptr_t			cs_data;
 GBLREF	gtmsource_options_t			gtmsource_options;
 GBLREF	gtmrecv_options_t			gtmrecv_options;
 GBLREF	int					pool_init;
@@ -81,7 +83,6 @@ GBLREF	is_anticipatory_freeze_needed_t		is_anticipatory_freeze_needed_fnptr;
 GBLREF	set_anticipatory_freeze_t		set_anticipatory_freeze_fnptr;
 GBLREF	err_ctl					merrors_ctl;
 GBLREF	jnl_gbls_t				jgbl;
-GBLREF	gd_addr					*gd_header;
 GBLREF	char					repl_instfilename[];
 GBLREF	char					repl_inst_name[];
 GBLREF	gd_addr					*repl_inst_from_gld;
@@ -162,28 +163,60 @@ error_def(ERR_TEXT);
 	}															\
 }
 
-#define RELEASE_NEW_TMP_JNLPOOL(HAVETMPJPL, TMPJPL, DUMMYREG, JPL, SAVEJPL, GVCURREGION)	\
-{												\
-	gd_region		*save_cur_reg;							\
-												\
-	if (HAVETMPJPL)										\
-	{											\
-		if (DUMMYREG)									\
-		{										\
-			save_cur_reg = GVCURREGION;						\
-			GVCURREGION = TMPJPL->jnlpool_dummy_reg;				\
-			mu_gv_cur_reg_free();							\
-			GVCURREGION = save_cur_reg;						\
-		}										\
-		JPL = SAVEJPL;									\
-		free(TMPJPL);									\
-	}											\
+#define RELEASE_NEW_TMP_JNLPOOL(HAVETMPJPL, TMPJPL, DUMMYREG, JPL, SAVEJPL, GVCURREGION)				\
+{															\
+	gd_region		*save_cur_reg;										\
+															\
+	if (HAVETMPJPL)													\
+	{														\
+		if (DUMMYREG)												\
+		{													\
+			sgmnt_addrs		*save_csaddrs;								\
+			sgmnt_data_ptr_t	save_csdata;								\
+															\
+			save_cur_reg = GVCURREGION;									\
+			/* Save "cs_addrs" and "cs_data" as "mu_gv_cur_reg_free" modifies these global variables */	\
+			save_csaddrs = cs_addrs;									\
+			save_csdata = cs_data;										\
+			GVCURREGION = TMPJPL->jnlpool_dummy_reg;							\
+			mu_gv_cur_reg_free();										\
+			GVCURREGION = save_cur_reg;									\
+			/* Restore cs_addrs and cs_data now that "mu_gv_cur_reg_free" is done */			\
+			cs_addrs = save_csaddrs;									\
+			cs_data = save_csdata;										\
+		}													\
+		JPL = SAVEJPL;												\
+		free(TMPJPL);												\
+	}														\
 }
+
+#define	SET_JNLPOOL_PTR_IN_GLD(GD_PTR, JNLPOOL)			\
+{								\
+	if (NULL != GD_PTR)					\
+		GD_PTR->gd_runtime->jnlpool = JNLPOOL;		\
+}
+
+#define	ADD_TO_JNLPOOL_HEAD_LIST(NEW_TMP_JNLPOOL, JNLPOOL, JNLPOOL_HEAD, GD_PTR)					\
+MBSTART {														\
+	jnlpool_addrs_ptr_t	last_jnlpool;										\
+															\
+	/* if new jnlpool, add to jnlpool_head list */									\
+	if (NEW_TMP_JNLPOOL)												\
+		if (NULL != JNLPOOL_HEAD)										\
+		{													\
+			for (last_jnlpool = jnlpool_head; last_jnlpool->next; last_jnlpool = last_jnlpool->next)	\
+				;											\
+			if (JNLPOOL != last_jnlpool)									\
+				last_jnlpool->next = JNLPOOL;								\
+		} else													\
+			jnlpool_head = JNLPOOL;										\
+	SET_JNLPOOL_PTR_IN_GLD(GD_PTR, JNLPOOL);									\
+} MBEND
 
 void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t *jnlpool_creator, gd_addr *gd_ptr)
 {
 	boolean_t		hold_onto_ftok_sem, is_src_srvr, new_ipc, reset_gtmsrclcl_info, slot_needs_init, srv_alive;
-	boolean_t		cannot_activate, ftok_counter_halted, skip_locks, new_tmp_jnlpool, new_dummy_reg, gdid_matched;
+	boolean_t		cannot_activate, ftok_counter_halted, skip_locks, new_tmp_jnlpool, new_dummy_reg;
 	char			instfilename[MAX_FN_LEN + 1], machine_name[MAX_MCNAMELEN], scndry_msg[OUT_BUFF_SIZE];
 	gd_region		*r_save, *reg;
 	int			status, save_errno;
@@ -207,7 +240,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	seq_num			reuse_slot_seqnum, instfilehdr_seqno;
 	repl_histinfo		last_histinfo;
 	jnlpool_ctl_ptr_t	tmp_jnlpool_ctl;
-	jnlpool_addrs_ptr_t	tmp_jnlpool, last_jnlpool, save_jnlpool;
+	jnlpool_addrs_ptr_t	tmp_jnlpool, save_jnlpool;
 	struct sembuf   	sop[3];
 	uint4           	sopcnt;
 	DEBUG_ONLY(int4		semval);
@@ -223,7 +256,6 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, status))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to get the hostname"), errno);
 	save_jnlpool = jnlpool;	/* so can be restored if error */
-	local_gdptr = gd_ptr ? gd_ptr : gd_header;	/* note gd_header may be NULL */
 	/* note embedded assignment below */
 	assertpro(repl_gld = (gd_addr *)repl_inst_get_name(instfilename, &full_len, MAX_FN_LEN + 1, issue_rts_error, gd_ptr));
 	status = filename_to_id(&instfilename_gdid, instfilename);
@@ -231,7 +263,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_REPLINSTACC, 2, full_len, instfilename,
 				ERR_TEXT, 2, RTS_ERROR_LITERAL("could not get file id"), status);
 	/* look through jnlpool_head list for matching instfilename */
-	for (tmp_jnlpool = jnlpool_head, gdid_matched = FALSE; tmp_jnlpool; tmp_jnlpool = tmp_jnlpool->next)
+	for (tmp_jnlpool = jnlpool_head; NULL != tmp_jnlpool; tmp_jnlpool = tmp_jnlpool->next)
 	{
 		if (NULL != tmp_jnlpool->jnlpool_dummy_reg)
 		{
@@ -239,12 +271,19 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			udi = FILE_INFO(reg);
 			if (is_gdid_identical(&instfilename_gdid, &udi->fileid))
 			{
-				gdid_matched = TRUE;
-				break;
+				if (tmp_jnlpool->pool_init)
+				{	/* This journal pool has already been inited. Possible if multiple glds map
+					 * to the same replication instance file. No need to do anything more.
+					 */
+					assert((NULL == gd_ptr) || (NULL == gd_ptr->gd_runtime->jnlpool));
+					SET_JNLPOOL_PTR_IN_GLD(gd_ptr, tmp_jnlpool);
+					return;
+				}
+				break;	/* At this point "tmp_jnlpool" is guaranteed to be non-NULL */
 			}
 		}
 	}
-	if ((NULL == tmp_jnlpool) || (tmp_jnlpool->pool_init && !gdid_matched))
+	if (NULL == tmp_jnlpool)
 	{	/* no jnlpool for instfilename or in use jnlpool not matching so get a new one */
 		tmp_jnlpool = malloc(SIZEOF(jnlpool_addrs));
 		memset((uchar_ptr_t)tmp_jnlpool, 0, SIZEOF(jnlpool_addrs));
@@ -270,12 +309,23 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		r_save = gv_cur_region;
 		if ((NULL != tmp_jnlpool->jnlpool_dummy_reg) && (tmp_jnlpool->jnlpool_dummy_reg != recvpool.recvpool_dummy_reg))
 		{	/* free jnlpool_dummy_reg if not in recvpool dummy reg */
+			sgmnt_addrs		*save_csaddrs;
+			sgmnt_data_ptr_t	save_csdata;
+
 			gv_cur_region = tmp_jnlpool->jnlpool_dummy_reg;
+			/* Save "cs_addrs" and "cs_data" as "mu_gv_cur_reg_free" modifies these global variables */
+			save_csaddrs = cs_addrs;
+			save_csdata = cs_data;
 			mu_gv_cur_reg_free();
+			/* Restore cs_addrs and cs_data now that "mu_gv_cur_reg_free" is done */
+			cs_addrs = save_csaddrs;
+			cs_data = save_csdata;
 		}
-		mu_gv_cur_reg_init();
+		mu_gv_cur_reg_init();	/* Note: this modifies "gv_cur_region" but not "cs_addrs" and "cs_data" so
+					 * restore of the latter done right after "mu_gv_cur_reg_free" above is good.
+					 */
 		reg = gv_cur_region;
-		gv_cur_region = r_save;
+		gv_cur_region = r_save;	/* Restore "gv_cur_region" to value at function entry */
 		new_dummy_reg = TRUE;
 		ASSERT_IN_RANGE(MIN_RN_LEN, SIZEOF(JNLPOOL_DUMMY_REG_NAME) - 1, MAX_RN_LEN);
 		MEMCPY_LIT(reg->rname, JNLPOOL_DUMMY_REG_NAME);
@@ -303,7 +353,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 				assert(repl_gld == tmp_jnlpool->gd_ptr);
 		} else if (NULL == tmp_jnlpool->gd_ptr)
 		{	/* instance file from ydb_repl_instance environment variable */
-			tmp_jnlpool->gd_ptr = local_gdptr;
+			tmp_jnlpool->gd_ptr = gd_ptr;
 			tmp_jnlpool->gd_instinfo = NULL;
 		}
 	}
@@ -318,9 +368,9 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	/* First grab ftok semaphore for replication instance file.  Once we have it locked, no one else can start up
 	 * or shut down replication for this instance. We will release ftok semaphore when initialization is done.
 	 */
-	 jnlpool = tmp_jnlpool;
-	 assert(NULL != jnlpool);
-	 /* ftok_sem_get uses jnlpool for asserts */
+	jnlpool = tmp_jnlpool;
+	assert(NULL != jnlpool);
+	/* ftok_sem_get uses jnlpool for asserts */
 	if (!ftok_sem_get(tmp_jnlpool->jnlpool_dummy_reg, TRUE, REPLPOOL_ID, FALSE, &ftok_counter_halted))
 	{
 		save_errno = errno;
@@ -359,8 +409,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 			ftok_sem_release(tmp_jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			if (GTMRELAXED == pool_user)
 			{
-				if (NULL == jnlpool_head)
-					jnlpool_head = jnlpool;
+				ADD_TO_JNLPOOL_HEAD_LIST(new_tmp_jnlpool, jnlpool, jnlpool_head, gd_ptr);
 				return;		/* jnlpool must be allocated by here */
 			}
 			assert(!STRCMP(udi->fn, instfilename));
@@ -507,8 +556,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		ftok_sem_release(tmp_jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 		if (GTMRELAXED == pool_user)
 		{
-			if (NULL == jnlpool_head)
-				jnlpool_head = jnlpool;
+			ADD_TO_JNLPOOL_HEAD_LIST(new_tmp_jnlpool, jnlpool, jnlpool_head, gd_ptr);
 			return;
 		}
 		assert(!STRCMP(udi->fn, instfilename));
@@ -575,17 +623,10 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JNLPOOLSETUP, 0, ERR_TEXT, 2,
 			RTS_ERROR_LITERAL("Error with journal pool shmat"), save_errno);
 	}
-	/* if new jnlpool, add to jnlpool_head list */
-	if (new_tmp_jnlpool)
-		if (NULL != jnlpool_head)
-		{
-			for (last_jnlpool = jnlpool_head; last_jnlpool->next; last_jnlpool = last_jnlpool->next)
-				;
-			if (tmp_jnlpool != last_jnlpool)
-				last_jnlpool->next = tmp_jnlpool;
-		} else
-			jnlpool_head = tmp_jnlpool;
-	jnlpool = tmp_jnlpool;
+	assert(jnlpool == tmp_jnlpool);
+	assert((NULL == gd_ptr) || (NULL == gd_ptr->gd_runtime->jnlpool)
+		|| (!new_tmp_jnlpool && (tmp_jnlpool == gd_ptr->gd_runtime->jnlpool) && !tmp_jnlpool->pool_init));
+	ADD_TO_JNLPOOL_HEAD_LIST(new_tmp_jnlpool, jnlpool, jnlpool_head, gd_ptr);
 	jnlpool->jnlpool_ctl = tmp_jnlpool_ctl;
 	/* Now that we have attached to the journal pool, fix udi->counter_ftok_incremented back to an accurate value */
 	udi->counter_ftok_incremented = !ftok_counter_halted;
@@ -1238,18 +1279,16 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	}
 	if (!hold_onto_ftok_sem && !ftok_sem_release(jnlpool->jnlpool_dummy_reg, FALSE, FALSE))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
-	/* Set up pool_init if jnlpool is still attached (e.g. we could have detached if GTMRELAXED and upd_disabled) */
-	if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl))
-	{
-		if (('\0' == repl_inst_name[0]) && ('\0' != repl_instfilename[0]))
-		{	/* fill in instance name if right instance file name and first */
-			if (0 == STRCMP(repl_instfilename, instfilename))
-				memcpy(repl_inst_name, repl_instance.inst_info.this_instname, MAX_INSTNAME_LEN);
-		}
-		jnlpool->pool_init = TRUE;
-		pool_init++;
-		ENABLE_FREEZE_ON_ERROR;
+	assert(NULL != jnlpool);
+	assert(NULL != jnlpool->jnlpool_ctl);
+	if (('\0' == repl_inst_name[0]) && ('\0' != repl_instfilename[0]))
+	{	/* fill in instance name if right instance file name and first */
+		if (0 == STRCMP(repl_instfilename, instfilename))
+			memcpy(repl_inst_name, repl_instance.inst_info.this_instname, MAX_INSTNAME_LEN);
 	}
+	jnlpool->pool_init = TRUE;
+	pool_init++;
+	ENABLE_FREEZE_ON_ERROR;
 	return;
 }
 

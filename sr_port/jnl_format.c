@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -175,7 +178,7 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 	/* Allocate a jfb structure */
 	if (!dollar_tlevel)
 	{
-		jfb = non_tp_jfb_ptr; /* already malloced in gvcst_init() */
+		jfb = non_tp_jfb_ptr; /* already malloced in "gvcst_init" */
 		jgbl.cumul_jnl_rec_len = 0;
 		DEBUG_ONLY(jgbl.cumul_index = jgbl.cu_jnl_index = 0;)
 	} else
@@ -354,7 +357,10 @@ jnl_format_buffer *jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 			SET_PREV_ZTWORM_JFB_IF_NEEDED(is_ztworm_rec, (jfb->alt_buff + FIXED_UPD_RECLEN));
 		}
 		ASSERT_ENCRYPTION_INITIALIZED;
-		use_new_key = (encr_ptr->reorg_encrypt_cycle != csa->nl->reorg_encrypt_cycle) ? FALSE : USES_NEW_KEY(encr_ptr);
+		if (encr_ptr->reorg_encrypt_cycle == csa->nl->reorg_encrypt_cycle)
+			use_new_key = USES_NEW_KEY(encr_ptr);
+		else	/* Cycle mismatch, use the current key unless there is none */
+			use_new_key = (GTMCRYPT_INVALID_KEY_HANDLE != csa->encr_key_handle) ? FALSE : TRUE;
 		assert((!use_new_key && (NULL != csa->encr_key_handle)) || (use_new_key && (NULL != csa->encr_key_handle2)));
 		/* Encrypt the logical portion of the record, which eventually gets written to the journal buffer/file */
 		if (use_new_key || encr_ptr->non_null_iv)

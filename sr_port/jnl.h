@@ -320,7 +320,7 @@ MBSTART {						\
 }
 
 /* Token generation used in non-replicated journaled environment. Note the assumption here
-   that SIZEOF(token_split_t) == SIZEOF(token_build) which will be asserted in gvcst_init().
+   that SIZEOF(token_split_t) == SIZEOF(token_build) which will be asserted in "gvcst_init".
    The TOKEN_SET macro below depends on this assumption.
 */
 typedef struct token_split_t_struct
@@ -1272,6 +1272,24 @@ MBSTART {							\
 	JPC->phase2_free = (FREEADDR) % JBP->size;	\
 }
 
+/* Test an edge case when a process is killed just before phase2_commit_index2 is updated at the end of UPDATE_JBP_RSRV_FREEADDR */
+#ifdef DEBUG
+#define DECR_INDEX2_AND_KILL(IDX2, IDX1)									\
+MBSTART {													\
+	/* ydb_white_box_test_case_count is set to 1/0 by test system. Then in t_end/tp_tend (if it's 0)	\
+	 * or in jnl_write (if it's 1), ydb_white_box_test_case_count is set to 2 : to kill the process.	\
+	 */													\
+	if (2 == ydb_white_box_test_case_count)									\
+	{													\
+		DECR_PHASE2_COMMIT_INDEX(IDX2, JNL_PHASE2_COMMIT_ARRAY_SIZE);					\
+		assert(IDX2 == IDX1);										\
+		kill(process_id, SIGKILL);									\
+	}													\
+} MBEND
+#else	/* #ifdef DEBUG */
+#define DECR_INDEX2_AND_KILL(IDX2, IDX1)	/* No-OP */
+#endif	/* #ifdef DEBUG */
+
 #define	UPDATE_JBP_RSRV_FREEADDR(CSA, JPC, JBP, JPL, RLEN, INDEX, IN_PHASE2, JNL_SEQNO, STRM_SEQNO, REPLICATION)	\
 MBSTART {														\
 	uint4			rsrv_freeaddr;										\
@@ -1282,6 +1300,14 @@ MBSTART {														\
 	GBLREF	uint4		dollar_tlevel;										\
 															\
 	assert(CSA->now_crit);												\
+	/* The following condition implies that a previous update process was killed in CMT06, right before updating	\
+	 * JBP->phase2_commit_index2. Increment index2 & call jnl_phase2_cleanup() to process it as a dead commit.	\
+	 */														\
+	if ((JBP->phase2_commit_index2 == JBP->phase2_commit_index1) && (JBP->freeaddr < JBP->rsrv_freeaddr))		\
+	{														\
+		INCR_PHASE2_COMMIT_INDEX(JBP->phase2_commit_index2, JNL_PHASE2_COMMIT_ARRAY_SIZE);			\
+		jnl_phase2_cleanup(CSA, JBP);										\
+	}														\
 	/* Allocate a slot. But before that, check if the slot array is full.						\
 	 * endIndex + 1 == first_index implies full.	Note: INCR_PHASE2_COMMIT_INDEX macro does the + 1		\
 	 * endIndex     == first_index implies empty.									\
@@ -1333,6 +1359,10 @@ MBSTART {														\
 	SET_JBP_RSRV_FREEADDR(JBP, rsrv_freeaddr);									\
 	SHM_WRITE_MEMORY_BARRIER; /* see corresponding SHM_READ_MEMORY_BARRIER in "jnl_phase2_cleanup" */		\
 	JBP->phase2_commit_index2 = nextIndex;										\
+	if (WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06))									\
+	{														\
+		DECR_INDEX2_AND_KILL(JBP->phase2_commit_index2, JBP->phase2_commit_index1);				\
+	}														\
 } MBEND
 
 #define	JNL_PHASE2_WRITE_COMPLETE(CSA, JBP, INDEX, NEW_FREEADDR)				\
@@ -1788,7 +1818,7 @@ MBSTART {								\
  * Note that we can do the db fsync only if we already have the journal file open. If we do not, we will end
  * up doing this later after grabbing crit. This just minimizes the # of times db fsync happens while inside crit.
  */
-#define	DO_DB_FSYNC_OUT_OF_CRIT_IF_NEEDED(REG, CSA, JPC, JBP)			\
+#define	DO_JNL_FSYNC_OUT_OF_CRIT_IF_NEEDED(REG, CSA, JPC, JBP)			\
 MBSTART {									\
 	assert(!CSA->now_crit);							\
 	if ((NULL != JPC) && JBP->need_db_fsync)				\

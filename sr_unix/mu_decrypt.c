@@ -1,6 +1,6 @@
 	/****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,7 +85,7 @@ int mu_decrypt(char *fname, int fname_len, uint4 off, uint4 len, char *type, int
 	}
 	if (is_encrypted)
 	{
-		INIT_PROC_ENCRYPTION(NULL, gtmcrypt_errno);
+		INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 		if (is_journal)
 		{
 			GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(NULL, hash, 0, NULL, key_handle, gtmcrypt_errno);

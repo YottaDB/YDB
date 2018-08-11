@@ -541,7 +541,7 @@ void mupip_backup(void)
 			continue;
 		}
 		gv_cur_region = rptr->reg;
-		gvcst_init(gv_cur_region, NULL);
+		gvcst_init(gv_cur_region);
 		if (gv_cur_region->was_open)
 		{
 			gv_cur_region->open = FALSE;
@@ -758,9 +758,9 @@ void mupip_backup(void)
 		/* Attach to jnlpool if backup of replication instance file is needed and "jnlpool_init" did not happen as part of
 		 * "gvcst_init" (e.g. if CUSTOM_ERRORS_AVAILABLE is FALSE).
 		 */
-		repl_inst_available = REPL_INST_AVAILABLE(NULL);
+		repl_inst_available = REPL_INST_AVAILABLE(gd_header);
 		if (!pool_init && repl_inst_available)
-			jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL, NULL);
+			jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL, gd_header);
 		if (!pool_init)
 		{	/* pool_init is only set if the source server has setup shared memory */
 			assert(NULL != jnlpool);
@@ -822,7 +822,7 @@ void mupip_backup(void)
 				 * rare that we keep retrying.
 				 */
 				ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
-				jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL, NULL);
+				jnlpool_init(GTMRELAXED, (boolean_t)FALSE, (boolean_t *)NULL, gd_header);
 					/* "jnlpool_init" will set "pool_init" if successful */
 				if (pool_init)
 					break;

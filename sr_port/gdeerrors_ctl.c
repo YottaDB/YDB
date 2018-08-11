@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -106,8 +106,17 @@ LITDEF	err_msg gdeerrors[] = {
 };
 
 
+
+LITDEF	int gdeerrors_undocarr[] = {
+};
+
+
 GBLDEF	err_ctl gdeerrors_ctl = {
 	248,
 	"GDE",
 	&gdeerrors[0],
-	86};
+	86,
+	&gdeerrors_undocarr[0],
+	0
+};
+

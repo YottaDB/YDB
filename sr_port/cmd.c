@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -212,6 +212,7 @@ LITDEF struct
 	int		rval, x;
 	oprtype		*cr;
 	triple		*fetch0, *oldchain, *ref0, *ref1, *temp_expr_start, tmpchain, *triptr;
+	mval		*v;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -270,12 +271,13 @@ LITDEF struct
 			triptr = triptr->exorder.bl;
 		if (OC_LIT == triptr->opcode)
 		{
-			if (0 == triptr->operand[0].oprval.mlit->v.m[1])
+			v = &triptr->operand[0].oprval.mlit->v;
+			if (0 == MV_FORCE_BOOL(v))
 			{	/* it's FALSE, so no need for this parse - get ready to discard it */
 				dqinit(&tmpchain, exorder);
 				oldchain = setcurtchain(&tmpchain);
 			}
-			unuse_literal(&triptr->operand[0].oprval.mlit->v);
+			unuse_literal(v);
 			dqdel(triptr, exorder);				/* if it's TRUE, so just pretend it never appeared */
 		}
 		if (shifting = ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode)))

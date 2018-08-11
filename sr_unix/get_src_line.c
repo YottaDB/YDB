@@ -151,14 +151,17 @@ int get_src_line(mval *routine, mval *label, int offset, mstr **srcret, rhdtyp *
 				return OBJMODMISS;
 			}
 		}
-#		ifdef AUTORELINK_SUPPORTED
-		/* We have the routine now but double check if we need to load a newer one */
-		explicit_relink_check(rtn_vector, TRUE);
+	}
+#	ifdef AUTORELINK_SUPPORTED
+	if (!(WANT_CURRENT_RTN(routine)) && !is_trigger)
+	{	/* We have the routine now but double check if we need to load a newer one */
+		DEBUG_ONLY(rtn_vector->rtn_relinked = FALSE);			/* meet expectations of assert in checker below */
+		explicit_relink_check(rtn_vector, TRUE);			/* meant for code invokers, not code displayers */
 		rtn_vector = (TABENT_PROXY).rtnhdr_adr;
 		assert(NULL != rtn_vector);
 		DBGARLNK((stderr, "get_src_line: Fetching routine source for rtnhdr 0x"lvaddr"\n", rtn_vector));
-#		endif
 	}
+#	endif
 	if (NULL != rtn_vec)
 		*rtn_vec = rtn_vector;
 	if (!rtn_vector->src_full_name.len)

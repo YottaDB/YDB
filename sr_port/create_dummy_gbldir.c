@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -69,8 +72,8 @@ gd_addr *create_dummy_gbldir(void)
 	/* The below code might need corresponding changes if ever the gld format changes hence the GDE_LABEL_LITERAL assert */
 	GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX112"));)
 	NON_GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX012"));)
-	addr = (gd_addr *)malloc(DUMMY_GBLDIR_SIZE);
-	memset(addr, 0, DUMMY_GBLDIR_SIZE);
+	addr = (gd_addr *)malloc(DUMMY_GBLDIR_SIZE + SIZEOF(gd_runtime_t));
+	memset(addr, 0, DUMMY_GBLDIR_SIZE + SIZEOF(gd_runtime_t));
 	addr->max_rec_size = 256;
 	addr->maps = (gd_binding *)((UINTPTR_T)addr + SIZEOF(gd_addr));
 	addr->var_maps_len = DUMMY_GBLDIR_VAR_MAP_SIZE;
@@ -115,5 +118,8 @@ gd_addr *create_dummy_gbldir(void)
 	memset(addr->id, 0, SIZEOF(gd_id));
 	addr->tab_ptr = (hash_table_mname *)malloc(SIZEOF(hash_table_mname));
 	init_hashtab_mname((hash_table_mname *)addr->tab_ptr, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE );
+	/* Allocate and initialize "gd_runtime" */
+	addr->gd_runtime = (gd_runtime_t *)((char *)addr + DUMMY_GBLDIR_SIZE);
+	assert((UINTPTR_T)addr->gd_runtime >= (UINTPTR_T)addr->end);
 	return addr;
 }

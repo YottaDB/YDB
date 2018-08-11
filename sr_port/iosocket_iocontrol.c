@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -63,7 +66,6 @@ error_def(ERR_INVCTLMNE);
 #define READ		"READ|"
 #define MAXEVENTLITLEN	(SIZEOF(LISTENING)-1)
 #define MAXZKEYITEMLEN	(MAX_HANDLE_LEN + SA_MAXLITLEN + MAXEVENTLITLEN + 2)	/* 1 pipe and a semicolon */
-#define FORMATTIMESTR "FORMAT"
 
 void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 {
@@ -103,7 +105,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 	{
 		arg = (0 < argcnt) ? va_arg(args, mval *) : (mval *)&literal_notimeout;
 		if ((NULL != arg) && !M_ARG_SKIPPED(arg) && MV_DEFINED(arg))
-			MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
+			MV_FORCE_MSTIMEOUT(arg, msec_timeout, "/WAIT");
 		else
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXPR);
@@ -131,7 +133,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				arg = (mval *)&literal_notimeout;
 		} else
 			arg = (mval *)&literal_notimeout;
-		MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
+		MV_FORCE_MSTIMEOUT(arg, msec_timeout, "/PASS");
 		iosocket_pass_local(io_curr_device.out, pid, msec_timeout, n, args);
 	} else if (0 == memcmp(action, "ACCEPT", length))
 	{
@@ -161,7 +163,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				arg = (mval *)&literal_notimeout;
 		} else
 			arg = (mval *)&literal_notimeout;
-		MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
+		MV_FORCE_MSTIMEOUT(arg, msec_timeout, "/ACCEPT");
 		iosocket_accept_local(io_curr_device.in, handlesvar, pid, msec_timeout, n, args);
 #ifdef	GTM_TLS
 	} else if (0 == memcmp(action, "TLS", length))
@@ -188,7 +190,7 @@ void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 				arg = (mval *)&literal_notimeout;
 		} else
 			arg = (mval *)&literal_notimeout;
-		MV_FORCE_MSTIMEOUT(arg, msec_timeout, FORMATTIMESTR);
+		MV_FORCE_MSTIMEOUT(arg, msec_timeout, "/TLS");
 		if (3 <= argcnt)
 		{
 			tlsid = va_arg(args, mval *);

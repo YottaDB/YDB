@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -198,11 +201,11 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 		}
 		fc = seg->file_cntl;
 		/* open shared to see what's possible */
-		gvcst_init(gv_cur_region, NULL);
+		gvcst_init(gv_cur_region);
 		tp_change_reg();
 		assert(!gv_cur_region->was_open);
 		rptr->sd = csd = cs_data;
-		rptr->state = ALLOCATED;		/* This means gvcst_init() was called for this region */
+		rptr->state = ALLOCATED;		/* This means "gvcst_init" was called for this region */
 		assert(!gv_cur_region->was_open);	/* In case mupip_set_file opened it, they must have closed */
 		if (gv_cur_region->read_only)
 		{

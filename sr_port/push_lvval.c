@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- * Copyright 2009, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
@@ -29,13 +30,13 @@ GBLREF unsigned char 	*stackbase, *stacktop, *msp, *stackwarn;
 GBLREF symval		*curr_symval;
 GBLREF uint4		dollar_tlevel;
 
+error_def(ERR_STACKOFLOW);
+error_def(ERR_STACKCRIT);
+
 /* Take supplied mval and place it into a freshly allocated lv_val */
 lv_val *push_lvval(mval *arg1)
 {
-	lv_val	*lvp;
-
-	error_def(ERR_STACKOFLOW);
-	error_def(ERR_STACKCRIT);
+	lv_val		*lvp;
 
 	PUSH_MV_STENT(MVST_LVAL);
 	mv_chain->mv_st_cont.mvs_lvval = lvp = lv_getslot(curr_symval);

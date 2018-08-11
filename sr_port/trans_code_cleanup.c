@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -113,7 +116,7 @@ void trans_code_cleanup(void)
 				 * is not a direct mode frame, we'll assert in debug or break in pro and just continue.
 				 * to direct mode.
 				 */
-				assert(fp->flags && (SFF_INDCE));
+				assert(fp->flags & SFF_INDCE);
 				if (!fp->old_frame_pointer || !(fp->old_frame_pointer->type & SFT_DM))
 				{
 					assert(FALSE);

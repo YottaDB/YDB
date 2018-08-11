@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2014 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -42,6 +42,10 @@
 #include "have_crit.h"
 
 #define FILE_NAME_SIZE	255
+
+#if defined(__x86_64__)
+	extern void opp_ciret();
+#endif
 
 LITDEF char 		interactive_mode_buf[] = "INTERACTIVE";
 LITDEF char 		other_mode_buf[] = "OTHER";

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -30,11 +30,10 @@
 #ifdef DEBUG
 #include "wbox_test_init.h"
 #endif
-#ifdef UNIX
 #include "gt_timer.h"
 #include "gtm_multi_thread.h"
 #include "gtm_multi_proc.h"
-#endif
+#include "gtmsiginfo.h"
 
 typedef enum
 {
@@ -79,6 +78,11 @@ typedef enum
 	INTRPT_IN_UNLINK_AND_CLEAR,	/* Deferring interrupts around unlink and clearing the filename being unlinked */
 	INTRPT_IN_GETC,			/* Deferring interrupts around GETC() call */
 	INTRPT_IN_AIO_ERROR,		/* Deferring interrupts around aio_error() call */
+	INTRPT_IN_RETRY_LOOP,		/* Deferring interrupts while retrying an operation while others are blocked */
+	INTRPT_IN_CRIT_FUNCTION,	/* Deferring interrupts in crit functions, replacing crit_count. */
+	INTRPT_IN_DEADLOCK_CHECK,	/* Deferring interrupts in crit deadlock check, replacing crit_count. */
+	INTRPT_IN_DB_JNL_LSEEKWRITE,	/* Deferring interrupts in DB_/JNL_LSEEKWRITE() call */
+	INTRPT_IN_JNL_QIO,		/* Deferring interrupts in journal qio, replacing jnl_qio_in_prog. */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 

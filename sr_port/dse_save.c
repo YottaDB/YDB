@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -129,7 +130,7 @@ void dse_save(void)
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	memcpy(patch_save_set[patch_save_count].bp, bp, cs_addrs->hdr->blk_size);
 	DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-	buff_len = SIZEOF(buff);
+	buff_len = MAX_COMMENT_LEN - 1;
 	if ((CLI_PRESENT == cli_present("COMMENT")) && cli_get_str("COMMENT", buff, &buff_len))
 	{
 		ptr = &buff[buff_len];

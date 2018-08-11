@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -40,7 +40,7 @@ GBLREF	boolean_t		caller_id_flag;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	volatile boolean_t	timer_in_handler;
-GBLREF	volatile int4		exit_state;
+GBLREF	int4			exit_state;
 
 #ifdef DEBUG
 static uint4		nesting_level = 0;

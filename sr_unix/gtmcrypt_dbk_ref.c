@@ -633,7 +633,7 @@ STATICFNDEF int keystore_refresh(void)
 				}
 				return -1;
 			}
-			if (GTM_PATH_MAX <= envvar_len)
+			if (YDB_PATH_MAX <= envvar_len)
 			{
 				if (is_ydb_env_match)
 				{

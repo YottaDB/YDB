@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2016 Fidelity National Information	*
+ * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -506,7 +506,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 	/* Setup function pointers to symbols exported by libyottadb.so. */
 	if (0 != gc_load_yottadb_symbols())
 		return NULL;
-	/* Setup a SSL context that allows SSLv3 and TLSv1.x but no SSLv2 (which is deprecated due to a great number of security
+	/* Setup a SSL context that allows TLSv1.x but no SSLv[23] (which is deprecated due to a great number of security
 	 * vulnerabilities).
 	 */
 	if (NULL == (ctx = SSL_CTX_new(SSLv23_method())))
@@ -514,7 +514,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		GC_APPEND_OPENSSL_ERROR("Failed to create an SSL context.");
 		return NULL;
 	}
-	SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2);
+	SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 	/* Read the configuration file for more configuration parameters. */
 	cfg = &gtm_tls_cfg;
 	config_init(cfg);

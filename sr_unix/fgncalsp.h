@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2013 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -162,6 +162,6 @@ void 		fgncal_getstr(mstr *inp, mstr *str);
 void 		fgncal_lkbind(mstr *inp);
 void 		fgn_glopref(mval *v);
 struct extcall_package_list 	*exttab_parse (mval *package);
-callin_entry_list		*citab_parse (void);
+callin_entry_list		*citab_parse (int internal);
 
 #endif

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -73,6 +74,10 @@ mint	gvcst_data(void)
 
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	val = gvcst_data2();
+	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_data, (gtm_uint64_t) 1);
+	WBTEST_ONLY(WBTEST_QUERY_HANG,
+		LONG_SLEEP(2); // we need this to let things see the incremented value
+	);
 #	ifdef UNIX
 	if (-1 != val)
 	{
@@ -86,8 +91,9 @@ mint	gvcst_data(void)
 		op_tstart((IMPLICIT_TSTART), TRUE, &literal_batch, 0);
 		ESTABLISH_NORET(gvcst_data_ch, est_first_pass);
 		GVCST_ROOT_SEARCH_AND_PREP(est_first_pass);
-		/* fix up since it should only be externally counted as one $data */
-		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_data, (gtm_uint64_t) -1);
+		WBTEST_ONLY(WBTEST_QUERY_HANG,
+				LONG_SLEEP(2);
+		);
 		val = gvcst_data2();
 	} else
 		sn_tpwrapped = FALSE;
@@ -212,7 +218,6 @@ mint	gvcst_data2(void)
 				continue;
 			}
 		}
-		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_data, 1);
 		return (0 != realval) ? realval : val;
 	}
 }

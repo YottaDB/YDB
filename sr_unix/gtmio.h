@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -417,6 +417,7 @@ MBSTART {											\
 	size_t			gtmioBuffLen;							\
 	off_t			gtmioPtr;							\
 	sm_uc_ptr_t		gtmioBuff;							\
+												\
 	gtmioBuffLen = FBUFF_LEN;								\
 	gtmioBuff = (sm_uc_ptr_t)(FBUFF);							\
 	gtmioPtr = (off_t)(FPTR);								\

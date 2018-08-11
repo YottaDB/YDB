@@ -1,6 +1,7 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-!	Copyright 2001, 2009 Fidelity Information Services, Inc	!
+! Copyright (c) 2001-2018 Fidelity National Information		!
+! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
 !	of its copyright holder(s), and is made available	!
@@ -10,6 +11,10 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	.FACILITY	CMI,250/PREFIX=CMI_
 	.TITLE	CMIERRORS Error Messages for CMI ,GT.CM
+!
+!  List of known undocumented messages follows (along with a comment) (do not change "known undocumented" phrase)
+! ----- Buffer to introduce new undocumented error messages without affecting UNUSEDMSGnnn match with corresponding line numbers.
+!
 DCNINPROG	<Attempt to initiate operation while disconnect was in progress>/fatal/fao=0
 LNKNOTIDLE	<Attempt to initiate operation before previous operation completed>/fatal/fao=0
 ASSERT		<Assert failed !AD line !UL>/error/fao=3

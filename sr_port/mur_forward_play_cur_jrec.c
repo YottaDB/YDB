@@ -280,8 +280,8 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 		}
 		tp_set_sgm();	/* needed to set "sgm_info_ptr" to correspond to "rctl" */
 	}
-	/* For extract, if database was present we would have done gvcst_init().
-	 * For recover/rollback gvcst_init() should definitely have been done.
+	/* For extract, if database was present we would have done "gvcst_init".
+	 * For recover/rollback "gvcst_init" should definitely have been done.
 	 * In both cases rctl->gd->open will be non-NULL. Note that rctl->csa could be non-NULL
 	 * (set in mur_forward) even if rctl->gd->open is non-NULL. So don't use that.
 	 * Only then can we call gvcst_root_search() to find out collation set up for this global.

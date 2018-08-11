@@ -35,6 +35,9 @@
 #include "filestruct.h"		/* needed for "jnl.h" */
 #include "jnl.h"		/* needed for "jgbl" */
 #include "zshow.h"		/* needed for format2zwr */
+#include "cli.h"
+#include "stringpool.h"
+#include "mv_stent.h"
 
 LITREF mval 		literal_one;
 
@@ -63,8 +66,9 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 	mname_entry		gvent, lvent;
 	mident_fixed		lcl_buff;
 	mstr			namestr, tmpstr;
+	mval			*tmpmv;
 	tp_region		*vr, *vr_nxt;
-	unsigned char 		*c, *c_top, *dst, *dst_top, global_names[1024], *nextsrc, *src, *src_top, stashed, y;
+	unsigned char 		*c, *c_top, *dst, *dst_top, global_names[MAX_PARMS], *nextsrc, *src, *src_top, stashed, y;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -127,7 +131,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					if ((IS_REG_BG_OR_MM(r_ptr)) && (!(IS_STATSDB_REG(r_ptr))))
 					{
 						if (!r_ptr->open)
-							gv_init_reg(r_ptr, NULL);
+							gv_init_reg(r_ptr);
 						insert_region(r_ptr, &TREF(view_region_list), &(TREF(view_region_free_list)),
 							SIZEOF(tp_region));
 					}
@@ -140,11 +144,14 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				rts_error_csa(CSA_ARG(NULL)
 					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
 			assert(NULL != parm);
-			if (!gd_header)		/* IF GD_HEADER == 0 THEN OPEN GBLDIR */
+			if (!gd_header)							/* IF GD_HEADER == 0 THEN OPEN GBLDIR */
 				gvinit();
-			if (!parm->str.len && vtp->keycode == VTK_GVNEXT)		/* "" => 1st region */
-				parmblk->gv_ptr = gd_header->regions;
-			else
+			if (!parm->str.len)
+			{								/* No region */
+				if (vtp->keycode != VTK_GVNEXT)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, LEN_AND_LIT("\"\""));
+				parmblk->gv_ptr = gd_header->regions;	 		/* "" => 1st region */
+			} else
 			{
 				namestr.addr = &lcl_buff.c[0];
 				cptr = parm->str.addr;
@@ -183,7 +190,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 							if (!is_dollar_view)
 							{
 								if (!r_ptr->open)
-									gv_init_reg(r_ptr, NULL);
+									gv_init_reg(r_ptr);
 								insert_region(r_ptr, &(TREF(view_region_list)),
 									&(TREF(view_region_free_list)), SIZEOF(tp_region));
 							}

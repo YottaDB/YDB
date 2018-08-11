@@ -267,7 +267,7 @@ STATICFNDCL void clean_wip_queue(unix_db_info *udi)
 	 * discover that our process id is not alive anymore and reissue the write. However, doing this here avoids
 	 * that salvage/reissue logic in "wcs_wtfini" from kicking in.
 	 */
-	gdi = udi->owning_gd->thread_gdi;
+	gdi = udi->owning_gd->gd_runtime->thread_gdi;
 	assert(gdi->num_ios > 0); 	/* caller should have ensured this */
 	csa = &udi->s_addrs;
 	csd = csa->hdr;
@@ -317,7 +317,7 @@ STATICFNDCL void clean_wip_queue(unix_db_info *udi)
 				{ 	/* We waited 5 seconds, and in that time wtfini_in_prog stayed non-zero.
 					 * We'll simply exit as our writes will be cleaned up once the process
 					 * dies anyway. We don't expect this edge case to occur in testing, so
-					 * we leave the assert gd->thread_gdi->num_ios == 0 in aio_shim_destroy()
+					 * we leave the assert gd->gd_runtime->thread_gdi->num_ios == 0 in aio_shim_destroy()
 					 * as-is.
 					 */
 					done = TRUE;
@@ -437,7 +437,7 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 	}
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, ret);
 	multi_thread_in_use = FALSE;
-	gd->thread_gdi = gdi;
+	gd->gd_runtime->thread_gdi = gdi;
 	return 0;
 }
 
@@ -454,7 +454,7 @@ void aio_shim_destroy(gd_addr *gd)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	gdi = gd->thread_gdi;
+	gdi = gd->gd_runtime->thread_gdi;
 	if (NULL == gdi)
 	{	/* A write didn't happen. */
 		return;
@@ -491,7 +491,7 @@ void aio_shim_destroy(gd_addr *gd)
 	assert(0 == gdi->num_ios);
 	/* Delete the thread_gdi to leave us in a state consistent with no thread existing. */
 	gtm_free(gdi);
-	gd->thread_gdi = NULL;
+	gd->gd_runtime->thread_gdi = NULL;
 }
 
 void	aio_gld_clean_wip_queue(gd_addr *input_gd, gd_addr *match_gd)
@@ -500,7 +500,7 @@ void	aio_gld_clean_wip_queue(gd_addr *input_gd, gd_addr *match_gd)
 	gd_region 	*reg, *r_top;
 	struct gd_info 	*gdi;
 
-	gdi = match_gd->thread_gdi;
+	gdi = match_gd->gd_runtime->thread_gdi;
 	assert(NULL != gdi);
 	for (reg = input_gd->regions, r_top = reg + input_gd->n_regions; reg < r_top; reg++)
 	{
@@ -534,7 +534,7 @@ int aio_shim_write(gd_region *reg, struct aiocb *aiocbp)
 	assert(gtm_is_main_thread() || (gtm_jvm_process && process_exiting));
 	owning_gd = udi->owning_gd;
 	assert(NULL != owning_gd);
-	if (NULL == (gdi = owning_gd->thread_gdi))
+	if (NULL == (gdi = owning_gd->gd_runtime->thread_gdi))
 	{	/* No thread is servicing this global directory -- set it up. */
 		ret = aio_shim_thread_init(owning_gd);
 		assert((0 == ret) || (EAGAIN == errno));
@@ -546,7 +546,7 @@ int aio_shim_write(gd_region *reg, struct aiocb *aiocbp)
 			 */
 			return -1;
 		}
-		gdi = owning_gd->thread_gdi;
+		gdi = owning_gd->gd_runtime->thread_gdi;
 	}
 	assert(NULL != gdi);
 	/* submit the write */

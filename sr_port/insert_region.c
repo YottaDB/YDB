@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -175,7 +178,7 @@ tp_region	*insert_region(	gd_region	*reg,
 	}
 	if ((CDB_STAGNATE <= t_tries) && dollar_tlevel && reg->open && !csa->now_crit && (&tp_reg_list == reg_list))
 	{	/* Final retry in TP and this region not locked down. Get crit on it if it is open.
-		 * reg->open needs to be checked above to take care of the case where we do an insert_region() from gvcst_init()
+		 * reg->open needs to be checked above to take care of the case where we do an "insert_region" from "gvcst_init"
 		 * 	in the 3rd retry in TP when we have not yet opened the region. In case region is not open,
 		 * 	tp_restart() (invoked through t_retry from gvcst_init) will open "reg" as well as get crit on it for us.
 		 */

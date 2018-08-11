@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -227,7 +227,7 @@ unsigned char mu_cre_file(void)
 	if (IS_ENCRYPTED(gv_cur_region->dyn.addr->is_encrypted))
 	{
 		assert(!TO_BE_ENCRYPTED(gv_cur_region->dyn.addr->is_encrypted));
-		INIT_PROC_ENCRYPTION(cs_addrs, gtmcrypt_errno);
+		INIT_PROC_ENCRYPTION(gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
 		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, file.len, file.addr);
@@ -240,7 +240,7 @@ unsigned char mu_cre_file(void)
 		 * STATSDBs.
 		 */
 		save_errno = errno;
-		TREF(mu_cre_file_openrc) = errno;		/* Save for gvcst_init() */
+		TREF(mu_cre_file_openrc) = errno;		/* Save for "gvcst_init" */
 		/* If this is an AUTODB (but not a STATSDB) and the file already exists, this is not an error (some other
 		 * process created the file. This is ok so return as if we created it.
 		 */

@@ -219,10 +219,10 @@ MBSTART {														\
 	}														\
 	DO_ERR_PROC_ENCRYPTION_IF_NEEDED(REG, DO_CRYPT_INIT, INIT_STATUS, CRYPT_WARNING);				\
 } MBEND
-#define INIT_PROC_ENCRYPTION_IF_NEEDED(CSA, DO_CRYPT_INIT, INIT_STATUS)							\
+#define INIT_PROC_ENCRYPTION_IF_NEEDED(DO_CRYPT_INIT, INIT_STATUS)							\
 MBSTART {														\
 	if (DO_CRYPT_INIT)												\
-		INIT_PROC_ENCRYPTION(CSA, INIT_STATUS);									\
+		INIT_PROC_ENCRYPTION(INIT_STATUS);									\
 } MBEND
 
 #define DO_ERR_PROC_ENCRYPTION_IF_NEEDED(REG, DO_CRYPT_INIT, INIT_STATUS, CRYPT_WARNING)				\
@@ -351,14 +351,25 @@ MBSTART {											\
 	}											\
 } MBEND
 
-#define MU_GV_CUR_REG_FREE(TMP_REG, SAVE_REG)		\
-{							\
-	GBLREF	gd_region	*gv_cur_region;		\
-							\
-	SAVE_REG = gv_cur_region;			\
-	gv_cur_region = TMP_REG;			\
-	mu_gv_cur_reg_free();				\
-	gv_cur_region = SAVE_REG;			\
+#define MU_GV_CUR_REG_FREE(TMP_REG, SAVE_REG)								\
+{													\
+	GBLREF	gd_region		*gv_cur_region;							\
+	GBLREF	sgmnt_addrs		*cs_addrs;							\
+	GBLREF	sgmnt_data_ptr_t	cs_data;							\
+													\
+	sgmnt_addrs			*save_csaddrs;							\
+	sgmnt_data_ptr_t		save_csdata;							\
+													\
+	SAVE_REG = gv_cur_region;									\
+	/* Save "cs_addrs" and "cs_data" as "mu_gv_cur_reg_free" modifies these global variables */	\
+	save_csaddrs = cs_addrs;									\
+	save_csdata = cs_data;										\
+	gv_cur_region = TMP_REG;									\
+	mu_gv_cur_reg_free();										\
+	gv_cur_region = SAVE_REG;									\
+	/* Restore cs_addrs and cs_data now that "mu_gv_cur_reg_free" is done */			\
+	cs_addrs = save_csaddrs;									\
+	cs_data = save_csdata;										\
 }
 
 GBLREF	int4			ydb_fullblockwrites;	/* Do full (not partial) database block writes */
@@ -437,6 +448,7 @@ gd_region *dbfilopn(gd_region *reg)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	db_init_region = reg;
 	seg = reg->dyn.addr;
 	assert(IS_ACC_METH_BG_OR_MM(seg->acc_meth));
 	FILE_CNTL_INIT_IF_NULL(seg);
@@ -596,7 +608,7 @@ gd_region *dbfilopn(gd_region *reg)
 			csa->read_write = FALSE;	/* maintain reg->read_only simultaneously */
 			csa->orig_read_write = FALSE;
 		}
-		if (!reg->owning_gd->is_dummy_gbldir && (pool_init || !jnlpool_init_needed || !CUSTOM_ERRORS_AVAILABLE))
+		if (!reg->owning_gd->is_dummy_gbldir && (!jnlpool_init_needed || !CUSTOM_ERRORS_AVAILABLE))
 			break;
 		/* Caller created a dummy region (not a region from a gld). So determine asyncio & acc_meth setting
 		 * from db file header and copy that to segment to avoid DBGLDMISMATCH error later in "db_init".
@@ -610,7 +622,7 @@ gd_region *dbfilopn(gd_region *reg)
 		fc->op_pos = 1;
 		fc->op_len = SGMNT_HDR_LEN;
 		dbfilop(fc);
-		if (!pool_init && jnlpool_init_needed && CUSTOM_ERRORS_AVAILABLE)
+		if (CUSTOM_ERRORS_AVAILABLE && jnlpool_init_needed)
 			csa->repl_state = tsd->repl_state;	/* needed in gvcst_init */
 		if (!reg->owning_gd->is_dummy_gbldir)
 			break;
@@ -687,10 +699,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	node_local_ptr_t	cnl;
 	sgmnt_data		tsdbuff;
 	sgmnt_data_ptr_t        csd, tsd;
-	jnlpool_addrs_ptr_t	save_jnlpool, local_jnlpool;
-	replpool_identifier	replpool_id;
-	unsigned int		full_len;	/* for REPL_INST_AVAILABLE */
-	gd_id			replfile_gdid, *tmp_gdid;
+	jnlpool_addrs_ptr_t	save_jnlpool;
 	boolean_t		need_jnlpool_setup;
 	struct sembuf   	sop[3];
 	struct stat     	stat_buf;
@@ -726,7 +735,6 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_NOUNWIND(dbinit_ch);
-	db_init_region = reg;	/* initialized for dbinit_ch */
 	assert(INTRPT_IN_GVCST_INIT == intrpt_ok_state); /* we better be called from gvcst_init */
 	read_only = reg->read_only;
 	udi = FILE_INFO(reg);
@@ -773,7 +781,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	{
 		gld_do_crypt_init = (IS_ENCRYPTED(reg->dyn.addr->is_encrypted) && !IS_LKE_IMAGE);
 		assert(!TO_BE_ENCRYPTED(reg->dyn.addr->is_encrypted));
-		INIT_PROC_ENCRYPTION_IF_NEEDED(csa, gld_do_crypt_init, init_status); /* heavyweight so do it before ftok */
+		INIT_PROC_ENCRYPTION_IF_NEEDED(gld_do_crypt_init, init_status); /* heavyweight so do it before ftok */
 		max_hrtbt_delta = TREF(dbinit_max_delta_secs);
 		indefinite_wait = (INDEFINITE_WAIT_ON_EAGAIN == max_hrtbt_delta);
 		if (!indefinite_wait)
@@ -814,7 +822,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 				 */
 				if (!bypassed_ftok && !ftok_sem_release(reg, FALSE, FALSE))
 					RTS_ERROR(VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(reg));
-				INIT_PROC_ENCRYPTION_IF_NEEDED(csa, db_do_crypt_init, init_status); /* redo initialization */
+				INIT_PROC_ENCRYPTION_IF_NEEDED(db_do_crypt_init, init_status); /* redo initialization */
 				bypassed_ftok = ok_to_bypass;
 				if (!indefinite_wait)
 				{	/* restart timer to reflect time lost in encryption initialization */
@@ -1130,7 +1138,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		RETURN_IF_ERROR(err_ret, err_ret, indefinite_wait, sem_stacktrace_time, sem_timedout);
 		tsd_read_only = tsd->read_only;
 		db_do_crypt_init = (USES_ENCRYPTION(tsd->is_encrypted) && !IS_LKE_IMAGE);
-		INIT_PROC_ENCRYPTION_IF_NEEDED(csa, db_do_crypt_init, init_status);
+		INIT_PROC_ENCRYPTION_IF_NEEDED(db_do_crypt_init, init_status);
 		INIT_DB_ENCRYPTION_IF_NEEDED(db_do_crypt_init, init_status, reg, csa, tsd, crypt_warning);
 		CSD2UDI(tsd, udi);
 		/* Make sure "mu_rndwn_file" has created semaphore for standalone access */
@@ -1552,38 +1560,20 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	 * would have lost the jnlpool initialization that the source server did. So do it on behalf of the source
 	 * server even though this is not a source server.
 	 */
-	need_jnlpool_setup = REPL_ALLOWED(csd) && is_src_server;
 	save_jnlpool = jnlpool;
-	if (need_jnlpool_setup)
-		assert(jnlpool && jnlpool->pool_init);	/* only one jnlpool for source server */
-	else if (!is_src_server && pool_init && REPL_ALLOWED(csd) && gd_header && udi->shm_created
-				&& REPL_INST_AVAILABLE(csa->gd_ptr))
-	{	/* not source server but db shm created so check proper jnlpool */
-		status = filename_to_id(&replfile_gdid, replpool_id.instfilename);	/* set by REPL_INST_AVAILABLE */
-		assertpro(SS_NORMAL == status);
-		if (jnlpool && jnlpool->pool_init)
-		{
-			tmp_gdid = &FILE_ID(jnlpool->jnlpool_dummy_reg);
-			if (!gdid_cmp(tmp_gdid, &replfile_gdid))
-				need_jnlpool_setup = TRUE;	/* current jnlpool is for this region */
-		}
-		if (!need_jnlpool_setup)
-		{	/* need to find right jnlpool */
-			for (local_jnlpool = jnlpool_head; local_jnlpool; local_jnlpool = local_jnlpool->next)
-			{
-				if (local_jnlpool->pool_init)
-				{
-					tmp_gdid = &FILE_ID(jnlpool->jnlpool_dummy_reg);
-					if (!gdid_cmp(tmp_gdid, &replfile_gdid))
-					{
-						jnlpool = local_jnlpool;
-						need_jnlpool_setup = TRUE;
-						break;
-					}
-				}
-			}
-		}
-	}
+	if (is_src_server)
+	{
+		assert(jnlpool && jnlpool->pool_init);	/* only one jnlpool for source server and should have been inited */
+		need_jnlpool_setup = REPL_ALLOWED(csd);
+	} else if (REPL_ALLOWED(csd) && udi->shm_created)
+	{
+		jnlpool = csa->gd_ptr->gd_runtime->jnlpool;
+		/* Note that we could have done a "jnlpool_init" but not been able to attach to jnlpool shared memory
+		 * (for example, if a source server was not started in the first place). Hence the checks below.
+		 */
+		need_jnlpool_setup = ((NULL != jnlpool) && jnlpool->pool_init);
+	} else
+		need_jnlpool_setup = FALSE;
 	if (need_jnlpool_setup)
 	{
 		assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));

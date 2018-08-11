@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,8 +24,6 @@
 GBLREF io_log_name *io_root_log_name;
 
 error_def(ERR_INVSTRLEN);
-
-#define LOGNAME_LEN 255
 
 io_log_name *get_log_name(mstr *v, bool insert)
 {

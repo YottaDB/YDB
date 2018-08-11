@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,14 +14,18 @@
 
 #include <errno.h>	/* for ENOSPC */
 
-#include "anticipatory_freeze.h"
-#include "wait_for_disk_space.h"
 #include "gtmio.h"
 #include "have_crit.h"
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsblk.h"
+#include "gdsfhead.h"
 #include "filestruct.h"
+#include "anticipatory_freeze.h"
 #include "jnl.h"
 #include "error.h"
 #include "gtmmsg.h"
+#include "wait_for_disk_space.h"
 
 #ifdef DEBUG
 GBLDEF	uint4			lseekwrite_target;
@@ -142,7 +146,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 		if (IS_REPL_INST_FROZEN && (STRCMP(wait_comment, jnlpool->jnlpool_ctl->freeze_comment) != 0))
 		{
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DSKNOSPCBLOCKED, 2, fn_len, fn);
-			WAIT_FOR_REPL_INST_UNFREEZE(csa)
+			WAIT_FOR_REPL_INST_UNFREEZE(csa);
 		}
 		LSEEKWRITE(fd, offset, buf, count, tmp_errno);
 #		ifdef DEBUG

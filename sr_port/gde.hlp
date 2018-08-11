@@ -1438,7 +1438,9 @@
    -[NO][STA[TS]
 
    Specifies whether YottaDB should permit processes to share their database
-   access statistics for other processes to monitor. There may be operational
+   access statistics for other processes to monitor. When on, this
+   characteristic causes YottaDB to create a small MM database for the
+   associated region to hold the shared statistics. There may be operational
    or security reasons to prohibit sharing of statistics. For example, YottaDB
    does not share statistics on database files that exist solely to support
    YottaDB features.
@@ -2165,7 +2167,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2017
+   Copyright 2018
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

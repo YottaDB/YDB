@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -84,6 +84,7 @@
 #include "bml_status_check.h"
 #include "is_proc_alive.h"
 #include "muextr.h"
+#include "gtmsource_inline.h"
 
 GBLREF	bool			rc_locked;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
@@ -176,6 +177,15 @@ error_def(ERR_TEXT);
 	 (((gds_t_busy2free == MODE) && (!CSD->db_got_to_v5_once || (FREE_SEEN & FREE_DIR_DATA)))	\
 	|| (gds_t_recycled2free == MODE))
 
+/**
+ * Validation function for a non-tp transaction; everything is done in crit
+ *
+ * @param[in] hist1 History to be validated
+ * @param[in] hist2 second history for kill and mupip reorg
+ * @param[in] ctn current transaction number
+ *
+ * @return transaction number that was comitted, or 0 if it failed to commit
+ */
 trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 {
 	srch_hist		*hist, tmp_hist;
@@ -1481,6 +1491,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			}
 			jnl_write_reserve(csa, jrs, non_tp_jfb_ptr->rectype, non_tp_jfb_ptr->record_size, non_tp_jfb_ptr);
 		}
+#ifdef DEBUG
+		if ((WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06)) && (ydb_white_box_test_case_count == 0))
+			ydb_white_box_test_case_count = 2;
+#endif
 		UPDATE_JRS_RSRV_FREEADDR(csa, jpc, jbp, jrs, jpl, jnl_fence_ctl, replication);	/* updates jbp->rsrv_freeaddr.
 												 * Step CMT06
 												 */

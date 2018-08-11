@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1089,7 +1089,7 @@ void	iorm_use(io_desc *iod, mval *pp)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CRYPTNOSEEK, 2, dev_name->len, dev_name->dollar_io);
 	if (init_input_encryption || init_output_encryption)
 	{	/* First time the device is getting encryption turned on. Initialize encryption and setup the keys. */
-		INIT_PROC_ENCRYPTION(NULL, rv);
+		INIT_PROC_ENCRYPTION(rv);
 		if (0 != rv)
 			GTMCRYPT_REPORT_ERROR(rv, rts_error, dev_name->len, dev_name->dollar_io);
 	}

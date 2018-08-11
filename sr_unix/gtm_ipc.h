@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -25,21 +28,26 @@
 #define FTOK		gtm_ftok
 #define FTOK_OLD	ftok
 
-#define	JNLPOOL_CLEAR_FIELDS(JNLPOOL)				\
-{								\
-	GBLREF	int		pool_init;			\
-								\
-	assert(NULL != JNLPOOL);				\
-	JNLPOOL->jnlpool_ctl = NULL;				\
-	JNLPOOL->gtmsrc_lcl_array = NULL;			\
-	JNLPOOL->gtmsource_local_array = NULL;			\
-	JNLPOOL->jnldata_base = NULL;				\
-	JNLPOOL->repl_inst_filehdr = NULL;			\
-	JNLPOOL->jnlpool_dummy_reg->open = FALSE;		\
-	JNLPOOL->gd_ptr = NULL;					\
-	if (JNLPOOL->pool_init && (0 < pool_init))		\
-		pool_init--;					\
-	JNLPOOL->pool_init = JNLPOOL->recv_pool = FALSE;	\
+#define	JNLPOOL_CLEAR_FIELDS(JNLPOOL)						\
+{										\
+	GBLREF	int		pool_init;					\
+										\
+	assert(NULL != JNLPOOL);						\
+	JNLPOOL->jnlpool_ctl = NULL;						\
+	JNLPOOL->gtmsrc_lcl_array = NULL;					\
+	JNLPOOL->gtmsource_local_array = NULL;					\
+	JNLPOOL->jnldata_base = NULL;						\
+	JNLPOOL->repl_inst_filehdr = NULL;					\
+	JNLPOOL->jnlpool_dummy_reg->open = FALSE;				\
+	if (NULL != JNLPOOL->gd_ptr)						\
+	{									\
+		assert(JNLPOOL == JNLPOOL->gd_ptr->gd_runtime->jnlpool);	\
+		JNLPOOL->gd_ptr->gd_runtime->jnlpool = NULL;			\
+	}									\
+	JNLPOOL->gd_ptr = NULL;							\
+	if (JNLPOOL->pool_init && (0 < pool_init))				\
+		pool_init--;							\
+	JNLPOOL->pool_init = JNLPOOL->recv_pool = FALSE;			\
 }
 
 #define JNLPOOL_SHMDT(JNLPOOL, RC, SAVE_ERRNO)			\

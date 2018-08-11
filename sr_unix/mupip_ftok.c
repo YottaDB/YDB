@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -36,7 +39,8 @@
 #include "file_head_read.h"	/* for file_head_read() prototype */
 #include "is_file_identical.h"	/* for filename_to_id() prototype */
 
-GBLREF	boolean_t		in_mupip_ftok;		/* Used by an assert in repl_inst_read */
+GBLREF	boolean_t	in_mupip_ftok;		/* Used by an assert in repl_inst_read */
+GBLREF	gd_addr		*gd_header;
 
 error_def(ERR_MUPCLIERR);
 error_def(ERR_MUNOACTION);
@@ -73,7 +77,7 @@ void mupip_ftok (void)
 	recvpool = (CLI_PRESENT == cli_present("RECVPOOL"));
 	if (jnlpool || recvpool)
 	{
-		if (!repl_inst_get_name(instfilename, &full_len, SIZEOF(instfilename), issue_rts_error, NULL))
+		if (!repl_inst_get_name(instfilename, &full_len, SIZEOF(instfilename), issue_rts_error, gd_header))
 			assertpro(NULL == instfilename);	/* rts_error should have been issued by repl_inst_get_name */
 		in_mupip_ftok = TRUE;
 		repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));

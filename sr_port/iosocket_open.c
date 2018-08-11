@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
@@ -558,11 +558,11 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		else if (socket_local == socketptr->protocol)
 		{
 			if ((NULL != socketptr->local.sa)
-					&& (NULL != ((struct sockaddr_un *)(socketptr->local.sa))->sun_path))
+					&& ('\0' != ((struct sockaddr_un *)(socketptr->local.sa))->sun_path[0]))
 				strncpy(&ioptr->dollar.key[len], ((struct sockaddr_un *)(socketptr->local.sa))->sun_path,
 					DD_BUFLEN - 1 - len);
 			else if ((NULL != socketptr->remote.sa)
-					&& (NULL != ((struct sockaddr_un *)(socketptr->remote.sa))->sun_path))
+					&& ('\0' != ((struct sockaddr_un *)(socketptr->remote.sa))->sun_path[0]))
 				strncpy(&ioptr->dollar.key[len], ((struct sockaddr_un *)(socketptr->remote.sa))->sun_path,
 					DD_BUFLEN - 1 - len);
 			/* set default delimiter on principal local sockets to resemble rm device */

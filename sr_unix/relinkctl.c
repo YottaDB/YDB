@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2017 Fidelity National Information	*
+ * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -20,7 +20,6 @@
 #include <sys/shm.h>
 #include "gtm_ipc.h"
 #include "gtm_limits.h"
-#include "gtm_fcntl.h"
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
@@ -52,6 +51,7 @@
 #include "gtm_permissions.h"
 #include "sleep.h"
 #include "time.h"
+#include "objlabel.h"
 
 /* This module contains routines that maintain autorelink 'relinkctl' structures */
 
@@ -69,7 +69,6 @@ OS_PAGE_SIZE_DECLARE
 
 STATICFNDCL void relinkctl_map(open_relinkctl_sgm *linkctl);
 STATICFNDCL void relinkctl_unmap(open_relinkctl_sgm *linkctl);
-STATICFNDCL int relinkctl_fcntl_lock(int fd, int l_type);
 STATICFNDCL void relinkctl_delete(open_relinkctl_sgm *linkctl);
 
 #define SLASH_GTM_RELINKCTL	"/ydb-relinkctl-"
@@ -229,7 +228,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 	int			fd, i, j, rc, save_errno, shmid, status, stat_res, user_id, group_id, perm;
 	struct stat     	stat_buf;
 	size_t			shm_size;
-	boolean_t		is_mu_rndwn_rlnkctl, shm_removed, obtained_perms, rctl_existed, need_shmctl;
+	boolean_t		is_mu_rndwn_rlnkctl, shm_removed, rctl_create_attempted, rctl_existed, need_shmctl;
 	relinkshm_hdr_t		*shm_base;
 	rtnobjshm_hdr_t		*rtnobj_shm_hdr;
 	relinkctl_data		*hdr;
@@ -286,13 +285,13 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				}
 				/* Attempt to create the relinkctl file with desired permissions. */
 				OPEN3_CLOEXEC(linkctl->relinkctl_path, O_CREAT | O_RDWR | O_EXCL, perm, fd);
-				obtained_perms = TRUE;
+				rctl_create_attempted = TRUE;
 			}
 		} else
-			obtained_perms = FALSE;
-		assert((!obtained_perms) || (!object_dir_missing));
+			rctl_create_attempted = FALSE;
+		assert((!rctl_create_attempted) || (!object_dir_missing));
 		/* If file already existed, try to open it. */
-		if ((!obtained_perms) || ((FD_INVALID == fd) && (errno == EEXIST)))
+		if ((!rctl_create_attempted) || ((FD_INVALID == fd) && (errno == EEXIST)))
 		{
 			rctl_existed = TRUE;
 			OPEN_CLOEXEC(linkctl->relinkctl_path, O_RDWR, fd);
@@ -304,7 +303,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				continue;
 			SNPRINTF(errstr, SIZEOF(errstr), "open() of file %s failed", linkctl->relinkctl_path);
 			ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, errno);
-		} else if (obtained_perms)
+		} else if (!rctl_existed)
 		{	/* If we just created the relinkctl file, ensure correct permissions on it. */
 			FSTAT_FILE(fd, &stat_buf, status);
 			if (0 != status)
@@ -342,6 +341,8 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			SLEEP_USEC(1000, FALSE);
 			continue;
 		}
+		if (!rctl_existed)
+			relinkctl_init_exclu(linkctl);
 		relinkctl_lock_exclu(linkctl);
 		if (hdr->file_deleted)
 		{	/* Some other process concurrently opened and closed/rundown the relinkctl file while we were still inside
@@ -406,7 +407,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 			 * object directory, we have no permissions to apply on a shared memory segment we are about to create;
 			 * therefore, error out.
 			 */
-			if (!obtained_perms)
+			if (rctl_existed)
 			{
 				relinkctl_unlock_exclu(linkctl);
 				relinkctl_unmap(linkctl);
@@ -438,7 +439,6 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 					shmid, (unsigned long long)shm_size, (unsigned long long)shm_size);
 				ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, errstr, save_errno);
 			}
-			assert(obtained_perms);
 			/* Change uid, group-id and permissions if needed */
 			need_shmctl = FALSE;
 			if ((INVALID_UID != user_id) && (user_id != shmstat.shm_perm.uid))
@@ -627,13 +627,18 @@ void relinkctl_incr_nattached(boolean_t rtnobj_refcnt_incr_cnt)
 int relinkctl_get_key(char key[YDB_PATH_MAX], mstr *zro_entry_name)
 {
 	gtm_uint16	hash;
+	hash128_state_t	hash_state;
+	unsigned int	obj_label = OBJ_UNIX_LABEL;
 	unsigned char	hexstr[33];
 	int		keylen;
 	char		*key_ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	gtmmrhash_128(zro_entry_name->addr, zro_entry_name->len, 0, &hash);
+	HASH128_STATE_INIT(hash_state, 0);
+	gtmmrhash_128_ingest(&hash_state, zro_entry_name->addr, zro_entry_name->len);
+	gtmmrhash_128_ingest(&hash_state, &obj_label, SIZEOF(obj_label));
+	gtmmrhash_128_result(&hash_state, zro_entry_name->len + SIZEOF(obj_label), &hash);
 	gtmmrhash_128_hex(&hash, hexstr);
 	hexstr[32] = '\0';
 	/* If the cumulative path to the relinkctl file exceeds YDB_PATH_MAX, it will be inaccessible, so no point continuing. */
@@ -683,6 +688,8 @@ STATICFNDEF void relinkctl_unmap(open_relinkctl_sgm *linkctl)
 	sm_uc_ptr_t	addr;
 	int		rc;
 
+	if (linkctl->locked)
+		pthread_mutex_unlock(&linkctl->hdr->exclu);
 	addr = (sm_uc_ptr_t)linkctl->hdr;
 	munmap(addr, RELINKCTL_MMAP_SZ); /* If munmap errors, it seems better to move on than stop for a non-critical error */
 	linkctl->hdr = NULL;
@@ -694,6 +701,49 @@ STATICFNDEF void relinkctl_unmap(open_relinkctl_sgm *linkctl)
 /**
  * Exclusive locking methods controlling WRITE access to relinkctl control files.
  */
+
+/* Routine to initialize locking for the relinkctl file.
+ *
+ * Parameter:
+ *
+ *   linkctl - address of relink control structure for a given $ZROUTINEs node
+ */
+void relinkctl_init_exclu(open_relinkctl_sgm* linkctl)
+{
+#	ifdef AUTORELINK_SUPPORTED
+	int status;
+	pthread_mutexattr_t exclu_attr;
+
+	/* Set up mutex for new file */
+	status = pthread_mutexattr_init(&exclu_attr);
+	if (0 != status)
+	{
+		relinkctl_unmap(linkctl);
+		ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, "pthread_mutexattr_init", status);
+	}
+	status = pthread_mutexattr_setpshared(&exclu_attr, PTHREAD_PROCESS_SHARED);
+	if (0 != status)
+	{
+		relinkctl_unmap(linkctl);
+		ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, "pthread_mutexattr_setpshared", status);
+	}
+#	ifdef __linux__
+	status = pthread_mutexattr_setrobust(&exclu_attr, PTHREAD_MUTEX_ROBUST);
+	if (0 != status)
+	{
+		relinkctl_unmap(linkctl);
+		ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, "pthread_mutexattr_setrobust", status);
+	}
+#	endif
+	status = pthread_mutex_init(&linkctl->hdr->exclu, &exclu_attr);
+	if (0 != status)
+	{
+		relinkctl_unmap(linkctl);
+		ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, "pthread_mutex_init", status);
+	}
+#endif
+	return;
+}
 
 /* Routine to exclusively lock the relinkctl file.
  *
@@ -709,9 +759,22 @@ void relinkctl_lock_exclu(open_relinkctl_sgm *linkctl)
 	assert(!linkctl->locked);
 	if (linkctl->locked)
 		return;
-	status = relinkctl_fcntl_lock(linkctl->fd, F_WRLCK);
-	if (-1 == status)
-		ISSUE_RELINKCTLERR_TEXT(&linkctl->zro_entry_name, "fcntl() lock attempt failed", errno);
+	status = pthread_mutex_lock(&linkctl->hdr->exclu);
+	if (EOWNERDEAD == status)
+	{
+#		ifdef __linux__
+		status = pthread_mutex_consistent(&linkctl->hdr->exclu);
+		if (0 != status)
+			ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, "pthread_mutex_consistent", status);
+#		endif
+	}
+	else if (0 != status)
+	{
+		relinkctl_data	hdr_copy = *linkctl->hdr;	/* Keep a copy in case we core */
+
+		assert(EINVAL != status);
+		ISSUE_RELINKCTLERR_TEXT(&linkctl->zro_entry_name, "lock attempt failed", status);
+	}
 	linkctl->locked = TRUE;
 #	endif
 	return;
@@ -726,42 +789,13 @@ void relinkctl_unlock_exclu(open_relinkctl_sgm *linkctl)
 	assert(linkctl->locked);
 	if (!linkctl->locked)
 		return;
-	status = relinkctl_fcntl_lock(linkctl->fd, F_UNLCK);
-	if (-1 == status)
-		ISSUE_RELINKCTLERR_TEXT(&linkctl->zro_entry_name, "fcntl() unlock attempt failed", errno);
+	status = pthread_mutex_unlock(&linkctl->hdr->exclu);
+	if (0 != status)
+		ISSUE_RELINKCTLERR_TEXT(&linkctl->zro_entry_name, "unlock attempt failed", status);
 	linkctl->locked = FALSE;
 #	endif
 	return;
 }
-
-/* Routine to set or remove an advisory lock on a given relinkctl file.
- *
- * Parameters:
- *
- *   fd	    - File descriptor of file to lock.
- *   l_type - Lock type (F_WRLCK for lock or F_UNLCK for unlock)
- *
- * Return value:
- *
- *   - status of fcntl() lock or unlock attempt
- */
-#ifdef AUTORELINK_SUPPORTED
-STATICFNDEF int relinkctl_fcntl_lock(int fd, int l_type)
-{
-	int		status;
-	struct flock	lock;
-
-	assert((F_WRLCK == l_type) || (F_UNLCK == l_type));
-	do
-	{
-		lock.l_type = l_type;
-		lock.l_whence = SEEK_SET;       /* Locking offsets from file beginning */
-		lock.l_start = lock.l_len = 0;  /* Lock the whole file */
-		lock.l_pid = process_id;
-	} while ((-1 == (status = fcntl(fd, F_SETLKW, &lock))) && (EINTR == errno));
-	return status;
-}
-#endif
 
 #ifdef AUTORELINK_SUPPORTED
 /*

@@ -36,6 +36,10 @@
 #include "trans_log_name.h"
 #include "iosp.h"
 #include "ydb_getenv.h"
+#include "gtm_limits.h"
+#include "restrict.h"
+
+GBLREF	char 			ydb_dist[YDB_PATH_MAX];
 
 #define	CR			0x0A		/* Carriage return */
 #define	NUM_TABS_FOR_GTMERRSTR	2
@@ -293,10 +297,29 @@ STATICFNDEF char *scan_ident(char *c)
 STATICFNDEF char *scan_labelref(char *c)
 {
 	char	*b = c;
+	uint4	state = 0;
 
-	for ( ; (ISALNUM_ASCII(*b) || '_' == *b || '^' == *b || '%' == *b); b++,ext_source_column++)
-		;
-	return (b == c) ? 0 : b;
+	for ( ; ; b++, ext_source_column++)
+	{
+		if (ISALNUM_ASCII(*b))
+			continue;
+		if ('%' == *b)
+		{
+			if (1 & state)
+				break;
+			state++;
+			continue;
+		}
+		if ('^' == *b)
+		{
+			if (2 & state)
+				break;
+			state = 2;
+			continue;
+		}
+		break;
+	}
+	return (('(' != *b) && (' ' != *b)) ? 0 : b;
 }
 
 STATICFNDEF enum ydb_types scan_keyword(char **c)
@@ -714,28 +737,36 @@ struct extcall_package_list *exttab_parse(mval *package)
 	return pak;
 }
 
-callin_entry_list* citab_parse (void)
+callin_entry_list* citab_parse (boolean_t internal_use)
 {
 	int			parameter_count, i, fclose_res;
 	uint4			inp_mask, out_mask, mask;
 	mstr			labref, callnam;
 	enum ydb_types		ret_tok, parameter_types[MAX_ACTUALS], pr;
-	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end;
+	char			str_buffer[MAX_TABLINE_LEN], *tbp, *end, rcfpath[YDB_PATH_MAX];
 	FILE			*ext_table_file_handle;
 	callin_entry_list	*entry_ptr = NULL, *save_entry_ptr = NULL;
 	boolean_t		is_ydb_env_match;
 	int			nbytes;
 	char			tmpbuff[256];
 
-	ext_table_file_name = ydb_getenv(YDBENVINDX_CI, NULL_SUFFIX, &is_ydb_env_match);
-	if (!ext_table_file_name) /* environment variable not set */
+	if (!internal_use)
 	{
-		nbytes = SNPRINTF(tmpbuff, SIZEOF(tmpbuff), "%s/%s", ydbenvname[YDBENVINDX_CI] + 1, gtmenvname[YDBENVINDX_CI] + 1);
-		if ((0 < nbytes) && (SIZEOF(str_buffer) > nbytes))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(tmpbuff));
-		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("SNPRINTF(citab_parse)"), CALLFROM, errno);
+		ext_table_file_name = ydb_getenv(YDBENVINDX_CI, NULL_SUFFIX, &is_ydb_env_match);
+		if (!ext_table_file_name) /* environment variable not set */
+		{
+			nbytes = SNPRINTF(tmpbuff, SIZEOF(tmpbuff), "%s/%s",
+						ydbenvname[YDBENVINDX_CI] + 1, gtmenvname[YDBENVINDX_CI] + 1);
+			if ((0 < nbytes) && (SIZEOF(str_buffer) > nbytes))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CITABENV, 2, LEN_AND_STR(tmpbuff));
+			else
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+						LEN_AND_LIT("SNPRINTF(citab_parse)"), CALLFROM, errno);
+		}
+	} else
+	{
+		SNPRINTF(rcfpath, YDB_PATH_MAX, "%s/%s", ydb_dist, COMM_FILTER_FILENAME);
+		ext_table_file_name = rcfpath;
 	}
 	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (!ext_table_file_handle) /* call-in table not found */

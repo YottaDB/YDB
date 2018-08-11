@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
@@ -143,6 +143,7 @@ error_def(ERR_TPRETRY);
 error_def(ERR_TRIGCOMPFAIL);
 error_def(ERR_TRIGNAMEUNIQ);
 error_def(ERR_TRIGTLVLCHNG);
+error_def(ERR_CITPNESTED);
 
 /* Macro to re-initialize a symval block that was on a previously-used free chain */
 #define REINIT_SYMVAL_BLK(svb, prev)									\

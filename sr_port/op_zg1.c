@@ -83,8 +83,8 @@ void op_zg1(int4 level)
 			zposition.mvtype = 0;	/* It's not an mval yet till getzposition fills it in */
 			getzposition(&zposition);
 			assert(MV_IS_STRING(&zposition) && (0 < zposition.str.len));
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_PROCTERM, 6, GTMIMAGENAMETXT(image_type), "ZGOTO 0", exi_cond,
-				zposition.str.len, zposition.str.addr);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_PROCTERM, 6, GTMIMAGENAMETXT(image_type),
+				"ZGOTO 0", exi_cond, zposition.str.len, zposition.str.addr);
 			EXIT(ERR_PROCTERM);
 		}
 		assert(IS_GTM_IMAGE);
