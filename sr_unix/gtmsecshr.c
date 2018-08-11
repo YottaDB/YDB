@@ -342,14 +342,17 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	/* Step 1 */
 	#if defined(__APPLE__)
 	uint32_t size = YDB_PATH_MAX;
-	if (_NSGetExecutablePath(gtmsecshr_realpath, &size) < 0)
+	char gtmsecshr_path[YDB_PATH_MAX];
+	if (_NSGetExecutablePath(gtmsecshr_path, &size) < 0)
 	{
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GTMSECSHRSTART, 3,
 			RTS_ERROR_LITERAL("Server 1"), process_id, ERR_GTMSECSHRNOARG0);
 		gtmsecshr_exit(UNABLETODETERMINEPATH, FALSE);
 	}
+	rndir = realpath(gtmsecshr_path, gtmsecshr_realpath);
 	#elif defined(__linux__)
 	rndir = realpath(PROCSELF, gtmsecshr_realpath);
+	#endif
 	if (NULL != rndir)
 		rndirln = STRLEN(rndir);
 	else
@@ -360,7 +363,6 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 			RTS_ERROR_LITERAL("Server 1"), process_id, ERR_GTMSECSHRNOARG0);
 		gtmsecshr_exit(UNABLETODETERMINEPATH, FALSE);
 	}
-	#endif
 	path = ydb_dist;
 	chrrv = realpath(path, ydbdist);
 	if (NULL != chrrv)
