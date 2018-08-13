@@ -173,7 +173,7 @@ typedef char  mach_inst;	/* machine instruction */
 #ifdef Linux390
 #  define INTERLOCK_ADD(X,Y,Z)	(interlock_add(Z, (sm_int_ptr_t)(X)))
 #else
-#  ifdef __linux__
+#  if defined(__linux__) || defined(__APPLE__)
 #    ifdef __atomic_add_fetch
 #      define INTERLOCK_ADD(X,Y,Z)	(__atomic_add_fetch(X, Z, __ATOMIC_SEQ_CST))
 #    else
