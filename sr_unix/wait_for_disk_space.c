@@ -164,8 +164,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	/* Only report if we were the process to set the current freeze comment; otherwise someone else reported it. */
 	if (STRCMP(wait_comment, jnlpool->jnlpool_ctl->freeze_comment) == 0)
 	{
-		freeze_cleared = FALSE;						/* Default */
-		CLEAR_ANTICIPATORY_FREEZE(freeze_cleared);			/* May reset freeze_cleared */
+		CLEAR_ANTICIPATORY_FREEZE(freeze_cleared);		/* Resets freeze_cleared */
 		REPORT_INSTANCE_UNFROZEN(freeze_cleared);
 	}
 	*save_errno = tmp_errno;

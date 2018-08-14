@@ -121,6 +121,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 		if (0 != (errcode = getnameinfo(ai_ptr->ai_addr, ai_ptr->ai_addrlen, NULL, 0, port_buffer,
 						 NI_MAXSERV, NI_NUMERICSERV)))
 		{
+			freeaddrinfo(ai_ptr);
 			assert(FALSE);
 			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
 			return errcode;
