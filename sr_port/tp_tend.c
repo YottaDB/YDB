@@ -778,8 +778,6 @@ boolean_t	tp_tend()
 						}
 						assert(csd == csa->hdr);	/* If MM, csd shouldn't have been reset */
 					}
-					if (MAXUINT4 == jbp->next_epoch_time)
-						jbp->next_epoch_time = (uint4)(jgbl.gbl_jrec_time + jbp->epoch_interval);
 					if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE))
 						&& !FROZEN_CHILLED(csa))
 					{	/* Flush the cache. Since we are in crit, defer syncing the epoch */
