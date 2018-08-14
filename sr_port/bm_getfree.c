@@ -80,7 +80,7 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 	sm_uc_ptr_t	bmp;
 	block_id	bml, hint_cycled, hint_limit;
 	block_id_ptr_t	b_ptr;
-	int		cw_set_top, depth = 0, lcnt;
+	int		cw_set_top, depth, lcnt;
 	unsigned int	local_maps, map_size, n_decrements = 0, total_blks;
 	trans_num	ctn;
 	int4		free_bit, offset;
@@ -94,7 +94,8 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 	hint_cycled = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	hint_limit = DIVIDE_ROUND_DOWN(hint, BLKS_PER_LMAP);
 	local_maps = hint_cycled + 2;	/* for (up to) 2 wraps */
-	for (lcnt = local_maps + 1; lcnt ; lcnt--) /* loop control counts down for slight efficiency */
+	lcnt = local_maps + 1;
+	do
 	{
 		bml = bmm_find_free(hint / BLKS_PER_LMAP, (sm_uc_ptr_t)MM_ADDR(cs_data), local_maps);
 		if ((NO_FREE_SPACE == bml) || (bml >= hint_cycled))
@@ -211,7 +212,7 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 			send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_DBMBMINCFREFIXED, 1, bml);
 			bit_clear(bml / BLKS_PER_LMAP, MM_ADDR(cs_data)); /* repair master map error */
 		}
-	}
+	} while (0 < --lcnt);
 	/* If not in the final retry, it is possible that free_bit is >= map_size, e.g., if the buffer holding the bitmap block
 	 * gets recycled with a non-bitmap block in which case the bit that bm_find_blk returns could be greater than map_size.
 	 * But, this should never happen in final retry.

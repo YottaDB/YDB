@@ -964,7 +964,6 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 		}
 		if (decr_attached)
 		{	/* MUPIP RUNDOWN -RELINKCTL should still hold a lock. */
-			shm_hdr = NULL;
 			assert(linkctl->locked == is_mu_rndwn_rlnkctl);
 			if (!is_mu_rndwn_rlnkctl)
 				relinkctl_lock_exclu(linkctl);
@@ -981,7 +980,10 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 				assert(0 <= nattached);
 				shm_hdr = GET_RELINK_SHM_HDR(linkctl);
 			} else
+			{
+				shm_hdr = NULL;
 				nattached = -1;
+			}
 			if (0 == nattached)
 			{
 				DBGARLNK((stderr, "relinkctl_rundown : nattached = 0\n"));

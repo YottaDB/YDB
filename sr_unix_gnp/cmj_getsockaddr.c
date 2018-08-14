@@ -108,7 +108,6 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 			return CMI_BADIPADDRPORT;
 		memcpy(port_str, port_str_ptr, port_len);
 		port_str[port_len] = '\0';
-
 		if (0 != iplen)
 		{	/* specified host name and port */
 			addr_end = *(addr_str_ptr + iplen); /* the end can be ] or : */
@@ -129,7 +128,6 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 				memcpy(hn, CMI_DESC_POINTER(nod), CMI_DESC_LENGTH(nod));
 				hn[CMI_DESC_LENGTH(nod)] = '\0';
 				CLIENT_HINTS(hints);
-
 				while ((EAI_AGAIN == (errcode = getaddrinfo(hn, port_str, &hints, &ai_ptr))) && (0 < loop_limit))
 				{
 					loop_limit--;
@@ -139,7 +137,6 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 				*ai_ptr_ptr = ai_ptr;
 				return SS_NORMAL;
 			}
-
 			SERVER_HINTS(hints, (ipv4_only ? AF_INET : AF_UNSPEC));
 			if (0 != (errcode = getaddrinfo(NULL, port_str, &hints, &ai_ptr)))
 			{
@@ -149,16 +146,16 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 		errno = 0;
 		port = ATOI(port_str);
 		if ((0 == port) && (0 != errno) || (0 >= port))
+		{
+			freeaddrinfo(ai_ptr);
 			return CMI_BADIPADDRPORT;
+		}
 	} else
 	{	/* neither host nor port is specified */
 		/* use the services db */
 		SERVER_HINTS(hints, (ipv4_only ? AF_INET : AF_UNSPEC));
 		if (0 != (errcode = getaddrinfo(NULL, GTCM_SERVER_NAME, &hints, &ai_ptr)))
-		{
-			freeaddrinfo(ai_ptr);
 			return CMI_NOSERVENT;
-		}
 	}
 	*ai_ptr_ptr = ai_ptr;
 	return SS_NORMAL;

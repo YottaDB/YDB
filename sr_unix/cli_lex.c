@@ -370,8 +370,8 @@ static void cli_lex_in_expand(int in_len)
 
 char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 {
-	size_t	in_len;
-	char	cli_fgets_buffer[MAX_LINE], *destbuffer, *retptr;
+	size_t		in_len;
+	char		cli_fgets_buffer[MAX_LINE], *destbuffer, *retptr = NULL;
 #	ifdef UNICODE_SUPPORTED
 	int		mbc_len, u16_off, destsize;
 	int32_t		mbc_dest_len;
@@ -447,18 +447,18 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 			errorcode = U_ZERO_ERROR;
 			u_strToUTF8(destbuffer, destsize, &mbc_dest_len, cli_fgets_Ubuffer, (int4)in_len + 1, &errorcode);
 			if (U_FAILURE(errorcode))
+			{
 				if (U_BUFFER_OVERFLOW_ERROR == errorcode)
 				{	/* truncate so null terminated */
 					destbuffer[destsize - 1] = 0;
 					retptr = destbuffer;
-				} else
-					retptr = NULL;
-			else
+				}
+			} else
 				retptr = destbuffer;	/* Repoint to new home */
 			if (cli_lex_str)
 				cli_lex_in_ptr->tp = retptr;
 		} else if (cli_lex_str)
-			cli_lex_in_ptr->tp = retptr = NULL;
+			cli_lex_in_ptr->tp = NULL;
 	} else
 	{
 #	endif
@@ -484,7 +484,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 			if (cli_lex_str)
 				cli_lex_in_ptr->tp = destbuffer;
 		} else if (cli_lex_str)
-			cli_lex_in_ptr->tp = retptr = NULL;
+			cli_lex_in_ptr->tp = NULL;
 #	ifdef UNICODE_SUPPORTED
 	}
 #	endif

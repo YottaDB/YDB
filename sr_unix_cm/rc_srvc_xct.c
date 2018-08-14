@@ -241,12 +241,12 @@ int rc_srvc_xact(cptr, xend)
 			 * rc_srvc_xct(error: %d)\n",
 			 * qhdr->a.erc.value));
 			 */
-#ifdef DEBUG
+#			ifdef DEBUG
 			if (!dumped)
 				gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value,
 					    "RC Request returned error.");
 			dumped = 1;
-#endif
+#			endif
 			eptr = (rc_clnt_err *) malloc(SIZEOF(rc_clnt_err));
 			eptr->pid = (qhdr->r.pid1.value << 16) | qhdr->r.pid2.value;
 			eptr->next = elst;

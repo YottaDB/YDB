@@ -356,7 +356,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 			gv_init_reg(reg);	/* Open the region before obtaining "csa" */
 		regcsa = &FILE_INFO(reg)->s_addrs;
 		assert('#' == rtn_name.addr[rtn_name.len - 1]);
-		if (NULL == rttabent)
+		if (NULL == rttabent)		/* Start at beginning of table to look up if not known already */
 			rttabent = rtn_names;
 		for ( ; rttabent <= rtn_names_end; rttabent++)
 		{

@@ -17,8 +17,8 @@
  * W A R N I N G  ---  W A R N I N G  --- W A R N I N G --- W A R N I N G --- W A R N I N G *
  *											    *
  * This routine (gtmsecshr) runs as setuid to root to perform various functions on behalf   *
- * of YDB processes. Extreme care must be taken to prevent all forms of deceptive access,   *
- * linking with unauthorized libraries, etc. Same applies to anything it calls.		    *
+ * of YottaDB processes. Extreme care must be taken to prevent all forms of deceptive	    *
+ * access, linking with unauthorized libraries, etc. Same applies to anything it calls.	    *
  *											    *
  * W A R N I N G  ---  W A R N I N G  --- W A R N I N G --- W A R N I N G --- W A R N I N G *
  ********************************************************************************************/

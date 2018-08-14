@@ -108,6 +108,16 @@ error_def(ERR_DBPRIVERR);
 #define	BIN_PUT_GVSPAN	4
 #define	TEXT1		"Record discarded because"
 
+# define FREE_MALLOCS						\
+{								\
+	int i;							\
+	for (i = 0; i < ARRAYSIZE(malloc_fields); i++)		\
+	{							\
+		if (NULL != *(malloc_fields[i]))		\
+			free(*(malloc_fields[i]));		\
+	}							\
+}
+
 # define GC_BIN_LOAD_ERR(GTMCRYPT_ERRNO)											\
 {																\
 	io_log_name		*io_log;											\
@@ -117,11 +127,7 @@ error_def(ERR_DBPRIVERR);
 		io_log = io_curr_device.in->name;										\
 		GTMCRYPT_REPORT_ERROR(GTMCRYPT_ERRNO, gtm_putmsg, io_log->len, io_log->dollar_io);				\
 		mupip_error_occurred = TRUE;											\
-		for (i = 0; i < (sizeof(malloc_fields) / sizeof(char **)); i++)							\
-		{														\
-			if (NULL != *(malloc_fields[i]))									\
-				free(*(malloc_fields[i]));									\
-		}														\
+		FREE_MALLOCS;													\
 		if (NULL != encr_key_handles)											\
 		{														\
 			free(encr_key_handles);											\
@@ -264,16 +270,13 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	mstr			mstr_src, mstr_dest, opstr;
 	collseq			*extr_collseq, *db_collseq, *save_gv_target_collseq;
 	coll_hdr		extr_collhdr, db_collhdr;
-	gv_key			*tmp_gvkey = NULL;	/* null-initialize at start, will be malloced later */
-	gv_key			*sn_gvkey = NULL; /* null-initialize at start, will be malloced later */
-	gv_key			*sn_savekey = NULL; /* null-initialize at start, will be malloced later */
-	gv_key			*save_orig_key = NULL; /* null-initialize at start, will be malloced later */
+	gv_key			*tmp_gvkey, *sn_gvkey, *sn_savekey, *save_orig_key;
 	gv_key			*orig_gv_currkey_ptr = NULL;
 	char			std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff, *sn_hold_buff_temp;
 	int			in_len, gtmcrypt_errno, n_index, encrypted_hash_array_len, null_iv_array_len;
 	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr, *null_iv_array_ptr, null_iv_char;
 	int4			index;
-	gtmcrypt_key_t		*encr_key_handles = NULL;
+	gtmcrypt_key_t		*encr_key_handles;
 	boolean_t		encrypted_version, mixed_encryption, valid_gblname;
 	char			index_err_buf[1024];
 	gvnh_reg_t		*gvnh_reg;
@@ -300,13 +303,12 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		(char **)&encrypted_hash_array_ptr,
 		(char **)&encr_key_handles,
 		(char **)&null_iv_array_ptr,
-		&sn_hold_buff,
-		&sn_hold_buff_temp
+		&sn_hold_buff
 	};
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	for (i = 0; i < (sizeof(malloc_fields) / sizeof(char *)); i++)
+	for (i = 0; i < ARRAYSIZE(malloc_fields); i++)
 		*(malloc_fields[i]) = NULL;		/* Make sure all pointers are cleared to start */
 	assert(4 == SIZEOF(coll_hdr));
 	gvinit();
@@ -323,6 +325,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base, DO_RTS_ERROR_FALSE);
 	if (0 >= len)
 	{
+		FREE_MALLOCS;
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
@@ -331,6 +334,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		((('6' <= hdr_lvl) && ('9' >= hdr_lvl)) && (BIN_HEADER_SZ == len)) ||
 		(('4' > hdr_lvl) && (V3_BIN_HEADER_SZ == len))))
 	{
+		FREE_MALLOCS;
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
@@ -339,6 +343,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	if (0 != memcmp(ptr, BIN_HEADER_LABEL, SIZEOF(BIN_HEADER_LABEL) - 2) || ('2' > hdr_lvl) ||
 			*(BIN_HEADER_VERSION_ENCR_IV) < hdr_lvl)
 	{	/* ignore the level check */
+		FREE_MALLOCS;
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
 		mupip_exit(ERR_LDBINFMT);
 	}
@@ -346,6 +351,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	utf8_extract = (0 == MEMCMP_LIT(&ptr[len - BIN_HEADER_LABELSZ], UTF8_NAME)) ? TRUE : FALSE;
 	if ((utf8_extract && !gtm_utf8_mode) || (!utf8_extract && gtm_utf8_mode))
 	{ /* extract CHSET doesn't match $ZCHSET */
+		FREE_MALLOCS;
 		if (utf8_extract)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("UTF-8"));
 		else
@@ -378,6 +384,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		extr_std_null_coll = STRTOUL(std_null_coll, NULL, 10);
 		if (0 != extr_std_null_coll && 1!= extr_std_null_coll)
 		{
+			FREE_MALLOCS;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
 				      RTS_ERROR_TEXT("Corrupted null collation field in header"), ERR_LDBINFMT);
 			mupip_exit(ERR_LDBINFMT);
@@ -423,6 +430,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base, DO_RTS_ERROR_TRUE);
 		if (SIZEOF(coll_hdr) != len)
 		{
+			FREE_MALLOCS;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_TEXT("Corrupt collation header"),
 				      ERR_LDBINFMT);
 			mupip_exit(ERR_LDBINFMT);
@@ -437,6 +445,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	{
 		if (!(len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base, DO_RTS_ERROR_TRUE)))
 		{
+			FREE_MALLOCS;
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, begin);
 			util_out_print("Error reading record number: !@UQ\n", TRUE, &iter);
 			mupip_error_occurred = TRUE;
@@ -520,6 +529,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_SEVERE(ERR_RECLOAD),
 								2, LEN_AND_STR(msg_buff), msg_buff, ERR_TEXT, 2,
 								RTS_ERROR_TEXT(index_err_buf));
+							FREE_MALLOCS;
 							return;
 						}
 #						ifdef DEBUG
@@ -643,6 +653,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					{
 						if (!do_verify(extr_collseq, extr_collhdr.act, extr_collhdr.ver))
 						{
+							FREE_MALLOCS;
 							gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_COLLTYPVERSION, 2,
 								       extr_collhdr.act, extr_collhdr.ver, ERR_GVIS, 2,
 								       gv_altkey->end - 1, gv_altkey->base);
@@ -650,6 +661,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 						}
 					} else
 					{
+						FREE_MALLOCS;
 						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_COLLATIONUNDEF, 1,
 							       extr_collhdr.act, ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
 						mupip_exit(ERR_COLLATIONUNDEF);
@@ -661,6 +673,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					{
 						if (!do_verify(db_collseq, db_collhdr.act, db_collhdr.ver))
 						{
+							FREE_MALLOCS;
 							gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_COLLTYPVERSION, 2,
 								       db_collhdr.act, db_collhdr.ver, ERR_GVIS, 2,
 								       gv_altkey->end - 1, gv_altkey->base);
@@ -668,6 +681,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 						}
 					} else
 					{
+						FREE_MALLOCS;
 						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_COLLATIONUNDEF, 1, db_collhdr.act,
 							ERR_GVIS, 2, gv_altkey->end - 1, gv_altkey->base);
 						mupip_exit(ERR_COLLATIONUNDEF);
@@ -829,8 +843,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 								break;
 							}
 						}
-					}
-					else /* It is a negative subscript */
+					} else /* It is a negative subscript */
 					{
 						while ((mych = *subs++) && (STR_SUB_PREFIX != mych)) /* WARNING: assignment */
 						{
@@ -1154,14 +1167,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		}
 		assert(NULL != encr_key_handles);
 	}
-	for (i = 0; i < (sizeof(malloc_fields) / sizeof(char **)); i++)
-	{
-		if (NULL != *(malloc_fields[i]))
-		{
-			free(*(malloc_fields[i]));
-			*(malloc_fields[i]) = NULL;
-		}
-	}
+	FREE_MALLOCS;
 	file_input_close();
 	tmp_rec_count = (rec_count == begin) ? rec_count : rec_count - 1;
 	if (0 != first_failed_rec_count)

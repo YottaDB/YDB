@@ -20,8 +20,7 @@
  *		     port - numeric port number
  *		     timeout - numeric seconds
  *		     passive - boolean 0 is sender and must have a host, 1 may
- *		               have a host and if so, it is checked to see that
- *		               incomming connections are from that host.
+ *		               have a host and if so, it is ignored.
  *      return:
  *                  socket descriptor for the connection or
  *                  -1 and output the error.
@@ -335,8 +334,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		{
 			freeaddrinfo(remote_ai_head);
 			CLOSEFILE(sock, rc);
-			util_out_print("Connection timed out.", TRUE);
-			assert(FALSE);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TCPCONNTIMEOUT, 1, timeout);
 			return -1;
 		}
 		freeaddrinfo(remote_ai_head);

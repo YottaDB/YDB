@@ -65,7 +65,6 @@ void dse_shift(void)
 	uchar_ptr_t	lbp;
 	uint4		offset, shift;
 
-	lbp = NULL;	/* Initialize */
         if (gv_cur_region->read_only)
                 rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
@@ -79,6 +78,7 @@ void dse_shift(void)
 	if (!cli_get_hex("OFFSET", &offset))
 		return;
 	shift = 0;
+	lbp = NULL;
 	if (CLI_PRESENT == cli_present("FORWARD"))
 	{
 		if (!cli_get_hex("FORWARD", &shift))

@@ -52,7 +52,7 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 	snapshot_filhdr_t	ss_filhdr;
 	blk_hdr_ptr_t		bp = NULL;
 	block_id		blkno;
-	unsigned int		*bitmap_buffer = NULL;
+	unsigned int		*bitmap_buffer;
 
 	OPENFILE(filename, O_RDONLY, shdw_fd);
 	if (FD_INVALID == shdw_fd)
@@ -112,6 +112,7 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 			if (0 != status)
 			{
 				free(bitmap_buffer);
+				free(bp);
 				if (-1 != status)
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("read"),
 						       flen, filename, status);

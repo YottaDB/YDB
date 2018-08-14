@@ -285,7 +285,8 @@ STATICFNDEF void gtcm_gnp_server_actions(void)
 				default:		/* not a valid msg */
 					reply = FALSE;
 					GET_LONG(status, curr_entry->clb_ptr->mbf);	/* Fetch error value from msg */
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_BADGTMNETMSG, 1, status);
+					if (SS_NORMAL != status)
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_BADGTMNETMSG, 1, status);
 			}
 			if (curr_entry)		/* curr_entry can be NULL if went through gtcmtr_terminate */
 			{

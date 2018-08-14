@@ -72,6 +72,9 @@ void mucblkini(void)
 	{
 		PUTMSG_ERROR_CSA((CSA_ARG(cs_addrs) VARLSTCNT(7) ERR_FILECREERR, 4, LEN_AND_LIT("reading first bitmap"),
 				  DB_LEN_STR(gv_cur_region), status));
+		free(bmp);
+		free(bp1);
+		free(bp2);
 		return;
 	}
 	bml_busy(DIR_ROOT, bmp + SIZEOF(blk_hdr));
