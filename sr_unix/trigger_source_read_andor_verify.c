@@ -80,7 +80,7 @@ GBLREF	int4			gtm_trigger_depth;
 GBLREF	trans_num		local_tn;
 GBLREF	unsigned int		t_tries;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
-GBLREF	rtn_tabent		*rtn_names_end;
+GBLREF	rtn_tabent		*rtn_names, *rtn_names_end;
 #ifdef DEBUG
 GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
@@ -321,7 +321,7 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 	mstr			gbl, xecute_buff;
 	mval			trig_index;
 	rhdtyp			*rtn_vector;
-	rtn_tabent		*rttabent;
+	rtn_tabent		*rttabent = NULL;
 	sgm_info		*save_sgm_info_ptr;
 	jnlpool_addrs_ptr_t	save_jnlpool;
 	sgmnt_addrs		*csa, *regcsa;
@@ -356,6 +356,8 @@ STATICFNDEF int trigger_source_raov(mstr *trigname, gd_region *reg, rhdtyp **rtn
 			gv_init_reg(reg);	/* Open the region before obtaining "csa" */
 		regcsa = &FILE_INFO(reg)->s_addrs;
 		assert('#' == rtn_name.addr[rtn_name.len - 1]);
+		if (NULL == rttabent)		/* Start at beginning of table to look up if not known already */
+			rttabent = rtn_names;
 		for ( ; rttabent <= rtn_names_end; rttabent++)
 		{
 			if ((rttabent->rt_name.len < rtn_name.len) || memcmp(rttabent->rt_name.addr, rtn_name.addr, rtn_name.len))

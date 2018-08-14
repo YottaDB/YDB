@@ -96,7 +96,6 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 {
 	jnl_create_info		jnl_info;
 	jnl_create_info		*jnl_info_ptr;
-	GDS_INFO		*gds_info;
 	file_control		*fc;
 	int			new_stat_res;	/* gtm_file_stat() return value for new journal file name */
 	int			curr_stat_res; 	/* gtm_file_stat() return value for current journal file name */
@@ -182,15 +181,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				continue;
 			}
 			gv_cur_region = rptr->reg;
-			if (NULL == seg->file_cntl)
-			{
-				seg->file_cntl =
-					(file_control *)malloc(SIZEOF(*seg->file_cntl));
-				memset(seg->file_cntl, 0, SIZEOF(*seg->file_cntl));
-				gds_info = FILE_INFO(gv_cur_region);
-				gds_info = (GDS_INFO *)malloc(SIZEOF(GDS_INFO));
-				memset(gds_info, 0, SIZEOF(GDS_INFO));
-			}
+			FILE_CNTL_INIT_IF_NULL(seg);
 		} else
 		{
 			mu_gv_cur_reg_init();

@@ -980,7 +980,10 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 				assert(0 <= nattached);
 				shm_hdr = GET_RELINK_SHM_HDR(linkctl);
 			} else
+			{
+				shm_hdr = NULL;
 				nattached = -1;
+			}
 			if (0 == nattached)
 			{
 				DBGARLNK((stderr, "relinkctl_rundown : nattached = 0\n"));
@@ -1095,12 +1098,19 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 						shm_rmid(shmid); /* If error removing shmid, not much we can do. Just move on */
 					}
 				}
-				SHMDT(shm_hdr);		/* If error detaching, not much we can do. Just move on */
+				if (-1 == SHMDT(shm_hdr))	/* If error detaching, not much we can do, log msg and move on */
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("shmdt()"),
+						       CALLFROM, errno);
 				shmid = hdr->relinkctl_shmid;
 				shm_rmid(shmid);	/* If error removing shmid, not much we can do. Just move on */
 			} else
 			{
-				SHMDT(shm_hdr);		/* If error detaching, not much we can do. Just move on */
+				if (NULL != shm_hdr)
+				{
+					if (-1 == SHMDT(shm_hdr)) /* If error detaching, not much can do, log msg and move on */
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+							       RTS_ERROR_LITERAL("shmdt()"), CALLFROM, errno);
+				}
 			}
 			if (remove_rctl)
 			{

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,6 +51,14 @@ static char rcsid[] = "$Header:$";
 #include <errno.h>
 #endif
 
+#define OMI_FREE 		\
+{				\
+	if (NULL != ag_name)	\
+		free(ag_name);	\
+	if (NULL != ag_pass)	\
+		free(ag_pass);	\
+}
+
 #undef MIN
 #define MIN(A, B) (((A) < (B)) ? (A) : (B))
 
@@ -65,8 +73,9 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
     char	*bptr, *eptr;
     char	*ag_name, *ag_pass, *s;
 
-	ASSERT_IS_LIBGTCM;
+    ASSERT_IS_LIBGTCM;
     bptr = buff;
+    ag_name = ag_pass = NULL;
 
 /*  Version numbers */
     OMI_SI_READ(&si, cptr->xptr);
@@ -150,13 +159,7 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 /*  Agent name (in) */
     OMI_SI_READ(&ss_len, cptr->xptr);
-    if ((ag_name = (char *) malloc(ss_len.value + 1)) == NULL)
-    {
-	    OMI_DBG((omi_debug, "%s:  memory allocation error (insufficient resources) while\n", SRVR_NAME));
-	    OMI_DBG((omi_debug, "processing connect request from connection %d, %s.\n",
-	    		cptr->stats.id, gtcm_hname(&cptr->stats.ai)));
-	    return -OMI_ER_DB_UNRECOVER;
-    }
+    ag_name = (char *)malloc(ss_len.value + 1);
     assert(ss_len.value < MAX_USER_NAME && ss_len.value > 0);
     memcpy(ag_name, cptr->xptr, ss_len.value);
     ag_name[ss_len.value] = '\0';
@@ -165,14 +168,7 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 
 /*  Agent password (in) */
     OMI_SI_READ(&ss_len, cptr->xptr);
-    if ((ag_pass = (char *) malloc(ss_len.value + 1)) == NULL)
-    {
-	    OMI_DBG((omi_debug, "%s:  memory allocation error (insufficient resources) while\n", SRVR_NAME));
-	    OMI_DBG((omi_debug, "processing connect request from connection %d, %s.\n",
-	    		cptr->stats.id, gtcm_hname(&cptr->stats.ai)));
-	    return -OMI_ER_DB_UNRECOVER;
-    }
-
+    ag_pass = (char *)malloc(ss_len.value + 1);
     memcpy(ag_pass, cptr->xptr, ss_len.value);
     ag_pass[ss_len.value] = '\0';
     cptr->xptr += ss_len.value;
@@ -184,7 +180,7 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 #	ifdef SHADOWPW
 	struct spwd *spass, *getspnam();
 	struct stat buf;
-#		endif
+#	endif
 	struct passwd *pass;
 	char *pw, *syspw;
 
@@ -201,11 +197,13 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 		    {
 			OMI_DBG((omi_debug, "%s:  error opening /etc/shadow for input\n",
 				 SRVR_NAME, ag_name));
+			OMI_FREE;
 			PERROR("/etc/shadow");
 			return -OMI_ER_DB_USERNOAUTH;
 		    }
 		    OMI_DBG((omi_debug, "%s:  user %s not found in /etc/shadow\n",
 			     SRVR_NAME, ag_name));
+		    OMI_FREE;
 		    return -OMI_ER_DB_USERNOAUTH;
 		}
 		syspw = spass->sp_pwdp;
@@ -213,6 +211,7 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 	{
 		OMI_DBG((omi_debug, "%s:  user %s not found in /etc/passwd\n",
 			SRVR_NAME, ag_name));
+		OMI_FREE;
 		return -OMI_ER_DB_USERNOAUTH;
 	} else
 		syspw = pass->pw_passwd;
@@ -221,15 +220,17 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
 	{
 		    OMI_DBG((omi_debug, "%s:  user %s not found in /etc/passwd\n",
 			     SRVR_NAME, ag_name));
+		    OMI_FREE;
 		    return -OMI_ER_DB_USERNOAUTH;
 	    } else
 		syspw = pass->pw_passwd;
 #	endif   /* SHADOWPW */
-	pw = (char *) crypt(ag_pass, syspw);
+	pw = (char *)crypt(ag_pass, syspw);
 	if (strcmp(pw, syspw) != 0)
 	{
 		OMI_DBG((omi_debug, "%s:  login attempt for user %s failed.\n",
 			SRVR_NAME, ag_name));
+		OMI_FREE;
 		return -OMI_ER_DB_USERNOAUTH;
 	}
     }
@@ -250,7 +251,10 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
     OMI_SI_WRIT(0, bptr);
 /*  Bounds checking */
     if (cptr->xptr > xend || bptr >= bend)
+    {
+	OMI_FREE;
 	return -OMI_ER_PR_INVMSGFMT;
+    }
 /*  Extensions (in) -- count through them */
     OMI_SI_READ(&ext_cnt, cptr->xptr);
     for (i = 0; i < ext_cnt.value; i++)
@@ -297,9 +301,12 @@ int omi_prc_conn(omi_conn *cptr, char *xend, char *buff, char *bend)
     OMI_SI_WRIT(i, eptr);
 /*  Bounds checking */
     if (cptr->xptr > xend || bptr >= bend)
+    {
+	OMI_FREE;
 	return -OMI_ER_PR_INVMSGFMT;
+    }
 /*  Change the state of the connection */
     cptr->state = OMI_ST_CONN;
-
+    OMI_FREE;
     return (int)(bptr - buff);
 }

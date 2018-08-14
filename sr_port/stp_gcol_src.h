@@ -1040,9 +1040,9 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 					stp_incr = stp_incr / 2;
 			}
 		} while (TRUE);
+		cstr = array;
 		if (strpool_base != stringpool.base) /* expanded successfully */
 		{
-			cstr = array;
 			COPY2STPOOL(cstr, topstr);
 			/* NOTE: rts_stringpool must be kept up-to-date because it tells whether the current
 			 * stringpool is the run-time or indirection stringpool.

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,17 @@ static char     rcsid[] = "$Header:$";
 #include "gtmio.h"
 #include "have_crit.h"
 #include "rc.h"
+
+/* Macro to release elst linked list if it exists */
+#define FREE_ELST								\
+{										\
+	if (elst)								\
+	{									\
+		for (eptr = elst->next; eptr; eptr = (elst = eptr)->next)	\
+			free(elst);						\
+		free(elst);							\
+	}									\
+}
 
 typedef struct rc_clnt_err rc_clnt_err;
 struct rc_clnt_err
@@ -72,9 +83,7 @@ static rc_op   rc_dispatch_table[RC_OP_MAX] = {
 	 /* rc_prc_ntrx */ 0
 };
 
-
-int
-rc_srvc_xact(cptr, xend)
+int rc_srvc_xact(cptr, xend)
 	omi_conn       *cptr;
 	char           *xend;
 {
@@ -92,54 +101,45 @@ rc_srvc_xact(cptr, xend)
 	/* Reserve space for the RC header in the response buffer */
 	fxhdr = (rc_xblk_hdr *) cptr->xptr;
 	cptr->xptr += SIZEOF(rc_xblk_hdr);
-
 	/* If true, this not a known RC block type */
 	if (fxhdr->method.value != RC_METHOD)
 	{
-#ifdef DEBUG
+#		ifdef DEBUG
 		gtcm_cpktdmp((char *)cptr, pkt_len,"Unknown RC block type.");
 		dumped = 1;
-#endif
+#		endif
 		return -OMI_ER_PR_INVMSGFMT;
 	}
 	/* Check the endianism of the XBLK */
-#ifdef LTL_END
+#	ifdef LTL_END
 	if (fxhdr->big_endian.value)
 		return -OMI_ER_PR_INVMSGFMT;
-#else				/* defined(LTL_END) */
-#ifdef BIG_END
+#	else				/* defined(LTL_END) */
+#	ifdef BIG_END
 	if (!fxhdr->big_endian.value)
 		return -OMI_ER_PR_INVMSGFMT;
-#else				/* defined(BIG_END) */
+#	else				/* defined(BIG_END) */
 	return -OMI_ER_PR_INVMSGFMT;
-#endif				/* !defined(BIG_END) */
-#endif				/* !defined(LTL_END) */
-
-
+#	endif				/* !defined(BIG_END) */
+#	endif				/* !defined(LTL_END) */
 	/* Stash this for any lock operations */
 	rc_auxown = (UINTPTR_T)cptr;
 	/* This is the list of errors */
 	elst = (rc_clnt_err *) 0;
 	/* This is the offset of the first error Aq */
 	fxhdr->err_aq.value = 0;
-
 	tptr = cptr->xptr;
-
 	/* Loop through the requests in the XBLK */
-	for (qhdr = (rc_q_hdr *) 0; cptr->xptr < xend;)
+	for (qhdr = NULL; cptr->xptr < xend;)
 	{
-
-		qhdr = (rc_q_hdr *) tptr;
+		qhdr = (rc_q_hdr *)tptr;
 		rqlen = qhdr->a.len.value;
-
 		if (history)
 		{
 			init_rc_hist(cptr->stats.id);
 			save_rc_req((char *)qhdr,qhdr->a.len.value);
 		}
-
 		rv = -1;
-
 		/* Check to see if this is a error'd PID, throw away packets
 		   from these. */
 		/* 9/8/94 VTF:  protocol change
@@ -151,27 +151,24 @@ rc_srvc_xact(cptr, xend)
 				break;
 		if (eptr)
 			qhdr->a.erc.value = RC_NETREQIGN;
-	/*	Do we do this yet? */
+		/*	Do we do this yet? */
 		else if (	/* (qhdr->r.typ.value < 0) || */ /* this is commented out as it always evaluates to FALSE */
 			(qhdr->r.typ.value > RC_OP_MAX )
 			|| (!rc_dispatch_table[qhdr->r.typ.value]))
 		{
-#ifdef DEBUG
+#			ifdef DEBUG
 			if (qhdr->r.typ.value == RC_EXCH_INFO)
 			{
 				dumped = 1;
 				OMI_DBG((omi_debug, "Note: Unsupported request type (ExchangeInfo)\n"));
-			}
-			else
+			} else
 			{
 				gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value, "Unknown request type.");
 				dumped = 1;
 			}
-#endif
+#			endif
 			qhdr->a.erc.value = RC_NETERRNTIMPL;
-		}
-		/* Try it */
-		else
+		} else		/* Try it */
 		{
 			/*
 			 * Calculate the size available for a response
@@ -195,6 +192,7 @@ rc_srvc_xact(cptr, xend)
 				gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);
 				if (history)
 				    dump_omi_rq();
+				FREE_ELST;
 				return -OMI_ER_PR_INVMSGFMT;
 			}
 			rv = (*rc_dispatch_table[qhdr->r.typ.value]) (qhdr);
@@ -224,7 +222,7 @@ rc_srvc_xact(cptr, xend)
 				rc_nerrs++;
 				qhdr->a.erc.value = rc_errno;
 				rv = -1;
-#ifdef DEBUG
+#				ifdef DEBUG
 				{
 					char msg[256];
 
@@ -232,13 +230,9 @@ rc_srvc_xact(cptr, xend)
 					gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value, msg);
 					dumped = 1;
 				}
-#endif
+#				endif
 			}
 		}
-
-
-
-
 		/* Keep track of erroneous PIDs */
 		if (rv < 0)
 		{
@@ -247,12 +241,12 @@ rc_srvc_xact(cptr, xend)
 			 * rc_srvc_xct(error: %d)\n",
 			 * qhdr->a.erc.value));
 			 */
-#ifdef DEBUG
+#			ifdef DEBUG
 			if (!dumped)
 				gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value,
 					    "RC Request returned error.");
 			dumped = 1;
-#endif
+#			endif
 			eptr = (rc_clnt_err *) malloc(SIZEOF(rc_clnt_err));
 			eptr->pid = (qhdr->r.pid1.value << 16) | qhdr->r.pid2.value;
 			eptr->next = elst;
@@ -261,10 +255,8 @@ rc_srvc_xact(cptr, xend)
 				fxhdr->err_aq.value = (char *) qhdr - (char *) fxhdr;
 		}
 		qhdr->r.typ.value |= 0x80;
-
 		if (history)
 			save_rc_rsp((char *)qhdr,qhdr->a.len.value);
-
 		/* Move to the next request */
 		cptr->xptr += rqlen;
 
@@ -276,7 +268,8 @@ rc_srvc_xact(cptr, xend)
 		    qhdr->r.typ.value == (RC_GET_RECORD | 0x80))
 			break;	/* Reads are always the last request in
 				 * the buffer */
-		else {
+		else
+		{
 			if (cptr->xptr < xend)
 			{
 				/* ensure that the length of the next request
@@ -291,14 +284,8 @@ rc_srvc_xact(cptr, xend)
 		  qhdr->a.len.value = RC_AQ_HDR;
 		}
 	}
-
 	/* Forget the erroneous PIDs */
-	if (elst)
-	{
-		for (eptr = elst->next; eptr; eptr = (elst = eptr)->next)
-			free(elst);
-		free(elst);
-	}
+	FREE_ELST;
 	/*
 	 * If true, there was an XBLK, so fill in some of the response
 	 * fields
@@ -306,7 +293,6 @@ rc_srvc_xact(cptr, xend)
 
 	/* There's no way that I can see to get to this point with a
 	   null qhdr. */
-
 	if (qhdr)
 	{
 		fxhdr->last_aq.value = (char *) qhdr - (char *) fxhdr;
@@ -319,7 +305,6 @@ rc_srvc_xact(cptr, xend)
 		fxhdr->cpt_tab.value = fxhdr->free.value;
 		fxhdr->cpt_siz.value = fxhdr->end.value - fxhdr->cpt_tab.value;
 	}
-
 	if (fxhdr->free.value > fxhdr->end.value)
 	{
 	    char msg[256];
@@ -330,8 +315,7 @@ rc_srvc_xact(cptr, xend)
 	    if (history)
 		dump_omi_rq();
 	    return -OMI_ER_PR_INVMSGFMT;
-	}
-	else if (fxhdr->cpt_tab.value > fxhdr->end.value)
+	} else if (fxhdr->cpt_tab.value > fxhdr->end.value)
 	{
 	    char msg[256];
 	    SPRINTF(msg,"invalid packet :  cpt_tab (%x) > end (%x).  Dumped RC header + packet",
@@ -341,8 +325,7 @@ rc_srvc_xact(cptr, xend)
 	    if (history)
 		dump_omi_rq();
 	    return -OMI_ER_PR_INVMSGFMT;
-	}
-	else if (fxhdr->cpt_tab.value + fxhdr->cpt_siz.value
+	} else if (fxhdr->cpt_tab.value + fxhdr->cpt_siz.value
 		                                      > fxhdr->end.value)
 	{
 	    char msg[256];
@@ -366,7 +349,6 @@ rc_srvc_xact(cptr, xend)
 	    if (history)
 		dump_omi_rq();
 	    assert(fxhdr->free.value <= fxhdr->end.value);
-
 	    return -OMI_ER_PR_INVMSGFMT;
 	}
 

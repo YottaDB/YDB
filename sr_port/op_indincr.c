@@ -37,6 +37,7 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	s = NULL;
 	MV_FORCE_STR(target);
 	indir_src.str = target->str;
 	indir_src.code = indir_increment;
@@ -98,7 +99,10 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 			rval = EXPR_FAIL;
 			break;
 		}
-		v = put_tref(s);
+		if (NULL != s)
+			v = put_tref(s);
+		else
+			assert(EXPR_FAIL == rval);
 		if (EXPR_FAIL == comp_fini(rval, obj, OC_IRETMVAL, &v, &getdst, target->str.len))
 			return;
 		indir_src.str.addr = target->str.addr;

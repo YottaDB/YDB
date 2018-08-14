@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -109,7 +112,6 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 	char		letter;
 	int		point;
 	char		previous;
-	int		seq;
 	int		state;
 	int		subs_count;
 	int		utf8_len;
@@ -130,7 +132,6 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 
 	gvn = ((0 < src->str.len) && ('^' == src->str.addr[0]));
 	MV_FORCE_STR(src);
-	seq = *subscripts;
 	state = BEFORE_NAME;
 	subs_count = -1;
 	*contains_env = 0;

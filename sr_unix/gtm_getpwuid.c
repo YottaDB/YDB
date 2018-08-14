@@ -51,10 +51,6 @@ struct passwd	*gtm_getpwuid(uid_t uid)
 		if (-1 == buff_size)
 			buff_size = 2048;
 		buff = malloc(buff_size);
-		if (NULL == buff)
-		{
-			return NULL;
-		}
 		getpwuid_r(uid, &temp_passwd, buff, buff_size, &retval);
 		if (blocksig_initialized)
 			SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
@@ -62,7 +58,7 @@ struct passwd	*gtm_getpwuid(uid_t uid)
 			return NULL;	/* error or "uid" record not found */
 		getpwuid_struct = *retval;
 		/* Cache return from "getpwuid" call and avoid future calls to this function */
-#ifdef DEBUG
+#		ifdef DEBUG
 		if (ydb_white_box_test_case_enabled &&
 			(WBTEST_GETPWUID_CHECK_OVERWRITE == ydb_white_box_test_case_number))
 		{
@@ -73,7 +69,7 @@ struct passwd	*gtm_getpwuid(uid_t uid)
 			assert(STRCMP(getpwuid_struct.pw_name, retval->pw_name));
 		}
 		first_time = FALSE;
-#endif
+#		endif
 	}
 	return &getpwuid_struct;
 }

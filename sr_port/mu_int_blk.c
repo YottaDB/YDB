@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -320,7 +323,10 @@ boolean_t mu_int_blk(
 	{
 		rec_num++;
 		if (mu_ctrly_occurred || mu_ctrlc_occurred)
-			return FALSE;	/* Only happens on termination, so don't worry about mu_int_plen. */
+		{
+			free(free_blk_base);	/* Added in case called from non-terminating process (perhaps in future) */
+			return FALSE;		/* Only happens on termination, so don't worry about mu_int_plen. */
+		}
 		mu_int_cum[RECS][level]++;
 		GET_USHORT(temp_ushort, &(((rec_hdr_ptr_t)rec_base)->rsiz));
 		rec_size = temp_ushort;

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc 	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,20 +57,20 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	int		i;
 	int 		save_errno;
 	int		rc;
-#ifdef NET_TCP
+#	ifdef NET_TCP
 	struct servent		*se;
 	unsigned short		port;
 	char			port_buffer[NI_MAXSERV];
-#endif /* defined(NET_TCP) */
-#ifdef BSD_TCP
+#	endif /* defined(NET_TCP) */
+#	ifdef BSD_TCP
 	struct addrinfo		*ai_ptr, hints;
 	const  boolean_t	reuseaddr = TRUE;
 	int			errcode;
-#else /* defined(BSD_TCP) */
-#ifdef SYSV_TCP
+#	else /* defined(BSD_TCP) */
+#	ifdef SYSV_TCP
 	struct t_bind		*bind;
-#endif /* defined(SYSV_TCP) */
-#endif /* !defined(BSD_TCP) */
+#	endif /* defined(SYSV_TCP) */
+#	endif /* !defined(BSD_TCP) */
 
 	ASSERT_IS_LIBGTCM;
 	/*  The linked list of connections */
@@ -88,15 +88,15 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	/*  Fall back on a compile time constant */
 	if (!omi_service)
 		omi_service = SRVC_NAME;
-#ifdef NET_TCP
+#	ifdef NET_TCP
 	/* NET_TCP is defined only when BSD_TCP is defined or SYSV_TCP is defined, but SYSV_TCP is never defined (a bug?)
 	 * so we move the code of obtaining port information from service down to #ifdef BSD_TCP
 	 */
-#ifdef SYSV_TCP
+#	ifdef SYSV_TCP
 	GTMASSERT;
-#endif
-#endif /* defined(NET_TCP) */
-#ifdef BSD_TCP
+#	endif
+#	endif /* defined(NET_TCP) */
+#	ifdef BSD_TCP
 	/*  Create a socket always tries IPv6 first */
 	SERVER_HINTS(hints, ((GTM_IPV6_SUPPORTED && !ipv4_only) ? AF_INET6 : AF_INET));
 	if ((fd = socket(hints.ai_family, SOCK_STREAM, 0)) < 0)
@@ -121,6 +121,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 		if (0 != (errcode = getnameinfo(ai_ptr->ai_addr, ai_ptr->ai_addrlen, NULL, 0, port_buffer,
 						 NI_MAXSERV, NI_NUMERICSERV)))
 		{
+			freeaddrinfo(ai_ptr);
 			assert(FALSE);
 			RTS_ERROR_ADDRINFO(NULL, ERR_GETNAMEINFO, errcode);
 			return errcode;
@@ -130,16 +131,19 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	/*  Reuse a specified address */
 	if (port && setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&reuseaddr, SIZEOF(reuseaddr)) < 0)
 	{
+		freeaddrinfo(ai_ptr);
 		save_errno = errno;
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return save_errno;
 	}
 	if (bind(fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen) < 0)
 	{
+		freeaddrinfo(ai_ptr);
 		save_errno = errno;
 		CLOSEFILE_RESET(fd, rc);	/* resets "fd" to FD_INVALID */
 		return save_errno;
 	}
+	freeaddrinfo(ai_ptr);
 	/*  Initialize the listen queue */
 	if (listen(fd, 5) < 0)
 	{
@@ -154,9 +158,9 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	cll->nve = fd;
 	OMI_DBG_STMP;
 	OMI_DBG((omi_debug, "%s: socket registered at port %d\n", SRVR_NAME, (int)port));
-#ifdef GTCM_RC
+#	ifdef GTCM_RC
 	OMI_DBG((omi_debug, "RC server ID %d, Process ID %d\n", rc_server_id, omi_pid));
-#endif
+#	endif
 	if (authenticate)
 		OMI_DBG((omi_debug, "Password verification on OMI connections enabled.\n"));
 	if (!one_conn_per_inaddr)
@@ -164,8 +168,8 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	if (psock > 0)
 		OMI_DBG((omi_debug, "Keepalive option (-ping) enabled.\n"));
 	return 0;
-#else /* defined(BSD_TCP) */
-#ifdef SYSV_TCP
+#	else /* defined(BSD_TCP) */
+#	ifdef SYSV_TCP
 	GTMASSERT;
 	if ((fd = t_open(SYSV_TCP, O_RDWR, NULL)) < 0)
 	{
@@ -192,13 +196,13 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 	cll->nve = fd;
 	OMI_DBG_STMP;
 	OMI_DBG((omi_debug, "%s: socket registered at port %d\n", SRVR_NAME, (int)port));
-#ifdef GTCM_RC
+#	ifdef GTCM_RC
 	OMI_DBG((omi_debug, "RC server ID %d\n", rc_server_id));
-#endif
+#	endif
 	return 0;
-#else /* defined(SYSV_TCP) */
+#	else /* defined(SYSV_TCP) */
 	cll->nve = FD_INVALID;
 	return -1;
-#endif /* !defined(SYSV_TCP) */
-#endif /* !defined(BSD_TCP) */
+#	endif /* !defined(SYSV_TCP) */
+#	endif /* !defined(BSD_TCP) */
 }

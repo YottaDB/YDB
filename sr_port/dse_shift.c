@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,6 +78,7 @@ void dse_shift(void)
 	if (!cli_get_hex("OFFSET", &offset))
 		return;
 	shift = 0;
+	lbp = NULL;
 	if (CLI_PRESENT == cli_present("FORWARD"))
 	{
 		if (!cli_get_hex("FORWARD", &shift))
@@ -91,7 +95,6 @@ void dse_shift(void)
 			return;
                 }
 		forward = FALSE;
-		lbp = (unsigned char *)0;
 	}
 	if (!shift)
 	{

@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -168,6 +171,7 @@ void mu_all_version_get_standalone(char_ptr_t db_fn, sem_info *sem_inf)
 	}
 	if (-1 != shmid)
 	{
+		save_errno = errno;
 		mu_all_version_release_standalone(sem_inf);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) MAKE_MSG_TYPE(ERR_MUSTANDALONE, ERROR), 2, RTS_ERROR_TEXT(db_fn),
 				save_errno, 0, ERR_FTOKKEY, 1, sem_inf[i].ftok_key);

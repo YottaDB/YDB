@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -161,7 +164,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	/* Only report if we were the process to set the current freeze comment; otherwise someone else reported it. */
 	if (STRCMP(wait_comment, jnlpool->jnlpool_ctl->freeze_comment) == 0)
 	{
-		CLEAR_ANTICIPATORY_FREEZE(freeze_cleared);			/* sets freeze_cleared */
+		CLEAR_ANTICIPATORY_FREEZE(freeze_cleared);		/* Resets freeze_cleared */
 		REPORT_INSTANCE_UNFROZEN(freeze_cleared);
 	}
 	*save_errno = tmp_errno;

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,13 +39,13 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 		size_t usr_size,
 		size_t mbl)
 {
-	cmi_status_t status = SS_NORMAL;
-	char *envvar;
+	cmi_status_t	status = SS_NORMAL;
+	char		*envvar;
 	struct protoent *p;
-	unsigned short myport;
-	sigset_t oset;
-	int on = 1;
-	int rval, rc, save_errno;
+	unsigned short	myport;
+	sigset_t	oset;
+	int		on = 1;
+	int		rval, rc, save_errno;
 	struct addrinfo	*ai_ptr, *local_ai_ptr;
 	boolean_t	af;
 
@@ -53,65 +53,62 @@ cmi_status_t cmi_init(cmi_descriptor *tnd, unsigned char tnr,
 	status = cmj_netinit();
 	if (CMI_ERROR(status))
 		return status;
-
 	status = cmj_getsockaddr(NULL, tnd, &local_ai_ptr);
 	if (CMI_ERROR(status))
 		return status;
 	ntd_root->pool_size = pool_size;
 	ntd_root->usr_size = usr_size;
 	ntd_root->mbl = mbl;
-
 	p = getprotobyname(GTCM_SERVER_PROTOCOL);
 	endprotoent();
 	if (!p)
+	{
+		freeaddrinfo(local_ai_ptr);
 		return CMI_NETFAIL;
-
+	}
 	/* create the listening socket */
 	if ((GTM_IPV6_SUPPORTED && !ipv4_only)
-			&& (FD_INVALID != (ntd_root->listen_fd = socket(AF_INET6, SOCK_STREAM, p->p_proto))))
+	    && (FD_INVALID != (ntd_root->listen_fd = socket(AF_INET6, SOCK_STREAM, p->p_proto))))
 		af = AF_INET6;
 	else if (FD_INVALID == (ntd_root->listen_fd = socket(AF_INET, SOCK_STREAM, p->p_proto)))
+	{
+		freeaddrinfo(local_ai_ptr);
 		return errno;
-	else
+	} else
 		af = AF_INET;
-
 	/* make sure we can re-run quickly w/o reuse problems */
 	status = setsockopt(ntd_root->listen_fd, SOL_SOCKET, SO_REUSEADDR,
-		(void*)&on, SIZEOF(on));
+			    (void*)&on, SIZEOF(on));
 	if (-1 == status)
 	{
 		save_errno = errno;
 		CLOSEFILE_RESET(ntd_root->listen_fd, rc);	/* resets "ntd_root->listen_fd" to FD_INVALID */
+		freeaddrinfo(local_ai_ptr);
 		return save_errno;
 	}
-
 	for(ai_ptr = local_ai_ptr; NULL != ai_ptr; ai_ptr = ai_ptr->ai_next)
 		if (af == ai_ptr->ai_family)
 			break;
-
 	if (NULL == ai_ptr)
 	{
 		CLOSEFILE_RESET(ntd_root->listen_fd, rc);
+		freeaddrinfo(local_ai_ptr);
 		return CMI_NETFAIL;
 	}
-
 	status = bind(ntd_root->listen_fd, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
-	freeaddrinfo(ai_ptr);
-
+	freeaddrinfo(local_ai_ptr);
 	if (-1 == status)
 	{
 		save_errno = errno;
 		CLOSEFILE_RESET(ntd_root->listen_fd, rc);	/* resets "ntd_root->listen_fd" to FD_INVALID */
 		return save_errno;
 	}
-
 	status = cmj_setupfd(ntd_root->listen_fd);
 	if (CMI_ERROR(status))
 	{
 		CLOSEFILE_RESET(ntd_root->listen_fd, rc);	/* resets "ntd_root->listen_fd" to FD_INVALID */
 		return status;
 	}
-
 	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &oset, rc);
 	rval = listen(ntd_root->listen_fd, MAX_CONN_IND);
 	if (-1 == rval)
