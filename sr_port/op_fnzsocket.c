@@ -448,6 +448,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 #			ifdef	GTM_TLS
 			if (socketptr->tlsenabled)
 			{
+				tls_options_mask = 0;
 				tls_sock = (gtm_tls_socket_t *)socketptr->tlssocket;
 				if (NULL == tls_sock)
 				{
@@ -461,7 +462,6 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 					len2 = MIN((MAX_TRANS_NAME_LEN - 1), arg2->str.len);
 					lower_to_upper((uchar_ptr_t)buf1, (uchar_ptr_t)arg2->str.addr, len2);
 					buf1[len2] = '\0';
-					tls_options_mask = 0;
 					for (charptr = buf1; (&buf1[len2] > charptr); charptr = optionend)
 					{
 						if (buf1 < charptr)

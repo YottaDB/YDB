@@ -188,6 +188,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 			gtmsource_onln_rlbk_clnup();
 			if (!was_crit)
 				rel_crit(reg);
+			free(tmp_ctl);
 			return -1;
 		}
 		/* Although replication may be WAS_ON, it is possible that source server has not yet sent records
@@ -264,6 +265,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 				if (FD_INVALID == fd)
 				{
 					save_errno = errno;
+					free(tmp_ctl);
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_JNLFILEOPNERR, 2, ext_new_jnl_fn_len,
 						ext_new_jnl_fn, ERR_SYSCALL, 5, LEN_AND_STR("open"), CALLFROM, save_errno);
 				}
@@ -272,6 +274,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 				if (SS_NORMAL != status1)
 				{
 					save_errno = errno;
+					free(tmp_ctl);
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLREAD, 3,
 									ext_new_jnl_fn_len, ext_new_jnl_fn, 0, save_errno);
 				}
@@ -279,8 +282,11 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 												 * even if errors.
 												 */
 				if (SS_NORMAL != status1)
+				{
+					free(tmp_ctl);
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_JNLOPNERR, 4,
-								ext_new_jnl_fn_len, ext_new_jnl_fn, DB_LEN_STR(reg), status1);
+						      ext_new_jnl_fn_len, ext_new_jnl_fn, DB_LEN_STR(reg), status1);
+				}
 				CLOSEFILE_RESET(fd, status1);
 				fn_len = header->prev_jnl_file_name_length;
 				fn = header->prev_jnl_file_name;
@@ -290,6 +296,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 				if (!was_crit)
 					rel_crit(reg);
 				/* In case jnl_status has a severity of INFO, treat that as an ERROR so force it below */
+				free(tmp_ctl);
 				if (SS_NORMAL != jpc->status)
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) MAKE_MSG_TYPE(jnl_status, ERROR), 4,
 						JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);
@@ -309,8 +316,8 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		gv_cur_region = r_save;
 		tp_change_reg();
 		assert((NOJNL != tmp_fd)
-				|| ((status != SS_NORMAL) && ydb_white_box_test_case_enabled
-					&& (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)));
+		       || ((status != SS_NORMAL) && ydb_white_box_test_case_enabled
+			   && (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)));
 	} else
 		status = repl_open_jnl_file_by_name(tmp_ctl, jnl_fn_len, jnl_fn, &tmp_fd, &stat_buf);
 	if (status == SS_NORMAL)
@@ -365,7 +372,10 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 		ASSERT_ENCRYPTION_INITIALIZED;	/* should be done in db_init ("gtmsource" -> "gvcst_init" -> "db_init") */
 		INIT_DB_OR_JNL_ENCRYPTION(tmp_ctl, tmp_jfh, reg->dyn.addr->fname_len, (char *)reg->dyn.addr->fname, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
+		{
+			free(tmp_ctl);
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, rts_error, tmp_ctl->jnl_fn_len, tmp_ctl->jnl_fn);
+		}
 	}
 	if (did_jnl_ensure_open)
 	{

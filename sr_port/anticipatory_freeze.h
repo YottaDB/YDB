@@ -101,7 +101,8 @@ error_def(ERR_TEXT);
 	{														\
 		jnlpool->jnlpool_ctl->freeze = 0;									\
 		FREEZE_CLEARED = TRUE;											\
-	}														\
+	} else														\
+		FREEZE_CLEARED = FALSE;											\
 }
 
 #define REPORT_INSTANCE_UNFROZEN(FREEZE_CLEARED)										\

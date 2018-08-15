@@ -313,6 +313,15 @@ boolean_t		init_anticipatory_freeze_errors()
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr,
 					line_no, ERR_TEXT, 2,
 					LEN_AND_LIT("First character should be comment (;) or alpha numeric"));
+			FCLOSE(handle, status);
+			if (SS_NORMAL != status)
+			{
+				save_errno = errno;
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"),
+					     custom_err_file.len, custom_err_file.addr, save_errno);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"),
+					       custom_err_file.len, custom_err_file.addr, save_errno);
+			}
 			return FALSE;
 		}
 		while (ISALNUM_ASCII(*buffptr))
@@ -324,6 +333,15 @@ boolean_t		init_anticipatory_freeze_errors()
 						custom_err_file.addr, line_no, ERR_TEXT, 2, LEN_AND_LIT("Mnemonic too long"));
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len,
 						custom_err_file.addr, line_no, ERR_TEXT, 2, LEN_AND_LIT("Mnemonic too long"));
+				FCLOSE(handle, status);
+				if (SS_NORMAL != status)
+				{
+					save_errno = errno;
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"),
+						     custom_err_file.len, custom_err_file.addr, save_errno);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"),
+						       custom_err_file.len, custom_err_file.addr, save_errno);
+				}
 				return FALSE;
 			}
 			assert(buffptr < buff_top); /* errptr > errptr_top should fail before this */
@@ -335,6 +353,15 @@ boolean_t		init_anticipatory_freeze_errors()
 			{
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CUSTERRNOTFND, 2, mnemonic_len, mnemonic_buf);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CUSTERRNOTFND, 2, mnemonic_len, mnemonic_buf);
+				FCLOSE(handle, status);
+				if (SS_NORMAL != status)
+				{
+					save_errno = errno;
+					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"),
+						     custom_err_file.len, custom_err_file.addr, save_errno);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"),
+						       custom_err_file.len, custom_err_file.addr, save_errno);
+				}
 				return FALSE;
 			}
 			if (!is_message_excluded(offset))
@@ -352,6 +379,15 @@ boolean_t		init_anticipatory_freeze_errors()
 					line_no, ERR_TEXT, 2, LEN_AND_LIT("Unexpected character found after mnemonic"));
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_CUSTERRSYNTAX, 3, custom_err_file.len, custom_err_file.addr,
 					line_no, ERR_TEXT, 2, LEN_AND_LIT("Unexpected character found after mnemonic"));
+			FCLOSE(handle, status);
+			if (SS_NORMAL != status)
+			{
+				save_errno = errno;
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"),
+					     custom_err_file.len, custom_err_file.addr, save_errno);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"),
+					       custom_err_file.len, custom_err_file.addr, save_errno);
+			}
 			return FALSE;
 		}
 		/* Need to ignore the rest of the current buffer and exhaust the current line */
@@ -370,6 +406,15 @@ boolean_t		init_anticipatory_freeze_errors()
 				custom_err_file.addr, save_errno);
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fgets"), custom_err_file.len,
 				custom_err_file.addr, save_errno);
+		FCLOSE(handle, status);
+		if (SS_NORMAL != status)
+		{
+			save_errno = errno;
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"), custom_err_file.len,
+				     custom_err_file.addr, save_errno);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_CUSTOMFILOPERR, 4, LEN_AND_LIT("fclose"), custom_err_file.len,
+				       custom_err_file.addr, save_errno);
+		}
 		return FALSE;
 	}
 	FCLOSE(handle, status);

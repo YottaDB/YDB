@@ -168,6 +168,7 @@ uint4 mur_next_rec(jnl_ctl_list **jjctl)
 	int		rec_size;
 	uint4		status;
 	mur_read_desc_t	*mur_desc;
+	off_jnl_t	lo_off;
 
 	jctl = *jjctl;
 	if (jctl->rec_offset < jctl->lvrec_off)
@@ -183,20 +184,32 @@ uint4 mur_next_rec(jnl_ctl_list **jjctl)
 		}
 		if (ERR_JNLBADRECFMT != status)
 			return status;
-		if (!mur_options.update)
-		{	/* only allow EXTRACT/SHOW/VERIFY to proceed after printing the error if error_limit permits */
-			if (!mur_report_error(jctl, MUR_JNLBADRECFMT))	/* Issue error because mur_next_rec is called from
-									 * mur_forward(), from which errors are unexpected.
-									 */
-				return status;
-			/* continue in distress, look for other valid records */
-			return mur_valrec_next(jctl, jctl->rec_offset + rec_size);
+		/* This is a case where we have a JNLBADRECFMT error.
+		 * In case of RECOVER/ROLLBACK), issue a JNLBADRECFMT error and return to caller
+		 * as we do not expect any concurrent updates in that case (i.e. it is a real JNLBADRECFMT error).
+		 */
+		if (mur_options.update)
+		{
+			gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
+					jctl->rec_offset, ERR_TEXT, 2, LEN_AND_LIT("Error accessing next record"));
+			return status;
 		}
-		gtm_putmsg_csa(CSA_ARG(JCTL2CSA(jctl)) VARLSTCNT(9) ERR_JNLBADRECFMT, 3, jctl->jnl_fn_len, jctl->jnl_fn,
-				jctl->rec_offset, ERR_TEXT, 2, LEN_AND_LIT("Error accessing next record"));
-		return status;
-	}
-	assert(jctl->rec_offset == jctl->lvrec_off);
+		/* But in case of EXTRACT/SHOW/VERIFY, allow for the possibility of seeing an invalid formatted journal
+		 * record and try to extract as much information from the journal file as possible. Proceed by looking for
+		 * other valid records after the offset where we saw the JNLBADRECFMT error. The only exception is if
+		 * the next record offset at which we are going to start the search is already after the last valid
+		 * record offset that we know of (i.e. jctl->rec_offset points to what was an EOF record at the start
+		 * of the EXTRACT/SHOW/VERIFY but was concurrently overwritten by a mumps process that did updates to
+		 * the same journal file and caused a JNLBADRECFMT error in the EOF record). In that case, just treat it
+		 * as the end of this journal file (i.e. move on to jctl->next_gen if it exists or issue ERR_JNLREADEOF error).
+		 */
+		lo_off = jctl->rec_offset + rec_size;
+		if (lo_off < jctl->lvrec_off)
+			return mur_valrec_next(jctl, lo_off);
+		else
+			assert(lo_off == jctl->lvrec_off);
+	} else
+		assert(jctl->rec_offset == jctl->lvrec_off);
 	if (NULL != jctl->next_gen)
 	{
 		jctl = jctl->next_gen;

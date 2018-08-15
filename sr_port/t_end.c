@@ -1300,8 +1300,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		}
 		assert(!jbp->last_eof_written);
 		assert(jgbl.gbl_jrec_time >= jbp->prev_jrec_time);
-		if (MAXUINT4 == jbp->next_epoch_time)
-			jbp->next_epoch_time = (uint4)(jgbl.gbl_jrec_time + jbp->epoch_interval);
 		if (((jbp->next_epoch_time <= jgbl.gbl_jrec_time) UNCONDITIONAL_EPOCH_ONLY(|| TRUE))
 						&& !FROZEN_CHILLED(csa))
 		{	/* Flush the cache. Since we are in crit, defer syncing epoch */

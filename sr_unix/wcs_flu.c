@@ -382,13 +382,14 @@ boolean_t wcs_flu(uint4 options)
 			 */
 			fileheader_sync(reg);
 			assert(NULL != jpc);
+			assert(jgbl.gbl_jrec_time);
 			if (!jgbl.mur_extract && !epoch_already_current)
 			{
 				if (0 == jpc->pini_addr)
 					jnl_write_pini(csa);
 				JNL_WRITE_EPOCH_REC(csa, cnl, clean_dbsync);
 			} else if (epoch_already_current)
-				jb->next_epoch_time = MAXUINT4;
+				jb->next_epoch_time = jgbl.gbl_jrec_time + jb->epoch_interval;
 		}
 		fsync_dskaddr = jb->fsync_dskaddr;	/* take a local copy as it could change concurrently */
 		if (fsync_dskaddr != jb->rsrv_freeaddr)
@@ -741,7 +742,7 @@ boolean_t wcs_flu(uint4 options)
 				jnl_write_pini(csa);
 			JNL_WRITE_EPOCH_REC(csa, cnl, clean_dbsync);
 		} else if (epoch_already_current)
-			jb->next_epoch_time = MAXUINT4;
+			jb->next_epoch_time = jgbl.gbl_jrec_time + jb->epoch_interval;
 	}
 	cnl->last_wcsflu_tn = csa->ti->curr_tn;	/* record when last successful wcs_flu occurred */
 	REL_CRIT_BEFORE_RETURN(cnl, reg);

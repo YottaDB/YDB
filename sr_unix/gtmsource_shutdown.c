@@ -314,7 +314,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	if (!ftok_sem_release(jnlpool->jnlpool_dummy_reg, !ftok_counter_halted && udi->counter_ftok_incremented, FALSE))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLPOOLSETUP);
 	assert(!num_src_servers_running || (ABNORMAL_SHUTDOWN == exit_status));
-	return (((1 == maxindex) && num_src_servers_running) ? shutdown_status : exit_status);
+	return ((!auto_shutdown && (1 == maxindex) && num_src_servers_running) ? shutdown_status : exit_status);
 }
 
 void gtmsource_stop(boolean_t exit)

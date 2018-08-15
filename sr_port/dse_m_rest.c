@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,6 +51,8 @@ GBLREF sgmnt_addrs	*cs_addrs;
 
 #define MAX_UTIL_LEN 64
 
+error_def(ERR_DSEBLKRDFAIL);
+
 void dse_m_rest (
 		 block_id	blk,		/* block number */
 		 unsigned char	*bml_list,	/* start of local list of local bit maps */
@@ -64,7 +69,7 @@ void dse_m_rest (
 	int4		bml_index;
 	short		level, rsize;
 	int4		bplmap;
-	error_def(ERR_DSEBLKRDFAIL);
+
 	if(!(bp = t_qread (blk, &dummy_int, &dummy_cr)))
 		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
@@ -73,22 +78,22 @@ void dse_m_rest (
 		b_top = bp + SIZEOF(blk_hdr);
 	else
 		b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
-
 	level = ((blk_hdr_ptr_t)bp)->levl;
 	bplmap = cs_addrs->hdr->bplmap;
-
-	for (rp = bp + SIZEOF(blk_hdr); rp < b_top ;rp = r_top)
-	{	if (in_dir_tree || level > 1)	/* reread block because it may have been flushed from read	*/
-		{	if (!(np = t_qread(blk,&dummy_int,&dummy_cr))) /* cache due to LRU buffer scheme and reads in recursive */
+	for (rp = bp + SIZEOF(blk_hdr); rp < b_top; rp = r_top)
+	{
+		if (in_dir_tree || level > 1)	/* reread block because it may have been flushed from read	*/
+		{
+			if (!(np = t_qread(blk, &dummy_int, &dummy_cr))) /* cache due to LRU buffer scheme and reads in recursive */
 				rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);	/* calls to dse_m_rest.	*/
 			if (np != bp)
-			{	b_top = np + (b_top - bp);
+			{
+				b_top = np + (b_top - bp);
 				rp = np + (rp - bp);
-				r_top = np + (r_top - bp);
 				bp = np;
 			}
 		}
-		GET_SHORT(rsize,&((rec_hdr_ptr_t)rp)->rsiz);
+		GET_SHORT(rsize, &((rec_hdr_ptr_t)rp)->rsiz);
 		r_top = rp + rsize;
 		if (r_top > b_top)
 			r_top = b_top;
@@ -101,32 +106,32 @@ void dse_m_rest (
 				if (*ptr++ == 0 && *ptr++ == 0)
 					break;
 			}
-			GET_LONG(next,ptr);
-		}
-		else
-			GET_LONG(next,r_top - SIZEOF(block_id));
+			GET_LONG(next, ptr);
+		} else
+			GET_LONG(next, r_top - SIZEOF(block_id));
 		if (next < 0 || next >= cs_addrs->ti->total_blks ||
 			(next / bplmap * bplmap == next))
-		{	memcpy(util_buff,"Invalid pointer in block ",25);
+		{
+			memcpy(util_buff,"Invalid pointer in block ",25);
 			util_len = 25;
 			util_len += i2hex_nofill(blk, &util_buff[util_len], 8);
 			memcpy(&util_buff[util_len], " record offset ",15);
 			util_len += 15;
 			util_len += i2hex_nofill((int)(rp - bp), &util_buff[util_len], 4);
 			util_buff[util_len] = 0;
-			util_out_print((char*)util_buff,TRUE);
+			util_out_print((char *)util_buff, TRUE);
 			continue;
 		}
 		bml_index = next / bplmap;
 		bml_ptr = bml_list + bml_index * bml_size;
 		if (bml_busy(next - next / bplmap * bplmap, bml_ptr + SIZEOF(blk_hdr)))
 		{	*blks_ptr = *blks_ptr - 1;
-			if (((blk_hdr_ptr_t) bp)->levl > 1)
-			{	dse_m_rest (next, bml_list, bml_size, blks_ptr, in_dir_tree);
-			}
+			if (((blk_hdr_ptr_t)bp)->levl > 1)
+				dse_m_rest(next, bml_list, bml_size, blks_ptr, in_dir_tree);
 			else if (in_dir_tree)
-			{	assert(((blk_hdr_ptr_t) bp)->levl == 0 || ((blk_hdr_ptr_t) bp)->levl == 1);
-				dse_m_rest (next, bml_list, bml_size, blks_ptr, ((blk_hdr_ptr_t)bp)->levl);
+			{
+				assert(((blk_hdr_ptr_t) bp)->levl == 0 || ((blk_hdr_ptr_t) bp)->levl == 1);
+				dse_m_rest(next, bml_list, bml_size, blks_ptr, ((blk_hdr_ptr_t)bp)->levl);
 			}
 		}
 	}

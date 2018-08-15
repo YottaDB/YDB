@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -145,8 +148,15 @@ int updhelper_writer(void)
 						ENSURE_JNL_OPEN(csa, reg);
 					SET_GBL_JREC_TIME;
 					assert(jgbl.gbl_jrec_time);
-					if (((jbp->next_epoch_time - UPDHELPER_EARLY_EPOCH) <= jgbl.gbl_jrec_time)
-						 && !FROZEN_CHILLED(csa))
+					/* If EPOCH is the most recent record written in the journal buffer, do not
+					 * attempt any more checks of time/crit or write epochs. Hence the "post_epoch_freeaddr"
+					 * use below. If EPOCH is not the most recent record in the journal buffer,
+					 * then check (out of crit) if it is close to an epoch and if so get crit and
+					 * check again if epoch is due and if so write one (using "wcs_flu").
+					 */
+					if ((jbp->post_epoch_freeaddr != jbp->rsrv_freeaddr)
+						&& ((jbp->next_epoch_time - UPDHELPER_EARLY_EPOCH) <= jgbl.gbl_jrec_time)
+						&& !FROZEN_CHILLED(csa))
 					{
 						DO_JNL_FSYNC_OUT_OF_CRIT_IF_NEEDED(reg, csa, jpc, jbp);
 						if (grab_crit_immediate(reg, OK_FOR_WCS_RECOVER_TRUE))
