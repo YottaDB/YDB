@@ -66,6 +66,14 @@ STATICFNDCL void append_filter(char *, FILE *, char *, char *, int *, char *);
 error_def(ERR_RESTRICTSYNTAX);
 error_def(ERR_TEXT);
 
+#if defined st_mtime
+# ifdef __APPLE__
+#   define st_mtim		st_mtimespec
+# else
+#   define st_mtim		st_mtim
+# endif
+#endif
+
 #define	PUT_FLNAME_IN_MAPPING_FILE(RPATH, FPATH, FP, C_CALL_NAME, M_REF_NAME, STAT_RM,					\
 						CREATED_NOW, CREATED_NOW_INITIALIZED, SAVE_ERRNO, ERR_STR)		\
 {															\
