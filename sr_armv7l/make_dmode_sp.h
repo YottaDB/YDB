@@ -13,14 +13,14 @@
  *								*
  ****************************************************************/
 
-#define CODEBUF_TYPE	char
+#define CODEBUF_TYPE	unsigned char
 #define CALL_SIZE	12
 #define EXTRA_INST	0
 #define EXTRA_INST_SIZE	0
 
 #ifdef __armv7l__
 #define GEN_CALL(func)  {					\
-    assert(SIZEOF(*code) == SIZEOF(char));			\
+    assert(SIZEOF(*code) == SIZEOF(unsigned char));		\
     /* movw r0,#func[15:16] */					\
     *code++ = (int)func & 0x000000ff;				\
     *code++ = ((int)func & 0x00000f00) >> 8;			\
@@ -39,7 +39,7 @@
     }
 #else	/* __armv6l__ */
 #define GEN_CALL(func)  {					\
-    assert(SIZEOF(*code) == SIZEOF(char));			\
+    assert(SIZEOF(*code) == SIZEOF(unsigned char));		\
     /* ldr r0, [pc] */						\
     *code++ = 0;						\
     *code++ = 0;						\

@@ -635,10 +635,12 @@ STATICFNDEF int keystore_refresh(void)
 			{
 				if (is_ydb_env_match)
 				{
-					UPDATE_ERROR_STRING(ENV_TOOLONG_ERROR, ydbenvname[YDBENVINDX_CRYPT_CONFIG] + 1, status);
+					UPDATE_ERROR_STRING(ENV_TOOLONG_ERROR, ydbenvname[YDBENVINDX_CRYPT_CONFIG] + 1,
+														YDB_PATH_MAX);
 				} else
 				{
-					UPDATE_ERROR_STRING(ENV_TOOLONG_ERROR, gtmenvname[YDBENVINDX_CRYPT_CONFIG] + 1, status);
+					UPDATE_ERROR_STRING(ENV_TOOLONG_ERROR, gtmenvname[YDBENVINDX_CRYPT_CONFIG] + 1,
+														YDB_PATH_MAX);
 				}
 				return -1;
 			}
