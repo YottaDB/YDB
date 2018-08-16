@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -42,7 +45,8 @@ void coerce(oprtype *a, unsigned short new_type)
 	if ((OC_COMVAL == old_op) || (OC_COMINT == old_op) || (OC_FORCENUM == old_op))
 	{
 		assert(TRIP_REF == ref->operand[0].oprclass);
-		if ((OC_FORCENUM != old_op) || (OC_LIT == (conv = ref->operand[0].oprval.tref->opcode)))	/* WARNING assign */
+		conv = ref->operand[0].oprval.tref->opcode;
+		if ((OC_FORCENUM != old_op) || (OC_LIT == conv))
 		{	/* because compiler generated literals should include their numeric form, we don't need to coerce */
 			assert(ref->operand[0].oprval.tref == ref->exorder.bl);
 			if (OC_LIT == conv)
