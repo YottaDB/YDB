@@ -671,10 +671,14 @@ void dse_chng_fhead(void)
 		/* Now generate the new hash to be placed in the database file header. */
 		GTMCRYPT_HASH_GEN(cs_addrs, fname_len, fname_ptr, 0, NULL, hash_buff, gtmcrypt_errno);
 		if (0 != gtmcrypt_errno)
+		{
 			GTMCRYPT_REPORT_ERROR(gtmcrypt_errno, gtm_putmsg, fname_len, fname_ptr);
-		memcpy(cs_data->encryption_hash, hash_buff, GTMCRYPT_HASH_LEN);
-		DEBUG_ONLY(GTMCRYPT_HASH_CHK(cs_addrs, cs_data->encryption_hash, fname_len, fname_ptr, gtmcrypt_errno));
-		assert(0 == gtmcrypt_errno);
+		} else
+		{
+			memcpy(cs_data->encryption_hash, hash_buff, GTMCRYPT_HASH_LEN);
+			DEBUG_ONLY(GTMCRYPT_HASH_CHK(cs_addrs, cs_data->encryption_hash, fname_len, fname_ptr, gtmcrypt_errno));
+			assert(0 == gtmcrypt_errno);
+		}
 	}
 
 #	ifdef UNIX
