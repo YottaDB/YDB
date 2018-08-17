@@ -366,7 +366,8 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 					if ((0 < field_width) && (cwidth > field_width))
 						cwidth = field_width;
 					assert(0 <= cwidth); /* since all unprintable and illegal characters are ignored */
-				}
+				} else
+					cwidth = 0;	/* this is an unknown character so set its width to 0 */
 				assert(0 <= field_width);
 				outtop1 = outtop - 1;
 				if (right_justify)
