@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,6 +37,7 @@
 #undef shmget
 #include "send_msg.h"
 #include "wbox_test_init.h"
+#include "dlopen_handle_array.h"
 #ifdef DEBUG
 #	define WBTEST_HUGETLB_DLSYM_ERROR "WBTEST_HUGETLB_DLSYM error"
 #endif
@@ -81,8 +85,10 @@ void libhugetlbfs_init(void)
 	GTM_WHITE_BOX_TEST(WBTEST_HUGETLB_DLOPEN, handle, NULL);
 	if (NULL != handle)
 	{
-		/* C99 standard leaves casting from "void *" to a function pointer undefined. The assignment used
-		 * below is the POSIX.1-2003 (Technical Corrigendum 1) workaround; */
+		dlopen_handle_array_add(handle);
+		/* C99 standard leaves casting from "void *" to a function pointer undefined.
+		 * The assignment used below is the POSIX.1-2003 (Technical Corrigendum 1) workaround;
+		 */
 		*(void **) (&p_shmget) = dlsym(handle, "shmget");
 		GTM_WHITE_BOX_TEST(WBTEST_HUGETLB_DLSYM, p_shmget, NULL);
 		if (NULL != p_shmget)		/* NULL value for shmget() necessarily means it was not found */

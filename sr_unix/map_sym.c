@@ -24,6 +24,7 @@
 #include "error.h"
 #include "gtmmsg.h"
 #include "ydb_getenv.h"
+#include "dlopen_handle_array.h"
 
 #define ERR_FGNSYM				\
 {						\
@@ -66,6 +67,7 @@ boolean_t map_collseq(int act, collseq *ret_collseq)
 		return FALSE;
 	if (NULL == (handle = fgn_getpak(envptr, INFO)))
 		return FALSE;
+	dlopen_handle_array_add(handle);
 	if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym_1, SUCCESS)))
 	{
 		if ((ret_collseq->xback = fgn_getrtn(handle, &xback_sym_1, SUCCESS)))

@@ -23,6 +23,7 @@
 #include "fgncal.h"		/* needed for COPY_DLLERR_MSG() */
 #include "gtm_zlib.h"
 #include "gtmmsg.h"
+#include "dlopen_handle_array.h"
 
 error_def(ERR_DLLNOOPEN);
 error_def(ERR_TEXT);
@@ -73,6 +74,7 @@ void gtm_zlib_init(void)
 #ifdef _AIX
 	}
 #endif
+	dlopen_handle_array_add(handle);
 	for (findx = 0; findx < ZLIB_NUM_DLSYMS; ++findx)
 	{
 		fptr = (void *)dlsym(handle, zlib_fname[findx]);

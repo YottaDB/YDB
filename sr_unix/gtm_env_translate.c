@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,6 +21,7 @@
 #include "lv_val.h"		/* needed for "fgncal.h" */
 #include "fgncal.h"
 #include "gtm_env_xlate_init.h"
+#include "dlopen_handle_array.h"
 
 GBLREF mstr	env_gtm_env_xlate;
 GBLREF mval	dollar_zdir;
@@ -46,6 +50,7 @@ mval* gtm_env_translate(mval* val1, mval* val2, mval* val_xlated)
 			memcpy(pakname, env_gtm_env_xlate.addr, env_gtm_env_xlate.len);
 			pakname[env_gtm_env_xlate.len]='\0';
 			pakhandle = fgn_getpak(pakname, ERROR);
+			dlopen_handle_array_add(pakhandle);
 			SFPTR(gtm_env_xlate_entry, (fgnfnc)fgn_getrtn(pakhandle, &routine_name, ERROR));
 			/* With Unicode mstr changes, xc_string_t is no longer compatible with mstr
 			 * so explicit copy of len/addr fields required */

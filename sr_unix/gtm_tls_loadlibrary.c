@@ -25,6 +25,7 @@
 #include "fgncal.h"	/* needed for COPY_DLLERR_MSG() */
 #include "gtmmsg.h"
 #include "gtmcrypt.h"
+#include "dlopen_handle_array.h"
 
 typedef void (*gtm_tls_func_t)();	/* A generic pointer type to the TLS functions exposed by the plugin */
 
@@ -86,6 +87,7 @@ int	gtm_tls_loadlibrary()
 		COPY_DLLERR_MSG(err_str, dl_err);
 		return -1;
 	}
+	dlopen_handle_array_add(handle);
 	for (findx = 0; findx < gtm_tls_func_n; ++findx)
 	{
 		fptr = (gtm_tls_func_t)dlsym(handle, gtm_tls_fname[findx]);

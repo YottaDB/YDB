@@ -88,6 +88,7 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "ydb_getenv.h"
+#include "dlopen_handle_array.h"
 
 GBLREF  stack_frame     	*frame_pointer;
 GBLREF  unsigned char		*msp;
@@ -1336,6 +1337,8 @@ int ydb_exit()
 #	endif
 	REVERT;
 	gtm_startup_active = FALSE;
+	/* We might have opened one or more shlib handles using "dlopen". Do a "dlclose" of them now. */
+	dlopen_handle_array_close();
 	return 0;
 }
 

@@ -30,6 +30,7 @@
 #include "ydb_trans_log_name.h"
 #include "gdsroot.h"
 #include "is_file_identical.h"
+#include "dlopen_handle_array.h"
 
 #define	GTMCRYPT_LIBNAME		"libgtmcrypt.so"
 #define MAX_GTMCRYPT_PLUGIN_STR_LEN	(SIZEOF(GTMCRYPT_LIBNAME) * 4)
@@ -126,6 +127,7 @@ uint4 gtmcrypt_entry()
 		COPY_DLLERR_MSG(err_str, dl_err);
 		return ERR_CRYPTDLNOOPEN;
 	}
+	dlopen_handle_array_add(handle);
 	for (findx = 0; findx < gtmcrypt_func_n; ++findx)
 	{
 		fptr = (gtmcrypt_func_t)dlsym(handle, gtmcrypt_fname[findx]);
