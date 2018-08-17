@@ -42,7 +42,7 @@ int	gtm_reg(int vax_reg);
 
 #ifdef __x86_64__
 #  define NUM_BUFFERRED_INSTRUCTIONS 100
-#  define CODE_TYPE char
+#  define CODE_TYPE unsigned char
 #elif defined(__ia64)
 #  define CODE_TYPE ia64_bundle
 #  define NUM_BUFFERRED_INSTRUCTIONS 25
