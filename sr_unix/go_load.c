@@ -197,6 +197,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 	des.len = key_count = max_data_len = max_subsc_len = 0;
 	des.addr = (char *)rec_buff;
 	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, 4294967196U); /* (2**32)-100=4294967196 */
+	first_failed_rec_count = 0;
 	for (iter = begin - 1; ;)
 	{
 		if (++iter > end)
@@ -269,7 +270,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 					insert_reg_to_list(reg_list, db_init_region, &num_of_reg);
 					first_failed_rec_count = iter;
 					mu_load_error = TRUE;
-				}else
+				} else
 				{
 					first_failed_rec_count = 0;
 					mu_gvis();
