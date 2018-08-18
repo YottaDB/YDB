@@ -165,9 +165,6 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 	mname_entry	gvname;
 
 	gvinit();
-	reg_list = (gd_region **) malloc(gd_header->n_regions * SIZEOF(gd_region *));
-	for (index = 0; index < gd_header->n_regions; index++)
-		reg_list[index] = NULL;
 	if ((MU_FMT_GO != fmt) && (MU_FMT_ZWR != fmt))
 	{
 		assert((MU_FMT_GO == fmt) || (MU_FMT_ZWR == fmt));
@@ -197,6 +194,9 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 	des.len = key_count = max_data_len = max_subsc_len = 0;
 	des.addr = (char *)rec_buff;
 	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, 4294967196U); /* (2**32)-100=4294967196 */
+	reg_list = (gd_region **) malloc(gd_header->n_regions * SIZEOF(gd_region *));
+	for (index = 0; index < gd_header->n_regions; index++)
+		reg_list[index] = NULL;
 	first_failed_rec_count = 0;
 	for (iter = begin - 1; ;)
 	{
@@ -397,6 +397,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 		key_count++;
 	}
 	file_input_close();
+	free(reg_list);
 	if (mu_ctrly_occurred)
 	{
 		gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_LOADCTRLY);
@@ -406,8 +407,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 	{
 		tmp_rec_count = (go_format_val_read) ? iter - 1 : iter;
 		failed_record_count-=(go_format_val_read) ? 1 : 0;
-	}
-	else
+	} else
 		tmp_rec_count = (iter == begin) ? iter : iter - 1;
 	if (0 != first_failed_rec_count)
 	{
