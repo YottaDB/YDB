@@ -295,6 +295,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	gd_region		**reg_list;
 	/* Array to help track malloc'd storage during this routine and release prior to error out or return */
 	char			**malloc_fields[] = {
+		(char **)&reg_list,
 		(char **)&tmp_gvkey,
 		(char **)&sn_gvkey,
 		(char **)&sn_savekey,
@@ -474,6 +475,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	assert(NULL == save_orig_key);	/* GVKEY_INIT macro relies on this */
 	GVKEY_INIT(save_orig_key, DBKEYSIZE(MAX_KEY_SZ));	/* sn_gvkey will point to malloced memory after this */
 	gvnh_reg = NULL;
+	first_failed_rec_count = 0;
 	for ( ; !mupip_DB_full; )
 	{
 		if (++rec_count > end)
