@@ -745,7 +745,9 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	assert(!mutex_per_process_init_pid || mutex_per_process_init_pid == process_id);
 	if (!mutex_per_process_init_pid)
 		mutex_per_process_init();
-	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN, gethostname_res))
+	/* Since "gethostname" does not ensure null termination, do it ourselves by passing in 1 lesser size */
+	machine_name[MAX_MCNAMELEN - 1] = '\0';
+	if (GETHOSTNAME(machine_name, MAX_MCNAMELEN - 1, gethostname_res))
 		RTS_ERROR(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Unable to get the hostname"), errno);
 	if (WBTEST_ENABLED(WBTEST_TAMPER_HOSTNAME))
 		STRCPY(machine_name, "s_i_l_l_y");
