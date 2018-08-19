@@ -174,7 +174,6 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 		begin = 3;
 	ptr = line3_ptr;
 	len = line3_len;
-	failed_record_count = 0;
 	go_format_val_read = FALSE;
 	for (iter = 3; iter < begin; iter++)
 	{
@@ -197,6 +196,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 	reg_list = (gd_region **) malloc(gd_header->n_regions * SIZEOF(gd_region *));
 	for (index = 0; index < gd_header->n_regions; index++)
 		reg_list[index] = NULL;
+	failed_record_count = 0;
 	first_failed_rec_count = 0;
 	for (iter = begin - 1; ;)
 	{
