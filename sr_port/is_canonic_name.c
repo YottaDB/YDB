@@ -73,10 +73,6 @@ boolean_t is_canonic_name(mval *src, int *subscripts, int *start_off, int *stop_
 			*start_off = start[contains_env + seq];
 			*stop_off = stop[contains_env + seq];
 		}
-		if ('"' == src->str.addr[*start_off])
-			*start_off++;
-		if ((0 < *stop_off) && ('"' == src->str.addr[*stop_off - 1]))
-			*stop_off--;
 		return TRUE;
 	}
 	return FALSE;
