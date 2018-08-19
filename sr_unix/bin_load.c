@@ -271,7 +271,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	coll_hdr		extr_collhdr, db_collhdr;
 	gv_key			*tmp_gvkey, *sn_gvkey, *sn_savekey, *save_orig_key;
 	gv_key			*orig_gv_currkey_ptr = NULL;
-	char			std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff, *sn_hold_buff_temp;
+	char			std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff = NULL, *sn_hold_buff_temp;
 	int			in_len, gtmcrypt_errno, n_index, encrypted_hash_array_len, null_iv_array_len;
 	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr, *null_iv_array_ptr, null_iv_char;
 	int4			index;
@@ -924,7 +924,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			if (is_hidden_subscript)
 			{	/* it's a chunk and we were expecting one */
 				sn_chunk_number = SPAN_GVSUBS2INT((span_subs *) &(gv_currkey->base[gv_currkey->end - 4]));
-				if (!expected_sn_chunk_number && is_hidden_subscript && sn_chunk_number)
+				if (!expected_sn_chunk_number && sn_chunk_number)
 				{ /* we not expecting a payload chunk (as opposed to a control record) but we got one */
 					DISPLAY_INCMP_SN_MSG;
 					util_out_print("!_!_Not expecting a spanning node chunk but found chunk : !UL", TRUE,
