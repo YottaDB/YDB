@@ -307,7 +307,7 @@ void	gtm_env_init(void)
 												IGNORE_ERRORS_TRUE, NULL)))
 		{
 			assert(SIZEOF(buf) > trans.len);
-			*(char *)(buf + trans.len) = 0;
+			assert('\0' == buf[trans.len]);
 			errno = 0;
 			time = strtod(buf, NULL);
 			if ((ERANGE != errno) && (TPNOTACID_MAX_TIME >= time))
