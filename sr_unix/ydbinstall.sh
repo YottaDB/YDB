@@ -16,6 +16,11 @@
 #								#
 #################################################################
 
+# ---------------------------------------------------------------------------------------------------------------------
+# For the latest version of this script, run the following command
+#	wget https://gitlab.com/YottaDB/DB/YDB/raw/master/sr_unix/ydbinstall.sh
+# ---------------------------------------------------------------------------------------------------------------------
+#
 # This script automates the installation of YottaDB as much as possible,
 # to the extent of attempting to download the distribution file.
 # Current limitation is GNU/Linux on x86 (32- & 64-bit) architectures
@@ -23,25 +28,6 @@
 
 # NOTE: This script requires the GNU wget program to download
 # distribution files that are not on the local file system.
-
-# Revision history
-#
-# 2011-02-15  0.01 K.S. Bhaskar - Initial version for internal use
-# 2011-02-20  0.02 K.S. Bhaskar - Mostly usable with enough features for first Beta test
-# 2011-02-21  0.03 K.S. Bhaskar - Deal with case of no group bin, bug fixes, download from FTP site, other platforms
-# 2011-02-28  0.04 K.S. Bhaskar - Use which to get locations of id and grep, more bug fixes
-# 2011-03-05  0.05 K.S. Bhaskar - Through V5.4-001 group only needed if execution restricted to a group
-# 2011-03-08  0.06 K.S. Bhaskar - Make it work when bundled with GT.M V5.4-002
-# 2011-03-10  0.10 K.S. Bhaskar - Incorporate review comments to bundle with V5.4-002 distribution
-# 2011-05-03  0.11 K.S. Bhaskar - Allow for letter suffix releases
-# 2011-10-25  0.12 K.S. Bhaskar - Support option to delete .o files on shared library platforms
-# 2014-08-13  0.13 K.S. Bhaskar - Add verbosity around getting latest version and tarball, if requested
-# 2015-10-13  0.14 GT.M Staff   - Fix a few minor bugs
-# 2017-07-16  0.15 Sam Habiel   - --yottadb or --distrib https://github.com/YottaDB/YottaDB to install YottaDB
-# 2017-08-12  0.16 Christopher Edwards - Default to YottaDB
-# 2017-10-xx  0.17 Narayanan Iyer - See git commit message for description of changes.
-#	Going forward, this script is maintained at https://github.com/YottaDB/YottaDB/blob/master/sr_unix/ydbinstall.sh
-#	and there is no revision history in this file.
 
 # Turn on debugging if set
 if [ "Y" = "$ydb_debug" ] ; then set -x ; fi
@@ -353,7 +339,7 @@ fi
 
 # See if YottaDB version can be determined from meta data
 if [ -z "$ydb_distrib" ] ; then
-    ydb_distrib="https://api.github.com/repos/YottaDB/YottaDB/"
+    ydb_distrib="https://gitlab.com/api/v4/projects/7957109/repository/tags"
 fi
 if [ "Y" = "$gtm_gtm" ] ; then
     ydb_distrib="http://sourceforge.net/projects/fis-gtm"
@@ -384,13 +370,18 @@ if [ -z "$ydb_version" -o "latest" = "$latest" ] ; then
                 ydb_version=`cat ${gtm_tmpdir}/latest`
             else echo Unable to determine YottaDB/GT.M version ; err_exit
             fi ;;
-        https://api.github.com/repos/YottaDB/YottaDB* | https://github.com/YottaDB/YottaDB*)
+        https://gitlab.com/api/*)
             if [ "Y" = "$gtm_verbose" ] ; then
-                echo wget https://api.github.com/repos/YottaDB/YottaDB/releases/latest to determine latest version
+                echo wget ${ydb_distrib} to determine latest version
                 echo Check proxy settings if wget hangs
             fi
-            if { wget $wget_flags $gtm_tmpdir https://api.github.com/repos/YottaDB/YottaDB/releases/latest 2>&1 1>${gtm_tmpdir}/wget_latest.log ; } ; then
-                ydb_version=`grep "tag_name" ${gtm_tmpdir}/latest | cut -d'"' -f4`
+            if { wget $wget_flags $gtm_tmpdir ${ydb_distrib} 2>&1 1>${gtm_tmpdir}/wget_latest.log ; } ; then
+	        # Find latest mainline YottaDB release by searching for all "tag_name"s and reverse sorting them based on the
+		# release number and taking the first line (which is the most recent release). Note that the sorting will take care
+		# of the case if a patch release for a prior version is released after the most recent mainline release
+		# (e.g. r1.12 as a patch for r1.10 is released after r1.22 is released). Not sorting will cause r1.12
+		# (which will show up as the first line since it is the most recent release) to incorrectly show up as latest.
+                ydb_version=`sed 's/,/\n/g' ${gtm_tmpdir}/tags | grep tag_name | sort -r | head -1 | cut -d'"' -f6`
             fi ;;
         *)
             if [ -f ${ydb_distrib}/latest ] ; then
@@ -420,15 +411,15 @@ else
                 	2>&1 1>${gtm_tmpdir}/wget_dist.log ; } ; then
                 echo Unable to download GT.M distribution $ydb_filename ; err_exit
             fi ;;
-        https://api.github.com/repos/YottaDB/YottaDB* | https://github.com/YottaDB/YottaDB*)
+        https://gitlab.com/api/*)
             if [ "Y" = "$gtm_verbose" ] ; then
-                echo wget https://api.github.com/repos/YottaDB/YottaDB/releases/tags/${ydb_version} and parse to download tarball
+                echo wget ${ydb_distrib}/${ydb_version} and parse to download tarball
                 echo Check proxy settings if wget hangs
             fi
-            if { wget $wget_flags $gtm_tmpdir https://api.github.com/repos/YottaDB/YottaDB/releases/tags/${ydb_version} 2>&1 1>${gtm_tmpdir}/wget_dist.log ;} ; then
+            if { wget $wget_flags $gtm_tmpdir ${ydb_distrib}/${ydb_version} 2>&1 1>${gtm_tmpdir}/wget_dist.log ;} ; then
 		# There might be multiple binary tarballs of YottaDB (for various architectures & platforms).
 		# If so, choose the one that corresponds to the current host.
-		yottadb_download_urls=`grep "browser_download_url" ${gtm_tmpdir}/${ydb_version} | cut -d'"' -f4`
+		yottadb_download_urls=`sed 's,/uploads/,\n&,g' ${gtm_tmpdir}/${ydb_version} | grep "^/uploads/" | cut -d')' -f1`
 		# Determine current host's architecture
 		arch=`uname -m | tr -d '_'`
 		# Determine current host's OS. We expect the OS name in the tarball.
@@ -456,10 +447,10 @@ else
 				fi
 			fi
 			case $ydb_filename in
-				*"$platform"*) ;;			# If tarball has current architecture in its name, consider it
-				*)             continue ;;		# else move on to next tarball
+				*"$platform"*) ;;		# If tarball has current architecture in its name, consider it
+				*)             continue ;;	# else move on to next tarball
 			esac
-			yottadb_download_url=$fullfilename
+			yottadb_download_url="https://gitlab.com/YottaDB/DB/YDB${fullfilename}"
 			break					# Now that we found one tarball, stop looking at other choices
 		done
 		if [ $yottadb_download_url = "" ]; then echo Unable to find YottaDB tarball for ${ydb_version} $platform $arch ; err_exit; fi
