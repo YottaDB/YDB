@@ -157,7 +157,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	alternation		*cur_alt;
 	mstr			alttail;
 	int4			status;
-	int4			altactive = 0;
+	int4			altactive;
 	int4			altend;
 	char			*saveinstr;
 	int			chidx;
