@@ -53,6 +53,7 @@ int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str)
 	op_fnzwrite(TRUE, &src, &dst);
 	SET_YDB_BUFF_T_FROM_MVAL(str, &dst, "NULL str->buf_addr", "ydb_zwr2str_s()");
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
+	LIBYOTTADB_DONE;
 	REVERT;
 	return YDB_OK;
 }
