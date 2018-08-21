@@ -244,7 +244,8 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_name->len,
 					      dev_name->dollar_io, ERR_TEXT, 2, LEN_AND_LIT("Error in stream open"), errno);
 		}
-	}
+	} else
+		assert((dev_open == iod->state) && (-2 == fd));	/* caller "io_open_try" should have ensured this */
 	/* setting of recordsize, WIDTH, etc, based on changed (if any) CHSET is taken care in iorm_use(). */
 	if (closed_nodestroy)
 		d_rm->no_destroy = TRUE;
@@ -324,6 +325,12 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 
 	if (!d_rm->bom_checked && !d_rm->fifo && !d_rm->is_pipe && (2 < fd) && IS_UTF_CHSET(iod->ochset))
 	{
+		assert(dev_closed == iod->state);	/* Since (2 < fd) needs to be TRUE for us to get into this "if" block,
+							 * fd cannot be -2 which is what it would have been if iod->state was
+							 * "dev_open". Therefore, iod->state has to be "dev_closed" which means
+							 * we would have done the FSTAT_FILE above which implies that "statbuf"
+							 * would be initialized and is usable below.
+							 */
 		/* if file opened with WRITEONLY */
 		if (d_rm->write_only)
 		{
