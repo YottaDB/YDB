@@ -429,7 +429,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 	SETUP_THREADGBL_ACCESS;
 	status = SS_NORMAL;
 	assert(remote_side == &jnlpool->gtmsource_local->remote_side);
-	DEBUG_ONLY(*msg_type = -1);
+	*msg_type = -1;	/* initialize to indicate we have not yet received any messages */
 	for (log_waitmsg = TRUE; SS_NORMAL == status; )
 	{
 		if (log_waitmsg)
@@ -443,7 +443,14 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 		DEBUG_ONLY(remote_side_endianness_known = remote_side->endianness_known);
 		if (SS_NORMAL != status)
 			break;
-		if (REPL_LOGFILE_INFO == msg.type) /* No need to endian convert as the receiver converts this to our native fmt */
+		/* If we had already received a message (*msg_type is not -1) then check if we are seeing a
+		 * REPL_LOGFILE_INFO message. If so that can be handled specially below.
+		 * Also, no need to endian convert this particular message as the receiver converts this to our native format.
+		 */
+		assert((REPL_LOGFILE_INFO != msg.type) || (-1 != *msg_type));	/* In pro, we handle this by falling through below
+										 * to code that treats this as an unknown message.
+										 */
+		if ((-1 != *msg_type) && (REPL_LOGFILE_INFO == msg.type))
 		{	/* We received a REPL_START_JNL_SEQNO/REPL_FETCH_RESYNC and coming through the loop again
 			 * to receive REPL_LOGFILE_INFO. At this point, we should have already established the endianness
 			 * of the remote side and even if the remote side is of different endianness, we are going to interpret the
@@ -475,8 +482,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			{
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Remote side rollback path is %s; Rollback PID = %d\n",
 						logfile_msg.fullpath, logfile_msg.pid);
-			}
-			else
+			} else
 			{
 				assert(REPL_START_JNL_SEQNO == *msg_type);
 				repl_log(gtmsource_log_fp, TRUE, TRUE, "Remote side receiver log file path is %s; "
