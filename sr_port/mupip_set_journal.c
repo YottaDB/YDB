@@ -524,6 +524,9 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 				exit_status |= EXIT_ERR;
 				break;
 			}
+			/* Now that we know "gtm_file_stat" did not return FILE_STAT_ERROR, we can assert the following */
+			assert(tmpjnlfile.len < SIZEOF(tmp_full_jnl_fn));
+			assert('\0' == tmpjnlfile.addr[tmpjnlfile.len]);/* "gtm_file_stat" -> "get_full_path" null terminates too */
 			memcpy(jnl_info.jnl, tmpjnlfile.addr, tmpjnlfile.len);
 			jnl_info.jnl_len = tmpjnlfile.len; /* get_full_path() null terminates and limits tmpjnlfile to MAX_FN_LEN */
 			/* Note: At this point jnlfile should have expanded journal name with extension */
