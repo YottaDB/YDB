@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,13 +118,13 @@ void mupip_downgrade(void)
 		cli_get_str("VERSION", ver_spec, &ver_spec_len);
 		ver_spec[ver_spec_len] = '\0';
 		cli_strupper(ver_spec);
-		if (0 == memcmp(ver_spec, "V4", ver_spec_len))
+		if (0 == strcmp(ver_spec, "V4"))
 		{	/* Downgrade file header to V4 format and downgrade EOF block from GDS-block to 512-byte block */
 			desired_dbver = GDSV4;
-		} else if (0 == memcmp(ver_spec, "V5", ver_spec_len))
+		} else if (0 == strcmp(ver_spec, "V5"))
 		{	/* Downgrade file header to V5 format and downgrade EOF block from GDS-block to 512-byte block */
 			desired_dbver = GDSV5;
-		} else if (0 == memcmp(ver_spec, "V63000A", ver_spec_len))
+		} else if (0 == strcmp(ver_spec, "V63000A"))
 		{	/* No file header downgrade needed. Only EOF block downgrade needed. */
 			desired_dbver = GDSNOVER;
 		} else
