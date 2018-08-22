@@ -131,7 +131,6 @@ enum
  *	and COPY_DONE will be set to FALSE.
  * Else the copy is done and COPY_DONE will be set to TRUE.
  * User of this macro needs to include <string.h> (needed for "strlen" prototype).
- * Note that this is similar to the YDB_STRING_TO_BUFFER macro except that this does not update (BUFFERP)->len_alloc.
  */
 #define YDB_COPY_STRING_TO_BUFFER(STRING, BUFFERP, COPY_DONE)	\
 {								\
