@@ -878,6 +878,7 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	assert(!linkctl->locked);
 	assert(!linkctl->hdr->file_deleted);
 	sizeIndex = rtnobj->queueIndex;
+	assert(NUM_RTNOBJ_SIZE_BITS > sizeIndex);
 #	ifdef DEBUG
 	/* Find shm_index corresponding to this routine buffer to cross check later */
 	min_index = linkctl->rtnobj_min_shm_index;
@@ -1015,6 +1016,7 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	{	/* Recompute min_free_index */
 		max_free_index = sizeIndex + 1;
 		sizeIndex = rtnobj_shm_hdr->rtnobj_min_free_index;
+		assert(NUM_RTNOBJ_SIZE_BITS > sizeIndex);
 		freeList = &rtnobj_shm_hdr->freeList[sizeIndex];
 		for ( ; sizeIndex < max_free_index; sizeIndex++, freeList++)
 		{
