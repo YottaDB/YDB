@@ -52,6 +52,7 @@
 #include "tp.h"
 #include "cli.h"
 #include "repl_filter.h"
+#include "gds_blk_upgrade.h"
 
 #ifdef DEBUG
 #  define INITIAL_DEBUG_LEVEL GDL_Simple
@@ -263,6 +264,9 @@ void	gtm_env_init(void)
 		wbox_test_init();
 		/* Initialize variable that controls dynamic block upgrade */
 		ydb_blkupgrade_flag = ydb_trans_numeric(YDBENVINDX_BLKUPGRADE_FLAG, &is_defined, IGNORE_ERRORS_TRUE, NULL);
+		/* If ydb_blkupgrade_flag is outside of valid range of choices, set it back to default value */
+		if ((UPGRADE_NEVER != ydb_blkupgrade_flag) && (UPGRADE_ALWAYS != ydb_blkupgrade_flag))
+			ydb_blkupgrade_flag = UPGRADE_IF_NEEDED;
 		/* Initialize whether database file extensions need to be logged in the operator log */
 		ret = ydb_logical_truth_value(YDBENVINDX_DBFILEXT_SYSLOG_DISABLE, FALSE, &is_defined);
 		if (is_defined)
