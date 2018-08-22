@@ -125,6 +125,10 @@ typedef struct
 	unsigned short	escape_length;			/* dm_read only */
 	unsigned char	escape_sequence[ESC_LEN];	/* dm_read only */
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1];
+#	ifdef DEBUG
+	boolean_t	timed;
+	int4		msec_timeout;
+#	endif
 } tt_interrupt;
 
 typedef struct

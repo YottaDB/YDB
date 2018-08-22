@@ -117,6 +117,13 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 			mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 			if (mv_chain == mv_zintdev)
 				POP_MV_STENT();         /* pop if top of stack */
+			/* The below two asserts ensure the invocation of "iott_rdone" after a job interrupt has
+			 * the exact same "msec_timeout" as well as "timed" variable context. This is needed to
+			 * ensure that the "end_time" usages in the post-interrupt invocation always happen
+			 * only if the pre-interrupt invocation had initialized "end_time".
+			 */
+			assert(timed == tt_state->timed);
+			assert(msec_timeout == tt_state->msec_timeout);
 			end_time = tt_state->end_time;
 			if (utf8_active)
 			{
@@ -190,6 +197,13 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 				tt_state = &tt_ptr->tt_state_save;
 				tt_state->exp_length = 0;
 				tt_state->who_saved = ttrdone;
+				/* Note that "end_time" might be uninitialized in some cases (e.g. if "msec_timeout" is
+				 * NO_M_TIMEOUT or 0) but it is okay since when it is restored, we are guaranteed that
+				 * the post-interrupt invocation of "iott_rdone" (after the jobinterrupt is handled)
+				 * will use the restored "end_time" only if "msec_timeout" (which will have the exact
+				 * same value as the pre-interrupt invocation of "iott_rdone" thanks to the xf_restartpc
+				 * invocation in OC_RDONE in ttt.txt) is not NO_M_TIMEOUT or 0.
+				 */
 				tt_state->end_time = end_time;
 				if (utf8_active)
 				{
@@ -199,6 +213,11 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 				}
 				tt_state->zb_ptr = zb_ptr;
 				tt_state->zb_top = zb_top;
+#				ifdef DEBUG
+				/* Store debug-only context used later to assert when restoring this context */
+				tt_state->timed = timed;
+				tt_state->msec_timeout = msec_timeout;
+#				endif
 				PUSH_MV_STENT(MVST_ZINTDEV);	/* used as a flag only */
 				mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 				mv_chain->mv_st_cont.mvs_zintdev.io_ptr = io_ptr;
