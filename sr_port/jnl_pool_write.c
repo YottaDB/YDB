@@ -3,6 +3,9 @@
  * Copyright (c) 2007-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -57,7 +60,7 @@ void	jnl_pool_write(sgmnt_addrs *csa, enum jnl_record_type rectype, jnl_record *
 	jnlpool_ctl_ptr_t	jctl;
 	jpl_rsrv_struct_t	*jrs;
 	uint4			write, write_total;
-	qw_off_t		cur_write_addr, end_write_addr;
+	qw_off_t		cur_write_addr;
 	gtm_int64_t		wait_write_addr;	/* needed signed because of subtraction happening below */
 
 	assert(is_replicator);
@@ -111,8 +114,9 @@ void	jnl_pool_write(sgmnt_addrs *csa, enum jnl_record_type rectype, jnl_record *
 			continue;
 		}
 		assert(cur_write_addr >= jctl->write_addr);
-		end_write_addr = cur_write_addr + rlen;
-		assert(end_write_addr <= jctl->rsrv_write_addr);
+		write = cur_write_addr % jnlpool_size;
+		cur_write_addr += rlen;
+		assert(cur_write_addr <= jctl->rsrv_write_addr);
 		/* If we cannot fit in this whole transaction in the journal pool, source server will anyways read this
 		 * transaction from the journal files. So skip the memcpy onto the jnlpool in the interest of time.
 		 */
@@ -122,7 +126,7 @@ void	jnl_pool_write(sgmnt_addrs *csa, enum jnl_record_type rectype, jnl_record *
 			/* Wait for jctl->write_addr to be high so we can go ahead with write
 			 * without overflowing/underflowing the pool.
 			 */
-			wait_write_addr = (gtm_int64_t)end_write_addr - jnlpool_size;
+			wait_write_addr = (gtm_int64_t)cur_write_addr - jnlpool_size;
 			while ((gtm_int64_t)jctl->write_addr < wait_write_addr)
 			{
 				JPL_TRACE_PRO(jctl, jnl_pool_write_sleep);
@@ -143,7 +147,6 @@ void	jnl_pool_write(sgmnt_addrs *csa, enum jnl_record_type rectype, jnl_record *
 				jnlrecptr = (uchar_ptr_t)jfb->alt_buff;
 			else
 				jnlrecptr = (uchar_ptr_t)jfb->buff;
-			write = cur_write_addr % jnlpool_size;
 			dstlen = jnlpool_size - write;
 			assert(rlen < jnlpool_size);	/* Because of "if (tot_jrec_len <= jnlpool_size)" above */
 			/* Inspite of the above assert, do a "rlen < jnlpool_size" check below in pro to be safe */
@@ -156,10 +159,9 @@ void	jnl_pool_write(sgmnt_addrs *csa, enum jnl_record_type rectype, jnl_record *
 			}
 		} else
 			jrs->memcpy_skipped = TRUE;
-		cur_write_addr = end_write_addr;
 	}
-	assert(end_write_addr > jrs->cur_write_addr);
-	jrs->cur_write_addr = end_write_addr;
+	assert(cur_write_addr > jrs->cur_write_addr);
+	jrs->cur_write_addr = cur_write_addr;
 	jrs->write_total = write_total;
 	return;
 }
