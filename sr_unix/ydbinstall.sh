@@ -32,11 +32,24 @@
 # Turn on debugging if set
 if [ "Y" = "$ydb_debug" ] ; then set -x ; fi
 
+check_if_util_exists()
+{
+	command -v $1 >/dev/null 2>&1 || { echo >&2 "Utility [$1] is needed by ydbinstall.sh but not found. Exiting."; exit 1; }
+}
+
+# Check all utilities that ydbinstall.sh will use and ensure they are present. If not error out at beginning.
+utillist="date id grep uname mktemp cut tr dirname chmod rm mkdir cat wget sed sort head basename ln gzip tar xargs sh cp"
+# Check all utilities that configure.gtc (which ydbinstall.sh calls) will additionally use and ensure they are present.
+# If not error out at beginning instead of erroring out midway during the install.
+utillist="$utillist ps file wc touch chown chgrp groups getconf awk expr locale install cc ld strip"
+for util in $utillist
+do
+	check_if_util_exists $util
+done
+
 # Initialization
 timestamp=`date +%Y%m%d%H%M%S`
-ydb_id=`which id`
-ydb_grep=`which grep`
-if [ -z "$USER" ] ; then USER=`$ydb_id -un` ; fi
+if [ -z "$USER" ] ; then USER=`id -un` ; fi
 
 # Functions
 dump_info()
@@ -327,7 +340,8 @@ if [ -z "$ydb_version" ] ; then
         chmod +x $ydb_dist/mumps
         tmp=`mktmpdir`
         ydb_routines="$tmp($ydb_dist)" ; export ydb_routines
-        ydb_version=`$ydb_dist/mumps -run %XCMD 'write $piece($zyrelease," ",2)'`
+        ydb_version=`$ydb_dist/mumps -run %XCMD 'write $piece($zyrelease," ",2)' 2>&1`
+	if [ $? -gt 0 ] ; then echo >&2 "$ydb_dist/mumps -run %XCMD 'write $piece($zyrelease," ",2)' failed with output $ydb_version"; exit 1; fi
         rm -rf $tmp
     fi
 fi
@@ -479,15 +493,15 @@ fi
 if [ "Y" = "$gtm_verbose" ] ; then echo Downloaded and unpacked YottaDB/GT.M distribution ; dump_info ; fi
 
 # Check installation settings & provide defaults as needed
-tmp=`$ydb_id -un`
+tmp=`id -un`
 if [ -z "$gtm_user" ] ; then gtm_user=$tmp
-else if [ "$gtm_user" != "`$ydb_id -un $gtm_user`" ] ; then
+else if [ "$gtm_user" != "`id -un $gtm_user`" ] ; then
     echo $gtm_user is a non-existent user ; err_exit
     fi
 fi
 if [ "root" = $tmp ] ; then
-    if [ -z "$gtm_group" ] ; then gtm_group=`$ydb_id -gn`
-    else if [ "root" != "$gtm_user" -a "$gtm_group" != "`$ydb_id -Gn $gtm_user | xargs -n 1 | $ydb_grep $gtm_group`" ] ; then
+    if [ -z "$gtm_group" ] ; then gtm_group=`id -gn`
+    else if [ "root" != "$gtm_user" -a "$gtm_group" != "`id -Gn $gtm_user | xargs -n 1 | grep $gtm_group`" ] ; then
         echo $gtm_user is not a member of $gtm_group ; err_exit
         fi
     fi

@@ -101,7 +101,7 @@ if [ $deliver_gtcm = "yes" ]; then
 	pathmods="$pathmods gtcm_run.gtc gtcm_slist.gtc"
 fi
 
-ydb_id=`which id`
+ydb_id=`command -v id`
 euid=`$ydb_id -un`	# Get effective user id
 if [ "$euid" != "root" ] ; then
 	$echo "You must run Configure as root."
@@ -127,7 +127,7 @@ read_yes_no()
 	fi
 }
 
-issystemd=`which systemctl`
+issystemd=`command -v systemctl`
 if [ "" != "$issystemd" ] ; then
 	# It is a systemd installation
 	# Check if RemoveIPC=no is set. If not, prompt user for okay to set this. If user says NO, abort the install.
