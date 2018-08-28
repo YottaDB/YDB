@@ -208,7 +208,9 @@ boolean_t ftok_sem_get_common(gd_region *reg, boolean_t incr_cnt, int project_id
 					RETURN_SUCCESS(reg);
 			} else if (!SEM_REMOVED(retstat->save_errno))
 				return FALSE; /* retstat will already have the necessary error information */
-			save_errno = retstat->save_errno; /* some other error. Fall-through */
+			else
+				save_errno = retstat->save_errno;
+			/* At this point "save_errno" is guaranteed to hold the errno detail across all "if/else" blocks above */
 		}
 		if (SEM_REMOVED(save_errno))
 		{	/* start afresh for next iteration of for loop with new semid and ftok_sopcnt */
