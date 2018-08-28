@@ -792,7 +792,7 @@ void service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_l
 			 */
 			fn = buf->mesg.db_ipcs.fn;
 			fn_len = buf->mesg.db_ipcs.fn_len;
-			if ((YDB_PATH_MAX < fn_len) || ('\0' != *(fn + fn_len))
+			if ((YDB_PATH_MAX <= fn_len) || ('\0' != *(fn + fn_len))
 				|| (fn_len != (msglen - GTM_MESG_HDR_SIZE - offsetof(ipcs_mesg, fn[0]) - 1)))
 			{
 				buf->code = EINVAL;
