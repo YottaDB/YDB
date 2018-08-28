@@ -386,7 +386,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 			}
 		} else if (SS_NORMAL == status)
 		{	/* Drain the rest of the message */
-			if (0 < *pending_data_len)
+			if (0 != *pending_data_len)
 			{
 				pending_msg_size = *pending_data_len;
 				REPL_DPRINT2("gtmrecv_poll_actions : (2) Throwing away %d bytes from pipe\n", pending_msg_size);
