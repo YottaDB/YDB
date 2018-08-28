@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,31 +78,14 @@ typedef struct
 	unsigned short fid[3];
 } gds_file_id;
 
-#if defined(VMS)
-	typedef struct           /* really just a place holder for gdsfhead.h union */
-	{
-		unsigned int	inode;		/* ino_t really but VMS defines are not useful here */
-		int		device;		/* dev_t really */
-		unsigned int 	st_gen;
-	} unix_file_id;
-	typedef	gds_file_id	gd_id;
-#elif defined(UNIX)
-	typedef struct gd_id_struct  /* note this is not the same size on all platforms
-				       but must be less than or equal to gds_file_id */
-	{	ino_t	inode;
-		dev_t	device;
-#if defined(__hpux) || defined(__linux__) || defined (__CYGWIN__) ||defined(_UWIN) || defined(__MVS__)
-		unsigned int st_gen;
-#elif defined(_AIX)
-		ulong_t st_gen;
-#else
-		uint_t	st_gen;
-#endif
-	} unix_file_id;
-	typedef unix_file_id	gd_id;
-#else
-# error Unsupported platform
-#endif
+/* Note the below is not the same size on all platforms but must be less than or equal to gds_file_id */
+typedef struct gd_id_struct
+{
+	ino_t	inode;
+	dev_t	device;
+} unix_file_id;
+
+typedef unix_file_id	gd_id;
 
 #define UNIQUE_ID_SIZE SIZEOF(gd_id)
 
@@ -144,30 +130,15 @@ typedef struct
 {
 	uint4	low, high;
 } date_time;
-/*
- * Note: For AIX we do not need to check FS_REMOTE == st_flag. Because st_gen is already set to 0
- * or, appropriate non-zero value.
- */
-#ifdef UNIX
-#if defined(__osf__) || defined(_AIX)
-#define gdid_cmp(A, B) 							\
-	(((A)->inode != (B)->inode)					\
-		? ((A)->inode > (B)->inode ? 1 : -1)			\
-		: ((A)->device != (B)->device) 				\
-			? ((A)->device > (B)->device ? 1 : -1)		\
-			: ((A)->st_gen != (B)->st_gen)			\
-				? ((A)->st_gen > (B)->st_gen ? 1 : -1)	\
-				: 0)
-#else
+
 #define gdid_cmp(A, B) 							\
 	(((A)->inode != (B)->inode)					\
 		? ((A)->inode > (B)->inode ? 1 : -1)			\
 		: ((A)->device != (B)->device) 				\
 			? ((A)->device > (B)->device ? 1 : -1)		\
 			: 0)
-#endif
+
 #define is_gdid_gdid_identical(A, B) (0 == gdid_cmp(A, B) ? TRUE: FALSE)
-#endif
 
 #define	VALFIRSTCHAR(X)			(ISALPHA_ASCII(X) || ('%' == X))
 #define	VALFIRSTCHAR_WITH_TRIG(X)	(ISALPHA_ASCII(X) || ('%' == X) GTMTRIG_ONLY(|| (HASHT_GBL_CHAR1 == X)))
