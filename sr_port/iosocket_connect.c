@@ -101,7 +101,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 		DBGSOCK((stdout, "socconn: *#*#*#*#*#*#*#  Restarted interrupted connect\n"));
 		mv_zintdev = io_find_mvstent(iod, FALSE);
 		if (mv_zintdev)
-		{
+		{	/* See later comment about "xf_restartpc" on why below two asserts are valid */
+			assert((NO_M_TIMEOUT == msec_timeout) || sockintr->end_time_valid);
+			assert((NO_M_TIMEOUT != msec_timeout) || !sockintr->end_time_valid);
 			if (sockintr->end_time_valid)
 				/* Restore end_time for timeout */
 				end_time = sockintr->end_time;
@@ -470,7 +472,15 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 				real_sockintr->end_time = sockintr->end_time = end_time;
 				real_sockintr->end_time_valid  = sockintr->end_time_valid = TRUE;
 			} else
+			{	/* Note that "end_time" is uninitialized in this case (i.e. if "msec_timeout" is NO_M_TIMEOUT)
+				 * but it is okay since when it is restored, we are guaranteed that the post-interrupt
+				 * invocation of "iosocket_connect" (after the jobinterrupt is handled) will use the
+				 * restored "end_time" only if "msec_timeout" (which will have the exact same value as the
+				 * pre-interrupt invocation of "iosocket_connect" thanks to the xf_restartpc invocation
+				 * in OC_IOCONTROL in ttt.txt) is not NO_M_TIMEOUT.
+				 */
 				real_sockintr->end_time_valid = sockintr->end_time_valid = FALSE;
+			}
 			real_sockintr->newdsocket = sockintr->newdsocket = newdsocket;
 			real_dsocketptr->mupintr = dsocketptr->mupintr = TRUE;
 			d_socket_struct_len = SIZEOF(d_socket_struct) +
