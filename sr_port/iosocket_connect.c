@@ -100,29 +100,27 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 		assertpro(sockwhich_connect == sockintr->who_saved);	/* ZINTRECURSEIO should have caught */
 		DBGSOCK((stdout, "socconn: *#*#*#*#*#*#*#  Restarted interrupted connect\n"));
 		mv_zintdev = io_find_mvstent(iod, FALSE);
-		if (mv_zintdev)
-		{	/* See later comment about "xf_restartpc" on why below two asserts are valid */
-			assert((NO_M_TIMEOUT == msec_timeout) || sockintr->end_time_valid);
-			assert((NO_M_TIMEOUT != msec_timeout) || !sockintr->end_time_valid);
-			if (sockintr->end_time_valid)
-				/* Restore end_time for timeout */
-				end_time = sockintr->end_time;
-			if ((socket_connect_inprogress == sockptr->state) && (FD_INVALID != sockptr->sd))
-			{
-				need_select = TRUE;
-				need_socket = need_connect = FALSE;	/* sd still good */
-			}
-			/* Done with this mv_stent. Pop it off if we can, else mark it inactive. */
-			if (mv_chain == mv_zintdev)
-				POP_MV_STENT();	 /* pop if top of stack */
-			else
-			{       /* else mark it unused, see iosocket_open for use */
-				mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
-				mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
-			}
-			DBGSOCK((stdout, "socconn: mv_stent found - endtime: %d/%d\n", end_time.at_sec, end_time.at_usec));
-		} else
-			DBGSOCK((stdout, "socconn: no mv_stent found !!\n"));
+		assert(NULL != mv_zintdev);
+		/* See later comment about "xf_restartpc" on why below two asserts are valid */
+		assert((NO_M_TIMEOUT == msec_timeout) || sockintr->end_time_valid);
+		assert((NO_M_TIMEOUT != msec_timeout) || !sockintr->end_time_valid);
+		if (sockintr->end_time_valid)
+			/* Restore end_time for timeout */
+			end_time = sockintr->end_time;
+		if ((socket_connect_inprogress == sockptr->state) && (FD_INVALID != sockptr->sd))
+		{
+			need_select = TRUE;
+			need_socket = need_connect = FALSE;	/* sd still good */
+		}
+		/* Done with this mv_stent. Pop it off if we can, else mark it inactive. */
+		if (mv_chain == mv_zintdev)
+			POP_MV_STENT();	 /* pop if top of stack */
+		else
+		{       /* else mark it unused, see iosocket_open for use */
+			mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+			mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
+		}
+		DBGSOCK((stdout, "socconn: mv_stent found - endtime: %d/%d\n", end_time.at_sec, end_time.at_usec));
 		real_dsocketptr->mupintr = dsocketptr->mupintr = FALSE;
 		real_sockintr->who_saved = sockintr->who_saved = sockwhich_invalid;
 	} else if (NO_M_TIMEOUT != msec_timeout)
