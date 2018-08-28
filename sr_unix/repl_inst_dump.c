@@ -49,7 +49,9 @@ LITDEF	char	state_array[][23] = {
 			"SEARCHING_FOR_RESTART",
 			"SENDING_JNLRECS",
 			"WAITING_FOR_XON",
-			"CHANGING_MODE"
+			"CHANGING_MODE",
+			"SEND_NEW_HISTINFO",
+			"HANDLE_ONLN_RLBK"
 		};
 
 #define	PREFIX_FILEHDR			"HDR "
@@ -783,6 +785,7 @@ void	repl_inst_dump_gtmsourcelocal(gtmsource_local_ptr_t gtmsourcelocal_ptr)
 		}
 
 		PRINT_OFFSET_PREFIX(offsetof(gtmsource_local_struct, gtmsource_state), SIZEOF(gtmsourcelocal_ptr->gtmsource_state));
+		assert(ARRAYSIZE(state_array) == GTMSOURCE_NUM_STATES);
 		string = ((0 <= (signed)gtmsourcelocal_ptr->gtmsource_state)
 				&& (GTMSOURCE_NUM_STATES > (signed)gtmsourcelocal_ptr->gtmsource_state))
 					? (char *)state_array[gtmsourcelocal_ptr->gtmsource_state] : "UNKNOWN";
