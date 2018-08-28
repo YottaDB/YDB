@@ -111,32 +111,30 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		}
 		assertpro(ttrdone == tt_state->who_saved);	/* ZINTRECURSEIO should have caught */
 		mv_zintdev = io_find_mvstent(io_ptr, FALSE);
-		if (NULL != mv_zintdev)
+		assert(NULL != mv_zintdev);
+		mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
+		mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
+		if (mv_chain == mv_zintdev)
+			POP_MV_STENT();         /* pop if top of stack */
+		/* The below two asserts ensure the invocation of "iott_rdone" after a job interrupt has
+		 * the exact same "msec_timeout" as well as "timed" variable context. This is needed to
+		 * ensure that the "end_time" usages in the post-interrupt invocation always happen
+		 * only if the pre-interrupt invocation had initialized "end_time".
+		 */
+		assert(timed == tt_state->timed);
+		assert(msec_timeout == tt_state->msec_timeout);
+		end_time = tt_state->end_time;
+		if (utf8_active)
 		{
-			mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
-			mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
-			if (mv_chain == mv_zintdev)
-				POP_MV_STENT();         /* pop if top of stack */
-			/* The below two asserts ensure the invocation of "iott_rdone" after a job interrupt has
-			 * the exact same "msec_timeout" as well as "timed" variable context. This is needed to
-			 * ensure that the "end_time" usages in the post-interrupt invocation always happen
-			 * only if the pre-interrupt invocation had initialized "end_time".
-			 */
-			assert(timed == tt_state->timed);
-			assert(msec_timeout == tt_state->msec_timeout);
-			end_time = tt_state->end_time;
-			if (utf8_active)
-			{
-				utf8_more = tt_state->utf8_more;
-				more_ptr = tt_state->more_ptr;
-				memcpy(more_buf, tt_state->more_buf, SIZEOF(more_buf));
-			}
-			zb_ptr = tt_state->zb_ptr;
-			zb_top = tt_state->zb_top;
-			tt_state->who_saved = ttwhichinvalid;
-			tt_ptr->mupintr = FALSE;
-			zint_restart = TRUE;
+			utf8_more = tt_state->utf8_more;
+			more_ptr = tt_state->more_ptr;
+			memcpy(more_buf, tt_state->more_buf, SIZEOF(more_buf));
 		}
+		zb_ptr = tt_state->zb_ptr;
+		zb_top = tt_state->zb_top;
+		tt_state->who_saved = ttwhichinvalid;
+		tt_ptr->mupintr = FALSE;
+		zint_restart = TRUE;
 	}
 	if (!zint_restart)
 	{
