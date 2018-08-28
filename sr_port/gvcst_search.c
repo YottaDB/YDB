@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -432,7 +432,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	if (NULL == (pBlkBase = t_qread(nBlkId, (sm_int_ptr_t)&cycle, &cr)))
 		return (enum cdb_sc)rdfail_detail;
 	nLevl = ((blk_hdr_ptr_t)pBlkBase)->levl;
-	if (MAX_BT_DEPTH < (int)nLevl)
+	if (MAX_BT_DEPTH <= (int)nLevl)
 	{
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_maxlvl;
