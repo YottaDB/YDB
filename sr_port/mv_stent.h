@@ -164,6 +164,9 @@ typedef struct
 	unsigned char	*restart_ctxt_check;
 	unsigned char	*restart_pc_prior;	/* from zintcmd_active before */
 	unsigned char	*restart_ctxt_prior;	/* this entry was put on stack */
+#	ifdef DEBUG
+	int		ms;
+#	endif
 } mvs_zintcmd_struct;
 
 /* Homogenous mv_stent structure containing all types. This structure is never allocated as is but is allocated

@@ -95,6 +95,9 @@ error_def(ERR_SYSCALL);
 void op_hang(mval* num)
 {
 	int		ms;
+#	ifdef DEBUG
+	int		orig_ms;
+#	endif
 	double		tmp;
 	mv_stent	*mv_zintcmd;
 	ABS_TIME	cur_time, end_time;
@@ -116,6 +119,7 @@ void op_hang(mval* num)
 		tmp = mval2double(num) * (double)1000;
 		ms = ((double)MAXPOSINT4 >= tmp) ? (int)tmp : (int)MAXPOSINT4;
 	}
+	DEBUG_ONLY(orig_ms = ms);
 	if (ms)
 	{
 		if ((TREF(tpnotacidtime)).m[1] < ms)
@@ -153,12 +157,13 @@ void op_hang(mval* num)
 		if (!mv_zintcmd)
 			add_int_to_abs_time(&cur_time, ms, &end_time);
 		else
-		{
+		{	/* See later comment about "xf_restartpc" on why the below assert is valid */
+			assert(ms == mv_zintcmd->mv_st_cont.mvs_zintcmd.ms);
 			end_time = mv_zintcmd->mv_st_cont.mvs_zintcmd.end_or_remain;
-			cur_time = sub_abs_time(&end_time, &cur_time);	/* get remaing time to sleep */
+			cur_time = sub_abs_time(&end_time, &cur_time);	/* get remaining time to sleep */
 			if (0 <= cur_time.at_sec)
 				ms = (int4)(cur_time.at_sec * MILLISECS_IN_SEC +
-					    /* Round up in order to prevent premautre timeouts */
+					    /* Round up in order to prevent premature timeouts */
 					    DIVIDE_ROUND_UP(cur_time.at_usec, MICROSECS_IN_MSEC));
 			else
 				ms = 0;		/* all done */
@@ -187,6 +192,12 @@ void op_hang(mval* num)
 	if (outofband)
 	{
 		PUSH_MV_STENT(MVST_ZINTCMD);
+		DEBUG_ONLY(mv_chain->mv_st_cont.mvs_zintcmd.ms = orig_ms);
+		/* Note that "end_time" is uninitialized in case "ms" is 0 but it is okay since when it is restored,
+		 * we are guaranteed that the post-interrupt invocation of "op_hang" (after the jobinterrupt is handled)
+		 * will use the restored "end_time" only if "ms" (which will have the exact same value as the pre-interrupt
+		 * invocation of "op_hang" thanks to the xf_restartpc invocation in OC_HANG in ttt.txt) is not 0.
+		 */
 		mv_chain->mv_st_cont.mvs_zintcmd.end_or_remain = end_time;
 		mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check = restart_ctxt;
 		mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check = restart_pc;
