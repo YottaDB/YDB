@@ -153,8 +153,7 @@ int rc_srvc_xact(cptr, xend)
 			qhdr->a.erc.value = RC_NETREQIGN;
 		/*	Do we do this yet? */
 		else if (	/* (qhdr->r.typ.value < 0) || */ /* this is commented out as it always evaluates to FALSE */
-			(qhdr->r.typ.value > RC_OP_MAX )
-			|| (!rc_dispatch_table[qhdr->r.typ.value]))
+			(RC_OP_MAX <= qhdr->r.typ.value) || (!rc_dispatch_table[qhdr->r.typ.value]))
 		{
 #			ifdef DEBUG
 			if (qhdr->r.typ.value == RC_EXCH_INFO)
