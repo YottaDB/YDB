@@ -3,7 +3,7 @@
 #								#
 # Copyright 2001, 2010 Fidelity Information Services, Inc	#
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -69,7 +69,7 @@ alias gt_ld $gt_ld_linker $gt_ld_options -L$gtm_obj $gt_ld_extra_libs $gt_ld_sys
 set c_struct = $1
 set srcfile  = $2
 
-set TMPFILE = /tmp/__${user}_offset_
+set TMPFILE = /tmp/__${user}_offset_$$_
 
 if !(-e $gtm_src/$srcfile) then
 	echo "OFFSET-E-INVALIDSRCFILE : $gtm_src/$srcfile doesn't exist. Please give a valid c-source-file-name. Exiting..."
