@@ -962,5 +962,6 @@ void	dm_read (mval *v)
 		}
 	}
 	active_device = 0;
+	RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 	return;
 }

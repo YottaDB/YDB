@@ -490,6 +490,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 	{
 		io_ptr->dollar.za = 9;
 		REVERT_GTMIO_CH(&io_curr_device, ch_set);
+		RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 		return FALSE;
 	}
 	io_ptr->dollar.za = 0;
@@ -534,5 +535,6 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 	}
 	memcpy(io_ptr->dollar.key, io_ptr->dollar.zb, (zb_ptr - io_ptr->dollar.zb));
 	REVERT_GTMIO_CH(&io_curr_device, ch_set);
+	RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 	return ret;
 }

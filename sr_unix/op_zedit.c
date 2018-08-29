@@ -62,7 +62,6 @@ void op_zedit(mval *v, mval *p)
 	mstr		src;
 	zro_ent		*sp, *srcdir;
 	struct		sigaction act, intr;
-	boolean_t	resetterm_done_by_me;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -167,12 +166,6 @@ void op_zedit(mval *v, mval *p)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZEDIT");
 
 	flush_pio();
-	if (IS_SETTERM_DONE(io_std_device.in))
-	{
-		resetterm(io_std_device.in);
-		resetterm_done_by_me = TRUE;
-	} else
-		resetterm_done_by_me = FALSE;
 	/* ignore interrupts */
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
@@ -200,8 +193,6 @@ void op_zedit(mval *v, mval *p)
 			dollar_zeditor = errno;
 		/* restore interrupt handler */
 		sigaction(SIGINT, &intr, 0);
-		if (resetterm_done_by_me)
-			setterm(io_std_device.in);
 	} else
 	{
 		if (WBTEST_ENABLED(WBTEST_BADEXEC_OP_ZEDIT))

@@ -67,12 +67,28 @@ GBLREF	uint4	process_id;
 					&& (NULL != IOPTR->dev_sp)						\
 					&& (process_id == ((d_tt_struct *)IOPTR->dev_sp)->setterm_done_by))
 
-/* If we are going to read or write to the terminal, and "setterm" has not yet been done, do it first */
+/* If we are going to read from the terminal, and "setterm" has not yet been done, do it first.
+ * This is needed so we get nocanonical and noecho mode turned on. That way we see the keystrokes as the user types them in,
+ * with no translation (e.g. escape sequences etc.) done by the terminal driver.
+ */
 #define	SETTERM_IF_NEEDED(ioPtr, ttPtr)							\
 MBSTART {										\
 	/* Only the true runtime runs with the modified terminal settings */		\
+	assert(ttPtr == ((d_tt_struct *)ioPtr->dev_sp));				\
 	if (IS_GTM_IMAGE && (0 == ttPtr->setterm_done_by))				\
 		setterm(ioPtr);								\
+} MBEND
+
+#define	EXPECT_SETTERM_DONE_FALSE	FALSE
+#define	EXPECT_SETTERM_DONE_TRUE	TRUE
+
+/* Below is converse of SETTERM_IF_NEEDED */
+#define	RESETTERM_IF_NEEDED(ioPtr, expectSettermDone)		\
+MBSTART {							\
+	assert(!expectSettermDone || IS_SETTERM_DONE(ioPtr));	\
+	if (IS_SETTERM_DONE(ioPtr))				\
+		resetterm(ioPtr);				\
+	assert(!IS_SETTERM_DONE(ioPtr));			\
 } MBEND
 
 enum	tt_which

@@ -89,6 +89,7 @@
 #endif
 #include "libyottadb.h"
 #include "setup_error.h"
+#include "iottdef.h"
 
 GBLREF	boolean_t		created_core, dont_want_core, in_gvcst_incr, run_time;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
@@ -299,6 +300,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 	 * easy to establish a condition handler there. Easy solution is following one line code.
 	 */
 	NULLIFY_MERGE_ZWRITE_CONTEXT;
+	/* If a function like "dm_read" is erroring out after having done a "setterm", but before doing the "resetterm"
+	 * do that cleanup here.
+	 */
+	if (NULL != active_device)
+		RESETTERM_IF_NEEDED(active_device, EXPECT_SETTERM_DONE_FALSE);
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{
 		lcl_error_frame = error_frame;

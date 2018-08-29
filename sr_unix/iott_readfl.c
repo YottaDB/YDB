@@ -74,7 +74,7 @@ GBLREF	char		*KEYPAD_LOCAL, *KEYPAD_XMIT;
 #else
 #	define	SEND_KEYPAD_LOCAL					\
 		if (edit_mode && NULL != KEYPAD_LOCAL && (keypad_len = STRLEN(KEYPAD_LOCAL)))	/* embedded assignment */	\
-			DOWRITE(tt_ptr->fildes, KEYPAD_LOCAL, keypad_len);
+			DOWRITE(tt_ptr->fildes, KEYPAD_LOCAL, keypad_len)
 #endif
 
 LITREF	unsigned char	lower_to_upper_table[];
@@ -394,7 +394,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 			} else
 			{
 				instr = outlen = 0;
-				SEND_KEYPAD_LOCAL
+				SEND_KEYPAD_LOCAL;
 				if (!msec_timeout)
 					iott_rterm(io_ptr);
 			}
@@ -546,7 +546,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				instr = outlen = 0;
 				io_ptr->dollar.za = 9;
 				std_dev_outbndset(INPUT_CHAR);	/* it needs ASCII?	*/
-				SEND_KEYPAD_LOCAL
+				SEND_KEYPAD_LOCAL;
 				if (!msec_timeout)
 					iott_rterm(io_ptr);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
@@ -948,13 +948,13 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				if (io_ptr->dollar.zeof)
 				{
 					io_ptr->dollar.za = 9;
-					SEND_KEYPAD_LOCAL
+					SEND_KEYPAD_LOCAL;
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 				} else
 				{
 					io_ptr->dollar.zeof = TRUE;
 					io_ptr->dollar.za = 0;
-					SEND_KEYPAD_LOCAL
+					SEND_KEYPAD_LOCAL;
 					if (0 < io_ptr->error_handler.len)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 				}
@@ -966,7 +966,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				io_ptr->dollar.x = 0;
 				io_ptr->dollar.za = 0;
 				io_ptr->dollar.y++;
-				SEND_KEYPAD_LOCAL
+				SEND_KEYPAD_LOCAL;
 				if (0 < io_ptr->error_handler.len)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 				break;
@@ -1171,12 +1171,13 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) status);
 		}
 	}
-	SEND_KEYPAD_LOCAL	/* to turn keypad off if possible */
+	SEND_KEYPAD_LOCAL;	/* to turn keypad off if possible */
 	if (outofband && jobinterrupt != outofband)
 	{
 		v->str.len = 0;
 		io_ptr->dollar.za = 9;
 		REVERT_GTMIO_CH(&io_curr_device, ch_set);
+		RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 		return(FALSE);
 	}
 #	ifdef UNICODE_SUPPORTED
@@ -1207,15 +1208,17 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		}
 	}
 	REVERT_GTMIO_CH(&io_curr_device, ch_set);
+	RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 	return ((short)ret);
 
 term_error:
 	save_errno = errno;
 	io_ptr->dollar.za = 9;
 	tt_ptr->discard_lf = FALSE;
-	SEND_KEYPAD_LOCAL	/* to turn keypad off if possible */
+	SEND_KEYPAD_LOCAL;	/* to turn keypad off if possible */
 	if (!msec_timeout)
 		iott_rterm(io_ptr);
+	RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);
 	return FALSE;
 }

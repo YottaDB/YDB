@@ -70,8 +70,7 @@ void io_rundown (int rundown_type)
 				 * If so do "resetterm" to restore terminal to what it was (undo whatever stty settings
 				 * YottaDB changed in terminal).
 				 */
-				if (IS_SETTERM_DONE(ioptr))
-					resetterm(ioptr);
+				RESETTERM_IF_NEEDED(ioptr, EXPECT_SETTERM_DONE_FALSE);
 			}
 		}
 	}

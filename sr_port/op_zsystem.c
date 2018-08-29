@@ -74,7 +74,6 @@ void op_zsystem(mval *v)
 #else
         int4            wait_stat;
 #endif
-	boolean_t	resetterm_done_by_me;
 	ydb_string_t	filtered_command;
 	DCL_THREADGBL_ACCESS;
 
@@ -84,13 +83,6 @@ void op_zsystem(mval *v)
 	TPNOTACID_CHECK(ZSYSTEMSTR);
 	MV_FORCE_STR(v);
 	flush_pio();
-	/* If we have done a "setterm", undo those terminal characteristics changes before transferring control to shell */
-	if (IS_SETTERM_DONE(io_std_device.in))
-	{
-		resetterm(io_std_device.in);
-		resetterm_done_by_me = TRUE;
-	} else
-		resetterm_done_by_me = FALSE;
 	if (v->str.len)
 	{
 		/* Copy the command to a new buffer and append a '\0' */
@@ -150,8 +142,5 @@ void op_zsystem(mval *v)
 #endif
 	if (WIFEXITED(wait_stat))
 		dollar_zsystem = WEXITSTATUS(wait_stat);
-	/* If we had undo terminal characteristics change before transferring control to shell, redo them now that we are back */
-	if (resetterm_done_by_me)
-		setterm(io_std_device.in);
 	return;
 }
