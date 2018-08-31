@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -71,6 +74,7 @@ boolean_t pat_unwind(
 			}
 			leaf_cnt++;
 		}
+		assert(MAX_PATTERN_ATOMS > atom_map);
 		minim = min[atom_map];
 		maxim = max[atom_map];
 		leaf_cnt += MAX(minim - 1, 0) * size[atom_map];

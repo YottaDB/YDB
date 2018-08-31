@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -314,10 +317,6 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 						 * 	fixed part from the indefinite part.
 						 */
 						split_atom = TRUE;
-						if ((count >= (MAX_PATTERN_ATOMS - 1)) ||
-								(atom_map >= (MAX_PATTERN_ATOMS -2)))
-			                         	return ERR_PATMAXLEN;
-
 					} else
 					{
 						infinite = TRUE;
@@ -741,6 +740,8 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				}
 				curr_min_dfa = min_dfa;
 				curr_leaf_num = leaf_num;
+				if (atom_map >= MAX_PATTERN_ATOMS)
+					return ERR_PATMAXLEN;
 				if (pattern_mask & PATM_STRLIT)
 				{
 					memset(&exp_temp[0], 0, SIZEOF(exp_temp));
