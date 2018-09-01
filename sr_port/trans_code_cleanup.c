@@ -134,8 +134,8 @@ void trans_code_cleanup(void)
 		IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(fp);
 		fp->mpc = CODE_ADDRESS(pseudo_ret);
 		fp->ctxt = GTM_CONTEXT(pseudo_ret);
-		fp->flags &= SSF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
-		GTMTRIG_ONLY(DBGTRIGR((stderr, "trans_code_cleanup: turning off SSF_NORET_VIA_MUMTSTART in frame 0x"lvaddr"\n",
+		fp->flags &= SFF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
+		GTMTRIG_ONLY(DBGTRIGR((stderr, "trans_code_cleanup: turning off SFF_NORET_VIA_MUMTSTART in frame 0x"lvaddr"\n",
 				       frame_pointer)));
 	}
 	TREF(transform) = TRUE;

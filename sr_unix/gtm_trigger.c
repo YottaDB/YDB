@@ -66,6 +66,7 @@
 #include "zshow.h"
 #include "zwrite.h"
 #include "zr_unlink_rtn.h"
+#include "gtmci.h"		/* for "gtm_levl_ret_code" prototype */
 
 #ifdef GTM_TRIGGER
 #define PREFIX_SPACE		" "
@@ -176,7 +177,6 @@ error_def(ERR_CITPNESTED);
 }
 
 /* All other platforms use this much faster direct return */
-void gtm_levl_ret_code(void);
 STATICFNDEF int gtm_trigger_invoke(void);
 
 /* gtm_trigger - saves (some of) current environment, sets up new environment and drives a trigger.
@@ -561,8 +561,8 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 		 * command (KILL, SET or ZTRIGGER) was entered. Set flag in the frame to prevent MUM_TSTART unless the frame gets
 		 * reset.
 		 */
-		frame_pointer->flags |= SSF_NORET_VIA_MUMTSTART;	/* Do not return to this frame via MUM_TSTART */
-		DBGTRIGR((stderr, "gtm_trigger: Setting SSF_NORET_VIA_MUMTSTART in frame 0x"lvaddr"\n", frame_pointer));
+		frame_pointer->flags |= SFF_NORET_VIA_MUMTSTART;	/* Do not return to this frame via MUM_TSTART */
+		DBGTRIGR((stderr, "gtm_trigger: Setting SFF_NORET_VIA_MUMTSTART in frame 0x"lvaddr"\n", frame_pointer));
 		base_frame(trigdsc->rtn_desc.rt_adr);
 		/* Finish base frame initialization - reset mpc/context to return to us without unwinding base frame */
 		frame_pointer->type |= SFT_TRIGR;
@@ -794,9 +794,9 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 			{       /* Unusual case of trigger that died in no-mans-land before trigger base frame established.
 				 * Remove the "do not return to me" flag only on non-error unwinds */
 				assert(tp_pointer->implicit_tstart);
-				assert(SSF_NORET_VIA_MUMTSTART & frame_pointer->flags);
-				frame_pointer->flags &= SSF_NORET_VIA_MUMTSTART_OFF;
-				DBGTRIGR((stderr, "gtm_trigger: turning off SSF_NORET_VIA_MUMTSTART (1) in frame 0x"lvaddr"\n",
+				assert(SFF_NORET_VIA_MUMTSTART & frame_pointer->flags);
+				frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;
+				DBGTRIGR((stderr, "gtm_trigger: turning off SFF_NORET_VIA_MUMTSTART (1) in frame 0x"lvaddr"\n",
 					  frame_pointer));
 				DBGTRIGR((stderr, "gtm_trigger: unwinding no-base-frame trigger for TP restart\n"));
 			}
@@ -852,9 +852,9 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 	{	/* Remove the "do not return to me" flag only on non-error unwinds. Note this flag may have already been
 		 * turned off by an earlier tp_restart if this is not an implicit_tstart situation.
 		 */
-		assert(!tp_pointer->implicit_tstart || (SSF_NORET_VIA_MUMTSTART & frame_pointer->flags));
-		frame_pointer->flags &= SSF_NORET_VIA_MUMTSTART_OFF;
-		DBGTRIGR((stderr, "gtm_trigger_fini: turning off SSF_NORET_VIA_MUMTSTART(2) in frame 0x"lvaddr"\n", frame_pointer));
+		assert(!tp_pointer->implicit_tstart || (SFF_NORET_VIA_MUMTSTART & frame_pointer->flags));
+		frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;
+		DBGTRIGR((stderr, "gtm_trigger_fini: turning off SFF_NORET_VIA_MUMTSTART(2) in frame 0x"lvaddr"\n", frame_pointer));
 	} else
 	{	/* Error unwind, make sure certain cleanups are done */
 #		ifdef DEBUG

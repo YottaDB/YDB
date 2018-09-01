@@ -59,8 +59,6 @@ error_def(ERR_SYSCALL);
 error_def(ERR_JOBSTARTCMDFAIL);
 error_def(ERR_JOBLABOFF);
 
-void gtm_levl_ret_code(void);
-
 CONDITION_HANDLER(job_init_ch)
 {
 	START_CH(TRUE);

@@ -663,9 +663,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 				 frame_pointer->type));
 			frame_pointer->mpc = restart_pc;
 			frame_pointer->ctxt = restart_ctxt;
-			frame_pointer->flags &= SSF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
+			frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
 			GTMTRIG_ONLY(
-				DBGTRIGR((stderr, "mdb_condition_handler: disabling SSF_NORET_VIA_MUMTSTART_OFF (1) in frame "
+				DBGTRIGR((stderr, "mdb_condition_handler: disabling SFF_NORET_VIA_MUMTSTART_OFF (1) in frame "
 					  "0x"lvaddr"\n", frame_pointer)));
 			if (!(frame_pointer->type & SFT_DM))
 				dm_setup();
@@ -673,9 +673,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 		{
 			frame_pointer->ctxt = GTM_CONTEXT(call_dm);
 			frame_pointer->mpc = CODE_ADDRESS(call_dm);
-			frame_pointer->flags &= SSF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
+			frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
 			GTMTRIG_ONLY(
-				DBGTRIGR((stderr, "mdb_condition_handler: disabling SSF_NORET_VIA_MUMTSTART_OFF (1) in frame "
+				DBGTRIGR((stderr, "mdb_condition_handler: disabling SFF_NORET_VIA_MUMTSTART_OFF (1) in frame "
 					  "0x"lvaddr"\n", frame_pointer)));
 		} else
 		{
@@ -683,9 +683,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 			IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(frame_pointer);
 			frame_pointer->ctxt = GTM_CONTEXT(pseudo_ret);
 			frame_pointer->mpc = CODE_ADDRESS(pseudo_ret);
-			frame_pointer->flags &= SSF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
+			frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
 			GTMTRIG_ONLY(
-				DBGTRIGR((stderr, "mdb_condition_handler: disabling SSF_NORET_VIA_MUMTSTART_OFF (1) in frame "
+				DBGTRIGR((stderr, "mdb_condition_handler: disabling SFF_NORET_VIA_MUMTSTART_OFF (1) in frame "
 					  "0x"lvaddr"\n", frame_pointer)));
 		}
 		PRN_ERROR;
@@ -798,8 +798,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 		{
 			frame_pointer->ctxt = GTM_CONTEXT(call_dm);
 			frame_pointer->mpc = CODE_ADDRESS(call_dm);
-			frame_pointer->flags &= SSF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
-			GTMTRIG_ONLY(DBGTRIGR((stderr, "mdb_condition_handler: disabling SSF_NORET_VIA_MUMTSTART (2) in frame 0x"
+			frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
+			GTMTRIG_ONLY(DBGTRIGR((stderr, "mdb_condition_handler: disabling SFF_NORET_VIA_MUMTSTART (2) in frame 0x"
 					       lvaddr"\n", frame_pointer)));
 		} else
 		{
@@ -807,8 +807,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 			IF_INDR_FRAME_CLEANUP_CACHE_ENTRY_AND_UNMARK(frame_pointer);
 			frame_pointer->ctxt = GTM_CONTEXT(pseudo_ret);
 			frame_pointer->mpc = CODE_ADDRESS(pseudo_ret);
-			frame_pointer->flags &= SSF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
-			GTMTRIG_ONLY(DBGTRIGR((stderr, "mdb_condition_handler: disabling SSF_NORET_VIA_MUMTSTART (3) in frame 0x"
+			frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
+			GTMTRIG_ONLY(DBGTRIGR((stderr, "mdb_condition_handler: disabling SFF_NORET_VIA_MUMTSTART (3) in frame 0x"
 					       lvaddr"\n", frame_pointer)));
 		}
 		PRN_ERROR;
@@ -985,9 +985,9 @@ CONDITION_HANDLER(mdb_condition_handler)
 					{
 						assert(SFF_INDCE & fp->flags);
 						fp->mpc = fp->ctxt;
-						fp->flags &= SSF_NORET_VIA_MUMTSTART_OFF; /* Frame enterable now with mpc reset */
+						fp->flags &= SFF_NORET_VIA_MUMTSTART_OFF; /* Frame enterable now with mpc reset */
 						GTMTRIG_ONLY(
-							DBGTRIGR((stderr, "mdb_condition_handler: disabling SSF_NORET_VIA_MUMTSTART"
+							DBGTRIGR((stderr, "mdb_condition_handler: disabling SFF_NORET_VIA_MUMTSTART"
 								  " (4) in frame 0x"lvaddr"\n", frame_pointer)));
 						break;
 					}
@@ -998,18 +998,18 @@ CONDITION_HANDLER(mdb_condition_handler)
 					{	/* GT.M specific error trapping retries the line with the error */
 						fp->mpc = dollar_ecode.error_last_b_line;
 						fp->ctxt = context;
-						fp->flags &= SSF_NORET_VIA_MUMTSTART_OFF; /* Frame enterable now with mpc reset */
+						fp->flags &= SFF_NORET_VIA_MUMTSTART_OFF; /* Frame enterable now with mpc reset */
 						GTMTRIG_ONLY(
-							DBGTRIGR((stderr, "mdb_condition_handler: disabling SSF_NORET_VIA_MUMTSTART"
+							DBGTRIGR((stderr, "mdb_condition_handler: disabling SFF_NORET_VIA_MUMTSTART"
 								  " (5) in frame 0x"lvaddr"\n", frame_pointer)));
 						break;
 					} else
 					{
 						fp->ctxt = GTM_CONTEXT(pseudo_ret);
 						fp->mpc = CODE_ADDRESS(pseudo_ret);
-						fp->flags &= SSF_NORET_VIA_MUMTSTART_OFF; /* Frame enterable now with mpc reset */
+						fp->flags &= SFF_NORET_VIA_MUMTSTART_OFF; /* Frame enterable now with mpc reset */
 						GTMTRIG_ONLY(
-							DBGTRIGR((stderr, "mdb_condition_handler: disabling SSF_NORET_VIA_MUMTSTART"
+							DBGTRIGR((stderr, "mdb_condition_handler: disabling SFF_NORET_VIA_MUMTSTART"
 							  " (6) in frame 0x"lvaddr"\n", frame_pointer)));
 					}
 				}

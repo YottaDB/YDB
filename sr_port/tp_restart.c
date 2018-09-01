@@ -119,8 +119,6 @@ error_def(ERR_TPRETRY);
 error_def(ERR_TRESTLOC);
 error_def(ERR_TRESTNOT);
 
-void gtm_levl_ret_code(void);
-
 CONDITION_HANDLER(tp_restart_ch)
 {
 	START_CH(TRUE);
@@ -697,26 +695,26 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			memcpy(extnam_str.addr, (TREF(gv_tporig_extnam_str)).addr, len);
 		}
 		extnam_str.len = len;
-		/* Maintenance of SSF_NORET_VIA_MUMTSTART stack frame flag:
+		/* Maintenance of SFF_NORET_VIA_MUMTSTART stack frame flag:
 		 * - Set by gtm_trigger when trigger base frame is created. Purpose to prevent MUM_TSTART from restarting
 		 *   a frame making a call-in to a trigger (flag is checked in MUM_TSTART macro) because the mpc in the
 		 *   stack frame is not the return point to the frame, which is only available in the C stack.
 		 * - Both TP restart and error handling unwinds can use MUM_TSTART to restart frame.
 		 * - TP restart changes the mpc to the proper address (where TSTART was done) before invoking MUM_TSTART. We allow
-		 *   this by shutting the SSF_NORET_VIA_MUMTSTART flag off when mpc is changed.
+		 *   this by shutting the SFF_NORET_VIA_MUMTSTART flag off when mpc is changed.
 		 * - For TSTARTs done implcitly by triggers, MUM_TSTART would break things so we do not turn off the flag
 		 *   for that type.
 		 */
 		if (!tf->implicit_tstart)
-		{	/* SSF_NORET_VIA_MUMTSTART validation:
+		{	/* SFF_NORET_VIA_MUMTSTART validation:
 			 * - This is not a trigger-initiated implicit TSTART.
 			 * - If the flag is is not on, no further checks. Turning off flag is unconditional for best performance.
 			 * - If flag is on, verify the address in the stack frame is in fact being modified so it points to
 			 *   a TSTART instead of the (currently) trigger call point.
 			 */
-			assert(!(tf->fp->flags & SSF_NORET_VIA_MUMTSTART) || (tf->fp->mpc != tf->restart_pc));
-			tf->fp->flags &= SSF_NORET_VIA_MUMTSTART_OFF;
-			DBGTRIGR((stderr, "tp_restart: Removing SSF_NORET_VIA_MUMTSTART in frame 0x"lvaddr"\n", tf->fp));
+			assert(!(tf->fp->flags & SFF_NORET_VIA_MUMTSTART) || (tf->fp->mpc != tf->restart_pc));
+			tf->fp->flags &= SFF_NORET_VIA_MUMTSTART_OFF;
+			DBGTRIGR((stderr, "tp_restart: Removing SFF_NORET_VIA_MUMTSTART in frame 0x"lvaddr"\n", tf->fp));
 		}
 		tf->fp->mpc = tf->restart_pc;
 		tf->fp->ctxt = tf->restart_ctxt;

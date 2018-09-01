@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2011 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,7 @@
 #include "golevel.h"
 #include "io.h"
 #include "send_msg.h"
+#include "gtmci.h"	/* for "gtm_levl_ret_code" prototype */
 
 #define BASE_FRAME(fp) ((fp->type & SFT_DM) || (fp->type & SFT_CI))
 
@@ -129,8 +130,25 @@ void error_return(void)
 	gtm_err_dev = NULL;
 	if (!zintrframe)
 	{
-		if (parent_counted_frame->type & SFT_CI)	/* Unhandled error in call-in: return to ydb_ci() */
+		if (frame_pointer->type & SFT_CI)	/* Unhandled error in call-in: return to ydb_ci() */
+		{
 			mumps_status = dollar_ecode.error_last_ecode;
+			/* We are about to return an error status back to "ydb_ci". If the SFF_NORET_VIA_MUMTSTART bit
+			 * is set, unset it as the MUM_TSTART we do in the next line relies on this not being set (or
+			 * else it fails with GTMASSERT2 fatal error). In this case, it is safe to unset this bit since
+			 * we know frame_pointer->mpc for the call-in base frame (SFT_CI bit set) is set to "gtm_levl_ret_code"
+			 * (asserted below) so the MUM_TSTART will do a "longjmp" which will take us back to the "setjmp"
+			 * done in "dm_start" and continue execution which will invoke "frame_pointer->mpc" which is
+			 * "gtm_levl_ret_code" and so that will return back to "ydb_ci_exec" (which did the "dm_start" call).
+			 * That said, we do not expect this bit to be set as whoever sets this bit should have unset this
+			 * before we came here (e.g. "gvcst_put", "gtm_trigger") so assert we never see this bit in dbg.
+			 * We do handle the case this bit is set in pro.
+			 */
+			assert(0 == (frame_pointer->flags & SFF_NORET_VIA_MUMTSTART));
+			assert(frame_pointer->mpc == CODE_ADDRESS(gtm_levl_ret_code));
+			assert(frame_pointer->ctxt == GTM_CONTEXT(gtm_levl_ret_code));
+			frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;
+		}
 		MUM_TSTART;
 	}
 	return;							/* Continue in caller (likely getframe macro) */

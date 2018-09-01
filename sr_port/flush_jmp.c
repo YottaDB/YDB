@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -68,8 +71,8 @@ void flush_jmp (rhdtyp *rtn_base, unsigned char *context, unsigned char *transfe
 	assert(!(frame_pointer->flags & SFF_ETRAP_ERR) || (NULL == error_frame) || (error_frame == frame_pointer));
 	assert(!(SFT_TRIGR & frame_pointer->type));
 	frame_pointer->flags &= SFF_ETRAP_ERR_OFF;	  /* clear SFF_ETRAP_ERR bit */
-	frame_pointer->flags &= SSF_NORET_VIA_MUMTSTART_OFF; /* clear SSF_NORET_VIA_MUMTSTART since this frame is being rewritten */
-	GTMTRIG_ONLY(DBGTRIGR((stderr, "flush_jmp: Disabling SSF_NORET_VIA_MUMTSTART_OFF in frame 0x"lvaddr"\n", frame_pointer)));
+	frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF; /* clear SFF_NORET_VIA_MUMTSTART since this frame is being rewritten */
+	GTMTRIG_ONLY(DBGTRIGR((stderr, "flush_jmp: Disabling SFF_NORET_VIA_MUMTSTART_OFF in frame 0x"lvaddr"\n", frame_pointer)));
 	USHBIN_ONLY(old_rtnhdr = frame_pointer->rvector);
 	frame_pointer->rvector = rtn_base;
 	/* Now that fp->rvector has been overwritten to new routine, check if the older routine had a "rtn_relinked" flag set

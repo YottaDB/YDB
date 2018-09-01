@@ -56,7 +56,6 @@ static	char			*sp;
 STATICFNDCL void receive_child_locals_init(char **local_buff, mval **comm_stack_ptr);
 STATICFNDCL void receive_child_locals_finalize(char **local_buff);
 /* All other platforms use this much faster direct return */
-void gtm_levl_ret_code(void);
 
 error_def(ERR_CLOSEFAIL);
 error_def(ERR_JOBSETUP);

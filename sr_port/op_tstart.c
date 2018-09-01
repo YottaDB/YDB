@@ -249,7 +249,7 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 			 * kicking in at all.
 			 */
 			 /* recovery logic does not invoke triggers */
-			assert(!(SSF_NORET_VIA_MUMTSTART & frame_pointer->flags) || (FALSE == mupip_jnl_recover));
+			assert(!(SFF_NORET_VIA_MUMTSTART & frame_pointer->flags) || (FALSE == mupip_jnl_recover));
 		}
 		for (tr = tp_reg_list; NULL != tr; tr = tr_next)
 		{	/* start with empty list, place all existing entries on free list */

@@ -283,6 +283,7 @@ void	gvcst_put(mval *val)
 	int				save_dollar_tlevel, rc;
 	boolean_t			save_in_gvcst_incr; /* gvcst_put2 sets this FALSE, so save it in case we need to back out */
 	span_parms			parms;
+	unsigned char			fp_flags;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -322,7 +323,8 @@ void	gvcst_put(mval *val)
 		 * happens within a trigger invocation. We want to return from gvtr_match_n_invoke, so we can goto retry.
 		 */
 		op_tstart((IMPLICIT_TSTART | IMPLICIT_TRIGGER_TSTART), TRUE, &literal_batch, 0);
-		frame_pointer->flags |= SSF_NORET_VIA_MUMTSTART;
+		fp_flags = frame_pointer->flags;
+		frame_pointer->flags = fp_flags | SFF_NORET_VIA_MUMTSTART;
 		assert(!donot_INVOKE_MUMTSTART);
 		DEBUG_ONLY(donot_INVOKE_MUMTSTART = TRUE);
 		ESTABLISH_NORET(gvcst_put_ch, est_first_pass);
@@ -417,6 +419,8 @@ void	gvcst_put(mval *val)
 	if (sn_tpwrapped)
 	{
 		op_tcommit();
+		assert(frame_pointer->flags == (fp_flags | SFF_NORET_VIA_MUMTSTART));
+		frame_pointer->flags = fp_flags;	/* Undo set of SFF_NORET_VIA_MUMTSTART bit after "op_tstart" */
 		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);
 		REVERT; /* remove our condition handler */
 	}

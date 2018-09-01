@@ -184,7 +184,7 @@ void ch_trace_point() {return;}
 				assert((ctxt->ch == &mdb_condition_handler)						\
 				       && (FALSE == ctxt->save_active_ch->ch_active));					\
 				/* Absolutely critical that this *never* occur hence assertpro() */			\
-				assertpro(!(SSF_NORET_VIA_MUMTSTART & frame_pointer->flags) || (0 != proc_act_type)	\
+				assertpro(!(SFF_NORET_VIA_MUMTSTART & frame_pointer->flags) || (0 != proc_act_type)	\
 					  || (SFF_ETRAP_ERR & frame_pointer->flags));					\
 				DBGEHND((stderr, "MUM_TSTART: Frame 0x"lvaddr" dispatched\n", frame_pointer));		\
 				ctxt->ch_active = FALSE; 								\
