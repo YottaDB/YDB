@@ -670,7 +670,7 @@ LITDEF	err_msg merrors[] = {
 	{ "TRACEON", "Missing global name (with optional subscripts) for recording M-tracing information", 0 },
 	{ "TOOMANYCLIENTS", "GT.CM is serving the maximum number of clients.  Try again later.", 0 },
 	{ "NOEXCLUDE", "None of the excluded variables exist", 0 },
-	{ "GVINCRISOLATION", "$INCREMENT cannot be performed on global ^!AD as it has NOISOLATION turned ON", 2 },
+	{ "UNUSEDMSG837", "GVINCRISOLATION nixed in r1.24", 0 },
 	{ "EXCLUDEREORG", "Global: !AD is present in the EXCLUDE option.  REORG will skip the global.", 2 },
 	{ "REORGINC", "Reorg was incomplete.  Not all globals were reorged.", 0 },
 	{ "ASC2EBCDICCONV", "ASCII/EBCDIC conversion failed when calling !AD", 2 },

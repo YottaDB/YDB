@@ -668,7 +668,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* TRACEON */
 	   0,	/* TOOMANYCLIENTS */
 	   0,	/* NOEXCLUDE */
-	   0,	/* GVINCRISOLATION */
+	   0,	/* UNUSEDMSG837 */
 	   0,	/* EXCLUDEREORG */
 	   0,	/* REORGINC */
 	   0,	/* ASC2EBCDICCONV */

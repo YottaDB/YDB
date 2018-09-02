@@ -148,7 +148,6 @@ GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t 		span_nodes_disallowed;
 
 error_def(ERR_DBROLLEDBACK);
-error_def(ERR_GVINCRISOLATION);
 error_def(ERR_GVIS);
 error_def(ERR_GVPUTFAIL);
 error_def(ERR_MAXBTLEVEL);
@@ -304,6 +303,9 @@ void	gvcst_put(mval *val)
 			assert(save_dollar_tlevel == dollar_tlevel);
 			return; /* We've successfully set a normal non-spanning global. */
 		}
+		/* else : An existing spanning node has to be killed before setting it to a non-spanning value.
+		 *        Need a TP transaction for the kill operation so fall through.
+		 */
 	}
 	RTS_ERROR_IF_SN_DISALLOWED;
 	/* Either we need to create a spanning node, or kill one before resetting it */
@@ -1455,17 +1457,8 @@ tn_restart:
 				if (cse && gv_target->noisolation && !cse->write_type && !need_extra_block_split)
 				{
 					assert(dollar_tlevel);
-					if (is_dollar_incr)
-					{	/* See comment in ENSURE_VALUE_WITHIN_MAX_REC_SIZE macro
-						 * definition for why the below macro call is necessary.
-						 */
-						ADD_TO_GVT_TP_LIST(gv_target, RESET_FIRST_TP_SRCH_STATUS_FALSE);
-						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_GVINCRISOLATION, 2,
-							gv_target->gvname.var_name.len, gv_target->gvname.var_name.addr);
-					}
-					if (NULL == cse->recompute_list_tail ||
-						0 != memcmp(gv_currkey->base, cse->recompute_list_tail->key.base,
-							gv_currkey->top))
+					if ((NULL == cse->recompute_list_tail)
+						|| (0 != memcmp(gv_currkey->base, cse->recompute_list_tail->key.base, gv_currkey->top)))
 					{
 						tempkv = (key_cum_value *)get_new_element(si->recompute_list, 1);
 						tempkv->key = *gv_currkey;

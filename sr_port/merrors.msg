@@ -834,7 +834,7 @@ REPLGBL2LONG	<Global names longer than 8 characters cannot be handled at the sec
 TRACEON		<Missing global name (with optional subscripts) for recording M-tracing information>/error/fao=0!/ansi=0
 TOOMANYCLIENTS	<GT.CM is serving the maximum number of clients.  Try again later.>/error/fao=0!/ansi=0
 NOEXCLUDE	<None of the excluded variables exist>/info/fao=0!/ansi=0
-GVINCRISOLATION	<$INCREMENT cannot be performed on global ^!AD as it has NOISOLATION turned ON>/error/fao=2!/ansi=0
+UNUSEDMSG837	<GVINCRISOLATION nixed in r1.24>/error/fao=0!/ansi=0
 EXCLUDEREORG	<Global: !AD is present in the EXCLUDE option.  REORG will skip the global.>/warning/fao=2!/ansi=0
 REORGINC	<Reorg was incomplete.  Not all globals were reorged.>/warning/fao=0!/ansi=0
 ASC2EBCDICCONV	<ASCII/EBCDIC conversion failed when calling !AD>/error/fao=2!/ansi=0
