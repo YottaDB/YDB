@@ -419,7 +419,12 @@ void	gvcst_put(mval *val)
 	if (sn_tpwrapped)
 	{
 		op_tcommit();
-		assert(frame_pointer->flags == (fp_flags | SFF_NORET_VIA_MUMTSTART));
+		/* We added the SFF_NORET_VIA_MUMTSTART bit after "op_tstart" a few lines above. Now that "op_tcommit"
+		 * is done, undo the SFF_NORET_VIA_MUMTSTART bit. Note though that it is possible this undo is already
+		 * done as part of "gtm_trigger_fini" if a trigger was invoked as part of this spanning node set in
+		 * "gvcst_put2". Hence the || in the assert below.
+		 */
+		assert((frame_pointer->flags == (fp_flags | SFF_NORET_VIA_MUMTSTART)) || (frame_pointer->flags == fp_flags));
 		frame_pointer->flags = fp_flags;	/* Undo set of SFF_NORET_VIA_MUMTSTART bit after "op_tstart" */
 		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE);
 		REVERT; /* remove our condition handler */
