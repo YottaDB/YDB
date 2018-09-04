@@ -288,31 +288,31 @@ MBSTART	{												\
 /* Macro to set a supplied ydb_buffer_t value from a supplied mval.
  * PARAM1 and PARAM2 are parameters supplied to the PARAMINVALID error if it needs to be issued.
  */
-#define SET_YDB_BUFF_T_FROM_MVAL(YDBBUFF, MVALP, PARAM1, PARAM2)				\
-MBSTART	{											\
-	mval		*sRC;	/* named so to avoid name collision with caller */		\
-	ydb_buffer_t	*dST;	/* named so to avoid name collision with caller */		\
-												\
-	sRC = MVALP;										\
-	/* It is possible source mval is not of type MV_STR. But ydb_buff_t needs one		\
-	 * so convert incoming mval to a string and then copy it, if needed.			\
-	 */											\
-	MV_FORCE_STR(sRC);									\
-	assert(MV_IS_STRING(sRC));								\
-	dST = YDBBUFF;										\
-	if (sRC->str.len > dST->len_alloc)							\
-	{											\
-		dST->len_used = sRC->str.len;	/* Set len to what it needed to be */		\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSTRLEN);			\
-	}											\
-	if (sRC->str.len)									\
-	{											\
-		if (NULL == dST->buf_addr)							\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,	\
-						LEN_AND_LIT(PARAM1), LEN_AND_LIT(PARAM2));	\
-		memcpy(dST->buf_addr, sRC->str.addr, sRC->str.len);				\
-	}											\
-	dST->len_used = sRC->str.len;								\
+#define SET_YDB_BUFF_T_FROM_MVAL(YDBBUFF, MVALP, PARAM1, PARAM2)						\
+MBSTART	{													\
+	mval		*sRC;	/* named so to avoid name collision with caller */				\
+	ydb_buffer_t	*dST;	/* named so to avoid name collision with caller */				\
+														\
+	sRC = MVALP;												\
+	/* It is possible source mval is not of type MV_STR. But ydb_buff_t needs one				\
+	 * so convert incoming mval to a string and then copy it, if needed.					\
+	 */													\
+	MV_FORCE_STR(sRC);											\
+	assert(MV_IS_STRING(sRC));										\
+	dST = YDBBUFF;												\
+	if (sRC->str.len > dST->len_alloc)									\
+	{													\
+		dST->len_used = sRC->str.len;	/* Set len to what it needed to be */				\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, sRC->str.len, dST->len_alloc);	\
+	}													\
+	if (sRC->str.len)											\
+	{													\
+		if (NULL == dST->buf_addr)									\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6)						\
+				ERR_PARAMINVALID, 4, LEN_AND_LIT(PARAM1), LEN_AND_LIT(PARAM2));			\
+		memcpy(dST->buf_addr, sRC->str.addr, sRC->str.len);						\
+	}													\
+	dST->len_used = sRC->str.len;										\
 } MBEND
 
 /* Debug macro to dump the PLIST structure that is being passed into a runtime opcode. To use, be sure to
@@ -389,7 +389,7 @@ MBSTART	{													\
 #define CHECK_MAX_STR_LEN(YDBBUFF)										\
 MBSTART {													\
 	if (YDB_MAX_STR < (YDBBUFF)->len_used)									\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, (YDBBUFF)->len_used, YDB_MAX_STR);	\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, (YDBBUFF)->len_used, YDB_MAX_STR);	\
 } MBEND
 
 /* Macro to record the address of a given mstr so garbage collection knows where to find it to fix it up if needbe */
