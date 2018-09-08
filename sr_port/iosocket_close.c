@@ -78,6 +78,7 @@ void iosocket_close(io_desc *iod, mval *pp)
 	SETUP_THREADGBL_ACCESS;
 	assert(iod->type == gtmsocket);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
+	assert(dsocketptr->iod == iod);
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 
 	while (iop_eol != (ch = *(pp->str.addr + p_offset++)))
