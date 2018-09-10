@@ -165,10 +165,10 @@ l5:
 
 ENTRY op_zstzb_st_over
 	CHKSTKALIGN				/* Verify stack alignment */
-	ldr	x10, [x19]
-	str	x30, [x10, #msf_mpc_off]
+	ldr	x0, [x19]
+	str	x30, [x0, #msf_mpc_off]
 	bl	op_zbreak
-	ldr	x0, =zstep_level
+	ldr	x1, =zstep_level
 	ldr	x1, [x1]
 	ldr	x10, [x19]
 	cmp	x1, x10
@@ -182,8 +182,8 @@ l7:
 	ret
 l8:
 	bl	op_zst_over
-	ldr	x0, [x19]
-	ldr	x30, [x0, #msf_mpc_off]
+	ldr	x10, [x19]
+	ldr	x30, [x10, #msf_mpc_off]
 	ret
 
 ENTRY op_zst_fet_over
