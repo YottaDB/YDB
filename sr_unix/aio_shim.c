@@ -529,6 +529,7 @@ int aio_shim_write(gd_region *reg, struct aiocb *aiocbp)
 	int		ret;
 	struct iocb 	*iocbp;
 	struct iocb 	*cb[1];
+	int		save_errno;
 
 	udi = FILE_INFO(reg);
 	assert(gtm_is_main_thread() || (gtm_jvm_process && process_exiting));
@@ -560,7 +561,8 @@ int aio_shim_write(gd_region *reg, struct aiocb *aiocbp)
 	ATOMIC_ADD_FETCH(&gdi->num_ios, 1);
 	ret = io_submit(gdi->ctx, 1, cb);
 	/* the only acceptable error is EAGAIN in our case */
-	assert((1 == ret) || (EAGAIN == errno));
+	DEBUG_ONLY(save_errno = errno);
+	assert((1 == ret) || (EAGAIN == save_errno));
 	if (1 == ret)
 		return 0;
 	/* we need to rescind the write */
