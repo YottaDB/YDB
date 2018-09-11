@@ -27,7 +27,6 @@
 #include "gtm_ctype.h"
 #include "gtm_string.h"
 #include "error.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "subscript.h"
 #include "svnames.h"

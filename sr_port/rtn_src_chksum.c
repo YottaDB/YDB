@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +21,6 @@
 #include "gtm_string.h"
 #include "io.h"
 #include "gtmio.h"
-#include <rtnhdr.h>
 #include "rtn_src_chksum.h"
 
 error_def(ERR_FILENOTFND);

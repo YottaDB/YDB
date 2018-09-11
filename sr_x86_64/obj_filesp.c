@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,6 @@
 #include "gtm_string.h"
 
 #include "compiler.h"
-#include <rtnhdr.h>
 #include "obj_gen.h"
 #include "cgp.h"
 #include "mdq.h"
@@ -53,7 +52,7 @@
 #include "gtmio.h"
 #include "mmemory.h"
 #include "obj_file.h"
-#include <obj_filesp.h>
+#include <obj_filesp.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 #include "release_name.h"
 #include "min_max.h"
 

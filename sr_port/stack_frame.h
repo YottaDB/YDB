@@ -30,6 +30,7 @@
  * Warning: the lists above may not be complete.
 */
 
+#include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 #include "hashtab_mname.h"
 
 typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */

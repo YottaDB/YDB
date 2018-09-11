@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -29,7 +32,6 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
-#include <rtnhdr.h>
 #include "mv_stent.h"		/* for COPY_SUBS_TO_GVCURRKEY macro */
 #include "op.h"
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype */

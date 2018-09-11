@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -24,7 +27,6 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "mupip_trigger.h"
 #include "mu_trig_trgfile.h"

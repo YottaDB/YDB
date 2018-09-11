@@ -20,7 +20,6 @@
 #endif
 #include "error.h"
 #include "indir_enum.h"
-#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "stringpool.h"

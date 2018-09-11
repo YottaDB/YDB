@@ -27,7 +27,6 @@
 
 #include "rtnobj.h"
 #include "gtmio.h"
-#include <rtnhdr.h>
 #include "iosp.h"
 #include "do_shmat.h"
 #include "min_max.h"

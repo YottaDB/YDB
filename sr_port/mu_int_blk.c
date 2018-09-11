@@ -36,7 +36,6 @@
 #include "get_spec.h"
 #include "mupip_integ.h"
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #endif
 

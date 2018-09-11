@@ -69,7 +69,6 @@
 #endif
 
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "tp_set_sgm.h"
 #endif

@@ -16,7 +16,6 @@
 #include "mdef.h"
 #include "gtm_string.h"
 #include "op.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "gtmci.h"
 #include "svnames.h"

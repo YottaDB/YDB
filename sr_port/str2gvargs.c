@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +28,6 @@
 #include "gtm_utf8.h"
 #endif
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>
 #include "gv_trigger.h"
 #endif
 

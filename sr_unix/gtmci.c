@@ -31,7 +31,6 @@
 
 #include "cli.h"
 #include "stringpool.h"
-#include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mvalconv.h"
 #include "libyottadb_int.h"

@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -13,7 +16,6 @@
 #include "mdef.h"
 
 #include "error.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 
 GBLREF stack_frame	*frame_pointer;

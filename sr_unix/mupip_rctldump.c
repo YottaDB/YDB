@@ -21,7 +21,6 @@
 
 #include "relinkctl.h"
 #include "util.h"
-#include <rtnhdr.h>		/* needed for zroutines.h */
 #include "zroutines.h"
 #include "cli.h"
 #include "cliif.h"

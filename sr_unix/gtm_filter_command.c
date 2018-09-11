@@ -19,7 +19,6 @@
 #include "send_msg.h"
 #include "gtm_threadgbl.h"
 #include "gtm_threadgbl_init.h"
-#include <rtnhdr.h>
 #include "gtmci.h"
 #include "stack_frame.h"
 #include "mprof.h"

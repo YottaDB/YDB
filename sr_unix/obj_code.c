@@ -25,7 +25,6 @@
 
 #include "compiler.h"
 #include "obj_gen.h"
-#include <rtnhdr.h>
 #include "cmd_qlf.h"
 #include "cgp.h"
 #include "gtmio.h"

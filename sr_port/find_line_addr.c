@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -14,10 +17,10 @@
 
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
 #include "cmd_qlf.h"
 #include "gtm_caseconv.h"
 #include "min_max.h"
+#include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 
 GBLREF command_qualifier	cmd_qlf;
 

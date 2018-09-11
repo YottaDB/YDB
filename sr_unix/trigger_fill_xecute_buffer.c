@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -18,7 +21,6 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"
 #include "gvcst_protos.h"
-#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "trigger.h"
 #include "mv_stent.h"			/* for COPY_SUBS_TO_GVCURRKEY macro */

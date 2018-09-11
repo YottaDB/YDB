@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,6 @@
 #include "hashtab.h"
 #include "hashtab_objcode.h"
 #include "hashtab_mname.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mprof.h"
 #include "gtm_unlink_all.h"

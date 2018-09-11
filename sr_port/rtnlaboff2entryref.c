@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2002, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +14,7 @@
 
 #include "mdef.h"
 #include "gtm_string.h"
-#include <rtnhdr.h>
+#include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 
 /* Format the given routine, label and offset into user presentable label+offset^routine string,
  * return end of formatted output + 1. Does not check for buffer overflow, it's caller's

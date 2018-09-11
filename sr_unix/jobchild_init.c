@@ -21,7 +21,6 @@
 
 #include <errno.h>
 
-#include <rtnhdr.h>
 #include "startup.h"
 #include "gtm_startup.h"
 #include "stack_frame.h"

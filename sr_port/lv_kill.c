@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2009, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +25,6 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "alias.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 
 GBLREF uint4		dollar_tlevel;

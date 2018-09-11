@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +15,6 @@
 #include "mdef.h"
 #include "compiler.h"
 #include "objlabel.h"
-#include <rtnhdr.h>
 #include "cache.h"
 #include "cgp.h"
 #include "stringpool.h"

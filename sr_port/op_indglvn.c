@@ -22,8 +22,8 @@
 #include "toktyp.h"
 #include "cache.h"
 #include "op.h"
-#include <rtnhdr.h>
 #include "valid_mname.h"
+#include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 
 GBLREF	bool			undef_inhibit;
 GBLREF	symval			*curr_symval;

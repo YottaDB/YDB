@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -28,7 +31,6 @@
 #include "copy.h"
 #include "longset.h"		/* also needed for cws_insert.h */
 #include "cws_insert.h"		/* for cw_stagnate_reinitialized */
-#include <rtnhdr.h>
 #include "gtm_trigger_trc.h"
 #include "gv_trigger.h"		/* for TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
 

@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,7 +24,6 @@
 #include "gdsblk.h"
 #include "filestruct.h"
 #include "trigger.h"
-#include <rtnhdr.h>			/* needed for gv_trigger.h */
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "gv_trigger_protos.h"

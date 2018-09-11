@@ -24,7 +24,6 @@
 #include "gtm_stdio.h"
 #include "gtm_stat.h"
 
-#include <rtnhdr.h>
 #include "compiler.h"
 #include "urx.h"
 #include "objlabel.h"

@@ -73,7 +73,6 @@
 #include "db_snapshot.h"
 
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #endif

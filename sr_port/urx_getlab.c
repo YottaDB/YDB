@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,7 +14,6 @@
 
 #include "mdef.h"
 #include "gtm_string.h"
-#include <rtnhdr.h> /* for urx.h */
 #include "urx.h"
 
 bool urx_getlab (char *lab, int lablen, urx_rtnref *rtn, urx_labref **lp0p, urx_labref **lp1p)

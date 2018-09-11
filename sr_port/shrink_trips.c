@@ -23,7 +23,6 @@
 #include "gtmdbglvl.h"
 #include "cdbg_dump.h"
 #include <emit_code.h>
-#include <rtnhdr.h>
 #include "obj_file.h"
 
 #if defined(USHBIN_SUPPORTED) || defined(VMS)

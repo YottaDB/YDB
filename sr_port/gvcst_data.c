@@ -33,7 +33,6 @@
 #ifdef UNIX			/* needed for frame_pointer in GVCST_ROOT_SEARCH_AND_PREP macro */
 # include "repl_msg.h"
 # include "gtmsource.h"
-# include "rtnhdr.h"
 # include "stack_frame.h"
 # include "wbox_test_init.h"
 #endif

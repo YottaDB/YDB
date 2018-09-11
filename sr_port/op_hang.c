@@ -29,7 +29,6 @@
 #include "find_mvstent.h"
 #if defined(DEBUG)
 # include "hashtab_mname.h"
-# include "rtnhdr.h"
 # include "stack_frame.h"
 # include "io.h"
 # include "wcs_sleep.h"

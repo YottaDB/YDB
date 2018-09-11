@@ -37,7 +37,6 @@
 #include "have_crit.h"
 #include "min_max.h"
 #include "tp_frame.h"
-#include <rtnhdr.h>
 #include "gtm_trigger_trc.h"
 #include "gv_trigger.h"		/* for TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */
 #include "util.h"		/* for TP_ZTRIGBUFF_PRINT macro */

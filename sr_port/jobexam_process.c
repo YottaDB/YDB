@@ -27,7 +27,6 @@
 #include "io_params.h"
 #include "op.h"
 #include "io.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "jobexam_process.h"
 #ifdef UNIX

@@ -62,7 +62,6 @@
 #include "targ_alloc.h"
 #include "gvcst_protos.h"
 #ifdef GTM_TRIGGER
-# include "rtnhdr.h"		/* For rtn_tabent in gv_trigger.h */
 # include "gv_trigger.h"
 # include "gtm_trigger.h"
 #endif

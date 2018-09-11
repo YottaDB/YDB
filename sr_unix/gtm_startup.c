@@ -21,7 +21,6 @@
 #include "gtm_signal.h"
 
 #include "error.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "stringpool.h"
 #include "stp_parms.h"

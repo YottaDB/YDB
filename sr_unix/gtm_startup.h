@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,6 +14,8 @@
 
 #ifndef GTM_STARTUP_INCLUDED
 #define GTM_STARTUP_INCLUDED
+
+#include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 
 void 	gtm_startup(struct startup_vector *svec);
 void	init_gtm(void);

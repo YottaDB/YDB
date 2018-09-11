@@ -2,7 +2,7 @@
  *								*
  * Copyright 2007, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -17,7 +17,6 @@
 #ifndef INCR_LINK_SP_INCLUDED
 #define INCR_LINK_SP_INCLUDED
 
-#include <rtnhdr.h>
 #include <obj_file.h>
 #include <elf.h>
 

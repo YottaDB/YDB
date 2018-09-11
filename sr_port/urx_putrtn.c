@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +15,6 @@
 #include "mdef.h"
 #include <stddef.h>
 #include "gtm_string.h"
-#include <rtnhdr.h> /* needed by urx.h */
 #include "urx.h"
 
 urx_rtnref *urx_putrtn (char *rtn, int rtnlen, urx_rtnref *anchor)

@@ -58,7 +58,6 @@
 #include "gtmio.h"
 #include "repl_inst_dump.h"		/* for "repl_dump_histinfo" prototype */
 #ifdef GTM_TRIGGER
-#include <rtnhdr.h>			/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "targ_alloc.h"

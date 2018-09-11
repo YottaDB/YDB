@@ -19,7 +19,6 @@
 #include "gtm_stdio.h"
 
 #include "gtmio.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "op.h"
 #include "hashtab_mname.h"

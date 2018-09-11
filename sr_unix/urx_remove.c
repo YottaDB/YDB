@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +15,6 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
-#include <rtnhdr.h>
 #include "urx.h"
 
 /* Routine to run the unresolved chain in search of entries that point into the linkage section that

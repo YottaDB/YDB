@@ -24,7 +24,6 @@
 #include <stdarg.h>
 
 #include "gt_timer.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mv_stent.h"
 #ifdef __MVS__

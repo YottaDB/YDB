@@ -18,7 +18,6 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
-#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "release_name.h"
 #include "gdsroot.h"		/* needed for tp.h & gv_trigger.h */

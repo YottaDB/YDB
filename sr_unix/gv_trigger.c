@@ -22,7 +22,6 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsfhead.h"
-#include <rtnhdr.h>		/* for rtn_tabent in gv_trigger.h */
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #include "error.h"

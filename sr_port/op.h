@@ -16,7 +16,6 @@
 #ifndef OP_INCLUDED
 #define OP_INCLUDED
 
-#include <rtnhdr.h>	/* Avoid changing a few hundred op_* and other modules to put this first */
 #include "op_tstart.h"	/* for "op_tstart" prototype */
 
 #ifdef VMS

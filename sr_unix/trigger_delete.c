@@ -20,7 +20,6 @@
 #include "gdsbt.h"			/* for gdsfhead.h */
 #include "gdsfhead.h"			/* For gvcst_protos.h */
 #include "gvcst_protos.h"
-#include <rtnhdr.h>			/* for gv_trigger.h */
 #include "gv_trigger.h"
 #include "gdscc.h"			/* needed for tp.h */
 #include "gdskill.h"			/* needed for tp.h */

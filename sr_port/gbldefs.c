@@ -46,7 +46,6 @@
 /* The define of CHEXPAND below causes error.h to create GBLDEFs */
 #define CHEXPAND
 #include "error.h"
-#include <rtnhdr.h>
 #include "gdsroot.h"
 #include "gdskill.h"
 #include "ccp.h"

@@ -3,6 +3,9 @@
  * Copyright (c) 2014-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -23,7 +26,6 @@
 #include "gtmio.h"
 #include "io.h"
 #include "iosp.h"
-#include <rtnhdr.h>
 #include "relinkctl.h"
 #include "parse_file.h"
 #include "eintr_wrappers.h"

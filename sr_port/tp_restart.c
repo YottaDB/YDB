@@ -30,7 +30,6 @@
 #include "error.h"
 #include "iosp.h"		/* for declaration of SS_NORMAL */
 #include "jnl.h"
-#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "stack_frame.h"
 #include "hashtab_int4.h"	/* needed for tp.h */

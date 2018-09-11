@@ -35,7 +35,6 @@
 #include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
 #include "repl_msg.h"
 #include "gtmsource.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "wbox_test_init.h"
 

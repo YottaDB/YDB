@@ -1912,4 +1912,16 @@ enum
 # define ASSERT_IS_LIBGTCM
 #endif
 
+/* HDR_FILE_INCLUDE_SYNTAX :
+ * There are a few header files that exist in multiple sr_* directories.
+ * For example,
+ *	./sr_unix/rtnhdr.h
+ *	./sr_unix_nsb/rtnhdr.h
+ * Whenever we have such a header file, it needs to be included using <> syntax and not "" syntax.
+ * This is because, even though this is not a system-header file, but is a user-defined header file,
+ * if the C file doing including rtnhdr.h is found in sr_unix, sr_unix/rtnhdr.h would be picked by the
+ * compiler (because it is in the same directory as the including C file) if the "" syntax is used
+ * even though the correct file to pick up is sr_unix_nsb/rtnhdr.h. Using the <> syntax avoids this issue.
+ * This block of comment is here as a marker so all such non-intuitive include usages reference this.
+ */
 #endif /* MDEF_included */

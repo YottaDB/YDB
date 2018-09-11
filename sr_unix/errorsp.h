@@ -21,7 +21,6 @@
 
 #include "have_crit.h"
 #include "gtmimagename.h"
-#include "rtnhdr.h"
 #include "stack_frame.h"
 
 #ifdef __MVS__

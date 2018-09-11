@@ -23,7 +23,6 @@
 
 #include "stringpool.h"
 #ifdef AUTORELINK_SUPPORTED
-# include "rtnhdr.h"
 #endif
 #include "zroutines.h"
 #include "cmd_qlf.h"

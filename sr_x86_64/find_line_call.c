@@ -3,6 +3,9 @@
  * Copyright (c) 2007-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -14,7 +17,6 @@
 #include <emit_code_sp.h>
 #include "xfer_enum.h"
 #include "i386.h"
-#include <rtnhdr.h>	/* Needed by zbreak.h */
 #include "zbreak.h"
 
 GBLREF emit_base_info_struct	emit_base_info;

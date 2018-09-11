@@ -23,7 +23,7 @@
 #include "gtm_stdio.h"
 #include "opcode.h"
 #include "mdq.h"
-#include <rtnhdr.h>
+#include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 #include "vxi.h"
 #include "vxt.h"
 #include "cgp.h"

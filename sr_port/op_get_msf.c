@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +24,6 @@
    every new release of GT.M.  */
 
 #include "mdef.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 
 GBLREF	stack_frame	*frame_pointer;

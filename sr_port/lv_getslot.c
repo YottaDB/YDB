@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,6 @@
 #include "gdsfhead.h"
 #include "caller_id.h"
 #include "alias.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 
 GBLREF stack_frame	*frame_pointer;

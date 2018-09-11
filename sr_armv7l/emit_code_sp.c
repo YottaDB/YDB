@@ -20,7 +20,7 @@
 
 #include "cgp.h"
 #include "compiler.h"
-#include <rtnhdr.h>
+#include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 #include "vxt.h"
 #include "list_file.h"
 #include <emit_code.h>

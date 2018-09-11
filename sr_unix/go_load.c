@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -37,7 +40,6 @@
 #include "str2gvkey.h"
 #include "gtmmsg.h"
 #include "gtm_utf8.h"
-#include <rtnhdr.h>
 #include "gv_trigger.h"
 #include "mu_interactive.h"
 #include "wbox_test_init.h"

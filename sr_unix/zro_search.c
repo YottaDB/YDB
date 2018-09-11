@@ -26,7 +26,6 @@
 #include "fgncal.h"
 #include "min_max.h"
 #ifdef AUTORELINK_SUPPORTED
-# include "rtnhdr.h"		/* Defines zro_hist * type for return */
 # include "parse_file.h"	/* Needed for zro_search_hist() */
 #endif
 #ifdef DEBUG

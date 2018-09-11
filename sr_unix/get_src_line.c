@@ -23,7 +23,6 @@
 #include "gtm_stat.h"
 #include "gtm_stdio.h"
 
-#include <rtnhdr.h>
 #include <auto_zlink.h>
 #include "zroutines.h"
 #include "compiler.h"

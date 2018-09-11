@@ -36,7 +36,6 @@
 #include "wake_alarm.h"
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "send_msg.h"

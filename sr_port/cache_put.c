@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +19,6 @@
 #include "hashtab_objcode.h"
 #include "cachectl.h"
 #include "cacheflush.h"
-#include <rtnhdr.h>
 #include "gtm_text_alloc.h"
 #include "io.h"
 

@@ -18,7 +18,6 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 
-#include <rtnhdr.h>
 #include "mv_stent.h"
 #include "objlabel.h"
 #include "cache.h"

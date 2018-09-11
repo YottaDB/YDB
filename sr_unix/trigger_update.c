@@ -21,7 +21,6 @@
 #include "gdsfhead.h"			/* For gvcst_protos.h */
 #include "dpgbldir.h"
 #include "gvcst_protos.h"
-#include <rtnhdr.h>
 #include "io.h"
 #include "iormdef.h"
 #include "hashtab_str.h"

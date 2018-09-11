@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,7 +34,7 @@ typedef	struct urx_labref_type
 /* urx_addr_type and associated prototypes can vary by chip or platform */
 
 #include "urxsp.h"
-#include <rtnhdr.h> /* Can be removed when all azl* routines are fixed */
+#include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 
 urx_rtnref *urx_putrtn(char *rtn, int rtnlen, urx_rtnref *anchor);
 void urx_free(urx_rtnref *anchor);

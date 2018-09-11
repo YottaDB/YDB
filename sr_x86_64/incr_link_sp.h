@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2007, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2007, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +15,6 @@
 #ifndef INCR_LINK_SP_INCLUDED
 #define INCR_LINK_SP_INCLUDED
 
-#include <rtnhdr.h>
 #include <elf.h>
 
 #define NATIVE_HDR_LEN	(SIZEOF(Elf64_Ehdr))

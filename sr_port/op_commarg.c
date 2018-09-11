@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +17,6 @@
 #include "compiler.h"
 #include "cmd.h"
 #include "toktyp.h"
-#include <rtnhdr.h>
 #include "stack_frame.h"
 #include "opcode.h"
 #include "indir_enum.h"
