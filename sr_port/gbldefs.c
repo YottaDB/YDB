@@ -138,6 +138,7 @@
 #define DEFAULT_ZERROR_LEN	(SIZEOF(DEFAULT_ZERROR_STR) - 1)
 #include "gtm_libaio.h"
 #include "gtcm.h"
+#include "xfer_enum.h"
 
 GBLDEF	gd_region		*db_init_region;
 GBLDEF	sgmnt_data_ptr_t	cs_data;
@@ -1236,3 +1237,14 @@ GBLDEF	int4		tstart_gtmci_nested_level;	/* TREF(gtmci_nested_level) at the time 
 GBLDEF	uint4		deferred_signal_handling_needed;	/* if non-zero, it means the DEFERRED_SIGNAL_HANDLING_CHECK
 								 * macro needs to do some work.
 								 */
+/* Below global variables record the transfer table state just before "jobinterrupt_set" changed it (in case of MUPIP INTRPT).
+ * This is restored later in "xfer_reset_handlers" that way a job interrupt restores the transfer table to what it was
+ * before the job interrupt. This lets for example a program which was being single-stepped using ZSTEP/$ZSTEP work
+ * even if job interrupts happen in between.
+ */
+GBLDEF	xfer_entry_t	jobintr_save_xf_linefetch;
+GBLDEF	xfer_entry_t	jobintr_save_xf_linestart;
+GBLDEF	xfer_entry_t	jobintr_save_xf_zbfetch;
+GBLDEF	xfer_entry_t	jobintr_save_xf_zbstart;
+GBLDEF	xfer_entry_t	jobintr_save_xf_forchk1;
+GBLDEF	xfer_entry_t	jobintr_save_xf_forloop;

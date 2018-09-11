@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,6 +43,12 @@
 GBLREF	xfer_entry_t		xfer_table[];
 GBLREF	volatile int4 		outofband;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	xfer_entry_t		jobintr_save_xf_linefetch;
+GBLREF	xfer_entry_t		jobintr_save_xf_linestart;
+GBLREF	xfer_entry_t		jobintr_save_xf_zbfetch;
+GBLREF	xfer_entry_t		jobintr_save_xf_zbstart;
+GBLREF	xfer_entry_t		jobintr_save_xf_forchk1;
+GBLREF	xfer_entry_t		jobintr_save_xf_forloop;
 
 /* Routine called when an interrupt event occurs (signaled by mupip intrpt or other future method
  * of signaling interrupts). This code is driven as a signal handler on Unix and from the START_CH
@@ -68,12 +77,19 @@ void jobinterrupt_set(int4 dummy_val)
 	if (jobinterrupt != outofband)
 	{	/* We need jobinterrupt out of band processing at our earliest convenience */
 		outofband = jobinterrupt;
+		/* Save current transfer table contents in case of MUPIP INTRPT. Restore this when transfer table is later reset. */
+		jobintr_save_xf_linefetch = xfer_table[xf_linefetch];
+		jobintr_save_xf_linestart = xfer_table[xf_linestart];
+		jobintr_save_xf_zbfetch   = xfer_table[xf_zbfetch];
+		jobintr_save_xf_zbstart   = xfer_table[xf_zbstart];
+		jobintr_save_xf_forchk1   = xfer_table[xf_forchk1];
+		jobintr_save_xf_forloop   = xfer_table[xf_forloop];
                 FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
                 FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_zbfetch, op_fetchintrrpt);
-                FIX_XFER_ENTRY(xf_zbstart, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
-                FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
+                FIX_XFER_ENTRY(xf_zbfetch,   op_fetchintrrpt);
+                FIX_XFER_ENTRY(xf_zbstart,   op_startintrrpt);
+                FIX_XFER_ENTRY(xf_forchk1,   op_startintrrpt);
+                FIX_XFER_ENTRY(xf_forloop,   op_forintrrpt);
 	}
 	VMS_ONLY(sys$wake(0,0));
 }
