@@ -1,9 +1,6 @@
 /****************************************************************
  *								*
- * Copyright 2001, 2011 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
- * All rights reserved.						*
+ *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -81,13 +78,7 @@ volatile short 			xfer_table_events[DEFERRED_EVENTS];
 #else
 # error "Unsupported Platform"
 #endif
-GBLREF	global_latch_t		defer_latch;
-GBLREF	xfer_entry_t		jobintr_save_xf_linefetch;
-GBLREF	xfer_entry_t		jobintr_save_xf_linestart;
-GBLREF	xfer_entry_t		jobintr_save_xf_zbfetch;
-GBLREF	xfer_entry_t		jobintr_save_xf_zbstart;
-GBLREF	xfer_entry_t		jobintr_save_xf_forchk1;
-GBLREF	xfer_entry_t		jobintr_save_xf_forloop;
+GBLREF  global_latch_t		defer_latch;
 
 /* -------------------------------------------------------
  * Act only on first recieved.
@@ -308,33 +299,22 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	 */
 	assert(0 < num_deferred);
 	assert(0 < xfer_table_events[event_type]);
-	if ((outofband_event == event_type) && (jobinterrupt == outofband))
-	{	/* Do special handling for this. Restore transfer table to what it was before "jobinterrupt_set" changed it. */
-                xfer_table[xf_linefetch] = jobintr_save_xf_linefetch;
-                xfer_table[xf_linestart] = jobintr_save_xf_linestart;
-                xfer_table[xf_zbfetch]   = jobintr_save_xf_zbfetch;
-                xfer_table[xf_zbstart]   = jobintr_save_xf_zbstart;
-                xfer_table[xf_forchk1]   = jobintr_save_xf_forchk1;
-                xfer_table[xf_forloop]   = jobintr_save_xf_forloop;
+	if (is_tracing_on)
+	{
+		FIX_XFER_ENTRY(xf_linefetch, op_mproflinefetch);
+		FIX_XFER_ENTRY(xf_linestart, op_mproflinestart);
+		FIX_XFER_ENTRY(xf_forchk1, op_mprofforchk1);
 	} else
 	{
-		if (is_tracing_on)
-		{
-			FIX_XFER_ENTRY(xf_linefetch, op_mproflinefetch);
-			FIX_XFER_ENTRY(xf_linestart, op_mproflinestart);
-			FIX_XFER_ENTRY(xf_forchk1, op_mprofforchk1);
-		} else
-		{
-			FIX_XFER_ENTRY(xf_linefetch, op_linefetch);
-			FIX_XFER_ENTRY(xf_linestart, op_linestart);
-			FIX_XFER_ENTRY(xf_forchk1, op_forchk1);
-		}
-		FIX_XFER_ENTRY(xf_forloop, op_forloop);
-		FIX_XFER_ENTRY(xf_zbfetch, op_zbfetch);
-		FIX_XFER_ENTRY(xf_zbstart, op_zbstart);
-		FIX_XFER_ENTRY(xf_ret, opp_ret);
-		FIX_XFER_ENTRY(xf_retarg, op_retarg);
+		FIX_XFER_ENTRY(xf_linefetch, op_linefetch);
+		FIX_XFER_ENTRY(xf_linestart, op_linestart);
+		FIX_XFER_ENTRY(xf_forchk1, op_forchk1);
 	}
+	FIX_XFER_ENTRY(xf_forloop, op_forloop);
+	FIX_XFER_ENTRY(xf_zbfetch, op_zbfetch);
+	FIX_XFER_ENTRY(xf_zbstart, op_zbstart);
+	FIX_XFER_ENTRY(xf_ret, opp_ret);
+	FIX_XFER_ENTRY(xf_retarg, op_retarg);
 	DBGDFRDEVNT((stderr, "xfer_reset_handlers: Reset xfer_table for event type %d.\n", event_type));
 	reset_type_is_set_type =  (event_type == first_event);
 #	ifdef DEBUG
