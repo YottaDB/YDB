@@ -126,7 +126,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 {
 	int		ret, byteperchar;
 	boolean_t 	timed, vari, more_data, terminator, has_delimiter, requeue_done, do_delim_conv, need_get_chset;
-	boolean_t	zint_restart, one_read_done, utf8_active;
+	boolean_t	zint_restart, outofband_terminate, one_read_done, utf8_active;
 	int		flags, len, real_errno, save_errno, fcntl_res, errlen, devlen, charlen, stp_need;
 	int		bytes_read, orig_bytes_read, ii, max_bufflen, bufflen, chars_read, mb_len, match_delim;
 	io_desc		*iod;
@@ -193,6 +193,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 	ENSURE_DATA_SOCKET(socketptr);
 	sockintr = &dsocketptr->sock_save_state;
 	assert(sockintr);
+	outofband_terminate = FALSE;
 	one_read_done = FALSE;
 	zint_restart = FALSE;
 	/* Check if new or resumed read */
@@ -767,13 +768,28 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		 * that we are explicitly not handling jobinterrupt outofband here because it is handled above where it needs
 		 * to be done to be able to cleanly requeue any input (before delimiter procesing).
 		 */
-		if ((chars_read >= width) ||
-		    (MAX_STRLEN <= orig_bytes_read) ||
-		    (vari && !has_delimiter && (0 != chars_read) && !more_data) ||
-		    ((0 < status) && terminator))
+		if ((chars_read >= width)
+				|| (MAX_STRLEN <= orig_bytes_read)
+				|| (vari && !has_delimiter && (0 != chars_read) && !more_data)
+				|| ((0 < status) && terminator))
 			break;
 		if (0 != outofband)
+		{	/* Record the fact that we did see "outofband" while we were still not done with the read.
+			 * Note: One might be tempted to eliminate the "outofband_terminate" local variable and instead
+			 * use the global "outofband" where "outofband_terminate" is used in an if check down below.
+			 * But that is incorrect since the if "outofband" check would succeed in case we did a "break"
+			 * in the immediately previous "if" check above in case the "((0 < status) && terminator)" clause
+			 * turned out to be TRUE. In that case, we got just a terminator in the read and already reduced
+			 * bytes_read/chars_read to not count the terminator byte/character and so if we go down the
+			 * if "outofband" check down below, we would incorrectly save no byte/char as having been read
+			 * as part of the job interrupt which would mean we will merge the current read line with the
+			 * next read line and incorrectly return the two together as the result of one READ. To avoid
+			 * that we want to do the job interrupt save only if we notice outofband non-zero after having done
+			 * the "((0 < status) && terminator)" check. Hence the need for the "outofband_terminate" local variable.
+			 */
+			outofband_terminate = TRUE;
 			break;
+		}
 		if (timed)
 		{
 			if (0 < msec_timeout)
@@ -823,7 +839,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 	 * Some restart info is kept in our iodesc block, but the buffer address information is kept in an mv_stent so if
 	 * the stack is garbage collected during the interrupt we don't lose track of where our stuff is saved away.
 	 */
-	if (0 != outofband)
+	if (outofband_terminate)
 	{
 		if (OUTOFBAND_RESTARTABLE(outofband))
 		{
