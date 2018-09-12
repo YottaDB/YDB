@@ -262,7 +262,11 @@ int gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out)
 			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, USER_ENV);
 			return -1;
 		}
-		strncpy(hash_in, ptr, passwd_len);
+		len = STRLEN(ptr);
+		if (len > passwd_len)
+			len = passwd_len;
+		memcpy(hash_in, ptr, len);
+		memset(hash_in + len, 0, passwd_len - len);
 		if (!(ptr = ydb_getenv(YDBENVINDX_DIST, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 		{
 			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR2, YDB_DIST_ENV, GTM_DIST_ENV);
