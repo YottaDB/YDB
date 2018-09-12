@@ -504,7 +504,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 		/* External call table is a null file */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZCCTNULLF, 2, package->str.len, package->str.addr);
 	}
-	STRNCPY_STR(str_temp_buffer, str_buffer, MAX_TABLINE_LEN);
+	SNPRINTF(str_temp_buffer, MAX_TABLINE_LEN, "%s", str_buffer);
 	val.addr = str_temp_buffer;
 	val.len = STRLEN(str_temp_buffer);
 	/* Need to copy the str_buffer into another temp variable since
