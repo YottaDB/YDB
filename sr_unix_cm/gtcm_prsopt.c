@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,9 +62,9 @@ enum opt_enum
 
 static struct
 {
-  char *name;
-  enum opt_enum option;
-  int args;
+	char		*name;
+	enum opt_enum	option;
+	int		args;
 } optlist[] =
 {
 	{"-D",		opt_debug,		1}, /* debugging output */
@@ -94,81 +94,98 @@ static struct
  */
 int gtcm_prsopt(int argc, char_ptr_t argv[])
 {
-    enum opt_enum opt;
-    int	 i,j, t;
-    boolean_t inv_option = FALSE;
+	enum opt_enum	opt;
+	int		i, j, t;
+	char_ptr_t	debug_argv = NULL;
+	boolean_t	inv_option = FALSE;
 
 	ASSERT_IS_LIBGTCM;
-    for (i = 1, argv++; i < argc; argv += optlist[j].args + 1, i += optlist[j].args + 1)
-    {
-	    for(j = 0; opt = optlist[j].option; j++)
-		    if (!strcmp(*argv,optlist[j].name))
-			    break;
-	    if (i + optlist[j].args >= argc)
-	    {
-		    FPRINTF(stderr, "%s option requires an argument - ignored\n", *argv);
-		    continue;
-	    }
-	    switch(opt)
-	    {
-		  case opt_debug:
-		    if ((*(argv + 1))[0] == '-' && (*(argv + 1))[1] == '\0')
-			    omi_debug = stdout;
-		    else if ((*(argv + 1))[0] == '=' && (*(argv + 1))[1] == '\0')
-			    omi_debug = stderr;
-		    else
-		    {
-#ifdef __MVS__
-			    if (-1 == gtm_zos_create_tagged_file(*(argv + 1), TAG_EBCDIC))
-					perror("error tagging log file");
-#endif
-		    	    Fopen(omi_debug, *(argv + 1), "w+");
-		    	    if (!omi_debug)
-		    	    {
-			    	    perror("error opening log file");
-			    	    EXIT(1);
-		    	    }
-		    }
-		    break;
-		  case opt_pktlog:	omi_pklog = *(argv + 1);  break;
-		  case opt_service:	omi_service = *(argv + 1); break;
-		  case opt_rc_id:	rc_server_id = atoi(*(argv + 1)); break;
-		  case opt_pktlog_addr: omi_pklog_addr = *(argv + 1); break;
-		  case opt_authenticate: authenticate = 1; break;
-		  case opt_multipleconn:
-		    one_conn_per_inaddr = 0;
-		    break;
-		  case opt_ping: 	ping_keepalive = 1; break;
-		  case opt_null:
-		    inv_option = TRUE;
-		    FPRINTF(stderr,"Unknown option:  %s\n",*argv);
-		    break;
-		  case opt_conn_timeout:
-		    t = atoi(*(argv + 1));
-		    if (t < MIN_TIMEOUT_INTERVAL)
-			FPRINTF(stderr,"-timeout parameter must be >= %d seconds. The default value %d seconds will be used\n"
-				, MIN_TIMEOUT_INTERVAL, TIMEOUT_INTERVAL);
-		    else
-			    conn_timeout = t;
-		    break;
-		  case opt_servtime:
-		    t = atoi(*(argv + 1));
-		    if (t < MIN_TIMEOUT_INTERVAL)
-			  FPRINTF(stderr, "-servtime parameter must be >= %d seconds. The default value %d seconds will be used\n",
-				    MIN_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL);
-		    else
-			    per_conn_servtime = t;
-		    break;
-		  case opt_history:
-		    history = 1;
-		    break;
-		  default:
+	for (i = 1, argv++; i < argc; argv += optlist[j].args + 1, i += optlist[j].args + 1)
+	{
+		for (j = 0; opt = optlist[j].option; j++)
+			if (!strcmp(*argv,optlist[j].name))
+				break;
+		if (i + optlist[j].args >= argc)
+		{
+			FPRINTF(stderr, "%s option requires an argument - ignored\n", *argv);
+			continue;
+		}
+		switch(opt)
+		{
+		case opt_debug:
+			debug_argv = argv[1];
+			break;
+		case opt_pktlog:
+			omi_pklog = *(argv + 1);
+			break;
+		case opt_service:
+			omi_service = *(argv + 1);
+			break;
+		case opt_rc_id:
+			rc_server_id = atoi(*(argv + 1));
+			break;
+		case opt_pktlog_addr:
+			omi_pklog_addr = *(argv + 1);
+			break;
+		case opt_authenticate:
+			authenticate = 1;
+			break;
+		case opt_multipleconn:
+			one_conn_per_inaddr = 0;
+			break;
+		case opt_ping:
+			ping_keepalive = 1;
+			break;
+		case opt_null:
 			inv_option = TRUE;
-		    FPRINTF(stderr,"Unsupported option:  %s\n",*argv);
-		    break;
-	    }
-	    if (inv_option)
-	    	return -1;
-    }
-    return 0;
+			FPRINTF(stderr,"Unknown option:  %s\n",*argv);
+			break;
+		case opt_conn_timeout:
+			t = atoi(*(argv + 1));
+			if (t < MIN_TIMEOUT_INTERVAL)
+				FPRINTF(stderr,"-timeout parameter must be >= %d seconds. The default value %d seconds "
+					"will be used\n", MIN_TIMEOUT_INTERVAL, TIMEOUT_INTERVAL);
+			else
+				conn_timeout = t;
+			break;
+		case opt_servtime:
+			t = atoi(*(argv + 1));
+			if (t < MIN_TIMEOUT_INTERVAL)
+				FPRINTF(stderr, "-servtime parameter must be >= %d seconds. The default value %d seconds "
+					"will be used\n", MIN_TIMEOUT_INTERVAL, MIN_TIMEOUT_INTERVAL);
+			else
+				per_conn_servtime = t;
+			break;
+		case opt_history:
+			history = 1;
+			break;
+		default:
+			inv_option = TRUE;
+			FPRINTF(stderr,"Unsupported option:  %s\n",*argv);
+			break;
+		}
+		if (inv_option)
+			return -1;
+	}
+	if (NULL != debug_argv)
+	{
+		if ((debug_argv[0] == '-') && (debug_argv[1] == '\0'))
+			omi_debug = stdout;
+		else if ((debug_argv[0] == '=') && (debug_argv[1] == '\0'))
+			omi_debug = stderr;
+		else
+		{
+#			ifdef __MVS__
+			if (-1 == gtm_zos_create_tagged_file(debug_argv, TAG_EBCDIC))
+				perror("error tagging log file");
+#			endif
+			Fopen(omi_debug, debug_argv, "w+");
+			if (!omi_debug)
+			{
+				perror("error opening log file");
+				EXIT(1);
+			}
+		}
+	}
+	return 0;
 }
