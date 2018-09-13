@@ -204,18 +204,15 @@ void dse_chng_fhead(void)
 			{
 				SPRINTF(temp_str, "!UB [0x!XB]");
 				old_value = *(sm_uc_ptr_t)chng_ptr;
-			}
-			else if (SIZEOF(short) == size)
+			} else if (SIZEOF(short) == size)
 			{
 				SPRINTF(temp_str, "!UW [0x!XW]");
 				old_value = *(sm_ushort_ptr_t)chng_ptr;
-			}
-			else if (SIZEOF(int4) == size)
+			} else if (SIZEOF(int4) == size)
 			{
 				SPRINTF(temp_str, "!UL [0x!XL]");
 				old_value = *(sm_uint_ptr_t)chng_ptr;
-			}
-			else if (SIZEOF(gtm_int64_t) == size)
+			} else if (SIZEOF(gtm_int64_t) == size)
 			{
 				SPRINTF(temp_str, "!@UQ [0x!@XQ]");
 				old_value = *(qw_num_ptr_t)chng_ptr;
@@ -530,29 +527,32 @@ void dse_chng_fhead(void)
 	if (CLI_PRESENT == cli_present("FREEZE"))
 	{
 		x = cli_t_f_n("FREEZE");
-		if (1 == x)
+		if (-1 != x)
 		{
-			while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, override, FALSE, FALSE, FALSE))
+			if (1 == x)
 			{
-				hiber_start(1000);
-				if (util_interrupt)
+				while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, override, FALSE, FALSE, FALSE))
 				{
-					gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_FREEZECTRL);
-					break;
+					hiber_start(1000);
+					if (util_interrupt)
+					{
+						gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_FREEZECTRL);
+						break;
+					}
+				}
+			} else if (0 == x)
+			{
+				if (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, FALSE, override, FALSE, FALSE, FALSE))
+				{
+					util_out_print("Region: !AD  is frozen by another user, not releasing freeze.",
+						TRUE, REG_LEN_STR(gv_cur_region));
 				}
 			}
+			if (x != !(FROZEN(cs_data)))
+				util_out_print("Region !AD is now !AD", TRUE, REG_LEN_STR(gv_cur_region),
+											LEN_AND_STR(freeze_msg[x]));
+			cs_addrs->persistent_freeze = x;	/* secshr_db_clnup() shouldn't clear the freeze up */
 		}
-		else if (0 == x)
-		{
-			if (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, FALSE, override, FALSE, FALSE, FALSE))
-			{
-				util_out_print("Region: !AD  is frozen by another user, not releasing freeze.",
-					TRUE, REG_LEN_STR(gv_cur_region));
-			}
-		}
-		if (x != !(FROZEN(cs_data)))
-			util_out_print("Region !AD is now !AD", TRUE, REG_LEN_STR(gv_cur_region), LEN_AND_STR(freeze_msg[x]));
-		cs_addrs->persistent_freeze = x;	/* secshr_db_clnup() shouldn't clear the freeze up */
 	}
 	if (CLI_PRESENT == cli_present("FULLY_UPGRADED") && cli_get_int("FULLY_UPGRADED", &x))
 	{
@@ -647,8 +647,7 @@ void dse_chng_fhead(void)
 			{
 				memset(cs_data->machine_name, 0, MAX_MCNAMELEN);
 				GETHOSTNAME(cs_data->machine_name, MAX_MCNAMELEN, gethostname_res);
-			}
-			else if (0 == STRCMP(buf, "CLEAR"))
+			} else if (0 == STRCMP(buf, "CLEAR"))
 				memset(cs_data->machine_name, 0, MAX_MCNAMELEN);
 			else
 				util_out_print("Invalid value for the machine_name qualifier", TRUE);
@@ -696,8 +695,7 @@ void dse_chng_fhead(void)
 		cs_data->mumps_can_bypass = TRUE;
 		util_out_print("Database file !AD now has quick database rundown flag set to TRUE", TRUE,
 					DB_LEN_STR(gv_cur_region));
-	}
-	else if (CLI_NEGATED == cli_present("QDBRUNDOWN"))
+	} else if (CLI_NEGATED == cli_present("QDBRUNDOWN"))
 	{
 		cs_data->mumps_can_bypass = FALSE;
 		util_out_print("Database file !AD now has quick database rundown flag set to FALSE", TRUE,
@@ -708,8 +706,7 @@ void dse_chng_fhead(void)
 		cs_data->epoch_taper = TRUE;
 		util_out_print("Database file !AD now has epoch taper flag set to TRUE", TRUE,
 					DB_LEN_STR(gv_cur_region));
-	}
-	else if (CLI_NEGATED == cli_present("EPOCHTAPER"))
+	} else if (CLI_NEGATED == cli_present("EPOCHTAPER"))
 	{
 		cs_data->epoch_taper = FALSE;
 		util_out_print("Database file !AD now has epoch taper flag set to FALSE", TRUE,
