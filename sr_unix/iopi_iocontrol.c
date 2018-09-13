@@ -3,6 +3,9 @@
  * Copyright (c) 2008-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -27,9 +30,11 @@
 #include "min_max.h"
 #include "arit.h"
 #include "gtmio.h"
+
 /* define max strings for $zkey */
 #define MAX_FIXED_STRING (2 * NUM_DEC_DG_2L) + 2
 #define MAX_VAR_STRING NUM_DEC_DG_2L + 1
+#define	EOF_KEYWORD	"EOF"
 
 GBLREF io_pair		io_curr_device;
 
@@ -47,11 +52,11 @@ void	iopi_iocontrol(mstr *mn, int4 argcnt, va_list args)
 	if (!d_rm->is_pipe)
 		return;
 	/* we should not get here unless there is some string length after write / */
-	assertpro((int)mn->len);
+	assert((int)mn->len);
 	if (0 == mn->len)
 		return;
 	lower_to_upper((uchar_ptr_t)&action[0], (uchar_ptr_t)mn->addr, MIN(mn->len, SIZEOF(action)));
-	if (0 == memcmp(&action[0], "EOF", MIN(mn->len, SIZEOF(action))))
+	if ((STR_LIT_LEN(EOF_KEYWORD) == mn->len) && (0 == memcmp(&action[0], EOF_KEYWORD, STR_LIT_LEN(EOF_KEYWORD))))
 	{	/* Implement the write /EOF action. Close the output stream to force any blocked output to complete.
 		 * Doing a write /EOF closes the output file descriptor for the pipe device but does not close the
 		 * device. Since the M program could attempt this command more than once, check if the file descriptor
