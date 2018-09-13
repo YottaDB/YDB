@@ -345,7 +345,8 @@ STATICFNDEF enum ydb_types scan_keyword(char **c)
 					break;
 				star_found = TRUE;
 			}
-			assert(star_count <= MAXIMUM_STARS);
+			if (star_count > MAXIMUM_STARS)
+				return ydb_notfound;
 			*c = exttab_scan_space(d);
 			return xctab[i].typ[star_count];
 		}
