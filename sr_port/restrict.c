@@ -61,7 +61,7 @@ GBLREF	boolean_t			ydb_dist_ok_to_use;
 #endif
 GBLREF	char				ydb_dist[YDB_PATH_MAX];
 
-STATICFNDCL void append_filter(char *, char *, char *, int *, char *);
+STATICFNDCL void append_filter(char * fpath, char * c_call_name, char * m_ref_name, int * save_errno, char *errstr, int errstrlen);
 
 error_def(ERR_RESTRICTSYNTAX);
 error_def(ERR_TEXT);
@@ -76,7 +76,7 @@ error_def(ERR_TEXT);
 		{	/* We created this file in a prior invocation of PUT_FLNAME_IN_MAPPING_FILE			\
 			 * so append all future macro invocations into the same file.					\
 			 */												\
-			append_filter(FPATH, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);				\
+			append_filter(FPATH, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR, SIZEOF(ERR_STR));		\
 		}													\
 		/* else : We have already determined restrict.txt and filter_commands.tab are in sync time wise.	\
 		 *        No need to do any more file modification checks.						\
@@ -85,7 +85,7 @@ error_def(ERR_TEXT);
 	{	/* File does not exist, create and write mapping */							\
 		CREATED_NOW = TRUE;											\
 		CREATED_NOW_INITIALIZED = TRUE;										\
-		append_filter(FPATH, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);					\
+		append_filter(FPATH, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR, SIZEOF(ERR_STR));			\
 	} else														\
 	{	/* Filter file exists. Check modified time */								\
 		Stat(RPATH, &rTime);											\
@@ -100,14 +100,14 @@ error_def(ERR_TEXT);
 		{	/* Delete the older mapping file and recreate new if required */				\
 			CREATED_NOW = TRUE;										\
 			gtm_file_remove(FPATH, strlen(FPATH), &STAT_RM);						\
-			append_filter(FPATH, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);				\
+			append_filter(FPATH, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR, SIZEOF(ERR_STR));		\
 		} else													\
 			CREATED_NOW = FALSE;										\
 		CREATED_NOW_INITIALIZED = TRUE;										\
 	}														\
 }
 
-void append_filter(char * fpath, char * c_call_name, char * m_ref_name, int * save_errno, char * errstr)
+void append_filter(char * fpath, char * c_call_name, char * m_ref_name, int * save_errno, char *errstr, int errstrlen)
 {
 	FILE	*fp;
 
@@ -121,7 +121,8 @@ void append_filter(char * fpath, char * c_call_name, char * m_ref_name, int * sa
 	else
 	{
 		*save_errno = errno;
-		SNPRINTF(errstr, SIZEOF(errstr), "fopen() : %s", COMM_FILTER_FILENAME);
+		assert((MAX_FN_LEN + 1) == errstrlen);	/* should match errstr[] array size in "restrict_init" */
+		SNPRINTF(errstr, errstrlen, "fopen() : %s", COMM_FILTER_FILENAME);
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
                                          LEN_AND_STR(errstr), CALLFROM, save_errno);
 	}
