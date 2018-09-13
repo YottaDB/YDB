@@ -137,59 +137,66 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 				query_node_name[query_node_len] = 0;
 				localhost_sa_ptr = NULL;	/* Null value needed if not find query node (remote default) */
 				CLIENT_HINTS(hints);
-				if (0 != (errcode = getaddrinfo(query_node_name, NULL, &hints, &ai_ptr)))	/* Assignment! */
-					ai_ptr = NULL;		/* Skip additional lookups */
-				else
+				errcode = getaddrinfo(query_node_name, NULL, &hints, &ai_ptr);
+				if (0 == errcode)
+				{
 					memcpy((sockaddr_ptr)&query_sas, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
-				CLIENT_HINTS(hints);
-				if (0 == (errcode = getaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr))
-					&& (0 == memcmp(localhost_ai_ptr->ai_addr, (sockaddr_ptr)&query_sas,
-						localhost_ai_ptr->ai_addrlen)))
-				{
-					localhost_sa_ptr = localhost_ai_ptr->ai_addr;
-				}
-				FREEADDRINFO(localhost_ai_ptr);
-				if (ai_ptr && !localhost_sa_ptr)
-				{	/* Have not yet established this is not a local node -- check further */
-					GETHOSTNAME(local_node_name, MAX_HOST_NAME_LEN, status);
-					if (-1 == status)
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-								LEN_AND_LIT("gethostname"), CALLFROM, errno);
 					CLIENT_HINTS(hints);
-					if (0 != (errcode = getaddrinfo(local_node_name, NULL, &hints, &localhost_ai_ptr)))
-						localhost_ai_ptr = NULL;	/* Empty address list */
-					for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
-					     temp_ai_ptr = temp_ai_ptr->ai_next)
+					if (0 == (errcode = getaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr))
+						&& (0 == memcmp(localhost_ai_ptr->ai_addr, (sockaddr_ptr)&query_sas,
+											localhost_ai_ptr->ai_addrlen)))
 					{
-						if (0 == memcmp((sockaddr_ptr)&query_sas, temp_ai_ptr->ai_addr,
-								 temp_ai_ptr->ai_addrlen))
-						{
-							localhost_sa_ptr = temp_ai_ptr->ai_addr;
-							break;		/* Tiz truly a local node */
-						}
+						localhost_sa_ptr = localhost_ai_ptr->ai_addr;
 					}
 					FREEADDRINFO(localhost_ai_ptr);
-				}
-				if (ai_ptr && !localhost_sa_ptr)
-				{
-					CLIENT_HINTS(hints);
-					if (0 != (errcode = getaddrinfo(LOCALHOSTNAME6, NULL, &hints, &localhost_ai_ptr)))
-						localhost_ai_ptr = NULL;	/* Empty address list */
-					for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
-					     temp_ai_ptr = temp_ai_ptr->ai_next)
-					{
-						if (0 == memcmp((sockaddr_ptr)&query_sas, temp_ai_ptr->ai_addr,
-								 temp_ai_ptr->ai_addrlen))
+					if (!localhost_sa_ptr)
+					{	/* Have not yet established this is not a local node -- check further */
+						GETHOSTNAME(local_node_name, MAX_HOST_NAME_LEN, status);
+						if (-1 == status)
+							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+									LEN_AND_LIT("gethostname"), CALLFROM, errno);
+						CLIENT_HINTS(hints);
+						if (0 != (errcode = getaddrinfo(local_node_name, NULL, &hints, &localhost_ai_ptr)))
+							localhost_ai_ptr = NULL;	/* Empty address list */
+						for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
+						     temp_ai_ptr = temp_ai_ptr->ai_next)
 						{
-							localhost_sa_ptr = temp_ai_ptr->ai_addr;
-							break;		/* Tiz truly a local node */
+							if (0 == memcmp((sockaddr_ptr)&query_sas, temp_ai_ptr->ai_addr,
+									 temp_ai_ptr->ai_addrlen))
+							{
+								localhost_sa_ptr = temp_ai_ptr->ai_addr;
+								break;		/* Tiz truly a local node */
+							}
 						}
+						FREEADDRINFO(localhost_ai_ptr);
 					}
-					FREEADDRINFO(localhost_ai_ptr);
-				}
-				if (!localhost_sa_ptr)		/* Not local (or an unknown) host given */
-				{	/* Remote node specified -- don't apply any defaults */
+					if (!localhost_sa_ptr)
+					{
+						CLIENT_HINTS(hints);
+						if (0 != (errcode = getaddrinfo(LOCALHOSTNAME6, NULL, &hints, &localhost_ai_ptr)))
+							localhost_ai_ptr = NULL;	/* Empty address list */
+						for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
+						     temp_ai_ptr = temp_ai_ptr->ai_next)
+						{
+							if (0 == memcmp((sockaddr_ptr)&query_sas, temp_ai_ptr->ai_addr,
+									 temp_ai_ptr->ai_addrlen))
+							{
+								localhost_sa_ptr = temp_ai_ptr->ai_addr;
+								break;		/* Tiz truly a local node */
+							}
+						}
+						FREEADDRINFO(localhost_ai_ptr);
+					}
 					FREEADDRINFO(ai_ptr);
+					/* At this point, if "localhost_sa_ptr" is NULL, a hostname that is not local
+					 * (or an unknown hostname) is given. If it is non-NULL, a local hostname is given.
+					 * Set "hasnode" to TRUE only for the non-local case.
+					 * Treat local host as if node was not specified.
+					 */
+					hasnode = (NULL == localhost_sa_ptr);
+				}
+				if (hasnode)
+				{	/* Remote node specified -- don't apply any defaults */
 					pblk->l_node = trans.addr;
 					pblk->b_node = node_name_len;
 					pblk->l_dir = base;
@@ -200,7 +207,6 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 					pblk->fnb |= (hasnode << V_HAS_NODE);
 					return ERR_PARNORMAL;
 				}
-				FREEADDRINFO(ai_ptr);
 				/* Remove local node name from filename buffer */
 				assert(0 < trans.len - node_name_len);
 				memmove(trans.addr, node, trans.len - node_name_len);
