@@ -375,7 +375,7 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 	gtm_keystore_t			*node;
 	int				name_length, path_length, search_fail;
 	char				*name_search_field_ptr, *path_search_field_ptr, *ynew_ext;
-	char				*lcl_key_name, lcl_key_name_buff[YDB_PATH_MAX];
+	char				*lcl_key_name, lcl_key_name_buff[YDB_PATH_MAX + SIZEOF(EXT_NEW) + 1];
 	char				name_search_field_buff[YDB_PATH_MAX];
 	int				search_field_len;
 	int				isautodb;
@@ -423,8 +423,7 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 			{
 				if (isautodb)
 				{	/* Append EXT_NEW to see if this a matching AutoDB */
-					strncpy(lcl_key_name_buff, curr->key_name, YDB_PATH_MAX);
-					strcat(lcl_key_name_buff, EXT_NEW);
+					SNPRINTF(lcl_key_name_buff, SIZEOF(lcl_key_name_buff), "%s%s", curr->key_name, EXT_NEW);
 					lcl_key_name = lcl_key_name_buff;
 				} else
 					lcl_key_name = curr->key_name;
