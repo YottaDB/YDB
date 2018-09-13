@@ -75,7 +75,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 	d_tt_struct	*tt_ptr;
 	tt_interrupt	*tt_state;
 	TID		timer_id;
-	int		rdlen, selstat, status, utf8_more, inchar_width;
+	int		rdlen, selstat, status, utf8_more, utf8_seen, inchar_width;
 	uint4		mask;
 	int		msk_in, msk_num;
 	unsigned char	*zb_ptr, *zb_top;
@@ -127,8 +127,14 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		if (utf8_active)
 		{
 			utf8_more = tt_state->utf8_more;
-			more_ptr = tt_state->more_ptr;
-			memcpy(more_buf, tt_state->more_buf, SIZEOF(more_buf));
+			if (utf8_more)
+			{
+				utf8_seen = tt_state->utf8_seen;
+				assert(0 < utf8_seen);
+				assert(GTM_MB_LEN_MAX >= (utf8_seen + utf8_more));
+				memcpy(more_buf, tt_state->more_buf, utf8_seen);
+				more_ptr = more_buf + utf8_seen;
+			}
 		}
 		zb_ptr = tt_state->zb_ptr;
 		zb_top = tt_state->zb_top;
@@ -206,8 +212,14 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 				if (utf8_active)
 				{
 					tt_state->utf8_more = utf8_more;
-					tt_state->more_ptr = more_ptr;
-					memcpy(tt_state->more_buf, more_buf, SIZEOF(more_buf));
+					if (utf8_more)
+					{
+						utf8_seen = (int)((UINTPTR_T)more_ptr - (UINTPTR_T)more_buf);
+						assert(0 < utf8_seen);
+						assert(GTM_MB_LEN_MAX >= (utf8_seen + utf8_more));
+						tt_state->utf8_seen = utf8_seen;
+						memcpy(tt_state->more_buf, more_buf, utf8_seen);
+					}
 				}
 				tt_state->zb_ptr = zb_ptr;
 				tt_state->zb_top = zb_top;

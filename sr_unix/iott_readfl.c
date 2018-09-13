@@ -152,7 +152,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	unsigned char	*current_ptr;		/* insert next character into buffer here */
 	unsigned char	*buffer_start;		/* beginning of non UTF8 buffer */
-	int		msk_in, msk_num, rdlen, save_errno, selstat, status, ioptr_width, i, utf8_more;
+	int		msk_in, msk_num, rdlen, save_errno, selstat, status, ioptr_width, i, utf8_more, utf8_seen;
 	int		exp_length;
 	int		inchar_width;		/* display width of inchar */
 	int		delchar_width;		/* display width of deleted char */
@@ -228,8 +228,14 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 						- tt_state->buffer_start), (SIZEOF(wint_t) * length));
 				current_32_ptr = buffer_32_start;
 				utf8_more = tt_state->utf8_more;
-				more_ptr = tt_state->more_ptr;
-				memcpy(more_buf, tt_state->more_buf, SIZEOF(more_buf));
+				if (utf8_more)
+				{
+					utf8_seen = tt_state->utf8_seen;
+					assert(0 < utf8_seen);
+					assert(GTM_MB_LEN_MAX >= (utf8_seen + utf8_more));
+					memcpy(more_buf, tt_state->more_buf, utf8_seen);
+					more_ptr = more_buf + utf8_seen;
+				}
 			}
 			instr = tt_state->instr;
 			outlen = tt_state->outlen;
@@ -373,8 +379,14 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 					tt_state->exp_length = exp_length;
 					tt_state->buffer_32_start = buffer_32_start;
 					tt_state->utf8_more = utf8_more;
-					tt_state->more_ptr = more_ptr;
-					memcpy(tt_state->more_buf, more_buf, SIZEOF(more_buf));
+					if (utf8_more)
+					{
+						utf8_seen = (int)((UINTPTR_T)more_ptr - (UINTPTR_T)more_buf);
+						assert(0 < utf8_seen);
+						assert(GTM_MB_LEN_MAX >= (utf8_seen + utf8_more));
+						tt_state->utf8_seen = utf8_seen;
+						memcpy(tt_state->more_buf, more_buf, utf8_seen);
+					}
 				}
 				if (IS_AT_END_OF_STRINGPOOL(buffer_start, 0))
 					stringpool.free += exp_length;	/* reserve space */
