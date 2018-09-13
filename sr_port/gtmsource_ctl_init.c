@@ -127,8 +127,8 @@ int repl_open_jnl_file_by_name(repl_ctl_element *tmp_ctl, int jnl_fn_len, char *
 			assert(FALSE);
 		}
 #		endif
+		*((struct stat *)stat_buf_ptr) = stat_buf;
 	}
-	*((struct stat *)stat_buf_ptr) = stat_buf;
 	REPL_DPRINT2("CTL INIT :  Direct open of file %s\n", tmp_ctl->jnl_fn);
 	*fd_ptr = tmp_fd;
 	return status;
