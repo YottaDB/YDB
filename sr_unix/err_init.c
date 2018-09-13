@@ -104,9 +104,9 @@ void err_init(void (*x)())
 			rcc = fgets(filter, SIZEOF(filter), filterstrm);
 			if (NULL == rcc)
 			{
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-						RTS_ERROR_LITERAL("fgets()"), CALLFROM, rc);
-				return;
+				rc = errno;
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fgets()"), CALLFROM, rc);
+				/* Note: Need to do FCLOSE cleanup before returning */
 			}
 			FCLOSE(filterstrm, rc);
 			if (0 > rc)
@@ -115,6 +115,8 @@ void err_init(void (*x)())
 						RTS_ERROR_LITERAL("fclose()"), CALLFROM, rc);
 				return;
 			}
+			if (NULL == rcc)
+				return;	/* Return for "fgets" error now that FCLOSE has been done */
 			filterend = filter + SIZEOF(filter);
 			filterbits = (unsigned int)strtol(filter, &filterend, 16);
 			if (FILTERENABLEBITS != (filterbits & FILTERENABLEBITS))
