@@ -2,7 +2,7 @@
  *								*
  * Copyright 2011 Fidelity Information Services, Inc		*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,7 @@ LITREF int4	ydb_release_name_len;
 
 error_def(ERR_GTMASSERT2);
 
+/* coverity[+kill] */
 int gtm_assert2(int condlen, char *condtext, int file_name_len, char file_name[], int line_no)
 {
 	send_msg(VARLSTCNT(9) ERR_GTMASSERT2, 7, ydb_release_name_len, ydb_release_name,
