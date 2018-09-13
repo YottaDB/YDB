@@ -305,6 +305,9 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		(char **)&null_iv_array_ptr,
 		&sn_hold_buff
 	};
+#	ifdef DEBUG
+	unsigned char		*save_msp;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -477,6 +480,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	gvnh_reg = NULL;
 	failed_record_count = 0;
 	first_failed_rec_count = 0;
+	val = NULL;
 	for ( ; !mupip_DB_full; )
 	{
 		if (++rec_count > end)
@@ -1064,9 +1068,10 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				update_nullcoll_mismatch_record = FALSE;
 				if (0 < null_subscript_cnt && gv_target->root)
 				{
-					if (!val)
-					{
+					if (NULL == val)
+					{	/* Push an mv_stent in the M-stack so we are safe from "stp_gcol" */
 						PUSH_MV_STENT(MVST_MVAL);
+						DEBUG_ONLY(save_msp = msp);
 						val = &mv_chain->mv_st_cont.mvs_mval;
 					}
 					if (csd->std_null_coll ? SUBSCRIPT_STDCOL_NULL
@@ -1159,6 +1164,11 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				}
 			}
 		}
+	}
+	if (NULL != val)
+	{
+		assert(msp == save_msp);
+		POP_MV_STENT();
 	}
 	if (encrypted_version)
 	{
