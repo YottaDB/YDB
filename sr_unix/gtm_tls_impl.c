@@ -1669,6 +1669,7 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 					break;
 				default:
 					assert(FALSE && ssl_version);
+					ssl_version_ptr = "unknown";
 					break;
 			}
 			SNPRINTF(conn_info->protocol, SIZEOF(conn_info->protocol), "%s", ssl_version_ptr);
