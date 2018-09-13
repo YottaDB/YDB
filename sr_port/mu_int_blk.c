@@ -256,7 +256,7 @@ boolean_t mu_int_blk(
 		mu_int_root_level = level = blk_levl;
 	else  if (is_root)
 	{
-		if (blk_levl >= MAX_BT_DEPTH)
+		if (MAX_BT_DEPTH <= blk_levl)
 		{
 			mu_int_err(ERR_DBRLEVTOOHI, 0, 0, 0, 0, 0, 0, (unsigned int)blk_levl);
 			free(free_blk_base);

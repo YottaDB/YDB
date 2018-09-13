@@ -227,7 +227,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 		}
 		return TRUE;
 	}
-	if (blk_levl > MAX_BT_DEPTH)
+	if (MAX_BT_DEPTH <= blk_levl)
 	{
 		RTS_ERROR_FUNC(csa, ERR_DBBLEVMX, util_buff, error_action);
 		return FALSE;

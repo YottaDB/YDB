@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -122,7 +125,7 @@
 {									\
 	STATUS = cdb_sc_normal;						\
 	NLEVL = ((blk_hdr_ptr_t)PBLKBASE)->levl;			\
-	if (MAX_BT_DEPTH < (int)NLEVL)					\
+	if (MAX_BT_DEPTH <= (int)NLEVL)					\
 		STATUS = cdb_sc_maxlvl;					\
 	else if (ANY_ROOT_LEVL == DESIREDLVL)				\
 	{								\

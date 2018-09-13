@@ -260,7 +260,7 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 	if (NULL == (pBlkBase = t_qread(nBlkId, (sm_int_ptr_t)&cycle, &cr)))
 		return (enum cdb_sc)rdfail_detail;
 	nLevl = ((blk_hdr_ptr_t)pBlkBase)->levl;
-	if (MAX_BT_DEPTH < (int)nLevl)
+	if (MAX_BT_DEPTH <= (int)nLevl)
 	{
 		assert(CDB_STAGNATE > t_tries);
 		return cdb_sc_maxlvl;
