@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -94,7 +97,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 			csa->nl->nbb = BACKUP_NOT_IN_PROGRESS;
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_BKUPTMPFILOPEN, 2,
 					LEN_AND_STR(sbufh_p->tempfilename), sbufh_p->backup_errno);
-			assert(EACCES == sbufh_p->backup_errno);
+			assert((EACCES == sbufh_p->backup_errno) || (ENOENT == sbufh_p->backup_errno));
 			shmpool_unlock_hdr(reg);
 			return FALSE;
 		}
