@@ -1081,6 +1081,7 @@ int ydb_ci(const char *c_rtn_name, ...)
 	va_list var;
 
 	VAR_START(var, c_rtn_name);
+	/* Note: "va_end(var)" done inside "ydb_ci_exec" */
 	return ydb_ci_exec(c_rtn_name, NULL, FALSE, var, FALSE);
 }
 
@@ -1092,6 +1093,7 @@ int ydb_cip(ci_name_descriptor* ci_info, ...)
 	va_list var;
 
 	VAR_START(var, ci_info);
+	/* Note: "va_end(var)" done inside "ydb_ci_exec" */
 	return ydb_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, var, FALSE);
 }
 
@@ -1100,6 +1102,7 @@ int gtm_ci_filter(const char *c_rtn_name, ...)
 	va_list var;
 
 	VAR_START(var, c_rtn_name);
+	/* Note: "va_end(var)" done inside "ydb_ci_exec" */
 	return ydb_ci_exec(c_rtn_name, NULL, FALSE, var, TRUE);
 }
 
