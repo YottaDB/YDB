@@ -61,9 +61,10 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 	 * If tnd is an empty string, get port number from services database
 	 *
 	 */
+	assert(NULL != tnd);
 	tnd_str = CMI_DESC_POINTER(tnd);
 	tnd_len = CMI_DESC_LENGTH(tnd);
-	if (tnd && (0 < tnd->len))
+	if (0 < tnd->len)
 	{
 		/* look for symbol separted ip address and port in ipv6 */
 		if (IPV6_START == tnd_str[0])
