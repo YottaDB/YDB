@@ -1278,8 +1278,8 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			session_id_len = session_id_len / 2;		/* bytes */
 		} else
 		{
-			strcpy((char *)session_id_string, id);		/* default to tlsid */
-			session_id_len = STRLEN(id);
+			SNPRINTF((char *)session_id_string, SIZEOF(session_id_string), "%s", id);	/* default to tlsid */
+			session_id_len = STRLEN((char *)session_id_string);
 		}
 		if (0 >= SSL_set_session_id_context(ssl, (const unsigned char *)session_id_string, (unsigned int)session_id_len))
 		{
