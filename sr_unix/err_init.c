@@ -85,10 +85,10 @@ void err_init(void (*x)())
 	status = ydb_trans_log_name(YDBENVINDX_COREDUMP_FILTER, &trans, buf, SIZEOF(buf), IGNORE_ERRORS_TRUE, NULL);
 	if ((SS_NOLOGNAM == status) || ((SS_NORMAL == status) && (0 != strncmp("-1", buf, 3))))
 	{
-		rc = snprintf(procfn, SIZEOF(procfn), COREDUMPFILTERFN, getpid());
+		rc = SNPRINTF(procfn, SIZEOF(procfn), COREDUMPFILTERFN, getpid());
 		if (0 > rc)
 		{
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("sprintf()"), CALLFROM, rc);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("SNPRINTF() 1"), CALLFROM, rc);
 			return;
 		}
 		if (SS_NOLOGNAM == status)
@@ -120,10 +120,14 @@ void err_init(void (*x)())
 			filterend = filter + SIZEOF(filter);
 			filterbits = (unsigned int)strtol(filter, &filterend, 16);
 			if (FILTERENABLEBITS != (filterbits & FILTERENABLEBITS))
-			{	/* At least one flag was missing - reset them */
-				filterbits = filterbits | FILTERENABLEBITS;
+				filterbits = filterbits | FILTERENABLEBITS;	/* At least one flag was missing - reset them */
+			rc = SNPRINTF(filter, FILTERPARMSIZE, FILTERPARMFMTSTR, filterbits);
+			if (0 > rc)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+									RTS_ERROR_LITERAL("SNPRINTF() 2"), CALLFROM, rc);
+				return;
 			}
-			snprintf(filter, FILTERPARMSIZE, FILTERPARMFMTSTR, filterbits);
 			bytes_buf = filter;
 		} else
 			bytes_buf = buf;
