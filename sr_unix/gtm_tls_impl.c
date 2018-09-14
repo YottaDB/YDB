@@ -766,7 +766,7 @@ int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *
 	/* Either no entry for tlsid or need to replace with new value */
 	pwent = MALLOC(SIZEOF(passwd_entry_t));
 	pwent->envindx = YDBENVINDX_TLS_PASSWD_PREFIX;
-	strcpy(pwent->suffix, tlsid);
+	SNPRINTF(pwent->suffix, SIZEOF(pwent->suffix), "%s", tlsid);
 	pwent->env_value = MALLOC(obs_len + 1);
 	memcpy(pwent->env_value, obs_passwd, obs_len + 1);	/* include null */
 	pwent->passwd = NULL;
