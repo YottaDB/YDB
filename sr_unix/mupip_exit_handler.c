@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -127,11 +130,11 @@ void mupip_exit_handler(void)
 		/* In case we hold the write_updated_ctl mutex, we need to release it before detaching the recvpool.
 		 * The robust mutex handling can't work if the memory no longer exists in the process' address space,
 		 * which is why we have to do it manually.
-		 * Ignore errors, as we may not have held it, and we're exiting anyway.
+		 * Ignore errors, as we may not have held it, and we're exiting anyway (hence the (void) below).
 		 * Only the update process acquires this lock, so limit the unlock accordingly.
 		 */
 		if (is_updproc)
-			pthread_mutex_unlock(&recvpool.recvpool_ctl->write_updated_ctl);
+			(void)pthread_mutex_unlock(&recvpool.recvpool_ctl->write_updated_ctl);
 		SHMDT(recvpool.recvpool_ctl);
 		recvpool.recvpool_ctl = NULL;
 	}
