@@ -1165,7 +1165,11 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			if (NULL != fp)
 			{
 				evp_pkey = PEM_read_PrivateKey(fp, &evp_pkey, &passwd_callback, pwent);
-				fclose(fp);
+				/* If fclose(fp) fails, ignore it particularly because we opened the file in "r" mode only
+				 * so there is no danger of loss of updates. If evp_pkey is non-NULL, we definitely want to
+				 * proceed. If it is NULL, we will error out a few lines later. Hence the (void) below.
+				 */
+				(void)fclose(fp);
 			} else
 				evp_pkey = NULL;
 			if (NULL == evp_pkey)
