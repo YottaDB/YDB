@@ -309,11 +309,6 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 		case SSL_ERROR_WANT_READ:
 			return GTMTLS_WANT_READ;
 
-		case SSL_ERROR_WANT_X509_LOOKUP:
-		case SSL_ERROR_WANT_ACCEPT:
-		case SSL_ERROR_WANT_CONNECT:
-			assert(FALSE);
-
 		case SSL_ERROR_SSL:
 		case SSL_ERROR_NONE:
 			errptr = gtmcrypt_err_string;
@@ -352,6 +347,9 @@ STATICFNDEF int ssl_error(gtm_tls_socket_t *tls_sock, int err, long verify_resul
 			} while (TRUE);
 			break;
 
+		case SSL_ERROR_WANT_X509_LOOKUP:
+		case SSL_ERROR_WANT_ACCEPT:
+		case SSL_ERROR_WANT_CONNECT:
 		default:
 			tls_errno = -1;
 			UPDATE_ERROR_STRING("Unknown error: %d returned by `SSL_get_error'", error_code);
