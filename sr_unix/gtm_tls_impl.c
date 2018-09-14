@@ -1597,8 +1597,12 @@ int gtm_tls_renegotiate_options(gtm_tls_socket_t *socket, int msec_timeout, char
 			SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.CAfile", socket->tlsid);
 			rv = config_lookup_string(cfg, cfg_path, &CAfile);
 			if (CONFIG_FALSE == rv)
-			{
-				rv = config_lookup_string(cfg, "tls.CAfile", &CAfile);
+			{	/* We intentionally do not check the return value of the below call. If it returns CONFIG_FALSE,
+				 * we are guaranteed CAfile is NULL. In that case, we will anyways skip the later "if" block
+				 * of code that handles a non-NULL CAfile. No error is needed in that case.
+				 */
+				assert(NULL == CAfile);
+				(void)config_lookup_string(cfg, "tls.CAfile", &CAfile);
 			}
 		}
 		if (NULL != CAfile)
