@@ -1303,11 +1303,11 @@ gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *tls_ctx, gtm_tls_socket_t *prev_
 			SSL_set_tmp_dh_callback(ssl, tmp_dh_callback);
 		}
 	}
-	tlscafile = config_lookup_string(cfg, "tls.CAfile", &CAfile);
 	SNPRINTF(cfg_path, MAX_CONFIG_LOOKUP_PATHLEN, "tls.%s.CAfile", id);
-	config_lookup_string(cfg, cfg_path, &CAfile);	/* if absent CAfile retains value */
-	if (NULL != CAfile)
+	tlscafile = config_lookup_string(cfg, cfg_path, &CAfile);	/* if absent CAfile retains value */
+	if (CONFIG_FALSE != tlscafile)
 	{
+		assert(NULL != CAfile);
 		if (!(GTMTLS_OP_CA_LOADED & tls_ctx->flags))
 		{	/* no CAfile or CApath before so do now */
 			if (!SSL_CTX_load_verify_locations(tls_ctx->ctx, CAfile, NULL))
@@ -1611,7 +1611,7 @@ int gtm_tls_renegotiate_options(gtm_tls_socket_t *socket, int msec_timeout, char
 		}
 		if ((0 < session_id_len)
 			&& (0 >= SSL_set_session_id_context(ssl, (const unsigned char *)session_id_string,
-						(unsigned int)session_id_len)))
+										(unsigned int)session_id_len)))
 		{
 			GC_APPEND_OPENSSL_ERROR("Failed to set Session-ID context to enable session resumption.");
 			tls_errno = -1;
