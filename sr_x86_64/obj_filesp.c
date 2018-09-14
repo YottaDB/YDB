@@ -148,6 +148,7 @@ void finish_object_file(void)
         Elf_Scn		*text_scn, *symtab_scn, *strtab_scn;
         Elf_Data	*text_data, *symtab_data, *strtab_data;
         Elf64_Sym	symEntries[3];
+	char		errbuff[128];
 
         buff_flush();
         bufSize = gtm_object_size;
@@ -172,24 +173,38 @@ void finish_object_file(void)
 	 */
         lseek(object_file_des, 0, SEEK_SET);
         DOREADRL(object_file_des, gtm_obj_code, bufSize, actualSize);
+	if (actualSize != bufSize)
+	{
+		if (-1 == actualSize)
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+				ERR_SYSCALL, 5, RTS_ERROR_LITERAL("finish_object_file() DOREADRL()"), CALLFROM,
+				errno);
+		} else
+		{
+			SNPRINTF(errbuff, SIZEOF(errbuff), "finish_object_file() DOREADRL() : actualSize = %d : bufSize = %d",
+						actualSize, bufSize);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+				ERR_SYSCALL, 5, RTS_ERROR_STRING(errbuff), CALLFROM);
+		}
+	}
         /* Reset the pointer back for writing an ELF object. */
-        lseek(object_file_des, 0, SEEK_SET);
+        if ((off_t)-1 == lseek(object_file_des, 0, SEEK_SET))
+	{
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("finish_object_file() lseek()"), CALLFROM,
+			errno);
+	}
         /* Generate ELF64 header */
         if (EV_NONE == elf_version(EV_CURRENT))
-        {
-		FPRINTF(stderr, "Elf library out of date!\n");
-		assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_version() : Elf library out of date"), CALLFROM);
         if (0 == (elf = elf_begin(object_file_des, ELF_C_WRITE, NULL)))
-        {
-		FPRINTF(stderr, "elf_begin failed!\n");
-		assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_begin()"), CALLFROM);
         if (NULL == (ehdr = elf64_newehdr(elf)))
-        {
-		FPRINTF(stderr, "elf64_newehdr() failed!\n");
-		assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf64_newehdr()"), CALLFROM);
         ehdr->e_ident[EI_MAG0] = ELFMAG0;
         ehdr->e_ident[EI_MAG1] = ELFMAG1;
         ehdr->e_ident[EI_MAG2] = ELFMAG2;
@@ -210,15 +225,11 @@ void finish_object_file(void)
         ehdr->e_shoff = SIZEOF(Elf64_Ehdr);
         ehdr->e_flags = ELF64_LINKER_FLAG;
         if (NULL == (text_scn = elf_newscn(elf)))
-        {
-                FPRINTF(stderr, "elf_newscn() failed for text section!\n");
-                assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_newscn() failed for text section"), CALLFROM);
         if (NULL == (text_data = elf_newdata(text_scn)))
-        {
-                FPRINTF(stderr, "elf_newdata() failed for text section!\n");
-                assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_newdata() failed for text section"), CALLFROM);
         text_data->d_align = SECTION_ALIGN_BOUNDARY;
         text_data->d_off  = 0LL;
         text_data->d_buf  = gtm_obj_code;
@@ -226,10 +237,8 @@ void finish_object_file(void)
         text_data->d_size = gtm_object_size;
         text_data->d_version = EV_CURRENT;
         if (NULL == (text_shdr = elf64_getshdr(text_scn)))
-        {
-                FPRINTF(stderr, "elf64_getshdr() failed for text section\n");
-                assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_getshdr() failed for text section"), CALLFROM);
         text_shdr->sh_name = STR_SEC_TEXT_OFFSET;
         text_shdr->sh_type = SHT_PROGBITS;
         text_shdr->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
@@ -237,15 +246,11 @@ void finish_object_file(void)
         memcpy((string_tbl +  symIndex), module_name.addr, module_name.len);
         string_tbl[symIndex + module_name.len] = '\0';
         if (NULL == (strtab_scn = elf_newscn(elf)))
-        {
-                FPRINTF(stderr, "elf_newscn() failed for strtab section\n");
-                assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_newscn() failed for strtab section"), CALLFROM);
         if (NULL == (strtab_data = elf_newdata(strtab_scn)))
-        {
-                FPRINTF(stderr, "elf_newdata() failed for strtab section!\n");
-                assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_newdata() failed for strtab section"), CALLFROM);
         strtab_data->d_align = NATIVE_WSIZE;
         strtab_data->d_buf = string_tbl;
         strtab_data->d_off = 0LL;
@@ -253,10 +258,8 @@ void finish_object_file(void)
         strtab_data->d_type = ELF_T_BYTE;
         strtab_data->d_version = EV_CURRENT;
         if (NULL == (strtab_shdr = elf64_getshdr(strtab_scn)))
-        {
-                FPRINTF(stderr, "elf_getshdr() failed for strtab section!\n");
-                assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_getshdr() failed for strtab section"), CALLFROM);
         strtab_shdr->sh_name = STR_SEC_STRTAB_OFFSET;
         strtab_shdr->sh_type = SHT_STRTAB;
         strtab_shdr->sh_entsize = 0;
@@ -288,15 +291,11 @@ void finish_object_file(void)
         symEntries[i].st_value = 0;
         i++;
         if (NULL == (symtab_scn = elf_newscn(elf)))
-        {
-                FPRINTF(stderr, "elf_newscn() failed for symtab section!\n");
-                assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_newscn() failed for symtab section"), CALLFROM);
         if (NULL == (symtab_data = elf_newdata(symtab_scn)))
-        {
-                FPRINTF(stderr, "elf_newdata() failed for symtab section!\n");
-                assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_newdata() failed for symtab section"), CALLFROM);
         symtab_data->d_align = NATIVE_WSIZE;
         symtab_data->d_off  = 0LL;
         symtab_data->d_buf  = symEntries;
@@ -304,20 +303,16 @@ void finish_object_file(void)
         symtab_data->d_size = SIZEOF(Elf64_Sym) * i;
         symtab_data->d_version = EV_CURRENT;
         if (NULL == (symtab_shdr = elf64_getshdr(symtab_scn)))
-        {
-                FPRINTF(stderr, "elf_getshdr() failed for symtab section!\n");
-                assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_getshdr() failed for symtab section"), CALLFROM);
         symtab_shdr->sh_name = STR_SEC_SYMTAB_OFFSET;
         symtab_shdr->sh_type = SHT_SYMTAB;
         symtab_shdr->sh_entsize = SIZEOF(Elf64_Sym) ;
         symtab_shdr->sh_link = SEC_STRTAB_INDX;
         elf_flagehdr(elf, ELF_C_SET, ELF_F_DIRTY);
         if (0 > elf_update(elf, ELF_C_WRITE))
-        {
-                FPRINTF(stderr, "elf_update() failed!\n");
-                assertpro(FALSE);
-        }
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
+			ERR_SYSCALL, 5, RTS_ERROR_LITERAL("elf_update() failed"), CALLFROM);
         elf_end(elf);
         /* Free the memory malloc'ed above */
         free(string_tbl);
