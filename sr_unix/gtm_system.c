@@ -26,13 +26,9 @@
 #include "fork_init.h"
 #include "eintr_wrappers.h"
 #include "ydb_getenv.h"
+#include "wbox_test_init.h"
 
-#define RESTOREMASK(RC)					\
-{							\
-	sigaction(SIGINT, &old_intrpt, NULL);		\
-	sigaction(SIGQUIT, &old_quit, NULL);		\
-	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, RC);	\
-}
+#define RESTOREMASK(RC)	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, RC)
 
 error_def(ERR_INVSTRLEN);
 
@@ -43,7 +39,6 @@ int gtm_system(const char *cmdline)
 
 int gtm_system_internal(const char *sh, const char *opt, const char *rtn, const char *cmdline)
 {
-	struct sigaction	ignore, old_intrpt, old_quit;
 	sigset_t		mask, savemask;
 	pid_t			pid;
 	int			stat;		/* child exit status */
@@ -55,28 +50,13 @@ int gtm_system_internal(const char *sh, const char *opt, const char *rtn, const 
 	SETUP_THREADGBL_ACCESS;
 	DEFER_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM, prev_intrpt_state);
 
-	sigemptyset(&ignore.sa_mask);
-	ignore.sa_handler = SIG_IGN;
-	ignore.sa_flags = 0;
-
-	if (sigaction(SIGINT, &ignore, &old_intrpt))
-	{
-		ENABLE_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM, prev_intrpt_state);
-		return -1;
-	}
-	if (sigaction(SIGQUIT, &ignore, &old_quit))
-	{
-		sigaction(SIGINT, &old_intrpt, NULL);
-		ENABLE_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM, prev_intrpt_state);
-		return -1;
-	}
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
+	sigaddset(&mask, SIGINT);
+	sigaddset(&mask, SIGQUIT);
 	SIGPROCMASK(SIG_BLOCK, &mask, &savemask, rc);
 	if (rc)
 	{
-		sigaction(SIGINT, &old_intrpt, NULL);
-		sigaction(SIGQUIT, &old_quit, NULL);
 		ENABLE_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM, prev_intrpt_state);
 		return -1;
 	}
@@ -95,15 +75,28 @@ int gtm_system_internal(const char *sh, const char *opt, const char *rtn, const 
 		RESTOREMASK(rc);
 		ENABLE_INTERRUPTS(INTRPT_IN_FORK_OR_SYSTEM, prev_intrpt_state);
 		return -1;
-	}
-	else if (0 == pid)
+	} else if (0 == pid)
 	{
 		RESTOREMASK(rc);
-		assert('\0' != *cmdline);
-		if (NULL == rtn)
-			execl(sh, sh, opt, cmdline, NULL);
+		assert((NULL == cmdline) || ('\0' != *cmdline));
+		assert(NULL != sh);
+		assert(NULL != opt);
+		if (WBTEST_ENABLED(WBTEST_BADEXEC_OP_ZEDIT))
+			STRCPY(sh, "");
+		/* "execl" (i.e. EXECL macro usage below) requires NULL to be the last parameter. All parameters before that
+		 * should be non-NULL. So depending on the NULL-ness of rtn and cmdline construct the appropriate "execl"
+		 * invocation. sh and opt are guaranteed non-NULL (asserted above) so they can be safely included always.
+		 */
+		if (NULL == cmdline)
+		{
+			if (NULL == rtn)
+				EXECL(sh, sh, opt, NULL);
+			else
+				EXECL(sh, sh, opt, rtn, NULL);
+		} else if (NULL == rtn)
+			EXECL(sh, sh, opt, cmdline, NULL);
 		else
-			execl(sh, sh, opt, rtn, cmdline, NULL);
+			EXECL(sh, sh, opt, rtn, cmdline, NULL);
 		UNDERSCORE_EXIT(127);
 	} else
 	{
