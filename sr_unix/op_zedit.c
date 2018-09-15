@@ -20,7 +20,6 @@
 #include "gtm_stdlib.h"
 #include "gtm_unistd.h"
 
-#include <sys/wait.h>
 #include <errno.h>
 
 #include "io.h"
@@ -33,7 +32,6 @@
 #include "fork_init.h"
 #include "geteditor.h"
 #include "restrict.h"
-#include "wbox_test_init.h"
 #include "iottdef.h"
 #include "ydb_getenv.h"
 
@@ -51,17 +49,12 @@ void op_zedit(mval *v, mval *p)
 	char		*edt;
 	char		es[MAX_FBUFF + 1], typ, *ptr;
 	short		path_len, tslash;
-	int		objcnt;
-	int		waitid;
-	unsigned int	childid, status;
-#	ifdef _BSD
-	union wait	wait_status;
-#	endif
+	int		objcnt, ret;
+	unsigned int	status;
 	bool		has_ext, exp_dir;
 	parse_blk	pblk;
 	mstr		src;
 	zro_ent		*sp, *srcdir;
-	struct		sigaction act, intr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -166,38 +159,16 @@ void op_zedit(mval *v, mval *p)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "ZEDIT");
 
 	flush_pio();
-	/* ignore interrupts */
-	sigemptyset(&act.sa_mask);
-	act.sa_flags = 0;
-	act.sa_handler = SIG_IGN;
-	sigaction(SIGINT, &act, &intr);
-	FORK(childid);
-	if (childid)
+	ret = gtm_system_internal(editor.addr, es, NULL, NULL);
+	if (-1 == ret)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("gtm_system_internal()"), CALLFROM, errno);
+	assert(WIFEXITED(ret));	/* Since "gtm_system_internal" does a WAITPID with options parameter set to 0,
+				 * we are guaranteed that a return that is not -1 implies the child has terminated.
+				 */
+	if (WIFEXITED(ret))
 	{
-		waitid = (int)childid;
-		for (;;)
-		{
-#ifdef _BSD
-			WAIT(&wait_status, waitid);
-#else
-			WAIT((int *)&status, waitid);
-#endif
-			if (waitid == (int)childid)
-				break;
-			if (-1 == waitid)
-				break;
-		}
-		if (-1 != waitid)
-			dollar_zeditor = 0;
-		else
-			dollar_zeditor = errno;
-		/* restore interrupt handler */
-		sigaction(SIGINT, &intr, 0);
+		ret = WEXITSTATUS(ret);
+		dollar_zeditor = ret;
 	} else
-	{
-		if (WBTEST_ENABLED(WBTEST_BADEXEC_OP_ZEDIT))
-			STRCPY(editor.addr, "");
-		EXECL(editor.addr, editor.addr, es, 0);
-		UNDERSCORE_EXIT(-1);
-	}
+		dollar_zeditor = -1;	/* Not sure how child did not terminate. Record that event with a -1 here. */
 }
