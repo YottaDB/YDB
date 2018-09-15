@@ -47,11 +47,14 @@ CONDITION_HANDLER(gvcmy_open_ch)
 		PRN_ERROR;
 		CONTINUE;
 	}
-	assert(NULL != gd_header);
-	assert(NULL != gv_currkey);
-	assert(NULL != gv_altkey);
-	gv_currkey->base[0] = gv_altkey->base[0] = '\0'; /* error opening remote db should reset gv_currkey and gv_altkey so
-							  * that we drive gtcm_bind_name if the next global reference is the
-							  * same as the current one */
+	/* Error opening remote db should reset gv_currkey and gv_altkey so that we drive gtcm_bind_name
+	 * if the next global reference is the same as the current one. Note that it is possible "gd_header",
+	 * "gv_currkey" and "gv_altkey" are all NULL at this point (e.g. the first database reference is
+	 * an extended reference) so we check for non-NULL pointers before clearing the "base" field.
+	 */
+	if (NULL != gv_currkey)
+		gv_currkey->base[0] = '\0';
+	if (NULL != gv_altkey)
+		gv_altkey->base[0] = '\0';
 	NEXTCH;
 }
