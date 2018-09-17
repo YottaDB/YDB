@@ -33,7 +33,6 @@
 #include "util.h"
 #include "gdsbml.h"
 #include "gtmmsg.h"
-#include "get_spec.h"
 #include "mupip_integ.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
@@ -204,11 +203,12 @@ boolean_t mu_int_blk(
 	sub_list	mu_sub_list[MAX_GVSUBSCRIPTS + 1];
 	sub_num		check_vals;
 	trans_num	blk_tn;
-	uchar_ptr_t	subrec_ptr, free_blk_base;
+	uchar_ptr_t	free_blk_base;
 	enum db_ver	ondsk_blkver;
 	uint4		cnt, span_curr_blk, rval_len, gblsize;
 	unsigned short	numsubs;
 	unsigned int	null_subscript_cnt;
+	boolean_t	coll_ret;
 
 	mu_int_offset[mu_int_plen] = 0;
 	mu_int_path[mu_int_plen++] = blk;  /* Increment mu_int_plen on entry; decrement explicitly or via mu_int_err() on exit. */
@@ -974,18 +974,14 @@ boolean_t mu_int_blk(
 				*/
 				if (rec_size > hdr_len + SIZEOF(block_id))
 				{
-					subrec_ptr = get_spec((sm_uc_ptr_t)rec_base + hdr_len + SIZEOF(block_id),
-									(int)(rec_size - (hdr_len + SIZEOF(block_id))), COLL_SPEC);
-					if (subrec_ptr)
+					GET_GVT_COLL_INFO(trees_tail, (sm_uc_ptr_t)rec_base + hdr_len + SIZEOF(block_id),
+									(int)(rec_size - (hdr_len + SIZEOF(block_id))), coll_ret);
+					if (!coll_ret)
 					{
-						trees_tail->nct = *(subrec_ptr + COLL_NCT_OFFSET);
-						trees_tail->act = *(subrec_ptr + COLL_ACT_OFFSET);
-						trees_tail->ver = *(subrec_ptr + COLL_VER_OFFSET);
-					} else
-					{
-						trees_tail->nct = 0;
-						trees_tail->act = 0;
-						trees_tail->ver = 0;
+						mu_int_err(ERR_INVSPECREC, TRUE, TRUE, buff, comp_length, top_key, top_len,
+								(unsigned int)blk_levl);
+						free(free_blk_base);
+						return FALSE;
 					}
 				} else
 				{

@@ -229,7 +229,7 @@ LITDEF	err_msg merrors[] = {
 	{ "VIEWAMBIG", "View parameter !AD is ambiguous", 2 },
 	{ "VIEWNOTFOUND", "View parameter !AD not valid", 2 },
 	{ "UNUSEDMSG395", "ZSETPRVARGBAD nixed in r1.20 because it is a VMS only error", 0 },
-	{ "INVSPECREC", "Invalid global modifier record", 0 },
+	{ "INVSPECREC", "!AD Invalid global modifier record", 2 },
 	{ "UNUSEDMSG397", "ZSETPRVSYNTAX nixed in r1.20 because it is a VMS only error", 0 },
 	{ "ZSRCHSTRMCT", "Search stream identifier out of range", 0 },
 	{ "VERSION", "Version mismatch - This program must be recompiled", 0 },

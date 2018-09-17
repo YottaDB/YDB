@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -69,7 +72,6 @@
 #include "gtmmsg.h"
 #include "gtmio.h"
 #include "spec_type.h"
-#include "get_spec.h"
 #include "collseq.h"
 #include "format_targ_key.h"
 #include "patcode.h"
@@ -760,9 +762,10 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	int		dtblk_index, hdr_len, rec_value_len, rec_len, rec_cmpc;
 	int		tmp_cmpc;
 	size_t		len;
-	uchar_ptr_t	blk_p, rec_value_p, subrec_p, key_end_p, rec_p;
+	uchar_ptr_t	blk_p, rec_value_p, key_end_p, rec_p;
 	block_info	*blk_set_p;
 	unsigned short	us_rec_len;
+	boolean_t	dummy_ret;
 
 	dbc_init_key(psa, &psa->first_rec_key);
 	/* We have to parse the block down to the supplied key to make sure the compressed portions
@@ -812,19 +815,8 @@ uchar_ptr_t dbc_format_key(phase_static_area *psa, uchar_ptr_t trec_p)
 	rec_len = us_rec_len;
 	rec_value_len = (int)(rec_len - (rec_value_p - blk_set_p->curr_rec));
 	if (SIZEOF(block_id) < rec_value_len)
-	{	/* This global potentially has collation data in its record (taken from gvcst_root_search()) */
-		subrec_p = get_spec(rec_value_p + SIZEOF(block_id), (int)(rec_value_len - SIZEOF(block_id)), COLL_SPEC);
-		if (subrec_p)
-		{
-			gv_target->nct = *(subrec_p + COLL_NCT_OFFSET);
-			gv_target->act = *(subrec_p + COLL_ACT_OFFSET);
-			gv_target->ver = *(subrec_p + COLL_VER_OFFSET);
-		} else
-		{
-			gv_target->nct = 0;
-			gv_target->act = 0;
-			gv_target->ver = 0;
-		}
+	{	/* This global potentially has collation data in its record (taken from "gvcst_root_search") */
+		GET_GVT_COLL_INFO(gv_target, rec_value_p + SIZEOF(block_id), (int)(rec_value_len - SIZEOF(block_id)), dummy_ret);
 	} else
 	{
 		gv_target->nct = 0;

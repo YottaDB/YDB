@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -1483,7 +1486,7 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 		if (*++key_top)
 			have_gvtleaf = TRUE;		/* gdsblk_gvtleaf subscript so must be */
 		else if (SIZEOF(block_id) <= ((rec1_ptr + rec1_len) - ++key_top) &&
-			 (SIZEOF(block_id) + MAX_SPEC_TYPE_LEN) >= ((rec1_ptr + rec1_len) - key_top))
+			 (SIZEOF(block_id) + COLL_SPEC_LEN) >= ((rec1_ptr + rec1_len) - key_top))
 		{	/* record value long enough for block_id but not longer than block_id plus collation information */
 			GET_LONG(ptr2blk, key_top);
 			if (new_is_native)

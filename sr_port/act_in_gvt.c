@@ -21,7 +21,6 @@
 #include "gdsfhead.h"
 #include "gdsblk.h"
 #include "collseq.h"
-#include "spec_type.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #endif
