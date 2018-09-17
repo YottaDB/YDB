@@ -92,6 +92,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-
 # Note: -Wuninitialized not explicitly mentioned since it is enabled by Wall
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-char-subscripts -Wno-unused-but-set-variable")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wvla")
 
 # Below is an optimization flag related description copied from sr_linux/gtm_env_sp.csh
 #	-fno-defer-pop to prevent problems with assembly/generated code with optimization

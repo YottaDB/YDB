@@ -67,6 +67,7 @@ int gtm_fprintf(FILE *stream, const char *format, ...)
 	va_list		printargs, pa_copy;
 	size_t		retval, buflen, retlen;
 	sigset_t	savemask;
+	char		*buf, tmpbuf[256];
 	intrpt_state_t	prev_intrpt_state;
 
 	retval = 0;
@@ -74,18 +75,20 @@ int gtm_fprintf(FILE *stream, const char *format, ...)
 	VAR_COPY(pa_copy, printargs);
 	VSNPRINTF(NULL, 0, format, pa_copy, buflen);	/* C99: NULL string just returns size */
 	va_end(pa_copy);
-	{
-		char buf[buflen + 1];			/* C99: Variable Length Array, avoids malloc. */
-
-		VSNPRINTF(buf, SIZEOF(buf), format, printargs, buflen);
-		GTM_FWRITE(buf, 1, buflen, stream, retlen, retval);
-		if (retlen < buflen)
-		{	/* Error from "GTM_FWRITE". "retval" contains "errno". */
-			assert(errno == retval);
-			retval = -1;	/* Now that "errno" has been set, return -1 just like "fprintf" would in case of error */
-		}
+	if (SIZEOF(tmpbuf) > buflen)	/* ">" (and not ">=") to account for terminating NULL byte */
+		buf = tmpbuf;		/* Use C local variable for most common case (where formatted output is < 256 bytes) */
+	else
+		buf = malloc(buflen + 1); /* Use malloc/free for unusual case where formatted output is >= 256 bytes */
+	VSNPRINTF(buf, buflen + 1, format, printargs, buflen);
+	GTM_FWRITE(buf, 1, buflen, stream, retlen, retval);
+	if (retlen < buflen)
+	{	/* Error from "GTM_FWRITE". "retval" contains "errno". */
+		assert(errno == retval);
+		retval = -1;	/* Now that "errno" has been set, return -1 just like "fprintf" would in case of error */
 	}
 	va_end(printargs);
+	if (buf != tmpbuf)
+		free(buf);
 	return retval;
 }
 

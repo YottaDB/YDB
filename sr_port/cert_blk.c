@@ -93,8 +93,8 @@ error_def(ERR_DBNONUMSUBS);
 #define TEXT3 " :              LVL=0x"
 #define TEXT4 ","
 
-#define MAX_UTIL_LEN STRLEN(TEXT0) + BLOCK_WINDOW + STRLEN(TEXT3) + LEVEL_WINDOW + STRLEN(TEXT4) + 1
-#define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION)										\
+#define MAX_UTIL_LEN STR_LIT_LEN(TEXT0) + BLOCK_WINDOW + STR_LIT_LEN(TEXT3) + LEVEL_WINDOW + STR_LIT_LEN(TEXT4) + 1
+#define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION)								\
 {														\
 	switch (ERROR_ACTION)											\
 	{													\
