@@ -210,7 +210,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 		{
 			util_out_print("!AD:!_  Key cnt: !@UQ  max subsc len: !UL  max data len: !UL", TRUE,
 				       LEN_AND_LIT("LOAD TOTAL"), &key_count, max_subsc_len, max_data_len);
-			tmp_rec_count = (iter == begin) ? iter : iter - 1;
+			tmp_rec_count = iter - 1;
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_INFO(ERR_LOADRECCNT), 1, &tmp_rec_count);
 			mu_gvis();
 			util_out_print(0, TRUE);
@@ -406,9 +406,9 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 	if (mupip_error_occurred && ONERROR_STOP == onerror)
 	{
 		tmp_rec_count = (go_format_val_read) ? iter - 1 : iter;
-		failed_record_count-=(go_format_val_read) ? 1 : 0;
+		failed_record_count -= (go_format_val_read) ? 1 : 0;
 	} else
-		tmp_rec_count = (iter == begin) ? iter : iter - 1;
+		tmp_rec_count = iter - 1;
 	if (0 != first_failed_rec_count)
 	{
 		if (tmp_rec_count > first_failed_rec_count)
