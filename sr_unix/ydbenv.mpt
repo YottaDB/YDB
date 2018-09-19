@@ -126,11 +126,6 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. if $zlength(tmp2) write "export ydb_retention=$gtm_retention",!
 	. else  write "export ydb_retention=42",!,"export gtm_retention=$ydb_retention",!
 	else  write "export gtm_retention=$ydb_retention",!
-	set tmp1=$ztrnlnm("ydb_prompt"),tmp2=$ztrnlnm("gtm_prompt")
-	if '$zlength(tmp1) do:$zlength(tmp2)
-	. set tmp3=$zpiece(tmp2,"GTM",1) for i=2:1:$zlength(tmp2,"GTM") set tmp3=tmp3_"YDB"_$zpiece(tmp2,"GTM",i)
-	. write "export ydb_prompt=",tmp3,!,"export gtm_prompt=$ydb_prompt",!
-	else  write "export gtm_prompt=$ydb_prompt",!
 	set tmp1=$ztrnlnm("LD_LIBRARY_PATH")
 	write:'($zlength(tmp1,dist)-1) "export LD_LIBRARY_PATH=""",dist,$select($zlength(dist):":"_tmp1,1:""),"""",!
 	write "alias dse=$ydb_dist/dse",!
