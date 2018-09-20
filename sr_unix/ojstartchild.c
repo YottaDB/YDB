@@ -112,17 +112,6 @@ LITREF gtmImageName	gtmImageNames[];
 	}										\
 }
 
-#define FORK_RETRY(PID)						\
-{								\
-	FORK(PID);						\
-	while (-1 == PID)					\
-	{							\
-		assertpro(EAGAIN == errno || ENOMEM == errno);	\
-		usleep(50000);					\
-		FORK(PID);					\
-	}							\
-}
-
 #define SETUP_OP_FAIL()											\
 {													\
 	kill(child_pid, SIGTERM);									\
@@ -376,17 +365,21 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Do the fork and exec but BEFORE that do a FFLUSH(NULL) to make sure any fclose (done in io_rundown
-	 * in the child process) does not affect file offsets in this (parent) process' file descriptors
-	 */
 	if (!ydb_dist_ok_to_use)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, STRLEN(ydb_dist), ydb_dist,
 				gtmImageNames[image_type].imageNameLen, gtmImageNames[image_type].imageName);
+	/* Do the fork and exec but BEFORE that do a FFLUSH(NULL) to make sure any fclose (done in io_rundown
+	 * in the child process) does not affect file offsets in this (parent) process' file descriptors
+	 */
 	FFLUSH(NULL);
-	FORK_RETRY(child_pid);
-	if (child_pid == 0)
+	FORK(child_pid);
+	if (0 > child_pid)
 	{
-		/* This is a child process (middle process, M)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_JOBFAIL, 0, ERR_SYSCALL, 5, LEN_AND_LIT("fork()"), CALLFROM, errno);
+		assert(FALSE);
+	}
+	if (child_pid == 0)
+	{	/* This is a child process (middle process, M).
 		 * Test out various parameters and setup everything possible for the actual Job (J), so it(J) can start off without
 		 * much hitch. If any error occurs during this, exit with appropriate status so the waiting parent can diagnose.
 		 */
@@ -530,7 +523,15 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		if (WBTEST_ENABLED(WBTEST_SIGTERM_IN_JOB_CHILD))
 			kill(getpid(), SIGTERM);
 		/* clone self and exit */
-		FORK_RETRY(child_pid);
+		joberr = joberr_frk;
+		FORK(child_pid);
+		if (0 > child_pid)
+		{
+			job_errno = errno;
+			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
+			ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr));
+			UNDERSCORE_EXIT(joberr);
+		}
 		if (child_pid)
 		{
 			/* This is still the middle process.  */

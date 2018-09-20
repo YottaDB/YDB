@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -215,8 +218,8 @@ int	op_job(int4 argcnt, ...)
 		{
 			DOREADRC(pipe_fds[0], &job_errno, SIZEOF(job_errno), pipe_status);
 			if (0 < pipe_status)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, joberrs[exit_stat].len,
-										joberrs[exit_stat].msg, 2, errno);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, joberrs[exit_stat].len,
+										joberrs[exit_stat].msg, errno);
 			if (ERR_JOBLVN2LONG == job_errno)
 			{	/* This message takes buffer_size as argument so take it before closing the pipe */
 				DOREADRC(pipe_fds[0], &buffer_size, SIZEOF(buffer_size), pipe_status);
