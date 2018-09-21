@@ -456,7 +456,12 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 					DEBUG_ONLY(dbg_wtfini_lcnt = dbg_wtfini_wcs_wtstart);	/* used by "wcs_wtfini" */
 					older_twin = (csr->bt_index ? (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, csr->twin) : cr);
 					assert(!older_twin->bt_index);
-					wcs_wtfini(region, CHECK_IS_PROC_ALIVE_FALSE, older_twin);
+					/* No need to check "wcs_wtfini" return value. If it errors out, "csr->twin"
+					 * would still be non-zero and we are going to check that a few lines later anyways
+					 * and will skip processing this cache-record. Best not to issue any errors here
+					 * where the caller might not actually need this to be flushed right now.
+					 */
+					(void)wcs_wtfini(region, CHECK_IS_PROC_ALIVE_FALSE, older_twin);
 					wtfini_called_once = TRUE;
 				}
 				if (!was_crit)
