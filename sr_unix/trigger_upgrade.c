@@ -172,7 +172,7 @@ STATICFNDEF void	gvtr_set_hashtrhash(char *trigvn, int trigvn_len, uint4 hash_co
 /* Upgrade ^#t global in "reg" region */
 void	trigger_upgrade(gd_region *reg)
 {
-	boolean_t		est_first_pass, do_upgrade, is_defined;
+	boolean_t		est_first_pass, is_defined;
 	boolean_t		was_null = FALSE, is_null = FALSE;
 	int			seq_num, trig_seq_num;
 	int			currlabel;
@@ -300,261 +300,257 @@ void	trigger_upgrade(gd_region *reg)
 	 * 	triggers for this global get re-read if and when we implement an -ONLINE upgrade).
 	 */
 	tmpmv = &tmpmval;	/* At all points maintain this relationship. The two are used interchangeably below */
-	if (gv_target->root)
-		do_upgrade = TRUE;
+	assert(gv_target->root);	/* caller "mupip_trigger" should have not invoked us otherwise */
 	/* The below logic assumes ^#t global does not have any integrity errors */
-	assert(do_upgrade);	/* caller should have not invoked us otherwise */
-	if (do_upgrade)
-	{	/* kill ^#t("#TRHASH"), ^#t("#TNAME") and ^#t("#LABEL") first. Regenerate each again as we process ^#t(<gbl>,...) */
-		csa->incr_db_trigger_cycle = TRUE; /* so that we increment csd->db_trigger_cycle at commit time.
-							 * this forces concurrent processes to read upgraded triggers.
-							 */
-		if (JNL_WRITE_LOGICAL_RECS(csa))
-		{	/* Note that the ^#t upgrade is a physical layout change. But it has no logical change (i.e. users
-			 * see the same MUPIP TRIGGER -SELECT output as before). So write only a dummy LGTRIG journal
-			 * record for this operation. Hence write a string that starts with a trigger comment character ";".
-			 */
-			assert(!gv_cur_region->read_only);
-			jnl_format(JNL_LGTRIG, NULL, (mval *)&literal_trigjnlrec, 0);
-		}
-		/* KILL ^#t("#LABEL") unconditionally */
-		BUILD_HASHT_SUB_CURRKEY(LITERAL_HASHLABEL, STRLEN(LITERAL_HASHLABEL));
-		if (0 != gvcst_data())
-			gvcst_kill(TRUE);
-		/* KILL ^#t("#TNAME") unconditionally and regenerate */
-		BUILD_HASHT_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME));
-		if (0 != gvcst_data())
-			gvcst_kill(TRUE);
-		/* KILL ^#t("#TRHASH") unconditionally and regenerate */
-		BUILD_HASHT_SUB_CURRKEY(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH));
-		if (0 != gvcst_data())
-			gvcst_kill(TRUE);
-		/* Loop through all global names for which ^#t(<gvn>) exists. The only first-level subscripts of ^#t starting
-		 * with # are #TNAME and #TRHASH in collation order. So after #TRHASH we expect to find subscripts that are
-		 * global names. Hence the HASHTRHASH code is placed AFTER the HASHTNAME code above.
-		 */
-		TREF(gd_targ_gvnh_reg) = NULL;	/* needed so op_gvorder below goes through gvcst_order (i.e. focuses only
-						 * on the current region) and NOT through gvcst_spr_order (which does not
-						 * apply anyways in the case of ^#t).
+	/* kill ^#t("#TRHASH"), ^#t("#TNAME") and ^#t("#LABEL") first. Regenerate each again as we process ^#t(<gbl>,...) */
+	csa->incr_db_trigger_cycle = TRUE; /* so that we increment csd->db_trigger_cycle at commit time.
+						 * this forces concurrent processes to read upgraded triggers.
 						 */
-		nullbyte[0] = '\0';
-		trig_protected_mval_push_count = 0;
-		INCR_AND_PUSH_MV_STENT(gvname); /* Protect gvname from garbage collection */
-		do
+	if (JNL_WRITE_LOGICAL_RECS(csa))
+	{	/* Note that the ^#t upgrade is a physical layout change. But it has no logical change (i.e. users
+		 * see the same MUPIP TRIGGER -SELECT output as before). So write only a dummy LGTRIG journal
+		 * record for this operation. Hence write a string that starts with a trigger comment character ";".
+		 */
+		assert(!gv_cur_region->read_only);
+		jnl_format(JNL_LGTRIG, NULL, (mval *)&literal_trigjnlrec, 0);
+	}
+	/* KILL ^#t("#LABEL") unconditionally */
+	BUILD_HASHT_SUB_CURRKEY(LITERAL_HASHLABEL, STRLEN(LITERAL_HASHLABEL));
+	if (0 != gvcst_data())
+		gvcst_kill(TRUE);
+	/* KILL ^#t("#TNAME") unconditionally and regenerate */
+	BUILD_HASHT_SUB_CURRKEY(LITERAL_HASHTNAME, STRLEN(LITERAL_HASHTNAME));
+	if (0 != gvcst_data())
+		gvcst_kill(TRUE);
+	/* KILL ^#t("#TRHASH") unconditionally and regenerate */
+	BUILD_HASHT_SUB_CURRKEY(LITERAL_HASHTRHASH, STRLEN(LITERAL_HASHTRHASH));
+	if (0 != gvcst_data())
+		gvcst_kill(TRUE);
+	/* Loop through all global names for which ^#t(<gvn>) exists. The only first-level subscripts of ^#t starting
+	 * with # are #TNAME and #TRHASH in collation order. So after #TRHASH we expect to find subscripts that are
+	 * global names. Hence the HASHTRHASH code is placed AFTER the HASHTNAME code above.
+	 */
+	TREF(gd_targ_gvnh_reg) = NULL;	/* needed so op_gvorder below goes through gvcst_order (i.e. focuses only
+					 * on the current region) and NOT through gvcst_spr_order (which does not
+					 * apply anyways in the case of ^#t).
+					 */
+	nullbyte[0] = '\0';
+	trig_protected_mval_push_count = 0;
+	INCR_AND_PUSH_MV_STENT(gvname); /* Protect gvname from garbage collection */
+	do
+	{
+		op_gvorder(gvname);
+		if (0 == gvname->str.len)
+			break;
+		assert(ARRAYSIZE(trigvn) > gvname->str.len);
+		memcpy(&trigvn[0], gvname->str.addr, gvname->str.len);
+		gvname->str.addr = &trigvn[0];	/* point away from stringpool to avoid stp_gcol issues */
+		/* Save gv_currkey->prev so it is restored before next call to op_gvorder (which cares about this field).
+		 * gv_currkey->prev gets tampered with in the for loop below (e.g. BUILD_HASHT_SUB_CURRKEY macro).
+		 * No need to do this for gv_currkey->end since the body of the for loop takes care of restoring it.
+		 */
+		gvname_prev = gv_currkey->prev;
+		BUILD_HASHT_SUB_CURRKEY(gvname->str.addr, gvname->str.len);
+		/* At this point, gv_currkey is ^#t(<gvn>) */
+		/* Increment ^#t(<gvn>,"#CYCLE") */
+		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashcycle, tmpmv);
+		assert(is_defined);
+		tmpint4 = mval2i(tmpmv);
+		tmpint4++;
+		i2mval(tmpmv, tmpint4);
+		gvtr_set_hasht_gblsubs((mval *)&literal_hashcycle, tmpmv);
+		/* Read ^#t(<gvn>,"#COUNT") */
+		is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashcount, tmpmv);
+		if (is_defined)
 		{
-			op_gvorder(gvname);
-			if (0 == gvname->str.len)
-				break;
-			assert(ARRAYSIZE(trigvn) > gvname->str.len);
-			memcpy(&trigvn[0], gvname->str.addr, gvname->str.len);
-			gvname->str.addr = &trigvn[0];	/* point away from stringpool to avoid stp_gcol issues */
-			/* Save gv_currkey->prev so it is restored before next call to op_gvorder (which cares about this field).
-			 * gv_currkey->prev gets tampered with in the for loop below (e.g. BUILD_HASHT_SUB_CURRKEY macro).
-			 * No need to do this for gv_currkey->end since the body of the for loop takes care of restoring it.
-			 */
-			gvname_prev = gv_currkey->prev;
-			BUILD_HASHT_SUB_CURRKEY(gvname->str.addr, gvname->str.len);
-			/* At this point, gv_currkey is ^#t(<gvn>) */
-			/* Increment ^#t(<gvn>,"#CYCLE") */
-			is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashcycle, tmpmv);
-			assert(is_defined);
 			tmpint4 = mval2i(tmpmv);
-			tmpint4++;
-			i2mval(tmpmv, tmpint4);
-			gvtr_set_hasht_gblsubs((mval *)&literal_hashcycle, tmpmv);
-			/* Read ^#t(<gvn>,"#COUNT") */
-			is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashcount, tmpmv);
+			count = tmpint4;
+			/* Get ^#t(<gvn>,"#LABEL"), error out for invalid values. Upgrade disallowed for label 1 triggers */
+			is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashlabel, tmpmv);
+			assert(is_defined);
+			currlabel = mval2i(tmpmv);
+			if ((V19_HASHT_GBL_LABEL_INT >= currlabel) || (HASHT_GBL_CURLABEL_INT <= currlabel))
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_TRIGUPBADLABEL, 6, currlabel,
+						HASHT_GBL_CURLABEL_INT, gvname->str.len, gvname->str.addr,
+						REG_LEN_STR(reg));
+			/* Set ^#t(<gvn>,"#LABEL")=HASHT_GBL_CURLABEL */
+			gvtr_set_hasht_gblsubs((mval *)&literal_hashlabel, (mval *)&literal_curlabel);
+		} else
+			count = 0;
+		/* Kill ^#t(<gvn>,"#TRHASH") unconditionally and regenerate */
+		gvtr_kill_hasht_gblsubs((mval *)&literal_hashtrhash, TRUE);
+		/* At this point, gv_currkey is ^#t(<gvn>) */
+		for (i = 1; i <= count; i++)
+		{
+			/* At this point, gv_currkey is ^#t(<gvn>) */
+			curend = gv_currkey->end; /* note gv_currkey->end before changing it so we can restore it later */
+			assert(KEY_DELIMITER == gv_currkey->base[curend]);
+			assert(gv_target->gd_csa == cs_addrs);
+			i2mval(tmpmv, i);
+			COPY_SUBS_TO_GVCURRKEY(tmpmv, gv_cur_region, gv_currkey, was_null, is_null);
+			/* At this point, gv_currkey is ^#t(<gvn>,i) */
+			/* Compute new LHASH and BHASH hash values.
+			 *	LHASH uses : GVSUBS,                        XECUTE
+			 *	BHASH uses : GVSUBS, DELIM, ZDELIM, PIECES, XECUTE
+			 * So reach each of these pieces and compute hash along the way.
+			 */
+			STR_PHASH_INIT(hash_state, hash_totlen);
+			STR_PHASH_PROCESS(hash_state, hash_totlen, gvname->str.addr, gvname->str.len);
+			STR_PHASH_PROCESS(hash_state, hash_totlen, nullbyte, 1);
+			/* Read in ^#t(<gvn>,i,"GVSUBS") */
+			is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_gvsubs, tmpmv);
 			if (is_defined)
 			{
-				tmpint4 = mval2i(tmpmv);
-				count = tmpint4;
-				/* Get ^#t(<gvn>,"#LABEL"), error out for invalid values. Upgrade disallowed for label 1 triggers */
-				is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_hashlabel, tmpmv);
-				assert(is_defined);
-				currlabel = mval2i(tmpmv);
-				if ((V19_HASHT_GBL_LABEL_INT >= currlabel) || (HASHT_GBL_CURLABEL_INT <= currlabel))
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_TRIGUPBADLABEL, 6, currlabel,
-							HASHT_GBL_CURLABEL_INT, gvname->str.len, gvname->str.addr,
-							REG_LEN_STR(reg));
-				/* Set ^#t(<gvn>,"#LABEL")=HASHT_GBL_CURLABEL */
-				gvtr_set_hasht_gblsubs((mval *)&literal_hashlabel, (mval *)&literal_curlabel);
-			} else
-				count = 0;
-			/* Kill ^#t(<gvn>,"#TRHASH") unconditionally and regenerate */
-			gvtr_kill_hasht_gblsubs((mval *)&literal_hashtrhash, TRUE);
-			/* At this point, gv_currkey is ^#t(<gvn>) */
-			for (i = 1; i <= count; i++)
-			{
-				/* At this point, gv_currkey is ^#t(<gvn>) */
-				curend = gv_currkey->end; /* note gv_currkey->end before changing it so we can restore it later */
-				assert(KEY_DELIMITER == gv_currkey->base[curend]);
-				assert(gv_target->gd_csa == cs_addrs);
-				i2mval(tmpmv, i);
-				COPY_SUBS_TO_GVCURRKEY(tmpmv, gv_cur_region, gv_currkey, was_null, is_null);
-				/* At this point, gv_currkey is ^#t(<gvn>,i) */
-				/* Compute new LHASH and BHASH hash values.
-				 *	LHASH uses : GVSUBS,                        XECUTE
-				 *	BHASH uses : GVSUBS, DELIM, ZDELIM, PIECES, XECUTE
-				 * So reach each of these pieces and compute hash along the way.
-				 */
-				STR_PHASH_INIT(hash_state, hash_totlen);
-				STR_PHASH_PROCESS(hash_state, hash_totlen, gvname->str.addr, gvname->str.len);
+				STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
 				STR_PHASH_PROCESS(hash_state, hash_totlen, nullbyte, 1);
-				/* Read in ^#t(<gvn>,i,"GVSUBS") */
-				is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_gvsubs, tmpmv);
-				if (is_defined)
+			}
+			/* Copy over SET hash state (2-tuple <state,totlen>) to KILL hash state before adding
+			 * the PIECES, DELIM, ZDELIM portions (those are only part of the SET hash).
+			 */
+			kill_hash_state = hash_state;
+			kill_hash_totlen = hash_totlen;
+			/* Read in ^#t(<gvn>,i,"PIECES") */
+			is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_pieces, tmpmv);
+			if (is_defined)
+			{
+				STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
+				STR_PHASH_PROCESS(hash_state, hash_totlen, nullbyte, 1);
+			}
+			/* Read in ^#t(<gvn>,i,"DELIM") */
+			is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_delim, tmpmv);
+			if (is_defined)
+			{
+				STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
+				STR_PHASH_PROCESS(hash_state, hash_totlen, nullbyte, 1);
+			}
+			/* Read in ^#t(<gvn>,i,"ZDELIM") */
+			is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_zdelim, tmpmv);
+			if (is_defined)
+			{
+				STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
+				STR_PHASH_PROCESS(hash_state, hash_totlen, nullbyte, 1);
+			}
+			/* Read in ^#t(<gvn>,i,"XECUTE").
+			 * Note: The XECUTE portion of the trigger definition is used in SET and KILL hash.
+			 * But since we have started maintaining "hash_state" and "kill_hash_state" separately
+			 * (due to PIECES, DELIM, ZDELIM) we need to update the hash for both using same input string.
+			 */
+			is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_xecute, tmpmv);
+			if (is_defined)
+			{
+				STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
+				STR_PHASH_PROCESS(kill_hash_state, kill_hash_totlen, tmpmval.str.addr, tmpmval.str.len);
+			} else
+			{	/* Multi-record XECUTE string */
+				/* At this point, gv_currkey is ^#t(<gvn>,i) */
+				xecute_curend = gv_currkey->end; /* note gv_currkey->end so we can restore it later */
+				assert(KEY_DELIMITER == gv_currkey->base[xecute_curend]);
+				tmpmv2 = (mval *)&literal_xecute;
+				COPY_SUBS_TO_GVCURRKEY(tmpmv2, gv_cur_region, gv_currkey, was_null, is_null);
+				xecutei = 1;
+				do
 				{
+					i2mval(&xecuteimval, xecutei);
+					is_defined = gvtr_get_hasht_gblsubs(&xecuteimval, tmpmv);
+					if (!is_defined)
+						break;
 					STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
-					STR_PHASH_PROCESS(hash_state, hash_totlen, nullbyte, 1);
-				}
-				/* Copy over SET hash state (2-tuple <state,totlen>) to KILL hash state before adding
-				 * the PIECES, DELIM, ZDELIM portions (those are only part of the SET hash).
-				 */
-				kill_hash_state = hash_state;
-				kill_hash_totlen = hash_totlen;
-				/* Read in ^#t(<gvn>,i,"PIECES") */
-				is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_pieces, tmpmv);
-				if (is_defined)
-				{
-					STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
-					STR_PHASH_PROCESS(hash_state, hash_totlen, nullbyte, 1);
-				}
-				/* Read in ^#t(<gvn>,i,"DELIM") */
-				is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_delim, tmpmv);
-				if (is_defined)
-				{
-					STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
-					STR_PHASH_PROCESS(hash_state, hash_totlen, nullbyte, 1);
-				}
-				/* Read in ^#t(<gvn>,i,"ZDELIM") */
-				is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_zdelim, tmpmv);
-				if (is_defined)
-				{
-					STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
-					STR_PHASH_PROCESS(hash_state, hash_totlen, nullbyte, 1);
-				}
-				/* Read in ^#t(<gvn>,i,"XECUTE").
-				 * Note: The XECUTE portion of the trigger definition is used in SET and KILL hash.
-				 * But since we have started maintaining "hash_state" and "kill_hash_state" separately
-				 * (due to PIECES, DELIM, ZDELIM) we need to update the hash for both using same input string.
-				 */
-				is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_xecute, tmpmv);
-				if (is_defined)
-				{
-					STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
-					STR_PHASH_PROCESS(kill_hash_state, kill_hash_totlen, tmpmval.str.addr, tmpmval.str.len);
-				} else
-				{	/* Multi-record XECUTE string */
-					/* At this point, gv_currkey is ^#t(<gvn>,i) */
-					xecute_curend = gv_currkey->end; /* note gv_currkey->end so we can restore it later */
-					assert(KEY_DELIMITER == gv_currkey->base[xecute_curend]);
-					tmpmv2 = (mval *)&literal_xecute;
-					COPY_SUBS_TO_GVCURRKEY(tmpmv2, gv_cur_region, gv_currkey, was_null, is_null);
-					xecutei = 1;
-					do
-					{
-						i2mval(&xecuteimval, xecutei);
-						is_defined = gvtr_get_hasht_gblsubs(&xecuteimval, tmpmv);
-						if (!is_defined)
-							break;
-						STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
-						STR_PHASH_PROCESS(kill_hash_state, kill_hash_totlen,
-									tmpmval.str.addr, tmpmval.str.len);
-						xecutei++;
-					} while (TRUE);
-					/* Restore gv_currkey to ^#t(<gvn>,i) */
-					gv_currkey->end = xecute_curend;
-					gv_currkey->base[xecute_curend] = KEY_DELIMITER;
-				}
-				STR_PHASH_RESULT(hash_state, hash_totlen, hash_code);
-				STR_PHASH_RESULT(kill_hash_state, kill_hash_totlen, kill_hash_code);
-				/* Set ^#t(<gvn>,i,"LHASH") */
-				MV_FORCE_UMVAL(tmpmv, kill_hash_code);
-				gvtr_set_hasht_gblsubs((mval *)&literal_lhash, tmpmv);
-				/* Set ^#t(<gvn>,i,"BHASH") */
-				MV_FORCE_UMVAL(tmpmv, hash_code);
-				gvtr_set_hasht_gblsubs((mval *)&literal_bhash, tmpmv);
-				/* Read in ^#t(<gvn>,i,"TRIGNAME") to determine if #SEQNUM/#TNCOUNT needs to be maintained */
-				is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_trigname, tmpmv);
-				assert(is_defined);
-				assert('#' == tmpmval.str.addr[tmpmval.str.len - 1]);
-				tmpmval.str.len--;
-				if ((tmpmval.str.len <= ARRAYSIZE(name_and_index)) &&
-						(NULL != (ptr = memchr(tmpmval.str.addr, '#', tmpmval.str.len))))
-				{	/* Auto-generated name. Need to maintain #SEQNUM/#TNCOUNT */
-					/* Take copy of trigger name into non-stringpool location to avoid stp_gcol issues */
-					trigname_len = ptr - tmpmval.str.addr;
-					ptr++;
-					name_index_len = (tmpmval.str.addr + tmpmval.str.len) - ptr;
-					assert(ARRAYSIZE(name_and_index) >= (trigname_len + 1 + name_index_len));
-					trigname = &name_and_index[0];
-					trigindex = ptr;
-					memcpy(trigname, tmpmval.str.addr, tmpmval.str.len);
-					A2I(ptr, ptr + name_index_len, trig_seq_num);
-					/* At this point, gv_currkey is ^#t(<gvn>,i) */
-					/* $get(^#t("#TNAME",<trigger name>,"#SEQNUM")) */
-					BUILD_HASHT_SUB_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
-						trigname, trigname_len, LITERAL_HASHSEQNUM, STR_LIT_LEN(LITERAL_HASHSEQNUM));
-					seq_num = gvcst_get(tmpmv) ? mval2i(tmpmv) : 0;
-					if (trig_seq_num > seq_num)
-					{	/* Set ^#t("#TNAME",<trigger name>,"#SEQNUM") = trig_seq_num */
-						SET_TRIGGER_GLOBAL_SUB_SUB_SUB_STR(LITERAL_HASHTNAME,
-							STR_LIT_LEN(LITERAL_HASHTNAME), trigname, trigname_len,
-							LITERAL_HASHSEQNUM, STR_LIT_LEN(LITERAL_HASHSEQNUM),
-							trigindex, name_index_len, result);
-						assert(PUT_SUCCESS == result);
-					}
-					/* set ^#t("#TNAME",<trigger name>,"#TNCOUNT")++ */
-					BUILD_HASHT_SUB_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
-						trigname, trigname_len, LITERAL_HASHTNCOUNT, STR_LIT_LEN(LITERAL_HASHTNCOUNT));
-					tncount = gvcst_get(tmpmv) ? mval2i(tmpmv) + 1 : 1;
-					i2mval(tmpmv, tncount);
-					SET_TRIGGER_GLOBAL_SUB_SUB_SUB_MVAL(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
-						trigname, trigname_len, LITERAL_HASHTNCOUNT, STR_LIT_LEN(LITERAL_HASHTNCOUNT),
-						tmpmval, result);
-					trigname_len += 1 + name_index_len; /* in preparation for ^#t("#TNAME") set below */
+					STR_PHASH_PROCESS(kill_hash_state, kill_hash_totlen,
+								tmpmval.str.addr, tmpmval.str.len);
+					xecutei++;
+				} while (TRUE);
+				/* Restore gv_currkey to ^#t(<gvn>,i) */
+				gv_currkey->end = xecute_curend;
+				gv_currkey->base[xecute_curend] = KEY_DELIMITER;
+			}
+			STR_PHASH_RESULT(hash_state, hash_totlen, hash_code);
+			STR_PHASH_RESULT(kill_hash_state, kill_hash_totlen, kill_hash_code);
+			/* Set ^#t(<gvn>,i,"LHASH") */
+			MV_FORCE_UMVAL(tmpmv, kill_hash_code);
+			gvtr_set_hasht_gblsubs((mval *)&literal_lhash, tmpmv);
+			/* Set ^#t(<gvn>,i,"BHASH") */
+			MV_FORCE_UMVAL(tmpmv, hash_code);
+			gvtr_set_hasht_gblsubs((mval *)&literal_bhash, tmpmv);
+			/* Read in ^#t(<gvn>,i,"TRIGNAME") to determine if #SEQNUM/#TNCOUNT needs to be maintained */
+			is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_trigname, tmpmv);
+			assert(is_defined);
+			assert('#' == tmpmval.str.addr[tmpmval.str.len - 1]);
+			tmpmval.str.len--;
+			if ((tmpmval.str.len <= ARRAYSIZE(name_and_index)) &&
+					(NULL != (ptr = memchr(tmpmval.str.addr, '#', tmpmval.str.len))))
+			{	/* Auto-generated name. Need to maintain #SEQNUM/#TNCOUNT */
+				/* Take copy of trigger name into non-stringpool location to avoid stp_gcol issues */
+				trigname_len = ptr - tmpmval.str.addr;
+				ptr++;
+				name_index_len = (tmpmval.str.addr + tmpmval.str.len) - ptr;
+				assert(ARRAYSIZE(name_and_index) >= (trigname_len + 1 + name_index_len));
+				trigname = &name_and_index[0];
+				trigindex = ptr;
+				memcpy(trigname, tmpmval.str.addr, tmpmval.str.len);
+				A2I(ptr, ptr + name_index_len, trig_seq_num);
+				/* At this point, gv_currkey is ^#t(<gvn>,i) */
+				/* $get(^#t("#TNAME",<trigger name>,"#SEQNUM")) */
+				BUILD_HASHT_SUB_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
+					trigname, trigname_len, LITERAL_HASHSEQNUM, STR_LIT_LEN(LITERAL_HASHSEQNUM));
+				seq_num = gvcst_get(tmpmv) ? mval2i(tmpmv) : 0;
+				if (trig_seq_num > seq_num)
+				{	/* Set ^#t("#TNAME",<trigger name>,"#SEQNUM") = trig_seq_num */
+					SET_TRIGGER_GLOBAL_SUB_SUB_SUB_STR(LITERAL_HASHTNAME,
+						STR_LIT_LEN(LITERAL_HASHTNAME), trigname, trigname_len,
+						LITERAL_HASHSEQNUM, STR_LIT_LEN(LITERAL_HASHSEQNUM),
+						trigindex, name_index_len, result);
 					assert(PUT_SUCCESS == result);
-					BUILD_HASHT_SUB_CURRKEY(gvname->str.addr, gvname->str.len);
-					/* At this point, gv_currkey is ^#t(<gvn>) */
-				} else
-				{
-					/* Take copy of trigger name into non-stringpool location to avoid stp_gcol issues */
-					trigname = &name_and_index[0];  /* in preparation for ^#t("#TNAME") set below */
-					trigname_len = MIN(tmpmval.str.len, ARRAYSIZE(name_and_index));
-					assert(ARRAYSIZE(name_and_index) >= trigname_len);
-					memcpy(trigname, tmpmval.str.addr, trigname_len);
-					/* Restore gv_currkey to what it was at beginning of for loop iteration */
-					gv_currkey->end = curend;
-					gv_currkey->base[curend] = KEY_DELIMITER;
 				}
-				/* At this point, gv_currkey is ^#t(<gvn>) */
-				if (kill_hash_code != hash_code)
-					gvtr_set_hashtrhash(gvname->str.addr, gvname->str.len, kill_hash_code, i);
-				/* Set ^#t(<gvn>,"#TRHASH",hash_code,i) */
-				gvtr_set_hashtrhash(gvname->str.addr, gvname->str.len, hash_code, i);
-				/* Set ^#t("#TNAME",<trigname>)=<gvn>_$c(0)_<trigindx> */
-				/* The upgrade assumes that the region does not contain two triggers with the same name.
-				 * V62000 and before could potentially have this out of design case. Once implemented
-				 * the trigger integrity check will warn users of this edge case */
-				ptr = &trigvn[gvname->str.len];
-				*ptr++ = '\0';
-				ilen = 0;
-				I2A(ptr, ilen, i);
-				ptr += ilen;
-				assert(ptr <= ARRAYTOP(trigvn));
-				SET_TRIGGER_GLOBAL_SUB_SUB_STR(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
-					trigname, trigname_len, trigvn, ptr - gvname->str.addr, result);
+				/* set ^#t("#TNAME",<trigger name>,"#TNCOUNT")++ */
+				BUILD_HASHT_SUB_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
+					trigname, trigname_len, LITERAL_HASHTNCOUNT, STR_LIT_LEN(LITERAL_HASHTNCOUNT));
+				tncount = gvcst_get(tmpmv) ? mval2i(tmpmv) + 1 : 1;
+				i2mval(tmpmv, tncount);
+				SET_TRIGGER_GLOBAL_SUB_SUB_SUB_MVAL(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
+					trigname, trigname_len, LITERAL_HASHTNCOUNT, STR_LIT_LEN(LITERAL_HASHTNCOUNT),
+					tmpmval, result);
+				trigname_len += 1 + name_index_len; /* in preparation for ^#t("#TNAME") set below */
 				assert(PUT_SUCCESS == result);
 				BUILD_HASHT_SUB_CURRKEY(gvname->str.addr, gvname->str.len);
 				/* At this point, gv_currkey is ^#t(<gvn>) */
+			} else
+			{
+				/* Take copy of trigger name into non-stringpool location to avoid stp_gcol issues */
+				trigname = &name_and_index[0];  /* in preparation for ^#t("#TNAME") set below */
+				trigname_len = MIN(tmpmval.str.len, ARRAYSIZE(name_and_index));
+				assert(ARRAYSIZE(name_and_index) >= trigname_len);
+				memcpy(trigname, tmpmval.str.addr, trigname_len);
+				/* Restore gv_currkey to what it was at beginning of for loop iteration */
+				gv_currkey->end = curend;
+				gv_currkey->base[curend] = KEY_DELIMITER;
 			}
-			/* At this point, gv_currkey is ^#t(<gvn>) i.e. gv_currkey->end is correct but gv_currkey->prev
-			 * might have been tampered with. Restore it to proper value first.
-			 */
-			 gv_currkey->prev = gvname_prev;
-			gvname->mvtype = 0; /* can now be garbage collected in the next iteration */
-		} while (TRUE);
-	}
+			/* At this point, gv_currkey is ^#t(<gvn>) */
+			if (kill_hash_code != hash_code)
+				gvtr_set_hashtrhash(gvname->str.addr, gvname->str.len, kill_hash_code, i);
+			/* Set ^#t(<gvn>,"#TRHASH",hash_code,i) */
+			gvtr_set_hashtrhash(gvname->str.addr, gvname->str.len, hash_code, i);
+			/* Set ^#t("#TNAME",<trigname>)=<gvn>_$c(0)_<trigindx> */
+			/* The upgrade assumes that the region does not contain two triggers with the same name.
+			 * V62000 and before could potentially have this out of design case. Once implemented
+			 * the trigger integrity check will warn users of this edge case */
+			ptr = &trigvn[gvname->str.len];
+			*ptr++ = '\0';
+			ilen = 0;
+			I2A(ptr, ilen, i);
+			ptr += ilen;
+			assert(ptr <= ARRAYTOP(trigvn));
+			SET_TRIGGER_GLOBAL_SUB_SUB_STR(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
+				trigname, trigname_len, trigvn, ptr - gvname->str.addr, result);
+			assert(PUT_SUCCESS == result);
+			BUILD_HASHT_SUB_CURRKEY(gvname->str.addr, gvname->str.len);
+			/* At this point, gv_currkey is ^#t(<gvn>) */
+		}
+		/* At this point, gv_currkey is ^#t(<gvn>) i.e. gv_currkey->end is correct but gv_currkey->prev
+		 * might have been tampered with. Restore it to proper value first.
+		 */
+		 gv_currkey->prev = gvname_prev;
+		gvname->mvtype = 0; /* can now be garbage collected in the next iteration */
+	} while (TRUE);
 	op_tcommit();
 	REVERT; /* remove our condition handler */
 	DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE;)
@@ -562,7 +558,7 @@ void	trigger_upgrade(gd_region *reg)
 	{
 		assert(csa->now_crit);	/* we should still hold crit */
 		/* Switch to new journal file and cut previous link if we did ^#t upgrade on a journaled region */
-		if (do_upgrade && JNL_WRITE_LOGICAL_RECS(csa))
+		if (JNL_WRITE_LOGICAL_RECS(csa))
 		{
 			sts = set_jnl_file_close();
 			assert(SS_NORMAL == sts);	/* because we should have done jnl_ensure_open already
