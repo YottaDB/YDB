@@ -226,6 +226,7 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 	int4			xecute_len;
 	unsigned char		util_buff[MAX_TRIG_UTIL_LEN];	/* needed for HASHT_GVN_DEFINITION_RETRY_OR_ERROR macro */
 	int4			util_len;
+	boolean_t		issue_error;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -248,40 +249,50 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 		}
 		BUILD_HASHT_SUB_SUB_MSUB_MSUB_CURRKEY(trigvn, trigvn_len,
 			LITERAL_HASHTRHASH, STR_LIT_LEN(LITERAL_HASHTRHASH), mv_hash, collision_indx);
-		if (!gvcst_get(&key_val))
+		if (gvcst_get(&key_val))
+		{
+			ptr = key_val.str.addr;
+			ptr2 = memchr(ptr, '\0', key_val.str.len);
+			if (NULL != ptr2)
+			{
+				len = ptr2 - ptr;
+				if ((len == trigvn_len) && (0 == memcmp(trigvn, ptr, len)))
+				{
+					ptr += len;
+					assert(('\0' == *ptr) && (key_val.str.len > len));
+					ptr++;
+					A2I(ptr, key_val.str.addr + key_val.str.len, trig_index);
+					assert(-1 != trig_index);
+					if (0 <= trig_index)
+						issue_error = FALSE;
+					else
+					{	/* Trigger index stored in ^#t(...,#TRHASH,...) node is negative.
+						 * Indicates a TRIGDEFBAD situation.
+						 */
+						issue_error = FALSE;
+					}
+				} else
+				{	/* We expect all hashes under ^#t(<gbl>,"#TRHASH",...) to correspond to <gbl>
+					 * in their value. If not this is a TRIGDEFBAD situation.
+					 */
+					issue_error = TRUE;
+				}
+			} else
+			{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
+				issue_error = TRUE;
+			}
+		} else
 		{	/* There has to be a #TRHASH entry or else it is a retry situation (due to concurrent updates) */
+			issue_error = TRUE;
+		}
+		if (issue_error)
+		{
 			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
 				t_retry(cdb_sc_triggermod);
 			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
-		ptr = key_val.str.addr;
-		ptr2 = memchr(ptr, '\0', key_val.str.len);
-		if (NULL == ptr2)
-		{	/* We expect $c(0) in the middle of ptr. If we dont find it, this is a restartable situation */
-			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
-				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
-		}
-		len = ptr2 - ptr;
-		if ((len != trigvn_len) || (0 != memcmp(trigvn, ptr, len)))
-		{	/* We expect all hashes under ^#t(<gbl>,"#TRHASH",...) to correspond to <gbl> in their value.
-			 * If not this is a TRIGDEFBAD situation.
-			 */
-			if (UPDATE_CAN_RETRY(t_tries, t_fail_hist[t_tries]))
-				t_retry(cdb_sc_triggermod);
-			assert(WBTEST_HELPOUT_TRIGDEFBAD == ydb_white_box_test_case_number);
-			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
-					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
-		}
-		ptr += len;
-		assert(('\0' == *ptr) && (key_val.str.len > len));
-		ptr++;
-		A2I(ptr, key_val.str.addr + key_val.str.len, trig_index);
-		assert(-1 != trig_index);
 		MV_FORCE_UMVAL(&mv_trig_indx, trig_index);
 		for (sub_indx = 0; sub_indx < NUM_TOTAL_SUBS; sub_indx++)
 		{
