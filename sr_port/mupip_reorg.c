@@ -369,7 +369,10 @@ void mupip_reorg(void)
 		mu_reorg_process = FALSE;
 		/* Default threshold is 0 i.e. we attempt to truncate no matter what free_blocks is. */
 		truncate_percent = 0;
-		cli_get_int("TRUNCATE", (int4 *)&truncate_percent);
+		/* If "cli_get_int" returns FALSE, we will use default threshold of 0 for "truncate_percent" so
+		 * do not check the return value of "cli_get_int".
+		 */
+		(void)cli_get_int("TRUNCATE", (int4 *)&truncate_percent);
 		if (99 < truncate_percent)
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUTRUNCPERCENT);
