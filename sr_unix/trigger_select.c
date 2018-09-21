@@ -326,6 +326,16 @@ STATICFNDEF void write_out_trigger(char *gbl_name, uint4 gbl_name_len, int nam_i
 			 */
 			assert(BHASH_SUB == NUM_SUBS);
 			assert(LHASH_SUB == (NUM_SUBS + 1));
+			/* Note: This set of "multi_line" to FALSE is not normally needed since we are guaranteed to go through
+			 * the "case XECUTE_SUB" below (every trigger should have a "XECUTE" node in the ^#t global) and so
+			 * we should be guaranteed "multi_line" is initialized before its use in an "if" statement after the
+			 * for loop. In case of concurrent trigger updates, we are guaranteed the "gvcst_get" done below would
+			 * cause a TP restart and take control away from here. But in case of integrity errors in the ^#t global,
+			 * it is possible "multi_line" is uninitialized in the later "if" check and that can cause SIG-11 in the
+			 * memchr and/or COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED since "xecute_buff" (and in turn "ptr1") would be NULL.
+			 * Besides "xecute_len" is also uninitialized in that case and is best not referenced.
+			 */
+			multi_line = FALSE;
 			for (sub_indx = 0; sub_indx < NUM_SUBS; sub_indx++)
 			{
 				if ((GVSUBS_SUB == sub_indx) || (CHSET_SUB == sub_indx))
