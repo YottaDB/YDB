@@ -751,6 +751,7 @@ boolean_t mur_open_files()
 				if (!file_head_read((char *)rctl->gd->dyn.addr->fname, rctl->csd, SGMNT_HDR_LEN))
 				{
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBFILOPERR, 2, REG_LEN_STR(rctl->gd));
+					ENABLE_INTERRUPTS(INTRPT_IN_MUR_OPEN_FILES, prev_intrpt_state);
 					return FALSE;
 				}
 				rctl->jnl_state = csd->jnl_state;
