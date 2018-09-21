@@ -659,7 +659,6 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 			n += extarg_getsize((void *)&status, ydb_status, dst);
 		ENSURE_STP_FREE_SPACE(n);
 		/* Convert return values. */
-		VAR_COPY(var, var_copy);
 		for (i = 0, j = 1, m1 = mask & entry_ptr->output_mask; i < argcnt; j++)
 		{
 			v = va_arg(var_copy, mval *);
@@ -670,7 +669,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 			i++;
 			m1 = m1 >> 1;
 		}
-		va_end(var);
+		va_end(var_copy);
 		if (dst)
 		{
 			if (entry_ptr->return_type != ydb_void)
