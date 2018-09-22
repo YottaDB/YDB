@@ -146,6 +146,18 @@ enum
 		COPY_DONE = FALSE;				\
 }
 
+/* Macro to allocate a buffer using "ydb_malloc" of length LEN and assign it to an already allocated ydb_buffer_t structure.
+ * BUFFERP->buf_addr is set to the malloced buffer.
+ * BUFFERP->len_alloc is set to the malloced length.
+ * BUFFERP->len_used is set to 0.
+ */
+#define	YDB_MALLOC_BUFFER(BUFFERP, LEN)			\
+{							\
+	(BUFFERP)->len_alloc = LEN;			\
+	(BUFFERP)->buf_addr = ydb_malloc(LEN);		\
+	(BUFFERP)->len_used = 0;			\
+}
+
 /* Macro to verify an assertion is true before proceeding - put expression to test as the parameter */
 #define YDB_ASSERT(X)														\
 {																\
