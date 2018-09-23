@@ -76,6 +76,15 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
 
 #define	IS_LIBPTHREAD_MUTEX_LOCK_HOLDER 	(pthread_self() == thread_mutex_holder)
 
+/* Macro to grab a lock across all active threads in this process.
+ * Note: One would normally need SHM_WRITE_MEMORY_BARRIER/SHM_READ_MEMORY_BARRIER usages surrounding the
+ * global variable "thread_mutex_holder" since this is code that might get run by multiple threads
+ * concurrently (to avoid cache coherency issues if any with setting a global variable in one thread
+ * and making it accessible to other threads right away). But those are not needed in this case because
+ * the lock/unlock macros defined below always compare the global variable against "pthread_self" i.e. a
+ * thread will never see itself as incorrectly holding the lock. If this behavior changes in the future,
+ * then use of memory barriers might be warranted.
+ */
 #define	PTHREAD_MUTEX_LOCK_IF_NEEDED(WAS_HOLDER)								\
 {														\
 	int	rc;												\
