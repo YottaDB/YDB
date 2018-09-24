@@ -246,6 +246,14 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 			recall_index = tt_state->recall_index;
 			no_up_or_down_cursor_yet = tt_state->no_up_or_down_cursor_yet;
 			insert_mode = tt_state->insert_mode;
+			/* The below two asserts ensure the invocation of "iott_rdone" after a job interrupt has
+			 * the exact same "msec_timeout" as well as "timed" variable context. This is needed to
+			 * ensure that the "end_time" usages in the post-interrupt invocation always happen
+			 * only if the pre-interrupt invocation had initialized "end_time".
+			 * Note: Since "timed" is not yet set, we cannot use it but instead use the variables that it derives from.
+			 */
+			assert((NO_M_TIMEOUT != msec_timeout) == tt_state->timed);
+			assert(msec_timeout == tt_state->msec_timeout);
 			end_time = tt_state->end_time;
 			zb_ptr = tt_state->zb_ptr;
 			zb_top = tt_state->zb_top;
@@ -402,6 +410,11 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				tt_state->end_time = end_time;
 				tt_state->zb_ptr = zb_ptr;
 				tt_state->zb_top = zb_top;
+#				ifdef DEBUG
+				/* Store debug-only context used later to assert when restoring this context */
+				tt_state->timed = timed;
+				tt_state->msec_timeout = msec_timeout;
+#				endif
 				tt_ptr->mupintr = TRUE;
 			} else
 			{

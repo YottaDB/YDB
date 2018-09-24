@@ -120,8 +120,9 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		 * the exact same "msec_timeout" as well as "timed" variable context. This is needed to
 		 * ensure that the "end_time" usages in the post-interrupt invocation always happen
 		 * only if the pre-interrupt invocation had initialized "end_time".
+		 * Note: Since "timed" is not yet set, we cannot use it but instead use the variables that it derives from.
 		 */
-		assert(timed == tt_state->timed);
+		assert((NO_M_TIMEOUT != msec_timeout) == tt_state->timed);
 		assert(msec_timeout == tt_state->msec_timeout);
 		end_time = tt_state->end_time;
 		if (utf8_active)
