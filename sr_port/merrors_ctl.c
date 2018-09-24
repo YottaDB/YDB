@@ -1345,7 +1345,7 @@ LITDEF	err_msg merrors[] = {
 	{ "NOTALLDBRNDWN", "Not all regions were successfully rundown", 0 },
 	{ "TPRESTNESTERR", "TP restart signaled while handing error - treated as nested error - Use TROLLBACK in error handler to avoid this", 0 },
 	{ "JNLFILRDOPN", "Error opening journal file !AD for read for database file !AD", 4 },
-	{ "SEQNUMSEARCHTIMEOUT", "Timed out trying to find sequence number !@ZQ [0x!16@XQ] in Journal File(s). See above messages for details. Source server exiting", 2 },
+	{ "UNUSEDMSG1514", "SEQNUMSEARCHTIMEOUT nixed in r1.24 because it was unused starting GT.M V6.3-000", 0 },
 	{ "FTOKKEY", "FTOK key 0x!XL", 1 },
 	{ "SEMID", "Semaphore id !UL", 1 },
 	{ "JNLQIOSALVAGE", "Journal IO lock salvaged", 0 },

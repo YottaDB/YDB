@@ -1343,7 +1343,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOTALLDBRNDWN */
 	   0,	/* TPRESTNESTERR */
 	   0,	/* JNLFILRDOPN */
-	   0,	/* SEQNUMSEARCHTIMEOUT */
+	   0,	/* UNUSEDMSG1514 */
 	   0,	/* FTOKKEY */
 	   0,	/* SEMID */
 	   0,	/* JNLQIOSALVAGE */

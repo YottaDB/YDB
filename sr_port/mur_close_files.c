@@ -803,7 +803,7 @@ boolean_t mur_close_files(void)
 				 * any timer slots. In either case, it is better to flush the jnl records to disk right away as the
 				 * source server could be waiting for these and the sooner it gets them, the better. In the
 				 * multiple-child processes case, not doing the flush here can actually cause the source server to
-				 * timeout with a SEQNUMSEARCHTIMEOUT error (if no GT.M processes have any flush timers active and
+				 * issue a REPL_WARN message (if no GT.M processes have any flush timers active and
 				 * if online rollback does not do the flush either) so it is actually necessary.
 				 */
 				assert(!FROZEN_CHILLED(cs_addrs));

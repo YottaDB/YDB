@@ -1511,7 +1511,7 @@ SETEXTRENV	<Database files are missing or Instance is frozen; supply the databas
 NOTALLDBRNDWN	<Not all regions were successfully rundown>/error/fao=0!/ansi=0
 TPRESTNESTERR	<TP restart signaled while handing error - treated as nested error - Use TROLLBACK in error handler to avoid this>/error/fao=0!/ansi=0
 JNLFILRDOPN	<Error opening journal file !AD for read for database file !AD>/error/fao=4!/ansi=0
-SEQNUMSEARCHTIMEOUT	<Timed out trying to find sequence number !@ZQ [0x!16@XQ] in Journal File(s). See above messages for details. Source server exiting>/error/fao=2!/ansi=0
+UNUSEDMSG1514	<SEQNUMSEARCHTIMEOUT nixed in r1.24 because it was unused starting GT.M V6.3-000>/error/fao=0!/ansi=0
 FTOKKEY		<FTOK key 0x!XL>/info/fao=1!/ansi=0
 SEMID		<Semaphore id !UL>/info/fao=1!/ansi=0
 JNLQIOSALVAGE	<Journal IO lock salvaged>/info/fao=0!/ansi=0
