@@ -1305,29 +1305,32 @@ void	gtmrecv_check_and_send_instinfo(repl_needinst_msg_ptr_t need_instinfo_msg, 
 		if (is_rcvr_srvr)
 		{
 			if (recvpool.upd_proc_local->read_jnl_seqno)
+			{
 				strm_jnl_seqno = recvpool.recvpool_ctl->jnl_seqno;
-			else
+				assert(strm_jnl_seqno);
+			} else
 			{
 				if (recvpool.gtmrecv_local->updateresync)
 				{
 					assert(FD_INVALID != recvpool.gtmrecv_local->updresync_instfile_fd);
 					if (!gtmrecv_options.resume_specified)
-						strm_jnl_seqno = recvpool.gtmrecv_local->updresync_jnl_seqno;
-					else
 					{
+						strm_jnl_seqno = recvpool.gtmrecv_local->updresync_jnl_seqno;
+						assert(strm_jnl_seqno);
+					} else
 						strm_jnl_seqno = jnlpool->jnlpool_ctl->strm_seqno[gtmrecv_options.resume_strm_num];
-						/* It is possible for the strm_seqno to be 0. This implies the stream has
-						 * had no updates. In that case, ideally this value should have been 1.
-						 * But because we want to differentiate a stream that has had updates from
-						 * stream numbers where there is no interest, we follow this convention.
-						 * Therefore, in this case, reset the 0 back to 1 so we never send a zero
-						 * seqno to the other side.
-						 */
-						if (!strm_jnl_seqno)
-							strm_jnl_seqno = 1;
-					}
 				} else
 					strm_jnl_seqno = jnlpool->jnlpool_ctl->strm_seqno[strm_index];
+				/* It is possible for the strm_seqno to be 0 in a few of the above codepaths (wherever
+				 * an "assert(strm_jnl_seqno)" is not present). This implies the stream has had no updates.
+				 * In that case, ideally this value should have been 1. But because we want to differentiate
+				 * a stream that has had updates from stream numbers where there is no interest, we follow
+				 * this convention of setting strm_seqno to 0 initially. Therefore, in this case, where this
+				 * is a stream number where there is interest, change the 0 to 1 before sending this seqno
+				 * across (this way we never send a zero seqno to the other side).
+				 */
+				if (!strm_jnl_seqno)
+					strm_jnl_seqno = 1;
 				assert(0 == GET_STRM_INDEX(strm_jnl_seqno));
 			}
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Sending Stream Seqno = "INT8_FMT" "INT8_FMTX"\n",

@@ -815,9 +815,13 @@ void	repl_inst_histinfo_add(repl_histinfo *histinfo)
 			}
 		}
 	}
-	/* Assert that the history record we are going to add is in sync with the current seqno state of the instance */
+	/* Assert that the history record we are going to add is in sync with the current seqno state of the instance.
+	 * The only exception is if jnlpool_ctl->strm_seqno is 0 (history record has not yet been added but A->P connection
+	 * had been previously established) in which case histinfo->strm_seqno should be 1. Assert that.
+	 */
 	assert(jnlpool->jnlpool_ctl->jnl_seqno == histinfo->start_seqno);
-	assert(jnlpool->jnlpool_ctl->strm_seqno[histinfo->strm_index] == histinfo->strm_seqno);
+	assert((jnlpool->jnlpool_ctl->strm_seqno[histinfo->strm_index] == histinfo->strm_seqno)
+		|| (!jnlpool->jnlpool_ctl->strm_seqno[histinfo->strm_index] && (1 == histinfo->strm_seqno)));
 	offset = REPL_INST_HISTINFO_START + (SIZEOF(repl_histinfo) * (off_t)histinfo_num);
 	/* Initialize the following members of the repl_histinfo structure. Everything else should be initialized by caller.
 	 *	histinfo_num
