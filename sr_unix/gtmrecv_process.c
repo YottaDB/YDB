@@ -155,7 +155,7 @@ STATICDEF int			gtmrecv_repl_cmpmsglen;
 STATICDEF int			gtmrecv_repl_uncmpmsglen;
 
 STATICFNDCL	void	gtmrecv_repl_send_loop_error(int status, char *msgtypestr);
-STATICFNDCL	int	repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t jnl_buff, uint4 jnl_len);
+STATICFNDCL	int	repl_tr_endian_convert_rcvr(unsigned char remote_jnl_ver, uchar_ptr_t jnl_buff, uint4 jnl_len);
 STATICFNDCL	void	do_flow_control(uint4 write_pos);
 STATICFNDCL	int	gtmrecv_est_conn(void);
 STATICFNDCL	int	gtmrecv_start_onln_rlbk(void);
@@ -378,20 +378,14 @@ static	boolean_t	repl_cmp_solve_timer_set;
  * (b) If primary >= secondary, primary will apply internal filters to convert the records to secondary's format. The
  *     secondary on receiving them will do the necessary endian conversion before letting the update process see them.
  *
- * However, the above logic will cause the older versions (< V5.4-002) to NOT replicate to V5.4-002 as the endian-conversion
- * by-primary is introduced only from V5.4-002 and above. Hence, allow secondary to do endian conversion for this special
- * case when the primary is a GT.M version running V5.3-003 (V18_JNL_VER) to V5.4-001 (V20_JNL_VER). The lower limit is
- * chosen to be V5.3-003 since that was the first version where cross-endian conversion was supported.
- *
  * There is one other exception. V5.5 source server (V22_JNL_VER) had a bug wherein a history record is endian-converted
  * when the replication is NOT cross-endian and vice versa. In either case, do an endian conversion of the history record.
  *
  * The below macro takes all the above conditions into consideration to determine if the receiver server needs to do endian
- * converison or not.
+ * conversion or not.
  */
 #define ENDIAN_CONVERSION_NEEDED(IS_NEW_HISTREC, THIS_JNL_VER, REMOTE_JNL_VER, X_ENDIAN)			\
-	((IS_NEW_HISTREC && (V22_JNL_VER == REMOTE_JNL_VER)) 							\
-		|| (X_ENDIAN && ((REMOTE_JNL_VER >= THIS_JNL_VER) || (V21_JNL_VER > REMOTE_JNL_VER))))
+	((IS_NEW_HISTREC && (V22_JNL_VER == REMOTE_JNL_VER)) || (X_ENDIAN && (REMOTE_JNL_VER >= THIS_JNL_VER)))
 
 STATICFNDEF void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 {
@@ -422,7 +416,7 @@ STATICFNDEF void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 }
 
 /* convert endianness of transaction */
-STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t jnl_buff, uint4 jnl_len)
+STATICFNDEF int repl_tr_endian_convert_rcvr(unsigned char remote_jnl_ver, uchar_ptr_t jnl_buff, uint4 jnl_len)
 {
 	unsigned char			*jb, *jstart, *ptr;
 	enum jnl_record_type		rectype;
@@ -436,14 +430,14 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 	repl_old_triple_jnl_ptr_t	oldtriple;
 	repl_histinfo			*histinfo;
 	jnl_str_len_t			nodeflags_keylen;
-	uint4				update_num, num_participants_4bytes;
+	uint4				update_num, num_participants_4bytes, bitmask;
 	unsigned short			num_participants_2bytes;
 #	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 #	endif
-	assert((remote_jnl_ver >= this_side->jnl_ver) || (V21_JNL_VER > remote_jnl_ver) || (V22_JNL_VER == remote_jnl_ver));
+	assert((remote_jnl_ver >= this_side->jnl_ver) || (V22_JNL_VER == remote_jnl_ver));
 	jb = jnl_buff;
 	status = SS_NORMAL;
 	jlen = jnl_len;
@@ -480,53 +474,34 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 			((jrec_suffix *)((unsigned char *)rec + reclen - JREC_SUFFIX_SIZE))->backptr = reclen;
 			rec->jrec_null.jnl_seqno = GTM_BYTESWAP_64(rec->jrec_null.jnl_seqno);
 			/* Starting jnl ver V22, we have a "strm_seqno" field in the journal record so endian convert that */
-			if (V22_JNL_VER <= remote_jnl_ver)
-			{	/* At this point, we could have a TCOM or NULL or SET/KILL/ZKILL/ZTRIG type of record.
-				 * Assert that all of them have "strm_seqno" at the exact same offset so we can avoid
-				 * an if/then/else check on the record types in order to endian convert "strm_seqno".
-				 */
-				assert(&rec->jrec_null.strm_seqno == &rec->jrec_set_kill.strm_seqno);
-				assert(&rec->jrec_null.strm_seqno == &rec->jrec_tcom.strm_seqno);
-				rec->jrec_null.strm_seqno = GTM_BYTESWAP_64(rec->jrec_null.strm_seqno);
-			}
+			assert(V22_JNL_VER <= remote_jnl_ver);
+			/* At this point, we could have a TCOM or NULL or SET/KILL/ZKILL/ZTRIG type of record.
+			 * Assert that all of them have "strm_seqno" at the exact same offset so we can avoid
+			 * an if/then/else check on the record types in order to endian convert "strm_seqno".
+			 */
+			assert(&rec->jrec_null.strm_seqno == &rec->jrec_set_kill.strm_seqno);
+			assert(&rec->jrec_null.strm_seqno == &rec->jrec_tcom.strm_seqno);
+			rec->jrec_null.strm_seqno = GTM_BYTESWAP_64(rec->jrec_null.strm_seqno);
 			if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
-			{	/* This code will need changes in case the jnl-ver changes from V27 to V28 so add an assert to
+			{	/* This code will need changes in case the jnl-ver changes from V44 to V45 so add an assert to
 				 * alert to that possibility. Once the code is fixed for the new jnl format, change the assert
 				 * to reflect the new latest jnl-ver.
 				 */
-				assert(JNL_VER_THIS == V27_JNL_VER);
+				assert(JNL_VER_THIS == V44_JNL_VER);
 				/* To better understand the logic below (particularly the use of hardcoded offsets), see comment
 				 * in repl_filter.c (search for "struct_jrec_upd layout" for the various jnl versions we support).
 				 */
-				if (V22_JNL_VER <= remote_jnl_ver)
-				{	/* byte-swap update_num */
-					assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
-					assert(&rec->jrec_set_kill.update_num == &rec->jrec_lgtrig.update_num);
-					rec->jrec_set_kill.update_num = GTM_BYTESWAP_32(rec->jrec_set_kill.update_num);
-					/* No need to byte-swap num_participants as it is not used by the update process */
-					/* Get pointer to mumps_node */
-					keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
-					assert(keystr == (jnl_string *)&rec->jrec_ztworm.ztworm_str);
-					assert(keystr == (jnl_string *)&rec->jrec_lgtrig.lgtrig_str);
-				} else if (V19_JNL_VER <= remote_jnl_ver)
-				{	/* byte-swap update_num */
-					ptr = (unsigned char *)rec + 32; /* is offset of update_num in V19 struct_jrec_upd */
-					update_num = *(uint4 *)ptr;
-					*(uint4 *)ptr = GTM_BYTESWAP_32(update_num);
-					/* No need to byte-swap num_participants as it is not used by the update process */
-					/* Get pointer to mumps_node */
-					keystr = (jnl_string *)((unsigned char *)rec + 40); /* is offset of mumps_node */
-				} else
-				{
-					assert(V17_JNL_VER <= remote_jnl_ver);
-					/* Note: In V17, there is no update_num or num_participants like V19 so no endian convert */
-					/* Get pointer to mumps_node */
-					keystr = (jnl_string *)((unsigned char *)rec + 32); /* is offset of mumps_node */
-				}
-				/* In V18, the jnl_string contained a 32 bit length field followed by mumps_node
-				 * In V19, the "length" field is divided into 8 bit "nodeflags" and 24 bit "length" fields.
-				 * Byteswap the entire 32 bit value
-				 */
+				assert(V22_JNL_VER <= remote_jnl_ver);
+				/* byte-swap update_num */
+				assert(&rec->jrec_set_kill.update_num == &rec->jrec_ztworm.update_num);
+				assert(&rec->jrec_set_kill.update_num == &rec->jrec_lgtrig.update_num);
+				rec->jrec_set_kill.update_num = GTM_BYTESWAP_32(rec->jrec_set_kill.update_num);
+				/* No need to byte-swap num_participants as it is not used by the update process */
+				/* Get pointer to mumps_node */
+				keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;
+				assert(keystr == (jnl_string *)&rec->jrec_ztworm.ztworm_str);
+				assert(keystr == (jnl_string *)&rec->jrec_lgtrig.lgtrig_str);
+				/* Byteswap the entire 32 bit value comprised of 8-bit "nodeflags" and 24-bit "length" fields. */
 				nodeflags_keylen = *(jnl_str_len_t *)keystr;
 				*(jnl_str_len_t *)keystr = GTM_BYTESWAP_32(nodeflags_keylen);
 				if (IS_SET(rectype))
@@ -542,40 +517,25 @@ STATICFNDEF int repl_tr_endian_convert(unsigned char remote_jnl_ver, uchar_ptr_t
 				}
 			} else if (JRT_TCOM == rectype)
 			{	/* byte-swap num_participants as this is relied upon by "repl_sort_tr_buff".
-				 * The offset and size of this field are different for older versions. Endian convert accordingly.
+				 * The offset and size of this field are the following. Endian convert accordingly.
  				 *       V22 struct_jrec_tcom layout is as follows.
 				 *      	offset = 0042 [0x002a]      size = 0002 [0x0002]    ----> num_participants
- 				 *       V19/V20/V21 struct_jrec_tcom layout is as follows.
- 				 *      	offset = 0034 [0x0022]      size = 0002 [0x0002]    ----> num_participants
-				 *       V17/V18 struct_jrec_tcom layout is as follows.
-				 *      	offset = 0040 [0x0028]      size = 0004 [0x0004]    ----> participants
 				 */
-				if (V22_JNL_VER <= remote_jnl_ver)
-				{
-					assert(42 == ((INTPTR_T)&rec->jrec_tcom.num_participants - (INTPTR_T)rec));
-					assert(SIZEOF(num_participants_2bytes) == SIZEOF(rec->jrec_tcom.num_participants));
-					num_participants_2bytes = rec->jrec_tcom.num_participants;
-					rec->jrec_tcom.num_participants = GTM_BYTESWAP_16(num_participants_2bytes);
-				} else if (V19_JNL_VER <= remote_jnl_ver)
-				{
-					ptr = (unsigned char *)rec + 34; /* is offset of update_num in V19 struct_jrec_upd */
-					assert(SIZEOF(num_participants_2bytes) == SIZEOF(unsigned short));
-					num_participants_2bytes = *(unsigned short *)ptr;
-					rec->jrec_tcom.num_participants = GTM_BYTESWAP_16(num_participants_2bytes);
-				} else
-				{
-					assert(V17_JNL_VER <= remote_jnl_ver);
-					ptr = (unsigned char *)rec + 40; /* is offset of update_num in V19 struct_jrec_upd */
-					assert(SIZEOF(num_participants_4bytes) == SIZEOF(uint4));
-					num_participants_4bytes = *(uint4 *)ptr;
-					rec->jrec_tcom.num_participants = GTM_BYTESWAP_32(num_participants_4bytes);
-				}
+				assert(V22_JNL_VER <= remote_jnl_ver);
+				assert(42 == ((INTPTR_T)&rec->jrec_tcom.num_participants - (INTPTR_T)rec));
+				assert(SIZEOF(num_participants_2bytes) == SIZEOF(rec->jrec_tcom.num_participants));
+				num_participants_2bytes = rec->jrec_tcom.num_participants;
+				rec->jrec_tcom.num_participants = GTM_BYTESWAP_16(num_participants_2bytes);
 				assert(rec->jrec_tcom.num_participants);
 				/* token_seq.jnl_seqno & strm_seqno have already been endian converted. */
+			} else
+			{	/* token_seq.jnl_seqno & strm_seqno have already been endian converted. */
+				assert(JRT_NULL == rectype);
+				/* Need to endian convert the 1-bit "salvaged" field in NULL record */
+				assert(SIZEOF(bitmask) == SIZEOF(null_rec_bitmask_t));
+				bitmask = *(uint4 *)&rec->jrec_null.bitmask;
+				*(uint4 *)&rec->jrec_null.bitmask = GTM_BYTESWAP_32(bitmask);
 			}
-			/* else if (JRT_NULL == rectype)
-			 *	token_seq.jnl_seqno & strm_seqno have already been endian converted.
-			 */
 			assert(reclen == REC_LEN_FROM_SUFFIX(jb, reclen));
 		}
 		jb = jb + reclen;
@@ -1780,10 +1740,9 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		write_len = (write_loc - write_off);
 		assert((write_off != write_wrap) || (0 == write_off));
 		assert(remote_side->jnl_ver);
-		assert(!remote_side->cross_endian || (V18_JNL_VER <= remote_side->jnl_ver));
 		if (ENDIAN_CONVERSION_NEEDED(is_new_histrec, this_side->jnl_ver, remote_side->jnl_ver, remote_side->cross_endian))
 		{
-			if (SS_NORMAL != (status = repl_tr_endian_convert(remote_side->jnl_ver,
+			if (SS_NORMAL != (status = repl_tr_endian_convert_rcvr(remote_side->jnl_ver,
 							recvpool.recvdata_base + write_off, write_len)))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLXENDIANFAIL, 3, LEN_AND_LIT("Replicating"),
 						&recvpool.upd_proc_local->read_jnl_seqno);
@@ -1843,27 +1802,15 @@ STATICFNDEF void process_tr_buff(int msg_type)
 				} else
 					memcpy(repl_filter_buff, recvpool.recvdata_base + write_off, write_len);
 				assert(write_len <= repl_filter_bufsiz);
-				GTMTRIG_ONLY(
-					if ((unsigned char)V19_JNL_VER <= remote_side->jnl_ver)
-					{
-						repl_sort_tr_buff(repl_filter_buff, write_len);
-						DBG_VERIFY_TR_BUFF_SORTED(repl_filter_buff, write_len);
-					}
-				)
+				repl_sort_tr_buff(repl_filter_buff, write_len);
+				DBG_VERIFY_TR_BUFF_SORTED(repl_filter_buff, write_len);
 				if ((gtmrecv_filter & EXTERNAL_FILTER)
 					&& (SS_NORMAL !=
 						(status = repl_filter(recvpool_ctl->jnl_seqno, &repl_filter_buff,
 											(int*)&write_len, &repl_filter_bufsiz))))
 					repl_filter_error(recvpool_ctl->jnl_seqno, status);
-				GTMTRIG_ONLY(
-					/* Ensure that the external filter has not disturbed the sorted sequence of the
-					 * update_num
-					 */
-					DEBUG_ONLY(
-						if ((unsigned char)V19_JNL_VER <= remote_side->jnl_ver)
-							DBG_VERIFY_TR_BUFF_SORTED(repl_filter_buff, write_len);
-					)
-				)
+				/* Ensure that the external filter has not disturbed the sorted sequence of the update_num */
+				DBG_VERIFY_TR_BUFF_SORTED(repl_filter_buff, write_len);
 				assert(write_len <= repl_filter_bufsiz);
 				write_loc = write_off;		/* reset "write_loc" */
 				PREPARE_RECVPOOL_FOR_WRITE(write_len, pre_filter_write_len);	/* could update "->write"
@@ -1874,13 +1821,8 @@ STATICFNDEF void process_tr_buff(int msg_type)
 				filter_pass = TRUE;
 			} else
 			{
-				GTMTRIG_ONLY(
-					if ((unsigned char)V19_JNL_VER <= remote_side->jnl_ver)
-					{
-						repl_sort_tr_buff((uchar_ptr_t)(recvpool.recvdata_base + write_off), write_len);
-						DBG_VERIFY_TR_BUFF_SORTED((recvpool.recvdata_base + write_off), write_len);
-					}
-				)
+				repl_sort_tr_buff((uchar_ptr_t)(recvpool.recvdata_base + write_off), write_len);
+				DBG_VERIFY_TR_BUFF_SORTED((recvpool.recvdata_base + write_off), write_len);
 			}
 		}
 		if (recvpool_ctl->jnl_seqno - lastlog_seqno >= log_interval)
@@ -1977,7 +1919,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 		{
 			/* Note: The REPL_OLD_TRIPLE or REPL_HISTREC messages are endian converted by the source server
 			 * in case the receiver is running with a this_side->jnl_ver higher than the source. If not, the call to
-			 * function "repl_tr_endian_convert" (done already in the current function) will take care of
+			 * function "repl_tr_endian_convert_rcvr" (done already in the current function) will take care of
 			 * the endian conversion. So no more endian conversion needed at this point.
 			 */
 			if (REPL_OLD_TRIPLE == msg_type)
@@ -2773,10 +2715,10 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 
 	assert((NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
 	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
-	DEBUG_ONLY(
-		assert(!repl_csa->hold_onto_crit);
-		ASSERT_VALID_JNLPOOL(repl_csa);
-	)
+#	ifdef DEBUG
+	assert(!repl_csa->hold_onto_crit);
+	ASSERT_VALID_JNLPOOL(repl_csa);
+#	endif
 	/* If BAD_TRANS was written by the update process, it would have updated recvpool_ctl->jnl_seqno accordingly.
 	 * Only otherwise, do we need to wait for it to write "recvpool_ctl->jnl_seqno".
 	 */
@@ -2852,7 +2794,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 		if (this_side->is_std_null_coll)
 			msgp->start_flags |= START_FLAG_COLL_M;
 		msgp->start_flags |= START_FLAG_VERSION_INFO;
-		GTMTRIG_ONLY(msgp->start_flags |= START_FLAG_TRIGGER_SUPPORT;)
+		msgp->start_flags |= START_FLAG_TRIGGER_SUPPORT;
 #		ifdef GTM_TLS
 		if (REPL_TLS_REQUESTED)
 		{
@@ -3497,9 +3439,6 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					GET_ULONG(recvd_start_flags, start_msg->start_flags);
 					if (remote_side->cross_endian)
 						recvd_start_flags = GTM_BYTESWAP_32(recvd_start_flags);
-					assert(remote_jnl_ver > V15_JNL_VER || 0 == recvd_start_flags);
-					if (remote_jnl_ver <= V15_JNL_VER) /* safety in pro */
-						recvd_start_flags = 0;
 					remote_side->is_std_null_coll = (recvd_start_flags & START_FLAG_COLL_M) ?  TRUE : FALSE;
 					if (remote_side->is_std_null_coll != this_side->is_std_null_coll)
 						remote_side->null_subs_xform = (remote_side->is_std_null_coll

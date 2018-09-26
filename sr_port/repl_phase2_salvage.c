@@ -3,6 +3,9 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -72,7 +75,11 @@ void	repl_phase2_salvage(jnlpool_addrs *jpa, jnlpool_ctl_ptr_t jpl, jpl_phase2_i
 		assert(deadCmt->jnl_seqno);
 		null_rec.jnl_seqno = deadCmt->jnl_seqno;
 		null_rec.strm_seqno = deadCmt->strm_seqno;
-		null_rec.filler = 0;
+		null_rec.bitmask.salvaged = TRUE;	/* Record the fact that this is an auto-generated NULL record */
+		null_rec.bitmask.filler = 0;
+		assert(SIZEOF(uint4) == SIZEOF(null_rec.bitmask));
+		LITTLEENDIAN_ONLY(assert(1 == (*(uint4 *)&null_rec.bitmask)));
+		BIGENDIAN_ONLY(assert((1 << 31) == (*(uint4 *)&null_rec.bitmask)));
 		null_rec.suffix.backptr = NULL_RECLEN;
 		null_rec.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 		write = (start_write_addr % jnlpool_size);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,79 +55,90 @@ typedef int (*intlfltr_t)(uchar_ptr_t, uint4 *, uchar_ptr_t, uint4 *, uint4);
  * the format of any REPLICATED jnl record changes as opposed to the jnl format which can change if the jnl file hdr format
  * changes or if the format of a non-replicated journal record (e.g. EPOCH record) changes.
  *
- *	------	-------	--------
- *	Filter	Journal	GT.M
- *	format	format	version
- *	------	-------	--------
- *	V11	V11	GT.M V4.2-000
- *	V12	V12	GT.M V4.3-000
- *	V12	V13	GT.M V4.3-001
- *	V12	V14	GT.M V4.3-001A
- *	V15	V15	GT.M V4.4-002
- *	V16	V16	GT.M V5.0-FT01
- *	V17	V17	GT.M V5.0-000	<--- filter support starts here
- *	V17	V18	GT.M V5.3-003	(EPOCH record format changed so no filter format change)
- *	V19	V19	GT.M V5.4-000	(SET/KILL records have nodeflags, New ZTWORMHOLE record, file header max_jrec_len changes)
- *	V19	V20	GT.M V5.4-001	64K journal file header change in Unix but V20 change for VMS too; No jnlrec format change
- *	V21	V21	GT.M V5.4-002	Added replicated ZTRIGGER jnl record type
- *	V22	V22	GT.M V5.5-000	strm_seqno added to all logical records (supplementary instances)
- *	V22	V23	GT.M V6.0-000	Various journaling-related limits have changed, allowing for much larger journal records
- *	V24	V24	GT.M V6.2-000	New logical trigger journal record (TLGTRIG and ULGTRIG jnl records)
- *	V24	V25	GT.M V6.2-001	No new jnl record but bump needed to replicate logical trigger jnl records (GTM-7509)
- *	V24	V26	GT.M V6.2-002	No new jnl record but bump needed because of different encryption method
- *	V24	V27	GT.M V6.3-001	JRT_ALIGN record size reduced from min of 32 bytes to min of 16 bytes.
- *					The extract format though did not change as we extract a 0 tn now in -detial extract.
- *					The filter format did not change because ALIGN record is not replicated.
+ * We support replication with versions as old as 5 years. To help with that determination every time the journal/filter
+ * format changes, the release date of each version is included in the MM/YY column.
+ *
+ * ------ ------  ------- --------
+ * MM/YY  Filter  Journal GT.M
+ *        format  format  version
+ * ------ ------  ------- --------
+ *         V11     V11    V4.2-000
+ *         V12     V12    V4.3-000
+ *         V12     V13    V4.3-001
+ *         V12     V14    V4.3-001A
+ *         V15     V15    V4.4-002
+ *         V16     V16    V5.0-FT01
+ *         V17     V17    V5.0-000  <--- filter support starts here
+ *         V17     V18    V5.3-003  <--- (EPOCH record format changed so no filter format change)
+ *         V19     V19    V5.4-000  <--- (SET/KILL records have nodeflags, New ZTWORMHOLE record, file header max_jrec_len changes)
+ *         V19     V20    V5.4-001  <--- 64K journal file header change in Unix but V20 change for VMS too; No jnlrec format change
+ *         V21     V21    V5.4-002  <--- Added replicated ZTRIGGER jnl record type
+ * 02/2012 V22     V22    V5.5-000  <--- strm_seqno added to all logical records (supplementary instances)
+ * 09/2012 V22     V23    V6.0-000  <--- Various journaling-related limits have changed, allowing for much larger journal records
+ * 09/2014 V24     V24    V6.2-000  <--- New logical trigger journal record (TLGTRIG and ULGTRIG jnl records)
+ * 12/2014 V24     V25    V6.2-001  <--- No new jnl record but bump needed to replicate logical trigger jnl records (GTM-7509)
+ * 05/2015 V24     V26    V6.2-002  <--- No new jnl record but bump needed because of different encryption method
+ * 03/2017 V24     V27    V6.3-001  <--- JRT_ALIGN record size reduced from min of 32 bytes to min of 16 bytes.
+ *                                       The extract format though did not change as we extract a 0 tn now in -detail extract.
+ *                                       The filter format did not change because ALIGN record is not replicated.
+ * ??/???? V??     V28    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V29    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V30    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V31    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V32    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V33    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V34    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V35    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V36    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V37    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V38    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V39    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V40    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V41    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V42    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * ??/???? V??     V43    V?.?-???  <--- Space reserved for GT.M changes to jnl record format and potentially filter format
+ * 11/2018 V44     V44    r1.24     <--- NULL record has "salvaged" bit indicating auto-generated record (not user-generated)
  */
 
 typedef enum
 {
-	REPL_FILTER_VNONE = 0,
-	REPL_FILTER_V17,	/* filter version corresponding to journal format V17 */
-	REPL_FILTER_V19,	/* filter version corresponding to journal format V19 */
-	REPL_FILTER_V21,	/* filter version corresponding to journal format V21 */
-	REPL_FILTER_V22,	/* filter version corresponding to journal format V22 */
-	REPL_FILTER_V24,	/* filter version corresponding to journal format V24 */
-	REPL_FILTER_MAX
-} repl_filter_t;
-
-typedef enum
-{
-	REPL_JNL_V17,		/* enum corresponding to journal format V17 */
-	REPL_JNL_V18,		/* enum corresponding to journal format V18 */
-	REPL_JNL_V19,		/* enum corresponding to journal format V19 */
-	REPL_JNL_V20,		/* enum corresponding to journal format V20 */
-	REPL_JNL_V21,		/* enum corresponding to journal format V21 */
-	REPL_JNL_V22,		/* enum corresponding to journal format V22 */
-	REPL_JNL_V23,		/* enum corresponding to journal format V23 */
 	REPL_JNL_V24,		/* enum corresponding to journal format V24 */
 	REPL_JNL_V25,		/* enum corresponding to journal format V25 */
 	REPL_JNL_V26,		/* enum corresponding to journal format V26 */
 	REPL_JNL_V27,		/* enum corresponding to journal format V27 */
+	REPL_JNL_V28,		/* enum corresponding to journal format V28 */
+	REPL_JNL_V29,		/* enum corresponding to journal format V29 */
+	REPL_JNL_V30,		/* enum corresponding to journal format V30 */
+	REPL_JNL_V31,		/* enum corresponding to journal format V31 */
+	REPL_JNL_V32,		/* enum corresponding to journal format V32 */
+	REPL_JNL_V33,		/* enum corresponding to journal format V33 */
+	REPL_JNL_V34,		/* enum corresponding to journal format V34 */
+	REPL_JNL_V35,		/* enum corresponding to journal format V35 */
+	REPL_JNL_V36,		/* enum corresponding to journal format V36 */
+	REPL_JNL_V37,		/* enum corresponding to journal format V37 */
+	REPL_JNL_V38,		/* enum corresponding to journal format V38 */
+	REPL_JNL_V39,		/* enum corresponding to journal format V39 */
+	REPL_JNL_V40,		/* enum corresponding to journal format V40 */
+	REPL_JNL_V41,		/* enum corresponding to journal format V41 */
+	REPL_JNL_V42,		/* enum corresponding to journal format V42 */
+	REPL_JNL_V43,		/* enum corresponding to journal format V43 */
+	REPL_JNL_V44,		/* enum corresponding to journal format V44 */
 	REPL_JNL_MAX
 } repl_jnl_t;
 
 #define IF_INVALID	((intlfltr_t)0L)
 #define IF_NONE		((intlfltr_t)(-1L))
-#define IF_24TO17	(intlfltr_t)jnl_v24TOv17
-#define IF_24TO19	(intlfltr_t)jnl_v24TOv19
-#define IF_24TO21	(intlfltr_t)jnl_v24TOv21
-#define IF_24TO22	(intlfltr_t)jnl_v24TOv22
-#define IF_17TO24	(intlfltr_t)jnl_v17TOv24
-#define IF_19TO24	(intlfltr_t)jnl_v19TOv24
-#define IF_21TO24	(intlfltr_t)jnl_v21TOv24
-#define IF_22TO24	(intlfltr_t)jnl_v22TOv24
-#define IF_24TO24	(intlfltr_t)jnl_v24TOv24
+#define IF_22TO44	(intlfltr_t)jnl_v22TOv44
+#define IF_44TO22	(intlfltr_t)jnl_v44TOv22
+#define IF_24TO44	(intlfltr_t)jnl_v24TOv44
+#define IF_44TO24	(intlfltr_t)jnl_v44TOv24
+#define IF_44TO44	(intlfltr_t)jnl_v44TOv44
 
-extern int jnl_v24TOv17(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v17TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v24TOv19(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v19TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v24TOv21(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v21TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v24TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v22TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
-extern int jnl_v24TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v44TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v22TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v44TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v24TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
+extern int jnl_v44TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, uint4 *conv_len, uint4 conv_bufsiz);
 
 extern void repl_check_jnlver_compat(boolean_t same_endianness);
 
@@ -151,9 +162,9 @@ GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
  * 	EREPL_INTLFILTER_BADREC - bad record in the filter buffer.
  * 	EREPL_INTLFILTER_INCMPLREC - incomplete record in the filter buffer.
  *	EREPL_INTLFILTER_NEWREC - cannot convert record, the record is newer than the "to" version.
- *	EREPL_INTLFILTER_REPLGBL2LONG - record contains global name > 8 characters, which is not supported in remote side
  *	EREPL_INTLFILTER_SECLESSTHANV62 - record contains #t global which is not allowed when source side is > V62000
  *	EREPL_INTLFILTER_PRILESSTHANV62 - record contains #t global which is not allowed when receiver side is > V62000
+ *	EREPL_INTLFILTER_NOCONVERT - conversion error
  * In all error cases, conv_len will be the offset at which processing was stopped.
  */
 
@@ -161,40 +172,17 @@ GBLREF	intlfltr_t repl_filter_cur2old[JNL_VER_THIS - JNL_VER_EARLIEST_REPL + 1];
 #define TP_TOKEN_TID_SIZE		(SIZEOF(token_num) + 8)
 #define	TOKEN_PARTICIPANTS_TS_SHORT_TIME_SIZE (SIZEOF(token_num) + 2 * SIZEOF(uint4))
 
-#define V15_JNL_VER		15
-#define V17_JNL_VER		17
-#define V18_JNL_VER		18
-#define V19_JNL_VER		19
-#define V20_JNL_VER		20
-#define V21_JNL_VER		21
 #define V22_JNL_VER		22
 #define V23_JNL_VER		23
 #define V24_JNL_VER		24
 #define V25_JNL_VER		25
 #define V26_JNL_VER		26
 #define V27_JNL_VER		27
+#define V44_JNL_VER		44
 
-#define	V17_NULL_RECLEN		40	/* size of a JRT_NULL record in V17/V18 jnl format */
-#define	V19_NULL_RECLEN		40	/* size of a JRT_NULL record in V19/V20 jnl format */
-#define	V21_NULL_RECLEN		40	/* size of a JRT_NULL record in V21	jnl format */
-#define	V22_NULL_RECLEN		48	/* size of a JRT_NULL record in V22/V23	jnl format */
-#define	V24_NULL_RECLEN		48	/* size of a JRT_NULL record in V24	jnl format */
+#define	V44_NULL_RECLEN		48	/* size of a JRT_NULL record in V22/V23/V24/V44 jnl format */
 
-#define	V19_UPDATE_NUM_OFFSET		32	/* offset of "update_num" member in struct_jrec_upd structure in V19 jnl format */
-#define	V19_MUMPS_NODE_OFFSET		40	/* offset of "mumps_node" member in struct_jrec_upd structure in V19 jnl format */
-#define	V19_TCOM_FILLER_SHORT_OFFSET	32	/* offset of "filler_short" in struct_jrec_tcom structure in V19 jnl format */
-#define	V19_NULL_FILLER_OFFSET		32	/* offset of "filler" in struct_jrec_nullstructure in V19 jnl format */
-
-#define	V24_MUMPS_NODE_OFFSET		48	/* offset of "mumps_node" member in struct_jrec_upd struct in V24 jnl format */
-
-typedef struct
-{
-	uint4			jrec_type : 8;		/* Actually, enum jnl_record_type */
-	uint4			forwptr : 24;		/* Offset to beginning of next record */
-	off_jnl_t		pini_addr;		/* Offset in the journal file which contains pini record */
-	jnl_tm_t		time;			/* 4-byte time stamp both for UNIX and VMS */
-	trans_num_4byte		tn;
-} v15_jrec_prefix;	/* 16-byte */
+#define	V44_MUMPS_NODE_OFFSET		48	/* offset of "mumps_node" member in struct_jrec_upd struct in V44 jnl format */
 
 int repl_filter_init(char *filter_cmd);
 int repl_filter(seq_num tr_num, unsigned char **tr, int *tr_len, int *tr_bufsize);
@@ -227,11 +215,8 @@ void repl_filter_error(seq_num filter_seqno, int why);
 		 * update_num.													\
 		 */														\
 		tr = GTMSOURCE_MSGP->msg;											\
-		if (V19_JNL_VER <= LOCAL_JNL_VER)										\
-		{														\
-			repl_sort_tr_buff(tr, DATA_LEN);									\
-			DBG_VERIFY_TR_BUFF_SORTED(tr, DATA_LEN);								\
-		}														\
+		repl_sort_tr_buff(tr, DATA_LEN);										\
+		DBG_VERIFY_TR_BUFF_SORTED(tr, DATA_LEN);									\
 		filter_seqno = ((struct_jrec_null *)tr)->jnl_seqno;								\
 		if (SS_NORMAL != (status = repl_filter(filter_seqno, &tr, &DATA_LEN, &gtmsource_msgbufsiz)))			\
 			repl_filter_error(filter_seqno, status);								\
@@ -260,24 +245,20 @@ void repl_filter_error(seq_num filter_seqno, int why);
 
 /* Below error_defs are needed by the following macros */
 error_def(ERR_REPLRECFMT);
-error_def(ERR_REPLGBL2LONG);
 error_def(ERR_REPLNOHASHTREC);
 
 # define INT_FILTER_RTS_ERROR(FILTER_SEQNO, REPL_ERRNO)										\
 {																\
 	assert((EREPL_INTLFILTER_BADREC == REPL_ERRNO)										\
-		|| (EREPL_INTLFILTER_REPLGBL2LONG == REPL_ERRNO)								\
 		|| (EREPL_INTLFILTER_PRILESSTHANV62 == REPL_ERRNO)								\
 		|| (EREPL_INTLFILTER_SECLESSTHANV62 == REPL_ERRNO));								\
 	if (EREPL_INTLFILTER_BADREC == REPL_ERRNO)										\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLRECFMT);							\
-	else if (EREPL_INTLFILTER_REPLGBL2LONG == REPL_ERRNO)									\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLGBL2LONG);							\
 	else if (EREPL_INTLFILTER_PRILESSTHANV62 == REPL_ERRNO)									\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLNOHASHTREC, 3, &FILTER_SEQNO, LEN_AND_LIT("Source"));		\
 	else if (EREPL_INTLFILTER_SECLESSTHANV62 == REPL_ERRNO)									\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_REPLNOHASHTREC, 3, &FILTER_SEQNO, LEN_AND_LIT("Receiver"));	\
-	else	/* (EREPL_INTLFILTER_INCMPLREC == REPL_ERRNO) */								\
+	else	/* (EREPL_INTLFILTER_INCMPLREC == REPL_ERRNO) || (EREPL_INTLFILTER_NOCONVERT == REPL_ERRNO) */			\
 		assertpro(FALSE);												\
 }
 

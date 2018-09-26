@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright 2012 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +15,7 @@
 #ifndef __GVCST_JRT_NULL_H__
 #define __GVCST_JRT_NULL_H__
 
-void	gvcst_jrt_null(void);
+void	gvcst_jrt_null(boolean_t salvaged);
 
 #endif
 

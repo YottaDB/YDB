@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,8 +24,8 @@
 /* Uncomment the below line to debug the flow of "mur_forward" with multiple parallel processes */
 /* #define	MUR_DEBUG */
 
-#define JNL_EXTR_LABEL		"GDSJEX07"	/* format of the simple journal extract */
-#define JNL_DET_EXTR_LABEL	"GDSJDX08"	/* format of the detailed journal extract */
+#define JNL_EXTR_LABEL		"YDBJEX08"	/* format of the simple journal extract */
+#define JNL_DET_EXTR_LABEL	"YDBJDX09"	/* format of the detailed journal extract */
 
 error_def(ERR_MUINFOSTR);
 error_def(ERR_MUINFOUINT4);

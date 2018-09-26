@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,7 +49,7 @@ enum
 	EREPL_INTLFILTER_INCMPLREC,		/* 283 */
 	EREPL_INTLFILTER_NEWREC,		/* 284 */
 	EREPL_INTLFILTER_DATA2LONG,		/* 285 */
-	EREPL_INTLFILTER_REPLGBL2LONG,		/* 286 */
+	EREPL_INTLFILTER_NOCONVERT,		/* 286 */
 	EREPL_FILTERRECV,			/* 287 */
 	EREPL_INTLFILTER_PRILESSTHANV62,	/* 288 */
 	EREPL_INTLFILTER_SECLESSTHANV62,	/* 289 */

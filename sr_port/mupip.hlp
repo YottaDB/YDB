@@ -5151,7 +5151,7 @@
        SHOW output for journal file /home/jdoe/.yottadb/r122_x86_64/g/gtm.mjl
        -------------------------------------------------------------------------------
        Journal file name       /home/jdoe/.yottadb/r122_x86_64/g/gtm.mjl
-       Journal file label      GDSJNL23
+       Journal file label      GDSJNL27
        Database file name      /home/jdoe/.yottadb/r122_x86_64/g/gtm.dat
         Prev journal file name /home/jdoe/.yottadb/r122_x86_64/g/gtm.mjl_2012310190106
         Next journal file name
@@ -5921,7 +5921,7 @@
    Extract Formats
 
    Journal EXTRACT files always start with a label. For the current release
-   of YottaDB, the label is GDSJEX07 for a simple journal extract file. This
+   of YottaDB, the label is YDBJEX08 for a simple journal extract file. This
    label is necessary to identify the format of the file.
 
    If the environment variable ydb_chset is set of UTF-8, then file format

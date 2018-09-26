@@ -431,7 +431,8 @@ uint4	mur_output_record(reg_ctl_list *rctl)
 			MUR_SET_JNL_FENCE_CTL_TOKEN(rec->jrec_null.jnl_seqno, rctl);
 			jnl_fence_ctl.strm_seqno = rec->jrec_null.strm_seqno;
 		}
-		gvcst_jrt_null();
+		assert(0 == rec->jrec_null.bitmask.filler);
+		gvcst_jrt_null(rec->jrec_null.bitmask.salvaged);	/* Preserve "salvaged" bit during replay of JRT_NULL */
 		break;
 	default:
 		assert(FALSE);

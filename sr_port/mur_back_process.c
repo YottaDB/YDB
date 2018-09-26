@@ -1164,6 +1164,42 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				 * the reserved space in the jnl file when the process got kill9'ed in phase2 of commit.
 				 * So do not treat that as an error.
 				 */
+				/* If this is a NULL record with the "salvaged" bit set to TRUE, it means this is an auto-generated
+				 * journal record. If the current rollback is a fetchresync rollback (i.e. done on a receiver side),
+				 * the corresponding seqno on the source side could be a user-generated seqno (i.e. non-NULL
+				 * journal record)or the same NULL record with the "salvaged" bit set even on the source side.
+				 * We cannot know for sure so err on the side of caution and treat this auto-generated NULL record
+				 * as a broken transaction. That way later when the receiver server on this instance connects to
+				 * the source server, the user-generated journal records for this seqno would be re-fetched on
+				 * this side from the source side thereby avoiding data discrepancies between the two sides (#362).
+				 * Note that it is possible one does a non-fetchresync rollback on a receiver side instance. In
+				 * that case, we would not consider the "salvaged" NULL record as a broken transaction which
+				 * could cause data discrepancies between source and receiver side. But the user is not supposed
+				 * to run a non-fetchresync rollback ever on a receiver side. Since the rollback process has no
+				 * clue whether it is running on what is going to be a receiver or source side, this is the best
+				 * we can do at this point.
+				 */
+				if ((NULLFENCE == rec_fence) && jnlrec->jrec_null.bitmask.salvaged && mur_options.fetchresync_port)
+				{
+					/* If this was not already set as a broken tn, bump the broken_cnt for this seqno */
+					if (0 == multi->partner)
+					{	/* This was a token seen first as a JRT_NULL record, not as a JRT_TCOM.
+						 * Now that we know this has to be treated as a broken transaction and
+						 * we know for sure "murgbl.broken_cnt" was not incremented for this token
+						 * in any other region (or else multi->partner will be non-zero), safely
+						 * bump it here.
+						 */
+						assert(!multi->this_is_broken);
+						murgbl.broken_cnt++;
+					}
+					/* else "murgbl.broken_cnt++" would have been done in MUR_TOKEN_ADD when we saw
+					 * the corresponding TCOM record for this TP transaction in another region.
+					 */
+					SET_THIS_TN_AS_BROKEN(multi, reg_total); /* This is broken */
+					assert(multi->this_is_broken);	/* This ensures we do not bump "broken_cnt"
+									 * more than once for the same seqno.
+									 */
+				}
 				PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);
 			}
 		}

@@ -1039,7 +1039,9 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				DEBUG_ONLY(csa = cs_addrs;)
 				assert(!csa->hold_onto_crit);
 				assert(!csa->now_crit);
-				gvcst_jrt_null();
+				assert(0 == rec->jrec_null.bitmask.filler);
+				/* Propagate the "salvaged" bit from the JRT_NULL record on source side to the receiver side */
+				gvcst_jrt_null(rec->jrec_null.bitmask.salvaged);
 				incr_seqno = TRUE;
 				/* Restore gv_cur_region to what it was before the NULL record processing started. op_tstart
 				 * relies on the fact that gv_target->gd_csa and cs_addrs be in sync. If prior to NULL record

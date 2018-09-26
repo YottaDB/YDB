@@ -587,13 +587,7 @@ int gtmsource_recv_restart(seq_num *recvd_jnl_seqno, int *msg_type, int *start_f
 			REPL_DPRINT3("Local jnl ver is octal %o, remote jnl ver is octal %o\n",
 				this_side->jnl_ver, remote_side->jnl_ver);
 			repl_check_jnlver_compat(!remote_side->cross_endian);
-			assert(remote_side->jnl_ver > V15_JNL_VER || 0 == (*start_flags & START_FLAG_COLL_M));
-			if (remote_side->jnl_ver <= V15_JNL_VER)
-				*start_flags &= ~START_FLAG_COLL_M; /* zap it for pro, just in case */
 			remote_side->is_std_null_coll = (*start_flags & START_FLAG_COLL_M) ? TRUE : FALSE;
-			assert((remote_side->jnl_ver >= V19_JNL_VER) || (0 == (*start_flags & START_FLAG_TRIGGER_SUPPORT)));
-			if (remote_side->jnl_ver < V19_JNL_VER)
-				*start_flags &= ~START_FLAG_TRIGGER_SUPPORT; /* zap it for pro, just in case */
 			remote_side->trigger_supported = (*start_flags & START_FLAG_TRIGGER_SUPPORT) ? TRUE : FALSE;
 #			ifdef GTM_TRIGGER
 			if (!remote_side->trigger_supported)

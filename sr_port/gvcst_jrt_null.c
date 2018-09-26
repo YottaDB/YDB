@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright 2012 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +41,7 @@ GBLREF	unsigned int		t_tries;
 
 error_def(ERR_JRTNULLFAIL);
 
-void	gvcst_jrt_null()
+void	gvcst_jrt_null(boolean_t salvaged)
 {
 	enum cdb_sc		status;
 	struct_jrec_null	*rec;
@@ -58,7 +61,8 @@ void	gvcst_jrt_null()
 	rec->prefix.checksum = INIT_CHECKSUM_SEED;
 	rec->suffix.backptr = NULL_RECLEN;
 	rec->suffix.suffix_code = JNL_REC_SUFFIX_CODE;
-	rec->filler = 0;
+	rec->bitmask.salvaged = salvaged;
+	rec->bitmask.filler = 0;
 	jgbl.cumul_jnl_rec_len = NULL_RECLEN;
 	/* The rest of the initialization is taken care of by jnl_write_logical (invoked in t_end below) */
 	DEBUG_ONLY(jgbl.cumul_index = 1;)

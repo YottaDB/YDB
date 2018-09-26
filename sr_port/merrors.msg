@@ -830,7 +830,7 @@ NEWJNLFILECREAT	<Journal file !AD nearing maximum size.  New journal file create
 DSKSPACEFLOW	<Disk Space for file !AD nearing maximum size.  !UL blocks available.>/info/fao=3!/ansi=0
 GVINCRFAIL	<Global variable $INCR failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 ISOLATIONSTSCHN	<Error changing NOISOLATION status for global ^!AD within a TP transaction from !UL to !UL>/error/fao=4!/ansi=0
-REPLGBL2LONG	<Global names longer than 8 characters cannot be handled at the secondary>/error/fao=0!/ansi=0
+UNUSEDMSG833	<REPLGBL2LONG nixed in r1.24>/error/fao=0!/ansi=0
 TRACEON		<Missing global name (with optional subscripts) for recording M-tracing information>/error/fao=0!/ansi=0
 TOOMANYCLIENTS	<GT.CM is serving the maximum number of clients.  Try again later.>/error/fao=0!/ansi=0
 NOEXCLUDE	<None of the excluded variables exist>/info/fao=0!/ansi=0
@@ -1381,7 +1381,7 @@ BOOLSIDEFFECT	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential
 DBBADUPGRDSTATE	<Correcting conflicting values for fields describing database version upgrade state in the file header for region !AD (!AD) - make fresh backups with new journal files immediately.>/warning/fao=4!/ansi=0
 WRITEWAITPID	<PID !UL waited !UL minute(s) for PID !UL to finish writing block 0x!XL in database file !AD>/error/fao=6!/ansi=0
 ZGOCALLOUTIN	<ZGOTO level 0 with entry ref not valid when using call-ins>/error/fao=0!/ansi=0
-REPLNOXENDIAN	<!AD side is running on a GT.M/YottaDB version that does not support cross-endian replication. Upgrade the !AD side to at least V5.3-003 to support cross-endian replication. Cannot continue>/error/fao=4!/ansi=0
+UNUSEDMSG1384	<REPLNOXENDIAN nixed in r1.24 because oldest supported version is V6.0-000 which supports cross-endian replication>/error/fao=0!/ansi=0
 REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ>/error/fao=3!/ansi=0
 UNUSEDMSG1386	<ZGOTOINVLVL2 nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/error/fao=2!/ansi=0

@@ -43,43 +43,41 @@ error_def(ERR_JNLENDIANLITTLE);
  * 	3) Add an entry each to repl_filter_old2cur & repl_filter_cur2old arrays in repl_filter.c.
  *	4) Bump JNL_EXTR_LABEL and JNL_DET_EXTR_LABEL as appropriate in muprec.h.
  *		This is not needed if for example the newly added jnl record types don't get extracted at all.
- *	5) Add a line in the big comment block just before "repl_filter_t" is typedefed in repl_filter.h
+ *	5) Add a line in the big comment block just before "repl_jnl_t" is typedefed in repl_filter.h
  *		to update the "Filter format", "Journal format" and "GT.M version" columns.
  *	6) Add Vxx_JNL_VER to repl_filter.h and examine usages of Vxx_JNL_VER where xx corresponds to older
  *		journal version to see if those need to be replaced with the newer version macro.
  * If the FILTER format is also changing, then do the following as well
- * 	7) Add REPL_FILTER_Vxx enum to repl_filter_t typedef in repl_filter.h
- * 	8) Add/Edit IF_xTOy macros in repl_filter.h to transform from/to the NEW jnl format version only.
+ * 	7) Add/Edit IF_xTOy macros in repl_filter.h to transform from/to the NEW jnl format version only.
  * 		Remove all entries that don't have the new jnl format in either the from or to part of the conversion.
- * 	9) Add/Edit prototype and implement functions jnl_xTOy() and jnl_yTOx() in repl_filter.c
- * 	10) Enhance repl_tr_endian_convert() to endian convert journal records from previous jnl formats to new format.
+ * 	8) Add/Edit prototype and implement functions jnl_xTOy() and jnl_yTOx() in repl_filter.c
+ * 	9) Enhance repl_tr_endian_convert_src() and/or repl_tr_endian_convert_rcvr() as appropriate to endian convert
+ *		journal records from previous jnl formats to new format.
  * 		This is similar to the jnl_xTOy() filter conversion functions except that lot of byte-swaps are needed.
- * 	11) Periodically determine if the size of the array repl_filter_old2cur is huge and if so trim support of
+ * 	10) Periodically determine if the size of the array repl_filter_old2cur is huge and if so trim support of
  * 		rolling upgrade (using replication internal filters) for older GT.M versions/jnl-formats.
  * 		This would mean bumping the macro JNL_VER_EARLIEST_REPL and examining all arrays that are defined
  * 		using this macro and changing the entries in all those arrays accordingly (e.g. repl_filter_old2cur
- * 		array currently assumes earliest supported version is V15 and hence has the function named IF_curTO15
- * 		which needs to change to say IF_curTO17 if the earliest supported version changes to V17 or so).
- *
+ * 		array currently assumes earliest supported version is V22 and hence has the function named IF_22TO44
+ * 		which needs to change to say IF_24TO44 if the earliest supported version changes to say V24).
+ *      11) Add JRT_MAX_Vxx macro to jnl.h where xx is cur format (44 currently). And delete any unsupported JRT_MAX_Vxx macros.
  */
-#define JNL_LABEL_TEXT		"GDSJNL27"	/* see above comment paragraph for todos whenever this is changed */
-#define JNL_VER_THIS		27
-#define JNL_VER_EARLIEST_REPL	17		/* Replication filter support starts here GDSJNL17 = GT.M V5.1-000.
-						 * (even though it should be V5.0-000, since that is pre-multisite,
-						 * the replication connection with V55000 will error out at handshake
-						 * time so V5.1-000 is the minimum that will even reach internal filter code)
-						 */
-#define JRT_MAX_V17		JRT_AIMG	/* Maximum jnl record type in GDSJNL17 or GDSJNL18 that can be input to replication
-						 * filter. Actually JRT_TRIPLE is a higher record type than JRT_AIMG but it is only
-						 * sent through the replication pipe and never seen by filter routines.
-						 */
-#define JRT_MAX_V19		JRT_UZTWORM	/* Max jnlrec type in GDSJNL19/GDSJNL20 that can be input to replication filter */
-#define JRT_MAX_V21		JRT_UZTRIG	/* Max jnlrec type in GDSJNL21 that can be input to replication filter */
-#define JRT_MAX_V22		JRT_UZTRIG	/* Max jnlrec type in GDSJNL22/GDSJNL23 that can be input to replication filter.
+#define JNL_LABEL_TEXT		"YDBJNL44"	/* see above comment paragraph for todos whenever this is changed */
+#define JNL_VER_THIS		44
+
+/* Since V24 filter format was first released in 09/2014 (see comment block in "repl_filter.h"), which is only 4 years
+ * apart (our minimum is 5 years apart, see comment in sr_port/repl_filter.h) from when JNL_VER_THIS (i.e. V36 filter format)
+ * will be released (11/2018), we have to go back one filter format row which is V22 (released 09/2012) so the earliest
+ * version we need to support is V6.0-000.
+ */
+#define JNL_VER_EARLIEST_REPL	22
+
+#define JRT_MAX_V22		JRT_UZTRIG	/* Max jnlrec type in V22/V23 that can be input to replication filter.
 						 * Actually JRT_HISTREC is a higher record type than JRT_UZTRIG but it is only
 						 * sent through the replication pipe and never seen by filter routines.
 						 */
-#define JRT_MAX_V24		JRT_ULGTRIG	/* Max jnlrec type in GDSJNL24/GDSJNL25 that can be input to replication filter */
+#define JRT_MAX_V24		JRT_ULGTRIG	/* Max jnlrec type in V24/V25/V26/V27 that can be input to replication filter */
+#define JRT_MAX_V44		JRT_ULGTRIG	/* Max jnlrec type in V44 that can be input to replication filter */
 
 #define JNL_ALLOC_DEF		2048
 #define JNL_ALLOC_MIN		2048
@@ -1020,13 +1018,24 @@ typedef struct	/* fixed length */
 	jrec_suffix		suffix;
 } struct_jrec_pfin;
 
-/* Following 3 are same structures. In case we change it in future, let's define them separately */
+typedef struct
+{
+	/* Need the #ifdef below to ensure cross-endian replication of NULL records works fine even with bit-fields */
+#	ifdef BIGENDIAN
+	unsigned int		filler   : 31;
+	unsigned int		salvaged :  1;	/* if this record was created by "jnl_phase2_salvage"/"repl_phase2_salvage" */
+#	else
+	unsigned int		salvaged :  1;	/* if this record was created by "jnl_phase2_salvage"/"repl_phase2_salvage" */
+	unsigned int		filler   : 31;
+#	endif
+} null_rec_bitmask_t;
+
 typedef struct	/* fixed length */
 {
 	jrec_prefix		prefix;
-	seq_num			jnl_seqno;		/* must start at 8-byte boundary */
-	seq_num			strm_seqno;		/* see "struct_jrec_upd" for comment on the purpose of this field */
-	uint4			filler;
+	seq_num			jnl_seqno;	/* must start at 8-byte boundary */
+	seq_num			strm_seqno;	/* see "struct_jrec_upd" for comment on the purpose of this field */
+	null_rec_bitmask_t	bitmask;	/* currently only 1-bit is used, 31-bits are fillers */
 	jrec_suffix		suffix;
 } struct_jrec_null;
 

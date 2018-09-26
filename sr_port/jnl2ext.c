@@ -126,10 +126,10 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 		return ext_buff;
 	}
 	curr = ext_buff;
-	/* The following assumes the journal extract format is "GDSJEX07". Whenever that changes (in mur_jnl_ext.c),
+	/* The following assumes the journal extract format is "YDBJEX08". Whenever that changes (in mur_jnl_ext.c),
 	 * the below code as well as ext2jnl.c will need to change. Add an assert to let us know of that event.
 	 */
-	assert(!MEMCMP_LIT(JNL_EXTR_LABEL,"GDSJEX07"));
+	assert(!MEMCMP_LIT(JNL_EXTR_LABEL,"YDBJEX08"));
 	if (IS_TUPD(rectype))
 	{
 		if (FALSE == first_tstart)
@@ -208,6 +208,8 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 	JNL2EXT_STRM_SEQNO(curr, rec->jrec_set_kill.strm_seqno);	/* Note: updates "curr" */
 	if (rectype == JRT_NULL)
 	{
+		DELIMIT_CURR;
+		curr = (char *)i2ascl((uchar_ptr_t)curr, rec->jrec_null.bitmask.salvaged);
 		*curr++ = '\n';
 		*curr='\0';
 		return curr;

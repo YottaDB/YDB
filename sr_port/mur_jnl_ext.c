@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -234,6 +237,7 @@ void	mur_extract_null(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *
 	EXTPID(plst);
 	EXTQW(rec->jrec_null.jnl_seqno);
 	EXT_STRM_SEQNO(rec->jrec_null.strm_seqno);
+	EXTINT(rec->jrec_null.bitmask.salvaged);
 	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 

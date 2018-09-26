@@ -240,12 +240,14 @@ error_def(ERR_TRIG2NOTRIG);
 error_def(ERR_TLSRENEGOTIATE);
 error_def(ERR_TEXT);
 
+STATICFNDCL void repl_tr_endian_convert_src(repl_msg_ptr_t send_msgp, int send_tr_len, seq_num pre_read_seqno);
+
 /* Endian converts the given set of journal records (possibly multiple sequence numbers) so that the secondary can consume them
  * as-is. This is done only in the case when the primary is running on a GT.M version less than the GT.M version on secondary
  * side. Otherwise, the secondary takes the responsibility of doing the endian conversion. Note that the endian conversion happens
- * in-place. The below function is based on gtmrecv_process.c/repl_tr_endian_convert()
+ * in-place. The below function is based on gtmrecv_process.c/repl_tr_endian_convert_rcvr()
  */
-static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, seq_num pre_read_seqno)
+STATICFNDEF void repl_tr_endian_convert_src(repl_msg_ptr_t send_msgp, int send_tr_len, seq_num pre_read_seqno)
 {
 	uchar_ptr_t		buffp, jb;
 	DEBUG_ONLY(uchar_ptr_t	jstart;)
@@ -255,12 +257,11 @@ static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, se
 	jrec_suffix		*suffixp;
 	jnl_string		*keystr;
 	mstr_len_t		*vallen_ptr;
-	/* seq_num		good_seqno; */
+	uint4			bitmask;
 
 	buffp = send_msgp->msg;
 	buflen = send_msgp->len - REPL_MSG_HDRLEN;
 	remaining_len = send_tr_len;
-	/* QWASSIGN(good_seqno, seq_num_zero); */
 	status = 0;
 	while (0 < remaining_len)
 	{
@@ -289,7 +290,6 @@ static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, se
 			 */
 			suffixp = ((jrec_suffix *)((unsigned char *)rec + reclen - JREC_SUFFIX_SIZE));
 			suffixp->backptr = GTM_BYTESWAP_24(suffixp->backptr);
-			/* QWASSIGN(good_seqno, rec->jrec_null.jnl_seqno); */ /* update good_seqno */
 			rec->jrec_null.jnl_seqno = GTM_BYTESWAP_64(rec->jrec_null.jnl_seqno);
 			/* At this point, we could have a TCOM or NULL or SET/KILL/ZKILL/ZTRIG type of record.
 			 * Assert that all of them have "strm_seqno" at the exact same offset so we can avoid
@@ -326,10 +326,15 @@ static void repl_tr_endian_convert(repl_msg_ptr_t send_msgp, int send_tr_len, se
 					+ SIZEOF(token_seq_t) == (unsigned char *)&rec->jrec_tcom.filler_short);
 				/* endian convert num_participants */
 				rec->jrec_tcom.num_participants = GTM_BYTESWAP_16(rec->jrec_tcom.num_participants);
+			} else
+			{
+				assert(JRT_NULL == rectype);
+				/* the sequence number has already been endian converted */
+				/* Need to endian convert the 1-bit "salvaged" field in NULL record */
+				assert(SIZEOF(bitmask) == SIZEOF(null_rec_bitmask_t));
+				bitmask = *(uint4 *)&rec->jrec_null.bitmask;
+				*(uint4 *)&rec->jrec_null.bitmask = GTM_BYTESWAP_32(bitmask);
 			}
-			/* else records can only be JRT_NULL. The only relevant field in JRT_NULL is the sequence number which is
-			 * already endian converted.
-			 */
 			assert(jstart == jb); /* endian conversion should always happen in-place. */
 			jlen -= reclen;
 			jb += reclen;
@@ -1622,9 +1627,9 @@ int gtmsource_process(void)
 					{	/* Cross-endian replication with GT.M version on primary being lesser than that
 						 * the secondary. Do the endian conversion in the primary so that the secondary
 						 * can consume it as-is.
-						 * No return if the below call to repl_tr_endian_convert fails.
+						 * No return if the below call to "repl_tr_endian_convert_src" fails.
 						 */
-						repl_tr_endian_convert(send_msgp, send_tr_len, pre_read_seqno);
+						repl_tr_endian_convert_src(send_msgp, send_tr_len, pre_read_seqno);
 					}
 					pre_cmpmsglen = send_tr_len; /* send_tr_len will be updated below */
 					if (ZLIB_CMPLVL_NONE != repl_zlib_cmp_level)

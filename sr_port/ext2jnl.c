@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -259,6 +262,9 @@ char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved
 	switch(exttype)
 	{
 		case MUEXT_NULL:
+			ptr = STRTOK_R(NULL, "\\", &strtokptr);		/* get the strm_seqno field */
+			assert(NULL != ptr);
+			rec->jrec_null.bitmask.salvaged = asc2i((uchar_ptr_t)ptr, STRLEN(ptr));
 			rec->jrec_null.prefix.forwptr =  rec->jrec_null.suffix.backptr = NULL_RECLEN;
 			rec->jrec_null.suffix.suffix_code = JNL_REC_SUFFIX_CODE;
 			return ((char_ptr_t)rec) + NULL_RECLEN;
