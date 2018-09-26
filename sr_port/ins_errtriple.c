@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -63,7 +66,8 @@ void ins_errtriple(int4 in_error)
 		assert(!add_rterror_triple || ((TREF(pos_in_chain)).exorder.bl->exorder.fl == TREF(curtchain)));
 		assert(!add_rterror_triple || ((TREF(curtchain))->exorder.bl == (TREF(pos_in_chain)).exorder.bl));
 		if ((ERR_DIVZERO == in_error) || (ERR_NEGFRACPWR == in_error)
-				|| (ERR_NUMOFLOW == in_error) || (ERR_PATNOTFOUND == in_error))
+				|| (ERR_NUMOFLOW == in_error) || (ERR_PATNOTFOUND == in_error)
+				|| (ERR_INVDLRCVAL == in_error))
 			TREF(rts_error_in_parse) = TRUE;	/* WARNING: fallthrough */
 	} else
 		/* For IS_STX_WARN errors (if not compiling a trigger), parsing continues, so dont strip the chain */
