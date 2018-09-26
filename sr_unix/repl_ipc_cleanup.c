@@ -91,7 +91,13 @@ int	gtmsource_ipc_cleanup(boolean_t auto_shutdown, int *exit_status, int4 *num_s
 	 */
 	assert(NULL != jnlpool);
 	if (IS_REPL_INST_FROZEN)
+	{	/* Before returning, give an indication that we are not deleting jnlpool ipcs because of a frozen instance
+		 * in the source server shutdown command logs. This keeps the output consistent ("Not deleting jnlpool ipcs")
+		 * between the frozen and not frozen case.
+		 */
+		repl_log(stderr, TRUE, TRUE, "Not deleting jnlpool ipcs. Instance is frozen\n");
 		return FALSE;
+	}
 	udi = (unix_db_info *)FILE_INFO(jnlpool->jnlpool_dummy_reg);
 	assert(INVALID_SHMID != udi->shmid);
 	if (attempt_ipc_cleanup)
