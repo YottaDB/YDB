@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,7 +39,7 @@ void ex_tail(oprtype *opr)
 	opctype		c;
 	oprtype		*i;
 	triple		*bftrip, *bitrip, *t, *t0, *t1, *t2;
-	uint		bexprs, j, oct;
+	uint		bexprs, oct;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -55,7 +55,7 @@ void ex_tail(oprtype *opr)
 	assert((TRIP_REF == t->operand[1].oprclass) || (NO_REF == t->operand[1].oprclass));
 	if (!(OCT_BOOL & oct))
 	{
-		for (i = t->operand, j = 0; ARRAYTOP(t->operand) > i; i++, j++)
+		for (i = t->operand; ARRAYTOP(t->operand) > i; i++)
 		{
 			if (TRIP_REF == i->oprclass)
 			{
@@ -73,10 +73,18 @@ void ex_tail(oprtype *opr)
 		while (OCT_ARITH & oct)					/* really a sneaky if that allows us to use breaks */
 		{	/* Consider moving this to a separate module (say, ex_arithlit) for clarity and modularity */
 			/* binary arithmetic operations might be on literals, which can be performed at compile time */
-			for (i = t->operand, j = 0; ARRAYTOP(t->operand) > i; i++, j++)
+			for (i = t->operand; ARRAYTOP(t->operand) > i; i++)
 			{
-				if (OC_LIT != t->operand[j].oprval.tref->opcode)
+				if (OC_LIT != i->oprval.tref->opcode)
 					break;				/* from for */
+				/* Go down to the mlit and ensure it has a numeric type */
+				for (t0 = i->oprval.tref; TRIP_REF == t0->operand[0].oprclass; t0 = t0->operand[0].oprval.tref)
+					;
+				assert(MLIT_REF == t0->operand[0].oprclass);
+				v0 = &t0->operand[0].oprval.mlit->v;
+				MV_FORCE_NUM(v0);
+				if (!(MV_NM & v0->mvtype))
+					break;
 			}
 			if (ARRAYTOP(t->operand) > i)
 				break;					/* from while */
