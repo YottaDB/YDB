@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -76,7 +79,18 @@ int f_char(oprtype *a, opctype op)
 				if (tmpptr != outptr)
 					++char_len; /* yet another valid character. update the character length */
 				else if (!badchar_inhibit)
+				{	/* Cannot use STX_ERROR_WARN macro here because we need to pass a few more parameters
+					 * to "stx_error" in the INVDLRCVAL case whereas we did not need to in the NUMOFLOW case.
+					 */
+					assert(IS_STX_WARN(ERR_INVDLRCVAL));
 					stx_error(ERR_INVDLRCVAL, 1, ch);
+					MV_INIT_STRING(&v, 0, NULL);
+					v.str.char_len = char_len;
+					v.mvtype |= MV_UTF_LEN;
+					CLEAR_MVAL_BITS(&v);
+					*a = put_lit(&v);
+					return TRUE;
+				}
 				outptr = tmpptr;
 			}
 		}

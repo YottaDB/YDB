@@ -146,7 +146,6 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 		if (!run_time && (CGP_PARSE == cg_phase) && !DUMP)
 		{
 			(*stx_error_va_fptr)(msgid, var_dup);
-			TREF(director_token) = TK_ERROR;
 			return FALSE;
 		}
 		gtm_putmsg_list(csa, argcnt, var);

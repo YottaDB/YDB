@@ -268,7 +268,8 @@ error_def(ERR_SVNOSET);
 #define	IS_STX_WARN(errcode)										\
 	((ERR_DEVPARINAP == errcode) || (ERR_DEVPARUNK == errcode) || (ERR_DEVPARVALREQ == errcode)	\
 		|| (ERR_FNOTONSYS == errcode) || (ERR_INVCMD == errcode) || (ERR_INVFCN == errcode) 	\
-		|| (ERR_INVSVN == errcode) || (ERR_SVNONEW == errcode) || (ERR_SVNOSET == errcode))
+		|| (ERR_INVSVN == errcode) || (ERR_SVNONEW == errcode) || (ERR_SVNOSET == errcode)	\
+		|| (ERR_NUMOFLOW == errcode) || (ERR_INVDLRCVAL == errcode))
 
 /* This macro does an "stx_error" of the input errcode but before that it asserts that the input errcode is one
  * of the known error codes that are to be handled as a compile-time warning (instead of an error). It also set

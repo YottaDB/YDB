@@ -139,7 +139,19 @@ LITDEF toktabtype tokentable[] =
 	tokdef("TK_SORTS_AFTER", OC_SORTS_AFTER, 0, OCT_MVAL),
 	tokdef("TK_NSORTS_AFTER", OC_NSORTS_AFTER, 0, OCT_MVAL),
 	tokdef("TK_ATHASH", 0, 0, 0),
-	tokdef("TK_CR", 0, 0, 0 )
+	tokdef("TK_SQLFIELDNAME", 0, 0, 0),
+	tokdef("TK_CR", 0, 0, 0 ),
+	tokdef("TK_GTM54", 0, 0, 0 ),
+	tokdef("TK_GTM55", 0, 0, 0 ),
+	tokdef("TK_GTM56", 0, 0, 0 ),
+	tokdef("TK_GTM57", 0, 0, 0 ),
+	tokdef("TK_GTM58", 0, 0, 0 ),
+	tokdef("TK_GTM59", 0, 0, 0 ),
+	tokdef("TK_GTM60", 0, 0, 0 ),
+	tokdef("TK_GTM61", 0, 0, 0 ),
+	tokdef("TK_GTM62", 0, 0, 0 ),
+	tokdef("TK_GTM63", 0, 0, 0 ),
+	tokdef("TK_NUMOFLOWLIT", 0, 0, 0 )
 };
 
 GBLREF mv_stent *mv_chain;	/* Needed for MV_SIZE macro */
@@ -222,7 +234,8 @@ LITDEF mval literal_notimeout	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 
  * try to set the MV_NUM_APPROX bit and that could cause a SIG-11 since these mvals are in the read-only data segment.
  * --------------------------------------------------------------------------------------------------------------------------
  */
-LITDEF mval literal_null	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX | MV_UTF_LEN, 0, 0, 0, 0, 0, 0);
+LITDEF mval literal_null	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX, 0, 0, 0, 0, 0, 0);
+LITDEF mval literal_numoflow	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_NUM_APPROX, EXPHI, 0, 0, 0, 0, 1);
 /* Create mval to hold batch type TSTART. "BA" or "BATCH" mean the same.
  * We define the shorter version here to try reduce the time taken for comparison.
  */

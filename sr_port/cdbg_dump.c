@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -85,12 +88,27 @@ LITREF int4	sa_class_sizes[];
 STATICDEF char	*indent_str;
 STATICDEF int	last_indent = 0;
 
-/* Routine to dump all triples on the current chain - also callable from debugger */
-void cdbg_dump_triple_all(void)
+/* Routine to dump all triples on "t_orig" chain - also callable from debugger */
+void cdbg_dump_t_orig(void)
 {
 	triple	*ct;
 
 	dqloop(&t_orig, exorder, ct)
+	{
+		PRINTF("\n ************************ Triple Start **********************\n");
+		cdbg_dump_triple(ct, 0);
+	}
+}
+
+/* Routine to dump all triples on "TREF(curtchain)" chain - also callable from debugger */
+void cdbg_dump_curtchain(void)
+{
+	triple	*ct, *chain;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	chain = TREF(curtchain);
+	dqloop(chain, exorder, ct)
 	{
 		PRINTF("\n ************************ Triple Start **********************\n");
 		cdbg_dump_triple(ct, 0);

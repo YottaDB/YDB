@@ -348,7 +348,6 @@ int m_set(void)
 				SYNTAX_ERROR(ERR_VAREXPECTED);
 			if (TK_LPAREN != TREF(director_token))
 			{	/* Look for intrinsic special variables */
-				s1 = (TREF(curtchain))->exorder.bl;
 				if (0 > (index = namelook(svn_index, svn_names, (TREF(window_ident)).addr,
 					(TREF(window_ident)).len)))
 				{	/* NOTE assignment above */

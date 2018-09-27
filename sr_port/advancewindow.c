@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -201,23 +204,21 @@ void advancewindow(void)
 		(TREF(director_mval)).mvtype = MV_STR;
 		CLEAR_MVAL_BITS(TADR(director_mval));
 		TREF(lexical_ptr) = (char *)s2n(&(TREF(director_mval)));
-		if (!((TREF(director_mval)).mvtype &= MV_NUM_MASK))
-		{
-			stx_error(ERR_NUMOFLOW);
-			TREF(director_token) = TK_ERROR;
-			return;
-		}
+		assert(((TREF(director_mval)).mvtype & MV_NUM_MASK) || !TREF(s2n_intlit));
 		if (TREF(s2n_intlit))
 		{
 			TREF(director_token) = TK_NUMLIT ;
 			n2s(&(TREF(director_mval)));
 		} else
 		{
-			TREF(director_token) = TK_INTLIT ;
+			if (((TREF(director_mval)).mvtype & MV_NUM_MASK))
+				TREF(director_token) = TK_INTLIT ;
+			else
+				TREF(director_token) = TK_NUMOFLOWLIT;
 			(TREF(director_mval)).str.len = INTCAST(TREF(lexical_ptr) - (TREF(director_mval)).str.addr);
 			ENSURE_STP_FREE_SPACE((TREF(director_mval)).str.len);
 			memcpy(stringpool.free, (TREF(director_mval)).str.addr, (TREF(director_mval)).str.len);
-			assert (stringpool.free <= stringpool.top) ;
+			assert(stringpool.free <= stringpool.top);
 		}
 		return;
 	case TK_APOSTROPHE:

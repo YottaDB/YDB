@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -169,6 +172,8 @@ char *s2n (mval *u)
 				u->mvtype &= ~NUM_MASK;
 				if (!TREF(compile_time))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
+				else
+					TREF(s2n_intlit) = 0;	/* "advancewindow" relies on this */
 			} else
 			{
 				u->e = x;

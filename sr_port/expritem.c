@@ -43,6 +43,7 @@ error_def(ERR_VAREXPECTED);
 
 LITREF	toktabtype	tokentable[];
 LITREF	mval		literal_null;
+LITREF	mval		literal_numoflow;
 LITREF	octabstruct	oc_tab[];
 
 /* note that svn_index array provides indexes into this array for each letter of the
@@ -524,6 +525,11 @@ int expritem(oprtype *a)
 	case TK_STRLIT:
 		*a = put_lit(&(TREF(window_mval)));
 		advancewindow();
+		return TRUE;
+	case TK_NUMOFLOWLIT:
+		STX_ERROR_WARN(ERR_NUMOFLOW);	/* sets "parse_warn" to TRUE */
+		advancewindow();
+		*a = put_lit((mval *)&literal_numoflow);
 		return TRUE;
 	case TK_LPAREN:
 		advancewindow();

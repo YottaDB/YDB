@@ -132,11 +132,15 @@ void ex_tail(oprtype *opr)
 			RETURN_IF_RTS_ERROR;
 			if (NULL == v)				/* leaving divide by literal 0 to create a run time error */
 				break;				/* from while */
+			/* If result is not a numeric (possible in case result had a NUMOFLOW) drop idea of compile optimization.
+			 * Instead issue runtime error if this codepath is encountered.
+			 */
+			if (!(MV_NM & v->mvtype))
+				break;
 			unuse_literal(v0);			/* drop original literals only after deciding whether to defer */
 			unuse_literal(v1);
 			dqdel(t0, exorder);
 			dqdel(t1, exorder);
-			assert(v->mvtype);
 			n2s(v);
 			s2n(v);					/* compiler must leave literals with both numeric and string */
 			t->opcode = OC_LIT;			/* replace the original operator triple with new literal */

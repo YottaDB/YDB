@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -77,6 +80,16 @@ void unary_tail(oprtype *opr)
 				drop++;			/* use a count of potential "extra" operands */
 				if (OC_LIT != c2)
 					continue;	/* this keeps the loop going */
+				assert(MLIT_REF == t2->operand[0].oprclass);
+				v = &t2->operand[0].oprval.mlit->v;
+				MV_FORCE_NUMD(v);
+				if (!(MV_NM & v->mvtype))
+				{	/* "s2n" would not set MV_NM if literal has a NUMOFLOW error.
+					 * In that case, do not do any optimization.
+					 */
+					stx_error(ERR_NUMOFLOW);
+					break;
+				}
 				for (t1 = t, c = t1->opcode; 0 < drop; drop--)	/* reached a literal - time to stop */
 				{	/* if it's a literal, delete all but one leading unary op and operate on the literal now */
 					assert(OCT_UNARY & oc_tab[c].octype);
@@ -93,9 +106,6 @@ void unary_tail(oprtype *opr)
 				}
 				assert(OC_LIT == c);
 				t = ta;
-				assert(MLIT_REF == t1->operand[0].oprclass);
-				v = &t1->operand[0].oprval.mlit->v;
-				MV_FORCE_NUMD(v);
 				if (OC_NOOP != pending_coerce && OC_COMVAL != pending_coerce)
 				{	/* add back a coercion if we need it;
 					 * a COMVAL preceding a LIT is unneeded (and will cause an error).
@@ -139,9 +149,8 @@ void unary_tail(oprtype *opr)
 						s2n(mv);
 						if (!(MV_NM & mv->mvtype))
 						{
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NUMOFLOW);
-							assert(TREF(rts_error_in_parse));
-							return;
+							stx_error(ERR_NUMOFLOW);
+							break;
 						}
 					}
 					n2s(mv);
