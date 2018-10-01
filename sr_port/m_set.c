@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -327,7 +330,7 @@ int m_set(void)
 			}
 			/* save and restore the variable lookup for true left-to-right evaluation */
 			INSERT_INDSAVGLVN(control_slot, v, ANY_SLOT, 0);	/* 0 flag to defer global reference */
-			if (!used_glvn_slot)
+			if (!used_glvn_slot && !curtchain_switched)
 			{
 				used_glvn_slot = TRUE;
 				first_control_slot = control_slot;
@@ -461,7 +464,7 @@ int m_set(void)
 					if (!indirection(&v))
 						SYNTAX_ERROR(ERR_VAREXPECTED);
 					INSERT_INDSAVGLVN(control_slot, v, ANY_SLOT, 0);
-					if (!used_glvn_slot)
+					if (!used_glvn_slot && !curtchain_switched)
 					{
 						used_glvn_slot = TRUE;
 						first_control_slot = control_slot;
