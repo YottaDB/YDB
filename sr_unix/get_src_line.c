@@ -259,6 +259,9 @@ STATICFNDEF boolean_t fill_src_tbl_via_litpool(routine_source **src_tbl_result, 
 		size = (int4)(srcptr - prev_srcptr);
 		if (*(srcptr - 1) == '\n')
 			size--; /* Strip trailing '\n' */
+		/* Strip trailing CR if any (if at least one byte is left) */
+		if (size && (ASCII_CR == *(srcptr - 2)))
+			size--;
 		if (size)
 		{
 			current->len = size;
