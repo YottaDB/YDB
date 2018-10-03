@@ -110,7 +110,7 @@ ABORT
         o abort:(newversion:noreadonly) u abort zsh "*" c abort
         u @useio
 	; make GDECHECK error fatal except native UNIX
-        i $d(gdeerr) zm gdeerr("GDECHECK") Write $ZMessage($Select((256>abortzs):+abortzs,1:+abortzs\8*8+4)),!
+        i $d(gdeerr) Write $ZMessage($Select((256>abortzs):+abortzs,1:+abortzs\8*8+4)),!
         e  w $zs
         d GETOUT^GDEEXIT
 	h
