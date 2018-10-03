@@ -257,10 +257,11 @@ STATICFNDEF boolean_t fill_src_tbl_via_litpool(routine_source **src_tbl_result, 
 		while ((srcptr < srcptr_max) && (*(srcptr - 1) != '\n')) /* find end of current line */
 			srcptr++;
 		size = (int4)(srcptr - prev_srcptr);
+		assert('\n' == *(srcptr - 1));
 		if (*(srcptr - 1) == '\n')
 			size--; /* Strip trailing '\n' */
 		/* Strip trailing CR if any (if at least one byte is left) */
-		if (size && (ASCII_CR == *(srcptr - 2)))
+		if (size && (ASCII_CR == prev_srcptr[size - 1]))
 			size--;
 		if (size)
 		{
