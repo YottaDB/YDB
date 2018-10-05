@@ -58,7 +58,7 @@ FROM ubuntu as ydb-release
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
- && apt-get install -y file binutils libelf-dev libicu-dev locales \
+ && apt-get install -y file binutils libelf-dev libicu-dev locales wget \
  && apt-get clean
 RUN locale-gen en_US.UTF-8
 WORKDIR /data
