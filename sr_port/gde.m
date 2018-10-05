@@ -47,6 +47,7 @@ DBG:	;transfer point for DEBUG and "runtime" %gde
 	i $l(comline) s:'gdeEntryState("zlevel") resume(comlevel)=$zl_":EXIT^GDEEXIT" d comline,EXIT^GDEEXIT
 	i runtime s prompt="GD_SHOW>",verb="SHOW",x="" f  s x=$o(syntab(x)) q:'$l(x)  i x'="SHOW" k syntab(x)
 INTERACT
+	quit:$g(gdequiet)
 	f  u io:ctrap=$c(25,26) w !,prompt," " r comline u @useio d comline:$l(comline)
 	q
 comline:
@@ -75,22 +76,22 @@ comexit: i 'update d QUIT^GDEQUIT
 	e  w $p($zm(gdeerr("VERIFY")\2*2),"!AD")_"FAILED" w !
 	d GETOUT^GDEEXIT
 	h
-DBGCOMX u $i:exception="" s $et="" zm gdeerr("VERIFY"):"FAILED" w !
+DBGCOMX u $i:exception="" s $et="" d message^GDE(gdeerr("VERIFY"),"""FAILED""") w:'$g(gdequiet) !
 	d GETOUT^GDEEXIT
 	h
 comfile:
 	d GETTOK^GDESCAN
-	i ntoktype="TKEOL" zm gdeerr("QUALREQD"):"file specification"
+	i ntoktype="TKEOL" d message^GDE(gdeerr("QUALREQD"),"""file specification""")
 	d TFSPEC^GDEPARSE
 	; remove trailing whitespaces in filename
 	n i
 	f i=$zl(value):-1  s c=$ze(value,i)  q:(c'=" ")&(c'=TAB)  ; remove trailing 0s
 	s value=$ze(value,1,i)
 	s (comfile,comfile(comlevel+1))=$zparse(value,"","",".COM")
-	i '$l($zsearch(comfile)),'$l($zsearch(comfile)) zm gdeerr("FILENOTFND"):comfile
-	e  o comfile:(read:exc="zg "_$zl_":comeof") zm gdeerr("EXECOM"):comfile d SCRIPT
+	i '$l($zsearch(comfile)),'$l($zsearch(comfile)) d message^GDE(gdeerr("FILENOTFND"),$zwrite(comfile))
+	e  o comfile:(read:exc="zg "_$zl_":comeof") d message^GDE(gdeerr("EXECOM"),$zwrite(comfile)) d SCRIPT
 comeof	c comfile s comlevel=$select(comlevel>1:comlevel-1,1:0)
-	i comlevel>0 s comfile=comfile(comlevel) zm gdeerr("EXECOM"):comfile
+	i comlevel>0 s comfile=comfile(comlevel) d message^GDE(gdeerr("EXECOM"),$zwrite(comfile))
 	e  u @useio
 	i $p($zs,",",3)'["-E-IOEOF",$p($zs,",",3)'["FILENOTFND" w !,$p($zs,",",3,9999),!
 	e  s ($ecode,$zstatus)=""	; clear IOEOF condition (not an error) so later GDE can exit with 0 status
@@ -110,11 +111,95 @@ ABORT
         o abort:(newversion:noreadonly) u abort zsh "*" c abort
         u @useio
 	; make GDECHECK error fatal except native UNIX
-        i $d(gdeerr) Write $ZMessage($Select((256>abortzs):+abortzs,1:+abortzs\8*8+4)),!
-        e  w $zs
+        i $d(gdeerr) Write:'$g(gdequiet) $ZMessage($Select((256>abortzs):+abortzs,1:+abortzs\8*8+4)),!
+        e  w:'$g(gdequiet) $zs
         d GETOUT^GDEEXIT
 	h
 DEBUG	;entry point to debug gde
 	n  ; clear calling process M variable state (if any) so it does not interfere with GDE variable names
 	s allerrs=0,debug=1,runtime=0 u 0:(ctrap="":exception="") zb DBGCOMX,ABORT
 	g DBG
+message(message,arguments,debug)
+	i '$g(gdequiet) n command s command="zm "_message_":"_$g(arguments) x command quit
+	s debug=$g(debug)
+	;
+	; Skip verify OK/Failed messages as we have other ways to know
+	i message=gdeerr("VERIFY") quit
+	;
+	n count,severity
+	s count=$i(gdeweberror("count"))
+	;
+	; Error message structure (from sr_port/err_check.c)
+	;  ___________________________________________
+	; |     1     FACILITY     1   MSG_IDX     SEV|
+	; |___________________________________________|
+	;  31   27                 15            3   0
+	;
+	; severities 0, 2, or 4 indicates that the process should stop
+	s severity=$$baseconv(message,2)
+	s severity=$e(severity,$l(severity)-2,$l(severity))
+	i severity="000"!(severity="010")!(severity="100"),message>2**27 s gdewebquit=1
+	;
+	s gdeweberror(count)=$s('debug:$zm(message),1:message)
+	;
+	; if we have arguments, format the string correctly
+	i $l($g(arguments)) d
+	. n tokenstart,tokenend,tokenend2,text,argument,fao,j,done
+	. s text=""
+	. s done=""
+	. s argument=1
+	. f  q:done  d
+	. . ; find the token for replacement
+	. . s tokenend=""
+	. . s tokenstart=$zf(gdeweberror(count),"!")-1
+	. . i tokenstart<0 s done=1 q
+	. . i "/_^!"[$ze(gdeweberror(count),tokenstart+1,tokenstart+1) s tokenend=tokenstart+1
+	. . e  s tokenend=tokenstart+2
+	. . ; if it isn't a valid FAO quit
+	. . s fao=$ze(gdeweberror(count),tokenstart,tokenend)
+	. . q:'$$isFAO(fao)
+	. . ; get all of the text before the token
+	. . s text=text_$ze(gdeweberror(count),1,tokenstart-1)
+	. . ; There are a few special FAO tokens:
+	. . ; !/ Inserts a new line
+	. . ; !_ Inserts a tab
+	. . ; !^ Inserts a form feed
+	. . ; !! Inserts an exclamation point
+	. . ;
+	. . ; If the FAO token is one of these do the right replacement
+	. . i "!/"=fao s text=text_"\n"
+	. . e  i "!_"=fao s text=text_$c(9)
+	. . e  i "!^"=fao s text=text_"\n" ; pretend a form feed is a new line
+	. . e  i "!!"=fao s text=text_"!"
+	. . ; concatenate the string with the replacement token
+	. . e  s text=text_$zpi(arguments,":",argument) s argument=argument+1
+	. . ; set gdeweberror to the rest of the text after the token we replaced
+	. . s gdeweberror(count)=$ze(gdeweberror(count),tokenend+1,$zl(gdeweberror(count)))
+	. ; pick up the rest of the text
+	. s text=text_gdeweberror(count)
+	. i $l($g(text)) s gdeweberror(count)=$tr(text,"""","")
+	quit
+baseconv(number,base) ; Convert decimal to binary
+	n remainder,result,out,i
+	s result=0
+	s (out,i)=""
+	f  q:number=0  d
+	. s result($i(result))=number#base
+	. s number=$p(number/base,".",1)
+	f  s i=$o(result(i),-1) q:i=""  s out=out_result(i)
+	quit out
+isFAO(string)
+	; util_output.c contains the real FAO implementation,
+	; this is a simplistic implementation that just does
+	; string subsitution
+	;
+	i string?1"!"1(1"/",1"_",1"^",1"!") QUIT 1
+	i string?1"!".N1(1"AC",1"AD",1"AF",1"AS",1"AZ") QUIT 1
+	i string?1"!".N1(1"SB",1"SW",1"SL") QUIT 1
+	i string?1"!".N1(1"UB",1"UW",1"UL",1"UJ",1"UQ") QUIT 1
+	i string?1"!".N1(1"XB",1"XW",1"XL",1"XJ") QUIT 1
+	i string?1"!".N1(1"ZB",1"ZW",1"ZL") QUIT 1
+	i string?1"!".N1"@"1(1"UJ",1"UQ",1"XJ",1"XQ") QUIT 1
+	i string?1"!".N1"*".ANP QUIT 1
+	i string?1"!"1"@"1(1"ZJ",1"ZQ") QUIT 1
+	QUIT 0

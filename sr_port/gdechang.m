@@ -11,8 +11,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 change:	;implement the verb: CHANGE
 NAME
-	i '$d(nams(NAME)) zm gdeerr("OBJNOTFND"):"Name":$$namedisp^GDESHOW(NAME,0)
-	i '$d(lquals("REGION")) zm gdeerr("QUALREQD"):"Region"
+	i '$d(nams(NAME)) d message^GDE(gdeerr("OBJNOTFND"),"""Name"":"_$zwrite($$namedisp^GDESHOW(NAME,0)))
+	i '$d(lquals("REGION")) d message^GDE(gdeerr("QUALREQD"),"""Region""")
 	; check if changing the mapping of a name (with ranges) poses issues with overlap amongst other existing name ranges
 	d namerangeoverlapcheck^GDEPARSE(.NAME,lquals("REGION"))
 	s update=1
@@ -21,15 +21,15 @@ NAME
 	i $d(namrangeoverlap) d namcoalesce^GDEMAP
 	q
 REGION
-	i '$d(regs(REGION)) zm gdeerr("OBJNOTFND"):"Region":REGION
-	i '$$RQUALS^GDEVERIF(.lquals) zm gdeerr("OBJNOTCHG"):"region":REGION
+	i '$d(regs(REGION)) d message^GDE(gdeerr("OBJNOTFND"),"""Region"":"_$zwrite(REGION))
+	i '$$RQUALS^GDEVERIF(.lquals) d message^GDE(gdeerr("OBJNOTCHG"),"""region"":"_$zwrite(REGION))
 	s update=1,s=""
 	f  s s=$o(lquals(s)) q:'$l(s)  s regs(REGION,s)=lquals(s)
 	q
 SEGMENT
-	i '$d(segs(SEGMENT)) zm gdeerr("OBJNOTFND"):"Segment":SEGMENT
+	i '$d(segs(SEGMENT)) d message^GDE(gdeerr("OBJNOTFND"),"""Segment"":"_$zwrite(SEGMENT))
 	s am=$s($d(lquals("ACCESS_METHOD")):lquals("ACCESS_METHOD"),1:segs(SEGMENT,"ACCESS_METHOD"))
-	i '$$SQUALS^GDEVERIF(am,.lquals) zm gdeerr("OBJNOTCHG"):"segment":SEGMENT
+	i '$$SQUALS^GDEVERIF(am,.lquals) d message^GDE(gdeerr("OBJNOTCHG"),"""segment"":"_$zwrite(SEGMENT))
 	s update=1,s=""
 	s segs(SEGMENT,"ACCESS_METHOD")=am
 	f  s s=$o(lquals(s)) q:'$l(s)  s segs(SEGMENT,s)=lquals(s)
@@ -42,9 +42,9 @@ SEGMENT
 	. . i "USER"[am,(regs(s,"DYNAMIC_SEGMENT")=SEGMENT),'$d(lquals("JOURNAL")) s regs(s,"JOURNAL")=0
 	q
 GBLNAME
-	i '$d(gnams(GBLNAME)) zm gdeerr("OBJNOTFND"):"Global Name":GBLNAME
-	i '$d(lquals("COLLATION")) zm gdeerr("QUALREQD"):"Collation"
-	i gnams(GBLNAME,"COLLATION")=lquals("COLLATION") zm gdeerr("OBJNOTCHG"):"gblname":GBLNAME
+	i '$d(gnams(GBLNAME)) d message^GDE(gdeerr("OBJNOTFND"),"""Global Name"":"_$zwrite(GBLNAME))
+	i '$d(lquals("COLLATION")) d message^GDE(gdeerr("QUALREQD"),"""Collation""")
+	i gnams(GBLNAME,"COLLATION")=lquals("COLLATION") d message^GDE(gdeerr("OBJNOTCHG"),"""gblname"":"_$zwrite(GBLNAME))
 	; check if changing collation for GBLNAME poses issues with existing names & ranges
 	d gblnameeditchecks^GDEPARSE(GBLNAME,lquals("COLLATION"))
 	i $d(namrangeoverlap) d namcoalesce^GDEMAP
@@ -52,12 +52,12 @@ GBLNAME
 	s gnams(GBLNAME,"COLLATION")=lquals("COLLATION")
 	q
 INSTANCE
-	i '$d(lquals("FILE_NAME")) zm gdeerr("QUALREQD"):"File Name"
+	i '$d(lquals("FILE_NAME")) d message^GDE(gdeerr("QUALREQD"),"""File Name""")
 	i $zl(lquals("FILE_NAME"))=0 d:$d(inst("FILE_NAME"))  q
 	. kill inst
 	. s update=1,inst=0
 	i $d(inst("FILE_NAME")),inst("FILE_NAME")=lquals("FILE_NAME") d
-	. i inst("FILE_NAME")'=$g(inst("envvar")) zm gdeerr("OBJNOTCHG"):"instance":""
+	. i inst("FILE_NAME")'=$g(inst("envvar")) d message^GDE(gdeerr("OBJNOTCHG"),"""instance"":""""")
 	s update=1
 	s inst=1,inst("FILE_NAME")=lquals("FILE_NAME")
 	q

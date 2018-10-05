@@ -37,7 +37,7 @@ cfilefail:
 	q
 NAME
 	n namsdisp,namedispmaxlen
-	i '$d(nams(NAME)) zm gdeerr("OBJNOTFND"):"Name":$$namedisp(NAME,0) q
+	i '$d(nams(NAME)) d message^GDE(gdeerr("OBJNOTFND"),"""Name"":"_$zwrite($$namedisp(NAME,0))) q
 	d n2calc,n2
 	i log s BOL="!" u @uself w BOL d n2 w ! u @useio s BOL=""
 	q
@@ -79,7 +79,7 @@ namec:
 	w !,BOL
 	q
 GBLNAME
-	i '$d(gnams(GBLNAME)) zm gdeerr("OBJNOTFND"):"Global Name":GBLNAME q
+	i '$d(gnams(GBLNAME)) d message^GDE(gdeerr("OBJNOTFND"),"""Global Name"":"_$zwrite(GBLNAME)) q
 	d gn2
 	i log s BOL="!" u @uself w BOL d gn2 w ! u @useio s BOL=""
 	q
@@ -121,7 +121,7 @@ instc:
 	w !,BOL
 	q
 REGION
-	i '$d(regs(REGION)) zm gdeerr("OBJNOTFND"):"Region":REGION q
+	i '$d(regs(REGION)) d message^GDE(gdeerr("OBJNOTFND"),"""Region"":"_$zwrite(REGION)) q
 	d r2
 	i log s BOL="!" u @uself w BOL d r2 w ! u @useio s BOL=""
 	q
@@ -212,7 +212,7 @@ qualadd:(prefix,delim,qual,val)
 	e  w prefix_delim_q_"="_val
 	q
 SEGMENT
-	i '$d(segs(SEGMENT)) zm gdeerr("OBJNOTFND"):"Segment":SEGMENT q
+	i '$d(segs(SEGMENT)) d message^GDE(gdeerr("OBJNOTFND"),"""Segment"":"_$zwrite(SEGMENT)) q
 	d s2
 	i log s BOL="!" u @uself w BOL d s2 w ! u @useio s BOL=""
 	q
@@ -274,7 +274,7 @@ segmentc:
 MAP
 	n map,mapdisp,mapdispmaxlen
 	i '$d(mapreg) n mapreg s mapreg=""
-	e  i '$d(regs(mapreg)) zm gdeerr("OBJNOTFND"):"Region":mapreg q
+	e  i '$d(regs(mapreg)) d message^GDE(gdeerr("OBJNOTFND"),"""Region"":"_$zwrite(mapreg)) q
 	d NAM2MAP^GDEMAP,m1
 	i log s BOL="!" u @uself w BOL d m1 w ! u @useio s BOL=""
 	q

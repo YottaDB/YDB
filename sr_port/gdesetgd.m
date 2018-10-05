@@ -10,14 +10,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 gdesetgd:	;implement the verb: SETGD
 GDESETGD
-	i update,'$$ALL^GDEVERIF zm gdeerr("GDNOTSET") q
-	i update,'$$GDEPUT^GDEPUT  zm gdeerr("GDNOTSET") q
+	i update,'$$ALL^GDEVERIF d message^GDE(gdeerr("GDNOTSET"),"""""") q
+	i update,'$$GDEPUT^GDEPUT  d message^GDE(gdeerr("GDNOTSET"),"""""") q
 	d GDFIND,CREATE^GDEGET:create,LOAD^GDEGET:'create
 	q
 GDFIND	s file=$zparse(tfile,"",defgldext)
-	i file="" s file=$ztrnlnm(tfile) s:file="" file=tfile zm gdeerr("INVGBLDIR"):file:defgld s tfile=defgld
+	i file="" s file=$ztrnlnm(tfile) s:file="" file=tfile d message^GDE(gdeerr("INVGBLDIR"),$zwrite(file)_":"_$zwrite(defgld)) s tfile=defgld
 	s file=$zsearch($zparse(tfile,"",defgldext))
 	i file="" s file=$zsearch($zparse(tfile,"",defgldext))
-	i file="" s file=$zparse(tfile,"",defgldext),create=1 zm gdeerr("GDUSEDEFS"):file
-	e  s create=0 zm gdeerr("LOADGD"):file
+	i file="" s file=$zparse(tfile,"",defgldext),create=1 d message^GDE(gdeerr("GDUSEDEFS"),$zwrite(file))
+	e  s create=0 d message^GDE(gdeerr("LOADGD"),$zwrite(file))
 	q

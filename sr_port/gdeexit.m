@@ -13,8 +13,8 @@ exit:	;implement the verb: EXIT
 EXIT
 	i 'update d QUIT^GDEQUIT
 	; At $zlevel 1 and 2 the EXIT command is implied and therefore must exit
-	i '$$ALL^GDEVERIF  s $zstatus=gdeerr("NOEXIT") zm gdeerr("NOEXIT") d:3>$zlevel GETOUT^GDEEXIT q
-	i '$$GDEPUT^GDEPUT  q	 ; zm is issued in GDEPUT.m
+	i '$$ALL^GDEVERIF  s $zstatus=gdeerr("NOEXIT") d message^GDE(gdeerr("NOEXIT"),"""""") d:3>$zlevel GETOUT^GDEEXIT q
+	i '$$GDEPUT^GDEPUT  q	 ; message is issued in GDEPUT.m
 	d GETOUT^GDEEXIT
 	zg 0
 GETOUT	; Routine executed just before exiting from GDE. This tries to restore the mumps process context

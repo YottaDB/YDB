@@ -10,12 +10,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 log:	;implement the verb: LOG
 LOG
-	i gqual="OFF" s log=0 zm gdeerr("LOGOFF"):logfile q
+	i gqual="OFF" s log=0 d message^GDE(gdeerr("LOGOFF"),$zwrite(logfile)) q
 	s log=1
 	i $d(gqual("value")) s logfile=$zparse(gqual("value"),"","",".LOG")
-	o logfile:(newversion:noreadonly) zm gdeerr("LOGON"):logfile
+	o logfile:(newversion:noreadonly) d message^GDE(gdeerr("LOGON"),$zwrite(logfile))
 	q
 INQUIRE
-	i 'log zm gdeerr("NOLOG"):logfile
-	e  zm gdeerr("LOGON"):logfile
+	i 'log d message^GDE(gdeerr("NOLOG"),$zwrite(logfile))
+	e  d message^GDE(gdeerr("LOGON"),$zwrite(logfile))
 	q

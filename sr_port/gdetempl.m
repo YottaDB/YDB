@@ -11,15 +11,15 @@
 template:	;implement the verb: TEMPLATE
 REGION
 	i $d(lquals("JOURNAL")),lquals("JOURNAL"),'tmpreg("JOURNAL"),'$d(lquals("BEFORE_IMAGE")) d
-	. zm gdeerr("QUALREQD"):"Before_image"
-	i '$$TRQUALS^GDEVERIF(.lquals) zm gdeerr("OBJNOTCHG"):"region":"template"
+	. d message^GDE(gdeerr("QUALREQD"),"""Before_image""")
+	i '$$TRQUALS^GDEVERIF(.lquals) d message^GDE(gdeerr("OBJNOTCHG"),"""region"":""template""")
 	s update=1,s=""
 	f  s s=$o(lquals(s)) q:'$l(s)  s tmpreg(s)=lquals(s) i s="ALLOCATION" s tmpreg("EXTENSION")=lquals(s)\10
 	q
 SEGMENT
 	i $d(lquals("ACCESS_METHOD")) s am=lquals("ACCESS_METHOD")
 	e  s am=tmpacc
-	i '$$TSQUALS^GDEVERIF(am,.lquals) zm gdeerr("OBJNOTCHG"):"segment":"template"
+	i '$$TSQUALS^GDEVERIF(am,.lquals) d message^GDE(gdeerr("OBJNOTCHG"),"""segment"":""template""")
 	s update=1,s="",tmpacc=am
 	f  s s=$o(lquals(s)) q:'$l(s)  s tmpseg(tmpacc,s)=lquals(s)
 	q

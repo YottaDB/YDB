@@ -11,7 +11,7 @@
 rename:	;implement the verb: RENAME
 NAME(old,new)
 	i old=new q
-	i old="*" zm gdeerr("LVSTARALON")
+	i old="*" d message^GDE(gdeerr("LVSTARALON"),"""""")
 	i '$d(nams(old)) d error1
 	i $d(nams(new)) d error2
 	; check if changing a name (with ranges) poses issues with overlap amongst other existing name ranges
@@ -37,7 +37,7 @@ SEGMENT(old,new)
 	i $d(segs(new)) d error2
 	n lquals s update=1,am=segs(old,"ACCESS_METHOD"),s=""
 	f  s s=$o(segs(old,s)) q:'$l(s)  s segs(new,s)=segs(old,s),lquals(s)=segs(old,s)
-	i '$$SQUALS^GDEVERIF(am,.lquals) k segs(new) zm gdeerr("OBJNOTCHG"):"segment":old
+	i '$$SQUALS^GDEVERIF(am,.lquals) k segs(new) d message^GDE(gdeerr("OBJNOTCHG"),"""segment"":"_$zwrite(old))
 	s segs(new,"ACCESS_METHOD")=am k segs(old)
 	f  s s=$o(regs(s)) q:'$l(s)  i regs(s,"DYNAMIC_SEGMENT")=old s regs(s,"DYNAMIC_SEGMENT")=new
 	q
@@ -57,8 +57,8 @@ GBLNAME(old,new)
 	k gnams(old)
 	q
 error1:
-	zm gdeerr("OBJNOTFND"):"Old "_$tr(gqual,upper,lower):old
+	d message^GDE(gdeerr("OBJNOTFND"),"""Old "_$tr(gqual,upper,lower)_""":"_$zwrite(old))
 	q
 error2:
-	zm gdeerr("OBJDUP"):"New "_$tr(gqual,upper,lower):new
+	d message^GDE(gdeerr("OBJDUP"),"""New "_$tr(gqual,upper,lower)_""":"_$zwrite(new))
 	q

@@ -140,14 +140,16 @@ GDEINIT
 	s tokens(")")="TKRPAREN",tokens("TKRPAREN")="right parenthesis"
 	s tokens("!")="TKEXCLAM",tokens("TKEXCLAM")="exclamation point"
 	s tokens("-")="TKDASH",tokens("TKDASH")="dash"
-	s tokens("")="TKEOL"	; for parsing purposes
+	; Check gdequiet to determine if null tokens should be added. gdequiet indicates that parsing of tokens
+	; isn't going to be performed as it is non-interactive
+	s:'$g(gdequiet) tokens("")="TKEOL"	; for parsing purposes
 ; tokendelim is used for parsing; it is defined for all characters that can terminate a valid token during parsing
-	for c=" ",TAB,"=",",",")","" s tokendelim(c)=""
+	i '$g(gdequiet) for c=" ",TAB,"=",",",")","" s tokendelim(c)=""
 	; In the Unix shell command line, space is by default the separator for multiple qualifiers.
 	; GDE handles separators similarly.
 ; spacedelim is used for parsing when we want to terminate token parsing only if we see a white space (a subset of "tokendelim")
 ; this is needed in case we are parsing say a filename and we don't want a "-" or "=" in the file name to terminate the parse.
-	for c=" ",TAB,"" s spacedelim(c)=""
+	i '$g(gdequiet) for c=" ",TAB,"" s spacedelim(c)=""
 	k c
 ; maximums and mimimums
 ; gblname

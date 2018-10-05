@@ -18,7 +18,7 @@ ALL()	;external
 	s gqual="SEGMENT" d ALLSEG,useseg
 	d ALLTEM
 	s:('verified)&('$zstatus) $zstatus=gdeerr("VERIFY")
-	zm gdeerr("VERIFY"):$s(verified:"OK",1:"FAILED") w !
+	d message^GDE(gdeerr("VERIFY"),$s(verified:"""OK""",1:"""FAILED""")) w:'$g(gdewebquiet) !
 	q verified
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
@@ -44,10 +44,10 @@ ALLNAM
 	. . . . s verified=0
 	. . . . i nextMapHasSubs d
 	. . . . . s gblname=$ze(nextMap,1,nextMapHasSubs-2)
-	. . . . . i '$d(mapreg(reg,gblname)) zm gdeerr("STDNULLCOLLREQ"):reg:"^"_gblname s mapreg(reg,gblname)=""
+	. . . . . i '$d(mapreg(reg,gblname)) d message^GDE(gdeerr("STDNULLCOLLREQ"),$zwrite(reg)_":""^"_gblname_"""") s mapreg(reg,gblname)=""
 	. . . . i hassubs d
 	. . . . . s gblname=$ze(currMap,1,hassubs-2)
-	. . . . . i '$d(mapreg(reg,gblname)) zm gdeerr("STDNULLCOLLREQ"):reg:"^"_gblname s mapreg(reg,gblname)=""
+	. . . . . i '$d(mapreg(reg,gblname)) d message^GDE(gdeerr("STDNULLCOLLREQ"),$zwrite(reg)_":""^"_gblname_"""") s mapreg(reg,gblname)=""
 	. . s nextMapHasSubs=hassubs,nextMap=currMap
 	q
 ALLGBL
@@ -70,20 +70,20 @@ ALLSEG
 	q
 NAME
 	i '$d(nams(NAME)) k verified d  q
-	. zm $$info(gdeerr("OBJNOTFND")):"Name":$s(NAME'="#":$$namedisp^GDESHOW(NAME,0),1:"Local Locks")
+	. d message^GDE($$info(gdeerr("OBJNOTFND")),"""Name"":"_$zwrite($s(NAME'="#":$$namedisp^GDESHOW(NAME,0),1:"Local Locks")))
 name1:	i '$d(regs(nams(NAME))) d
 	. s verified=0
-	. zm gdeerr("MAPBAD"):"Region":nams(NAME):"Name":$s(NAME'="#":$$namedisp^GDESHOW(NAME,0),1:"Local Locks")
+	. d message^GDE(gdeerr("MAPBAD"),"""Region"":"_$zwrite(nams(NAME))_":""Name"":"_$zwrite($s(NAME'="#":$$namedisp^GDESHOW(NAME,0),1:"Local Locks")))
 	q
 GBLNAME
-	i '$d(gnams(GBLNAME)) k verified zm $$info(gdeerr("OBJNOTFND")):"Global Name":GBLNAME q
+	i '$d(gnams(GBLNAME)) k verified d message^GDE($$info(gdeerr("OBJNOTFND")),"""Global Name"":"_$zwrite(GBLNAME)) q
 gblname1:
 	n s,sval,errissued s s=""
 	f  s s=$o(gnams(GBLNAME,s)) q:""=s  s sval=gnams(GBLNAME,s) d
 	. s errissued=0
-	. i $d(mingnam(s)),mingnam(s)>sval s errissued=1 zm gdeerr("VALTOOSMALL"):sval:mingnam(s):s
-	. i $d(maxgnam(s)),maxgnam(s)<sval s errissued=1 zm gdeerr("VALTOOBIG"):sval:maxgnam(s):s
-	. i errissued s verified=0 zm gdeerr("GBLNAMEIS"):GBLNAME
+	. i $d(mingnam(s)),mingnam(s)>sval s errissued=1 d message^GDE(gdeerr("VALTOOSMALL"),$zwrite(sval)_":"_$zwrite(mingnam(s))_":"_$zwrite(s))
+	. i $d(maxgnam(s)),maxgnam(s)<sval s errissued=1 d message^GDE(gdeerr("VALTOOBIG"),$zwrite(sval)_":"_$zwrite(maxgnam(s))_":"_$zwrite(s))
+	. i errissued s verified=0 d message^GDE(gdeerr("GBLNAMEIS"),$zwrite(GBLNAME))
 	. i (s="COLLATION") d
 	. . i $d(gnams(GBLNAME,"COLLVER")) d
 	. . . d chkcoll^GDEPARSE(sval,GBLNAME,gnams(GBLNAME,"COLLVER"))
@@ -94,26 +94,26 @@ gblname1:
 	; ASSERT : i $d(namrangeoverlap)  zsh "*"  zg 0
 	q
 REGION
-	i '$d(regs(REGION)) k verified zm $$info(gdeerr("OBJNOTFND")):"Region":REGION q
+	i '$d(regs(REGION)) k verified d message^GDE($$info(gdeerr("OBJNOTFND")),"""Region"":"_$zwrite(REGION)) q
 region1:	i '$d(segs(regs(REGION,"DYNAMIC_SEGMENT"))) s verified=0
-	i  zm gdeerr("MAPBAD"):"Dynamic segment":regs(REGION,"DYNAMIC_SEGMENT"):"Region":REGION q
+	i  d message^GDE(gdeerr("MAPBAD"),"""Dynamic segment"":"""_regs(REGION,"DYNAMIC_SEGMENT")_""":""Region"":"_$zwrite(REGION)) q
 	n rquals s s=""
 	f  s s=$o(regs(REGION,s)) q:'$l(s)  s rquals(s)=regs(REGION,s)
-	f  s s=$o(minreg(s)) q:'$l(s)  i '$d(rquals(s)) s verified=0 zm $$info(gdeerr("QUALREQD")):s,gdeerr("REGIS"):REGION
-	f  s s=$o(maxreg(s)) q:'$l(s)  i '$d(rquals(s)) s verified=0 zm $$info(gdeerr("QUALREQD")):s,gdeerr("REGIS"):REGION
+	f  s s=$o(minreg(s)) q:'$l(s)  i '$d(rquals(s)) s verified=0 d message^GDE($$info(gdeerr("QUALREQD")),$zwrite(s)),message^GDE(gdeerr("REGIS"),$zwrite(REGION))
+	f  s s=$o(maxreg(s)) q:'$l(s)  i '$d(rquals(s)) s verified=0 d message^GDE($$info(gdeerr("QUALREQD")),$zwrite(s)),message^GDE(gdeerr("REGIS"),$zwrite(REGION))
 	s x=$$RQUALS(.rquals)
 	q
 SEGMENT
-	i '$d(segs(SEGMENT)) k verified zm $$info(gdeerr("OBJNOTFND")):"Segment":SEGMENT q
-seg1:	i '$d(segs(SEGMENT,"ACCESS_METHOD")) s verified=0 zm $$info(gdeerr("QUALREQD")):"Access method",gdeerr("SEGIS"):"":SEGMENT q
+	i '$d(segs(SEGMENT)) k verified d message^GDE($$info(gdeerr("OBJNOTFND")),"""Segment"":"_$zwrite(SEGMENT)) q
+seg1:	i '$d(segs(SEGMENT,"ACCESS_METHOD")) s verified=0 d message^GDE($$info(gdeerr("QUALREQD")),"""Access method"""),message^GDE(gdeerr("SEGIS"),""""":"_$zwrite(SEGMENT)) q
 	s am=segs(SEGMENT,"ACCESS_METHOD")
 	n squals s s=""
 	f  s s=$o(segs(SEGMENT,s)) q:'$l(s)  s squals(s)=segs(SEGMENT,s)
-	f  s s=$o(minseg(am,s)) q:'$l(s)  i '$d(squals(s)) s verified=0 zm $$info(gdeerr("QUALREQD")):s,gdeerr("SEGIS"):am:SEGMENT
-	f  s s=$o(maxseg(am,s)) q:'$l(s)  i '$d(squals(s)) s verified=0 zm $$info(gdeerr("QUALREQD")):s,gdeerr("SEGIS"):am:SEGMENT
+	f  s s=$o(minseg(am,s)) q:'$l(s)  i '$d(squals(s)) s verified=0 d message^GDE($$info(gdeerr("QUALREQD")),$zwrite(s)),message^GDE(gdeerr("SEGIS"),$zwrite(am)_":"_$zwrite(SEGMENT))
+	f  s s=$o(maxseg(am,s)) q:'$l(s)  i '$d(squals(s)) s verified=0 d message^GDE($$info(gdeerr("QUALREQD")),$zwrite(s)),message^GDE(gdeerr("SEGIS"),$zwrite(am)_":"_$zwrite(SEGMENT))
 	i "MM"=am  do
-	. i 1=squals("ENCRYPTION_FLAG") s verified=0 zm $$info(gdeerr("GDECRYPTNOMM")):SEGMENT
-	. i 1=squals("ASYNCIO")         s verified=0 zm $$info(gdeerr("GDEASYNCIONOMM")):SEGMENT
+	. i 1=squals("ENCRYPTION_FLAG") s verified=0 d message^GDE($$info(gdeerr("GDECRYPTNOMM")),$zwrite(SEGMENT))
+	. i 1=squals("ASYNCIO")         s verified=0 d message^GDE($$info(gdeerr("GDEASYNCIONOMM")),$zwrite(SEGMENT))
 	s x=$$SQUALS(am,.squals)
 	q
 usereg:	n REGION,NAME s REGION=""
@@ -121,14 +121,14 @@ usereg:	n REGION,NAME s REGION=""
 	q
 usereg1:	s NAME=""
 	f  s NAME=$o(nams(NAME)) q:$g(nams(NAME))=REGION!'$zl(NAME)
-	i '$zl(NAME) s verified=0 zm gdeerr("MAPBAD"):"A":"NAME":"REGION":REGION
+	i '$zl(NAME) s verified=0 d message^GDE(gdeerr("MAPBAD"),"""A"":""NAME"":""REGION"":"_$zwrite(REGION))
 	q
 useseg:	n SEGMENT,REGION s SEGMENT=""
 	f  s SEGMENT=$o(segs(SEGMENT)) q:'$l(SEGMENT)  d useseg1
 	q
 useseg1:	s REGION=""
 	f  s REGION=$o(regs(REGION)) q:$g(regs(REGION,"DYNAMIC_SEGMENT"))=SEGMENT!'$l(REGION)
-	i '$l(REGION) s verified=0 zm gdeerr("MAPBAD"):"A":"REGION":"SEGMENT":SEGMENT
+	i '$l(REGION) s verified=0 d message^GDE(gdeerr("MAPBAD"),"""A"":""REGION"":""SEGMENT"":"_$zwrite(SEGMENT))
 	q
 ;-----------------------------------------------------------------------------------------------------------------------------------
 ; routine services
@@ -137,10 +137,10 @@ info:(mesno)
 	q mesno\8*8+3
 	;
 dupseg:	s verified=0
-	zm gdeerr("MAPDUP"):"Regions":$o(refdyns(regs(s,"DYNAMIC_SEGMENT"),"")):s:"Dynamic segment":regs(s,"DYNAMIC_SEGMENT")
+	d message^GDE(gdeerr("MAPDUP"),"""Regions"":"_$zwrite($o(refdyns(regs(s,"DYNAMIC_SEGMENT"),"")))_":"_$zwrite(s)_":""Dynamic segment"":"_$zwrite(regs(s,"DYNAMIC_SEGMENT")))
 	q
 dupfile:	s verified=0
-	zm gdeerr("MAPDUP"):"Dynamic segments":$o(reffils(segs(s,"FILE_NAME"),"")):s:"File":segs(s,"FILE_NAME")
+	d message^GDE(gdeerr("MAPDUP"),"""Dynamic segments"":"_$zwrite($o(reffils(segs(s,"FILE_NAME"),"")))_":"_$zwrite(s)_":""File"":"_$zwrite(segs(s,"FILE_NAME")))
 	q
 ALLTEM
 	s x=$$TRQUALS(.tmpreg)
@@ -152,15 +152,15 @@ tmpseg:	n squals s s=""
 	f  s s=$o(tmpseg(am,s)) q:'$l(s)  s squals(s)=tmpseg(am,s)
 	s x=$$TSQUALS(am,.squals)
 	q
-regelm:	i s'="DYNAMIC_SEGMENT",'$d(tmpreg(s)) zm $$info(gdeerr("QUALBAD")):s
-	e  i $d(minreg(s)),minreg(s)>rquals(s) zm gdeerr("VALTOOSMALL"):rquals(s):minreg(s):s
-	e  i $d(maxreg(s)),maxreg(s)<rquals(s) zm gdeerr("VALTOOBIG"):rquals(s):maxreg(s):s
-	i  s verified=0 zm gdeerr("REGIS"):REGION
+regelm:	i s'="DYNAMIC_SEGMENT",'$d(tmpreg(s)) d message^GDE($$info(gdeerr("QUALBAD")),$zwrite(s))
+	e  i $d(minreg(s)),minreg(s)>rquals(s) d message^GDE(gdeerr("VALTOOSMALL"),$zwrite(rquals(s))_":"_$zwrite(minreg(s))_":"_$zwrite(s))
+	e  i $d(maxreg(s)),maxreg(s)<rquals(s) d message^GDE(gdeerr("VALTOOBIG"),$zwrite(rquals(s))_":"_$zwrite(maxreg(s))_":"_$zwrite(s))
+	i  s verified=0 d message^GDE(gdeerr("REGIS"),$zwrite(REGION))
 	q
-segelm:	i s'="FILE_NAME",'$l(tmpseg(am,s)) zm $$info(gdeerr("QUALBAD")):s
-	e  i $d(minseg(am,s)),minseg(am,s)>squals(s) zm gdeerr("VALTOOSMALL"):squals(s):minseg(am,s):s
-	e  i $d(maxseg(am,s)),maxseg(am,s)<squals(s) zm gdeerr("VALTOOBIG"):squals(s):maxseg(am,s):s
-	i  s verified=0 zm gdeerr("SEGIS"):am:SEGMENT
+segelm:	i s'="FILE_NAME",'$l(tmpseg(am,s)) d message^GDE($$info(gdeerr("QUALBAD")),$zwrite(s))
+	e  i $d(minseg(am,s)),minseg(am,s)>squals(s) d message^GDE(gdeerr("VALTOOSMALL"),$zwrite(squals(s))_":"_$zwrite(minseg(am,s))_":"_$zwrite(s))
+	e  i $d(maxseg(am,s)),maxseg(am,s)<squals(s) d message^GDE(gdeerr("VALTOOBIG"),$zwrite(squals(s))_":"_$zwrite(maxseg(am,s))_":"_$zwrite(s))
+	i  s verified=0 d message^GDE(gdeerr("SEGIS"),$zwrite(am)_":"_$zwrite(SEGMENT))
 	q
 key2blk:
 	; the computation below allows for at least 1 max-key record in a data OR index block.
@@ -168,23 +168,23 @@ key2blk:
 	; bs:block size, y:supportable max key size, f:size of reserved bytes, ks:key size
 	i REGION="TEMPLATE" q  ; do not do keysize/blksize check for TEMPLATE region as this is not a real region
 	s y=bs-f-SIZEOF("blk_hdr")-len("min_val")-SIZEOF("rec_hdr")-len("hide_subs")-len("bstar_rec")
-	i ks>y s verified=0 zm gdeerr("KEYSIZIS"):ks,gdeerr("KEYFORBLK"):bs:f:y,gdeerr("REGIS"):REGION
+	i ks>y s verified=0 d message^GDE(gdeerr("KEYSIZIS"),$zwrite(ks)),message^GDE(gdeerr("KEYFORBLK"),$zwrite(bs)_":"_$zwrite(f)_":"_$zwrite(y)),message^GDE(gdeerr("REGIS"),$zwrite(REGION))
 	q
 buf2blk:	i REGION="TEMPLATE" q
-	i "USER"[am s verified=0 zm gdeerr("NOJNL"):am,gdeerr("REGIS"):REGION,gdeerr("SEGIS"):am:SEGMENT
+	i "USER"[am s verified=0 d message^GDE(gdeerr("NOJNL"),$zwrite(am)),message^GDE(gdeerr("REGIS"),$zwrite(REGION)),message^GDE(gdeerr("SEGIS"),$zwrite(am)_":"_$zwrite(SEGMENT))
 	q
 mmbichk:	i REGION="TEMPLATE",am="MM",tmpacc'="MM" q
-	i am="MM" s verified=0 zm gdeerr("MMNOBEFORIMG"),gdeerr("REGIS"):REGION,gdeerr("SEGIS"):am:SEGMENT
+	i am="MM" s verified=0 d message^GDE(gdeerr("MMNOBEFORIMG"),""""""),message^GDE(gdeerr("REGIS"),$zwrite(REGION)),message^GDE(gdeerr("SEGIS"),$zwrite(am)_":"_$zwrite(SEGMENT))
 	q
 allocchk(rquals)
 	n ext,alloc,asl,qn
 	s qn="EXTENSION",ext=$s($d(rquals(qn)):rquals(qn),$d(regs(REGION,qn)):regs(REGION,qn),1:tmpreg(qn))
 	s qn="ALLOCATION",alloc=$s($d(rquals(qn)):rquals(qn),$d(regs(REGION,qn)):regs(REGION,qn),1:tmpreg(qn))
 	s qn="AUTOSWITCHLIMIT",asl=$s($d(rquals(qn)):rquals(qn),$d(regs(REGION,qn)):regs(REGION,qn),1:tmpreg(qn))
-	i alloc>asl s verified=0 zm gdeerr("VALTOOBIG"):alloc:asl_" (AUTOSWITCHLIMIT)":"ALLOCATION" q
+	i alloc>asl s verified=0 d message^GDE(gdeerr("VALTOOBIG"),$zwrite(alloc)_":"_$zwrite(asl)_" (AUTOSWITCHLIMIT)"":""ALLOCATION""") q
 	i alloc'=asl,ext+alloc>asl d
 	. s rquals("ALLOCATION")=asl
-	. zm gdeerr("JNLALLOCGROW"):alloc:asl:"region":REGION
+	. d message^GDE(gdeerr("JNLALLOCGROW"),$zwrite(alloc)_":"_$zwrite(asl)_":""region"":"_$zwrite(REGION))
 	q
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
@@ -198,7 +198,7 @@ RQUALS(rquals)
 	s s=""
 	f  s s=$o(rquals(s)) q:'$l(s)  d regelm
 	i $d(rquals("FILE_NAME")),$zl(rquals("FILE_NAME"))>(SIZEOF("file_spec")-1) s verified=0
-	i  zm $$info(gdeerr("VALTOOLONG")):rquals("FILE_NAME"):SIZEOF("file_spec")-1:"Journal filename",gdeerr("REGIS"):REGION
+	i  d message^GDE($$info(gdeerr("VALTOOLONG")),$zwrite(rquals("FILE_NAME"))_":"_$zwrite(SIZEOF("file_spec")-1)_":""Journal filename""") d message^GDE(gdeerr("REGIS"),$zwrite(REGION))
 	s ks="KEY_SIZE",ks=$s($d(rquals(ks)):rquals(ks),$d(regs(REGION,ks)):regs(REGION,ks),1:tmpreg(ks))
 	s x="RECORD_SIZE",x=$s($d(rquals(x)):rquals(x),$d(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
 	d allocchk(.rquals)
@@ -225,7 +225,7 @@ SQUALS(am,squals)
 	f  s s=$o(squals(s)) q:'$l(s)  i $l(squals(s)) d segelm
 	n bs s bs="BLOCK_SIZE"
 	i $d(squals(bs)),squals(bs)#512 s x=squals(bs),squals(bs)=x\512+1*512
-	i  zm gdeerr("BLKSIZ512"):x:squals(bs),gdeerr("SEGIS"):am:SEGMENT
+	i  d message^GDE(gdeerr("BLKSIZ512"),$zwrite(x)_":"_$zwrite(squals(bs))),message^GDE(gdeerr("SEGIS"),$zwrite(am)_":"_$zwrite(SEGMENT))
 	s s="WINDOW_SIZE"
 	i SEGMENT="TEMPLATE" s x=tmpreg("RECORD_SIZE") d segreg q verified
 	n REGION s REGION=""

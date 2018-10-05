@@ -69,8 +69,8 @@ GDEPUT()
 	s rec=rec_$$num2bin(4,hasSpanGbls)			; has_span_gbls
 	s rec=rec_filler12byte					; for runtime filler
 	s rec=hdrlab_$$num2bin(4,$l(hdrlab)+4+filesize)_rec
-	i create zm gdeerr("GDCREATE"):file
-	e  zm gdeerr("GDUPDATE"):file
+	i create d message^GDE(gdeerr("GDCREATE"),$zwrite(file))
+	e  d message^GDE(gdeerr("GDUPDATE"),$zwrite(file))
 	s gdexcept="s gdeputzs=$zs  zgoto "_$zl_":writeerr^GDEPUT"
 	s tempfile=file_"inprogress"
 	;if zchset is UTF-8 open in raw mode to avoid BADCHAR errors
@@ -333,7 +333,7 @@ fatal:(msgno)
 error1:
 	s $et="d ABORT^GDE"
 	c tempfile:delete
-	zm $$fatal(gdeerr("VERIFY")):"FAILED"
+	d message^GDE($$fatal(gdeerr("VERIFY")),"""FAILED""")
 	;
 writerec:
 	n len
@@ -348,5 +348,5 @@ writerec:
 writeerr
 	u @useio
 	c tempfile:delete
-	zm gdeerr("WRITEERROR"):gdeputzs
+	d message^GDE(gdeerr("WRITEERROR"),$zwrite(gdeputzs))
 	q 0

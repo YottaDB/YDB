@@ -17,19 +17,19 @@ GDEPARSE
 	d @verb
 	q
 qual(qual,ent,s)
-	i ntoktype="TKEOL" zm gdeerr("QUALREQD"):ent
+	i ntoktype="TKEOL" d message^GDE(gdeerr("QUALREQD"),$zwrite(ent))
 	d matchtok(sep,ent),matchtok("TKIDENT",ent)
 	s qual=token d checkkw(.qual,ent,s) s t=@s@(qual)
- 	i negated,t'["NEGATABLE" zm gdeerr("NONEGATE"):qual
-	i t["REQUIRED",ntoktype'="TKEQUAL",'negated zm gdeerr("VALUEREQD"):qual
-	i "NEGATABLE"[t!negated,ntoktype="TKEQUAL" zm gdeerr("NOVALUE"):$s(negated:"NO"_qual,1:qual)
+ 	i negated,t'["NEGATABLE" d message^GDE(gdeerr("NONEGATE"),$zwrite(qual))
+	i t["REQUIRED",ntoktype'="TKEQUAL",'negated d message^GDE(gdeerr("VALUEREQD"),$zwrite(qual))
+	i "NEGATABLE"[t!negated,ntoktype="TKEQUAL" d message^GDE(gdeerr("NOVALUE"),$zwrite($s(negated:"NO"_qual,1:qual)))
 	i t["NEGATABLE" s qual("value")='negated
 	i ntoktype="TKEQUAL",t'["LIST" s qual("value")=$$getvalue(s,qual) q
 	i ntoktype="TKEQUAL" d list(qual)
 	q
 getvalue:(s,qual)
 	d matchtok("TKEQUAL","Value")
-	i ntoktype="TKEOL" zm gdeerr("VALUEREQD"):qual
+	i ntoktype="TKEOL" d message^GDE(gdeerr("VALUEREQD"),$zwrite(qual))
 	d @@s@(qual,"TYPE")
 	q value
 	;
@@ -40,14 +40,14 @@ list:(lhead)
 	i $ze(comline,cp)="(" d GETTOK^GDESCAN
 	n sep
 	s sep=ntoktype d getlitm
-	i sep="TKLPAREN" s sep=ntoktype f  q:ntoktype="TKRPAREN"  zm:"TKRPAREN|TKCOMMA"'[ntoktype gdeerr("RPAREN") d getlitm
+	i sep="TKLPAREN" s sep=ntoktype f  q:ntoktype="TKRPAREN"  d:"TKRPAREN|TKCOMMA"'[ntoktype message^GDE(gdeerr("RPAREN"),"""""") d getlitm
 	i ntoktype="TKRPAREN" d GETTOK^GDESCAN
 	s lqual=tmp,lqual("value")=v
 	q
 TNUMBER
 	d GETTOK^GDESCAN
-	i $l(token)'=$zl(token) zm gdeerr("NONASCII"):token:"number"	; error if the token has non-ascii numbers
-	i token'?1.N zm gdeerr("VALUEBAD"):token:"number"
+	i $l(token)'=$zl(token) d message^GDE(gdeerr("NONASCII"),$zwrite(token)_":""number""")	; error if the token has non-ascii numbers
+	i token'?1.N d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":""number""")
 	s value=token
 	q
 TFSPEC
@@ -55,8 +55,8 @@ TFSPEC
 	i ntoktype="TKSTRLIT" s filespec=ntoken
 	e  d TFSPECP
 	d GETTOK^GDESCAN
-	i $zl(filespec)>(SIZEOF("file_spec")-1) zm gdeerr("VALUEBAD"):filespec:"file specification"
-	i '$zl($zparse(filespec,"","","","SYNTAX_ONLY")) zm gdeerr("VALUEBAD"):filespec:"file specification"
+	i $zl(filespec)>(SIZEOF("file_spec")-1) d message^GDE(gdeerr("VALUEBAD"),$zwrite(filespec)_":""file specification""")
+	i '$zl($zparse(filespec,"","","","SYNTAX_ONLY")) d message^GDE(gdeerr("VALUEBAD"),$zwrite(filespec)_":""file specification""")
 	s @("value="_$s($zl(filexfm):filexfm,1:filespec))	; do system specific file name translation
 	q
 TFSPECP						; scan filespec token by token
@@ -69,15 +69,15 @@ TFSPECP						; scan filespec token by token
 	q
 TACCMETH
 	d GETTOK^GDESCAN
-	i toktype'="TKIDENT" zm gdeerr("VALUEBAD"):token:qual
+	i toktype'="TKIDENT" d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"_$zwrite(qual))
 	s value=$tr(token,lower,upper)
-	i '$data(typevalue("STR2NUM","TACCMETH",value)) zm gdeerr("VALUEBAD"):token:qual
+	i '$data(typevalue("STR2NUM","TACCMETH",value)) d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"_$zwrite(qual))
 	q
 TNULLSUB
 	d GETTOK^GDESCAN
-	i toktype'="TKIDENT" zm gdeerr("VALUEBAD"):token:qual
+	i toktype'="TKIDENT" d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"_$zwrite(qual))
 	s value=$tr(token,lower,upper)
-	i '$data(typevalue("STR2NUM","TNULLSUB",value)) zm gdeerr("VALUEBAD"):token:qual
+	i '$data(typevalue("STR2NUM","TNULLSUB",value)) d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"_$zwrite(qual))
 	s value=typevalue("STR2NUM","TNULLSUB",value)
 	q
 TREGION
@@ -89,26 +89,26 @@ TSEGMENT
 GBLNAME
 	k GBLNAME
 	n c
-	i ntoktype="TKEOL" zm gdeerr("OBJREQD"):"gblname"
+	i ntoktype="TKEOL" d message^GDE(gdeerr("OBJREQD"),"""gblname""")
 	d GETTOK^GDESCAN
 	s GBLNAME=token
-	i GBLNAME'?1(1"%",1A).AN zm gdeerr("VALUEBAD"):GBLNAME:"gblname"
-	i $l(GBLNAME)'=$zl(GBLNAME) zm gdeerr("NONASCII"):GBLNAME:"gblname"		; error if the name is non-ascii
-	i $zl(GBLNAME)>PARNAMLN zm gdeerr("VALTOOLONG"):GBLNAME:PARNAMLN:"gblname"
+	i GBLNAME'?1(1"%",1A).AN d message^GDE(gdeerr("VALUEBAD"),$zwrite(GBLNAME)_":""gblname""")
+	i $l(GBLNAME)'=$zl(GBLNAME) d message^GDE(gdeerr("NONASCII"),$zwrite(GBLNAME)_":""gblname""")	; error if the name is non-ascii
+	i $zl(GBLNAME)>PARNAMLN d message^GDE(gdeerr("VALTOOLONG"),$zwrite(GBLNAME)_":"""_PARNAMLN_""":""gblname""")
 	q
 INSTANCE
-	i ntoktype="TKEOL" zm gdeerr("OBJREQD"):"instance"
+	i ntoktype="TKEOL" d message^GDE(gdeerr("OBJREQD"),"""instance""")
 	q
 NAME
 	k NAME
 	n c,len,j,k,tokname,starti,endi,subcnt,nsubs,gblname,type,rangeprefix,nullsub,lsub
-	i ntoktype="TKEOL" zm gdeerr("OBJREQD"):"name"
+	i ntoktype="TKEOL" d message^GDE(gdeerr("OBJREQD"),"""name""")
 	m nsubs=NAMEsubs	; before GETTOK overwrites it
 	s type=NAMEtype		; before GETTOK overwrites it
 	d GETTOK^GDESCAN
 	s tokname=token
-	i "%Y"=$ze(tokname,1,2) zm gdeerr("NOPERCENTY")
-	i (MAXGVSUBS<(nsubs-1-$select(type="RANGE":1,1:0))) zm gdeerr("NAMGVSUBSMAX"):tokname:MAXGVSUBS
+	i "%Y"=$ze(tokname,1,2) d message^GDE(gdeerr("NOPERCENTY"),"""""")
+	i (MAXGVSUBS<(nsubs-1-$select(type="RANGE":1,1:0))) d message^GDE(gdeerr("NAMGVSUBSMAX"),$zwrite(tokname)_":"""_MAXGVSUBS_"""")
 	; parse subscripted tokname (potentially with ranges) to ensure individual pieces are well-formatted
 	; One would be tempted to use $NAME to do automatic parsing of subscripts for well-formedness, but there are issues
 	; with it. $NAME does not issue error in various cases (unsubscripted global name longer than 31 characters,
@@ -118,16 +118,16 @@ NAME
 	s j=$g(nsubs(1))
 	s gblname=$ze(tokname,1,j-2)
 	s NAME=gblname
-	i $l(NAME)'=$zl(NAME) zm gdeerr("NONASCII"):NAME:"name"				; error if the name is non-ascii
+	i $l(NAME)'=$zl(NAME) d message^GDE(gdeerr("NONASCII"),$zwrite(NAME)_":""name""")				; error if the name is non-ascii
 	s NAME("SUBS",0)=gblname
 	i $ze(gblname,j-2)="*" s type="STAR"
 	s NAME("TYPE")=type
-	i ("*"'=gblname)&(gblname'?1(1"%",1A).AN.1"*") zm gdeerr("VALUEBAD"):gblname:"name"
-	i (j-2)>PARNAMLN zm gdeerr("VALTOOLONG"):gblname:PARNAMLN:"name"
+	i ("*"'=gblname)&(gblname'?1(1"%",1A).AN.1"*") d message^GDE(gdeerr("VALUEBAD"),$zwrite(gblname)_":""name""")
+	i (j-2)>PARNAMLN d message^GDE(gdeerr("VALTOOLONG"),$zwrite(gblname)_":"""_PARNAMLN_""":""name""")
 	i j=(len+2) s NAME("NSUBS")=0 q  ; no subscripts to process. done.
 	; have subscripts to process
-	i type="STAR" zm gdeerr("NAMSTARSUBSMIX"):tokname
-	i $ze(tokname,len)'=")" zm gdeerr("NAMENDBAD"):tokname
+	i type="STAR" d message^GDE(gdeerr("NAMSTARSUBSMIX"),$zwrite(tokname))
+	i $ze(tokname,len)'=")" d message^GDE(gdeerr("NAMENDBAD"),$zwrite(tokname))
 	s NAME=NAME_"("
 	s nullsub=""""""
 	f subcnt=1:1:nsubs-1 d
@@ -138,7 +138,7 @@ NAME
 	. . i (type="RANGE") d
 	. . . i (subcnt=(nsubs-2)) s sub=nullsub q  ; if left  side of range is empty, replace with null subscript
 	. . . i (subcnt=(nsubs-1)) s sub=nullsub q  ; if right side of range is empty, replace with null subscript
-	. i (sub="") zm gdeerr("NAMSUBSEMPTY"):subcnt ; null subscript
+	. i (sub="") d message^GDE(gdeerr("NAMSUBSEMPTY"),$zwrite(subcnt)) ; null subscript
 	. s c=$ze(sub,1)
 	. i (c="""")!(c="$") set sub=$$strsub(sub,subcnt)	; string subscript
 	. e  set sub=$$numsub(sub,subcnt)			; numeric subscript
@@ -163,7 +163,7 @@ NAME
 	. s key=$$gvn2gds^GDEMAP("^"_NAME,coll)
 	. d keylencheck(NAME,key,coll)
 	q
-namerangeoutofordercheck:(nam,coll)
+namerangeoutofordercheck(nam,coll)
 	n rlo,rhi,nsubs,nullsub,rangelo,rangehi,keylo,keyhi,range
 	s nullsub=""""""
 	s nsubs=nam("NSUBS")
@@ -175,12 +175,12 @@ namerangeoutofordercheck:(nam,coll)
 	. s keylo=$$gvn2gds^GDEMAP(rangelo,coll),keyhi=$$gvn2gds^GDEMAP(rangehi,coll)
 	. d keylencheck(rangelo,keylo,coll)
 	. d keylencheck(rangehi,keyhi,coll)
-	. i keylo]keyhi zm gdeerr("NAMRANGEORDER"):$$namedisp^GDESHOW(nam("NAME"),0):coll
+	. i keylo]keyhi d message^GDE(gdeerr("NAMRANGEORDER"),$zwrite($$namedisp^GDESHOW(nam("NAME"),0))_":"""_coll_"""")
 	q
 keylencheck(gvn,key,coll)
 	n text
 	s text="subscripted name in the database using collation #"_coll
-	i $zl(key)>maxreg("KEY_SIZE") zm gdeerr("VALTOOLONG"):gvn:maxreg("KEY_SIZE"):text
+	i $zl(key)>maxreg("KEY_SIZE") d message^GDE(gdeerr("VALTOOLONG"),$zwrite(gvn)_":"""_maxreg("KEY_SIZE")_""":"_$zwrite(text))
 	q
 gblnameeditchecks(gblname,newcoll)
 	; Check if setting collation of "gblname" to "newcoll"
@@ -245,7 +245,7 @@ namerangeoverlapcheck2:(nam1,reg1,nam2,coll)
 	. ; if regions match, no range overlap error needs to be issued but coalesce is needed for sure
 	. s overlap=1
 	. i reg1=reg2 q  ; if regions match, no need for range overlap error, but need coalesce
-	. zm gdeerr("NAMRANGEOVERLAP"):$$namedisp^GDESHOW(nam1("NAME"),0):$$namedisp^GDESHOW(nam2("NAME"),0):coll
+	. d message^GDE(gdeerr("NAMRANGEOVERLAP"),$zwrite($$namedisp^GDESHOW(nam1("NAME"),0))_":"_$zwrite($$namedisp^GDESHOW(nam2("NAME"),0))_":"""_coll_"""")
 	; else check for a few sub-range cases
 	e  i (keylo1inbetween) s overlap=1 ; keylo1 and keyhi1 are both in between keylo2 and keyhi2
 	; else if keylo2 is in between keylo1 and keyhi1, this means another sub-range case
@@ -287,7 +287,7 @@ namerangeoverlapcheck(newname,newreg,oldname,gblname,newcoll)
 	q
 chkcoll(coll,gblname,collver)
 	i coll=0 q  ; 0 is always a good collation sequence
-	i (coll<0)!(coll>maxgnam("COLLATION")) zm gdeerr("GBLNAMCOLLRANGE"):coll
+	i (coll<0)!(coll>maxgnam("COLLATION")) d message^GDE(gdeerr("GBLNAMCOLLRANGE"),""""_coll_"""")
 	n savetrap
 	s savetrap=$etrap
 	n $etrap
@@ -298,16 +298,16 @@ chkcoll(coll,gblname,collver)
 	. i (0=$view("YCOLLATE",coll,collver)) d
 	. . n ver
 	. . s ver=$view("YCOLLATE",coll)
-	. . i $view("YCOLLATE",coll,ver) zm gdeerr("GBLNAMCOLLVER"):gblname:coll:collver:ver
+	. . i $view("YCOLLATE",coll,ver) d message^GDE(gdeerr("GBLNAMCOLLVER"),$zwrite(gblname)_":"""_coll_""":"""_collver_""":"""_ver_"""")
 	q
 collundeferr
 	i $zstatus'["COLLATIONUNDEF" q  ; don't know how a non-COLLATIONUNDEF error can occur.
 					; let parent frame handle this like any other error
 	s $ecode=""
 	s $etrap=savetrap
-	zm gdeerr("GBLNAMCOLLUNDEF"):coll:gblname
+	d message^GDE(gdeerr("GBLNAMCOLLUNDEF"),""""_coll_""":"_$zwrite(gblname))
 	q
-strsub:(sub,subcnt)
+strsub(sub,subcnt)
 	n state,xstr,len,iszchar,istart,x,y	; iszchar and istart are initialized in lower level invocations
 						; but needed outside that frame too hence the new done here (in parent)
 	n retsub	; the subscript that is returned after doing $c() transformations
@@ -316,13 +316,13 @@ strsub:(sub,subcnt)
 	s state=0,len=$zl(sub),doublequote="""",retsub=doublequote
 	f i=1:1:len s c=$ze(sub,i) d @state
 	; check if state is terminating
-	i (state'=2)&(state'=6) zm gdeerr("NAMNOTSTRSUBS"):subcnt:sub
+	i (state'=2)&(state'=6) d message^GDE(gdeerr("NAMNOTSTRSUBS"),""""_subcnt_""":"_$zwrite(sub))
 	i (state=2) s retsub=retsub_$ze(sub,previ,i-1)
 	q retsub_doublequote
 0	;
 	i c=doublequote s state=1,previ=i+1
 	e  i c="$" s state=3
-	e  zm gdeerr("NAMNOTSTRSUBS"):subcnt:sub
+	e  d message^GDE(gdeerr("NAMNOTSTRSUBS"),""""_subcnt_""":"_$zwrite(sub))
 	q
 1	;
 	i c=doublequote s state=2
@@ -331,7 +331,7 @@ strsub:(sub,subcnt)
 2	;
 	i c=doublequote s state=1
 	e  i c="_" s state=0,retsub=retsub_$ze(sub,previ,i-2) ; previ would be reset when we execute the label "0" (state=0)
-	e  zm gdeerr("NAMNOTSTRSUBS"):subcnt:sub
+	e  d message^GDE(gdeerr("NAMNOTSTRSUBS"),""""_subcnt_""":"_$zwrite(sub))
 	q
 3	;
 	; the only $ functions allowed are $C, $CHAR, $ZCH, $ZCHAR. check for those.
@@ -341,24 +341,24 @@ strsub:(sub,subcnt)
 	s fn=$tr(fn,lower,upper)
 	i ((fn="C")!(fn="CHAR")) s iszchar=0
 	e  i ((fn="ZCH")!(fn="ZCHAR")) s iszchar=1
-	e  zm gdeerr("NAMSTRSUBSFUN"):subcnt:sub
-	i j=0 zm gdeerr("NAMSTRSUBSLPAREN"):subcnt:sub	; no "(" found following $
+	e  d message^GDE(gdeerr("NAMSTRSUBSFUN"),""""_subcnt_""":"_$zwrite(sub))
+	i j=0 d message^GDE(gdeerr("NAMSTRSUBSLPAREN"),""""_subcnt_""":"_$zwrite(sub))	; no "(" found following $
 	s i=j-1,state=4
 	q
 4	;
 	s istart=i
-	i c'?1N zm gdeerr("NAMSTRSUBSCHINT"):subcnt:sub
+	i c'?1N d message^GDE(gdeerr("NAMSTRSUBSCHINT"),""""_subcnt_""":"_$zwrite(sub))
 	s state=5
 	q
 5	;
 	i c="," d numcheck(istart,i) s state=4 q
 	i c=")" d numcheck(istart,i) s state=6 q
-	i c'?1N zm gdeerr("NAMSTRSUBSCHINT"):subcnt:sub
+	i c'?1N d message^GDE(gdeerr("NAMSTRSUBSCHINT"),""""_subcnt_""":"_$zwrite(sub))
 	; else state stays at 5
 	q
 6	;
 	i c="_" s state=0
-	e  zm gdeerr("NAMNOTSTRSUBS"):subcnt:sub
+	e  d message^GDE(gdeerr("NAMNOTSTRSUBS"),""""_subcnt_""":"_$zwrite(sub))
 	q
 numcheck(istart,i);
 	n num,dollarc
@@ -366,16 +366,16 @@ numcheck(istart,i);
 	d chknumoflow(subcnt,num)
 	d chknumexact(subcnt,num,num)
 	; check if string subscript has $c() usages. If so, check if $zl($c(NNN)) for each number NNN is non-zero
-	i (iszchar&'$zl($zch(num)))!('iszchar&'$zl($c(num))) zm gdeerr("NAMSTRSUBSCHARG"):subcnt:sub:num
+	i (iszchar&'$zl($zch(num)))!('iszchar&'$zl($c(num))) d message^GDE(gdeerr("NAMSTRSUBSCHARG"),""""_subcnt_""":"_$zwrite(sub)_":"""_num_"""")
 	; now that we know $zch()/$c() is passed a valid number, add this to the string subscript to be returned
 	s dollarc=$s(iszchar:$zch(num),1:$c(num)),retsub=retsub_dollarc
 	i dollarc="""" s retsub=retsub_dollarc	; if double-quote is specified as a $c() expression, use two double-quotes
 						; to indicate this is a double-quote inside the string subscript
 	q
-numsub:(sub,subcnt)
+numsub(sub,subcnt)
 	n mantissa
 	; check if a valid subscript. if not error right away
-	i sub'?.(.1"+",.1"-").N.1(1".".N).1(1"E"1(.1"+",.1"-")1.N)!(sub=".") zm gdeerr("NAMSUBSBAD"):subcnt:sub
+	i sub'?.(.1"+",.1"-").N.1(1".".N).1(1"E"1(.1"+",.1"-")1.N)!(sub=".") d message^GDE(gdeerr("NAMSUBSBAD"),""""_subcnt_""":"_$zwrite(sub))
 	; check if number too big to be represented in GT.M. If so issue NAMNUMSUBSOFLOW error
 	d chknumoflow(subcnt,sub)
 	; check if mantissa contains more digits than GT.M can store. If so issue NAMNUMSUBNOTEXACT error
@@ -391,9 +391,9 @@ chknumexact(subcnt,mantissa,sub)
 	i i<j f j=$zl(mantissa):-1  q:$ze(mantissa,j)'=0  ; remove trailing 0s
 	s mantissa=$ze(mantissa,i,j)	; this is the real mantissa
 	; check if mantissa is non-zero but number too small to be represented in GT.M. If so issue NAMNUMSUBNOTEXACT error
-	i (+mantissa)&(0=+sub) zm gdeerr("NAMNUMSUBNOTEXACT"):subcnt:sub
+	i (+mantissa)&(0=+sub) d message^GDE(gdeerr("NAMNUMSUBNOTEXACT"),""""_subcnt_""":"_$zwrite(sub))
 	; check if mantissa cannot be accurately represented in GT.M. If so issue NAMNUMSUBNOTEXACT error
-	i +mantissa'=mantissa zm gdeerr("NAMNUMSUBNOTEXACT"):subcnt:sub
+	i +mantissa'=mantissa d message^GDE(gdeerr("NAMNUMSUBNOTEXACT"),""""_subcnt_""":"_$zwrite(sub))
 	q
 chknumoflow(subcnt,sub)
 	n $etrap
@@ -402,42 +402,42 @@ chknumoflow(subcnt,sub)
 	q
 numoflowerr
 	s $ecode=""
-	zm gdeerr("NAMNUMSUBSOFLOW"):subcnt:sub
+	d message^GDE(gdeerr("NAMNUMSUBSOFLOW"),""""_subcnt_""":"_$zwrite(sub))
 	q
 REGION
 	k REGION
-	i ntoktype="TKEOL" zm gdeerr("OBJREQD"):renpref_"region"
+	i ntoktype="TKEOL" d message^GDE(gdeerr("OBJREQD"),""""_renpref_"region""")
 	d GETTOK^GDESCAN
 	s REGION=$tr(token,lower,upper)
-	i '$zl(REGION) zm gdeerr("VALUEBAD"):token:renpref_"region"
-	i $l(REGION)'=$zl(REGION) zm gdeerr("NONASCII"):REGION:"region"		; error if the name of the region is non-ascii
+	i '$zl(REGION) d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"""_renpref_"region""")
+	i $l(REGION)'=$zl(REGION) d message^GDE(gdeerr("NONASCII"),$zwrite(REGION)_":""region""")		; error if the name of the region is non-ascii
 	i REGION=defreg q
 	s x=$ze(REGION) i x'?1A d prefixbaderr(REGION,"region")
-	i $ze(REGION,2,999)'?.(1AN,1"_",1"$") zm gdeerr("VALUEBAD"):REGION:"region"
-	i $zl(REGION)>PARREGLN zm gdeerr("VALTOOLONG"):REGION:PARREGLN:renpref_"region"
+	i $ze(REGION,2,999)'?.(1AN,1"_",1"$") d message^GDE(gdeerr("VALUEBAD"),$zwrite(REGION)_":""region""")
+	i $zl(REGION)>PARREGLN d message^GDE(gdeerr("VALTOOLONG"),$zwrite(REGION)_":"""_PARREGLN_""":"""_renpref_"region""")
 	q
 SEGMENT
 	k SEGMENT
-	i ntoktype="TKEOL" zm gdeerr("OBJREQD"):renpref_"segment"
+	i ntoktype="TKEOL" d message^GDE(gdeerr("OBJREQD"),""""_renpref_"segment""")
 	d GETTOK^GDESCAN
 	s SEGMENT=$tr(token,lower,upper)
-	i '$zl(SEGMENT) zm gdeerr("VALUEBAD"):token:renpref_"segment"
-	i $l(SEGMENT)'=$zl(SEGMENT) zm gdeerr("NONASCII"):SEGMENT:"segment"	; error if the name of the segment is non-ascii
+	i '$zl(SEGMENT) d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"""_renpref_"segment""")
+	i $l(SEGMENT)'=$zl(SEGMENT) d message^GDE(gdeerr("NONASCII"),$zwrite(SEGMENT)_":""segment""")	; error if the name of the segment is non-ascii
 	i SEGMENT=defseg q
 	s x=$ze(SEGMENT) i x'?1A d prefixbaderr(SEGMENT,"segment")
-	i $ze(SEGMENT,2,999)'?.(1AN,1"_",1"$") zm gdeerr("VALUEBAD"):SEGMENT:"segment"
-	i $zl(SEGMENT)>PARSEGLN zm gdeerr("VALTOOLONG"):SEGMENT:PARSEGLN:renpref_"segment"
+	i $ze(SEGMENT,2,999)'?.(1AN,1"_",1"$") d message^GDE(gdeerr("VALUEBAD"),$zwrite(SEGMENT)_":""segment""")
+	i $zl(SEGMENT)>PARSEGLN d message^GDE(gdeerr("VALTOOLONG"),$zwrite(SEGMENT)_":"""_PARSEGLN_""":"""_renpref_"segment""")
 	q
 prefixbaderr:(name,str)
 	n namestr
 	s namestr="name"
-	zm gdeerr("PREFIXBAD"):name:renpref_str:namestr
+	d message^GDE(gdeerr("PREFIXBAD"),$zwrite(name)_":"""_renpref_str_""":"_$zwrite(namestr))
 	q
 matchtok:(tok,ent)
 	d GETTOK^GDESCAN
 	i toktype=tok q
-	i tok=sep zm gdeerr("MISSINGDELIM"):tokens(sep):ent:token q
-	zm gdeerr("VALUEBAD"):token:ent
+	i tok=sep d message^GDE(gdeerr("MISSINGDELIM"),$zwrite(tokens(sep))_":"_$zwrite(ent)_":"_$zwrite(token)) q
+	d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"_$zwrite(ent))
 	q
 checkkw(kw,ent,kwlist)
 	n x1,x2
@@ -445,18 +445,18 @@ checkkw(kw,ent,kwlist)
 	i $ze(kw,1,2)="NO" s negated=1,kw=$ze(kw,3,999)
 	e  s negated=0
 	s x1="" f  s x1=$o(@kwlist@(x1)) q:kw=$ze(x1,1,$zl(kw))!'$zl(x1)
-	i '$zl(x1) zm gdeerr("KEYWRDBAD"):kw:ent
+	i '$zl(x1) d message^GDE(gdeerr("KEYWRDBAD"),$zwrite(kw)_":"_$zwrite(ent))
 	s x2=x1 s x2=$o(@kwlist@(x2))
-	i ('$zl(x2))&(kw=$ze(x2,1,$zl(kw))) zm gdeerr("KEYWRDAMB"):kw:ent
+	i ('$zl(x2))&(kw=$ze(x2,1,$zl(kw))) d message^GDE(gdeerr("KEYWRDAMB"),$zwrite(kw)_":"_$zwrite(ent))
 	s kw=x1
 	q
 getqual: d qual(.lqual,"qualifier","syntab("""_verb_""","""_gqual_""")")
 	i '$d(lquals(lqual)) s lquals(lqual)=$g(lqual("value"))
-	e  zm gdeerr("QUALDUP"):lqual
+	e  d message^GDE(gdeerr("QUALDUP"),$zwrite(lqual))
 	q
 getlitm: d qual(.lqual,"qualifier","syntab("""_verb_""","""_gqual_""","""_lhead_""")")
 	i '$d(lquals(lqual)) s lquals(lqual)=$g(lqual("value"))
-	e  zm gdeerr("QUALDUP"):lqual
+	e  d message^GDE(gdeerr("QUALDUP"),$zwrite(lqual))
 	q
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
@@ -510,8 +510,8 @@ VERIFY
 	. d @("ALL"_$ze(gqual,1,3))^GDEVERIF
 	e  i "NAMEGBLNAMEREGIONSEGMENTINSTANCE"[gqual d
 	. d @gqual,@gqual^GDEVERIF
-	e  zm gdeerr("NOVALUE"):gqual
-	i $d(verified) zm gdeerr("VERIFY"):$s(verified:"OK",1:"FAILED") w !
+	e  d message^GDE(gdeerr("NOVALUE"),$zwrite(gqual))
+	i $d(verified) d message^GDE(gdeerr("VERIFY"),$zwrite($s(verified:"OK",1:"FAILED"))) w:'$g(gdequiet) !
 	q
 EXIT
 QUIT

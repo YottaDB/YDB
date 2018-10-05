@@ -104,7 +104,7 @@ tokscan:(delim)
 	. . . . s NAMEsubs($incr(NAMEsubs))=(i+2)
 	. i quotestate i '$zl(errstate) s errstate="STRMISSQUOTE"
 	. i (1=parenstate)!(2<parenstate) i '$zl(errstate) s errstate="NAMRPARENMISSING"
-	. i $zl(errstate) zm gdeerr(errstate):$ze(comline,cp,cp+i-1)
+	. i $zl(errstate) d message^GDE(gdeerr(errstate),$zwrite($ze(comline,cp,cp+i-1)))
 	. i 'NAMEsubs s NAMEsubs($incr(NAMEsubs))=i+2
 	i c="" d
 	. ; check if tail of last token in line contains $c(13,10) and if so remove it
@@ -120,7 +120,7 @@ TKSTRLIT
 	n i,len
 	s len=$zl(comline)
 	f i=1:1:(len-cp) q:$ze(comline,cp+i)=""""
-	i (i=(len-cp))&($ze(comline,cp+i)'="""") zm gdeerr("STRMISSQUOTE"):$ze(comline,cp,cp+i)
+	i (i=(len-cp))&($ze(comline,cp+i)'="""") d message^GDE(gdeerr("STRMISSQUOTE"),$zwrite($ze(comline,cp,cp+i)))
 	s ntoken=$ze(comline,cp+1,cp+i-1),cp=cp+i+1
 	d skipwhitespace
 	q
@@ -142,7 +142,7 @@ TKEXCLAM
 ;TKDASH - more UNIXy handling disabled for compatibility with other utilities
 	s ntoken=c,cp=cp+1
 	i sep="TKDASH",$ze(comline,cp)?1A s c=$ze(comline,cp-2) i c=" "!(c=TAB) q
-	zm gdeerr("ILLCHAR"):"-"
+	d message^GDE(gdeerr("ILLCHAR"),$zwrite("-"))
 	q
 TKEOL
 	s ntoken=""

@@ -10,6 +10,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 quit:	;implement the verb: QUIT
 QUIT
-	zm gdeerr("NOACTION"):$zparse(tfile,"",defgldext)
+	d message^GDE(gdeerr("NOACTION"),$zwrite($zparse(tfile,"",defgldext)))
 	d GETOUT^GDEEXIT
 	h

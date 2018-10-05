@@ -46,7 +46,7 @@ SHOWNAM
 	d NAM2MAP
 	s s1="",$zpi(s1,$zch(255),SIZEOF("mident"))=""
 	f  s s2=s1,s1=$o(map(s1),-1),map(s2)=map(s1) q:s1="$"  k map(s1)
-	k map("#") i '$$MAP2NAM(.map) zm gdeerr("GDECHECK")\2*2
+	k map("#") i '$$MAP2NAM(.map) d message^GDE(gdeerr("GDECHECK")\2*2,"""""")
  	q
 ;----------------------------------------------------------------------------------------------------------------------------------
 MAP2NAM(list1)
@@ -447,7 +447,7 @@ gvsuboflowerr
 	s $etrap=savetrap
 	; Do not attempt to print the full "gvn" value as it might exceed the buffer allocated by zmessage.
 	; So print first 100 bytes and last 100 bytes with a "..." in between
-	zm gdeerr("NAMGVSUBOFLOW"):$ze(gvn,2,100):$ze(gvn,len-100,len):coll	; 2 (instead of 1) to skip ^ at start of gvn
+	d message^GDE(gdeerr("NAMGVSUBOFLOW"),$zwrite($ze(gvn,2,100))_":"_$zwrite($ze(gvn,len-100,len))_":"""_coll_"""")	; 2 (instead of 1) to skip ^ at start of gvn
 	q
 gvn2gdsnotrailingnulls:(gvn,coll)
 	; return subscript (gds) representation for input "gvn". Removes trailing double null-byte
