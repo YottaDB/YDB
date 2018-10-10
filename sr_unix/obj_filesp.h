@@ -51,7 +51,7 @@ void buff_flush(void);
 #elif defined(__armv6l__) || defined(__armv7l__)
 #  define JSB_ACTION_N_INS	3
 #elif defined(__aarch64__)
-#  define JSB_ACTION_N_INS	3		/* xxxxxxx not sure yet */
+#  define JSB_ACTION_N_INS	3
 #else
 #  define JSB_ACTION_N_INS	2
 #endif

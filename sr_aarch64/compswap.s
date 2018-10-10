@@ -1,9 +1,9 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
-# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+# Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -39,7 +39,7 @@ ENTRY compswap_lock
 	stlxr	w3, w2, [x0]		/* only do swap if latch value matches comparison value */
 	cmp	w3, #1
 	b.eq	notset			/* store-exclusive failed */
-	dmb	ish	/* xxxxxxx ish? */			/* ensures that all subsequent accesses are observed (by a concurrent process)
+	dmb	ish			/* ensures that all subsequent accesses are observed (by a concurrent process)
 					 * AFTER the gaining of the lock is observed.
 					 */
 	mov	x0, #1			/* return success */
@@ -58,7 +58,7 @@ notset:
  */
 ENTRY compswap_unlock
 	mov	w1, wzr
-	dmb	ish	/* xxxxxxx ish? */			/* ensures that all previous accesses are observed (by a concurrent process)
+	dmb	ish			/* ensures that all previous accesses are observed (by a concurrent process)
 					 * BEFORE the clearing of the lock is observed.
 					 */
 	str	w1, [x0]

@@ -167,7 +167,7 @@ if ( $?gtm_version_change == "1" ) then
 	if ( "aarch64" == $mach_type ) then
 		setenv	gt_ld_m_shl_linker	"cc"
 		setenv  gt_ld_m_shl_options     "-shared"
-		setenv  gt_cc_options_common    "$gt_cc_options_common -march=armv8-a -mcpu=cortex-a53 "	#xxxxxxx cortex part
+		setenv  gt_cc_options_common    "$gt_cc_options_common -march=armv8-a -mcpu=cortex-a53 "
 	endif
 
         setenv  gt_cc_options_common    "$gt_cc_options_common -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 "

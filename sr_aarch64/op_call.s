@@ -1,9 +1,9 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
-# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+# Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -38,17 +38,6 @@ ENTRY op_callb
 	stp	x29, x30, [sp, #-16]!
 	mov	x29, sp
 	CHKSTKALIGN					/* Verify stack alignment */
-.ifdef xxxxxxx
-	ldr	w9, [x30]				/* verify the instruction immediately after return */
-	lsr	w9, w9, #24
-	cmp	w9, #0x14				/* Is the instruction a (short) branch */
-	b.eq	call1
-	add	x0, x30, #24				/* xxxxxxx check #24 Bump return pc past the long branch instruction */
-	b	call2
-call1:	
-	add	x0, x30, #4				/* Bump return pc past the short branch instruction */
-call2:
-.endif
 	add	x2, x30, x0				/* Bump return pc past the branch instruction */
 	ldr	x9, [x19]
 	str	x2, [x9, #msf_mpc_off]			/* and store it in Mumps stack frame */

@@ -1,9 +1,9 @@
 ################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
-# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+# Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -49,7 +49,6 @@
 #	include "debug.si"
 
 	.data
-/*	.extern	ERR_LABELNOTFND xxxxxxx */
 	.extern	frame_pointer
 	.extern gtm_threadgbl
 

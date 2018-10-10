@@ -2,10 +2,10 @@
  *								*
  * Copyright 2007, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -207,7 +207,6 @@ void finish_object_file(void)
         ehdr->e_machine = EM_AARCH64;
         ehdr->e_type = ET_REL;
         ehdr->e_version = EV_CURRENT;
-	/* xxxxxxx ehdr->e_shoff = ROUND_UP2(SIZEOF(Elf64_Ehdr), SECTION_ALIGN_BOUNDARY); */
 	ehdr->e_shoff = SIZEOF(Elf64_Ehdr);
         ehdr->e_flags = 0;
         if (NULL == (text_scn = elf_newscn(elf)))
@@ -298,7 +297,7 @@ void finish_object_file(void)
                 FPRINTF(stderr, "elf_newdata() failed for symtab section!\n");
                 assertpro(FALSE);
         }
-        symtab_data->d_align = 1;				/* xxxxxxx NATIVE_WSIZE */
+        symtab_data->d_align = 1;
         symtab_data->d_off  = 0LL;
         symtab_data->d_buf  = symEntries;
         symtab_data->d_type = ELF_T_REL;

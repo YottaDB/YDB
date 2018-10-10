@@ -2,10 +2,10 @@
  *								*
  * Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +40,6 @@ void	fmt_rd_raw_imm16(int size);
 void	fmt_rd_raw_imm16_inv(int size);
 void	fmt_rd_rm(int size);
 void	fmt_rd_rn(int size);
-/* xxxxxxx void	fmt_rd_rn_shift_imm12(int size); */
 void	fmt_rd_rn_rm(int size);
 void	fmt_rd_rn_rm_sxtw(void);
 void	fmt_reg(int reg, int size, int z_flag);
@@ -80,34 +79,6 @@ void	tab_to_column(int col);
 #define MAX_OFFSET 			0xffffffff
 #define EMIT_JMP_ADJUST_BRANCH_OFFSET
 
-
-#ifdef abcdefg
-/* xxxxxxx */
-
-#define GENERIC_OPCODE_LDA		1
-#define GENERIC_OPCODE_LOAD		2
-#define GENERIC_OPCODE_STORE		3
-
-#define IGEN_LOAD_ADDR_REG(reg)				(AARCH64_INS_ADD_REG_EXT | ((reg & AARCH64_MASK_REG) << AARCH64_SHIFT_RD))
-#define IGEN_LOAD_WORD_REG_4(reg)			(AARCH64_INS_LDR_W | (reg & AARCH64_MASK_REG) << AARCH64_SHIFT_RT)
-#define IGEN_LOAD_WORD_REG_8(reg)			(AARCH64_INS_LDR_X | (reg & AARCH64_MASK_REG) << AARCH64_SHIFT_RT)
-#define IGEN_STORE_WORD_REG_4(reg)			(AARCH64_INS_STR_W | (reg & AARCH64_MASK_REG) << AARCH64_SHIFT_RT)
-#define IGEN_STORE_WORD_REG_8(reg)			(AARCH64_INS_STR_X | (reg & AARCH64_MASK_REG) << AARCH64_SHIFT_RT)
-/* xxxxxxx */
-#endif
-
-#ifdef abcdef
-/* xxxxxxx */
-#define IGEN_GENERIC_REG(opcode, reg)												\
-	(GENERIC_OPCODE_LDA == opcode) ? IGEN_LOAD_ADDR_REG(reg)								\
-		: ((GENERIC_OPCODE_LOAD == opcode) && (4 == next_ptr_offset)) ? IGEN_LOAD_WORD_REG_4(reg)			\
-		: (GENERIC_OPCODE_LOAD == opcode) ? IGEN_LOAD_WORD_REG_8(reg)							\
-		: ((GENERIC_OPCODE_STORE == opcode) && (4 == next_ptr_offset)) ? IGEN_STORE_WORD_REG_4(reg)			\
-		: (GENERIC_OPCODE_STORE == opcode) ? IGEN_STORE_WORD_REG_8(reg)							\
-		: 0xffffffff
-/* xxxxxxx */
-#endif
-
 /* Define the macros for the instructions to be generated.. */
 
 #define GENERIC_OPCODE_BEQ		((uint4)AARCH64_INS_BEQ)
@@ -126,9 +97,6 @@ void	tab_to_column(int col);
 /* Branch has origin of +0 instructions. However, if the branch was nullified 
  * in an earlier shrink_trips, the origin is the current instruction itself
 */
-/* xxxxxxx #define EMIT_JMP_ADJUST_BRANCH_OFFSET	branch_offset = ((branch_offset != 0) ? branch_offset - 2 : -1) */
-/* xxxxxxx #define EMIT_JMP_ADJUST_BRANCH_OFFSET	branch_offset -= 2 */
-
 
 /* Define the macros for the instructions to be generated.. */
 
@@ -165,7 +133,6 @@ void	tab_to_column(int col);
 #define CODE_BUF_GEN_DNM_IMM6(ins, areg, breg, creg, imm, type)									\
 	(ins | areg << AARCH64_SHIFT_RD | breg << AARCH64_SHIFT_RN | creg << AARCH64_SHIFT_RM | (imm) << AARCH64_SHIFT_IMM6 | type << AARCH64_SHIFT_TYPE_SHIFT)
 
-/* experiment with no shift xxxxxxx LDR_? -- since it's no divide */
 #define CODE_BUF_GEN_TN0_IMM12(ins, areg, breg, imm)										\
 	(ins | areg << AARCH64_SHIFT_RN | breg << AARCH64_SHIFT_RN | (imm) << AARCH64_SHIFT_IMM12)
 
@@ -274,16 +241,6 @@ void	tab_to_column(int col);
 	}															\
 }
 
-/* xxxxxxx
-	code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, reg, imval & 0xffff);					\
-	if ((MAX_16BIT < imval) || (-1 * MAX_16BIT > imval))									\
-	{															\
-		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, reg, (imval & 0xffff0000) >> 16, 1);	\
-	}															\
-		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_INV, reg, (-1 * imval) - 1); -1 but not -53282 -- b2fa0421 want 129a0421			\
-		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, reg, imval); gives 65535 for -1					\
-xxxxxxx */
-
 #define GEN_LOAD_IMMED(reg, imval)												\
 {																\
 	if (0 <= imval)														\
@@ -305,14 +262,6 @@ xxxxxxx */
 		}														\
 	}															\
 }
-
-#if 0		/* xxxxxxx */
-#define GEN_CLEAR_WORD_EMIT(reg)												\
-{       															\
-	code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, reg, 0);						\
-	emit_trip(*(fst_opr + *inst++), TRUE, AARCH64_INS_STR_W, reg);								\
-}
-#endif
 
 #define GEN_CLEAR_WORD_EMIT(reg)	emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_STORE_ZERO, reg)
 #define GEN_LOAD_WORD_EMIT(reg)		emit_trip(*(fst_opr + *inst++), TRUE, GENERIC_OPCODE_LOAD, reg)
@@ -422,7 +371,6 @@ xxxxxxx */
 
 #define CALL_INST_SIZE (2 * INST_SIZE)
 
-/* xxxxxxx GEN_LOAD_WORD needs to return 64 bit */
 #define GEN_XFER_TBL_CALL(xfer)													\
 {																\
 	GEN_LOAD_WORD_8(GTM_REG_CODEGEN_TEMP, GTM_REG_XFER_TABLE, (xfer >> 3));							\
@@ -479,7 +427,6 @@ xxxxxxx */
 #define IGEN_STORE_WORD_REG_8(reg)			(AARCH64_INS_STR_X | (reg & AARCH64_MASK_REG) << AARCH64_SHIFT_RT)
 #define IGEN_COND_BRANCH_OFFSET(disp)			((disp & AARCH64_MASK_BRANCH_DISP) << AARCH64_SHIFT_BRANCH_DISP)
 #define IGEN_LOAD_LINKAGE(reg)				(AARCH64_INS_SUB | ((reg & AARCH64_MASK_REG) << AARCH64_SHIFT_RT))
-/* xxxxxxx #define IGEN_LOAD_NATIVE_REG(reg)			(AARCH64_INS_LDR_X | (reg & AARCH64_MASK_REG) << AARCH64_SHIFT_RT) */
 #define IGEN_LOAD_NATIVE_REG(reg)												\
 {																\
 	code_buf[code_idx] = ADJ_OFFSET_FOR_8(code_buf[code_idx]);								\
@@ -493,7 +440,6 @@ xxxxxxx */
 #define ADJ_OFFSET_FOR_4(instr)				(CLEAR_INST_OFFSET(instr) | ADJ_INST_OFFSET(instr, 2))
 #define ADJ_OFFSET_FOR_8(instr)				(CLEAR_INST_OFFSET(instr) | ADJ_INST_OFFSET(instr, 3))
 
-/* xxxxxxx #define IGEN_GENERIC_REG(opcode, reg)			(opcode | ((reg & AARCH64_MASK_REG) << AARCH64_SHIFT_RD)) */
 #define IGEN_GENERIC_REG(opcode, reg)												\
 {																\
 	switch(opcode)														\
@@ -511,7 +457,6 @@ xxxxxxx */
 				code_buf[code_idx] = ADJ_OFFSET_FOR_8(code_buf[code_idx]);					\
 				code_buf[code_idx++] |= IGEN_LOAD_WORD_REG_8(reg);						\
 			}													\
-			/* xxxxxxx next_ptr_offset = 8; */									\
 			break;													\
 		/* case GENERIC_OPCODE_STORE_ZERO:*/										\
 		case GENERIC_OPCODE_STORE:											\
@@ -524,7 +469,6 @@ xxxxxxx */
 				code_buf[code_idx] = ADJ_OFFSET_FOR_8(code_buf[code_idx]);					\
 				code_buf[code_idx++] |= IGEN_STORE_WORD_REG_8(reg);						\
 			}													\
-			/* xxxxxxx next_ptr_offset = 8; */									\
 			break;													\
 		default: /* which opcode ? */											\
 			assertpro(FALSE);											\
@@ -540,11 +484,6 @@ xxxxxxx */
 /* Multiples of 4 in the range +/-128MB (0xffffffc) */
 #define EMIT_JMP_SHORT_CODE_CHECK												\
 	((branch_offset >= -268435452) && (branch_offset <= 268435452))
-/* xxxxxxx
-	code_buf[code_idx++] = (branchop | ((GENERIC_OPCODE_BR == branchop)							\
-					? ((branch_offset & AARCH64_MASK_BRANCH_DISP) << AARCH64_SHIFT_BRANCH_DISP)		\
-					: ((branch_offset & AARCH64_MASK_BRANCH_DISP_COND) << AARCH64_SHIFT_BRANCH_DISP_COND)));\
-xxxxxxx */
 
 /* Emit the short jump */
 #define EMIT_JMP_SHORT_CODE_GEN													\
@@ -574,7 +513,6 @@ xxxxxxx */
  * opcode in generic_inst is changed to ldw/stw
  * On other platforms, it is defined to null
  */
-/* xxxxxxxx #define REVERT_GENERICINST_TO_WORD(inst) (inst & AARCH64_32_BIT_OP) | ((inst >> 1) & (AARCH64_MASK_IMM12 << AARCH64_SHIFT_IMM12)) */
 #define REVERT_GENERICINST_TO_WORD(inst)
 
 #endif

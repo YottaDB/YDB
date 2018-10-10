@@ -2,10 +2,10 @@
  *								*
  * Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -57,46 +57,7 @@
 #define AARCH64_INS_SUB_IMM	((unsigned)0xd1 << AARCH64_SHIFT_OP_24)
 #define AARCH64_INS_SUB_REG	((unsigned)0xcb << AARCH64_SHIFT_OP_24)
 #define AARCH64_INS_SUB_XREG	((unsigned)0xcb << AARCH64_SHIFT_OP_24) | (0x206000)
-#define AARCH64_INS_SUB		((unsigned)0x00 << AARCH64_SHIFT_OP_24)			/* xxxxxxx */
-
-
-/* xxxxxxx
-#define AARCH64_INS_TEQ		((unsigned)0xe13 << AARCH64_SHIFT_OP)
-#define AARCH64_INS_TST		((unsigned)0xe31 << AARCH64_SHIFT_OP)
-#define AARCH64_INS_ORRS		((unsigned)0xe19 << AARCH64_SHIFT_OP)
-#define AARCH64_INS_ANDS		((unsigned)0xe21 << AARCH64_SHIFT_OP)
-  xxxxxxx */
-
-/* xxxxxxx #define AARCH64_REG2IMM_BIT		((unsigned)0x02 << AARCH64_SHIFT_OP_24) */	/* Converts ADD/SUB register to ADD/SUB immediate */
-
-/* xxxxxxx
-#define AARCH64_INS_BIS		((unsigned)0xc << AARCH64_SHIFT_DP | AARCH64_COND_ALWAYS << AARCH64_SHIFT_COND)
-#define AARCH64_INS_BLBS		((unsigned)0x3c << AARCH64_SHIFT_OP)
-   xxxxxxx */
-
-#if 0		/* xxxxxxx */
-/* Branch to Subroutine */
-#define AARCH64_INS_BSR		((unsigned)0x34 << AARCH64_SHIFT_OP)
-/* Jump */
-#define	AARCH64_INS_JMP		((unsigned)0x1a << AARCH64_SHIFT_OP)
-
-#define	AARCH64_INS_JSR		((unsigned)0x1a << AARCH64_SHIFT_OP | 1 << AARCH64_SHIFT_BRANCH_FUNC)
-/* Load Sign-Extended Longword from Memory to Register */
-#define	AARCH64_INS_LDL		((unsigned)0x01 << AARCH64_SHIFT_OP)
-/* Load Quadword from Memory to Register */
-#define	AARCH64_INS_LDQ		((unsigned)0x29 << AARCH64_SHIFT_OP)
-#define	AARCH64_INS_RET		((unsigned)0x1a << AARCH64_SHIFT_OP | 2 << AARCH64_SHIFT_BRANCH_FUNC)
-/* Store Longword from Register to Memory */
-#define	AARCH64_INS_STL		((unsigned)0x2c << AARCH64_SHIFT_OP)
-/* Store Quadword from Register to Memory */
-#define	AARCH64_INS_STQ		((unsigned)0x2d << AARCH64_SHIFT_OP)
-/* Subtract Longword */
-#define	AARCH64_INS_SUBL		((unsigned)0x2 << AARCH64_SHIFT_DP)
-/* Subtract Quadword */
-#define	AARCH64_INS_SUBQ		((unsigned)0x10 << AARCH64_SHIFT_OP | 0x29 << AARCH64_SHIFT_FUNC)
-
-#define AARCH64_INS_DP_IMMED	((unsigned)0x1 << AARCH64_SHIFT_I_BIT)
-#endif			/* xxxxxxx */
+#define AARCH64_INS_SUB		((unsigned)0x00 << AARCH64_SHIFT_OP_24)
 
 #define AARCH64_SHIFT_TYPE_SHIFT	22
 #define AARCH64_SHIFT_TYPE_LSL		0
@@ -129,7 +90,7 @@
 #define AARCH64_SHIFT_BRANCH_DISP	0
 #define AARCH64_SHIFT_OPTION		13
 
-/*	Bit masks for instruction fields. xxxxxxx  */
+/*	Bit masks for instruction fields.	*/
 
 #define AARCH64_MASK_BRANCH_DISP	0x3ffffff
 #define AARCH64_MASK_BRANCH_DISP_COND	0x7ffff

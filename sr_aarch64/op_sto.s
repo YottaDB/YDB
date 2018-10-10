@@ -1,9 +1,9 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
-# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+# Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -32,7 +32,7 @@ ENTRY op_sto
 	stp	x29, x30, [sp, #-16]!
 	mov	x29, sp
 	CHKSTKALIGN					/* Verify stack alignment */
-	mov	x12, x0					/* Save x0 -- xxxxxxx but only needed if mv_if_notdefined can change x0 */
+	mov	x12, x0					/* Save x0 */
 	mv_if_notdefined x1, notdef
 nowdef:
 	mov	w15, #mval_byte_len

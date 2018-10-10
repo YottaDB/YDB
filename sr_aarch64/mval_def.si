@@ -2,10 +2,10 @@
 #								#
 # Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
-# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+# Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -88,7 +88,6 @@ top			=	16
 	mov	w15, #mval_m_str
 	add	w15, w15, #mval_m_nm
 	tst	w14, w15
-	/* xxxxxxx ands	w14, w14, w15 */
 	b.ne	1f
 	mov	x0, \reg
 	bl	underr
@@ -103,7 +102,6 @@ top			=	16
 	ldrh	w14, [\reg, #mval_w_mvtype]
 	mov	w15, #mval_m_str
 	add	w15, w15, #mval_m_nm
-	/* xxxxxxx ands	w14, w14, w15 */
 	tst	w14, w15
 	b.ne	1f
 	mov	x0, \reg
@@ -117,7 +115,6 @@ top			=	16
 # ---------------------------------------
 .macro	mv_force_str	reg
 	ldrh	w14, [\reg, #mval_w_mvtype]
-	/* xxxxxxx ands	w15, w14, #mval_m_str */
 	tst	w14, #mval_m_str
 	b.ne	1f
 	mov	x0, \reg
@@ -130,7 +127,6 @@ top			=	16
 # ---------------------------------------
 .macro	mv_force_num	reg
 	ldrh	w14, [\reg, #mval_w_mvtype]
-	/* xxxxxxx ands	w15, w14, #mval_m_nm */
 	tst	w14, #mval_m_nm
 	b.ne	1f
 	mov	x0, \reg
@@ -143,7 +139,6 @@ top			=	16
 # ---------------------------------------
 .macro	mv_force_str_if_num_approx	reg
 	ldrh	w14, [\reg, #mval_w_mvtype]
-	/* xxxxxxx ands	w15, w14, #mval_m_num_approx */
 	tst	w14, #mval_m_num_approx
 	b.eq	1f
 	mov	x0, \reg
@@ -167,7 +162,6 @@ top			=	16
 # ---------------------------------------
 .macro	mv_if_string	reg, label
 	ldrh	w14, [\reg, #mval_w_mvtype]
-	/* xxxxxxx ands	w15, w14, #mval_m_str */
 	tst	w14, #mval_m_str
 	b.ne	\label
 .endm
@@ -177,7 +171,6 @@ top			=	16
 # ---------------------------------------
 .macro	mv_if_number	reg, label
 	ldrh	w14, [\reg, #mval_w_mvtype]
-	/* xxxxxxx ands	w15, w14, #mval_m_nm */
 	tst	w14, #mval_m_nm
 	b.ne	\label
 .endm
@@ -187,7 +180,6 @@ top			=	16
 # ---------------------------------------
 .macro	mv_if_int	reg, label
 	ldrh	w14, [\reg, #mval_w_mvtype]
-	/* xxxxxxx ands	w15, w14, #mval_m_int_without_nm */
 	tst	w14, #mval_m_int_without_nm
 	b.ne	\label
 .endm
@@ -197,7 +189,6 @@ top			=	16
 # ---------------------------------------
 .macro	mv_if_notstring	reg, label
 	ldrh	w14, [\reg, #mval_w_mvtype]
-	/* xxxxxxx ands	w15, w14, #mval_m_str */
 	tst	w14, #mval_m_str
 	b.eq	\label
 .endm
@@ -207,7 +198,6 @@ top			=	16
 # ---------------------------------------
 .macro	mv_if_notnumber	reg, label
 	ldrh	w14, [\reg, #mval_w_mvtype]
-	/* xxxxxxx ands	w15, w14, #mval_m_nm */
 	tst	w14, #mval_m_nm
 	b.eq	\label
 .endm
@@ -217,7 +207,6 @@ top			=	16
 # ---------------------------------------
 .macro	mv_if_notint	reg, label
 	ldrh	w14, [\reg, #mval_w_mvtype]
-	/* xxxxxxx ands	w15, w14, #mval_m_int_without_nm */
 	tst	w14, #mval_m_int_without_nm
 	b.eq	\label
 .endm
@@ -229,7 +218,6 @@ top			=	16
 	ldrh	w14, [\reg, #mval_w_mvtype]
 	mov	w15, #mval_m_str
 	add	w15, w15, #mval_m_nm
-	/* xxxxxxx ands	w14, w14, w15 */
 	tst	w14, w15
 	b.ne	\label
 .endm
@@ -241,7 +229,6 @@ top			=	16
 	ldrh	w14, [\reg, #mval_w_mvtype]
 	mov	w15, #mval_m_str
 	add	w15, w15, #mval_m_nm
-	/* xxxxxxx ands	w14, w14, w15 */
 	tst	w14, w15
 	b.eq	\label
 .endm
@@ -251,10 +238,8 @@ top			=	16
 # -------------------------------------------------------------
 .macro	mv_if_canonical	reg, mainlabel, tmp_label1, tmp_label2
 	ldrh	w14, [\reg, #mval_w_mvtype]
-	/* xxxxxxx ands	w15, w14, #mval_m_nm */
 	tst	w14, #mval_m_nm
 	b.eq	1f
-	/* xxxxxxx ands	w15, w14, #mval_m_num_approx */
 	tst	w14, #mval_m_num_approx
 	b.ne	2f
 	b	\mainlabel

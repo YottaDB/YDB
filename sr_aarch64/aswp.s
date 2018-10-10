@@ -1,9 +1,9 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
-# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+# Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -33,13 +33,13 @@ RETRY_COUNT	=	1024
  */
 ENTRY aswp
 	mov	w13, #RETRY_COUNT
-	dmb	ish			/* xxxxxxx is ish the proper option */
+	dmb	ish
 retry:
 	ldxr	w10, [x0]
 	stlxr	w11, w1, [x0]
 	cmp	w11, #1
 	b.eq	store_failed
-	dmb	ish			/* xxxxxxx is ish the proper option */
+	dmb	ish
 	mov	w0, w10
 	ret
 store_failed:

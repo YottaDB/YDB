@@ -1,9 +1,9 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
-# Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+# Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -44,7 +44,7 @@ FRAME_SIZE	=  48
 ENTRY op_forloop
 	stp	x9, x29, [sp, #-16]!				/* x9 is to maintain 16 byte alignment */
 	mov	x29, sp
-	sub	sp, sp, #FRAME_SIZE				/* Stack remains 16 byte aligned xxxxxxx change to 40 - something goes weird */
+	sub	sp, sp, #FRAME_SIZE				/* Stack remains 16 byte aligned */
 	CHKSTKALIGN						/* Verify stack alignment */
 
 	ldr	x27, [x19]

@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
+ * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -96,25 +96,8 @@ void	emit_base_offset_load(int base, int offset)
 		case CGP_MACHINE:
 			assert(base >= 0  &&  base <= 31);		/* register is in correct range */
 			abs_offst = abs(offset);
-#if 0
 			if (MAX_12BIT >= abs_offst)
 			{
-				if (0 != offset)
-				{
-					code_buf[code_idx++] = CODE_BUF_GEN_DN_IMM12(((0 < offset)
-										      ? AARCH64_INS_ADD_IMM : AARCH64_INS_SUB_IMM),
-										     GTM_REG_CODEGEN_TEMP_1, base, offset);
-					code_buf[code_idx] = CODE_BUF_GEN_TN_IMM12(0, 0, GTM_REG_CODEGEN_TEMP_1, 0);
-				} else
-				{
-					code_buf[code_idx] = CODE_BUF_GEN_TN_IMM12(0, 0, base, 0);
-				}
-#endif
-			if (MAX_12BIT >= abs_offst)
-			{
-				/* Assume this will be an 4 byte operation. If it turns out to be 8, the IGEN_GENERIC_REG macro
-				   will adjust offset	xxxxxxx trying an experiment with no shift xxxxxxx
-				*/
 				code_buf[code_idx] = CODE_BUF_GEN_TN0_IMM12(0, 0, base, offset);
 			} else
 			{
@@ -154,10 +137,6 @@ void fmt_reg(int reg, int size, int z_flag)
 {
 	switch(reg)
 	{
-		/* case 29:	xxxxxxx */			/* fp */
-			/* *obpt++ = 'f';
-			*obpt++ = 'p';
-			break; xxxxxxx */
 		case 30:				/* lr */
 			*obpt++ = 'l';
 			*obpt++ = 'r';
@@ -295,17 +274,6 @@ void fmt_rd_rn_shift_immr(int size)
 	immed = GET_IMMR(ains);
 	obpt = i2asc(obpt, immed);
 }
-
-/* xxxxxxx
-void fmt_rd_rn_shift_imm12(int size)
-{
-	fmt_rd_rn(size);
-	*obpt++ = ',';
-	obpt++;
-	*obpt++ = '#';
-	obpt = i2asc(obpt, GET_IMM12(ains) * 8);
-}
-xxxxxxx */
 
 void fmt_rd_rn_imm12(int size)
 {
