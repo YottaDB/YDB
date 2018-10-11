@@ -291,8 +291,8 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		dest_blk_id = 2; /* we know that first block is bitmap and next one is directory tree root */
 	file_extended = cs_data->trans_hist.total_blks;
 	blk_size = cs_data->blk_size;
-	d_max_fill = (double)data_fill_factor * blk_size / 100.0 - cs_data->reserved_bytes;
-	i_max_fill = (double)index_fill_factor * blk_size / 100.0 - cs_data->reserved_bytes;
+	d_max_fill = (double)data_fill_factor * (blk_size - cs_data->reserved_bytes) / 100;
+	i_max_fill = (double)index_fill_factor * (blk_size - cs_data->reserved_bytes) / 100;
 	d_toler = (double) DATA_FILL_TOLERANCE * blk_size / 100.0;
 	i_toler = (double) INDEX_FILL_TOLERANCE * blk_size / 100.0;
 	blks_killed = blks_processed = blks_reused = lvls_reduced = blks_coalesced = blks_split = blks_swapped = 0;
@@ -345,8 +345,9 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 					}
 					level = pre_order_successor_level;
 				}
-				max_fill = (0 == level)? d_max_fill : i_max_fill;
-				toler = (0 == level)? d_toler:i_toler;
+				max_fill = (0 == level) ? d_max_fill : i_max_fill;
+				assert(0 <= max_fill);
+				toler = (0 == level)? d_toler : i_toler;
 				cur_blk_size =  ((blk_hdr_ptr_t)(gv_target->hist.h[level].buffaddr))->bsiz;
 				if (cur_blk_size > max_fill + toler && 0 == (reorg_op & NOSPLIT)) /* SPLIT BLOCK */
 				{
