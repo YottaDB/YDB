@@ -1004,7 +1004,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GETSOCKNAMERR", "Getting the socket name failed from getsockname(): (errno==!UL) !AD", 3 },
 	{ "INVYDBEXIT", "Inappropriate invocation of ydb_exit(). Calls to ydb_exit() cannot be made from external calls.", 0 },
 	{ "CIMAXPARAM", "Exceeded maximum number of parameters in the call-in table entry. An M routine cannot accept more than 32 parameters.", 0 },
-	{ "CITPNESTED", "Call-ins can not be used inside a TP transaction", 0 },
+	{ "UNUSEDMSG1171", "CITPNESTED nixed in r1.20 as part of #188", 0 },
 	{ "CIMAXLEVELS", "Too many nested Call-ins. Nested resources exhausted at level !UL.", 1 },
 	{ "JOBINTRRETHROW", "Job interrupt redelivered", 0 },
 	{ "STARFILE", "Star(*) argument cannot be specified with !AD", 2 },

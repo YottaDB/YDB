@@ -63,6 +63,7 @@
 #include "fork_init.h"
 #include "gtmio.h"
 #include "io.h"
+#include "getjobnum.h"		/* for SET_PROCESS_ID */
 
 GBLDEF	boolean_t		gtmrecv_fetchreysnc;
 GBLDEF	boolean_t		gtmrecv_logstats = FALSE;
@@ -406,7 +407,7 @@ int gtmrecv(void)
 	assert(!holds_sem[RECV][RECV_POOL_ACCESS_SEM]);
 	assert(holds_sem[RECV][RECV_SERV_OPTIONS_SEM]);
 	is_rcvr_server = TRUE;
-	process_id = getpid();
+	SET_PROCESS_ID;
 	OPERATOR_LOG_MSG;
 	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
 	 * Note that the initialization would already have been done by the parent receiver startup command but we need to

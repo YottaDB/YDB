@@ -1240,3 +1240,10 @@ GBLDEF	void_ptr_t	*dlopen_handle_array;	/* Array of handles returned from variou
 						 */
 GBLDEF	uint4		dlopen_handle_array_len_alloc, dlopen_handle_array_len_used;	/* Allocated and Used length of the array */
 
+#ifdef YDB_USE_POSIX_TIMERS
+GBLDEF	pid_t		posix_timer_thread_id;	/* The thread id that gets the SIGALRM signal for timer pops.
+						 * If 0, this is set to a non-zero value in "sys_settimer".
+						 * This is cleared by SET_PROCESS_ID macro (e.g. any time a "fork" occurs).
+						 */
+GBLDEF	boolean_t	posix_timer_created;
+#endif

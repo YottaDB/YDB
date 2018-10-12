@@ -66,6 +66,7 @@
 #include "fork_init.h"
 #include "gtmio.h"
 #include "io.h"
+#include "getjobnum.h"		/* for SET_PROCESS_ID */
 #ifdef GTM_TLS
 #include "gtm_repl.h"
 #endif
@@ -319,7 +320,7 @@ int gtmsource()
 	is_src_server = TRUE;
 	TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_ERRORS; /* source server should never switch journal files even on errors */
 	OPERATOR_LOG_MSG;
-	process_id = getpid();
+	SET_PROCESS_ID;
 	/* Initialize mutex socket, memory semaphore etc. before any "grab_lock" is done by this process on the journal pool.
 	 * Note that the initialization would already have been done by the parent receiver startup command but we need to
 	 * redo the initialization with the child process id.

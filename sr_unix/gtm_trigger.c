@@ -143,7 +143,6 @@ error_def(ERR_TPRETRY);
 error_def(ERR_TRIGCOMPFAIL);
 error_def(ERR_TRIGNAMEUNIQ);
 error_def(ERR_TRIGTLVLCHNG);
-error_def(ERR_CITPNESTED);
 
 /* Macro to re-initialize a symval block that was on a previously-used free chain */
 #define REINIT_SYMVAL_BLK(svb, prev)									\

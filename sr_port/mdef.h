@@ -188,9 +188,11 @@ typedef UINTPTR_T uintszofptr_t;
 #ifdef __linux__
 #	define LINUX_ONLY(X) X
 #	define NON_LINUX_ONLY(X)
+#	define YDB_USE_POSIX_TIMERS
 #else
 #	define LINUX_ONLY(X)
 #	define NON_LINUX_ONLY(X) X
+#	undef  YDB_USE_POSIX_TIMERS
 #endif
 
 #ifdef __MVS__

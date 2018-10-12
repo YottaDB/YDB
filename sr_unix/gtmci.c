@@ -123,7 +123,6 @@ error_def(ERR_CALLINAFTERXIT);
 error_def(ERR_CIMAXLEVELS);
 error_def(ERR_CINOENTRY);
 error_def(ERR_CIRCALLNAME);
-error_def(ERR_CITPNESTED);
 error_def(ERR_DISTPATHMAX);
 error_def(ERR_FMLLSTMISSING);
 error_def(ERR_YDBDISTUNDEF);

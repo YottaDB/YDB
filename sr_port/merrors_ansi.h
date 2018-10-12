@@ -1002,7 +1002,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GETSOCKNAMERR */
 	   0,	/* INVYDBEXIT */
 	   0,	/* CIMAXPARAM */
-	   0,	/* CITPNESTED */
+	   0,	/* UNUSEDMSG1171 */
 	   0,	/* CIMAXLEVELS */
 	   0,	/* JOBINTRRETHROW */
 	   0,	/* STARFILE */

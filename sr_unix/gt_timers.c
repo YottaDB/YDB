@@ -57,20 +57,15 @@
 #include <errno.h>
 #include <stddef.h>
 #include <stdarg.h>
+#ifdef YDB_USE_POSIX_TIMERS
+#include <sys/syscall.h>	/* for "syscall" */
+#endif
 
-#if (defined(__ia64) && defined(__linux__)) || defined(__MVS__)
-# include "gtm_unistd.h"
-#endif /* __ia64 && __linux__ or __MVS__ */
 #include "gt_timer.h"
 #include "wake_alarm.h"
 #ifdef DEBUG
 # include "wbox_test_init.h"
 # include "io.h"
-#endif
-#if	defined(mips) && !defined(_SYSTYPE_SVR4)
-# include <bsd/sys/time.h>
-#else
-# include <sys/time.h>
 #endif
 #ifndef __MVS__
 # include <sys/param.h>
@@ -83,6 +78,7 @@
 #include "error.h"
 #include "gtm_multi_thread.h"
 #include "gtmxc_types.h"
+#include "getjobnum.h"
 
 #ifdef ITIMER_REAL
 # define BSD_TIMER
@@ -107,33 +103,37 @@ int4	time();
 	safe_handlers[safe_handlers_cnt++] = HNDLR;						\
 }
 
-#ifdef BSD_TIMER
-#  define REPORT_SETITIMER_ERROR(TIMER_TYPE, SYS_TIMER, FATAL, ERRNO)				\
-{												\
-	char s[512];										\
-												\
-	SNPRINTF(s, 512, "Timer: %s; timer_active: %d; "					\
-		"sys_timer.it_value: [tv_sec: %ld; tv_usec: %ld]; "				\
-		"sys_timer.it_interval: [tv_sec: %ld; tv_usec: %ld]",				\
-		TIMER_TYPE, timer_active,							\
-		SYS_TIMER.it_value.tv_sec, SYS_TIMER.it_value.tv_usec,				\
-		SYS_TIMER.it_interval.tv_sec, SYS_TIMER.it_interval.tv_usec);			\
-	if (FATAL)										\
-	{											\
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7)						\
-			ERR_SETITIMERFAILED, 1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));		\
-		in_setitimer_error = TRUE;							\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SETITIMERFAILED, 1, ERRNO);	\
-	} else											\
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7)	MAKE_MSG_WARNING(ERR_SETITIMERFAILED),	\
-			1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));					\
-}
-
-STATICDEF struct itimerval	sys_timer, old_sys_timer;
-STATICDEF ABS_TIME		sys_timer_at;			/* Absolute time associated with sys_timer */
-STATICDEF boolean_t		in_setitimer_error;
-#else
+#ifndef BSD_TIMER
 #  error Platform does not support BSD_TIMER which this module relies on
+#endif
+
+#ifdef YDB_USE_POSIX_TIMERS
+	STATICDEF struct itimerspec	sys_timer, old_sys_timer;
+	STATICDEF ABS_TIME		sys_timer_at;			/* Absolute time associated with sys_timer */
+#else
+#	define REPORT_SETITIMER_ERROR(TIMER_TYPE, SYS_TIMER, FATAL, ERRNO)				\
+	MBSTART {											\
+		char s[512];										\
+													\
+		SNPRINTF(s, 512, "Timer: %s; timer_active: %d; "					\
+			"sys_timer.it_value: [tv_sec: %ld; tv_usec: %ld]; "				\
+			"sys_timer.it_interval: [tv_sec: %ld; tv_usec: %ld]",				\
+			TIMER_TYPE, timer_active,							\
+			SYS_TIMER.it_value.tv_sec, SYS_TIMER.it_value.tv_usec,				\
+			SYS_TIMER.it_interval.tv_sec, SYS_TIMER.it_interval.tv_usec);			\
+		if (FATAL)										\
+		{											\
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7)						\
+				ERR_SETITIMERFAILED, 1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));		\
+			in_setitimer_error = TRUE;							\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SETITIMERFAILED, 1, ERRNO);	\
+		} else											\
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(7)	MAKE_MSG_WARNING(ERR_SETITIMERFAILED),	\
+				1, ERRNO, ERR_TEXT, 2, LEN_AND_STR(s));					\
+	} MBEND
+	STATICDEF struct itimerval	sys_timer, old_sys_timer;
+	STATICDEF ABS_TIME		sys_timer_at;			/* Absolute time associated with sys_timer */
+	STATICDEF boolean_t		in_setitimer_error;
 #endif
 
 #define DUMMY_SIG_NUM		0		/* following can be used to see why timer_handler was called */
@@ -167,6 +167,10 @@ STATICDEF int		safe_handlers_cnt;
 STATICDEF boolean_t	stolen_timer = FALSE;	/* only complain once, used in check_for_timer_pops() */
 STATICDEF char 		*whenstolen[] = {"check_for_timer_pops", "check_for_timer_pops first time"}; /* for check_for_timer_pops */
 
+#ifdef YDB_USE_POSIX_TIMERS
+STATICDEF timer_t	posix_timer_id;
+#endif
+
 #ifdef DEBUG
 STATICDEF int		trc_timerpop_idx;
 STATICDEF GT_TIMER	trc_timerpop_array[MAX_TIMER_POP_TRACE_SZ];
@@ -199,6 +203,10 @@ GBLREF	void		(*jnl_file_close_timer_ptr)(void);	/* Initialized only in gtm_start
 GBLREF	int4		error_condition;
 GBLREF	int4		outofband;
 GBLREF	int		process_exiting;
+#ifdef YDB_USE_POSIX_TIMERS
+GBLREF	pid_t		posix_timer_thread_id;
+GBLREF	boolean_t	posix_timer_created;
+#endif
 #ifdef DEBUG
 GBLREF	boolean_t	in_nondeferrable_signal_handler;
 GBLREF	boolean_t	gtm_jvm_process;
@@ -559,6 +567,51 @@ void clear_timers(void)
  */
 STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 {
+	struct sigevent	sevp;
+	int		save_errno;
+
+#	ifdef YDB_USE_POSIX_TIMERS
+	if (!posix_timer_created)
+	{	/* No posix timer has yet been created */
+		sevp.sigev_notify = SIGEV_THREAD_ID;
+		if (0 == posix_timer_thread_id)
+			posix_timer_thread_id = syscall(SYS_gettid);
+		/* Note: The man pages of "timer_create" indicate we need to fill "sevp.sigev_notify_thread_id" with the thread id
+		 * but that field does not seem to be defined at least in all linux versions we currently have with the current
+		 * compilation flags we use so we define it explicitly to "sevp._sigev_un._tid" which then works as desired.
+		 */
+#		ifndef sigev_notify_thread_id
+#		define sigev_notify_thread_id _sigev_un._tid
+#		endif
+		sevp.sigev_notify_thread_id = posix_timer_thread_id;
+		sevp.sigev_signo = SIGALRM;
+		if (timer_create(CLOCK_MONOTONIC, &sevp, &posix_timer_id))
+		{
+			save_errno = errno;
+			assert(FALSE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7)
+					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_create()"), CALLFROM, save_errno);
+		}
+		posix_timer_created = TRUE;
+	}
+	assert(0 <= time_to_expir->tv_sec);
+	assert(0 <= time_to_expir->tv_nsec);
+	assert(NANOSECS_IN_SEC > time_to_expir->tv_nsec);
+	sys_timer.it_value.tv_sec = time_to_expir->tv_sec;
+	sys_timer.it_value.tv_nsec = time_to_expir->tv_nsec;
+	assert(sys_timer.it_value.tv_sec || sys_timer.it_value.tv_nsec);
+	sys_timer.it_interval.tv_sec = sys_timer.it_interval.tv_nsec = 0;
+	if ((-1 == timer_settime(posix_timer_id, 0, &sys_timer, &old_sys_timer)) || WBTEST_ENABLED(WBTEST_SETITIMER_ERROR))
+	{
+		save_errno = errno;
+		assert(WBTEST_ENABLED(WBTEST_SETITIMER_ERROR));
+		WBTEST_ONLY(WBTEST_SETITIMER_ERROR,
+			save_errno = EINVAL;
+		);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
+					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_settime()"), CALLFROM, save_errno);
+	}
+#	else
 	if (in_setitimer_error)
 		return;
 	sys_timer.it_value.tv_sec = time_to_expir->tv_sec;
@@ -579,6 +632,7 @@ STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 	{
 		REPORT_SETITIMER_ERROR("ITIMER_REAL", sys_timer, TRUE, errno);
 	}
+#	endif
 	timer_active = TRUE;
 }
 
@@ -994,9 +1048,14 @@ STATICFNDEF void remove_timer(TID tid)
  */
 void sys_canc_timer()
 {
+	int	save_errno;
+#	ifndef YDB_USE_POSIX_TIMERS
 	struct itimerval zero;
 
 	memset(&zero, 0, SIZEOF(struct itimerval));
+#	else
+	assert(posix_timer_created);
+#	endif
 	assert(timer_active);
 	/* In case of canceling the system timer, we do not care if we succeed. Consider the two scenarios:
 	 *   1) The process is exiting, so all timers must have been removed anyway, and regardless of whether the system
@@ -1006,10 +1065,18 @@ void sys_canc_timer()
 	 *      database access has been established) would fail; if no other timer is scheduled, then the canceled entry
 	 *      must have been removed off the queue anyway, so no processing would occur on a pop.
 	 */
-	if (-1 == setitimer(ITIMER_REAL, &zero, &old_sys_timer))
+#	ifdef YDB_USE_POSIX_TIMERS
+	if (-1 == timer_delete(posix_timer_id))
 	{
-		REPORT_SETITIMER_ERROR("ITIMER_REAL", zero, FALSE, errno);
+		save_errno = errno;
+		assert(FALSE);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_delete()"), CALLFROM, save_errno);
 	}
+	CLEAR_POSIX_TIMER_FIELDS_IF_APPLICABLE;
+#	else
+	if (-1 == setitimer(ITIMER_REAL, &zero, &old_sys_timer))
+		REPORT_SETITIMER_ERROR("ITIMER_REAL", zero, FALSE, errno);
+#	endif
 	timer_active = FALSE;		/* no timer is active now */
 }
 

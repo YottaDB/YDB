@@ -19490,10 +19490,7 @@
    Rules to Follow in Call-Ins
 
     1. External calls must not be fenced with TSTART/TCOMMIT if the external
-       routine calls back into mumps using call-in mechanism. YottaDB reports
-       the error YDB-E-CITPNESTED if nested call-ins are invoked within a TP
-       fence since YottaDB currently does not handle TP support across multiple
-       call-in invocations.
+       routine calls back into mumps using call-in mechanism.
     2. The external application should never call exit() unless it has called
        ydb_exit() previously. YottaDB internally installs an exit handler that
        should never be bypassed.

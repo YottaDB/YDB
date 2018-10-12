@@ -61,6 +61,7 @@
 #include "fork_init.h"
 #include "wbox_test_init.h"
 #include "ydb_getenv.h"
+#include "getjobnum.h"		/* for SET_PROCESS_ID */
 
 GBLREF struct sockaddr_un       gtmsecshr_sock_name;
 GBLREF key_t                    gtmsecshr_key;
@@ -444,7 +445,7 @@ int create_server(void)
 	FORK(child_pid);
 	if (0 == child_pid)
 	{
-		process_id = getpid();
+		SET_PROCESS_ID;
 		/* Do exec using gtmsecshr_path, which was initialize in file check code - send_mesg2gtmsecshr */
 		if (WBTEST_ENABLED(WBTEST_BADEXEC_SECSHR_PROCESS))
 			STRCPY(gtmsecshr_path, "");
