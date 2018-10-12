@@ -151,6 +151,9 @@ boolean_t mur_close_files(void)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jb;
 	uint4			jnl_status;
+	jnlpool_ctl_ptr_t	jpl;
+	jpl_phase2_in_prog_t	*lastJplCmt;
+	int			index2;
 #	ifdef DEBUG
 	int		semval;
 #	endif
@@ -677,7 +680,8 @@ boolean_t mur_close_files(void)
 					 * (a) ONLINE ROLLBACK
 					 * (b) Regular ROLLBACK with Anticipatory Freeze scheme
 					 */
-					if (jnlpool->jnlpool_ctl && !(was_crit = csa->now_crit))	/* note: assignment */
+					jpl = jnlpool->jnlpool_ctl;
+					if ((NULL != jpl) && !(was_crit = csa->now_crit))	/* note: assignment */
 					{
 						assert(!jgbl.onlnrlbk);
 						assert(NULL != jnlpool);
@@ -687,32 +691,41 @@ boolean_t mur_close_files(void)
 						grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 					}
 					last_histinfo_seqno = repl_inst_histinfo_truncate(murgbl.consist_jnl_seqno);
-					if ((NULL != jnlpool->jnlpool_ctl) && !was_crit)
+					if ((NULL != jpl) && !was_crit)
 						rel_lock(jnlpool->jnlpool_dummy_reg);
 					/* The above also updates "repl_inst_filehdr->jnl_seqno". If regular rollback, it also
 					 * updates "repl_inst_filehdr->crash" to FALSE. For online rollback, we have to update
 					 * the crash field ONLY if there is NO journal pool and that is done below.
 					 */
-					if ((NULL != jnlpool->jnlpool_ctl) && jgbl.onlnrlbk)
+					if ((NULL != jpl) && jgbl.onlnrlbk)
 					{	/* journal pool still exists and some backward and forward processing happened. More
 						 * importantly, the database was taken to a prior logical state. Refresh the journal
 						 * pool fields to reflect the new state.
 						 */
 						assert(csa->now_crit && csa->hold_onto_crit);
-						jnlpool->jnlpool_ctl->last_histinfo_seqno = last_histinfo_seqno;
-						jnlpool->jnlpool_ctl->jnl_seqno = murgbl.consist_jnl_seqno;
-						jnlpool->jnlpool_ctl->start_jnl_seqno = murgbl.consist_jnl_seqno;
-						jnlpool->jnlpool_ctl->rsrv_write_addr = jnlpool->jnlpool_ctl->write_addr = 0;
-						jnlpool->jnlpool_ctl->rsrv_write_addr = 0;
-						assert(jnlpool->jnlpool_ctl->phase2_commit_index1
-							== jnlpool->jnlpool_ctl->phase2_commit_index2);
-						jnlpool->jnlpool_ctl->lastwrite_len = 0;
-						jnlpool->jnlpool_ctl->max_zqgblmod_seqno = max_zqgblmod_seqno;
+						jpl->last_histinfo_seqno = last_histinfo_seqno;
+						jpl->jnl_seqno = murgbl.consist_jnl_seqno;
+						jpl->start_jnl_seqno = murgbl.consist_jnl_seqno;
+						jpl->rsrv_write_addr = jpl->write_addr = 0;
+						jpl->lastwrite_len = 0;
+						jpl->max_zqgblmod_seqno = max_zqgblmod_seqno;
+						assert(jpl->phase2_commit_index1 == jpl->phase2_commit_index2);
+						/* The below few zero-initializations of lastJplCmt are needed by "mutex_salvage"
+						 * (see "CMT02 < killed <= CMT03" comment there) to ensure that if we get killed
+						 * before the "rel_lock" later below, "mutex_salvage" will do a no-op because of
+						 * the 0 values in lastJplCmt.
+						 */
+						index2 = jpl->phase2_commit_index2;
+						DECR_PHASE2_COMMIT_INDEX(index2, JPL_PHASE2_COMMIT_ARRAY_SIZE);
+						lastJplCmt = &jpl->phase2_commit_array[index2];
+						lastJplCmt->jnl_seqno = 0;
+						lastJplCmt->start_write_addr = 0;
+						lastJplCmt->tot_jrec_len = 0;
 						/* Keep strm_seqno in journal pool in sync with the one in instance file header */
-						assert(SIZEOF(jnlpool->jnlpool_ctl->strm_seqno) == SIZEOF(inst_hdr->strm_seqno));
-						memcpy(jnlpool->jnlpool_ctl->strm_seqno, inst_hdr->strm_seqno,
+						assert(SIZEOF(jpl->strm_seqno) == SIZEOF(inst_hdr->strm_seqno));
+						memcpy(jpl->strm_seqno, inst_hdr->strm_seqno,
 										MAX_SUPPL_STRMS * SIZEOF(seq_num));
-						if (!jnlpool->jnlpool_ctl->upd_disabled)
+						if (!jpl->upd_disabled)
 						{	/* Simulate a fresh instance startup by writing a new history record with
 							 * the rollback'ed sequence number. This is required as otherwise the source
 							 * server startup will NOT realize that receiver server needs to rollback or
