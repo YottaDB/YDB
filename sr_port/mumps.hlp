@@ -10659,7 +10659,7 @@
    Example:
 
    YDB>job ^Somejob
-   YDB>set ret=$&gtmposix.signalval("SIGUSR1",.sigusr1) zwrite
+   YDB>set ret=$&ydbposix.signalval("SIGUSR1",.sigusr1) zwrite
    ret=0
    sigusr1=10
    YDB>write $zsigproc($zjob,sigusr1)
