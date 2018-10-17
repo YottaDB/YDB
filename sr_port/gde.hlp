@@ -1457,9 +1457,10 @@
    subscripts.
 
    If NOSTDNULLCOLL is specified, null subscripts collate between numeric and
-   string subscripts. YottaDB strongly recommends that you use STDNULL and
-   against using this non-standard null collation, which is the default for
-   historical reasons.
+   string subscripts.
+
+   By default, GDE uses STDNULLCOLL.  YottaDB strongly recommends that you
+   use STDNULLCOLL.
 
    The following table summarizes GDE region qualifiers. It provides their
    abbreviations, defaults (as provided by YottaDB), and allowable minimum and
@@ -2155,7 +2156,7 @@
    |-N[ULL_SUBSCRIPTS]=[ALWAYS|NEVER|EXISTING]  |NEVER  |-      |-                     |-    |X    |-    |
    |                                            |or ****|       |                      |     |     |     |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
-   |-[NO]STDNULLCOLL[=TRUE|FALSE]               |FALSE  |-      |-                     |-    |X    |-    |
+   |-[NO]STDNULLCOLL                            |TRUE   |-      |-                     |-    |X    |-    |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
    |-R[ECORD_SIZE]=size (bytes)                 |256    |7      |1,048,576             |-    |X    |-    |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|

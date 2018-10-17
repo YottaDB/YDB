@@ -3,6 +3,9 @@
 ; Copyright (c) 2006-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -336,7 +339,7 @@ region:
 	i 'v44&'v30 s regs(s,"STDNULLCOLL")=$$bin2num($ze(rec,rel))
 	e  d
 	. i $ze(rec,rel)'=$tr($j("",1)," ",ZERO) zm gdeerr("INPINTEG")					; 1 chars
-	. s regs(s,"STDNULLCOLL")=0
+	. s regs(s,"STDNULLCOLL")=1
 	s rel=rel+1
 	i (reghasv600fields=TRUE)  d
 	. s regs(s,"INST_FREEZE_ON_ERROR")=$$bin2num($ze(rec,rel)),rel=rel+1
@@ -502,7 +505,7 @@ cretmps:
 	s tmpreg("QDBRUNDOWN")=0
 	s tmpreg("RECORD_SIZE")=256
 	s tmpreg("STATS")=1
-	s tmpreg("STDNULLCOLL")=0
+	s tmpreg("STDNULLCOLL")=1
 	s tmpreg("SYNC_IO")=0
 	s tmpreg("YIELD_LIMIT")=8
 	n tmpsegcommon
