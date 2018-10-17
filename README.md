@@ -24,7 +24,7 @@ Install development libraries
 
 ```sh
    Ubuntu Linux OR Raspbian Linux OR Beagleboard Debian
-   sudo aptitude install cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev
+   sudo apt-get install cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev
 
    Arch Linux
    sudo pacman -S cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,gpgme,icu,ncurses,openssl,zlib}
@@ -38,10 +38,10 @@ If CMake issues a NOTFOUND error, please see the FAQ below.
 
 ### Building from source tarball
 
-The YottaDB source tarball extracts to a directory with the version number in the name, i.e. ```yottadb_r123```
+The YottaDB source tarball extracts to a directory with the version number in the name, e.g. ```yottadb_r123```
 
 ```sh
- $ tar xfz yottadb_r123_src.tar.gz
+ $ tar xzf yottadb_r123_src.tar.gz
  $ cd yottadb_r123_src
 ```
 
@@ -83,7 +83,7 @@ To contribute or help with further development, [fork the repository](https://do
 ### Installing
 
 Now you are ready to install YottaDB. The default installation path is ```/usr/local/lib/yottadb/r123```
-but can be controlled using the --installdir option. Run ```./ydbinstall --help``` for a list of options.
+but can be controlled using the ```--installdir``` option. Run ```./ydbinstall --help``` for a list of options.
 
 ```sh
  $ sudo ./ydbinstall
