@@ -80,9 +80,6 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
 	if (YDB_MAX_SUBS < subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
-	if (NULL == ret_value)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-					LEN_AND_LIT("NULL ret_value"), LEN_AND_LIT("ydb_incr_s()"));
 	if ((NULL == increment) || !increment->len_used)
 		increment_mval = literal_one;
 	else
@@ -155,7 +152,10 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 		default:
 			assertpro(FALSE);
 	}
-	SET_YDB_BUFF_T_FROM_MVAL(ret_value, ret_mv, "NULL ret_value->buf_addr", "ydb_incr_s()"); /* Copy value to return buffer */
+	if (NULL != ret_value)
+	{	/* Copy value to return buffer */
+		SET_YDB_BUFF_T_FROM_MVAL(ret_value, ret_mv, "NULL ret_value->buf_addr", "ydb_incr_s()");
+	}
 	TREF(sapi_mstrs_for_gc_indx) = 0; /* mstrs in this array (added by RECORD_MSTR_FOR_GC) no longer need to be protected */
 	LIBYOTTADB_DONE;
 	REVERT;
