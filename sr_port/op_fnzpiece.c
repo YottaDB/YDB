@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -16,6 +19,10 @@
 #include "fnpc.h"
 
 #include "gtm_utf8.h"
+
+#ifdef DEBUG
+GBLREF	boolean_t	gtm_utf8_mode;
+#endif
 
 /* --------------------------------------------------------------------
  * NOTE: This module is a near copy of sr_unix/op_fnpiece.c differing
@@ -46,12 +53,10 @@ void op_fnzpiece(mval *src, mval *del, int first, int last, mval *dst)
 	char		*match_start;
 	int		match_res;
 	delimfmt	unichar;
-
 	DCL_THREADGBL_ACCESS;
+
 	SETUP_THREADGBL_ACCESS;
-
-	assert(!TREF(compile_time) || valid_utf_string(&src->str));
-
+	assert(!TREF(compile_time) || !gtm_utf8_mode || valid_utf_string(&src->str));
 	if (--first < 0)
 		first = 0;
 	if ((piece_cnt = last - first) < 1)
