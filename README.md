@@ -78,7 +78,7 @@ You may want to clone the YottaDB repository for access to the latest code.
    git clone git@gitlab.com:YottaDB/DB/YDB.git
 ```
 
-To contribute or help with further development, [fork the repository](https://help.github.com/articles/fork-a-repo/), clone your fork to a local copy and begin contributing!
+To contribute or help with further development, [fork the repository](https://docs.gitlab.com/ee/gitlab-basics/fork-project.html), clone your fork to a local copy and begin contributing!
 
 ### Installing
 
