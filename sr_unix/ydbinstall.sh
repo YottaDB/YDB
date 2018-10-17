@@ -23,9 +23,9 @@
 #
 # This script automates the installation of YottaDB as much as possible,
 # to the extent of attempting to download the distribution file.
-# Current limitation is GNU/Linux on x86 (32- & 64-bit) architectures
-# and root installation, but it is intended to relax this in the future.
-
+#
+# Note: This needs to be run as root.
+#
 # NOTE: This script requires the GNU wget program to download
 # distribution files that are not on the local file system.
 
@@ -41,7 +41,12 @@ check_if_util_exists()
 utillist="date id grep uname mktemp cut tr dirname chmod rm mkdir cat wget sed sort head basename ln gzip tar xargs sh cp"
 # Check all utilities that configure.gtc (which ydbinstall.sh calls) will additionally use and ensure they are present.
 # If not error out at beginning instead of erroring out midway during the install.
-utillist="$utillist ps file wc touch chown chgrp groups getconf awk expr locale install cc ld strip"
+utillist="$utillist ps file wc touch chown chgrp groups getconf awk expr locale install ld strip"
+arch=`uname -m`
+if [ "armv6l" = "$arch" -o "armv7l" = "$arch" ] ; then
+	# ARM platform requires cc (in configure.gtc) to use as the system linker (ld does not work yet)
+	utillist="$utillist cc"
+fi
 for util in $utillist
 do
 	check_if_util_exists $util
