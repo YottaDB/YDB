@@ -753,8 +753,10 @@ STATICFNDEF void timer_handler(int why)
 #	ifdef DEBUG
 	if (safe_for_timer_pop)
 		in_nondeferrable_signal_handler = IN_TIMER_HANDLER;
-	/* Allow a base 50 seconds of lateness for safe timers */
-	late_time.tv_sec = 50;
+	/* Allow a base 100 seconds of lateness for safe timers. Note that this used to be 50 seconds before but in loaded
+	 * systems we have seen the timer pop getting delayed by as much as 75 seconds. So bumped it to 100 seconds instead.
+	 */
+	late_time.tv_sec = 100;
 	late_time.tv_nsec = 0;
 #	endif
 	while (tpop)					/* fire all handlers that expired */
