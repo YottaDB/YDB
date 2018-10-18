@@ -70,6 +70,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	struct sockaddr		localhost_sa, *localhost_sa_ptr;
 	mval			def_trans;
 	int			errcode;
+	boolean_t		donot_short_circuit;
 
 	pblk->fnb = 0;
 	ai_ptr = localhost_ai_ptr = temp_ai_ptr = NULL;
@@ -112,6 +113,24 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 		if (pblk->fop & F_PARNODE)
 		{	/* What we have could be a nodename */
 			assert(pblk->fop & F_SYNTAXO);
+			/* A file specification could be any of the the following forms
+			 *	<filepath>
+			 *	<hostname>:<filepath>
+			 *	@<hostname>:<filepath>
+			 * where <hostname> is a host name that does not contain either '@' or ':'.
+			 * In case '@' is not specified, we will check <hostname> to see if it is a local host
+			 * and if so short-circuit the remote access and not go through GTCM GNP.
+			 * In case '@' is specified, we will go through GTCM GNP even if it is a local host (#191).
+			 */
+			if ('@' == *node)
+			{
+				donot_short_circuit = TRUE;
+				/* Now that we have seen the '@', remove it from the nodename */
+				ptr++;
+				node = base = trans.addr = ptr;
+				trans.len--;
+			} else
+				donot_short_circuit = FALSE;
 			while (node < top)
 			{
 				ch = *node++;
@@ -125,75 +144,81 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 			}
 			if (node < top)
 			{
+				assert(':' == ch);
 				hasnode = TRUE;
-				ptr = base = node;				/* Update pointers past node name */
+				base = node;				/* Update pointers past node name */
 				/* See if the desired (query) node is the local node */
 				node_name_len = (int)(node - trans.addr);	/* Scanned node including ':' */
-				query_node_len = node_name_len - 1;		/* Pure name length, no ':' on end */
-				assert(MAX_HOST_NAME_LEN >= query_node_len);
-				assert(0 < query_node_len);
-				assert(':' == *(trans.addr + query_node_len));
-				memcpy(query_node_name, trans.addr, query_node_len);
-				query_node_name[query_node_len] = 0;
-				localhost_sa_ptr = NULL;	/* Null value needed if not find query node (remote default) */
-				CLIENT_HINTS(hints);
-				errcode = getaddrinfo(query_node_name, NULL, &hints, &ai_ptr);
-				if (0 == errcode)
+				if (!donot_short_circuit)
 				{
-					memcpy((sockaddr_ptr)&query_sas, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
+					query_node_len = node_name_len - 1;		/* Pure name length, no ':' on end */
+					assert(MAX_HOST_NAME_LEN >= query_node_len);
+					assert(0 < query_node_len);
+					assert(':' == *(trans.addr + query_node_len));
+					memcpy(query_node_name, trans.addr, query_node_len);
+					query_node_name[query_node_len] = 0;
+					localhost_sa_ptr = NULL; /* Null value needed if not find query node (remote default) */
 					CLIENT_HINTS(hints);
-					if (0 == (errcode = getaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr))
-						&& (0 == memcmp(localhost_ai_ptr->ai_addr, (sockaddr_ptr)&query_sas,
-											localhost_ai_ptr->ai_addrlen)))
+					errcode = getaddrinfo(query_node_name, NULL, &hints, &ai_ptr);
+					if (0 == errcode)
 					{
-						localhost_sa_ptr = localhost_ai_ptr->ai_addr;
-					}
-					FREEADDRINFO(localhost_ai_ptr);
-					if (!localhost_sa_ptr)
-					{	/* Have not yet established this is not a local node -- check further */
-						GETHOSTNAME(local_node_name, MAX_HOST_NAME_LEN, status);
-						if (-1 == status)
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-									LEN_AND_LIT("gethostname"), CALLFROM, errno);
+						memcpy((sockaddr_ptr)&query_sas, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
 						CLIENT_HINTS(hints);
-						if (0 != (errcode = getaddrinfo(local_node_name, NULL, &hints, &localhost_ai_ptr)))
-							localhost_ai_ptr = NULL;	/* Empty address list */
-						for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
-						     temp_ai_ptr = temp_ai_ptr->ai_next)
+						if (0 == (errcode = getaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr))
+							&& (0 == memcmp(localhost_ai_ptr->ai_addr, (sockaddr_ptr)&query_sas,
+												localhost_ai_ptr->ai_addrlen)))
 						{
-							if (0 == memcmp((sockaddr_ptr)&query_sas, temp_ai_ptr->ai_addr,
-									 temp_ai_ptr->ai_addrlen))
-							{
-								localhost_sa_ptr = temp_ai_ptr->ai_addr;
-								break;		/* Tiz truly a local node */
-							}
+							localhost_sa_ptr = localhost_ai_ptr->ai_addr;
 						}
 						FREEADDRINFO(localhost_ai_ptr);
-					}
-					if (!localhost_sa_ptr)
-					{
-						CLIENT_HINTS(hints);
-						if (0 != (errcode = getaddrinfo(LOCALHOSTNAME6, NULL, &hints, &localhost_ai_ptr)))
-							localhost_ai_ptr = NULL;	/* Empty address list */
-						for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
-						     temp_ai_ptr = temp_ai_ptr->ai_next)
-						{
-							if (0 == memcmp((sockaddr_ptr)&query_sas, temp_ai_ptr->ai_addr,
-									 temp_ai_ptr->ai_addrlen))
+						if (!localhost_sa_ptr)
+						{	/* Have not yet established this is not a local node -- check further */
+							GETHOSTNAME(local_node_name, MAX_HOST_NAME_LEN, status);
+							if (-1 == status)
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+										LEN_AND_LIT("gethostname"), CALLFROM, errno);
+							CLIENT_HINTS(hints);
+							errcode = getaddrinfo(local_node_name, NULL, &hints, &localhost_ai_ptr);
+							if (0 != errcode)
+								localhost_ai_ptr = NULL;	/* Empty address list */
+							for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
+							     temp_ai_ptr = temp_ai_ptr->ai_next)
 							{
-								localhost_sa_ptr = temp_ai_ptr->ai_addr;
-								break;		/* Tiz truly a local node */
+								if (0 == memcmp((sockaddr_ptr)&query_sas, temp_ai_ptr->ai_addr,
+										 temp_ai_ptr->ai_addrlen))
+								{
+									localhost_sa_ptr = temp_ai_ptr->ai_addr;
+									break;		/* Tiz truly a local node */
+								}
 							}
+							FREEADDRINFO(localhost_ai_ptr);
 						}
-						FREEADDRINFO(localhost_ai_ptr);
+						if (!localhost_sa_ptr)
+						{
+							CLIENT_HINTS(hints);
+							errcode = getaddrinfo(LOCALHOSTNAME6, NULL, &hints, &localhost_ai_ptr);
+							if (0 != errcode)
+								localhost_ai_ptr = NULL;	/* Empty address list */
+							for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
+							     temp_ai_ptr = temp_ai_ptr->ai_next)
+							{
+								if (0 == memcmp((sockaddr_ptr)&query_sas, temp_ai_ptr->ai_addr,
+										 temp_ai_ptr->ai_addrlen))
+								{
+									localhost_sa_ptr = temp_ai_ptr->ai_addr;
+									break;		/* Tiz truly a local node */
+								}
+							}
+							FREEADDRINFO(localhost_ai_ptr);
+						}
+						FREEADDRINFO(ai_ptr);
+						/* At this point, if "localhost_sa_ptr" is NULL, a hostname that is not local
+						 * (or an unknown hostname) is given. If it is non-NULL, a local hostname is given.
+						 * Set "hasnode" to TRUE only for the non-local case.
+						 * Treat local host as if node was not specified.
+						 */
+						hasnode = (NULL == localhost_sa_ptr);
 					}
-					FREEADDRINFO(ai_ptr);
-					/* At this point, if "localhost_sa_ptr" is NULL, a hostname that is not local
-					 * (or an unknown hostname) is given. If it is non-NULL, a local hostname is given.
-					 * Set "hasnode" to TRUE only for the non-local case.
-					 * Treat local host as if node was not specified.
-					 */
-					hasnode = (NULL == localhost_sa_ptr);
 				}
 				if (hasnode)
 				{	/* Remote node specified -- don't apply any defaults */
@@ -204,7 +229,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 					pblk->l_name = pblk->l_ext = base + pblk->b_dir;
 					pblk->b_esl = pblk->b_node + pblk->b_dir;
 					pblk->b_name = pblk->b_ext = 0;
-					pblk->fnb |= (hasnode << V_HAS_NODE);
+					pblk->fnb |= (1 << V_HAS_NODE);
 					return ERR_PARNORMAL;
 				}
 				/* Remove local node name from filename buffer */

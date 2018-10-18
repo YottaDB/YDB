@@ -443,6 +443,7 @@ gd_region *dbfilopn(gd_region *reg)
 	sgmnt_data_ptr_t        tsd;
 	file_control    	*fc;
 	unsigned char		cstatus;
+	char			*ptr;
 	boolean_t		ftok_counter_halted;
 	ZOS_ONLY(int		realfiletag;)
 	DCL_THREADGBL_ACCESS;
@@ -488,8 +489,15 @@ gd_region *dbfilopn(gd_region *reg)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DBFILERR, 2, DB_LEN_STR(reg), status);
 	}
 	assert(((int)pblk.b_esl + 1) <= SIZEOF(seg->fname));
-	memcpy(seg->fname, pblk.buffer, pblk.b_esl);
-	pblk.buffer[pblk.b_esl] = 0;
+	/* If a remote nodename has been specified with the @ syntax, pblk.l_node points to the character past the '@'
+	 * whereas pblk.buffer points to the '@' so use pblk.l_node in that case. In case a remote nodename has
+	 * been specified without the '@' syntax, pblk.l_node points to the same character as pblk.buffer.
+	 * In case no remote nodename is specified, pblk.l_node is uninitialized and pblk.buffer should be used.
+	 * So in case a remote nodename is specified, use pblk.l_node and use pblk.buffer otherwise.
+	 */
+	ptr = !(pblk.fnb & F_HAS_NODE) ? pblk.buffer : pblk.l_node;
+	memcpy(seg->fname, ptr, pblk.b_esl);
+	ptr[pblk.b_esl] = 0;
 	seg->fname[pblk.b_esl] = 0;
 	seg->fname_len = pblk.b_esl;
 	if (pblk.fnb & F_HAS_NODE)
