@@ -253,6 +253,8 @@ void	gtm_env_init(void)
 		ret = ydb_logical_truth_value(YDBENVINDX_LCT_STDNULL, FALSE, &is_defined);
 		if (is_defined)
 			TREF(local_collseq_stdnull) = ret;
+		else
+			TREF(local_collseq_stdnull) = TRUE;
 		/* Initialize eXclusive Kill variety (GTM vs M Standard) */
 		ret = ydb_logical_truth_value(YDBENVINDX_STDXKILL, FALSE, &is_defined);
 		if (is_defined)
