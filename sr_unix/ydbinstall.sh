@@ -71,6 +71,7 @@ dump_info()
     if [ -n "$gtm_dryrun" ] ; then echo gtm_dryrun " : " $gtm_dryrun ; fi
     if [ -n "$ydb_filename" ] ; then echo ydb_filename " : " $ydb_filename ; fi
     if [ -n "$ydb_flavor" ] ; then echo ydb_flavor " : " $ydb_flavor ; fi
+    if [ -n "$ydb_force_install" ] ; then echo ydb_force_install " : " $ydb_force_install ; fi
     if [ -n "$gtm_ftp_dirname" ] ; then echo gtm_ftp_dirname " : " $gtm_ftp_dirname ; fi
     if [ -n "$gtm_group" ] ; then echo gtm_group " : " $gtm_group ; fi
     if [ -n "$gtm_group_already" ] ; then echo gtm_group_already " : " $gtm_group_already ; fi
@@ -108,33 +109,28 @@ help_exit()
     set +x
     echo "ydbinstall [option] ... [version]"
     echo "Options are:"
-    echo "--build-type buildtype - * type of YottaDB build, default is pro"
-    echo "--copyenv dirname - copy gtmprofile and gtmcshrc files to dirname; incompatible with linkenv"
-    echo "--copyexec dirname - copy gtm script to dirname; incompatible with linkexec"
-    echo "--debug - * turn on debugging with set -x"
-    echo "--distrib dirname or URL - source directory for YottaDB/GT.M distribution tarball, local or remote"
-    echo "--preserveRemoveIPC - do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
-    echo "--dry-run - do everything short of installing YottaDB, including downloading the distribution"
-    echo "--group group - group that should own the YottaDB installation"
-    echo "--group-restriction - limit execution to a group; defaults to unlimited if not specified"
-    echo "--gtm - Install GT.M instead of YottaDB"
-    echo "--help - print this usage information"
-    echo "--installdir dirname - directory where YottaDB is to be installed; defaults to /usr/local/lib/yottadb/version"
-    m1="--keep-obj - keep .o files"
-    m1="$m1"" of M routines (normally deleted on platforms with YottaDB support for routines in shared libraries)"
-    echo "$m1"
-    echo "--linkenv dirname - create link in dirname to gtmprofile and gtmcshrc files; incompatible with copyenv"
-    echo "--linkexec dirname - create link in dirname to gtm script; incompatible with copyexec"
-    echo "--overwrite-existing - install into an existing directory, overwriting contents; defaults to requiring new directory"
-    m1="--prompt-for-group - * YottaDB installation "
-    m1="$m1""script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
-    echo "$m1"
-    echo "--ucaseonly-utils -- install only upper case utility program names; defaults to both if not specified"
-    echo "--user username - user who should own YottaDB installation; default is root"
-    m1="--utf8 ICU_version - install "
-    m1="$m1""UTF-8 support using specified  major.minor ICU version; specify default to use default version"
-    echo "$m1"
-    echo "--verbose - * output diagnostic information as the script executes; default is to run quietly"
+    echo "--build-type buildtype   -> type of YottaDB build, default is pro"
+    echo "--copyenv dirname        -> copy gtmprofile and gtmcshrc files to dirname; incompatible with linkenv"
+    echo "--copyexec dirname       -> copy gtm script to dirname; incompatible with linkexec"
+    echo "--debug                  -> turn on debugging with set -x"
+    echo "--distrib dirname or URL -> source directory for YottaDB/GT.M distribution tarball, local or remote"
+    echo "--dry-run                -> do everything short of installing YottaDB, including downloading the distribution"
+    echo "--force-install          -> install even if the current platform is not known to be supported or supportable"
+    echo "--group group            -> group that should own the YottaDB installation"
+    echo "--group-restriction      -> limit execution to a group; defaults to unlimited if not specified"
+    echo "--gtm                    -> Install GT.M instead of YottaDB"
+    echo "--help                   -> print this usage information"
+    echo "--installdir dirname     -> directory where YottaDB is to be installed; defaults to /usr/local/lib/yottadb/version"
+    echo "--keep-obj               -> keep .o files of M routines (normally deleted on platforms with YottaDB support for routines in shared libraries)"
+    echo "--linkenv dirname        -> create link in dirname to gtmprofile and gtmcshrc files; incompatible with copyenv"
+    echo "--linkexec dirname       -> create link in dirname to gtm script; incompatible with copyexec"
+    echo "--overwrite-existing     -> install into an existing directory, overwriting contents; defaults to requiring new directory"
+    echo "--preserveRemoveIPC      -> do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
+    echo "--prompt-for-group       -> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
+    echo "--ucaseonly-utils        -> install only upper case utility program names; defaults to both if not specified"
+    echo "--user username          -> user who should own YottaDB installation; default is root"
+    echo "--utf8 ICU_version       -> install UTF-8 support using specified  major.minor ICU version; specify default to use versionprovided by OS as default"
+    echo "--verbose                -> output diagnostic information as the script executes; default is to run quietly"
     echo "options that take a value (e.g, --group) can be specified as either --option=value or --option value"
     echo "options marked with * are likely to be of interest primarily to YottaDB developers"
     echo "version is defaulted from mumps file if one exists in the same directory as the installer"
@@ -214,6 +210,7 @@ if [ -z "$gtm_verbose" ] ; then gtm_verbose="N" ; fi
 
 # Initializing internal flags
 gtm_group_already="N"
+ydb_force_install="N"
 
 # Process command line
 while [ $# -gt 0 ] ; do
@@ -249,6 +246,7 @@ while [ $# -gt 0 ] ; do
             fi
             shift ;;
         --dry-run) gtm_dryrun="Y" ; shift ;;
+	--force-install) ydb_force_install="Y" ; shift ;;
         --gtm)
             gtm_gtm="Y"
             shift ;;
@@ -335,6 +333,72 @@ case ${gtm_hostos}_${gtm_arch} in
         ydb_flavor="armv7l" ;;
     *) echo Architecture `uname -o` on `uname -m` not supported by this script ; err_exit ;;
 esac
+
+if [ "N" = "$ydb_force_install" ]; then
+	# At this point, we know the current machine architecture is supported by YottaDB
+	# but not yet sure if the OS and/or version is supported or supportable. Since
+	# --force-install is not specified, it is okay to do the os-version check now.
+	osfile="/etc/os-release"
+	osver_supported=0 # Consider platform unsupported by default
+	if [ -f "$osfile" ] ; then
+		osid=`grep -w ID $osfile | cut -d= -f2 | cut -d'"' -f2`
+		osver=`grep -w VERSION_ID $osfile | cut -d= -f2 | cut -d'"' -f2`
+		# Set an impossible major/minor version by default in case we do not descend down known platforms in if/else below.
+		osallowmajorver=999
+		osallowminorver=999
+		if [ "x8664" = "${ydb_flavor}" ] ; then
+			if [ "ubuntu" = "${osid}" ] ; then
+				# Ubuntu 16.04 and onwards is considered supported
+				osallowmajorver=16
+				osallowminorver=4
+			else
+				if [ "rhel" = "${osid}" ] ; then
+					# RHEL 7.x is considered supported
+					osallowmajorver=7
+					osallowminorver=0
+				fi
+			fi
+		else
+			if [ "armv6l" = "${ydb_flavor}" -o "armv7l" = "${ydb_flavor}" ] ; then
+				if [ "raspbian" = "${osid}" -o "debian" = ${osid} ] ; then
+					# Raspbian or Debian 9 or 9.x is considered supported
+					osallowmajorver=9
+					osallowminorver=0
+				fi
+			fi
+		fi
+		osmajorver=`echo $osver | cut -d. -f1`
+		# It is possible there is no minor version (e.g. Raspbian 9) in which case "cut" will not work
+		# as -f2 will give us 9 again. So use awk in that case which will give us "" as $2.
+		osminorver=`echo $osver | awk -F. '{print $2}'`
+		if [ "" = "$osminorver" ] ; then
+			# Needed by "expr" (since it does not compare "" vs numbers correctly)
+			# in case there is no minor version field (e.g. Raspbian 9).
+			osminorver=0
+		fi
+		if [ 1 = `expr "$osmajorver" ">" $osallowmajorver` ] ; then
+			osver_supported=1
+		elif [ 1 = `expr "$osmajorver" "=" $osallowmajorver` -a 1 = `expr "$osminorver" ">=" $osallowminorver` ] ; then
+			osver_supported=1
+		else
+			if [ 999 = "$osallowmajorver" ] ; then
+				# Not a supported OS. Print generic message without OS version #.
+				osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
+				echo "YottaDB not supported on $osname. Not installing YottaDB."
+			else
+				# Supported OS but version is too old to support.
+				osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
+				echo "YottaDB supported from $osname $osallowmajorver.$osallowminorver. Current system is $osname $osver. Not installing YottaDB."
+			fi
+		fi
+	else
+		echo "/etc/os-release does not exist on host; Not installing YottaDB."
+	fi
+	if [ 0 = "$osver_supported" ] ; then
+		echo "Specify ydbinstall.sh --force-install to force install"
+		err_exit
+	fi
+fi
 
 # YottaDB version is required - first see if ydbinstall and mumps are bundled
 if [ -z "$ydb_version" ] ; then
