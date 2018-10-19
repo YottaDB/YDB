@@ -437,13 +437,12 @@ gd_region *dbfilopn(gd_region *reg)
 	int			status;
 	boolean_t		raw;
 	boolean_t		open_read_only;
-	int			stat_res, rc, save_errno;
+	int			stat_res, rc, save_errno, len;
 	sgmnt_addrs		*csa;
 	sgmnt_data		tsdbuff;
 	sgmnt_data_ptr_t        tsd;
 	file_control    	*fc;
 	unsigned char		cstatus;
-	char			*ptr;
 	boolean_t		ftok_counter_halted;
 	ZOS_ONLY(int		realfiletag;)
 	DCL_THREADGBL_ACCESS;
@@ -495,11 +494,11 @@ gd_region *dbfilopn(gd_region *reg)
 	 * In case no remote nodename is specified, pblk.l_node is uninitialized and pblk.buffer should be used.
 	 * So in case a remote nodename is specified, use pblk.l_node and use pblk.buffer otherwise.
 	 */
-	ptr = !(pblk.fnb & F_HAS_NODE) ? pblk.buffer : pblk.l_node;
-	memcpy(seg->fname, ptr, pblk.b_esl);
-	ptr[pblk.b_esl] = 0;
-	seg->fname[pblk.b_esl] = 0;
-	seg->fname_len = pblk.b_esl;
+	len = ('@' == *pblk.buffer) ? pblk.b_esl + 1 : pblk.b_esl;
+	memcpy(seg->fname, pblk.buffer, pblk.b_esl);
+	pblk.buffer[len] = 0;
+	seg->fname[len] = 0;
+	seg->fname_len = len;
 	if (pblk.fnb & F_HAS_NODE)
 	{	/* Remote node specification given */
 		assert(pblk.b_node && pblk.l_node[pblk.b_node - 1] == ':');
