@@ -115,7 +115,7 @@ help_exit()
     echo "--debug                  -> turn on debugging with set -x"
     echo "--distrib dirname or URL -> source directory for YottaDB/GT.M distribution tarball, local or remote"
     echo "--dry-run                -> do everything short of installing YottaDB, including downloading the distribution"
-    echo "--force-install          -> install even if the current platform is not known to be supported or supportable"
+    echo "--force-install          -> install even if the current platform is not supported"
     echo "--group group            -> group that should own the YottaDB installation"
     echo "--group-restriction      -> limit execution to a group; defaults to unlimited if not specified"
     echo "--gtm                    -> Install GT.M instead of YottaDB"
@@ -336,7 +336,7 @@ esac
 
 if [ "N" = "$ydb_force_install" ]; then
 	# At this point, we know the current machine architecture is supported by YottaDB
-	# but not yet sure if the OS and/or version is supported or supportable. Since
+	# but not yet sure if the OS and/or version is supported. Since
 	# --force-install is not specified, it is okay to do the os-version check now.
 	osfile="/etc/os-release"
 	osver_supported=0 # Consider platform unsupported by default
