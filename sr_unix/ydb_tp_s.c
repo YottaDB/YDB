@@ -131,10 +131,14 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	tpfn_status = YDB_OK;
 	if (error_encountered)
-	{	/* If we reach here, it means an error occurred and "ydb_simpleapi_ch" was invoked which did a "longjmp"/"UNWIND" */
-		tpfn_status = TREF(ydb_error_code);
-		assert(0 < tpfn_status);
-		if (ERR_TPRETRY == tpfn_status)
+	{	/* If we reach here, it means an error occurred and "ydb_simpleapi_ch" was invoked which did a "longjmp"/"UNWIND".
+		 * Note: tpfn_status should at all times be negative since that is the final return value of "ydb_tp_s".
+		 * But TREF(ydb_error_code) is the error code currently encountered and is positive hence the negation below.
+		 */
+		tpfn_status = -TREF(ydb_error_code);
+		assert(0 > tpfn_status);
+		assert(-ERR_TPRETRY == YDB_ERR_TPRETRY);
+		if (YDB_ERR_TPRETRY == tpfn_status)
 		{
 			assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
 			/* If we reach here, it means we have a TPRETRY error from the database engine */
