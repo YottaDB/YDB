@@ -154,8 +154,17 @@ enum
 #define	YDB_MALLOC_BUFFER(BUFFERP, LEN)			\
 {							\
 	(BUFFERP)->len_alloc = LEN;			\
-	(BUFFERP)->buf_addr = ydb_malloc(LEN);		\
 	(BUFFERP)->len_used = 0;			\
+	(BUFFERP)->buf_addr = ydb_malloc(LEN);		\
+	YDB_ASSERT_DBG(NULL != (BUFFERP)->buf_addr);	\
+}
+
+/* Macro to free the buffer malloced using "YDB_MALLOC_BUFFER" */
+#define	YDB_FREE_BUFFER(BUFFERP)			\
+{							\
+	YDB_ASSERT_DBG(NULL != (BUFFERP)->buf_addr);	\
+	ydb_free((BUFFERP)->buf_addr);			\
+	(BUFFERP)->buf_addr = NULL;			\
 }
 
 /* Macro to verify an assertion is true before proceeding - put expression to test as the parameter */
