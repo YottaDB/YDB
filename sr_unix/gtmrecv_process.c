@@ -1990,9 +1990,27 @@ STATICFNDEF void process_tr_buff(int msg_type)
 					assert(0 == pool_histinfo->strm_seqno);
 					assert(IS_REPL_INST_UUID_NON_NULL(recvpool.gtmrecv_local->remote_lms_group));
 					pool_histinfo->lms_group = recvpool.gtmrecv_local->remote_lms_group;
-					if (recvpool.gtmrecv_local->updateresync)
+					/* If -updateresync was specified in this receiver server command line and this is the
+					 * first history record we receive (recvpool.gtmrecv_local->updateresync is reset to FALSE
+					 * once the first history record is seen), let the update process know this is an
+					 * updateresync type history record. It is also possible, a -updateresync receiver server
+					 * was shutdown after the initial handshake but before the first history record was
+					 * received from the source side. In that case, a restarted receiver server will not have
+					 * the -updateresync but should still treat the first history record as an updateresync
+					 * type of history record. This is done by checking if this is the first history record
+					 * received by this receiver server ("first_histrec") and if there is no history record
+					 * for this stream in the instance file. If so treat this as if -updateresync was specified.
+					 * Not treating so can cause "jnlpool->jnlpool_ctl->strm_seqno[]" to not be set correctly
+					 * which would result in the following assertpro failure in the update process.
+					 *	assertpro(FALSE && (upd_proc_local->read_jnl_seqno == jnlpool_ctl_seqno));
+					 */
+					if (recvpool.gtmrecv_local->updateresync
+						|| (first_histrec
+							&& (INVALID_HISTINFO_NUM
+								== jnlpool->repl_inst_filehdr->last_histinfo_num[strm_index])))
 					{
-						assert(FD_INVALID != recvpool.gtmrecv_local->updresync_instfile_fd);
+						assert(!recvpool.gtmrecv_local->updateresync
+							|| (FD_INVALID != recvpool.gtmrecv_local->updresync_instfile_fd));
 						/* Make it known that this is an updateresync type history record */
 						pool_histinfo->history_type = HISTINFO_TYPE_UPDRESYNC;
 					}
