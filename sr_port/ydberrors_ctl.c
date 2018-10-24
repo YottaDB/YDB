@@ -37,6 +37,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "CALLINTCOMMIT", "TCOMMIT at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL", 2 },
 	{ "CALLINTROLLBACK", "TROLLBACK at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL", 2 },
 	{ "TCPCONNTIMEOUT", "Connection wait timeout (!UL seconds) has expired", 2 },
+	{ "STDERRALREADYOPEN", "STDERR deviceparameter specifies an already open device !AD", 2 },
 };
 
 
@@ -49,7 +50,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	20,
+	21,
 	&ydberrors_undocarr[0],
 	0
 };

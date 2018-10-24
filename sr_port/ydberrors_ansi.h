@@ -33,4 +33,5 @@ const static readonly int error_ansi[] = {
 	   0,	/* CALLINTCOMMIT */
 	   0,	/* CALLINTROLLBACK */
 	   0,	/* TCPCONNTIMEOUT */
+	   0,	/* STDERRALREADYOPEN */
 	};

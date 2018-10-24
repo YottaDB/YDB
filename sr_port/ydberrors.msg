@@ -45,6 +45,7 @@ SIMPLEAPINEST	<Attempt to nest call of !AD with a call to !AD - nesting calls is
 CALLINTCOMMIT	<TCOMMIT at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL>/error/fao=2!/ansi=0
 CALLINTROLLBACK	<TROLLBACK at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL>/error/fao=2!/ansi=0
 TCPCONNTIMEOUT	<Connection wait timeout (!UL seconds) has expired>/error/fao=2!/ansi=0
+STDERRALREADYOPEN	<STDERR deviceparameter specifies an already open device !AD>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

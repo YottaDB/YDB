@@ -748,8 +748,14 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 
 
 		MSTR_DEF(stderr_mstr, slen[PSTDERR], sparams[PSTDERR]);
+		/* User has specified a device name for STDERR in the pipe device. Check if it already points
+		 * to an OPEN device. If so error out.
+		 */
+		stderr_naml = get_log_name(&stderr_mstr, NO_INSERT);
+		if (NULL != stderr_naml)
+			rts_error_csa(CSA_ARG(NULL)
+					VARLSTCNT(4) ERR_STDERRALREADYOPEN, 2, stderr_naml->len, stderr_naml->dollar_io);
 		stderr_naml = get_log_name(&stderr_mstr, INSERT);
-
 		stderr_iod = stderr_naml->iod =  (io_desc *)malloc(SIZEOF(io_desc));
 		memset((char*)stderr_naml->iod, 0, SIZEOF(io_desc));
 		stderr_naml->iod->pair.in  = stderr_naml->iod;
