@@ -1656,17 +1656,6 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 			/* SSL-Session Protocol */
 			switch (ssl_version = SSL_version(ssl))
 			{
-				case SSL2_VERSION:
-					ssl_version_ptr = "SSLv2";
-					break;
-
-				case SSL3_VERSION:
-					ssl_version_ptr = "SSLv3";
-					break;
-
-				case TLS1_VERSION:
-					ssl_version_ptr = "TLSv1";
-					break;
 				case TLS1_1_VERSION:
 					ssl_version_ptr = "TLSv1.1";
 					break;
