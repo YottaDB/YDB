@@ -1338,7 +1338,7 @@ SSTMPCREATE	<Cannot create the temporary file in directory !AD for the requested
 JNLFILEDUP	<Journal files !AD and !AD are the same>/error/fao=4!/ansi=0
 SSPREMATEOF	<Premature end of file while reading block !UL of size: !UL bytes at offset: !UL from !AD>/error/fao=5!/ansi=0
 SSFILOPERR	<Error while doing !AD operation on file !AD>/error/fao=4!/ansi=0
-REGSSFAIL	<Process !UL encountered error contributing to the snapshot for region !AD - the snapshot is no longer valid>/error/fao=3!/ansi=0
+REGSSFAIL	<Process !UL encountered error !UL contributing to the snapshot for region !AD - the snapshot is no longer valid>/error/fao=4!/ansi=0
 SSSHMCLNUPFAIL	<Error while doing snapshot shared memory cleanup. Operation -- !AD. Identifier -- !UL>/error/fao=3!/ansi=0
 SSFILCLNUPFAIL	<Error while unlinking snapshot file -- !AD>/error/fao=2!/ansi=0
 SETINTRIGONLY	<ISV !AD cannot be modified outside of the trigger environment>/error/fao=2!/ansi=0

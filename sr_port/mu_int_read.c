@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -103,8 +106,9 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *fr
 			 * crit as GT.M is the only one that sets it and INTEG (while doing snapshot cleanup) is the only one
 			 * that resets it
 			 */
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_REGSSFAIL, 3, ss_shm_ptr->failed_pid,
-						DB_LEN_STR(gv_cur_region));
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_REGSSFAIL, 4,
+					ss_shm_ptr->failed_pid, ss_shm_ptr->failure_errno, DB_LEN_STR(gv_cur_region),
+					ss_shm_ptr->failure_errno);
 			mupip_exit(ERR_INTEGERRS);
 		}
 	}
@@ -126,8 +130,9 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *fr
 				ss_get_block(csa, blk, tmp_ptr);
 			else
 			{
-				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_REGSSFAIL, 3, ss_shm_ptr->failed_pid,
-							DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_REGSSFAIL, 4,
+						ss_shm_ptr->failed_pid, ss_shm_ptr->failure_errno, DB_LEN_STR(gv_cur_region),
+						ss_shm_ptr->failure_errno);
 				mupip_exit(ERR_INTEGERRS);
 			}
 		}

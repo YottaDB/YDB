@@ -1174,7 +1174,7 @@ LITDEF	err_msg merrors[] = {
 	{ "JNLFILEDUP", "Journal files !AD and !AD are the same", 4 },
 	{ "SSPREMATEOF", "Premature end of file while reading block !UL of size: !UL bytes at offset: !UL from !AD", 5 },
 	{ "SSFILOPERR", "Error while doing !AD operation on file !AD", 4 },
-	{ "REGSSFAIL", "Process !UL encountered error contributing to the snapshot for region !AD - the snapshot is no longer valid", 3 },
+	{ "REGSSFAIL", "Process !UL encountered error !UL contributing to the snapshot for region !AD - the snapshot is no longer valid", 4 },
 	{ "SSSHMCLNUPFAIL", "Error while doing snapshot shared memory cleanup. Operation -- !AD. Identifier -- !UL", 3 },
 	{ "SSFILCLNUPFAIL", "Error while unlinking snapshot file -- !AD", 2 },
 	{ "SETINTRIGONLY", "ISV !AD cannot be modified outside of the trigger environment", 2 },
