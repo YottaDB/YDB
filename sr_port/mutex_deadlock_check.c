@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -98,13 +101,18 @@ void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr, sgmnt_addrs *csa)
 		++crit_deadlock_check_cycle;
 		repl_csa = ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg))
 			? &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs : NULL;
-		assert(!jnlpool || !jnlpool->jnlpool_dummy_reg || jnlpool->jnlpool_dummy_reg->open
-			 || (repl_csa->critical != criticalPtr) || (NULL == cs_addrs));
 		if (!dollar_tlevel)
 		{
 			if ((NULL != repl_csa) && (repl_csa->critical == criticalPtr))
 			{	/* grab_lock going for crit on the jnlpool region. gv_cur_region points to the current region of
-				 * interest, which better have REPL_ENABLED or REPL_WAS_ENABLED, and be now crit
+				 * interest, which better have REPL_ENABLED or REPL_WAS_ENABLED. Assert that.
+				 */
+				assert(REPL_ALLOWED(cs_addrs));
+				/* Most likely, we will have crit on gv_cur_region but it is rarely possible we do not
+				 * (e.g. in the below call sequence
+				 *	gvcst_init -> jnlpool_init -> repl_inst_ftok_counter_halted -> grab_lock
+				 *			-> gtm_mutex_lock -> mutex_long_sleep -> mutex_deadlock_check)
+				 * Any case, if seeking crit for jnlpool, allow crit on gv_cur_region/cs_addrs.
 				 */
 				if ((NULL != cs_addrs) && cs_addrs->now_crit)
 				{	/* cs_addrs can be NULL if it is open, but there is no update on that region */
