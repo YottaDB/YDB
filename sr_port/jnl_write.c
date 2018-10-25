@@ -43,6 +43,7 @@
 #include "memcoherency.h"
 #include "interlock.h"
 #include "gdsbgtr.h"
+#include "cli.h"
 #ifdef DEBUG
 #include "gdskill.h"		/* needed for tp.h */
 #include "gdscc.h"		/* needed for tp.h */
@@ -58,6 +59,7 @@ GBLREF	boolean_t		in_jnl_file_autoswitch;
 GBLREF	uint4			dollar_tlevel;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	jnl_gbls_t		jgbl;
+GBLREF	IN_PARMS		*cli_lex_in_ptr;
 
 #ifdef DEBUG
 #define	MAX_JNL_WRITE_RECURSION_DEPTH	3
@@ -115,7 +117,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	jbuf_phase2_in_prog_t	*phs2cmt;
 	boolean_t		was_latch_owner;
 #	ifdef DEBUG
-	uint4			tmp_csum1, tmp_csum2;
+	uint4			tmp_csum1, tmp_csum2, cmdstr_csum;
 	uint4			mumps_node_sz;
 	char			*mumps_node_ptr;
 	struct_jrec_align	*align_rec;
@@ -214,10 +216,18 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	if ((JRT_PBLK == rectype) || (JRT_AIMG == rectype))
 	{
 		blk_ptr = (blk_hdr_ptr_t)parm1;
-		assert(JNL_MAX_PBLK_RECLEN(csd) >= rlen);			/* PBLK and AIMG */
+		assert((JRT_PBLK != rectype) || (JNL_MAX_PBLK_RECLEN(csd) >= rlen));			/* PBLK */
+		assert((JRT_AIMG != rectype) || (JNL_MAX_AIMG_RECLEN(csd) >= rlen));			/* AIMG */
 		COMPUTE_COMMON_CHECKSUM(tmp_csum2, jnl_rec->prefix);
 		tmp_csum1 = jnl_get_checksum(blk_ptr, NULL, jnl_rec->jrec_pblk.bsiz);
-		COMPUTE_PBLK_CHECKSUM(tmp_csum1, &jnl_rec->jrec_pblk, tmp_csum2, tmp_csum1);
+		if (JRT_PBLK == rectype)
+			COMPUTE_PBLK_CHECKSUM(tmp_csum1, &jnl_rec->jrec_pblk, tmp_csum2, tmp_csum1);
+		else
+		{
+			cmdstr_csum = compute_checksum(INIT_CHECKSUM_SEED,
+							(unsigned char *)cli_lex_in_ptr->in_str, jnl_rec->jrec_aimg.cmdstrlen);
+			COMPUTE_AIMG_CHECKSUM(tmp_csum1, cmdstr_csum, &jnl_rec->jrec_pblk, tmp_csum2, tmp_csum1);
+		}
 	} else if (IS_SET_KILL_ZKILL_ZTWORM_LGTRIG_ZTRIG(rectype))
 	{
 		jfb = (jnl_format_buffer *)parm1;
@@ -382,11 +392,20 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 					/* write actual block */
 					memcpy(lcl_buff + lcl_free, (uchar_ptr_t)blk_ptr, jrec_blk->bsiz);
 					lcl_free += jrec_blk->bsiz;
+					if (JRT_AIMG == rectype)
+					{	/* Write the DSE command that caused this AIMG record */
+						memcpy(lcl_buff + lcl_free, (uchar_ptr_t)cli_lex_in_ptr->in_str,
+												jrec_blk->cmdstrlen);
+						lcl_free += jrec_blk->cmdstrlen;
+					}
 				} else
 				{	/* write fixed part of record before the actual gds block image */
 					JNL_PUTSTR(lcl_free, lcl_buff, (uchar_ptr_t)jnl_rec, (int4)FIXED_BLK_RECLEN, lcl_size);
 					/* write actual block */
 					JNL_PUTSTR(lcl_free, lcl_buff, (uchar_ptr_t)blk_ptr, jrec_blk->bsiz, lcl_size);
+					if (JRT_AIMG == rectype)
+						JNL_PUTSTR(lcl_free, lcl_buff, (uchar_ptr_t)cli_lex_in_ptr->in_str,
+											jrec_blk->cmdstrlen, lcl_size);
 				}
 				/* Skip over a few characters for 8-bye alignment and then write suffix */
 				assert(lcl_free <= lcl_size);

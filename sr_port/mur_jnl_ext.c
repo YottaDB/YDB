@@ -275,9 +275,17 @@ void	mur_extract_blk(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *r
 	EXTPID(plst);
 	EXTINT(rec->jrec_pblk.blknum);
 	EXTINT(rec->jrec_pblk.bsiz);
-	memcpy((char*)&pblk_head, (char*)&rec->jrec_pblk.blk_contents[0], SIZEOF(blk_hdr));
+	memcpy((char *)&pblk_head, (char *)&rec->jrec_pblk.blk_contents[0], SIZEOF(blk_hdr));
 	EXTQW(pblk_head.tn);
 	EXTINT(rec->jrec_pblk.ondsk_blkver);
+	assert((JRT_PBLK == rec->prefix.jrec_type) || (JRT_AIMG == rec->prefix.jrec_type));
+	if (JRT_AIMG == rec->prefix.jrec_type)
+	{	/* Also extract the DSE COMMAND that caused the AIMG record */
+		ptr = &murgbl.extr_buff[extract_len];
+		memcpy(ptr, &rec->jrec_aimg.blk_contents[rec->jrec_aimg.bsiz], rec->jrec_aimg.cmdstrlen);
+		extract_len += rec->jrec_aimg.cmdstrlen;
+		murgbl.extr_buff[extract_len++] = '\\';
+	}
 	jnlext_write(jctl, rec, recstat, murgbl.extr_buff, extract_len);
 }
 

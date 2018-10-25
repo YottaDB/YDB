@@ -3,6 +3,9 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -25,6 +28,7 @@
 #include "jnl_write_pblk.h"
 #include "jnl_write_aimg_rec.h"
 #include "jnl_write.h"
+#include "cli.h"
 
 GBLREF	jnl_gbls_t	jgbl;
 GBLREF	uint4		process_id;
@@ -125,7 +129,8 @@ void	jnl_write_phase2(sgmnt_addrs *csa, jbuf_rsrv_struct_t *jrs)
 			break;
 		case JRT_AIMG:
 			assert(write_to_jnlbuff);
-			assert(reclen <= ROUND_UP2(FIXED_AIMG_RECLEN + JREC_SUFFIX_SIZE + csa->hdr->blk_size, JNL_REC_START_BNDRY));
+			assert(reclen <= ROUND_UP2(FIXED_AIMG_RECLEN + JREC_SUFFIX_SIZE + csa->hdr->blk_size + MAX_LINE,
+													JNL_REC_START_BNDRY));
 			cse = (cw_set_element *)param1;
 			jnl_write_aimg_rec(csa, cse, common_csum);
 			break;

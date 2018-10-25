@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -14,7 +17,7 @@
 
 #include <stddef.h>
 
-#include "gtm_string.h"
+#include "gtm_string.h"	/* for STRLEN needed by AIMG record */
 #include "gtm_time.h"
 
 #include "gdsroot.h"
@@ -31,9 +34,11 @@
 #include "jnl_get_checksum.h"
 #include "min_max.h"
 #include "gtmcrypt.h"
+#include "cli.h"			/* for AIMG record */
 
-GBLREF 	jnl_gbls_t		jgbl;
-GBLREF	mstr			pvt_crypt_buf;
+GBLREF 	jnl_gbls_t	jgbl;
+GBLREF	mstr		pvt_crypt_buf;
+GBLREF	IN_PARMS	*cli_lex_in_ptr;
 
 void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 {
@@ -47,7 +52,7 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 	jnl_private_control	*jpc;
 	sgmnt_data_ptr_t	csd;
 	struct_jrec_blk		aimg_record;
-	uint4			cursum;
+	uint4			cursum, cmdstr_cksum;
 
 	csd = csa->hdr;
 	jpc = csa->jnl;
@@ -67,7 +72,8 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 	assert(buffer->bsiz >= SIZEOF(blk_hdr));
 	aimg_record.bsiz = MIN(csd->blk_size, buffer->bsiz);
 	aimg_record.ondsk_blkver = cse->ondsk_blkver;
-	tmp_jrec_size = (int)FIXED_AIMG_RECLEN + aimg_record.bsiz + JREC_SUFFIX_SIZE;
+	aimg_record.cmdstrlen = MIN(STRLEN(cli_lex_in_ptr->in_str), MAX_LINE);
+	tmp_jrec_size = (int)FIXED_AIMG_RECLEN + aimg_record.bsiz + aimg_record.cmdstrlen + JREC_SUFFIX_SIZE;
 	aimg_record.prefix.forwptr = ROUND_UP2(tmp_jrec_size, JNL_REC_START_BNDRY);
 	assert(SIZEOF(uint4) == SIZEOF(jrec_suffix));
 	save_buffer = buffer;
@@ -92,6 +98,7 @@ void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum)
 		buffer = (blk_hdr_ptr_t)pvt_crypt_buf.addr;
 	}
 	cursum = jnl_get_checksum(buffer, NULL, aimg_record.bsiz);
-	COMPUTE_AIMG_CHECKSUM(cursum, &aimg_record, com_csum, aimg_record.prefix.checksum);
+	cmdstr_cksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)cli_lex_in_ptr->in_str, aimg_record.cmdstrlen);
+	COMPUTE_AIMG_CHECKSUM(cursum, cmdstr_cksum, &aimg_record, com_csum, aimg_record.prefix.checksum);
 	jnl_write(jpc, JRT_AIMG, (jnl_record *)&aimg_record, buffer);
 }

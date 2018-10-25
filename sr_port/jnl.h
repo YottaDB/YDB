@@ -913,8 +913,14 @@ typedef struct	/* variable length */
 	block_id		blknum;
 	uint4			bsiz;
 	enum db_ver		ondsk_blkver;		/* Previous version of block from cache_rec */
-	int4			filler;
-	char			blk_contents[1];	/* Actually blk_contents[bsiz] */
+	uint4			cmdstrlen;		/* Uninitialized in case of JRT_PBLK type;
+							 * Initialized (and non-zero) in case of JRT_AIMG reflecting the Byte
+							 *	length of the DSE command line that resulted in this AIMG record.
+							 *	This string follows the block contents in blk_contents[].
+							 */
+	char			blk_contents[1];	/* Actually blk_contents[bsiz]             in case of JRT_PBLK
+							 *      and blk_contents[bsiz + cmdstrlen] in case of JRT_AIMG
+							 */
 } struct_jrec_blk;
 
 /* Note: A JRT_ALIGN is the ONLY journal record which does not have the full "jrec_prefix" prefix. This is because
@@ -1715,6 +1721,9 @@ MBSTART {								\
 
 #define	JNL_MAX_PBLK_RECLEN(CSD)	(uint4)ROUND_UP2(MIN_PBLK_RECLEN + (CSD)->blk_size, JNL_REC_START_BNDRY)
 
+/* AIMG record is just like PBLK record but with an added DSE command line so add MAX_LINE for it */
+#define	JNL_MAX_AIMG_RECLEN(CSD)	(uint4)ROUND_UP2(MIN_PBLK_RECLEN + (CSD)->blk_size + MAX_LINE, JNL_REC_START_BNDRY)
+
 /* Macro to compute the maximum possible journal record length in the journal file.
  * In order to compute the maximum jnl record length, note that an align record is written whenever
  * a <non-align-record + an-align-record> would cause the jnl file offset to move past an aligned boundary.
@@ -1724,15 +1733,18 @@ MBSTART {								\
 #define JNL_MAX_RECLEN(JINFO, CSD)										\
 {														\
 	/* This macro used to compare the value returned from JNL_MAX_SET_KILL_RECLEN with that from		\
-	 * JNL_MAX_PBLK_RECLEN and, in case of triggers, MAX_ZTWORK_JREC_LEN. However, in the current design	\
-	 * max_logi_reclen includes MAX_STR_LEN as one of its summants, thus always exceeding both		\
-	 * MAX_ZTWORK_JREC_LEN and JNL_MAX_PBLK_RECLEN.								\
+	 * JNL_MAX_PBLK_RECLEN, JNL_MAX_AIMG_RECLEN and, in case of triggers, MAX_ZTWORM_JREC_LEN.		\
+	 * However, in the current design max_logi_reclen includes MAX_STR_LEN as one of its summants,		\
+	 * thus always exceeding both MAX_ZTWORM_JREC_LEN, JNL_MAX_PBLK_RECLEN and JNL_MAX_AIMG_RECLEN.		\
 	 *													\
 	 * A logical record is a SET/KILL record. The SET could be as big as (CSD)->max_rec_size, but since	\
 	 * csd->max_rec_size can be changed independent of journal file creation (through DSE), we consider	\
 	 * the max possible record size that can be ever produced.						\
 	 */													\
 	(JINFO)->max_jrec_len = JNL_MAX_SET_KILL_RECLEN(CSD) + MIN_ALIGN_RECLEN;				\
+	assert(MAX_ZTWORM_JREC_LEN < (JINFO)->max_jrec_len);							\
+	assert(JNL_MAX_PBLK_RECLEN(CSD) < (JINFO)->max_jrec_len);						\
+	assert(JNL_MAX_AIMG_RECLEN(CSD) < (JINFO)->max_jrec_len);						\
 }
 
 /* Macro that checks that the region seqno in the filehdr is never more than the seqno in the journal pool */

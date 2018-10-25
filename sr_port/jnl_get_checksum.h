@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -65,8 +68,16 @@ MBSTART {														\
 	ADJUST_CHECKSUM(jrec_checksum, common_cksum, jrec_checksum);							\
 } MBEND
 
-#define COMPUTE_AIMG_CHECKSUM(blk_checksum, aimg_rec, common_cksum, jrec_checksum)					\
-					COMPUTE_PBLK_CHECKSUM(blk_checksum, aimg_rec, common_cksum, jrec_checksum);
+#define COMPUTE_AIMG_CHECKSUM(blk_checksum, cmdstr_checksum, aimg_rec, common_cksum, jrec_checksum)			\
+MBSTART {														\
+	ADJUST_CHECKSUM(blk_checksum, (aimg_rec)->prefix.jrec_type, jrec_checksum);					\
+	ADJUST_CHECKSUM(jrec_checksum, cmdstr_checksum, jrec_checksum);							\
+	ADJUST_CHECKSUM(jrec_checksum, (aimg_rec)->blknum, jrec_checksum);						\
+	ADJUST_CHECKSUM(jrec_checksum, (aimg_rec)->bsiz, jrec_checksum);						\
+	ADJUST_CHECKSUM(jrec_checksum, (aimg_rec)->cmdstrlen, jrec_checksum);						\
+	ADJUST_CHECKSUM(jrec_checksum, (aimg_rec)->ondsk_blkver, jrec_checksum);					\
+	ADJUST_CHECKSUM(jrec_checksum, common_cksum, jrec_checksum);							\
+} MBEND
 
 #define COMPUTE_LOGICAL_REC_CHECKSUM(jfb_checksum, jrec, common_cksum, jrec_checksum)					\
 MBSTART {														\

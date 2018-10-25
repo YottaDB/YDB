@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,7 +38,7 @@
 boolean_t mur_validate_checksum(jnl_ctl_list *jctl)
 {
 	enum jnl_record_type 	rectype;
-	uint4			orig_csum, rec_csum, tmp_csum;
+	uint4			orig_csum, rec_csum, cmdstr_csum, tmp_csum, bsiz;
 	unsigned char		*start_ptr, *end_ptr;
 	jnl_record		*jnlrec;
 	reg_ctl_list		*rctl;
@@ -62,9 +65,19 @@ boolean_t mur_validate_checksum(jnl_ctl_list *jctl)
 	{
 		COMPUTE_COMMON_CHECKSUM(tmp_csum, jnlrec->prefix);
 		start_ptr = (unsigned char *)jnlrec->jrec_pblk.blk_contents;
-		rec_csum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)start_ptr,
-								MIN(jnlrec->jrec_pblk.prefix.forwptr, jnlrec->jrec_pblk.bsiz));
-		COMPUTE_PBLK_CHECKSUM(rec_csum, &jnlrec->jrec_pblk, tmp_csum, rec_csum);
+		bsiz = MIN(jnlrec->jrec_pblk.prefix.forwptr, jnlrec->jrec_pblk.bsiz);
+		rec_csum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)start_ptr, bsiz);
+		if (JRT_PBLK == rectype)
+			COMPUTE_PBLK_CHECKSUM(rec_csum, &jnlrec->jrec_pblk, tmp_csum, rec_csum);
+		else
+		{	/* Note: The DSE command string immediately follows the block contents in the AIMG record.
+			 * Hence the "bsiz" usage below.
+			 */
+			cmdstr_csum = compute_checksum(INIT_CHECKSUM_SEED,
+							(unsigned char *)&jnlrec->jrec_aimg.blk_contents[bsiz],
+											jnlrec->jrec_aimg.cmdstrlen);
+			COMPUTE_AIMG_CHECKSUM(rec_csum, cmdstr_csum, &jnlrec->jrec_aimg, tmp_csum, rec_csum);
+		}
 	} else if (IS_FIXED_SIZE(rectype))
 	{
 		jnlrec->prefix.checksum = INIT_CHECKSUM_SEED;

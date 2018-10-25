@@ -18,6 +18,7 @@
 #include "gtm_time.h"
 #include "gtm_inet.h"
 #include "gtm_signal.h"	/* for VSIG_ATOMIC_T type */
+#include "gtm_string.h"	/* for STRLEN needed by AIMG record */
 
 #include <stddef.h>
 
@@ -56,6 +57,7 @@
 #include "deferred_exit_handler.h"
 #include "repl_instance.h"
 #include "format_targ_key.h"
+#include "cli.h"			/* for AIMG record */
 
 /* Include prototypes */
 #include "t_qread.h"
@@ -141,6 +143,7 @@ GBLREF	boolean_t		skip_dbtriggers;	/* see gbldefs.c for description of this glob
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	uint4			bml_save_dollar_tlevel;
 #endif
+GBLREF	IN_PARMS		*cli_lex_in_ptr;
 
 error_def(ERR_GBLOFLOW);
 error_def(ERR_GVKILLFAIL);
@@ -1444,6 +1447,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			old_block = (blk_hdr_ptr_t)cs->new_buff;
 			bsiz = old_block->bsiz;
 			bsiz = MIN(bsiz, csd->blk_size);	/* be safe in PRO */
+			/* Store the DSE command line (that caused this AIMG record) in the same AIMG record */
+			bsiz += MIN(STRLEN(cli_lex_in_ptr->in_str), MAX_LINE);
 			bsiz += FIXED_AIMG_RECLEN + JREC_SUFFIX_SIZE;
 			bsiz = ROUND_UP2(bsiz, JNL_REC_START_BNDRY);
 			jnl_write_reserve(csa, jrs, JRT_AIMG, bsiz, cs);
