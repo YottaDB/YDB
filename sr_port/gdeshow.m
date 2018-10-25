@@ -3,6 +3,9 @@
 ; Copyright (c) 2001-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -148,7 +151,7 @@ onereg:
 	w ?x(11),$s(regs(s,"EPOCHTAPER"):"Y",1:"N")
 	w ?x(12),$s(regs(s,"AUTODB"):"Y",1:"N")
 	w ?x(13),$s(regs(s,"STATS"):"Y",1:"N")
-	w ?x(14),$s(regs(s,"LOCK_CRIT"):"Sep",1:"DB")
+	w ?x(14),$s(regs(s,"LOCK_CRIT_SEPARATE"):"Sep",1:"DB")
 	q
 onejnl:
 	w !,BOL,?x(1),s,?x(2),$s($zl(regs(s,"FILE_NAME")):$$namedisp(regs(s,"FILE_NAME"),1),1:"<based on DB file-spec>")
@@ -314,7 +317,7 @@ t1:	d tmpreghd
 	w ?x(11),$s(tmpreg("EPOCHTAPER"):"Y",1:"N")
 	w ?x(12),$s(tmpreg("AUTODB"):"Y",1:"N")
 	w ?x(13),$s(tmpreg("STATS"):"Y",1:"N")
-	w ?x(14),$s(tmpreg("LOCK_CRIT"):"Sep",1:"DB")
+	w ?x(14),$s(tmpreg("LOCK_CRIT_SEPARATE"):"Sep",1:"DB")
 	i tmpreg("JOURNAL") d tmpjnlhd,tmpjnlbd
 	d tmpseghd
 	w !,BOL,?x(1),"<default>"

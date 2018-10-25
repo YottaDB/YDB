@@ -169,7 +169,7 @@ GDEINIT
 	s minreg("EPOCHTAPER")=0
 	s minreg("AUTODB")=0
 	s minreg("STATS")=0
-	s minreg("LOCK_CRIT")=0
+	s minreg("LOCK_CRIT_SEPARATE")=0
 	s minreg("RECORD_SIZE")=0
 	s minreg("JOURNAL")=0,minreg("KEY_SIZE")=3,minreg("NULL_SUBSCRIPTS")=0
 	s maxreg("ALLOCATION")=TWO(24),maxreg("BEFORE_IMAGE")=1
@@ -186,7 +186,7 @@ GDEINIT
 	s maxreg("EPOCHTAPER")=1
 	s maxreg("AUTODB")=1
 	s maxreg("STATS")=1
-	s maxreg("LOCK_CRIT")=1
+	s maxreg("LOCK_CRIT_SEPARATE")=1
 	s maxreg("KEY_SIZE")=1019	; = max value of KEY->end that returns TRUE for CAN_APPEND_HIDDEN_SUBS(KEY) in gdsfhead.h
 	s maxreg("JOURNAL")=1,maxreg("NULL_SUBSCRIPTS")=2
 	s maxreg("RECORD_SIZE")=SIZEOF("max_str")
@@ -260,7 +260,7 @@ syntabi:
 	s syntab("ADD","REGION","EPOCHTAPER")="NEGATABLE"
 	s syntab("ADD","REGION","AUTODB")="NEGATABLE"
 	s syntab("ADD","REGION","STATS")="NEGATABLE"
-	s syntab("ADD","REGION","LOCK_CRIT")="NEGATABLE"
+	s syntab("ADD","REGION","LOCK_CRIT_SEPARATE")="NEGATABLE"
 	s syntab("ADD","REGION","INST_FREEZE_ON_ERROR")="NEGATABLE"
 	s syntab("ADD","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
 	s syntab("ADD","REGION","JOURNAL","ALLOCATION")="REQUIRED"
@@ -326,7 +326,7 @@ syntabi:
 	s syntab("CHANGE","REGION","EPOCHTAPER")="NEGATABLE"
 	s syntab("CHANGE","REGION","AUTODB")="NEGATABLE"
 	s syntab("CHANGE","REGION","STATS")="NEGATABLE"
-	s syntab("CHANGE","REGION","LOCK_CRIT")="NEGATABLE"
+	s syntab("CHANGE","REGION","LOCK_CRIT_SEPARATE")="NEGATABLE"
 	s syntab("CHANGE","REGION","INST_FREEZE_ON_ERROR")="NEGATABLE"
 	s syntab("CHANGE","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
 	s syntab("CHANGE","REGION","JOURNAL","ALLOCATION")="REQUIRED"
@@ -392,7 +392,7 @@ syntabi:
 	s syntab("TEMPLATE","REGION","EPOCHTAPER")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","AUTODB")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","STATS")="NEGATABLE"
-	s syntab("TEMPLATE","REGION","LOCK_CRIT")="NEGATABLE"
+	s syntab("TEMPLATE","REGION","LOCK_CRIT_SEPARATE")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","JOURNAL","EXTENSION")="REQUIRED"
 	s syntab("TEMPLATE","REGION","JOURNAL","EXTENSION","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION","JOURNAL","FILE_NAME")="REQUIRED"
