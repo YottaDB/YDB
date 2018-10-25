@@ -61,7 +61,7 @@ void mupip_ftok (void)
 	int		semid, shmid;
 	unsigned int	full_len;
 	unsigned short	fn_len; /* cli library expects unsigned short */
-	char		fn[MAX_FN_LEN + 1], instfilename[MAX_FN_LEN + 1];
+	char		fn[MAX_FN_LEN + 1];
 	repl_inst_hdr	repl_instance;
 	gd_id		fid;
 	sm_uc_ptr_t	fid_ptr, fid_top;
@@ -77,10 +77,8 @@ void mupip_ftok (void)
 	recvpool = (CLI_PRESENT == cli_present("RECVPOOL"));
 	if (jnlpool || recvpool)
 	{
-		if (!repl_inst_get_name(instfilename, &full_len, SIZEOF(instfilename), issue_rts_error, gd_header))
-			assertpro(NULL == instfilename);	/* rts_error should have been issued by repl_inst_get_name */
 		in_mupip_ftok = TRUE;
-		repl_inst_read(instfilename, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
+		repl_inst_read(fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
 		in_mupip_ftok = FALSE;
 		if (jnlpool)
 		{
