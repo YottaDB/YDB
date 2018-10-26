@@ -84,15 +84,22 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 	glob_t		globbuf;
 	boolean_t	absolute;
 	intrpt_state_t	prev_intrpt_state;
-#ifdef _AIX
+#	ifdef _AIX
 	boolean_t	use_stat;
 	struct		stat statbuf;
-#endif
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (mfunc && ((MAX_STRM_CT <= indx) || (0 > indx)))	/* Allow an out-of-range stream only if used internally. */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSRCHSTRMCT);
+	if (mfunc)
+	{
+		if (STRM_ALWAYSNEW != indx)
+		{
+			if ((MAX_STRM_CT <= indx) || (0 > indx))	/* Allow an out-of-range stream only if used internally. */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZSRCHSTRMCT);
+		} else
+			zsrch_clr(STRM_ALWAYSNEW);	/* $ZSEARCH(expr,-1) : Special case to start a new stream */
+	}
 	ESTABLISH_RET(fnzsrch_ch, -1);
 	TREF(fnzsearch_nullsubs_sav) = TREF(lv_null_subs);
 	TREF(lv_null_subs) = LVNULLSUBS_OK;			/* $ZSearch processing depends on this. */
@@ -152,7 +159,7 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 				CANONICALIZE_PATH(buf_ptr);
 				/* Do not sort the matches because we use $order() to obtain them from a local anyway. */
 				DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-#ifdef _AIX
+#				ifdef _AIX
 				use_stat = !((pblk.fnb & (1 << V_WILD_NAME)) || (pblk.fnb & (1 << V_WILD_DIR)));
 				if (use_stat)
 				{
@@ -161,7 +168,7 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 						globbuf.gl_pathc = 1;
 				}
 				else
-#endif
+#				endif
 					status = glob(sanitized_buf, LINUX_ONLY(GLOB_PERIOD | ) GLOB_NOSORT,
 							(int (*)(const char *, int))NULL, &globbuf);
 				ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
@@ -171,11 +178,11 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 					file.mvtype = MV_STR;
 					for (i = 0; i < globbuf.gl_pathc; i++)
 					{	/* We do not care for . and .. */
-#ifdef _AIX
+#						ifdef _AIX
 						if (use_stat)
 							match = sanitized_buf;
 						else
-#endif
+#						endif
 							match = globbuf.gl_pathv[i];
 						length = STRLEN(match);
 						if ((length > 1) && ('.' == match[length - 1]) && (('/' == match[length - 2])
@@ -195,23 +202,23 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 						match_len = (plength *)&(var_ref->v.m[1]);
 						SET_LENGTHS(match_len, file.str.addr, length, TRUE);
 					}
-#ifdef _AIX
+#					ifdef _AIX
 					if (!use_stat)
 					{
-#endif
+#					endif
 						DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 						globfree(&globbuf);
 						ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 						TREF(fnzsearch_globbuf_ptr) = NULL;
-#ifdef _AIX
+#					ifdef _AIX
 					}
-#endif
+#					endif
 				} else
 				{
-#ifdef _AIX
+#					ifdef _AIX
 					if (!use_stat)
 					{
-#endif
+#					endif
 						DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 						globfree(&globbuf);
 						ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
@@ -222,9 +229,9 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) EACCES); /* Access error. */
 						else
 							assert(GLOB_NOMATCH == status);			  /* No matches found. */
-#ifdef _AIX
+#					ifdef _AIX
 					}
-#endif
+#					endif
 				}
 			}
 		}
