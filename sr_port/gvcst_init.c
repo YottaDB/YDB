@@ -1179,7 +1179,7 @@ void gvcst_init(gd_region *reg)
 			(TREF(gbuff_limit)).str.addr = malloc(SIZEOF(REORG_GBUFF_LIMIT));
 			memcpy((TREF(gbuff_limit)).str.addr, REORG_GBUFF_LIMIT, SIZEOF(REORG_GBUFF_LIMIT));
 		}
-		if ((mu_reorg_process DEBUG_ONLY(|| IS_GTM_IMAGE)) && (0 != (TREF(gbuff_limit)).str.len))
+		if (0 != (TREF(gbuff_limit)).str.len)
 		{	/* if reorg or dbg apply env var */
 			set_gbuff_limit(&csa, &csd, &(TREF(gbuff_limit)));
 #			ifdef DEBUG
