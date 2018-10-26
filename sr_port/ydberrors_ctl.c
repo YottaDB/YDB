@@ -38,6 +38,8 @@ LITDEF	err_msg ydberrors[] = {
 	{ "CALLINTROLLBACK", "TROLLBACK at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL", 2 },
 	{ "TCPCONNTIMEOUT", "Connection wait timeout (!UL seconds) has expired", 2 },
 	{ "STDERRALREADYOPEN", "STDERR deviceparameter specifies an already open device !AD", 2 },
+	{ "SETENVFAIL", "VIEW \"SETENV\":\"!AZ\" failed in setenv() system call", 1 },
+	{ "UNSETENVFAIL", "VIEW \"UNSETENV\":\"!AZ\" failed in unsetenv() system call", 1 },
 };
 
 
@@ -50,7 +52,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	21,
+	23,
 	&ydberrors_undocarr[0],
 	0
 };

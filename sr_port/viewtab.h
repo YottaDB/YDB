@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,6 +110,7 @@ VIEWTAB("RELLOCK",		VTP_DBREGION,			VTK_RELLOCK,		MV_STR),
 VIEWTAB("RESETGVSTATS",		VTP_NULL,			VTK_RESETGVSTATS,	MV_STR),
 VIEWTAB("RTNCHECKSUM",		VTP_RTNAME,			VTK_RTNCHECKSUM,	MV_STR),
 VIEWTAB("RTNNEXT",		VTP_RTNAME,			VTK_RTNEXT,		MV_STR),
+VIEWTAB("SETENV",		VTP_VALUE,			VTK_SETENV,		MV_STR),
 VIEWTAB("SPSIZE",		VTP_NULL,			VTK_SPSIZE,		MV_STR),
 VIEWTAB("STATSHARE",		VTP_NULL | VTP_DBREGION,	VTK_STATSHARE,		MV_NM),
 VIEWTAB("STKSIZ",		VTP_NULL,			VTK_STKSIZ,		MV_NM),
@@ -120,6 +121,7 @@ VIEWTAB("TOTALBLOCKS",		VTP_DBREGION,			VTK_BLTOTAL,		MV_NM),
 VIEWTAB("TRACE",		VTP_VALUE,			VTK_TRACE,		MV_NM),
 VIEWTAB("TRANSACTIONID",	VTP_VALUE | VTP_NULL,		VTK_TID,		MV_STR),
 VIEWTAB("UNDEF",		VTP_NULL,			VTK_UNDEF,		MV_NM),
+VIEWTAB("UNSETENV",		VTP_VALUE,			VTK_UNSETENV,		MV_STR),
 VIEWTAB("YCHKCOLL",		VTP_NULL | VTP_VALUE,		VTK_YCHKCOLL,		MV_NM), /* nodoc : GDE related
 												 * undocumented feature */
 VIEWTAB("YCOLLATE",		VTP_VALUE,			VTK_YCOLLATE,		MV_NM), /* nodoc : collation related

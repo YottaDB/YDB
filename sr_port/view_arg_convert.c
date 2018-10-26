@@ -77,7 +77,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 		case VTP_NULL:
 			if (parm != 0)
 				rts_error_csa(CSA_ARG(NULL)
-					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
 			break;
 		case (VTP_NULL | VTP_VALUE):
 			if ((NULL == parm) && (VTK_JNLERROR != vtp->keycode))
@@ -89,7 +89,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 		case VTP_VALUE:
 			if ((NULL == parm) && (VTK_JNLERROR != vtp->keycode))
 				rts_error_csa(CSA_ARG(NULL)
-					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
 			parmblk->value = parm;
 			if (is_dollar_view || (VTK_JNLERROR != vtp->keycode))
 				break;
@@ -142,7 +142,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 		case VTP_DBREGION:
 			if ((NULL == parm) && (VTK_JNLERROR != vtp->keycode))
 				rts_error_csa(CSA_ARG(NULL)
-					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
 			assert(NULL != parm);
 			if (!gd_header)							/* IF GD_HEADER == 0 THEN OPEN GBLDIR */
 				gvinit();
@@ -208,7 +208,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 		case VTP_DBKEY:
 			if (NULL == parm)
 				rts_error_csa(CSA_ARG(NULL)
-					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
 			if (!parm->str.len)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOTGBL, 2, parm->str.len, NULL);
 			if (!gd_header)		/* IF GD_HEADER ==0 THEN OPEN GBLDIR */
@@ -235,7 +235,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 		case VTP_RTNAME:
 			if (NULL == parm)
 				rts_error_csa(CSA_ARG(NULL)
-					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
 			memset(&parmblk->ident.c[0], 0, SIZEOF(parmblk->ident));
 			if (parm->str.len > 0)
 				memcpy(&parmblk->ident.c[0], parm->str.addr,
@@ -252,7 +252,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 		case VTP_DBKEYLIST:
 			if (NULL == parm)
 				rts_error_csa(CSA_ARG(NULL)
-					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
 			if (!gd_header)
 				gvinit();
 			if (NULL == noisolation_buddy_list)
@@ -386,7 +386,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 		case VTP_LVN:
 			if (NULL == parm)
 				rts_error_csa(CSA_ARG(NULL)
-					VARLSTCNT(4) ERR_VIEWARGCNT, 2, strlen((const char *)vtp->keyword), vtp->keyword);
+					VARLSTCNT(4) ERR_VIEWARGCNT, 2, STRLEN((const char *)vtp->keyword), vtp->keyword);
 			if (0 < parm->str.len)
 			{
 				lvent.var_name.addr = parm->str.addr;
