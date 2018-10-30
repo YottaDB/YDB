@@ -179,7 +179,7 @@ void	op_view(int numarg, mval *keyword, ...)
 	lv_val			*lv, *lvp, *lvp_top;
 	lvmon_var		*lvmon_var_p, *lvmon_vars_base;
 	mstr			tmpstr;
-	mval			*arg, *nextarg, outval;
+	mval			*arg, *nextarg, outval, *arg2;
 	noisolation_element	*gvnh_entry;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -422,19 +422,19 @@ void	op_view(int numarg, mval *keyword, ...)
 				memcpy(envvarname, arg->str.addr, arg->str.len);
 				envvarname[arg->str.len] = '\0';
 				/* Set up the env var value next */
-				arg = va_arg(var, mval *);
-				MV_FORCE_STR(arg);
-				envvarvalue = malloc(arg->str.len + 1);	/* + 1 for null terminated string, needed by "setenv" */
-				if (arg->str.len)
-					memcpy(envvarvalue, arg->str.addr, arg->str.len);
-				envvarvalue[arg->str.len] = '\0';
+				arg2 = va_arg(var, mval *);
+				MV_FORCE_STR(arg2);
+				envvarvalue = malloc(arg2->str.len + 1); /* + 1 for null terminated string, needed by "setenv" */
+				if (arg2->str.len)
+					memcpy(envvarvalue, arg2->str.addr, arg2->str.len);
+				envvarvalue[arg2->str.len] = '\0';
 				status = setenv(envvarname, envvarvalue, TRUE);
 				if (-1 == status)
 				{
 					save_errno = errno;
 					free(envvarname);
 					free(envvarvalue);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_SETENVFAIL, 1, envvarname,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_SETENVFAIL, 2, arg->str.len, arg->str.addr,
 							ERR_SYSCALL, 5, RTS_ERROR_LITERAL("setenv()"), CALLFROM, save_errno);
 				}
 				free(envvarname);
@@ -455,7 +455,7 @@ void	op_view(int numarg, mval *keyword, ...)
 				{
 					save_errno = errno;
 					free(envvarname);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_UNSETENVFAIL, 1, envvarname,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_UNSETENVFAIL, 2, arg->str.len, arg->str.addr,
 							ERR_SYSCALL, 5, RTS_ERROR_LITERAL("unsetenv()"), CALLFROM, save_errno);
 				}
 				free(envvarname);
