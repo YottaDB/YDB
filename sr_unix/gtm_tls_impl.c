@@ -664,7 +664,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		}
 		X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK|X509_V_FLAG_CRL_CHECK_ALL);
 	}
-	SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
+	SSL_CTX_clear_mode(ctx, SSL_MODE_AUTO_RETRY);
 	SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_BOTH);
 	/* Set callbacks to called whenever a SSL session is added. */
 	SSL_CTX_sess_set_new_cb(ctx, new_session_callback);
