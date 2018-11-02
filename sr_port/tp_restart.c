@@ -84,7 +84,7 @@ GBLREF	mv_stent		*mv_chain;
 GBLREF	unsigned char		*msp, *stackbase, *stacktop, t_fail_hist[CDB_MAX_TRIES];
 GBLREF	sgm_info		*first_sgm_info;
 GBLREF	unsigned int		t_tries;
-GBLREF	int			process_id;
+GBLREF	uint4			process_id;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;

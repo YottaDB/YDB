@@ -69,12 +69,12 @@ MBSTART {										\
 	triple	*c;									\
 	DCL_THREADGBL_ACCESS;								\
 											\
-	SETUP_THREADGBL_ACCESS;							\
+	SETUP_THREADGBL_ACCESS;								\
 					/* memcmp() is fast and 3 chars sufficient */	\
  	if ((ydbDebugLevel & GDL_DebugCompiler) && (0 == memcmp(#n, "exorder", 3)))	\
 	{										\
 		if ((triple *)-1 != (triple *)q) /* to avoid post-checking deletes */	\
-			chktchain((triple *)q);					\
+			chktchain((triple *)q);						\
 		if (b)									\
 		{									\
 			c = TREF(curtchain);						\
@@ -89,12 +89,12 @@ MBSTART {										\
 MBSTART {				\
 	CHKTCHAIN((x), n, FALSE);	\
 	DQDEL((x), n);			\
-	CHKTCHAIN(-1, n, TRUE);	\
+	CHKTCHAIN(-1, n, TRUE);		\
 } MBEND
 #  define dqdelchain(q, x, n)		\
 MBSTART {				\
 	CHKTCHAIN((q), n, FALSE);	\
-	DQDELCHAIN((q), (x), n);		\
+	DQDELCHAIN((q), (x), n);	\
 	CHKTCHAIN((q), n, TRUE);	\
 } MBEND
 #  define dqins(q, n, x)		\

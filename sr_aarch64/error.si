@@ -23,9 +23,12 @@ chnd_ch_active	 =	8
 chnd_ch		 =	16
 chnd_jmp	 =	24
 
+	.include "gtm_threadgbl_deftypes_asm.si"
+
 	.data
 	.extern	ctxt
 	.extern	active_ch
+	.extern gtm_threadgbl
 
 	.text
 
@@ -41,6 +44,17 @@ chnd_jmp	 =	24
 	mov	x1, xzr				/* setjmp(ctxt->jmp) */
 	add	x0, x0, #chnd_jmp
 	bl 	__sigsetjmp
+	cbz	x0, 2f
+	/* This return point is when an error was unwound or a MUM_TSTART was run. We need to reduce the
+	 * rts_error_depth before doing anything else.
+	 */
+	ldr	x1, =gtm_threadgbl
+	ldr	x1, [x1]
+	ldr	w2, [x1, #ggo_rts_error_depth]
+	cbz	w2, 2f				/* Verify value is non-zero before decrementing */
+	subs	w2, w2, #1
+	str	w2, [x1, #ggo_rts_error_depth]
+2:
 	adds	w0, w0, #1
 	b.ne	1f
 	REVERT

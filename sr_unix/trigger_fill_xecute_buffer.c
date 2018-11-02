@@ -84,7 +84,9 @@ CONDITION_HANDLER(trigger_fill_xecute_buffer_ch)
 int trigger_fill_xecute_buffer(gv_trigger_t *trigdsc)
 {
 	int	src_fetch_status;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth));
 	/* We have 3 cases to consider - all of which REQUIRE a TP fence to already be in effect. The reason for this is, if we
 	 * detect a restartable condition, we are going to cause this region's triggers to be unloaded which destroys the block

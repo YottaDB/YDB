@@ -61,16 +61,16 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_NODE_NEXT);	/* Note: macro could "return" from this function in case of errors */
+	LIBYOTTADB_INIT(LYDB_RTN_NODE_NEXT, (int));	/* Note: macro could "return" from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
+	VERIFY_NON_THREADED_API;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
 		assert(0 == TREF(sapi_query_node_subs_cnt));	/* should have been cleared by "ydb_simpleapi_ch" */
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
-		LIBYOTTADB_DONE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
@@ -104,7 +104,7 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 			varnamemv.str.addr = varname->buf_addr;
 			varnamemv.str.len = varname->len_used;
 			if (0 == subs_used)
-			{	/* If no subscripts, use op_fnlvname() to locate the next local variable */
+			{	/* If no subscripts, no need for callg() overhead */
 				op_fnquery(3, NULL, &varnamemv, lvvalp);
 			} else
 			{	/* We have some subscripts - feed them all to op_fnquery */

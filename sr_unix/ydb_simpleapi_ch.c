@@ -20,6 +20,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_pthread.h"
 
 #include "error.h"
 #include "error_trap.h"
@@ -53,6 +54,8 @@
 #include "tp_restart.h"
 #include "tp_frame.h"
 #include "create_fatal_error_zshow_dmp.h"
+#include "gtm_multi_thread.h"
+#include "trace_table.h"
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	boolean_t		created_core;
@@ -73,15 +76,19 @@ GBLREF	uint4			ydbDebugLevel;		/* Debug level */
 GBLREF	mval			dollar_zstatus;
 GBLREF	int			tprestart_state;	/* When triggers restart, multiple states possible - see tp_restart.h */
 GBLREF	int4			gtm_trigger_depth;
-#ifdef DEBUG
-GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
-#endif
 GBLREF	int			mumps_status;
 GBLREF	uint4			dollar_trestart;
 GBLREF	trans_num		local_tn;
 GBLREF	uint4			simpleapi_dollar_trestart;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
+GBLREF	pthread_mutex_t		thread_mutex;
+GBLREF	uint4			process_id;
+#ifdef DEBUG
+GBLREF	char			*thread_mutex_holder_rtn;
+GBLREF	int			thread_mutex_holder_line;
+GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
+#endif
 
 /* Condition handler for simpleAPI environment. This routine catches all errors thrown by the YottaDB engine. The error
  * is basically returned to the user as the negative of the error to differentiate those errors from positive (success
@@ -310,6 +317,16 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 			ENABLE_INTERRUPTS(intrpt_ok_state, INTRPT_OK_TO_INTERRUPT);	/* If interrupts were deferred,
 											 * re-enable them now */
 	}
+#	ifdef GTM_PTHREAD
+	/* If thread_mutex is locked (from rts_error) by this thread, release it ignoring errors at this point */
+	if ((0 != (uintptr_t)thread_mutex_holder) && IS_LIBPTHREAD_MUTEX_LOCK_HOLDER)
+	{
+		thread_mutex_holder = 0;
+		DEBUG_ONLY(thread_mutex_holder_rtn = NULL);
+		DEBUG_ONLY(thread_mutex_holder_line = 0);
+		(void)pthread_mutex_unlock(&thread_mutex);
+	}
+#	endif
 #	ifdef GTM_TRIGGER
 	/* At this point, we are past the point where the frame pointer is allowed to be resting on a trigger frame
 	 * (this is possible in a TPRETRY situation where gtm_trigger must return to gtm_trigger() signaling a

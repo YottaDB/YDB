@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -41,7 +41,7 @@ ENTRY	dm_start
 	movl    $1, mumps_status(REG_IP)
 	leaq	xfer_table(REG_IP), REG_XFER_TABLE
 	movl	$1, dollar_truth(REG_IP)
-	ESTABLISH l30
+	ESTABLISH l30, l35
 	movq    restart(REG_IP), REG64_SCRATCH1
 	call    *REG64_SCRATCH1
 return:

@@ -281,7 +281,9 @@ void mupip_backup(void)
 	struct perm_diag_data	pdd;
 	int			nbytes, nbytes2;
 	ZOS_ONLY(int		realfiletag;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* ==================================== STEP 1. Initialization ======================================= */
 	backup_started = backup_interrupted = FALSE;
 	ret = SS_NORMAL;

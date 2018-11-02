@@ -708,12 +708,16 @@ STATICFNDEF void timer_handler(int why)
 	SETUP_THREADGBL_ACCESS;
 	assert(gtm_is_main_thread() || gtm_jvm_process);
 	DUMP_TIMER_INFO("At the start of timer_handler()");
+#	ifndef YDB_USE_POSIX_TIMERS
 	if (SIGALRM == why)
 	{	/* If why is 0, we know that timer_handler() was called directly, so no need
-		 * to check if the signal needs to be forwarded to appropriate thread.
+		 * to check if the signal needs to be forwarded to appropriate thread. Note
+		 * that when using POSIX timers, the signal is already being sent to the
+		 * correct thread for timer pops so there is no need to "forward it".
 		 */
 		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGALRM);
 	}
+#	endif
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into generic_signal_handler
 	 * (say to handle sig-3) and then had a timer handler pop while inside there (possible for example in receiver server).

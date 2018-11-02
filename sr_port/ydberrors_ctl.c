@@ -33,13 +33,21 @@ LITDEF	err_msg ydberrors[] = {
 	{ "FATALERROR2", "Fatal error raised. Bypassing core generation and terminating process. Error: !AD", 2 },
 	{ "TIME2LONG", "Specified time value [0x!16@XQ] exceeds supported maximum [0x!16@XQ]", 2 },
 	{ "VARNAME2LONG", "Variable name length exceeds maximum allowed (!UL)", 1 },
-	{ "SIMPLEAPINEST", "Attempt to nest call of !AD with a call to !AD - nesting calls is not permitted in simpleAPI", 4 },
+	{ "SIMPLEAPINEST", "Attempt to nest call of !AD with a call to !AD - nesting calls is not permitted in the Simple API", 4 },
 	{ "CALLINTCOMMIT", "TCOMMIT at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL", 2 },
 	{ "CALLINTROLLBACK", "TROLLBACK at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL", 2 },
 	{ "TCPCONNTIMEOUT", "Connection wait timeout (!UL seconds) has expired", 2 },
 	{ "STDERRALREADYOPEN", "STDERR deviceparameter specifies an already open device !AD", 2 },
 	{ "SETENVFAIL", "VIEW \"SETENV\":\"!AD\" failed in setenv() system call", 2 },
 	{ "UNSETENVFAIL", "VIEW \"UNSETENV\":\"!AD\" failed in unsetenv() system call", 2 },
+	{ "UNKNOWNSYSERR", "An unknown system error has occurred: !AD", 2 },
+	{ "STRUCTNOTALLOCD", "Structure not previously called with Alloc() method", 0 },
+	{ "PARMOFLOW", "Parameter overflow attempting to call variadic plist routine", 0 },
+	{ "NODEEND", "End of list of nodes/subscripts", 0 },
+	{ "INVLNPAIRLIST", "Invalid lockname/subscript pair list (uneven number of lockname/subscript parameters)", 0 },
+	{ "INVTPTRANS", "Invalid TP transaction - either invalid TP token or transaction not in progress", 0 },
+	{ "INVAPIMODE", "Process not allowed to first use a(n) !AD API then switch to using a(n) !AD API", 4 },
+	{ "NOTSUPSTAPI", "Calls to !AD are not supported in the threaded Simple API", 2 },
 };
 
 
@@ -52,7 +60,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	23,
+	31,
 	&ydberrors_undocarr[0],
 	0
 };

@@ -59,7 +59,9 @@ int	gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, in
 {
 	int		bom_bytes = 0;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&iod->pair, -1, ch_set);
 	switch (*chset)
 	{
@@ -123,7 +125,9 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 	int4		sleep_time;
 	ABS_TIME	current_time, time_left;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	status = 0;
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
@@ -263,7 +267,9 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 	boolean_t	bom_timeout = FALSE;
 	ABS_TIME	current_time, time_left;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
@@ -528,7 +534,9 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 	d_rm_struct	*rm_ptr;
 	boolean_t	pipe_or_fifo = FALSE;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
 	if (rm_ptr->is_pipe || rm_ptr->fifo)
@@ -657,7 +665,9 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 	int		fildes;
 	boolean_t	pipe_or_fifo = FALSE;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	assert (io_ptr->state == dev_open);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);

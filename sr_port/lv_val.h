@@ -241,15 +241,6 @@
 #define	LV_BLK_GET_BASE(LV_BLK)			(((sm_uc_ptr_t)LV_BLK) + SIZEOF(lv_blk))
 #define	LV_BLK_GET_FREE(LV_BLK, LVBLK_BASE)	(&LVBLK_BASE[LV_BLK->numUsed])
 
-#ifdef DEBUG_ALIAS
-# ifdef __linux__
-/*void * __attribute ((noinline)) __builtin_return_address(unsigned int level); Currently gives a warning we don't need */
-#  define CURRENT_PC __builtin_return_address(0)
-# else
-#  define CURRENT_PC NULL
-# endif
-#endif
-
 typedef struct lv_val_struct
 {
 	mval 				v;			/* Value associated with this lv_val */

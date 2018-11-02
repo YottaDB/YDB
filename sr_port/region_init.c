@@ -101,10 +101,11 @@ boolean_t region_init(bool cm_regions)
 
 void region_open(void)
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(region_init_ch);
-#ifdef UNIX
 	gv_cur_region->node = -1;
-#endif
 	gv_init_reg(gv_cur_region);
 	REVERT;
 }

@@ -343,6 +343,7 @@ void	gtm_env_init(void)
 		ret = ydb_logical_truth_value(YDBENVINDX_ENVIRONMENT_INIT, FALSE, &is_defined);
 		if (is_defined)
 			TREF(ydb_environment_init) = TRUE; /* in-house */
+#		ifdef DEBUG
 		/* See if a trace table is desired. If we have been asked to trace one or more groups, we also
 		 * see if a specific size has been specified. A default size is provided.
 		 */
@@ -364,6 +365,7 @@ void	gtm_env_init(void)
 				}
 			}
 		}
+#		endif
 		/* Initialize jnl_extract_nocol */
 		TREF(jnl_extract_nocol) = ydb_trans_numeric(YDBENVINDX_EXTRACT_NOCOL, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		/* Initialize dollar_zmaxtptime */

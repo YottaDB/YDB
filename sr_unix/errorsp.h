@@ -17,11 +17,13 @@
 #define __ERRORSP_H__
 
 #include <setjmp.h>
+#include "gtm_pthread.h"
 #include "gtm_stdio.h"
 
 #include "have_crit.h"
 #include "gtmimagename.h"
 #include "stack_frame.h"
+#include "trace_table.h"
 
 #ifdef __MVS__
 #  define GTMCORENAME "gtmcore"
@@ -98,6 +100,7 @@ GBLREF err_ctl			merrors_ctl;
 GBLREF err_ctl			ydberrors_ctl;
 GBLREF void			(*restart)();
 GBLREF int			process_exiting;
+GBLREF uint4			process_id;
 #endif
 
 #define WARNING		0
@@ -129,6 +132,8 @@ GBLREF int			process_exiting;
 #define MAKE_MSG_SEVERE(x)	((x) & ~SEV_MSK | SEVERE)
 
 #define ERROR_RTN		error_return
+
+#define MAX_RTS_ERROR_DEPTH	10				/* Max nest of rts_error_csa/send_msg_csa() before it's stopped */
 
 /* The CHTRACEPOINT macros are in place for CH debugging if necessary */
 #ifdef DEBUG
@@ -212,7 +217,7 @@ void ch_trace_point() {return;}
 					active_ch = ctxt;							\
 				}
 /* Currently the ESTABLISH_NOJMP macro is only used internal to this header file - if ever used outside this header file, it
- * needs to be protected with DEFER/ENABLE_INTERRUPTS macros.
+ * needs to be protected with DEFER/ENABLE_INTERRUPTS macros and may need code to reduce rts_error_depth.
  */
 #define ESTABLISH_NOJMP(x)	{								\
 					GTM_ASM_ESTABLISH;					\
@@ -245,6 +250,12 @@ void ch_trace_point() {return;}
 					ctxt->intrpt_ok_state = prev_intrpt_state;				\
 					if (0 != setjmp(ctxt->jmp))						\
 					{									\
+						/* Undo increment done in rts_error_csa() */			\
+						TRCTBL_ENTRY(RTSNEST_NESTDECR, TREF(rts_error_depth),		\
+							     (uintptr_t)process_id, (uintptr_t)pthread_self(),	\
+							     CURRENT_PC);					\
+						if (0 < TREF(rts_error_depth))					\
+							--(TREF(rts_error_depth));				\
 						prev_intrpt_state = ctxt->intrpt_ok_state;			\
 						REVERT;								\
 						/* The only way we should reach here is if a "longjmp" happened	\
@@ -276,6 +287,12 @@ void ch_trace_point() {return;}
 					ctxt->intrpt_ok_state = prev_intrpt_state;				\
 					if (0 != setjmp(ctxt->jmp))						\
 					{									\
+						/* Undo increment done in rts_error_csa() */			\
+						TRCTBL_ENTRY(RTSNEST_NESTDECR, TREF(rts_error_depth),		\
+							     (uintptr_t)process_id, (uintptr_t)pthread_self(),	\
+							     CURRENT_PC);					\
+						if (0 < TREF(rts_error_depth))					\
+							--(TREF(rts_error_depth));				\
 						prev_intrpt_state = ctxt->intrpt_ok_state;			\
 						REVERT;								\
 						/* See ESTABLISH_RET macro comment for below assert */		\
@@ -300,6 +317,12 @@ void ch_trace_point() {return;}
 					ctxt->intrpt_ok_state = prev_intrpt_state;				\
 					if (0 != setjmp(ctxt->jmp))						\
 					{									\
+						/* Undo increment done in rts_error_csa() */			\
+						TRCTBL_ENTRY(RTSNEST_NESTDECR, TREF(rts_error_depth),		\
+							     (uintptr_t)process_id, (uintptr_t)pthread_self(),	\
+							     CURRENT_PC);					\
+						if (0 < TREF(rts_error_depth))					\
+							--(TREF(rts_error_depth));				\
 						prev_intrpt_state = ctxt->intrpt_ok_state;			\
 						did_long_jump = TRUE;						\
 						/* See ESTABLISH_RET macro comment for below assert */		\
@@ -460,7 +483,7 @@ MBSTART {													\
 					CHTRACEPOINT;										\
 					DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);					\
 					chnd[current_ch].ch_active = FALSE;							\
-					assert((active_ch + 1)->dollar_tlevel == dollar_tlevel);					\
+					assert((active_ch + 1)->dollar_tlevel == dollar_tlevel);				\
 					active_ch++;										\
 					CHECKHIGHBOUND(active_ch);								\
 					ctxt = active_ch;									\
@@ -488,6 +511,8 @@ MBSTART {													\
 	DCL_THREADGBL_ACCESS;										\
 													\
 	SETUP_THREADGBL_ACCESS;										\
+	TRCTBL_ENTRY(CONDHNDLR_INVOKED, 0, (uintptr_t)process_id, (uintptr_t)pthread_self(),		\
+		     CURRENT_PC);									\
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);								\
 	CHTRACEPOINT;											\
 	DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);						\

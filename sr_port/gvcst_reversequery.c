@@ -94,7 +94,9 @@ boolean_t	gvcst_reversequery(void)
 	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	int		i;
 	int		save_dollar_tlevel;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	found = gvcst_reversequery2();
 	assert(save_dollar_tlevel == dollar_tlevel);

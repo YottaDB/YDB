@@ -60,17 +60,17 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_SUBSCRIPT_NEXT);	/* Note: macro could "return" from this function in case of errors */
+	LIBYOTTADB_INIT(LYDB_RTN_SUBSCRIPT_NEXT, (int));/* Note: macro could "return" from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
+	VERIFY_NON_THREADED_API;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
 		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* should have never become non-zero and even if it did,
 								 * it should have been cleared by "ydb_simpleapi_ch".
 								 */
-		LIBYOTTADB_DONE;
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}

@@ -230,7 +230,9 @@ void	iosocket_dlr_device(mstr *d)
 {
 	io_desc		*iod;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	iod = io_curr_device.in;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	PUT_DOLLAR_DEVICE_INTO_MSTR(iod, d);
@@ -243,7 +245,9 @@ void	iosocket_dlr_key(mstr *d)
 	io_desc		*iod;
 	int		len;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	iod = io_curr_device.in;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	len = STRLEN(iod->dollar.key);
@@ -265,7 +269,9 @@ void iosocket_dlr_zkey(mstr *d)
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	iod = io_curr_device.in;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 	assertpro(gtmsocket == iod->type);

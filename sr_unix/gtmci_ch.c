@@ -14,6 +14,9 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_pthread.h"
+
 #include "stack_frame.h"
 #include "mv_stent.h"
 #include "error.h"
@@ -28,6 +31,7 @@ GBLREF  unsigned char		*fgncal_stack;
 GBLREF  dollar_ecode_type 	dollar_ecode;
 GBLREF  boolean_t		created_core;
 GBLREF  boolean_t		dont_want_core;
+GBLREF	pthread_mutex_t		ydb_initexit_threadsafe_mutex;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
@@ -47,6 +51,7 @@ CONDITION_HANDLER(gtmci_ch)
 		gtm_dump();
 		TERMINATE;
 	}
+	(void)pthread_mutex_unlock(&ydb_initexit_threadsafe_mutex);
 	entryref.addr = CALL_IN_M_ENTRYREF;
 	entryref.len = STR_LIT_LEN(CALL_IN_M_ENTRYREF);
 	set_zstatus(&entryref, SIGNAL, NULL, FALSE);

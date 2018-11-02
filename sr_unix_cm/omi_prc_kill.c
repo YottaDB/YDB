@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,14 +29,15 @@ static char rcsid[] = "$Header:$";
 #include "op.h"
 
 
-int
-omi_prc_kill(omi_conn *cptr, char *xend, char *buff, char *bend)
+int omi_prc_kill(omi_conn *cptr, char *xend, char *buff, char *bend)
 {
     int		 rv;
     omi_si	 replicate;
     omi_li	 li;
+    DCL_THREADGBL_ACCESS;
 
-	ASSERT_IS_LIBGTCM;
+    SETUP_THREADGBL_ACCESS;
+    ASSERT_IS_LIBGTCM;
 /*  Replicate flag */
     OMI_SI_READ(&replicate, cptr->xptr);
 

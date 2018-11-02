@@ -85,7 +85,9 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 	ABS_TIME	cur_time, end_time;
 	mv_stent	*mv_zintdev;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	io_ptr = io_curr_device.in;
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	assert(io_ptr->state == dev_open);

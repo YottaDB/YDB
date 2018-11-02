@@ -27,9 +27,12 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 GBLREF	boolean_t	thread_mutex_initialized;	/* TRUE => "thread_mutex" variable is initialized */
 GBLREF	pthread_mutex_t	thread_mutex;			/* mutex structure used to ensure serialization amongst threads */
 GBLREF	pthread_t	thread_mutex_holder;		/* pid/tid of the thread that has "thread_mutex" currently locked */
+GBLREF	char		*thread_mutex_holder_rtn;	/* The thread_mutex_holder_[rtn,line]() fields are NOT debug-only */
+GBLREF	int		thread_mutex_holder_line;	/* .. see comments in gbldefs.c for more information. */
 GBLREF	pthread_key_t	thread_gtm_putmsg_rname_key;	/* points to region name corresponding to each running thread */
 GBLREF	boolean_t	thread_block_sigsent;		/* TRUE => block external signals SIGINT/SIGQUIT/SIGTERM/SIGTSTP/SIGCONT */
 GBLREF	int		ydb_mupjnl_parallel;		/* Maximum # of concurrent threads or procs to use in "gtm_multi_thread" */
+GBLREF	volatile boolean_t timer_in_handler;
 #ifdef DEBUG
 GBLREF	boolean_t	in_nondeferrable_signal_handler;
 
@@ -37,6 +40,7 @@ GBLREF	boolean_t	in_nondeferrable_signal_handler;
 # define	IN_TIMER_HANDLER		2
 #endif
 GBLREF	boolean_t	forced_thread_exit;
+GBLREF	boolean_t	simpleThreadAPI_active;
 
 error_def(ERR_SYSCALL);
 
@@ -74,7 +78,7 @@ typedef struct {
 
 int	gtm_multi_thread_helper(thread_parm_t *tparm);
 
-#define	IS_LIBPTHREAD_MUTEX_LOCK_HOLDER 	(pthread_self() == thread_mutex_holder)
+#define	IS_LIBPTHREAD_MUTEX_LOCK_HOLDER 	(pthread_equal(pthread_self(), thread_mutex_holder))
 
 /* Macro to grab a lock across all active threads in this process.
  * Note: One would normally need SHM_WRITE_MEMORY_BARRIER/SHM_READ_MEMORY_BARRIER usages surrounding the
@@ -85,51 +89,55 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
  * thread will never see itself as incorrectly holding the lock. If this behavior changes in the future,
  * then use of memory barriers might be warranted.
  */
-#define	PTHREAD_MUTEX_LOCK_IF_NEEDED(WAS_HOLDER)								\
-{														\
-	int	rc;												\
-														\
-	if (multi_thread_in_use)										\
-	{	/* gtm_malloc/gtm_free is not thread safe. So use locks to serialize */				\
-		assert(thread_mutex_initialized);								\
-		/* We should never use pthread_* calls inside a signal/timer handler. Assert that */		\
-		assert(!in_nondeferrable_signal_handler);							\
-		/* Allow for self to already own the lock (due to nested codepaths that need the lock. */	\
-		if (!IS_LIBPTHREAD_MUTEX_LOCK_HOLDER)								\
-		{												\
-			rc = pthread_mutex_lock(&thread_mutex);							\
-			if (rc)											\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,			\
-						RTS_ERROR_LITERAL("pthread_mutex_lock()"), CALLFROM, rc);	\
-			thread_mutex_holder = pthread_self();							\
-			WAS_HOLDER = FALSE;									\
-		} else												\
-			WAS_HOLDER = TRUE;									\
-	} else													\
-		assert(!thread_mutex_holder);									\
+#define	PTHREAD_MUTEX_LOCK_IF_NEEDED(WAS_HOLDER)									\
+{															\
+	int	rc;													\
+															\
+	if (multi_thread_in_use || simpleThreadAPI_active)								\
+	{														\
+		assertpro(!timer_in_handler);										\
+		/* We should never use pthread_* calls inside a signal/timer handler. Assert that */			\
+		assert(!in_nondeferrable_signal_handler);								\
+		/* Allow for self to already own the lock (due to nested codepaths that need the lock. */		\
+		if (!IS_LIBPTHREAD_MUTEX_LOCK_HOLDER)									\
+		{													\
+			rc = pthread_mutex_lock(&thread_mutex);								\
+			if (rc)												\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,				\
+					      RTS_ERROR_LITERAL("pthread_mutex_lock(thread_mutex)"), CALLFROM, rc);	\
+			thread_mutex_holder = pthread_self();								\
+			DEBUG_ONLY(thread_mutex_holder_rtn = __FILE__);							\
+			DEBUG_ONLY(thread_mutex_holder_line = __LINE__);						\
+			WAS_HOLDER = FALSE;										\
+		} else													\
+			WAS_HOLDER = TRUE;										\
+	} else														\
+		assert(0 == (uintptr_t)thread_mutex_holder);								\
 }
 
-#define	PTHREAD_MUTEX_UNLOCK_IF_NEEDED(WAS_HOLDER)							\
-{													\
-	int	rc;											\
-													\
-	if (multi_thread_in_use)									\
-	{												\
-		assert(thread_mutex_initialized);							\
-		/* We should never use pthread_* calls inside a signal/timer handler. Assert that */	\
-		assert(!in_nondeferrable_signal_handler);						\
-		/* assert self does own the lock */							\
-		assert(pthread_self() == thread_mutex_holder);						\
-		if (!WAS_HOLDER)									\
-		{											\
-			thread_mutex_holder = 0;							\
-			rc = pthread_mutex_unlock(&thread_mutex);					\
-			if (rc)										\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,		\
-					RTS_ERROR_LITERAL("pthread_mutex_unlock()"), CALLFROM, rc);	\
-		}											\
-	} else												\
-		assert(!thread_mutex_holder);								\
+#define	PTHREAD_MUTEX_UNLOCK_IF_NEEDED(WAS_HOLDER)									\
+{															\
+	int	rc;													\
+															\
+	if (multi_thread_in_use || simpleThreadAPI_active)								\
+	{														\
+		assertpro(!timer_in_handler);										\
+		/* We should never use pthread_* calls inside a signal/timer handler. Assert that */			\
+		assert(!in_nondeferrable_signal_handler);								\
+		/* assert self does own the lock */									\
+		assert(IS_LIBPTHREAD_MUTEX_LOCK_HOLDER);								\
+		if (!WAS_HOLDER)											\
+		{													\
+			thread_mutex_holder = 0;									\
+			DEBUG_ONLY(thread_mutex_holder_rtn = NULL);							\
+			DEBUG_ONLY(thread_mutex_holder_line = 0);							\
+			rc = pthread_mutex_unlock(&thread_mutex);							\
+			if (rc)												\
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,				\
+					      RTS_ERROR_LITERAL("pthread_mutex_unlock(pthread_mutex)"), CALLFROM, rc);	\
+		}													\
+	} else														\
+		assert(0 == (uintptr_t)thread_mutex_holder);								\
 }
 
 /* Below macro identifies if the caller is inside threaded code. A quick check of this is using the global
@@ -139,14 +147,14 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
  * master and non-NULL for the threads.
  * Note: In the future, if more threads are implemented with no region context, we might be better off checking
  * "gtm_main_thread_id" against "pthread_self()". Right now, the former is not maintained in all cases and is
- * hence not used.
+ * hence not used. TODO SEE
  */
 #define	INSIDE_THREADED_CODE(rname) (multi_thread_in_use && (NULL != (rname = pthread_getspecific(thread_gtm_putmsg_rname_key))))
 
 #else
 
 #define	IS_LIBPTHREAD_MUTEX_LOCK_HOLDER 		FALSE
-#define	ASSERT_NO_THREAD_USAGE				assert(!multi_thread_in_use && !thread_mutex_holder)
+#define	ASSERT_NO_THREAD_USAGE				assert(!multi_thread_in_use && (0 != (uintptr_t)thread_mutex_holder))
 #define	PTHREAD_MUTEX_LOCK_IF_NEEDED(WAS_HOLDER) 	ASSERT_NO_THREAD_USAGE
 #define	PTHREAD_MUTEX_UNLOCK_IF_NEEDED(WAS_HOLDER)	ASSERT_NO_THREAD_USAGE
 #define	INSIDE_THREADED_CODE(rname)			FALSE

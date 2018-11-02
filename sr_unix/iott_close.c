@@ -40,7 +40,9 @@ void iott_close(io_desc *v, mval *pp)
 	int		p_offset;
 	boolean_t	ch_set;
 	recall_ctxt_t	*recall, *recall_top;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(v->type == tt);
 	if (v->state != dev_open)
 		return;

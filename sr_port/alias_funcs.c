@@ -389,13 +389,14 @@ void als_check_xnew_var_aliases(symval *popdsymval, symval *cursymval)
 	lv_val			*lv, *prevlv, *currlv, *popdlv;
 	lv_val			*newlv, *oldlv;
 	boolean_t		bypass_lvscan, bypass_lvrepl;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(als_check_xnew_var_aliases_ch);
 	suspend_lvgcol = TRUE;
 	assert(NULL != popdsymval);
 	assert(NULL != cursymval);
 	assert((NULL != popdsymval->xnew_var_list) || (NULL != alias_retarg));
-
 	DBGRFCT((stderr, "\nals_check_xnew_var_aliases: Beginning xvar pop processing\n"));
 	/* Step 2: (step 1 done in op_xnew()) - Run the list of vars that were passed through the xnew and remove them
 	 * from the popped hash table so they can not be found by the step 3 scan below - meaning we won't mess with the

@@ -116,7 +116,7 @@ GBLREF	sgmnt_addrs		*reorg_encrypt_restart_csa;
 GBLREF	uint4			update_trans;
 #endif
 
-#define TP_STACK_SIZE ((TP_MAX_NEST + 1) * SIZEOF(tp_frame))	/* Size of TP stack frame with no-overflow pad */
+#define TP_STACK_SIZE ((TP_MAX_LEVEL + 1) * SIZEOF(tp_frame))	/* Size of TP stack frame with no-overflow pad */
 
 void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 {
@@ -196,8 +196,8 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 	}
 	if (0 != jnl_fence_ctl.level)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
-	if (dollar_tlevel + 1 >= TP_MAX_NEST)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TPTOODEEP, 1, TP_MAX_NEST - 1);
+	if (dollar_tlevel + 1 >= TP_MAX_LEVEL)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TPTOODEEP, 1, TP_MAX_LEVEL - 1);
 	va_start(varlst, tstart_flag);	/* no argument count first */
 	serial = va_arg(varlst, int);
 	tid = va_arg(varlst, mval *);

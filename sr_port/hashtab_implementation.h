@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -443,6 +446,9 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 	boolean_t	added;
 	void		*htval;
 	CONDITION_HANDLER(hashtab_rehash_ch);
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(hashtab_rehash_ch);
 	DBGHASHTAB((stderr, "EXPAND_HASHTAB:ENTER: table: table(%lx) base (%lx), spare_base(%lx), spare_base_size(%d), \n",
 		table, table->base, table->spare_base, table->spare_base_size));

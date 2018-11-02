@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -66,7 +69,7 @@ void gtm_dump_core(void)
 	sigemptyset(&unblock_sigquit);
 	sigaddset(&unblock_sigquit, SIGQUIT);
 	SIGPROCMASK(SIG_UNBLOCK, &unblock_sigquit, NULL, rc);
-	kill(getpid(), SIGQUIT);
+	pthread_kill(pthread_self(), SIGQUIT);
 	/* The below sleep function should NOT be converted to LONG_SLEEP() despite what ftpput says. This sleep is just
 	 * waiting for the preceding signal to take effect so it should not run hiber_start() since this is NOT the main
 	 * process but a fork-inspired facsimile spawned for the sole purpose of generating an appropriate core.

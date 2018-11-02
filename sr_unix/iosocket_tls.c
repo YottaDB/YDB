@@ -87,7 +87,9 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 	ABS_TIME		cur_time, end_time;
 	struct pollfd		fds;
 	boolean_t		ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	iod = io_curr_device.out;
 	assert(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;

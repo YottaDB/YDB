@@ -41,8 +41,8 @@ GBLREF	mval	dollar_zinterrupt;
 void jobinterrupt_init(void)
 {
 	char	trans_bufr[MAX_TRANS_NAME_LEN];
-	DCL_THREADGBL_ACCESS;
 	struct sigaction new_action;
+	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	/* Setup new signal handler to just drive condition handler which will do the right thing.  */

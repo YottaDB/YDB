@@ -40,36 +40,36 @@ GBLREF boolean_t	err_same_as_out;
 
 LITREF	mval	literal_zero;
 
+static readonly unsigned char open_params_list[2] =
+{
+	(unsigned char)iop_newversion,
+	(unsigned char)iop_eol
+};
+static readonly unsigned char nolognam_params_list[] =
+{
+	(unsigned char)iop_stream,	/* open FILEs in Unix with STREAM option by default */
+	(unsigned char)iop_nl,
+	(unsigned char)iop_eol
+};
+static readonly unsigned char nowrap_params_list[] =
+{
+	(unsigned char)iop_nowrap,
+	(unsigned char)iop_eol
+};
+static readonly unsigned char	no_params = (unsigned char)iop_eol;
+static readonly unsigned char	shr_params[] =
+{
+	(unsigned char)iop_shared,
+	(unsigned char)iop_readonly,
+	(unsigned char)iop_eol
+};
+
 error_def(ERR_FILEOPENFAIL);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_SYSCALL);
 
 void io_init(boolean_t term_ctrl)
 {
-	static readonly unsigned char open_params_list[2] =
-	{
-		(unsigned char)iop_newversion,
-		(unsigned char)iop_eol
-	};
-	static readonly unsigned char nolognam_params_list[] =
-	{
-		(unsigned char)iop_stream,	/* open FILEs in Unix with STREAM option by default */
-		(unsigned char)iop_nl,
-		(unsigned char)iop_eol
-	};
-	static readonly unsigned char nowrap_params_list[] =
-	{
-		(unsigned char)iop_nowrap,
-		(unsigned char)iop_eol
-	};
-	static readonly unsigned char	no_params = (unsigned char)iop_eol;
-	static readonly unsigned char	shr_params[] =
-	{
-		(unsigned char)iop_shared,
-		(unsigned char)iop_readonly,
-		(unsigned char)iop_eol
-	};
-
 	int4			status;
         mval			val;
 	mstr			tn;
@@ -82,7 +82,9 @@ void io_init(boolean_t term_ctrl)
 	enum io_dev_type	dev_type;
 	int			fd, newfd;
 	struct stat		statbuf, out_statbuf;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* Make sure we have valid descriptors on stdin/stdout/stderr.
 	 * Otherwise we could end up "filling the hole" with a database file and writing an error message to it.
 	 */

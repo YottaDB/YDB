@@ -502,7 +502,7 @@ LITDEF char *lydbrtnnames[] =
 };
 #undef LYDBRTN
 
-/* What package the libyottadb routines below to */
+/* What package the libyottadb routines belong to */
 #define LYDBRTN(a, b, c) b
 LITDEF int lydbrtnpkg[] =
 {

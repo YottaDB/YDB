@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,10 +13,12 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
 #ifdef SYS_ERRLIST_INCLUDE
-#include SYS_ERRLIST_INCLUDE
+# include SYS_ERRLIST_INCLUDE
 #endif
+
 #include "error.h"
 #include "gtmmsg.h"
 
@@ -21,10 +26,10 @@ GBLREF bool	dec_nofac;
 
 #define ERR_TAG		"ENO"
 
-
-void	gtm_getmsg(int4 msgnum, mstr *msgbuf)
+int gtm_getmsg(int4 msgnum, mstr *msgbuf)
 {
 	short int	m_len, faclen, taglen, j, sever;
+	int		retval;
 	char		*cp;
 	const char 	*top, *msgp, *fac;
 	char		outbuf[32];
@@ -33,6 +38,7 @@ void	gtm_getmsg(int4 msgnum, mstr *msgbuf)
 	const err_ctl	*ctl;
 
 	ctl = err_check(msgnum);
+	retval = 0;
 	if (NULL != ctl)
 	{
 		GET_MSG_INFO(msgnum, ctl, msg);
@@ -57,6 +63,7 @@ void	gtm_getmsg(int4 msgnum, mstr *msgbuf)
 		{
 			tag = "UNKNOWN";
 			msgp = "Unknown system error !SL";
+			retval = ERR_UNKNOWNSYSERR;	/* This is an unknown system error */
 		}
 		fac = "SYSTEM";
 	}
@@ -114,4 +121,5 @@ void	gtm_getmsg(int4 msgnum, mstr *msgbuf)
 	cp += top - cp;
 	msgbuf->len = m_len;
 	*cp++ = 0;
+	return retval;
 }

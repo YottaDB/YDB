@@ -15,8 +15,8 @@
 #include "gtmxc_types.h"
 #include "error.h"
 #include "send_msg.h"
-#include "libydberrors.h"
 #include "libyottadb_int.h"
+#include "libydberrors.h"
 
 /* Simple YottaDB wrapper for gtm_start_timer() */
 int	ydb_timer_start(int timer_id, unsigned long long limit_nsec, ydb_funcptr_retvoid_t handler, unsigned int hdata_len,
@@ -28,11 +28,11 @@ int	ydb_timer_start(int timer_id, unsigned long long limit_nsec, ydb_funcptr_ret
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (process_exiting)
-	{	/* YDB runtime environment not setup/available, no driving of errors */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		return YDB_OK;
-	}
+	LIBYOTTADB_INIT(LYDB_RTN_TIMER_START, (int));	/* Note: macro could return from this function in case of errors */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Previously unused entries should have been cleared by that
+							 * corresponding ydb_*_s() call.
+							 */
+	VERIFY_NON_THREADED_API;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{	/* Some error occurred - just return to the caller ($ZSTATUS is set) */
@@ -44,6 +44,7 @@ int	ydb_timer_start(int timer_id, unsigned long long limit_nsec, ydb_funcptr_ret
 	timeout_msec = (limit_nsec / NANOSECS_IN_MSEC);
 	timeoutms = (int)timeout_msec;
 	gtm_start_timer(timer_id, timeoutms, handler, hdata_len, hdata);
+	LIBYOTTADB_DONE;
 	REVERT;
 	return YDB_OK;
 }

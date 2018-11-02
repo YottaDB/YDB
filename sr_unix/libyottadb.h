@@ -43,15 +43,16 @@ enum
 };
 
 /* Maximum values */
-#define YDB_MAX_IDENT		31	/* Maximum size of global/local name (not including '^') */
-#define YDB_MAX_NAMES		35	/* Maximum number of variable names can be specified in a single ydb_*_s() call */
+#define YDB_MAX_IDENT		31		/* Maximum size of global/local name (not including '^') */
+#define YDB_MAX_NAMES		35		/* Maximum number of variable names can be specified in a single ydb_*_s() call */
 #define YDB_MAX_STR		(1 * 1024 * 1024)	/* Maximum YottaDB string length */
-#define YDB_MAX_SUBS		31	/* Maximum subscripts currently supported */
+#define YDB_MAX_SUBS		31		/* Maximum subscripts currently supported */
 #define YDB_MAX_TIME_NSEC	(0x7fffffffllu * 1000llu * 1000llu)	/* Max specified time in (long long) nanoseconds */
-#define YDB_MIN_YDBERR		(2 ** 27)	/* Minimum (absolute) value for a YottaDB error */
 #define YDB_MAX_YDBERR		(2 ** 30)	/* Maximum (absolute) value for a YottaDB error */
+#define YDB_MAX_ERRORMSG	1024		/* Will hold any message we return */
 
 /* Minimum values */
+#define YDB_MIN_YDBERR		(2 ** 27)	/* Minimum (absolute) value for a YottaDB error */
 
 /* Non-error return codes (all positive) */
 #define YDB_OK		0		/* Successful return code */
@@ -76,6 +77,10 @@ enum
 #ifndef NULL
 #  define NULL ((void *)0)
 #endif
+
+/* Value for tptoken for SimpleThreadAPI calls if NOT in a TP transaction */
+#define YDB_NOTTP 0
+
 
 /* Macro to create/fill-in a ydb_buffer_t structure from a literal - use - literal varnames, subscripts
  * or values.
@@ -261,6 +266,11 @@ typedef ydb_char_t	ydb_jstring_t;
 typedef ydb_char_t	ydb_jbyte_array_t;
 typedef ydb_char_t	ydb_jbig_decimal_t;
 
+/* Function pointer types for use in the APIs below */
+typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);			/* For use in SimpleAPI */
+typedef int	(*ydb_tp2fnptr_t)(uint64_t tptoken, void *tpfnparm);	/* For use in SimpleThreadAPI */
+typedef uintptr_t (*ydb_vplist_func)(uintptr_t cnt, ...);
+
 /* Call-in interface. */
 int 	ydb_ci(const char *c_rtn_name, ...);
 int 	ydb_cip(ci_name_descriptor *ci_info, ...);
@@ -274,24 +284,36 @@ int	ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 void 	ydb_zstatus(char* msg, int len);
 
 /* Utility entry points accessable in libyottadb.so */
+int	ydb_child_init(void *param);
+int	ydb_file_id_free(ydb_fileid_ptr_t fileid);
+int	ydb_file_is_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
 int	ydb_file_name_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
 int	ydb_hiber_start(unsigned long long sleep_nsec);
 int	ydb_hiber_start_wait_any(unsigned long long sleep_nsec);
+void 	*ydb_malloc(size_t size);
+int	ydb_message(int status, ydb_buffer_t *msg_buff);
+int	ydb_stdout_stderr_adjust(void);
+int	ydb_thread_is_main(void);
 int	ydb_timer_start(int timer_id, unsigned long long limit_nsec, ydb_funcptr_retvoid_t handler, unsigned int hdata_len,
 			void *hdata);
-void	ydb_timer_cancel(int timer_id);
-int	ydb_file_is_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
-int	ydb_file_id_free(ydb_fileid_ptr_t fileid);
-int	ydb_thread_is_main(void);
-void 	*ydb_malloc(size_t size);
-void	ydb_free(void *ptr);
 void	ydb_fork_n_core(void);
-int	ydb_child_init(void *param);
-int	ydb_stdout_stderr_adjust(void);
+void	ydb_free(void *ptr);
+void	ydb_timer_cancel(int timer_id);
 
-typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);
+/* Utility routines for use in threaded applications - use SimpleThreadAPI */
+int	ydb_file_id_free_t(uint64_t tptoken, ydb_fileid_ptr_t fileid);
+int	ydb_file_is_identical_t(uint64_t tptoken, ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
+int	ydb_file_name_to_id_t(uint64_t tptoken, ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
+void	ydb_free_t(uint64_t tptoken, void *ptr);
+void 	*ydb_malloc_t(uint64_t tptoken, size_t size);
+int	ydb_message_t(uint64_t tptoken, int status, ydb_buffer_t *msg_buff);
+int	ydb_stdout_stderr_adjust_t(uint64_t tptoken);
+void	ydb_timer_cancel_t(uint64_t tptoken, int timer_id);
+int	ydb_timer_start_t(uint64_t tptoken, int timer_id, unsigned long long limit_nsec, ydb_funcptr_retvoid_t handler,
+			  unsigned int hdata_len, void *hdata);
 
 /* Simple API routine declarations */
+int ydb_call_variadic_plist_func_s(ydb_vplist_func cgfunc, uintptr_t cvplist);	/* Used by Golang to call variadic C function */
 int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, unsigned int *ret_value);
 int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int deltype);
 int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames);
@@ -310,6 +332,34 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr);
 int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str);
 int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames);
-void ydb_fork_n_core(void);
+
+/* SimpleAPI via thread interface (currently only one thread, once YottaDB itself is multi-threaded, we can support
+ * more threads.
+ */
+int ydb_call_variadic_plist_func_st(uint64_t tptoken, ydb_vplist_func cgfunc, uintptr_t cvplist); /* Used by Golang to call a
+												   * variadic C function */
+int ydb_data_st(uint64_t tptoken, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, unsigned int *ret_value);
+int ydb_delete_st(uint64_t tptoken, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int deltype);
+int ydb_delete_excl_st(uint64_t tptoken, int namecount, ydb_buffer_t *varnames);
+int ydb_lock_st(uint64_t tptoken, unsigned long long timeout_nsec, int namecount, ...);
+int ydb_lock_incr_st(uint64_t tptoken, unsigned long long timeout_nsec, ydb_buffer_t *varname, int subs_used,
+		     ydb_buffer_t *subsarray);
+int ydb_lock_decr_st(uint64_t tptoken, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
+int ydb_set_st(uint64_t tptoken, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *value);
+int ydb_get_st(uint64_t tptoken, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
+int ydb_subscript_next_st(uint64_t tptoken, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
+			  ydb_buffer_t *ret_value);
+int ydb_subscript_previous_st(uint64_t tptoken, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
+			      ydb_buffer_t *ret_value);
+int ydb_node_next_st(uint64_t tptoken, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int *ret_subs_used,
+		     ydb_buffer_t *ret_subsarray);
+int ydb_node_previous_st(uint64_t tptoken, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int *ret_subs_used,
+			 ydb_buffer_t *ret_subsarray);
+int ydb_incr_st(uint64_t tptoken, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *increment,
+		ydb_buffer_t *ret_value);
+int ydb_str2zwr_st(uint64_t tptoken, ydb_buffer_t *str, ydb_buffer_t *zwr);
+int ydb_zwr2str_st(uint64_t tptoken, ydb_buffer_t *zwr, ydb_buffer_t *str);
+int ydb_tp_st(uint64_t tptoken, ydb_tp2fnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames);
+
 
 #endif /* LIBYOTTADB_TYPES_H */

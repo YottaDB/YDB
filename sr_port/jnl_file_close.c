@@ -73,14 +73,16 @@ void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 	int			rc, save_errno, idx;
 	uint4			jnl_fs_block_size;
 	boolean_t		was_in_jnl_file_autoswitch, write_eof, in_tail;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	assert(!clean || csa->now_crit || (csd->clustered && (CCST_CLOSED == csa->nl->ccp_state)));
-	DEBUG_ONLY(
-		if (clean)
-			ASSERT_JNLFILEID_NOT_NULL(csa);
-	)
+#	ifdef DEBUG
+	if (clean)
+		ASSERT_JNLFILEID_NOT_NULL(csa);
+#	endif
 	jpc = csa->jnl;
 	if (csa->dbsync_timer)
 		CANCEL_DBSYNC_TIMER(csa);

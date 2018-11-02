@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,8 +32,7 @@ static char rcsid[] = "$Header:$";
 #include "op.h"
 
 
-int
-omi_prc_lock(omi_conn *cptr, char *xend, char *buff, char *bend)
+int omi_prc_lock(omi_conn *cptr, char *xend, char *buff, char *bend)
 {
     GBLREF int		 omi_pid;
     GBLREF mlk_pvtblk	*mlk_pvt_root;
@@ -43,8 +42,10 @@ omi_prc_lock(omi_conn *cptr, char *xend, char *buff, char *bend)
     int			 rv;
     omi_si		 si;
     mlk_pvtblk		*next, **prior;
+    DCL_THREADGBL_ACCESS;
 
-	ASSERT_IS_LIBGTCM;
+    SETUP_THREADGBL_ACCESS;
+    ASSERT_IS_LIBGTCM;
     bptr = buff;
 
 /*  Global Ref */

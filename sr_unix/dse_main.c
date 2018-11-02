@@ -181,7 +181,9 @@ static void display_prompt(void)
 static bool	dse_process(int argc)
 {
 	int	res;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(util_ch, TRUE);
 	func = 0;
 	util_interrupt = 0;

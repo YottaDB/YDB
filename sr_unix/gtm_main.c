@@ -60,6 +60,8 @@ GBLREF	boolean_t			ydb_dist_ok_to_use;
 GBLREF	char				ydb_dist[YDB_PATH_MAX];
 GBLREF	CLI_ENTRY			mumps_cmd_ary[];
 GBLREF	boolean_t			skip_dbtriggers;
+GBLREF	boolean_t			noThreadAPI_active;
+GBLREF	boolean_t			simpleThreadAPI_active;
 #if defined (GTM_TRIGGER) && (DEBUG)
 GBLREF	ch_ret_type			(*ch_at_trigger_init)();
 #endif
@@ -99,6 +101,8 @@ int gtm_main(int argc, char **argv, char **envp)
 	common_startup_init(GTM_IMAGE, &mumps_cmd_ary[0]);
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
 	err_init(stop_image_conditional_core);
+	assert(!(noThreadAPI_active || simpleThreadAPI_active));	/* Neither should be set unless we recursed (never!) */
+	noThreadAPI_active = TRUE;
 	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	ydb_chk_dist(argv[0]);

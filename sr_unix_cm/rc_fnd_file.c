@@ -82,7 +82,9 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	int             len, node2;
 	gvnh_reg_t	*gvnh_reg;
 	boolean_t	is_ydb_env_match;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ASSERT_IS_LIBGTCM;
 	GET_SHORT(dsid, &xdsid->dsid.value);
 	GET_SHORT(node, &xdsid->node.value);

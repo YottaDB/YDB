@@ -366,6 +366,9 @@ MBSTART {														\
 #endif
 static void expand_stp(size_t new_size)	/* BYPASSOK */
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	if (retry_if_expansion_fails)
 		ESTABLISH(stp_gcol_ch);
 	assert(IS_GTM_IMAGE || IS_MUPIP_IMAGE);

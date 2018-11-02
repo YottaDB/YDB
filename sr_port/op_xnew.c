@@ -57,7 +57,7 @@ CONDITION_HANDLER(zbreak_zstep_xnew_ch);
  *	 in umw_mv_stent().
  */
 
-void op_xnew(UNIX_ONLY_COMMA(unsigned int argcnt_arg) mval *s_arg, ...)
+void op_xnew(unsigned int argcnt_arg, mval *s_arg, ...)
 {
 	boolean_t		added;
 	ht_ent_mname		*tabent1, *tabent2;
@@ -70,8 +70,7 @@ void op_xnew(UNIX_ONLY_COMMA(unsigned int argcnt_arg) mval *s_arg, ...)
 	va_list			var;
 	var_tabent		lvent;
 
-	VMS_ONLY(va_count(argcnt));
-	UNIX_ONLY(argcnt = argcnt_arg);		/* need to preserve stack copy on i386 */
+	argcnt = argcnt_arg;		/* need to preserve stack copy on i386 */
 	htold = &curr_symval->h_symtab;
 	shift = symbinit();
 	DBGRFCT((stderr, "\n\n****op_xnew: **** New symbol table (0x"lvaddr") replaced previous table (0x"lvaddr")\n\n",
@@ -168,7 +167,9 @@ STATICFNDEF void guard_against_zbzst(void)
 	 */
 	boolean_t	fetch;
 	stack_frame	*fp, *fp_prev;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	fp = frame_pointer;
 	assert(!(fp->type & SFT_COUNT));
 	fp_prev = fp->old_frame_pointer;

@@ -76,7 +76,9 @@ boolean_t gvcst_queryget(mval *val)
 	boolean_t	est_first_pass;
 	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	int		save_dollar_tlevel;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	found = gvcst_queryget2(val, NULL);
 	WBTEST_ONLY(WBTEST_QUERY_HANG,

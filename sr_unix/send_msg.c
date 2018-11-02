@@ -15,6 +15,8 @@
 
 #include "mdef.h"
 
+#include "gtm_syslog.h"
+#include "gtm_stdio.h"
 #include <stdarg.h>
 
 #include "gtm_multi_thread.h"
@@ -34,6 +36,8 @@
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for anticipatory_freeze.h */
 #include "anticipatory_freeze.h"	/* for SET_ANTICIPATORY_FREEZE_IF_NEEDED */
+#include "get_syslog_flags.h"
+#include "libyottadb_int.h"
 
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	boolean_t		caller_id_flag;
@@ -41,6 +45,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	volatile boolean_t	timer_in_handler;
 GBLREF	int4			exit_state;
+GBLREF	boolean_t		first_syslog;
 
 #ifdef DEBUG
 static uint4		nesting_level = 0;
@@ -94,6 +99,29 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	/* Like in rts_error_csa() do some checking we aren't nesting too deep due to error loop */
+	if (MAX_RTS_ERROR_DEPTH < ++(TREF(rts_error_depth)))
+	{	/* Too many errors nesting - stop it here - fatally. What we do is the following:
+		 *   1. Put a message in syslog (not using send_msg_csa()) about what happened.
+		 *   2. Put same message on stderr (straight shot - not through YottaDBs gtm_fprintf() routine)
+		 *   3. Terminate this process with a core - not a fork as this process cannot continue.
+		 *
+		 * Note this counter is not an exact science. Normally when we drive condition handlers, we don't return here
+		 * as some sort of error mitigation code runs and resets things. So the counter is typically ever increasing
+		 * but there is a reset in mdb_condition_handler and ydb_simpleapi_ch - both handlers that "recover" and continue
+		 * that clear this depth counter. So we are only detecting error loops in rts_error.c itself really (they typically
+		 * occur in the PTHREAD_MUTEX_LOCK_IF_NEEDED() macro)) when/if they occur.
+		 */
+		if (first_syslog)
+		{
+			OPENLOG("YottaDB", get_syslog_flags(), LOG_USER);
+			first_syslog = FALSE;
+		}
+		SYSLOG(LOG_USER | LOG_INFO, "%s", "%YDB-F-MAXRTSERRDEPTH Error loop detected - aborting image with core");
+		fprintf(stderr, "%%YDB-F-MAXRTSERRDEPTH Error loop detected - aborting image with core");
+		ydb_dmp_tracetbl();
+		DUMP_CORE;			/* Terminate *THIS* thread/process and produce a core */
+	}
 	PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
 	/* Since send_msg uses a global variable buffer, reentrant calls to send_msg will use the same buffer.
 	 * Ensure we never overwrite an under-construction send_msg buffer with a nested send_msg call. One
@@ -151,7 +179,8 @@ void send_msg_va(void *csa, int arg_count, va_list var)
         /* it has been suggested that this would be a place to check a view_debugN
          * and conditionally enter a "forever" loop on wcs_sleep for unix debugging
          */
-	DEBUG_ONLY(nesting_level--;)
+	DEBUG_ONLY(nesting_level--);
 	FREEZE_INSTANCE_IF_NEEDED(csa, freeze_needed, freeze_msg_id, local_jnlpool);
 	PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
+	--(TREF(rts_error_depth));			/* All done, remove our bump */
 }

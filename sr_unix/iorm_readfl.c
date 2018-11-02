@@ -86,7 +86,9 @@ void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned cha
 	io_desc         *iod;
 	d_rm_struct	*rm_ptr;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(0 <= datalen);
 	iod = io_curr_device.in;
 	ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);

@@ -796,8 +796,8 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 			TRACE_MALLOC(retVal, size, smTn);
 			--gtmMallocDepth;
 			--fast_lock_count;
-			DEFERRED_SIGNAL_HANDLING_CHECK;
 			PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
+			DEFERRED_SIGNAL_HANDLING_CHECK;
 			return retVal;
 		} else  /* Storage mgmt has not been initialized */
 		{

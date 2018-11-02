@@ -74,7 +74,9 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 	int			trynum;
 	uint4			curr_wbox_seq_num;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	*return_value = FALSE;
 	jnlpool_init_needed = TRUE;
 	ESTABLISH(mu_int_reg_ch);

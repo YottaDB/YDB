@@ -343,7 +343,7 @@ typedef struct ua_list_struct
 	uint4		update_array_size;
 } ua_list;
 
-#define TP_MAX_NEST	127
+#define TP_MAX_LEVEL	127			/* Note this is actually MAX + 1 level for TP (actual max 126) */
 
 /* Note gv_orig_key is assigned to tp_pointer->orig_key which then tries to dereference the "begin", "end", "prev", "top"
  * 	fields like it were a gv_currkey pointer. Since these members are 2-byte fields, we need atleast 2 byte alignment.

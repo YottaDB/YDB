@@ -3,6 +3,9 @@
  * Copyright (c) 2015 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -17,11 +20,11 @@
 #include "gtm_multi_thread.h"	/* needed for below EXIT macro */
 
 void	gtm_image_exit(int status)
-{						\
-	char	*rname;				\
-						\
-	if (!INSIDE_THREADED_CODE(rname))	\
-		exit(status);			\
-	else					\
-		GTM_PTHREAD_EXIT(status);	\
+{
+	char	*rname;
+
+	if (!INSIDE_THREADED_CODE(rname))
+		exit(status);
+	else
+		GTM_PTHREAD_EXIT(status);
 }

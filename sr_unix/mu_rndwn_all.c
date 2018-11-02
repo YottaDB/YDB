@@ -144,7 +144,9 @@ STATICFNDEF void mu_rndwn_all_helper(shm_parms *parm_buff, char *fname, int *exi
 	replpool_identifier	replpool_id;
 	boolean_t 		ret_status, jnlpool_sem_created;
 	unsigned char		ipcs_buff[MAX_IPCS_ID_BUF], *ipcs_ptr;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(mu_rndwn_all_helper_ch);
 	if (validate_db_shm_entry(parm_buff, fname, tmp_exit_status))
 	{

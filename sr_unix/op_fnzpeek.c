@@ -246,7 +246,9 @@ STATICFNDEF int op_fnzpeek_stpcopy(char *zpeekadr, int len, mval *ret, char fmtc
 	char		timebuff[MAXNUMLEN + 1];
 	time_t		seconds;
 	uint4		days;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(op_fnzpeek_ch, ERR_BADZPEEKRANGE);		/* If get an exception, likely due to bad range */
 	ret->mvtype = 0;						/* Prevent GC of incomplete field */
 	switch(fmtcode)
@@ -411,6 +413,9 @@ CONDITION_HANDLER(op_fnzpeek_getpool_ch)
 /* Attach to the journal pool. Separate routine so can be wrapped in a condition handler */
 STATICFNDEF boolean_t op_fnzpeek_attach_jnlpool(void)
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(op_fnzpeek_getpool_ch, FALSE);
 	jnlpool_init(GTMRELAXED, FALSE, NULL, gd_header);		/* Attach to journal pool */
 	REVERT;
@@ -420,6 +425,9 @@ STATICFNDEF boolean_t op_fnzpeek_attach_jnlpool(void)
 /* Attach to the receive pool. Separate routine so can be wrapped in a condition handler */
 STATICFNDEF boolean_t op_fnzpeek_attach_recvpool(void)
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(op_fnzpeek_getpool_ch, FALSE);
 	recvpool_init(GTMZPEEK, FALSE);			/* Attach to receive pool */
 	REVERT;

@@ -17,6 +17,9 @@
 #include "send_msg.h"
 #include "libydberrors.h"
 #include "libyottadb_int.h"
+#include "libydberrors.h"
+
+GBLREF	boolean_t	simpleThreadAPI_active;
 
 /* Simple YottaDB wrapper for gtm_hiber_start() */
 int	ydb_hiber_start(unsigned long long sleep_nsec)
@@ -27,11 +30,11 @@ int	ydb_hiber_start(unsigned long long sleep_nsec)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (process_exiting)
-	{	/* YDB runtime environment not setup/available, no driving of errors */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		return YDB_OK;
-	}
+	LIBYOTTADB_INIT(LYDB_RTN_HIBER_START, (int));	/* Note: macro could return from this function in case of errors */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Previously unused entries should have been cleared by that
+							 * corresponding ydb_*_s() call.
+							 */
+	VERIFY_NON_THREADED_API;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{	/* Some error occurred - just return to the caller ($ZSTATUS is set) */
@@ -39,10 +42,13 @@ int	ydb_hiber_start(unsigned long long sleep_nsec)
 		return -(TREF(ydb_error_code));
 	}
 	ISSUE_TIME2LONG_ERROR_IF_NEEDED(sleep_nsec);
+	if (simpleThreadAPI_active)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOTSUPSTAPI, 2, RTS_ERROR_LITERAL("ydb_hiber_start()"));
 	assert(MAXPOSINT4 >= (sleep_nsec / NANOSECS_IN_MSEC));	/* Or else a TIME2LONG error would have been issued above */
 	sleep_msec = (sleep_nsec / NANOSECS_IN_MSEC);
 	sleepms = (int)sleep_msec;
 	gtm_hiber_start(sleepms);
+	LIBYOTTADB_DONE;
 	REVERT;
 	return YDB_OK;
 }

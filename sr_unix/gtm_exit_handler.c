@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -46,6 +49,7 @@
 #include "relinkctl.h"
 #include "gvcst_protos.h"
 #include "op.h"
+#include "trace_table.h"
 
 GBLREF	int4			exi_condition;
 GBLREF	uint4			dollar_tlevel;
@@ -173,6 +177,7 @@ void gtm_exit_handler(void)
 	if (exit_handler_active || skip_exit_handler) /* Skip exit handling if specified or if exit handler already active */
 		return;
 	exit_handler_active = TRUE;
+	ydb_dmp_tracetbl();
 	attempting = rundown_state_lock;
 	actual_exi_condition = 0;
 	ESTABLISH_NORET(exi_ch, error_seen);	/* "error_seen" is initialized inside this macro */

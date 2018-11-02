@@ -38,7 +38,7 @@
 THREADGBLDEF(grabbing_crit, 			gd_region *)			/* Region currently grabbing crit in (if any) */
 
 /* Compiler */
-THREADGBLDEF(blkmod_fail_level,		int4)				/* TP trace reporting element */
+THREADGBLDEF(blkmod_fail_level,			int4)				/* TP trace reporting element */
 THREADGBLDEF(blkmod_fail_type,			int4)				/* TP trace reporting element */
 THREADGBLDEF(block_level,			int4)				/* used to check embedded subroutine levels */
 THREADGBLDEF(boolchain,				triple)				/* anchor for chain used by bx_boolop  */
@@ -187,7 +187,7 @@ THREADGBLDEF(tprestart_syslog_delta,		int4)				/* defines every n-th restart to 
 THREADGBLDEF(tprestart_syslog_first,		int4)				/* # of TP restarts logged unconditionally */
 THREADGBLAR1DEF(t_fail_hist_blk,		block_id,	(CDB_MAX_TRIES))/* array for TP tracing */
 THREADGBLAR1DEF(tp_fail_bttn,			trans_num,	(CDB_MAX_TRIES))/* array for TP tracing */
-THREADGBLAR1DEF(tp_fail_histtn,		trans_num,	(CDB_MAX_TRIES))/* array for TP tracing */
+THREADGBLAR1DEF(tp_fail_histtn,			trans_num,	(CDB_MAX_TRIES))/* array for TP tracing */
 THREADGBLAR1DEF(tp_fail_hist,			gv_namehead *,	(CDB_MAX_TRIES))/* array for TP tracing */
 THREADGBLAR1DEF(tp_fail_hist_reg,		gd_region *,	(CDB_MAX_TRIES))/* array for TP tracing */
 THREADGBLDEF(transform,				boolean_t)			/* flag collation transform eligible */
@@ -224,6 +224,8 @@ THREADGBLDEF(collseq_list,			collseq *)			/* list of pointers to currently mappe
 										 * algorithms - since this seems only used in
 										 * collseq.c -seems more like a STATICDEF */
 THREADGBLFPTR(create_fatal_error_zshow_dmp_fptr, void, 		(void))		/* Fptr for gtm_fatal_error* zshow dmp routine */
+THREADGBLDEF(curWorkQHeadIndx,			int)				/* Which index to stmWorkQueue[] is current queue */
+THREADGBLDEF(curWorkQHead,			stm_workq *)			/* Work queue header address */
 THREADGBLDEF(disable_sigcont,			boolean_t)			/* indicates whether the SIGCONT signal
 										 * is allowed internally */
 THREADGBLDEF(dollar_zcompile,			mstr)				/* compiler qualifiers */
@@ -309,6 +311,7 @@ THREADGBLDEF(ydb_autorelink_keeprtn,		boolean_t)			/* do not let go of objects i
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
 THREADGBLDEF(parm_pool_ptr,			parm_pool *)			/* Pointer to the parameter pool */
 THREADGBLDEF(parms_cnt,                         unsigned int)                   /* Parameters count */
+THREADGBLDEF(rts_error_depth,			unsigned int)			/* Recursion level of rts_error_csa() */
 THREADGBLDEF(sapi_query_node_subs,		mstr *)				/* -> Array of YDB_MAX_SUBS mstrs holding subs
 										 * .. to return to ydb_node_*_s(). */
 THREADGBLDEF(sapi_query_node_subs_cnt,		int)				/* Count of subs filled in */

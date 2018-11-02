@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -53,7 +56,9 @@ void iorm_wteol(int4 x,io_desc *iod)
 	struct stat	statbuf;
 	int		fstat_res, save_errno;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);
 #	ifdef __MVS__
 	/* on zos if it is a fifo device then point to the pair.out for $X and $Y */

@@ -25,7 +25,7 @@
 #include "wcs_sleep.h"
 #include "rel_quant.h"
 
-GBLREF	int4		process_id;
+GBLREF	uint4		process_id;
 GBLREF	volatile int4	fast_lock_count;		/* Used in wcs_stale */
 GBLREF	int		num_additional_processors;
 

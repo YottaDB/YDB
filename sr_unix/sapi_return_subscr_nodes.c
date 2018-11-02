@@ -41,7 +41,7 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, c
 		return;
 	}
 	if (-1 == TREF(sapi_query_node_subs_cnt))
-	{	/* No subscripts were returned but we are legitimately returning the basevar name in a rever $query()
+	{	/* No subscripts were returned but we are legitimately returning the basevar name in a reverse $query()
 		 * so no YDB_NODE_END return code.
 		 */
 		*ret_subs_used = 0;			/* Just return 0 subscripts */

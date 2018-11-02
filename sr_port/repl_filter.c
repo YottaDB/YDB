@@ -583,7 +583,9 @@ STATICFNDEF int repl_filter_recv_line(char *line, int *line_len, int max_line_le
 #endif
 	struct timeval	repl_filter_poll_interval;
 	boolean_t	half_timeout_done, timedout;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	for (; ;)
 	{
 		for ( ; (srv_line_end < srv_read_end) && ('\n' != *srv_line_end); srv_line_end++)

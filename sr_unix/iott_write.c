@@ -53,7 +53,9 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 	d_tt_struct	*tt_ptr;
 	int		buff_left, status;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	tt_ptr = io_ptr->dev_sp;
 	assert(tt_ptr->write_active == FALSE);
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
@@ -111,7 +113,9 @@ void iott_write(mstr *v)
 	wint_t		codepoint;
 	boolean_t	flush_immediately;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* We cannot be starting unsafe timers during process exiting or in an interrupt-deferred window. */
 	flush_immediately = (process_exiting || (INTRPT_OK_TO_INTERRUPT != intrpt_ok_state));
 	str_len = v->len;

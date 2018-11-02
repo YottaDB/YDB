@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -52,7 +55,9 @@ int	iott_write_raw(int fildes, void *str832, unsigned int len)
 	d_tt_struct	*tt_ptr;
 	boolean_t	utf8_active;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (0 == len)
 		return 0;
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
@@ -122,7 +127,9 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 	d_tt_struct	*tt_ptr;
 	boolean_t	utf8_active, writenewline;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(width);
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	tt_ptr = (d_tt_struct *)io_ptr->dev_sp;
@@ -324,7 +331,9 @@ int 	move_cursor_left(int col, int num_cols)
 	int		fildes = ((d_tt_struct *)((io_curr_device.in)->dev_sp))->fildes;
 	int		ret;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	if (0 == num_cols)
 		ret = 0;
@@ -377,7 +386,9 @@ int 	move_cursor_right(int col, int num_cols)
 	int		fildes = ((d_tt_struct *)((io_curr_device.in)->dev_sp))->fildes;
 	int		ret;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	if (0 == num_cols)
 		ret = 0;
@@ -472,7 +483,9 @@ int 	compute_dx(void *str832, unsigned int index, unsigned int width, unsigned i
 	wint_t		*str32;
 	int		dx_ret, this_width, i;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
 	utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ichset) : FALSE;
 	str32 = (wint_t *)str832;

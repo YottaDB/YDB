@@ -95,7 +95,7 @@ GBLREF  unsigned char		*msp;
 GBLREF  mv_stent         	*mv_chain;
 GBLREF	int			mumps_status;
 GBLREF 	void			(*restart)();
-GBLREF 	boolean_t		gtm_startup_active;
+GBLREF 	boolean_t		ydb_init_complete;
 GBLREF	volatile int 		*var_on_cstack_ptr;	/* volatile so that nothing gets optimized out */
 GBLREF	rhdtyp			*ci_base_addr;
 GBLREF  mval			dollar_zstatus;
@@ -112,11 +112,20 @@ GBLREF	boolean_t		ydb_dist_ok_to_use;
 GBLREF	int			dollar_truth;
 GBLREF	CLI_ENTRY		mumps_cmd_ary[];
 GBLREF	tp_frame		*tp_pointer;
+GBLREF	stm_workq		*stmWorkQueue[];
+GBLREF	stm_workq		*stmTPWorkQueue;
+GBLREF	stm_freeq		stmFreeQueue;
+GBLREF	boolean_t		noThreadAPI_active;
+GBLREF	boolean_t		simpleThreadAPI_active;
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
 
 LITREF  gtmImageName            gtmImageNames[];
 
 void gtm_levl_ret_code(void);
+
+GBLDEF	pthread_mutex_t	ydb_initexit_threadsafe_mutex = PTHREAD_MUTEX_INITIALIZER;	/* Single thread ydb_init/ydb_exit() to gate
+											 * users so critical functions are safe.
+											 */
 
 error_def(ERR_ACTLSTTOOLONG);
 error_def(ERR_CALLINAFTERXIT);
@@ -265,7 +274,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
-	if (!gtm_startup_active)
+	if (!ydb_init_complete)
 	{
 		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
 			return status;
@@ -293,6 +302,23 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	FGNCAL_UNWIND;		/* note - this is outside the establish since gtmci_ch calso calls fgncal_unwind() which,
 				 * if this failed, would lead to a nested error which we'd like to avoid */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
+	/* This block is a version of the VERIFY_NON_THREADED_API macro that instead does an rts_error when a violation
+	 * is detected.
+	 */
+	if (simpleThreadAPI_active)
+	{
+		if (!IS_STAPI_WORKER_THREAD)
+		{
+			DBGAPITP_ONLY(gtm_fork_n_core());
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVAPIMODE, 4, RTS_ERROR_LITERAL(THREADED_STR),
+				      RTS_ERROR_LITERAL(UNTHREADED_STR));
+		}
+		/* We are in threaded mode but running an unthreaded command in the main work thread which
+		 * is allowed. In that case just fall out (verified). Note this is not possible just now because
+		 * call-ins NEVER run in the worker thread but they will be along eventually.
+		 */
+	} else
+		noThreadAPI_active = TRUE;
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
 	if (!TREF(ci_table))	/* Load the call-in table only once from env variable ydb_ci/GTMCI. */
@@ -636,7 +662,7 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 			unwind_here = TRUE;
 	}
 	/* Do the "ydb_init" (if needed) first as it would set gtm_threadgbl etc. which is needed to use TREF later */
-	if (!gtm_startup_active)
+	if (!ydb_init_complete)
 	{
 		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
 			return status;
@@ -679,6 +705,23 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	FGNCAL_UNWIND;		/* note - this is outside the establish since gtmci_ch calso calls fgncal_unwind() which,
 				 * if this failed, would lead to a nested error which we'd like to avoid */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
+	/* This block is a version of the VERIFY_NON_THREADED_API macro that instead does an rts_error when a violation
+	 * is detected.
+	 */
+	if (simpleThreadAPI_active)
+	{
+		if (!IS_STAPI_WORKER_THREAD)
+		{
+			DBGAPITP_ONLY(gtm_fork_n_core());
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVAPIMODE, 4, RTS_ERROR_LITERAL(THREADED_STR),
+				      RTS_ERROR_LITERAL(UNTHREADED_STR));
+		}
+		/* We are in threaded mode but running an unthreaded command in the main work thread which
+		 * is allowed. In that case just fall out (verified). Note this is not possible just now because
+		 * call-ins NEVER run in the worker thread but they will be along eventually.
+		 */
+	} else
+		noThreadAPI_active = TRUE;
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
 	if (!internal_use)
@@ -1131,17 +1174,35 @@ int ydb_init()
 	Dl_info			shlib_info;
 	DCL_THREADGBL_ACCESS;
 
+	/* Single thread the rest of initialization so all of the various not-thread-safe things this routine does in
+	 * addition to initializing both memory and work thread mutexes in gtm_startup() are all completed without race
+	 * conditions. Note our condition handler coverage differs depending on whether ydb has been initialized or not.
+	 * In the most typical case, YDB will not yet be initialized so the gtmci_ch handler is not established until
+	 * after the condition handling stack is setup below. But if YDB is initialized, we establish the handler before
+	 * much of anything happens.
+	 */
+	status = pthread_mutex_lock(&ydb_initexit_threadsafe_mutex);
+	if (0 != status)
+	{	/* If not initialized yet, can't rts_error so just return our error code */
+		if (ydb_init_complete)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutex_lock()"),
+				      CALLFROM, status);
+		return status;
+	}
 	SETUP_THREADGBL_ACCESS;
 	if (NULL == lcl_gtm_threadgbl)
 	{	/* This will likely need some attention before going to a threaded model */
-		assert(!gtm_startup_active);
+		assert(!ydb_init_complete);
 		GTM_THREADGBL_INIT;
 	}
+	if (ydb_init_complete)
+		ESTABLISH_RET(gtmci_ch, mumps_status);
 	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_init to be
 	 * invoked after a ydb_exit
 	 */
 	if (process_exiting)
 	{
+		(void)pthread_mutex_unlock(&ydb_initexit_threadsafe_mutex);
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
@@ -1193,12 +1254,12 @@ int ydb_init()
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 				RTS_ERROR_LITERAL("setenv(gtm_dist)"), CALLFROM, save_errno);
 		}
-	}
-	/* else : "ydb_dist" env var is defined. Use that for later verification done inside "common_startup_init" */
-	if (!gtm_startup_active)
+	} /* else : "ydb_dist" env var is defined. Use that for later verification done inside "common_startup_init" */
+	if (!ydb_init_complete)
 	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
 		common_startup_init(GTM_IMAGE, &mumps_cmd_ary[0]);
 		err_init(stop_image_conditional_core);
+		ESTABLISH_RET(gtmci_ch, mumps_status);
 		UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 		/* Ensure that $ydb_dist exists */
@@ -1219,7 +1280,7 @@ int ydb_init()
 		path[path_len] = '\0';
 		if (-1 == Stat(path, &stat_buf))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("stat for $ydb_dist/gtmsecshr"), CALLFROM, errno);
+				      LEN_AND_LIT("stat for $ydb_dist/gtmsecshr"), CALLFROM, errno);
 		/* Ensure that the call-in can execute $ydb_dist/gtmsecshr. This not sufficient for security purposes */
 		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
@@ -1235,8 +1296,7 @@ int ydb_init()
 		msp = (unsigned char *)-1L;
 		GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
 	}
-	ESTABLISH_RET(gtmci_ch, mumps_status);
-	if (!gtm_startup_active)
+	if (!ydb_init_complete)
 	{	/* GT.M is not active yet. Create GT.M startup environment */
 		invocation_mode = MUMPS_CALLIN;
 		init_gtm();			/* Note - this initializes fgncal_stackbase and creates the call-in
@@ -1244,7 +1304,7 @@ int ydb_init()
 						 */
 		gtm_savetraps(); 		/* Nullify default $ZTRAP handling */
 		assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
-		assert(gtm_startup_active);
+		assert(ydb_init_complete);
 		assert(frame_pointer->type & SFT_CI);
 		TREF(gtmci_nested_level) = 1;
 		TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;
@@ -1258,6 +1318,7 @@ int ydb_init()
 		ydb_nested_callin();	/* Nested call-in: setup a new CI environment (additional SFT_CI base-frame) */
 	REVERT;
 	assert(NULL == TREF(temp_fgncal_stack));
+	(void)pthread_mutex_unlock(&ydb_initexit_threadsafe_mutex);
 	return 0;
 }
 
@@ -1294,21 +1355,37 @@ void ydb_nested_callin(void)
 /* Routine exposed to call-in user to exit from active GT.M environment */
 int ydb_exit()
 {
+	int		status, i;
+	pthread_t	thisThread;
         DCL_THREADGBL_ACCESS;
 
         SETUP_THREADGBL_ACCESS;
-	if (!gtm_startup_active)
-		return 0;		/* GT.M environment not setup yet - quietly return */
+	if (!ydb_init_complete)
+		return 0;		/* If we aren't initialized, we don't have things to take down so just return */
+	status = pthread_mutex_lock(&ydb_initexit_threadsafe_mutex);
+	if (0 != status)
+		return status;		/* Lock failed - no condition handler yet so just return the error code */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	assert(NULL != frame_pointer);
 	/* If process_exiting is set and the YottaDB environment is still active, shortcut some of the checks
 	 * and cleanups we are making in this routine as they are not particularly useful. If the environment
 	 * is not active though, that's still an error.
 	 */
-	if (!process_exiting && gtm_startup_active)
+	if (!process_exiting && ydb_init_complete)
 	{	/* Do not allow ydb_exit() to be invoked from external calls (unless process_exiting) */
 		if (!(SFT_CI & frame_pointer->type) || !(MUMPS_CALLIN & invocation_mode) || (1 < TREF(gtmci_nested_level)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
+		/* Check if this is a worker thread - not allowed to do ydb_exit() there either. There are TP_MAX_LEVEL + 2
+		 * possible queues.
+		 */
+#		ifdef DEBUG
+		thisThread = pthread_self();
+		for (i = 0; (STMWORKQUEUEDIM > i) && (NULL != stmWorkQueue[i]); i++)
+		{	/* Verify our current thread is not one of the threads we are killing off (avoid suicide) */
+			assert(!pthread_equal(thisThread, stmWorkQueue[i]->threadid));
+		}
+#		endif
+		/* TODO SEE for the final version, clean up the TP work queue also */
 		/* Now get rid of the whole M stack - end of GT.M environment */
 		while (NULL != frame_pointer)
 		{
@@ -1325,22 +1402,45 @@ int ydb_exit()
 				ci_ret_code_quit();
 			}
 		}
-	} else if (!gtm_startup_active)
+	} else if (!ydb_init_complete)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
 	gtm_exit_handler(); /* rundown all open database resource */
+	/* Now that the DBs are down, let's remove the pthread constructs created for SimpleThreadAPI
+	 * usages. Note return codes ignored here as reporting errors creates more problems than they
+	 * are worth. Note the three situations this loop cleans up are:
+	 *   1. No work thread was ever created but we do have the work queue mutex and condition var
+	 *      in index 0 created by gtm_startup() that need cleaning up.
+	 *   2. We have created a worker thread in [0] but no TP levels.
+	 *   3. We have created TP levels with threads, queues, and mutex/condvars.
+	 * It is only [0] where we can have initialized mutex and condvar that need cleaning up (because
+	 * they were created in gtm_startup()) but if never used, we have no active thread to clean up.
+	 */
+	for (i = 0; (NULL != stmWorkQueue[i]) && (STMWORKQUEUEDIM > i); i++)
+	{
+		if (0 != (uintptr_t)stmWorkQueue[i]->threadid)
+			(void)pthread_cancel(stmWorkQueue[i]->threadid);
+		stmWorkQueue[i]->threadid = 0;
+		(void)pthread_cond_destroy(&stmWorkQueue[i]->cond);
+		(void)pthread_mutex_destroy(&stmWorkQueue[i]->mutex);
+	}
+	/* TODO SEE - also kill the TP queue mutex/condvar */
+	/* If we had more than one level initialized, then the alternate TP queue was also initialized */
+	if (1 < i)
+		(void)pthread_mutex_destroy(&stmTPWorkQueue->mutex);
+	(void)pthread_mutex_destroy(&stmFreeQueue.mutex);
+	/* TODO SEE: Also destroy the msems in the free queue blocks and release them if they exist */
+
 	/* If libyottadb was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
 	 * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
 	 * 'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
 	 * our exit handler has already been called. Linux and Solaris don't need this, looking at the
 	 * other platforms we support to see if resolutions can be found. SE 05/2007
 	 */
-#	ifdef _AIX
-	unatexit(gtm_exit_handler);
-#	endif
 	REVERT;
-	gtm_startup_active = FALSE;
+	ydb_init_complete = FALSE;
 	/* We might have opened one or more shlib handles using "dlopen". Do a "dlclose" of them now. */
 	dlopen_handle_array_close();
+	(void)pthread_mutex_unlock(&ydb_initexit_threadsafe_mutex);
 	return 0;
 }
 
@@ -1348,6 +1448,7 @@ int ydb_exit()
 void ydb_zstatus(char *msg, int len)
 {
 	int msg_len;
+
 	msg_len = (len <= dollar_zstatus.str.len) ? len - 1 : dollar_zstatus.str.len;
 	memcpy(msg, dollar_zstatus.str.addr, msg_len);
 	msg[msg_len] = 0;
@@ -1367,10 +1468,10 @@ void gtmci_cleanup(void)
 	if (MUMPS_CALLIN != invocation_mode)
 		return;
 	/* If we have already run the exit handler, no need to do so again */
-	if (gtm_startup_active)
+	if (ydb_init_complete)
 	{
 		ydb_exit_handler();
-		gtm_startup_active = FALSE;
+		ydb_init_complete = FALSE;
 	}
 	/* Unregister exit handler .. AIX only for now */
 	unatexit(gtm_exit_handler);

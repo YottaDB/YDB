@@ -29,7 +29,7 @@
 #include "gdsroot.h"
 #include "iosp.h"		/* for SS_NORMAL */
 #include "is_file_identical.h"
-#include "libyottadb.h"
+#include "libyottadb_int.h"
 
 /* YottaDB reimplementation of the gtm_filename_to_id() utility function that allows the return
  * of an error code if it fails.
@@ -42,12 +42,12 @@ int ydb_file_name_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	LIBYOTTADB_INIT(LYDB_RTN_FILE_NAME_TO_ID, (int));	/* Note: macro could return from this function in case of errors */
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));		/* Previously unused entries should have been cleared by that
+								 * corresponding ydb_*_s() call.
+								 */
+	VERIFY_NON_THREADED_API;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
-	if (process_exiting)
-	{	/* YDB runtime environment not setup/available, no driving of errors */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		return YDB_ERR_CALLINAFTERXIT;
-	}
 	if (error_encountered)
 	{	/* Some error occurred - return the error code to the caller ($ZSTATUS is set) */
 		REVERT;
@@ -55,6 +55,7 @@ int ydb_file_name_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid)
 	}
 	if (!filename)
 	{
+		LIBYOTTADB_DONE;
 		REVERT;
 		return YDB_NOTOK;
 	}
@@ -70,6 +71,7 @@ int ydb_file_name_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid)
 		free(tmp_fileid);
 		*fileid = NULL;
 	}
+	LIBYOTTADB_DONE;
 	REVERT;
 	return (SS_NORMAL == status) ? YDB_OK : -status;
 }

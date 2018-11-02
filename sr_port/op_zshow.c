@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -50,9 +53,10 @@ void op_zshow(mval *func, int type, lv_val *lvn)
 			done_v = FALSE;
 	int		i;
   	zshow_out	output;
-
 	MAXSTR_BUFF_DECL(buff);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_STR(func);
 	for (i = 0, ptr = func->str.addr; i < func->str.len; i++, ptr++)
 	{

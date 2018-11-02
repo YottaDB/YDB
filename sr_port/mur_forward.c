@@ -212,7 +212,9 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 	char			*shmPtr; /* not using "shm_ptr" since it is already used in an AIX include file */
 	int			shmid;
 	multi_proc_shm_hdr_t	*mp_hdr;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	status = 0;
 	/* Although we made sure the # of tasks is the same as the # of processes forked off (in the "gtm_multi_proc"
 	 * invocation in "mur_forward"), it is possible one of the forked process finishes one invocation of

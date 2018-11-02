@@ -76,7 +76,9 @@ short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	char		*errmsg;
 #	endif
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	newversion = closed_nodestroy = append = FALSE;
 	iod = dev_name->iod;
 	ESTABLISH_RET_GTMIO_CH(&iod->pair, -1, ch_set);
@@ -398,7 +400,9 @@ int	open_get_bom(io_desc *io_ptr, int bom_size)
 	gtm_chset_t	chset;
 	int 		num_bom_bytes;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&io_ptr->pair, -1, ch_set);
 	rm_ptr = (d_rm_struct *)(io_ptr->dev_sp);
 	assert(UTF16BE_BOM_LEN == UTF16LE_BOM_LEN);

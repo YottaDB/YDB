@@ -44,7 +44,7 @@ typedef enum
 	RECVPOOL_REG = 3,
 } ydb_reg_type_t;
 
-void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool_addrs_ptr_t tmp_jnlpool);
+STATICFNDCL void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool_addrs_ptr_t tmp_jnlpool);
 
 GBLREF	uint4			mutex_per_process_init_pid;
 GBLREF	boolean_t		skip_exit_handler;
@@ -79,7 +79,7 @@ int	ydb_child_init(void *param)
 		return YDB_OK;
 	}
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_CHILDINIT);	/* Note: macro could "return" from this function in case of errors */
+	LIBYOTTADB_INIT(LYDB_RTN_CHILDINIT, (int));	/* Note: macro could "return" from this function in case of errors */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
@@ -133,7 +133,7 @@ int	ydb_child_init(void *param)
 }
 
 /* Note: cur_jnlpool is non-NULL if reg_type is JNLPOOL_REG and NULL otherwise */
-void	ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool_addrs_ptr_t cur_jnlpool)
+STATICFNDEF void ydb_child_init_sem_incrcnt(gd_region *reg, ydb_reg_type_t reg_type, jnlpool_addrs_ptr_t cur_jnlpool)
 {
 	unix_db_info		*udi;
 	sgmnt_addrs		*csa;

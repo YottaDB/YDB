@@ -179,7 +179,9 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 	struct timeval	save_input_timeval;
 	boolean_t	ch_set;
 	recall_ctxt_t	*recall;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(stringpool.free >= stringpool.base);
 	assert(stringpool.free <= stringpool.top);
 	io_ptr = io_curr_device.in;

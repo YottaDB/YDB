@@ -48,7 +48,6 @@
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
 
-
 LITREF mval		literal_statsDB_gblname;
 
 GBLREF sgmnt_addrs	*cs_addrs;
@@ -630,6 +629,9 @@ void gvcst_remove_statsDB_linkage_all(void)
  */
 void gvcst_remove_statsDB_linkage_wrapper(gd_region *baseDBreg, gd_region *statsDBreg)
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(gvcst_remove_statsDB_linkage_ch);
 	save_statsDBreg = statsDBreg;						/* Save for use in condition handler */
 	gvcst_remove_statsDB_linkage(baseDBreg);				/* If fails, we unwind and go to next one */

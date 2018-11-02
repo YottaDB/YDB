@@ -45,7 +45,9 @@ boolean_t iosocket_listen(io_desc *iod, unsigned short len)
 	d_socket_struct	*dsocketptr;
 	socket_struct	*socketptr;
 	boolean_t	result, ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	if (0 >= dsocketptr->n_socket)

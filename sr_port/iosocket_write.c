@@ -346,7 +346,9 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	d_socket_struct *dsocketptr;
 	socket_struct	*socketptr;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	DBGSOCK2((stdout, "socwrite: ************************** Top of iosocket_write\n"));
 	iod = io_curr_device.out;
 	ESTABLISH_GTMIO_CH(&iod->pair, ch_set);

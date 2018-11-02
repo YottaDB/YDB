@@ -61,7 +61,9 @@ short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	gtm_chset_t	temp_chset, old_ichset, old_ochset;
 	boolean_t	empt = FALSE;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ioptr = dev_name->iod;
 	ESTABLISH_RET_GTMIO_CH(&ioptr->pair, -1, ch_set);
 	if (ioptr->state == dev_never_opened)

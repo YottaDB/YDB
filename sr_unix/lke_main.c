@@ -129,7 +129,9 @@ static bool lke_process(int argc)
 	bool		flag = FALSE;
 	int		res;
 	static int	save_stderr = SYS_STDERR;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(util_ch, TRUE);
 	if (util_interrupt)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);

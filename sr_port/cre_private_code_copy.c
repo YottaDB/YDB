@@ -41,7 +41,9 @@ uint4 cre_private_code_copy(rhdtyp *rtn)
 {
 	unsigned char	*new_ptext;
 	int		code_size;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 #	ifdef USHBIN_SUPPORTED
 	assert(NULL != rtn->shared_ptext_adr); 			/* Don't need private copy if not shared */
 	assert(rtn->shared_ptext_adr == rtn->ptext_adr); 	/* If already private, we shouldn't be calling this routine */

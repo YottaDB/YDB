@@ -20,7 +20,7 @@
 #define YDBNOTACTIVE "YDB-F-YDBNOTACTIVE The ydb_fork_n_core() facility is not available until the YottaDB runtime "	\
 		     "is initialized - Core generation request denied\n"
 
-GBLREF	boolean_t	gtm_startup_active;
+GBLREF	boolean_t	ydb_init_complete;
 
 /* Externalized wrapper for gtm_fork_n_core() routine that creates a core of a running YottaDB initialized
  * process. The key is "initialized". If YottaDB has not yet been initialized in the process where this
@@ -34,12 +34,12 @@ GBLREF	boolean_t	gtm_startup_active;
  *
  * Note no errors are raised by gtm_fork_n_core() and no user parameter pointers are being handled so no
  * condition handler wrapper has been added. It also already protects itself against being re-entered after
- * ydb_exit() because gtm_startup_active is cleared in that case.
+ * ydb_exit() because ydb_init_complete is cleared in that case.
  */
 
 void ydb_fork_n_core(void)
 {
-	if (!gtm_startup_active)
+	if (!ydb_init_complete)
 	{
 		OPENLOG("YottaDB/SimpleAPI", get_syslog_flags(), LOG_USER);
 		syslog(LOG_USER | LOG_INFO, YDBNOTACTIVE);

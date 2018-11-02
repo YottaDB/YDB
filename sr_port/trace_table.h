@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ * Copyright 2011 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,11 +53,14 @@ enum trace_types
 
 #define TRACE_TABLE_SIZE_DEFAULT 500
 
+#ifdef DEBUG
 #define TRCTBL_ENTRY(typeval, intval, addrval1, addrval2, addrval3)						\
-{														\
+MBSTART {													\
+	boolean_t	was_holder;										\
 	/* If tracing in general, verify this group is being traced */						\
 	if ((NULL != TREF(gtm_trctbl_start)) && (0 != (TREF(gtm_trctbl_groups) & (1 << (typeval >> 16)))))	\
 	{	/* Trace only if we are tracing */								\
+		PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder);							\
 		(TREF(gtm_trctbl_cur))++;	/* Next entry */						\
 		if (TREF(gtm_trctbl_cur) >= TREF(gtm_trctbl_end))						\
 			TREF(gtm_trctbl_cur) = TREF(gtm_trctbl_start);						\
@@ -63,8 +69,12 @@ enum trace_types
 		(TREF(gtm_trctbl_cur))->addrfld1 = (void *)(addrval1);						\
 		(TREF(gtm_trctbl_cur))->addrfld2 = (void *)(addrval2);						\
 		(TREF(gtm_trctbl_cur))->addrfld3 = (void *)(addrval3);						\
+		PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);							\
 	}													\
-}
+} MBEND
+#else
+#define TRCTBL_ENTRY(typeval, intval, addrval1, addrval2, addrval3)
+#endif
 
 /* Structure defining the size of a single trace entry */
 typedef struct trctbl_entry_struct
@@ -76,4 +86,5 @@ typedef struct trctbl_entry_struct
 	void	*addrfld3;
 } trctbl_entry;
 
+void ydb_dmp_tracetbl(void);
 #endif

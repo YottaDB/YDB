@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,8 +48,10 @@ int rc_prc_set(rc_q_hdr *qhdr)
     mname_entry	gvname;
     char	*cp1;
     gvnh_reg_t	*gvnh_reg;
+    DCL_THREADGBL_ACCESS;
 
-	ASSERT_IS_LIBGTCM;
+    SETUP_THREADGBL_ACCESS;
+    ASSERT_IS_LIBGTCM;
     ESTABLISH_RET(rc_dbms_ch, RC_SUCCESS);
     if ((qhdr->a.erc.value = rc_fnd_file(&qhdr->r.xdsid)) != RC_SUCCESS)
     {

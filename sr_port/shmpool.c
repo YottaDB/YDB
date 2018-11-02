@@ -64,7 +64,7 @@
 #include"gtm_c_stack_trace.h"
 
 GBLREF	volatile int4		fast_lock_count;
-GBLREF	pid_t			process_id;
+GBLREF	uint4			process_id;
 GBLREF	uint4			image_count;
 GBLREF	int			num_additional_processors;
 GBLREF	node_local_ptr_t	locknl;

@@ -122,7 +122,8 @@
 #include "gtmcrypt.h"
 #include "gdsblk.h"
 #include "muextr.h"
-#include "gtmxc_types.h"
+//#include "gtmxc_types.h"
+#include "libyottadb_int.h"
 #ifdef GTM_TLS
 #include "gtm_tls_interface.h"
 #endif
@@ -1138,6 +1139,14 @@ GBLDEF	pthread_mutex_t	thread_mutex;			/* mutex structure used to ensure seriali
 							 * a bottleneck this needs to be revisited.
 							 */
 GBLDEF	pthread_t	thread_mutex_holder;		/* pid/tid of the thread that has "thread_mutex" currently locked */
+/* Even though thread_mutex_holder_[rtn,line]() are only used in a debug build, they are used in the
+ * PTHREAD_MUTEX_[UN]LOCK_IF_NEEDED macro which is used in gtm_malloc_src.h. Note that gtm_malloc_src.h is built twice in a
+ * pro build - once with the debug flag on. So even with a pro build, we still need to define these fields as they could be used
+ * with the debug build of gtm_malloc_src.h.
+ */
+GBLDEF	char		*thread_mutex_holder_rtn;	/* Routine doing the holding of the lock */
+GBLDEF	int		thread_mutex_holder_line;	/* Line number in routine where lock was acquired */
+
 GBLDEF	pthread_key_t	thread_gtm_putmsg_rname_key;	/* points to region name corresponding to each running thread */
 GBLDEF	boolean_t	thread_block_sigsent;		/* TRUE => block external signals SIGINT/SIGQUIT/SIGTERM/SIGTSTP/SIGCONT */
 GBLDEF	boolean_t	in_nondeferrable_signal_handler;	/* TRUE if we are inside "generic_signal_handler". Although this
@@ -1197,30 +1206,30 @@ GBLDEF	CLI_ENTRY	*cmd_ary;	/* Pointer to command table for MUMPS/DSE/LKE etc. */
 
 /* Begin -- GT.CM OMI related global variables */
 GBLDEF	bool		neterr_pending;
-GBLDEF	int4		omi_bsent = 0;
+GBLDEF	int4		omi_bsent;
 GBLDEF	int		psock = -1;		/* pinging socket */
 GBLDEF	short		gtcm_ast_avail;
 GBLDEF	int4		gtcm_exi_condition;
-GBLDEF	char		*omi_service = (char *)0;
-GBLDEF	FILE		*omi_debug   = (FILE *)0;
-GBLDEF	char		*omi_pklog   = (char *)0;
-GBLDEF	char		*omi_pklog_addr = (char *)0;
-GBLDEF	int		omi_pkdbg   = 0;
-GBLDEF	omi_conn_ll	*omi_conns   = (omi_conn_ll *)0;
-GBLDEF	int		omi_exitp   = 0;
-GBLDEF	int		omi_pid     = 0;
-GBLDEF	int4		omi_errno   = 0;
-GBLDEF	int4		omi_nxact   = 0;
-GBLDEF	int4		omi_nxact2  = 0;
-GBLDEF	int4		omi_nerrs   = 0;
-GBLDEF	int4		omi_brecv   = 0;
-GBLDEF	int4		gtcm_stime  = 0;  /* start time for GT.CM */
-GBLDEF	int4		gtcm_ltime  = 0;  /* last time stats were gathered */
-GBLDEF	int		one_conn_per_inaddr = 0;
-GBLDEF	int		authenticate = 0;   /* authenticate OMI connections */
-GBLDEF	int		ping_keepalive = 0; /* check connections using ping */
+GBLDEF	char		*omi_service;
+GBLDEF	FILE		*omi_debug;
+GBLDEF	char		*omi_pklog;
+GBLDEF	char		*omi_pklog_addr;
+GBLDEF	int		omi_pkdbg;
+GBLDEF	omi_conn_ll	*omi_conns;
+GBLDEF	int		omi_exitp;
+GBLDEF	int		omi_pid;
+GBLDEF	int4		omi_errno;
+GBLDEF	int4		omi_nxact;
+GBLDEF	int4		omi_nxact2;
+GBLDEF	int4		omi_nerrs;
+GBLDEF	int4		omi_brecv;
+GBLDEF	int4		gtcm_stime;		/* start time for GT.CM */
+GBLDEF	int4		gtcm_ltime;		/* last time stats were gathered */
+GBLDEF	int		one_conn_per_inaddr;
+GBLDEF	int		authenticate;		/* authenticate OMI connections */
+GBLDEF	int		ping_keepalive;		/* check connections using ping */
 GBLDEF	int		conn_timeout = TIMEOUT_INTERVAL;
-GBLDEF	int		history = 0;
+GBLDEF	int		history;
 /* image_id....allows you to determine info about the server by using the strings command, or running dbx */
 GBLDEF	char		image_id[256]= "image_id";
 /* End -- GT.CM OMI related global variables */
@@ -1247,3 +1256,25 @@ GBLDEF	pid_t		posix_timer_thread_id;	/* The thread id that gets the SIGALRM sign
 						 */
 GBLDEF	boolean_t	posix_timer_created;
 #endif
+
+/* Structures  used for the Simple Thread API */
+
+/* See the description of STMWORKQUEUEDIM in libyottadb_int.h for a better description of how this array of work queues is
+ * allocated and used. Summary is it contains one base work queue as stmWorkQueue[0] and TP_MAX_LEVEL additional work queues
+ * one for each nested TP level with one extra so that if a call is made that would trip the TPTOODEEP, we don't have to
+ * detect it in the front-end but rather wait until op_tstart() is driven in a TP thread to raise the error. It means less
+ * doubled up of checking if we can let the regular check do the right thing.
+ */
+GBLDEF	stm_workq	*stmWorkQueue[STMWORKQUEUEDIM];	/* A set of queue/thread descriptor blocks. One extra for the
+							 * main workQ and the other so we let op_tstart() raise the TP
+							 * max nesting level error instead of doing it ourselves thus
+							 * checking twice.
+							 */
+GBLDEF	stm_workq	*stmTPWorkQueue;		/* Alternate queue main worker thread uses when TP is active */
+GBLDEF	stm_freeq	stmFreeQueue;			/* Structure used to maintain free queue of stm_que_ent blocks */
+GBLDEF	uint64_t	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
+/* One of the following two flags must be true - either running a threaded API or we are running something else (M-code, call-in,
+ * SimpleAPI) that is NOT threaded.
+ */
+GBLDEF	boolean_t	simpleThreadAPI_active;		/* SimpleThreadAPI is active */
+GBLDEF	boolean_t	noThreadAPI_active;		/* Any non-threaded API active (mumps, call-ins or SimpleAPI) */

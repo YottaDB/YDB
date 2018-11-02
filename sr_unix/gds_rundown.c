@@ -168,8 +168,10 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	sgmnt_addrs		*baseDBcsa;
 	node_local_ptr_t	baseDBnl;
 	sgm_info		*si;
-	DEBUG_ONLY(boolean_t	orig_we_are_last_writer = FALSE);
+	DEBUG_ONLY(boolean_t	orig_we_are_last_writer = FALSE;)
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	jnl_status = 0;
 	reg = gv_cur_region;			/* Local copy */
 	/* Early out for cluster regions

@@ -19,7 +19,8 @@
 #include "gtm_putmsg_list.h"
 
 /* Routine to setup an error in util_outbuff as if rts_error had put it there. Used when we morph ERR_TPRETRY
- * to ERR_TPRESTNESTERR. Requires a va_list var containing the args so do this in this separate routine.
+ * to ERR_TPRESTNESTERR and in various API processing. Requires a va_list var containing the args so do this
+ * in this separate routine.
  */
 void setup_error(sgmnt_addrs *csa, int argcnt, ...)
 {

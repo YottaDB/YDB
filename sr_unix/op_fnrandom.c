@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,15 +14,14 @@
 
 #include "mdef.h"
 
+#include "gtm_stdlib.h"
 #include "gtm_string.h"
 #include "gtm_time.h"
 
 #include "op.h"
 #include "mvalconv.h"
 
-GBLREF int4 process_id;
-double          drand48(void);
-void            srand48(long int);
+GBLREF uint4	process_id;
 
 void op_fnrandom (int4 interval, mval *ret)
 {

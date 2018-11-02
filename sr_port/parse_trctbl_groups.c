@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ * Copyright 2011 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +19,7 @@
 #include "trace_table.h"
 #include "parse_trctbl_groups.h"
 
+#ifdef DEBUG
 #define TRACEGROUP(group) #group,
 #define TRACETYPE(group, type, int, addr1, addr2, addr3)
 LITDEF char *gtm_trcgrp_names[LAST_TRACE_GROUP + 1] =
@@ -26,6 +30,7 @@ LITDEF char *gtm_trcgrp_names[LAST_TRACE_GROUP + 1] =
 };
 #undef TRACEGROUP
 #undef TRACETYPE
+#endif
 
 error_def(ERR_INVTRCGRP);
 
@@ -38,6 +43,7 @@ error_def(ERR_INVTRCGRP);
  */
 void parse_trctbl_groups(mstr *grps)
 {
+#	ifdef DEBUG
 	unsigned char	*grpstrt, *cp, *cpe;
 	int		grplen, grpindx;
 	DCL_THREADGBL_ACCESS;
@@ -80,4 +86,5 @@ void parse_trctbl_groups(mstr *grps)
 			/* We didn't find the group - raise error */
 			rts_error(VARLSTCNT(4) ERR_INVTRCGRP, 2, grplen, grpstrt);
 	}
+#	endif
 }

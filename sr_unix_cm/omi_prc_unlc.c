@@ -34,8 +34,7 @@ static char rcsid[] = "$Header:$";
 #include "mlk_pvtblk_delete.h"
 #include "mlk_unlock.h"
 
-int
-omi_prc_unlc(omi_conn *cptr, char *xend, char *buff, char *bend)
+int omi_prc_unlc(omi_conn *cptr, char *xend, char *buff, char *bend)
 {
 	GBLREF int		omi_pid;
 	GBLREF mlk_pvtblk	*mlk_pvt_root;
@@ -44,7 +43,9 @@ omi_prc_unlc(omi_conn *cptr, char *xend, char *buff, char *bend)
 	omi_si		  	si;
 	char		 	*jid;
 	mlk_pvtblk		**prior;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ASSERT_IS_LIBGTCM;
 	/*  Client's $JOB */
 	OMI_SI_READ(&si, cptr->xptr);

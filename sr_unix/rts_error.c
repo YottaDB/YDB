@@ -16,7 +16,8 @@
 #include "mdef.h"
 
 #include "gtm_stdio.h"
-
+#include "gtm_syslog.h"
+#include "gtm_pthread.h"
 #include <stdarg.h>
 #include <errno.h>
 
@@ -36,7 +37,11 @@
 #include "toktyp.h"
 #include "cgp.h"
 #include "stack_frame.h"
+#include "get_syslog_flags.h"
+#include "trace_table.h"
+#include "caller_id.h"
 
+GBLREF	boolean_t	first_syslog;					/* Global for a process - not thread specific */
 GBLREF	boolean_t 	created_core;
 GBLREF	boolean_t	dont_want_core;
 GBLREF	boolean_t	run_time;
@@ -46,8 +51,8 @@ GBLREF	gd_region	*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	int		gtm_errno;
 GBLREF	void		(*stx_error_va_fptr)(int in_error, ...);	/* Function pointer for stx_error_va() so this can avoid
-								 	 * pulling stx_error() into gtmsecshr.
-								 	 */
+								 	 * pulling stx_error() into gtmsecshr.								 	 					       */
+GBLREF	uint4		process_id;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
@@ -78,6 +83,7 @@ int rts_error(int argcnt, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	TRCTBL_ENTRY(RTSNEST_NESTINCR, TREF(rts_error_depth), (uintptr_t)process_id, (uintptr_t)pthread_self(), caller_id());
 	PTHREAD_CSA_FROM_GV_CUR_REGION(csa, local_jnlpool);
 	VAR_START(var, argcnt);
 	return rts_error_va(csa, argcnt, var);
@@ -87,7 +93,10 @@ int rts_error(int argcnt, ...)
 int rts_error_csa(void *csa, int argcnt, ...)
 {
 	va_list		var;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	TRCTBL_ENTRY(RTSNEST_NESTINCR, TREF(rts_error_depth), (uintptr_t)process_id, (uintptr_t)pthread_self(), caller_id());
 	VAR_START(var, argcnt);
 	return rts_error_va(csa, argcnt, var);
 }
@@ -112,6 +121,28 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 		assert(FALSE);
 	}
 #	endif
+	if (MAX_RTS_ERROR_DEPTH < ++(TREF(rts_error_depth)))
+	{	/* Too many errors nesting - stop it here - fatally. What we do is the following:
+		 *   1. Put a message in syslog (not using send_msg_csa()) about what happened.
+		 *   2. Put same message on stderr (straight shot - not through YottaDBs gtm_fprintf() routine)
+		 *   3. Terminate this process with a core - not a fork as this process cannot continue.
+		 *
+		 * Note this counter is not an exact science. Normally when we drive condition handlers, we don't return here
+		 * as some sort of error mitigation code runs and resets things. So the counter is typically ever increasing
+		 * but there is a reset in mdb_condition_handler and ydb_simpleapi_ch - both handlers that "recover" and continue
+		 * that clear this depth counter. So we are only detecting error loops in rts_error.c itself really (they typically
+		 * occur in the PTHREAD_MUTEX_LOCK_IF_NEEDED() macro)) when/if they occur.
+		 */
+		if (first_syslog)
+		{
+			OPENLOG("YottaDB", get_syslog_flags(), LOG_USER);
+			first_syslog = FALSE;
+		}
+		SYSLOG(LOG_USER | LOG_INFO, "%s", "%YDB-F-MAXRTSERRDEPTH Error loop detected - aborting image with core");
+		fprintf(stderr, "%%YDB-F-MAXRTSERRDEPTH Error loop detected - aborting image with core");
+		ydb_dmp_tracetbl();
+		DUMP_CORE;			/* Terminate *THIS* thread/process and produce a core */
+	}
 	PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
 	/* Note that rts_error does not return most of the times (control gets transferred somewhere else) so no point
 	 * unlocking thread mutex at the end of this function. This means that if one thread gets an error, the rest of
@@ -146,6 +177,8 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 		if (!run_time && (CGP_PARSE == cg_phase) && !DUMP)
 		{
 			(*stx_error_va_fptr)(msgid, var_dup);
+			if (0 < TREF(rts_error_depth))
+				--(TREF(rts_error_depth));
 			return FALSE;
 		}
 		gtm_putmsg_list(csa, argcnt, var);
@@ -157,6 +190,9 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 	va_end(var_dup);
 	va_end(var);
 	DRIVECH(msgid);				/* Drive the topmost (inactive) condition handler */
+	TRCTBL_ENTRY(RTSNEST_NESTDECR, TREF(rts_error_depth), (uintptr_t)process_id, (uintptr_t)pthread_self(), caller_id());
+	if (0 < TREF(rts_error_depth))
+		--(TREF(rts_error_depth));
 	/* Note -- at one time there was code here to catch if we returned from the condition handlers
 	 * when the severity was error or above. That code had to be removed because of several errors
 	 * that are handled and returned from. An example is EOF errors.  SE 9/2000

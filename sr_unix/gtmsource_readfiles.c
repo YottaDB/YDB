@@ -1936,8 +1936,10 @@ int gtmsource_readfiles(unsigned char *buff, int *data_len, int maxbufflen, bool
 	unsigned int		start_heartbeat;
 	boolean_t		stop_bunching;
 	gtmsource_state_t	gtmsource_state_sav;
+	DCL_THREADGBL_ACCESS;
 
-	jctl = jnlpool->jnlpool_ctl;
+	SETUP_THREADGBL_ACCESS;
+ 	jctl = jnlpool->jnlpool_ctl;
 	gtmsource_local = jnlpool->gtmsource_local;
 	jnlpool_size = jctl->jnlpool_size;
 	max_read_seqno = jctl->jnl_seqno;

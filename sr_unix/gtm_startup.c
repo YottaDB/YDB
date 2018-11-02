@@ -95,6 +95,9 @@
 #include "utfcgr.h"
 #endif
 #include "ydb_getenv.h"
+#include "libyottadb_int.h"
+#include "mdq.h"
+#include "invocation_mode.h"
 
 #define	NOISOLATION_LITERAL	"NOISOLATION"
 
@@ -134,6 +137,8 @@ GBLREF ch_ret_type		(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch *
 GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 GBLREF enum gtmImageTypes	image_type;
 GBLREF int			init_xfer_table(void);
+GBLREF stm_workq		*stmWorkQueue[];
+GBLREF stm_freeq		stmFreeQueue;
 
 OS_PAGE_SIZE_DECLARE
 
@@ -146,12 +151,15 @@ void gtm_startup(struct startup_vector *svec)
 	 * while in UNIX, it's all done with environment variables
 	 * hence, various references to data copied from *svec could profitably be referenced directly
 	 */
-	char		*temp;
-	mstr		log_name;
-	stack_frame 	*frame_pointer_lcl;
-	static char 	other_mode_buf[] = "OTHER";
-	void		gtm_ret_code();
-	char		*ptr;
+	char			*temp;
+	mstr			log_name;
+	stack_frame 		*frame_pointer_lcl;
+	static char 		other_mode_buf[] = "OTHER";
+	void			gtm_ret_code();
+	char			*ptr;
+	int			status;
+	pthread_mutexattr_t	mattr;
+	mval			noiso_lit, gbllist;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -280,6 +288,17 @@ void gtm_startup(struct startup_vector *svec)
 	lvzwr_init((enum zwr_init_types)0, (mval *)NULL);
 	TREF(in_zwrite) = FALSE;
 	curr_symval->alias_activity = FALSE;
+	/* Initialize several things to do with the YottaDB Simple Thread API (ydb_*_st() functions) */
+	/* This initialization routine does not have a return code so returning a return code back to the caller is not
+	 * currently possible. This could probably be addressed (returning code back to init_gtm() as a TODO SEE but the
+	 * process-killing rts_error suffices for now.
+	 */
+	assert(NULL == stmWorkQueue[0]);
+	/* Allocate level 0 work queue (primary work queue) */
+	stmWorkQueue[0] = ydb_stm_init_work_queue();	/* Initialize and return address of work descriptor queue block */
+	dqinit(&stmFreeQueue.stm_cbqhead, que);		/* Initialize queue headers for free queue for request blocks */
+	INIT_STM_QUEUE_MUTEX(&stmFreeQueue);		/* Initialize the free queue's mutex */
+	/* Pick up the parms for this invocation */
 	if ((GTM_IMAGE == image_type) && (NULL != svec->base_addr))
 		/* We are in the grandchild at this point. This call is made to greet local variables sent from the midchild. There
 		 * is no symbol table for locals before this point so we have to greet them here, after creating the symbol table.
@@ -290,8 +309,6 @@ void gtm_startup(struct startup_vector *svec)
 	/* See if ydb_noisolation is specified */
 	if (NULL != (ptr = ydb_getenv(YDBENVINDX_APP_ENSURES_ISOLATION, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 	{	/* Call the VIEW "NOISOLATION" command with the contents of the <ydb_app_ensures_isolation> env var */
-		mval 	noiso_lit, gbllist;
-
 		noiso_lit.mvtype = MV_STR;
 		noiso_lit.str.len = STR_LIT_LEN(NOISOLATION_LITERAL);
 		noiso_lit.str.addr = NOISOLATION_LITERAL;

@@ -433,6 +433,9 @@ void go_call_db(int routine, char *parm1, int parm2, int val_off1, int val_len1)
 	 * and continue in go_load after they occur, it is necessary to call these routines from a
 	 * subroutine due to the limitations of condition handlers and unwinding on UNIX.
 	 */
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(mupip_load_ch);
 	switch(routine)
 	{	case GO_PUT_SUB:
@@ -454,7 +457,9 @@ int go_get(char **in_ptr, int max_len, uint4 max_rec_size)
 {
 	int			rd_len, ret_len;
 	mval			val;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(mupip_load_ch, 0);
 	/* one-time only reads if in TP to avoid TPNOTACID, otherwise use untimed reads */
 	for (ret_len = 0; ; )

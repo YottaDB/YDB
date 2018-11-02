@@ -79,7 +79,7 @@ GBLREF pthread_t	gtm_main_thread_id;
 GBLREF boolean_t	gtm_main_thread_id_set;
 GBLREF boolean_t	gtm_jvm_process;
 #endif
-GBLDEF boolean_t	gtm_startup_active = FALSE;
+GBLDEF boolean_t	ydb_init_complete = FALSE;
 
 STATICFNDCL void assert_on_entry(int4 arg);
 
@@ -200,7 +200,7 @@ void init_gtm(void)
 	svec.zdate_form = 0;
 	svec.sysid_ptr = &default_sysid;
 	gtm_startup(&svec);
-	gtm_startup_active = TRUE;
+	ydb_init_complete = TRUE;
 }
 
 /* Routine to be driven by a function pointer when that function pointer should never be driven.

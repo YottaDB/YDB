@@ -124,7 +124,9 @@ int gtmrecv(void)
 	int			updresync_instfile_fd;	/* fd of the instance file name specified in -UPDATERESYNC= */
 	boolean_t		cross_endian, dummy_ftok_counter_halted;
 	int			null_fd, rc;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	call_on_signal = gtmrecv_sigstop;
 	ESTABLISH_RET(gtmrecv_ch, SS_NORMAL);
 	memset((uchar_ptr_t)&recvpool, 0, SIZEOF(recvpool));

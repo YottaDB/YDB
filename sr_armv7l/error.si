@@ -2,7 +2,7 @@
 #								#
 # Copyright 2001, 2014 Fidelity Information Services, Inc	#
 #								#
-# Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -26,9 +26,12 @@ chnd_ch_active	 =	4
 chnd_ch		 =	12
 chnd_jmp	 =	16
 
+	.include "gtm_threadgbl_deftypes_asm.si"
+
 	.data
 	.extern	ctxt
 	.extern	active_ch
+	.extern gtm_threadgbl
 
 	.text
 #	setjmp is really __sigsetjmp(env,0)
@@ -46,6 +49,19 @@ chnd_jmp	 =	16
 	mov	r1, #0				/* setjmp(ctxt->jmp) */
 	add	r0, #chnd_jmp
 	bl 	__sigsetjmp
+	cmp	r0, #0
+	beq	2f
+	/* This return point is when an error was unwound or a MUM_TSTART was run. We need to reduce the
+	 * rts_error_depth before doing anything else.
+	 */
+	ldr	r1, =gtm_threadgbl
+	ldr	r1, [r1]
+	ldr	r2, [r1, #ggo_rts_error_depth]
+	cmp	r2, #0				/* Verify value is non-zero before decrementing */
+	beq	2f
+	sub	r2, #1
+	str	r2, [r1, #ggo_rts_error_depth]
+2:
 	adds	r0, #1
 	bne	1f
 	REVERT

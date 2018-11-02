@@ -71,7 +71,6 @@ MBSTART {															\
 } MBEND
 #define PRINT_UNFROZEN_MSG	util_out_print("All regions will be unfrozen", TRUE)
 
-
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBRDONLY);
 error_def(ERR_FREEZECTRL);
@@ -93,10 +92,12 @@ void	mupip_freeze(void)
 	uint4			online;
 	freeze_status		freeze_ret;
 	int			dummy_errno;
-	const char 		*msg1[] = { "unfreeze", "freeze" } ;
-	const char 		*msg2[] = { "UNFROZEN", "FROZEN" } ;
-	const char 		*msg3[] = { "unfrozen", "frozen" } ;
+	const char 		*msg1[] = { "unfreeze", "freeze" };
+	const char 		*msg2[] = { "UNFROZEN", "FROZEN" };
+	const char 		*msg3[] = { "unfrozen", "frozen" };
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	status = SS_NORMAL;
 	in_mupip_freeze = TRUE;
 	UNIX_ONLY(jnlpool_init_needed = TRUE);

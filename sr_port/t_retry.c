@@ -15,6 +15,8 @@
 
 #include "mdef.h"
 
+#include "gtm_pthread.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -51,15 +53,16 @@
 #include "getzposition.h"
 #include "process_reorg_encrypt_restart.h"
 #ifdef GTM_TRIGGER
-#include "gtm_trigger_trc.h"
+# include "gtm_trigger_trc.h"
 #endif
 #include "gvcst_protos.h"
 #include "gtmimagename.h"
 #include "caller_id.h"
 #include "mupip_reorg_encrypt.h"
+#include "trace_table.h"
 #ifdef DEBUG
-#include "repl_msg.h"
-#include "gtmsource.h"
+# include "repl_msg.h"
+# include "gtmsource.h"
 #endif
 
 /* In mu_reorg if we are in gvcst_bmp_mark_free, we actually have a valid gv_target. Find its root before the next iteration
@@ -212,8 +215,7 @@ void t_retry(enum cdb_sc failure)
 			{
 				gvname_mstr.addr = (char *)gvname_dirtree;
 				gvname_mstr.len = gvname_dirtree_len;
-			}
-			else if (NULL != gv_target)
+			} else if (NULL != gv_target)
 			{
 				if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
 					end = &buff[MAX_ZWR_KEY_SZ - 1];
@@ -570,8 +572,8 @@ void t_retry(enum cdb_sc failure)
 		{
 			GTMTRIG_ONLY(DBGTRIGR((stderr, "t_retry: invoking restart logic (INVOKE_RESTART)\n")));
 			INVOKE_RESTART;
-		} else	/* explicit trigger update caused implicit tp wrap so should return to caller without rts_error */
-		{
+		} else
+		{	/* Explicit trigger update caused implicit tp wrap so should return to caller without rts_error */
 			GTMTRIG_ONLY(DBGTRIGR((stderr, "t_retry: invoking tp_restart directly\n")));
 			tp_restart(1, !TP_RESTART_HANDLES_ERRORS);
 		}

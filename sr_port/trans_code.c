@@ -103,7 +103,9 @@ CONDITION_HANDLER(zyerr_ch)
 void trans_code_finish(void)
 {
 	mval		dummy;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	frame_pointer->type = proc_act_type;
 	proc_act_type = 0;
 	/* Save/restore restart_pc over dispatch of this error handler */

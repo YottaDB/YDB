@@ -1873,6 +1873,12 @@ enum
 #define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIG)
 #endif
 
+#ifdef __linux__
+# define CURRENT_PC __builtin_return_address(0)
+#else
+# define CURRENT_PC NULL
+#endif
+
 #ifdef DEBUG
 # define MVAL_IN_RANGE(V, START, END)	(((char *)(V) >= (char *)(START))					\
 				      && ((char *)(V) < ((char *)(START) + (INTPTR_T)(END) * SIZEOF(mval))))

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -44,7 +47,9 @@ static char	*format_label[] = {"; BAD", "; GLO", "; ZWR"}; /* CLOSE_FMT == 0, GL
 void	dse_dmp(void)
 {
 	boolean_t	dmp_res, glo_present, zwr_present;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	patch_fdmp_recs = 0;
 	glo_present = (CLI_PRESENT == cli_present("GLO"));
 	zwr_present = (CLI_PRESENT == cli_present("ZWR"));

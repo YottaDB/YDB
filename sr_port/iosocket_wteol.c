@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -39,7 +42,9 @@ void	iosocket_wteol(int4 val, io_desc *io_ptr)
 	char		*ch, *top;
 	int		eol_cnt;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(gtmsocket == io_ptr->type);
 	dsocketptr = (d_socket_struct *)io_ptr->dev_sp;
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);

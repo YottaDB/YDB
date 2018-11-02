@@ -140,7 +140,9 @@ void	gvcst_kill(boolean_t do_subtree)
 	boolean_t	est_first_pass;
 	int		oldend;
 	int		save_dollar_tlevel;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	if (do_subtree)
 	{	/* If we're killing the whole subtree, that includes any spanning nodes. No need to do anything special */

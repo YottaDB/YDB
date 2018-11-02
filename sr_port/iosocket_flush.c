@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -42,7 +45,9 @@ void iosocket_flush(io_desc *iod)
 	char		*errptr;
 	int4		errlen;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(gtmsocket == iod->type);
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	socketptr = dsocketptr->socket[dsocketptr->current_socket];

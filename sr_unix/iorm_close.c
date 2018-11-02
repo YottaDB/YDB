@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -77,11 +80,9 @@ void iorm_close(io_desc *iod, mval *pp)
 	boolean_t	ch_set;
 	sigset_t	empty_set, old_set;
 	boolean_t	use_timer;
-
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-
 	assert (iod->type == rm);
 	if (iod->state != dev_open)
 	{

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,8 +38,9 @@ GBLREF int		rc_size_return;
 GBLREF sgmnt_data	*cs_data;
 GBLREF sgmnt_addrs	*cs_addrs;
 
-int
-rc_prc_getp(rc_q_hdr *qhdr)
+error_def(ERR_DSEBLKRDFAIL);
+
+int rc_prc_getp(rc_q_hdr *qhdr)
 {
     rc_req_getp	*req;
     rc_rsp_page	*rsp;
@@ -49,9 +50,10 @@ rc_prc_getp(rc_q_hdr *qhdr)
     srch_hist		 targ_hist;
     short		 bsiz;
     unsigned char	*buffaddr;
-    error_def(ERR_DSEBLKRDFAIL);
+    DCL_THREADGBL_ACCESS;
 
-	ASSERT_IS_LIBGTCM;
+    SETUP_THREADGBL_ACCESS;
+    ASSERT_IS_LIBGTCM;
     ESTABLISH_RET(rc_dbms_ch,0);
     req  = (rc_req_getp *)qhdr;
     rsp = (rc_rsp_page *)qhdr;

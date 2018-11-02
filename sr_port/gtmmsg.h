@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -13,7 +16,7 @@
 #ifndef GTMMSG_H_INCLUDED
 #define GTMMSG_H_INCLUDED
 
-void gtm_getmsg(int4 msgnum, mstr *msgbuf);
+int  gtm_getmsg(int4 msgnum, mstr *msgbuf);
 void gtm_putmsg(int argcnt, ...);
 void gtm_putmsg_csa(void *, int argcnt, ...);		/* Use CSA_ARG(CSA) for portability */
 void gtm_putmsg_noflush(int argcnt, ...);

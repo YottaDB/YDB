@@ -275,7 +275,9 @@ STATICFNDEF int gtm_trigger_invoke(void)
 {	/* Invoke trigger M routine. Separate so error returns to gtm_trigger with proper retcode */
 	int		rc;
 	intrpt_state_t	prev_intrpt_state;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(gtm_trigger_ch, mumps_status);
 	gtm_trigger_depth++;
 	DBGTRIGR((stderr, "gtm_trigger: Dispatching trigger at depth %d\n", gtm_trigger_depth));

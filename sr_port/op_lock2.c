@@ -99,6 +99,9 @@ STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr); /* put these prototypes. These
 						   */
 STATICFNDCL void level_err(mlk_pvtblk *pvt_ptr)
 {
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	lks_this_cmd = 0;
 	MAXSTR_BUFF_DECL(buff);
 	MAXSTR_BUFF_INIT;
@@ -109,7 +112,9 @@ STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr)
 {
 	MAXSTR_BUFF_DECL(buff);
 	mval		zpos;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	getzposition(&zpos);
 	MAXSTR_BUFF_INIT;
 	lock_str_to_buff(pvt_ptr, buff, MAX_STRBUFF_INIT);

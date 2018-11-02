@@ -365,7 +365,9 @@ static	enum cdb_sc mutex_long_sleep(mutex_struct_ptr_t addr, sgmnt_addrs *csa,  
 	int			timeout_intr_slpcnt;
 	long			timeout_val;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 #	ifdef DEBUG
 	if (ydb_white_box_test_case_enabled
 		&& (WBTEST_SENDTO_EPERM == ydb_white_box_test_case_number))

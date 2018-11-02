@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,8 +40,7 @@ static char rcsid[] = "$Header:$";
 
 GBLREF gv_key		*gv_altkey;
 
-int
-omi_prc_qry(omi_conn *cptr, char *xend, char *buff, char *bend)
+int omi_prc_qry(omi_conn *cptr, char *xend, char *buff, char *bend)
 {
     char	*bptr, *eptr;
     int		rv;
@@ -51,8 +50,10 @@ omi_prc_qry(omi_conn *cptr, char *xend, char *buff, char *bend)
     uns_char	*bgn1, *bgn2, *sbsp;
     char	*grp;
     int		grl;
+    DCL_THREADGBL_ACCESS;
 
-	ASSERT_IS_LIBGTCM;
+    SETUP_THREADGBL_ACCESS;
+    ASSERT_IS_LIBGTCM;
     bptr = buff;
 
 /*  Global Ref */

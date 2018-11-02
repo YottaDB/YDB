@@ -120,8 +120,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 			mv_zintdev->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 			mv_zintdev->mv_st_cont.mvs_zintdev.io_ptr = NULL;
 		}
-		DBGSOCK((stdout, "socconn: mv_stent found - endtime: %d/%d\n", end_time.tv_sec,			\
-									end_time.tv_nsec / NANOSECS_IN_USEC));
+		DBGSOCK((stdout, "socconn: mv_stent found - endtime: %d/%d\n", end_time.tv_sec,
+			 end_time.tv_nsec / NANOSECS_IN_USEC));
 		real_dsocketptr->mupintr = dsocketptr->mupintr = FALSE;
 		real_sockintr->who_saved = sockintr->who_saved = sockwhich_invalid;
 	} else if (NO_M_TIMEOUT != msec_timeout)

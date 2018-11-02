@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ * Copyright 2010 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +26,10 @@
 void op_zwritesvn(int svn)
 {
   	zshow_out	output;
-
 	MAXSTR_BUFF_DECL(buff);
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	memset(&output, 0, SIZEOF(output));
 	MAXSTR_BUFF_INIT;
 	output.type = ZSHOW_DEVICE;

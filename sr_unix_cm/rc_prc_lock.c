@@ -60,7 +60,9 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 	unsigned char	buff[12], *cp;
 	short		subcnt;
 	int		in_pid, locks_done, temp;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ASSERT_IS_LIBGTCM;
 	ESTABLISH_RET(rc_dbms_ch, RC_SUCCESS);
 	/*  Clean up dead locks in private list */

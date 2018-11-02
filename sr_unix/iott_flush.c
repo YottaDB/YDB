@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -38,7 +41,9 @@ void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 	int4		status;
 	ssize_t		write_len;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	tt_ptr = io_ptr->dev_sp;
 	if (!tt_ptr->write_active)
 		return;	/* Was assert but that ended up causing endless loops -- now we just survive */
@@ -74,7 +79,9 @@ void iott_flush(io_desc *io_ptr)
 {
 	d_tt_struct	*tt_ptr;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
 	tt_ptr = io_ptr->dev_sp;
 	if (tt_ptr->timer_set)
@@ -98,7 +105,9 @@ void iott_flush_time(TID id, int4 hd_len, io_desc **io_ptr_parm)
 	d_tt_struct	*tt_ptr;
 	boolean_t	flush_immediately;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	io_ptr = *io_ptr_parm;
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
 	tt_ptr = io_ptr->dev_sp;

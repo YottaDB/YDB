@@ -3,6 +3,9 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -85,7 +88,9 @@ void file_input_init(char *fn, short fn_len, open_params_flags params_flag)
 	mval		pars, val;
 	unsigned char	no_param = (unsigned char)iop_eol;
 	unsigned char*	open_params;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH(mupip_load_ch);
 	pars.mvtype = MV_STR;
 	if (params_flag & IOP_REWIND)
@@ -143,7 +148,9 @@ int file_input_bin_get(char **in_ptr, off_t *file_offset, char **buff_base, bool
 	char	*ptr;
 	int	rd_cnt, rd_len, ret, s1;
 	unsigned short	s1s;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(mupip_load_ch, 0);
 	if (SIZEOF(short) > (buff1_end - buff1_ptr))
 	{
@@ -264,7 +271,9 @@ int file_input_get(char **in_ptr, int max_len)
 	static char 		*mbuff = buff1;
 	static unsigned int	mbuff_len = BUFF_SIZE;
 	unsigned int 		new_mbuff_len, ret_len;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(mupip_load_ch, 0);
 	ret_len = 0;
 	for (;;)

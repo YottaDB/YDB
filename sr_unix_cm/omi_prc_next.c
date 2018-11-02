@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,8 +39,10 @@ omi_prc_next(omi_conn *cptr, char *xend, char *buff, char *bend)
     int		 rv;
     omi_li	 len;
     mval	 v;
+    DCL_THREADGBL_ACCESS;
 
-	ASSERT_IS_LIBGTCM;
+    SETUP_THREADGBL_ACCESS;
+    ASSERT_IS_LIBGTCM;
     bptr = buff;
 
 /*  Global Ref */

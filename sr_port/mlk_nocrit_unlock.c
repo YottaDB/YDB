@@ -3,6 +3,9 @@
  * Copyright (c) 2001, 2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -21,7 +24,7 @@
 #include "mlkdef.h"
 #include "mlk_unlock.h"
 
-GBLREF	int4 		process_id;
+GBLREF	uint4 		process_id;
 
 /* This function is similar to "mlk_unlock" except that it does not get crit. So does what can be safely done
  * and leaves the rest to be done by the next guy who has crit and wants this lock. Note that this means processes

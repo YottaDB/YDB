@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -52,7 +55,9 @@ int  iorm_write_utf_ascii(io_desc *iod, char *string, int len)
 	unsigned char	*outstart, *out, *top, *outptr, *nextoutptr, *outptrtop, *nextmb;
 	d_rm_struct	*rm_ptr;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET_GTMIO_CH(&iod->pair, -1, ch_set);
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
 	assert(NULL != rm_ptr);
@@ -122,7 +127,9 @@ void iorm_write_utf(mstr *v)
 	boolean_t	stream, wrap;
 	struct stat	statbuf;
 	boolean_t	ch_set;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	iod = io_curr_device.out;
 	ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);
 	rm_ptr = (d_rm_struct *)iod->dev_sp;
@@ -360,7 +367,9 @@ void iorm_write(mstr *v)
 	int		fstat_res, save_errno;
 	boolean_t	ch_set;
 	unsigned int	save_dollarx;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	iod = io_curr_device.out;
 	ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);
 #ifdef __MVS__

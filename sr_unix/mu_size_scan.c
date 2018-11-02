@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -61,7 +64,7 @@ error_def(ERR_MUSIZEINVARG);
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
 GBLREF	gv_namehead		*gv_target;
-GBLREF	int4			process_id;
+GBLREF	uint4			process_id;
 GBLREF	inctn_opcode_t          inctn_opcode;
 GBLREF	unsigned char           rdfail_detail;
 GBLREF	int4			mu_int_adj[];

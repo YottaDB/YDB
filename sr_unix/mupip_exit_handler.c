@@ -102,7 +102,9 @@ void mupip_exit_handler(void)
 	char		err_log[1024];
 	FILE		*fp;
 	boolean_t	files_closed = TRUE;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (exit_handler_active || skip_exit_handler) /* Skip exit handling if specified or if exit handler already active */
 		return;
 	exit_handler_active = TRUE;

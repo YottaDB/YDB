@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,8 +28,7 @@ static char rcsid[] = "$Header:$";
 #include "error.h"
 
 
-int
-omi_prc_incr(cptr, xend, buff, bend)
+int omi_prc_incr(cptr, xend, buff, bend)
     omi_conn	*cptr;
     char	*xend;
     char	*buff;
@@ -41,8 +40,10 @@ omi_prc_incr(cptr, xend, buff, bend)
     omi_li	 li;
     omi_si	 si;
     char	*ivptr;
+    DCL_THREADGBL_ACCESS;
 
-	ASSERT_IS_LIBGTCM;
+    SETUP_THREADGBL_ACCESS;
+    ASSERT_IS_LIBGTCM;
     bptr = buff;
 
 /*  Replicate flag */
