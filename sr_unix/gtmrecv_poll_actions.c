@@ -267,18 +267,30 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 				; /* Empty Body */
 			if (SS_NORMAL != status)
 			{
-				if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
+				if (EREPL_SEND == repl_errno)
 				{
-					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending XOFF_ACK_ME. "
-							"Status = %d ; %s\n", status, STRERROR(status));
-					REPL_CLOSE_CONNECTION(gtmrecv_sock_fd, repl_connection_reset, curr_conn_state,	\
-												gtmrecv_send_cmp2uncmp);
+#					ifdef GTM_TLS
+					if (ERR_TLSIOERROR == status)
+					{	/* Note that both GTMRECV_HANDLE_TLSIOERROR and REPL_CLOSE_CONNECTION do a
+						 * "repl_close" but that is okay since "repl_close" is a no-op in the second call.
+						 */
+						GTMRECV_HANDLE_TLSIOERROR("send");
+						REPL_CLOSE_CONNECTION(gtmrecv_sock_fd, repl_connection_reset, curr_conn_state,	\
+													gtmrecv_send_cmp2uncmp);
+					} else
+#					endif
+					if (REPL_CONN_RESET(status))
+					{
+						repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending XOFF_ACK_ME. "
+								"Status = %d ; %s\n", status, STRERROR(status));
+						REPL_CLOSE_CONNECTION(gtmrecv_sock_fd, repl_connection_reset, curr_conn_state,	\
+													gtmrecv_send_cmp2uncmp);
 
-				} else if (EREPL_SEND == repl_errno)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-						LEN_AND_LIT("Error sending XOFF msg due to BAD_TRANS or UPD crash/shutdown. "
-								"Error in send"), status);
-				else
+					} else
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0,
+							ERR_TEXT, 2, LEN_AND_LIT("Error sending XOFF msg due to BAD_TRANS or UPD"
+									" crash/shutdown. Error in send"), status);
+				} else
 				{
 					assert(EREPL_SELECT == repl_errno);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
@@ -415,6 +427,17 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		{
 			if (EREPL_RECV == repl_errno)
 			{
+#				ifdef GTM_TLS
+				if (ERR_TLSIOERROR == status)
+				{	/* Note that both GTMRECV_HANDLE_TLSIOERROR and REPL_CLOSE_CONNECTION do a "repl_close"
+					 * but that is okay since "repl_close" returns as a no-op in the second call.
+					 */
+					GTMRECV_HANDLE_TLSIOERROR("recv");
+					REPL_CLOSE_CONNECTION(gtmrecv_sock_fd, repl_connection_reset, curr_conn_state,	\
+												gtmrecv_send_cmp2uncmp);
+					return_status = STOP_POLL;
+				} else
+#				endif
 				if (REPL_CONN_RESET(status))
 				{
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while receiving XOFF_ACK. "
@@ -464,24 +487,37 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 												curr_conn_state.send_seqno);
 		} else
 		{
-			if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
+			if (EREPL_SEND == repl_errno)
 			{
-				if (curr_conn_state.send_cmp2uncmp)
-				{
-					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending REPL_CMP2UNCMP. "
-							"Status = %d ; %s\n", status, STRERROR(status));
+#				ifdef GTM_TLS
+				if (ERR_TLSIOERROR == status)
+				{	/* Note that both GTMRECV_HANDLE_TLSIOERROR and REPL_CLOSE_CONNECTION do a
+					 * "repl_close" but that is okay since "repl_close" is a no-op in the second call.
+					 */
+					GTMRECV_HANDLE_TLSIOERROR("send");
+					REPL_CLOSE_CONNECTION(gtmrecv_sock_fd, repl_connection_reset, curr_conn_state,	\
+												gtmrecv_send_cmp2uncmp);
+					return_status = STOP_POLL;
 				} else
+#				endif
+				if (REPL_CONN_RESET(status))
 				{
-					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending REPL_BADTRANS. "
-							"Status = %d ; %s\n", status, STRERROR(status));
-				}
-				REPL_CLOSE_CONNECTION(gtmrecv_sock_fd, repl_connection_reset, curr_conn_state,	\
-											gtmrecv_send_cmp2uncmp);
-				return_status = STOP_POLL;
-			} else if (EREPL_SEND == repl_errno)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-					LEN_AND_LIT("Error sending REPL_BADTRANS/REPL_CMP2UNCMP. Error in send"), status);
-			else
+					if (curr_conn_state.send_cmp2uncmp)
+					{
+						repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending REPL_CMP2UNCMP. "
+								"Status = %d ; %s\n", status, STRERROR(status));
+					} else
+					{
+						repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset while sending REPL_BADTRANS. "
+								"Status = %d ; %s\n", status, STRERROR(status));
+					}
+					REPL_CLOSE_CONNECTION(gtmrecv_sock_fd, repl_connection_reset, curr_conn_state,	\
+												gtmrecv_send_cmp2uncmp);
+					return_status = STOP_POLL;
+				} else
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+						LEN_AND_LIT("Error sending REPL_BADTRANS/REPL_CMP2UNCMP. Error in send"), status);
+			} else
 			{
 				assert(EREPL_SELECT == repl_errno);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,

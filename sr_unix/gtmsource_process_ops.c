@@ -1003,6 +1003,7 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int			status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
 	char			err_string[1024];
+	gtmsource_local_ptr_t	gtmsource_local;
 
 	assert((REPL_MULTISITE_MSG_START > msg->type) || (REPL_PROTO_VER_MULTISITE <= remote_side->proto_ver));
 	if (MAX_SEQNO != optional_seqno)
@@ -1024,22 +1025,32 @@ void	gtmsource_repl_send(repl_msg_ptr_t msg, char *msgtypestr, seq_num optional_
 	/* Check for error status from the REPL_SEND */
 	if (SS_NORMAL != status)
 	{
-		if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
-		{
-			repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while sending %s. Status = %d ; %s\n",
-					msgtypestr, status, STRERROR(status));
-			repl_close(&gtmsource_sock_fd);
-			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-			gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
-			return;
-		}
+		assert((EREPL_SEND == repl_errno) || (EREPL_SELECT == repl_errno));
 		if (EREPL_SEND == repl_errno)
 		{
-			SNPRINTF(err_string, SIZEOF(err_string), "Error sending %s message. "
-				"Error in send : %s", msgtypestr, STRERROR(status));
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
-		}
-		if (EREPL_SELECT == repl_errno)
+#			ifdef GTM_TLS
+			if (ERR_TLSIOERROR == status)
+			{
+				gtmsource_local = jnlpool->gtmsource_local;	/* needed by GTMSOURCE_HANDLE_TLSIOERROR */
+				GTMSOURCE_HANDLE_TLSIOERROR("send");
+				return;
+			} else
+#			endif
+			if (REPL_CONN_RESET(status))
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while sending %s. Status = %d ; %s\n",
+						msgtypestr, status, STRERROR(status));
+				repl_close(&gtmsource_sock_fd);
+				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
+				gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+				return;
+			} else
+			{
+				SNPRINTF(err_string, SIZEOF(err_string), "Error sending %s message. "
+					"Error in send : %s", msgtypestr, STRERROR(status));
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(err_string));
+			}
+		} else if (EREPL_SELECT == repl_errno)
 		{
 			SNPRINTF(err_string, SIZEOF(err_string), "Error sending %s message. "
 				"Error in select : %s", msgtypestr, STRERROR(status));
@@ -1069,6 +1080,7 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 	char			err_string[1024];
 	unsigned char		*buff;
 	int4			bufflen;
+	gtmsource_local_ptr_t	gtmsource_local;
 
 	repl_log(gtmsource_log_fp, TRUE, FALSE, "Waiting for %s message\n", msgtypestr);
 	assert((REPL_XOFF != msgtype) && (REPL_XON != msgtype) && (REPL_XOFF_ACK_ME != msgtype));
@@ -1100,6 +1112,14 @@ static	boolean_t	gtmsource_repl_recv(repl_msg_ptr_t msg, int4 msglen, int4 msgty
 		{
 			if (EREPL_RECV == repl_errno)
 			{
+#				ifdef GTM_TLS
+				if (ERR_TLSIOERROR == status)
+				{
+					gtmsource_local = jnlpool->gtmsource_local;	/* needed by GTMSOURCE_HANDLE_TLSIOERROR */
+					GTMSOURCE_HANDLE_TLSIOERROR("recv");
+					return FALSE;
+				} else
+#				endif
 				if (REPL_CONN_RESET(status))
 				{	/* Connection reset */
 					repl_log(gtmsource_log_fp, TRUE, TRUE,

@@ -62,6 +62,7 @@
 #include "repl_instance.h"
 #include "gtmio.h"
 #include "replgbl.h"
+#include "gtm_repl.h"
 
 #define MAX_ATTEMPTS_FOR_FETCH_RESYNC	60 /* max-wait in seconds for source server response after connection is established */
 #define MAX_WAIT_FOR_FETCHRESYNC_CONN	60 /* max-wait in seconds to establish connection with the source server */
@@ -72,14 +73,24 @@
 	if (SS_NORMAL != STATUS)												\
 	{															\
 		if (EREPL_RECV == repl_errno)											\
+		{	/* Note that no check for TLSIOERROR is needed here since the fetchresync rollback			\
+			 * currently never connects with a source server using TLS.						\
+			 */													\
+			assert(ERR_TLSIOERROR != STATUS);									\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,					\
 					LEN_AND_LIT("Error in recv() for " MESSAGE), STATUS);	/* BYPASSOK(recv) */		\
-		else if (EREPL_SEND == repl_errno)										\
+		} else if (EREPL_SEND == repl_errno)										\
+		{	/* Note that no check for TLSIOERROR is needed here since the fetchresync rollback			\
+			 * currently never connects with a source server using TLS.						\
+			 */													\
+			assert(ERR_TLSIOERROR != STATUS);									\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,					\
 					LEN_AND_LIT("Error in send() for " MESSAGE), STATUS);	/* BYPASSOK(send) */		\
-		else if (EREPL_SELECT == repl_errno)										\
+		} else if (EREPL_SELECT == repl_errno)										\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,					\
 					LEN_AND_LIT("Error in select() for " MESSAGE), STATUS);					\
+		else														\
+			assert(FALSE);												\
 	}															\
 	if (0 >= WAIT_COUNT)													\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,						\
@@ -236,6 +247,7 @@ int gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_REPLCOMM);
 		return ERR_REPLCOMM;
 	}
+	assert(!REPL_TLS_ENABLED);	/* Currently, a fetchresync rollback never uses TLS to connect to the source server */
 	/* Wait for REPL_RESYNC_SEQNO (if dual-site primary) or REPL_OLD_NEED_INSTANCE_INFO (if multi-site primary)
 	 * or REPL_NEED_INSTINFO (if multi-site primary with supplementary instance support) message
 	 */

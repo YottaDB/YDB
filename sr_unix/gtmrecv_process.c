@@ -392,21 +392,31 @@ STATICFNDEF void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 	char		print_msg[1024];
 
 	assert((EREPL_SEND == repl_errno) || (EREPL_SELECT == repl_errno));
-	if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
+	if (EREPL_SEND == repl_errno)
 	{
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection got reset while sending %s message. Status = %d ; %s\n",
-				msgtypestr, status, STRERROR(status));
-		repl_connection_reset = TRUE;
-		repl_close(&gtmrecv_sock_fd);
-		SNPRINTF(print_msg, SIZEOF(print_msg), "Closing connection on receiver side\n");
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
-		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "ERR_REPLWARN", print_msg);
-		return;
-	} else if (EREPL_SEND == repl_errno)
-	{
-		SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending %s message. Error in send : %s",
-				msgtypestr, STRERROR(status));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
+#		ifdef GTM_TLS
+		if (ERR_TLSIOERROR == status)
+		{
+			GTMRECV_HANDLE_TLSIOERROR("send");
+			return;
+		} else
+#		endif
+		if (REPL_CONN_RESET(status))
+		{
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection got reset while sending %s message. Status = %d ; %s\n",
+					msgtypestr, status, STRERROR(status));
+			repl_connection_reset = TRUE;
+			repl_close(&gtmrecv_sock_fd);
+			SNPRINTF(print_msg, SIZEOF(print_msg), "Closing connection on receiver side\n");
+			repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
+			gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "ERR_REPLWARN", print_msg);
+			return;
+		} else
+		{
+			SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending %s message. Error in send : %s",
+					msgtypestr, STRERROR(status));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_STR(print_msg));
+		}
 	} else if (EREPL_SELECT == repl_errno)
 	{
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Error sending %s message. Error in select : %s",
@@ -2881,6 +2891,13 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 		{
 			if (EREPL_RECV == repl_errno)
 			{
+#				ifdef GTM_TLS
+				if (ERR_TLSIOERROR == status)
+				{
+					GTMRECV_HANDLE_TLSIOERROR("recv");
+					return;
+				} else
+#				endif
 				if (REPL_CONN_RESET(status))
 				{
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset. Status = %d ; %s\n",
@@ -2894,7 +2911,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				}
 			} else if (EREPL_SELECT == repl_errno)
 			{
-					ISSUE_REPLCOMM_ERROR("Error in receiving from source. Error in select", status);
+				ISSUE_REPLCOMM_ERROR("Error in receiving from source. Error in select", status);
 			}
 		}
 		if (repl_connection_reset)

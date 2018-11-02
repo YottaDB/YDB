@@ -619,6 +619,13 @@ void gtmsource_recv_ctl(void)
 	{
 		if (EREPL_RECV == repl_errno)
 		{
+#			ifdef GTM_TLS
+			if (ERR_TLSIOERROR == status)
+			{
+				GTMSOURCE_HANDLE_TLSIOERROR("recv");
+				return;
+			} else
+#			endif
 			if (REPL_CONN_RESET(status))
 			{
 				/* Connection reset */
@@ -830,6 +837,13 @@ int gtmsource_process(void)
 		{
 			if (EREPL_RECV == repl_errno)
 			{
+#				ifdef GTM_TLS
+				if (ERR_TLSIOERROR == status)
+				{
+					GTMSOURCE_HANDLE_TLSIOERROR("recv");
+					continue;
+				} else
+#				endif
 				if (REPL_CONN_RESET(status))
 				{	/* Connection reset */
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
@@ -848,6 +862,13 @@ int gtmsource_process(void)
 				}
 			} else if (EREPL_SEND == repl_errno)
 			{
+#				ifdef GTM_TLS
+				if (ERR_TLSIOERROR == status)
+				{
+					GTMSOURCE_HANDLE_TLSIOERROR("send");
+					continue;
+				} else
+#				endif
 				if (REPL_CONN_RESET(status))
 				{
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
@@ -1700,26 +1721,36 @@ int gtmsource_process(void)
 						gtmsource_flush_fh(post_read_seqno);
 						if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 							break; /* the outerloop will continue */
-						if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
-						{
-							repl_log(gtmsource_log_fp, TRUE, TRUE,
-								"Connection reset while sending seqno data from "
-								INT8_FMT" "INT8_FMTX" to "INT8_FMT" "INT8_FMTX
-								". Status = %d ; %s\n", pre_read_seqno, pre_read_seqno,
-								post_read_seqno, post_read_seqno, status, STRERROR(status));
-							repl_close(&gtmsource_sock_fd);
-							SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
-							gtmsource_state = gtmsource_local->gtmsource_state
-								= GTMSOURCE_WAITING_FOR_CONNECTION;
-							break;
-						}
 						if (EREPL_SEND == repl_errno)
 						{
-							SNPRINTF(err_string, SIZEOF(err_string),
-								"Error sending DATA. Error in send : %s", STRERROR(status));
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-								  LEN_AND_STR(err_string));
+#							ifdef GTM_TLS
+							if (ERR_TLSIOERROR == status)
+							{
+								GTMSOURCE_HANDLE_TLSIOERROR("send");
+								break;
+							} else
+#							endif
+							if (REPL_CONN_RESET(status))
+							{
+								repl_log(gtmsource_log_fp, TRUE, TRUE,
+									"Connection reset while sending seqno data from "
+									INT8_FMT" "INT8_FMTX" to "INT8_FMT" "INT8_FMTX
+									". Status = %d ; %s\n", pre_read_seqno, pre_read_seqno,
+									post_read_seqno, post_read_seqno, status, STRERROR(status));
+								repl_close(&gtmsource_sock_fd);
+								SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
+								gtmsource_state = gtmsource_local->gtmsource_state
+									= GTMSOURCE_WAITING_FOR_CONNECTION;
+								break;
+							} else
+							{
+								SNPRINTF(err_string, SIZEOF(err_string),
+									"Error sending DATA. Error in send : %s", STRERROR(status));
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0,
+											ERR_TEXT, 2, LEN_AND_STR(err_string));
+							}
 						}
+						assert(EREPL_SELECT == repl_errno);
 						if (EREPL_SELECT == repl_errno)
 						{
 							SNPRINTF(err_string, SIZEOF(err_string),

@@ -238,11 +238,11 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 			/* handle error */
 			save_errno = repl_tls.enabled ? gtm_tls_errno() : ERRNO;
 			if (-1 == save_errno)
-			{	/* This indicates an error from TLS/SSL layer and not from a system call. */
+			{	/* This indicates an error from TLS/SSL layer and not from a system call.
+				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.
+				 */
 				assert(repl_tls.enabled);
-				assert(FALSE);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2,
-						LEN_AND_STR(gtm_tls_get_error()));
+				save_errno = ERR_TLSIOERROR;
 			}
 #			else
 			save_errno = ERRNO;
@@ -347,11 +347,12 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 			/* handle error */
 			save_errno = repl_tls.enabled ? gtm_tls_errno() : ERRNO;
 			if (-1 == save_errno)
-			{
+			{	/* This indicates an error from TLS/SSL layer and not from a system call.
+				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.
+				 */
 				assert(repl_tls.enabled);
-				assert(FALSE);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("recv"), ERR_TEXT, 2,
-						LEN_AND_STR(gtm_tls_get_error()));
+				save_errno = ERR_TLSIOERROR;
+				bytes_recvd = -1;	/* to ensure "save_errno" does not get overwritten a few lines later */
 			}
 #			else
 			save_errno = ERRNO;

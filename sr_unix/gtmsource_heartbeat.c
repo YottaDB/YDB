@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -41,6 +44,7 @@
 #include "gt_timer.h"
 #include "gtmsource_heartbeat.h"
 #include "relqop.h"
+#include "gtm_repl.h"
 
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	int			gtmsource_sock_fd;
@@ -200,18 +204,26 @@ int gtmsource_send_heartbeat(time_t *now)
 
 		return (SS_NORMAL);
 	}
-	if (EREPL_SEND == repl_errno && REPL_CONN_RESET(status))
-	{
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while attempting to send heartbeat. Status = %d ; %s\n",
-				status, STRERROR(status));
-		repl_close(&gtmsource_sock_fd);
-		gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
-		return (SS_NORMAL);
-	}
 	if (EREPL_SEND == repl_errno)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-			LEN_AND_LIT("Error sending HEARTBEAT message. Error in send"), status);
-	if (EREPL_SELECT == repl_errno)
+	{
+#		ifdef GTM_TLS
+		if (ERR_TLSIOERROR == status)
+		{
+			GTMSOURCE_HANDLE_TLSIOERROR("send");
+			return (SS_NORMAL);
+		} else
+#		endif
+		if (REPL_CONN_RESET(status))
+		{
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "Connection reset while attempting to send heartbeat. Status = %d ; %s\n",
+					status, STRERROR(status));
+			repl_close(&gtmsource_sock_fd);
+			gtmsource_state = jnlpool->gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+			return (SS_NORMAL);
+		} else
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				LEN_AND_LIT("Error sending HEARTBEAT message. Error in send"), status);
+	} else if (EREPL_SELECT == repl_errno)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Error sending HEARTBEAT message. Error in select"), status);
 	assertpro((SS_NORMAL == status));
