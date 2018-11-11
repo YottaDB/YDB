@@ -44,6 +44,7 @@
 #include "arlinkdbg.h"
 #include "incr_link.h"
 #include "have_crit.h"
+#include "sleep.h"
 
 GBLDEF uint4 			lits_text_size, lits_mval_size;
 
@@ -62,6 +63,7 @@ GBLREF int4			sym_table_size;
 GBLREF int4			linkage_size;
 GBLREF uint4			lnkrel_cnt;	/* number of entries in linkage Psect to relocate */
 GBLREF spdesc			stringpool;
+GBLREF unsigned char		source_file_name[];
 GBLREF short			object_name_len;
 GBLREF char			object_file_name[];
 GBLREF int			object_file_des;
@@ -123,6 +125,8 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	gtm_uint16	objhash;
 	var_tabent	*vptr;
 	intrpt_state_t	prev_intrpt_state;
+	struct stat	src_stat, obj_stat;
+	struct timespec	times[2];	/* for "futimens" call */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -295,6 +299,42 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, errno);
 	emit_immed((char *)&objhash.one, SIZEOF(gtm_uint64_t));	/* Update 8 bytes of objhash in the file header */
 	buff_flush();						/* Push it out */
+	/* Now check if the object file modification timestamp is greater than the source file timestamp.
+	 * If not, ensure it by sleeping as much as needed. If there are any errors during any system calls,
+	 * then do not issue errors (as the object file is otherwise constructed fine) but skip this step of
+	 * ensuring object file timestamp is greater than source file timestamp.
+	 */
+	STAT_FILE((char *)source_file_name, &src_stat, status);
+	if (0 == status)
+	{
+		times[0].tv_nsec = UTIME_OMIT;	/* do not touch "last access time" */
+		times[1].tv_nsec = UTIME_NOW;	/* set "last modification time" to current time */
+		do
+		{
+			FSTAT_FILE(object_file_des, &obj_stat, status);
+			if (0 != status)
+				break;
+			/* If object file that we created has a timestamp that is BEFORE the source file timestamp,
+			 * then the system time is going backwards. In that case, do not attempt to get it to be higher.
+			 * Just skip this new-ensuring-step.
+			 * If the object file has a newer timestmap, then our job is done. So we can break.
+			 * Therefore the only case when we cannot break is if the two timestamps are identical/equal.
+			 */
+			if (!IS_STAT1_MTIME_EQUAL_TO_STAT2(src_stat, obj_stat))
+				break;
+			/* Source and Object file modification timestamp are identical. Sleep a bit and update object file
+			 * modification timestamp to see if that becomes newer.
+			 */
+			NANOSLEEP(1, RESTART_TRUE); /* Sleep for 1 nanosecond, the least possible sleep */
+			futimens(object_file_des, times); /* Set the "last modification time" of object file to the current time */
+			/* In case the underlying file system does not track timestamps at nanosecond level, we will
+			 * need to do the do/while loop many times until the current time becomes greater even at the
+			 * filesystem granularity. But it should be a finite # of iterations. Most common filesystems
+			 * support nanosecond timestamp resolution so we do not expect this loop to be more than 1
+			 * in the most common case.
+			 */
+		} while (TRUE);
+	}
 	CLOSE_OBJECT_FILE(object_file_des, status);
 	if (-1 == status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("close()"), CALLFROM, errno);

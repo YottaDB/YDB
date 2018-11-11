@@ -55,19 +55,6 @@ typedef enum
 #define PROBE_SHLIBS	SKIP_SHLIBS
 #endif
 
-/* On certain platforms the st_mtime field of the stat structure got replaced by a timespec st_mtim field, which in turn has tv_sec
- * and tv_nsec fields. For compatibility reasons, those platforms define an st_mtime macro which points to st_mtim.tv_sec. Whenever
- * we detect such a situation, we define a nanosecond flavor of that macro to point to st_mtim.tv_nsec. On HPUX Itanium and older
- * AIX boxes the stat structure simply has additional fields with the nanoseconds value, yet the names of those field are different
- * on those two architectures, so we choose our mapping accordingly.
- */
-#if defined st_mtime
-#  define st_nmtime		st_mtim.tv_nsec
-#elif defined(_AIX)
-#  define st_nmtime		st_mtime_n
-#elif defined(__hpux) && defined(__ia64)
-#  define st_nmtime		st_nmtime
-#endif
 /* Macro to close object file and give appropriate error */
 #define CLOSE_OBJECT_FD(FD, STATUS)												\
 {																\
@@ -413,10 +400,16 @@ void op_zlink (mval *v, mval *quals)
 						rts_error_csa(CSA_ARG(NULL)VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
 							      save_errno);
 					}
-					if ((src_stat.st_mtime > obj_stat.st_mtime)
-					    || ((src_stat.st_mtime == obj_stat.st_mtime)
-						&& (src_stat.st_nmtime > obj_stat.st_nmtime)))
-					{
+					if (!IS_STAT1_MTIME_OLDER_THAN_STAT2(src_stat, obj_stat))
+					{	/* src_stat.mtim is newer than or equal to obj_stat.mtime.
+						 * If src is newer than object, we have to recompile it.
+						 * If src is equal to object, it is an unusual scenario since as part of object
+						 *	file generation we ensure the object file timestamp is newer than the
+						 *	source file. Examples of this scenario are where a .m and .o exist and
+						 *	the .m is copied over from another .m (so the new .m and pre-existing .o
+						 *	do not match in contents and a recompile is needed). In this case, we
+						 *	err on the side of caution and recompile.
+						 */
 						CLOSE_OBJECT_FD(object_file_des, status);
 						compile = TRUE;
 					}
