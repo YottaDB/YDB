@@ -1147,7 +1147,7 @@ typedef struct set_jnl_options_struct
 	boolean_t		alignsize_specified,
 				allocation_specified,
 				autoswitchlimit_specified,
-				image_type_specified,	/* beofre/nobefore option specified */
+				image_type_specified,	/* before/nobefore option specified */
 				buffer_size_specified,
 				epoch_interval_specified,
 				extension_specified,

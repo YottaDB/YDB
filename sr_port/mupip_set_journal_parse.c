@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -73,11 +76,7 @@ boolean_t mupip_set_journal_parse(set_jnl_options *jnl_options, jnl_create_info 
 		jnl_options->image_type_specified = TRUE;
 		jnl_info->before_images = FALSE;
 	} else
-	{
 		jnl_options->image_type_specified = FALSE;
-		assert(!(CLI_PRESENT == jnl_options->cli_on ||
-			((CLI_PRESENT == jnl_options->cli_enable) && (CLI_ABSENT == jnl_options->cli_on))));
-	}
 	assert(JNL_ALLOC_MIN > DIVIDE_ROUND_UP(JNL_FILE_FIRST_RECORD, DISK_BLOCK_SIZE));
 	/* Parsing for other journal characteristics given in "JOURNAL" option */
 	if (jnl_options->allocation_specified = (CLI_PRESENT == cli_present("JOURNAL.ALLOCATION")))

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -75,15 +78,21 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 		} else
 			rptr->jnl_new_state = jnl_open;	/* turn journaling on for REPLICATION=ON */
 	}
-	VMS_ONLY(rptr->before_images = (jnl_options->image_type_specified ?  jnl_info->before_images : current_image);)
-	UNIX_ONLY(	/* If turning replic ON, don't set BEFORE images with MM -- leave it unchanged */
-		rptr->before_images = (jnl_options->image_type_specified
-			? jnl_info->before_images
-			: (((CLI_PRESENT == jnl_options->cli_replic_on) && (repl_open != repl_curr_state)
-					&& (dba_bg == acc_meth))
-				? TRUE
-				: current_image));
-	)
+	/* If BEFORE_IMAGe or NOBEFORE_IMAGE is not specified, determine type for new journal file as follows.
+	 *	1) If acc_meth is MM then continue with whatever journal type is stored in the db file header.
+	 *	2) If acc_meth is BG, then check
+	 *		a) if -replic=ON is specified and replication is not already on currently OR
+	 *		b) if -journal=enable is specified and journaling is disallowed currently
+	 *	   In either of these cases, set new journal type as BEFORE_IMAGE
+	 *	   Else use current journal type from db file header.
+	 */
+	rptr->before_images = (jnl_options->image_type_specified
+		? jnl_info->before_images
+		: (((dba_bg == acc_meth)
+			&& (((CLI_PRESENT == jnl_options->cli_replic_on) && (repl_open != repl_curr_state))
+				|| ((CLI_PRESENT == jnl_options->cli_enable) && (jnl_notallowed == jnl_curr_state))))
+			? TRUE
+			: current_image));
 	if (rptr->before_images && (dba_mm == acc_meth))
 	{
 		gtm_putmsg(VARLSTCNT(4) ERR_MMBEFOREJNL, 2, DB_LEN_STR(gv_cur_region));
@@ -96,16 +105,6 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 			|| (jnl_open == rptr->jnl_new_state)));
 		rptr->repl_new_state = repl_open;
 		rptr->jnl_new_state = jnl_open;
-		VMS_ONLY(
-			assert((CLI_ABSENT == jnl_options->cli_journal)
-				|| (!jnl_options->image_type_specified || rptr->before_images));
-			if (dba_mm == acc_meth)
-			{
-				gtm_putmsg(VARLSTCNT(4) ERR_MMNOBFORRPL, 2, DB_LEN_STR(gv_cur_region));
-				return EXIT_WRN;
-			}
-			rptr->before_images = TRUE;
-		)
 	} else if (CLI_NEGATED == jnl_options->cli_replic_on) /* replic="OFF" */
 		rptr->repl_new_state = repl_closed;
 	else
@@ -114,13 +113,6 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 		{
 			if (CLI_ABSENT != jnl_options->cli_journal)
 			{
-				VMS_ONLY(
-					if (jnl_options->image_type_specified && !rptr->before_images)
-					{
-						gtm_putmsg(VARLSTCNT(4) ERR_REPLNOBEFORE, 2, DB_LEN_STR(gv_cur_region));
-						return EXIT_WRN;
-					}
-				)
 				if (jnl_open != rptr->jnl_new_state)
 				{
 					gtm_putmsg(VARLSTCNT(10) ERR_REPLJNLCNFLCT, 8,

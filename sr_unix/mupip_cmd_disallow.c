@@ -3,6 +3,9 @@
  * Copyright (c) 2002-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -530,9 +533,6 @@ boolean_t cli_disallow_mupip_set(void)
 		  d_c_cli_present("JOURNAL.EXTENSION")	|| d_c_cli_present("JOURNAL.BUFFER_SIZE")   ||
 		  d_c_cli_present("JOURNAL.ALIGNSIZE") 	|| d_c_cli_present("JOURNAL.EPOCH_INTERVAL") ||
 		  d_c_cli_present("JOURNAL.AUTOSWITCHLIMIT")));
-	CLI_DIS_CHECK_N_RESET;
-	disallow_return_value = (!(!d_c_cli_present("JOURNAL") || d_c_cli_present("DISABLE") || d_c_cli_present("OFF") ||
-		d_c_cli_present("JOURNAL.BEFORE_IMAGES") || d_c_cli_negated("JOURNAL.BEFORE_IMAGES")));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = (d_c_cli_present("REPLICATION.ON") && d_c_cli_present("REPLICATION.OFF"));
 	CLI_DIS_CHECK_N_RESET;
