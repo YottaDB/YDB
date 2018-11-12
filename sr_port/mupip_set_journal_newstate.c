@@ -78,13 +78,15 @@ uint4 mupip_set_journal_newstate(set_jnl_options *jnl_options, jnl_create_info *
 		} else
 			rptr->jnl_new_state = jnl_open;	/* turn journaling on for REPLICATION=ON */
 	}
-	/* If BEFORE_IMAGe or NOBEFORE_IMAGE is not specified, determine type for new journal file as follows.
+	/* If BEFORE_IMAGE or NOBEFORE_IMAGE is not specified, determine type for new journal file as follows.
 	 *	1) If acc_meth is MM then continue with whatever journal type is stored in the db file header.
 	 *	2) If acc_meth is BG, then check
 	 *		a) if -replic=ON is specified and replication is not already on currently OR
 	 *		b) if -journal=enable is specified and journaling is disallowed currently
 	 *	   In either of these cases, set new journal type as BEFORE_IMAGE
-	 *	   Else use current journal type from db file header.
+	 *	   Else use current journal type from db file header (e.g. if acc_meth is BG and journaling is enabled
+	 *		but off currently, we should use the db file header state of the before_image property while
+	 *		creating the new journal file).
 	 */
 	rptr->before_images = (jnl_options->image_type_specified
 		? jnl_info->before_images

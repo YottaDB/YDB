@@ -585,13 +585,21 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
 					reg_exit_stat |= EXIT_WRN;
 				}
-				if (JNL_ENABLED(pvt_csd) && pvt_csd->jnl_before_image)
+				if (JNL_ENABLED(pvt_csd))
 				{
-					util_out_print("MM access method cannot be set with BEFORE image journaling", TRUE);
-					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
-					reg_exit_stat |= EXIT_WRN;
+					if (pvt_csd->jnl_before_image)
+					{
+						util_out_print("MM access method cannot be set with BEFORE image journaling", TRUE);
+						util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
+						reg_exit_stat |= EXIT_WRN;
+					}
+				} else if (acc_meth_changing)
+				{	/* Journaling is not ON now. But access method is going to be change and be MM.
+					 * Set default journal type to be NOBEFORE_IMAGE journaling as that is the
+					 * only option compatible with MM (will be used by a later MUPIP SET JOURNAL command).
+					 */
+					pvt_csd->jnl_before_image = FALSE;
 				}
-				pvt_csd->jnl_before_image = FALSE;
 			} else
 			{
 				if (defer_status)
@@ -599,6 +607,13 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("DEFER cannot be specified with BG access method.", TRUE);
 					util_out_print("Database file !AD not changed", TRUE, fn_len, fn);
 					reg_exit_stat |= EXIT_WRN;
+				}
+				if (!JNL_ENABLED(pvt_csd) && acc_meth_changing)
+				{	/* Journaling is not ON now. But access method is going to change and be BG.
+					 * Set default journal type to be BEFORE_IMAGE journaling (will be used by a
+					 * later MUPIP SET JOURNAL command).
+					 */
+					pvt_csd->jnl_before_image = TRUE;
 				}
 			}
 			if (bypass_partial_recov)
