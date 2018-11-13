@@ -223,7 +223,7 @@ STATICFNDCL int io_getevents_internal(aio_context_t ctx)
 		num_ios += ret;
 		for (i = 0; i < ret; ++i)
 		{
-#			ifdef __i386
+#			ifndef GTM64
 			aiocbp = (struct aiocb *)(unsigned long)event[i].obj;
 #			else
 			aiocbp = (struct aiocb *)event[i].obj;

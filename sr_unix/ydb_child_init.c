@@ -107,7 +107,7 @@ int	ydb_child_init(void *param)
 		/* Now that we are in a child process, but inherited the parent's memory as is due to the "fork",
 		 * clear any parent-related AIO activity. If needed, the child needs to do AIO activity afresh.
 		 */
-		addr_ptr->gd_runtime->thread_gdi = NULL;
+		IF_LIBAIO(addr_ptr->gd_runtime->thread_gdi = NULL;)
 		for (reg = addr_ptr->regions, reg_top = reg + addr_ptr->n_regions; reg < reg_top; reg++)
 		{
 			if (reg->open && !reg->was_open && IS_REG_BG_OR_MM(reg))
