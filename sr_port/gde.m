@@ -124,7 +124,9 @@ message(message,arguments,debug)
 	s debug=$g(debug)
 	;
 	; Skip verify OK/Failed messages as we have other ways to know
-	i message=gdeerr("VERIFY") quit
+	; Skip Load of Global directory error messages
+	; Skip Global directory update error messages
+	i message=gdeerr("VERIFY")!(message=gdeerr("LOADGD"))!(message=gdeerr("GDUPDATE")) quit
 	;
 	n count,severity
 	s count=$i(gdeweberror("count"))
@@ -136,9 +138,8 @@ message(message,arguments,debug)
 	;  31   27                 15            3   0
 	;
 	; severities 0, 2, or 4 indicates that the process should stop
-	s severity=$$baseconv(message,2)
-	s severity=$e(severity,$l(severity)-2,$l(severity))
-	i severity="000"!(severity="010")!(severity="100"),message>2**27 s gdewebquit=1
+	s severity=message#8
+	i severity="0"!(severity="2")!(severity="4"),message>2**27 s gdewebquit=1
 	;
 	s gdeweberror(count)=$s('debug:$zm(message),1:message)
 	;
@@ -179,15 +180,6 @@ message(message,arguments,debug)
 	. s text=text_gdeweberror(count)
 	. i $l($g(text)) s gdeweberror(count)=$tr(text,"""","")
 	quit
-baseconv(number,base) ; Convert decimal to binary
-	n remainder,result,out,i
-	s result=0
-	s (out,i)=""
-	f  q:number=0  d
-	. s result($i(result))=number#base
-	. s number=$p(number/base,".",1)
-	f  s i=$o(result(i),-1) q:i=""  s out=out_result(i)
-	quit out
 isFAO(string)
 	; util_output.c contains the real FAO implementation,
 	; this is a simplistic implementation that just does

@@ -18,7 +18,7 @@ ALL()	;external
 	s gqual="SEGMENT" d ALLSEG,useseg
 	d ALLTEM
 	s:('verified)&('$zstatus) $zstatus=gdeerr("VERIFY")
-	d message^GDE(gdeerr("VERIFY"),$s(verified:"""OK""",1:"""FAILED""")) w:'$g(gdewebquiet) !
+	d message^GDE(gdeerr("VERIFY"),$s(verified:"""OK""",1:"""FAILED""")) w:'$g(gdequiet) !
 	q verified
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
