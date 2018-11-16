@@ -690,7 +690,12 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZROUTINES:
-			if (!TREF(zro_root))
+			/* If process is already exiting, do not waste time doing "zro_init". That could open
+			 * relinkctl files which require more memory and could cause more errors if we are already
+			 * exiting due to a YDB-F-MEMORY error. In this case, we would have $ZROUTINES show up as ""
+			 * in the output. That is okay.
+			 */
+			if (!TREF(zro_root) && !process_exiting)
 				zro_init();
 			var.mvtype = MV_STR;
 			var.str = TREF(dollar_zroutines);
