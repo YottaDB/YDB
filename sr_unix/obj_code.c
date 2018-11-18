@@ -303,37 +303,42 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	 * If not, ensure it by sleeping as much as needed. If there are any errors during any system calls,
 	 * then do not issue errors (as the object file is otherwise constructed fine) but skip this step of
 	 * ensuring object file timestamp is greater than source file timestamp.
+	 * But if we are compiling a trigger, we create a temporary .m and .o file and are going to delete both soon after
+	 * the compilation so do not waste time sleeping (and slowing down trigger compiles) in that case.
 	 */
-	STAT_FILE((char *)source_file_name, &src_stat, status);
-	if (0 == status)
+	if (!TREF(trigger_compile_and_link))
 	{
-		times[0].tv_nsec = UTIME_OMIT;	/* do not touch "last access time" */
-		times[1].tv_nsec = UTIME_NOW;	/* set "last modification time" to current time */
-		do
+		STAT_FILE((char *)source_file_name, &src_stat, status);
+		if (0 == status)
 		{
-			FSTAT_FILE(object_file_des, &obj_stat, status);
-			if (0 != status)
-				break;
-			/* If object file that we created has a timestamp that is BEFORE the source file timestamp,
-			 * then the system time is going backwards. In that case, do not attempt to get it to be higher.
-			 * Just skip this new-ensuring-step.
-			 * If the object file has a newer timestmap, then our job is done. So we can break.
-			 * Therefore the only case when we cannot break is if the two timestamps are identical/equal.
-			 */
-			if (!IS_STAT1_MTIME_EQUAL_TO_STAT2(src_stat, obj_stat))
-				break;
-			/* Source and Object file modification timestamp are identical. Sleep a bit and update object file
-			 * modification timestamp to see if that becomes newer.
-			 */
-			NANOSLEEP(1, RESTART_TRUE); /* Sleep for 1 nanosecond, the least possible sleep */
-			futimens(object_file_des, times); /* Set the "last modification time" of object file to the current time */
-			/* In case the underlying file system does not track timestamps at nanosecond level, we will
-			 * need to do the do/while loop many times until the current time becomes greater even at the
-			 * filesystem granularity. But it should be a finite # of iterations. Most common filesystems
-			 * support nanosecond timestamp resolution so we do not expect this loop to be more than 1
-			 * in the most common case.
-			 */
-		} while (TRUE);
+			times[0].tv_nsec = UTIME_OMIT;	/* do not touch "last access time" */
+			times[1].tv_nsec = UTIME_NOW;	/* set "last modification time" to current time */
+			do
+			{
+				FSTAT_FILE(object_file_des, &obj_stat, status);
+				if (0 != status)
+					break;
+				/* If object file that we created has a timestamp that is BEFORE the source file timestamp,
+				 * then the system time is going backwards. In that case, do not attempt to get it to be higher.
+				 * Just skip this new-ensuring-step.
+				 * If the object file has a newer timestmap, then our job is done. So we can break.
+				 * Therefore the only case when we cannot break is if the two timestamps are identical/equal.
+				 */
+				if (!IS_STAT1_MTIME_EQUAL_TO_STAT2(src_stat, obj_stat))
+					break;
+				/* Source and Object file modification timestamp are identical. Sleep a bit and update object file
+				 * modification timestamp to see if that becomes newer.
+				 */
+				NANOSLEEP(1, RESTART_TRUE); /* Sleep for 1 nanosecond, the least possible sleep */
+				futimens(object_file_des, times); /* Set "last modification time" of object file to current time */
+				/* In case the underlying file system does not track timestamps at nanosecond level, we will
+				 * need to do the do/while loop many times until the current time becomes greater even at the
+				 * filesystem granularity. But it should be a finite # of iterations. Most common filesystems
+				 * support nanosecond timestamp resolution so we do not expect this loop to be more than 1
+				 * in the most common case.
+				 */
+			} while (TRUE);
+		}
 	}
 	CLOSE_OBJECT_FILE(object_file_des, status);
 	if (-1 == status)
