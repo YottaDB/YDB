@@ -93,51 +93,69 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
 {															\
 	int	rc;													\
 															\
-	if (multi_thread_in_use || simpleThreadAPI_active)								\
+	GBLREF	int	process_exiting;										\
+															\
+	if (!process_exiting)												\
 	{														\
-		assertpro(!timer_in_handler);										\
-		/* We should never use pthread_* calls inside a signal/timer handler. Assert that */			\
-		assert(!in_nondeferrable_signal_handler);								\
-		/* Allow for self to already own the lock (due to nested codepaths that need the lock. */		\
-		if (!IS_LIBPTHREAD_MUTEX_LOCK_HOLDER)									\
+		if (multi_thread_in_use || simpleThreadAPI_active)							\
 		{													\
-			rc = pthread_mutex_lock(&thread_mutex);								\
-			if (rc)												\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,				\
-					      RTS_ERROR_LITERAL("pthread_mutex_lock(thread_mutex)"), CALLFROM, rc);	\
-			thread_mutex_holder = pthread_self();								\
-			DEBUG_ONLY(thread_mutex_holder_rtn = __FILE__);							\
-			DEBUG_ONLY(thread_mutex_holder_line = __LINE__);						\
-			WAS_HOLDER = FALSE;										\
+			assertpro(!timer_in_handler);									\
+			/* We should never use pthread_* calls inside a signal/timer handler. Assert that */		\
+			assert(!in_nondeferrable_signal_handler);							\
+			/* Allow for self to already own the lock (due to nested codepaths that need the lock. */	\
+			if (!IS_LIBPTHREAD_MUTEX_LOCK_HOLDER)								\
+			{												\
+				rc = pthread_mutex_lock(&thread_mutex);							\
+				if (rc)											\
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,			\
+						RTS_ERROR_LITERAL("pthread_mutex_lock(thread_mutex)"), CALLFROM, rc);	\
+				thread_mutex_holder = pthread_self();							\
+				DEBUG_ONLY(thread_mutex_holder_rtn = __FILE__);						\
+				DEBUG_ONLY(thread_mutex_holder_line = __LINE__);					\
+				WAS_HOLDER = FALSE;									\
+			} else												\
+				WAS_HOLDER = TRUE;									\
 		} else													\
-			WAS_HOLDER = TRUE;										\
-	} else														\
-		assert(0 == (uintptr_t)thread_mutex_holder);								\
+			assert(0 == (uintptr_t)thread_mutex_holder);							\
+	}														\
+	/* else : We are in the process of exiting. It is possible we are in a signal handler at this point in which	\
+	 *        case, doing pthread_* calls can cause deadlock so best avoid it and terminate the process without	\
+	 *	  any more secondary errors during exit handling.							\
+	 */														\
 }
 
 #define	PTHREAD_MUTEX_UNLOCK_IF_NEEDED(WAS_HOLDER)									\
 {															\
 	int	rc;													\
 															\
-	if (multi_thread_in_use || simpleThreadAPI_active)								\
+	GBLREF	int	process_exiting;										\
+															\
+	if (!process_exiting)												\
 	{														\
-		assertpro(!timer_in_handler);										\
-		/* We should never use pthread_* calls inside a signal/timer handler. Assert that */			\
-		assert(!in_nondeferrable_signal_handler);								\
-		/* assert self does own the lock */									\
-		assert(IS_LIBPTHREAD_MUTEX_LOCK_HOLDER);								\
-		if (!WAS_HOLDER)											\
+		if (multi_thread_in_use || simpleThreadAPI_active)							\
 		{													\
-			thread_mutex_holder = 0;									\
-			DEBUG_ONLY(thread_mutex_holder_rtn = NULL);							\
-			DEBUG_ONLY(thread_mutex_holder_line = 0);							\
-			rc = pthread_mutex_unlock(&thread_mutex);							\
-			if (rc)												\
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,				\
-					      RTS_ERROR_LITERAL("pthread_mutex_unlock(pthread_mutex)"), CALLFROM, rc);	\
-		}													\
-	} else														\
-		assert(0 == (uintptr_t)thread_mutex_holder);								\
+			assertpro(!timer_in_handler);									\
+			/* We should never use pthread_* calls inside a signal/timer handler. Assert that */		\
+			assert(!in_nondeferrable_signal_handler);							\
+			/* assert self does own the lock */								\
+			assert(IS_LIBPTHREAD_MUTEX_LOCK_HOLDER);							\
+			if (!WAS_HOLDER)										\
+			{												\
+				thread_mutex_holder = 0;								\
+				DEBUG_ONLY(thread_mutex_holder_rtn = NULL);						\
+				DEBUG_ONLY(thread_mutex_holder_line = 0);						\
+				rc = pthread_mutex_unlock(&thread_mutex);						\
+				if (rc)											\
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,			\
+						RTS_ERROR_LITERAL("pthread_mutex_unlock(thread_mutex)"), CALLFROM, rc);	\
+			}												\
+		} else													\
+			assert(0 == (uintptr_t)thread_mutex_holder);							\
+	}														\
+	/* else : We are in the process of exiting. It is possible we are in a signal handler at this point in which	\
+	 *        case, doing pthread_* calls can cause deadlock so best avoid it and terminate the process without	\
+	 *	  any more secondary errors during exit handling.							\
+	 */														\
 }
 
 /* Below macro identifies if the caller is inside threaded code. A quick check of this is using the global
