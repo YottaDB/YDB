@@ -102,15 +102,7 @@ int	gtm_multi_thread(gtm_pthread_fnptr_t fnptr, int ntasks, int max_threads,
 		return final_ret;
 	}
 #	ifdef GTM_PTHREAD
-	/* Initialize thread-mutex variables if not already done */
-	if (!thread_mutex_initialized)
-	{
-		rc = pthread_mutex_init(&thread_mutex, NULL);
-		if (rc)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)
-					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutex_init()"), CALLFROM, rc);
-		thread_mutex_initialized = TRUE;
-	}
+	INITIALIZE_THREAD_MUTEX_IF_NEEDED; /* Initialize thread-mutex variables if not already done */
 	/* Initialize and set thread-is-joinable attribute */
 	rc = pthread_attr_init(&attr);
 	if (rc)

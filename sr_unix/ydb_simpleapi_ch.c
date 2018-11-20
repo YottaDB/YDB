@@ -105,8 +105,15 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	int			zstatus_buffer_len;
 	int			rc;
 	mstr			entryref;
+	boolean_t		was_holder;
 
 	START_CH(TRUE);
+	/* If thread_mutex is locked (from rts_error) by this thread, release it ignoring errors at this point */
+	if (thread_mutex_initialized)
+	{
+		was_holder = !IS_LIBPTHREAD_MUTEX_LOCK_HOLDER;
+		PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);
+	}
 	if (ERR_REPEATERROR == SIGNAL)
 		arg = SIGNAL = dollar_ecode.error_last_ecode;	/* Rethrown error. Get primary error code */
 	/* The mstrs that were part of the current ydb_*_s() call and were being protected from "stp_gcol" through a global
@@ -317,16 +324,6 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 			ENABLE_INTERRUPTS(intrpt_ok_state, INTRPT_OK_TO_INTERRUPT);	/* If interrupts were deferred,
 											 * re-enable them now */
 	}
-#	ifdef GTM_PTHREAD
-	/* If thread_mutex is locked (from rts_error) by this thread, release it ignoring errors at this point */
-	if ((0 != (uintptr_t)thread_mutex_holder) && IS_LIBPTHREAD_MUTEX_LOCK_HOLDER)
-	{
-		thread_mutex_holder = 0;
-		DEBUG_ONLY(thread_mutex_holder_rtn = NULL);
-		DEBUG_ONLY(thread_mutex_holder_line = 0);
-		(void)pthread_mutex_unlock(&thread_mutex);
-	}
-#	endif
 #	ifdef GTM_TRIGGER
 	/* At this point, we are past the point where the frame pointer is allowed to be resting on a trigger frame
 	 * (this is possible in a TPRETRY situation where gtm_trigger must return to gtm_trigger() signaling a

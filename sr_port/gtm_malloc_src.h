@@ -1109,7 +1109,8 @@ void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg wh
 			--gtmMallocDepth;
 		--fast_lock_count;
 		DEFERRED_SIGNAL_HANDLING_CHECK;
-		was_holder = TRUE; /* caller (gtm_malloc/gtm_free) got the thread lock so release it before the rts_error */
+		assert(IS_PTHREAD_LOCKED_AND_HOLDER);
+		was_holder = FALSE; /* caller (gtm_malloc/gtm_free) got the thread lock so release it before the rts_error */
 		PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_MEMORY, 2, gtmMallocErrorSize, gtmMallocErrorCallerid,
 					gtmMallocErrorErrno);

@@ -11,6 +11,10 @@
  ****************************************************************/
 #include "mdef.h"
 
+#ifdef YDB_USE_POSIX_TIMERS
+#include <sys/syscall.h>	/* for "syscall" */
+#endif
+
 #include "gtm_semaphore.h"
 
 #include "libyottadb_int.h"
@@ -33,8 +37,10 @@ GBLREF	uint4		dollar_tlevel;
 GBLREF	boolean_t	simpleThreadAPI_active;
 GBLREF	pthread_t	gtm_main_thread_id;
 GBLREF	boolean_t	gtm_main_thread_id_set;
+#ifdef YDB_USE_POSIX_TIMERS
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
+#endif
 
 STATICFNDCL void ydb_stm_threadq_process(boolean_t *queueChanged);
 
@@ -59,6 +65,12 @@ void *ydb_stm_thread(void *parm)
 	simpleThreadAPI_active = TRUE;
 	assert(gtm_main_thread_id_set);
 	gtm_main_thread_id = pthread_self();
+	INITIALIZE_THREAD_MUTEX_IF_NEEDED; /* Initialize thread-mutex variables if not already done */
+#	ifdef YDB_USE_POSIX_TIMERS
+	assert(0 == posix_timer_created);
+	assert(0 == posix_timer_thread_id);
+	posix_timer_thread_id = syscall(SYS_gettid);
+#	endif
 	/* Initialize which queue we are looking for work in */
 	TREF(curWorkQHead) = stmWorkQueue[0];			/* Initially pick requests from main work queue */
 	assert(NULL != TREF(curWorkQHead));			/* Queue should be setup by now */

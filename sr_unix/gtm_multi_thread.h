@@ -78,6 +78,20 @@ typedef struct {
 
 int	gtm_multi_thread_helper(thread_parm_t *tparm);
 
+#define	INITIALIZE_THREAD_MUTEX_IF_NEEDED										\
+{															\
+	int	rc;													\
+															\
+	if (!thread_mutex_initialized)											\
+	{														\
+		rc = pthread_mutex_init(&thread_mutex, NULL);								\
+		if (rc)													\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8)							\
+					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutex_init()"), CALLFROM, rc);	\
+		thread_mutex_initialized = TRUE;									\
+	}														\
+}
+
 #define	IS_LIBPTHREAD_MUTEX_LOCK_HOLDER 	(pthread_equal(pthread_self(), thread_mutex_holder))
 
 /* Macro to grab a lock across all active threads in this process.
@@ -171,6 +185,7 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
 
 #else
 
+#define	INITIALIZE_THREAD_MUTEX_IF_NEEDED
 #define	IS_LIBPTHREAD_MUTEX_LOCK_HOLDER 		FALSE
 #define	ASSERT_NO_THREAD_USAGE				assert(!multi_thread_in_use && (0 != (uintptr_t)thread_mutex_holder))
 #define	PTHREAD_MUTEX_LOCK_IF_NEEDED(WAS_HOLDER) 	ASSERT_NO_THREAD_USAGE
@@ -179,7 +194,7 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
 
 #endif
 
-/* Returns FALSE if threads are in use and we dont own the libpthread mutex lock. Returns TRUE otherwise */
+/* Returns FALSE if threads are in use and we don't own the libpthread mutex lock. Returns TRUE otherwise */
 #define	IS_PTHREAD_LOCKED_AND_HOLDER	(!multi_thread_in_use || IS_LIBPTHREAD_MUTEX_LOCK_HOLDER)
 
 /* Below macro is invoked just before we read or write global variables that are also updated inside threaded code.
