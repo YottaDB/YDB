@@ -24,13 +24,13 @@ Install development libraries
 
 ```sh
    Ubuntu Linux OR Raspbian Linux OR Beagleboard Debian
-   sudo apt-get install cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev
+   sudo apt-get install cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev binutils
 
    Arch Linux
-   sudo pacman -S cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,gpgme,icu,ncurses,openssl,zlib}
+   sudo pacman -S cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,gpgme,icu,ncurses,openssl,zlib} binutils
 
    CentOS Linux OR RedHat Linux
-   sudo yum install git gcc cmake tcsh {libconfig,gpgme,libicu,libgpg-error,libgcrypt,ncurses,openssl,zlib,elfutils-libelf}-devel
+   sudo yum install git gcc cmake tcsh {libconfig,gpgme,libicu,libgpg-error,libgcrypt,ncurses,openssl,zlib,elfutils-libelf}-devel binutils
 ```
 
 There may be other library dependencies or the packages may have different names.
@@ -56,7 +56,7 @@ Build the YottaDB binaries:
 
 > By default the script creates production (pro) builds of YottaDB. To create
 > a debug (dbg) build of YottaDB supply the following parameter to cmake
->     ```-D CMAKE_BUILD\_TYPE=Debug```	
+>     ```-D CMAKE_BUILD\_TYPE=Debug```
 > (*Note: title case is important*)
 >
 
@@ -141,7 +141,7 @@ docker run --rm -it yottadb/yottadb # you can add a specific version after a ":"
 
 - The CMake build fails with the following message followed by one or more cases.
 
-  ```         
+  ```
   CMake Error: The following variables are used in this project, but they are set to NOTFOUND. Please set them or make sure they are set and tested correctly in the CMake files
   ```
 
