@@ -49,9 +49,10 @@ TRACEGROUP(STAPITP)
 TRACETYPE(STAPITP,	ENTRY,		"",		"entry_point",	"workqlocked",	"TID")		/* Entry point */
 TRACETYPE(STAPITP,	LOCKWORKQ,	"thread_start",	"workqueue",	"callblk",	"TID")		/* Locking a work queue header */
 TRACETYPE(STAPITP,	UNLOCKWORKQ,	"",		"workqueue",	"",		"TID")		/* Unlocking of a work queue header */
-TRACETYPE(STAPITP,	SEMWAKE,	"",		"retval",	"callblk",	"TID")		/* Wake from semwait */
-TRACETYPE(STAPITP,	FUNCDISPATCH,	"",		"function",	"",		"TID")		/* Dispatch function to run */
+TRACETYPE(STAPITP,	SEMWAIT,	"",		"",		"callblk",	"TID")		/* Thread now waiting on msem */
+TRACETYPE(STAPITP,	FUNCDISPATCH,	"function",	"",		"callblk",	"TID")		/* Dispatch function to run */
 TRACETYPE(STAPITP,	SIGCOND,	"",		"",		"callblk",	"TID")		/* When signal condition var */
+TRACETYPE(STAPITP,	REQCOMPLT,	"function",	"retval",	"callblk",	"TID")		/* The current request is complete */
 TRACETYPE(STAPITP,	TPCOMPLT,	"TPLevel",	"workqueue",	"",		"TID")		/* When a TP level commits/completes */
 
 /* Trace to figure out why rts_error_csa() keeps overflowing max nesting (not getting reset in some path) */

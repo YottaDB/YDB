@@ -770,8 +770,6 @@ int ydb_stm_freecallblk(stm_que_ent *callblk);
 void *ydb_stm_thread(void *parm);
 void *ydb_stm_tpthread(void *parm);
 stm_workq *ydb_stm_init_work_queue(void);
-int ydb_tp_sst(uint64_t tptoken, ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount,
-	       ydb_buffer_t *varnames);
 int ydb_tp_s_common(boolean_t stapi, uint64_t tptoken, ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount,
 		    ydb_buffer_t *varnames);
 

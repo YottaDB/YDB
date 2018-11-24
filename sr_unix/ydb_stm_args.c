@@ -98,6 +98,7 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 		SETUP_SYSCALL_ERROR("pthread_cond_signal()", status);
 		return YDB_ERR_SYSCALL;
 	}
+	TRCTBL_ENTRY(STAPITP_SEMWAIT, 0, NULL, callblk, pthread_self());
 	/* Now wait till a worker thread tells us our request is complete */
 	GTM_SEM_WAIT(&callblk->complete, status);
 	if (0 != status)
@@ -106,7 +107,7 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 		SETUP_SYSCALL_ERROR("sem_wait()", save_errno);
 		return YDB_ERR_SYSCALL;
 	}
-	TRCTBL_ENTRY(STAPITP_SEMWAKE, 0, callblk->retval, callblk, pthread_self());
+	TRCTBL_ENTRY(STAPITP_REQCOMPLT, callblk->calltyp, callblk->retval, callblk, pthread_self());
 	/* Save the return value, queue the now-free call block for later reuse */
 	retval = callblk->retval;
 	status = ydb_stm_freecallblk(callblk);

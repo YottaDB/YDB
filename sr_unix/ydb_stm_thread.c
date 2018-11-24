@@ -363,7 +363,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 			return;
 		/* Signal to process that we are done with this request */
 		TRCTBL_ENTRY(STAPITP_SIGCOND, 0, NULL, callblk, pthread_self());
-		status = sem_post(&callblk->complete);
+		GTM_SEM_POST(&callblk->complete, status);
 		if (0 != status)
 		{
 			save_errno = errno;

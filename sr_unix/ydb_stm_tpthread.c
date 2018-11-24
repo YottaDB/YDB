@@ -122,9 +122,9 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 				 */
 				tptoken = INTERLOCK_ADD(&stmTPToken, UNUSED, 1);
 				stmWorkQueue[TREF(curWorkQHeadIndx)]->tptoken = tptoken;
-				int_retval = ydb_tp_sst(tptoken, (ydb_basicfnptr_t)callblk->args[0], (void *)callblk->args[1],
-							(const char *)callblk->args[2], (int)callblk->args[3],
-							(ydb_buffer_t *)callblk->args[4]);
+				int_retval = ydb_tp_s_common(TRUE, tptoken, (ydb_basicfnptr_t)callblk->args[0],
+							     (void *)callblk->args[1], (const char *)callblk->args[2],
+							     (int)callblk->args[3], (ydb_buffer_t *)callblk->args[4]);
 				callblk->retval = (uintptr_t)int_retval;
 				break;
 			default:
@@ -137,8 +137,8 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 		if (1 == TREF(curWorkQHeadIndx))
 		{
 			status = ydb_stm_args0(tptoken, LYDB_RTN_TPCOMPLT);
-			    if (0 != status)
-				    callblk->retval = status;
+			if (0 != status)
+				callblk->retval = status;
 		} else
 			(TREF(curWorkQHeadIndx))--;	/* Reduce TP level */
 		/* The request is complete - regrab the lock to check if any more entries on this queue (not so much
@@ -153,7 +153,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 		}
 		/* Signal to process that we are done with this request */
 		TRCTBL_ENTRY(STAPITP_SIGCOND, 0, NULL, callblk, pthread_self());
-		status = sem_post(&callblk->complete);
+		GTM_SEM_POST(&callblk->complete, status);
 		if (0 != status)
 		{
 			save_errno = errno;

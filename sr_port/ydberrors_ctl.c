@@ -47,7 +47,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "INVLNPAIRLIST", "Invalid lockname/subscript pair list (uneven number of lockname/subscript parameters)", 0 },
 	{ "INVTPTRANS", "Invalid TP transaction - either invalid TP token or transaction not in progress", 0 },
 	{ "INVAPIMODE", "Process not allowed to first use a(n) !AD API then switch to using a(n) !AD API", 4 },
-	{ "NOTSUPSTAPI", "Calls to !AD are not supported in the threaded Simple API", 2 },
+	{ "NOTSUPSTAPI", "Calls to !AD are not supported if threaded Simple API functions are in use", 2 },
 };
 
 

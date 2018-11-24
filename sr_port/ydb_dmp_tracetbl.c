@@ -31,7 +31,7 @@ void ydb_dmp_tracetbl(void)
 	SETUP_THREADGBL_ACCESS;
 	start = cur = TREF(gtm_trctbl_cur);			/* The last entry that was filled in */
 	if ((NULL != start) && (start >= TREF(gtm_trctbl_start)))
-		fprintf(stderr, "Trace table entries:\n");
+		fprintf(stderr, "Trace table entries (newest to oldest order):\n");
 	else
 		return;
 	/* At least one entry exists - format entries from cur backwards until we hit start again or we run into
@@ -93,9 +93,9 @@ void ydb_dmp_tracetbl(void)
 				fprintf(stderr, "   Entry: STAPITP_UNLOCKWORDQ,  WorkQAddr: %p,  Callblk: %p,  "
 					"TID: 0x"lvaddr"\n", cur->addrfld1, cur-> addrfld2, (unsigned long)cur->addrfld3);
 				break;
-			case STAPITP_SEMWAKE:
-				fprintf(stderr, "   Entry: STAPITP_SEMWAKE,  Retval: %p, Callblk: %p,  TID: 0x"lvaddr"\n",
-					cur->addrfld1, cur->addrfld2, (unsigned long)cur->addrfld3);
+			case STAPITP_SEMWAIT:
+				fprintf(stderr, "   Entry: STAPITP_SEMWAIT,  Callblk: %p,  TID: 0x"lvaddr"\n",
+					cur->addrfld2, (unsigned long)cur->addrfld3);
 				break;
 			case STAPITP_FUNCDISPATCH:
 				assert(0 < cur->intfld);
@@ -108,6 +108,22 @@ void ydb_dmp_tracetbl(void)
 				}
 				fprintf(stderr, "   Entry: STAPITP_FUNCDISPATCH,  Func: %s,   TID: 0x"lvaddr"\n", funcname,
 					(unsigned long)cur->addrfld3);
+				break;
+			case STAPITP_REQCOMPLT:
+				assert(0 < cur->intfld);
+				if (LYDB_RTN_TPCOMPLT == cur->intfld)
+					funcname = "TPCOMPLT";	/* Not really a routine but rather an event (TP trans complete) */
+				else
+				{
+					assert(LYDB_RTN_TPCOMPLT > cur->intfld);
+					funcname = lydbrtnnames[cur->intfld];
+				}
+				fprintf(stderr, "   Entry: STAPITP_SEMWAKE,  Retval: %p, Callblk: %p,  TID: 0x"lvaddr"\n",
+					cur->addrfld1, cur->addrfld2, (unsigned long)cur->addrfld3);
+				break;
+				fprintf(stderr, "   Entry: STAPITP_REQCOMPLT,  Func: %s,  Retval: %p, Callblk: %p,  TID: 0x"lvaddr
+					"\n", funcname, cur->addrfld1, cur->addrfld2, (unsigned long)cur->addrfld3);
+
 				break;
 			case STAPITP_SIGCOND:
 				fprintf(stderr, "   Entry: STAPITP_SIGCOND,  Callblk: %p,  TID: 0x"lvaddr"\n", cur->addrfld2,

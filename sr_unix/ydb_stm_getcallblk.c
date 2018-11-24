@@ -44,7 +44,7 @@ stm_que_ent *ydb_stm_getcallblk(void)
 	{	/* No free blocks available so create a new one */
 		callblk = malloc(SIZEOF(stm_que_ent));
 		memset(callblk, 0, SIZEOF(stm_que_ent));
-		sem_init(&callblk->complete, 0, 1);	/* Create initially unlocked */
+		GTM_SEM_INIT(&callblk->complete, 0, 0, status);		/* Create initially locked */
 	}
 	DEBUG_ONLY(callblk->mainqcaller = callblk->tpqcaller = NULL);
 	/* Release our lock on the queue header */
@@ -59,18 +59,15 @@ stm_que_ent *ydb_stm_getcallblk(void)
 	 * thread putting an entry on the queue can then wait on this lock and wakeup when a worker
 	 * thread "unlocks" it which it does when the task is complete. Our purpose here is just to
 	 * make sure it is locked so it can be waited on. To do that, we do a sem_trywait() which
-	 * always returns immediately. We always expect it to be unlocked but deal with it if it
-	 * already was locked but assertfail in that case so we know we had a case of one being locked.
+	 * always returns immediately. The expected status here is that the semaphore is already locked
+	 * since it is both created that way and the last operation on a recycled block is that it
+	 * was locked by a sem_wait in ydb_stm_thread(). But in debug, we make sure it is locked and
+	 * generate an assert fail if it isn't.
 	 */
-	GTM_SEM_TRYWAIT(&callblk->complete, status);	/* Semaphore may or may not be locked already */
-	if ((0 != status) && (EAGAIN != errno))
-	{
-		save_errno = errno;
-		SETUP_SYSCALL_ERROR("sem_trywait()", save_errno);
-		assert(FALSE);
-		return (stm_que_ent *)-1;
-	}
-	assert(EAGAIN != errno);			/* Find out if this ever happens */
+#	ifdef DEBUG
+	GTM_SEM_TRYWAIT(&callblk->complete, status);	/* Attempt to lock what should already be locked */
+	assert((0 > status) && (EAGAIN == errno));
+#	endif
 	assert(callblk && (-1 != (intptr_t)callblk));
 	return callblk;
 }
