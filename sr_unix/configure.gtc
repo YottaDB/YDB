@@ -521,16 +521,12 @@ done
 # Install the normal binaries
 for i in $binaries
 do
-	if [ $arch = "linux" ]; then
-		install -g $bingroup -o $owner -m 644 $i $ydbdist
-	elif [ $arch = "ibm" ]; then
-		/usr/bin/install -f $ydbdist -M 644 -O $owner -G $bingroup $i
-	elif [ -x /usr/sbin/install ]; then
-		/usr/sbin/install -f $ydbdist -m 644 -u $owner -g $bingroup $i $ydbdist
-	else
-		install -f $ydbdist -m 644 -u $owner -g $bingroup $i $ydbdist
+	install -g $bingroup -o $owner -m 644 $i $ydbdist
+	# Install *.dbg file (debug symbol file) if it exists for the binary
+	basebinaryname=`basename $i .so`	# needed to take .so out of libyottadb.so; is a no-op for other non .so binaries
+	if [ -e $basebinaryname.dbg ]; then
+		install -g $bingroup -o $owner -m 644 $basebinaryname.dbg $ydbdist
 	fi
-#		strip $ydbdist/$i >/dev/null 2>&1
 done
 
 # Install other individual files
@@ -729,6 +725,10 @@ fi
 for i in $binaries
 do
 	chmod 755 $ydbdist/$i
+	basebinaryname=`basename $i .so`	# needed to take .so out of libyottadb.so; is a no-op for other non .so binaries
+	if [ -e $ydbdist/$basebinaryname.dbg ]; then
+		chmod 755 $ydbdist/$basebinaryname.dbg
+	fi
 done
 
 chmod 0644 $ydbdist/*.m
