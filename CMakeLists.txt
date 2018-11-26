@@ -965,14 +965,12 @@ if("${CMAKE_BUILD_TYPE}" MATCHES "RelWithDebInfo")
     )
 
   foreach(e ${executable_target_list})
-    add_custom_command(OUTPUT ${e}.dbg
-      DEPENDS ${e}
+    add_custom_command(TARGET ${e} POST_BUILD
       COMMAND objcopy --only-keep-debug $<TARGET_FILE:${e}> ${e}.dbg
       COMMAND objcopy --strip-debug $<TARGET_FILE:${e}>
       COMMAND objcopy --add-gnu-debuglink=${e}.dbg $<TARGET_FILE:${e}>
       WORKING_DIRECTORY "${YDB_BINARY_DIR}"
       )
-    list(APPEND files_to_place ${e}.dbg)
     install(FILES "${YDB_BINARY_DIR}/${e}.dbg" DESTINATION ${YDB_INSTALL_DIR})
   endforeach()
 endif()
