@@ -317,7 +317,7 @@ void	gtm_env_init_sp(void)
 		{	/* Else use default $ydb_tmp value or its default */
 			if ((SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_TMP, &trans, buf, YDB_PATH_MAX,
 												IGNORE_ERRORS_TRUE, NULL)))
-					|| (0 < trans.len))
+					|| (0 == trans.len))
 			{	/* Nothing for $ydb_tmp either - use DEFAULT_GTM_TMP which is already a string */
 				trans.addr = DEFAULT_GTM_TMP;
 				trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
