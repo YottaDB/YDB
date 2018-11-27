@@ -177,19 +177,19 @@ enum
  * BUFFERP->len_alloc is set to the malloced length.
  * BUFFERP->len_used is set to 0.
  */
-#define	YDB_MALLOC_BUFFER_T(BUFFERP, LEN)		\
-{							\
-	(BUFFERP)->len_alloc = LEN;			\
-	(BUFFERP)->len_used = 0;			\
-	(BUFFERP)->buf_addr = ydb_malloc_t(LEN);	\
-	YDB_ASSERT_DBG(NULL != (BUFFERP)->buf_addr);	\
+#define	YDB_MALLOC_BUFFER_T(TPTOKEN, BUFFERP, LEN)		\
+{								\
+	(BUFFERP)->len_alloc = LEN;				\
+	(BUFFERP)->len_used = 0;				\
+	(BUFFERP)->buf_addr = ydb_malloc_t(TPTOKEN, LEN);	\
+	YDB_ASSERT_DBG(NULL != (BUFFERP)->buf_addr);		\
 }
 
 /* Macro to free the buffer malloced using "YDB_MALLOC_BUFFER_T" */
-#define	YDB_FREE_BUFFER_T(BUFFERP)			\
+#define	YDB_FREE_BUFFER_T(TPTOKEN, BUFFERP)		\
 {							\
 	YDB_ASSERT_DBG(NULL != (BUFFERP)->buf_addr);	\
-	ydb_free_t((BUFFERP)->buf_addr);		\
+	ydb_free_t(TPTOKEN, (BUFFERP)->buf_addr);	\
 	(BUFFERP)->buf_addr = NULL;			\
 }
 
