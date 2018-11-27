@@ -182,9 +182,9 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 							     (int)callblk->args[2], (ydb_buffer_t *)callblk->args[3]);
 #				else
 #				ifdef BIGENDIAN
-				tparm = (((unsigned long long)callblk->args[1]) << 32) | (unsigned long long)callblk->args[2];
+				tparm = (((unsigned long long)callblk->args[0]) << 32) | (unsigned long long)callblk->args[1];
 #				else
-				tparm = (((unsigned long long)callblk->args[2]) << 32) | (unsigned long long)callblk->args[1];
+				tparm = (((unsigned long long)callblk->args[1]) << 32) | (unsigned long long)callblk->args[0];
 #				endif
 				int_retval - ydb_lock_incr_s(tparm, (ydb_buffer_t *)callblk->args[2],
 							     (int)callblk->args[3], (ydb_buffer_t *)callblk->args[4]);

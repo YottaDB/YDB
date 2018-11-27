@@ -61,11 +61,11 @@ enum
  * in the future to a higher value in <limits.h> so set YDB_INT_MAX to the hardcoded fixed value of ((2**31)-1).
  */
 #define YDB_INT_MAX		((int)0x7fffffff)
-#define	YDB_TP_RESTART		(YDB_INT_MAX - 1)
-#define	YDB_TP_ROLLBACK		(YDB_INT_MAX - 2)
-#define YDB_NODE_END		(YDB_INT_MAX - 3)
-#define YDB_LOCK_TIMEOUT	(YDB_INT_MAX - 4)
-#define YDB_NOTOK		(YDB_INT_MAX - 5)
+#define	YDB_TP_RESTART		(YDB_INT_MAX - 1)	/* 0x7ffffffe */
+#define	YDB_TP_ROLLBACK		(YDB_INT_MAX - 2)	/* 0x7ffffffd */
+#define YDB_NODE_END		(YDB_INT_MAX - 3)	/* 0x7ffffffc */
+#define YDB_LOCK_TIMEOUT	(YDB_INT_MAX - 4)	/* 0x7ffffffb */
+#define YDB_NOTOK		(YDB_INT_MAX - 5)	/* 0x7ffffffa */
 
 /* Miscellaneous defines */
 #ifndef TRUE
