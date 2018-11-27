@@ -172,6 +172,27 @@ enum
 	(BUFFERP)->buf_addr = NULL;			\
 }
 
+/* Macro to allocate a buffer using "ydb_malloc_t" of length LEN and assign it to an already allocated ydb_buffer_t structure.
+ * BUFFERP->buf_addr is set to the malloced buffer.
+ * BUFFERP->len_alloc is set to the malloced length.
+ * BUFFERP->len_used is set to 0.
+ */
+#define	YDB_MALLOC_BUFFER_T(BUFFERP, LEN)		\
+{							\
+	(BUFFERP)->len_alloc = LEN;			\
+	(BUFFERP)->len_used = 0;			\
+	(BUFFERP)->buf_addr = ydb_malloc_t(LEN);	\
+	YDB_ASSERT_DBG(NULL != (BUFFERP)->buf_addr);	\
+}
+
+/* Macro to free the buffer malloced using "YDB_MALLOC_BUFFER_T" */
+#define	YDB_FREE_BUFFER_T(BUFFERP)			\
+{							\
+	YDB_ASSERT_DBG(NULL != (BUFFERP)->buf_addr);	\
+	ydb_free_t((BUFFERP)->buf_addr);		\
+	(BUFFERP)->buf_addr = NULL;			\
+}
+
 /* Macro to verify an assertion is true before proceeding - put expression to test as the parameter */
 #define YDB_ASSERT(X)														\
 {																\
