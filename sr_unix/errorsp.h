@@ -133,7 +133,7 @@ GBLREF uint4			process_id;
 
 #define ERROR_RTN		error_return
 
-#define MAX_RTS_ERROR_DEPTH	10				/* Max nest of rts_error_csa/send_msg_csa() before it's stopped */
+#define MAX_RTS_ERROR_DEPTH	5			/* Max nest of rts_error_csa/send_msg_csa() before it's stopped */
 
 /* The CHTRACEPOINT macros are in place for CH debugging if necessary */
 #ifdef DEBUG
