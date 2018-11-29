@@ -41,6 +41,7 @@ GBLREF	boolean_t	gtm_main_thread_id_set;
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
 #endif
+GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex;
 
 STATICFNDCL void ydb_stm_threadq_process(boolean_t *queueChanged);
 
@@ -132,12 +133,20 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 		status = pthread_mutex_unlock(&((TREF(curWorkQHead))->mutex));
 		if (0 != status)
 		{
-			SETUP_SYSCALL_ERROR("pthread_mutex_unlock()", status);
+			SETUP_SYSCALL_ERROR("pthread_mutex_unlock(&((TREF(curWorkQHead))->mutex))", status);
 			callblk->retval = (uintptr_t)YDB_ERR_SYSCALL;
 			break;
 		}
 		TRCTBL_ENTRY(STAPITP_UNLOCKWORKQ, 0, TREF(curWorkQHead), callblk, pthread_self());
 		TRCTBL_ENTRY(STAPITP_FUNCDISPATCH, callblk->calltyp, NULL, NULL, pthread_self());
+		/* Get the YottaDB engine multi-thread lock while servicing a SimpleThreadAPI request */
+		status = pthread_mutex_lock(&ydb_engine_threadsafe_mutex);
+		if (0 != status)
+		{
+			SETUP_SYSCALL_ERROR("pthread_mutex_lock(&ydb_engine_threadsafe_mutex)", status);
+			callblk->retval = (uintptr_t)YDB_ERR_SYSCALL;
+			break;
+		}
 		/* We have our request - dispatch it appropriately */
 		calltyp = callblk->calltyp;
 		switch(calltyp)
@@ -347,6 +356,13 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 				break;
 			default:
 				assertpro(FALSE);
+		}
+		/* Now that the SimpleThreadAPI request has been serviced, release the YottaDB engine multi-thread mutex */
+		status = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+		if (0 != status)
+		{
+			SETUP_SYSCALL_ERROR("pthread_mutex_unlock(&ydb_engine_threadsafe_mutex)", status);
+			assertpro(YDB_ERR_SYSCALL);		/* No return possible so abandon thread */
 		}
 		/* The request is complete (except TP - it's just requeued - regrab the lock to check if we are done or not yet */
 		TRCTBL_ENTRY(STAPITP_LOCKWORKQ, FALSE, TREF(curWorkQHead), NULL, pthread_self());
