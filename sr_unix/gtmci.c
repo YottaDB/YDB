@@ -117,15 +117,12 @@ GBLREF	stm_workq		*stmTPWorkQueue;
 GBLREF	stm_freeq		stmFreeQueue;
 GBLREF	boolean_t		noThreadAPI_active;
 GBLREF	boolean_t		simpleThreadAPI_active;
+GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex;
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
 
 LITREF  gtmImageName            gtmImageNames[];
 
 void gtm_levl_ret_code(void);
-
-GBLDEF	pthread_mutex_t	ydb_initexit_threadsafe_mutex = PTHREAD_MUTEX_INITIALIZER;	/* Single thread ydb_init/ydb_exit() to gate
-											 * users so critical functions are safe.
-											 */
 
 error_def(ERR_ACTLSTTOOLONG);
 error_def(ERR_CALLINAFTERXIT);
@@ -1158,7 +1155,7 @@ int ydb_jinit()
 #endif
 
 /* Initialization routine - can be called directly by call-in caller or can be driven by ydb_ci*() implicitly. But
- * if other GT.M services are to be used prior to a ydb_ci*() call (like timers, gtm_malloc/free, etc), this routine
+ * if other YottaDB services are to be used prior to a ydb_ci*() call (like timers, gtm_malloc/free, etc), this routine
  * should be called first.
  */
 int ydb_init()
@@ -1181,7 +1178,7 @@ int ydb_init()
 	 * after the condition handling stack is setup below. But if YDB is initialized, we establish the handler before
 	 * much of anything happens.
 	 */
-	status = pthread_mutex_lock(&ydb_initexit_threadsafe_mutex);
+	status = pthread_mutex_lock(&ydb_engine_threadsafe_mutex);
 	if (0 != status)
 	{	/* If not initialized yet, can't rts_error so just return our error code */
 		if (ydb_init_complete)
@@ -1191,72 +1188,72 @@ int ydb_init()
 	}
 	SETUP_THREADGBL_ACCESS;
 	if (NULL == lcl_gtm_threadgbl)
-	{	/* This will likely need some attention before going to a threaded model */
+	{	/* This will likely need some attention before going to a fully threaded model */
 		assert(!ydb_init_complete);
 		GTM_THREADGBL_INIT;
 	}
-	if (ydb_init_complete)
-		ESTABLISH_RET(gtmci_ch, mumps_status);
-	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_init to be
-	 * invoked after a ydb_exit
+	/* A prior invocation of ydb_exit would have set process_exiting = TRUE.
+	 * Use this to disallow ydb_init to be invoked after a ydb_exit
 	 */
 	if (process_exiting)
 	{
-		(void)pthread_mutex_unlock(&ydb_initexit_threadsafe_mutex);
+		(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
-	if (NULL == (dist = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
-	{	/* In a call-in and "ydb_dist" env var is not defined. Set it to full path of libyottadb.so
-		 * that contains the currently invoked "ydb_init" function.
-		 */
-		if (0 == dladdr(&ydb_init, &shlib_info))
-		{	/* Could not find "common_startup_init" symbol in a shared library. Issue error. */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dladdr"), CALLFROM);
-		}
-		/* Temporarily copy shlib_info.dli_fname onto a local buffer as we cannot modify the former and we need to
-		 * to do that to remove the "/libyottadb.so" trailer before setting "$ydb_dist".
-		 */
-		tmp_ptr = path;
-		tmp_len = STRLEN(shlib_info.dli_fname);
-		assert(tmp_len);
-		if (tmp_len >= SIZEOF(path))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
-		memcpy(tmp_ptr, shlib_info.dli_fname, tmp_len);
-		tmp_ptr += tmp_len - 1;
-		/* Remove trailing "/libyottadb.so" from filename before setting $ydb_dist.
-		 * Note: The later call to "common_startup_init" will ensure the filename is libyottadb.so.
-		 */
-		for (; tmp_ptr >= path; tmp_ptr--)
-		{
-			if ('/' == *tmp_ptr)
-				break;
-		}
-		*tmp_ptr = '\0';
-		/* Note that we still have not checked if the executable name is libyottadb.so.
-		 * We will do that a little later in "common_startup_init" below (after setting <ydb_dist>
-		 * env var) and issue a LIBYOTTAMISMTCH error if needed.
-		 */
-		status = setenv(ydbenvname[YDBENVINDX_DIST] + 1, path, TRUE);	/* + 1 to skip leading $ */
-		if (status)
-		{
-			assert(-1 == status);
-			save_errno = errno;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				RTS_ERROR_LITERAL("setenv(ydb_dist)"), CALLFROM, save_errno);
-		}
-		status = setenv(gtmenvname[YDBENVINDX_DIST] + 1, path, TRUE);	/* + 1 to skip leading $ */
-		if (status)
-		{
-			assert(-1 == status);
-			save_errno = errno;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-				RTS_ERROR_LITERAL("setenv(gtm_dist)"), CALLFROM, save_errno);
-		}
-	} /* else : "ydb_dist" env var is defined. Use that for later verification done inside "common_startup_init" */
 	if (!ydb_init_complete)
-	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
+	{	/* Call-in or SimpleAPI or SimpleThreadAPI invoked from C as base.
+		 * YottaDB hasn't been started up yet. Start it now.
+		 */
+		if (NULL == (dist = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
+		{	/* In a call-in and "ydb_dist" env var is not defined. Set it to full path of libyottadb.so
+			 * that contains the currently invoked "ydb_init" function.
+			 */
+			if (0 == dladdr(&ydb_init, &shlib_info))
+			{	/* Could not find "common_startup_init" symbol in a shared library. Issue error. */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dladdr"), CALLFROM);
+			}
+			/* Temporarily copy shlib_info.dli_fname onto a local buffer as we cannot modify the former
+			 * and we need to to do that to remove the "/libyottadb.so" trailer before setting "$ydb_dist".
+			 */
+			tmp_ptr = path;
+			tmp_len = STRLEN(shlib_info.dli_fname);
+			assert(tmp_len);
+			if (tmp_len >= SIZEOF(path))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
+			memcpy(tmp_ptr, shlib_info.dli_fname, tmp_len);
+			tmp_ptr += tmp_len - 1;
+			/* Remove trailing "/libyottadb.so" from filename before setting $ydb_dist.
+			 * Note: The later call to "common_startup_init" will ensure the filename is libyottadb.so.
+			 */
+			for (; tmp_ptr >= path; tmp_ptr--)
+			{
+				if ('/' == *tmp_ptr)
+					break;
+			}
+			*tmp_ptr = '\0';
+			/* Note that we still have not checked if the executable name is libyottadb.so.
+			 * We will do that a little later in "common_startup_init" below (after setting <ydb_dist>
+			 * env var) and issue a LIBYOTTAMISMTCH error if needed.
+			 */
+			status = setenv(ydbenvname[YDBENVINDX_DIST] + 1, path, TRUE);	/* + 1 to skip leading $ */
+			if (status)
+			{
+				assert(-1 == status);
+				save_errno = errno;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					RTS_ERROR_LITERAL("setenv(ydb_dist)"), CALLFROM, save_errno);
+			}
+			status = setenv(gtmenvname[YDBENVINDX_DIST] + 1, path, TRUE);	/* + 1 to skip leading $ */
+			if (status)
+			{
+				assert(-1 == status);
+				save_errno = errno;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					RTS_ERROR_LITERAL("setenv(gtm_dist)"), CALLFROM, save_errno);
+			}
+		} /* else : "ydb_dist" env var is defined. Use that for later verification done inside "common_startup_init" */
 		common_startup_init(GTM_IMAGE, &mumps_cmd_ary[0]);
 		err_init(stop_image_conditional_core);
 		ESTABLISH_RET(gtmci_ch, mumps_status);
@@ -1290,14 +1287,11 @@ int ydb_init()
 			memcpy(ydb_dist, dist, dist_len);
 		}
 		cli_lex_setup(0, NULL);
-		/* Initialize msp to the maximum so if errors occur during GT.M startup below,
+		/* Initialize msp to the maximum so if errors occur during YottaDB startup below,
 		 * the unwind logic in gtmci_ch() will get rid of the whole stack.
 		 */
 		msp = (unsigned char *)-1L;
 		GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
-	}
-	if (!ydb_init_complete)
-	{	/* GT.M is not active yet. Create GT.M startup environment */
 		invocation_mode = MUMPS_CALLIN;
 		init_gtm();			/* Note - this initializes fgncal_stackbase and creates the call-in
 						 * base-frame for the initial level.
@@ -1308,17 +1302,21 @@ int ydb_init()
 		assert(frame_pointer->type & SFT_CI);
 		TREF(gtmci_nested_level) = 1;
 		TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;
-		/* Now that GT.M is initialized. Mark the new stack pointer (msp) so that errors
+		/* Now that YottaDB is initialized. Mark the new stack pointer (msp) so that errors
 		 * while executing an M routine do not unwind stack below this mark. It important that
 		 * the call-in frames (SFT_CI) that hold nesting information (eg. $ECODE/$STACK data
 		 * of the previous stack) are kept from being unwound.
 		 */
 		SAVE_FGNCAL_STACK;
+		REVERT;
 	} else if (!(frame_pointer->type & SFT_CI))
+	{
+		ESTABLISH_RET(gtmci_ch, mumps_status);
 		ydb_nested_callin();	/* Nested call-in: setup a new CI environment (additional SFT_CI base-frame) */
-	REVERT;
+		REVERT;
+	}
 	assert(NULL == TREF(temp_fgncal_stack));
-	(void)pthread_mutex_unlock(&ydb_initexit_threadsafe_mutex);
+	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
 	return 0;
 }
 
@@ -1352,7 +1350,7 @@ void ydb_nested_callin(void)
 	TREF(temp_fgncal_stack) = NULL;		/* Drop override */
 }
 
-/* Routine exposed to call-in user to exit from active GT.M environment */
+/* Routine exposed to call-in user to exit from active YottaDB environment */
 int ydb_exit()
 {
 	int		status, i;
@@ -1362,7 +1360,7 @@ int ydb_exit()
         SETUP_THREADGBL_ACCESS;
 	if (!ydb_init_complete)
 		return 0;		/* If we aren't initialized, we don't have things to take down so just return */
-	status = pthread_mutex_lock(&ydb_initexit_threadsafe_mutex);
+	status = pthread_mutex_lock(&ydb_engine_threadsafe_mutex);
 	if (0 != status)
 		return status;		/* Lock failed - no condition handler yet so just return the error code */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
@@ -1386,7 +1384,7 @@ int ydb_exit()
 		}
 #		endif
 		/* TODO SEE for the final version, clean up the TP work queue also */
-		/* Now get rid of the whole M stack - end of GT.M environment */
+		/* Now get rid of the whole M stack - end of YottaDB environment */
 		while (NULL != frame_pointer)
 		{
 			while ((NULL != frame_pointer) && !(frame_pointer->type & SFT_CI))
@@ -1440,7 +1438,7 @@ int ydb_exit()
 	ydb_init_complete = FALSE;
 	/* We might have opened one or more shlib handles using "dlopen". Do a "dlclose" of them now. */
 	dlopen_handle_array_close();
-	(void)pthread_mutex_unlock(&ydb_initexit_threadsafe_mutex);
+	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
 	return 0;
 }
 

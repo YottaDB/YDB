@@ -1278,3 +1278,9 @@ GBLDEF	uint64_t	stmTPToken;			/* Counter used to generate unique token for Simpl
  */
 GBLDEF	boolean_t	simpleThreadAPI_active;		/* SimpleThreadAPI is active */
 GBLDEF	boolean_t	noThreadAPI_active;		/* Any non-threaded API active (mumps, call-ins or SimpleAPI) */
+
+GBLDEF	pthread_mutex_t	ydb_engine_threadsafe_mutex = PTHREAD_MUTEX_INITIALIZER;/* Single thread YottaDB engine access
+										 * (e.g. ydb_init/ydb_exit()) to gate
+										 * users so critical functions are safe.
+										 */
+

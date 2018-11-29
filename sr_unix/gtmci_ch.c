@@ -31,7 +31,7 @@ GBLREF  unsigned char		*fgncal_stack;
 GBLREF  dollar_ecode_type 	dollar_ecode;
 GBLREF  boolean_t		created_core;
 GBLREF  boolean_t		dont_want_core;
-GBLREF	pthread_mutex_t		ydb_initexit_threadsafe_mutex;
+GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
@@ -51,7 +51,7 @@ CONDITION_HANDLER(gtmci_ch)
 		gtm_dump();
 		TERMINATE;
 	}
-	(void)pthread_mutex_unlock(&ydb_initexit_threadsafe_mutex);
+	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
 	entryref.addr = CALL_IN_M_ENTRYREF;
 	entryref.len = STR_LIT_LEN(CALL_IN_M_ENTRYREF);
 	set_zstatus(&entryref, SIGNAL, NULL, FALSE);
