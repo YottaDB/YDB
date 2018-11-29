@@ -673,3 +673,22 @@ else if [ -d "$gtm_copyexec" ] ; then
         if [ "Y" = "$gtm_verbose" ] ; then echo Copied exec ; ls -l $gtm_copyexec ; fi
      fi
 fi
+
+# Create the pkg-config file and place it where the system can find it
+# We strip the "r" and "." to perform a numeric comparision between the versions
+# YottaDB will only ever increment versions, so a larger number indicates a newer version
+if [ ! -f /usr/share/pkgconfig/yottadb.pc ] || [ $(grep -oP "^Version: \K.*" /usr/share/pkgconfig/yottadb.pc | cut -c 2- | tr -d .) -lt $(echo $ydb_version | cut -c 2- | tr -d .) ] ; then
+        cat > /usr/share/pkgconfig/yottadb.pc << EOF
+prefix=${ydb_installdir}
+
+exec_prefix=\${prefix}
+includedir=\${prefix}
+libdir=\${exec_prefix}
+
+Name: YottaDB
+Description: YottaDB database library
+Version: ${ydb_version}
+Cflags: -I\${includedir}
+Libs: -L\${libdir} -lyottadb -Wl,-rpath,\${libdir}
+EOF
+fi
