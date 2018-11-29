@@ -119,7 +119,9 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 		}
 		SYSLOG(LOG_USER | LOG_INFO, "%s", "%YDB-F-MAXRTSERRDEPTH Error loop detected - aborting image with core");
 		fprintf(stderr, "%%YDB-F-MAXRTSERRDEPTH Error loop detected - aborting image with core");
-		ydb_dmp_tracetbl();
+		/* It is possible "ydb_dmp_tracetbl" gets a recursive error. Therefore have a safeguard to skip that step. */
+		if (MAX_RTS_ERROR_DEPTH < (2 *(TREF(rts_error_depth))))
+			ydb_dmp_tracetbl();
 		DUMP_CORE;			/* Terminate *THIS* thread/process and produce a core */
 	}
 	PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
