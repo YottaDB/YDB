@@ -55,7 +55,12 @@ void *ydb_stm_tpthread(void *parm)
 	 * This signal set is SIGINT, SIGQUIT, SIGTERM, SIGTSTP, SIGCONT, SIGALRM.
 	 */
 	assert(blocksig_initialized);
-	SIGPROCMASK(SIG_BLOCK, &block_sigsent, NULL, rc);	/* Note these signals are only blocked on THIS thread */
+	/* Note we do not use SIGPROCMASK macro below because it would incorrectly invoke "sigprocmask" which is a no-no
+	 * given this code is running inside a thread for sure (even though "multi_thread_in_use" global variable is not
+	 * set to TRUE).
+	 */
+	rc = pthread_sigmask(SIG_BLOCK, &block_sigsent, NULL);	/* Note these signals are only blocked on THIS thread */
+	assert(0 == rc);
 	/* Initialize which queue we are looking for work in */
 	assert(0 < TREF(curWorkQHeadIndx));
 	curTPWorkQHead = stmWorkQueue[TREF(curWorkQHeadIndx)];	/* Initially pick requests from main work queue */
