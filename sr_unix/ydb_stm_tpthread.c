@@ -70,17 +70,17 @@ void *ydb_stm_tpthread(void *parm)
 	if (0 != status)
 	{
 		SETUP_SYSCALL_ERROR("pthread_mutex_lock(curWorkQHead)", status);
-		assertpro(YDB_ERR_SYSCALL);			/* No return possible so abandon thread */
+		assertpro(FALSE && YDB_ERR_SYSCALL);			/* No return possible so abandon thread */
 	}
 	/* Before we wait the first time, veryify nobody snuck something onto the queue by processing anything there */
 	ydb_stm_tpthreadq_process(curTPWorkQHead);
-	while(!stop)
+	while (!stop)
 	{	/* Wait for some work to probably show up */
 		status = pthread_cond_wait(&curTPWorkQHead->cond, &curTPWorkQHead->mutex);
 		if (0 != status)
 		{
 			SETUP_SYSCALL_ERROR("pthread_cond_wait(curWorkQHead)", status);
-			assertpro(YDB_ERR_SYSCALL);		/* No return possible so abandon thread */
+			assertpro(FALSE && YDB_ERR_SYSCALL);		/* No return possible so abandon thread */
 		}
 		ydb_stm_tpthreadq_process(curTPWorkQHead);	/* Process any entries on the queue */
 	}
@@ -100,7 +100,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 	SETUP_THREADGBL_ACCESS;
 	TRCTBL_ENTRY(STAPITP_ENTRY, 0, "ydb_stm_tpthreadq_process", curTPWorkQHead, pthread_self());
 	/* Loop to work till queue is empty */
-	while(TRUE)
+	while (TRUE)
 	{	/* If queue is empty, we should just go right back to sleep */
 		if (curTPWorkQHead->stm_wqhead.que.fl == &curTPWorkQHead->stm_wqhead)
 			break;
@@ -118,7 +118,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 		TRCTBL_ENTRY(STAPITP_UNLOCKWORKQ, 0, curTPWorkQHead, callblk, pthread_self());
 		TRCTBL_ENTRY(STAPITP_FUNCDISPATCH, callblk->calltyp, NULL, NULL, pthread_self());
 		/* We have our request - dispatch it appropriately (currently only one choice) */
-		switch(callblk->calltyp)
+		switch (callblk->calltyp)
 		{
 			case LYDB_RTN_TP:
 				/* Driving new TP level requires a new tptoken. Create one by incrementing our counter. Note
@@ -143,7 +143,10 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 		{
 			status = ydb_stm_args0(tptoken, LYDB_RTN_TPCOMPLT);
 			if (0 != status)
+			{
+				assert(FALSE);
 				callblk->retval = status;
+			}
 		} else
 			(TREF(curWorkQHeadIndx))--;	/* Reduce TP level */
 		/* The request is complete - regrab the lock to check if any more entries on this queue (not so much
@@ -154,7 +157,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 		if (0 != status)
 		{
 			SETUP_SYSCALL_ERROR("pthread_mutex_lock()", status);
-			assertpro(YDB_ERR_SYSCALL);		/* No return possible so abandon thread */
+			assertpro(FALSE && YDB_ERR_SYSCALL);		/* No return possible so abandon thread */
 		}
 		/* Signal to process that we are done with this request */
 		TRCTBL_ENTRY(STAPITP_SIGCOND, 0, NULL, callblk, pthread_self());
@@ -163,6 +166,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 		{
 			save_errno = errno;
 			SETUP_SYSCALL_ERROR("sem_post()", save_errno);
+			assert(FALSE);
 			callblk->retval = (uintptr_t)YDB_ERR_SYSCALL;
 			/* No return here - just keep going if at all possible */
 		}

@@ -80,7 +80,10 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 	TRCTBL_ENTRY(STAPITP_LOCKWORKQ, startThread, queueToUse, callblk, pthread_self());
 	LOCK_STM_QHEAD_AND_START_WORK_THREAD(queueToUse, startThread, ydb_stm_thread, TRUE, status);
 	if (0 != status)
+	{
+		assert(FALSE);
 		return status;			/* Error already setup */
+	}
 	/* Place this call block on the thread queue (at the end of the queue) */
 	dqrins(&queueToUse->stm_wqhead, que, callblk);
 	/* Release CV/mutex lock so worker thread can get the lock and wakeup */
@@ -88,6 +91,7 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 	if (0 != status)
 	{
 		SETUP_SYSCALL_ERROR("pthread_mutex_unlock()", status);
+		assert(FALSE);
 		return YDB_ERR_SYSCALL;
 	}
 	TRCTBL_ENTRY(STAPITP_UNLOCKWORKQ, callblk->calltyp, queueToUse, callblk, pthread_self());
@@ -96,6 +100,7 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 	if (0 != status)
 	{
 		SETUP_SYSCALL_ERROR("pthread_cond_signal()", status);
+		assert(FALSE);
 		return YDB_ERR_SYSCALL;
 	}
 	TRCTBL_ENTRY(STAPITP_SEMWAIT, 0, NULL, callblk, pthread_self());
@@ -105,6 +110,7 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 	{
 		save_errno = errno;
 		SETUP_SYSCALL_ERROR("sem_wait()", save_errno);
+		assert(FALSE);
 		return YDB_ERR_SYSCALL;
 	}
 	TRCTBL_ENTRY(STAPITP_REQCOMPLT, callblk->calltyp, callblk->retval, callblk, pthread_self());
@@ -112,7 +118,10 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 	retval = callblk->retval;
 	status = ydb_stm_freecallblk(callblk);
 	if (0 != status)
+	{
+		assert(FALSE);
 		return status;
+	}
 	/* Return the return value from the call */
 	return retval;
 }

@@ -80,7 +80,7 @@ void *ydb_stm_thread(void *parm)
 	if (0 != status)
 	{
 		SETUP_SYSCALL_ERROR("pthread_mutex_lock(curWorkQHead)", status);
-		assertpro(YDB_ERR_SYSCALL);			/* No return possible so abandon thread */
+		assertpro(FALSE && YDB_ERR_SYSCALL);			/* No return possible so abandon thread */
 	}
 	/* Before we wait the first time, veryify nobody snuck something onto the queue by processing anything there */
 	do
@@ -88,13 +88,13 @@ void *ydb_stm_thread(void *parm)
 		queueChanged = FALSE;
 		ydb_stm_threadq_process(&queueChanged);
 	} while (queueChanged);
-	while(!stop)
+	while (!stop)
 	{	/* Wait for some work to probably show up */
 		status = pthread_cond_wait(&(TREF(curWorkQHead))->cond, &(TREF(curWorkQHead))->mutex);
 		if (0 != status)
 		{
 			SETUP_SYSCALL_ERROR("pthread_cond_wait(curWorkQHead)", status);
-			assertpro(YDB_ERR_SYSCALL);		/* No return possible so abandon thread */
+			assertpro(FALSE && YDB_ERR_SYSCALL);		/* No return possible so abandon thread */
 		}
 		do
 		{
@@ -122,7 +122,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 	SETUP_THREADGBL_ACCESS;
 	TRCTBL_ENTRY(STAPITP_ENTRY, 0, "ydb_stm_threadq_process", TREF(curWorkQHead), pthread_self());
 	/* Loop to work till queue is empty */
-	while(TRUE)
+	while (TRUE)
 	{	/* If queue is empty, we should just go right back to sleep */
 		if ((TREF(curWorkQHead))->stm_wqhead.que.fl == &(TREF(curWorkQHead))->stm_wqhead)
 			break;
@@ -149,7 +149,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 		}
 		/* We have our request - dispatch it appropriately */
 		calltyp = callblk->calltyp;
-		switch(calltyp)
+		switch (calltyp)
 		{	/* This first group are all SimpleThreadAPI critters */
 			case LYDB_RTN_CALL_VPLST_FUNC:
 				int_retval = ydb_call_variadic_plist_func_s((ydb_vplist_func)callblk->args[0], callblk->args[1]);
@@ -363,7 +363,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 		if (0 != status)
 		{
 			SETUP_SYSCALL_ERROR("pthread_mutex_unlock(&ydb_engine_threadsafe_mutex)", status);
-			assertpro(YDB_ERR_SYSCALL);		/* No return possible so abandon thread */
+			assertpro(FALSE && YDB_ERR_SYSCALL);		/* No return possible so abandon thread */
 		}
 		/* The request is complete (except TP - it's just requeued - regrab the lock to check if we are done or not yet */
 		TRCTBL_ENTRY(STAPITP_LOCKWORKQ, FALSE, TREF(curWorkQHead), NULL, pthread_self());
@@ -371,7 +371,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 		if (0 != status)
 		{
 			SETUP_SYSCALL_ERROR("pthread_mutex_lock()", status);
-			assertpro(YDB_ERR_SYSCALL);		/* No return possible so abandon thread */
+			assertpro(FALSE && YDB_ERR_SYSCALL);		/* No return possible so abandon thread */
 		}
 		/* If the queue changed due to TP level creation, the request is not done so should not yet be posted. Also,
 		 * processing on this queue must halt immediately as we are headed into TP mode so just return.
@@ -385,6 +385,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 		{
 			save_errno = errno;
 			SETUP_SYSCALL_ERROR("sem_post()", save_errno);
+			assert(FALSE);
 			callblk->retval = (uintptr_t)YDB_ERR_SYSCALL;
 			/* No return here - just keep going if at all possible */
 		}
