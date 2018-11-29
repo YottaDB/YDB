@@ -353,6 +353,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 				TREF(curWorkQHead) = stmWorkQueue[0];
 				*queueChanged = TRUE;
 				TRCTBL_ENTRY(STAPITP_TPCOMPLT, TREF(curWorkQHeadIndx), TREF(curWorkQHead), NULL, pthread_self());
+				callblk->retval = 0; /* Set request success (relied upon by thread waiting on this request) */
 				break;
 			default:
 				assertpro(FALSE);
