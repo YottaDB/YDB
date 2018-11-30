@@ -50,7 +50,6 @@
 #include "gtm_savetraps.h"
 #include "code_address_type.h"
 #include "push_lvval.h"
-#include "send_msg.h"
 #include "gtmmsg.h"
 #include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
@@ -118,6 +117,7 @@ GBLREF	stm_freeq		stmFreeQueue;
 GBLREF	boolean_t		noThreadAPI_active;
 GBLREF	boolean_t		simpleThreadAPI_active;
 GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex;
+GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder;
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
 
 LITREF  gtmImageName            gtmImageNames[];
@@ -268,7 +268,6 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	if (process_exiting)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
 	if (!ydb_init_complete)
@@ -695,7 +694,6 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	if (process_exiting)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
 	assert(NULL == TREF(temp_fgncal_stack));
@@ -1182,9 +1180,13 @@ int ydb_init()
 	if (0 != status)
 	{	/* If not initialized yet, can't rts_error so just return our error code */
 		if (ydb_init_complete)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutex_lock()"),
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutex_lock()"),
 				      CALLFROM, status);
-		return status;
+		else
+			FPRINTF(stderr, "%%YDB-E-SYSCALL, Error received from system call pthread_mutex_lock()"
+				"-- called from module %s at line %d\n%%SYSTEM-E-ENO%d, %s\n",
+				__FILE__, __LINE__, status, STRERROR(status));
+		return ERR_SYSCALL;
 	}
 	SETUP_THREADGBL_ACCESS;
 	if (NULL == lcl_gtm_threadgbl)
@@ -1197,9 +1199,12 @@ int ydb_init()
 	 */
 	if (process_exiting)
 	{
-		(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+		assert(!ydb_init_complete);	/* should have been cleared by "ydb_exit" as part of calling "gtm_exit_handler" */
+		/* Note that because "ydb_init" was already run (or else "process_exiting" can never be set to TRUE),
+		 * "gtm_putmsg_csa" (and "rts_error_csa") is usable here even though "ydb_init_complete" is FALSE.
+		 */
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
+		(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
 		return ERR_CALLINAFTERXIT;
 	}
 	if (!ydb_init_complete)
@@ -1211,17 +1216,27 @@ int ydb_init()
 			 * that contains the currently invoked "ydb_init" function.
 			 */
 			if (0 == dladdr(&ydb_init, &shlib_info))
-			{	/* Could not find "common_startup_init" symbol in a shared library. Issue error. */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dladdr"), CALLFROM);
+			{	/* Could not find "ydb_init" symbol (current running function) in any loaded shared libraries.
+				 * Issue error.
+				 */
+				FPRINTF(stderr, "%%YDB-E-SYSCALL, Error received from system call dladdr()"
+					"-- called from module %s at line %d\n%s\n", __FILE__, __LINE__, dlerror());
+				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+				return ERR_SYSCALL;
 			}
 			/* Temporarily copy shlib_info.dli_fname onto a local buffer as we cannot modify the former
-			 * and we need to to do that to remove the "/libyottadb.so" trailer before setting "$ydb_dist".
+			 * and we need to do that to remove the "/libyottadb.so" trailer before setting "$ydb_dist".
 			 */
 			tmp_ptr = path;
 			tmp_len = STRLEN(shlib_info.dli_fname);
 			assert(tmp_len);
 			if (tmp_len >= SIZEOF(path))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, YDB_DIST_PATH_MAX);
+			{
+				FPRINTF(stderr, "%%YDB-E-DISTPATHMAX, Executable path length is greater than maximum (%d)\n",
+													YDB_DIST_PATH_MAX);
+				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+				return ERR_DISTPATHMAX;
+			}
 			memcpy(tmp_ptr, shlib_info.dli_fname, tmp_len);
 			tmp_ptr += tmp_len - 1;
 			/* Remove trailing "/libyottadb.so" from filename before setting $ydb_dist.
@@ -1242,21 +1257,35 @@ int ydb_init()
 			{
 				assert(-1 == status);
 				save_errno = errno;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					RTS_ERROR_LITERAL("setenv(ydb_dist)"), CALLFROM, save_errno);
+				FPRINTF(stderr, "%%YDB-E-SYSCALL, Error received from system call setenv(ydb_dist)"
+					"-- called from module %s at line %d\n%%SYSTEM-E-ENO%d, %s\n",
+					__FILE__, __LINE__, save_errno, STRERROR(save_errno));
+				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+				return ERR_SYSCALL;
 			}
 			status = setenv(gtmenvname[YDBENVINDX_DIST] + 1, path, TRUE);	/* + 1 to skip leading $ */
 			if (status)
 			{
 				assert(-1 == status);
 				save_errno = errno;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					RTS_ERROR_LITERAL("setenv(gtm_dist)"), CALLFROM, save_errno);
+				FPRINTF(stderr, "%%YDB-E-SYSCALL, Error received from system call setenv(gtm_dist)"
+					"-- called from module %s at line %d\n%%SYSTEM-E-ENO%d, %s\n",
+					__FILE__, __LINE__, save_errno, STRERROR(save_errno));
+				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+				return ERR_SYSCALL;
 			}
 		} /* else : "ydb_dist" env var is defined. Use that for later verification done inside "common_startup_init" */
 		common_startup_init(GTM_IMAGE, &mumps_cmd_ary[0]);
 		err_init(stop_image_conditional_core);
 		ESTABLISH_RET(gtmci_ch, mumps_status);
+		/* Let "gtmci_ch" know this thread is currently holding the YottaDB engine thread level lock by setting a global
+		 * variable (so it knows to release this in case of an "rts_error_csa" call below).
+		 */
+		ydb_engine_threadsafe_mutex_holder = pthread_self();
+		/* Now that a condition handler has been established, it is safe to use "rts_error_csa" going forward.
+		 * Also "gtmci_ch" does a "pthread_mutex_unlock(&ydb_engine_threadsafe_mutex)" so no need to do that before
+		 * the "rts_error_csa" calls below like is done for other "return" code paths above.
+		 */
 		UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 		/* Ensure that $ydb_dist exists */
@@ -1296,9 +1325,9 @@ int ydb_init()
 		init_gtm();			/* Note - this initializes fgncal_stackbase and creates the call-in
 						 * base-frame for the initial level.
 						 */
+		assert(ydb_init_complete);
 		gtm_savetraps(); 		/* Nullify default $ZTRAP handling */
 		assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
-		assert(ydb_init_complete);
 		assert(frame_pointer->type & SFT_CI);
 		TREF(gtmci_nested_level) = 1;
 		TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;
@@ -1312,10 +1341,17 @@ int ydb_init()
 	} else if (!(frame_pointer->type & SFT_CI))
 	{
 		ESTABLISH_RET(gtmci_ch, mumps_status);
+		/* Let "gtmci_ch" know this thread is currently holding the YottaDB engine thread level lock by setting a global
+		 * variable (so it knows to release this in case of an "rts_error_csa" call below, inside "ydb_nested_callin").
+		 */
+		ydb_engine_threadsafe_mutex_holder = pthread_self();
 		ydb_nested_callin();	/* Nested call-in: setup a new CI environment (additional SFT_CI base-frame) */
 		REVERT;
 	}
 	assert(NULL == TREF(temp_fgncal_stack));
+	ydb_engine_threadsafe_mutex_holder = 0;	/* Clear now that we no longer hold the YottaDB engine thread lock and
+						 * "gtmci_ch" is no longer the active condition handler.
+						 */
 	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
 	return 0;
 }
@@ -1364,12 +1400,16 @@ int ydb_exit()
 	if (0 != status)
 		return status;		/* Lock failed - no condition handler yet so just return the error code */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
-	assert(NULL != frame_pointer);
-	/* If process_exiting is set and the YottaDB environment is still active, shortcut some of the checks
-	 * and cleanups we are making in this routine as they are not particularly useful. If the environment
-	 * is not active though, that's still an error.
+	/* Let "gtmci_ch" know this thread is currently holding the YottaDB engine thread level lock by setting a global
+	 * variable (so it knows to release this in case of an "rts_error_csa" call below).
 	 */
-	if (!process_exiting && ydb_init_complete)
+	ydb_engine_threadsafe_mutex_holder = pthread_self();
+	assert(NULL != frame_pointer);
+	/* If process_exiting is set (and the YottaDB environment is still active since "ydb_init_complete" is TRUE here),
+	 * shortcut some of the checks and cleanups we are making in this routine as they are not particularly useful.
+	 * If the environment is not active though, that's still an error.
+	 */
+	if (!process_exiting)
 	{	/* Do not allow ydb_exit() to be invoked from external calls (unless process_exiting) */
 		if (!(SFT_CI & frame_pointer->type) || !(MUMPS_CALLIN & invocation_mode) || (1 < TREF(gtmci_nested_level)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
@@ -1400,8 +1440,7 @@ int ydb_exit()
 				ci_ret_code_quit();
 			}
 		}
-	} else if (!ydb_init_complete)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
+	}
 	gtm_exit_handler(); /* rundown all open database resource */
 	/* Now that the DBs are down, let's remove the pthread constructs created for SimpleThreadAPI
 	 * usages. Note return codes ignored here as reporting errors creates more problems than they
@@ -1438,6 +1477,9 @@ int ydb_exit()
 	ydb_init_complete = FALSE;
 	/* We might have opened one or more shlib handles using "dlopen". Do a "dlclose" of them now. */
 	dlopen_handle_array_close();
+	ydb_engine_threadsafe_mutex_holder = 0;	/* Clear now that we no longer hold the YottaDB engine thread lock and
+						 * "gtmci_ch" is no longer the active condition handler.
+						 */
 	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
 	return 0;
 }

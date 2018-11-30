@@ -1283,4 +1283,6 @@ GBLDEF	pthread_mutex_t	ydb_engine_threadsafe_mutex = PTHREAD_MUTEX_INITIALIZER;/
 										 * (e.g. ydb_init/ydb_exit()) to gate
 										 * users so critical functions are safe.
 										 */
-
+GBLDEF	pthread_t	ydb_engine_threadsafe_mutex_holder;	/* tid of thread that has YottaDB engine mutex currently locked.
+								 * Currently used only by "gtmci_ch".
+								 */

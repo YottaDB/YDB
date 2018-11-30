@@ -32,6 +32,7 @@ GBLREF  dollar_ecode_type 	dollar_ecode;
 GBLREF  boolean_t		created_core;
 GBLREF  boolean_t		dont_want_core;
 GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex;
+GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
@@ -44,6 +45,7 @@ error_def(ERR_STACKOFLOW);
 CONDITION_HANDLER(gtmci_ch)
 {
 	mstr	entryref;
+	int	status;
 
 	START_CH(TRUE);
 	if (DUMPABLE)
@@ -51,7 +53,18 @@ CONDITION_HANDLER(gtmci_ch)
 		gtm_dump();
 		TERMINATE;
 	}
-	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+	/* Check if we hold the YottaDB engine thread lock (we only own it in some cases in gtmci.c and those cases
+	 * are indicated by the global variable "ydb_engine_threadsafe_mutex_holder" being a non-zero value set to
+	 * the current thread id.
+	 */
+	if (pthread_equal(pthread_self(), ydb_engine_threadsafe_mutex_holder))
+	{
+		ydb_engine_threadsafe_mutex_holder = 0;	/* Clear now that we no longer hold the YottaDB engine thread lock and
+							 * "gtmci_ch" is no longer the active condition handler.
+							 */
+		status = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+		assert(!status);
+	}
 	entryref.addr = CALL_IN_M_ENTRYREF;
 	entryref.len = STR_LIT_LEN(CALL_IN_M_ENTRYREF);
 	set_zstatus(&entryref, SIGNAL, NULL, FALSE);
