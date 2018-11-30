@@ -195,7 +195,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 #				else
 				tparm = (((unsigned long long)callblk->args[1]) << 32) | (unsigned long long)callblk->args[0];
 #				endif
-				int_retval - ydb_lock_incr_s(tparm, (ydb_buffer_t *)callblk->args[2],
+				int_retval = ydb_lock_incr_s(tparm, (ydb_buffer_t *)callblk->args[2],
 							     (int)callblk->args[3], (ydb_buffer_t *)callblk->args[4]);
 
 #				endif
