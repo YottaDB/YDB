@@ -111,7 +111,7 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
 															\
 	if (!process_exiting)												\
 	{														\
-		if (multi_thread_in_use || simpleThreadAPI_active)							\
+		if (multi_thread_in_use)										\
 		{													\
 			assertpro(!timer_in_handler);									\
 			/* We should never use pthread_* calls inside a signal/timer handler. Assert that */		\
@@ -146,7 +146,7 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
 															\
 	if (!process_exiting)												\
 	{														\
-		if (multi_thread_in_use || simpleThreadAPI_active)							\
+		if (multi_thread_in_use)										\
 		{													\
 			assertpro(!timer_in_handler);									\
 			/* We should never use pthread_* calls inside a signal/timer handler. Assert that */		\
