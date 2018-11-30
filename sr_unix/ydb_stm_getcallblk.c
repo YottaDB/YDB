@@ -12,6 +12,16 @@
 
 #include "mdef.h"
 
+/* Note: We cannot use "ydb_malloc/ydb_free" here as this function can be called from any threads running
+ * in the current process while the MAIN or TP worker thread could be concurrently running "ydb_malloc"
+ * (which is a no-no). Therefore we undef "malloc"/"free" (which would have been defined by "sr_unix/mdefsp.h")
+ * here so we use the real system version instead. Currently there is no "free" invoked in this function
+ * but the #undef is done so we are safe even if a future "free" call gets added below.
+ */
+#undef malloc
+#undef free
+
+#include "gtm_stdlib.h"
 #include "gtm_semaphore.h"
 #include <errno.h>
 
@@ -19,7 +29,6 @@
 #include "mdq.h"
 
 GBLREF	stm_freeq		stmFreeQueue;
-GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex;
 
 stm_que_ent *ydb_stm_getcallblk(void)
 {
@@ -42,25 +51,8 @@ stm_que_ent *ydb_stm_getcallblk(void)
 		callblk = (stm_que_ent *)stmFreeQueue.stm_cbqhead.que.fl;
 		dqdel(callblk, que);		/* Removes callblk from the queue */
 	} else
-	{	/* No free blocks available so create a new one.
-		 * But before invoking "malloc" we need to get the YottaDB engine thread mutex lock
-		 * (to prevent issues with concurrently running MAIN and/or TP worker threads).
-		 */
-		status = pthread_mutex_lock(&ydb_engine_threadsafe_mutex);
-		if (0 != status)
-		{	/* If not initialized yet, can't rts_error so just return our error code */
-			SETUP_SYSCALL_ERROR("pthread_mutex_lock(&ydb_engine_threadsafe_mutex)", status);
-			assert(FALSE);
-			return (stm_que_ent *)-1;
-		}
+	{	/* No free blocks available so create a new one. */
 		callblk = malloc(SIZEOF(stm_que_ent));
-		status = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
-		if (0 != status)
-		{	/* If not initialized yet, can't rts_error so just return our error code */
-			SETUP_SYSCALL_ERROR("pthread_mutex_unlock(&ydb_engine_threadsafe_mutex)", status);
-			assert(FALSE);
-			return (stm_que_ent *)-1;
-		}
 		memset(callblk, 0, SIZEOF(stm_que_ent));
 		GTM_SEM_INIT(&callblk->complete, 0, 0, status);		/* Create initially locked */
 	}

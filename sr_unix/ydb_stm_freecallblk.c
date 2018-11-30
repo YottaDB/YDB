@@ -12,6 +12,16 @@
 
 #include "mdef.h"
 
+/* Note: We cannot use "ydb_malloc/ydb_free" here as this function can be called from any threads running
+ * in the current process while the MAIN or TP worker thread could be concurrently running "ydb_malloc"
+ * (which is a no-no). Therefore we undef "malloc"/"free" (which would have been defined by "sr_unix/mdefsp.h")
+ * here so we use the real system version instead. Currently there is no "malloc"/"free" invoked in this function
+ * but the #undef is done so we are safe even if a future "malloc"/"free" call gets added below.
+ */
+#undef malloc
+#undef free
+
+#include "gtm_stdlib.h"		/* Not needed now but will be when a "free" call is added below in the future */
 #include "gtm_semaphore.h"
 
 #include "libyottadb_int.h"
