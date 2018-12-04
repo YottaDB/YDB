@@ -61,6 +61,7 @@ GBLREF	boolean_t		exit_handler_active;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		skip_exit_handler;
 GBLREF 	boolean_t		is_tracing_on;
+GBLREF	int			fork_after_ydb_init;
 #ifdef DEBUG
 GBLREF 	boolean_t		stringpool_unusable;
 GBLREF 	boolean_t		stringpool_unexpandable;
@@ -174,6 +175,13 @@ void gtm_exit_handler(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (fork_after_ydb_init)
+	{	/* This process had SimpleAPI or SimpleThreadAPI active when a "fork" happened to create this child process.
+		 * The YottaDB engine has not been initialized in the child process yet (or else "fork_after_ydb_init" would
+		 * have been cleared) so skip any YottaDB cleanup as part of exit handling.
+		 */
+		return;
+	}
 	if (exit_handler_active || skip_exit_handler) /* Skip exit handling if specified or if exit handler already active */
 		return;
 	exit_handler_active = TRUE;

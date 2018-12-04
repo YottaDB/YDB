@@ -48,6 +48,7 @@
 #include "show_source_line.h"
 #include "patcode.h"
 #include "collseq.h"
+#include "libyottadb_int.h"
 
 GBLREF boolean_t	utf8_patnumeric;
 GBLREF int4		exi_condition;
@@ -90,7 +91,7 @@ void init_gtm(void)
 	 * the function pointer initializations below happen in both the GT.M runtime and in mupip
 	 */
 	struct startup_vector   svec;
-	int			i;
+	int			i, status;
 	int4			lct;
 	DEBUG_ONLY(mval		chkmval;)
 	DEBUG_ONLY(mval		chkmval_b;)
@@ -201,6 +202,10 @@ void init_gtm(void)
 	svec.sysid_ptr = &default_sysid;
 	gtm_startup(&svec);
 	ydb_init_complete = TRUE;
+	/* Now that "ydb_init_complete" is set to TRUE, establish pthread_atfork handlers to help catch error scenarios */
+	status = pthread_atfork(ydb_stm_atfork_prepare, ydb_stm_atfork_parent, ydb_stm_atfork_child);
+	if (0 != status)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_atfork()"), CALLFROM, status);
 }
 
 /* Routine to be driven by a function pointer when that function pointer should never be driven.

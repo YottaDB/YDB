@@ -55,6 +55,7 @@ GBLREF	gd_region		*ftok_sem_reg;
 GBLREF	jnl_process_vector	*prc_vec;
 GBLREF	uint4			process_id;
 GBLREF	uint4			dollar_zjob;
+GBLREF	int			fork_after_ydb_init;
 
 /* Routine that is invoked right after a "fork()" in the child pid.
  * This will do needed setup so the parent and child pids are treated as different pids
@@ -72,14 +73,17 @@ int	ydb_child_init(void *param)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (process_id == getpid())
+	/* Verify entry conditions, make sure YDB CI environment is up etc. */
+	LIBYOTTADB_INIT(LYDB_RTN_CHILDINIT, (int));	/* Note: macro could "return" from this function in case of errors */
+	if (!fork_after_ydb_init)
 	{	/* "ydb_child_init" is being called again in child OR is being called from parent of "fork".
 		 * No more setup needed. Return right away.
 		 */
+		assert(process_id == getpid());
+		LIBYOTTADB_DONE;
 		return YDB_OK;
 	}
-	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_CHILDINIT, (int));	/* Note: macro could "return" from this function in case of errors */
+	assert(process_id != getpid());
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
@@ -129,6 +133,10 @@ int	ydb_child_init(void *param)
 	assert(NULL == ftok_sem_reg);
 	LIBYOTTADB_DONE;
 	REVERT;
+	/* Now that "ydb_child_init" has been run, the YottaDB engine is safe to use after a "fork"
+	 * in case "fork_after_ydb_init" has been set to TRUE. So that can be safely cleared.
+	 */
+	fork_after_ydb_init = FALSE;
 	return YDB_OK;
 }
 

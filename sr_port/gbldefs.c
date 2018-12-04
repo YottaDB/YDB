@@ -1286,3 +1286,7 @@ GBLDEF	pthread_mutex_t	ydb_engine_threadsafe_mutex = PTHREAD_MUTEX_INITIALIZER;/
 GBLDEF	pthread_t	ydb_engine_threadsafe_mutex_holder;	/* tid of thread that has YottaDB engine mutex currently locked.
 								 * Currently used only by "gtmci_ch".
 								 */
+GBLDEF	int		fork_after_ydb_init;	/* Set to a non-zero value if a "fork" occurs after "ydb_init_complete" has been
+						 * set to TRUE. Used for handling/detecting error scenarios in SimpleAPI and
+						 * SimpleThreadAPI.
+						 */

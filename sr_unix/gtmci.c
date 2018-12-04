@@ -118,6 +118,7 @@ GBLREF	boolean_t		noThreadAPI_active;
 GBLREF	boolean_t		simpleThreadAPI_active;
 GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex;
 GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder;
+GBLREF	int			fork_after_ydb_init;
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
 
 LITREF  gtmImageName            gtmImageNames[];
@@ -262,14 +263,6 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	added = FALSE;
 	assert(NULL == TREF(gtmci_retval));
 	TREF(gtmci_retval) = NULL;
-	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_ci to be
-	 * invoked after a ydb_exit
-	 */
-	if (process_exiting)
-	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		return ERR_CALLINAFTERXIT;
-	}
 	if (!ydb_init_complete)
 	{
 		if ((status = ydb_init()) != 0)		/* Note - sets fgncal_stack */
@@ -688,14 +681,6 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	}
 	assert(NULL == TREF(gtmci_retval));
 	TREF(gtmci_retval) = NULL;
-	/* A prior invocation of ydb_exit would have set process_exiting = TRUE. Use this to disallow ydb_ci to be
-	 * invoked after a ydb_exit
-	 */
-	if (process_exiting)
-	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		return ERR_CALLINAFTERXIT;
-	}
 	assert(NULL == TREF(temp_fgncal_stack));
 	FGNCAL_UNWIND;		/* note - this is outside the establish since gtmci_ch calso calls fgncal_unwind() which,
 				 * if this failed, would lead to a nested error which we'd like to avoid */
@@ -1169,6 +1154,51 @@ int ydb_init()
 	Dl_info			shlib_info;
 	DCL_THREADGBL_ACCESS;
 
+	if (fork_after_ydb_init)
+	{	/* This process was created by a "fork" from a parent process that had done YottaDB engine calls.
+		 * Do some checks for error scenarios.
+		 */
+		assert(!ydb_init_complete);	/* should have been cleared by "ydb_stm_atfork_child" */
+		assert(simpleThreadAPI_active || noThreadAPI_active);
+		if (simpleThreadAPI_active)
+		{	/* SimpleThreadAPI was active in the parent process before the "fork". This means the parent
+			 * was multi-threaded and so after a "fork", the YottaDB state of the child (current) process
+			 * is not consistent (inherent issue with fork in a multi-threaded process) as a concurrently running
+			 * thread could be in the middle of YottaDB runtime logic at the time of the "fork" which means the
+			 * global variables capturing YottaDB state are not in a clean state in the child process.
+			 * It is a mess to clean up this and start afresh in the child process so we disallow YottaDB engine
+			 * calls after a "fork". We therefore expected an "exec" to be done in the child process before any
+			 * YottaDB calls are made. That clearly did not happen. So issue an error.
+			 */
+			return ERR_STAPIFORKEXEC;
+		} else
+		{	/* SimpleAPI was active in the parent process before the "fork". We expect the first YottaDB call in
+			 * the child process to be "ydb_child_init". But the fact that "fork_after_ydb_init" is non-zero
+			 * implies that call did not happen. Handle that first before proceeding. "ydb_stm_atfork_child" would
+			 * have reset "ydb_init_complete" to FALSE even though YottaDB engine has been initialized. Undo that
+			 * change before calling "ydb_child_init".
+			 */
+			assert(!ydb_init_complete);
+			ydb_init_complete = TRUE;
+			status = ydb_child_init(NULL);
+			if (YDB_OK != status)
+			{
+				assert(0 > status);	/* "ydb_child_init" returns negated error status. */
+				ydb_init_complete = FALSE;	/* Force "ydb_init" to be invoked again in case any more
+								 * YottaDB calls happen since "ydb_child_init" did not run clean.
+								 */
+				return -status;		/* Negate it back before returning from "ydb_init". */
+			}
+		}
+	}
+	if (process_exiting)
+	{	/* A prior invocation of ydb_exit() would have set process_exiting = TRUE.
+		 * Use this to disallow any more YottaDB calls.
+		 */
+		assert(!ydb_init_complete);	/* should have been cleared by "ydb_exit" as part of calling "gtm_exit_handler" */
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
+		return ERR_CALLINAFTERXIT;
+	}
 	/* Single thread the rest of initialization so all of the various not-thread-safe things this routine does in
 	 * addition to initializing both memory and work thread mutexes in gtm_startup() are all completed without race
 	 * conditions. Note our condition handler coverage differs depending on whether ydb has been initialized or not.
@@ -1199,7 +1229,6 @@ int ydb_init()
 	 */
 	if (process_exiting)
 	{
-		assert(!ydb_init_complete);	/* should have been cleared by "ydb_exit" as part of calling "gtm_exit_handler" */
 		/* Note that because "ydb_init" was already run (or else "process_exiting" can never be set to TRUE),
 		 * "gtm_putmsg_csa" (and "rts_error_csa") is usable here even though "ydb_init_complete" is FALSE.
 		 */

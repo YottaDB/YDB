@@ -183,14 +183,6 @@ MBSTART	{													\
 	int		status, errcode;									\
 	mstr		entryref;										\
 														\
-	/* A prior invocation of ydb_exit() would have set process_exiting = TRUE. Use this to disallow further	\
-	 * API calls.	      	 	    	       	   		     	       	       			\
-	 */    													\
-	if (process_exiting)											\
-	{	/* YDB runtime environment not setup/available, no driving of errors */				\
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);					\
-		return RETTYPE YDB_ERR_CALLINAFTERXIT;								\
-	}													\
 	LIBYOTTADB_RUNTIME_CHECK(RETTYPE);									\
 	/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet	\
 	 * established the condition handler to take care of these issues so we simulate it's effect by		\
@@ -218,14 +210,6 @@ MBSTART	{													\
 	int		status, errcode;									\
 	mstr		entryref;										\
 														\
-	/* A prior invocation of ydb_exit() would have set process_exiting = TRUE. Use this to disallow further	\
-	 * API calls.	      	 	    	       	   		     	       	       			\
-	 */    													\
-	if (process_exiting)											\
-	{	/* YDB runtime environment not setup/available, no driving of errors */				\
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);					\
-		return;												\
-	}													\
 	LIBYOTTADB_RUNTIME_CHECK_NORETVAL;									\
 	/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet	\
 	 * established the condition handler to take care of these issues so we simulate it's effect by		\
@@ -748,6 +732,7 @@ MBSTART {															\
 			      RTS_ERROR_LITERAL(__FILE__), __LINE__, status);							\
 	}															\
 	pthread_mutex_init(&((MUTEX_PTR)->mutex), &mattr);									\
+	pthread_mutexattr_destroy(&mattr);	/* Destroy mutex attribute block before it goes out of scope */			\
 } MBEND
 
 
@@ -772,5 +757,12 @@ void *ydb_stm_tpthread(void *parm);
 stm_workq *ydb_stm_init_work_queue(void);
 int ydb_tp_s_common(boolean_t stapi, uint64_t tptoken, ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount,
 		    ydb_buffer_t *varnames);
+
+/* Below are the 3 functions invoked by "pthread_atfork" during a "fork" call to ensure all SimpleThreadAPI related
+ * mutex and condition variables are safely released (without any deadlocks, inconsistent states) in the child after the fork.
+ */
+void	ydb_stm_atfork_prepare(void);
+void	ydb_stm_atfork_parent(void);
+void	ydb_stm_atfork_child(void);
 
 #endif /*  LIBYOTTADB_INT_H */

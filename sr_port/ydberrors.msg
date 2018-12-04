@@ -61,6 +61,7 @@ INVLNPAIRLIST	<Invalid lockname/subscript pair list (uneven number of lockname/s
 INVTPTRANS	<Invalid TP transaction - either invalid TP token or transaction not in progress>/error/fao=0
 INVAPIMODE	<Process not allowed to first use a(n) !AD API then switch to using a(n) !AD API>/error/fao=4
 NOTSUPSTAPI	<Calls to !AD are not supported if threaded Simple API functions are in use>/error/fao=2
+STAPIFORKEXEC	<Calls to YottaDB are not supported after a fork() if threaded Simple API functions were in use in parent. Call exec() first>/error/fao=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

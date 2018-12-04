@@ -385,7 +385,7 @@ void gtm_icu_init(void)
 #	endif
 	/* Note that a call to "dlopen_handle_array_add(handle)" should normally have been placed here but
 	 * if "dlopen_handle_array_close()" happens on this handle (corresponding to libicuio.so) later and
-	 * any type of error occurs (e.g. CALLINAFTEREXIT etc.), it is very likely we would end up invoking
+	 * any type of error occurs (e.g. CALLINAFTERXIT etc.), it is very likely we would end up invoking
 	 * "gtm_wcwidth" as part of displaying/logging the error and that would SIG-11 because a "dlclose"
 	 * has already been done on libicuio.so. Since this library is so much tied with YottaDB error handling,
 	 * we skip the "dlopen_handle_array_add" (and in turn "dlopen_handle_array_close" at "ydb_exit" time).
