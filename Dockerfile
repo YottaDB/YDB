@@ -63,15 +63,12 @@ RUN apt-get update \
 RUN locale-gen en_US.UTF-8
 WORKDIR /data
 COPY --from=ydb-release-builder /tmp/yottadb-release /tmp/yottadb-release
-COPY --from=ydb-release-builder /tmp/yottadb-src/.yottadb.vsn /tmp/yottadb-release/
 RUN cd /tmp/yottadb-release  \
  && icu-config --version \
       > /tmp/yottadb-release/.icu.vsn \
  && ./ydbinstall \
       --utf8 `cat /tmp/yottadb-release/.icu.vsn` \
-      --installdir /opt/yottadb/`cat /tmp/yottadb-release/.yottadb.vsn`-`uname -p` \
- && cd /opt/yottadb \
- && ln -s `cat /tmp/yottadb-release/.yottadb.vsn`-`uname -p` current \
+      --installdir /opt/yottadb/current \
  && rm -rf /tmp/yottadb-release
 ENV gtmdir=/data \
     LANG=en_US.UTF-8 \

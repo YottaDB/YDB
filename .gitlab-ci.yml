@@ -1,0 +1,55 @@
+image: docker:latest
+
+services:
+  - docker:dind
+
+stages:
+ - build
+ - push
+
+before_script:
+  - docker login -u $HUB_USERNAME -p $HUB_PASSWORD
+
+build:
+  artifacts:
+    paths:
+      - docker-images
+  stage: build
+  script:
+    - mkdir docker-images
+    - docker build --pull -t yottadb/yottadb:latest -f Dockerfile .
+    - docker save yottadb/yottadb:latest > docker-images/app.tar
+
+push:
+  stage: push
+  script:
+    - docker load -i docker-images/app.tar
+    - docker tag yottadb/yottadb:latest yottadb/yottadb:latest-master
+    - docker push yottadb/yottadb:latest-master
+    - docker tag yottadb/yottadb:latest-master yottadb/yottadb:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | sort -u)
+    - docker push yottadb/yottadb:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | sort -u)
+    - 'echo -e "FROM yottadb/yottadb:latest-master\n ENTRYPOINT []" > BareDockerfile'
+    - cat BareDockerfile
+    - docker build --pull -t yottadb/yottadb-base:latest-master -f BareDockerfile .
+    - docker push yottadb/yottadb-base:latest-master
+    - docker tag yottadb/yottadb-base:latest-master yottadb/yottadb-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | sort -u)
+    - docker push yottadb/yottadb-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | sort -u)
+  only:
+    - master
+
+push-release:
+  stage: push
+  script:
+    - docker load -i docker-images/app.tar
+    - docker push yottadb/yottadb:latest
+    - docker tag yottadb/yottadb:latest yottadb/yottadb:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | sort -u)
+    - docker push yottadb/yottadb:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | sort -u)
+    - 'echo -e "FROM yottadb/yottadb:latest\n ENTRYPOINT []" > BareDockerfile'
+    - cat BareDockerfile
+    - docker build --pull -t yottadb/yottadb-base:latest -f BareDockerfile .
+    - docker push yottadb/yottadb-base:latest
+    - docker tag yottadb/yottadb-base:latest yottadb/yottadb-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | sort -u)
+    - docker push yottadb/yottadb-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | sort -u)
+  only:
+    - tag
+
