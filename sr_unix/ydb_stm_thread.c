@@ -296,14 +296,6 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 								 (ydb_fileid_ptr_t)callblk->args[1]);
 				callblk->retval = (uintptr_t)int_retval;
 				break;
-			case LYDB_RTN_FREE:
-				ydb_free((void *)callblk->args[0]);
-				callblk->retval = 0;
-				break;
-			case LYDB_RTN_MALLOC:
-				voidstar_retval = ydb_malloc((size_t)callblk->args[0]);
-				callblk->retval = (intptr_t)voidstar_retval;
-				break;
 			case LYDB_RTN_MESSAGE:
 				int_retval = ydb_message((int)callblk->args[0], (ydb_buffer_t *)callblk->args[1]);
 				callblk->retval = (uintptr_t)int_retval;

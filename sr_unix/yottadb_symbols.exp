@@ -50,7 +50,6 @@ ydb_file_name_to_id
 ydb_file_name_to_id_t
 ydb_fork_n_core
 ydb_free
-ydb_free_t
 ydb_get_s
 ydb_get_st
 ydb_hiber_start
@@ -66,7 +65,6 @@ ydb_lock_incr_st
 ydb_lock_s
 ydb_lock_st
 ydb_malloc
-ydb_malloc_t
 ydb_message
 ydb_message_t
 ydb_node_next_s

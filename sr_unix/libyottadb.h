@@ -306,8 +306,6 @@ void	ydb_timer_cancel(int timer_id);
 int	ydb_file_id_free_t(uint64_t tptoken, ydb_fileid_ptr_t fileid);
 int	ydb_file_is_identical_t(uint64_t tptoken, ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
 int	ydb_file_name_to_id_t(uint64_t tptoken, ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
-void	ydb_free_t(uint64_t tptoken, void *ptr);
-void 	*ydb_malloc_t(uint64_t tptoken, size_t size);
 int	ydb_message_t(uint64_t tptoken, int status, ydb_buffer_t *msg_buff);
 int	ydb_stdout_stderr_adjust_t(uint64_t tptoken);
 void	ydb_timer_cancel_t(uint64_t tptoken, int timer_id);
