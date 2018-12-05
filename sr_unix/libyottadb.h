@@ -51,8 +51,9 @@ enum
 #define YDB_MAX_SUBS		31		/* Maximum subscripts currently supported */
 #define YDB_MAX_TIME_NSEC	(0x7fffffffllu * 1000llu * 1000llu)	/* Max specified time in (long long) nanoseconds */
 #define YDB_MAX_YDBERR		(2 ** 30)	/* Maximum (absolute) value for a YottaDB error */
-#define YDB_MAX_ERRORMSG	1024		/* Will hold any message we return */
-
+#define YDB_MAX_ERRORMSG	1024		/* Will hold any message we return. Not used in YottaDB C code but relied upon
+						 * by the GoWrapper/Golang interface to YottaDB.
+						 */
 /* Minimum values */
 #define YDB_MIN_YDBERR		(2 ** 27)	/* Minimum (absolute) value for a YottaDB error */
 
