@@ -31,6 +31,8 @@ GBLREF	stm_workq	*stmWorkQueue[];
 GBLREF	uintptr_t	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
 GBLREF	sigset_t	block_sigsent;
 GBLREF	boolean_t	blocksig_initialized;
+GBLREF	uint4		simpleapi_dollar_trestart;
+GBLREF	uint4		dollar_trestart;
 
 STATICFNDCL void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead);
 
@@ -92,9 +94,13 @@ void *ydb_stm_tpthread(void *parm)
  */
 STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 {
-	stm_que_ent	*callblk;
-	int		int_retval, status, save_errno;
-	unsigned int	tptoken;
+	stm_que_ent		*callblk;
+	int			int_retval, status, save_errno;
+	uint64_t		tptoken;
+	ydb_tp2fnptr_t		tpfn;
+	void			*tpfnparm;
+	boolean_t		nested_tp;
+	libyottadb_routines	lydbrtn;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -121,19 +127,77 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 		switch (callblk->calltyp)
 		{
 			case LYDB_RTN_TP:
-				/* Driving new TP level requires a new tptoken. Create one by incrementing our counter. Note
-				 * that the atomic part of the increment is probably not necessary at this point but will be
-				 * when multiple work queues exist after YottaDB is fully threaded.
-				 */
-				tptoken = INTERLOCK_ADD(&stmTPToken, UNUSED, 1);
+				/* Driving new TP level requires a new tptoken. Create one by incrementing our counter. */
+				tptoken = ++stmTPToken;
+				assert(YDB_NOTTP != tptoken);
 				stmWorkQueue[TREF(curWorkQHeadIndx)]->tptoken = tptoken;
-				int_retval = ydb_tp_s_common(TRUE, tptoken, (ydb_basicfnptr_t)callblk->args[0],
-							     (void *)callblk->args[1], (const char *)callblk->args[2],
-							     (int)callblk->args[3], (ydb_buffer_t *)callblk->args[4]);
+				/* Note that all YottaDB engine calls are handled only by the MAIN worker thread and never
+				 * by the current TP worker thread. The latter is used only to invoke the user-defined
+				 * callback function. This lets the logic for handling timer pops stay in the MAIN worker thread
+				 * keeping it simple (as opposed to introducing locks between the MAIN and TP worker threads
+				 * in case the TP worker thread can also do YottaDB engine calls like "ydb_tp_s_common").
+				 */
+				nested_tp = (boolean_t)dollar_tlevel;
+				lydbrtn = (!nested_tp ? LYDB_RTN_TP_START_TLVL0 : LYDB_RTN_TP_START);
+				/*
+				 * callblk->args[0] = tpfn      parameter in "ydb_tp_s_common"
+				 * callblk->args[1] = tpfnparm  parameter in "ydb_tp_s_common"
+				 * callblk->args[2] = transid   parameter in "ydb_tp_s_common"
+				 * callblk->args[3] = namecount parameter in "ydb_tp_s_common"
+				 * callblk->args[4] = varnames  parameter in "ydb_tp_s_common"
+				 *
+				 * For the LYDB_RTN_TP_START or LYDB_RTN_TP_START_TLVL0 case, we do not invoke the user-defined
+				 *	callback function so do not need to pass tpfn or tpfnparm.
+				 * For the LYDB_RTN_TP_RESTART/LYDB_RTN_TP_COMMIT/LYDB_RTN_TP_RESTART_TLVL0/LYDB_RTN_TP_COMMIT_TLVL0
+				 *	cases, we do not need ANY of the above 5 parameters.
+				 * The ydb_stm_args* calls done below take that into account.
+				 * Once the "op_tstart" is done above, we do not need "transid", "namecount" and "varnames"
+				 *	parameters for the later calls. So we use ydb_stm_args2 below.
+				 */
+				/* Start the TP transaction by asking the MAIN worker thread to do the "op_tstart" */
+				int_retval = ydb_stm_args3(tptoken, lydbrtn, callblk->args[2], callblk->args[3], callblk->args[4]);
+				assert(YDB_TP_RESTART != int_retval);
+				if (YDB_OK != int_retval)
+				{
+					assert(FALSE);
+					callblk->retval = (uintptr_t)int_retval;
+					break;
+				}
+				tpfn = (ydb_basicfnptr_t)callblk->args[0];
+				tpfnparm = (void *)callblk->args[1];
+				for ( ; ; )
+				{	/* Loop to handle TP restarts */
+					if (!nested_tp)
+					{	/* Maintain "simpleapi_dollar_trestart" just like "ydb_tp_s_common"
+						 * does for the "LYDB_RTN_TP" case.
+						 */
+						simpleapi_dollar_trestart = dollar_trestart;
+					}
+					/* Invoke the user-defined TP callback function in the TP worker thread (current thread) */
+					int_retval = (*tpfn)(tptoken, tpfnparm);
+					if (YDB_OK == int_retval)
+					{	/* Commit the TP transaction by asking MAIN worker thread to do the "op_tcommit" */
+						lydbrtn = (!nested_tp ? LYDB_RTN_TP_COMMIT_TLVL0 : LYDB_RTN_TP_COMMIT);
+						int_retval = ydb_stm_args0(tptoken, lydbrtn);
+					}
+					if (nested_tp || (YDB_TP_RESTART != int_retval))
+					{	/* If nested TP, return success/error code directly back to caller of "ydb_tp_st".
+						 * If outermost TP, then handle TPRESTART specially.
+						 *	Else return success/error code directly back to caller of "ydb_tp_st".
+						 */
+						break;
+					}
+					/* Restart the outermost TP transaction by asking the MAIN worker thread
+					 * to do the "tp_restart" (in "ydb_tp_s_common").
+					 */
+					int_retval = ydb_stm_args0(tptoken, LYDB_RTN_TP_RESTART_TLVL0);
+					assert(YDB_OK == int_retval);
+				}
 				callblk->retval = (uintptr_t)int_retval;
 				break;
 			default:
-				assertpro(FALSE);
+				assert(FALSE);
+				break;
 		}
 		/* If this is the first TP level finishing up, we need to put a task on the TP work queue of
 		 * the main worker thread that causes it to switch the queues back to the main work queue so

@@ -33,7 +33,6 @@
 
 GBLREF	stm_workq	*stmWorkQueue[];
 GBLREF	stm_workq	*stmTPWorkQueue;
-GBLREF	uint4		dollar_tlevel;
 GBLREF	boolean_t	simpleThreadAPI_active;
 GBLREF	pthread_t	gtm_main_thread_id;
 GBLREF	boolean_t	gtm_main_thread_id_set;
@@ -116,6 +115,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 #	ifndef GTM64
 	unsigned long long	tparm;
 #	endif
+	libyottadb_routines	lydbrtn;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -234,14 +234,14 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 				 * levels by switching to a TP queue until the transaction is complete.
 				 */
 				*queueChanged = TRUE;
-				/* Switch processing from the normal work queue to the TP work queue */
+				/* If not already done, allocate the TP work queue and set it up */
 				if (NULL == stmTPWorkQueue)
 				{
 					stmTPWorkQueue = ydb_stm_init_work_queue();
 					stmTPWorkQueue->threadid = stmWorkQueue[0]->threadid;	/* Uses same thread */
 				}
+				/* Switch processing from the normal work queue to the TP work queue */
 				TREF(curWorkQHead) = stmTPWorkQueue;
-				/* If not already done, allocate the TP work queue and set it up */
 				/* Bump the index to the current TP level to the next one */
 				(TREF(curWorkQHeadIndx))++;
 				assert(STMWORKQUEUEDIM > TREF(curWorkQHeadIndx));
@@ -276,6 +276,21 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 					SETUP_SYSCALL_ERROR("pthread_cond_signal()", status);
 					break;
 				}
+				break;
+			case LYDB_RTN_TP_START:
+			case LYDB_RTN_TP_START_TLVL0:
+				int_retval = ydb_tp_s_common(calltyp, (ydb_basicfnptr_t)NULL, (void *)NULL,
+								(const char *)callblk->args[0],
+								(int)callblk->args[1], (ydb_buffer_t *)callblk->args[2]);
+				callblk->retval = (uintptr_t)int_retval;
+				break;
+			case LYDB_RTN_TP_COMMIT:
+			case LYDB_RTN_TP_RESTART:
+			case LYDB_RTN_TP_COMMIT_TLVL0:
+			case LYDB_RTN_TP_RESTART_TLVL0:
+				int_retval = ydb_tp_s_common(calltyp, (ydb_basicfnptr_t)NULL, (void *)NULL,
+								(const char *)NULL, (int)0, (ydb_buffer_t *)NULL);
+				callblk->retval = (uintptr_t)int_retval;
 				break;
 			case LYDB_RTN_ZWR2STR:
 				int_retval = ydb_zwr2str_s((ydb_buffer_t *)callblk->args[0], (ydb_buffer_t *)callblk->args[1]);

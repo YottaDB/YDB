@@ -666,25 +666,6 @@ MBSTART {												\
 	} else													\
 		noThreadAPI_active = TRUE;									\
 } MBEND
-#define VERIFY_TP_NON_THREADED_API 										\
-	MBSTART {	/* If threaded API but in TP worker thread, that is OK */				\
-	GBLREF boolean_t noThreadAPI_active;									\
-	GBLREF boolean_t simpleThreadAPI_active;								\
-	GBLREF stm_workq *stmWorkQueue[];									\
-	if (simpleThreadAPI_active)										\
-	{													\
-		if (!IS_STAPI_TP_WORKER_THREAD)									\
-		{												\
-			DBGAPITP_ONLY(gtm_fork_n_core());							\
-			SETUP_GENERIC_ERROR_4PARMS(ERR_INVAPIMODE, THREADED_STR_LEN, THREADED_STR,		\
-						   UNTHREADED_STR_LEN, UNTHREADED_STR);				\
-		}												\
-		/* We are in threaded mode but running an unthreaded command in the main work thread which	\
-		 * is allowed. In that case just fall out (verified).						\
-		 */												\
-	} else													\
-		noThreadAPI_active = TRUE;									\
-} MBEND
 #define VERIFY_THREADED_API(RETTYPE)									\
 MBSTART {												\
 	GBLREF boolean_t noThreadAPI_active;								\
@@ -755,8 +736,8 @@ int ydb_stm_freecallblk(stm_que_ent *callblk);
 void *ydb_stm_thread(void *parm);
 void *ydb_stm_tpthread(void *parm);
 stm_workq *ydb_stm_init_work_queue(void);
-int ydb_tp_s_common(boolean_t stapi, uint64_t tptoken, ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount,
-		    ydb_buffer_t *varnames);
+int ydb_tp_s_common(libyottadb_routines lydbrtn,
+			ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames);
 
 /* Below are the 3 functions invoked by "pthread_atfork" during a "fork" call to ensure all SimpleThreadAPI related
  * mutex and condition variables are safely released (without any deadlocks, inconsistent states) in the child after the fork.

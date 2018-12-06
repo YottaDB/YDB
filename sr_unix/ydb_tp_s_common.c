@@ -27,7 +27,6 @@
 #include "outofband.h"
 
 GBLREF	volatile int4	outofband;
-GBLREF	uint4		dollar_tlevel;
 GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int	t_tries;
 GBLREF	int		tprestart_state;
@@ -35,118 +34,153 @@ GBLREF	uint4		dollar_trestart;
 GBLREF	uint4		simpleapi_dollar_trestart;
 GBLREF	boolean_t	noThreadAPI_active;
 GBLREF	stm_workq	*stmWorkQueue[];
+#ifdef DEBUG
+GBLREF	uint4		dollar_tlevel;
+#endif
 
 /* Routine to invoke a user-specified function "tpfn" inside a TP transaction (i.e. TSTART/TCOMMIT fence).
  *
  * Parameters:
- *   stapi	 - Flag indicating call is for SimpleThreadAPI (if false, call is for SimpleAPI).
- *   tptoken	 - This value is 0 if no TP is active, else it is the token for the active TP level.
+ *   lydbrtn     - Can be LYDB_RTN_TP (SimpleAPI) or LYDB_RTN_TP_START (SimpleThreadAPI) or LYDB_RTN_TP_COMMIT (SimpleThreadAPI)
+ *			OR their TLVL0 equivalents (i.e. LYDB_RTN_TP_TLVL0, LYDB_RTN_TP_START_TLVL0, LYDB_RTN_TP_COMMIT_TLVL0
+ *								or LYDB_RTN_TP_RESTART_TLVL0)
  *   transid     - Transaction id.
  *   varnamelist - Comma-separated list of variable names that are preserved across restarts in this TP transaction.
  *   tpfn        - Pointer to a function that executes user-specified code inside of the TSTART/TCOMMIT fence.
  *   tpfnparm    - Parameter that is passed to the user C function "tpfn". Can be NULL if not needed.
  */
-int ydb_tp_s_common(boolean_t stapi, uint64_t tptoken, ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount,
-		    ydb_buffer_t *varnames)
+int ydb_tp_s_common(libyottadb_routines lydbrtn,
+			ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames)
 {
 	boolean_t	error_encountered;
 	mval		tid;
-	int		rc, save_dollar_tlevel, tpfn_status, tstart_flag;
+	int		rc, tpfn_status, tstart_flag;
 	mval		varnamearray[YDB_MAX_NAMES], *mv, *mv_top;
 	ydb_buffer_t	*curvarname;
 	char		buff[256];			/* sprintf() buffer */
+	int		nested_tp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	assert(LYDB_RTN_TP < LYDB_RTN_TP_START);
+	assert(LYDB_RTN_TP_START < LYDB_RTN_TP_COMMIT);
+	assert(LYDB_RTN_TP_COMMIT < LYDB_RTN_TP_RESTART);
+	assert(LYDB_RTN_TP_RESTART < LYDB_RTN_TP_TLVL0);
+	assert((LYDB_RTN_TP_TLVL0 - LYDB_RTN_TP) == (LYDB_RTN_TP_START_TLVL0 - LYDB_RTN_TP_START));
+	assert((LYDB_RTN_TP_TLVL0 - LYDB_RTN_TP) == (LYDB_RTN_TP_COMMIT_TLVL0 - LYDB_RTN_TP_COMMIT));
+	assert((LYDB_RTN_TP_TLVL0 - LYDB_RTN_TP) == (LYDB_RTN_TP_RESTART_TLVL0 - LYDB_RTN_TP_RESTART));
+	/* Set "nested_tp" to 0 in case lydbrtn is any of the _TLVL0 codes else set it to a non-zero value.
+	 * 0 value indicates this is the outermost TP else it is a nested TP (used below for restart processing).
+	 */
+	if (LYDB_RTN_TP_TLVL0 > lydbrtn)
+	{
+		nested_tp = TRUE;
+		assert(LYDB_RTN_TP_RESTART != lydbrtn);	/* Callers ensure this value is never passed */
+	} else
+	{
+		nested_tp = FALSE;
+		/* Now that "nested_tp" has been determined, revert "lydbrtn" to its non-_TLVL0 counterpart for ease of use below */
+		lydbrtn = lydbrtn - (LYDB_RTN_TP_TLVL0 - LYDB_RTN_TP);
+	}
+	assert((LYDB_RTN_TP == lydbrtn)
+		|| (LYDB_RTN_TP_START == lydbrtn) || (LYDB_RTN_TP_COMMIT == lydbrtn) || (LYDB_RTN_TP_RESTART == lydbrtn));
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
-	LIBYOTTADB_INIT(LYDB_RTN_TP, (int));		/* Note: macro could "return" from this function in case of errors */
+	LIBYOTTADB_INIT(lydbrtn, (int));		/* Note: macro could "return" from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
-	/* We can't use the VERIFY_NON_THREADED_API macro here because if we are threaded, this routine runs in a TP thread
-	 * (a different thread for each TP level). So this is a "manual" version of the needed checks.
-	 */
-	if (stapi)
+
+	if (LYDB_RTN_TP != lydbrtn)
 	{	/* We have been called via the threaded interface so verify we are in a threaded environment */
 		VERIFY_THREADED_API((int));
 	} else
-	{	/* We have been called as non-threaded so verify we are not threaded OR we are executing in the proper TP
-		 * work queue.
-		 */
-		VERIFY_TP_NON_THREADED_API;
+	{	/* We have been called as non-threaded so verify we are not threaded */
+		VERIFY_NON_THREADED_API;
 	}
-	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
-	if (error_encountered)
-	{
-		assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
-		REVERT;
-		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
-	}
-	/* Check if an outofband action that might care about has popped up */
-	if (outofband)
-		outofband_action(FALSE);
-	if (0 > namecount)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, RTS_ERROR_LITERAL("ydb_tp_s()"));
-	save_dollar_tlevel = dollar_tlevel;
-	/* Ready "transid" for passing to "op_tstart" */
-	tid.mvtype = MV_STR;
-	if (NULL == transid)
-		tid.str.len = 0;
-	else
-	{
-		tid.str.len = STRLEN(transid);
-		tid.str.addr = (char *)transid;
-	}
-	/* Ready "varnamelist" for passing to "op_tstart" */
-	tstart_flag = IMPLICIT_TSTART | YDB_TP_S_TSTART;
-	if (0 == namecount)
-		op_tstart(tstart_flag, TRUE, &tid, 0);
-	else if ((1 == namecount) && ('*' == *varnames->buf_addr))
-	{	/* preserve all local variables */
-		op_tstart(tstart_flag, TRUE, &tid, ALLLOCAL);
-	} else
-	{	/* varnames is a pointer to an array of ydb_buffer_t structs that describe each varname.
-		 * First do some error checking on input.
-		 */
-		if (YDB_MAX_NAMES < namecount)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNT2HI, 3,
-								RTS_ERROR_LITERAL("ydb_tp_s()"), YDB_MAX_NAMES);
-		for (curvarname = varnames, mv = varnamearray, mv_top = mv + namecount; mv < mv_top; curvarname++, mv++)
+	if (LYDB_RTN_TP_START >= lydbrtn)
+	{	/* LYDB_RTN_TP (SimpleAPI) or LYDB_RTN_TP_START (SimpleThreadAPI) */
+		assert((LYDB_RTN_TP == lydbrtn) || (LYDB_RTN_TP_START == lydbrtn));
+		ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
+		if (error_encountered)
 		{
-			if (IS_INVALID_YDB_BUFF_T(curvarname))
-			{
-				SPRINTF(buff, "Invalid varname array (index %d)", curvarname - varnames);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-					      LEN_AND_STR(buff), LEN_AND_LIT(buff));
-			}
-			if (YDB_MAX_IDENT < curvarname->len_used)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);
-			VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used);
-			/* Note the variable name is put in the stringpool. Needed if this variable does not yet exist in the
-			 * current symbol table, a pointer to this string is added in op_tstart as part of the
-			 * "add_hashtab_mname_symval" call and that would then point to memory in user-driven C program
-			 * which cannot be assumed to be stable for the rest of the lifetime of this process.
-			 */
-			mv->mvtype = MV_STR;
-			mv->str.addr = curvarname->buf_addr;
-			mv->str.len = curvarname->len_used;
-			s2pool(&mv->str);
-			RECORD_MSTR_FOR_GC(&mv->str);
+			assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Should have been cleared by "ydb_simpleapi_ch" */
+			REVERT;
+			assert(ERR_TPRETRY != SIGNAL);
+			return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 		}
-		/* Now that no errors are detected, pass this array of mvals (containing the names of variables to be preserved)
-		 * to "op_tstart" with a special value (LISTLOCAL) so it knows this format and parses this differently from the
-		 * usual "op_tstart" invocations (where each variable name is a separate mval pointer in a var-args list).
+		/* Check if an outofband action that might care about has popped up */
+		if (outofband)
+			outofband_action(FALSE);
+		if (0 > namecount)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, RTS_ERROR_LITERAL("ydb_tp_s()"));
+		/* Ready "transid" for passing to "op_tstart" */
+		tid.mvtype = MV_STR;
+		if (NULL == transid)
+			tid.str.len = 0;
+		else
+		{
+			tid.str.len = STRLEN(transid);
+			tid.str.addr = (char *)transid;
+		}
+		/* Ready "varnamelist" for passing to "op_tstart" */
+		tstart_flag = IMPLICIT_TSTART | YDB_TP_S_TSTART;
+		if (0 == namecount)
+			op_tstart(tstart_flag, TRUE, &tid, 0);
+		else if ((1 == namecount) && ('*' == *varnames->buf_addr))
+		{	/* preserve all local variables */
+			op_tstart(tstart_flag, TRUE, &tid, ALLLOCAL);
+		} else
+		{	/* varnames is a pointer to an array of ydb_buffer_t structs that describe each varname.
+			 * First do some error checking on input.
+			 */
+			if (YDB_MAX_NAMES < namecount)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNT2HI, 3,
+									RTS_ERROR_LITERAL("ydb_tp_s()"), YDB_MAX_NAMES);
+			for (curvarname = varnames, mv = varnamearray, mv_top = mv + namecount; mv < mv_top; curvarname++, mv++)
+			{
+				if (IS_INVALID_YDB_BUFF_T(curvarname))
+				{
+					SPRINTF(buff, "Invalid varname array (index %d)", curvarname - varnames);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+						      LEN_AND_STR(buff), LEN_AND_LIT(buff));
+				}
+				if (YDB_MAX_IDENT < curvarname->len_used)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);
+				VALIDATE_MNAME_C1(curvarname->buf_addr, curvarname->len_used);
+				/* Note the variable name is put in the stringpool. Needed if this variable does not yet exist in
+				 * the current symbol table, a pointer to this string is added in op_tstart as part of the
+				 * "add_hashtab_mname_symval" call and that would then point to memory in user-driven C program
+				 * which cannot be assumed to be stable for the rest of the lifetime of this process.
+				 */
+				mv->mvtype = MV_STR;
+				mv->str.addr = curvarname->buf_addr;
+				mv->str.len = curvarname->len_used;
+				s2pool(&mv->str);
+				RECORD_MSTR_FOR_GC(&mv->str);
+			}
+			/* Now that no errors are detected, pass this array of mvals (containing the names of variables to be
+			 * preserved) to "op_tstart" with a special value (LISTLOCAL) so it knows this format and parses this
+			 * differently from the usual "op_tstart" invocations (where each variable name is a separate mval
+			 * pointer in a var-args list).
+			 */
+			op_tstart(tstart_flag, TRUE, &tid, LISTLOCAL, namecount, varnamearray);
+			TREF(sapi_mstrs_for_gc_indx) = 0;
+					/* mstrs in this array (added by RECORD_MSTR_FOR_GC) no longer need protection */
+		}
+		assert(dollar_tlevel);
+		/* Now that op_tstart has been done, revert our previous handler (which had an error return up top) in favor of
+		 * re-establishing the handler so it returns here so we can deal with errors within the transaction differently.
 		 */
-		op_tstart(tstart_flag, TRUE, &tid, LISTLOCAL, namecount, varnamearray);
-		TREF(sapi_mstrs_for_gc_indx) = 0; /* mstrs in this array (added by RECORD_MSTR_FOR_GC) no longer need protection */
+		REVERT;
+		if (LYDB_RTN_TP_START == lydbrtn)
+		{	/* The "op_tstart" part of the SimpleThreadAPI TP transaction is done. Return now. */
+			LIBYOTTADB_DONE;		/* Shutoff active rtn indicator while TP callback routine is driven */
+			return YDB_OK;
+		}
 	}
-	assert(dollar_tlevel);
-	/* Now that op_tstart has been done, revert our previous handler (which had an error return up top) in favor of
-	 * re-establishing the handler so it returns here so we can deal with errors within the transaction differently.
-	 */
-	REVERT;
-	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	tpfn_status = YDB_OK;
+	/* else: For SimpleThreadAPI, the user callback routine is invoked from the TP worker thread */
+	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{	/* If we reach here, it means an error occurred and "ydb_simpleapi_ch" was invoked which did a "longjmp"/"UNWIND".
 		 * Note: tpfn_status should at all times be negative since that is the final return value of "ydb_tp_s".
@@ -159,7 +193,7 @@ int ydb_tp_s_common(boolean_t stapi, uint64_t tptoken, ydb_basicfnptr_t tpfn, vo
  		{
 			assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
 			/* If we reach here, it means we have a TPRETRY error from the database engine */
-			if (save_dollar_tlevel)
+			if (nested_tp)
 			{	/* We were already inside a transaction when we entered this "ydb_tp_s" invocation.
 				 * So pass the TPRETRY to the caller until we go back to the outermost "ydb_tp_s" invocation.
 				 */
@@ -196,24 +230,47 @@ int ydb_tp_s_common(boolean_t stapi, uint64_t tptoken, ydb_basicfnptr_t tpfn, vo
 				assert((0 == rc) && (TPRESTART_STATE_NORMAL == tprestart_state));
 			}
 			tpfn_status = YDB_OK;	/* Now that the restart processing is complete, clear status back to normal */
+			if (LYDB_RTN_TP_RESTART == lydbrtn)
+			{	/* Now that restart processing has happened, return control to "ydb_stm_tpthread" to invoke
+				 * the user-defined callback function.
+				 */
+				LIBYOTTADB_DONE;
+				REVERT;
+				return YDB_OK;
+			}
 		}
 	}
-	LIBYOTTADB_DONE;		/* Shutoff active rtn indicator while TP callback routine is driven */
-	if (!save_dollar_tlevel)
-	{	/* This is the outermost TP. Note down "simpleapi_dollar_trestart" for later use
-		 * by "ydb_tp_s"/"ydb_simpleapi_ch" to help decide whether "tp_restart" processing is needed.
-		 */
-		simpleapi_dollar_trestart = dollar_trestart;
-	}
-	if (YDB_OK == tpfn_status)
-	{	/* Drive the user-specified transaction routine. Parameters differ between SimpleThreadAPI and SimpleAPI */
-		if (stapi)
-			tpfn_status = (*tpfn)(tptoken, tpfnparm);
-		else
+	switch(lydbrtn)
+	{
+	case LYDB_RTN_TP:
+		if (!nested_tp)
+		{	/* This is the outermost TP. Note down "simpleapi_dollar_trestart" for later use
+			 * by "ydb_tp_s"/"ydb_simpleapi_ch" to help decide whether "tp_restart" processing is needed.
+			 */
+			simpleapi_dollar_trestart = dollar_trestart;
+		}
+		/* SimpleAPI */
+		if (YDB_OK == tpfn_status)
+		{
+			LIBYOTTADB_DONE;		/* Shutoff active rtn indicator while TP callback routine is driven */
+			/* Drive the user-specified TP callback routine */
 			tpfn_status = (*tpfn)(tpfnparm);
-		assert(dollar_tlevel);			/* ensure "dollar_tlevel" is still non-zero */
+			assert(dollar_tlevel);			/* ensure "dollar_tlevel" is still non-zero */
+			TREF(libyottadb_active_rtn) = LYDB_RTN_TP; /* Restore our routine indicator (i.e. redo LIBYOTTADB_INIT) */
+		}
+		break;
+	case LYDB_RTN_TP_RESTART:
+		assert(!nested_tp);
+		assert(YDB_OK == tpfn_status);
+		/* Set "tpfn_status" to YDB_TP_RESTART so we fall through to the "INVOKE_RESTART" code block below
+		 * which will in turn transfer control to the "if (error_encountered)" block above and trigger "tp_restart"
+		 * processing as needed.
+		 */
+		tpfn_status = YDB_TP_RESTART;
+		break;
+	default:
+		break;
 	}
-	TREF(libyottadb_active_rtn) = LYDB_RTN_TP;	/* Restore our routine indicator */
 	if (YDB_OK == tpfn_status)
 		op_tcommit();
 	else if (YDB_TP_RESTART == tpfn_status)
@@ -225,7 +282,7 @@ int ydb_tp_s_common(boolean_t stapi, uint64_t tptoken, ydb_basicfnptr_t tpfn, vo
 	} else
 	{	/* Some other error. Pass the error code back to user code (caller of "ydb_tp_s") */
 		assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
-		if (!save_dollar_tlevel)
+		if (!nested_tp)
 		{	/* This is the outermost "ydb_tp_s" invocation. Rollback the transaction and pass the error to user code.
 			 * See comment above about "preemptive_db_clnup" for why it is needed.
 			 */

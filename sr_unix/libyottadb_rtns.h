@@ -26,7 +26,14 @@ LYDBRTN(LYDB_RTN_SET, 			LYDB_SIMPLEAPI,		"ydb_set_s()"),			/* "ydb_set_s" is ru
 LYDBRTN(LYDB_RTN_STR2ZWR,		LYDB_SIMPLEAPI,		"ydb_str2zwr_s()"),		/* "ydb_str2zwr_s" is running */
 LYDBRTN(LYDB_RTN_SUBSCRIPT_NEXT, 	LYDB_SIMPLEAPI,		"ydb_subscript_next_s()"),	/* "ydb_subscript_next_s" is running */
 LYDBRTN(LYDB_RTN_SUBSCRIPT_PREVIOUS, 	LYDB_SIMPLEAPI,		"ydb_subscript_previous_s()"),	/* "ydb_subscript_previous_s" is running */
-LYDBRTN(LYDB_RTN_TP,			LYDB_SIMPLEAPI,		"ydb_tp_s()"),			/* "ydb_tp_s" is running */
+LYDBRTN(LYDB_RTN_TP,			LYDB_SIMPLEAPI,		"ydb_tp_s()"),			/* "ydb_tp_s"                    in SimpleAPI       for nested TP */
+LYDBRTN(LYDB_RTN_TP_START,		LYDB_SIMPLEAPI,		"ydb_tp_s()"),			/* "ydb_tp_s" to do "op_tstart"  in SimpleThreadAPI for nested TP */
+LYDBRTN(LYDB_RTN_TP_COMMIT,		LYDB_SIMPLEAPI,		"ydb_tp_s()"),			/* "ydb_tp_s" to do "op_tcommit" in SimpleThreadAPI for nested TP */
+LYDBRTN(LYDB_RTN_TP_RESTART,		LYDB_SIMPLEAPI,		"ydb_tp_s()"),			/* "ydb_tp_s" to do "tp_restart" in SimpleThreadAPI for nested TP */
+LYDBRTN(LYDB_RTN_TP_TLVL0,		LYDB_SIMPLEAPI,		"ydb_tp_s()"),			/* "ydb_tp_s"                    in SimpleAPI       for outermost TP */
+LYDBRTN(LYDB_RTN_TP_START_TLVL0,	LYDB_SIMPLEAPI,		"ydb_tp_s()"),			/* "ydb_tp_s" to do "op_tstart"  in SimpleThreadAPI for outermost TP */
+LYDBRTN(LYDB_RTN_TP_COMMIT_TLVL0,	LYDB_SIMPLEAPI,		"ydb_tp_s()"),			/* "ydb_tp_s" to do "op_tcommit" in SimpleThreadAPI for outermost TP */
+LYDBRTN(LYDB_RTN_TP_RESTART_TLVL0,	LYDB_SIMPLEAPI,		"ydb_tp_s()"),			/* "ydb_tp_s" to do "tp_restart" in SimpleThreadAPI for outermost TP */
 LYDBRTN(LYDB_RTN_ZWR2STR,		LYDB_SIMPLEAPI,		"ydb_zwr2str_s()"),		/* "ydb_zwr2str_s" is running */
 LYDBRTN(LYDB_RTN_CHILDINIT,		LYDB_UTILITY,		"ydb_child_init()"),		/* "ydb_child_init" is running */
 LYDBRTN(LYDB_RTN_FILE_ID_FREE,		LYDB_UTILITY,		"ydb_file_id_free()"),		/* "ydb_file_id_free" is running */

@@ -14,6 +14,8 @@
 
 #include "libyottadb_int.h"
 
+GBLREF	uint4		dollar_tlevel;
+
 /* Routine to invoke a user-specified function "tpfn" inside a TP transaction (i.e. TSTART/TCOMMIT fence).
  *
  * Parameters:
@@ -24,12 +26,14 @@
  */
 int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames)
 {
-	boolean_t	error_encountered;
-	mval		tid;
-	int		rc, save_dollar_tlevel, tpfn_status, tstart_flag;
-	mval		varnamearray[YDB_MAX_NAMES], *mv, *mv_top;
-	ydb_buffer_t	*curvarname;
-	char		buff[256];			/* sprintf() buffer */
+	boolean_t		error_encountered;
+	mval			tid;
+	int			rc, save_dollar_tlevel, tpfn_status, tstart_flag;
+	mval			varnamearray[YDB_MAX_NAMES], *mv, *mv_top;
+	ydb_buffer_t		*curvarname;
+	char			buff[256];			/* sprintf() buffer */
+	libyottadb_routines	lydbrtn;
 
-	return ydb_tp_s_common(FALSE, YDB_NOTTP, (ydb_basicfnptr_t)tpfn, tpfnparm, transid, namecount, varnames);
+	lydbrtn = (0 == dollar_tlevel) ? LYDB_RTN_TP_TLVL0 : LYDB_RTN_TP;
+	return ydb_tp_s_common(lydbrtn, (ydb_basicfnptr_t)tpfn, tpfnparm, transid, namecount, varnames);
 }
