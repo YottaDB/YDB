@@ -66,7 +66,6 @@
 #ifdef DEBUG
 # include "wbox_test_init.h"
 # include "io.h"
-# include "libyottadb_int.h"
 #endif
 #ifndef __MVS__
 # include <sys/param.h>
@@ -211,8 +210,6 @@ GBLREF	boolean_t	posix_timer_created;
 #ifdef DEBUG
 GBLREF	boolean_t	in_nondeferrable_signal_handler;
 GBLREF	boolean_t	gtm_jvm_process;
-GBLREF	boolean_t	simpleThreadAPI_active;
-GBLREF	stm_workq	*stmWorkQueue[];
 #endif
 
 error_def(ERR_SETITIMERFAILED);
@@ -425,7 +422,6 @@ void start_timer(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
 	sigset_t	savemask;
 	boolean_t	safe_timer = FALSE, safe_to_add = FALSE;
 	int		i, rc;
-	DEBUG_ONLY(intrpt_state_t	lcl_intrpt_ok_state);
 
 	assertpro(0 <= time_to_expir);			/* Callers should verify non-zero time */
 	DUMP_TIMER_INFO("At the start of start_timer()");
@@ -435,15 +431,13 @@ void start_timer(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
 		safe_timer = TRUE;
 	} else if (wcs_clean_dbsync_fptr == handler)
 	{	/* Account for known instances of the above function being called from within a deferred zone. */
-		DEBUG_ONLY(lcl_intrpt_ok_state = intrpt_ok_state);
-		assert((INTRPT_OK_TO_INTERRUPT == lcl_intrpt_ok_state) || (INTRPT_IN_WCS_WTSTART == lcl_intrpt_ok_state)
-			|| (INTRPT_IN_GDS_RUNDOWN == lcl_intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == lcl_intrpt_ok_state));
+		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_WCS_WTSTART == intrpt_ok_state)
+			|| (INTRPT_IN_GDS_RUNDOWN == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state));
 		safe_to_add = TRUE;
 	} else if (wcs_stale_fptr == handler)
 	{	/* Account for known instances of the above function being called from within a deferred zone. */
-		DEBUG_ONLY(lcl_intrpt_ok_state = intrpt_ok_state);
-		assert((INTRPT_OK_TO_INTERRUPT == lcl_intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == lcl_intrpt_ok_state)
-			|| (INTRPT_IN_TRIGGER_NOMANS_LAND == lcl_intrpt_ok_state));
+		assert((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) || (INTRPT_IN_DB_CSH_GETN == intrpt_ok_state)
+			|| (INTRPT_IN_TRIGGER_NOMANS_LAND == intrpt_ok_state));
 		safe_to_add = TRUE;
 	} else
 	{
@@ -712,14 +706,7 @@ STATICFNDEF void timer_handler(int why)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* In case of SimpleThreadAPI, it is possible the main worker thread (the one where "gtm_is_main_thread" returns TRUE)
-	 * is not executing this function. In that case, the only exception we know of is if this is the TP worker thread.
-	 * (example C-stack is
-	 *	ydb_stm_tpthread -> ydb_stm_tpthreadq_process -> ydb_tp_s_common -> op_tcommit ->
-	 *			tp_tend -> rel_crit -> deferred_signal_handler -> check_for_deferred_timers -> timer_handler)
-	 * Hence the IS_STAPI_TP_WORKER_THREAD check below.
-	 */
-	assert(gtm_is_main_thread() || gtm_jvm_process || (simpleThreadAPI_active && IS_STAPI_TP_WORKER_THREAD));
+	assert(gtm_is_main_thread() || gtm_jvm_process);
 	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifndef YDB_USE_POSIX_TIMERS
 	if (SIGALRM == why)
