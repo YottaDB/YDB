@@ -117,7 +117,7 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. set tmp4=$zpiece(tmp3,tmp1,1) for i=2:1:$zlength(tmp3,tmp1) set tmp4=tmp4_env("ydb_rel")_$zpiece(tmp3,tmp1,i)
 	. set tmp3=tmp4
 	if $zlength(tmp2) set tmp4=$zpiece(tmp3,tmp2,1) for i=2:1:$zlength(tmp3,tmp2) set tmp4=tmp4_env("gtmver")_$zpiece(tmp3,tmp2,i)
-	zsystem "mkdir -p "_tmp4
+	zsystem "umask 0; mkdir -p "_tmp4
 	write tmp4,!,"export gtm_log=$ydb_log",!,"export ydb_tmp=$ydb_log",!,"export gtm_tmp=$gtm_log",!
 	set tmp1=$ztrnlnm("ydb_etrap"),tmp2=$ztrnlnm("gtm_etrap")
 	write:'($zlength($ztrnlnm("ydb_etrap"))!$zlength($ztrnlnm("gtm_etrap"))) "export ydb_etrap='Write:(0=$STACK) ""Error occurred: "",$ZStatus,!'",!,"export gtm_etrap=""$ydb_etrap""",!
