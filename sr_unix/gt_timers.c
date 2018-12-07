@@ -683,9 +683,9 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 
 /* Timer handler. This is the main handler routine that is being called by the kernel upon receipt
  * of timer signal. It dispatches to the user handler routine, and removes first timer in a timer
- * queue. If the queue is not empty, it starts the first timer in the queue. The why parameter is a
- * no-op in our case, but is required to maintain compatibility with the system type of __sighandler_t,
- * which is (void*)(int).
+ * queue. If the queue is not empty, it starts the first timer in the queue.
+ * The "why" parameter can be DUMMY_SIG_NUM (if the handler is being invoked internally from YottaDB code)
+ * or SIGALRM (if the handler is being invoked by the kernel upon receipt of the SIGALRM signal).
  */
 STATICFNDEF void timer_handler(int why)
 {
@@ -706,18 +706,23 @@ STATICFNDEF void timer_handler(int why)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(gtm_is_main_thread() || gtm_jvm_process);
-	DUMP_TIMER_INFO("At the start of timer_handler()");
-#	ifndef YDB_USE_POSIX_TIMERS
+	assert((DUMMY_SIG_NUM == why) || (SIGALRM == why));
 	if (SIGALRM == why)
-	{	/* If why is 0, we know that timer_handler() was called directly, so no need
-		 * to check if the signal needs to be forwarded to appropriate thread. Note
-		 * that when using POSIX timers, the signal is already being sent to the
-		 * correct thread for timer pops so there is no need to "forward it".
+	{	/* Note that when using POSIX timers, the signal is already being sent to the
+		 * correct thread for timer pops so one might think there is no need to "forward it".
+		 * But it is possible a C program holding a parent M-lock with SimpleAPI can fork off processes
+		 * that start waiting for a child M-lock with SimpleThreadAPI in which case the lock wake up signal
+		 * (a SIGALRM signal) from the parent program would get sent to the child process-id (using "crit_wake")
+		 * which should forward the signal to the MAIN worker thread as that is the one driving the YottaDB engine.
+		 * Therefore we need this signal forwarding even in the POSIX timer case.
 		 */
 		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGALRM);
 	}
-#	endif
+	/* else: why == DUMMY_SIG_NUM we know that "timer_handler" was called directly, so no need
+	 * to check if the signal needs to be forwarded to appropriate thread.
+	 */
+	assert(gtm_is_main_thread() || gtm_jvm_process);
+	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into generic_signal_handler
 	 * (say to handle sig-3) and then had a timer handler pop while inside there (possible for example in receiver server).
