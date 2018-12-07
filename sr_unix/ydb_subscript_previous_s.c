@@ -33,7 +33,7 @@
 
 GBLREF	volatile int4	outofband;
 
-LITREF	mval	literal_zero;
+LITREF	mval	literal_null;
 
 /* Routine to locate the previous subscript at a given level.
  *
@@ -113,9 +113,9 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 				if (NULL == lvvalp)
 				{	/* Base local variable does not exist (ERR_LVUNDEF_OK_FALSE above is to ensure
 					 * we do not issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
-					 * Return 0 for "ydb_subscript_previous_s" result.
+					 * Return null-string (i.e. no more subscripts) for "ydb_subscript_previous_s" result.
 					 */
-					SET_YDB_BUFF_T_FROM_MVAL(ret_value, (mval *)&literal_zero,
+					SET_YDB_BUFF_T_FROM_MVAL(ret_value, (mval *)&literal_null,
 									"NULL ret_value->buf_addr", "ydb_subscript_previous_s()");
 					break;
 				}
