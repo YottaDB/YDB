@@ -1170,6 +1170,7 @@ int ydb_init()
 			 * calls after a "fork". We therefore expected an "exec" to be done in the child process before any
 			 * YottaDB calls are made. That clearly did not happen. So issue an error.
 			 */
+			SETUP_GENERIC_ERROR(ERR_STAPIFORKEXEC);	/* ensure a later call to "ydb_zstatus" returns full error string */
 			return ERR_STAPIFORKEXEC;
 		} else
 		{	/* SimpleAPI was active in the parent process before the "fork". We expect the first YottaDB call in
