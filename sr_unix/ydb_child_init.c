@@ -36,6 +36,7 @@
 #include "repl_inst_ftok_counter_halted.h"
 #include "add_inter.h"
 #include "eintr_wrapper_semop.h"
+#include "getjobnum.h"
 
 typedef enum
 {
@@ -56,6 +57,15 @@ GBLREF	jnl_process_vector	*prc_vec;
 GBLREF	uint4			process_id;
 GBLREF	uint4			dollar_zjob;
 GBLREF	int			fork_after_ydb_init;
+GBLREF	boolean_t		noThreadAPI_active;
+GBLREF	boolean_t		simpleThreadAPI_active;
+#ifdef YDB_USE_POSIX_TIMERS
+GBLREF	pid_t			posix_timer_thread_id;
+GBLREF	boolean_t		posix_timer_created;
+#endif
+#ifdef DEBUG
+GBLREF	volatile boolean_t	timer_active;
+#endif
 
 /* Routine that is invoked right after a "fork()" in the child pid.
  * This will do needed setup so the parent and child pids are treated as different pids
@@ -133,6 +143,21 @@ int	ydb_child_init(void *param)
 	assert(NULL == ftok_sem_reg);
 	LIBYOTTADB_DONE;
 	REVERT;
+	/* If SimpleAPI was in use in the parent, we can allow either SimpleAPI or SimpleThreadAPI in the child
+	 * as we are guaranteed at this point that there is no other thread in the child active (let alone doing YottaDB calls).
+	 * Therefore reset "noThreadAPI_active" in case it was set to TRUE in the parent.
+	 */
+	assert(!noThreadAPI_active || !simpleThreadAPI_active);
+	noThreadAPI_active = FALSE;
+	/* Clear any timer related stuff that was started in this function.
+	 * This is so we still make ourselves able to use SimpleThreadAPI in the child process.
+	 */
+	/* "ydb_child_init_sem_incrcnt" invocation above could have started timers but it should have canceled
+	 * all the timers before returning. Therefore we have no need to call "sys_canc_timer" below. Assert that.
+	 */
+	assert(!timer_active);
+	clear_timers();
+	CLEAR_POSIX_TIMER_FIELDS_IF_APPLICABLE;
 	/* Now that "ydb_child_init" has been run, the YottaDB engine is safe to use after a "fork"
 	 * in case "fork_after_ydb_init" has been set to TRUE. So that can be safely cleared.
 	 */
