@@ -674,11 +674,9 @@ else if [ -d "$gtm_copyexec" ] ; then
      fi
 fi
 
-# Create the pkg-config file and place it where the system can find it
-# We strip the "r" and "." to perform a numeric comparision between the versions
-# YottaDB will only ever increment versions, so a larger number indicates a newer version
-if [ ! -f /usr/share/pkgconfig/yottadb.pc ] || [ $(grep -oP "^Version: \K.*" /usr/share/pkgconfig/yottadb.pc | cut -c 2- | tr -d .) -lt $(echo $ydb_version | cut -c 2- | tr -d .) ] ; then
-        cat > /usr/share/pkgconfig/yottadb.pc << EOF
+# Create the pkg-config file
+pcfilepath=/usr/share/pkgconfig
+cat > ${ydb_installdir}/yottadb.pc << EOF
 prefix=${ydb_installdir}
 
 exec_prefix=\${prefix}
@@ -691,4 +689,13 @@ Version: ${ydb_version}
 Cflags: -I\${includedir}
 Libs: -L\${libdir} -lyottadb -Wl,-rpath,\${libdir}
 EOF
+
+# Now place it where the system can find it
+# We strip the "r" and "." to perform a numeric comparision between the versions
+# YottaDB will only ever increment versions, so a larger number indicates a newer version
+if [ ! -f ${pcfilepath}/yottadb.pc ] || [ $(grep -oP "^Version: \K.*" ${pcfilepath}/yottadb.pc | cut -c 2- | tr -d .) -lt $(echo $ydb_version | cut -c 2- | tr -d .) ] ; then
+    cp ${ydb_installdir}/yottadb.pc ${pcfilepath}/yottadb.pc
+    echo $product_name pkg-config file installed successfully at ${pcfilepath}/yottadb.pc
+else
+    echo Skipping $product_name pkg-config file install for ${ydb_version} as newer version $(grep -oP "^Version: \K.*" ${pcfilepath}/yottadb.pc) exists at ${pcfilepath}/yottadb.pc
 fi
