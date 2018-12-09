@@ -167,6 +167,9 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 		 */
 		assert(active_ch[1].dollar_tlevel >= dollar_tlevel);
 		DEBUG_ONLY(active_ch[1].dollar_tlevel = dollar_tlevel;)
+		TREF(sapi_mstrs_for_gc_indx) = 0;
+		TREF(sapi_query_node_subs_cnt) = 0;
+		LIBYOTTADB_DONE;
 		UNWIND(NULL, NULL);
 	}
 	if (ERR_REPEATERROR != SIGNAL)
