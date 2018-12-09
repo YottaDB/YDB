@@ -138,7 +138,6 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 				 * in case the TP worker thread can also do YottaDB engine calls like "ydb_tp_s_common").
 				 */
 				nested_tp = (boolean_t)dollar_tlevel;
-				lydbrtn = (!nested_tp ? LYDB_RTN_TP_START_TLVL0 : LYDB_RTN_TP_START);
 				/*
 				 * callblk->args[0] = tpfn      parameter in "ydb_tp_s_common"
 				 * callblk->args[1] = tpfnparm  parameter in "ydb_tp_s_common"
@@ -152,10 +151,18 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 				 *	cases, we do not need ANY of the above 5 parameters.
 				 * The ydb_stm_args* calls done below take that into account.
 				 * Once the "op_tstart" is done above, we do not need "transid", "namecount" and "varnames"
-				 *	parameters for the later calls. So we use ydb_stm_args2 below.
+				 *	parameters for the later calls. So we use ydb_stm_args0 below.
+				 * Also, after each "ydb_stm_args3" or "ydb_stm_args0" call ensure a LIBYOTTADB_DONE
+				 *	was done by the corresponding "ydb_tp_s_common" call in the MAIN worker thread
+				 *	in all cases by asserting that TREF(libyottadb_active_rtn) is LYDB_RTN_NONE.
 				 */
-				/* Start the TP transaction by asking the MAIN worker thread to do the "op_tstart" */
+				assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
+				/* Start the TP transaction by asking the MAIN worker thread to do the "op_tstart"
+				 * (in "ydb_tp_s_common").
+				 */
+				lydbrtn = (!nested_tp ? LYDB_RTN_TP_START_TLVL0 : LYDB_RTN_TP_START);
 				int_retval = ydb_stm_args3(tptoken, lydbrtn, callblk->args[2], callblk->args[3], callblk->args[4]);
+				assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 				assert(YDB_TP_RESTART != int_retval);
 				if (YDB_OK != int_retval)
 				{
@@ -176,10 +183,19 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 					/* Invoke the user-defined TP callback function in the TP worker thread (current thread) */
 					int_retval = (*tpfn)(tptoken, tpfnparm);
 					if (YDB_OK == int_retval)
-					{	/* Commit the TP transaction by asking MAIN worker thread to do the "op_tcommit" */
+					{	/* Commit the TP transaction by asking MAIN worker thread to do the "op_tcommit"
+						 * (in "ydb_tp_s_common").
+						 */
 						lydbrtn = (!nested_tp ? LYDB_RTN_TP_COMMIT_TLVL0 : LYDB_RTN_TP_COMMIT);
 						int_retval = ydb_stm_args0(tptoken, lydbrtn);
+					} else if (!nested_tp && (YDB_TP_ROLLBACK == int_retval))
+					{	/* User-defined callback function asked for the TP to be rolled back.
+						 * ROLLBACK the TP transaction by asking MAIN worker thread to do the
+						 *	"op_trollback" (in "ydb_tp_s_common").
+						 */
+						int_retval = ydb_stm_args0(tptoken, LYDB_RTN_TP_ROLLBACK_TLVL0);
 					}
+					assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 					if (nested_tp || (YDB_TP_RESTART != int_retval))
 					{	/* If nested TP, return success/error code directly back to caller of "ydb_tp_st".
 						 * If outermost TP, then handle TPRESTART specially.
@@ -191,8 +207,11 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 					 * to do the "tp_restart" (in "ydb_tp_s_common").
 					 */
 					int_retval = ydb_stm_args0(tptoken, LYDB_RTN_TP_RESTART_TLVL0);
+					assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 					assert(YDB_OK == int_retval);
 				}
+				assert(nested_tp || (YDB_OK == int_retval) || (YDB_TP_ROLLBACK == int_retval));
+				assert(!dollar_tlevel);
 				callblk->retval = (uintptr_t)int_retval;
 				break;
 			default:

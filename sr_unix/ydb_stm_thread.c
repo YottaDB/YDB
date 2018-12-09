@@ -288,6 +288,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 			case LYDB_RTN_TP_RESTART:
 			case LYDB_RTN_TP_COMMIT_TLVL0:
 			case LYDB_RTN_TP_RESTART_TLVL0:
+			case LYDB_RTN_TP_ROLLBACK_TLVL0:
 				int_retval = ydb_tp_s_common(calltyp, (ydb_basicfnptr_t)NULL, (void *)NULL,
 								(const char *)NULL, (int)0, (ydb_buffer_t *)NULL);
 				callblk->retval = (uintptr_t)int_retval;

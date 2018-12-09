@@ -43,7 +43,7 @@ GBLREF	uint4		dollar_tlevel;
  * Parameters:
  *   lydbrtn     - Can be LYDB_RTN_TP (SimpleAPI) or LYDB_RTN_TP_START (SimpleThreadAPI) or LYDB_RTN_TP_COMMIT (SimpleThreadAPI)
  *			OR their TLVL0 equivalents (i.e. LYDB_RTN_TP_TLVL0, LYDB_RTN_TP_START_TLVL0, LYDB_RTN_TP_COMMIT_TLVL0
- *								or LYDB_RTN_TP_RESTART_TLVL0)
+ *							or LYDB_RTN_TP_RESTART_TLVL0 or LYDB_RTN_TP_ROLLBACK_TLVL0)
  *   transid     - Transaction id.
  *   varnamelist - Comma-separated list of variable names that are preserved across restarts in this TP transaction.
  *   tpfn        - Pointer to a function that executes user-specified code inside of the TSTART/TCOMMIT fence.
@@ -65,10 +65,12 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 	assert(LYDB_RTN_TP < LYDB_RTN_TP_START);
 	assert(LYDB_RTN_TP_START < LYDB_RTN_TP_COMMIT);
 	assert(LYDB_RTN_TP_COMMIT < LYDB_RTN_TP_RESTART);
-	assert(LYDB_RTN_TP_RESTART < LYDB_RTN_TP_TLVL0);
+	assert(LYDB_RTN_TP_RESTART < LYDB_RTN_TP_ROLLBACK);
+	assert(LYDB_RTN_TP_ROLLBACK < LYDB_RTN_TP_TLVL0);
 	assert((LYDB_RTN_TP_TLVL0 - LYDB_RTN_TP) == (LYDB_RTN_TP_START_TLVL0 - LYDB_RTN_TP_START));
 	assert((LYDB_RTN_TP_TLVL0 - LYDB_RTN_TP) == (LYDB_RTN_TP_COMMIT_TLVL0 - LYDB_RTN_TP_COMMIT));
 	assert((LYDB_RTN_TP_TLVL0 - LYDB_RTN_TP) == (LYDB_RTN_TP_RESTART_TLVL0 - LYDB_RTN_TP_RESTART));
+	assert((LYDB_RTN_TP_TLVL0 - LYDB_RTN_TP) == (LYDB_RTN_TP_ROLLBACK_TLVL0 - LYDB_RTN_TP_ROLLBACK));
 	/* Set "nested_tp" to 0 in case lydbrtn is any of the _TLVL0 codes else set it to a non-zero value.
 	 * 0 value indicates this is the outermost TP else it is a nested TP (used below for restart processing).
 	 */
@@ -76,6 +78,7 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 	{
 		nested_tp = TRUE;
 		assert(LYDB_RTN_TP_RESTART != lydbrtn);	/* Callers ensure this value is never passed */
+		assert(LYDB_RTN_TP_ROLLBACK != lydbrtn);	/* Callers ensure this value is never passed */
 	} else
 	{
 		nested_tp = FALSE;
@@ -83,7 +86,8 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 		lydbrtn = lydbrtn - (LYDB_RTN_TP_TLVL0 - LYDB_RTN_TP);
 	}
 	assert((LYDB_RTN_TP == lydbrtn)
-		|| (LYDB_RTN_TP_START == lydbrtn) || (LYDB_RTN_TP_COMMIT == lydbrtn) || (LYDB_RTN_TP_RESTART == lydbrtn));
+		|| (LYDB_RTN_TP_START == lydbrtn) || (LYDB_RTN_TP_COMMIT == lydbrtn)
+		|| (LYDB_RTN_TP_RESTART == lydbrtn) || (LYDB_RTN_TP_ROLLBACK == lydbrtn));
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(lydbrtn, (int));		/* Note: macro could "return" from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
@@ -236,6 +240,7 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 				 */
 				LIBYOTTADB_DONE;
 				REVERT;
+				assert(dollar_tlevel);
 				return YDB_OK;
 			}
 		}
@@ -267,6 +272,12 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 		 * processing as needed.
 		 */
 		tpfn_status = YDB_TP_RESTART;
+		break;
+	case LYDB_RTN_TP_ROLLBACK:
+		assert(!nested_tp);
+		assert(YDB_OK == tpfn_status);
+		/* Set "tpfn_status" so we fall through to the OP_TROLLBACK below */
+		tpfn_status = YDB_TP_ROLLBACK;
 		break;
 	default:
 		break;
