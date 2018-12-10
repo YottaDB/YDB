@@ -115,13 +115,14 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wvla")
 # But they are no-ops in case of a dbg build when optimization is turned off so we include them in all cmake builds.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-defer-pop -fno-strict-aliasing -ffloat-store -fno-omit-frame-pointer")
 
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 	# Newer versions of Linux by default include -fstack-protector in gcc. This causes the build to slightly bloat
-	# in size. Avoid that for production builds of YottaDB.
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-protector")
-else()
-	# In Debug builds though, keep stack-protection on for ALL functions.
+	# in size and have a runtime overhead (as high as 5% extra CPU cost in our experiments). So keep that option
+	# enabled only for DEBUG builds of YottaDB.
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector-all")
+else()
+	# For "Release" or "RelWithDebInfo" type of builds, keep this option disabled for performance reasons
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-protector")
 endif()
 
 # On ARM Linux, gcc by default does not include -funwind-tables whereas it does on x86_64 Linux.
