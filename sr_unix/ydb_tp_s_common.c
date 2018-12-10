@@ -197,9 +197,14 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
  		{
 			assert(dollar_tlevel);	/* ensure "dollar_tlevel" is still non-zero */
 			/* If we reach here, it means we have a TPRETRY error from the database engine */
-			if (nested_tp)
-			{	/* We were already inside a transaction when we entered this "ydb_tp_s" invocation.
-				 * So pass the TPRETRY to the caller until we go back to the outermost "ydb_tp_s" invocation.
+			if (nested_tp || (LYDB_RTN_TP_COMMIT == lydbrtn))
+			{	/* If "nested_tp" is TRUE, we were already inside a transaction when we entered this
+				 *   "ydb_tp_s" invocation and so pass the TPRETRY to the caller until we go back to the
+				 *   outermost "ydb_tp_s" invocation.
+				 * If "lydbrtn" is LYDB_RTN_TP_COMMIT and we reach here, it means we got a TPRETRY while
+				 *   inside "op_tcommit" so we need to return with the restart code to "ydb_stm_tpthread"
+				 *   so it can then trigger restart processing and then reinvoke the user-defined callback
+				 *   function before attempting another "op_tcommit".
 				 */
 				LIBYOTTADB_DONE;
 				REVERT;
