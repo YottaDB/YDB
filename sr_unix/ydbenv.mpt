@@ -117,7 +117,35 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. set tmp4=$zpiece(tmp3,tmp1,1) for i=2:1:$zlength(tmp3,tmp1) set tmp4=tmp4_env("ydb_rel")_$zpiece(tmp3,tmp1,i)
 	. set tmp3=tmp4
 	if $zlength(tmp2) set tmp4=$zpiece(tmp3,tmp2,1) for i=2:1:$zlength(tmp3,tmp2) set tmp4=tmp4_env("gtmver")_$zpiece(tmp3,tmp2,i)
-	zsystem "umask 0; mkdir -p "_tmp4
+	if ""=$zsearch(tmp4) do
+	. ; Release-specific directory (e.g. /tmp/yottadb/r1.23_x86_64) does not exist. Create it.
+	. ; Note: One might be tempted to combine the "umask" and "chmod o-rwx" commands below into one "umask command
+	. ;       But that might not be correct in case we also create /tmp/yottadb as part of the below "mkdir".
+	. ;       In that case, we do not want to create /tmp/yottadb with no world execute permissions because the
+	. ;       current YottaDB version is installed with no execute permissions for the world. Later if a different
+	. ;       YottaDB version gets installed with execute permissions for the world, a ydb_env_set invocation using
+	. ;       that version might not be able to access /tmp/yottadb with the restricted chmod. Hence we first do the
+	. ;       mkdir with a "umask 0" and later do a chmod of just the subdirectory /tmp/yottadb/r1.23_x86_64.
+	. zsystem "umask 0; mkdir -p "_tmp4
+	. new line,worldexecute,ydbgroup
+	. open "file":(shell="/bin/sh":command="ls -l "_dist_"/libyottadb.so":readonly)::"pipe"
+	. use "file" read line use io close "file"
+	. set worldexecute=$zextract(line,10)	; permissions are the first word in "line" so no need to do $zpiece before $zextract
+	. set ydbgroup=$zpiece(line," ",4)
+	. if "x"'=worldexecute do
+	. . ; $ydb_dist/libyottadb.so does not have world execute permissions, restrict directory access to only user and group
+	. . zsystem "chmod o-rwx "_tmp4
+	. . ; ---------------------------------------------------------------------------------
+	. . ; If currently running user is part of the group that libyottadb.so belongs to,
+	. . ; then change the group of the created directory to the yottadb group. If not,
+	. . ; we cannot change the group (chgrp would error out) so skip this step in that case.
+	. . new user,index,membergroup
+	. . open "file":(shell="/bin/sh":command="id":readonly)::"pipe"
+	. . use "file" read line use io close "file"
+	. . set user=$zpiece($zpiece(line,")",1),"(",2)
+	. . set grouplist=$zpiece(line," groups=",2)	; gets list of group names that "user" is a member of
+	. . ; Since every group is surrounded by parentheses all we need to do is check if "(ydbgroup)" exists in "grouplist"
+	. . zsystem:$zfind(grouplist,"("_ydbgroup_")") "chgrp "_ydbgroup_" "_tmp4
 	write tmp4,!,"export gtm_log=$ydb_log",!,"export ydb_tmp=$ydb_log",!,"export gtm_tmp=$gtm_log",!
 	set tmp1=$ztrnlnm("ydb_etrap"),tmp2=$ztrnlnm("gtm_etrap")
 	write:'($zlength($ztrnlnm("ydb_etrap"))!$zlength($ztrnlnm("gtm_etrap"))) "export ydb_etrap='Write:(0=$STACK) ""Error occurred: "",$ZStatus,!'",!,"export gtm_etrap=""$ydb_etrap""",!
