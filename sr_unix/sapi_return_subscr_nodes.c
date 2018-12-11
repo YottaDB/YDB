@@ -73,7 +73,14 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, c
 		if (mstrp->len > outsubp->len_alloc)
 			/* Buffer is too small - report an error */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, mstrp->len, outsubp->len_alloc);
-		memcpy(outsubp->buf_addr, mstrp->addr, mstrp->len);
+		if (mstrp->len)
+		{
+			if (NULL == outsubp->buf_addr)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6)
+					ERR_PARAMINVALID, 4,
+						LEN_AND_LIT("NULL ret_subsarray->buf_addr"), LEN_AND_STR(ydb_caller_fn));
+			memcpy(outsubp->buf_addr, mstrp->addr, mstrp->len);
+		}
 		/* Now that everything is in place, bump the count of subscripts. This is left till now because
 		 * when an error occurs this value is used as an INDEX to the broken subscript so we can only
 		 * increment it after the rebuffering is complete.
