@@ -32,12 +32,6 @@ endif()
 if(output_file)
   set(output_file OUTPUT_FILE ${output_file})
 endif()
-
-# Set ydb_chset/gtm_chset env vars to M since if they are set to UTF-8 in the calling environment,
-# the below mumps invocation can issue ICUSYMNOTFOUND or NONUTF8LOCALE errors.
-set(ENV{ydb_chset} "M")
-set(ENV{gtm_chset} "M")
-
 execute_process(
   COMMAND ${mumps} ${args}
   ${input_file}
