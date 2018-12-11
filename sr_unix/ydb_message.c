@@ -60,7 +60,13 @@ int ydb_message(int errnum, ydb_buffer_t *msg_buff)
 	msg_buff->len_used = msg.len;
 	if (msg.len > msg_buff->len_alloc)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVSTRLEN, 2, msg.len, msg_buff->len_alloc);
-	memcpy(msg_buff->buf_addr, msg.addr, msg.len);
+	if (msg.len)
+	{
+		if (NULL == msg_buff->buf_addr)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6)
+				ERR_PARAMINVALID, 4, LEN_AND_LIT("NULL msg_buff->buf_addr"), LEN_AND_LIT("ydb_message"));
+		memcpy(msg_buff->buf_addr, msg.addr, msg.len);
+	}
 	LIBYOTTADB_DONE;
 	REVERT;
 	return YDB_OK;
