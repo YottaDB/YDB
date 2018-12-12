@@ -57,6 +57,7 @@ LITREF	char 		*lydbrtnnames[];
 #define LYDB_NONE	0				/* Routine is part of no package */
 #define LYDB_UTILITY 	1				/* Routine is a utility routine */
 #define LYDB_SIMPLEAPI	2				/* Routine is part of the simpleAPI */
+#define LYDB_MISC	3				/* Routine is part of a miscellaneous set of functions */
 
 #define YDB_MAX_SAPI_ARGS GTM64_ONLY(5) NON_GTM64_ONLY(6)	/* The most args any simpleapi routine has (excepting ydb_lock_s)
 								 * is 5 but in 32 bit mode the max is 6.
@@ -74,7 +75,6 @@ LITREF	char 		*lydbrtnnames[];
 typedef enum
 {
 #include "libyottadb_rtns.h"
-	, LYDB_RTN_TPCOMPLT		/* Used in stm_que_ent to denote this TP level is complete */
 } libyottadb_routines;
 #undef LYDBRTN
 

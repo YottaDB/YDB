@@ -303,8 +303,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 				      RTS_ERROR_LITERAL(UNTHREADED_STR));
 		}
 		/* We are in threaded mode but running an unthreaded command in the main work thread which
-		 * is allowed. In that case just fall out (verified). Note this is not possible just now because
-		 * call-ins NEVER run in the worker thread but they will be along eventually.
+		 * is allowed. In that case just fall out (verified).
 		 */
 	} else
 		noThreadAPI_active = TRUE;
@@ -697,8 +696,7 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 				      RTS_ERROR_LITERAL(UNTHREADED_STR));
 		}
 		/* We are in threaded mode but running an unthreaded command in the main work thread which
-		 * is allowed. In that case just fall out (verified). Note this is not possible just now because
-		 * call-ins NEVER run in the worker thread but they will be along eventually.
+		 * is allowed. In that case just fall out (verified).
 		 */
 	} else
 		noThreadAPI_active = TRUE;

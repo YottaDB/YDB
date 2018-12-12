@@ -19,6 +19,8 @@
 
 #include "mdef.h"
 
+#include "libyottadb.h"
+
 /* Allow this many nested callin levels before generating an error.  Previously, the code
  * allowed a number of condition handlers per call-in invocation, but when we implemented
  * triggers they count as an invocation and caused varying behavior that made testing the limit
@@ -55,5 +57,7 @@ void gtm_levl_ret_code(void);
 #include "gtmxc_types.h"	/* for "gtm_status_t" */
 
 gtm_status_t	gtm_ci_filter(const char *c_rtn_name, ...);
+
+int		ydb_cip_helper(ci_name_descriptor *ci_info, va_list *var);
 
 #endif

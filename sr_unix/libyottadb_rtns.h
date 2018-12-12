@@ -48,4 +48,7 @@ LYDBRTN(LYDB_RTN_MALLOC,		LYDB_UTILITY,		"ydb_malloc()"),		/* "ydb_malloc" is ru
 LYDBRTN(LYDB_RTN_MESSAGE,		LYDB_UTILITY,		"ydb_message()"),		/* "ydb_message" is running */
 LYDBRTN(LYDB_RTN_STDIO_ADJUST,		LYDB_UTILITY,		"ydb_stdout_stderr_adjust"),	/* "ydb_stdout_stderr_adjust" is running */
 LYDBRTN(LYDB_RTN_TIMER_CANCEL,		LYDB_UTILITY,		"ydb_timer_cancel()"),		/* "ydb_timer_cancel" is running */
-LYDBRTN(LYDB_RTN_TIMER_START,		LYDB_UTILITY,		"ydb_timer_start()")		/* "ydb_timer_start" is running */
+LYDBRTN(LYDB_RTN_TIMER_START,		LYDB_UTILITY,		"ydb_timer_start()"),		/* "ydb_timer_start" is running */
+LYDBRTN(LYDB_RTN_YDB_CI,		LYDB_UTILITY,		"ydb_ci()"),			/* "ydb_cip_helper" is running */
+LYDBRTN(LYDB_RTN_YDB_CIP,		LYDB_UTILITY,		"ydb_cip_helper()"),		/* "ydb_cip_helper" is running */
+LYDBRTN(LYDB_RTN_TPCOMPLT,		LYDB_MISC,		"tpcomplt()"),			/* TP callback has completed in main worker thread */

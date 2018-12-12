@@ -33,8 +33,10 @@ ydb_call_variadic_plist_func_s
 ydb_call_variadic_plist_func_st
 ydb_child_init
 ydb_ci
+ydb_ci_t
 ydb_cij
 ydb_cip
+ydb_cip_t
 ydb_data_s
 ydb_data_st
 ydb_delete_excl_s

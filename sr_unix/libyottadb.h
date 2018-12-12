@@ -274,9 +274,6 @@ typedef int	(*ydb_tpfnptr_t)(void *tpfnparm);			/* For use in SimpleAPI */
 typedef int	(*ydb_tp2fnptr_t)(uint64_t tptoken, void *tpfnparm);	/* For use in SimpleThreadAPI */
 typedef uintptr_t (*ydb_vplist_func)(uintptr_t cnt, ...);
 
-/* Call-in interface. */
-int 	ydb_ci(const char *c_rtn_name, ...);
-int 	ydb_cip(ci_name_descriptor *ci_info, ...);
 int 	ydb_init(void);
 #	ifdef GTM_PTHREAD
 int 	ydb_jinit(void);
@@ -288,12 +285,16 @@ void 	ydb_zstatus(char* msg, int len);
 
 /* Utility entry points accessable in libyottadb.so */
 int	ydb_child_init(void *param);
+int	ydb_ci(const char *c_rtn_name, ...);				/* Call-in interface */
+int	ydb_cip(ci_name_descriptor *ci_info, ...);			/* Slightly faster "ydb_ci" */
+int	ydb_ci_t(uint64_t tptoken, const char *c_rtn_name, ...);	/* SimpleThreadAPI version of "ydb_ci" */
+int	ydb_cip_t(uint64_t tptoken, ci_name_descriptor *ci_info, ...);	/* SimpleThreadAPI version of "ydb_cip" */
 int	ydb_file_id_free(ydb_fileid_ptr_t fileid);
 int	ydb_file_is_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
 int	ydb_file_name_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
 int	ydb_hiber_start(unsigned long long sleep_nsec);
 int	ydb_hiber_start_wait_any(unsigned long long sleep_nsec);
-void 	*ydb_malloc(size_t size);
+void	*ydb_malloc(size_t size);
 int	ydb_message(int status, ydb_buffer_t *msg_buff);
 int	ydb_stdout_stderr_adjust(void);
 int	ydb_thread_is_main(void);

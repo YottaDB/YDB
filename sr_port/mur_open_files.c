@@ -246,7 +246,11 @@ boolean_t mur_open_files()
 	 */
 	if (star_specified || mur_options.update)
 	{	/* "*" is specified or it is -recover or -rollback. We require ydb_gbldir to be set in all these cases */
-		assert(NULL == gd_header);
+		/* Note: It is possible gd_header is non-NULL at this point (for example if "ydb_app_ensures_isolation"
+		 * env var is defined and "gvinit" was invoked by the following call sequence
+		 *	mupip_main -> init_gtm -> gtm_startup -> op_view -> view_arg_convert -> gvinit).
+		 * Therefore we cannot assert that gd_header is NULL.
+		 */
 		gvinit();	/* read in current global directory */
 		assert(NULL != gd_header);
 	}

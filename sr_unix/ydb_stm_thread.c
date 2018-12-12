@@ -30,6 +30,7 @@
 #include "gtm_multi_thread.h"
 #include "caller_id.h"
 #include "trace_table.h"
+#include "gtmci.h"
 
 GBLREF	stm_workq	*stmWorkQueue[];
 GBLREF	stm_workq	*stmTPWorkQueue;
@@ -116,6 +117,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 	unsigned long long	tparm;
 #	endif
 	libyottadb_routines	lydbrtn;
+	ci_name_descriptor	ci_desc;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -338,6 +340,19 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 				int_retval = ydb_timer_start((int)callblk->args[0], tparm, (ydb_funcptr_retvoid_t)callblk->args[3],
 							     (unsigned int)callblk->args[4], (void *)callblk->args[5]);
 #				endif
+				callblk->retval = (uintptr_t)int_retval;
+				break;
+			case LYDB_RTN_YDB_CI:
+				/* Ready a call-in name descriptor so we can use "ydb_cip_helper" */
+				ci_desc.rtn_name.address = (char *)callblk->args[0];
+				ci_desc.rtn_name.length = STRLEN(ci_desc.rtn_name.address);
+				ci_desc.handle = NULL;
+				int_retval = ydb_cip_helper(&ci_desc, (va_list *)callblk->args[1]);
+				callblk->retval = (uintptr_t)int_retval;
+				break;
+			case LYDB_RTN_YDB_CIP:
+				/* Use "ydb_cip_helper" directly */
+				int_retval = ydb_cip_helper((ci_name_descriptor *)callblk->args[0], (va_list *)callblk->args[1]);
 				callblk->retval = (uintptr_t)int_retval;
 				break;
 
