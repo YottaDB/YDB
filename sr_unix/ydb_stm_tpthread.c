@@ -95,7 +95,7 @@ void *ydb_stm_tpthread(void *parm)
 STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 {
 	stm_que_ent		*callblk;
-	int			int_retval, status, save_errno;
+	int			int_retval, rlbk_retval, status, save_errno;
 	uint64_t		tptoken;
 	ydb_tp2fnptr_t		tpfn;
 	void			*tpfnparm;
@@ -166,7 +166,20 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 				assert(YDB_TP_RESTART != int_retval);
 				if (YDB_OK != int_retval)
 				{
-					assert(FALSE);
+					if (!nested_tp && dollar_tlevel)
+					{	/* If outermost TP had an error, rollback any TP that might have been created
+						 * (we do not expect any since dollar_tlevel++ is done only after all error code
+						 * paths have been checked in "op_tstart") before returning error.
+						 */
+						assert(FALSE);
+						rlbk_retval = ydb_stm_args0(tptoken, LYDB_RTN_TP_ROLLBACK_TLVL0);
+						assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
+						assert(YDB_TP_ROLLBACK == rlbk_retval);
+						/* Note: "int_retval" records the "op_tstart" error code while
+						 *       "rlbk_retval" holds the "op_trollback" error code (we do not expect any).
+						 * Use the "op_tstart" error code (the first error) in the call block.
+						 */
+					}
 					callblk->retval = (uintptr_t)int_retval;
 					break;
 				}
@@ -188,18 +201,32 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 						 */
 						lydbrtn = (!nested_tp ? LYDB_RTN_TP_COMMIT_TLVL0 : LYDB_RTN_TP_COMMIT);
 						int_retval = ydb_stm_args0(tptoken, lydbrtn);
-					} else if (!nested_tp && (YDB_TP_ROLLBACK == int_retval))
-					{	/* User-defined callback function asked for the TP to be rolled back.
-						 * ROLLBACK the TP transaction by asking MAIN worker thread to do the
-						 *	"op_trollback" (in "ydb_tp_s_common").
-						 */
-						int_retval = ydb_stm_args0(tptoken, LYDB_RTN_TP_ROLLBACK_TLVL0);
 					}
 					assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
-					if (nested_tp || (YDB_TP_RESTART != int_retval))
-					{	/* If nested TP, return success/error code directly back to caller of "ydb_tp_st".
-						 * If outermost TP, then handle TPRESTART specially.
-						 *	Else return success/error code directly back to caller of "ydb_tp_st".
+					if (nested_tp)
+					{	/* If nested TP, return success/error code directly back to caller of "ydb_tp_st" */
+						break;
+					}
+					/* If we reach here, it means we are in the outermost TP */
+					if (YDB_OK == int_retval)
+					{	/* Outermost TP committed successfully. Return success to caller of "ydb_tp_st". */
+						break;
+					}
+					if (YDB_TP_RESTART != int_retval)
+					{	/* Outermost TP and error code is not a TPRESTART.
+						 * Return it directly to caller of "ydb_tp_st" but before that roll back the
+						 *	TP transaction.
+						 * ROLLBACK the TP transaction by asking MAIN worker thread to do the
+						 *	"op_trollback" (in "ydb_tp_s_common").
+						 * Note that it is possible "int_retval" is YDB_TP_ROLLBACK (e.g. if the callback
+						 *	function returned YDB_TP_ROLLBACK).
+						 */
+						rlbk_retval = ydb_stm_args0(tptoken, LYDB_RTN_TP_ROLLBACK_TLVL0);
+						assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
+						assert(YDB_TP_ROLLBACK == rlbk_retval);
+						/* Note: "int_retval" records the primary error code while
+						 *       "rlbk_retval" holds the "op_trollback" error code (we do not expect any).
+						 * Use the "op_tstart" error code (the first error) in the call block.
 						 */
 						break;
 					}
@@ -210,8 +237,6 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 					assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 					assert(YDB_OK == int_retval);
 				}
-				assert(nested_tp || (YDB_OK == int_retval) || (YDB_TP_ROLLBACK == int_retval));
-				assert(!dollar_tlevel);
 				callblk->retval = (uintptr_t)int_retval;
 				break;
 			default:
