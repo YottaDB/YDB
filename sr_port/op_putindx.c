@@ -84,8 +84,8 @@ void	set_active_lv(lv_val *newlv, boolean_t do_assert, int type)
 	dbg_array[lv_index].type = type;
 	dbg_array[lv_index].frame_pointer = frame_pointer;
 	dbg_array[lv_index].curr_symval = curr_symval;
-	dbg_array[lv_index].mpc = frame_pointer->mpc;
-	dbg_array[lv_index].ctxt = frame_pointer->ctxt;
+	dbg_array[lv_index].mpc = (NULL != frame_pointer) ? frame_pointer->mpc : NULL;
+	dbg_array[lv_index].ctxt = (NULL != frame_pointer) ? frame_pointer->ctxt : NULL;
 	active_lv = newlv;
 }
 #endif

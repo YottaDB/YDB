@@ -235,7 +235,14 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				symval_ptr->lvtreenode_first_block = NULL;
 				free_hashtab_mname(&symval_ptr->h_symtab);
 				free(symval_ptr);
-				frame_pointer->flags |= SFF_UNW_SYMVAL;
+				/* Note: It is possible for "frame_pointer" to be NULL in case of edge cases like the following.
+				 * ydb_init -> init_gtm -> gtm_startup -> op_view -> view_arg_convert -> gvinit ->zgbldir
+				 *	-> gd_load -> open_gd_file -> rts_error_csa (e.g. ZGBLDIRACC error due to absent gld)
+				 *	-> rts_error_va -> gtmci_ch -> fgncal_unwind -> unw_mv_ent
+				 * Therefore check for it before dereferencing it.
+				 */
+				if (NULL != frame_pointer)
+					frame_pointer->flags |= SFF_UNW_SYMVAL;
 			}
 			return;
 		case MVST_NTAB:
