@@ -46,7 +46,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "NODEEND", "End of list of nodes/subscripts", 0 },
 	{ "INVLNPAIRLIST", "Invalid lockname/subscript pair list (uneven number of lockname/subscript parameters)", 0 },
 	{ "INVTPTRANS", "Invalid TP transaction - either invalid TP token or transaction not in progress", 0 },
-	{ "INVAPIMODE", "Process not allowed to first use a(n) !AD API then switch to using a(n) !AD API", 4 },
+	{ "INVAPIMODE", "Process not allowed to first use !AD then switch to using !AD", 4 },
 	{ "NOTSUPSTAPI", "Calls to !AD are not supported if threaded Simple API functions are in use", 2 },
 	{ "STAPIFORKEXEC", "Calls to YottaDB are not supported after a fork() if threaded Simple API functions were in use in parent. Call exec() first", 0 },
 };

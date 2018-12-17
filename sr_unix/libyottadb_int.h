@@ -49,8 +49,8 @@ LITREF	svn_data_type	svn_data[];
 LITREF	int		lydbrtnpkg[];
 LITREF	char 		*lydbrtnnames[];
 
-#define THREADED_STR	"threaded"
-#define UNTHREADED_STR	"un-threaded"
+#define THREADED_STR	"threaded Simple API"
+#define UNTHREADED_STR	"Simple API"
 #define THREADED_STR_LEN (SIZEOF(THREADED_STR) - 1)
 #define UNTHREADED_STR_LEN (SIZEOF(UNTHREADED_STR) - 1)
 
