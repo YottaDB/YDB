@@ -69,7 +69,7 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 	 */
 	if (0 > namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2,
-			RTS_ERROR_LITERAL(simpleThreadAPI_active ? "ydb_delete_excl_st()" : "ydb_delete_excl_s()"));
+			LEN_AND_STR(simpleThreadAPI_active ? "ydb_delete_excl_st()" : "ydb_delete_excl_s()"));
 	if (0 == namecount)
 	{	/* Special case - no varname supplied so drive kill-all of local variables */
 		op_killall();
@@ -79,7 +79,7 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 	}
 	if (YDB_MAX_NAMES < namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNT2HI, 3,
-			RTS_ERROR_LITERAL(simpleThreadAPI_active ? "ydb_delete_excl_st()" : "ydb_delete_excl_s()"), YDB_MAX_NAMES);
+			LEN_AND_STR(simpleThreadAPI_active ? "ydb_delete_excl_st()" : "ydb_delete_excl_s()"), YDB_MAX_NAMES);
 	/* Run through the array creating mvals to hold the list of names to be excluded. Note, normally, we would use
 	 * the COPY_PAMS_TO_CALLG_BUFFER() macro for this but in this case, we also need to validate each mval that it has
 	 * a valid variable name in it so we do the parm copy "manually".

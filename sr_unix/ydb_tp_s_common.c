@@ -117,7 +117,7 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 			outofband_action(FALSE);
 		if (0 > namecount)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2,
-					RTS_ERROR_LITERAL(simpleThreadAPI_active ? "ydb_tp_st()" : "ydb_tp_s()"));
+					LEN_AND_STR(simpleThreadAPI_active ? "ydb_tp_st()" : "ydb_tp_s()"));
 		/* Ready "transid" for passing to "op_tstart" */
 		tid.mvtype = MV_STR;
 		if (NULL == transid)
@@ -140,7 +140,7 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 			 */
 			if (YDB_MAX_NAMES < namecount)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNT2HI, 3,
-					RTS_ERROR_LITERAL(simpleThreadAPI_active ? "ydb_tp_st()" : "ydb_tp_s()"), YDB_MAX_NAMES);
+					LEN_AND_STR(simpleThreadAPI_active ? "ydb_tp_st()" : "ydb_tp_s()"), YDB_MAX_NAMES);
 			for (curvarname = varnames, mv = varnamearray, mv_top = mv + namecount; mv < mv_top; curvarname++, mv++)
 			{
 				if (IS_INVALID_YDB_BUFF_T(curvarname))

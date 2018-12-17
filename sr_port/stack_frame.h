@@ -124,8 +124,9 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFF_UNW_SYMVAL_OFF		~(SFF_UNW_SYMVAL)		/* Mask to turn off SFF_UNW_SYMVAL */
 #define SFF_NORET_VIA_MUMTSTART_OFF	~(SFF_NORET_VIA_MUMTSTART)	/* Mask to turn off SFF_NORET_VIA_MUMTSTART */
 
-#define	CALL_IN_M_ENTRYREF	"(Call-In)"	/* M entryref equivalent for Call-In. Filled in $zstatus, ZSHOW "S" etc. */
-#define	SIMPLEAPI_M_ENTRYREF	"(SimpleAPI)"	/* M entryref equivalent for simpleAPI. Filled in $zstatus */
+#define	CALL_IN_M_ENTRYREF		"(Call-In)"	/* M entryref equivalent for Call-In. Filled in $zstatus, ZSHOW "S" etc. */
+#define	SIMPLEAPI_M_ENTRYREF		"(SimpleAPI)"		/* M entryref equivalent for SimpleAPI. Filled in $zstatus */
+#define	SIMPLETHREADAPI_M_ENTRYREF	"(SimpleThreadAPI)"	/* M entryref equivalent for SimpleThreadAPI. Filled in $zstatus */
 
 #define	ADJUST_FRAME_POINTER(fptr, shift)			\
 MBSTART {							\
