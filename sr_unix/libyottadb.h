@@ -26,13 +26,14 @@
 #include <inttypes.h>	/* .. ditto (defined different places in different platforms) .. */
 #include <stdlib.h>	/* For abs() */
 
-/* Enumerated parameter values */
+/* Enumerated parameter values. List value of each enum (not just first in list) as it is relied upon by the YottaDB Go Wrapper */
 enum
 {
 	YDB_DEL_TREE = 1,
-	YDB_DEL_NODE,
+	YDB_DEL_NODE = 2,
 };
 
+/* Enumerated parameter values. List value of each enum (not just first in list) as it is relied upon by the YottaDB Go Wrapper */
 enum
 {
 	YDB_SEVERITY_WARNING = 0,	/* Warning - Something is potentially incorrect */
