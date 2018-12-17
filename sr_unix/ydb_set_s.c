@@ -81,7 +81,8 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 	{
 		if (IS_INVALID_YDB_BUFF_T(value))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-				      LEN_AND_LIT("Invalid value"), LEN_AND_LIT("ydb_set_s()"));
+				      LEN_AND_LIT("Invalid value"),
+				      LEN_AND_STR(simpleThreadAPI_active ? "ydb_set_st()" : "ydb_set_s()"));
 		CHECK_MAX_STR_LEN(value);		/* Generates error is value is too long */
 	}
 	/* Separate actions depending on the type of SET being done */
@@ -104,7 +105,8 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_putindx */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE, 1, "ydb_set_s()");
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE, 1,
+						simpleThreadAPI_active ? "ydb_set_st()" : "ydb_set_s()");
 				dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Locate/create node */
 			}
 			SET_MVAL_FROM_YDB_BUFF_T(&dst_lv->v, value);	/* Set value into located/created node */
@@ -123,7 +125,8 @@ int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 			gvname.str.len = varname->len_used - 1;
 			plist.arg[0] = &gvname;
 			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
-			COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, "ydb_set_s()");
+			COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
+						simpleThreadAPI_active ? "ydb_set_st()" : "ydb_set_s()");
 			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
 			SET_MVAL_FROM_YDB_BUFF_T(&set_value, value);	/* Put value to set into mval for "op_gvput" */
 			op_gvput(&set_value);				/* Save the global value */

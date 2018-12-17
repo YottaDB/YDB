@@ -433,7 +433,7 @@ MBSTART	{													\
 	{													\
 		if (NULL == dST->buf_addr)									\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6)						\
-				ERR_PARAMINVALID, 4, LEN_AND_LIT(PARAM1), LEN_AND_LIT(PARAM2));			\
+				ERR_PARAMINVALID, 4, LEN_AND_LIT(PARAM1), LEN_AND_STR(PARAM2));			\
 		memcpy(dST->buf_addr, sRC->str.addr, sRC->str.len);						\
 	}													\
 	dST->len_used = sRC->str.len;										\
@@ -478,7 +478,7 @@ MBSTART	{													\
 	subs = (ydb_buffer_t *)SUBSARRAY;	 								\
 	if ((COUNT) && (NULL == subs))										\
 	{       /* count of subscripts is non-zero but no subscript specified - error */			\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SUBSARRAYNULL, 3, (COUNT), LEN_AND_LIT(PARAM2));	\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SUBSARRAYNULL, 3, (COUNT), LEN_AND_STR(PARAM2));	\
 	}													\
 	/* Now for each subscript */										\
 	for (parmp = &PLIST.arg[STARTIDX], parmp_top = parmp + (COUNT), mvalp = &PLIST_MVALS[0];		\
@@ -492,7 +492,7 @@ MBSTART	{													\
 		{												\
 			SPRINTF(buff, "Invalid subsarray (index %d)", subs - ((ydb_buffer_t *)SUBSARRAY));	\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,				\
-				      LEN_AND_STR(buff), LEN_AND_LIT(PARAM2));					\
+				      LEN_AND_STR(buff), LEN_AND_STR(PARAM2));					\
 		}												\
 		CHECK_MAX_STR_LEN(subs);									\
 		SET_MVAL_FROM_YDB_BUFF_T(mvalp, subs);	/* Generates error if subscript too long */		\

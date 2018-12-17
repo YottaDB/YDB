@@ -73,9 +73,11 @@ int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 		outofband_action(FALSE);
 	ISSUE_TIME2LONG_ERROR_IF_NEEDED(timeout_nsec);
 	if (0 > namecount)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, RTS_ERROR_LITERAL("ydb_lock_s()"));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2,
+					RTS_ERROR_LITERAL(simpleThreadAPI_active ? "ydb_lock_st()" : "ydb_lock_s()"));
 	if (YDB_MAX_NAMES < namecount)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNT2HI, 3, RTS_ERROR_LITERAL("ydb_lock_s()"), YDB_MAX_NAMES);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNT2HI, 3,
+				RTS_ERROR_LITERAL(simpleThreadAPI_active ? "ydb_lock_st()" : "ydb_lock_s()"), YDB_MAX_NAMES);
 	/* Need to validate all parms before we can do the unlock of all locks held by us */
 	VAR_START(var, namecount);
 	VAR_COPY(varcpy, var);		/* Used to validate parms, then var is used to process them */
@@ -146,7 +148,8 @@ int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 		 * lock block space by routines called by op_lkname so are effectively already rebuffered. No need for
 		 * us to do it again.
 		 */
-		COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2, "ydb_lock_s()");
+		COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2,
+							simpleThreadAPI_active ? "ydb_lock_st()" : "ydb_lock_s()");
 		callg((callgfnptr)op_lkname, &plist);
 	}
 	va_end(var);

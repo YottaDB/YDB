@@ -52,7 +52,7 @@ int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr)
 	src.str.len = str->len_used;
 	src.str.addr = str->buf_addr;
 	op_fnzwrite(FALSE, &src, &dst);
-	SET_YDB_BUFF_T_FROM_MVAL(zwr, &dst, "NULL zwr->buf_addr", "ydb_str2zwr_s()");
+	SET_YDB_BUFF_T_FROM_MVAL(zwr, &dst, "NULL zwr->buf_addr", simpleThreadAPI_active ? "ydb_str2zwr_st()" : "ydb_str2zwr_s()");
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;

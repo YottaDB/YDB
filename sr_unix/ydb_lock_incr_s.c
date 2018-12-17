@@ -82,7 +82,8 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int 
 	 * lock block space by routines called by op_lkname so are effectively already rebuffered. No need for
 	 * us to do it again.
 	 */
-	COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2, "ydb_lock_incr_s()");
+	COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2,
+				simpleThreadAPI_active ? "ydb_lock_incr_st()" : "ydb_lock_incr_s()");
 	callg((callgfnptr)op_lkname, &plist);
 	/* At this point, the private lock block has been created. Remaining task before calling "op_incrlock" is to
 	 * convert the timeout value from nanoseconds to seconds

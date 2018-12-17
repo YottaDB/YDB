@@ -79,7 +79,8 @@ int ydb_lock_decr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 	 * lock block space by routines called by op_lkname so are effectively already rebuffered. No need for
 	 * us to do it again.
 	 */
-	COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2, "ydb_lock_decr_s()");
+	COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2,
+				simpleThreadAPI_active ? "ydb_lock_decr_st()" : "ydb_lock_decr_s()");
 	callg((callgfnptr)op_lkname, &plist);
 	lock_rc = op_decrlock(NULL);
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
