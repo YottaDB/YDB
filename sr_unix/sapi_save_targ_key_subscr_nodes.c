@@ -39,6 +39,7 @@ void sapi_save_targ_key_subscr_nodes(void)
 	mstr		*subcur, *subtop, opstr;
 	unsigned char	*gvkey_char_ptr, *gvkey_top_ptr, work_buff[MAX_ZWR_KEY_SZ], *work_top;
 	boolean_t	is_string;
+	int		subs_cnt;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -82,6 +83,15 @@ void sapi_save_targ_key_subscr_nodes(void)
 		assert(gvkey_char_ptr <= gvkey_top_ptr);
 		subcur++;
 	}
-	TREF(sapi_query_node_subs_cnt) = subcur - TREF(sapi_query_node_subs);
+	subs_cnt = subcur - TREF(sapi_query_node_subs);
+	if (subs_cnt)
+		TREF(sapi_query_node_subs_cnt) = subs_cnt;
+	else
+	{	/* Returning just the name (no subscripts) so set the subscript count to -1 to
+		 * differentiate it from a subs_cnt=0 return which signals the end of the list (YDB_NODE_END).
+		 * Similar code exists in "sr_port/op_fnreversequery.c" for local variables.
+		 */
+		TREF(sapi_query_node_subs_cnt) = -1;
+	}
 	return;
 }

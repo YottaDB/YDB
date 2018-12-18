@@ -290,7 +290,8 @@ void op_fnreversequery_va(int sbscnt, mval *dst, va_list var)
 						stringpool.free += varname->str.len;
 					} else
 					{	/* Returning just the name (no subscripts) so set the subscript count to -1 to
-						 * differentiate it from a NULL return signaling the end of the list.
+						 * differentiate it from a NULL return signaling the end of the list. Similar
+						 * code exists in "sr_unix/sapi_save_targ_key_subscr_nodes.c" for global variables.
 						 */
 						TREF(sapi_query_node_subs_cnt) = -1;
 					}
