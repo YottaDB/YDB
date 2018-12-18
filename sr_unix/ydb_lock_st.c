@@ -32,7 +32,7 @@ int ydb_lock_st(uint64_t tptoken, unsigned long long timeout_nsec, int namecount
 {
 	va_list		var;
 	gparam_list	gparms;
-	int		parmcnt, maxparmcnt, indx, i;
+	int		parmcnt, maxparmcnt, indx, i, maxallowednamecount;
 #	define 		MAXPARMS ARRAYSIZE(gparms.arg)
 	DCL_THREADGBL_ACCESS;
 
@@ -47,12 +47,13 @@ int ydb_lock_st(uint64_t tptoken, unsigned long long timeout_nsec, int namecount
 		SETUP_GENERIC_ERROR_2PARMS(ERR_INVNAMECOUNT, strlen("ydb_lock_st()"), "ydb_lock_st()");
 		return YDB_ERR_INVNAMECOUNT;
 	}
+	NON_GTM64_ONLY(parmcnt++);		/* Using an extra parm due to 32 bit environment so account for the extra */
 	maxparmcnt = parmcnt + (3 * namecount);
-	NON_GTM64_ONLY(maxparmcnt++);			/* Using an extra parm due to 32 bit environment so account for the extra */
 	if (MAXPARMS <= maxparmcnt)
 	{	/* Too many parms for this call */
-		SETUP_GENERIC_ERROR(ERR_PARMOFLOW);
-		return YDB_ERR_PARMOFLOW;
+		maxallowednamecount = (int)((MAXPARMS - parmcnt) / 3);
+		SETUP_GENERIC_ERROR_3PARMS(ERR_NAMECOUNT2HI, strlen("ydb_lock_st()"), "ydb_lock_st()", maxallowednamecount);
+		return YDB_ERR_NAMECOUNT2HI;
 	}
 	indx = 0;
 #	ifdef GTM64

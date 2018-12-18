@@ -55,7 +55,6 @@ SETENVFAIL	<VIEW "SETENV":"!AD" failed in setenv() system call>/error/fao=2
 UNSETENVFAIL	<VIEW "UNSETENV":"!AD" failed in unsetenv() system call>/error/fao=2
 UNKNOWNSYSERR	<An unknown system error has occurred: !AD>/error/fao=2
 STRUCTNOTALLOCD	<Structure not previously called with Alloc() method>/error/fao=0
-PARMOFLOW	<Parameter overflow attempting to call variadic plist routine>/error/fao=0
 NODEEND		<End of list of nodes/subscripts>/error/fao=0
 INVLNPAIRLIST	<Invalid lockname/subscript pair list (uneven number of lockname/subscript parameters)>/error/fao=0
 INVTPTRANS	<Invalid TP transaction - either invalid TP token or transaction not in progress>/error/fao=0

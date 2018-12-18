@@ -42,7 +42,6 @@ LITDEF	err_msg ydberrors[] = {
 	{ "UNSETENVFAIL", "VIEW \"UNSETENV\":\"!AD\" failed in unsetenv() system call", 2 },
 	{ "UNKNOWNSYSERR", "An unknown system error has occurred: !AD", 2 },
 	{ "STRUCTNOTALLOCD", "Structure not previously called with Alloc() method", 0 },
-	{ "PARMOFLOW", "Parameter overflow attempting to call variadic plist routine", 0 },
 	{ "NODEEND", "End of list of nodes/subscripts", 0 },
 	{ "INVLNPAIRLIST", "Invalid lockname/subscript pair list (uneven number of lockname/subscript parameters)", 0 },
 	{ "INVTPTRANS", "Invalid TP transaction - either invalid TP token or transaction not in progress", 0 },
@@ -61,7 +60,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	32,
+	31,
 	&ydberrors_undocarr[0],
 	0
 };

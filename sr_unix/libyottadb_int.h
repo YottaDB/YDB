@@ -624,6 +624,17 @@ MBSTART {												\
 	TREF(ydb_error_code) = errnum;									\
 } MBEND
 
+/* Similar to SETUP_SYSCALL_ERROR(), this is a macro to setup a generic error with 3 parameters */
+#define SETUP_GENERIC_ERROR_3PARMS(ERRNUM, PARM1, PARM2, PARM3)						\
+MBSTART {												\
+	mstr	entryref;										\
+	int	errnum = abs(ERRNUM);									\
+	setup_error(CSA_ARG(NULL) VARLSTCNT(5) errnum, 3, (PARM1), (PARM2), (PARM3));			\
+	SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
+	set_zstatus(&entryref, errnum, NULL, FALSE);							\
+	TREF(ydb_error_code) = errnum;									\
+} MBEND
+
 /* Similar to SETUP_SYSCALL_ERROR(), this is a macro to setup a generic error with 4 parameters */
 #define SETUP_GENERIC_ERROR_4PARMS(ERRNUM, PARM1, PARM2, PARM3, PARM4)					\
 MBSTART {												\
