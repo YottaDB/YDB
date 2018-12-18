@@ -15,6 +15,10 @@
 #include "libyottadb_int.h"
 #include "gtmci.h"
 
+#ifdef DEBUG
+GBLREF	stm_workq	*stmWorkQueue[];		/* Array to hold list of work queues for SimpleThreadAPI */
+#endif
+
 /* Helper routine to do a "ydb_cip" call with a "ydb_simpleapi_ch" condition handler wrapper to handle TPRETRY/TPRESTART */
 int ydb_cip_helper(ci_name_descriptor *ci_info, va_list *var)
 {
@@ -41,7 +45,10 @@ int ydb_cip_helper(ci_name_descriptor *ci_info, va_list *var)
 		 */
 		return ((ERR_TPRETRY == SIGNAL) ? ERR_TPRETRY : TREF(ydb_error_code));
 	}
+	LIBYOTTADB_DONE;	/* Shutoff active rtn indicator while call-in routine is driven */
+	assert(IS_STAPI_WORKER_THREAD);	/* The MAIN worker thread is the only thread that can currently invoke "ydb_cip_helper" */
 	status = ydb_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, *var, FALSE);
+	TREF(libyottadb_active_rtn) = LYDB_RTN_YDB_CIP; /* Restore our routine indicator (i.e. redo LIBYOTTADB_INIT) */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;
