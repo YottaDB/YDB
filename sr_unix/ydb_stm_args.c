@@ -43,77 +43,94 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 {
 	int		status, save_errno;
 	intptr_t	retval;
+	uintptr_t	calltyp;
 	stm_workq	*queueToUse;
-	boolean_t	startThread;
+	boolean_t	startThread, queueChanged;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	TRCTBL_ENTRY(STAPITP_ENTRY, 0, "ydb_stm_args", NULL, pthread_self());
 	DEBUG_ONLY(callblk->mainqcaller = caller_id());
-	/* If have a descriptor block (meaning we are in TP), validate the tptoken value against our tplevel counter. A
-	 * failure in validation is an error as well as if we discover no TP transaction has been started. Otherwiswe, we
-	 * have a non-TP transaction so use the regular work queue.
+	calltyp = callblk->calltyp;
+	/* If this is the MAIN worker thread and the current request is not to start a TP transaction (that requires
+	 * involvement of the TP worker thread), service this request right away in the MAIN worker thread
+	 * without queueing the request anywhere. This avoids unnecessary deadlocks where the MAIN worker thread
+	 * is hung waiting for queued request to be serviced when the only thread that can service the request is
+	 * the MAIN worker thread.
 	 */
-	if (YDB_NOTTP != tptoken)
-	{
-		if (0 >= TREF(curWorkQHeadIndx))
-		{	/* No TP transaction in effect - return error */
-			SETUP_GENERIC_ERROR(YDB_ERR_INVTPTRANS);
-			return YDB_ERR_INVTPTRANS;
-		}
-		if (tptoken != stmWorkQueue[TREF(curWorkQHeadIndx)]->tptoken)
-		{	/* This is not the correct token for this TP transaction - return error */
-			SETUP_GENERIC_ERROR(YDB_ERR_INVTPTRANS);
-			return YDB_ERR_INVTPTRANS;
-		}
-		/* This is legitimately TP mode - We are putting any subsequent work on the alternate queue but using the
-		 * same worker thread so don't start a new thread. Instead, just lock the queue.
-		 */
-		queueToUse = stmTPWorkQueue;
-		startThread = FALSE;
+	assert(!IS_STAPI_WORKER_THREAD || (LYDB_RTN_TPCOMPLT != calltyp));
+	if (IS_STAPI_WORKER_THREAD && (LYDB_RTN_TP != calltyp))
+	{	/* This request does not need to be queued */
+		DEBUG_ONLY(queueChanged = FALSE);
+		ydb_stm_threadq_dispatch(callblk, &queueChanged);
+		assert(!queueChanged);
 	} else
-	{	/* Lock the queue header and start the worker thread if not already running */
-		queueToUse = stmWorkQueue[0];
-		startThread = TRUE;
+	{	/* This request has to be queued */
+		/* If have a descriptor block (meaning we are in TP), validate the tptoken value against our tplevel counter. A
+		 * failure in validation is an error as well as if we discover no TP transaction has been started. Otherwiswe, we
+		 * have a non-TP transaction so use the regular work queue.
+		 */
+		if (YDB_NOTTP != tptoken)
+		{
+			if (0 >= TREF(curWorkQHeadIndx))
+			{	/* No TP transaction in effect - return error */
+				SETUP_GENERIC_ERROR(YDB_ERR_INVTPTRANS);
+				return YDB_ERR_INVTPTRANS;
+			}
+			if (tptoken != stmWorkQueue[TREF(curWorkQHeadIndx)]->tptoken)
+			{	/* This is not the correct token for this TP transaction - return error */
+				SETUP_GENERIC_ERROR(YDB_ERR_INVTPTRANS);
+				return YDB_ERR_INVTPTRANS;
+			}
+			/* This is legitimately TP mode - We are putting any subsequent work on the alternate queue but using the
+			 * same worker thread so don't start a new thread. Instead, just lock the queue.
+			 */
+			queueToUse = stmTPWorkQueue;
+			startThread = FALSE;
+		} else
+		{	/* Lock the queue header and start the worker thread if not already running */
+			queueToUse = stmWorkQueue[0];
+			startThread = TRUE;
+		}
+		assert(NULL != queueToUse);
+		TRCTBL_ENTRY(STAPITP_LOCKWORKQ, startThread, queueToUse, callblk, pthread_self());
+		LOCK_STM_QHEAD_AND_START_WORK_THREAD(queueToUse, startThread, ydb_stm_thread, TRUE, status);
+		if (0 != status)
+		{
+			assert(FALSE);
+			return status;			/* Error already setup */
+		}
+		/* Place this call block on the thread queue (at the end of the queue) */
+		dqrins(&queueToUse->stm_wqhead, que, callblk);
+		/* Release CV/mutex lock so worker thread can get the lock and wakeup */
+		status = pthread_mutex_unlock(&queueToUse->mutex);
+		if (0 != status)
+		{
+			SETUP_SYSCALL_ERROR("pthread_mutex_unlock()", status);
+			assert(FALSE);
+			return YDB_ERR_SYSCALL;
+		}
+		TRCTBL_ENTRY(STAPITP_UNLOCKWORKQ, callblk->calltyp, queueToUse, callblk, pthread_self());
+		/* Signal the condition variable something is on the queue awaiting tender ministrations */
+		status = pthread_cond_signal(&queueToUse->cond);
+		if (0 != status)
+		{
+			SETUP_SYSCALL_ERROR("pthread_cond_signal()", status);
+			assert(FALSE);
+			return YDB_ERR_SYSCALL;
+		}
+		TRCTBL_ENTRY(STAPITP_SEMWAIT, 0, NULL, callblk, pthread_self());
+		/* Now wait till a worker thread tells us our request is complete */
+		GTM_SEM_WAIT(&callblk->complete, status);
+		if (0 != status)
+		{
+			save_errno = errno;
+			SETUP_SYSCALL_ERROR("sem_wait()", save_errno);
+			assert(FALSE);
+			return YDB_ERR_SYSCALL;
+		}
+		TRCTBL_ENTRY(STAPITP_REQCOMPLT, callblk->calltyp, callblk->retval, callblk, pthread_self());
 	}
-	assert(NULL != queueToUse);
-	TRCTBL_ENTRY(STAPITP_LOCKWORKQ, startThread, queueToUse, callblk, pthread_self());
-	LOCK_STM_QHEAD_AND_START_WORK_THREAD(queueToUse, startThread, ydb_stm_thread, TRUE, status);
-	if (0 != status)
-	{
-		assert(FALSE);
-		return status;			/* Error already setup */
-	}
-	/* Place this call block on the thread queue (at the end of the queue) */
-	dqrins(&queueToUse->stm_wqhead, que, callblk);
-	/* Release CV/mutex lock so worker thread can get the lock and wakeup */
-	status = pthread_mutex_unlock(&queueToUse->mutex);
-	if (0 != status)
-	{
-		SETUP_SYSCALL_ERROR("pthread_mutex_unlock()", status);
-		assert(FALSE);
-		return YDB_ERR_SYSCALL;
-	}
-	TRCTBL_ENTRY(STAPITP_UNLOCKWORKQ, callblk->calltyp, queueToUse, callblk, pthread_self());
-	/* Signal the condition variable something is on the queue awaiting tender ministrations */
-	status = pthread_cond_signal(&queueToUse->cond);
-	if (0 != status)
-	{
-		SETUP_SYSCALL_ERROR("pthread_cond_signal()", status);
-		assert(FALSE);
-		return YDB_ERR_SYSCALL;
-	}
-	TRCTBL_ENTRY(STAPITP_SEMWAIT, 0, NULL, callblk, pthread_self());
-	/* Now wait till a worker thread tells us our request is complete */
-	GTM_SEM_WAIT(&callblk->complete, status);
-	if (0 != status)
-	{
-		save_errno = errno;
-		SETUP_SYSCALL_ERROR("sem_wait()", save_errno);
-		assert(FALSE);
-		return YDB_ERR_SYSCALL;
-	}
-	TRCTBL_ENTRY(STAPITP_REQCOMPLT, callblk->calltyp, callblk->retval, callblk, pthread_self());
 	/* Save the return value, queue the now-free call block for later reuse */
 	retval = callblk->retval;
 	status = ydb_stm_freecallblk(callblk);

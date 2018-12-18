@@ -745,5 +745,6 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 void	ydb_stm_atfork_prepare(void);
 void	ydb_stm_atfork_parent(void);
 void	ydb_stm_atfork_child(void);
+void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged);
 
 #endif /*  LIBYOTTADB_INT_H */
