@@ -174,8 +174,7 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	}
 	if (ERR_REPEATERROR != SIGNAL)
 	{
-		entryref.addr = (simpleThreadAPI_active ? SIMPLETHREADAPI_M_ENTRYREF : SIMPLEAPI_M_ENTRYREF);
-		entryref.len = STRLEN(entryref.addr);
+		SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);
 		set_zstatus(&entryref, arg, NULL, FALSE);
 	}
 	/* Ensure gv_target and cs_addrs are in sync. If not, make them so. */

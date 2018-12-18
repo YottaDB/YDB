@@ -194,8 +194,7 @@ MBSTART	{													\
 		setup_error(CSA_ARG(NULL) VARLSTCNT(6) ERR_SIMPLEAPINEST, 4,					\
 				RTS_ERROR_TEXT(lydbrtnnames[TREF(libyottadb_active_rtn)]),			\
 				RTS_ERROR_TEXT(lydbrtnnames[ROUTINE]));						\
-		entryref.addr = SIMPLEAPI_M_ENTRYREF;								\
-		entryref.len = STR_LIT_LEN(SIMPLEAPI_M_ENTRYREF);						\
+		SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
 		set_zstatus(&entryref, errcode, NULL, FALSE);							\
 		TREF(ydb_error_code) = errcode;									\
 		return RETTYPE YDB_ERR_SIMPLEAPINEST;								\
@@ -221,8 +220,7 @@ MBSTART	{													\
 		setup_error(CSA_ARG(NULL) VARLSTCNT(6) ERR_SIMPLEAPINEST, 4,					\
 				RTS_ERROR_TEXT(lydbrtnnames[TREF(libyottadb_active_rtn)]),			\
 				RTS_ERROR_TEXT(lydbrtnnames[ROUTINE]));						\
-		entryref.addr = SIMPLEAPI_M_ENTRYREF;								\
-		entryref.len = STR_LIT_LEN(SIMPLEAPI_M_ENTRYREF);						\
+		SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
 		set_zstatus(&entryref, errcode, NULL, FALSE);							\
 		TREF(ydb_error_code) = errcode;									\
 		return;												\
@@ -582,6 +580,12 @@ MBSTART {												\
 	}												\
 } MBEND
 
+#define	SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(ENTRYREF)					\
+{													\
+	ENTRYREF.addr = (simpleThreadAPI_active ? SIMPLETHREADAPI_M_ENTRYREF : SIMPLEAPI_M_ENTRYREF);	\
+	ENTRYREF.len = STRLEN(ENTRYREF.addr);								\
+}
+
 /* Macro to create a SYSCALL error. Since these are usually "encountered" instead of "thrown" in the
  * various no-mans-land parts of the code we'll be running in (not in user code but prior to any
  * condition handlers being installed), we can't use rts_error_csa() to reflect errors back to the
@@ -593,8 +597,7 @@ MBSTART {												\
 	mstr	entryref;										\
 	setup_error(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,						\
 		    RTS_ERROR_LITERAL(CALLNAME), RTS_ERROR_LITERAL(__FILE__), __LINE__, STATUS);	\
-	entryref.addr = SIMPLEAPI_M_ENTRYREF;								\
-	entryref.len = STR_LIT_LEN(SIMPLEAPI_M_ENTRYREF);						\
+	SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
 	set_zstatus(&entryref, ERR_SYSCALL, NULL, FALSE);						\
 	TREF(ydb_error_code) = ERR_SYSCALL;								\
 } MBEND
@@ -605,8 +608,7 @@ MBSTART {												\
 	mstr	entryref;										\
 	int	errnum = abs(ERRNUM);									\
 	setup_error(CSA_ARG(NULL) VARLSTCNT(1) errnum);							\
-	entryref.addr = SIMPLEAPI_M_ENTRYREF;								\
-	entryref.len = STR_LIT_LEN(SIMPLEAPI_M_ENTRYREF);						\
+	SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
 	set_zstatus(&entryref, errnum, NULL, FALSE);							\
 	TREF(ydb_error_code) = errnum;									\
 } MBEND
@@ -617,8 +619,7 @@ MBSTART {												\
 	mstr	entryref;										\
 	int	errnum = abs(ERRNUM);									\
 	setup_error(CSA_ARG(NULL) VARLSTCNT(4) errnum, 2, (PARM1), (PARM2));				\
-	entryref.addr = SIMPLEAPI_M_ENTRYREF;								\
-	entryref.len = STR_LIT_LEN(SIMPLEAPI_M_ENTRYREF);						\
+	SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
 	set_zstatus(&entryref, errnum, NULL, FALSE);							\
 	TREF(ydb_error_code) = errnum;									\
 } MBEND
@@ -629,8 +630,7 @@ MBSTART {												\
 	mstr	entryref;										\
 	int	errnum = abs(ERRNUM);									\
 	setup_error(CSA_ARG(NULL) VARLSTCNT(6) errnum, 4, (PARM1), (PARM2), (PARM3), (PARM4));		\
-	entryref.addr = SIMPLEAPI_M_ENTRYREF;								\
-	entryref.len = STR_LIT_LEN(SIMPLEAPI_M_ENTRYREF);						\
+	SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
 	set_zstatus(&entryref, errnum, NULL, FALSE);							\
 	TREF(ydb_error_code) = errnum;									\
 } MBEND
