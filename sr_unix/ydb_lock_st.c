@@ -49,7 +49,11 @@ int ydb_lock_st(uint64_t tptoken, unsigned long long timeout_nsec, int namecount
 	}
 	NON_GTM64_ONLY(parmcnt++);		/* Using an extra parm due to 32 bit environment so account for the extra */
 	maxparmcnt = parmcnt + (3 * namecount);
-	if (MAXPARMS <= maxparmcnt)
+	/* Note: It is possible that "namecount" is a positive number when treated as an "int" but (3 * namecount) is a
+	 * negative number when treated as an "int". In that case, checking for "MAXPARMS <= maxparmcnt" is not enough
+	 * since that will incorrectly fail. Hence the need for "MAXPARMS <= namecount" too.
+	 */
+	if ((MAXPARMS <= namecount) || (MAXPARMS <= maxparmcnt))
 	{	/* Too many parms for this call */
 		maxallowednamecount = (int)((MAXPARMS - parmcnt) / 3);
 		SETUP_GENERIC_ERROR_3PARMS(ERR_NAMECOUNT2HI, strlen("ydb_lock_st()"), "ydb_lock_st()", maxallowednamecount);
