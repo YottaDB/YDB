@@ -177,55 +177,43 @@ MBSTART	{													\
  *
  * We need two flavors - one for use in routines with a return value and one without.
  */
-#define LIBYOTTADB_INIT(ROUTINE, RETTYPE)									\
-MBSTART	{													\
-	int		status, errcode;									\
-	mstr		entryref;										\
-														\
-	LIBYOTTADB_RUNTIME_CHECK(RETTYPE);									\
-	/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet	\
-	 * established the condition handler to take care of these issues so we simulate it's effect by		\
-	 * doing the "set_zstatus", setting TREF(ydb_error_code) and returning the error code.			\
-	 */													\
-	if (LYDB_RTN_NONE != TREF(libyottadb_active_rtn))							\
-	{													\
-		errcode = ERR_SIMPLEAPINEST;									\
-		setup_error(CSA_ARG(NULL) VARLSTCNT(6) ERR_SIMPLEAPINEST, 4,					\
-				RTS_ERROR_TEXT(LYDBRTNNAME(TREF(libyottadb_active_rtn))),			\
-				RTS_ERROR_TEXT(LYDBRTNNAME(ROUTINE)));						\
-		SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
-		set_zstatus(&entryref, errcode, NULL, FALSE);							\
-		TREF(ydb_error_code) = errcode;									\
-		return RETTYPE YDB_ERR_SIMPLEAPINEST;								\
-	}													\
-	TREF(libyottadb_active_rtn) = ROUTINE;									\
-	DBGAPI((stderr, "Entering routine %s\n", LYDBRTNNAME(ROUTINE)));					\
+#define LIBYOTTADB_INIT(ROUTINE, RETTYPE)										\
+MBSTART	{														\
+	int		errcode;											\
+															\
+	LIBYOTTADB_RUNTIME_CHECK(RETTYPE);										\
+	/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet		\
+	 * established the condition handler to take care of these issues so we simulate it's effect by			\
+	 * doing the "set_zstatus", setting TREF(ydb_error_code) and returning the error code.				\
+	 */														\
+	if (LYDB_RTN_NONE != TREF(libyottadb_active_rtn))								\
+	{														\
+		errcode = YDB_ERR_SIMPLEAPINEST;									\
+		SETUP_GENERIC_ERROR_2PARMS(errcode, LYDBRTNNAME(TREF(libyottadb_active_rtn)), LYDBRTNNAME(ROUTINE));	\
+		return RETTYPE errcode;											\
+	}														\
+	TREF(libyottadb_active_rtn) = ROUTINE;										\
+	DBGAPI((stderr, "Entering routine %s\n", LYDBRTNNAME(ROUTINE)));						\
 } MBEND
 
 /* And now for the no return value edition */
-#define LIBYOTTADB_INIT_NORETVAL(ROUTINE)									\
-MBSTART	{													\
-	int		status, errcode;									\
-	mstr		entryref;										\
-														\
-	LIBYOTTADB_RUNTIME_CHECK_NORETVAL;									\
-	/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet	\
-	 * established the condition handler to take care of these issues so we simulate it's effect by		\
-	 * doing the "set_zstatus", setting TREF(ydb_error_code) and returning the error code.			\
-	 */													\
-	if (LYDB_RTN_NONE != TREF(libyottadb_active_rtn))							\
-	{													\
-		errcode = ERR_SIMPLEAPINEST;									\
-		setup_error(CSA_ARG(NULL) VARLSTCNT(6) ERR_SIMPLEAPINEST, 4,					\
-				RTS_ERROR_TEXT(LYDBRTNNAME(TREF(libyottadb_active_rtn))),			\
-				RTS_ERROR_TEXT(LYDBRTNNAME(ROUTINE)));						\
-		SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
-		set_zstatus(&entryref, errcode, NULL, FALSE);							\
-		TREF(ydb_error_code) = errcode;									\
-		return;												\
-	}													\
-	TREF(libyottadb_active_rtn) = ROUTINE;									\
-	DBGAPI((stderr, "Entering routine %s\n", LYDBRTNNAME(ROUTINE)));					\
+#define LIBYOTTADB_INIT_NORETVAL(ROUTINE)										\
+MBSTART	{														\
+	int		errcode;											\
+															\
+	LIBYOTTADB_RUNTIME_CHECK_NORETVAL;										\
+	/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet		\
+	 * established the condition handler to take care of these issues so we simulate it's effect by			\
+	 * doing the "set_zstatus", setting TREF(ydb_error_code) and returning the error code.				\
+	 */														\
+	if (LYDB_RTN_NONE != TREF(libyottadb_active_rtn))								\
+	{														\
+		errcode = YDB_ERR_SIMPLEAPINEST;									\
+		SETUP_GENERIC_ERROR_2PARMS(errcode, LYDBRTNNAME(TREF(libyottadb_active_rtn)), LYDBRTNNAME(ROUTINE));	\
+		return;													\
+	}														\
+	TREF(libyottadb_active_rtn) = ROUTINE;										\
+	DBGAPI((stderr, "Entering routine %s\n", LYDBRTNNAME(ROUTINE)));						\
 } MBEND
 
 #ifdef YDB_TRACE_API

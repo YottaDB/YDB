@@ -41,29 +41,54 @@ GBLREF	stm_workq	*stmTPWorkQueue;		/* Alternate queue main worker thread uses wh
  */
 intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 {
-	int		status, save_errno;
-	intptr_t	retval;
-	uintptr_t	calltyp;
-	stm_workq	*queueToUse;
-	boolean_t	startThread, queueChanged;
+	int			status, save_errno;
+	intptr_t		retval;
+	uintptr_t		calltyp;
+	stm_workq		*queueToUse;
+	boolean_t		startThread, queueChanged;
+	libyottadb_routines	active_stapi_rtn;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	TRCTBL_ENTRY(STAPITP_ENTRY, 0, "ydb_stm_args", NULL, pthread_self());
 	DEBUG_ONLY(callblk->mainqcaller = caller_id());
 	calltyp = callblk->calltyp;
-	/* If this is the MAIN worker thread and the current request is not to start a TP transaction (that requires
-	 * involvement of the TP worker thread), service this request right away in the MAIN worker thread
-	 * without queueing the request anywhere. This avoids unnecessary deadlocks where the MAIN worker thread
-	 * is hung waiting for queued request to be serviced when the only thread that can service the request is
-	 * the MAIN worker thread.
-	 */
-	assert(!IS_STAPI_WORKER_THREAD || (LYDB_RTN_TPCOMPLT != calltyp));
-	if (IS_STAPI_WORKER_THREAD && (LYDB_RTN_TP != calltyp))
-	{	/* This request does not need to be queued */
-		DEBUG_ONLY(queueChanged = FALSE);
-		ydb_stm_threadq_dispatch(callblk, &queueChanged);
-		assert(!queueChanged);
+	if (IS_STAPI_WORKER_THREAD)
+	{	/* If this is the MAIN worker thread and the current request is not to start a TP transaction (that requires
+		 * involvement of the TP worker thread), service this request right away in the MAIN worker thread
+		 * without queueing the request anywhere. This avoids unnecessary deadlocks where the MAIN worker thread
+		 * is hung waiting for queued request to be serviced when the only thread that can service the request is
+		 * the MAIN worker thread.
+		 */
+		assert(LYDB_RTN_TPCOMPLT != calltyp);
+		active_stapi_rtn = TREF(libyottadb_active_rtn);
+		assert(LYDB_RTN_NONE != active_stapi_rtn);
+		if (LYDB_RTN_TP != calltyp)
+		{	/* This request does not need to be queued */
+			DEBUG_ONLY(queueChanged = FALSE);
+			if ((LYDB_RTN_YDB_CI == active_stapi_rtn) || (LYDB_RTN_YDB_CIP == active_stapi_rtn))
+			{	/* The MAIN worker thread is servicing a "ydb_ci_t" or "ydb_cip_t" call (through "ydb_cip_helper").
+				 * Allow calls to SimpleThreadAPI functions (other than "ydb_tp_st") while inside the call-in by
+				 * shutting off the active rtn indicator temporarily for the duration of the SimpleThreadAPI call.
+				 */
+				TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;
+			}
+			/* else: It is possible we are inside a "ydb_set_st" call which invoked a trigger and got us here.
+			 *       In that case, the SIMPLEAPINEST error will be issued inside the "ydb_stm_threadq_dispatch" call.
+			 */
+			ydb_stm_threadq_dispatch(callblk, &queueChanged);
+			assert(!queueChanged);
+			if ((LYDB_RTN_YDB_CI == active_stapi_rtn) || (LYDB_RTN_YDB_CIP == active_stapi_rtn))
+				TREF(libyottadb_active_rtn) = active_stapi_rtn;	/* Restore active rtn indicator */
+		} else
+		{	/* This request needs to be queued (since it involves the TP worker thread which in turn is going
+			 * to ask the MAIN worker thread to do some work) but since we are the MAIN worker thread, waiting
+			 * for service is a deadlock so issue an error.
+			 */
+			/* A SimpleAPI routine is already running. SIMPLEAPINEST error can be issued */
+			SETUP_GENERIC_ERROR_2PARMS(YDB_ERR_SIMPLEAPINEST, LYDBRTNNAME(active_stapi_rtn), LYDBRTNNAME(calltyp));
+			return YDB_ERR_SIMPLEAPINEST;
+		}
 	} else
 	{	/* This request has to be queued */
 		/* If have a descriptor block (meaning we are in TP), validate the tptoken value against our tplevel counter. A

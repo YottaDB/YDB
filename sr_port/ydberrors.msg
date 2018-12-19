@@ -46,7 +46,7 @@ INVNAMECOUNT	<Number of varnames (namecount parameter in a !AD call) cannot be l
 FATALERROR2	<Fatal error raised. Bypassing core generation and terminating process. Error: !AD>/fatal/fao=2
 TIME2LONG	<Specified time value [0x!16@XQ] exceeds supported maximum [0x!16@XQ]>/error/fao=2
 VARNAME2LONG	<Variable name length exceeds maximum allowed (!UL)>/error/fao=1
-SIMPLEAPINEST	<Attempt to nest call of !AD with a call to !AD - nesting calls is not permitted in the Simple API>/error/fao=4
+SIMPLEAPINEST	<Attempt to nest call of !AZ with a call to !AZ - nesting calls is not permitted in the Simple API>/error/fao=2
 CALLINTCOMMIT	<TCOMMIT at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL>/error/fao=2
 CALLINTROLLBACK	<TROLLBACK at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL>/error/fao=2
 TCPCONNTIMEOUT	<Connection wait timeout (!UL seconds) has expired>/error/fao=2

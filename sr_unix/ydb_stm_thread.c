@@ -388,12 +388,12 @@ void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged)
 			ci_desc.rtn_name.address = (char *)callblk->args[0];
 			ci_desc.rtn_name.length = STRLEN(ci_desc.rtn_name.address);
 			ci_desc.handle = NULL;
-			int_retval = ydb_cip_helper(&ci_desc, (va_list *)callblk->args[1]);
+			int_retval = ydb_cip_helper(calltyp, &ci_desc, (va_list *)callblk->args[1]);
 			callblk->retval = (uintptr_t)int_retval;
 			break;
 		case LYDB_RTN_YDB_CIP:
 			/* Use "ydb_cip_helper" directly */
-			int_retval = ydb_cip_helper((ci_name_descriptor *)callblk->args[0], (va_list *)callblk->args[1]);
+			int_retval = ydb_cip_helper(calltyp, (ci_name_descriptor *)callblk->args[0], (va_list *)callblk->args[1]);
 			callblk->retval = (uintptr_t)int_retval;
 			break;
 

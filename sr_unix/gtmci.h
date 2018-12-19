@@ -58,6 +58,6 @@ void gtm_levl_ret_code(void);
 
 gtm_status_t	gtm_ci_filter(const char *c_rtn_name, ...);
 
-int		ydb_cip_helper(ci_name_descriptor *ci_info, va_list *var);
+int		ydb_cip_helper(int calltyp, ci_name_descriptor *ci_info, va_list *var);
 
 #endif

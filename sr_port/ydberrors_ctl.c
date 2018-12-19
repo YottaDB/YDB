@@ -33,7 +33,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "FATALERROR2", "Fatal error raised. Bypassing core generation and terminating process. Error: !AD", 2 },
 	{ "TIME2LONG", "Specified time value [0x!16@XQ] exceeds supported maximum [0x!16@XQ]", 2 },
 	{ "VARNAME2LONG", "Variable name length exceeds maximum allowed (!UL)", 1 },
-	{ "SIMPLEAPINEST", "Attempt to nest call of !AD with a call to !AD - nesting calls is not permitted in the Simple API", 4 },
+	{ "SIMPLEAPINEST", "Attempt to nest call of !AZ with a call to !AZ - nesting calls is not permitted in the Simple API", 2 },
 	{ "CALLINTCOMMIT", "TCOMMIT at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL", 2 },
 	{ "CALLINTROLLBACK", "TROLLBACK at call-in-level=!UL not allowed as corresponding TSTART was done at lower call-in-level=!UL", 2 },
 	{ "TCPCONNTIMEOUT", "Connection wait timeout (!UL seconds) has expired", 2 },
