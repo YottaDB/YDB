@@ -210,6 +210,7 @@ GBLREF	boolean_t	posix_timer_created;
 #ifdef DEBUG
 GBLREF	boolean_t	in_nondeferrable_signal_handler;
 GBLREF	boolean_t	gtm_jvm_process;
+GBLREF	boolean_t	exit_handler_active;
 #endif
 
 error_def(ERR_SETITIMERFAILED);
@@ -721,7 +722,7 @@ STATICFNDEF void timer_handler(int why)
 	/* else: why == DUMMY_SIG_NUM we know that "timer_handler" was called directly, so no need
 	 * to check if the signal needs to be forwarded to appropriate thread.
 	 */
-	assert(gtm_is_main_thread() || gtm_jvm_process);
+	assert(gtm_is_main_thread() || gtm_jvm_process || exit_handler_active && (DUMMY_SIG_NUM == why));
 	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into generic_signal_handler
