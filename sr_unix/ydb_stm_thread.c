@@ -112,9 +112,6 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 	stm_que_ent		*callblk;
 	int			status, save_errno, calltyp;
 	void			*voidstar_retval;
-#	ifndef GTM64
-	unsigned long long	tparm;
-#	endif
 	libyottadb_routines	lydbrtn;
 	DCL_THREADGBL_ACCESS;
 
@@ -179,6 +176,9 @@ void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged)
 	int			int_retval, status, calltyp;
 	ci_name_descriptor	ci_desc;
 	stm_workq		*curTPQLevel;
+#	ifndef GTM64
+	unsigned long long	tparm;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -368,19 +368,19 @@ void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged)
 			callblk->retval = 0;
 			break;
 		case LYDB_RTN_TIMER_START:
-#				ifdef GTM64
+#			ifdef GTM64
 			int_retval = ydb_timer_start((int)callblk->args[0], (unsigned long long)callblk->args[1],
 						     (ydb_funcptr_retvoid_t)callblk->args[2],
 						     (unsigned int)callblk->args[3], (void *)callblk->args[4]);
-#				else
-#				ifdef BIGENDIAN
+#			else
+#			ifdef BIGENDIAN
 			tparm = (((unsigned long long)callblk->args[1]) << 32) | (unsigned long long)callblk->args[2];
-#				else
+#			else
 			tparm = (((unsigned long long)callblk->args[2]) << 32) | (unsigned long long)callblk->args[1];
-#				endif
+#			endif
 			int_retval = ydb_timer_start((int)callblk->args[0], tparm, (ydb_funcptr_retvoid_t)callblk->args[3],
 						     (unsigned int)callblk->args[4], (void *)callblk->args[5]);
-#				endif
+#			endif
 			callblk->retval = (uintptr_t)int_retval;
 			break;
 		case LYDB_RTN_YDB_CI:
