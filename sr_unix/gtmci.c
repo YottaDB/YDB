@@ -1152,6 +1152,7 @@ int ydb_init()
 	Dl_info			shlib_info;
 	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;	/* needed at least by SETUP_GENERIC_ERROR macro in case we go below that code path */
 	if (fork_after_ydb_init)
 	{	/* This process was created by a "fork" from a parent process that had done YottaDB engine calls.
 		 * Do some checks for error scenarios.
@@ -1217,7 +1218,6 @@ int ydb_init()
 				__FILE__, __LINE__, status, STRERROR(status));
 		return ERR_SYSCALL;
 	}
-	SETUP_THREADGBL_ACCESS;
 	if (NULL == lcl_gtm_threadgbl)
 	{	/* This will likely need some attention before going to a fully threaded model */
 		assert(!ydb_init_complete);
