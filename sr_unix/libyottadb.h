@@ -67,9 +67,8 @@ enum
 #define YDB_INT_MAX		((int)0x7fffffff)
 #define	YDB_TP_RESTART		(YDB_INT_MAX - 1)	/* 0x7ffffffe */
 #define	YDB_TP_ROLLBACK		(YDB_INT_MAX - 2)	/* 0x7ffffffd */
-#define YDB_NODE_END		(YDB_INT_MAX - 3)	/* 0x7ffffffc */
+#define YDB_NOTOK		(YDB_INT_MAX - 3)	/* 0x7ffffffc */
 #define YDB_LOCK_TIMEOUT	(YDB_INT_MAX - 4)	/* 0x7ffffffb */
-#define YDB_NOTOK		(YDB_INT_MAX - 5)	/* 0x7ffffffa */
 
 /* Miscellaneous defines */
 #ifndef TRUE
@@ -364,5 +363,7 @@ int ydb_str2zwr_st(uint64_t tptoken, ydb_buffer_t *str, ydb_buffer_t *zwr);
 int ydb_zwr2str_st(uint64_t tptoken, ydb_buffer_t *zwr, ydb_buffer_t *str);
 int ydb_tp_st(uint64_t tptoken, ydb_tp2fnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames);
 
+
+#include "libydberrors.h"	/* needed for various errors returned by SimpleAPI/SimpleThreadAPI (e.g. YDB_ERR_TPTIMEOUT etc.) */
 
 #endif /* LIBYOTTADB_TYPES_H */

@@ -715,8 +715,8 @@ MBSTART {															\
 } MBEND
 
 
-void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn);
-void sapi_save_targ_key_subscr_nodes(void);
+int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn);
+void	sapi_save_targ_key_subscr_nodes(void);
 intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk);
 intptr_t ydb_stm_args0(uint64_t tptoken, uintptr_t calltyp);
 intptr_t ydb_stm_args1(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1);

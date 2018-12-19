@@ -52,7 +52,7 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 	boolean_t	error_encountered;
 	gparam_list	plist;
 	ht_ent_mname	*tabent;
-	int		nodenext_svn_index;
+	int		nodenext_svn_index, status;
 	lv_val		*lvvalp, *next_lv;
 	mname_entry	var_mname;
 	mval		varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
@@ -86,6 +86,7 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 	if (NULL == ret_subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			      LEN_AND_LIT("NULL ret_subs_used"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_NODE_NEXT)));
+	status = YDB_OK;
 	/* Separate actions depending on type of variable for which the next subscript is being located */
 	switch(nodenext_type)
 	{
@@ -95,9 +96,9 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 			if (NULL == lvvalp)
 			{	/* Base local variable does not exist (ERR_LVUNDEF_OK_FALSE above is to ensure
 				 * we do not issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
-				 * Return 0 for "ydb_node_next_s" result.
+				 * Return YDB_ERR_NODEEND for "ydb_node_next_s" result.
 				 */
-				*ret_subs_used = YDB_NODE_END;
+				status = YDB_ERR_NODEEND;
 				break;
 			}
 			varnamemv.mvtype = MV_STR;
@@ -115,7 +116,7 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 							LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
 				callg((callgfnptr)op_fnquery, &plist);	/* Drive "op_fnquery" to locate next node */
 			}
-			sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, (char *)LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
+			status = sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, (char *)LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-next processing is the same regardless of argument count:
@@ -138,7 +139,7 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
 			op_gvquery(NULL);				/* Locate next subscript this level */
-			sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, (char *)LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
+			status = sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, (char *)LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
@@ -151,5 +152,5 @@ int ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarra
 	TREF(sapi_query_node_subs_cnt) = 0;
 	LIBYOTTADB_DONE;
 	REVERT;
-	return YDB_OK;
+	return status;
 }

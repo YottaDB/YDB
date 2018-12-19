@@ -27,7 +27,7 @@
  *   ret_subsarray - Address of an array of ydb_buffer_t subscript descriptors
  *   ydb_caller_fn - Name of function that is invoking it. Used as a parameter to PARAMINVALID error if issued.
  */
-void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn)
+int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn)
 {
 	ydb_buffer_t	*outsubp, *outsubp_top;
 	mstr		*mstrp, *mstrp_top;
@@ -36,16 +36,13 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, c
 
 	SETUP_THREADGBL_ACCESS;
 	if (0 == TREF(sapi_query_node_subs_cnt))
-	{	/* No subscripts were returned - set to YDB_NODE_END */
-		*ret_subs_used = YDB_NODE_END;
-		return;
-	}
+		return YDB_ERR_NODEEND;	/* No subscripts were returned - return YDB_ERR_NODEEND */
 	if (-1 == TREF(sapi_query_node_subs_cnt))
 	{	/* No subscripts were returned but we are legitimately returning the basevar name in a reverse $query()
-		 * so no YDB_NODE_END return code.
+		 * so no YDB_ERR_NODEEND return code.
 		 */
 		*ret_subs_used = 0;			/* Just return 0 subscripts */
-		return;
+		return YDB_OK;
 	}
 	if (NULL == ret_subsarray)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
@@ -88,4 +85,5 @@ void sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, c
 		 */
 		(*ret_subs_used)++;
 	}
+	return YDB_OK;
 }

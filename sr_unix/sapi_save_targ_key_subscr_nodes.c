@@ -88,7 +88,7 @@ void sapi_save_targ_key_subscr_nodes(void)
 		TREF(sapi_query_node_subs_cnt) = subs_cnt;
 	else
 	{	/* Returning just the name (no subscripts) so set the subscript count to -1 to
-		 * differentiate it from a subs_cnt=0 return which signals the end of the list (YDB_NODE_END).
+		 * differentiate it from a subs_cnt=0 return which signals the end of the list (YDB_ERR_NODEEND).
 		 * Similar code exists in "sr_port/op_fnreversequery.c" for local variables.
 		 */
 		TREF(sapi_query_node_subs_cnt) = -1;

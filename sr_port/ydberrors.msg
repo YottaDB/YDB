@@ -21,7 +21,6 @@
 !
 !  List of messages that are (currently) only used in Golang Wrapper code
 !    STRUCTNOTALLOCD
-!    NODEEND
 !    INVLNPAIRLIST
 !
 !  List of known undocumented messages follows (along with a comment) (do not change "known undocumented" phrase)
