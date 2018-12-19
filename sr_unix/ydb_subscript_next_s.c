@@ -51,7 +51,7 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 	boolean_t	error_encountered;
 	gparam_list	plist;
 	ht_ent_mname	*tabent;
-	int		get_svn_index;
+	int		get_svn_index, status;
 	lv_val		*lvvalp, *ord_lv;
 	mname_entry	var_mname;
 	mval		*subval, nextsub, *nextsub_mv, varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
@@ -136,8 +136,6 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 				nextsub_mv = &nextsub;
 				MV_FORCE_STR(nextsub_mv);
 			}
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &nextsub, "NULL ret_value->buf_addr",
-					LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_NEXT));
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-next processing is the same regardless of argument count:
@@ -160,8 +158,6 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
 			op_gvorder(&nextsub);				/* Locate next subscript this level */
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &nextsub, "NULL ret_value->buf_addr",
-						LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_NEXT));
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
@@ -169,9 +165,17 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 			break;
 		default:
 			assertpro(FALSE);
+			break;
 	}
+	assert(MVTYPE_IS_STRING(nextsub.mvtype));
+	if (nextsub.str.len)
+	{
+		SET_YDB_BUFF_T_FROM_MVAL(ret_value, &nextsub, "NULL ret_value->buf_addr", LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_NEXT));
+		status = YDB_OK;
+	} else
+		status = YDB_ERR_NODEEND; /* About to return the empty string. Signal end of list. Leave "ret_value" untouched */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;
-	return YDB_OK;
+	return status;
 }

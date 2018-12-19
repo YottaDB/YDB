@@ -52,7 +52,7 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 	boolean_t	error_encountered;
 	gparam_list	plist;
 	ht_ent_mname	*tabent;
-	int		get_svn_index;
+	int		get_svn_index, status;
 	lv_val		*lvvalp, *ord_lv;
 	mname_entry	var_mname;
 	mval		*subval, previoussub, *previoussub_mv, varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
@@ -137,8 +137,6 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 				previoussub_mv = &previoussub;
 				MV_FORCE_STR(previoussub_mv);
 			}
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub, "NULL ret_value->buf_addr",
-				LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_PREVIOUS));
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-previous processing is the same regardless of argument count:
@@ -161,8 +159,6 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get previous global */
 			op_zprevious(&previoussub);			/* Locate previous subscript this level */
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub, "NULL ret_value->buf_addr",
-				LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_PREVIOUS));
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */
@@ -170,7 +166,16 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 			break;
 		default:
 			assertpro(FALSE);
+			break;
 	}
+	assert(MVTYPE_IS_STRING(previoussub.mvtype));
+	if (previoussub.str.len)
+	{
+		SET_YDB_BUFF_T_FROM_MVAL(ret_value, &previoussub, "NULL ret_value->buf_addr",
+								LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_PREVIOUS));
+		status = YDB_OK;
+	} else
+		status = YDB_ERR_NODEEND; /* About to return the empty string. Signal end of list. Leave "ret_value" untouched */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;
