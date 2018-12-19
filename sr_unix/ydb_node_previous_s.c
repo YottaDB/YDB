@@ -85,8 +85,7 @@ int ydb_node_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subs
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if (NULL == ret_subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			      LEN_AND_LIT("NULL ret_subs_used"),
-			      LEN_AND_STR(simpleThreadAPI_active ? "ydb_node_previous_st()" : "ydb_node_previous_s()"));
+			      LEN_AND_LIT("NULL ret_subs_used"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_NODE_PREVIOUS)));
 	/* Separate actions depending on type of variable for which the previous subscript is being located */
 	switch(nodeprev_type)
 	{
@@ -113,11 +112,10 @@ int ydb_node_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subs
 				plist.arg[1] = &varnamemv;		/* arg2: varname mval */
 				plist.arg[2] = lvvalp;			/* arg3: varname lv_val */
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 3,
-						simpleThreadAPI_active ? "ydb_node_previous_st()" : "ydb_node_previous_s()");
+						LYDBRTNNAME(LYDB_RTN_NODE_PREVIOUS));
 				callg((callgfnptr)op_fnreversequery, &plist);/* Drive "op_fnreversequery" to locate previous node */
 			}
-			sapi_return_subscr_nodes(ret_subs_used, ret_subsarray,
-					simpleThreadAPI_active ? "ydb_node_previous_st()" : "ydb_node_previous_s()");
+			sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, (char *)LYDBRTNNAME(LYDB_RTN_NODE_PREVIOUS));
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-previous processing is the same regardless of argument count:
@@ -135,13 +133,12 @@ int ydb_node_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subs
 			{
 				plist.arg[0] = &gvname;
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
-						simpleThreadAPI_active ? "ydb_node_previous_st()" : "ydb_node_previous_s()");
+						LYDBRTNNAME(LYDB_RTN_NODE_PREVIOUS));
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to create key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to locate specified global */
 			op_gvreversequery(NULL);			/* Locate previous subscript this level */
-			sapi_return_subscr_nodes(ret_subs_used, ret_subsarray,
-					simpleThreadAPI_active ? "ydb_node_previous_st()" : "ydb_node_previous_s()");
+			sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, (char *)LYDBRTNNAME(LYDB_RTN_NODE_PREVIOUS));
 			break;
 		case LYDB_VARREF_ISV:
 			/* ISV references are not supported for this call */

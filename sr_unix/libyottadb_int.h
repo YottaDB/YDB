@@ -46,18 +46,13 @@ LITREF	char		ctypetab[NUM_CHARS];
 LITREF	nametabent	svn_names[];
 LITREF	unsigned char	svn_index[];
 LITREF	svn_data_type	svn_data[];
-LITREF	int		lydbrtnpkg[];
-LITREF	char 		*lydbrtnnames[];
+LITREF	char		*lydb_simpleapi_rtnnames[];
+LITREF	char		*lydb_simplethreadapi_rtnnames[];
 
 #define THREADED_STR	"threaded Simple API"
 #define UNTHREADED_STR	"Simple API"
 #define THREADED_STR_LEN (SIZEOF(THREADED_STR) - 1)
 #define UNTHREADED_STR_LEN (SIZEOF(UNTHREADED_STR) - 1)
-
-#define LYDB_NONE	0				/* Routine is part of no package */
-#define LYDB_UTILITY 	1				/* Routine is a utility routine */
-#define LYDB_SIMPLEAPI	2				/* Routine is part of the simpleAPI */
-#define LYDB_MISC	3				/* Routine is part of a miscellaneous set of functions */
 
 #define YDB_MAX_SAPI_ARGS GTM64_ONLY(5) NON_GTM64_ONLY(6)	/* The most args any simpleapi routine has (excepting ydb_lock_s)
 								 * is 5 but in 32 bit mode the max is 6.
@@ -71,12 +66,16 @@ LITREF	char 		*lydbrtnnames[];
 #define STMWORKQUEUEDIM (TP_MAX_LEVEL + 1)
 
 /* Values for TREF(libyottadb_active_rtn) */
-#define LYDBRTN(a, b, c) a
+#define LYDBRTN(lydbtype, simpleapi_rtnname, simplethreadapi_rtnname)	lydbtype
 typedef enum
 {
 #include "libyottadb_rtns.h"
 } libyottadb_routines;
 #undef LYDBRTN
+
+#define	LYDBRTNNAME(lydbtype)	(simpleThreadAPI_active					\
+					? lydb_simplethreadapi_rtnnames[lydbtype]	\
+					: lydb_simpleapi_rtnnames[lydbtype])
 
 /* Returned values for VARTYPE in VALIDATE-VARNAME() macro */
 typedef enum
@@ -192,15 +191,15 @@ MBSTART	{													\
 	{													\
 		errcode = ERR_SIMPLEAPINEST;									\
 		setup_error(CSA_ARG(NULL) VARLSTCNT(6) ERR_SIMPLEAPINEST, 4,					\
-				RTS_ERROR_TEXT(lydbrtnnames[TREF(libyottadb_active_rtn)]),			\
-				RTS_ERROR_TEXT(lydbrtnnames[ROUTINE]));						\
+				RTS_ERROR_TEXT(LYDBRTNNAME(TREF(libyottadb_active_rtn))),			\
+				RTS_ERROR_TEXT(LYDBRTNNAME(ROUTINE)));						\
 		SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
 		set_zstatus(&entryref, errcode, NULL, FALSE);							\
 		TREF(ydb_error_code) = errcode;									\
 		return RETTYPE YDB_ERR_SIMPLEAPINEST;								\
 	}													\
 	TREF(libyottadb_active_rtn) = ROUTINE;									\
-	DBGAPI((stderr, "Entering routine %s\n", lydbrtnnames[ROUTINE]));					\
+	DBGAPI((stderr, "Entering routine %s\n", LYDBRTNNAME(ROUTINE)));					\
 } MBEND
 
 /* And now for the no return value edition */
@@ -218,21 +217,21 @@ MBSTART	{													\
 	{													\
 		errcode = ERR_SIMPLEAPINEST;									\
 		setup_error(CSA_ARG(NULL) VARLSTCNT(6) ERR_SIMPLEAPINEST, 4,					\
-				RTS_ERROR_TEXT(lydbrtnnames[TREF(libyottadb_active_rtn)]),			\
-				RTS_ERROR_TEXT(lydbrtnnames[ROUTINE]));						\
+				RTS_ERROR_TEXT(LYDBRTNNAME(TREF(libyottadb_active_rtn))),			\
+				RTS_ERROR_TEXT(LYDBRTNNAME(ROUTINE)));						\
 		SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
 		set_zstatus(&entryref, errcode, NULL, FALSE);							\
 		TREF(ydb_error_code) = errcode;									\
 		return;												\
 	}													\
 	TREF(libyottadb_active_rtn) = ROUTINE;									\
-	DBGAPI((stderr, "Entering routine %s\n", lydbrtnnames[ROUTINE]));					\
+	DBGAPI((stderr, "Entering routine %s\n", LYDBRTNNAME(ROUTINE)));					\
 } MBEND
 
 #ifdef YDB_TRACE_API
 # define LIBYOTTADB_DONE 									\
 MBSTART {											\
-	DBGAPI((stderr, "Exiting routine %s\n", lydbrtnnames[TREF(libyottadb_active_rtn)]));	\
+	DBGAPI((stderr, "Exiting routine %s\n", LYDBRTNNAME(TREF(libyottadb_active_rtn))));	\
 	TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;						\
 } MBEND
 #else

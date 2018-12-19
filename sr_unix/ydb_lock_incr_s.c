@@ -83,7 +83,7 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int 
 	 * us to do it again.
 	 */
 	COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2,
-				simpleThreadAPI_active ? "ydb_lock_incr_st()" : "ydb_lock_incr_s()");
+							LYDBRTNNAME(LYDB_RTN_LOCK_INCR));
 	callg((callgfnptr)op_lkname, &plist);
 	/* At this point, the private lock block has been created. Remaining task before calling "op_incrlock" is to
 	 * convert the timeout value from nanoseconds to seconds

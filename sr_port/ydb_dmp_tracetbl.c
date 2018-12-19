@@ -17,8 +17,6 @@
 #include "trace_table.h"
 #include "libyottadb_int.h"
 
-LITREF char *lydbrtnnames[];
-
 /* Routine to dump the current (circular queue) trace table contents */
 void ydb_dmp_tracetbl(void)
 {
@@ -104,7 +102,7 @@ void ydb_dmp_tracetbl(void)
 				else
 				{
 					assert(LYDB_RTN_TPCOMPLT > cur->intfld);
-					funcname = lydbrtnnames[cur->intfld];
+					funcname = LYDBRTNNAME(cur->intfld);
 				}
 				fprintf(stderr, "   Entry: STAPITP_FUNCDISPATCH,  Func: %s,   TID: 0x"lvaddr"\n", funcname,
 					(unsigned long)cur->addrfld3);
@@ -116,7 +114,7 @@ void ydb_dmp_tracetbl(void)
 				else
 				{
 					assert(LYDB_RTN_TPCOMPLT > cur->intfld);
-					funcname = lydbrtnnames[cur->intfld];
+					funcname = LYDBRTNNAME(cur->intfld);
 				}
 				fprintf(stderr, "   Entry: STAPITP_SEMWAKE,  Retval: %p, Callblk: %p,  TID: 0x"lvaddr"\n",
 					cur->addrfld1, cur->addrfld2, (unsigned long)cur->addrfld3);

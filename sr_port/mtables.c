@@ -494,17 +494,17 @@ GBLDEF casemap_t casemaps[MAX_CASE_IDX] =
 LITDEF mstr	nsb_dummy = {0, 1, "\0"};
 /*LITDEF mstr	nsb_dummy = {0, LEN_AND_LIT("dummy")};*/
 
-/* Names of the libyottadb routines */
-#define LYDBRTN(a, b, c) c
-LITDEF char *lydbrtnnames[] =
+/* Names of the libyottadb routines in SimpleAPI mode */
+#define LYDBRTN(lydbtype, simpleapi_rtnname, simplethreadapi_rtnname)	simpleapi_rtnname
+LITDEF char *lydb_simpleapi_rtnnames[] =
 {
 #include "libyottadb_rtns.h"
 };
 #undef LYDBRTN
 
-/* What package the libyottadb routines belong to */
-#define LYDBRTN(a, b, c) b
-LITDEF int lydbrtnpkg[] =
+/* Names of the libyottadb routines in SimpleThreadAPI mode */
+#define LYDBRTN(lydbtype, simpleapi_rtnname, simplethreadapi_rtnname)	simplethreadapi_rtnname
+LITDEF char *lydb_simplethreadapi_rtnnames[] =
 {
 #include "libyottadb_rtns.h"
 };

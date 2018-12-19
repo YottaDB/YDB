@@ -86,7 +86,7 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(simpleThreadAPI_active ? "ydb_get_st()" : "ydb_get_s()"));
+			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_GET)));
 	/* Separate actions depending on type of GET being done */
 	switch(get_type)
 	{
@@ -107,14 +107,13 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
-								simpleThreadAPI_active ? "ydb_get_st()" : "ydb_get_s()");
+											LYDBRTNNAME(LYDB_RTN_GET));
 				src_lv = (lv_val *)callg((callgfnptr)op_getindx, &plist);	/* Locate node */
 			}
 			if (!LV_IS_VAL_DEFINED(src_lv))				/* Fetched value should be defined */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVUNDEF);
 			/* Copy value to return buffer */
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &src_lv->v, "NULL ret_value->buf_addr",
-							simpleThreadAPI_active ? "ydb_get_st()" : "ydb_get_s()");
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &src_lv->v, "NULL ret_value->buf_addr", LYDBRTNNAME(LYDB_RTN_GET));
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Fetch the given global variable value. We do this by:
@@ -130,22 +129,20 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 			plist.arg[0] = &gvname;
 			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
 			COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
-							simpleThreadAPI_active ? "ydb_get_st()" : "ydb_get_s()");
+							LYDBRTNNAME(LYDB_RTN_GET));
 			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
 			gotit = op_gvget(&get_value);			/* Fetch value into get_value - should signal UNDEF
 									 * if value not found (and undef_inhibit not set)
 									 */
 			assert(gotit);
 			/* Copy value to return buffer */
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr",
-							simpleThreadAPI_active ? "ydb_get_st()" : "ydb_get_s()");
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr", LYDBRTNNAME(LYDB_RTN_GET));
 			break;
 		case LYDB_VARREF_ISV:
 			/* Fetch the given ISV value (no subscripts supported) */
 			op_svget(get_svn_index, &get_value);
 			/* Copy value to return buffer */
-			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr",
-							simpleThreadAPI_active ? "ydb_get_st()" : "ydb_get_s()");
+			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &get_value, "NULL ret_value->buf_addr", LYDBRTNNAME(LYDB_RTN_GET));
 			break;
 		default:
 			assertpro(FALSE);

@@ -86,8 +86,7 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 	{
 		if (IS_INVALID_YDB_BUFF_T(increment))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-					LEN_AND_LIT("Invalid increment"),
-					LEN_AND_STR(simpleThreadAPI_active ? "ydb_incr_st()" : "ydb_incr_s()"));
+					LEN_AND_LIT("Invalid increment"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_INCR)));
 		increment_mval.mvtype = MV_STR;
 		increment_mval.str.addr = increment->buf_addr;
 		increment_mval.str.len = increment->len_used;
@@ -115,7 +114,7 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_putindx */
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE, 1,
-							simpleThreadAPI_active ? "ydb_incr_st()" : "ydb_incr_s()");
+							LYDBRTNNAME(LYDB_RTN_INCR));
 				dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Locate/create node */
 			}
 			/* If we created this node just now, fill it with a 0 value */
@@ -141,7 +140,7 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 			{
 				plist.arg[0] = &gvname;
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
-								simpleThreadAPI_active ? "ydb_incr_st()" : "ydb_incr_s()");
+											LYDBRTNNAME(LYDB_RTN_INCR));
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to  key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
@@ -157,8 +156,7 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 	}
 	if (NULL != ret_value)
 	{	/* Copy value to return buffer */
-		SET_YDB_BUFF_T_FROM_MVAL(ret_value, ret_mv, "NULL ret_value->buf_addr",
-					simpleThreadAPI_active ? "ydb_incr_st()" : "ydb_incr_s()");
+		SET_YDB_BUFF_T_FROM_MVAL(ret_value, ret_mv, "NULL ret_value->buf_addr", LYDBRTNNAME(LYDB_RTN_INCR));
 	}
 	TREF(sapi_mstrs_for_gc_indx) = 0; /* mstrs in this array (added by RECORD_MSTR_FOR_GC) no longer need to be protected */
 	LIBYOTTADB_DONE;

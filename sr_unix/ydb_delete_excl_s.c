@@ -68,8 +68,7 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 	 * validate a name that may not be specified.
 	 */
 	if (0 > namecount)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2,
-			LEN_AND_STR(simpleThreadAPI_active ? "ydb_delete_excl_st()" : "ydb_delete_excl_s()"));
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DELETE_EXCL)));
 	if (0 == namecount)
 	{	/* Special case - no varname supplied so drive kill-all of local variables */
 		op_killall();
@@ -79,7 +78,7 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 	}
 	if (YDB_MAX_NAMES < namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNT2HI, 3,
-			LEN_AND_STR(simpleThreadAPI_active ? "ydb_delete_excl_st()" : "ydb_delete_excl_s()"), YDB_MAX_NAMES);
+			LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DELETE_EXCL)), YDB_MAX_NAMES);
 	/* Run through the array creating mvals to hold the list of names to be excluded. Note, normally, we would use
 	 * the COPY_PAMS_TO_CALLG_BUFFER() macro for this but in this case, we also need to validate each mval that it has
 	 * a valid variable name in it so we do the parm copy "manually".
@@ -87,14 +86,12 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 	for (curvarname = varnames, parmp = &plist.arg[0], parmp_top = parmp + namecount, mvalp = &plist_mvals[0];
 	     parmp < parmp_top;
 	     parmp++, mvalp++, curvarname++)
-
 	{	/* Validate each name to make sure is well formed */
 		if (IS_INVALID_YDB_BUFF_T(curvarname))
 		{
 			SPRINTF(buff, "Invalid varname array (index %d)", curvarname - varnames);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-				      LEN_AND_STR(buff),
-				      LEN_AND_STR(simpleThreadAPI_active ? "ydb_delete_excl_st()" : "ydb_delete_excl_s()"));
+					LEN_AND_STR(buff), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DELETE_EXCL)));
 		}
 		if (YDB_MAX_IDENT < curvarname->len_used)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_VARNAME2LONG, 1, YDB_MAX_IDENT);

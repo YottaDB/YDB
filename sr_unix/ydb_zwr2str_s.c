@@ -47,12 +47,12 @@ int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str)
 	/* Do some validation */
 	if (NULL == str)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-						LEN_AND_LIT("NULL str"), LEN_AND_LIT("ydb_zwr2str()"));
+						LEN_AND_LIT("NULL str"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_ZWR2STR)));
 	src.mvtype = MV_STR;
 	src.str.len = zwr->len_used;
 	src.str.addr = zwr->buf_addr;
 	op_fnzwrite(TRUE, &src, &dst);
-	SET_YDB_BUFF_T_FROM_MVAL(str, &dst, "NULL str->buf_addr", simpleThreadAPI_active ? "ydb_zwr2str_st()" : "ydb_zwr2str_s()");
+	SET_YDB_BUFF_T_FROM_MVAL(str, &dst, "NULL str->buf_addr", LYDBRTNNAME(LYDB_RTN_ZWR2STR));
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;

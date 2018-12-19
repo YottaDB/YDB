@@ -64,7 +64,8 @@ int ydb_message(int errnum, ydb_buffer_t *msg_buff)
 	{
 		if (NULL == msg_buff->buf_addr)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6)
-				ERR_PARAMINVALID, 4, LEN_AND_LIT("NULL msg_buff->buf_addr"), LEN_AND_LIT("ydb_message"));
+				ERR_PARAMINVALID, 4, LEN_AND_LIT("NULL msg_buff->buf_addr"),
+				LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_MESSAGE)));
 		memcpy(msg_buff->buf_addr, msg.addr, msg.len);
 	}
 	LIBYOTTADB_DONE;

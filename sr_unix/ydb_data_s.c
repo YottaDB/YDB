@@ -84,7 +84,7 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
-			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(simpleThreadAPI_active ? "ydb_data_st()" : "ydb_data_s()"));
+			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DATA)));
 	/* Separate actions depending on type of DATA being done */
 	switch(data_type)
 	{
@@ -109,7 +109,7 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
-								simpleThreadAPI_active ? "ydb_data_st()" : "ydb_data_s()");
+											LYDBRTNNAME(LYDB_RTN_DATA));
 				src_lv = (lv_val *)callg((callgfnptr)op_srchindx, &plist);	/* Locate node */
 			}
 			op_fndata(src_lv, &data_value);
@@ -128,7 +128,7 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 			{
 				plist.arg[0] = &gvname;
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
-								simpleThreadAPI_active ? "ydb_data_st()" : "ydb_data_s()");
+											LYDBRTNNAME(LYDB_RTN_DATA));
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to  key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
