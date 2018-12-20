@@ -1219,7 +1219,18 @@ int ydb_init()
 		return ERR_SYSCALL;
 	}
 	if (NULL == lcl_gtm_threadgbl)
-	{	/* This will likely need some attention before going to a fully threaded model */
+	{	/* This means the SETUP_THREADGBL_ACCESS done at the beginning of this function (before getting the
+		 * "ydb_engine_threadsafe_mutex" multi-thread lock) saw the global variable "gtm_threadgbl" as NULL.
+		 * But it is possible we reach here after one thread has done the initialization and released the
+		 * multi-thread lock. So redo the SETUP_THREADGBL_ACCESS.
+		 */
+		SETUP_THREADGBL_ACCESS;
+	}
+	if (NULL == lcl_gtm_threadgbl)
+	{	/* A NULL value of "lcl_gtm_threagbl" here means "gtm_threadgbl" is still NULL.
+		 * This means no GTM_THREADGBL_INIT or "ydb_init" has happened yet in this process. Take care of both below.
+		 * Note: This will likely need some attention before going to a fully threaded model
+		 */
 		assert(!ydb_init_complete);
 		GTM_THREADGBL_INIT;
 	}
