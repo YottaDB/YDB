@@ -654,9 +654,93 @@ MBSTART {												\
 	{													\
 		if (!IS_STAPI_WORKER_THREAD)									\
 		{												\
-			DBGAPITP_ONLY(gtm_fork_n_core());							\
 			SETUP_GENERIC_ERROR_4PARMS(ERR_INVAPIMODE, THREADED_STR_LEN, THREADED_STR,		\
 						   UNTHREADED_STR_LEN, UNTHREADED_STR);				\
+			DBGAPITP_ONLY(gtm_fork_n_core());							\
+			/* Reset active routine indicator before returning an error.				\
+			 * Caller would have done LIBYOTTADB_INIT before invoking this macro. Assert that.	\
+			 */											\
+			assert(LYDB_RTN_NONE != TREF(libyottadb_active_rtn));					\
+			TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;						\
+			return YDB_ERR_INVAPIMODE;								\
+		}												\
+		/* We are in threaded mode but running an unthreaded command in the main work thread which	\
+		 * is allowed. In that case just fall out (verified).						\
+		 */												\
+	} else													\
+		noThreadAPI_active = TRUE;									\
+} MBEND
+
+/* Variant of VERIFY_NON_THREADED_API macro that does a "return" but without any value */
+#define VERIFY_NON_THREADED_API_NORETVAL									\
+MBSTART {	/* If threaded API but in worker thread, that is OK */						\
+	GBLREF boolean_t noThreadAPI_active;									\
+	GBLREF boolean_t simpleThreadAPI_active;								\
+	GBLREF stm_workq *stmWorkQueue[];									\
+	if (simpleThreadAPI_active)										\
+	{													\
+		if (!IS_STAPI_WORKER_THREAD)									\
+		{												\
+			SETUP_GENERIC_ERROR_4PARMS(ERR_INVAPIMODE, THREADED_STR_LEN, THREADED_STR,		\
+						   UNTHREADED_STR_LEN, UNTHREADED_STR);				\
+			DBGAPITP_ONLY(gtm_fork_n_core());							\
+			/* Reset active routine indicator before returning an error.				\
+			 * Caller would have done LIBYOTTADB_INIT before invoking this macro. Assert that.	\
+			 */											\
+			assert(LYDB_RTN_NONE != TREF(libyottadb_active_rtn));					\
+			TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;						\
+			return;											\
+		}												\
+		/* We are in threaded mode but running an unthreaded command in the main work thread which	\
+		 * is allowed. In that case just fall out (verified).						\
+		 */												\
+	} else													\
+		noThreadAPI_active = TRUE;									\
+} MBEND
+
+/* Variant of VERIFY_NON_THREADED_API macro that does a "return" but with a NULL pointer value */
+#define VERIFY_NON_THREADED_API_RETNULL										\
+	MBSTART {	/* If threaded API but in worker thread, that is OK */					\
+	GBLREF boolean_t noThreadAPI_active;									\
+	GBLREF boolean_t simpleThreadAPI_active;								\
+	GBLREF stm_workq *stmWorkQueue[];									\
+	if (simpleThreadAPI_active)										\
+	{													\
+		if (!IS_STAPI_WORKER_THREAD)									\
+		{												\
+			SETUP_GENERIC_ERROR_4PARMS(ERR_INVAPIMODE, THREADED_STR_LEN, THREADED_STR,		\
+						   UNTHREADED_STR_LEN, UNTHREADED_STR);				\
+			DBGAPITP_ONLY(gtm_fork_n_core());							\
+			/* Reset active routine indicator before returning an error.				\
+			 * Caller would have done LIBYOTTADB_INIT before invoking this macro. Assert that.	\
+			 */											\
+			assert(LYDB_RTN_NONE != TREF(libyottadb_active_rtn));					\
+			TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;						\
+			return NULL;										\
+		}												\
+		/* We are in threaded mode but running an unthreaded command in the main work thread which	\
+		 * is allowed. In that case just fall out (verified).						\
+		 */												\
+	} else													\
+		noThreadAPI_active = TRUE;									\
+} MBEND
+
+/* Variant of VERIFY_NON_THREADED_API macro that does a "return" but without resetting TREF(libyottadb_active_rtn).
+ * Called by functions that do not do LIBYOTTADB_INIT but do call VERIFY_NON_THREADED_API* macro.
+ */
+#define VERIFY_NON_THREADED_API_DO_NOT_SHUTOFF_ACTIVE_RTN							\
+	MBSTART {	/* If threaded API but in worker thread, that is OK */					\
+	GBLREF boolean_t noThreadAPI_active;									\
+	GBLREF boolean_t simpleThreadAPI_active;								\
+	GBLREF stm_workq *stmWorkQueue[];									\
+	if (simpleThreadAPI_active)										\
+	{													\
+		if (!IS_STAPI_WORKER_THREAD)									\
+		{												\
+			SETUP_GENERIC_ERROR_4PARMS(ERR_INVAPIMODE, THREADED_STR_LEN, THREADED_STR,		\
+						   UNTHREADED_STR_LEN, UNTHREADED_STR);				\
+			DBGAPITP_ONLY(gtm_fork_n_core());							\
+			return YDB_ERR_INVAPIMODE;								\
 		}												\
 		/* We are in threaded mode but running an unthreaded command in the main work thread which	\
 		 * is allowed. In that case just fall out (verified).						\

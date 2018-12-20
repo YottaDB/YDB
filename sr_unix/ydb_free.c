@@ -29,7 +29,7 @@ void ydb_free(void *ptr)
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
-	VERIFY_NON_THREADED_API;
+	VERIFY_NON_THREADED_API_NORETVAL;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{	/* Some error occurred - just return to the caller ($ZSTATUS is set) */

@@ -30,11 +30,14 @@ int ydb_cip_helper(int calltyp, ci_name_descriptor *ci_info, va_list *var)
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	assert((LYDB_RTN_YDB_CI == calltyp) || (LYDB_RTN_YDB_CIP == calltyp));
+	/* Need to call VERIFY_THREADED_API before LIBYOTTADB_INIT.
+	 * Moving this to after LIBYOTTADB_INIT implies LIBYOTTADB_DONE would not be done in case of INVAPIMODE error.
+	 */
+	VERIFY_THREADED_API((int));
 	LIBYOTTADB_INIT(calltyp, (int));	/* Note: macro could "return" from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
-	VERIFY_THREADED_API((int));
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{

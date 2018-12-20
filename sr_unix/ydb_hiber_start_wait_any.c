@@ -18,7 +18,9 @@
 #include "libyottadb_int.h"
 #include "libydberrors.h"
 
+#ifdef DEBUG
 GBLREF	boolean_t	simpleThreadAPI_active;
+#endif
 
 /* Simple YottaDB wrapper for gtm_hiber_start_wait_any() */
 int	ydb_hiber_start_wait_any(unsigned long long sleep_nsec)
@@ -41,8 +43,7 @@ int	ydb_hiber_start_wait_any(unsigned long long sleep_nsec)
 		return -(TREF(ydb_error_code));
 	}
 	ISSUE_TIME2LONG_ERROR_IF_NEEDED(sleep_nsec);
-	if (simpleThreadAPI_active)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOTSUPSTAPI, 2, RTS_ERROR_LITERAL("ydb_hiber_startwaut_any()"));
+	assert(!simpleThreadAPI_active);	/* or else an INVAPIMODE error would have been issued in VERIFY_NON_THREADED_API */
 	assert(MAXPOSINT4 >= (sleep_nsec / NANOSECS_IN_MSEC));	/* Or else a TIME2LONG error would have been issued above */
 	sleep_msec = (sleep_nsec / NANOSECS_IN_MSEC);
 	sleepms = (int)sleep_msec;

@@ -88,16 +88,19 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 	assert((LYDB_RTN_TP == lydbrtn)
 		|| (LYDB_RTN_TP_START == lydbrtn) || (LYDB_RTN_TP_COMMIT == lydbrtn)
 		|| (LYDB_RTN_TP_RESTART == lydbrtn) || (LYDB_RTN_TP_ROLLBACK == lydbrtn));
+	/* Need to call VERIFY_THREADED_API before LIBYOTTADB_INIT.
+	 * Moving this to after LIBYOTTADB_INIT implies LIBYOTTADB_DONE would not be done in case of INVAPIMODE error.
+	 */
+	if (LYDB_RTN_TP != lydbrtn)
+	{	/* We have been called via the threaded interface so verify we are in a threaded environment */
+		VERIFY_THREADED_API((int));
+	}
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(lydbrtn, (int));		/* Note: macro could "return" from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
-
-	if (LYDB_RTN_TP != lydbrtn)
-	{	/* We have been called via the threaded interface so verify we are in a threaded environment */
-		VERIFY_THREADED_API((int));
-	} else
+	if (LYDB_RTN_TP == lydbrtn)
 	{	/* We have been called as non-threaded so verify we are not threaded */
 		VERIFY_NON_THREADED_API;
 	}
