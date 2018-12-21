@@ -1270,7 +1270,10 @@ GBLDEF	stm_workq	*stmWorkQueue[STMWORKQUEUEDIM];	/* A set of queue/thread descri
 							 * max nesting level error instead of doing it ourselves thus
 							 * checking twice.
 							 */
-GBLDEF	stm_workq	*stmTPWorkQueue;		/* Alternate queue main worker thread uses when TP is active */
+GBLDEF	stm_workq	*stmTPWorkQueue[STMWORKQUEUEDIM - 1];	/* Alternate queue main worker thread uses when TP is active.
+								 * MAIN worker thread uses queue stmTPWorkQueue[dollar_tlevel-1]
+								 * depending on the current value of "dollar_tlevel".
+								 */
 GBLDEF	stm_freeq	stmFreeQueue;			/* Structure used to maintain free queue of stm_que_ent blocks */
 GBLDEF	uint64_t	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
 /* One of the following two flags must be true - either running a threaded API or we are running something else (M-code, call-in,

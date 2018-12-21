@@ -112,7 +112,7 @@ GBLREF	int			dollar_truth;
 GBLREF	CLI_ENTRY		mumps_cmd_ary[];
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	stm_workq		*stmWorkQueue[];
-GBLREF	stm_workq		*stmTPWorkQueue;
+GBLREF	stm_workq		*stmTPWorkQueue[];
 GBLREF	stm_freeq		stmFreeQueue;
 GBLREF	boolean_t		noThreadAPI_active;
 GBLREF	boolean_t		simpleThreadAPI_active;
@@ -1479,8 +1479,12 @@ int ydb_exit()
 	}
 	/* TODO SEE - also kill the TP queue mutex/condvar */
 	/* If we had more than one level initialized, then the alternate TP queue was also initialized */
-	if (1 < i)
-		(void)pthread_mutex_destroy(&stmTPWorkQueue->mutex);
+	for (i = 0; i < (STMWORKQUEUEDIM - 1); i++)
+	{
+		if (NULL == stmTPWorkQueue[i])
+			break;
+		(void)pthread_mutex_destroy(&stmTPWorkQueue[i]->mutex);
+	}
 	(void)pthread_mutex_destroy(&stmFreeQueue.mutex);
 	/* TODO SEE: Also destroy the msems in the free queue blocks and release them if they exist */
 

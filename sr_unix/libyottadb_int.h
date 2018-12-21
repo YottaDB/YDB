@@ -87,7 +87,7 @@ typedef enum
 
 /* Structure for isolating YottaDB SimpleAPI calls in its own thread. This is the queue entry that conveys
  * the call from one thread to another. Possible queues are the queue array anchored at stmWorkQueue and the
- * special TP work queue stmTPWorkQueue both of which are defined in gbldefs.c and described in more detail there.
+ * TP work queue stmTPWorkQueue both of which are defined in gbldefs.c and described in more detail there.
  */
 typedef struct stm_que_ent_struct				/* SimpleAPI Thread Model */
 {
@@ -99,6 +99,7 @@ typedef struct stm_que_ent_struct				/* SimpleAPI Thread Model */
 	libyottadb_routines	calltyp;			/* Which routine's call is being migrated */
 	uintptr_t		args[YDB_MAX_SAPI_ARGS];	/* Args that are moving over */
 	uintptr_t		retval;				/* Return value coming back */
+	uint64_t		tptoken;			/* tptoken used to create this call block */
 #	ifdef DEBUG
 	char			*mainqcaller, *tpqcaller;	/* Where queued from */
 #	endif
@@ -107,7 +108,7 @@ typedef struct stm_que_ent_struct				/* SimpleAPI Thread Model */
 /* Structure that provides the working structures for SimpleThreadAPI access (running YottaDB requests in a known thread).
  * Note we try to keep the mutexes, and queue headers in separate cachelines so conditional load/store work correctly.
  */
-typedef struct
+typedef struct stm_work_q_t
 {
 	pthread_mutex_t		mutex;				/* Mutex controlling access to queue and CV */
 	CACHELINE_PAD(SIZEOF(pthread_mutex_t), 1);
@@ -116,7 +117,7 @@ typedef struct
 	stm_que_ent		stm_wqhead;			/* Work queue head/tail */
 	/* TODO SEE - checking for threadid of 0 is verbotten - create a new field that says it is set or not */
 	pthread_t		threadid;			/* Thread associated with the queue */
-	uintptr_t		tptoken;			/* TP token for this TP level for given transaction */
+	struct stm_work_q_t	*prevWorkQHead;	/* See comment in LYDB_RTN_TPCOMPLT case of ydb_stm_thread.c for purpose */
 } stm_workq;
 
 /* Structure to hold the free stm_que_ent entries for re-use. Again, keeping parts in separate cache lines to minimize
@@ -542,27 +543,20 @@ MBSTART {											\
 
 /* Macro to lock the condition-variable/queue-mutex and, if requested, see if the related thread is running
  * yet and if not, fire it up with the requested start address. If thread gets started, wait for it to start
- * up before going forward else we run into sync-ing issues (TODO SEE). Note, this is one of two places
- * where TREF(curWorkQHeadIndx) is incremented (the other is in ydb_stm_thread()). If we are going to
- * increment it here it can only be when the the main work thread does not yet exist.
+ * up before going forward else we run into sync-ing issues (TODO SEE).
  */
-#define LOCK_STM_QHEAD_AND_START_WORK_THREAD(QROOT, STARTTHREAD, THREADROUTINE, INCRQINDX, STATUS)	\
+#define LOCK_STM_QHEAD_AND_START_WORK_THREAD(QROOT, STARTTHREAD, THREADROUTINE, STATUS)			\
 MBSTART {												\
 	STATUS = pthread_mutex_lock(&((QROOT)->mutex));							\
 	if (0 != STATUS)										\
 	{	 											\
 		SETUP_SYSCALL_ERROR("pthread_mutex_lock()", STATUS);					\
 	} else if ((STARTTHREAD) && (0 == (uintptr_t)(QROOT)->threadid))				\
-	{	/* The YDB main execution thread is notrunning yet - start it */			\
+	{	/* The YDB main execution thread is not running yet - start it */			\
 		STATUS = pthread_create(&((QROOT)->threadid), NULL, &THREADROUTINE, NULL);		\
 		if (0 != STATUS)									\
 		{     	 										\
 			SETUP_SYSCALL_ERROR("pthread_create()", STATUS);				\
-		}											\
-		if (INCRQINDX)			/* If incrementing queue indx do so now */		\
-		{											\
-			assert((QROOT) == stmWorkQueue[0]);						\
-			(TREF(curWorkQHeadIndx))++;							\
 		}											\
 	}												\
 } MBEND
@@ -635,10 +629,6 @@ MBSTART {												\
 
 /* Macro to determine if we are executing in the worker thread */
 #define IS_STAPI_WORKER_THREAD ((NULL != stmWorkQueue[0]) && pthread_equal(pthread_self(), stmWorkQueue[0]->threadid))
-
-/* Similar macro to determine if we are executing in the current TP thread (applicable to ydb_tp_s()) */
-#define IS_STAPI_TP_WORKER_THREAD ((NULL != stmWorkQueue[TREF(curWorkQHeadIndx)])					\
-				   && (pthread_equal(pthread_self(), stmWorkQueue[TREF(curWorkQHeadIndx)]->threadid)))
 
 /* A process is not allowed to switch "modes" in midstream. This means if a process has started using non-threaded APIs and
  * services, it cannot switch to using threaded APIs and services and vice versa.
@@ -798,6 +788,14 @@ MBSTART {															\
 	pthread_mutexattr_destroy(&mattr);	/* Destroy mutex attribute block before it goes out of scope */			\
 } MBEND
 
+/* tptoken is a 64-bit quantity. The least significant 57 bits is a counter (that matches the global variable "stmTPToken").
+ * When passed to a user function, the current TP depth (dollar_tlevel) which can only go upto 127 (i.e. 7 bits) is bitwise-ORed
+ * into the most significant 7 bits thereby generating a 64-bit token.
+ */
+#define	TPTOKEN_NBITS				57
+#define	USER_VISIBLE_TPTOKEN(tpdepth, tptoken)	(((uint64_t)tpdepth << TPTOKEN_NBITS) | tptoken)
+#define	GET_TPDEPTH_FROM_TPTOKEN(tptoken)	(tptoken >> TPTOKEN_NBITS)
+#define	GET_INTERNAL_TPTOKEN(tptoken)		(tptoken & (((uint64_t)1 << TPTOKEN_NBITS) - 1))
 
 int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn);
 void	sapi_save_targ_key_subscr_nodes(void);

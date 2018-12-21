@@ -232,5 +232,4 @@ void gtm_threadgbl_init(void)
 	(TREF(ydbmsgprefix)).addr[(TREF(ydbmsgprefix)).len] = '\0';	/* need null terminated "fac" in "gtm_getmsg" */
 	/* Point "merrors_ctl" facility name to the ydb_msgprefix env var (default or user-specified value) */
 	merrors_ctl.facname = (TREF(ydbmsgprefix)).addr;
-	TREF(curWorkQHeadIndx) = -1;			/* No threads/queues in use state */
 }

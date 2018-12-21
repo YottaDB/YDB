@@ -224,7 +224,6 @@ THREADGBLDEF(collseq_list,			collseq *)			/* list of pointers to currently mappe
 										 * algorithms - since this seems only used in
 										 * collseq.c -seems more like a STATICDEF */
 THREADGBLFPTR(create_fatal_error_zshow_dmp_fptr, void, 		(void))		/* Fptr for gtm_fatal_error* zshow dmp routine */
-THREADGBLDEF(curWorkQHeadIndx,			int)				/* Which index to stmWorkQueue[] is current queue */
 THREADGBLDEF(curWorkQHead,			stm_workq *)			/* Work queue header address */
 THREADGBLDEF(disable_sigcont,			boolean_t)			/* indicates whether the SIGCONT signal
 										 * is allowed internally */

@@ -28,11 +28,13 @@
 #include "trace_table.h"
 
 GBLREF	stm_workq	*stmWorkQueue[];
-GBLREF	uintptr_t	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
 GBLREF	sigset_t	block_sigsent;
 GBLREF	boolean_t	blocksig_initialized;
 GBLREF	uint4		simpleapi_dollar_trestart;
 GBLREF	uint4		dollar_trestart;
+#ifdef DEBUG
+GBLREF	uint64_t 	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
+#endif
 
 STATICFNDCL void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead);
 
@@ -46,7 +48,7 @@ STATICFNDCL void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead);
  */
 void *ydb_stm_tpthread(void *parm)
 {
-	int		status, rc;
+	int		tpdepth, status, rc;
 	boolean_t	stop = FALSE;
 	stm_workq	*curTPWorkQHead;
 	DCL_THREADGBL_ACCESS;
@@ -63,9 +65,11 @@ void *ydb_stm_tpthread(void *parm)
 	 */
 	rc = pthread_sigmask(SIG_BLOCK, &block_sigsent, NULL);	/* Note these signals are only blocked on THIS thread */
 	assert(0 == rc);
+	tpdepth = dollar_tlevel + 1;
 	/* Initialize which queue we are looking for work in */
-	assert(0 < TREF(curWorkQHeadIndx));
-	curTPWorkQHead = stmWorkQueue[TREF(curWorkQHeadIndx)];	/* Initially pick requests from main work queue */
+	assert(0 < tpdepth);
+	assert(STMWORKQUEUEDIM > tpdepth);
+	curTPWorkQHead = stmWorkQueue[tpdepth];	/* Initially pick requests from main work queue */
 	assert(NULL != curTPWorkQHead);				/* Queue should be setup by now */
 	/* Must have mutex locked before we start waiting */
 	status = pthread_mutex_lock(&curTPWorkQHead->mutex);
@@ -96,11 +100,11 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 {
 	stm_que_ent		*callblk;
 	int			int_retval, rlbk_retval, status, save_errno;
-	uint64_t		tptoken;
 	ydb_tp2fnptr_t		tpfn;
 	void			*tpfnparm;
 	boolean_t		nested_tp;
 	libyottadb_routines	lydbrtn;
+	uint64_t		tptoken;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -127,10 +131,6 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 		switch (callblk->calltyp)
 		{
 			case LYDB_RTN_TP:
-				/* Driving new TP level requires a new tptoken. Create one by incrementing our counter. */
-				tptoken = ++stmTPToken;
-				assert(YDB_NOTTP != tptoken);
-				stmWorkQueue[TREF(curWorkQHeadIndx)]->tptoken = tptoken;
 				/* Note that all YottaDB engine calls are handled only by the MAIN worker thread and never
 				 * by the current TP worker thread. The latter is used only to invoke the user-defined
 				 * callback function. This lets the logic for handling timer pops stay in the MAIN worker thread
@@ -138,6 +138,9 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 				 * in case the TP worker thread can also do YottaDB engine calls like "ydb_tp_s_common").
 				 */
 				nested_tp = (boolean_t)dollar_tlevel;
+				tptoken = callblk->tptoken;
+				assert(tptoken == USER_VISIBLE_TPTOKEN(dollar_tlevel, stmTPToken));
+				assert(YDB_NOTTP != tptoken);
 				/*
 				 * callblk->args[0] = tpfn      parameter in "ydb_tp_s_common"
 				 * callblk->args[1] = tpfnparm  parameter in "ydb_tp_s_common"
@@ -243,20 +246,13 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 				assert(FALSE);
 				break;
 		}
-		/* If this is the first TP level finishing up, we need to put a task on the TP work queue of
-		 * the main worker thread that causes it to switch the queues back to the main work queue so
-		 * do that now before we signal this task as complete.
-		 */
-		if (1 == TREF(curWorkQHeadIndx))
+		/* Signal the MAIN worker thread that this TP is done */
+		status = ydb_stm_args0(tptoken, LYDB_RTN_TPCOMPLT);
+		if (0 != status)
 		{
-			status = ydb_stm_args0(tptoken, LYDB_RTN_TPCOMPLT);
-			if (0 != status)
-			{
-				assert(FALSE);
-				callblk->retval = status;
-			}
-		} else
-			(TREF(curWorkQHeadIndx))--;	/* Reduce TP level */
+			assert(FALSE);
+			callblk->retval = status;
+		}
 		/* The request is complete - regrab the lock to check if any more entries on this queue (not so much
 		 * possible now as in the future when/if the codebase becomes fully threaded.
 		 */

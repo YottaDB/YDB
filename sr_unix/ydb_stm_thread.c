@@ -33,10 +33,11 @@
 #include "gtmci.h"
 
 GBLREF	stm_workq	*stmWorkQueue[];
-GBLREF	stm_workq	*stmTPWorkQueue;
+GBLREF	stm_workq	*stmTPWorkQueue[];
 GBLREF	boolean_t	simpleThreadAPI_active;
 GBLREF	pthread_t	gtm_main_thread_id;
 GBLREF	boolean_t	gtm_main_thread_id_set;
+GBLREF	uint64_t 	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
 #ifdef YDB_USE_POSIX_TIMERS
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
@@ -173,9 +174,10 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged)
 
 void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged)
 {
-	int			int_retval, status, calltyp;
+	int			calltyp, int_retval, status, tpdepth;
 	ci_name_descriptor	ci_desc;
 	stm_workq		*curTPQLevel;
+	uint64_t		tptoken;
 #	ifndef GTM64
 	unsigned long long	tparm;
 #	endif
@@ -278,22 +280,35 @@ void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged)
 			 */
 			*queueChanged = TRUE;
 			/* If not already done, allocate the TP work queue and set it up */
-			if (NULL == stmTPWorkQueue)
+			tpdepth = dollar_tlevel;
+			if (!tpdepth)
+				tptoken = ++stmTPToken;
+			else
 			{
-				stmTPWorkQueue = ydb_stm_init_work_queue();
-				stmTPWorkQueue->threadid = stmWorkQueue[0]->threadid;	/* Uses same thread */
+				tptoken = stmTPToken;
+				assert(GET_INTERNAL_TPTOKEN(callblk->tptoken) == tptoken);
+			}
+			tptoken = USER_VISIBLE_TPTOKEN(tpdepth, tptoken);
+			assert(YDB_NOTTP != tptoken);
+			curTPQLevel = stmTPWorkQueue[tpdepth];
+			if (NULL == curTPQLevel)
+			{
+				curTPQLevel = ydb_stm_init_work_queue();
+				curTPQLevel->threadid = stmWorkQueue[0]->threadid;	/* Uses same thread */
+				stmTPWorkQueue[tpdepth] = curTPQLevel;
 			}
 			/* Switch processing from the normal work queue to the TP work queue */
-			TREF(curWorkQHead) = stmTPWorkQueue;
+			curTPQLevel->prevWorkQHead = TREF(curWorkQHead);
+			TREF(curWorkQHead) = curTPQLevel;
 			/* Bump the index to the current TP level to the next one */
-			(TREF(curWorkQHeadIndx))++;
-			assert(STMWORKQUEUEDIM > TREF(curWorkQHeadIndx));
-			curTPQLevel = stmWorkQueue[TREF(curWorkQHeadIndx)];
-			/* Make sure new TP level is set up then lock it and start the thread if needed */
+			tpdepth++;
+			assert(STMWORKQUEUEDIM > tpdepth);
+			curTPQLevel = stmWorkQueue[tpdepth];
+			/* Make sure new TP level is set up then lock it and start the TP worker thread if needed */
 			if (NULL == curTPQLevel)
-				curTPQLevel = stmWorkQueue[TREF(curWorkQHeadIndx)] = ydb_stm_init_work_queue();
+				curTPQLevel = stmWorkQueue[tpdepth] = ydb_stm_init_work_queue();
 			TRCTBL_ENTRY(STAPITP_LOCKWORKQ, TRUE, curTPQLevel, callblk, pthread_self());
-			LOCK_STM_QHEAD_AND_START_WORK_THREAD(curTPQLevel, TRUE, ydb_stm_tpthread, FALSE, status);
+			LOCK_STM_QHEAD_AND_START_WORK_THREAD(curTPQLevel, TRUE, ydb_stm_tpthread, status);
 			if (0 != status)
 			{
 				callblk->retval = (uintptr_t)status;
@@ -302,6 +317,7 @@ void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged)
 			/* Place our call block on the TP thread queue */
 			DEBUG_ONLY(callblk->tpqcaller = caller_id());
 			dqrins(&curTPQLevel->stm_wqhead, que, callblk);
+			callblk->tptoken = tptoken;	/* modify the tptoken that caller passed in to reflect this is a TP token */
 			/* Release CV/mutex lock so worker thread can get the lock and wakeup */
 			status = pthread_mutex_unlock(&curTPQLevel->mutex);
 			if (0 != status)
@@ -399,15 +415,27 @@ void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged)
 
 		/* This last group of operation(s) are miscellaneous */
 		case LYDB_RTN_TPCOMPLT:
-			/* A previously initiated TP callblk has completed so we need to switch the work queue back to
-			 * the main work queue and signal that to our immediate caller above.
+			/* A TP callblk has completed so we need to switch the work queue back to
+			 * an outer TP work queue (stmTPWorkQueue[xxx]) or the main work queue (stmWorkQueue[0]).
+			 *
+			 * One might think it is easy to figure out which TP queue to go back to based on the current
+			 * value of "dollar_tlevel" (since that is how TREF(curWorkQHead) was set in the LYDB_RTN_TP
+			 * case above) but in case of a TPRESTART, a TPCOMPLT request would be sent by a nested TP (say
+			 * dollar_tlevel=3) followed by a TPCOMPLT request by the outer nested TP (dollar_tlevel=2) but
+			 * the value of "dollar_tlevel" would be the same across both the TPCOMPLT requests (it is set
+			 * back to 1 only when the outermost TP transaction restarts) so we cannot rely on "dollar_tlevel"
+			 * to figure out which TP queue to go back to. Hence the need for "prevWorkQHead" in each work
+			 * queue to go back to the previous queue.
+			 *
+			 * One might think a global variable "TREF(prevWorkQHead)" would be enough (instead of one field
+			 * per work queue) but that is not enough since it is possible the LYDB_RTN_TP/LYDB_RTN_TPCOMPLT
+			 * requests nest. For example if LYDB_RTN_TP, LYDB_RTN_TP, LYDB_RTN_TPCOMPLT, LYDB_RTN_TPCOMPLT
+			 * is the sequence of requests to serve, TREF(prevworkQHead) would help to restore on the first
+			 * LYDB_RTN_TPCOMPLT but we won't know how to restore on the second LYDB_RTN_TPCOMPLT.
 			 */
-			assert(stmTPWorkQueue == TREF(curWorkQHead));
-			(TREF(curWorkQHeadIndx))--;
-			assert(0 == TREF(curWorkQHeadIndx));
-			TREF(curWorkQHead) = stmWorkQueue[0];
+			TREF(curWorkQHead) = (TREF(curWorkQHead))->prevWorkQHead;
 			*queueChanged = TRUE;
-			TRCTBL_ENTRY(STAPITP_TPCOMPLT, TREF(curWorkQHeadIndx), TREF(curWorkQHead), NULL, pthread_self());
+			TRCTBL_ENTRY(STAPITP_TPCOMPLT, 0, TREF(curWorkQHead), NULL, pthread_self());
 			callblk->retval = 0; /* Set request success (relied upon by thread waiting on this request) */
 			break;
 		default:

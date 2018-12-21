@@ -30,7 +30,8 @@
 #include "trace_table.h"
 
 GBLREF	stm_workq	*stmWorkQueue[];		/* Array to hold list of work queues for SimpleThreadAPI */
-GBLREF	stm_workq	*stmTPWorkQueue;		/* Alternate queue main worker thread uses when TP is active */
+GBLREF	stm_workq	*stmTPWorkQueue[];		/* Alternate queue main worker thread uses when TP is active */
+GBLREF	uint64_t	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
 
 /* Function to take the arguments stored in a callblk and push them onto the work queue for the worker
  * thread(s) (multiple threads is a future project) to execute in the isolated thread.
@@ -41,7 +42,7 @@ GBLREF	stm_workq	*stmTPWorkQueue;		/* Alternate queue main worker thread uses wh
  */
 intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 {
-	int			status, save_errno;
+	int			status, save_errno, tpdepth;
 	intptr_t		retval;
 	uintptr_t		calltyp;
 	stm_workq		*queueToUse;
@@ -53,6 +54,7 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 	TRCTBL_ENTRY(STAPITP_ENTRY, 0, "ydb_stm_args", NULL, pthread_self());
 	DEBUG_ONLY(callblk->mainqcaller = caller_id());
 	calltyp = callblk->calltyp;
+	callblk->tptoken = tptoken;
 	if (IS_STAPI_WORKER_THREAD)
 	{	/* If this is the MAIN worker thread and the current request is not to start a TP transaction (that requires
 		 * involvement of the TP worker thread), service this request right away in the MAIN worker thread
@@ -97,20 +99,19 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 		 */
 		if (YDB_NOTTP != tptoken)
 		{
-			if (0 >= TREF(curWorkQHeadIndx))
-			{	/* No TP transaction in effect - return error */
-				SETUP_GENERIC_ERROR(YDB_ERR_INVTPTRANS);
-				return YDB_ERR_INVTPTRANS;
-			}
-			if (tptoken != stmWorkQueue[TREF(curWorkQHeadIndx)]->tptoken)
+			tpdepth = GET_TPDEPTH_FROM_TPTOKEN(tptoken);
+			tptoken = GET_INTERNAL_TPTOKEN(tptoken);
+			if ((LYDB_RTN_TP_START_TLVL0 != calltyp) && (LYDB_RTN_TPCOMPLT != calltyp) && !dollar_tlevel
+				|| (tptoken != stmTPToken))
 			{	/* This is not the correct token for this TP transaction - return error */
+				assert(FALSE);
 				SETUP_GENERIC_ERROR(YDB_ERR_INVTPTRANS);
 				return YDB_ERR_INVTPTRANS;
 			}
 			/* This is legitimately TP mode - We are putting any subsequent work on the alternate queue but using the
 			 * same worker thread so don't start a new thread. Instead, just lock the queue.
 			 */
-			queueToUse = stmTPWorkQueue;
+			queueToUse = stmTPWorkQueue[tpdepth];
 			startThread = FALSE;
 		} else
 		{	/* Lock the queue header and start the worker thread if not already running */
@@ -119,7 +120,7 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 		}
 		assert(NULL != queueToUse);
 		TRCTBL_ENTRY(STAPITP_LOCKWORKQ, startThread, queueToUse, callblk, pthread_self());
-		LOCK_STM_QHEAD_AND_START_WORK_THREAD(queueToUse, startThread, ydb_stm_thread, TRUE, status);
+		LOCK_STM_QHEAD_AND_START_WORK_THREAD(queueToUse, startThread, ydb_stm_thread, status);
 		if (0 != status)
 		{
 			assert(FALSE);
