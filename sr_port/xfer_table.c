@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,14 +13,41 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "xfer_enum.h"
 
-/* Declare all prototypes with same signature as xfer_entry_t */
-#define XFER(a,b) b()
-int
-#include "xfer.h"
-;
-#undef XFER
+/* Below is the list of header files needed for the prototypes of C functions used in the transfer table. */
+#include "lv_val.h"
+#include "op.h"
+#include "flt_mod.h"
+#include "mprof.h"
+#include "stack_frame.h"
+#include "glvn_pool.h"
+#include "rtnhdr.h"
+#include "gdsroot.h"		/* needed by "gvname_info.h" */
+#include "gdskill.h"		/* needed by "gvname_info.h" */
+#include "gtm_facility.h"	/* needed by "gvname_info.h" */
+#include "gdsbt.h"		/* needed by "gvname_info.h" */
+#include "gdsfhead.h"		/* needed by "gvname_info.h" */
+#include "buddy_list.h"		/* needed by "tp.h" */
+#include "hashtab_int4.h"	/* needed by "tp.h" */
+#include "filestruct.h"		/* needed by "jnl.h" */
+#include "gdscc.h"		/* needed by "jnl.h" */
+#include "jnl.h"		/* needed by "tp.h" */
+#include "tp.h"			/* needed by "gvname_info.h" */
+#include "gvname_info.h"	/* needed by "op_merge.h" */
+#include "op_merge.h"
+
+/* Below is the list of function prototypes for Assembly functions which do not have a header file with the prototype
+ * and which are used in the transfer table.
+ */
+int mint2mval(), mval2bool(), mval2mint(), mval2num(), op_contain(), op_currtn(), op_equ(), op_equnul(),
+    op_extjmp(), op_fnget(), op_follow(), op_forcenum(), op_forinit(), op_gettruth(), op_iretmvad(), op_neg(),
+    op_numcmp(), op_pattern(), op_restartpc(), op_sorts_after(), op_sto(), op_zhelp(), opp_break(), opp_commarg(),
+    opp_hardret(), opp_inddevparms(), opp_indfnname(), opp_indfun(), opp_indglvn(), opp_indincr(), opp_indlvadr(),
+    opp_indlvarg(), opp_indlvnamadr(), opp_indmerge(), opp_indpat(), opp_indrzshow(), opp_indsavglvn(), opp_indsavlvn(),
+    opp_indset(), opp_indtext(), opp_iretmval(), opp_newintrinsic(), opp_newvar(), opp_rterror(), opp_setzbrk(), opp_svput(),
+    opp_tcommit(), opp_trestart(), opp_trollback(), opp_tstart(), opp_xnew(), opp_zcont(), opp_zg1(), opp_zgoto();
 
 #ifndef UNICODE_SUPPORTED
 /* Call "z" counterparts for non-unicode flavor of these functions on unsupported platforms */
@@ -41,7 +71,7 @@ int
 
 /* Initialize the table with the runtime routine functions */
 
-#define XFER(a,b) b
+#define XFER(a,b) (xfer_entry_t)b
 
 GBLDEF xfer_entry_t xfer_table[] =
 {

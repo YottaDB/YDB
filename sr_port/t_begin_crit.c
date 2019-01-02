@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,7 +38,7 @@ GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	trans_num		start_tn;
 GBLREF	uint4			t_err;
 GBLREF	unsigned char		cw_set_depth;
-GBLREF	unsigned char		t_fail_hist;
+GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int		t_tries;
 GBLREF	uint4			update_trans;
 GBLREF	boolean_t		write_after_image;

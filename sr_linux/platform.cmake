@@ -3,7 +3,7 @@
 # Copyright (c) 2013-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -123,6 +123,12 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 else()
 	# For "Release" or "RelWithDebInfo" type of builds, keep this option disabled for performance reasons
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-protector")
+	# Enable (a) link time optimization and (b) use gold linker.
+	# (a) was seen to reduce the size of libyottadb.so by 5% and improve runtimes by 7% on a simple database test
+	# (b) gold linker was seen to slightly (~ 0.1%) improve build times and run times compared to default ld linker.
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto -fuse-ld=gold")
+	set(CMAKE_AR "gcc-ar")		# needed on some versions of gcc to get -flto working
+	set(CMAKE_RANLIB "gcc-ranlib")	# needed on some versions of gcc to get -flto working
 endif()
 
 # On ARM Linux, gcc by default does not include -funwind-tables whereas it does on x86_64 Linux.

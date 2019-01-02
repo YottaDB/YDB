@@ -54,11 +54,15 @@ Build the YottaDB binaries:
  $ cd build
 ```
 
-> By default the script creates production (pro) builds of YottaDB. To create
-> a debug (dbg) build of YottaDB supply the following parameter to cmake
->     ```-D CMAKE_BUILD\_TYPE=Debug```
-> (*Note: title case is important*)
->
+Note: By default the script creates production (pro) builds of YottaDB. To create
+a debug (dbg) build of YottaDB supply the following parameter to cmake
+    ```-D CMAKE_BUILD\_TYPE=Debug```
+(*Note: title case is important*)
+
+Note: If building on Ubuntu 18.10, owing to a bug in the binutils package
+(details at https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=103da91bc083f94769e3758175a96d06cef1f8fe)
+you need to bump the open file descriptors limit to 4096 or higher (e.g. ```ulimit -n 4096``` in sh/bash
+or ```limit openfiles 4096``` in tcsh shell). This avoids failures in the ```make -j``` step below.
 
 ```sh
  $ cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../

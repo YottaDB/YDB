@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,6 @@
 GBLREF spdesc			stringpool;
 GBLREF io_log_name		*dollar_principal;
 GBLREF io_pair			io_std_device;
-GBLREF int4			aligned_source_buffer[];
 GBLREF stack_frame		*frame_pointer;
 GBLREF hash_table_objcode	cache_table;
 #ifdef DEBUG
@@ -295,7 +294,7 @@ STATICFNDEF void receive_child_locals_finalize(char **local_buff)
 	free((TREF(source_buffer)).addr);
 	/* Reset the source buffer */
 	(TREF(source_buffer)).len = MAX_SRCLINE;
-	(TREF(source_buffer)).addr = (char *)&aligned_source_buffer;
+	(TREF(source_buffer)).addr = (char *)aligned_source_buffer;
 	/* Return the space saved for command strings */
 	POP_MV_STENT();
 	ctxt = active_ch = chnd;		/* Clear extra condition handlers added by dm_start()s */

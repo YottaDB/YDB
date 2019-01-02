@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -31,7 +34,7 @@
 #include "tp_change_reg.h"
 #include "dbfilop.h"
 
-GBLREF	mu_set_rlist	*grlist;
+GBLREF	tp_region	*grlist;
 GBLREF	gd_region	*gv_cur_region;
 
 error_def(ERR_NOTALLDBRNDWN);
@@ -42,7 +45,7 @@ void mupip_set_jnl_cleanup(void)
 	file_control		*fc;
 	int4			rundown_status = EXIT_NRM;		/* if "gds_rundown" went smoothly */
 
-	for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
+	for (rptr = (mu_set_rlist *)grlist; NULL != rptr; rptr = rptr->fPtr)
 	{
 		if (ALLOCATED == rptr->state && !rptr->exclusive)
 		{
@@ -52,7 +55,7 @@ void mupip_set_jnl_cleanup(void)
 		}
 	}
 
-	for (rptr = grlist; NULL != rptr; rptr = rptr->fPtr)
+	for (rptr = (mu_set_rlist *)grlist; NULL != rptr; rptr = rptr->fPtr)
 	{
 		if (ALLOCATED != rptr->state)
 			continue;

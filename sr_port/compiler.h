@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -595,7 +595,9 @@ MBSTART {													\
 	SAVE_PARSE_PTR->window_token = TREF(window_token);							\
 } MBEND
 
-#define RESTORE_PARSE_STATE(SAVE_PARSE_PTR)								\
+GBLREF	int4		aligned_source_buffer[MAX_SRCLINE / SIZEOF(int4) + 1];
+
+#define RESTORE_PARSE_STATE(SAVE_PARSE_PTR)									\
 MBSTART {													\
 	TREF(block_level) = SAVE_PARSE_PTR->block_level;							\
 	(TREF(director_ident)).len = SAVE_PARSE_PTR->director_ident_len;					\
@@ -603,7 +605,7 @@ MBSTART {													\
 	TREF(director_mval) = SAVE_PARSE_PTR->director_mval;							\
 	TREF(director_token) = SAVE_PARSE_PTR->director_token;							\
 	TREF(lexical_ptr) = SAVE_PARSE_PTR->lexical_ptr;							\
-	(TREF(source_buffer)).addr = (char *)&aligned_source_buffer;						\
+	(TREF(source_buffer)).addr = (char *)aligned_source_buffer;						\
 	(TREF(source_buffer)).len = SAVE_PARSE_PTR->source_len;							\
 	source_column = SAVE_PARSE_PTR->source_column;								\
 	TREF(source_error_found) = SAVE_PARSE_PTR->source_error_found;						\

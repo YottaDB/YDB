@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -27,7 +30,7 @@
 
 GBLREF short int	patch_path_count;
 GBLREF block_id		ksrch_root;
-GBLREF bool		patch_find_root_search;
+GBLREF boolean_t	patch_find_root_search;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*original_header;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@ GBLREF	bool			region;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	mu_set_rlist		*grlist;
+GBLREF	tp_region		*grlist;
 GBLREF	char			*before_image_lit[];
 GBLREF	char			*jnl_state_lit[];
 GBLREF	char			*repl_state_lit[];
@@ -156,11 +156,11 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	} else
 	{	/* The command line specified a single database file; force the following do-loop to be one-trip */
 		dummy_rlist.fPtr = NULL;
-		grlist = &dummy_rlist;
+		grlist = (tp_region *)&dummy_rlist;
 	}
 	ESTABLISH_RET(mupip_set_jnl_ch, (uint4)ERR_MUNOFINISH);
 	SET_GBL_JREC_TIME; /* set_jnl_file_close/cre_jnl_file/wcs_flu need gbl_jrec_time initialized */
-	for (rptr = grlist; (EXIT_ERR != exit_status) && NULL != rptr; rptr = rptr->fPtr)
+	for (rptr = (mu_set_rlist *)grlist; (EXIT_ERR != exit_status) && NULL != rptr; rptr = rptr->fPtr)
 	{
 		rptr->exclusive = FALSE;
 		rptr->state = NONALLOCATED;
@@ -341,7 +341,7 @@ uint4	mupip_set_journal(unsigned short db_fn_len, char *db_fn)
 	DEBUG_ONLY(save_gbl_jrec_time = jgbl.gbl_jrec_time;)
 	jgbl.dont_reset_gbl_jrec_time = TRUE;
 	do_prevlinkcut_error = FALSE;
-	for (rptr = grlist; (EXIT_ERR != exit_status) && NULL != rptr; rptr = next_rptr)
+	for (rptr = (mu_set_rlist *)grlist; (EXIT_ERR != exit_status) && NULL != rptr; rptr = next_rptr)
 	{
 		this_iter_prevlinkcut_error = do_prevlinkcut_error;
 		do_prevlinkcut_error = FALSE;
