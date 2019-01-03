@@ -3,7 +3,7 @@
 # Copyright (c) 2014-2017 Fidelity National Information         #
 # Services, Inc. and/or its subsidiaries. All rights reserved.  #
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson.				#
@@ -348,7 +348,7 @@ if [ "N" = "$ydb_force_install" ]; then
 		# Set an impossible major/minor version by default in case we do not descend down known platforms in if/else below.
 		osallowmajorver=999
 		osallowminorver=999
-		if [ "x8664" = "${ydb_flavor}" ] ; then
+		if [ "x8664" = "${ydb_flavor}" -o "aarch64" = "${ydb_flavor}" ] ; then
 			if [ "ubuntu" = "${osid}" ] ; then
 				# Ubuntu 16.04 and onwards is considered supported
 				osallowmajorver=16
@@ -386,7 +386,7 @@ if [ "N" = "$ydb_force_install" ]; then
 			if [ 999 = "$osallowmajorver" ] ; then
 				# Not a supported OS. Print generic message without OS version #.
 				osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
-				echo "YottaDB not supported on $osname. Not installing YottaDB."
+				echo "YottaDB not supported on $osname for ${ydb_flavor}. Not installing YottaDB."
 			else
 				# Supported OS but version is too old to support.
 				osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
