@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -185,6 +185,8 @@ void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged)
 
 	SETUP_THREADGBL_ACCESS;
 	calltyp = callblk->calltyp;
+	assert(NULL == TREF(stapi_errstr));
+	TREF(stapi_errstr) = callblk->errstr;	/* Set this so "ydb_simpleapi_ch" can fill in error string in case error is seen */
 	switch (calltyp)
 	{	/* This first group are all SimpleThreadAPI critters */
 		case LYDB_RTN_CALL_VPLST_FUNC:
@@ -222,19 +224,19 @@ void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged)
 			callblk->retval = (uintptr_t)int_retval;
 			break;
 		case LYDB_RTN_LOCK_INCR:
-#				ifdef GTM64
+#			ifdef GTM64
 			int_retval = ydb_lock_incr_s((unsigned long long)callblk->args[0], (ydb_buffer_t *)callblk->args[1],
 						     (int)callblk->args[2], (ydb_buffer_t *)callblk->args[3]);
-#				else
-#				ifdef BIGENDIAN
+#			else
+#			ifdef BIGENDIAN
 			tparm = (((unsigned long long)callblk->args[0]) << 32) | (unsigned long long)callblk->args[1];
-#				else
+#			else
 			tparm = (((unsigned long long)callblk->args[1]) << 32) | (unsigned long long)callblk->args[0];
-#				endif
+#			endif
 			int_retval = ydb_lock_incr_s(tparm, (ydb_buffer_t *)callblk->args[2],
 						     (int)callblk->args[3], (ydb_buffer_t *)callblk->args[4]);
 
-#				endif
+#			endif
 			callblk->retval = (uintptr_t)int_retval;
 			break;
 		case LYDB_RTN_NODE_NEXT:
@@ -441,5 +443,6 @@ void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged)
 		default:
 			assertpro(FALSE);
 	}
+	TREF(stapi_errstr) = NULL;
 	return;
 }

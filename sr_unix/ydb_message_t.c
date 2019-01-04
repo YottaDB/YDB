@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,9 +19,9 @@
  * of most of that currently but also the check in LIBYOTTADB_INIT*() macro will happen in ydb_message() still
  * so no need for it here. The one exception to this is that we need to make sure the run time is alive.
  *
- * Parms and return - same as ydb_delete_s() except for the addition of tptoken.
+ * Parms and return - same as ydb_delete_s() except for the addition of tptoken and errstr.
  */
-int ydb_message_t(uint64_t tptoken, int errnum, ydb_buffer_t *msg_buff)
+int ydb_message_t(uint64_t tptoken, ydb_buffer_t *errstr, int errnum, ydb_buffer_t *msg_buff)
 {
 	intptr_t retval;
 	DCL_THREADGBL_ACCESS;
@@ -29,6 +29,6 @@ int ydb_message_t(uint64_t tptoken, int errnum, ydb_buffer_t *msg_buff)
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int));
 	VERIFY_THREADED_API((int));
-	retval = ydb_stm_args2(tptoken, LYDB_RTN_MESSAGE, (uintptr_t)errnum, (uintptr_t)msg_buff);
+	retval = ydb_stm_args2(tptoken, errstr, LYDB_RTN_MESSAGE, (uintptr_t)errnum, (uintptr_t)msg_buff);
 	return (int)retval;
 }

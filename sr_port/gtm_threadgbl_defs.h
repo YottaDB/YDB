@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -225,6 +225,9 @@ THREADGBLDEF(collseq_list,			collseq *)			/* list of pointers to currently mappe
 										 * collseq.c -seems more like a STATICDEF */
 THREADGBLFPTR(create_fatal_error_zshow_dmp_fptr, void, 		(void))		/* Fptr for gtm_fatal_error* zshow dmp routine */
 THREADGBLDEF(curWorkQHead,			stm_workq *)			/* Work queue header address */
+THREADGBLDEF(stapi_errstr,			ydb_buffer_t *)			/* Pointer to ydb_buffer_t that is filled in case
+										 * of error inside a SimpleThreadAPI call.
+										 */
 THREADGBLDEF(disable_sigcont,			boolean_t)			/* indicates whether the SIGCONT signal
 										 * is allowed internally */
 THREADGBLDEF(dollar_zcompile,			mstr)				/* compiler qualifiers */

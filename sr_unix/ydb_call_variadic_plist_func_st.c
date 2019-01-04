@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,9 +20,9 @@
  * the underlying SimpleAPI call still so no need for it here. The one exception to this is that we need to make sure
  * the run time is alive.
  *
- * Parms and return - same as ydb_call_variadic_plist_func_s() except for the addition of tptoken.
+ * Parms and return - same as ydb_call_variadic_plist_func_s() except for the addition of tptoken and errstr.
  */
-int ydb_call_variadic_plist_func_st(uint64_t tptoken, ydb_vplist_func cgfunc, uintptr_t cvplist)
+int ydb_call_variadic_plist_func_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_vplist_func cgfunc, uintptr_t cvplist)
 {
 	intptr_t retval;
 	DCL_THREADGBL_ACCESS;
@@ -30,6 +30,6 @@ int ydb_call_variadic_plist_func_st(uint64_t tptoken, ydb_vplist_func cgfunc, ui
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int));
 	VERIFY_THREADED_API((int));
-	retval = ydb_stm_args2(tptoken, LYDB_RTN_CALL_VPLST_FUNC, (uintptr_t)cgfunc, (uintptr_t)cvplist);
+	retval = ydb_stm_args2(tptoken, errstr, LYDB_RTN_CALL_VPLST_FUNC, (uintptr_t)cgfunc, (uintptr_t)cvplist);
 	return (int)retval;
 }

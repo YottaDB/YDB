@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,9 +26,9 @@ GBLREF	volatile int4	outofband;
  * of most of that currently but also the check in LIBYOTTADB_INIT*() macro will happen in ydb_lock_s()
  * still so no need for it here. The one exception to this is that we need to make sure the run time is alive.
  *
- * Parms and return - same as ydb_lock_s() except for the addition of tptoken.
+ * Parms and return - same as ydb_lock_s() except for the addition of tptoken and errstr.
  */
-int ydb_lock_st(uint64_t tptoken, unsigned long long timeout_nsec, int namecount, ...)
+int ydb_lock_st(uint64_t tptoken, ydb_buffer_t *errstr, unsigned long long timeout_nsec, int namecount, ...)
 {
 	va_list		var;
 	gparam_list	gparms;
@@ -83,5 +83,5 @@ int ydb_lock_st(uint64_t tptoken, unsigned long long timeout_nsec, int namecount
 	/* Have now loaded the callg_nc buffer with the parameters but we can't drive callg() here. We have to
 	 * put this request on a queue for execution in the main execution thread.
 	 */
-	return ydb_call_variadic_plist_func_st(tptoken, (ydb_vplist_func)&ydb_lock_s, (uintptr_t)&gparms);
+	return ydb_call_variadic_plist_func_st(tptoken, errstr, (ydb_vplist_func)&ydb_lock_s, (uintptr_t)&gparms);
 }

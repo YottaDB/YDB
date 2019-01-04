@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,6 +100,7 @@ typedef struct stm_que_ent_struct				/* SimpleAPI Thread Model */
 	uintptr_t		args[YDB_MAX_SAPI_ARGS];	/* Args that are moving over */
 	uintptr_t		retval;				/* Return value coming back */
 	uint64_t		tptoken;			/* tptoken used to create this call block */
+	ydb_buffer_t		*errstr;			/* errstr passed in by user to return error string if any */
 #	ifdef DEBUG
 	char			*mainqcaller, *tpqcaller;	/* Where queued from */
 #	endif
@@ -799,17 +800,18 @@ MBSTART {															\
 
 int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn);
 void	sapi_save_targ_key_subscr_nodes(void);
-intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk);
-intptr_t ydb_stm_args0(uint64_t tptoken, uintptr_t calltyp);
-intptr_t ydb_stm_args1(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1);
-intptr_t ydb_stm_args2(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintptr_t p2);
-intptr_t ydb_stm_args3(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3);
-intptr_t ydb_stm_args4(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4);
-intptr_t ydb_stm_args5(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
-		       uintptr_t p5);
+intptr_t ydb_stm_args(stm_que_ent *callblk);
+intptr_t ydb_stm_args0(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp);
+intptr_t ydb_stm_args1(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1);
+intptr_t ydb_stm_args2(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2);
+intptr_t ydb_stm_args3(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3);
+intptr_t ydb_stm_args4(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3,
+			uintptr_t p4);
+intptr_t ydb_stm_args5(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3,
+			uintptr_t p4, uintptr_t p5);
 #ifndef GTM64
-intptr_t ydb_stm_args6(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4,
-		       uintptr_t p5, uintptr_t p6);
+intptr_t ydb_stm_args6(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3,
+			uintptr_t p4, uintptr_t p5, uintptr_t p6);
 #endif
 stm_que_ent *ydb_stm_getcallblk(void);
 int ydb_stm_freecallblk(stm_que_ent *callblk);

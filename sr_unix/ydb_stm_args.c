@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,7 @@ GBLREF	uint64_t	stmTPToken;			/* Counter used to generate unique token for Simpl
  * the main work queue. If we are in TP (descriptor is not NULL), then work is put on the alternate TP work queue regardless
  * of TP level. This works because only one level at a time will ever be active.
  */
-intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
+intptr_t ydb_stm_args(stm_que_ent *callblk)
 {
 	int			status, save_errno, tpdepth;
 	intptr_t		retval;
@@ -48,13 +48,13 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 	stm_workq		*queueToUse;
 	boolean_t		startThread, queueChanged;
 	libyottadb_routines	active_stapi_rtn;
+	uint64_t		tptoken;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	TRCTBL_ENTRY(STAPITP_ENTRY, 0, "ydb_stm_args", NULL, pthread_self());
 	DEBUG_ONLY(callblk->mainqcaller = caller_id());
 	calltyp = callblk->calltyp;
-	callblk->tptoken = tptoken;
 	if (IS_STAPI_WORKER_THREAD)
 	{	/* If this is the MAIN worker thread and the current request is not to start a TP transaction (that requires
 		 * involvement of the TP worker thread), service this request right away in the MAIN worker thread
@@ -97,6 +97,7 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 		 * failure in validation is an error as well as if we discover no TP transaction has been started. Otherwiswe, we
 		 * have a non-TP transaction so use the regular work queue.
 		 */
+		tptoken = callblk->tptoken;
 		if (YDB_NOTTP != tptoken)
 		{
 			tpdepth = GET_TPDEPTH_FROM_TPTOKEN(tptoken);
@@ -170,7 +171,7 @@ intptr_t ydb_stm_args(uint64_t tptoken, stm_que_ent *callblk)
 }
 
 /* Function to create a callblk with no parameters */
-intptr_t ydb_stm_args0(uint64_t tptoken, uintptr_t calltyp)
+intptr_t ydb_stm_args0(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp)
 {
 	stm_que_ent	*callblk;
 
@@ -179,11 +180,13 @@ intptr_t ydb_stm_args0(uint64_t tptoken, uintptr_t calltyp)
 	if (-1 == (intptr_t)callblk)
 		return YDB_ERR_SYSCALL;		/* All errors from ydb_stm_getcallblk() are of this type */
 	callblk->calltyp = calltyp;
-	return ydb_stm_args(tptoken, callblk);
+	callblk->tptoken = tptoken;
+	callblk->errstr = errstr;
+	return ydb_stm_args(callblk);
 }
 
 /* Function to create a callblk with 1 parameter */
-intptr_t ydb_stm_args1(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1)
+intptr_t ydb_stm_args1(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1)
 {
 	stm_que_ent	*callblk;
 
@@ -192,12 +195,14 @@ intptr_t ydb_stm_args1(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1)
 	if (-1 == (intptr_t)callblk)
 		return YDB_ERR_SYSCALL;		/* All errors from ydb_stm_getcallblk() are of this type */
 	callblk->calltyp = calltyp;
+	callblk->tptoken = tptoken;
+	callblk->errstr = errstr;
 	callblk->args[0] = p1;
-	return ydb_stm_args(tptoken, callblk);
+	return ydb_stm_args(callblk);
 }
 
 /* Function to create a callblk with 2 parameters */
-intptr_t ydb_stm_args2(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintptr_t p2)
+intptr_t ydb_stm_args2(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2)
 {
 	stm_que_ent	*callblk;
 
@@ -206,13 +211,15 @@ intptr_t ydb_stm_args2(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintpt
 	if (-1 == (intptr_t)callblk)
 		return YDB_ERR_SYSCALL;		/* All errors from ydb_stm_getcallblk() are of this type */
 	callblk->calltyp = calltyp;
+	callblk->tptoken = tptoken;
+	callblk->errstr = errstr;
 	callblk->args[0] = p1;
 	callblk->args[1] = p2;
-	return ydb_stm_args(tptoken, callblk);
+	return ydb_stm_args(callblk);
 }
 
 /* Function to create a callblk with 3 parameters */
-intptr_t ydb_stm_args3(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3)
+intptr_t ydb_stm_args3(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
 	stm_que_ent	*callblk;
 
@@ -221,14 +228,17 @@ intptr_t ydb_stm_args3(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintpt
 	if (-1 == (intptr_t)callblk)
 		return YDB_ERR_SYSCALL;		/* All errors from ydb_stm_getcallblk() are of this type */
 	callblk->calltyp = calltyp;
+	callblk->tptoken = tptoken;
+	callblk->errstr = errstr;
 	callblk->args[0] = p1;
 	callblk->args[1] = p2;
 	callblk->args[2] = p3;
-	return ydb_stm_args(tptoken, callblk);
+	return ydb_stm_args(callblk);
 }
 
 /* Function to create a callblk with 4 parameters */
-intptr_t ydb_stm_args4(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
+intptr_t ydb_stm_args4(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3,
+			uintptr_t p4)
 {
 	stm_que_ent	*callblk;
 
@@ -237,15 +247,18 @@ intptr_t ydb_stm_args4(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintpt
 	if (-1 == (intptr_t)callblk)
 		return YDB_ERR_SYSCALL;		/* All errors from ydb_stm_getcallblk() are of this type */
 	callblk->calltyp = calltyp;
+	callblk->tptoken = tptoken;
+	callblk->errstr = errstr;
 	callblk->args[0] = p1;
 	callblk->args[1] = p2;
 	callblk->args[2] = p3;
 	callblk->args[3] = p4;
-	return ydb_stm_args(tptoken, callblk);
+	return ydb_stm_args(callblk);
 }
 
 /* Function to create a callblk with 5 parameters */
-intptr_t ydb_stm_args5(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
+intptr_t ydb_stm_args5(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3,
+			uintptr_t p4, uintptr_t p5)
 {
 	stm_que_ent	*callblk;
 
@@ -254,18 +267,20 @@ intptr_t ydb_stm_args5(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintpt
 	if (-1 == (intptr_t)callblk)
 		return YDB_ERR_SYSCALL;		/* All errors from ydb_stm_getcallblk() are of this type */
 	callblk->calltyp = calltyp;
+	callblk->tptoken = tptoken;
+	callblk->errstr = errstr;
 	callblk->args[0] = p1;
 	callblk->args[1] = p2;
 	callblk->args[2] = p3;
 	callblk->args[3] = p4;
 	callblk->args[4] = p5;
-	return ydb_stm_args(tptoken, callblk);
+	return ydb_stm_args(callblk);
 }
 
 #ifndef GTM64
 /* Function to create a callblk with 6 parameters needed in 32 bit mode only */
-intptr_t ydb_stm_args6(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5,
-		       uintptr_t p6)
+intptr_t ydb_stm_args6(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3,
+			uintptr_t p4, uintptr_t p5, uintptr_t p6)
 {
 	stm_que_ent	*callblk;
 
@@ -274,12 +289,14 @@ intptr_t ydb_stm_args6(uint64_t tptoken, uintptr_t calltyp, uintptr_t p1, uintpt
 	if (-1 == (intptr_t)callblk)
 		return YDB_ERR_SYSCALL;		/* All errors from ydb_stm_getcallblk() are of this type */
 	callblk->calltyp = calltyp;
+	callblk->tptoken = tptoken;
+	callblk->errstr = errstr;
 	callblk->args[0] = p1;
 	callblk->args[1] = p2;
 	callblk->args[2] = p3;
 	callblk->args[3] = p4;
 	callblk->args[4] = p5;
 	callblk->args[5] = p6;
-	return ydb_stm_args(tptoken, callblk);
+	return ydb_stm_args(callblk);
 }
 #endif

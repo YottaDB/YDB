@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,9 +19,9 @@
  * but also the check in LIBYOTTADB_INIT*() macro will happen in ydb_lock_incr_s() still so no need for it here. The one
  * exception to this is that we need to make sure the run time is alive.
  *
- * Parms and return - same as ydb_lock_incr_s() except for the addition of tptoken.
+ * Parms and return - same as ydb_lock_incr_s() except for the addition of tptoken and errstr.
  */
-int ydb_lock_incr_st(uint64_t tptoken, unsigned long long timeout_nsec, ydb_buffer_t *varname, int subs_used,
+int ydb_lock_incr_st(uint64_t tptoken, ydb_buffer_t *errstr, unsigned long long timeout_nsec, ydb_buffer_t *varname, int subs_used,
 		     ydb_buffer_t *subsarray)
 {
 	intptr_t	retval;
@@ -34,7 +34,7 @@ int ydb_lock_incr_st(uint64_t tptoken, unsigned long long timeout_nsec, ydb_buff
 	LIBYOTTADB_RUNTIME_CHECK((int));
 	VERIFY_THREADED_API((int));
 #	ifdef GTM64
-	retval = ydb_stm_args4(tptoken, LYDB_RTN_LOCK_INCR, (uintptr_t)timeout_nsec, (uintptr_t)varname,
+	retval = ydb_stm_args4(tptoken, errstr, LYDB_RTN_LOCK_INCR, (uintptr_t)timeout_nsec, (uintptr_t)varname,
 			       (uintptr_t)subs_used, (uintptr_t)subsarray);
 #	else
 	/* 32 bit addresses - have to split long long parm into 2 pieces and pass as 2 parms */
@@ -45,7 +45,7 @@ int ydb_lock_incr_st(uint64_t tptoken, unsigned long long timeout_nsec, ydb_buff
 	tparm1 = (uintptr_t)(timeout_nsec & 0xffffffff);
 	tparm2 = (uintptr_t)(timeout_nsec >> 32);
 #	endif
-	retval = ydb_stm_args5(tptoken, LYDB_RTN_LOCK_INCR, (uintptr_t)tparm1, (uintptr_t)tparm2, (uintptr_t)varname,
+	retval = ydb_stm_args5(tptoken, errstr, LYDB_RTN_LOCK_INCR, (uintptr_t)tparm1, (uintptr_t)tparm2, (uintptr_t)varname,
 			       (uintptr_t)subs_used, (uintptr_t)subsarray);
 
 #	endif

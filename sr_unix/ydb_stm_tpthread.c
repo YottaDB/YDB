@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,6 +105,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 	boolean_t		nested_tp;
 	libyottadb_routines	lydbrtn;
 	uint64_t		tptoken;
+	ydb_buffer_t		*errstr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -141,6 +142,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 				tptoken = callblk->tptoken;
 				assert(tptoken == USER_VISIBLE_TPTOKEN(dollar_tlevel, stmTPToken));
 				assert(YDB_NOTTP != tptoken);
+				errstr = callblk->errstr;
 				/*
 				 * callblk->args[0] = tpfn      parameter in "ydb_tp_s_common"
 				 * callblk->args[1] = tpfnparm  parameter in "ydb_tp_s_common"
@@ -164,7 +166,8 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 				 * (in "ydb_tp_s_common").
 				 */
 				lydbrtn = (!nested_tp ? LYDB_RTN_TP_START_TLVL0 : LYDB_RTN_TP_START);
-				int_retval = ydb_stm_args3(tptoken, lydbrtn, callblk->args[2], callblk->args[3], callblk->args[4]);
+				int_retval = ydb_stm_args3(tptoken, errstr, lydbrtn,
+								callblk->args[2], callblk->args[3], callblk->args[4]);
 				assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 				assert(YDB_TP_RESTART != int_retval);
 				if (YDB_OK != int_retval)
@@ -175,7 +178,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 						 * paths have been checked in "op_tstart") before returning error.
 						 */
 						assert(FALSE);
-						rlbk_retval = ydb_stm_args0(tptoken, LYDB_RTN_TP_ROLLBACK_TLVL0);
+						rlbk_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_ROLLBACK_TLVL0);
 						assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 						assert(YDB_TP_ROLLBACK == rlbk_retval);
 						/* Note: "int_retval" records the "op_tstart" error code while
@@ -197,13 +200,13 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 						simpleapi_dollar_trestart = dollar_trestart;
 					}
 					/* Invoke the user-defined TP callback function in the TP worker thread (current thread) */
-					int_retval = (*tpfn)(tptoken, tpfnparm);
+					int_retval = (*tpfn)(tptoken, errstr, tpfnparm);
 					if (YDB_OK == int_retval)
 					{	/* Commit the TP transaction by asking MAIN worker thread to do the "op_tcommit"
 						 * (in "ydb_tp_s_common").
 						 */
 						lydbrtn = (!nested_tp ? LYDB_RTN_TP_COMMIT_TLVL0 : LYDB_RTN_TP_COMMIT);
-						int_retval = ydb_stm_args0(tptoken, lydbrtn);
+						int_retval = ydb_stm_args0(tptoken, errstr, lydbrtn);
 					}
 					assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 					if (nested_tp)
@@ -224,7 +227,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 						 * Note that it is possible "int_retval" is YDB_TP_ROLLBACK (e.g. if the callback
 						 *	function returned YDB_TP_ROLLBACK).
 						 */
-						rlbk_retval = ydb_stm_args0(tptoken, LYDB_RTN_TP_ROLLBACK_TLVL0);
+						rlbk_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_ROLLBACK_TLVL0);
 						assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 						assert(YDB_TP_ROLLBACK == rlbk_retval);
 						/* Note: "int_retval" records the primary error code while
@@ -236,7 +239,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 					/* Restart the outermost TP transaction by asking the MAIN worker thread
 					 * to do the "tp_restart" (in "ydb_tp_s_common").
 					 */
-					int_retval = ydb_stm_args0(tptoken, LYDB_RTN_TP_RESTART_TLVL0);
+					int_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_RESTART_TLVL0);
 					assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 					assert(YDB_OK == int_retval);
 				}
@@ -247,7 +250,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 				break;
 		}
 		/* Signal the MAIN worker thread that this TP is done */
-		status = ydb_stm_args0(tptoken, LYDB_RTN_TPCOMPLT);
+		status = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TPCOMPLT);
 		if (0 != status)
 		{
 			assert(FALSE);
