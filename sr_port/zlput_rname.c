@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -144,7 +144,7 @@ boolean_t on_stack(rhdtyp *rtnhdr, boolean_t *need_duplicate)
 		*need_duplicate = FALSE;
 	for (fp = frame_pointer; NULL != fp; fp = fp->old_frame_pointer)
 	{
-		SKIP_BASE_FRAMES(fp);		/* Updates fp */
+		SKIP_BASE_FRAMES(fp, (SFT_CI | SFT_TRIGR));	/* Can update fp if fp is a call-in or trigger base frame */
 		if (MSTR_EQ(&fp->rvector->routine_name, &rtnhdr->routine_name))
 		{
 			if ((NULL != need_duplicate) && (CURRENT_RHEAD_ADR(fp->rvector) == rtnhdr))
@@ -239,7 +239,7 @@ STATICFNDEF boolean_t handle_active_old_versions(boolean_t *duplicated, rhdtyp *
 		old_rhead->active_rhead_adr = copy_rhead; /* Reserve previous version on active chain */
 		for (fp = frame_pointer; NULL != fp; fp = fp->old_frame_pointer)
 		{
-			SKIP_BASE_FRAMES(fp);		/* Updates fp */
+			SKIP_BASE_FRAMES(fp, (SFT_CI | SFT_TRIGR));	/* Can update fp if fp is a call-in or trigger base frame */
 			DBGARLNK_ONLY(fprhd = CURRENT_RHEAD_ADR(fp->rvector));
 			if (CURRENT_RHEAD_ADR(fp->rvector) == old_rhead)
 			{
@@ -310,7 +310,7 @@ void zr_cleanup_recursive_rtn(rhdtyp *rtnhdr)
 	/* See if routine is still in use */
 	for (fp = frame_pointer; fp; fp = fp->old_frame_pointer)
 	{
-		SKIP_BASE_FRAMES(fp);				/* Update rp */
+		SKIP_BASE_FRAMES(fp, (SFT_CI | SFT_TRIGR));	/* Can update fp if fp is a call-in or trigger base frame */
 		if (rtnhdr == fp->rvector)
 			break; /* Found reference - not done with it */
 	}

@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2014 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,6 +80,15 @@ void op_clralsvars(lv_val *rslt)
 		assert(frame_pointer);
 		do
 		{
+			/* For call-ins we need to be able to crawl past apparent end of stack (due to call-in base
+			 * frame) to earlier stack segments. Base frames hide the stack continue address behind them so
+			 * pick that up and see if it allows us to continue the unroll.
+			 *
+			 * Note no check for triggers here as their locals are isolated so hitting a trigger base
+			 * frame stops this search back through the stack. Because of that, we use only the SFT_CI flag
+			 * in the second parameter to the SKIP_BASE_FRAMES macro below.
+			 */
+			SKIP_BASE_FRAMES(fp, SFT_CI);	/* Can update fp if fp is a call-in base frame */
 			if (fp->l_symtab != last_lsym_hte)
 			{	/* Different l_symtab than last time (don't want to update twice) */
 				last_lsym_hte = fp->l_symtab;
@@ -105,25 +114,11 @@ void op_clralsvars(lv_val *rslt)
 			}
 			if (done)
 				break;
-			if (SFT_CI & fp->type)
-			{	/* For call-ins we need to be able to crawl past apparent end of stack (due to call-in base
-				 * frame) to earlier stack segments. Base frames hide the stack continue address behind them so
-				 * pick that up and see if it allows us to continue the unroll.
-				 *
-				 * Note no check for triggers here as their locals are isolated so hitting a trigger base
-				 * frame stops this search back through the stack. Because of that, we do not use the
-				 * SKIP_BASE_FRAMES() macro here.
-				 */
-				assert(NULL == fp->old_frame_pointer);
-				while ((NULL == fp->old_frame_pointer) && (SFT_CI & fp->type))
-				{
-					fp = *(stack_frame **)(fp + 1);	/* Load "prev pointer" created by base_frame() */
-				}
-				if ((NULL == fp) || (fp >= (stack_frame *)stackbase) || (fp < (stack_frame *)stacktop))
-					break;	/* Pointer not within the stack -- must be earliest occurence */
-			} else
-				fp = fp->old_frame_pointer;
-		} while(fp);
+			fp = fp->old_frame_pointer;
+			if (NULL == fp)
+				break;
+			assert(IS_PTR_INSIDE_M_STACK(fp));
+		} while(TRUE);
 		/* Now that $ZWRTAC* vars have been deleted, we should check if compaction is a suggested thing
 		 * to get rid of the deleted vars which will improve the free slot search and reduce the slot scan
 		 * on a gargabe collection (both types). If it is, compact in a safe way and do the necessary l_symtab

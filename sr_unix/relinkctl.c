@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -936,7 +936,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 		 */
 		for (fp = frame_pointer; NULL != fp; fp = fp->old_frame_pointer)
 		{
-			SKIP_BASE_FRAMES(fp);		/* Updates rp */
+			SKIP_BASE_FRAMES(fp, (SFT_CI | SFT_TRIGR));	/* Can update fp if fp is a call-in or trigger base frame */
 			rtnhdr = CURRENT_RHEAD_ADR(fp->rvector);
 			if ((NULL != rtnhdr) && rtnhdr->rtn_relinked && rtnhdr->shared_object)
 			{

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2013 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,7 +66,7 @@ void zshow_stack(zshow_out *output, boolean_t show_checksum)
 			zshow_output(output, &v);
 			v.len = 0;
 		}
-		SKIP_BASE_FRAMES(fp);			/* Updates fp */
+		SKIP_BASE_FRAMES(fp, (SFT_CI | SFT_TRIGR));	/* Can update fp if fp is a call-in or trigger base frame */
 		if (NULL == fp->old_frame_pointer)
 			break; /* Endpoint.. */
 		if (!(fp->type & SFT_COUNT) || ((fp->type & SFT_ZINTR) && (fp->flags & SFF_INDCE)))

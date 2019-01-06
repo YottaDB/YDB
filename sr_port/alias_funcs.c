@@ -3,7 +3,7 @@
  * Copyright (c) 2009, 2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -268,6 +268,7 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 	{	/* Once through for each stackframe using the same symbol table. Note this loop is similar
 		 * to the stack frame loop in op_clralsvars.c.
 		 */
+		SKIP_BASE_FRAMES(fp, (SFT_CI | SFT_TRIGR));	/* Can update fp if fp is a call-in or trigger base frame */
 		if (fp->l_symtab != last_lsym_hte)
 		{	/* Different l_symtab than last time (don't want to update twice) */
 			last_lsym_hte = fp->l_symtab;
@@ -295,10 +296,10 @@ void als_lsymtab_repair(hash_table_mname *table, ht_ent_mname *table_base_orig, 
 		fp = fp->old_frame_pointer;	/* Bump to prev frame and check if found a call-in base frame */
 		if (done)
 			break;
-		SKIP_BASE_FRAMES(fp);		/* Updates fp */
-		if ((NULL == fp) || (fp >= (stack_frame *)stackbase) || (fp < (stack_frame *)stacktop))
-			break;	/* Pointer not within the stack -- must be earliest occurence */
-	} while(fp);
+		if (NULL == fp)
+			break;
+		assert(IS_PTR_INSIDE_M_STACK(fp));
+	} while(TRUE);
 	/* Next, check the mv_stents for the stackframes we processed. Certain mv_stents also have hash
 	 * table references in them that need repair.
 	 */

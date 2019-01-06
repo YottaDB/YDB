@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -937,7 +937,7 @@ void gtm_trigger_cleanup(gv_trigger_t *trigdsc)
 #	ifdef DEBUG
 	for (fp = frame_pointer; NULL != fp; fp = fp->old_frame_pointer)
 	{
-		SKIP_BASE_FRAMES(fp);
+		SKIP_BASE_FRAMES(fp, (SFT_CI | SFT_TRIGR));	/* Can update fp if fp is a call-in or trigger base frame */
 		assert(fp->rvector != rtnhdr);
 	}
 #	endif
