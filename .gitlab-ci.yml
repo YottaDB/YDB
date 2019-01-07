@@ -33,7 +33,7 @@ push:
     - docker tag yottadb/yottadb-base:latest-master yottadb/yottadb-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
     - docker push yottadb/yottadb-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
   only:
-    - master@yottadb/db/ydb
+    - master@YottaDB/DB/YDB
 
 push-release:
   stage: push
