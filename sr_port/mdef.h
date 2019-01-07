@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -1233,7 +1233,7 @@ typedef INTPTR_T  ptroff_t;
 */
 
 #ifdef CACHELINE_SIZE
-# define CACHELINE_PAD(fieldSize, fillnum) char fill_cacheline##fillnum[CACHELINE_SIZE - (fieldSize)];
+# define CACHELINE_PAD(fieldSize, fillnum) char fill_cacheline##fillnum[CACHELINE_SIZE - (fieldSize)]
 #else
 # define CACHELINE_PAD(fieldSize, fillnum)
 #endif

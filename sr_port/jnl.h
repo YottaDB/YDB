@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -516,13 +516,13 @@ typedef struct
 	   not interfere with each other which can happen if they fall in the same data cacheline
 	   of a processor.
 	*/
-	CACHELINE_PAD(SIZEOF(global_latch_t), 0)	/* start next latch at a different cacheline than previous fields */
+	CACHELINE_PAD(SIZEOF(global_latch_t), 0);	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		io_in_prog_latch;	/* UNIX only: write in progress indicator */
-	CACHELINE_PAD(SIZEOF(global_latch_t), 1)	/* start next latch at a different cacheline than previous fields */
+	CACHELINE_PAD(SIZEOF(global_latch_t), 1);	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		fsync_in_prog_latch;	/* fsync in progress indicator */
-        CACHELINE_PAD(SIZEOF(global_latch_t), 2)	/* start next latch at a different cacheline than previous fields */
+        CACHELINE_PAD(SIZEOF(global_latch_t), 2);	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		phase2_commit_latch;	/* Used by "jnl_phase2_cleanup" to update "phase2_commit_index1" */
-	CACHELINE_PAD(SIZEOF(global_latch_t), 3)	/* pad enough space so next non-filler byte falls in different cacheline */
+	CACHELINE_PAD(SIZEOF(global_latch_t), 3);	/* pad enough space so next non-filler byte falls in different cacheline */
 	/**********************************************************************************************/
 	/* Important: must keep header structure quadword (8 byte)  aligned for buffers used in QIO's */
 	/**********************************************************************************************/

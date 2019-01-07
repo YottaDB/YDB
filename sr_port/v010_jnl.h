@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -104,7 +107,7 @@ typedef struct
 										only with interlocked instructions */
 	double			filler_q2;		/* QUAD reset to insure quadword alignment in comment below */
         global_latch_t          jb_latch;               /* needed by aswp on HPPA, 16 bytes */
-        CACHELINE_PAD(SIZEOF(global_latch_t), 1)	/* ; supplied by macro */
+        CACHELINE_PAD(SIZEOF(global_latch_t), 1);	/* ; supplied by macro */
 	/************************************************************************************/
 	/* Important: must keep header structure quadword aligned for buffers used in QIO's */
 	/************************************************************************************/

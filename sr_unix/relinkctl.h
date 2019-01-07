@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -148,7 +148,7 @@ typedef struct relinkrec_struct
 					 * object file linked list (starting at rtnobj_shm_offset)
 					 */
 	gtm_uint64_t	objhash;	/* Hash of the object file last touched here */
-	CACHELINE_PAD_COND(88, 1)	/* Add 40 bytes (on top of 88 bytes) to make this structure 128 bytes to avoid cacheline
+	CACHELINE_PAD_COND(88, 1);	/* Add 40 bytes (on top of 88 bytes) to make this structure 128 bytes to avoid cacheline
 					 * interference (between successive relinkrec_t structures in shared memory) on the RS6000
 					 * (where the cacheline is 128 bytes currently). Other platforms have smaller
 					 * cachelines (i.e. 64 bytes or lesser) and so this structure (88 bytes currently)
@@ -239,7 +239,7 @@ typedef struct relinkshm_hdr
 	 * interference possible.
 	 */
 	global_latch_t	relinkctl_latch;	/* latch for insertions/deletions of buddy list structurs in any rtnobj shmids */
-	CACHELINE_PAD(SIZEOF(global_latch_t), 1)
+	CACHELINE_PAD(SIZEOF(global_latch_t), 1);
 } relinkshm_hdr_t;
 
 #define	STATE_FREE	0

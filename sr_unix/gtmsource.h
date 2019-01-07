@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -236,7 +236,7 @@ typedef struct
 #	undef TAB_JPL_TRC_REC
 	/************* JPL_TRC_REC RELATED FIELDS -- end -- ***********/
 	jpl_phase2_in_prog_t	phase2_commit_array[JPL_PHASE2_COMMIT_ARRAY_SIZE];
-	CACHELINE_PAD(SIZEOF(global_latch_t), 0)	/* start next latch at a different cacheline than previous fields */
+	CACHELINE_PAD(SIZEOF(global_latch_t), 0);	/* start next latch at a different cacheline than previous fields */
 	global_latch_t		phase2_commit_latch;	/* Used by "repl_phase2_complete" to update "phase2_commit_index1" */
 } jnlpool_ctl_struct;
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -173,18 +173,18 @@ typedef struct
 {
 	FILL8DCL(uint4, crit_cycle, 1);
 	global_latch_t	semaphore;
-	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 2)		/* 8 for the FILL8DCL */
+	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 2);		/* 8 for the FILL8DCL */
 	FILL8DCL(latch_t, crashcnt, 3);
 	global_latch_t	crashcnt_latch;
-	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 4)	/* 8 for the FILL8DCL */
+	CACHELINE_PAD(8 + SIZEOF(global_latch_t), 4);	/* 8 for the FILL8DCL */
 	compswap_time_field	stuckexec;
-	CACHELINE_PAD(SIZEOF(compswap_time_field), 5)
+	CACHELINE_PAD(SIZEOF(compswap_time_field), 5);
 	FILL8DCL(latch_t, queslots, 6);
-	CACHELINE_PAD(SIZEOF(latch_t) + SIZEOF(latch_t), 7)
+	CACHELINE_PAD(SIZEOF(latch_t) + SIZEOF(latch_t), 7);
 	mutex_que_head	prochead;
-	CACHELINE_PAD(SIZEOF(mutex_que_head), 8)
+	CACHELINE_PAD(SIZEOF(mutex_que_head), 8);
 	mutex_que_head	freehead;
-	CACHELINE_PAD(SIZEOF(mutex_que_head), 9)
+	CACHELINE_PAD(SIZEOF(mutex_que_head), 9);
 } mutex_struct;
 
 typedef struct {
@@ -557,9 +557,9 @@ typedef struct node_local_struct
 								 * from working on the cache. In MM mode, it is used to call
 								 * wcs_recover during a file extension */
 	global_latch_t	wc_var_lock;                            /* latch used for access to various wc_* ref counters */
-	CACHELINE_PAD(SIZEOF(global_latch_t), 1)		/* Keep these two latches in separate cache lines */
+	CACHELINE_PAD(SIZEOF(global_latch_t), 1);		/* Keep these two latches in separate cache lines */
 	global_latch_t	db_latch;                               /* latch for interlocking on hppa and tandem */
-	CACHELINE_PAD(SIZEOF(global_latch_t), 2)
+	CACHELINE_PAD(SIZEOF(global_latch_t), 2);
 	int4		cache_hits;
 	int4		wc_in_free;                             /* number of write cache records in free queue */
 	/* All counters below (declared using CNTR4DCL) are 2 or 4-bytes, depending on platform, but always stored in 4 bytes.
@@ -567,21 +567,21 @@ typedef struct node_local_struct
 	 * separate cachelines on load-lock/store-conditional platforms particularly and on other platforms too, just to be safe.
 	 */
 	volatile CNTR4DCL(wcs_timers, 1);			/* number of write cache timers in use - 1 */
-	CACHELINE_PAD(4, 3)
+	CACHELINE_PAD(4, 3);
 	volatile CNTR4DCL(wcs_active_lvl, 2);			/* number of entries in active queue */
-	CACHELINE_PAD(4, 4)
+	CACHELINE_PAD(4, 4);
 	volatile CNTR4DCL(wcs_staleness, 3);
-	CACHELINE_PAD(4, 5)
+	CACHELINE_PAD(4, 5);
 	volatile CNTR4DCL(ref_cnt, 4);				/* reference count. How many people are using the database */
-	CACHELINE_PAD(4, 6)
+	CACHELINE_PAD(4, 6);
 	volatile CNTR4DCL(intent_wtstart, 5);			/* Count of processes that INTEND to enter wcs_wtstart code */
-	CACHELINE_PAD(4, 7)
+	CACHELINE_PAD(4, 7);
 	volatile CNTR4DCL(in_wtstart, 6);			/* Count of processes that are INSIDE wcs_wtstart code */
-	CACHELINE_PAD(4, 8)
+	CACHELINE_PAD(4, 8);
 	volatile CNTR4DCL(wcs_phase2_commit_pidcnt, 7);		/* number of processes actively finishing phase2 commit */
-	CACHELINE_PAD(4, 9)
+	CACHELINE_PAD(4, 9);
 	volatile CNTR4DCL(wcs_wip_lvl, 8);			/* number of entries in wip queue */
-	CACHELINE_PAD(4, 10)
+	CACHELINE_PAD(4, 10);
 	volatile int4	wtfini_in_prog;				/* whether wcs_wtfini() is in progress at this time */
 	boolean_t	freezer_waited_for_kip;			/* currently used only in dbg code */
 	int4            mm_extender_pid;			/* pid of the process executing gdsfilext in MM mode */
