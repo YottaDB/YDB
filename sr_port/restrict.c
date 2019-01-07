@@ -3,7 +3,7 @@
  * Copyright (c) 2017-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -115,8 +115,7 @@ error_def(ERR_TEXT);
 			if (SS_NORMAL != status)									\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,				\
 					LEN_AND_LIT("PUT_FLNAME_IN_MAPPING_FILE() gtm_file_remove() for "		\
-										COMM_FILTER_FILENAME), CALLFROM,	\
-					status);										\
+						    COMM_FILTER_FILENAME), CALLFROM, status);				\
 			append_filter(FPATH, C_CALL_NAME, M_REF_NAME);							\
 		} else													\
 			CREATED_NOW = FALSE;										\
@@ -182,7 +181,7 @@ void restrict_init(void)
 					{
 						lineno++;
 						fields = SSCANF(linebuf, FACILITY_FMTSTR " : " GROUP_FMTSTR,
-											facility, group_or_flname);
+								facility, group_or_flname);
 						if (0 == fields)
 							continue;	/* Ignore blank lines */
 						else if (1 == fields)

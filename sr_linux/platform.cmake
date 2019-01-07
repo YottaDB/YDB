@@ -149,6 +149,8 @@ set(gtm_dep   "${YDB_BINARY_DIR}/ydbexe_symbols.export")
 
 set(libyottadb_link "-Wl,-u,ydb_ci -Wl,-u,gtm_filename_to_id -Wl,-u,gtm_is_main_thread")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,accumulate -Wl,-u,is_big_endian -Wl,-u,to_ulong")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,gtm_ci")
+set(libyottadb_link "${libyottadb_link} -Wl,-u,gtm_cip")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_call_variadic_plist_func_s")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_call_variadic_plist_func_st")
 set(libyottadb_link "${libyottadb_link} -Wl,-u,ydb_child_init")

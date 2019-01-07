@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,11 +72,13 @@ void		gtm_hiber_start(ydb_uint_t mssleep);
 void		gtm_hiber_start_wait_any(ydb_uint_t mssleep);
 void		gtm_start_timer(ydb_tid_t tid, ydb_int_t time_to_expir, void (*handler)(), ydb_int_t hdata_len, void *hdata);
 
-/* The java plug-in has some very direct references to some of these routines that
- * cannot be changed by the pre-processor so for now, we have some stub routines
- * that take care of the translation. These routines are exported along with their
- * ydb_* variants.
+/* The java plug-in has some very direct references to some of these routines that cannot be changed by the pre-processor and
+ * in addition, there are some user uses of these routines that also cannot be changed by the pre-processor so we need these
+ * particular gtm_* entry points to continue to exist for compatibility.
  */
+ydb_status_t	gtm_init(void);
+ydb_status_t	gtm_ci(const char *c_rtn_name, ...);				/* Call-in interface */
+ydb_status_t	gtm_cip(ci_name_descriptor *ci_info, ...);			/* Slightly faster "gtm_ci" */
 #ifdef GTM_PTHREAD
 ydb_status_t 	gtm_jinit(void);
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,16 +14,19 @@
 
 #include <stdarg.h>
 
+#include "gtmxc_types.h"
 #include "libyottadb_int.h"
 #include "gtmci.h"
 
-/* Simple YottaDB wrapper to do a call-in. Does name lookup on each call whereas "ydb_cip" does not
+#undef gtm_ci		/* Undo the transformation of gtm_ci -> ydb_ci created by gtmxc_types.h */
+
+/* Simple YottaDB wrapper to do a call-in. Does name lookup on each call whereas "gtm_cip" does not
  *
- * Note this routine is nearly identical to gtm_ci() so any changes in either should be changed in the other. This is done by
+ * Note this routine is nearly identical to ydb_ci() so any changes in either should be changed in the other. This is done by
  * copying this small routine (which calls a larger common routine) because a simple wrapper doesn't work for a variadic call
  * like this one.
  */
-int ydb_ci(const char *c_rtn_name, ...)
+int gtm_ci(const char *c_rtn_name, ...)
 {
 	va_list		var;
 	int		retval;

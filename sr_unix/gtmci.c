@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -726,8 +726,7 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 				assert(syment->value == entry);
 			}
 		}
-	}
-	else /* Call from the filter command*/
+	} else /* Call from the filter command*/
 	{
 		if (!TREF(ci_filter_table))
 		{
@@ -1544,10 +1543,16 @@ void gtmci_cleanup(void)
  * that take care of the translation. These routines are exported along with their
  * ydb_* variants. First - get rid of the pre-processor redirection via #defines.
  */
+#undef gtm_init
 #undef gtm_jinit
 #undef gtm_exit
 #undef gtm_cij
 #undef gtm_zstatus
+
+ydb_status_t gtm_init()
+{
+	return ydb_init();
+}
 #ifdef GTM_PTHREAD
 ydb_status_t gtm_jinit()
 {
@@ -1555,7 +1560,6 @@ ydb_status_t gtm_jinit()
 	return ydb_init();
 }
 #endif
-
 ydb_status_t gtm_exit()
 {
 	return ydb_exit();

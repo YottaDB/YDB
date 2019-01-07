@@ -8,12 +8,15 @@ gtcm_play_main
 gtcm_server_main
 gtcm_shmclean_main
 gtm_cancel_timer
+gtm_ci
 gtm_cij
+gtm_cip
 gtm_exit
 gtm_filename_to_id
 gtm_free
 gtm_hiber_start
 gtm_hiber_start_wait_any
+gtm_init
 gtm_is_file_identical
 gtm_is_main_thread
 gtm_jinit

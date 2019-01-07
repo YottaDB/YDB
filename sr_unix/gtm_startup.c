@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,7 +123,6 @@ GBLREF bool			compile_time;
 GBLREF spdesc			stringpool;
 GBLREF spdesc			rts_stringpool;
 GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
-GBLREF lv_val			*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF symval			*curr_symval;
 GBLREF global_latch_t 		defer_latch;
 GBLREF boolean_t		is_replicator;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -130,7 +130,7 @@ LITREF	mval		literal_notimeout;
 	secshr_db_clnup(NORMAL_TERMINATION);								\
 	zcall_halt();											\
 	op_unlock();											\
-	op_zdeallocate((mval *)&literal_notimeout);									\
+	op_zdeallocate((mval *)&literal_notimeout);							\
 }
 
 #define	IO_RUNDOWN_MACRO											\

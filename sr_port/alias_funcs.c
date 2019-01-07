@@ -56,7 +56,6 @@ GBLREF zwr_hash_table	*zwrhtab;
 GBLREF trans_num	local_tn;					/* transaction number for THIS PROCESS */
 GBLREF uint4		tstartcycle;
 GBLREF uint4		lvtaskcycle;					/* lv_val cycle for misc lv_val related tasks */
-GBLREF lv_val		*zsrch_var, *zsrch_dir1, *zsrch_dir2;
 GBLREF tp_frame		*tp_pointer;
 GBLREF int4		SPGC_since_LVGC;				/* stringpool GCs since the last dead-data GC */
 GBLREF boolean_t	suspend_lvgcol;

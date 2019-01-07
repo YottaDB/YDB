@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,10 @@
 
 /* Fast path YottaDB wrapper to do a call-in.
  * Adds a struct parm that contains name resolution info after first call to speed up dispatching.
+ *
+ * Note this routine is nearly identical to gtm_cip() so any changes in either should be changed in the other. This is done by
+ * copying this small routine (which calls a larger common routine) because a simple wrapper doesn't work for a variadic call
+ * like this one.
  */
 int ydb_cip(ci_name_descriptor* ci_info, ...)
 {

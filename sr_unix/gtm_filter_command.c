@@ -3,7 +3,7 @@
  * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,9 +33,9 @@ GBLREF boolean_t	is_tracing_on;
 
 #define CALL_ROUTINE_N_CHECK_ERR(ROUTINE, COMMAND, RET_COMM)							\
 {														\
-	gtm_status_t	stat;											\
-	gtm_long_t	quit_return;										\
-	gtm_char_t	err_str[2 * OUT_BUFF_SIZE]; /* Same as Max buffer for zstatus */			\
+	ydb_status_t	stat;											\
+	ydb_long_t	quit_return;										\
+	ydb_char_t	err_str[2 * OUT_BUFF_SIZE]; /* Same as Max buffer for zstatus */			\
 	stat = gtm_ci_filter(ROUTINE, &quit_return, COMMAND, &RET_COMM);					\
 	if (quit_return == -1)											\
 	{													\
@@ -60,18 +60,18 @@ GBLREF boolean_t	is_tracing_on;
 	}													\
 }
 
-gtm_string_t gtm_filter_command(char * command, char * caller_name)
+ydb_string_t gtm_filter_command(char * command, char * caller_name)
 {
-	gtm_char_t	com_str[MAX_STRLEN];
-	gtm_string_t 	returned_command;
+	ydb_char_t	com_str[MAX_STRLEN];
+	ydb_string_t 	returned_command;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 
-	returned_command.address = (xc_char_t *)&com_str;
+	returned_command.address = (ydb_char_t *)&com_str;
 	returned_command.length = MAX_STRLEN;
 
-	if(TREF(comm_filter_init)) /*Already in a filter, no nesting allowed*/
+	if (TREF(comm_filter_init)) /* Already in a filter, no nesting allowed */
 	{
 		TREF(comm_filter_init) = FALSE;
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOFILTERNEST);

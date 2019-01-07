@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -136,12 +136,12 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 			case SIGABND:
 #			else
 				/* On Linux SIGIOT is commonly same as SIGABRT, so to avoid duplicate cases, check for that. */
-#				if !defined(__CYGWIN__) && defined (SIGIOT) && (SIGIOT != SIGABRT)
+#			if !defined(__CYGWIN__) && defined (SIGIOT) && (SIGIOT != SIGABRT)
 			case SIGIOT:
-#				endif
-#				ifndef __linux__
+#			endif
+#			ifndef __linux__
 			case SIGEMT:
-#				endif
+#			endif
 #			endif
 			case SIGILL:
 			case SIGQUIT:
