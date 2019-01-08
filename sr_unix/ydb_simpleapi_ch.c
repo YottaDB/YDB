@@ -187,8 +187,8 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 			ydb_zstatus(errstr->buf_addr, errstr->len_alloc);
 			/* errstr->buf_addr points to a null-terminated string. So no need for errstr->len_used.
 			 * Therefore set it to the actual length of the error string.
-			 * If errstr->len_used >= errstr->len_alloc - 1, then user knows they got a truncated error string
-			 * and need to pass in a bigger buffer.
+			 * If errstr->len_used > errstr->len_alloc - 1, then user knows they got a truncated error string
+			 * and need to pass in a bigger buffer to avoid truncation in future SimpleThreadAPI calls.
 			 */
 			errstr->len_used = dollar_zstatus.str.len;
 		}
