@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1293,3 +1293,17 @@ GBLDEF	int		fork_after_ydb_init;	/* Set to a non-zero value if a "fork" occurs a
 						 * set to TRUE. Used for handling/detecting error scenarios in SimpleAPI and
 						 * SimpleThreadAPI.
 						 */
+GBLDEF siginfo_t		exi_siginfo;		/* Holds the "info" parameter passed by OS in "generic_signal_handler" */
+GBLDEF gtm_sigcontext_t 	exi_context;		/* Holds the "context" parameter passed by OS in "generic_signal_handler" */
+GBLDEF int			exi_signal_forwarded;	/* 0 if no signal forwarding happened in "generic_signal_handler".
+							 * Non-zero signal number if forwarding did happen. In that case,
+							 * "exi_siginfo" and "exi_context" store the "info" and "context"
+							 * passed into "generic_signal_handler" (by the OS) before the
+							 * forwarding. This way we do not lose the original information
+							 * (e.g. if another process-id sent us the signal, forwarding the
+							 * signal from one thread to another thread in the same process
+							 * causes the signal to be treated as having originated in the
+							 * same process and thus loses the sending pid information).
+							 * For example, sending SIGQUIT/SIG-3 should show up as KILLBYSIGUINFO
+							 * but would show up as KILLBYSIGSINFO1 without the pre-forwarding store.
+							 */

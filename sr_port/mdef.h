@@ -1852,27 +1852,6 @@ enum
 #define OPERATOR_LOG_MSG
 #endif
 
-#ifdef GTM_PTHREAD
-/* If we detect a case when the signal came to a thread other than the main GT.M thread, this macro will redirect the signal to the
- * main thread if such is defined. Such scenarios is possible, for instance, if we are running along a JVM, which, upon receiving a
- * signal, dispatches a new thread to invoke signal handlers other than its own. The pthread_kill() enables us to target the signal
- * to a specific thread rather than rethrow it to the whole process.
- */
-#define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIG)								\
-{														\
-	GBLREF pthread_t	gtm_main_thread_id;								\
-	GBLREF boolean_t	gtm_main_thread_id_set;								\
-														\
-	if (gtm_main_thread_id_set && !pthread_equal(gtm_main_thread_id, pthread_self()))			\
-	{	/* Only redirect the signal if the main thread ID has been defined, and we are not that. */	\
-		pthread_kill(gtm_main_thread_id, SIG);								\
-		return;												\
-	}													\
-}
-#else
-#define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIG)
-#endif
-
 #ifdef __linux__
 # define CURRENT_PC __builtin_return_address(0)
 #else

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson.			*
@@ -79,6 +79,7 @@
 #include "gtm_multi_thread.h"
 #include "gtmxc_types.h"
 #include "getjobnum.h"
+#include "generic_signal_handler.h"
 
 #ifdef ITIMER_REAL
 # define BSD_TIMER
@@ -717,7 +718,7 @@ STATICFNDEF void timer_handler(int why)
 		 * which should forward the signal to the MAIN worker thread as that is the one driving the YottaDB engine.
 		 * Therefore we need this signal forwarding even in the POSIX timer case.
 		 */
-		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGALRM);
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGALRM, IS_EXI_SIGNAL_FALSE, NULL, NULL);
 	}
 	/* else: why == DUMMY_SIG_NUM we know that "timer_handler" was called directly, so no need
 	 * to check if the signal needs to be forwarded to appropriate thread.

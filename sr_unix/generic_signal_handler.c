@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,13 +55,6 @@
 	gtm_putmsg_csa(CSA_ARG(NULL) __VA_ARGS__);		\
 }
 
-/* These fields are defined as globals not because they are used globally but
- * so they will be easily retrievable even in 'pro' cores.
- */
-GBLDEF siginfo_t		exi_siginfo;
-
-GBLDEF gtm_sigcontext_t 	exi_context;
-
 GBLREF	int4			forced_exit_err;
 GBLREF	int4			exi_condition;
 GBLREF	boolean_t		dont_want_core;
@@ -109,7 +102,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	 */
 	if (thread_block_sigsent && sigismember(&block_sigsent, sig))
 		return;
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig);
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig, IS_EXI_SIGNAL_TRUE, info, context);
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into timer_handler
 	 * and then came here due to a nested signal (e.g. SIG-15). So save current value of global and restore it at
@@ -121,20 +114,24 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	dont_want_core = FALSE;		/* (re)set in case we recurse */
 	created_core = FALSE;		/* we can deal with a second core if needbe */
 	exi_condition = sig;
-	if (NULL != info)
-		exi_siginfo = *info;
-	else
-		memset(&exi_siginfo, 0, SIZEOF(*info));
-#	if defined(__ia64) && defined(__hpux)
-	context_ptr = (gtm_sigcontext_t *)context;	/* no way to make a copy of the context */
-	memset(&exi_context, 0, SIZEOF(exi_context));
-#	else
-	if (NULL != context)
-		exi_context = *(gtm_sigcontext_t *)context;
-	else
-		memset(&exi_context, 0, SIZEOF(exi_context));
+	if (exi_signal_forwarded && (sig != exi_signal_forwarded))
+	{	/* We had forwarded the signal "exi_signal_forwarded" in a previous call to "generic_signal_handler" but
+		 * this call is for a different signal. Forget whatever was recorded in previous forwarding and treat
+		 * this as a fresh signal occurrence (which will be recorded in case it gets forward) by clearing
+		 * evidence of exi_signal forwarding.
+		 */
+		exi_signal_forwarded = 0;
+	}
+	if (sig != exi_signal_forwarded)
+	{	/* Signal has not been forwarded. Note down passed in "info" and "context" into global variables */
+		SET_EXI_SIGINFO_AS_APPROPRIATE(info);
+		SET_EXI_CONTEXT_AS_APPROPRIATE(context);
+	}
+	/* else: Signal has been forwarded. "exi_siginfo" and "exi_context" already point to pre-forwarded "info" and "context"
+	 *	(see FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED macro for details).
+	 */
+	exi_signal_forwarded = 0;	/* Now that "exi_siginfo" and "exi_context" are set appropriately, clear this global */
 	context_ptr = &exi_context;
-#	endif
 	/* Check if we are fielding nested immediate shutdown signals */
 	if (EXIT_IMMED <= exit_state)
 	{

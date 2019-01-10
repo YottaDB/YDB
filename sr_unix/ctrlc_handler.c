@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +22,7 @@
 
 #include "ctrlc_handler.h"
 #include "std_dev_outbndset.h"
+#include "generic_signal_handler.h"
 
 void ctrlc_handler(int sig)
 {
@@ -27,7 +31,7 @@ void ctrlc_handler(int sig)
 
 	if (SIGINT == sig)
 	{
-		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig);
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig, IS_EXI_SIGNAL_FALSE, NULL, NULL);
 		save_errno = errno;
 		ob_char = 3;
 		std_dev_outbndset(ob_char);
