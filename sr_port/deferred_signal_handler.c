@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,17 @@ void	deferred_signal_handler(void)
 	assert(GET_DEFERRED_EXIT_CHECK_NEEDED || (1 != forced_exit));
 	if (process_exiting)
 		return;	/* Process is already exiting. Skip handling deferred events in that case. */
+	if (simpleThreadAPI_active && timer_in_handler)
+	{	/* Process is in a timer handler and has multiple threads. Exit handling could
+		 * 	a) do "pthread_mutex_lock" calls (see PTHREAD_MUTEX_LOCK_IF_NEEDED comment in wcs_wtstart.c for example) OR
+		 *	b) do "wcs_flu" which in turn could not flush anything because "wcs_wtstart" chose not to do any
+		 *		flushes (for the same reason as (a))
+		 * Due to these and possibly other reasons, it is not safe to do exit handling while inside a timer handler
+		 * when multiple threads are active. Therefore return right away. "deferred_signal_handler" will be invoked
+		 * again at a safer point once the timer handler is done (e.g. at a later ENABLE_INTERRUPTS call)
+		 */
+		return;
+	}
 	if (!OK_TO_INTERRUPT_TRIMMED)
 		return;	/* Not in a position to allow interrupt to happen. Defer interrupt handling to later. */
 	/* If forced_exit was set while in a deferred state, disregard any deferred timers or deferred Ctrl-Zs
