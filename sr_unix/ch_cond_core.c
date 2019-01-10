@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,6 +23,10 @@ GBLREF boolean_t	created_core;
 GBLREF boolean_t	dont_want_core;
 GBLREF boolean_t	need_core;
 GBLREF uint4		ydbDebugLevel;
+#ifdef DEBUG
+GBLREF boolean_t	multi_thread_in_use;
+GBLREF boolean_t	simpleThreadAPI_active;
+#endif
 
 /* Create our own version of the DUMP macro that does not include stack overflow. This
    error is handled better inside mdb_condition_handler which should be the top level
@@ -57,10 +61,21 @@ void ch_cond_core(void)
 	boolean_t	cond_core_signal;
 
 	cond_core_signal = (ERR_STACKOFLOW == SIGNAL) || (ERR_MEMORY == SIGNAL);
-	if (DUMPABLE && ((cond_core_signal && (GDL_DumpOnStackOFlow & ydbDebugLevel) && !IS_SIMPLEAPI_MODE) || !cond_core_signal)
-	    && !SUPPRESS_DUMP)
+	if (DUMPABLE
+		&& ((cond_core_signal && (GDL_DumpOnStackOFlow & ydbDebugLevel) && !IS_SIMPLEAPI_MODE) || !cond_core_signal)
+		&& !SUPPRESS_DUMP)
 	{
 		need_core = TRUE;
+#		ifdef DEBUG
+		if (simpleThreadAPI_active || multi_thread_in_use)
+		{	/* Either of the conditions in the "if" check imply this process has more than one thread active.
+			 * If we do a "fork_n_core", we would only get the C-stack of the current thread (since a "fork"
+			 * does not inherit the C-stack of all active threads). Therefore in debug builds at least,
+			 * dump a core right away so we have more information for debugging.
+			 */
+			DUMP_CORE;	/* will not return */
+		}
+#		endif
 		gtm_fork_n_core();
 	}
 
