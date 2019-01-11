@@ -348,22 +348,28 @@ if [ "N" = "$ydb_force_install" ]; then
 		# Set an impossible major/minor version by default in case we do not descend down known platforms in if/else below.
 		osallowmajorver=999
 		osallowminorver=999
-		if [ "x8664" = "${ydb_flavor}" -o "aarch64" = "${ydb_flavor}" ] ; then
+		if [ "x8664" = "${ydb_flavor}" ] ; then
 			if [ "ubuntu" = "${osid}" ] ; then
-				# Ubuntu 16.04 and onwards is considered supported
+				# Ubuntu 16.04 and onwards is considered supported on 64-bit x86 architecture
 				osallowmajorver=16
 				osallowminorver=4
 			else
 				if [ "rhel" = "${osid}" ] ; then
-					# RHEL 7.x is considered supported
+					# RHEL 7.x is considered supported on 64-bit x86 architecture
 					osallowmajorver=7
 					osallowminorver=0
 				fi
 			fi
+		elif [ "aarch64" = "${ydb_flavor}" ] ; then
+			if [ "ubuntu" = "${osid}" ] ; then
+				# Ubuntu 18.04 and onwards is considered supported on 64-bit ARM architecture
+				osallowmajorver=18
+				osallowminorver=4
+			fi
 		else
 			if [ "armv6l" = "${ydb_flavor}" -o "armv7l" = "${ydb_flavor}" ] ; then
 				if [ "raspbian" = "${osid}" -o "debian" = ${osid} ] ; then
-					# Raspbian or Debian 9 or 9.x is considered supported
+					# Raspbian or Debian 9 or 9.x is considered supported on 32-bit ARM architecture
 					osallowmajorver=9
 					osallowminorver=0
 				fi
