@@ -50,6 +50,7 @@
 #include "gvcst_protos.h"
 #include "op.h"
 #include "trace_table.h"
+#include "libyottadb_int.h"
 
 GBLREF	int4			exi_condition;
 GBLREF	uint4			dollar_tlevel;
@@ -62,6 +63,7 @@ GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		skip_exit_handler;
 GBLREF 	boolean_t		is_tracing_on;
 GBLREF	int			fork_after_ydb_init;
+GBLREF	stm_workq		*stmWorkQueue[];
 #ifdef DEBUG
 GBLREF 	boolean_t		stringpool_unusable;
 GBLREF 	boolean_t		stringpool_unexpandable;
@@ -184,19 +186,29 @@ void gtm_exit_handler(void)
 	}
 	if (exit_handler_active || skip_exit_handler) /* Skip exit handling if specified or if exit handler already active */
 		return;
+	if (simpleThreadAPI_active && !IS_STAPI_WORKER_THREAD)
+	{	/* This is a SimpleThreadAPI environment and the thread that is invoking the exit handler is not the
+		 * MAIN worker thread. This is an out-of-design situation since this would imply concurrently running
+		 * the YottaDB engine in this thread and the MAIN worker thread. Therefore signal the MAIN worker thread
+		 * to run the exit handler stuff, wait for that to finish (it would have run "gtm_exit_handler") and then return.
+		 * All this is already done by "ydb_exit" so invoke it and return.
+		 */
+		 ydb_exit();
+		 return;
+	}
 	exit_handler_active = TRUE;
 	ydb_dmp_tracetbl();
 	attempting = rundown_state_lock;
 	actual_exi_condition = 0;
 	ESTABLISH_NORET(exi_ch, error_seen);	/* "error_seen" is initialized inside this macro */
-#ifdef DEBUG
+#	ifdef DEBUG
 	if (WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) && (NO_STATS_OPTIN != TREF(statshare_opted_in)))
 	{	/* Forced to FALSE when killing processes and we may need to rundown statsdbs */
 		stringpool_unusable = FALSE;
 		stringpool_unexpandable = FALSE;
 		fast_lock_count = 0;
 	}
-#endif
+#	endif
 	RUNDOWN_STEP(rundown_state_lock, rundown_state_mprof, ERR_LKRUNDOWN, LOCK_RUNDOWN_MACRO);
 	RUNDOWN_STEP(rundown_state_mprof, rundown_state_statsdb, ERR_MPROFRUNDOWN, MPROF_RUNDOWN_MACRO);
 	/* The condition handler used in the gvcst_remove_statsDB_linkage_all() path takes care of sending errors */

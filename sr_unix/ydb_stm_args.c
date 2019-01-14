@@ -29,6 +29,16 @@
 #include "caller_id.h"
 #include "trace_table.h"
 
+#define	RETURN_IF_FORCED_THREAD_EXIT											\
+{															\
+	if (forced_thread_exit)												\
+	{	/* MAIN worker thread has exited or has been signaled to exit (i.e. "ydb_exit" has been called).	\
+		 * Do not service any more SimpleThreadAPI requests. Return right away.					\
+		 */													\
+		return YDB_ERR_CALLINAFTERXIT;										\
+	}														\
+}
+
 GBLREF	stm_workq	*stmWorkQueue[];		/* Array to hold list of work queues for SimpleThreadAPI */
 GBLREF	stm_workq	*stmTPWorkQueue[];		/* Alternate queue main worker thread uses when TP is active */
 GBLREF	uint64_t	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
@@ -46,7 +56,7 @@ intptr_t ydb_stm_args(stm_que_ent *callblk)
 	intptr_t		retval;
 	uintptr_t		calltyp;
 	stm_workq		*queueToUse;
-	boolean_t		startThread, queueChanged;
+	boolean_t		callblkServiceNeeded, startThread, queueChanged, dummy_forced_thread_exit_seen;
 	libyottadb_routines	active_stapi_rtn;
 	uint64_t		tptoken;
 	DCL_THREADGBL_ACCESS;
@@ -55,44 +65,51 @@ intptr_t ydb_stm_args(stm_que_ent *callblk)
 	TRCTBL_ENTRY(STAPITP_ENTRY, 0, "ydb_stm_args", NULL, pthread_self());
 	DEBUG_ONLY(callblk->mainqcaller = caller_id());
 	calltyp = callblk->calltyp;
-	if (IS_STAPI_WORKER_THREAD)
-	{	/* If this is the MAIN worker thread and the current request is not to start a TP transaction (that requires
-		 * involvement of the TP worker thread), service this request right away in the MAIN worker thread
-		 * without queueing the request anywhere. This avoids unnecessary deadlocks where the MAIN worker thread
-		 * is hung waiting for queued request to be serviced when the only thread that can service the request is
-		 * the MAIN worker thread.
-		 */
-		assert(LYDB_RTN_TPCOMPLT != calltyp);
-		active_stapi_rtn = TREF(libyottadb_active_rtn);
-		assert(LYDB_RTN_NONE != active_stapi_rtn);
-		if (LYDB_RTN_TP != calltyp)
-		{	/* This request does not need to be queued */
-			DEBUG_ONLY(queueChanged = FALSE);
-			if ((LYDB_RTN_YDB_CI == active_stapi_rtn) || (LYDB_RTN_YDB_CIP == active_stapi_rtn))
-			{	/* The MAIN worker thread is servicing a "ydb_ci_t" or "ydb_cip_t" call (through "ydb_cip_helper").
-				 * Allow calls to SimpleThreadAPI functions (other than "ydb_tp_st") while inside the call-in by
-				 * shutting off the active rtn indicator temporarily for the duration of the SimpleThreadAPI call.
+	retval = YDB_OK;
+	for ( ; ; )	/* for loop only there to let us break from error cases without having a deep if-then-else structure */
+	{
+		if (IS_STAPI_WORKER_THREAD)
+		{	/* If this is the MAIN worker thread and the current request is not to start a TP transaction (that requires
+			 * involvement of the TP worker thread), service this request right away in the MAIN worker thread
+			 * without queueing the request anywhere. This avoids unnecessary deadlocks where the MAIN worker thread
+			 * is hung waiting for queued request to be serviced when the only thread that can service the request is
+			 * the MAIN worker thread.
+			 */
+			assert(LYDB_RTN_TPCOMPLT != calltyp);
+			active_stapi_rtn = TREF(libyottadb_active_rtn);
+			assert(LYDB_RTN_NONE != active_stapi_rtn);
+			if (LYDB_RTN_TP != calltyp)
+			{	/* This request does not need to be queued */
+				DEBUG_ONLY(queueChanged = FALSE);
+				if ((LYDB_RTN_YDB_CI == active_stapi_rtn) || (LYDB_RTN_YDB_CIP == active_stapi_rtn))
+				{	/* The MAIN worker thread is servicing a "ydb_ci_t" or "ydb_cip_t" call
+					 * (through "ydb_cip_helper"). Allow calls to SimpleThreadAPI functions
+					 * (other than "ydb_tp_st") while inside the call-in by shutting off the
+					 * active rtn indicator temporarily for the duration of the SimpleThreadAPI call.
+					 */
+					TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;
+				}
+				/* else: It is possible we are inside a "ydb_set_st" call which invoked a trigger and got us here.
+				 *       In that case, the SIMPLEAPINEST error will be issued inside "ydb_stm_threadq_dispatch".
 				 */
-				TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;
+				ydb_stm_threadq_dispatch(callblk, &queueChanged, &dummy_forced_thread_exit_seen);
+				assert(!queueChanged);
+				if ((LYDB_RTN_YDB_CI == active_stapi_rtn) || (LYDB_RTN_YDB_CIP == active_stapi_rtn))
+					TREF(libyottadb_active_rtn) = active_stapi_rtn;	/* Restore active rtn indicator */
+				retval = callblk->retval;
+			} else
+			{	/* This request needs to be queued (since it involves the TP worker thread which in turn is going
+				 * to ask the MAIN worker thread to do some work) but since we are the MAIN worker thread, waiting
+				 * for service is a deadlock so issue an error.
+				 */
+				/* A SimpleAPI routine is already running. SIMPLEAPINEST error can be issued */
+				SETUP_GENERIC_ERROR_2PARMS(YDB_ERR_SIMPLEAPINEST, LYDBRTNNAME(active_stapi_rtn),
+								LYDBRTNNAME(calltyp));
+				retval = YDB_ERR_SIMPLEAPINEST;
 			}
-			/* else: It is possible we are inside a "ydb_set_st" call which invoked a trigger and got us here.
-			 *       In that case, the SIMPLEAPINEST error will be issued inside the "ydb_stm_threadq_dispatch" call.
-			 */
-			ydb_stm_threadq_dispatch(callblk, &queueChanged);
-			assert(!queueChanged);
-			if ((LYDB_RTN_YDB_CI == active_stapi_rtn) || (LYDB_RTN_YDB_CIP == active_stapi_rtn))
-				TREF(libyottadb_active_rtn) = active_stapi_rtn;	/* Restore active rtn indicator */
-		} else
-		{	/* This request needs to be queued (since it involves the TP worker thread which in turn is going
-			 * to ask the MAIN worker thread to do some work) but since we are the MAIN worker thread, waiting
-			 * for service is a deadlock so issue an error.
-			 */
-			/* A SimpleAPI routine is already running. SIMPLEAPINEST error can be issued */
-			SETUP_GENERIC_ERROR_2PARMS(YDB_ERR_SIMPLEAPINEST, LYDBRTNNAME(active_stapi_rtn), LYDBRTNNAME(calltyp));
-			return YDB_ERR_SIMPLEAPINEST;
+			break;
 		}
-	} else
-	{	/* This request has to be queued */
+		/* This request has to be queued */
 		/* If have a descriptor block (meaning we are in TP), validate the tptoken value against our tplevel counter. A
 		 * failure in validation is an error as well as if we discover no TP transaction has been started. Otherwiswe, we
 		 * have a non-TP transaction so use the regular work queue.
@@ -107,7 +124,8 @@ intptr_t ydb_stm_args(stm_que_ent *callblk)
 			{	/* This is not the correct token for this TP transaction - return error */
 				assert(FALSE);
 				SETUP_GENERIC_ERROR(YDB_ERR_INVTPTRANS);
-				return YDB_ERR_INVTPTRANS;
+				retval = YDB_ERR_INVTPTRANS;
+				break;
 			}
 			/* This is legitimately TP mode - We are putting any subsequent work on the alternate queue but using the
 			 * same worker thread so don't start a new thread. Instead, just lock the queue.
@@ -125,47 +143,65 @@ intptr_t ydb_stm_args(stm_que_ent *callblk)
 		if (0 != status)
 		{
 			assert(FALSE);
-			return status;			/* Error already setup */
+			retval = status;			/* Error already setup */
+			break;
 		}
-		/* Place this call block on the thread queue (at the end of the queue) */
-		dqrins(&queueToUse->stm_wqhead, que, callblk);
+		if (!forced_thread_exit)
+		{	/* Place this call block on the thread queue (at the end of the queue) */
+			dqrins(&queueToUse->stm_wqhead, que, callblk);
+			callblkServiceNeeded = TRUE;
+		} else
+		{	/* MAIN worker thread has exited or has been signaled to exit (i.e. "ydb_exit" has been called).
+			 * Do not queue any more SimpleThreadAPI requests. Return with appropriate error.
+			 */
+			callblkServiceNeeded = FALSE;
+		}
 		/* Release CV/mutex lock so worker thread can get the lock and wakeup */
 		status = pthread_mutex_unlock(&queueToUse->mutex);
 		if (0 != status)
 		{
 			SETUP_SYSCALL_ERROR("pthread_mutex_unlock()", status);
 			assert(FALSE);
-			return YDB_ERR_SYSCALL;
+			retval = YDB_ERR_SYSCALL;
+			break;
 		}
-		TRCTBL_ENTRY(STAPITP_UNLOCKWORKQ, callblk->calltyp, queueToUse, callblk, pthread_self());
-		/* Signal the condition variable something is on the queue awaiting tender ministrations */
-		status = pthread_cond_signal(&queueToUse->cond);
-		if (0 != status)
+		if (callblkServiceNeeded)
 		{
-			SETUP_SYSCALL_ERROR("pthread_cond_signal()", status);
-			assert(FALSE);
-			return YDB_ERR_SYSCALL;
-		}
-		TRCTBL_ENTRY(STAPITP_SEMWAIT, 0, NULL, callblk, pthread_self());
-		/* Now wait till a worker thread tells us our request is complete */
-		GTM_SEM_WAIT(&callblk->complete, status);
-		if (0 != status)
-		{
-			save_errno = errno;
-			SETUP_SYSCALL_ERROR("sem_wait()", save_errno);
-			assert(FALSE);
-			return YDB_ERR_SYSCALL;
-		}
-		TRCTBL_ENTRY(STAPITP_REQCOMPLT, callblk->calltyp, callblk->retval, callblk, pthread_self());
+			TRCTBL_ENTRY(STAPITP_UNLOCKWORKQ, callblk->calltyp, queueToUse, callblk, pthread_self());
+			/* Signal the condition variable something is on the queue awaiting tender ministrations */
+			status = pthread_cond_signal(&queueToUse->cond);
+			if (0 != status)
+			{
+				SETUP_SYSCALL_ERROR("pthread_cond_signal()", status);
+				assert(FALSE);
+				retval = YDB_ERR_SYSCALL;
+				break;
+			}
+			TRCTBL_ENTRY(STAPITP_SEMWAIT, 0, NULL, callblk, pthread_self());
+			/* Now wait till a worker thread tells us our request is complete */
+			GTM_SEM_WAIT(&callblk->complete, status);
+			if (0 != status)
+			{
+				save_errno = errno;
+				SETUP_SYSCALL_ERROR("sem_wait()", save_errno);
+				assert(FALSE);
+				retval = YDB_ERR_SYSCALL;
+				break;
+			}
+			TRCTBL_ENTRY(STAPITP_REQCOMPLT, callblk->calltyp, callblk->retval, callblk, pthread_self());
+		} else
+			callblk->retval = YDB_ERR_CALLINAFTERXIT;
+		/* Save the return value, queue the now-free call block for later reuse */
+		retval = callblk->retval;
+		break;
 	}
-	/* Save the return value, queue the now-free call block for later reuse */
-	retval = callblk->retval;
 	status = ydb_stm_freecallblk(callblk);
-	if (0 != status)
-	{
-		assert(FALSE);
-		return status;
-	}
+	assert(0 == status);
+	/* If the above call failed, return this only if "retval" is YDB_OK.
+	 * If not, return "retval" as is as that is the primary error.
+	 */
+	if ((YDB_OK == retval) && (0 != status))
+		retval = status;
 	/* Return the return value from the call */
 	return retval;
 }
@@ -175,6 +211,7 @@ intptr_t ydb_stm_args0(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
+	RETURN_IF_FORCED_THREAD_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
@@ -190,6 +227,7 @@ intptr_t ydb_stm_args1(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
+	RETURN_IF_FORCED_THREAD_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
@@ -206,6 +244,7 @@ intptr_t ydb_stm_args2(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
+	RETURN_IF_FORCED_THREAD_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
@@ -223,6 +262,7 @@ intptr_t ydb_stm_args3(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
+	RETURN_IF_FORCED_THREAD_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
@@ -242,6 +282,7 @@ intptr_t ydb_stm_args4(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
+	RETURN_IF_FORCED_THREAD_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
@@ -262,6 +303,7 @@ intptr_t ydb_stm_args5(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
+	RETURN_IF_FORCED_THREAD_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
@@ -284,6 +326,7 @@ intptr_t ydb_stm_args6(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
+	RETURN_IF_FORCED_THREAD_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)

@@ -36,8 +36,7 @@ GBLREF	uint4		dollar_trestart;
 GBLREF	uint64_t 	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
 #endif
 
-STATICFNDCL void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead);
-
+STATICFNDCL void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t *forced_thread_exit_seen);
 
 /* Routine to manage worker thread(s) for the *_st() interface routines (Simple Thread API aka the
  * Simple Thread Method). Note for the time being, only one worker thread is created. In the future,
@@ -49,8 +48,8 @@ STATICFNDCL void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead);
 void *ydb_stm_tpthread(void *parm)
 {
 	int		tpdepth, status, rc;
-	boolean_t	stop = FALSE;
 	stm_workq	*curTPWorkQHead;
+	boolean_t	forced_thread_exit_seen = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -75,20 +74,28 @@ void *ydb_stm_tpthread(void *parm)
 	status = pthread_mutex_lock(&curTPWorkQHead->mutex);
 	if (0 != status)
 	{
-		SETUP_SYSCALL_ERROR("pthread_mutex_lock(curWorkQHead)", status);
+		SETUP_SYSCALL_ERROR("pthread_mutex_lock(curTPWorkQHead)", status);
 		assertpro(FALSE && YDB_ERR_SYSCALL);			/* No return possible so abandon thread */
 	}
-	/* Before we wait the first time, veryify nobody snuck something onto the queue by processing anything there */
-	ydb_stm_tpthreadq_process(curTPWorkQHead);
-	while (!stop)
-	{	/* Wait for some work to probably show up */
+	for ( ; ; )
+	{
+		/* Before we wait, verify nobody snuck something onto the queue by processing anything there */
+		ydb_stm_tpthreadq_process(curTPWorkQHead, &forced_thread_exit_seen);	/* Process any entries on the queue */
+		if (forced_thread_exit_seen)
+		{	/* We saw "forced_thread_exit" to be TRUE while inside "ydb_stm_tpthreadq_process".
+			 * Just like we do in "ydb_stm_thread", exit. Note that here, we do not have multiple
+			 * queues to worry about like there so the code is relatively simpler.
+			 */
+			assert(curTPWorkQHead->stm_wqhead.que.fl == &curTPWorkQHead->stm_wqhead);
+			break;	/* No more requests queued up AND we have been signaled to exit. So exit. */
+		}
+		/* Wait for some work to probably show up */
 		status = pthread_cond_wait(&curTPWorkQHead->cond, &curTPWorkQHead->mutex);
 		if (0 != status)
 		{
-			SETUP_SYSCALL_ERROR("pthread_cond_wait(curWorkQHead)", status);
+			SETUP_SYSCALL_ERROR("pthread_cond_wait(curTPWorkQHead)", status);
 			assertpro(FALSE && YDB_ERR_SYSCALL);		/* No return possible so abandon thread */
 		}
-		ydb_stm_tpthreadq_process(curTPWorkQHead);	/* Process any entries on the queue */
 	}
 	return NULL;
 }
@@ -96,7 +103,7 @@ void *ydb_stm_tpthread(void *parm)
 /* Routine to actually process the thread work queue for the Simple Thread API/Method. Note there are two possible queues we
  * would be looking at.
  */
-STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
+STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t *forced_thread_exit_seen)
 {
 	stm_que_ent		*callblk;
 	int			int_retval, rlbk_retval, status, save_errno;
@@ -114,7 +121,13 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 	while (TRUE)
 	{	/* If queue is empty, we should just go right back to sleep */
 		if (curTPWorkQHead->stm_wqhead.que.fl == &curTPWorkQHead->stm_wqhead)
+		{
+			if (forced_thread_exit)
+			{	/* TP worker thread has been signaled to exit (i.e. "ydb_exit" has been called) */
+				*forced_thread_exit_seen = TRUE;
+			}
 			break;
+		}
 		/* Remove the first element (going forward) from the work queue */
 		callblk = curTPWorkQHead->stm_wqhead.que.fl;
 		dqdel(callblk, que);		/* Removes our element from the queue */
@@ -129,133 +142,143 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead)
 		TRCTBL_ENTRY(STAPITP_UNLOCKWORKQ, 0, curTPWorkQHead, callblk, pthread_self());
 		TRCTBL_ENTRY(STAPITP_FUNCDISPATCH, callblk->calltyp, NULL, NULL, pthread_self());
 		/* We have our request - dispatch it appropriately (currently only one choice) */
-		switch (callblk->calltyp)
+		assert(LYDB_RTN_TP == callblk->calltyp);
+		for ( ; ;) /* for loop only there to let us break from various cases without having a deep if-then-else structure */
 		{
-			case LYDB_RTN_TP:
-				/* Note that all YottaDB engine calls are handled only by the MAIN worker thread and never
-				 * by the current TP worker thread. The latter is used only to invoke the user-defined
-				 * callback function. This lets the logic for handling timer pops stay in the MAIN worker thread
-				 * keeping it simple (as opposed to introducing locks between the MAIN and TP worker threads
-				 * in case the TP worker thread can also do YottaDB engine calls like "ydb_tp_s_common").
+			if (forced_thread_exit)
+			{	/* TP worker thread has been signaled to exit (i.e. "ydb_exit" has been called).
+				 * Do not service any more SimpleThreadAPI requests. Return right away with appropriate error.
 				 */
-				nested_tp = (boolean_t)dollar_tlevel;
-				tptoken = callblk->tptoken;
-				assert(tptoken == USER_VISIBLE_TPTOKEN(dollar_tlevel, stmTPToken));
-				assert(YDB_NOTTP != tptoken);
-				errstr = callblk->errstr;
-				/*
-				 * callblk->args[0] = tpfn      parameter in "ydb_tp_s_common"
-				 * callblk->args[1] = tpfnparm  parameter in "ydb_tp_s_common"
-				 * callblk->args[2] = transid   parameter in "ydb_tp_s_common"
-				 * callblk->args[3] = namecount parameter in "ydb_tp_s_common"
-				 * callblk->args[4] = varnames  parameter in "ydb_tp_s_common"
-				 *
-				 * For the LYDB_RTN_TP_START or LYDB_RTN_TP_START_TLVL0 case, we do not invoke the user-defined
-				 *	callback function so do not need to pass tpfn or tpfnparm.
-				 * For the LYDB_RTN_TP_RESTART/LYDB_RTN_TP_COMMIT/LYDB_RTN_TP_RESTART_TLVL0/LYDB_RTN_TP_COMMIT_TLVL0
-				 *	cases, we do not need ANY of the above 5 parameters.
-				 * The ydb_stm_args* calls done below take that into account.
-				 * Once the "op_tstart" is done above, we do not need "transid", "namecount" and "varnames"
-				 *	parameters for the later calls. So we use ydb_stm_args0 below.
-				 * Also, after each "ydb_stm_args3" or "ydb_stm_args0" call ensure a LIBYOTTADB_DONE
-				 *	was done by the corresponding "ydb_tp_s_common" call in the MAIN worker thread
-				 *	in all cases by asserting that TREF(libyottadb_active_rtn) is LYDB_RTN_NONE.
-				 */
-				assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
-				/* Start the TP transaction by asking the MAIN worker thread to do the "op_tstart"
-				 * (in "ydb_tp_s_common").
-				 */
-				lydbrtn = (!nested_tp ? LYDB_RTN_TP_START_TLVL0 : LYDB_RTN_TP_START);
-				int_retval = ydb_stm_args3(tptoken, errstr, lydbrtn,
-								callblk->args[2], callblk->args[3], callblk->args[4]);
-				assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
-				assert(YDB_TP_RESTART != int_retval);
-				if (YDB_OK != int_retval)
-				{
-					if (!nested_tp && dollar_tlevel)
-					{	/* If outermost TP had an error, rollback any TP that might have been created
-						 * (we do not expect any since dollar_tlevel++ is done only after all error code
-						 * paths have been checked in "op_tstart") before returning error.
-						 */
-						assert(FALSE);
-						rlbk_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_ROLLBACK_TLVL0);
-						assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
-						assert(YDB_TP_ROLLBACK == rlbk_retval);
-						/* Note: "int_retval" records the "op_tstart" error code while
-						 *       "rlbk_retval" holds the "op_trollback" error code (we do not expect any).
-						 * Use the "op_tstart" error code (the first error) in the call block.
-						 */
-					}
-					callblk->retval = (uintptr_t)int_retval;
-					break;
-				}
-				tpfn = (ydb_basicfnptr_t)callblk->args[0];
-				tpfnparm = (void *)callblk->args[1];
-				for ( ; ; )
-				{	/* Loop to handle TP restarts */
-					if (!nested_tp)
-					{	/* Maintain "simpleapi_dollar_trestart" just like "ydb_tp_s_common"
-						 * does for the "LYDB_RTN_TP" case.
-						 */
-						simpleapi_dollar_trestart = dollar_trestart;
-					}
-					/* Invoke the user-defined TP callback function in the TP worker thread (current thread) */
-					int_retval = (*tpfn)(tptoken, errstr, tpfnparm);
-					if (YDB_OK == int_retval)
-					{	/* Commit the TP transaction by asking MAIN worker thread to do the "op_tcommit"
-						 * (in "ydb_tp_s_common").
-						 */
-						lydbrtn = (!nested_tp ? LYDB_RTN_TP_COMMIT_TLVL0 : LYDB_RTN_TP_COMMIT);
-						int_retval = ydb_stm_args0(tptoken, errstr, lydbrtn);
-					}
-					assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
-					if (nested_tp)
-					{	/* If nested TP, return success/error code directly back to caller of "ydb_tp_st" */
-						break;
-					}
-					/* If we reach here, it means we are in the outermost TP */
-					if (YDB_OK == int_retval)
-					{	/* Outermost TP committed successfully. Return success to caller of "ydb_tp_st". */
-						break;
-					}
-					if (YDB_TP_RESTART != int_retval)
-					{	/* Outermost TP and error code is not a TPRESTART.
-						 * Return it directly to caller of "ydb_tp_st" but before that roll back the
-						 *	TP transaction.
-						 * ROLLBACK the TP transaction by asking MAIN worker thread to do the
-						 *	"op_trollback" (in "ydb_tp_s_common").
-						 * Note that it is possible "int_retval" is YDB_TP_ROLLBACK (e.g. if the callback
-						 *	function returned YDB_TP_ROLLBACK).
-						 */
-						rlbk_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_ROLLBACK_TLVL0);
-						assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
-						assert(YDB_TP_ROLLBACK == rlbk_retval);
-						/* Note: "int_retval" records the primary error code while
-						 *       "rlbk_retval" holds the "op_trollback" error code (we do not expect any).
-						 * Use the "op_tstart" error code (the first error) in the call block.
-						 */
-						break;
-					}
-					/* Restart the outermost TP transaction by asking the MAIN worker thread
-					 * to do the "tp_restart" (in "ydb_tp_s_common").
+				callblk->retval = YDB_ERR_CALLINAFTERXIT;
+				*forced_thread_exit_seen = TRUE;
+				break;
+			}
+			/* Note that all YottaDB engine calls are handled only by the MAIN worker thread and never
+			 * by the current TP worker thread. The latter is used only to invoke the user-defined
+			 * callback function. This lets the logic for handling timer pops stay in the MAIN worker thread
+			 * keeping it simple (as opposed to introducing locks between the MAIN and TP worker threads
+			 * in case the TP worker thread can also do YottaDB engine calls like "ydb_tp_s_common").
+			 */
+			nested_tp = (boolean_t)dollar_tlevel;
+			tptoken = callblk->tptoken;
+			assert(tptoken == USER_VISIBLE_TPTOKEN(dollar_tlevel, stmTPToken));
+			assert(YDB_NOTTP != tptoken);
+			errstr = callblk->errstr;
+			/*
+			 * callblk->args[0] = tpfn      parameter in "ydb_tp_s_common"
+			 * callblk->args[1] = tpfnparm  parameter in "ydb_tp_s_common"
+			 * callblk->args[2] = transid   parameter in "ydb_tp_s_common"
+			 * callblk->args[3] = namecount parameter in "ydb_tp_s_common"
+			 * callblk->args[4] = varnames  parameter in "ydb_tp_s_common"
+			 *
+			 * For the LYDB_RTN_TP_START or LYDB_RTN_TP_START_TLVL0 case, we do not invoke the user-defined
+			 *	callback function so do not need to pass tpfn or tpfnparm.
+			 * For the LYDB_RTN_TP_RESTART/LYDB_RTN_TP_COMMIT/LYDB_RTN_TP_RESTART_TLVL0/LYDB_RTN_TP_COMMIT_TLVL0
+			 *	cases, we do not need ANY of the above 5 parameters.
+			 * The ydb_stm_args* calls done below take that into account.
+			 * Once the "op_tstart" is done above, we do not need "transid", "namecount" and "varnames"
+			 *	parameters for the later calls. So we use ydb_stm_args0 below.
+			 * Also, after each "ydb_stm_args3" or "ydb_stm_args0" call ensure a LIBYOTTADB_DONE
+			 *	was done by the corresponding "ydb_tp_s_common" call in the MAIN worker thread
+			 *	in all cases by asserting that TREF(libyottadb_active_rtn) is LYDB_RTN_NONE.
+			 */
+			assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
+			/* Start the TP transaction by asking the MAIN worker thread to do the "op_tstart"
+			 * (in "ydb_tp_s_common").
+			 */
+			lydbrtn = (!nested_tp ? LYDB_RTN_TP_START_TLVL0 : LYDB_RTN_TP_START);
+			int_retval = ydb_stm_args3(tptoken, errstr, lydbrtn,
+							callblk->args[2], callblk->args[3], callblk->args[4]);
+			assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
+			assert(YDB_TP_RESTART != int_retval);
+			if (YDB_OK != int_retval)
+			{
+				if (!nested_tp && dollar_tlevel)
+				{	/* If outermost TP had an error, rollback any TP that might have been created
+					 * (we do not expect any since dollar_tlevel++ is done only after all error code
+					 * paths have been checked in "op_tstart") before returning error.
 					 */
-					int_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_RESTART_TLVL0);
+					assert(FALSE);
+					rlbk_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_ROLLBACK_TLVL0);
 					assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
-					assert(YDB_OK == int_retval);
+					assert(YDB_TP_ROLLBACK == rlbk_retval);
+					/* Note: "int_retval" records the "op_tstart" error code while
+					 *       "rlbk_retval" holds the "op_trollback" error code (we do not expect any).
+					 * Use the "op_tstart" error code (the first error) in the call block.
+					 */
 				}
 				callblk->retval = (uintptr_t)int_retval;
 				break;
-			default:
-				assert(FALSE);
-				break;
+			}
+			tpfn = (ydb_basicfnptr_t)callblk->args[0];
+			tpfnparm = (void *)callblk->args[1];
+			for ( ; ; )
+			{	/* Loop to handle TP restarts */
+				if (!nested_tp)
+				{	/* Maintain "simpleapi_dollar_trestart" just like "ydb_tp_s_common"
+					 * does for the "LYDB_RTN_TP" case.
+					 */
+					simpleapi_dollar_trestart = dollar_trestart;
+				}
+				/* Invoke the user-defined TP callback function in the TP worker thread (current thread) */
+				int_retval = (*tpfn)(tptoken, errstr, tpfnparm);
+				if (YDB_OK == int_retval)
+				{	/* Commit the TP transaction by asking MAIN worker thread to do the "op_tcommit"
+					 * (in "ydb_tp_s_common").
+					 */
+					lydbrtn = (!nested_tp ? LYDB_RTN_TP_COMMIT_TLVL0 : LYDB_RTN_TP_COMMIT);
+					int_retval = ydb_stm_args0(tptoken, errstr, lydbrtn);
+				}
+				assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
+				if (nested_tp)
+				{	/* If nested TP, return success/error code directly back to caller of "ydb_tp_st" */
+					break;
+				}
+				/* If we reach here, it means we are in the outermost TP */
+				if (YDB_OK == int_retval)
+				{	/* Outermost TP committed successfully. Return success to caller of "ydb_tp_st". */
+					break;
+				}
+				if (YDB_TP_RESTART != int_retval)
+				{	/* Outermost TP and error code is not a TPRESTART.
+					 * Return it directly to caller of "ydb_tp_st" but before that roll back the
+					 *	TP transaction.
+					 * ROLLBACK the TP transaction by asking MAIN worker thread to do the
+					 *	"op_trollback" (in "ydb_tp_s_common").
+					 * Note that it is possible "int_retval" is YDB_TP_ROLLBACK (e.g. if the callback
+					 *	function returned YDB_TP_ROLLBACK).
+					 */
+					rlbk_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_ROLLBACK_TLVL0);
+					assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
+					assert(YDB_TP_ROLLBACK == rlbk_retval);
+					/* Note: "int_retval" records the primary error code while
+					 *       "rlbk_retval" holds the "op_trollback" error code (we do not expect any).
+					 * Use the "op_tstart" error code (the first error) in the call block.
+					 */
+					break;
+				}
+				/* Restart the outermost TP transaction by asking the MAIN worker thread
+				 * to do the "tp_restart" (in "ydb_tp_s_common").
+				 */
+				int_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_RESTART_TLVL0);
+				assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
+				assert(YDB_OK == int_retval);
+			}
+			callblk->retval = (uintptr_t)int_retval;
+			break;
 		}
-		/* Signal the MAIN worker thread that this TP is done */
-		status = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TPCOMPLT);
-		if (0 != status)
-		{
-			assert(FALSE);
-			callblk->retval = status;
+		if (!*forced_thread_exit_seen)
+		{	/* Signal the MAIN worker thread that this TP is done */
+			status = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TPCOMPLT);
+			if (0 != status)
+			{
+				assert(YDB_ERR_CALLINAFTERXIT == status);
+				callblk->retval = status;
+			}
 		}
+		/* else: No need to signal end of TP transaction to MAIN worker thread. It would have also seen
+		 *       "forced_thread_exit" and would be cleaning up its queues as appropriate.
+		 */
 		/* The request is complete - regrab the lock to check if any more entries on this queue (not so much
 		 * possible now as in the future when/if the codebase becomes fully threaded.
 		 */
