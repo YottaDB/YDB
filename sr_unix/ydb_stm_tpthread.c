@@ -242,15 +242,23 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t 
 				if (YDB_TP_RESTART != int_retval)
 				{	/* Outermost TP and error code is not a TPRESTART.
 					 * Return it directly to caller of "ydb_tp_st" but before that roll back the
-					 *	TP transaction.
+					 *	TP transaction (if not already done).
 					 * ROLLBACK the TP transaction by asking MAIN worker thread to do the
 					 *	"op_trollback" (in "ydb_tp_s_common").
 					 * Note that it is possible "int_retval" is YDB_TP_ROLLBACK (e.g. if the callback
 					 *	function returned YDB_TP_ROLLBACK).
 					 */
-					rlbk_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_ROLLBACK_TLVL0);
+					if (dollar_tlevel)
+					{	/* Rollback could have happened in some cases already (for example
+						 * if "ydb_tp_s_common(LYDB_RTN_TP_COMMIT)" invocation failed with a GBLOFLOW
+						 * error). We do not want to invoke a rollback again in that case since
+						 * the tptoken no longer matches the current "dollar_tlevel" (would return with
+						 * a YDB_ERR_INVTPTRANS error). Hence the "if (dollar_tlevel)" check above.
+						 */
+						rlbk_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_ROLLBACK_TLVL0);
+						assert(YDB_TP_ROLLBACK == rlbk_retval);
+					}
 					assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
-					assert(YDB_TP_ROLLBACK == rlbk_retval);
 					/* Note: "int_retval" records the primary error code while
 					 *       "rlbk_retval" holds the "op_trollback" error code (we do not expect any).
 					 * Use the "op_tstart" error code (the first error) in the call block.
