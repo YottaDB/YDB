@@ -1172,7 +1172,6 @@ int ydb_init()
 		 * Use this to disallow any more YottaDB calls.
 		 */
 		assert(!ydb_init_complete);	/* should have been cleared by "ydb_exit" as part of calling "gtm_exit_handler" */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		return ERR_CALLINAFTERXIT;
 	}
 	/* Single thread the rest of initialization so all of the various not-thread-safe things this routine does in
@@ -1218,7 +1217,6 @@ int ydb_init()
 		/* Note that because "ydb_init" was already run (or else "process_exiting" can never be set to TRUE),
 		 * "gtm_putmsg_csa" (and "rts_error_csa") is usable here even though "ydb_init_complete" is FALSE.
 		 */
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
 		(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
 		return ERR_CALLINAFTERXIT;
 	}

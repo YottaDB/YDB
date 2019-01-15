@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,10 +29,7 @@ int ydb_thread_is_main(void)
 
 	SETUP_THREADGBL_ACCESS;
 	if (process_exiting)
-	{	/* YDB runtime environment not setup/available, no driving of errors */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		return YDB_ERR_CALLINAFTERXIT;
-	}
+		return YDB_ERR_CALLINAFTERXIT;	/* YDB runtime environment not setup/available, no driving of errors */
 	status = gtm_is_main_thread();
 	return status ? YDB_OK : YDB_NOTOK;
 }
