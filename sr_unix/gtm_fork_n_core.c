@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,6 +75,21 @@ void gtm_fork_n_core(void)
 	DEBUG_ONLY(struct rlimit rlim;)
 
 #	ifdef DEBUG
+	if (simpleThreadAPI_active || multi_thread_in_use)
+	{	/* Either of the conditions in the "if" check imply this process has more than one thread active.
+		 * If we do a "fork_n_core", we would only get the C-stack of the current thread (since a "fork"
+		 * does not inherit the C-stack of all active threads). Therefore in debug builds at least,
+		 * dump a core right away so we have more information for debugging.
+		 *
+		 * Note that this means a user directly invoking "ydb_fork_n_core" through the SimpleThreadAPI
+		 * in a debug build of YottaDB will get a core dump that terminates the process (with the C-stack
+		 * of all threads) whereas the same invocation in a pro build of YottaDB will create a core file
+		 * (with just the C-stack of the current thread) and the process will continue from where it left off.
+		 * This difference in behavior is considered acceptable since, in debug builds, the focus is more on
+		 * getting the first point of failure with the most information (C-stack of all threads).
+		 */
+		DUMP_CORE;	/* will not return */
+	}
 	getrlimit(RLIMIT_CORE, &rlim);
 	if ( rlim.rlim_cur != rlim.rlim_max)
 	{
