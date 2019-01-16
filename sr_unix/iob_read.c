@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -33,7 +36,7 @@
 #include "gtmio.h"
 #include "gtmmsg.h"
 
-GBLREF	uint4		restore_read_errno;
+GBLREF	int4		restore_read_errno;
 
 error_def(ERR_IOEOF);
 

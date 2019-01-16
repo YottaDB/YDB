@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@
 #include "obj_file.h"
 
 GBLREF mliteral 	literal_chain;
-GBLREF char 		source_file_name[];
+GBLREF unsigned char 	source_file_name[];
 GBLREF unsigned short 	source_name_len;
 
 GBLREF command_qualifier cmd_qlf;
@@ -46,10 +46,11 @@ GBLREF int4		mlmax, mvmax;
 GBLREF int4		code_size, lit_addrs, lits_size;
 GBLREF spdesc		stringpool;
 
-GBLDEF int4	psect_use_tab[GTM_LASTPSECT];	/* bytes of each psect in this module */
-GBLREF char	object_file_name[];
-GBLREF short	object_name_len;
-GBLREF int	object_file_des;
+GBLDEF int4		psect_use_tab[GTM_LASTPSECT];	/* bytes of each psect in this module */
+
+GBLREF unsigned char	object_file_name[];
+GBLREF unsigned short	object_name_len;
+GBLREF int		object_file_des;
 
 static short int current_psect;
 static char emit_buff[OBJ_EMIT_BUF_SIZE];	/* buffer for emit output */

@@ -3,6 +3,9 @@
  * Copyright (c) 2017-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,9 +38,8 @@ int gtm_confstr(char *command, int maxsize)
 	if (n)
 	{
 		assert(n <= MAX_FN_LEN);
-		confstr(_CS_PATH, pathbuf, n);
-	}
-	else
+		confstr(_CS_PATH, pathbuf, MAX_FN_LEN);
+	} else
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SYSUTILCONF, 2,
 						LEN_AND_LIT("Path for system utilities not defined"));

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -19,8 +22,9 @@
 #include "gtm_utf8.h"
 #endif
 
-GBLREF short int 	source_name_len, source_line;
-GBLREF char 		source_file_name[];
+GBLREF short int 	source_line;
+GBLREF unsigned short	source_name_len;
+GBLREF unsigned char 	source_file_name[];
 GBLREF bool		dec_nofac;
 GBLREF boolean_t	run_time;
 

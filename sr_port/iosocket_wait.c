@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@
 #define READ	"READ"
 
 GBLREF volatile int4		outofband;
-GBLREF int4			ydb_max_sockets;
+GBLREF uint4			ydb_max_sockets;
 GBLREF int			socketus_interruptus;
 GBLREF boolean_t		dollar_zininterrupt;
 GBLREF stack_frame  	        *frame_pointer;

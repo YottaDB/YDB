@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,8 +41,8 @@ struct inst_count
 
 /* Prototypes */
 #ifdef UNIX
-int mk_tmp_object_file(const char *object_fname, int object_fname_len);
-void rename_tmp_object_file(const char *object_fname);
+int mk_tmp_object_file(const unsigned char *object_fname, int object_fname_len);
+void rename_tmp_object_file(const unsigned char *object_fname);
 void init_object_file_name(void);
 void finish_object_file(void);
 #endif

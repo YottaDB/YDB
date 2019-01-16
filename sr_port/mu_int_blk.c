@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,7 +67,7 @@ GBLREF int			muint_end_keyend;
 GBLREF int			muint_start_keyend;
 GBLREF int			mu_int_plen;
 GBLREF int			trans_errors;
-GBLREF int4			mu_int_adj[];
+GBLREF uint4			mu_int_adj[];
 GBLREF gtm_uint64_t		mu_int_cum[CUM_TYPE_MAX][MAX_BT_DEPTH + 1];
 GBLREF uint4			mu_int_offset[];
 GBLREF uint4			mu_int_errknt;

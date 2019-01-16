@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,9 +70,9 @@ LITDEF mach_inst jsb_action[JSB_ACTION_N_INS] = {0x48, 0xc7, 0xc0, 0xff, 0xff, 0
 
 
 GBLREF command_qualifier cmd_qlf;
-GBLREF char		object_file_name[];
+GBLREF unsigned char	object_file_name[];
 GBLREF int		object_file_des;
-GBLREF short		object_name_len;
+GBLREF unsigned short	object_name_len;
 GBLREF mident		module_name;
 GBLREF boolean_t	run_time;
 GBLREF int4		gtm_object_size;
@@ -102,7 +102,7 @@ static char static_string_tbl[] = {
 #define SEC_SYMTAB_INDX 3
 
 GBLREF mliteral 	literal_chain;
-GBLREF char 		source_file_name[];
+GBLREF unsigned char	source_file_name[];
 GBLREF unsigned short 	source_name_len;
 GBLREF mident		routine_name;
 GBLREF mident		module_name;

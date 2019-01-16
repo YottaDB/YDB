@@ -126,7 +126,10 @@ else()
 	# Enable (a) link time optimization and (b) use gold linker.
 	# (a) was seen to reduce the size of libyottadb.so by 5% and improve runtimes by 7% on a simple database test
 	# (b) gold linker was seen to slightly (~ 0.1%) improve build times and run times compared to default ld linker.
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto -fuse-ld=gold")
+	# Use -flto=N where N is number of available CPUs to speed up the link time.
+	include(ProcessorCount)
+	ProcessorCount(NUMCPUS)
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=${NUMCPUS} -fuse-ld=gold")
 	set(CMAKE_AR "gcc-ar")		# needed on some versions of gcc to get -flto working
 	set(CMAKE_RANLIB "gcc-ranlib")	# needed on some versions of gcc to get -flto working
 endif()

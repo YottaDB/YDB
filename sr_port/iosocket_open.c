@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,7 @@
 GBLREF	d_socket_struct		*socket_pool, *newdsocket;
 GBLREF	io_pair			io_std_device;	/* standard device */
 GBLREF	boolean_t		gtm_utf8_mode;
-GBLREF	int4			ydb_max_sockets;
+GBLREF	uint4			ydb_max_sockets;
 GBLREF	boolean_t		dollar_zininterrupt;
 GBLREF	UConverter		*chset_desc[];
 
@@ -473,11 +473,11 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			{
 				assert(ioptr->newly_created == FALSE);
 				if (FD_INVALID != socketptr->temp_sd)
-						close(socketptr->temp_sd);
-					SOCKET_FREE(socketptr);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, ydb_max_sockets);
-					return FALSE;
-				}
+					close(socketptr->temp_sd);
+				SOCKET_FREE(socketptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, ydb_max_sockets);
+				return FALSE;
+			}
 			socketptr->dev = newdsocket;
 			newdsocket->socket[newdsocket->n_socket++] = socketptr;
 			newdsocket->current_socket = newdsocket->n_socket - 1;

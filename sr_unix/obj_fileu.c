@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,8 +27,8 @@
 #include "obj_file.h"
 
 GBLREF command_qualifier	cmd_qlf;
-GBLREF char			object_file_name[];
-GBLREF short			object_name_len;
+GBLREF unsigned char		object_file_name[];
+GBLREF unsigned short		object_name_len;
 GBLREF mident			module_name;
 
 #define MKSTEMP_MASK		"XXXXXX"
@@ -58,7 +58,7 @@ error_def(ERR_TEXT);
  * Return value:
  *   File descriptor for the open object file.
  */
-int mk_tmp_object_file(const char *object_fname, int object_fname_len)
+int mk_tmp_object_file(const unsigned char *object_fname, int object_fname_len)
 {
 	int	fdesc, status, umask_creat, umask_orig, retry;
 	DCL_THREADGBL_ACCESS;
@@ -102,13 +102,13 @@ int mk_tmp_object_file(const char *object_fname, int object_fname_len)
  * Global input:
  *   tmp_object_file_name - private/unique file created by mkstemp() in routine above.
  */
-void rename_tmp_object_file(const char *object_fname)
+void rename_tmp_object_file(const unsigned char *object_fname)
 {
 	int	status;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	status = rename(TADR(tmp_object_file_name), object_fname);
+	status = rename(TADR(tmp_object_file_name), (char *)object_fname);
 	if (-1 == status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("rename()"), CALLFROM, errno);
 }
@@ -133,7 +133,7 @@ void init_object_file_name(void)
 	parse_blk	pblk;
 
 	memset(&pblk, 0, SIZEOF(pblk));
-	pblk.buffer = object_file_name;
+	pblk.buffer = (char *)object_file_name;
 	pblk.buff_size = MAX_FBUFF;
 	fstr.len = (MV_DEFINED(&cmd_qlf.object_file) ? cmd_qlf.object_file.str.len : 0);
 	fstr.addr = cmd_qlf.object_file.str.addr;

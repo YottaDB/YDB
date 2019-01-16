@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -39,7 +42,7 @@
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_data		mu_int_data;
 GBLREF	unsigned char		*mu_int_master;
-GBLREF	int			mu_int_skipreg_cnt;
+GBLREF	uint4			mu_int_skipreg_cnt;
 GBLREF	enc_handles		mu_int_encr_handles;
 GBLREF	boolean_t		mu_region_found;
 

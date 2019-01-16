@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,7 +82,7 @@
 
 GBLREF	d_socket_struct		*socket_pool;
 GBLREF	io_pair			io_std_device;
-GBLREF	int4			ydb_max_sockets;
+GBLREF	uint4			ydb_max_sockets;
 GBLREF	spdesc			stringpool;
 GBLREF	int			dollar_truth;
 GBLREF	bool			out_of_time;

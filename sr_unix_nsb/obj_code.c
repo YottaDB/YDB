@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,7 @@ GBLREF spdesc			stringpool;
 GBLREF char			cg_phase;	/* code generation phase */
 GBLREF char			cg_phase_last;	/* previous code generation phase */
 GBLREF int4			curr_addr, code_size;
-GBLREF char			object_file_name[];
+GBLREF unsigned char		object_file_name[];
 GBLREF int			object_file_des;
 
 error_def(ERR_SYSCALL);

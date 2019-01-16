@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,8 +22,8 @@
 #include "gtcmlkdef.h"
 #include "gtcml.h"
 
-GBLREF short cm_cmd_lk_ct;
-GBLREF mlk_pvtblk *mlk_cm_root;
+GBLREF	unsigned short	cm_cmd_lk_ct;
+GBLREF	mlk_pvtblk	*mlk_cm_root;
 
 void gtcml_lckclr(void)
 {

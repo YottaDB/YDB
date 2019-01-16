@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,9 +26,9 @@
 #include "mlk_pvtblk_insert.h"
 #include "mlk_pvtblk_equ.h"
 
-GBLREF mlk_pvtblk *mlk_pvt_root;
-GBLREF short lks_this_cmd;
-GBLREF bool remlkreq;
+GBLREF	mlk_pvtblk	*mlk_pvt_root;
+GBLREF	unsigned short	lks_this_cmd;
+GBLREF	bool		remlkreq;
 
 int mlk_pvtblk_insert(mlk_pvtblk *pblk)
 {

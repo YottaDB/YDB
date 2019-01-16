@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,7 @@
 GBLREF	boolean_t		dollar_zininterrupt;
 GBLREF	d_socket_struct		*newdsocket;	/* in case jobinterrupt */
 GBLREF	int			socketus_interruptus;
-GBLREF	int4			ydb_max_sockets;
+GBLREF	uint4			ydb_max_sockets;
 GBLREF	mv_stent		*mv_chain;
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
@@ -482,8 +482,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 			}
 			real_sockintr->newdsocket = sockintr->newdsocket = newdsocket;
 			real_dsocketptr->mupintr = dsocketptr->mupintr = TRUE;
-			d_socket_struct_len = SIZEOF(d_socket_struct) +
-						(SIZEOF(socket_struct) * (ydb_max_sockets - 1));
+			d_socket_struct_len = SIZEOF(d_socket_struct) + (SIZEOF(socket_struct) * (ydb_max_sockets - 1));
 			ENSURE_STP_FREE_SPACE(d_socket_struct_len);
 			PUSH_MV_STENT(MVST_ZINTDEV);
 			mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;

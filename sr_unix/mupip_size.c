@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,7 +60,7 @@ GBLREF bool			error_mupip;
 GBLREF bool			mu_ctrlc_occurred;
 GBLREF bool			mu_ctrly_occurred;
 GBLREF int			muint_adj;
-GBLREF int4			mu_int_adj[MAX_BT_DEPTH + 1];
+GBLREF uint4			mu_int_adj[MAX_BT_DEPTH + 1];
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF tp_region		*grlist;
 GBLREF	unsigned char		rdfail_detail;

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2007, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -71,9 +71,9 @@ LITDEF mach_inst jsb_action[JSB_ACTION_N_INS] = {0xe30f0fff, 0xe34f0fff, 0xe12ff
 
 
 GBLREF command_qualifier cmd_qlf;
-GBLREF char		object_file_name[];
+GBLREF unsigned char	object_file_name[];
 GBLREF int		object_file_des;
-GBLREF short		object_name_len;
+GBLREF unsigned short	object_name_len;
 GBLREF mident		module_name;
 GBLREF boolean_t	run_time;
 GBLREF int4		gtm_object_size;
@@ -106,7 +106,7 @@ LITREF char gtm_release_name[];
 LITREF int4 gtm_release_name_len;
 
 GBLREF mliteral 	literal_chain;
-GBLREF char 		source_file_name[];
+GBLREF unsigned char 	source_file_name[];
 GBLREF unsigned short 	source_name_len;
 GBLREF mident		routine_name;
 GBLREF mident		module_name;

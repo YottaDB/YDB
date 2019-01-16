@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,7 +67,7 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	uint4			process_id;
 GBLREF	inctn_opcode_t          inctn_opcode;
 GBLREF	unsigned char           rdfail_detail;
-GBLREF	int4			mu_int_adj[];
+GBLREF	uint4			mu_int_adj[];
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned int		t_tries;

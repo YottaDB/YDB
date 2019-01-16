@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,8 +64,8 @@ GBLREF int4			linkage_size;
 GBLREF uint4			lnkrel_cnt;	/* number of entries in linkage Psect to relocate */
 GBLREF spdesc			stringpool;
 GBLREF unsigned char		source_file_name[];
-GBLREF short			object_name_len;
-GBLREF char			object_file_name[];
+GBLREF unsigned short		object_name_len;
+GBLREF unsigned char		object_file_name[];
 GBLREF int			object_file_des;
 
 /* The sections of the internal GT.M object (sans native object wrapper) are grouped

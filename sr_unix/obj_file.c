@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,8 +33,8 @@
 #include "obj_file.h"
 #include "mmrhash.h"
 
-GBLREF char		object_file_name[];
-GBLREF short		object_name_len;
+GBLREF unsigned char	object_file_name[];
+GBLREF unsigned short	object_name_len;
 GBLREF int		object_file_des;
 DEBUG_ONLY(GBLDEF int	obj_bytes_written;)
 
@@ -42,7 +42,7 @@ GBLREF boolean_t	run_time;
 GBLREF int4		lits_text_size, lits_mval_size;
 GBLREF unsigned char	*runtime_base;
 GBLREF mliteral		literal_chain;
-GBLREF char		source_file_name[];
+GBLREF unsigned char 	source_file_name[];
 GBLREF unsigned short	source_name_len;
 GBLREF mident		routine_name;
 GBLREF spdesc		stringpool;
@@ -70,7 +70,7 @@ void drop_object_file(void)
 
         if (0 < object_file_des)
         {
-		UNLINK(object_file_name);
+		UNLINK((const char *)object_file_name);
 		CLOSE_OBJECT_FILE(object_file_des, rc);		/* Resets "object_file_des" to FD_INVALID */
         }
 }
@@ -401,7 +401,7 @@ void emit_literals(void)
 		emit_immed(PADCHARS, padsize);
 		offset += padsize;
 	}
-	emit_immed(source_file_name, source_name_len);
+	emit_immed((char *)source_file_name, source_name_len);
 	offset += source_name_len;
 	padsize = (uint4)(PADLEN(offset, NATIVE_WSIZE)); /* comp_lits() aligns routine_name on NATIVE_WSIZE boundary */
 	if (padsize)

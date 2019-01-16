@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -25,14 +28,14 @@
 #define	NO_ONLINE_ERR_MSG	"ONLINE qualifier for this region will be ignored"
 
 #define DEFAULT_ADJACENCY 10
-#define CHECK_ADJACENCY(BLK, LVL, CNTR)								\
+#define CHECK_ADJACENCY(BLK, LVL, CNTR)									\
 {													\
 	GBLREF int			muint_adj;							\
-	GBLREF int4			mu_int_adj[];							\
+	GBLREF uint4			mu_int_adj[];							\
 	GBLREF block_id			mu_int_adj_prev[];						\
 													\
-	if (mu_int_adj_prev[LVL] <= BLK + muint_adj && mu_int_adj_prev[LVL] >= BLK - muint_adj)	\
-		CNTR += 1;									\
+	if (mu_int_adj_prev[LVL] <= BLK + muint_adj && mu_int_adj_prev[LVL] >= BLK - muint_adj)		\
+		CNTR += 1;										\
 	mu_int_adj_prev[LVL] = BLK;									\
 }
 

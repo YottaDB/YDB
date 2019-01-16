@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,8 @@
 #include "hashtab_objcode.h"
 
 GBLREF spdesc			stringpool;
-GBLREF int4			cache_hits, cache_fails, max_cache_entries;
+GBLREF int4			cache_hits, cache_fails;
+GBLREF uint4			max_cache_entries;
 GBLREF unsigned char		*stackbase, *stacktop;
 GBLREF gd_addr			*gd_header;
 GBLREF boolean_t		certify_all_blocks;
@@ -81,7 +82,7 @@ GBLREF int4			zdir_form;
 GBLREF boolean_t		badchar_inhibit;
 GBLREF boolean_t		gvdupsetnoop; /* if TRUE, duplicate SETs update journal but not database blocks */
 GBLREF int			gv_fillfactor;
-GBLREF int4			ydb_max_sockets;
+GBLREF uint4			ydb_max_sockets;
 GBLREF gv_key			*gv_currkey;
 GBLREF boolean_t		is_ydb_chset_utf8;
 GBLREF int4			gtm_trigger_depth;

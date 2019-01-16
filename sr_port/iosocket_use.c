@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ GBLREF	d_socket_struct		*socket_pool;
 GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	spdesc			stringpool;
 GBLREF	UConverter  		*chset_desc[];
-GBLREF	int4			ydb_max_sockets;
+GBLREF	uint4			ydb_max_sockets;
 GBLREF	d_socket_struct		*newdsocket;
 GBLREF	boolean_t		dollar_zininterrupt;
 

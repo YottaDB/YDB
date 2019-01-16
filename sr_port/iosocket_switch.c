@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@
 #include "gt_timer.h"
 #include "iosocketdef.h"
 
-GBLREF  int4	ydb_max_sockets;
+GBLREF  uint4	ydb_max_sockets;
 
 error_def(ERR_SOCKNOTFND);
 error_def(ERR_SOCKETEXIST);

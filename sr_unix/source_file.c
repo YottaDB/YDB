@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -37,13 +40,14 @@
 #include "util.h"
 #include "op_fnzsearch.h"
 
-GBLREF char			object_file_name[], rev_time_buf[];
+GBLREF char			rev_time_buf[];
+GBLREF unsigned char		object_file_name[];
 GBLREF command_qualifier	cmd_qlf;
 GBLREF int			object_file_des;
 GBLREF int4			dollar_zcstatus;
 GBLREF io_pair			io_curr_device, io_std_device;
 GBLREF mident			routine_name, module_name, int_module_name;
-GBLREF short			object_name_len;
+GBLREF unsigned short		object_name_len;
 GBLREF stack_frame		*frame_pointer;
 GBLREF uint4			dollar_tlevel;
 GBLREF unsigned char		source_file_name[];
