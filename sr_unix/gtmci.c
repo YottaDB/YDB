@@ -1434,17 +1434,6 @@ int ydb_exit()
 			 */
 			assert(!IS_STAPI_WORKER_THREAD);
 			SET_FORCED_THREAD_EXIT;	/* this signals MAIN and TP worker thread(s) to stop execution at a logical point */
-			/* In case the MAIN/TP worker threads are in "pthread_cond_wait", wake them up by "pthread_cond_signal" */
-			for (i = 0; (NULL != stmWorkQueue[i]) && (STMWORKQUEUEDIM > i); i++)
-			{
-				status = pthread_cond_signal(&stmWorkQueue[i]->cond);
-				assert(0 == status);
-			}
-			for (i = 0; (NULL != stmTPWorkQueue[i]) && ((STMWORKQUEUEDIM - 1) > i); i++)
-			{
-				status = pthread_cond_signal(&stmTPWorkQueue[i]->cond);
-				assert(0 == status);
-			}
 			wait_for_main_worker_thread_to_die = TRUE;
 			break;
 		}
@@ -1499,15 +1488,53 @@ int ydb_exit()
 	if (wait_for_main_worker_thread_to_die)
 	{	/* We signaled the MAIN (and TP) worker threads to terminate. Wait for that to happen before returning. */
 		assert(forced_thread_exit);
-		i = 0;
-		if (NULL != stmWorkQueue[i])
+		if (NULL != stmWorkQueue[0])
 		{
-			threadid = stmWorkQueue[i]->threadid;
+			threadid = stmWorkQueue[0]->threadid;
+			assert(0 != threadid);
 			if (0 != threadid)
 			{
-				status = pthread_join(stmWorkQueue[i]->threadid, NULL);
-				assert(0 == status);
-				stmWorkQueue[i]->threadid = 0;
+				for ( ; ; )
+				{	/* In case the MAIN worker thread is in "pthread_cond_wait", it will not see the
+					 * "forced_thread_exit" global variable change so wake it up by a "pthread_cond_signal".
+					 * Since we are not necessarily holding the mutex associated with the condition variable
+					 * before signaling, we could have lost wake-ups (i.e. we could do a "pthread_cond_signal"
+					 * BEFORE the worker thread has done a "pthread_cond_wait", for example when the worker
+					 * thread is inside the function "ydb_stm_threadq_dispatch") and so a blocking
+					 * "pthread_join" might hang indefinitely. Therefore do a non-blocking join and if
+					 * that fails, keep signaling again (eventually we will signal the worker thread while
+					 * it is in a "pthread_cond_wait") until the join succeeds. Note that the MAIN worker
+					 * thread could be waiting on stmWorkQueue[0] or stmTPWorkQueue[i] (i = 0, 1, ...)
+					 * so signal all of those as appropriate.
+					 */
+					status = pthread_cond_signal(&stmWorkQueue[0]->cond);
+					assert(0 == status);
+					for (i = 0; (NULL != stmTPWorkQueue[i]) && ((STMWORKQUEUEDIM - 1) > i); i++)
+					{
+						status = pthread_cond_signal(&stmTPWorkQueue[i]->cond);
+						assert(0 == status);
+					}
+					status = pthread_tryjoin_np(threadid, NULL);
+					if (EBUSY != status)
+					{
+						assert(0 == status);
+						break;
+					}
+					SLEEP_USEC(1, FALSE);	/* sleep for 1 micro-second before retrying */
+				}
+				/* Now that the MAIN worker thread has really terminated, it is safe to destroy the mutex
+				 * and condition variables we needed until now to signal it. And clear the threadid too.
+				 */
+				assert(threadid == stmWorkQueue[0]->threadid);
+				stmWorkQueue[0]->threadid = 0;
+				(void)pthread_cond_destroy(&stmWorkQueue[0]->cond);
+				(void)pthread_mutex_destroy(&stmWorkQueue[0]->mutex);
+				/* If we had more than one level initialized, then the alternate TP queue was also initialized */
+				for (i = 0; (NULL != stmTPWorkQueue[i]) && ((STMWORKQUEUEDIM - 1) > i); i++)
+				{
+					(void)pthread_cond_destroy(&stmTPWorkQueue[i]->cond);
+					(void)pthread_mutex_destroy(&stmTPWorkQueue[i]->mutex);
+				}
 			}
 		}
 		ydb_init_complete = FALSE;

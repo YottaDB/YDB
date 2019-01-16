@@ -131,9 +131,21 @@ void *ydb_stm_thread(void *parm)
 			break;
 		threadid = stmWorkQueue[i]->threadid;
 		if (0 != threadid)
-		{
-			status = pthread_join(stmWorkQueue[i]->threadid, NULL);
-			assert(0 == status);
+		{	/* See comments in similar code in the function "ydb_exit" (search for "pthread_tryjoin_np")
+			 * for why the for loop below is necessary.
+			 */
+			for ( ; ; )
+			{
+				status = pthread_cond_signal(&stmWorkQueue[i]->cond);
+				assert(0 == status);
+				status = pthread_tryjoin_np(threadid, NULL);
+				if (EBUSY != status)
+				{
+					assert(0 == status);
+					break;
+				}
+				SLEEP_USEC(1, FALSE);	/* sleep for 1 micro-second before retrying */
+			}
 			stmWorkQueue[i]->threadid = 0;
 		}
 	}
@@ -146,18 +158,16 @@ void *ydb_stm_thread(void *parm)
 	 *   3. We have created TP levels with threads, queues, and mutex/condvars.
 	 * It is only [0] where we can have initialized mutex and condvar that need cleaning up (because
 	 * they were created in gtm_startup()) but if never used, we have no active thread to clean up.
+	 * Note that we clean up everything except stmWorkQueue[0]->cond, stmWorkQueue[0]->mutex AND
+	 * stmTPWorkQueue[i]->cond, stmTPWorkQueue[i]->mutex. These will be cleaned up by the thread
+	 * that invokes "ydb_exit" (which will do that once it sees that the MAIN worker thread has
+	 * terminated). Until then that thread could be using this cond/mutex for signaling us
+	 * (the MAIN worker thread) and so we should not destroy it.
 	 */
-	for (i = 0; (NULL != stmWorkQueue[i]) && (STMWORKQUEUEDIM > i); i++)
+	for (i = 1; (NULL != stmWorkQueue[i]) && (STMWORKQUEUEDIM > i); i++)
 	{
-		stmWorkQueue[i]->threadid = 0;
 		(void)pthread_cond_destroy(&stmWorkQueue[i]->cond);
 		(void)pthread_mutex_destroy(&stmWorkQueue[i]->mutex);
-	}
-	/* If we had more than one level initialized, then the alternate TP queue was also initialized */
-	for (i = 0; (NULL != stmTPWorkQueue[i]) && ((STMWORKQUEUEDIM - 1) > i); i++)
-	{
-		(void)pthread_cond_destroy(&stmTPWorkQueue[i]->cond);
-		(void)pthread_mutex_destroy(&stmTPWorkQueue[i]->mutex);
 	}
 	(void)pthread_mutex_destroy(&stmFreeQueue.mutex);
 	/* TODO SEE: Also destroy the msems in the free queue blocks and release them if they exist */
