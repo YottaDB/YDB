@@ -256,11 +256,23 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t 
 						 * a YDB_ERR_INVTPTRANS error). Hence the "if (dollar_tlevel)" check above.
 						 */
 						rlbk_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_ROLLBACK_TLVL0);
-						assert(YDB_TP_ROLLBACK == rlbk_retval);
+						/* Note that it is possible the above returns a YDB_ERR_CALLINAFTERXIT error
+						 * in case the MAIN/TP worker thread(s) have been asked to terminate.
+						 * Take that into account in the below assert.
+						 * In this case, the TP transaction would not be rolled back yet (so dollar_tlevel
+						 * would still be non-zero) but it is okay to return in this case with this
+						 * error code since the MAIN worker thread will run the exit handler which will
+						 * do the needed "op_trollback".
+						 */
+						assert((YDB_TP_ROLLBACK == rlbk_retval)
+							|| (YDB_ERR_CALLINAFTERXIT == rlbk_retval)
+								&& (int_retval == rlbk_retval) && dollar_tlevel);
 					}
 					assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 					/* Note: "int_retval" records the primary error code while
-					 *       "rlbk_retval" holds the "op_trollback" error code (we do not expect any).
+					 *       "rlbk_retval" holds the "op_trollback" error code (we do not expect any
+					 *			except YDB_ERR_CALLINAFTERXIT in which case we expect int_retval
+					 *			and rlbk_retval to be the same as asserted above).
 					 * Use the "op_tstart" error code (the first error) in the call block.
 					 */
 					break;
@@ -270,6 +282,8 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t 
 				 */
 				int_retval = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TP_RESTART_TLVL0);
 				assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
+				if (YDB_ERR_CALLINAFTERXIT == int_retval)
+					break;	/* The MAIN/TP worker thread(s) have been asked to exit. Return right away. */
 				assert(YDB_OK == int_retval);
 			}
 			callblk->retval = (uintptr_t)int_retval;
