@@ -40,12 +40,13 @@ GBLREF	boolean_t	simpleThreadAPI_active;
 GBLREF	pthread_t	gtm_main_thread_id;
 GBLREF	boolean_t	gtm_main_thread_id_set;
 GBLREF	uint64_t 	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
+GBLREF	boolean_t	forced_simplethreadapi_exit;
 #ifdef YDB_USE_POSIX_TIMERS
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
 #endif
 
-STATICFNDCL void ydb_stm_threadq_process(boolean_t *queueChanged, boolean_t *forced_thread_exit_seen);
+STATICFNDCL void ydb_stm_threadq_process(boolean_t *queueChanged, boolean_t *forced_simplethreadapi_exit_seen);
 
 /* Routine to manage worker thread(s) for the *_st() interface routines (Simple Thread API aka the
  * Simple Thread Method). Note for the time being, only one worker thread is created. In the future,
@@ -58,7 +59,7 @@ void *ydb_stm_thread(void *parm)
 {
 	int		i, status;
 	boolean_t	queueChanged;
-	boolean_t	forced_thread_exit_seen = FALSE;
+	boolean_t	forced_simplethreadapi_exit_seen = FALSE;
 	pthread_t	threadid;
 	DCL_THREADGBL_ACCESS;
 
@@ -91,14 +92,20 @@ void *ydb_stm_thread(void *parm)
 		do
 		{
 			queueChanged = FALSE;
-			ydb_stm_threadq_process(&queueChanged, &forced_thread_exit_seen); /* Process any entries on the queue */
-			if (forced_thread_exit_seen)
-			{	/* We saw "forced_thread_exit" to be TRUE while inside "ydb_stm_threadq_dispatch". Any new requests
-				 * that are queued (by "ydb_stm_args") AFTER this point on will need to lock the queue header mutex
-				 * at which point we set "callblkServiceNeeded" (in ydb_stm_args.c) to TRUE to not queue such
-				 * requests. Therefore the worker thread can safely exit at this point without any risk of having
-				 * unserviced requests. But before that check if we are servicing a TP queue, if so bubble
-				 * back down the work queues at various TP depth until we reach the main work queue before exiting.
+			/* If "forced_thread_exit" has been set to TRUE, but "forced_simplethreadapi_exit" has not yet
+			 * been set to TRUE, check to see if now is a logical point to set the latter.
+			 */
+			if (forced_thread_exit && !forced_simplethreadapi_exit && OK_TO_INTERRUPT)
+				forced_simplethreadapi_exit = TRUE;
+			ydb_stm_threadq_process(&queueChanged, &forced_simplethreadapi_exit_seen); /* Process entries on queue */
+			if (forced_simplethreadapi_exit_seen)
+			{	/* We saw "forced_simplethreadapi_exit" to be TRUE while inside "ydb_stm_threadq_dispatch".
+				 * Any new requests that are queued (by "ydb_stm_args") AFTER this point on will need to lock
+				 * the queue header mutex at which point we set "callblkServiceNeeded" (in ydb_stm_args.c) to TRUE
+				 * to not queue such requests. Therefore the worker thread can safely exit at this point without
+				 * any risk of having unserviced requests. But before that check if we are servicing a TP queue,
+				 * if so bubble back down the work queues at various TP depth until we reach the main work queue
+				 * before exiting.
 				 */
 				assert((TREF(curWorkQHead))->stm_wqhead.que.fl == &(TREF(curWorkQHead))->stm_wqhead);
 				assert(!queueChanged);
@@ -110,7 +117,7 @@ void *ydb_stm_thread(void *parm)
 					break;	/* Reached the main work queue and no work to do and signaled to exit. So exit. */
 			}
 		} while (queueChanged);
-		if (forced_thread_exit_seen)
+		if (forced_simplethreadapi_exit_seen)
 			break;
 		/* Wait for some work to probably show up */
 		status = pthread_cond_wait(&(TREF(curWorkQHead))->cond, &(TREF(curWorkQHead))->mutex);
@@ -124,7 +131,9 @@ void *ydb_stm_thread(void *parm)
 	 * Do YottaDB exit processing too as part of the same.
 	 */
 	gtm_exit_handler(); /* rundown all open database resource */
-	/* TP worker thread(s) would have also seen the signal to exit ("forced_thread_exit"). Wait for them to terminate. */
+	/* TP worker thread(s) would have also seen the signal to exit ("forced_simplethreadapi_exit").
+	 * Wait for them to terminate.
+	 */
 	for (i = 1; (STMWORKQUEUEDIM > i); i++)
 	{
 		if (NULL == stmWorkQueue[i])
@@ -177,7 +186,7 @@ void *ydb_stm_thread(void *parm)
 /* Routine to actually process the thread work queue for the Simple Thread API/Method. Note there are two possible queues we
  * would be looking at.
  */
-STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged, boolean_t *forced_thread_exit_seen)
+STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged, boolean_t *forced_simplethreadapi_exit_seen)
 {
 	stm_que_ent		*callblk;
 	int			status, save_errno, calltyp;
@@ -192,9 +201,9 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged, boolean_t *for
 	{	/* If queue is empty, we should just go right back to sleep */
 		if ((TREF(curWorkQHead))->stm_wqhead.que.fl == &(TREF(curWorkQHead))->stm_wqhead)
 		{
-			if (forced_thread_exit)
-			{	/* MAIN worker thread has been signaled to exit (i.e. "ydb_exit" has been called) */
-				*forced_thread_exit_seen = TRUE;
+			if (forced_simplethreadapi_exit)
+			{	/* MAIN worker thread has been signaled to exit */
+				*forced_simplethreadapi_exit_seen = TRUE;
 			}
 			break;
 		}
@@ -213,7 +222,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged, boolean_t *for
 		calltyp = callblk->calltyp;
 		TRCTBL_ENTRY(STAPITP_FUNCDISPATCH, calltyp, NULL, NULL, pthread_self());
 		/* We have our request - dispatch it appropriately */
-		ydb_stm_threadq_dispatch(callblk, queueChanged, forced_thread_exit_seen);
+		ydb_stm_threadq_dispatch(callblk, queueChanged, forced_simplethreadapi_exit_seen);
 		/* The request is complete (except TP - it's just requeued - regrab the lock to check if we are done or not yet */
 		TRCTBL_ENTRY(STAPITP_LOCKWORKQ, FALSE, TREF(curWorkQHead), NULL, pthread_self());
 		status = pthread_mutex_lock(&((TREF(curWorkQHead))->mutex));
@@ -247,7 +256,7 @@ STATICFNDEF void ydb_stm_threadq_process(boolean_t *queueChanged, boolean_t *for
 	} while (TRUE);
 }
 
-void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged, boolean_t *forced_thread_exit_seen)
+void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged, boolean_t *forced_simplethreadapi_exit_seen)
 {
 	int			calltyp, int_retval, status, tpdepth;
 	ci_name_descriptor	ci_desc;
@@ -261,12 +270,12 @@ void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged, boo
 	SETUP_THREADGBL_ACCESS;
 	calltyp = callblk->calltyp;
 	assert(NULL == TREF(stapi_errstr));
-	if (forced_thread_exit)
+	if (forced_simplethreadapi_exit)
 	{	/* MAIN worker thread has been signaled to exit (i.e. "ydb_exit" has been called).
 		 * Do not service any more SimpleThreadAPI requests. Return right away with appropriate error.
 		 */
 		callblk->retval = YDB_ERR_CALLINAFTERXIT;
-		*forced_thread_exit_seen = TRUE;
+		*forced_simplethreadapi_exit_seen = TRUE;
 		return;
 	}
 	TREF(stapi_errstr) = callblk->errstr;	/* Set this so "ydb_simpleapi_ch" can fill in error string in case error is seen */
@@ -311,11 +320,11 @@ void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged, boo
 			int_retval = ydb_lock_incr_s((unsigned long long)callblk->args[0], (ydb_buffer_t *)callblk->args[1],
 						     (int)callblk->args[2], (ydb_buffer_t *)callblk->args[3]);
 #			else
-#			ifdef BIGENDIAN
-			tparm = (((unsigned long long)callblk->args[0]) << 32) | (unsigned long long)callblk->args[1];
-#			else
-			tparm = (((unsigned long long)callblk->args[1]) << 32) | (unsigned long long)callblk->args[0];
-#			endif
+#				ifdef BIGENDIAN
+				tparm = (((unsigned long long)callblk->args[0]) << 32) | (unsigned long long)callblk->args[1];
+#				else
+				tparm = (((unsigned long long)callblk->args[1]) << 32) | (unsigned long long)callblk->args[0];
+#				endif
 			int_retval = ydb_lock_incr_s(tparm, (ydb_buffer_t *)callblk->args[2],
 						     (int)callblk->args[3], (ydb_buffer_t *)callblk->args[4]);
 

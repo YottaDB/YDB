@@ -32,11 +32,12 @@ GBLREF	sigset_t	block_sigsent;
 GBLREF	boolean_t	blocksig_initialized;
 GBLREF	uint4		simpleapi_dollar_trestart;
 GBLREF	uint4		dollar_trestart;
+GBLREF	boolean_t	forced_simplethreadapi_exit;
 #ifdef DEBUG
 GBLREF	uint64_t 	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
 #endif
 
-STATICFNDCL void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t *forced_thread_exit_seen);
+STATICFNDCL void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t *forced_simplethreadapi_exit_seen);
 
 /* Routine to manage worker thread(s) for the *_st() interface routines (Simple Thread API aka the
  * Simple Thread Method). Note for the time being, only one worker thread is created. In the future,
@@ -49,7 +50,7 @@ void *ydb_stm_tpthread(void *parm)
 {
 	int		tpdepth, status, rc;
 	stm_workq	*curTPWorkQHead;
-	boolean_t	forced_thread_exit_seen = FALSE;
+	boolean_t	forced_simplethreadapi_exit_seen = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -80,9 +81,9 @@ void *ydb_stm_tpthread(void *parm)
 	for ( ; ; )
 	{
 		/* Before we wait, verify nobody snuck something onto the queue by processing anything there */
-		ydb_stm_tpthreadq_process(curTPWorkQHead, &forced_thread_exit_seen);	/* Process any entries on the queue */
-		if (forced_thread_exit_seen)
-		{	/* We saw "forced_thread_exit" to be TRUE while inside "ydb_stm_tpthreadq_process".
+		ydb_stm_tpthreadq_process(curTPWorkQHead, &forced_simplethreadapi_exit_seen);	/* Process any entries on queue */
+		if (forced_simplethreadapi_exit_seen)
+		{	/* We saw "forced_simplethreadapi_exit" to be TRUE while inside "ydb_stm_tpthreadq_process".
 			 * Just like we do in "ydb_stm_thread", exit. Note that here, we do not have multiple
 			 * queues to worry about like there so the code is relatively simpler.
 			 */
@@ -103,7 +104,7 @@ void *ydb_stm_tpthread(void *parm)
 /* Routine to actually process the thread work queue for the Simple Thread API/Method. Note there are two possible queues we
  * would be looking at.
  */
-STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t *forced_thread_exit_seen)
+STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t *forced_simplethreadapi_exit_seen)
 {
 	stm_que_ent		*callblk;
 	int			int_retval, rlbk_retval, status, save_errno;
@@ -122,9 +123,9 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t 
 	{	/* If queue is empty, we should just go right back to sleep */
 		if (curTPWorkQHead->stm_wqhead.que.fl == &curTPWorkQHead->stm_wqhead)
 		{
-			if (forced_thread_exit)
+			if (forced_simplethreadapi_exit)
 			{	/* TP worker thread has been signaled to exit (i.e. "ydb_exit" has been called) */
-				*forced_thread_exit_seen = TRUE;
+				*forced_simplethreadapi_exit_seen = TRUE;
 			}
 			break;
 		}
@@ -145,12 +146,12 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t 
 		assert(LYDB_RTN_TP == callblk->calltyp);
 		for ( ; ;) /* for loop only there to let us break from various cases without having a deep if-then-else structure */
 		{
-			if (forced_thread_exit)
+			if (forced_simplethreadapi_exit)
 			{	/* TP worker thread has been signaled to exit (i.e. "ydb_exit" has been called).
 				 * Do not service any more SimpleThreadAPI requests. Return right away with appropriate error.
 				 */
 				callblk->retval = YDB_ERR_CALLINAFTERXIT;
-				*forced_thread_exit_seen = TRUE;
+				*forced_simplethreadapi_exit_seen = TRUE;
 				break;
 			}
 			/* Note that all YottaDB engine calls are handled only by the MAIN worker thread and never
@@ -289,7 +290,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t 
 			callblk->retval = (uintptr_t)int_retval;
 			break;
 		}
-		if (!*forced_thread_exit_seen)
+		if (!*forced_simplethreadapi_exit_seen)
 		{	/* Signal the MAIN worker thread that this TP is done */
 			status = ydb_stm_args0(tptoken, errstr, LYDB_RTN_TPCOMPLT);
 			if (0 != status)
@@ -299,7 +300,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t 
 			}
 		}
 		/* else: No need to signal end of TP transaction to MAIN worker thread. It would have also seen
-		 *       "forced_thread_exit" and would be cleaning up its queues as appropriate.
+		 *       "forced_simplethreadapi_exit" and would be cleaning up its queues as appropriate.
 		 */
 		/* The request is complete - regrab the lock to check if any more entries on this queue (not so much
 		 * possible now as in the future when/if the codebase becomes fully threaded.

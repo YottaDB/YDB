@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,6 +140,15 @@ GBLREF	volatile int4	gtmMallocDepth;
 	/* Whenever "forced_exit" gets set to 1, set the corresponding deferred event too */	\
 	SET_DEFERRED_EXIT_CHECK_NEEDED;								\
 	SET_FORCED_THREAD_EXIT; /* Signal any running threads to stop */			\
+	/* In the case of SimpleThreadAPI, note that the MAIN/TP worker threads do not		\
+	 * see this "forced_thread_exit" variable (set by the SET_FORCED_THREAD_EXIT macro	\
+	 * above) but instead wait for "forced_simplethreadapi_exit" to be set before they	\
+	 * start exit processing. That is, the MAIN/TP worker threads continue to service	\
+	 * requests while in the deferred window even though say a kill -15 was seen. When	\
+	 * the deferred window is done (e.g. crit is released) and "deferred_exit_handler"	\
+	 * is invoked, "forced_simplethreadapi_exit" will be set to a non-zero value in		\
+	 * "deferred_exit_handler" and that will signal these threads to terminate.		\
+	 */											\
 	SET_FORCED_MULTI_PROC_EXIT; /* Signal any parallel processes to stop */			\
 }
 

@@ -1156,6 +1156,18 @@ GBLDEF	boolean_t	in_nondeferrable_signal_handler;	/* TRUE if we are inside "gene
 								 */
 GBLDEF	boolean_t	forced_thread_exit;		/* TRUE => signal threads to exit (likely because some thread already
 							 * exited with an error or the main process got a SIGTERM etc.)
+							 * In the case of SimpleThreadAPI, this variable signals the MAIN/TP
+							 * worker threads to exit when a logical point is reached (e.g. if we are
+							 * in middle of TP transaction in final retry, exit is deferred until
+							 * transaction is committed and crit is released).
+							 */
+GBLDEF	boolean_t	forced_simplethreadapi_exit;	/* TRUE => signal MAIN/TP worker threads in SimpleThreadAPI to exit
+							 * immediately (e.g. because the main process got a SIGTERM etc.).
+							 * Note that this is set to TRUE only when we have confirmed the MAIN/TP
+							 * worker threads are at a logical point i.e. it is possible for
+							 * "forced_thread_exit" to be TRUE but "forced_simplethreadapi_exit" to be
+							 * FALSE if we are for example in a final retry TP transaction. Both will
+							 * get set to TRUE once the transaction is committed and crit is released.
 							 */
 GBLDEF	int		next_task_index;		/* "next" task index waiting for a thread to be assigned */
 GBLDEF	int		ydb_mupjnl_parallel;		/* Maximum # of concurrent threads or procs to use in "gtm_multi_thread"

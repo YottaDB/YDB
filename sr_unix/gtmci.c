@@ -1429,7 +1429,13 @@ int ydb_exit()
 			 * threads to complete and then return.
 			 */
 			assert(!IS_STAPI_WORKER_THREAD);
-			SET_FORCED_THREAD_EXIT;	/* this signals MAIN and TP worker thread(s) to stop execution at a logical point */
+			/* The below signals MAIN and TP worker thread(s) to stop execution at a logical point.
+			 * If they are say in the middle of a TP transaction that is in the final retry, we want to wait
+			 * for that to finish before the threads start terminating. Hence the below only sets "forced_thread_exit"
+			 * to TRUE (and not "forced_simplethreadapi_exit" to TRUE). The latter will be set by the MAIN
+			 * worker thread when it reaches a logical point of execution.
+			 */
+			SET_FORCED_THREAD_EXIT;
 			wait_for_main_worker_thread_to_die = TRUE;
 			break;
 		}

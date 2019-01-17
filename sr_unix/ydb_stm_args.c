@@ -29,9 +29,9 @@
 #include "caller_id.h"
 #include "trace_table.h"
 
-#define	RETURN_IF_FORCED_THREAD_EXIT											\
+#define	RETURN_IF_FORCED_SIMPLETHREADAPI_EXIT										\
 {															\
-	if (forced_thread_exit)												\
+	if (forced_simplethreadapi_exit)										\
 	{	/* MAIN worker thread has exited or has been signaled to exit (i.e. "ydb_exit" has been called).	\
 		 * Do not service any more SimpleThreadAPI requests. Return right away.					\
 		 */													\
@@ -42,6 +42,7 @@
 GBLREF	stm_workq	*stmWorkQueue[];		/* Array to hold list of work queues for SimpleThreadAPI */
 GBLREF	stm_workq	*stmTPWorkQueue[];		/* Alternate queue main worker thread uses when TP is active */
 GBLREF	uint64_t	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
+GBLREF	boolean_t	forced_simplethreadapi_exit;
 
 /* Function to take the arguments stored in a callblk and push them onto the work queue for the worker
  * thread(s) (multiple threads is a future project) to execute in the isolated thread.
@@ -56,7 +57,7 @@ intptr_t ydb_stm_args(stm_que_ent *callblk)
 	intptr_t		retval;
 	uintptr_t		calltyp;
 	stm_workq		*queueToUse;
-	boolean_t		callblkServiceNeeded, startThread, queueChanged, dummy_forced_thread_exit_seen;
+	boolean_t		callblkServiceNeeded, startThread, queueChanged, dummy_forced_simplethreadapi_exit_seen;
 	libyottadb_routines	active_stapi_rtn;
 	uint64_t		tptoken;
 	DCL_THREADGBL_ACCESS;
@@ -92,7 +93,7 @@ intptr_t ydb_stm_args(stm_que_ent *callblk)
 				/* else: It is possible we are inside a "ydb_set_st" call which invoked a trigger and got us here.
 				 *       In that case, the SIMPLEAPINEST error will be issued inside "ydb_stm_threadq_dispatch".
 				 */
-				ydb_stm_threadq_dispatch(callblk, &queueChanged, &dummy_forced_thread_exit_seen);
+				ydb_stm_threadq_dispatch(callblk, &queueChanged, &dummy_forced_simplethreadapi_exit_seen);
 				assert(!queueChanged);
 				if ((LYDB_RTN_YDB_CI == active_stapi_rtn) || (LYDB_RTN_YDB_CIP == active_stapi_rtn))
 					TREF(libyottadb_active_rtn) = active_stapi_rtn;	/* Restore active rtn indicator */
@@ -146,7 +147,7 @@ intptr_t ydb_stm_args(stm_que_ent *callblk)
 			retval = status;			/* Error already setup */
 			break;
 		}
-		if (!forced_thread_exit)
+		if (!forced_simplethreadapi_exit)
 		{	/* Place this call block on the thread queue (at the end of the queue) */
 			dqrins(&queueToUse->stm_wqhead, que, callblk);
 			callblkServiceNeeded = TRUE;
@@ -211,7 +212,7 @@ intptr_t ydb_stm_args0(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
-	RETURN_IF_FORCED_THREAD_EXIT;
+	RETURN_IF_FORCED_SIMPLETHREADAPI_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
@@ -227,7 +228,7 @@ intptr_t ydb_stm_args1(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
-	RETURN_IF_FORCED_THREAD_EXIT;
+	RETURN_IF_FORCED_SIMPLETHREADAPI_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
@@ -244,7 +245,7 @@ intptr_t ydb_stm_args2(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
-	RETURN_IF_FORCED_THREAD_EXIT;
+	RETURN_IF_FORCED_SIMPLETHREADAPI_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
@@ -262,7 +263,7 @@ intptr_t ydb_stm_args3(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
-	RETURN_IF_FORCED_THREAD_EXIT;
+	RETURN_IF_FORCED_SIMPLETHREADAPI_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
@@ -282,7 +283,7 @@ intptr_t ydb_stm_args4(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
-	RETURN_IF_FORCED_THREAD_EXIT;
+	RETURN_IF_FORCED_SIMPLETHREADAPI_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
@@ -303,7 +304,7 @@ intptr_t ydb_stm_args5(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
-	RETURN_IF_FORCED_THREAD_EXIT;
+	RETURN_IF_FORCED_SIMPLETHREADAPI_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
@@ -326,7 +327,7 @@ intptr_t ydb_stm_args6(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp
 {
 	stm_que_ent	*callblk;
 
-	RETURN_IF_FORCED_THREAD_EXIT;
+	RETURN_IF_FORCED_SIMPLETHREADAPI_EXIT;
 	/* Grab a call block (parameter block/queue entry) */
 	callblk = ydb_stm_getcallblk();
 	if (-1 == (intptr_t)callblk)
