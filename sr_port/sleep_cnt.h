@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,6 +55,13 @@ GBLREF int	num_additional_processors;	/* needed by a few macros below */
 #define MAX_WTSTART_FINI_SLEEPS	(4 * SLEEP_ONE_MIN * MAXSLPTIME)/* After this many sleeps (each 1 msec in duration)
 								 * without progress, request cache recovery.
 								 */
+/* The MULTI_THREAD_AWARE_FORK_N_CORE and FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED macros sleep-loop for
+ * a max of SAFE_TO_FORK_N_CORE_TRIES iterations each with a sleep of SAFE_TO_FORK_N_CORE_SLPTIME_USEC microseconds
+ * == 60 * MILLISECS_IN_SEC * 1000 microseconds = 60 seconds
+ */
+#define	SAFE_TO_FORK_N_CORE_SLPTIME_USEC	1000			/* 1000 microseconds == 1 millisecond */
+#define	SAFE_TO_FORK_N_CORE_TRIES		(60 * MILLISECS_IN_SEC)
+
 /* On the ARMV6L (Raspberry Pi Zero) architecture where there is just one CPU, we have seen the below timeout
  * of 1 minute (for phase2 commit wait) as not enough in in-house testing. So bump the timeout to 4 times the 1 minute
  * in the hope that would be enough. Do this for all single-cpu systems.

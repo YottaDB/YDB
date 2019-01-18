@@ -17,11 +17,19 @@
 
 #include "gtm_string.h"
 
+#include <errno.h>
+
+#include "error.h"
 #include "gtmsiginfo.h"
+#include "sleep.h"
+#include "sleep_cnt.h"
 
 GBLREF	siginfo_t		exi_siginfo;
 GBLREF	gtm_sigcontext_t 	exi_context;
 GBLREF	int			exi_signal_forwarded;
+
+/* Macro to check if a given signal sets the "dont_want_core" variable to TRUE in the function "generic_signal_handler" */
+#define	IS_DONT_WANT_CORE_TRUE(SIG)	((SIGQUIT == SIG) || (SIGTERM == SIG))
 
 #define	SET_EXI_SIGINFO_AS_APPROPRIATE(INFO)			\
 {								\
@@ -50,10 +58,15 @@ GBLREF	int			exi_signal_forwarded;
  */
 #define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIG, IS_EXI_SIGNAL, INFO, CONTEXT)					\
 {														\
-	GBLREF pthread_t	gtm_main_thread_id;								\
-	GBLREF boolean_t	gtm_main_thread_id_set;								\
+	GBLREF	pthread_t	gtm_main_thread_id;								\
+	GBLREF	boolean_t	gtm_main_thread_id_set;								\
+	GBLREF	boolean_t	safe_to_fork_n_core;								\
 														\
-	if (gtm_main_thread_id_set && !pthread_equal(gtm_main_thread_id, pthread_self()))			\
+	pthread_t		this_thread_id;									\
+	int			i;										\
+														\
+	this_thread_id = pthread_self();									\
+	if (gtm_main_thread_id_set && !pthread_equal(gtm_main_thread_id, this_thread_id))			\
 	{	/* Only redirect the signal if the main thread ID has been defined, and we are not that. */	\
 		if (IS_EXI_SIGNAL)										\
 		{	/* Caller wants INFO and CONTEXT to be recorded as forwarding the signal would lose	\
@@ -65,12 +78,71 @@ GBLREF	int			exi_signal_forwarded;
 			SET_EXI_CONTEXT_AS_APPROPRIATE(CONTEXT);						\
 		}												\
 		pthread_kill(gtm_main_thread_id, SIG);								\
+		if (IS_EXI_SIGNAL)										\
+		{	/* This thread got a signal that will trigger exit handler processing. The signal	\
+			 * has been forwarded to the MAIN worker thread. But it is possible we got a signal	\
+			 * that requires this thread's current C-stack for further analysis (e.g. SIGSEGV).	\
+			 * In this case, we should not return from this thread but wait for the MAIN worker	\
+			 * thread to continue exit processing and let us know when we should do a		\
+			 * "gtm_fork_n_core". This way the core that gets dumped after a fork (which can only	\
+			 * have the current thread's C-stack) will be from this thread rather than the MAIN	\
+			 * worker thread (it is this thread that got the SIGSEGV and hence this is what the	\
+			 * user cares about). So wait for such a signal from the MAIN worker thread.		\
+			 * Need to do this only in case the incoming signal SIG would have not set		\
+			 * "dont_want_core" to TRUE in "generic_signal_handler". This is easily identified	\
+			 * by the IS_DONT_WANT_CORE_TRUE macro. Note that we cannot do a "gtm_fork_n_core"	\
+			 * in this thread at any time since the MAIN worker thread would be concurrently	\
+			 * running the YottaDB engine and we do not want more than one thread running that at	\
+			 * the same time (YottaDB engine is not multi-thread safe yet). Hence waiting for the	\
+			 * MAIN worker thread to let us know when it is safe for us to take over control of	\
+			 * the YottaDB engine for a short period of time (1 minute) to generate the core.	\
+			 */											\
+			if (!IS_DONT_WANT_CORE_TRUE(SIG))							\
+			{											\
+				for (i = 0; i < SAFE_TO_FORK_N_CORE_TRIES; i++)					\
+				{										\
+					if (safe_to_fork_n_core)						\
+					{	/* MAIN worker thread has told us to do "gtm_fork_n_core" */	\
+						break;								\
+					}									\
+					SLEEP_USEC(SAFE_TO_FORK_N_CORE_SLPTIME_USEC, TRUE);			\
+				}										\
+				gtm_fork_n_core();								\
+				safe_to_fork_n_core = FALSE;	/* signal MAIN worker thread to resume */	\
+			}											\
+		}												\
 		return;												\
 	}													\
 }
 #else
 #define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIG)
 #endif
+
+#define	MULTI_THREAD_AWARE_FORK_N_CORE(SIGNAL_FORWARDED)								\
+{															\
+	GBLREF	boolean_t	safe_to_fork_n_core;									\
+															\
+	int	i;													\
+															\
+	if (!SIGNAL_FORWARDED)												\
+		gtm_fork_n_core();	/* Generate "virgin" core while we can */					\
+	else														\
+	{	/* Signal the forwarding thread that it is now okay for it to do the "gtm_fork_n_core".			\
+		 * Wait for that to be done and then proceed. Do not wait indefinitely (60 second max wait).		\
+		 */													\
+		assert(!safe_to_fork_n_core);										\
+		safe_to_fork_n_core = TRUE;	/* this sends the signal to the forwarding thread */			\
+		for (i = 0; i < SAFE_TO_FORK_N_CORE_TRIES; i++)								\
+		{													\
+			if (!safe_to_fork_n_core)									\
+			{	/* forwarding thread has done the "gtm_fork_n_core" */					\
+				break;											\
+			}												\
+			SLEEP_USEC(SAFE_TO_FORK_N_CORE_SLPTIME_USEC, TRUE);						\
+		}													\
+		safe_to_fork_n_core = FALSE;	/* reset it to be safe in case we timed out above */			\
+	}														\
+}
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context);
 

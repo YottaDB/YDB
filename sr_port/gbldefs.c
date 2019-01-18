@@ -1319,3 +1319,8 @@ GBLDEF int			exi_signal_forwarded;	/* 0 if no signal forwarding happened in "gen
 							 * For example, sending SIGQUIT/SIG-3 should show up as KILLBYSIGUINFO
 							 * but would show up as KILLBYSIGSINFO1 without the pre-forwarding store.
 							 */
+GBLDEF	boolean_t		safe_to_fork_n_core;	/* Set to TRUE by the MAIN worker thread in "generic_signal_handler"
+							 * to indicate to another thread that forwarded an exit signal
+							 * to invoke "gtm_fork_n_core". The MAIN worker thread will pause while
+							 * that happens.
+							 */

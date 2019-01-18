@@ -88,6 +88,7 @@ error_def(ERR_KRNLKILL);
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
+	boolean_t		lcl_exi_signal_forwarded;
 	gtm_sigcontext_t	*context_ptr;
 	void			(*signal_routine)();
 #	ifdef DEBUG
@@ -130,6 +131,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	/* else: Signal has been forwarded. "exi_siginfo" and "exi_context" already point to pre-forwarded "info" and "context"
 	 *	(see FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED macro for details).
 	 */
+	lcl_exi_signal_forwarded = exi_signal_forwarded;	/* Note down global variable in local before clearing global */
 	exi_signal_forwarded = 0;	/* Now that "exi_siginfo" and "exi_context" are set appropriately, clear this global */
 	context_ptr = &exi_context;
 	/* Check if we are fielding nested immediate shutdown signals */
@@ -190,10 +192,10 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				if (OK_TO_SEND_MSG)
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) forced_exit_err);
 			}
-			dont_want_core = TRUE;
+			dont_want_core = TRUE; assert(IS_DONT_WANT_CORE_TRUE(sig));
 			break;
 		case SIGQUIT:	/* Handle SIGQUIT specially which we ALWAYS want to defer if possible as it is always sent */
-			dont_want_core = TRUE;
+			dont_want_core = TRUE; assert(IS_DONT_WANT_CORE_TRUE(sig));
 			extract_signal_info(sig, &exi_siginfo, context_ptr, &signal_info);
 			switch(signal_info.infotype)
 			{
@@ -251,24 +253,6 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					break;
 			}
 			break;
-#		ifdef _AIX
-		case SIGDANGER:
-			forced_exit_err = ERR_KRNLKILL;
-			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
-			if (DEFER_EXIT_PROCESSING)
-			{
-				SET_FORCED_EXIT_STATE;
-				exit_state++;		/* Make exit pending, may still be tolerant though */
-				assert(!IS_GTMSECSHR_IMAGE);
-				return;
-			}
-			DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
-			exit_state = EXIT_IMMED;
-			SET_PROCESS_EXITING_TRUE;
-			SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
-			dont_want_core = TRUE;
-			break;
-#		endif
 		default:
 			extract_signal_info(sig, &exi_siginfo, context_ptr, &signal_info);
 			switch(signal_info.infotype)
@@ -290,7 +274,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 						SET_FORCED_EXIT_STATE;
 						exit_state++;		/* Make exit pending, may still be tolerant though */
 						need_core = TRUE;
-						gtm_fork_n_core();	/* Generate "virgin" core while we can */
+						MULTI_THREAD_AWARE_FORK_N_CORE(lcl_exi_signal_forwarded);
 						return;
 					}
 					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
@@ -347,7 +331,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	if (!dont_want_core)
 	{
 		need_core = TRUE;
-		gtm_fork_n_core();
+		MULTI_THREAD_AWARE_FORK_N_CORE(lcl_exi_signal_forwarded);
 	}
 	/* If any special routines are registered to be driven on a signal, drive them now */
 	if (0 != exi_condition)
