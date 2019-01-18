@@ -67,7 +67,11 @@ GBLREF	stm_workq		*stmWorkQueue[];
 #ifdef DEBUG
 GBLREF 	boolean_t		stringpool_unusable;
 GBLREF 	boolean_t		stringpool_unexpandable;
+GBLREF	int			process_exiting;
+GBLREF	boolean_t		forced_simplethreadapi_exit;
 #endif
+
+LITREF	mval		literal_notimeout;
 
 enum rundown_state
 {
@@ -80,12 +84,6 @@ enum rundown_state
 };
 
 static	enum rundown_state	attempting;
-
-#ifdef DEBUG
-GBLREF	int			process_exiting;
-#endif
-
-LITREF	mval		literal_notimeout;
 
 /* This macro is a framework to help perform ONE type of rundown (e.g. db or lock or io rundown etc.).
  * "gtm_exit_handler" invokes this macro for each type of rundown that is needed and passes appropriate
@@ -186,15 +184,23 @@ void gtm_exit_handler(void)
 	}
 	if (exit_handler_active || skip_exit_handler) /* Skip exit handling if specified or if exit handler already active */
 		return;
-	if (simpleThreadAPI_active && !IS_STAPI_WORKER_THREAD)
-	{	/* This is a SimpleThreadAPI environment and the thread that is invoking the exit handler is not the
-		 * MAIN worker thread. This is an out-of-design situation since this would imply concurrently running
-		 * the YottaDB engine in this thread and the MAIN worker thread. Therefore signal the MAIN worker thread
-		 * to run the exit handler stuff, wait for that to finish (it would have run "gtm_exit_handler") and then return.
-		 * All this is already done by "ydb_exit" so invoke it and return.
-		 */
-		 ydb_exit();
-		 return;
+	if (simpleThreadAPI_active)
+	{
+		if (!IS_STAPI_WORKER_THREAD)
+		{	/* This is a SimpleThreadAPI environment and the thread that is invoking the exit handler is not the
+			 * MAIN worker thread. This is an out-of-design situation since this would imply concurrently running
+			 * the YottaDB engine in this thread and the MAIN worker thread. Therefore signal the MAIN worker thread
+			 * to run the exit handler stuff, wait for that to finish (it would have run "gtm_exit_handler") and then
+			 * return. All this is already done by "ydb_exit" so invoke it and return.
+			 */
+			 ydb_exit();
+			 return;
+		} else
+		{	/* We are the MAIN worker thread. Assert that we have reached a logical point to terminate
+			 * (generic_signal_handler or ydb_stm_thread should have deferred "gtm_exit_handler" invocation otherwise).
+			 */
+			assert(forced_simplethreadapi_exit);
+		}
 	}
 	exit_handler_active = TRUE;
 	ydb_dmp_tracetbl();

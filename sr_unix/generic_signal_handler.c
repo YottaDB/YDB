@@ -42,10 +42,13 @@
 #include "gtmio.h"
 #include "have_crit.h"
 #include "util.h"
+#include "libyottadb_int.h"
 
-#define	DEFER_EXIT_PROCESSING	((EXIT_PENDING_TOLERANT >= exit_state)				\
+#define	DEFER_EXIT_PROCESSING	(((EXIT_PENDING_TOLERANT >= exit_state)				\
 					&& (exit_handler_active || multi_thread_in_use		\
-						|| multi_proc_in_use || !OK_TO_INTERRUPT))
+						|| multi_proc_in_use || !OK_TO_INTERRUPT))	\
+				 || (simpleThreadAPI_active && IS_STAPI_WORKER_THREAD)		\
+				)
 
 /* Combine send_msg and gtm_putmsg into one macro to conserve space. */
 #define SEND_AND_PUT_MSG(...)					\
@@ -71,6 +74,8 @@ GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 GBLREF	volatile boolean_t	timer_active;
 GBLREF	sigset_t		block_sigsent;
 GBLREF	boolean_t		blocksig_initialized;
+GBLREF	stm_workq		*stmWorkQueue[];		/* Array to hold list of work queues for SimpleThreadAPI */
+GBLREF	boolean_t		forced_simplethreadapi_exit;
 #ifdef DEBUG
 GBLREF	boolean_t		in_nondeferrable_signal_handler;
 #endif
