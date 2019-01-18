@@ -64,11 +64,11 @@ GBLREF	boolean_t		skip_exit_handler;
 GBLREF 	boolean_t		is_tracing_on;
 GBLREF	int			fork_after_ydb_init;
 GBLREF	stm_workq		*stmWorkQueue[];
+GBLREF	boolean_t		forced_simplethreadapi_exit;
 #ifdef DEBUG
 GBLREF 	boolean_t		stringpool_unusable;
 GBLREF 	boolean_t		stringpool_unexpandable;
 GBLREF	int			process_exiting;
-GBLREF	boolean_t		forced_simplethreadapi_exit;
 #endif
 
 LITREF	mval		literal_notimeout;
@@ -196,10 +196,28 @@ void gtm_exit_handler(void)
 			 ydb_exit();
 			 return;
 		} else
-		{	/* We are the MAIN worker thread. Assert that we have reached a logical point to terminate
-			 * (generic_signal_handler or ydb_stm_thread should have deferred "gtm_exit_handler" invocation otherwise).
+		{	/* We are the MAIN worker thread.
+			 *
+			 * If this invocation of "gtm_exit_handler" is coming through "generic_signal_handler" or "ydb_stm_thread"
+			 * then they would have deferred the invocation until we reach a logical point
+			 * (i.e. "forced_simplethreadapi_exit" is TRUE). In this case though, we can safely continue with exit
+			 * processing in this invocation.
+			 *
+			 * But it is possible the exit handler is invoked through other means in the MAIN worker
+			 * thread (e.g. EXIT macro usage in "wait_for_repl_inst_unfreeze_nocsa_jpl" OR a fatal YDB-F-MEMORY
+			 * error happens in the MAIN worker thread with the following C-stack call graph
+			 *	gtm_malloc -> raise_gtmmemory_error -> rts_error_csa -> rts_error_va -> ydb_simpleapi_ch
+			 *		-> stop_image_no_core -> gtm_image_exit -> exit).
+			 * In this case though "forced_simplethreadapi_exit" would not be set. And it is not safe to continue
+			 * with exit processing in this invocation of "gtm_exit_handler". It is better to wait for some time for
+			 * the TP worker threads (if any) to terminate before continuing with exit handling. "ydb_stm_thread_exit"
+			 * takes care of that so invoke that in this case.
 			 */
-			assert(forced_simplethreadapi_exit);
+			if (!forced_simplethreadapi_exit)
+			{
+				ydb_stm_thread_exit();
+				return;
+			}
 		}
 	}
 	exit_handler_active = TRUE;

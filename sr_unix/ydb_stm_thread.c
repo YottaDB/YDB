@@ -57,10 +57,9 @@ STATICFNDCL void ydb_stm_threadq_process(boolean_t *queueChanged, boolean_t *for
  */
 void *ydb_stm_thread(void *parm)
 {
-	int		i, status;
+	int		status;
 	boolean_t	queueChanged;
 	boolean_t	forced_simplethreadapi_exit_seen = FALSE;
-	pthread_t	threadid;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -128,9 +127,35 @@ void *ydb_stm_thread(void *parm)
 		}
 	}
 	/* If we reach here, it means the MAIN worker thread has been asked to shut down (i.e. a "ydb_exit" was done).
-	 * Do YottaDB exit processing too as part of the same.
+	 * Do YottaDB exit processing too as part of the same but before that wait some time for the TP worker threads (if any)
+	 * to terminate. "ydb_stm_thread_exit" takes care of that for us.
 	 */
-	gtm_exit_handler(); /* rundown all open database resource */
+	ydb_stm_thread_exit();
+	return NULL;
+}
+
+/* Function that does exit handling for the MAIN worker thread. Includes wait for TP worker threads to terminate
+ * before invoking YottaDB exit handler. See function body for more comments.
+ */
+void	ydb_stm_thread_exit(void)
+{
+	int		i, j, status;
+	boolean_t	timed_wait, timed_out, n_timed_out;
+	pthread_t	threadid;
+
+	/* If "forced_simplethreadapi_exit" is TRUE when we enter this function, it means both MAIN and TP worker threads
+	 *   have reached a logical state and they can terminate right away. Therefore it is okay to wait indefinitely for the
+	 *   TP worker threads to terminate.
+	 * Else, it is possible the TP worker threads are hung waiting for some request to be serviced by the MAIN worker thread
+	 *   and so waiting indefinitely for the TP worker thread in the MAIN worker thread would lead to a deadlock.
+	 *   Therefore in this case, wait only for a finite time period before giving up and proceeding to exit handling.
+	 *   If the TP worker thread is hung, it is okay for the MAIN worker thread to continue exit handling without risk of
+	 *   any issues.
+	 */
+	timed_wait = !forced_simplethreadapi_exit;
+	n_timed_out = 0;
+	/* Signal TP worker threads to exit at a logical point if they are not hung waiting for the MAIN worker thread */
+	forced_simplethreadapi_exit = TRUE;
 	/* TP worker thread(s) would have also seen the signal to exit ("forced_simplethreadapi_exit").
 	 * Wait for them to terminate.
 	 */
@@ -143,7 +168,8 @@ void *ydb_stm_thread(void *parm)
 		{	/* See comments in similar code in the function "ydb_exit" (search for "pthread_tryjoin_np")
 			 * for why the for loop below is necessary.
 			 */
-			for ( ; ; )
+			timed_out = FALSE;
+			for (j = 0; ; j++)
 			{
 				status = pthread_cond_signal(&stmWorkQueue[i]->cond);
 				assert(0 == status);
@@ -154,10 +180,18 @@ void *ydb_stm_thread(void *parm)
 					break;
 				}
 				SLEEP_USEC(1, FALSE);	/* sleep for 1 micro-second before retrying */
+				if (timed_wait && (MICROSECS_IN_MSEC < j))
+				{
+					timed_out = TRUE;
+					n_timed_out++;
+					break;
+				}
 			}
-			stmWorkQueue[i]->threadid = 0;
+			if (!timed_out)
+				stmWorkQueue[i]->threadid = 0;
 		}
 	}
+	gtm_exit_handler(); /* rundown all open database resource */
 	/* Now that the DBs are down, let's remove the pthread constructs created for SimpleThreadAPI
 	 * usages. Note return codes ignored here as reporting errors creates more problems than they
 	 * are worth. Note the three situations this loop cleans up are:
@@ -173,14 +207,17 @@ void *ydb_stm_thread(void *parm)
 	 * terminated). Until then that thread could be using this cond/mutex for signaling us
 	 * (the MAIN worker thread) and so we should not destroy it.
 	 */
-	for (i = 1; (NULL != stmWorkQueue[i]) && (STMWORKQUEUEDIM > i); i++)
+	if (!n_timed_out)
 	{
-		(void)pthread_cond_destroy(&stmWorkQueue[i]->cond);
-		(void)pthread_mutex_destroy(&stmWorkQueue[i]->mutex);
+		for (i = 1; (NULL != stmWorkQueue[i]) && (STMWORKQUEUEDIM > i); i++)
+		{
+			(void)pthread_cond_destroy(&stmWorkQueue[i]->cond);
+			(void)pthread_mutex_destroy(&stmWorkQueue[i]->mutex);
+		}
+		(void)pthread_mutex_destroy(&stmFreeQueue.mutex);
 	}
-	(void)pthread_mutex_destroy(&stmFreeQueue.mutex);
 	/* TODO SEE: Also destroy the msems in the free queue blocks and release them if they exist */
-	return NULL;
+	return;
 }
 
 /* Routine to actually process the thread work queue for the Simple Thread API/Method. Note there are two possible queues we
