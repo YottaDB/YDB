@@ -59,11 +59,6 @@ a debug (dbg) build of YottaDB supply the following parameter to cmake
     ```-D CMAKE_BUILD\_TYPE=Debug```
 (*Note: title case is important*)
 
-Note: If building on Ubuntu 18.10, owing to a bug in the binutils package
-(details at https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=103da91bc083f94769e3758175a96d06cef1f8fe)
-you need to bump the open file descriptors limit to 4096 or higher (e.g. ```ulimit -n 4096``` in sh/bash
-or ```limit openfiles 4096``` in tcsh shell). This avoids failures in the ```make -j``` step below.
-
 ```sh
  $ cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
  $ make -j `grep -c ^processor /proc/cpuinfo`
@@ -151,3 +146,51 @@ docker run --rm -it yottadb/yottadb # you can add a specific version after a ":"
 
   This indicates that required libraries are not found. Please consult the list of libraries and check your distributions package manager.
 
+- YottaDB installation fails on Ubuntu 18.10
+
+  Example error message that would be printed to the screen:
+
+  ```
+  %YDB-E-DLLNOOPEN, Failed to load external dynamic library /usr/local/lib/yottadb/r122/libyottadb.so
+  %YDB-E-TEXT, libtinfo.so.5: cannot open shared object file: No such file or directory
+  ```
+
+  Ubuntu 18.10's default version of libtinfo6 is not backwards compatible with libtinfo5. To resolve the issue, libtinfo5 can be installed via the following command:
+
+  ```bash
+  sudo apt-get install libtinfo5
+  ```
+- YottaDB compilation fails with plugin needed to handle lto object
+
+  There is a [known issue](https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=103da91bc083f94769e3758175a96d06cef1f8fe) with binutils on Ubuntu 18.10 (unknown if this affects other Linux Distributions) that may cause ar and ranlib to generate the following error messages:
+
+  ```
+  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_locks.c.o: plugin needed to handle lto object
+  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_output.c.o: plugin needed to handle lto object
+  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_stack.c.o: plugin needed to handle lto object
+  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_svn.c.o: plugin needed to handle lto object
+  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_zbreaks.c.o: plugin needed to handle lto object
+  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_zwrite.c.o: plugin needed to handle lto object
+  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/ztrap_save_ctxt.c.o: plugin needed to handle lto object
+  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zwr2format.c.o: plugin needed to handle lto object
+  /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zyerror_init.c.o: plugin needed to handle lto object
+  /usr/bin/ranlib: libmumps.a(f_zwrite.c.o): plugin needed to handle lto object
+  /usr/bin/ranlib: libmumps.a(fgn_glopref.c.o): plugin needed to handle lto object
+  /usr/bin/ranlib: libmumps.a(fgncal_unwind.c.o): plugin needed to handle lto object
+  /usr/bin/ranlib: libmumps.a(find_line_addr.c.o): plugin needed to handle lto object
+  /usr/bin/ranlib: libmumps.a(find_line_start.c.o): plugin needed to handle lto object
+  /usr/bin/ranlib: libmumps.a(find_mvstent.c.o): plugin needed to handle lto object
+  ```
+
+  The work around is to bump the open file descriptors limit to 4096 or higher
+
+  bash/sh
+  ```bash
+  ulimit -n 4096
+  ```
+  OR
+
+  tcsh
+  ```tcsh
+  limit openfiles 4096
+  ```
