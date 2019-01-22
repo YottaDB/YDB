@@ -8,90 +8,85 @@ Homepage: https://gitlab.com/YottaDB/DB/YDB
 
 Documentation: https://yottadb.com/resources/documentation/
 
-YottaDB relies on CMake to generate the Makefiles to build binaries from source.
-The prerequisites are CMake (at least 2.8.5), GNU make (at least 3.81), Linux
-(`x86_64`), libraries and development files for libz, Unicode, OpenSSL and GPG.
-Ubuntu 16.04 LTS was used to test the builds for this distribution, with default
-versions of packages from the distribution repositories.
-
-## Install YottaDB
-
-To quickly get started with running YottaDB, follow the instructions on our [Get Started](https://yottadb.com/product/get-started/) page.
-
-### Fulfill the prerequisites
-
-Install development libraries
-
-```sh
-   Ubuntu Linux OR Raspbian Linux OR Beagleboard Debian
-   sudo apt-get install cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev binutils
-
-   Arch Linux
-   sudo pacman -S cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,gpgme,icu,ncurses,openssl,zlib} binutils
-
-   CentOS Linux OR RedHat Linux
-   sudo yum install git gcc cmake tcsh {libconfig,gpgme,libicu,libgpg-error,libgcrypt,ncurses,openssl,zlib,elfutils-libelf}-devel binutils
-```
-
-There may be other library dependencies or the packages may have different names.
-If CMake issues a NOTFOUND error, please see the FAQ below.
-
-### Building from source tarball
-
-The YottaDB source tarball extracts to a directory with the version number in the name, e.g. ```yottadb_r123```
-
-```sh
- $ tar xzf yottadb_r123_src.tar.gz
- $ cd yottadb_r123_src
-```
-
-You should find this README, LICENSE, COPYING and CMakeLists.txt file and sr\_\* source directories.
-
-Build the YottaDB binaries:
-
-```sh
- $ mkdir build
- $ cd build
-```
-
-Note: By default the script creates production (pro) builds of YottaDB. To create
-a debug (dbg) build of YottaDB supply the following parameter to cmake
-    ```-D CMAKE_BUILD\_TYPE=Debug```
-(*Note: title case is important*)
-
-```sh
- $ cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
- $ make -j `grep -c ^processor /proc/cpuinfo`
- $ make install
- $ cd yottadb_r123
-```
-
-Note that the make install done above does not create the final installed YottaDB.
-Instead, it stages YottaDB for distribution.
-
-### Cloning the repository for the latest updates
+## Cloning the repository for the latest updates
 
 You may want to clone the YottaDB repository for access to the latest code.
 
 ```sh
-   git clone git@gitlab.com:YottaDB/DB/YDB.git
+git clone git@gitlab.com:YottaDB/DB/YDB.git
 ```
 
 To contribute or help with further development, [fork the repository](https://docs.gitlab.com/ee/gitlab-basics/fork-project.html), clone your fork to a local copy and begin contributing!
 
-### Installing
+## Install pre-built YottaDB binaries
 
-Now you are ready to install YottaDB. The default installation path is ```/usr/local/lib/yottadb/r123```
-but can be controlled using the ```--installdir``` option. Run ```./ydbinstall --help``` for a list of options.
+To quickly get started with running YottaDB, follow the instructions on our [Get Started](https://yottadb.com/product/get-started/) page.
 
-```sh
- $ sudo ./ydbinstall
- $ cd - ; make clean
-```
+## Build and Install YottaDB from source
 
-### Packaging YottaDB
+YottaDB relies on CMake to generate the Makefiles to build binaries from source.
+Refer to the Release Notes for each release for a list of the Supported platforms
+in which we build and test YottaDB binary distributions.
 
-Create a tar file from the installed directory
+- Install prerequisite packages
+
+  ```sh
+  Ubuntu Linux OR Raspbian Linux OR Beagleboard Debian
+  sudo apt-get install cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev binutils
+
+  Arch Linux
+  sudo pacman -S cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,gpgme,icu,ncurses,openssl,zlib} binutils
+
+  CentOS Linux OR RedHat Linux
+  sudo yum install git gcc cmake tcsh {libconfig,gpgme,libicu,libgpg-error,libgcrypt,ncurses,openssl,zlib,elfutils-libelf}-devel binutils
+  ```
+
+  There may be other library dependencies or the packages may have different names.
+
+- Building YottaDB from source tarball
+
+  The YottaDB source tarball extracts to a directory with the version number in the name, e.g. ```yottadb_r123```
+
+  ```sh
+  tar xzf yottadb_r123_src.tar.gz
+  cd yottadb_r123_src
+  ```
+
+  You should find this README, LICENSE, COPYING and CMakeLists.txt file and sr\_\* directories.
+
+  Build the YottaDB binaries:
+
+  ```sh
+  mkdir build
+  cd build
+  ```
+
+  Note: By default the script creates production (pro) builds of YottaDB. To create
+  a debug (dbg) build of YottaDB supply the following parameter to cmake
+      ```-D CMAKE_BUILD\_TYPE=Debug```
+  (*Note: title case is important*)
+
+  ```sh
+  cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
+  make -j `grep -c ^processor /proc/cpuinfo`
+  make install
+  cd yottadb_r123
+  ```
+
+  Note that the ```make install``` command above does not create the final installed YottaDB.
+  Instead, it stages YottaDB for distribution.
+  If cmake or make issues an error in the above steps, please see the [FAQ](#faq) below.
+
+- Installing YottaDB
+
+  Now you are ready to install YottaDB. The default installation path for each release includes the release
+  (e.g. for YottaDB r1.24, the default installation path is /usr/local/lib/yottadb/r124),
+  but can be controlled using the ```--installdir``` option. Run ```./ydbinstall --help``` for a list of options.
+
+  ```sh
+  sudo ./ydbinstall
+  cd - ; make clean
+  ```
 
 ## Docker
 
@@ -194,3 +189,4 @@ docker run --rm -it yottadb/yottadb # you can add a specific version after a ":"
   ```tcsh
   limit openfiles 4096
   ```
+
