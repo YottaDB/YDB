@@ -32,5 +32,6 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 	VERIFY_THREADED_API((int));
 	retval = ydb_stm_args5(tptoken, errstr, LYDB_RTN_TP, (uintptr_t)tpfn, (uintptr_t)tpfnparm, (uintptr_t)transid,
 			       (uintptr_t)namecount, (uintptr_t)varnames);
+	assert((YDB_NOTTP != tptoken) || (YDB_TP_RESTART != retval));
 	return (int)retval;
 }
