@@ -28,8 +28,8 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	LIBYOTTADB_RUNTIME_CHECK((int));
-	VERIFY_THREADED_API((int));
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
+	VERIFY_THREADED_API((int), errstr);
 	retval = ydb_stm_args5(tptoken, errstr, LYDB_RTN_TP, (uintptr_t)tpfn, (uintptr_t)tpfnparm, (uintptr_t)transid,
 			       (uintptr_t)namecount, (uintptr_t)varnames);
 	assert((YDB_NOTTP != tptoken) || (YDB_TP_RESTART != retval));

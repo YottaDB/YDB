@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,5 +41,6 @@
 #define ERR_NODEEND 151027922
 #define ERR_INVLNPAIRLIST 151027930
 #define ERR_INVTPTRANS 151027938
-#define ERR_INVAPIMODE 151027946
-#define ERR_STAPIFORKEXEC 151027954
+#define ERR_THREADEDAPINOTALLOWED 151027946
+#define ERR_SIMPLEAPINOTALLOWED 151027954
+#define ERR_STAPIFORKEXEC 151027962

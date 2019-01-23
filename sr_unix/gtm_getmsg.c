@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,9 @@ GBLREF bool	dec_nofac;
 
 #define ERR_TAG		"ENO"
 
+/* #YDB_THREAD_SAFE : The below function (gtm_getmsg) is multi-thread-safe.
+ * Note: This is being relied upon by the SET_STAPI_ERRSTR_MULTI_THREAD_SAFE macro which calls this function.
+ */
 int gtm_getmsg(int4 msgnum, mstr *msgbuf)
 {
 	short int	m_len, faclen, taglen, j, sever;

@@ -298,8 +298,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		if (!IS_STAPI_WORKER_THREAD)
 		{
 			DBGAPITP_ONLY(gtm_fork_n_core());
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVAPIMODE, 4, RTS_ERROR_LITERAL(THREADED_STR),
-				      RTS_ERROR_LITERAL(UNTHREADED_STR));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIMPLEAPINOTALLOWED);
 		}
 		/* We are in threaded mode but running an unthreaded command in the main work thread which
 		 * is allowed. In that case just fall out (verified).
@@ -691,8 +690,7 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		if (!IS_STAPI_WORKER_THREAD)
 		{
 			DBGAPITP_ONLY(gtm_fork_n_core());
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVAPIMODE, 4, RTS_ERROR_LITERAL(THREADED_STR),
-				      RTS_ERROR_LITERAL(UNTHREADED_STR));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIMPLEAPINOTALLOWED);
 		}
 		/* We are in threaded mode but running an unthreaded command in the main work thread which
 		 * is allowed. In that case just fall out (verified).

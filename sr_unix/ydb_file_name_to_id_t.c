@@ -27,8 +27,8 @@ int ydb_file_name_to_id_t(uint64_t tptoken, ydb_buffer_t *errstr, ydb_string_t *
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	LIBYOTTADB_RUNTIME_CHECK((int));
-	VERIFY_THREADED_API((int));
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
+	VERIFY_THREADED_API((int), errstr);
 	retval = ydb_stm_args2(tptoken, errstr, LYDB_RTN_FILE_NAME_TO_ID, (uintptr_t)filename, (uintptr_t)fileid);
 	return (int)retval;
 }

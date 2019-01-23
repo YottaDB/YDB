@@ -27,8 +27,8 @@ int ydb_lock_decr_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varna
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	LIBYOTTADB_RUNTIME_CHECK((int));
-	VERIFY_THREADED_API((int));
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
+	VERIFY_THREADED_API((int), errstr);
 	retval = ydb_stm_args3(tptoken, errstr, LYDB_RTN_LOCK_DECR, (uintptr_t)varname, (uintptr_t)subs_used,
 			       (uintptr_t)subsarray);
 	return (int)retval;

@@ -31,8 +31,8 @@ int ydb_timer_start_t(uint64_t tptoken, ydb_buffer_t *errstr, int timer_id, unsi
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	LIBYOTTADB_RUNTIME_CHECK((int));
-	VERIFY_THREADED_API((int));
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
+	VERIFY_THREADED_API((int), errstr);
 #	ifdef GTM64
 	retval = ydb_stm_args5(tptoken, errstr, LYDB_RTN_TIMER_START, (uintptr_t)timer_id, (uintptr_t)limit_nsec,
 				(uintptr_t)handler, (uintptr_t)hdata_len, (uintptr_t)hdata);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,7 @@ int ydb_cip_helper(int calltyp, ci_name_descriptor *ci_info, va_list *var)
 	/* Need to call VERIFY_THREADED_API before LIBYOTTADB_INIT.
 	 * Moving this to after LIBYOTTADB_INIT implies LIBYOTTADB_DONE would not be done in case of INVAPIMODE error.
 	 */
-	VERIFY_THREADED_API((int));
+	VERIFY_THREADED_API((int), NULL);
 	LIBYOTTADB_INIT(calltyp, (int));	/* Note: macro could "return" from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.

@@ -31,8 +31,8 @@ int ydb_lock_incr_st(uint64_t tptoken, ydb_buffer_t *errstr, unsigned long long 
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	LIBYOTTADB_RUNTIME_CHECK((int));
-	VERIFY_THREADED_API((int));
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
+	VERIFY_THREADED_API((int), errstr);
 #	ifdef GTM64
 	retval = ydb_stm_args4(tptoken, errstr, LYDB_RTN_LOCK_INCR, (uintptr_t)timeout_nsec, (uintptr_t)varname,
 			       (uintptr_t)subs_used, (uintptr_t)subsarray);

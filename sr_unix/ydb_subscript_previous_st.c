@@ -28,8 +28,8 @@ int ydb_subscript_previous_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	LIBYOTTADB_RUNTIME_CHECK((int));
-	VERIFY_THREADED_API((int));
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
+	VERIFY_THREADED_API((int), errstr);
 	retval = ydb_stm_args4(tptoken, errstr, LYDB_RTN_SUBSCRIPT_PREVIOUS, (uintptr_t)varname, (uintptr_t)subs_used,
 			       (uintptr_t)subsarray, (uintptr_t)ret_value);
 	return (int)retval;

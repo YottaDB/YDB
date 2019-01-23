@@ -32,8 +32,8 @@ int ydb_ci_t(uint64_t tptoken, ydb_buffer_t *errstr, const char *c_rtn_name, ...
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	LIBYOTTADB_RUNTIME_CHECK((int));
-	VERIFY_THREADED_API((int));
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
+	VERIFY_THREADED_API((int), errstr);
 	VAR_START(var, c_rtn_name);
 	/* Note: "va_end(var)" done inside "ydb_ci_exec" when this gets run in the MAIN worker thread */
 	retval = ydb_stm_args2(tptoken, errstr, LYDB_RTN_YDB_CI, (uintptr_t)c_rtn_name, (uintptr_t)&var);

@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -93,7 +93,7 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 	 */
 	if (LYDB_RTN_TP != lydbrtn)
 	{	/* We have been called via the threaded interface so verify we are in a threaded environment */
-		VERIFY_THREADED_API((int));
+		VERIFY_THREADED_API((int), NULL);
 	}
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(lydbrtn, (int));		/* Note: macro could "return" from this function in case of errors */

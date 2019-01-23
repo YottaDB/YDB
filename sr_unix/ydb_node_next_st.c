@@ -28,8 +28,8 @@ int ydb_node_next_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varna
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	LIBYOTTADB_RUNTIME_CHECK((int));
-	VERIFY_THREADED_API((int));
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
+	VERIFY_THREADED_API((int), errstr);
 	retval = ydb_stm_args5(tptoken, errstr, LYDB_RTN_NODE_NEXT, (uintptr_t)varname, (uintptr_t)subs_used,
 			       (uintptr_t)subsarray, (uintptr_t)ret_subs_used, (uintptr_t)ret_subsarray);
 	return (int)retval;

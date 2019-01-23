@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2017 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	!
+! Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -57,7 +57,8 @@ STRUCTNOTALLOCD	<Structure not previously called with Alloc() method>/error/fao=
 NODEEND		<End of list of nodes/subscripts>/error/fao=0
 INVLNPAIRLIST	<Invalid lockname/subscript pair list (uneven number of lockname/subscript parameters)>/error/fao=0
 INVTPTRANS	<Invalid TP transaction - either invalid TP token or transaction not in progress>/error/fao=0
-INVAPIMODE	<Process not allowed to first use !AD then switch to using !AD>/error/fao=4
+THREADEDAPINOTALLOWED	<Process cannot switch to using threaded Simple API while already using Simple API>/error/fao=0
+SIMPLEAPINOTALLOWED	<Process cannot switch to using Simple API while already using threaded Simple API>/error/fao=0
 STAPIFORKEXEC	<Calls to YottaDB are not supported after a fork() if threaded Simple API functions were in use in parent. Call exec() first>/error/fao=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.

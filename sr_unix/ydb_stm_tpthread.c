@@ -151,6 +151,7 @@ STATICFNDEF void ydb_stm_tpthreadq_process(stm_workq *curTPWorkQHead, boolean_t 
 				 * Do not service any more SimpleThreadAPI requests. Return right away with appropriate error.
 				 */
 				callblk->retval = YDB_ERR_CALLINAFTERXIT;
+				SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(YDB_ERR_CALLINAFTERXIT, callblk->errstr);
 				*forced_simplethreadapi_exit_seen = TRUE;
 				break;
 			}

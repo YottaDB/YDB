@@ -49,11 +49,6 @@ LITREF	svn_data_type	svn_data[];
 LITREF	char		*lydb_simpleapi_rtnnames[];
 LITREF	char		*lydb_simplethreadapi_rtnnames[];
 
-#define THREADED_STR	"threaded Simple API"
-#define UNTHREADED_STR	"Simple API"
-#define THREADED_STR_LEN (SIZEOF(THREADED_STR) - 1)
-#define UNTHREADED_STR_LEN (SIZEOF(UNTHREADED_STR) - 1)
-
 #define YDB_MAX_SAPI_ARGS GTM64_ONLY(5) NON_GTM64_ONLY(6)	/* The most args any simpleapi routine has (excepting ydb_lock_s)
 								 * is 5 but in 32 bit mode the max is 6.
 								 */
@@ -137,7 +132,7 @@ typedef struct
 typedef int (*ydb_basicfnptr_t)();
 
 /* Macros to startup YottaDB runtime if it is not going yet - one for routines with return values, one for not */
-#define LIBYOTTADB_RUNTIME_CHECK(RETTYPE)									\
+#define LIBYOTTADB_RUNTIME_CHECK(RETTYPE, ERRSTR)								\
 MBSTART	{													\
 	int	status;												\
 														\
@@ -145,7 +140,10 @@ MBSTART	{													\
 	if (!ydb_init_complete || !(frame_pointer->type & SFT_CI))						\
 	{	/* Have to initialize things before we can establish an error handler */			\
 		if (0 != (status = ydb_init()))		/* Note - sets fgncal_stack */				\
+		{												\
+			SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(-status, (ydb_buffer_t *)ERRSTR);			\
 			return RETTYPE -status;									\
+		}												\
 		/* Since we called "ydb_init" above, "gtm_threadgbl" would have been set to a non-null VALUE	\
 		 * and so any call to SETUP_THREADGBL_ACCESS done by the function that called this macro	\
 		 * needs to be redone to set "lcl_gtm_threadgbl" to point to this new "gtm_threadgbl".		\
@@ -155,7 +153,7 @@ MBSTART	{													\
 } MBEND
 
 /* Macros to startup YottaDB runtime if it is not going yet - one for returns, one for not */
-#define LIBYOTTADB_RUNTIME_CHECK_NORETVAL									\
+#define LIBYOTTADB_RUNTIME_CHECK_NORETVAL(ERRSTR)								\
 MBSTART	{													\
 	int	status;												\
 														\
@@ -163,7 +161,10 @@ MBSTART	{													\
 	if (!ydb_init_complete || !(frame_pointer->type & SFT_CI))						\
 	{	/* Have to initialize things before we can establish an error handler */			\
 		if (0 != (status = ydb_init()))		/* Note - sets fgncal_stack */				\
+		{												\
+			SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(-status, (ydb_buffer_t *)ERRSTR);			\
 			return;											\
+		}												\
 		/* Since we called "ydb_init" above, "gtm_threadgbl" would have been set to a non-null VALUE	\
 		 * and so any call to SETUP_THREADGBL_ACCESS done by the function that called this macro	\
 		 * needs to be redone to set "lcl_gtm_threadgbl" to point to this new "gtm_threadgbl".		\
@@ -183,7 +184,7 @@ MBSTART	{													\
 MBSTART	{														\
 	int		errcode;											\
 															\
-	LIBYOTTADB_RUNTIME_CHECK(RETTYPE);										\
+	LIBYOTTADB_RUNTIME_CHECK(RETTYPE, NULL);									\
 	/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet		\
 	 * established the condition handler to take care of these issues so we simulate it's effect by			\
 	 * doing the "set_zstatus", setting TREF(ydb_error_code) and returning the error code.				\
@@ -203,7 +204,7 @@ MBSTART	{														\
 MBSTART	{														\
 	int		errcode;											\
 															\
-	LIBYOTTADB_RUNTIME_CHECK_NORETVAL;										\
+	LIBYOTTADB_RUNTIME_CHECK_NORETVAL(NULL);									\
 	/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet		\
 	 * established the condition handler to take care of these issues so we simulate it's effect by			\
 	 * doing the "set_zstatus", setting TREF(ydb_error_code) and returning the error code.				\
@@ -617,17 +618,6 @@ MBSTART {												\
 	TREF(ydb_error_code) = errnum;									\
 } MBEND
 
-/* Similar to SETUP_SYSCALL_ERROR(), this is a macro to setup a generic error with 4 parameters */
-#define SETUP_GENERIC_ERROR_4PARMS(ERRNUM, PARM1, PARM2, PARM3, PARM4)					\
-MBSTART {												\
-	mstr	entryref;										\
-	int	errnum = abs(ERRNUM);									\
-	setup_error(CSA_ARG(NULL) VARLSTCNT(6) errnum, 4, (PARM1), (PARM2), (PARM3), (PARM4));		\
-	SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
-	set_zstatus(&entryref, errnum, NULL, FALSE);							\
-	TREF(ydb_error_code) = errnum;									\
-} MBEND
-
 /* Macro to determine if we are executing in the worker thread */
 #define IS_STAPI_WORKER_THREAD ((NULL != stmWorkQueue[0]) && pthread_equal(pthread_self(), stmWorkQueue[0]->threadid))
 
@@ -645,15 +635,14 @@ MBSTART {												\
 	{													\
 		if (!IS_STAPI_WORKER_THREAD)									\
 		{												\
-			SETUP_GENERIC_ERROR_4PARMS(ERR_INVAPIMODE, THREADED_STR_LEN, THREADED_STR,		\
-						   UNTHREADED_STR_LEN, UNTHREADED_STR);				\
+			SETUP_GENERIC_ERROR(ERR_SIMPLEAPINOTALLOWED);						\
 			DBGAPITP_ONLY(gtm_fork_n_core());							\
 			/* Reset active routine indicator before returning an error.				\
 			 * Caller would have done LIBYOTTADB_INIT before invoking this macro. Assert that.	\
 			 */											\
 			assert(LYDB_RTN_NONE != TREF(libyottadb_active_rtn));					\
 			TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;						\
-			return YDB_ERR_INVAPIMODE;								\
+			return YDB_ERR_SIMPLEAPINOTALLOWED;							\
 		}												\
 		/* We are in threaded mode but running an unthreaded command in the main work thread which	\
 		 * is allowed. In that case just fall out (verified).						\
@@ -672,8 +661,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	{													\
 		if (!IS_STAPI_WORKER_THREAD)									\
 		{												\
-			SETUP_GENERIC_ERROR_4PARMS(ERR_INVAPIMODE, THREADED_STR_LEN, THREADED_STR,		\
-						   UNTHREADED_STR_LEN, UNTHREADED_STR);				\
+			SETUP_GENERIC_ERROR(ERR_SIMPLEAPINOTALLOWED);						\
 			DBGAPITP_ONLY(gtm_fork_n_core());							\
 			/* Reset active routine indicator before returning an error.				\
 			 * Caller would have done LIBYOTTADB_INIT before invoking this macro. Assert that.	\
@@ -699,8 +687,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	{													\
 		if (!IS_STAPI_WORKER_THREAD)									\
 		{												\
-			SETUP_GENERIC_ERROR_4PARMS(ERR_INVAPIMODE, THREADED_STR_LEN, THREADED_STR,		\
-						   UNTHREADED_STR_LEN, UNTHREADED_STR);				\
+			SETUP_GENERIC_ERROR(ERR_SIMPLEAPINOTALLOWED);						\
 			DBGAPITP_ONLY(gtm_fork_n_core());							\
 			/* Reset active routine indicator before returning an error.				\
 			 * Caller would have done LIBYOTTADB_INIT before invoking this macro. Assert that.	\
@@ -728,10 +715,9 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	{													\
 		if (!IS_STAPI_WORKER_THREAD)									\
 		{												\
-			SETUP_GENERIC_ERROR_4PARMS(ERR_INVAPIMODE, THREADED_STR_LEN, THREADED_STR,		\
-						   UNTHREADED_STR_LEN, UNTHREADED_STR);				\
+			SETUP_GENERIC_ERROR(ERR_SIMPLEAPINOTALLOWED);						\
 			DBGAPITP_ONLY(gtm_fork_n_core());							\
-			return YDB_ERR_INVAPIMODE;								\
+			return YDB_ERR_SIMPLEAPINOTALLOWED;							\
 		}												\
 		/* We are in threaded mode but running an unthreaded command in the main work thread which	\
 		 * is allowed. In that case just fall out (verified).						\
@@ -739,31 +725,29 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	} else													\
 		noThreadAPI_active = TRUE;									\
 } MBEND
-#define VERIFY_THREADED_API(RETTYPE)									\
-MBSTART {												\
-	GBLREF boolean_t noThreadAPI_active;								\
-	GBLREF boolean_t simpleThreadAPI_active;							\
-	if (noThreadAPI_active)										\
-	{												\
-		SETUP_GENERIC_ERROR_4PARMS(ERR_INVAPIMODE, UNTHREADED_STR_LEN, UNTHREADED_STR,		\
-					   THREADED_STR_LEN, THREADED_STR);				\
-		DBGAPITP_ONLY(gtm_fork_n_core());							\
-		return RETTYPE YDB_ERR_INVAPIMODE;							\
-	}												\
-	simpleThreadAPI_active = TRUE;									\
+#define VERIFY_THREADED_API(RETTYPE, ERRSTR)									\
+MBSTART {													\
+	GBLREF boolean_t noThreadAPI_active;									\
+	GBLREF boolean_t simpleThreadAPI_active;								\
+	if (noThreadAPI_active)											\
+	{													\
+		SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(YDB_ERR_THREADEDAPINOTALLOWED, (ydb_buffer_t *)ERRSTR);	\
+		DBGAPITP_ONLY(gtm_fork_n_core());								\
+		return RETTYPE YDB_ERR_THREADEDAPINOTALLOWED;							\
+	}													\
+	simpleThreadAPI_active = TRUE;										\
 } MBEND
-#define VERIFY_THREADED_API_NORETVAL									\
-MBSTART {												\
-	GBLREF boolean_t noThreadAPI_active;								\
-	GBLREF boolean_t simpleThreadAPI_active;							\
-	if (noThreadAPI_active)										\
-	{												\
-		SETUP_GENERIC_ERROR_4PARMS(ERR_INVAPIMODE, UNTHREADED_STR_LEN, UNTHREADED_STR,		\
-					   THREADED_STR_LEN, THREADED_STR);				\
-		DBGAPITP_ONLY(gtm_fork_n_core());							\
-		return;											\
-	}												\
-	simpleThreadAPI_active = TRUE;									\
+#define VERIFY_THREADED_API_NORETVAL(ERRSTR)									\
+MBSTART {													\
+	GBLREF boolean_t noThreadAPI_active;									\
+	GBLREF boolean_t simpleThreadAPI_active;								\
+	if (noThreadAPI_active)											\
+	{													\
+		SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(YDB_ERR_THREADEDAPINOTALLOWED, (ydb_buffer_t *)ERRSTR);	\
+		DBGAPITP_ONLY(gtm_fork_n_core());								\
+		return;												\
+	}													\
+	simpleThreadAPI_active = TRUE;										\
 } MBEND
 
 /* Initialize an STM (simple thread mode) mutex */
@@ -797,6 +781,37 @@ MBSTART {															\
 #define	USER_VISIBLE_TPTOKEN(tpdepth, tptoken)	(((uint64_t)tpdepth << TPTOKEN_NBITS) | tptoken)
 #define	GET_TPDEPTH_FROM_TPTOKEN(tptoken)	(tptoken >> TPTOKEN_NBITS)
 #define	GET_INTERNAL_TPTOKEN(tptoken)		(tptoken & (((uint64_t)1 << TPTOKEN_NBITS) - 1))
+
+/* This macro fills in the "ydb_buffer_t" structure pointed to by "errstr" with the error string corresponding
+ * to the error code "errnum". errstr->buf_addr is a null terminated string at the end. errstr->len_used is
+ * set just like is done in the function "ydb_simpleapi_ch" for TREF(stapi_errstr).
+ */
+#define	SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(ERRNUM, ERRSTR)							\
+{														\
+	GBLREF boolean_t noThreadAPI_active;									\
+														\
+	char	msgbuf[YDB_MAX_ERRORMSG];									\
+	mstr	msg;												\
+	int	errNum, status;											\
+														\
+	if (NULL != ERRSTR)											\
+	{													\
+		assert(simpleThreadAPI_active);									\
+		/* The below code is similar to that in ydb_mesage.c */						\
+		msg.len = SIZEOF(msgbuf);									\
+		msg.addr = msgbuf;										\
+		errNum = abs(ERRNUM);										\
+		status = gtm_getmsg(errNum, &msg);								\
+		if (ERR_UNKNOWNSYSERR == status)								\
+		{	/* Unknown message. Just null terminate it */						\
+			msg.addr[0] = '\0';									\
+		} else												\
+			assert('\0' == msg.addr[msg.len]);	/* assert null termination */			\
+		/* Copy message to user's buffer depending on available room */					\
+		SNPRINTF((ERRSTR)->buf_addr, (ERRSTR)->len_alloc, "%d,%s,%s", ERRNUM,				\
+			(noThreadAPI_active ? SIMPLEAPI_M_ENTRYREF : SIMPLETHREADAPI_M_ENTRYREF), msg.addr);	\
+	}													\
+}
 
 int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn);
 void	sapi_save_targ_key_subscr_nodes(void);

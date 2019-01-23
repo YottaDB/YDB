@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,8 @@ LITDEF	err_msg ydberrors[] = {
 	{ "NODEEND", "End of list of nodes/subscripts", 0 },
 	{ "INVLNPAIRLIST", "Invalid lockname/subscript pair list (uneven number of lockname/subscript parameters)", 0 },
 	{ "INVTPTRANS", "Invalid TP transaction - either invalid TP token or transaction not in progress", 0 },
-	{ "INVAPIMODE", "Process not allowed to first use !AD then switch to using !AD", 4 },
+	{ "THREADEDAPINOTALLOWED", "Process cannot switch to using threaded Simple API while already using Simple API", 0 },
+	{ "SIMPLEAPINOTALLOWED", "Process cannot switch to using Simple API while already using threaded Simple API", 0 },
 	{ "STAPIFORKEXEC", "Calls to YottaDB are not supported after a fork() if threaded Simple API functions were in use in parent. Call exec() first", 0 },
 };
 
@@ -59,7 +60,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	30,
+	31,
 	&ydberrors_undocarr[0],
 	0
 };

@@ -37,8 +37,8 @@ int ydb_lock_st(uint64_t tptoken, ydb_buffer_t *errstr, unsigned long long timeo
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	LIBYOTTADB_RUNTIME_CHECK((int));
-	VERIFY_THREADED_API((int));
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
+	VERIFY_THREADED_API((int), errstr);
 	parmcnt = 2;			/* First 2 parms are fixed and always present (not counting tptoken since it
 					 * is not passed on to ydb_lock_s()).
 					 */

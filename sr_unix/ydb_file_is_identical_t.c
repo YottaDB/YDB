@@ -27,8 +27,8 @@ int ydb_file_is_identical_t(uint64_t tptoken, ydb_buffer_t *errstr, ydb_fileid_p
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	LIBYOTTADB_RUNTIME_CHECK((int));
-	VERIFY_THREADED_API((int));
+	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
+	VERIFY_THREADED_API((int), errstr);
 	retval = ydb_stm_args2(tptoken, errstr, LYDB_RTN_FILE_IS_IDENTICAL, (uintptr_t)fileid1, (uintptr_t) fileid2);
 	return (int)retval;
 }

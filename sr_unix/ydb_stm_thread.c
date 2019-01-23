@@ -312,6 +312,7 @@ void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged, boo
 		 * Do not service any more SimpleThreadAPI requests. Return right away with appropriate error.
 		 */
 		callblk->retval = YDB_ERR_CALLINAFTERXIT;
+		SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(YDB_ERR_CALLINAFTERXIT, callblk->errstr);
 		*forced_simplethreadapi_exit_seen = TRUE;
 		return;
 	}
