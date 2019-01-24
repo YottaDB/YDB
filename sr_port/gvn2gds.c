@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,13 +48,13 @@ error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_NOCANONICNAME);
 
 STATICDEF boolean_t	save_transform;
-STATICDEF gd_region	*save_gv_cur_region;
+STATICDEF gd_region	*gvn2gds_save_gv_cur_region;
 
 /* Restore global variables "gv_cur_region", "gv_target" and "transform" */
 #define	RESTORE_GBL_VARS_BEFORE_FUN_RETURN										\
 MBSTART {														\
 	/* Restore global variables "gv_cur_region", "gv_target" and "transform" back to their original state */	\
-	gv_cur_region = save_gv_cur_region;										\
+	gv_cur_region = gvn2gds_save_gv_cur_region;										\
 	RESET_GV_TARGET(DO_GVT_GVKEY_CHECK);										\
 	TREF(transform) = save_transform;										\
 } MBEND
@@ -138,7 +138,7 @@ unsigned char *gvn2gds(mval *gvn, gv_key *gvkey, int act)
 	gv_target->collseq = csp;
 	memset(&tmpreg, 0, SIZEOF(gd_region));
 	/* Assign "gv_cur_region" only after tmpreg has been fully initialized or timer interrupts can look at inconsistent copy */
-	save_gv_cur_region = gv_cur_region;
+	gvn2gds_save_gv_cur_region = gv_cur_region;
 	gv_cur_region = &tmpreg;
 	gv_cur_region->std_null_coll = TRUE;
 	ESTABLISH_NORET(gvn2gds_ch, est_first_pass);
@@ -291,7 +291,7 @@ unsigned char *gds2gvn(mval *gds, unsigned char *buff, int col)
 	unsigned char 	*key;
 	gv_key 		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gv_key 		*gvkey;
-	gd_region	tmpreg, *save_gv_cur_region;
+	gd_region	tmpreg;
 	gv_namehead	temp_gv_target;
 	boolean_t	est_first_pass;
 	DCL_THREADGBL_ACCESS;
