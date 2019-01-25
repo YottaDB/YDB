@@ -47,6 +47,7 @@ void continue_handler(int sig, siginfo_t *info, void *context)
 			     process_id, TREF(continue_proc_cnt), TREF(continue_proc_cnt) + 1)));
 	DEBUG_ONLY((TREF(continue_proc_cnt))++);
  	assert(SIGCONT == sig);
+	/* Note - we do not forward this signal to the main routine but depend on our suspend/continue operations instead */
 	extract_signal_info(sig, info, context, &sig_info);
 	if (is_suspended)
 	{	/* Don't bother checking if user info is available. If info isn't available,

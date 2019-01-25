@@ -18,45 +18,60 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_signal.h"
+#include "gtm_stdio.h"
 
-#include <signal.h>
+#include "io.h"
+#include "gtmio.h"
 #include "continue_handler.h"
 #include "sig_init.h"
-#include "gtmci_signals.h"
 #include "invocation_mode.h"
+#include "libyottadb_int.h"
+#include "generic_signal_handler.h"
 
 #ifdef GTM_PTHREAD
 GBLREF	boolean_t		gtm_jvm_process;
 #endif
+GBLREF	struct sigaction	orig_sig_action[];
 
 void	null_handler(int sig);
 
 void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)(), void (*continue_handler)())
 {
-	struct sigaction 	ignore, null_action, def_action, susp_action, gen_action, ctrlc_action, cont_action, check;
+	struct sigaction 	ignore, null_action, def_action, susp_action, gen_action, ctrlc_action, cont_action;
 	int			sig;
         DCL_THREADGBL_ACCESS;
 
         SETUP_THREADGBL_ACCESS;
 	memset(&ignore, 0, SIZEOF(ignore));
 	sigemptyset(&ignore.sa_mask);
-
-	/* Copying only up to susp_action here to later specify SA_SIGINFO flag and continue copying with it. */
+	/* Initialize handler definitions we deal with. Note susp_action gets a copy of ignore but we'll be doing more with it
+	 * in the next section.
+	 */
 	null_action = def_action = susp_action = ignore;
 	ignore.sa_handler = SIG_IGN;
 	null_action.sa_handler = null_handler;
 	def_action.sa_handler = SIG_DFL;
-
-	/* Give us extra info on the following signals and a full core if necessary. */
+	/* These signals need the additional information we get by adding SA_SIGINFO. Then fine tune how we handle certain
+	 * classes of handlers.
+	 */
 	susp_action.sa_flags = SA_SIGINFO;
 	gen_action = ctrlc_action = cont_action = susp_action;
 	susp_action.sa_sigaction = suspsig_handler;
 	gen_action.sa_sigaction = signal_handler;
 	ctrlc_action.sa_sigaction = ctrlc_handler;
 	cont_action.sa_sigaction = continue_handler;
-
+	/* Save the current handler for each signal in orig_sig_action[] array indexed by the signal number */
 	for (sig = 1; sig <= NSIG; sig++)
 	{
+		sigaction(sig, NULL, &orig_sig_action[sig]);	/* Save original handler */
+#		ifdef DEBUG_SIGNAL_HANDLING
+		if ((SIG_DFL != orig_sig_action[sig].sa_handler) && (SIG_IGN != orig_sig_action[sig].sa_handler))
+		{
+			DBGSIGHND((stderr, "sig_init: Note pre-existing handler for signal %d (handler = "lvaddr")\n",
+				   sig, orig_sig_action[sig].sa_handler));
+		}
+#		endif
 		switch (sig)
 		{
 			case SIGHUP:
@@ -82,24 +97,10 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 				break;
 			case SIGINT:
 				/* If supplied with a control-C handler, install it now. */
-				if (MUMPS_CALLIN != invocation_mode)
-				{
-					if (NULL != ctrlc_handler)
-						sigaction(sig, &ctrlc_action, NULL);
-					else
-						sigaction(sig, &ignore, NULL);
-				} else
-				{	/* ^C for both call-ins and simpleapi allow the user to set a handler prior to making a
-					 * call that would cause the YottaDB runtime to initialize and not have YDB override it.
-					 * So if we find a handler defined other than the default, we allow it to remain.
-					 * untouched.
-					 */
-					sigaction(sig, NULL, &check);			/* Fetch current ^C handler */
-					if (SIG_DFL == check.sa_handler)
-					{	/* No handler defined - it gets the passed in handler instead */
-						sigaction(sig, &ctrlc_action, NULL);
-					} /* else we leave the handler alone */
-				}
+				if (NULL != ctrlc_handler)
+					sigaction(sig, &ctrlc_action, NULL);
+				else
+					sigaction(sig, &ignore, NULL);
 				break;
 			case SIGCONT:
 				/* Special handling for SIGCONT. */
@@ -154,6 +155,14 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 				sigaction(sig, &gen_action, NULL);
 				break;
 			default:
+				/* If we are in call-in/simpleAPI mode and a non-default handler is installed, leave it
+				 * installed. Otherwise, set the signal to IGNORE. Note this may initially be true of some
+				 * signals we setup later (e.g. timers, intrpt, etc) but they'll be replaced when they get
+				 * setup and we still have a record of what was there in orig_sig_action[].
+				 */
+				if ((MUMPS_CALLIN & invocation_mode) && IS_SIMPLEAPI_MODE
+				    && (SIG_DFL != orig_sig_action[sig].sa_handler) && (SIG_IGN != orig_sig_action[sig].sa_handler))
+					break;
 				sigaction(sig, &ignore, NULL);
 		}
 	}

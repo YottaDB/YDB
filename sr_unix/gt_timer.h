@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -221,7 +221,7 @@ STATICFNDCL void	start_timer_int(TID tid, int4 time_to_expir, void (*handler)(),
 					void *hdata, boolean_t safe_timer);
 STATICFNDCL void	sys_settimer (TID tid, ABS_TIME *time_to_expir);
 STATICFNDCL void	start_first_timer(ABS_TIME *curr_time);
-STATICFNDCL void	timer_handler(int why);
+STATICFNDCL void	timer_handler(int why, siginfo_t *info, void *context);
 STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
 STATICFNDCL GT_TIMER	*add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
 					void *hdata, boolean_t safe_timer);

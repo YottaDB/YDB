@@ -20,18 +20,14 @@
 
 #include "mdef.h"
 
-#ifdef UNIX
-#  include <signal.h>
-#else
-#  include <ssdef.h>
-#  include "efn.h"
-#endif
+#include "gtm_signal.h"
 #ifdef GTM_PTHREAD
 #  include <pthread.h>
 #endif
-
 #include "gtm_stdio.h"
+
 #include "io.h"
+#include "gtmio.h"
 #include "op.h"
 #include "xfer_enum.h"
 #include "outofband.h"
@@ -39,10 +35,13 @@
 #include "jobinterrupt_event.h"
 #include "fix_xfer_entry.h"
 #include "generic_signal_handler.h"
+#include "libyottadb_int.h"
+#include "invocation_mode.h"
 
 GBLREF	xfer_entry_t		xfer_table[];
 GBLREF	volatile int4 		outofband;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
+GBLREF	struct sigaction	orig_sig_action[];
 
 /* Routine called when an interrupt event occurs (signaled by mupip intrpt or other future method
  * of signaling interrupts). This code is driven as a signal handler on Unix where it intercepts the posix signal.
@@ -53,6 +52,12 @@ void jobinterrupt_event(int sig, siginfo_t *info, void *context)
 	/* Note the (presently unused) args are to match signature for signal handlers in Unix */
 	if (!dollar_zininterrupt)
 		(void)xfer_set_handlers(outofband_event, &jobinterrupt_set, 0);
+	/* If we are in SIMPLEAPI mode and the original handler was neither SIG_DFL or SIG_IGN, drive the originally
+	 * defined handler before we replaced them.
+	 */
+#	ifdef SIGNAL_PASSTHRU
+	DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("jobinterrupt_event", sig, info, context, FALSE);
+#	endif
 }
 
 /* Call back routine from xfer_set_handlers to complete outofband setup */

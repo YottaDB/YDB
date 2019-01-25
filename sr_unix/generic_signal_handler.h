@@ -24,9 +24,48 @@
 #include "sleep.h"
 #include "sleep_cnt.h"
 
+/* Define debugging macros for signal handling - uncomment the define below to enable but note it emits
+ * output to stderr.
+ */
+//#define DEBUG_SIGNAL_HANDLING
+#ifdef DEBUG_SIGNAL_HANDLING
+# define DBGSIGHND(x) DBGFPF(x)
+#else
+# define DBGSIGHND(x)
+#endif
+
 GBLREF	siginfo_t		exi_siginfo;
 GBLREF	gtm_sigcontext_t 	exi_context;
 GBLREF	int			exi_signal_forwarded;
+
+/* When we share signal handling with a main in simpleAPI mode and need to drive the non-YottaDB base routine's handler
+ * for a signal, we need to move it to a matching type because Linux does not define the handler with information
+ * attributes (the siginfo_t and context parameters sent when SA_SIGINFO is specified) without some exotic C99* flag.
+ * Use this type to drive the handler.
+ */
+typedef void (*nonYDB_sighandler_t)(int, siginfo_t *, void *);
+
+#define IS_HANDLER_DEFINED(SIGNAL) \
+	((SIG_DFL != orig_sig_action[(SIGNAL)].sa_handler) && (SIG_IGN != orig_sig_action[(SIGNAL)].sa_handler))
+
+#define DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY(NAME, SIGNAL, INFO, CONTEXT, DRIVEEXIT)					\
+MBSTART {														\
+	nonYDB_sighandler_t	sighandler;										\
+															\
+	if ((MUMPS_CALLIN & invocation_mode) && IS_HANDLER_DEFINED(SIGNAL))						\
+	{														\
+		assert((0 < (SIGNAL)) && (NSIG >= (SIGNAL)));								\
+		if (DRIVEEXIT)												\
+		{													\
+			DBGSIGHND((stderr, "%s: Driving ydb_stm_thread_exit() prior to signal passthru\n", NAME));	\
+			ydb_stm_thread_exit();										\
+		}													\
+		sighandler = (nonYDB_sighandler_t)(orig_sig_action[(SIGNAL)].sa_handler);				\
+		DBGSIGHND((stderr, "%s: Passing signal %d through to the caller\n", (NAME), (SIGNAL)));			\
+		(*sighandler)((SIGNAL), (INFO), (CONTEXT));	/* Note - likely to NOT return */			\
+		DBGSIGHND((stderr, "%s: Returned from signal passthru for signal %d\n", (NAME), (SIGNAL)));		\
+	}														\
+} MBEND
 
 /* Macro to check if a given signal sets the "dont_want_core" variable to TRUE in the function "generic_signal_handler" */
 #define	IS_DONT_WANT_CORE_TRUE(SIG)	((SIGQUIT == SIG) || (SIGTERM == SIG))

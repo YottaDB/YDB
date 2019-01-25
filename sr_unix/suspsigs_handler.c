@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018,2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,7 @@ void suspsigs_handler(int sig, siginfo_t* info, void *context)
 	sigset_t	block_susp_sigs, oldsigmask;
 	int		status;
 
+	/* Note - we do not forward these signals to the main routine but depend on our suspend/continue operations instead */
 	switch(sig)
 	{
 		case SIGTTIN:

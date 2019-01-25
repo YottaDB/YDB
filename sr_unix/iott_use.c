@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,6 +45,7 @@
 #include "restrict.h"
 #include "op.h"
 #include "indir_enum.h"
+#include "invocation_mode.h"
 
 LITDEF nametabent filter_names[] =
 {
@@ -146,7 +147,10 @@ void iott_use(io_desc *iod, mval *pp)
 					tt_ptr->ext_cap &= ~TT_EMPTERM;
 					break;
 				case iop_cenable:
-					if (!ctrlc_on && !RESTRICTED(cenable))
+					/* Note that this parameter is ignored in callin/simpleapi mode because ^C in this mode
+					 * is treated as a process termination request.
+					 */
+					if (!ctrlc_on && !RESTRICTED(cenable) && !(MUMPS_CALLIN & invocation_mode))
 					{	/* if it's already cenable, no need to change */
 						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
 						if (tt_ptr->fildes == temp_ptr->fildes)
@@ -160,7 +164,10 @@ void iott_use(io_desc *iod, mval *pp)
 					}
 					break;
 				case iop_nocenable:
-					if (ctrlc_on && !RESTRICTED(cenable))
+					/* Note that this parameter is ignored in callin/simpleapi mode because ^C in this mode
+					 * is treated as a process termination request.
+					*/
+					if (ctrlc_on && !RESTRICTED(cenable) && !(MUMPS_CALLIN & invocation_mode))
 					{	/* if it's already nocenable, no need to change */
 						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
 						if (tt_ptr->fildes == temp_ptr->fildes)

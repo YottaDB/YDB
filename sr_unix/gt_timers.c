@@ -63,9 +63,9 @@
 
 #include "gt_timer.h"
 #include "wake_alarm.h"
+#include "io.h"
 #ifdef DEBUG
 # include "wbox_test_init.h"
-# include "io.h"
 #endif
 #ifndef __MVS__
 # include <sys/param.h>
@@ -80,6 +80,8 @@
 #include "gtmxc_types.h"
 #include "getjobnum.h"
 #include "generic_signal_handler.h"
+#include "libyottadb_int.h"
+#include "invocation_mode.h"
 
 #ifdef ITIMER_REAL
 # define BSD_TIMER
@@ -204,6 +206,7 @@ GBLREF	void		(*jnl_file_close_timer_ptr)(void);	/* Initialized only in gtm_start
 GBLREF	int4		error_condition;
 GBLREF	int4		outofband;
 GBLREF	int		process_exiting;
+GBLREF	struct sigaction orig_sig_action[];
 #ifdef YDB_USE_POSIX_TIMERS
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
@@ -660,7 +663,7 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 			if (tpop->safe || (SAFE_FOR_TIMER_START && (1 > timer_stack_count)
 						&& !(TREF(in_ext_call) && (wcs_stale_fptr == tpop->handler))))
 			{
-				timer_handler(DUMMY_SIG_NUM);
+				timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 				/* At this point all timers should have been handled, including a recursive call to
 				 * start_first_timer(), if needed, and SET_DEFERRED_TIMERS_CHECK_NEEDED invoked if
 				 * appropriate, so we are done.
@@ -689,7 +692,7 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
  * The "why" parameter can be DUMMY_SIG_NUM (if the handler is being invoked internally from YottaDB code)
  * or SIGALRM (if the handler is being invoked by the kernel upon receipt of the SIGALRM signal).
  */
-STATICFNDEF void timer_handler(int why)
+STATICFNDEF void timer_handler(int why, siginfo_t *info, void *context)
 {
 	int4		cmp, save_error_condition;
 	GT_TIMER	*tpop, *tpop_prev = NULL;
@@ -743,6 +746,12 @@ STATICFNDEF void timer_handler(int why)
 	{
 		SET_DEFERRED_TIMERS_CHECK_NEEDED;
 		INTERLOCK_ADD(&timer_stack_count, UNUSED, -1);
+#		ifdef SIGNAL_PASSTHRU
+		if (SIGALRM == why)
+		{	/* Only drive this handler if we have an actual signal - not a dummy call */
+			DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("timer_handler", why, info, context, FALSE);
+		}
+#		endif
 		return;
 	}
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
@@ -912,6 +921,14 @@ STATICFNDEF void timer_handler(int why)
 #	ifdef DEBUG
 	if (safe_for_timer_pop)
 		in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler;
+#	endif
+#	ifdef SIGNAL_PASSTHRU
+	/* If this is call-in/simpleAPI mode and a handler exists for this signal, call it */
+	if ((SIGALRM == why) && (MUMPS_CALLIN & invocation_mode) && IS_SIMPLEAPI_MODE
+	    && (SIG_DFL != orig_sig_action[why].sa_handler) && (SIG_IGN != orig_sig_action[why].sa_handler))
+	{
+		DRIVE_SIGNAL_HANDLER_FROM_MAIN("timer_handler2", why, info, context, orig_sig_action[why].sa_handler);
+	}
 #	endif
 	DUMP_TIMER_INFO("At the end of timer_handler()");
 }
@@ -1151,7 +1168,7 @@ STATICFNDEF void init_timers()
 
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
-	act.sa_handler = timer_handler;
+	act.sa_handler = (sighandler_t)timer_handler;
 	sigaction(SIGALRM, &act, &prev_alrm_handler);
 	if (first_timeset && 					/* not from timer_handler to prevent dup message */
 	    (SIG_IGN != prev_alrm_handler.sa_handler) &&	/* as set by sig_init */
@@ -1177,7 +1194,7 @@ void check_for_deferred_timers(void)
 
 	assert(!INSIDE_THREADED_CODE(rname));	/* below code is not thread safe as it does SIGPROCMASK() etc. */
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
-	timer_handler(DUMMY_SIG_NUM);
+	timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 }
 
 /* Check for timer pops. If any timers are on the queue, pretend a sigalrm occurred, and we have to
@@ -1194,7 +1211,7 @@ void check_for_timer_pops()
 	sigaction(SIGALRM, NULL, &current_sa);	/* get current info */
 	if (!first_timeset)
 	{
-		if (timer_handler != current_sa.sa_handler)	/* check if what we expected */
+		if ((sighandler_t)timer_handler != current_sa.sa_handler)	/* check if what we expected */
 		{
 			init_timers();
 			if (!stolen_timer)
@@ -1217,7 +1234,7 @@ void check_for_timer_pops()
 	}
 	if (timeroot && (1 > timer_stack_count))
 	{
-		timer_handler(DUMMY_SIG_NUM);
+		timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 	}
 	if (stolenwhen)
 	{

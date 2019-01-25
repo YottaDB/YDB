@@ -21,6 +21,7 @@
 #ifdef GTM_PTHREAD
 #  include "gtm_pthread.h"
 #endif
+#include "gtm_signal.h"
 #include "gtm_stat.h"
 #include "gtm_stdlib.h"
 #include "gtm_string.h"
@@ -118,6 +119,7 @@ GBLREF	boolean_t		simpleThreadAPI_active;
 GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex;
 GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder;
 GBLREF	int			fork_after_ydb_init;
+GBLREF	struct sigaction	orig_sig_action[];
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
 
 LITREF  gtmImageName            gtmImageNames[];
@@ -1398,7 +1400,7 @@ void ydb_nested_callin(void)
 /* Routine exposed to call-in user to exit from active YottaDB environment */
 int ydb_exit()
 {
-	int		status, i;
+	int		status, i, sig;
 	pthread_t	thisThread, threadid;
 	boolean_t	wait_for_main_worker_thread_to_die;
         DCL_THREADGBL_ACCESS;
@@ -1484,6 +1486,10 @@ int ydb_exit()
 							 */
 		break;
 	}
+	/* Restore the signal handlers that were saved and overridden during ydb_init()->gtm_startup()->sig_init() */
+	for (sig = 1; sig <= NSIG; sig++)
+		sigaction(sig, &orig_sig_action[sig], NULL);
+	/* More multi-thread engine cleanup */
 	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
 	if (wait_for_main_worker_thread_to_die)
 	{	/* We signaled the MAIN (and TP) worker threads to terminate. Wait for that to happen before returning. */
