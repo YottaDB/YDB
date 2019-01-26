@@ -1402,7 +1402,6 @@ int ydb_exit()
 {
 	int		status, i, sig;
 	pthread_t	thisThread, threadid;
-	boolean_t	wait_for_main_worker_thread_to_die;
         DCL_THREADGBL_ACCESS;
 
         SETUP_THREADGBL_ACCESS;
@@ -1411,16 +1410,13 @@ int ydb_exit()
 	status = pthread_mutex_lock(&ydb_engine_threadsafe_mutex);
 	if (0 != status)
 		return status;		/* Lock failed - no condition handler yet so just return the error code */
-	wait_for_main_worker_thread_to_die = FALSE;
-	for ( ; ; )	/* for loop only there to let us break from various cases without having a deep if-then-else structure */
+	if (!ydb_init_complete)
+	{	/* "ydb_init_complete" was TRUE before we got the "ydb_engine_threadsafe_mutex" lock but became FALSE
+		 * afterwards. This implies some other concurrent thread did the "ydb_exit" so we can return from this
+		 * "ydb_exit" call without doing anything more.
+		 */
+	} else
 	{
-		if (!ydb_init_complete)
-		{	/* "ydb_init_complete" was TRUE before we got the "ydb_engine_threadsafe_mutex" lock but became FALSE
-			 * afterwards. This implies some other concurrent thread did the "ydb_exit" so we can return from this
-			 * "ydb_exit" call without doing anything more.
-			 */
-			break;
-		}
 		if (simpleThreadAPI_active)
 		{	/* This is a SimpleThreadAPI environment. We are guaranteed this thread is not the MAIN or TP worker thread
 			 * That means we cannot run exit handling code (since that would imply concurrently running YottaDB engine
@@ -1436,117 +1432,116 @@ int ydb_exit()
 			 * worker thread when it reaches a logical point of execution.
 			 */
 			SET_FORCED_THREAD_EXIT;
-			wait_for_main_worker_thread_to_die = TRUE;
-			break;
-		}
-		ESTABLISH_RET(gtmci_ch, mumps_status);
-		/* Let "gtmci_ch" know this thread is currently holding the YottaDB engine thread level lock by setting a global
-		 * variable (so it knows to release this in case of an "rts_error_csa" call below).
-		 */
-		ydb_engine_threadsafe_mutex_holder = pthread_self();
-		assert(NULL != frame_pointer);
-		/* If process_exiting is set (and the YottaDB environment is still active since "ydb_init_complete" is TRUE here),
-		 * shortcut some of the checks and cleanups we are making in this routine as they are not particularly useful.
-		 * If the environment is not active though, that's still an error.
-		 */
-		if (!process_exiting)
-		{	/* Do not allow ydb_exit() to be invoked from external calls (unless process_exiting) */
-			if (!(SFT_CI & frame_pointer->type) || !(MUMPS_CALLIN & invocation_mode) || (1 < TREF(gtmci_nested_level)))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
-			/* Now get rid of the whole M stack - end of YottaDB environment */
-			while (NULL != frame_pointer)
+			/* We signaled the MAIN (and TP) worker threads to terminate. Wait for that to happen before returning. */
+			assert(forced_thread_exit);
+			if (NULL != stmWorkQueue[0])
 			{
-				while ((NULL != frame_pointer) && !(frame_pointer->type & SFT_CI))
+				threadid = stmWorkQueue[0]->threadid;
+				assert(0 != threadid);
+				if (0 != threadid)
 				{
-					if (SFT_TRIGR & frame_pointer->type)
-						gtm_trigger_fini(TRUE, FALSE);
-					else
-						op_unwind();
-				}
-				if (NULL != frame_pointer)
-				{	/* unwind the current invocation of call-in environment */
-					assert(frame_pointer->type & SFT_CI);
-					ci_ret_code_quit();
-				}
-			}
-		}
-		gtm_exit_handler(); /* rundown all open database resource */
-		/* If libyottadb was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
-		 * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
-		 * 'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
-		 * our exit handler has already been called. Linux and Solaris don't need this, looking at the
-		 * other platforms we support to see if resolutions can be found. SE 05/2007
-		 */
-		REVERT;
-		ydb_init_complete = FALSE;
-		/* We might have opened one or more shlib handles using "dlopen". Do a "dlclose" of them now. */
-		dlopen_handle_array_close();
-		ydb_engine_threadsafe_mutex_holder = 0;	/* Clear now that we no longer hold the YottaDB engine thread lock and
-							 * "gtmci_ch" is no longer the active condition handler.
-							 */
-		break;
-	}
-	/* Restore the signal handlers that were saved and overridden during ydb_init()->gtm_startup()->sig_init() */
-	for (sig = 1; sig <= NSIG; sig++)
-		sigaction(sig, &orig_sig_action[sig], NULL);
-	/* More multi-thread engine cleanup */
-	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
-	if (wait_for_main_worker_thread_to_die)
-	{	/* We signaled the MAIN (and TP) worker threads to terminate. Wait for that to happen before returning. */
-		assert(forced_thread_exit);
-		if (NULL != stmWorkQueue[0])
-		{
-			threadid = stmWorkQueue[0]->threadid;
-			assert(0 != threadid);
-			if (0 != threadid)
-			{
-				for ( ; ; )
-				{	/* In case the MAIN worker thread is in "pthread_cond_wait", it will not see the
-					 * "forced_thread_exit" global variable change so wake it up by a "pthread_cond_signal".
-					 * Since we are not necessarily holding the mutex associated with the condition variable
-					 * before signaling, we could have lost wake-ups (i.e. we could do a "pthread_cond_signal"
-					 * BEFORE the worker thread has done a "pthread_cond_wait", for example when the worker
-					 * thread is inside the function "ydb_stm_threadq_dispatch") and so a blocking
-					 * "pthread_join" might hang indefinitely. Therefore do a non-blocking join and if
-					 * that fails, keep signaling again (eventually we will signal the worker thread while
-					 * it is in a "pthread_cond_wait") until the join succeeds. Note that the MAIN worker
-					 * thread could be waiting on stmWorkQueue[0] or stmTPWorkQueue[i] (i = 0, 1, ...)
-					 * so signal all of those as appropriate.
+					for ( ; ; )
+					{	/* In case the MAIN worker thread is in "pthread_cond_wait", it will not see the
+						 * "forced_thread_exit" global variable change so wake it up by a
+						 * "pthread_cond_signal". Since we are not necessarily holding the mutex associated
+						 * with the condition variable before signaling, we could have lost wake-ups
+						 * (i.e. we could do a "pthread_cond_signal" BEFORE the worker thread has done a
+						 * "pthread_cond_wait", for example when the worker thread is inside the function
+						 * "ydb_stm_threadq_dispatch") and so a blocking "pthread_join" might hang
+						 * indefinitely. Therefore do a non-blocking join and if that fails, keep signaling
+						 * again (eventually we will signal the worker thread while it is in a
+						 * "pthread_cond_wait") until the join succeeds. Note that the MAIN worker
+						 * thread could be waiting on stmWorkQueue[0] or stmTPWorkQueue[i] (i = 0, 1, ...)
+						 * so signal all of those as appropriate.
+						 */
+						status = pthread_cond_signal(&stmWorkQueue[0]->cond);
+						assert(0 == status);
+						for (i = 0; (NULL != stmTPWorkQueue[i]) && ((STMWORKQUEUEDIM - 1) > i); i++)
+						{
+							status = pthread_cond_signal(&stmTPWorkQueue[i]->cond);
+							assert(0 == status);
+						}
+						status = pthread_tryjoin_np(threadid, NULL);
+						if (EBUSY != status)
+						{
+							assert(0 == status);
+							break;
+						}
+						SLEEP_USEC(1, FALSE);	/* sleep for 1 micro-second before retrying */
+					}
+					/* Now that the MAIN worker thread has really terminated, it is safe to destroy the mutex
+					 * and condition variables we needed until now to signal it. And clear the threadid too.
 					 */
-					status = pthread_cond_signal(&stmWorkQueue[0]->cond);
-					assert(0 == status);
+					assert(threadid == stmWorkQueue[0]->threadid);
+					stmWorkQueue[0]->threadid = 0;
+					(void)pthread_cond_destroy(&stmWorkQueue[0]->cond);
+					(void)pthread_mutex_destroy(&stmWorkQueue[0]->mutex);
+					/* If we had more than one level initialized,
+					 * then the alternate TP queue was also initialized.
+					 */
 					for (i = 0; (NULL != stmTPWorkQueue[i]) && ((STMWORKQUEUEDIM - 1) > i); i++)
 					{
-						status = pthread_cond_signal(&stmTPWorkQueue[i]->cond);
-						assert(0 == status);
+						(void)pthread_cond_destroy(&stmTPWorkQueue[i]->cond);
+						(void)pthread_mutex_destroy(&stmTPWorkQueue[i]->mutex);
 					}
-					status = pthread_tryjoin_np(threadid, NULL);
-					if (EBUSY != status)
-					{
-						assert(0 == status);
-						break;
-					}
-					SLEEP_USEC(1, FALSE);	/* sleep for 1 micro-second before retrying */
-				}
-				/* Now that the MAIN worker thread has really terminated, it is safe to destroy the mutex
-				 * and condition variables we needed until now to signal it. And clear the threadid too.
-				 */
-				assert(threadid == stmWorkQueue[0]->threadid);
-				stmWorkQueue[0]->threadid = 0;
-				(void)pthread_cond_destroy(&stmWorkQueue[0]->cond);
-				(void)pthread_mutex_destroy(&stmWorkQueue[0]->mutex);
-				/* If we had more than one level initialized, then the alternate TP queue was also initialized */
-				for (i = 0; (NULL != stmTPWorkQueue[i]) && ((STMWORKQUEUEDIM - 1) > i); i++)
-				{
-					(void)pthread_cond_destroy(&stmTPWorkQueue[i]->cond);
-					(void)pthread_mutex_destroy(&stmTPWorkQueue[i]->mutex);
 				}
 			}
+		} else
+		{
+			ESTABLISH_RET(gtmci_ch, mumps_status);
+			/* Let "gtmci_ch" know this thread is currently holding the YottaDB engine thread level lock by setting a
+			 * global variable (so it knows to release this in case of an "rts_error_csa" call below).
+			 */
+			ydb_engine_threadsafe_mutex_holder = pthread_self();
+			assert(NULL != frame_pointer);
+			/* If process_exiting is set (and the YottaDB environment is still active since "ydb_init_complete" is TRUE
+			 * here), shortcut some of the checks and cleanups we are making in this routine as they are not
+			 * particularly useful. If the environment is not active though, that's still an error.
+			 */
+			if (!process_exiting)
+			{	/* Do not allow ydb_exit() to be invoked from external calls (unless process_exiting) */
+				if (!(SFT_CI & frame_pointer->type) || !(MUMPS_CALLIN & invocation_mode)
+						|| (1 < TREF(gtmci_nested_level)))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
+				/* Now get rid of the whole M stack - end of YottaDB environment */
+				while (NULL != frame_pointer)
+				{
+					while ((NULL != frame_pointer) && !(frame_pointer->type & SFT_CI))
+					{
+						if (SFT_TRIGR & frame_pointer->type)
+							gtm_trigger_fini(TRUE, FALSE);
+						else
+							op_unwind();
+					}
+					if (NULL != frame_pointer)
+					{	/* unwind the current invocation of call-in environment */
+						assert(frame_pointer->type & SFT_CI);
+						ci_ret_code_quit();
+					}
+				}
+			}
+			gtm_exit_handler(); /* rundown all open database resource */
+			/* If libyottadb was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
+			 * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
+			 * 'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
+			 * our exit handler has already been called. Linux and Solaris don't need this, looking at the
+			 * other platforms we support to see if resolutions can be found. SE 05/2007
+			 */
+			REVERT;
+			ydb_engine_threadsafe_mutex_holder = 0;	/* Clear now that we are about to release the YottaDB engine
+								 * thread lock and "gtmci_ch" is no longer the active
+								 * condition handler. We cannot do this after releasing the
+								 * mutex as that would cause race conditions.
+								 */
 		}
-		ydb_init_complete = FALSE;
+		/* Restore the signal handlers that were saved and overridden during ydb_init()->gtm_startup()->sig_init() */
+		for (sig = 1; sig <= NSIG; sig++)
+			sigaction(sig, &orig_sig_action[sig], NULL);
 		/* We might have opened one or more shlib handles using "dlopen". Do a "dlclose" of them now. */
 		dlopen_handle_array_close();
+		ydb_init_complete = FALSE;
 	}
+	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
 	return 0;
 }
 

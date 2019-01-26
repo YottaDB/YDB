@@ -1166,6 +1166,7 @@ STATICFNDEF void init_timers()
 {
 	struct sigaction	act;
 
+	memset(&act, 0, SIZEOF(act));
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
 	act.sa_handler = (sighandler_t)timer_handler;
