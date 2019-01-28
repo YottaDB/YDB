@@ -3,7 +3,7 @@
 # Copyright (c) 2012-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -32,7 +32,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version r123)
+set(version r124)
 
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)

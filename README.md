@@ -146,7 +146,7 @@ docker run --rm -it yottadb/yottadb # you can add a specific version after a ":"
   Example error message that would be printed to the screen:
 
   ```
-  %YDB-E-DLLNOOPEN, Failed to load external dynamic library /usr/local/lib/yottadb/r122/libyottadb.so
+  %YDB-E-DLLNOOPEN, Failed to load external dynamic library /usr/local/lib/yottadb/r124/libyottadb.so
   %YDB-E-TEXT, libtinfo.so.5: cannot open shared object file: No such file or directory
   ```
 
