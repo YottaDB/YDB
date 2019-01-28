@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1165,21 +1165,20 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 				 * So do not treat that as an error.
 				 */
 				/* If this is a NULL record with the "salvaged" bit set to TRUE, it means this is an auto-generated
-				 * journal record. If the current rollback is a fetchresync rollback (i.e. done on a receiver side),
-				 * the corresponding seqno on the source side could be a user-generated seqno (i.e. non-NULL
-				 * journal record)or the same NULL record with the "salvaged" bit set even on the source side.
+				 * journal record. This seqno could be a user-generated seqno (i.e. non-NULL journal record)
+				 * on another instance (i.e. on a receiving side if this is the source side in a
+				 * replicated environment OR on another source side if this is a receiving side).
 				 * We cannot know for sure so err on the side of caution and treat this auto-generated NULL record
-				 * as a broken transaction. That way later when the receiver server on this instance connects to
-				 * the source server, the user-generated journal records for this seqno would be re-fetched on
-				 * this side from the source side thereby avoiding data discrepancies between the two sides (#362).
-				 * Note that it is possible one does a non-fetchresync rollback on a receiver side instance. In
-				 * that case, we would not consider the "salvaged" NULL record as a broken transaction which
-				 * could cause data discrepancies between source and receiver side. But the user is not supposed
-				 * to run a non-fetchresync rollback ever on a receiver side. Since the rollback process has no
-				 * clue whether it is running on what is going to be a receiver or source side, this is the best
-				 * we can do at this point.
+				 * as a broken transaction. That way if the current instance is on the receiving side,
+				 * later when the receiver server on this instance connects to the source server,
+				 * the user-generated journal records for this seqno would be re-fetched on this side from the
+				 * source side thereby avoiding data discrepancies between the two sides (#362). Similary, if
+				 * the current instance is on the source side, later when the source server of this instance
+				 * connects to the receiver side, the receiver side would undo any non-NULL journal records it
+				 * had for the same NULL record seqno as part of the fetchresync rollback it does thereby avoiding
+				 * data discrepancies between the two sides.
 				 */
-				if ((NULLFENCE == rec_fence) && jnlrec->jrec_null.bitmask.salvaged && mur_options.fetchresync_port)
+				if ((NULLFENCE == rec_fence) && jnlrec->jrec_null.bitmask.salvaged)
 				{
 					/* If this was not already set as a broken tn, bump the broken_cnt for this seqno */
 					if (0 == multi->partner)
