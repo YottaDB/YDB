@@ -65,6 +65,7 @@ GBLREF 	boolean_t		is_tracing_on;
 GBLREF	int			fork_after_ydb_init;
 GBLREF	stm_workq		*stmWorkQueue[];
 GBLREF	boolean_t		forced_simplethreadapi_exit;
+GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 #ifdef DEBUG
 GBLREF 	boolean_t		stringpool_unusable;
 GBLREF 	boolean_t		stringpool_unexpandable;
@@ -215,7 +216,9 @@ void gtm_exit_handler(void)
 			 */
 			if (!forced_simplethreadapi_exit)
 			{
-				ydb_stm_thread_exit();
+				assert(NULL != ydb_stm_thread_exit_fnptr);
+				if (NULL != ydb_stm_thread_exit_fnptr)
+					(*ydb_stm_thread_exit_fnptr)();	/* invokes "ydb_stm_thread_exit" */
 				return;
 			}
 		}

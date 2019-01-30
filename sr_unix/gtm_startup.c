@@ -138,6 +138,7 @@ GBLREF enum gtmImageTypes	image_type;
 GBLREF int			init_xfer_table(void);
 GBLREF stm_workq		*stmWorkQueue[];
 GBLREF stm_freeq		stmFreeQueue;
+GBLREF void			(*ydb_stm_thread_exit_fnptr)(void);
 
 OS_PAGE_SIZE_DECLARE
 
@@ -297,6 +298,7 @@ void gtm_startup(struct startup_vector *svec)
 	stmWorkQueue[0] = ydb_stm_init_work_queue();	/* Initialize and return address of work descriptor queue block */
 	dqinit(&stmFreeQueue.stm_cbqhead, que);		/* Initialize queue headers for free queue for request blocks */
 	INIT_STM_QUEUE_MUTEX(&stmFreeQueue);		/* Initialize the free queue's mutex */
+	ydb_stm_thread_exit_fnptr = &ydb_stm_thread_exit;
 	/* Pick up the parms for this invocation */
 	if ((GTM_IMAGE == image_type) && (NULL != svec->base_addr))
 		/* We are in the grandchild at this point. This call is made to greet local variables sent from the midchild. There

@@ -37,6 +37,7 @@
 GBLREF	siginfo_t		exi_siginfo;
 GBLREF	gtm_sigcontext_t 	exi_context;
 GBLREF	int			exi_signal_forwarded;
+GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 
 /* When we share signal handling with a main in simpleAPI mode and need to drive the non-YottaDB base routine's handler
  * for a signal, we need to move it to a matching type because Linux does not define the handler with information
@@ -58,7 +59,8 @@ MBSTART {														\
 		if (DRIVEEXIT)												\
 		{													\
 			DBGSIGHND((stderr, "%s: Driving ydb_stm_thread_exit() prior to signal passthru\n", NAME));	\
-			ydb_stm_thread_exit();										\
+			if (NULL != ydb_stm_thread_exit_fnptr)								\
+				(*ydb_stm_thread_exit_fnptr)();								\
 		}													\
 		sighandler = (nonYDB_sighandler_t)(orig_sig_action[(SIGNAL)].sa_handler);				\
 		DBGSIGHND((stderr, "%s: Passing signal %d through to the caller\n", (NAME), (SIGNAL)));			\
