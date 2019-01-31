@@ -346,32 +346,32 @@ if [ "N" = "$ydb_force_install" ]; then
 		osid=`grep -w ID $osfile | cut -d= -f2 | cut -d'"' -f2`
 		osver=`grep -w VERSION_ID $osfile | cut -d= -f2 | cut -d'"' -f2`
 		# Set an impossible major/minor version by default in case we do not descend down known platforms in if/else below.
-		osallowmajorver=999
-		osallowminorver=999
+		osallowmajorver="999"
+		osallowminorver="999"
 		if [ "x8664" = "${ydb_flavor}" ] ; then
 			if [ "ubuntu" = "${osid}" ] ; then
-				# Ubuntu 16.04 and onwards is considered supported on 64-bit x86 architecture
-				osallowmajorver=16
-				osallowminorver=4
+				# Ubuntu 18.04 and onwards is considered supported on 64-bit x86 architecture
+				osallowmajorver="18"
+				osallowminorver="04"
 			else
 				if [ "rhel" = "${osid}" ] ; then
 					# RHEL 7.x is considered supported on 64-bit x86 architecture
-					osallowmajorver=7
-					osallowminorver=0
+					osallowmajorver="7"
+					osallowminorver="0"
 				fi
 			fi
 		elif [ "aarch64" = "${ydb_flavor}" ] ; then
 			if [ "ubuntu" = "${osid}" ] ; then
 				# Ubuntu 18.04 and onwards is considered supported on 64-bit ARM architecture
-				osallowmajorver=18
-				osallowminorver=4
+				osallowmajorver="18"
+				osallowminorver="04"
 			fi
 		else
 			if [ "armv6l" = "${ydb_flavor}" -o "armv7l" = "${ydb_flavor}" ] ; then
 				if [ "raspbian" = "${osid}" -o "debian" = ${osid} ] ; then
 					# Raspbian or Debian 9 or 9.x is considered supported on 32-bit ARM architecture
-					osallowmajorver=9
-					osallowminorver=0
+					osallowmajorver="9"
+					osallowminorver="0"
 				fi
 			fi
 		fi
@@ -382,14 +382,14 @@ if [ "N" = "$ydb_force_install" ]; then
 		if [ "" = "$osminorver" ] ; then
 			# Needed by "expr" (since it does not compare "" vs numbers correctly)
 			# in case there is no minor version field (e.g. Raspbian 9).
-			osminorver=0
+			osminorver="0"
 		fi
-		if [ 1 = `expr "$osmajorver" ">" $osallowmajorver` ] ; then
+		if [ 1 = `expr "$osmajorver" ">" "$osallowmajorver"` ] ; then
 			osver_supported=1
-		elif [ 1 = `expr "$osmajorver" "=" $osallowmajorver` -a 1 = `expr "$osminorver" ">=" $osallowminorver` ] ; then
+		elif [ 1 = `expr "$osmajorver" "=" "$osallowmajorver"` -a 1 = `expr "$osminorver" ">=" "$osallowminorver"` ] ; then
 			osver_supported=1
 		else
-			if [ 999 = "$osallowmajorver" ] ; then
+			if [ "999" = "$osallowmajorver" ] ; then
 				# Not a supported OS. Print generic message without OS version #.
 				osname=`grep -w NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
 				echo "YottaDB not supported on $osname for ${ydb_flavor}. Not installing YottaDB."
