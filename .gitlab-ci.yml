@@ -50,5 +50,5 @@ push-release:
     - docker tag yottadb/yottadb-base:latest yottadb/yottadb-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
     - docker push yottadb/yottadb-base:$(grep YDB_ZYRELEASE sr_*/release_name.h | grep -o '\(r[0-9.]*\)' | grep -v '^r$' | sort -u)
   only:
-    - tag
+    - tags
 
