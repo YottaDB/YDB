@@ -25,6 +25,7 @@
 #include <sys/types.h>	/* For intptr_t */
 #include <inttypes.h>	/* .. ditto (defined different places in different platforms) .. */
 #include <stdlib.h>	/* For abs() */
+#include <string.h>	/* For strlen() */
 
 /* Enumerated parameter values. List value of each enum (not just first in list) as it is relied upon by the YottaDB Go Wrapper */
 enum
@@ -84,13 +85,23 @@ enum
 /* Value for tptoken for SimpleThreadAPI calls if NOT in a TP transaction */
 #define	YDB_NOTTP	0
 
-/* Macro to create/fill-in a ydb_buffer_t structure from a literal - use - literal varnames, subscripts
- * or values.
- */
-#define YDB_LITERAL_TO_BUFFER(LITERAL, BUFFERP)					\
+/* Macro to create/fill-in a ydb_buffer_t structure from a C string literal (string constant) */
+#define	YDB_LITERAL_TO_BUFFER(LITERAL, BUFFERP)					\
 {										\
 	(BUFFERP)->buf_addr = LITERAL;						\
 	(BUFFERP)->len_used = (BUFFERP)->len_alloc = sizeof(LITERAL) - 1;	\
+}
+
+/* Macro to create/fill-in a ydb_buffer_t structure from a C string (char * pointer).
+ * Note that YDB_LITERAL_TO_BUFFER does a "sizeof(LITERAL) - 1" whereas YDB_STRING_TO_BUFFER does a "strlen()".
+ * Both produce the same output almost always. There is one exception though and that is if LITERAL has embedded null bytes
+ * in it. In that case, sizeof() would include the null bytes too whereas strlen() would not. Hence the need for both versions
+ * of the macros.
+ */
+#define YDB_STRING_TO_BUFFER(STRING, BUFFERP)				\
+{									\
+	(BUFFERP)->buf_addr = STRING;					\
+	(BUFFERP)->len_used = (BUFFERP)->len_alloc = strlen(STRING);	\
 }
 
 /* Below macro returns TRUE if two input ydb_buffer_t structures pointer to the same string and FALSE otherwise. */
@@ -113,7 +124,7 @@ enum
 		COPY_DONE = FALSE;						\
 }
 
-/* Macro to copy a strlit to an already allocated ydb_buffer_t structure.
+/* Macro to copy a string literal LITERAL (i.e. string constant in C) to an already allocated ydb_buffer_t structure.
  * If BUFFERP does not have space allocated to hold LITERAL, then no copy is done
  *	and COPY_DONE will be set to FALSE.
  * Else the copy is done and COPY_DONE will be set to TRUE.
@@ -138,6 +149,8 @@ enum
  *	and COPY_DONE will be set to FALSE.
  * Else the copy is done and COPY_DONE will be set to TRUE.
  * User of this macro needs to include <string.h> (needed for "strlen" prototype).
+ * See comment before YDB_STRING_TO_BUFFER macro for why YDB_COPY_LITERAL_TO_BUFFER and YDB_COPY_STRING_TO_BUFFER
+ * cannot be merged into one macro (i.e. sizeof is not same as strlen in rare case).
  */
 #define YDB_COPY_STRING_TO_BUFFER(STRING, BUFFERP, COPY_DONE)	\
 {								\
