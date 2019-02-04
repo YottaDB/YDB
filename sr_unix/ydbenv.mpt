@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	;
+; Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -61,13 +61,16 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	write "export ydb_dir=",env("ydb_dir"),!,"export gtmdir=",env("gtmdir"),!
 	do DirEnsure("ydb_rel","gtmver")
 	write "export ydb_rel=",env("ydb_rel"),!,"export gtmver=",env("gtmver"),!
+	; ydb_dist and gtm_dist are the same with regards to $ztrnlnm, so there is no need
+	; to grab both. Always re-export both of them as we don't know which one is set
 	set dist=$ztrnlnm("ydb_dist")			; use $ydb_dist, if set
-	set:'$zlength(dist) dist=$ztrnlnm("gtm_dist")	; otherwise use $gtm_dist
 	set chset=$zconvert($ztrnlnm("ydb_tmp_chset"),"u")
 	do:$zlength(chset)
 	. set:'("UTF-8"=chset!("M"=chset)) $ecode=",U249,"
-	. write:"UTF-8"=chset "export ydb_dist=",dist,"/utf8",!,"export gtm_dist=$ydb_dist",!
 	. write "export ydb_chset=",chset,!,"export gtm_chset=$ydb_chset",!
+	; ydb_dist is set here
+	write "export ydb_dist=",dist,$select($get(chset)="UTF-8":"/utf8",1:""),!
+	write "export gtm_dist=$ydb_dist",!
 	; gbldir is set here
 	set path=env("ydb_dir")_"/"_env("ydb_rel")
 	set tmp1=$ztrnlnm("ydb_gbldir"),tmp2=$ztrnlnm("gtmgbldir")
