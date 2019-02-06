@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,10 +112,10 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 				if (NULL == lvvalp)
 				{	/* Base local variable does not exist (ERR_LVUNDEF_OK_FALSE above is to ensure
 					 * we do not issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
-					 * Return null-string (i.e. no more subscripts) for "ydb_subscript_next_s" result.
+					 * Return YDB_ERR_NODEEND (i.e. no more subscripts) for "ydb_subscript_next_s" result.
 					 */
-					SET_YDB_BUFF_T_FROM_MVAL(ret_value, (mval *)&literal_null,
-						"NULL ret_value->buf_addr", LYDBRTNNAME(LYDB_RTN_SUBSCRIPT_NEXT));
+					nextsub.mvtype = MV_STR;
+					nextsub.str.len = 0;	/* this lets us return YDB_ERR_NODEEND when we fall through */
 					break;
 				}
 				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals,
