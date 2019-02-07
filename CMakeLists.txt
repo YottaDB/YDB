@@ -953,12 +953,9 @@ if("${CMAKE_BUILD_TYPE}" MATCHES "RelWithDebInfo")
     gtcm_server
     gtcm_shmclean
     gtmsecshr
-#    libgtmcrypt
-    libgtmtls
+    gtmsecshr_real
     libyottadb
-#    libmumps
     lke
-    maskpass
     mumps
     mupip
     semstat2
