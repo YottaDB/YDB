@@ -141,7 +141,7 @@ docker run --rm -it yottadb/yottadb # you can add a specific version after a ":"
 
   This indicates that required libraries are not found. Please consult the list of libraries and check your distributions package manager.
 
-- YottaDB installation fails on Ubuntu 18.10
+- YottaDB installation fails with %YDB-E-DLLNOOPEN 
 
   Example error message that would be printed to the screen:
 
@@ -150,14 +150,14 @@ docker run --rm -it yottadb/yottadb # you can add a specific version after a ":"
   %YDB-E-TEXT, libtinfo.so.5: cannot open shared object file: No such file or directory
   ```
 
-  Ubuntu 18.10's default version of libtinfo6 is not backwards compatible with libtinfo5. To resolve the issue, libtinfo5 can be installed via the following command:
+  This indicates that the libtinfo5 package isn't installed and libtinfo6 is not backwards compatible with libtinfo5. This has been observed on Ubutntu 18.10 and could possibly apply to outher Linux distributions as well. To resolve the issue, libtinfo5 can be installed via the following command:
 
   ```bash
   sudo apt-get install libtinfo5
   ```
 - YottaDB compilation fails with plugin needed to handle lto object
 
-  There is a [known issue](https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=103da91bc083f94769e3758175a96d06cef1f8fe) with binutils on Ubuntu 18.10 (unknown if this affects other Linux Distributions) that may cause ar and ranlib to generate the following error messages:
+  There is a [known issue](https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=103da91bc083f94769e3758175a96d06cef1f8fe) with binutils and has been observed on Ubuntu 18.10 and could possibly apply to other Linux distributions including debian unstable that may cause ar and ranlib to generate the following error messages:
 
   ```
   /usr/bin/ar: CMakeFiles/libmumps.dir/sr_port/zshow_locks.c.o: plugin needed to handle lto object
