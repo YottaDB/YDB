@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,9 @@ int ydb_file_id_free(ydb_fileid_ptr_t fileid)
 		REVERT;
 		return -(TREF(ydb_error_code));
 	}
+	if (NULL == fileid)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+			LEN_AND_LIT("NULL fileid"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_FILE_ID_FREE)));
 	gtm_xcfileid_free(fileid);
 	LIBYOTTADB_DONE;
 	REVERT;

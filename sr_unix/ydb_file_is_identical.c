@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,12 @@ int ydb_file_is_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2)
 		REVERT;
 		return -(TREF(ydb_error_code));
 	}
+	if (NULL == fileid1)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+			LEN_AND_LIT("NULL fileid1"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_FILE_IS_IDENTICAL)));
+	if (NULL == fileid2)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+			LEN_AND_LIT("NULL fileid2"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_FILE_IS_IDENTICAL)));
 	status = gtm_is_file_identical(fileid1, fileid2);
 	LIBYOTTADB_DONE;
 	REVERT;

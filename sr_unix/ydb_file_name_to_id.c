@@ -3,7 +3,7 @@
  * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,13 +53,12 @@ int ydb_file_name_to_id(ydb_string_t *filename, ydb_fileid_ptr_t *fileid)
 		REVERT;
 		return -(TREF(ydb_error_code));
 	}
-	if (!filename)
-	{
-		LIBYOTTADB_DONE;
-		REVERT;
-		return YDB_NOTOK;
-	}
-	assert(fileid && !*fileid);
+	if (NULL == filename)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+			LEN_AND_LIT("NULL filename"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_FILE_NAME_TO_ID)));
+	if (NULL == fileid)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+			LEN_AND_LIT("NULL fileid"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_FILE_NAME_TO_ID)));
 	tmp_fileid = (gd_id_ptr_t)malloc(SIZEOF(gd_id));
 	status = filename_to_id(tmp_fileid, filename->address);
 	if (SS_NORMAL == status)
