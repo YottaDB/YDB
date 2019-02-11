@@ -1855,10 +1855,13 @@ MBSTART {									\
  */
 #define	DO_JNL_FLUSH_IF_POSSIBLE(REG, CSA, FLUSH_DONE, DSKADDR, FREEADDR, RSRV_FREEADDR)	\
 MBSTART {											\
-	jnl_private_control	*jpc;								\
-	jnl_buffer_ptr_t	jbp;								\
-	boolean_t		was_crit;							\
-	uint4			jnl_status;							\
+	jnl_private_control		*jpc;							\
+	jnl_buffer_ptr_t		jbp;							\
+	boolean_t			was_crit;						\
+	uint4				jnl_status;						\
+	jnlpool_addrs_ptr_t		local_jnlpool;						\
+												\
+	GBLREF	jnlpool_addrs_ptr_t	jnlpool;						\
 												\
 	assert(JNL_ENABLED(CSA));								\
 	assert(CSA == &FILE_INFO(REG)->s_addrs);						\
@@ -1869,26 +1872,35 @@ MBSTART {											\
 	FLUSH_DONE = FALSE;									\
 	if (jbp->dskaddr != jbp->rsrv_freeaddr)							\
 	{											\
-		was_crit = CSA->now_crit;							\
-		if (!was_crit)									\
-			grab_crit(REG);								\
-		DSKADDR = jbp->dskaddr;								\
-		FREEADDR = jbp->freeaddr;							\
-		RSRV_FREEADDR = jbp->rsrv_freeaddr;						\
-		if (JNL_ENABLED(CSA->hdr) && (DSKADDR != RSRV_FREEADDR))			\
+		local_jnlpool = JNLPOOL_FROM(CSA);	/* uses "jnlpool" */			\
+		if (!IS_REPL_INST_FROZEN_JPL(local_jnlpool))					\
 		{										\
-			jnl_status = jnl_ensure_open(REG, CSA);					\
-			assert(0 == jnl_status);						\
-			if (0 == jnl_status)							\
+			was_crit = CSA->now_crit;						\
+			if (!was_crit)								\
+				grab_crit(REG);							\
+			DSKADDR = jbp->dskaddr;							\
+			FREEADDR = jbp->freeaddr;						\
+			RSRV_FREEADDR = jbp->rsrv_freeaddr;					\
+			if (JNL_ENABLED(CSA->hdr) && (DSKADDR != RSRV_FREEADDR))		\
 			{									\
-				FLUSH_DONE = TRUE;						\
-				jnl_status = jnl_flush(REG);					\
-				assert(SS_NORMAL == jnl_status);				\
+				jnl_status = jnl_ensure_open(REG, CSA);				\
+				assert(0 == jnl_status);					\
+				if (0 == jnl_status)						\
+				{								\
+					FLUSH_DONE = TRUE;					\
+					jnl_status = jnl_flush(REG);				\
+					assert(SS_NORMAL == jnl_status);			\
+				}								\
+				/* In case of error, silently return for now. */		\
 			}									\
-			/* In case of error, silently return for now. */			\
+			if (!was_crit)								\
+				rel_crit(REG);							\
 		}										\
-		if (!was_crit)									\
-			rel_crit(REG);								\
+		/* else Instance is frozen and "jnl_flush" will hang. Since the caller		\
+		 * only wants to do the "jnl_flush" as a nice-to-have thing and not a		\
+		 * necessity, we skip the flush in this case to avoid hanging the caller	\
+		 * (currently only the source server).						\
+		 */										\
 	}											\
 } MBEND
 
