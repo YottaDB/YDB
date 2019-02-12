@@ -29,6 +29,8 @@ int ydb_file_id_free_t(uint64_t tptoken, ydb_buffer_t *errstr, ydb_fileid_ptr_t 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	retval = ydb_stm_args1(tptoken, errstr, LYDB_RTN_FILE_ID_FREE, (uintptr_t)fileid);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
+	retval = ydb_file_id_free(fileid);
+	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
 	return (int)retval;
 }

@@ -33,21 +33,8 @@ int ydb_lock_incr_st(uint64_t tptoken, ydb_buffer_t *errstr, unsigned long long 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-#	ifdef GTM64
-	retval = ydb_stm_args4(tptoken, errstr, LYDB_RTN_LOCK_INCR, (uintptr_t)timeout_nsec, (uintptr_t)varname,
-			       (uintptr_t)subs_used, (uintptr_t)subsarray);
-#	else
-	/* 32 bit addresses - have to split long long parm into 2 pieces and pass as 2 parms */
-#	ifdef BIGENDIAN
-	tparm1 = (uintptr_t)(timeout_nsec >> 32);
-	tparm2 = (uintptr_t)(timeout_nsec & 0xffffffff);
-#	else
-	tparm1 = (uintptr_t)(timeout_nsec & 0xffffffff);
-	tparm2 = (uintptr_t)(timeout_nsec >> 32);
-#	endif
-	retval = ydb_stm_args5(tptoken, errstr, LYDB_RTN_LOCK_INCR, (uintptr_t)tparm1, (uintptr_t)tparm2, (uintptr_t)varname,
-			       (uintptr_t)subs_used, (uintptr_t)subsarray);
-
-#	endif
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
+	retval = ydb_lock_incr_s(timeout_nsec, varname, subs_used, subsarray);
+	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
 	return (int)retval;
 }

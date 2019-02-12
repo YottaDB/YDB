@@ -33,9 +33,6 @@ int ydb_cip(ci_name_descriptor* ci_info, ...)
 	SETUP_THREADGBL_ACCESS;
 	/* Do not use LIBYOTTADB_INIT to avoid unnecessary SIMPLEAPINEST errors. Instead call LIBYOTTADB_RUNTIME_CHECK macro. */
 	LIBYOTTADB_RUNTIME_CHECK((int), NULL);		/* Note: macro could return from this function in case of errors */
-	VERIFY_NON_THREADED_API_DO_NOT_SHUTOFF_ACTIVE_RTN;	/* Need to call this version of VERIFY_NON_THREADED_API macro
-								 * since LIBYOTTADB_INIT was not called.
-								 */
 	/* "ydb_ci_exec" already sets up a condition handler "gtmci_ch" so we do not do an
 	 * ESTABLISH_RET of ydb_simpleapi_ch here like is done for other SimpleAPI function calls.
 	 */

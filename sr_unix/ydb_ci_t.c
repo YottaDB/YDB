@@ -17,6 +17,7 @@
 
 #include "libyottadb_int.h"
 #include "error.h"
+#include "gtmci.h"
 
 /* Routine to drive ydb_ci() in a worker thread so YottaDB access is isolated. Note because this drives
  * ydb_ci(), we don't do any of the exclusive access checks here. The thread management itself takes care
@@ -27,15 +28,22 @@
  */
 int ydb_ci_t(uint64_t tptoken, ydb_buffer_t *errstr, const char *c_rtn_name, ...)
 {
-	va_list		var;
-	intptr_t	retval;
+	va_list			var;
+	intptr_t		retval;
+	ci_name_descriptor	ci_desc;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
 	VAR_START(var, c_rtn_name);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
 	/* Note: "va_end(var)" done inside "ydb_ci_exec" when this gets run in the MAIN worker thread */
-	retval = ydb_stm_args2(tptoken, errstr, LYDB_RTN_YDB_CI, (uintptr_t)c_rtn_name, (uintptr_t)&var);
-	return (int)retval;
+	/* Ready a call-in name descriptor so we can use "ydb_cip_helper" */
+	ci_desc.rtn_name.address = (char *)c_rtn_name;
+	ci_desc.rtn_name.length = STRLEN(ci_desc.rtn_name.address);
+	ci_desc.handle = NULL;
+	retval = ydb_cip_helper(LYDB_RTN_YDB_CI, &ci_desc, &var);
+	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
+	return retval;
 }

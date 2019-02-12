@@ -30,7 +30,8 @@ int ydb_delete_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname,
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	retval = ydb_stm_args4(tptoken, errstr, LYDB_RTN_DELETE, (uintptr_t)varname, (uintptr_t)subs_used,
-			       (uintptr_t)subsarray, (uintptr_t)deltype);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
+	retval = ydb_delete_s(varname, subs_used, subsarray, deltype);
+	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
 	return (int)retval;
 }

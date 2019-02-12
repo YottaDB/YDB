@@ -1437,7 +1437,6 @@ int ydb_exit()
 			if (NULL != stmWorkQueue[0])
 			{
 				threadid = stmWorkQueue[0]->threadid;
-				assert(0 != threadid);
 				if (0 != threadid)
 				{
 					for ( ; ; )

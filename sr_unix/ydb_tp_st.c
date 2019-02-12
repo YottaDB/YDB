@@ -30,8 +30,11 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	retval = ydb_stm_args5(tptoken, errstr, LYDB_RTN_TP, (uintptr_t)tpfn, (uintptr_t)tpfnparm, (uintptr_t)transid,
-			       (uintptr_t)namecount, (uintptr_t)varnames);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
+	/* NARSTODO: Implement ydb_stm_tpthread.c TP stuff here */
+	/* retval = ydb_tp_s(tpfn, tpfnparm, transid, namecount, varnames); */
+	retval = YDB_OK;
+	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
 	assert((YDB_NOTTP != tptoken) || (YDB_TP_RESTART != retval));
 	return (int)retval;
 }

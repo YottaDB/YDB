@@ -100,10 +100,6 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
-	if (LYDB_RTN_TP == lydbrtn)
-	{	/* We have been called as non-threaded so verify we are not threaded */
-		VERIFY_NON_THREADED_API;
-	}
 	if (LYDB_RTN_TP_START >= lydbrtn)
 	{	/* LYDB_RTN_TP (SimpleAPI) or LYDB_RTN_TP_START (SimpleThreadAPI) */
 		assert((LYDB_RTN_TP == lydbrtn) || (LYDB_RTN_TP_START == lydbrtn));

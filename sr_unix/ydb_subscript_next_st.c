@@ -30,7 +30,8 @@ int ydb_subscript_next_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	retval = ydb_stm_args4(tptoken, errstr, LYDB_RTN_SUBSCRIPT_NEXT, (uintptr_t)varname, (uintptr_t)subs_used,
-			       (uintptr_t)subsarray, (uintptr_t)ret_value);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
+	retval = ydb_subscript_next_s(varname, subs_used, subsarray, ret_value);
+	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
 	return (int)retval;
 }

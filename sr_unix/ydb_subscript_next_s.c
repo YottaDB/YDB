@@ -64,7 +64,6 @@ int ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *sub
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
-	VERIFY_NON_THREADED_API;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{

@@ -725,6 +725,29 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	} else													\
 		noThreadAPI_active = TRUE;									\
 } MBEND
+
+#define THREADED_API_YDB_ENGINE_LOCK(TPTOKEN, ERRSTR)					\
+{											\
+	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex;				\
+											\
+	/* NARSTODO: Handle case where TPTOKEN is not YDB_NOTTP */			\
+	/* NARSTODO: Handle case where we already hold pthread lock, say due to error conditions or so. */	\
+	if (YDB_NOTTP == TPTOKEN)							\
+		pthread_mutex_lock(&ydb_engine_threadsafe_mutex);			\
+	TREF(stapi_errstr) = ERRSTR;	/* Set this so "ydb_simpleapi_ch" can fill in	\
+					 * error string in case error is seen.		\
+					 */						\
+}
+
+#define THREADED_API_YDB_ENGINE_UNLOCK(TPTOKEN, ERRSTR)			\
+{									\
+	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex;		\
+									\
+	TREF(stapi_errstr) = NULL;					\
+	if (YDB_NOTTP == TPTOKEN)					\
+		pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);	\
+}
+
 #define VERIFY_THREADED_API(RETTYPE, ERRSTR)									\
 MBSTART {													\
 	GBLREF boolean_t noThreadAPI_active;									\

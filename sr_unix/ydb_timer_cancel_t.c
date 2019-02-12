@@ -29,6 +29,8 @@ void ydb_timer_cancel_t(uint64_t tptoken, ydb_buffer_t *errstr, int timer_id)
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK_NORETVAL(errstr);
 	VERIFY_THREADED_API_NORETVAL(errstr);
-	(void)ydb_stm_args1(tptoken, errstr, LYDB_RTN_TIMER_CANCEL, (uintptr_t)timer_id);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
+	(void)ydb_timer_cancel(timer_id);
+	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
 	return;
 }

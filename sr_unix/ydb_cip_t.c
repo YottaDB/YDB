@@ -17,6 +17,7 @@
 
 #include "libyottadb_int.h"
 #include "error.h"
+#include "gtmci.h"
 
 /* Routine to drive ydb_cip() in a worker thread so YottaDB access is isolated. Note because this drives
  * ydb_cip(), we don't do any of the exclusive access checks here. The thread management itself takes care
@@ -35,7 +36,9 @@ int ydb_cip_t(uint64_t tptoken, ydb_buffer_t *errstr, ci_name_descriptor *ci_inf
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
 	VAR_START(var, ci_info);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
 	/* Note: "va_end(var)" done inside "ydb_ci_exec" when this gets run in the MAIN worker thread */
-	retval = ydb_stm_args2(tptoken, errstr, LYDB_RTN_YDB_CIP, (uintptr_t)ci_info, (uintptr_t)&var);
+	retval = ydb_cip_helper(LYDB_RTN_YDB_CIP, ci_info, &var);
+	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
 	return (int)retval;
 }

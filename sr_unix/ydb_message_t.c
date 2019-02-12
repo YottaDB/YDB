@@ -29,6 +29,8 @@ int ydb_message_t(uint64_t tptoken, ydb_buffer_t *errstr, int errnum, ydb_buffer
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	retval = ydb_stm_args2(tptoken, errstr, LYDB_RTN_MESSAGE, (uintptr_t)errnum, (uintptr_t)msg_buff);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
+	retval = ydb_message(errnum, msg_buff);
+	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
 	return (int)retval;
 }

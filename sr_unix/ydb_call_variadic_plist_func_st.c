@@ -30,6 +30,8 @@ int ydb_call_variadic_plist_func_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	retval = ydb_stm_args2(tptoken, errstr, LYDB_RTN_CALL_VPLST_FUNC, (uintptr_t)cgfunc, (uintptr_t)cvplist);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
+	retval = ydb_call_variadic_plist_func_s(cgfunc, cvplist);
+	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
 	return (int)retval;
 }
