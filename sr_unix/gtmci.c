@@ -1325,7 +1325,7 @@ int ydb_init()
 		REVERT;
 	} else if (!(frame_pointer->type & SFT_CI))
 	{
-		ESTABLISH_NORET(gtmci_ch, mumps_status);
+		ESTABLISH_NORET(gtmci_ch, error_encountered);
 		if (error_encountered)
 		{	/* "gtmci_ch" encountered an error and transferred control back here. Return after mutex lock cleanup. */
 			THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
@@ -1377,6 +1377,7 @@ int ydb_exit()
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;
 	boolean_t		get_lock;
+	boolean_t		error_encountered;
         DCL_THREADGBL_ACCESS;
 
         SETUP_THREADGBL_ACCESS;
@@ -1462,7 +1463,12 @@ int ydb_exit()
 			}
 		} else
 		{
-			ESTABLISH_NORET(gtmci_ch, mumps_status);
+			ESTABLISH_NORET(gtmci_ch, error_encountered);
+			if (error_encountered)
+			{	/* "gtmci_ch" encountered an error and transferred control back here. Return after mutex lock cleanup. */
+				THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+				return mumps_status;
+			}
 			assert(NULL != frame_pointer);
 			/* If process_exiting is set (and the YottaDB environment is still active since "ydb_init_complete" is TRUE
 			 * here), shortcut some of the checks and cleanups we are making in this routine as they are not
