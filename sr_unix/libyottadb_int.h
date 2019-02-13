@@ -937,6 +937,7 @@ void *ydb_stm_tpthread(void *parm);
 stm_workq *ydb_stm_init_work_queue(void);
 int ydb_tp_s_common(libyottadb_routines lydbrtn,
 			ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames);
+int ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var);
 
 /* Below are the 3 functions invoked by "pthread_atfork" during a "fork" call to ensure all SimpleThreadAPI related
  * mutex and condition variables are safely released (without any deadlocks, inconsistent states) in the child after the fork.

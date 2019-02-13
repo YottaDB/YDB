@@ -17,7 +17,6 @@
 
 #include "libyottadb_int.h"
 #include "error.h"
-#include "callg.h"
 
 GBLREF	volatile int4	outofband;
 
@@ -30,58 +29,22 @@ GBLREF	volatile int4	outofband;
  */
 int ydb_lock_st(uint64_t tptoken, ydb_buffer_t *errstr, unsigned long long timeout_nsec, int namecount, ...)
 {
-	va_list		var;
-	gparam_list	gparms;
-	int		parmcnt, maxparmcnt, indx, i, maxallowednamecount;
-#	define 		MAXPARMS ARRAYSIZE(gparms.arg)
+	libyottadb_routines	save_active_stapi_rtn;
+	ydb_buffer_t		*save_errstr;
+	boolean_t		get_lock;
+	int			retval;
+	va_list			var;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	parmcnt = 2;			/* First 2 parms are fixed and always present (not counting tptoken since it
-					 * is not passed on to ydb_lock_s()).
-					 */
-	if (0 > namecount)
-	{	/* Can't pass this request on if the count is negative */
-		SETUP_GENERIC_ERROR_2PARMS(ERR_INVNAMECOUNT, strlen("ydb_lock_st()"), "ydb_lock_st()");
-		return YDB_ERR_INVNAMECOUNT;
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_LOCK, save_active_stapi_rtn, save_errstr, get_lock, retval);
+	if (YDB_OK == retval)
+	{
+		VAR_START(var, namecount);
+		retval = ydb_lock_s_va(timeout_nsec, namecount, var);
+		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
 	}
-	NON_GTM64_ONLY(parmcnt++);		/* Using an extra parm due to 32 bit environment so account for the extra */
-	maxparmcnt = parmcnt + (3 * namecount);
-	/* Note: It is possible that "namecount" is a positive number when treated as an "int" but (3 * namecount) is a
-	 * negative number when treated as an "int". In that case, checking for "MAXPARMS <= maxparmcnt" is not enough
-	 * since that will incorrectly fail. Hence the need for "MAXPARMS <= namecount" too.
-	 */
-	if ((MAXPARMS <= namecount) || (MAXPARMS <= maxparmcnt))
-	{	/* Too many parms for this call */
-		maxallowednamecount = (int)((MAXPARMS - parmcnt) / 3);
-		SETUP_GENERIC_ERROR_3PARMS(ERR_NAMECOUNT2HI, strlen("ydb_lock_st()"), "ydb_lock_st()", maxallowednamecount);
-		return YDB_ERR_NAMECOUNT2HI;
-	}
-	indx = 0;
-#	ifdef GTM64
-	gparms.arg[indx++] = (void *)timeout_nsec;
-#	else /* 32 bit - need to split 8 byte timeout value across 2 parameters */
-#	ifdef BIGENDIAN
-	gparms.arg[indx++] = (void *)(uintptr_t)(timeout_nsec >> 32);
-	gparms.arg[indx++] = (void *)(uintptr_t)(timeout_nsec & 0xffffffff);
-#	else
-	gparms.arg[indx++] = (void *)(uintptr_t)(timeout_nsec & 0xffffffff);
-	gparms.arg[indx++] = (void *)(uintptr_t)(timeout_nsec >> 32);
-#	endif
-#	endif
-	gparms.arg[indx++] = (void *)(uintptr_t)namecount;
-	VAR_START(var, namecount);
-	for (i = namecount; 0 < i; i--)			/* Once through for each set of 3 parms that make up a lock name */
-	{	/* Fetch and store the 3 parms that make up this subscript */
-		gparms.arg[indx++] = (void *)(va_arg(var, ydb_buffer_t *));	/* Varname */
-		gparms.arg[indx++] = (void *)(uintptr_t)(va_arg(var, int));	/* Subscript count */
-		gparms.arg[indx++] = (void *)(va_arg(var, ydb_buffer_t *));	/* Subscript array */
-	}
-	gparms.n = maxparmcnt;
-	/* Have now loaded the callg_nc buffer with the parameters but we can't drive callg() here. We have to
-	 * put this request on a queue for execution in the main execution thread.
-	 */
-	return ydb_call_variadic_plist_func_st(tptoken, errstr, (ydb_vplist_func)&ydb_lock_s, (uintptr_t)&gparms);
+	return retval;
 }

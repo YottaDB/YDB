@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,15 @@ GBLREF	volatile int4	outofband;
  */
 int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 {
-	va_list			var, varcpy;
+	va_list var;
+
+	VAR_START(var, namecount);
+	return ydb_lock_s_va(timeout_nsec, namecount, var);
+}
+
+int ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var)
+{
+	va_list			varcpy;
 	int			parmidx, lock_rc, sub_idx, var_svn_index;
 	gparam_list		plist;
 	boolean_t		error_encountered;
@@ -59,7 +67,6 @@ int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
-	VERIFY_NON_THREADED_API;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{
@@ -78,7 +85,6 @@ int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNT2HI, 3,
 				LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_LOCK)), YDB_MAX_NAMES);
 	/* Need to validate all parms before we can do the unlock of all locks held by us */
-	VAR_START(var, namecount);
 	VAR_COPY(varcpy, var);		/* Used to validate parms, then var is used to process them */
 	for (parmidx = 0; parmidx < namecount; parmidx++)
 	{	/* Simplified version of the processing loop below that validates things */
@@ -165,3 +171,4 @@ int ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...)
 	REVERT;
 	return lock_rc ? YDB_OK : YDB_LOCK_TIMEOUT;
 }
+
