@@ -28,17 +28,23 @@
  */
 int ydb_cip_t(uint64_t tptoken, ydb_buffer_t *errstr, ci_name_descriptor *ci_info, ...)
 {
-	va_list		var;
-	intptr_t	retval;
+	libyottadb_routines	save_active_stapi_rtn;
+	ydb_buffer_t		*save_errstr;
+	boolean_t		get_lock;
+	va_list			var;
+	intptr_t		retval;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
 	VAR_START(var, ci_info);
-	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_YDB_CIP, save_active_stapi_rtn, save_errstr, get_lock, retval);
 	/* Note: "va_end(var)" done inside "ydb_ci_exec" when this gets run in the MAIN worker thread */
-	retval = ydb_cip_helper(LYDB_RTN_YDB_CIP, ci_info, &var);
-	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
+	if (YDB_OK == retval)
+	{
+		retval = ydb_cip_helper(LYDB_RTN_YDB_CIP, ci_info, &var);
+		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
+	}
 	return (int)retval;
 }

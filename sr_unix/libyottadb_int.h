@@ -728,12 +728,13 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 
 /* Macro invoked by all ydb_*_st() and ydb_*_t() functions to get the appropriate multi-thread safe mutex and return.
  * TPTOKEN, ERRSTR, CALLTYP are input parameters passed in from the caller function.
- * SAVE_ACTIVE_STAPI_RTN, GET_LOCK, RETVAL are output parameters from this macro. They will later be needed
- * to be passed as is at unlock time (i.e. when THREADED_API_YDB_ENGINE_UNLOCK is invoked).
+ * SAVE_ACTIVE_STAPI_RTN, SAVE_ERRSTR, GET_LOCK, RETVAL are output parameters from this macro. Except for RETVAL,
+ * the rest of the output parameters will need to be later passed as is to THREADED_API_YDB_ENGINE_UNLOCK (i.e. at unlock time).
  */
-#define THREADED_API_YDB_ENGINE_LOCK(TPTOKEN, ERRSTR, CALLTYP, SAVE_ACTIVE_STAPI_RTN, GET_LOCK, RETVAL)			\
+#define THREADED_API_YDB_ENGINE_LOCK(TPTOKEN, ERRSTR, CALLTYP, SAVE_ACTIVE_STAPI_RTN, SAVE_ERRSTR, GET_LOCK, RETVAL)	\
 {															\
-	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];						\
+	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];								\
+	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];							\
 															\
 	int	lock_index;												\
 															\
@@ -759,7 +760,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 		if (LYDB_RTN_TP == CALLTYP)										\
 		{	/* Disallow starting a new TP transaction while inside a "ydb_ci_t" or "ydb_cip_t" call */	\
 			SETUP_GENERIC_ERROR_2PARMS(YDB_ERR_SIMPLEAPINEST, LYDBRTNNAME(SAVE_ACTIVE_STAPI_RTN),		\
-							LYDBRTNNAME(calltyp));						\
+							LYDBRTNNAME(CALLTYP));						\
 			RETVAL = YDB_ERR_SIMPLEAPINEST;									\
 		} else													\
 		{													\
@@ -774,31 +775,33 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 			pthread_mutex_lock(&ydb_engine_threadsafe_mutex[lock_index]);					\
 			ydb_engine_threadsafe_mutex_holder[lock_index] = pthread_self();				\
 		}													\
+		SAVE_ERRSTR = TREF(stapi_errstr);									\
 		TREF(stapi_errstr) = ERRSTR;	/* Set this so "ydb_simpleapi_ch" can fill in				\
 						 * error string in case error is seen.					\
 						 */									\
 	}														\
 }
 
-#define THREADED_API_YDB_ENGINE_UNLOCK(TPTOKEN, ERRSTR, SAVE_ACTIVE_STAPI_RTN, RELEASE_LOCK)	\
-{												\
-	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];			\
-												\
-	int	lock_index;									\
-												\
-	if (RELEASE_LOCK)									\
-	{											\
-		assert(ERRSTR == TREF(stapi_errstr));						\
-		TREF(stapi_errstr) = NULL;							\
-		lock_index = GET_TPDEPTH_FROM_TPTOKEN(TPTOKEN);					\
-		ydb_engine_threadsafe_mutex_holder[lock_index] = 0;				\
-		pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lock_index]);			\
-	} else											\
-	{											\
-		assert((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN)				\
-					|| (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN));	\
-		TREF(libyottadb_active_rtn) = SAVE_ACTIVE_STAPI_RTN;				\
-	}											\
+#define THREADED_API_YDB_ENGINE_UNLOCK(TPTOKEN, ERRSTR, SAVE_ACTIVE_STAPI_RTN, SAVE_ERRSTR, RELEASE_LOCK)	\
+{														\
+	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];							\
+	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];						\
+														\
+	int	lock_index;											\
+														\
+	if (RELEASE_LOCK)											\
+	{													\
+		assert(ERRSTR == TREF(stapi_errstr));								\
+		TREF(stapi_errstr) = SAVE_ERRSTR;								\
+		lock_index = GET_TPDEPTH_FROM_TPTOKEN(TPTOKEN);							\
+		ydb_engine_threadsafe_mutex_holder[lock_index] = 0;						\
+		pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lock_index]);					\
+	} else													\
+	{													\
+		assert((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN)						\
+					|| (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN));			\
+		TREF(libyottadb_active_rtn) = SAVE_ACTIVE_STAPI_RTN;						\
+	}													\
 }
 
 #define VERIFY_THREADED_API(RETTYPE, ERRSTR)									\

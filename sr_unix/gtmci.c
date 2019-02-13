@@ -116,8 +116,8 @@ GBLREF	stm_workq		*stmWorkQueue[];
 GBLREF	stm_workq		*stmTPWorkQueue[];
 GBLREF	boolean_t		noThreadAPI_active;
 GBLREF	boolean_t		simpleThreadAPI_active;
-GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];
-GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
+GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex[];
+GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[];
 GBLREF	int			fork_after_ydb_init;
 GBLREF	struct sigaction	orig_sig_action[];
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)

@@ -24,14 +24,20 @@
 int ydb_node_previous_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
 				int *ret_subs_used, ydb_buffer_t *ret_subsarray)
 {
-	intptr_t retval;
+	libyottadb_routines	save_active_stapi_rtn;
+	ydb_buffer_t		*save_errstr;
+	boolean_t		get_lock;
+	intptr_t		retval;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
-	retval = ydb_node_previous_s(varname, subs_used, subsarray, ret_subs_used, ret_subsarray);
-	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_NODE_PREVIOUS, save_active_stapi_rtn, save_errstr, get_lock, retval);
+	if (YDB_OK == retval)
+	{
+		retval = ydb_node_previous_s(varname, subs_used, subsarray, ret_subs_used, ret_subsarray);
+		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
+	}
 	return (int)retval;
 }

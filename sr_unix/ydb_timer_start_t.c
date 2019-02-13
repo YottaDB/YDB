@@ -24,17 +24,20 @@
 int ydb_timer_start_t(uint64_t tptoken, ydb_buffer_t *errstr, int timer_id, unsigned long long limit_nsec,
 			ydb_funcptr_retvoid_t handler, unsigned int hdata_len, void *hdata)
 {
-	intptr_t	retval;
-#	ifndef GTM64
-	unsigned int	tparm1, tparm2;
-#	endif
+	libyottadb_routines	save_active_stapi_rtn;
+	ydb_buffer_t		*save_errstr;
+	boolean_t		get_lock;
+	intptr_t		retval;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
-	retval = ydb_timer_start(timer_id, limit_nsec, handler, hdata_len, hdata);
-	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_TIMER_START, save_active_stapi_rtn, save_errstr, get_lock, retval);
+	if (YDB_OK == retval)
+	{
+		retval = ydb_timer_start(timer_id, limit_nsec, handler, hdata_len, hdata);
+		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
+	}
 	return (int)retval;
 }

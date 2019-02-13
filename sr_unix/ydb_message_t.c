@@ -23,14 +23,20 @@
  */
 int ydb_message_t(uint64_t tptoken, ydb_buffer_t *errstr, int errnum, ydb_buffer_t *msg_buff)
 {
-	intptr_t retval;
+	libyottadb_routines	save_active_stapi_rtn;
+	ydb_buffer_t		*save_errstr;
+	boolean_t		get_lock;
+	intptr_t		retval;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
-	retval = ydb_message(errnum, msg_buff);
-	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_MESSAGE, save_active_stapi_rtn, save_errstr, get_lock, retval);
+	if (YDB_OK == retval)
+	{
+		retval = ydb_message(errnum, msg_buff);
+		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
+	}
 	return (int)retval;
 }

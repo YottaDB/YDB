@@ -24,14 +24,21 @@
  */
 int ydb_call_variadic_plist_func_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_vplist_func cgfunc, uintptr_t cvplist)
 {
-	intptr_t retval;
+	libyottadb_routines	save_active_stapi_rtn;
+	ydb_buffer_t		*save_errstr;
+	boolean_t		get_lock;
+	intptr_t		retval;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
-	retval = ydb_call_variadic_plist_func_s(cgfunc, cvplist);
-	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_CALL_VPLST_FUNC,
+					save_active_stapi_rtn, save_errstr, get_lock, retval);
+	if (YDB_OK == retval)
+	{
+		retval = ydb_call_variadic_plist_func_s(cgfunc, cvplist);
+		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
+	}
 	return (int)retval;
 }

@@ -42,8 +42,8 @@ GBLREF  unsigned char		*fgncal_stack;
 GBLREF  dollar_ecode_type 	dollar_ecode;
 GBLREF  boolean_t		created_core;
 GBLREF  boolean_t		dont_want_core;
-GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];
-GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
+GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex[];
+GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[];
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);

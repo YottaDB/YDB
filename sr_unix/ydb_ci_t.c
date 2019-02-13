@@ -28,6 +28,9 @@
  */
 int ydb_ci_t(uint64_t tptoken, ydb_buffer_t *errstr, const char *c_rtn_name, ...)
 {
+	libyottadb_routines	save_active_stapi_rtn;
+	ydb_buffer_t		*save_errstr;
+	boolean_t		get_lock;
 	va_list			var;
 	intptr_t		retval;
 	ci_name_descriptor	ci_desc;
@@ -37,13 +40,16 @@ int ydb_ci_t(uint64_t tptoken, ydb_buffer_t *errstr, const char *c_rtn_name, ...
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
 	VAR_START(var, c_rtn_name);
-	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr);
-	/* Note: "va_end(var)" done inside "ydb_ci_exec" when this gets run in the MAIN worker thread */
 	/* Ready a call-in name descriptor so we can use "ydb_cip_helper" */
 	ci_desc.rtn_name.address = (char *)c_rtn_name;
 	ci_desc.rtn_name.length = STRLEN(ci_desc.rtn_name.address);
 	ci_desc.handle = NULL;
-	retval = ydb_cip_helper(LYDB_RTN_YDB_CI, &ci_desc, &var);
-	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr);
+	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_YDB_CI, save_active_stapi_rtn, save_errstr, get_lock, retval);
+	/* Note: "va_end(var)" done inside "ydb_ci_exec" when this gets run in the MAIN worker thread */
+	if (YDB_OK == retval)
+	{
+		retval = ydb_cip_helper(LYDB_RTN_YDB_CI, &ci_desc, &var);
+		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
+	}
 	return retval;
 }
