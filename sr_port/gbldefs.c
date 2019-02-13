@@ -1294,13 +1294,20 @@ GBLDEF	uint64_t	stmTPToken;			/* Counter used to generate unique token for Simpl
 GBLDEF	boolean_t	simpleThreadAPI_active;		/* SimpleThreadAPI is active */
 GBLDEF	boolean_t	noThreadAPI_active;		/* Any non-threaded API active (mumps, call-ins or SimpleAPI) */
 
-GBLDEF	pthread_mutex_t	ydb_engine_threadsafe_mutex = PTHREAD_MUTEX_INITIALIZER;/* Single thread YottaDB engine access
-										 * (e.g. ydb_init/ydb_exit()) to gate
-										 * users so critical functions are safe.
-										 */
-GBLDEF	pthread_t	ydb_engine_threadsafe_mutex_holder;	/* tid of thread that has YottaDB engine mutex currently locked.
-								 * Currently used only by "gtmci_ch".
-								 */
+/* The below mutex is used to single thread YottaDB engine access (e.g. ydb_init/ydb_exit/ydb_set_st etc.)
+ * to gate users so only one thread runs YottaDB engine code at any point in time. We have an array of mutexes
+ * to account for the fact that a "ydb_tp_st" call could start a sub-transaction (up to TP_MAX_LEVEL depth)
+ * and the callback function in each such sub-transaction could spawn multiple threads each of which can make
+ * SimpleThreadAPI calls (e.g. ydb_set_st etc.) in which case we want all those calls in that sub-transaction
+ * to execute one after the other.
+ * Note: We initialize only ydb_engine_threadsafe_mutex[0] to PTHREAD_MUTEX_INITIALIZER here. This is needed so
+ * the first call to "ydb_init" works correctly. ydb_engine_threadsafe_mutex[1] to ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM-1]
+ * are initialized in "gtm_startup" which is invoked from within the first "ydb_init" call.
+ */
+GBLDEF	pthread_mutex_t	ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM] = { PTHREAD_MUTEX_INITIALIZER };
+
+GBLDEF	pthread_t	ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
+								/* tid of thread that has YottaDB engine mutex currently locked */
 GBLDEF	int		fork_after_ydb_init;	/* Set to a non-zero value if a "fork" occurs after "ydb_init_complete" has been
 						 * set to TRUE. Used for handling/detecting error scenarios in SimpleAPI and
 						 * SimpleThreadAPI.

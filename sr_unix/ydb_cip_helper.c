@@ -49,7 +49,6 @@ int ydb_cip_helper(int calltyp, ci_name_descriptor *ci_info, va_list *var)
 		 */
 		return ((ERR_TPRETRY == SIGNAL) ? ERR_TPRETRY : TREF(ydb_error_code));
 	}
-	assert(IS_STAPI_WORKER_THREAD);	/* The MAIN worker thread is the only thread that can currently invoke "ydb_cip_helper" */
 	status = ydb_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, *var, FALSE);
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;

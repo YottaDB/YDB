@@ -139,6 +139,8 @@ GBLREF int			init_xfer_table(void);
 GBLREF stm_workq		*stmWorkQueue[];
 GBLREF stm_freeq		stmFreeQueue;
 GBLREF void			(*ydb_stm_thread_exit_fnptr)(void);
+GBLREF pthread_mutex_t		ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];
+GBLREF pthread_t		ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
 
 OS_PAGE_SIZE_DECLARE
 
@@ -157,7 +159,7 @@ void gtm_startup(struct startup_vector *svec)
 	static char 		other_mode_buf[] = "OTHER";
 	void			gtm_ret_code();
 	char			*ptr;
-	int			status;
+	int			i, status;
 	pthread_mutexattr_t	mattr;
 	mval			noiso_lit, gbllist;
 	DCL_THREADGBL_ACCESS;
@@ -299,6 +301,8 @@ void gtm_startup(struct startup_vector *svec)
 	dqinit(&stmFreeQueue.stm_cbqhead, que);		/* Initialize queue headers for free queue for request blocks */
 	INIT_STM_QUEUE_MUTEX(&stmFreeQueue);		/* Initialize the free queue's mutex */
 	ydb_stm_thread_exit_fnptr = &ydb_stm_thread_exit;
+	for (i = 1; i < STMWORKQUEUEDIM; i++)
+		pthread_mutex_init(&ydb_engine_threadsafe_mutex[i], NULL);
 	/* Pick up the parms for this invocation */
 	if ((GTM_IMAGE == image_type) && (NULL != svec->base_addr))
 		/* We are in the grandchild at this point. This call is made to greet local variables sent from the midchild. There

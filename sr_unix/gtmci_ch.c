@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,17 @@
 #include "fgncal.h"
 #include "gtmci.h"
 #include "util.h"
+#include "libyottadb_int.h"
+#include "gdsroot.h"
+#include "gdskill.h"
+#include "gdsbt.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "gdscc.h"
+#include "jnl.h"
+#include "hashtab_int4.h"
+#include "buddy_list.h"		/* needed for tp.h */
+#include "tp.h"
 
 GBLREF  unsigned char		*msp;
 GBLREF  int                     mumps_status;
@@ -31,8 +42,8 @@ GBLREF  unsigned char		*fgncal_stack;
 GBLREF  dollar_ecode_type 	dollar_ecode;
 GBLREF  boolean_t		created_core;
 GBLREF  boolean_t		dont_want_core;
-GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex;
-GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder;
+GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];
+GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
@@ -54,15 +65,15 @@ CONDITION_HANDLER(gtmci_ch)
 		TERMINATE;
 	}
 	/* Check if we hold the YottaDB engine thread lock (we only own it in some cases in gtmci.c and those cases
-	 * are indicated by the global variable "ydb_engine_threadsafe_mutex_holder" being a non-zero value set to
+	 * are indicated by the global variable "ydb_engine_threadsafe_mutex_holder[0]" being a non-zero value set to
 	 * the current thread id.
 	 */
-	if (pthread_equal(pthread_self(), ydb_engine_threadsafe_mutex_holder))
+	if (pthread_equal(pthread_self(), ydb_engine_threadsafe_mutex_holder[0]))
 	{
-		ydb_engine_threadsafe_mutex_holder = 0;	/* Clear now that we no longer hold the YottaDB engine thread lock and
+		ydb_engine_threadsafe_mutex_holder[0] = 0;	/* Clear now that we no longer hold the YottaDB engine thread lock and
 							 * "gtmci_ch" is no longer the active condition handler.
 							 */
-		status = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+		status = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 		assert(!status);
 	}
 	entryref.addr = CALL_IN_M_ENTRYREF;

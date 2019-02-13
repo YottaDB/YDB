@@ -116,8 +116,8 @@ GBLREF	stm_workq		*stmWorkQueue[];
 GBLREF	stm_workq		*stmTPWorkQueue[];
 GBLREF	boolean_t		noThreadAPI_active;
 GBLREF	boolean_t		simpleThreadAPI_active;
-GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex;
-GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder;
+GBLREF	pthread_mutex_t		ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];
+GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
 GBLREF	int			fork_after_ydb_init;
 GBLREF	struct sigaction	orig_sig_action[];
 GTMTRIG_DBG_ONLY(GBLREF ch_ret_type (*ch_at_trigger_init)();)
@@ -292,21 +292,6 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	FGNCAL_UNWIND;		/* note - this is outside the establish since gtmci_ch calso calls fgncal_unwind() which,
 				 * if this failed, would lead to a nested error which we'd like to avoid */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
-	/* This block is a version of the VERIFY_NON_THREADED_API macro that instead does an rts_error when a violation
-	 * is detected.
-	 */
-	if (simpleThreadAPI_active)
-	{
-		if (!IS_STAPI_WORKER_THREAD)
-		{
-			DBGAPITP_ONLY(gtm_fork_n_core());
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIMPLEAPINOTALLOWED);
-		}
-		/* We are in threaded mode but running an unthreaded command in the main work thread which
-		 * is allowed. In that case just fall out (verified).
-		 */
-	} else
-		noThreadAPI_active = TRUE;
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
 	if (!TREF(ci_table))	/* Load the call-in table only once from env variable ydb_ci/GTMCI. */
@@ -684,21 +669,6 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	FGNCAL_UNWIND;		/* note - this is outside the establish since gtmci_ch calso calls fgncal_unwind() which,
 				 * if this failed, would lead to a nested error which we'd like to avoid */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
-	/* This block is a version of the VERIFY_NON_THREADED_API macro that instead does an rts_error when a violation
-	 * is detected.
-	 */
-	if (simpleThreadAPI_active)
-	{
-		if (!IS_STAPI_WORKER_THREAD)
-		{
-			DBGAPITP_ONLY(gtm_fork_n_core());
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIMPLEAPINOTALLOWED);
-		}
-		/* We are in threaded mode but running an unthreaded command in the main work thread which
-		 * is allowed. In that case just fall out (verified).
-		 */
-	} else
-		noThreadAPI_active = TRUE;
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
 	if (!internal_use)
@@ -1136,7 +1106,7 @@ int ydb_init()
 	 * after the condition handling stack is setup below. But if YDB is initialized, we establish the handler before
 	 * much of anything happens.
 	 */
-	status = pthread_mutex_lock(&ydb_engine_threadsafe_mutex);
+	status = pthread_mutex_lock(&ydb_engine_threadsafe_mutex[0]);
 	if (0 != status)
 	{	/* If not initialized yet, can't rts_error so just return our error code */
 		if (ydb_init_complete)
@@ -1150,7 +1120,7 @@ int ydb_init()
 	}
 	if (NULL == lcl_gtm_threadgbl)
 	{	/* This means the SETUP_THREADGBL_ACCESS done at the beginning of this function (before getting the
-		 * "ydb_engine_threadsafe_mutex" multi-thread lock) saw the global variable "gtm_threadgbl" as NULL.
+		 * "ydb_engine_threadsafe_mutex[0]" multi-thread lock) saw the global variable "gtm_threadgbl" as NULL.
 		 * But it is possible we reach here after one thread has done the initialization and released the
 		 * multi-thread lock. So redo the SETUP_THREADGBL_ACCESS.
 		 */
@@ -1184,7 +1154,7 @@ int ydb_init()
 			 * because "ydb_init" was already run in this process.
 			 */
 			SETUP_GENERIC_ERROR(ERR_STAPIFORKEXEC);	/* ensure a later call to "ydb_zstatus" returns full error string */
-			(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+			(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 			return ERR_STAPIFORKEXEC;
 		} else
 		{	/* SimpleAPI was active in the parent process before the "fork". We expect the first YottaDB call in
@@ -1202,7 +1172,7 @@ int ydb_init()
 				ydb_init_complete = FALSE;	/* Force "ydb_init" to be invoked again in case any more
 								 * YottaDB calls happen since "ydb_child_init" did not run clean.
 								 */
-				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 				return -status;		/* Negate it back before returning from "ydb_init". */
 			}
 		}
@@ -1215,7 +1185,7 @@ int ydb_init()
 		 */
 		assert(!ydb_init_complete);	/* should have been cleared by "ydb_exit" as part of calling "gtm_exit_handler" */
 		SETUP_GENERIC_ERROR(ERR_CALLINAFTERXIT); /* ensure a later call to "ydb_zstatus" returns full error string */
-		(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+		(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 		return ERR_CALLINAFTERXIT;
 	}
 	if (!ydb_init_complete)
@@ -1232,7 +1202,7 @@ int ydb_init()
 				 */
 				FPRINTF(stderr, "%%YDB-E-SYSCALL, Error received from system call dladdr()"
 					"-- called from module %s at line %d\n%s\n", __FILE__, __LINE__, dlerror());
-				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 				return ERR_SYSCALL;
 			}
 			/* Temporarily copy shlib_info.dli_fname onto a local buffer as we cannot modify the former
@@ -1245,7 +1215,7 @@ int ydb_init()
 			{
 				FPRINTF(stderr, "%%YDB-E-DISTPATHMAX, Executable path length is greater than maximum (%d)\n",
 													YDB_DIST_PATH_MAX);
-				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 				return ERR_DISTPATHMAX;
 			}
 			memcpy(tmp_ptr, shlib_info.dli_fname, tmp_len);
@@ -1271,7 +1241,7 @@ int ydb_init()
 				FPRINTF(stderr, "%%YDB-E-SYSCALL, Error received from system call setenv(ydb_dist)"
 					"-- called from module %s at line %d\n%%SYSTEM-E-ENO%d, %s\n",
 					__FILE__, __LINE__, save_errno, STRERROR(save_errno));
-				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 				return ERR_SYSCALL;
 			}
 			status = setenv(gtmenvname[YDBENVINDX_DIST] + 1, path, TRUE);	/* + 1 to skip leading $ */
@@ -1282,7 +1252,7 @@ int ydb_init()
 				FPRINTF(stderr, "%%YDB-E-SYSCALL, Error received from system call setenv(gtm_dist)"
 					"-- called from module %s at line %d\n%%SYSTEM-E-ENO%d, %s\n",
 					__FILE__, __LINE__, save_errno, STRERROR(save_errno));
-				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+				(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 				return ERR_SYSCALL;
 			}
 		} /* else : "ydb_dist" env var is defined. Use that for later verification done inside "common_startup_init" */
@@ -1292,9 +1262,9 @@ int ydb_init()
 		/* Let "gtmci_ch" know this thread is currently holding the YottaDB engine thread level lock by setting a global
 		 * variable (so it knows to release this in case of an "rts_error_csa" call below).
 		 */
-		ydb_engine_threadsafe_mutex_holder = pthread_self();
+		ydb_engine_threadsafe_mutex_holder[0] = pthread_self();
 		/* Now that a condition handler has been established, it is safe to use "rts_error_csa" going forward.
-		 * Also "gtmci_ch" does a "pthread_mutex_unlock(&ydb_engine_threadsafe_mutex)" so no need to do that before
+		 * Also "gtmci_ch" does a "pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0])" so no need to do that before
 		 * the "rts_error_csa" calls below like is done for other "return" code paths above.
 		 */
 		UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
@@ -1355,15 +1325,15 @@ int ydb_init()
 		/* Let "gtmci_ch" know this thread is currently holding the YottaDB engine thread level lock by setting a global
 		 * variable (so it knows to release this in case of an "rts_error_csa" call below, inside "ydb_nested_callin").
 		 */
-		ydb_engine_threadsafe_mutex_holder = pthread_self();
+		ydb_engine_threadsafe_mutex_holder[0] = pthread_self();
 		ydb_nested_callin();	/* Nested call-in: setup a new CI environment (additional SFT_CI base-frame) */
 		REVERT;
 	}
 	assert(NULL == TREF(temp_fgncal_stack));
-	ydb_engine_threadsafe_mutex_holder = 0;	/* Clear now that we no longer hold the YottaDB engine thread lock and
+	ydb_engine_threadsafe_mutex_holder[0] = 0;	/* Clear now that we no longer hold the YottaDB engine thread lock and
 						 * "gtmci_ch" is no longer the active condition handler.
 						 */
-	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 	return 0;
 }
 
@@ -1407,11 +1377,11 @@ int ydb_exit()
         SETUP_THREADGBL_ACCESS;
 	if (!ydb_init_complete)
 		return 0;		/* If we aren't initialized, we don't have things to take down so just return */
-	status = pthread_mutex_lock(&ydb_engine_threadsafe_mutex);
+	status = pthread_mutex_lock(&ydb_engine_threadsafe_mutex[0]);
 	if (0 != status)
 		return status;		/* Lock failed - no condition handler yet so just return the error code */
 	if (!ydb_init_complete)
-	{	/* "ydb_init_complete" was TRUE before we got the "ydb_engine_threadsafe_mutex" lock but became FALSE
+	{	/* "ydb_init_complete" was TRUE before we got the "ydb_engine_threadsafe_mutex[0]" lock but became FALSE
 		 * afterwards. This implies some other concurrent thread did the "ydb_exit" so we can return from this
 		 * "ydb_exit" call without doing anything more.
 		 */
@@ -1491,7 +1461,7 @@ int ydb_exit()
 			/* Let "gtmci_ch" know this thread is currently holding the YottaDB engine thread level lock by setting a
 			 * global variable (so it knows to release this in case of an "rts_error_csa" call below).
 			 */
-			ydb_engine_threadsafe_mutex_holder = pthread_self();
+			ydb_engine_threadsafe_mutex_holder[0] = pthread_self();
 			assert(NULL != frame_pointer);
 			/* If process_exiting is set (and the YottaDB environment is still active since "ydb_init_complete" is TRUE
 			 * here), shortcut some of the checks and cleanups we are making in this routine as they are not
@@ -1527,11 +1497,11 @@ int ydb_exit()
 			 * other platforms we support to see if resolutions can be found. SE 05/2007
 			 */
 			REVERT;
-			ydb_engine_threadsafe_mutex_holder = 0;	/* Clear now that we are about to release the YottaDB engine
-								 * thread lock and "gtmci_ch" is no longer the active
-								 * condition handler. We cannot do this after releasing the
-								 * mutex as that would cause race conditions.
-								 */
+			ydb_engine_threadsafe_mutex_holder[0] = 0;	/* Clear now that we are about to release the YottaDB engine
+									 * thread lock and "gtmci_ch" is no longer the active
+									 * condition handler. We cannot do this after releasing the
+									 * mutex as that would cause race conditions.
+									 */
 		}
 		/* Restore the signal handlers that were saved and overridden during ydb_init()->gtm_startup()->sig_init() */
 		for (sig = 1; sig <= NSIG; sig++)
@@ -1540,7 +1510,7 @@ int ydb_exit()
 		dlopen_handle_array_close();
 		ydb_init_complete = FALSE;
 	}
-	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex);
+	(void)pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 	return 0;
 }
 
