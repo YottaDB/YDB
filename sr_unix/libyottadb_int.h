@@ -742,8 +742,11 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	/* NARSTODO: Do we need RECURSIVE pthread_mutex_lock? */							\
 	RETVAL = YDB_OK;												\
 	GET_LOCK = TRUE;												\
-	SAVE_ACTIVE_STAPI_RTN = TREF(libyottadb_active_rtn);								\
-	lock_index = GET_TPDEPTH_FROM_TPTOKEN(TPTOKEN);									\
+	/* Since this macro can be called from "ydb_init" as part of opening YottaDB for the first time in the process,	\
+	 * we need to handle the case where "lcl_gtm_threadgbl" is NULL in which case we should not skip TREF usages.	\
+	 */														\
+	SAVE_ACTIVE_STAPI_RTN = (NULL != lcl_gtm_threadgbl) ? TREF(libyottadb_active_rtn) : LYDB_RTN_NONE;		\
+	lock_index = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);							\
 	/* Note: We first do the LYDB_RTN_NONE check below to avoid the overhead of an					\
 	 * || check in the most common case (SAVE_ACTIVE_STAPI_RTN == LYDB_RTN_NONE).					\
 	 */														\
@@ -764,6 +767,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 			RETVAL = YDB_ERR_SIMPLEAPINEST;									\
 		} else													\
 		{													\
+			assert(NULL != lcl_gtm_threadgbl);								\
 			TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;							\
 			GET_LOCK = FALSE;										\
 		}													\
@@ -772,36 +776,55 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	{														\
 		if (GET_LOCK)												\
 		{													\
-			pthread_mutex_lock(&ydb_engine_threadsafe_mutex[lock_index]);					\
-			ydb_engine_threadsafe_mutex_holder[lock_index] = pthread_self();				\
+			/* NARSTODO: Handle non-zero return from "pthread_mutex_lock" below */				\
+			RETVAL = pthread_mutex_lock(&ydb_engine_threadsafe_mutex[lock_index]);				\
+			assert(0 == YDB_OK);										\
+			if (YDB_OK == RETVAL)										\
+				ydb_engine_threadsafe_mutex_holder[lock_index] = pthread_self();			\
 		}													\
-		SAVE_ERRSTR = TREF(stapi_errstr);									\
-		TREF(stapi_errstr) = ERRSTR;	/* Set this so "ydb_simpleapi_ch" can fill in				\
-						 * error string in case error is seen.					\
-						 */									\
+		if (YDB_OK == RETVAL)											\
+		{													\
+			if (NULL != lcl_gtm_threadgbl)									\
+			{												\
+				SAVE_ERRSTR = TREF(stapi_errstr);							\
+				TREF(stapi_errstr) = ERRSTR;	/* Set this so "ydb_simpleapi_ch" can fill in		\
+								 * error string in case error is seen.			\
+								 */							\
+			} else												\
+				SAVE_ERRSTR = NULL;									\
+		}													\
 	}														\
 }
 
-#define THREADED_API_YDB_ENGINE_UNLOCK(TPTOKEN, ERRSTR, SAVE_ACTIVE_STAPI_RTN, SAVE_ERRSTR, RELEASE_LOCK)	\
-{														\
-	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];							\
-	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];						\
-														\
-	int	lock_index;											\
-														\
-	if (RELEASE_LOCK)											\
-	{													\
-		assert(ERRSTR == TREF(stapi_errstr));								\
-		TREF(stapi_errstr) = SAVE_ERRSTR;								\
-		lock_index = GET_TPDEPTH_FROM_TPTOKEN(TPTOKEN);							\
-		ydb_engine_threadsafe_mutex_holder[lock_index] = 0;						\
-		pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lock_index]);					\
-	} else													\
-	{													\
-		assert((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN)						\
-					|| (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN));			\
-		TREF(libyottadb_active_rtn) = SAVE_ACTIVE_STAPI_RTN;						\
-	}													\
+#define THREADED_API_YDB_ENGINE_UNLOCK(TPTOKEN, ERRSTR, SAVE_ACTIVE_STAPI_RTN, SAVE_ERRSTR, RELEASE_LOCK)		\
+{															\
+	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];								\
+	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];							\
+															\
+	int	lock_index;												\
+															\
+	/* Since this macro can be called from "ydb_init" as part of opening YottaDB for the first time in the process,	\
+	 * we need to handle the case where "lcl_gtm_threadgbl" is NULL in which case we should not skip TREF usages.	\
+	 */														\
+	if (RELEASE_LOCK)												\
+	{														\
+		if (NULL != lcl_gtm_threadgbl)										\
+		{													\
+			assert(ERRSTR == TREF(stapi_errstr));								\
+			TREF(stapi_errstr) = SAVE_ERRSTR;								\
+		}													\
+		lock_index = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);						\
+		assert(pthread_self() == ydb_engine_threadsafe_mutex_holder[lock_index]);				\
+		ydb_engine_threadsafe_mutex_holder[lock_index] = 0;							\
+		/* NARSTODO: Handle non-zero return from "pthread_mutex_unlock" below */				\
+		pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lock_index]);						\
+	} else														\
+	{														\
+		assert((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN)							\
+					|| (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN));				\
+		if (NULL != lcl_gtm_threadgbl)										\
+			TREF(libyottadb_active_rtn) = SAVE_ACTIVE_STAPI_RTN;						\
+	}														\
 }
 
 #define VERIFY_THREADED_API(RETTYPE, ERRSTR)									\
