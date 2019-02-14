@@ -1338,3 +1338,9 @@ GBLDEF	boolean_t		safe_to_fork_n_core;	/* Set to TRUE by the MAIN worker thread 
 							 * to invoke "gtm_fork_n_core". The MAIN worker thread will pause while
 							 * that happens.
 							 */
+GBLDEF	boolean_t		caller_func_is_stapi;	/* Set to TRUE by a SimpleThreadAPI function just before it invokes
+							 * its corresponding SimpleAPI function. This lets the
+							 * VERIFY_NON_THREADED* macro invocation in the SimpleAPI function
+							 * distinguish whether the caller is a direct user invocation or a
+							 * SimpleThreadAPI invocation. Used to issue SIMPLEAPINOTALLOWED error.
+							 */

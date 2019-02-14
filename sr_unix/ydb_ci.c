@@ -30,11 +30,12 @@ int ydb_ci(const char *c_rtn_name, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
+					 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
+					 * scenarios from not resetting this global variable even though this function returns.
+					 */
 	/* Do not use LIBYOTTADB_INIT to avoid unnecessary SIMPLEAPINEST errors. Instead call LIBYOTTADB_RUNTIME_CHECK macro. */
 	LIBYOTTADB_RUNTIME_CHECK((int), NULL);		/* Note: macro could return from this function in case of errors */
-	VERIFY_NON_THREADED_API_DO_NOT_SHUTOFF_ACTIVE_RTN;	/* Need to call this version of VERIFY_NON_THREADED_API macro
-								 * since LIBYOTTADB_INIT was not called.
-								 */
 	/* "ydb_ci_exec" already sets up a condition handler "gtmci_ch" so we do not do an
 	 * ESTABLISH_RET of ydb_simpleapi_ch here like is done for other SimpleAPI function calls.
 	 */

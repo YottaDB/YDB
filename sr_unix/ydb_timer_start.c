@@ -28,11 +28,14 @@ int	ydb_timer_start(intptr_t timer_id, unsigned long long limit_nsec, ydb_funcpt
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
+					 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
+					 * scenarios from not resetting this global variable even though this function returns.
+					 */
 	LIBYOTTADB_INIT(LYDB_RTN_TIMER_START, (int));	/* Note: macro could return from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* Previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
 							 */
-	VERIFY_NON_THREADED_API;
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{	/* Some error occurred - just return to the caller ($ZSTATUS is set) */

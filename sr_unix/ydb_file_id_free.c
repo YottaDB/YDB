@@ -24,6 +24,10 @@ int ydb_file_id_free(ydb_fileid_ptr_t fileid)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
+					 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
+					 * scenarios from not resetting this global variable even though this function returns.
+					 */
 	LIBYOTTADB_INIT(LYDB_RTN_FILE_ID_FREE, (int));		/* Note: macro could return from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));		/* Previously unused entries should have been cleared by that
 								 * corresponding ydb_*_s() call.

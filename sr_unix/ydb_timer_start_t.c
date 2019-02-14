@@ -14,6 +14,8 @@
 
 #include "libyottadb_int.h"
 
+GBLREF	boolean_t	caller_func_is_stapi;
+
 /* Routine to drive ydb_timer_start() in a worker thread so YottaDB access is isolated. Note because this drives
  * ydb_timer_start(), we don't do any of the exclusive access checks here. The thread management itself takes care
  * of most of that currently but also the check in LIBYOTTADB_INIT*() macro will happen in ydb_timer_start() still
@@ -36,6 +38,7 @@ int ydb_timer_start_t(uint64_t tptoken, ydb_buffer_t *errstr, int timer_id, unsi
 	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_TIMER_START, save_active_stapi_rtn, save_errstr, get_lock, retval);
 	if (YDB_OK == retval)
 	{
+		caller_func_is_stapi = TRUE;	/* used to inform below SimpleAPI call that caller is SimpleThreadAPI */
 		retval = ydb_timer_start(timer_id, limit_nsec, handler, hdata_len, hdata);
 		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
 	}

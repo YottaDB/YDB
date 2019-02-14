@@ -14,6 +14,8 @@
 
 #include "libyottadb_int.h"
 
+GBLREF	boolean_t	caller_func_is_stapi;
+
 /* Routine to drive ydb_delete_excl_s() in a worker thread so YottaDB access is isolated. Note because this drives
  * ydb_delete_excl_s(), we don't do any of the exclusive access checks here. The thread management itself takes care
  * of most of that currently but also the check in LIBYOTTADB_INIT*() macro will happen in ydb_delete_excl_s() still
@@ -35,6 +37,7 @@ int ydb_delete_excl_st(uint64_t tptoken, ydb_buffer_t *errstr, int namecount, yd
 	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_DELETE_EXCL, save_active_stapi_rtn, save_errstr, get_lock, retval);
 	if (YDB_OK == retval)
 	{
+		caller_func_is_stapi = TRUE;	/* used to inform below SimpleAPI call that caller is SimpleThreadAPI */
 		retval = ydb_delete_excl_s(namecount, varnames);
 		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
 	}

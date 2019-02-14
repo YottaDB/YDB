@@ -19,6 +19,7 @@
 #include "error.h"
 
 GBLREF	volatile int4	outofband;
+GBLREF	boolean_t	caller_func_is_stapi;
 
 /* Routine to drive ydb_lock_s() in a worker thread so YottaDB access is isolated. Note because this drives
  * ydb_lock_s(), we don't do any of the exclusive access checks here. The thread management itself takes care
@@ -43,6 +44,7 @@ int ydb_lock_st(uint64_t tptoken, ydb_buffer_t *errstr, unsigned long long timeo
 	if (YDB_OK == retval)
 	{
 		VAR_START(var, namecount);
+		caller_func_is_stapi = TRUE;	/* used to inform below SimpleAPI call that caller is SimpleThreadAPI */
 		retval = ydb_lock_s_va(timeout_nsec, namecount, var);
 		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
 	}

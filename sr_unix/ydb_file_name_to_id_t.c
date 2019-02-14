@@ -14,6 +14,8 @@
 
 #include "libyottadb_int.h"
 
+GBLREF	boolean_t	caller_func_is_stapi;
+
 /* Routine to drive ydb_file_name_to_id() in a worker thread so YottaDB access is isolated. Note because this drives
  * ydb_file_name_to_id(), we don't do any of the exclusive access checks here. The thread management itself takes care
  * of most of that currently but also the check in LIBYOTTADB_INIT*() macro will happen in ydb_file_name_to_id() still
@@ -36,7 +38,8 @@ int ydb_file_name_to_id_t(uint64_t tptoken, ydb_buffer_t *errstr, ydb_string_t *
 					save_active_stapi_rtn, save_errstr, get_lock, retval);
 	if (YDB_OK == retval)
 	{
-		retval = ydb_stm_args2(tptoken, errstr, LYDB_RTN_FILE_NAME_TO_ID, (uintptr_t)filename, (uintptr_t)fileid);
+		caller_func_is_stapi = TRUE;	/* used to inform below SimpleAPI call that caller is SimpleThreadAPI */
+		retval = ydb_file_name_to_id(filename, fileid);
 		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
 	}
 	return (int)retval;

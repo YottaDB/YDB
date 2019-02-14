@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,13 @@ int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int nameco
 	ydb_buffer_t		*curvarname;
 	char			buff[256];			/* sprintf() buffer */
 	libyottadb_routines	lydbrtn;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
+					 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
+					 * scenarios from not resetting this global variable even though this function returns.
+					 */
 	lydbrtn = (0 == dollar_tlevel) ? LYDB_RTN_TP_TLVL0 : LYDB_RTN_TP;
 	return ydb_tp_s_common(lydbrtn, (ydb_basicfnptr_t)tpfn, tpfnparm, transid, namecount, varnames);
 }

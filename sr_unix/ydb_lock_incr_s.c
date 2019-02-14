@@ -48,6 +48,10 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int 
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	VERIFY_NON_THREADED_API;	/* clears a global variable "caller_func_is_stapi" set by SimpleThreadAPI caller
+					 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
+					 * scenarios from not resetting this global variable even though this function returns.
+					 */
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	LIBYOTTADB_INIT(LYDB_RTN_LOCK_INCR, (int));	/* Note: macro could return from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
