@@ -32,7 +32,7 @@ int ydb_ci_t(uint64_t tptoken, ydb_buffer_t *errstr, const char *c_rtn_name, ...
 	ydb_buffer_t		*save_errstr;
 	boolean_t		get_lock;
 	va_list			var;
-	intptr_t		retval;
+	int			retval;
 	ci_name_descriptor	ci_desc;
 	DCL_THREADGBL_ACCESS;
 

@@ -26,7 +26,7 @@ int ydb_delete_excl_st(uint64_t tptoken, ydb_buffer_t *errstr, int namecount, yd
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;
 	boolean_t		get_lock;
-	intptr_t 		retval;
+	intptr_t		retval;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

@@ -32,7 +32,7 @@ int ydb_cip_t(uint64_t tptoken, ydb_buffer_t *errstr, ci_name_descriptor *ci_inf
 	ydb_buffer_t		*save_errstr;
 	boolean_t		get_lock;
 	va_list			var;
-	intptr_t		retval;
+	int			retval;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
