@@ -28,7 +28,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "MINNRSUBSCRIPTS", "Number of subscripts cannot be a negative number", 0 },
 	{ "SUBSARRAYNULL", "Non-zero number of subscripts [!UL] specified but subscript array parameter is NULL in !AD call", 3 },
 	{ "FATALERROR1", "Fatal error raised. Generating core and terminating process. Error: !AD", 2 },
-	{ "NAMECOUNT2HI", "Number of varnames (namecount parameter in a !AD call) exceeds maximum (!UL)", 3 },
+	{ "NAMECOUNT2HI", "Number of varnames !UL (namecount parameter in a !AD call) exceeds maximum (!UL)", 4 },
 	{ "INVNAMECOUNT", "Number of varnames (namecount parameter in a !AD call) cannot be less than zero", 2 },
 	{ "FATALERROR2", "Fatal error raised. Bypassing core generation and terminating process. Error: !AD", 2 },
 	{ "TIME2LONG", "Specified time value [0x!16@XQ] exceeds supported maximum [0x!16@XQ]", 2 },

@@ -76,8 +76,8 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 		return YDB_OK;
 	}
 	if (YDB_MAX_NAMES < namecount)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_NAMECOUNT2HI, 3,
-			LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DELETE_EXCL)), YDB_MAX_NAMES);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NAMECOUNT2HI, 4,
+			namecount, LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DELETE_EXCL)), YDB_MAX_NAMES);
 	/* Run through the array creating mvals to hold the list of names to be excluded. Note, normally, we would use
 	 * the COPY_PAMS_TO_CALLG_BUFFER() macro for this but in this case, we also need to validate each mval that it has
 	 * a valid variable name in it so we do the parm copy "manually".
