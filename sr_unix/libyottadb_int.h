@@ -724,28 +724,36 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	 */														\
 	SAVE_ACTIVE_STAPI_RTN = (NULL != lcl_gtm_threadgbl) ? TREF(libyottadb_active_rtn) : LYDB_RTN_NONE;		\
 	lock_index = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);							\
-	/* Note: We first do the LYDB_RTN_NONE check below to avoid the overhead of an					\
-	 * || check in the most common case (SAVE_ACTIVE_STAPI_RTN == LYDB_RTN_NONE).					\
-	 */														\
 	if ((LYDB_RTN_NONE != SAVE_ACTIVE_STAPI_RTN)									\
-		&& ((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN)								\
-				|| (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN))						\
 		&& (ydb_engine_threadsafe_mutex_holder[lock_index] == pthread_self()))					\
-	{	/* We are the thread that started a "ydb_ci_t" or "ydb_cip_t" call (through "ydb_cip_helper").		\
-		 * And that same thread has done an external call in the call-in M code which in turn wants to do	\
-		 * the current SimpleThreadAPI function call. Allow all calls except "ydb_tp_st" while inside the	\
-		 * call-in by shutting off the active rtn indicator temporarily for the duration of this		\
-		 * SimpleThreadAPI call.										\
+	{	/* We are already in the middle of a SimpleThreadAPI call. Since we already hold the mutex lock as	\
+		 * part of the original SimpleThreadAPI call, skip lock get/release in this nested call.		\
 		 */													\
 		if (LYDB_RTN_TP == CALLTYP)										\
-		{	/* Disallow starting a new TP transaction while inside a "ydb_ci_t" or "ydb_cip_t" call */	\
+		{	/* Disallow starting a new TP transaction */							\
 			SETUP_GENERIC_ERROR_2PARMS(YDB_ERR_SIMPLEAPINEST, LYDBRTNNAME(SAVE_ACTIVE_STAPI_RTN),		\
 							LYDBRTNNAME(CALLTYP));						\
 			RETVAL = YDB_ERR_SIMPLEAPINEST;									\
 		} else													\
 		{													\
-			assert(NULL != lcl_gtm_threadgbl);								\
-			TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;							\
+			if ((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN) || (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN))	\
+			{	/* We are the thread that started a "ydb_ci_t"/"ydb_cip_t" call. And that same thread	\
+				 * has done an external call in the call-in M code which in turn wants to do the	\
+				 * current SimpleThreadAPI function call. Allow all calls while inside the call-in by	\
+				 * shutting off the active rtn indicator for the duration of this SimpleThreadAPI call.	\
+				 */											\
+				assert(NULL != lcl_gtm_threadgbl);							\
+				TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;						\
+			}												\
+			/* else: It is possible we are the thread that started a "ydb_set_st"/"ydb_kill_st" which	\
+			 * invoked a trigger M code that did an external call and the C code reinvoked the current	\
+			 * SimpleThreadAPI function. In this case, we allow all calls but do not reset the active rtn	\
+			 * indicator. The corresponding SimpleAPI function invocation will issue the needed		\
+			 * SIMPLEAPINEST error. The reason we do not issue the error here is because CALLTYP would most	\
+			 * likely be LYDB_RTN_NONE at this point if this is a "ydb_init" call (a utility function).	\
+			 * In that case, deferring the error would give us a more accurate SIMPLEAPINEST error message	\
+			 * when the non-utility SimpleAPI function is made a little later.				\
+			 */												\
 			GET_LOCK = FALSE;										\
 		}													\
 	}														\
@@ -795,11 +803,9 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 		ydb_engine_threadsafe_mutex_holder[lock_index] = 0;							\
 		/* NARSTODO: Handle non-zero return from "pthread_mutex_unlock" below */				\
 		pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lock_index]);						\
-	} else														\
-	{														\
-		assert((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN)							\
-					|| (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN));				\
-		if (NULL != lcl_gtm_threadgbl)										\
+	} else if ((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN) || (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN))		\
+	{	/* Undo active rtn indicator reset done in THREADED_API_YDB_ENGINE_LOCK */ 				\
+		 if (NULL != lcl_gtm_threadgbl)										\
 			TREF(libyottadb_active_rtn) = SAVE_ACTIVE_STAPI_RTN;						\
 	}														\
 }
