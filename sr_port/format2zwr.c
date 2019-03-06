@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +18,7 @@
 #include "patcode.h"
 #include "compiler.h"		/* for CHARMAXARGS */
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"	/* U_ISPRINT() needs this header */
 #include "gtm_utf8.h"
 #endif
@@ -54,7 +55,7 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 				isill = FALSE;
 				chlen = 1;
 			}
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 			else {
 				strnext = UTF8_MBTOWC(cp, srctop, ch);
 				isill = (WEOF == ch) ? (ch = *cp, TRUE) : FALSE;

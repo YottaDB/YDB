@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -40,7 +40,7 @@
 #include "dm_read.h"
 #include "gtm_tputs.h"
 #include "op.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
@@ -64,7 +64,7 @@ GBLREF	boolean_t	dmterm_default;
 GBLREF	volatile boolean_t	timer_in_handler;
 
 LITREF unsigned char	lower_to_upper_table[];
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 LITREF	UChar32		u32_line_term[];
 #endif
 
@@ -151,7 +151,7 @@ if (0 < (TREF(gtmprompt)).len)													\
 void	dm_read (mval *v)
 {
 	boolean_t	buffer_moved, insert_mode, terminator_seen, utf8_active, zint_restart;
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	boolean_t	matched;
 	char		*recptr = RECALL;
 #	endif
@@ -410,7 +410,7 @@ void	dm_read (mval *v)
 			assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
 			/* set prin_in_dev_failure to FALSE in case it was set to TRUE in the previous read which may have failed */
 			prin_in_dev_failure = FALSE;
-#			ifdef UNICODE_SUPPORTED
+#			ifdef UTF8_SUPPORTED
 			if (utf8_active)
 			{
 				if (tt_ptr->discard_lf)
@@ -479,7 +479,7 @@ void	dm_read (mval *v)
 					NATIVE_CVT2UPPER(inbyte, inbyte);
 				inchar = inbyte;
 				inchar_width = 1;
-#			ifdef UNICODE_SUPPORTED
+#			ifdef UTF8_SUPPORTED
 			}
 #			endif
 			GETASCII(asc_inchar,inchar);
@@ -497,7 +497,7 @@ void	dm_read (mval *v)
 					terminator_seen = TRUE;
 			} else if (utf8_active && tt_ptr->default_mask_term && ((INPUT_CHAR == u32_line_term[U32_LT_NL])
 				 || (INPUT_CHAR == u32_line_term[U32_LT_LS]) || (INPUT_CHAR == u32_line_term[U32_LT_PS])))
-			{	/* UTF and default terminators and Unicode terminators above ASCII_MAX */
+			{	/* UTF and default terminators and UTF terminators above ASCII_MAX */
 				terminator_seen = TRUE;
 			}
 			if (terminator_seen)
@@ -506,7 +506,7 @@ void	dm_read (mval *v)
 				if (utf8_active && (ASCII_CR == INPUT_CHAR))
 					tt_ptr->discard_lf = TRUE;
 					/* exceeding the maximum length exits the while loop, so it must fit here . */
-#				ifdef UNICODE_SUPPORTED
+#				ifdef UTF8_SUPPORTED
 				if (utf8_active)
 				{	/* recall buffer kept as UTF-8 */
 					matched = TRUE;
@@ -558,7 +558,7 @@ void	dm_read (mval *v)
 						argv[1] = STRTOK_R(NULL, "", &strtokptr);
 					} else
 						break;		/* not RECALL so end of line */
-#				ifdef UNICODE_SUPPORTED
+#				ifdef UTF8_SUPPORTED
 				}
 #				endif
 				index = 0;
@@ -615,7 +615,7 @@ void	dm_read (mval *v)
 						WRITE_GTM_PROMPT;
 						write_str((unsigned char *)comline_base[histidx].addr,
 							comline_base[histidx].len, dx_start, TRUE, TRUE);
-#						ifdef UNICODE_SUPPORTED
+#						ifdef UTF8_SUPPORTED
 						if (utf8_active)
 						{	/* note out* variables are used for input here */
 							len = comline_base[histidx].len;
@@ -642,7 +642,7 @@ void	dm_read (mval *v)
 								comline_base[histidx].len);
 							instr = outlen = comline_base[histidx].len;
 							dx_instr = dx_outlen = instr;
-#						ifdef UNICODE_SUPPORTED
+#						ifdef UTF8_SUPPORTED
 						}
 #						endif
 						dx = (dx_start + dx_outlen) % ioptr_width;
@@ -871,7 +871,7 @@ void	dm_read (mval *v)
 				{
 					cl = clmod (comline_index - index);
 					instr = outlen = comline_base[cl].len;
-#					ifdef UNICODE_SUPPORTED
+#					ifdef UTF8_SUPPORTED
 					if (utf8_active)
 					{
 						len = comline_base[cl].len;
@@ -895,7 +895,7 @@ void	dm_read (mval *v)
 						if (0 != instr)
 							memcpy(buffer_start, comline_base[cl].addr, outlen);
 						dx_instr = dx_outlen = comline_base[cl].len;
-#					ifdef UNICODE_SUPPORTED
+#					ifdef UTF8_SUPPORTED
 					}
 #					endif
 					dx = (unsigned)(dx_instr + dx_start) % ioptr_width;
@@ -935,7 +935,7 @@ void	dm_read (mval *v)
 		outlen = length - 1;
 	io_ptr->dollar.za = 0;
 	v->mvtype = MV_STR;
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	if (utf8_active)
 	{
 		int	i;

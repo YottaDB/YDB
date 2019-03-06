@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,7 @@ error_def(ERR_MAXSTRLEN);
 
 /*
  * ----------------------------------------------------------
- * Set piece procedure (unicode flavor).
+ * Set piece procedure (UTF8 flavor).
  * Set pieces first through last to expr.
  *
  * Arguments:

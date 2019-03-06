@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -115,7 +115,7 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMV50000:
 			case GDSMV51000ALT:
 			case GDSMV51000:		/* Multi-site replication available */
-			case GDSMV52000:		/* Unicode */
+			case GDSMV52000:		/* UTF8 */
 			case GDSMV53000:		/* M-Itanium release */
 				gvstats_rec_upgrade(csa); /* Move GVSTATS information to new place in file header */
 			case GDSMV53003:		/* ZSHOW "G" release */

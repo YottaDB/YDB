@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,13 +11,15 @@
  ****************************************************************/
 
 /* Uncomment below to enable tracing of deferred events */
-/* #define DEBUG_DEFERRED_EVENT */
+/*#define DEBUG_DEFERRED_EVENT*/
 #ifdef DEBUG_DEFERRED_EVENT
 # define DBGDFRDEVNT(x) DBGFPF(x)
+#include "gtmio.h"
+#include "io.h"
 #else
 # define DBGDFRDEVNT(x)
 #endif
-
+#include "xfer_enum.h"
 /* --------------------------------------------
  * Async. events that can be deferred
  * --------------------------------------------
@@ -45,7 +48,7 @@ enum deferred_event
  * -------------------------------------------------------
  */
 #if defined(UNIX)
-GBLREF volatile int4	num_deferred;
+GBLREF volatile uint4	num_deferred;
 #elif defined(VMS)
 GBLREF volatile short	num_deferred;
 #else
@@ -67,7 +70,7 @@ GBLREF volatile short	num_deferred;
  *         a thorough redesign or rethinking).
  * ------------------------------------------------------------------
  */
-boolean_t xfer_set_handlers(int4, void (*callback)(int4), int4 param);
+boolean_t xfer_set_handlers(int4, void (*callback)(int4), int4 param, boolean_t popped_entry);
 
 /* ------------------------------------------------------------------
  * Reset transfer table to normal settings.
@@ -109,3 +112,5 @@ void tt_write_error_set(int4);
  */
 void async_action(bool);
 boolean_t xfer_table_changed(void);
+
+#define IS_VALID_TRAP ((set_fn == (&ctrlc_set)) || (set_fn == (&ctrap_set)) || (set_fn == (&ctrly_set)))

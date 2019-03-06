@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -33,12 +33,16 @@
 #include "gtmimagename.h"
 #include "dpgbldir.h"
 #include "gtmcrypt.h"
+#include "interlock.h"
+#include "mlkdef.h"
+#include "mlk_ops.h"
 
 GBLREF	boolean_t	need_core;
 GBLREF	boolean_t	created_core;
 GBLREF	boolean_t	exit_handler_active;
 GBLREF	boolean_t	skip_exit_handler;
 GBLREF	uint4		dollar_tlevel;
+GBLREF	uint4		process_id;
 
 void util_exit_handler()
 {
@@ -70,6 +74,13 @@ void util_exit_handler()
 					 * unneeded cache recovery. However, if this *IS* an error condition, we leave crit
 					 * alone and let secshr_db_clnup() deal with it appropriately.
 					 */
+					if ((0 == severity) && !csa->lock_crit_with_db && LOCK_CRIT_HELD(csa))
+					{
+						mlk_pvtctl	pctl;
+
+						MLK_PVTCTL_INIT(pctl, reg);
+						REL_LOCK_CRIT(pctl, FALSE);
+					}
 					if ((0 == severity) && csa->now_crit)
 						rel_crit(reg);
 				}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,7 @@ void mlk_shr_init(sm_uc_ptr_t base,
 		  boolean_t read_write)
 {
 	int			i, nr_blocks, nr_procs, shr_size, nr_buckets;
+	float			shrblk_adj, shrhash_adj;
 	sm_uc_ptr_t		cp;
 	mlk_shrhash_ptr_t	sh;
 	mlk_shrblk_ptr_t	sb;
@@ -46,10 +47,12 @@ void mlk_shr_init(sm_uc_ptr_t base,
 	shr_size = (size >> 1) + (size >> 3);	/* size/2 + size/8 = size*5/8 */
 	/* Split shrblock space into blocks and hash buckets.
 	 * Hopscotch hashing works reasonably well with a high load factor, but leaving a little space avoids the worst case,
-	 * so allocate up to 1/8 more hash buckets than shrblks.
+	 * and more buckets helps avoid excess collisions, so allocate up to 1/4 more hash buckets than shrblks.
 	 */
-	nr_blocks = (8 * shr_size) / (8 * SIZEOF(mlk_shrblk) + 9 * SIZEOF(mlk_shrhash));
-	nr_buckets = (9 * shr_size) / (8 * SIZEOF(mlk_shrblk) + 9 * SIZEOF(mlk_shrhash));
+	shrblk_adj = 1;
+	shrhash_adj = 1 + MLK_HASH_EXCESS;
+	nr_blocks = (shrblk_adj * shr_size) / (shrblk_adj * SIZEOF(mlk_shrblk) + shrhash_adj * SIZEOF(mlk_shrhash));
+	nr_buckets = (shrhash_adj * shr_size) / (shrblk_adj * SIZEOF(mlk_shrblk) + shrhash_adj * SIZEOF(mlk_shrhash));
 	assert(shr_size >= (nr_blocks * SIZEOF(mlk_shrblk) + nr_buckets * SIZEOF(mlk_shrhash)));
 	nr_procs = (size >> 3) / SIZEOF(mlk_prcblk);
 	memset(base, 0, size);
@@ -59,13 +62,12 @@ void mlk_shr_init(sm_uc_ptr_t base,
 	A2R(ctl->blkhash, sh);
 	ctl->num_blkhash = nr_buckets;
 	sb = (mlk_shrblk_ptr_t)(sh + nr_buckets);
+	A2R(ctl->blkbase, sb);
 	A2R(ctl->blkfree, sb);
 	ctl->blkcnt = nr_blocks;
 	ctl->max_blkcnt = nr_blocks;
 	for (i = 1; i < nr_blocks ; i++, sb++)
-	{
 		A2R(sb->rsib, sb + 1);
-	}
 	pb = (mlk_prcblk_ptr_t)(sb + 1);
 	A2R(ctl->prcfree, pb);
 	ctl->prccnt = nr_procs;
@@ -82,5 +84,6 @@ void mlk_shr_init(sm_uc_ptr_t base,
 	assert(ctl->subtop > ctl->subbase);
 	if (read_write)
 		csa->hdr->trans_hist.lock_sequence = 0;
+	ctl->hash_shmid = 0;
 	return;
 }

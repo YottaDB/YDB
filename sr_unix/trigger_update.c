@@ -71,6 +71,7 @@
 #include "is_file_identical.h"
 #include "anticipatory_freeze.h"
 #include "gtm_repl_multi_inst.h" /* for DISALLOW_MULTIINST_UPDATE_IN_TP */
+#include "stringpool.h"
 
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			dollar_tlevel;
@@ -115,7 +116,6 @@ static	boolean_t		promptanswer = TRUE;
 #define	MAX_COMMANDS_LEN	32		/* Need room for S,K,ZK,ZTK + room for expansion */
 #define	MAX_OPTIONS_LEN		32		/* Need room for NOI,NOC + room for expansion */
 #define	MAX_TRIGNAME_SEQ_NUM	999999
-#define	MAX_TRIG_DISPLEN	80		/* maximum length of a trigger that is displayed in case of errors */
 #define	LITERAL_M		"M"
 #define	OPTIONS_I		1
 #define	OPTIONS_NOI		2
@@ -1129,10 +1129,10 @@ STATICFNDEF int4 gen_trigname_sequence(char *trigvn, int trigvn_len, mval *trigg
 	return SEQ_SUCCESS;
 }
 
-boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, uint4 *trig_stats, io_pair *trigfile_device,
+boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_stats, io_pair *trigfile_device,
 		int4 *record_num)
 {
-	char			add_delete;
+	char			add_delete, *trigptr;
 	char			ans[2];
 	boolean_t		multiline_parse_fail;
 	mname_entry		gvname;
@@ -1150,11 +1150,12 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	int			disp_trigvn_len;
 	int			trigvn_len;
 	char			*values[NUM_SUBS], *save_values[NUM_SUBS];
-	uint4			value_len[NUM_SUBS], save_value_len[NUM_SUBS];
+	uint4			len, value_len[NUM_SUBS], save_value_len[NUM_SUBS];
 	stringkey		kill_trigger_hash, set_trigger_hash;
 	char			tmp_str[MAX_HASH_LEN + 1];
-	char			xecute_buffer[MAX_BUFF_SIZE + MAX_XECUTE_LEN], dispbuff[MAX_TRIG_DISPLEN];
-	mval			trigjrec;
+	char			xecute_buffer[MAX_BUFF_SIZE + MAX_XECUTE_LEN];
+	unsigned char		*dispbuff;
+	mval			multi_jrec, *trigjrec;
 	char			*trigjrecptr;
 	int			trigjreclen;
 	io_pair			io_save_device;
@@ -1190,33 +1191,36 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	assert(0 > memcmp(LITERAL_HASHTNCOUNT, LITERAL_MAXHASHVAL, MIN(STRLEN(LITERAL_HASHTNCOUNT), STRLEN(LITERAL_MAXHASHVAL))));
 	rec_num = (NULL == record_num) ? 0 : *record_num;
 	gvinit();
-	trigjrec.mvtype = MV_STR;
-	trigjrec.str.len = len;
-	trigjrec.str.addr = trigger_rec;
+	len = trigger_rec->str.len;
 	if (NULL == trigfile_device)
 	{	/* Check if this is a multi-line trigger. In that case, use just the first line for the below processing.
 		 * The rest of the lines will later be copied over into values[XECUTE_SUB].
 		 */
-		trigjrecptr = memchr(trigger_rec, '\n', len);
+		trigjrecptr = memchr(trigger_rec->str.addr, '\n', len);
 		if (NULL != trigjrecptr)
-			len = trigjrecptr - trigger_rec;
+			len = trigjrecptr - trigger_rec->str.addr;
 	} else
-		assert(NULL == memchr(trigger_rec, '\n', len));
-	if ((0 == len) || (COMMENT_LITERAL == *trigger_rec))
+		assert(NULL == memchr(trigger_rec->str.addr, '\n', len));
+	if ((0 == len) || (COMMENT_LITERAL == *trigger_rec->str.addr))
 		return TRIG_SUCCESS;
-	if (('-' != *trigger_rec) && ('+' != *trigger_rec))
+	assert(dollar_tlevel);
+	if (('-' != *trigger_rec->str.addr) && ('+' != *trigger_rec->str.addr))
 	{
 		trig_stats[STATS_ERROR_TRIGFILE]++;
-		displen = MAX_TRIG_DISPLEN;
-		format2disp(trigger_rec, len, dispbuff, &displen);	/* returns displayable string in "dispbuff" */
+		len = trigger_rec->str.len = MIN(len, MAX_SRCLINE);
+		trigger_rec->str.addr[len] = 0;
+		displen = ZWR_EXP_RATIO(len);
+		dispbuff = malloc(displen);
+		format2zwr((sm_uc_ptr_t)trigger_rec->str.addr, len, dispbuff, &displen); /* returns displayable string & displen */
 		util_out_print_gtmio("Error : missing +/- at start of line: !AD", FLUSH, displen, dispbuff);
+		free(dispbuff);
 		return TRIG_FAILURE;
 	}
-	add_delete = *trigger_rec++;
+	add_delete = trigger_rec->str.addr[0];
 	len--;
 	if ('-' == add_delete)
 	{
-		if ((1 == len) && ('*' == *trigger_rec))
+		if ((1 == len) && ('*' == trigger_rec->str.addr[1]))
 		{
 			if ((NULL == trigfile_device) && (NULL != trigjrecptr))
 			{
@@ -1233,9 +1237,9 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 			}
 			if (FALSE == promptanswer)
 				return TRIG_SUCCESS;
-			trigger_delete_all(--trigger_rec, len + 1, trig_stats);	/* updates trig_stats[] appropriately */
+			trigger_delete_all(trigger_rec, trig_stats);	/* updates trig_stats[] appropriately */
 			return TRIG_SUCCESS;
-		} else if ((0 == len) || ('^' != *trigger_rec))
+		} else if ((0 == len) || ('^' != trigger_rec->str.addr[1]))
 		{	/* if the length < 0 let trigger_delete_name respond with the error message */
 			if ((NULL == trigfile_device) && (NULL != trigjrecptr))
 			{
@@ -1243,18 +1247,20 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 				trig_stats[STATS_ERROR_TRIGFILE]++;
 				return TRIG_FAILURE;
 			}
-			status = trigger_delete_name(--trigger_rec, len + 1, trig_stats); /* updates trig_stats[] appropriately */
+			status = trigger_delete_name(trigger_rec, trig_stats); /* updates trig_stats[] appropriately */
 			return status;
 		}
 	}
 	values[GVSUBS_SUB] = tfile_rec_val;	/* GVSUBS will be the first entry set so initialize it */
 	max_len = (int4)SIZEOF(tfile_rec_val);
+	trigptr = trigger_rec->str.addr + 1;
 	multi_line_xecute = FALSE;
-	if (!trigger_parse(trigger_rec, len, trigvn, values, value_len, &max_len, &multi_line_xecute))
+	if (!trigger_parse(trigptr, len, trigvn, values, value_len, &max_len, &multi_line_xecute))
 	{
 		trig_stats[STATS_ERROR_TRIGFILE]++;
 		return TRIG_FAILURE;
 	}
+	assert(dollar_tlevel && (('-' == trigger_rec->str.addr[0]) || ('+' == trigger_rec->str.addr[0])));
 	trigvn_len = STRLEN(trigvn);
 	set_trigger_hash.str.addr = &tmp_str[0];
 	set_trigger_hash.str.len = MAX_HASH_LEN;
@@ -1271,6 +1277,7 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	STR_PHASH_PROCESS(kill_hash_state, kill_hash_totlen, kill_trigger_hash.str.addr, kill_trigger_hash.str.len);
 	first_gtmio = TRUE;
 	utilprefixlen = ARRAYSIZE(utilprefix);
+	trigjrec = trigger_rec;
 	if (multi_line_xecute)
 	{
 		if (NULL != trigfile_device)
@@ -1281,12 +1288,15 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 			 * use this to write the TLGTRIG/ULGTRIG journal record in case we do "jnl_format" later.
 			 */
 			values[XECUTE_SUB] = &xecute_buffer[MAX_BUFF_SIZE];
-			trigjreclen = trigjrec.str.len + 1;	/* 1 for newline */
+			multi_jrec = *trigger_rec;
+			trigjrec = &multi_jrec;
+			trigjreclen = trigjrec->str.len + 1;	/* 1 for newline */
 			assert(trigjreclen < MAX_BUFF_SIZE);
 			trigjrecptr = &xecute_buffer[MAX_BUFF_SIZE - trigjreclen];
-			memcpy(trigjrecptr, trigjrec.str.addr, trigjreclen - 1);
+			memcpy(trigjrecptr, trigjrec->str.addr, trigjreclen - 1);
 			trigjrecptr[trigjreclen - 1] = '\n';
-			trigjrec.str.addr = trigjrecptr;
+			trigjrec->str.addr = trigjrecptr;
+			assert(dollar_tlevel && (('-' == trigjrec->str.addr[0]) || ('+' == trigjrec->str.addr[0])));
 			value_len[XECUTE_SUB] = 0;
 			max_xecute_size = MAX_XECUTE_LEN;
 			io_save_device = io_curr_device;
@@ -1300,7 +1310,7 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 			multiline_parse_fail = FALSE;
 			while (multi_line)
 			{
-				rec_len = file_input_get(&trigger_rec, MAX_SRCLINE - 1);
+				rec_len = file_input_get(&trigptr, MAX_SRCLINE - 1);
 				if (!io_curr_device.in->dollar.x)
 					rec_num++;
 				if (0 > rec_len)
@@ -1309,8 +1319,8 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 					if (FILE_INPUT_GET_ERROR == rec_len)
 						break;
 					do
-					{	/* Read the remainder of the long line in as many MAX_SRCLINE chunks as needed */
-						rec_len = file_input_get(&trigger_rec, MAX_SRCLINE - 1);
+					{	/* Read remainder of over-length line in as many MAX_SRCLINE chunks as needed */
+						rec_len = file_input_get(&trigptr, MAX_SRCLINE - 1);
 						if (!io_curr_device.in->dollar.x)
 							rec_num++;
 						if (0 <= rec_len)
@@ -1333,8 +1343,9 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 					multiline_parse_fail = TRUE;
 				}
 				io_curr_device = io_save_device;	/* In case we have to write an error message */
-				no_error = trigger_parse(trigger_rec, (uint4)rec_len, trigvn, values, value_len,
+				no_error = trigger_parse(trigptr, (uint4)rec_len, trigvn, values, value_len,
 											&max_xecute_size, &multi_line);
+				assert(dollar_tlevel && (('-' == trigjrec->str.addr[0]) || ('+' == trigjrec->str.addr[0])));
 				io_curr_device = *trigfile_device;
 				if (!no_error)
 				{	/* An error occurred (e.g. Trigger definition too long etc.).
@@ -1352,7 +1363,7 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 					max_xecute_size = SIZEOF(xecute_buffer);
 				}
 			}
-			trigjrec.str.len = trigjreclen + value_len[XECUTE_SUB];
+			trigjrec->str.len = trigjreclen + value_len[XECUTE_SUB];
 			if (NULL != record_num)
 				*record_num = rec_num;
 			if (0 > rec_len)
@@ -1372,8 +1383,9 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 			io_curr_device = io_save_device;
 		} else
 		{
+			assert(memchr(trigjrec->str.addr, '\n', trigjrec->str.len) == trigjrecptr);
 			values[XECUTE_SUB] = trigjrecptr + 1;
-			value_len[XECUTE_SUB] = trigjrec.str.addr + trigjrec.str.len - (trigjrecptr + 1);
+			value_len[XECUTE_SUB] = trigjrec->str.addr + trigjrec->str.len - (trigjrecptr + 1);
 			if ('\n' != values[XECUTE_SUB][value_len[XECUTE_SUB] - 1])
 			{
 				util_out_print_gtmio("Error : Multi-line xecute in $ztrigger ITEM must end in newline", FLUSH);
@@ -1394,8 +1406,9 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	{	/* If this is a not a multi-line xecute string, we dont expect newlines. The only exception is if it is
 		 * the last byte in the string.
 		 */
-		*trigjrecptr++;
-		if (trigjrecptr != (trigjrec.str.addr + trigjrec.str.len))
+		 assert(memchr(trigjrec->str.addr, '\n', trigjrec->str.len) == trigjrecptr);
+		 *trigjrecptr++;
+		if (trigjrecptr != (trigjrec->str.addr + trigjrec->str.len))
 		{
 			util_out_print_gtmio("Error : Newline allowed only inside multi-line xecute in $ztrigger ITEM", FLUSH);
 			trig_stats[STATS_ERROR_TRIGFILE]++;
@@ -1444,7 +1457,7 @@ boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, u
 	{	/* At this point gv_cur_region/cs_addrs/gv_target already point to the correct region.
 		 * For a spanning global, they point to one of the spanned regions in each iteration of the do-while loop below.
 		 */
-		this_trig_status = trigupdrec_reg(trigvn, trigvn_len, &jnl_format_done, &trigjrec,
+		this_trig_status = trigupdrec_reg(trigvn, trigvn_len, &jnl_format_done, trigjrec,
 						&new_name_check_done, &new_name, &values[0], &value_len[0], add_delete,
 						&kill_trigger_hash, &set_trigger_hash, &disp_trigvn[0], disp_trigvn_len, trig_stats,
 						&first_gtmio, utilprefix, &utilprefixlen);
@@ -1550,7 +1563,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 		 * in case this is a global spanning multiple regions.
 		 */
 		JNLPOOL_INIT_IF_NEEDED(csa, csa->hdr, csa->nl, SCNDDBNOUPD_CHECK_TRUE);
-		assert(dollar_tlevel);
+		assert(dollar_tlevel && (('-' == trigjrec->str.addr[0]) || ('+' == trigjrec->str.addr[0])));
 		T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_TRIGLOADFAIL);	/* needed to set update_trans TRUE on this region
 									 * even if NO db updates happen to ^#t nodes. */
 		jnl_format(JNL_LGTRIG, NULL, trigjrec, 0);
@@ -1996,7 +2009,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 	RETURN_AND_POP_MVALS(trigload_status);
 }
 
-STATICFNDEF boolean_t trigger_update_rec_helper(char *trigger_rec, uint4 len, boolean_t noprompt, uint4 *trig_stats)
+STATICFNDEF boolean_t trigger_update_rec_helper(mval *trigger_rec, boolean_t noprompt, uint4 *trig_stats)
 {
 	enum cdb_sc		cdb_status;
 	boolean_t		trigger_status;
@@ -2004,7 +2017,7 @@ STATICFNDEF boolean_t trigger_update_rec_helper(char *trigger_rec, uint4 len, bo
 
 	SETUP_THREADGBL_ACCESS;
 	ESTABLISH_RET(trigger_tpwrap_ch, TRIG_FAILURE);
-	trigger_status = trigger_update_rec(trigger_rec, len, TRUE, trig_stats, NULL, NULL);
+	trigger_status = trigger_update_rec(trigger_rec, TRUE, trig_stats, NULL, NULL);
 	if (TRIG_SUCCESS == trigger_status)
 	{
 		GVTR_OP_TCOMMIT(cdb_status);
@@ -2022,7 +2035,7 @@ STATICFNDEF boolean_t trigger_update_rec_helper(char *trigger_rec, uint4 len, bo
 	return trigger_status;
 }
 
-boolean_t trigger_update(char *trigger_rec, uint4 len)
+boolean_t trigger_update(mval *trigger_rec)
 {
 	uint4			i;
 	uint4			trig_stats[NUM_STATS];
@@ -2057,7 +2070,7 @@ boolean_t trigger_update(char *trigger_rec, uint4 len)
 		{
 			assert(donot_INVOKE_MUMTSTART);	/* Make sure still set */
 			DEBUG_ONLY(lcl_t_tries = t_tries);
-			trigger_status = trigger_update_rec_helper(trigger_rec, len, TRUE, trig_stats);
+			trigger_status = trigger_update_rec_helper(trigger_rec, TRUE, trig_stats);
 			if (0 == dollar_tlevel)
 				break;
 			assert(0 < t_tries);
@@ -2083,7 +2096,7 @@ boolean_t trigger_update(char *trigger_rec, uint4 len)
 		}
 	} else
 	{
-		trigger_status = trigger_update_rec(trigger_rec, len, TRUE, trig_stats, NULL, NULL);
+		trigger_status = trigger_update_rec(trigger_rec, TRUE, trig_stats, NULL, NULL);
 		assert(0 < dollar_tlevel);
 	}
 	return (TRIG_FAILURE == trigger_status);

@@ -551,10 +551,13 @@ void mupip_restore(void)
 				{
 					gds_blk_downgrade((v15_blk_hdr_ptr_t)blk_ptr, (blk_hdr_ptr_t)blk_ptr);
 					size = (((v15_blk_hdr_ptr_t)blk_ptr)->bsiz + 1) & ~1;
+					assert((size <= old_blk_size) && (size >= SIZEOF(v15_blk_hdr)));
 				} else
+				{
 					size = (((blk_hdr_ptr_t)blk_ptr)->bsiz + 1) & ~1;
+					assert((size <= old_blk_size) && (size >= SIZEOF(blk_hdr)));
+				}
 			}
-			assert((size <= old_blk_size) && (size >= SIZEOF(blk_hdr)));
 			in_len = MIN(old_blk_size, size) - SIZEOF(blk_hdr);
 			if (!same_encr_settings && IS_BLK_ENCRYPTED(((blk_hdr_ptr_t)blk_ptr)->levl, in_len))
 			{

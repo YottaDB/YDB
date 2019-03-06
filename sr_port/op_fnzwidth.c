@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010, 2015 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "op.h"
 #include "patcode.h"
 #include "mvalconv.h"
-#ifdef	UNICODE_SUPPORTED
+#ifdef	UTF8_SUPPORTED
 #include <wchar.h>
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
@@ -34,7 +34,7 @@ void op_fnzwidth(mval* src, mval* dst)
 	MV_FORCE_STR(src);
 
 	srcptr = (unsigned char *)src->str.addr;
-#ifdef	UNICODE_SUPPORTED
+#ifdef	UTF8_SUPPORTED
 	if (!gtm_utf8_mode)
 	{
 #endif
@@ -44,7 +44,7 @@ void op_fnzwidth(mval* src, mval* dst)
 			if ((pattern_typemask[*srcptr] & PATM_C))
 				width -= 1;
 		}
-#ifdef	UNICODE_SUPPORTED
+#ifdef	UTF8_SUPPORTED
 	} else
 		width = gtm_wcswidth(srcptr, src->str.len, !badchar_inhibit, 0);
 #endif

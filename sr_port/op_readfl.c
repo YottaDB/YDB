@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -66,7 +66,7 @@ int op_readfl(mval *v, int4 length, mval *timeout)
 	SETUP_THREADGBL_ACCESS;
 	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, READTIMESTR);
 	/* Length is in units of characters, MAX_STRLEN and allocation unit in stp is bytes. Compute the worst case need in bytes.
-	 * Worst case, every Unicode char is 4 bytes
+	 * Worst case, every UTF char is 4 bytes
 	 */
 	b_length = (!IS_UTF_CHSET(io_curr_device.in->ichset)) ? length : (length * 4);
 	if (0 >= length)

@@ -86,6 +86,8 @@ GBLREF	int		*ht_sizes;
 #	define FREE_HASHTAB			free_hashtab_int4
 #	define REINITIALIZE_HASHTAB		reinitialize_hashtab_int4
 #	define COMPACT_HASHTAB			compact_hashtab_int4
+#	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_int4
+#	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_int4
 
 #elif defined(INT8_HASH)
 
@@ -108,6 +110,8 @@ GBLREF	int		*ht_sizes;
 #	define FREE_HASHTAB			free_hashtab_int8
 #	define REINITIALIZE_HASHTAB		reinitialize_hashtab_int8
 #	define COMPACT_HASHTAB			compact_hashtab_int8
+#	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_int8
+#	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_int8
 
 #elif defined(ADDR_HASH)
 
@@ -130,6 +134,8 @@ GBLREF	int		*ht_sizes;
 #	define FREE_HASHTAB			free_hashtab_addr
 #	define REINITIALIZE_HASHTAB		reinitialize_hashtab_addr
 #	define COMPACT_HASHTAB			compact_hashtab_addr
+#	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_addr
+#	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_addr
 
 #elif defined(MNAME_HASH)
 
@@ -159,6 +165,8 @@ GBLREF	int		*ht_sizes;
 #	define FREE_HASHTAB			free_hashtab_mname
 #	define REINITIALIZE_HASHTAB		reinitialize_hashtab_mname
 #	define COMPACT_HASHTAB			compact_hashtab_mname
+#	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_mname
+#	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_mname
 
 #elif defined(STRING_HASH)
 
@@ -186,6 +194,8 @@ GBLREF	int		*ht_sizes;
 #	define FREE_HASHTAB			free_hashtab_str
 #	define REINITIALIZE_HASHTAB		reinitialize_hashtab_str
 #	define COMPACT_HASHTAB			compact_hashtab_str
+#	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_str
+#	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_str
 
 #elif defined (OBJCODE_HASH)
 
@@ -212,6 +222,8 @@ GBLREF	int		*ht_sizes;
 #	define FREE_HASHTAB			free_hashtab_objcode
 #	define REINITIALIZE_HASHTAB		reinitialize_hashtab_objcode
 #	define COMPACT_HASHTAB			compact_hashtab_objcode
+#	define COPY_HASHTAB_TO_BUFFER		copy_hashtab_to_buffer_objcode
+#	define ACTIVATE_HASHTAB_IN_BUFFER	activate_hashtab_in_buffer_objcode
 
 #else
 #error undefined hash
@@ -300,6 +312,7 @@ GBLREF	int		*ht_sizes;
 #define HT_FIELDS_COMMON_INIT(table) 							\
 	table->exp_trigger_size = (double)table->size * HT_LOAD_FACTOR / 100.0;		\
 	table->cmp_trigger_size = (double)table->size * HT_REHASH_FACTOR / 100.0;	\
+	table->active = TRUE;								\
 	table->count = table->del_count = 0;
 
 /* Prototypes */
@@ -330,6 +343,7 @@ void INIT_HASHTAB(HASH_TABLE *table, int minsize, boolean_t dont_compact, boolea
 	table->dont_compact = dont_compact;
 	table->dont_keep_spare_table = dont_keep_spare_table;
 	table->defer_base_release = FALSE;
+	table->active = TRUE;
 	INIT_HASHTAB_INTL(table, minsize, NULL);
 }
 
@@ -445,6 +459,8 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 	HT_ENT 		*tabent, *topent, *dummy;
 	boolean_t	added;
 	void		*htval;
+
+	assert(TRUE == table->active);
 	CONDITION_HANDLER(hashtab_rehash_ch);
 	DCL_THREADGBL_ACCESS;
 
@@ -516,6 +532,7 @@ STATICFNDEF boolean_t ADD_HASHTAB_INTL(HASH_TABLE *table, HT_KEY_T *key, void *v
 	uint4	 	hash, ht_index, save_ht_index, prime, rhfact;
 #endif /* INT8_HASH */
 	HT_ENT		*oldbase, *first_del_ent, *tabbase;
+	assert(TRUE == table->active);
 	if (!changing_table_size && (table->count >= table->exp_trigger_size))
 	{
 		oldbase = table->base;
@@ -580,6 +597,7 @@ void *LOOKUP_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
 #	endif /* INT8_HASH */
 	HT_ENT		*tabent, *tabbase;
 
+	assert(TRUE == table->active);
 	tabbase = &table->base[0];
 	prime = table->size;
 	FIND_HASH(key, hash);
@@ -626,6 +644,7 @@ boolean_t DELETE_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
 #	endif /* INT8_HASH */
 	HT_ENT		*tabent, *tabbase;
 
+	assert(TRUE == table->active);
 	tabbase = &table->base[0];
 	prime = table->size;
 	FIND_HASH(key, hash);
@@ -650,6 +669,7 @@ boolean_t DELETE_HASHTAB(HASH_TABLE *table, HT_KEY_T *key)
  */
 void FREE_HASHTAB(HASH_TABLE *table)
 {
+	assert(TRUE == table->active);
 	if (table->base)
 	{
 		DBGHASHTAB((stderr, "FREE_HASHTAB:free table(%lx): base (%lx)\n", table, table->base));
@@ -670,6 +690,7 @@ void FREE_HASHTAB(HASH_TABLE *table)
  */
 void REINITIALIZE_HASHTAB(HASH_TABLE *table)
 {
+	assert(TRUE == table->active);
 	memset((char *)table->base, 0, (table->size * SIZEOF(HT_ENT)) + ((table->size / BITS_PER_UCHAR) + 1));
 	HT_FIELDS_COMMON_INIT(table);
 }
@@ -685,6 +706,7 @@ void COMPACT_HASHTAB(HASH_TABLE *table)
 {
 	HT_ENT	*oldbase;
 
+	assert(TRUE == table->active);
 	DBGHASHTAB((stderr, "COMPACT_HASHTAB: table(%lx)\n", table));
 	if (!table->dont_compact)
 	{
@@ -696,4 +718,81 @@ void COMPACT_HASHTAB(HASH_TABLE *table)
 			(table)->cmp_trigger_size = (table)->size;
 		}
 	}
+}
+
+/**
+ * Writes the hashtable to the specified buffer
+ * @param [in] table to write
+ * @param [out] buffer the location to write the table to; note that the caller is responsible for making sure the buffer is large
+ * 	enough for everything, including the literal representation of the records when they get written to the buffer
+ * @param [in] copy_entry_to_buffer function pointed to returns an int representing the number of bits written to the buffer
+ * 	and takes the current hash table entry along with a pointer to the buffer. It should write the hash table record to
+ * 	the buffer in a way that can later be read by another function
+ */
+sm_uc_ptr_t COPY_HASHTAB_TO_BUFFER(HASH_TABLE *table, sm_uc_ptr_t buffer, int (*copy_entry_to_buffer)(HT_ENT *, sm_uc_ptr_t))
+{
+	HT_ENT *cur, *top;
+	sm_uc_ptr_t bufptr;
+	int copied_data;
+	/* First we write the table entry to the buffer, then copy in each entry
+	 *  Lastly, we set the table in the buffer to have null pointers for the
+	 *  base and top pointers; these will have to be reconstituted when it's read
+	 *  from the storage
+	 */
+	assert(TRUE == table->active);
+	bufptr = buffer;
+	memcpy(bufptr, table, SIZEOF(HASH_TABLE));
+	bufptr += SIZEOF(HASH_TABLE);
+	/* Write the entry_passed_thru array to the buffer */
+	memcpy(bufptr, table->entry_passed_thru, ROUND_UP(table->size, BITS_PER_UCHAR));
+	bufptr += ROUND_UP(table->size, BITS_PER_UCHAR);
+	memcpy(bufptr, table->base, table->size * SIZEOF(HT_ENT));
+	bufptr += table->size * SIZEOF(HT_ENT);
+	if (NULL != copy_entry_to_buffer)
+	{
+		for(cur = table->base, top = table->top; cur < top; cur++) {
+			bufptr += (*copy_entry_to_buffer)(cur, bufptr);
+		}
+	}
+	table = (HASH_TABLE*)buffer;
+	table->base = NULL;
+	table->top = NULL;
+	table->spare_base = NULL;
+	table->active = FALSE;
+	return bufptr;
+}
+
+/**
+ * Constructs a hash table from the given buffer.
+ *
+ * The buffer is expected to stay alive for the duration of
+ *  the life of the hastable; we don't perform an extra copy
+ * @param [in] buffer the written hashtable value; note that the caller is responsible for making the buffer
+ * 	is large enough for the hash table, hash table entries, and the values the entries point too
+ * @param [in] copy_entry_from_buffer function pointed to returns an int representing bits used in the buffer,
+ * 	and takes the current hash table entry along with a pointer to the buffer. It should fill out the hash
+ * 	table entry
+ */
+HASH_TABLE *ACTIVATE_HASHTAB_IN_BUFFER(sm_uc_ptr_t buffer, int (*copy_entry_from_buffer)(HT_ENT *, sm_uc_ptr_t))
+{
+	int i;
+	HT_ENT *cur, *top;
+
+	HASH_TABLE *table = (HASH_TABLE *)buffer;
+	if (TRUE == table->active)
+		return table;
+	buffer += SIZEOF(HASH_TABLE);
+	table->entry_passed_thru = buffer;
+	buffer += ROUND_UP(table->size, BITS_PER_UCHAR);
+	table->base = (HT_ENT *)buffer;
+	buffer += table->size * SIZEOF(HT_ENT);
+	table->top = (HT_ENT *)buffer;
+	table->active = TRUE;
+	if (NULL != copy_entry_from_buffer)
+	{
+		for(cur = table->base, top = table->top; cur < top; cur++) {
+			buffer += (*copy_entry_from_buffer)(cur, buffer);
+		}
+	}
+	return table;
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -56,6 +56,10 @@
 #include "gv_trigger.h"
 #include "gtm_trigger.h"
 #endif
+#include "xfer_enum.h"
+#include "deferred_events.h"
+#include "deferred_events_queue.h"
+#include "ztimeout_routines.h"
 
 GBLREF symval			*curr_symval;
 GBLREF boolean_t		dollar_truth;
@@ -117,6 +121,8 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 	socket_struct		*socketptr;
 	zintcmd_ops		zintcmd_command;
 	intrpt_state_t		prev_intrpt_state;
+	int4			event_type, param_val;
+	void (*set_fn)		(int4 param);
 	UNIX_ONLY(d_tt_struct	*tt_ptr;)
 	DBGRFCT_ONLY(mident_fixed vname;)
 	DCL_THREADGBL_ACCESS;
@@ -141,11 +147,31 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				} else
 					ztrap_explicit_null = FALSE;
 				(TREF(dollar_etrap)).str.len = 0;
-				if (tp_timeout_deferred UNIX_ONLY( && !dollar_zininterrupt))
+				if ((TREF(save_xfer_root)))
+				{
+				/*If TP timeout or ztimeout, check conditions before popping out */
+					if (((TREF(save_xfer_root))->set_fn == tptimeout_set)
+						|| ((TREF(save_xfer_root))->set_fn == ztimeout_set))
+					{
+						if ((tp_timeout_deferred || TREF(ztimeout_deferred))
+							UNIX_ONLY(&& !dollar_zininterrupt) && ((0 == dollar_ecode.index)
+									|| !(ETRAP_IN_EFFECT)))
+						{
+							DBGDFRDEVNT((stderr, "Calling pop_reset_xfer from unw_mv_ent\n"));
+							POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
+							xfer_set_handlers(event_type, set_fn, param_val, TRUE);
+						}
+					} else
+					{
+						DBGDFRDEVNT((stderr, "Calling pop_reset_xfer from unw_mv_ent\n"));
+						POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
+						xfer_set_handlers(event_type, set_fn, param_val, TRUE);
+					}
+				}
+/*				if (tp_timeout_deferred UNIX_ONLY( && !dollar_zininterrupt))*/
 					/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and we are not in a
 					 * job interrupt, the timeout can no longer be deferred and needs to be recognized.
 					 */
-					tptimeout_set(0);
 			} else if (mv_st_ent->mv_st_cont.mvs_msav.addr == &dollar_zgbldir)
 			{
 				/* Restore GLD if a match is found, otherwise defer setting gd_header */
@@ -465,6 +491,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				TREF(dollar_ztrap) = mv_st_ent->mv_st_cont.mvs_trigr.dollar_ztrap_save;
 				ztrap_explicit_null = mv_st_ent->mv_st_cont.mvs_trigr.ztrap_explicit_null_save;
 			}
+<<<<<<< HEAD
 			if (TREF(trig_forced_unwind))
 			{	/* This is a forced unwind of the trigger context so reset the condition handler stack too */
 				DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
@@ -491,12 +518,48 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				TREF(trig_forced_unwind) = FALSE;
 			}
 			if (tp_timeout_deferred && !((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)) && !dollar_zininterrupt)
+=======
+			DEFER_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
+			CHECKHIGHBOUND(mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
+			CHECKLOWBOUND(mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save);
+			ctxt = mv_st_ent->mv_st_cont.mvs_trigr.ctxt_save;
+			/* same assert as in gtm_trigger.c */
+			assert(((0 == gtm_trigger_depth)
+					&& (((ch_at_trigger_init == ctxt->ch)
+						|| ((ch_at_trigger_init == (ctxt - 1)->ch)
+							&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
+								|| (&gvcst_spr_kill_ch == ctxt->ch))))))
+				|| ((0 < gtm_trigger_depth)
+					&& (((&mdb_condition_handler == ctxt->ch)
+						|| ((&mdb_condition_handler == (ctxt - 1)->ch)
+							&& ((&gvcst_put_ch == ctxt->ch) || (&gvcst_kill_ch == ctxt->ch)
+								|| (&gvcst_spr_kill_ch == ctxt->ch)))))));
+			active_ch = ctxt;
+			ctxt->ch_active = FALSE;
+			ENABLE_INTERRUPTS(INTRPT_IN_CONDSTK, prev_intrpt_state);
+			if ((TREF(save_xfer_root)))
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 			{	/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and/or we are no
 				 * longer in a job interrupt, the timeout can no longer be deferred and needs to be
 				 * recognized.
 				 */
-				tp_timeout_deferred = FALSE;
-				tptimeout_set(0);
+				if (((TREF(save_xfer_root))->set_fn == tptimeout_set)
+					|| ((TREF(save_xfer_root))->set_fn == ztimeout_set))
+				{
+					if ((tp_timeout_deferred || TREF(ztimeout_deferred))
+						UNIX_ONLY(&& !dollar_zininterrupt) && ((0 == dollar_ecode.index)
+									|| !(ETRAP_IN_EFFECT)))
+					{
+						DBGDFRDEVNT((stderr, "Calling pop_reset_xfer from unw_mv_ent\n"));
+						POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
+						xfer_set_handlers(event_type, set_fn, param_val, TRUE);
+					}
+				} else
+				{
+					DBGDFRDEVNT((stderr, "Calling pop_reset_xfer from unw_mv_ent\n"));
+					POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
+					xfer_set_handlers(event_type, set_fn, param_val, TRUE);
+				}
 			}
 #			endif	/* GTM_TRIGGER */
 			return;

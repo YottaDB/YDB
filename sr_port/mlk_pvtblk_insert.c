@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 74ea4a3c... GT.M V6.3-006
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,10 +40,10 @@ int mlk_pvtblk_insert(mlk_pvtblk *pblk)
 	bool new;
 	mlk_pvtblk *temp, *inlist1, *inlist2, *save_store;
 
-	if (pblk->region->dyn.addr->acc_meth == dba_cm)
+	if (pblk->pvtctl.region->dyn.addr->acc_meth == dba_cm)
 	{
 		save_store = mlk_pvt_root;
-		mlk_pvt_root = ((link_info *)pblk->region->dyn.addr->cm_blk->usr)->netlocks;
+		mlk_pvt_root = ((link_info *)pblk->pvtctl.region->dyn.addr->cm_blk->usr)->netlocks;
 	}
 
 	if (!mlk_pvt_root)
@@ -83,10 +88,10 @@ int mlk_pvtblk_insert(mlk_pvtblk *pblk)
 			new = TRUE;
 		}
 	}
-	if (pblk->region->dyn.addr->acc_meth == dba_cm)
+	if (pblk->pvtctl.region->dyn.addr->acc_meth == dba_cm)
 	{
-		((link_info *)pblk->region->dyn.addr->cm_blk->usr)->netlocks = mlk_pvt_root;
-		((link_info *)pblk->region->dyn.addr->cm_blk->usr)->lck_info |= REQUEST_PENDING;
+		((link_info *)pblk->pvtctl.region->dyn.addr->cm_blk->usr)->netlocks = mlk_pvt_root;
+		((link_info *)pblk->pvtctl.region->dyn.addr->cm_blk->usr)->lck_info |= REQUEST_PENDING;
 		mlk_pvt_root = save_store;
 		remlkreq = TRUE;
 	}

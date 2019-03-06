@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -14,6 +14,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "mvalconv.h"
 
 #include <stddef.h>
 
@@ -22,6 +23,7 @@
 #include "mlkdef.h"
 #include "copy.h"
 #include "mlk_shrblk_create.h"
+<<<<<<< HEAD
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -31,12 +33,32 @@
 #include "gdsbgtr.h"
 
 void mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum);
+=======
+#include "mlk_shrhash_find_bucket.h"
+#include "mlk_garbage_collect.h"
+#include "gdsfhead.h"
+#include "filestruct.h"
+#include "mlk_ops.h"
+
+#ifdef MLK_SHRHASH_DEBUG
+#define SHRHASH_DEBUG_ONLY(x) x
+#else
+#define SHRHASH_DEBUG_ONLY(x)
+#endif
+
+boolean_t mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum);
+#ifdef MLK_SHRHASH_DEBUG
+void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
+#endif
+>>>>>>> 74ea4a3c... GT.M V6.3-006
+
+#define MAX_TRIES 4
 
 mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 				   unsigned char *val,		/* the subscript */
 				   int len,			/* subscript's length */
 				   mlk_shrblk_ptr_t par,	/* pointer to the parent (zero if top level) */
-				   ptroff_t *ptr,		/* parent's pointer to us (zero if we are not the eldest child */
+				   ptroff_t *ptr,		/* parent's pointer to us (zero if we are not the eldest child) */
 				   int nshrs)			/* number of shrblks remaining to be created for this operation */
 {
 	mlk_ctldata_ptr_t	ctl;
@@ -44,58 +66,103 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 	mlk_shrsub_ptr_t	subptr;
 	ptroff_t		n;
 
-	ctl = p->ctlptr;
+	ctl = p->pvtctl.ctl;
 	if ((ctl->subtop - ctl->subfree) < (MLK_PVTBLK_SHRSUB_SIZE(p, nshrs) - (val - p->value)) || ctl->blkcnt < nshrs)
 		return NULL; /* There is not enough substring or shared block space */
+	CHECK_SHRBLKPTR(ctl->blkfree, p->pvtctl);
+	assert(ctl->blkfree != 0);
 	ret = (mlk_shrblk_ptr_t)R2A(ctl->blkfree);
 	ctl->blkcnt--;
+	CHECK_SHRBLKPTR(ret->rsib, p->pvtctl);
 	if (ret->rsib == 0)
 		ctl->blkfree = 0;
 	else
 	{
 		shr1 = (mlk_shrblk_ptr_t)R2A(ret->rsib);
+		shr1->lsib = 0;
 		A2R(ctl->blkfree, shr1);
+		CHECK_SHRBLKPTR(ctl->blkfree, p->pvtctl);
+		CHECK_SHRBLKPTR(shr1->rsib, p->pvtctl);
 	}
 	memset(ret, 0, SIZEOF(*ret));
 	if (par)
 		A2R(ret->parent, par);
+	else
+		ret->parent = 0;
 	if (ptr)
+	{
+		assert(0 == *ptr);
 		A2R(*ptr, ret);
+	}
 	n = (ptroff_t)ROUND_UP(OFFSETOF(mlk_shrsub, data[0]) + len, SIZEOF(ptroff_t));
 	subptr = (mlk_shrsub_ptr_t)R2A(ctl->subfree);
 	ctl->subfree += n;
 	A2R(ret->value, subptr);
-	n = (ptroff_t)((sm_uc_ptr_t)ret - (sm_uc_ptr_t)&subptr->backpointer);
-	assert (n < 0);
-	subptr->backpointer = n;
+	A2R(subptr->backpointer, ret);
+	assert(subptr->backpointer < 0);
 	subptr->length = len;
 	memcpy(subptr->data, val, len);
-	mlk_shrhash_add(p, ret, p->subscript_cnt - nshrs);
-	return ret;
+	ret->hash = MLK_PVTBLK_SUBHASH(p, p->subscript_cnt - nshrs);
+	if (mlk_shrhash_add(p, ret, p->subscript_cnt - nshrs))
+		return ret;
+	/* We failed to add the block; return the shrblk and shrsub to the free lists */
+	memset(subptr, 0, SIZEOF(mlk_shrsub));
+	ctl->subfree -= n;
+	memset(ret, 0, SIZEOF(mlk_shrblk));
+	if (ctl->blkfree)
+		A2R(ret->rsib, R2A(ctl->blkfree));
+	else
+		ret->rsib = 0;
+	A2R(ctl->blkfree, ret);
+	if (ptr)
+		*ptr = 0;
+	ctl->blkcnt++;
+	return NULL;
 }
 
-void mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum)
+boolean_t mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum)
 {
+<<<<<<< HEAD
 	int			bi, fi, si, mi, bitnum;
+=======
+	int			bi, fi, si, mi, loop_cnt, tries = 0;
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 	uint4			hash, num_buckets, usedmap;
 	boolean_t		bucket_full;
 	mlk_shrhash_ptr_t	shrhash, bucket, free_bucket, search_bucket, move_bucket;
 	mlk_shrblk_ptr_t	move_shrblk;
+	char			*str_ptr;
+	mlk_shrsub_ptr_t	sub;
 
 	SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(p->ctlptr));
-	shrhash = (mlk_shrhash_ptr_t)R2A(p->ctlptr->blkhash);
-	num_buckets = p->ctlptr->num_blkhash;
+	shrhash = p->pvtctl.shrhash;
+	num_buckets = p->pvtctl.shrhash_size;
 	hash = MLK_PVTBLK_SUBHASH(p, subnum);
 	bi = hash % num_buckets;
 	bucket = &shrhash[bi];
+<<<<<<< HEAD
 	if (0 == bucket->shrblk)
+=======
+	assert(MLK_SHRHASH_MAP_MAX >= bucket->usedmap);
+#	ifdef DEBUG
+	if (WBTEST_ENABLED(WBTEST_LOCK_HASH_ZTW))
+	{
+		GBLREF mval dollar_ztwormhole;
+
+		i2mval(&dollar_ztwormhole, bi);
+		MV_FORCE_STRD(&dollar_ztwormhole);
+	}
+#	endif
+	if (0 == bucket->shrblk_idx)
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 	{	/* Target bucket is free, so just use it. */
-		assert(0 == (bucket->usedmap & 1U));
-		A2R(bucket->shrblk, shr);
-		assert(0 < bucket->shrblk);
+		assert(!IS_NEIGHBOR(bucket->usedmap, 0));
+		bucket->shrblk_idx = MLK_SHRBLK_IDX(p->pvtctl, shr);
+		assert(0 < bucket->shrblk_idx);
 		bucket->hash = hash;
-		bucket->usedmap |= 1U;
+		SET_NEIGHBOR(bucket->usedmap, 0);
 		SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(p->ctlptr));
+<<<<<<< HEAD
 		return;
 	}
 	/* Search for free bucket */
@@ -221,3 +288,14 @@ void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl)
 }
 
 #endif
+=======
+		return TRUE;
+	}
+	fi = mlk_shrhash_find_bucket(&p->pvtctl, hash);
+	if (fi == -1)
+		return FALSE;
+	/* We found one close enough, so store the new data there */
+	mlk_shrhash_insert(&p->pvtctl, bi, fi, MLK_SHRBLK_IDX(p->pvtctl, shr), hash);
+	return TRUE;
+}
+>>>>>>> 74ea4a3c... GT.M V6.3-006

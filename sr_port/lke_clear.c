@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,7 @@
  * used in     : lke.c
  * -------------------------------------------------
  */
+#include <sys/shm.h>
 
 #include "mdef.h"
 
@@ -40,6 +41,8 @@
 #include "gtmmsg.h"
 #include "interlock.h"
 #include "rel_quant.h"
+#include "do_shmat.h"
+#include "mlk_ops.h"
 
 #define NOFLUSH 0
 #define FLUSH	1
@@ -61,10 +64,9 @@ void	lke_clear(void)
 	int4		pid;
 	int		n;
 	char		regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];
-	mlk_ctldata_ptr_t	ctl;
 	mstr		regname, node, one_lock;
 	gd_region	*reg;
-	sgmnt_addrs	*csa;
+	mlk_pvtctl	pctl;
 
 	/* Get all command parameters */
 	regname.addr = regbuf;
@@ -73,7 +75,7 @@ void	lke_clear(void)
 	node.len = SIZEOF(nodebuf);
 	one_lock.addr = one_lockbuf;
 	one_lock.len = SIZEOF(one_lockbuf);
-	if (lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact) == 0)
+	if (lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0) == 0)
 		return;
 	/* Search all regions specified on the command line */
 	for (reg = gd_header->regions, n = 0; n != gd_header->n_regions; ++reg, ++n)
@@ -100,15 +102,14 @@ void	lke_clear(void)
 #				endif
 			} else if (IS_REG_BG_OR_MM(reg))
 			{	/* Local region */
-				csa = &FILE_INFO(reg)->s_addrs;
-				ctl = (mlk_ctldata_ptr_t)csa->lock_addrs[0];
+				MLK_PVTCTL_INIT(pctl, reg);
 				/* Prevent any modifications of locks while we are clearing */
-				GRAB_LOCK_CRIT(csa, reg, was_crit);
-				locks = ctl->blkroot == 0 ? FALSE
-							  : lke_cleartree(reg, NULL, ctl,
-									 (mlk_shrblk_ptr_t)R2A(ctl->blkroot),
+				GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
+				locks = pctl.ctl->blkroot == 0 ? FALSE
+							  : lke_cleartree(&pctl, NULL,
+									  (mlk_shrblk_ptr_t)R2A(pctl.ctl->blkroot),
 									  all, interactive, pid, one_lock, exact);
-				REL_LOCK_CRIT(csa, reg, was_crit);
+				REL_LOCK_CRIT(pctl, was_crit);
 			} else
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_BADREGION, 0);

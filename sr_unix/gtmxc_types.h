@@ -21,7 +21,57 @@
 #ifndef GTMXC_TYPES_H
 #define GTMXC_TYPES_H
 
+<<<<<<< HEAD
 #include "libyottadb.h"
+=======
+#include <sys/types.h>	/* For intptr_t */
+#include "inttypes.h"	/* .. ditto (defined different places in different platforms) .. */
+
+#ifdef __osf__
+/* Ensure 32-bit pointers for compatibility with GT.M internal representations.  */
+#pragma pointer_size (save)
+#pragma pointer_size (short)
+#endif
+typedef int		gtm_status_t;
+typedef	int		gtm_int_t;
+typedef unsigned int 	gtm_uint_t;
+#if defined(__osf__)
+typedef	int		gtm_long_t;
+typedef unsigned int 	gtm_ulong_t;
+#else
+typedef	long		gtm_long_t;
+typedef unsigned long 	gtm_ulong_t;
+#endif
+typedef	float		gtm_float_t;
+typedef	double		gtm_double_t;
+typedef	char		gtm_char_t;
+typedef int		(*gtm_pointertofunc_t)();
+/* Structure for passing (non-NULL-terminated) character arrays whose length corresponds to the value of the
+ * 'length' field. Note that for output-only gtm_string_t * arguments the 'length' field is set to the
+ * preallocation size of the buffer pointed to by 'address', while the first character of the buffer is '\0'.
+ */
+typedef struct
+{
+	gtm_long_t	length;
+	gtm_char_t	*address;
+}	gtm_string_t;
+#ifdef __osf__
+#pragma pointer_size (restore)
+#endif
+
+struct extcall_string
+{
+        long    len;
+        char    *addr;
+};
+
+
+#if !defined(__alpha)
+typedef intptr_t	gtm_tid_t;
+#else
+typedef int		gtm_tid_t;
+#endif
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
 /* Define types for GT.M backward compatibility. */
 typedef ydb_status_t		gtm_status_t;

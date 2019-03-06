@@ -68,7 +68,6 @@
 #include "gtmci.h"		/* for "gtm_levl_ret_code" prototype */
 
 #ifdef GTM_TRIGGER
-#define PREFIX_SPACE		" "
 #define EMBED_SOURCE_PARM	" -EMBED_SOURCE "
 #define ERROR_CAUSING_JUNK	"XX XX XX XX"
 #define NEWLINE			"\n"

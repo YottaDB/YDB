@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
@@ -18,8 +18,8 @@
 #
 ###########################################################################################
 #
-#	check_unicode_support.csh - Checks if icu library and utf8 locale is available
-#	setenv is_unicode_support to TRUE/FALSE
+#	check_utf8_support.csh - Checks if icu library and utf8 locale is available
+#	setenv is_utf8_support to TRUE/FALSE
 #	Returns :
 #		TRUE - if both icu library and utf8 locale is installed
 #		FALSE - if either of them is not available
@@ -67,11 +67,11 @@ foreach libdir ( {/usr/local,/usr,}/lib{64,/arm-linux-gnueabihf,/aarch64-linux-g
 end
 # The calling gtm installation script should sould source this script in order to avoid duplication of 'setenv LD_LIBRARY_PATH'
 # The gtm-internal test system runs it within `...` in a few places and sets the return value to an env variable
-# To aid both the cases above, do a 'setenv is_unicode_support' as well as 'echo' of TRUE/FALSE
+# To aid both the cases above, do a 'setenv is_utf8_support' as well as 'echo' of TRUE/FALSE
 if ($found_icu && $utflocale != "") then
-	setenv is_unicode_support TRUE
-	echo "TRUE" # the system has unicode/utf8 support
+	setenv is_utf8_support TRUE
+	echo "TRUE" # the system has utf8 support
 else
-	setenv is_unicode_support FALSE
-	echo "FALSE" # the system doesn't have unicode/utf8 support
+	setenv is_utf8_support FALSE
+	echo "FALSE" # the system doesn't have utf8 support
 endif

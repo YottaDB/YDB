@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -210,7 +210,7 @@ ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2);
 void		sys_get_curr_time(ABS_TIME *atp);
 void		prealloc_gt_timers(void);
 void		set_blocksig(void);
-void		check_for_timer_pops(void);
+void		check_for_timer_pops(boolean_t sig_handler_changed);
 GT_TIMER	*find_timer_intr_safe(TID tid, GT_TIMER **tprev);
 void		check_for_deferred_timers(void);
 void		add_safe_timer_handler(int safetmr_cnt, ...);

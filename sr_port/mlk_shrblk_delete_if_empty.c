@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -22,24 +22,34 @@
 #include "mlk_shrblk_delete_if_empty.h"
 #include "mmrhash.h"
 
-void mlk_shrhash_delete(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d);
+void mlk_shrhash_delete(mlk_pvtctl_ptr_t ctl, mlk_shrblk_ptr_t d);
 void mlk_shrhash_val_build(mlk_shrblk_ptr_t d, uint4 *total_len, hash128_state_t *hs);
 
-boolean_t mlk_shrblk_delete_if_empty(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d)
+boolean_t mlk_shrblk_delete_if_empty(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 {
-	mlk_shrblk_ptr_t	r, l, p;
+	mlk_shrblk_ptr_t	r, l, p, child;
 	mlk_shrsub_ptr_t	sub;
+#	ifdef DEBUG
+	ptroff_t		offset;
+#	endif
 
 	if (d->children != 0  ||  d->owner != 0  ||  d->pending != 0)
 		return FALSE;
+#	ifdef DEBUG
+	A2R(offset, d);
+	CHECK_SHRBLKPTR(offset, *pctl);
+#	endif
 	p = (d->parent == 0) ? NULL : (mlk_shrblk_ptr_t)R2A(d->parent);
+	if (p)
+		CHECK_SHRBLKPTR(d->parent, *pctl);
+	assertpro((0 != d->lsib) && (0 != d->rsib));
 	l = (mlk_shrblk_ptr_t)R2A(d->lsib);
 	r = (mlk_shrblk_ptr_t)R2A(d->rsib);
-	mlk_shrhash_delete(ctl, d);
+	mlk_shrhash_delete(pctl, d);
 	if (d == r)
-	{
+	{	/* If d == r, it means d is the last element in the sibling circular list */
 		if (p == NULL)
-			ctl->blkroot = 0;
+			pctl->ctl->blkroot = 0;
 		else
 			p->children = 0;
 	} else
@@ -47,41 +57,69 @@ boolean_t mlk_shrblk_delete_if_empty(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d)
 		assert(d != l);
 		A2R(r->lsib, l);
 		A2R(l->rsib, r);
-		if (p != NULL  &&  (mlk_shrblk_ptr_t)R2A(p->children) == d)
+		if ((p != NULL) && (mlk_shrblk_ptr_t)R2A(p->children) == d)
+		{
 			A2R(p->children, r);
-		else if ((mlk_shrblk_ptr_t)R2A(ctl->blkroot) == d)
-			A2R(ctl->blkroot, r);
+			if (l == r)
+				assertpro((mlk_shrblk_ptr_t)R2A(p->children) == l);
+		}
+		if ((mlk_shrblk_ptr_t)R2A(pctl->ctl->blkroot) == d)
+		{
+			assertpro(p == NULL);
+			A2R(pctl->ctl->blkroot, r);
+		}
+	}
+	if (p)
+	{
+		assertpro(!p->children || ((mlk_shrblk_ptr_t)R2A(p->children) != d));
+		if (p->children)
+		{
+			child = (mlk_shrblk_ptr_t)R2A(p->children);
+			assertpro((mlk_shrblk_ptr_t)R2A(child->parent) == p);
+		}
 	}
 	sub = (mlk_shrsub_ptr_t)R2A(d->value);
 	sub->backpointer = 0;
-	p = (mlk_shrblk_ptr_t)R2A(ctl->blkfree);
 	memset(d, 0, SIZEOF(mlk_shrblk));
-	A2R(d->rsib, p);
-	A2R(ctl->blkfree, d);
-	++ctl->blkcnt;
+	if (0 != pctl->ctl->blkfree)
+	{
+		p = (mlk_shrblk_ptr_t)R2A(pctl->ctl->blkfree);
+		A2R(d->rsib, p);
+	}
+	d->lsib = INVALID_LSIB_MARKER;
+	A2R(pctl->ctl->blkfree, d);
+	++pctl->ctl->blkcnt;
 	return TRUE;
 }
 
-void mlk_shrhash_delete(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d)
+void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 {
 	hash128_state_t		hs;
 	gtm_uint16		hashres;
-	uint4			hash, total_len = 0, num_buckets, usedmap;
+	uint4			hash, total_len, num_buckets;
+	mlk_shrhash_map_t	usedmap;
 	mlk_shrblk_ptr_t	search_shrblk;
 	int			bi, si, bitnum;
 	boolean_t		bitnum_set;
 	mlk_shrhash_ptr_t	shrhash, bucket, search_bucket;
 
-	shrhash = (mlk_shrhash_ptr_t)R2A(ctl->blkhash);
-	num_buckets = ctl->num_blkhash;
+	shrhash = pctl->shrhash;
+	num_buckets = pctl->shrhash_size;
+#	ifdef DEBUG
 	HASH128_STATE_INIT(hs, 0);
+	total_len = 0;
 	mlk_shrhash_val_build(d, &total_len, &hs);
 	gtmmrhash_128_result(&hs, total_len, &hashres);
 	DBG_LOCKHASH_N_BITS(hashres.one);
 	hash = (uint4)hashres.one;
+	assert(hash == d->hash);
+#	else
+	hash = d->hash;
+#	endif
 	bi = hash % num_buckets;
 	bucket = &shrhash[bi];
 	usedmap = bucket->usedmap;
+<<<<<<< HEAD
 	bitnum_set = FALSE;
 	assert(usedmap);
 	if (0 == (usedmap & (1U << MLK_SHRHASH_HIGHBIT)))
@@ -122,6 +160,24 @@ void mlk_shrhash_delete(mlk_ctldata_ptr_t ctl, mlk_shrblk_ptr_t d)
 			}
 			si = (si + 1) % num_buckets;
 			assert(si != bi); /* We should have seen the shrblk BEFORE the end of one full scan of the hash array */
+=======
+	for (si = bi ; 0 != usedmap ; (si = (si + 1) % num_buckets), (usedmap >>= 1))
+	{
+		if (0 == (usedmap & 1U))
+			continue;
+		search_bucket = &shrhash[si];
+		if (search_bucket->hash != hash)
+			continue;
+		assert(0 != search_bucket->shrblk_idx);
+		search_shrblk = MLK_SHRHASH_SHRBLK(*pctl, search_bucket);
+		if (d == search_shrblk)
+		{
+			assert(IS_NEIGHBOR(bucket->usedmap, (num_buckets + si - bi) % num_buckets));
+			search_bucket->shrblk_idx = 0;
+			search_bucket->hash = 0;
+			CLEAR_NEIGHBOR(bucket->usedmap, (num_buckets + si - bi) % num_buckets);
+			return;
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 		}
 	}
 	assert(bitnum_set);
@@ -151,6 +207,7 @@ void mlk_shrhash_val_build(mlk_shrblk_ptr_t d, uint4 *total_len, hash128_state_t
 {
 	mlk_shrsub_ptr_t	shrsub;
 
+	assertpro(0 != d->value);
 	if (d->parent)
 		mlk_shrhash_val_build((mlk_shrblk_ptr_t)R2A(d->parent), total_len, hs);
 	shrsub = (mlk_shrsub_ptr_t)R2A(d->value);

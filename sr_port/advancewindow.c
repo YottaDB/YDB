@@ -25,7 +25,7 @@
 #include "advancewindow.h"
 #include "show_source_line.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #include "gtm_icu_api.h"	/* U_ISPRINT() needs this header */
 #endif
@@ -56,10 +56,10 @@ static readonly unsigned char apos_ok[] =
 void advancewindow(void)
 {
 	unsigned char	*cp1, *cp2, *cp3, *cptop, *cptr;
-	unsigned char	*error, errtxt[(3 + 1) UNICODE_ONLY(* GTM_MB_LEN_MAX)], x;	/* up to 3 digits/byte & a comma */
+	unsigned char	*error, errtxt[(3 + 1) UTF8_ONLY(* GTM_MB_LEN_MAX)], x;	/* up to 3 digits/byte & a comma */
 	char		*tmp;
 	int		y, charlen;
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	uint4		ch;
 #	endif
 	DCL_THREADGBL_ACCESS;
@@ -82,7 +82,7 @@ void advancewindow(void)
 		{	/* Not looking like a <CR><LF>, so it's an error */
 			y = TK_ERROR;
 			break;
-		}	/* WARNING fall through - it is a <CR><LF>*/
+		}	/* WARNING fall through - it is a <CR><LF> */
 	case TK_EOL:
 		TREF(director_token) = TK_EOL;
 		return;		/* if next character is terminator, avoid incrementing past it */
@@ -92,13 +92,13 @@ void advancewindow(void)
 		cp2 = cp3 = stringpool.free;
 		for (cp1 = (unsigned char *)TREF(lexical_ptr) + 1; cp1 <= cptop;)
 		{
-#			ifdef UNICODE_SUPPORTED
+#			ifdef UTF8_SUPPORTED
 			if (gtm_utf8_mode)
 				cptr = (unsigned char *)UTF8_MBTOWC((sm_uc_ptr_t)cp1, (TREF(source_buffer)).addr
 					+ (TREF(source_buffer)).len, ch);
 #			endif
 			x = *cp1++;
-			if ((SP > x) UNICODE_ONLY(|| (gtm_utf8_mode && !(U_ISPRINT(ch)))))
+			if ((SP > x) UTF8_ONLY(|| (gtm_utf8_mode && !(U_ISPRINT(ch)))))
 			{
 				TREF(last_source_column) = (cp1 - (unsigned char*)((TREF(source_buffer)).addr));
 				if (!run_time)
@@ -110,7 +110,7 @@ void advancewindow(void)
 					}
 					if (!gtm_utf8_mode)
 						charlen = 1;			/* always one character in M mode */
-#					ifdef UNICODE_SUPPORTED
+#					ifdef UTF8_SUPPORTED
 					else
 					{
 						charlen = cptr - cp1 + 1;	/* get the number of bytes in the utf8 character */
@@ -132,14 +132,14 @@ void advancewindow(void)
 			}
 			if ('\"' == x)
 			{
-				UNICODE_ONLY(assert(!gtm_utf8_mode || (cp1 == cptr)));
+				UTF8_ONLY(assert(!gtm_utf8_mode || (cp1 == cptr)));
 				if ('\"' == *cp1)
 					cp1++;
 				else
 					break;
 			}
 			*cp2++ = x;
-#			ifdef UNICODE_SUPPORTED
+#			ifdef UTF8_SUPPORTED
 			if (gtm_utf8_mode && (cptr > cp1))
 			{
 				assert(4 > (cptr - cp1));
@@ -163,7 +163,7 @@ void advancewindow(void)
 		CLEAR_MVAL_BITS(TADR(director_mval));
 		stringpool.free = cp2;
 		s2n(&(TREF(director_mval)));
-#		ifdef UNICODE_SUPPORTED
+#		ifdef UTF8_SUPPORTED
 		if (gtm_utf8_mode && !run_time)
 		{	/* UTF8 mode and not compiling an indirect gets an optimization to set the
 			 * (true) length of the string into the mval

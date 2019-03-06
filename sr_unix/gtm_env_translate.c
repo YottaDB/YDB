@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2006, 2011 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 74ea4a3c... GT.M V6.3-006
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +57,7 @@ mval* gtm_env_translate(mval* val1, mval* val2, mval* val_xlated)
 			pakhandle = fgn_getpak(pakname, ERROR);
 			dlopen_handle_array_add(pakhandle);
 			SFPTR(gtm_env_xlate_entry, (fgnfnc)fgn_getrtn(pakhandle, &routine_name, ERROR));
-			/* With Unicode mstr changes, xc_string_t is no longer compatible with mstr
+			/* With UTF8 mstr changes, xc_string_t is no longer compatible with mstr
 			 * so explicit copy of len/addr fields required */
 		}
 		in1.length = val1->str.len;

@@ -52,6 +52,7 @@
 #include "setzdir.h"
 #include "get_reference.h"
 #include "dollar_quit.h"
+#include "ztimeout_routines.h"
 #ifdef UNIX
 #  include "iormdef.h"
 #  ifdef DEBUG
@@ -627,6 +628,9 @@ void op_svget(int varnum, mval *v)
 		case SV_ZSTRPLLIM:
 			count = TREF(gtm_strpllim);
 			MV_FORCE_MVAL(v, count);
+			break;
+		case SV_ZTIMEOUT:
+			get_ztimeout(v);
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSVN);

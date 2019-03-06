@@ -31,8 +31,6 @@ void warn_db_sz(char *db_fname, uint4 prev_blocks, uint4 curr_blocks, int4 tot_b
 	if (new_sz_frac < SPCWARNTHRESHOLD)
 		return;
 	old_sz_frac = (((float)prev_blocks) / tot_blocks) * 100;
-	/*Adjust curr_blocks by one to accurately reflect the number of blocks in use*/
-	curr_blocks--;
 	/*To check if we've crossed a 1% boundary*/
 	diff = ((int)new_sz_frac) - ((int)old_sz_frac);
 	if (diff >= 1)

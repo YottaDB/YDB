@@ -1,7 +1,8 @@
 #! tcsh -f
 #################################################################
 #								#
-#	Copyright 2007, 2011 Fidelity Information Services, Inc	#
+# Copyright (c) 2007-2018 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -21,8 +22,8 @@
 #
 #######################################################################
 
-set checkunicode = "../sr_unix/check_unicode_support.csh"
-if ( -e $checkunicode ) then
+set checkutf8 = "../sr_unix/check_utf8_support.csh"
+if ( -e $checkutf8 ) then
     set incdir = ""
     if ( "Linux" == `uname` && "64" == "$gt_build_type" ) then
 	switch (`uname -m`)
@@ -36,8 +37,8 @@ if ( -e $checkunicode ) then
 	    breaksw
 	endsw
     endif
-    source $checkunicode $incdir
-    if ("TRUE" == "$is_unicode_support") then
+    source $checkutf8 $incdir
+    if ("TRUE" == "$is_utf8_support") then
 	if (! -e utf8) mkdir utf8
 	if ( "OS/390" == $HOSTOS ) then
 		setenv gtm_chset_locale $utflocale	# LC_CTYPE not picked up right

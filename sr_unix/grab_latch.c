@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2017 Fidelity National Information	*
+ * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -67,7 +67,7 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 		for (spins = maxspins; spins > 0 ; spins--)
 		{	/* We better not hold it if trying to get it */
 			assert(latch->u.parts.latch_pid != process_id);
-                        if (GET_SWAPLOCK(latch))
+			if (GET_SWAPLOCK(latch))
 			{
 				--fast_lock_count;
 				assert(0 <= fast_lock_count);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -37,6 +37,7 @@ static char rcsid[] = "$Header:$";
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "mlkdef.h"
+#include "mlk_ops.h"
 #include "error.h"
 #include "mlk_pvtblk_insert.h"
 #include "dpgbldir.h"
@@ -53,7 +54,6 @@ omi_lkextnam(
     char	*data)
 {
     mlk_pvtblk	*r;
-    sgmnt_addrs	*sa;
     gd_region	*reg;
     mval	 ext, lck;
     char	*ptr, *end;
@@ -109,9 +109,7 @@ omi_lkextnam(
     MLK_PVTBLK_TAIL(r)[0] = si.value;
     memcpy(MLK_PVTBLK_TAIL(r) + 1, data, si.value);
     MLK_PVTBLK_SUBHASH_GEN(r);
-    r->region  = reg;
-    sa         = &FILE_INFO(r->region)->s_addrs;
-    r->ctlptr  = (mlk_ctldata *)sa->lock_addrs[0];
+    MLK_PVTCTL_INIT(r->pvtctl, reg);
     if (!mlk_pvtblk_insert(r))
     {
 	MLK_PVTBLK_VALIDATE(r);

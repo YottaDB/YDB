@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,8 +22,9 @@
 #include "gtmmsg.h"
 #include "util.h"
 #include "mu_upgrd_dngrd_confirmed.h"
+#include "op.h"
 
-#define MAX_RESP_LEN		80
+LITREF	mval		literal_notimeout;
 
 #define CONTINUEMSG "Are you ready to continue the operation [y/n] ? "
 
@@ -30,26 +32,15 @@
  * Returns: TRUE if confirmed, FALSE if not confirmed */
 boolean_t mu_upgrd_dngrd_confirmed(void)
 {
-	char		local_str[MAX_RESP_LEN + 1], *resp;
-	int		intchar;
-
-#ifdef VMS
-	$DESCRIPTOR     (dres, local_str);
-	$DESCRIPTOR     (contprm, CONTINUEMSG);
-	unsigned short	result_len;
-#endif
+	mval		dummy, *input_line;
 
 	util_out_print("!AD", TRUE, LEN_AND_LIT("You must have a backup before you proceed!!"));
 	util_out_print("!AD", TRUE, LEN_AND_LIT("An abnormal termination will damage the database during the operation !!"));
-#ifdef VMS
-	lib$get_input(&dres, &contprm, &result_len);
-	local_str[MAX_RESP_LEN < dres.dsc$w_length ? MAX_RESP_LEN : dres.dsc$w_length] = 0;
-	resp = local_str;
-#else
 	util_out_print("!_!_!AD", TRUE, LEN_AND_LIT(CONTINUEMSG));
-	FGETS(local_str, MAX_RESP_LEN, stdin, resp);
-#endif
-	if (NULL == resp)
+	input_line = push_mval(&dummy);
+
+	op_read(input_line, (mval *)&literal_notimeout);
+	if (!input_line->str.len)
 		return FALSE;
-	return ('y' == local_str[0] || 'Y' == local_str[0]);
+	return ('y' == input_line->str.addr[0] || 'Y' == input_line->str.addr[0]);
 }

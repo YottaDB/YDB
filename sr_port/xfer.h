@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -264,7 +264,7 @@ XFER(xf_fnzpopulation, op_fnzpopulation),
 XFER(xf_fnzpiece, op_fnzpiece),
 XFER(xf_fnzp1, op_fnzp1),
 XFER(xf_fnztranslate, op_fnztranslate),
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 XFER(xf_fnzconvert2, op_fnzconvert2),
 XFER(xf_fnzconvert3, op_fnzconvert3),
 #endif
@@ -319,8 +319,13 @@ XFER(xf_currhd, op_currhd),
 #endif
 XFER(xf_fnzcollate, op_fnzcollate),
 XFER(xf_fnzatransform, op_fnzatransform),
+<<<<<<< HEAD
 XFER(xf_fnreversequery, op_fnreversequery),
 XFER(xf_gvreversequery, op_gvreversequery),
 XFER(xf_fnq2, op_fnq2),
 XFER(xf_gvq2, op_gvq2),
 XFER(xf_indq2, op_indq2)
+=======
+XFER(xf_fnztranslate_fast, op_fnztranslate_fast),
+XFER(xf_fntranslate_fast, op_fntranslate_fast)
+>>>>>>> 74ea4a3c... GT.M V6.3-006

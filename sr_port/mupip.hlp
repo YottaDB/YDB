@@ -348,13 +348,14 @@
 3 NETtimeout
    NETtimeout
 
-   Specifies the timeout period when a bytestream BACKUP data is sent over a
-   TCP/IP connection. The format of the NETTIMEOUT qualifier is:
+   Specifies the timeout period when a bytestream BACKUP data is either sent
+   over a TCP/IP connection or restored using the RESTORE command. The format
+   of the NETTIMEOUT qualifier is:
 
    NET[TIMEOUT]=seconds
 
      o The default value is 30 seconds.
-     o Use only with: -BYTESTREAM.
+     o Use only with: -BYTESTREAM and RESTORE.
 
 3 NEWJNLFILES
    NEWJNLFILES
@@ -1000,14 +1001,16 @@
 
     2. GO - Global Output format, used for files to transport or archive.
        -FORMAT=GO stores the data in record pairs. Each global node produces
-       one record for the key and one for the data. MUPIP EXTRACT -FORMAT=GO
-       has two header records - the first is a test label (refer to the LABEL
-       qualifier) and the second contains a data, and time.
+       two records - the first contains the key and the second contains the
+       value. MUPIP EXTRACT -FORMAT=GO has two header records - the first is
+       a text label (refer to the LABEL qualifier) and the second is the date
+       and time of extract in $ZDATE() format DD-MON-YEAR 24:60:SS. If -LABEL
+       is not specified, the default first header is "GT.M MUPIP EXTRACT".
     3. ZWR - ZWRITE format, used for files to transport or archive that may
        contain non-graphical information. Each global node produces one
-       record with both key and data. MUPIP EXTRACT -FORMAT=ZWR has two
+       record with both key and value. MUPIP EXTRACT -FORMAT=ZWR has two
        header records, which are the same as for FORMAT=GO, except that the
-       second record ends with the text " ZWR"
+       second record ends with the text " ZWR".
 
 3 FReeze
    FReeze
@@ -1175,9 +1178,17 @@
 2 FREEZE
    FREEZE
 
+<<<<<<< HEAD
    Temporarily suspends (freezes) updates to the database. If you prefer a
    non-YottaDB utility to perform a backup or reorganization, you might use this
    facility to provide standalone access to your YottaDB database. You might use
+=======
+   Temporarily suspends (freezes) updates to the database after ensuring a
+   consistent state between memory and secondary storage, which, with
+   -ACCESS_METHOD=BG, means after flushing global buffers. If you prefer a
+   non-GT.M utility to perform a backup or reorganization, you might use this
+   facility to provide standalone access to your GT.M database. You might use
+>>>>>>> 74ea4a3c... GT.M V6.3-006
    MUPIP FREEZE to suspend (and later resume) database updates for creating
    mirrored disk configuration or re-integrating a mirror.
 
@@ -1213,7 +1224,8 @@
        -ONLINE, and if -ONLINE, can specify either -AUTORELEASE, the default,
        or -NOAUTORELEASE.
      o A FREEZE specifying -ONLINE attempts to minimize the impact of the
-       FREEZE on concurrently updating processes.
+       FREEZE on concurrently updating processes by restricting all
+       database-related updates to memory as long as it can.
      o A FREEZE specifying -ONLINE -AUTORELEASE allows updates to continue
        immediately when YottaDB needs to update the database file.
      o After MUPIP FREEZE -ON -NOONLINE, processes that are attempting
@@ -1282,7 +1294,11 @@
        needs to update the file before a FREEZE -OFF.
      o -NOAUTORELEASE causes YottaDB to hold off actions that need to update the
        database file until someone issues a MUPIP FREEZE -OFF.
+<<<<<<< HEAD
      o -The actions that require YottaDB to write to the database file are:
+=======
+     o The actions that require GT.M to write to the database file are:
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
           o Insufficient global buffers to hold updates - YottaDB must flush
             buffers to make space to do any additional updates
@@ -1315,8 +1331,13 @@
 
      o ON -NOONLINE, the default, causes the freeze to last until OFF, and
        makes management of the FREEZE straightforward.
+<<<<<<< HEAD
      o ON -ONLINE, causes YottaDB to attempt to minimize the impact of the
        FREEZE on concurrently updating processesby taking a number of
+=======
+     o ON -ONLINE, causes GT.M to attempt to minimize the impact of the
+       FREEZE on concurrently updating processes by taking a number of
+>>>>>>> 74ea4a3c... GT.M V6.3-006
        actions, as appropriate:
 
           o Switching journal files to provide maximum space
@@ -1325,7 +1346,7 @@
           o Incompatible with: -AUTORELEASE, -OFF
 
      o After performing these preparations, -ONLINE allows updating processes
-       to make updates to global buffers but defer flushing them to the
+       to make updates to global buffers but defers flushing them to the
        database file.
      o -ONLINE cannot apply to MM databases, so a FREEZE -ONLINE skips any MM
        regions it encounters.
@@ -2838,25 +2859,32 @@
 2 RESTORE
    RESTORE
 
-   Integrates one or more BACKUP -INCREMENTAL files into a corresponding
+   Integrates one or more BACKUP -BYTESTREAM files into a corresponding
    database. The transaction number in the first incremental backup must be
    one more than the current transaction number of the database. Otherwise,
    MUPIP RESTORE terminates with an error.
 
    The format of the RESTORE command is:
 
-   RE[STORE] [-[NO]E[XTEND]] file-name file-list
+   RE[STORE] [-NET[TIMEOUT]] [-[NO]E[XTEND]] file-name bytestrm-bkup-list
 
      o file-name identifies the name of the database file that RESTORE uses
        as a starting point.
-     o file-list specifies one or more files produced by BACKUP -INCREMENTAL
-       to RESTORE into the database. The file-name are separated by commas
-       (,) and must be in sequential order, from the oldest transaction
-       number to the most recent transaction number. RESTORE may take its
-       input from a UNIX file on any device that supports such files.
+     o bytestrm-bkup-list specifies one or more bytestream backup files
+       (generated with BACKUP -BYTESTREAM) to RESTORE into the database file
+       specified with file-name. The file-list are separated by commas (,)
+       and must be in sequential order, from the oldest transaction number to
+       the most recent transaction number. RESTORE may take its input from a
+       UNIX file on any device that supports such files.
+
+       bytestrm-bkup-list may also include a comma separated list of pipe
+       commands or TCP socket addresses (a combination of IPv4 or IPV6
+       hostname and a port number) from where MUPIP RESTORE receives
+       bytestream backup files (produced with BACKUP -BYTESTREAM).
+
      o The current transaction number in the database must match the starting
        transaction number of each successive input to the RESTORE.
-     o If the BACKUP -INCREMENTAL was created using -TRANSACTION=1, create a
+     o If the BACKUP -BYTESTREAM was created using -TRANSACTION=1, create a
        new database with MUPIP CREATE and do not access it, except the
        standalone MUPIP commands INTEG -FILE, EXTEND, and SET before
        initiating the RESTORE.
@@ -3017,12 +3045,12 @@
 2 SET
    SET
 
-   Modifies certain database characteristics. MUPIP SET operates on either
-   regions or files.
+   Use MUPIP SET for performance tuning and/or modifying certain database and
+   journal file attributes.
 
    The format of the SET command is:
 
-   SE[T] {-FI[LE] file-name|-JN[LFILE] journal-file-name|-REG[ION] region-list|-REP[LICATION]={ON|OFF}}
+   SE[T] {-FI[LE] file-name|-JN[LFILE] journal-file-name|-REG[ION] region-list}
     -AC[CESS_METHOD]={BG|MM}
     -[NO]AS[YNCIO]
     -[NO]DE[FER_TIME][=seconds]
@@ -3032,13 +3060,12 @@
     -G[LOBAL_BUFFERS]=integer
     -H[ARD_SPIN_COUNT]=integer
     -[NO]INST[_FREEZE_ON_ERROR]
-    -JN[LFILE]journal-file-name
+    -JN[LFILE] journal-file-name journal-file-quals
     -K[EY_SIZE]=bytes
     -L[OCK_SPACE]=integer
     -M[UTEX_SLOTS]=integer
     -N[ULL_SUBSCRIPTS]=value
     -[NO]LCK_SHARES_DB_CRIT
-    -PA[RTIAL_RECOV_BYPASS]
     -[NO]Q[DBRUNDOWN]
     -[NO]REA[D_ONLY]
     -REC[ORD_SIZE]=bytes
@@ -3047,7 +3074,6 @@
     -RES[ERVED_BYTES]=integer]
     -SL[EEP_SPIN_COUNT]=integer
     -SPIN_SLEEP_M[ASK]=hex_mask
-    -STAN[DALONENOT]
     -[NO]STAT[S]
     -NO]STD[NULLCOLL]
     -V[ERSION]={V4|V6}
@@ -3109,14 +3135,20 @@
 
    -REP[LICATION]={ON|OFF}
 
-   Incompatible with: -FILE, -JNLFILE and -REGION
+   Incompatible with: -JNLFILE
 
 3 ACcess_method
    ACcess_method
 
+<<<<<<< HEAD
    Specifies the access method (YottaDB buffering strategy) for storing and
    retrieving data from the global database file. The format of the
    ACCESS_METHOD qualifier is:
+=======
+   Specifies the access method (GT.M buffering strategy) for storing and
+   retrieving data from the database file. The format of the ACCESS_METHOD
+   qualifier is:
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
    -AC[CESS_METHOD]=code
 
@@ -3149,6 +3181,7 @@
 3 DEFER_Allocate
    DEFER_Allocate
 
+<<<<<<< HEAD
    Provides a mechanism to control YottaDB behavior when subsequently extending
    existing database files, whether using MUPIP EXTEND or auto-extend. To
    switch an existing database file so it immediately preallocates all
@@ -3156,16 +3189,46 @@
    database file header, followed by MUPIP EXTEND -BLOCKS=n, where n >= 0.
    Failures to preallocate space produce a PREALLOCATEFAIL error. The format
    of the DEFER_ALLOCATE qualifier is:
+=======
+   With -DEFER_ALLOCATE, GT.M instructs the file system to create the
+   database file as a sparse file. Before using -DEFER_ALLOCATE, ensure that
+   your underlying file system supports sparse files. By default UNIX file
+   systems, and GT.M, use sparse (or lazy) allocation, which defers actual
+   allocation until blocks are first written. The format of the
+   DEFER_ALLOCATE qualifier is:
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
    -[NO]DEFER_Allocate
+
+     o Utilities such as du report typically show lower disk space usage for
+       a database file with -DEFER_ALLOCATE because GT.M instructs the file
+       system to defer disk space allocation to the time when there is an
+       actual need. With -NODEFER_ALLOCATE, such utilities report higher disk
+       space usage count as GT.M instructs the file system to preallocate
+       disk space without waiting for a need to arise.
+     o -DEFER_ALLOCATE makes database file extensions lighter weight.
+       However, disk activity may tend towards causing fragmentation.
+     o To switch an existing database file so it immediately preallocates all
+       blocks, first use MUPIP SET -NODEFER_ALLOCATE to set the switch in the
+       database file header, followed by MUPIP EXTEND -BLOCKS=n, where n >=
+       0. Failures to preallocate space produce a PREALLOCATEFAIL error.
+     o The default is DEFER_ALLOCATE.
 
 3 Epochtaper
    Epochtaper
 
    Tries to minimize epoch duration by reducing the number of buffers to
+<<<<<<< HEAD
    flush by YottaDB and the file system (via an fsync()) as the epoch
    (time-based or due to journal file auto-switch) approaches. The format of
    the -EPOCHTAPER qualifier is:
+=======
+   flush by GT.M and the file system (via an fsync()) as the epoch
+   (time-based or due to journal file auto-switch) approaches. Epoch tapering
+   reduces the impact of I/O activity during an epoch event. Application that
+   experience high load and/or need to reduce latency may benefit from epoch
+   tapering. The format of the -EPOCHTAPER qualifier is:
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
    -[NO]EPOCHTAPER
 
@@ -3468,10 +3531,20 @@
 
    -[NO]STAT[S]
 
+<<<<<<< HEAD
    At database creation, GDE controls this characteristic, which, by default
    it specifies as STATS (on). When on, this characteristic causes YottaDB to
    create a small MM database for the associated region to hold the shared
    statistics.
+=======
+     o At database creation, GDE controls this characteristic, which, by
+       default it specifies as STATS (on). When on, this characteristic
+       causes GT.M to create a small MM database for the associated region to
+       hold the shared statistics.
+     o A process disables itself from maintaining the shared statistics when
+       it fails to open a statsDB. It does not, however, disable subsequently
+       starting processes from maintaining the shared statistics.
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
 3 STDnullcoll
    STDnullcoll
@@ -4120,8 +4193,7 @@
    -F[ILE]
 
    Specifies that the argument to the SET is a file-specification for a
-   single database file. A Journal file's name cannclude characters in
-   Unicode.
+   single database file. A Journal file's name can include UTF-8 characters.
 
    Old journal files stay open for about 10 seconds after a switch to a new
    journal file.
@@ -4453,7 +4525,7 @@
        characters (due to the suffix creation rules), YottaDB produces an error
        and turns off journaling.
 
-   A journal file name can include characters in Unicode.
+   A journal file name can include UTF-8 characters.
 
    **Note**
 
@@ -4502,10 +4574,6 @@
    cycles in back-links are possible only due to explicit FILENAME
    specifications and never due to an existing FILENAME characteristics from
    the database or by using the default FILENAME.
-
-   NOPREVJNLFILE
-
-   Eliminates the back link of a journal file.
 
    [NO]S[YNC_IO]
 
@@ -4661,13 +4729,6 @@
    example produces an error on a database with BEFORE_IMAGE journaling
    enabled. You can also use -access_method=BG to set BG (Buffered Global) as
    your buffering strategy.
-
-   Example:
-
-   $ mupip set -journal=before,noprevjnlfile,file=newmumps.mjl -file mumps.dat
-
-   The above command cuts the back link of the newly created journal file
-   newmumps.mjl.
 
 2 JOURNAL
    JOURNAL
@@ -4966,6 +5027,12 @@
    for any future database recovery. If there is a need to process
    rolled_bak* files, you should extract the journal records from
    rolled_back* files and process them using a M program.
+
+   **Note**
+
+   Using -RECOVER on a replicated database initiates database recovery but
+   turns replication OFF. Under most circumstances, there is no need to
+   perform a -RECOVER operation on replicated regions.
 
 4 ROLLBACK
    ROLLBACK
@@ -5355,9 +5422,9 @@
 
    -A[FTER]=time
 
-   Specifies reference time stamps in the journal and identifies the point
-   after which JOURNAL starts processing in the journal file(s). This time
-   qualifier applies to -FORWARD only.
+   Specifies the starting time stamp in the journal file after which any
+   -FORWARD action should start processing. This time qualifier is compatible
+   only with -EXTRACT,-SHOW, or -VERIFY.
 
    If -AFTER= provides a time following the last time recorded in the journal
    file or following any -BEFORE= time, JOURNAL processing produces no result
@@ -6407,14 +6474,30 @@
 
    mupip replicate
     -edit[instance] {<instance-file>|-source -jnlpool}
-    {-show [-detail]|-change [-offset=] [-size=] [-value=]}
+     {-show [-detail]|-change [-offset=] [-size=] [-value=]|-cleanslots}
     [-name=<new-name>]
     [-[no]qdbrundown]
 
    -editinstance
 
    Displays or changes the attributes of the specified instance-file. Use
-   -editinstance in combination with SHOW or CHANGE qualifiers.
+   -editinstance in combination with the SHOW, CHANGE, or CLEANSLOTS
+   qualifiers.
+
+   -cleanslots
+
+   Goes through all 16 slots in the replication instance file, identifies the
+   slots that are inactive, and clears them to make them available for reuse.
+
+   **Note**
+
+   Initially, all the slots are unused. A Source Server replicating to a
+   secondary instance for the first time utilizes an unused slot to store the
+   information related to that secondary. Any Source Server process
+   replicating to the same secondary instance updates information using the
+   same slot until -CLEANSLOT clears the slot to make it reusable. Use
+   -CLEANSLOT to clear inactive slots when the originating instance connects
+   to more than 16 different secondary instances throughout its lifetime.
 
    -jnlpool
 
@@ -8492,7 +8575,14 @@
 
    **Note**
 
+<<<<<<< HEAD
    This help file is a concise representation of the revision r1.24 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
+=======
+   This help file is a concise representation of revision V6.3-006 of the
+   UNIX Administration and Operations Guide. To obtain a copy of the current
+   revision, go to www.fis-gtm.com and then click on the User Documentation
+   tab.
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 

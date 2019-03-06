@@ -212,7 +212,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DELIMSIZNA);
 					break;
 				case iop_ipchset:
-					UNICODE_ONLY(
+					UTF8_ONLY(
 						if (gtm_utf8_mode)
 						{	/* Only change ipchset if in UTF8 mode */
 							GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
@@ -222,7 +222,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					);
 					break;
 				case iop_opchset:
-					UNICODE_ONLY(
+					UTF8_ONLY(
 						if (gtm_utf8_mode)
 						{       /* Only change ipchset if in UTF8 mode */
 							GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
@@ -232,7 +232,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					);
 					break;
 				case iop_chset:
-					UNICODE_ONLY(
+					UTF8_ONLY(
 						if (gtm_utf8_mode)
 						{       /* Only change ipchset/opchset if in UTF8 mode */
 							GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
@@ -246,13 +246,13 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 			   but are included here because they can be easily used in internal processing.
 			*/
 				case iop_m:
-					UNICODE_ONLY(
+					UTF8_ONLY(
 						temp_ichset = temp_ochset = CHSET_M;
 						ichset_specified = ochset_specified = TRUE;
 					);
 					break;
 				case iop_utf16:
-					UNICODE_ONLY(
+					UTF8_ONLY(
 						if (gtm_utf8_mode)
 						{       /* Only change chset if in UTF8 mode */
 							temp_ichset = temp_ochset = CHSET_UTF16;
@@ -261,7 +261,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					);
 					break;
 				case iop_utf16be:
-					UNICODE_ONLY(
+					UTF8_ONLY(
 						if (gtm_utf8_mode)
 						{       /* Only change chset if in UTF8 mode */
 							temp_ichset = temp_ochset = CHSET_UTF16BE;
@@ -270,7 +270,7 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 					);
 					break;
 				case iop_utf16le:
-					UNICODE_ONLY(
+					UTF8_ONLY(
 						if (gtm_utf8_mode)
 						{       /* Only change chset if in UTF8 mode */
 							temp_ichset = temp_ochset = CHSET_UTF16LE;

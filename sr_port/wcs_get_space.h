@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 74ea4a3c... GT.M V6.3-006
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,13 +31,18 @@ typedef struct wcs_conflict_trace_struct
 
 /* Ensure that at least DB_CSH_RDPOOL_SZ buffers are not dirty by the time an update transaction completes. This guarantees
  * a minimum number of buffers are available at all times. Macro should be used whenever second arg is non-zero.
- * WBTEST_FORCE_WCS_GET_SPACE forces wcs_get_space to be called, regardless of wc_in_free.
+ * WBTEST_FORCE_WCS_GET_SPACE and WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY force wcs_get_space to be called, regardless of wc_in_free.
  */
 #define WCS_GET_SPACE(REG, NEEDED, CR)												\
 (																\
 	(															\
 	 (cnl->wc_in_free >= ((int4)(NEEDED) + DB_CSH_RDPOOL_SZ))								\
+<<<<<<< HEAD
 	 DEBUG_ONLY( && !(ydb_white_box_test_case_enabled && (WBTEST_FORCE_WCS_GET_SPACE == ydb_white_box_test_case_number)))	\
+=======
+	 DEBUG_ONLY( && !(gtm_white_box_test_case_enabled && ((WBTEST_FORCE_WCS_GET_SPACE == gtm_white_box_test_case_number)	\
+				 || (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == gtm_white_box_test_case_number))))			\
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 	)															\
 	|| wcs_get_space(REG, (NEEDED) + DB_CSH_RDPOOL_SZ, CR)									\
 )

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2016 Fidelity National Information	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -202,7 +202,7 @@ void dse_cache(void)
 			util_out_print("Region !AD :  shmpool_buffer     = 0x!XJ",
 				TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->shmpool_buffer));
 			util_out_print("Region !AD :  lock_space         = 0x!XJ",
-				TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->lock_addrs[0]));
+				TRUE, REG_LEN_STR(reg), DB_ABS2REL(csa->mlkctl));
 			csd = csa->hdr;
 			if (!is_mm)
 			{

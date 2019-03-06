@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -13,11 +13,9 @@
  *								*
  ****************************************************************/
 
-#include "mdef.h"
+#include <sys/shm.h>
 
-#ifdef VMS
-#include <ssdef.h>
-#endif
+#include "mdef.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -26,6 +24,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "mlkdef.h"
+#include "mlk_ops.h"
 #include "lockdefs.h"
 #include "cmidef.h"
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
@@ -36,6 +35,7 @@
 #include "gtcml.h"
 #include "interlock.h"
 #include "rel_quant.h"
+#include "do_shmat.h"
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF uint4            process_id;
@@ -49,6 +49,7 @@ void gtcml_chklck(cm_lckblkreg *reg, bool timed)
 	boolean_t	stop_waking, timeout, was_crit;
 	sgmnt_addrs	*csa;
 	int4		icount, status, time[2];
+	mlk_pvtctl	pctl;
 
 	ASSERT_IS_LIBGNPSERVER;
 	timeout = TRUE;
@@ -80,7 +81,8 @@ void gtcml_chklck(cm_lckblkreg *reg, bool timed)
 						if ((d = prc1->blocked))
 						{	/* Blocking process shrblk exists. Check it under crit lock */
 							csa = &FILE_INFO(gv_cur_region)->s_addrs;
-							GRAB_LOCK_CRIT(csa, gv_cur_region, was_crit);
+							MLK_PVTCTL_INIT(pctl, gv_cur_region);
+							GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
 							if (d->sequence != prc1->blk_sequence)
 							{	/* Blocking structure no longer ours - do artificial wakeup */
 								lck->sequence = csa->hdr->trans_hist.lock_sequence++;
@@ -95,7 +97,7 @@ void gtcml_chklck(cm_lckblkreg *reg, bool timed)
 							{	/* No longer any owner (lke stole?). Wake up */
 								lck->sequence = csa->hdr->trans_hist.lock_sequence++;
 							}
-							REL_LOCK_CRIT(csa, gv_cur_region, was_crit);
+							REL_LOCK_CRIT(pctl, was_crit);
 						}
 						prc1 = prc1->next;
 					} while (prc1 != prc);

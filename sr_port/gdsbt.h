@@ -643,13 +643,6 @@ typedef struct node_local_struct
 	int4		jnlpool_shmid;	/* copy of jnlpool->repl_inst_filehdr->jnlpool_shmid to prevent mixing of multiple
 					 * journal pools within the same database.
 					 */
-	boolean_t	lockspacefull_logged;			/* Avoids flooding syslog with LOCKSPACEFULL messages.
-								 * If TRUE: LOCKSPACEFULL is written to the syslog.
-								 * If FALSE: Do not write LOCKSPACEFULL to syslog.
-								 * Set this to FALSE if free space ratio is above
-								 * LOCK_SPACE_FULL_SYSLOG_THRESHOLD (defined in mlk_unlock.h).
-								 * We exclude mlk_shrsub, and only consider mlk_prcblk & mlk_shrblk.
-								 */
 	uint4		trunc_pid;			/* Operating truncate. */
 	block_id	highest_lbm_with_busy_blk;	/* Furthest lmap block known to have had a busy block during truncate. */
 	ftokhist	ftok_ops_array[FTOK_OPS_ARRAY_SIZE];
@@ -697,6 +690,8 @@ typedef struct node_local_struct
 	boolean_t	statsdb_rundown_clean;		/* TRUE if statsdb "gds_rundown"/"mu_rndwn_file" was clean.
 							 *      This means statsdb file can be removed on a clean basedb rundown.
 							 */
+	int		statsdb_cur_error;		/* failure code for last statsDB error - used in throttling messages */
+	uint4		statsdb_error_cycle;		/* for count down of repeated errors - used in throttling messages */
 #	ifdef GTM_CRYPT_UPDATES_REPORT
 	blk_info	blk_infos[BLK_INFO_ARRAY_SIZE];
 	uint4		blk_info_cnt;
@@ -707,7 +702,6 @@ typedef struct node_local_struct
 	volatile gtm_uint64_t	dskspace_next_fire;
 	global_latch_t	lock_crit;		/* mutex for LOCK processing */
 	volatile block_id	tp_hint;
-	int4		filler_8byte_align3;
 } node_local;
 
 #define	COPY_STATSDB_FNAME_INTO_STATSREG(statsDBreg, statsDBfname, statsDBfname_len)				\
@@ -742,6 +736,7 @@ MBSTART {														\
 		assert(CNL->statsdb_fname_len);	/* "gvcst_init" would not have set CNL->statsdb_created otherwise */	\
 		assert('\0' == CNL->statsdb_fname[CNL->statsdb_fname_len]);						\
 		rc = UNLINK(CNL->statsdb_fname);									\
+		assert(0 == rc);											\
 		/* If error removing statsdb, ignore as we want to continue rundown of basedb (more important) */	\
 		CNL->statsdb_created = FALSE;										\
 	}														\

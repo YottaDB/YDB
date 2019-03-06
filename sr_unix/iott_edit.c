@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Copyright (c) 2005-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -29,7 +29,7 @@
 #include "iott_edit.h"
 #include "gtmio.h"
 #include "eintr_wrappers.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
@@ -44,7 +44,7 @@ GBLREF char		*CURSOR_UP, *CURSOR_DOWN, *CURSOR_LEFT, *CURSOR_RIGHT;
 int	iott_write_raw(int fildes, void *str832, unsigned int len)
 {
 	/* Writes len characters without considering the cursor position
-	 * The characters are really Unicode codepoints if the current
+	 * The characters are really utf codepoints if the current
 	 * device is in UTF-8 mode
 	 * Returns -1 if error or number of bytes written
 	 */
@@ -72,7 +72,7 @@ int	iott_write_raw(int fildes, void *str832, unsigned int len)
 			REVERT_GTMIO_CH(&io_curr_device, ch_set);
 			return -1;
 		}
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	} else
 	{
 		str32 = (wint_t *)str832;
@@ -108,7 +108,7 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 	  writes a specified string starting from the current cursor position
 	  and returns the cursor back to the same place.
 
-		str832		-> the string to write, may be Unicode code points
+		str832		-> the string to write, may be utf code points
 		len		-> the length of the string
 		start_x		-> is the current cursor's column in the window.
 		move		-> whether the cursor moves or not.
@@ -145,7 +145,7 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 	}
 	cur_x = start_x % width;	/* start_x is absolute, get relative value into cur_x */
 	number_of_lines_up = 0;
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	if (utf8_active)
 	{
 		cur_width = width - cur_x;
@@ -271,7 +271,7 @@ int 	write_str(void *str832, unsigned int len, unsigned int start_x, boolean_t m
 			cur_x = 0;
 			cur_width = width;
 		}
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	}
 #endif
 	number_of_chars_left = cur_x - start_x;
@@ -470,7 +470,7 @@ int	move_cursor(int fildes, int num_up, int num_left)
  * value that it returns does not include "dx_start" as this is how "dx_instr" and "dx_outlen" is maintained
  * in the caller functions (dm_read and iott_readfl).
  *
- *	str832   -> the array of characters, may be Unicode code points
+ *	str832   -> the array of characters, may be utf code points
  *	index    -> the index of this array upto which we want to cumulative dollarx computed
  *	width    -> the WIDTH of the terminal device
  *	dx_start -> the value of $X after the GT.M prompt has been displayed (in case of dm_read) and 0 (for iott_readfl).

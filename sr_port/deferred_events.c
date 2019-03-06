@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,10 +26,12 @@
 #include "add_inter.h"
 #include "op.h"
 #include "iott_wrterr.h"
+#include "fix_xfer_entry.h"
+#include "deferred_events_queue.h"
 #ifdef DEBUG_DEFERRED_EVENT
 # include "gtm_stdio.h"
 #endif
-#include "fix_xfer_entry.h"
+#include "have_crit.h"
 
 /* =============================================================================
  * EXTERNAL VARIABLES
@@ -40,14 +43,11 @@ GBLREF xfer_entry_t     xfer_table[];
 /* M Profiling active */
 GBLREF	boolean_t	is_tracing_on;
 /* Marks sensitive database operations */
-GBLREF volatile int4	fast_lock_count;
-#if defined(VMS)
-GBLREF volatile short   num_deferred;
-#else
-GBLREF volatile int4    num_deferred;
-#endif
-GBLREF volatile int4	ctrap_action_is, outofband;
-
+GBLREF volatile int4			fast_lock_count;
+GBLREF volatile int4			ctrap_action_is, outofband;
+GBLREF boolean_t			tp_timeout_deferred;
+GBLREF volatile int4			deferred_incr;
+GBLREF intrpt_state_t			intrpt_ok_state;
 /* =============================================================================
  * FILE-SCOPE VARIABLES
  * =============================================================================
@@ -112,10 +112,24 @@ error_def(ERR_DEFEREVENT);
  *   - A higher-level interface (e.g. change sets) might be better.
  * ------------------------------------------------------------------
  */
-boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 param_val)
+boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 param_val, boolean_t popped_entry)
 {
 	boolean_t 	is_first_event = FALSE;
 
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	if (popped_entry && (fast_lock_count == 0) && (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state))
+	{
+		INCR_CNT_SP(&xfer_table_events[event_type], &defer_latch);
+		INCR_CNT_SP(&num_deferred, &defer_latch);
+		DBGDFRDEVNT((stderr, "xfer_set_handlers: popped entry :  "
+			     "xfer_table_events[%d] = %d, num_deferred = %d\n",
+			     event_type, xfer_table_events[event_type], num_deferred));
+		first_event = event_type;
+		set_fn(param_val);
+		return TRUE;
+	}
 	/* ------------------------------------------------------------
 	 * Keep track of what event types have come in.
 	 * - Get and set value atomically in case of concurrent
@@ -134,17 +148,20 @@ boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 p
 	 * ------------------------------------------------------------------
 	 */
 	VMS_ONLY(assert(lib$ast_in_prog()));
-	if (fast_lock_count == 0)
+	if ((fast_lock_count == 0) && (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state))
 	{
 		DBGDFRDEVNT((stderr, "xfer_set_handlers: Before interlocked operations:  "
-			     "xfer_table_events[%d]=%d, first_event=%s, num_deferred=%d\n",
+			     "xfer_table_events[%d] = %d, first_event = %s, num_deferred = %d\n",
 			     event_type, xfer_table_events[event_type], (is_first_event ? "TRUE" : "FALSE"),
 			     num_deferred));
-		if (1 == INCR_CNT_SP(&xfer_table_events[event_type], &defer_latch))
+		if ((1 == INCR_CNT_SP(&xfer_table_events[event_type], &defer_latch)) &&
+				(1 == INCR_CNT_SP(&num_deferred, &defer_latch)) && (!(TREF(save_xfer_root)) || IS_VALID_TRAP))
+		{
 			/* Concurrent events can collide here, too */
-			is_first_event =  (1 == INCR_CNT_SP(&num_deferred, &defer_latch));
+			is_first_event = TRUE;
+		}
 		DBGDFRDEVNT((stderr, "xfer_set_handlers: After interlocked operations:   "
-			     "xfer_table_events[%d]=%d, first_event=%s, num_deferred=%d\n",
+			     "xfer_table_events[%d] = %d, first_event = %s, num_deferred = %d\n",
 			     event_type,xfer_table_events[event_type], (is_first_event ? "TRUE" : "FALSE"),
 			     num_deferred));
 	} else if (1 == ++xfer_table_events[event_type])
@@ -197,16 +214,17 @@ boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 p
 		DBGDFRDEVNT((stderr, "xfer_set_handlers: Driving event setup handler\n"));
 		set_fn(param_val);
 	}
-#	ifdef DEBUG_DEFERRED_EVENT
 	else if (0 != fast_lock_count)
 	{
 		DBGDFRDEVNT((stderr, "xfer_set_handlers: ---Multiple deferred events---\n"
 			     "Event type %d occurred while type %d was pending\n", event_type, first_event));
-	} else
+	} else if (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state)
 	{
+		if (set_fn == (&tptimeout_set)) /*Deferring tptimeout, hence set the flag */
+			tp_timeout_deferred = TRUE;
+		SAVE_XFER_ENTRY(event_type, set_fn, param_val);
 		DBGDFRDEVNT((stderr, "xfer_set_handlers: Event bypassed -- was not first event\n"));
 	}
-#	endif
  	assert(no_event != first_event);
 	return is_first_event;
 }
@@ -289,7 +307,9 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	boolean_t	reset_type_is_set_type;
 	int4		status;
 	int 		e, ei, e_tot = 0;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	/* ------------------------------------------------------------------
 	 * Note: If reset routine can preempt path from handler to
 	 * set routine (e.g. clearing event before acting on it),
@@ -361,7 +381,7 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	 * Reset private variables.
 	 * --------------------------------------------
 	 */
-	first_event = no_event;
+	first_event = (!(TREF(save_xfer_root))) ? no_event : (TREF(save_xfer_root))->outofband;
 	num_deferred = 0;
 	ctrap_action_is = 0;
 	outofband = 0;

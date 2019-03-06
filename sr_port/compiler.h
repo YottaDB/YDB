@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -538,7 +538,7 @@ typedef struct
 {							\
 	((mval_b *)(mvalptr))->sgne = 0;		\
 	(mvalptr)->fnpc_indx = 0xff;			\
-	UNICODE_ONLY((mvalptr)->utfcgr_indx = 0xff);	\
+	UTF8_ONLY((mvalptr)->utfcgr_indx = 0xff);	\
 }
 
 /* Macro to put a literal truth value as an operand */

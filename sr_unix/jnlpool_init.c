@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -86,6 +86,7 @@ GBLREF	jnl_gbls_t				jgbl;
 GBLREF	char					repl_instfilename[];
 GBLREF	char					repl_inst_name[];
 GBLREF	gd_addr					*repl_inst_from_gld;
+GBLREF  boolean_t				in_repl_inst_edit;
 
 #ifdef DEBUG
 GBLREF	uint4	is_updhelper;
@@ -406,7 +407,9 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 		/* Source server startup is the only command that can create the journal pool. Check that. */
 		if (!is_src_srvr || !gtmsource_options.start)
 		{
-			ftok_sem_release(tmp_jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
+			/* Release the ftok if we're not in -editinstance, otherwise we want to hold onto it. */
+			if (!in_repl_inst_edit)
+				ftok_sem_release(tmp_jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, TRUE);
 			if (GTMRELAXED == pool_user)
 			{
 				ADD_TO_JNLPOOL_HEAD_LIST(new_tmp_jnlpool, jnlpool, jnlpool_head, gd_ptr);
@@ -771,8 +774,10 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	 *		Invoke the function "gtmsource_flush_jnlpool" from the function "repl_ipc_cleanup"
 	 *	c) MUPIP REPLIC -SOURCE -ACTIVATE -ROOTPRIMARY (or -UPDOK) on a journal pool that has updates disabled.
 	 *		Invoke the function "gtmsource_rootprimary_init"
+	 *	d) MUPIP REPLIC -EDITINSTANCE
+	 *		Invoke the function "repl_inst_edit"
 	 */
-	hold_onto_ftok_sem = is_src_srvr && (gtmsource_options.start || gtmsource_options.shut_down);
+	hold_onto_ftok_sem = is_src_srvr && (gtmsource_options.start || gtmsource_options.shut_down) || in_repl_inst_edit;
 	/* Determine "gtmsourcelocal_ptr" to later initialize jnlpool->gtmsource_local */
 	if (!is_src_srvr || !gtmsource_options.instsecondary)
 	{	/* GT.M or Update process or receiver server or a source server command that did not specify INSTSECONDARY */

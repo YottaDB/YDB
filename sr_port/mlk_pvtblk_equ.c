@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,6 @@
 
 int mlk_pvtblk_equ(mlk_pvtblk *a, mlk_pvtblk *b)
 {
-	return (a->ctlptr == b->ctlptr && a->nref_length == b->nref_length
+	return (a->pvtctl.ctl == b->pvtctl.ctl && a->nref_length == b->nref_length
 		&& (memcmp(a->value, b->value, a->nref_length) == 0));
 }

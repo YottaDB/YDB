@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -24,7 +24,9 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
+#include "filestruct.h"
 #include "mlkdef.h"
+#include "mlk_ops.h"
 #include "locklits.h"
 #include "error.h"
 #include "rc.h"
@@ -202,8 +204,7 @@ int rc_prc_lock(rc_q_hdr *qhdr)
 		mp->nref_length = temp;
 		memcpy(mp->value, key_buff, mp->nref_length);
 		MLK_PVTBLK_SUBHASH_GEN(mp);
-		mp->region = gv_cur_region;
-		mp->ctlptr = (mlk_ctldata*)cs_addrs->lock_addrs[0];
+		MLK_PVTCTL_INIT(mp->pvtctl, gv_cur_region);
 		MLK_PVTBLK_TAIL(mp)[0] = pid_len;
 		memcpy(MLK_PVTBLK_TAIL(mp) + 1, buff, pid_len);
 		if (!mlk_pvtblk_insert(mp))

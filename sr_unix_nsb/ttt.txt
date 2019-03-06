@@ -1041,3 +1041,13 @@ OC_FNZPEEK:	pushab	val.0
 OC_FNZSYSLOG:	pushab	val.0			; /* destination mval */
 		pushab  val.1			; /* string */
 		calls	#2,xfer.xf_fnzsyslog
+OC_FNZTRANSLATE_FAST: pushab   val.0
+		pushab  val.2
+		pushab  val.1
+		calls   #3,xfer.xf_fnztranslate_fast
+OC_FNTRANSLATE_FAST: pushab   val.0
+		pushab val.4
+		pushab val.3
+		pushab val.2
+		pushab val.1
+		calls   #5,xfer.xf_fntranslate_fast

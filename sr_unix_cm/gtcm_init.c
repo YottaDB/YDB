@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -59,7 +59,7 @@
 #include "gtmio.h"
 #include "have_crit.h"
 #include "gt_timers_add_safe_hndlrs.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
 #endif

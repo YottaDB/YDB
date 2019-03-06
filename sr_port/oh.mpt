@@ -22,9 +22,16 @@
 INT	r !,"Octal: ",%OH s %OH=$$FUNC(%OH)
 	i %OH="" w !,"Input must be an octal number"
 	q
+FUNCFM(o)
+	n d,dg,h
+	s d=0,h="",o=+o
+	f dg=1:1:$l(o) s d=d*8+$e(o,dg)
+	f  q:'d  s h=$e("0123456789ABCDEF",d#16+1)_h,d=d\16
+	q h
 FUNC(o)
 	q:o=0 0
 	q:"-"=$ze(o,1) ""
 	q:o'?1.N ""
 	q:o[8!(o[9) ""
+	q:$l(o)<19 $$FUNCFM(o)
 	q $$CONVERTBASE^%CONVBASEUTIL(o,8,16)

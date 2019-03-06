@@ -82,6 +82,7 @@
 #include "muprec.h"
 #include "aio_shim.h"
 #include "mu_gv_cur_reg_init.h"
+#include "mlkdef.h"
 
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	gd_region		*gv_cur_region;
@@ -1188,17 +1189,17 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			JNL_INIT(csa, reg, tsd);
 			csa->shmpool_buffer = (shmpool_buff_hdr_ptr_t)(csa->db_addrs[0]
 										+ NODE_LOCAL_SPACE(tsd) + JNL_SHARE_SIZE(tsd));
-			csa->lock_addrs[0] = (sm_uc_ptr_t)csa->shmpool_buffer + SHMPOOL_SECTION_SIZE;
-			csa->lock_addrs[1] = csa->lock_addrs[0] + LOCK_SPACE_SIZE(tsd) - 1;
+			csa->mlkctl = (struct mlk_ctldata_struct *)((sm_uc_ptr_t)csa->shmpool_buffer + SHMPOOL_SECTION_SIZE);
+			csa->mlkctl_len = LOCK_SPACE_SIZE(tsd);
 			if (dba_bg == acc_meth)
 			{
-				cs_data = csd = csa->hdr = (sgmnt_data_ptr_t)(csa->lock_addrs[1] + 1
+				cs_data = csd = csa->hdr = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->mlkctl + csa->mlkctl_len
 								+ CACHE_CONTROL_SIZE(tsd));
 				assert(cnl->cache_off == -CACHE_CONTROL_SIZE(csd));
 				db_csh_ini(csa);
 			} else
 			{
-				cs_data = csd = csa->hdr = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->lock_addrs[1] + 1);
+				cs_data = csd = csa->hdr = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->mlkctl + csa->mlkctl_len);
 				FSTAT_FILE(udi->fd, &stat_buf, stat_res);
 				if (-1 == stat_res)
 				{

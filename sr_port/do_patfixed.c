@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "patcode.h"
 #include "copy.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"	/* needed by *TYPEMASK* macros defined in gtm_utf8.h */
 #include "gtm_utf8.h"
 #endif
@@ -47,7 +47,7 @@ int do_patfixed(mval *str, mval *pat)
 	uint4			code, tempuint, patstream_len;
 	uint4			*patptr;
 	boolean_t		flags, pvalid, strvalid;
-	UNICODE_ONLY(
+	UTF8_ONLY(
 	wint_t			utf8_codepoint;
 	)
 	DCL_THREADGBL_ACCESS;
@@ -71,7 +71,7 @@ int do_patfixed(mval *str, mval *pat)
 	patptr++;
 	if (!gtm_utf8_mode)
 		charlen = str->str.len;
-	UNICODE_ONLY(
+	UTF8_ONLY(
 	else
 	{
 		MV_FORCE_LEN(str); /* to set str.char_len if not already done; also issues BADCHAR error if appropriate */
@@ -106,7 +106,7 @@ int do_patfixed(mval *str, mval *pat)
 						return FALSE;
 				}
 			}
-			UNICODE_ONLY(
+			UTF8_ONLY(
 			else
 			{
 				for (repcnt = 0; repcnt < repeat; repcnt++)
@@ -142,7 +142,7 @@ int do_patfixed(mval *str, mval *pat)
 							return FALSE;
 					patptr++;
 				}
-				UNICODE_ONLY(
+				UTF8_ONLY(
 				else
 				{
 					for (repcnt = 0; repcnt < repeat; repcnt++)
@@ -163,7 +163,7 @@ int do_patfixed(mval *str, mval *pat)
 								return FALSE;
 					patptr += DIVIDE_ROUND_UP(bytelen, SIZEOF(*patptr));
 				}
-				UNICODE_ONLY(
+				UTF8_ONLY(
 				else
 				{
 					pstr = (unsigned char *)patptr;

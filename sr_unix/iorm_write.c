@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -25,7 +25,7 @@
 #include "iormdefsp.h"
 #include "gtmio.h"
 #include "min_max.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #endif
@@ -34,7 +34,7 @@
 #include "error.h"
 
 GBLREF io_pair		io_curr_device;
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 LITREF mstr		chset_names[];
 #endif
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -159,7 +159,7 @@ static	void	gvcst_search_fail(srch_blk_status *pStat)
 				"csa = 0x%lX : csalock = 0x%lX",
 				regbuff, (long unsigned int)pStat->blk_num, (long unsigned int)pStat->buffaddr,
 				(long unsigned int)pStat->cr, crbuff, (long unsigned int)cs_addrs,
-				(long unsigned int)cs_addrs->lock_addrs[0]);
+				(long unsigned int)cs_addrs->mlkctl);
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(buff));
 	}
 	assert(t_tries);				/* assert here so we don't have to do it when this returns */

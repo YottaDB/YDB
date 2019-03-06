@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -71,7 +72,7 @@ typedef struct src_line_type
 	int4	line;	/* line number */
 } src_line_struct;
 
-void zl_cmd_qlf(mstr *quals, command_qualifier *qualif);
+void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned short *srclen, boolean_t last);
 void get_cmd_qlf(command_qualifier *qualif);
 
 #endif /* CMD_QLF_H_INCLUDED */

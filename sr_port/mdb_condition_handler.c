@@ -79,10 +79,19 @@
 #include "alias.h"
 #include "create_fatal_error_zshow_dmp.h"
 #include "have_crit.h"
+<<<<<<< HEAD
 #include "invocation_mode.h"
 #include "iormdef.h"
 #include "ftok_sems.h"
 #include "gtm_putmsg_list.h"
+=======
+#include "ztimeout_routines.h"
+#ifdef UNIX
+# include "iormdef.h"
+# include "ftok_sems.h"
+# include "gtm_putmsg_list.h"
+#endif
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 #ifdef GTM_TRIGGER
 # include "gv_trigger.h"
 # include "gtm_trigger.h"
@@ -162,6 +171,11 @@ error_def(ERR_TPSTACKCRIT);
 error_def(ERR_TPSTACKOFLOW);
 error_def(ERR_TPTIMEOUT);
 error_def(ERR_UNSOLCNTERR);
+<<<<<<< HEAD
+=======
+error_def(ERR_VMSMEMORY);
+error_def(ERR_ZTIMEOUT);
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
 boolean_t clean_mum_tstart(void);
 
@@ -848,6 +862,22 @@ CONDITION_HANDLER(mdb_condition_handler)
 		cp = stackwarn;
 		stackwarn = stacktop;
 		push_stck(cp, 0, (void **)&stackwarn, MVST_STCK_SP);
+	} else if ((int)ERR_ZTIMEOUT == SIGNAL)
+	{	/* Verify not indirect or that context is unchanged before reset context */
+		if (((TREF(dollar_ztimeout)).ztimeout_vector.str.len))
+		{
+			assert(NULL != restart_pc);
+			assert((!(SFF_INDCE & frame_pointer->flags)) || (restart_ctxt == frame_pointer->ctxt));
+			DBGEHND((stderr, "mdb_condition_handler(5): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
+			"0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, restart_pc, restart_ctxt,
+			frame_pointer->type));
+			frame_pointer->mpc = restart_pc;
+			frame_pointer->ctxt = restart_ctxt;
+			assert(!dollar_zininterrupt);
+			proc_act_type = SFT_ZTIMEOUT | SFT_COUNT;/* | SFT_COUNT;*/
+			err_act = &((TREF(dollar_ztimeout)).ztimeout_vector.str);
+			MUM_TSTART; /* This will take us to trans_code */
+		}
 	}
 	if (!repeat_error)
 		dollar_ecode.error_last_b_line = NULL;

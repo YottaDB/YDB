@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -396,7 +396,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 		if (CHSET_UTF16 == iod->ochset)
 		{
 			DBGSOCK2((stdout, "socwrite: First write UTF16 -- writing BOM\n"));
-			iod->ochset = CHSET_UTF16BE; /* per Unicode standard, assume big endian when endian
+			iod->ochset = CHSET_UTF16BE; /* per standard, assume big endian when endian
 							format is unspecified */
 			dsocketptr->ochset_utf16_variant = iod->ochset;
 			get_chset_desc(&chset_names[iod->ochset]);
@@ -426,7 +426,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZFF2MANY, 2, new_len, MAX_ZFF_LEN);
 			socketptr->ozff.addr = (char *)malloc(MAX_ZFF_LEN);	/* should not need */
 			socketptr->ozff.len = new_len;
-			UNICODE_ONLY(socketptr->ozff.char_len = 0); /* don't care */
+			UTF8_ONLY(socketptr->ozff.char_len = 0); /* don't care */
 			memcpy(socketptr->ozff.addr, stringpool.free, new_len);
 			if (tempv.addr == socketptr->zff.addr)
 				tempv = socketptr->ozff;	/* from iosocket_wtff so use converted form */

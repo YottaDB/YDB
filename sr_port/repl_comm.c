@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -147,7 +147,13 @@ int fd_ioready(int sock_fd, int poll_direction, int timeout)
 	struct pollfd	fds;
 
 	assert(timeout < MILLISECS_IN_SEC);
+<<<<<<< HEAD
 	assert((timeout >= 0) && (timeout < MILLISECS_IN_SEC));
+=======
+	SELECT_ONLY(timeout = timeout * 1000);		/* Convert to microseconds (~ 1sec) */
+	assert((timeout >= 0) && (timeout < POLL_ONLY(MILLISECS_IN_SEC) SELECT_ONLY(MICROSECS_IN_SEC)));
+#	ifdef USE_POLL
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 	fds.fd = sock_fd;
 	fds.events = (REPL_POLLIN == poll_direction) ? POLLIN : POLLOUT;
 	while (-1 == (status = poll(&fds, 1, timeout)))

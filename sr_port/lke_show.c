@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -19,6 +19,8 @@
  * used in    : lke.c
  * -------------------------------------------------
  */
+
+#include <sys/shm.h>
 
 #include "mdef.h"
 
@@ -43,6 +45,8 @@
 #include "min_max.h"
 #include "interlock.h"
 #include "rel_quant.h"
+#include "do_shmat.h"
+#include "mlk_ops.h"
 
 #define NOFLUSH 0
 #define FLUSH	1
@@ -59,6 +63,8 @@ error_def(ERR_NOLOCKMATCH);
 error_def(ERR_LOCKSPACEUSE);
 error_def(ERR_LOCKSPACEFULL);
 error_def(ERR_LOCKSPACEINFO);
+error_def(ERR_LOCKCRITOWNER);
+
 
 void	lke_show(void)
 {
@@ -74,6 +80,7 @@ void	lke_show(void)
 	sgmnt_addrs		*csa;
 	int			shr_sub_len = 0;
 	float			ls_free = 0;	/* Free space in bottleneck subspace */
+	mlk_pvtctl		pctl, pctl2;
 
 	/* Get all command parameters */
 	regname.addr = regbuf;
@@ -82,7 +89,7 @@ void	lke_show(void)
 	node.len = SIZEOF(nodebuf);
 	one_lock.addr = one_lockbuf;
 	one_lock.len = SIZEOF(one_lockbuf);
-	if (lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact) == 0)
+	if (lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0) == 0)
 		return;
 	/* Search all regions specified on the command line */
 	for (reg = gd_header->regions, n = 0; n != gd_header->n_regions; ++reg, ++n)
@@ -110,20 +117,47 @@ void	lke_show(void)
 			} else if (IS_REG_BG_OR_MM(reg))
 			{	/* Local region */
 				csa = &FILE_INFO(reg)->s_addrs;
-				ls_len = (size_t)(csa->lock_addrs[1] - csa->lock_addrs[0]);
+				ls_len = (size_t)csa->mlkctl_len;
 				ctl = (mlk_ctldata_ptr_t)malloc(ls_len);
+				MLK_PVTCTL_INIT(pctl, reg);
+				if (nocrit)
+				{	/* Set shrhash and shrhash_size here when nocrit, as they normally get set up
+					 * when grabbing lock crit.
+					 * If we have an external lock hash table, attach the shared memory.
+					 */
+					pctl.shrhash_size = pctl.ctl->num_blkhash;
+					if (MLK_CTL_BLKHASH_EXT != pctl.ctl->blkhash)
+						pctl.shrhash = (mlk_shrhash_ptr_t)R2A(pctl.ctl->blkhash);
+					else
+						pctl.shrhash = do_shmat(pctl.ctl->hash_shmid, NULL, 0);
+				}
 				/* Prevent any modification of the lock space while we make a local copy of it */
 				if (!nocrit)
+<<<<<<< HEAD
 					GRAB_LOCK_CRIT(csa, reg, was_crit);
 				memcpy((uchar_ptr_t)ctl, (uchar_ptr_t)csa->lock_addrs[0], ls_len);
+=======
+					GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
+				memcpy((uchar_ptr_t)ctl, (uchar_ptr_t)csa->mlkctl, ls_len);
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 				assert((ctl->max_blkcnt > 0) && (ctl->max_prccnt > 0) && ((ctl->subtop - ctl->subbase) > 0));
+				pctl2 = pctl;
+				if (MLK_CTL_BLKHASH_EXT == pctl.ctl->blkhash)
+				{
+					pctl2.shrhash = (mlk_shrhash_ptr_t)malloc(SIZEOF(mlk_shrhash) * pctl.shrhash_size);
+					memcpy(pctl2.shrhash, pctl.shrhash, SIZEOF(mlk_shrhash) * pctl.shrhash_size);
+				}
 				if (!nocrit)
-					REL_LOCK_CRIT(csa, reg, was_crit);
+					REL_LOCK_CRIT(pctl, was_crit);
+				else if (MLK_CTL_BLKHASH_EXT == pctl.ctl->blkhash)
+					SHMDT(pctl.shrhash);
 				shr_sub_len = 0;
-				locks = ctl->blkroot == 0 ?
-						FALSE:
-						lke_showtree(NULL, (mlk_shrblk_ptr_t)R2A(ctl->blkroot), all, wait, pid,
-							     one_lock, memory, &shr_sub_len);
+				MLK_PVTCTL_SET_CTL(pctl2, ctl);
+				if (MLK_CTL_BLKHASH_EXT != pctl.ctl->blkhash)
+					pctl2.shrhash = (mlk_shrhash_ptr_t)R2A(pctl2.ctl->blkhash);
+				locks = (ctl->blkroot == 0)
+						? FALSE
+						: lke_showtree(NULL, &pctl2, all, wait, pid, one_lock, memory, &shr_sub_len);
 				/* lock space usage consists of: control_block + nodes(locks) +  processes + substrings */
 				/* any of those subspaces can be bottleneck.
 				 * Therefore we will report the subspace which is running out.
@@ -133,14 +167,12 @@ void	lke_show(void)
 				ls_free *= 100;	/* Scale to [0-100] range. (couldn't do this inside util_out_print) */
 				if (ls_free < 1) /* No memory? Notify user. */
 					gtm_putmsg_csa(NULL, VARLSTCNT(4) ERR_LOCKSPACEFULL, 2, DB_LEN_STR(reg));
-				if (ctl->subtop > ctl->subfree)
-					gtm_putmsg_csa(NULL, VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
-						   (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
-						   (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" not "));
-				else
-					gtm_putmsg_csa(NULL, VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
-						   (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
-						   (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt, LEN_AND_LIT(" "));
+				gtm_putmsg_csa(NULL, VARLSTCNT(10) ERR_LOCKSPACEINFO, 8, REG_LEN_STR(reg),
+					   (ctl->max_prccnt - ctl->prccnt), ctl->max_prccnt,
+					   (ctl->max_blkcnt - ctl->blkcnt), ctl->max_blkcnt,
+					   shr_sub_len, (ctl->subtop - ctl->subbase));
+				if (MLK_CTL_BLKHASH_EXT == pctl.ctl->blkhash)
+					free(pctl2.shrhash);
 				free(ctl);
 			} else
 			{
@@ -152,6 +184,8 @@ void	lke_show(void)
 			assert((ls_free <= 100) && (ls_free >= 0));
 			gtm_putmsg_csa(NULL, VARLSTCNT(4) ERR_LOCKSPACEUSE, 2, ((int)ls_free),
 				       csa->hdr->lock_space_size/OS_PAGELET_SIZE);
+			if (nocrit)
+				gtm_putmsg_csa(NULL, VARLSTCNT(3) ERR_LOCKCRITOWNER, 1, LOCK_CRIT_OWNER(csa));
 		}
 	}
 	if (!match && (0 != regname.len))

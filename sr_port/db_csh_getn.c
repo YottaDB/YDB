@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -311,8 +311,13 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 			if (FALSE == wcs_get_space(reg, 0, cr))
 			{	/* failed to flush it out - force a rebuild */
 				BG_TRACE_PRO(wc_blocked_db_csh_getn_wcsstarvewrt);
+<<<<<<< HEAD
 				assert(csa->nl->wc_blocked); /* only reason we currently know why wcs_get_space could fail */
 				assert(ydb_white_box_test_case_enabled);
+=======
+				/* only reason we currently know why wcs_get_space could fail */
+				assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 				break;
 			}
 			assert(0 == cr->dirty);

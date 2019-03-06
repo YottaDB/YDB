@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +19,7 @@
 #include "dollarx.h"
 #include "patcode.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"	/* needed by *TYPEMASK* macros defined in gtm_utf8.h */
 #include "gtm_utf8.h"
 
@@ -35,7 +36,7 @@ void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 	boolean_t	utf8_term, utf8_active, utf8_crlast = FALSE;
 	wint_t		curr_char;
 
-	utf8_active = (gtm_utf8_mode UNICODE_ONLY(&& CHSET_M != io_ptr->ochset)) ? TRUE : FALSE;
+	utf8_active = (gtm_utf8_mode UTF8_ONLY(&& CHSET_M != io_ptr->ochset)) ? TRUE : FALSE;
 	utf8_term = (utf8_active && tt == io_ptr->type) ? TRUE : FALSE;
 	strstart = strcursor = str;
 	if (io_ptr->write_filter)
@@ -57,7 +58,7 @@ void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 				curr_char = *str;
 				strnext = str + 1;
 			}
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 			else
 				strnext = UTF8_MBTOWC(str, strtop, curr_char);
 #endif
@@ -78,8 +79,8 @@ void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 					case NATIVE_CR:
 						io_ptr->dollar.x = 0;
 						if (utf8_active && gtmsocket != io_ptr->type)
-						{	/* CR implies LF for Unicode except for socket which recongizes
-							   only NATIVE_LF as a terminator unicode or not.
+						{	/* CR implies LF for UTF except for socket which recongizes
+							   only NATIVE_LF as a terminator UTF or not.
 							*/
 							utf8_crlast = TRUE;
 							io_ptr->dollar.y++;
@@ -91,7 +92,7 @@ void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 					case NATIVE_BS:
 						/* if bs at beginning of string but x > 0 need image of line */
 						if (io_ptr->dollar.x > 0)
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 							if (utf8_term)
 							{
 								/* get previous character relative to strcursor and back it up */
@@ -139,7 +140,7 @@ void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 								io_ptr->dollar.x++;
 							str++;
 						}
-						UNICODE_ONLY(
+						UTF8_ONLY(
 						else
 						{
 							assert(str < strtop);	/* PATTERN_TYPEMASK macro relies on this */
@@ -167,7 +168,7 @@ void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 								io_ptr->dollar.x++;
 							str = strnext;
 						}
-						)	/* UNICODE_ONLY */
+						)	/* UTF8_ONLY */
 						break;
 				}
 			} else if (NATIVE_ESC == *str)
@@ -179,7 +180,7 @@ void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 					io_ptr->esc_state = START;
 			} else
 			{
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 				if (utf8_term)
 				{
 					GTM_IO_WCWIDTH(curr_char, char_width);
@@ -190,7 +191,7 @@ void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 				str = strnext;
 			}
 		}
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	} else if (utf8_active)
 	{
 		for (total = 0; str < strtop; str = strnext)
@@ -201,7 +202,7 @@ void dollarx(io_desc *io_ptr, unsigned char *str, unsigned char *strtop)
 				GTM_IO_WCWIDTH(curr_char, char_width);
 				total += char_width;
 			} else
-				total++;	/* count number of Unicode characters */
+				total++;	/* count number of UTF characters */
 		}
 		io_ptr->dollar.x += total;
 #endif

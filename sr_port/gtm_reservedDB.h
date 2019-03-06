@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -27,14 +27,20 @@ enum
 	RDBF_STATSDB = 0x04			/* This is a statsDB (must have AUTODB and NOSTATS also) */
 };
 #define RDBF_STATSDB_MASK (RDBF_AUTODB | RDBF_NOSTATS | RDBF_STATSDB)	/* This is a statsDB */
-
+#define STATSDB_ERROR_RATE 99	/* a number of identical statsDB error messages to skip/throttle before the next output */
 /* Possible errors we encounter that prevent us from setting baseDBnl->statsdb_fnname[.len] */
 enum
 {
 	FNERR_NOERR = 0,			/* No error recorded */
+<<<<<<< HEAD
 	FNERR_NOSTATS,				/* BaseDB has NOSTATS set - (should never happen) */
 	FNERR_STATSDIR_TRNFAIL,			/* Unable to translate $ydb_statsdir (should never happen) */
 	FNERR_STATSDIR_TRN2LONG,		/* Translation of $ydb_statsdir too long (should never happen) */
+=======
+	FNERR_NOSTATS,				/* BaseDB has NOSTATS set */
+	FNERR_STATSDIR_TRNFAIL,			/* Unable to translate $gtm_statsdir (should never happen) */
+	FNERR_STATSDIR_TRN2LONG,		/* Translation of $gtm_statsdir too long (should never happen) */
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 	FNERR_INV_BASEDBFN,			/* BaseDBfn had no '/' making parse fail (should never happen) */
 	FNERR_FTOK_FAIL,			/* The STAT() in gtm_ftok() failed (no rc) (should never hapen) */
 	FNERR_FNAMEBUF_OVERFLOW			/* Not enough space to add the statsdb fname to fname buffer */
@@ -46,7 +52,6 @@ enum
 #define FNERR_FTOK_FAIL_TEXT		"Failure generating FTOK value for $ydb_statsdir"
 #define FNERR_FNAMEBUF_OVERFLOW_TEXT	"Buffer overflow detected adding statistics database filename (hash.<dbname>.gst) to " \
 					"filename buffer"
-
 /* Global name used for shared global stats in statsDB MM database */
 #define STATSDB_GBLNAME		"%YGS"
 #define STATSDB_GBLNAME_LEN	(SIZEOF(STATSDB_GBLNAME) - 1)

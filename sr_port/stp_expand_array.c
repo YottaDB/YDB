@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 74ea4a3c... GT.M V6.3-006
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +24,10 @@
 #include "compiler.h"
 #include "stringpool.h"
 #include "stp_parms.h"
+<<<<<<< HEAD
+=======
+#include "gtm_string.h"
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
 GBLREF mstr		**stp_array;
 GBLREF gtm_uint64_t	stp_array_size;
@@ -31,7 +40,11 @@ void stp_expand_array(void)
 	n = stp_array_size;
 	stp_array_size = ((MAXINT4 > n) ? (n * 2) : (n + MAXINT4));
 	a = stp_array;
+<<<<<<< HEAD
 	stp_array = (mstr **)malloc(stp_array_size * SIZEOF(mstr *));
+=======
+	stp_array = (mstr **) malloc(stp_array_size * SIZEOF(mstr *));
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 	memcpy((uchar_ptr_t)stp_array, (uchar_ptr_t)a, n * SIZEOF(mstr *));
 	free(a);
 	return;

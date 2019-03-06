@@ -219,7 +219,7 @@ void	op_view(int numarg, mval *keyword, ...)
 	view_arg_convert(vtp, (int)vtp->parm, arg, &parmblk, IS_DOLLAR_VIEW_FALSE);
 	switch(vtp->keycode)
 	{
-#		ifdef UNICODE_SUPPORTED
+#		ifdef UTF8_SUPPORTED
 		case VTK_BADCHAR:
 			badchar_inhibit = FALSE;
 			break;

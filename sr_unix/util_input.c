@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,13 +16,13 @@
 #include <errno.h>
 #include "gtm_stdio.h"
 #include "gtm_string.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
 #include "util.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 GBLREF	boolean_t	gtm_utf8_mode;
 #endif
 
@@ -34,7 +35,7 @@ GBLREF	boolean_t	gtm_utf8_mode;
  * where the line is returned and includes the
  * terminating null.
  * buffersize must be less than or equal to MAX_LINE
- * for Unicode
+ * for UTF8
  *
  * If the return is NULL, there was an error
  * otherwise it is the start of the line.
@@ -48,7 +49,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 {
 	size_t		in_len;
 	char		*retptr;
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	int		mbc_len, u16_off, non_space_off;
 	int32_t		mbc_dest_len;
 	boolean_t	found_non_space = FALSE;
@@ -58,7 +59,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 	UErrorCode	errorcode;
 #endif
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	if (gtm_utf8_mode)
 	{
 		assert(MAX_LINE >= buffersize);
@@ -134,7 +135,7 @@ char *util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leadin
 			if (!feof(fp))
 				util_out_print("Error reading from STDIN", TRUE);
 		}
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	}
 #endif
 	return retptr;

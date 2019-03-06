@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2016 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -70,7 +70,7 @@ int f_char(oprtype *a, opctype op)
 		base = stringpool.free;
 		argp = &argv[0];
 		for (outptr = base, char_len = 0; argc > 0; --argc, argp++)
-		{	/* For each wide char value, convert to unicode chars in stringpool buffer */
+		{	/* For each wide char value, convert to UTF chars in stringpool buffer */
 			ch = argp->oprval.tref->operand[0].oprval.ilit;
 			if (0 <= ch)
 			{ /* As per the M standard, negative code points should map to no characters */

@@ -529,6 +529,7 @@ static readonly CLI_PARM gtmrecv_helpers_parm[] = {
 
 static	CLI_ENTRY	inst_edit_qual[] = {
 	{"CHANGE",     0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_STR, 0       },
+	{"CLEANSLOTS", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0       },
 	{"DETAIL",     0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0       },
 	{"NAME",       0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0       },
 	{"OFFSET",     0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, VAL_HEX },

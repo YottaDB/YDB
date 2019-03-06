@@ -1515,4 +1515,16 @@ const static readonly int error_ansi[] = {
 	   0,	/* LOADRECCNT */
 	   0,	/* COMMFILTERERR */
 	   0,	/* NOFILTERNEST */
+	   0,	/* MLKHASHTABERR */
+	   0,	/* LOCKCRITOWNER */
+	   0,	/* MLKHASHWRONG */
+	   0,	/* XCRETNULLREF */
+	   0,	/* EXTCALLBOUNDS */
+	   0,	/* EXCEEDSPREALLOC */
+	   0,	/* ZTIMEOUT */
+	   0,	/* ERRWZTIMEOUT */
+	   0,	/* MLKHASHRESIZE */
+	   0,	/* MLKHASHRESIZEFAIL */
+	   0,	/* MLKCLEANED */
+	   0,	/* NOTMNAME */
 	};

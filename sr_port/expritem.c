@@ -115,6 +115,7 @@ LITDEF nametabent svn_names[] =
 	,{ 4, "ZTDA*"}
 	,{ 4, "ZTDE*"}
 	,{ 3, "ZTE" }, { 4, "ZTEX*"}
+	,{ 4, "ZTIM*" }
 	,{ 4, "ZTLE*"}
 	,{ 4, "ZTNA*"}
 	,{ 4, "ZTOL*"}
@@ -205,6 +206,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZTDATA, FALSE, TRIGGER_OS }
 	,{ SV_ZTDELIM, FALSE, TRIGGER_OS }
 	,{ SV_ZTEXIT, TRUE, ALL_SYS }, { SV_ZTEXIT, TRUE, ALL_SYS }
+	,{ SV_ZTIMEOUT, TRUE, UNIX_OS}
 	,{ SV_ZTLEVEL, FALSE, TRIGGER_OS}
 	,{ SV_ZTNAME, FALSE, TRIGGER_OS }
 	,{ SV_ZTOLDVAL, FALSE, TRIGGER_OS }

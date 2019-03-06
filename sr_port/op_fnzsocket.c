@@ -284,7 +284,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			assert(creator_passed >= socketptr->howcreated);
 			dst->str.addr = (char *)zsocket_howcreated_names[socketptr->howcreated];
 			dst->str.len = STRLEN(dst->str.addr);
-			UNICODE_ONLY(dst->str.char_len = 0);
+			UTF8_ONLY(dst->str.char_len = 0);
 			s2pool(&dst->str);
 			break;
 		case zsocket_index:
@@ -338,7 +338,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 #			endif
 			} else
 				*dst = literal_null;
-			UNICODE_ONLY(dst->str.char_len = 0);
+			UTF8_ONLY(dst->str.char_len = 0);
 			s2pool(&dst->str);
 			break;
 		case zsocket_localport:
@@ -367,7 +367,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 			{
 				dst->str.addr = socketptr->parenthandle;
 				dst->str.len = STRLEN(socketptr->parenthandle);
-				UNICODE_ONLY(dst->str.char_len = 0);
+				UTF8_ONLY(dst->str.char_len = 0);
 				s2pool(&dst->str);
 			} else
 				*dst = literal_null;
@@ -419,7 +419,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 #			endif
 			} else
 				*dst = literal_null;
-			UNICODE_ONLY(dst->str.char_len = 0);
+			UTF8_ONLY(dst->str.char_len = 0);
 			s2pool(&dst->str);
 			break;
 		case zsocket_remoteport:
@@ -434,14 +434,14 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 		case zsocket_sockethandle:
 			dst->str.addr = socketptr->handle;
 			dst->str.len = socketptr->handle_len;
-			UNICODE_ONLY(dst->str.char_len = 0);
+			UTF8_ONLY(dst->str.char_len = 0);
 			s2pool(&dst->str);
 			break;
 		case zsocket_state:
 			assert(socket_connect_inprogress >= socketptr->state);
 			dst->str.addr = (char *)zsocket_state_names[socketptr->state];
 			dst->str.len = STRLEN(dst->str.addr);
-			UNICODE_ONLY(dst->str.char_len = 0);
+			UTF8_ONLY(dst->str.char_len = 0);
 			s2pool(&dst->str);
 			break;
 		case zsocket_tls:

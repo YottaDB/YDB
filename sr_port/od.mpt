@@ -21,6 +21,16 @@
 	q
 INT	r !,"Octal: ",%OD s %OD=$$FUNC(%OD)
 	q
+FUNCFM(o)
+	n d,dg
+	s d=0,o=+o
+	f dg=1:1:$l(o) s d=d*8+$e(o,dg)
+	q d
 FUNC(o)
+<<<<<<< HEAD
 	q:"-"=$ze(o,1) ""
+=======
+	q:o<0 ""
+	q:$l(o)<19 $$FUNCFM(o)
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 	q $$CONVERTBASE^%CONVBASEUTIL(o,8,10)

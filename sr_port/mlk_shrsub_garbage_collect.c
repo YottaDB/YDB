@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,14 +17,16 @@
 #include "copy.h"
 #include "mlk_shrsub_garbage_collect.h"
 
-void mlk_shrsub_garbage_collect(mlk_ctldata_ptr_t ctl)
+void mlk_shrsub_garbage_collect(mlk_pvtctl_ptr_t pctl)
 {
         ptroff_t                bckp;
 	int4 			delta, n;
 	mlk_shrsub_ptr_t	p;
 	mlk_shrblk_ptr_t	b;
 	sm_uc_ptr_t		f;
+	mlk_ctldata_ptr_t	ctl;
 
+	ctl = pctl->ctl;
 	delta = 0;
 	for (p = (mlk_shrsub_ptr_t)R2A(ctl->subbase), f = (sm_uc_ptr_t)R2A(ctl->subfree);
 		p < (mlk_shrsub_ptr_t) f ; p = (mlk_shrsub_ptr_t)((sm_uc_ptr_t) p + n))

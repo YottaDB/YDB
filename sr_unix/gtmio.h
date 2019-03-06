@@ -61,6 +61,7 @@
 # include "get_fs_block_size.h"
 # include "min_max.h"
 #endif
+#include "stdio.h"
 
 #if defined(__linux__) || defined(__CYGWIN__)
 #include <sys/vfs.h>

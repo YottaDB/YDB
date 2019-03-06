@@ -164,13 +164,13 @@ int gtm_wcswidth(unsigned char* ptr, int len, boolean_t strict, int nonprintwidt
  * platforms and its incorrect behavior for several characters (even on Linux).
  *
  * ICU does not provide a direct API for display width, however, it does provide API
- * for the property "East Asian Width" specified in the "Unicode Standard Annex #11"
- * which provides guidelines to determine the width for the entire Unicode repertoire.
+ * for the property "East Asian Width" specified in UAX#11 (http://unicode.org/reports/tr11/)
+ * which provides guidelines to determine the width for the entire repertoire.
  *
  * Using "East Asian Width" and "General Category" properties. gtm_wcwidth() determines
  * the column width as below:
  * 	- SOFT-HYPHEN is a special format control character with a width of 1.
- *	- Non-spacing combining marks and Enclosing combining marks (Unicode general
+ *	- Non-spacing combining marks and Enclosing combining marks (general
  *	  category codes 'Mn' and 'Me') have a column width of 0. Note that Combing spacing
  *	  marks (General Category 'Mc') occupy a column width of 1.
  *	- Conjoining Hangul Jamos (i.e. vowels and trailing consonants between U+1160 -
@@ -186,7 +186,7 @@ int gtm_wcswidth(unsigned char* ptr, int len, boolean_t strict, int nonprintwidt
  */
 int gtm_wcwidth(wint_t code)
 {
-	UCharCategory		gc;	/* General category as defined by the Unicode standard */
+	UCharCategory		gc;	/* General category as defined by the standard */
 	UEastAsianWidth		ea;
 	UHangulSyllableType	hst;
 

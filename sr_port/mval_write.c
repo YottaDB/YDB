@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 74ea4a3c... GT.M V6.3-006
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +27,7 @@
 #include "stack_frame.h"
 #include "mv_stent.h"	/* for POP_MV_STENT */
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #include "gtm_icu_api.h"	/* U_ISPRINT() needs this header */
 #endif
@@ -100,7 +105,7 @@ void mval_write(zshow_out *output, mval *v, boolean_t flush)
 				isill = FALSE;
 				chlen = 1;
 			}
-			UNICODE_ONLY(
+			UTF8_ONLY(
 			else
 			{
 				strnext = (char *)UTF8_MBTOWC(&v->str.addr[src_cnt], &v->str.addr[src_len], ch);

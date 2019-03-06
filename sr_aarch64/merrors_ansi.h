@@ -1503,4 +1503,32 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLBUFFPHS2SALVAGE */
 	   0,	/* JNLPOOLPHS2SALVAGE */
 	   0,	/* MURNDWNARGLESS */
+<<<<<<< HEAD:sr_aarch64/merrors_ansi.h
+=======
+	   0,	/* DBFREEZEON */
+	   0,	/* DBFREEZEOFF */
+	   0,	/* STPCRIT */
+	   0,	/* STPOFLOW */
+	   0,	/* SYSUTILCONF */
+	   0,	/* MSTACKSZNA */
+	   0,	/* JNLEXTRCTSEQNO */
+	   0,	/* INVSEQNOQUAL */
+	   0,	/* LOWSPC */
+	   0,	/* FAILEDRECCOUNT */
+	   0,	/* LOADRECCNT */
+	   0,	/* COMMFILTERERR */
+	   0,	/* NOFILTERNEST */
+	   0,	/* MLKHASHTABERR */
+	   0,	/* LOCKCRITOWNER */
+	   0,	/* MLKHASHWRONG */
+	   0,	/* XCRETNULLREF */
+	   0,	/* EXTCALLBOUNDS */
+	   0,	/* EXCEEDSPREALLOC */
+	   0,	/* ZTIMEOUT */
+	   0,	/* ERRWZTIMEOUT */
+	   0,	/* MLKHASHRESIZE */
+	   0,	/* MLKHASHRESIZEFAIL */
+	   0,	/* MLKCLEANED */
+	   0,	/* NOTMNAME */
+>>>>>>> 74ea4a3c... GT.M V6.3-006:sr_x86_64/merrors_ansi.h
 	};

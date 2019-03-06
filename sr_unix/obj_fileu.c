@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2016 Fidelity National Information	*
+ * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -90,7 +90,7 @@ int mk_tmp_object_file(const unsigned char *object_fname, int object_fname_len)
 	status = FCHMOD(fdesc, umask_creat);
 	if (-1 == status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fchmod()"), CALLFROM, errno);
-        return fdesc;
+	return fdesc;
 }
 
 /* Routine to rename the most recent temporary object file (name stored in threadgbl tmp_object_file_name) to the name
@@ -132,11 +132,20 @@ void init_object_file_name(void)
 	mstr		fstr;
 	parse_blk	pblk;
 
+	fstr.len = (MV_DEFINED(&cmd_qlf.object_file) && (MAX_FN_LEN > cmd_qlf.object_file.str.len)
+		? cmd_qlf.object_file.str.len : 0);
+	fstr.addr = cmd_qlf.object_file.str.addr;
+	assert(!fstr.len || strlen(fstr.addr) == fstr.len);
 	memset(&pblk, 0, SIZEOF(pblk));
+<<<<<<< HEAD
 	pblk.buffer = (char *)object_file_name;
 	pblk.buff_size = MAX_FBUFF;
 	fstr.len = (MV_DEFINED(&cmd_qlf.object_file) ? cmd_qlf.object_file.str.len : 0);
 	fstr.addr = cmd_qlf.object_file.str.addr;
+=======
+	pblk.buffer = object_file_name;
+	pblk.buff_size = MAX_FN_LEN;
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 	rout_len = (int)module_name.len;
 	memcpy(&obj_name[0], module_name.addr, rout_len);
 	memcpy(&obj_name[rout_len], DOTOBJ, SIZEOF(DOTOBJ));    /* Includes null terminator */

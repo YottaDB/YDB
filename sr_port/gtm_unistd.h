@@ -73,7 +73,7 @@ GBLREF	gid_t	group_id, effective_group_id;
 #define CONFSTR gtm_confstr
 #endif
 
-#ifndef UNICODE_SUPPORTED
+#ifndef UTF8_SUPPORTED
 #define GETHOSTNAME(name,namelen,gethostname_res)			\
 	(gethostname_res = gethostname(name, namelen))
 #else

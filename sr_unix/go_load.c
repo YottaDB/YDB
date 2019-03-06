@@ -81,6 +81,7 @@ error_def(ERR_DBFILERR);
 error_def(ERR_STATSDBNOTSUPP);
 error_def(ERR_JNLFILOPN);
 error_def(ERR_DBPRIVERR);
+error_def(ERR_GBLOFLOW);
 
 #define GO_PUT_SUB		0
 #define GO_PUT_DATA		1
@@ -103,7 +104,8 @@ if ((HASHT_GBL = IS_GVKEY_HASHT_FULL_GBLNAME(KEYLENGTH, PTR)) && !IGNORE)						\
 {																\
 	if (MUPIP_ERROR_OCCURRED)												\
 	{															\
-		if (ERR_JNLFILOPN == ERROR_CONDITION || ERR_DBPRIVERR == ERROR_CONDITION)					\
+		if (ERR_JNLFILOPN == ERROR_CONDITION || ERR_DBPRIVERR == ERROR_CONDITION ||					\
+			ERR_GBLOFLOW == ERROR_CONDITION)									\
 		{														\
 			insert_reg_to_list(REG_LIST, gv_cur_region, &NUM_OF_REG);						\
 			FIRST_FAILED_REC_COUNT = ITER;										\
@@ -422,7 +424,8 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 	if (failed_record_count)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FAILEDRECCOUNT, 1, &failed_record_count);
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_INFO(ERR_LOADRECCNT), 1, &tmp_rec_count);
-
+	if (failed_record_count)
+		mupip_exit(error_condition);
 	if (format_error)
 		mupip_exit(ERR_LOADFILERR);
 }

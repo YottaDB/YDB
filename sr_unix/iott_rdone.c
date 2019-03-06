@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -35,7 +35,7 @@
 #include "error.h"
 #include "std_dev_outbndset.h"
 #include "wake_alarm.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
@@ -305,7 +305,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 			 * --------------------------------------------------
 			 */
 			prin_in_dev_failure = FALSE;
-#			ifdef UNICODE_SUPPORTED
+#			ifdef UTF8_SUPPORTED
 			if (utf8_active)
 			{
 				if (tt_ptr->discard_lf)
@@ -371,7 +371,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 					NATIVE_CVT2UPPER(inbyte, inbyte);
 				inchar = inbyte;
 				inchar_width = 1;
-#			ifdef UNICODE_SUPPORTED
+#			ifdef UTF8_SUPPORTED
 			}
 #			endif
 			GETASCII(asc_inchar, inchar);
@@ -394,7 +394,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 				ret = FALSE;
 				do
 				{
-					if (zb_ptr >= zb_top UNICODE_ONLY(|| (utf8_active && ASCII_MAX < inchar)))
+					if (zb_ptr >= zb_top UTF8_ONLY(|| (utf8_active && ASCII_MAX < inchar)))
 					{
 						/* -------------
 						 * $zb overflow
@@ -532,8 +532,16 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		if ((TT_EDITING & tt_ptr->ext_cap) && !((TRM_PASTHRU|TRM_NOECHO) & mask))
 		{	/* keep above test in sync with iott_readfl */
 			if (!utf8_active)
+<<<<<<< HEAD
 				iott_recall_array_add(tt_ptr, 1, inchar_width, 1, &INPUT_CHAR);
 #			ifdef UNICODE_SUPPORTED
+=======
+			{
+				tt_ptr->recall_buff.addr[0] = INPUT_CHAR;
+				tt_ptr->recall_buff.len = 1;
+			}
+#			ifdef UTF8_SUPPORTED
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 			else
 				iott_recall_array_add(tt_ptr, 1, inchar_width, SIZEOF(INPUT_CHAR), &INPUT_CHAR);
 #			endif

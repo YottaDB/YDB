@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -55,7 +55,7 @@
 #include "gtm_trigger_trc.h"
 #endif
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"	/* needed by *TYPEMASK* macros defined in gtm_utf8.h */
 #include "gtm_utf8.h"
 #endif
@@ -281,7 +281,7 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 				if (tid->str.len > TID_STR_SIZE)
 					tid->str.len = TID_STR_SIZE;
 			}
-#			ifdef UNICODE_SUPPORTED
+#			ifdef UTF8_SUPPORTED
 			else
 			{	/* In UTF8 mode, take only as many valid multi-byte characters as can fit in TID_STR_SIZE */
 				if (gtm_utf8_mode)

@@ -52,6 +52,7 @@
 #include "mupint.h"
 #include "mu_gv_cur_reg_init.h"
 #include "warn_db_sz.h"
+#include "gvcst_protos.h"
 
 #define DUMMY_GLOBAL_VARIABLE		"%D%DUMMY_VARIABLE"
 #define DUMMY_GLOBAL_VARIABLE_LEN	SIZEOF(DUMMY_GLOBAL_VARIABLE)
@@ -394,11 +395,18 @@ void mupip_integ(void)
 					baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
 					baseDBnl = baseDBcsa->nl;
 					BASEDBREG_TO_STATSDBREG(baseDBreg, reg);
+					if (0 == baseDBnl->statsdb_fname_len)
+					{
+						/* Initialize cnl->statsdb_fname from the basedb name */
+						baseDBnl->statsdb_fname_len = ARRAYSIZE(baseDBnl->statsdb_fname);
+						gvcst_set_statsdb_fname(baseDBcsa->hdr, baseDBreg, baseDBnl->statsdb_fname,
+									&baseDBnl->statsdb_fname_len);
+					}
 					COPY_STATSDB_FNAME_INTO_STATSREG(reg, baseDBnl->statsdb_fname, baseDBnl->statsdb_fname_len);
 					if (!mupfndfil(reg, NULL, LOG_ERROR_FALSE))
 					{	/* statsDB does not exist. Print an info message and skip to next region */
 						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REGFILENOTFOUND, 4,
-											DB_LEN_STR(reg), REG_LEN_STR(reg));
+							       DB_LEN_STR(reg), REG_LEN_STR(baseDBreg));
 						retvalue_mu_int_reg = FALSE;
 					}
 				}

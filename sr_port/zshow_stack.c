@@ -1,10 +1,15 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2013 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 74ea4a3c... GT.M V6.3-006
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,6 +38,7 @@
 #define UNK_LOC_MESS		"        Indirection"
 #define INDR_OVERFLOW		"        (Max indirect frames per counted frame exceeded for ZSHOW ""S"" -"	\
                                 " some indirect frames not processed)"
+#define	ZTIMEOUT_FRAME		"	($ZTIMEOUT) "
 
 #define MAX_FRAME_MESS_LEN	20	/* Maximum length of any of the frame messages above */
 #define MAX_INDR_PER_COUNTED	64	/* Maximum number of indirect frames printed per counted frame */
@@ -69,7 +75,8 @@ void zshow_stack(zshow_out *output, boolean_t show_checksum)
 		SKIP_BASE_FRAMES(fp, (SFT_CI | SFT_TRIGR));	/* Can update fp if fp is a call-in or trigger base frame */
 		if (NULL == fp->old_frame_pointer)
 			break; /* Endpoint.. */
-		if (!(fp->type & SFT_COUNT) || ((fp->type & SFT_ZINTR) && (fp->flags & SFF_INDCE)))
+		if (!(fp->type & SFT_COUNT) || (((fp->type & SFT_ZINTR) || (fp->type & SFT_ZTIMEOUT))
+										&& (fp->flags & SFF_INDCE)))
 		{	/* SFT_ZINTR is normally indirect but if the frame has been replaced by non-indirect frame via ZGOTO or GOTO
 			 * then do not include it in the indirect list here.
 			 */
@@ -128,6 +135,10 @@ void zshow_stack(zshow_out *output, boolean_t show_checksum)
 						case (SFT_COUNT | SFT_ZINTR):
 							MEMCPY_LIT(&buff[v.len], ZINTR_FRAME);
 							v.len += SIZEOF(DIR_MODE_MESS) - 1;
+							break;
+						case (SFT_COUNT | SFT_ZTIMEOUT):
+							MEMCPY_LIT(&buff[v.len], ZTIMEOUT_FRAME);
+							v.len += SIZEOF(ZTIMEOUT_FRAME) - 1;
 							break;
 						case 0xffff:
 							MEMCPY_LIT(&buff[v.len], INDR_OVERFLOW);

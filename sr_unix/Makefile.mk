@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2017 Fidelity National Information		#
+# Copyright (c) 2013-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	#
@@ -37,8 +37,13 @@ CURDIR = `pwd`
 # Find out whether we are already in $ydb_dist/plugin/gtmcrypt directory.
 NOT_IN_GTMCRYPTDIR = $(shell [ "$(CURDIR)" = "$(GTMCRYPTDIR)" ] ; echo $$?)
 
+<<<<<<< HEAD
 # Users may install YottaDB without Unicode support
 HAVE_UNICODE = $(shell [ -d "$(DISTDIR)/utf8" ] ; echo $$?)
+=======
+# Users may install GT.M without utf8 support
+HAVE_UTF8 = $(shell [ -d "$(DISTDIR)/utf8" ] ; echo $$?)
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
 # Determine machine and OS type.
 UNAMESTR = $(shell uname -a)
@@ -220,9 +225,15 @@ ifeq ($(NOT_IN_GTMCRYPTDIR),1)
 	cp -pf *.sh *.m $(GTMCRYPTDIR)/
 	cp -f maskpass $(GTMCRYPTDIR)/
 endif
+<<<<<<< HEAD
 ifeq ($(HAVE_UNICODE),0)
 	@echo "UTF-8 mode library installation may fail if ydb_icu_version/gtm_icu_version (${ydb_icu_version}/${gtm_icu_version}) is not set"
 	(cd $(PLUGINDIR)/o/utf8 && env ydb_chset=UTF-8 ${ydb_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
+=======
+ifeq ($(HAVE_UTF8),0)
+	@echo "UTF-8 mode library installation may fail if gtm_icu_version (${gtm_icu_version}) is not set"
+	(cd $(PLUGINDIR)/o/utf8 && env gtm_chset=UTF-8 ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 endif
 
 uninstall:

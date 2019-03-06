@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -75,7 +75,7 @@ error_def(ERR_TEXT);
 error_def(ERR_ZINTRECURSEIO);
 error_def(ERR_NOPRINCIO);
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 /* Maintenance of $KEY, $DEVICE and $ZB on a badchar error */
 void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned char *delimptr, unsigned char *strend)
 {
@@ -175,8 +175,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CURRSOCKOFR, 2, dsocketptr->current_socket, dsocketptr->n_socket);
 		return 0;
 	}
-	utf8_active = NON_UNICODE_ONLY(FALSE) UNICODE_ONLY(gtm_utf8_mode ? IS_UTF_CHSET(ichset) : FALSE);
-	byteperchar = UNICODE_ONLY(utf8_active ? GTM_MB_LEN_MAX :) 1;
+	utf8_active = NON_UTF8_ONLY(FALSE) UTF8_ONLY(gtm_utf8_mode ? IS_UTF_CHSET(ichset) : FALSE);
+	byteperchar = UTF8_ONLY(utf8_active ? GTM_MB_LEN_MAX :) 1;
 	if (0 == width)
 	{	/* op_readfl won't do this; must be a call from iosocket_read */
 		vari = TRUE;
@@ -601,9 +601,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 								DBGSOCK2((stdout, "socrfl: UTF16LE BOM detected\n"));
 							}
 						} else
-						{	/* No BOM specified. If UTF16, default BOM to UTF16BE per Unicode
-							 * standard
-							 */
+						{	/* No BOM specified. If UTF16, default BOM to UTF16BE per standard */
 							if (CHSET_UTF16 == ichset)
 							{
 								DBGSOCK2((stdout, "socrfl: UTF16BE BOM assumed\n"));
@@ -614,7 +612,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 						}
 					} else
 					{	/* Insufficient characters to form a BOM so no BOM present. Like above, if in
-						 * UTF16 mode, default to UTF16BE per the Unicode standard.
+						 * UTF16 mode, default to UTF16BE per the standard.
 						 */
 						if (CHSET_UTF16 == ichset)
 						{
@@ -707,7 +705,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 				      (CHSET_UTF8 == ichset) ? UTF8_VALID(c_ptr, c_top, mb_len) :
 				      (CHSET_UTF16BE == ichset) ? UTF16BE_VALID(c_ptr, c_top, mb_len) :
 				      UTF16LE_VALID(c_ptr, c_top, mb_len)))
-				{	/* This char is not valid unicode but this is only an error if entire char is
+				{	/* This char is not valid utf character but this is only an error if entire char is
 					 * in the buffer. Else we ignore it and it is rebuffered further down.
 					 * First, we need to find its (real) length as xx_VALID set it to one when it
 					 * was determined to be invalid.
@@ -719,7 +717,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 					mb_len++;	/* Account for first byte of char */
 					if ((0 == mb_len) || ((c_ptr + mb_len) <= c_top))
 					{	/* The entire char is in the buffer.. badchar */
-#						ifdef UNICODE_SUPPORTED
+#						ifdef UTF8_SUPPORTED
 						if (CHSET_UTF8 == ichset)
 						{
 							iosocket_readfl_badchar(v, (int)((unsigned char *)c_ptr - stringpool.free),
@@ -757,8 +755,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 			assert(0 < bytes_read);
 			bytes_read -= socketptr->idelimiter[match_delim].len;
 			c_ptr -= socketptr->idelimiter[match_delim].len;
-			UNICODE_ONLY(chars_read -= socketptr->idelimiter[match_delim].char_len);
-			NON_UNICODE_ONLY(chars_read = bytes_read);
+			UTF8_ONLY(chars_read -= socketptr->idelimiter[match_delim].char_len);
+			NON_UTF8_ONLY(chars_read = bytes_read);
 			DBGSOCK((stdout, "socrfl: Terminator found - bytes_read reduced by %d bytes to %d\n",
 				 socketptr->idelimiter[match_delim].len, bytes_read));
 			DBGSOCK((stdout, "socrfl: .. c_ptr also reduced to 0x"lvaddr"\n", c_ptr));
@@ -883,7 +881,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		assert(0 <= bytes_read);
 		v->str.len = bytes_read;
 		v->str.addr = (char *)stringpool.free;
-		UNICODE_ONLY(v->str.char_len = chars_read);
+		UTF8_ONLY(v->str.char_len = chars_read);
 		DBGSOCK((stdout, "socrfl: String to return bytelen: %d  charlen: %d  iod-width: %d  wrap: %d\n",
 			 v->str.len, chars_read, iod->width, iod->wrap));
 		DBGSOCK((stdout, "socrfl:   x: %d  y: %d\n", iod->dollar.x, iod->dollar.y));

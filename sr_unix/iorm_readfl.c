@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -33,7 +33,7 @@
 #include "min_max.h"
 #include "outofband.h"
 #include "mv_stent.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #endif
@@ -47,7 +47,7 @@ GBLREF  boolean_t       gtm_utf8_mode;
 GBLREF	volatile int4	outofband;
 GBLREF	mv_stent      	*mv_chain;
 GBLREF  boolean_t    	dollar_zininterrupt;
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 LITREF	UChar32		u32_line_term[];
 LITREF	mstr		chset_names[];
 GBLREF	UConverter	*chset_desc[];
@@ -66,7 +66,7 @@ error_def(ERR_IOERROR);
 		if (!rm_ptr->follow && timed && !out_of_time)	\
 			cancel_timer(timer_id);
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 
 #define UTF8CRLEN	1	/* Length of CR in UTF8 mode. */
 #define SET_UTF8_DOLLARKEY_DOLLARZB(UTF_CODE, DOLLAR_KEY, DOLLAR_ZB)		\
@@ -398,7 +398,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 	{
 		exp_width = pipeintr->max_bufflen;
 		bytes_read = pipeintr->bytes_read;
-		/* some locals needed by unicode & M streaming mode */
+		/* some locals needed by UTF8 & M streaming mode */
 		if (!rm_ptr->fixed)
 		{
 			bytes2read = pipeintr->bytes2read;
@@ -989,7 +989,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 			} while (bytes_count < width);
 		}
 	} else
-	{	/* Unicode mode */
+	{	/* UTF8 mode */
 		assert(NULL != rm_ptr->inbuf);
 		if (rm_ptr->fixed)
 		{
@@ -1112,7 +1112,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				if (rm_ptr->follow && (char_count == width) && (TRUE == follow_timeout))
 					follow_timeout = FALSE;
 				v->str.len = INTCAST(char_ptr - rm_ptr->inbuf_off);
-				UNICODE_ONLY(v->str.char_len = char_count;)
+				UTF8_ONLY(v->str.char_len = char_count;)
 				if (0 < v->str.len)
 				{
 					if (CHSET_UTF8 == chset)
@@ -1917,7 +1917,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 	{
 		v->str.len = 0;
 		v->str.addr = (char *)stringpool.free;		/* ensure valid address */
-		UNICODE_ONLY(v->str.char_len = 0;)
+		UTF8_ONLY(v->str.char_len = 0;)
 		if (rm_ptr->follow)
 		{
 			if (TRUE == io_ptr->dollar.zeof)
@@ -1962,10 +1962,10 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				ret = FALSE;
 		}
 		if (!utf_active || !rm_ptr->fixed)
-		{	/* if Unicode and fixed, already setup the mstr */
+		{	/* if UTF8 and fixed, already setup the mstr */
 			v->str.len = bytes_count;
 			v->str.addr = (char *)stringpool.free;
-			UNICODE_ONLY(v->str.char_len = char_count;)
+			UTF8_ONLY(v->str.char_len = char_count;)
 			if (!utf_active)
 				char_count = bytes_count;
 		}

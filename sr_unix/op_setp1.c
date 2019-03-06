@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,7 @@ error_def(ERR_MAXSTRLEN);
 /*
  * ----------------------------------------------------------
  * Fast path setpiece when delimiter is one (lit) char replacing
- * a single piece (last is same as first). Unicode flavor.
+ * a single piece (last is same as first). UTF8 flavor.
  *
  * Arguments:
  *	src	- source mval
@@ -194,7 +194,7 @@ void op_setp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 				{
 					valid_char = UTF8_VALID(start_sfx, end_src, mblen); /* Length of next char */
 					if (!valid_char)
-					{	/* Next character is not valid unicode. If badchar error is not inhibited,
+					{	/* Next character is not valid UTF8. If badchar error is not inhibited,
 						 * signal it now. If it is inhibited, just treat the character as a single
 						 * character and continue.
 						 */

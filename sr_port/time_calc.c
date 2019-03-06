@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -75,6 +75,7 @@ void	add_int_to_abs_time(ABS_TIME *atps, int4 ival,ABS_TIME *atpd)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TIMEROVFL);
 	}
 	ival_sec  = ival / MILLISECS_IN_SEC;					/* milliseconds -> seconds */
+<<<<<<< HEAD
 	ival_nsec = (ival - (ival_sec * MILLISECS_IN_SEC)) * NANOSECS_IN_MSEC;	/* nanosecond remainder */
 	atpd->tv_sec = atps->tv_sec + ival_sec;
 	if ((atpd->tv_nsec = atps->tv_nsec + ival_nsec) >= NANOSECS_IN_SEC)
@@ -82,6 +83,15 @@ void	add_int_to_abs_time(ABS_TIME *atps, int4 ival,ABS_TIME *atpd)
 		/* nanosecond overflow */
 		atpd->tv_nsec -= NANOSECS_IN_SEC;
 		atpd->tv_sec  += 1;		/* carry */
+=======
+	ival_usec = (ival - (ival_sec * MILLISECS_IN_SEC)) * MICROSECS_IN_MSEC;	/* microsecond remainder */
+	atpd->at_sec = atps->at_sec + ival_sec;
+	if ((atpd->at_usec = atps->at_usec + ival_usec) >= MICROSECS_IN_SEC)
+	{
+		/* microsecond overflow */
+		atpd->at_usec -= MICROSECS_IN_SEC;
+		atpd->at_sec  += 1;		/* carry */
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 	}
 }
 
@@ -110,8 +120,13 @@ ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2)
 
 	if (atp2->tv_nsec > atp1->tv_nsec)
 	{
+<<<<<<< HEAD
 		dat.tv_nsec += NANOSECS_IN_SEC;
 		dat.tv_sec--;
+=======
+		dat.at_usec += MICROSECS_IN_SEC;
+		dat.at_sec--;
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 	}
 	return (dat);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -125,7 +125,7 @@
 #include "gds_blk_upgrade.h"	/* for UPGRADE_IF_NEEDED flag */
 #include "cws_insert.h"		/* for CWS_REORG_ARRAYSIZE */
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
 # include "utfcgr.h"
@@ -143,7 +143,8 @@
 #ifdef AUTORELINK_SUPPORTED
 # include "relinkctl.h"
 #endif
-
+#include "ztimeout_routines.h"
+#include "deferred_events_queue.h"
 #include "gtm_threadgbl_init.h"
 
 #define	DEFAULT_PROMPT		"YDB>"
@@ -224,6 +225,7 @@ void gtm_threadgbl_init(void)
 	TREF(util_outptr) = TREF(util_outbuff_ptr);
 	(TREF(source_buffer)).addr = (char *)aligned_source_buffer;
 	(TREF(source_buffer)).len = MAX_SRCLINE;
+<<<<<<< HEAD
 	assert(SIZEOF_ydbmsgprefixbuf >= SIZEOF(DEFAULT_MSGPREFIX));
 	(TREF(ydbmsgprefix)).addr = TADR(ydbmsgprefixbuf);
 	(TREF(ydbmsgprefix)).len = STR_LIT_LEN(DEFAULT_MSGPREFIX);	/* STR_LIT_LEN does not include terminating null byte */
@@ -231,4 +233,7 @@ void gtm_threadgbl_init(void)
 	(TREF(ydbmsgprefix)).addr[(TREF(ydbmsgprefix)).len] = '\0';	/* need null terminated "fac" in "gtm_getmsg" */
 	/* Point "merrors_ctl" facility name to the ydb_msgprefix env var (default or user-specified value) */
 	merrors_ctl.facname = (TREF(ydbmsgprefix)).addr;
+=======
+	(TREF(dollar_ztimeout)).ztimeout_seconds.m[1] = -1000;
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 }

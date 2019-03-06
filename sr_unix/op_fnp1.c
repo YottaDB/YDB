@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,7 +12,7 @@
 
 /*
  * -----------------------------------------------
- * op_fnp1 Piece function (the piecemaker) for unicode
+ * op_fnp1 Piece function (the piecemaker) for UTF
  * Special case of 1 char delimiter and 1 piece (reference)
  *
  * Arguments:
@@ -142,7 +142,7 @@ void op_fnp1(mval *src, int delim, int trgpcidx,  mval *dst)
 		{
 			valid_char = UTF8_VALID(last, end, mblen);	/* Length of next char */
 			if (!valid_char)
-			{	/* Next character is not valid unicode. If badchar error is not inhibited,
+			{	/* Next character is not valid UTF8. If badchar error is not inhibited,
 				 * signal it now. If it is inhibited, just treat the character as a single
 				 * character and continue.
 				 */

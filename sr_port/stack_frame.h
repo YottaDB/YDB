@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -92,8 +92,12 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFT_ZSTEP_ACT	(1 << 7)	/* 0x0080 action frame for a zstep */
 #define SFT_ZINTR	(1 << 8)	/* 0x0100 $zinterrupt frame */
 #define SFT_TRIGR	(1 << 9)	/* 0x0200 Trigger base frame */
+<<<<<<< HEAD
 #define SFT_CI		(1 << 10)	/* 0x0400 Call-in base frame */
 
+=======
+#define SFT_ZTIMEOUT	(1 << 10)	/* 0x0400 ZTIMEOUT frame */
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 #define SFT_ZINTR_OFF	~(SFT_ZINTR)	/* Mask to turn off SFF_ZINTR */
 
 /* The following definition identifies a frame that is running a line of code - either in a routine or what amounts to an XECUTE
@@ -178,8 +182,9 @@ void base_frame(rhdtyp *base_address);
 void pseudo_ret(void);
 void call_dm(void);
 int dm_start(void);
-stack_frame *op_get_msf (void);
+stack_frame *op_get_msf(void);
 int op_zbreak(stack_frame *fp);
 void adjust_frames(unsigned char *old_ptext_beg, unsigned char *old_ptext_end, unsigned char *new_ptext_beg);
+void gtm_ret_code(void);
 
 #endif

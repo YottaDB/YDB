@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,7 @@ GBLREF	boolean_t	gtm_utf8_mode;
 /*
  * -----------------------------------------------
  * op_fnpiece()
- * MUMPS $Piece function for unicode
+ * MUMPS $Piece function for UTF8
  *
  * Arguments:
  *	src	- Pointer to Source string mval

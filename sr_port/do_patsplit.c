@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +17,7 @@
 #include "min_max.h"
 #include "gtm_string.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #endif
 
@@ -74,7 +75,7 @@ int do_patsplit(mval *str, mval *pat)
 	patptr++;
 	GET_LONG(total_max, patptr);
 	patptr++;
-	UNICODE_ONLY(
+	UTF8_ONLY(
 	if (gtm_utf8_mode)
 	{
 		MV_FORCE_LEN(str);	/* to set str.char_len if not already done */
@@ -247,7 +248,7 @@ int do_patsplit(mval *str, mval *pat)
 	strtop = strptr + strbytelen;
 	if (!gtm_utf8_mode)
 		strcharlen = str->str.len;
-	UNICODE_ONLY(
+	UTF8_ONLY(
 	else
 		strcharlen = str->str.char_len;
 	)
@@ -258,7 +259,7 @@ int do_patsplit(mval *str, mval *pat)
 		charstoskip = strcharlen - tot_min[1] - fixedcharlen;
 	if (!gtm_utf8_mode)
 		strptr += charstoskip;
-	UNICODE_ONLY(
+	UTF8_ONLY(
 	else
 	{
 		for ( ; 0 < charstoskip; charstoskip--)
@@ -278,7 +279,7 @@ int do_patsplit(mval *str, mval *pat)
 	leftcharlen = charstoskip;
 	if (!gtm_utf8_mode)
 		strptr += charstoskip;
-	UNICODE_ONLY(
+	UTF8_ONLY(
 	else
 	{
 		for ( ; 0 < charstoskip; charstoskip--)
@@ -301,7 +302,7 @@ int do_patsplit(mval *str, mval *pat)
 		fixed_str.str.len = fixedcharlen;
 		rightptr = fixedptr + fixedcharlen;
 	}
-	UNICODE_ONLY(
+	UTF8_ONLY(
 	else
 	{
 		left_str.mvtype |= MV_UTF_LEN;	/* avoid recomputing "char_len" in do_patfixed below */
@@ -329,7 +330,7 @@ int do_patsplit(mval *str, mval *pat)
 			fixednext = fixedptr + 1;
 			rightnext = rightptr + 1;
 		}
-		UNICODE_ONLY(
+		UTF8_ONLY(
 		else
 		{
 			assert(fixedptr < strtop);
@@ -345,7 +346,7 @@ int do_patsplit(mval *str, mval *pat)
 		if (cnt[0])
 		{
 			left_str.str.len = INTCAST(fixedptr - (unsigned char *)left_str.str.addr);
-			UNICODE_ONLY(left_str.str.char_len = leftcharlen;)
+			UTF8_ONLY(left_str.str.char_len = leftcharlen;)
 			match = fixed[0] ? do_patfixed(&left_str, &left_pat) : do_pattern(&left_str, &left_pat);
 			if (!match)
 				continue;
@@ -353,7 +354,7 @@ int do_patsplit(mval *str, mval *pat)
 		if (cnt[1])
 		{
 			right_str.str.addr = (char *)rightptr;
-			UNICODE_ONLY(right_str.str.char_len = strcharlen - leftcharlen - fixedcharlen;)
+			UTF8_ONLY(right_str.str.char_len = strcharlen - leftcharlen - fixedcharlen;)
 			right_str.str.len = INTCAST(strtop - rightptr);
 			match = (fixed[1] ? do_patfixed(&right_str, &right_pat) : do_pattern(&right_str, &right_pat));
 		}

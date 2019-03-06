@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -39,6 +39,10 @@
 #include "have_crit.h"
 #include "util.h"
 #include "op_fnzsearch.h"
+#include "toktyp.h"		/* Needed for "valid_mname.h" */
+#include "valid_mname.h"
+#include "stringpool.h"
+#include "gtmmsg.h"
 
 GBLREF char			rev_time_buf[];
 GBLREF unsigned char		object_file_name[];
@@ -53,6 +57,7 @@ GBLREF uint4			dollar_tlevel;
 GBLREF unsigned char		source_file_name[];
 GBLREF unsigned short		source_name_len;
 GBLREF short int		source_line;
+GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
 
 LITREF	mval		literal_null;
 LITREF	mval		literal_notimeout;
@@ -77,76 +82,105 @@ error_def(ERR_FILEPARSE);
 error_def(ERR_GTMASSERT);
 error_def(ERR_GTMASSERT2);
 error_def(ERR_GTMCHECK);
+error_def(ERR_LSINSERTED);
 error_def(ERR_MEMORY);
+error_def(ERR_NOTMNAME);
 error_def(ERR_OBJFILERR);
 error_def(ERR_SRCFILERR);
 error_def(ERR_STACKOFLOW);
-error_def(ERR_LSINSERTED);
+error_def(ERR_ZLNOOBJECT);
 
 void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 {
-	plength		plen;
-	mval		fstr, ret;
-	int		i, rc;
-	unsigned char	*p;
 	boolean_t	wildcarded, dm_action;
+	int		ci, i, rc;
+	mval		fstr, ret;
+	plength		plen;
+	unsigned char	*p, source_file_string[MAX_FN_LEN + 1];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (MAX_FBUFF < flen)
+	assert(rts_stringpool.base == stringpool.base);
+	if (MAX_FN_LEN < flen)
 	{
 		dec_err(VARLSTCNT(4) ERR_FILEPARSE, 2, flen, faddr);
 		TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
+		return;
+	}
+	object_file_des = FD_INVALID;
+	fstr.mvtype = MV_STR;
+	if (!MEMCMP_LIT(&faddr[flen - SIZEOF(DOTM) + 1], DOTM) || (MAX_FN_LEN < (flen + SIZEOF(DOTM) - 1)))
+	{
+		fstr.str.addr = faddr;
+		fstr.str.len = flen - (!TREF(trigger_compile_and_link) ? 0 : (SIZEOF(DOTM) - 1));
 	} else
 	{
-		object_file_des = FD_INVALID;
-		fstr.mvtype = MV_STR;
-		fstr.str.addr = faddr;
-		fstr.str.len = flen;
-		ESTABLISH(source_ch);
-		tt_so_do_once = FALSE;
-		zsrch_clr(STRM_COMP_SRC);	/* Clear any existing search cache */
-		for (i = 0; ; i++)
+		memcpy(source_file_string, faddr, flen);
+		MEMCPY_LIT(&source_file_string[flen], DOTM);
+		fstr.str.addr = (char *)source_file_string;
+		fstr.str.len = flen + SIZEOF(DOTM) - 1;
+	}
+	ESTABLISH(source_ch);
+	tt_so_do_once = FALSE;
+	zsrch_clr(STRM_COMP_SRC);	/* Clear any existing search cache */
+	for (i = 0; ; i++)
+	{
+		plen.p.pint = op_fnzsearch(&fstr, STRM_COMP_SRC, 0, &ret);	/* 3rd argument of 0 means internal invocation */
+		if (!ret.str.len)
 		{
-			plen.p.pint = op_fnzsearch(&fstr, STRM_COMP_SRC, 0, &ret);
-			if (!ret.str.len)
+			if (!i)
 			{
-				if (!i)
-				{
-					dec_err(VARLSTCNT(4) ERR_FILENOTFND, 2, fstr.str.len, fstr.str.addr);
-					TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
-				}
-				break;
+				dec_err(VARLSTCNT(4) ERR_FILENOTFND, 2, fstr.str.len, fstr.str.addr);
+				TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
 			}
-			assert(ret.mvtype == MV_STR);
-			assert(ret.str.len <= MAX_FBUFF);
-			source_name_len = ret.str.len;
-			memcpy(source_file_name, ret.str.addr, source_name_len);
-			source_file_name[source_name_len] = 0;
-			p = &source_file_name[plen.p.pblk.b_dir];
-			if ((plen.p.pblk.b_dir >= SIZEOF("/dev/") - 1) && !MEMCMP_LIT(source_file_name, "/dev/"))
-				tt_so_do_once = TRUE;
-			else if (MFtIsReqd && (plen.p.pblk.b_ext != 2 || ('M' != p[plen.p.pblk.b_name + 1]
-									  &&  'm' != p[plen.p.pblk.b_name + 1])))
-			{	/* M filetype is required but not present */
-				dec_err(VARLSTCNT(4) ERR_FILEPARSE, 2, source_name_len, source_file_name);
+			break;
+		}
+		assert(ret.mvtype == MV_STR);
+		assert(ret.str.len <= MAX_FN_LEN);
+		source_name_len = ret.str.len;
+		memcpy(source_file_name, ret.str.addr, source_name_len);
+		source_file_name[source_name_len] = 0;
+		p = &source_file_name[plen.p.pblk.b_dir];
+		if ((plen.p.pblk.b_dir >= SIZEOF("/dev/") - 1) && !MEMCMP_LIT(source_file_name, "/dev/"))
+			tt_so_do_once = TRUE;
+		else if (MFtIsReqd && (plen.p.pblk.b_ext != 2 || ('M' != p[plen.p.pblk.b_name + 1]
+			&&  'm' != p[plen.p.pblk.b_name + 1])))
+		{	/* M filetype is required but not present */
+			dec_err(VARLSTCNT(4) ERR_FILEPARSE, 2, source_name_len, source_file_name);
+			TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
+			continue;
+		}
+		if (i || !MV_DEFINED(&cmd_qlf.object_file))
+		{
+			routine_name.len = MIN(MAX_MIDENT_LEN, plen.p.pblk.b_name);
+			memcpy(routine_name.addr, p, routine_name.len);
+			memcpy(module_name.addr, routine_name.addr, routine_name.len);
+			if ('_' == *routine_name.addr)
+				routine_name.addr[0] = '%';
+			if (!TREF(trigger_compile_and_link) && !valid_mname(&routine_name))
+			{
+				gtm_putmsg_csa(CSA_ARG(NUL) VARLSTCNT(5) ERR_NOTMNAME, 2, source_name_len, source_file_name,
+					ERR_ZLNOOBJECT);
 				TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
 				continue;
 			}
-			if (compiler_startup())
-				TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
-			if (FD_INVALID != object_file_des)
-			{
-				CLOSEFILE_RESET(object_file_des, rc);	/* resets "object_file_des" to FD_INVALID */
-				if (-1 == rc)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2,
-							object_name_len, object_file_name, errno);
-			}
-			if (tt_so_do_once)
-				break;
+			module_name.len = int_module_name.len = routine_name.len;
+			memcpy(int_module_name.addr, routine_name.addr, routine_name.len);
+			object_file_name[0] = object_name_len = 0;
 		}
-		REVERT;
+		if (compiler_startup())
+			TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
+		if (FD_INVALID != object_file_des)
+		{
+			CLOSEFILE_RESET(object_file_des, rc);	/* resets "object_file_des" to FD_INVALID */
+			if (-1 == rc)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2,
+					      object_name_len, object_file_name, errno);
+		}
+		if (tt_so_do_once)
+			break;
 	}
+	REVERT;
 }
 
 CONDITION_HANDLER(source_ch)
@@ -158,27 +192,30 @@ CONDITION_HANDLER(source_ch)
 	{
 		NEXTCH;
 	}
+	assert(rts_stringpool.base == stringpool.base);
 	zsrch_clr(0);
 	TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
 	UNWIND(dummy1, dummy2);
 }
 
 
-bool	open_source_file (void)
+boolean_t open_source_file(void)
 {
 	mstr		fstr;
 	int		status, n;
 	parse_blk	pblk;
-	char		*p, buff[MAX_FBUFF + 1];
+	char		*p, buff[MAX_FN_LEN + 1];
 	time_t		clock;
 	struct stat	statbuf;
 	mval		val;
 	mval		pars;
 	unsigned short	clen;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = buff;
-	pblk.buff_size = MAX_FBUFF;
+	pblk.buff_size = MAX_FN_LEN;
 	pblk.fop = F_SYNTAXO;
 	fstr.addr = (char *)source_file_name;
 	fstr.len = source_name_len;
@@ -191,49 +228,32 @@ bool	open_source_file (void)
 	val.mvtype = MV_STR;
 	val.str.len = source_name_len;
 	val.str.addr = (char *)source_file_name;
+	p = pblk.l_name;
+	n = (pblk.b_name > MAX_MIDENT_LEN) ? MAX_MIDENT_LEN : pblk.b_name;
+	if (!module_name.len)
+	{
+		memcpy(module_name.addr, p, n);
+		memcpy(routine_name.addr, p, n);
+		if ('_' == *routine_name.addr)
+			routine_name.addr[0] = '%';
+		routine_name.len = n;
+		if (!TREF(trigger_compile_and_link) && !valid_mname(&routine_name))
+			stx_error(VARLSTCNT(4) ERR_NOTMNAME, 2, RTS_ERROR_MSTR(&routine_name));
+		module_name.len = int_module_name.len = n;
+		memcpy(int_module_name.addr, routine_name.addr, n);
+	}
 	op_open(&val, &pars, (mval *)&literal_zero, 0);
 	dev_in_use = io_curr_device;	/*	save list file info in use if it is opened	*/
 	op_use(&val, &pars);
 	compile_src_dev = io_curr_device;
 	if (tt_so_do_once)
-	{
 		clock = time(0);
-		p = "MDEFAULT";
-		n = STR_LIT_LEN("MDEFAULT");
-	} else
+	else
 	{
 		STAT_FILE((char *)source_file_name, &statbuf, status);
 		assert(status == 0);
 		clock = statbuf.st_mtime;
-		p = pblk.l_name;
-		n = pblk.b_name;
-		if (n > MAX_MIDENT_LEN)
-			n = MAX_MIDENT_LEN;
 	}
-	/* routine_name is the internal name of the routine (with '%' translated to '_') which can be
-	 * different from module_name if the NAMEOFRTN parm is used (by trigger compilation code).
-	 * module_name is the external file name of the module (file.m, file.o).
-	 * int_module_name is the external symbol that gets exposed (in the GTM context) and is normally
-	 * the same as module_name except when NAMEOFRTN is specified in which case it takes on the
-	 * untranslated value of routine_name.
-	 */
-	memcpy(module_name.addr, p, n);
-	module_name.len = n;
-	if (!(cmd_qlf.qlf & CQ_NAMEOFRTN))
-	{
-		memcpy(routine_name.addr, p, n);
-		routine_name.len = n;
-	} else
-	{	/* Routine name specified */
-		clen = MAX_MIDENT_LEN;
-		cli_get_str("NAMEOFRTN", routine_name.addr, &clen);
-		routine_name.len = MIN(clen, MAX_MIDENT_LEN);
-		cmd_qlf.qlf &= ~CQ_NAMEOFRTN;	/* Can only be used for first module in list */
-	}
-	memcpy(int_module_name.addr, routine_name.addr, routine_name.len);
-	int_module_name.len = routine_name.len;
-	if ('_' == *routine_name.addr)
-		routine_name.addr[0] = '%';
 	GTM_CTIME(p, &clock);
 	memcpy(rev_time_buf, p + 4, REV_TIME_BUFF_LEN);
 	io_curr_device = dev_in_use;	/*	set it back to make open_list_file save the device	*/

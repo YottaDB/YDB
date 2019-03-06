@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -121,7 +121,7 @@
 #include "gds_blk_upgrade.h"	/* for UPGRADE_IF_NEEDED flag */
 #include "cws_insert.h"		/* for CWS_REORG_ARRAYSIZE */
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
 #endif
@@ -138,6 +138,8 @@
 #ifdef AUTORELINK_SUPPORTED
 # include "relinkctl.h"
 #endif
+#include "ztimeout_routines.h"
+#include "deferred_events_queue.h"
 
 /* This module's purpose is to generate gtm_threadgbl_deftypes.h for a given platform. This header file
  * contains all the type and offset informatin needed for the TREF macro in gtm_threadgbl.h to access

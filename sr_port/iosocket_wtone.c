@@ -50,7 +50,7 @@ void iosocket_wtone(int ch)
 		temp.len = INTCAST(endptr - uni_c);
 		assert(0 < temp.len); /* we validated the code point already in op_wtone() */
 	}
-	UNICODE_ONLY(temp.char_len = 1);
+	UTF8_ONLY(temp.char_len = 1);
 	iosocket_write_real(&temp, TRUE);
 	return;
 }

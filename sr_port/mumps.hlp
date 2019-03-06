@@ -771,11 +771,16 @@
    0
    b("got")="a match"
 
-2 Extensions_for_Unicode(TM)_support
-   Extensions for Unicode(TM) support
+2 Extensions_for_the_support_for_the_Unicode(R)_standard
+   Extensions for the support for the Unicode(R) standard
 
+<<<<<<< HEAD
    To represent and process strings that use international characters, YottaDB
    processes can use Unicode.
+=======
+   To represent and process strings that use international characters, GT.M
+   processes can use the UTF-8 encoding defined by the Unicode(R) standard.
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
    If the environment variable ydb_chset has a value of UTF-8 and either
    LC_ALL or LC_CTYPE is set to a locale with UTF-8 support (for example,
@@ -790,6 +795,7 @@
    value other than "UTF-8", YottaDB treats each 8-bit byte as a character,
    which suffices for English, and many single-language applications.
 
+<<<<<<< HEAD
    All YottaDB components related to M mode reside in the top level directory in
    which a YottaDB release is installed and the environment variable ydb_dist
    should points to that directory for M mode processes. All Unicode-related
@@ -798,15 +804,26 @@
    in addition to the values of the environment variables ydb_chset and
    LC_ALL/LC_CTYPE, ydb_dist for a UTF-8 process should also point to the
    utf8 subdirectory.
+=======
+   All GT.M components related to the M mode reside in the top level
+   directory in which a GT.M release is installed and the environment
+   variable gtm_dist should point to that directory for M mode processes. All
+   GT.M components related to the UTF-8 mode reside in the utf8 subdirectory
+   and the environment variable gtm_dist should point to that subdirectory
+   for UTF-8 mode processes. So, in addition to the values of the environment
+   variables gtm_chset and LC_ALL/LC_CTYPE, gtm_dist for a UTF-8 process
+   should also point to the utf8 subdirectory.
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
    M mode and UTF-8 mode are set for the process, not for the database. As a
-   subset of Unicode, ASCII characters ($CHAR() values 0 through 127) are
-   interpreted identically by processes in M and UTF-8 modes. The indexes and
-   values in the database are simply sequences of bytes and therefore it is
-   possible for one process to interpret a global node as encoded in UTF-8
-   and for another to interpret the same node as bytecodes. Note that such an
-   application configuration would be extremely unusual, except perhaps
-   during a transition phase or in connection with data import/export.
+   subset of UTF-8 characters, ASCII characters ($CHAR() values 0 through
+   127) are interpreted identically by processes in M and UTF-8 modes. The
+   indexes and values in the database are simply sequences of bytes and
+   therefore it is possible for one process to interpret a global node as
+   encoded in UTF-8 and for another to interpret the same node as bytecodes.
+   Note that such an application configuration would be extremely unusual,
+   except perhaps during a transition phase or in connection with data
+   import/export.
 
    In UTF-8 mode, string processing functions (such as $EXTRACT()) operate on
    strings of multi-byte characters, and can therefore produce different
@@ -818,8 +835,8 @@
    In M mode, the concept of an illegal character does not exist. In UTF-8
    mode, a sequence of bytes may not represent a valid character, and
    generates an error when encountered by functions that expect and process
-   UTF-8 strings. During a migration of an application to add support for
-   Unicode, illegal character errors may be frequent and indicative of
+   UTF-8 strings. During a migration of an application to add the support for
+   UTF-8 mode, illegal character errors may be frequent and indicative of
    application code that is yet to be modified. VIEW "NOBADCHAR" suppresses
    these errors at times when their presence impedes development.
 
@@ -827,23 +844,26 @@
    in the traditional one byte per character encoding from devices other than
    $PRINCIPAL.
 
+<<<<<<< HEAD
    The following table summarizes YottaDB Unicode support.
+=======
+   The following table summarizes GT.M's support for the Unicode(R) standard.
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
    +------------------------------------------------------------------------+
    |       EXTENSION        |                  EXPLANATION                  |
    |------------------------+-----------------------------------------------|
    |                        | IN UTF-8 mode, the $ASCII() function returns  |
-   |                        | the integer Unicode code-point value of a     |
-   |                        | character in the given string. Note that the  |
-   | $ASCII()               | name $ASCII() is somewhat anomalous for       |
-   |                        | Unicode data but that name is the logical     |
-   |                        | extension of the function from M mode to      |
-   |                        | UTF-8 mode.                                   |
+   |                        | the integer UTF-8 code-point value of a       |
+   | $ASCII()               | character in the given string. Note that the  |
+   |                        | name $ASCII() is somewhat anomalous for UTF-8 |
+   |                        | data but that name is the logical extension   |
+   |                        | of the function from M mode to UTF-8 mode.    |
    |------------------------+-----------------------------------------------|
    |                        | In UTF-8 mode, $CHAR() returns a string       |
    | $Char()                | composed of characters represented by the     |
-   |                        | integer equivalents of the Unicode            |
-   |                        | code-points specified in its argument(s).     |
+   |                        | integer equivalents of the UTF-8 code-points  |
+   |                        | specified in its argument(s).                 |
    |------------------------+-----------------------------------------------|
    | $Extract()             | The $EXTRACT() function returns a substring   |
    |                        | of a given string.                            |
@@ -922,10 +942,10 @@
    |                        | interprets the patcode N used in the pattern  |
    |                        | match operator. With $ZPATNUMERIC="UTF-8",    |
    | $ZPATNumeric           | the patcode N matches any numeric character   |
-   |                        | as defined by Unicode. By default patcode N   |
-   |                        | only matches the ASCII digits, which are the  |
-   |                        | only digits which M actually treats as        |
-   |                        | numerics.                                     |
+   |                        | as defined by the Unicode standard. By        |
+   |                        | default patcode N only matches the ASCII      |
+   |                        | digits, which are the only digits which M     |
+   |                        | actually treats as numerics.                  |
    |------------------------+-----------------------------------------------|
    |                        | The $ZPIECE() function returns a sequence of  |
    |                        | bytes delimited by a specified byte sequence  |
@@ -980,14 +1000,14 @@
    |                        | as if the routine had issued a WRITE !        |
    |                        | command.                                      |
    |------------------------+-----------------------------------------------|
-   |                        | In UTF-8 mode, DSE and LKE accept characters  |
-   |                        | in Unicode in all their command qualifiers    |
+   |                        | In UTF-8 mode, DSE and LKE accept Unicode     |
+   |                        | characters in all their command qualifiers    |
    | DSE and LKE            | that require file names, keys, or data (such  |
    |                        | as DSE -KEY, DSE -DATA and LKE -LOCK          |
    |                        | qualifiers).                                  |
    |------------------------+-----------------------------------------------|
    |                        | GDE allows the name of a file to include      |
-   |                        | characters in Unicode                         |
+   |                        | UTF-8 characters                              |
    | GDE Objects            |                                               |
    |                        | In UTF-8 mode, GDE considers a text file to   |
    |                        | be encoded in UTF-8 when it is executed via   |
@@ -1053,11 +1073,19 @@
    |                        | deviceparameters to determine the encoding of |
    |                        | the input / output devices.                   |
    |------------------------+-----------------------------------------------|
+<<<<<<< HEAD
    |                        | YottaDB allows the pattern string literals to |
    | Pattern Match Operator | contain the characters in Unicode.            |
    | (?)                    | Additionally, YottaDB extends the M standard  |
    |                        | pattern codes (patcodes) A, C, N, U, L, P and |
    |                        | E to the Unicode character set.               |
+=======
+   |                        | GT.M allows the pattern string literals to    |
+   | Pattern Match Operator | contain UTF-8 characters. Additionally, GT.M  |
+   | (?)                    | extends the M standard pattern codes          |
+   |                        | (patcodes) A, C, N, U, L, P and E to the      |
+   |                        | UTF-8 character set.                          |
+>>>>>>> 74ea4a3c... GT.M V6.3-006
    |------------------------+-----------------------------------------------|
    |                        | In UTF-8 mode, the READ command uses the      |
    |                        | character set value specified on the device   |
@@ -1087,17 +1115,18 @@
    |                        | fixed-length READ (READ #).                   |
    |------------------------+-----------------------------------------------|
    |                        | In UTF-8 or UTF-16 modes, the READ * command  |
-   | Read *                 | accepts one character in Unicode of input and |
-   |                        | puts the numeric code-point value for that    |
-   |                        | character into the variable.                  |
+   | Read *                 | accepts one Unicode character of input and    |
+   |                        | puts the numeric UTF-8 code-point value for   |
+   |                        | that character into the variable.             |
    |------------------------+-----------------------------------------------|
-   |                        | As an aid to migrating applications to        |
-   |                        | Unicode, this UTF-8 mode VIEW command         |
-   | View "[NO]BADCHAR"     | determines whether Unicode enabled functions  |
-   |                        | trigger errors when they encounter illegal    |
-   |                        | strings.                                      |
+   |                        | As an aid to migrating applications to using  |
+   |                        | the Unicode standard, this UTF-8 mode VIEW    |
+   | View "[NO]BADCHAR"     | command determines whether UTF-8 enabled      |
+   |                        | functions trigger errors when they encounter  |
+   |                        | illegal strings.                              |
    |------------------------+-----------------------------------------------|
    |                        | For some languages (such as Chinese), the     |
+<<<<<<< HEAD
    |                        | ordering of strings according to Unicode      |
    |                        | code-points (character values) may not be the |
    |                        | linguistically or culturally correct          |
@@ -1109,6 +1138,19 @@
    |                        | language Therefore, applications that use     |
    |                        | characters in Unicode may need to implement   |
    |                        | their own collation functions.                |
+=======
+   |                        | ordering of character strings encoded with    |
+   |                        | UTF-8 may not be the linguistically or        |
+   |                        | culturally correct ordering. Supporting       |
+   |                        | applications in such languages requires       |
+   | User-defined Collation | development of collation modules - GT.M       |
+   |                        | natively supports M collation, but does not   |
+   |                        | include pre-built collation modules for any   |
+   |                        | specific natural language. Therefore,         |
+   |                        | applications that use UTF-8 characters may    |
+   |                        | need to implement their own collation         |
+   |                        | functions.                                    |
+>>>>>>> 74ea4a3c... GT.M V6.3-006
    |------------------------+-----------------------------------------------|
    |                        | When ICHSET is UTF-16, YottaDB uses BOM       |
    |                        | (U+FEFF) to automatically determine the       |
@@ -1123,8 +1165,13 @@
    |                        | When endianess is not specified, SEEK or      |
    |                        | APPEND assume big endianess.                  |
    |                        |                                               |
+<<<<<<< HEAD
    | Unicode Byte Order     | If the character set of a device is UTF-8,    |
    | Marker (BOM)           | YottaDB checks for and ignores a BOM on input.|
+=======
+   | Unicode(R) Byte Order  | If the character set of a device is UTF-8,    |
+   | Marker (BOM)           | GT.M checks for and ignores a BOM on input.   |
+>>>>>>> 74ea4a3c... GT.M V6.3-006
    |                        |                                               |
    |                        | If the BOM does not match the character set   |
    |                        | specified at device OPEN, YottaDB produces an |
@@ -1184,6 +1231,7 @@
    ICU
 
    ICU is a widely used, defacto standard package (see http://icu-project.org
+<<<<<<< HEAD
    for more information) that YottaDB relies on for most operations that require
    knowledge of the Unicode character sets, such as text boundary detection,
    character string conversion between UTF-8 and UTF-16, and calculating
@@ -1195,6 +1243,20 @@
    environment variable ydb_chset is UTF8"), YottaDB processes do not need ICU.
    In other words, existing, non-Unicode, applications continue to work on
    supported platforms without ICU.
+=======
+   for more information) that GT.M relies on for most operations that require
+   knowledge of the Unicode(R) character sets, such as text boundary
+   detection, character string conversion between UTF-8 and UTF-16, and
+   calculating glyph display widths.
+
+   **Important**
+
+   Unless the support for the Unicode standard is sought for a process (that
+   is, unless the environment variable gtm_chset is UTF-8"), GT.M processes
+   do not need ICU. In other words, existing applications that are not based
+   on the Unicode standard continue to work on supported platforms without
+   ICU.
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
    An ICU version number is of the form major.minor.milli.micro where major,
    minor, milli and micro are integers. Two versions that have different
@@ -1207,8 +1269,13 @@
    evolve.
 
    An operating system's distribution generally includes an ICU library
+<<<<<<< HEAD
    tailored to the OS and hardware, therefore YottaDB does not provide any ICU
    library. In order to support Unicode functionality, YottaDB requires an
+=======
+   tailored to the OS and hardware, therefore FIS does not provide any ICU
+   library. In order to support UTF-8 functionality, GT.M requires an
+>>>>>>> 74ea4a3c... GT.M V6.3-006
    appropriate version of ICU to be installed on the system - check the
    release notes for your YottaDB release for supported ICU versions.
 
@@ -1598,7 +1665,17 @@
    The -noobject qualifier suppresses the production of an object file and is
    usually used with the -list qualifier to produce only a listing file.
 
+   Compilation with -OBJECT without -NAMEOFRTN implicitly names the first
+   routine to match the name specified with -OBJECT.
+
    By default, the compiler produces object modules.
+
+4 [n]ameofrtn=filename
+   [n]ameofrtn=filename
+
+   Instructs the compiler to produce an output object file with the specified
+   name. You can use -NAMEOFRTN and -OBJECT to create two object files with
+   different names from the same .m source file.
 
 4 [no]w[arning]
    [no]w[arning]
@@ -2331,6 +2408,7 @@
    String Literals
 
    A string literal (strlit) is enclosed in quotation marks (" ") and can
+<<<<<<< HEAD
    contain a sequence of ASCII and Unicode characters. While the standard
    indicates the characters must be graphic, YottaDB accepts non-graphic
    characters and, at compile-time, gives a warning. Using $CHAR() and
@@ -2339,6 +2417,16 @@
    attempts to use character text that appears outside of quotation mark
    delimiters according to context, which generally means as a local variable
    name.
+=======
+   contain a sequence of ASCII and Unicode(R) UTF-8 characters. While the
+   standard indicates the characters must be graphic, GT.M accepts
+   non-graphic characters and, at compile-time, gives a warning. Using
+   $CHAR() and concatenate to represent non-graphic characters in strings not
+   only avoids the warning but is less error prone and makes for easier
+   understanding. M attempts to use character text that appears outside of
+   quotation mark delimiters according to context, which generally means as a
+   local variable name.
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
    To include a quotation mark (") within a strlit, use a set of two
    quotation marks ("" "").
@@ -2354,8 +2442,8 @@
    marks denote a single quote within the string, and the last quotation mark
    delimits the end of the string literal.
 
-   Use the $CHAR function and the concatenation operator to include control
-   characters within a string.
+   Use the $[Z]CHAR() function and the concatenation operator to include
+   control characters within a string.
 
    Example:
 
@@ -4939,10 +5027,10 @@
    When all strings consist of well-formed characters, the value of VIEW
    [NO]BADCHAR has no effect whatsoever. With VIEW "NOBADCHAR", the same
    functions treat malformed byte sequences as valid characters. During the
-   migration of an application to add support for Unicode, illegal character
-   errors are likely to be frequent and indicative of application code that
-   is yet to be modified. VIEW "NOBADCHAR" suppresses these errors at times
-   when their presence impedes development.
+   migration of an application to add support for the UTF-8 mode, illegal
+   character errors are likely to be frequent and indicative of application
+   code that is yet to be modified. VIEW "NOBADCHAR" suppresses these errors
+   at times when their presence impedes development.
 
 4 DBFLUSH
    DBFLUSH
@@ -7160,7 +7248,7 @@
 2 ZSYstem
    ZSYstem
 
-   The ZSYSTEM command creates a child of the current process .
+   The ZSYSTEM command creates a child of the current process.
 
    The format of the ZSYSTEM command is:
 
@@ -7450,8 +7538,8 @@
    $ASCII()
 
    Returns the integer ASCII code for a character in the given string. For a
-   mumps process started in UTF-8 mode, $ASCII() returns the integer Unicode
-   code-point value of a character in the given string.
+   mumps process started in UTF-8 mode, $ASCII() returns the integer
+   Unicode(R) UTF-8 code-point value of a character in the given string.
 
    The format for the $ASCII function is:
 
@@ -7491,8 +7579,8 @@
    00004E3B
 
    In this example, 20027 is the integer equivalent of the hexadecimal value
-   4E3B. U+4E3B is a character in the CJK Ideograph block of the Unicode
-   Standard.
+   4E3B. U+4E3B is a character in the CJK Ideograph block of the Unicode(R)
+   standard.
 
 2 $Char()
    $Char()
@@ -7500,7 +7588,7 @@
    Returns a string of one or more characters corresponding to integer ASCII
    codes specified in its argument(s). For a process started in UTF-8 mode,
    $CHAR() returns a string composed of characters represented by the integer
-   equivalents of the Unicode code-points specified in its argument(s).
+   equivalents of the Unicode(R) code-points specified in its argument(s).
 
    The format for the $CHAR function is:
 
@@ -7516,7 +7604,7 @@
    YDB>
 
    This example uses $CHAR() to WRITE the word MUMPS and signal the terminal
-   "bell."
+   bell.
 
    Example:
 
@@ -7535,8 +7623,8 @@
    YDB>write $char(65)
    A
 
-   In the above example, the integer value 20027 is the Unicode character "*"
-   in the CJK Ideograph block of Unicode. Note that the output of the $CHAR()
+   In the above example, the integer value 20027 is the Unicode(R) character
+   "*" in the CJK Ideograph block. Note that the output of the $CHAR()
    function for values of integer expression(s) from 0 through 127 does not
    vary with choice of the character encoding scheme. This is because 7-bit
    ASCII is a proper subset of UTF-8 character encoding scheme. The
@@ -7620,9 +7708,10 @@
    For a mumps process started in UTF-mode, $EXTRACT interprets the string
    arguments as UTF-8 encoded. With VIEW "BADCHAR" enabled, $EXTRACT()
    produces a run-time error when it encounters a character in the reserved
-   range of the Unicode Standard, but it does not process the characters that
-   fall after the span specified by the arguments. The parallel function of
-   $EXTRACT() is $ZEXTRACT(). Use $ZEXTRACT() for byte-oriented operations.
+   range of the Unicode(R) standard, but it does not process the characters
+   that fall after the span specified by the arguments. The parallel function
+   of $EXTRACT() is $ZEXTRACT(). Use $ZEXTRACT() for byte-oriented
+   operations.
 
    $EXTRACT() can be used on the left-hand side of the equal sign (=) of a
    SET command to set a substring of a string. This construct permits easy
@@ -9591,7 +9680,7 @@
 
    When UTF-8 mode is enabled, YottaDB uses the ICU Library to perform case
    conversion. As mentioned in the Theory of Operation section, the case
-   conversion of the strings occurs according to Unicode code-point values.
+   conversion of the strings occurs according to UTF-8 code-point values.
    This may not be the linguistically or culturally correct case conversion,
    for example, of the names in the telephone directories. Therefore,
    application developers must ensure that the actual case conversion is
@@ -10518,11 +10607,13 @@
    |       |OpenSSL defaults, options set by the YottaDB TLS plugin, and options specified in the  |
    |       |ydb_crypt_config configuration file prefixed by "O:", a comma, and the verify mode as  |
    |       |two hexadecimal digits. Here is an example:                                            |
-   |OPTIONS|                                                                                       |
-   |       ||O:0000000001520004,01                                                                 |
+   |       |                                                                                       |
+   |OPTIONS||O:0000000001520004,01                                                                 |
    |       |                                                                                       |
    |       |The values for the SSL_OP options and verify modes are defined in the                  |
    |       |include/openssl/ssl.h file provided by the OpenSSL development package.                |
+   |       |                                                                                       |
+   |       |Note: the TLS reference implementation plug-in disables SSLv3 by default.              |
    |-------+---------------------------------------------------------------------------------------|
    |       |The SSL protocol version prefixed by "P:" and the algorithm negotiated between the     |
    |CIPHER |server and client prefixed by "C:". Here is an example:                                |
@@ -10725,7 +10816,7 @@
        boundaries.
      * $ZSUBSTR() is the only way to extract as valid UTF-8 encoded
        characters from a byte string containing mixed UTF-8 and non UTF-8
-       data. It operates on characters in Unicode so that its result does not
+       data. It operates on Unicode(R) characters so that its result does not
        exceed the given byte length.
 
 2 $ZTRanslate()
@@ -10876,30 +10967,36 @@
 
    $ZW[IDTH] (expr)
 
+   With character set UTF-8 specified, the $ZWIDTH() function uses the ICU's
+   glyph-related conventions to calculate the number of columns required to
+   represent the expression.
+
    **Note**
 
    When in "NOBADCHAR" mode, $ZWIDTH() returns give any bad characters a
    length of zero (0), which may or may not match the behavior of any device
    used to display the string.
 
-   With character set UTF-8 specified, the $ZWIDTH() function uses the ICU's
-   glyph-related conventions to calculate the number of columns required to
-   represent the expression.
-
 3 Examples
    Examples
 
    Example:
 
+<<<<<<< HEAD
    YDB>set NG=$char($$FUNC^%HD("200B"))
    YDB>set S=$char(26032)_NG_$CHAR(26033)
    YDB>W $ZWidth(STR)
+=======
+   GTM>set NG=$char($$FUNC^%HD("200B"))
+   GTM>set S=$char(26032)_NG_$CHAR(26033)
+   GTM>W $ZWidth(S)
+>>>>>>> 74ea4a3c... GT.M V6.3-006
    4
    YDB>
 
    In the above example, the local variable NG contains a non-graphic
-   character which does not display between two double-width characters in
-   Unicode.
+   character which does not display between two double-width UTF-8
+   characters.
 
    Example:
 
@@ -10912,8 +11009,8 @@
    24
 
    In the above example, the $ZWIDTH() function returns 24 because each
-   character in A occupies 2 columns when they are displayed on the screen or
-   printer.
+   character in local variable A occupies 2 columns when they are displayed
+   on the screen or printer.
 
 2 $ZWRite()
    $ZWRite()
@@ -11185,7 +11282,7 @@
    timed out or there was no established connection. $KEY only has the
    selected handle, if any, immediately after a WRITE /WAIT. $KEY is also
    used by other socket I/O commands such as READ which sets it to the
-   delimiter or bad Unicode character, if any, which terminated the read.
+   delimiter or malformed UTF-8 character, if any, which terminated the read.
 
 2 $Principal
    $Principal
@@ -12334,9 +12431,15 @@
    settings may have an impact on such operations. Therefore, always compile
    with the same pattern code settings as those used at runtime.
 
+<<<<<<< HEAD
    For characters in Unicode, YottaDB assigns patcodes based on the default
    classification of the Unicode character set by the ICU library with three
    adjustments:
+=======
+   For UTF-8 characters, GT.M assigns patcodes based on the default
+   classification of the Unicode(R) character set by the ICU library with
+   three adjustments:
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
     1. If $ZPATNUMERIC is not "UTF-8", non-ASCII decimal digits are
        classified as A.
@@ -12346,11 +12449,16 @@
        classified into either patcode P or C. The ICU function u_isprint is
        used since is returns "TRUE" for non-control characters.
 
-   The following table contains the resulting Unicode general category to M
-   patcode mapping:
+   The following table contains the resulting general category as per the
+   Unicode standard to M patcode mapping:
 
    +------------------------------------------------------------------------+
+<<<<<<< HEAD
    |   Unicode General Category   |           YottaDB patcode Class         |
+=======
+   | General category as per the  |           GT.M patcode class            |
+   |     Unicode(R) standard      |                                         |
+>>>>>>> 74ea4a3c... GT.M V6.3-006
    |------------------------------+-----------------------------------------|
    | L* (all letters)             | A                                       |
    |------------------------------+-----------------------------------------|
@@ -13147,6 +13255,51 @@
    output in each YDB_JOBEXAM_ZSHOW_DMP for the initial interrupt, and at
    tcommit when the interrupt is rethrown.
 
+2 $ZTIMeout
+   $ZTIMeout
+
+   $ZTIMEOUT controls a single process wide timer. The format of the
+   $ZTIMEOUT ISV is:
+
+   $ZTIMeout=([timeout][:labelref])
+
+     o The optional timeout in seconds specifies with millisecond accuracy
+       how long from the current time the timer interrupts the process. If
+       the specified timeout is negative, GT.M cancels the timer. If the
+       timeout is zero, GT.M treats it as it would a DO of the vector.
+     o The optional labelref specifies a code vector defining a fragment of M
+       code to which GT.M transfers control as if with a DO when the timeout
+       expires. If the timeout is missing, the assignment must start with a
+       colon and only changes the vector, and in this case, if the timeout is
+       the empty string, GT.M removes any current vector.
+
+   Note that GT.M only recognizes interrupts such as from $ZTIMEOUT at points
+   where it can properly resume operation, such as the beginning of a line,
+   when waiting on a command with a timeout, or when starting a FOR
+   iteration. When a timeout occurs, if the last assignment specified no
+   vector, GT.M uses the current $ETRAP or $ZTRAP. GT.M rejects an attempted
+   KILL of $ZTIMeout with the VAREXPECTED error and an attempted NEW of
+   $ZTIMeout with the SVNONEW error.
+
+   Example:
+
+   GTM>zprint ^ztimeout
+   ztimeout
+     ; Display $ztimeout
+       write !,$ztimeout               ; display $ZTIMeout - in this case the initial value -1
+                                       ; set with a vector (do ^TIMEOUT)
+       set $ztimeout="60:do ^TIMEOUT"  ; timeout of 1 minute. After timeout expires, XECUTEs do ^TIMEOUT
+       write !,$ztimeout               ; displays the remaining time:vector until timeout
+     ; set without a vector
+       set $ztimeout=120               ; set the timeout to 2 minutes without changing the vector
+       set $ztimeout="1234do ^TIMEOUT" ; missing colon creates a timeout for 1234 seconds
+       set $ztimeout="10:"             ; set the timeout to 10 seconds and vector to current etrap or ztrap
+       set $ztimeout=-1                ; set cancels the timeout
+     ; Note that set to 0 triggers an immediate timeout
+       set $ztimeout=0                 ; triggers the current vector
+       set $ztimeout="0:DO FOO"        ; this has the same effect as DO FOO
+   GTM>
+
 2 $ZTrap
    $ZTrap
 
@@ -13799,7 +13952,7 @@
    LF ($CHAR(10)) terminates the logical record for all M mode sequential
    files, TRM, PIPE, and FIFO. For non FIXED format sequential files and
    terminal devices for which character set is not M, all the standard
-   Unicode line terminators terminate the logical record. These are U+000A
+   Unicode(R) line terminators terminate the logical record. These are U+000A
    (LF), U+0000D (CR), U+000D followed by U+000A (CRLF), U+0085 (NEL), U+000C
    (FF), U+2028 (LS) and U+2029 (PS).
 
@@ -14775,7 +14928,7 @@
    The following table summarizes the PIPE format deviceparameters.
 
    +------------------------------------------------------------------------+
-   | DEVICE PARAMETER   | CMD | DESCRIPTION                                 |
+   |  DEVICE PARAMETER  | CMD |                 DESCRIPTION                 |
    |--------------------+-----+---------------------------------------------|
    | [NO]FIXED          | O   | Controls whether records have fixed length  |
    |--------------------+-----+---------------------------------------------|
@@ -15728,8 +15881,13 @@
    FIXED length records do not implicitly use embedded record terminators
    such as line feeds.
 
+<<<<<<< HEAD
    In UTF-8 mode, YottaDB I/O enforces a more record-oriented view of the file,
    treating each record as RECORDSIZE bytes long. Note that a Unicode
+=======
+   In UTF-8 mode, GT.M I/O enforces a more record-oriented view of the file,
+   treating each record as RECORDSIZE bytes long. Note that a UTF-8
+>>>>>>> 74ea4a3c... GT.M V6.3-006
    code-point never splits across records. If a multi-byte character (when
    CHSET is UTF-8) or a surrogate pair (when CHSET is UTF-16) does not fit
    into the record (either logical as given by WIDTH or physical as given by
@@ -15739,8 +15897,8 @@
 
    **Note**
 
-   PAD is effective only for devices opened with a Unicode CHSET. In M mode
-   PAD is always <SP>
+   PAD is effective only for devices opened with a CHSET related to
+   Unicode(R) characters. In M mode PAD is always <SP>
 
    Example:
 
@@ -16314,10 +16472,17 @@
    The maximum size of intexpr is 1,048,576 bytes. YottaDB produces an error if
    you specify a value greater than 1,048,576.
 
+<<<<<<< HEAD
    When a Unicode CHSET is in use, YottaDB treats RECORDSIZE as a byte limit at
    which to wrap or truncate output depending on [Z][NO]WRAP. For any Unicode
    character set, YottaDB ignores RECORDSIZE for a device which is already open
    if any I/O has been done.
+=======
+   When a CHSET related to Unicode(R) characters is in use, GT.M treats
+   RECORDSIZE as a byte limit at which to wrap or truncate output depending
+   on [Z][NO]WRAP. For any Unicode character set, GT.M ignores RECORDSIZE for
+   a device which is already open if any I/O has been done.
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
    If the character set is not UTF-16, UTF-16LE, UTF-16BE, the default
    RECORDSIZE is 32K-1bytes.
@@ -17652,12 +17817,17 @@
 
    When the terminal is in UTF-8 mode (chset=utf8,) YottaDB limits the
    terminator characters to the first 127 which are common between ASCII and
-   Unicode. In M mode, any of the 256 characters may be specified a
+   UTF-8 encodng. In M mode, any of the 256 characters may be specified a
    terminator.
 
    In UTF-8 mode, if CR is in the terminator list (either by default or
+<<<<<<< HEAD
    explicitly,) YottaDB ignore the following LF to keep with the standard
    Unicode line terminator scheme.
+=======
+   explicitly,) GT.M ignore the following LF to keep with the standard
+   Unicode(R) line terminator definitions.
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
    NOTERMINATOR eliminates all terminators. When a terminal has all
    terminators disabled, fixed length READ and READ * terminate on receipt of
@@ -17666,7 +17836,7 @@
 
    By default, terminals recognize <CR>, <LF>, and <ESC> as terminators (that
    is, TERMINATOR=$C(10, 13,27)). TERMINATOR="" restores the default. In
-   UTF-8 mode, the usual Unicode line terminators are also included in the
+   UTF-8 mode, the usual UTF-8 line terminators are also included in the
    default set of terminators.
 
    Example:
@@ -17762,9 +17932,9 @@
    is in units of display-columns and is used with $X to control truncation
    and WRAPing for output and maintenance of $X and $Y for input.
 
-   In UTF-8 mode and SOC, the WIDTH deviceparameter is in units of Unicode
-   code points and is used with $X to control truncation and wrapping for
-   output and maintenance of $X and $Y for input.
+   In UTF-8 mode and SOC, the WIDTH deviceparameter is in units of UTF-8 code
+   points and is used with $X to control truncation and wrapping for output
+   and maintenance of $X and $Y for input.
 
    In M mode if WIDTH is set to 0, YottaDB uses the default WIDTH of the TRM and
    SOC devices. USE x:WIDTH=0 is equivalent to USE
@@ -17775,7 +17945,7 @@
    have an effect on $X.
 
    In UTF-8 mode and SOC output, the WIDTH deviceparameter specifies the
-   number of characters in Unicode.
+   number of UTF-8 characters.
 
 5 WRAP
    WRAP
@@ -18494,10 +18664,21 @@
    containing the pathname of the shareable library file followed by one or
    more specification lines in the following format:
 
-   entryref: return-value routine-name (parameter, parameter, ... )
+   entryref: return-value routine-name (parameter, parameter, ... ) [: SIGSAFE]
 
+   The optional case-insensitive keyword SIGSAFE following the parameter list
+   specifies the external call does not create its own signal handlers; this
+   allows GT.M to avoid burdensome signal handler coordination for the
+   external call. By default, GT.M saves and restores signal setups for
+   external calls.
+
+<<<<<<< HEAD
    where entryref is an M entryref, return-value is ydb_long_t, ydb_status_t,
    or void, and parameters are in the format:
+=======
+   entryref is an M entryref, return-value is gtm_long_t, gtm_status_t, or
+   void, and parameters are in the format:
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
    direction:type [num]
 
@@ -18512,7 +18693,7 @@
 
    Type : Usage
 
-   Void: Specifies that the function does not return a value.
+   void: Specifies that the function does not return a value.
 
    ydb_status_t : Type int. If the function returns zero (0), then the call
    was successful. If it returns a non-zero value, YottaDB will signal an error
@@ -18789,8 +18970,18 @@
    **Important**
 
    Pre-allocation is optional for all output-only parameters except
+<<<<<<< HEAD
    ydb_string_t * and ydb_char_t *. Pre-allocation yields better management
    of memory for the external call.
+=======
+   gtm_string_t * and gtm_char_t *. Pre-allocation yields better management
+   of memory for the external call. When an external call exceeds its
+   specified preallocation (gtm_string_t * or gtm_char_t * output), GT.M
+   produces the EXCEEDSPREALLOC error. In the case the user allocates space
+   for the character pointer inside a gtm_string_t * type output parameter, a
+   length field longer than the specified preallocate size for the output
+   parameter does not cause an EXCEEDSPREALLOC error.
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
 3 Callback_Mechanism
    Callback Mechanism
@@ -19464,10 +19655,16 @@
    functions whose behavior changes in the context of every new nested
    call-in environment.
 
+<<<<<<< HEAD
    ZGOTO operates only within the current nested M stack. ZGOTO zero (0)
    unwinds all frames in the current nested call-in M stack (including the
    call-in base frame) and returns to C while keeping the current nested
    call-in environment active for any following ydb_ci[p]() calls.
+=======
+   ZGOTO 0 (zero) returns to the processing of the invoking non-M routine as
+   does ZGOTO 1 (one) with no entryref, while ZGOTO 1:entryref replaces the
+   originally invoked M routine and continues M execution.
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
    $ZTRAP/$ETRAP NEW'd at level 1 (in call-in base frame).
 
@@ -19497,11 +19694,20 @@
     3. The external application should never use any signals when YottaDB is
        active since YottaDB reserves them for its internal use. YottaDB provides
        the ability to handle SIGUSR1 within M. An interface is provided by
+<<<<<<< HEAD
        YottaDB for timers. Although not required, YottaDB recommends the use of
        gtm_malloc() and gtm_free() for memory management by C code that
        executes in a YottaDB process space for enhanced performance and improved
        debugging.
     4. YottaDB performs device input using the read() system service. UNIX
+=======
+       GT.M for timers.
+    4. FIS recommends the use of gtm_malloc() and gtm_free() for memory
+       management by C code that executes in a GT.M process space for
+       enhanced performance and improved debugging. Always use gtm_malloc to
+       allocate returns for pointer types to prevent memory leaks.
+    5. GT.M performs device input using the read() system service. UNIX
+>>>>>>> 74ea4a3c... GT.M V6.3-006
        documentation recommends against mixing this type of input with
        buffered input services in the fgets() family and ignoring this
        recommendation is likely to cause loss of input that is difficult to
@@ -19595,7 +19801,7 @@
    section called Match Alternative Patterns.
 
    For some languages (such as Chinese), the ordering of strings according to
-   Unicode code-points (character values) may or may not be the
+   Unicode(R) code-points (character values) may or may not be the
    linguistically or culturally correct ordering. Supporting applications in
    such languages requires development of collation modules - YottaDB natively
    supports M collation, but does not include pre-built collation modules for
@@ -20458,13 +20664,19 @@
        ^G("Madrid")=1
        ^G("Friendly")=1
 
-2 Implementing_an_Alternative_Collation_Sequence_for_Unicode
-   Implementing an Alternative Collation Sequence for Unicode
+2 Implementing_an_Alternative_Collation_Sequence_for_Unicode(R)
+   Implementing an Alternative Collation Sequence for Unicode(R)
+characters
 
+<<<<<<< HEAD
    By default, YottaDB sorts string subscripts in the default order of the
    Unicode numeric code-point ($ASCII()) values. Since this implied ordering
+=======
+   By default, GT.M sorts string subscripts in the default order of the
+   Unicode(R) UTF-8 numeric code-point values. Since this implied ordering
+>>>>>>> 74ea4a3c... GT.M V6.3-006
    may or may not be linguistically or culturally correct for a specific
-   application, an implementation of an algorithm such as the Unicode
+   application, an implementation of an algorithm such as the Unicode(R)
    Collation Algorithm (UCA) may be required. Note that implementation of
    collation in YottaDB requires the implementation of two functions, f(x) and
    g(y). f(x) transforms each input sequence of bytes into an alternative
@@ -20589,9 +20801,9 @@
      * The C pattern code you define is used by YottaDB to determine those
        characters which are to be treated as unprintable. All characters not
        defined as C are treated as printable.
-     * In UTF-8 mode, M standard patcodes (A,C,L,U,N,P,E) work with Unicode
-       characters. Application developers can neither change their default
-       classification nor define the non-standard patcodes
+     * In UTF-8 mode, M standard patcodes (A,C,L,U,N,P,E) work with
+       Unicode(R) characters. Application developers can neither change their
+       default classification nor define the non-standard patcodes
        ((B,D,F-K,M,O,Q-T,V-X) beyond the ASCII subset. This means that the
        pattern tables cannot contain characters with codes greater than the
        maximum ASCII code 127.

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2014-2017 Fidelity National Information		#
+# Copyright (c) 2014-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
@@ -33,8 +33,8 @@ if ("" == "${hlpdir}") then
 	endif
 endif
 
-set errout = ""
-if ("" != "${2}") set errout = ">> $2"
+alias do_log '\!:*'
+if ("" != "${2}") alias do_log '\!:* >>& '$2''
 
 # Need write permissions to $ydb_dist
 if (! -w ${ydb_dist}) then
@@ -73,7 +73,7 @@ GDE_in_help
 
 	if ($status) then
 		@ script_stat++
-		echo "genreatehelp-E-hlp, Error creating GLD for ${hlp}" $errout
+		do_log echo "genreatehelp-E-hlp, Error creating GLD for ${hlp}"
 		continue
 	endif
 
@@ -81,7 +81,7 @@ GDE_in_help
 
 	if ($status) then
 		@ script_stat++
-		echo "genreatehelp-E-hlp, Error creating DAT for ${hlp}" $errout
+		do_log echo "genreatehelp-E-hlp, Error creating DAT for ${hlp}"
 		continue
 	endif
 
@@ -93,14 +93,14 @@ GTM_in_gtmhelp
 
 	if ($status) then
 		@ script_stat++
-		echo "genreatehelp-E-hlp, Error while processing ${hlp}" $errout
+		do_log echo "genreatehelp-E-hlp, Error while processing ${hlp}"
 		continue
 	endif
 	if ("gtm" == "$prefix") then
 		${ydb_dist}/mumps -run GTMDEFINEDTYPESTODB
 		if ($status) then
 			@ script_stat++
-			echo "generatehelp-E-hlp, Error during GTMDEFINEDTYPESTODB ${hlp}" $errout
+			do_log echo "generatehelp-E-hlp, Error during GTMDEFINEDTYPESTODB ${hlp}"
 			continue
 		endif
 	endif

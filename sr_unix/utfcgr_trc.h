@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information 		*
+ * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,13 +14,13 @@
 #define UTFCGR_TRC_INCLUDED
 
 /* Debugging macros for UTF8 caching. These are separate from other macros so they can be
- * included regardless of whether UNICODE_SUPPORTED is set or not.
+ * included regardless of whether UTF8_SUPPORTED is set or not.
  *
  * Uncomment below define to enable debugging macros
  */
 
 /* #define DEBUG_UTF8CACHE */
-#if defined(UNICODE_SUPPORTED) && defined(DEBUG_UTF8CACHE)
+#if defined(UTF8_SUPPORTED) && defined(DEBUG_UTF8CACHE)
 # define DBGUTFC(x) DBGFPF(x)
 # define DBGUTFC_ONLY(x) x
 # include "gtm_stdio.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -23,7 +23,7 @@
 #include "copy.h"
 #include "min_max.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"	/* needed for UTF8_MBNEXT macro */
 #endif
 
@@ -387,7 +387,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 					}
 					if (!gtm_utf8_mode)
 						bytelen = 1;
-#					ifdef UNICODE_SUPPORTED
+#					ifdef UTF8_SUPPORTED
 					else
 					{
 						if (!UTF8_VALID(inchar, in_top, bytelen))

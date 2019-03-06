@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -49,7 +49,7 @@ typedef struct				/* lock node.  The member descriptions below are correct if th
 	ptroff_t	lsib;		/* relative pointers to the "left sibling" and "right sibling" */
 	ptroff_t	rsib;		/* note that each level of the tree is sorted, for faster lookup */
 	ptroff_t	pending;	/* relative pointer to a mlk_prcblk, or zero if no entries are are blocked on this node */
-	int4		owner;		/* process id of the owner, if zero, this node is un-owned, and there
+	uint4		owner;		/* process id of the owner, if zero, this node is un-owned, and there
 					 * must, by defintion, be either a non-zero 'pending' entry, or a
 					 * non-zero 'children' entry and in the latter case, at least one
 					 * child must have a 'pending' entry */
@@ -57,13 +57,32 @@ typedef struct				/* lock node.  The member descriptions below are correct if th
 					 * during a direct re-access via pointer from a mlk_pvtblk, the
 					 * sequence numbers do not match, then we must assume that the
 					 * lock was stolen from us by LKE or some other abnormal event. */
-	UINTPTR_T	auxowner;	/* For gt.cm, this contains information on the remote owner of the lock.*/
+	uint4		hash;		/* The hash value associated with this node, based on the shrsubs of this node
+					 * and its parents. Copied from a mlk_pvtblk via MLK_PVTBLK_SUBHASH().
+					 */
 	int4		auxpid;		/* If non-zero auxowner, this is the pid of the client that is holding the lock */
+	UINTPTR_T	auxowner;	/* For gt.cm, this contains information on the remote owner of the lock.*/
 	unsigned char	auxnode[16];	/* If non-zero auxowner, this is the nodename of the client that is holding the lock */
 } mlk_shrblk;
 
-typedef struct
+#if !defined(MLK_SHRHASH_MAP_32) && !defined(MLK_SHRHASH_MAP_64)
+#define	MLK_SHRHASH_MAP_32
+#endif
+
+#if defined(MLK_SHRHASH_MAP_32)
+	typedef uint4				mlk_shrhash_map_t;
+#	define MLK_SHRHASH_MAP_MAX		MAXUINT4
+#	define PRIUSEDMAP			PRIx32
+#endif
+#if defined(MLK_SHRHASH_MAP_64)
+	typedef gtm_uint8			mlk_shrhash_map_t;
+#	define MLK_SHRHASH_MAP_MAX		MAXUINT8
+#	define PRIUSEDMAP			PRIx64
+#endif
+
+typedef struct mlk_shrhash_struct
 {
+<<<<<<< HEAD
 	ptroff_t	shrblk;		/* relative pointer to the shrblk referenced by this hash bucket, or zero for empty. */
 	uint4		hash;		/* hash value associated with the shrblk referenced by this hash bucket
 					 * Compare the hash value before comparing the pvtblk value against the
@@ -78,6 +97,27 @@ typedef struct
 
 #define MLK_SHRHASH_NEIGHBORS	((SIZEOF(((mlk_shrhash *)0)->usedmap) * BITS_PER_UCHAR) - 1)
 #define	MLK_SHRHASH_HIGHBIT	MLK_SHRHASH_NEIGHBORS
+=======
+	uint4			shrblk_idx;	/* Index to shrblk referenced by this hash bucket, or zero for empty. */
+	mlk_shrhash_map_t	usedmap;	/* Bitmap representing the bucket neighborhood, with bit N set
+						 * if (bucket+N) % nbuckets is associated with this bucket, i.e.,
+						 * part of this bucket's neighborhood.
+						 */
+	uint4			hash;		/* Hash value associated with the shrblk referenced by this hash bucket.
+						 * Compare the hash value before comparing the pvtblk value against the
+						 * shrblk/shrsub chain
+						 */
+} mlk_shrhash;
+
+#define MLK_SHRHASH_NEIGHBORS		(SIZEOF(mlk_shrhash_map_t) * BITS_PER_UCHAR)
+#define IS_NEIGHBOR(MAP, OFFSET)	(0 != ((MAP) & (((mlk_shrhash_map_t)1) << (OFFSET))))
+#define SET_NEIGHBOR(MAP, OFFSET)	(MAP) |= (((mlk_shrhash_map_t)1) << (OFFSET))
+#define CLEAR_NEIGHBOR(MAP, OFFSET)	(MAP) &= ~(((mlk_shrhash_map_t)1) << (OFFSET))
+/* The number of buckets the hash table is based on the number of shrblks, plus some extra.
+ * The number of extra buckets is specified as a fraction of the number of shrblks by the following.
+ */
+#define MLK_HASH_EXCESS		(1.0/2.0)
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 
 typedef struct				/* the subscript value of a single node in a tree.  Stored separately so that
 					 * the mlk_shrblk's can all have fixed positions, and yet we can
@@ -94,12 +134,15 @@ typedef struct				/* the subscript value of a single node in a tree.  Stored sep
 /* WARNING:  GT.CM relies on the fact that this structure is at the start of the lock space */
 #define NUM_CLST_LCKS 64
 
+#define MLK_CTL_BLKHASH_EXT (0)
+
 typedef struct	mlk_ctldata_struct	/* this describes the entire shared lock section */
 {
 	ptroff_t	prcfree;		/* relative pointer to the first empty mlk_prcblk */
+	ptroff_t	blkbase;		/* relative pointer to the first mlk_shrblk array entry */
 	ptroff_t	blkfree;		/* relative pointer to the first free mlk_shrblk.
 						 * if zero, the blkcnt must also equal zero */
-	ptroff_t	blkhash;		/* relative pointer to the first mlk_shrhash */
+	ptroff_t	blkhash;		/* relative pointer to the first mlk_shrhash, or MLK_CTL_BLKHASH_EXT if external */
 	ptroff_t	blkroot;		/* relative pointer to the first name level mlk_shrblk.
 						 * if zero, then there are no locks in this section */
 	ptroff_t	subbase;		/* relative pointer to the base of the mlk_shrsub area */
@@ -111,6 +154,11 @@ typedef struct	mlk_ctldata_struct	/* this describes the entire shared lock secti
 	int4		prccnt;			/* number of entries in the prcfree chain */
 	int4		blkcnt;			/* number of entries in the blkfree chain */
 	unsigned int	wakeups;		/* lock wakeup counter */
+	boolean_t	lockspacefull_logged;	/* whether LOCKSPACEFULL has been issued since last being below threshold */
+	boolean_t	gc_needed;		/* whether we've determined that a garbage collection is needed */
+	boolean_t	resize_needed;		/* whether we've determined that a hash table resize is needed */
+	global_latch_t	lock_gc_in_progress;	/* pid of the process doing the GC, or 0 if none */
+	int		hash_shmid;		/* shared memory id of hash table, or undefined if internal (see blkhash) */
 } mlk_ctldata;
 
 /* Define types for shared memory resident structures */
@@ -146,12 +194,29 @@ typedef mlk_shrhash	*mlk_shrhash_ptr_t;
 # endif
 #endif
 
-/* Now define main private lock structure */
+/* Now define main private lock structures */
+
+typedef struct mlk_pvtctl_struct
+{
+	struct gd_region_struct		*region;	/* pointer to the database region */
+	struct sgmnt_addrs_struct	*csa;		/* pointer to the database cs_addrs */
+	mlk_ctldata_ptr_t		ctl;		/* pointer to the shared mlk_ctldata */
+	mlk_shrblk_ptr_t		shrblk;		/* pointer to the base of the shrblk array (indexed from one) */
+	mlk_shrhash_ptr_t		shrhash;	/* pointer to the hash array */
+	uint4				shrhash_size;	/* number of hash buckets */
+	uint4				hash_fail_cnt;	/* number of consecutive hash insert failures */
+} mlk_pvtctl;
+
+typedef mlk_pvtctl	*mlk_pvtctl_ptr_t;
+
+#define MLK_PVTCTL_SET_CTL(PCTL, CTL)											\
+		mlk_pvtctl_set_ctl(&(PCTL), CTL)
+#define MLK_PVTCTL_INIT(PCTL, REG)											\
+		mlk_pvtctl_init(&(PCTL), REG)
 
 typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref which is locked or being processed */
 {
-	mlk_ctldata_ptr_t	ctlptr;		/* pointer to the mlk_ctldata for the data base region, duplicated to save
-							 * recalculating it each time. */
+	mlk_pvtctl		pvtctl;			/* Non lock specific control information */
 	mlk_shrblk_ptr_t	nodptr;			/* pointer to the node in the shared data structure which corresponds to
 							 * this nref */
 	mlk_shrblk_ptr_t	blocked;		/* pointer to the node in the shared data structure which blocked this
@@ -160,7 +225,6 @@ typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref wh
 				*next;			/* pointer to the next mlk_pvtblk in this chain.  The chain may be temporary
 							 * if lock processing is underway, or permanent, in which case the chain
 							 * represents owned locks. */
-	struct gd_region_struct	*region;		/* pointer to the database region in which the lock belongs */
 	uint4			sequence;		/* shrblk sequence for nodptr node (node we want) */
 	uint4			blk_sequence;		/* shrblk sequence for blocked node (node preventing our lock) */
 	mlk_tp			*tp;			/* pointer to saved tp information */
@@ -202,10 +266,16 @@ typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref wh
 } mlk_pvtblk;
 
 /* convert relative pointer to absolute pointer */
-#define R2A(X) (((sm_uc_ptr_t) &(X)) + (X))
+#define R2A(X) (DBG_ASSERT(X) (((sm_uc_ptr_t) &(X)) + (X)))
 
 /* store absolute pointer Y in X as a relative pointer */
-#define A2R(X, Y) ((X) = (ptroff_t)(((sm_uc_ptr_t)(Y)) - ((sm_uc_ptr_t) &(X))))
+#define A2R(X, Y) (DBG_ASSERT(Y) ((X) = (ptroff_t)(((sm_uc_ptr_t)(Y)) - ((sm_uc_ptr_t) &(X)))))
+
+/* get the index for use in a shrhash */
+#define MLK_SHRBLK_IDX(PCTL, SHRBLK)		((SHRBLK) - (PCTL).shrblk)
+/* get a mlk_shrblk pointer from an mlk_shrhash pointer */
+#define MLK_SHRHASH_SHRBLK(PCTL, SHRHASH)	((PCTL).shrblk + (SHRHASH)->shrblk_idx)
+#define MLK_SHRHASH_SHRBLK_CHECK(PCTL, SHRHASH)	((SHRHASH)->shrblk_idx ? MLK_SHRHASH_SHRBLK(PCTL, SHRHASH) : NULL)
 
 /* compute the true size of a mlk_pvtblk, excluding any GT.CM id */
 #define MLK_PVTBLK_SIZE(NREF_LEN, SUBCNT) (ROUND_UP(SIZEOF(mlk_pvtblk) - 1 + (NREF_LEN), SIZEOF(uint4))		\
@@ -310,5 +380,30 @@ typedef struct mlk_stats_struct
 } mlk_stats_t;
 
 #define MLK_FAIRNESS_DISABLED	((uint4)-1)
+
+#define CHECK_SHRBLKPTR(RPTR, PCTL)											\
+	assert((RPTR == 0)												\
+		|| (((mlk_shrblk_ptr_t)R2A(RPTR) > (PCTL).shrblk) 							\
+			&& ((mlk_shrblk_ptr_t)R2A(RPTR) < ((PCTL).shrblk + (PCTL).ctl->max_blkcnt + 1))))
+
+#define INVALID_LSIB_MARKER	0x1ee4c0de
+
+#define LOCK_SPACE_FULL_SYSLOG_THRESHOLD	0.25	/* Minimum free space percentage to write LOCKSPACEFULL to syslog again.
+							 * MIN(free_prcblk_ratio, free_shr_blk_ratio) must be greater than this
+							 * value to print syslog again (see also: gdsbt.h,
+							 * lockspacefull_logged definition
+							 */
+
+/* macros to grab and release a critical section (either shared with DB or not) for LOCK operations */
+#define GRAB_LOCK_CRIT_AND_SYNC(PCTL, RET_WAS_CRIT)								\
+		grab_lock_crit_and_sync(&(PCTL), &(RET_WAS_CRIT))
+#define GRAB_LOCK_CRIT_INTL(PCTL, RET_WAS_CRIT)							\
+		grab_lock_crit_intl(&(PCTL), &(RET_WAS_CRIT))
+#define REL_LOCK_CRIT(PCTL, WAS_CRIT)								\
+		rel_lock_crit(&(PCTL), WAS_CRIT)
+#define LOCK_CRIT_OWNER(CSA)									\
+		((CSA)->lock_crit_with_db ? (CSA)->critical->semaphore.u.parts.latch_pid : (CSA)->nl->lock_crit.u.parts.latch_pid)
+#define LOCK_CRIT_HELD(CSA)									\
+		((CSA)->lock_crit_with_db ? ((CSA)->now_crit) : (process_id == (CSA)->nl->lock_crit.u.parts.latch_pid))
 
 #endif

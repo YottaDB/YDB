@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,13 +14,13 @@
 #include "mvalconv.h"
 #include "op.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 
 GBLREF	boolean_t	badchar_inhibit;
 GBLREF boolean_t        gtm_utf8_mode;
 
-/* Returns the Unicode code point of a character in a string at a given index */
+/* Returns the UTF code point of a character in a string at a given index */
 void	op_fnascii(int4 num, mval* in, mval* out)
 {
 	int	bytelen;
@@ -83,7 +83,7 @@ void	op_fnascii(int4 num, mval* in, mval* out)
 	}
 	MV_FORCE_MVAL(out, (int)code);
 }
-#endif /* UNICODE_SUPPORTED */
+#endif /* UTF8_SUPPORTED */
 
 void	op_fnzascii(int4 num, mval* in, mval* out)
 {

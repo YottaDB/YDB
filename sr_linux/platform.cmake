@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2017 Fidelity National Information		#
+# Copyright (c) 2013-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	#
@@ -226,4 +226,8 @@ if(${bits} EQUAL 32)
   endif()
 else()
   set(libsyslibs "-lelf -lncurses -lm -ldl -lc -lpthread -lrt")
+endif()
+
+if(ENABLE_PROFILING)
+  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fprofile-arcs -ftest-coverage")
 endif()

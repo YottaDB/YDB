@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -38,7 +38,7 @@
 #include "mvalconv.h"
 #include "format_targ_key.h"
 #include "gtm_maxstr.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #endif
 #include "gtmimagename.h"
@@ -84,7 +84,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 	lv_val		*lv, *lv_child;
 	mval		lmv, *mv_child, *mv;
 	ssize_t		buff_len, cumul_width, device_width, inchar_width, len, outlen, chcnt, char_len, disp_len;
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	wint_t		codepoint;
 #endif
 	DCL_THREADGBL_ACCESS;
@@ -128,8 +128,8 @@ void zshow_output(zshow_out *out, const mstr *str)
 		{
 			len = str->len;
 			strptr = str->addr;
-			char_len = UNICODE_ONLY((gtm_utf8_mode) ? (ssize_t)UTF8_LEN_STRICT(strptr, (int)len) :) len;
-			disp_len = UNICODE_ONLY((gtm_utf8_mode) ?
+			char_len = UTF8_ONLY((gtm_utf8_mode) ? (ssize_t)UTF8_LEN_STRICT(strptr, (int)len) :) len;
+			disp_len = UTF8_ONLY((gtm_utf8_mode) ?
 						(ssize_t)gtm_wcswidth((unsigned char *)strptr, (int)len, FALSE, 1) :) len;
 			str_processed = 0;
 		}
@@ -148,7 +148,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 					strptr += outlen;
 					disp_len -= outlen;
 				}
-#				ifdef UNICODE_SUPPORTED
+#				ifdef UTF8_SUPPORTED
 				else
 				{
 					utf8_active = (CHSET_M != io_curr_device.out->ichset); /* needed by GTM_IO_WCWIDTH macro */
@@ -171,7 +171,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 				str_processed += (int)outlen;
 				len = (ssize_t)(strtop - strptr);
 				char_len -= chcnt;
-				assert((UNICODE_ONLY((gtm_utf8_mode) ?
+				assert((UTF8_ONLY((gtm_utf8_mode) ?
 						     (ssize_t)UTF8_LEN_STRICT(strptr, (int)len) :) len) == char_len);
 				WRITE_ONE_LINE_FROM_BUFFER;
 			}
@@ -287,7 +287,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 							break;
 						len = MAX_SRCLINE - (ssize_t)(out->ptr - out->buff);
 						strbase = str->addr + str_processed;
-#						ifdef UNICODE_SUPPORTED
+#						ifdef UTF8_SUPPORTED
 						if (gtm_utf8_mode)
 						{ /* terminate at the proper character boundary within MAX_SRCLINE bytes */
 							UTF8_LEADING_BYTE(strbase + len, strbase, leadptr);
@@ -423,7 +423,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 					len = out->len - (ssize_t)(out->ptr - out->buff);
 					assert(0 <= len);
 					strbase = str->addr + str_processed;
-#					ifdef UNICODE_SUPPORTED
+#					ifdef UTF8_SUPPORTED
 					if (gtm_utf8_mode)
 					{ /* terminate at the proper character boundary within out->len bytes */
 						UTF8_LEADING_BYTE(strbase + len, strbase, leadptr);

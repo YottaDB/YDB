@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +14,7 @@
 #include "patcode.h"
 #include "zshow.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"	/* U_ISPRINT() needs this header */
 #include "gtm_utf8.h"
 #endif
@@ -53,7 +54,7 @@ void	format2disp(char *src, int src_len, char *dispbuff, int *displen)
 			isill = FALSE;
 			chlen = 1;
 		}
-#		ifdef UNICODE_SUPPORTED
+#		ifdef UTF8_SUPPORTED
 		else {
 			nextc = (char *)UTF8_MBTOWC(c, c_top, codepoint);
 			isill = (WEOF == codepoint) ? (codepoint = *c, TRUE) : FALSE;

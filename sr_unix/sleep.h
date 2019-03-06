@@ -66,6 +66,7 @@ MBSTART {											\
 	} while (TRUE);										\
 } MBEND
 
+<<<<<<< HEAD
 # define SLEEP_USEC(MICROSECONDS, RESTART)					\
 MBSTART {									\
 	assert((MICROSECS_IN_SEC > MICROSECONDS) && (0 < MICROSECONDS));	\
@@ -76,6 +77,17 @@ MBSTART {									\
 MBSTART {								\
 	assert((NANOSECS_IN_SEC > NANOSECONDS) && (0 < NANOSECONDS));	\
 	CLOCK_NANOSLEEP(NANOSECONDS, RESTART);				\
+=======
+#if !defined(_AIX)
+# define SLEEP_USEC(MICROSECONDS, RESTART)						\
+MBSTART {										\
+	NANOSLEEP(((MICROSECONDS) * NANOSECS_IN_USEC), RESTART);			\
+} MBEND
+
+# define NANOSLEEP(NANOSECONDS, RESTART)						\
+MBSTART {										\
+	CLOCK_NANOSLEEP(NANOSECONDS, RESTART);						\
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 } MBEND
 
 #endif /* SLEEP_H */

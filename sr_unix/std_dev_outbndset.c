@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,13 +43,13 @@ void std_dev_outbndset(int4 ob_char)
 		std_dev_outbnd = TRUE;
 		mask = SHFT_MSK << ob_char;
 		if (mask & tt_ptr->enbld_outofbands.mask)
-			(void)xfer_set_handlers(outofband_event, &ctrap_set, ob_char);
+			(void)xfer_set_handlers(outofband_event, &ctrap_set, ob_char, FALSE);
 		else if (mask & CTRLC_MSK)
 		{
 			if (ctrlc_on)
-		        	(void)xfer_set_handlers(outofband_event, &ctrlc_set, 0);
+		        	(void)xfer_set_handlers(outofband_event, &ctrlc_set, 0, FALSE);
 		} else if (mask & CTRLY_MSK)
-	        	(void)xfer_set_handlers(outofband_event, &ctrly_set, 0);
+	        	(void)xfer_set_handlers(outofband_event, &ctrly_set, 0, FALSE);
 		else if ((CTRL_U == ob_char) && (spc_inp_prc & (SHFT_MSK << CTRL_U)))
 			ctrlu_occurred = TRUE;
 		else

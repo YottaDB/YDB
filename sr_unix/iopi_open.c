@@ -523,7 +523,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		} else
 		{
 #ifdef __MVS__
-			/* stderr is always tagged EBCDIC. there are no Unicode or untagged ASCII error messages */
+			/* stderr is always tagged EBCDIC. there are no UTF8 or untagged ASCII error messages */
 			PIPE_CVT_FROM_CHSET(stderr_chset, ccsid, textflag, dummy_cvt);
 			if (-1 == gtm_zos_set_tag(pfd_read_stderr[0], ccsid, textflag, TAG_FORCE, &realfiletag))
 				TAG_POLICY_SEND_MSG("PIPE - ccsid tag(pfd_read_stderr) failed", errno, realfiletag, ccsid);

@@ -1,7 +1,8 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+# Copyright (c) 2001-2018 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -182,7 +183,7 @@ ls -1 *.mpt | awk '{printf "mv %s _%s\n", $1, $1}' | sed 's/mpt$/m/g' | sh
 
 if ($cms_ver != $dst_ver) then
 	echo "Modifying release_name.h"
-	$cms_tools/edrelnam.csh $dst_ver # Do we care if this fails?
+	$btc_tools/edrelnam.csh $dst_ver # Do we care if this fails?
 endif
 
 ############## Set appropriate permissions on the files. For comments see $gtm_tools/comlist.csh ##############

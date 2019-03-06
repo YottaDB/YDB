@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,20 +31,21 @@ typedef struct hash_table_str_struct
 {
 	ht_ent_str 	*base;		/* base of array of hent_* entries */
 	ht_ent_str 	*top; 		/* top of array of hent_* entries */
+	ht_ent_str 	*spare_base;	/* spare array of hent_* entries */
+	sm_uc_ptr_t	entry_passed_thru;/* Bit vector used to determine whether a particular */
+						/* ht_ent has been involved in a collision (meaning that */
+						/* this value can't be marked empty on delete */
 	unsigned int 	size;		/* Hash table size */
 	unsigned int 	initial_size;	/* Hash table initial size */
-	ht_ent_str 	*spare_base;	/* spare array of hent_* entries */
 	unsigned int 	spare_base_size;/* size of spare array */
-	boolean_t	dont_compact;	/* if set, never perform compaction */
-	boolean_t	dont_keep_spare_table; /* if set, don't keep a spare table */
-	boolean_t	defer_base_release; /* if set don't release base, caller will free_base...() later */
 	unsigned int 	count;		/* Number of valid entries */
 	unsigned int 	del_count;	/* Number of entries marked deleted. */
 	unsigned int 	exp_trigger_size;/* When exp_trigger_size entried are used, expand table */
 	unsigned int 	cmp_trigger_size;/* When cmp_trigger_size reached compact table */
-	sm_uc_ptr_t	entry_passed_thru;/* Bit vector used to determine whether a particular */
-					/* ht_ent has been involved in a collision (meaning that */
-					/* this value can't be marked empty on delete */
+	boolean_t	dont_compact;	/* if set, never perform compaction */
+	boolean_t	dont_keep_spare_table; /* if set, don't keep a spare table */
+	boolean_t	defer_base_release; /* if set don't release base, caller will free_base...() later */
+	boolean_t	active;	/* indicates that the table "ready to use"; if not, we need to activate it */
 } hash_table_str;
 
 #define HTENT_EMPTY_STR(tabent, type, htvalue) (!(tabent)->key.hash_code && !(tabent)->key.str.len)
@@ -74,5 +76,8 @@ boolean_t delete_hashtab_str(hash_table_str *table, stringkey *key);
 void free_hashtab_str(hash_table_str *table);
 void reinitialize_hashtab_str(hash_table_str *table);
 void compact_hashtab_str(hash_table_str *table);
+sm_uc_ptr_t copy_hashtab_to_buffer_str(hash_table_str *table, sm_uc_ptr_t buffer,
+		int (*copy_entry_to_buffer)(ht_ent_str *, sm_uc_ptr_t));
+hash_table_str *activate_hashtab_in_buffer_str(sm_uc_ptr_t buffer, int (*copy_entry_from_buffer)(ht_ent_str *, sm_uc_ptr_t));
 
 #endif /* HASHTAB_STR_H */

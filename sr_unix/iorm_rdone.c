@@ -57,7 +57,7 @@ int	iorm_rdone(mint *v, int4 msec_timeout)
 					assertpro(ichset && FALSE);
 #endif
 			}
-			UNICODE_ONLY(assert(WEOF != codepoint);)
+			UTF8_ONLY(assert(WEOF != codepoint);)
 		} else
 			codepoint = (uint4)-1;			/* zero length is end of file */
 		*v = (mint)(codepoint);

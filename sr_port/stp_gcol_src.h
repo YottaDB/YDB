@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -30,7 +30,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "fnpc.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 # include "utfcgr.h"
 #endif
 #include "gdscc.h"
@@ -498,13 +498,14 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 	int			i, n;
 	unsigned char		*old_free;
 	d_rm_struct		*rm_ptr;
-	UNICODE_ONLY(utfcgr	*utfcgrp;)
+	UTF8_ONLY(utfcgr	*utfcgrp;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	/* Asserts added here are tested every time any module in the codebase does stringpool garbage collection */
 	assert(!stringpool_unusable);
 	assert(!stringpool_unexpandable);
+	stringpool.gcols++;
 #	ifndef STP_MOVE
 	/* Before we get cooking with our stringpool GC, check if it is appropriate to call lv_val garbage collection.
 	 * This is data that can get orphaned with no way to access it when aliases are used. This form of GC is only done
@@ -623,7 +624,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 			(TREF(fnpca)).fnpcs[index].last_str.len = 0;
 			(TREF(fnpca)).fnpcs[index].delim = 0;
 		}
-#		ifdef UNICODE_SUPPORTED
+#		ifdef UTF8_SUPPORTED
 		for (utfcgrp = (TREF(utfcgra)).utfcgrs; (NULL != utfcgrp) && (utfcgrp <= (TREF(utfcgra)).utfcgrmax);
 		     utfcgrp = (utfcgr *)((UINTPTR_T)utfcgrp + (TREF(utfcgra)).utfcgrsize))
 		{	/* Clear string addresses for each cache field since they are likely to change with the
@@ -817,7 +818,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 					MVAL_STPG_ADD(&mvs->mv_st_cont.mvs_trigr.dollar_ztrap_save);
 					/* Note fall into MVST_ZINTR to process common entries */
 #				endif
-				case MVST_ZINTR:
+				case MVST_ZINTR: /* Or case MVST_ZTIMEOUT: */
 					MSTR_STPG_ADD(&mvs->mv_st_cont.mvs_zintr.savextref);
 					m = &mvs->mv_st_cont.mvs_zintr.savtarg;
 					break;

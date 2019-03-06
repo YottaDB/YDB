@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,9 +44,8 @@ error_def(ERR_LCKGONE);
 
 
 bool	lke_clearlock(
-		      gd_region		*region,
+		      mlk_pvtctl_ptr_t	pctl,
 		      struct CLB	*lnk,
-		      mlk_ctldata_ptr_t	ctl,
 		      mlk_shrblk_ptr_t	node,
 		      mstr		*name,
 		      bool		all,
@@ -83,7 +83,7 @@ bool	lke_clearlock(
 
 		if (unlock)
 		{
-			csa = &FILE_INFO(region)->s_addrs;
+			csa = pctl->csa;
 			node->owner = 0;
 			node->sequence = csa->hdr->trans_hist.lock_sequence++;
 			len = name->len - 1;

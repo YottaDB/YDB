@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,9 +23,7 @@
 
 GBLREF uint4	process_id;
 
-int mlk_tree_wake_children(mlk_ctldata_ptr_t ctl,
-			    mlk_shrblk_ptr_t d,
-			    gd_region *reg)
+int mlk_tree_wake_children(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 {
 	/* Note: should add infinite loop check */
 	mlk_shrblk_ptr_t 	b, bhead, bnext;
@@ -33,7 +32,7 @@ int mlk_tree_wake_children(mlk_ctldata_ptr_t ctl,
 
 	gotone = FALSE;
 
-	max_loop_tries = (int4)(((sm_uc_ptr_t)R2A(ctl->subtop) - (sm_uc_ptr_t)ctl) / SIZEOF(mlk_shrblk));
+	max_loop_tries = (int4)(((sm_uc_ptr_t)R2A(pctl->ctl->subtop) - (sm_uc_ptr_t)pctl->ctl) / SIZEOF(mlk_shrblk));
 		/* although more than the actual, it is better than underestimating */
 
 	for (bhead = b = d , bnext = NULL; bnext != bhead && max_loop_tries > lcnt; lcnt++)
@@ -44,15 +43,15 @@ int mlk_tree_wake_children(mlk_ctldata_ptr_t ctl,
 		 * for comments on why, see comments about d->owner in mlk_wake_pending.c
 		 */
 		gotone_in_subtree = (b->children && !b->owner)
-					? mlk_tree_wake_children(ctl, (mlk_shrblk_ptr_t)R2A(b->children), reg)
+					? mlk_tree_wake_children(pctl, (mlk_shrblk_ptr_t)R2A(b->children))
 					: FALSE;
 		bnext = (mlk_shrblk_ptr_t)R2A(b->rsib);
 		if (!gotone_in_subtree && b->pending && !b->owner)
 		{
-			mlk_wake_pending(ctl, b, reg);
+			mlk_wake_pending(pctl, b);
 			gotone = TRUE;
 		} else
-			delete_status = mlk_shrblk_delete_if_empty(ctl, b);
+			delete_status = mlk_shrblk_delete_if_empty(pctl, b);
 		if (delete_status && b == bhead)
 		{
 			bhead = b = (b == bnext) ? NULL : bnext;

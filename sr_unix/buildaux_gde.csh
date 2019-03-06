@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2016 Fidelity National Information		#
+# Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
@@ -30,6 +30,7 @@ chmod 664 *.m *.o
 \rm -f *.m *.o	# use \rm to avoid rm from asking for confirmation (in case it has been aliased so)
 cp -p $gtm_pct/*.m .
 rm -f pinentry.m  # avoid problems with concurrent deletion
+rm -f decomment.m scantypedefs.m	# These routines are used only by gengtmdeftypes.csh
 switch ($gt_image)  # potentially all 3 versions could be in $gtm_pct .. we only need one, delete the others
     case "pro":
 	rm -f GTMDefinedTypesInitBta.m >& /dev/null
@@ -71,8 +72,8 @@ endif
 unset echo
 
 source $gtm_tools/set_library_path.csh
-source $gtm_tools/check_unicode_support.csh
-if ("TRUE" == "$is_unicode_support") then
+source $gtm_tools/check_utf8_support.csh
+if ("TRUE" == "$is_utf8_support") then
 	if (! -e utf8) mkdir utf8
 	if ( "OS/390" == $HOSTOS ) then
 		setenv gtm_chset_locale $utflocale	# LC_CTYPE not picked up right

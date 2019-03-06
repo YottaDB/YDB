@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -199,12 +199,14 @@ void	repl_inst_read(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 	reg = jnlpool ? jnlpool->jnlpool_dummy_reg : NULL;
 	if (NULL == reg)
 		reg = recvpool.recvpool_dummy_reg;
-	assert((NULL == reg) && (in_repl_inst_create || in_repl_inst_edit || in_mupip_ftok)
-		|| (NULL != reg) && !in_repl_inst_create && !in_repl_inst_edit && !in_mupip_ftok);
+	assert(((NULL == reg) && (in_repl_inst_create || in_repl_inst_edit || in_mupip_ftok))
+		|| ((NULL != reg) && !in_repl_inst_create && !in_repl_inst_edit && !in_mupip_ftok)
+		|| ((NULL != reg) && (NULL != jnlpool) && in_repl_inst_edit));
 	if (NULL != reg)
 	{
 		udi = FILE_INFO(reg);
-		assert(udi->grabbed_ftok_sem || ((jnlpool && jnlpool->jnlpool_ctl) && udi->s_addrs.now_crit) || jgbl.mur_rollback);
+		assert(udi->grabbed_ftok_sem || ((jnlpool && jnlpool->jnlpool_ctl) && udi->s_addrs.now_crit)
+				|| jgbl.mur_rollback || ((NULL != jnlpool) && in_repl_inst_edit));
 	}
 	OPENFILE_CLOEXEC(fn, O_RDONLY, fd);
 	if (FD_INVALID == fd)
@@ -315,14 +317,15 @@ void	repl_inst_write(char *fn, off_t offset, sm_uc_ptr_t buff, size_t buflen)
 		if (NULL == reg)
 			reg = recvpool.recvpool_dummy_reg;
 	)
-	assert((NULL == reg) && (in_repl_inst_create || in_repl_inst_edit)
-		|| (NULL != reg) && !in_repl_inst_create && !in_repl_inst_edit);
+	assert(((NULL == reg) && (in_repl_inst_create || in_repl_inst_edit))
+		|| ((NULL != reg) && !in_repl_inst_create && !in_repl_inst_edit)
+		|| ((NULL != reg) && (NULL != jnlpool) && in_repl_inst_edit));
 	DEBUG_ONLY(
 		if (NULL != reg)
 		{
 			udi = FILE_INFO(reg);
 			assert(udi->grabbed_ftok_sem || (jnlpool && (NULL != jnlpool->jnlpool_ctl) && udi->s_addrs.now_crit)
-				|| jgbl.mur_rollback);
+				|| jgbl.mur_rollback || ((NULL != jnlpool) && in_repl_inst_edit));
 		}
 	)
 	oflag = O_RDWR;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -18,7 +18,7 @@
 #include "compiler.h"
 #include "show_source_line.h"
 #include "gtmmsg.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #endif
 
@@ -71,7 +71,7 @@ void show_source_line(boolean_t warn)
 			*b++ = ' ';
 			c++;
 		}
-#		ifdef UNICODE_SUPPORTED
+#		ifdef UTF8_SUPPORTED
 		else
 		{
 			chlen = (int)(UTF8_MBTOWC(c, c_top, ch) - (uchar_ptr_t)c);
@@ -118,7 +118,7 @@ void show_source_line(boolean_t warn)
 				c++;
 			} else
 			{
-#			ifdef UNICODE_SUPPORTED		/* funky positioning makes VMS compiler happy */
+#			ifdef UTF8_SUPPORTED		/* funky positioning makes VMS compiler happy */
 				chlen = (int)(UTF8_MBTOWC(c, ((TREF(source_buffer)).addr + (TREF(source_buffer)).len - 1), ch)
 						- (uchar_ptr_t)c);
 				if ((WEOF != ch) && 0 < (chwidth = UTF8_WCWIDTH(ch)))

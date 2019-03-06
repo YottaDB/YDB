@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -24,6 +24,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "mlkdef.h"
+#include "mlk_ops.h"
 #include "cmidef.h"
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
@@ -68,13 +69,12 @@ void gtcml_lklist(void)
 		memcpy(&new_entry->value[0], ptr, len);
 		ptr += len;
 		reg_ref->oper = PENDING;
-		new_entry->region = reg_ref->reghead->reg;
 		new_entry->translev = translev;
 		new_entry->subscript_cnt = subcnt;
 		new_entry->level = 0;
 		new_entry->nref_length = len;
 		MLK_PVTBLK_SUBHASH_GEN(new_entry);
-		new_entry->ctlptr = (mlk_ctldata *)FILE_INFO(new_entry->region)->s_addrs.lock_addrs[0];
+		MLK_PVTCTL_INIT(new_entry->pvtctl, reg_ref->reghead->reg);
 		if (!reg_ref->lockdata)
 		{
 			reg_ref->lockdata = new_entry;

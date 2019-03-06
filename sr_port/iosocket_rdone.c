@@ -49,7 +49,7 @@ int	iosocket_rdone(mint *v, int4 msec_timeout)
 				default:
 					assertpro(ichset != ichset);
 			}
-			UNICODE_ONLY(assert(WEOF != codepoint));
+			UTF8_ONLY(assert(WEOF != codepoint));
 		} else
 			/* Null length string returns 0 */
 			codepoint = 0;

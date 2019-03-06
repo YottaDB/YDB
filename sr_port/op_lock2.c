@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -367,7 +367,11 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 			if ((NULL != pvt_ptr1->blocked)
 					&& (pvt_ptr1->blk_sequence == pvt_ptr1->blocked->sequence)
 					&& (!BLOCKING_PROC_DEAD(pvt_ptr1, time, icount, status)))
+			{
+				if (pvt_ptr1->pvtctl.ctl->lock_gc_in_progress.u.parts.latch_pid == process_id)
+					pvt_ptr1->pvtctl.ctl->lock_gc_in_progress.u.parts.latch_pid = 0;
 				continue;
+			}
 			/* Note that "TREF(mlk_yield_pid)" is not initialized here as we want to use any value inherited
 			 * from previous calls to mlk_lock for this lock.
 			 */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,7 @@
 #include "zshow.h"
 #include "patcode.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #endif
 
@@ -114,7 +114,7 @@ boolean_t zwr2format(mstr *src, mstr *des)
 						return FALSE;
 					FORMAT_CHAR(num);
 				}
-#				ifdef UNICODE_SUPPORTED
+#				ifdef UTF8_SUPPORTED
 				else
 				{
 					strnext = UTF8_WCTOMB(num, &dstptr[des->len]);

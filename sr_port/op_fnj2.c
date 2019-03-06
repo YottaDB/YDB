@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +20,7 @@
 GBLREF spdesc stringpool;
 error_def(ERR_MAXSTRLEN);
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 GBLREF	boolean_t	badchar_inhibit;
 
@@ -52,7 +53,7 @@ void op_fnj2(mval *src, int len, mval *dst)
 	}
 	return;
 }
-#endif /* UNICODE_SUPPORTED */
+#endif /* UTF8_SUPPORTED */
 
 void op_fnzj2(mval *src, int len, mval *dst)
 {

@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 74ea4a3c... GT.M V6.3-006
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,8 +54,8 @@ int mint2mval(), mval2bool(), mval2mint(), mval2num(), op_contain(), op_currtn()
     opp_indset(), opp_indtext(), opp_iretmval(), opp_newintrinsic(), opp_newvar(), opp_rterror(), opp_setzbrk(), opp_svput(),
     opp_tcommit(), opp_trestart(), opp_trollback(), opp_tstart(), opp_xnew(), opp_zcont(), opp_zg1(), opp_zgoto();
 
-#ifndef UNICODE_SUPPORTED
-/* Call "z" counterparts for non-unicode flavor of these functions on unsupported platforms */
+#ifndef UTF8_SUPPORTED
+/* Call "z" counterparts for non-utf8 flavor of these functions on unsupported platforms */
 
 #define op_fnascii op_fnzascii
 #define op_fnchar op_fnzchar

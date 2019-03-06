@@ -55,7 +55,7 @@ GBLREF sgmnt_data	*cs_data;
 GBLREF jnlpool_addrs_ptr_t	jnlpool;
 GBLREF uint4		process_id;
 GBLREF uint4		dollar_tlevel;
-GBLREF gd_region	*gv_cur_region;
+GBLREF gd_region	*db_init_region, *gv_cur_region;
 GBLREF gv_key		*gv_altkey, *gv_currkey;
 GBLREF gv_namehead	*reset_gv_target;
 GBLREF boolean_t	need_core;
@@ -426,9 +426,11 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
  */
 CONDITION_HANDLER(gvcst_statsDB_open_ch)
 {
-	char	buffer[OUT_BUFF_SIZE];
-	int	msglen;
-	mval	zpos;
+	char			buffer[OUT_BUFF_SIZE];
+	gd_region		*reg;
+	int			msglen;
+	mval			zpos;
+	node_local_ptr_t	cnl;
 
 	START_CH(TRUE);
 	assert(ERR_DBROLLEDBACK != arg);	/* A statsDB region should never participate in rollback */
@@ -437,13 +439,23 @@ CONDITION_HANDLER(gvcst_statsDB_open_ch)
 	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
 		CONTINUE;			/* Keep going for non-error issues */
 	if (ERR_DRVLONGJMP != arg)
-	{	/* Need to reflect the current error to the syslog - First save message that got us here */
-		msglen = TREF(util_outptr) - TREF(util_outbuff_ptr);
-		assert(OUT_BUFF_SIZE > msglen);
-		memcpy(buffer, TREF(util_outbuff_ptr), msglen);
-		getzposition(&zpos);
-		/* Send whole thing to syslog */
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_STATSDBERR, 4, zpos.str.len, zpos.str.addr, msglen, buffer);
+	{	/* Need to reflect the current error to the syslog - 1st check whether to throttle because it's a repeat */
+		if (IS_STATSDB_REG(db_init_region))
+			STATSDBREG_TO_BASEDBREG(db_init_region, reg);
+		else
+			reg = db_init_region;
+		cnl = (&FILE_INFO(reg)->s_addrs)->nl;
+		if ((cnl->statsdb_cur_error != SIGNAL) || !cnl->statsdb_error_cycle--)
+		{	/* Not a repeat or we've surpressed STATSDB_ERROR_RATE messages */
+			cnl->statsdb_error_cycle = STATSDB_ERROR_RATE;
+			cnl->statsdb_cur_error = SIGNAL;
+			msglen = TREF(util_outptr) - TREF(util_outbuff_ptr);
+			assert(OUT_BUFF_SIZE > msglen);
+			memcpy(buffer, TREF(util_outbuff_ptr), msglen);		/* save message that got us here */
+			getzposition(&zpos);
+			/* Send whole thing to syslog */
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_STATSDBERR, 4, zpos.str.len, zpos.str.addr, msglen, buffer);
+		}
 	}
 	intrpt_ok_state = gvcst_statsDB_open_ch_intrpt_ok_state;
 	UNWIND(NULL, NULL);			/* Return back to where ESTABLISH_NORET was done */

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2017 Fidelity National Information		#
+# Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	#
@@ -665,19 +665,8 @@ endif
 rm -f obj/gengtmdeftypes.log* >& /dev/null
 rm -f GTMDefinedTypesInit.m >& /dev/null
 echo "Generating GTMDefinedTypesInit.m"
-if ($?work_dir) then
-	if (-e $work_dir/tools/cms_tools/builddefinedtypes/gengtmdeftypes.csh) then
-		echo "Using gengtmdeftypes.csh from $work_dir"
-		$work_dir/tools/cms_tools/builddefinedtypes/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
-		@ savestatus = $status
-	else
-		$cms_tools/builddefinedtypes/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
-		@ savestatus = $status
-	endif
-else
-	$cms_tools/builddefinedtypes/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
-	@ savestatus = $status
-endif
+$gtm_tools/gengtmdeftypes.csh >& obj/gengtmdeftypes.log
+@ savestatus = $status
 if ((0 != $savestatus) || (! -e GTMDefinedTypesInit.m)) then
 	set errmsg = "COMLIST-E-FAIL gengtmdeftypes.csh failed to create GTMDefinedTypesInit.m "
 	set errmsg = "$errmsg - see log in $gtm_obj/gengtmdeftypes.log"
@@ -707,10 +696,17 @@ if (-e GTMDefinedTypesInit.m) then
 	# If we have a utf8 dir (created by buildaux.csh called from buildbdp.csh above), add a link to it for
 	# GTMDefinedTypesInit.m and compile it in UTF8 mode
 	source $gtm_tools/set_library_path.csh
+<<<<<<< HEAD
 	source $gtm_tools/check_unicode_support.csh
 	if (-e $ydb_dist/utf8 && ("TRUE" == "$is_unicode_support")) then
 		if (! -e $ydb_dist/utf8/GTMDefinedTypesInit.m) then
 		    ln -s $ydb_dist/GTMDefinedTypesInit.m $ydb_dist/utf8/GTMDefinedTypesInit.m
+=======
+	source $gtm_tools/check_utf8_support.csh
+	if (-e $gtm_dist/utf8 && ("TRUE" == "$is_utf8_support")) then
+		if (! -e $gtm_dist/utf8/GTMDefinedTypesInit.m) then
+		    ln -s $gtm_dist/GTMDefinedTypesInit.m $gtm_dist/utf8/GTMDefinedTypesInit.m
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 		endif
 		if (! -e $ydb_dist/utf8/GDEINITSZ.m) then
 		    ln -s $ydb_dist/GDEINITSZ.m $ydb_dist/utf8/GDEINITSZ.m

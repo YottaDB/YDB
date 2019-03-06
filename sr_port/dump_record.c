@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 74ea4a3c... GT.M V6.3-006
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,7 +42,7 @@
 #include "hashtab_mname.h"
 #include "targ_alloc.h"
 #endif
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
@@ -227,7 +232,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 							else
 								util_out_print(dot_str, FALSE);
 						}
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 						else { /* multi-byte characters */
 							cptr_next = UTF8_MBTOWC(cptr1, r_top, ch);
 							chlen = cptr_next - cptr1;

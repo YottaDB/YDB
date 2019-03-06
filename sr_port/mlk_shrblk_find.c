@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -56,27 +56,37 @@ boolean_t	mlk_find_blocking_child_lock(mlk_pvtblk *p, mlk_shrblk_ptr_t child, UI
 			}
 		}
 		if (!blocked && d->children)
+		{
+			CHECK_SHRBLKPTR(d->children, p->pvtctl);
 			blocked = mlk_find_blocking_child_lock(p, (mlk_shrblk_ptr_t)R2A(d->children), auxown);
+		}
 	}
 	return blocked;
 }
 
 mlk_shrblk_ptr_t mlk_shrhash_find(mlk_pvtblk *p, int subnum, unsigned char *subval, unsigned char sublen, mlk_shrblk_ptr_t parent);
 
+/**
+ * Searches the shrblk's for the shrblk belonging to the given pvtblk; if it doesn't find it, it creates it
+ *
+ * @param [in] p private block which contains the lock name
+ * @param [out] ret will contain the address of shrblk for the last subscript of the given lock
+ * @param [in] auxown who this lock is being requested on behalf of
+ * @returns 0 if success, or 1 if we are blocked from getting that lock for some reason
+ */
 boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown)
 {
 	boolean_t		blocked;
 	int			i, j, slen;
 	mlk_ctldata_ptr_t	ctl;
+	mlk_ctldata		ctl_bak;
 	mlk_prcblk_ptr_t	pr;
 	mlk_shrblk_ptr_t	pnt, d, d0, d1, dhead;
 	mlk_shrsub_ptr_t	dsub;
 	ptroff_t		*chld_of_pnt;
 	unsigned char		*cp;
 	uint4			yield_pid;
-#	ifdef DEBUG
 	mlk_shrblk_ptr_t	dh;
-#	endif
 	DCL_THREADGBL_ACCESS;
 
 	blocked = FALSE;
@@ -85,7 +95,7 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 	 */
 	*ret = 0;
 	SETUP_THREADGBL_ACCESS;
-	for (pnt = NULL , chld_of_pnt = (ptroff_t *)&p->ctlptr->blkroot , i = p->subscript_cnt , cp = p->value ;
+	for (pnt = NULL , chld_of_pnt = (ptroff_t *)&p->pvtctl.ctl->blkroot , i = p->subscript_cnt , cp = p->value ;
 		i > 0 ; i-- , pnt = d , chld_of_pnt = (ptroff_t *)&d->children, cp += slen)
 	{
 		slen = *cp++;
@@ -95,16 +105,22 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 			if (!(d = mlk_shrblk_create(p, cp, slen, pnt, chld_of_pnt, i)))
 			{
 				assert(NULL == mlk_shrhash_find(p, p->subscript_cnt - i, cp, slen, pnt));
+				CHECK_SHRBLKPTR(p->pvtctl.ctl->blkroot, p->pvtctl);
 				return TRUE;
 			}
 			assert((dh = mlk_shrhash_find(p, p->subscript_cnt - i, cp, slen, pnt)) == d);
+			assert(d->value != 0);
 			A2R(d->lsib, d);
+			CHECK_SHRBLKPTR(d->lsib, p->pvtctl);
 			A2R(d->rsib, d);
+			CHECK_SHRBLKPTR(d->rsib, p->pvtctl);
+			CHECK_SHRBLKPTR(p->pvtctl.ctl->blkroot, p->pvtctl);
 		} else
 		{
 			d = mlk_shrhash_find(p, p->subscript_cnt - i, cp, slen, pnt);
 			if (NULL != d)
 			{	/* We found the right node */
+				assertpro(d->rsib != 0);
 				if (d->owner)
 				{
 					if (d->owner != process_id || d->auxowner != auxown)
@@ -139,15 +155,19 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 						p->blocked = d;
 						p->blk_sequence = d->sequence;
 						TREF(mlk_yield_pid) = pr->process_id;
-						blocked =TRUE;
+						blocked = TRUE;
 						/* Give the first waiting process a nudge to wake up */
-						ctl = p->ctlptr;
-						mlk_wake_pending(ctl, d, p->region);
+						ctl = p->pvtctl.ctl;
+						mlk_wake_pending(&p->pvtctl, d);
 					}
 				}
 			} else
 			{	/* Add a new shrblk node to the end of the list */
+				assert(*chld_of_pnt != 0);
+				CHECK_SHRBLKPTR(*chld_of_pnt, p->pvtctl);
 				d = (mlk_shrblk_ptr_t)R2A(*chld_of_pnt);
+				assertpro(d->lsib);
+				assertpro(d->lsib != INVALID_LSIB_MARKER);
 				d0 = d;
 				d1 = (mlk_shrblk_ptr_t)R2A(d->lsib);
 				if (!(d = mlk_shrblk_create(p, cp, slen, pnt, NULL, i)))
@@ -157,9 +177,16 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 				}
 				assert((dh = mlk_shrhash_find(p, p->subscript_cnt - i, cp, slen, pnt)) == d);
 				A2R(d->rsib, d0);
-				A2R(d->lsib, d1);
+				CHECK_SHRBLKPTR(d->rsib, p->pvtctl);
+				d->lsib = 0;
+				if (d1)
+					A2R(d->lsib, d1);
+				CHECK_SHRBLKPTR(d->lsib, p->pvtctl);
 				A2R(d0->lsib, d);
-				A2R(d1->rsib, d);
+				CHECK_SHRBLKPTR(d0->lsib, p->pvtctl);
+				if (d1)
+					A2R(d1->rsib, d);
+				CHECK_SHRBLKPTR(d1->rsib, p->pvtctl);
 			}
 		}
 		/* When we get to the last "subscript", it's node is our lock target */
@@ -179,15 +206,17 @@ mlk_shrblk_ptr_t mlk_shrhash_find(mlk_pvtblk *p, int subnum, unsigned char *subv
 	mlk_shrblk_ptr_t	search_shrblk;
 	mlk_shrsub_ptr_t	search_sub;
 	int			bi, si;
-	uint4			hash, num_buckets, usedmap;
+	uint4			hash, num_buckets;
+	mlk_shrhash_map_t	usedmap;
 	mlk_shrhash_ptr_t	shrhash, bucket, search_bucket;
 
-	shrhash = (mlk_shrhash_ptr_t)R2A(p->ctlptr->blkhash);
-	num_buckets = p->ctlptr->num_blkhash;
+	shrhash = p->pvtctl.shrhash;
+	num_buckets = p->pvtctl.shrhash_size;
 	hash = MLK_PVTBLK_SUBHASH(p, subnum);
 	bi = hash % num_buckets;
 	bucket = &shrhash[bi];
 	usedmap = bucket->usedmap;
+<<<<<<< HEAD
 	if (0 == (usedmap & (1U << MLK_SHRHASH_HIGHBIT)))
 	{	/* High bit is not set. We can use Hopscotch hash algorithm to speedily search */
 		for (si = bi ; 0 != usedmap ; (si = (si + 1) % num_buckets), (usedmap >>= 1))
@@ -228,6 +257,29 @@ mlk_shrblk_ptr_t mlk_shrhash_find(mlk_pvtblk *p, int subnum, unsigned char *subv
 			if (si == bi)
 				break;
 		}
+=======
+	for (si = bi ; 0 != usedmap ; (si = (si + 1) % num_buckets), (usedmap >>= 1))
+	{
+		if (0 == (usedmap & 1U))
+			continue;
+		search_bucket = &shrhash[si];
+		if (search_bucket->hash != hash)
+			continue;
+		assert(0 != search_bucket->shrblk_idx);
+		search_shrblk = MLK_SHRHASH_SHRBLK(p->pvtctl, search_bucket);
+		/* if the parents don't match (either both null, or one null and the other not, or both non-null but
+		 *  non-matching then we continue
+		 */
+		if (!((NULL == parent) && (0 == search_shrblk->parent))
+				&& ((0 == search_shrblk->parent) || ((mlk_shrblk_ptr_t)R2A(search_shrblk->parent) != parent)))
+			continue;
+		search_sub = (mlk_shrsub_ptr_t)R2A(search_shrblk->value);
+		if (0 != memvcmp(subval, sublen, search_sub->data, search_sub->length))
+			continue;
+		res = search_shrblk;
+		assert(hash == res->hash);
+		break;
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 	}
 	return NULL;
 }

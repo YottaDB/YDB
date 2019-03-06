@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -37,7 +37,7 @@
 #include "std_dev_outbndset.h"
 #include "wake_alarm.h"
 #include "min_max.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
@@ -59,7 +59,7 @@ GBLREF	boolean_t	dollar_zininterrupt;
 GBLREF	int4		ctrap_action_is;
 GBLREF	boolean_t	gtm_utf8_mode;
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 LITREF	UChar32		u32_line_term[];
 #endif
 
@@ -91,7 +91,7 @@ error_def(ERR_ZINTRECURSEIO);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 
 /* Maintenance of $ZB on a badchar error and returning partial data (if any) */
 void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
@@ -482,7 +482,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				} else
 					io_ptr->dollar.zeof = FALSE;
 			}
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 			if (utf8_active)
 			{
 				if (tt_ptr->discard_lf)
@@ -559,7 +559,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 					NATIVE_CVT2UPPER(inbyte, inbyte);
 				inchar = inbyte;
 				inchar_width = 1;
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 			}
 #endif
 			GETASCII(asc_inchar,inchar);
@@ -582,7 +582,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 			if (((0 != (mask & TRM_ESCAPE)) || edit_mode)
 			     && ((NATIVE_ESC == inchar) || (START != io_ptr->esc_state)))
 			{
-				if (zb_ptr >= zb_top UNICODE_ONLY(|| (utf8_active && ASCII_MAX < inchar)))
+				if (zb_ptr >= zb_top UTF8_ONLY(|| (utf8_active && ASCII_MAX < inchar)))
 				{	/* $zb overflow or not ASCII in utf8 mode */
 					io_ptr->dollar.za = 2;
 					break;
@@ -616,7 +616,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 					}
 				} else if (utf8_active && tt_ptr->default_mask_term && (u32_line_term[U32_LT_NL] == INPUT_CHAR ||
 					u32_line_term[U32_LT_LS] == INPUT_CHAR || u32_line_term[U32_LT_PS] == INPUT_CHAR))
-				{	/* UTF and default terminators and Unicode terminators above ASCII_MAX */
+				{	/* UTF and default terminators and UTF terminators above ASCII_MAX */
 					zb_ptr = UTF8_WCTOMB(INPUT_CHAR, zb_ptr);
 					break;
 				}
@@ -1207,7 +1207,11 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 		return(FALSE);
 	}
+<<<<<<< HEAD
 #	ifdef UNICODE_SUPPORTED
+=======
+#ifdef UTF8_SUPPORTED
+>>>>>>> 74ea4a3c... GT.M V6.3-006
 	if (utf8_active)
 	{
 		outptr = buffer_start;
