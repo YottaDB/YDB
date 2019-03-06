@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +52,7 @@ VMS_ONLY(void jobinterrupt_event(void))
 	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig);
 	/* Note the (presently unused) args are to match signature for signal handlers in Unix */
 	if (!dollar_zininterrupt)
-		(void)xfer_set_handlers(outofband_event, &jobinterrupt_set, 0);
+		(void)xfer_set_handlers(outofband_event, &jobinterrupt_set, 0, FALSE);
 }
 
 /* Call back routine from xfer_set_handlers to complete outofband setup */
@@ -65,6 +66,7 @@ void jobinterrupt_set(int4 dummy_val)
 	if ((SS$_WASCLR != status) && (SS$_WASSET != status))
 		GTMASSERT;
 #	endif
+	DBGDFRDEVNT((stderr, "jobinterrupt_set: Setting jobinterrupt outofband\n"));
 	if (jobinterrupt != outofband)
 	{	/* We need jobinterrupt out of band processing at our earliest convenience */
 		outofband = jobinterrupt;

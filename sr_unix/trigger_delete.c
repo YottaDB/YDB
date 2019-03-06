@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -324,13 +324,13 @@ STATICFNDEF int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 	return result;
 }
 
-boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 *trig_stats)
+boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats)
 {
 	sgmnt_addrs		*csa;
 	char			curr_name[MAX_MIDENT_LEN + 1];
-	uint4			curr_name_len, orig_name_len;
+	uint4			curr_name_len, orig_name_len, trigger_name_len;
 	mval			mv_curr_nam;
-	char			*ptr;
+	char			*ptr, *trigger_name;
 	char			*name_tail_ptr;
 	char			save_name[MAX_MIDENT_LEN + 1];
 	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
@@ -349,7 +349,6 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 	int			utilprefixlen;
 	boolean_t		first_gtmio;
 	uint4			triggers_deleted;
-	mval			trigjrec;
 	boolean_t		jnl_format_done;
 	gd_region		*reg, *reg_top;
 	char			disp_trigvn[MAX_MIDENT_LEN + SPANREG_REGION_LITLEN + MAX_RN_LEN + 1 + 1];
@@ -362,10 +361,8 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 
 	SETUP_THREADGBL_ACCESS;
 	badpos = 0;
-	trigjrec.mvtype = MV_STR;
-	trigjrec.str.len = trigger_name_len--;
-	trigjrec.str.addr = trigger_name++;
-	orig_name_len = trigger_name_len;
+	orig_name_len = trigger_name_len = trigger_rec->str.len - 1;
+	trigger_name = trigger_rec->str.addr + 1;
 	if ((0 == trigger_name_len)
 		|| (trigger_name_len != (badpos = validate_input_trigger_name(trigger_name, trigger_name_len, &wildcard))))
 	{	/* is the input name valid */
@@ -455,7 +452,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 				}
 				if (!jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
 				{
-					jnl_format(JNL_LGTRIG, NULL, &trigjrec, 0);
+					jnl_format(JNL_LGTRIG, NULL, trigger_rec, 0);
 					jnl_format_done = TRUE;
 				}
 				/* kill the target trigger for GVN at index trig_indx */
@@ -523,7 +520,7 @@ boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 
 		assert(dollar_tlevel);
 		/* below is needed to set update_trans TRUE on this region even if NO db updates happen to ^#t nodes */
 		T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_TRIGLOADFAIL);
-		jnl_format(JNL_LGTRIG, NULL, &trigjrec, 0);
+		jnl_format(JNL_LGTRIG, NULL, trigger_rec, 0);
 		jnl_format_done = TRUE;
 	}
 	if (wildcard)
@@ -782,7 +779,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 	return PUT_SUCCESS;
 }
 
-void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
+void trigger_delete_all(mval *trigger_rec, uint4 *trig_stats)
 {
 	int			count;
 	sgmnt_addrs		*csa;
@@ -798,7 +795,6 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 	mval			trigger_count;
 	boolean_t		this_db_updated;
 	uint4			triggers_deleted;
-	mval			trigjrec;
 	boolean_t		jnl_format_done;
 	boolean_t		delete_required;
 	DCL_THREADGBL_ACCESS;
@@ -807,9 +803,6 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 	assert(0 < dollar_tlevel);
 	jnl_format_done = FALSE;
 	lgtrig_reg = NULL;
-	trigjrec.mvtype = MV_STR;
-	trigjrec.str.len = len;
-	trigjrec.str.addr = trigger_rec;
 	triggers_deleted = 0;
 	for (reg = gd_header->regions, reg_top = reg + gd_header->n_regions; reg < reg_top; reg++)
 	{
@@ -908,7 +901,7 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TRIGMODREGNOTRW, 2, REG_LEN_STR(reg));
 				if (!jnl_format_done && JNL_WRITE_LOGICAL_RECS(csa))
 				{
-					jnl_format(JNL_LGTRIG, NULL, &trigjrec, 0);
+					jnl_format(JNL_LGTRIG, NULL, trigger_rec, 0);
 					jnl_format_done = TRUE;
 				}
 				/* kill ^#t(curr_gbl_name); kills ^#t(curr_gbl_name,"#TRHASH") as well */
@@ -951,7 +944,7 @@ void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats)
 		assert(dollar_tlevel);
 		T_BEGIN_SETORKILL_NONTP_OR_TP(ERR_TRIGLOADFAIL);	/* needed to set update_trans TRUE on this region
 									 * even if NO db updates happen to ^#t nodes. */
-		jnl_format(JNL_LGTRIG, NULL, &trigjrec, 0);
+		jnl_format(JNL_LGTRIG, NULL, trigger_rec, 0);
 		jnl_format_done = TRUE;
 	}
 	if (triggers_deleted)

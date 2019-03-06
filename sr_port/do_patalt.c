@@ -17,7 +17,7 @@
 #include "copy.h"
 #include "patcode.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #endif
 
@@ -261,7 +261,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 				charlen = alt_tot_min;
 				bytelen = alt_tot_min;
 			}
-			UNICODE_ONLY(
+			UTF8_ONLY(
 			else
 			{	/* skip alt_tot_min characters */
 				strtmp = strptr;
@@ -273,14 +273,14 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 				bytelen = (int)(strtmp - strptr);
 			}
 			)
-			UNICODE_ONLY(
+			UTF8_ONLY(
 				if (gtm_utf8_mode)
 					alt_str.mvtype |= MV_UTF_LEN;	/* avoid recomputing "char_len" in do_pattern/do_patfixed */
 			)
 			for ( ; !match && (charlen <= alt_tot_max); charlen++)
 			{
 				alt_str.str.len = bytelen;
-				UNICODE_ONLY(
+				UTF8_ONLY(
 					if (gtm_utf8_mode)
 					{
 						assert(utf8_len(&alt_str.str) == charlen);
@@ -317,7 +317,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 				{	/* update "bytelen" to correspond to "charlen + 1" */
 					if (!gtm_utf8_mode)
 						bytelen++;
-					UNICODE_ONLY(
+					UTF8_ONLY(
 					else
 					{
 						assert((strtmp < strtop) || (charlen == alt_tot_max));

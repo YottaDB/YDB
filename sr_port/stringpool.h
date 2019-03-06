@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,7 +12,9 @@
 
 typedef struct
 {
-	unsigned char *base, *free, *top, *lasttop, prvprt, *invokestpgcollevel;
+	unsigned char *base, *free, *top, *lasttop, *invokestpgcollevel;
+	unsigned int gcols; /* some optimizations need to know if the stringpool garbage collected  */
+	unsigned char prvprt;
 } spdesc;
 
 void	stp_expand_array(void);

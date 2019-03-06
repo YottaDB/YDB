@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2017 Fidelity National Information		#
+# Copyright (c) 2013-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -31,8 +31,8 @@ CURDIR = `pwd`
 # Find out whether we are already in $gtm_dist/plugin/gtmcrypt directory.
 NOT_IN_GTMCRYPTDIR = $(shell [ "$(CURDIR)" = "$(GTMCRYPTDIR)" ] ; echo $$?)
 
-# Users may install GT.M without Unicode support
-HAVE_UNICODE = $(shell [ -d "$(DISTDIR)/utf8" ] ; echo $$?)
+# Users may install GT.M without utf8 support
+HAVE_UTF8 = $(shell [ -d "$(DISTDIR)/utf8" ] ; echo $$?)
 
 # Determine machine and OS type.
 UNAMESTR = $(shell uname -a)
@@ -211,7 +211,7 @@ ifeq ($(NOT_IN_GTMCRYPTDIR),1)
 	cp -pf *.sh *.m $(GTMCRYPTDIR)/
 	cp -f maskpass $(GTMCRYPTDIR)/
 endif
-ifeq ($(HAVE_UNICODE),0)
+ifeq ($(HAVE_UTF8),0)
 	@echo "UTF-8 mode library installation may fail if gtm_icu_version (${gtm_icu_version}) is not set"
 	(cd $(PLUGINDIR)/o/utf8 && env gtm_chset=UTF-8 ${gtm_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
 endif

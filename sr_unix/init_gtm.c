@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,6 +46,7 @@
 #include "show_source_line.h"
 #include "patcode.h"
 #include "collseq.h"
+#include "ztimeout_routines.h"
 
 GBLREF boolean_t	utf8_patnumeric;
 GBLREF int4		exi_condition;
@@ -78,6 +79,8 @@ GBLREF boolean_t	gtm_main_thread_id_set;
 GBLREF boolean_t	gtm_jvm_process;
 #endif
 GBLDEF boolean_t	gtm_startup_active = FALSE;
+GBLDEF void             (*ztimeout_action_ptr)(void) = ztimeout_action;
+GBLDEF void             (*ztimeout_clear_ptr)(void) = ztimeout_clear_timer;
 
 STATICFNDCL void assert_on_entry(int4 arg);
 

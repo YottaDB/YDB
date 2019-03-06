@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,25 +43,25 @@
 #include "gt_timers_add_safe_hndlrs.h"
 #include "zco_init.h"
 
-GBLREF command_qualifier	glb_cmd_qlf, cmd_qlf;
-GBLREF IN_PARMS			*cli_lex_in_ptr;
-GBLREF stack_frame	 	*frame_pointer;
-GBLREF unsigned char 		*stackbase,*stacktop,*stackwarn,*msp;
-GBLREF mv_stent			*mv_chain;
-GBLREF symval			*curr_symval;
 GBLREF boolean_t		run_time;
+GBLREF command_qualifier	cmd_qlf;
+GBLREF IN_PARMS		*cli_lex_in_ptr;
+GBLREF mident			module_name;
+GBLREF mv_stent		*mv_chain;
 GBLREF spdesc			rts_stringpool, stringpool;
+GBLREF stack_frame		*frame_pointer;
+GBLREF symval			*curr_symval;
+GBLREF unsigned char 		*msp, *stackbase, *stacktop, *stackwarn;
 
-int	gtm_compile (void)
+int	gtm_compile(void)
 {
+	boolean_t		more;
+	char			ceprep_file[MAX_FN_LEN + 1], list_file[MAX_FN_LEN + 1], obj_file[MAX_FN_LEN + 1];
+	char			source_file_string[MAX_FN_LEN + 1];
 	int			status;
-	unsigned short		len;
-	char			source_file_string[MAX_FBUFF + 1];
-	char			obj_file[MAX_FBUFF + 1], list_file[MAX_FBUFF + 1], ceprep_file[MAX_FBUFF + 1];
-	unsigned char		*mstack_ptr;
-	void 			gtm_ret_code();
-	command_qualifier	save_qlf;
 	mstr			orig_cmdstr;
+	unsigned char		*mstack_ptr;
+	unsigned short		len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -71,8 +71,8 @@ int	gtm_compile (void)
 	io_init(TRUE);
 	getjobnum();
 	getzdir();
-	run_time = FALSE;
-	TREF(compile_time) = TRUE;
+	run_time = TRUE;		/* This and the next seem odd, but called routines expect it */
+	TREF(compile_time) = FALSE;
 	mstack_ptr = (unsigned char *)malloc(USER_STACK_SIZE);
 	msp = stackbase = mstack_ptr + (USER_STACK_SIZE - SIZEOF(char *));
 	mv_chain = (mv_stent *)msp;
@@ -93,31 +93,26 @@ int	gtm_compile (void)
 	/* command qualifier processing stuff */
 	zco_init();
 	assert(cli_lex_in_ptr);
-	save_qlf = glb_cmd_qlf;
 	/* Save the original MUMPS command line qualifers. These are processed after, and take precedence over, $ZCOMPILE. */
 	orig_cmdstr.len = strlen(cli_lex_in_ptr->in_str) - strlen("MUMPS ");
 	orig_cmdstr.addr = (char *)malloc(orig_cmdstr.len);
 	memcpy(orig_cmdstr.addr, cli_lex_in_ptr->in_str + strlen("MUMPS "), orig_cmdstr.len);
-	INIT_CMD_QLF_STRINGS(cmd_qlf, obj_file, list_file, ceprep_file, MAX_FBUFF);
-	zl_cmd_qlf(&(TREF(dollar_zcompile)), &cmd_qlf);	/* Initialize $ZCOMPILE as default command qualifiers */
-	glb_cmd_qlf = cmd_qlf;
-	INIT_CMD_QLF_STRINGS(cmd_qlf, obj_file, list_file, ceprep_file, MAX_FBUFF);
-	zl_cmd_qlf(&orig_cmdstr, &cmd_qlf);		/* Next, process MUMPS command line qualifers */
+	INIT_CMD_QLF_STRINGS(cmd_qlf, obj_file, list_file, ceprep_file, MAX_FN_LEN);
+	len = module_name.len = 0;
+	zl_cmd_qlf(&(TREF(dollar_zcompile)), &cmd_qlf, source_file_string, &len, FALSE);	/* Init with default quals */
+	zl_cmd_qlf(&orig_cmdstr, &cmd_qlf, source_file_string, &len, TRUE);		/* Override with the actual qualifers */
 	free(orig_cmdstr.addr);
-	glb_cmd_qlf = save_qlf;
 	/* end command qualifier processing stuff */
 	ce_init();	/* initialize compiler escape processing */
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();	/* Not sure why compiler needs timers but .. */
 	TREF(dollar_zcstatus) = SS_NORMAL;
-	len = MAX_FBUFF;
-	for (status = cli_get_str("INFILE", source_file_string, &len);
-		status;
-		status = cli_get_str("INFILE", source_file_string, &len))
-	{
+	do {
 		compile_source_file(len, source_file_string, TRUE);
-		len = MAX_FBUFF;
-	}
+		cmd_qlf.object_file.str.len = module_name.len = 0;
+		len = MAX_FN_LEN;
+		status = cli_get_str("INFILE", source_file_string, &len);
+	} while (status);
 	print_exit_stats();
 	SET_PROCESS_EXITING_TRUE;	/* needed by remove_rms($principal) to avoid closing that */
 	io_rundown(NORMAL_RUNDOWN);

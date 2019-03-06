@@ -16,18 +16,20 @@
 # include "gtm_limits.h"
 # include "parse_file.h"	/* for MAX_FBUFF */
 
-/* Input RTNNAME is derived from an object file name and we need to convert it to a proper routine name.
+/* Input RTNNAME is derived from a file name and we need to convert it to a proper routine name.
  * a) It is possible we got a '_' as the first character in case of a % routine. But the actual routine name stored in
- *	that object file would have '%' as the first character. Fix that.
+ *	that object file would have '%' as the first character. Fix that along with removing any .m extension
  * b) Also limit routine name length to MAX_MIDENT_LEN (internal design max). Ignore the rest of the file name.
  */
-#define	CONVERT_FILENAME_TO_RTNNAME(RTNNAME)		\
-{							\
-	if ('_' == RTNNAME.addr[0])			\
-		RTNNAME.addr[0] = '%';			\
-	if (MAX_MIDENT_LEN < RTNNAME.len)		\
-		RTNNAME.len = MAX_MIDENT_LEN;		\
-}
+#define	CONVERT_FILENAME_TO_RTNNAME(RTNNAME)					\
+MBSTART {									\
+	if ('_' == RTNNAME.addr[0])						\
+		RTNNAME.addr[0] = '%';						\
+	if (!MEMCMP_LIT(&RTNNAME.addr[RTNNAME.len - SIZEOF(DOTM) + 1],DOTM))	\
+		RTNNAME.len -= (SIZEOF(DOTM) - 1);				\
+	if (MAX_MIDENT_LEN < RTNNAME.len)					\
+		RTNNAME.len = MAX_MIDENT_LEN;					\
+} MBEND
 
 #define	COMPUTE_RELINKCTL_HASH(RTNNAME, RTNHASH, RELINKCTL_HASH_BUCKETS)	\
 {										\

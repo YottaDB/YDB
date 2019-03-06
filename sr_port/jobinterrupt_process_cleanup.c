@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,8 +27,7 @@
 #include "jobinterrupt_process_cleanup.h"
 
 GBLREF stack_frame		*frame_pointer;
-GBLREF spdesc			stringpool;
-GBLREF spdesc			rts_stringpool;
+GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
 GBLREF unsigned short		proc_act_type;
 GBLREF volatile boolean_t	dollar_zininterrupt;
 GBLREF mval			dollar_zstatus;
@@ -49,10 +49,11 @@ void jobinterrupt_process_cleanup(void)
 	assert((SFT_COUNT | SFT_ZINTR) == proc_act_type);
 	assert(dollar_zininterrupt);
 	if (TREF(compile_time))
-	{	/* Make sure we are using the right stringpool */
 		TREF(compile_time) = FALSE;
-		if (stringpool.base != rts_stringpool.base)
-			stringpool = rts_stringpool;
+	if (stringpool.base != rts_stringpool.base)
+	{	/* Make sure we are using the right stringpool */
+		indr_stringpool = stringpool;
+		stringpool = rts_stringpool;
 	}
 	proc_act_type = 0;
 	/* Note, no frames are unwound as in trans_code_cleanup() because we should be

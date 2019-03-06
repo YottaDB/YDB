@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,9 +44,8 @@ error_def(ERR_CTRLC);
 mlk_shrblk_ptr_t mlk_shrblk_sort(mlk_shrblk_ptr_t head);
 
 bool	lke_cleartree(
-		      gd_region		*region,
+		      mlk_pvtctl_ptr_t	pctl,
 		      struct CLB	*lnk,
-		      mlk_ctldata_ptr_t	ctl,
 		      mlk_shrblk_ptr_t	tree,
 		      bool		all,
 		      bool		interactive,
@@ -75,8 +74,8 @@ bool	lke_cleartree(
 		locks |= locked;
 
 		/* If it was locked, clear it and wake up any processes waiting for it */
-		if (locked  &&  lke_clearlock(region, lnk, ctl, node, &name, all, interactive, pid)  &&  node->pending != 0)
-			mlk_wake_pending(ctl, node, region);
+		if (locked  &&  lke_clearlock(pctl, lnk, node, &name, all, interactive, pid)  &&  node->pending != 0)
+			mlk_wake_pending(pctl, node);
 
 		/* if a specific lock was requested (-EXACT and -LOCK=), then we are done */
 		if (exact && (0 != one_lock.len) && locked)
@@ -95,16 +94,16 @@ bool	lke_cleartree(
 				{
 					/* We're already at the top, so we're done */
 					assert(depth == 0);
-					(void)mlk_shrblk_delete_if_empty(ctl, node);
+					(void)mlk_shrblk_delete_if_empty(pctl, node);
 					return locks;
 				}
 				--depth;
 				node = (mlk_shrblk_ptr_t)R2A(node->parent);
-				(void)mlk_shrblk_delete_if_empty(ctl, oldnode);
+				(void)mlk_shrblk_delete_if_empty(pctl, oldnode);
 				oldnode = node;
 				node = (mlk_shrblk_ptr_t)R2A(node->rsib);
 			}
-			deleted = mlk_shrblk_delete_if_empty(ctl, oldnode);
+			deleted = mlk_shrblk_delete_if_empty(pctl, oldnode);
 			if (deleted  &&  start[depth] == oldnode)
 				start[depth] = node;
 		}
@@ -117,6 +116,6 @@ bool	lke_cleartree(
 			subscript_offset[depth] = name.len;
 		}
 		if (util_interrupt)
-			rts_error_csa(CSA_ARG(REG2CSA(region)) VARLSTCNT(1) ERR_CTRLC);
+			rts_error_csa(CSA_ARG(pctl->csa) VARLSTCNT(1) ERR_CTRLC);
 	}
 }

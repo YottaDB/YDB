@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -261,7 +261,7 @@ XFER(xf_fnzpopulation, op_fnzpopulation),
 XFER(xf_fnzpiece, op_fnzpiece),
 XFER(xf_fnzp1, op_fnzp1),
 XFER(xf_fnztranslate, op_fnztranslate),
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 XFER(xf_fnzconvert2, op_fnzconvert2),
 XFER(xf_fnzconvert3, op_fnzconvert3),
 #endif
@@ -315,4 +315,6 @@ XFER(xf_zrupdate, op_zrupdate),
 XFER(xf_currhd, op_currhd),
 #endif
 XFER(xf_fnzcollate, op_fnzcollate),
-XFER(xf_fnzatransform, op_fnzatransform)
+XFER(xf_fnzatransform, op_fnzatransform),
+XFER(xf_fnztranslate_fast, op_fnztranslate_fast),
+XFER(xf_fntranslate_fast, op_fntranslate_fast)

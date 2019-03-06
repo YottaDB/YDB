@@ -92,6 +92,12 @@ THREADGBLDEF(xecute_literal_parse,		boolean_t)			/* flag TRUE when trying what i
 /* Database */
 THREADGBLDEF(dbinit_max_delta_secs,		uint4)				/* max time before we bail out in db_init */
 THREADGBLDEF(dollar_zmaxtptime, 		int4)				/* tp timeout in seconds */
+THREADGBLDEF(ztimeout_deferred,			boolean_t)			/* ztimeout occured but was deferred */
+THREADGBLDEF(in_ztimeout,			boolean_t)
+THREADGBLDEF(ztimeout_set_xfer,			volatile boolean_t)		/* A ztimeout set the xfer table intercepts */
+THREADGBLDEF(dollar_ztimeout,			dollar_ztimeout_struct)
+THREADGBLDEF(save_xfer_root,			volatile save_xfer_entry*)	 /*  *= NULL;*/
+THREADGBLDEF(save_xfer_tail,			volatile save_xfer_entry*) 	/*= NULL;*/
 THREADGBLDEF(donot_write_inctn_in_wcs_recover,	boolean_t)			/* TRUE if wcs_recover should NOT write INCTN */
 THREADGBLDEF(gbuff_limit,			mval)				/* holds a GTM_POOLLIMIT value for REORG or DBG */
 THREADGBLDEF(gd_targ_tn,			trans_num)			/* number that is incremented for every gvcst_spr*
@@ -190,6 +196,7 @@ THREADGBLAR1DEF(tp_fail_hist_reg,		gd_region *,	(CDB_MAX_TRIES))/* array for TP 
 THREADGBLDEF(transform,				boolean_t)			/* flag collation transform eligible */
 THREADGBLDEF(wcs_recover_done,			boolean_t)			/* TRUE if wcs_recover was ever invoked in this
 										 * process. */
+THREADGBLDEF(statsdb_fnerr_reason,		int)				/* Failure code for "gvcst_set_statsdb_fname" */
 
 /* Local variables */
 THREADGBLDEF(curr_symval_cycle,			unsigned int)			/* When curr_symval is changed, counter is bumped */
@@ -304,7 +311,6 @@ THREADGBLDEF(gtm_autorelink_keeprtn,		boolean_t)			/* do not let go of objects i
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
 THREADGBLDEF(parm_pool_ptr,			parm_pool *)			/* Pointer to the parameter pool */
 THREADGBLDEF(parms_cnt,                         unsigned int)                   /* Parameters count */
-THREADGBLDEF(statsdb_fnerr_reason,		int)				/* Failure code for "gvcst_set_statsdb_fname" */
 THREADGBLAR1DEF(zpeek_regname,			char,		NAME_ENTRY_SZ)	/* Last $ZPEEK() region specified */
 THREADGBLDEF(zpeek_regname_len,			int)				/* Length of zpeekop_regname */
 THREADGBLDEF(zpeek_reg_ptr,			gd_region *)			/* Resolved pointer for zpeekop_regname */
@@ -353,13 +359,13 @@ THREADGBLAR1DEF(parm_ary,                       char *,         MAX_PARMS)      
 THREADGBLAR1DEF(parm_ary_len,                   int,            MAX_PARMS)      /* Array element allocation length */
 THREADGBLAR1DEF(parm_str_len,                   int,            MAX_PARMS)      /* Parameter strings lengths */
 THREADGBLAR1DEF(prombuf,			char,	(MAX_MIDENT_LEN + 1))	/* The prompt buffer size (32) would allow at
-										 * least 8 Unicode characters, but since most
-										 * commonly used Unicode characters only occupy up
+										 * least 8 UTF8 characters, but since most
+										 * commonly used UTF8 characters only occupy up
 										 * to 3 bytes, the buffer would at least
-										 * accommodate 10 Unicode characters in a prompt */
+										 * accommodate 10 UTF8 characters in a prompt */
 THREADGBLAR1DEF(tmp_object_file_name,		char,	GTM_PATH_MAX)		/* Hold temporary object name across routines */
 THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_restart dbg storage of restart history */
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 THREADGBLDEF(utfcgra,				utfcgr_area)			/* Lookaside cache for UTF8 parsing */
 #endif
 THREADGBLDEF(utfcgr_string_lookmax,		int)				/* How many times to look for unreferenced slot */

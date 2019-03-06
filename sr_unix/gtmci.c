@@ -57,7 +57,7 @@
 # include "gv_trigger.h"
 # include "gtm_trigger.h"
 #endif
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
 # include "gtm_conv.h"
@@ -76,6 +76,7 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
+#include "gtm_permissions.h"
 
 #if defined(__x86_64__)
 extern	void	opp_ciret();
@@ -498,7 +499,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 					CHECK_FOR_RET_TYPE_MISMATCH(i, 7, *arg_types);
 					MV_FORCE_STR(arg_ptr);
 					/* Since the ci_gateway.c code temporarily switches the character following the string's
-					 * content in memory to '\0' (for generation of a proper Unicode string), ensure that the
+					 * content in memory to '\0' (for generation of a proper UTF string), ensure that the
 					 * whole string resides in the stringpool, and that we do have that one byte to play with.
 					 */
 					if (!IS_IN_STRINGPOOL(arg_ptr->str.addr, arg_ptr->str.len))
@@ -1034,6 +1035,7 @@ int gtm_init()
 	char			gtmsecshr_path[GTM_PATH_MAX];
 	int			gtmsecshr_path_len;
 	struct stat		stat_buf;
+	char			file_perm[MAX_PERM_LEN];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1055,7 +1057,7 @@ int gtm_init()
 	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
 		common_startup_init(GTM_IMAGE);
 		err_init(stop_image_conditional_core);
-		UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
+		UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 		/* Ensure that $gtm_dist exists */
 		if (NULL == (dist = (char *)GETENV(GTM_DIST)))
@@ -1078,7 +1080,12 @@ int gtm_init()
 					LEN_AND_LIT("stat for $gtm_dist/gtmsecshr"), CALLFROM, errno);
 		/* Ensure that the call-in can execute $gtm_dist/gtmsecshr. This not sufficient for security purposes */
 		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
+		{
+			SNPRINTF(file_perm, SIZEOF(file_perm), "%04o", stat_buf.st_mode & PERMALL);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GTMSECSHRPERM, 5,
+					gtmsecshr_path_len, gtmsecshr_path,
+					RTS_ERROR_STRING(file_perm), stat_buf.st_uid);
+		}
 		else
 		{	/* $gtm_dist validated */
 			gtm_dist_ok_to_use = TRUE;

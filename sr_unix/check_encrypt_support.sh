@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-# Copyright (c) 2009-2016 Fidelity National Information		#
+# Copyright (c) 2009-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -83,7 +83,7 @@ send_mail()
 hostos=`uname -s`
 hostname=`uname -n | awk -F. '{print $1}'`
 machtype=`uname -m`
-server_list="$cms_tools/server_list"
+server_list="$btc_tools/server_list.csh"
 this_host_noencrypt="FALSE"
 if [ -f $server_list ]; then
 	eval `/usr/local/bin/tcsh -efc "

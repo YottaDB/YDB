@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -111,29 +111,3 @@
 /* Function prototypes */
 boolean_t	grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs);
 void		rel_latch(sm_global_latch_ptr_t latch);
-
-/* macros to grab and release a critical section (either shared with DB or not) for LOCK operations */
-#define GRAB_LOCK_CRIT(CSA, REGION, RET_WAS_CRIT)						\
-MBSTART {											\
-	if (CSA->lock_crit_with_db)								\
-	{											\
-		if (CSA->critical)								\
-			crash_count = CSA->critical->crashcnt;					\
-		if (!(RET_WAS_CRIT = CSA->now_crit))		/* WARNING assignment */	\
-			grab_crit(REGION);							\
-	} else											\
-	{	/* Return value of "grab_latch" does not need to be checked because we pass	\
-		 * in GRAB_LATCH_INDEFINITE_WAIT as the timeout.				\
-		 */										\
-		grab_latch(&CSA->nl->lock_crit, GRAB_LATCH_INDEFINITE_WAIT);			\
-	}											\
-} MBEND
-#define REL_LOCK_CRIT(CSA, REGION, WAS_CRIT)							\
-MBSTART {											\
-	if (CSA->lock_crit_with_db)								\
-	{											\
-		if (!WAS_CRIT)									\
-			rel_crit(REGION);							\
-	} else											\
-		rel_latch(&CSA->nl->lock_crit);							\
-} MBEND

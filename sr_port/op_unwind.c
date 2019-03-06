@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,11 @@
 #ifdef GTM_TRIGGER
 # include "gtm_trigger_trc.h"
 #endif
+#include "xfer_enum.h"
+#include "deferred_events.h"
+#include "deferred_events_queue.h"
+#include "ztimeout_routines.h"
+#include "jobinterrupt_event.h"
 
 GBLREF	void			(*unw_prof_frame_ptr)(void);
 GBLREF	stack_frame		*frame_pointer, *zyerr_frame;
@@ -61,7 +66,10 @@ error_def(ERR_TPQUIT);
 void op_unwind(void)
 {
 	rhdtyp			*rtnhdr;
-	mv_stent 		*mvc;
+	mv_stent		*mvc;
+	int4			event_type, param_val;
+	void (*set_fn)(int4 param);
+
 	DBGEHND_ONLY(stack_frame *prevfp;)
 	DCL_THREADGBL_ACCESS;
 
@@ -134,7 +142,25 @@ void op_unwind(void)
 	 * our error state. If we have a deferred timeout and none of the deferral conditions are anymore in effect, release
 	 * the hounds.
 	 */
-	if (tp_timeout_deferred UNIX_ONLY(&& !dollar_zininterrupt) && ((0 == dollar_ecode.index) || !(ETRAP_IN_EFFECT)))
-		tptimeout_set(0);
+	if ((TREF(save_xfer_root)))
+	{
+		/*If TP timeout or ztimeout , check conditions before popping out */
+		if (((TREF(save_xfer_root))->set_fn == tptimeout_set) || ((TREF(save_xfer_root))->set_fn == ztimeout_set))
+		{
+			if ((tp_timeout_deferred || TREF(ztimeout_deferred))
+				UNIX_ONLY(&& !dollar_zininterrupt) && ((0 == dollar_ecode.index)
+									|| !(ETRAP_IN_EFFECT)))
+			{
+				DBGDFRDEVNT((stderr, "op_unwind1: Calling pop_reset_xfer from op_unwind\n"));
+				POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
+				xfer_set_handlers(event_type, set_fn, param_val, TRUE);
+			}
+		} else if (((TREF(save_xfer_root))->set_fn == jobinterrupt_set) UNIX_ONLY(&& !dollar_zininterrupt))
+		{
+			DBGDFRDEVNT((stderr, "op_unwind2: Calling pop_reset_xfer from op_unwind\n"));
+			POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
+			xfer_set_handlers(event_type, set_fn, param_val, TRUE);
+		}
+	}
 	return;
 }

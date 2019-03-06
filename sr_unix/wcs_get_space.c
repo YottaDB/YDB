@@ -57,21 +57,23 @@ error_def(ERR_GBLOFLOW);
 #define	WCS_CONFLICT_TRACE_ARRAYSIZE	64
 #define	LCNT_INTERVAL			DIVIDE_ROUND_UP(UNIX_GETSPACEWAIT, WCS_CONFLICT_TRACE_ARRAYSIZE)
 
-#define WCS_GET_SPACE_RETURN_FAIL(TRACEARRAY, CR)								\
-{														\
-	/* A failure occurred. Ignored for WB test case */							\
-	assert(FALSE || (gtm_white_box_test_case_enabled							\
-				&& ((WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)		\
-					|| (WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)		\
-					|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number))));	\
-	get_space_fail_cr = CR;											\
-	get_space_fail_array = TRACEARRAY;									\
-	if (TREF(gtm_environment_init) DEBUG_ONLY(&& !(gtm_white_box_test_case_enabled				\
-				&& ((WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)		\
-					|| (WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)		\
-					|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number)))))	\
-		gtm_fork_n_core();	/* take a snapshot in case running in-house */				\
-	return FALSE;												\
+#define WCS_GET_SPACE_RETURN_FAIL(TRACEARRAY, CR)									\
+{															\
+	/* A failure occurred. Ignored for WB test case */								\
+	assert(FALSE || (gtm_white_box_test_case_enabled								\
+				&& ((WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)			\
+					|| (WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)			\
+					|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number)			\
+					|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == gtm_white_box_test_case_number))));	\
+	get_space_fail_cr = CR;												\
+	get_space_fail_array = TRACEARRAY;										\
+	if (TREF(gtm_environment_init) DEBUG_ONLY(&& !(gtm_white_box_test_case_enabled					\
+				&& ((WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)			\
+					|| (WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)			\
+					|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number))			\
+					|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == gtm_white_box_test_case_number))))	\
+		gtm_fork_n_core();	/* take a snapshot in case running in-house */					\
+	return FALSE;													\
 }
 
 #define GET_IO_LATCH_PID(CSA)		(CSA->jnl ? CSA->jnl->jnl_buff->io_in_prog_latch.u.parts.latch_pid : -1)
@@ -81,7 +83,7 @@ error_def(ERR_GBLOFLOW);
 {																\
 	int4	io_latch_pid, fsync_latch_pid;											\
 																\
-	if (CR->epid)														\
+	if (CR && CR->epid)													\
 	{															\
 		GET_C_STACK_FROM_SCRIPT("WCS_GET_SPACE_RETURN_FAIL_CR", process_id, CR->epid, STUCK_CNT);			\
 	}															\
@@ -178,7 +180,10 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 				return TRUE;
 			BG_TRACE_ANY(csa, bufct_buffer_flush_loop);
 		}
-		if (cnl->wc_in_free >= needed)
+		if (cnl->wc_in_free >= needed DEBUG_ONLY( && !(gtm_white_box_test_case_enabled
+						&& ((WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == gtm_white_box_test_case_number)
+							&& (0 == gtm_white_box_test_case_count++))))
+				)
 			return TRUE;
 	} else
 	{	/* Wait for a specific buffer to be flushed. */
@@ -295,7 +300,8 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_WAITDSKSPACE, 4, process_id, to_wait, DB_LEN_STR(reg), save_errno);
 	else
 		assert((WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)
-			|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number));
+			|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number)
+			|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == gtm_white_box_test_case_number));
 	INVOKE_C_STACK_APPROPRIATE(cr, csa, 2);
 	WCS_GET_SPACE_RETURN_FAIL(wcs_conflict_trace, cr);
 }

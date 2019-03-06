@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2017 Fidelity National Information		#
+# Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -100,8 +100,10 @@ else
 endif
 
 source $gtm_tools/set_library_path.csh
-source $gtm_tools/check_unicode_support.csh
-if (! -e $gtm_dist/utf8) mkdir $gtm_dist/utf8
+source $gtm_tools/check_utf8_support.csh
+if ("TRUE" == "$is_utf8_support") then
+	if (! -e $gtm_dist/utf8) mkdir $gtm_dist/utf8
+endif
 # Build and install all encryption libraries and executables.
 env LC_ALL=$utflocale $make install algo=$algorithm image=$plugin_build_type thirdparty=$encryption_lib
 if ($status) then

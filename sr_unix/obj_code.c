@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -357,7 +357,7 @@ STATICFNDEF void cg_lab(mlabel *mlbl, char *do_emit)
 											/* Offset into lnr table */
 			lent.has_parms = (NO_FORMALLIST != mlbl->formalcnt);		/* Flag to indicate any formallist */
 			GTM64_ONLY(lent.filler = 0);					/* Remove garbage due so hashes well */
-			UNICODE_ONLY(lent.lab_name.char_len = 0);			/* .. ditto .. */
+			UTF8_ONLY(lent.lab_name.char_len = 0);			/* .. ditto .. */
 			emit_immed((char *)&lent, SIZEOF(lent));
 		} else
 		{	/* 1st pass, do the definition but no emissions */

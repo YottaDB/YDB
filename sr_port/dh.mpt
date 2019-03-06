@@ -20,13 +20,22 @@
 INT	n %DL
 	r !,"Decimal: ",%DH r !,"Digits:  ",%DL s %DH=$$FUNC(%DH,%DL)
 	q
+FUNCFM(d,l)
+	q:d=0 $e("00000000",1,l)
+	n h
+	s h=""
+	f  q:'d  s h=$e("0123456789ABCDEF",d#16+1)_h,d=d\16
+	q $e("00000000",1,l-$l(h))_h
 FUNC(d,l)
 	n isn,i,h,apnd
 	s:'$l($g(l)) l=8
 	s isn=0,i=0,h="",apnd="0"
 	if d["-" do
 	. s isn=1,d=$extract(d,2,$length(d))
-	s h=$$CONVERTBASE^%CONVBASEUTIL(d,10,16)
+	if ($l(d)<18) do
+	. s h=$$FUNCFM(d,l)
+	else  do
+	. s h=$$CONVERTBASE^%CONVBASEUTIL(d,10,16)
 	if (isn&(h'="0")) do
 	. s h=$$CONVNEG^%CONVBASEUTIL(h,16)
 	. s apnd="F"

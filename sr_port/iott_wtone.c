@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +13,7 @@
 #include "mdef.h"
 
 #include "io.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #endif
 
@@ -24,20 +25,20 @@ void iott_wtone(int v)
 {
 	mstr	temp;
 	char	p[1];
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	unsigned char	utf_buf[GTM_MB_LEN_MAX], *up;
 #endif
 	io_desc	*iod;
-	UNICODE_ONLY(error_def(ERR_BADCHSET);)
+	UTF8_ONLY(error_def(ERR_BADCHSET);)
 
-	if (!gtm_utf8_mode UNICODE_ONLY(|| CHSET_M == io_curr_device.out->ochset))
+	if (!gtm_utf8_mode UTF8_ONLY(|| CHSET_M == io_curr_device.out->ochset))
 	{
 		p[0] = (char)v;
 		temp.len = 1;
 		temp.addr = p;
-		UNICODE_ONLY(temp.char_len = 1;)
+		UTF8_ONLY(temp.char_len = 1;)
 	}
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	else if (CHSET_UTF8 == io_curr_device.out->ochset)
 	{
 		up = UTF8_WCTOMB(v, utf_buf);

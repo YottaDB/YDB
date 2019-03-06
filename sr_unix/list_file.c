@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,14 +25,17 @@
 
 #define LISTEXT ".lis"
 
-GBLREF int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
+GBLREF char		rev_time_buf[], source_file_name[];
 GBLREF command_qualifier cmd_qlf;
-GBLREF mident		module_name;
-GBLREF io_pair 		io_curr_device;
+GBLREF int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
+GBLREF io_pair		io_curr_device;
 GBLREF list_params 	lst_param;
-GBLREF char rev_time_buf[20];
+GBLREF mident		module_name;
+GBLREF unsigned short	source_name_len;
 
-LITREF	mval		literal_zero;
+LITREF char		gtm_release_name[];
+LITREF int4		gtm_release_name_len;
+LITREF mval		literal_zero;
 
 static char print_time_buf[20];
 static io_pair dev_in_use;
@@ -62,22 +65,23 @@ static readonly struct
 
 void open_list_file(void)
 {
-	char charspace;
-	uint4  status;
-	char		*p, list_name[MAX_MIDENT_LEN + STR_LIT_LEN(LISTEXT)], fname[MAX_FBUFF + 1];
-	mval		parms;
-	mval		file;
+	char		charspace, cp, fname[MAX_FBUFF + 1], list_name[MAX_MIDENT_LEN + STR_LIT_LEN(LISTEXT)], *p;
 	mstr		fstr;
+	mval		file, parms;
 	parse_blk	pblk;
 	time_t		clock;
+	uint4		status;
 
 	lst_param.list_line = 1;
 	lst_param.page = 0;
 
 	memset(&pblk, 0, SIZEOF(pblk));
-	assert(module_name.len <= MAX_MIDENT_LEN);
-	pblk.def1_size = module_name.len;
-	memcpy(&list_name[0], module_name.addr, pblk.def1_size);
+	for (cp = source_name_len - 1; cp && ('/' != source_file_name[cp]); cp--)
+		;	/* scan back from the end to find the source file name */
+	cp += cp ? 1 : 0;
+	pblk.def1_size = source_name_len - cp - SIZEOF(DOTM) + 1;
+	assert(pblk.def1_size <= MAX_MIDENT_LEN);
+	memcpy(list_name, &source_file_name[cp], pblk.def1_size);
 	MEMCPY_LIT(&list_name[pblk.def1_size], LISTEXT);
 	pblk.def1_size += STR_LIT_LEN(LISTEXT);
 	pblk.def1_buf = list_name;
@@ -121,32 +125,6 @@ void close_list_file(void)
 	op_close(&list_file, &param);
 	io_curr_device = dev_in_use;
 }
-
-
-void list_cmd(void)
-{
-	unsigned short cmd_len;
-	unsigned char cmd_line[256];
-	static readonly unsigned char command_line[] =		"COMMAND LINE";
-	static readonly unsigned char command_line_under[] =	"-----------------";
-
-/*	if (lib$get_foreign(&d_cmd, 0, &cmd_len) == SS$_NORMAL)
-	{
-		list_line(command_line);
-		list_line(command_line_under);
-		cmd_line[cmd_len]='\0';
-		list_line(cmd_line);
-	}
-*/
-}
-
-
-LITREF char gtm_release_name[];
-LITREF int4 gtm_release_name_len;
-
-GBLREF char source_file_name[];
-GBLREF unsigned short source_name_len;
-GBLREF char rev_time_buf[];
 
 void list_head(bool newpage)
 {

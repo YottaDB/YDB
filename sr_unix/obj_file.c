@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@ GBLREF mliteral		literal_chain;
 GBLREF char		source_file_name[];
 GBLREF unsigned short	source_name_len;
 GBLREF mident		routine_name;
-GBLREF spdesc		stringpool;
+GBLREF spdesc		rts_stringpool, stringpool;
 GBLREF int4		linkage_size;
 GBLREF uint4		lnkrel_cnt;	/* number of entries in linkage Psect to relocate */
 GBLREF int4		sym_table_size;
@@ -115,6 +115,7 @@ void emit_immed(char *source, uint4 size)
 
 	if (run_time)
 	{
+		assert(rts_stringpool.base == stringpool.base);
 		if (!IS_STP_SPACE_AVAILABLE_PRO(size))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STRINGOFLOW);
 		memcpy(stringpool.free, source, size);

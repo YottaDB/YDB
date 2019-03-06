@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,8 +46,8 @@ GBLREF	int	c_clear;			/* cleared due to (possible) value change */
 #endif
 
 /* The delimiter argument to op_fnp1, opfnzp1, op_setp1, and op_setzp1 is
- * passed as an integer but contains 1-4 chars (zero filled). The unicode
- * versions are interested in all of them but the non-unicode versions are
+ * passed as an integer but contains 1-4 chars (zero filled). The UTF
+ * versions are interested in all of them but the non-UTF versions are
  * only interested in the first char.
  */
 typedef union
@@ -62,7 +62,7 @@ typedef struct fnpc_struct
 	int		delim;				/* delimiter used in $[z]piece */
 	int		npcs;				/* Number of pieces for which values are filled in */
 	int		indx;				/* The index of this piece */
-	boolean_t	byte_oriented;			/* True if byte oriented; False if (unicode) char oriented */
+	boolean_t	byte_oriented;			/* True if byte oriented; False if (UTF) char oriented */
 	unsigned int	pstart[FNPC_ELEM_MAX + 1];	/* Where each piece starts (last elem holds end of last piece) */
 } fnpc;
 

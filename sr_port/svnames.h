@@ -89,6 +89,7 @@ enum
 	SV_ZUT,			/* 74 */
 	SV_ZSTRPLLIM,		/* 75 */
 	SV_ZRELDATE,		/* 76 */
+	SV_ZTIMEOUT,		/* 77 */
 	SV_NUM_SV,		/* count - should be next to last SV entry just prior to dummy entry below */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +14,7 @@
 #define LKE_GETCLI_H
 
 int4 lke_getcli(bool *all, bool *wait, bool *inta, int4 *pid, mstr *region, mstr *node,
-	mstr *one_lock, bool *memory, bool *nocrit, boolean_t *exact);
+	mstr *one_lock, bool *memory, bool *nocrit, boolean_t *exact, int *repeat, boolean_t *integ);
 int lke_getki(char* src, int srclen, char* outptr);
 
 #ifdef VMS

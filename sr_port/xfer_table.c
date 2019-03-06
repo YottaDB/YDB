@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,8 +20,8 @@ int
 ;
 #undef XFER
 
-#ifndef UNICODE_SUPPORTED
-/* Call "z" counterparts for non-unicode flavor of these functions on unsupported platforms */
+#ifndef UTF8_SUPPORTED
+/* Call "z" counterparts for non-utf8 flavor of these functions on unsupported platforms */
 
 #define op_fnascii op_fnzascii
 #define op_fnchar op_fnzchar

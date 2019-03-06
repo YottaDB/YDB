@@ -34,7 +34,7 @@ typedef uint2 mach_inst;
 #define INT8_SUPPORTED
 #define	INT8_FMT		"%llu"
 #define	INT8_FMTX		"[0x%llx]"
-#define UNICODE_SUPPORTED
+#define UTF8_SUPPORTED
 
 #define UNIX 1
 #undef VMS
@@ -113,8 +113,8 @@ typedef unsigned short	in_port_t;
 #endif
 
 #ifdef __CYGWIN__
-#ifdef UNICODE_SUPPORTED_OBEYED
-#undef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED_OBEYED
+#undef UTF8_SUPPORTED
 #endif
 #define MUTEX_MSEM_WAKE
 #define POSIX_MSEM
@@ -203,7 +203,7 @@ typedef struct
 	unsigned char	sgn	: 1;
 #	endif
 	unsigned char	fnpc_indx;	/* Index to fnpc_work area this mval is using */
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	unsigned int	utfcgr_indx;	/* Index to utfcgr_work area this mval is using */
 	NON_GTM64_ONLY(unsigned int filler2;) /* To 8 byte align mval on 32 bit platforms */
 #	endif
@@ -216,7 +216,7 @@ typedef struct
 	unsigned short	mvtype;
 	unsigned char	sgne;
 	unsigned char	fnpc_indx;	/* Index to fnpc_work area this mval is using */
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	unsigned int	utfcgr_indx;	/* Index to utfcgr_work area this mval is using */
 	NON_GTM64_ONLY(unsigned int filler2;) /* To 8 byte align mval on 32 bit platforms */
 #	endif

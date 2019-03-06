@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,6 +9,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#include <sys/shm.h>
 
 #include "mdef.h"
 #include "gdsroot.h"
@@ -26,6 +28,7 @@
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "t_retry.h"
+#include "mlk_ops.h"
 #include "mlk_shrblk_delete_if_empty.h"
 #include "mlk_tree_wake_children.h"
 #include "mlk_unlock.h"
@@ -34,6 +37,7 @@
 #include "min_max.h"
 #include "interlock.h"
 #include "rel_quant.h"
+#include "do_shmat.h"
 
 GBLREF	int4 		process_id;
 GBLREF	short		crash_count;
@@ -47,23 +51,23 @@ void mlk_unlock(mlk_pvtblk *p)
 	int			status;
 	mlk_shrblk_ptr_t	d, pnt;
 	mlk_ctldata_ptr_t	ctl;
-	bool			stop_waking, was_crit;
+	boolean_t		stop_waking, was_crit;
 	sgmnt_addrs		*csa;
 	float			ls_free;	/* Free space in bottleneck subspace */
 
-	if (p->region->dyn.addr->acc_meth != dba_usr)
+	if (p->pvtctl.region->dyn.addr->acc_meth != dba_usr)
 	{
-		ctl = p->ctlptr;
+		ctl = p->pvtctl.ctl;
 		assert((ctl->max_blkcnt > 0) && (ctl->max_prccnt > 0) && ((ctl->subtop - ctl->subbase) > 0));
-		csa = &FILE_INFO(p->region)->s_addrs;
+		csa = p->pvtctl.csa;
 		d = p->nodptr;
 		if (dollar_tlevel)
 		{
 			assert((CDB_STAGNATE > t_tries) || csa->now_crit || !csa->lock_crit_with_db);
 			/* make sure this region is in the list in case we end up retrying */
-			insert_region(p->region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
+			insert_region(p->pvtctl.region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 		}
-		GRAB_LOCK_CRIT(csa, p->region, was_crit);
+		GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
 		if (d->owner == process_id && p->sequence == d->sequence)
 		{
 			d->owner = 0;
@@ -73,25 +77,25 @@ void mlk_unlock(mlk_pvtblk *p)
 			 * for comments on why, see comments about d->owner in mlk_wake_pending.c
 			 */
 			stop_waking = (d->children && !d->owner)
-						? mlk_tree_wake_children(ctl, (mlk_shrblk_ptr_t)R2A(d->children), p->region)
+						? mlk_tree_wake_children(&p->pvtctl, (mlk_shrblk_ptr_t)R2A(d->children))
 						: FALSE;
 			for ( ; d ; d = pnt)
 			{
 				pnt = ((d->parent) ? (mlk_shrblk_ptr_t)R2A(d->parent) : 0);
 				if (!stop_waking && d->pending && !d->owner)
 				{
-					mlk_wake_pending(ctl, d, p->region);
+					mlk_wake_pending(&p->pvtctl, d);
 					stop_waking = TRUE;
 				} else
-					mlk_shrblk_delete_if_empty(ctl, d);
+					mlk_shrblk_delete_if_empty(&p->pvtctl, d);
 			}
 		}
 		/* Find the ratio of least free subspace. Here we intentionally ignore shr_sub_len to keep unlock lightweight. */
 		ls_free = MIN(((float)ctl->blkcnt) / ctl->max_blkcnt, ((float)ctl->prccnt) / ctl->max_prccnt);
 		if (ls_free >= LOCK_SPACE_FULL_SYSLOG_THRESHOLD)
-			csa->nl->lockspacefull_logged = FALSE; /* Allow syslog writes if enough free space is established. */
-		REL_LOCK_CRIT(csa, p->region, was_crit);
+			ctl->lockspacefull_logged = FALSE; /* Allow syslog writes if enough free space is established. */
+		REL_LOCK_CRIT(p->pvtctl, was_crit);
 	} else	/* acc_meth == dba_usr */
-		gvusr_unlock(p->nref_length, &p->value[0], p->region);
+		gvusr_unlock(p->nref_length, &p->value[0], p->pvtctl.region);
 	return;
 }

@@ -447,7 +447,7 @@ typedef long		ulimit_t;	/* NOT int4; the UNIX ulimit function returns a value of
  * temporary allocation on the stack
  */
 GBLREF	boolean_t		gtm_utf8_mode;
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #	define ZWR_EXP_RATIO(X)	((!gtm_utf8_mode) ? (((X) * 6 + 7)) : ((X) * 9 + 11))
 #	define MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 9 + 11)
 #	define MAX_ZWR_EXP_RATIO	9
@@ -497,6 +497,7 @@ mval *underr_strict(mval *start, ...);
 /* Note MV_FORCE_CANONICAL currently only used in op_add() when vars are known to be defined so no MV_FORCE_DEFINED()
    macro has been added. If uses are added, this needs to be revisited. 01/2008 se
 */
+#define ZTIMEOUTSTR "ZTIMEOUT"
 #define MV_FORCE_MSTIMEOUT(TMV, TMS, NOTACID)	/* requires a flock of include files especially for TP */		\
 MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 	GBLREF uint4		dollar_tlevel;										\
@@ -518,7 +519,7 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 		if (0 > TMS)												\
 			TMS = 0;											\
 	}														\
-	if ((TREF(tpnotacidtime)).m[1] < TMS)										\
+	if ((STRNCMP_LIT(NOTACID, "ZTIMEOUTSTR")) && ((TREF(tpnotacidtime)).m[1] < TMS))				\
 		TPNOTACID_CHECK(NOTACID);										\
 } MBEND
 #define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0 ? s2n(X) : 0 ) \
@@ -529,8 +530,8 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 #define MV_IS_STRING(X)		(((X)->mvtype & MV_STR) != 0)
 #define MV_DEFINED(X)		(((X)->mvtype & (MV_STR | MV_NM)) != 0)
 #define MV_IS_CANONICAL(X)	(((X)->mvtype & MV_NM) ? (((X)->mvtype & MV_NUM_APPROX) == 0) : (boolean_t)val_iscan(X))
-#define MV_INIT(X)		((X)->mvtype = 0, (X)->fnpc_indx = UNICODE_ONLY((X)->utfcgr_indx =) 0xff)
-#define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = UNICODE_ONLY((X)->utfcgr_indx =) 0xff,	\
+#define MV_INIT(X)		((X)->mvtype = 0, (X)->fnpc_indx = UTF8_ONLY((X)->utfcgr_indx =) 0xff)
+#define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = UTF8_ONLY((X)->utfcgr_indx =) 0xff,	\
 				      (X)->str.len = INTCAST(LEN), (X)->str.addr = (char *)ADDR)
 
 /* The MVTYPE_IS_* macros are similar to the MV_IS_* macros except that the input is an mvtype instead of an "mval *".
@@ -553,7 +554,7 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 	DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, 0, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH)
 
 #ifdef BIGENDIAN
-# ifdef UNICODE_SUPPORTED
+# ifdef UTF8_SUPPORTED
 #  ifdef GTM64
 #   define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
 	{TYPE, SIGN, EXPONENT, 0xff, 0xff, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
@@ -564,9 +565,9 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 # else
 #  define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
 	{TYPE, SIGN, EXPONENT, 0xff, {MANT_LOW, MANT_HIGH}, {LENGTH, ADDRESS}}
-# endif	/* UNICODE */
+# endif	/* UTF8 */
 #else	/* end BIGENDIAN -- start LITTLEENDIAN */
-# ifdef UNICODE_SUPPORTED
+# ifdef UTF8_SUPPORTED
 #  ifdef GTM64
 #    define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
 	{TYPE, EXPONENT, SIGN, 0xff, 0xff, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
@@ -577,13 +578,13 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 # else
 #  define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
 	{TYPE, EXPONENT, SIGN, 0xff, MANT_LOW, MANT_HIGH, LENGTH, ADDRESS}
-# endif	/* UNICODE */
+# endif	/* UTF8 */
 #endif	/* BIGENDIAN/LITTLEENDIAN */
 
 #define	ASCII_MAX		(unsigned char)0x7F
 #define	IS_ASCII(X)		((uint4)(X) <= ASCII_MAX)	/* X can be greater than 255 hence the typecast to uint4 */
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #	define	MV_FORCE_LEN(X)	    ((!((X)->mvtype & MV_UTF_LEN)) 							\
 				     ? (utf8_len(&(X)->str), ((X)->mvtype |= MV_UTF_LEN), (X)->str.char_len)		\
 				     : (X)->str.char_len)
@@ -602,7 +603,7 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 #	define MV_FORCE_LEN(X)		((X)->str.len)
 #	define MV_FORCE_LEN_DEC(X)	((X)->str.len)
 #	define MV_FORCE_LEN_STRICT(X)	((X)->str.len)
-#	define MV_IS_SINGLEBYTE(X)	(TRUE)	/* all characters are single-byte in non-Unicode platforms */
+#	define MV_IS_SINGLEBYTE(X)	(TRUE)	/* all characters are single-byte in non-UTF8 platforms */
 #endif
 
 #define DISK_BLOCK_SIZE		512
@@ -776,15 +777,15 @@ void m_usleep(int useconds);
 #	define ARLINK_ONLY(X)
 #	define NON_ARLINK_ONLY(X)	X
 #endif
-/* Unicode. Although most (all?) UNIX platforms currently support Unicode, that may
+/* UTF8. Although all UNIX platforms currently support UTF8, that may
  * not always be the case so a separate contingent is defined.
  */
-#ifdef UNICODE_SUPPORTED
-#	define UNICODE_ONLY(X) X
-#	define NON_UNICODE_ONLY(X)
+#ifdef UTF8_SUPPORTED
+#	define UTF8_ONLY(X) X
+#	define NON_UTF8_ONLY(X)
 #else
-#	define UNICODE_ONLY(X)
-#	define NON_UNICODE_ONLY(X) X
+#	define UTF8_ONLY(X)
+#	define NON_UTF8_ONLY(X) X
 #endif
 
 /* Note: LONG_SLEEP *MUST*NOT* be the sleep() function because use of the sleep() function in
@@ -1406,12 +1407,14 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define HOUR			3600	/* one hour in seconds 60 * 60 */
 #define ONEDAY			86400	/* seconds in a day */
 #define MILLISECS_IN_SEC	1000	/* millseconds in a second */
-#define MICROSEC_IN_SEC		1000000 /* microseconds in a second */
+#define MICROSECS_IN_SEC	1000000 /* microseconds in a second */
+#define NANOSECS_IN_SEC		1000000000	/* nanoseconds in a second */
 #define MICROSECS_IN_MSEC	1000	/* microseconds in a millisecond */
+#define NANOSECS_IN_USEC	1000	/* nanoseconds in a microsecond */
 #define E_6			1000000
 #define E_9			1000000000
 #define E_18			1000000000000000000LL
-
+#define STR_LEN_OF_E_9		10
 #define ASSERT_IN_RANGE(low, x, high)	assert((low <= x) && (x <= high))
 
 #if defined(VMS)

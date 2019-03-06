@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@ error_def(ERR_ERRWIOEXC);
 error_def(ERR_ERRWZBRK);
 error_def(ERR_ERRWZINTR);
 error_def(ERR_ERRWZTRAP);
+error_def(ERR_ERRWZTIMEOUT);
 
 /* Note assertpro() checks have extra text in them to identify which assertpro tripped */
 #define SET_ERR_CODE(fp, errmsg)					\
@@ -47,6 +48,8 @@ error_def(ERR_ERRWZTRAP);
 		case (SFT_ZINTR | SFT_COUNT):				\
 			errmsg = ERR_ERRWZINTR;				\
 			break;						\
+		case (SFT_ZTIMEOUT | SFT_COUNT):			\
+			errmsg = ERR_ERRWZTIMEOUT;			\
 		default:						\
 			assertpro(FALSE && fp->type);			\
 	}								\

@@ -384,7 +384,8 @@ boolean_t	tp_tend()
 			 * bypass 1st check if already in crit -- check later
 			 */
 			if (!csa->now_crit && !is_mm && !WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL))
-				assert(FALSE);	/* wcs_get_space should have returned TRUE unconditionally in this case */
+				/* only reason we currently know why wcs_get_space could fail */
+				assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
 			if (JNL_ENABLED(csa))
 			{	/* compute the total journal record size requirements before grab_crit.
 				 * there is code later that will check for state changes from now to then
@@ -700,9 +701,8 @@ boolean_t	tp_tend()
 					 */
 					if (!WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL))
 					{
-						assert(cnl->wc_blocked);	/* only reason we currently know
-										 * why wcs_get_space could fail */
-						assert(gtm_white_box_test_case_enabled);
+						/* only reason we currently know why wcs_get_space could fail */
+						assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
 						SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 						BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_wcsgetspace);
 						SET_CACHE_FAIL_STATUS(status, csd);

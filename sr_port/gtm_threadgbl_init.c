@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -122,7 +122,7 @@
 #include "gds_blk_upgrade.h"	/* for UPGRADE_IF_NEEDED flag */
 #include "cws_insert.h"		/* for CWS_REORG_ARRAYSIZE */
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
 # include "utfcgr.h"
@@ -140,7 +140,8 @@
 #ifdef AUTORELINK_SUPPORTED
 # include "relinkctl.h"
 #endif
-
+#include "ztimeout_routines.h"
+#include "deferred_events_queue.h"
 #include "gtm_threadgbl_init.h"
 
 #define	DEFAULT_PROMPT	"GTM>"
@@ -217,4 +218,5 @@ void gtm_threadgbl_init(void)
 	TREF(util_outptr) = TREF(util_outbuff_ptr);
 	(TREF(source_buffer)).addr = (char *)&aligned_source_buffer;
 	(TREF(source_buffer)).len = MAX_SRCLINE;
+	(TREF(dollar_ztimeout)).ztimeout_seconds.m[1] = -1000;
 }

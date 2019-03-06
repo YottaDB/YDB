@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -226,7 +226,9 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 #define MVST_NVAL	8	/* A temporary mval for indirect news */
 #define MVST_TVAL	9	/* Saved value of $T, to be restored upon QUITing */
 #define MVST_TPHOLD	10	/* Place holder for MUMPS stack pertaining to TSTART */
-#define MVST_ZINTR	11	/* Environmental save for $zinterrupt */
+#define	MVST_ZINTR	11	/* Environmental save for $zinterrupt */
+/* Environmental save for ZTIMEOUT, same info required as above MVST_ZINTR since transferring to a vector in both cases */
+#define	MVST_ZTIMEOUT	11
 #define MVST_ZINTDEV	12	/* In I/O when ZINTR, mstr input to now protected */
 #define	MVST_STCK_SP	13	/* same as the MVST_STCK type except that it needs special handling in flush_jmp.c
 				 * (see comment in mtables.c where mvs_save is defined).
@@ -238,7 +240,6 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 #define MVST_MRGZWRSV	18	/* Block used to save merge/zwrite control blocks when one or more of them nest */
 #define	MVST_LAST	18	/* update this, mvs_size and mvs_save in mtables.c, and switches in unw_mv_ent.c,
 				 * stp_gcol_src.h, and get_ret_targ.c when adding a new MVST type */
-
 /* Variation of ROUND_UP2 macro that doesn't have the checking that generates an assertpro. This is necessary because
  * the MV_SIZE macro is used in a static table initializer so cannot have executable (non-constant) code in it
  */

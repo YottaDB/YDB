@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,6 +57,8 @@ void dse_f_reg(void)
 		util_out_print("List of global directory:!_!AD!/", TRUE, dollar_zgbldir.str.len, dollar_zgbldir.str.addr);
 		for (i = 0, regptr = original_header->regions; i < original_header->n_regions; i++, regptr++)
 		{
+			if (0 == regptr->dyn.addr->fname_len)
+				continue;				/* skip inactive statsDB */
 			util_out_print("!/File  !_!AD", TRUE, regptr->dyn.addr->fname_len, &regptr->dyn.addr->fname[0]);
 			util_out_print("Region!_!AD", TRUE, REG_LEN_STR(regptr));
 		}

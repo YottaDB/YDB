@@ -740,7 +740,7 @@
    The format of the CHANGE command is:
 
    C[HANGE] -G[BLNAME] -C[OLLATION]=collation_number
-   C[HANGE] -I[INSTANCE] -F[ILE_NAME=[repl_inst_filename|""]
+   C[HANGE] -I[NSTANCE] -F[ILE_NAME]={repl_inst_filename|""}
    C[HANGE] -N[AME] namespace -R[EGION]=new-region
    C[HANGE] -R[EGION] region-name [-REGION-qualifier...]
    C[HANGE] -S[EGMENT] segment-name [-SEGMENT-qualifier...]
@@ -1246,7 +1246,9 @@
    Tries to minimize epoch duration by reducing the number of buffers to
    flush by GT.M and the file system (via an fsync()) as the epoch
    (time-based or due to a journal file auto-switch) approaches. By default,
-   EPOCHTAPER is enabled.
+   EPOCHTAPER is enabled. Epoch tapering reduces the impact of I/O activity
+   during an epoch event. Application that experience high load and/or need
+   to reduce latency may benefit from epoch tapering.
 
    -[NO]INST[_FREEZE_ON_ERROR]
 
@@ -1446,6 +1448,10 @@
    does not share statistics on database files that exist solely to support
    GT.M features.
 
+   Note that a process disables itself from maintaining the shared statistics
+   when it fails to open a statsDB. It does not, however, disable
+   subsequently starting processes from maintaining the shared statistics.
+
    By default, GDE uses STATS.
 
    -[NO]STD[NULLCOLL]
@@ -1572,23 +1578,22 @@
    Determines whether an access method BG database file uses asynchronous I/O
    rather than using synchronous I/O through the file system cache.
 
-   The performance characteristics of asynchronous IO are likely to be quite
-   different from the traditional sequential IO. Although asynchronous IO in
-   theory should be more efficient than synchronous IO by eliminating the
-   need for the UNIX file buffer cache and eliminating certain filesystem
-   locks, in practice asynchronous IO is likely to emerge from the starting
-   gate under-performing synchronous IO because of the years that synchronous
-   IO has been the common IO model operating systems and filesystems have had
-   used by applications. So, you should anticipate extensive benchmarking and
-   tuning for your application to achieve the best performance it can with
-   asynchronous IO. Some notes and observations that we have to share:
+   With ASYNCIO, GT.M assumes responsibility for writing database updates
+   directly to secondary storage, essentially bypassing the file system and
+   its cache. This can yield improved behavior if the file system has trouble
+   handling GT.M database I/O, particularly file synchronization (fsync).
+   ASYNCIO eliminates some memory activities and may improve performance in
+   some configurations.
+
+   Some notes and observations:
 
      o As asynchronous IO dispenses with the UNIX file buffer cache, GT.M
        global buffers are the sole caching mechanism. To make asynchronous IO
        perform well, you will likely need to increase the number of global
-       buffers considerably. With GT.M's limit of 2GiB per shared memory
-       segment, a database segment with 4KiB blocks has a limit of almost two
-       million global buffers.
+       buffers considerably. Assign adequate database global buffers to
+       compensate for async I/O bypassing the file system cache. With GT.M's
+       limit of 2GiB per shared memory segment, a database segment with 4KiB
+       blocks has a limit of almost two million global buffers.
      o A large number of global buffers potentially implies a large number of
        dirty global buffers to be flushed at an epoch. You should investigate
        the impact on application response time of GT.M epoch tapering vs.
@@ -1605,44 +1610,54 @@
        CIO mount option drops support for the file buffer cache (unused by
        asynchronous IO), and also eliminates a lock that is a potential
        bottleneck to GT.M performance on the AIX jfs2 filesystem.
-     o For Linux x86_64, the gtm_aio_nr_events environment variable controls
-       the number of structures a process has per global directory to manage
-       asynchronous writes, and therefore determines the number of concurrent
-       writes a process can manage across all regions within a global
-       directory. If not specified, the value controlled by gtm_aio_nr_events
-       defaults to 128. If a process encounters a situation where it needs to
-       perform an asynchronous write, but has no available slots with which
-       to manage an additional one, it either falls back to synchronous
-       writing if the write is blocking other actions, and otherwise defers
-       the write until a slot becomes available as other writes complete.
-       Linux allocates the structures on a system-wide basis with the setting
-       of /proc/sys/fs/aio-max-nr. Therefore you should configure this
-       parameter to account for the needs (as determined by gtm_aio_nr_events
-       or the default) of all processes using asynchronous I/O. When
-       processes use multiple global directories with asynchronous I/O, their
-       need for the system resources increases accordingly. For example, if
-       an environment runs 10,000 processes each of which open two global
-       directories and /proc/sys/fs/aio-max-nr is set to a value of 200,000
-       then gtm_aio_nr_events needs to be set to a value <= 200,000 / (10,000
-       * 2) = 10. Conversely if gtm_aio_nr_events is set to a value of 20,
-       then aio-max-nr needs to be bumped up to (10,000 * 2 * 20) = 400,000.
-       GT.M captures the number of errors encountered when attempting to
-       write database blocks for a region, and, barring problems with the
-       storage subsystem, hitting an asynchronous write limit would
-       constitute primary (probably only) contribution to that value, which
-       you can access with the following:
-
-       $$^%PEEKBYNAME("sgmnt_data.wcs_wterror_invoked_cntr",<region>)
-
+     o If a process encounters a situation where it needs to perform an
+       asynchronous write, but has no available slots with which to manage an
+       additional one, it either falls back to synchronous writing if the
+       write is blocking other actions, and otherwise defers the write until
+       a slot becomes available as other writes complete. Linux allocates the
+       structures on a system-wide basis with the setting of
+       /proc/sys/fs/aio-max-nr. FIS recommends setting
+       /proc/sys/fs/aio-max-nr to 1048576.
+     o For Linux x86_64, set the environment variable gtm_aio_nr_events: the
+       gtm_aio_nr_events environment variable controls the number of
+       structures a process has per global directory to manage asynchronous
+       writes, and therefore determines the number of concurrent writes a
+       process can manage across all regions within a global directory. If
+       not specified, the value controlled by gtm_aio_nr_events defaults to
+       128. If a process encounters a situation where it needs to perform an
+       asynchronous write, but has no available slots with which to manage an
+       additional one, it either falls back to synchronous writing if the
+       write is blocking other actions, and otherwise defers the write until
+       a slot becomes available as other writes complete. The default value
+       for gtm_aio_nr_events (that is, 128) should be sufficient for most
+       applications. Change the value for the gtm_aio_nr_events environment
+       variable based on benchmarking.
+     o Monitor the number of database writes errors for each global directory
+       with set x="" for set x=$view("gvnext",x) quit:""=x
+       $$^%PEEKBYNAME("sgmnt_data.wcs_wterror_invoked_cntr",x). If there are
+       database write errors, your application may benefit from altering the
+       number of gtm_aio_nr_events.
+     o While database write errors may indicate a problem with database
+       writes if your storage system is starting to degrade, in a
+       well-functioning environment, they indicate that a write attempt was
+       unable to start an asynchronous write because it was unable to obtain
+       a free resource of the type associated with /proc/sys/fs/aio-max-nr
+       and gtm_aio_nr_events. In such a case, GT.M either defers the write in
+       hopes that a resource will come available for a future attempt, or, if
+       the write is blocking the application, GT.M performs a synchronous
+       direct I/O. A synchronous direct I/O tends to lengthen response times
+       and reduce throughput, so if you see non-trivial counts of such
+       errors, you should revisit your settings for the resource.
      o Limited experience with solid-state storage (SSDs) on Linux in the
        GT.M development environment suggests a considerable difference in
        asynchronous IO performance on the same underlying hardware, with f2fs
        performing better than xfs, which in turn performed better than ext4.
 
-   In GT.M development, we have not benchmarked asynchronous IO on the types
-   of storage commonly used for enterprise scale applications (as workloads
-   vary widely, we do not routinely benchmark workloads in development).
-   Please consider the above observations in this light.
+   While there is reason to hope that ASYNCIO can provide better and more
+   uniform performance, to this point we have limited information on
+   performance comparisons, so FIS recommends well thought out benchmarking
+   of your application in a suitable test environment. Please consider the
+   above observations in this light.
 
    By default GDE uses NOASYNCIO. On segments with an access method of MM,
    GT.M ignores this setting.
@@ -1696,13 +1711,25 @@
 
    --[NO]DEFER_ALLOCATE
 
-   Determines whether MUPIP CREATE preallocates blocks on database creation,
-   and determines whether subsequent extensions also preallocate. The default
-   is DEFER_ALLOCATE. This provides an option to preallocate blocks from the
-   file system when creating or extending a database file; by default UNIX
-   file systems, and GT.M, use sparse (or lazy) allocation, which defers
-   actual allocation until blocks are first written. Failures to preallocate
-   space produce a PREALLOCATEFAIL error.
+   With -DEFER_ALLOCATE, GT.M instructs the file system to create the
+   database file as a sparse file. Before using -DEFER_ALLOCATE, ensure that
+   your underlying file system supports sparse files. By default UNIX file
+   systems, and GT.M, use sparse (or lazy) allocation, which defers actual
+   allocation until blocks are first written.
+
+     o Utilities such as du report typically show lower disk space usage for
+       a database file with -DEFER_ALLOCATE because GT.M instructs the file
+       system to defer disk space allocation to the time when there is an
+       actual need. With -NODEFER_ALLOCATE, such utilities report higher disk
+       space usage count as GT.M instructs the file system to preallocate
+       disk space without waiting for a need to arise.
+     o -DEFER_ALLOCATE makes database file extensions lighter weight.
+       However, disk activity may tend towards causing fragmentation.
+     o To switch an existing database file so it immediately preallocates all
+       blocks, first use MUPIP SET -NODEFER_ALLOCATE to set the switch in the
+       database file header, followed by MUPIP EXTEND -BLOCKS=n, where n >=
+       0. Failures to preallocate space produce a PREALLOCATEFAIL error.
+     o The default is DEFER_ALLOCATE.
 
    -[NO]ENcryption
 
@@ -2190,7 +2217,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.3-005 of the
+   This help file is a concise representation of revision V6.3-006 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

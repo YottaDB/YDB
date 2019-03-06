@@ -83,6 +83,8 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
+#include "mlkdef.h"
+#include "mlk_ops.h"
 
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	boolean_t		mupip_jnl_recover;
@@ -282,6 +284,13 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	inst_is_frozen = IS_REPL_INST_FROZEN && REPL_ALLOWED(csa->hdr);
 	if (!csa->persistent_freeze)
 		region_freeze(reg, FALSE, FALSE, FALSE, FALSE, FALSE);
+	if (!csa->lock_crit_with_db && LOCK_CRIT_HELD(csa))
+	{
+		mlk_pvtctl	pctl;
+
+		MLK_PVTCTL_INIT(pctl, reg);
+		REL_LOCK_CRIT(pctl, FALSE);
+	}
 	if (!was_crit)
 	{
 		rel_crit(reg);		/* get locks to known state */
@@ -852,6 +861,13 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		if (bypassed_ftok)
 			cnl->dbrndwn_ftok_skip++;
 	}
+	if (MLK_CTL_BLKHASH_EXT == csa->mlkctl->blkhash)
+	{
+		csa->mlkhash_shmid = csa->mlkctl->hash_shmid;
+		if (NULL != csa->mlkhash)
+			SHMDT(csa->mlkhash);
+	} else
+		csa->mlkhash_shmid = INVALID_SHMID;
 	if (jgbl.onlnrlbk)
 		csa->hold_onto_crit = FALSE;
 	GTM_WHITE_BOX_TEST(WBTEST_HOLD_SEM_BYPASS, cnl->wbox_test_seq_num, 0);
@@ -879,6 +895,12 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		if (remove_shm)
 		{
 			ipc_deleted = TRUE;
+			if (INVALID_SHMID != csa->mlkhash_shmid)
+			{
+				if (0 != shm_rmid(csa->mlkhash_shmid))
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+						      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove lock shared memory"));
+			}
 			if (0 != shm_rmid(udi->shmid))
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 					      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove shared memory"));

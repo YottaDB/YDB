@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +53,7 @@
  *	set numpcs arg to # of pieces that could not be matched (because end of source string was reached before then)
  * -----------------------------------------------
  */
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 
 GBLREF	boolean_t	gtm_utf8_mode;
@@ -138,7 +139,7 @@ unsigned char *matchc(int del_len, unsigned char *del_str, int src_len, unsigned
 	}
 	RETURN_NOMATCH;
 }
-#endif /* UNICODE_SUPPORTED */
+#endif /* UTF8_SUPPORTED */
 
 /* byte-oriented substring matching */
 unsigned char *matchb(int del_len, unsigned char *del_str, int src_len, unsigned char *src_str, int *res, int *numpcs)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@
  * -----------------------------------------------
  */
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #include "utfcgr.h"
 
@@ -133,7 +133,7 @@ int4 op_fnfind(mval *src, mval *del, mint first, mval *dst)
 }
 #else
 #  include "utfcgr_trc.h"		/* Needed for op_fnzfind() DBGUTFC() macro below */
-#endif /* UNICODE_SUPPORTED */
+#endif /* UTF8_SUPPORTED */
 
 int4 op_fnzfind(mval *src, mval *del, mint first, mval *dst)
 {

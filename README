@@ -10,7 +10,7 @@ package.
 
 GT.M relies on CMake to generate the Makefiles to build GT.M from source. The
 prerequisites are CMake (at least 2.8.5), GNU make (at least 3.81), Linux
-(either x86 or x86_64), libraries and development files for libz, Unicode,
+(either x86 or x86_64), libraries and development files for libz, Unicode(R),
 OpenSSL and GPG. Debian 7, Ubuntu 12.04/14.04 LTS and RHEL 6.0 were used to do
 the test builds for this distribution. The default ICU and GPG packages were
 taken from the distribution repositories.
@@ -25,16 +25,16 @@ To build GT.M for Linux, do the following steps:
 
 2. Unpack the GT.M sources
    The GT.M source tarball extracts to a directory with the version number in
-   the name, fis-gtm-V6.3-005
-   $ tar xfz fis-gtm-V6.3-005.tar.gz
-   $ cd fis-gtm-V6.3-005
+   the name, fis-gtm-V6.3-006
+   $ tar xfz fis-gtm-V6.3-006.tar.gz
+   $ cd fis-gtm-V6.3-006
 
    You should find this README, LICENSE, COPYING and CMakeLists.txt file and
    sr_* source directories.
 
 3. Building GT.M -
    <fis-gtm-build> can be a sub directory of the source directory,
-   fis-gtm-V6.3-005, or any other valid path.
+   fis-gtm-V6.3-006, or any other valid path.
 
    $ mkdir <fis-gtm-build>
    $ cd <fis-gtm-build>
@@ -53,16 +53,16 @@ To build GT.M for Linux, do the following steps:
    #
    #     -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package
    #
-   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V6.3-005
+   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V6.3-006
 
    $ make
 
    $ make install
 
-   $ cd package/lib/fis-gtm/V6.3-005_x86_64
+   $ cd package/lib/fis-gtm/V6.3-006_x86_64
 
    # Now you are ready to install GT.M. Answer a few questions and install it.
-   # The recommended installation path is /opt/fis-gtm/V6.3-005_x86_64
+   # The recommended installation path is /opt/fis-gtm/V6.3-006_x86_64
 
    $ sudo ./configure
 

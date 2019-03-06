@@ -90,6 +90,7 @@
 #include "mmemory.h"
 #include "have_crit.h"
 #include "alias.h"
+#include "ztimeout_routines.h"
 /* FOR REPLICATION RELATED GLOBALS */
 #include "repl_msg.h"
 #include "gtmsource.h"
@@ -111,7 +112,7 @@
 #include "cws_insert.h"		/* for CWS_REORG_ARRAYSIZE */
 #include "gtm_multi_proc.h"
 #include "fnpc.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #include "gtm_conv.h"
@@ -134,6 +135,7 @@
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
 #define DEFAULT_ZERROR_LEN	(SIZEOF(DEFAULT_ZERROR_STR) - 1)
 #include "gtm_libaio.h"
+#include "deferred_events_queue.h"
 
 GBLDEF	gd_region		*db_init_region;
 GBLDEF	sgmnt_data_ptr_t	cs_data;
@@ -293,6 +295,7 @@ GBLDEF 	char		cg_phase_last;
 GBLDEF	int		cmd_cnt;
 GBLDEF	command_qualifier	glb_cmd_qlf = { CQ_DEFAULT },
 				cmd_qlf = { CQ_DEFAULT };
+
 #ifdef __osf__
 #pragma pointer_size (save)
 #pragma pointer_size (long)
@@ -323,7 +326,7 @@ GBLDEF	void			(*jnl_file_close_timer_ptr)(void);
 GBLDEF	void			(*fake_enospc_ptr)(void);
 GBLDEF	void			(*simple_timeout_timer_ptr)(TID tid, int4 hd_len, boolean_t **timedout);
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 GBLDEF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
 GBLDEF	boolean_t		mu_reorg_process;		/* set to TRUE by MUPIP REORG */
@@ -398,6 +401,7 @@ GBLDEF	io_desc			*gtm_err_dev;
 /* this array is indexed by file descriptor */
 /* Latch variable for Unix implementations. Used in SUN and HP */
 GBLDEF	global_latch_t		defer_latch;
+GBLDEF  global_latch_t          outofband_queue_latch;
 GBLDEF	int			num_additional_processors;
 GBLDEF	int			gtm_errno = -1;		/* holds the errno (unix) in case of an rts_error */
 GBLDEF	int4			error_condition;
@@ -435,7 +439,7 @@ GBLDEF	int	cs_pscan;			/* number of pieces "scanned" */
 GBLDEF	int	cs_parscan;			/* number of partial scans (partial cache hits) */
 GBLDEF	int	c_clear;			/* cleared due to (possible) value change */
 GBLDEF	boolean_t	setp_work;
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 /* Items for UTF8 cache */
 GBLDEF	int	u_miss;				/* UTF cache misses (debug) */
 GBLDEF	int	u_hit;				/* UTF cache hits (debug) */
@@ -445,7 +449,7 @@ GBLDEF	int	u_puscan;			/* Number of groups "scanned" for located char (debug) */
 GBLDEF	int	u_pabscan;			/* Number of non-UTF groups we scan for located char (debug) */
 GBLDEF	int	u_parscan;			/* Number of partial scans (partial cache hits) (debug) */
 GBLDEF	int	u_parhscan;			/* Number of partial scans after filled slots (debug) */
-#endif /* UNICODE_SUPPORTED */
+#endif /* UTF8_SUPPORTED */
 #endif /* DEBUG */
 GBLDEF z_records	zbrk_recs;
 GBLDEF	ipcs_mesg	db_ipcs;		/* For requesting gtmsecshr to update ipc fields */
@@ -466,8 +470,8 @@ GBLDEF	mstr_len_t	sizeof_pat_everything = SIZEOF(pat_everything);
 GBLDEF	uint4		*pattern_typemask;
 GBLDEF	pattern		*pattern_list;
 GBLDEF	pattern		*curr_pattern;
-/* Unicode related data */
-GBLDEF	boolean_t	gtm_utf8_mode;		/* Is GT.M running with Unicode Character Set; Set only after ICU initialization */
+/* UTF8 related data */
+GBLDEF	boolean_t	gtm_utf8_mode;		/* Is GT.M running with UTF8 Character Set; Set only after ICU initialization */
 GBLDEF	boolean_t	is_gtm_chset_utf8;	/* Is gtm_chset environment variable set to UTF8 */
 GBLDEF	boolean_t	utf8_patnumeric;	/* Should patcode N match non-ASCII numbers in pattern match ? */
 GBLDEF	boolean_t	badchar_inhibit;	/* Suppress malformed UTF-8 characters by default */
@@ -773,8 +777,8 @@ GBLDEF	boolean_t	in_mupip_ftok;		/* Used by an assert in repl_inst_read */
 GBLDEF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
 GBLDEF	uint4		mutex_per_process_init_pid;	/* pid that invoked "mutex_per_process_init" */
 GBLDEF	boolean_t	gtm_quiet_halt;		/* Suppress FORCEDHALT message */
-#ifdef UNICODE_SUPPORTED
-/* Unicode line terminators.  In addition to the following
+#ifdef UTF8_SUPPORTED
+/* UTF8 line terminators.  In addition to the following
  * codepoints, the sequence CR LF is considered a single
  * line terminator.
  */
@@ -907,6 +911,7 @@ GBLDEF  sigset_t	block_worker;	/* block all signals for use by the linux AIO wor
 					 * any signal externally sent always gets handled by the main process and not
 					 * by the worker thread.
 					 */
+GBLDEF  sigset_t        block_sigusr;
 GBLDEF  char            *gtm_core_file;
 GBLDEF  char            *gtm_core_putenv;
 #ifdef __MVS__

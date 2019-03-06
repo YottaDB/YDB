@@ -157,8 +157,8 @@ MBSTART {											\
 	clock_gettime(CLOCK_MONOTONIC, &REQTIM);						\
 	if (E_9 <= (NANOSECONDS) + REQTIM.tv_nsec)						\
 	{											\
-		REQTIM.tv_sec += (time_t)(((NANOSECONDS) + REQTIM.tv_nsec) / E_9);		\
-		REQTIM.tv_nsec = ((NANOSECONDS) + REQTIM.tv_nsec) % E_9;			\
+		REQTIM.tv_sec += (time_t)(((NANOSECONDS) + REQTIM.tv_nsec) / NANOSECS_IN_SEC);	\
+		REQTIM.tv_nsec = ((NANOSECONDS) + REQTIM.tv_nsec) % NANOSECS_IN_SEC;		\
 	}											\
 	else											\
 		REQTIM.tv_nsec += (long)(NANOSECONDS);						\
@@ -174,12 +174,12 @@ MBSTART {											\
 #if !defined(_AIX)
 # define SLEEP_USEC(MICROSECONDS, RESTART)						\
 MBSTART {										\
-	NANOSLEEP(((MICROSECONDS) * 1000), RESTART);					\
+	NANOSLEEP(((MICROSECONDS) * NANOSECS_IN_USEC), RESTART);			\
 } MBEND
 
 # define NANOSLEEP(NANOSECONDS, RESTART)						\
 MBSTART {										\
-	CLOCK_NANOSLEEP(NANOSECONDS, RESTART);					\
+	CLOCK_NANOSLEEP(NANOSECONDS, RESTART);						\
 } MBEND
 #endif
 #endif

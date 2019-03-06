@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,6 +23,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "mlkdef.h"
+#include "mlk_ops.h"
 #include "mlk_region_lookup.h"
 #include "mlk_pvtblk_insert.h"
 #include "mlk_pvtblk_create.h"
@@ -65,7 +66,6 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 	mval		*extgbl2, *mp_temp, val_xlated;
 	mlk_pvtblk	*r;
 	gd_region	*reg;
-	sgmnt_addrs	*sa;
 	gd_addr		*gld;
 	hash128_state_t	accstate, tmpstate;
 	gtm_uint16	hashres;
@@ -143,9 +143,7 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 		MLK_PVTBLK_SUBHASH(r, i) = (uint4)hashres.one;
 	}
 	va_end(mp);
-	r->region = reg;
-	sa = &FILE_INFO(r->region)->s_addrs;
-	r->ctlptr = (mlk_ctldata_ptr_t)sa->lock_addrs[0];
+	MLK_PVTCTL_INIT(r->pvtctl, reg);
 	if (!mlk_pvtblk_insert(r))
 		free(r);
 	return;

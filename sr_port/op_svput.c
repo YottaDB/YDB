@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,6 +46,9 @@
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #endif
+#include "ztimeout_routines.h"
+#include "deferred_events.h"
+#include "deferred_events_queue.h"
 
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
@@ -98,6 +101,9 @@ void op_svput(int varnum, mval *v)
 	int	i, ok, state;
 	char	*vptr;
 	int4	previous_gtm_strpllim;
+	int4  	event_type, param_val;
+	void (*set_fn)(int4 param);
+
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -208,11 +214,19 @@ void op_svput(int varnum, mval *v)
 			}
 			if (ZTRAP_POP & TREF(ztrap_form))
 				ztrap_save_ctxt();
-			if (tp_timeout_deferred && !dollar_zininterrupt)
-				/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and no job interrupt is in
-				 * effect, the timeout need no longer be deferred and can be recognized.
+			if ((TREF(save_xfer_root)) && (((TREF(save_xfer_root))->set_fn == tptimeout_set)
+						|| ((TREF(save_xfer_root))->set_fn == ztimeout_set)))
+			{	/* A tp timeout was deferred. Now that $ETRAP is no longer in effect and
+				 * no job interrupt is in effect, the timeout need no longer be deferred
+				 * and can be recognized.
 				 */
-				tptimeout_set(0);
+				if ((tp_timeout_deferred || TREF(ztimeout_deferred)) && !dollar_zininterrupt)
+				{
+					DBGDFRDEVNT((stderr, "op_unwind1: Calling pop_reset_xfer from op_unwind\n"));
+					POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
+					xfer_set_handlers(event_type, set_fn, param_val, TRUE);
+				}
+			}
 			break;
 		case SV_ZSTATUS:
 			MV_FORCE_STR(v);
@@ -228,7 +242,7 @@ void op_svput(int varnum, mval *v)
 				(TREF(gtmprompt)).len = v->str.len;
 			else if (!gtm_utf8_mode)
 				(TREF(gtmprompt)).len = SIZEOF_prombuf;
-#			ifdef UNICODE_SUPPORTED
+#			ifdef UTF8_SUPPORTED
 			else
 			{
 				UTF8_LEADING_BYTE(v->str.addr + SIZEOF_prombuf, v->str.addr, vptr);
@@ -279,11 +293,19 @@ void op_svput(int varnum, mval *v)
 			{
 				NULLIFY_DOLLAR_ECODE;	/* reset $ECODE related variables to correspond to $ECODE = NULL state */
 				NULLIFY_ERROR_FRAME;	/* we are no more in error-handling mode */
-				if (tp_timeout_deferred && !dollar_zininterrupt)
-					/* A tp timeout was deferred. Now that we are clear of error handling and no job interrupt
-					 * is in process, allow the timeout to be recognized.
-					 */
-					tptimeout_set(0);
+				/* A tp timeout was deferred. Now that we are clear of error handling and no job interrupt
+				 * is in process, allow the timeout to be recognized.
+				 */
+				if ((TREF(save_xfer_root)) &&
+				(((TREF(save_xfer_root))->set_fn == tptimeout_set) || ((TREF(save_xfer_root))->set_fn == ztimeout_set)))
+				{
+					if ((tp_timeout_deferred || TREF(ztimeout_deferred)) && !dollar_zininterrupt)
+					{
+						DBGDFRDEVNT((stderr, "op_unwind1: Calling pop_reset_xfer from op_unwind\n"));
+						POP_XFER_ENTRY(&event_type, &set_fn, &param_val);
+						xfer_set_handlers(event_type, set_fn, param_val, TRUE);
+					}
+				}
 			}
 			break;
 		case SV_ETRAP:
@@ -390,6 +412,9 @@ void op_svput(int varnum, mval *v)
 			TREF(gtm_strpllim) = MV_FORCE_INT(v);
 			if ((TREF(gtm_strpllim) <= 0) || (TREF(gtm_strpllim) >= previous_gtm_strpllim))
 				TREF(gtm_strpllimwarned) =  FALSE;
+			break;
+		case SV_ZTIMEOUT:
+			check_and_set_ztimeout(v);
 			break;
 		default:
 			assertpro(FALSE && varnum);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,12 +36,12 @@ STATICFNDCL boolean_t validate_label(char *trigvn, int trigvn_len);
 STATICFNDCL int4 update_commands(char *trigvn, int trigvn_len, int trigger_index, char *new_trig_cmds, char *orig_db_cmds);
 STATICFNDCL int4 update_trigger_name(char *trigvn, int trigvn_len, int trigger_index, char *db_trig_name, char *tf_trig_name,
 				     uint4 tf_trig_name_len);
-STATICFNDCL boolean_t trigger_update_rec_helper(char *trigger_rec, uint4 len, boolean_t noprompt, uint4 *trig_stats);
+STATICFNDCL boolean_t trigger_update_rec_helper(mval *trigger_rec, boolean_t noprompt, uint4 *trig_stats);
 
 boolean_t trigger_name_search(char *trigger_name, uint4 trigger_name_len, mval *val, gd_region **found_reg);
 boolean_t check_unique_trigger_name_full(char **values, uint4 *value_len, mval *val, boolean_t *new_match,
 				char *trigvn, int trigvn_len, stringkey *kill_trigger_hash, stringkey *set_trigger_hash);
-boolean_t trigger_update_rec(char *trigger_rec, uint4 len, boolean_t noprompt, uint4 *trig_stats, io_pair *trigfile_device,
+boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_stats, io_pair *trigfile_device,
 			     int4 *record_num);
 
 STATICFNDCL trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t *jnl_format_done, mval *trigjrec,
@@ -48,5 +49,5 @@ STATICFNDCL trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t 
 	stringkey *kill_trigger_hash, stringkey *set_trigger_hash, char *disp_trigvn, int disp_trigvn_len, uint4 *trig_stats,
 	boolean_t *first_gtmio, char *utilprefix, int *utilprefixlen);
 
-boolean_t trigger_update(char *trigger_rec, uint4 len);
+boolean_t trigger_update(mval *trigger_rec);
 #endif

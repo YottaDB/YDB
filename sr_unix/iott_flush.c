@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,7 @@ void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 		{
 			tt_ptr->write_active = FALSE;		/* In case we come back this-a-way */
 			ISSUE_NOPRINCIO_IF_NEEDED_TT(io_ptr);
-			xfer_set_handlers(tt_write_error_event, tt_write_error_set, status);
+			xfer_set_handlers(tt_write_error_event, tt_write_error_set, status, FALSE);
 		}
 	}
 	tt_ptr->write_active = new_write_flag;

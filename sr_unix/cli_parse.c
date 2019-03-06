@@ -23,6 +23,7 @@
 #include "error.h"
 #include "cli_disallow.h"
 #include "gtmio.h"
+#include "op.h"
 
 #define	NO_STRING	"NO"
 
@@ -62,6 +63,8 @@ GBLREF char 		cli_token_buf[];
 GBLREF CLI_ENTRY 	*cmd_ary;
 
 GBLREF IN_PARMS *cli_lex_in_ptr;
+
+LITREF	mval		literal_notimeout;
 
 error_def(ERR_CLIERR);
 error_def(ERR_MUNOACTION);
@@ -573,7 +576,7 @@ int cli_check_negated(char **opt_str_ptr, CLI_ENTRY *pcmd_parm_ptr, CLI_ENTRY **
 boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 {
 	CLI_ENTRY 	*pparm_qual, *pparm1;
-	char		local_str[MAX_LINE], tmp_str[MAX_LINE], *tmp_str_ptr;
+	char		local_str[MAX_LINE], tmp_str[MAX_LINE + 1], *tmp_str_ptr;
 	char 		*ptr_next_val, *ptr_next_comma, *ptr_equal;
 	int		len_str, neg_flg, ptr_equal_len;
 	boolean_t	val_flg, has_a_qual;
@@ -584,12 +587,12 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 		return TRUE;
 	if ((VAL_STR == pparm->val_type) || (VAL_LIST == pparm->val_type))
 	{
-		strncpy(local_str, pparm->pval_str, SIZEOF(local_str) - 1);
+		STRNCPY_STR(local_str, pparm->pval_str, SIZEOF(local_str) - 1);
 		ptr_next_val = local_str;
 		while (NULL != ptr_next_val)
-		{
-			len_str = STRLEN(ptr_next_val);
-			strncpy(tmp_str, ptr_next_val, SIZEOF(tmp_str));
+		{	/* WARNING assignment below */
+			STRNCPY_STR(tmp_str, ptr_next_val, (len_str = MIN(STRLEN(ptr_next_val), SIZEOF(tmp_str))));
+			tmp_str[len_str] = 0;
 			tmp_str_ptr = tmp_str;
 			ptr_next_comma = strchr(tmp_str_ptr, ',');
 			if (NULL == ptr_next_comma)
@@ -668,7 +671,7 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 				{
 					ptr_equal_len = STRLEN(ptr_equal + 1);
 					pparm1->pval_str = malloc(ptr_equal_len + 1);
-					strncpy(pparm1->pval_str, ptr_next_val + (ptr_equal - tmp_str_ptr) + 1, ptr_equal_len);
+					STRNCPY_STR(pparm1->pval_str, ptr_next_val + (ptr_equal - tmp_str_ptr) + 1, ptr_equal_len);
 					pparm1->pval_str[ptr_equal_len] = 0;
 				}
 
@@ -880,7 +883,7 @@ int cli_present(char *entry)
 	CLI_ENTRY	*pparm;
 	char		local_str[MAX_LINE];
 
-	strncpy(local_str, entry, SIZEOF(local_str) - 1);
+	STRNCPY_STR(local_str, entry, SIZEOF(local_str) - 1);
 	local_str[SIZEOF(local_str) - 1] = '\0';
 	cli_strupper(local_str);
 	if (pparm = get_parm_entry(local_str))
@@ -919,7 +922,7 @@ bool cli_get_value(char *entry, char val_buf[])
 
 	SETUP_THREADGBL_ACCESS;
 #	endif
-	strncpy(local_str, entry, SIZEOF(local_str) - 1);
+	STRNCPY_STR(local_str, entry, SIZEOF(local_str) - 1);
 	local_str[SIZEOF(local_str) - 1] = '\0';
 	cli_strupper(local_str);
 	if (NULL == (pparm = get_parm_entry(local_str)))
@@ -963,7 +966,7 @@ boolean_t cli_negated(char *entry) 		/* entity */
 	CLI_ENTRY	*pparm;
 	char		local_str[MAX_LINE];
 
-	strncpy(local_str, entry, SIZEOF(local_str) - 1);
+	STRNCPY_STR(local_str, entry, SIZEOF(local_str) - 1);
 	local_str[SIZEOF(local_str) - 1] = '\0';
 	cli_strupper(local_str);
 	if (pparm = get_parm_entry(local_str))
@@ -974,13 +977,9 @@ boolean_t cli_negated(char *entry) 		/* entity */
 
 bool cli_get_parm(char *entry, char val_buf[])
 {
-	char		*sp;
-	int		ind;
-	int		match_ind, res;
-	char		local_str[MAX_LINE];
-	int		eof;
-	char		*gets_res;
-	int		parm_len;
+	char		*gets_res, local_str[MAX_LINE], *sp;
+	int		eof, ind, match_ind, parm_len, res;
+	mval		prompt, dummy, *input_line;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1012,22 +1011,21 @@ bool cli_get_parm(char *entry, char val_buf[])
 			if (!((gpcmd_parm_vals + match_ind)->parm_required)) /* Value not required */
 				return FALSE;
 			/* If no value and required, prompt for it */
-			PRINTF("%s", (gpcmd_parm_vals + match_ind)->prompt);
-			FFLUSH(stdout);
-			gets_res = cli_fgets(local_str, MAX_LINE, stdin, FALSE);
-			if (gets_res)
+			dummy.mvtype = dummy.str.len = 0;
+			input_line = push_mval(&dummy);
+			prompt.mvtype = MV_STR;
+			prompt.str.addr = (gpcmd_parm_vals + match_ind)->prompt;
+			for (prompt.str.len = 0, sp = prompt.str.addr; 0 != *sp; sp++, prompt.str.len++)
+				;
+			op_write(&prompt);
+			op_read(input_line, (mval *)&literal_notimeout);
+			if (input_line->str.len)
 			{
-				parm_len = STRLEN(gets_res);
-				/* chop off newline */
-				if (parm_len && (local_str[parm_len - 1] == '\n'))
-				{
-					local_str[parm_len - 1] = '\0';
-					--parm_len;
-				}
+				parm_len = input_line->str.len;
 				TAREF1(parm_str_len, match_ind) = parm_len + 1;
 				GROW_HEAP_IF_NEEDED(match_ind);
 				if (parm_len)
-					memcpy(TAREF1(parm_ary, match_ind), &local_str[0], parm_len);
+					memcpy(TAREF1(parm_ary, match_ind), input_line->str.addr, parm_len);
 				*(TAREF1(parm_ary, match_ind) + parm_len) = '\0';
 			} else
 			{	/* No string was returned so create a real ghost to point to.

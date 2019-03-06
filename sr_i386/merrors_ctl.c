@@ -681,7 +681,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DISTPATHMAX", "$gtm_dist path is greater than maximum (!UL)", 1 },
 	{ "FILEOPENFAIL", "Failed to open file !AD", 2 },
 	{ "IMAGENAME", "The executing module name should be !AD instead of !AD", 4 },
-	{ "GTMSECSHRPERM", "The gtmsecshr module in $gtm_dist does not have the correct permission and uid", 0 },
+	{ "GTMSECSHRPERM", "The gtmsecshr module in $gtm_dist (!AD) does not have the correct permission: !AD, and UID: !UL", 5 },
 	{ "GTMDISTUNDEF", "Environment variable $gtm_dist is not defined", 0 },
 	{ "SYSCALL", "Error received from system call !AD -- called from module !AD at line !UL", 5 },
 	{ "MAXGTMPATH", "The executing module path is greater than the maximum !UL", 1 },
@@ -1293,7 +1293,7 @@ LITDEF	err_msg merrors[] = {
 	{ "STRMNUMMISMTCH1", "Stream !2UL exists on the receiver instance file but is unknown on the source instance", 1 },
 	{ "STRMNUMMISMTCH2", "Stream !2UL exists on the source instance file but is unknown on the receiver instance", 1 },
 	{ "STRMSEQMISMTCH", "Unable to play update on Stream !2UL with seqno [0x!16@XQ] as receiving instance has a different stream seqno [0x!16@XQ]", 3 },
-	{ "LOCKSPACEINFO", "Region: !AD: processes on queue: !UL/!UL; LOCK slots in use: !UL/!UL; name space!ADfull", 8 },
+	{ "LOCKSPACEINFO", "Region: !AD: processes on queue: !UL/!UL; LOCK slots in use: !UL/!UL; SUBSCRIPT slot bytes in use: !UL/!UL", 8 },
 	{ "JRTNULLFAIL", "Applying NULL journal record failed.  Failure code: !AD.", 2 },
 	{ "LOCKSUB2LONG", "Following subscript is !UL bytes long which exceeds 255 byte limit.", 1 },
 	{ "RESRCWAIT", "Waiting briefly for the !AD semaphore for region !AD (!AD) was held by PID !UL (Sem. ID: !UL).", 8 },
@@ -1508,11 +1508,23 @@ LITDEF	err_msg merrors[] = {
 	{ "MSTACKSZNA", "User-specified M stack size of !UL KiB not appropriate; must be between !UL KiB and !UL KiB; reverting to !UL KiB", 4 },
 	{ "JNLEXTRCTSEQNO", "Journal Extracts based on sequence numbers are restricted to a single region when replication is OFF", 0 },
 	{ "INVSEQNOQUAL", "Invalid SEQNO qualifier value !AD", 2 },
-	{ "LOWSPC", "WARNING: Database !AD has less than !UL% of the total block space remaining. Blocks Used: !UL Total Blocks Available: !UL", 5 },
+	{ "LOWSPC", "WARNING: Database !AD has !UL% or less of the total block space remaining. Blocks Used: !UL Total Blocks Available: !UL", 5 },
 	{ "FAILEDRECCOUNT", "LOAD unable to process !@UQ records", 1 },
 	{ "LOADRECCNT", "Last EXTRACT record processed by LOAD: !@UQ", 1 },
 	{ "COMMFILTERERR", "Error executing the command filter for !AD. !AD", 4 },
 	{ "NOFILTERNEST", "Filter nesting not allowed", 0 },
+	{ "MLKHASHTABERR", "A LOCK control structure is damaged and could not be corrected. Lock entry for !AD is invalid.", 2 },
+	{ "LOCKCRITOWNER", "LOCK crit is held by: !UL", 1 },
+	{ "MLKHASHWRONG", "A LOCK control structure has an invalid value; LOCK table failed integrity check. !AD", 2 },
+	{ "XCRETNULLREF", "Returned null reference from external call !AD", 2 },
+	{ "EXTCALLBOUNDS", "Wrote outside bounds of external call buffer. M label: !AZ", 1 },
+	{ "EXCEEDSPREALLOC", "Preallocated size !UL for M external call label !AZ exceeded by string of length !UL", 3 },
+	{ "ZTIMEOUT", "Time expired", 0 },
+	{ "ERRWZTIMEOUT", "Error while processing $ZTIMEOUT", 0 },
+	{ "MLKHASHRESIZE", "LOCK hash table increased in size from !UL to !UL and placed in shared memory (id = !UL)", 3 },
+	{ "MLKHASHRESIZEFAIL", "Failed to increase LOCK hash table size from !UL to !UL. Will retry with larger size.", 2 },
+	{ "MLKCLEANED", "LOCK garbage collection freed !UL lock slots for region !AD", 3 },
+	{ "NOTMNAME", "!AD is not a valid M name", 2 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -3015,6 +3027,18 @@ LITDEF	int ERR_FAILEDRECCOUNT = 150384330;
 LITDEF	int ERR_LOADRECCNT = 150384339;
 LITDEF	int ERR_COMMFILTERERR = 150384346;
 LITDEF	int ERR_NOFILTERNEST = 150384354;
+LITDEF	int ERR_MLKHASHTABERR = 150384362;
+LITDEF	int ERR_LOCKCRITOWNER = 150384371;
+LITDEF	int ERR_MLKHASHWRONG = 150384378;
+LITDEF	int ERR_XCRETNULLREF = 150384386;
+LITDEF	int ERR_EXTCALLBOUNDS = 150384396;
+LITDEF	int ERR_EXCEEDSPREALLOC = 150384402;
+LITDEF	int ERR_ZTIMEOUT = 150384408;
+LITDEF	int ERR_ERRWZTIMEOUT = 150384418;
+LITDEF	int ERR_MLKHASHRESIZE = 150384427;
+LITDEF	int ERR_MLKHASHRESIZEFAIL = 150384432;
+LITDEF	int ERR_MLKCLEANED = 150384443;
+LITDEF	int ERR_NOTMNAME = 150384450;
 
 
 LITDEF	int merrors_undocarr[] = {
@@ -3051,7 +3075,7 @@ GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1500,
+	1512,
 	&merrors_undocarr[0],
 	26
 };

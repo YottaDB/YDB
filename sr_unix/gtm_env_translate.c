@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -47,7 +48,7 @@ mval* gtm_env_translate(mval* val1, mval* val2, mval* val_xlated)
 			pakname[env_gtm_env_xlate.len]='\0';
 			pakhandle = fgn_getpak(pakname, ERROR);
 			SFPTR(gtm_env_xlate_entry, (fgnfnc)fgn_getrtn(pakhandle, &routine_name, ERROR));
-			/* With Unicode mstr changes, xc_string_t is no longer compatible with mstr
+			/* With UTF8 mstr changes, xc_string_t is no longer compatible with mstr
 			 * so explicit copy of len/addr fields required */
 		}
 		in1.length = val1->str.len;

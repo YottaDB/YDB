@@ -65,7 +65,6 @@
 #include "zr_unlink_rtn.h"
 
 #ifdef GTM_TRIGGER
-#define PREFIX_SPACE		" "
 #define EMBED_SOURCE_PARM	" -EMBED_SOURCE "
 #define ERROR_CAUSING_JUNK	"XX XX XX XX"
 #define NEWLINE			"\n"

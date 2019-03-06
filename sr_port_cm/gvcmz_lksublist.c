@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,7 +66,7 @@ void gvcmz_lksublist(struct CLB *lnk)
 		len = 1 + 1 + 1 + lk_walk->nref_length; /* regnum + translev + subsc count + key */
 		CM_PUT_USHORT(ptr, len, ((link_info *)(lnk->usr))->convert_byteorder);
 		ptr += SIZEOF(unsigned short);
-		*ptr++ = lk_walk->region->cmx_regnum;
+		*ptr++ = lk_walk->pvtctl.region->cmx_regnum;
 		*ptr++ = lk_walk->translev;
 		assert(256 > lk_walk->subscript_cnt); /* else the assignment "*ptr++ = lk_walk->subscript_cnt" could be lossy */
 		*ptr++ = lk_walk->subscript_cnt;

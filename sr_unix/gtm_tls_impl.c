@@ -195,6 +195,19 @@ STATICDEF struct gtm_ssl_options gtm_ssl_options_list[] =
 	{NULL, 0}
 };
 
+#ifdef	SSL_OP_NO_TLSv1
+	#define	GTM_NO_TLSv1	| SSL_OP_NO_TLSv1
+#else
+	#define	GTM_NO_TLSv1
+#endif
+#ifdef	SSL_OP_NO_TLSv1_1
+	#define	GTM_NO_TLSv1_1	| SSL_OP_NO_TLSv1_1
+#else
+	#define	GTM_NO_TLSv1_1
+#endif
+/* Deprecate all SSL/TLS Protocols before TLS v1.2 */
+#define	DEPRECATED_SSLTLS_PROTOCOLS (SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 GTM_NO_TLSv1 GTM_NO_TLSv1_1)
+
 STATICFNDEF char *parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_table_size, const char *options, long *current,
 					long *clear);
 STATICFNDEF char *parse_SSL_options(struct gtm_ssl_options *opt_table, size_t opt_table_size, const char *options, long *current,
@@ -510,7 +523,7 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		GC_APPEND_OPENSSL_ERROR("Failed to create an SSL context.");
 		return NULL;
 	}
-	SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+	SSL_CTX_set_options(ctx, DEPRECATED_SSLTLS_PROTOCOLS);
 	/* Read the configuration file for more configuration parameters. */
 	cfg = &gtm_tls_cfg;
 	config_init(cfg);

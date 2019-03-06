@@ -18,7 +18,7 @@
  * 1. Range of records ( Eg: Error loading record number: 3 to 10 )
  * 2. Single record ( Eg: Error loading record number: 3 )
  */
-#define MAX_RECLOAD_ERR_MSG_SIZE ((SIZEOF(E_9) *2) + SIZEOF(" to ") + 1)
+#define MAX_RECLOAD_ERR_MSG_SIZE ((STR_LEN_OF_E_9 * 2) + SIZEOF(" to ") + 1)
 
 #define ONERROR_STOP		0
 #define ONERROR_PROCEED		1

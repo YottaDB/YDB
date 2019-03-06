@@ -46,7 +46,7 @@
 #include "have_crit.h"
 #include "gtm_multi_proc.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
@@ -412,7 +412,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						break;
 					if ((outptr + chlen) > outtop1)	/* adding next input char will cross output buffer limit */
 						break;
-					if (!isprintable && (('F' == type2) UNICODE_ONLY(|| (('D' == type2) && gtm_utf8_mode))))
+					if (!isprintable && (('F' == type2) UTF8_ONLY(|| (('D' == type2) && gtm_utf8_mode))))
 					{	/* Since HPUX stops printing lines (via FPRINTF) when it
 						 * encounters a bad character, all platforms in utf8 mode
 						 * will behave as if !AF were specified and put a "." in place

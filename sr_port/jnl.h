@@ -1297,7 +1297,9 @@ MBSTART {														\
 	/* The following condition implies that a previous update process was killed in CMT06, right before updating	\
 	 * JBP->phase2_commit_index2. Increment index2 & call jnl_phase2_cleanup() to process it as a dead commit.	\
 	 */														\
-	if ((JBP->phase2_commit_index2 == JBP->phase2_commit_index1) && (JBP->freeaddr < JBP->rsrv_freeaddr))		\
+	if ((JBP->phase2_commit_index2 == JBP->phase2_commit_index1) && (JBP->freeaddr < JBP->rsrv_freeaddr)		\
+		&& ((JBP->phase2_commit_array[JBP->phase2_commit_index1].start_freeaddr +				\
+			JBP->phase2_commit_array[JBP->phase2_commit_index1].tot_jrec_len) == JBP->rsrv_freeaddr))	\
 	{														\
 		INCR_PHASE2_COMMIT_INDEX(JBP->phase2_commit_index2, JNL_PHASE2_COMMIT_ARRAY_SIZE);			\
 		jnl_phase2_cleanup(CSA, JBP);										\

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,8 +20,8 @@ STATICFNDCL int4 update_trigger_hash_value(char *trigvn, int trigvn_len, char **
 					   stringkey *kill_hash, int old_trig_index, int new_trig_index);
 STATICFNDCL int4 update_trigger_name_value(char *trig_name, int trig_name_len, int new_trig_index);
 
-boolean_t trigger_delete_name(char *trigger_name, uint4 trigger_name_len, uint4 *trig_stats);
+boolean_t trigger_delete_name(mval *trigger_rec, uint4 *trig_stats);
 int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index);
-void trigger_delete_all(char *trigger_rec, uint4 len, uint4 *trig_stats);
+void trigger_delete_all(mval *trigger_rec, uint4 *trig_stats);
 
 #endif

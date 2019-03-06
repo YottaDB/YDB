@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2018 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -36,6 +37,7 @@ SFT_REP_OP		=	0x04
 SFT_ZBRK_ACT		=	0x08
 SFT_DEV_ACT		=	0x10
 SFT_ZTRAP		=	0x20
+SFT_ZTIMEOUT		=	0x40
 SFT_ZSTEP_ACT		=	0x80
 SFT_ZINTR		=	0x100
 

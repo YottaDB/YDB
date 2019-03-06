@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,6 +10,8 @@
  *								*
  ****************************************************************/
 
+#include <sys/shm.h>
+
 #include "mdef.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -18,8 +20,10 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "mlkdef.h"
+#include "do_shmat.h"
 
 /* Include prototypes */
+#include "mlk_ops.h"
 #include "mlk_prcblk_delete.h"
 #include "mlk_unpend.h"
 #include "interlock.h"
@@ -30,13 +34,13 @@ GBLREF short	crash_count;
 
 void mlk_unpend(mlk_pvtblk *p)
 {
-	bool			was_crit;
+	boolean_t		was_crit;
 	sgmnt_addrs		*csa;
 
-	csa = &FILE_INFO(p->region)->s_addrs;
-	GRAB_LOCK_CRIT(csa, p->region, was_crit);
-	mlk_prcblk_delete(p->ctlptr, p->nodptr, process_id);
-	p->ctlptr->wakeups++;
-	REL_LOCK_CRIT(csa, p->region, was_crit);
+	csa = p->pvtctl.csa;
+	GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
+	mlk_prcblk_delete(&p->pvtctl, p->nodptr, process_id);
+	p->pvtctl.ctl->wakeups++;
+	REL_LOCK_CRIT(p->pvtctl, was_crit);
 	return;
 }

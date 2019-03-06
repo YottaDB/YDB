@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 #include "copy.h"
 #include "min_max.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"	/* needed by *TYPEMASK* macros defined in gtm_utf8.h */
 #include "gtm_utf8.h"
 #endif
@@ -78,7 +78,7 @@ int do_pattern(mval *str, mval *pat)
 	int		alt;
 	boolean_t	pte_csh_init;
 	boolean_t	match;
-	UNICODE_ONLY(
+	UTF8_ONLY(
 	wint_t		utf8_codepoint;
 	)
 	DCL_THREADGBL_ACCESS;
@@ -113,7 +113,7 @@ int do_pattern(mval *str, mval *pat)
 	/* "length" actually denotes character length; Get it from the appropriate field in the mstr */
 	if (!gtm_utf8_mode)
 		length = str->str.len;
-	UNICODE_ONLY(
+	UTF8_ONLY(
 	else
 	{
 		MV_FORCE_LEN(str); /* to set str.char_len if not already done; also issues BADCHAR error if appropriate */
@@ -187,7 +187,7 @@ int do_pattern(mval *str, mval *pat)
 						{
 							if (!gtm_utf8_mode)
 								strptr += rept;
-							UNICODE_ONLY(
+							UTF8_ONLY(
 							else
 							{
 								for (unit = 0; unit < rept; unit++)
@@ -220,7 +220,7 @@ int do_pattern(mval *str, mval *pat)
 								goto CALC;
 						}
 					}
-					UNICODE_ONLY(
+					UTF8_ONLY(
 					else
 					{
 						for (unit = 0; unit < rept; unit++)
@@ -247,7 +247,7 @@ int do_pattern(mval *str, mval *pat)
 								success = (dfa_val & pattern_typemask[*strptr]);
 								strnext = strptr + 1;
 							}
-							UNICODE_ONLY(
+							UTF8_ONLY(
 							else
 							{
 								success = (dfa_val &
@@ -267,7 +267,7 @@ int do_pattern(mval *str, mval *pat)
 								success = (dfa_val == *strptr);
 								strnext = strptr + 1;
 							}
-							UNICODE_ONLY(
+							UTF8_ONLY(
 							else
 							{
 								UTF8_VALID(strptr, strtop, strbytelen);
@@ -330,7 +330,7 @@ int do_pattern(mval *str, mval *pat)
 									goto CALC;
 							}
 						}
-						UNICODE_ONLY(
+						UTF8_ONLY(
 						else
 						{
 							for (unit = 0; unit < rept; unit++)
@@ -357,7 +357,7 @@ int do_pattern(mval *str, mval *pat)
 								}
 							}
 						}
-						UNICODE_ONLY(
+						UTF8_ONLY(
 						else
 						{
 							pstr = (unsigned char *)patptr;

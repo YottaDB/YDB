@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@ int pid;
 #define DEBUGPIPEFLUSH
 #endif
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #define SET_WIDTH_BYTES				\
 	width_bytes = 1;			\
 	width_chset = iod->ichset;		\

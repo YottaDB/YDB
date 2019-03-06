@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2015 Fidelity National Information 	*
+ * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
  * where it is instead built as op_fnextract2() due to linkage requirements
  * where values in the transfer table must be consistently assembler or
  * "C" for the correct call signature to be made. Since this routine is
- * changed in the transfer table under certain conditions (unicode or not),
+ * changed in the transfer table under certain conditions (UTF8 or not),
  * the interface needed to be consistent so an assembler stub is made to
  * call this C routine to match the alternate op_fnzextract that could be
  * in that transfer table slot.
@@ -40,7 +40,7 @@ void OP_FNEXTRACT(int last, int first, mval *src, mval *dest)
 	char			*srcbase, *srctop, *srcptr;
 	unsigned char		*cptr, *cstart, *ctop;
 	int			len, skip, bytelen, clen, first_charcnt;
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	utfscan_parseblk	utf_parse_blk;
 	DEBUG_ONLY(utfscan_parseblk utf_parse_blk_save;)
 	boolean_t		success, found_start, utf_parse_blk_setup;
@@ -101,7 +101,7 @@ void OP_FNEXTRACT(int last, int first, mval *src, mval *dest)
 			 dest->str.len, dest->str.addr));
 	} else
 	{	/* Generic extraction of a multi-byte string or UTF8 mode and length unknown */
-#		ifdef UNICODE_SUPPORTED
+#		ifdef UTF8_SUPPORTED
 		utf_parse_blk_setup = FALSE;
 		if (0 >= (last - first + 1))
 		{	/* first is > last - return NULL string */
@@ -199,6 +199,6 @@ void OP_FNEXTRACT(int last, int first, mval *src, mval *dest)
 			 dest->str.len, dest->str.addr));
 #		else
 		assertpro(FALSE);					/* Shouldn't be here if not supported */
-#		endif /* UNICODE_SUPPORTED */
+#		endif /* UTF8_SUPPORTED */
 	}
 }

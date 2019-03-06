@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2017 Fidelity National Information	*
+ * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,9 +22,11 @@ enum perm_target_types
     PERM_EXEC = 0x04			/* Request execute permissions, masked with the above. Currently only used with PERM_IPC */
 };
 
+#define MAX_PERM_LEN		12
 #define MAX_PRINT_GID_LEN	128
 #define GID_ELLIPSIS		"..."
 #define GID_ELLIPSIS_LEN	4
+#define PERMALL			07777
 
 struct perm_diag_data
 {
@@ -32,9 +34,9 @@ struct perm_diag_data
 	gid_t	this_gid;
 	uid_t	file_uid;
 	gid_t	file_gid;
-	char	file_perm[12];
+	char	file_perm[MAX_PERM_LEN];
 	gid_t	lib_gid;
-	char	lib_perm[12];
+	char	lib_perm[MAX_PERM_LEN];
 	char	print_gid_list[MAX_PRINT_GID_LEN];	/* Can't imagine this getting any longer in the real world */
 	int	print_gid_list_len;
 };

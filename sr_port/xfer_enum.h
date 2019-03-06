@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -36,8 +37,8 @@ enum
 
 typedef int (* volatile xfer_entry_t)();
 
-#ifndef UNICODE_SUPPORTED
-/* Call "z" counterparts for non-unicode flavor of these functions on VMS. */
+#ifndef UTF8_SUPPORTED
+/* Call "z" counterparts for non-utf8 flavor of these functions on VMS. */
 #define op_fnascii op_fnzascii
 #define op_fnchar op_fnzchar
 #define op_fnextract op_fnzextract
@@ -52,5 +53,5 @@ typedef int (* volatile xfer_entry_t)();
 #define op_setp1 op_setzp1
 #define op_fntranslate op_fnztranslate
 #define op_fnreverse op_fnzreverse
-#endif /* UNICODE_SUPPORTED */
+#endif /* UTF8_SUPPORTED */
 #endif /* XFER_ENUM_H */

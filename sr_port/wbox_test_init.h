@@ -189,7 +189,15 @@ typedef enum {
 	WBTEST_JNL_WRITE_HANG,			/* 142 : Hang after a number of journal writes */
 	WBTEST_DB_WRITE_HANG,			/* 143 : Hang after a number of database writes */
 	WBTEST_EXPECT_IO_HANG,			/* 144 : Like the above two cases, but using external tools to cause the hang. */
-	WBTEST_MURUNDOWN_KILLCMT06		/* 145 : Kill an update process in CMT06, to test a special case */
+	WBTEST_MURUNDOWN_KILLCMT06,		/* 145 : Kill an update process in CMT06, to test a special case */
+	WBTEST_TRASH_HASH_RECOVER,		/* 146 : Fill hash table with junk and recover */
+	WBTEST_TRASH_HASH_NO_RECOVER,		/* 147 : Fill hash table with junk */
+	WBTEST_MLOCK_HANG,			/* 148 : Hang after getting mlock so something can issue MUPIP STOP on us */
+	WBTEST_MLOCK_HANG_AFTER_SCAN,		/* 149 : Hang after scanning pids so something can change root block on us */
+	WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY,	/* 150 : Force wcs_get_space() to attempt cache verification */
+	WBTEST_LOCK_HASH_ZTW,			/* 151 : Put the hash of each LOCK command's final node in $ZTWORMHOLE */
+	WBTEST_LOCK_HASH_OFLOW,			/* 152 : Allow hash neighborhood overflow without complaint */
+	WBTEST_ZTIMEOUT_TRACE			/* 153 : Trace the setting/deferring of ztimeout when trigerred */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

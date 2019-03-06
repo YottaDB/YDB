@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,7 +13,7 @@
 #include "mdef.h"
 #include "op.h"
 #include "gtm_utf8.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 # include "utfcgr.h"
 #else
 # include "utfcgr_trc.h"

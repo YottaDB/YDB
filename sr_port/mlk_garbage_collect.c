@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,21 +21,23 @@
 #include "mlk_shrclean.h"
 #include "mlk_shrsub_garbage_collect.h"
 
-void mlk_garbage_collect(mlk_ctldata_ptr_t ctl,
+void mlk_garbage_collect(mlk_pvtblk *p,
 			 uint4 size,
-			 mlk_pvtblk *p)
+			 boolean_t force)
 {
-	ptroff_t *d;
+	mlk_ctldata_ptr_t	ctl;
 
-	if (ctl->subtop - ctl->subfree < size)
-		mlk_shrsub_garbage_collect(ctl);
+	ctl = p->pvtctl.ctl;
+	if (force || ctl->gc_needed || (ctl->subtop - ctl->subfree < size))
+		mlk_shrsub_garbage_collect(&p->pvtctl);
 
-	if ((ctl->blkcnt < p->subscript_cnt) || (ctl->subtop - ctl->subfree < size))
+	if (force || ctl->gc_needed || (ctl->blkcnt < p->subscript_cnt) || (ctl->subtop - ctl->subfree < size))
 	{
-		d = (ptroff_t *) &ctl->blkroot;
-		mlk_shrclean(p->region, ctl, (mlk_shrblk_ptr_t)R2A(*d));
-		mlk_shrsub_garbage_collect(ctl);
+		mlk_shrclean(&p->pvtctl);
+		ctl = p->pvtctl.ctl;			// mlk_shrclean() can drop lock crit, so grab current ctl to be safe.
+		mlk_shrsub_garbage_collect(&p->pvtctl);
 	}
+	ctl->gc_needed = FALSE;
 
 	return;
 }

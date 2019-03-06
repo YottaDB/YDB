@@ -49,6 +49,13 @@ typedef struct
 #pragma pointer_size (restore)
 #endif
 
+struct extcall_string
+{
+        long    len;
+        char    *addr;
+};
+
+
 #if !defined(__alpha)
 typedef intptr_t	gtm_tid_t;
 #else

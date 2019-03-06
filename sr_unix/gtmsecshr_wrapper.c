@@ -64,6 +64,7 @@
 #define	REL_PATH_TO_GTMSECSHR "./gtmsecshr"
 #define	GTMSECSHR_BASENAME "/gtmsecshr"
 #define MAX_ENV_NAME_LEN 2048
+#define	PERMALL		07777
 
 /* Build up some defines for use with AIX and reading /etc/environment to pick up a default TZ value plus some defines
  * for testing AIX errors in this wrapper with white box test cases.
@@ -404,7 +405,7 @@ int main()
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRNOTOWNEDBYROOT, gtm_secshrdir_path_display);
 		else if (gtm_secshrdir_stat.st_mode & 0277)
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRPERMINCRCT, gtm_secshrdir_path_display,
-					gtm_secshrdir_stat.st_mode & 0777);
+					gtm_secshrdir_stat.st_mode & PERMALL);
 		else if (-1 == Stat(REL_PATH_TO_GTMSECSHR, &gtm_secshr_stat))
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSTATFAILED, gtm_secshr_path_display, errno);
 		else if (ROOTUID != gtm_secshr_stat.st_uid)

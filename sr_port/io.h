@@ -168,7 +168,7 @@ typedef struct io_desc_struct
  *
  * ICHSET: UTF-16
  * First READ: Not BOM
- * Transition to UTF-16BE per Unicode standard
+ * Transition to UTF-16BE per standard
  *
  * ICHSET: UTF-16LE (or UTF-16BE)
  * First READ: BOM or not BOM

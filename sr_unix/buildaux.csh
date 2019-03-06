@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2017 Fidelity National Information		#
+# Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -71,7 +71,7 @@ if ( $buildaux_status ) then
 	exit $buildaux_status
 endif
 
-set buildaux_auxillaries = "gde dse geteuid gtmsecshr lke mupip gtcm_server gtcm_gnp_server gtmcrypt"
+set buildaux_auxillaries = "gde gtmsecshr dse geteuid lke mupip gtcm_server gtcm_gnp_server gtmcrypt"
 set buildaux_utilities = "semstat2 ftok gtcm_pkdisp gtcm_shmclean gtcm_play dbcertify"
 set buildaux_executables = "$buildaux_auxillaries $buildaux_utilities"
 set buildaux_validexecutable = 0
@@ -163,21 +163,22 @@ if (! $skip_auxillaries) then
 		# Building GDE cannot happen parallely with buildshr as this stage requires "mumps" which is built by "buildshr".
 		# Take that into account when parallelizing. If buildshr is also happening now, then defer buildgde to after that.
 		if ($do_buildshr) then
-			echo "wait" >> $cmdfile.csh
+			echo "wait"									>> $cmdfile.csh
 		endif
-		echo "($gtm_tools/buildaux_gde.csh $gt_image; $err_check) $redir &" >> $cmdfile.csh
+		echo "($gtm_tools/buildaux_gde.csh $gt_image; $err_check) $redir &"			>> $cmdfile.csh
 	endif
 	set double_quote = '"'
 	set args3 = "$gt_image ${double_quote}${gt_ld_options}${double_quote} $3"
-	set args3exelist = "dse geteuid gtmsecshr lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean"
+	set args3exelist = "gtmsecshr dse geteuid lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean"
 	set args3exelist = "$args3exelist semstat2 ftok dbcertify"
 	foreach exe ($args3exelist)
+		set bg = '&'
 		set val = `eval echo '${'buildaux_${exe}'}'`
 		if ($val == 1) then
 			set outfile = "${cmdfile}_buildaux_${exe}.log"
 			set redir=">& $outfile"
 			set outlist = "$outlist $outfile"
-			echo "($gtm_tools/buildaux_${exe}.csh $args3; $err_check) $redir &" >> $cmdfile.csh
+			echo "($gtm_tools/buildaux_${exe}.csh $args3; $err_check) $redir $bg"		>> $cmdfile.csh
 		endif
 	end
 	# Create the plugin directory, copy the files and set it up so that build.sh can build the needed libraries.
@@ -185,7 +186,7 @@ if (! $skip_auxillaries) then
 		set outfile = "${cmdfile}_buildaux_gtmcrypt.log"
 		set redir=">& $outfile"
 		set outlist = "$outlist $outfile"
-		echo "($gtm_tools/buildaux_gtmcrypt.csh; $err_check) $redir &" >> $cmdfile.csh
+		echo "($gtm_tools/buildaux_gtmcrypt.csh; $err_check) $redir &"				>> $cmdfile.csh
 	endif
 endif
 

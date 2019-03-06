@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -188,7 +189,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 				nlen = -LEN_OF_3_CHAR_ABBREV;
 			} else
 			{
-				UNICODE_ONLY(gtm_utf8_mode ? op_fnp1(mo_str, comma, month, &temp_mval) :
+				UTF8_ONLY(gtm_utf8_mode ? op_fnp1(mo_str, comma, month, &temp_mval) :
 					                     op_fnzp1(mo_str, comma, month, &temp_mval));
 				VMS_ONLY(op_fnzp1(mo_str, comma, month, &temp_mval, TRUE));
 				nlen = -temp_mval.str.len;
@@ -214,7 +215,7 @@ void op_fnzdate(mval *src, mval *fmt, mval *mo_str, mval *day_str, mval *dst)
 				nlen = -LEN_OF_3_CHAR_ABBREV;
 			} else
 			{
-				UNICODE_ONLY(gtm_utf8_mode ? op_fnp1(day_str, comma, dow, &temp_mval)
+				UTF8_ONLY(gtm_utf8_mode ? op_fnp1(day_str, comma, dow, &temp_mval)
 							   : op_fnzp1(day_str, comma, dow, &temp_mval));
 				VMS_ONLY(op_fnzp1(day_str, comma, dow, &temp_mval, TRUE));
 				nlen = -temp_mval.str.len;

@@ -22,7 +22,7 @@
 #include <errno.h>
 #include "gtm_stdio.h"
 #include "gtm_string.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
@@ -37,7 +37,7 @@ GBLREF char	**cmd_arg;
 GBLDEF boolean_t gtm_cli_interpret_string = TRUE;
 GBLDEF IN_PARMS *cli_lex_in_ptr;
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 GBLREF	boolean_t	gtm_utf8_mode;
 #define CLI_GET_CHAR(PTR, BUFEND, CHAR) (gtm_utf8_mode ? UTF8_MBTOWC(PTR, BUFEND, CHAR) : (CHAR = (wint_t)*(PTR), (PTR) + 1))
 #define CLI_PUT_CHAR(PTR, CHAR) (gtm_utf8_mode ? UTF8_WCTOMB(CHAR, PTR) : (*(PTR) = CHAR, (PTR) + 1))
@@ -54,7 +54,7 @@ static int tok_string_extract(void)
 	boolean_t	have_quote, first_quote;
 	uchar_ptr_t	in_sp, out_sp, in_next, last_in_next,
 			bufend;	/* really one past last byte of buffer */
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	wint_t		ch;
 #	else
 	int		ch;
@@ -165,7 +165,7 @@ void	cli_lex_setup (int argc, char **argv)
 	{	/* We have the cure for a missing or unusable buffer */
 		if (cli_lex_in_ptr)
 			free(cli_lex_in_ptr);
-		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + parmlen);
+		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + parmlen + 1);
 		cli_lex_in_ptr->buflen = parmlen;
 	}
 	cli_lex_in_ptr->argc = argc;
@@ -184,7 +184,7 @@ void cli_str_setup(int addrlen, char *addr)
 	{	/* We have the cure for a missing or unusable buffer */
 		if (cli_lex_in_ptr)
 			free(cli_lex_in_ptr);
-		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + alloclen);
+		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + alloclen + 1);
 		cli_lex_in_ptr->buflen = alloclen;
 	}
 	cli_lex_in_ptr->argv = NULL;
@@ -273,14 +273,14 @@ int cli_is_assign(char *p)
 void	skip_white_space(void)
 {
 	uchar_ptr_t	in_sp;
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	wint_t	ch;
 	uchar_ptr_t	next_sp, bufend;
 #	endif
 
 	assert(cli_lex_in_ptr);
 	in_sp = (uchar_ptr_t)cli_lex_in_ptr->tp;
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	if (gtm_utf8_mode)
 	{
 		bufend = (uchar_ptr_t)(cli_lex_in_ptr->in_str + cli_lex_in_ptr->buflen);
@@ -315,7 +315,7 @@ static int	tok_extract (void)
 {
 	int	token_len;
 	uchar_ptr_t	in_sp, in_next, out_sp, bufend;
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	wint_t		ch;
 #	else
 	int		ch;
@@ -336,7 +336,7 @@ static int	tok_extract (void)
 		token_len = 1;
 	} else if (ch)				/* only if something there */
 	{
-		/* smw if quotable, need to unicode isspace (BYPASSOK) */
+		/* smw if quotable, need to utf8 isspace (BYPASSOK) */
 		/* '-' is not a token separator */
 		while(ch && !CLI_ISSPACE(ch)
 		  && ch != '=')
@@ -369,7 +369,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 {
 	size_t	in_len;
 	char	cli_fgets_buffer[MAX_LINE], *destbuffer, *retptr;
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	int		mbc_len, u16_off, destsize;
 	int32_t		mbc_dest_len;
 	UErrorCode	errorcode;
@@ -380,7 +380,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 	static FILE	*save_fp; /* Only used in this routine so not using STATICDEF */
 #	endif
 
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	if (gtm_utf8_mode)
 	{
 		cli_fgets_Ubuffer[0] = 0;
@@ -482,7 +482,7 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 				cli_lex_in_ptr->tp = destbuffer;
 		} else if (cli_lex_str)
 			cli_lex_in_ptr->tp = NULL;
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	}
 #	endif
 	return retptr;
@@ -654,7 +654,7 @@ int cli_get_string_token(int *eof)
  */
 int cli_has_space(char *p)
 {
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	uchar_ptr_t	local_p, next_p, bufend;
 	wint_t	ch;
 

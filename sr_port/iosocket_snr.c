@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -268,7 +268,7 @@ ssize_t iosocket_snr_io(socket_struct *socketptr, void *buffer, size_t maxlength
 /* When scanning for delimiters, we have to make sure that the next read can pull in at least one full utf char.
  * Failure to do this means that if a partial utf8 char is read, it will be rebuffered, reread, rebuffered, forever.
  * A return code of zero indicates a timeout error occured. A negative return code indicates an IO error of some sort.
- * A positive return code is the length in bytes of the next unicode char in the buffer.
+ * A positive return code is the length in bytes of the next utf char in the buffer.
  */
 ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int flags, ABS_TIME *time_for_read,
 				   boolean_t wait_for_input)

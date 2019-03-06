@@ -193,6 +193,7 @@ GBLREF	sigset_t	blockalrm;
 GBLREF	sigset_t	block_ttinout;
 GBLREF	sigset_t	block_sigsent;
 GBLREF	sigset_t	block_worker;
+GBLREF  sigset_t        block_sigusr;
 GBLREF 	volatile int4	fast_lock_count;
 GBLREF	boolean_t	oldjnlclose_started;
 GBLREF	void		(*jnl_file_close_timer_ptr)(void);	/* Initialized only in gtm_startup(). */
@@ -278,6 +279,14 @@ void set_blocksig(void)
 	sigdelset(&block_worker, SIGKILL);
 	sigdelset(&block_worker, SIGFPE);
 	sigdelset(&block_worker, SIGBUS);
+	sigemptyset(&block_sigusr);
+	sigaddset(&block_sigusr, SIGINT);
+	sigaddset(&block_sigusr, SIGQUIT);
+	sigaddset(&block_sigusr, SIGTERM);
+	sigaddset(&block_sigusr, SIGTSTP);
+	sigaddset(&block_sigusr, SIGCONT);
+	sigaddset(&block_sigusr, SIGALRM);
+	sigaddset(&block_sigusr, SIGUSR1);
 	blocksig_initialized = TRUE;	/* note the fact that blockalrm and block_sigsent are initialized */
 }
 
@@ -769,10 +778,10 @@ STATICFNDEF void timer_handler(int why)
 					rel_time = sub_abs_time(&at, &old_at);
 					late_time.at_sec += rel_time.at_sec;
 					late_time.at_usec += rel_time.at_usec;
-					if (late_time.at_usec > MICROSEC_IN_SEC)
+					if (late_time.at_usec > MICROSECS_IN_SEC)
 					{
 						late_time.at_sec++;
-						late_time.at_usec -= MICROSEC_IN_SEC;
+						late_time.at_usec -= MICROSECS_IN_SEC;
 					}
 #					endif
 				}
@@ -1113,39 +1122,42 @@ void check_for_deferred_timers(void)
  * can use this timing facility. Current problem is that external calls are doing their own catching
  * of sigalarms that should be ours, so we end up hung.
  */
-void check_for_timer_pops()
+void check_for_timer_pops(boolean_t sig_handler_changed)
 {
 	int			rc, stolenwhen = 0;		/* 0 = no, 1 = not first, 2 = first time */
 	sigset_t 		savemask;
 	struct sigaction 	current_sa;
-
-	sigaction(SIGALRM, NULL, &current_sa);	/* get current info */
-	if (!first_timeset)
+	if (sig_handler_changed)
 	{
-		if (timer_handler != current_sa.sa_handler)	/* check if what we expected */
+		sigaction(SIGALRM, NULL, &current_sa);	/* get current info */
+		if (!first_timeset)
 		{
-			init_timers();
-			if (!stolen_timer)
+			if (timer_handler != current_sa.sa_handler)	/* check if what we expected */
 			{
-				stolen_timer = TRUE;
-				stolenwhen = 1;
+				init_timers();
+				if (!stolen_timer)
+				{
+					stolen_timer = TRUE;
+					stolenwhen = 1;
+				}
 			}
-		}
-	} else	/* we haven't set so should be ... */
-	{
-		if ((SIG_IGN != current_sa.sa_handler) &&	/* as set by sig_init */
-		    (SIG_DFL != current_sa.sa_handler)) 	/* utils, compile */
+		} else	/* we haven't set so should be ... */
 		{
-			if (!stolen_timer)
+			if ((SIG_IGN != current_sa.sa_handler) &&	/* as set by sig_init */
+			    (SIG_DFL != current_sa.sa_handler)) 	/* utils, compile */
 			{
-				stolen_timer = TRUE;
-				stolenwhen = 2;
+				if (!stolen_timer)
+				{
+					stolen_timer = TRUE;
+					stolenwhen = 2;
+				}
 			}
 		}
 	}
 	if (timeroot && (1 > timer_stack_count))
 	{
-		timer_handler(DUMMY_SIG_NUM);
+		DEFERRED_EXIT_HANDLING_CHECK;                                   /* Check for deferred wcs_stale() timer */
+
 	}
 	if (stolenwhen)
 	{

@@ -681,7 +681,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 						FALSE, TRUE, CALLFROM);
 					SEND_MSG_CSA(VARLSTCNT(13) ERR_DBCRERR, 11, DB_LEN_STR(reg), cr, cr->blk,
 						RTS_ERROR_TEXT("Block certification result buffer"),
-						bptmp, csa->lock_addrs[0], CALLFROM);
+						bptmp, csa->mlkctl, CALLFROM);
 					assert(expect_damage);
 				}
 			}

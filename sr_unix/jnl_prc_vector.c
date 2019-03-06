@@ -27,7 +27,7 @@
 #include "filestruct.h"
 #include "jnl.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"	/* needed by *TYPEMASK* macros defined in gtm_utf8.h */
 #include "gtm_utf8.h"
 #endif
@@ -57,7 +57,7 @@ void jnl_prc_vector (jnl_process_vector *pv)
 	{
 		SNPRINTF(pv->jpv_user, JPV_LEN_USER, "%s", pw->pw_name);
 		SNPRINTF(pv->jpv_prcnam, JPV_LEN_PRCNAM, "%s", pw->pw_name);
-#		ifdef UNICODE_SUPPORTED
+#		ifdef UTF8_SUPPORTED
 		/* In UTF8 mode, trim the string (if necessary) to contain only as many valid multi-byte characters as can fit in */
 		if (gtm_utf8_mode)
 		{

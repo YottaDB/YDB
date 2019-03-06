@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,9 +33,9 @@ void op_fnzsubstr(mval* src, int first, int byte_width, mval* dest)
 		return;
 	}
 	srctop = src->str.addr + src->str.len;
-	UNICODE_ONLY(if (!gtm_utf8_mode || (src_is_singlebyte = MV_IS_SINGLEBYTE(src)))) /* entirely single byte string */
+	UTF8_ONLY(if (!gtm_utf8_mode || (src_is_singlebyte = MV_IS_SINGLEBYTE(src)))) /* entirely single byte string */
 		srcbase =  src->str.addr + first - 1;
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	else
 	{ /* generic extraction of a multi-byte string */
 		for (srcbase = src->str.addr, skip = first - 1; (skip > 0 && srcbase < srctop); --skip)
@@ -54,7 +55,7 @@ void op_fnzsubstr(mval* src, int first, int byte_width, mval* dest)
 	if (srctop - srcbase > byte_width)
 	{
 		srcptr = srcbase + byte_width;
-#		ifdef UNICODE_SUPPORTED
+#		ifdef UTF8_SUPPORTED
 		if (gtm_utf8_mode)
 		{
 			if (src_is_singlebyte)
@@ -71,7 +72,7 @@ void op_fnzsubstr(mval* src, int first, int byte_width, mval* dest)
 		dest->str.len = INTCAST(srcptr - srcbase);
 	} else /* width exceeds the length, so return the rest of the entire string */
 		dest->str.len = INTCAST(srctop - srcbase);
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	if (gtm_utf8_mode && !src_is_singlebyte && !badchar_inhibit)
 		MV_FORCE_LEN(dest); /* catch BADCHAR (if any) */
 #	endif

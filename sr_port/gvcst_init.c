@@ -134,10 +134,11 @@ MBSTART {														\
 
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	boolean_t		created_core, dont_want_core;
-GBLREF  gd_region               *gv_cur_region;
+GBLREF  gd_region               *db_init_region, *gv_cur_region, *ftok_sem_reg;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
 GBLREF	sgmnt_addrs		*cs_addrs_list;
+GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	boolean_t		gtmcrypt_initialized;
 GBLREF	boolean_t		gtcm_connection;
 GBLREF	gd_addr			*gd_header;
@@ -171,6 +172,7 @@ GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	uint4			process_id;
+
 LITREF char			gtm_release_name[];
 LITREF int4			gtm_release_name_len;
 LITREF mval			literal_statsDB_gblname;
@@ -302,12 +304,20 @@ void	assert_jrec_member_offsets(void)
 
 CONDITION_HANDLER(gvcst_init_autoDB_ch)
 {
+	gd_region	*reg;
+
 	START_CH(TRUE);
 	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
 	{
-		assert(FALSE);  /* don't know of any possible INFO/SUCCESS errors */
-		CONTINUE;                       /* Keep going for non-error issues */
+		assert(FALSE);	/* don't know of any possible INFO/SUCCESS errors */
+		CONTINUE;	/* Keep going for non-error issues */
 	}
+	if (IS_STATSDB_REG(db_init_region))
+		STATSDBREG_TO_BASEDBREG(db_init_region, reg);
+	else
+		reg = db_init_region;
+	if ((NULL != ftok_sem_reg) && !ftok_sem_release(reg, FALSE, FALSE))	/* release ftok lock on the base region */
+		assert(FALSE);
 	/* Enable interrupts in case we are here with intrpt_ok_state == INTRPT_IN_GVCST_INIT due to an rts error.
 	 * Normally we would have the new state stored in "prev_intrpt_state" but that is not possible here because
 	 * the corresponding DEFER_INTERRUPTS happened in "gvcst_init" (a different function) so we have an assert
@@ -408,70 +418,8 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		}
 		baseDBcsa = &FILE_INFO(baseDBreg)->s_addrs;
 		baseDBnl = baseDBcsa->nl;
-		if (0 == baseDBnl->statsdb_fname_len)
-		{	/* This can only be true if it was set that way in gvcst_set_statsdb_fname(). Each error case sets a
-			 * reason value in TREF(statsdb_fnerr_reason) so use that to give a useful error message.
-			 */
-			switch(TREF(statsdb_fnerr_reason))
-			{
-				case FNERR_NOSTATS:
-					errrsn_text = FNERR_NOSTATS_TEXT;
-					errrsn_text_len = SIZEOF(FNERR_NOSTATS_TEXT) - 1;
-					break;
-				case FNERR_STATSDIR_TRNFAIL:
-					errrsn_text = FNERR_STATSDIR_TRNFAIL_TEXT;
-					errrsn_text_len = SIZEOF(FNERR_STATSDIR_TRNFAIL_TEXT) - 1;
-					break;
-				case FNERR_STATSDIR_TRN2LONG:
-					errrsn_text = FNERR_STATSDIR_TRN2LONG_TEXT;
-					errrsn_text_len = SIZEOF(FNERR_STATSDIR_TRN2LONG_TEXT) - 1;
-					break;
-				case FNERR_INV_BASEDBFN:
-					errrsn_text = FNERR_INV_BASEDBFN_TEXT;
-					errrsn_text_len = SIZEOF(FNERR_INV_BASEDBFN_TEXT) - 1;
-					break;
-				case FNERR_FTOK_FAIL:
-					errrsn_text = FNERR_FTOK_FAIL_TEXT;
-					errrsn_text_len = SIZEOF(FNERR_FTOK_FAIL_TEXT) - 1;
-					break;
-				case FNERR_FNAMEBUF_OVERFLOW:
-					errrsn_text = FNERR_FNAMEBUF_OVERFLOW_TEXT;
-					errrsn_text_len = SIZEOF(FNERR_FNAMEBUF_OVERFLOW_TEXT) - 1;
-					break;
-				case FNERR_NOERR:
-				default:
-					assertpro(FALSE);
-			}
-			assert(TREF(gvcst_statsDB_open_ch_active));	/* so the below error goes to syslog and not to user */
-			baseDBreg->reservedDBFlags |= RDBF_NOSTATS;	/* Disable STATS in base DB */
-			baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg), ERR_STATSDBFNERR, 2,
-				      errrsn_text_len, errrsn_text);
-		}
-		COPY_STATSDB_FNAME_INTO_STATSREG(reg, baseDBnl->statsdb_fname, baseDBnl->statsdb_fname_len);
-		seg = reg->dyn.addr;
-		if (!seg->blk_size)
-		{	/* This is a region/segment created by "mu_gv_cur_reg_init" (which sets most of reg/seg fields to 0).
-			 * Now that we need a non-zero blk_size, do what GDE did to calculate the statsdb block-size.
-			 * But since we cannot duplicate that code here, we set this to the same value effectively but
-			 * add an assert that the two are the same in "gd_load" function.
-			 * Take this opportunity to initialize other seg/reg fields for statsdbs like what GDE would have done.
-			 */
-			seg->blk_size = STATSDB_BLK_SIZE;
-			/* Similar code for a few other critical fields that need initialization before "mu_cre_file" */
-			seg->allocation = STATSDB_ALLOCATION;
-			seg->ext_blk_count = STATSDB_EXTENSION;
-			reg->max_key_size = STATSDB_MAX_KEY_SIZE;
-			reg->max_rec_size = STATSDB_MAX_REC_SIZE;
-			/* The below is directly inherited from the base db so no macro/assert like above fields */
-			seg->mutex_slots = NUM_CRIT_ENTRY(baseDBcsa->hdr);
-			reg->mumps_can_bypass = TRUE;
-		}
-		/* Before "dbfilopn" of a statsdb, check if it has been created. If not, create it (as it is an autodb).
-		 * Use FTOK of the base db as a lock, the same lock that is obtained when statsdb is auto deleted.
-		 */
 		if (!baseDBnl->statsdb_created)
-		{
+		{	/* Before "dbfilopn" of a statsdb, check if it has been created. If not, create it (as it is an autodb).*/
 			/* Disable interrupts for the time we hold the ftok lock as it is otherwise possible we get a SIG-15
 			 * and go to exit handling and try a nested "ftok_sem_lock" on the same basedb and that could pose
 			 * multiple issues (e.g. ftok_sem_lock starts a timer while waiting in the "semop" call and we will
@@ -498,19 +446,81 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 				assert(!mupip_jnl_recover);
 				TP_FINAL_RETRY_DECREMENT_T_TRIES_IF_OK;
 			}
+			db_init_region = baseDBreg;				/* gvcst_init_autoDB_ch needs reg 4 ftok_sem_lock */
 			DEFER_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
 			assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state);	/* relied upon by ENABLE_INTERRUPTS
 										 * in "gvcst_init_autoDB_ch".
 										 */
-			ESTABLISH(gvcst_init_autoDB_ch);
 			if (!ftok_sem_lock(baseDBreg, FALSE))
-			{
+			{	/* Use FTOK of the base db as a lock, the same lock obtained when statsdb is auto deleted */
 				assert(FALSE);
 				rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
 			}
+			ESTABLISH(gvcst_init_autoDB_ch);	/* ch reverses the DEFER and lock in the opposite order */
+			if (0 == baseDBnl->statsdb_fname_len)
+			{	/* Initialize cnl->statsdb_fname from the basedb name */
+				baseDBnl->statsdb_fname_len = ARRAYSIZE(baseDBnl->statsdb_fname);
+				gvcst_set_statsdb_fname(baseDBcsa->hdr, baseDBreg, baseDBnl->statsdb_fname,
+					&baseDBnl->statsdb_fname_len);
+			}
+			if (0 == baseDBnl->statsdb_fname_len)
+			{	/* only true if gvcst_set_statsdb_fname had a problem and set it that way in */
+				switch(TREF(statsdb_fnerr_reason))
+				{	/* turn the reason from gvcst_set_statsdb_fname into a useful error message */
+					case FNERR_NOSTATS:
+						errrsn_text = FNERR_NOSTATS_TEXT;
+						errrsn_text_len = SIZEOF(FNERR_NOSTATS_TEXT) - 1;
+						break;
+					case FNERR_STATSDIR_TRNFAIL:
+						errrsn_text = FNERR_STATSDIR_TRNFAIL_TEXT;
+						errrsn_text_len = SIZEOF(FNERR_STATSDIR_TRNFAIL_TEXT) - 1;
+						break;
+					case FNERR_STATSDIR_TRN2LONG:
+						errrsn_text = FNERR_STATSDIR_TRN2LONG_TEXT;
+						errrsn_text_len = SIZEOF(FNERR_STATSDIR_TRN2LONG_TEXT) - 1;
+						break;
+					case FNERR_INV_BASEDBFN:
+						errrsn_text = FNERR_INV_BASEDBFN_TEXT;
+						errrsn_text_len = SIZEOF(FNERR_INV_BASEDBFN_TEXT) - 1;
+						break;
+					case FNERR_FTOK_FAIL:
+						errrsn_text = FNERR_FTOK_FAIL_TEXT;
+						errrsn_text_len = SIZEOF(FNERR_FTOK_FAIL_TEXT) - 1;
+						break;
+					case FNERR_FNAMEBUF_OVERFLOW:
+						errrsn_text = FNERR_FNAMEBUF_OVERFLOW_TEXT;
+						errrsn_text_len = SIZEOF(FNERR_FNAMEBUF_OVERFLOW_TEXT) - 1;
+						break;
+					default:
+						assertpro(FALSE);
+				}
+				assert(TREF(gvcst_statsDB_open_ch_active));	/* below error goes to syslog and not to user */
+				baseDBreg->reservedDBFlags |= RDBF_NOSTATS;	/* Disable STATS in base DB */
+				baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg), ERR_STATSDBFNERR,
+					      2, errrsn_text_len, errrsn_text);
+			}
+			COPY_STATSDB_FNAME_INTO_STATSREG(reg, baseDBnl->statsdb_fname, baseDBnl->statsdb_fname_len);
+			seg = reg->dyn.addr;
+			if (!seg->blk_size)
+			{	/* Region/segment created by "mu_gv_cur_reg_init" (which sets most of reg/seg fields to 0).
+				* Now that we need a non-zero blk_size, do what GDE did to calculate the statsdb block-size.
+				* But since we cannot duplicate that code here, we set this to the same value effectively but
+				* add an assert that the two are the same in "gd_load" function.
+				* Take this opportunity to initialize other seg/reg fields for statsdbs as GDE would have done.
+				*/
+				seg->blk_size = STATSDB_BLK_SIZE;
+				/* Similar code for a few other critical fields that need initialization before "mu_cre_file" */
+				seg->allocation = STATSDB_ALLOCATION;
+				seg->ext_blk_count = STATSDB_EXTENSION;
+				reg->max_key_size = STATSDB_MAX_KEY_SIZE;
+				reg->max_rec_size = STATSDB_MAX_REC_SIZE;
+				/* The below is directly inherited from the base db so no macro/assert like above fields */
+				seg->mutex_slots = NUM_CRIT_ENTRY(baseDBcsa->hdr);
+				reg->mumps_can_bypass = TRUE;
+			}
 			for ( ; ; )     /* for loop only to let us break from error cases without having a deep if-then-else */
-			{
-				/* Now that we have the lock, check if the db is already created */
+			{	/* with the ftok lock in place, check if the db is already created */
 				if (baseDBnl->statsdb_created)
 					break;
 				/* File still not created. Do it now under the ftok lock. */
@@ -531,6 +541,12 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 				DBGRDB((stderr, "gvcst_init: Create of statsDB failed - rc = %d\n", save_errno));
 				for ( ; ; )     /* for loop only to handle error cases without having a deep if-then-else */
 				{
+					if (EACCES == TREF(mu_cre_file_openrc))
+					{
+						statsdb_rcerr = STATSDB_OPNERR;
+						save_errno = errno;
+						break;
+					}
 					if (EEXIST != TREF(mu_cre_file_openrc))
 					{
 						statsdb_rcerr = STATSDB_NOTEEXIST;
@@ -646,6 +662,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 											 */
 					baseDBreg->reservedDBFlags |= RDBF_NOSTATS;	/* Disable STATS in base DB */
 					baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
+					baseDBnl->statsdb_fname_len = 0;
 					if (!ftok_sem_release(baseDBreg, FALSE, FALSE))
 					{	/* Release the lock before unwinding back */
 						assert(FALSE);
@@ -727,13 +744,27 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 				}
 				break;
 			}
+			REVERT;
 			if (!ftok_sem_release(baseDBreg, FALSE, FALSE))
 			{
 				assert(FALSE);
 				rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
 			}
-			REVERT;
 			ENABLE_INTERRUPTS(INTRPT_IN_GVCST_INIT, prev_intrpt_state);
+		} else
+		{
+			COPY_STATSDB_FNAME_INTO_STATSREG(reg, baseDBnl->statsdb_fname, baseDBnl->statsdb_fname_len);
+			seg = reg->dyn.addr;
+			if (!seg->blk_size)
+			{	/* see comment above on why we this initialization for a statsDB */
+				seg->blk_size = STATSDB_BLK_SIZE;
+				seg->allocation = STATSDB_ALLOCATION;
+				seg->ext_blk_count = STATSDB_EXTENSION;
+				reg->max_key_size = STATSDB_MAX_KEY_SIZE;
+				reg->max_rec_size = STATSDB_MAX_REC_SIZE;
+				seg->mutex_slots = NUM_CRIT_ENTRY(baseDBcsa->hdr);
+				reg->mumps_can_bypass = TRUE;
+			}
 		}
 	}
 #	ifdef DEBUG
@@ -900,7 +931,9 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		csa->persistent_freeze = FALSE;	/* want secshr_db_clnup() to clear an incomplete freeze/unfreeze codepath */
 		csa->regcnt = 1;	/* At this point, only one region points to this csa */
 		csa->db_addrs[0] = csa->db_addrs[1] = NULL;
-		csa->lock_addrs[0] = csa->lock_addrs[1] = NULL;
+		csa->mlkctl = NULL;
+		csa->mlkctl_len = 0;
+		csa->mlkhash = NULL;
 		csa->gd_ptr = addr ? addr : gd_header;
 		if (csa->gd_ptr)
 			csa->gd_instinfo = csa->gd_ptr->instinfo;
@@ -1036,6 +1069,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		csa->dir_tree->clue.end = 0;
 	}
 	SET_CSA_DIR_TREE(csa, reg->max_key_size, reg);
+	assert(reg->open);
 	/* Now that reg->open is set to TRUE and directory tree is initialized, go ahead and set rts_error back to being usable */
 	DBG_MARK_RTS_ERROR_USABLE;
 	/* Do the deferred encryption initialization now in case it needs to issue an rts_error */

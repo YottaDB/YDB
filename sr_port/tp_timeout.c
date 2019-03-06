@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,11 +69,13 @@
 #include "gt_timer.h"
 #include "xfer_enum.h"
 #include "deferred_events.h"
+#include "deferred_events_queue.h"
 #include "op.h"
 #include "fix_xfer_entry.h"
 #include "error_trap.h"
 
 #define TP_TIMER_ID (TID)&tp_start_timer
+#define TP_QUEUE_ID &tptimeout_set
 
 /* If debugging timeout deferral, it is helpful to timestamp the messages. Encapsulate our debugging macro with
  * enough processing to be able to do that.
@@ -129,7 +131,7 @@ STATICFNDEF void tp_expire_now(void)
 	DBGWTIME((stderr, "%s tp_expire_now: Driving xfer_set_handlers\n" VMS_ONLY("\n"),
 		  asccurtime));
 	assert(in_timed_tn);
-	tp_timeout_set_xfer = xfer_set_handlers(outofband_event, &tptimeout_set, 0);
+	tp_timeout_set_xfer = xfer_set_handlers(outofband_event, &tptimeout_set, 0, FALSE);
 }
 
 /* ------------------------------------------------------------------
@@ -164,22 +166,25 @@ STATICFNDEF void tptimeout_set(int4 dummy_param)
 						 * should be garranteed this flag is OFF.
 						 */
 		tp_timeout_deferred = TRUE;
-		DBGWTIME((stderr, "%s tptimeout_set: TP timeout deferred\n" VMS_ONLY("\n"), asccurtime));
+		SAVE_XFER_ENTRY(outofband_event, &tptimeout_set, 0);
+		DBGWTIME((stderr, "%s tptimeout_set: TP timeout deferred function address: %d\n"
+				, asccurtime,&tptimeout_set));
 		return;
 	} else
 	{
-		DBGWTIME((stderr, "%s tptimeout_set: TP timeout *NOT* deferred - ecode index: %d  etrap: %d\n"  VMS_ONLY("\n"),
-			  asccurtime, dollar_ecode.index, ETRAP_IN_EFFECT));
+		DBGWTIME((stderr, "%s tptimeout_set: TP timeout *NOT* deferred - ecode index: %d  etrap: %d\n"
+					VMS_ONLY("\n"), asccurtime, dollar_ecode.index, ETRAP_IN_EFFECT));
 	}
 	if (tptimeout != outofband)
 	{
+		outofband = tptimeout;
 		FIX_XFER_ENTRY(xf_linefetch, op_fetchintrrpt);
 		FIX_XFER_ENTRY(xf_linestart, op_startintrrpt);
 		FIX_XFER_ENTRY(xf_zbfetch, op_fetchintrrpt);
 		FIX_XFER_ENTRY(xf_zbstart, op_startintrrpt);
 		FIX_XFER_ENTRY(xf_forchk1, op_startintrrpt);
 		FIX_XFER_ENTRY(xf_forloop, op_forintrrpt);
-		outofband = tptimeout;
+		tp_timeout_set_xfer = TRUE;
 #		ifdef VMS
 		/* Set event flag now that intercept is in place */
 		status = sys$setef(efn_outofband);
@@ -254,6 +259,7 @@ void tp_clear_timeout(void)
 		 * ------------------------------------------------
 		 */
 		cancel_timer(TP_TIMER_ID);
+		REMOVE_QUEUE_ENTRY(TP_QUEUE_ID);
 		/* --------------------------------------------
 		 * For unambiguous states, clear this flag
 		 * after cancelling timer and before clearing

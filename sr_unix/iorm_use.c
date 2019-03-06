@@ -31,7 +31,7 @@
 #include "gtm_stdlib.h"
 #include "min_max.h"
 #include "arit.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #endif
@@ -146,7 +146,7 @@ GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	io_pair			io_std_device;		/* standard device	*/
 
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 GBLREF	UConverter		*chset_desc[];
 LITREF	mstr			chset_names[];
 #endif

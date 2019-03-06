@@ -1091,7 +1091,8 @@ boolean_t mur_fclose(jnl_ctl_list *jctl)
 		free(jctl->jfh);
 		jctl->jfh = NULL;
 	}
-	free_hashtab_int4(&jctl->pini_list);
+	if (jctl->pini_list.active)
+		free_hashtab_int4(&jctl->pini_list);
 	JNL_FD_CLOSE(jctl->channel, jctl->status);	/* sets jctl->channel to NOJNL */
 	if (SS_NORMAL == jctl->status)
 		return TRUE;

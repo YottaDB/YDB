@@ -172,7 +172,7 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 
 	MV_FORCE_STR(src);
 	if (!gtm_utf8_mode)
-	{ /* Unicode not enabled, report error rather than silently ignoring the conversion */
+	{ /* UTF8 not enabled, report error rather than silently ignoring the conversion */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVFCN, 0, ERR_TEXT, 2,
 			LEN_AND_LIT("Three-argument form of $ZCONVERT() is not allowed in the current $ZCHSET"));
 	}

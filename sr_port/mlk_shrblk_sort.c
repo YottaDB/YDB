@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,9 +25,10 @@ mlk_shrblk_ptr_t mlk_shrblk_sort(mlk_shrblk_ptr_t head)
 {
 	mlk_shrblk_ptr_t	lhead, rhead;
 
+	if (head->rsib == 0 || head->lsib == 0)
+		return head;
 	if ((mlk_shrblk_ptr_t)R2A(head->rsib) == head)
 	{
-		assert((mlk_shrblk_ptr_t)R2A(head->lsib) == head);
 		return head;
 	}
 	assert((mlk_shrblk_ptr_t)R2A(head->lsib) != head);
@@ -53,6 +54,12 @@ void mlk_shrblk_split(mlk_shrblk_ptr_t head, mlk_shrblk_ptr_t *lhead, mlk_shrblk
 		}
 		left = cur;
 		cur = (mlk_shrblk_ptr_t)R2A(cur->rsib);
+		if (cur == left)
+		{	/* If we get here it probably means we have a somewhat invalid state; try again by starting over
+			 *  This relies on tail-recursion to make sure the stack doesn't overflow */
+			mlk_shrblk_split(head, lhead, rhead);
+			return;
+		}
 		if (cur == head)
 		{
 			assert(NULL != right);
@@ -80,6 +87,7 @@ mlk_shrblk_ptr_t mlk_shrblk_merge(mlk_shrblk_ptr_t lhead, mlk_shrblk_ptr_t rhead
 {
 	mlk_shrblk_ptr_t	left, right, ltail, rtail, head = NULL, tail;
 	mlk_shrsub_ptr_t	lsub, rsub;
+	int			cmpres;
 
 	ltail = (mlk_shrblk_ptr_t)R2A(lhead->lsib);
 	rtail = (mlk_shrblk_ptr_t)R2A(rhead->lsib);
@@ -89,7 +97,8 @@ mlk_shrblk_ptr_t mlk_shrblk_merge(mlk_shrblk_ptr_t lhead, mlk_shrblk_ptr_t rhead
 	rsub = (mlk_shrsub_ptr_t)R2A(right->value);
 	while (TRUE)
 	{
-		if (0 > memvcmp(lsub->data, lsub->length, rsub->data, rsub->length))
+		cmpres = memvcmp(lsub->data, lsub->length, rsub->data, rsub->length);
+		if (0 > cmpres)
 		{
 			if (NULL == head)
 				head = left;
@@ -112,6 +121,7 @@ mlk_shrblk_ptr_t mlk_shrblk_merge(mlk_shrblk_ptr_t lhead, mlk_shrblk_ptr_t rhead
 		}
 		else
 		{
+			assert(0 != cmpres);
 			if (NULL == head)
 				head = right;
 			else

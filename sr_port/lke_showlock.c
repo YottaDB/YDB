@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,17 +50,14 @@
 #define	CLNTNODE_LIT	" : CLNTNODE = "
 #define CLNTPID_LIT	" : CLNTPID = "
 
-#if defined(UNIX)
-#	define	PID_FMT_STR	"!UL"
-#	define	PIDPRINT_LIT	"%d"
-#	define	GNAM_FMT_STR	"!AD "
-#elif defined(VMS)
-#	define	PID_FMT_STR	"!XL"
-#	define	PIDPRINT_LIT	"%08X"
-#	define	GNAM_FMT_STR	"!24<!AD!> "
-#endif
+#define	PID_FMT_STR	"!UL"
+#define	PIDPRINT_LIT	"%d"
+#define	GNAM_FMT_STR	"!AD "
 
 GBLREF	int4		process_id;
+
+void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name);
+void lke_formatlocknodes(mlk_shrblk_ptr_t node, mstr* name);
 
 static	char	gnam[]    = GNAM_FMT_STR,
 		gnaml[]	  = "!AD!/!24*  ",
@@ -70,9 +68,65 @@ static	char	gnam[]    = GNAM_FMT_STR,
 		nonexam[] = "an inexaminable process",
 		nopriv[]  = "no privilege";
 
+void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name)
+{
+	mlk_shrsub_ptr_t	value;
+	char			save_ch;
+	short			len1;
+	int			len2;
+	static mval		subsc = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
+
+	value = (mlk_shrsub_ptr_t) R2A(node->value);
+	if (0 == name->len)
+	{
+		/* unsubscripted lock name can never have control characters, so no ZWR translation needed */
+		memcpy(name->addr, value->data, value->length);
+		name->len = value->length;
+		name->addr[name->len++] = '(';
+	}
+	else
+	{
+		/* perform ZWR translation on the subscript */
+		len1 = name->len - 1;
+		if (')' == name->addr[len1])
+			name->addr[len1] = ',';
+
+		subsc.str.len = value->length;
+		subsc.str.addr = (char*) value->data;
+		if (val_iscan(&subsc))
+		{
+			/* avoid printing enclosed quotes for canonical numbers */
+			save_ch = name->addr[len1];
+			format2zwr((sm_uc_ptr_t) value->data, value->length, (unsigned char*) &name->addr[len1], &len2);
+			assert(name->addr[len1 + len2 - 1] == '"');
+			name->addr[len1] = save_ch;
+			len2 -= 2; /* exclude the enclosing quotes */
+		}
+		else
+			format2zwr((sm_uc_ptr_t) value->data, value->length, (unsigned char*) &name->addr[name->len], &len2);
+
+		name->len += len2;
+		name->addr[name->len++] = ')';
+	}
+}
+
+void lke_formatlocknodes(mlk_shrblk_ptr_t node, mstr* name)
+{
+	if (node->parent)
+		lke_formatlocknodes((mlk_shrblk_ptr_t)R2A(node->parent), name);
+	lke_formatlocknode(node, name);
+}
+
+void lke_formatlockname(mlk_shrblk_ptr_t node, mstr* name)
+{
+	lke_formatlocknodes(node, name);
+	if ('(' == name->addr[name->len - 1])
+		name->len--;
+}
+
 bool	lke_showlock(
 		     struct CLB		*lnk,
-		     mlk_shrblk_ptr_t	tree,
+		     mlk_shrblk_ptr_t	node,
 		     mstr		*name,
 		     bool		all,
 		     bool		wait,
@@ -83,106 +137,54 @@ bool	lke_showlock(
 {
 	mlk_prcblk	pblk;
 	mlk_prcblk_ptr_t r;
-	mlk_shrsub_ptr_t value;
 	short		len1;
 	int 		len2;
-	boolean_t	lock = FALSE, owned;
+	boolean_t	lock = FALSE, owned, unsub;
 	UINTPTR_T	f[7];
         int4            gtcmbufidx, item, ret;
 	uint4		status;
 	char		*msg, save_ch, format[64], gtcmbuf[64];	/* gtcmbuf[] is to hold ": CLNTNODE = %s : CLNTPID = %s" */
-	static	mval	subsc = DEFINE_MVAL_STRING(MV_STR, 0, 0, 0, NULL, 0, 0);
-	VMS_ONLY(
-		char		sysinfo[NDIM];
-		$DESCRIPTOR	(sysinfo_dsc, sysinfo);
-	)
 
-	value = (mlk_shrsub_ptr_t)R2A(tree->value);
-	if (0 == name->len)
-	{ /* unsubscripted lock name can never have control characters, so no ZWR translation needed */
-		memcpy(name->addr, value->data, value->length);
-		f[0] = name->len = value->length;
-		name->addr[name->len++] = '(';
-	} else
-	{ /* perform ZWR translation on the subscript */
-		len1 = name->len - 1;
-		if (')' == name->addr[len1])
-			name->addr[len1] = ',';
-		subsc.str.len = value->length;
-		subsc.str.addr = (char *)value->data;
-		if (val_iscan(&subsc))
-		{ /* avoid printing enclosed quotes for canonical numbers */
-			save_ch = name->addr[len1];
-			format2zwr((sm_uc_ptr_t)value->data, value->length, (unsigned char*)&name->addr[len1], &len2);
-			assert(name->addr[len1 + len2 - 1] == '"');
-			name->addr[len1] = save_ch;
-			len2 -= 2; /* exclude the enclosing quotes */
-		} else
-			format2zwr((sm_uc_ptr_t)value->data, value->length, (unsigned char*)&name->addr[name->len], &len2);
-		name->len += len2;
-		name->addr[name->len++] = ')';
-		f[0] = name->len;
-	}
+	unsub = (0 == name->len);
+
+	lke_formatlocknode(node, name);
+	/* Subtract one for the lparen in unsubscripted name */
+	f[0] = name->len + (unsub ? -1 : 0);
 	f[1] = (UINTPTR_T)name->addr;
-	if (tree->owner || (tree->pending && wait))
+	if (node->owner || (node->pending && wait))
 	{
-		pblk.process_id = tree->owner;
-		pblk.next = (wait && tree->pending) ?
-			(ptroff_t)((uchar_ptr_t)&tree->pending - (uchar_ptr_t)&pblk.next + tree->pending)
+		pblk.process_id = node->owner;
+		pblk.next = (wait && node->pending) ?
+			(ptroff_t)((uchar_ptr_t)&node->pending - (uchar_ptr_t)&pblk.next + node->pending)
 						       : 0;
-		owned = (all || !wait) && tree->owner;
+		owned = (all || !wait) && node->owner;
 		r = owned ? &pblk
-			  : ((0 == tree->pending) ? NULL
-						: (mlk_prcblk_ptr_t)R2A(tree->pending));
+			  : ((0 == node->pending) ? NULL
+						: (mlk_prcblk_ptr_t)R2A(node->pending));
 		while (NULL != r)
 		{
 			if ((0 == pid) || (pid == r->process_id))
 			{
 				f[2] = r->process_id;
-				VMS_ONLY(
-					item = JPI$_STATE;
-					status = lib$getjpi(&item, &r->process_id, 0, &ret, &sysinfo_dsc, &len1);
-					switch (status)
-					{
-					case SS$_NORMAL:
-						f[3] = len1;
-						f[4] = sysinfo;
-						break;
-					case SS$_NOPRIV:
-						f[3] = STR_LIT_LEN(nopriv);
-						f[4] = nopriv;
-						break;
-					case SS$_NONEXPR:
-						f[3] = STR_LIT_LEN(nonexpr);
-						f[4] = nonexpr;
-						break;
-					default:
-						f[3] = STR_LIT_LEN(nonexam);
-						f[4] = nonexam;
-						break;
-					}
-				)
-				UNIX_ONLY(
-					if (is_proc_alive((int4)r->process_id, 0))
-					{
-						f[3] = STR_LIT_LEN(existpr);
-						f[4] = (INTPTR_T)existpr;
-					} else
-					{
-						f[3] = STR_LIT_LEN(nonexpr);
-						f[4] = (UINTPTR_T)nonexpr;
-					}
-				)
-				if (tree->auxowner)
+				if (is_proc_alive((int4)r->process_id, 0))
+				{
+					f[3] = STR_LIT_LEN(existpr);
+					f[4] = (INTPTR_T)existpr;
+				} else
+				{
+					f[3] = STR_LIT_LEN(nonexpr);
+					f[4] = (UINTPTR_T)nonexpr;
+				}
+				if (node->auxowner)
 				{
 					gtcmbufidx = 0;
 					memcpy(&gtcmbuf[gtcmbufidx], CLNTNODE_LIT, STR_LIT_LEN(CLNTNODE_LIT));
 					gtcmbufidx += STR_LIT_LEN(CLNTNODE_LIT);
-					memcpy(&gtcmbuf[gtcmbufidx], tree->auxnode, SIZEOF(tree->auxnode));
-					gtcmbufidx += real_len(SIZEOF(tree->auxnode), (uchar_ptr_t)tree->auxnode);
+					memcpy(&gtcmbuf[gtcmbufidx], node->auxnode, SIZEOF(node->auxnode));
+					gtcmbufidx += real_len(SIZEOF(node->auxnode), (uchar_ptr_t)node->auxnode);
 					memcpy(&gtcmbuf[gtcmbufidx], CLNTPID_LIT, STR_LIT_LEN(CLNTPID_LIT));
 					gtcmbufidx += STR_LIT_LEN(CLNTPID_LIT);
-					SPRINTF(&gtcmbuf[gtcmbufidx], PIDPRINT_LIT, tree->auxpid);
+					SPRINTF(&gtcmbuf[gtcmbufidx], PIDPRINT_LIT, node->auxpid);
 					f[5] = strlen(gtcmbuf);
 					f[6] = (UINTPTR_T)&gtcmbuf[0];
 					assert(f[5] > gtcmbufidx);

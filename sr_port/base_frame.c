@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +26,6 @@ error_def(ERR_STACKOFLOW);
 
 void base_frame(rhdtyp *base_address)
 {
-	void		gtm_ret_code();	/* This is an external which points to code without an entry mask */
 	unsigned char	*msp_save;
 	stack_frame	*fp;
 
@@ -37,19 +37,18 @@ void base_frame(rhdtyp *base_address)
 	if ((INTPTR_T)msp & 4)
 		msp -= 4;
 #endif /* GTM64 */
-
 	msp_save = msp;
 	msp -= SIZEOF(stack_frame) + SIZEOF(stack_frame *);
-   	if (msp <= stackwarn)
-   	{
+	if (msp <= stackwarn)
+	{
 		if (msp <= stacktop)
-   		{
+		{
 			msp = msp_save;
-			rts_error(VARLSTCNT(1) ERR_STACKOFLOW);
-   		}
-   		else
-   			rts_error(VARLSTCNT(1) ERR_STACKCRIT);
-   	}
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
+		}
+		else
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
+	}
 	*(stack_frame **)((stack_frame *)msp + 1) = frame_pointer;
 	frame_pointer = fp = (stack_frame *)msp;
 	memset(fp, 0, SIZEOF(stack_frame));

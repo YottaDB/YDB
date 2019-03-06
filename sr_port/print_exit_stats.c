@@ -28,7 +28,7 @@
 #include "mmemory.h"
 #include "gtmio.h"
 #include "have_crit.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "utfcgr.h"
 #endif
 
@@ -64,7 +64,7 @@ void print_exit_stats(void)
 	if (GDL_PrintCacheStats & gtmDebugLevel)
 	{
 		fnpc_stats();
-#		ifdef UNICODE_SUPPORTED
+#		ifdef UTF8_SUPPORTED
 		if (gtm_utf8_mode)
 			utfcgr_stats();
 #		endif

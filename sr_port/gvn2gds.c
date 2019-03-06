@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -212,7 +212,7 @@ boolean_t convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsig
 				{	/* Inside the argument list for $[Z]CHAR */
 					/* STRTOUL will stop at the ',' or ')' */
 					num = (int4)STRTOUL(&gvn->str.addr[isrc], NULL, 10);
-#					ifdef UNICODE_SUPPORTED
+#					ifdef UTF8_SUPPORTED
 					if (!is_zchar && is_gtm_chset_utf8)
 						op_fnchar(2, &dollarcharmval, num);
 					else

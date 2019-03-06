@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,10 +17,11 @@
 #include "stringpool.h"
 #include "min_max.h"
 #include "op.h"
+#include "toktyp.h"
 
 GBLREF spdesc stringpool;
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "hashtab_int4.h"
 #include "hashtab.h"
 #include "gtm_utf8.h"
@@ -29,229 +30,211 @@ GBLREF	boolean_t	badchar_inhibit;
 
 error_def(ERR_MAXSTRLEN);
 
-/******************************************************************************
- $TRANSLATE() - Multi-byte character translation.
-
-  This algorithm is similar to $ZTRANSLATE() but uses a hash table (hash_table_int4)
-  to store multi-byte character mappings in addition to the xlate[] array used
-  for single-byte characters.  The key differences are:
-
-  Datastructures:
-	The stringpool buffer is computed based on keeping track of additional
-	space needed for every input->output character translation in addition
-	to the source length (src->str.len).
-
-	Uses xlate[] an array of 'int4' rather than 'short int' to store the
-	(1-based) byte offset of the replacement character within out_str rather than the
-	character itself.
-
-	Since "stp_gcol" can potentially change out_str address, the byte offsets
-	are stored instead of byte pointers. Also, note that the offset is not
-	0-based, since 0 can not be stored as valid entry in hash table.
-
-  Algorithm:
-	If the character being indexed is single-byte (ASCII or illegal byte),
-	store the offset to the corresponding replacement out_str character
-	in the xlate[] element. If the character being indexed is multi-byte,
-	store the offset to the replacing out_str character in the hash table
-	using the code point as the hash key.
-
-	For the input characters that do not have corresponding replacing
-	ouput characters, store MAXPOSINT4 in the respective table.
-
-	Iterate over each character of the source string and perform the
-	translation according to the mapping specified above.
-
-  Note:
-  	If input is entirely of ASCII characters, this algorithm will not use
-	the hash table, therefore making its efficiency closer to that of the
-	byte-oriented algorithm.
-******************************************************************************/
-
-void op_fntranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
+void op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_table_int4 *xlate_hash)
 {
-	unsigned char	*inptr, *intop, *outptr, *outbase, *outtop, *dstbase, *nextptr, *chptr;
-	int4		xlate[256]; /* translation table to hold all single-byte character mappings */
-	static hash_table_int4	xlate_hash;  /* translation table to hold all multi-byte character mappings */
-	static int hash_table_size = 0;
-	INTPTR_T	choff;	/* byte offset of the character within out_str */
-	ht_ent_int4	*tabent;
-	unsigned char 	ch, drop;
-	int 		n, max_len_incr, size, inlen, outlen, char_len, chlen, dstlen;
-	int		max_length_string = 0;
-	uint4		code;
-	boolean_t	hashtab_created, char_already_seen;
+	int4 offset;
+	unsigned char val;
+	char *srcptr, *srctop, *prevsrc, *rstr, *rtop, *rcur;
+	sm_uc_ptr_t dstptr;
+	uint4 code, copy_length, char_len, dstlen;
+	ht_ent_int4 *tabent;
+	boolean_t single_byte_src;
+
+	/* Callers are responsible for making sure there is space in the stringpool for the result */
+	assert(IS_STP_SPACE_AVAILABLE(4 * src->str.len));
+	srcptr = src->str.addr;
+	srctop = srcptr + src->str.len;
+	dstptr = stringpool.free;
+	dstlen = char_len = 0;
+	rstr = rplc->str.addr;
+	rtop = rplc->str.addr + rplc->str.len;
+	single_byte_src = src->str.len == src->str.char_len;
+	while (srcptr < srctop)
+	{
+		if (single_byte_src)
+		{
+			prevsrc = srcptr++;
+		} else
+		{
+			prevsrc = srcptr;
+			srcptr = (char *)UTF8_MBTOWC(srcptr, srctop, code);
+		}
+		copy_length = 0;
+		if (single_byte_src || (1 == (srcptr - prevsrc)))
+		{
+			val = *prevsrc;
+			offset = xlate[val];
+			assert(offset < rplc->str.len);
+			if (DELETE_VALUE != offset)
+			{
+				if (NO_VALUE == offset)
+				{
+					*dstptr = val;
+					copy_length = 1;
+				}
+				else
+				{
+					rcur = &rstr[offset];
+					copy_length = (char *)UTF8_MBTOWC(rcur, rtop, code) - rcur;
+					copy_character(copy_length, dstptr, rcur);
+				}
+				char_len++;
+			}
+		} else if (NULL != xlate_hash)
+		{	/* if null == xlate_hash, we know are mappings are single character, so no sense looking it up; simply
+			    copy it */
+			if (WEOF == code)
+				continue;
+			tabent = (ht_ent_int4*)lookup_hashtab_int4(xlate_hash, (uint4*)&code);
+			if (NULL == tabent)
+			{	/* Code not found, copy over value to string */
+				copy_length = srcptr - prevsrc;
+				copy_character(copy_length, dstptr, prevsrc);
+				char_len++;
+			} else
+			{
+				offset = (uint4)((size_t)(tabent->value));
+				if (MAXPOSINT4 != offset)
+				{	/* Valid translation found; copy new value to dst */
+					/* Because the hashtable can't do zeros, it has the offset incremented by one,
+					 *  compensate */
+					rcur = &rstr[offset - 1];
+					copy_length = (char *)UTF8_MBTOWC(rcur, rtop, code) - rcur;
+					copy_character(copy_length, dstptr, rcur);
+					char_len++;
+				}
+			}
+		} else
+		{
+			copy_length = srcptr - prevsrc;
+			copy_character(copy_length, dstptr, prevsrc);
+			char_len++;
+		}
+		dstptr += copy_length;
+		dstlen += copy_length;
+	}
+	MV_INIT_STRING(dst, dstlen, stringpool.free);
+	dst->mvtype |= MV_UTF_LEN; /* set character length since we know it */
+	dst->str.char_len = char_len;
+	stringpool.free = (unsigned char *)dstptr;
+}
+
+void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
+{
+	static int xlate[NUM_CHARS];
+	static hash_table_int4 *xlate_hash = NULL;
+	static mstr prev_srch = {0, 0}, prev_rplc = {0, 0};
+	static unsigned int prev_gcols = 0;
 
 	MV_FORCE_STR(src);
-	MV_FORCE_STR(in_str);
-	MV_FORCE_STR(out_str);
-
 	MV_FORCE_LEN(src); /* char_len needed for stringpool allocation */
 	if (!badchar_inhibit)
 	{	/* needed only to validate for BADCHARs */
-		MV_FORCE_LEN(in_str);
-		MV_FORCE_LEN(out_str);
+		MV_FORCE_LEN(srch);
+		MV_FORCE_LEN(rplc);
 	}
-	/* Initialize both translation tables & other stuff */
-	memset(xlate, 0, SIZEOF(xlate));
-	if (!MV_IS_SINGLEBYTE(in_str))
-	{ /* hash table not needed if input is entirely single byte */
-		max_length_string = MAX(in_str->str.len, out_str->str.len);
-		if (NULL == xlate_hash.base)
-			init_hashtab_int4(&xlate_hash, max_length_string * (100.0 / HT_LOAD_FACTOR),
-					HASHTAB_COMPACT, HASHTAB_SPARE_TABLE);
-		else
-		{
-			reinitialize_hashtab_int4(&xlate_hash);
-			if (max_length_string > hash_table_size)
-			{
-				hash_table_size = max_length_string;
-				expand_hashtab_int4(&xlate_hash, max_length_string * (100.0 / HT_LOAD_FACTOR));
-			}
-		}
-		hashtab_created = TRUE;
-	} else
-		hashtab_created = FALSE;
-	max_len_incr = 0;
-	/* Initialize the translation table with the mapping */
-	inptr = (unsigned char *)in_str->str.addr;
-	outbase = outptr = (unsigned char *)out_str->str.addr;
-	intop = inptr + in_str->str.len;
-	outtop = outptr + out_str->str.len;
-	for (char_len = 0; inptr < intop && outptr < outtop; ++char_len, inptr = nextptr, outptr += outlen)
+	if (!(prev_gcols == stringpool.gcols && srch->str.addr == prev_srch.addr && srch->str.len == prev_srch.len
+			&& rplc->str.addr == prev_rplc.addr && rplc->str.len == prev_rplc.len))
 	{
-		nextptr = UTF8_MBTOWC(inptr, intop, code);
-		inlen = (int)(nextptr - inptr);
-		assert(inlen > 0);
-		assert((1 == inlen) || (WEOF != code));
-		assert((1 == inlen) || hashtab_created);
-		if (1 == inlen)
+		if(NULL != xlate_hash)
 		{
-			if (0 == xlate[*inptr]) /* store 1-based byte offset */
-			{
-		    		xlate[*inptr] = (int)(outptr - outbase + 1);
-				char_already_seen = FALSE;
-			} else
-				char_already_seen = TRUE;
-		} else if (!lookup_hashtab_int4(&xlate_hash, &code))
-		{
-			add_hashtab_int4(&xlate_hash, &code, (void*)(outptr - outbase + 1), &tabent);
-			char_already_seen = FALSE;
-		} else
-			char_already_seen = TRUE;
-		outlen =(int)(UTF8_MBNEXT(outptr, outtop) - outptr); /* byte length of replacement character */
-		if (!char_already_seen && (n = outlen - inlen) > max_len_incr)
-			max_len_incr = n; /* extra stringpool space needed if this translation occurs */
-	}
-	/* Mark those input characters that do not have translation */
-	for (; inptr < intop; inptr = nextptr, ++char_len)
-	{
-		nextptr = UTF8_MBTOWC(inptr, intop, code);
-		inlen = (int)(nextptr - inptr);
-		assert(inlen > 0);
-		assert((1 == inlen) || (WEOF != code));
-		assert((1 == inlen) || hashtab_created);
-		if (1 == inlen)
-		{
-			if (0 == xlate[*inptr])
-		    		xlate[*inptr] = MAXPOSINT4;
-		} else if (!lookup_hashtab_int4(&xlate_hash, &code))
-			add_hashtab_int4(&xlate_hash, &code, (void*)MAXPOSINT4, &tabent);
-	}
-	assert(!(in_str->mvtype & MV_UTF_LEN) || in_str->str.char_len == char_len);
-	if (!(in_str->mvtype & MV_UTF_LEN))
-	{	/* now that we've processed in_str entirely, set its char_len since we know it */
-		in_str->mvtype |= MV_UTF_LEN;
-		in_str->str.char_len = char_len;
-	}
-	/* The result string size can potentially increase by the factor of max_len_incr, which is the maximum increase
-	 * of byte length amongst all character mapppings from in_str to out_str. This may be an over-allocation, but
-	 * that's the most conservative size guaranteed to hold the result.
-	 */
-	size = src->str.len + src->str.char_len * max_len_incr;
-	size = (size > MAX_STRLEN) ? MAX_STRLEN : size;
-	ENSURE_STP_FREE_SPACE(size);
-	outbase = (unsigned char *)out_str->str.addr; /* recompute in case "stp_gcol" changes out_str->str.addr */
-	outtop = outbase + out_str->str.len;
-	dstbase = stringpool.free;
-	dstlen = char_len = 0; /* character length of the result */
-	for (inptr = (unsigned char *)src->str.addr, intop = inptr + src->str.len; inptr < intop; inptr = nextptr)
-	{
-		nextptr = UTF8_MBTOWC(inptr, intop, code);
-		inlen = (int)(nextptr - inptr);
-		assert(inlen > 0);
-		if (1 == inlen)
-			choff = xlate[*inptr];
-		else {
-			tabent = hashtab_created ? (ht_ent_int4*)lookup_hashtab_int4(&xlate_hash, &code): NULL;
-			choff = (NULL != tabent) ? (INTPTR_T)tabent->value : 0;
+			free_hashtab_int4(xlate_hash);
+			free(xlate_hash);
 		}
-		if (0 == choff)
-		{ /* no translation exists, retain the source character */
-			chptr = inptr;
-			chlen = inlen;
-		} else if (MAXPOSINT4 != choff)
-		{ /* translation exists, replace the source character */
-			assert(choff > 0);
-			chptr = &outbase[choff - 1];	/* retreive the character using 1-based index */
-			chlen = (int)(UTF8_MBNEXT(chptr, outtop) - chptr);
-			assert(chlen > 0);
-		}
-		if (MAXPOSINT4 != choff)
-		{ /* add a new character into the result based on the translation above */
-			if (dstlen + chlen > MAX_STRLEN)
-			 	rts_error_csa(NULL, VARLSTCNT(1) ERR_MAXSTRLEN);
-			if (1 == chlen)
-				dstbase[dstlen] = *chptr;
-			else
-				memcpy(&dstbase[dstlen], chptr, chlen);
-			dstlen += chlen;
-			++char_len;
-		}
-	}
-	assert(MAX_STRLEN >= dstlen);
-	MV_INIT_STRING(dst, dstlen, (char *)dstbase);
-	assert(dst->str.len <= size);
-	dst->mvtype |= MV_UTF_LEN; /* set character length since we know it */
-	dst->str.char_len = char_len;
-	stringpool.free = dstbase + dstlen;
-}
-#endif /* UNICODE_SUPPORTED */
 
-/* $ZTRANSLATE() is implemented using a byte-indexed translation table xlate[256] which stores the
- * replacement character (byte) for a given character (byte) of the second argument specified in $TR().
- */
-void op_fnztranslate(mval *src, mval *in_str, mval *out_str, mval *dst)
+		MV_FORCE_STR(srch);
+		MV_FORCE_STR(rplc);
+		/* If we had a static xlate_hash and prev_srch, prev_rplc, we could avoid this in rapid succession */
+		xlate_hash = create_utf8_xlate_table(srch, rplc, xlate);
+		prev_gcols = stringpool.gcols;
+		prev_srch = srch->str;
+		prev_rplc = rplc->str;
+	}
+	ENSURE_STP_FREE_SPACE(4 * src->str.len);
+	op_fntranslate_common(src, dst, rplc, xlate, xlate_hash);
+}
+
+void op_fntranslate_fast(mval *src, mval *rplc, mval *m_xlate, mval *m_xlate_hash, mval *dst)
 {
-	int		n, xlate[256];
-	unsigned char	ch, *inpt, *intop, *outpt, *dstp;
+	hash_table_int4	*xlate_hash;  /* translation table to hold all multi-byte character mappings */
+	int4 *xlate;
 
 	MV_FORCE_STR(src);
-	MV_FORCE_STR(in_str);
-	MV_FORCE_STR(out_str);
-	ENSURE_STP_FREE_SPACE(src->str.len);
-	memset(xlate, 0xFF, SIZEOF(xlate));
-	n = in_str->str.len < out_str->str.len ? in_str->str.len : out_str->str.len;
-	for (inpt = (unsigned char *)in_str->str.addr, outpt = (unsigned char *)out_str->str.addr, intop = inpt + n;
-		inpt < intop; inpt++, outpt++)
+	MV_FORCE_LEN(src); /* force BADCHAR if needed */
+	ENSURE_STP_FREE_SPACE(4 * src->str.len); /* Allocate string space now so the stringpool doesn't shift xlate table */
+	xlate = (int4 *)m_xlate->str.addr;
+	assert(m_xlate->str.len == NUM_CHARS * SIZEOF(int4));
+	if (0 != m_xlate_hash->str.len)
+		xlate_hash = activate_hashtab_in_buffer_int4((sm_uc_ptr_t)m_xlate_hash->str.addr, NULL);
+	else
+		xlate_hash = NULL;
+	op_fntranslate_common(src, dst, rplc, xlate, xlate_hash);
+}
+#endif /* UTF8_SUPPORTED */
+
+void op_fnztranslate_common(mval *src, mval *dst, int *xlate)
+{
+	int4 n;
+	unsigned char val;
+	char *srcptr, *srctop, *dstptr;
+
+	/* Callers are responsible for making sure there is space in the stringpool for the result */
+	assert(IS_STP_SPACE_AVAILABLE(src->str.len));
+	dstptr = (char *)stringpool.free;
+	srcptr = src->str.addr;
+	srctop = srcptr + src->str.len;
+
+	while(srcptr < srctop)
 	{
-		if (-1 == xlate[ch = *inpt])
-		    xlate[ch] = *outpt;
+		val = *srcptr;
+		n = xlate[val];
+		if(DELETE_VALUE != n)
+		{
+			if (NO_VALUE == n)
+				*dstptr = val;
+			else
+				*dstptr = n;
+			dstptr++;
+		}
+		srcptr++;
 	}
-	for (intop = (unsigned char *)in_str->str.addr + in_str->str.len; inpt < intop; inpt++)
-		if (-1 == xlate[ch = *inpt])
-		    xlate[ch] = -2;
-	dstp = outpt = stringpool.free;
-	for (inpt = (unsigned char *)src->str.addr, intop = inpt + src->str.len; inpt < intop; )
-	{
-		n = xlate[ch = *inpt++];
-		if (0 <= n)
-			*outpt++ = n;
-		else if (-1 == n)
-			*outpt++ = ch;
-	}
-	dst->str.addr = (char *)dstp;
-	dst->str.len = INTCAST(outpt - dstp);
+	dst->str.addr = (char *)stringpool.free;
+	dst->str.len = INTCAST(dstptr - dst->str.addr);
 	dst->mvtype = MV_STR;
-	stringpool.free = outpt;
+	stringpool.free = (unsigned char*)dstptr;
+}
+
+/* $ZTRANSLATE() is implemented using a byte-indexed translation table xlate[NUM_CHARS] which stores the
+ * replacement character (byte) for a given character (byte) of the second argument specified in $TR().
+ */
+void op_fnztranslate(mval *src, mval *srch, mval *rplc, mval *dst)
+{
+	static int xlate[NUM_CHARS];
+	static mstr prev_srch = {0, 0}, prev_rplc = {0, 0};
+	static unsigned int prev_gcols = 0;
+
+	MV_FORCE_STR(src);
+	if (!(prev_gcols == stringpool.gcols && srch->str.addr == prev_srch.addr && srch->str.len == prev_srch.len
+			&& rplc->str.addr == prev_rplc.addr && rplc->str.len == prev_rplc.len))
+	{
+		MV_FORCE_STR(srch);
+		MV_FORCE_STR(rplc);
+		create_byte_xlate_table(srch, rplc, xlate);
+		prev_gcols = stringpool.gcols;
+		prev_srch = srch->str;
+		prev_rplc = rplc->str;
+	}
+	ENSURE_STP_FREE_SPACE(src->str.len);
+	op_fnztranslate_common(src, dst, xlate);
+}
+
+void op_fnztranslate_fast(mval *src, mval *m_xlate, mval *dst)
+{
+	int4		*xlate;
+
+	MV_FORCE_STR(src);
+	ENSURE_STP_FREE_SPACE(src->str.len); /* Allocate string space now so the stringpool doesn't shift xlate table */
+	xlate = (int4 *)m_xlate->str.addr;
+	assert(m_xlate->str.len == NUM_CHARS * SIZEOF(int4));
+	op_fnztranslate_common(src, dst, xlate);
 }

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@
 #include "iormdef.h"
 #include "iormdefsp.h"
 #include "gtmio.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #endif
@@ -31,7 +31,7 @@
 #include "send_msg.h"
 #include "error.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 LITREF mstr		chset_names[];
 GBLREF UConverter	*chset_desc[];
 #endif
@@ -113,7 +113,7 @@ void iorm_wteol(int4 x,io_desc *iod)
 #	endif
 	for (i = 0; i < x; i++)
 	{
-#		ifdef UNICODE_SUPPORTED
+#		ifdef UTF8_SUPPORTED
 		if (IS_UTF_CHSET(iod->ochset))
 		{
 			if (!rm_ptr->done_1st_write)

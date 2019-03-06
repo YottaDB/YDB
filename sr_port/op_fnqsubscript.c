@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 #include "gtm_ctype.h"
 #include "zshow.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 GBLREF	boolean_t	badchar_inhibit;
 error_def(ERR_INVDLRCVAL);
@@ -29,7 +29,7 @@ GBLREF spdesc stringpool;
 error_def(ERR_NOSUBSCRIPT);
 error_def(ERR_NOCANONICNAME);
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #define UTF_CHAR_CPY(FROM, TO, FROM_OFFSET, TO_OFFSET, UTF_LEN)			\
 {										\
 	unsigned int	temp_int;						\
@@ -59,7 +59,7 @@ error_def(ERR_NOCANONICNAME);
  */
 void op_fnqsubscript(mval *src, int seq, mval *dst)
 {
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	int		char_len = 0;
 #endif
 	int		ch_int;
@@ -95,7 +95,7 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 		if ((0 == seq) && ('^' == src->str.addr[0]))
 		{	/* add ^ here in case there's an intervening environment */
 			dst->str.addr[odst++] = '^';
-			UNICODE_ONLY(++char_len);
+			UTF8_ONLY(++char_len);
 		}
 		if ((0 == isrc) || ('"' == src->str.addr[isrc - 1])
 			|| ((('"' != (letter = src->str.addr[isrc])) && ('$' != letter))))
@@ -103,14 +103,14 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 			while (isrc < stop)
 			{
 				letter = src->str.addr[isrc++];
-				UNICODE_ONLY(if (!gtm_utf8_mode || (0 == (0x80 & letter))))
+				UTF8_ONLY(if (!gtm_utf8_mode || (0 == (0x80 & letter))))
 				{
 					dst->str.addr[odst++] = letter;
 					if (('"' == letter) && ('"' == src->str.addr[isrc]))
 						isrc++;  /* safe 'cause embedded quotes have at least 1 following char in src */
-					UNICODE_ONLY(++char_len);
+					UTF8_ONLY(++char_len);
 				}
-#				ifdef UNICODE_SUPPORTED
+#				ifdef UTF8_SUPPORTED
 				else
 				{
 					UTF_CHAR_CPY(src, dst, isrc, odst, char_len);
@@ -131,14 +131,14 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 						if (!(instring = !instring))
 						{	/* keep quotes in quotes */
 							dst->str.addr[odst++] = letter;
-							UNICODE_ONLY(++char_len);
+							UTF8_ONLY(++char_len);
 						}
 						letter = src->str.addr[isrc++];
 					} while (('"' == letter) && (isrc <= stop));
 					if ((!instring) && (odst > ch_int))
 					{	/* loose the closing quote */
 						odst--;
-						UNICODE_ONLY(char_len--);
+						UTF8_ONLY(char_len--);
 					}
 					if (isrc == stop)
 					{
@@ -148,12 +148,12 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 				}
 				if (instring)
 				{
-					UNICODE_ONLY(if (!gtm_utf8_mode || (0 == (0x80 & letter))))
+					UTF8_ONLY(if (!gtm_utf8_mode || (0 == (0x80 & letter))))
 					{
 						dst->str.addr[odst++] = letter;
-						UNICODE_ONLY(++char_len);
+						UTF8_ONLY(++char_len);
 					}
-#					ifdef UNICODE_SUPPORTED
+#					ifdef UTF8_SUPPORTED
 					else
 					{
 						UTF_CHAR_CPY(src, dst, isrc, odst, char_len);
@@ -162,7 +162,7 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 				}
 				else if (isrc < stop)
 				{
-#					ifdef UNICODE_SUPPORTED
+#					ifdef UTF8_SUPPORTED
 					for ( ; '$' != letter; letter = src->str.addr[isrc++])
 						;
 					letter = src->str.addr[isrc++];
@@ -181,15 +181,15 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 						end = (unsigned char*)&src->str.addr[isrc++];
 						assert((',' == *end) || (')' == *end));
 						A2I(cp, end, ch_int);
-						UNICODE_ONLY(if (!gtm_utf8_mode || (0 == (0xFFFFFF80 & ch_int)) || ('Z' == letter)))
+						UTF8_ONLY(if (!gtm_utf8_mode || (0 == (0xFFFFFF80 & ch_int)) || ('Z' == letter)))
 						{
 							if (0 == (0xFFFFFF00 & ch_int))
 							{
 								dst->str.addr[odst++] = (char)ch_int;	/* byte copy */
-								UNICODE_ONLY(++char_len);
+								UTF8_ONLY(++char_len);
 							}
 						}
-#						ifdef UNICODE_SUPPORTED
+#						ifdef UTF8_SUPPORTED
 						else
 						{	/* multi-byte copy */
 							cp = (unsigned char*)&dst->str.addr[odst];
@@ -211,7 +211,7 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 	}
 	dst->str.len = odst;
 	stringpool.free += odst;
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	assert((char_len <= odst) && (gtm_utf8_mode || (char_len == odst)));
 	dst->str.char_len = char_len;
 	dst->mvtype |= MV_UTF_LEN;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001, 2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,10 +36,10 @@ void mlk_nocrit_unlock(mlk_pvtblk *p)
 	mlk_ctldata_ptr_t	ctl;
 #	endif
 
-	assert(p->region->dyn.addr->acc_meth != dba_usr);
-	DEBUG_ONLY(ctl = p->ctlptr;)
+	assert(p->pvtctl.region->dyn.addr->acc_meth != dba_usr);
+	DEBUG_ONLY(ctl = p->pvtctl.ctl;)
 	assert((ctl->max_blkcnt > 0) && (ctl->max_prccnt > 0) && ((ctl->subtop - ctl->subbase) > 0));
-	csa = &FILE_INFO(p->region)->s_addrs;
+	csa = p->pvtctl.csa;
 	d = p->nodptr;
 	if ((d->owner == process_id) && (p->sequence == d->sequence))
 	{

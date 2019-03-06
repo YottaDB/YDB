@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,17 +44,19 @@
 #include "fix_xfer_entry.h"
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
+#include "stringpool.h"
 
-GBLREF	sgmnt_data_ptr_t 	cs_data;
-GBLREF  uint4			dollar_tlevel;
+GBLREF	boolean_t		dollar_ztrigger_invoked;
 GBLREF	gd_addr			*gd_header;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	gv_key			*gv_currkey;
 GBLREF	gv_namehead		*gv_target;
-GBLREF	jnlpool_addrs_ptr_t	jnlpool;
-GBLREF	boolean_t		dollar_ztrigger_invoked;
 GBLREF	int4			gtm_trigger_depth;
+GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	mstr			*dollar_ztname;
+GBLREF	sgmnt_data_ptr_t 	cs_data;
+GBLREF spdesc			rts_stringpool, stringpool;
+GBLREF	uint4			dollar_tlevel;
 #ifdef DEBUG
 GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
@@ -62,12 +64,12 @@ GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 LITREF	mval	literal_zero;
 LITREF	mval	literal_one;
 
-STATICDEF gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+STATICDEF boolean_t		save_gv_last_subsc_null, save_gv_some_subsc_null;
 STATICDEF gd_addr		*save_gd_header;
+STATICDEF gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 STATICDEF gv_key		*save_gv_currkey;
 STATICDEF gv_namehead		*save_gv_target;
 STATICDEF gd_region		*save_gv_cur_region;
-STATICDEF boolean_t		save_gv_last_subsc_null, save_gv_some_subsc_null;
 STATICDEF jnlpool_addrs_ptr_t	save_jnlpool;
 #ifdef DEBUG
 STATICDEF boolean_t		in_op_fnztrigger;
@@ -152,10 +154,10 @@ CONDITION_HANDLER(op_fnztrigger_ch)
 
 void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 {
-	int				inparm_len, index;
-	uint4				filename_len;
 	boolean_t			failed;
 	char				filename[MAX_FN_LEN + 1];
+	int				inparm_len, index;
+	uint4				filename_len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -167,6 +169,7 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 		DEBUG_ONLY(in_op_fnztrigger = FALSE);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DZTRIGINTRIG, 2, dollar_ztname->len, dollar_ztname->addr);
 	}
+	assert(rts_stringpool.base == stringpool.base); /* because stp management and trigger compilation have a history */
 	MV_FORCE_STR(func);
 	MV_FORCE_STR(arg1);
 	/* MV_FORCE_STR(arg2); optional arg2 not currently used - added so parm easily implemented when added */
@@ -219,7 +222,7 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	}
 	TREF(gv_last_subsc_null) = TREF(gv_some_subsc_null) = FALSE;
 	ESTABLISH(op_fnztrigger_ch);
-	dollar_ztrigger_invoked = TRUE; /* reset after use when the transaction commits, restarts or rollbacks */
+	dollar_ztrigger_invoked = TRUE;			/* reset after use when the transaction commits, restarts or rollbacks */
 	switch(ztrprm_data[index])
 	{
 		case ZTRP_FILE:
@@ -242,9 +245,15 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 			if (RESTRICTED(trigger_mod))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, "$ZTRIGGER(ITEM)");
 			/* If 2nd parameter is empty, do nothing (but dont issue error) */
-			failed = (arg1->str.len) ? trigger_update(arg1->str.addr, arg1->str.len) : FALSE;
+			failed = (arg1->str.len) ? trigger_update(arg1) : FALSE;
 			break;
 		case ZTRP_SELECT:
+			/* We changed the interface for item (above) to pass an mval because stringpool management sometimes
+			 * moved strings ajusting the associated mval, is blinded to any other pointer, which than becomes stale,
+			 * which causes nasty intermittant problems, as stp_gcol runs randoml-ish (compilation is likely simulus)
+			 * and even when it does the old location may work well enough. We have some concern select could have
+			 * similar issues, athough we are not aware of any symptoms. The called code does try to protect its working
+			 * variables, but there is a window to perhaps create a tstart, which could have potential risk. */
 			failed = trigger_select_tpwrap(arg1->str.addr, arg1->str.len, NULL, 0);
 			break;
 		default:

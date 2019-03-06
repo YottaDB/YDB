@@ -95,6 +95,7 @@
 #include "dpgbldir.h"
 #include "tp_change_reg.h"
 #include "mu_gv_cur_reg_init.h"
+#include "mlkdef.h"
 
 #define REQRUNDOWN_TEXT		"semid is invalid but shmid is valid or at least one of sem_ctime or shm_ctime are non-zero"
 #define MAX_ACCESS_SEM_RETRIES	2	/* see comment below where this macro is used for why it needs to be 2 */
@@ -739,7 +740,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	assert(strlen(machine_name) < MAX_MCNAMELEN);
 	assert(NULL == csa->hdr);	/* dbinit_ch relies on this to unmap the db (if mm) */
 	assert((NULL == csa->db_addrs[0]) && (NULL == csa->db_addrs[1]));
-	assert((NULL == csa->lock_addrs[0]) && (NULL == csa->lock_addrs[1]));
+	assert((NULL == csa->mlkctl) && (0 == csa->mlkctl_len));
 	reg->opening = TRUE;
 	assert(0 <= udi->fd); /* database file must have been already opened by "dbfilopn" done from "gvcst_init" */
 	FSTAT_FILE(udi->fd, &stat_buf, stat_res); /* get the stats for the database file */
@@ -1255,8 +1256,8 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	if (NULL == csa->ss_ctx)					/* May have been allocated if opened/closed/opened */
 		csa->ss_ctx = malloc(SIZEOF(snapshot_context_t));
 	DEFAULT_INIT_SS_CTX((SS_CTX_CAST(csa->ss_ctx)));
-	csa->lock_addrs[0] = (sm_uc_ptr_t)csa->shmpool_buffer + SHMPOOL_SECTION_SIZE;
-	csa->lock_addrs[1] = csa->lock_addrs[0] + LOCK_SPACE_SIZE(tsd) - 1;
+	csa->mlkctl = (struct mlk_ctldata_struct *) ((sm_uc_ptr_t)csa->shmpool_buffer + SHMPOOL_SECTION_SIZE);
+	csa->mlkctl_len = LOCK_SPACE_SIZE(tsd);
 	csa->total_blks = tsd->trans_hist.total_blks;   		/* For test to see if file has extended */
 	cnl = csa->nl;
 	if (new_shm_ipc)
@@ -1279,7 +1280,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	}
 	is_bg = (dba_bg == tsd->acc_meth);
 	if (is_bg)
-		csd = csa->hdr = (sgmnt_data_ptr_t)(csa->lock_addrs[1] + 1 + CACHE_CONTROL_SIZE(tsd));
+		csd = csa->hdr = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->mlkctl + csa->mlkctl_len + CACHE_CONTROL_SIZE(tsd));
 	else
 	{
 		FSTAT_FILE(udi->fd, &stat_buf, stat_res);
@@ -1305,7 +1306,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 #		endif
 		csa->db_addrs[1] = (sm_uc_ptr_t)((sm_uc_ptr_t)csa->db_addrs[0] + mmap_sz - 1);	/* '- 1' due to 0-based indexing */
 		assert(csa->db_addrs[1] > csa->db_addrs[0]);
-		csd = csa->hdr = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->lock_addrs[1] + 1);
+		csd = csa->hdr = (sgmnt_data_ptr_t)((sm_uc_ptr_t)csa->mlkctl + csa->mlkctl_len);
 	}
 	/* At this point, shm_setup_ok is TRUE so we are guaranteed that vermismatch is FALSE.  Therefore, we can safely
 	 * dereference cnl->glob_sec_init without worrying about whether or not it could be at a different offset than
@@ -1357,7 +1358,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		if (is_bg)
 			/* Field is sm_off_t (4 bytes) so only in BG mode is this assurred to be 4 byte capable */
 			cnl->hdr = (sm_off_t)((sm_uc_ptr_t)csd - (sm_uc_ptr_t)cnl);
-		cnl->lock_addrs = (sm_off_t)((sm_uc_ptr_t)csa->lock_addrs[0] - (sm_uc_ptr_t)cnl);
+		cnl->lock_addrs = (sm_off_t)((sm_uc_ptr_t)csa->mlkctl - (sm_uc_ptr_t)cnl);
 		if (!read_only || is_bg)
 		{
 			csd->trans_hist.early_tn = csd->trans_hist.curr_tn;
@@ -1374,7 +1375,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		cnl->wc_blocked = FALSE; 	/* Since we are creating shared memory, reset wc_blocked to FALSE */
 		gvstats_rec_csd2cnl(csa);	/* should be called before "db_auto_upgrade" */
 		reg->dyn.addr->ext_blk_count = csd->extension_size;
-		mlk_shr_init(csa->lock_addrs[0], csd->lock_space_size, csa, (FALSE == read_only));
+		mlk_shr_init((sm_uc_ptr_t)csa->mlkctl, csd->lock_space_size, csa, (FALSE == read_only));
 		db_auto_upgrade(reg);		/* should be called before "gtm_mutex_init" to ensure NUM_CRIT_ENTRY is nonzero */
 		DEBUG_ONLY(locknl = cnl;)	/* for DEBUG_ONLY LOCK_HIST macro */
 		gtm_mutex_init(reg, NUM_CRIT_ENTRY(csd), FALSE);
@@ -1401,9 +1402,9 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 		set_gdid_from_stat(&cnl->unique_id.uid, &stat_buf);
 		recover_truncate(csa, csd, reg);
 		cnl->jnlpool_shmid = INVALID_SHMID;
-		cnl->statsdb_fname_len = ARRAYSIZE(cnl->statsdb_fname);
-		/* Initialize cnl->statsdb_fname from the basedb name */
-		gvcst_set_statsdb_fname(csd, reg, cnl->statsdb_fname, &cnl->statsdb_fname_len);
+		assert(0 == cnl->statsdb_fname_len);
+		assert(0 == cnl->statsdb_cur_error);
+		assert(0 == cnl->statsdb_error_cycle);
 		cnl->statsdb_created = FALSE;
 		cnl->statsdb_rundown_clean = FALSE;
 		if (IS_STATSDB_REGNAME(reg))
@@ -1500,10 +1501,10 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			PRINT_CRASH_MESSAGE(2, cnl, ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("file header"),
 					(uint4)((sm_uc_ptr_t)csd - (sm_uc_ptr_t)cnl), (uint4)cnl->hdr);
 		}
-		if (cnl->lock_addrs != (sm_off_t)((sm_uc_ptr_t)csa->lock_addrs[0] - (sm_uc_ptr_t)cnl))
+		if (cnl->lock_addrs != (sm_off_t)((sm_uc_ptr_t)csa->mlkctl - (sm_uc_ptr_t)cnl))
 		{
 			PRINT_CRASH_MESSAGE(2, cnl, ERR_NLMISMATCHCALC, 4, LEN_AND_LIT("lock address"),
-				  (uint4)((sm_uc_ptr_t)csa->lock_addrs[0] - (sm_uc_ptr_t)cnl), (uint4)cnl->lock_addrs);
+				  (uint4)((sm_uc_ptr_t)csa->mlkctl - (sm_uc_ptr_t)cnl), (uint4)cnl->lock_addrs);
 		}
 		assert(!udi->shm_created);
 		if (is_bg)

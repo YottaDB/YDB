@@ -1,7 +1,7 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2001-2017 Fidelity National Information		#
+# Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -156,7 +156,7 @@ cp $preserve_time $cms_dir/*/gtmsrc.csh .
 
 ############### Define platform-specific libraries ##################################
 # if you add a platform or a platform specific directory below you must modify
-# tools/cms_tools/cms_cshrc.csh
+# tools/btc_tools/cms_cshrc.csh
 # tools/work_tools/get_lib_dirs.csh
 # CMakeLists.txt / sr_*/platform.cmake
 #
@@ -270,12 +270,10 @@ foreach ref_library ( $ref_libs )
 end
 cp sr_unix_cm/makefile* $gtm_ver/tools
 
-########### Copy files from tools repo or $cms_tools to $dst_dir/tools ############
+########### Copy files from tools repo to $dst_dir/tools ############
 
-if (-d $cms_dir/../tools/cms_tools/gtmpcat) then
-	set gtmpcat_dir=$cms_dir/../tools/cms_tools/gtmpcat
-else if (-d $cms_tools/gtmpcat) then
-	set gtmpcat_dir=$cms_tools/gtmpcat
+if (! $?gtmpcat_dir && -d $ggtools/gtmpcat_tools/gtmpcat) then
+	set gtmpcat_dir=$ggtools/gtmpcat_tools/gtmpcat
 endif
 
 if ($?gtmpcat_dir) then
@@ -307,7 +305,7 @@ if ($mods_only == 0) then
 ######################## Edit release_name.h ####################################
 
 	echo "Modifying release_name.h"
-	$cms_tools/edrelnam.csh $dst_ver # Do we care if this fails?
+	$btc_tools/edrelnam.csh $dst_ver # Do we care if this fails?
 endif
 
 ############## Set appropriate permissions on the files. For comments see $gtm_tools/comlist.csh ##############

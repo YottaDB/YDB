@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,7 @@
 #include "dollarx.h"
 #include "have_crit.h"
 #include "iott_flush_time.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
@@ -120,7 +120,7 @@ void iott_write(mstr *v)
 		if (tt_ptr->mupintr)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZINTRECURSEIO);
 		ESTABLISH_GTMIO_CH(&io_curr_device, ch_set);
-		UNICODE_ONLY(utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ochset) : FALSE;)
+		UTF8_ONLY(utf8_active = gtm_utf8_mode ? (CHSET_M != io_ptr->ochset) : FALSE;)
 		for (; ;)
 		{
 			if (FALSE == io_ptr->wrap)
@@ -135,7 +135,7 @@ void iott_write(mstr *v)
 				}
 				if (START != io_ptr->esc_state)
 					len = str_len;			/* write all if in escape sequence */
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 				else if (utf8_active)
 				{
 					ptrtop = (unsigned char *)str + str_len;

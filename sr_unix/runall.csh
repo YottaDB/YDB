@@ -215,7 +215,7 @@ touch ${TMP_DIR}_inc_files
 touch ${TMP_DIR}_src_files
 
 	echo "Modifying release_name.h"
-	$cms_tools/edrelnam.csh $RUNALL_VERSION
+	$btc_tools/edrelnam.csh $RUNALL_VERSION
 
 # For all builds, gtm_threadgbl_deftypes.h needs to be generated unless we are bypassing.
 # This only updates gtm_threadgbl_deftypes.h in $gtm_inc if generation shows it changed.

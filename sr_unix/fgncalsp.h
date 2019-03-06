@@ -46,15 +46,6 @@
 typedef int4	(*fgnfnc)();
 typedef void	(*clnupfptr)();
 
-struct extcall_string
-{
-#ifdef __osf__
-	int	len;
-#else
-	long	len;
-#endif
-	char	*addr;
-};
 
 /* A chain of packages, each package has a list of "entries", that is external routine entry points.  */
 
@@ -99,6 +90,8 @@ enum gtm_types
 	gtm_jbig_decimal
 };
 
+typedef enum {SIGSAFE, XCBEHAVIORTAILENTRY} gtm_ext_call_behavior;
+
 enum callintogtm_fncs
 {
 	gtmfunc_hiber_start,
@@ -125,6 +118,7 @@ struct extcall_entry_list
 	fgnfnc				fcn;		/* address of runtime routine */
 	mstr				entry_name;	/* name of M entryref */
 	mstr				call_name;	/* corresponding name of C function */
+	boolean_t			ext_call_behaviors[XCBEHAVIORTAILENTRY]; /* Array of set behaviors*/
 };
 
 /* A list of entries in the call-in table each indicating the signature of

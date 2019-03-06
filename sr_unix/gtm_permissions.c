@@ -334,8 +334,8 @@ boolean_t gtm_permissions(struct stat *stat_buff, int *user_id, int *group_id, i
 		pdd->file_uid = file_uid;	/* get owning file uid */
 		pdd->file_gid = file_gid;	/* get owning file gid */
 		pdd->lib_gid  = gtm_dist_gid;
-		SNPRINTF(pdd->file_perm, SIZEOF(pdd->file_perm), "%04o", st_mode & 07777);
-		SNPRINTF(pdd->lib_perm, SIZEOF(pdd->lib_perm), "%04o", dir_mode  & 07777);
+		SNPRINTF(pdd->file_perm, SIZEOF(pdd->file_perm), "%04o", st_mode & PERMALL);
+		SNPRINTF(pdd->lib_perm, SIZEOF(pdd->lib_perm), "%04o", dir_mode  & PERMALL);
 		if (gid_list_len > 0)
 		{
 			strtop = pdd->print_gid_list + MAX_PRINT_GID_LEN;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +30,7 @@
 #include "gtm_string.h"
 #include "gtm_unistd.h"
 #include "gtm_stdlib.h"
-#include <signal.h>
+#include "gtm_signal.h"
 
 #ifdef UNIX
 # include "continue_handler.h"
@@ -55,40 +56,66 @@
 #include "cli.h"
 #include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
+#include "startup.h"
+#include "stringpool.h"
+#include "stp_parms.h"
+#include "mstack_size_init.h"
+#include "getjobname.h"
+#include "op.h"
+#include "io.h"
 #include "wbox_test_init.h"
 
-GBLREF	uint4			process_id;
 GBLREF	boolean_t		gtm_utf8_mode;
-#ifdef VMS
-GBLREF	desblk			exi_blk;
-GBLREF	int4			exi_condition;
-#endif
-#ifdef UNIX
-GBLREF	CLI_ENTRY		dbcertify_cmd_ary[];
-#endif
+GBLREF	ch_ret_type		(*stpgc_ch)();				/* Function pointer to stp_gcol_ch */
+GBLREF	CLI_ENTRY		dbcertify_cmd_ary[];			/* define before the GBLDEF below */
+GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
+GBLREF	mstr			default_sysid;
+GBLREF	spdesc			rts_stringpool, stringpool;
+GBLREF	uint4			process_id;
 
-GBLDEF	phase_static_area	*psa_gbl;			/* Global anchor for static area */
-#ifdef UNIX
-GBLDEF	CLI_ENTRY		*cmd_ary = &dbcertify_cmd_ary[0]; /* Define cmd_ary to be the DBCERTIFY specific cmd table */
-#endif
+GBLDEF	CLI_ENTRY		*cmd_ary = &dbcertify_cmd_ary[0];	/* Define cmd_ary to be the DBCERTIFY specific cmd table */
+GBLDEF	phase_static_area	*psa_gbl;				/* Global anchor for static area */
 
 int UNIX_ONLY(main)VMS_ONLY(dbcertify)(int argc, char **argv)
 {
+	struct startup_vector   svec;
 	DCL_THREADGBL_ACCESS;
 
 	/* Initialization of scaffolding we run on */
 	GTM_THREADGBL_INIT;
 	common_startup_init(DBCERTIFY_IMAGE);
+	memset(&svec, 0, SIZEOF(svec));
+	svec.argcnt = SIZEOF(svec);
+	svec.rtn_start = svec.rtn_end = malloc(SIZEOF(rtn_tabent));
+	memset(svec.rtn_start, 0, SIZEOF(rtn_tabent));
+	svec.user_strpl_size = STP_INITSIZE_REQUESTED;
+	svec.ctrlc_enable = 1;
+	svec.break_message_mask = 31;
+	svec.labels = 1;
+	svec.lvnullsubs = 1;
+	svec.base_addr = (unsigned char *)1L;
+	svec.zdate_form = 0;
+	svec.sysid_ptr = &default_sysid;
+	mstack_size_init(&svec);
+	mv_chain = (mv_stent *)msp;
+	op_open_ptr = op_open;
+	stp_init(STP_INITSIZE);
+	stpgc_ch = &stp_gcol_ch;
+	rts_stringpool = stringpool;
+	getjobname();
 	gtm_utf8_mode = FALSE; 		/* Only ever runs in V4 database so NO utf8 mode -- ever */
 	psa_gbl = malloc(SIZEOF(*psa_gbl));
 	memset(psa_gbl, 0, SIZEOF(*psa_gbl));
-	UNIX_ONLY(err_init(dbcertify_base_ch));
-	UNIX_ONLY(sig_init(dbcertify_signal_handler, dbcertify_signal_handler, NULL, continue_handler));
-	VMS_ONLY(util_out_open(0));
-	VMS_ONLY(SET_EXIT_HANDLER(exi_blk, dbcertify_exit_handler, exi_condition));	/* Establish exit handler */
-	VMS_ONLY(ESTABLISH(dbcertify_base_ch));
+	err_init(dbcertify_base_ch);
+	sig_init(dbcertify_signal_handler, dbcertify_signal_handler, NULL, continue_handler);
 	/* Structure checks .. */
 	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
+	op_open_ptr = op_open;
+	stp_init(STP_INITSIZE);
+	stpgc_ch = &stp_gcol_ch;
+	rts_stringpool = stringpool;
+	getjobname();
+	io_init(FALSE);
 	OPERATOR_LOG_MSG;
 	/* Platform dependent method to get the option scan going and invoke necessary driver routine */
 	dbcertify_parse_and_dispatch(argc, argv);

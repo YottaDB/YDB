@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,13 +22,14 @@
 #define CREATEDBY_FUNCTION	2
 #define CREATEDBY_ZINTR		3
 #define CREATEDBY_TRIGGER	4
+#define	CREATEDBY_ZTIMEOUT	5
 
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	spdesc			stringpool;
 
 #ifdef UNIX
-LITDEF 	mstr	createdby_text[5] = {{0, LEN_AND_LIT("DO")}, {0, LEN_AND_LIT("XECUTE")}, {0, LEN_AND_LIT("$$")},
-				     {0, LEN_AND_LIT("ZINTR")}, {0, LEN_AND_LIT("TRIGGER")}};
+LITDEF 	mstr	createdby_text[6] = {{0, LEN_AND_LIT("DO")}, {0, LEN_AND_LIT("XECUTE")}, {0, LEN_AND_LIT("$$")},
+				     {0, LEN_AND_LIT("ZINTR")}, {0, LEN_AND_LIT("TRIGGER")}, {0, LEN_AND_LIT("ZTIMEOUT")}};
 #endif
 
 #ifdef VMS
@@ -69,6 +71,8 @@ void	get_frame_creation_info(int level, int cur_zlevel, mval *result)
 		result->str = createdby_text[CREATEDBY_ZINTR];
 	else if (fp && (fp->flags & SFF_INDCE))
 		result->str = createdby_text[CREATEDBY_XECUTE];
+	else if (fp && (fp->type & SFT_ZTIMEOUT))
+		result->str = createdby_text[CREATEDBY_ZTIMEOUT];
 #	ifdef GTM_TRIGGER
 	else if (fp && (fp->old_frame_pointer->type & SFT_TRIGR))
 		result->str = createdby_text[CREATEDBY_TRIGGER];

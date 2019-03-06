@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,7 @@
 #include "mdef.h"
 
 #include <stddef.h>
+#include <sys/shm.h>
 
 #include "gtm_stdio.h"
 
@@ -27,6 +28,7 @@
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
 #include "cmmdef.h"
 #include "mlkdef.h"
+#include "mlk_ops.h"
 #include "cmi.h"
 #include "util.h"
 #include "iosp.h"
@@ -37,6 +39,7 @@
 #include "lke_cleartree.h"
 #include "interlock.h"
 #include "rel_quant.h"
+#include "do_shmat.h"
 
 #define RESET		2
 
@@ -53,21 +56,23 @@ char gtcmtr_lke_clearrep(struct CLB *lnk, clear_request	*creq)
 	show_reply		srep;
 	uint4			status;
 	boolean_t		was_crit;
+	mlk_pvtctl		pctl;
 
 	cur_region = gv_cur_region = gtcm_find_region(curr_entry, creq->rnum)->reghead->reg;
 	if (IS_REG_BG_OR_MM(cur_region))
 	{
 		csa = &FILE_INFO(cur_region)->s_addrs;
-		lke_ctl = (mlk_ctldata_ptr_t)csa->lock_addrs[0];
+		lke_ctl = (mlk_ctldata_ptr_t)csa->mlkctl;
 		util_cm_print(lnk, 0, NULL, RESET);
 		dnode.len = creq->nodelength;
 		dnode.addr = creq->node;
-		GRAB_LOCK_CRIT(csa, gv_cur_region, was_crit);
+		MLK_PVTCTL_INIT(pctl, cur_region);
+		GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
 		if (lke_ctl->blkroot != 0)
 			/* Remote lock clears are not supported, so LKE CLEAR -EXACT qualifier will not be supported on GT.CM.*/
-			lke_cleartree(cur_region, lnk, lke_ctl, (mlk_shrblk_ptr_t)R2A(lke_ctl->blkroot), creq->all,
+			lke_cleartree(&pctl, lnk, (mlk_shrblk_ptr_t)R2A(lke_ctl->blkroot), creq->all,
 				      creq->interactive, creq->pid, dnode, FALSE);
-		REL_LOCK_CRIT(csa, gv_cur_region, was_crit);
+		REL_LOCK_CRIT(pctl, was_crit);
 	}
 	srep.code = CMMS_U_LKEDELETE;
 	lnk->cbl = SIZEOF(srep.code);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,7 @@ boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len
 					socketptr->delimiter[ii].addr = (char *)malloc(counter - 1);
 					memcpy(socketptr->delimiter[ii].addr, delimiter, counter - 1);
 					socketptr->delimiter[ii].len = counter - 1;
-					UNICODE_ONLY(socketptr->delimiter[ii].char_len = c_len);
+					UTF8_ONLY(socketptr->delimiter[ii].char_len = c_len);
 					socketptr->idelimiter[ii] = socketptr->delimiter[ii];
 					if (0 == ii)
 						socketptr->odelimiter0 = socketptr->delimiter[0];
@@ -87,7 +87,7 @@ boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len
 								  has to change. Vinaya, 2007/09/07
 							       */
 				break;
-			case NATIVE_LF : /* Only NATIVE_LF is accepted as line terminator although Unicode defines other
+			case NATIVE_LF : /* Only NATIVE_LF is accepted as line terminator although the standard defines other
 					    line terminators */
 				if (0 == ii)
 					socketptr->delim0containsLF = TRUE;
@@ -105,7 +105,7 @@ boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len
 			socketptr->delimiter[ii].addr = (char *)malloc(counter);
 			memcpy(socketptr->delimiter[ii].addr, delimiter, counter);
 			socketptr->delimiter[ii].len = counter;
-			UNICODE_ONLY(socketptr->delimiter[ii].char_len = c_len);
+			UTF8_ONLY(socketptr->delimiter[ii].char_len = c_len);
 			socketptr->idelimiter[ii] = socketptr->delimiter[ii];
 			if (0 == ii)
 				socketptr->odelimiter0 = socketptr->delimiter[0];
@@ -146,7 +146,7 @@ void iosocket_idelim_conv(socket_struct *socketptr, gtm_chset_t to_chset)
 				return;
 			}
 			socketptr->idelimiter[delim_index].len = new_delim_len;
-			UNICODE_ONLY(socketptr->idelimiter[delim_index].char_len = socketptr->delimiter[delim_index].char_len);
+			UTF8_ONLY(socketptr->idelimiter[delim_index].char_len = socketptr->delimiter[delim_index].char_len);
 			socketptr->idelimiter[delim_index].addr = malloc(new_delim_len);
 			memcpy(socketptr->idelimiter[delim_index].addr, conv_buff, new_delim_len);
 		}
@@ -185,7 +185,7 @@ void iosocket_odelim_conv(socket_struct *socketptr, gtm_chset_t to_chset)
 			return;
 		}
 		socketptr->odelimiter0.len = new_len;
-		UNICODE_ONLY(socketptr->odelimiter0.char_len = socketptr->delimiter[0].char_len);
+		UTF8_ONLY(socketptr->odelimiter0.char_len = socketptr->delimiter[0].char_len);
 		socketptr->odelimiter0.addr = malloc(new_len);
 		memcpy(socketptr->odelimiter0.addr, conv_buff, new_len);
 	} else

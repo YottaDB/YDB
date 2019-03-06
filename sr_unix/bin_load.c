@@ -97,6 +97,7 @@ error_def(ERR_DBFILERR);
 error_def(ERR_STATSDBNOTSUPP);
 error_def(ERR_JNLFILOPN);
 error_def(ERR_DBPRIVERR);
+error_def(ERR_GBLOFLOW);
 
 #define	BIN_PUT		0
 #define	BIN_BIND	1
@@ -1090,24 +1091,24 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					bin_call_db(BIN_PUT, (INTPTR_T)&v, 0);
 				if (mupip_error_occurred)
 				{
-					if (!mupip_DB_full)
+					if ((ERR_JNLFILOPN == error_condition) || (ERR_DBPRIVERR == error_condition) ||
+						(ERR_GBLOFLOW == error_condition))
 					{
-						if ((ERR_JNLFILOPN == error_condition) || (ERR_DBPRIVERR == error_condition))
-						{
-							first_failed_rec_count = rec_count;
-							mu_load_error = TRUE;
-							break;
-						} else
-						{
-							first_failed_rec_count = 0;
-							bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
-							file_offset = file_offset_base + ((unsigned char *)rp - ptr_base);
-							util_out_print("!_!_at File offset : [0x!16@XQ]", TRUE, &file_offset);
-							DISPLAY_CURRKEY;
-							DISPLAY_VALUE("!_!_Value :");
-						}
+						first_failed_rec_count = rec_count;
+						insert_reg_to_list(reg_list, gv_cur_region, &num_of_reg);
+						mu_load_error = TRUE;
+						failed_record_count++;
+						break;
+					} else
+					{
+						if (ERR_DBFILERR == error_condition)
+							failed_record_count++;
+						bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+						file_offset = file_offset_base + ((unsigned char *)rp - ptr_base);
+						util_out_print("!_!_at File offset : [0x!16@XQ]", TRUE, &file_offset);
+						DISPLAY_CURRKEY;
+						DISPLAY_VALUE("!_!_Value :");
 					}
-					failed_record_count++;
 					ONERROR_PROCESS;
 				}
 				mu_load_error = FALSE;
@@ -1158,6 +1159,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	if (failed_record_count)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FAILEDRECCOUNT, 1, &failed_record_count);
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_INFO(ERR_LOADRECCNT), 1, &tmp_rec_count);
+	if (failed_record_count)
+		mupip_exit(error_condition);
 	if (mu_ctrly_occurred)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LOADCTRLY);

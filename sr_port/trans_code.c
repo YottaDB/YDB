@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,7 @@
 # include "gv_trigger.h"
 # include "gtm_trigger.h"
 #endif
+#include "ztimeout_routines.h"
 
 #define POP_SPECIFIED 	(ZTRAP_POP & (TREF(ztrap_form)) && (level2go = MV_FORCE_INTD(&ztrap_pop2level))) /* note: assignment */
 
@@ -190,9 +191,17 @@ void trans_code(void)
 		jobinterrupt_process();
 		return;
 	}
+	if ((SFT_ZTIMEOUT & proc_act_type) && ((TREF(dollar_ztimeout)).ztimeout_vector.str.len))
+	{	/* Else current ETRAP or ZTRAP is the vector */
+		ztimeout_process();
+		return;
+	}
 	assert(err_act);
 	if (stringpool.base != rts_stringpool.base)
+	{
+		indr_stringpool = stringpool;
 		stringpool = rts_stringpool;
+	}
 	assert(SFT_ZTRAP == proc_act_type || SFT_DEV_ACT == proc_act_type);
 	/* The frame_pointer->mpc of error-causing M routine should always be set
 	 * to 'error_return' irrespective of the validity of $etrap code to make sure

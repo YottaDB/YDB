@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2016 Fidelity National Information	*
+ * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,7 @@ MBSTART {	/* Note assumption made that this is valid cache for this string so do
 # define DUMP_UTFCACHE_END(MVALPTR, UTFCGRPTR)
 #endif
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 /* Routine to locate a reusable cache area in the utfcgr array.
  *
  * Parameter:
@@ -711,4 +711,4 @@ void utfcgr_stats(void)
 	FPRINTF(stderr, "Number of partial scans after filled slots:        %d\n", u_parhscan);
 }
 #endif	/* DEBUG */
-#endif	/* UNICODE_SUPPORTED */
+#endif	/* UTF8_SUPPORTED */

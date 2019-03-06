@@ -12,7 +12,7 @@
 
 #include "mdef.h"
 #include "io.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #endif
 
@@ -23,7 +23,7 @@ void iorm_wtone(int ch)
 {
 	mstr		temp;
 	char		c;
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	unsigned char	uni_buf[GTM_MB_LEN_MAX], *endptr;
 #endif
 
@@ -33,7 +33,7 @@ void iorm_wtone(int ch)
 		temp.len = 1;
 		temp.addr = &c;
 	}
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 	else
 	{
 		switch (io_curr_device.out->ochset)
@@ -52,7 +52,7 @@ void iorm_wtone(int ch)
 		assert(0 < temp.len); /* we validated the code point already in op_wtone() */
 	}
 #endif
-	UNICODE_ONLY(temp.char_len = 1;)
+	UTF8_ONLY(temp.char_len = 1;)
 	iorm_write(&temp);
 	return;
 }

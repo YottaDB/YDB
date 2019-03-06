@@ -1268,6 +1268,7 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 			{
 				int		i;
 				boolean_t	trigger_status;
+				mval		*trigger_rec;
 				uint4		trig_stats[NUM_STATS];
 
 				assert(dollar_tlevel);
@@ -1278,9 +1279,14 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 				dollar_ztrigger_invoked = TRUE;	/* needed to ensure later SET/KILLs done in this TP transaction
 								 * read triggers installed by the below trigger_update_rec call.
 								 */
-				trigger_status = trigger_update_rec(rec->jrec_lgtrig.lgtrig_str.text,
-							rec->jrec_lgtrig.lgtrig_str.length, TRUE, trig_stats, NULL, NULL);
+				PUSH_MV_STENT(MVST_MVAL);	/* protect the trigger content from stp_gcol */
+				trigger_rec = &mv_chain->mv_st_cont.mvs_mval;
+				trigger_rec->mvtype = MV_STR;
+				trigger_rec->str.len = rec->jrec_ztworm.ztworm_str.length;
+				trigger_rec->str.addr = rec->jrec_ztworm.ztworm_str.text;
+				trigger_status = trigger_update_rec(trigger_rec, TRUE, trig_stats, NULL, NULL);
 				assert(TRIG_SUCCESS == trigger_status);
+				POP_MV_STENT();
 			}
 #			endif
 		}

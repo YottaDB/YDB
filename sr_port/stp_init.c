@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,5 +46,6 @@ void stp_init(size_t size)
 	lasttop = stringpool.top = stringpool.invokestpgcollevel
 		= na_page[0] - SIZEOF(char *);
 	set_noaccess (na_page, &stringpool.prvprt);
+	stringpool.gcols = 0;
 	return;
 }

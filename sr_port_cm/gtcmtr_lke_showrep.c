@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "mdef.h"
 
 #include <stddef.h>
+#include <sys/shm.h>
 
 #include "cmidef.h"
 #include "hashtab_mname.h"	/* needed for cmmdef.h */
@@ -39,9 +40,11 @@
 #include "iosp.h"
 #include "gtcm_find_region.h"
 #include "gvcmz.h"
-#include "longcpy.h"
+#include "gtm_string.h"
 #include "interlock.h"
 #include "rel_quant.h"
+#include "do_shmat.h"
+#include "mlk_ops.h"
 
 #define RESET	2
 
@@ -59,23 +62,29 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 	show_reply		srep;
 	uint4			status;
 	boolean_t		was_crit;
+	mlk_pvtctl		pctl, pctl2;
 
 	cur_region = gv_cur_region = gtcm_find_region(curr_entry, sreq->rnum)->reghead->reg;
 	if (IS_REG_BG_OR_MM(cur_region))
 	{
 		csa = &FILE_INFO(cur_region)->s_addrs;
-		ls_len = csa->lock_addrs[1] - csa->lock_addrs[0];
+		ls_len = csa->mlkctl_len;
 		lke_ctl = (mlk_ctldata *)malloc(ls_len);
 		/* Prevent any modification of the lock space while we make a local copy of it */
-		GRAB_LOCK_CRIT(csa, gv_cur_region, was_crit);
-		longcpy((uchar_ptr_t)lke_ctl, csa->lock_addrs[0], ls_len);
-		REL_LOCK_CRIT(csa, gv_cur_region, was_crit);
+		pctl.region = cur_region;
+		pctl.csa = csa;
+		pctl.ctl = (mlk_ctldata_ptr_t)pctl.csa->mlkctl;
+		/* No need to set up shrblk just to do an lke_showtree() with no memory dump. */
+		GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
+		memcpy((uchar_ptr_t)lke_ctl, pctl.ctl, ls_len);
+		pctl2 = pctl;
+		REL_LOCK_CRIT(pctl, was_crit);
+		pctl2.ctl = lke_ctl;
 		util_cm_print(lnk, 0, NULL, RESET);
 		dnode.len = sreq->nodelength;
 		dnode.addr = sreq->node;
 		if (lke_ctl->blkroot != 0)
-			(void)lke_showtree(lnk, (mlk_shrblk_ptr_t)R2A(lke_ctl->blkroot), sreq->all, sreq->wait, sreq->pid, dnode,
-					   FALSE, NULL);
+			(void)lke_showtree(lnk, &pctl2, sreq->all, sreq->wait, sreq->pid, dnode, FALSE, NULL);
 		free(lke_ctl);
 	}
 	srep.code = CMMS_U_LKESHOW;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 #include "subscript.h"
 #endif
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 GBLREF	boolean_t	badchar_inhibit;
 error_def(ERR_BADCHAR);
@@ -379,7 +379,7 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 			case END_OF_PROCESSING:		/* end of subscript but no closing paren - ")" */
 				return FALSE;
 		}
-#		ifdef UNICODE_SUPPORTED
+#		ifdef UTF8_SUPPORTED
 		if (!gtm_utf8_mode || (0 == (letter & 0x80)))
 			isrc++;
 		else if (0 < (utf8_len = UTF8_MBFOLLOW(&src->str.addr[isrc++])))
@@ -391,7 +391,7 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 			isrc += utf8_len;
 		}
 #		endif
-		NON_UNICODE_ONLY(isrc++);
+		NON_UTF8_ONLY(isrc++);
 	}
 	if ((END_OF_PROCESSING != state) && (EXPECT_NEXT_LETTER_OF_NAME != state))
 		return FALSE;

@@ -234,7 +234,7 @@ typedef void			(*gtm_free_fnptr_t)(void *);
 GBLREF gtm_malloc_fnptr_t	gtm_malloc_fnptr;
 GBLREF gtm_free_fnptr_t		gtm_free_fnptr;
 
-GBLREF	char			gtmcrypt_err_string[MAX_GTMCRYPT_ERR_STRLEN];
+GBLREF	char			gtmcrypt_err_string[MAX_GTMCRYPT_ERR_STRLEN + 1];
 
 int				gc_load_gtmshr_symbols(void);
 void 				gtm_gcry_log_handler(void *opaque, int level, const char *fmt, va_list arg_ptr);

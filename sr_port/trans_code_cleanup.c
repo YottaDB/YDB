@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,13 +28,13 @@
 
 GBLREF	unsigned short	proc_act_type;
 GBLREF	stack_frame	*frame_pointer;
-GBLREF	spdesc		stringpool;
-GBLREF	spdesc		rts_stringpool;
+GBLREF	spdesc		indr_stringpool, rts_stringpool, stringpool;
 GBLREF	mstr		*err_act;
 GBLREF	io_desc		*active_device;
 GBLREF	boolean_t	ztrap_explicit_null;
 
 error_def(ERR_STACKCRIT);
+error_def(ERR_ERRWZTIMEOUT);
 
 void trans_code_cleanup(void)
 {
@@ -56,14 +56,17 @@ void trans_code_cleanup(void)
 			errmsg = ERR_ERRWETRAP;
 	} else if (SFT_DEV_ACT == proc_act_type)
 		errmsg = ERR_ERRWIOEXC;
+	else if (SFT_ZTIMEOUT == proc_act_type)
+		errmsg = ERR_ERRWZTIMEOUT;
 	else
 		errmsg = 0;
 	proc_act_type = 0;
 	if (TREF(compile_time))
-	{
 		TREF(compile_time) = FALSE;
-		if (stringpool.base != rts_stringpool.base)
-			stringpool = rts_stringpool;
+	if (stringpool.base != rts_stringpool.base)
+	{
+		indr_stringpool = stringpool;
+		stringpool = rts_stringpool;
 	}
 	for (fp = frame_pointer; fp; fp = fpprev)
 	{

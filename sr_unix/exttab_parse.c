@@ -35,6 +35,7 @@
 #include "gtm_limits.h"
 #include "restrict.h"
 
+GBLREF  volatile boolean_t      timer_in_handler;
 GBLREF	char 			gtm_dist[GTM_PATH_MAX];
 
 #define	CR			0x0A		/* Carriage return */
@@ -56,6 +57,7 @@ STATICDEF boolean_t star_found;
 STATICFNDCL void *get_memory(size_t n);
 STATICFNDCL char *exttab_scan_space(char *c);
 STATICFNDCL char *scan_ident(char *c);
+STATICFNDCL void scan_behavioral_words(char *c, struct extcall_entry_list *entry_ptr);
 STATICFNDCL char *scan_labelref(char *c);
 STATICFNDCL enum gtm_types scan_keyword(char **c);
 STATICFNDCL int scan_array_bound(char **b,int curr_type);
@@ -182,6 +184,52 @@ STATICFNDEF char *scan_ident(char *c)
 	for ( ; ISALNUM_ASCII(*b) || ('_' == *b); b++, ext_source_column++)
 		;
 	return (b == c) ? 0 : b;
+}
+
+/* Function for scaning through words in the call table
+ * that change the way the external call behaves (eg. SIGSAFE)
+ * scans through list of key words and fills out any array of booleans
+ * inside the extcall_entry_list struct. Note behavioral words must be
+ * white-space separated and that bad keywords are silently ignored.
+ */
+
+STATICFNDEF void scan_behavioral_words(char *c, struct extcall_entry_list *entry_ptr)
+{
+	char    *token,*temp_tok,*saveptr;
+	int     j;
+	const static struct
+	{
+		gtm_ext_call_behavior	bwords;
+		const char		*str;
+	} conversion [] = {
+		{SIGSAFE, "SIGSAFE"}
+	};
+
+	/* scan until : or null if no list of behavioral words */
+	while(*c != ':')
+	{
+		if (*c == '\0')
+			return;
+		c++;
+	}
+	c++;
+	token = STRTOK_R(c, " \t", &saveptr);
+	while (token != NULL)
+	/* Make Keyword case insensitive */
+	{
+		temp_tok = token;
+		while (*temp_tok)
+		{
+			*temp_tok = toupper((unsigned char) *temp_tok);
+			temp_tok++;
+		}
+		for (j = 0;  j < (SIZEOF(conversion) / SIZEOF(conversion[0])); j++)
+		{
+			if (0 == memcmp(token, conversion[j].str, STRLEN(conversion[j].str)))
+				entry_ptr->ext_call_behaviors[j] = TRUE;
+		}
+		token = STRTOK_R(NULL, " \t", &saveptr);
+	}
 }
 
 /* If this is a label (alphameric, underscore, caret, and percent (C9E12-002681)), then
@@ -675,6 +723,8 @@ struct extcall_package_list *exttab_parse(mval *package)
 			tbp = exttab_scan_space(tbp);
 		}
 		entry_ptr = get_memory(SIZEOF(*entry_ptr));
+		/* note fills out part of entry_ptr */
+		scan_behavioral_words(tbp, entry_ptr);
 		entry_ptr->next_entry = pak->first_entry;
 		pak->first_entry = entry_ptr;
 		entry_ptr->return_type = ret_tok;

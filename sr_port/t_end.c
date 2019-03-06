@@ -644,7 +644,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		 */
 		DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 		if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL))
-			assert(FALSE);	/* wcs_get_space should have returned TRUE unconditionally in this case */
+			/* only reason we currently know why wcs_get_space could fail */
+			assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
 		assert(tmp_jnlpool == jnlpool);
 		for (;;)
 		{
@@ -811,8 +812,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 	if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL))
 	{
-		assert(cnl->wc_blocked);	/* only reason we currently know why wcs_get_space could fail */
-		assert(gtm_white_box_test_case_enabled);
+		/* only reason we currently know why wcs_get_space could fail */
+		assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
 		SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 		BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_hist);
 		SET_CACHE_FAIL_STATUS(status, csd);

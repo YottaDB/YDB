@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2006 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,15 +21,15 @@ boolean_t valid_mname(mstr *targ)
 	src = targ->addr;
 	src_top = targ->addr + targ->len;
 
-	if (0 < targ->len && targ->len <= MAX_MIDENT_LEN && VALID_MNAME_FCHAR(*src))
-	{
-		for ( ; ++src < src_top; )
+	if ((0 < targ->len) && (targ->len <= MAX_MIDENT_LEN) && VALID_MNAME_FCHAR(*src))
+	{	/* we currently trucate the name at length = MAX_MIDENT_LEN */
+		/* a comment in GTM-5284 suggests we should parse the whole name in order to give a more helpful error */
+		for (; ++src < src_top;)
 		{
 			if (!VALID_MNAME_NFCHAR(*src))
 				break;
 		}
 		return (src == src_top); /* Was it a valid M identifier? */
-			/* See D9E02-002422 for an issue here. Also we are supposed to trucate the name at lenght = 31 */
 	}
 	return FALSE;
 }

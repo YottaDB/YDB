@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "cgp.h"
 #include "error.h"
 #include "mmemory.h"
+#include "stp_parms.h"
 #include "stringpool.h"
 #include "list_file.h"
 #include "source_file.h"
@@ -31,24 +32,31 @@
 #include "hashtab_str.h"
 #include <rtnhdr.h>
 #include "rtn_src_chksum.h"
+#include "gtmmsg.h"
 
 #define HOPELESS_COMPILE 128
 
 GBLREF short int source_line;
 GBLREF int	source_column;
 
-GBLREF unsigned char		source_file_name[];
-GBLREF src_line_struct 		src_head;
-GBLREF triple			t_orig, *curr_fetch_trip, *curr_fetch_opr;
-GBLREF int4			curr_fetch_count;
-GBLREF command_qualifier	cmd_qlf;
-GBLREF int			mlmax;
-GBLREF mline			mline_root;
-GBLREF char			cg_phase;	/* code generation phase */
 GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
+GBLREF char			cg_phase;	/* code generation phase */
+GBLREF command_qualifier	cmd_qlf;
 GBLREF hash_table_str		*complits_hashtab;
+GBLREF int			mlmax;
+GBLREF int4			curr_fetch_count;
+GBLREF mcalloc_hdr 		*mcavailptr, *mcavailbase;
+GBLREF mline			mline_root;
+GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
+GBLREF src_line_struct 	src_head;
+GBLREF triple			t_orig, *curr_fetch_trip, *curr_fetch_opr;
+GBLREF unsigned char		source_file_name[];
+GBLREF unsigned short		source_name_len;
 
 LITDEF char compile_terminated[] = "COMPILATION TERMINATED DUE TO EXCESS ERRORS";
+
+error_def(ERR_ZLINKFILE);
+error_def(ERR_ZLNOOBJECT);
 
 boolean_t compiler_startup(void)
 {
@@ -66,6 +74,8 @@ boolean_t compiler_startup(void)
 	mident			null_mident;
 	gtm_rtn_src_chksum_ctx	checksum_ctx;
 	mstr			str;
+	size_t			mcallocated, alloc;
+	mcalloc_hdr		*lastmca, *nextmca;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -75,7 +85,24 @@ boolean_t compiler_startup(void)
 	 * (test is part of the macro invocation). Note this is the easiest place to make this check rather than complicating
 	 * error handling to provide a similar effect.
 	 */
-	COMPILE_HASHTAB_CLEANUP;
+	/* The stringpool switching pattern is to copy the stringpool structure to the holding structure for the currently active
+	 * pool and then copy the other pool structure into the stringpool structure. The initialization pattern is to stp_init
+	 * the stringpool structure and then copy it to the holding structure for the pool we're initializing. The indr_stringpool
+	 * might more appropriately be called cmplr_stringpool, because we use it for all compiles not just those for indirection
+	 */
+	if (rts_stringpool.base == stringpool.base)
+	{
+		rts_stringpool = stringpool;
+		if (!indr_stringpool.base)
+		{
+			stp_init(STP_INITSIZE);
+			indr_stringpool = stringpool;
+		} else
+			stringpool = indr_stringpool;
+	}
+	run_time = FALSE;
+	TREF(compile_time) = TRUE;
+	TREF(transform) = FALSE;
 	reinit_externs();
 	memset(&null_mident, 0, SIZEOF(null_mident));
 	ESTABLISH_RET(compiler_ch, FALSE);
@@ -84,6 +111,13 @@ boolean_t compiler_startup(void)
 	 * However, when a module is compiled at runtime, we need to preserve the existing runtime setting
 	 * (that was initialized at GT.M startup) once the compilation is done.  save_mstr_native_align is used for
 	 * this purpose. */
+	mcfree();	/* If last compile errored out, may have left things uninitialized for us */
+	/* Find out how much space we have in mcalloc blocks */
+	for (mcallocated = 0, nextmca = mcavailptr; nextmca; nextmca = nextmca->link)
+		mcallocated += nextmca->size;
+	if (0 == mcallocated)
+		mcallocated = MC_DSBLKSIZE - MCALLOC_HDR_SZ;	/* Min size is one default block size */
+	COMPILE_HASHTAB_CLEANUP;
 	save_mstr_native_align = mstr_native_align;
 	/* mstr_native_align = (cmd_qlf.qlf & CQ_ALIGN_STRINGS) ? TRUE : FALSE; */
 	mstr_native_align = FALSE; /* TODO: remove this line and  uncomment the above line */
@@ -93,6 +127,9 @@ boolean_t compiler_startup(void)
 	{
 		mstr_native_align = save_mstr_native_align;
 		REVERT;
+		assert(indr_stringpool.base == stringpool.base);
+		indr_stringpool = stringpool;
+		stringpool = rts_stringpool;
 		return FALSE;
 	}
 	rtn_src_chksum_init(&checksum_ctx);
@@ -154,6 +191,7 @@ boolean_t compiler_startup(void)
 		newtriple(OC_LINESTART);
 	newtriple(OC_RET);			/* always provide a default QUIT */
 	mline_root.externalentry = t_orig.exorder.fl;
+	assert(indr_stringpool.base == stringpool.base);
 	INVOKE_STP_GCOL(0);
 	/* The above invocation of stp_gcol with a parameter of 0 is a critical part of compilation
 	 * (both routine compilations and indirect dynamic compilations). This collapses the indirect
@@ -200,18 +238,38 @@ boolean_t compiler_startup(void)
 		if (cmd_qlf.qlf & CQ_MACHINE_CODE && compile_w_err)
 			list_head(1);
 	}
-	if ((!errknt || compile_w_err) && (cmd_qlf.qlf & CQ_OBJECT || cmd_qlf.qlf & CQ_MACHINE_CODE))
+	if ((!errknt || compile_w_err) && ((cmd_qlf.qlf & CQ_OBJECT)
+		|| (cmd_qlf.qlf &CQ_MACHINE_CODE)))
 	{
 		obj_code(line_count, &checksum_ctx);
 		cg_phase = CGP_FINI;
-	}
+	} else if (!compile_w_err)
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, source_name_len, source_file_name, ERR_ZLNOOBJECT);
 	if (cmd_qlf.qlf & CQ_LIST || cmd_qlf.qlf & CQ_CROSS_REFERENCE)
-	{
-		list_cmd();
 		close_list_file();
-	}
 	COMPILE_HASHTAB_CLEANUP;
 	reinit_externs();
+	/* Determine if need to remove any added mc blocks. Min value of mcallocated ensures we leave at least one block alone. */
+	for (alloc = 0, nextmca = mcavailptr;
+	     nextmca && (alloc < mcallocated);
+	alloc += nextmca->size, lastmca = nextmca, nextmca = nextmca->link);
+	if (nextmca)
+	{	/* Start freeing at the nextmca node since these are added blocks */
+		lastmca->link = NULL;	/* Sever link to further blocks here */
+		/* Release any remaining blocks if any */
+		for (lastmca = nextmca; lastmca; lastmca = nextmca)
+		{
+			nextmca = lastmca->link;
+			free(lastmca);
+		}
+	}
+	assert ((FALSE == run_time) && (TRUE == TREF(compile_time)));
+	run_time = TRUE;
+	TREF(compile_time) = FALSE;
+	TREF(transform) = TRUE;
+	assert(indr_stringpool.base == stringpool.base);
+	indr_stringpool = stringpool;
+	stringpool = rts_stringpool;
 	mstr_native_align = save_mstr_native_align;
 	REVERT;
 	return errknt ? TRUE : FALSE;

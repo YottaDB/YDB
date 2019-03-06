@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2015 Fidelity National Information 	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -320,7 +320,7 @@ LITREF unsigned int	utf8_bytelen[];
 
 /* boolean_t U_VALID_CODE(wint_t codepoint)
  * 	Returns
- * 		TRUE if the code point of a character is a valid Unicode code point
+ * 		TRUE if the code point of a character is a valid utf code point
  * 		FALSE otherwise.
  * 	Invalid code points include:
  * 		All surrogate code points
@@ -642,7 +642,7 @@ LITREF signed int 	utf8_followlen[];
 #define UTF16LE_LOW_SURROGATE(mbptr)								\
 	(U_IS_SURROGATE_LOW(UTF16LE_GET_UNIT(mbptr)))
 
-/* The following macros provide the character classification for Unicode characters given their code points */
+/* The following macros provide the character classification for utf characters given their code points */
 #define U_ISLOWER(c)	u_islower(c)
 #define U_ISUPPER(c)	u_isupper(c)
 #define U_ISALPHA(c)	u_isalpha(c)
@@ -658,7 +658,7 @@ LITREF signed int 	utf8_followlen[];
 
 /* uint4	CTYPEMASK(wint_t c)
  *
- * This macro assumes that "c" is a valid unicode codepoint.
+ * This macro assumes that "c" is a valid utf codepoint.
  *
  * Returns a patcode from a code point (wide character wint_t) paralleling the way ICU library functions classify codepoints.
  * 	u_isalpha (for A)
@@ -670,13 +670,13 @@ LITREF signed int 	utf8_followlen[];
  *	2) Non-decimal digits (Nl and No) are classified as A. Note: u_isdigit only matches decimal digits.
  *	3) Anything left is classified via u_isprint into either P or C. Note: u_isprint only matches non-control characters.
  * Note that the ISV $ZPATN[UMERIC] dictates how the pattern class N used in the pattern match operator is interpreted.
- * If $ZPATNUMERIC is "UTF-8", the pattern class N matches any decimal numeric character as defined by the Unicode standard.
+ * If $ZPATNUMERIC is "UTF-8", the pattern class N matches any decimal numeric character as defined by the standard.
  * If $ZPATNUMERIC is "M", GT.M restricts the pattern class N to match only ASCII digits 0-9 (i.e. ASCII 48-57).
  * The variable "utf8_patnumeric" is TRUE if $ZPATNUMERIC is "UTF-8".
  *
  * The above rules result in the following mapping
  *      --------------------------------------------------
- *      Unicode general category       GT.M patcode class
+ *      general category               GT.M patcode class
  *      --------------------------------------------------
  *	L* (all letters)	    -> A
  *	M* (all marks)		    -> P
@@ -690,7 +690,7 @@ LITREF signed int 	utf8_followlen[];
  *	Zp (paragraph separators)   -> C
  *	C* (all control codepoints) -> C
  *
- * For a description of the Unicode general categories see http://unicode.org/versions/Unicode4.0.0/ch04.pdf (section 4.5)
+ * For a description of the general categories see http://unicode.org/versions/Unicode4.0.0/ch04.pdf (section 4.5)
  *
  * E = A + P + N + C and the classifications A, P, N, and C are mutually exclusive.
  *
@@ -705,7 +705,7 @@ LITREF signed int 	utf8_followlen[];
 	(U_ISALPHA(c) ?						/* alphabet */							\
 		(U_ISLOWER(c) ? PATM_L				/* lower-case */						\
 			: (U_ISUPPER(c) ? PATM_U		/* upper-case */						\
-				: PATM_UTF8_ALPHABET))		/* unicode alphabet that is neither lower nor upper case */	\
+				: PATM_UTF8_ALPHABET))		/* utf alphabet that is neither lower nor upper case */		\
 		: (U_ISDIGIT(c)					/* ascii or non-ascii decimal digit */				\
 			? ((utf8_patnumeric || IS_ASCII(c))	/* check $ZPATNUMERIC setting */				\
 				? PATM_N			/* Ascii digit OR $ZPATNUMERIC set to "UTF-8" */		\
@@ -714,7 +714,7 @@ LITREF signed int 	utf8_followlen[];
 				? PATM_UTF8_ALPHABET 		/* PATM_UTF8_ALPHABET */					\
 				: (U_ISPUNCT(c) ? PATM_P	/* punctuation */						\
 					:(U_ISCNTRL(c) ? PATM_C /* control */							\
-								/* unicode character that is not part of any basic class */	\
+								/* utf character that is not part of any basic class */		\
 						:(U_ISPRINT(c) 		/* if printable  */					\
 							? PATM_P	/* punctuation */					\
 							: PATM_C))))))	/* otherwise, control */
@@ -750,7 +750,7 @@ LITREF signed int 	utf8_followlen[];
 /* The following macro is same as UTF8_WCWIDTH except that it returns 0 for unprintable valid characters as well.
  * It is primarily used by the IO code.
  */
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #define GTM_IO_WCWIDTH(CHAR,RET)		\
 	if (utf8_active)			\
 	{					\
@@ -770,7 +770,7 @@ LITREF signed int 	utf8_followlen[];
 #define U32_LT_LS	4
 #define U32_LT_PS	5
 #define U32_LT_LAST	5	/* not counting null sentinel */
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 int	trim_U16_line_term(UChar *buffer, int len);
 #endif
@@ -807,7 +807,7 @@ int	trim_U16_line_term(UChar *buffer, int len);
 #define	UTF8_LEN_STRICT(ptr, len)			\
 	utf8_len_strict((unsigned char *)(ptr), (len))
 
-/* This macro is needed to to ensure all Unicode line terminators are considered non-printable. As of this
+/* This macro is needed to to ensure all utf line terminators are considered non-printable. As of this
  * writing, ICU's u_isprint returns TRUE for LS/PS (Line/Paragraph separator; codepoints 0x2028, 0x2029)
  * and this causes problems in extracting and loading data which contains these codepoints (in UTF8 mode).
  * Ideally, one should go through all the line terminators in u32_line_term[] array and check them.
@@ -818,6 +818,27 @@ int	trim_U16_line_term(UChar *buffer, int len);
 	((((UChar32)UTF_LINE_SEPARATOR == (UChar32)(code)) || ((UChar32)UTF_PARA_SEPARATOR == (UChar32)(code)))		\
 		? FALSE													\
 		: u_isprint(code))
+
+static void inline copy_character(uint4 copy_length, sm_uc_ptr_t dstptr, char *rcur)
+{
+        switch (copy_length)
+        {       /* Rather than calling memcpy, do this dance so we can save some instructions */
+        case 4:
+                *((int4*)dstptr) = *((int4*)rcur);
+                break;
+        case 2:
+                *((short*)dstptr) = *((short*)rcur);
+                break;
+        case 3:
+                *((short*)(dstptr+1)) = *((short*)(rcur+1));
+                /* FALLTHROUGH */
+        case 1:
+                *dstptr = *rcur;
+                break;
+        default:
+                assert(FALSE);
+        }
+}
 
 /* The utf8_len[_{stx,dec)] routines do slightly different error reporting. This enum defines which type is desired */
 typedef enum
@@ -843,7 +864,7 @@ STATICFNDCL void utf8_badchar_real(utf8_err_type err_type, int len, unsigned cha
 unsigned char	*gtm_utf8_trim_invalid_tail(unsigned char *str, int len);
 boolean_t       valid_utf_string(const mstr *str);
 
-/* To prevent GTMSECSHR from pulling in the function "gtmwcswidth" (used in util_output.c) and in turn the entire Unicode
+/* To prevent GTMSECSHR from pulling in the function "gtmwcswidth" (used in util_output.c) and in turn the entire utf
  * codebase, we define a function-pointer variable and initialize it at startup to NULL only in GTMSECSHR and not-null
  * in all the other executables.
  */

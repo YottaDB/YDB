@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2002-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,7 +22,7 @@
 #include "subscript.h"
 #include "str2gvargs.h"
 #include "zshow.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #endif
 #ifdef GTM_TRIGGER
@@ -181,7 +182,7 @@ boolean_t str2gvargs(char *cp, int len, gvargs_t *op_gvargs)
 						*dstptr = chcode;
 						chlen = 1;
 					}
-#					ifdef UNICODE_SUPPORTED
+#					ifdef UTF8_SUPPORTED
 					else {
 						strnext = (char *)UTF8_WCTOMB(chcode, dstptr);
 						chlen = INTCAST(strnext - dstptr);

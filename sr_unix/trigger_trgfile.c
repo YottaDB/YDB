@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -96,7 +96,8 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 	boolean_t		trigger_status;
 	enum cdb_sc		cdb_status;
 	uint4			trig_stats[NUM_STATS];
-	char			*trigger_rec;
+	mval			*trigger_rec;
+	char			*trigptr;
 	char			*values[NUM_SUBS];
 	unsigned short		value_len[NUM_SUBS];
 
@@ -114,20 +115,25 @@ STATICFNDEF boolean_t trigger_trgfile_tpwrap_helper(char *trigger_filename, uint
 	record_num = 0;
 	for (i = 0; NUM_STATS > i; i++)
 		trig_stats[i] = 0;
+	PUSH_MV_STENT(MVST_MVAL);	/* protect the trigger content from stp_gcol */
+	trigger_rec = &mv_chain->mv_st_cont.mvs_mval;
+	trigger_rec->mvtype = MV_STR;
 	trigger_error = FALSE;
-	while ((0 == io_curr_device.in->dollar.zeof) && (0 <= (len = file_input_get(&trigger_rec, 0))))
+	while ((0 == io_curr_device.in->dollar.zeof) && (0 <= (len = file_input_get(&trigptr, 0))))
 	{
 		io_curr_device = io_save_device;
 		record_num++;
-		if ((0 != len) && (COMMENT_LITERAL != trigger_rec[0]))
+		if ((0 != len) && (COMMENT_LITERAL != trigptr[0]))
 			util_out_print_gtmio("File !AD, Line !UL: ", NOFLUSH, trigger_filename_len, trigger_filename, record_num);
-		trigger_status = trigger_update_rec(trigger_rec, (uint4)len, noprompt, trig_stats, &io_trigfile_device,
-						    &record_num);
+		trigger_rec->str.len = len;
+		trigger_rec->str.addr = trigptr;
+		trigger_status = trigger_update_rec(trigger_rec, noprompt, trig_stats, &io_trigfile_device, &record_num);
 		trigger_error |= (TRIG_FAILURE == trigger_status);
 		assert(!trigger_error || trig_stats[STATS_ERROR_TRIGFILE]);
 		assert(trigger_error || !trig_stats[STATS_ERROR_TRIGFILE]);
 		io_curr_device = io_trigfile_device;
 	}
+	POP_MV_STENT();
 	if ((-1 == len) && (!io_curr_device.in->dollar.zeof))
 	{
 		io_curr_device = io_save_device;

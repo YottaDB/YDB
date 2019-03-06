@@ -110,7 +110,7 @@
 #define	GTM_JNL_RELEASE_TIMEOUT		"$gtm_jnl_release_timeout"
 #define	GTM_CUSTOM_ERRORS		"$gtm_custom_errors"
 
-/* Unicode */
+/* UTF8 */
 #define	GTM_CHSET_ENV			"$gtm_chset"
 #ifdef __MVS__
 #define	GTM_CHSET_LOCALE_ENV		"$gtm_chset_locale"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,6 +57,7 @@
 #include "secshr_client.h"
 #include "hashtab.h"		/* for STR_HASH macro */
 #include "fork_init.h"
+#include "gtm_permissions.h"
 #include "wbox_test_init.h"
 
 GBLREF struct sockaddr_un       gtmsecshr_sock_name;
@@ -185,6 +186,7 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 	int4			msec_timeout;
 	char			*gtm_tmp_ptr;
 	struct stat		stat_buf;
+	char			file_perm[MAX_PERM_LEN];
 	struct shmid_ds		shm_info;
 	int			len;
 	DCL_THREADGBL_ACCESS;
@@ -213,10 +215,20 @@ int send_mesg2gtmsecshr(unsigned int code, unsigned int id, char *path, int path
 		if (-1 == Stat(gtmsecshr_pathname.addr, &stat_buf))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("stat"), CALLFROM, errno);
-		if ((ROOTUID != stat_buf.st_uid)
-			|| !(stat_buf.st_mode & S_ISUID)
-			|| (0 != ACCESS(gtmsecshr_pathname.addr, (X_OK))))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
+		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
+		{
+			SNPRINTF(file_perm, SIZEOF(file_perm), "%04o", stat_buf.st_mode & PERMALL);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GTMSECSHRPERM, 5,
+					gtmsecshr_pathname.len, gtmsecshr_pathname.addr,
+					RTS_ERROR_STRING(file_perm), stat_buf.st_uid);
+		}
+		if (0 != ACCESS(gtmsecshr_pathname.addr, (X_OK)))
+		{
+			SNPRINTF(file_perm, SIZEOF(file_perm), "%04o", stat_buf.st_mode & PERMALL);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_GTMSECSHRPERM, 5,
+					gtmsecshr_pathname.len, gtmsecshr_pathname.addr,
+					RTS_ERROR_STRING(file_perm), stat_buf.st_uid, errno);
+		}
 		gtmsecshr_file_check_done = TRUE;
 	}
 	if (!gtmsecshr_sock_init_done && (0 < (init_ret_code = gtmsecshr_sock_init(CLIENT))))	/* Note assignment */

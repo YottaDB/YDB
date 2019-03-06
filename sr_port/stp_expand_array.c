@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +14,7 @@
 #include "compiler.h"
 #include "stringpool.h"
 #include "stp_parms.h"
-#include "longcpy.h"
+#include "gtm_string.h"
 
 GBLREF mstr **stp_array;
 GBLREF int stp_array_size;
@@ -27,7 +28,7 @@ void stp_expand_array(void)
 	stp_array_size += STP_MAXITEMS;
 	a = stp_array;
 	stp_array = (mstr **) malloc(stp_array_size * SIZEOF(mstr *));
-	longcpy((uchar_ptr_t)stp_array, (uchar_ptr_t)a, n * SIZEOF(mstr *));
+	memcpy((uchar_ptr_t)stp_array, (uchar_ptr_t)a, n * SIZEOF(mstr *));
 	free(a);
 	return;
 }

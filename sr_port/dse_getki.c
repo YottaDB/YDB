@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,7 +36,7 @@
 #include <rtnhdr.h>
 #include "targ_alloc.h"
 #endif
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #endif
 
@@ -248,7 +249,7 @@ int parse_dlr_char(char *src, char *top, char *dlr_subsc)
 					return 0;
 				*dlr_subsc++ = dlr_val;
 			}
-#			ifdef UNICODE_SUPPORTED
+#			ifdef UTF8_SUPPORTED
 			else {
 				strnext = (char *)UTF8_WCTOMB(dlr_val, dlr_subsc);
 				if (strnext == dlr_subsc)

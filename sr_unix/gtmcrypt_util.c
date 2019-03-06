@@ -37,7 +37,7 @@
  * into the shared library automatically and is shared across all different libraries that comprise the encryption reference
  * implementation.
  */
-GBLDEF	char	gtmcrypt_err_string[MAX_GTMCRYPT_ERR_STRLEN];
+GBLDEF	char	gtmcrypt_err_string[MAX_GTMCRYPT_ERR_STRLEN + 1];
 #ifndef USE_SYSLIB_FUNCS
 GBLDEF gtm_malloc_fnptr_t		gtm_malloc_fnptr;
 GBLDEF gtm_free_fnptr_t			gtm_free_fnptr;

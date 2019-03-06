@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +23,7 @@ GBLREF stack_frame	*frame_pointer;
 GBLREF unsigned char	*restart_ctxt, *restart_pc;
 GBLREF void             (*tp_timeout_action_ptr)(void);
 GBLREF volatile int4 	ctrap_action_is, outofband;
-
+GBLREF void		(*ztimeout_action_ptr)(void);
 error_def(ERR_CTRAP);
 error_def(ERR_CTRLC);
 error_def(ERR_CTRLY);
@@ -59,6 +60,9 @@ void outofband_action(boolean_t lnfetch_or_start)
 				break;
 			case (jobinterrupt):
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBINTRRQST);
+				break;
+			case (ztimeout): /* Following is basically rts_error */
+				(*ztimeout_action_ptr)();
 				break;
 			default:
 				assertpro(FALSE);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,7 @@
 #include "gdsfhead.h"
 #include "alias.h"
 #include "glvn_pool.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_utf8.h"
 #endif
 
@@ -537,7 +537,7 @@ int m_set(void)
 				{	/* There is no "last" value. Only if 1 char literal delimiter and
 					 * no "last" value can we generate shortcut code to op_set[z]p1 entry
 					 * instead of op_set[z]piece. Note if UTF8 mode is in effect, then this
-					 * optimization applies if the literal is one unicode char which may in
+					 * optimization applies if the literal is one UTF8 char which may in
 					 * fact be up to 4 bytes but will still be passed as a single unsigned
 					 * integer.
 					 */
@@ -556,14 +556,14 @@ int m_set(void)
 								 */
 								unichar.unichar_val = 0;
 								if (!gtm_utf8_mode
-								    UNICODE_ONLY(|| (OC_SETZPIECE == s->opcode)))
+								    UTF8_ONLY(|| (OC_SETZPIECE == s->opcode)))
 								{	/* Single byte delimiter */
 									assert(1 == delim_mval->str.len);
 									UNIX_ONLY(s->opcode = OC_SETZP1);
 									VMS_ONLY(s->opcode = OC_SETP1);
 									unichar.unibytes_val[0] = *delim_mval->str.addr;
 								}
-#								ifdef UNICODE_SUPPORTED
+#								ifdef UTF8_SUPPORTED
 								else
 								{	/* Potentially multiple bytes in one int */
 									assert(SIZEOF(int) >= delim_mval->str.len);

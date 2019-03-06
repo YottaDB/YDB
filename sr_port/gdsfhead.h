@@ -794,10 +794,10 @@ MBSTART {											\
 /* the file header has relative pointers to its data structures so each process will malloc
  * one of these and fill it in with absolute pointers upon file initialization.
  */
-#define GDS_REL2ABS(x)	(((sm_uc_ptr_t)cs_addrs->lock_addrs[0] + (sm_off_t)(x)))
-#define GDS_ABS2REL(x) (sm_off_t)(((sm_uc_ptr_t)(x) - (sm_uc_ptr_t)cs_addrs->lock_addrs[0]))
-#define GDS_ANY_REL2ABS(w,x) (((sm_uc_ptr_t)(w->lock_addrs[0]) + (sm_off_t)(x)))
-#define GDS_ANY_ABS2REL(w,x) (sm_off_t)(((sm_uc_ptr_t)(x) - (sm_uc_ptr_t)w->lock_addrs[0]))
+#define GDS_REL2ABS(x)	(((sm_uc_ptr_t)cs_addrs->mlkctl + (sm_off_t)(x)))
+#define GDS_ABS2REL(x) (sm_off_t)(((sm_uc_ptr_t)(x) - (sm_uc_ptr_t)cs_addrs->mlkctl))
+#define GDS_ANY_REL2ABS(CSA, x) (((sm_uc_ptr_t)((CSA)->mlkctl) + (sm_off_t)(x)))
+#define GDS_ANY_ABS2REL(CSA, x) (sm_off_t)(((sm_uc_ptr_t)(x) - (sm_uc_ptr_t)(CSA)->mlkctl))
 #define GDS_ANY_ENCRYPTGLOBUF(w,x) ((sm_uc_ptr_t)(w) + (sm_off_t)(x->nl->encrypt_glo_buff_off))
 #define	ASSERT_IS_WITHIN_SHM_BOUNDS(ptr, csa)											\
 	assert((NULL == (ptr)) || (((ptr) >= csa->db_addrs[0]) && ((0 == csa->db_addrs[1]) || ((ptr) < csa->db_addrs[1]))))
@@ -2561,7 +2561,8 @@ typedef struct	sgmnt_addrs_struct
 	mutex_struct_ptr_t			critical;
 	struct shmpool_buff_hdr_struct		*shmpool_buffer;	/* 1MB chunk of shared memory that we micro manage */
 	sm_uc_ptr_t				db_addrs[2];
-	sm_uc_ptr_t				lock_addrs[2];
+	struct mlk_ctldata_struct		*mlkctl;
+	uint4					mlkctl_len;		/* The size of the cnl lock space */
 	struct gv_namehead_struct		*dir_tree;
 #	ifdef GTM_TRIGGER
 	struct gv_namehead_struct		*hasht_tree;
@@ -2703,6 +2704,10 @@ typedef struct	sgmnt_addrs_struct
 	gd_inst_info	*gd_instinfo;		/* global directory not gtm_repl_instance */
 	gd_addr		*gd_ptr;		/* global directory for region */
 	struct jnlpool_addrs_struct	*jnlpool;	/* NULL until put, kill, or other function requiring jnlpool */
+	struct mlk_shrhash_struct	*mlkhash;	/* Pointer to shared lock hash array. Set by GRAB_LOCK_CRIT(). */
+	int				mlkhash_shmid;	/* Shared memory id of attached lock hash array, or zero if internal.
+							 * Set by GRAB_LOCK_CRIT().
+							 */
 } sgmnt_addrs;
 
 typedef struct gd_binding_struct

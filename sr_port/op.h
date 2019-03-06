@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,8 @@
 #define OP_INCLUDED
 
 #include <rtnhdr.h>	/* Avoid changing a few hundred op_* and other modules to put this first */
+#include "hashtab_int4.h"
+#include "hashtab.h"
 
 #ifdef VMS
 /* Define a TWO-argument VMS_ONLY macro (first argument is empty string but is needed because of the VMS-only , that follows) */
@@ -21,6 +23,10 @@
 #else
 #define	UNIX1_VMS2(X,Y)	X
 #endif
+
+/* Definitions for mystery numbers in op_fnztranslate and f_translate */
+#define NO_VALUE -1
+#define DELETE_VALUE -2
 
 void	op_add(mval *u, mval *v, mval *s);
 void	add_mvals(mval *u, mval *v, int subtraction, mval *result);	/* function defined in op_add.c */
@@ -124,6 +130,12 @@ void	op_fnzsqlfield(int findex, mval *target);
 void	op_fnzsubstr(mval *src, int start, int bytelen, mval *dest);
 void	op_fnzsyslog(mval *src, mval *dst);
 void	op_fnztranslate(mval *src, mval *in_str , mval *out_str, mval *dst);
+void	op_fnztranslate_fast(mval *src, mval *m_xlate, mval *dst);
+void	op_fntranslate_fast(mval *src, mval *rplc, mval *xlate, mval *m_xlate_hash, mval *dst);
+void	op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_table_int4 *xlate_hash);
+void	op_fnztranslate_common(mval *src, mval *dst, int *xlate);
+void	create_byte_xlate_table(mval *srch, mval *rplc, int4 *xlate);
+hash_table_int4	*create_utf8_xlate_table(mval *srch, mval *rplc, int4 *xlate);
 void	op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst);
 void	op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blind, mval *item, mval *ret);
 void	op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blind, mval *item, mval *ret);

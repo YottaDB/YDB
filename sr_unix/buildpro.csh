@@ -39,4 +39,7 @@ if ( "$HOSTOS" == "Linux" ) then
 	end
 endif
 
+# strip removes the restricted permissions of gtmsecshr. Fix it
+$gtm_com/IGS $gtm_dist/gtmsecshr CHOWN
+
 exit $status

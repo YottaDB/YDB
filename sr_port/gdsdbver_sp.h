@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2017 Fidelity National Information	*
+ * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,7 +13,7 @@ ENUM_ENTRY(GDSMV4),		/* Applies to all V4 versions (no minor versions defined) *
 ENUM_ENTRY(GDSMV50000),
 ENUM_ENTRY(GDSMV51000),		/* Multi-site available (for databases created by V51000 - see V51000ALT */
 ENUM_ENTRY(GDSMV51000ALT),	/* Upgrade from a previous version upgraded to this value for V51000 due to bug */
-ENUM_ENTRY(GDSMV52000),		/* Unicode .. no real header changes but db contents could be unusable by previous versions */
+ENUM_ENTRY(GDSMV52000),		/* UTF8 .. no real header changes but db contents could be unusable by previous versions */
 ENUM_ENTRY(GDSMV53000),		/* M-Itanium release. secshr_ops_array and index is been copied from sgmnt_data to node_local. */
 ENUM_ENTRY(GDSMV53003),		/* ZSHOW "G" release: Db Statistics rearranged in file header */
 ENUM_ENTRY(GDSMV53004),		/* New fields(is_encrypted, encryption_hash) for encryption */

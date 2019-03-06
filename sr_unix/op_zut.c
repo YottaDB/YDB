@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information 		*
+ * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,7 @@ void op_zut(mval *s)
 	int4		pwr;
 
 	assertpro(-1 != gettimeofday(&tv, NULL));
-	microseconds = (1LL * MICROSEC_IN_SEC * tv.tv_sec) + tv.tv_usec;
+	microseconds = (1LL * MICROSECS_IN_SEC * tv.tv_sec) + tv.tv_usec;
 	if ((microseconds < 0) && (microseconds > E_18))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_WEIRDSYSTIME);
 	if (microseconds < E_6)

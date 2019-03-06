@@ -274,9 +274,10 @@ boolean_t cli_disallow_mupip_replic_editinst(void)
 
 	*cli_err_str_ptr = 0;
 
-	/* any MUPIP REPLIC -EDITINSTANCE command should contain one of CHANGE or SHOW or NAME or QDBRUNDOWN */
+	/* any MUPIP REPLIC -EDITINSTANCE command should contain one of CHANGE or SHOW or NAME or QDBRUNDOWN or CLEANSLOTS*/
 	disallow_return_value = !(d_c_cli_present("CHANGE") || d_c_cli_present("SHOW") || d_c_cli_present("NAME")
-					|| (d_c_cli_present("QDBRUNDOWN") || d_c_cli_negated("QDBRUNDOWN")));
+					|| (d_c_cli_present("QDBRUNDOWN") || d_c_cli_negated("QDBRUNDOWN"))
+					|| d_c_cli_present("CLEANSLOTS"));
 	CLI_DIS_CHECK_N_RESET;
 	/* CHANGE and SHOW are mutually exclusive */
 	disallow_return_value = (d_c_cli_present("CHANGE") && d_c_cli_present("SHOW"));
@@ -284,14 +285,16 @@ boolean_t cli_disallow_mupip_replic_editinst(void)
 	/* CHANGE and NAME are mutually exclusive */
 	disallow_return_value = (d_c_cli_present("CHANGE") && d_c_cli_present("NAME"));
 	CLI_DIS_CHECK_N_RESET;
-	/* CHANGE and QDBRUNDOWN are mutually exclusive */
-	disallow_return_value = (d_c_cli_present("CHANGE") && (d_c_cli_present("QDBRUNDOWN") || d_c_cli_negated("QDBRUNDOWN")));
+	/* CHANGE and QDBRUNDOWN/CLEANSLOTS are mutually exclusive */
+	disallow_return_value = (d_c_cli_present("CHANGE") && (d_c_cli_present("QDBRUNDOWN") || d_c_cli_negated("QDBRUNDOWN")
+									|| d_c_cli_present("CLEANSLOTS")));
 	CLI_DIS_CHECK_N_RESET;
 	/* SHOW and NAME are mutually exclusive */
 	disallow_return_value = (d_c_cli_present("SHOW") && d_c_cli_present("NAME"));
 	CLI_DIS_CHECK_N_RESET;
-	/* SHOW and QDBRUNDOWN are mutually exclusive */
-	disallow_return_value = (d_c_cli_present("SHOW") && (d_c_cli_present("QDBRUNDOWN") || d_c_cli_negated("QDBRUNDOWN")));
+	/* SHOW and QDBRUNDOWN/CLEANSLOTS are mutually exclusive */
+	disallow_return_value = (d_c_cli_present("SHOW") && (d_c_cli_present("QDBRUNDOWN") || d_c_cli_negated("QDBRUNDOWN")
+									|| d_c_cli_present("CLEANSLOTS")));
 	CLI_DIS_CHECK_N_RESET;
 	/* OFFSET, SIZE and VALUE is compatible only with CHANGE */
 	disallow_return_value = (!d_c_cli_present("CHANGE")
@@ -554,9 +557,8 @@ boolean_t cli_disallow_mupip_set(void)
 	disallow_return_value = (d_c_cli_present("INST_FREEZE_ON_ERROR") && p3);
 	CLI_DIS_CHECK_N_RESET;
 	p1 = d_c_cli_present("KEY_SIZE");
-	p2 = d_c_cli_present("RECORD_SIZE");
-	p3 = d_c_cli_present("RESERVED_BYTES");
-	disallow_return_value =  cli_check_any2(VARLSTCNT(3) p1, p2, p3);
+	p2 = d_c_cli_present("RESERVED_BYTES");
+	disallow_return_value =  cli_check_any2(VARLSTCNT(2) p1, p2);
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }

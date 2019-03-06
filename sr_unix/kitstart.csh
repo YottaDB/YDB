@@ -45,13 +45,12 @@ if (-e /etc/csh.cshrc) then
 endif
 
 # we need s_linux and s_linux64 here
-source $cms_tools/cms_cshrc.csh
-
-source $cms_tools/server_list
+source $btc_tools/cms_cshrc.csh
+source $btc_tools/server_list.csh	# To set $distrib_servers_unix
 
 setenv PATH "/usr/local/bin:/usr/sbin:/usr/ccs/bin:/usr/bin:/bin"
 
-# get the osname and arch type from the tables in server_list
+# get the osname and arch type from the tables in server_list.csh
 
 set servers      = ( $distrib_servers_unix )
 set platformarch = ( $distrib_unix_platformarch )
@@ -72,7 +71,7 @@ if (! $?os_arch) then
 	setenv randstr `$gtm_dist/mumps -r %XCMD 'do ^%RANDSTR'`
 	set tempdir = /tmp/kit_unamearch_${randstr}
 	mkdir $tempdir
-	cp $cms_tools/unamearch.m $tempdir
+	cp $btc_tools/unamearch.m $tempdir
 	set os_arch=`(cd $tempdir; $gtm_dist/mumps -r unamearch $distrib_unix_platformarch%$uname_platformarch)`
 	if ("" == "$os_arch") then
 		echo "Problem getting platform and arch from uname -a"
@@ -189,7 +188,7 @@ set releasever = $zver[2]
 # create a README.txt which has the current year in it
 setenv readme_txt ${gtm_com}/README.txt
 set year = `date +%Y`
-sed "s/#YEAR#/$year/" $cms_tools/license_README_txt > $readme_txt
+sed "s/#YEAR#/$year/" $btc_tools/license_README.txt > $readme_txt
 chmod 444 $readme_txt
 
 # Set the open source flag and set lib_specific to the platform specific directories that needs to
@@ -198,7 +197,7 @@ set open_source = 0
 set GNU_COPYING_license = "${gtm_com}/COPYING"
 if ("$osname" == "linux" && ( "$arch" == "i586" || "x8664" == "$arch" )) then
 	set open_source = 1
-	/bin/cp -pf $cms_tools/opensource_COPYING $GNU_COPYING_license
+	/bin/cp -pf $btc_tools/opensource_COPYING.txt $GNU_COPYING_license
 	chmod 444 $GNU_COPYING_license
 endif
 

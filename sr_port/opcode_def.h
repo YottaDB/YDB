@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -347,5 +347,7 @@ OPCODE_DEF(OC_ZRUPDATE, (OCT_NULL))
 OPCODE_DEF(OC_CDIDX, (OCT_MINT | OCT_CGSKIP | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZCOLLATE, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZATRANSFORM, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_FNZTRANSLATE_FAST, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_FNTRANSLATE_FAST, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_LASTOPCODE, (OCT_CGSKIP))
 /* insert new opcodes before OC_LASTOPCODE */

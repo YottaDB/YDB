@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,13 +42,11 @@ GBLREF uint4 process_id;
 	if (GONE == crit_wake_res)								\
 	{											\
 		pr->ref_cnt = 1;								\
-		mlk_prcblk_delete(ctl, d, *((sm_uint_ptr_t)&pr->process_id));			\
+		mlk_prcblk_delete(pctl, d, *((sm_uint_ptr_t)&pr->process_id));			\
 	}											\
 }
 
-void mlk_wake_pending(mlk_ctldata_ptr_t ctl,
-		      mlk_shrblk_ptr_t d,
-		      gd_region *reg)
+void mlk_wake_pending(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 {
 	mlk_prcblk_ptr_t	next, pr;
 	sm_uint_ptr_t 		empty_slot, ctop;
@@ -57,23 +55,23 @@ void mlk_wake_pending(mlk_ctldata_ptr_t ctl,
 	int 			crit_wake_res; /* also used in macro DO_CRIT_WAKE */
 	int 			lcnt;
 
-	csa = &FILE_INFO(reg)->s_addrs;
+	csa = pctl->csa;
 	if (!d->pending)
 		return;
-	ctl->wakeups++;
+	pctl->ctl->wakeups++;
 	/* Before updating d->sequence ensure there is no process owning this lock, since otherwise when the owner process attempts
 	 * to release the lock it will fail as its private copy of "p->sequence" will not match the shared memory "d->sequence".
 	*/
 	assert(!d->owner);
 	d->sequence = csa->hdr->trans_hist.lock_sequence++;	/* This node is being awakened (GTCM) */
 	BG_TRACE_PRO_ANY(csa, mlock_wakeups);			/* Record halted slumbers */
-	for (pr = (mlk_prcblk_ptr_t)R2A(d->pending), lcnt = ctl->max_prccnt; lcnt; lcnt--)
+	for (pr = (mlk_prcblk_ptr_t)R2A(d->pending), lcnt = pctl->ctl->max_prccnt; lcnt; lcnt--)
 	{
 		next = (pr->next) ? (mlk_prcblk_ptr_t)R2A(pr->next) : 0;	/* in case it's deleted */
 		DO_CRIT_WAKE;
 
 		/* Wake one process to keep things orderly, if it loses its way, others
-		 * will jump in after a timout */
+		 * will jump in after a timeout */
 		if (GONE == crit_wake_res && next)
 			pr = next;
 		else

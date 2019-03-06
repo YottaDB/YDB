@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -90,7 +90,7 @@
 #include "jobsp.h" /* For gcall.h */
 #include "gcall.h" /* For ojchildparms() */
 #include "common_startup_init.h"
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "utfcgr.h"
 #endif
 
@@ -146,7 +146,6 @@ void gtm_startup(struct startup_vector *svec)
 	mstr		log_name;
 	stack_frame 	*frame_pointer_lcl;
 	static char 	other_mode_buf[] = "OTHER";
-	void		gtm_ret_code();
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -198,7 +197,7 @@ void gtm_startup(struct startup_vector *svec)
 			assert(FALSE);
 	}
 #	endif
-	gtm_utf8_init(); /* Initialize the runtime for Unicode */
+	gtm_utf8_init(); /* Initialize the runtime for UTF8 */
 	/* Initialize alignment requirement for the runtime stringpool */
 	log_name.addr = DISABLE_ALIGN_STRINGS;
 	log_name.len = STR_LIT_LEN(DISABLE_ALIGN_STRINGS);
@@ -287,14 +286,14 @@ void gtm_startup(struct startup_vector *svec)
 void gtm_utf8_init(void)
 {
 	int	utfcgr_size, alloc_size, i;
-#	ifdef UNICODE_SUPPORTED
+#	ifdef UTF8_SUPPORTED
 	utfcgr	*utfcgrp, *p;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	if (!gtm_utf8_mode)
-	{	/* Unicode is not enabled (i.e. $ZCHSET="M"). All standard functions must be byte oriented */
+	{	/* UTF8 is not enabled (i.e. $ZCHSET="M"). All standard functions must be byte oriented */
 		FIX_XFER_ENTRY(xf_setextract, op_setzextract);
 		FIX_XFER_ENTRY(xf_fnj2, op_fnzj2);
 		FIX_XFER_ENTRY(xf_setpiece, op_setzpiece);
@@ -310,7 +309,7 @@ void gtm_utf8_init(void)
 	{	/* We are in UTF8 mode - allocate desired UTF8 parse cache and initialize it. This is effectively a 2 dimensional
 		 * structure where both dimensions are variable.
 		 */
-#       	ifdef UNICODE_SUPPORTED
+#       	ifdef UTF8_SUPPORTED
 		utfcgr_size = OFFSETOF(utfcgr, entry) + (SIZEOF(utfcgr_entry) * TREF(gtm_utfcgr_string_groups));
 		alloc_size = utfcgr_size * TREF(gtm_utfcgr_strings);
 		(TREF(utfcgra)).utfcgrs = utfcgrp = (utfcgr *)malloc(alloc_size);
@@ -324,6 +323,6 @@ void gtm_utf8_init(void)
 		(TREF(utfcgra)).utfcgrmax = (utfcgr *)((UINTPTR_T)utfcgrp + ((TREF(gtm_utfcgr_strings) - 1) * utfcgr_size));
 		/* Spins to find non-(recently)-referenced cache slot before we overwrite an entry */
 		TREF(utfcgr_string_lookmax) = TREF(gtm_utfcgr_strings) / UTFCGR_MAXLOOK_DIVISOR;
-#		endif /* UNICODE_SUPPORTED */
+#		endif /* UTF8_SUPPORTED */
 	}
 }

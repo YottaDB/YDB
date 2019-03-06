@@ -847,7 +847,7 @@ MUQUALINCOMP	<Incompatible qualifiers - FILE and REGION>/error/fao=0!/ansi=0
 DISTPATHMAX	<$gtm_dist path is greater than maximum (!UL)>/error/fao=1!/ansi=0
 FILEOPENFAIL	<Failed to open file !AD>/error/fao=2!/ansi=0
 IMAGENAME	<The executing module name should be !AD instead of !AD>/error/fao=4!/ansi=0
-GTMSECSHRPERM	<The gtmsecshr module in $gtm_dist does not have the correct permission and uid>/error/fao=0!/ansi=0
+GTMSECSHRPERM	<The gtmsecshr module in $gtm_dist (!AD) does not have the correct permission: !AD, and UID: !UL>/error/fao=5!/ansi=0
 GTMDISTUNDEF	<Environment variable $gtm_dist is not defined>/error/fao=0!/ansi=0
 SYSCALL		<Error received from system call !AD -- called from module !AD at line !UL>/error/fao=5!/ansi=0
 MAXGTMPATH	<The executing module path is greater than the maximum !UL>/error/fao=1!/ansi=0
@@ -1461,7 +1461,7 @@ STRMNUMIS	<Stream # is !2UL>/info/fao=1!/ansi=0
 STRMNUMMISMTCH1	<Stream !2UL exists on the receiver instance file but is unknown on the source instance>/error/fao=1!/ansi=0
 STRMNUMMISMTCH2	<Stream !2UL exists on the source instance file but is unknown on the receiver instance>/error/fao=1!/ansi=0
 STRMSEQMISMTCH	<Unable to play update on Stream !2UL with seqno [0x!16@XQ] as receiving instance has a different stream seqno [0x!16@XQ]>/error/fao=3!/ansi=0
-LOCKSPACEINFO	<Region: !AD: processes on queue: !UL/!UL; LOCK slots in use: !UL/!UL; name space!ADfull>/info/fao=8!/ansi=0
+LOCKSPACEINFO	<Region: !AD: processes on queue: !UL/!UL; LOCK slots in use: !UL/!UL; SUBSCRIPT slot bytes in use: !UL/!UL>/info/fao=8!/ansi=0
 JRTNULLFAIL	<Applying NULL journal record failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 LOCKSUB2LONG	<Following subscript is !UL bytes long which exceeds 255 byte limit.>/error/fao=1!/ansi=0
 RESRCWAIT	<Waiting briefly for the !AD semaphore for region !AD (!AD) was held by PID !UL (Sem. ID: !UL).>/info/fao=8!/ansi=0
@@ -1676,11 +1676,23 @@ SYSUTILCONF	<Error determining the path for system utility. !AD>/error/fao=2!/an
 MSTACKSZNA	<User-specified M stack size of !UL KiB not appropriate; must be between !UL KiB and !UL KiB; reverting to !UL KiB>/info/fao=4!/ansi=0
 JNLEXTRCTSEQNO	<Journal Extracts based on sequence numbers are restricted to a single region when replication is OFF>/error/fao=0!/ansi=0
 INVSEQNOQUAL	<Invalid SEQNO qualifier value !AD>/error/fao=2!/ansi=0
-LOWSPC		<WARNING: Database !AD has less than !UL% of the total block space remaining. Blocks Used: !UL Total Blocks Available: !UL>/info/fao=5!/ansi=0
+LOWSPC		<WARNING: Database !AD has !UL% or less of the total block space remaining. Blocks Used: !UL Total Blocks Available: !UL>/info/fao=5!/ansi=0
 FAILEDRECCOUNT	<LOAD unable to process !@UQ records>/error/fao=1!/ansi=0
 LOADRECCNT	<Last EXTRACT record processed by LOAD: !@UQ>/info/fao=1!/ansi=0
 COMMFILTERERR	<Error executing the command filter for !AD. !AD>/error/fao=4!/ansi=0
 NOFILTERNEST	<Filter nesting not allowed>/error/fao=0!/ansi=0
+MLKHASHTABERR	<A LOCK control structure is damaged and could not be corrected. Lock entry for !AD is invalid.>/error/fao=2!/ansi=0
+LOCKCRITOWNER	<LOCK crit is held by: !UL>/info/fao=1!/ansi=0
+MLKHASHWRONG	<A LOCK control structure has an invalid value; LOCK table failed integrity check. !AD>/error/fao=2!/ansi=0
+XCRETNULLREF	<Returned null reference from external call !AD>/error/fao=2!/ansi=0
+EXTCALLBOUNDS	<Wrote outside bounds of external call buffer. M label: !AZ>/fatal/fao=1!/ansi=0
+EXCEEDSPREALLOC	<Preallocated size !UL for M external call label !AZ exceeded by string of length !UL>/error/fao=3!/ansi=0
+ZTIMEOUT	<Time expired>/warning/fao=0!/ansi=0
+ERRWZTIMEOUT	<Error while processing $ZTIMEOUT>/error/fao=0!/ansi=0
+MLKHASHRESIZE	<LOCK hash table increased in size from !UL to !UL and placed in shared memory (id = !UL)>/info/fao=3!/ansi=0
+MLKHASHRESIZEFAIL	<Failed to increase LOCK hash table size from !UL to !UL. Will retry with larger size.>/warning/fao=2!/ansi=0
+MLKCLEANED	<LOCK garbage collection freed !UL lock slots for region !AD>/info/fao=3!/ansi=0
+NOTMNAME	<!AD is not a valid M name>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

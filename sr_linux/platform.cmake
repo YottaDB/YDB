@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2017 Fidelity National Information		#
+# Copyright (c) 2013-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -77,4 +77,8 @@ if(${bits} EQUAL 32)
   set(libmumpslibs "-lncurses -lm -ldl -lc -lpthread -lrt")
 else()
   set(libmumpslibs "-lelf -lncurses -lm -ldl -lc -lpthread -lrt")
+endif()
+
+if(ENABLE_PROFILING)
+  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fprofile-arcs -ftest-coverage")
 endif()
