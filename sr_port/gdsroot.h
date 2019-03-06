@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -54,6 +59,7 @@ typedef	gtm_uint64_t	trans_num;
 typedef	uint4		trans_num_4byte;
 
 typedef	int4		block_id;	/* allows for GDS block #s to have 32 bits but see GDS_MAX_BLK_BITS below */
+					/* NOTE : GDEVERIF.m assumes block_id to be int4. Fix that if this changes */
 
 #define	GDS_MAX_BLK_BITS	30	/* see blk_ident structure in gdskill.h for why this cannot be any greater */
 #define	GDS_MAX_VALID_BLK	(1<<GDS_MAX_BLK_BITS - 1)	/* the maximum valid block # that a GT.M database can have */

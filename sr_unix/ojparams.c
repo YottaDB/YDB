@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,6 +18,7 @@
 #include "min_max.h"
 #include "io.h"
 #include "iosocketdef.h"
+#include "eintr_wrappers.h"
 
 /*
  * ---------------------------------------------------------
@@ -25,9 +27,6 @@
  */
 
 static readonly char definput[] = "/dev/null";
-
-static char *defoutbuf;
-static char *deferrbuf;
 
 MSTR_CONST(defoutext, ".mjo");
 MSTR_CONST(deferrext, ".mje");
@@ -52,18 +51,19 @@ void ojparams (char *p, job_params_type *job_params)
 	unsigned char		ch;
 	int4			status;
 	mstr_len_t		handle_len;
+	FILE			*curlvn_out;
 
 		/* Initializations */
-	job_params->baspri = 0;
-	job_params->input.len = 0;
-	job_params->output.len = 0;
-	job_params->error.len = 0;
-	job_params->gbldir.len = 0;
-	job_params->startup.len = 0;
-	job_params->directory.len = 0;
-	job_params->directory.addr = 0;
+	job_params->params.baspri = 0;
+	job_params->params.input.len = 0;
+	job_params->params.output.len = 0;
+	job_params->params.error.len = 0;
+	job_params->params.gbldir.len = 0;
+	job_params->params.startup.len = 0;
+	job_params->params.directory.len = 0;
+	/* job_params->params.routine.len initialized by caller */
+	/* job_params->params.label.len initialized by caller */
 	job_params->cmdline.len = 0;
-	job_params->cmdline.addr = 0;
 	job_params->passcurlvn = FALSE;
 
 		/* Process parameter list */
@@ -74,52 +74,52 @@ void ojparams (char *p, job_params_type *job_params)
 		case jp_default:
 			if (*p != 0)
 			{
-				job_params->directory.len = (int)((unsigned char) *p);
-				job_params->directory.addr = (p + 1);
+				job_params->params.directory.len = (int)((unsigned char) *p);
+				memcpy(job_params->params.directory.buffer, p + 1, job_params->params.directory.len);
 			}
 			break;
 
 		case jp_error:
 			if (*p != 0)
 			{
-				job_params->error.len = (int)((unsigned char) *p);
-				job_params->error.addr = (p + 1);
+				job_params->params.error.len = (int)((unsigned char) *p);
+				memcpy(job_params->params.error.buffer, p + 1, job_params->params.error.len);
 			}
 			break;
 
 		case jp_gbldir:
 			if (*p != 0)
 			{
-				job_params->gbldir.len = (int)((unsigned char) *p);
-				job_params->gbldir.addr = (p + 1);
+				job_params->params.gbldir.len = (int)((unsigned char) *p);
+				memcpy(job_params->params.gbldir.buffer, p + 1, job_params->params.gbldir.len);
 			}
 			break;
 
 		case jp_input:
 			if (*p != 0)
 			{
-				job_params->input.len = (int)((unsigned char) *p);
-				job_params->input.addr = p + 1;
+				job_params->params.input.len = (int)((unsigned char) *p);
+				memcpy(job_params->params.input.buffer, p + 1, job_params->params.input.len);
 			}
 			break;
 
 		case jp_output:
 			if (*p != 0)
 			{
-				job_params->output.len = (int)((unsigned char) *p);
-				job_params->output.addr = p + 1;
+				job_params->params.output.len = (int)((unsigned char) *p);
+				memcpy(job_params->params.output.buffer, p + 1, job_params->params.output.len);
 			}
 			break;
 
 		case jp_priority:
-			job_params->baspri = (int4)(*((int4 *)p));
+			job_params->params.baspri = (int4)(*((int4 *)p));
 			break;
 
 		case jp_startup:
 			if (*p != 0)
 			{
-				job_params->startup.len = (int)((unsigned char) *p);
-				job_params->startup.addr = p + 1;
+				job_params->params.startup.len = (int)((unsigned char) *p);
+				memcpy(job_params->params.startup.buffer, p + 1, job_params->params.startup.len);
 			}
 			break;
 
@@ -127,7 +127,7 @@ void ojparams (char *p, job_params_type *job_params)
 			if(*p != 0)
 			{
 				job_params->cmdline.len = (int)((unsigned char) *p);
-				job_params->cmdline.addr = p + 1;
+				memcpy(job_params->cmdline.buffer, p + 1, job_params->cmdline.len);
 			}
 			break;
 
@@ -146,7 +146,7 @@ void ojparams (char *p, job_params_type *job_params)
 		case jp_swapping:
 			break;
 		default:
-		        assertpro(ch != ch);
+			assertpro(ch != ch);
 		}
 
 		switch (job_param_datatypes[ch])
@@ -173,116 +173,109 @@ void ojparams (char *p, job_params_type *job_params)
 /*
  * Input file
  */
-	if (0 == job_params->input.len)
+	if (0 == job_params->params.input.len)
 	{
-		job_params->input.len = STRLEN(definput);
-		job_params->input.addr = definput;
+		job_params->params.input.len = STRLEN(definput);
+		memcpy(job_params->params.input.buffer, definput, job_params->params.input.len);
 	}
-	else if (IS_JOB_SOCKET(job_params->input.addr, job_params->input.len))
+	else if (IS_JOB_SOCKET(job_params->params.input.buffer, job_params->params.input.len))
 	{
-		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->input.len);
-		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->input.addr),
+		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->params.input.len);
+		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->params.input.buffer),
 									&handle_len, FALSE, socket_pool)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "INPUT",
-				job_params->input.len, job_params->input.addr);
+					job_params->params.input.len, job_params->params.input.buffer);
 	}
 	else
-		if (!(status = ojchkfs (job_params->input.addr,
-		  job_params->input.len, TRUE)))
+		if (!(status = ojchkfs (job_params->params.input.buffer,
+					job_params->params.input.len, TRUE)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "INPUT",
-			job_params->input.len, job_params->input.addr);
+					job_params->params.input.len, job_params->params.input.buffer);
 
 /*
  * Output file
  */
-	if (0 == job_params->output.len)
+	if (0 == job_params->params.output.len)
 	{
-		if (!defoutbuf)
-			defoutbuf = malloc(MAX_FILSPC_LEN);
-		memcpy (&defoutbuf[0], job_params->routine.addr,
-		  job_params->routine.len);
-		memcpy (&defoutbuf[job_params->routine.len],
-		  defoutext.addr, defoutext.len);
-		if (*defoutbuf == '%')
-			*defoutbuf = '_';
-		job_params->output.len = job_params->routine.len
-		  + defoutext.len;
-		job_params->output.addr = &defoutbuf[0];
+		memcpy (&job_params->params.output.buffer[0], job_params->params.routine.buffer, job_params->params.routine.len);
+		memcpy (&job_params->params.output.buffer[job_params->params.routine.len], defoutext.addr, defoutext.len);
+		if (job_params->params.output.buffer[0] == '%')
+			job_params->params.output.buffer[0] = '_';
+		job_params->params.output.len = job_params->params.routine.len + defoutext.len;
 	}
-	else if (IS_JOB_SOCKET(job_params->output.addr, job_params->output.len))
+	else if (IS_JOB_SOCKET(job_params->params.output.buffer, job_params->params.output.len))
 	{
-		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->output.len);
-		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->output.addr),
+		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->params.output.len);
+		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->params.output.buffer),
 									&handle_len, FALSE, socket_pool)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "OUTPUT",
-				job_params->output.len, job_params->output.addr);
+					job_params->params.output.len, job_params->params.output.buffer);
 	}
 	else
-		if (!(status = ojchkfs (job_params->output.addr,
-		  job_params->output.len, FALSE)))
+		if (!(status = ojchkfs (job_params->params.output.buffer,
+					job_params->params.output.len, FALSE)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 6,
-				"OUTPUT", job_params->output.len,
-				job_params->output.addr);
+					"OUTPUT", job_params->params.output.len, job_params->params.output.buffer);
 /*
  * Error file
  */
-	if (0 == job_params->error.len)
+	if (0 == job_params->params.error.len)
 	{
-		if (!deferrbuf)
-			deferrbuf = malloc(MAX_FILSPC_LEN);
-		memcpy (&deferrbuf[0], job_params->routine.addr,
-		  job_params->routine.len);
-		memcpy (&deferrbuf[job_params->routine.len],
-		  deferrext.addr, deferrext.len);
-		if (*deferrbuf == '%')
-			*deferrbuf = '_';
-		job_params->error.len = job_params->routine.len
-		  + deferrext.len;
-		job_params->error.addr = &deferrbuf[0];
+		memcpy(&job_params->params.error.buffer[0], job_params->params.routine.buffer, job_params->params.routine.len);
+		memcpy(&job_params->params.error.buffer[job_params->params.routine.len], deferrext.addr, deferrext.len);
+		if (job_params->params.error.buffer[0] == '%')
+			job_params->params.error.buffer[0] = '_';
+		job_params->params.error.len = job_params->params.routine.len + deferrext.len;
 	}
-	else if (IS_JOB_SOCKET(job_params->error.addr, job_params->error.len))
+	else if (IS_JOB_SOCKET(job_params->params.error.buffer, job_params->params.error.len))
 	{
-		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->error.len);
-		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->error.addr),
+		handle_len = JOB_SOCKET_HANDLE_LEN(job_params->params.error.len);
+		if ((NULL == socket_pool) || (-1 == iosocket_handle(JOB_SOCKET_HANDLE(job_params->params.error.buffer),
 									&handle_len, FALSE, socket_pool)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "ERROR",
-				job_params->error.len, job_params->error.addr);
+				job_params->params.error.len, job_params->params.error.buffer);
 	}
 	else
-		if (!(status = ojchkfs (job_params->error.addr,
-		  job_params->error.len, FALSE)))
+		if (!(status = ojchkfs (job_params->params.error.buffer,
+					job_params->params.error.len, FALSE)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 5, "ERROR",
-			  job_params->error.len,
-			  job_params->error.addr);
+					job_params->params.error.len, job_params->params.error.buffer);
 /*
  * Global Directory
  */
-	if (0 == job_params->gbldir.len)
+	if (0 == job_params->params.gbldir.len)
 	{
 		assert(MAX_JOBPARM_LEN > dollar_zgbldir.str.len);
-		job_params->gbldir.len = dollar_zgbldir.str.len;
-		job_params->gbldir.addr = dollar_zgbldir.str.addr;
+		job_params->params.gbldir.len = dollar_zgbldir.str.len;
+		memcpy(job_params->params.gbldir.buffer, dollar_zgbldir.str.addr, dollar_zgbldir.str.len);
 	}
 	else
-		if (!(status = ojchkfs (job_params->gbldir.addr,
-		  job_params->gbldir.len, FALSE)))
+		if (!(status = ojchkfs (job_params->params.gbldir.buffer,
+					job_params->params.gbldir.len, FALSE)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 6, "GBLDIR",
-			  job_params->gbldir.len, job_params->gbldir.addr);
+					job_params->params.gbldir.len, job_params->params.gbldir.buffer);
 /*
  * Startup
  */
-	if (job_params->startup.len)
-		if (!(status = ojchkfs (job_params->startup.addr,
-		  job_params->startup.len, TRUE)))
+	if (job_params->params.startup.len)
+		if (!(status = ojchkfs (job_params->params.startup.buffer,
+					job_params->params.startup.len, TRUE)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 7, "STARTUP",
-			  job_params->startup.len, job_params->startup.addr);
+					job_params->params.startup.len, job_params->params.startup.buffer);
 /*
  * Default Directory
  */
-	if (job_params->directory.len)
-		if (!(status = ojchkfs (job_params->directory.addr,
-		  job_params->directory.len, FALSE)))
+	if (job_params->params.directory.len)
+		if (!(status = ojchkfs (job_params->params.directory.buffer,
+					job_params->params.directory.len, FALSE)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARFILSPC, 4, 7, "DEFAULT",
-			  job_params->directory.len, job_params->directory.addr);
-}
+					job_params->params.directory.len, job_params->params.directory.buffer);
 
+	/* Gather local variables to pass */
+	if (job_params->passcurlvn)
+	{	/* Create a "memory file" to store the job_set_locals messages for later transmission by the middle child. */
+		curlvn_out = open_memstream(&job_params->curlvn_buffer_ptr, &job_params->curlvn_buffer_size);
+		local_variable_marshalling(curlvn_out);
+		FCLOSE(curlvn_out, status);	/* Force "written" messages into the buffer */
+	}
+}

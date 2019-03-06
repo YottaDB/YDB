@@ -29,12 +29,13 @@
 #include "list_file.h"
 #include "source_file.h"
 #include "lb_init.h"
-#include "reinit_externs.h"
+#include "reinit_compilation_externs.h"
 #include "comp_esc.h"
 #include "resolve_blocks.h"
 #include "hashtab_str.h"
 #include "rtn_src_chksum.h"
 #include "gtmmsg.h"
+#include "iosp.h"	/* for SS_NORMAL */
 
 #define HOPELESS_COMPILE 128
 
@@ -57,6 +58,7 @@ GBLREF unsigned short		source_name_len;
 
 LITDEF char compile_terminated[] = "COMPILATION TERMINATED DUE TO EXCESS ERRORS";
 
+error_def(ERR_ERRORSUMMARY);
 error_def(ERR_ZLINKFILE);
 error_def(ERR_ZLNOOBJECT);
 
@@ -105,7 +107,8 @@ boolean_t compiler_startup(void)
 	run_time = FALSE;
 	TREF(compile_time) = TRUE;
 	TREF(transform) = FALSE;
-	reinit_externs();
+	TREF(dollar_zcstatus) = SS_NORMAL;
+	reinit_compilation_externs();
 	memset(&null_mident, 0, SIZEOF(null_mident));
 	ESTABLISH_RET(compiler_ch, FALSE);
 	/* Since the stringpool alignment is solely based on mstr_native_align, we need to initialize it based
@@ -113,8 +116,7 @@ boolean_t compiler_startup(void)
 	 * However, when a module is compiled at runtime, we need to preserve the existing runtime setting
 	 * (that was initialized at GT.M startup) once the compilation is done.  save_mstr_native_align is used for
 	 * this purpose. */
-	mcfree();	/* If last compile errored out, may have left things uninitialized for us */
-	/* Find out how much space we have in mcalloc blocks */
+	/* If last compile errored out, it may have left stuff - find out how much space we have in mcalloc blocks */
 	for (mcallocated = 0, nextmca = mcavailptr; nextmca; nextmca = nextmca->link)
 		mcallocated += nextmca->size;
 	if (0 == mcallocated)
@@ -245,11 +247,14 @@ boolean_t compiler_startup(void)
 		obj_code(line_count, &checksum_ctx);
 		cg_phase = CGP_FINI;
 	} else if (!compile_w_err)
+	{
+		TREF(dollar_zcstatus) = -ERR_ERRORSUMMARY;
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, source_name_len, source_file_name, ERR_ZLNOOBJECT);
+	}
 	if (cmd_qlf.qlf & CQ_LIST || cmd_qlf.qlf & CQ_CROSS_REFERENCE)
 		close_list_file();
 	COMPILE_HASHTAB_CLEANUP;
-	reinit_externs();
+	reinit_compilation_externs();
 	/* Determine if need to remove any added mc blocks. Min value of mcallocated ensures we leave at least one block alone. */
 	for (alloc = 0, nextmca = mcavailptr;
 	     nextmca && (alloc < mcallocated);

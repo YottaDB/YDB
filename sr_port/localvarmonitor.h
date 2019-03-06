@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 Fidelity National Information 		*
+ * Copyright (c) 2017-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _LOCALVARMONITOR_H_DEFINED_
-#define _LOCALVARMONITOR_H_DEFINED_
+#ifndef LOCALVARMONITOR_H_DEFINED
+#define LOCALVARMONITOR_H_DEFINED
 
 /* Note there are two forms of local variable monitoring in GTM - both initiated by VIEW commands. The first is the lv monitoring
  * potentially done by aliases when #ifdef(DEBUG_ALIAS) is set during a build followed by the appropriate

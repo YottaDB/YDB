@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -13,8 +13,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _GTMSECSHR
-#define _GTMSECSHR
+#ifndef GTMSECSHR_INCLUDED
+#define GTMSECSHR_INCLUDED
 
 /* To enable debugging of gtmsecshr, uncomment #define immediately below */
 /* #define DEBUG_GTMSECSHR */

@@ -38,32 +38,26 @@ GBLREF	boolean_t	gtm_utf8_mode;
 
 int do_patsplit(mval *str, mval *pat)
 {
-	int4		count, total_min, total_max;
-	int4		min[MAX_PATTERN_ATOMS], max[MAX_PATTERN_ATOMS], size[MAX_PATTERN_ATOMS];
-	int4		bytelen, charlen, charstoskip, fixedcharlen, leftcharlen, rightcharlen, deltalen, numchars;
-	int4		strbytelen, strcharlen;
-	int4		alt_rep_min, alt_rep_max;
-	int4		alt;
-	uint4		tempuint;
-	uint4		code, flags;
-	uint4		*patptr, *patptr_start, *patptr_end, *fixed_patptr, *right_patptr, *tmp_patptr;
-	ptstr		left_ptstr, right_ptstr, fixed_ptstr;
-	mval		left_pat, right_pat, fixed_pat, left_str, right_str, fixed_str;
-	int4		index, fixed_index;	/* index of our current fixed-length pattern-atom  */
-	boolean_t	right;		/* 0 indicates we are processing left side, 1 indicates right side */
-	boolean_t	fixed[2];	/* fixed[0] is for the left, fixed[1] is for the right */
-	int4		tot_min[2], tot_max[2], cnt[2];	/* index 0 is for left, index 1 is for right */
-	int4		offset;
-	unsigned char	*strptr, *strtop, *rightptr, *rightnext, *fixedptr, *fixednext, *maxfixedptr;
-	boolean_t	match;		/* match status of input pattern with input string */
+	boolean_t	fixed[2];				/* fixed[0] is for the left, fixed[1] is for the right */
+	boolean_t	right;					/* 0 indicates processing left side, 1 indicates right side */
+	boolean_t	match;					/* match status of input pattern with input string */
 	gtm_uint64_t	bound;
+	int4		index, fixed_index;			/* index of our current fixed-length pattern-atom  */
+	int4		alt, alt_rep_max, alt_rep_min, bytelen, charlen, charstoskip, count, deltalen, fixedcharlen, leftcharlen;
+	int4		max[MAX_PATTERN_ATOMS], min[MAX_PATTERN_ATOMS], size[MAX_PATTERN_ATOMS];
+	int4		numchars, offset, rightcharlen, strbytelen, strcharlen, total_max, total_min;
+	mval		fixed_pat, fixed_str, left_pat, left_str, right_pat, right_str;
+	ptstr		fixed_ptstr, left_ptstr, right_ptstr;
+	uint4		cnt[2], tot_min[2], tot_max[2];		/* index 0 is for left, index 1 is for right */
+	uint4		code, *fixed_patptr, flags, *patptr, *patptr_end, *patptr_start, *right_patptr, tempuint, *tmp_patptr;
+	unsigned char	*fixednext, *fixedptr, *maxfixedptr, *rightnext, *rightptr, *strptr, *strtop;
 
 	MV_FORCE_STR(str);
 	patptr = (uint4 *)pat->str.addr;
-	DEBUG_ONLY(
+#	ifdef DEBUG
 		GET_ULONG(tempuint, patptr);
 		assert(!tempuint);
-	)
+#	endif
 	patptr++;
 	patptr_start = patptr + 1;
 	GET_ULONG(tempuint, patptr);
@@ -142,14 +136,18 @@ int do_patsplit(mval *str, mval *pat)
 				{	/* non-zero fixed length pattern with a fixed_index closer to the median of the array */
 					if (right)
 					{	/* update left's tot_min and tot_max to reflect the new fixed_index */
-						tot_min[0] += tot_min[right] +
-							BOUND_MULTIPLY(min[fixed_index], size[fixed_index], bound);
-						if (tot_min[0] > PAT_MAX_REPEAT)
+						if (PAT_MAX_REPEAT < (tot_min[0] + tot_min[right]
+								+ BOUND_MULTIPLY(min[fixed_index], size[fixed_index], bound)))
 							tot_min[0] = PAT_MAX_REPEAT;
-						tot_max[0] += tot_max[right] +
-							BOUND_MULTIPLY(max[fixed_index], size[fixed_index], bound);
-						if (tot_max[0] > PAT_MAX_REPEAT)
+						else	/* check before assignment to statisfy static scan */
+							tot_min[0] += (tot_min[right]
+								+ BOUND_MULTIPLY(min[fixed_index], size[fixed_index], bound));
+						if (PAT_MAX_REPEAT < (tot_max[0] + tot_max[right]
+								+ BOUND_MULTIPLY(max[fixed_index], size[fixed_index], bound)))
 							tot_max[0] = PAT_MAX_REPEAT;
+						else	/* check before assignment to statisfy static scan */
+							tot_max[0] += (tot_max[right]
+								+ BOUND_MULTIPLY(max[fixed_index], size[fixed_index], bound));
 						fixed[0] &= fixed[right];
 					}
 					fixed_index = index;
@@ -163,12 +161,14 @@ int do_patsplit(mval *str, mval *pat)
 			} else
 				fixed[right] = FALSE;
 		}
-		tot_min[right] += BOUND_MULTIPLY(min[index], size[index], bound);
-		if (tot_min[right] > PAT_MAX_REPEAT)
+		if (PAT_MAX_REPEAT < (tot_min[right] + BOUND_MULTIPLY(min[index], size[index], bound)))
 			tot_min[right] = PAT_MAX_REPEAT;
-		tot_max[right] += BOUND_MULTIPLY(max[index], size[index], bound);
-		if (tot_max[right] > PAT_MAX_REPEAT)
+		else	/* check before assignment to statisfy static scan */
+			tot_min[right] += BOUND_MULTIPLY(min[index], size[index], bound);
+		if (PAT_MAX_REPEAT < (tot_max[right] + BOUND_MULTIPLY(max[index], size[index], bound)))
 			tot_max[right] = PAT_MAX_REPEAT;
+		else	/* check before assignment to statisfy static scan */
+			tot_max[right] += BOUND_MULTIPLY(max[index], size[index], bound);
 	}
 	assert(index == count);
 	if (-1 == fixed_index)

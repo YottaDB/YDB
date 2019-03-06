@@ -229,6 +229,8 @@ STATICDEF	boolean_t	renegotiation_pending = FALSE;
 #endif
 #endif
 
+#define	OUT_LINE	256 + 1
+
 error_def(ERR_JNLNEWREC);
 error_def(ERR_JNLSETDATA2LONG);
 error_def(ERR_REPLCOMM);
@@ -695,7 +697,7 @@ int gtmsource_process(void)
 	uLongf				cmpbuflen;
 	int4				msghdrlen;
 	Bytef				*cmpbufptr;
-	char				histdetail[256];
+	char				histdetail[OUT_LINE];
 	sm_global_latch_ptr_t		gtmsource_srv_latch;
 	gtmsource_state_t		gtmsource_state_sav;
 	uint4				phase2_commit_index1;
@@ -706,11 +708,11 @@ int gtmsource_process(void)
 
 	SETUP_THREADGBL_ACCESS;
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
-	DEBUG_ONLY(
-		repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
-		assert(!repl_csa->hold_onto_crit); /* so we can do unconditional grab_lock/rel_lock */
-		ASSERT_VALID_JNLPOOL(repl_csa);
-	)
+#	ifdef DEBUG
+	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
+	assert(!repl_csa->hold_onto_crit); /* so we can do unconditional grab_lock/rel_lock */
+	ASSERT_VALID_JNLPOOL(repl_csa);
+#	endif
 	assert(REPL_MSG_HDRLEN == SIZEOF(jnldata_hdr_struct)); /* necessary for reading multiple transactions from jnlpool in
 								* a single attempt */
 	jctl = jnlpool->jnlpool_ctl;
@@ -1072,7 +1074,8 @@ int gtmsource_process(void)
 					 * In that case, issue error and close the connection.
 					 */
 
-					SPRINTF(histdetail, "seqno "INT8_FMT" "INT8_FMTX, recvd_seqno - 1, recvd_seqno - 1);
+					SNPRINTF(histdetail, OUT_LINE, "seqno "INT8_FMT" "INT8_FMTX, recvd_seqno - 1,
+						recvd_seqno - 1);
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTNOHIST, 4,
 							LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
 					instnohist_msg.type = REPL_INST_NOHIST;

@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +17,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __ZROUTINES_H__
-#define __ZROUTINES_H__
+#ifndef ZROUTINES_H_INCLUDED
+#define ZROUTINES_H_INCLUDED
 
 #include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 #include "zroutinessp.h"

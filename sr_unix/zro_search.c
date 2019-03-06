@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -205,7 +205,7 @@ zro_hist *zro_search_hist(char *objnamebuf, zro_ent **objdir)
 	zro_search_hist_ent	zhent_base[ZRO_MAX_ENTS];
 	zro_search_hist_ent	*zhent;
 	zro_hist		*recent_zhist;
-	char			obj_file[MAX_FBUFF + 1];
+	char			obj_file[MAX_FN_LEN + 1];
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -216,7 +216,7 @@ zro_hist *zro_search_hist(char *objnamebuf, zro_ent **objdir)
 	DBGARLNK((stderr, "\n\nzro_search_hist: Entered for %s\n", objnamebuf));
 	/* First parse our input string to isolate the directory name we will look up */
 	memset(&pblk, 0, SIZEOF(pblk));
-	pblk.buff_size = MAX_FBUFF;
+	pblk.buff_size = MAX_FN_LEN;
 	pblk.buffer = obj_file;
 	pblk.fop = F_SYNTAXO;				/* Just a syntax parse */
 	status = parse_file(&objstr, &pblk);

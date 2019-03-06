@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD:sr_port/merrors_ansi.h
  * Copyright (c) 2001-2019 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2019 Fidelity National Information 	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007:sr_i386/merrors_ansi.h
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.*
@@ -1527,4 +1531,12 @@ const static readonly int error_ansi[] = {
 	   0,	/* MLKHASHRESIZEFAIL */
 	   0,	/* MLKCLEANED */
 	   0,	/* NOTMNAME */
+	   0,	/* DEVNAMERESERVED */
+	   0,	/* ORLBKREL */
+	   0,	/* ORLBKRESTART */
+	   0,	/* UNIQNAME */
+	   0,	/* APDINITFAIL */
+	   0,	/* APDCONNFAIL */
+	   0,	/* APDLOGFAIL */
+	   0,	/* STATSDBMEMERR */
 	};

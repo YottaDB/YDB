@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -764,7 +764,9 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 	/* Now that new routine is registered, no longer need to do rtnobj_shm_free.
 	 * That will be done by relinkctl_rundown as part of scanning the rtn_names[] array.
 	 */
-	/* Fix up of routine headers for old versions of routine so they point to the newest version */
+	/* Fix up of routine headers for old versions of routine so they point to the newest version; these headers are never
+	 * tied to routines active on the stack as zlput_rname has already given any such their own copy of the header
+	 */
 	old_rhead = hdr->old_rhead_adr;
 	lbt_bot = hdr->labtab_adr;
 	lbt_top = lbt_bot + hdr->labtab_len;
@@ -795,25 +797,62 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 				hdr->routine_name.len, hdr->routine_name.addr, old_rhead,
 				olbt_ent->lab_name.len, olbt_ent->lab_name.addr, olbt_ent, olbt_ent->lnr_adr));
 		}
+		/* the copying below could be simpler and faster if the copied rhdtyp / rhead_struct fields formed a single block
+		 * within the definition in rthhdr.h so this could use 1 memcpy() rather than picking through the structure
+		 */
+		/* jsb should no longer be in play for this old header */
+		/* shlib_handle should characterize this old header */
 		old_rhead->src_full_name = hdr->src_full_name;
+		old_rhead->compiler_qlf = hdr->compiler_qlf;		/* added Jan. 2019 */
+		assert(old_rhead->objlabel == hdr->objlabel);		/* added Jan. 2019 */
 		old_rhead->routine_name = hdr->routine_name;
 		old_rhead->vartab_len = hdr->vartab_len;
 		old_rhead->vartab_adr = hdr->vartab_adr;
+		/* We used labtab_adr and labtab_len above to plug any old labels with matching new labels and deadend any old label
+		 * with no corresponding new label. If a there's a new label but no corresponding new label, any currently linked
+		 * routine either has no such label, has not used that label, in which case it will correctly discover the new label
+		 * from the new table when it later uses it, or it has already called op_labaddr.c which delivered an error that
+		 * indicated label was invalid, but left the label unresolved. In the latter case, a subsequent call to op_labaddr
+		 * will use the current label table and locate the new label.
+		 */
+		old_rhead->lnrtab_adr = hdr->lnrtab_adr;
+		old_rhead->lnrtab_len = hdr->lnrtab_len;
+		if (0 < old_rhead->literal_text_len)	/* section added Jan. 2019; seems right, but no test case proving need */
+		{	/* move any string literals used by current mvals to the string pool before we lose track of them */
+			assert(old_rhead->literal_text_adr);
+			stp_move((char *)old_rhead->literal_text_adr,
+				 (char *)(old_rhead->literal_text_adr + old_rhead->literal_text_len));
+		}
+		old_rhead->literal_text_adr = hdr->literal_text_adr;
+		old_rhead->literal_text_len = hdr->literal_text_len;	/* added Jan. 2019 */
+		/* shared_object should characterize this old header */
+		old_rhead->literal_adr = hdr->literal_adr;
+		old_rhead->literal_len = hdr->literal_len;
+		old_rhead->linkage_adr = hdr->linkage_adr;
+		old_rhead->linkage_len = hdr->linkage_len;
+		/* rtn_relinked should characterize this old header */
 		old_rhead->shared_ptext_adr = hdr->shared_ptext_adr;
 		old_rhead->ptext_adr = hdr->ptext_adr;
 		old_rhead->ptext_end_adr = hdr->ptext_end_adr;
-		old_rhead->lnrtab_adr = hdr->lnrtab_adr;
-		old_rhead->lnrtab_len = hdr->lnrtab_len;
-		old_rhead->current_rhead_adr = hdr;
+		/* checksum should no longer be in play for this old header */
 		old_rhead->temp_mvals = hdr->temp_mvals;
 		old_rhead->temp_size = hdr->temp_size;
-		old_rhead->linkage_adr = hdr->linkage_adr;
-		old_rhead->linkage_len = hdr->linkage_len;
-		old_rhead->linkage_names = hdr->linkage_names;
-		old_rhead->literal_adr = hdr->literal_adr;
-		old_rhead->literal_text_adr = hdr->literal_text_adr;
-		old_rhead->literal_len = hdr->literal_len;
+		/* has_ZBREAK should no longer be in play for this old header */
+		old_rhead->current_rhead_adr = hdr;
+		/* old_rhead_adr holds the chain of replaced headers we are currently following - see below
+		 * trigr_handle should no longer be in play for this old header
+		 * checksum_128 should no longer be in play for this old header
+		 * active_rhead_adr should characterize this old header
+		 * source code should characterize this old header
+		 */
 		ARLINK_ONLY(old_rhead->zhist = hdr->zhist);
+		/* objhash should no longer be in play for this old header
+		 * lbltext_ptr should characterize this old header ?
+		 * object_len should characterize this old header
+		 * routine_source_offset should characterize this old header
+		 */
+		old_rhead->linkage_names = hdr->linkage_names;
+		/* relinkctl_bkptr should characterize this old header */
 		old_rhead = (rhdtyp *)old_rhead->old_rhead_adr;
 	}
 	/* Add local unresolves to global chain freeing elements that already existed in the global chain */

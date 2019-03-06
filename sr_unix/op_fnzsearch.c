@@ -104,8 +104,8 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 	TREF(fnzsearch_nullsubs_sav) = TREF(lv_null_subs);
 	TREF(lv_null_subs) = LVNULLSUBS_OK;			/* $ZSearch processing depends on this. */
 	MV_FORCE_STR(pattern);
-	if (MAX_FBUFF < pattern->str.len)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, pattern->str.len, MAX_FBUFF);
+	if (MAX_FN_LEN < pattern->str.len)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, pattern->str.len, MAX_FN_LEN);
 	MV_FORCE_MVAL(((mval *)TADR(fnzsearch_sub_mval)), indx);
 	TREF(fnzsearch_lv_vars) = op_srchindx(VARLSTCNT(2) TREF(zsearch_var), (mval *)TADR(fnzsearch_sub_mval));
 	if (TREF(fnzsearch_lv_vars))
@@ -123,7 +123,7 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 	{
 		memset(&pblk, 0, SIZEOF(pblk));
 		pblk.buffer = pblk_buf;
-		pblk.buff_size = MAX_FBUFF;
+		pblk.buff_size = MAX_FN_LEN;
 		if (parse_file(&pattern->str, &pblk) & 1)
 		{	/* Establish new search context. */
 			TREF(fnzsearch_lv_vars) = op_putindx(VARLSTCNT(2) TREF(zsearch_var), TADR(fnzsearch_sub_mval));
@@ -139,9 +139,9 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 					else
 					{
 						length = STRLEN(sanitized_buf);
-						if (MAX_FBUFF < length + 1 + pblk.b_esl)
+						if (MAX_FN_LEN < length + 1 + pblk.b_esl)
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN,
-									2, length + 1 + pblk.b_esl, MAX_FBUFF);
+									2, length + 1 + pblk.b_esl, MAX_FN_LEN);
 						sanitized_buf[length] = '/';
 					}
 					buf_ptr = sanitized_buf + length + 1;
@@ -190,7 +190,7 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 								&& ('/' == match[length - 3]))))
 							continue;
 						/* If the resolved length is too long to be used in a local, skip it. */
-						if (MAX_FBUFF < length)
+						if (MAX_FN_LEN < length)
 							continue;
 						ENSURE_STP_FREE_SPACE(length);
 						file.str.addr = match;
@@ -304,7 +304,7 @@ STATICFNDEF int pop_top(lv_val *src, mval *res, mint mfunc)
 	plength		pret;
 	struct stat	statbuf;
 	int		stat_res;
-	char		file_name[MAX_FBUFF + 1];
+	char		file_name[MAX_FN_LEN + 1];
 
 	while (TRUE)
 	{
@@ -312,7 +312,7 @@ STATICFNDEF int pop_top(lv_val *src, mval *res, mint mfunc)
 		if (res->str.len)
 		{
 			tmp = op_getindx(VARLSTCNT(2) src, res);
-			assert(MAX_FBUFF >= res->str.len);
+			assert(MAX_FN_LEN >= res->str.len);
 			pret.p.pint = tmp->v.m[1];
 			op_kill(tmp);	/* Remove this element from the tree. */
 			memcpy(file_name, res->str.addr, res->str.len);

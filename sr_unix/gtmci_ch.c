@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -51,10 +51,19 @@ CONDITION_HANDLER(gtmci_ch)
 		gtm_dump();
 		TERMINATE;
 	}
+<<<<<<< HEAD
 	entryref.addr = CALL_IN_M_ENTRYREF;
 	entryref.len = STR_LIT_LEN(CALL_IN_M_ENTRYREF);
 	set_zstatus(&entryref, SIGNAL, NULL, FALSE);
 	FGNCAL_UNWIND_CLEANUP;
+=======
+	src_line.len = 0;
+	src_line.addr = &src_buf[0];
+	set_zstatus(&src_line, MAX_ENTRYREF_LEN, SIGNAL, NULL, FALSE);
+	if (msp < FGNCAL_STACK) /* restore stack to the last marked position */
+		fgncal_unwind();
+	else TREF(temp_fgncal_stack) = NULL;	/* If fgncal_unwind() didn't run to clear this, we have to */
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	if (TREF(comm_filter_init))
 		TREF(comm_filter_init) = FALSE;  /* Exiting from filters */
 	mumps_status = SIGNAL;

@@ -208,7 +208,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 				if (NULL != env_var)
 				{	/* build a translated path to command */
 					assert(pathsize > (STRLEN(token2 + env_inc) + STRLEN(env_var)));
-					SPRINTF(temp, "%s%s", env_var, token2 + env_inc);
+					SNPRINTF(temp, pathsize, "%s%s", env_var, token2 + env_inc);
 					/* The command must be a regular file and executable */
 					STAT_FILE(temp, &sb, ret_stat);
 					if (0 == ret_stat && (S_ISREG(sb.st_mode)) && (sb.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
@@ -224,7 +224,11 @@ int parse_pipe(char *cmd_string, char *ret_token)
 		{	/* look in $ydb_dist in case not explicitly listed or not in the $PATH variable */
 			if (ydb_dist_ok_to_use)
 			{	/* build a translated path to command */
+<<<<<<< HEAD
 				SPRINTF(temp, "%s/%s", ydb_dist, token2);
+=======
+				SNPRINTF(temp,  pathsize, "%s/%s", gtm_dist, token2);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 				STAT_FILE(temp, &sb, ret_stat);
 				if (0 == ret_stat && (S_ISREG(sb.st_mode)) && (sb.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
 					notfound = FALSE;
@@ -239,7 +243,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 					token3 = STRTOK_R(str3, ":", &saveptr3);
 					if (NULL == token3)
 						break;
-					SPRINTF(buf, "%s/%s", token3, token2);
+					SNPRINTF(buf, pathsize, "%s/%s", token3, token2);
 					notfound = TRUE;
 					/* The command must be a regular file and executable */
 					STAT_FILE(buf, &sb, ret_stat);
@@ -395,9 +399,11 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			{
 				PIPE_ERROR_INIT();
 				if (PARSE_FAIL == parse_result)
-					SPRINTF(error_str, "%s%s", INVALID_CMD, ret_token);
+					SNPRINTF(error_str, MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD2), "%s%s", INVALID_CMD,
+						ret_token);
 				else
-					SPRINTF(error_str, "%s%s", INVALID_CMD2, ret_token);
+					SNPRINTF(error_str, MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD2), "%s%s", INVALID_CMD2,
+						ret_token);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 					  ERR_TEXT, 2, LEN_AND_STR(error_str));
 			}
@@ -415,7 +421,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			if (!strlen(filtered_command.address)) /*empty command returned*/
 			{
 				PIPE_ERROR_INIT();
-				send_msg(VARLSTCNT(6) ERR_COMMFILTERERR, 4, LEN_AND_LIT(PIPEOPENSTR),
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4, LEN_AND_LIT(PIPEOPENSTR),
 					LEN_AND_LIT("Empty return command"));
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4,
 						LEN_AND_LIT(PIPEOPENSTR),LEN_AND_LIT("Empty return command"));
@@ -450,7 +456,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		{
 			save_errno = errno;
 			assert(GTM_MAX_DIR_LEN - 1 >= STRLEN(pshell));
-			SPRINTF(error_str, "Invalid shell: %s", pshell);
+			SNPRINTF(error_str, MAXDEVPARLEN + STR_LIT_LEN(INVALID_CMD2), "Invalid shell: %s", pshell);
 			PIPE_ERROR_INIT();
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, dev_name->len, dev_name->dollar_io,
 				  ERR_TEXT, 2, LEN_AND_STR(error_str));
@@ -696,7 +702,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			d_rm->read_fildes = file_des_read;
 		} else
 			d_rm->read_fildes = FD_INVALID;
-		SPRINTF(&iod->dollar.key[0], "%d", cpid); /* save in pipe specific structure for $KEY access */
+		SNPRINTF(&iod->dollar.key[0], DD_BUFLEN, "%d", cpid); /* save in pipe specific structure for $KEY access */
 		memcpy(iod->dollar.device, "0", SIZEOF("0"));
 		iod->state = dev_closed;
                 d_rm->stream = FALSE;
@@ -717,7 +723,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			MALLOC_CPY_LIT(d_rm->dev_param_pairs.pairs[param_offset].name, "SHELL=");
 			/* add quotes around the command field */
 			d_rm->dev_param_pairs.pairs[param_offset].definition = malloc(STRLEN(pshell) + 5);
-			SPRINTF(d_rm->dev_param_pairs.pairs[param_offset++].definition, "\"%s\"", pshell);
+			SNPRINTF(d_rm->dev_param_pairs.pairs[param_offset++].definition, STRLEN(pshell) + 5, "\"%s\"", pshell);
 			if (NULL != pshell)
 				free(pshell);
 		}
@@ -725,7 +731,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		MALLOC_CPY_LIT(d_rm->dev_param_pairs.pairs[param_offset].name, "COMMAND=");
 		/* add quotes around the command field */
 		d_rm->dev_param_pairs.pairs[param_offset].definition = malloc(STRLEN(pcommand) + 5);
-		SPRINTF(d_rm->dev_param_pairs.pairs[param_offset++].definition, "\"%s\"", pcommand);
+		SNPRINTF(d_rm->dev_param_pairs.pairs[param_offset++].definition, STRLEN(pcommand) + 5, "\"%s\"", pcommand);
 		if (NULL != pcommand)
 			free(pcommand);
 		if (slen[PSTDERR])
@@ -733,7 +739,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			MALLOC_CPY_LIT(d_rm->dev_param_pairs.pairs[param_offset].name, "STDERR=");
 			/* add quotes around the stderr field */
 			d_rm->dev_param_pairs.pairs[param_offset].definition = malloc(STRLEN(pstderr) + 5);
-			SPRINTF(d_rm->dev_param_pairs.pairs[param_offset].definition, "\"%s\"", pstderr);
+			SNPRINTF(d_rm->dev_param_pairs.pairs[param_offset].definition, STRLEN(pstderr) + 5, "\"%s\"", pstderr);
 			if (NULL != pstderr)
 				free(pstderr);
 		}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -59,7 +59,7 @@ void zro_load(mstr *str)
 	int			oi, si, total_ents;
 	struct  stat		outbuf;
 	int			stat_res;
-	char			tranbuf[MAX_FBUFF + 1];
+	char			tranbuf[MAX_FN_LEN + 1];
 	parse_blk		pblk;
 	DCL_THREADGBL_ACCESS;
 
@@ -114,7 +114,7 @@ void zro_load(mstr *str)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
 					      ERR_FILEPARSE, 2, tok.len, tok.addr);
 			/* Run specified directory through parse_file to fill in any missing pieces and get some info on it */
-			pblk.buff_size = MAX_FBUFF;	/* Don't count null terminator here */
+			pblk.buff_size = MAX_FN_LEN;	/* Don't count null terminator here */
 			pblk.fnb = 0;
 			status = parse_file(&tok, &pblk);
 			if (!(status & 1))
@@ -203,7 +203,7 @@ void zro_load(mstr *str)
 					if (SIZEOF(tranbuf) <= tok.len)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZROSYNTAX, 2, str->len, str->addr,
 							      ERR_FILEPARSE, 2, tok.len, tok.addr);
-					pblk.buff_size = MAX_FBUFF;
+					pblk.buff_size = MAX_FN_LEN;
 					pblk.fnb = 0;
 					status = parse_file(&tok, &pblk);
 					if (!(status & 1))
@@ -282,15 +282,16 @@ void zro_load(mstr *str)
 		assert((ZRO_TYPE_OBJECT == op->type) || (ZRO_TYPE_OBJLIB == op->type));
 		if (op->str.len)
 		{
-			pblk.buff_size = MAX_FBUFF;
+			pblk.buff_size = MAX_FN_LEN;
 			pblk.fnb = 0;
 			status = parse_file(&op->str, &pblk);
 			if (!(status & 1))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
 					      ERR_FILEPARSE, 2, op->str.len, op->str.addr, status);
-			op->str.addr = (char *)malloc(pblk.b_esl);
+			op->str.addr = (char *)malloc(pblk.b_esl + 1);
 			op->str.len = pblk.b_esl;
 			memcpy(op->str.addr, pblk.buffer, pblk.b_esl);
+			op->str.addr[pblk.b_esl] = 0;
 		}
 		if (ZRO_TYPE_OBJLIB == (op++)->type)
 			continue;
@@ -301,15 +302,16 @@ void zro_load(mstr *str)
 			assert(ZRO_TYPE_SOURCE == op->type);
 			if (op->str.len)
 			{
-				pblk.buff_size = MAX_FBUFF;
+				pblk.buff_size = MAX_FN_LEN;
 				pblk.fnb = 0;
 				status = parse_file(&op->str, &pblk);
 				if (!(status & 1))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
 						      ERR_FILEPARSE, 2, op->str.len, op->str.addr, status);
-				op->str.addr = (char *)malloc(pblk.b_esl);
+				op->str.addr = (char *)malloc(pblk.b_esl + 1);
 				op->str.len = pblk.b_esl;
 				memcpy(op->str.addr, pblk.buffer, pblk.b_esl);
+				op->str.addr[pblk.b_esl] = 0;
 			}
 		}
 	}

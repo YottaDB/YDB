@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __MUPIP_SIZE_H__
-#define __MUPIP_SIZE_H__
+#ifndef MUPIP_SIZE_H_INCLUDED
+#define MUPIP_SIZE_H_INCLUDED
 
 #include "cdb_sc.h"
 

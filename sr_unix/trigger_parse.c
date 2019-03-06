@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -83,6 +83,7 @@ GBLREF	volatile boolean_t	timer_in_handler;
 	int		out_len;							\
 	unsigned char	out_str[64];		/* Plenty of room for $ZCH(xxx) */ 	\
 											\
+	out_len = 64;									\
 	CONV_CH(PTR, out_str, out_len);							\
 	util_out_print_gtmio(STR, FLUSH, out_len, out_str);				\
 }
@@ -93,7 +94,9 @@ GBLREF	volatile boolean_t	timer_in_handler;
 	unsigned char	out_str1[64];		/* Plenty of room for $ZCH(xxx) */ 	\
 	unsigned char	out_str2[MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE];			\
 											\
+	out_len1 = 64;									\
 	CONV_CH(PTR1, out_str1, out_len1);						\
+	out_len2 = MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE;					\
 	CONV_TO_ZWR(LEN, PTR2, out_len2, out_str2);					\
 	util_out_print_gtmio(STR, FLUSH, out_len1, out_str1, out_len2, out_str2);	\
 }
@@ -103,6 +106,7 @@ GBLREF	volatile boolean_t	timer_in_handler;
 	int		out_len;							\
 	unsigned char	out_str[MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE];			\
 											\
+	out_len = MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE;					\
 	CONV_TO_ZWR(LEN, PTR, out_len, out_str);					\
 	util_out_print_gtmio(STR, FLUSH, NUM, out_len, out_str);			\
 }
@@ -809,6 +813,15 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 						if (ISDIGIT_ASCII(*ptr))
 							PROCESS_AND_GET_INTEGER(ptr, len, have_star, dst_ptr, dst_len, num1,
 										MAX_GVSUBS_LEN);
+<<<<<<< HEAD
+=======
+							if (0 > num1)
+							{
+								util_out_print_gtmio("Alternation integer overflow", FLUSH);
+								return FALSE;
+							}
+						}
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 						if ('.' == *ptr)
 						{
 							have_dot = TRUE;
@@ -822,7 +835,17 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 							if (ISDIGIT_ASCII(*ptr))
 								PROCESS_AND_GET_INTEGER(ptr, len, have_star, dst_ptr, dst_len, num2,
 									MAX_GVSUBS_LEN);
+<<<<<<< HEAD
 							if (-1 == num1)
+=======
+								if (0 > num2)
+								{
+									util_out_print_gtmio("Alternation integer overflow", FLUSH);
+									return FALSE;
+								}
+							}
+							if (-1 == num1)	/* Pattern range without a defined beginning */
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 								num1 = 0;
 						}
 						switch (*ptr)
@@ -1080,7 +1103,7 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 			case '9':
 				ptr1 = ptr;
 				A2I(ptr1, ptr + len, num);
-				if ((0 == num) || (MAX_PIECE_VALUE < num))
+				if ((0 >= num) || (MAX_PIECE_VALUE < num))
 				{
 					CONV_NUM_AND_STR_AND_PRINT("Invalid value !UL in PIECES - !AD", num, *piece_len, piece_str);
 					have_error = TRUE;
@@ -1123,7 +1146,7 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 				}
 				ptr1 = ptr;
 				A2I(ptr1, ptr + len, num);
-				if (MAX_PIECE_VALUE < num)
+				if ((0 >= num) || (MAX_PIECE_VALUE < num))
 				{
 					CONV_NUM_AND_STR_AND_PRINT("Invalid value \"!UL\" in PIECES - !AD", num,
 								   *piece_len, piece_str);
@@ -1212,7 +1235,9 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 			len++;
 			num_len = 0;
 			I2A(ptr, num_len, num);
-			len += num_len;
+			assert(num_len < MAX_DIGITS_IN_INT);
+			len += MIN(num_len, MAX_DIGITS_IN_INT);
+			assert(*piece_len >= len);
 			ptr += num_len;
 		}
 	}

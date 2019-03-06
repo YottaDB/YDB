@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2008, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2008-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __WCS_PHASE2_COMMIT_WAIT_H__
-#define __WCS_PHASE2_COMMIT_WAIT_H__
+#ifndef WCS_PHASE2_COMMIT_WAIT_H_INCLUDED
+#define WCS_PHASE2_COMMIT_WAIT_H_INCLUDED
 
 /* We have found that having the default spin count at 128 causes huge CPU usage in Tru64 even though ALL the processes are
  * waiting for one process to finish its phase2 commit. Since this parameter is user controlled anyways using DSE CHANGE -FILE,

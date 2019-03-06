@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __GDSKILL_H__
-#define __GDSKILL_H__
+#ifndef GDSKILL_H_INCLUDED
+#define GDSKILL_H_INCLUDED
 
 /* Since small memory is allocated in powers of two, keep the kill_set
    structure size about 8 bytes under 1k mark (current size of

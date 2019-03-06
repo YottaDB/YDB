@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -13,8 +13,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __ERRORSP_H__
-#define __ERRORSP_H__
+#ifndef ERRORSP_H_INCLUDED
+#define ERRORSP_H_INCLUDED
 
 #include <setjmp.h>
 #include "gtm_pthread.h"
@@ -578,9 +578,9 @@ error_def(ERR_OUTOFSPACE);
 					DEBUG_ONLY(&& (WBTEST_ENABLED(WBTEST_SKIP_CORE_FOR_MEMORY_ERROR)		\
 							? (SIGNAL != (int)ERR_MEMORY) : TRUE)))
 
-unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t need_rtsloc);
+unsigned char *set_zstatus(mstr *src, int max_len, int arg, unsigned char **ctxtp, boolean_t need_rtsloc);
 
-#define SET_ZSTATUS(ctxt)	set_zstatus(&src_line_d, SIGNAL, ctxt, TRUE);
+#define SET_ZSTATUS(ctxt)	set_zstatus(&src_line_d, src_line_max, SIGNAL, ctxt, TRUE);
 
 #define MSG_OUTPUT		(1)
 

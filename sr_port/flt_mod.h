@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __FLT_MOD_H__
-#define __FLT_MOD_H__
+#ifndef FLT_MOD_H_INCLUDED
+#define FLT_MOD_H_INCLUDED
 
 void flt_mod (mval *u, mval *v, mval *q);
 

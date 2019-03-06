@@ -280,21 +280,18 @@ STATICFNDEF boolean_t fill_src_tbl_via_litpool(routine_source **src_tbl_result, 
 
 STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rhdtyp *rtn_vector)
 {
-	int			srcrecs, *lt_ptr, size, line_indx, srcfilnamlen;
 	boolean_t		found, added, eof_seen, srcstat;
-	mstr			src;
-	zro_ent			*srcdir;
-	mstr			*base, *current, *top;
-	char			buff[MAX_SRCLINE], *cptr, *srcfile_name;
-	char			srcnamebuf[SIZEOF(mident_fixed) + STR_LIT_LEN(DOTM)];
-	routine_source		*src_tbl;
-	int			rc, fclose_res;
-	char			*fgets_rc;
+	char			buff[MAX_SRCLINE], *cptr, *fgets_rc, *srcfile_name;
+	char			srcnamebuf[SIZEOF(mident_fixed) + STR_LIT_LEN(DOTM) + 1];
 	FILE			*fp;
-	struct stat		srcfile_stat;
-	off_t			srcsize;
-	unsigned char		*srcptr, *srcptr_max, *srcstart, *eol_srcstart, *prev_srcptr;
 	gtm_rtn_src_chksum_ctx	checksum_ctx;
+	int			fclose_res, fdd, fsd, line_indx, *lt_ptr, rc, size, srcfilnamlen, srcrecs;
+	mstr			*base, *current, src, *top;
+	off_t			srcsize;
+	routine_source		*src_tbl;
+	struct stat		srcfile_stat;
+	unsigned char		*srcptr, *srcptr_max, *srcstart, *eol_srcstart, *prev_srcptr;
+	zro_ent			*srcdir;
 
 	srcstat = 0;
 	srcfile_name = malloc(rtn_vector->src_full_name.len + 1);
@@ -307,6 +304,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 	Fopen(fp, srcfile_name, "r");
 	if (NULL == fp)
 	{
+		found = FALSE;
 		free(srcfile_name);
 		srcfile_name = NULL;
 		srcfilnamlen = (int)rtn_vector->routine_name.len;
@@ -316,23 +314,36 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 		MEMCPY_LIT(&srcnamebuf[srcfilnamlen], DOTM);
 		src.addr = srcnamebuf;
 		src.len = INTCAST(srcfilnamlen + STR_LIT_LEN(DOTM));
+		src.addr[src.len] = 0;
 		zro_search(NULL, NULL, &src, &srcdir, TRUE);
 		if (srcdir)
 		{
-			srcfile_name = malloc(src.len + srcdir->str.len + 2);
-			memcpy(srcfile_name, srcdir->str.addr, srcdir->str.len);
-			cptr = srcfile_name + srcdir->str.len;
-			*cptr++ = '/';
-			memcpy(cptr, src.addr, src.len);
-			cptr += src.len;
-			*cptr++ = 0;
-			Fopen(fp, srcfile_name, "r");
-			found = (NULL != fp) ? TRUE : FALSE;
-		} else
-			found = FALSE;
+			OPENFILE(srcdir->str.addr, O_RDONLY, fdd);
+			if (-1 == fdd)
+				srcdir = NULL;
+			else
+			{	/* having latched on to the directory, openat ensures no jiggering of path between find and open */
+				OPENAT(fdd, src.addr, O_RDONLY, fsd);
+				if (-1 != fsd)
+				{
+					FDOPEN(fp, fsd, "r");
+					if (NULL != fp)
+					{
+						found = TRUE;
+						srcfile_name = malloc(src.len + srcdir->str.len + 2);
+						memcpy(srcfile_name, srcdir->str.addr, srcdir->str.len);
+						cptr = srcfile_name + srcdir->str.len;
+						*cptr++ = '/';
+						memcpy(cptr, src.addr, src.len);
+						cptr += src.len;
+						*cptr++ = 0;
+					}
+				}
+				CLOSEFILE(fdd, fclose_res);
+			}
+		}
 	} else
 		found = TRUE;
-
 	if (!found)
 	{
 		srcstat |= SRCNOTFND;

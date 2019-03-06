@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -63,6 +68,8 @@ GBLDEF rof_struct *rc_overflow = (rof_struct *) 0;
 GBLREF int	history;
 GBLREF int	omi_pid;
 
+#define	OUT_LINE	256 + 1
+
 static rc_op   rc_dispatch_table[RC_OP_MAX] = {
 	0,
 	rc_prc_opnd,
@@ -74,7 +81,6 @@ static rc_op   rc_dispatch_table[RC_OP_MAX] = {
 	rc_prc_getp,
 	rc_prc_getr,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
 	rc_prc_kill,
 	rc_prc_set,
 	rc_prc_setf,
@@ -83,21 +89,26 @@ static rc_op   rc_dispatch_table[RC_OP_MAX] = {
 	 /* rc_prc_ntrx */ 0
 };
 
+<<<<<<< HEAD
 int rc_srvc_xact(cptr, xend)
 	omi_conn       *cptr;
 	char           *xend;
+=======
+int rc_srvc_xact(omi_conn *cptr, char *xend)
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 {
-	rc_xblk_hdr   *fxhdr;
-	rc_q_hdr      *qhdr;
+	char           *cpte, msg[OUT_LINE], *p, *tptr;
+	int             dumped = 0, pkt_len, rqlen, rv;
 	rc_clnt_err   *elst, *eptr;
+	rc_q_hdr      *qhdr;
 	rc_rsp_page   *rpg;
-	char           *cpte;
-	int             rv, rqlen;
-	char	       *tptr;
-	int 		dumped = 0;
-	int		pkt_len = (int)(xend - (char *) cptr);
+	rc_xblk_hdr   *fxhdr;
 
+<<<<<<< HEAD
 	ASSERT_IS_LIBGTCM;
+=======
+	pkt_len = (int)(xend - (char *) cptr);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	/* Reserve space for the RC header in the response buffer */
 	fxhdr = (rc_xblk_hdr *) cptr->xptr;
 	cptr->xptr += SIZEOF(rc_xblk_hdr);
@@ -132,7 +143,11 @@ int rc_srvc_xact(cptr, xend)
 	/* Loop through the requests in the XBLK */
 	for (qhdr = NULL; cptr->xptr < xend;)
 	{
+<<<<<<< HEAD
 		qhdr = (rc_q_hdr *)tptr;
+=======
+		qhdr = (rc_q_hdr *) tptr;
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		rqlen = qhdr->a.len.value;
 		if (history)
 		{
@@ -140,20 +155,29 @@ int rc_srvc_xact(cptr, xend)
 			save_rc_req((char *)qhdr,qhdr->a.len.value);
 		}
 		rv = -1;
+<<<<<<< HEAD
 		/* Check to see if this is a error'd PID, throw away packets
 		   from these. */
 		/* 9/8/94 VTF:  protocol change
 		 * Process any LOCK/UNLOCK requests from an error'd PID
 		 */
+=======
+		/* Check to see if this is a error'd PID, throw away packets from these. */
+		/* 9/8/94 VTF:  protocol change: Process any LOCK/UNLOCK requests from an error'd PID */
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		for (eptr = elst; eptr; eptr = eptr->next)
-			if (eptr->pid == ((qhdr->r.pid1.value << 16) | qhdr->r.pid2.value)
-			    && qhdr->r.typ.value != RC_LOCK_NAMES)
+			if ((eptr->pid == ((qhdr->r.pid1.value << 16) | qhdr->r.pid2.value))
+					&& (qhdr->r.typ.value != RC_LOCK_NAMES))
 				break;
 		if (eptr)
 			qhdr->a.erc.value = RC_NETREQIGN;
 		/*	Do we do this yet? */
+<<<<<<< HEAD
 		else if (	/* (qhdr->r.typ.value < 0) || */ /* this is commented out as it always evaluates to FALSE */
 			(RC_OP_MAX <= qhdr->r.typ.value) || (!rc_dispatch_table[qhdr->r.typ.value]))
+=======
+		else if ((qhdr->r.typ.value > RC_OP_MAX ) || (!rc_dispatch_table[qhdr->r.typ.value]))
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		{
 #			ifdef DEBUG
 			if (qhdr->r.typ.value == RC_EXCH_INFO)
@@ -167,7 +191,11 @@ int rc_srvc_xact(cptr, xend)
 			}
 #			endif
 			qhdr->a.erc.value = RC_NETERRNTIMPL;
+<<<<<<< HEAD
 		} else		/* Try it */
+=======
+		} else	/* Try it */
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		{
 			/*
 			 * Calculate the size available for a response
@@ -184,8 +212,7 @@ int rc_srvc_xact(cptr, xend)
 			rc_errno = RC_SUCCESS;
 			if (fxhdr->free.value > fxhdr->end.value)
 			{
-				char msg[256];
-				SPRINTF(msg,"invalid packet :  free (%x) > end (%x).  Dumped RC header + packet",
+				SNPRINTF(msg, OUT_LINE, "invalid packet :  free (%x) > end (%x).  Dumped RC header + packet",
 					fxhdr->free.value, fxhdr->end.value);
 				/*GTM64: Assuming length of packet wont excced MAX_INT */
 				gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);
@@ -197,9 +224,7 @@ int rc_srvc_xact(cptr, xend)
 			rv = (*rc_dispatch_table[qhdr->r.typ.value]) (qhdr);
 			if (fxhdr->free.value > fxhdr->end.value)
 			{
-				char msg[256];
-				char *p;
-				SPRINTF(msg,"corrupted packet, free (%x) > end.value (%x).  Dumped RC header + packet",
+				SNPRINTF(msg, OUT_LINE, "corrupted packet, free (%x) > end.value (%x).  Dumped RC header + packet",
 					fxhdr->free.value,fxhdr->end.value);
 				gtcm_cpktdmp((char *)fxhdr, (int)(((char *)xend) - ((char *)fxhdr)),msg);
 				p = (char *)-1L;
@@ -207,9 +232,8 @@ int rc_srvc_xact(cptr, xend)
 			}
 			if (qhdr->a.len.value > fxhdr->end.value)
 			{
-				char msg[256];
-				char *p;
-				SPRINTF(msg,"corrupted packet, qhdr.a.len.value=%x > fxhdr end (%x).  Dumped RC header + packet",
+				SNPRINTF(msg, OUT_LINE,
+					"corrupted packet, qhdr.a.len.value=%x > fxhdr end (%x).  Dumped RC header + packet",
 					qhdr->a.len.value,fxhdr->end.value);
 				gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value, msg);
 				p = (char *)-1L;
@@ -223,9 +247,7 @@ int rc_srvc_xact(cptr, xend)
 				rv = -1;
 #				ifdef DEBUG
 				{
-					char msg[256];
-
-					SPRINTF(msg,"RC error (0x%x).",rc_errno);
+					SNPRINTF(msg, OUT_LINE, "RC error (0x%x).",rc_errno);
 					gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value, msg);
 					dumped = 1;
 				}
@@ -235,11 +257,14 @@ int rc_srvc_xact(cptr, xend)
 		/* Keep track of erroneous PIDs */
 		if (rv < 0)
 		{
+<<<<<<< HEAD
 			/*
 			 * OMI_DBG_STMP; OMI_DBG((omi_debug, "gtcm_server:
 			 * rc_srvc_xct(error: %d)\n",
 			 * qhdr->a.erc.value));
 			 */
+=======
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 #			ifdef DEBUG
 			if (!dumped)
 				gtcm_cpktdmp((char *)qhdr, qhdr->a.len.value,
@@ -258,9 +283,9 @@ int rc_srvc_xact(cptr, xend)
 			save_rc_rsp((char *)qhdr,qhdr->a.len.value);
 		/* Move to the next request */
 		cptr->xptr += rqlen;
-
 		tptr = (char *)qhdr;
 		tptr += RC_AQ_HDR;
+<<<<<<< HEAD
 
 		if (qhdr->r.typ.value ==
 		    (RC_GET_PAGE | 0x80) ||
@@ -269,21 +294,24 @@ int rc_srvc_xact(cptr, xend)
 				 * the buffer */
 		else
 		{
+=======
+		if ((qhdr->r.typ.value == (RC_GET_PAGE | 0x80)) || (qhdr->r.typ.value == (RC_GET_RECORD | 0x80)))
+			break;	/* Reads are always the last request in the buffer */
+		else {
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 			if (cptr->xptr < xend)
 			{
-				/* ensure that the length of the next request
-				 * actually fits into this XBLK
-				 */
+				/* ensure that the length of the next request actually fits into this XBLK */
 				assert(((rc_q_hdr *)(cptr->xptr))
 				       ->a.len.value <= xend - cptr->xptr);
 				memcpy(tptr, cptr->xptr, ((rc_q_hdr
 					   *)(cptr->xptr))->a.len.value);
 			}
-
 		  qhdr->a.len.value = RC_AQ_HDR;
 		}
 	}
 	/* Forget the erroneous PIDs */
+<<<<<<< HEAD
 	FREE_ELST;
 	/*
 	 * If true, there was an XBLK, so fill in some of the response
@@ -292,6 +320,16 @@ int rc_srvc_xact(cptr, xend)
 
 	/* There's no way that I can see to get to this point with a
 	   null qhdr. */
+=======
+	if (elst)
+	{
+		for (eptr = elst->next; eptr; eptr = (elst = eptr)->next)
+			free(elst);
+		free(elst);
+	}
+	/* If true, there was an XBLK, so fill in some of the response fields */
+	/* There's no way that I can see to get to this point with a null qhdr. */
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	if (qhdr)
 	{
 		fxhdr->last_aq.value = (char *) qhdr - (char *) fxhdr;
@@ -306,6 +344,7 @@ int rc_srvc_xact(cptr, xend)
 	}
 	if (fxhdr->free.value > fxhdr->end.value)
 	{
+<<<<<<< HEAD
 	    char msg[256];
 	    SPRINTF(msg,"invalid packet :  free (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->free.value, fxhdr->end.value);
@@ -314,11 +353,20 @@ int rc_srvc_xact(cptr, xend)
 	    if (history)
 		dump_omi_rq();
 	    return -OMI_ER_PR_INVMSGFMT;
+=======
+		SNPRINTF(msg, OUT_LINE, "invalid packet :  free (%x) > end (%x).  Dumped RC header + packet",
+			fxhdr->free.value, fxhdr->end.value);
+		/*GTM64: Assuming length of packet wont excced MAX_INT */
+		gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);
+		if (history)
+			dump_omi_rq();
+		return -OMI_ER_PR_INVMSGFMT;
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	} else if (fxhdr->cpt_tab.value > fxhdr->end.value)
 	{
-	    char msg[256];
-	    SPRINTF(msg,"invalid packet :  cpt_tab (%x) > end (%x).  Dumped RC header + packet",
+		SNPRINTF(msg, OUT_LINE, "invalid packet :  cpt_tab (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->cpt_tab.value, fxhdr->end.value);
+<<<<<<< HEAD
 	    /*GTM64: Assuming length of packet wont excced MAX_INT */
 	    gtcm_cpktdmp((char *)fxhdr, (int)(((char *)xend) - ((char *)fxhdr)),msg);
 	    if (history)
@@ -326,20 +374,27 @@ int rc_srvc_xact(cptr, xend)
 	    return -OMI_ER_PR_INVMSGFMT;
 	} else if (fxhdr->cpt_tab.value + fxhdr->cpt_siz.value
 		                                      > fxhdr->end.value)
+=======
+		/*GTM64: Assuming length of packet wont excced MAX_INT */
+		gtcm_cpktdmp((char *)fxhdr, (int)(((char *)xend) - ((char *)fxhdr)),msg);
+		if (history)
+			dump_omi_rq();
+		return -OMI_ER_PR_INVMSGFMT;
+	} else if (fxhdr->cpt_tab.value + fxhdr->cpt_siz.value > fxhdr->end.value)
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	{
-	    char msg[256];
-	    SPRINTF(msg,"invalid packet :  cpt_tab + cpt_siz (%x) > end (%x).  Dumped RC header + packet",
-		    fxhdr->cpt_tab.value + fxhdr->cpt_siz.value,
-		    fxhdr->end.value);
-	    /*GTM64: Assuming length of packet wont excced MAX_INT */
-	    gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);
-	    if (history)
-		dump_omi_rq();
-	    return -OMI_ER_PR_INVMSGFMT;
+		SNPRINTF(msg, OUT_LINE, "invalid packet :  cpt_tab + cpt_siz (%x) > end (%x).  Dumped RC header + packet",
+			fxhdr->cpt_tab.value + fxhdr->cpt_siz.value, fxhdr->end.value);
+		/*GTM64: Assuming length of packet wont excced MAX_INT */
+		gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);
+		if (history)
+			dump_omi_rq();
+		return -OMI_ER_PR_INVMSGFMT;
 	}
 	rc_send_cpt(fxhdr, (rc_rsp_page *) qhdr);
 	if (fxhdr->free.value > fxhdr->end.value)
 	{
+<<<<<<< HEAD
 	    char msg[256];
 	    SPRINTF(msg,"invalid Aq packet :  free (%x) > end (%x).  Dumped RC header + packet",
 		    fxhdr->free.value, fxhdr->end.value);
@@ -349,8 +404,16 @@ int rc_srvc_xact(cptr, xend)
 		dump_omi_rq();
 	    assert(fxhdr->free.value <= fxhdr->end.value);
 	    return -OMI_ER_PR_INVMSGFMT;
+=======
+		SNPRINTF(msg, OUT_LINE, "invalid Aq packet :  free (%x) > end (%x).  Dumped RC header + packet",
+			fxhdr->free.value, fxhdr->end.value);
+		/*GTM64: Assuming length of packet wont excced MAX_INT */
+		gtcm_cpktdmp((char *)fxhdr, (int4)(((char *)xend) - ((char *)fxhdr)),msg);
+		if (history)
+			dump_omi_rq();
+		assert(fxhdr->free.value <= fxhdr->end.value);
+		return -OMI_ER_PR_INVMSGFMT;
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	}
-
 	return fxhdr->free.value;
-
 }

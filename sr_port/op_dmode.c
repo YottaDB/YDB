@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -43,6 +43,8 @@
 #include "dm_read.h"
 #include "tp_change_reg.h"
 #include "getzposition.h"
+#include "restrict.h"
+#include "dm_audit_log.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
@@ -60,12 +62,16 @@ LITREF	mval		literal_notimeout;
 
 error_def(ERR_NOTPRINCIO);
 error_def(ERR_NOPRINCIO);
+error_def(ERR_APDLOGFAIL);
 
 void	op_dmode(void)
 {
 	d_tt_struct		*tt_ptr;
 	gd_region		*save_re;
 	mval			prompt, dummy, *input_line;
+	boolean_t		xec_cmd = TRUE;			/* Determines if command should be
+								 * executed (for direct mode auditing purposes)
+								 */
 	static boolean_t	dmode_intruptd;
 	static boolean_t	kill = FALSE;
 	static int		loop_cnt = 0;
@@ -114,17 +120,39 @@ void	op_dmode(void)
 		op_wteol(1);
 	TPNOTACID_CHECK(DIRECTMODESTR);
 	if (io_curr_device.in->type == tt)
+	{
 		dm_read(input_line);
-	else
+		/* If direct mode auditing is enabled, this attempts to send the command to logger */
+		if ((AUDIT_ENABLE_DMODE & RESTRICTED(dm_audit_enable)) && !dm_audit_log(input_line, AUDIT_SRC_DMREAD))
+		{
+			xec_cmd = FALSE;	/* Do not execute command because logging failed */
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_APDLOGFAIL);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_APDLOGFAIL);
+		}
+	} else
 	{
 		prompt.mvtype = MV_STR;
 		prompt.str = TREF(gtmprompt);
 		op_write(&prompt);
 		op_read(input_line, (mval *)&literal_notimeout);
+		/* Check if auditing for direct mode is enabled. Also check if
+		 * auditing for all READ is disabled, so we do not log twice.
+		 */
+		if ((AUDIT_ENABLE_DMODE & RESTRICTED(dm_audit_enable)) && !(AUDIT_ENABLE_RDMODE & RESTRICTED(dm_audit_enable))
+			       	&& !dm_audit_log(input_line, AUDIT_SRC_OPREAD))
+		{
+			xec_cmd = FALSE;	/* Do not execute command because logging failed */
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_APDLOGFAIL);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_APDLOGFAIL);
+		}
 	}
 	op_wteol(1);
 	io_curr_device = save_device;
 	dmode_intruptd = FALSE;
-	op_commarg(input_line, indir_linetail);
+	/* Only executes command when Direct Mode Auditing
+	 * is disabled or when sending/logging is successful
+	 */
+	if (xec_cmd)
+		op_commarg(input_line, indir_linetail);
 	frame_pointer->type = 0;
 }

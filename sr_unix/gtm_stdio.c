@@ -87,22 +87,16 @@ int gtm_fprintf(FILE *stream, const char *format, ...)
 		retval = -1;	/* Now that "errno" has been set, return -1 just like "fprintf" would in case of error */
 	}
 	va_end(printargs);
+<<<<<<< HEAD
 	if (buf != tmpbuf)
 		free(buf);
+=======
+	assert(-1 != retval);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	return retval;
 }
 
-/* Wrapper for sprintf() */
-int	gtm_sprintf(char *str, const char *format, ...)
-{
-	va_list		printargs;
-	int		retval;
-
-	va_start(printargs, format);
-	VSPRINTF(str, format, printargs, retval);
-	va_end(printargs);
-	return retval;
-}
+/* Wrapper for sprintf() - unneeded / unwanted as it is not safe */
 
 /* Wrapper for snprintf() */
 int	gtm_snprintf(char *str, size_t size, const char *format, ...)
@@ -113,6 +107,7 @@ int	gtm_snprintf(char *str, size_t size, const char *format, ...)
 	va_start(printargs, format);
 	VSNPRINTF(str, size, format, printargs, retval);
 	va_end(printargs);
+	assert(-1 != retval);
 	return retval;
 }
 

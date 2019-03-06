@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,8 +9,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#ifndef _MU_INTERACTIVE_H_
-#define _MU_INTERACTIVE_H_
+#ifndef MU_INTERACTIVE_H_INCLUDED
+#define MU_INTERACTIVE_H_INCLUDED
 
 boolean_t mu_interactive(caddr_t message);
 

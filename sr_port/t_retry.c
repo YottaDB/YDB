@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -206,8 +206,7 @@ void t_retry(enum cdb_sc failure)
 				INCR_GVSTATS_COUNTER(csa, cnl, n_nontp_retries_3, 1);
 				break;
 		}
-		if (csa->critical)
-			crash_count = csa->critical->crashcnt;
+		UPDATE_CRASH_COUNT(csa, crash_count);
 		if (TREF(nontprestart_log_delta) && (((TREF(nontprestart_count))++ < TREF(nontprestart_log_first)) ||
 		    (0 == ((TREF(nontprestart_count) - TREF(nontprestart_log_first)) % TREF(nontprestart_log_delta)))))
 		{
@@ -425,8 +424,8 @@ void t_retry(enum cdb_sc failure)
 				if (cdb_sc_gbloflow == failure)
 				{
 					gv_currkey->end = 0;
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2, DB_LEN_STR(csa->region));
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2, DB_LEN_STR(csa->region));
 				}
 				if (IS_DOLLAR_INCREMENT)
 				{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -77,6 +77,7 @@ GBLREF uint4		dollar_zjob;
 GBLREF mval		dollar_zstatus;
 GBLREF mval		dollar_zsource;
 GBLREF int4		dollar_zsystem;
+GBLREF boolean_t	dollar_zaudit;
 GBLREF int4		dollar_zeditor;
 GBLREF uint4		dollar_tlevel;
 GBLREF uint4		dollar_trestart;
@@ -282,6 +283,9 @@ void op_svget(int varnum, mval *v)
 			count = (int)io_curr_device.in->dollar.za;
 			MV_FORCE_MVAL(v, count);
 			break;
+		case SV_ZAUDIT:
+			MV_FORCE_MVAL(v, dollar_zaudit);
+			break;
 		case SV_ZB:
 			c1 = (char *)io_curr_device.in->dollar.zb;
 			c2 = c1 + SIZEOF(io_curr_device.in->dollar.zb);
@@ -422,7 +426,7 @@ void op_svget(int varnum, mval *v)
 		case SV_ZC:
 		case SV_ZCSTATUS:
 			/* Maintain the external $ZCSTATUS == 1 for SUCCESS on UNIX while internal good is 0 */
-			MV_FORCE_MVAL(v, UNIX_ONLY((0 == TREF(dollar_zcstatus)) ? 1 : ) TREF(dollar_zcstatus));
+			MV_FORCE_MVAL(v, !TREF(dollar_zcstatus) ? 1 : TREF(dollar_zcstatus));
 			break;
 		case SV_ZEDITOR:
 			MV_FORCE_MVAL(v, dollar_zeditor);
@@ -630,7 +634,9 @@ void op_svget(int varnum, mval *v)
 			MV_FORCE_MVAL(v, count);
 			break;
 		case SV_ZTIMEOUT:
-			get_ztimeout(v);
+			count = get_ztimeout(v);
+			if (-1 == count)
+				MV_FORCE_MVAL(v, count);
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSVN);

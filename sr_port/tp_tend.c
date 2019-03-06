@@ -84,6 +84,10 @@
 #include "is_proc_alive.h"
 #include "process_reorg_encrypt_restart.h"
 #include "gtmsource_inline.h"
+#include "deferred_events_queue.h"
+#include "deferred_events.h"
+#include "error_trap.h"
+#include "ztimeout_routines.h"
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			dollar_trestart;
@@ -280,7 +284,12 @@ boolean_t	tp_tend()
 	jnl_tm_t		save_gbl_jrec_time;
 	uint4			max_upd_num, prev_upd_num, upd_num, upd_num_end, upd_num_start;
 #	endif
+<<<<<<< HEAD
 	int4			tprestart_syslog_delta;
+=======
+        int4			event_type, param_val;
+        void (*set_fn)(int4 param);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -550,7 +559,9 @@ boolean_t	tp_tend()
 			 * the current transaction which we want to avoid if we are in the final retry.
 			 */
 			if (!csa->now_crit)
+			{
 				grab_crit(gv_cur_region); /* Step CMT01 (see secshr_db_clnup.c for CMTxx step descriptions) */
+			}
 			else if (cnl->wc_blocked)
 			{
 				status = cdb_sc_helpedout;
@@ -1833,6 +1844,7 @@ failed:
 		 */
 		assert(jgbl.onlnrlbk || !release_crit || (0 == have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT)));
 	}
+	CALL_ZTIMEOUT_IF_DEFERRED;
 	/* We have finished validation on this region. Reset transaction numbers in the gv_target
 	 * histories so they will be valid for a future access utilizing the clue field. This occurs
 	 * to improve performance (of next tn in case of commit of current tn) or the chances of commit

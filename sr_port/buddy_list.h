@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __BUDDY_LIST_H__
-#define __BUDDY_LIST_H__
+#ifndef BUDDY_LIST_H_INCLUDED
+#define BUDDY_LIST_H_INCLUDED
 
 /* This is a general purpose structure used for storing a list of similar-sized structure-elements with the need for
  *		efficiently accessing the element once we know its index.

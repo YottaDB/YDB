@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -193,7 +193,7 @@ boolean_t search_trigger_hash(char *trigvn, int trigvn_len, stringkey *trigger_h
 		assert(('\0' == *ptr2) && (key_val.str.len > len));
 		ptr2++;
 		A2I(ptr2, key_val.str.addr + key_val.str.len, trig_index);
-		assert(-1 != trig_index);
+		assert(0 < trig_index);
 		match = (match_index == trig_index);
 		if (match)
 		{
@@ -293,12 +293,20 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
+<<<<<<< HEAD
+=======
+		ptr += len;
+		assert(('\0' == *ptr) && (key_val.str.len > len));
+		ptr++;
+		A2I(ptr, key_val.str.addr + key_val.str.len, trig_index);
+		assert(0 < trig_index);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		MV_FORCE_UMVAL(&mv_trig_indx, trig_index);
-		for (sub_indx = 0; sub_indx < NUM_TOTAL_SUBS; sub_indx++)
+		for (sub_indx = 0; sub_indx < NUM_SUBS; sub_indx++)
 		{
 			if (((TRSBS_IN_NONE == trig_subsc_partofhash[sub_indx]) && (CMD_SUB != sub_indx))
 					|| (!doing_set && (TRSBS_IN_BHASH == trig_subsc_partofhash[sub_indx])))
-				continue;
+				continue; /* Skip indices that are not used for the trigger hash */
 			assert((CMD_SUB == sub_indx) || ((TRSBS_IN_LHASH | TRSBS_IN_BHASH) == trig_subsc_partofhash[sub_indx])
 				|| (doing_set && (TRSBS_IN_BHASH == trig_subsc_partofhash[sub_indx])));
 			BUILD_HASHT_SUB_MSUB_SUB_CURRKEY(trigvn, trigvn_len, mv_trig_indx, trigger_subs[sub_indx],

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -66,7 +66,7 @@ struct passwd	*gtm_getpwuid(uid_t uid)
 		   	overwrite by calling getpwuid */
 			/* uid 1 is a daemon process id */
 			retval = getpwuid((uid_t)1);
-			assert(STRCMP(getpwuid_struct.pw_name, retval->pw_name));
+			assert(retval && STRCMP(getpwuid_struct.pw_name, retval->pw_name));
 		}
 		first_time = FALSE;
 #		endif

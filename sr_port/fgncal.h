@@ -1,10 +1,15 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2013 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,8 +18,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __FGNCAL_H__
-#define __FGNCAL_H__
+#ifndef FGNCAL_H_INCLUDED
+#define FGNCAL_H_INCLUDED
 
 void fgncal_unwind(void);
 void fgncal_rundown(void);

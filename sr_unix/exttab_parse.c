@@ -500,6 +500,7 @@ STATICFNDEF uint4 array_to_mask(boolean_t ar[MAX_ACTUALS], int n)
 /* Note: Need condition handler to clean-up allocated structures and close intput file in the event of an error */
 struct extcall_package_list *exttab_parse(mval *package)
 {
+<<<<<<< HEAD
 	int		parameter_alloc_values[MAX_ACTUALS], parameter_count, ret_pre_alloc_val, i, fclose_res;
 	int		len, keywordlen;
 	boolean_t	is_input[MAX_ACTUALS], is_output[MAX_ACTUALS], got_status;
@@ -513,9 +514,25 @@ struct extcall_package_list *exttab_parse(mval *package)
 	FILE		*ext_table_file_handle;
 	boolean_t	is_ydb_env_match;
 	struct extcall_package_list	*pak;
+=======
+	boolean_t			is_input[MAX_ACTUALS], is_output[MAX_ACTUALS], got_status;
+	char				*end, str_buffer[MAX_TABLINE_LEN], str_temp_buffer[MAX_TABLINE_LEN + 1], *tbp;
+	enum gtm_types			ret_tok, parameter_types[MAX_ACTUALS], pr;
+	FILE				*ext_table_file_handle;
+	int				fclose_res, i, keywordlen, len;
+	int				parameter_alloc_values[MAX_ACTUALS], parameter_count, ret_pre_alloc_val;
+	mstr				callnam, clnuprtn, rtnnam, trans, val;
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	struct extcall_entry_list	*entry_ptr;
+	struct extcall_package_list	*pak;
+	void_ptr_t			pakhandle;
 
 	/* First, construct package name environment variable */
+<<<<<<< HEAD
+=======
+	MEMCPY_LIT(str_buffer, PACKAGE_ENV_PREFIX);
+	tbp = &str_buffer[SIZEOF(PACKAGE_ENV_PREFIX) - 1];
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	if (package->str.len)
 		ext_table_file_name = ydb_getenv(YDBENVINDX_XC_PREFIX, &package->str, &is_ydb_env_match);
 	else

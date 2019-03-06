@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __TRANS_CODE_CLEANUP_H__
-#define __TRANS_CODE_CLEANUP_H__
+#ifndef TRANS_CODE_CLEANUP_H_INCLUDED
+#define TRANS_CODE_CLEANUP_H_INCLUDED
 
 void trans_code_cleanup(void);
 

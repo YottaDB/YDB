@@ -104,8 +104,11 @@ int gtm_main(int argc, char **argv, char **envp)
 	assert(!(noThreadAPI_active || simpleThreadAPI_active));	/* Neither should be set unless we recursed (never!) */
 	noThreadAPI_active = TRUE;
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
+<<<<<<< HEAD
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	ydb_chk_dist(argv[0]);
+=======
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	cli_lex_setup(argc, argv);
 	/* put the arguments into buffer, then clean up the token buffer
 	 * cli_gettoken() copies all arguments except the first one argv[0]

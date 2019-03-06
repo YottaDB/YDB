@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2014 Fidelity Information Services, Inc 	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,7 +29,6 @@
 #include "gtm_string.h"
 #include "gtm_unistd.h"		/* for execlp and fork */
 #include "gtm_stdlib.h"		/* for exit */
-#include "gtm_stdio.h"		/* for SPRINTF */
 
 #include <sys/wait.h>		/* for wait */
 

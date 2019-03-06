@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,6 +110,7 @@ unsigned char *gvsub2str(unsigned char *sub, mstr *opstr, boolean_t xlat_flg)
 			targ = ptr;
 		if (xlat_flg)
 		{
+			targ_len = opstr->len;
 			format2zwr((sm_uc_ptr_t)ptr, in_length, targ, &targ_len);
 			assert(targ_len <= opstr->len);
 			targ = targ + targ_len;

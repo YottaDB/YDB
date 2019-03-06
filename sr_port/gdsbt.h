@@ -187,6 +187,13 @@ typedef struct
 	CACHELINE_PAD(SIZEOF(mutex_que_head), 9);
 } mutex_struct;
 
+typedef struct
+{
+	FILL8DCL(uint4, crit_cycle, 1);
+	FILL8DCL(uint4, stuck_cycle, 2);
+	pthread_mutex_t		mutex;
+} pth_mutex_struct;
+
 typedef struct {
 	int4	mutex_hard_spin_count;
 	int4	mutex_sleep_spin_count;
@@ -948,8 +955,12 @@ MBSTART {								\
 #define MIN_CRIT_ENTRY				64		/* keep this in sync with gdeinit.m minseg("MUTEX_SLOTS") */
 #define MAX_CRIT_ENTRY				32768		/* keep this in sync with gdeinit.m maxseg("MUTEX_SLOTS") */
 #define DEFAULT_NUM_CRIT_ENTRY			1024		/* keep this in sync with gdeget.m tmpseg("MUTEX_SLOTS") */
-#define NUM_CRIT_ENTRY(CSD)			(CSD)->mutex_spin_parms.mutex_que_entry_space_size
+#ifdef CRIT_USE_PTHREAD_MUTEX
+#define CRIT_SPACE(ENTRIES)			SIZEOF(pth_mutex_struct)
+#else
 #define CRIT_SPACE(ENTRIES)			((ENTRIES) * SIZEOF(mutex_que_entry) + SIZEOF(mutex_struct))
+#endif
+#define NUM_CRIT_ENTRY(CSD)			(CSD)->mutex_spin_parms.mutex_que_entry_space_size
 #define JNLPOOL_CRIT_SPACE			CRIT_SPACE(DEFAULT_NUM_CRIT_ENTRY)
 #define NODE_LOCAL_SIZE				(ROUND_UP(SIZEOF(node_local), OS_PAGE_SIZE))
 #define NODE_LOCAL_SPACE(CSD)			(ROUND_UP(CRIT_SPACE(NUM_CRIT_ENTRY(CSD)) + NODE_LOCAL_SIZE, OS_PAGE_SIZE))
@@ -1063,9 +1074,17 @@ typedef bt_rec	*bt_rec_ptr_t;
 typedef th_rec	*th_rec_ptr_t;
 typedef th_index *th_index_ptr_t;
 typedef mutex_struct *mutex_struct_ptr_t;
+typedef pth_mutex_struct *pth_mutex_struct_ptr_t;
+
 typedef mutex_spin_parms_struct *mutex_spin_parms_ptr_t;
 typedef mutex_que_entry	*mutex_que_entry_ptr_t;
 typedef node_local *node_local_ptr_t;
+
+#ifdef CRIT_USE_PTHREAD_MUTEX
+typedef pth_mutex_struct_ptr_t	CRIT_PTR_T;
+#else
+typedef mutex_struct_ptr_t	CRIT_PTR_T;
+#endif
 
 #define OLDEST_HIST_TN(CSA)		(DBG_ASSERT(CSA->hdr) DBG_ASSERT(CSA->hdr->acc_meth != dba_mm)	\
 						((th_rec_ptr_t)((sm_uc_ptr_t)CSA->th_base + CSA->th_base->tnque.fl))->tn)

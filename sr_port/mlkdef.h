@@ -13,8 +13,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __MLKDEF_H__
-#define __MLKDEF_H__
+#ifndef MLKDEF_H_INCLUDED
+#define MLKDEF_H_INCLUDED
 
 /* mlkdef.h */
 
@@ -385,7 +385,7 @@ typedef struct mlk_stats_struct
 #define REL_LOCK_CRIT(PCTL, WAS_CRIT)								\
 		rel_lock_crit(&(PCTL), WAS_CRIT)
 #define LOCK_CRIT_OWNER(CSA)									\
-		((CSA)->lock_crit_with_db ? (CSA)->critical->semaphore.u.parts.latch_pid : (CSA)->nl->lock_crit.u.parts.latch_pid)
+		((CSA)->lock_crit_with_db ? -1 : (CSA)->nl->lock_crit.u.parts.latch_pid)
 #define LOCK_CRIT_HELD(CSA)									\
 		((CSA)->lock_crit_with_db ? ((CSA)->now_crit) : (process_id == (CSA)->nl->lock_crit.u.parts.latch_pid))
 

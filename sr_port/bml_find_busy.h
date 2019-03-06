@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __BML_FIND_BUSY_H__
-#define __BML_FIND_BUSY_H__
+#ifndef BML_FIND_BUSY_H_INCLUDED
+#define BML_FIND_BUSY_H_INCLUDED
 
 int4 bml_find_busy(int4 hint, uchar_ptr_t base_addr, int4 total_blks);
 

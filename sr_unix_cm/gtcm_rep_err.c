@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -60,9 +60,9 @@ void gtcm_rep_err(char *msg, int errcode)
 
 	ASSERT_IS_LIBGTCM;
 	if ('\0' == msg[0])
-		sgtm_putmsg(outbuf, VARLSTCNT(2) errcode, 0);
+		sgtm_putmsg(outbuf, OUT_BUFF_SIZE, VARLSTCNT(2) errcode, 0);
 	else
-		sgtm_putmsg(outbuf, VARLSTCNT(6) errcode, 0, ERR_TEXT, 2, LEN_AND_STR(msg));
+		sgtm_putmsg(outbuf, OUT_BUFF_SIZE, VARLSTCNT(6) errcode, 0, ERR_TEXT, 2, LEN_AND_STR(msg));
 	util_out_print(outbuf, OPER);	/* Same message goes out to operator log */
 	return;
 }

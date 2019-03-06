@@ -194,6 +194,7 @@ void db_auto_upgrade(gd_region *reg)
 				/* GT.M V63003 introduced read-only databases */
 				csd->read_only = 0;
 			case GDSMV63003:
+<<<<<<< HEAD
 				/* YottaDB r122 introduced "reorg_sleep_nsec" to slow down reorg update rate by user */
 				csd->reorg_sleep_nsec = 0;
 				break;
@@ -207,6 +208,12 @@ void db_auto_upgrade(gd_region *reg)
 		 * f) Move this entire comment block (a) thru (f) to just before the newly added "case ...:" block.
 		 */
 			case GDSMR122:
+=======
+				/*  GT.M v63007 added stable user control of flush_trigger using flush_trigger_top */
+				csd->flush_trigger_top = FLUSH_FACTOR(csd->n_bts);	/* more predictable than flush_trigger */
+				break;
+			case GDSMV63007:
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

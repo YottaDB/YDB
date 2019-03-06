@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -687,8 +687,8 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 			has_a_qual = TRUE;
 			if ((tmp_str_ptr + len_str) != ptr_next_comma)
 			{
-				ptr_next_val = strchr(ptr_next_val, ',')+ 1;
-				if (!*ptr_next_val)
+				ptr_next_val = strchr(ptr_next_val, ',') + 1;
+				if (!ptr_next_val || !*ptr_next_val)
 				{
 					SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Option expected");
 					cli_lex_in_ptr->tp = 0;
@@ -837,10 +837,10 @@ int parse_cmd(void)
 CLI_ENTRY *get_parm_entry(char *parm_str)
 {
 	CLI_ENTRY	*pparm;
-	bool		root_match;
+	boolean_t	root_match;
 	char		local_str[MAX_LINE], *tmp_ptr;
 
-	STRNCPY_STR(local_str, parm_str, SIZEOF(local_str) - 1);
+	SNPRINTF(local_str, MAX_LINE, "%s", parm_str);
 	root_match = (gpqual_root && !STRNCMP_STR(gpqual_root->name, local_str, MAX_OPT_LEN));
 
 	/* ---------------------------------------
@@ -915,19 +915,20 @@ int cli_present(char *entry)
  *	<> 0 - ok
  * ------------------------------------------------------------
  */
-bool cli_get_value(char *entry, char val_buf[])
+boolean_t cli_get_value(char *entry, char val_buf[])
 {
 	CLI_ENTRY	*pparm;
 	char		local_str[MAX_LINE];
 #	ifdef DEBUG
-	int		ind, len;
+	int             ind, len;
 	CLI_ENTRY	*parm_vals;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 #	endif
-	STRNCPY_STR(local_str, entry, SIZEOF(local_str) - 1);
-	local_str[SIZEOF(local_str) - 1] = '\0';
+	STRNCPY_STR(local_str, entry, MAX_LINE - 1);
+	local_str[MAX_LINE - 1] = '\0';
+
 	cli_strupper(local_str);
 	if (NULL == (pparm = get_parm_entry(local_str)))
 		return (FALSE);
@@ -950,7 +951,8 @@ bool cli_get_value(char *entry, char val_buf[])
 			}
 		}
 #		endif
-		strcpy(val_buf, pparm->pval_str);
+		STRNCPY_STR(val_buf, pparm->pval_str, MAX_LINE);
+		val_buf[MAX_LINE - 1] = '\0';
 	}
 	return (TRUE);
 }
@@ -979,7 +981,7 @@ boolean_t cli_negated(char *entry) 		/* entity */
 }
 
 
-bool cli_get_parm(char *entry, char val_buf[])
+boolean_t cli_get_parm(char *entry, char val_buf[])
 {
 	char		*gets_res, local_str[MAX_LINE], *sp, *ptr, *nextptr;
 	int		eof, ind, match_ind, parm_len, res, numtblparms, i;

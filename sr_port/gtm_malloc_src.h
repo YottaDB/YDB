@@ -666,15 +666,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 	{
 		if (0 == size)
 			return &NullStruct.nullStr[0];
-		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-		rval = malloc(size);
-		if (!rval)
-		{
-			PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder);	/* get exclusive thread lock in case threads are in use */
-			raise_gtmmemory_error();
-		}
-		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-		return rval;
+		return system_malloc(size);
 	}
 #	ifndef DEBUG
 	/* If we are not expanding for DEBUG, check now if DEBUG has been turned on.
@@ -853,9 +845,7 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 	{
 		if (&NullStruct.nullStr[0] == addr)
 			return;
-		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-		free(addr);
-		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+		system_free(addr);
 		return;
 	}
 #	ifndef DEBUG
@@ -1460,4 +1450,32 @@ void printMallocDump(void)
 		FFLUSH(stderr);
 	}
 }
+
+void *system_malloc(size_t size)
+{
+	void		*rval;
+	intrpt_state_t	prev_intrpt_state;
+	boolean_t	was_holder;
+
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	rval = malloc(size);
+	if (!rval)
+	{
+		PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder);	/* get exclusive thread lock in case threads are in use */
+		raise_gtmmemory_error();
+	}
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	return rval;
+}
+
+void system_free(void *addr)
+{
+	intrpt_state_t	prev_intrpt_state;
+
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	free(addr);
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	return;
+}
+
 #endif

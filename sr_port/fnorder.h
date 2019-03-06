@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +17,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _FNORDER_H_INC_
-#define _FNORDER_H_INC_
+#ifndef FNORDER_H_INCLUDED
+#define FNORDER_H_INCLUDED
 
 enum order_obj {
 	GLOBAL = 0,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -182,12 +182,13 @@ void op_zlink (mval *v, mval *quals)
 		if (pblk.fnb & F_WILD)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 				ERR_WILDCARD, 2, v->str.len, v->str.addr);
+		/* 4SCA: file.len is bounded by MAX_FN_LEN in parse_file() */
 		file.addr = pblk.buffer;
 		file.len = pblk.b_esl;
 		type = NOTYPE;
 		expdir = (0 != (pblk.fnb & F_HAS_DIR));
 		if (pblk.b_ext)
-		{
+		{	/* 4SCA: file.len is decremented by the extension length pblk.b_ext */
 			file.len -= pblk.b_ext;
 			if (('o' == pblk.l_ext[1]) && (2 == pblk.b_ext))
 				type = OBJ;
@@ -210,19 +211,19 @@ void op_zlink (mval *v, mval *quals)
 		if (OBJ == type)
 		{	/* Object file extension specified */
 			objnamelen = file.len + pblk.b_ext;
-			assert(objnamelen < MAX_FN_LEN + 1);
+			assert(MAX_FN_LEN >= objnamelen);
 			memmove(objnamebuf, file.addr, objnamelen);
 			objnamebuf[objnamelen] = 0;
 		} else if (SRC == type)
 		{	/* Non-object file extension specified */
 			srcnamelen = file.len + pblk.b_ext;
-			assert(srcnamelen <= MAX_FN_LEN + 1);
+			assert(MAX_FN_LEN >= srcnamelen);
 			memmove(srcnamebuf, file.addr, srcnamelen);
 			srcnamebuf[srcnamelen] = 0;
 			objnamelen = file.len;
 			if (pblk.b_name > MAX_MIDENT_LEN)
 				objnamelen = expdir ? (pblk.b_dir + MAX_MIDENT_LEN) : MAX_MIDENT_LEN;
-			assert(objnamelen + SIZEOF(DOTOBJ) <= MAX_FN_LEN + 1);
+			assert((MAX_FN_LEN + 1) >= (objnamelen + SIZEOF(DOTOBJ)));
 			memcpy(objnamebuf, file.addr, objnamelen);
 			memcpy(&objnamebuf[objnamelen], DOTOBJ, SIZEOF(DOTOBJ));	/* Copies null terminator */
 			objnamelen += STR_LIT_LEN(DOTOBJ);
@@ -233,10 +234,10 @@ void op_zlink (mval *v, mval *quals)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			memmove(srcnamebuf, file.addr, file.len);
 			srcnamelen = file.len + SIZEOF(DOTM) - 1;
-			assert((MAX_FN_LEN + 1) > srcnamelen);
+			assert(MAX_FN_LEN >= srcnamelen);
 			memcpy(&srcnamebuf[file.len], DOTM, SIZEOF(DOTM));		/* Copies null terminator */
 			objnamelen = file.len + SIZEOF(DOTOBJ) - 1;
-			assert((MAX_FN_LEN + 1) > objnamelen);
+			assert(MAX_FN_LEN >= objnamelen);
 			memcpy(objnamebuf, file.addr, file.len);
 			memcpy(&objnamebuf[file.len], DOTOBJ, SIZEOF(DOTOBJ));		/* Copies null terminator */
 		}
@@ -302,7 +303,7 @@ void op_zlink (mval *v, mval *quals)
 		if (objdir)
 		{	/* Object file found via zro_search() */
 			assert(ZRO_TYPE_OBJLIB != objdir->type);
-			if (objdir->str.len + objnamelen + 2 > SIZEOF(objnamebuf))
+			if ((objdir->str.len + objnamelen + 2) > (SIZEOF(objnamebuf) - 1))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			if (objdir->str.len)
 			{
@@ -313,6 +314,7 @@ void op_zlink (mval *v, mval *quals)
 					assert(objnamelen + tslash <= MAX_FN_LEN + 1);
 					objnamebuf[objdir->str.len] = '/';
 				}
+				/* 4SCA: Protected by rts_error above */
 				memcpy(objnamebuf, objdir->str.addr, objdir->str.len);
 				objnamelen += objdir->str.len + tslash;
 				objnamebuf[objnamelen] = 0;
@@ -338,6 +340,7 @@ void op_zlink (mval *v, mval *quals)
 		if (srcdir)
 		{	/* A source directory containing routine was found by zro_search() */
 			assert(ZRO_TYPE_OBJLIB != objdir->type);
+<<<<<<< HEAD
 			if (srcdir->str.len)
 			{
 				tslash = ('/' == srcdir->str.addr[srcdir->str.len - 1]) ? 0 : 1; /* for possible '/' in between */
@@ -354,6 +357,21 @@ void op_zlink (mval *v, mval *quals)
 				}
 			} else
 				assert(srcnamelen <= (SIZEOF(srcnamebuf) - 1));
+=======
+			if ((srcdir->str.len + srcnamelen) > (SIZEOF(srcnamebuf) - 1))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
+			if (srcdir->str.len)
+			{
+				tslash = ('/' == srcdir->str.addr[srcdir->str.len - 1]) ? 0 : 1;
+				/* 4SCA: Protected by rts_error above */
+				memmove(&srcnamebuf[srcdir->str.len + tslash], srcnamebuf, srcnamelen);
+				if (tslash)
+					srcnamebuf[srcdir->str.len] = '/';
+				memcpy(srcnamebuf, srcdir->str.addr, srcdir->str.len);
+				srcnamelen += srcdir->str.len + tslash;
+				srcnamebuf[srcnamelen] = 0;
+			}
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		}
 		if (objdir)
 		{	/* An object directory or shared library containing the routine was found by zro_search() */
@@ -369,12 +387,13 @@ void op_zlink (mval *v, mval *quals)
 				assertpro(IL_DONE == INCR_LINK(NULL, objdir, NULL, objnamelen, objnamebuf));
 				return;
 			}
-			if (objdir->str.len + objnamelen > SIZEOF(objnamebuf) - 1)
+			if ((objdir->str.len + objnamelen) > (SIZEOF(objnamebuf) - 1))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 			if (objdir->str.len)
 			{
 				tslash = ('/' == objdir->str.addr[objdir->str.len - 1]) ? 0 : 1;
 				assert((objnamelen + objdir->str.len + tslash) <= (MAX_FN_LEN + 1));
+				/* 4SCA: Protected by rts_error above */
 				memmove(&objnamebuf[objdir->str.len + tslash], objnamebuf, objnamelen);
 				if (tslash)
 					objnamebuf[objdir->str.len] = '/';
@@ -468,18 +487,19 @@ void op_zlink (mval *v, mval *quals)
 		}
 		if (compile)
 		{	/* (Re)Compile source file */
+			module_name.len = 0;
+			if (!TREF(trigger_compile_and_link))
+			{
+				INIT_CMD_QLF_STRINGS(cmd_qlf, obj_file, list_file, ceprep_file, MAX_FN_LEN);
+				zl_cmd_qlf(&(TREF(dollar_zcompile)), &cmd_qlf, srcnamebuf, &srcnamelen, !quals);/*  */
+				if (quals)	/* after initization with default qualifers, override with any actual qualifers */
+					zl_cmd_qlf(&quals->str, &cmd_qlf, srcnamebuf, &srcnamelen, TRUE);
+			}
 			qlf = cmd_qlf.qlf;
 			if (!(qlf & CQ_OBJECT) && (SRC != type))
 			{
 				assert(FD_INVALID == object_file_des);	/* Make sure no object file open */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_ZLNOOBJECT);
-			}
-			module_name.len = 0;
-			if (!TREF(trigger_compile_and_link))
-			{
-				zl_cmd_qlf(&(TREF(dollar_zcompile)), &cmd_qlf, srcnamebuf, &srcnamelen, !quals);/*  */
-				if (quals)	/* after initization with default qualifers, override with any actual qualifers */
-					zl_cmd_qlf(&quals->str, &cmd_qlf, srcnamebuf, &srcnamelen, TRUE);
 			}
 			COMBINE_OBJ_DIR_W_NAME();
 			zlcompile(srcnamelen, (uchar_ptr_t)srcnamebuf);

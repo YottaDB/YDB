@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -241,6 +241,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	boolean_t		trans_action;	/* did the error occur during "transcendental" code */
 	boolean_t		prev_frame_is_indce;	/* used to compute "dm_action" */
 	char			src_line[MAX_ENTRYREF_LEN];
+	int			src_line_max = MAX_ENTRYREF_LEN;
 	mstr			src_line_d;
 	io_desc			*err_dev;
 	tp_region		*tr;

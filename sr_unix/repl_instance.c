@@ -645,7 +645,7 @@ int4	repl_inst_histinfo_find_seqno(seq_num seqno, int4 strm_idx, repl_histinfo *
 int4	repl_inst_wrapper_histinfo_find_seqno(seq_num seqno, int4 strm_idx, repl_histinfo *local_histinfo)
 {
 	unix_db_info	*udi;
-	char		histdetail[256];
+	char		histdetail[MAX_REPL_OPMSG_LEN];
 	int4		status;
 	repl_histinfo	*next_histinfo;
 
@@ -662,7 +662,7 @@ int4	repl_inst_wrapper_histinfo_find_seqno(seq_num seqno, int4 strm_idx, repl_hi
 	if (0 != status)
 	{
 		status = ERR_REPLINSTNOHIST;
-		SPRINTF(histdetail, "seqno "INT8_FMT" "INT8_FMTX, seqno - 1, seqno - 1);
+		SNPRINTF(histdetail, MAX_REPL_OPMSG_LEN, "seqno "INT8_FMT" "INT8_FMTX, seqno - 1, seqno - 1);
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTNOHIST, 4, LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
 	} else
 		assert(0 <= local_histinfo->histinfo_num);
@@ -917,7 +917,7 @@ void	repl_inst_histinfo_add(repl_histinfo *histinfo)
  */
 seq_num	repl_inst_histinfo_truncate(seq_num rollback_seqno)
 {
-	char			histdetail[256];
+	char			histdetail[MAX_REPL_OPMSG_LEN];
 	int4			status, index, num_histinfo, last_histnum;
 	int			idx;
 	repl_histinfo		temphistinfo, nexthistinfo, strmhistinfo;
@@ -949,8 +949,8 @@ seq_num	repl_inst_histinfo_truncate(seq_num rollback_seqno)
 				 * a RELINSTNOHIST warning message even though rollback is going to proceed anycase.
 				 */
 				assert(FALSE);
-				NON_GTM64_ONLY(SPRINTF(histdetail, "seqno [0x%llx]", rollback_seqno - 1));
-				GTM64_ONLY(SPRINTF(histdetail, "seqno [0x%lx]", rollback_seqno - 1));
+				NON_GTM64_ONLY(SNPRINTF(histdetail, MAX_REPL_OPMSG_LEN, "seqno [0x%llx]", rollback_seqno - 1));
+				GTM64_ONLY(SNPRINTF(histdetail, MAX_REPL_OPMSG_LEN, "seqno [0x%lx]", rollback_seqno - 1));
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) MAKE_MSG_WARNING(ERR_REPLINSTNOHIST), 4,
 					       LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
 			}

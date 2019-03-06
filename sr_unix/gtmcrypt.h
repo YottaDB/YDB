@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2018 Fidelity National Information	*
+ * Copyright (c) 2009-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -164,8 +164,14 @@ MBSTART {															\
 
 #define ENCR_INITIALIZED 				gtmcrypt_initialized
 
+<<<<<<< HEAD
 #define ENCR_WBOX_ENABLED				(ydb_white_box_test_case_enabled 					\
 				 				&& (WBTEST_ENCRYPT_INIT_ERROR == ydb_white_box_test_case_number))
+=======
+#define ENCR_WBOX_ENABLED				(gtm_white_box_test_case_enabled 					\
+				 				&& (WBTEST_ENCRYPT_INIT_ERROR == gtm_white_box_test_case_number \
+								|| WBTEST_LOW_MEMORY == gtm_white_box_test_case_number))
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 #define ASSERT_ENCRYPTION_INITIALIZED			assert(ENCR_INITIALIZED || ENCR_WBOX_ENABLED)
 

@@ -13,6 +13,7 @@
  *								*
  ****************************************************************/
 
+#include <sys/shm.h>
 #include "mdef.h"
 
 #include "gtm_string.h"
@@ -24,6 +25,7 @@
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsblk.h"
+#include "gtm_fcntl.h"  /* Needed for AIX's silly open to open64 translations */
 #include "gdsfhead.h"
 #include "gdscc.h"			/* needed for tp.h */
 #include "gdskill.h"			/* needed for tp.h */
@@ -74,7 +76,12 @@
 #include "wcs_recover.h"
 #include "is_proc_alive.h"
 #include "anticipatory_freeze.h"
+<<<<<<< HEAD
 #include "gvcst_protos.h"		/* for "gvcst_init" */
+=======
+#include "gtmrecv.h"
+#include "gtm_ipc.h"
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 #define RELEASE_ACCESS_CONTROL(REGLIST)												\
 {																\
@@ -178,16 +185,97 @@ error_def(ERR_STARFILE);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_WCBLOCKED);
+error_def(ERR_ORLBKRESTART);
+error_def(ERR_ORLBKREL);
+error_def(ERR_REPLPOOLINST);
 
 #define		STAR_QUOTE "\"*\""
 
-boolean_t mur_open_files()
+/* Release all locks, in general follow the direction of mur_close_files. We do not reset fields
+ * more than the required, and also do not remove shm etc, because we know we are goign to retry
+ * the operation once freeze is over in this case. Note that, gv_rundown also has some of the functionality
+ * below, but we do not want to call gds_rundown at this point, which gv_rundown does.
+ */
+void release_all_locks(unix_db_info *udi, gtmsource_local_ptr_t gtmsourcelocal_ptr, gld_dbname_list *curr,
+				int max_reg_total, onln_rlbk_reg_list *rl_last)
+{
+	boolean_t		got_ftok;
+	int4			idx;
+	global_latch_t		*latch;
+	repl_inst_hdr		repl_instance;
+	int4			status;
+	int	 		save_errno;
+	reg_ctl_list		*rctl, *rctl_top;
+	sgmnt_addrs		*csa;
+        onln_rlbk_reg_list      *rl;
+
+        for (rl = rl_last; rl; rl = rl->fPtr)
+		RELEASE_ACCESS_CONTROL(rl); /* reset udi->grabbed_access_sem to FALSE */
+	/* Release all the source server latches, from mur_close_files */
+	if (((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl)) && jgbl.onlnrlbk)
+	{
+		gtmsourcelocal_ptr = &jnlpool->gtmsource_local_array[0];
+		for (idx = 0; NUM_GTMSRC_LCL > idx; idx++, gtmsourcelocal_ptr++)
+		{
+			latch = &gtmsourcelocal_ptr->gtmsource_srv_latch;
+			if (latch->u.parts.latch_pid == process_id)
+			{	/* need to release the latch */
+				rel_gtmsource_srv_latch(latch);
+			}
+		}
+	}
+	/* Mark the regions as closed, else next gvcst_init has issues, similar to gds_rundown */
+	repl_inst_read(udi->fn, (off_t)0, (sm_uc_ptr_t)&repl_instance, SIZEOF(repl_inst_hdr));
+	for (rctl = mur_ctl, rctl_top = mur_ctl + max_reg_total; rctl < rctl_top; rctl++, curr = curr->next)
+	{
+		csa = (sgmnt_addrs *)&FILE_INFO(rctl->gd)->s_addrs;
+		if (csa)
+		{
+			/* Decrement private ref_cnt before shared ref_cnt decrement */
+			assert(csa->ref_cnt);
+			csa->ref_cnt--;  /* Reduce count of processes using db */
+			DECR_CNT(&csa->nl->ref_cnt, &csa->nl->wc_var_lock);
+			csa->nl = NULL;
+			/* Below requires csa->nl to be NULL */
+			REMOVE_CSA_FROM_CSADDRSLIST(csa); /* List of open csa modified in gvcst_init */
+		}
+		rctl->gd->open = FALSE;
+	}
+	/* Before this point the access semaphore for DB has been released in mur_close_files too*/
+	/* We would have attached to the journal pool, grabbed the JNLPOOL and RECVPOOL segment locks,
+	 * when calling mu_rndwn_repl_instance, check and release
+	 */
+	JNLPOOL_SHMDT(jnlpool, status, save_errno); /* Detach from jnlpool */
+	if (-1 == status)
+	{
+		ISSUE_REPLPOOLINST(save_errno, repl_instance.jnlpool_shmid,
+			repl_instance.inst_info.this_instname, "shmdt()");
+		assert(FALSE);
+	}
+	/* Should be holding ftok lock to release the POOL semaphores */
+	/* Below is the ftok lock on the instance file 					*/
+	got_ftok = ftok_sem_lock(jnlpool->jnlpool_dummy_reg, TRUE); /* immediate=TRUE */
+	mu_replpool_release_sem(&repl_instance, JNLPOOL_SEGMENT, FALSE); /* Just release sems, do not delete them */
+	mu_replpool_release_sem(&repl_instance, RECVPOOL_SEGMENT, FALSE); /* Just release sems , do not delete them*/
+	if (got_ftok)
+		ftok_sem_release(jnlpool->jnlpool_dummy_reg, FALSE, TRUE); /* immediate=TRUE */
+	ASSERT_DONOT_HOLD_REPLPOOL_SEMS;
+	/* Now that the standalone access is released, we should decrement the counter in the ftok semaphore
+	 * obtained in mu_rndwn_repl_instance(). This is not reset in case of a rollback.
+	 */
+	if (!ftok_sem_lock(jnlpool->jnlpool_dummy_reg, FALSE)
+			|| !ftok_sem_release(jnlpool->jnlpool_dummy_reg, udi->counter_ftok_incremented, FALSE))
+		assert(FALSE);
+}
+
+
+uint4 mur_open_files(boolean_t retry)
 {
 	boolean_t			interrupted_rollback;
 	int                             jnl_total, jnlno, regno, max_reg_total, errcode;
 	unsigned int			full_len;
-	unsigned short			jnl_file_list_len; /* cli_get_str requires a short */
-	char                            jnl_file_list[MAX_LINE];
+	static unsigned short		jnl_file_list_len; /* cli_get_str requires a short */
+	static char			jnl_file_list[MAX_LINE];
 	char				*cptr, *cptr_last, *ctop;
 	jnl_ctl_list                    *jctl, *temp_jctl;
 	reg_ctl_list			*rctl, *rctl_top, tmp_rctl;
@@ -207,6 +295,8 @@ boolean_t mur_open_files()
 	sgmnt_data			*tmpcsd;
 	gd_region			*reg;
 	int4				llcnt, max_epoch_interval = 0, idx;
+	int4				status;
+	boolean_t			locks_released = FALSE;
 	int				save_errno;
 	unix_db_info			*udi;
 	char				time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
@@ -219,9 +309,12 @@ boolean_t mur_open_files()
 
 	SETUP_THREADGBL_ACCESS;
 	jnlpool_init_needed = !mur_options.update;
-	jnl_file_list_len = MAX_LINE;
-	if (FALSE == CLI_GET_STR_ALL("FILE", jnl_file_list, &jnl_file_list_len))
-		mupip_exit(ERR_MUPCLIERR);
+	if (!retry)
+	{
+		jnl_file_list_len = MAX_LINE;
+		if (FALSE == CLI_GET_STR_ALL("FILE", jnl_file_list, &jnl_file_list_len))
+			mupip_exit(ERR_MUPCLIERR);
+	}
 	if ((1 == jnl_file_list_len && '*' == jnl_file_list[0]) ||
 		(STR_LIT_LEN(STAR_QUOTE) == jnl_file_list_len &&
 		0 == memcmp(jnl_file_list, STAR_QUOTE, STR_LIT_LEN(STAR_QUOTE))))
@@ -245,12 +338,17 @@ boolean_t mur_open_files()
 	 * That is, journal file names specified must be from current global directory.
 	 */
 	if (star_specified || mur_options.update)
+<<<<<<< HEAD
 	{	/* "*" is specified or it is -recover or -rollback. We require ydb_gbldir to be set in all these cases */
 		/* Note: It is possible gd_header is non-NULL at this point (for example if "ydb_app_ensures_isolation"
 		 * env var is defined and "gvinit" was invoked by the following call sequence
 		 *	mupip_main -> init_gtm -> gtm_startup -> op_view -> view_arg_convert -> gvinit).
 		 * Therefore we cannot assert that gd_header is NULL.
 		 */
+=======
+	{	/* "*" is specified or it is -recover or -rollback. We require gtmgbldir to be set in all these cases */
+		assert((NULL == gd_header) || retry);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		gvinit();	/* read in current global directory */
 		assert(NULL != gd_header);
 	}
@@ -262,8 +360,12 @@ boolean_t mur_open_files()
 		gld_db_files = mur_db_files_from_jnllist(jnl_file_list, jnl_file_list_len, &max_reg_total);
 	if (NULL == gld_db_files)
 		return FALSE;
-	mur_ctl = (reg_ctl_list *)malloc(SIZEOF(reg_ctl_list) * max_reg_total);
-	memset(mur_ctl, 0, SIZEOF(reg_ctl_list) * max_reg_total);
+	/* Only malloc if not done earlier */
+	if (!retry)
+	{
+		mur_ctl = (reg_ctl_list *)malloc(SIZEOF(reg_ctl_list) * max_reg_total);
+		memset(mur_ctl, 0, SIZEOF(reg_ctl_list) * max_reg_total);
+	}
 	curr = gld_db_files;
 	murgbl.max_extr_record_length = DEFAULT_EXTR_BUFSIZE;
 	murgbl.repl_standalone = FALSE;
@@ -279,7 +381,7 @@ boolean_t mur_open_files()
 		}
 		assert((int)NUM_SRC_SEMS == (int)NUM_RECV_SEMS);
 		ASSERT_DONOT_HOLD_REPLPOOL_SEMS;
-		assert((NULL == jnlpool) || (NULL == jnlpool->repl_inst_filehdr));
+		assert((NULL == jnlpool) || (NULL == jnlpool->repl_inst_filehdr) || retry);
 		if (!mu_rndwn_repl_instance(&replpool_id, FALSE, TRUE, &jnlpool_sem_created))
 			return FALSE;	/* mu_rndwn_repl_instance will have printed appropriate message in case of error */
 		assert(jgbl.onlnrlbk || INST_FREEZE_ON_ERROR_POLICY || ((NULL == jnlpool) || (NULL == jnlpool->jnlpool_ctl)));
@@ -312,10 +414,11 @@ boolean_t mur_open_files()
 						 * so consider this rctl only after those have been initialized.
 						 */
 		/* Do region specific initialization */
-		init_hashtab_mname(&rctl->gvntab, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);	/* for mur_forward() */
-		rctl->db_ctl = (file_control *)malloc(SIZEOF(file_control));
+		init_hashtab_mname(&rctl->gvntab, 0, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE); /* for mur_forward() */
+		if (!retry) rctl->db_ctl = (file_control *)malloc(SIZEOF(file_control));
 		memset(rctl->db_ctl, 0, SIZEOF(file_control));
-		mur_rctl_desc_alloc(rctl); /* Allocate rctl->mur_desc associated buffers */
+		/* Allocate rctl->mur_desc associated buffers if required, which are only released by mur_close_files */
+		if (!retry) mur_rctl_desc_alloc(rctl);
 		/* For redirect we just need to change the name of database. recovery will redirect to new database file */
 		if (mur_options.redirect)
 		{
@@ -357,7 +460,11 @@ boolean_t mur_open_files()
 			}
 			if (mur_options.update || mur_options.extr[GOOD_TN])
 			{
+<<<<<<< HEAD
 	        		gvcst_init(rctl->gd);
+=======
+				gvcst_init(rctl->gd, NULL);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 				TP_CHANGE_REG(rctl->gd);
 				if (jgbl.onlnrlbk)
 				{
@@ -396,10 +503,19 @@ boolean_t mur_open_files()
 	{
 		inst_requires_rlbk = FALSE;
 		udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ORLBKSTART, 4,
+		if (!retry)
+		{
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ORLBKSTART, 4,
 			     LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ORLBKSTART, 4,
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ORLBKSTART, 4,
 			       LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
+		} else
+		{
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ORLBKRESTART, 4,
+				LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ORLBKRESTART, 4,
+				LEN_AND_STR(jnlpool->repl_inst_filehdr->inst_info.this_instname), LEN_AND_STR(udi->fn));
+		}
 		/* Need to get the gtmsource_srv_latch BEFORE grab_crit to avoid deadlocks */
 		if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl))
 		{
@@ -474,7 +590,17 @@ boolean_t mur_open_files()
 			while (FROZEN(tmpcsd))
 			{
 				if (MAXHARDCRITS < llcnt)
+				{
+					if ((llcnt == (MAXHARDCRITS + 1))
+						&& INST_FREEZE_ON_ERROR_POLICY)
+					{
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ORLBKREL);
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ORLBKREL);
+						release_all_locks(udi, gtmsourcelocal_ptr, gld_db_files, max_reg_total, rl_last);
+						locks_released = TRUE;
+					}
 					wcs_sleep(llcnt); /* Don't waste CPU cycles anymore */
+				}
 				llcnt++;
 			}
 			GET_CUR_TIME(time_str);
@@ -482,6 +608,8 @@ boolean_t mur_open_files()
 				     REG_LEN_STR(save_rl->reg), DB_LEN_STR(save_rl->reg));
 			gtm_putmsg_csa(CSA_ARG(REG2CSA(save_rl->reg)) VARLSTCNT(8) ERR_ORLBKFRZOVER, 6, CTIME_BEFORE_NL, time_str,
 				       REG_LEN_STR(save_rl->reg), DB_LEN_STR(save_rl->reg));
+			if (locks_released) /* All locks were released , restart */
+				return -1;
 		}
 		inst_requires_rlbk |= TREF(wcs_recover_done);
 		assert(x_lock); /* Now we have crit on all the regions (for this global directory) */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -13,8 +13,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __JNL_WRITE_H__
-#define __JNL_WRITE_H__
+#ifndef JNL_WRITE_H_INCLUDED
+#define JNL_WRITE_H_INCLUDED
 
 /* We do not put this in jnl.h, because it needs all including jnl.h must include gdsblk.h */
 void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_record *jnl_rec, void *parm1);

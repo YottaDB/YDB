@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,7 @@ error_def(ERR_JNLSWITCHFAIL);
 error_def(ERR_JNLSWITCHRETRY);
 error_def(ERR_PREVJNLLINKCUT);
 
-uint4 jnl_file_open_switch(gd_region *reg, uint4 sts, char *err_str)
+uint4 jnl_file_open_switch(gd_region *reg, uint4 sts, char *err_str, size_t err_str_len)
 {
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -78,7 +78,8 @@ uint4 jnl_file_open_switch(gd_region *reg, uint4 sts, char *err_str)
 	{
 		jpc->status = create.status;
 		jpc->status2 = create.status2;
-		sgtm_putmsg(err_str, VARLSTCNT(7) ERR_JNLSWITCHFAIL, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);
+		sgtm_putmsg(err_str, err_str_len, VARLSTCNT(7) ERR_JNLSWITCHFAIL, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
+			jpc->status);
 		jpc->err_str = err_str;
 		return ERR_JNLSWITCHFAIL;
 	}

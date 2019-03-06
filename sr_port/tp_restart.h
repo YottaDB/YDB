@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +17,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __TP_RESTART_H__
-#define __TP_RESTART_H__
+#ifndef TP_RESTART_H_INCLUDED
+#define TP_RESTART_H_INCLUDED
 
 /* The following codes define the states "tp_restart" can be run in */
 #define TPRESTART_STATE_NORMAL	0	/* This is the normal way tp_restart is entered when not in a trigger */

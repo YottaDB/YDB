@@ -309,23 +309,27 @@ int main()
 	/* get the ones we need */
 	if (env_var_ptr = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH))	/* Warning - assignment */
 	{
-		if (MAX_ALLOWABLE_LEN < (strlen(env_var_ptr) + STR_LIT_LEN(SUB_PATH_TO_GTMSECSHRDIR)
-		    + STR_LIT_LEN(GTMSECSHR_BASENAME)))
+		if (MAX_ALLOWABLE_LEN <
+				(strlen(env_var_ptr) + STR_LIT_LEN(SUB_PATH_TO_GTMSECSHRDIR) + STR_LIT_LEN(GTMSECSHR_BASENAME)))
 		{
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRYDBDIST2LONG);
 			ret = -1;
 		} else
 		{
+<<<<<<< HEAD
 			strcpy(ydb_dist_val, env_var_ptr);
+=======
+			snprintf(gtm_dist_val, MAX_ENV_VAR_VAL_LEN, "%s", env_var_ptr);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 			/* point the path to the real gtmsecshr - for display purposes only */
-			strcpy(gtm_secshr_path, env_var_ptr);
-			strcat(gtm_secshr_path, SUB_PATH_TO_GTMSECSHRDIR);
-			strcat(gtm_secshr_path, GTMSECSHR_BASENAME);
+			snprintf(gtm_secshr_path, MAX_ENV_VAR_VAL_LEN, "%s%s%s",
+					env_var_ptr, SUB_PATH_TO_GTMSECSHRDIR, GTMSECSHR_BASENAME);
 			strsanitize(gtm_secshr_path, gtm_secshr_path_display);
 			/* point the path to the real gtmsecshrdir */
-			strcpy(gtm_secshrdir_path, env_var_ptr);
-			strcat(gtm_secshrdir_path, SUB_PATH_TO_GTMSECSHRDIR);
+			snprintf(gtm_secshrdir_path, MAX_ENV_VAR_VAL_LEN, "%s%s", env_var_ptr, SUB_PATH_TO_GTMSECSHRDIR);
 			strsanitize(gtm_secshrdir_path, gtm_secshrdir_path_display);
+			/* the path to gtmsecshr wrapper that we want to display in a PS listing */
+			snprintf(gtm_secshr_orig_path, MAX_ENV_VAR_VAL_LEN, "%s%s", env_var_ptr, GTMSECSHR_BASENAME);
 		}
 	} else
 	{
@@ -420,8 +424,11 @@ int main()
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSETUIDFAILED);
 		else
 		{	/* call the real gtmsecshr, but have ps display the original gtmsecshr location */
+<<<<<<< HEAD
 			strcpy(gtm_secshr_orig_path, ydb_dist_val);
 			strcat(gtm_secshr_orig_path, GTMSECSHR_BASENAME);
+=======
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 			ret = execl(REL_PATH_TO_GTMSECSHR, gtm_secshr_orig_path, NULL);
 			if (-1 == ret)
 				SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHREXECLFAILED, gtm_secshr_path_display);

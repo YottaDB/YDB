@@ -13,8 +13,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __FGNCALSP_H__
-#define  __FGNCALSP_H__
+#ifndef FGNCALSP_H_INCLUDED
+#define FGNCALSP_H_INCLUDED
 
 #include "hashtab.h"
 #include "hashtab_str.h"

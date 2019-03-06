@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -1938,8 +1938,8 @@ jnl_format_buffer	*jnl_format(jnl_action_code opcode, gv_key *key, mval *val, ui
 
 void	wcs_defer_wipchk_ast(jnl_private_control *jpc);
 uint4	set_jnl_file_close(void);
-uint4 	jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *err_str);
-uint4	jnl_file_open_switch(gd_region *reg, uint4 sts, char *err_str);
+uint4 	jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *err_str, size_t err_str_len);
+uint4	jnl_file_open_switch(gd_region *reg, uint4 sts, char *err_str, size_t err_str_len);
 void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch);
 
 /* Consider putting followings in a mupip only header file  : Layek 2/18/2003 */
@@ -1953,7 +1953,7 @@ unsigned char *ext2jnlcvt(char *ext_buff, int4 ext_len, unsigned char **tr, int 
 					seq_num saved_jnl_seqno, seq_num saved_strm_seqno);
 char	*ext2jnl(char *ptr, jnl_record *rec, seq_num saved_jnl_seqno, seq_num saved_strm_seqno);
 char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char **ext_buff, int *extract_bufsiz);
-char	*jnl2ext(char *jnl_buff, char *ext_buff);
+char	*jnl2ext(char *jnl_buff, char *ext_buff, char *ext_bufftop);
 void	jnl_set_cur_prior(gd_region *reg, sgmnt_addrs *csa, sgmnt_data *csd);
 void	jnl_set_fd_prior(int jnl_fd, sgmnt_addrs* csa, sgmnt_data* csd, jnl_file_header *jfh);
 

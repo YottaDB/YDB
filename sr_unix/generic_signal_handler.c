@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -44,9 +44,17 @@
 #include "gtmio.h"
 #include "have_crit.h"
 #include "util.h"
+<<<<<<< HEAD
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
 #include "gtm_exit_handler.h"
+=======
+// For gd_region
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsblk.h"
+#include "gdsfhead.h"
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 #define	DEFER_EXIT_PROCESSING	((EXIT_PENDING_TOLERANT >= exit_state)			\
 				 && (exit_handler_active || multi_thread_in_use		\
@@ -79,6 +87,7 @@ GBLREF	boolean_t		ydb_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 GBLREF	volatile boolean_t	timer_active;
 GBLREF	sigset_t		block_sigsent;
+GBLREF	gd_region		*gv_cur_region;
 GBLREF	boolean_t		blocksig_initialized;
 GBLREF	struct sigaction	orig_sig_action[];
 #ifdef DEBUG
@@ -105,6 +114,26 @@ error_def(ERR_KILLBYSIGSINFO2);
 error_def(ERR_KILLBYSIGSINFO3);
 error_def(ERR_KILLBYSIGUINFO);
 error_def(ERR_KRNLKILL);
+error_def(ERR_STATSDBMEMERR);
+
+static inline void check_for_statsdb_memerr()
+{
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+
+	if (TREF(gvcst_statsDB_open_ch_active))
+	{	/* Case where we've tried to create a stats db block
+		 * Issue an rts error and let the statsDB condition handler
+		 * do the clean up
+		 */
+		TREF(statsdb_memerr) = TRUE;
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STATSDBMEMERR, 2, gv_cur_region->dyn.addr->fname_len,
+				gv_cur_region->dyn.addr->fname);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STATSDBMEMERR, 2, gv_cur_region->dyn.addr->fname_len,
+				gv_cur_region->dyn.addr->fname);
+	}
+}
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
@@ -324,7 +353,12 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 							 process_id, sig, signal_info.send_pid, signal_info.send_uid);
 					break;
 				case GTMSIGINFO_ILOC + GTMSIGINFO_BADR:
+<<<<<<< HEAD
 					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
+=======
+					check_for_statsdb_memerr();
+					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
 					/* SIGABRT is usually delivered when memory corruption is detected by glibc
@@ -343,7 +377,12 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 							 process_id, sig, signal_info.int_iadr);
 					break;
 				case GTMSIGINFO_BADR:
+<<<<<<< HEAD
 					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
+=======
+					check_for_statsdb_memerr();
+					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
 					SEND_AND_PUT_MSG(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),

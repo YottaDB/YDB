@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,8 +15,7 @@
 #include "gtm_string.h"
 #include "gtm_stdio.h"
 #include "gtm_time.h"
-
-#include <stdlib.h>
+#include "gtm_stdlib.h"
 
 #include "random.h"
 
@@ -57,18 +57,18 @@ int get_rand_from_table (void)
 int init_rand_table (void)
 {
   char buf[MAX_RND_IDX+2];
-  char c_seed[MAX_SEED_LEN+1];
+  char c_seed[MAX_SEED_LEN + 1];
   int  i_seed, seed_len;
   int i, j, k;
 
   i_seed = (int) time(NULL);
-  SPRINTF(c_seed,"%d",i_seed);
+  SNPRINTF(c_seed, MAX_SEED_LEN + 1, "%d", i_seed);
   seed_len = STRLEN(c_seed);
 
   if (seed_len > MAX_SEED_LEN)
   	return(0);
 
-  SPRINTF(buf, "%s aEbFcGdHeI", c_seed);
+  SNPRINTF(buf, MAX_RND_IDX + 2, "%s aEbFcGdHeI", c_seed);
 
   for (i = 1; i < MAX_RND_IDX; i++)
     rannum_table[i] = buf[i%seed_len] * 8171717 + i * 997;

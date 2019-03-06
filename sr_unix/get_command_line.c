@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,7 +60,10 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 			}
 		}
 		for (word_cnt = first_item; word_cnt < cmd_cnt; word_cnt++)
+		{
 			len += STRLEN(cmd_arg[word_cnt]) + 1;		/* include space between arguments */
+			assert(0 <= len);
+		}
 	}
 	if (0 >= len)
 	{

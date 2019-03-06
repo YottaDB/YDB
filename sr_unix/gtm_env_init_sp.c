@@ -59,9 +59,6 @@
 #include "eintr_wrappers.h"
 #include "utfcgr.h"
 #include "gtm_reservedDB.h"
-#ifdef __linux__
-#include "hugetlbfs_overrides.h"
-#endif
 
 #define	DEFAULT_NON_BLOCKED_WRITE_RETRIES	10	/* default number of retries */
 #ifdef __MVS__
@@ -131,9 +128,6 @@ void	gtm_env_init_sp(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-#	ifdef HUGETLB_SUPPORTED
-	libhugetlbfs_init();
-#	endif
 #	ifdef __MVS__
 	/* For now OS/390 only. Eventually, this could be added to all UNIX platforms along with the
 	 * capability to specify the desired directory to put a core file in. Needs to be setup before

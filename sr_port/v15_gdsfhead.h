@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __V15_GDSFHEAD_H__
-#define __V15_GDSFHEAD_H__
+#ifndef V15_GDSFHEAD_H_INCLUDED
+#define V15_GDSFHEAD_H_INCLUDED
 
 /* gdsfhead.h as of journal format 15 (last GT.M V4 format)  */
 /* this requires gdsroot.h gtm_facility.h fileinfo.h gdsbt.h */

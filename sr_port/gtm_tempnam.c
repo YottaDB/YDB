@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,5 +48,5 @@ void gtm_tempnam(char *dir, char *prefix, char *fullname)
 		len = STRLEN(prefix);
 	memcpy(ptr, prefix, len);
 	ptr += len;
-	SPRINTF(ptr, "_%d.tmp", temp_file_counter++);
+	SNPRINTF(ptr, MAX_FN_LEN - len, "_%d.tmp", temp_file_counter++);
 }

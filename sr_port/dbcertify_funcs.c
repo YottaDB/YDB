@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Copyright (c) 2005-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -439,10 +439,11 @@ void dbc_find_database_filename(phase_static_area *psa, uchar_ptr_t regname, uch
 	{
 		rptr = dbc_read_result_file(psa, ERR_NOREGION, regname);	/* Should have filename */
 		assertpro(0 == MEMCMP_LIT(rptr, FILETAB));
-		len = STRLEN(((char_ptr_t)rptr + SIZEOF(FILETAB) - 1)) - 1;
-		assert(MAX_FN_LEN >= len);
-		assert(len);
-		memcpy(dbfn, (rptr + SIZEOF(FILETAB) - 1), len);
+		rptr += STR_LIT_LEN(FILETAB);
+		len = STRLEN((char_ptr_t)rptr) - 1;
+		assert((MAX_FN_LEN >= len) && (0 < len));
+		len = MIN(len, MAX_FN_LEN);
+		memcpy(dbfn, rptr, len);
 		dbfn[len] = 0;
 		rptr = dbc_read_result_file(psa, ERR_NOREGION, regname);
 		assertpro(0 == MEMCMP_LIT(rptr, REGIONTAB));

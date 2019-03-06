@@ -111,6 +111,7 @@ void rename_tmp_object_file(const unsigned char *object_fname)
 	status = rename(TADR(tmp_object_file_name), (char *)object_fname);
 	if (-1 == status)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("rename()"), CALLFROM, errno);
+	memset(TADR(tmp_object_file_name), 0, GTM_PATH_MAX);
 }
 
 /* Routine to determine and initialize the fully qualified object name and path.

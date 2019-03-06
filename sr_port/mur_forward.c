@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -84,6 +84,7 @@ GBLREF	boolean_t		mur_forward_multi_proc_done;
 GBLREF	uint4			process_id;
 
 error_def(ERR_BLKCNTEDITFAIL);
+error_def(ERR_FILENAMETOOLONG);
 error_def(ERR_FILENOTCREATE);
 error_def(ERR_FORCEDHALT);
 error_def(ERR_JNLREADEOF);
@@ -403,11 +404,12 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 		} while (SS_NORMAL == status);
 		CHECK_IF_EOF_REACHED(rctl, status); /* sets rctl->forw_eof_seen if needed; resets "status" to SS_NORMAL */
 		if (SS_NORMAL != status)
-		{	/* ERR_FILENOTCREATE is possible from "mur_cre_file_extfmt" OR	ERR_FORCEDHALT is possible
-			 * from "mur_forward_play_cur_jrec" OR SYSTEM-E-ENO2 from a ERR_RENAMEFAIL is possible from
-			 * a "rename_file_if_exists" call. No other errors are known to occur here. Assert accordingly.
+		{	/* ERR_FILENOTCREATE and ERR_FILENAMETOOLONG/SYSTEN-E-ENAMETOOLONG are possible from "mur_cre_file_extfmt"
+			 * OR ERR_FORCEDHALT is possible from "mur_forward_play_cur_jrec" OR SYSTEM-E-ENO2 from a ERR_RENAMEFAIL is
+			 * possible from a "rename_file_if_exists" call. No other errors are known to occur here. Assert accordingly
 			 */
-			assert((ERR_FILENOTCREATE == status) || (ERR_FORCEDHALT == status) || (ENOENT == status));
+			assert((ENAMETOOLONG == status) || (ERR_FILENAMETOOLONG == status) || (ERR_FILENOTCREATE == status) ||
+				(ERR_FORCEDHALT == status) || (ENOENT == status));
 			goto finish;
 		}
 		if (rctl->forw_eof_seen)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -100,7 +100,7 @@ void op_break(void)
 			do_msg = TRUE;
 		}
 		if (do_msg)
-			line_length = (int)(get_symb_line((uchar_ptr_t)line, 0, 0) - (uchar_ptr_t)line);
+			line_length = (int)(get_symb_line((uchar_ptr_t)line, MAX_ENTRYREF_LEN, 0, 0) - (uchar_ptr_t)line);
 	}
 	if (do_msg && (0 != line_length))
 	{

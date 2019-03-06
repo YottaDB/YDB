@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,12 +40,14 @@ error_def(ERR_CLISTRTOOLONG);
  */
 boolean_t cli_get_hex(char *entry, uint4 *dst)
 {
-	char	buf[MAX_LINE];
-	char	local_str[MAX_LINE];
+	char	buf[MAX_LINE + 1];
+	char	local_str[MAX_LINE + 1];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
-
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
 	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
 	{
 		if (!cli_str_to_hex(buf, dst))
@@ -69,12 +71,14 @@ boolean_t cli_get_hex(char *entry, uint4 *dst)
  */
 boolean_t cli_get_hex64(char *entry, gtm_uint64_t *dst)
 {
-	char	buf[MAX_LINE];
-	char	local_str[MAX_LINE];
+	char	buf[MAX_LINE + 1];
+	char	local_str[MAX_LINE + 1];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
-
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
 	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
 	{
 		if (!cli_str_to_hex64(buf, dst))
@@ -98,12 +102,14 @@ boolean_t cli_get_hex64(char *entry, gtm_uint64_t *dst)
  */
 boolean_t cli_get_uint64(char *entry, gtm_uint64_t *dst)
 {
-	char	buf[MAX_LINE];
-	char	local_str[MAX_LINE];
+	char	buf[MAX_LINE + 1];
+	char	local_str[MAX_LINE + 1];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
-
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
 	if ((cli_present(local_str) == CLI_PRESENT) && cli_get_value(local_str, buf))
 	{
 		if (!cli_str_to_uint64(buf, dst))
@@ -127,14 +133,15 @@ boolean_t cli_get_uint64(char *entry, gtm_uint64_t *dst)
  */
 boolean_t cli_get_int(char *entry, int4 *dst)
 {
-	char		buf[MAX_LINE];
-	char		local_str[MAX_LINE];
+	char		buf[MAX_LINE + 1];
+	char		local_str[MAX_LINE + 1];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
-
-	if (cli_present(local_str) == CLI_PRESENT
-		&& cli_get_value(local_str, buf))
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
+	if (cli_present(local_str) == CLI_PRESENT && cli_get_value(local_str, buf))
 	{
 		if (!cli_is_dcm(buf) || !cli_str_to_int(buf, dst))
 		{
@@ -157,14 +164,15 @@ boolean_t cli_get_int(char *entry, int4 *dst)
  */
 boolean_t cli_get_int64(char *entry, gtm_int64_t *dst)
 {
-	char		buf[MAX_LINE];
-	char		local_str[MAX_LINE];
+	char		buf[MAX_LINE + 1];
+	char		local_str[MAX_LINE + 1];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
-
-	if (cli_present(local_str) == CLI_PRESENT
-		&& cli_get_value(local_str, buf))
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
+	if (cli_present(local_str) == CLI_PRESENT && cli_get_value(local_str, buf))
 	{
 		if (!cli_is_dcm(buf) || !cli_str_to_int64(buf, dst))
 		{
@@ -187,14 +195,15 @@ boolean_t cli_get_int64(char *entry, gtm_int64_t *dst)
  */
 boolean_t cli_get_num(char *entry, int4 *dst)
 {
-	char		buf[MAX_LINE];
-	char		local_str[MAX_LINE];
+	char		buf[MAX_LINE + 1];
+	char		local_str[MAX_LINE + 1];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
-
-	if (cli_present(local_str) == CLI_PRESENT
-		&& cli_get_value(local_str, buf))
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
+	if (cli_present(local_str) == CLI_PRESENT && cli_get_value(local_str, buf))
 	{
 		if (!cli_str_to_num(buf, dst))
 		{
@@ -218,14 +227,15 @@ boolean_t cli_get_num(char *entry, int4 *dst)
  */
 boolean_t cli_get_num64(char *entry, gtm_int64_t *dst)
 {
-	char		buf[MAX_LINE];
-	char		local_str[MAX_LINE];
+	char		buf[MAX_LINE + 1];
+	char		local_str[MAX_LINE + 1];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
-
-	if (cli_present(local_str) == CLI_PRESENT
-		&& cli_get_value(local_str, buf))
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
+	if (cli_present(local_str) == CLI_PRESENT && cli_get_value(local_str, buf))
 	{
 		if (!cli_str_to_num64(buf, dst))
 		{
@@ -248,33 +258,30 @@ boolean_t cli_get_num64(char *entry, gtm_int64_t *dst)
  */
 boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len)
 {
-	char		buf[MAX_LINE];
-	char		local_str[MAX_LINE];
+	char		buf[MAX_LINE + 1];
+	char		local_str[MAX_LINE + 1];
 	size_t		maxdstlen, maxbuflen, copylen;
 #	ifdef DEBUG
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-#	endif
+	#	endif
 	maxbuflen = SIZEOF(buf);
 	maxdstlen = *max_len;
-
-	assert(maxdstlen <= maxbuflen);
+	assert(maxdstlen <= maxbuflen); /* Ensure that the callers do not use a MAX_LINE or greater buffer */
 	assert(maxdstlen > 0);
-
 	assert(strlen(entry) > 0);
-	strncpy(local_str, entry, SIZEOF(local_str) - 1);
-
+	SNPRINTF(local_str, MAX_LINE, "%s", entry);
 	DEBUG_ONLY(TREF(cli_get_str_max_len) = maxdstlen;)	/* for use inside cli_get_value -> get_parm_entry ... */
 	if (!((CLI_PRESENT == cli_present(local_str)) && cli_get_value(local_str, buf)))
 	{
 		if (!cli_get_parm(local_str, buf))
 		{
-			DEBUG_ONLY(TREF(cli_get_str_max_len) = 0;)	/* for use inside cli_get_value -> get_parm_entry ... */
+			DEBUG_ONLY(TREF(cli_get_str_max_len) = maxdstlen;)	/* for use in cli_get_value -> get_parm_entry ... */
 			return FALSE;
 		}
 	}
-	DEBUG_ONLY(TREF(cli_get_str_max_len) = 0;)	/* for use inside cli_get_value -> get_parm_entry ... */
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = maxdstlen;)			/* for use in cli_get_value -> get_parm_entry ... */
 	copylen = strlen(buf);
 	if (maxdstlen < copylen)
 	{
@@ -303,14 +310,16 @@ boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len)
 boolean_t cli_get_time(char *entry, uint4 *dst)
 {
 #define MAXFACTOR (10 * 100 * 60 * 60)	/* (decisec / millisec) * (decisec / sec) * (sec /min) * (min / hour) */
-	char		buf[MAX_LINE + 1], *cp, local_str[MAX_LINE];
+	char		buf[MAX_LINE + 1], *cp, local_str[MAX_LINE + 1];
 	unsigned int	factor;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 	buf[0] = ':';
-	if ((cli_present(local_str) == CLI_PRESENT
-	  && cli_get_value(local_str, buf + 1)))
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
+	if ((cli_present(local_str) == CLI_PRESENT && cli_get_value(local_str, buf + 1)))
 	{
 		for (*dst = 0, factor = 10, cp = buf + strlen(buf) - 1; cp >= buf; cp--)
 		{
@@ -347,13 +356,16 @@ boolean_t cli_get_time(char *entry, uint4 *dst)
  */
 int4 cli_t_f_n (char *entry)
 {
-	char		buf[MAX_LINE];
-	char		local_str[MAX_LINE];
+	char		buf[MAX_LINE + 1];
+	char		local_str[MAX_LINE + 1];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert (strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 	local_str[SIZEOF(local_str) - 1] = '\0';
 	cli_strupper(local_str);
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
 	if (cli_get_value(local_str, buf))
 	{
 		if ('t' == TOLOWER(buf[0]))
@@ -387,13 +399,16 @@ int4 cli_t_f_n (char *entry)
  */
 int4 cli_n_a_e (char *entry)
 {
-	char		buf[MAX_LINE];
-	char		local_str[MAX_LINE];
+	char		buf[MAX_LINE + 1];
+	char		local_str[MAX_LINE + 1];
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert (strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
 	local_str[SIZEOF(local_str) - 1] = '\0';
 	cli_strupper(local_str);
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
 	if (cli_get_value(local_str, buf))
 	{
 		if ('f' == TOLOWER(buf[0]) || 'n' == TOLOWER(buf[0]))
@@ -417,17 +432,18 @@ int4 cli_n_a_e (char *entry)
 
 boolean_t cli_get_defertime(char *entry, int4 *dst)
 {
-	char		buf[MAX_LINE];
-	char		local_str[MAX_LINE];
+	char		buf[MAX_LINE + 1];
+	char		local_str[MAX_LINE + 1];
 	int		ch_index = 0;
 	int4		prev_value = 0, num = 0;
 	boolean_t	neg_num = FALSE;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(strlen(entry) > 0);
 	strncpy(local_str, entry, SIZEOF(local_str) - 1);
-
-	if (cli_present(local_str) == CLI_PRESENT
-		&& cli_get_value(local_str, buf))
+	DEBUG_ONLY(TREF(cli_get_str_max_len) = MAX_LINE;)
+	if (cli_present(local_str) == CLI_PRESENT && cli_get_value(local_str, buf))
 	{
 		prev_value = 0;
 		if (buf[ch_index] == '-')

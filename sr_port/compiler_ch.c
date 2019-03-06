@@ -21,7 +21,7 @@
 #include "list_file.h"
 #include "source_file.h"
 #include "obj_file.h"
-#include "reinit_externs.h"
+#include "reinit_compilation_externs.h"
 #include "compiler.h"
 #include "util.h"
 #include "hashtab_str.h"
@@ -34,6 +34,7 @@ GBLREF command_qualifier	cmd_qlf;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
 
 error_def(ERR_ASSERT);
+error_def(ERR_ERRORSUMMARY);
 error_def(ERR_FORCEDHALT);
 error_def(ERR_GTMASSERT);
 error_def(ERR_GTMASSERT2);
@@ -57,7 +58,7 @@ CONDITION_HANDLER(compiler_ch)
 	if (CQ_WARNINGS & cmd_qlf.qlf)
 		PRN_ERROR;
 	COMPILE_HASHTAB_CLEANUP;
-	reinit_externs();
+	reinit_compilation_externs();
 	mstr_native_align = save_mstr_native_align;
 	if (CGP_MACHINE == cg_phase)
 		drop_object_file();
@@ -79,5 +80,6 @@ CONDITION_HANDLER(compiler_ch)
 		indr_stringpool = stringpool;
 		stringpool = rts_stringpool;
 	}
+	TREF(dollar_zcstatus) = -ERR_ERRORSUMMARY;
 	UNWIND(NULL, NULL);
 }

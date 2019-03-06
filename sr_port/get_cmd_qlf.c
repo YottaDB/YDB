@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,13 +53,13 @@ void get_cmd_qlf(command_qualifier *qualif)
 	INIT_QUALIF_STR(qualif, CQ_CE_PREPROCESS, ceprep_file);
 	if (gtm_utf8_mode)
 		qualif->qlf |= CQ_UTF8;		/* Mark as being compiled in UTF8 mode */
-	if (cli_present("OBJECT") == CLI_PRESENT)
+	if (CLI_PRESENT == cli_present("OBJECT"))
 	{
 		qualif->qlf |= CQ_OBJECT;
 		qualif->object_file.mvtype = MV_STR;
 		s = &qualif->object_file.str;
 		len = s->len;
-		if (cli_get_str("OBJECT", s->addr, &len) == FALSE)
+		if (FALSE == cli_get_str("OBJECT", s->addr, &len))
 		{
 			s->len = 0;
 			if (glb_cmd_qlf.object_file.mvtype == MV_STR  &&  glb_cmd_qlf.object_file.str.len > 0)
@@ -65,22 +70,32 @@ void get_cmd_qlf(command_qualifier *qualif)
 			}
 		} else
 			s->len = len;
+<<<<<<< HEAD
 	} else if (cli_negated("OBJECT"))
+=======
+	} else if (TRUE == cli_negated("OBJECT"))
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		qualif->qlf &= ~CQ_OBJECT;
-
-
-	if (cli_present("CROSS_REFERENCE") == CLI_PRESENT)
+	if (CLI_PRESENT == cli_present("CROSS_REFERENCE"))	/* CROSS_REFERENCE is undocumented and apparently not useful */
 		qualif->qlf |= CQ_CROSS_REFERENCE;
+<<<<<<< HEAD
 	else if (cli_negated("CROSS_REFERENCE"))
 		qualif->qlf &= ~CQ_CROSS_REFERENCE;
 
 	if (cli_negated("IGNORE"))
 		qualif->qlf &= ~CQ_IGNORE;
 	else
+=======
+	else if (TRUE == cli_negated("CROSS_REFERENCE"))
+		qualif->qlf &= ~CQ_CROSS_REFERENCE;
+	if (TRUE == cli_present("IGNORE"))
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		qualif->qlf |= CQ_IGNORE;
-
-	if (cli_present("DEBUG") == CLI_PRESENT)
+	else if (TRUE == cli_negated("IGNORE"))
+		qualif->qlf &= ~CQ_IGNORE;
+	if (CLI_PRESENT == cli_present("DEBUG"))		/* the only other appearance of CQ_DEBUG is in cmd_qlf.h */
 		qualif->qlf |= CQ_DEBUG;
+<<<<<<< HEAD
 	else if (cli_negated("DEBUG"))
 		qualif->qlf &= ~CQ_DEBUG;
 
@@ -91,15 +106,32 @@ void get_cmd_qlf(command_qualifier *qualif)
 		qualif->qlf &= ~CQ_INLINE_LITERALS;
 
 	if (cli_negated("ALIGN_STRINGS"))
+=======
+	else if (TRUE == cli_negated("DEBUG"))
+		qualif->qlf &= ~CQ_DEBUG;
+	if (TRUE == cli_negated("LINE_ENTRY"))			/* NOLINE_ENTRY appears implies colon syntax on all labels */
+		qualif->qlf &= ~CQ_LINE_ENTRY;
+	if (TRUE == cli_negated("INLINE_LITERALS"))
+		qualif->qlf &= ~CQ_INLINE_LITERALS;
+	if (TRUE == cli_negated("ALIGN_STRINGS"))		/* ALIGN_STRINGS is undocument and unimplemented */
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		qualif->qlf &= ~CQ_ALIGN_STRINGS;
-
-#ifdef DEBUG
-	if (cli_present("MACHINE_CODE") == CLI_PRESENT)
+	if (TRUE == cli_negated("WARNINGS"))
+		qualif->qlf &= ~CQ_WARNINGS;
+	else if (CLI_PRESENT == cli_present("WARNINGS"))
+		qualif->qlf |= CQ_WARNINGS;
+	#ifdef DEBUG
+	if (CLI_PRESENT == cli_present("MACHINE_CODE"))
 		qualif->qlf |= CQ_MACHINE_CODE;
+<<<<<<< HEAD
 	else if (cli_negated("MACHINE_CODE"))
+=======
+	else if (TRUE == cli_negated("MACHINE_CODE"))
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		qualif->qlf &= ~CQ_MACHINE_CODE;
-#else
+	#else
 	qualif->qlf &= ~CQ_MACHINE_CODE;
+<<<<<<< HEAD
 #endif
 
 	if (cli_negated("WARNINGS"))
@@ -111,14 +143,18 @@ void get_cmd_qlf(command_qualifier *qualif)
 	}
 
 	if (cli_negated("LIST"))
+=======
+	#endif
+	if (TRUE == cli_negated("LIST"))
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		qualif->qlf &= (~CQ_LIST & ~CQ_MACHINE_CODE);
-	else if (cli_present("LIST") == CLI_PRESENT)
+	else if (CLI_PRESENT == cli_present("LIST"))
 	{
 		qualif->qlf |= CQ_LIST;
 		qualif->list_file.mvtype = MV_STR;
 		s = &qualif->list_file.str;
 		len = s->len;
-		if (cli_get_str("LIST", s->addr, &len) == FALSE)
+		if (FALSE == cli_get_str("LIST", s->addr, &len))
 		{
 			s->len = 0;
 			if (glb_cmd_qlf.list_file.mvtype == MV_STR  &&  glb_cmd_qlf.list_file.str.len > 0)
@@ -131,15 +167,13 @@ void get_cmd_qlf(command_qualifier *qualif)
 			s->len = len;
 	} else if (!(qualif->qlf & CQ_LIST))
 		qualif->qlf &= ~CQ_MACHINE_CODE;
-
-	if (cli_get_int("LENGTH",&temp_int) == FALSE)
+	if (FALSE == cli_get_int("LENGTH",&temp_int))
 		temp_int = 66;
 	lst_param.lines_per_page = temp_int;
-	if (cli_get_int("SPACE",&temp_int) == FALSE || temp_int <= 0 || temp_int >= lst_param.lines_per_page)
+	if ((FALSE == cli_get_int("SPACE",&temp_int)) || (0 >= temp_int) || (temp_int >= lst_param.lines_per_page))
 		temp_int = 1;
 	lst_param.space = temp_int;
-
-	if (cli_present("LABELS") == CLI_PRESENT)
+	if (CLI_PRESENT == cli_present("LABELS"))
 	{
 		len = SIZEOF(inbuf);
 		if (cli_get_str("LABELS", (char *)&inbuf[0], &len))
@@ -153,17 +187,15 @@ void get_cmd_qlf(command_qualifier *qualif)
 			}
 		}
 	}
-#	ifdef UNIX
 	if (CLI_PRESENT == cli_present("NAMEOFRTN"))
 		qualif->qlf |= CQ_NAMEOFRTN;
-#	endif
-	if (cli_present("CE_PREPROCESS") == CLI_PRESENT)
+	if (CLI_PRESENT == cli_present("CE_PREPROCESS"))
         {
 		qualif->qlf |= CQ_CE_PREPROCESS;
 		qualif->ceprep_file.mvtype = MV_STR;
 		s = &qualif->ceprep_file.str;
 		len = s->len;
-		if (cli_get_str("CE_PREPROCESS", s->addr, &len) == FALSE)
+		if (FALSE == cli_get_str("CE_PREPROCESS", s->addr, &len))
 		{
 			s->len = 0;
 			if (glb_cmd_qlf.ceprep_file.mvtype == MV_STR  &&  glb_cmd_qlf.ceprep_file.str.len > 0)
@@ -173,16 +205,18 @@ void get_cmd_qlf(command_qualifier *qualif)
 			}
 		} else
 			s->len = len;
+<<<<<<< HEAD
 	} else if (cli_negated("CE_PREPROCESS"))
+=======
+	} else if (TRUE == cli_negated("CE_PREPROCESS"))
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		qualif->qlf &= ~CQ_CE_PREPROCESS;
 #	ifdef USHBIN_SUPPORTED
 	if (CLI_PRESENT == cli_present("DYNAMIC_LITERALS"))
 		qualif->qlf |= CQ_DYNAMIC_LITERALS;
 #	endif
-#	ifdef UNIX
 	if (CLI_PRESENT == cli_present("EMBED_SOURCE"))
 		qualif->qlf |= CQ_EMBED_SOURCE;
 	else if (cli_negated("EMBED_SOURCE"))
 		qualif->qlf &= ~CQ_EMBED_SOURCE;
-#	endif
 }

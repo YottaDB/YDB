@@ -421,12 +421,14 @@ void iosocket_unsnr(socket_struct *socketptr, unsigned char *buffer, size_t len)
 		{
 			if (socketptr->buffered_offset < len)
 			{
+				assert((len + socketptr->buffered_length) < socketptr->buffer_size);
 				memmove(socketptr->buffer + len, socketptr->buffer + socketptr->buffered_offset,
 						socketptr->buffered_length);
 				memmove(socketptr->buffer, buffer, len);
 			} else
 			{
 				memmove(socketptr->buffer, buffer, len);
+				assert((len + socketptr->buffered_length) < socketptr->buffer_size);
 				memmove(socketptr->buffer + len, socketptr->buffer + socketptr->buffered_offset,
 						socketptr->buffered_length);
 			}

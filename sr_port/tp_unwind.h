@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __TP_UNWIND_H__
-#define __TP_UNWIND_H__
+#ifndef TP_UNWIND_H_INCLUDED
+#define TP_UNWIND_H_INCLUDED
 
 enum tp_unwind_invocation
 {

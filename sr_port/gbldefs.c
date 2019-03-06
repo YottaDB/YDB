@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -103,7 +103,6 @@
 #include "cli.h"
 #include "invocation_mode.h"
 #include "fgncal.h"
-#include "parse_file.h"		/* for MAX_FBUFF */
 #include "repl_sem.h"
 #include "gtm_zlib.h"
 #include "anticipatory_freeze.h"
@@ -141,6 +140,7 @@
 #include "gtcm.h"
 #include "sig_init.h"
 #include "deferred_events_queue.h"
+#include "dm_audit_log.h"
 
 GBLDEF	gd_region		*db_init_region;
 GBLDEF	sgmnt_data_ptr_t	cs_data;
@@ -754,8 +754,8 @@ GBLDEF	MIDENT_DEF(int_module_name, 0, &int_module_name_buff[0]);
 GBLDEF	char		rev_time_buf[REV_TIME_BUFF_LEN];
 GBLDEF	unsigned short	source_name_len;
 GBLDEF	unsigned short	object_name_len;
-GBLDEF	unsigned char	source_file_name[MAX_FBUFF + 1];
-GBLDEF	unsigned char	object_file_name[MAX_FBUFF + 1];
+GBLDEF	unsigned char	source_file_name[MAX_FN_LEN + 1];
+GBLDEF	unsigned char	object_file_name[MAX_FN_LEN + 1];
 GBLDEF	int		object_file_des;
 GBLDEF	int4		curr_addr, code_size;
 GBLDEF	mident_fixed	zlink_mname;
@@ -1329,3 +1329,10 @@ GBLDEF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 GBLDEF	void			*dummy_ptr;	/* A dummy global variable which works around a suspected Clang compiler issue.
 						 * See use of this global variable in sr_unix/gvcst_spr_queryget.c for details.
 						 */
+
+/* Direct mode auditing related global variables */
+GBLDEF	boolean_t	dollar_zaudit;			/* Intrinsic that indicates whether direct mode
+							 * auditing (i.e. APD) is enabled.
+							 * TRUE => Auditing is enabled.
+							 */
+GBLDEF	dm_audit_info	*audit_conn;			/* Stores the APD logger's connection information */

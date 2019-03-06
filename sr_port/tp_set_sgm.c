@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,8 +61,7 @@ void tp_set_sgm(void)
 	{
 		si->next_sgm_info = first_sgm_info;
 		first_sgm_info = si;
-		if (csa->critical)
-			si->crash_count = csa->critical->crashcnt;
+		UPDATE_CRASH_COUNT(csa, si->crash_count);
 		insert_region(gv_cur_region, &tp_reg_list, &tp_reg_free_list, SIZEOF(tp_region));
 		/* Note down "si->start_tn" AFTER the "insert_region" call in case it does a "grab_crit_immediate/wcs_recover"
 		 * call and bumps csa->ti->curr_tn. Otherwise we would end up with a cdb_sc_wcs_recover failure code.

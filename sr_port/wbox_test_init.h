@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2018 Fidelity National Information	*
+ * Copyright (c) 2005-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -200,6 +200,12 @@ typedef enum {
 	WBTEST_LOCK_HASH_ZTW,			/* 151 : Put the hash of each LOCK command's final node in $ZTWORMHOLE */
 	WBTEST_LOCK_HASH_OFLOW,			/* 152 : Allow hash neighborhood overflow without complaint */
 	WBTEST_ZTIMEOUT_TRACE,			/* 153 : Trace the setting/deferring of ztimeout when trigerred */
+<<<<<<< HEAD
+=======
+	WBTEST_ZTIME_DEFER_CRIT,		/* 154 : Defer ZTIMEOUT when CRIT is held */
+	WBTEST_LOW_MEMORY			/* 155 : In tests that limit vmemuse, exit gracefully when system calls,
+						   external libraries, etc.  fail to allocate more memory */
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.

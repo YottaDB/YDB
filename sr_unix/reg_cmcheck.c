@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +27,7 @@ error_def(ERR_DBFILERR);
 bool reg_cmcheck(gd_region *reg)
 {
 	gd_segment	*seg;
-	char		fbuff[MAX_FBUFF + 1];
+	char		fbuff[MAX_FN_LEN + 1];
 	parse_blk	pblk;
 	mstr		file;
 	int		status;
@@ -38,7 +39,7 @@ bool reg_cmcheck(gd_region *reg)
 	file.len = seg->fname_len;
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = fbuff;
-	pblk.buff_size = MAX_FBUFF;
+	pblk.buff_size = MAX_FN_LEN;
 	pblk.fop = (F_SYNTAXO | F_PARNODE);
 	strncpy(fbuff,file.addr,file.len);
 	*(fbuff + file.len) = '\0';

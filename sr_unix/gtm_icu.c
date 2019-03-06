@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -21,16 +21,20 @@
 #include "gtm_string.h"
 #include "gtm_strings.h"
 #include "gtm_stdlib.h"		/* needed for realpath */
+#include <gtm_limits.h>		/* needed for GTM_PATH_MAX */
+#include "gtm_stat.h"
 
 #include <wctype.h>
 #include <dlfcn.h>
 #include <locale.h>		/* needed for setlocale() */
 #include <langinfo.h>		/* needed for nl_langinfo() */
 #ifdef _AIX
+<<<<<<< HEAD
 #include <gtm_limits.h>		/* needed for YDB_PATH_MAX */
+=======
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 #include <sys/ldr.h>		/* needed for loadquery */
 #include <libgen.h>		/* needed for basename */
-#include <gtm_stat.h>
 #include <errno.h>
 #endif
 
@@ -41,6 +45,8 @@
 #include "ydb_trans_log_name.h"
 #include "real_len.h"		/* for COPY_DLERR_MSG */
 #include "fgncal.h"		/* needed for COPY_DLLERR_MSG() */
+#include "restrict.h"		/* Needed for restrictions */
+#include "have_crit.h"		/* Defer interrupts */
 
 #ifdef _AIX
 # define DELIM			":"
@@ -50,6 +56,8 @@
 #endif
 
 ZOS_ONLY(GBLREF	char	*gtm_utf8_locale_object;)
+GBLREF boolean_t		gtm_dist_ok_to_use;
+GBLREF char			gtm_dist[GTM_PATH_MAX];
 GBLREF	volatile boolean_t	timer_in_handler;
 
 LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];
@@ -128,9 +136,10 @@ void gtm_conv_init(void);
 
 error_def(ERR_DLLNOOPEN);
 error_def(ERR_ICUSYMNOTFOUND);
-error_def(ERR_TEXT);
-error_def(ERR_NONUTF8LOCALE);
 error_def(ERR_ICUVERLT36);
+error_def(ERR_NONUTF8LOCALE);
+error_def(ERR_RESTRICTEDOP);
+error_def(ERR_TEXT);
 
 /*
  * The ICU project has used two different formats to specify the version. These format are visible to us
@@ -197,8 +206,13 @@ static boolean_t parse_ydb_icu_version(char *icu_ver_buf, int len, char *icusymv
 	if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(major_ver, minor_ver)))
 	{
 		/* Construct the first part of the ICUVERLT36 error message. */
+<<<<<<< HEAD
 		SPRINTF(tmp_errstr, "%s is",
 			(is_ydb_env_match ?  ydbenvname[YDBENVINDX_ICU_VERSION] : gtmenvname[YDBENVINDX_ICU_VERSION]));
+=======
+		SNPRINTF(tmp_errstr, SIZEOF(GTM_ICU_VERSION) + STR_LIT_LEN(GTM_ICU_VERSION_SUFFIX), "%s%s", GTM_ICU_VERSION,
+			GTM_ICU_VERSION_SUFFIX);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), major_ver, minor_ver);
 	}
 	return TRUE;
@@ -217,9 +231,10 @@ void gtm_icu_init(void)
 	void_ptr_t	handle;
 	char_ptr_t	err_str;
 	icu_func_t	fptr;
-	int		findx;
+	int		findx, ver;
 	boolean_t	icu_getversion_found = FALSE, gtm_icu_ver_defined, symbols_renamed;
 	UVersionInfo	icu_version;
+<<<<<<< HEAD
 	mstr		trans;
 	char		*envname;
 #	ifdef _AIX
@@ -229,6 +244,20 @@ void gtm_icu_init(void)
 	struct stat	real_path_stat;		/* To see if the resolved real_path exists or not */
 #	endif
 	boolean_t	is_ydb_env_match;
+=======
+	mstr		icu_ver, trans;
+	int		iculdflags = ICU_LIBFLAGS;
+	struct stat	libpath_stat;
+	char		real_path[GTM_PATH_MAX], librarypath[GTM_PATH_MAX];
+	char		*pieceptr, *cptr;
+#	ifdef _AIX
+	int		buflen, prev_dyn_size;
+	char            buf[ICU_LIBNAME_LEN], temp_path[GTM_PATH_MAX], search_paths[MAX_SEARCH_PATH_LEN];
+	char		*ptr, *each_libpath, *dyn_search_paths = NULL, *search_path_ptr;
+	struct stat	real_path_stat;		/* To see if the resolved real_path exists or not */
+#	endif
+	intrpt_state_t  prev_intrpt_state;
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 	assert(!gtm_utf8_mode);
 #	ifdef __MVS__
@@ -236,7 +265,12 @@ void gtm_icu_init(void)
 		locale = setlocale(LC_CTYPE, gtm_utf8_locale_object);
 	else
 #	endif
+#	ifdef _AIX
+	iculdflags |= RTLD_MEMBER;
+#	endif
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 	locale = setlocale(LC_CTYPE, "");
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 	chset = nl_langinfo(CODESET);
 	if (NULL == chset)	/* 4SCA : null return nl_langinfo not possible */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NONUTF8LOCALE, 2, LEN_AND_LIT("<undefined>"));
@@ -287,10 +321,58 @@ void gtm_icu_init(void)
 		assert(SIZEOF(icu_libname) > icu_libname_len);
 		libname = icu_libname;
 	} else
-		libname = ICU_LIBNAME;	/* go with default name */
+		libname = ICU_LIBNAME;  /* go with default name */
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	if (RESTRICTED(library_load_path))
+	{
+		/* Try the version named symlink */
+		if (gtm_icu_ver_defined)
+		{
+			SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_FULL, gtm_dist, libname);
+			if (0 != Stat(librarypath, &libpath_stat)) /* Try the default named symlink */
+				SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_SHORT ICU_LIBNAME, gtm_dist);
+		} else	/* Try the default named symlink */
+			SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_SHORT ICU_LIBNAME, gtm_dist);
+#		ifdef _AIX
+		STRNCAT(librarypath, AIX_SHR_64, SIZEOF(AIX_SHR_64)); /* Append "(shr_64.o)" to library path */
+#		endif
+		libname = librarypath;
+		if (NULL == (handle = dlopen(libname, iculdflags)))
+		{
+			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+			SNPRINTF(err_msg, MAX_ERRSTR_LEN, "dlopen(%s)", libname);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, err_msg);
+		}
+#		ifndef _AIX
+		if (NULL == realpath(librarypath, real_path))
+			assert(FALSE); /* Just opened that library */
+		pieceptr = STRTOK_R(real_path, DOT_CHAR, &strtokptr);
+		while (NULL != pieceptr)
+		{
+			if ((2 == strlen(pieceptr)) && (('0' <= pieceptr[0]) && ('9' >= pieceptr[0]))
+					&& (('0' <= pieceptr[1]) && ('9' >= pieceptr[1])))
+			{
+				icusymver_len = ver = 0;
+				cptr = pieceptr;
+				A2I(cptr, pieceptr+2, ver);
+				assert(0 <= ver);	/* Already validated above */
+				/* Generate the ICU symbol renaming string */
+				icusymver[icusymver_len++] = '_';
+				icusymver[icusymver_len++] = pieceptr[0];
+				if (44 > ver)
+					icusymver[icusymver_len++] = '_';
+				icusymver[icusymver_len++] = pieceptr[1];
+				icusymver[icusymver_len++] = '\0';
+				gtm_icu_ver_defined = TRUE;
+				break;
+			}
+			pieceptr = STRTOK_R(NULL, DOT_CHAR, &strtokptr);
+		}
+#		endif
+	} else	/* Note: the "else" clause spans an ifdef which calls dlopen() twice on AIX */
 #	ifdef _AIX
 	if (gtm_icu_ver_defined || /* Use the AIX system default when no ICU version specified */
-			NULL == (handle = dlopen(ICU_LIBNAME_DEF, ICU_LIBFLAGS | RTLD_MEMBER)))
+			NULL == (handle = dlopen(ICU_LIBNAME_DEF, iculdflags)))
 	{
 		/* AIX has a unique packaging convention in that shared objects are conventionally
 		 * archived into a static (.a) library. To resolve the shared library name at runtime
@@ -306,7 +388,7 @@ void gtm_icu_init(void)
 			/* We don't expect loadquery to fail for reason other than ENOMEM */
 			assertpro(ENOMEM == errno);
 			/* If the previous call to loadquery fails and if it's because the input buffer's length was not
-			 * enough for loadquery to fill the library search paths, then do a malloc equal to double the previous
+			 * enough for loadquery to fill the library search paths, then do a malloc equal to double the prior
 			 * size and call loadquery again. It's relatively unlikely that this condition would be reached
 			 */
 			if (NULL != dyn_search_paths)
@@ -346,14 +428,17 @@ void gtm_icu_init(void)
 			free(dyn_search_paths);
 		/* If each_libpath is NULL then we were not able to look for libicuio.a in the loader search path */
 		if (NULL == each_libpath)
+		{
+			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname),
 					ERR_TEXT, 2, LEN_AND_LIT(ICU_NOT_FOUND_ERR));
+		}
 		libname = buf;
-		handle = dlopen(libname, ICU_LIBFLAGS | RTLD_MEMBER);
+		handle = dlopen(libname, iculdflags);
 	}
-#else
-	handle = dlopen(libname, ICU_LIBFLAGS);
-#endif
+#	else
+	handle = dlopen(libname, iculdflags);
+#	endif
 	if (NULL == handle)
 	{
 		COPY_DLLERR_MSG(err_str, err_msg);
@@ -364,9 +449,10 @@ void gtm_icu_init(void)
 		 */
 		SNPRINTF(temp_path, ICU_LIBNAME_LEN, "%s(%s.so)", real_path, ICU_LIBNAME_ROOT);
 		libname = temp_path;
-		handle = dlopen(libname, ICU_LIBFLAGS | RTLD_MEMBER);
+		handle = dlopen(libname, iculdflags);
 		if (NULL == handle)
 		{
+			ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 			libname = buf;
 #		endif
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname),
@@ -375,6 +461,7 @@ void gtm_icu_init(void)
 		}
 #		endif
 	}
+<<<<<<< HEAD
 #	ifdef __hpux
 	/* HP-UX dlsym() doesn't allow lookup for symbols that are present in the nested dependent shared libraries
 	 * of ICU_LIBNAME. Workaround is to lookup within the global space (i.e. from invoking module libyottadb)
@@ -390,6 +477,9 @@ void gtm_icu_init(void)
 	 * has already been done on libicuio.so. Since this library is so much tied with YottaDB error handling,
 	 * we skip the "dlopen_handle_array_add" (and in turn "dlopen_handle_array_close" at "ydb_exit" time).
 	 */
+=======
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	DEBUG_ONLY(symbols_renamed = -1;)
 	for (findx = 0; findx < icu_func_n; ++findx)
 	{
@@ -456,7 +546,8 @@ void gtm_icu_init(void)
 			if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(icu_version[0], icu_version[1])))
 			{
 				/* Construct the first part of the ICUVERLT36 error message. */
-				SPRINTF(tmp_errstr, "%s%s", ICU_LIBNAME, ICU_LIBNAME_SUFFIX);
+				SNPRINTF(tmp_errstr, SIZEOF(ICU_LIBNAME) + STR_LIT_LEN(ICU_LIBNAME_SUFFIX), "%s%s", ICU_LIBNAME,
+					ICU_LIBNAME_SUFFIX);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ICUVERLT36, 4,
 						LEN_AND_STR(tmp_errstr), icu_version[0], icu_version[1]);
 			}

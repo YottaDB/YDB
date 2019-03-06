@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,11 +11,14 @@
  ****************************************************************/
 
 #include "mdef.h"
+
+#include "gtm_ctype.h"
+#include "gtm_string.h"
+
 #include "error.h"
 #include "stringpool.h"
 #include "op.h"
 #include "is_canonic_name.h"
-#include "gtm_ctype.h"
 #include "zshow.h"
 
 #ifdef UTF8_SUPPORTED
@@ -26,8 +29,8 @@ error_def(ERR_INVDLRCVAL);
 
 GBLREF spdesc stringpool;
 
-error_def(ERR_NOSUBSCRIPT);
 error_def(ERR_NOCANONICNAME);
+error_def(ERR_NOSUBSCRIPT);
 
 #ifdef UTF8_SUPPORTED
 #define UTF_CHAR_CPY(FROM, TO, FROM_OFFSET, TO_OFFSET, UTF_LEN)			\
@@ -73,7 +76,6 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 	int		stop;
 	int		subs_count;
 	unsigned char	*temp_cp;
-
 
 	if (seq < -1)	/* error "Cannot return subscript number ###" */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_NOSUBSCRIPT, 1, seq);
@@ -174,13 +176,15 @@ void op_fnqsubscript(mval *src, int seq, mval *dst)
 					do
 					{
 						assert(isrc < stop);
-						cp = (unsigned char*)&src->str.addr[isrc];
+						temp_cp = cp = (unsigned char*)&src->str.addr[isrc];
 						assert(ISDIGIT_ASCII(*cp));
 						for ( ; ISDIGIT_ASCII(src->str.addr[isrc]); isrc++)
 							;
 						end = (unsigned char*)&src->str.addr[isrc++];
 						assert((',' == *end) || (')' == *end));
 						A2I(cp, end, ch_int);
+						if (0 > ch_int)	/* Integer overflow, assign MAXPOSINT4 */
+							ch_int = MAXPOSINT4;
 						UTF8_ONLY(if (!gtm_utf8_mode || (0 == (0xFFFFFF80 & ch_int)) || ('Z' == letter)))
 						{
 							if (0 == (0xFFFFFF00 & ch_int))

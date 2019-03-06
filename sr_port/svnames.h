@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -93,7 +93,11 @@ enum
 	SV_ZSTRPLLIM,		/* 75 */
 	SV_ZRELDATE,		/* 76 */
 	SV_ZTIMEOUT,		/* 77 */
+<<<<<<< HEAD
 	SV_ZYRELEASE,		/* 78 */
+=======
+	SV_ZAUDIT,		/* 78 */
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	SV_NUM_SV,		/* count - should be next to last SV entry just prior to dummy entry below */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

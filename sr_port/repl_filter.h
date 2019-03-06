@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -13,8 +13,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _REPL_FILTER_H
-#define _REPL_FILTER_H
+#ifndef REPL_FILTER_H_INCLUDED
+#define REPL_FILTER_H_INCLUDED
 
 #define MAX_FILTER_ARGS		31
 #define	READ_END		0

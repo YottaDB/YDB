@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2018 Fidelity National Information	*
+ * Copyright (c) 2016-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -334,6 +334,7 @@ STATICFNDCL int	aio_shim_setup(aio_context_t *ctx)
 {
 	int 	ret;
 	int	nr_events;
+	DEBUG_ONLY(int	local_errno;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -346,7 +347,8 @@ STATICFNDCL int	aio_shim_setup(aio_context_t *ctx)
 	{
 		*ctx = 0;
 		ret = io_setup(nr_events, ctx);
-		assert((0 == ret) || (EAGAIN == errno));
+		DEBUG_ONLY(local_errno = errno;)
+		assert((0 == ret) || (EAGAIN == local_errno) || (WBTEST_ENABLED(WBTEST_LOW_MEMORY) && ENOMEM == local_errno));
 		if (-1 == ret)
 		{
 			nr_events /= 2;
@@ -400,7 +402,7 @@ STATICFNDCL int aio_shim_thread_init(gd_addr *gd)
 		 * aio_shim_setup().
 		 */
 		assert(NULL != aio_shim_errstr);
-		assert(EAGAIN == errno);
+		assert(EAGAIN == errno || (WBTEST_ENABLED(WBTEST_LOW_MEMORY) && ENOMEM == errno));
 		CLEANUP_AIO_SHIM_THREAD_INIT(tmp_gdi);
 		return -1;
 	}

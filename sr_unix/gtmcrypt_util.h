@@ -86,13 +86,13 @@
 }
 
 /* Convert SOURCE, sequence of decimal characters, into hexadecimal representation. LEN denotes the length of the TARGET string. */
-#define GC_HEX(SOURCE, TARGET, LEN)						\
-{										\
-	int i;									\
-										\
-	for (i = 0; i < LEN; i += 2)						\
-		SPRINTF(TARGET + i, "%02X", (unsigned char)SOURCE[i / 2]);	\
-}
+#define GC_HEX(SOURCE, TARGET, LEN)								\
+MBSTART {											\
+	int i;											\
+												\
+	for (i = 0; i < LEN; i += 2)								\
+		SNPRINTF(TARGET + i, LEN + 1 - i, "%02X", (unsigned char)SOURCE[i / 2]);	\
+} MBEND
 
 #define SNPRINTF(SRC, LEN, ...)							\
 {										\
@@ -104,22 +104,13 @@
 	} while ((-1 == rc) && (EINTR == errno)); /* EINTR-safe */		\
 }
 
-#define SPRINTF(SRC, ...)							\
-{										\
-	int rc;									\
-										\
-	do									\
-	{									\
-		rc = sprintf(SRC, __VA_ARGS__);	/* BYPASSOK */			\
-	} while ((-1 == rc) && (EINTR == errno)); /* EINTR-safe */		\
-}
+#define SPRINTF(SRC, ...)	assert(FALSE);	/* don't want use of function subject to overruns */	\
 
 /* Some helper error reporting macros. */
 #define UPDATE_ERROR_STRING(...)						\
 {										\
 	SNPRINTF(gtmcrypt_err_string, MAX_GTMCRYPT_ERR_STRLEN, __VA_ARGS__);	\
 }
-
 #define STR_QUOT(X)			#X
 #define STR_WRAP(X)			STR_QUOT(X)
 #define STR_ARG				"%." STR_WRAP(MAX_GTMCRYPT_STR_ARG_LEN) "s%s"

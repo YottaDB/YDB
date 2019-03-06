@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,8 +9,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#ifndef __CTRLC_HANDLER_DUMMY_H__
-#define __CTRLC_HANDLER_DUMMY_H__
+#ifndef CTRLC_HANDLER_DUMMY_H_INCLUDED
+#define CTRLC_HANDLER_DUMMY_H_INCLUDED
 
 void ctrlc_handler_dummy(void);
 

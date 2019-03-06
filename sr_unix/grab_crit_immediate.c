@@ -77,8 +77,10 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover)
 					return(FALSE);
 				case cdb_sc_critreset:
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_CRITRESET, 2, REG_LEN_STR(reg));
+					break;	/* Keep syntax checkers happy */
 				case cdb_sc_dbccerr:
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBCCERR, 2, REG_LEN_STR(reg));
+					break;	/* Keep syntax checkers happy */
 				default:
 					/* An out-of-design return value. assertpro(FALSE) but spell out the failing condition
 					 * details instead of just FALSE. Hence the complex structure below.

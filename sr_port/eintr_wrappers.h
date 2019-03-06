@@ -29,7 +29,7 @@
 #include "have_crit.h"
 #include "gt_timer.h"
 #include "gtm_stdio.h"
-#if defined(DEBUG) && defined(UNIX)
+#if defined(DEBUG)
 #include "io.h"
 #include "wcs_sleep.h"
 #include "deferred_exit_handler.h"
@@ -171,12 +171,105 @@
 	} while (-1 == RC && EINTR == errno);			\
 }
 
+/* GTM_FREAD is an EINTR-safe versions of "fread". Retries on EINTR. Returns number of elements read in NREAD.
+ * If NREAD < NELEMS, if error then copies errno into RC, if eof then sets RC to 0. Note: RC is not initialized otherwise.
+ * Macro is named GTM_FREAD instead of FREAD because AIX defines a macro by the same name in fcntl.h.
+ */
+#define GTM_FREAD(BUFF, ELEMSIZE, NELEMS, FP, NREAD, RC)			\
+MBSTART {									\
+	size_t		elems_to_read, elems_read;				\
+	intrpt_state_t	prev_intrpt_state;					\
+	\
+	DEFER_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);		\
+	elems_to_read = NELEMS;							\
+	for (;;)								\
+	{									\
+		elems_read = fread(BUFF, ELEMSIZE, elems_to_read, FP);		\
+		assert(elems_read <= elems_to_read);				\
+		elems_to_read -= elems_read;					\
+		if (0 == elems_to_read)						\
+			break;							\
+			RC = feof(FP);							\
+			if (RC)								\
+			{	/* Reached EOF. No error. */				\
+				RC = 0;							\
+				break;							\
+			}								\
+			RC = ferror(FP);						\
+			assert(RC);							\
+			clearerr(FP);	/* reset error set by the "fread" */		\
+			/* In case of EINTR, retry "fread" */				\
+			if (EINTR != errno)						\
+				break;							\
+	}									\
+	NREAD = NELEMS - elems_to_read;						\
+	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);		\
+} MBEND
+
+#define GTM_FSYNC(FD, RC)					\
+{								\
+	do							\
+	{							\
+		RC = fsync(FD);					\
+	} while (-1 == RC && EINTR == errno);			\
+}
+
+/* GTM_FWRITE is an EINTR-safe versions of "fwrite". Retries on EINTR. Returns number of elements written in NWRITTEN.
+ * If NWRITTEN < NELEMS, copies errno into RC. Note: RC is not initialized otherwise.
+ * Macro is named GTM_FWRITE instead of FWRITE because AIX defines a macro by the same name in fcntl.h.
+ */
+#define GTM_FWRITE(BUFF, ELEMSIZE, NELEMS, FP, NWRITTEN, RC)			\
+RC = gtm_fwrite(BUFF, ELEMSIZE, NELEMS, FP, &(NWRITTEN));
+
+static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE *fp, size_t *nwritten)
+{
+	size_t		elems_to_write, elems_written, rc = 0;
+	intrpt_state_t	prev_intrpt_state;
+
+	DEFER_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);
+	elems_to_write = nelems;
+	for ( ; (0 != elems_to_write) && (0 != elemsize) ; )
+	{
+		elems_written = fwrite(buff, elemsize, elems_to_write, fp);
+		assert(elems_written <= elems_to_write);
+		elems_to_write -= elems_written;
+		if (0 == elems_to_write)
+			break;
+		assert(!feof(fp));
+		rc = ferror(fp);
+		assert(rc);
+		clearerr(fp);	/* reset error set by the "fwrite" */
+		/* In case of EINTR, retry "fwrite" */
+		if (EINTR != errno)
+			break;
+	}
+	*nwritten = nelems - elems_to_write;
+	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);
+	return rc;
+}
+
+#define LSTAT_FILE(PATH, INFO, RC)				\
+{								\
+	do							\
+	{							\
+		RC = LSTAT(PATH, INFO);				\
+	} while ((uint4)-1 == RC && EINTR == errno);		\
+}
+
 #define MSGSND(MSGID, MSGP, MSGSZ, FLG, RC)			\
 {								\
 	do							\
 	{							\
 		RC = msgsnd(MSGID, MSGP, MSGSZ, FLG);		\
 	} while (-1 == RC && EINTR == errno);			\
+}
+
+#define OPENAT(PATH, FLAGS, MODE, RC)				\
+{								\
+	do							\
+	{							\
+		RC = openat(PATH, FLAGS, MODE);			\
+	} while ((-1 == RC) && (EINTR == errno));		\
 }
 
 #define OPEN_PIPE(FDESC, RC)					\
@@ -251,13 +344,32 @@
 	} while ((uint4)-1 == RC && EINTR == errno);		\
 }
 
-#define LSTAT_FILE(PATH, INFO, RC)				\
-{								\
-	do							\
-	{							\
-		RC = LSTAT(PATH, INFO);				\
-	} while ((uint4)-1 == RC && EINTR == errno);		\
+#if defined(DEBUG)
+#define SYSCONF(PARM, RC)							\
+{										\
+	intrpt_state_t		prev_intrpt_state;				\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);			\
+	if (gtm_white_box_test_case_enabled					\
+		&& (WBTEST_SYSCONF_WRAPPER == gtm_white_box_test_case_number))	\
+		{									\
+			DBGFPF((stderr, "will sleep indefinitely now\n"));		\
+			while (TRUE)							\
+				LONG_SLEEP(60);						\
+		}									\
+		RC = sysconf(PARM);							\
+		ENABLE_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);		\
 }
+#else
+#define SYSCONF(PARM, RC)							\
+{										\
+	intrpt_state_t		prev_intrpt_state;				\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);			\
+	RC = sysconf(PARM);							\
+	ENABLE_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);		\
+}
+#endif
 
 #define TCFLUSH(FDESC, REQUEST, RC)				\
 {								\
@@ -267,7 +379,6 @@
 	} while (-1 == RC && EINTR == errno);			\
 }
 
-#if defined(UNIX)
 #define Tcsetattr(FDESC, WHEN, TERMPTR, RC, ERRNO)		\
 {								\
 	GBLREF sigset_t block_ttinout;				\
@@ -281,7 +392,6 @@
 	ERRNO = errno;						\
 	SIGPROCMASK(SIG_SETMASK, &oldset, NULL, rc);		\
 }
-#endif
 
 #define TRUNCATE_FILE(PATH, LENGTH, RC)				\
 {								\
@@ -313,6 +423,7 @@
 	} while (-1 == RC && EINTR == errno);										\
 }
 
+<<<<<<< HEAD
 #define GTM_FSYNC(FD, RC)					\
 {								\
 	do							\
@@ -422,4 +533,6 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	return rc;
 }
 
+=======
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 #endif

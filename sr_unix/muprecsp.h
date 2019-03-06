@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2003 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,5 +16,6 @@
 #define EXT_MJF		".mjf"
 #define EXT_BROKEN	".broken"
 #define EXT_LOST	".lost"
+#define DEVNULL		"/dev/null"
 
 #endif

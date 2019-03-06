@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -149,14 +149,16 @@ int	op_job(int4 argcnt, ...)
 	jobcnt++;
 	command.addr = &combuf[0];
 	/* Setup job parameters by parsing param_buf and using label, offset, routine, & timeout).  */
-	job_params.routine = routine->str;
-	job_params.label = label->str;
-	job_params.offset = offset;
+	job_params.params.routine.len = routine->str.len;
+	memcpy(job_params.params.routine.buffer, routine->str.addr, job_params.params.routine.len);
+	job_params.params.label.len = label->str.len;
+	memcpy(job_params.params.label.buffer, label->str.addr, job_params.params.label.len);
+	job_params.params.offset = offset;
 	ojparams(param_buf->str.addr, &job_params);
 	/*
 	 * Verify that entryref to JOB command is not NULL.
 	 */
-	if (!job_params.routine.len)
+	if (!job_params.params.routine.len)
 	{
 		va_end(var);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_JOBFAIL, 0, ERR_NULLENTRYREF, 0);
@@ -195,6 +197,13 @@ int	op_job(int4 argcnt, ...)
 	 * non-blocking. also resets "pipe_fds[1]" to FD_INVALID
 	 */
 	CLOSEFILE_RESET(pipe_fds[1], pipe_status);
+	/* Do cleanup here so we avoid leaks in case we hit an error below */
+	if (timed && !ojtimeout)
+		cancel_timer((TID)&tid);
+	if (argcnt)
+		free(job_params.parms);
+	if (job_params.passcurlvn)
+		system_free(job_params.curlvn_buffer_ptr);		/* Space allocated by open_memstream in ojparams */
 	if (!non_exit_return)
 	{
 #ifdef _BSD
@@ -230,10 +239,6 @@ int	op_job(int4 argcnt, ...)
 			}
 		}
 	}
-	if (argcnt)
-		free(job_params.parms);
-	if (timed && !ojtimeout)
-		cancel_timer((TID)&tid);
 	assert(SIZEOF(pid_t) == SIZEOF(zjob_pid));
 	DOREADRC(pipe_fds[0], &zjob_pid, SIZEOF(zjob_pid), pipe_status);
 	/* empty pipe (pipe_status == -1) is ignored and not reported as error */
@@ -272,7 +277,7 @@ int	op_job(int4 argcnt, ...)
 			{
 				if (exit_stat < joberr_stp)		/* one of our EXITs */
 				{
-					if (-1 == job_errno)
+					if ((-1 == job_errno) || (0 == job_errno))
 					{
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
 							  joberrs[exit_stat].len,
@@ -309,24 +314,27 @@ int	op_job(int4 argcnt, ...)
 			dollar_truth = 1;
 		assert(0 < zjob_pid);
 		dollar_zjob = zjob_pid;
-		if (IS_JOB_SOCKET(job_params.input.addr, job_params.input.len))
+		if (IS_JOB_SOCKET(job_params.params.input.buffer, job_params.params.input.len))
 		{
-			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.input.len);
-			index = iosocket_handle(JOB_SOCKET_HANDLE(job_params.input.addr), &handle_len, FALSE, socket_pool);
+			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.params.input.len);
+			index = iosocket_handle(JOB_SOCKET_HANDLE(job_params.params.input.buffer),
+						&handle_len, FALSE, socket_pool);
 			if (-1 != index)
 				iosocket_close_one(socket_pool, index);
 		}
-		if (IS_JOB_SOCKET(job_params.output.addr, job_params.output.len))
+		if (IS_JOB_SOCKET(job_params.params.output.buffer, job_params.params.output.len))
 		{
-			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.output.len);
-			index = iosocket_handle(JOB_SOCKET_HANDLE(job_params.output.addr), &handle_len, FALSE, socket_pool);
+			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.params.output.len);
+			index = iosocket_handle(JOB_SOCKET_HANDLE(job_params.params.output.buffer),
+						&handle_len, FALSE, socket_pool);
 			if (-1 != index)
 				iosocket_close_one(socket_pool, index);
 		}
-		if (IS_JOB_SOCKET(job_params.error.addr, job_params.error.len))
+		if (IS_JOB_SOCKET(job_params.params.error.buffer, job_params.params.error.len))
 		{
-			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.error.len);
-			index = iosocket_handle(JOB_SOCKET_HANDLE(job_params.error.addr), &handle_len, FALSE, socket_pool);
+			handle_len = JOB_SOCKET_HANDLE_LEN(job_params.params.error.len);
+			index = iosocket_handle(JOB_SOCKET_HANDLE(job_params.params.error.buffer),
+						&handle_len, FALSE, socket_pool);
 			if (-1 != index)
 				iosocket_close_one(socket_pool, index);
 		}

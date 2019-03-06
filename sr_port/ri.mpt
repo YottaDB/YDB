@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 1985-2015 Fidelity National Information 	;
+; Copyright (c) 1985-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -9,8 +9,7 @@
 ;	the license, please stop and do not read further.	;
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%RI	;service@greystone.com %RI;19920722 07:40;routine input
-	;Converts mumps routines from a standard routine output (RO)
+%RI	;Converts mumps routines from a standard routine output (RO)
 	;file to individual *.m files.
 	;possible enhancements:
 	;selection and/or exclusion by list, range and/or wildcard

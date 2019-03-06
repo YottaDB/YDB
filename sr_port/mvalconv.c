@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +16,7 @@
 
 #include "arit.h"
 #include "mvalconv.h"
-#include "gtm_stdio.h"	/* this is here due to the need for an SPRINTF,
+#include "gtm_stdio.h"	/* this is here due to the need for an SNPRINTF,
 			 * which is in turn due the kudge that is the current double2mval routine
 			 */
 /* we return strings for >18 digit 64-bit numbers, so pull in stringpool */
@@ -24,6 +25,8 @@
 GBLREF spdesc   stringpool;
 
 LITREF int4 ten_pwr[];
+
+#define BUFF_LEN	32 /* MAX of 16, 21 and 32 */
 
 void i2smval(mval *v, uint4 i)
 {
@@ -164,7 +167,7 @@ void xi82mval(mval *v, gtm_uint64_t i)
 	int	exp;
 	uint4	low;
 	uint4	high;
-	char    buf[21];	/* [possible] sign, [up to] 19L/20UL digits, and terminator. */
+	char    buf[BUFF_LEN];	/* [possible] sign, [up to] 19L/20UL digits, and terminator. */
 	int	len;
 
 	if (i < INT_HI)
@@ -203,9 +206,9 @@ void xi82mval(mval *v, gtm_uint64_t i)
 		} else
 		{	/* The value won't fit in 18 digits, so return a string. */
 			if (v->sgn)
-				len = SPRINTF(buf, "%lld", -(gtm_int64_t)i);
+				len = SNPRINTF(buf, BUFF_LEN, "%lld", -(gtm_int64_t)i);
 			else
-				len = SPRINTF(buf, "%llu", i);
+				len = SNPRINTF(buf, BUFF_LEN, "%llu", i);
 			assert(18 < len);
 			ENSURE_STP_FREE_SPACE(len);
 			memcpy(stringpool.free, buf, len);
@@ -255,7 +258,7 @@ double mval2double(mval *v)
 
 void float2mval(mval *dst, float src)
 {
-        char    buf[16];	/* The maximum-length value in the 'F' representation would look like -0.123457 (that is,
+        char    buf[BUFF_LEN];	/* The maximum-length value in the 'F' representation would look like -0.123457 (that is,
 				 * sign[1] + zero[1] + dot[1] + digits[6] = 9). Note that for values below -1 the number would
 				 * be shorter, since the integer part would be counted against the precision capacity. However,
 				 * a longer representation is possible in the 'E' format: -1.23456E+12 (that is, sign[1] +
@@ -263,7 +266,7 @@ void float2mval(mval *dst, float src)
 				 * additionally worry about one termination character, we will be safe and allocate 16 bytes
 				 * instead of 13. */
 
-	SPRINTF(buf, "%.6G", src);
+	SNPRINTF(buf, BUFF_LEN, "%.6G", src);
 	dst->mvtype = MV_STR;
 	dst->str.len = STRLEN(buf);
 	dst->str.addr = buf;
@@ -274,7 +277,7 @@ void float2mval(mval *dst, float src)
 
 void double2mval(mval *dst, double src)
 {
-        char    buf[32];		/* The maximum-length value in the 'F' representation would look like -0.123456789012345
+        char    buf[BUFF_LEN];		/* The maximum-length value in the 'F' representation would look like -0.123456789012345
 					 * (that is, sign[1] + zero[1] + dot[1] + digits[15] = 18). Note that for values below -1
 					 * the number would be shorter, since the integer part would be counted against the
 					 * precision capacity. However, a longer representation is possible in the 'E' format:
@@ -282,7 +285,7 @@ void double2mval(mval *dst, double src)
 					 * sign[1] + exp[3] = 23). Although we only need to additionally worry about one termination
                                          * character, we will be safe and allocate 32 bytes instead of 24. */
 
-	SPRINTF(buf, "%.15G", src);
+	SNPRINTF(buf, BUFF_LEN, "%.15G", src);
 	dst->mvtype = MV_STR;
 	dst->str.len = STRLEN(buf);
 	dst->str.addr = buf;

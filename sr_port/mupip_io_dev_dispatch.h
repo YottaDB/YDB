@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@ GBLDEF dev_dispatch_struct io_dev_dispatch_mupip[] =
 	iotype(iorm, iorm, iopi, iopi),
 	ionil_dev,
 	ionil_dev,
-	ionil_dev,
+	iotype(ionl, ionl, nil, nil),
 	iotype(ioff, iorm, iopi, nil),
 	ionil_dev,
 	ionil_dev

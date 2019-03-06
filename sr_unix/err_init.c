@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -88,7 +88,11 @@ void err_init(void (*x)())
 		rc = SNPRINTF(procfn, SIZEOF(procfn), COREDUMPFILTERFN, getpid());
 		if (0 > rc)
 		{
+<<<<<<< HEAD
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("SNPRINTF() 1"), CALLFROM, rc);
+=======
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("snprintf()"), CALLFROM, rc);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 			return;
 		}
 		if (SS_NOLOGNAM == status)

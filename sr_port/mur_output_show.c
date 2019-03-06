@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -84,12 +84,13 @@ int	format_time(jnl_proc_time proc_time, char *string, int string_len, int time_
 	uint4		days;
 	int		len;
 
+	assert((LENGTH_OF_TIME + 1) >= string_len);
 	if (LONG_TIME_FORMAT == time_format)
 		short_time = MID_TIME(proc_time);
 	else
 		short_time = (time_t)proc_time;
 	GTM_LOCALTIME(tsp, (const time_t *)&short_time);
-	SPRINTF(string, "%04d/%02d/%02d %02d:%02d:%02d", (1900 + tsp->tm_year), (1 + tsp->tm_mon), tsp->tm_mday,
+	SNPRINTF(string, string_len, "%04d/%02d/%02d %02d:%02d:%02d", (1900 + tsp->tm_year), (1 + tsp->tm_mon), tsp->tm_mday,
 			tsp->tm_hour, tsp->tm_min, tsp->tm_sec);
 	assert(LENGTH_OF_TIME >= strlen(string));
 	return STRLEN(string);

@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -49,7 +54,7 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 	bool		was_null, is_null;
 	mval		v;
 	mname_entry	gvname;
-	char		*ptr, *end, c[MAX_FBUFF + 1];
+	char		*ptr, *end, c[MAX_FN_LEN + 1];
 	omi_li		li;
 	omi_si		si;
 	parse_blk	pblk;
@@ -77,7 +82,7 @@ int	omi_gvextnam (omi_conn *cptr, uns_short len, char *ref)
 	cptr->ga    = zgbldir(&v);
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = c;
-	pblk.buff_size = MAX_FBUFF;
+	pblk.buff_size = MAX_FN_LEN;
 	pblk.def1_buf = DEF_GDR_EXT;
 	pblk.def1_size = SIZEOF(DEF_GDR_EXT) - 1;
 	status = parse_file(&v.str, &pblk);

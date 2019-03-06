@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -163,7 +164,10 @@ boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
 			*work_char_ptr++ = '"';
 			dest_len = 0;
 		} else
+		{
+			dest_len = work_buff_length;
 			format2zwr(data, len, work_char_ptr, &dest_len);
+		}
 		if (!dse_fdmp_output(work_buff, (int4)(work_char_ptr + dest_len - work_buff)))
 			return FALSE;
 	}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,7 +105,7 @@
  * multiplication. With the increase of PAT_MAX_REPEAT from 32K to 1MB, the values of result and
  * the expression value can potentially be as large as (1MB * 1MB).
  * NOTE: The macro expects result to be declared with type gtm_uint64_t */
-#define BOUND_MULTIPLY(x, y, result) 	(((result = ((gtm_uint64_t)(x) * (y))) >= PAT_MAX_REPEAT) ? PAT_MAX_REPEAT : (int)(result))
+#define BOUND_MULTIPLY(x, y, result) 	(((result = (((gtm_uint64_t)x) * ((gtm_uint64_t)y))) >= PAT_MAX_REPEAT) ? PAT_MAX_REPEAT : (int)(result))
 
 /*  Compiled Pattern
  *  -----------------

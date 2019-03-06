@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -219,7 +219,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 			if (zav->value_printed)
 			{
 				lvzwr_out(lv);
-				UNIX_ONLY(MIDCHILD_SEND_VAR);
+				ZWRITE_OUTPUT_HOOK();
 				lvzwrite_block->curr_subsc = lvzwrite_block->subsc_count = 0;
 				return;
 			} else
@@ -234,7 +234,7 @@ void lvzwr_var(lv_val *lv, int4 n)
 		|| ((0 != n) && !(lvzwrite_block->mask >> n))))
 	{	/* Print value for *this* node  */
 		lvzwr_out(lv);
-		UNIX_ONLY(MIDCHILD_SEND_VAR);
+		ZWRITE_OUTPUT_HOOK();
 	}
 	if (verify_hash_add && !lvzwrite_block->zav_added)
 	{	/* lvzwr_out processing didn't add a zav for this var. Take care of that now so we

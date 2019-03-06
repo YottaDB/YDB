@@ -1,4 +1,5 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+<<<<<<< HEAD
 ;								;
 ; Copyright (c) 2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
@@ -11,6 +12,17 @@
 ;	under a license.  If you do not know the terms of	;
 ;	the license, please stop and do not read further.	;
 ;								;
+=======
+;                                                               ;
+; Copyright (c) 2017-2019 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.  ;
+;                                                               ;
+;       This source code contains the intellectual property     ;
+;       of its copyright holder(s), and is made available       ;
+;       under a license.  If you do not know the terms of       ;
+;       the license, please stop and do not read further.       ;
+;                                                               ;
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %YGBLSTAT
 	; Gather and report statistics shared by GT.M processes
@@ -51,11 +63,12 @@ help    ; Usage: mumps -run %YGBLSTAT [--help] [--pid pidlist] [--reg reglist] [
 	;                              processes), for region (defaults to all regions) in
 	;                              global directory gld (defaults to current global direcory).
 	; Note: this program uses external calls, which must be installed.
+version	;0;If the format of %YGS changes, increment the version between the semicolons to ensure %YGS gets reconstructed on a relink
 
 	; Main Program
 	if $stack do PROMPTGO quit      ; if invoked from another program, prompt for inputs, do work, and exit
 	use $principal:(ctrap=$char(3):nocenable:exception="zgoto 0")	   ; terminate on Ctrl-C if invoked from shell
-	set $etrap="set $etrap=""use $principal write $zstatus,! set $etrap=""""zshow """"""*"""""" zgoto 0"""" zhalt 1"""
+	set $etrap="set $etrap=""use $principal write $zstatus,! set $etrap=""""zshow """"""*"""""" zgoto 0"""" zhalt 254"""
 	set $etrap=$etrap_" set tmp1=$piece($ecode,"","",2),tmp2=$text(@tmp1)"
 	set $etrap=$etrap_" if $length(tmp2) write $text(+0),@$piece(tmp2,"";"",2),!"
 	set $etrap=$etrap_" set $etrap=""zgoto 0"" zhalt +$extract(tmp1,2,$length(tmp1))"
@@ -80,7 +93,7 @@ INITYGS ; Initialize statistics names and locations in %YGS
 	. set stat=$zpiece($zpiece(zsh,",",i),":",1)
 	. set %YGS(i-1)=stat,%YGS(stat)=(i-2)*8+1
 	. set %YGS("*")=%YGS("*")_stat_","
-	set %YGS(0)=i-1,%YGS=(i-1)*8
+	set %YGS(0)=i-1,%YGS=((i-1)*8)_"|"_$piece($text(version),";",2)
 	set $zpiece(%YGS(-1),$zchar(0),1+%YGS)="",%YGS(-2)=%YGS-1
 	set %YGS("*")=$zextract(%YGS("*"),1,$zlength(%YGS("*"))-1)
 	quit
@@ -88,31 +101,36 @@ INITYGS ; Initialize statistics names and locations in %YGS
 MSGANDHALT(label)
 	new j,tmp
 	set $etrap="zgoto 0"
-	for j=0:1 set tmp=$piece($text(@label+j),"; ",2) zhalt:""=tmp 1 write tmp,!
+	for j=0:1 set tmp=$piece($text(@label+j),"; ",2) zhalt:""=tmp 2 write tmp,!
 
 ORDERPID(pid,gld,reg)
 	; Get the next pid as specified by gld and reg, first pid if pid=""
 	; Verify that the pid actually exists
-	new i,nextpid,nextreg,pidflag,tmp,$zgbldir
+	new i,nextpid,nextreg,tmp,$zgbldir
 	set pid=$get(pid),reg=$zconvert($get(reg),"U")
 	set:$data(gld) $zgbldir=gld
 	; return next pid in region if only one region specified, otherwise get lowest across regions
 	; if not running on simulated pids, verify that process exists
-	set pidflag=0
-	if $zlength(reg)&("*"'=reg) for  quit:pidflag  do
-	. set nextpid=$order(^%YGS(reg,pid))
-	. set:""=nextpid!$zlength($zsearch("/proc/"_$j))!$zlength($zsearch("/proc/"_$j)) pidflag=1
-	else  do
-	. set nextreg="",nextpid=999999999999999999     ; start nextpid at largest GT.M integer
-	. for  set nextreg=$order(^%YGS(nextreg)) quit:""=nextreg  do
-	. . set pidflag=0 for  quit:pidflag  do
-	. . . set tmp=$order(^%YGS(nextreg,pid))
-	. . . set:""=tmp!$zlength($zsearch("/proc/"_$j))!$zlength($zsearch("/proc/"_$j)) pidflag=1
-	. . set:$zlength(tmp)&(tmp<nextpid) nextpid=tmp
-	quit $select(999999999999999999=nextpid:"",1:nextpid)
+	if $zlength(reg)&("*"'=reg) set nextpid=pid do  quit nextpid
+	. for  do  quit:""=nextpid!$zlength($zsearch("/proc/"_nextpid))!$zlength($zsearch("/proc/"_nextpid))
+	. . set nextpid=$order(^%YGS(reg,nextpid))
+	set nextreg="",tmp=999999999999999999     ; start tmp at largest GT.M integer
+	for  set nextreg=$order(^%YGS(nextreg)) quit:""=nextreg  set nextpid=pid do  set:$length(nextpid)&(nextpid<tmp) tmp=nextpid
+	. for  do  quit:""=nextpid!$zlength($zsearch("/proc/"_nextpid))!$zlength($zsearch("/proc/"_nextpid))
+	. . set nextpid=$order(^%YGS(nextreg,nextpid))
+	quit $select(999999999999999999=tmp:"",1:tmp)
 
 PROMPTGO
 	; prompt for inputs, execute
+	set d("io")=$io
+	if '$data(%zdebug) new $etrap set $etrap="zgoto "_$zlevel_":err^"_$text(+0) do
+	. zshow "d":d									; save original $p settings
+	. set x=$piece($piece(d("D",1),"CTRA=",2)," ")
+	. set:""=x x=""""""
+	. set d("use")="$principal:(ctrap="_x_":exception=",x=$piece(d("D",1),"EXCE=",2),x=$zwrite($extract(x,2,$length(x)-1))
+	. set:""=x x=""""""
+	. set d("use")=d("use")_x_":"_$select($find(d("D",1),"NOCENE"):"nocenable",1:"cenable")_")"
+	. use $principal:(ctrap=$char(3,4):exception="":nocenable)
 	new gld,pid,reg,stat
 	if $zsearch("")         ; clear $zsearch() context
 	read "Process id / $JOB [default all processes]: ",pid,! set:0'<+pid pid="*"
@@ -120,14 +138,17 @@ PROMPTGO
 	write "Global directory [default ",$zgbldir,"]: " read gld,! set:'$zsearch(gld) gld=$zgbldir
 	read "Region list (comma separated) [default all regions]: ",reg,! set:'$zlength(reg) reg="*"
 	write $$STAT(pid,stat,gld,reg),!
+err	use:$data(d("use")) @d("use")
+	use:$data(d("io")) d("io")
+	set $ecode=""
 	quit
 
 SHOW(wkstat,stat)
 	; Generate output from accumulated statistics
 	new i,r,ret,tmp
-	do:'$data(%YGS) INITYGS
+	do:$piece($text(version),";",2)>$piece($get(%YGS),"|",2) INITYGS
 	set stat=$get(stat)
-	if ""'=wkstat do ; ,(%YGS(-1)'=wkstat) do
+	if ""'=$get(wkstat) do ; ,(%YGS(-1)'=wkstat) do
 	. if %YGS<$zlength(wkstat) set wkstat=$zextract(wkstat,$zlength(wkstat)-%YGS(-2),$zlength(wkstat))
 	. else  set:%YGS>$zlength(wkstat) wkstat=$zextract(%YGS(-1),1,%YGS-$zlength(wkstat))_wkstat	; protect against user error
 	. if 1=$zlength(stat,","),""'=stat,"*"'=stat do                                 ; only one statistic
@@ -160,8 +181,8 @@ STAT(pid,stat,gld,reg)
 	; cannot be used because it requires the target process to have the same userid as the
 	; process executing the function. $zsearch() must be called twice to ensure that it works
 	; despite the context.
-	if $zlength(pid)&(pid=+pid) do	    		; one process
-	. if $zlength($zsearch("/proc/"_$j))!$zlength($zsearch("/proc/"_$j)) do	;process exists
+	if $zlength(pid)&(pid=+pid) set nextpid=pid do	    		; one process
+	. if $zlength($zsearch("/proc/"_nextpid))!$zlength($zsearch("/proc/"_nextpid)) do	;process exists
 	. . if $zlength(reg)&("*"'=reg) do		; one process, one region
 	. . . set tmp=$get(^%YGS(reg,pid))
 	. . . set wkstat=$select($zlength(tmp):$zextract(tmp,$zlength(tmp)-statszm1,$zlength(tmp)),1:"")

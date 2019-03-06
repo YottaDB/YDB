@@ -307,13 +307,20 @@ STATICFNDEF int gtm_trigger_invoke(void)
 
 int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 {
+<<<<<<< HEAD
 	char		rtnname[YDB_PATH_MAX + 1], rtnname_template[YDB_PATH_MAX + 1];
 	char		objname[YDB_PATH_MAX + 1];
 	char		zcomp_parms[(YDB_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)
+=======
+	char		rtnname[GTM_PATH_MAX], rtnname_template[GTM_PATH_MAX];
+	char		objname[GTM_PATH_MAX];
+	char		zcomp_parms[(GTM_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 				    + SIZEOF(EMBED_SOURCE_PARM)];
 	mstr		save_zsource;
-	int		rtnfd, rc, lenrtnname, lenobjname, len, retry, save_errno;
-	char		*mident_suffix_p1, *mident_suffix_p2, *mident_suffix_top, *namesub1, *namesub2, *zcomp_parms_ptr;
+	int		rtnfd, rc, lenobjname, len, retry, save_errno;
+	char		*mident_suffix_p1, *mident_suffix_p2, *mident_suffix_top, *namesub1, *namesub2;
+	char		*zcomp_parms_ptr, *zcomp_parms_top;
 	mval		zlfile, zcompprm;
 	DCL_THREADGBL_ACCESS;
 
@@ -321,7 +328,7 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	DBGTRIGR_ONLY(memcpy(rtnname, trigdsc->rtn_desc.rt_name.addr, trigdsc->rtn_desc.rt_name.len));
 	DBGTRIGR_ONLY(rtnname[trigdsc->rtn_desc.rt_name.len] = 0);
 	DBGTRIGR((stderr, "gtm_trigger_complink: (Re)compiling trigger %s\n", rtnname));
-	ESTABLISH_RET(gtm_trigger_complink_ch, ((0 == error_condition) ? TREF(dollar_zcstatus) : error_condition ));
+	ESTABLISH_RET(gtm_trigger_complink_ch, ((0 == error_condition) ? TREF(dollar_zcstatus) : error_condition));
 	 /* Verify there are 2 available chars for uniqueness */
 	assert((MAX_MIDENT_LEN - TRIGGER_NAME_RESERVED_SPACE) >= (trigdsc->rtn_desc.rt_name.len));
 	assert(NULL == trigdsc->rtn_desc.rt_adr);
@@ -422,25 +429,24 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	}
 	assert(MAX_MIDENT_LEN > trigdsc->rtn_desc.rt_name.len);
 	zcomp_parms_ptr = zcomp_parms;
-	lenrtnname = STRLEN(rtnname);
+	zcomp_parms_top = zcomp_parms + SIZEOF(zcomp_parms);
+	/* rt_name is not null terminated so start the compilation string like this */
 	MEMCPY_LIT(zcomp_parms_ptr, NAMEOFRTN_PARM);
 	zcomp_parms_ptr += STRLEN(NAMEOFRTN_PARM);
 	memcpy(zcomp_parms_ptr, trigdsc->rtn_desc.rt_name.addr, trigdsc->rtn_desc.rt_name.len);
 	zcomp_parms_ptr += trigdsc->rtn_desc.rt_name.len;
-	MEMCPY_LIT(zcomp_parms_ptr, OBJECT_PARM);
-	zcomp_parms_ptr += STRLEN(OBJECT_PARM);
-	strcpy(objname, rtnname);		/* Make copy of rtnname to become object name */
-	strcat(objname, OBJECT_FTYPE);		/* Turn into object file reference */
-	lenobjname = lenrtnname + STRLEN(OBJECT_FTYPE);
-	memcpy(zcomp_parms_ptr, objname, lenobjname);
-	zcomp_parms_ptr += lenobjname;
-	MEMCPY_LIT(zcomp_parms_ptr, EMBED_SOURCE_PARM);
-	zcomp_parms_ptr += SIZEOF(EMBED_SOURCE_PARM) - 1;
-	memcpy(zcomp_parms_ptr, rtnname, lenrtnname);
-	zcomp_parms_ptr += lenrtnname;
-	*zcomp_parms_ptr = '\0';
 	len = INTCAST(zcomp_parms_ptr - zcomp_parms);
-	assert((SIZEOF(zcomp_parms) - 1) > len);	/* Verify no overflow */
+	/* Copy the rtnname to become object name while appending the null terminated OBJ file ext string */
+	lenobjname = SNPRINTF(objname, GTM_PATH_MAX, "%s" OBJECT_FTYPE, rtnname);
+	/* Append the remaining parameters to the compile string */
+	len += SNPRINTF(zcomp_parms_ptr, zcomp_parms_top - zcomp_parms_ptr,
+				" -OBJECT=%s -EMBED_SOURCE %s", objname, rtnname);
+	if (SIZEOF(zcomp_parms) <= len)	/* overflow */
+	{
+		UNLINK(rtnname);
+		assert(FALSE);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TEXT, 2, RTS_ERROR_LITERAL("Compilation string too long"));
+	}
 	zcompprm.mvtype = MV_STR;
 	zcompprm.str.addr = zcomp_parms;
 	zcompprm.str.len = len;
@@ -455,8 +461,16 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	{	/* Someone err'd.. */
 		run_time = gtm_trigger_comp_prev_run_time;
 		REVERT;
-		UNLINK(objname);		/* Remove files before return error */
-		UNLINK(rtnname);
+		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(5) ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("TRIGCOMPFAIL"), TREF(dollar_zcstatus)));
+		if (-1 == UNLINK(objname))	/* Delete the object file first since rtnname is the unique key */
+			DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
+						RTS_ERROR_LITERAL("unlink(objname)"), CALLFROM,
+						ERR_TEXT, 2, LEN_AND_STR(objname), errno));
+		if (-1 == UNLINK(rtnname))	/* Delete the source file */
+			DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
+						RTS_ERROR_LITERAL("unlink(rtnname)"), CALLFROM,
+						ERR_TEXT, 2, LEN_AND_STR(rtnname), errno));
 		return ERR_TRIGCOMPFAIL;
 	}
 	if (dolink)
@@ -495,8 +509,14 @@ int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 	} else
 		assert(FALSE); 	/* This mv_stent should be the one we just pushed */
 	/* Remove temporary files created */
-	UNLINK(objname);	/* Delete the object file first since rtnname is the unique key */
-	UNLINK(rtnname);	/* Delete the source file */
+	if (-1 == UNLINK(objname))	/* Delete the object file first since rtnname is the unique key */
+		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
+					RTS_ERROR_LITERAL("unlink(objname)"), CALLFROM,
+					ERR_TEXT, 2, LEN_AND_STR(objname), errno));
+	if (-1 == UNLINK(rtnname))	/* Delete the source file */
+		DEBUG_ONLY(send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_SYSCALL, 5,
+					RTS_ERROR_LITERAL("unlink(rtnname)"), CALLFROM,
+					ERR_TEXT, 2, LEN_AND_STR(rtnname), errno));
 	run_time = gtm_trigger_comp_prev_run_time;
 	REVERT;
 	return 0;

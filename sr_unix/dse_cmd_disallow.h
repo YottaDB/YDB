@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __DSE_CMD_DISALLOW_H__
-#define __DSE_CMD_DISALLOW_H__
+#ifndef DSE_CMD_DISALLOW_H_INCLUDED
+#define DSE_CMD_DISALLOW_H_INCLUDED
 
 boolean_t cli_disallow_dse_add(void);
 boolean_t cli_disallow_dse_all(void);

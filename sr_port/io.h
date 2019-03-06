@@ -80,8 +80,10 @@ error_def(ERR_UTF16ENDIAN);
 
 #define DLRZKEYLEN	1024
 
-#define BADCHAR_DEVICE_MSG "BADCHAR error raised on input"
-#define UNAVAILABLE_DEVICE_MSG "Resource temporarily unavailable"
+#define BADCHAR_DEVICE_MSG	"BADCHAR error raised on input"
+#define UNAVAILABLE_DEVICE_MSG	"Resource temporarily unavailable"
+#define SOCKETPOOLNAME		"YGTMSOCKETPOOL"
+#define SOCDEVTYPENAME		"socket"
 
 #define LOGNAME_LEN 255	/* Maximum possible length of name in "io_log_name.dollar_io[]". Enforced by "get_log_name". */
 

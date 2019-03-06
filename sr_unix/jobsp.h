@@ -13,8 +13,10 @@
  *								*
  ****************************************************************/
 
-#ifndef __JOBSP_H__
-#define __JOBSP_H__
+#ifndef JOBSP_H_INCLUDED
+#define JOBSP_H_INCLUDED
+
+#include "gtm_stdio.h"
 
 #include "gtm_signal.h"
 
@@ -29,6 +31,7 @@
 
 #define TIMEOUT_ERROR		(MAX_SYSERR + 1)	/* a special value to differentiate it from the rest of errno's */
 
+<<<<<<< HEAD
 #define CHILD_FLAG_ENV		"ydb_j0"
 #define CLEAR_CHILD_FLAG_ENV  	"ydb_j0="""
 #define GBLDIR_ENV		(ydbenvname[YDBENVINDX_GBLDIR] + 1)	/* + 1 to skip leading $ in env var name */
@@ -42,6 +45,11 @@
 #define OFFSET_ENV		"ydb_j9"
 #define PRIORITY_ENV		"ydb_ja"
 #define STARTUP_ENV		"ydb_jb"
+=======
+#define CHILD_FLAG_ENV		"gtmj0"
+#define CLEAR_CHILD_FLAG_ENV  	"gtmj0="""
+#define GBLDIR_ENV		"gtmgbldir"
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 #define JOB_SOCKET_PREFIX		"SOCKET:"
 #define IS_JOB_SOCKET(ADDR, LEN)	((LEN >= SIZEOF(JOB_SOCKET_PREFIX)) && (0 == STRNCMP_LIT(ADDR, JOB_SOCKET_PREFIX)))
@@ -97,23 +105,41 @@ typedef enum
 } joberr_t;
 
 typedef struct job_parm_struct
-{	mval		*parm;
+{
+	mval			*parm;
 	struct job_parm_struct	*next;
-}job_parm;
+} job_parm;
+
+typedef struct job_param_str_struct
+{
+	size_t		len;
+	char		buffer[MAX_JOBPARM_LEN];
+} job_param_str;
+
+struct job_params_struct
+{
+	job_param_str	directory;
+	job_param_str	gbldir;
+	job_param_str	startup;
+	job_param_str	input;
+	job_param_str	output;
+	job_param_str	error;
+	job_param_str	routine;
+	job_param_str	label;
+	int		offset;
+	int		baspri;
+};
 
 typedef	struct
 {
-	mstr		input, output, error;
-	mstr		gbldir, startup, directory;
-	mstr		routine;
-	mstr		label;
-	mstr		cmdline;
-	int4		baspri;
-	int4		offset;
-	job_parm	*parms;
-	size_t		input_prebuffer_size;
-	char		*input_prebuffer;
-	boolean_t	passcurlvn;
+	struct job_params_struct	params;
+	job_param_str			cmdline;
+	job_parm			*parms;
+	size_t				input_prebuffer_size;
+	char				*input_prebuffer;
+	boolean_t			passcurlvn;
+	char				*curlvn_buffer_ptr;
+	size_t				curlvn_buffer_size;
 } job_params_type;
 
 typedef enum
@@ -139,29 +165,8 @@ typedef enum
 	local_trans_done		/* Indicates all of the locals have been sent to the grandchild */
 } job_setup_op;
 
-typedef struct
-{
-	size_t		directory_len;
-	char		directory[MAX_JOBPARM_LEN];
-	size_t		gbldir_len;
-	char		gbldir[MAX_JOBPARM_LEN];
-	size_t		startup_len;
-	char		startup[MAX_JOBPARM_LEN];
-	size_t		input_len;
-	char		input[MAX_JOBPARM_LEN];
-	size_t		output_len;
-	char		output[MAX_JOBPARM_LEN];
-	size_t		error_len;
-	char		error[MAX_JOBPARM_LEN];
-	size_t		routine_len;
-	char		routine[MAX_JOBPARM_LEN];
-	size_t		label_len;
-	char		label[MAX_JOBPARM_LEN];
-	int		offset;
-	int		baspri;
-} job_params_msg;
-
-typedef size_t job_arg_count_msg;
+typedef struct job_params_struct	job_params_msg;
+typedef size_t				job_arg_count_msg;
 
 typedef struct
 {
@@ -174,9 +179,13 @@ typedef size_t job_buffer_size_msg;
 int ojchildioset(job_params_type *jparms);
 int ojstartchild(job_params_type *jparms, int argcnt, boolean_t *non_exit_return, int pipe_fds[]);
 void ojparams(char *p, job_params_type *job_params);
-void ojgetch_env(job_params_type *jparms);
 void ojchildioclean(void);
+<<<<<<< HEAD
 void ojmidchild_send_var(void);
 void job_term_handler(int sig, siginfo_t *info, void *context);
+=======
+void ojpassvar_hook(void);
+void local_variable_marshalling(FILE *output);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 #endif

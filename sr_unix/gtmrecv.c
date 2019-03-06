@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -39,7 +39,6 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "repl_errno.h"
-#include "gtm_event_log.h"
 #include "repl_sem.h"
 #include "repl_sp.h"
 #include "cli.h"
@@ -117,7 +116,12 @@ int gtmrecv(void)
 	repl_inst_hdr		updresync_inst_hdr;
 	uint4			gtmrecv_pid;
 	int			idx, semval, status, save_upd_status, upd_start_status, upd_start_attempts;
+<<<<<<< HEAD
 	char			print_msg[1024], tmpmsg[1024];
+=======
+	struct stat		stat_buf;
+	char			print_msg[REPL_MSG_SIZE], tmpmsg[REPL_MSG_SIZE];
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	pid_t			pid, procgp;
 	int			exit_status, waitpid_res, save_errno;
 	int			log_init_status;
@@ -475,7 +479,27 @@ int gtmrecv(void)
 	if (-1 == (procgp = setsid()))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_RECVPOOLSETUP, 0, ERR_TEXT, 2,
 			  RTS_ERROR_LITERAL("Receiver server error in setsid"), errno);
+<<<<<<< HEAD
 	gtm_event_log_init();
+=======
+	/* Point stdin to /dev/null */
+	OPENFILE("/dev/null", O_RDONLY, null_fd);
+	if (0 > null_fd)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to open /dev/null for read"), errno, 0);
+	assert(null_fd > 2);
+	/* Detached from the initiating process, now detach from the starting IO */
+	io_rundown(NORMAL_RUNDOWN);
+	FSTAT_FILE(gtmrecv_log_fd, &stat_buf, log_init_status);
+	assertpro(!log_init_status);	/* io_rundown should not affect the log file */
+	DUP2(null_fd, 0, rc);
+	if (0 > rc)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to set stdin to /dev/null"), errno, 0);
+	/* Re-init IO now that we have opened the log file and set stdin to /dev/null */
+	io_init(IS_MUPIP_IMAGE);
+	CLOSEFILE(null_fd, rc);
+	if (0 > rc)
+		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	gtmrecv_local->recv_serv_pid = process_id;
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));
 	jnlpool->jnlpool_ctl->gtmrecv_pid = process_id;
@@ -484,13 +508,12 @@ int gtmrecv(void)
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "%s %s\n", cli_lex_in_ptr->argv[0], cli_lex_in_ptr->in_str);
 
 	assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));
-	SPRINTF(tmpmsg, "GTM Replication Receiver Server with Pid [%d] started on replication instance [%s]",
+	SNPRINTF(tmpmsg, REPL_MSG_SIZE, "GTM Replication Receiver Server with Pid [%d] started on replication instance [%s]",
 		process_id, jnlpool->repl_inst_filehdr->inst_info.this_instname);
-	sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
+	sgtm_putmsg(print_msg, REPL_MSG_SIZE, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Attached to existing jnlpool with shmid = [%d] and semid = [%d]\n",
 			jnlpool->repl_inst_filehdr->jnlpool_shmid, jnlpool->repl_inst_filehdr->jnlpool_semid);
-	gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
 	if (recvpool_ctl->fresh_start)
 	{
 		QWASSIGNDW(recvpool_ctl->jnl_seqno, 0); /* Update process will initialize this to a non-zero value */
@@ -533,11 +556,11 @@ int gtmrecv(void)
 	if ((UPDPROC_EXISTS == upd_start_status && recvpool_ctl->fresh_start) ||
 	    (UPDPROC_START_ERR == upd_start_status && GTMRECV_MAX_UPDSTART_ATTEMPTS <= upd_start_attempts))
 	{
-		sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLERR, RTS_ERROR_LITERAL((UPDPROC_EXISTS == upd_start_status) ?
+		sgtm_putmsg(print_msg, REPL_MSG_SIZE, VARLSTCNT(4) ERR_REPLERR, RTS_ERROR_LITERAL(
+			(UPDPROC_EXISTS == upd_start_status) ?
 			    "Runaway Update Process. Aborting..." :
 			    "Too many failed attempts to fork Update Process. Aborting..."));
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
-		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLERR", print_msg);
 		gtmrecv_exit(ABNORMAL_SHUTDOWN);
 	}
 	upd_proc_local->start_upd = UPDPROC_STARTED;

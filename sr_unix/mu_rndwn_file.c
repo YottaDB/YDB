@@ -969,7 +969,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	{
 		util_out_print("Expected shared memory size is !SL, but found !SL",
 			TRUE, sec_size, shm_buf.shm_segsz);
-		util_out_print("!AD -> Existing shared memory size do not match.", TRUE, DB_LEN_STR(reg));
+		util_out_print("!AD -> Existing shared memory sizes do not match.", TRUE, DB_LEN_STR(reg));
 		/* fall through to get VERMISMATCH message */
 	}
 	gv_cur_region = reg;
@@ -1181,7 +1181,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 					cnl->statsdb_rundown_clean = statsDBrundown_status;
 				}
 			}
-			csa->critical = (mutex_struct_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
+			csa->critical = (CRIT_PTR_T)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
 			assert(((INTPTR_T)csa->critical & 0xf) == 0);	/* critical should be 16-byte aligned */
 #			ifdef CACHELINE_SIZE
 			assert(0 == ((INTPTR_T)csa->critical & (CACHELINE_SIZE - 1)));

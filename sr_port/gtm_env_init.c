@@ -284,6 +284,7 @@ void	gtm_env_init(void)
 		if (reservesize)
 			outOfMemoryMitigateSize = reservesize;
 		/* Initialize indirect cache limits (max memory, max entries) */
+<<<<<<< HEAD
 		max_cache_memsize = MAX_CACHE_MEMSIZE * 1024;
 		memsize = ydb_trans_numeric(YDBENVINDX_MAX_INDRCACHE_MEMORY, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		if (memsize)
@@ -291,6 +292,17 @@ void	gtm_env_init(void)
 		max_cache_entries = MAX_CACHE_ENTRIES;
 		cachent = ydb_trans_numeric(YDBENVINDX_MAX_INDRCACHE_COUNT, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 		if (cachent)
+=======
+		max_cache_memsize = DEFAULT_INDRCACHE_KBSIZE * BIN_ONE_K;
+		val.addr = GTM_MAX_INDRCACHE_MEMORY;
+		val.len = SIZEOF(GTM_MAX_INDRCACHE_MEMORY) - 1;
+		if (memsize = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
+			max_cache_memsize = ((MAX_INDRCACHE_KBSIZE > memsize) ? memsize : MAX_INDRCACHE_KBSIZE) * BIN_ONE_K;
+		max_cache_entries = DEFAULT_INRDCACHE_ENTRIES;
+		val.addr = GTM_MAX_INDRCACHE_COUNT;
+		val.len = SIZEOF(GTM_MAX_INDRCACHE_COUNT) - 1;
+		if (cachent = trans_numeric(&val, &is_defined, TRUE)) /* Note assignment!! */
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 			max_cache_entries = cachent;
 		/* Initialize ZQUIT to control funky QUIT compilation */
 		ret = ydb_logical_truth_value(YDBENVINDX_ZQUIT_ANYWAY, FALSE, &is_defined);
@@ -357,6 +369,8 @@ void	gtm_env_init(void)
 				trctblsize = ydb_trans_numeric(YDBENVINDX_TRACE_TABLE_SIZE, &is_defined, IGNORE_ERRORS_TRUE, NULL);
 				if (0 < (trctblsize = (0 < trctblsize) ? trctblsize : TRACE_TABLE_SIZE_DEFAULT)) /* assignment! */
 				{
+					if (TRACE_TABLE_SIZE_MAX < trctblsize)
+						trctblsize = TRACE_TABLE_SIZE_MAX;
 					trctblbytes = trctblsize * SIZEOF(trctbl_entry);
 					TREF(gtm_trctbl_start) = malloc(trctblbytes);
 					TREF(gtm_trctbl_end) = TREF(gtm_trctbl_start) + trctblsize;

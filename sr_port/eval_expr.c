@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,7 @@
 GBLREF	boolean_t	run_time;
 
 error_def(ERR_EXPR);
+error_def(ERR_MAXARGCNT);
 error_def(ERR_RHMISSING);
 error_def(ERR_SIDEEFFECTEVAL);
 
@@ -98,7 +99,7 @@ int eval_expr(oprtype *a)
 			ref1 = ref = maketriple(OC_CAT);
 			catbp = &ref->backptr;		/* borrow backptr to track args */
 			saw_se = saw_local = FALSE;
-			for (op_count = 2; ; op_count++) /* op_count = first operand plus destination */
+			for (op_count = 2; (MAX_ARGS - 3) >= op_count ; op_count++) /* op_count = first operand plus destination */
 			{	/* If we can, concat string literals at compile-time rather than runtime */
 				replaced = FALSE;
 				if ((OC_PARAMETER == ref1->opcode)
@@ -209,6 +210,11 @@ int eval_expr(oprtype *a)
 					return EXPR_FAIL;
 				}
 				coerce(&optyp_1, type);
+			}
+			if ((MAX_ARGS - 3) < op_count)
+			{
+				stx_error(ERR_MAXARGCNT, 1, MAX_ARGS - 3);
+				return EXPR_FAIL;
 			}
 		} else
 		{

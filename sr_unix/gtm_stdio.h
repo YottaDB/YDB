@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -77,11 +77,10 @@
 /* We are compiling a GTM source module if UNIX is defined */
 #  define FPRINTF			gtm_fprintf
 #  define PRINTF			gtm_printf
-#  define SPRINTF			gtm_sprintf
+#  define SPRINTF(STR, ...)		assert(FALSE);	/* don't want to use invocation prone to buffer overruns */
 #  define SNPRINTF			gtm_snprintf
 int	gtm_printf(const char *format, ...);
 int	gtm_fprintf(FILE *stream, const char *format, ...);
-int	gtm_sprintf(char *str, const char *format, ...);
 int	gtm_snprintf(char *str, size_t size, const char *format, ...);
 #else
 /* We are compiling a standalone or test system module so no override (This is NOT VMS)  */
@@ -159,16 +158,16 @@ int	gtm_sscanf(char *str, const char *format, ...);
 	} while(-1 == RC && EINTR == errno);			\
 }
 
-#define SPRINTF_ENV_NUM(BUFF, ENV_VAR, ENV_VAL, ENV_IND)						\
+#define SNPRINTF_ENV_NUM(BUFF, LEN, ENV_VAR, ENV_VAL, ENV_IND)						\
 {													\
 	assert(NULL == strchr(ENV_VAR, '='));	/* strchr() done in ojstartchild() relies on this */	\
-	SPRINTF(BUFF, "%s=%d", ENV_VAR, ENV_VAL); *ENV_IND++ = BUFF;					\
+	SNPRINTF(BUFF, LEN, "%s=%d", ENV_VAR, ENV_VAL); *ENV_IND++ = BUFF;				\
 }
 
-#define SPRINTF_ENV_STR(BUFF, ENV_VAR, ENV_VAL, ENV_IND)						\
+#define SNPRINTF_ENV_STR(BUFF, LEN, ENV_VAR, ENV_VAL, ENV_IND)						\
 {													\
 	assert(NULL == strchr(ENV_VAR, '='));	/* strchr() done in ojstartchild() relies on this */	\
-	SPRINTF(BUFF, "%s=%s", ENV_VAR, ENV_VAL); *ENV_IND++ = BUFF;					\
+	SNPRINTF(BUFF, LEN, "%s=%s", ENV_VAR, ENV_VAL); *ENV_IND++ = BUFF;				\
 }
 
 #endif

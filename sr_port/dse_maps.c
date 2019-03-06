@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,8 +91,7 @@ void dse_maps(void)
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	assert(&FILE_INFO(gv_cur_region)->s_addrs == csa);
 	was_crit = csa->now_crit;
-	if (csa->critical)
-		crash_count = csa->critical->crashcnt;
+	UPDATE_CRASH_COUNT(csa, crash_count);
 	csd = csa->hdr;
 	assert(csd == cs_data);
 	bplmap = csd->bplmap;

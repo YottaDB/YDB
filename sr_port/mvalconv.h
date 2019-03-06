@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __MVALCONV_H__
-#define  __MVALCONV_H__
+#ifndef MVALCONV_H_INCLUDED
+#define  MVALCONV_H_INCLUDED
 
 /* Several of the following functions suffer from a lack of precision when used
  * on a 64bit system.  ints are 4 byte values, but the functions i2mval and i2usmval

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -15,9 +15,9 @@
 
 #include "mdef.h"
 
-#define BYPASS_MEMCPY_OVERRIDE	/* Want to run original system memcpy() here */
+#define BYPASS_MEMCPY_OVERRIDE	/* Want to run original system memcpy() after checks */
 #include "gtm_string.h"
-
+#include "stringpool.h"
 #include "gtmdbglvl.h"
 #include "gtm_memcpy_validate_and_execute.h"
 
@@ -39,6 +39,8 @@ void *gtm_memcpy_validate_and_execute(void *target, const void *src, size_t len)
 	assert(((char *)(target) > (char *)(src))
 	       ? ((char *)(target) >= ((char *)(src) + (len)))
 	       : ((char *)(src) >= ((char *)(target) + (len))));
+	assert(((unsigned char *)target < stringpool.base) || ((unsigned char *)target > stringpool.top)
+		|| (((unsigned char *)target + len) <= stringpool.top));
 	return memcpy(target, src, len);
 }
 #endif

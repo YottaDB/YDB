@@ -89,7 +89,7 @@ MBSTART {						\
 	do						\
 	{						\
 		RC = ioctl(FDESC, REQUEST, ARG);	\
-	} while(-1 == RC && EINTR == errno);		\
+	} while (-1 == RC && EINTR == errno);		\
 	if (-1 != RC)					\
 		RC = 0;					\
 	else						\
@@ -101,7 +101,7 @@ MBSTART {						\
 	do						\
 	{						\
 		FDESC = OPEN(FNAME, FFLAGS);		\
-	} while(-1 == FDESC && EINTR == errno);		\
+	} while (-1 == FDESC && EINTR == errno);	\
 } MBEND
 
 #define OPENFILE3(FNAME, FFLAGS, FMODE, FDESC)		\
@@ -109,7 +109,7 @@ MBSTART {						\
 	do						\
 	{						\
 		FDESC = OPEN3(FNAME, FFLAGS, FMODE);	\
-	} while(-1 == FDESC && EINTR == errno);		\
+	} while (-1 == FDESC && EINTR == errno);	\
 } MBEND
 
 /* OPENFILE4 not needed - io_open_try handles interrupts */
@@ -137,9 +137,12 @@ MBSTART {								\
 MBSTART {					\
 	FDESC = OPEN(FNAME, FFLAGS | O_CLOEXEC);\
 } MBEND
-#define OPEN3_CLOEXEC(FNAME, FFLAGS, FMODE, FDESC)  	\
-MBSTART {						\
-	FDESC = OPEN3(FNAME, FFLAGS | O_CLOEXEC, FMODE);\
+#define OPEN3_CLOEXEC(FNAME, FFLAGS, FMODE, FDESC)  			\
+MBSTART {								\
+	do								\
+	{								\
+		FDESC = OPEN3(FNAME, FFLAGS | O_CLOEXEC, FMODE);	\
+	} while (-1 == FDESC && EINTR == errno);			\
 } MBEND
 #define OPENFILE_CLOEXEC(FNAME, FFLAGS, FDESC)  OPENFILE(FNAME, FFLAGS | O_CLOEXEC, FDESC);
 #define OPENFILE_SYNC_CLOEXEC(FNAME, FFLAGS, FDESC)	OPENFILE_SYNC(FNAME, FFLAGS | O_CLOEXEC, FDESC);
@@ -281,7 +284,7 @@ MBSTART {							\
 	do							\
 	{							\
 		RC = close(FDESC);				\
-	} while(-1 == RC && EINTR == errno);			\
+	} while (-1 == RC && EINTR == errno);			\
 	if (-1 == RC)	/* Had legitimate error - return it */	\
 		RC = errno;					\
 } MBEND

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -52,6 +52,7 @@
 #include "get_reference.h"
 #include "sgtm_putmsg.h"
 #include "dollar_quit.h"
+#include "ztimeout_routines.h"
 
 #define ESC_OFFSET 		4
 #define MAX_COMMAND_LINE_LENGTH 255
@@ -88,6 +89,7 @@ static readonly char x_text[] = "$X";
 static readonly char y_text[] = "$Y";
 static readonly char za_text[] = "$ZA";
 static readonly char zallocstor_text[] = "$ZALLOCSTOR";
+static readonly char zaudit_text[] = "$ZAUDIT";
 static readonly char zb_text[] = "$ZB";
 static readonly char zchset_text[] = "$ZCHSET";
 static readonly char zcmdline_text[] = "$ZCMDLINE";
@@ -118,6 +120,7 @@ static readonly char zstatus_text[] = "$ZSTATUS";
 static readonly char zstep_text[] = "$ZSTEP";
 static readonly char zstrpllim_text[] = "$ZSTRPLLIM";
 static readonly char zsystem_text[] = "$ZSYSTEM";
+static readonly char ztimeout_text[] = "$ZTIMEOUT";
 #ifdef GTM_TRIGGER
 static readonly char ztname_text[] = "$ZTNAME";
 static readonly char ztdata_text[] = "$ZTDATA";
@@ -159,6 +162,7 @@ GBLREF uint4		dollar_zjob;
 GBLREF mval		dollar_zstatus;
 GBLREF mval		dollar_zsource;
 GBLREF int4		dollar_zsystem;
+GBLREF boolean_t	dollar_zaudit;
 GBLREF int4		dollar_zeditor;
 GBLREF uint4		dollar_tlevel;
 GBLREF uint4		dollar_trestart;
@@ -251,6 +255,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 	int 		count, save_dollar_zlevel;
 	char		*c1, *c2;
 	char		zdir_error[ZDIR_ERR_LEN];
+	size_t		zdir_error_rem_len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -428,6 +433,13 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
+		case SV_ZAUDIT:
+			MV_FORCE_MVAL(&var, dollar_zaudit);
+			ZS_VAR_EQU(&x, zaudit_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
 		case SV_ZB:
 			c1 = (char *)io_curr_device.in->dollar.zb;
 			c2 = c1 + SIZEOF(io_curr_device.in->dollar.zb);
@@ -474,7 +486,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 		/* CAUTION: fall through */
 		case SV_ZC:
 		case SV_ZCSTATUS:
-			MV_FORCE_MVAL(&var, TREF(dollar_zcstatus));
+			MV_FORCE_MVAL(&var, !TREF(dollar_zcstatus) ? 1 : TREF(dollar_zcstatus));
 			ZS_VAR_EQU(&x, zcstatus_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
@@ -494,8 +506,10 @@ void zshow_svn(zshow_out *output, int one_sv)
 			{
 				memcpy(zdir_error, zdir.str.addr, zdir.str.len);
 				memcpy(&zdir_error[zdir.str.len], arrow_text, STR_LIT_LEN(arrow_text));
-				sgtm_putmsg(&zdir_error[zdir.str.len + STR_LIT_LEN(arrow_text)], VARLSTCNT(6) ERR_ZDIROUTOFSYNC, 4,
-					zdir.str.len, zdir.str.addr, dollar_zdir.str.len, dollar_zdir.str.addr);
+				zdir_error_rem_len = ZDIR_ERR_LEN - zdir.str.len - STR_LIT_LEN(arrow_text);
+				sgtm_putmsg(&zdir_error[zdir.str.len + STR_LIT_LEN(arrow_text)], zdir_error_rem_len,
+					VARLSTCNT(6) ERR_ZDIROUTOFSYNC, 4, zdir.str.len, zdir.str.addr,
+					dollar_zdir.str.len, dollar_zdir.str.addr);
 				zdir.str.addr = zdir_error;
 				zdir.str.len = STRLEN(zdir_error) - 1; /* eliminate trailing '\n' */
 			}
@@ -737,6 +751,12 @@ void zshow_svn(zshow_out *output, int one_sv)
 			if (SV_ALL != one_sv)
 				break;
 		/* CAUTION: fall through */
+		case SV_ZTIMEOUT:
+			get_ztimeout(&var);
+			ZS_VAR_EQU(&x, ztimeout_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;		/* CAUTION: fall through */
 #		ifdef GTM_TRIGGER
 		case SV_ZTDATA:
 			if (NULL != dollar_ztdata)

@@ -583,10 +583,10 @@ void updproc_actions(gld_dbname_list *gld_db_files)
 	SETUP_THREADGBL_ACCESS;
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
 	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
-	DEBUG_ONLY(
-		assert(!repl_csa->hold_onto_crit); /* so we can do unconditional grab_lock/rel_lock below */
-		ASSERT_VALID_JNLPOOL(repl_csa);
-	)
+#	ifdef DEBUG
+	assert(!repl_csa->hold_onto_crit); /* so we can do unconditional grab_lock/rel_lock below */
+	ASSERT_VALID_JNLPOOL(repl_csa);
+#	endif
 	ESTABLISH(updproc_ch);
 	recvpool_ctl = recvpool.recvpool_ctl;
 	upd_proc_local = recvpool.upd_proc_local;

@@ -60,7 +60,7 @@ int	gtm_compile(void)
 	boolean_t		more;
 	char			ceprep_file[MAX_FN_LEN + 1], list_file[MAX_FN_LEN + 1], obj_file[MAX_FN_LEN + 1];
 	char			source_file_string[MAX_FN_LEN + 1];
-	int			status;
+	int			cum_status, status;
 	mstr			orig_cmdstr;
 	unsigned char		*mstack_ptr;
 	unsigned short		len;
@@ -108,9 +108,10 @@ int	gtm_compile(void)
 	ce_init();	/* initialize compiler escape processing */
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();	/* Not sure why compiler needs timers but .. */
-	TREF(dollar_zcstatus) = SS_NORMAL;
+	cum_status = SS_NORMAL;
 	do {
 		compile_source_file(len, source_file_string, TRUE);
+		cum_status |= TREF(dollar_zcstatus);
 		cmd_qlf.object_file.str.len = module_name.len = 0;
 		len = MAX_FN_LEN;
 		status = cli_get_str("INFILE", source_file_string, &len);
@@ -118,5 +119,5 @@ int	gtm_compile(void)
 	print_exit_stats();
 	SET_PROCESS_EXITING_TRUE;	/* needed by remove_rms($principal) to avoid closing that */
 	io_rundown(NORMAL_RUNDOWN);
-	return (SS_NORMAL == TREF(dollar_zcstatus)) ? SS_NORMAL : 1;
+	return (SS_NORMAL == cum_status) ? SS_NORMAL : 1;
 }

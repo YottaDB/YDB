@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -194,6 +194,7 @@ void	mur_extract_set(jnl_ctl_list *jctl, enum broken_type recstat, jnl_record *r
 		if (ZWR_EXP_RATIO(val_len) <= murgbl.max_extr_record_length - extract_len)
 		{
 			ptr = &murgbl.extr_buff[extract_len];
+			val_extr_len = murgbl.max_extr_record_length - extract_len;
 			format2zwr((sm_uc_ptr_t)val_ptr, val_len, (unsigned char *)ptr, &val_extr_len);
 			extract_len += val_extr_len;
 		} else

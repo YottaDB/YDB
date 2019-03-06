@@ -401,6 +401,12 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("pthread_mutexattr_init"), CALLFROM, status, 0);
 		}
+		status = pthread_mutexattr_settype(&write_updated_ctl_attr, PTHREAD_MUTEX_ERRORCHECK);
+		if (0 != status)
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+					LEN_AND_LIT("pthread_mutexattr_settype"), CALLFROM, status, 0);
+		}
 		status = pthread_mutexattr_setpshared(&write_updated_ctl_attr, PTHREAD_PROCESS_SHARED);
 		if (0 != status)
 		{
@@ -408,7 +414,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("pthread_mutexattr_setpshared"), CALLFROM, status, 0);
 		}
-#		ifdef __linux__
+#		if PTHREAD_MUTEX_ROBUST_SUPPORTED
 		status = pthread_mutexattr_setrobust(&write_updated_ctl_attr, PTHREAD_MUTEX_ROBUST);
 		if (0 != status)
 		{

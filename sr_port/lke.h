@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __LKE_H__
-#define __LKE_H__
+#ifndef LKE_H_INCLUDED
+#define LKE_H_INCLUDED
 
 #include "error.h"
 

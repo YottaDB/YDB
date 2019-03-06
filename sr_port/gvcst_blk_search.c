@@ -133,10 +133,11 @@ error_def(ERR_TEXT);
 #endif
 
 #define	INVOKE_GVCST_SEARCH_FAIL_IF_NEEDED(pStat)	if (CDB_STAGNATE <= t_tries) gvcst_search_fail(pStat);
+#define	OUT_LINE	1024 + 1
 
 static	void	gvcst_search_fail(srch_blk_status *pStat)
 {
-	char		buff[1024], crbuff[256], regbuff[512];
+	char		buff[OUT_LINE], crbuff[SIZEOF(blk_hdr_ptr_t) + 1], regbuff[MAX_RN_LEN + 1];
 	uint4		len;
 
 	assert(CDB_STAGNATE <= t_tries);
@@ -145,7 +146,7 @@ static	void	gvcst_search_fail(srch_blk_status *pStat)
 	{
 		if (NULL != pStat->cr)
 		{
-			SPRINTF(crbuff, ": crbuff = 0x%lX", pStat->cr->buffaddr);
+			SNPRINTF(crbuff, OUT_LINE, ": crbuff = 0x%lX", pStat->cr->buffaddr);
 			cert_blk(gv_cur_region, pStat->cr->blk, (blk_hdr_ptr_t)GDS_ANY_REL2ABS(cs_addrs, pStat->cr->buffaddr),
 				0,  SEND_MSG_ON_CERT_FAIL, NULL);
 		} else

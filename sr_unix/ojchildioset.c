@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,10 +56,10 @@ int ojchildioset(job_params_type *jparms)
 	/*
 	 * Open Input
 	 */
-	if (IS_JOB_SOCKET(jparms->input.addr, jparms->input.len))
+	if (IS_JOB_SOCKET(jparms->params.input.buffer, jparms->params.input.len))
 	{
-		handle_len = JOB_SOCKET_HANDLE_LEN(jparms->input.len);
-		index = iosocket_handle(JOB_SOCKET_HANDLE(jparms->input.addr), &handle_len, FALSE, socket_pool);
+		handle_len = JOB_SOCKET_HANDLE_LEN(jparms->params.input.len);
+		index = iosocket_handle(JOB_SOCKET_HANDLE(jparms->params.input.buffer), &handle_len, FALSE, socket_pool);
 		if (-1 == index)
 		{
 			joberr = joberr_stdin_socket_lookup;
@@ -83,8 +84,8 @@ int ojchildioset(job_params_type *jparms)
 		}
 	} else
 	{
-		strncpy(fname_buf, jparms->input.addr, jparms->input.len);
-		*(fname_buf + jparms->input.len) = '\0';
+		strncpy(fname_buf, jparms->params.input.buffer, jparms->params.input.len);
+		*(fname_buf + jparms->params.input.len) = '\0';
 
 		OPENFILE(fname_buf, O_RDONLY, in_fd);
 		if (FD_INVALID == in_fd)
@@ -99,10 +100,10 @@ int ojchildioset(job_params_type *jparms)
 	/*
 	 * Open Output
 	 */
-	if (IS_JOB_SOCKET(jparms->output.addr, jparms->output.len))
+	if (IS_JOB_SOCKET(jparms->params.output.buffer, jparms->params.output.len))
 	{
-		handle_len = JOB_SOCKET_HANDLE_LEN(jparms->output.len);
-		index = iosocket_handle(JOB_SOCKET_HANDLE(jparms->output.addr), &handle_len, FALSE, socket_pool);
+		handle_len = JOB_SOCKET_HANDLE_LEN(jparms->params.output.len);
+		index = iosocket_handle(JOB_SOCKET_HANDLE(jparms->params.output.buffer), &handle_len, FALSE, socket_pool);
 		if (-1 == index)
 		{
 			joberr = joberr_stdout_socket_lookup;
@@ -119,8 +120,8 @@ int ojchildioset(job_params_type *jparms)
 		out_fd = dup_ret;
 	} else
 	{
-		strncpy(fname_buf, jparms->output.addr, jparms->output.len);
-		*(fname_buf + jparms->output.len) = '\0';
+		strncpy(fname_buf, jparms->params.output.buffer, jparms->params.output.len);
+		*(fname_buf + jparms->params.output.len) = '\0';
 
 		CREATE_FILE(fname_buf, 0666, out_fd);
 		if (FD_INVALID == out_fd)
@@ -148,10 +149,10 @@ int ojchildioset(job_params_type *jparms)
 	/*
 	 * Open Error
 	 */
-	if (IS_JOB_SOCKET(jparms->error.addr, jparms->error.len))
+	if (IS_JOB_SOCKET(jparms->params.error.buffer, jparms->params.error.len))
 	{
-		handle_len = JOB_SOCKET_HANDLE_LEN(jparms->error.len);
-		index = iosocket_handle(JOB_SOCKET_HANDLE(jparms->error.addr), &handle_len, FALSE, socket_pool);
+		handle_len = JOB_SOCKET_HANDLE_LEN(jparms->params.error.len);
+		index = iosocket_handle(JOB_SOCKET_HANDLE(jparms->params.error.buffer), &handle_len, FALSE, socket_pool);
 		if (-1 == index)
 		{
 			joberr = joberr_stderr_socket_lookup;
@@ -168,8 +169,8 @@ int ojchildioset(job_params_type *jparms)
 		err_fd = dup_ret;
 	} else
 	{
-		strncpy(fname_buf, jparms->error.addr, jparms->error.len);
-		*(fname_buf + jparms->error.len) = '\0';
+		strncpy(fname_buf, jparms->params.error.buffer, jparms->params.error.len);
+		*(fname_buf + jparms->params.error.len) = '\0';
 
 		CREATE_FILE(fname_buf, 0666, err_fd);
 		if (FD_INVALID == err_fd)

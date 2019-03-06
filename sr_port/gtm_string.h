@@ -23,7 +23,7 @@
 
 #include <string.h>
 
-#define STRERROR	strerror
+#define	STRERROR	strerror
 #define	STRCPY(DEST, SOURCE)		strcpy((char *)(DEST), (char *)(SOURCE))
 #define	STRNCPY_STR(DEST, STRING, LEN)	strncpy((char *)(DEST), (char *)(STRING), LEN)
 #define	STRCMP(SOURCE, DEST)		strcmp((char *)(SOURCE), (char *)(DEST))
@@ -33,6 +33,7 @@
 #define STRNCMP_LIT_LEN(SOURCE, LITERAL, LENGTH)	\
 		strncmp((const char *)(SOURCE), (const char *)(LITERAL), MIN(SIZEOF(LITERAL), LENGTH))	/* BYPASSOK */
 #define	STRNCMP_STR(SOURCE, STRING, LEN) strncmp(SOURCE, STRING, LEN)
+#define	STRNCAT(DEST, SOURCE, LEN)	strncat((char *)DEST, (const char *)SOURCE, (size_t)LEN)
 /* Ensure that our uses of STRTOK and STRTOK_R are not called inside a timer handler */
 #define STRTOK_R(STR, DELIM, SAVE)	(DBG_ASSERT(FALSE == timer_in_handler) strtok_r(STR, DELIM, SAVE))
 /* We need to catch any memcpy() that is used when the source and target strings overlap in any fashion so we can change

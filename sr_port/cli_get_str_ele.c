@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,7 +15,7 @@
 
 LITREF unsigned char  lower_to_upper_table[];
 
-bool cli_get_str_ele(char *inbuff, char *dst, unsigned short *dst_len, boolean_t upper_case)
+boolean_t cli_get_str_ele(char *inbuff, char *dst, unsigned short *dst_len, boolean_t upper_case)
 {
 	*dst_len = 0;
 	while (*inbuff && ',' != *inbuff)

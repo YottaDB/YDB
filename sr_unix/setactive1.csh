@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2016 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
@@ -205,15 +205,15 @@ endif
 
 set setactive_old_gtm_exe = `basename $gtm_exe`
 switch ($setactive_old_gtm_exe)
-case "[Bb][Tt][Aa]":
+case "[Bb]*":
 	set setactive_binary_desc = "optimized, with asserts, and without debugger information"
 	breaksw
 
-case "[Dd][Bb][Gg]":
+case "[Dd]*":
 	set setactive_binary_desc = "unoptimized, with asserts, and with debugger information"
 	breaksw
 
-case "[Pp][Rr][Oo]":
+case "[Pp]*":
 	set setactive_binary_desc = "optimized, without asserts, and without debugger information"
 	breaksw
 

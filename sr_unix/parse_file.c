@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +35,7 @@
 #include "trans_log_name.h"
 #include "setzdir.h"
 #include "gtmmsg.h" /* for gtm_putmsg */
+#include "min_max.h"
 
 #define LOCALHOSTNAME "localhost"
 #define LOCALHOSTNAME6 "::1"
@@ -58,12 +64,13 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	struct stat		statbuf;
 	struct addrinfo		*ai_ptr, *localhost_ai_ptr, *temp_ai_ptr, hints;
 	mstr			trans, tmp;
-	int			status, diff, local_node_len, query_node_len, node_name_len;
+	int			status, diff;
+	uint4			local_node_len, query_node_len, node_name_len;
 	parse_blk		def;
 	char			local_node_name[MAX_HOST_NAME_LEN + 1], query_node_name[MAX_HOST_NAME_LEN + 1];
 	char			*base, *ptr, *top, *del, *node, *name, *ext, ch;
 	char			**hostaddrlist;
-	char			def_string[MAX_FBUFF + 1];
+	char			def_string[MAX_FN_LEN + 1];
 	boolean_t		hasnode, hasdir, hasname, hasext, wilddir, wildname;
 	enum parse_state	state;
 	struct sockaddr_storage	query_sas;
@@ -74,7 +81,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 
 	pblk->fnb = 0;
 	ai_ptr = localhost_ai_ptr = temp_ai_ptr = NULL;
-	assert(((unsigned int)pblk->buff_size + 1) <= (MAX_FBUFF + 1));
+	assert(((unsigned int)pblk->buff_size + 1) <= (MAX_FN_LEN + 1));
 	/* All callers of parse_blk set buff_size to 1 less than the allocated buffer. This is because buff_size is a char
 	 * type (for historical reasons) and so cannot go more than 255 whereas we support a max of 255 characters. So we
 	 * allocate buffers that contain one more byte (for the terminating '\0') but dont set that in buff_size. Use
@@ -89,12 +96,12 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	{	/* Parse default filespec if supplied */
 		def.fop = F_SYNTAXO;
 		def.buffer = def_string;
-		def.buff_size = MAX_FBUFF;
+		def.buff_size = MAX_FN_LEN;
 		def.def1_size = pblk->def2_size;
 		def.def1_buf = pblk->def2_buf;
 		tmp.len = pblk->def1_size;
 		tmp.addr = pblk->def1_buf;
-		if ((status = parse_file(&tmp, &def)) != ERR_PARNORMAL)
+		if ((status = (ERR_PARNORMAL != parse_file(&tmp, &def))))
 			return status;
 		assert(!def.b_node);
 		if (def.b_dir)	def.fnb |= F_HAS_DIR;
@@ -104,6 +111,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	wildname = wilddir = hasnode = hasdir = hasname = hasext = FALSE;
 	node = base = ptr = trans.addr;
 	top = ptr + trans.len;
+	node_name_len = (uint4)trans.len;
 	if ((0 == trans.len) || ('/' != *ptr))
 	{	/* No file given, no full path given, or a nodename was specified */
 		setzdir(NULL, &def_trans); /* Default current directory if none given */
@@ -148,8 +156,28 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 				hasnode = TRUE;
 				base = node;				/* Update pointers past node name */
 				/* See if the desired (query) node is the local node */
+<<<<<<< HEAD
 				node_name_len = (int)(node - trans.addr);	/* Scanned node including ':' */
 				if (!donot_short_circuit)
+=======
+				node_name_len = (uint4)(node - trans.addr);	/* Scanned node including ':' */
+				query_node_len = MIN((node_name_len - 1), MAX_HOST_NAME_LEN); /* Pure name length, no ':' on end */
+				assert(MAX_HOST_NAME_LEN >= query_node_len);
+				assert(0 < query_node_len);
+				assert(':' == *(trans.addr + query_node_len));
+				memcpy(query_node_name, trans.addr, query_node_len);
+				query_node_name[query_node_len] = 0;
+				localhost_sa_ptr = NULL;	/* Null value needed if not find query node (remote default) */
+				CLIENT_HINTS(hints);
+				if (0 != (errcode = getaddrinfo(query_node_name, NULL, &hints, &ai_ptr)))	/* Assignment! */
+					ai_ptr = NULL;		/* Skip additional lookups */
+				else
+					memcpy((sockaddr_ptr)&query_sas, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
+				CLIENT_HINTS(hints);
+				if (0 == (errcode = getaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr))
+					&& (0 == memcmp(localhost_ai_ptr->ai_addr, (sockaddr_ptr)&query_sas,
+						localhost_ai_ptr->ai_addrlen)))
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 				{
 					query_node_len = node_name_len - 1;		/* Pure name length, no ':' on end */
 					assert(MAX_HOST_NAME_LEN >= query_node_len);
@@ -233,8 +261,8 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 					return ERR_PARNORMAL;
 				}
 				/* Remove local node name from filename buffer */
-				assert(0 < trans.len - node_name_len);
-				memmove(trans.addr, node, trans.len - node_name_len);
+				assert(trans.len > node_name_len);	/* this is a function of how we determined node_name_len */
+				memmove(trans.addr, node, MIN(trans.len - node_name_len, MAX_FN_LEN));
 				ptr = base = node -= node_name_len;
 				top -= node_name_len;
 				trans.len -= node_name_len;
@@ -251,7 +279,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 		/* Construct full filename to parse prefixing given filename with default path prefix */
 		if (0 < def_trans.str.len)
 		{
-			memmove(ptr + def_trans.str.len, ptr, trans.len);
+			memmove(ptr + def_trans.str.len, ptr, MIN(trans.len, MAX_FN_LEN));
 			memcpy(ptr, def_trans.str.addr, def_trans.str.len);
 			assert('/' == ptr[def_trans.str.len - 1]);
 			ptr += def_trans.str.len;
@@ -302,6 +330,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 				while ((ptr < top) && ('/' == *ptr))
 					ptr++;
 			}
+			assert(top >= ptr);
 			memmove(del, ptr, top - ptr);
 			diff = (int)(ptr - del);
 			ptr -= diff;
@@ -385,11 +414,11 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	{
 		diff = (int)(name - base);
 		diff = def.b_dir - diff;
-		if (def.b_dir + pblk->b_name + pblk->b_ext > pblk->buff_size)
+		if ((pblk->b_name + pblk->b_ext + ((0 < def.b_dir) ? def.b_dir : 0 )) > pblk->buff_size)
 			return ERR_PARBUFSM;
-		if (diff > 0)
-			memmove(name + diff, name, pblk->b_name + pblk->b_ext);
-		else if (diff < 0)
+		if (0 < diff)
+			memmove(name + diff, name, pblk->b_name + pblk->b_ext);	/* the return ERR_PARBUFSM ensures this is safe */
+		else if (0 > diff)
 			memcpy(name + diff, name, pblk->b_name + pblk->b_ext);
 		memcpy(base, def.l_dir, def.b_dir);
 		ptr += diff;

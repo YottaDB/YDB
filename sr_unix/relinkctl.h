@@ -17,7 +17,6 @@
 #define RELINKCTL_H_INCLUDED
 
 # include "gtm_limits.h"
-# include "parse_file.h"	/* for MAX_FBUFF */
 
 /* Input RTNNAME is derived from a file name and we need to convert it to a proper routine name.
  * a) It is possible we got a '_' as the first character in case of a % routine. But the actual routine name stored in
@@ -158,7 +157,7 @@ typedef struct relinkrec_struct
 					 */
 } relinkrec_t;
 
-#define	ZRO_DIR_PATH_MAX	MAX_FBUFF	/* since "zro_load" which parses $zroutines uses MAX_FBUFF */
+#define	ZRO_DIR_PATH_MAX	MAX_FN_LEN	/* since "zro_load" which parses $zroutines uses MAX_FN_LEN */
 
 /* Shared structure - relinkctl file header */
 typedef struct relinkctl_data_struct

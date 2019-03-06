@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __RC_CPT_OPS_H__
-#define __RC_CPT_OPS_H__
+#ifndef RC_CPT_OPS_H_INCLUDED
+#define RC_CPT_OPS_H_INCLUDED
 
 int rc_cpt_entry(int blk);
 int rc_cpt_inval(void);

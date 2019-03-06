@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2018 Fidelity National Information	*
+ * Copyright (c) 2016-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -47,6 +47,10 @@
 #include "util.h"
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
+<<<<<<< HEAD
+=======
+#include "gtm_signal.h"			/* for SIGPROCMASK */
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 LITREF mval		literal_statsDB_gblname;
 
@@ -157,7 +161,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 	jnlpool_addrs_ptr_t		save_jnlpool;
 	srch_blk_status 		*bh;
 	char				statsDBinitrec[SIZEOF(gvstats_rec_t) * 2];	/* Gives chunk large enuf to hold pad */
-	int				datasize, extlen, freespace, padsize, sizewkey, sizewkeyrnd;
+	int				datasize, extlen, freespace, padsize, sizewkey, sizewkeyrnd, rc;
 	gv_key				save_altkey[DBKEYALLOC(MAX_KEY_SZ)], save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	sgmnt_addrs			*baseDBcsa, *statsDBcsa;
 	statsDB_deferred_init_que_elem	*sdiqeptr;
@@ -168,6 +172,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 	boolean_t			save_gvcst_statsDB_open_ch_active;
 	gd_binding			*ygs_map;
 	mname_entry			gvname;
+	sigset_t			unblock_sigbus;
 	ht_ent_mname			*tabent;
 	gvnh_reg_t			*gvnh_reg;
 	DCL_THREADGBL_ACCESS;
@@ -357,7 +362,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			if (0 < padsize)
 				memset(statsDBinitrec, 0, padsize);		/* Initialize prefix pad area with NULLs */
 			/* Move the current stats in cs_addrs to the shared rec we are about to write */
-			memcpy(statsDBinitrec + padsize, cs_addrs->gvstats_rec_p, SIZEOF(gvstats_rec_t));
+			memcpy(statsDBinitrec + padsize, baseDBcsa->gvstats_rec_p, SIZEOF(gvstats_rec_t));
 			memset((char *)&statsDBrec_mval, 0, SIZEOF(mval));
 			statsDBrec_mval.mvtype = MV_STR;
 			statsDBrec_mval.str.addr = statsDBinitrec;
@@ -412,9 +417,22 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 		assert(0 != error_condition);
 		if (ERR_TPRETRY == error_condition)
 			DRIVECH(error_condition);	/* Drive lower level handlers with same error we had */
-		/* Since we got an error while trying to open the statsDB, silently set NOSTATS on baseDB */
-		baseDBreg->reservedDBFlags |= RDBF_NOSTATS;
-		baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
+		if (TRUE == TREF(statsdb_memerr))
+		{	/* Case where we've received a SIGBUS trying to create the stats block.
+			 * In this case, we don't want to turn off stats, because we want the process
+			 * to continue with private updates.
+			 */
+			TREF(statsdb_memerr) = FALSE;
+			/* unblock SIGBUS since we did a long jump */
+			sigemptyset(&unblock_sigbus);
+			sigaddset(&unblock_sigbus, SIGBUS);
+			SIGPROCMASK(SIG_UNBLOCK, &unblock_sigbus, NULL, rc);
+		}
+		else
+		{	/* Since we got an error while trying to open the statsDB, silently set NOSTATS on baseDB */
+			baseDBreg->reservedDBFlags |= RDBF_NOSTATS;
+			baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;
+		}
 	}
 	return;
 }
@@ -817,7 +835,7 @@ void	gvcst_set_statsdb_fname(sgmnt_data_ptr_t csd, gd_region *baseDBreg, char *s
 			statsdb_off = TRUE;
 			break;
 		}
-		SPRINTF(statsBuf, "%x", hash_ftok);
+		SNPRINTF(statsBuf, statsTop - statsBuf, "%x", hash_ftok);
 		statsBuf += 8;
 		*statsBuf++ = '.';
 		/* Now add the basedb file name + ".gst" extension to the statsdb file name */

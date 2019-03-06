@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -200,6 +200,7 @@ THREADGBLDEF(transform,				boolean_t)			/* flag collation transform eligible */
 THREADGBLDEF(wcs_recover_done,			boolean_t)			/* TRUE if wcs_recover was ever invoked in this
 										 * process. */
 THREADGBLDEF(statsdb_fnerr_reason,		int)				/* Failure code for "gvcst_set_statsdb_fname" */
+THREADGBLDEF(statsdb_memerr,			boolean_t)			/* If true, Failed to write to statsdb (SIG7)" */
 
 /* Local variables */
 THREADGBLDEF(curr_symval_cycle,			unsigned int)			/* When curr_symval is changed, counter is bumped */
@@ -278,6 +279,8 @@ THREADGBLDEF(gtmsecshr_comkey,			unsigned int)			/* Hashed version key for gtmse
 										 * eliminates cross-version issues */
 THREADGBLDEF(gvcst_statsDB_open_ch_active,	boolean_t)			/* Condition handler is active */
 THREADGBLDEF(in_zwrite,				boolean_t)			/* ZWrite is active */
+THREADGBLDEF(is_socketpool,			boolean_t)			/* True when device-to-be-opened is socketpool */
+THREADGBLDEF(in_mupip_integ,			boolean_t)			/* To let DO_DB_HDR_CHECK skip DBFLCORRP */
 THREADGBLDEF(lab_lnr,				lnr_tabent **)			/* Passes address from op_rhd_ext to op_extcall etc.
 										 * Points into either lab_proxy or linkage table
 										 */
@@ -413,8 +416,8 @@ THREADGBLDEF(extcall_package_root,		struct extcall_package_list *)	/* External c
 THREADGBLDEF(gtmci_nested_level,		unsigned int)			/* Current nested depth of callin environments */
 THREADGBLDEF(comm_filter_init,			boolean_t)			/* Signifying that the filter is in use */
 THREADGBLDEF(temp_fgncal_stack,			unsigned char *)		/* Override for fgncal_stack when non-NULL */
-THREADGBLDEF(midchild_send_locals,		boolean_t)			/* The middle child will send the locals to the
-										 * grandchild using ojmidchild_send_var() if TRUE.
+THREADGBLDEF(zwrite_output_hook,		void *)				/* Really a void (*)(void), called if not NULL
+										 * when zwr_output is ready for use.
 										 */
 THREADGBLDEF(want_empty_gvts,			boolean_t)			/* set to TRUE by MUPIP REORG when it is selecting
 										 * globals to be reorged. Need to be able to select

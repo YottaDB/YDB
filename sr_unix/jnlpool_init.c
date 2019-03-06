@@ -676,7 +676,7 @@ void jnlpool_init(jnlpool_user pool_user, boolean_t gtmsource_startup, boolean_t
 	 * journal pool.
 	 */
 	assert(MERRORS_ARRAY_SZ > merrors_ctl.msg_cnt);
-	csa->critical = (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE);
+	csa->critical = (CRIT_PTR_T)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE);
 	assert(jnlpool->jnlpool_ctl == REPLCSA2JPL(csa));	/* secshr_db_clnup uses this relationship */
 	jnlpool_mutex_spin_parms = (mutex_spin_parms_ptr_t)((sm_uc_ptr_t)csa->critical + JNLPOOL_CRIT_SPACE);
 	csa->nl = (node_local_ptr_t)((sm_uc_ptr_t)jnlpool_mutex_spin_parms + SIZEOF(mutex_spin_parms_struct));

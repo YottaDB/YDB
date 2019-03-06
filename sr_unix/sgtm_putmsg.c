@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,7 @@
 *   This routine is a variation on the unix version of rts_error, and has an identical interface.
 */
 
-void sgtm_putmsg(char *out_str, ...)
+void sgtm_putmsg(char *out_str, size_t out_str_len, ...)
 {
 	va_list	var;
 	int	arg_count, dummy, fao_actual, fao_count, i, msg_id;
@@ -50,7 +50,7 @@ void sgtm_putmsg(char *out_str, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	VAR_START(var, out_str);
+	VAR_START(var, out_str_len);
 	arg_count = va_arg(var, int);
 
 	assert(arg_count > 0);
@@ -95,7 +95,9 @@ void sgtm_putmsg(char *out_str, ...)
 
 	util_out_print(NULL, SPRINT);
 	util_outbufflen = STRLEN(TREF(util_outbuff_ptr));
-	memcpy(out_str, TREF(util_outbuff_ptr), util_outbufflen);
-	out_str[util_outbufflen] = '\n';
-	out_str[util_outbufflen + 1] = '\0';
+	out_str_len -= 2;	// for the trailing \n and \0
+	out_str_len = MIN(out_str_len, util_outbufflen);
+	memcpy(out_str, TREF(util_outbuff_ptr), out_str_len);
+	out_str[out_str_len] = '\n';
+	out_str[out_str_len + 1] = '\0';
 }

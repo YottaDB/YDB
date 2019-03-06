@@ -51,7 +51,6 @@ GBLREF char			rev_time_buf[];
 GBLREF unsigned char		object_file_name[];
 GBLREF command_qualifier	cmd_qlf;
 GBLREF int			object_file_des;
-GBLREF int4			dollar_zcstatus;
 GBLREF io_pair			io_curr_device, io_std_device;
 GBLREF mident			routine_name, module_name, int_module_name;
 GBLREF unsigned short		object_name_len;
@@ -107,7 +106,7 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 	if (MAX_FN_LEN < flen)
 	{
 		dec_err(VARLSTCNT(4) ERR_FILEPARSE, 2, flen, faddr);
-		TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
+		TREF(dollar_zcstatus) = -ERR_ERRORSUMMARY;
 		return;
 	}
 	object_file_des = FD_INVALID;
@@ -134,7 +133,7 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 			if (!i)
 			{
 				dec_err(VARLSTCNT(4) ERR_FILENOTFND, 2, fstr.str.len, fstr.str.addr);
-				TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
+				TREF(dollar_zcstatus) = -ERR_ERRORSUMMARY;
 			}
 			break;
 		}
@@ -150,7 +149,7 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 			&&  'm' != p[plen.p.pblk.b_name + 1])))
 		{	/* M filetype is required but not present */
 			dec_err(VARLSTCNT(4) ERR_FILEPARSE, 2, source_name_len, source_file_name);
-			TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
+			TREF(dollar_zcstatus) = -ERR_ERRORSUMMARY;
 			continue;
 		}
 		if (i || !MV_DEFINED(&cmd_qlf.object_file))
@@ -164,14 +163,14 @@ void	compile_source_file(unsigned short flen, char *faddr, boolean_t MFtIsReqd)
 			{
 				gtm_putmsg_csa(CSA_ARG(NUL) VARLSTCNT(5) ERR_NOTMNAME, 2, source_name_len, source_file_name,
 					ERR_ZLNOOBJECT);
-				TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
+				TREF(dollar_zcstatus) = -ERR_ERRORSUMMARY;
 				continue;
 			}
 			module_name.len = int_module_name.len = routine_name.len;
 			memcpy(int_module_name.addr, routine_name.addr, routine_name.len);
 			object_file_name[0] = object_name_len = 0;
 		}
-		if (compiler_startup())
+		if ((compiler_startup()) && !TREF(dollar_zcstatus))
 			TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
 		if (FD_INVALID != object_file_des)
 		{

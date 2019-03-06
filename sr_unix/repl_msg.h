@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2006, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +17,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _REPL_MSG_H
-#define _REPL_MSG_H
+#ifndef REPL_MSG_H_INCLUDED
+#define REPL_MSG_H_INCLUDED
 
 enum
 {
@@ -119,6 +124,8 @@ enum
 #define	REPL_MSG_LEN	(uint4)(SIZEOF(int4))
 #define	REPL_MSG_HDRLEN	(uint4)(REPL_MSG_TYPE + REPL_MSG_LEN) /* For type and len fields */
 
+#define REPL_MSG_SIZE	1024 + 1
+
 typedef struct	/* Used also to send a message of type REPL_INST_NOHIST */
 {
 	int4		type;
@@ -166,6 +173,7 @@ typedef struct	/* Used also to send a message of type REPL_TR_CMP_JNL_RECS2 */
  */
 #define	MAX_REPL_MSGLEN	(2 * 1024 * 1024)
 #define MAX_TR_BUFFSIZE	(MAX_REPL_MSGLEN - REPL_MSG_HDRLEN2) /* allow for biggest replication message header */
+#define	MAX_REPL_OPMSG_LEN 256 + 1
 
 typedef struct	/* used to send a message of type REPL_START_JNL_SEQNO */
 {

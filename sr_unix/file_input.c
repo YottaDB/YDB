@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -32,6 +32,7 @@
 #include "op.h"
 #include "file_input.h"
 #include "iotimer.h"
+#include "min_max.h"
 
 #define BUFF_SIZE	65535
 
@@ -139,6 +140,7 @@ void file_input_bin_init(char *line1_ptr, int line1_len)
 	assert(line1_len < BUFF_SIZE);
 	assert(buff1_end == buff1_ptr);
 	assert(0 == buff1_ptr_file_offset);
+	line1_len = MIN(line1_len, (BUFF_SIZE - 1));
 	memcpy(buff1_ptr, line1_ptr, line1_len);
 	buff1_end += line1_len;
 }

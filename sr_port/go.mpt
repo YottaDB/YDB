@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987, 2008 Fidelity Information Services, Inc	;
+; Copyright (c) 1987-2018 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -8,8 +9,7 @@
 ;	the license, please stop and do not read further.	;
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%GO	;service@greystone.com %GO;19920722 21:15;global output
-	;Extracts global data to standard global output (GO) file
+%GO	;Extracts global data to standard global output (GO) file
 	;Invoke ^%GO to get interaction
 	;possible enhancements:
 	;selection by key list, range and/or wildcard, rather than global name

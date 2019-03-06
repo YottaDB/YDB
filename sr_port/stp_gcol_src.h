@@ -311,7 +311,10 @@ MBSTART {														\
 		PROCESS_CONTIGUOUS_BLOCK(begaddr, endaddr, cstr, delta);					\
 		blklen = endaddr - begaddr;									\
 		if (delta)											\
+		{												\
+			assert((stringpool.free + blklen) <= stringpool.top);					\
 			memmove(stringpool.free, begaddr, blklen);						\
+		}												\
 		stringpool.free += blklen;									\
 	}													\
 }

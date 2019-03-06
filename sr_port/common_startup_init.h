@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2017 Fidelity National Information	*
+ * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -13,8 +13,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _COMMON_STARTUP_INIT_DEFINED
-#define _COMMON_STARTUP_INIT_DEFINED
+#ifndef COMMON_STARTUP_INIT_DEFINED
+#define COMMON_STARTUP_INIT_DEFINED
 
 #include "cli.h"
 

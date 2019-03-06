@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -94,7 +94,7 @@ char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char **ext_buff, int *extract_bu
 			extbuf = tmp + tmpsize;
 			exttop = tmp + tmpbufsiz;
 		}
-		extbuf = jnl2ext((char *)rec, extbuf);
+		extbuf = jnl2ext((char *)rec, extbuf, exttop);
 		jnl_len -= rec_len;
 		rec = (jnl_record *)((char *)rec + rec_len);
 	}
@@ -102,7 +102,7 @@ char	*jnl2extcvt(jnl_record *rec, int4 jnl_len, char **ext_buff, int *extract_bu
 	return extbuf;
 }
 
-char	*jnl2ext(char *jnl_buff, char *ext_buff)
+char	*jnl2ext(char *jnl_buff, char *ext_buff, char *ext_bufftop)
 {
   	char		*curr, *val_ptr, rectype;
 	unsigned char	*ptr;
@@ -227,6 +227,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 		ztwormstr = &rec->jrec_ztworm.ztworm_str;
 		val_len = ztwormstr->length;
 		val_ptr = &ztwormstr->text[0];
+		val_extr_len = ext_bufftop - curr;
 		format2zwr((sm_uc_ptr_t)val_ptr, val_len, (uchar_ptr_t)curr, &val_extr_len);
 		curr += val_extr_len;
 		*curr++ = '\n';
@@ -255,6 +256,7 @@ char	*jnl2ext(char *jnl_buff, char *ext_buff)
 		val_ptr = &keystr->text[keystr->length];
 		GET_MSTR_LEN(val_len, val_ptr);
 		val_ptr += SIZEOF(mstr_len_t);
+		val_extr_len = ext_bufftop - curr;
 		format2zwr((sm_uc_ptr_t)val_ptr, val_len, (uchar_ptr_t)curr, &val_extr_len);
 		curr += val_extr_len;
 	}

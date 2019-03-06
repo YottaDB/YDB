@@ -1,10 +1,15 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2013 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -79,7 +84,7 @@ void	get_frame_place_mcode(int level, stack_mode_t mode, int cur_zlevel, mval *r
 	if (ADDR_IN_CODE(fpmpc, fp->rvector))
 	{
 		result->str.addr = (char *)&pos_str[0];
-		result->str.len = INTCAST(symb_line(fpmpc, &pos_str[0], 0, fp->rvector) - &pos_str[0]);
+		result->str.len = INTCAST(symb_line(fpmpc, &pos_str[0], MAX_ENTRYREF_LEN, 0, fp->rvector) - &pos_str[0]);
 		indirect_frame = FALSE;
 	} else
 	{
@@ -133,7 +138,7 @@ void	get_frame_place_mcode(int level, stack_mode_t mode, int cur_zlevel, mval *r
 					label.str.len = s1;
 					if (s2 < 0)
 						s2 = result->str.len;
-					for (ips = s1 + 1; ips < s2; ips++)
+					for (ips = s1 + 1; (ips < s2) && (MAX_ENTRYREF_LEN > ips); ips++)
 						offset = offset * 10 + pos_str[ips] - '0';
 				}
 				op_fntext(&label, offset, &routine, result);

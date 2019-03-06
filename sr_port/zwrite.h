@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _ZWRITE_H_INCLUDED
-#define _ZWRITE_H_INCLUDED
+#ifndef ZWRITE_H_INCLUDED
+#define ZWRITE_H_INCLUDED
 
 #define ZWRITE_END	0
 #define ZWRITE_ASTERISK 1

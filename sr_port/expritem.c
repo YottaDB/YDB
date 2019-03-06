@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -72,6 +72,7 @@ LITDEF nametabent svn_names[] =
 	,{ 1, "Y" }
 	,{ 2, "ZA" }
 	,{ 3, "ZAL*"}
+	,{ 6, "ZAUDIT" }
 	,{ 2, "ZB" }
 	,{ 2, "ZC" }
 	,{ 3, "ZCH" }, { 6, "ZCHSET" }
@@ -163,6 +164,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_Y, TRUE, ALL_SYS }
 	,{ SV_ZA, FALSE, ALL_SYS }
 	,{ SV_ZALLOCSTOR, FALSE, ALL_SYS }
+	,{ SV_ZAUDIT, FALSE, ALL_SYS }
 	,{ SV_ZB, FALSE, ALL_SYS }
 	,{ SV_ZC, FALSE, ALL_SYS }
 	,{ SV_ZCHSET, FALSE, ALL_SYS }, { SV_ZCHSET, FALSE, ALL_SYS }

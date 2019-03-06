@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2012, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,10 +20,9 @@
 #include "mdef.h"
 
 #include <errno.h>
-#include <sys/un.h>
-#include <signal.h>
 #include <sys/wait.h>
-#include "gtm_stdio.h"	/* For SPRINTF */
+#include "gtm_un.h"
+#include "gtm_signal.h"
 #include "gtm_string.h"
 #include "send_msg.h"
 #include "wbox_test_init.h"

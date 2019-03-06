@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -163,9 +163,9 @@ struct NTD
 #define CMI_CLB_ERROR(c)	(CMI_ERROR(CMI_CLB_IOSTATUS(c)))
 #define CMI_MAKE_STATUS(s)	(s)
 
-#define CMI_MUTEX_DECL(RC)	sigset_t _cmi_oset_; int RC
-#define CMI_MUTEX_BLOCK(RC)	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &_cmi_oset_, RC)
-#define CMI_MUTEX_RESTORE(RC)	SIGPROCMASK(SIG_SETMASK, &_cmi_oset_, NULL, RC)
+#define CMI_MUTEX_DECL(RC)	sigset_t cmi_oset_prev; int RC
+#define CMI_MUTEX_BLOCK(RC)	SIGPROCMASK(SIG_BLOCK, &ntd_root->mutex_set, &cmi_oset_prev, RC)
+#define CMI_MUTEX_RESTORE(RC)	SIGPROCMASK(SIG_SETMASK, &cmi_oset_prev, NULL, RC)
 
 /* All TCP/IP GNP messages have a 2 byte length before the message itself */
 #define CMI_TCP_PREFIX_LEN	2
@@ -197,7 +197,6 @@ void cmj_exception_interrupt(struct CLB *lnk, int signo);
 void cmj_fini(struct CLB *lnk);
 int cmj_firstone(fd_set *s, int n);
 struct CLB *cmj_getdeferred(struct NTD *tsk);
-cmi_status_t cmj_get_port(cmi_descriptor *tnd, unsigned short *outport);
 void cmj_handler(int signo, siginfo_t *info, void *context);
 void cmj_housekeeping(void);
 void cmj_incoming_call(struct NTD *tsk);

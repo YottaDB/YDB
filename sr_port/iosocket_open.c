@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -40,6 +40,7 @@
 #include "error.h"
 #include "op.h"
 #include "indir_enum.h"
+#include "min_max.h"
 
 GBLREF	d_socket_struct		*socket_pool, *newdsocket;
 GBLREF	io_pair			io_std_device;	/* standard device */
@@ -466,6 +467,9 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 				}
 			} else
 				iosocket_handle(sock_handle, &handle_len, TRUE, dsocketptr);
+			assert(MAX_HANDLE_LEN > handle_len);
+			if (MAX_HANDLE_LEN < handle_len)
+				handle_len = MAX_HANDLE_LEN;
 			socketptr->handle_len = handle_len;
 			memcpy(socketptr->handle, sock_handle, handle_len);
 			/* connects newdsocket and socketptr (the new socket) */
@@ -550,21 +554,22 @@ short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4
 		len = SIZEOF(ESTABLISHED) - 1;
 		memcpy(&ioptr->dollar.key[0], ESTABLISHED, len);
 		ioptr->dollar.key[len++] = '|';
-		memcpy(&ioptr->dollar.key[len], socketptr->handle, socketptr->handle_len);
-		len += socketptr->handle_len;
+		assert((DD_BUFLEN - len - 1) >= socketptr->handle_len); /* handle could be MAX_HANDLE_LEN */
+		memcpy(&ioptr->dollar.key[len], socketptr->handle, MIN(socketptr->handle_len, DD_BUFLEN - len - 2));
+		len += MIN(socketptr->handle_len, DD_BUFLEN - len - 2); /* -2 for the next delimiter and trailing null */
 		ioptr->dollar.key[len++] = '|';
 		if (socket_tcpip == socketptr->protocol)
-			strncpy(&ioptr->dollar.key[len], socketptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
+			STRNCPY_STR(&ioptr->dollar.key[len], socketptr->remote.saddr_ip, DD_BUFLEN - len - 1);
 		else if (socket_local == socketptr->protocol)
 		{
 			if ((NULL != socketptr->local.sa)
 					&& ('\0' != ((struct sockaddr_un *)(socketptr->local.sa))->sun_path[0]))
-				strncpy(&ioptr->dollar.key[len], ((struct sockaddr_un *)(socketptr->local.sa))->sun_path,
-					DD_BUFLEN - 1 - len);
+				STRNCPY_STR(&ioptr->dollar.key[len], ((struct sockaddr_un *)(socketptr->local.sa))->sun_path,
+					DD_BUFLEN - len - 1);
 			else if ((NULL != socketptr->remote.sa)
 					&& ('\0' != ((struct sockaddr_un *)(socketptr->remote.sa))->sun_path[0]))
-				strncpy(&ioptr->dollar.key[len], ((struct sockaddr_un *)(socketptr->remote.sa))->sun_path,
-					DD_BUFLEN - 1 - len);
+				STRNCPY_STR(&ioptr->dollar.key[len], ((struct sockaddr_un *)(socketptr->remote.sa))->sun_path,
+					DD_BUFLEN - len - 1);
 			/* set default delimiter on principal local sockets to resemble rm device */
 			delimiter_buffer[0] = NATIVE_NL;
 			delimiter_len = 1;

@@ -23,6 +23,8 @@
 #include "gtm_utf8.h"
 #endif
 
+#include "wbox_test_init.h"
+
 LITREF	unsigned char	lower_to_upper_table[];
 
 #define FORMAT_PRINTABLE(cp)					\

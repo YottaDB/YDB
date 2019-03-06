@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __DOLLAR_ZLEVEL_H__
-#define __DOLLAR_ZLEVEL_H__
+#ifndef DOLLAR_ZLEVEL_H_INCLUDED
+#define DOLLAR_ZLEVEL_H_INCLUDED
 
 int dollar_zlevel(void);
 

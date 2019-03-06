@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -173,7 +173,7 @@ void mupip_cvtgbl(void)
 	file_format = get_load_format(&line1_ptr, &line3_ptr, &line1_len, &line3_len, &max_rec_size, &utf8, &dos); /* from header */
 	if (MU_FMT_GOQ == file_format)
 		mupip_exit(ERR_LDBINFMT);
-	if (BADZCHSET == utf8)
+	if ((BADZCHSET == utf8) || (0 >= line1_len))
 		mupip_exit(ERR_MUNOFINISH);
 	/* Check if "line3_len" is set to 0 by "get_load_format". If so, it means the extract file is empty (contains just
 	 * the 2 header lines). If so, set "end" (the last record # to be loaded) to 2 to indicate "go_load" should do no loading.

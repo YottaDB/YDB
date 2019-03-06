@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -803,6 +803,7 @@ void zshow_devices(zshow_out *output)
 								delim_len_sm = socketptr->delimiter[jj].len;
 								memcpy(delim_buff_sm,
 								       socketptr->delimiter[jj].addr, delim_len_sm);
+								delim_len = (MAX_DELIM_LEN * MAX_ZWR_EXP_RATIO) + 11;
 								format2zwr(delim_buff_sm, delim_len_sm,
 									   (uchar_ptr_t)delim.addr, &delim_len);
 								delim.len = (unsigned short)delim_len;

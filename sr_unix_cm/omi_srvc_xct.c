@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -46,6 +47,8 @@ GBLREF char	*omi_pklog_addr;
 GBLREF int	history;
 GBLREF boolean_t	servtime_expired;
 
+#define	OMI_MSG_SIZE	256 + 1
+
 static omi_op	omi_dispatch_table[OMI_OP_MAX] =
 {
 	0,
@@ -86,6 +89,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 	int4		rv, blen;
 	int		bunches, xblk, i, fatal;
 	char		buff[OMI_BUFSIZ], *bptr, *xend, *bend;
+	char		msg[OMI_MSG_SIZE];
 
 #ifdef BSD_TCP
 	int		 cc, save_errno;
@@ -111,8 +115,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 		}
 		else
 		{
-			char	msg[256];
-			SPRINTF(msg, "Attempted read from connection %d to %s failed",
+			SNPRINTF(msg, OMI_MSG_SIZE, "Attempted read from connection %d to %s failed",
 				cptr->stats.id, gtcm_hname(&cptr->stats.ai));
 			gtcm_rep_err(msg, save_errno);
 		}
@@ -174,9 +177,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 
 	if (mlen.value + 4 > OMI_BUFSIZ)
 	{
-		char	msg[256];
-
-		SPRINTF(msg, "OMI packet length (%d) larger than max (%d)", mlen.value+4, OMI_BUFSIZ);
+		SNPRINTF(msg, OMI_MSG_SIZE, "OMI packet length (%d) larger than max (%d)", mlen.value+4, OMI_BUFSIZ);
 		gtcm_cpktdmp((char *)cptr->bptr, cptr->blen, msg);
 		return -1;
 	}
@@ -221,9 +222,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 		bptr = buff + OMI_VI_SIZ + OMI_LI_SIZ;
 		if (nxact.value * (OMI_RH_SIZ + 1) > mlen.value) /* || nxact.value < 0 */ /* is commented as it is always FALSE */
 		{
-			char	msg[256];
-
-			SPRINTF(msg, "invalid OMI packet (invalid nxact)");
+			SNPRINTF(msg, OMI_MSG_SIZE, "invalid OMI packet (invalid nxact)");
 			gtcm_cpktdmp((char *)cptr->bptr, cptr->blen, msg);
 			return -1;
 		}
@@ -271,8 +270,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 		}
 		else if (cptr->state == OMI_ST_DISC  &&  rh.op_type.value != OMI_CONNECT)
 		{
-			char	msg[256];
-			SPRINTF(msg, "Request (%x) sent before session was established",
+			SNPRINTF(msg, OMI_MSG_SIZE, "Request (%x) sent before session was established",
 				rh.op_type.value);
 			eh.type = OMI_ER_SE_NOSESS;
 		}
@@ -447,8 +445,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 				continue;
 			else
 			{
-				char	msg[256];
-				SPRINTF(msg, "Write attempt to connection %d failed", cptr->stats.id);
+				SNPRINTF(msg, OMI_MSG_SIZE, "Write attempt to connection %d failed", cptr->stats.id);
 				gtcm_rep_err(msg, save_errno);
 			}
 			return -1;

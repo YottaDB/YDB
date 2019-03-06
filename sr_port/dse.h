@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __DSE_H__
-#define __DSE_H__
+#ifndef DSE_H_INCLUDED
+#define DSE_H_INCLUDED
 
 error_def(ERR_DSEWCREINIT);
 

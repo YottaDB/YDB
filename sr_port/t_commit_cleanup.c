@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@
 #include "send_msg.h"
 #include "have_crit.h"
 #include "aswp.h"
+#include "mutexsp.h"
 
 GBLREF	cache_rec_ptr_t		cr_array[]; /* Maximum number of blocks that can be in transaction */
 GBLREF	unsigned int		cr_array_index;
@@ -133,7 +134,7 @@ MBSTART {															\
 
 boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 {
-	boolean_t			update_underway, reg_seqno_reset = FALSE, release_crit;
+	boolean_t			update_underway, reg_seqno_reset = FALSE, release_crit, was_crit;
 	cache_rec_ptr_t			cr;
 	sgm_info			*si, *jnlpool_si = NULL;
 	sgmnt_addrs			*csa, *jpl_csa = NULL, *jnlpool_csa = NULL;
@@ -203,7 +204,23 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 	{
 		trstr = "NON-TP";
 		assert(!(cs_addrs->now_crit && (UPDTRNS_TCOMMIT_STARTED_MASK & update_trans)) || T_UPDATE_UNDERWAY(cs_addrs));
-		update_underway = T_UPDATE_UNDERWAY(cs_addrs);
+		if (TREF(statsdb_memerr))
+		{	/* Case where we've tried to create a stats block and received a SIGBUS
+			 * We need to fake conditions for a rollback in this case because doing a roll forward
+			 * could cause the another SIGBUS to be generated (creating a loop).
+			 */
+			/* Make sure we have crit when updating early_tn */
+			if (FALSE == ((was_crit = cs_addrs->now_crit)))
+				grab_crit(gv_cur_region);
+			cs_addrs->ti->early_tn--;
+			if (!was_crit)
+				rel_crit(gv_cur_region);
+			cs_addrs->t_commit_crit = FALSE;
+			update_trans = 0;
+			update_underway = FALSE;
+		}
+		else
+			update_underway = T_UPDATE_UNDERWAY(cs_addrs);
 		if (NULL != gv_target)			/* gv_target can be NULL in case of DSE MAPS command etc. */
 			gv_target->clue.end = 0;	/* in case t_end() had set history's tn to be "valid_thru++", undo it */
 		update_jnlpool = cs_addrs->jnlpool ? cs_addrs->jnlpool : jnlpool;

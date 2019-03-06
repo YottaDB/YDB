@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -85,7 +85,7 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 				*status = ERR_FILENAMETOOLONG;
 				return FALSE;
 			}
-			strcpy(full_fn, cwdbuf);
+			memcpy(full_fn, cwdbuf, cwd_len);
 			full_fn[cwd_len] = '/';
 			memcpy(full_fn + cwd_len + 1, cptr, orig_len - (cptr - orig_fn));
 		}

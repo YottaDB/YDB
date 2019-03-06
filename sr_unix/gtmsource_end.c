@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -35,7 +35,6 @@
 #include "gtmsource.h"
 #include "repl_dbg.h"
 #include "gtm_stdio.h"
-#include "gtm_event_log.h"
 #include "repl_shutdcode.h"
 #include "eintr_wrappers.h"
 #include "jnl.h"
@@ -135,8 +134,13 @@ int gtmsource_end1(boolean_t auto_shutdown)
 	repl_log(gtmsource_log_fp, FALSE, TRUE, "  Number of unsent Seqno : %llu\n", 0 < diff_seqno ? diff_seqno : 0);
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "REPL INFO - Jnl Total : %llu  Msg Total : %llu  CmpMsg Total : %llu\n",
 		 repl_source_data_sent, repl_source_msg_sent, repl_source_cmp_sent);
+<<<<<<< HEAD
 	STOP_EXTERNAL_FILTER_IF_NEEDED(gtmsource_filter, gtmsource_log_fp, "GTMSOURCE_END");
 	gtm_event_log_close();
+=======
+	if (gtmsource_filter & EXTERNAL_FILTER)
+		repl_stop_filter();
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 	if (auto_shutdown)
 		return (exit_status);
 	else

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __DBGBLDIR_H__
-#define __DBGBLDIR_H__
+#ifndef DBGBLDIR_H_INCLUDED
+#define DBGBLDIR_H_INCLUDED
 
 typedef struct gvt_container_struct
 {

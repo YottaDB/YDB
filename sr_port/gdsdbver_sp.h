@@ -36,6 +36,11 @@ ENUM_ENTRY(GDSMV62002),		/* New field defer_allocate needed for database file pr
 ENUM_ENTRY(GDSMV63000),		/* New field non_null_iv to indicate IV mode for encrypted blocks */
 ENUM_ENTRY(GDSMV63000A),	/* Move fields ftok_counter_halted and access_counter_halted from fileheader to nodelocal */
 ENUM_ENTRY(GDSMV63001),		/* New "asyncio" option; New reservedDBFlags field */
+<<<<<<< HEAD
 ENUM_ENTRY(GDSMV63003),		/* New field "read_only" to indicate a read-only database */
 ENUM_ENTRY(GDSMR122),		/* New field "reorg_sleep_nsec" to slow down reorg update rate (e.g. reduce restarts) by user */
+=======
+ENUM_ENTRY(GDSMV63003),		/* New field read_only to indicate a read-only database */
+ENUM_ENTRY(GDSMV63007),		/* Reuse abandoned field for use controlled stable flush_trigger_top */
+>>>>>>> 7a1d2b3e... GT.M V6.3-007
 ENUM_ENTRY(GDSMVLAST)

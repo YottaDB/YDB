@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -13,8 +13,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __STACK_FRAME_H__
-#define __STACK_FRAME_H__
+#ifndef STACK_FRAME_H_INCLUDED
+#define STACK_FRAME_H_INCLUDED
 
 /* stack_frame.h - GT.M MUMPS stack frame */
 
@@ -168,8 +168,8 @@ MBSTART {												\
 void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);
 void new_stack_frame_sp(rhdtyp *rtn_base, unsigned char *context, unsigned char *transfer_addr);
 int4 symbinit(void);
-unsigned char *get_symb_line(unsigned char *out, unsigned char **b_line, unsigned char **ctxt);
-unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned char **b_line, rhdtyp *routine);
+unsigned char *get_symb_line(unsigned char *out, int max_len, unsigned char **b_line, unsigned char **ctxt);
+unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, int max_len, unsigned char **b_line, rhdtyp *routine);
 void copy_stack_frame(void);
 void copy_stack_frame_sp(void);
 void exfun_frame(void);

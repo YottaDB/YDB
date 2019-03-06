@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2015 Fidelity National Information 	*
+ * Copyright (c) 2013-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -63,6 +63,8 @@
 #define GTMTLS_OP_VERIFY_PEER		0x00000008
 /* Socket device */
 #define GTMTLS_OP_SOCKET_DEV		0x00000010
+/* Socket (client) created for direct mode auditing (APD). Temporarily defined with GTMTLS_OP_SOCKET_DEV's value */
+#define GTMTLS_OP_DM_AUDIT		0x00000010
 /* No cipher list specifed at top tls level */
 #define GTMTLS_OP_ABSENT_CIPHER		0x00000020
 /* Default cipher list used */

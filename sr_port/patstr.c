@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -745,7 +745,8 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 				if (pattern_mask & PATM_STRLIT)
 				{
 					memset(&exp_temp[0], 0, SIZEOF(exp_temp));
-					assert(atom_map < MAX_PATTERN_ATOMS);
+					if (atom_map >= MAX_PATTERN_ATOMS)
+						return ERR_PATMAXLEN;
 					min[atom_map] = lower_bound;
 					max[atom_map] = upper_bound;
 					size[atom_map] = strlit.bytelen;
@@ -816,7 +817,8 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 							atom_map--;
 						}
 					}
-					assert(atom_map < MAX_PATTERN_ATOMS);
+					if (atom_map >= MAX_PATTERN_ATOMS)
+						return ERR_PATMAXLEN;
 					min[atom_map] = lower_bound;
 					max[atom_map] = upper_bound;
 					size[atom_map] = 1;

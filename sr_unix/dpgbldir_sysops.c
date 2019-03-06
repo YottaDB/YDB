@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -60,13 +60,13 @@ error_def(ERR_BADTAG);
 mstr *get_name(mstr *ms)
 {
 	int4	status;
-	char	c[MAX_FBUFF + 1];
+	char	c[MAX_FN_LEN + 1];
 	parse_blk pblk;
 	mstr	*new;
 
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = c;
-	pblk.buff_size = MAX_FBUFF;
+	pblk.buff_size = MAX_FN_LEN;
 	pblk.def1_buf = DEF_GDR_EXT;
 	pblk.def1_size = SIZEOF(DEF_GDR_EXT) - 1;
 	status = parse_file(ms,&pblk);
@@ -173,7 +173,7 @@ void file_read(file_pointer *file_ptr, int4 size, uchar_ptr_t buff, int4 pos)
 void dpzgbini(void)
 {
 	mstr		temp_mstr;
-	char		temp_buff[MAX_FBUFF + 1];
+	char		temp_buff[MAX_FN_LEN + 1];
 	uint4		status;
 	parse_blk	pblk;
 
@@ -182,7 +182,7 @@ void dpzgbini(void)
 	dollar_zgbldir.str.len = temp_mstr.len;
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = temp_buff;
-	pblk.buff_size = MAX_FBUFF;
+	pblk.buff_size = MAX_FN_LEN;
 	pblk.def1_buf = DEF_GDR_EXT;
 	pblk.def1_size = SIZEOF(DEF_GDR_EXT) - 1;
 	status = parse_file(&temp_mstr, &pblk);

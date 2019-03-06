@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,7 +55,6 @@
 #include "repl_log.h"
 #include "mutex.h"
 #include "anticipatory_freeze.h"
-#include "gtm_event_log.h"
 #include "mupip_exit.h"
 #include "read_db_files_from_gld.h"
 #include "updproc.h"
@@ -124,7 +123,6 @@ void  updproc_stop(boolean_t exit)
 	 */
 	SHMDT(recvpool.recvpool_ctl);
 	recvpool.recvpool_ctl = NULL;
-	gtm_event_log_close();
 	if (exit)
 		mupip_exit(SS_NORMAL);
 	return;

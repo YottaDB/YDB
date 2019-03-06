@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2015 Fidelity National Information	*
+ * Copyright (c) 2011-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _FORK_INIT_H
-#define _FORK_INIT_H
+#ifndef FORK_INIT_H_INCLUDED
+#define FORK_INIT_H_INCLUDED
 
 #include "have_crit.h"
 

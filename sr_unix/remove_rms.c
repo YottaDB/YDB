@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -78,7 +78,8 @@ void remove_rms (io_desc *ciod)
 	if ((n_io_dev_types != ciod->type) && ciod->newly_created)
 	{
 		assert((NULL == rm_ptr) || !rm_ptr->is_pipe);
-		UNLINK(ciod->trans_name->dollar_io);
+		rc = UNLINK(ciod->trans_name->dollar_io);
+		assert(!rc);
 	}
 	for (lpp = &io_root_log_name, lp = *lpp; lp; lp = *lpp)
 	{

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __GOLEVEL_H__
-#define __GOLEVEL_H__
+#ifndef GOLEVEL_H_INCLUDED
+#define GOLEVEL_H_INCLUDED
 /* golevel() will unwind up to the counted frame corresponding to level specified by the parm. The first flag indicates
  * whether or not it is ok to land on a $ZINTERRUPT frame or not (which it is not ok when unwinding a $ZINTERRUPT). Also,
  * In a trigger environment, an additional flag that determines if landing on a trigger frame means the unwind should

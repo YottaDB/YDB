@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,7 +19,7 @@ GBLREF	seq_num		seq_num_zero;
 uchar_ptr_t i2asc(uchar_ptr_t p, unsigned int n)
 {
 	unsigned char	ar[MAX_DIGITS_IN_INT], *q;
-	unsigned	m, len;
+	unsigned int	m, len;
 
 	q = ar + SIZEOF(ar);
 	if (!n)
@@ -28,7 +29,12 @@ uchar_ptr_t i2asc(uchar_ptr_t p, unsigned int n)
 		while (n)
 		{
 			m = n / 10;
-			*--q = n - (m * 10) + '0';
+			assert(n >= (m * 10));
+			n = n - (m * 10);
+			assert((9 >= n) && (0 <= n));
+			n = n + '0';
+			assert(('9' >= n) && ('0' <= n));
+			*--q = (unsigned char)n;
 			n = m;
 		}
 	}
