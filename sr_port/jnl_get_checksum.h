@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Copyright (c) 2005-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,8 +9,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#ifndef __JNL_GET_CHECKSUM_H_
-#define __JNL_GET_CHECKSUM_H_
+#ifndef JNL_GET_CHECKSUM_H_INCLUDED
+#define JNL_GET_CHECKSUM_H_INCLUDED
 
 #define INIT_CHECKSUM_SEED 0xFFFFFFFF
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,7 +49,6 @@
 #include "gtmio.h"		/* for REPL_DPRINT* macros */
 #include "repl_dbg.h"
 #include "iosp.h"
-#include "gtm_event_log.h"
 #include "gt_timer.h"
 #include "eintr_wrappers.h"
 #include "repl_sp.h"
@@ -86,6 +85,8 @@
 			return SS_NORMAL;								\
 	}												\
 }
+
+#define PROC_OPS_PRINT_MSG_LEN	1024
 
 GBLREF	boolean_t		gtmsource_logstats;
 GBLREF	boolean_t		gtmsource_pool2file_transition;
@@ -133,7 +134,7 @@ error_def(ERR_TLSHANDSHAKE);
 
 int gtmsource_est_conn()
 {
-	char			print_msg[1024], msg_str[1024], *errmsg;
+	char			print_msg[PROC_OPS_PRINT_MSG_LEN], msg_str[1024], *errmsg;
 	int			connection_attempts, alert_attempts, save_errno, status;
 	int			send_buffsize, recv_buffsize, tcp_s_bufsize;
 	int 			logging_period, logging_interval; /* logging period = soft_tries_period*logging_interval */
@@ -227,9 +228,8 @@ int gtmsource_est_conn()
 					 "GTM Replication Source Server : Could not connect to secondary in %d seconds\n",
 					connection_attempts *
 					gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
-				sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLWARN, 2, LEN_AND_STR(msg_str));
+				sgtm_putmsg(print_msg, PROC_OPS_PRINT_MSG_LEN, VARLSTCNT(4) ERR_REPLWARN, 2, LEN_AND_STR(msg_str));
 				repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
-				gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLWARN", print_msg);
 			}
 			if (logging_period <= REPL_MAX_LOG_PERIOD)
 			{	 /*the maximum real_period can reach 2*REPL_MAX_LOG_PERIOD)*/
@@ -1416,7 +1416,7 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 		{	/* Instance name obtained from the receiver does not match what was specified in the
 			 * source server command line. Issue error.
 			 */
-			sgtm_putmsg(print_msg, VARLSTCNT(6) ERR_REPLINSTSECMTCH, 4,
+			sgtm_putmsg(print_msg, PROC_OPS_PRINT_MSG_LEN, VARLSTCNT(6) ERR_REPLINSTSECMTCH, 4,
 				LEN_AND_STR(old_instinfo_msg.instname), LEN_AND_STR(jnlpool->gtmsource_local->secondary_instname));
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 			status = gtmsource_shutdown(TRUE, NORMAL_SHUTDOWN) - NORMAL_SHUTDOWN;
@@ -1479,7 +1479,7 @@ boolean_t	gtmsource_get_instance_info(boolean_t *secondary_was_rootprimary, seq_
 		{	/* Instance name obtained from the receiver does not match what was specified in the
 			 * source server command line. Issue error.
 			 */
-			sgtm_putmsg(print_msg, VARLSTCNT(6) ERR_REPLINSTSECMTCH, 4,
+			sgtm_putmsg(print_msg, PROC_OPS_PRINT_MSG_LEN, VARLSTCNT(6) ERR_REPLINSTSECMTCH, 4,
 				LEN_AND_STR(instinfo_msg.instname), LEN_AND_STR(jnlpool->gtmsource_local->secondary_instname));
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 			status = gtmsource_shutdown(TRUE, NORMAL_SHUTDOWN) - NORMAL_SHUTDOWN;
@@ -1673,7 +1673,7 @@ boolean_t	gtmsource_check_remote_strm_histinfo(seq_num seqno, boolean_t *rollbac
 void	gtmsource_histinfo_get(int4 index, repl_histinfo *histinfo)
 {
 	unix_db_info	*udi;
-	char		histdetail[256];
+	char		histdetail[MAX_REPL_OPMSG_LEN];
 	int4		status;
 	repl_msg_t	instnohist_msg;
 
@@ -1686,7 +1686,7 @@ void	gtmsource_histinfo_get(int4 index, repl_histinfo *histinfo)
 	if (0 != status)
 	{
 		assert(ERR_REPLINSTNOHIST == status);	/* currently the only error returned by "repl_inst_histinfo_get" */
-		SPRINTF(histdetail, "record number %d [0x%x]", index, index);
+		SNPRINTF(histdetail, MAX_REPL_OPMSG_LEN, "record number %d [0x%x]", index, index);
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTNOHIST, 4, LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));
 		/* Send this error status to the receiver server before closing the connection. This way the receiver
 		 * will know to shut down rather than loop back trying to reconnect. This avoids an infinite loop of
@@ -1760,16 +1760,18 @@ seq_num	gtmsource_find_resync_seqno(repl_histinfo *local_histinfo, repl_histinfo
 {
 	seq_num			max_start_seqno, local_start_seqno, remote_start_seqno;
 	int4			local_histinfo_num;
-	DEBUG_ONLY(int4		prev_remote_histinfo_num;)
-	DEBUG_ONLY(sgmnt_addrs	*csa;)
-	DEBUG_ONLY(seq_num	min_start_seqno;)
+#	ifdef DEBUG
+	int4			prev_remote_histinfo_num;
+	sgmnt_addrs		*csa;
+	seq_num			min_start_seqno;
+#	endif
 
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
-	DEBUG_ONLY(
-		csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
-		ASSERT_VALID_JNLPOOL(csa);
-	)
-	DEBUG_ONLY(prev_remote_histinfo_num = remote_histinfo->prev_histinfo_num;)
+#	ifdef DEBUG
+	csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
+	ASSERT_VALID_JNLPOOL(csa);
+	prev_remote_histinfo_num = remote_histinfo->prev_histinfo_num;
+#	endif
 	do
 	{
 		local_start_seqno = local_histinfo->start_seqno;
@@ -1841,10 +1843,10 @@ void	gtmsource_send_new_histrec()
 	DEBUG_ONLY(sgmnt_addrs	*csa;)
 
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
-	DEBUG_ONLY(
-		csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
-		ASSERT_VALID_JNLPOOL(csa);
-	)
+#	ifdef DEBUG
+	csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
+	ASSERT_VALID_JNLPOOL(csa);
+#	endif
 	gtmsource_local = jnlpool->gtmsource_local;
 	assert(gtmsource_local->send_new_histrec);
 	assert(gtmsource_local->read_jnl_seqno <= gtmsource_local->next_histinfo_seqno);
@@ -1971,10 +1973,10 @@ void	gtmsource_set_next_histinfo_seqno(boolean_t detect_new_histinfo)
 	DEBUG_ONLY(sgmnt_addrs	*csa;)
 
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
-	DEBUG_ONLY(
-		csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
-		ASSERT_VALID_JNLPOOL(csa);
-	)
+#	ifdef DEBUG
+	csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
+	ASSERT_VALID_JNLPOOL(csa);
+#	endif
 	grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);
 	if (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state)
 		return;
@@ -2005,8 +2007,8 @@ void	gtmsource_set_next_histinfo_seqno(boolean_t detect_new_histinfo)
 				{	/* The read seqno is PRIOR to the starting seqno of the instance file.
 					 * In that case, issue error and close the connection.
 					 */
-					NON_GTM64_ONLY(SPRINTF(histdetail, "seqno [0x%llx]", read_seqno - 1));
-					GTM64_ONLY(SPRINTF(histdetail, "seqno [0x%lx]", read_seqno - 1));
+					NON_GTM64_ONLY(SNPRINTF(histdetail, MAX_REPL_OPMSG_LEN, "seqno [0x%llx]", read_seqno - 1));
+					GTM64_ONLY(SNPRINTF(histdetail, MAX_REPL_OPMSG_LEN, "seqno [0x%lx]", read_seqno - 1));
 					udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTNOHIST, 4,
 							LEN_AND_STR(histdetail), LEN_AND_STR(udi->fn));

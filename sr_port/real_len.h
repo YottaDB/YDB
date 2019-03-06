@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __REAL_LEN_H__
-#define __REAL_LEN_H__
+#ifndef REAL_LEN_H_INCLUDED
+#define REAL_LEN_H_INCLUDED
 
 int real_len(int length, uchar_ptr_t str);
 

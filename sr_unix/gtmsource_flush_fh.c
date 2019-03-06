@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,11 +33,11 @@ void gtmsource_flush_fh(seq_num resync_seqno)
 	sgmnt_addrs	*repl_csa;
 
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
-	DEBUG_ONLY(
-		repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
-		assert(!repl_csa->hold_onto_crit);
-		ASSERT_VALID_JNLPOOL(repl_csa);
-	)
+#	ifdef DEBUG
+	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
+	assert(!repl_csa->hold_onto_crit);
+	ASSERT_VALID_JNLPOOL(repl_csa);
+#	endif
 	jnlpool->gtmsource_local->read_jnl_seqno = resync_seqno;
 	gtmsource_last_flush_time = gtmsource_now;
 	if (jnlpool->gtmsource_local->last_flush_resync_seqno == resync_seqno)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,7 +20,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include "gtm_stdio.h"		/* for SPRINTF */
+#include "gtm_stdio.h"		/* for SNPRINTF */
 
 #ifdef VMS
 #include <jpidef.h>
@@ -55,6 +55,8 @@
 #define	GNAM_FMT_STR	"!AD "
 
 GBLREF	int4		process_id;
+
+#define	NODE_SIZE	64 + 1
 
 void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name);
 void lke_formatlocknodes(mlk_shrblk_ptr_t node, mstr* name);
@@ -93,6 +95,7 @@ void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name)
 
 		subsc.str.len = value->length;
 		subsc.str.addr = (char*) value->data;
+		len2 = MAX_ZWR_KEY_SZ + 1;
 		if (val_iscan(&subsc))
 		{
 			/* avoid printing enclosed quotes for canonical numbers */
@@ -135,15 +138,16 @@ bool	lke_showlock(
 		     mstr		one_lock,
 		     boolean_t		exact)
 {
+	boolean_t	lock = FALSE, owned, unsub;
+	char		format[NODE_SIZE], gtcmbuf[NODE_SIZE]; /* gtcmbuf[] holds ": CLNTNODE = %s : CLNTPID = %d" */
+	char		*msg, save_ch;
+	int 		len2;
+	int4            gtcmbufidx, item, ret;
 	mlk_prcblk	pblk;
 	mlk_prcblk_ptr_t r;
 	short		len1;
-	int 		len2;
-	boolean_t	lock = FALSE, owned, unsub;
-	UINTPTR_T	f[7];
-        int4            gtcmbufidx, item, ret;
 	uint4		status;
-	char		*msg, save_ch, format[64], gtcmbuf[64];	/* gtcmbuf[] is to hold ": CLNTNODE = %s : CLNTPID = %s" */
+	UINTPTR_T	f[7];
 
 	unsub = (0 == name->len);
 
@@ -184,7 +188,7 @@ bool	lke_showlock(
 					gtcmbufidx += real_len(SIZEOF(node->auxnode), (uchar_ptr_t)node->auxnode);
 					memcpy(&gtcmbuf[gtcmbufidx], CLNTPID_LIT, STR_LIT_LEN(CLNTPID_LIT));
 					gtcmbufidx += STR_LIT_LEN(CLNTPID_LIT);
-					SPRINTF(&gtcmbuf[gtcmbufidx], PIDPRINT_LIT, node->auxpid);
+					SNPRINTF(&gtcmbuf[gtcmbufidx], NODE_SIZE - gtcmbufidx, PIDPRINT_LIT, node->auxpid);
 					f[5] = strlen(gtcmbuf);
 					f[6] = (UINTPTR_T)&gtcmbuf[0];
 					assert(f[5] > gtcmbufidx);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information 	*
+ * Copyright (c) 2001-2019 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,7 +78,7 @@ LITDEF	err_msg merrors[] = {
 	{ "YDIRTSZ", "Improper size of YDIRT data: !UL", 1 },
 	{ "JNLSUCCESS", "!AD successful", 2 },
 	{ "GBLNAME", "Either an identifier or a left parenthesis is expected after a ^ in this context", 0 },
-	{ "GBLOFLOW", "Database segment is full", 0 },
+	{ "GBLOFLOW", "Database file !AD is full", 2 },
 	{ "CORRUPT", "Corrupt input in Blk # !UL, Key #!UL; resuming with next global block", 2 },
 	{ "GTMCHECK", "Internal GT.M error--Report to your GT.M Support Channel", 0 },
 	{ "GVDATAFAIL", "Global variable $DATA function failed.  Failure code: !AD.", 2 },
@@ -1525,6 +1525,14 @@ LITDEF	err_msg merrors[] = {
 	{ "MLKHASHRESIZEFAIL", "Failed to increase LOCK hash table size from !UL to !UL. Will retry with larger size.", 2 },
 	{ "MLKCLEANED", "LOCK garbage collection freed !UL lock slots for region !AD", 3 },
 	{ "NOTMNAME", "!AD is not a valid M name", 2 },
+	{ "DEVNAMERESERVED", "Cannot use !AD as device name. Reserved for GTM internal usage", 2 },
+	{ "ORLBKREL", "ONLINE ROLLBACK releasing all locking resources to allow a freeze OFF to proceed", 0 },
+	{ "ORLBKRESTART", "ONLINE ROLLBACK restarted on instance !AD corresponding to !AD", 4 },
+	{ "UNIQNAME", "Cannot provide same file name (!AD) for !AD and !AD", 6 },
+	{ "APDINITFAIL", "Audit Principal Device failed to initialize audit information", 0 },
+	{ "APDCONNFAIL", "Audit Principal Device failed to connect to audit logger", 0 },
+	{ "APDLOGFAIL", "Audit Principal Device failed to log activity", 0 },
+	{ "STATSDBMEMERR", "Process attempted to create stats block in statistics database !AD and received SIGBUS--invalid physical address. Check file system space.", 2 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -3039,6 +3047,14 @@ LITDEF	int ERR_MLKHASHRESIZE = 150384427;
 LITDEF	int ERR_MLKHASHRESIZEFAIL = 150384432;
 LITDEF	int ERR_MLKCLEANED = 150384443;
 LITDEF	int ERR_NOTMNAME = 150384450;
+LITDEF	int ERR_DEVNAMERESERVED = 150384458;
+LITDEF	int ERR_ORLBKREL = 150384467;
+LITDEF	int ERR_ORLBKRESTART = 150384475;
+LITDEF	int ERR_UNIQNAME = 150384482;
+LITDEF	int ERR_APDINITFAIL = 150384490;
+LITDEF	int ERR_APDCONNFAIL = 150384498;
+LITDEF	int ERR_APDLOGFAIL = 150384506;
+LITDEF	int ERR_STATSDBMEMERR = 150384514;
 
 
 LITDEF	int merrors_undocarr[] = {
@@ -3075,7 +3091,7 @@ GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1512,
+	1520,
 	&merrors_undocarr[0],
 	26
 };

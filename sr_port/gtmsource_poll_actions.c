@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,6 +67,8 @@ error_def(ERR_REPLINSTFROZEN);
 error_def(ERR_REPLINSTUNFROZEN);
 #endif
 
+#define	OUT_LINE	1024 + 1
+
 int gtmsource_poll_actions(boolean_t poll_secondary)
 {
 	/* This function should be called only in active mode, but cannot assert for it */
@@ -76,7 +78,7 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 	repl_heartbeat_msg_t	overdue_heartbeat;
 	char			*time_ptr;
 	char			time_str[CTIME_BEFORE_NL + 1];
-	char			print_msg[1024], msg_str[1024];
+	char			print_msg[REPL_MSG_SIZE], msg_str[OUT_LINE];
 	boolean_t 		log_switched = FALSE;
 	int			status;
 	time_t			temp_time;
@@ -93,15 +95,16 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 		last_seen_freeze_flag = jnlpool->jnlpool_ctl->freeze;
 		if (last_seen_freeze_flag)
 		{
-			sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFROZEN, 1,
+			sgtm_putmsg(print_msg, REPL_MSG_SIZE, VARLSTCNT(3) ERR_REPLINSTFROZEN, 1,
 					jnlpool->repl_inst_filehdr->inst_info.this_instname);
 			repl_log(gtmsource_log_fp, TRUE, FALSE, print_msg);
-			sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool->jnlpool_ctl->freeze_comment);
+			sgtm_putmsg(print_msg, REPL_MSG_SIZE, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1,
+					jnlpool->jnlpool_ctl->freeze_comment);
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		}
 		else
 		{
-			sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTUNFROZEN, 1,
+			sgtm_putmsg(print_msg, REPL_MSG_SIZE, VARLSTCNT(3) ERR_REPLINSTUNFROZEN, 1,
 					jnlpool->repl_inst_filehdr->inst_info.this_instname);
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 		}
@@ -129,10 +132,10 @@ int gtmsource_poll_actions(boolean_t poll_secondary)
 			GTM_CTIME(time_ptr, &temp_time);
 			memcpy(time_str, time_ptr, CTIME_BEFORE_NL);
 			time_str[CTIME_BEFORE_NL] = '\0';
-			SPRINTF(msg_str, "No response received for heartbeat sent at %s with SEQNO "
+			SNPRINTF(msg_str, OUT_LINE, "No response received for heartbeat sent at %s with SEQNO "
 					GTM64_ONLY("%lu") NON_GTM64_ONLY("%llu") " in %0.f seconds. Closing connection\n",
 					time_str, *(seq_num *)&overdue_heartbeat.ack_seqno[0], difftime(now, temp_time));
-			sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLWARN, 2, LEN_AND_STR(msg_str));
+			sgtm_putmsg(print_msg, REPL_MSG_SIZE, VARLSTCNT(4) ERR_REPLWARN, 2, LEN_AND_STR(msg_str));
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 			repl_close(&gtmsource_sock_fd);
 			SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);

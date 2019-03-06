@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@ CONDITION_HANDLER(gtmci_ch)
 	}
 	src_line.len = 0;
 	src_line.addr = &src_buf[0];
-	set_zstatus(&src_line, SIGNAL, NULL, FALSE);
+	set_zstatus(&src_line, MAX_ENTRYREF_LEN, SIGNAL, NULL, FALSE);
 	if (msp < FGNCAL_STACK) /* restore stack to the last marked position */
 		fgncal_unwind();
 	else TREF(temp_fgncal_stack) = NULL;	/* If fgncal_unwind() didn't run to clear this, we have to */

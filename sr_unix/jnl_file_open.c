@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,11 +49,11 @@
 
 #include "wbox_test_init.h"
 
-#define SET_JPC_ERR_STR(ERR1, ERR2, BUF)							\
+#define SET_JPC_ERR_STR(ERR1, ERR2, BUF, BUF_LEN)							\
 {												\
 	jpc->status = ERR2;									\
 	sts = ERR1;										\
-	sgtm_putmsg(BUF, VARLSTCNT(7) sts, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);	\
+	sgtm_putmsg(BUF, BUF_LEN, VARLSTCNT(7) sts, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);	\
 	jpc->err_str = BUF;									\
 }
 
@@ -140,7 +140,7 @@ uint4 jnl_file_open(gd_region *reg, boolean_t init)
 					JNL_FD_CLOSE(jpc->channel, close_res);	/* sets jpc->channel to NOJNL */
 					break;
 				} else
-					sts = jnl_file_open_common(reg, (off_jnl_t) stat_buf.st_size, buff);
+					sts = jnl_file_open_common(reg, (off_jnl_t) stat_buf.st_size, buff, OUT_BUFF_SIZE);
 			}
 #			ifdef DEBUG
 			/* Will fail if Source Server would need to switch journal files. */
@@ -149,7 +149,7 @@ uint4 jnl_file_open(gd_region *reg, boolean_t init)
 #			endif
 			if ((0 != sts) && switch_and_retry)
 			{	/* Switch to a new journal file and retry, but only once */
-				sts = jnl_file_open_switch(reg, sts, buff);
+				sts = jnl_file_open_switch(reg, sts, buff, OUT_BUFF_SIZE);
 				if (0 == sts)
 				{
 					switch_and_retry = FALSE;
@@ -216,14 +216,14 @@ uint4 jnl_file_open(gd_region *reg, boolean_t init)
 				}  /* if jnl_state */
 			} else
 			{	/* not init and file moved */
-				SET_JPC_ERR_STR(ERR_JNLOPNERR, ERR_JNLMOVED, buff);
+				SET_JPC_ERR_STR(ERR_JNLOPNERR, ERR_JNLMOVED, buff, OUT_BUFF_SIZE);
 				assert(gtm_white_box_test_case_enabled
 					&& ((WBTEST_JNLOPNERR_EXPECTED == gtm_white_box_test_case_number)
 						|| (WBTEST_JNL_CREATE_FAIL == gtm_white_box_test_case_number)));
 			}
 		} else
 		{	/* stat failed */
-			SET_JPC_ERR_STR(ERR_JNLFILOPN, errno, buff);
+			SET_JPC_ERR_STR(ERR_JNLFILOPN, errno, buff, OUT_BUFF_SIZE);
 		}
 	}  /* sts == 0 when we started */
 	if (0 != sts)

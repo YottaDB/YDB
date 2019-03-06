@@ -32,12 +32,6 @@
 
 #include "mdef.h"
 
-#ifdef VMS
-#include <descrip.h>
-#include <rms.h>
-#include <ssdef.h>
-#endif
-
 #include <errno.h>
 #include "gtm_stat.h"
 #include "gtm_ctype.h"
@@ -134,14 +128,10 @@ void dbcertify_scan_phase(void)
 	psa = psa_gbl;
 	DBC_DEBUG(("DBC_DEBUG: Beginning scan phase\n"));
 	psa->bsu_keys = TRUE;
-	UNIX_ONLY(atexit(dbc_scan_phase_cleanup));
+	atexit(dbc_scan_phase_cleanup);
 	TREF(transform) = TRUE;
 	psa->block_depth = psa->block_depth_hwm = -1;		/* Initialize no cache */
 	initialize_pattern_table();
-	/* On VMS, file operations are in 512 byte chunks which seems to give VMS some fidgies
-	   when we rewrite the header later. Make sure the header is in one single 512 byte
-	   block.
-	*/
 	assert(DISK_BLOCK_SIZE == SIZEOF(p1hdr));
 	/* Check results of option parse */
 	psa->phase_one = TRUE;
@@ -153,7 +143,7 @@ void dbcertify_scan_phase(void)
 		buff_len = SIZEOF(psa->outfn) - 1;
 		if (FALSE == cli_get_str("OUTFILE", (char_ptr_t)psa->outfn, &buff_len))
 			mupip_exit(ERR_MUPCLIERR);
-		psa->outfn[buff_len] = '\0';	/* Not null terminated if max string on UNIX, not at all on VMS */
+		psa->outfn[buff_len] = '\0';	/* Not null terminated if max string */
 	}
 	if (CLI_PRESENT == cli_present("TEMPFILE_DIR"))
 	{	/* Want to put temp files in this directory */
@@ -171,24 +161,17 @@ void dbcertify_scan_phase(void)
 	   as current a version as possible.
 	*/
 	dbc_open_command_file(psa);
-#	ifdef VMS
-	strcpy((char_ptr_t)psa->util_cmd_buff, RESULT_ASGN);
-	strcat((char_ptr_t)psa->util_cmd_buff, (char_ptr_t)psa->tmprsltfile);
-	dbc_write_command_file(psa, (char_ptr_t)psa->util_cmd_buff);
-	dbc_write_command_file(psa, DSE_START);
-#	else
 	strcpy((char_ptr_t)psa->util_cmd_buff, DSE_START_PIPE_RSLT1);
 	strcat((char_ptr_t)psa->util_cmd_buff, (char_ptr_t)psa->tmprsltfile);
 	strcat((char_ptr_t)psa->util_cmd_buff, DSE_START_PIPE_RSLT2);
 	dbc_write_command_file(psa, (char_ptr_t)psa->util_cmd_buff);
-#	endif
 	strcpy((char_ptr_t)psa->util_cmd_buff, DSE_FIND_REG_ALL);
 	strcat((char_ptr_t)psa->util_cmd_buff, "=");
 	strcat((char_ptr_t)psa->util_cmd_buff, (char_ptr_t)psa->regname);
 	dbc_write_command_file(psa, (char_ptr_t)psa->util_cmd_buff);
 	dbc_write_command_file(psa, DSE_BFLUSH);
 	dbc_write_command_file(psa, DSE_QUIT);
-	UNIX_ONLY(dbc_write_command_file(psa, "EOF"));
+	dbc_write_command_file(psa, "EOF");
 	dbc_close_command_file(psa);
 	dbc_remove_result_file(psa);
 	dbc_run_command_file(psa, "DSE", DSE_BFLUSH, TRUE);
@@ -197,25 +180,27 @@ void dbcertify_scan_phase(void)
 	/* See if a phase-1 output filename was specified. If not, create a default name */
 	if (!outfile_present)
 	{	/* No output file name specified -- supply a default */
-		len = strlen((char_ptr_t)dbfn);
-		if (MAX_FN_LEN < (len + SIZEOF(DEFAULT_OUTFILE_SUFFIX) - 1))
-		{
-			badfn = malloc(len + SIZEOF(DEFAULT_OUTFILE_SUFFIX));
+		len = STRLEN((char_ptr_t)dbfn);
+		if ((size_t)MAX_FN_LEN <= (len + SIZEOF(DEFAULT_OUTFILE_SUFFIX)))
+		{	/* WARNING: malloc()ed space not free()d because this is a one and done program */
+			badfn = malloc(len + SIZEOF(DEFAULT_OUTFILE_SUFFIX) + 1);
 			memcpy(badfn, dbfn, len);
+			memcpy(badfn + len, DEFAULT_OUTFILE_SUFFIX, SIZEOF(DEFAULT_OUTFILE_SUFFIX));
+			len += SIZEOF(DEFAULT_OUTFILE_SUFFIX);
 			badfn[len] = 0;
-			strcat((char_ptr_t)badfn, DEFAULT_OUTFILE_SUFFIX);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILENAMETOOLONG, 0,
 						ERR_TEXT, 2, RTS_ERROR_STRING((char_ptr_t)badfn));
 		}
-		strcpy((char_ptr_t)psa->outfn, (char_ptr_t)dbfn);
-		strcat((char_ptr_t)psa->outfn, DEFAULT_OUTFILE_SUFFIX);
+		STRNCPY_STR((char_ptr_t)psa->outfn, (char_ptr_t)dbfn, MAX_FN_LEN + 1);	/* +1 prevents compiler warning */
+		assert(MAX_FN_LEN > (len + SIZEOF(DEFAULT_OUTFILE_SUFFIX)));
+		STRNCAT((char_ptr_t)psa->outfn, DEFAULT_OUTFILE_SUFFIX, SIZEOF(DEFAULT_OUTFILE_SUFFIX));
 	}
 	/* Build data structures and open database */
 	MALLOC_INIT(psa->dbc_gv_cur_region, SIZEOF(gd_region));
 	MALLOC_INIT(psa->dbc_gv_cur_region->dyn.addr, SIZEOF(gd_segment));
 	REG_ACC_METH(psa->dbc_gv_cur_region) = dba_bg;
 	len = strlen((char_ptr_t)dbfn);
-	strcpy((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)dbfn);
+	STRNCPY_STR((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname, (char_ptr_t)dbfn, MAX_FN_LEN - 1);
 	psa->dbc_gv_cur_region->dyn.addr->fname_len = (unsigned short)len;
 	FILE_CNTL_INIT(psa->dbc_gv_cur_region->dyn.addr);
 	psa->dbc_cs_data = malloc(SIZEOF(*psa->dbc_cs_data));
@@ -223,16 +208,16 @@ void dbcertify_scan_phase(void)
 	psa->fc = psa->dbc_gv_cur_region->dyn.addr->file_cntl;
 	dbc_init_db(psa);
 	/* If REPORT_ONLY was *NOT* specified, then we require two things:
-	 * 1) The reserved bytes value must be at least 8 (UNIX) or 9 (VMS).
+	 * 1) The reserved bytes value must be at least 8.
 	 * 2) The maximum record size must be < blk_size - 16 to allow for new V5 block header.
 	 */
 	max_max_rec_size = psa->dbc_cs_data->blk_size - SIZEOF(blk_hdr);
-	if (VMS_ONLY(9) UNIX_ONLY(8) > psa->dbc_cs_data->reserved_bytes)
+	if (8 > psa->dbc_cs_data->reserved_bytes)
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL)
-			VARLSTCNT(4) ERR_DBMINRESBYTES, 2, VMS_ONLY(9) UNIX_ONLY(8), psa->dbc_cs_data->reserved_bytes);
+			VARLSTCNT(4) ERR_DBMINRESBYTES, 2, 8, psa->dbc_cs_data->reserved_bytes);
 		if (!psa->report_only)
-			EXIT(SS_NORMAL - 1);	/* Gives -1 on UNIX (failure) and 0 on VMS (failure) */
+			EXIT(SS_NORMAL - 1);	/* Gives -1 on failure */
 	}
 	if (psa->dbc_cs_data->max_rec_size > max_max_rec_size)
 	{
@@ -248,7 +233,7 @@ void dbcertify_scan_phase(void)
 	{	/* Recreate the file entirely if it exists */
 		psa->outfd = OPEN3((char_ptr_t)psa->outfn, O_WRONLY + O_CREAT + O_TRUNC, S_IRUSR + S_IWUSR RMS_OPEN_BIN);
 		if (FD_INVALID == psa->outfd)
-		{	/* The following STRERROR() extraction necessary for VMS portability */
+		{
 			save_errno = errno;
 			errmsg = STRERROR(save_errno);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, RTS_ERROR_STRING((char_ptr_t)psa->outfn),
@@ -283,10 +268,9 @@ void dbcertify_scan_phase(void)
 		/* Verification we haven't gotten lost */
 		assert(0 == (blk_num % psa->dbc_cs_data->bplmap));
 		/* Loop through each local bit map processing (checking) allocated blocks */
-		for (lm_offset = 0;
-		     (lm_offset < (psa->dbc_cs_data->bplmap * BML_BITS_PER_BLK))
-			     && (blk_num < psa->dbc_cs_data->trans_hist.total_blks);
-		     lm_offset += BML_BITS_PER_BLK, dbptr += psa->dbc_cs_data->blk_size, blk_num++)
+		for (lm_offset = 0; (lm_offset < (psa->dbc_cs_data->bplmap * BML_BITS_PER_BLK))
+			&& (blk_num < psa->dbc_cs_data->trans_hist.total_blks);
+			lm_offset += BML_BITS_PER_BLK, dbptr += psa->dbc_cs_data->blk_size, blk_num++)
 		{
 			if (gvcst_blk_is_allocated(psa->curr_lbmap_buff + SIZEOF(v15_blk_hdr), lm_offset))
 				/* This block is in use -- process it */
@@ -321,7 +305,7 @@ void dbcertify_scan_phase(void)
 				if (bitmap_blk_num != last_bitmap_blk_num)
 				{
 					psa->fc->op_buff = psa->curr_lbmap_buff;
-					dbptr = BLK_ZERO_OFF((psa->dbc_cs_data->start_vbn))
+					dbptr = BLK_ZERO_OFF(psa->dbc_cs_data->start_vbn)
 						+ psa->dbc_cs_data->free_space
 						+ ((gtm_off_t)psa->dbc_cs_data->blk_size * bitmap_blk_num);
 					psa->fc->op_pos = (dbptr / DISK_BLOCK_SIZE) + 1;
@@ -361,8 +345,7 @@ void dbcertify_scan_phase(void)
 		psa->ofhdr.gvt_leaf_cnt = psa->gvtlvl0;
 		psa->ofhdr.gvt_index_cnt = psa->gvtlvln0;
 		psa->ofhdr.uid_len = SIZEOF(unique_file_id);	/* Size used by v5cbsu since this field len varies by platform */
-		memcpy(&psa->ofhdr.unique_id, &FILE_INFO(psa->dbc_gv_cur_region)->UNIX_ONLY(fileid)VMS_ONLY(file_id),
-		       SIZEOF(unique_file_id));
+		memcpy(&psa->ofhdr.unique_id, &FILE_INFO(psa->dbc_gv_cur_region)->fileid, SIZEOF(unique_file_id));
 		assert(SIZEOF(psa->ofhdr.regname) > strlen((char_ptr_t)psa->regname));
 		strcpy((char_ptr_t)psa->ofhdr.regname, (char_ptr_t)psa->regname);
 		assert(SIZEOF(psa->ofhdr.dbfn) > strlen((char_ptr_t)psa->dbc_gv_cur_region->dyn.addr->fname));
@@ -392,21 +375,6 @@ void dbcertify_scan_phase(void)
 	PRINTF("- GVT index blocks --------------   %12d [0x%08x]\n", psa->gvtlvln0, psa->gvtlvln0);
 	/* Release resources */
 	free(psa->dbc_cs_data);
-#	ifdef VMS
-	/* Some extra freeing of control blocks on VMS */
-	if (NULL != FILE_INFO(psa->dbc_gv_cur_region)->fab)
-		free(FILE_INFO(psa->dbc_gv_cur_region)->fab);
-	if (NULL != FILE_INFO(psa->dbc_gv_cur_region)->nam)
-	{
-		if (NULL != FILE_INFO(psa->dbc_gv_cur_region)->nam->nam$l_esa)
-			free(FILE_INFO(psa->dbc_gv_cur_region)->nam->nam$l_esa);
-		free(FILE_INFO(psa->dbc_gv_cur_region)->nam);
-	}
-	if (NULL != FILE_INFO(psa->dbc_gv_cur_region)->xabfhc)
-		free(FILE_INFO(psa->dbc_gv_cur_region)->xabfhc);
-	if (NULL != FILE_INFO(psa->dbc_gv_cur_region)->xabpro)
-		free(FILE_INFO(psa->dbc_gv_cur_region)->xabpro);
-#	endif
 	free(psa->dbc_gv_cur_region->dyn.addr->file_cntl->file_info);
 	free(psa->dbc_gv_cur_region->dyn.addr->file_cntl);
 	free(psa->dbc_gv_cur_region->dyn.addr);
@@ -466,7 +434,7 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 	/* Check free space in block */
 	blk_len = ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz;
 	free_bytes = psa->dbc_cs_data->blk_size - blk_len;
-	if (UNIX_ONLY(8) VMS_ONLY(9) > free_bytes)
+	if (8 > free_bytes)
 	{
 		blk_levl = ((v15_blk_hdr_ptr_t)psa->block_buff)->levl;
 		if (MAX_BT_DEPTH <= blk_levl)
@@ -641,7 +609,6 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 				PRINTF("       Blknum           Offset  Blktype  BlkLvl   Blksize   Free"
 				       "   Key\n");
 			}
-#			ifndef __osf__
 			GTM64_ONLY(PRINTF("   0x%08x %16lx %s %5d   %9d %6d   %s%s\n", blk_num, dbptr,
 			       (have_dt_blk ? "   DT   " : "   GVT  "),
 			       ((v15_blk_hdr_ptr_t)psa->block_buff)->levl,
@@ -650,16 +617,6 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 			       (have_dt_blk ? "   DT   " : "   GVT  "),
 			       ((v15_blk_hdr_ptr_t)psa->block_buff)->levl,
 			       ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz, free_bytes, key_pfx, key_ptr));
-			VMS_ONLY(PRINTF("   0x%08x %16llx %s %5d   %9d %6d   %s%s\n", blk_num, dbptr,
-			       (have_dt_blk ? "   DT   " : "   GVT  "),
-			       ((v15_blk_hdr_ptr_t)psa->block_buff)->levl,
-			       ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz, free_bytes, key_pfx, key_ptr));
-#			else
-			PRINTF("   0x%08x %16lx %s %5d   %9d %6d\n   %s%s", blk_num, dbptr,
-			       (have_dt_blk ? "   DT   " : "   GVT  "),
-			       ((v15_blk_hdr_ptr_t)psa->block_buff)->levl,
-			       ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz, free_bytes, key_pfx, key_ptr);
-#			endif
 		}
 		psa->blks_too_big++;
 		/* Prepare the record to put to the output file */

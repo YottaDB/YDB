@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __GDSBLK_OPS_H__
-#define __GDSBLK_OPS_H__
+#ifndef GDSBLK_OPS_H_INCLUDED
+#define GDSBLK_OPS_H_INCLUDED
 
 /* Block segment array holds the list of memcpys needed to build the updated block.  The first entry in the array holds the
 	length of the updated block and the address of the last entry in the array that holds valid data.

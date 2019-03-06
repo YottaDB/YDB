@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,11 +59,11 @@ error_def(ERR_EXPR);
 error_def(ERR_INVCTLMNE);
 
 /* for iosocket_dlr_zkey */
+#define FORMATTIMESTR	"FORMAT"
 #define LISTENING	"LISTENING|"
-#define READ		"READ|"
 #define MAXEVENTLITLEN	(SIZEOF(LISTENING)-1)
 #define MAXZKEYITEMLEN	(MAX_HANDLE_LEN + SA_MAXLITLEN + MAXEVENTLITLEN + 2)	/* 1 pipe and a semicolon */
-#define FORMATTIMESTR "FORMAT"
+#define READ		"READ|"
 
 void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 {
@@ -314,11 +314,11 @@ void iosocket_dlr_zkey(mstr *d)
 			/* add READ/LISTENING|handle|remoteinfo;... */
 			if (socket_listening == socketptr->state)
 			{
-				thislen = len = SIZEOF(LISTENING) - 1;
+				thislen = len = STR_LIT_LEN(LISTENING);
 				memcpy(zkeyptr, LISTENING, len);
 			} else
 			{
-				thislen = len = SIZEOF(READ) - 1;
+				thislen = len = STR_LIT_LEN(READ);
 				memcpy(zkeyptr, READ, len);
 			}
 			zkeyptr += len;
@@ -332,7 +332,7 @@ void iosocket_dlr_zkey(mstr *d)
 			if (socket_local != socketptr->protocol)
 			{
 				if (socket_listening == socketptr->state)
-					len = SPRINTF(zkeyptr, "%d", socketptr->local.port);
+					len = SNPRINTF(zkeyptr, MAXZKEYITEMLEN - thislen, "%d", socketptr->local.port);
 				else
 				{
 					if (NULL != socketptr->remote.saddr_ip)

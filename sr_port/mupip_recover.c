@@ -102,6 +102,8 @@ error_def(ERR_JNLEXTRCTSEQNO);
 
 void		gtm_ret_code();
 
+#define	HIST_LEN	256 + 1
+
 CONDITION_HANDLER(mupip_recover_ch)
 {
 	int	rc;
@@ -164,7 +166,7 @@ void	mupip_recover(void)
 {
 	bool			mur_open_files_status;
 	boolean_t		all_gen_properly_closed, apply_pblk, ztp_broken, intrrupted_recov_processing;
-	char			histdetail[256];
+	char			histdetail[HIST_LEN];
 	enum jnl_record_type	rectype;
 	int			cur_time_len, regno, reg_total, status;
 	jnl_ctl_list		*jctl;
@@ -189,11 +191,16 @@ void	mupip_recover(void)
 	DEBUG_ONLY(jgbl.in_mupjnl = TRUE;)
 	jgbl.mur_extract = mur_options.extr[GOOD_TN]; /* journal extract process */
 	jgbl.mur_update = mur_options.update;
-	mur_open_files_status = mur_open_files();
+	mur_open_files_status = mur_open_files(FALSE);
 	if (WBTEST_ENABLED(WBTEST_KILL_ROLLBACK))
 		kill(getpid(), SIGKILL);
-	if (!mur_open_files_status) /* mur_open_files already issued error */
-		mupip_exit(ERR_MUNOACTION);
+	do
+	{
+		if (!mur_open_files_status) /* mur_open_files already issued error */
+			mupip_exit(ERR_MUNOACTION);
+		else if (-1 == mur_open_files_status)
+			mur_open_files_status = mur_open_files(TRUE);
+	} while (1 != mur_open_files_status);
 	assert(!mur_options.rollback_losttnonly || mur_options.rollback);
 	assert(!mur_options.rollback || jgbl.mur_rollback);	/* this equivalence is assumed all over so assert it */
 	murgbl.prc_vec = prc_vec;
@@ -406,7 +413,7 @@ void	mupip_recover(void)
 			if (0 != status)
 			{
 				assert(ERR_REPLINSTNOHIST == status);
-				SPRINTF(histdetail, "Stream Seqno "INT8_FMT" "INT8_FMTX" (Stream # %2d) ",
+				SNPRINTF(histdetail, HIST_LEN, "Stream Seqno "INT8_FMT" "INT8_FMTX" (Stream # %2d) ",
 					murgbl.resync_seqno - 1, murgbl.resync_seqno - 1, murgbl.resync_strm_index);
 				udi = FILE_INFO(jnlpool->jnlpool_dummy_reg);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLINSTNOHIST, 4,

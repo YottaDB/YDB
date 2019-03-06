@@ -78,20 +78,11 @@ int gtm_fprintf(FILE *stream, const char *format, ...)
 		GTM_FWRITE(buf, buflen, 1, stream, buflen, retval);
 	}
 	va_end(printargs);
+	assert(-1 != retval);
 	return retval;
 }
 
-/* Wrapper for sprintf() */
-int	gtm_sprintf(char *str, const char *format, ...)
-{
-	va_list		printargs;
-	int		retval;
-
-	va_start(printargs, format);
-	VSPRINTF(str, format, printargs, retval);
-	va_end(printargs);
-	return retval;
-}
+/* Wrapper for sprintf() - unneeded / unwanted as it is not safe */
 
 /* Wrapper for snprintf() */
 int	gtm_snprintf(char *str, size_t size, const char *format, ...)
@@ -102,6 +93,7 @@ int	gtm_snprintf(char *str, size_t size, const char *format, ...)
 	va_start(printargs, format);
 	VSNPRINTF(str, size, format, printargs, retval);
 	va_end(printargs);
+	assert(-1 != retval);
 	return retval;
 }
 

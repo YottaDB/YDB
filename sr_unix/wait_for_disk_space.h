@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __WAIT_FOR_DISK_SPACE_H__
-#define __WAIT_FOR_DISK_SPACE_H__
+#ifndef WAIT_FOR_DISK_SPACE_H_INCLUDED
+#define WAIT_FOR_DISK_SPACE_H_INCLUDED
 
 void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char *buf, size_t count, int *save_errno);
 

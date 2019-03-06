@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __EB_MULDIV_H__
-#define __EB_MULDIV_H__
+#ifndef EB_MULDIV_H_INCLUDED
+#define EB_MULDIV_H_INCLUDED
 
 bool	eb_int_mul (int4 v1, int4 u1, int4 p[]);
 int4	eb_mul (int4 v[], int4 u[], int4 p[]);	/* p = u*v */

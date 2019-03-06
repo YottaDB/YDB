@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _GTMDBGFLAGS_H
-#define _GTMDBGFLAGS_H
+#ifndef GTMDBGFLAGS_H_INCLUDED
+#define GTMDBGFLAGS_H_INCLUDED
 
 #ifdef GTMDBGFLAGS_ENABLED
 # define GTMDBGFLAGS_MASK_SET(MASK)	(TREF(gtmdbgflags) & MASK)

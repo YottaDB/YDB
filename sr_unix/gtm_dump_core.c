@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,10 +21,12 @@
 #include "error.h"
 #include "gtmcrypt.h"
 
+#define	CORE_NAME_LEN	20 + 1
+
 void gtm_dump_core(void)
 {
 	struct sigaction        act;
-	char                    newname[20];
+	char                    newname[CORE_NAME_LEN];
 	int                     rc, suffix, status;
 	struct stat             fs1;
 	sigset_t		unblock_sigquit;
@@ -52,7 +54,7 @@ void gtm_dump_core(void)
 		status = -1;
 		for (suffix = 1; 0 != status && suffix < 100; ++suffix)
 		{
-			SPRINTF(&newname[0], "core%d", suffix);         /* Make new file name */
+			SNPRINTF(&newname[0], CORE_NAME_LEN, "core%d", suffix);         /* Make new file name */
 			status = Stat(&newname[0], &fs1);               /* This file exist ? */
 			if (0 != status)
 				status = RENAME("core", &newname[0]);   /* No, attempt the rename */

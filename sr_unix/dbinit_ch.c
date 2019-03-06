@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,6 +91,11 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 		{
 			ftok_counter_halted = csa->nl->ftok_counter_halted;
 			access_counter_halted = csa->nl->access_counter_halted;
+			if (csa->now_crit)
+			{	/* Ensure that we don't hold crit before detaching shared memory */
+				assert(!csa->now_crit);
+				rel_crit(db_init_region);
+			}
 			shmdt((caddr_t)csa->nl);
 			csa->nl = (node_local_ptr_t)NULL;
 		} else

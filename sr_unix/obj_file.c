@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,12 +65,17 @@ STATICFNDCL void emit_link_reference(int4 refoffset, mstr *name);
 void drop_object_file(void)
 {
 	int	rc;
+	DCL_THREADGBL_ACCESS;
 
-        if (0 < object_file_des)
+	SETUP_THREADGBL_ACCESS;
+	if (0 < object_file_des)
         {
-		UNLINK(object_file_name);
+		rc = UNLINK(object_file_name);
+		assert(!rc);
 		CLOSE_OBJECT_FILE(object_file_des, rc);		/* Resets "object_file_des" to FD_INVALID */
-        }
+		assert(!rc);
+		(void)UNLINK(TADR(tmp_object_file_name));	/* Just in case the temp file was in play */
+	}
 }
 
 /*
@@ -431,7 +436,8 @@ void emit_literals(void)
 	assert(offset == lits_text_size);
 	/* Emit the linkage name mstr table (never relocated - always offset/length pair). Same index as linkage table */
 	offset = 0;
-	for (linkagep = TREF(linkage_first); NULL != linkagep; linkagep = linkagep->next)
+	for (linkagep = TREF(linkage_first); (NULL != linkagep)
+			&& ((MAXPOSINT4 - (2 * SIZEOF(mstr))) > offset); linkagep = linkagep->next)
 	{
 		name.char_len = 0;				/* No need for this length */
 		name.len = linkagep->symbol->name_len - 1;	/* Don't count '\0' terminator */
@@ -445,6 +451,7 @@ void emit_literals(void)
 		emit_immed(PADCHARS, padsize);
 		offset += padsize;
 	}
+	assert((MAXPOSINT4 - (3 * SIZEOF(mstr))) > offset); /* Should never happen */
 	assert(0 == (uint4)(PADLEN(offset, NATIVE_WSIZE)));
 	/* Emit the literal mval list (also aligned by comp_lits() on NATIVE_WSIZE boundary */
 	offset = 0;

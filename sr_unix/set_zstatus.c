@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@ GBLREF mstr             *err_act;
 
 error_def(ERR_MEMORY);
 
-unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t need_rtsloc)
+unsigned char *set_zstatus(mstr *src, int max_len, int arg, unsigned char **ctxtp, boolean_t need_rtsloc)
 {
 	unsigned char	*b_line;	/* beginning of line (used to restart line) */
 	mval		val;		/* pointer to dollar_zstatus */
@@ -63,7 +63,7 @@ unsigned char *set_zstatus(mstr *src, int arg, unsigned char **ctxtp, boolean_t 
 			save_arg = arg;
 			SET_ERR_CODE(frame_pointer, arg);
 		}
-		src->len = INTCAST(get_symb_line((unsigned char*)src->addr, &b_line, ctxtp) - (unsigned char*)src->addr);
+		src->len = INTCAST(get_symb_line((unsigned char*)src->addr, max_len, &b_line, ctxtp) - (unsigned char*)src->addr);
 	}
 	MV_FORCE_MVAL(&val, arg);
 	n2s(&val);

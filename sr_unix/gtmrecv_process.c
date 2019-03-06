@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,6 @@
 #include "repl_errno.h"
 #include "io.h"
 #include "iosp.h"
-#include "gtm_event_log.h"
 #include "eintr_wrappers.h"
 #include "jnl.h"
 #include "repl_sp.h"
@@ -403,7 +402,6 @@ STATICFNDEF void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 		repl_close(&gtmrecv_sock_fd);
 		SNPRINTF(print_msg, SIZEOF(print_msg), "Closing connection on receiver side\n");
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
-		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "ERR_REPLWARN", print_msg);
 		return;
 	} else if (EREPL_SEND == repl_errno)
 	{
@@ -2767,10 +2765,10 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 
 	assert((NULL != jnlpool->jnlpool_dummy_reg) && jnlpool->jnlpool_dummy_reg->open);
 	repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;
-	DEBUG_ONLY(
-		assert(!repl_csa->hold_onto_crit);
-		ASSERT_VALID_JNLPOOL(repl_csa);
-	)
+#	ifdef DEBUG
+	assert(!repl_csa->hold_onto_crit);
+	ASSERT_VALID_JNLPOOL(repl_csa);
+#	endif
 	/* If BAD_TRANS was written by the update process, it would have updated recvpool_ctl->jnl_seqno accordingly.
 	 * Only otherwise, do we need to wait for it to write "recvpool_ctl->jnl_seqno".
 	 */

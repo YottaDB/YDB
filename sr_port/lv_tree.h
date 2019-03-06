@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _TREE_H
-#define _TREE_H
+#ifndef TREE_H_INCLUDED
+#define TREE_H_INCLUDED
 
 #include <stdarg.h>
 

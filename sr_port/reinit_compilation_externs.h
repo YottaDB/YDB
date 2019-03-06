@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,14 +10,9 @@
  *								*
  ****************************************************************/
 
-#include "mdef.h"
-#include "stringpool.h"
-#include "reinit_externs.h"
+#ifndef REINIT_EXTERNS_INCLUDED
+#define REINIT_EXTERNS_INCLUDED
 
-GBLREF spdesc 		stringpool;
+void reinit_compilation_externs(void);
 
-void reinit_externs(void)
-{
-	stringpool.free = stringpool.base;
-	mcfree();
-}
+#endif /* REINIT_EXTERNS_INCLUDED */

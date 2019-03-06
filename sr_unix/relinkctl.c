@@ -62,6 +62,7 @@ GBLREF	uint4		process_id;
 GBLREF	rtn_tabent	*rtn_names, *rtn_names_end;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	int		process_exiting;
+GBLREF	boolean_t	gtm_pipe_child;
 OS_PAGE_SIZE_DECLARE
 
 STATICFNDCL void relinkctl_map(open_relinkctl_sgm *linkctl);
@@ -370,7 +371,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 				" : shmid = %d\n", hdr->nattached, shmid));
 			assert(INVALID_SHMID != shmid);
 			assert(!hdr->file_deleted);
-			hdr->nattached++;
+			INTERLOCK_ADD(&hdr->nattached, NULL, 1);
 			if (!is_mu_rndwn_rlnkctl)
 				relinkctl_unlock_exclu(linkctl);
 			if (-1 == (sm_long_t)(shm_base = (relinkshm_hdr_t *)do_shmat(shmid, 0, 0)))
@@ -382,7 +383,7 @@ int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 					relinkctl_lock_exclu(linkctl);
 				if (!shm_removed || !is_mu_rndwn_rlnkctl)
 				{
-					hdr->nattached--;
+					INTERLOCK_ADD(&hdr->nattached, NULL, -1);
 					relinkctl_unlock_exclu(linkctl);
 					relinkctl_unmap(linkctl);
 					SNPRINTF(errstr, SIZEOF(errstr), "shmat() failed for shmid=%d shmsize=%llu [0x%llx]",
@@ -551,12 +552,10 @@ void relinkctl_incr_nattached(void)
 	SETUP_THREADGBL_ACCESS;
 	for (linkctl = TREF(open_relinkctl_list); NULL != linkctl; linkctl = linkctl->next)
 	{
-		relinkctl_lock_exclu(linkctl);
 		DBGARLNK((stderr, "relinkctl_incr_nattached : pid = %d : file %s : pre-incr hdr->nattached = %d\n",
 			  getpid(), linkctl->relinkctl_path, linkctl->hdr->nattached));
 		assert(linkctl->hdr->nattached);
-		linkctl->hdr->nattached++;
-		relinkctl_unlock_exclu(linkctl);
+		INTERLOCK_ADD(&linkctl->hdr->nattached, NULL, 1);
 	}
 }
 
@@ -670,13 +669,19 @@ void relinkctl_init_exclu(open_relinkctl_sgm* linkctl)
 		relinkctl_unmap(linkctl);
 		ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, "pthread_mutexattr_init", status);
 	}
+	status = pthread_mutexattr_settype(&exclu_attr, PTHREAD_MUTEX_ERRORCHECK);
+	if (0 != status)
+	{
+		relinkctl_unmap(linkctl);
+		ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, "pthread_mutexattr_settype", status);
+	}
 	status = pthread_mutexattr_setpshared(&exclu_attr, PTHREAD_PROCESS_SHARED);
 	if (0 != status)
 	{
 		relinkctl_unmap(linkctl);
 		ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, "pthread_mutexattr_setpshared", status);
 	}
-#	ifdef __linux__
+#	if PTHREAD_MUTEX_ROBUST_SUPPORTED
 	status = pthread_mutexattr_setrobust(&exclu_attr, PTHREAD_MUTEX_ROBUST);
 	if (0 != status)
 	{
@@ -711,7 +716,7 @@ void relinkctl_lock_exclu(open_relinkctl_sgm *linkctl)
 	status = pthread_mutex_lock(&linkctl->hdr->exclu);
 	if (EOWNERDEAD == status)
 	{
-#		ifdef __linux__
+#		if PTHREAD_MUTEX_CONSISTENT_SUPPORTED
 		status = pthread_mutex_consistent(&linkctl->hdr->exclu);
 		if (0 != status)
 			ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, "pthread_mutex_consistent", status);
@@ -913,7 +918,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 		if (decr_attached)
 		{	/* MUPIP RUNDOWN -RELINKCTL should still hold a lock. */
 			assert(linkctl->locked == is_mu_rndwn_rlnkctl);
-			if (!is_mu_rndwn_rlnkctl)
+			if (!is_mu_rndwn_rlnkctl && !gtm_pipe_child)
 				relinkctl_lock_exclu(linkctl);
 			hdr = linkctl->hdr;
 			assert((INVALID_SHMID != hdr->relinkctl_shmid) || is_mu_rndwn_rlnkctl);
@@ -921,7 +926,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 			{
 				assert(0 < hdr->nattached);
 				if (0 < hdr->nattached)
-					hdr->nattached--;
+					INTERLOCK_ADD(&hdr->nattached, NULL, -1);
 				nattached = hdr->nattached;
 				DBGARLNK((stderr, "relinkctl_rundown : pid = %d : file %s : post-decr nattached = %d\n",
 					getpid(), linkctl->relinkctl_path, nattached));
@@ -929,7 +934,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 				shm_hdr = GET_RELINK_SHM_HDR(linkctl);
 			} else
 				nattached = -1;
-			if (0 == nattached)
+			if ((0 == nattached) && !gtm_pipe_child)
 			{
 				DBGARLNK((stderr, "relinkctl_rundown : nattached = 0\n"));
 				remove_shm = remove_rctl = TRUE;
@@ -971,6 +976,7 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 				}
 			} else
 			{
+				assert(!gtm_pipe_child || (0 != nattached));
 				remove_shm = FALSE;
 				remove_rctl = FALSE;
 			}
@@ -1059,7 +1065,8 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 			}
 			linkctl->rec_base = NULL;
 			linkctl->shm_hashbase = NULL;
-			relinkctl_unlock_exclu(linkctl);
+			if (!gtm_pipe_child)
+				relinkctl_unlock_exclu(linkctl);
 		}
 		relinkctl_unmap(linkctl);	/* sets "linkctl->hdr" to NULL */
 		nextctl = linkctl->next;

@@ -570,7 +570,8 @@ void mupip_backup(void)
 		{	/* determine the directory name and prefix for the temp file */
 			memset(tempnam_prefix, 0, MAX_FN_LEN);
 			memcpy(tempnam_prefix, gv_cur_region->rname, gv_cur_region->rname_len);
-			SPRINTF(&tempnam_prefix[gv_cur_region->rname_len], "_%x", process_id);
+			SNPRINTF(&tempnam_prefix[gv_cur_region->rname_len], MAX_FN_LEN - gv_cur_region->rname_len, "_%x",
+				process_id);
 			if ((SS_NORMAL == trans_log_name_status)
 					&& (NULL != tempdir_trans.addr) && (0 != tempdir_trans.len))
 				*(tempdir_trans.addr + tempdir_trans.len) = 0;
@@ -626,7 +627,7 @@ void mupip_backup(void)
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ERR_FILENAMETOOLONG);
 			}
-			SPRINTF(tempfilename + tempdir_full.len,"/%s_XXXXXX",tempnam_prefix);
+			SNPRINTF(tempfilename + tempdir_full.len, MAX_FN_LEN - tempdir_full.len, "/%s_XXXXXX", tempnam_prefix);
 			MKSTEMP(tempfilename, rptr->backup_fd);
 			if (FD_INVALID == rptr->backup_fd)
 			{
@@ -1083,7 +1084,7 @@ repl_inst_bkup_done1:
 					 */
 					csa = &udi->s_addrs;
 					assert(csa->critical
-						== (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE));
+						== (CRIT_PTR_T)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE));
 					grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, ASSERT_NO_ONLINE_ROLLBACK);
 					jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;
 					if (repl_instance.num_histinfo != jnlpool->repl_inst_filehdr->num_histinfo)

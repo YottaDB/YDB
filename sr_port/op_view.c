@@ -81,6 +81,7 @@
 #include "localvarmonitor.h"
 #include "is_file_identical.h"	/* Needed for JNLPOOL_INIT_IF_NEEDED */
 #include "break.h"
+#include "min_max.h"
 
 STATICFNDCL void lvmon_release(void);
 STATICFNDCL void view_dbop(unsigned char keycode, viewparm *parmblkptr, mval *thirdarg);
@@ -205,6 +206,7 @@ void	op_view(int numarg, mval *keyword, ...)
 	assertpro(1 <= numarg);
 	MV_FORCE_STR(keyword);
 	numarg--;	/* Remove keyword from count */
+	assert(MAX_ARGS >= numarg);
 	if (0 < numarg)
 	{
 		arg = va_arg(var, mval *);
@@ -810,6 +812,7 @@ void	op_view(int numarg, mval *keyword, ...)
 			{	/* A variable list was supplied - Need a new table but first free any existing old table first */
 				if (NULL != TREF(lvmon_vars_anchor))
 					lvmon_release();			/* Table exists. Free allocated var names/values */
+				numarg = MIN(numarg, MAX_ARGS);			/* 4SCA: Apply MIN for supposed integer overflow */
 				TREF(lvmon_vars_count) = numarg;		/* Elements in this table */
 				size = numarg * SIZEOF(lvmon_var);		/* Byte size of new table */
 				lvmon_vars_base = TREF(lvmon_vars_anchor) = malloc(size);	/* Allocate new table */

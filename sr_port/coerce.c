@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,41 +39,48 @@ void coerce(oprtype *a, unsigned short new_type)
 	old_op = ref->opcode;
 	if (new_type & oc_tab[old_op].octype)
 		return;
-	if ((OC_COMVAL == old_op) || (OC_COMINT == old_op) || (OC_FORCENUM == old_op))
+	switch (old_op)
 	{
-		assert(TRIP_REF == ref->operand[0].oprclass);
-		if ((OC_FORCENUM != old_op) || (OC_LIT == (conv = ref->operand[0].oprval.tref->opcode)))	/* WARNING assign */
-		{	/* because compiler generated literals should include their numeric form, we don't need to coerce */
-			assert(ref->operand[0].oprval.tref == ref->exorder.bl);
-			if (OC_LIT == conv)
+		case OC_FORCENUM:
+			if ((ref->operand[0].oprval.tref != ref->exorder.bl) || (OC_LIT != ref->operand[0].oprval.tref->opcode))
+				break;						/* WARNING possible fallthrough */
+		case OC_COMVAL:
+		case OC_COMINT:
+			assert(TRIP_REF == ref->operand[0].oprclass);
+			if (OC_LIT == ref->operand[0].oprval.tref->opcode)
+			{	/* compiler generated literals should include their numeric form - no need to coerce */
 				MV_FORCE_NUMD(&ref->operand[0].oprval.tref->operand[0].oprval.mlit->v);
+			}
 			dqdel(ref, exorder);
 			ref = ref->operand[0].oprval.tref;
 			old_op = ref->opcode;
 			if (new_type & oc_tab[old_op].octype)
 				return;
-		}
-	} else if ((OC_LIT == old_op) && (OCT_MINT == new_type))
-	{
-		lit = ref->operand[0].oprval.mlit;
-		if (!(++lit->rt_addr))
-		{	/* completely removing this otherwise unused literal as needs to be an ILIT instead */
-			if (NULL != complits_hashtab && NULL != complits_hashtab->base)
-			{	/* Deleted entry is in the hash table .. remove it */
-				litkey.str = lit->v.str;
-				COMPUTE_HASH_STR(&litkey);
-				DEBUG_ONLY(litent = lookup_hashtab_str(complits_hashtab, &litkey));
-				assert(litent);	/* Literal is there .. better be found */
-				assert(litent->value == (void *)lit);
-				litdltd = delete_hashtab_str(complits_hashtab, &litkey);
-				assert(litdltd);
+			break;
+		case OC_LIT:
+			if (OCT_MINT != new_type)
+				break;
+			lit = ref->operand[0].oprval.mlit;
+			if (!(++lit->rt_addr))
+			{	/* completely removing this otherwise unused literal as needs to be an ILIT instead */
+				if (NULL != complits_hashtab && NULL != complits_hashtab->base)
+				{	/* Deleted entry is in the hash table .. remove it */
+					litkey.str = lit->v.str;
+					COMPUTE_HASH_STR(&litkey);
+					DEBUG_ONLY(litent = lookup_hashtab_str(complits_hashtab, &litkey));
+					assert(litent);	/* Literal is there .. better be found */
+					assert(litent->value == (void *)lit);
+					litdltd = delete_hashtab_str(complits_hashtab, &litkey);
+					assert(litdltd);
+				}
+				dqdel(lit, que);
 			}
-			dqdel(lit, que);
-		}
-		ref->opcode = OC_ILIT;
-		ref->operand[0].oprclass = ILIT_REF;
-		ref->operand[0].oprval.ilit = MV_FORCE_INTD(&(lit->v));
-		return;
+			ref->opcode = OC_ILIT;
+			ref->operand[0].oprclass = ILIT_REF;
+			ref->operand[0].oprval.ilit = MV_FORCE_INTD(&(lit->v));
+			return;
+		default:
+			break;
 	}
 	if (OCT_BOOL == new_type)
 		conv = OC_COBOOL;

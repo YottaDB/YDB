@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2018 Fidelity National Information	*
+ * Copyright (c) 2017-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,10 +16,15 @@
 #define COMM_FILTER_FILENAME     	"filter_commands.tab"
 #define PIPE_C_CALL_NAME		"gtmpipeopen"
 #define ZSY_C_CALL_NAME			"gtmzsystem"
+/* Bit definitions for the dm_audit_enable restriction facility */
+#define	AUDIT_DISABLE			0x0000		/* Disables Direct Mode Auditing */
+#define	AUDIT_ENABLE_DMODE		0x0001		/* Enables auditing for direct mode */
+#define	AUDIT_ENABLE_RDMODE		0x0002		/* Enables auditing for all READ (op_read)*/
+#define AUDIT_ENABLE_DMRDMODE		0x0003		/* (AUDIT_ENABLE_DMODE | AUDIT_ENABLE_RDMODE) */
 
 struct restrict_facilities
-{
-	boolean_t	break_op;
+{						/* Restriction(s) added in version */
+	boolean_t	break_op;		/* V6.3-002 */
 	boolean_t	zbreak_op;
 	boolean_t	zedit_op;
 	boolean_t	zsystem_op;
@@ -29,10 +34,12 @@ struct restrict_facilities
 	boolean_t	dse;
 	boolean_t	dmode;
 	boolean_t	zcmdline;
-	boolean_t	halt_op;
+	boolean_t	halt_op;		/* V6.3-003 */
 	boolean_t	zhalt_op;
-	boolean_t	zsy_filter;
+	boolean_t	zsy_filter;		/* V6.3-006 */
 	boolean_t	pipe_filter;
+	boolean_t	library_load_path;	/* V6.3-007 */
+	uint4		dm_audit_enable;
 };
 
 GBLREF	struct restrict_facilities	restrictions;

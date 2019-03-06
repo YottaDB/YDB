@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
-#include <signal.h>
+#include "gtm_signal.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -30,7 +30,7 @@
 #include "t_qread.h"
 
 #define REUSABLE_CHAR	":"
-#define FREE_CHAR	"."
+#define FREE_CHAR	DOT_CHAR
 #define BUSY_CHAR	"X"
 #define CORRUPT_CHAR	"?"
 #define MAX_UTIL_LEN	80

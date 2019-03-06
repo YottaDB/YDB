@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -48,7 +49,8 @@ enum trace_types
 #undef TRACEGROUP
 #undef TRACETYPE
 
-#define TRACE_TABLE_SIZE_DEFAULT 500
+#define TRACE_TABLE_SIZE_DEFAULT	.5 * BIN_ONE_K
+#define TRACE_TABLE_SIZE_MAX		4 * BIN_ONE_K
 
 #define TRCTBL_ENTRY(typeval, intval, addrval1, addrval2, addrval3)						\
 {														\

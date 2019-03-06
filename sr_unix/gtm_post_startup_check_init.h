@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2018 Fidelity National Information		*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,9 +10,9 @@
  *								*
  ****************************************************************/
 
-#ifndef REINIT_EXTERNS_INCLUDED
-#define REINIT_EXTERNS_INCLUDED
+#ifndef __GTM_POST_STARTUP_CHECK_INIT_H__
+#define __GTM_POST_STARTUP_CHECK_INIT_H__
 
-void reinit_externs(void);
+void gtm_post_startup_check_init(void);
 
-#endif /* REINIT_EXTERNS_INCLUDED */
+#endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,6 +43,7 @@ GBLREF 	mur_gbls_t	murgbl;
 GBLREF 	jnl_gbls_t	jgbl;
 GBLREF	boolean_t	mupip_jnl_recover;
 
+error_def(ERR_UNIQNAME);
 error_def(ERR_INVERRORLIM);
 error_def(ERR_INVGLOBALQUAL);
 error_def(ERR_INVIDQUAL);
@@ -81,13 +82,13 @@ void	mur_get_options(void)
 	char		*qual_buffer_ptr, *entry, *entry_ptr;
 	char		*file_name_specified, *file_name_expanded;
 	unsigned int 	file_name_specified_len, file_name_expanded_len;
-	int		extr_type, top, onln_rlbk_val, status2;
+	int		extr_type, cnt, top, onln_rlbk_val, status2;
 	boolean_t	global_exclude;
 	long_list	*ll_ptr, *ll_ptr1;
 	long_long_list	*seqno_list, *seqno_list1;
 	redirect_list	*rl_ptr, *rl_ptr1, *tmp_rl_ptr;
 	select_list	*sl_ptr, *sl_ptr1;
-	boolean_t	interactive, parse_error;
+	boolean_t	interactive, parse_error, uniqname_error = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -168,7 +169,9 @@ void	mur_get_options(void)
 	{
 		mur_options.extr[extr_type] = FALSE;
 		mur_options.extr_fn_is_stdout[extr_type] = FALSE;
-		if (CLI_PRESENT == cli_present(extr_parms[extr_type]))
+		mur_options.extr_fn_is_devnull[extr_type] = FALSE;
+		status = cli_present(extr_parms[extr_type]);
+		if (CLI_PRESENT == status)
 		{
 			mur_options.extr[extr_type] = TRUE;
 			length = MAX_LINE;
@@ -182,9 +185,43 @@ void	mur_get_options(void)
 				mur_options.extr_fn[extr_type][mur_options.extr_fn_len[extr_type]] = '\0';
 				mur_options.extr_fn_is_stdout[extr_type] =
 					(0 == STRNCASECMP(qual_buffer, JNL_STDO_EXTR, SIZEOF(JNL_STDO_EXTR)));
+				mur_options.extr_fn_is_devnull[extr_type] = ((STR_LIT_LEN(DEVNULL) ==
+					mur_options.extr_fn_len[extr_type]) && (0 == STRNCMP_LIT(qual_buffer, DEVNULL)));
+				/* Check if this extract filename is same as any filename seen before
+				 * However, Allow /dev/null & -stdout to be repeated
+				 */
+				if (!mur_options.extr_fn_is_devnull[extr_type] && !mur_options.extr_fn_is_stdout[extr_type])
+				{
+					for (cnt = 0; cnt < extr_type; cnt++)
+					{
+						if (mur_options.extr[cnt] && !mur_options.extr_fn_is_devnull[cnt] &&
+ 							!mur_options.extr_fn_is_stdout[cnt] &&
+							(mur_options.extr_fn_len[cnt] == mur_options.extr_fn_len[extr_type]) &&
+							(0 == STRNCMP_STR(mur_options.extr_fn[extr_type], mur_options.extr_fn[cnt],
+								mur_options.extr_fn_len[cnt])))
+						{
+							uniqname_error = TRUE;
+							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_UNIQNAME, 6,
+								mur_options.extr_fn_len[cnt], mur_options.extr_fn[cnt],
+								LEN_AND_STR(extr_parms[extr_type]), LEN_AND_STR(extr_parms[cnt]));
+						}
+					}
+				}
 			}
+		} else if (CLI_NEGATED == status)
+		{
+			/* negation not allowed for -EXTRACT */
+			assert(extr_type != 0);
+			/* Don't need to store the txns. redirect them to null device (DEVNULL) */
+			mur_options.extr[extr_type] = TRUE;
+			mur_options.extr_fn_is_devnull[extr_type] = TRUE;
+			mur_options.extr_fn_len[extr_type] = STRLEN(DEVNULL);
+			mur_options.extr_fn[extr_type] = (char *)malloc(mur_options.extr_fn_len[extr_type] + 1);
+			STRNCPY_STR(mur_options.extr_fn[extr_type], DEVNULL, mur_options.extr_fn_len[extr_type] + 1);
 		}
 	}
+	if (uniqname_error)
+		mupip_exit(ERR_MUPCLIERR);
 	/*----- JOURNAL DIRECTION QUALIFIERS -----*/
 	/*-----		-FORWARD		-----*/
 	mur_options.forward = cli_present("FORWARD") == CLI_PRESENT;

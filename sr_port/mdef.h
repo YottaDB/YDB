@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,6 +18,10 @@
 #define CLANG_SCA_ANALYZER_NORETURN __attribute__((analyzer_noreturn))
 #else
 #define CLANG_SCA_ANALYZER_NORETURN
+#endif
+
+#ifdef __linux__
+#define CRIT_USE_PTHREAD_MUTEX
 #endif
 
 /* mstr needs to be defined before including "mdefsp.h".  */
@@ -108,15 +112,27 @@ typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
 /* Anchor for thread-global structure rather than individual global vars */
 GBLREF void	*gtm_threadgbl;		/* Accessed through TREF macro in gtm_threadgbl.h */
 
-#if defined(DEBUG) || defined(STATIC_ANALYSIS_NORETURN)
+#if defined(DEBUG)
+# ifndef STATIC_ANALYSIS
 error_def(ERR_ASSERT);
-# define assert(x) ((x) ? 1 : rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ASSERT, 5, LEN_AND_LIT(__FILE__), __LINE__,		\
+#  define assert(x) ((x) ? 1 : rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_ASSERT, 5, LEN_AND_LIT(__FILE__), __LINE__,		\
 						(SIZEOF(#x) - 1), (#x)))
+# else
+#  include <stdlib.h>
+static inline int gtm_abrt() { abort(); return 0;}
+#  define assert(x) ((x) ? 1 : gtm_abrt())
+# endif
 # ifdef UNIX
 #  define GTMDBGFLAGS_ENABLED
 # endif
 #else
 # define assert(x)
+#endif
+
+#ifdef STATIC_ANALYSIS
+#  define STATIC_ANALYSIS_ONLY(statement)			statement
+#else
+#  define STATIC_ANALYSIS_ONLY(statement)
 #endif
 
 #ifdef GTM64
@@ -448,14 +464,17 @@ typedef long		ulimit_t;	/* NOT int4; the UNIX ulimit function returns a value of
  */
 GBLREF	boolean_t		gtm_utf8_mode;
 #ifdef UTF8_SUPPORTED
-#	define ZWR_EXP_RATIO(X)	((!gtm_utf8_mode) ? (((X) * 6 + 7)) : ((X) * 9 + 11))
-#	define MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 9 + 11)
-#	define MAX_ZWR_EXP_RATIO	9
+#	define	ZWR_EXP_RATIO(X)	((!gtm_utf8_mode) ? (((X) * 6 + 7)) : ((X) * 9 + 11))
+#	define	MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 9 + 11)
+#	define	MAX_ZWR_EXP_RATIO	9
+#	define	MAX_ZWR_DCHAR_DIGITS	5
 #else
-#	define ZWR_EXP_RATIO(X)	((X) * 6 + 7)
-#	define MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 6 + 7)
-#	define MAX_ZWR_EXP_RATIO	6
+#	define	ZWR_EXP_RATIO(X)	((X) * 6 + 7)
+#	define	MAX_ZWR_KEY_SZ		(MAX_KEY_SZ * 6 + 7)
+#	define	MAX_ZWR_EXP_RATIO	6
+#	define	MAX_ZWR_DCHAR_DIGITS	3
 #endif
+#define		MAX_ZWR_ZCHAR_DIGITS	3
 
 #define MAX_SYSERR		1000000
 
@@ -606,7 +625,8 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 #	define MV_IS_SINGLEBYTE(X)	(TRUE)	/* all characters are single-byte in non-UTF8 platforms */
 #endif
 
-#define DISK_BLOCK_SIZE		512
+#define DISK_BLOCK_SIZE	512
+#define BIN_ONE_K		1024
 #define LOG2_DISK_BLOCK_SIZE	9
 
 #ifdef DEBUG
@@ -1328,15 +1348,16 @@ gtm_uint64_t asc_hex2l(uchar_ptr_t p, int len);
 /* This macro converts a decimal string to a number (a more efficient alternative to asc2i).
  * It is used by zwr2format() and str2gvargs which is called a lot during MUPIP LOAD (can be time-consuming for a big database).
  */
-#define A2I(cp, end, num)											\
-{														\
-	unsigned char	*cpbase = (unsigned char*)(cp);								\
-	char		ch;											\
-														\
-	for (num = 0; (cp) < (end) && ('0' <= (ch = *((unsigned char*)cp))) && ('9' >= ch); ++(cp))		\
-		num = (num) * 10 + (ch - '0');									\
-	if (cpbase == ((unsigned char*)cp))									\
-		num = -1;											\
+#define A2I(cp, end, num)												\
+{															\
+	unsigned char	*cpbase = (unsigned char*)(cp);									\
+	unsigned char	ch;												\
+															\
+	for (num = 0; (0 <= num) && ((cp) < (end)) && ('0' <= (ch = *((unsigned char*)cp))) && ('9' >= ch); ++(cp))	\
+		num = ((num) * 10) + (unsigned int)(ch - (unsigned char)'0');						\
+	assert((0 <= num) || gtm_white_box_test_case_enabled);								\
+	if (cpbase == ((unsigned char*)cp))										\
+		num = (int)-1;												\
 }
 
 void double2s(double *dp, mval *v); /* double conversion */
@@ -1344,8 +1365,10 @@ int skpc(char c, int length, char *string);
 
 /* If the below declaration changes, corresponding changes in gtmxc_types.h needs to be done. */
 void *gtm_malloc(size_t size);
+void *system_malloc(size_t size);
 /* If the below declaration changes, corresponding changes in gtmxc_types.h needs to be done. */
 void gtm_free(void *addr);
+void system_free(void *addr);
 int gtm_memcmp (const void *, const void *, size_t);
 DEBUG_ONLY(void printMallocInfo(void);)
 int is_equ(mval *u, mval *v);
@@ -1753,7 +1776,7 @@ typedef enum
 										\
 	assert(0 == len % 2);							\
 	for (i = 0; i < len; i+=2)						\
-		SPRINTF((char *)out + i, "%02X", (unsigned char)in[i/2]);	\
+		SNPRINTF((char *)out + i, len, "%02X", (unsigned char)in[i/2]);	\
 }
 
 /* Currently triggers are supported only on UNIX */

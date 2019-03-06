@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,6 +59,7 @@ error_def(ERR_LOGTOOLONG);
 error_def(LP_NOTACQ);				/* bad license */
 error_def(ERR_DEVOPENFAIL);
 error_def(ERR_TEXT);
+error_def(ERR_DEVNAMERESERVED);
 
 #define OPENTIMESTR "OPEN"
 
@@ -110,6 +111,12 @@ int op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
 						      LEN_AND_LIT("The value of $P followed by \"> /\" is an invalid device name"));
 			}
 		}
+	}
+	if (((SIZEOF(SOCKETPOOLNAME) - 1) == device->str.len) &&
+			(0 == STRNCMP_LIT(device->str.addr, SOCKETPOOLNAME)))
+	{
+		if (!TREF(is_socketpool))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DEVNAMERESERVED, 2, device->str.len, device->str.addr);
 	}
 	naml = get_log_name(&device->str, INSERT);
 	if (naml->iod != 0)

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2007 Fidelity Information Services, Inc	*
+ * Copyright (c) 2002-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -178,7 +179,7 @@ boolean_t check_disallow(CLI_ENTRY *pparm)
 		return TRUE;
 	assert(NULL != pparm->parms);	/* should never add a line in *_cmd.c with a disallow function and no sub-qualifiers */
 	/* Copy the error string ahead of time */
-	SPRINTF(cli_err_str, "Missing or illegal combination of command elements - check documentation:");
+	SNPRINTF(cli_err_str, MAX_CLI_ERR_STR, "Missing or illegal combination of command elements - check documentation:");
 	/* point to the end so that individual disallow functions can fill it */
 	cli_err_str_ptr = cli_err_str + strlen(cli_err_str);
 	if (qual_disallow_func())

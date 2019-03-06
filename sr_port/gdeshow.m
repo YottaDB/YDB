@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2017 Fidelity National Information		;
+; Copyright (c) 2001-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -33,48 +33,51 @@ cfilefail:
 	s BOL=""
 	q
 NAME
-	n namsdisp,namedispmaxlen
-	i '$d(nams(NAME)) zm gdeerr("OBJNOTFND"):"Name":$$namedisp(NAME,0) q
-	d n2calc,n2
-	i log s BOL="!" u @uself w BOL d n2 w ! u @useio s BOL=""
+	new namsdisp,namedispmaxlen
+	do ALLNAME(NAME)
+	quit
+ALLNAME(name)
+	new namedisp,namedispmaxlen,tmpnams
+	do SHOWNAM^GDEMAP
+	merge tmpnams=nams
+	; if specific name is passed to be displayed, populate tmpnams only with just that name and its
+	; subscript mappings. If none exists throw OBJNOTFND and exit
+	if $data(name) do
+	. set s="" for  set s=$order(nams(s)) quit:'$zl(s)  kill:((s'=name)&($get(nams(s,"SUBS",0))'=name)) tmpnams((s))
+	. if (11'=$data(tmpnams)) zmessage gdeerr("OBJNOTFND"):"Name":$$namedisp(name,0) quit
+	do n1calc(.tmpnams)
+	do n1(.tmpnams)
+	if log set BOL="!" use @uself write BOL do n1(.tmpnams) write ! use @useio set BOL=""
+	kill tmpnams
 	q
-n2calc:	s namedispmaxlen=0
-	d namedisplaycalc(NAME) ; sets namedispmaxlen
-	q
-n2:	d namehd,namedisplay(NAME)
-	q
-ALLNAME
-	n namedisp,namedispmaxlen
-	d SHOWNAM^GDEMAP,n1calc
-	d n1
-	i log s BOL="!" u @uself w BOL d n1 w ! u @useio s BOL=""
-	q
-n1calc:	s namedispmaxlen=0
-	s s="#"
-	f  s s=$o(nams(s)) q:'$zl(s)  d namedisplaycalc(s)
-	q
-n1:	d namehd
-	d namscollatecalc ; sets "namscollate" array
-	s s="#" ; skip processing "#" name
-	f  s s=$o(namscollate(s)) q:'$zl(s)  d namedisplay(namscollate(s))
-	q
+n1calc:(namesarray)
+	set namedispmaxlen=0
+	set s="#"
+	for  set s=$order(namesarray(s)) quit:'$zlength(s)  do namedisplaycalc(s)
+	quit
+n1:(namesarray)
+	do namehd
+	do namscollatecalc(.namesarray) ; sets "namscollate" array
+	set s="#" ; skip processing "#" name
+	for  set s=$order(namscollate(s)) quit:'$zlength(s)  do namedisplay(namscollate(s))
+	quit
 namedisplay:(name)
 	w !,BOL,?x(1),namsdisp(name),?x(2),nams(name)
 	q
 namec:
-	n s,key,namedisp,namedispmaxlen,namscollate
-	d SHOWNAM^GDEMAP
-	s s="#"
-	w !,"LOCKS "_delim_"REGION=",nams(s)
-	d namscollatecalc	; sets "namscollate" array
-	d n1calc		; sets "namedispmaxlen" and "namsdisp" array
-	s key="#" ; skip processing "#" name
-	f  s key=$o(namscollate(key)) q:'$zl(key)  d
-	. s s=namscollate(key)
-	. i "*"'=s w !,"ADD "_delim_"NAME ",namsdisp(s)," "_delim_"REGION=",nams(s) q
-	. i defreg'=nams(s) w !,"CHANGE "_delim_"NAME "_namsdisp(s)_" "_delim_"REGION=",nams(s)
-	w !,BOL
-	q
+	new s,key,namedisp,namedispmaxlen,namscollate
+	do SHOWNAM^GDEMAP
+	set s="#"
+	write !,"LOCKS "_delim_"REGION=",nams(s)
+	do namscollatecalc(.nams)	; sets "namscollate" array
+	do n1calc(.nams)			; sets "namedispmaxlen" and "namsdisp" array
+	set key="#" ; skip processing "#" name
+	for  set key=$order(namscollate(key)) quit:'$zlength(key)  do
+	. set s=namscollate(key)
+	. if "*"'=s write !,"ADD "_delim_"NAME ",namsdisp(s)," "_delim_"REGION=",nams(s) quit
+	. write:defreg'=nams(s) !,"CHANGE "_delim_"NAME "_namsdisp(s)_" "_delim_"REGION=",nams(s)
+	write !,BOL
+	quit
 GBLNAME
 	i '$d(gnams(GBLNAME)) zm gdeerr("OBJNOTFND"):"Global Name":GBLNAME q
 	d gn2
@@ -559,28 +562,28 @@ tmpseghd:
 	w ?x(7),"Exten",?x(8),"Options"
 	w !,BOL,?x(1),$tr($j("",78)," ","-")
 	q
-namscollatecalc:
+namscollatecalc:(namesarray)
 	; we want subscripted names printed in collating order of subscripts (so x(2) gets printed before x(10))
 	; whereas they would stored in the "nams" array as nams("x(2)") preceded by nams("x(10)")
 	; so determine the gds representation of the names and sort based on that (this automatically includes collation too).
-	n s,type,nsubs,gvn,key,coll,keylen,i
-	k namscollate
-	s s=""
-	f  s s=$o(nams(s)) q:'$zl(s)  d
-	. s type=$g(nams(s,"TYPE")),nsubs=$g(nams(s,"NSUBS"))
-	. i (""=type)!(0=nsubs) s namscollate(s)=s q  ; if not a subscripted name process right away
-	. i "POINT"=type s gvn="^"_nams(s,"NAME")
-	. e  s gvn="^"_nams(s,"GVNPREFIX")_nams(s,"SUBS",nsubs-1)_")"  ; type="RANGE"
-	. s coll=+$g(gnams(nams(s,"SUBS",0),"COLLATION"))
-	. s key=$$gvn2gds^GDEMAP(gvn,coll)
-	. s key=$ze(key,1,$zl(key)-2)  ; remove trailing 00 00
-	. i "RANGE"=type d
+	new s,type,nsubs,gvn,key,coll,keylen,i
+	kill namscollate
+	set s=""
+	for  set s=$order(namesarray(s)) quit:'$zlength(s)  do
+	. set type=$get(namesarray(s,"TYPE")),nsubs=$get(namesarray(s,"NSUBS"))
+	. if (""=type)!(0=nsubs) set namscollate(s)=s quit  ; if not a subscripted name process right away
+	. if "POINT"=type set gvn="^"_namesarray(s,"NAME")
+	. else  set gvn="^"_namesarray(s,"GVNPREFIX")_namesarray(s,"SUBS",nsubs-1)_")"  ; type="RANGE"
+	. set coll=+$get(gnams(namesarray(s,"SUBS",0),"COLLATION"))
+	. set key=$$gvn2gds^GDEMAP(gvn,coll)
+	. set key=$zextract(key,1,$zlength(key)-2)  ; remove trailing 00 00
+	. if "RANGE"=type do
 	. . ; Some processing needed so X(2,4:5) (a range) comes AFTER X(2,4,5:"") (a point within X(2,4)).
 	. . ; Add a 01 at the end of the left subscript of a range.
-	. . s key=key_ONE
+	. . set key=key_ONE
 	. ; ASSERT : i $d(namscollate(key)) s $etrap="zg 0" zsh "*"  zhalt 1  ; assert that checks for duplicate keys
-	. s namscollate(key)=s
-	q
+	. set namscollate(key)=s
+	quit
 namedisp(name,addquote)
 	; returns a name that is displayable (i.e. if it contains control characters, they are replaced by $c() etc.)
 	; if addquote=0, no surrounding double-quotes are added.

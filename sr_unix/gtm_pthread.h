@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information 		*
+ * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,5 +15,8 @@
 #define GTM_PTHREAD_H
 
 #include <pthread.h>	/* BYPASSOK(gtm_pthread.h) */
+
+#define PTHREAD_MUTEX_ROBUST_SUPPORTED		((_POSIX_C_SOURCE >= 200809L) && !defined(_AIX))
+#define PTHREAD_MUTEX_CONSISTENT_SUPPORTED	((_POSIX_C_SOURCE >= 200809L) && !defined(_AIX))
 
 #endif

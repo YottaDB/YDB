@@ -66,7 +66,6 @@ CONDITION_HANDLER(job_init_ch)
 /* Child process test and initialization. If this copy of GTM is a child process, then initialize the child. */
 void jobchild_init(void)
 {
-	boolean_t	need_rtnobj_shm_free;
 	job_params_type	jparms;
 	unsigned char	*transfer_addr;		/* Transfer data */
 	rhdtyp		*base_addr;
@@ -96,47 +95,29 @@ void jobchild_init(void)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 		}
 		/* Execute the command to be run before executing the actual M routine */
-		if (jparms.startup.len)
+		if (jparms.params.startup.len)
 		{
-			status = SYSTEM(jparms.startup.addr);
+			jparms.params.startup.buffer[jparms.params.startup.len] = '\0';
+			status = SYSTEM(jparms.params.startup.buffer);
 			if (-1 == status)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_JOBSTARTCMDFAIL, 0, errno);
 			else if (0 != status)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_JOBSTARTCMDFAIL, 0);
 		}
-		/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
-		 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
-		 */
-		if (!job_addr(&jparms.routine, &jparms.label, jparms.offset,
-				(char **)&base_addr, (char **)&transfer_addr, &need_rtnobj_shm_free))
+		MSTR_DEF(routine_mstr, jparms.params.routine.len, jparms.params.routine.buffer);
+		MSTR_DEF(label_mstr, jparms.params.label.len, jparms.params.label.buffer);
+		if (!job_addr(&routine_mstr, &label_mstr, jparms.params.offset, (char **)&base_addr, (char **)&transfer_addr))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 		/* Set process priority */
-		if (jparms.baspri)
+		if (jparms.params.baspri)
 		{	/* send message to system log if nice fails */
-			if (-1 == nice((int)jparms.baspri))
+			if (-1 == nice((int)jparms.params.baspri))
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("nice"), CALLFROM, errno);
 		}
 		/* Set up $ZMODE to "OTHER" */
 		(TREF(dollar_zmode)).mvtype = MV_STR;
 		(TREF(dollar_zmode)).str.addr = (char *)other_mode_buf;
 		(TREF(dollar_zmode)).str.len = SIZEOF(other_mode_buf) -1;
-		/* Release storage allocated by ojchildparms() */
-		if (jparms.directory.len)
-			free(jparms.directory.addr);
-		if (jparms.gbldir.len)
-			free(jparms.gbldir.addr);
-		if (jparms.startup.len)
-			free(jparms.startup.addr);
-		if (jparms.input.len)
-			free(jparms.input.addr);
-		if (jparms.output.len)
-			free(jparms.output.addr);
-		if (jparms.error.len)
-			free(jparms.error.addr);
-		if (jparms.routine.len)
-			free(jparms.routine.addr);
-		if (jparms.label.len)
-			free(jparms.label.addr);
 	} else
 	{	/* If we are not a child, setup a dummy mumps routine */
 		if (MUMPS_RUN == invocation_mode)
@@ -145,11 +126,7 @@ void jobchild_init(void)
 			if (!cli_get_str("INFILE", run_file_name, &arg_len))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_RUNPARAMERR);
 			lref_parse((uchar_ptr_t)run_file_name, &routine, &label, &offset);
-			/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
-			 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
-			 */
-			if (!job_addr(&routine, &label, offset, (char **)&base_addr,
-					(char **)&transfer_addr, &need_rtnobj_shm_free))
+			if (!job_addr(&routine, &label, offset, (char **)&base_addr, (char **)&transfer_addr))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 		} else if (MUMPS_CALLIN & invocation_mode) /* call-in mode */
 		{

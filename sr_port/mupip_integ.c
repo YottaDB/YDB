@@ -205,6 +205,7 @@ void mupip_integ(void)
 	sndata = &span_node_data;
 	error_mupip = FALSE;
 	mu_region_found = TRUE;
+	TREF(in_mupip_integ) = TRUE;	/* This is for mupip integ to continue in case of error, to report a better msg. */
 	if (NULL == gv_target)
 		gv_target = (gv_namehead *)targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL, NULL);
 	if (CLI_PRESENT == (cli_status = cli_present("MAXKEYSIZE")))
@@ -417,6 +418,8 @@ void mupip_integ(void)
 			}
 			if (!retvalue_mu_int_reg)
 			{
+				if (cs_addrs && cs_addrs->hdr && cs_addrs->hdr->recov_interrupted)
+					util_out_print("!/Recover Interrupted flag is TRUE.!/", TRUE);
 				rptr = rptr->fPtr;
 				if (NULL == rptr)
 					break;

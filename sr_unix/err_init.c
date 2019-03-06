@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,7 +80,7 @@ void err_init(void (*x)())
 		rc = snprintf(procfn, SIZEOF(procfn), COREDUMPFILTERFN, getpid());
 		if (0 > rc)
 		{
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("sprintf()"), CALLFROM, rc);
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("snprintf()"), CALLFROM, rc);
 			return;
 		}
 		if (NULL == bytes_buf)

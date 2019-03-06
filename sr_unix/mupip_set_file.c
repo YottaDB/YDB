@@ -121,14 +121,14 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	gd_region		*temp_cur_region;
 	int			asyncio_status, defer_allocate_status, defer_status, disk_wait_status, encryptable_status,
 				encryption_complete_status, epoch_taper_status, extn_count_status, fd, fn_len, glbl_buff_status,
-				hard_spin_status, inst_freeze_on_error_status, key_size_status, locksharesdbcrit,
+				gtmcrypt_errno, hard_spin_status, inst_freeze_on_error_status, key_size_status, locksharesdbcrit,
 				lock_space_status, mutex_space_status, null_subs_status, qdbrundown_status, rec_size_status,
 				reg_exit_stat, rc, rsrvd_bytes_status, sleep_cnt_status, save_errno, stats_status, status,
-				status1, stdnullcoll_status;
-	int			gtmcrypt_errno;
-	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_hard_spin, new_key_size,
-				new_lock_space, new_mutex_space, new_null_subs, new_rec_size, new_sleep_cnt, new_spin_sleep,
-				new_stdnullcoll, reserved_bytes, spin_sleep_status, read_only_status;
+				status1, stdnullcoll_status, trigger_flush_limit_status, wrt_per_flu_status;
+	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_flush_trigger, new_hard_spin,
+				new_key_size, new_lock_space, new_mutex_space, new_null_subs, new_rec_size, new_sleep_cnt,
+				new_spin_sleep, new_stdnullcoll, new_wrt_per_flu, reserved_bytes, spin_sleep_status,
+				read_only_status;
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;
 	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
@@ -373,7 +373,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if ((uint4) new_spin_sleep > MAX_SPIN_SLEEP_MASK)
 			{
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_spin_sleep,
-                                      LEN_AND_LIT("SPIN_SLEEP_MASK"), MAX_SPIN_SLEEP_MASK);
+					LEN_AND_LIT("SPIN_SLEEP_MASK"), MAX_SPIN_SLEEP_MASK);
 				exit_stat |= EXIT_ERR;
 			}
 		} else
@@ -611,7 +611,6 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			{
 				pvt_csd->n_bts = BT_FACTOR(new_cache_size);
 				pvt_csd->bt_buckets = getprime(pvt_csd->n_bts);
-				pvt_csd->n_wrt_per_flu = 7;
 				pvt_csd->flush_trigger = FLUSH_FACTOR(pvt_csd->n_bts);
 			}
 			if (key_size_status)
@@ -789,6 +788,52 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				reg_exit_stat |= EXIT_WRN;
 			}
 		}
+		if (wrt_per_flu_status = (CLI_PRESENT == cli_present("WRITES_PER_FLUSH")))
+		{
+			if (cli_get_int("WRITES_PER_FLUSH", &new_wrt_per_flu))
+			{
+				if (0 >= new_wrt_per_flu)
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2SML, 4, new_wrt_per_flu,
+						       LEN_AND_LIT("WRITES_PER_FLUSH"), 1);
+					reg_exit_stat |= EXIT_ERR;
+				} else if (MAX_WRT_PER_FLU < new_wrt_per_flu)
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_wrt_per_flu,
+						       LEN_AND_LIT("WRITES_PER_FLUSH"), MAX_WRT_PER_FLU);
+					reg_exit_stat |= EXIT_ERR;
+				}
+			} else
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("WRITES_PER_FLUSH"));
+				reg_exit_stat |= EXIT_ERR;
+			}
+		}
+		if (trigger_flush_limit_status = (CLI_PRESENT == cli_present("TRIGGER_FLUSH_LIMIT")))
+		{
+			if (cli_get_int("TRIGGER_FLUSH_LIMIT", &new_flush_trigger))
+			{
+				if (glbl_buff_status ? (MIN_FLUSH_TRIGGER(BT_FACTOR(new_cache_size)) > new_flush_trigger)
+					: (MIN_FLUSH_TRIGGER(cs_data->n_bts) > new_flush_trigger))
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2SML, 4, new_flush_trigger,
+						LEN_AND_LIT("TRIGGER_FLUSH_LIMIT"), glbl_buff_status
+						? MIN_FLUSH_TRIGGER(BT_FACTOR(new_cache_size)) : MIN_FLUSH_TRIGGER(cs_data->n_bts));
+					reg_exit_stat |= EXIT_ERR;
+				} else if (glbl_buff_status ? (FLUSH_FACTOR(BT_FACTOR(new_cache_size)) < new_flush_trigger)
+					: (FLUSH_FACTOR(cs_data->n_bts) < new_flush_trigger))
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_flush_trigger,
+						       LEN_AND_LIT("TRIGGER_FLUSH_LIMIT"), glbl_buff_status
+						       ? FLUSH_FACTOR(BT_FACTOR(new_cache_size)) : FLUSH_FACTOR(cs_data->n_bts));
+					reg_exit_stat |= EXIT_ERR;
+				}
+			} else
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("TRIGGER_FLUSH_LIMIT"));
+				reg_exit_stat |= EXIT_ERR;
+			}
+		}
 		if (EXIT_NRM == reg_exit_stat)
 		{
 			if (n_dba != access)
@@ -826,6 +871,10 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				SLEEP_SPIN_CNT(csd) = new_sleep_cnt;
 			if (spin_sleep_status)
 				SPIN_SLEEP_MASK(csd) = new_spin_sleep;
+			if (trigger_flush_limit_status)
+				csd->flush_trigger = csd->flush_trigger_top = new_flush_trigger;
+			if (wrt_per_flu_status)
+				csd->n_wrt_per_flu = new_wrt_per_flu;
 			/* --------------------- report results ------------------------- */
 			if (asyncio_status)
 			{
@@ -868,6 +917,12 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (spin_sleep_status)
 				util_out_print("Database file !AD now has spin sleep mask !UL",
 					TRUE, fn_len, fn, SPIN_SLEEP_MASK(csd));
+			if (trigger_flush_limit_status)
+				util_out_print("Database file !AD now has trigger_flush_limit !UL",
+					TRUE, fn_len, fn, csd->flush_trigger_top);
+			if (wrt_per_flu_status)
+				util_out_print("Database file !AD now has writes per flush !UL",
+					TRUE, fn_len, fn, csd->n_wrt_per_flu);
 			if (got_standalone)
 			{
 				DB_LSEEKWRITE(NULL, ((unix_db_info *)NULL), NULL, fd, 0, pvt_csd, SIZEOF(sgmnt_data), status);

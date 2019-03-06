@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2018 Fidelity National Information		!
+! Copyright (c) 2001-2019 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
@@ -244,7 +244,7 @@ FOROFLOW	<FOR commands nested more than !UL deep on a line>/error/fao=1!/ansi=0
 YDIRTSZ		<Improper size of YDIRT data: !UL>/error/fao=1!/ansi=0
 JNLSUCCESS	<!AD successful>/success/fao=2!/ansi=0
 GBLNAME		<Either an identifier or a left parenthesis is expected after a ^ in this context>/error/fao=0!/ansi=29
-GBLOFLOW	<Database segment is full>/error/fao=0!/ansi=0
+GBLOFLOW	<Database file !AD is full>/error/fao=2!/ansi=0
 CORRUPT		<Corrupt input in Blk # !UL, Key #!UL; resuming with next global block>/error/fao=2!/ansi=0
 GTMCHECK	<Internal GT.M error--Report to your GT.M Support Channel>/fatal/fao=0!/ansi=0
 GVDATAFAIL	<Global variable $DATA function failed.  Failure code: !AD.>/error/fao=2!/ansi=0
@@ -1693,6 +1693,14 @@ MLKHASHRESIZE	<LOCK hash table increased in size from !UL to !UL and placed in s
 MLKHASHRESIZEFAIL	<Failed to increase LOCK hash table size from !UL to !UL. Will retry with larger size.>/warning/fao=2!/ansi=0
 MLKCLEANED	<LOCK garbage collection freed !UL lock slots for region !AD>/info/fao=3!/ansi=0
 NOTMNAME	<!AD is not a valid M name>/error/fao=2!/ansi=0
+DEVNAMERESERVED	 <Cannot use !AD as device name. Reserved for GTM internal usage>/error/fao=2!/ansi=0
+ORLBKREL	<ONLINE ROLLBACK releasing all locking resources to allow a freeze OFF to proceed>/info/fao=0!/ansi=0
+ORLBKRESTART	<ONLINE ROLLBACK restarted on instance !AD corresponding to !AD>/info/fao=4!/ansi=0
+UNIQNAME	<Cannot provide same file name (!AD) for !AD and !AD>/error/fao=6!/ansi=0
+APDINITFAIL	<Audit Principal Device failed to initialize audit information>/error/fao=0!/ansi=0
+APDCONNFAIL	<Audit Principal Device failed to connect to audit logger>/error/fao=0!/ansi=0
+APDLOGFAIL	<Audit Principal Device failed to log activity>/error/fao=0!/ansi=0
+STATSDBMEMERR	<Process attempted to create stats block in statistics database !AD and received SIGBUS--invalid physical address. Check file system space.>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

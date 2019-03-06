@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __MU_GV_CUR_REG_INIT__H
-#define __MU_GV_CUR_REG_INIT__H
+#ifndef MU_GV_CUR_REG_INIT_H_INCLUDED
+#define MU_GV_CUR_REG_INIT_H_INCLUDED
 
 void mu_gv_cur_reg_init(void);
 void mu_gv_cur_reg_free(void);

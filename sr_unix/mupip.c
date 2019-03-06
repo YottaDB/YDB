@@ -93,7 +93,6 @@ int main (int argc, char **argv)
 	invocation_mode = MUMPS_UTILTRIGR;
 	err_init(util_base_ch);
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
-	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, NULL, suspsigs_handler, continue_handler);	/* Note: no ^C handler is defined (yet) */
 	atexit(mupip_exit_handler);
 	licensed = TRUE;

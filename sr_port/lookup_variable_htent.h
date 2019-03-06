@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2009-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __LOOKUP_VARIABLE_HTENT_H__
-#define __LOOKUP_VARIABLE_HTENT_H__
+#ifndef LOOKUP_VARIABLE_HTENT_H_INCLUDED
+#define LOOKUP_VARIABLE_HTENT_H_INCLUDED
 
 ht_ent_mname *lookup_variable_htent(unsigned int x);
 

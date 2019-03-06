@@ -1015,7 +1015,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 	 * eliminate it on a case by case basis.
 	 */
 	DBG_MARK_RTS_ERROR_UNUSABLE;
-	crash_count = csa->critical->crashcnt;
+	UPDATE_CRASH_COUNT(csa, crash_count);
 	csa->regnum = ++region_open_count;
 	csd = csa->hdr;
 #	ifdef GTM_TRIGGER

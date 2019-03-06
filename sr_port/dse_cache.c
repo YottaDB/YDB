@@ -45,6 +45,7 @@ error_def(ERR_SIZENOTVALID4);
 #define	UNCLEAN_VERIFY		"verification is NOT clean (see operator log for details)"
 #define	RECOVER_DONE		"recovery complete (see operator log for details)"
 #define	RECOVER_NOT_APPLIC	"recovery not applicable with MM access method"
+#define	OUT_LINE	256 + 1
 
 error_def(ERR_SIZENOTVALID4);
 
@@ -59,7 +60,7 @@ void dse_cache(void)
 	int4			size;
 	uint4			offset, value, old_value, lcnt;
 	char			dollarh_buffer[MAXNUMLEN], zdate_buffer[SIZEOF(DSE_DMP_TIME_FMT)];
-	char			temp_str[256], temp_str1[256];
+	char			temp_str[OUT_LINE], temp_str1[OUT_LINE];
 	sm_uc_ptr_t		chng_ptr;
 	cache_rec_ptr_t		cr_que_lo;
 	boolean_t		is_mm, was_hold_onto_crit, wc_blocked_ok;
@@ -149,15 +150,15 @@ void dse_cache(void)
 				chng_ptr = (sm_uc_ptr_t)csa->nl + offset;
 				if (SIZEOF(char) == size)
 				{
-					SPRINTF(temp_str, "!UB [0x!XB]");
+					SNPRINTF(temp_str, OUT_LINE, "!UB [0x!XB]");
 					old_value = *(sm_uc_ptr_t)chng_ptr;
 				} else if (SIZEOF(short) == size)
 				{
-					SPRINTF(temp_str, "!UW [0x!XW]");
+					SNPRINTF(temp_str, OUT_LINE, "!UW [0x!XW]");
 					old_value = *(sm_ushort_ptr_t)chng_ptr;
 				} else if (SIZEOF(int4) == size)
 				{
-					SPRINTF(temp_str, "!UL [0x!XL]");
+					SNPRINTF(temp_str, OUT_LINE, "!UL [0x!XL]");
 					old_value = *(sm_uint_ptr_t)chng_ptr;
 				}
 				if (value_present)
@@ -172,12 +173,12 @@ void dse_cache(void)
 					value = old_value;
 				if (show_present)
 				{
-					SPRINTF(temp_str1, "Region !12AD : Location !UL [0x!XL] : Value = %s :"
+					SNPRINTF(temp_str1, OUT_LINE, "Region !12AD : Location !UL [0x!XL] : Value = %s :"
 						" Size = !UB [0x!XB]", temp_str);
 					util_out_print(temp_str1, TRUE, REG_LEN_STR(reg), offset, offset, value, value, size, size);
 				} else
 				{
-					SPRINTF(temp_str1, "Region !12AD : Location !UL [0x!XL] : Old Value = %s : "
+					SNPRINTF(temp_str1, OUT_LINE, "Region !12AD : Location !UL [0x!XL] : Old Value = %s : "
 						"New Value = %s : Size = !UB [0x!XB]", temp_str, temp_str);
 					util_out_print(temp_str1, TRUE, REG_LEN_STR(reg), offset, offset,
 						old_value, old_value, value, value, size, size);

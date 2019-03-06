@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2017 Fidelity National Information	*
+ * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,11 +30,9 @@ GBLREF	boolean_t		run_time;
 GBLREF	boolean_t		write_after_image;
 GBLREF	boolean_t		dse_running;
 GBLREF	enum gtmImageTypes	image_type;
-#ifdef UNIX
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	boolean_t 		span_nodes_disallowed;
 GBLREF	char			gtm_dist[GTM_PATH_MAX];
-#endif
 
 void	common_startup_init(enum gtmImageTypes img_type)
 {
@@ -50,7 +48,6 @@ void	common_startup_init(enum gtmImageTypes img_type)
 	getjobnum();
 	/* Get the OS page size. */
 	get_page_size();
-#	ifdef UNIX
 	/* Read gtm_dist. */
 	if (NULL != (dist = GETENV(GTM_DIST)))
 	{
@@ -59,7 +56,8 @@ void	common_startup_init(enum gtmImageTypes img_type)
 		memcpy(gtm_dist, dist, len);
 		len = MIN(len, PATH_MAX);
 		gtm_dist[len] = '\0';
-	}
+	} else
+		gtm_dist[0] = '\0';
 	/* Setup global variables corresponding to signal blocks. */
 	set_blocksig();
 	/* Do common environment initialization. */
@@ -73,9 +71,8 @@ void	common_startup_init(enum gtmImageTypes img_type)
 	 * operate on UTF-8 mode.
 	 */
 	gtm_wcswidth_fnptr = (GTMSECSHR_IMAGE == img_type) ? NULL : gtm_wcswidth;
-#	endif
 	NON_GTMTRIG_ONLY(skip_dbtriggers = TRUE;) /* Do not invoke triggers for trigger non-supporting platforms. */
-	UNIX_ONLY(span_nodes_disallowed = (GTCM_GNP_SERVER_IMAGE == img_type) || (GTCM_SERVER_IMAGE == img_type);)
+	span_nodes_disallowed = (GTCM_GNP_SERVER_IMAGE == img_type) || (GTCM_SERVER_IMAGE == img_type);
 	is_gtcm = ((GTCM_GNP_SERVER_IMAGE == img_type) || (GTCM_SERVER_IMAGE == img_type));
 	if (is_gtcm)
 		skip_dbtriggers = TRUE; /* GT.CM OMI and GNP servers do not invoke triggers */

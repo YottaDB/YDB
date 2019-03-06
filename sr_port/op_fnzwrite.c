@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2015 Fidelity National Information	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,7 @@ void op_fnzwrite(boolean_t direction, mval* src, mval* dst)
 			DBG_MARK_STRINGPOOL_EXPANDABLE;
 		} else
 		{
+			dst_len = str_len;
 			format2zwr((sm_uc_ptr_t)src->str.addr, src->str.len, (uchar_ptr_t)stringpool.free, &dst_len);
 			DBG_MARK_STRINGPOOL_EXPANDABLE;
 			if (MAX_STRLEN < dst_len)

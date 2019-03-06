@@ -139,6 +139,7 @@ MBSTART {									\
  *
  * #define TIMER_DEBUGGING
  */
+#define	MAX_UNKNOWN_LEN 20 + 1
 
 #ifdef TIMER_DEBUGGING
 #  define DUMP_TIMER_INFO(LOCATION)								\
@@ -153,7 +154,7 @@ MBSTART {									\
 	char		*s_hiber_wake = "hiber_wake";						\
 	char		*s_fake_enospc = "fake_enospc";						\
 	char		*s_simple_timeout_timer = "simple_timeout_timer";			\
-	char		s_unknown[20];								\
+	char		s_unknown[MAX_UNKNOWN_LEN];						\
 	char		*handler;								\
 												\
 	cur_timer = (GT_TIMER *)timeroot;							\
@@ -184,7 +185,7 @@ MBSTART {									\
 			handler = s_simple_timeout_timer;					\
 		else										\
 		{										\
-			SPRINTF(s_unknown, "%p", (void *)handler);				\
+			SNPRINTF(s_unknown, MAX_UNKNOWN_LEN, "%p", (void *)handler);				\
 			handler = s_unknown;							\
 		}										\
 		FPRINTF(stderr, "  - timer #%d:\n"						\

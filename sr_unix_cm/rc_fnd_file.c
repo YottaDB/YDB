@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	short		dsid, node;
 	gd_binding	*map;
 	gd_addr		*addr;
-	char		buff[1024], *cp, *cp1;
+	char		buff[1024], *cp, *cp1, msg[MAX_FN_LEN + 1];
 	mstr		fpath1, fpath2;
 	mval		v;
 	mname_entry	gvname;
@@ -88,8 +88,7 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		fpath1.len = SIZEOF(RC_NSPACE_PATH);
 		if (SS_NORMAL != TRANS_LOG_NAME(&fpath1, &fpath2, buff, SIZEOF(buff), do_sendmsg_on_log2long))
 		{
-			char msg[256];
-			SPRINTF(msg, "Invalid DB filename, \"%s\"", fpath1.addr);
+			SNPRINTF(msg, MAX_FN_LEN + 1, "Invalid DB filename, \"%s\"", fpath1.addr);
 			gtcm_rep_err(msg, errno);
 			return RC_BADFILESPEC;
 		}

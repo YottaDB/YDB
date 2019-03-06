@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2017 Fidelity National Information		;
+; Copyright (c) 2006-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -152,24 +152,26 @@ tmpseg:	n squals s s=""
 	f  s s=$o(tmpseg(am,s)) q:'$l(s)  s squals(s)=tmpseg(am,s)
 	s x=$$TSQUALS(am,.squals)
 	q
-regelm:	i s'="DYNAMIC_SEGMENT",'$d(tmpreg(s)) zm $$info(gdeerr("QUALBAD")):s
-	e  i $d(minreg(s)),minreg(s)>rquals(s) zm gdeerr("VALTOOSMALL"):rquals(s):minreg(s):s
-	e  i $d(maxreg(s)),maxreg(s)<rquals(s) zm gdeerr("VALTOOBIG"):rquals(s):maxreg(s):s
-	i  s verified=0 zm gdeerr("REGIS"):REGION
-	q
-segelm:	i s'="FILE_NAME",'$l(tmpseg(am,s)) zm $$info(gdeerr("QUALBAD")):s
-	e  i $d(minseg(am,s)),minseg(am,s)>squals(s) zm gdeerr("VALTOOSMALL"):squals(s):minseg(am,s):s
-	e  i $d(maxseg(am,s)),maxseg(am,s)<squals(s) zm gdeerr("VALTOOBIG"):squals(s):maxseg(am,s):s
-	i  s verified=0 zm gdeerr("SEGIS"):am:SEGMENT
-	q
+regelm:	if s'="DYNAMIC_SEGMENT",'$data(tmpreg(s)) zmessage $$info(gdeerr("QUALBAD")):s
+	else  if $data(minreg(s)),minreg(s)>rquals(s) zmessage gdeerr("VALTOOSMALL"):rquals(s):minreg(s):s
+	else  if $data(maxreg(s)),maxreg(s)<rquals(s) zmessage gdeerr("VALTOOBIG"):rquals(s):maxreg(s):s
+	if  set verified=0
+	quit
+segelm:	if s'="FILE_NAME",'$length(tmpseg(am,s)) zmessage $$info(gdeerr("QUALBAD")):s
+	else  if $data(minseg(am,s)),minseg(am,s)>squals(s) zmessage gdeerr("VALTOOSMALL"):squals(s):minseg(am,s):s
+	else  if $data(maxseg(am,s)),maxseg(am,s)<squals(s) zmessage gdeerr("VALTOOBIG"):squals(s):maxseg(am,s):s
+	if  set verified=0
+	quit
 key2blk:
 	; the computation below allows for at least 1 max-key record in a data OR index block.
 	; since an index block always contains a *-key, we need to account for that too.
 	; bs:block size, y:supportable max key size, f:size of reserved bytes, ks:key size
-	i REGION="TEMPLATE" q  ; do not do keysize/blksize check for TEMPLATE region as this is not a real region
-	s y=bs-f-SIZEOF("blk_hdr")-len("min_val")-SIZEOF("rec_hdr")-len("hide_subs")-len("bstar_rec")
-	i ks>y s verified=0 zm gdeerr("KEYSIZIS"):ks,gdeerr("KEYFORBLK"):bs:f:y,gdeerr("REGIS"):REGION
-	q
+	set len("block_id")=4	;size of block_id
+	set len("bstar_rec")=8	;size for bstar record
+	if REGION="TEMPLATE" quit  ; do not do keysize/blksize check for TEMPLATE region as this is not a real region
+	set y=bs-f-SIZEOF("blk_hdr")-SIZEOF("rec_hdr")-len("block_id")-len("bstar_rec")
+	if ks>y set verified=0 zmessage gdeerr("KEYSIZIS"):ks,gdeerr("KEYFORBLK"):bs:f:y,gdeerr("REGIS"):REGION
+	quit
 buf2blk:	i REGION="TEMPLATE" q
 	i "USER"[am s verified=0 zm gdeerr("NOJNL"):am,gdeerr("REGIS"):REGION,gdeerr("SEGIS"):am:SEGMENT
 	q
@@ -191,58 +193,54 @@ allocchk(rquals)
 ; called from GDEADD.M and GDECHANG.M
 
 RQUALS(rquals)
-	i '$d(verified) n verified s verified=1
-	s len("min_val")=4   ;size for value field in index block
-	s len("bstar_rec")=8   ;size for bstar record
-	s len("hide_subs")=8   ;size for hidden subscript
-	s s=""
-	f  s s=$o(rquals(s)) q:'$l(s)  d regelm
-	i $d(rquals("FILE_NAME")),$zl(rquals("FILE_NAME"))>(SIZEOF("file_spec")-1) s verified=0
-	i  zm $$info(gdeerr("VALTOOLONG")):rquals("FILE_NAME"):SIZEOF("file_spec")-1:"Journal filename",gdeerr("REGIS"):REGION
-	s ks="KEY_SIZE",ks=$s($d(rquals(ks)):rquals(ks),$d(regs(REGION,ks)):regs(REGION,ks),1:tmpreg(ks))
-	s x="RECORD_SIZE",x=$s($d(rquals(x)):rquals(x),$d(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
-	d allocchk(.rquals)
-	i REGION="TEMPLATE" s bs=tmpseg(tmpacc,"BLOCK_SIZE"),f=tmpseg(tmpacc,"RESERVED_BYTES")
+	if '$data(verified) new verified set verified=1
+	set s=""
+	for  set s=$order(rquals(s)) quit:'$length(s)  do regelm
+	quit:'verified verified
+	if $data(rquals("FILE_NAME")),$zlength(rquals("FILE_NAME"))>(SIZEOF("file_spec")-1) set verified=0
+	if  zmessage $$info(gdeerr("VALTOOLONG")):rquals("FILE_NAME"):SIZEOF("file_spec")-1:"Journal filename",gdeerr("REGIS"):REGION
+	set ks="KEY_SIZE",ks=$select($data(rquals(ks)):rquals(ks),$data(regs(REGION,ks)):regs(REGION,ks),1:tmpreg(ks))
+	set x="RECORD_SIZE",x=$select($data(rquals(x)):rquals(x),$data(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
+	do allocchk(.rquals)
+	if REGION="TEMPLATE" set bs=tmpseg(tmpacc,"BLOCK_SIZE"),f=tmpseg(tmpacc,"RESERVED_BYTES")
 	; note "else" used in two consecutive lines intentionally (instead of using a do block inside one else).
 	; this is because we want the QUIT to quit out of RQUALS and the NEW of SEGMENT,am to happen at the RQUALS level.
-	e  s s="DYNAMIC_SEGMENT",s=$s($d(rquals(s)):rquals(s),$d(regs(REGION,s)):regs(REGION,s),1:0)
-	e  q:'$d(segs(s)) verified n SEGMENT,am d
-	. s SEGMENT=s,am=segs(s,"ACCESS_METHOD"),bs=$g(segs(s,"BLOCK_SIZE")),f=$g(segs(s,"RESERVED_BYTES"))
-	i minreg("KEY_SIZE")'>ks d
-	. i am'="USER" d key2blk ;GTM-6941
-	s x="JOURNAL"
-	i '$s('$d(rquals(x)):tmpreg(x),1:rquals(x)) q verified
-	s x="BUFFER_SIZE",x=$s($d(rquals(x)):rquals(x),$d(regs(REGION,x)):regs(REGION,x),1:tmpreg(x)) d buf2blk
-	i nommbi s x="BEFORE_IMAGE" i $s('$d(rquals(x)):tmpreg(x),1:rquals(x)) d mmbichk
-	q verified
+	else  set s="DYNAMIC_SEGMENT",s=$select($data(rquals(s)):rquals(s),$data(regs(REGION,s)):regs(REGION,s),1:0)
+	else  quit:'$data(segs(s)) verified new SEGMENT,am do
+	. set SEGMENT=s,am=segs(s,"ACCESS_METHOD"),bs=$get(segs(s,"BLOCK_SIZE")),f=$get(segs(s,"RESERVED_BYTES"))
+	do:((minreg("KEY_SIZE")'>ks)&(maxreg("KEY_SIZE")'<ks)&("USER"'=am)) key2blk ;GTM-6941
+	set x="JOURNAL"
+	quit:'$select('$data(rquals(x)):tmpreg(x),1:rquals(x)) verified
+	set x="BUFFER_SIZE",x=$select($data(rquals(x)):rquals(x),$data(regs(REGION,x)):regs(REGION,x),1:tmpreg(x)) do buf2blk
+	if nommbi set x="BEFORE_IMAGE" do:$select('$data(rquals(x)):tmpreg(x),1:rquals(x)) mmbichk
+	quit verified
 	;
 SQUALS(am,squals)
-	i '$d(verified) n verified s verified=1
-	s len("min_val")=4   ;size for value field in index block
-	s len("bstar_rec")=8   ;size for bstar record
-	s len("hide_subs")=8   ;size for hidden subscript
-	n s s s=""
-	f  s s=$o(squals(s)) q:'$l(s)  i $l(squals(s)) d segelm
-	n bs s bs="BLOCK_SIZE"
-	i $d(squals(bs)),squals(bs)#512 s x=squals(bs),squals(bs)=x\512+1*512
-	i  zm gdeerr("BLKSIZ512"):x:squals(bs),gdeerr("SEGIS"):am:SEGMENT
-	s s="WINDOW_SIZE"
-	i SEGMENT="TEMPLATE" s x=tmpreg("RECORD_SIZE") d segreg q verified
-	n REGION s REGION=""
-	f  s REGION=$o(regs(REGION)) q:'$l(REGION)  d
-	. i regs(REGION,"DYNAMIC_SEGMENT")=SEGMENT s bs=regs(REGION,"RECORD_SIZE") d segreg
-	q verified
+	if '$data(verified) new verified set verified=1
+	new s set s=""
+	for  set s=$order(squals(s)) quit:'$length(s)  do:$length(squals(s)) segelm
+	quit:'verified verified
+	new bs set bs="BLOCK_SIZE"
+	if $data(squals(bs)),((minseg(am,"BLOCK_SIZE")'>squals(bs))&(maxseg(am,"BLOCK_SIZE")'<squals(bs))) do
+	. if squals(bs)#512 set x=squals(bs),squals(bs)=((x\512)+1)*512
+	. if  zmessage gdeerr("BLKSIZ512"):x:squals(bs),gdeerr("SEGIS"):am:SEGMENT
+	set s="WINDOW_SIZE"
+	if SEGMENT="TEMPLATE" set x=tmpreg("RECORD_SIZE") do segreg quit verified
+	new REGION set REGION=""
+	for  set REGION=$order(regs(REGION)) quit:'$length(REGION)  do
+	. if regs(REGION,"DYNAMIC_SEGMENT")=SEGMENT set bs=regs(REGION,"RECORD_SIZE") do segreg
+	quit verified
 segreg:
-	i am'="USER" d
-	. s bs="BLOCK_SIZE",bs=$s($d(squals(bs)):squals(bs),$d(segs(SEGMENT,bs)):segs(SEGMENT,bs),1:tmpseg(am,bs))
-	. s f="RESERVED_BYTES",f=$s($d(squals(f)):squals(f),$d(segs(SEGMENT,f)):segs(SEGMENT,f),1:tmpseg(am,f))
-	. s x="RECORD_SIZE",x=$s($d(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
-	. s ks="KEY_SIZE",ks=$s($d(regs(REGION,ks)):regs(REGION,ks),1:tmpreg(ks))
-	. d key2blk ;GTM-6941
-	i '$s(SEGMENT="TEMPLATE":0,1:regs(REGION,"JOURNAL")) q
-	s x=$s(SEGMENT="TEMPLATE":tmpreg("BUFFER_SIZE"),1:regs(REGION,"BUFFER_SIZE")) d buf2blk
-	i nommbi,$s(SEGMENT="TEMPLATE":0,1:regs(REGION,"BEFORE_IMAGE")) d mmbichk
-	q
+	if am'="USER" do
+	. set bs="BLOCK_SIZE",bs=$select($data(squals(bs)):squals(bs),$data(segs(SEGMENT,bs)):segs(SEGMENT,bs),1:tmpseg(am,bs))
+	. set f="RESERVED_BYTES",f=$select($data(squals(f)):squals(f),$data(segs(SEGMENT,f)):segs(SEGMENT,f),1:tmpseg(am,f))
+	. set x="RECORD_SIZE",x=$select($data(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
+	. set ks="KEY_SIZE",ks=$select($data(regs(REGION,ks)):regs(REGION,ks),1:tmpreg(ks))
+	. do:((minseg(am,"BLOCK_SIZE")'>bs)&(maxseg(am,"BLOCK_SIZE")'<bs)) key2blk ;GTM-6941
+	if '$select(SEGMENT="TEMPLATE":0,1:regs(REGION,"JOURNAL")) quit
+	set x=$select(SEGMENT="TEMPLATE":tmpreg("BUFFER_SIZE"),1:regs(REGION,"BUFFER_SIZE")) do buf2blk
+	if nommbi,$select(SEGMENT="TEMPLATE":0,1:regs(REGION,"BEFORE_IMAGE")) do mmbichk
+	quit
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
 ; called from GDETEMPL.M

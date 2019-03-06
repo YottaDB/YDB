@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __WCS_TIMER_START_H__
-#define __WCS_TIMER_START_H__
+#ifndef WCS_TIMER_START_H_INCLUDED
+#define WCS_TIMER_START_H_INCLUDED
 
 void wcs_timer_start(gd_region *reg, boolean_t io_ok);
 

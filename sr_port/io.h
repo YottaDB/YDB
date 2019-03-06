@@ -78,8 +78,10 @@ error_def(ERR_UTF16ENDIAN);
 
 #define DLRZKEYLEN	1024
 
-#define BADCHAR_DEVICE_MSG "BADCHAR error raised on input"
-#define UNAVAILABLE_DEVICE_MSG "Resource temporarily unavailable"
+#define BADCHAR_DEVICE_MSG	"BADCHAR error raised on input"
+#define UNAVAILABLE_DEVICE_MSG	"Resource temporarily unavailable"
+#define SOCKETPOOLNAME		"YGTMSOCKETPOOL"
+#define SOCDEVTYPENAME		"socket"
 
 typedef unsigned char params;
 

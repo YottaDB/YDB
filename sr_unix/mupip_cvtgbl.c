@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -170,7 +170,7 @@ void mupip_cvtgbl(void)
 	file_format = get_load_format(&line1_ptr, &line3_ptr, &line1_len, &line3_len, &max_rec_size, &utf8, &dos); /* from header */
 	if (MU_FMT_GOQ == file_format)
 		mupip_exit(ERR_LDBINFMT);
-	if (BADZCHSET == utf8)
+	if ((BADZCHSET == utf8) || (0 >= line1_len))
 		mupip_exit(ERR_MUNOFINISH);
 	if (cli_present("FORMAT") == CLI_PRESENT)
 	{	/* If the command speficies a format see if it matches the label */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 Fidelity National Information		*
+ * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,6 +60,7 @@
 #include "compiler.h"
 #include "gtm_common_defs.h"
 
+
 GBLREF	stack_frame		*frame_pointer, *error_frame;
 GBLREF	spdesc			stringpool;
 GBLREF	unsigned short		proc_act_type;
@@ -86,19 +87,22 @@ error_def(ERR_ZTIMEOUT);
 #define ZTIMEOUT_QUEUE_ID &ztimeout_set
 #define MAX_FORMAT_LEN	250
 
-#define NULLIFY_VECTOR											\
-{													\
-	if ((TREF(dollar_ztimeout)).ztimeout_vector.str.len && (TREF(dollar_ztimeout)).ztimeout_vector.str.addr)	\
+#define NULLIFY_VECTOR												\
+{														\
+	if ((TREF(dollar_ztimeout)).ztimeout_vector.str.len && (TREF(dollar_ztimeout)).ztimeout_vector.str.addr)\
+	{													\
 		free((TREF(dollar_ztimeout)).ztimeout_vector.str.addr);						\
-	memcpy(&(TREF(dollar_ztimeout)).ztimeout_vector, &literal_null, SIZEOF(mval));				\
+		memcpy(&(TREF(dollar_ztimeout)).ztimeout_vector, &literal_null, SIZEOF(mval));			\
+		ztimeout_vector.str.addr = NULL;								\
+		ztimeout_vector.str.len = 0;									\
+	}													\
 }
 
 void check_and_set_ztimeout(mval * inp_val)
 {
 	int 		timeout_seconds, max_read_len;
 	char		*vector_ptr = NULL;
-	char		timeout_ptr[MAX_SRCLINE + 1] = {0};
-	char		*tok_ptr,format[MAX_FORMAT_LEN] = {0};
+	char		*tok_ptr;
 	char		*local_str_val = NULL, *local_str_end, *strtokptr;
 	char		*colon_ptr = NULL;
 	double 		float_timeout;
@@ -106,8 +110,9 @@ void check_and_set_ztimeout(mval * inp_val)
 	sigset_t	savemask;
 	int4		rc;
 	ABS_TIME	cur_time, end_time;
-	int4		msec_timeout;   /* timeout in milliseconds */
+	int4		msec_timeout = -1;   /* no change to timeout in milliseconds */
 	mval		*interim_ptr;
+	mval		ztimeout_vector, ztimeout_seconds;
 	boolean_t	is_negative = FALSE;
 	DCL_THREADGBL_ACCESS;
 
@@ -118,32 +123,29 @@ void check_and_set_ztimeout(mval * inp_val)
 	local_str_end = local_str_val + inp_val->str.len;
 	local_str_val[inp_val->str.len] = '\0';
 	colon_ptr = strchr(local_str_val, ':');
+	ztimeout_vector = (TREF(dollar_ztimeout)).ztimeout_vector;
+	ztimeout_seconds = (TREF(dollar_ztimeout)).ztimeout_seconds;
 	(!colon_ptr) ? (max_read_len = inp_val->str.len)
 			: ((colon_ptr == local_str_val) ? (max_read_len = inp_val->str.len - 1)
 				: (max_read_len = (local_str_end - colon_ptr - 1)));
-	/* Construct a format for reading in the input */
-	SNPRINTF(format, MAX_FORMAT_LEN, "%%%ds", max_read_len);
 	if (max_read_len > MAX_SRCLINE)
 		max_read_len = MAX_SRCLINE;
 	if (colon_ptr == local_str_val) /*Starting with colon, change the vector only*/
 	{
 		tok_ptr = STRTOK_R(local_str_val, ":", &strtokptr);
+		NULLIFY_VECTOR;
 		if (colon_ptr != (local_str_end - 1)) /* Not an empty string */
 		{
 			vector_ptr = (char *)malloc(max_read_len + 1);
 			memcpy(vector_ptr, tok_ptr, max_read_len);
 			vector_ptr[max_read_len] = '\0';
-			(TREF(dollar_ztimeout)).ztimeout_vector.str.addr = vector_ptr;
-			(TREF(dollar_ztimeout)).ztimeout_vector.str.len = max_read_len;
-			(TREF(dollar_ztimeout)).ztimeout_vector.mvtype = MV_STR;
-		} else
-		{ /* If already existing vector nullify it , so that the ${E|Z}TRAP would be the vector */
-			NULLIFY_VECTOR;
+			ztimeout_vector.str.addr = vector_ptr;
+			ztimeout_vector.str.len = max_read_len + 1;
+			ztimeout_vector.mvtype = MV_STR;
 		}
 		free(local_str_val);
 		local_str_val = NULL;
-	}
-	else
+	} else
 	{	/* Some form of timeout specified */
 		if (inp_val->m[1] < 0) /* Negative timeout specified, cancel the timer */
 		{
@@ -151,7 +153,7 @@ void check_and_set_ztimeout(mval * inp_val)
 			is_negative = TRUE;
 			DBGDFRDEVNT((stderr,"Cancelling the timer with ID : %ld\n", ZTIMEOUT_TIMER_ID));
 			/* All negative values transformed to -1 */
-			memcpy(&(TREF(dollar_ztimeout)).ztimeout_seconds, &literal_minusone, SIZEOF(mval));
+			memcpy(&ztimeout_seconds, &literal_minusone, SIZEOF(mval));
 			cancel_timer(ZTIMEOUT_TIMER_ID);
 		}
 		tok_ptr = STRTOK_R(local_str_val, ":", &strtokptr);
@@ -160,27 +162,30 @@ void check_and_set_ztimeout(mval * inp_val)
 			only_timeout = TRUE;
 			if (!is_negative) /* Process for positive timeout */
 			{
-				sscanf(local_str_val, format, timeout_ptr);
-				timeout_ptr[max_read_len] = '\0';
-				(TREF(dollar_ztimeout)).ztimeout_seconds.str.addr = timeout_ptr;
-				(TREF(dollar_ztimeout)).ztimeout_seconds.str.len = max_read_len;
-				(TREF(dollar_ztimeout)).ztimeout_seconds.mvtype = MV_STR;
-				interim_ptr = &(TREF(dollar_ztimeout)).ztimeout_seconds;
+				/* Construct a format for reading in the input */
+				ztimeout_seconds.str.addr = local_str_val;
+				ztimeout_seconds.str.len = STRLEN(local_str_val);
+				ztimeout_seconds.mvtype = MV_STR;
+				interim_ptr = &ztimeout_seconds;
 				MV_FORCE_MSTIMEOUT(interim_ptr, msec_timeout, ZTIMEOUTSTR);
 				if (colon_ptr == (local_str_end - 1)) /* Form : timeout: */
-				{
 					NULLIFY_VECTOR;
-				}
+				/* Done with the contents of ztimeout_seconds */
+				ztimeout_seconds.str.addr = NULL;
+				ztimeout_seconds.str.len = 0;
 			}
 			free(local_str_val);
 			local_str_val = NULL;
 		} else /* Both specified, extract timeout from token pointer */
 		{
-			(TREF(dollar_ztimeout)).ztimeout_seconds.str.addr = tok_ptr;
-			STRNLEN(tok_ptr, MAX_SRCLINE, (TREF(dollar_ztimeout)).ztimeout_seconds.str.len);
-			(TREF(dollar_ztimeout)).ztimeout_seconds.mvtype = MV_STR;
-			interim_ptr = &(TREF(dollar_ztimeout)).ztimeout_seconds;
+			ztimeout_seconds.str.addr = tok_ptr;
+			STRNLEN(tok_ptr, MAX_SRCLINE, ztimeout_seconds.str.len);
+			ztimeout_seconds.mvtype = MV_STR;
+			interim_ptr = &ztimeout_seconds;
 			MV_FORCE_MSTIMEOUT(interim_ptr, msec_timeout, ZTIMEOUTSTR);
+			/* Done with the contents of ztimeout_seconds */
+			ztimeout_seconds.str.addr = NULL;
+			ztimeout_seconds.str.len = 0;
 		}
 		if (msec_timeout >= 0)
 		/* Will be zero for both 0 and negative value */
@@ -190,38 +195,45 @@ void check_and_set_ztimeout(mval * inp_val)
 			 */
 			if (!only_timeout)
 			{ /* Change both */
+				NULLIFY_VECTOR;
 				vector_ptr = (char *)malloc(max_read_len + 1);
 				tok_ptr = STRTOK_R(NULL, ":", &strtokptr); /* Next token is the vector */
 				memcpy(vector_ptr, tok_ptr, max_read_len);
 				vector_ptr[max_read_len] = '\0';
-				(TREF(dollar_ztimeout)).ztimeout_vector.str.addr = vector_ptr;
-				(TREF(dollar_ztimeout)).ztimeout_vector.str.len = max_read_len+1;
-				(TREF(dollar_ztimeout)).ztimeout_vector.mvtype = MV_STR;
+				ztimeout_vector.str.addr = vector_ptr;
+				ztimeout_vector.str.len = max_read_len + 1;
+				ztimeout_vector.mvtype = MV_STR;
 				free(local_str_val);
 				local_str_val = NULL;
 			}
-			if (!is_negative)
-			{
-				if (!msec_timeout)
-				{ /* Immediately transfer control to vector */
-					TREF(in_ztimeout) = TRUE;
-					cancel_timer(ZTIMEOUT_TIMER_ID);
-					start_timer(ZTIMEOUT_TIMER_ID, 0, &ztimeout_expire_now, 0, NULL);
-				} else
-				{
-					if (!TREF(in_ztimeout))
-						TREF(in_ztimeout) = TRUE;
-					else	/* Cancel the previous timer and start a new one */
-						cancel_timer(ZTIMEOUT_TIMER_ID);
-					sys_get_curr_time(&cur_time);
-					add_int_to_abs_time(&cur_time, msec_timeout,
-									&(TREF(dollar_ztimeout)).end_time);
-					start_timer(ZTIMEOUT_TIMER_ID, msec_timeout,
-								&ztimeout_expire_now, 0, NULL);
-					DBGDFRDEVNT((stderr,"Started ztimeout timer with timeout: %d\n",
-										msec_timeout));
-				}
-			}
+		}
+	}
+	if (ztimeout_vector.str.len)
+	{
+		op_commarg(&ztimeout_vector, indir_linetail);
+		op_unwind();
+	}
+	(TREF(dollar_ztimeout)).ztimeout_vector = ztimeout_vector;
+	(TREF(dollar_ztimeout)).ztimeout_seconds = ztimeout_seconds;
+	if (!is_negative)
+	{
+		if (!msec_timeout)
+		{ /* Immediately transfer control to vector */
+			TREF(in_ztimeout) = TRUE;
+			cancel_timer(ZTIMEOUT_TIMER_ID);
+			start_timer(ZTIMEOUT_TIMER_ID, 0, &ztimeout_expire_now, 0, NULL);
+		} else if (0 < msec_timeout)
+		{
+			if (!TREF(in_ztimeout))
+				TREF(in_ztimeout) = TRUE;
+			else	/* Cancel the previous timer and start a new one */
+				cancel_timer(ZTIMEOUT_TIMER_ID);
+			sys_get_curr_time(&cur_time);
+			add_int_to_abs_time(&cur_time, msec_timeout, &(TREF(dollar_ztimeout)).end_time);
+			start_timer(ZTIMEOUT_TIMER_ID, msec_timeout,
+						&ztimeout_expire_now, 0, NULL);
+			DBGDFRDEVNT((stderr,"Started ztimeout timer with timeout: %d\n",
+								msec_timeout));
 		}
 	}
 	assert(!local_str_val);
@@ -247,7 +259,8 @@ void ztimeout_expire_now(void)
 	DBGDFRDEVNT((stderr,"Ztimeout expired, setting xfer handlers\n"));
 #ifdef DEBUG
 	if (gtm_white_box_test_case_enabled &&
-				(WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number))
+				((WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number)
+					|| (WBTEST_ZTIME_DEFER_CRIT == gtm_white_box_test_case_number)))
 	DBGFPF((stderr,"Ztimeout expired, setting xfer handlers\n"));
 #endif
 	TREF(ztimeout_set_xfer) = xfer_set_handlers(outofband_event, &ztimeout_set, 0, FALSE);
@@ -258,14 +271,16 @@ void ztimeout_set(int4 dummy_param)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)) || dollar_zininterrupt)
+	if (((0 < dollar_ecode.index) && (ETRAP_IN_EFFECT)) || dollar_zininterrupt ||
+					have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT))
 	{
 		TREF(ztimeout_deferred) = TRUE;
 		SAVE_XFER_ENTRY(outofband_event, &ztimeout_set, 0);
 		DBGDFRDEVNT((stderr, "ztimeout_set : ZTIMEOUT Deferred\n"));
 #ifdef DEBUG
 	if (gtm_white_box_test_case_enabled &&
-				(WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number))
+				((WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number)
+					|| (WBTEST_ZTIME_DEFER_CRIT == gtm_white_box_test_case_number)))
 		DBGFPF((stderr, "ztimeout_set : ZTIMEOUT Deferred\n"));
 #endif
 		return;

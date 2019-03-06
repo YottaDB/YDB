@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __ERROR_H__
-#define __ERROR_H__
+#ifndef ERROR_H_INCLUDED
+#define ERROR_H_INCLUDED
 
 typedef struct err_msg_struct
 {

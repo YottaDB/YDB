@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,6 +57,8 @@ GBLREF	uint4		process_id;
 GBLREF	uint4		image_count;
 LITREF	char		*gtm_dbversion_table[];
 
+#define	OUT_LINE	256 + 1
+
 error_def(ERR_FREEZE);
 error_def(ERR_BLKSIZ512);
 error_def(ERR_DBRDONLY);
@@ -76,7 +78,7 @@ void dse_chng_fhead(void)
 	gtm_uint64_t	value, old_value;
 	seq_num		seq_no;
 	trans_num	tn, prev_tn, max_tn_old, max_tn_warn_old, curr_tn_old, max_tn_new, max_tn_warn_new, curr_tn_new;
-	char		temp_str[256], temp_str1[256], buf[MAX_LINE], *fname_ptr;
+	char		temp_str[OUT_LINE], temp_str1[OUT_LINE], buf[MAX_LINE], *fname_ptr;
 	int		gethostname_res;
 	sm_uc_ptr_t	chng_ptr;
 	const char 	*freeze_msg[] = { "UNFROZEN", "FROZEN" } ;
@@ -87,8 +89,8 @@ void dse_chng_fhead(void)
 	SETUP_THREADGBL_ACCESS;
 	if (gv_cur_region->read_only)
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
-	memset(temp_str, 0, 256);
-	memset(temp_str1, 0, 256);
+	memset(temp_str, 0, OUT_LINE);
+	memset(temp_str1, 0, OUT_LINE);
 	memset(buf, 0, MAX_LINE);
 	was_crit = cs_addrs->now_crit;
 	nocrit_present = (CLI_NEGATED == cli_present("CRIT"));
@@ -199,22 +201,22 @@ void dse_chng_fhead(void)
 			chng_ptr = (sm_uc_ptr_t)cs_data + location;
 			if (SIZEOF(char) == size)
 			{
-				SPRINTF(temp_str, "!UB [0x!XB]");
+				SNPRINTF(temp_str, OUT_LINE, "!UB [0x!XB]");
 				old_value = *(sm_uc_ptr_t)chng_ptr;
 			}
 			else if (SIZEOF(short) == size)
 			{
-				SPRINTF(temp_str, "!UW [0x!XW]");
+				SNPRINTF(temp_str, OUT_LINE, "!UW [0x!XW]");
 				old_value = *(sm_ushort_ptr_t)chng_ptr;
 			}
 			else if (SIZEOF(int4) == size)
 			{
-				SPRINTF(temp_str, "!UL [0x!XL]");
+				SNPRINTF(temp_str, OUT_LINE, "!UL [0x!XL]");
 				old_value = *(sm_uint_ptr_t)chng_ptr;
 			}
 			else if (SIZEOF(gtm_int64_t) == size)
 			{
-				SPRINTF(temp_str, "!@UQ [0x!@XQ]");
+				SNPRINTF(temp_str, OUT_LINE, "!@UQ [0x!@XQ]");
 				old_value = *(qw_num_ptr_t)chng_ptr;
 			}
 			if (value_present)
@@ -229,7 +231,7 @@ void dse_chng_fhead(void)
 					*(qw_num_ptr_t)chng_ptr = value;
 			} else
 				value = old_value;
-			SPRINTF(temp_str1, "Location !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
+			SNPRINTF(temp_str1, OUT_LINE, "Location !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
 				temp_str, temp_str);
 			if (SIZEOF(int4) >= size)
 				util_out_print(temp_str1, TRUE, location, location, (uint4)old_value, (uint4)old_value,
@@ -449,7 +451,7 @@ void dse_chng_fhead(void)
 	if ((CLI_PRESENT == cli_present("WRITES_PER_FLUSH")) && (cli_get_int("WRITES_PER_FLUSH", &x)))
 		cs_data->n_wrt_per_flu = x;
 	if ((CLI_PRESENT == cli_present("TRIGGER_FLUSH")) && (cli_get_int("TRIGGER_FLUSH", &x)))
-		cs_data->flush_trigger = x;
+		cs_data->flush_trigger = cs_data->flush_trigger_top = x;
 	if ((CLI_PRESENT == cli_present("GOT2V5ONCE")) && (cli_get_int("GOT2V5ONCE", &x)))
                 cs_data->db_got_to_v5_once = (boolean_t)x;
 	change_fhead_timer("STALENESS_TIMER", cs_data->staleness, 5000, TRUE);

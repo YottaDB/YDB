@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __DB_WRITE_H__
-#define __DB_WRITE_H__
+#ifndef DB_WRITE_H_INCLUDED
+#define DB_WRITE_H_INCLUDED
 
 int4 db_write (int4 fdesc, off_t fptr, sm_uc_ptr_t fbuff, size_t fbuff_len);
 int4 db_write_ntp (int4 fdesc, off_t fptr, sm_uc_ptr_t fbuff, size_t fbuff_len);

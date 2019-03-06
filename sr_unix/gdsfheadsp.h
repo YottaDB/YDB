@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __GDSFHEADSP_H__
-#define __GDSFHEADSP_H__
+#ifndef GDSFHEADSP_H_INCLUDED
+#define GDSFHEADSP_H_INCLUDED
 
 int dsk_write_nocache(gd_region *r, block_id blk, sm_uc_ptr_t buff, enum db_ver ondsk_blkver);
 void wcs_clean_dbsync_timer(sgmnt_addrs *csa);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,9 +21,9 @@ boolean_t	cli_get_int64(char *entry, gtm_int64_t *dst);
 boolean_t	cli_get_num(char *entry, int4 *dst);
 boolean_t	cli_get_num64(char *entry, gtm_int64_t *dst);
 boolean_t	cli_get_str(char *entry, char *dst, unsigned short *max_len);
-bool		cli_get_str_ele(char *inbuff, char *dst, unsigned short *dst_len, boolean_t upper_case);
+boolean_t	cli_get_str_ele(char *inbuff, char *dst, unsigned short *dst_len, boolean_t upper_case);
 boolean_t	cli_get_time(char *entry, uint4 *dst);
-bool		cli_get_value(char *entry, char val_buf[]);
+boolean_t	cli_get_value(char *entry, char val_buf[]);
 boolean_t	cli_negated(char *entry);
 boolean_t	cli_str_to_hex(char *str, uint4 *dst);
 boolean_t	cli_str_to_hex64(char *str, gtm_uint64_t *dst);
@@ -43,7 +43,7 @@ int		cli_is_qualif(char *p);
 int		cli_look_next_string_token(int *eof);
 int		cli_look_next_token(int *eof);
 int		cli_present(char *entry);		/***type int added***/
-void		cli_str_setup(int length, char *addr);
+void		cli_str_setup(uint4 length, char *addr);
 void		cli_strupper(char *sp);
 int		cli_parse_two_numbers(char *qual_name, const char delimiter, uint4 *first_num, uint4 *second_num);
 boolean_t	cli_get_defertime(char *entry, int4 *dst);

@@ -114,7 +114,6 @@
 #include "cli.h"
 #include "invocation_mode.h"
 #include "fgncal.h"
-#include "parse_file.h"	/* for MAX_FBUFF */
 #include "repl_sem.h"
 #include "gtm_zlib.h"
 #include "zro_shlibs.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Copyright (c) 2013-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -239,7 +239,7 @@ void	iosocket_use(io_desc *iod, mval *pp)
 				n_specified++;
 				listen_specified = TRUE;
 				int_len = (int)(*(pp->str.addr + p_offset));
-				if (int_len < USR_SA_MAXLITLEN)
+				if ((USR_SA_MAXLITLEN > int_len) && (0 < int_len))
 				{
 					memcpy(sockaddr, (char *)(pp->str.addr + p_offset + 1), int_len);
 					sockaddr[int_len] = '\0';

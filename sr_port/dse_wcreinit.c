@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,8 +52,7 @@ void dse_wcreinit (void)
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVLCLUSFN);
 		return;
 	}
-	if (cs_addrs->critical)
-		crash_count = cs_addrs->critical->crashcnt;
+	UPDATE_CRASH_COUNT(cs_addrs, crash_count);
 	GET_CONFIRM_AND_HANDLE_NEG_RESPONSE
 	if (!IS_CSD_BG_OR_MM(cs_addrs->hdr))
 	{

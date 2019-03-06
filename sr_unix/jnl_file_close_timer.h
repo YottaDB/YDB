@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016 Fidelity National Information		*
+ * Copyright (c) 2016-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _JNL_FILE_CLOSE_TIMER_H
-#define _JNL_FILE_CLOSE_TIMER_H
+#ifndef JNL_FILE_CLOSE_TIMER_H_INCLUDED
+#define JNL_FILE_CLOSE_TIMER_H_INCLUDED
 
 #define OLDERJNL_CHECK_INTERVAL			(60 * MILLISECS_IN_SEC)
 

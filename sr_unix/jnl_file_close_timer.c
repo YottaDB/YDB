@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,7 @@
 #include "have_crit.h"
 #include "anticipatory_freeze.h"
 #include "jnl_file_close_timer.h"
+#include "db_snapshot.h"
 
 GBLREF	boolean_t	oldjnlclose_started;
 GBLREF	uint4		process_id;
@@ -38,12 +39,12 @@ GBLREF	int		process_exiting;
 
 void jnl_file_close_timer(void)
 {
+	boolean_t		any_jnl_open = FALSE;
 	gd_addr			*addr_ptr;
-	sgmnt_addrs		*csa;
-	jnl_private_control	*jpc;
 	gd_region		*r_local, *r_top;
 	int			rc;
-	boolean_t		any_jnl_open = FALSE;
+	jnl_private_control	*jpc;
+	sgmnt_addrs		*csa;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -68,6 +69,8 @@ void jnl_file_close_timer(void)
 				if (!IS_REG_BG_OR_MM(r_local))
 					continue;
 				csa = REG2CSA(r_local);
+				if (SNAPSHOTS_IN_PROG(csa))
+					SS_RELEASE_IF_NEEDED(csa, (node_local_ptr_t)csa->nl);
 				jpc = csa->jnl;
 				if (csa->now_crit)
 				{

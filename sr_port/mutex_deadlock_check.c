@@ -64,7 +64,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	volatile boolean_t	in_mutex_deadlock_check;
 
-void mutex_deadlock_check(mutex_struct_ptr_t criticalPtr, sgmnt_addrs *csa)
+void mutex_deadlock_check(CRIT_PTR_T criticalPtr, sgmnt_addrs *csa)
 {
 	tp_region	*tr;
 	sgmnt_addrs	*tp_list_csa_element, *repl_csa;

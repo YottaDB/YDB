@@ -18,6 +18,7 @@
 
 #define CHDIR		chdir
 #define CHOWN		chown
+#define FCHOWN		fchown
 
 /* Usual convention is to uppercase the system function in the GT.M macro wrapper. But in this case, we want to macro-wrap
  * the _exit() function. _EXIT is ruled out because names starting with _ are reserved for system functions.

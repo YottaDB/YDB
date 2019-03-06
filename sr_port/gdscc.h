@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __GDSCC_H__
-#define __GDSCC_H__
+#ifndef GDSCC_H_INCLUDED
+#define GDSCC_H_INCLUDED
 
 /* this requires gdsroot.h gtm_facilit.h fileinfo.h gdsbt.h gdsfhead.h gdir.h gdskey.h  */
 

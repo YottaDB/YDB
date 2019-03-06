@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -168,7 +168,8 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 							PUSH_MV_STENT(MVST_MVAL);
 							tmpmv = &mv_chain->mv_st_cont.mvs_mval;
 							tmpmv->mvtype = MV_STR;
-							ENSURE_STP_FREE_SPACE(ZWR_EXP_RATIO(namestr.len));
+							n = ZWR_EXP_RATIO(namestr.len);
+							ENSURE_STP_FREE_SPACE(n);
 							tmpmv->str.addr = (char *)stringpool.free;
 							format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len,
 								(uchar_ptr_t)stringpool.free, &n);
@@ -226,7 +227,8 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				PUSH_MV_STENT(MVST_MVAL);
 				tmpmv = &mv_chain->mv_st_cont.mvs_mval;
 				tmpmv->mvtype = MV_STR;
-				ENSURE_STP_FREE_SPACE(ZWR_EXP_RATIO(parm->str.len));
+				n = ZWR_EXP_RATIO(parm->str.len);
+				ENSURE_STP_FREE_SPACE(n);
 				tmpmv->str.addr = (char *)stringpool.free;
 				format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, (uchar_ptr_t)stringpool.free, &n);
 				stringpool.free += n;
@@ -310,6 +312,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 						} else
 						{
 							memcpy(&lcl_buff.c[0], src, nextsrc - src - 1);
+							n = MAX_PARMS;
 							format2zwr((sm_uc_ptr_t)&lcl_buff.c, nextsrc - src - 1, global_names, &n);
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
 						}
@@ -319,9 +322,11 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 						PUSH_MV_STENT(MVST_MVAL);
 						tmpmv = &mv_chain->mv_st_cont.mvs_mval;
 						tmpmv->mvtype = MV_STR;
-						ENSURE_STP_FREE_SPACE(ZWR_EXP_RATIO(n));
+						n = ZWR_EXP_RATIO(n);
+						ENSURE_STP_FREE_SPACE(n);
 						tmpmv->str.addr = (char *)stringpool.free;
-						format2zwr((sm_uc_ptr_t)&lcl_buff.c, n, (uchar_ptr_t)stringpool.free, &n);
+						format2zwr((sm_uc_ptr_t)&lcl_buff.c, nextsrc - src - 1,
+								(uchar_ptr_t)stringpool.free, &n);
 						stringpool.free += n;
 						tmpmv->str.len = n;
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);
@@ -390,6 +395,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					lvent.var_name.len = MAX_MIDENT_LEN;
 				if (!valid_mname(&lvent.var_name))
 				{
+					n = MAX_PARMS;
 					format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWLVN, 2, n, global_names);
 				}

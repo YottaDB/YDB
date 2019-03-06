@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -336,7 +336,7 @@ boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t
 				{
 					memcpy(zwr_buffer, key_buffer, fmtd_key_len);
 					memcpy(zwr_buffer + fmtd_key_len, "=", 1);
-					des_len = 0;
+					des_len = max_zwr_len;
 					format2zwr(cp1, data_len, zwr_buffer + fmtd_key_len + 1, &des_len);
 					WRITE_EXTR_LINE(zwr_buffer, (fmtd_key_len + des_len + 1));
 				}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,8 +39,7 @@ void dse_flush(void)
 	{
 	case dba_bg:
 	case dba_mm:
-		if (cs_addrs->critical)
-			crash_count = cs_addrs->critical->crashcnt;
+		UPDATE_CRASH_COUNT(cs_addrs, crash_count);
 		wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_SYNC_EPOCH);
 		break;
 	default:

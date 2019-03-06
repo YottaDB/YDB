@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __WCS_GET_SPACE_H__
-#define __WCS_GET_SPACE_H__
+#ifndef WCS_GET_SPACE_H_INCLUDED
+#define WCS_GET_SPACE_H_INCLUDED
 
 #ifdef	UNIX
 typedef struct wcs_conflict_trace_struct

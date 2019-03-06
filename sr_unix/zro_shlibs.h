@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2011-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +17,7 @@ typedef struct open_shlib_struct
 {
 	struct open_shlib_struct *next;
 	void		*shlib_handle;
-	char		shlib_name[MAX_FBUFF + 1];
+	char		shlib_name[MAX_FN_LEN + 1];
 } open_shlib;
 
 

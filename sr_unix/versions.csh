@@ -20,6 +20,6 @@
 ############################################
 
 #	gtm_curpro is the current production version
-setenv	gtm_curpro	"V63005"
+setenv	gtm_curpro	"V63006"
 #	gtm_verno is the current production version
 setenv	gtm_verno	$gtm_curpro

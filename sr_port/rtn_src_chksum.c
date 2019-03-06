@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2013, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2013-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -179,12 +180,12 @@ int append_checksum(unsigned char *out, rhdtyp *routine)
 	len = 0;
 	for (i = 0; i < MD5_DIGEST_LENGTH; i++)
 	{
-		tlen = SPRINTF((char *)bptr, "%02x", cptr[i]);
+		tlen = SNPRINTF((char *)bptr, MAX_ROUTINE_CHECKSUM_DIGITS - len, "%02x", cptr[i]);
 		bptr += tlen;
 		len += tlen;
 	}
 #	else
-	len = SPRINTF(buf, "%04x", (uint4)get_rtnhdr_checksum(hdr));
+	len = SNPRINTF(buf, MAX_ROUTINE_CHECKSUM_DIGITS, "%04x", (uint4)get_rtnhdr_checksum(hdr));
 #	endif
 	memcpy(out, (unsigned char *)buf, len);
 	return len;

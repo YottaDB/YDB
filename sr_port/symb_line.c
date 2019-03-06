@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,7 @@
 
 #include <rtnhdr.h>
 #include "stack_frame.h"
+#include "min_max.h"
 
 #define OFFSET_LEN 5
 
@@ -23,7 +24,7 @@ GBLREF	unsigned char	*stackbase, *stacktop;
 GBLREF	unsigned short	proc_act_type;
 GBLREF	mstr		*err_act;
 
-unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned char **b_line, rhdtyp *routine)
+unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, int max_len, unsigned char **b_line, rhdtyp *routine)
 {
 	unsigned char	temp[OFFSET_LEN], *adjusted_in_addr;
 	lab_tabent	*max_label, *label_table, *last_label;
@@ -72,11 +73,15 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned ch
 		label_table++;
 	}
 	line_table = LABENT_LNR_ENTRY(routine, max_label);
-	len = max_label->lab_name.len;
+	len = MIN(max_label->lab_name.len, max_len);
 	if (len)
 	{
 		memcpy(out, max_label->lab_name.addr, len);
 		out += len;
+		max_len -= len;
+		assert(0 < max_len);
+		if (0 == max_len)
+			return out;
 	}
 	offset = 0;
 	in_addr_offset = (int4)(adjusted_in_addr - CODE_BASE_ADDR(routine));
@@ -100,20 +105,25 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, unsigned ch
 	if (offset)
 	{
 		*out++ = '+';
-		ct = OFFSET_LEN;
-		for ( ; ct > 0 ; )
+		for (ct = OFFSET_LEN - 1; ct >= 0 ; ct--)
 		{
-			temp[--ct] = (offset % 10) + '0';
+			temp[ct] = (offset % 10) + '0';
 			if ((offset /= 10) == 0)
 				break;
 		}
-		len = OFFSET_LEN - ct;
+		len = MIN(OFFSET_LEN - ct, max_len);
 		memcpy (out, &temp[ct], len);
 		out += len;
+		max_len -= len;
+		assert(0 < max_len);
+		if (0 == max_len)
+			return out;
 	}
 	*out++ = '^';
-	len = routine->routine_name.len;
+	len = MIN(routine->routine_name.len, --max_len);
 	memcpy(out, routine->routine_name.addr, len);
 	out += len;
+	max_len -= len;
+	assert(0 <= max_len);
 	return out;
 }

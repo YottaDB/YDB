@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,6 +82,10 @@
 #include "is_proc_alive.h"
 #include "muextr.h"
 #include "gtmsource_inline.h"
+#include "deferred_events_queue.h"
+#include "deferred_events.h"
+#include "error_trap.h"
+#include "ztimeout_routines.h"
 
 GBLREF	bool			rc_locked;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
@@ -245,6 +249,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	th_index_ptr_t     	cti;
 	jbuf_rsrv_struct_t	*jrs;
 	jrec_rsrv_elem_t	*first_jre, *jre, *jre_top;
+        int4			event_type, param_val;
+        void (*set_fn)(int4 param);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -481,7 +487,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		 */
 		SS_INIT_IF_NEEDED(csa, cnl);
 	} else
-		CLEAR_SNAPSHOTS_IN_PROG(csa);
+		SS_RELEASE_IF_NEEDED(csa, cnl);
 	if (0 != cw_depth)
 	{	/* Caution : since csa->backup_in_prog and read_before_image are initialized below
 	 	 * only if (cw_depth), these variables should be used below only within an if (cw_depth).
@@ -513,18 +519,15 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						GET_CDB_SC_CODE(cs->blk, status);	/* code is set in status */
 						if (is_mm && (cdb_sc_gbloflow == status))
 						{
-							assert(NULL != gv_currkey);
-							if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
-								end = &buff[MAX_ZWR_KEY_SZ - 1];
-							send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0,
-									ERR_GVIS, 2, end - buff, buff);
+							send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2,
+								DB_LEN_STR(csa->region));
 							if (save_jnlpool != jnlpool)
 							{
 								assert(!jnlpool_csa || (jnlpool_csa == csa));
 								jnlpool = save_jnlpool;
 							}
-							rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0,
-									ERR_GVIS, 2, end - buff, buff);
+							rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2,
+								DB_LEN_STR(csa->region));
 						}
 					}
 					goto failed_skip_revert;
@@ -1783,6 +1786,7 @@ skip_cr_array:
 	assert(!csa->now_crit || csa->hold_onto_crit);
 	assert(cdb_sc_normal == status);
 	REVERT;	/* no need for t_ch to be invoked if any errors occur after this point */
+	CALL_ZTIMEOUT_IF_DEFERRED;
 	DEFERRED_EXIT_HANDLING_CHECK; /* now that all crits are released, check if deferred signal/exit handling needs to be done */
 	assert(update_trans);
 	if (REPL_ALLOWED(csa) && IS_DSE_IMAGE)

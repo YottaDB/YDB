@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,7 +30,7 @@
 #include <machine/sys/reg_struct.h>
 #endif /* __ia64 */
 
-#include <signal.h>
+#include "gtm_signal.h"
 
 #include "gtmsiginfo.h"
 
@@ -79,48 +80,13 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 				gtmsi->infotype |= GTMSIGINFO_USER;
 				break;
 			default:
-#  if defined(__osf__)
+#  if defined(__linux__)
 				gtmsi->subcode = info->si_code;
 				gtmsi->bad_vadr = info->si_addr;
 				gtmsi->infotype |= GTMSIGINFO_BADR;
 				if (NULL != context)
 				{
-					gtmsi->int_iadr = (caddr_t)context->sc_pc;
-					gtmsi->infotype |= GTMSIGINFO_ILOC;
-				}
-				break;
-#  elif defined(__hpux)
-				gtmsi->subcode = info->si_code;
-				gtmsi->bad_vadr = info->si_addr;
-				gtmsi->infotype |= GTMSIGINFO_BADR;
-				if (NULL != context)
-				{
-#if !defined(__ia64) && !defined(__GNUC__)
-					if (0 == (context->uc_mcontext.ss_flags & SS_NARROWISINVALID))
-					{
-						/* Interrupt location is in narrow area */
-						gtmsi->int_iadr = (caddr_t)(context->uc_mcontext.ss_narrow.ss_pcoq_head & ~3);
-					} else
-					{
-						/* Interupt location is in wide area */
-						gtmsi->int_iadr =
-							(caddr_t)(context->uc_mcontext.ss_wide.ss_32.ss_pcoq_head_hi & ~3);
-					}
-#else /* __ia64 */
-					__uc_get_ip(context, (uint64_t *) &gtmsi->int_iadr);
-#endif /* __ia64 */
-					gtmsi->infotype |= GTMSIGINFO_ILOC;
-				}
-				break;
-#  elif defined(__linux__)
-				gtmsi->subcode = info->si_code;
-				gtmsi->bad_vadr = info->si_addr;
-				gtmsi->infotype |= GTMSIGINFO_BADR;
-				if (NULL != context)
-				{
-#    ifdef __ia64
-					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.sc_ip;
-#    elif defined(__i386)
+#    if defined(__i386)
 #      ifndef REG_EIP
 #        define REG_EIP EIP
 #      endif
@@ -135,16 +101,6 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 #    else
 #      error "Unsupported Linux Platform"
 #    endif
-					gtmsi->infotype |= GTMSIGINFO_ILOC;
-				}
-				break;
-#  elif defined(__sparc)
-				gtmsi->subcode = info->si_code;
-				gtmsi->bad_vadr = info->si_addr;
-				gtmsi->infotype |= GTMSIGINFO_BADR;
-				if (NULL != context)
-				{
-					gtmsi->int_iadr = (caddr_t)context->uc_mcontext.gregs[REG_PC];
 					gtmsi->infotype |= GTMSIGINFO_ILOC;
 				}
 				break;
@@ -199,60 +155,80 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 				case SIGILL :
 					switch (gtmsi->subcode)
 					{
-						case ILL_ILLOPC : gtmsi->sig_err = ERR_SIGILLOPC;
+						case ILL_ILLOPC :
+							gtmsi->sig_err = ERR_SIGILLOPC;
 							break;
-						case ILL_ILLOPN : gtmsi->sig_err = ERR_SIGILLOPN;
+						case ILL_ILLOPN :
+							gtmsi->sig_err = ERR_SIGILLOPN;
 							break;
-						case ILL_ILLADR : gtmsi->sig_err = ERR_SIGILLADR;
+						case ILL_ILLADR :
+							gtmsi->sig_err = ERR_SIGILLADR;
 							break;
-						case ILL_ILLTRP : gtmsi->sig_err = ERR_SIGILLTRP;
+						case ILL_ILLTRP :
+							gtmsi->sig_err = ERR_SIGILLTRP;
 							break;
-						case ILL_PRVOPC : gtmsi->sig_err = ERR_SIGPRVOPC;
+						case ILL_PRVOPC :
+							gtmsi->sig_err = ERR_SIGPRVOPC;
 							break;
-						case ILL_PRVREG : gtmsi->sig_err = ERR_SIGPRVREG;
+						case ILL_PRVREG :
+							gtmsi->sig_err = ERR_SIGPRVREG;
 							break;
-						case ILL_COPROC : gtmsi->sig_err = ERR_SIGCOPROC;
+						case ILL_COPROC :
+							gtmsi->sig_err = ERR_SIGCOPROC;
 							break;
-						case ILL_BADSTK : gtmsi->sig_err = ERR_SIGBADSTK;
+						case ILL_BADSTK :
+							gtmsi->sig_err = ERR_SIGBADSTK;
 							break;
 					}
 					break;
 				case SIGBUS :
 					switch (gtmsi->subcode)
 					{
-						case BUS_ADRALN : gtmsi->sig_err = ERR_SIGADRALN;
+						case BUS_ADRALN :
+							gtmsi->sig_err = ERR_SIGADRALN;
 							break;
-						case BUS_ADRERR : gtmsi->sig_err = ERR_SIGADRERR;
+						case BUS_ADRERR :
+							gtmsi->sig_err = ERR_SIGADRERR;
 							break;
-						case BUS_OBJERR : gtmsi->sig_err = ERR_SIGOBJERR;
+						case BUS_OBJERR :
+							gtmsi->sig_err = ERR_SIGOBJERR;
 							break;
 					}
 					break;
 				case SIGFPE :
 					switch (gtmsi->subcode)
 					{
-						case FPE_INTDIV : gtmsi->sig_err = ERR_SIGINTDIV;
+						case FPE_INTDIV :
+							gtmsi->sig_err = ERR_SIGINTDIV;
 							break;
-						case FPE_INTOVF : gtmsi->sig_err = ERR_SIGINTOVF;
+						case FPE_INTOVF :
+							gtmsi->sig_err = ERR_SIGINTOVF;
 							break;
-						case FPE_FLTDIV : gtmsi->sig_err = ERR_SIGFLTDIV;
+						case FPE_FLTDIV :
+							gtmsi->sig_err = ERR_SIGFLTDIV;
 							break;
-						case FPE_FLTOVF : gtmsi->sig_err = ERR_SIGFLTOVF;
+						case FPE_FLTOVF :
+							gtmsi->sig_err = ERR_SIGFLTOVF;
 							break;
-						case FPE_FLTUND : gtmsi->sig_err = ERR_SIGFLTUND;
+						case FPE_FLTUND :
+							gtmsi->sig_err = ERR_SIGFLTUND;
 							break;
-						case FPE_FLTRES : gtmsi->sig_err = ERR_SIGFLTRES;
+						case FPE_FLTRES :
+							gtmsi->sig_err = ERR_SIGFLTRES;
 							break;
-						case FPE_FLTINV	: gtmsi->sig_err = ERR_SIGFLTINV;
+						case FPE_FLTINV	:
+							gtmsi->sig_err = ERR_SIGFLTINV;
 							break;
 					}
 					break;
 				case SIGSEGV :
 					switch (gtmsi->subcode)
 					{
-						case SEGV_MAPERR : gtmsi->sig_err = ERR_SIGMAPERR;
+						case SEGV_MAPERR :
+							gtmsi->sig_err = ERR_SIGMAPERR;
 							break;
-						case SEGV_ACCERR : gtmsi->sig_err = ERR_SIGACCERR;
+						case SEGV_ACCERR :
+							gtmsi->sig_err = ERR_SIGACCERR;
 							break;
 					}
 					break;

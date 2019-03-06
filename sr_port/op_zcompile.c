@@ -16,7 +16,6 @@
 #include "op.h"
 #include "source_file.h"
 #include "cli.h"
-#include "iosp.h"
 #include "mmemory.h"
 #include "comp_esc.h"
 
@@ -54,7 +53,6 @@ void op_zcompile(mval *v, boolean_t ignore_dollar_zcompile)
 		assert(MAX_FN_LEN == cmd_qlf.object_file.str.len);
 	zl_cmd_qlf(&v->str, &cmd_qlf, source_file_string, &len, TRUE);		/* command args override $ZCOMPILE */
 	ce_init();	/* initialize compiler escape processing */
-	TREF(dollar_zcstatus) = SS_NORMAL;
 	do {
 		compile_source_file(len, source_file_string, FALSE);
 		cmd_qlf.object_file.str.len = module_name.len = 0;

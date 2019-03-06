@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,8 @@
 #include "getzposition.h"
 #include "min_max.h"
 #include "mvalconv.h"
+#include "restrict.h"
+#include "dm_audit_log.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
@@ -47,6 +49,7 @@ GBLREF io_desc		*active_device;
 GBLREF spdesc		stringpool;
 
 error_def(ERR_TEXT);
+error_def(ERR_APDLOGFAIL);
 
 int op_read(mval *v, mval *timeout)
 {
@@ -84,5 +87,12 @@ int op_read(mval *v, mval *timeout)
 	}
 #	endif
 	active_device = 0;
+	/* If direct mode auditing is enabled, attempt to send the command to logger */
+	if (IS_MUMPS_IMAGE && (AUDIT_ENABLE_RDMODE & RESTRICTED(dm_audit_enable)) && !dm_audit_log(v, AUDIT_SRC_OPREAD))
+	{
+		/* Logging has failed so terminate */
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_APDLOGFAIL);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_APDLOGFAIL);
+	}
 	return ((NO_M_TIMEOUT != msec_timeout) ? stat : FALSE);
 }

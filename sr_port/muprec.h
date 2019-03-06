@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,9 @@
 #include "mu_interactive.h"
 #include "jnl_typedef.h"	/* for IS_VALID_JRECTYPE macro */
 #include "dollarh.h"	    /* for dollarh function */
+#include "read_db_files_from_gld.h"
+#include "repl_msg.h"
+#include "gtmsource.h"
 
 /* Uncomment the below line to debug the flow of "mur_forward" with multiple parallel processes */
 /* #define	MUR_DEBUG */
@@ -62,12 +65,12 @@ error_def(ERR_SYSCALL);
 	murgbl.extr_buff[extract_len++] = '\\';				\
 }
 
-#define	EXT_DET_COMMON_PREFIX(JCTL)					\
-{									\
-	extract_len = SPRINTF(murgbl.extr_buff, "0x%08x [0x%04x] :: ",	\
-		JCTL->rec_offset, JCTL->reg_ctl->mur_desc->jreclen);	\
-	assert(extract_len == STRLEN(murgbl.extr_buff));		\
-}
+#define	EXT_DET_COMMON_PREFIX(JCTL)									\
+MBSTART {												\
+	extract_len = SNPRINTF(murgbl.extr_buff, murgbl.max_extr_record_length, "0x%08x [0x%04x] :: ",	\
+		JCTL->rec_offset, JCTL->reg_ctl->mur_desc->jreclen);					\
+	assert(extract_len == STRLEN(murgbl.extr_buff));						\
+} MBEND
 
 #define EXT_DET_PREFIX(JCTL)									\
 {												\
@@ -141,7 +144,7 @@ error_def(ERR_SYSCALL);
 															\
 	short_time = (time_t)input_time;										\
 	GTM_LOCALTIME(tsp, (const time_t *)&short_time);								\
-	SPRINTF(time_str, "%04d/%02d/%02d %02d:%02d:%02d",								\
+	SNPRINTF(time_str, LENGTH_OF_TIME + 1, "%04d/%02d/%02d %02d:%02d:%02d",						\
 		(1900 + tsp->tm_year), (1 + tsp->tm_mon), tsp->tm_mday, tsp->tm_hour, tsp->tm_min, tsp->tm_sec);	\
 }
 #define	GET_LONG_TIME_STR(long_time, time_str, time_str_len) GET_TIME_STR(long_time, time_str)
@@ -713,6 +716,7 @@ typedef struct
 	char			*extr_fn[TOT_EXTR_TYPES];
 	int			extr_fn_len[TOT_EXTR_TYPES];
 	boolean_t		extr_fn_is_stdout[TOT_EXTR_TYPES];
+	boolean_t		extr_fn_is_devnull[TOT_EXTR_TYPES];
 } mur_opt_struct;
 
 typedef struct onln_rlbk_reg_list_struct
@@ -1277,7 +1281,7 @@ uint4			mur_jctl_from_next_gen(reg_ctl_list *rctl);
 void 			mur_multi_rehash(void);
 uint4			mur_next(jnl_ctl_list *jctl, off_jnl_t dskaddr);
 uint4			mur_next_rec(jnl_ctl_list **jjctl);
-boolean_t		mur_open_files(void);
+uint4			mur_open_files(boolean_t retry);
 uint4			mur_output_pblk(reg_ctl_list *rctl);
 uint4			mur_output_record(reg_ctl_list *rctl);
 void			mur_output_show(void);
@@ -1300,7 +1304,8 @@ void			mur_show_header(jnl_ctl_list *jctl);
 boolean_t		mur_select_rec(jnl_ctl_list *jctl);
 void			mur_sort_files(void);
 boolean_t		mur_ztp_lookback(void);
-
-int	format_time(jnl_proc_time proc_time, char *string, int string_len, int time_format);
+void			release_all_locks(unix_db_info *udi, gtmsource_local_ptr_t gtmsourcelocal_ptr,
+			gld_dbname_list *curr, int max_reg_total, onln_rlbk_reg_list *rl_last);
+int			format_time(jnl_proc_time proc_time, char *string, int string_len, int time_format);
 
 #endif /* MUPREC_H_INCLUDED */

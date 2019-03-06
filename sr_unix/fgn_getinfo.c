@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_limits.h"
 #include <dlfcn.h>
 
 #include <rtnhdr.h>
@@ -21,11 +23,16 @@
 #include "util.h"
 #include "gtmmsg.h"
 #include "error.h"
+#include "restrict.h"	/* Needed for restrictions */
+#include "have_crit.h"	/* Needed for defer interrupts */
 
 error_def(ERR_DLLNOCLOSE);
 error_def(ERR_DLLNOOPEN);
 error_def(ERR_DLLNORTN);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TEXT);
+
+GBLREF char		gtm_dist[GTM_PATH_MAX];
 
 /* below comments applicable only to tru64 */
 /* dlsym() is bound to return short pointer because of -taso loader flag
@@ -53,19 +60,40 @@ void_ptr_t fgn_getpak(char *package_name, int msgtype)
 	void_ptr_t 	ret_handle;
 	char_ptr_t	dummy_err_str;
 	char		err_str[MAX_ERRSTR_LEN]; /* needed as util_out_print doesn't handle 64bit pointers */
+	char	 	librarypath[GTM_PATH_MAX], *lpath = NULL;
+	intrpt_state_t	prev_intrpt_state;
 
-	if (!(ret_handle = dlopen(package_name, RTLD_LAZY)))
+	if ((RESTRICTED(library_load_path)) && (0 != memcmp(gtm_dist, package_name, STRLEN(gtm_dist))))
+	{	/* Restrictions in place and the path is not somewhere under $gtm_dist */
+		lpath = librarypath;
+		SNPRINTF(lpath, GTM_PATH_MAX, GTM_PLUGIN_FMT_FULL, gtm_dist, strrchr(package_name, '/'));
+	} else
+		lpath = package_name;
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	ret_handle = dlopen(lpath, RTLD_LAZY);
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	if (NULL == ret_handle)
 	{
 		if (SUCCESS != msgtype)
 		{
 			assert(!(msgtype & ~SEV_MSK));
+			if (RESTRICTED(library_load_path))
+			{
+				SNPRINTF(err_str, MAX_ERRSTR_LEN, "dlopen(%s)", lpath);
+				if ((INFO == msgtype))
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3)
+							MAKE_MSG_TYPE(ERR_RESTRICTEDOP, msgtype), 1, err_str);
+				else
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3)
+							MAKE_MSG_TYPE(ERR_RESTRICTEDOP, msgtype), 1, err_str);
+			}
 			COPY_DLLERR_MSG(dummy_err_str, err_str);
 			if ((INFO == msgtype))
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNOOPEN, msgtype),
-					2, LEN_AND_STR(package_name), ERR_TEXT, 2, LEN_AND_STR(err_str));
+					2, LEN_AND_STR(lpath), ERR_TEXT, 2, LEN_AND_STR(err_str));
 			else
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) MAKE_MSG_TYPE(ERR_DLLNOOPEN, msgtype),
-					2, LEN_AND_STR(package_name), ERR_TEXT, 2, LEN_AND_STR(err_str));
+					2, LEN_AND_STR(lpath), ERR_TEXT, 2, LEN_AND_STR(err_str));
 		}
 	}
 	return ret_handle;

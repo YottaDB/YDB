@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __TRAP_ENV_INIT_H__
-#define __TRAP_ENV_INIT_H__
+#ifndef TRAP_ENV_INIT_H_INCLUDED
+#define TRAP_ENV_INIT_H_INCLUDED
 
 void trap_env_init(void);
 

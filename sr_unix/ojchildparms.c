@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,6 +49,7 @@ GBLREF unsigned char		*msp;
 static unsigned char		*save_msp;
 #endif
 static	char			*sp;
+static	int			setup_fd;
 
 STATICFNDCL void receive_child_locals_init(char **local_buff, mval **comm_stack_ptr);
 STATICFNDCL void receive_child_locals_finalize(char **local_buff);
@@ -58,8 +59,21 @@ void gtm_levl_ret_code(void);
 error_def(ERR_CLOSEFAIL);
 error_def(ERR_JOBSETUP);
 error_def(ERR_STRINGOFLOW);
+error_def(ERR_JOBLABOFF);
 error_def(ERR_JOBLVN2LONG);
 error_def(ERR_MAXACTARG);
+
+static CONDITION_HANDLER(job_addr_ch)
+{
+	joberr_t		joberr;
+	int			rc;
+	START_CH(FALSE);
+
+	joberr = joberr_rtn;
+	DOWRITERC(setup_fd, &joberr, SIZEOF(joberr), rc);
+	/* Ignore rc, as it is more important to report the underlying error than it is to report problems reporting it. */
+	NEXTCH;
+}
 
 /*
  * ------------------------------------------------
@@ -71,7 +85,6 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 {
 	char			parm_string[8];
 	int4			argcnt, i;
-	int			setup_fd;
 	int			rc;
 	job_setup_op		setup_op;
 	boolean_t		setup_done = FALSE;
@@ -83,6 +96,9 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 	socket_struct		*socketptr;
 	char			*local_buff = NULL;
 	mval			*command_str;
+	joberr_t		joberr;
+	rhdtyp			*rtnhdr;
+	char			*transfer_addr;
 
 	if ((NULL == sp) && (!((sp = GETENV(CHILD_FLAG_ENV)) && sp[0]))) /* note assignment */
 		return;
@@ -101,61 +117,30 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 			setup_done = TRUE;
 			break;
 		case job_set_params:
-			DOREADRC(setup_fd, &params, SIZEOF(params), rc);
+			DOREADRC(setup_fd, &jparms->params, SIZEOF(jparms->params), rc);
 			if (rc < 0)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("job parameters"), errno, 0);
-
-			jparms->directory.len = params.directory_len;
-			jparms->gbldir.len = params.gbldir_len;
-			jparms->startup.len = params.startup_len;
-			jparms->input.len = params.input_len;
-			jparms->output.len = params.output_len;
-			jparms->error.len = params.error_len;
-			jparms->routine.len = params.routine_len;
-			jparms->label.len = params.label_len;
-			jparms->baspri = params.baspri;
-			jparms->offset = params.offset;
-
-			if (0 != params.directory_len)
+			/* Validate the routine and label */
+			MSTR_DEF(routine_mstr, jparms->params.routine.len, jparms->params.routine.buffer);
+			MSTR_DEF(label_mstr, jparms->params.label.len, jparms->params.label.buffer);
+			ESTABLISH(job_addr_ch);
+			if (!job_addr(&routine_mstr, &label_mstr, jparms->params.offset, (char **)&rtnhdr, &transfer_addr))
 			{
-				jparms->directory.addr = malloc(jparms->directory.len + 1);
-				memcpy(jparms->directory.addr, params.directory, jparms->directory.len + 1);
+				REVERT;
+				/* Send routine status */
+				joberr = joberr_rtn;
+				DOWRITERC(setup_fd, &joberr, SIZEOF(joberr), rc);
+				/* Ignore rc, as it is more important to report the underlying error than it is
+				 * to report problems reporting it.
+				 */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_JOBLABOFF, 0);
 			}
-			if (0 != params.gbldir_len)
-			{
-				jparms->gbldir.addr = malloc(jparms->gbldir.len + 1);
-				memcpy(jparms->gbldir.addr, params.gbldir, jparms->gbldir.len + 1);
-			}
-			if (0 != params.startup_len)
-			{
-				jparms->startup.addr = malloc(jparms->startup.len + 1);
-				memcpy(jparms->startup.addr, params.startup, jparms->startup.len + 1);
-			}
-			if (0 != params.input_len)
-			{
-				jparms->input.addr = malloc(jparms->input.len + 1);
-				memcpy(jparms->input.addr, params.input, jparms->input.len + 1);
-			}
-			if (0 != params.output_len)
-			{
-				jparms->output.addr = malloc(jparms->output.len + 1);
-				memcpy(jparms->output.addr, params.output, jparms->output.len + 1);
-			}
-			if (0 != params.error_len)
-			{
-				jparms->error.addr = malloc(jparms->error.len + 1);
-				memcpy(jparms->error.addr, params.error, jparms->error.len + 1);
-			}
-			if (0 != params.routine_len)
-			{
-				jparms->routine.addr = malloc(jparms->routine.len + 1);
-				memcpy(jparms->routine.addr, params.routine, jparms->routine.len + 1);
-			}
-			if (0 != params.label_len)
-			{
-				jparms->label.addr = malloc(jparms->label.len + 1);
-				memcpy(jparms->label.addr, params.label, jparms->label.len + 1);
-			}
+			REVERT;
+			/* Send routine status */
+			joberr = joberr_ok;
+			DOWRITERC(setup_fd, &joberr, SIZEOF(joberr), rc);
+			if (rc < 0)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBSETUP, 2, LEN_AND_LIT("routine status"), errno, 0);
 			break;
 		case job_set_parm_list:
 			DOREADRC(setup_fd, &arg_count, SIZEOF(arg_count), rc);

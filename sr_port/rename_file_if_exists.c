@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,7 +55,7 @@ int rename_file_if_exists(char *org_fn, int org_fn_len, char *rename_fn, int *re
 		return RENAME_FAILED;
 	}
 	/* File is present in the system */
-	assert(0 <  MAX_FN_LEN - org_fn_len - 1);
+	assert(0 <= (MAX_FN_LEN - org_fn_len));
 	JNL_SHORT_TIME(now);
 	if (SS_NORMAL != (status = prepare_unique_name(org_fn, org_fn_len, "", "", rename_fn, rename_fn_len, now, ustatus)))
 	{	/* "prepare_unique_name" would not have set "ustatus" to the error code. So set it here and return */

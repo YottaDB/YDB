@@ -79,31 +79,32 @@ void	mupcli_get_offset_size_value(uint4 *offset, uint4 *size, gtm_uint64_t *valu
 
 void	mupcli_edit_offset_size_value(sm_uc_ptr_t buff, uint4 offset, uint4 size, gtm_uint64_t value, boolean_t value_present)
 {
-	char		temp_str[256], temp_str1[256];
-	gtm_uint64_t	old_value;
+	char		temp_str[MAX_REPL_OPMSG_LEN], temp_str1[MAX_REPL_OPMSG_LEN];
+	gtm_uint64_t	old_value = -1;
 
-	memset(temp_str, 0, 256);
-	memset(temp_str1, 0, 256);
+	memset(temp_str, 0, MAX_REPL_OPMSG_LEN);
+	memset(temp_str1, 0, MAX_REPL_OPMSG_LEN);
 	if (SIZEOF(char) == size)
 	{
-		SPRINTF(temp_str, "!UB [0x!XB]");
+		SNPRINTF(temp_str, MAX_REPL_OPMSG_LEN, "!UB [0x!XB]");
 		old_value = *(sm_uc_ptr_t)buff;
 	}
 	else if (SIZEOF(short) == size)
 	{
-		SPRINTF(temp_str, "!UW [0x!XW]");
+		SNPRINTF(temp_str, MAX_REPL_OPMSG_LEN, "!UW [0x!XW]");
 		old_value = *(sm_ushort_ptr_t)buff;
 	}
 	else if (SIZEOF(int4) == size)
 	{
-		SPRINTF(temp_str, "!UL [0x!XL]");
+		SNPRINTF(temp_str, MAX_REPL_OPMSG_LEN, "!UL [0x!XL]");
 		old_value = *(sm_uint_ptr_t)buff;
 	}
 	else if (SIZEOF(gtm_int64_t) == size)
 	{
-		SPRINTF(temp_str, "!@UQ [0x!@XQ]");
+		SNPRINTF(temp_str, MAX_REPL_OPMSG_LEN, "!@UQ [0x!@XQ]");
 		old_value = *(qw_num_ptr_t)buff;
 	}
+	assert(-1 != old_value);
 	if (value_present)
 	{
 		if (SIZEOF(char) == size)
@@ -116,7 +117,7 @@ void	mupcli_edit_offset_size_value(sm_uc_ptr_t buff, uint4 offset, uint4 size, g
 			*(qw_num_ptr_t)buff = value;
 	} else
 		value = old_value;
-	SPRINTF(temp_str1, "Offset !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
+	SNPRINTF(temp_str1, MAX_REPL_OPMSG_LEN, "Offset !UL [0x!XL] : Old Value = %s : New Value = %s : Size = !UB [0x!XB]",
 		temp_str, temp_str);
 	if (SIZEOF(int4) >= size)
 		util_out_print(temp_str1, TRUE, offset, offset, (uint4)old_value, (uint4)old_value,

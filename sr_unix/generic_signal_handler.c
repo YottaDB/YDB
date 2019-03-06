@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,6 +39,11 @@
 #include "gtmio.h"
 #include "have_crit.h"
 #include "util.h"
+// For gd_region
+#include "gdsroot.h"
+#include "gdsbt.h"
+#include "gdsblk.h"
+#include "gdsfhead.h"
 
 #define	DEFER_EXIT_PROCESSING	((EXIT_PENDING_TOLERANT >= exit_state)				\
 					&& (exit_handler_active || multi_thread_in_use		\
@@ -74,6 +79,7 @@ GBLREF	boolean_t		gtm_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 GBLREF	volatile boolean_t	timer_active;
 GBLREF	sigset_t		block_sigsent;
+GBLREF	gd_region		*gv_cur_region;
 GBLREF	boolean_t		blocksig_initialized;
 #ifdef DEBUG
 GBLREF	boolean_t		in_nondeferrable_signal_handler;
@@ -89,6 +95,26 @@ error_def(ERR_KILLBYSIGSINFO2);
 error_def(ERR_KILLBYSIGSINFO3);
 error_def(ERR_KILLBYSIGUINFO);
 error_def(ERR_KRNLKILL);
+error_def(ERR_STATSDBMEMERR);
+
+static inline void check_for_statsdb_memerr()
+{
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+
+	if (TREF(gvcst_statsDB_open_ch_active))
+	{	/* Case where we've tried to create a stats db block
+		 * Issue an rts error and let the statsDB condition handler
+		 * do the clean up
+		 */
+		TREF(statsdb_memerr) = TRUE;
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STATSDBMEMERR, 2, gv_cur_region->dyn.addr->fname_len,
+				gv_cur_region->dyn.addr->fname);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_STATSDBMEMERR, 2, gv_cur_region->dyn.addr->fname_len,
+				gv_cur_region->dyn.addr->fname);
+	}
+}
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
@@ -300,6 +326,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 						process_id, sig, signal_info.send_pid, signal_info.send_uid);
 					break;
 				case GTMSIGINFO_ILOC + GTMSIGINFO_BADR:
+					check_for_statsdb_memerr();
 					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
@@ -319,6 +346,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 						process_id, sig, signal_info.int_iadr);
 					break;
 				case GTMSIGINFO_BADR:
+					check_for_statsdb_memerr();
 					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;

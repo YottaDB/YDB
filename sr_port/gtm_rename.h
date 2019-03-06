@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __GTM_RENAME_
-#define __GTM_RENAME_
+#ifndef GTM_RENAME_H_INCLUDED
+#define GTM_RENAME_H_INCLUDED
 /* gtm_rename.h */
 
 #define RENAME_SUCCESS 0

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +54,7 @@ int4 iosocket_handle(char *handle, int *len, boolean_t newhandle, d_socket_struc
 	{
 		if (newhandle)
 		{
-			SPRINTF(handle, "h%ld%03d", time((time_t *)0), ((TREF(socket_handle_counter))++ % 1000));
+			SNPRINTF(handle, MAX_HANDLE_LEN, "h%ld%03d", time((time_t *)0), ((TREF(socket_handle_counter))++ % 1000));
 			*len = (short)strlen(handle);
 		}
 		ii = 0;

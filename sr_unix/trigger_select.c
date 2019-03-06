@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,6 +123,7 @@ LITREF	char 			*trigger_subs[];
 	int		lcl_len;				       			\
 	unsigned char	tmp_buff[MAX_ZWR_EXP_RATIO * MAX_BUFF_SIZE];			\
 											\
+	lcl_len = MAX_ZWR_EXP_RATIO * MAX_BUFF_SIZE;					\
 	format2zwr((sm_uc_ptr_t)STR, STR_LEN, tmp_buff, &lcl_len);			\
 	COPY_TO_OUTPUT_AND_WRITE_IF_NEEDED(OUT_START, OUT_STR, tmp_buff, lcl_len);	\
 }

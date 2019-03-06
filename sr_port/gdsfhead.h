@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -283,7 +283,7 @@ gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
 #define VERIFY_QUEUE_LOCK(base,latch)
 #endif
 
-#define BLK_ZERO_OFF(start_vbn)			((start_vbn - 1) * DISK_BLOCK_SIZE)
+#define BLK_ZERO_OFF(start_vbn)		(((start_vbn) - 1) * DISK_BLOCK_SIZE)
 #ifdef GTM64
 #  define CHECK_LARGEFILE_MMAP(REG, MMAP_SZ)
 #else
@@ -1199,11 +1199,14 @@ MBSTART {									\
 		cr_old = (cache_rec_ptr_t)GDS_ANY_REL2ABS(CSA, CR->twin);	/* get old twin */				\
 		DEBUG_ONLY(lcl_cr_old = *cr_old);	/* In case the following assert trips capture the CR contents */	\
 		DEBUG_ONLY(lcl_cr_curr = *CR);											\
-		assert(!cr_old->bt_index);											\
-		assert(!cr_old->in_cw_set || cr_old->dirty);									\
-		assert(CR->bt_index);												\
-		assert((process_id == cr_old->in_cw_set) || (0 == cr_old->in_cw_set));						\
-		UNPIN_CACHE_RECORD(cr_old);											\
+		assert(!cr_old->bt_index || !CR->twin);										\
+		assert(!cr_old->in_cw_set || cr_old->dirty || !CR->twin);							\
+		assert(CR->bt_index || !CR->twin);										\
+		assert((process_id == cr_old->in_cw_set) || (0 == cr_old->in_cw_set) || !CR->twin);				\
+		if(CR->twin)													\
+		{														\
+			UNPIN_CACHE_RECORD(cr_old);										\
+		}														\
 	}															\
 	/* A concurrent process reading this block will wait for in_tend to become FALSE and then proceed with its		\
 	 * database operation. Later it will reach t_end/tp_tend doing validations at which point it will need to set in_cw_set.\
@@ -1393,7 +1396,7 @@ MBSTART {													\
 														\
 	assert(CSA && CSA->critical && CSA->nl); /* should have been setup in mu_rndwn_replpool */		\
 	assert(jnlpool && jnlpool->jnlpool_ctl);								\
-	assert(CSA->critical == (mutex_struct_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE));	\
+	assert(CSA->critical == (CRIT_PTR_T)((sm_uc_ptr_t)jnlpool->jnlpool_ctl + JNLPOOL_CTL_SIZE));	\
 	assert(CSA->nl == (node_local_ptr_t) ((sm_uc_ptr_t)CSA->critical + JNLPOOL_CRIT_SPACE			\
 		+ SIZEOF(mutex_spin_parms_struct)));								\
 	assert(jnlpool->jnlpool_ctl->filehdr_off);								\
@@ -1406,6 +1409,19 @@ MBSTART {													\
 	assert(jnlpool->gtmsource_local_array == (gtmsource_local_ptr_t)((sm_uc_ptr_t)jnlpool->jnlpool_ctl	\
 			+ jnlpool->jnlpool_ctl->sourcelocal_array_off));					\
 } MBEND
+
+#ifdef CRIT_USE_PTHREAD_MUTEX
+#define UPDATE_CRASH_COUNT(CSA, CRASH_COUNT)							\
+MBSTART {											\
+	/* Do Nothing */									\
+} MBEND
+#else
+#define UPDATE_CRASH_COUNT(CSA, CRASH_COUNT)							\
+MBSTART {											\
+	if ((CSA) && (CSA)->critical)								\
+		CRASH_COUNT = (CSA)->critical->crashcnt;					\
+} MBEND
+#endif
 
 /* Explanation for why we need the following macro.
  *
@@ -1493,9 +1509,9 @@ MBSTART {													\
 #define	START_VBN_V4		 49
 #define START_VBN_CURRENT	START_VBN_V6
 
-#define	STEP_FACTOR			64		/* the factor by which flush_trigger is incremented/decremented */
-#define	MIN_FLUSH_TRIGGER(n_bts)	((n_bts)/4)	/* the minimum flush_trigger as a function of n_bts */
-#define	MAX_FLUSH_TRIGGER(n_bts)	((n_bts)*15/16)	/* the maximum flush_trigger as a function of n_bts */
+#define	STEP_FACTOR			64			/* the factor by which flush_trigger is incremented/decremented */
+#define	MIN_FLUSH_TRIGGER(n_bts)	((n_bts) / 8)		/* the minimum flush_trigger as a function of n_bts */
+#define	MAX_WRT_PER_FLU			64			/* arbitrary, but probably sensible limit */
 
 #define MIN_FILLFACTOR 30
 #define MAX_FILLFACTOR 100
@@ -1986,11 +2002,11 @@ typedef struct sgmnt_data_struct
 	int4		wait_disk_space;        /* seconds to wait for diskspace before giving up on a db block write */
 	int4		defer_time;		/* defer write
 						 *	 0 => immediate,
-						 *	-1 => infinite defer,
+						 *	-1 => indefinite defer,
 						 *	>0 => defer_time * flush_time[0] is actual defer time
 						 * default value = 1 => a write-timer every csd->flush_time[0] seconds
 						 */
-	volatile boolean_t filler_wc_blocked;	/* Now moved to node_local */
+	int4		flush_trigger_top;	/* biggest value for flush_trigger */
 	boolean_t	mumps_can_bypass;	/* Allow mumps processes to bypass flushing, access control, and ftok semaphore
 						 * in "gds_rundown". This was done to improve shutdown performance.
 						 */
@@ -2262,7 +2278,7 @@ MBSTART {											\
 												\
 	if (TSD->createinprogress)								\
 		gtm_errcode = ERR_DBCREINCOMP;							\
-	if (TSD->file_corrupt && !mupip_jnl_recover)						\
+	if (TSD->file_corrupt && !mupip_jnl_recover && !TREF(in_mupip_integ))			\
 		gtm_errcode = ERR_DBFLCORRP;							\
 	if ((dba_mm == TSD->acc_meth) && TSD->blks_to_upgrd)					\
 		gtm_errcode = ERR_MMNODYNUPGRD;							\
@@ -2558,7 +2574,7 @@ typedef struct	sgmnt_addrs_struct
 	th_rec_ptr_t				th_base;
 	th_index_ptr_t				ti;
 	node_local_ptr_t			nl;
-	mutex_struct_ptr_t			critical;
+	CRIT_PTR_T				critical;
 	struct shmpool_buff_hdr_struct		*shmpool_buffer;	/* 1MB chunk of shared memory that we micro manage */
 	sm_uc_ptr_t				db_addrs[2];
 	struct mlk_ctldata_struct		*mlkctl;
@@ -4193,7 +4209,9 @@ MBSTART {														\
 		status = ss_create_context(lcl_ss_ctx, ss_shmcycle);							\
 		if (!status)												\
 		{	/* snapshot context creation failed. Reset private copy of snapshot_in_prog so that we don't	\
-			 * read the before images in t_end or op_tcommit */						\
+			 * read the before images in t_end or op_tcommit						\
+			 */												\
+			SS_RELEASE_IF_NEEDED(CSA, CNL);									\
 			CLEAR_SNAPSHOTS_IN_PROG(CSA);									\
 		}													\
 		assert(!status || (SNAPSHOT_INIT_DONE == lcl_ss_ctx->cur_state));					\
@@ -4212,6 +4230,7 @@ MBSTART {														\
 		 * snapshot is no longer valid. This way we don't wait for MUPIP INTEG to detect and terminate the 	\
 		 * snapshots												\
 		 */													\
+		SS_RELEASE_IF_NEEDED(CSA, CNL);										\
 		CLEAR_SNAPSHOTS_IN_PROG(CSA);										\
 	}														\
 } MBEND
@@ -4240,19 +4259,22 @@ MBSTART {										\
  * GT.M runtime. Assumes that csa->snapshot_in_prog is TRUE and as a side effect sets csa->snapshot_in_prog
  * to FALSE if the context is destroyed
  */
-# define SS_RELEASE_IF_NEEDED(CSA, CNL)							\
-MBSTART {										\
-	int			ss_shmcycle;						\
-	snapshot_context_ptr_t	lcl_ss_ctx;						\
-											\
-	lcl_ss_ctx = SS_CTX_CAST(CSA->ss_ctx);						\
-	assert(SNAPSHOTS_IN_PROG(CSA) && (NULL != lcl_ss_ctx));				\
-	ss_shmcycle = CNL->ss_shmcycle;							\
-	if (!SNAPSHOTS_IN_PROG(cnl) || (lcl_ss_ctx->ss_shmcycle != ss_shmcycle))	\
-	{										\
-		ss_destroy_context(lcl_ss_ctx);						\
-		CLEAR_SNAPSHOTS_IN_PROG(CSA);						\
-	}										\
+# define SS_RELEASE_IF_NEEDED(CSA, CNL)								\
+MBSTART {											\
+	int			ss_shmcycle;							\
+	snapshot_context_ptr_t	lcl_ss_ctx;							\
+												\
+	if (SNAPSHOTS_IN_PROG(CSA))								\
+	{											\
+		lcl_ss_ctx = SS_CTX_CAST((CSA)->ss_ctx);					\
+		assert(NULL != lcl_ss_ctx);							\
+		ss_shmcycle = (CNL)->ss_shmcycle;						\
+		if (!SNAPSHOTS_IN_PROG(CNL) || (lcl_ss_ctx->ss_shmcycle != ss_shmcycle))	\
+		{										\
+			ss_destroy_context(lcl_ss_ctx);						\
+			CLEAR_SNAPSHOTS_IN_PROG(CSA);						\
+		}										\
+	}											\
 } MBEND
 
 /* No need to write before-image in case the block is FREE. In case the database had never been fully upgraded from V4 to V5 format

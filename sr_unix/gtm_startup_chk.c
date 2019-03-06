@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,15 +47,7 @@
 #include "gtm_startup_chk.h"
 #include "gtmimagename.h"
 #include "have_crit.h"
-
-/* HPUX does not have a /proc filesystem to retrieve the exe's path. The
- * following link leads to a forum thread in which the user yrpark shows the
- * desired result.
- * http://h30499.www3.hp.com/t5/Languages-and-Scripting/Get-full-path-of-executable-of-running-process/td-p/5135520#.U-o1W3X7GV4
- */
-#if defined(__hpux)
-#include <sys/pstat.h>
-#endif
+#include "gtm_post_startup_check_init.h"
 
 GBLREF	char		gtm_dist[GTM_PATH_MAX];
 GBLREF	boolean_t	gtm_dist_ok_to_use;
@@ -143,22 +135,13 @@ int gtm_chk_dist(char *image)
 
 	if (IS_GTM_IMAGE && memcmp(exename, GTM_IMAGE_NAME, GTM_IMAGE_NAMELEN))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_IMAGENAME, 4, LEN_AND_LIT(GTM_IMAGE_NAME), LEN_AND_STR(exename));
+	gtm_post_startup_check_init();
 	return 0;
 }
 
 int gtm_image_path(char *realpath)
 {
-#if defined(__hpux)
-	int		  status = 0;
-	struct pst_status pst;
-	pst.pst_pid = -1;
-	/* The man page for pstat_getproc does not list in/valid return codes, so we ignore it */
-	pstat_getproc(&pst, SIZEOF(struct pst_status), 0, process_id);
-	status = pstat_getpathname(realpath, GTM_PATH_MAX, &pst.pst_fid_text);
-	assertpro(status != 0); /* Can only happen if the path name is not in the system cache */
-	if (status < 0) /* errno is set */
-		return status;
-#elif defined(__linux__) || defined(__sparc) ||  defined(_AIX) || defined(__CYGWIN__)
+#if defined(__linux__) || defined(__sparc) ||  defined(_AIX) || defined(__CYGWIN__)
 	SNPRINTF(realpath, GTM_PATH_MAX, PROCSELF, process_id);
 #else
 #	error "Unsupported platform : no way to determine the true exe path"

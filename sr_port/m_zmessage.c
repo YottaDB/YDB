@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,7 @@ int m_zmessage (void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	switch (expr(&arg, MUMPS_EXPR))
+	switch (expr(&arg, MUMPS_INT))
 	{
 	case EXPR_FAIL:
 		return FALSE;

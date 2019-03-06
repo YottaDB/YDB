@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +21,8 @@
 	GBLREF long	gtm_os_hugepage_size;
 #	define		OS_HUGEPAGE_SIZE gtm_os_hugepage_size
 
-	extern int	gtm_shmget(key_t __key, size_t __size, int __shmflg);
+#	define		HUGEPAGE_LIB_NAME	"libhugetlbfs.so"
+	extern int	gtm_shmget(key_t key, size_t size, int shmflg);
 	void 		libhugetlbfs_init(void);
 #endif
 

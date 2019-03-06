@@ -125,10 +125,10 @@ void	grab_crit(gd_region *reg)
 		DEBUG_ONLY(locknl = NULL;)	/* restore "locknl" to default value */
 		if (status != cdb_sc_normal)
 		{
-#		ifdef DEBUG
-		if (save_jnlpool != jnlpool)
-			jnlpool = save_jnlpool;
-#		endif
+#			ifdef DEBUG
+			if (save_jnlpool != jnlpool)
+				jnlpool = save_jnlpool;
+#			endif
 			ENABLE_INTERRUPTS(INTRPT_IN_CRIT_FUNCTION, prev_intrpt_state);
 			TREF(grabbing_crit) = NULL;
 			switch(status)

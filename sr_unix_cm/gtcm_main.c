@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,13 +41,15 @@
 static char rcsid[] = "$Header:$";
 #endif
 
+#define	MAX_IMAGE_NAME_LEN	256 + 1
+
 GBLDEF short		gtcm_ast_avail;
 GBLDEF int4		gtcm_exi_condition;
 
 /* image_id....allows you to determine info about the server
  * by using the strings command, or running dbx
  */
-GBLDEF char		image_id[256]= "image_id";
+GBLDEF char		image_id[MAX_IMAGE_NAME_LEN];
 GBLDEF char		*omi_service = (char *)0;
 GBLDEF FILE		*omi_debug   = (FILE *)0;
 GBLDEF char		*omi_pklog   = (char *)0;
@@ -88,7 +90,7 @@ int main(int argc, char_ptr_t argv[])
 	GTM_THREADGBL_INIT;
 	ctxt = NULL;
 	common_startup_init(GTCM_SERVER_IMAGE);
-	SPRINTF(image_id,"%s=gtcm_server", image_id);
+	SNPRINTF(image_id, MAX_IMAGE_NAME_LEN, "%s=gtcm_server", "image_id");
 #	ifdef SEQUOIA
 	if (!set_pset())
 		EXIT(-1);
@@ -114,8 +116,7 @@ int main(int argc, char_ptr_t argv[])
 		gtcm_exi_condition = ret_val;
 		gtcm_exit();
 	}
-	SPRINTF(image_id,"%s(pid=%d) %s %s %s -id %d -service %s",
-		image_id,
+	SNPRINTF(image_id, MAX_IMAGE_NAME_LEN, "image_id=gtcm_server(pid=%d) %s %s %s -id %d -service %s",
 		omi_pid,
 		( history ? "-hist" : "" ),
 		( authenticate ? "-auth" : "" ),

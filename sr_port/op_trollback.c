@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,11 @@
 #include "gvcst_protos.h"
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
+#include "deferred_events_queue.h"
+#include "deferred_events.h"
+#include "error_trap.h"
+#include "ztimeout_routines.h"
+#include "db_snapshot.h"
 
 GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			dollar_trestart;
@@ -80,6 +85,8 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	sgmnt_addrs	*csa;
 	tp_region	*tr;
 	int		tl;
+        int4		event_type, param_val;
+        void (*set_fn)(int4 param);
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -118,11 +125,14 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 			if (!curreg->open)
 				continue;
 			csa = &FILE_INFO(curreg)->s_addrs;
+			if (SNAPSHOTS_IN_PROG(csa))
+				SS_RELEASE_IF_NEEDED(csa, (node_local_ptr_t)csa->nl);
 			INCR_GVSTATS_COUNTER(csa, csa->nl, n_tp_rolledback, 1);
 			if (csa->now_crit && !csa->hold_onto_crit)
 				rel_crit(curreg);			/* release any crit regions */
 		}
 		reg_reset = FALSE;
+		CALL_ZTIMEOUT_IF_DEFERRED;
 		if (!process_exiting && lcl_implicit_trollback && tp_pointer->implicit_tstart)
 		{	/* This is an implicit TROLLBACK of an implicit TSTART started for a non-tp explicit update.
 			 * gv_currkey needs to be restored to the value it was at the beginning of the implicit TSTART.

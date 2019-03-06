@@ -21,7 +21,7 @@ STATICFNDEF boolean_t trigger_already_exists(char *trigvn, int trigvn_len, char 
 STATICFNDCL int4 modify_record(char *trigvn, int trigvn_len, char add_delete, int trigger_index, char **values, uint4 *value_len,
 			       mval *trigger_count, boolean_t db_matched_set, boolean_t db_matched_kill, stringkey *kill_hash,
 			       stringkey *set_hash, int set_kill_bitmask);
-STATICFNDCL int4 gen_trigname_sequence(char *trigvn, int trigvn_len, mval *trigger_count, char *trigname_seq_str, uint4 seq_len);
+STATICFNDCL int4 gen_trigname_sequence(char *trigvn, uint4 trigvn_len, mval *trigger_count, char *trigname_seq_str, uint4 seq_len);
 STATICFNDCL int4 add_trigger_hash_entry(char *trigvn, int trigvn_len, char *cmd_value, int trigindx, boolean_t add_kill_hash,
 					stringkey *kill_hash, stringkey *set_hash);
 STATICFNDCL int4 add_trigger_cmd_attributes(char *trigvn, int trigvn_len,  int trigger_index, char *trig_cmds, char **values,
@@ -44,7 +44,7 @@ boolean_t check_unique_trigger_name_full(char **values, uint4 *value_len, mval *
 boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_stats, io_pair *trigfile_device,
 			     int4 *record_num);
 
-STATICFNDCL trig_stats_t trigupdrec_reg(char *trigvn, int trigvn_len, boolean_t *jnl_format_done, mval *trigjrec,
+STATICFNDCL trig_stats_t trigupdrec_reg(char *trigvn, uint4 trigvn_len, boolean_t *jnl_format_done, mval *trigjrec,
 	boolean_t *new_name_check_done, boolean_t *new_name_ptr, char **values, uint4 *value_len, char add_delete,
 	stringkey *kill_trigger_hash, stringkey *set_trigger_hash, char *disp_trigvn, int disp_trigvn_len, uint4 *trig_stats,
 	boolean_t *first_gtmio, char *utilprefix, int *utilprefixlen);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,6 @@
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "repl_errno.h"
-#include "gtm_event_log.h"
 #include "repl_sem.h"
 #include "repl_sp.h"
 #include "cli.h"
@@ -111,7 +110,7 @@ int gtmrecv(void)
 	uint4			gtmrecv_pid;
 	int			idx, semval, status, save_upd_status, upd_start_status, upd_start_attempts;
 	struct stat		stat_buf;
-	char			print_msg[1024], tmpmsg[1024];
+	char			print_msg[REPL_MSG_SIZE], tmpmsg[REPL_MSG_SIZE];
 	pid_t			pid, procgp;
 	int			exit_status, waitpid_res, save_errno;
 	int			log_init_status;
@@ -471,7 +470,6 @@ int gtmrecv(void)
 	CLOSEFILE(null_fd, rc);
 	if (0 > rc)
 		rts_error_csa(CSA_ARG(NULL) ERR_REPLERR, RTS_ERROR_LITERAL("Failed to close /dev/null"), errno, 0);
-	gtm_event_log_init();
 	gtmrecv_local->recv_serv_pid = process_id;
 	assert((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl));
 	jnlpool->jnlpool_ctl->gtmrecv_pid = process_id;
@@ -480,13 +478,12 @@ int gtmrecv(void)
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "%s %s\n", cli_lex_in_ptr->argv[0], cli_lex_in_ptr->in_str);
 
 	assert((NULL != jnlpool) && (NULL != jnlpool->repl_inst_filehdr));
-	SPRINTF(tmpmsg, "GTM Replication Receiver Server with Pid [%d] started on replication instance [%s]",
+	SNPRINTF(tmpmsg, REPL_MSG_SIZE, "GTM Replication Receiver Server with Pid [%d] started on replication instance [%s]",
 		process_id, jnlpool->repl_inst_filehdr->inst_info.this_instname);
-	sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
+	sgtm_putmsg(print_msg, REPL_MSG_SIZE, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Attached to existing jnlpool with shmid = [%d] and semid = [%d]\n",
 			jnlpool->repl_inst_filehdr->jnlpool_shmid, jnlpool->repl_inst_filehdr->jnlpool_semid);
-	gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
 	if (recvpool_ctl->fresh_start)
 	{
 		QWASSIGNDW(recvpool_ctl->jnl_seqno, 0); /* Update process will initialize this to a non-zero value */
@@ -529,11 +526,11 @@ int gtmrecv(void)
 	if ((UPDPROC_EXISTS == upd_start_status && recvpool_ctl->fresh_start) ||
 	    (UPDPROC_START_ERR == upd_start_status && GTMRECV_MAX_UPDSTART_ATTEMPTS <= upd_start_attempts))
 	{
-		sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLERR, RTS_ERROR_LITERAL((UPDPROC_EXISTS == upd_start_status) ?
+		sgtm_putmsg(print_msg, REPL_MSG_SIZE, VARLSTCNT(4) ERR_REPLERR, RTS_ERROR_LITERAL(
+			(UPDPROC_EXISTS == upd_start_status) ?
 			    "Runaway Update Process. Aborting..." :
 			    "Too many failed attempts to fork Update Process. Aborting..."));
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
-		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLERR", print_msg);
 		gtmrecv_exit(ABNORMAL_SHUTDOWN);
 	}
 	upd_proc_local->start_upd = UPDPROC_STARTED;

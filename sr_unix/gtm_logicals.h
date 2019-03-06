@@ -105,8 +105,6 @@
 #define	GTM_REPL_INSTNAME		"$gtm_repl_instname"
 #define	GTM_REPL_INSTSECONDARY		"$gtm_repl_instsecondary"
 #define	GTM_ZLIB_CMP_LEVEL		"$gtm_zlib_cmp_level"
-#define	GTM_EVENT_LOG_LIB_ENV		"$gtm_event_log_libpath"
-#define	GTM_EVENT_LOG_RTN_ENV		"$gtm_event_log_rtn"
 #define	GTM_JNL_RELEASE_TIMEOUT		"$gtm_jnl_release_timeout"
 #define	GTM_CUSTOM_ERRORS		"$gtm_custom_errors"
 

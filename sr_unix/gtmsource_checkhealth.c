@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -161,7 +161,7 @@ int gtmsource_checkhealth(void)
 				assert(!JNL_ENABLED(csd) || REPL_ENABLED(csd));	/* || is for turning replication on concurrently */
 				reg_seqno = csd->reg_seqno;
 				jnlseqno = (NULL != jnlpool->jnlpool_ctl) ? jnlpool->jnlpool_ctl->jnl_seqno : MAX_SEQNO;
-				sgtm_putmsg(errtxt, VARLSTCNT(8) ERR_REPLJNLCLOSED, 6, DB_LEN_STR(reg),
+				sgtm_putmsg(errtxt, OUT_BUFF_SIZE, VARLSTCNT(8) ERR_REPLJNLCLOSED, 6, DB_LEN_STR(reg),
 					&reg_seqno, &reg_seqno, &jnlseqno, &jnlseqno);
 				repl_log(stderr, FALSE, TRUE, errtxt);
 				status |= SRV_ERR;

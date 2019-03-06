@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,8 +38,13 @@
 #ifdef DEBUG
 #	define WBTEST_HUGETLB_DLSYM_ERROR "WBTEST_HUGETLB_DLSYM error"
 #endif
+#include "gtm_stdio.h"
+#include "gtm_limits.h"
+#include "restrict.h"	/* Needed for restrictions */
+#include "have_crit.h"	/* Needed for defer interrupts */
 
-GBLDEF long	gtm_os_hugepage_size = -1;	/* Default Huge Page size of OS. If huge pages are not supported or the
+GBLREF char	 gtm_dist[GTM_PATH_MAX];
+GBLDEF long	 gtm_os_hugepage_size = -1;	/* Default Huge Page size of OS. If huge pages are not supported or the
  	 	 	 	 	 	 * value doesn't fit into a *long* it will be equal to the OS page size
  	 	 	 	 	 	 */
 OS_PAGE_SIZE_DECLARE
@@ -51,9 +57,10 @@ STATICDEF long		(*p_gethugepagesize) (void) = NULL;
 STATICDEF boolean_t	hugetlb_is_attempted = FALSE;
 /* all shmget declarations have already been MACROed to gtm_shmget in mdefsp.h so we need to declare the real
  * one here */
-extern int 		shmget (key_t __key, size_t __size, int __shmflg);
+extern int 		shmget (key_t key, size_t size, int shmflg);
 
 error_def(ERR_DLLNORTN);
+error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TEXT);
 
 /* A MACRO in mdefsp.h (LINUX_ONLY) replaces all shmget with this function */
@@ -73,11 +80,22 @@ int gtm_shmget (key_t key, size_t size, int shmflg)
  */
 void libhugetlbfs_init(void)
 {
-	char 	*error = NULL;
-	void	*handle;
+	char	 	*error = NULL;
+	void		*handle;
+	char	 	librarypath[GTM_PATH_MAX], *lpath = NULL;
+	char		err_msg[GTM_PATH_MAX];
+	intrpt_state_t	prev_intrpt_state;
 
 	assert(!hugetlb_is_attempted);
-	handle = dlopen("libhugetlbfs.so", RTLD_NOW);
+	if (RESTRICTED(library_load_path))
+	{
+		lpath = librarypath;
+		SNPRINTF(librarypath, GTM_PATH_MAX, GTM_PLUGIN_FMT_SHORT HUGEPAGE_LIB_NAME, gtm_dist);
+	} else
+		lpath = HUGEPAGE_LIB_NAME;
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	handle = dlopen(lpath, RTLD_NOW);
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 	GTM_WHITE_BOX_TEST(WBTEST_HUGETLB_DLOPEN, handle, NULL);
 	if (NULL != handle)
 	{
@@ -98,9 +116,13 @@ void libhugetlbfs_init(void)
 		if (error)
 		{
 			p_shmget = NULL;
-			send_msg(VARLSTCNT(8) ERR_DLLNORTN, 2, LEN_AND_LIT("shmget from libhugetlbfs.so"), ERR_TEXT, 2,
-					LEN_AND_STR(error));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNORTN, 2, LEN_AND_LIT("shmget from libhugetlbfs.so"),
+				ERR_TEXT, 2, LEN_AND_STR(error));
 		}
+	} else if (RESTRICTED(library_load_path))
+	{
+		SNPRINTF(err_msg, GTM_PATH_MAX, "dlopen(%s)", lpath);
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, err_msg);
 	}
 	if (NULL == p_shmget)
 		p_shmget = &shmget;			/* Fall back to using the native shmget */

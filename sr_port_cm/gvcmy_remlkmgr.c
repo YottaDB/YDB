@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,20 +42,20 @@ GBLREF unsigned short	lksusp_sent, lksusp_rec;
 GBLREF bool		out_of_time;
 GBLDEF bool		lk_cm_noresponse;
 
+error_def(ERR_BADSRVRNETMSG);
+error_def(ERR_TEXT);
+
 #define CM_LKWAIT_TIME		100 /* ms */
 #define CM_LKNORESPONSE_TIME	60 * 1000 /* ms */
 
 bool gvcmy_remlkmgr(unsigned short count)
 {
-	char		errbuf[90];
+	char		errbuf[CM_ERRBUFF_SIZE];
 	unsigned char	*c_ptr;
 	int4		*delay;
 	uint4		status, norm_stat;
 	boolean_t	one_try, noresponse_timer;
 	cm_lk_response	*lk_res_ptr, *lk_resume;
-
-	error_def(ERR_BADSRVRNETMSG);
-	error_def(ERR_TEXT);
 
 	one_try = TRUE;
 	lk_cm_noresponse = FALSE;
@@ -92,8 +93,10 @@ bool gvcmy_remlkmgr(unsigned short count)
 			{
 				if (CMMS_E_ERROR != *(lkerrlnk->mbf))
 				{
-					SPRINTF(errbuf, "gvcmy_remlkmgr 1: expected CMMS_E_ERROR, got %d", (int)(*(lkerrlnk->mbf)));
-					rts_error(VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
+					SNPRINTF(errbuf, CM_ERRBUFF_SIZE, "gvcmy_remlkmgr 1: expected CMMS_E_ERROR, got %d",
+						(int)(*(lkerrlnk->mbf)));
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
+						LEN_AND_STR(errbuf));
 				} else
 					gvcmz_errmsg(lkerrlnk, FALSE);
 			}
@@ -134,9 +137,10 @@ bool gvcmy_remlkmgr(unsigned short count)
 				else
 				{	if (CMMS_E_ERROR != *(lkerrlnk->mbf))
 					{
-						SPRINTF(errbuf, "gvcmy_remlkmgr 2: expected CMMS_E_ERROR, got %d",
+						SNPRINTF(errbuf, CM_ERRBUFF_SIZE, "gvcmy_remlkmgr 2: expected CMMS_E_ERROR, got %d",
 							(int)(*(lkerrlnk->mbf)));
-						rts_error(VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
+							LEN_AND_STR(errbuf));
 					} else
 						gvcmz_errmsg(lkerrlnk, FALSE);
 				}
@@ -150,8 +154,10 @@ bool gvcmy_remlkmgr(unsigned short count)
 			{
 				if (CMMS_E_ERROR != *(lktask_x->mbf))
 				{
-					SPRINTF(errbuf, "gvcmy_remlkmgr 3: expected CMMS_E_ERROR, got %d", (int)(*(lkerrlnk->mbf)));
-					rts_error(VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
+					SNPRINTF(errbuf, CM_ERRBUFF_SIZE, "gvcmy_remlkmgr 3: expected CMMS_E_ERROR, got %d",
+						(int)(*(lkerrlnk->mbf)));
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
+						LEN_AND_STR(errbuf));
 				}
 				gvcmz_errmsg(lktask_x, FALSE);
 			}
@@ -200,9 +206,10 @@ bool gvcmy_remlkmgr(unsigned short count)
 				{
 					if (CMMS_E_ERROR != *(lkerrlnk->mbf))
 					{
-						SPRINTF(errbuf, "gvcmy_remlkmgr 4: expected CMMS_E_ERROR, got %d",
+						SNPRINTF(errbuf, CM_ERRBUFF_SIZE, "gvcmy_remlkmgr 4: expected CMMS_E_ERROR, got %d",
 							(int)(*(lkerrlnk->mbf)));
-						rts_error(VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2,
+							LEN_AND_STR(errbuf));
 					} else
 						gvcmz_errmsg(lkerrlnk,FALSE);
 				}

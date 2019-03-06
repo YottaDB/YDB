@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __FILE_INPUT_INPUT_H__
-#define __FILE_INPUT_INPUT_H__
+#ifndef FILE_INPUT_INPUT_H_INCLUDED
+#define FILE_INPUT_INPUT_H_INCLUDED
 
 #define	FILE_INPUT_GET_ERROR		-1
 #define	FILE_INPUT_GET_LINE2LONG	-2

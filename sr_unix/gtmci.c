@@ -77,6 +77,7 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "gtm_permissions.h"
+#include "gtm_post_startup_check_init.h"
 
 #if defined(__x86_64__)
 extern	void	opp_ciret();
@@ -218,7 +219,6 @@ static callin_entry_list* get_entry(const char* call_name, int internal)
 int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
 		unsigned int *has_ret_value)
 {
-	boolean_t		need_rtnobj_shm_free;
 	callin_entry_list	*entry;
 	mstr			label, routine;
 	int			has_return, i, len;
@@ -288,10 +288,7 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	/* The 3rd argument is NULL because we will get lnr_adr via TABENT_PROXY. */
-	/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
-	 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
-	 */
-	if (!job_addr(&routine, &label, 0, (char **)&base_addr, NULL, &need_rtnobj_shm_free))
+	if (!job_addr(&routine, &label, 0, (char **)&base_addr, NULL))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 	memset(&param_blk, 0, SIZEOF(param_blk));
 	param_blk.rtnaddr = (void *)(ARLINK_ONLY(0) NON_ARLINK_ONLY(base_addr));
@@ -531,7 +528,6 @@ int gtm_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var,
 										boolean_t internal_use)
 {
-	boolean_t		need_rtnobj_shm_free;
 	va_list			var;
 	callin_entry_list	*entry;
 	mstr			label, routine;
@@ -644,10 +640,7 @@ int gtm_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		entry = callin_handle;
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	/* 3rd argument is NULL because we will get lnr_adr via TABENT_PROXY */
-	/* See comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
-	 * decrement rtnobj reference counts at exit time in relinkctl_rundown (called by gtm_exit_handler).
-	 */
-	if (!job_addr(&routine, &label, 0, (char **)&base_addr, NULL, &need_rtnobj_shm_free))
+	if (!job_addr(&routine, &label, 0, (char **)&base_addr, NULL))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBLABOFF);
 	memset(&param_blk, 0, SIZEOF(param_blk));
 	param_blk.rtnaddr = (void *)(ARLINK_ONLY(0) NON_ARLINK_ONLY(base_addr));
@@ -1058,7 +1051,6 @@ int gtm_init()
 		common_startup_init(GTM_IMAGE);
 		err_init(stop_image_conditional_core);
 		UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
-		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 		/* Ensure that $gtm_dist exists */
 		if (NULL == (dist = (char *)GETENV(GTM_DIST)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
@@ -1090,6 +1082,7 @@ int gtm_init()
 		{	/* $gtm_dist validated */
 			gtm_dist_ok_to_use = TRUE;
 			memcpy(gtm_dist, dist, dist_len);
+			gtm_post_startup_check_init();
 		}
 		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during GT.M startup below,

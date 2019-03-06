@@ -65,7 +65,7 @@ static readonly struct
 
 void open_list_file(void)
 {
-	char		charspace, cp, fname[MAX_FBUFF + 1], list_name[MAX_MIDENT_LEN + STR_LIT_LEN(LISTEXT)], *p;
+	char		charspace, cp, fname[MAX_FN_LEN + 1], list_name[MAX_MIDENT_LEN + STR_LIT_LEN(LISTEXT)], *p;
 	mstr		fstr;
 	mval		file, parms;
 	parse_blk	pblk;
@@ -86,7 +86,7 @@ void open_list_file(void)
 	pblk.def1_size += STR_LIT_LEN(LISTEXT);
 	pblk.def1_buf = list_name;
 	pblk.buffer = &fname[0];
-	pblk.buff_size = MAX_FBUFF;
+	pblk.buff_size = MAX_FN_LEN;
 	pblk.fop = F_SYNTAXO;
 	fstr.len = (MV_DEFINED(&cmd_qlf.list_file) ? cmd_qlf.list_file.str.len : 0);
 	fstr.addr = cmd_qlf.list_file.str.addr;

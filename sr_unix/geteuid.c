@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,6 +18,12 @@
 
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
+#include "cli.h"
+
+/* This executable does not have any command tables so initialize command array to NULL.
+ * (op_zcompile etc. require cmd_ary).
+ */
+GBLDEF  CLI_ENTRY       *cmd_ary = NULL;
 
 int main(int argc, char **argv)
 {

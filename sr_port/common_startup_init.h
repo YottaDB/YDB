@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2017 Fidelity National Information	*
+ * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _COMMON_STARTUP_INIT_DEFINED
-#define _COMMON_STARTUP_INIT_DEFINED
+#ifndef COMMON_STARTUP_INIT_DEFINED
+#define COMMON_STARTUP_INIT_DEFINED
 
 void	common_startup_init(enum gtmImageTypes img_type);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@ void gvcmz_int_lkcancel(void)
 {
 	static unsigned char	temp[16];
 	bool			read_inprog;
-	char			errbuf[90];
+	char			errbuf[CM_ERRBUFF_SIZE];
 	unsigned char		*ptr, action, sent;
 	unsigned short		count, cbl;
 	uint4			status, norm_stat;
@@ -137,7 +137,8 @@ void gvcmz_int_lkcancel(void)
 		{
 			if (CMMS_E_ERROR != *(lkerrlnk->mbf))
 			{
-				SPRINTF(errbuf, "gvcmz_int_lkcancel: expected CMMS_E_ERROR, got %d", (int)(*(lkerrlnk->mbf)));
+				SNPRINTF(errbuf, CM_ERRBUFF_SIZE, "gvcmz_int_lkcancel: expected CMMS_E_ERROR, got %d",
+					(int)(*(lkerrlnk->mbf)));
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BADSRVRNETMSG, 0, ERR_TEXT, 2, LEN_AND_STR(errbuf));
 			} else
 				gvcmz_errmsg(lkerrlnk, FALSE);

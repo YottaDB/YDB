@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +26,6 @@
 #include "repl_log.h"
 #include "repl_dbg.h"
 #include "gtm_stdio.h"
-#include "gtm_event_log.h"
 #include "read_db_files_from_gld.h"
 #include "updproc.h"
 
@@ -70,10 +70,7 @@ int upd_log_init(recvpool_user who)
 		status = repl_log_init(REPL_GENERAL_LOG, fd_addrs, log_file);
 		repl_log_fd2fp(fp_addrs, *fd_addrs);
 		if (UPDPROC == who)
-		{
 			strcpy(recvpool.upd_proc_local->log_file, log_file);
-			gtm_event_log_init();
-		}
 	}
 	return(status);
 }

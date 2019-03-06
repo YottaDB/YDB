@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,6 @@
 #include "gtmrecv.h"
 #include "repl_dbg.h"
 #include "gtm_stdio.h"
-#include "gtm_event_log.h"
 #include "eintr_wrappers.h"
 #include "jnl.h"
 #include "repl_filter.h"
@@ -204,7 +203,6 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 	repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Last Recvd Seqno : %llu  Jnl Total : %llu  Msg Total : %llu\n",
 			log_seqno, repl_recv_data_processed, repl_recv_data_recvd);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Last Seqno processed by update process : %llu\n", log_seqno1);
-	gtm_event_log_close();
 	if (gtmrecv_filter & EXTERNAL_FILTER)
 		repl_stop_filter();
 	if (auto_shutdown)

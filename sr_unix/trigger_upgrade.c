@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2018 Fidelity National Information	*
+ * Copyright (c) 2014-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -489,6 +489,7 @@ void	trigger_upgrade(gd_region *reg)
 					trigindex = ptr;
 					memcpy(trigname, tmpmval.str.addr, tmpmval.str.len);
 					A2I(ptr, ptr + name_index_len, trig_seq_num);
+					assert(0 < trig_seq_num); /* Auto generated seqnum in the DB must be valid */
 					/* At this point, gv_currkey is ^#t(<gvn>,i) */
 					/* $get(^#t("#TNAME",<trigger name>,"#SEQNUM")) */
 					BUILD_HASHT_SUB_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
@@ -566,7 +567,7 @@ void	trigger_upgrade(gd_region *reg)
 			assert(SS_NORMAL == sts);	/* because we should have done jnl_ensure_open already
 							 * in which case set_jnl_file_close has no way of erroring out.
 							 */
-			sts = jnl_file_open_switch(reg, 0, buff);
+			sts = jnl_file_open_switch(reg, 0, buff, OUT_BUFF_SIZE);
 			if (sts)
 			{
 				jpc = csa->jnl;

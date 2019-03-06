@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __WCS_FLU_H__
-#define __WCS_FLU_H__
+#ifndef WCS_FLU_H_INCLUDED
+#define WCS_FLU_H_INCLUDED
 
 boolean_t wcs_flu(uint4 options);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _REPL_CTL_H
-#define _REPL_CTL_H
+#ifndef REPL_CTL_H_INCLUDED
+#define REPL_CTL_H_INCLUDED
 
 #include "gtmcrypt.h" /* for gtmcrypt_key_t type used in repl_ctl_element */
 

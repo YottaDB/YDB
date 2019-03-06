@@ -1,6 +1,7 @@
+
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +47,7 @@ int indirection(oprtype *a)
 	concat_athashes = (2 == source_column);
 	INCREMENT_EXPR_DEPTH;
 	advancewindow();
-	if (TREF(xecute_literal_parse) || !expratom(a))
+	if ((TREF(xecute_literal_parse) && ! TREF(trigger_compile_and_link)) || !expratom(a))
 	{
 		DECREMENT_EXPR_DEPTH;
 		stx_error(ERR_EXPR);

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2003 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __READ_DB_FILES_FROM_GLD_H__
-#define __READ_DB_FILES_FROM_GLD_H__
+#ifndef READ_DB_FILES_FROM_GLD_H_INCLUDED
+#define READ_DB_FILES_FROM_GLD_H_INCLUDED
 
 typedef struct gld_dbname_list_struct
 {

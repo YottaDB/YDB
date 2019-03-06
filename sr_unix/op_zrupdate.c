@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information 	*
+ * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,7 +75,7 @@ void op_zrupdate(int argcnt, ...)
 void op_zrupdate(int argcnt, ...)
 {
 	boolean_t		wildcarded, noresult, seenfext, invalid;
-	char			pblkbuf[MAX_FBUFF + 1], statbuf[MAX_FBUFF + 1], namebuf[MAX_FBUFF + 1];
+	char			pblkbuf[MAX_FN_LEN + 1], statbuf[MAX_FN_LEN + 1], namebuf[MAX_FN_LEN + 1];
 	char			*chptr, chr;
 	int			status, fextlen, fnamlen, object_count;
 	mstr			objdir, rtnname;
@@ -97,7 +97,7 @@ void op_zrupdate(int argcnt, ...)
 	/* Initialize pblk with information about the pattern in the argument to ZRUPDATE. */
 	memset(&pblk, 0, SIZEOF(pblk));
         pblk.buffer = pblkbuf;
-	pblk.buff_size = (unsigned char)(MAX_FBUFF);	/* Pass size of buffer - 1 (standard protocol for parse_file). */
+	pblk.buff_size = (unsigned char)(MAX_FN_LEN);	/* Pass size of buffer - 1 (standard protocol for parse_file). */
 	pblk.def1_buf = DOTOBJEXT;			/* Default .o file type if not specified. */
 	pblk.def1_size = SIZEOF(DOTOBJEXT) - 1;
 	pblk.fop = F_SYNTAXO;				/* Syntax check only - bypass directory / file existence check. */

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -18,14 +19,15 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-#include "gtm_stdio.h"		/* for SPRINTF() atleast */
+#include "gtm_stdio.h"		/* for SNPRINTF() atleast */
 #include "gtm_time.h"
+#include "gtm_signal.h"
 #include "have_crit.h"
-#include <signal.h>
-
 #include "gtcm.h"
 
 GBLREF omi_conn *curr_conn;
+
+#define	MAX_HIST_REC_LEN	256 + 1
 
 /* init_omi_hist - Set up the next OMI history record */
 void init_hist(void)
@@ -115,7 +117,7 @@ void save_rc_rsp(char *buff, int len)
 
 void dump_omi_rq(void)
 {
-    char	msg[256];
+    char	msg[MAX_HIST_REC_LEN];
     char	*then;
     omi_conn	*temp;
 
@@ -123,7 +125,7 @@ void dump_omi_rq(void)
     then[24] = '\0';
     if (omi_hist_num < 0)   /* no history? */
 	return;
-    SPRINTF(msg,
+    SNPRINTF(msg, MAX_HIST_REC_LEN,
 	    "OMI Rq dump: %ld / %s Lg size %d conn %d",
 	    omi_hist[omi_hist_num].timestamp, then,
 	    omi_hist[omi_hist_num].req_len, omi_hist[omi_hist_num].conn);
@@ -134,7 +136,7 @@ void dump_omi_rq(void)
 void dump_rc_hist(void)
 {
 	int	i;
-	char	msg[256];
+	char	msg[MAX_HIST_REC_LEN + 1];
 	char	*then;
 
 	if (rc_hist_num < 0)	/* no history? */
@@ -149,12 +151,12 @@ void dump_rc_hist(void)
 			then[24] = '\0'; /* eliminate newline */
 			if (rc_hist[i].toobigflag)
 			{
-				SPRINTF(msg,
+				SNPRINTF(msg, MAX_HIST_REC_LEN,
 				"RC Rq history: %ld / %s Lg size %d conn %d",
 					rc_hist[i].timestamp, then,
 					rc_hist[i].req_len, rc_hist[i].conn);
 				gtcm_pktdmp(rc_hist[i].req, 0, msg);
-				SPRINTF(msg,
+				SNPRINTF(msg, MAX_HIST_REC_LEN,
 				"RC Aq history: %ld / %s Lg size %d conn %d",
 					rc_hist[i].timestamp, then,
 					rc_hist[i].rsp_len, rc_hist[i].conn);
@@ -162,14 +164,14 @@ void dump_rc_hist(void)
 			}
 			else
 			{
-				SPRINTF(msg,
+				SNPRINTF(msg, MAX_HIST_REC_LEN,
 				"RC Rq history: %ld / %s size %d conn %d",
 					rc_hist[i].timestamp, then,
 					rc_hist[i].req_len, rc_hist[i].conn);
 				gtcm_pktdmp(rc_hist[i].req,
 					    rc_hist[i].req_len,
 					    msg);
-				SPRINTF(msg,
+				SNPRINTF(msg, MAX_HIST_REC_LEN,
 				"RC Aq history: %ld / %s size %d conn %d",
 					rc_hist[i].timestamp, then,
 					rc_hist[i].rsp_len, rc_hist[i].conn);

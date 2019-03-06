@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information 	*
+ * Copyright (c) 2001-2019 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -1523,4 +1523,12 @@ const static readonly int error_ansi[] = {
 	   0,	/* MLKHASHRESIZEFAIL */
 	   0,	/* MLKCLEANED */
 	   0,	/* NOTMNAME */
+	   0,	/* DEVNAMERESERVED */
+	   0,	/* ORLBKREL */
+	   0,	/* ORLBKRESTART */
+	   0,	/* UNIQNAME */
+	   0,	/* APDINITFAIL */
+	   0,	/* APDCONNFAIL */
+	   0,	/* APDLOGFAIL */
+	   0,	/* STATSDBMEMERR */
 	};

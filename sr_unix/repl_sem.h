@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2006, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _REPL_SEM_H
-#define _REPL_SEM_H
+#ifndef REPL_SEM_H_INCLUDED
+#define REPL_SEM_H_INCLUDED
 
 #include "repl_sem_sp.h"
 

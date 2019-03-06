@@ -104,7 +104,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t        cnl;
 	cache_que_head_ptr_t	q0, base, crwipq = NULL;
-	int4			count, dummy_errno, i, k, max_count, n, save_errno = 0;
+	int4			count, dummy_errno, flsh_trigger, i, k, max_count, n, save_errno = 0;
 	uint4			lcnt, size, to_wait, to_msg, this_idx;
 	wcs_conflict_trace_t	wcs_conflict_trace[WCS_CONFLICT_TRACE_ARRAYSIZE];
 	cache_rec		cr_contents;
@@ -128,7 +128,8 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 		return TRUE;
 	}
 	asyncio = csd->asyncio;
-	csd->flush_trigger = MAX(csd->flush_trigger - MAX(csd->flush_trigger / STEP_FACTOR, 1), MIN_FLUSH_TRIGGER(csd->n_bts));
+	flsh_trigger = csd->flush_trigger;
+	csd->flush_trigger = MAX(flsh_trigger - MAX(flsh_trigger / STEP_FACTOR, 1), MIN_FLUSH_TRIGGER(csd->n_bts));
 	/* Routine actually serves two purposes:
 	 *	1 - Free up required number of buffers or
 	 *	2 - Free up a specific buffer

@@ -525,6 +525,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				assert(NULL != csa->critical);
 				/* as long as csa->hold_onto_crit is FALSE, we should have released crit if we held it at entry */
 				assert(!csa->now_crit || csa->hold_onto_crit);
+#				ifndef CRIT_USE_PTHREAD_MUTEX
 				/* Note: Do not release crit if we still hold it. As we want the next process to grab crit to invoke
 				 * "mutex_salvage" (to cleanup stuff) in case we terminate while holding crit. Hence the below line
 				 * is commented out.
@@ -534,6 +535,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 				RELEASE_LATCH_IF_OWNER(&csa->critical->crashcnt_latch);
 				RELEASE_LATCH_IF_OWNER(&csa->critical->prochead.latch);
 				RELEASE_LATCH_IF_OWNER(&csa->critical->freehead.latch);
+#				endif
 			}	/* For all regions */
 		}	/* For all glds */
 		if (jnlpool_head)

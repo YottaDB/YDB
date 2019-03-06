@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __LKE_CLEARTREE_H__
-#define __LKE_CLEARTREE_H__
+#ifndef LKE_CLEARTREE_H_INCLUDED
+#define LKE_CLEARTREE_H_INCLUDED
 
 bool lke_cleartree(mlk_pvtctl_ptr_t pctl, struct CLB *lnk, mlk_shrblk_ptr_t tree, bool all,
 			bool interactive, int4 pid, mstr one_lock, boolean_t exact);

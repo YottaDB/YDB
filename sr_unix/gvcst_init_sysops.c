@@ -415,7 +415,7 @@ gd_region *dbfilopn(gd_region *reg)
 	unix_db_info		*tmp_udi, *udi;
 	parse_blk		pblk;
 	mstr			file;
-	char			*fnptr, fbuff[MAX_FBUFF + 1], tmpbuff[MAX_FBUFF + 1];
+	char			*fnptr, fbuff[MAX_FN_LEN + 1], tmpbuff[MAX_FN_LEN + 1];
 	struct stat		buf;
 	gd_region		*prev_reg, *save_gv_cur_region, *tmp_reg;
 	gd_segment		*seg;
@@ -443,7 +443,7 @@ gd_region *dbfilopn(gd_region *reg)
 	file.len = seg->fname_len;
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = fbuff;
-	pblk.buff_size = MAX_FBUFF;
+	pblk.buff_size = MAX_FN_LEN;
 	pblk.fop = (F_SYNTAXO | F_PARNODE);
 	memcpy(fbuff, file.addr, file.len);
 	*(fbuff + file.len) = '\0';
@@ -717,8 +717,11 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 	gd_region		*baseDBreg;
 	sgmnt_addrs		*baseDBcsa;
 	node_local_ptr_t	baseDBnl;
-	DEBUG_ONLY(int		i);
-	DEBUG_ONLY(char 	*ptr);
+#	ifdef DEBUG
+	int			i;
+	char 			*ptr;
+#	endif
+
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1242,7 +1245,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 			DSE_VERIFY_AND_RESTORE(csa, tsd, blk_size);
 		}
 	}
-	csa->critical = (mutex_struct_ptr_t)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
+	csa->critical = (CRIT_PTR_T)(csa->db_addrs[0] + NODE_LOCAL_SIZE);
 	assert(((INTPTR_T)csa->critical & 0xf) == 0); /* critical should be 16-byte aligned */
 #	ifdef CACHELINE_SIZE
 	assert(0 == ((INTPTR_T)csa->critical & (CACHELINE_SIZE - 1)));

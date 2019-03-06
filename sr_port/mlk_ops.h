@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __MLK_OPS_H__
-#define __MLK_OPS_H__
+#ifndef MLK_OPS_H_INCLUDED
+#define MLK_OPS_H_INCLUDED
 
 /* mlk_ops.h */
 
@@ -82,8 +82,7 @@ static inline void grab_lock_crit_intl(mlk_pvtctl_ptr_t pctl, boolean_t *ret_was
 	csa = pctl->csa;
 	if (csa->lock_crit_with_db)
 	{
-		if (csa->critical)
-			crash_count = csa->critical->crashcnt;
+		UPDATE_CRASH_COUNT(csa, crash_count);
 		if (!(*ret_was_crit = csa->now_crit))		/* WARNING assignment */
 			grab_crit(pctl->region);
 	} else

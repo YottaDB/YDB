@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __FGNCAL_H__
-#define __FGNCAL_H__
+#ifndef FGNCAL_H_INCLUDED
+#define FGNCAL_H_INCLUDED
 
 mval *fgncal_lookup(mval *x);
 void fgncal_unwind(void);

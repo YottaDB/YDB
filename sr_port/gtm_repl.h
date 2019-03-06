@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2016 Fidelity National Information	*
+ * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,9 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _GTM_REPL_H
-#define _GTM_REPL_H
-
+#ifndef GTM_REPL_H_INCLUDED
+#define GTM_REPL_H_INCLUDED
 #ifdef GTM_TLS
 #include "gtm_tls.h"
 

@@ -76,7 +76,7 @@ int gtmrecv_comm_init(in_port_t port)
 
 	/* Make it known to the world that you are ready for a Source Server */
 	SERVER_HINTS(hints, af);
-	SPRINTF(port_buffer, "%hu", port);
+	SNPRINTF(port_buffer, NI_MAXSERV, "%hu", port);
 	if (0 != (errcode = getaddrinfo(NULL, port_buffer, &hints, &ai_ptr)))
 	{
 		CLOSEFILE(temp_sock_fd, rc);

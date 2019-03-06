@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2017 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -204,6 +204,10 @@ if ( $?gtm_version_change == "1" ) then
 		endif
 	endif
 
+	# TODO: integrate a build option to use these on demand
+	setenv gt_cc_option_DDEBUG_scan "-DBYPASS_MEMCPY_OVERRIDE -DSTATIC_ANALYSIS"
+	if ($?scan_image) setenv gt_cc_option_DDEBUG	"$gt_cc_option_DDEBUG $gt_cc_option_DDEBUG_scan"
+
 	# -fno-defer-pop to prevent problems with assembly/generated code with optimization
 	# -fno-strict-aliasing since we don't comply with the rules
 	# -ffloat-store for consistent results avoiding rounding differences
@@ -217,11 +221,20 @@ if ( $?gtm_version_change == "1" ) then
 			setenv  gt_cc_option_optimize "$gt_cc_option_optimize -march=i586"
 		endif
 	endif
-	# -g	generate debugging information for dbx (no longer overrides -O)
-	setenv	gt_cc_option_debug	"-g"
+
+	# Debugging options:
+	setenv	gt_cc_option_debug	"-g "
+	# Override the default debug settings for third party source code scans WARNING: these builds are HUGE
+	# -g3		generate debugging information including macros
+	# -O0		drop optimizations for alternate debuggers
+	# -fno-builtin	avoid using compiler built-in functions for alternate debuggers
+	# -gdwarf-2	DWARF version 2 debugging (version 4, was release in 2010)
+	setenv	gt_cc_option_debug_scan	"-g3 -gdwarf-2 -O0 -fno-builtin "
 	if ( "cygwin" == $platform_only ) then
-		setenv gt_cc_option_debug "$gt_cc_option_debug -gdwarf-2 -fno-inline -fno-inline-functions"
+		setenv gt_cc_option_debug	"$gt_cc_option_debug -gdwarf-2 -fno-inline -fno-inline-functions"
+		setenv gt_cc_option_debug_scan	"$gt_cc_option_debug_scan -fno-inline -fno-inline-functions"
 	endif
+	if ($?scan_image) setenv gt_cc_option_debug	"$gt_cc_option_debug_scan"
 
 	# Linker definitions:
 	setenv	gt_ld_linker		"$gt_cc_compiler" # redefine to use new C compiler definition

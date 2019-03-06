@@ -187,7 +187,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 					return NULL;
 				}
 				/* for connection socket */
-				SPRINTF(port_buffer, "%hu", port);
+				SNPRINTF(port_buffer, NI_MAXSERV, "%hu", port);
 				addrlen = last_2colon - sockaddr;
 				if ('[' == sockaddr[0])
 				{

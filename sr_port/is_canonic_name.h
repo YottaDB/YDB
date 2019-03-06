@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,8 @@ MBSTART {									\
 	int		error_len;						\
 	unsigned char	*error_chr;						\
 										\
-	ENSURE_STP_FREE_SPACE(ZWR_EXP_RATIO((MVAL)->str.len));			\
+	error_len = ZWR_EXP_RATIO((MVAL)->str.len);				\
+	ENSURE_STP_FREE_SPACE(error_len);					\
 	DBG_MARK_STRINGPOOL_UNEXPANDABLE;					\
 	format2zwr((sm_uc_ptr_t)(MVAL)->str.addr, (MVAL)->str.len,		\
 		   (uchar_ptr_t)stringpool.free, &error_len);			\

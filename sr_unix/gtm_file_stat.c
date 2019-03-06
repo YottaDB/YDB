@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,7 @@ int gtm_file_stat(mstr *file, mstr *def, mstr *ret, boolean_t check_prv, uint4 *
 {
 	int 		stat_res;
         struct stat	stat_buf;
-	char		fbuff[MAX_FBUFF + 1];
+	char		fbuff[MAX_FN_LEN + 1];
 	parse_blk	pblk;
 	mstr		tmp_str, *tmpfile;
 	boolean_t	file_not_found = FALSE;
@@ -50,7 +50,7 @@ int gtm_file_stat(mstr *file, mstr *def, mstr *ret, boolean_t check_prv, uint4 *
 	{
 		memset(&pblk, 0, SIZEOF(pblk));
 		pblk.buffer = fbuff;
-		pblk.buff_size = MAX_FBUFF;
+		pblk.buff_size = MAX_FN_LEN;
 		pblk.fop = (F_SYNTAXO | F_PARNODE);
 		memcpy(fbuff, file->addr, file->len);
 		*(fbuff + file->len) = '\0';

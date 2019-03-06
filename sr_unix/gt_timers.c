@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -725,7 +725,8 @@ STATICFNDEF void timer_handler(int why)
 		if (tpop->safe && (TREF(continue_proc_cnt) == last_continue_proc_cnt)
 			&& !(gtm_white_box_test_case_enabled
 				&& ((WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == gtm_white_box_test_case_number)
-					|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number))))
+				|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number)
+				|| (WBTEST_OINTEG_WAIT_ON_START == gtm_white_box_test_case_number))))
 		{	/* Check if the timer is extremely overdue, with the following exceptions:
 			 *	- Unsafe timers can be delayed indefinitely.
 			 *	- AIX systems tend to arbitrarily delay processes when loaded.

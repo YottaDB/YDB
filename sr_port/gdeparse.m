@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2010-2017 Fidelity National Information		;
+; Copyright (c) 2010-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -68,18 +68,18 @@ TFSPECP						; scan filespec token by token
 	s filespec=$ze(comline,cp1,cp1+i-1),cp=cp1+i
 	q
 TACCMETH
-	d GETTOK^GDESCAN
-	i toktype'="TKIDENT" zm gdeerr("VALUEBAD"):token:qual
-	s value=$tr(token,lower,upper)
-	i '$data(typevalue("STR2NUM","TACCMETH",value)) zm gdeerr("VALUEBAD"):token:qual
-	q
+	do GETTOK^GDESCAN
+	zmessage:(("TKIDENT"'=toktype)&("TKSTRLIT"'=toktype)) gdeerr("VALUEBAD"):token:qual
+	set value=$zconvert(token,"U")
+	zmessage:'$data(typevalue("STR2NUM","TACCMETH",value)) gdeerr("VALUEBAD"):token:qual
+	quit
 TNULLSUB
-	d GETTOK^GDESCAN
-	i toktype'="TKIDENT" zm gdeerr("VALUEBAD"):token:qual
-	s value=$tr(token,lower,upper)
-	i '$data(typevalue("STR2NUM","TNULLSUB",value)) zm gdeerr("VALUEBAD"):token:qual
-	s value=typevalue("STR2NUM","TNULLSUB",value)
-	q
+	do GETTOK^GDESCAN
+	zmessage:(("TKIDENT"'=toktype)&("TKSTRLIT"'=toktype)) gdeerr("VALUEBAD"):token:qual
+	set value=$zconvert(token,"U")
+	zmessage:'$data(typevalue("STR2NUM","TNULLSUB",value)) gdeerr("VALUEBAD"):token:qual
+	set value=typevalue("STR2NUM","TNULLSUB",value)
+	quit
 TREGION
 	n REGION d REGION s value=REGION
 	q
@@ -308,17 +308,18 @@ collundeferr
 	zm gdeerr("GBLNAMCOLLUNDEF"):coll:gblname
 	q
 strsub:(sub,subcnt)
-	n state,xstr,len,iszchar,istart,x,y	; iszchar and istart are initialized in lower level invocations
+	new state,xstr,len,iszchar,istart,x,y	; iszchar and istart are initialized in lower level invocations
 						; but needed outside that frame too hence the new done here (in parent)
-	n retsub	; the subscript that is returned after doing $c() transformations
-	n i,previ,doublequote
+	new retsub	; the subscript that is returned after doing $c() transformations
+	new i,previ,doublequote
 	; check if string subscript is properly formatted. done using a DFA.
-	s state=0,len=$zl(sub),doublequote="""",retsub=doublequote
-	f i=1:1:len s c=$ze(sub,i) d @state
+	set state=0,len=$zlength(sub),doublequote="""",retsub=""
+	for i=1:1:len set c=$zextract(sub,i) do @state
 	; check if state is terminating
-	i (state'=2)&(state'=6) zm gdeerr("NAMNOTSTRSUBS"):subcnt:sub
-	i (state=2) s retsub=retsub_$ze(sub,previ,i-1)
-	q retsub_doublequote
+	zmessage:((state'=2)&(state'=6)) gdeerr("NAMNOTSTRSUBS"):subcnt:sub
+	set:(state=2) retsub=retsub_$zextract(sub,previ,i-1)
+	; if retsub is a canonical number, strip off the double quotes and return it as a number
+	quit $select(retsub=+retsub:retsub,1:doublequote_retsub_doublequote)
 0	;
 	i c=doublequote s state=1,previ=i+1
 	e  i c="$" s state=3

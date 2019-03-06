@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,7 @@ MBSTART {					\
 } MBEND
 
 /* note: returns 0 on success */
-uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
+uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff, size_t buff_len)
 {
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -123,7 +123,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 	CHECK_JNL_FILE_IS_USABLE(header, jpc->status, FALSE, 0, NULL);	/* FALSE => NO gtm_putmsg even if errors */
 	if (SS_NORMAL != jpc->status)
 	{
-		sgtm_putmsg(buff, VARLSTCNT(7) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);
+		sgtm_putmsg(buff, buff_len, VARLSTCNT(7) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), jpc->status);
 		RETURN_AND_SET_JPC(ERR_JNLOPNERR, jpc->status, buff);
 	}
 	end_of_data = header->end_of_data;
@@ -141,7 +141,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 	if (header->prev_recov_end_of_data)
 	{
 		/* not possible for run time. In case it happens user must fix it */
-		sgtm_putmsg(buff, VARLSTCNT(7) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), ERR_JNLPREVRECOV);
+		sgtm_putmsg(buff, buff_len, VARLSTCNT(7) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), ERR_JNLPREVRECOV);
 		RETURN_AND_SET_JPC(ERR_JNLOPNERR, ERR_JNLPREVRECOV, buff);
 	}
 	if (!is_gdid_file_identical(&FILE_ID(reg), (char *)header->data_file_name, header->data_file_name_length))
@@ -153,7 +153,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 	memcpy(&eof_record, (unsigned char *)eof_rec_buffer + adjust, EOF_RECLEN);
 	if (JRT_EOF != eof_record.prefix.jrec_type)
 	{
-		sgtm_putmsg(buff, VARLSTCNT(7) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), ERR_JNLRECTYPE);
+		sgtm_putmsg(buff, buff_len, VARLSTCNT(7) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg), ERR_JNLRECTYPE);
 		RETURN_AND_SET_JPC(ERR_JNLOPNERR, ERR_JNLRECTYPE, buff);
 	}
 	if (eof_record.prefix.tn != csd->trans_hist.curr_tn)
@@ -162,14 +162,14 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 			status = ERR_JNLTRANSLSS;
 		else
 			status = ERR_JNLTRANSGTR;
-		sgtm_putmsg(buff, VARLSTCNT(10) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
+		sgtm_putmsg(buff, buff_len, VARLSTCNT(10) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
 				status, 2, &eof_record.prefix.tn, &csd->trans_hist.curr_tn);
 		RETURN_AND_SET_JPC(ERR_JNLOPNERR, status, buff);
 	}
 	if (eof_record.suffix.suffix_code != JNL_REC_SUFFIX_CODE ||
 		eof_record.suffix.backptr != eof_record.prefix.forwptr)
 	{
-		sgtm_putmsg(buff, VARLSTCNT(11) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
+		sgtm_putmsg(buff, buff_len, VARLSTCNT(11) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
 				ERR_JNLBADRECFMT, 3, JNL_LEN_STR(csd), adjust);
 		RETURN_AND_SET_JPC(ERR_JNLOPNERR, ERR_JNLBADRECFMT, buff);
 	}
@@ -178,7 +178,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 		 * MUPIP REORG -ENCRYPT, which switches the journal file upon changing encryption-specific fields in the file
 		 * header, thus temporarily violating this expectation.
 		 */
-		sgtm_putmsg(buff, VARLSTCNT(12) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
+		sgtm_putmsg(buff, buff_len, VARLSTCNT(12) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
 				ERR_CRYPTJNLMISMATCH, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
 		RETURN_AND_SET_JPC(ERR_JNLOPNERR, ERR_CRYPTJNLMISMATCH, buff);
 	}
@@ -194,7 +194,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 	if ((ROUND_UP2((header_virtual_size * DISK_BLOCK_SIZE), jnl_fs_block_size) < os_file_size)
 		|| (header->jnl_deq && 0 != ((header_virtual_size - header->jnl_alq) % header->jnl_deq)))
 	{
-		sgtm_putmsg(buff, VARLSTCNT(14) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
+		sgtm_putmsg(buff, buff_len, VARLSTCNT(14) ERR_JNLOPNERR, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg),
 				ERR_JNLVSIZE, 7, JNL_LEN_STR(csd), header->virtual_size,
 					header->jnl_alq, header->jnl_deq, os_file_size, jnl_fs_block_size);
 		RETURN_AND_SET_JPC(ERR_JNLOPNERR, ERR_JNLVSIZE, buff);
@@ -260,7 +260,7 @@ uint4 jnl_file_open_common(gd_region *reg, off_jnl_t os_file_size, char *buff)
 	memcpy(&header->who_opened, prc_vec, SIZEOF(jnl_process_vector));
 	if (header->is_not_latest_jnl)
 	{	/* Magic message to indicate that we should try a switch without cutting links. */
-		sgtm_putmsg(buff, VARLSTCNT(6) ERR_JNLSWITCHRETRY, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
+		sgtm_putmsg(buff, buff_len, VARLSTCNT(6) ERR_JNLSWITCHRETRY, 4, JNL_LEN_STR(csd), DB_LEN_STR(reg));
 		RETURN_AND_SET_JPC(ERR_JNLSWITCHRETRY, 0, buff);
 	}
 	header->crash = TRUE;	/* in case this processes is crashed, this will remain TRUE */

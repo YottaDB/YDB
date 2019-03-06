@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,7 +75,7 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 	 */
 	save_cmd_ary = cmd_ary;
 	cmd_ary = &mumps_cmd_ary[0];
-	cli_str_setup((SIZEOF(COMMAND) + quals->len), cbuf);
+	cli_str_setup((uint4)(SIZEOF(COMMAND) + quals->len), cbuf);
 	parse_ret = parse_cmd();
 	if (parse_ret)
 	{
@@ -196,6 +196,12 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 	{
 		save_qlf = glb_cmd_qlf.qlf;
 		glb_cmd_qlf.qlf = cmd_qlf.qlf;
+#		ifdef DEBUG
+		if (!cmd_qlf.list_file.str.len && (CLI_PRESENT == cli_present("LIST")))
+			cmd_qlf.list_file.str.len = MAX_FN_LEN;
+		if (!cmd_qlf.ceprep_file.str.len && (CLI_PRESENT == cli_present("CE_PREPROCESS")))
+			cmd_qlf.ceprep_file.str.len = MAX_FN_LEN;
+#		endif
 	} else if (save_qlf)
 		glb_cmd_qlf.qlf = save_qlf;
 	return;

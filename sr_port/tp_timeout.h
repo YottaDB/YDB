@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __TP_TIMEOUT_H__
-#define __TP_TIMEOUT_H__
+#ifndef TP_TIMEOUT_H_INCLUDED
+#define TP_TIMEOUT_H_INCLUDED
 
 /* Uncomment below to enable tptimeout defer trace */
 /* #define DEBUG_TPTIMEOUT_DEFERRAL */

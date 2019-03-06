@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,6 +84,7 @@ typedef enum
 #define	ADD_SET_NOCHNG_KILL_TRIG	-7
 #define	OPTIONS_CMDS_CONFLICT		-8
 #define	NAME_CMDS_CONFLICT		-9
+#define AUTO_NAME_GEN_FAIL		-10
 
 #define CONV_TO_ZWR(LEN, PTR, OUT_LEN, OUT_STR)						\
 {											\
@@ -102,6 +103,7 @@ typedef enum
 	int		out_len;							\
 	unsigned char	out_str[MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE];			\
 											\
+	out_len = MAX_ZWR_EXP_RATIO * OUT_BUFF_SIZE;					\
 	CONV_TO_ZWR_AND_PRINT(STR, LEN, PTR, out_len, out_str);				\
 }
 

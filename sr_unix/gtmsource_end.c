@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,6 @@
 #include "gtmsource.h"
 #include "repl_dbg.h"
 #include "gtm_stdio.h"
-#include "gtm_event_log.h"
 #include "repl_shutdcode.h"
 #include "eintr_wrappers.h"
 #include "jnl.h"
@@ -134,7 +133,6 @@ int gtmsource_end1(boolean_t auto_shutdown)
 		 repl_source_data_sent, repl_source_msg_sent, repl_source_cmp_sent);
 	if (gtmsource_filter & EXTERNAL_FILTER)
 		repl_stop_filter();
-	gtm_event_log_close();
 	if (auto_shutdown)
 		return (exit_status);
 	else

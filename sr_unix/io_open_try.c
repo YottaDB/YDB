@@ -485,7 +485,8 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 		{
 			if ((ff == tl->iod->type) && filecreated)
 			{	/* The FIFO didn't really exist so remove all traces of it */
-				UNLINK(tl->iod->trans_name->dollar_io);
+				status = UNLINK(tl->iod->trans_name->dollar_io);
+				assert(!status);
 				tl->iod->type = rm;
 				remove_rms(tl->iod);
 			}

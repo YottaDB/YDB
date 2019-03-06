@@ -43,13 +43,13 @@ void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix)
 	mlk_shrsub_ptr_t	dsub;
 	mlk_prcblk_ptr_t	pending;
 	char			temp[MAX_ZWR_KEY_SZ + 1];
-	char			new_prefix[KDIM+2];
+	char			new_prefix[KDIM + 2];
 	hash128_state_t		hs;
 	uint4			total_len;
 	gtm_uint16		hashres;
 	uint4			hash;
 
-	SPRINTF(new_prefix, "	%s", prefix);
+	SNPRINTF(new_prefix, KDIM + 2, "	%s", prefix);
 	for (b = bhead, bnext = 0; bnext != bhead; b = bnext)
 	{
 		dsub = (mlk_shrsub_ptr_t)R2A(b->value);

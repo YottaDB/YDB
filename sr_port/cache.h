@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,8 +53,9 @@ typedef struct ihead_struct
  * Current default limits (overrideable by environment variable): 128 entries, 128KB of object code on all platforms
  * except IA64 architecture which gets 256KB due to its less compact instruction forms.
  */
-#define MAX_CACHE_MEMSIZE	(IA64_ONLY(256) NON_IA64_ONLY(128))
-#define MAX_CACHE_ENTRIES	128
+#define DEFAULT_INDRCACHE_KBSIZE	128
+#define MAX_INDRCACHE_KBSIZE		2048
+#define DEFAULT_INRDCACHE_ENTRIES	128
 
 void indir_lits(ihdtyp *ihead);
 void cache_init(void);

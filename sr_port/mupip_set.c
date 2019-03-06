@@ -114,8 +114,10 @@ void mupip_set(void)
 		|| (CLI_PRESENT == cli_present("STATS"))
 		|| (CLI_PRESENT == cli_present("STDNULLCOLL"))
 		|| (CLI_NEGATED == cli_present("STDNULLCOLL"))
+		|| (CLI_PRESENT == cli_present("TRIGGER_FLUSH_LIMIT"))
 		|| (CLI_PRESENT == cli_present("VERSION"))
-		|| (CLI_PRESENT == cli_present("WAIT_DISK")))
+		|| (CLI_PRESENT == cli_present("WAIT_DISK"))
+		|| (CLI_PRESENT == cli_present("WRITES_PER_FLUSH")))
 	{
 		if (SS_NORMAL != (status = mupip_set_file(db_fn_len, db_fn)))
 			mupip_exit(status);

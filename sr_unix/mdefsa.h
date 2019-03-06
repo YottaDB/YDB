@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,7 @@ MBSTART {							\
 		status = 0;					\
 } MBEND
 
+#define	DOT_CHAR	"."
 #define DOTM			".m"
 #define DOTOBJ			".o"
 #define GTM_DIST		"gtm_dist"
@@ -35,14 +36,7 @@ MBSTART {							\
 #define	ICU_LIBFLAGS		(RTLD_NOW | RTLD_GLOBAL)
 
 #define	ICU_LIBNAME_ROOT		"libicuio"
-#ifdef __hpux
-#  ifdef __ia64
-#	define GTMSHR_IMAGE_NAME	"libgtmshr.so"
-#  else
-#	define GTMSHR_IMAGE_NAME	"libgtmshr.sl"
-#  endif
-#	define	ICU_LIBNAME_EXT		"sl"
-#elif defined(__MVS__)
+#if defined(__MVS__)
 #	define GTMSHR_IMAGE_NAME	"libgtmshr.dll"
 #	define	ICU_LIBNAME_EXT		"so"
 #elif defined(__CYGWIN__)
@@ -56,12 +50,20 @@ MBSTART {							\
 	 */
 #		define	ICU_LIBNAME_EXT	"a"
 	/* AIX system default ICU library uses a different convention for the library name */
-#		define	ICU_LIBNAME_DEF	ICU_LIBNAME_ROOT "." ICU_LIBNAME_EXT "(shr_64.o)"
+#		define	AIX_SHR_64	"(shr_64.o)"	/* Could also be "(libicuio.so)" */
+#		define	ICU_LIBNAME_DEF	ICU_LIBNAME_ROOT "." ICU_LIBNAME_EXT AIX_SHR_64
+#		define	LIBRARY_PATH_MAX (GTM_PATH_MAX - SIZEOF(AIX_SHR_64))
 #	else
 #		define	ICU_LIBNAME_EXT	"so"
 #	endif
 #endif
+#ifndef LIBRARY_PATH_MAX
+#define	LIBRARY_PATH_MAX GTM_PATH_MAX
+#endif
 #define	ICU_LIBNAME	ICU_LIBNAME_ROOT "." ICU_LIBNAME_EXT
+
+#define	GTM_PLUGIN_FMT_SHORT	"%s/plugin/"
+#define	GTM_PLUGIN_FMT_FULL	"%s/plugin/%s"
 
 #define GTM_MAIN_FUNC		"gtm_main"
 

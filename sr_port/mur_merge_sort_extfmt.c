@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2017 Fidelity National Information	*
+ * Copyright (c) 2015-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -321,7 +321,10 @@ int mur_merge_sort_extfmt(void)
 				fn_len++;	/* for the '_' */
 				reg = rctl->gd;
 				is_dummy_gbldir = reg->owning_gd->is_dummy_gbldir;
-				if (!is_dummy_gbldir)
+				if (mur_options.extr_fn_is_devnull[recstat])
+				{	/* We don't create any temporary file when NULL device is specified as o/p */
+					fn_len--;	/* revert the fn_len++ done for '_' */
+				} else if (!is_dummy_gbldir)
 				{
 					assert(reg->rname_len);
 					fn_len += reg->rname_len;
@@ -341,18 +344,25 @@ int mur_merge_sort_extfmt(void)
 				/* Now adjust the file name to be region-specific. Add a region-name suffix.
 				 * If no region-name is found, add region #.
 				 */
-				tmplen = file_info->fn_len;
-				ptr = &file_info->fn[tmplen];
-				*ptr++ = '_'; tmplen++;
-				if (!is_dummy_gbldir)
-				{
-					memcpy(ptr, reg->rname, reg->rname_len);
-					tmplen += reg->rname_len;
+				if (!mur_options.extr_fn_is_devnull[recstat])
+				{	/* Don't rename for "DEVNULL". No temporary file is needed */
+					tmplen = file_info->fn_len;
+					ptr = &file_info->fn[tmplen];
+					*ptr++ = '_'; tmplen++;
+					if (!is_dummy_gbldir)
+					{
+						memcpy(ptr, reg->rname, reg->rname_len);
+						tmplen += reg->rname_len;
+					} else
+						tmplen += SNPRINTF(ptr, fn_len - tmplen, "%d", rctl - &mur_ctl[0]);
+					file_info->fn_len = tmplen;
+					assert(tmplen + 1 <= fn_len);	/* assert allocation is enough and no overflows */
 				} else
-					tmplen += SPRINTF(ptr, "%d", rctl - &mur_ctl[0]);
-				file_info->fn_len = tmplen;
-				file_info->fn[tmplen] = '\0';
-				assert(tmplen + 1 <= fn_len);	/* assert allocation is enough and no overflows */
+				{
+					assert(file_info->fn_len == STR_LIT_LEN(DEVNULL));
+					assert(0 == STRNCMP_LIT(file_info->fn, DEVNULL));
+				}
+				file_info->fn[file_info->fn_len] = '\0';
 			}
 		}
 		for (rctl = rctl_start, shm_rctl = mur_shm_hdr->shm_rctl_start; rctl < rctl_top; rctl++, shm_rctl++)
@@ -476,8 +486,10 @@ int mur_merge_sort_extfmt(void)
 						if (!mur_options.extr_fn_is_stdout[recstat])
 						{
 							rename_fn_len = ARRAYSIZE(rename_fn);
-							if (RENAME_FAILED == rename_file_if_exists(fn_out, extr_fn_len,
-											rename_fn, &rename_fn_len, &status))
+							/* Don't rename DEVNULL */
+							if (!mur_options.extr_fn_is_devnull[recstat] && (RENAME_FAILED ==
+								rename_file_if_exists(fn_out, extr_fn_len, rename_fn,
+									 &rename_fn_len, &status)))
 							{
 								assert(FALSE);
 								save_errno = status;
@@ -498,8 +510,9 @@ int mur_merge_sort_extfmt(void)
 									ERR_SYSCALL, 5, LEN_AND_STR(errstr), CALLFROM, save_errno);
 								goto cleanup;
 							}
-							gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILECREATE, 4,
-								LEN_AND_STR(ext_file_type[recstat]), extr_fn_len, extr_fn);
+							if (!mur_options.extr_fn_is_devnull[recstat]) /* not reqd if NULL device */
+								gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILECREATE, 4,
+									LEN_AND_STR(ext_file_type[recstat]), extr_fn_len, extr_fn);
 						} else
 							fp_out = stdout;
 						assert(NULL != fp_out);
@@ -529,7 +542,7 @@ int mur_merge_sort_extfmt(void)
 				}
 				fp = fp_array[index];
 				GTM_FREAD(buff, 1, jm_size, fp, ret_size, save_errno);
-				if (ret_size < jm_size)
+				if ((ret_size < jm_size) && !mur_options.extr_fn_is_devnull[recstat])
 				{
 					assert(FALSE);
 					rctl = &rctl_start[index];
@@ -550,7 +563,7 @@ int mur_merge_sort_extfmt(void)
 				}
 				buff[jm_size] = '\0';
 				GTM_FWRITE(buff, 1, jm_size, fp_out, ret_size, save_errno);
-				if (ret_size < jm_size)
+				if ((ret_size < jm_size) && !mur_options.extr_fn_is_devnull[recstat])
 				{
 					assert(FALSE);
 					assert(save_errno);
@@ -601,9 +614,10 @@ cleanup:
 				continue;
 			fn = ((fi_type *)rctl->file_info[recstat])->fn;
 			assert('\0' != fn[0]);
-			MUR_JNLEXT_UNLINK(fn); /* Note: "fn" is cleared inside this macro so a later call to
-						* MUR_JNLEXT_UNLINK "mur_close_file_extfmt" will not try the UNLINK again.
-						*/
+			if (!mur_options.extr_fn_is_devnull[recstat])
+				MUR_JNLEXT_UNLINK(fn); /* Note: "fn" is cleared inside this macro so a later call to
+							* MUR_JNLEXT_UNLINK "mur_close_file_extfmt" will not try the UNLINK again.
+							*/
 			/* Do not clear "rctl->extr_file_created[recstat]" here as this is used later in
 			 * "mur_close_file_extfmt.c" to issue ERR_FILENOTCREATE message if appropriate.
 			 */

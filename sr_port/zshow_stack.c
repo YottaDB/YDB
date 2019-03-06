@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,14 +82,15 @@ void zshow_stack(zshow_out *output, boolean_t show_checksum)
 				line_reset = FALSE;
 			} else
 				addr = fp->mpc;
-			v.len = INTCAST(symb_line(addr, &buff[0], 0, fp->rvector) - &buff[0]);
+			v.len = INTCAST(symb_line(addr, &buff[0], SIZEOF(buff) - 1, 0, fp->rvector) - &buff[0]);
 			if (v.len == 0)
 			{
 				MEMCPY_LIT(&buff[0], UNK_LOC_MESS);
 				v.len = SIZEOF(UNK_LOC_MESS) - 1;
 			} /*else if (show_checksum && !(fp->type & SFT_DM)) Don't print noisy 000...000 checksum for GTM$DMOD */
 			/* {
-				v.len += SPRINTF(&buff[v.len], ":");
+				v .len += SNPRINTF(&buff[v.len],
+					MAX_ENTRYREF_LEN + MAX_ROUTINE_CHECKSUM_DIGITS + SIZEOF(INDR_OVERFLOW) - v.len, ":");
 				v.len += append_checksum(&buff[v.len], fp->rvector);
 			}*/
 			if (nfp != &nocount_frames[0])
@@ -142,6 +143,7 @@ void zshow_stack(zshow_out *output, boolean_t show_checksum)
 					 * where it is meaningful.
 					 */
 					buff[v.len++] = ':';
+					assert(SIZEOF(buff) >= (v.len + MAX_ROUTINE_CHECKSUM_DIGITS));
 					v.len += append_checksum(&buff[v.len], fp->rvector);
 				}
 				output->flush = TRUE;

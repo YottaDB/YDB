@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -337,7 +337,7 @@ enum cdb_sc	op_tcommit(void)
 						 */
 						SS_INIT_IF_NEEDED(csa, cnl);
 					} else
-						CLEAR_SNAPSHOTS_IN_PROG(csa);
+						SS_RELEASE_IF_NEEDED(csa, cnl);
 					read_before_image = ((NULL != jbp) || csa->backup_in_prog || SNAPSHOTS_IN_PROG(csa));
 					/* The following section allocates new blocks required by the transaction it is done
 					 * before going crit in order to reduce the change of having to wait on a read while crit.
@@ -487,10 +487,10 @@ enum cdb_sc	op_tcommit(void)
 				)
 				if (cdb_sc_gbloflow == status)
 				{
-					if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, gv_currkey, TRUE)))
-						end = &buff[MAX_ZWR_KEY_SZ - 1];
-					send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_GBLOFLOW, 0, ERR_GVIS, 2, end - buff, buff);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2,
+						DB_LEN_STR(cse->blk_target->gd_csa->region));
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GBLOFLOW, 2,
+						DB_LEN_STR(cse->blk_target->gd_csa->region));
 				} else if (!skip_invoke_restart)
 					INVOKE_RESTART;
 				GTMTRIG_ONLY(DBGTRIGR((stderr, "op_tcommit: Return status = %d\n", status));)

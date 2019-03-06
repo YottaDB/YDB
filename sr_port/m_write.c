@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,12 +33,13 @@ error_def(ERR_STRINGOFLOW);
 
 int m_write(void)
 {
-	char	*cp;
-	int	lnx;
-	mval	lit;
-	mstr	*msp;
-	oprtype	*oprptr, x;
-	triple	*litlst[128], **llptr, **ltop, **ptx, *ref, *t1;
+	boolean_t	concat_ok;
+	char		*cp;
+	int		lnx;
+	mstr		*msp;
+	mval		lit;
+	oprtype		*oprptr, x;
+	triple		*litlst[128], **llptr, **ltop, **ptx, *ref, *t1;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -68,6 +69,7 @@ int m_write(void)
 			STO_LLPTR(0);
 			break;
 		default:
+			concat_ok = ((0 != TREF(side_effect_handling)) || (TK_LPAREN != TREF(window_token)));
 			switch (expr(&x, MUMPS_STR))
 			{
 			case EXPR_FAIL:
@@ -79,7 +81,7 @@ int m_write(void)
 					ref = newtriple(OC_WRITE);
 					ref->operand[0] = x;
 					STO_LLPTR(0);
-				} else if (x.oprval.tref->opcode == OC_CAT)
+				} else if (concat_ok && (OC_CAT == x.oprval.tref->opcode))
 					wrtcatopt(x.oprval.tref, &llptr, LITLST_TOP);
 				else
 				{

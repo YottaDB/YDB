@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -159,14 +159,12 @@ void dse_all(void)
 			patch_curr_blk = get_dir_root();
 			if (crit)
 			{
-				UNIX_ONLY(gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY(csd), TRUE));
-				VMS_ONLY(mutex_init(cs_addrs->critical, NUM_CRIT_ENTRY(csd), TRUE));
+				gtm_mutex_init(gv_cur_region, NUM_CRIT_ENTRY(csd), TRUE);
 				cs_addrs->nl->in_crit = 0;
 				cs_addrs->hold_onto_crit = FALSE;	/* reset this just before cs_addrs->now_crit is reset */
 				cs_addrs->now_crit = FALSE;
 			}
-			if (cs_addrs->critical)
-				crash_count = cs_addrs->critical->crashcnt;
+			UPDATE_CRASH_COUNT(cs_addrs, crash_count);
 			if (freeze)
 			{
 				while (REG_ALREADY_FROZEN == region_freeze(gv_cur_region, TRUE, override, FALSE, FALSE, FALSE))

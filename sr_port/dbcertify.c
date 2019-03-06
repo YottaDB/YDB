@@ -32,12 +32,8 @@
 #include "gtm_stdlib.h"
 #include "gtm_signal.h"
 
-#ifdef UNIX
-# include "continue_handler.h"
-# include "sig_init.h"
-#else
-# include "desblk.h"		/* for desblk structure */
-#endif
+#include "continue_handler.h"
+#include "sig_init.h"
 #include "gdsroot.h"
 #include "v15_gdsroot.h"
 #include "gtm_facility.h"
@@ -64,14 +60,17 @@
 #include "op.h"
 #include "io.h"
 #include "wbox_test_init.h"
+#include "gtm_post_startup_check_init.h"
 
-GBLREF	boolean_t		gtm_utf8_mode;
-GBLREF	ch_ret_type		(*stpgc_ch)();				/* Function pointer to stp_gcol_ch */
 GBLREF	CLI_ENTRY		dbcertify_cmd_ary[];			/* define before the GBLDEF below */
-GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	mstr			default_sysid;
-GBLREF	spdesc			rts_stringpool, stringpool;
+GBLREF	char			gtm_dist[GTM_PATH_MAX];
+GBLREF	boolean_t		gtm_dist_ok_to_use;
+GBLREF	boolean_t		gtm_utf8_mode;
+GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	uint4			process_id;
+GBLREF	spdesc			rts_stringpool, stringpool;
+GBLREF	ch_ret_type		(*stpgc_ch)();				/* Function pointer to stp_gcol_ch */
 
 GBLDEF	CLI_ENTRY		*cmd_ary = &dbcertify_cmd_ary[0];	/* Define cmd_ary to be the DBCERTIFY specific cmd table */
 GBLDEF	phase_static_area	*psa_gbl;				/* Global anchor for static area */
@@ -116,6 +115,8 @@ int UNIX_ONLY(main)VMS_ONLY(dbcertify)(int argc, char **argv)
 	rts_stringpool = stringpool;
 	getjobname();
 	io_init(FALSE);
+	gtm_dist_ok_to_use = TRUE;	/* For RESTRICTED, but it is running alongside V4 and not the current, so lie */
+	gtm_post_startup_check_init();
 	OPERATOR_LOG_MSG;
 	/* Platform dependent method to get the option scan going and invoke necessary driver routine */
 	dbcertify_parse_and_dispatch(argc, argv);

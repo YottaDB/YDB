@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __JNL_WRITE_AIMG_REC_H__
-#define __JNL_WRITE_AIMG_REC_H__
+#ifndef JNL_WRITE_AIMG_REC_H_INCLUDED
+#define JNL_WRITE_AIMG_REC_H_INCLUDED
 
 void jnl_write_aimg_rec(sgmnt_addrs *csa, cw_set_element *cse, uint4 com_csum);
 

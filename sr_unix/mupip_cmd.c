@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -406,7 +406,7 @@ static	CLI_ENTRY	mup_journal_qual[] = {
 { "APPLY_AFTER_IMAGE", mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 { "BACKWARD",          mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 { "BEFORE",            mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
-{ "BROKENTRANS",       mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
+{ "BROKENTRANS",       mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NEG,     VAL_STR, 0 },
 { "CHAIN",             mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 { "CHECKTN",           mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 { "DETAIL",            mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
@@ -420,7 +420,7 @@ static	CLI_ENTRY	mup_journal_qual[] = {
 { "ID",                mupip_recover, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
 { "INTERACTIVE",       mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 { "LOOKBACK_LIMIT",    mupip_recover, 0, mup_jnl_lookback_parm, mur_jnl_lookback_qual, 0, 0, VAL_NOT_REQ,    1, NEG,     VAL_STR, 0 },
-{ "LOSTTRANS",         mupip_recover, 0, mup_jnl_lost_fn,       0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
+{ "LOSTTRANS",         mupip_recover, 0, mup_jnl_lost_fn,       0,                     0, 0, VAL_REQ,        1, NEG, VAL_STR, 0 },
 { "ONLINE",            mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A, 0 },
 { "PARALLEL",          mupip_recover, 0, 0,                     0,                     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_NUM, 0 },
 { "RECOVER",           mupip_recover, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
@@ -717,12 +717,12 @@ static	CLI_ENTRY	mup_set_qual[] = {
 { "KEY_SIZE",             mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "LCK_SHARES_DB_CRIT",   mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
 { "LOCK_SPACE",           mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
-{ "MUTEX_SLOTS",          mupip_set, 0, 0,              	0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
+{ "MUTEX_SLOTS",          mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "NULL_SUBSCRIPTS",      mupip_set, 0, 0,			mup_null_subs_qual,		0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0 },
 { "PARTIAL_RECOV_BYPASS", mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
 { "PREVJNLFILE",          mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
 { "QDBRUNDOWN",           mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-{ "READ_ONLY",            mupip_set, 0, 0,                  0,                    0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
+{ "READ_ONLY",            mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
 { "RECORD_SIZE",          mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "REGION",               mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
 { "REPLICATION",          mupip_set, 0, 0,			mup_repl_qual,			0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
@@ -733,8 +733,10 @@ static	CLI_ENTRY	mup_set_qual[] = {
 { "STANDALONENOT",        mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
 { "STATS",                mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
 { "STDNULLCOLL",          mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,	  VAL_N_A,  0 },
+{ "TRIGGER_FLUSH_LIMIT",  mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "VERSION",              mupip_set, 0, 0,			mup_set_dbver_qual,		0, 0, VAL_REQ,        1, NON_NEG, VAL_STR,  0 },
 { "WAIT_DISK",            mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
+{ "WRITES_PER_FLUSH",     mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "" }
 };
 

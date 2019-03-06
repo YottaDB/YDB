@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -494,14 +494,14 @@ void	set_active_lv(lv_val *newlv, boolean_t do_assert, int type);
 	sym->lvtreenode_flist = LV;							\
 }
 
-#ifdef UNIX
-/* job command needs to send the local variables to the child */
-#define MIDCHILD_SEND_VAR			\
-{						\
-	if (TREF(midchild_send_locals))		\
-		ojmidchild_send_var();		\
-}
-#endif
+/* Call function pointer, if not NULL, to consume formatted output.
+ * Currently only used for ojpassvar_hook().
+ */
+#define ZWRITE_OUTPUT_HOOK()					\
+MBSTART {							\
+	if (TREF(zwrite_output_hook))				\
+		(*(void (*)(void))TREF(zwrite_output_hook))();	\
+} MBEND
 
 unsigned char   *format_lvname(lv_val *start, unsigned char *buff, int size);
 lv_val		*lv_getslot(symval *sym);

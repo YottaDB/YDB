@@ -85,8 +85,7 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 	}
 	/* If we use a clue then we must consider the oldest tn in the search history to be the start tn for this transaction */
         /* start_tn manipulation for TP taken care of in tp_hist */
-	if (cs_addrs->critical)
-		crash_count = cs_addrs->critical->crashcnt;
+	UPDATE_CRASH_COUNT(cs_addrs, crash_count);
 	start_tn = cs_addrs->ti->curr_tn;
 	/* Note: If gv_target was NULL before the start of a transaction and the only operations done inside the transaction
 	 * are trigger deletions causing bitmap free operations, we can reach here with gv_target being NULL.

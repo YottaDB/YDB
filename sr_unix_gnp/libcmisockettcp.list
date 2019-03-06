@@ -14,7 +14,6 @@ cmj_err
 cmj_exception
 cmj_fini
 cmj_firstone
-cmj_get_port
 cmj_getsockaddr
 cmj_getdeferred
 cmj_handler

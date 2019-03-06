@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -191,7 +191,7 @@ void lvzwr_out(lv_val *lvp)
 				{	/* Put out "dummy" statement that will clear all the $ZWRTAC vars for a clean slate */
 					zwr_output->flush = TRUE;
 					zshow_output(zwr_output, &dzwrtac_clean);
-					MIDCHILD_SEND_VAR;
+					ZWRITE_OUTPUT_HOOK();
 				}
 				MEMCPY_LIT(zwrt_varname.c, DOLLAR_ZWRTAC);
 				lastc = i2asc((uchar_ptr_t)zwrt_varname.c + STR_LIT_LEN(DOLLAR_ZWRTAC), zwrtacindx);
@@ -214,7 +214,7 @@ void lvzwr_out(lv_val *lvp)
 			zshow_output(zwr_output, &one);
 			zwr_output->flush = TRUE;
 			zshow_output(zwr_output, (const mstr *)&newzav->zwr_var);
-			MIDCHILD_SEND_VAR;
+			ZWRITE_OUTPUT_HOOK();
 			if (dump_container)
 			{	/* We want to dump the entire container variable but the name doesn't match the var we are
 				 * currently dumping so push a new lvzwrite_block onto the stack, fill it in for the current var

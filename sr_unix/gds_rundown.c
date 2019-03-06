@@ -871,6 +871,11 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	if (jgbl.onlnrlbk)
 		csa->hold_onto_crit = FALSE;
 	GTM_WHITE_BOX_TEST(WBTEST_HOLD_SEM_BYPASS, cnl->wbox_test_seq_num, 0);
+	if (csa->now_crit)
+	{	/* Ensure that we don't hold crit before detaching shared memory */
+		assert(!csa->now_crit);
+		rel_crit(reg);
+	}
 	status = SHMDT((caddr_t)cnl);
 	csa->nl = NULL; /* dereferencing nl after detach is not right, so we set it to NULL so that we can test before dereference*/
 	csa->hdr = NULL;	/* dereferencing hdr after detach also is not right so set it to NULL */

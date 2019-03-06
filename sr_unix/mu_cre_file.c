@@ -104,14 +104,16 @@ MBSTART {														\
  * the zOS port ever be resurrected. In that case, uses of this macro need to be converted to PUTMSG_ERROR_CSA
  * invocations.
  */
-#define SPRINTF_AND_PERROR_MVS(MESSAGE)					\
-MBSTART {								\
-	assertpro(FALSE);						\
-	save_errno = errno;						\
-	SPRINTF(errbuff, MESSAGE, path, realfiletag, TAG_BINARY);	\
-	errno = save_errno;						\
-	PERROR(errbuff);						\
+#define SNPRINTF_AND_PERROR_MVS(MESSAGE)					\
+MBSTART {									\
+	assertpro(FALSE);							\
+	save_errno = errno;							\
+	SNPRINTF(errbuff, OUT_LINE, MESSAGE, path, realfiletag, TAG_BINARY);	\
+	errno = save_errno;							\
+	PERROR(errbuff);							\
 } MBEND
+
+#define	OUT_LINE	512 + 1
 
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
@@ -158,7 +160,7 @@ CONDITION_HANDLER(mu_cre_file_ch)
 
 unsigned char mu_cre_file(void)
 {
-	char		path[MAX_FBUFF + 1], errbuff[512];
+	char		path[MAX_FN_LEN + 1], errbuff[OUT_LINE];
 	unsigned char	buff[DISK_BLOCK_SIZE];
 	int		i, lower, upper, norm_vbn;
         ssize_t         status;
@@ -194,7 +196,7 @@ unsigned char mu_cre_file(void)
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.fop = (F_SYNTAXO | F_PARNODE);
 	pblk.buffer = path;
-	pblk.buff_size = MAX_FBUFF;
+	pblk.buff_size = MAX_FN_LEN;
 	file.addr = (char*)gv_cur_region->dyn.addr->fname;
 	file.len = gv_cur_region->dyn.addr->fname_len;
 	strncpy(path, file.addr, file.len);
@@ -231,7 +233,10 @@ unsigned char mu_cre_file(void)
 			return EXIT_ERR;
 		}
 	}
-	mu_cre_file_fd = OPEN3(pblk.l_dir, O_CREAT | O_EXCL | O_RDWR, 0600);
+	do
+	{
+		mu_cre_file_fd = OPEN3(pblk.l_dir, O_CREAT | O_EXCL | O_RDWR, 0600);
+	} while ((-1 == mu_cre_file_fd)  && (EINTR == errno));
 	if (FD_INVALID == mu_cre_file_fd)
 	{	/* Avoid error message if file already exists (another process created it) for AUTODBs that are NOT also
 		 * STATSDBs.
@@ -254,7 +259,7 @@ unsigned char mu_cre_file(void)
 	ESTABLISH_RET(mu_cre_file_ch, EXIT_ERR);
 #	ifdef __MVS__
 	if (-1 == gtm_zos_set_tag(mu_cre_file_fd, TAG_BINARY, TAG_NOTTEXT, TAG_FORCE, &realfiletag))
-		SPRINTF_AND_PERROR_MVS("Error setting tag policy for file %s (%d) to %d\n");
+		SNPRINTF_AND_PERROR_MVS("Error setting tag policy for file %s (%d) to %d\n");
 #	endif
 	if (0 != (save_errno = disk_block_available(mu_cre_file_fd, &avail_blocks, FALSE)))
 	{

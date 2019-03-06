@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,6 @@
 #include "iosp.h"
 #include "repl_log.h"
 #include "repl_errno.h"
-#include "gtm_event_log.h"
 #include "repl_shutdcode.h"
 #include "repl_sem.h"
 #include "repl_filter.h"
@@ -63,6 +62,7 @@
 #include "fork_init.h"
 #include "io.h"
 #include "gtmio.h"
+#include "util.h"
 #ifdef GTM_TLS
 #include "gtm_repl.h"
 #endif
@@ -118,7 +118,7 @@ int gtmsource()
 {
 	int			status, log_init_status, waitpid_res, save_errno;
 	struct stat		stat_buf;
-	char			print_msg[1024], tmpmsg[1024];
+	char			print_msg[OUT_BUFF_SIZE - 1], tmpmsg[REPL_MSG_SIZE];
 	gd_region		*reg, *region_top;
 	sgmnt_addrs		*csa, *repl_csa;
 	boolean_t		all_files_open, isalive, ftok_counter_halted;
@@ -414,14 +414,13 @@ int gtmsource()
 
 	gtmsource_srv_count++;
 	gtmsource_local->child_server_running = TRUE;	/* At this point, the parent startup command will stop waiting for child */
-	gtm_event_log_init();
 	/* Log source server startup command line first */
-	SPRINTF(tmpmsg, "%s %s\n", cli_lex_in_ptr->argv[0], cli_lex_in_ptr->in_str);
+	SNPRINTF(tmpmsg, REPL_MSG_SIZE, "%s %s\n", cli_lex_in_ptr->argv[0], cli_lex_in_ptr->in_str);
 	repl_log(gtmsource_log_fp, TRUE, TRUE, tmpmsg);
 
-	SPRINTF(tmpmsg, "GTM Replication Source Server with Pid [%d] started for Secondary Instance [%s]",
+	SNPRINTF(tmpmsg, REPL_MSG_SIZE, "GTM Replication Source Server with Pid [%d] started for Secondary Instance [%s]",
 		process_id, gtmsource_local->secondary_instname);
-	sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
+	sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
 	repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 	if (is_jnlpool_creator)
 	{
@@ -430,7 +429,6 @@ int gtmsource()
 	} else
 		repl_log(gtmsource_log_fp, TRUE, TRUE, "Attached to existing jnlpool with shmid = [%d] and semid = [%d]\n",
 			jnlpool->repl_inst_filehdr->jnlpool_shmid, jnlpool->repl_inst_filehdr->jnlpool_semid);
-	gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
 #	ifdef GTM_TLS
 	if (REPL_TLS_REQUESTED)
 	{
@@ -441,9 +439,11 @@ int gtmsource()
 	if (jnlpool->jnlpool_ctl->freeze)
 	{
 		last_seen_freeze_flag = jnlpool->jnlpool_ctl->freeze;
-		sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFROZEN, 1, jnlpool->repl_inst_filehdr->inst_info.this_instname);
+		sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1, VARLSTCNT(3) ERR_REPLINSTFROZEN, 1,
+				jnlpool->repl_inst_filehdr->inst_info.this_instname);
 		repl_log(gtmsource_log_fp, TRUE, FALSE, print_msg);
-		sgtm_putmsg(print_msg, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1, jnlpool->jnlpool_ctl->freeze_comment);
+		sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1, VARLSTCNT(3) ERR_REPLINSTFREEZECOMMENT, 1,
+				jnlpool->jnlpool_ctl->freeze_comment);
 		repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
 	}
 	add_safe_timer_handler(1, gtmsource_heartbeat_timer);
@@ -470,10 +470,9 @@ int gtmsource()
 		if (GTMSOURCE_MODE_PASSIVE == gtmsource_local->mode)
 		{	/* Shutdown initiated */
 			assert(gtmsource_local->shutdown == SHUTDOWN);
-			sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2,
+			sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1, VARLSTCNT(4) ERR_REPLINFO, 2,
 				    RTS_ERROR_LITERAL("GTM Replication Source Server Shutdown signalled"));
 			repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
-			gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
 			break;
 		}
 		gtmsource_poll_actions(FALSE);
@@ -481,10 +480,10 @@ int gtmsource()
 			continue;
 		if (GTMSOURCE_MODE_ACTIVE_REQUESTED == gtmsource_local->mode)
 			gtmsource_local->mode = GTMSOURCE_MODE_ACTIVE;
-		SPRINTF(tmpmsg, "GTM Replication Source Server now in ACTIVE mode using port %d", gtmsource_local->secondary_port);
-		sgtm_putmsg(print_msg, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
+		SNPRINTF(tmpmsg, REPL_MSG_SIZE, "GTM Replication Source Server now in ACTIVE mode using port %d",
+			gtmsource_local->secondary_port);
+		sgtm_putmsg(print_msg, OUT_BUFF_SIZE - 1, VARLSTCNT(4) ERR_REPLINFO, 2, LEN_AND_STR(tmpmsg));
 		repl_log(gtmsource_log_fp, TRUE, TRUE, print_msg);
-		gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "REPLINFO", print_msg);
 		DEBUG_ONLY(repl_csa = &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs;)
 		assert(!repl_csa->hold_onto_crit);	/* so it is ok to invoke "grab_lock" and "rel_lock" unconditionally */
 		grab_lock(jnlpool->jnlpool_dummy_reg, TRUE, HANDLE_CONCUR_ONLINE_ROLLBACK);

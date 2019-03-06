@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef _GV_TRIGGER_COMMON_INCLUDED
-#define _GV_TRIGGER_COMMON_INCLUDED
+#ifndef GV_TRIGGER_COMMON_INCLUDED
+#define GV_TRIGGER_COMMON_INCLUDED
 /* Following macros, though related to trigger global (^#t), are needed in trigger non-supported platforms.
  * While gv_trigger.h lives placed in sr_unix, VMS needs the following macros.
  */

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2004 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2004-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,11 +10,11 @@
  *								*
  ****************************************************************/
 
-#ifndef __GTM_ENV_INIT_DEFINED
+#ifndef GTM_ENV_INIT_DEFINED
 
 void	gtm_env_init(void);
 void	gtm_env_init_sp(void);
 
-#define __GTM_ENV_INIT_DEFINED
+#define GTM_ENV_INIT_DEFINED
 
 #endif

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -8,8 +9,8 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-#ifndef __LA_ENCRYPT_H__
-#define __LA_ENCRYPT_H__
+#ifndef LA_ENCRYPT_H_INCLUDED
+#define LA_ENCRYPT_H_INCLUDED
 
 bool la_encrypt (
 	short 		n  ,			/* encryption function number	*/

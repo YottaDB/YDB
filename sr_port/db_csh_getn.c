@@ -469,8 +469,8 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		csa->nl->cache_hits++;
 		if (csa->nl->cache_hits > csd->n_bts)
 		{
-			flsh_trigger = csd->flush_trigger;
-			csd->flush_trigger = MIN(flsh_trigger + MAX(flsh_trigger / STEP_FACTOR, 1), MAX_FLUSH_TRIGGER(csd->n_bts));
+			if (csd->flush_trigger_top != (flsh_trigger = csd->flush_trigger))	/* WARNING assignment */
+				csd->flush_trigger = MIN(flsh_trigger + MAX(flsh_trigger / STEP_FACTOR, 1), csd->flush_trigger_top);
 			csa->nl->cache_hits = 0;
 		}
 		INCR_DB_CSH_COUNTER(csa, n_db_csh_getn_lcnt, lcnt);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,7 +76,7 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 	mval			op_val, op_pars;
 	boolean_t		is_stdout;	/* Output will go STDOUT?. Matters only for single-region in this function */
 	boolean_t		need_rel_latch, copy_from_shm, single_reg, release_latch, key_reset;
-	boolean_t		is_dummy_gbldir;
+	boolean_t		is_dummy_gbldir, fname_is_devnull;
 	reg_ctl_list		*rctl;
 	gd_region		*reg;
 	shm_reg_ctl_t		*shm_rctl_start, *shm_rctl;
@@ -137,12 +137,14 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 	if (!is_stdout)
 	{
 		file_info = (void *)malloc(SIZEOF(fi_type));
-		file_info->fn = malloc(MAX_FN_LEN);
+		file_info->fn = malloc(MAX_FN_LEN + 1);	/* +1 for '\0' */
+		memset(file_info->fn, 0, MAX_FN_LEN + 1);
 		if (0 == mur_options.extr_fn_len[recstat])
 		{
 			if (!multi_proc_in_use || need_rel_latch)
 			{
-				mur_options.extr_fn[recstat] = malloc(MAX_FN_LEN);
+				mur_options.extr_fn[recstat] = malloc(MAX_FN_LEN + 1);	/* +1 for '\0' */
+				memset(mur_options.extr_fn[recstat], 0, MAX_FN_LEN + 1);
 				ptr = (char *)&jctl->jnl_fn[jctl->jnl_fn_len];
 				while (DOT != *ptr)	/* we know journal file name always has a DOT */
 					ptr--;
@@ -179,10 +181,12 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 		}
 		rctl->file_info[recstat] = file_info;
 		rctl->extr_fn_len_orig[recstat] = file_info->fn_len;
+		fname_is_devnull = mur_options.extr_fn_is_devnull[recstat] && mur_options.extr_fn[recstat];
 		/* Now adjust the file name to be region-specific. Add a region-name suffix. If no region-name is found,
 		 * add region #. Do this only if there are at least 2 regions. Otherwise no need of a merge sort.
+		 * Also, this is not required if o/p device is DEVNULL
 		 */
-		if (!single_reg)
+		if (!single_reg && !fname_is_devnull)
 		{
 			reg = rctl->gd;
 			/* Calculate if appending region name will not overflow allocation. If so error out */
@@ -222,11 +226,13 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 				memcpy(ptr, reg->rname, reg->rname_len);
 				tmplen += reg->rname_len;
 			} else
-				tmplen += SPRINTF(ptr, "%d", rctl - &mur_ctl[0]);
+				tmplen += SNPRINTF(ptr, MAX_FN_LEN - tmplen, "%d", rctl - &mur_ctl[0]);
 			file_info->fn_len = tmplen;
 		}
 		rename_fn_len = ARRAYSIZE(rename_fn);
-		if (RENAME_FAILED == rename_file_if_exists(file_info->fn, file_info->fn_len, rename_fn, &rename_fn_len, &status))
+		/* Don't rename DEVNULL */
+		if (!fname_is_devnull && (RENAME_FAILED == rename_file_if_exists(file_info->fn, file_info->fn_len, rename_fn,
+				&rename_fn_len, &status)))
 			return status;
 		op_pars.mvtype = MV_STR;
 		op_pars.str.len = SIZEOF(open_params_list);
@@ -248,7 +254,7 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 	{
 		mur_write_header_extfmt(jctl, NULL, NULL, recstat);
 		/* For multi-region, this header writing will be done later as part of "mur_merge_sort_extfmt" */
-		if (!is_stdout) /* We wrote to stdout so it doesn't make a sense to print a message about file creation. */
+		if (!is_stdout && !fname_is_devnull) /* We wrote to stdout or /dev/null. Suppress the message about file creation.*/
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILECREATE, 4, LEN_AND_STR(ext_file_type[recstat]),
 					file_info->fn_len, file_info->fn);
 	} else if (multi_proc_in_use)

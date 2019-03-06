@@ -120,8 +120,7 @@ void dse_f_reg(void)
 	assert(IS_REG_BG_OR_MM(gv_cur_region));
 	cs_addrs = &FILE_INFO(gv_cur_region)->s_addrs;
 	cs_data = cs_addrs->hdr;
-	if (cs_addrs && cs_addrs->critical)
-		crash_count = cs_addrs->critical->crashcnt;
+	UPDATE_CRASH_COUNT(cs_addrs, crash_count);
 	util_out_print("!/File  !_!AD", TRUE, DB_LEN_STR(gv_cur_region));
 	util_out_print("Region!_!AD!/", TRUE, REG_LEN_STR(gv_cur_region));
 	patch_curr_blk = get_dir_root();

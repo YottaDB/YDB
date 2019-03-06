@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2018 Fidelity National Information	*
+ * Copyright (c) 2008-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,20 +14,28 @@
 
 #include <dlfcn.h>
 #include "gtm_string.h"
+#include "gtm_stdio.h"
+#include "gtm_limits.h"
 
 #include "real_len.h"		/* for COPY_DLERR_MSG */
 #include "lv_val.h"		/* needed for "fgncal.h" */
 #include "fgncal.h"		/* needed for COPY_DLLERR_MSG() */
 #include "gtm_zlib.h"
 #include "gtmmsg.h"
+#include "send_msg.h"
+#include "restrict.h"	/* Needed for restrictions */
+#include "have_crit.h"	/* Needed for defer interrupts */
 
 error_def(ERR_DLLNOOPEN);
-error_def(ERR_TEXT);
 error_def(ERR_DLLNORTN);
+error_def(ERR_RESTRICTEDOP);
+error_def(ERR_TEXT);
+
+GBLREF char		gtm_dist[GTM_PATH_MAX];
 
 void gtm_zlib_init(void)
 {
-	char		*libname, err_msg[MAX_ERRSTR_LEN];
+	char		err_msg[MAX_ERRSTR_LEN];
 #ifdef _AIX
 	char		aix_err_msg[MAX_ERRSTR_LEN];
 #endif
@@ -43,25 +51,51 @@ void gtm_zlib_init(void)
 			};
 	int		findx;
 	void		*fptr;
+	char 		librarypath[GTM_PATH_MAX], *lpath = NULL;
+	intrpt_state_t	prev_intrpt_state;
 
 	assert(gtm_zlib_cmp_level);
 #ifdef _AIX
+	if (RESTRICTED(library_load_path))
+	{
+		lpath = librarypath;
+		SNPRINTF(librarypath, GTM_PATH_MAX, GTM_PLUGIN_FMT_SHORT ZLIB_AIXLIBNAME, gtm_dist);
+	} else
+		lpath = ZLIB_AIXLIBNAME;
 	/* Attempt to load the AIX packaged zlib first */
-	if (NULL == (handle = dlopen(ZLIB_AIXLIBNAME, ZLIB_LIBFLAGS | RTLD_MEMBER))) /* inline assignment */
+	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	handle = dlopen( lpath, ZLIB_LIBFLAGS | RTLD_MEMBER);
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+	if (NULL == handle)
 	{
 		COPY_DLLERR_MSG(err_str, aix_err_msg);
 #endif
-		libname = ZLIB_LIBNAME;
-		handle = dlopen(libname, ZLIB_LIBFLAGS);
+		if (RESTRICTED(library_load_path))
+		{
+			lpath = librarypath;
+			SNPRINTF(librarypath, GTM_PATH_MAX, GTM_PLUGIN_FMT_SHORT ZLIB_LIBNAME, gtm_dist);
+		} else
+			lpath = ZLIB_LIBNAME;
+		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
+		handle = dlopen(lpath, ZLIB_LIBFLAGS);
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		if (NULL == handle)
 		{
+			if (RESTRICTED(library_load_path))
+			{
+				SNPRINTF(err_msg, MAX_ERRSTR_LEN, "dlopen(%s)", lpath);
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, err_msg);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, err_msg);
+				gtm_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* dont use compression */
+				return;
+			}
 			COPY_DLLERR_MSG(err_str, err_msg);
 #		ifdef _AIX
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname),
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_DLLNOOPEN, 2, LEN_AND_STR(lpath),
 					ERR_TEXT, 2, LEN_AND_STR(err_msg),
 					ERR_TEXT, 2, LEN_AND_STR(aix_err_msg));
 #		else
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(libname),
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DLLNOOPEN, 2, LEN_AND_STR(lpath),
 					ERR_TEXT, 2, LEN_AND_STR(err_msg));
 #		endif
 			gtm_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* dont use compression */

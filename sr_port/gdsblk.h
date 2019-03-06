@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __GDSBLK_H__
-#define __GDSBLK_H__
+#ifndef GDSBLK_H_INCLUDED
+#define GDSBLK_H_INCLUDED
 
 /* gdsblk.h */
 
@@ -192,7 +192,8 @@ typedef rec_hdr *rec_hdr_ptr_t;
 # endif
 #endif
 
-#define MAX_RESERVE_B(X) ((X)->blk_size - (X)->max_key_size - SIZEOF(blk_hdr) - SIZEOF(rec_hdr)) /* anything past key can span */
+#define MAX_RESERVE_B(X) ((X)->blk_size - (X)->max_key_size - SIZEOF(blk_hdr) - SIZEOF(rec_hdr) \
+        - SIZEOF(block_id) - BSTAR_REC_SIZE) /* anything past key can span */
 #define CHKRECLEN(r,b,n) ((unsigned int)((n) + (uchar_ptr_t)(r) - (uchar_ptr_t)(b)) <= (unsigned int)((blk_hdr_ptr_t)(b))->bsiz)
 
 /*********************************************************************

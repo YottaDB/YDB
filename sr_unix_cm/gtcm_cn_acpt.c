@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc *
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -42,26 +43,24 @@ GBLREF	char	*omi_pklog;
 GBLREF	int	one_conn_per_inaddr;
 GBLREF	int	conn_timeout;
 
+#define	MAX_LOG_LEN	1024 + 1
+
 int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds */
 {
-	int		i;
+	char 		pklog[MAX_LOG_LEN], *tmp_time;
+	int		errno_save, i, rc;
 	omi_conn	*cptr;
 	omi_fd		fd;
-	int		rc;
-	char 		*tmp_time;
-
-#ifdef BSD_TCP
-	GTM_SOCKLEN_TYPE	sln;
-	struct sockaddr_storage	sas;
-	int			optsize;
 	const boolean_t		keepalive = TRUE;
+	GTM_SOCKLEN_TYPE	sln;
+	int			optsize;
+	struct sockaddr_storage	sas;
 
 	/*  Accept the connection from the network layer */
 	sln = SIZEOF(sas);
-	if ((fd = accept(cll->nve, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sln)) < 0)
+	ACCEPT_SOCKET(cll->nve, (struct sockaddr *)&sas, (GTM_SOCKLEN_TYPE *)&sln, fd);
+	if (0 > fd)
 		return -1;
-#endif				/* defined(BSD_TCP) */
-
 	/*  Build the client data structure */
 	if (!(cptr = (omi_conn *)malloc(SIZEOF(omi_conn))) || !(cptr->buff = (char *)malloc(OMI_BUFSIZ)))
 	{
@@ -96,12 +95,10 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 		cptr->stats.xact[i] = 0;
 	for (i = 0; i < OMI_ER_MAX; i++)
 		cptr->stats.errs[i] = 0;
-
 	/* if we only allowing one connection per internet address, close any existing ones with the same addr. */
 	if (one_conn_per_inaddr)
 	{
 		omi_conn	*this, *prev;
-
 		for (prev = NULL, this = cll->head; this; prev = this, this = this->next)
 		{
 			if (0 == memcmp((sockaddr_ptr)(&this->stats.sas), (sockaddr_ptr)&sas, sln))
@@ -141,14 +138,10 @@ int gtcm_cn_acpt(omi_conn_ll *cll, int now)		/* now --> current time in seconds 
 			cll->head = cll->tail = cptr;
 	}
 	cptr->stats.id = ++cll->stats.conn;
-
 	DEBUG_ONLY(
 		if (omi_pklog)
 		{
-			int		errno_save;
-			char		pklog[1024];
-
-			(void)SPRINTF(pklog, "%s.%04d", omi_pklog, cptr->stats.id);
+			(void)SNPRINTF(pklog, MAX_LOG_LEN, "%s.%04d", omi_pklog, cptr->stats.id);
 			if (INV_FD_P((cptr->pklog = OPEN3(pklog, O_WRONLY|O_CREAT|O_APPEND|O_TRUNC, 0644))))
 			{
 				errno_save = errno;

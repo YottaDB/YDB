@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,7 @@ error_def(ERR_RESTRICTEDOP);
 void op_zedit(mval *v, mval *p)
 {
 	char		*edt;
-	char		es[MAX_FBUFF + 1], typ, *ptr;
+	char		es[MAX_FN_LEN + 1], typ, *ptr;
 	short		path_len, tslash;
 	int		objcnt;
 	int		waitid;
@@ -76,7 +76,7 @@ void op_zedit(mval *v, mval *p)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, src.len, src.addr);
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = es;
-	pblk.buff_size = MAX_FBUFF;
+	pblk.buff_size = MAX_FN_LEN;
 	status = parse_file(&src, &pblk);
 	if (!(status & 1))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZEDFILSPEC, 2, src.len, src.addr, status);
@@ -103,7 +103,7 @@ void op_zedit(mval *v, mval *p)
 		if ('.' != *ptr)
 		{
 			typ = STR_LIT_LEN(DOTM);
-			if (path_len + typ > MAX_FBUFF)
+			if (path_len + typ > MAX_FN_LEN)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, path_len, es);
 			memcpy(&es[path_len], DOTM, STR_LIT_LEN(DOTM));
 			path_len += typ;

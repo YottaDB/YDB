@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,7 @@ GBLREF int			process_exiting;
 
 LITREF gtmImageName		gtmImageNames[];
 
-unsigned char *get_symb_line(unsigned char *out, unsigned char **b_line, unsigned char **ctxt)
+unsigned char *get_symb_line(unsigned char *out, int max_len, unsigned char **b_line, unsigned char **ctxt)
 {
 	boolean_t	line_reset;
 	stack_frame	*fp;
@@ -53,7 +53,7 @@ unsigned char *get_symb_line(unsigned char *out, unsigned char **b_line, unsigne
 				addr = fpmpc + 1;
 			else
 				addr = fpmpc;
-			out_addr = symb_line(addr, out, b_line, fp->rvector);
+			out_addr = symb_line(addr, out, max_len, b_line, fp->rvector);
 			assert(out < out_addr);
 			return out_addr;
 		} else

@@ -115,7 +115,6 @@ int gtm_main (int argc, char **argv, char **envp)
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
 	err_init(stop_image_conditional_core);
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
-	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	cli_lex_setup(argc, argv);
 	/* put the arguments into buffer, then clean up the token buffer
 	 * cli_gettoken() copies all arguments except the first one argv[0]

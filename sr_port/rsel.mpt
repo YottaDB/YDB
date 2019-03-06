@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 1987, 2015 Fidelity National Information	;
+; Copyright (c) 1987-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -9,7 +9,7 @@
 ;	the license, please stop and do not read further.	;
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%RSEL   ;service@greystone.com gtm,%rsel;19920523;GT.M %RSEL utility - routine select into a local array
+%RSEL	;GT.M %RSEL utility - routine select into a local array
         ;invoke ^%RSEL to create %ZR - a local array of existing routines, interactively
         ;invoke OBJ^%RSEL to create %ZR based on object modules
         ;invoke CALL^%RSEL to maintain the array %ZR with the input %ZR, %ZE specifies extensions .m or .o[bj]

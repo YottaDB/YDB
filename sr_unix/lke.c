@@ -95,7 +95,6 @@ int main (int argc, char *argv[])
 	licensed = TRUE;
 	err_init(util_base_ch);
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
-	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, lke_ctrlc_handler, suspsigs_handler, continue_handler);
 	atexit(util_exit_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);

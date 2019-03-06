@@ -44,11 +44,13 @@ error_def(ERR_CENOINDIR);
 error_def(ERR_CETOOLONG);
 error_def(ERR_CETOOMANY);
 error_def(ERR_CEUSRERROR);
+error_def(ERR_ERRORSUMMARY);
 error_def(ERR_FMLLSTMISSING);
 error_def(ERR_FMLLSTPRESENT);
 error_def(ERR_FOROFLOW);
 error_def(ERR_INVDLRCVAL);
 error_def(ERR_LABELMISSING);
+error_def(ERR_MAXARGCNT);
 error_def(ERR_PATNOTFOUND);
 error_def(ERR_SRCLIN);
 error_def(ERR_SRCLOC);
@@ -77,7 +79,8 @@ void stx_error_va(int in_error, va_list args)
 
 	SETUP_THREADGBL_ACCESS;
 	VAR_COPY(dup_args, args);
-
+	if (!TREF(dollar_zcstatus))
+		TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
 	/* In case of a IS_STX_WARN type of parsing error, we resume parsing so it is important NOT to reset
 	 * the following global variables
 	 *	a) saw_side_effect
@@ -138,7 +141,10 @@ void stx_error_va(int in_error, va_list args)
 			arg2 = va_arg(args, VA_ARG_TYPE);
 			va_end(args);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) in_error, cnt, arg1, arg2);
-		} else if ((ERR_CEUSRERROR == in_error) || (ERR_INVDLRCVAL == in_error) || (ERR_FOROFLOW == in_error))
+		} else if ((ERR_CEUSRERROR == in_error)
+			|| (ERR_INVDLRCVAL == in_error)
+			|| (ERR_FOROFLOW == in_error)
+			|| (ERR_MAXARGCNT == in_error))
 		{
 			cnt = va_arg(args, VA_ARG_TYPE);
 			assert(cnt == 1);
@@ -219,7 +225,8 @@ void stx_error_va(int in_error, va_list args)
 				arg1 = va_arg(args, VA_ARG_TYPE);
 				arg2 = va_arg(args, VA_ARG_TYPE);
 				dec_err(VARLSTCNT(4) in_error, 2, arg1, arg2);
-			} else if ((ERR_CEUSRERROR != in_error) && (ERR_INVDLRCVAL != in_error) && (ERR_FOROFLOW != in_error))
+			} else if ((ERR_CEUSRERROR != in_error) && (ERR_FOROFLOW != in_error) && (ERR_INVDLRCVAL != in_error)
+					&& (ERR_MAXARGCNT != in_error))
 				dec_err(VARLSTCNT(1) in_error);
 			else
 			{
@@ -238,13 +245,9 @@ void stx_error_va(int in_error, va_list args)
 		msg.len = SIZEOF(msgbuf);
 		gtm_getmsg(in_error, &msg);
 		assert(msg.len);
-#		ifdef UNIX
 		cnt = va_arg(dup_args, VA_ARG_TYPE);
 		c = util_format(msgbuf, dup_args, LIT_AND_LEN(buf), (int)cnt);
 		va_end(TREF(last_va_list_ptr));	/* set by util_format */
-#		else
-		c = util_format(msgbuf, dup_args, LIT_AND_LEN(buf));
-#		endif
 		va_end(dup_args);
 		*c = 0;
 		list_line(buf);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,13 +91,19 @@ void mur_close_file_extfmt(boolean_t in_mur_close_files)
 				 * would have taken care of this cleanup. We need the below for the FALSE case.
 				 */
 				fn = ((fi_type *)rctl->file_info[recstat])->fn;
-				MUR_JNLEXT_UNLINK(fn);
+				if (!mur_options.extr_fn_is_devnull[recstat])	/* For DEVNULL, we don't create intermediate files*/
+				{
+					MUR_JNLEXT_UNLINK(fn);
+				} else	/* Assert the intermediate file was indeed DEVNULL */
+					assert((STR_LIT_LEN(DEVNULL) == ((fi_type *)rctl->file_info[recstat])->fn_len)
+						&& (0 == STRNCMP_LIT(fn, DEVNULL)));
 			}
 			/* Note: Not freeing up rctl->file_info[recstat] here as the process is about to die anyways */
 		}
 		if (in_mur_close_files && !extr_file_created && !murgbl.filenotcreate_displayed[recstat])
-		{	/* If STDOUT no file closing message. */
-			if (mur_options.extr_fn[recstat] && !mur_options.extr_fn_is_stdout[recstat])
+		{	/* If STDOUT or DEVNULL, no file closing message. */
+			if (mur_options.extr_fn[recstat] && !mur_options.extr_fn_is_stdout[recstat] &&
+					!mur_options.extr_fn_is_devnull[recstat])
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILENOTCREATE, 4, LEN_AND_STR(ext_file_type[recstat]),
 							mur_options.extr_fn_len[recstat], mur_options.extr_fn[recstat]);
 		}

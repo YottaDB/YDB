@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 1991-2016 Fidelity National Information		;
+; Copyright (c) 1991-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -9,8 +9,7 @@
 ;	the license, please stop and do not read further.	;
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%GI	;service@greystone.com %GO;19920722 21:35;global input
-	;Load globals into database
+%GI	;Load globals into database
 	;Possible enhancements:
 	;selection and/or exclusion by key list, range and/or wildcard
 	;optional confirmation by global name

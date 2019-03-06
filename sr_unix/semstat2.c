@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,6 +34,7 @@
 
 #undef EXIT
 #define	EXIT	exit	/* Use system "exit" (not gtm_image_exit) directly since this is a standalone module */
+#define	OUT_LINE	80 + 1
 
 static void	usage (char *prog);
 
@@ -53,7 +54,7 @@ static void	usage (char *prog)
 int main (int argc, char *argv[])
 {
 	int 		i, j;
-	char 		s[81];
+	char 		s[OUT_LINE];
 	int 		sem, semval, semncnt, semzcnt, sempid;
 	struct	 	sembuf sop;
 	struct semid_ds		semstat;
@@ -72,7 +73,7 @@ int main (int argc, char *argv[])
 		if ( semctl(sem, 0, IPC_STAT, semarg) == -1 )
 		{
 			FPRINTF(stderr, "Error obtaining semaphore status.\n");
-			SPRINTF(s, "semctl(%d)", sem);
+			SNPRINTF(s, OUT_LINE, "semctl(%d)", sem);
 			PERROR(s);
 			continue;
 		}
@@ -83,7 +84,7 @@ int main (int argc, char *argv[])
 			if ( (semval = semctl(sem, j, GETVAL)) == -1 )
 			{
 				FPRINTF(stderr, "Error obtaining semaphore %d value.\n", j);
-				SPRINTF(s, "semctl(%d)", sem);
+				SNPRINTF(s, OUT_LINE, "semctl(%d)", sem);
 				PERROR(s);
 				continue;
 			}
@@ -91,7 +92,7 @@ int main (int argc, char *argv[])
 			if ( (semncnt = semctl(sem, j, GETNCNT)) == -1 )
 			{
 				FPRINTF(stderr, "\nError obtaining semaphore %d ncnt.\n", j);
-				SPRINTF(s, "semctl(%d)", sem);
+				SNPRINTF(s, OUT_LINE, "semctl(%d)", sem);
 				PERROR(s);
 				continue;
 			}
@@ -99,7 +100,7 @@ int main (int argc, char *argv[])
 			if ( (semzcnt = semctl(sem, j, GETZCNT)) == -1 )
 			{
 				FPRINTF(stderr, "\nError obtaining semaphore %d zcnt.\n", j);
-				SPRINTF(s, "semctl(%d)", sem);
+				SNPRINTF(s, OUT_LINE, "semctl(%d)", sem);
 				PERROR(s);
 				continue;
 			}
@@ -107,7 +108,7 @@ int main (int argc, char *argv[])
 			if ( (sempid= semctl(sem, j, GETPID)) == -1 )
 			{
 				FPRINTF(stderr, "\nError obtaining semaphore %d PID.\n", j);
-				SPRINTF(s, "semctl(%d)", sem);
+				SNPRINTF(s, OUT_LINE, "semctl(%d)", sem);
 				PERROR(s);
 				continue;
 			}

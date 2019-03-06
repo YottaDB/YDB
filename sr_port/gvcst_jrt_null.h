@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,8 +10,8 @@
  *								*
  ****************************************************************/
 
-#ifndef __GVCST_JRT_NULL_H__
-#define __GVCST_JRT_NULL_H__
+#ifndef GVCST_JRT_NULL_H_INCLUDED
+#define GVCST_JRT_NULL_H_INCLUDED
 
 void	gvcst_jrt_null(void);
 

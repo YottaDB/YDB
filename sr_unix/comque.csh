@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2001-2018 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -95,7 +95,11 @@ case "[Bb]*":
 			"$gt_cc_options_common $gt_cc_option_I $gt_cc_option_DDEBUG $gt_cc_option_optimize"
 		breaksw
 
-case "[Dd*]":
+case "[Dd]*":
+		if ("$comque_image" =~ "*scan*") then
+			setenv scan_image 1
+			setenv gt_cc_option_debug "$gt_cc_option_debug_scan"
+		endif
 		set comque_image = "dbg"
 		set comque_as_options_default = \
 			"$gt_as_options_common $gt_as_option_I $gt_as_option_DDEBUG $gt_as_option_debug $gt_as_option_nooptimize"
