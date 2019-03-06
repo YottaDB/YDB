@@ -34,7 +34,7 @@ ENTRY op_startintrrpt
 	ldrb	w0, [x0]
 	cbz	w0, l1
 	bl	outofband_clear
-	mov	w0, wzr
+	mov	x0, xzr
 	bl	gvcmz_neterr
 l1:
 	mov	w0, #1

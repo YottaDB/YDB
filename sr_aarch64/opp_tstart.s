@@ -32,7 +32,6 @@
 
 	.include "linkage.si"
 	.include "g_msf.si"
-	.include "stack.si"
 #	include "debug.si"
 
 	.data
@@ -64,24 +63,22 @@ ENTRY opp_tstart
 	 * must allocate 8 slots to keep the stack aligned but the 7 slots used must be those with the lowest address for
 	 * this to work correctly.
 	 */
-	ADJ_STACK_ALIGN_ODD_ARGS w2
-	mov	x28, sp						/* str xnn, [sp, #-8]! only works for 16 byte aligns, so use x28.
-								 * At the end x28 will be 16 byte aligned, so sp will be OK */
 	cmp	w2, #5
 	b.eq	five_arg					/* Param in x7 doesn't get copied, but is pushed directly */
+	cmp	w2, #6
+	b.eq	six_arg
 	mov	w13, w2						/* Total number of args */
 	sub	w13, w13, #5					/* Five args were in registers so they don't get copied */
-	tst	w13, #1						/* See if count was odd or even */
-	beq	loop						/* Original count was not even so no extra word used to align sp */
-	sub	x27, x27, #8					/* Skip over the word that was used to align sp */
 loop:
-	ldr	x12, [x27, #-8]!
-	str	x12, [x28, #-8]!
-	subs	w13, w13, #1
-	b.ne	loop
+	ldp	x11, x12, [x27], #-16
+	stp	x11, x12, [sp, #-16]!
+	subs	w13, w13, #2
+	cmp	w13, #1
+	b.gt	loop
+six_arg:
+	ldr	x12, [x27]
 five_arg:
-	str	x7, [x28, #-8]!
-	mov	sp, x28						/* Put sp back where it should be */
+	stp	x7, x12, [sp, #-16]!
 	CHKSTKALIGN						/* Verify stack alignment */
 four_arg:
 	mov	x7, x6

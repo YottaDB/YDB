@@ -44,7 +44,7 @@ retry:
 	ret
 store_failed:
 	subs	w10, w10, #1
-	bne	retry
+	b.ne	retry
 	mov	w10, #RETRY_COUNT
 	b	retry
 

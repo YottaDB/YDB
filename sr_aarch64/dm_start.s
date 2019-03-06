@@ -16,7 +16,6 @@
 
 	.include "linkage.si"
 	.include "error.si"
-	.include "stack.si"
 #	include "debug.si"
 
 	.data

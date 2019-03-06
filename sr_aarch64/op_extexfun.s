@@ -36,7 +36,7 @@
  *  - arg4 (w4)	- Count of M routine parameters supplied (actualcnt).
  *  - arg5 (x5)	- Address of first mval parameters (actual1).
  *  - arg6 (x6)	- Address of second mval parameters (actual2).
- *  - arg7 (x7)	- Address of tghird mval parameters (actual3).
+ *  - arg7 (x7)	- Address of third mval parameters (actual3).
  * The rest of the args are on the stack
  *  - actual4   - Address of the fourth mval parameter
  *  - actual5   - Address of the fifth mval parameter
@@ -55,7 +55,6 @@
 	.include "linkage.si"
 	.include "g_msf.si"
 	.include "gtm_threadgbl_deftypes_asm.si"
-	.include "stack.si"
 #	include "debug.si"
 
 	.data
@@ -171,19 +170,21 @@ justgo:
 	b.eq	one_arg
 	cmp	w0, #2
 	b.eq	two_arg
-	ADJ_STACK_ALIGN_EVEN_ARGS w0
-	mov	x11, sp						/* Use x11 for stack copy since 8 byte alignment is bad for sp */
 	sub	w9, w0, #3					/* Number of arguments to copy (number already pushed on stack) */
 	cmp	w0, #3
 	b.eq	three_arg
 	add	x10, x29, x9, LSL #3				/* where to copy from -- skip 8 * (count - 1) + 16 */
 	add	x10, x10, #8					/* The 16 is for the pushed x30 and x29, so 8 * count + 8 */
+	tst	w0, #1
+	b.eq	in_loop
 loop:
 	ldr	x12, [x10], #-8
-	str	x12, [x11, #-8]!
 	subs	w9, w9, #1
-	b.ne	loop
-	mov	sp, x11						/* Copy is done, now we can use sp */
+in_loop:
+	ldr	x11, [x10], #-8
+	stp	x11, x12, [sp, #-16]!
+	subs	w9, w9, #1
+	b.gt	loop
 	CHKSTKALIGN						/* Verify stack alignment */
 three_arg:
 	ldr	x7, [x29, #actual3]

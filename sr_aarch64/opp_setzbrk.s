@@ -25,7 +25,6 @@
 
 	.include "linkage.si"
 	.include "g_msf.si"
-	.include "stack.si"
 #	include "debug.si"
 
 	.data

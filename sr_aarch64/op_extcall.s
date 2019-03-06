@@ -58,7 +58,6 @@
 	.include "linkage.si"
 	.include "g_msf.si"
 	.include "gtm_threadgbl_deftypes_asm.si"
-	.include "stack.si"
 #	include "debug.si"
 
 	.data

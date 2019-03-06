@@ -16,7 +16,6 @@
 
 	.include "linkage.si"
 	.include "g_msf.si"
-	.include "stack.si"
 #	include "debug.si"
 
 	.data
@@ -39,7 +38,7 @@ ENTRY op_fetchintrrpt
 	ldrb	w15, [x15]
 	cbz	w15, l1
 	bl	outofband_clear
-	mov	X0, xzr
+	mov	x0, xzr
 	bl	gvcmz_neterr
 l1:
 	mov	x0, #1
