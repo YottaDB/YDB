@@ -4,7 +4,7 @@
 # Copyright (c) 2009-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.	#
+# Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -112,7 +112,7 @@ fi
 $echo "                     YottaDB Configuration Script"
 $echo "Copyright 2009, 2014 Fidelity Information Services, Inc. Use of this"
 $echo "software is restricted by the provisions of your license agreement."
-$echo "Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries."
+$echo "Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries."
 $echo "All rights reserved."
 $echo ""
 

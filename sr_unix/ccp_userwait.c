@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*

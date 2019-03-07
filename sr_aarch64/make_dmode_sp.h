@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2019 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
