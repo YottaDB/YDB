@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "STDERRALREADYOPEN", "STDERR deviceparameter specifies an already open device !AD", 2 },
 	{ "SETENVFAIL", "VIEW \"SETENV\":\"!AD\" failed in setenv() system call", 2 },
 	{ "UNSETENVFAIL", "VIEW \"UNSETENV\":\"!AD\" failed in unsetenv() system call", 2 },
-	{ "UNKNOWNSYSERR", "An unknown system error has occurred: !AD", 2 },
+	{ "UNKNOWNSYSERR", "[!UL] does not correspond to a known YottaDB error code", 1 },
 	{ "STRUCTNOTALLOCD", "Structure not previously called with Alloc() method", 0 },
 	{ "NODEEND", "End of list of nodes/subscripts", 0 },
 	{ "INVLNPAIRLIST", "Invalid lockname/subscript pair list (uneven number of lockname/subscript parameters)", 0 },

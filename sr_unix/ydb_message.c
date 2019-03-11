@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,11 +55,14 @@ int ydb_message(int errnum, ydb_buffer_t *msg_buff)
 	msg.addr = msgbuf;
 	status = gtm_getmsg(l_x, &msg);			/* Writes result to our buffer */
 	if (ERR_UNKNOWNSYSERR == status)		/* Message loopup failed */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_UNKNOWNSYSERR, 2, msg.len, msg.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_UNKNOWNSYSERR, 1, l_x);
+	if (NULL == msg_buff)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
+			LEN_AND_LIT("NULL msg_buff"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_MESSAGE)));
 	/* Copy message to user's buffer if there is room */
 	msg_buff->len_used = msg.len;
 	if (msg.len > msg_buff->len_alloc)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVSTRLEN, 2, msg.len, msg_buff->len_alloc);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, msg.len, msg_buff->len_alloc);
 	if (msg.len)
 	{
 		if (NULL == msg_buff->buf_addr)
