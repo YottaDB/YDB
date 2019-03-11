@@ -120,7 +120,7 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. set tmp4=$zpiece(tmp3,tmp1,1) for i=2:1:$zlength(tmp3,tmp1) set tmp4=tmp4_env("ydb_rel")_$zpiece(tmp3,tmp1,i)
 	. set tmp3=tmp4
 	if $zlength(tmp2) set tmp4=$zpiece(tmp3,tmp2,1) for i=2:1:$zlength(tmp3,tmp2) set tmp4=tmp4_env("gtmver")_$zpiece(tmp3,tmp2,i)
-	if ""=$zsearch(tmp4) do
+	if ""=$zsearch(tmp4,$increment(zstmp)) do
 	. ; Release-specific directory (e.g. /tmp/yottadb/r1.23_x86_64) does not exist. Create it.
 	. ; Note: One might be tempted to combine the "umask" and "chmod o-rwx" commands below into one "umask command
 	. ;       But that might not be correct in case we also create /tmp/yottadb as part of the below "mkdir".
@@ -158,25 +158,41 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. else  write "export ydb_retention=42",!,"export gtm_retention=$ydb_retention",!
 	else  write "export gtm_retention=$ydb_retention",!
 	set tmp1=$ztrnlnm("LD_LIBRARY_PATH")
-	write:'($zlength(tmp1,dist)-1) "export LD_LIBRARY_PATH=""",dist,$select($zlength(dist):":"_tmp1,1:""),"""",!
-	write "alias dse=$ydb_dist/dse",!
+	write:'($zlength(tmp1,dist)-1) "export LD_LIBRARY_PATH=""",dist,$select($zlength(tmp1):":"_tmp1,1:""),"""",!
+	if $increment(zstmp)	       ; new search context for search in next line
+	for  set tmp1=$zsearch("$ydb_dist/plugin/*.xc",zstmp) quit:""=tmp1  do
+	. set tmp2=$zparse(tmp1,"name")
+	. write "export ydb_xc_",tmp2,"=",tmp1,"; export GTMXC_",tmp2,"=",tmp1,!
+	set tmp=$zsearch("$ydb_dist/plugin/bin",$increment(zstmp))
+	write:'$find($ztrnlnm("PATH"),dist) "export PATH=",$select($length(tmp):tmp_":",1:""),"$ydb_dist:$PATH",!
 	write "alias gde=""$ydb_dist/mumps -run GDE""",!
-	write "alias gtm=$ydb_dist/ydb",!
-	write "alias lke=$ydb_dist/lke",!
-	write "alias mumps=$ydb_dist/mumps",!
-	write "alias mupip=$ydb_dist/mupip",!
-	write "alias ydb=$ydb_dist/ydb",!
-	write "alias yottadb=$ydb_dist/ydb",!
 	quit
 
-unset	; Remove $ydb_dist from $LD_LIBRARY_PATH as part of unsetting the environment set by entryref set
-	new dist,i,ldpath,tmp
-	set dist=$ztrnlnm("ydb_dist")_":"
-	set ldpath=$ztrnlnm("LD_LIBRARY_PATH")_":"
-	if dist=ldpath write "unset LD_LIBRARY_PATH",!
+unset	; As part of unsetting the environment set by entryref set:
+	; - Remove $ydb_dist from $LD_LIBRARY_PATH 
+	; - Remove $ydb_dist and $ydb_dist/plugin/bin from $PATH
+	new dir,env,i,io,path,tmp,unset
+	set io=$io
+	set path=$ztrnlnm("PATH")_":"
+	set dir=$ztrnlnm("ydb_dist")_"/plugin/bin:"
+	set tmp=$zpiece(path,dir,1) for i=2:1:$zlength(path,dir) set tmp=tmp_$zpiece(path,dir,i)
+	set path=tmp
+	set dir=$zpiece(dir,"/plugin/bin:",1)_":"
+	set tmp=$zpiece(path,dir,1) for i=2:1:$zlength(path,dir) set tmp=tmp_$zpiece(path,dir,i)
+	write "export PATH=",$zextract(tmp,1,$zlength(tmp)-1),!
+	set path=$ztrnlnm("LD_LIBRARY_PATH")_":"
+	if dir=path write "unset LD_LIBRARY_PATH",!
 	else  do
-	. set tmp=$zpiece(ldpath,dist,1) for i=2:1:$zlength(ldpath,dist) set tmp=tmp_$zpiece(ldpath,dist,i)
-	. write "export LD_LIBRARY_PATH=",$extract(tmp,1,$zlength(tmp)-1),!
+	. set tmp=$zpiece(path,dir,1) for i=2:1:$zlength(path,dir) set tmp=tmp_$zpiece(path,dir,i)
+	. write "export LD_LIBRARY_PATH=",$zextract(tmp,1,$zlength(tmp)-1),!
+	open "env":(shell="/bin/sh":command="env":readonly)::"pipe"
+	use "env"
+	set unset="unset"
+	for  read env quit:$zeof  do
+	. set tmp=$zconvert($zextract(env,1,3),"l")
+	. set:"ydb"=tmp!("gtm"=tmp) unset=unset_" "_$zpiece(env,"=",1)
+	use io close "env"
+	write:"unset"'=unset unset,!
 	quit
 
 DirEnsure(ydbvar,gtmvar)
