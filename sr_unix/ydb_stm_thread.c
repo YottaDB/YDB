@@ -32,6 +32,7 @@
 #include "trace_table.h"
 #include "gtmci.h"
 #include "gtm_exit_handler.h"
+#include "memcoherency.h"
 
 GBLREF	stm_workq	*stmWorkQueue[];
 GBLREF	stm_workq	*stmTPWorkQueue[];
@@ -67,8 +68,8 @@ void *ydb_stm_thread(void *parm)
 	/* Now that we are establishing this main work queue thread, we need to make sure all timers and checks done by
 	 * YottaDB *and* user code deal with THIS thread and not some other random thread.
 	 */
-	simpleThreadAPI_active = TRUE;
 	assert(gtm_main_thread_id_set);
+	assert(!simpleThreadAPI_active);
 	gtm_main_thread_id = pthread_self();
 	INITIALIZE_THREAD_MUTEX_IF_NEEDED; /* Initialize thread-mutex variables if not already done */
 #	ifdef YDB_USE_POSIX_TIMERS
@@ -76,6 +77,8 @@ void *ydb_stm_thread(void *parm)
 	assert(0 == posix_timer_thread_id);
 	posix_timer_thread_id = syscall(SYS_gettid);
 #	endif
+	SHM_WRITE_MEMORY_BARRIER;
+	simpleThreadAPI_active = TRUE;	/* to indicate to caller/creator thread that we are done with setup */
 	/* Initialize which queue we are looking for work in */
 	TREF(curWorkQHead) = stmWorkQueue[0];			/* Initially pick requests from main work queue */
 	assert(NULL != TREF(curWorkQHead));			/* Queue should be setup by now */

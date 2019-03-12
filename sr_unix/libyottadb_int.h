@@ -34,6 +34,7 @@
 #include "libydberrors.h"	/* Define YDB_ERR_* errors */
 #include "error.h"
 #include "setup_error.h"
+#include "sleep.h"
 
 #define MAX_SAPI_MSTR_GC_INDX	YDB_MAX_NAMES
 
@@ -712,8 +713,10 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 {															\
 	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];								\
 	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];							\
+	GBLREF	boolean_t	simpleThreadAPI_active;									\
+	GBLREF	stm_workq	*stmWorkQueue[];	/* Array to hold list of work queues for SimpleThreadAPI */	\
 															\
-	int	lock_index;												\
+	int	i, lock_index, status;											\
 															\
 	/* NARSTODO: Handle case where we already hold pthread lock, say due to error conditions or so. */		\
 	/* NARSTODO: Do we need RECURSIVE pthread_mutex_lock? */							\
@@ -765,7 +768,40 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 			RETVAL = pthread_mutex_lock(&ydb_engine_threadsafe_mutex[lock_index]);				\
 			assert(0 == YDB_OK);										\
 			if (YDB_OK == RETVAL)										\
+			{												\
 				ydb_engine_threadsafe_mutex_holder[lock_index] = pthread_self();			\
+				/* NARSTODO: Handle case where non-zero tptoken is passed in first STAPI call		\
+				 * by process (say ydb_get_st()). This should issue a INVTPTRANS error.			\
+				 */											\
+				/* Mark this process as having SimpleThreadAPI active if not already done */		\
+				if (!simpleThreadAPI_active && (LYDB_RTN_NONE != CALLTYP))				\
+				{	/* The LYDB_RTN_NONE check above is needed to take into account calls of this	\
+					 * macro from "ydb_init" which are done even in SimpleAPI mode. Those calls	\
+					 * should not mark SimpleThreadAPI as active.					\
+					 */										\
+					assert(0 == lock_index);							\
+					/* Start the MAIN worker thread for SimpleThreadAPI */				\
+					status = pthread_create(&stmWorkQueue[0]->threadid, NULL,			\
+										&ydb_stm_thread, NULL);			\
+					/* NARSTODO: Handle non-zero return from "pthread_create" below */		\
+					if (YDB_OK == status)								\
+					{     	 									\
+						/* Wait for MAIN worker thread to set simpleThreadAPI_active */		\
+						for (i = 0; i < MICROSECS_IN_MSEC; i++) 				\
+						{									\
+							if (simpleThreadAPI_active)					\
+								break;							\
+							SLEEP_USEC(1, FALSE);						\
+						}									\
+						if (MICROSECS_IN_MSEC == i)						\
+						{	/* Worker thread did not reach desired state in given time.	\
+							 * Treat this as if the "pthread_create" call failed.		\
+							 */								\
+							status = ETIMEDOUT;						\
+						}									\
+					}										\
+				}											\
+			}												\
 		}													\
 		if (YDB_OK == RETVAL)											\
 		{													\
@@ -813,26 +849,22 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 #define VERIFY_THREADED_API(RETTYPE, ERRSTR)									\
 MBSTART {													\
 	GBLREF boolean_t noThreadAPI_active;									\
-	GBLREF boolean_t simpleThreadAPI_active;								\
 	if (noThreadAPI_active)											\
 	{													\
 		SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(YDB_ERR_THREADEDAPINOTALLOWED, (ydb_buffer_t *)ERRSTR);	\
 		DBGAPITP_ONLY(gtm_fork_n_core());								\
 		return RETTYPE YDB_ERR_THREADEDAPINOTALLOWED;							\
 	}													\
-	simpleThreadAPI_active = TRUE;										\
 } MBEND
 #define VERIFY_THREADED_API_NORETVAL(ERRSTR)									\
 MBSTART {													\
 	GBLREF boolean_t noThreadAPI_active;									\
-	GBLREF boolean_t simpleThreadAPI_active;								\
 	if (noThreadAPI_active)											\
 	{													\
 		SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(YDB_ERR_THREADEDAPINOTALLOWED, (ydb_buffer_t *)ERRSTR);	\
 		DBGAPITP_ONLY(gtm_fork_n_core());								\
 		return;												\
 	}													\
-	simpleThreadAPI_active = TRUE;										\
 } MBEND
 
 /* Initialize an STM (simple thread mode) mutex */
