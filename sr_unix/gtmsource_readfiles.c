@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -118,6 +118,36 @@ MBSTART {														\
 		jpc->cycle = saved_jpc_cycle; /* do not want cycle to be changed by our flushing so restore it */	\
 	}														\
 } MBEND
+
+#ifdef DEBUG
+
+# define	GTMSRC_READFILE_TRCARRAY_SIZE	512
+
+int		dbg_gtmsrc_readfile_trcarray_index;
+trctbl_entry	dbg_gtmsrc_readfile_trcarray[GTMSRC_READFILE_TRCARRAY_SIZE];
+
+# define DBG_GTMSRC_READFILE_TRACE(typeval, intval, addrval1, addrval2, addrval3)	\
+MBSTART {										\
+	trctbl_entry	*trc;								\
+	int		index;								\
+											\
+	index = dbg_gtmsrc_readfile_trcarray_index;					\
+	assert(GTMSRC_READFILE_TRCARRAY_SIZE > index);					\
+	trc = &dbg_gtmsrc_readfile_trcarray[index];					\
+	trc->type = (int4)(typeval);							\
+	trc->intfld = (int4)(intval);							\
+	trc->addrfld1 = (void *)(addrval1);						\
+	trc->addrfld2 = (void *)(addrval2);						\
+	trc->addrfld3 = (void *)(addrval3);						\
+	index++;									\
+	if (GTMSRC_READFILE_TRCARRAY_SIZE == index)					\
+		index = 0;								\
+	dbg_gtmsrc_readfile_trcarray_index = index;					\
+} MBEND
+
+#else
+# define DBG_GTMSRC_READFILE_TRACE(typeval, intval, addrval1, addrval2, addrval3)
+#endif
 
 GBLREF	unsigned char		*gtmsource_tcombuff_start;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
@@ -1586,6 +1616,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 	jctl = jnlpool->jnlpool_ctl;
 	/* For each region */
 	assert(repl_ctl_list->next == repl_rctl_list->ctl_start);
+	DEBUG_ONLY(dbg_gtmsrc_readfile_trcarray_index = 0);
 	for (repl_rctl = repl_rctl_list; (NULL != repl_rctl) && !trans_read; repl_rctl = repl_rctl->next)
 	{
 		ctl = repl_rctl->ctl_start;
@@ -1656,6 +1687,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					ctl = prev_ctl;
 					prev_ctl = ctl->prev;
 					found = TR_FIND_WOULD_BLOCK;
+					DBG_GTMSRC_READFILE_TRACE(found, __LINE__, ctl, prev_ctl, region);
 					continue;
 				}
 				/* We come here ONLY if we have searched from the current generation journal file (as known to the
@@ -1698,10 +1730,13 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 							 * greater than read_jnl_seqno
 							 */
 							found = TR_WILL_NOT_BE_FOUND;
+							DBG_GTMSRC_READFILE_TRACE(found, __LINE__, ctl, (uintptr_t)freeaddr,	\
+										(uintptr_t)ctl->repl_buff->fc->eof_addr);
 							continue;
 						}
 					}
 					found = TR_FIND_WOULD_BLOCK;
+					DBG_GTMSRC_READFILE_TRACE(found, __LINE__, ctl, prev_ctl, NULL);
 				}
 			} else if (ctl->file_state == JNL_FILE_UNREAD)
 			{
@@ -1725,6 +1760,8 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 						 * but the first possible seqno in this gener is > read_jnl_seqno.
 						 */
 						found = TR_WILL_NOT_BE_FOUND;
+						DBG_GTMSRC_READFILE_TRACE(found, __LINE__, ctl,					\
+								(uintptr_t)ctl->repl_buff->fc->jfh->start_seqno, ctl->reg);
 						continue;
 					}
 					if (ctl->prev->reg == ctl->reg)
@@ -1747,6 +1784,9 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 							if (QWGT(ctl->repl_buff->fc->jfh->start_seqno, read_jnl_seqno))
 							{
 								found = TR_WILL_NOT_BE_FOUND;
+								DBG_GTMSRC_READFILE_TRACE(found, __LINE__, ctl,			\
+									(uintptr_t)ctl->repl_buff->fc->jfh->start_seqno,	\
+									(uintptr_t)read_jnl_seqno);
 								continue;
 							}
 							/* Nothing yet written to this file. Attempt opening next gener */
@@ -1764,6 +1804,9 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 								REPL_DPRINT2("Skipping to other regions. Not reading from "
 										"previous generation file %s\n", old_ctl->jnl_fn);
 								found = TR_FIND_WOULD_BLOCK;
+								DBG_GTMSRC_READFILE_TRACE(found, __LINE__, old_ctl,	\
+											(uintptr_t)old_ctl->file_state,
+											(uintptr_t)old_ctl->min_seqno);
 								continue;
 							}
 							/* Search the prev gener and backwards */
@@ -1775,6 +1818,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 					{
 						REPL_DPRINT2("First pass...skipping UNREAD file %s\n", ctl->jnl_fn);
 						found = TR_FIND_WOULD_BLOCK;
+						DBG_GTMSRC_READFILE_TRACE(found, __LINE__, ctl, ctl->reg, ctl->prev->reg);
 						continue;
 					}
 				}
@@ -1793,6 +1837,8 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 						&& (ctl->prev->max_seqno < read_jnl_seqno)
 							|| (JNL_FILE_EMPTY == ctl->prev->file_state));
 					found = TR_WILL_NOT_BE_FOUND;
+					DBG_GTMSRC_READFILE_TRACE(found, __LINE__, ctl,			\
+						(uintptr_t)ctl->file_state, (uintptr_t)ctl->min_seqno);
 					continue;
 				}
 				if (ctl->prev->reg == ctl->reg)
@@ -1806,6 +1852,7 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 				{
 					REPL_DPRINT2("First pass...not opening prev gener file...skipping %s\n", ctl->jnl_fn);
 					found = TR_FIND_WOULD_BLOCK;
+					DBG_GTMSRC_READFILE_TRACE(found, __LINE__, ctl, ctl->reg, ctl->prev->reg);
 					continue;
 				}
 				/* Need to open prev gener */
@@ -1819,8 +1866,11 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 						return 0;
 					}
 					if (ctl->file_state != JNL_FILE_EMPTY)
+					{
 						found = TR_WILL_NOT_BE_FOUND;
-					else
+						DBG_GTMSRC_READFILE_TRACE(found, __LINE__, ctl,			\
+							(uintptr_t)ctl->file_state, (uintptr_t)ctl->min_seqno);
+					} else
 					{	/* Skip the empty generation */
 						REPL_DPRINT2("Skipping empty journal file %s\n", ctl->jnl_fn);
 						prev_ctl = ctl;
@@ -1832,6 +1882,9 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 				if (old_ctl->file_state == JNL_FILE_EMPTY || QWGT(old_ctl->min_seqno, read_jnl_seqno))
 				{	/* Give the other regions a chance to open their previous generations */
 					found = TR_FIND_WOULD_BLOCK;
+					DBG_GTMSRC_READFILE_TRACE(found, __LINE__, old_ctl,	\
+						(uintptr_t)old_ctl->file_state,			\
+						(uintptr_t)old_ctl->min_seqno);
 					REPL_DPRINT2("Skipping to other regions. Not reading from previous generation file %s\n",
 							old_ctl->jnl_fn);
 					continue;
@@ -1867,9 +1920,13 @@ static	int read_regions(unsigned char **buff, int *buff_avail,
 						assert(cumul_read % JNL_WRT_END_MODULUS == 0);
 					}
 					found = TR_FOUND;
+					DBG_GTMSRC_READFILE_TRACE(found, __LINE__, ctl,			\
+						(uintptr_t)ctl->seqno, (uintptr_t)read_jnl_seqno);
 				} else if (read_jnl_seqno < ctl->seqno)
 				{	/* This region is not involved in transaction read_jnl_seqno */
 					found = TR_WILL_NOT_BE_FOUND;
+					DBG_GTMSRC_READFILE_TRACE(found, __LINE__, ctl,			\
+						(uintptr_t)ctl->seqno, (uintptr_t)read_jnl_seqno);
 				} else	/* QWGT(read_jnl_seqno, ctl->seqno) */
 				{
 					/* Detect infinite loop of calls to position_read() by limiting # of calls to 1024 in dbg */
