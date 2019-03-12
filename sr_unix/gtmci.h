@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,21 @@
  * that purpose so only has a non-NULL value for the duration of level creation.
  */
 #define FGNCAL_STACK ((NULL == TREF(temp_fgncal_stack)) ? fgncal_stack : TREF(temp_fgncal_stack))
+
+/* Call-ins uses the fgncal_stack global as a marker in the stack for where to unwind the stack back to. This preserves
+ * the call-in base frame(s) but removes any other frames left on the stack as well as the parameter related mv_stents
+ * and any other mv_stents no longer needed. This macro saves the current value of fgncal_stack on the M stack in an
+ * MVST_STCK_SP type mv_stent. Note MVST_STCK_SP is chosen (instead of MVST_STCK) because MVST_STCK_SP doesn't get removed
+ * if the frame is rewritten by a ZGOTO for instance.
+ */
+# define SAVE_FGNCAL_STACK								\
+{											\
+	if (msp != fgncal_stack)							\
+	{										\
+		push_stck(fgncal_stack, 0, (void **)&fgncal_stack, MVST_STCK_SP);	\
+		fgncal_stack = msp;							\
+	}										\
+}
 
 void	ci_ret_code_quit(void);
 void	gtmci_isv_save(void);
