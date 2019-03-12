@@ -16,10 +16,13 @@
 #include "gtmci.h"
 
 #ifdef DEBUG
-GBLREF	stm_workq	*stmWorkQueue[];		/* Array to hold list of work queues for SimpleThreadAPI */
+GBLREF	boolean_t	noThreadAPI_active;
+GBLREF	boolean_t	simpleThreadAPI_active;
 #endif
 
-/* Helper routine to do a "ydb_cip" call with a "ydb_simpleapi_ch" condition handler wrapper to handle TPRETRY/TPRESTART */
+/* Helper routine to do a "ydb_ci_t" or "ydb_cip_t" call with a "ydb_simpleapi_ch" condition handler wrapper
+ * to handle TPRETRY/TPRESTART.
+ */
 int ydb_cip_helper(int calltyp, ci_name_descriptor *ci_info, va_list *var)
 {
 	mval		src, dst;
@@ -30,10 +33,7 @@ int ydb_cip_helper(int calltyp, ci_name_descriptor *ci_info, va_list *var)
 	SETUP_THREADGBL_ACCESS;
 	/* Verify entry conditions, make sure YDB CI environment is up etc. */
 	assert((LYDB_RTN_YDB_CI == calltyp) || (LYDB_RTN_YDB_CIP == calltyp));
-	/* Need to call VERIFY_THREADED_API before LIBYOTTADB_INIT.
-	 * Moving this to after LIBYOTTADB_INIT implies LIBYOTTADB_DONE would not be done in case of INVAPIMODE error.
-	 */
-	VERIFY_THREADED_API((int), NULL);
+	assert(simpleThreadAPI_active && !noThreadAPI_active);	/* Assert we are in SimpleThreadAPI mode. Caller ensures that. */
 	LIBYOTTADB_INIT(calltyp, (int));	/* Note: macro could "return" from this function in case of errors */
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* previously unused entries should have been cleared by that
 							 * corresponding ydb_*_s() call.
