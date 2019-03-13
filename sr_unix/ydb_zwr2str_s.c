@@ -17,6 +17,9 @@
 #include "libyottadb_int.h"
 #include "stringpool.h"		/* for "s2pool" prototype */
 #include "op.h"			/* for "op_fnzwrite" prototype */
+#include "outofband.h"
+
+GBLREF	volatile int4	outofband;
 
 /* Routine to convert an input in the zwrite representation into string subscript representation.
  *
@@ -47,6 +50,9 @@ int ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str)
 		REVERT;
 		return ((ERR_TPRETRY == SIGNAL) ? YDB_TP_RESTART : -(TREF(ydb_error_code)));
 	}
+	/* Check if an outofband action that might care about has popped up */
+	if (outofband)
+		outofband_action(FALSE);
 	/* Do some validation */
 	if (NULL == str)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
