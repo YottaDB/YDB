@@ -216,8 +216,8 @@ GBLREF	boolean_t	posix_timer_created;
 GBLREF	boolean_t	in_nondeferrable_signal_handler;
 GBLREF	boolean_t	gtm_jvm_process;
 GBLREF	boolean_t	exit_handler_active;
-GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
 #endif
+GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
 
 error_def(ERR_SETITIMERFAILED);
 error_def(ERR_TEXT);
@@ -705,6 +705,7 @@ STATICFNDEF void timer_handler(int why, siginfo_t *info, void *context)
 	char 		*save_util_outptr;
 	va_list		save_last_va_list_ptr;
 	boolean_t	util_copy_saved = FALSE, safe_for_timer_pop;
+	pthread_t	mutex_holder_thread_id, this_thread_id;
 #	ifdef DEBUG
 	boolean_t	save_in_nondeferrable_signal_handler;
 	ABS_TIME	rel_time, old_at, late_time;
@@ -715,25 +716,39 @@ STATICFNDEF void timer_handler(int why, siginfo_t *info, void *context)
 	SETUP_THREADGBL_ACCESS;
 	assert((DUMMY_SIG_NUM == why) || (SIGALRM == why));
 	if (SIGALRM == why)
-	{	/* Note that when using POSIX timers, the signal is already being sent to the
-		 * correct thread for timer pops so one might think there is no need to "forward it".
-		 * But it is possible a C program holding a parent M-lock with SimpleAPI can fork off processes
-		 * that start waiting for a child M-lock with SimpleThreadAPI in which case the lock wake up signal
-		 * (a SIGALRM signal) from the parent program would get sent to the child process-id (using "crit_wake")
-		 * which should forward the signal to the MAIN worker thread as that is the one driving the YottaDB engine.
-		 * Therefore we need this signal forwarding even in the POSIX timer case.
+	{	/* If SimpleThreadAPI is active, the MAIN worker thread is usually the one that will receive the SIGALRM
+		 * signal (when using POSIX timers). Note though that it is possible some other thread also receives
+		 * the signal (for example if a C program holding a parent M-lock with SimpleAPI can fork off processes
+		 * that start waiting for a child M-lock with SimpleThreadAPI in which case the lock wake up signal,
+		 * also the same SIGALRM signal, from the parent program would get sent to the child process-id,
+		 * using "crit_wake", which should forward the signal to the MAIN worker thread OR the currently active
+		 * thread that is holding the YottaDB engine lock). In any case, as long as the thread holds the
+		 * YottaDB engine lock, we can continue "timer_handler" processing in this thread. If not, we need
+		 * to defer the invocation until a later point when we do hold the lock (cannot do a "pthread_mutex_lock"
+		 * call here since we are inside a signal handler and "pthread_mutex_lock" is not async-signal-safe).
+		 * Record the fact that a timer invocation happened and let the MAIN worker thread invoke
+		 * "timer_handler" outside of the signal handler as part of its normal processing ("ydb_stm_thread").
 		 */
-		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGALRM, IS_EXI_SIGNAL_FALSE, NULL, NULL);
 		if (simpleThreadAPI_active)
-		{	/* If SimpleThreadAPI is active, the MAIN worker thread is the one that will receive the timer
-			 * signal. But it cannot continue with "timer_handler" function processing since we do not have
-			 * the YottaDB engine multi-thread mutex. But we cannot do a "pthread_mutex_lock" call here since
-			 * we are inside a signal handler and "pthread_mutex_lock" is not async-signal-safe. Therefore
-			 * we record the fact that a timer invocation happened and let the MAIN worker thread invoke
-			 * "timer_handler" outside of the signal handler as part of its normal processing ("ydb_stm_thread").
-			 */
-			stapi_timer_handler_deferred = TRUE;
-			return;
+		{
+			this_thread_id = pthread_self();
+			mutex_holder_thread_id = ydb_engine_threadsafe_mutex_holder[0];
+			if (!pthread_equal(mutex_holder_thread_id, this_thread_id))
+			{
+				stapi_timer_handler_deferred = TRUE;
+				/* It is possible we are the MAIN worker thread that gets the SIGALRM signal but another thread
+				 * that is holding the YottaDB engine lock is waiting for the signal to know of a timeout
+				 * (e.g. ydb_lock_st/ydb_tp_st etc.). Therefore forward the signal to that thread too so it
+				 * can invoke the timer handler right away.
+				 */
+				if (mutex_holder_thread_id)
+					pthread_kill(mutex_holder_thread_id, SIGALRM);
+				return;
+			}
+		} else
+		{
+			FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGALRM, IS_EXI_SIGNAL_FALSE, NULL, NULL);
+			assert(gtm_is_main_thread() || gtm_jvm_process);
 		}
 	} else
 	{	/* else: why == DUMMY_SIG_NUM we know that "timer_handler" was called directly, so no need
@@ -742,10 +757,10 @@ STATICFNDEF void timer_handler(int why, siginfo_t *info, void *context)
 		 * (needed to ensure other threads cannot be concurrently running YottaDB runtime code).
 		 */
 		assert(!simpleThreadAPI_active || (ydb_engine_threadsafe_mutex_holder[0] == pthread_self()));
-		assert(simpleThreadAPI_active || !stapi_timer_handler_deferred);
-		stapi_timer_handler_deferred = FALSE;	/* Clear any pending deferred timer handler flags in SimpleThreadAPI */
 	}
-	assert(gtm_is_main_thread() || gtm_jvm_process);
+	/* Now that we are going to go through "timer_handler", clear any pending deferred timer handler flags in SimpleThreadAPI */
+	assert(simpleThreadAPI_active || !stapi_timer_handler_deferred);
+	stapi_timer_handler_deferred = FALSE;
 	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into generic_signal_handler

@@ -138,6 +138,7 @@ MBSTART {														\
 			 * MAIN worker thread to let us know when it is safe for us to take over control of	\
 			 * the YottaDB engine for a short period of time (1 minute) to generate the core.	\
 			 */											\
+			/* NARSTODO: Investigate if this part changes due to STAPIPERF MAIN worker thread changes */	\
 			if (!IS_DONT_WANT_CORE_TRUE(SIG))							\
 			{											\
 				for (i = 0; i < SAFE_TO_FORK_N_CORE_TRIES; i++)					\
