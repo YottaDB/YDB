@@ -726,7 +726,7 @@ STATICFNDEF void timer_handler(int why, siginfo_t *info, void *context)
 	/* else: why == DUMMY_SIG_NUM we know that "timer_handler" was called directly, so no need
 	 * to check if the signal needs to be forwarded to appropriate thread.
 	 */
-	assert(gtm_is_main_thread() || gtm_jvm_process || exit_handler_active && (DUMMY_SIG_NUM == why));
+	assert(gtm_is_main_thread() || gtm_jvm_process);
 	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into generic_signal_handler
