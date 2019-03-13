@@ -224,7 +224,6 @@ THREADGBLDEF(collseq_list,			collseq *)			/* list of pointers to currently mappe
 										 * algorithms - since this seems only used in
 										 * collseq.c -seems more like a STATICDEF */
 THREADGBLFPTR(create_fatal_error_zshow_dmp_fptr, void, 		(void))		/* Fptr for gtm_fatal_error* zshow dmp routine */
-THREADGBLDEF(curWorkQHead,			stm_workq *)			/* Work queue header address */
 THREADGBLDEF(stapi_errstr,			ydb_buffer_t *)			/* Pointer to ydb_buffer_t that is filled in case
 										 * of error inside a SimpleThreadAPI call.
 										 */

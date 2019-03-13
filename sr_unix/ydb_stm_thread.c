@@ -71,9 +71,6 @@ void *ydb_stm_thread(void *parm)
 #	endif
 	SHM_WRITE_MEMORY_BARRIER;
 	simpleThreadAPI_active = TRUE;	/* to indicate to caller/creator thread that we are done with setup */
-	/* Initialize which queue we are looking for work in */
-	TREF(curWorkQHead) = stmWorkQueue[0];			/* Initially pick requests from main work queue */
-	assert(NULL != TREF(curWorkQHead));			/* Queue should be setup by now */
 	/* If we reach here, it means the MAIN worker thread has been asked to shut down (i.e. a "ydb_exit" was done).
 	 * Do YottaDB exit processing too as part of the same but before that wait some time for the TP worker threads (if any)
 	 * to terminate. "ydb_stm_thread_exit" takes care of that for us.
