@@ -207,7 +207,7 @@ GBLREF	int4		error_condition;
 GBLREF	int4		outofband;
 GBLREF	int		process_exiting;
 GBLREF	struct sigaction orig_sig_action[];
-GBLREF	boolean_t	stapi_timer_handler_deferred;
+GBLREF	int		stapi_timer_handler_deferred;
 #ifdef YDB_USE_POSIX_TIMERS
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
@@ -218,6 +218,7 @@ GBLREF	boolean_t	gtm_jvm_process;
 GBLREF	boolean_t	exit_handler_active;
 #endif
 GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
+GBLREF	uint4		dollar_tlevel;
 
 error_def(ERR_SETITIMERFAILED);
 error_def(ERR_TEXT);
@@ -699,7 +700,7 @@ STATICFNDEF void timer_handler(int why, siginfo_t *info, void *context)
 	int4		cmp, save_error_condition;
 	GT_TIMER	*tpop, *tpop_prev = NULL;
 	ABS_TIME	at;
-	int		save_errno, timer_defer_cnt, offset;
+	int		save_errno, timer_defer_cnt, offset, lock_index;
 	TID 		*deferred_tid;
 	boolean_t	tid_found;
 	char 		*save_util_outptr;
@@ -715,6 +716,12 @@ STATICFNDEF void timer_handler(int why, siginfo_t *info, void *context)
 
 	SETUP_THREADGBL_ACCESS;
 	assert((DUMMY_SIG_NUM == why) || (SIGALRM == why));
+	/* If we are not in TP, the YottaDB engine lock index is 0 (i.e. ydb_engine_threadsafe_mutex_holder[0] is current
+	 * lock holder thread). But if we are in TP, then lock index is dollar_tlevel - 1. Take that into account below.
+	 */
+	lock_index = dollar_tlevel;
+	if (lock_index)
+		lock_index--;
 	if (SIGALRM == why)
 	{	/* If SimpleThreadAPI is active, the MAIN worker thread is usually the one that will receive the SIGALRM
 		 * signal (when using POSIX timers). Note though that it is possible some other thread also receives
@@ -732,16 +739,20 @@ STATICFNDEF void timer_handler(int why, siginfo_t *info, void *context)
 		if (simpleThreadAPI_active)
 		{
 			this_thread_id = pthread_self();
-			mutex_holder_thread_id = ydb_engine_threadsafe_mutex_holder[0];
+			mutex_holder_thread_id = ydb_engine_threadsafe_mutex_holder[lock_index];
 			if (!pthread_equal(mutex_holder_thread_id, this_thread_id))
 			{
-				stapi_timer_handler_deferred = TRUE;
+				stapi_timer_handler_deferred++;
 				/* It is possible we are the MAIN worker thread that gets the SIGALRM signal but another thread
 				 * that is holding the YottaDB engine lock is waiting for the signal to know of a timeout
 				 * (e.g. ydb_lock_st/ydb_tp_st etc.). Therefore forward the signal to that thread too so it
 				 * can invoke the timer handler right away.
+				 * It is possible for "dollar_tlevel" to change from now by the time the forwarded signal gets
+				 * delivered/handled in the receiving thread. But we do not want forwarding again (could lead
+				 * to indefinite forwardings). Hence the "stapi_timer_handler_deferred" check below which ensures
+				 * a limit on the # of forwardings before "timer_handler" gets invoked.
 				 */
-				if (mutex_holder_thread_id)
+				if (mutex_holder_thread_id && (4 > stapi_timer_handler_deferred))
 					pthread_kill(mutex_holder_thread_id, SIGALRM);
 				return;
 			}
@@ -756,7 +767,7 @@ STATICFNDEF void timer_handler(int why, siginfo_t *info, void *context)
 		 * But if we are in SimpleThreadAPI mode, check that we hold the YottaDB engine multi-thread lock
 		 * (needed to ensure other threads cannot be concurrently running YottaDB runtime code).
 		 */
-		assert(!simpleThreadAPI_active || (ydb_engine_threadsafe_mutex_holder[0] == pthread_self()));
+		assert(!simpleThreadAPI_active || (ydb_engine_threadsafe_mutex_holder[lock_index] == pthread_self()));
 	}
 	/* Now that we are going to go through "timer_handler", clear any pending deferred timer handler flags in SimpleThreadAPI */
 	assert(simpleThreadAPI_active || !stapi_timer_handler_deferred);

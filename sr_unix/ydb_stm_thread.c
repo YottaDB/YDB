@@ -43,7 +43,7 @@ GBLREF	uint64_t 	stmTPToken;			/* Counter used to generate unique token for Simp
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
 #endif
-GBLREF	boolean_t	stapi_timer_handler_deferred;
+GBLREF	int		stapi_timer_handler_deferred;
 
 /* Routine to manage worker thread(s) for the *_st() interface routines (Simple Thread API aka the
  * Simple Thread Method). Note for the time being, only one worker thread is created. In the future,
@@ -95,11 +95,6 @@ void *ydb_stm_thread(void *parm)
 			/* else: lock failed. Not much we can do. Just keep retrying the sleep loop */
 		}
 	}
-	/* If we reach here, it means the MAIN worker thread has been asked to shut down (i.e. a "ydb_exit" was done).
-	 * Do YottaDB exit processing too as part of the same but before that wait some time for the TP worker threads (if any)
-	 * to terminate. "ydb_stm_thread_exit" takes care of that for us.
-	 */
-	ydb_stm_thread_exit();
 	return NULL;
 }
 
