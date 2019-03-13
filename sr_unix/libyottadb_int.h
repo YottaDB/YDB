@@ -716,7 +716,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	GBLREF	boolean_t	simpleThreadAPI_active;									\
 	GBLREF	stm_workq	*stmWorkQueue[];	/* Array to hold list of work queues for SimpleThreadAPI */	\
 															\
-	int	i, lock_index, status;											\
+	int	i, lock_index, lclStatus;											\
 															\
 	/* NARSTODO: Handle case where we already hold pthread lock, say due to error conditions or so. */		\
 	/* NARSTODO: Do we need RECURSIVE pthread_mutex_lock? */							\
@@ -781,10 +781,10 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 					 */										\
 					assert(0 == lock_index);							\
 					/* Start the MAIN worker thread for SimpleThreadAPI */				\
-					status = pthread_create(&stmWorkQueue[0]->threadid, NULL,			\
+					lclStatus = pthread_create(&stmWorkQueue[0]->threadid, NULL,			\
 										&ydb_stm_thread, NULL);			\
 					/* NARSTODO: Handle non-zero return from "pthread_create" below */		\
-					if (YDB_OK == status)								\
+					if (YDB_OK == lclStatus)							\
 					{     	 									\
 						/* NARSTODO: Remove this sleep loop and instead use pthread_cond_signal etc. calls */	\
 						/* Wait for MAIN worker thread to set simpleThreadAPI_active */		\
@@ -798,7 +798,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 						{	/* Worker thread did not reach desired state in given time.	\
 							 * Treat this as if the "pthread_create" call failed.		\
 							 */								\
-							status = ETIMEDOUT;						\
+							lclStatus = ETIMEDOUT;						\
 						}									\
 					}										\
 				}											\
