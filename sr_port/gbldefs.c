@@ -1161,7 +1161,7 @@ GBLDEF	boolean_t	forced_thread_exit;		/* TRUE => signal threads to exit (likely 
 							 * in middle of TP transaction in final retry, exit is deferred until
 							 * transaction is committed and crit is released).
 							 */
-GBLDEF	boolean_t	forced_simplethreadapi_exit;	/* TRUE => signal MAIN/TP worker threads in SimpleThreadAPI to exit
+GBLDEF	boolean_t	forced_simplethreadapi_exit;	/* TRUE => signal MAIN worker thread in SimpleThreadAPI to exit
 							 * immediately (e.g. because the main process got a SIGTERM etc.).
 							 * Note that this is set to TRUE only when we have confirmed the MAIN/TP
 							 * worker threads are at a logical point i.e. it is possible for
@@ -1282,11 +1282,6 @@ GBLDEF	stm_workq	*stmWorkQueue[STMWORKQUEUEDIM];	/* A set of queue/thread descri
 							 * max nesting level error instead of doing it ourselves thus
 							 * checking twice.
 							 */
-GBLDEF	stm_workq	*stmTPWorkQueue[STMWORKQUEUEDIM - 1];	/* Alternate queue main worker thread uses when TP is active.
-								 * MAIN worker thread uses queue stmTPWorkQueue[dollar_tlevel-1]
-								 * depending on the current value of "dollar_tlevel".
-								 */
-GBLDEF	stm_freeq	stmFreeQueue;			/* Structure used to maintain free queue of stm_que_ent blocks */
 GBLDEF	uint64_t	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
 /* One of the following two flags must be true - either running a threaded API or we are running something else (M-code, call-in,
  * SimpleAPI) that is NOT threaded.

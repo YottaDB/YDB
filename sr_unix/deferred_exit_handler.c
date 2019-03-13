@@ -72,7 +72,7 @@ void deferred_exit_handler(void)
 	assert(!INSIDE_THREADED_CODE(rname));	/* below code is not thread safe as it does EXIT() etc. */
 	/* To avoid nested calls to this routine, progress the forced_exit state. */
 	SET_FORCED_EXIT_STATE_ALREADY_EXITING;
-	forced_simplethreadapi_exit = TRUE;	/* If SimpleThreadAPI running, signal MAIN/TP worker threads to
+	forced_simplethreadapi_exit = TRUE;	/* If SimpleThreadAPI running, signal MAIN worker thread to
 						 * terminate immediately now that we are past the window where exit
 						 * had to be deferred (e.g. crit was held etc.).
 						 */

@@ -213,6 +213,7 @@ void gtm_exit_handler(void)
 			 * with exit processing in this invocation of "gtm_exit_handler". It is better to wait for some time for
 			 * the TP worker threads (if any) to terminate before continuing with exit handling. "ydb_stm_thread_exit"
 			 * takes care of that so invoke that in this case.
+			 * NARSTODO: Investigate above comment about TP worker threads to see if it is still relevant.
 			 */
 			if (!forced_simplethreadapi_exit)
 			{

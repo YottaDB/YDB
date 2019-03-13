@@ -82,8 +82,8 @@ typedef enum
 } ydb_var_types;
 
 /* Structure for isolating YottaDB SimpleAPI calls in its own thread. This is the queue entry that conveys
- * the call from one thread to another. Possible queues are the queue array anchored at stmWorkQueue and the
- * TP work queue stmTPWorkQueue both of which are defined in gbldefs.c and described in more detail there.
+ * the call from one thread to another. Possible queues are the queue array anchored at stmWorkQueue
+ * which is defined in gbldefs.c and described in more detail there.
  */
 typedef struct stm_que_ent_struct				/* SimpleAPI Thread Model */
 {
@@ -932,23 +932,7 @@ MBSTART {															\
 
 int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn);
 void	sapi_save_targ_key_subscr_nodes(void);
-intptr_t ydb_stm_args(stm_que_ent *callblk);
-intptr_t ydb_stm_args0(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp);
-intptr_t ydb_stm_args1(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1);
-intptr_t ydb_stm_args2(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2);
-intptr_t ydb_stm_args3(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3);
-intptr_t ydb_stm_args4(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3,
-			uintptr_t p4);
-intptr_t ydb_stm_args5(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3,
-			uintptr_t p4, uintptr_t p5);
-#ifndef GTM64
-intptr_t ydb_stm_args6(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t calltyp, uintptr_t p1, uintptr_t p2, uintptr_t p3,
-			uintptr_t p4, uintptr_t p5, uintptr_t p6);
-#endif
-stm_que_ent *ydb_stm_getcallblk(void);
-int ydb_stm_freecallblk(stm_que_ent *callblk);
 void *ydb_stm_thread(void *parm);
-void *ydb_stm_tpthread(void *parm);
 stm_workq *ydb_stm_init_work_queue(void);
 int ydb_tp_s_common(libyottadb_routines lydbrtn,
 			ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames);
@@ -960,7 +944,6 @@ int ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var);
 void	ydb_stm_atfork_prepare(void);
 void	ydb_stm_atfork_parent(void);
 void	ydb_stm_atfork_child(void);
-void	ydb_stm_threadq_dispatch(stm_que_ent *callblk, boolean_t *queueChanged, boolean_t *forced_thread_exit_seen);
 void	ydb_stm_thread_exit(void);
 
 #endif /*  LIBYOTTADB_INT_H */

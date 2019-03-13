@@ -89,7 +89,6 @@ GBLREF	boolean_t		gtm_main_thread_id_set;
 GBLREF	int			dollar_truth;
 GBLREF	tp_frame		*tp_pointer;
 GBLREF	stm_workq		*stmWorkQueue[];
-GBLREF	stm_workq		*stmTPWorkQueue[];
 GBLREF	boolean_t		noThreadAPI_active;
 GBLREF	boolean_t		simpleThreadAPI_active;
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,87 +49,34 @@ void ydb_dmp_tracetbl(void)
 					cur->intfld, cur->addrfld1, (int)(intptr_t)cur->addrfld2);
 				break;
 			case SOCKRFL_MVS_ZINTR:
-				fprintf(stderr, "   Entry: STAPITP_MVS_ZINTR,  bytes_read: %d, buffer_start: %p,  "
+				fprintf(stderr, "   Entry: SOCKRFL_MVS_ZINTR,  bytes_read: %d, buffer_start: %p,  "
 					"stp_free: %p\n", cur->intfld, cur->addrfld1, cur->addrfld2);
 				break;
 			case SOCKRFL_RESTARTED:
-				fprintf(stderr, "   Entry: STAPITP_RESTARTED, chars_read: %d,  max_bufflen: %d,  stp_need: %d,  "
+				fprintf(stderr, "   Entry: SOCKRFL_RESTARTED, chars_read: %d,  max_bufflen: %d,  stp_need: %d,  "
 					"buffer_start: %p\n", cur->intfld,(int)(intptr_t) cur->addrfld1,
 					(int)(intptr_t)cur->addrfld2, cur->addrfld3);
 				break;
 			case SOCKRFL_RSTGC:
-				fprintf(stderr, "   Entry: STAPITP_RSTGC,  buffer_start: %p,  stp_free: %p\n",
+				fprintf(stderr, "   Entry: SOCKRFL_RSTGC,  buffer_start: %p,  stp_free: %p\n",
 					cur->addrfld1, cur->addrfld2);
 				break;
 			case SOCKRFL_BEGIN:
-				fprintf(stderr, "   Entry: STAPITP_BEGIN,  chars_read: %d,  buffer_start: %p,  stp_free: %p\n",
+				fprintf(stderr, "   Entry: SOCKRFL_BEGIN,  chars_read: %d,  buffer_start: %p,  stp_free: %p\n",
 					cur->intfld, cur->addrfld1, cur->addrfld2);
 				break;
 			case SOCKRFL_OUTOFBAND:
-				fprintf(stderr, "   Entry: STAPITP_OUTOFBAND,  bytes_read: %d,  chars_read: %d,  "
+				fprintf(stderr, "   Entry: SOCKRFL_OUTOFBAND,  bytes_read: %d,  chars_read: %d,  "
 					"buffer_start: %p\n", cur->intfld, (int)(intptr_t)cur->addrfld1, cur->addrfld2);
 				break;
 			case SOCKRFL_EXPBUFGC:
-				fprintf(stderr, "   Entry: STAPITP_EXPBUFGC,  bytes_read: %d,  stp_free: %p,  "
+				fprintf(stderr, "   Entry: SOCKRFL_EXPBUFGC,  bytes_read: %d,  stp_free: %p,  "
 					"old_stp_free: %p,  max_bufflen: %d\n", cur->intfld, cur->addrfld1,
 					cur->addrfld2, (int)(intptr_t)cur->addrfld3);
 				break;
 			case SOCKRFL_RDSTATUS:
-				fprintf(stderr, "   Entry: STAPITP_RDSTATUS,  read_status: %d,  out_of_band: %d, out_of_time: %d\n",
+				fprintf(stderr, "   Entry: SOCKRFL_RDSTATUS,  read_status: %d,  out_of_band: %d, out_of_time: %d\n",
 					cur->intfld, (int)(intptr_t)cur->addrfld1, (int)(intptr_t)cur->addrfld2);
-				break;
-			case STAPITP_ENTRY:
-				fprintf(stderr, "   Entry: STAPITP_ENTRY,  EP: %s,  WorkQAddr: %p,  TID: 0x"lvaddr"\n",
-					(char *)cur->addrfld1, cur->addrfld2, (unsigned long)cur->addrfld3);
-				break;
-			case STAPITP_LOCKWORKQ:
-				fprintf(stderr, "   Entry: STAPITP_LOCKWORDQ,  StrtThread?: %s,  WorkQAddr: %p,  Callblk:"
-					" %p,  TID: 0x"lvaddr"\n", cur->intfld ? "True" : "False", cur->addrfld1,
-					cur->addrfld2, (unsigned long)cur->addrfld3);
-				break;
-			case STAPITP_UNLOCKWORKQ:
-				fprintf(stderr, "   Entry: STAPITP_UNLOCKWORDQ,  WorkQAddr: %p,  Callblk: %p,  "
-					"TID: 0x"lvaddr"\n", cur->addrfld1, cur-> addrfld2, (unsigned long)cur->addrfld3);
-				break;
-			case STAPITP_SEMWAIT:
-				fprintf(stderr, "   Entry: STAPITP_SEMWAIT,  Callblk: %p,  TID: 0x"lvaddr"\n",
-					cur->addrfld2, (unsigned long)cur->addrfld3);
-				break;
-			case STAPITP_FUNCDISPATCH:
-				assert(0 < cur->intfld);
-				if (LYDB_RTN_TPCOMPLT == cur->intfld)
-					funcname = "TPCOMPLT";	/* Not really a routine but rather an event (TP trans complete) */
-				else
-				{
-					assert(LYDB_RTN_TPCOMPLT > cur->intfld);
-					funcname = LYDBRTNNAME(cur->intfld);
-				}
-				fprintf(stderr, "   Entry: STAPITP_FUNCDISPATCH,  Func: %s,   TID: 0x"lvaddr"\n", funcname,
-					(unsigned long)cur->addrfld3);
-				break;
-			case STAPITP_REQCOMPLT:
-				assert(0 < cur->intfld);
-				if (LYDB_RTN_TPCOMPLT == cur->intfld)
-					funcname = "TPCOMPLT";	/* Not really a routine but rather an event (TP trans complete) */
-				else
-				{
-					assert(LYDB_RTN_TPCOMPLT > cur->intfld);
-					funcname = LYDBRTNNAME(cur->intfld);
-				}
-				fprintf(stderr, "   Entry: STAPITP_SEMWAKE,  Retval: %p, Callblk: %p,  TID: 0x"lvaddr"\n",
-					cur->addrfld1, cur->addrfld2, (unsigned long)cur->addrfld3);
-				break;
-				fprintf(stderr, "   Entry: STAPITP_REQCOMPLT,  Func: %s,  Retval: %p, Callblk: %p,  TID: 0x"lvaddr
-					"\n", funcname, cur->addrfld1, cur->addrfld2, (unsigned long)cur->addrfld3);
-
-				break;
-			case STAPITP_SIGCOND:
-				fprintf(stderr, "   Entry: STAPITP_SIGCOND,  Callblk: %p,  TID: 0x"lvaddr"\n", cur->addrfld2,
-					(unsigned long)cur->addrfld3);
-				break;
-			case STAPITP_TPCOMPLT:
-				fprintf(stderr, "   Entry: STAPITP_TPCOMPLT,  TPLevel: %d,  WorkQAddr: %p,  TID: 0x"lvaddr"\n",
-					cur->intfld, cur->addrfld1, (unsigned long)cur->addrfld3);
 				break;
 			case RTSNEST_NESTINCR:
 				fprintf(stderr, "   Entry: RTSNEST_NESTINCR,  Count: %d,  PID: %d,  TID: 0x"lvaddr",  PC: %p\n",

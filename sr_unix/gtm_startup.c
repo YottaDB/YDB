@@ -137,7 +137,6 @@ GBLREF ch_ret_type		(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 GBLREF enum gtmImageTypes	image_type;
 GBLREF int			init_xfer_table(void);
 GBLREF stm_workq		*stmWorkQueue[];
-GBLREF stm_freeq		stmFreeQueue;
 GBLREF void			(*ydb_stm_thread_exit_fnptr)(void);
 GBLREF pthread_mutex_t		ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];
 GBLREF pthread_t		ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
@@ -298,8 +297,6 @@ void gtm_startup(struct startup_vector *svec)
 	assert(NULL == stmWorkQueue[0]);
 	/* Allocate level 0 work queue (primary work queue) */
 	stmWorkQueue[0] = ydb_stm_init_work_queue();	/* Initialize and return address of work descriptor queue block */
-	dqinit(&stmFreeQueue.stm_cbqhead, que);		/* Initialize queue headers for free queue for request blocks */
-	INIT_STM_QUEUE_MUTEX(&stmFreeQueue);		/* Initialize the free queue's mutex */
 	ydb_stm_thread_exit_fnptr = &ydb_stm_thread_exit;
 	for (i = 1; i < STMWORKQUEUEDIM; i++)
 		pthread_mutex_init(&ydb_engine_threadsafe_mutex[i], NULL);

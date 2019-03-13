@@ -38,14 +38,13 @@
 #include "dlopen_handle_array.h"
 
 GBLREF	stm_workq		*stmWorkQueue[];
-GBLREF	stm_workq		*stmTPWorkQueue[];
 GBLREF	int			mumps_status;
 GBLREF	struct sigaction	orig_sig_action[];
 
 /* Routine exposed to call-in user to exit from active YottaDB environment */
 int ydb_exit()
 {
-	int			status, i, sig;
+	int			status, sig;
 	pthread_t		thisThread, threadid;
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;
@@ -99,16 +98,10 @@ int ydb_exit()
 						 * indefinitely. Therefore do a non-blocking join and if that fails, keep signaling
 						 * again (eventually we will signal the worker thread while it is in a
 						 * "pthread_cond_wait") until the join succeeds. Note that the MAIN worker
-						 * thread could be waiting on stmWorkQueue[0] or stmTPWorkQueue[i] (i = 0, 1, ...)
-						 * so signal all of those as appropriate.
+						 * thread could be waiting on stmWorkQueue[0] so signal as appropriate.
 						 */
 						status = pthread_cond_signal(&stmWorkQueue[0]->cond);
 						assert(0 == status);
-						for (i = 0; (NULL != stmTPWorkQueue[i]) && ((STMWORKQUEUEDIM - 1) > i); i++)
-						{
-							status = pthread_cond_signal(&stmTPWorkQueue[i]->cond);
-							assert(0 == status);
-						}
 						status = pthread_tryjoin_np(threadid, NULL);
 						if (EBUSY != status)
 						{
@@ -124,14 +117,6 @@ int ydb_exit()
 					stmWorkQueue[0]->threadid = 0;
 					(void)pthread_cond_destroy(&stmWorkQueue[0]->cond);
 					(void)pthread_mutex_destroy(&stmWorkQueue[0]->mutex);
-					/* If we had more than one level initialized,
-					 * then the alternate TP queue was also initialized.
-					 */
-					for (i = 0; (NULL != stmTPWorkQueue[i]) && ((STMWORKQUEUEDIM - 1) > i); i++)
-					{
-						(void)pthread_cond_destroy(&stmTPWorkQueue[i]->cond);
-						(void)pthread_mutex_destroy(&stmTPWorkQueue[i]->mutex);
-					}
 				}
 			}
 		} else

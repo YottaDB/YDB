@@ -175,7 +175,6 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 		}
 	}
 	tpfn_status = YDB_OK;
-	/* else: For SimpleThreadAPI, the user callback routine is invoked from the TP worker thread */
 	ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 	if (error_encountered)
 	{	/* If we reach here, it means an error occurred and "ydb_simpleapi_ch" was invoked which did a "longjmp"/"UNWIND".
@@ -194,7 +193,7 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 				 *   "ydb_tp_s" invocation and so pass the TPRETRY to the caller until we go back to the
 				 *   outermost "ydb_tp_s" invocation.
 				 * If "lydbrtn" is LYDB_RTN_TP_COMMIT and we reach here, it means we got a TPRETRY while
-				 *   inside "op_tcommit" so we need to return with the restart code to "ydb_stm_tpthread"
+				 *   inside "op_tcommit" so we need to return with the restart code to "ydb_tp_st"
 				 *   so it can then trigger restart processing and then reinvoke the user-defined callback
 				 *   function before attempting another "op_tcommit".
 				 */
@@ -232,7 +231,7 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 			}
 			tpfn_status = YDB_OK;	/* Now that the restart processing is complete, clear status back to normal */
 			if (LYDB_RTN_TP_RESTART == lydbrtn)
-			{	/* Now that restart processing has happened, return control to "ydb_stm_tpthread" to invoke
+			{	/* Now that restart processing has happened, return control to "ydb_tp_st" to invoke
 				 * the user-defined callback function.
 				 */
 				LIBYOTTADB_DONE;

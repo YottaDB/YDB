@@ -96,7 +96,7 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 				 */
 				simpleapi_dollar_trestart = dollar_trestart;
 			}
-			/* Invoke the user-defined TP callback function in the TP worker thread (current thread) */
+			/* Invoke the user-defined TP callback function */
 			retval = (*tpfn)(new_tptoken, errstr, tpfnparm);
 			if (YDB_OK == retval)
 			{	/* Commit the TP transaction by asking MAIN worker thread to do the "op_tcommit"
@@ -135,14 +135,14 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 					rlbk_retval = ydb_tp_s_common(LYDB_RTN_TP_ROLLBACK_TLVL0, (ydb_basicfnptr_t)NULL,
 								(void *)NULL, (const char *)NULL, (int)0, (ydb_buffer_t *)NULL);
 					/* Note that it is possible the above returns a YDB_ERR_CALLINAFTERXIT error
-					 * in case the MAIN/TP worker thread(s) have been asked to terminate.
+					 * in case the MAIN worker thread(s) have been asked to terminate.
 					 * Take that into account in the below assert.
 					 * In this case, the TP transaction would not be rolled back yet (so dollar_tlevel
 					 * would still be non-zero) but it is okay to return in this case with this
 					 * error code since the MAIN worker thread will run the exit handler which will
 					 * do the needed "op_trollback".
 					 */
-					/* NARSTODO: Investigate implication of above comment once MAIN/TP worker threads are gone */
+					/* NARSTODO: Investigate implication of above comment once MAIN worker thread is gone */
 					assert((YDB_TP_ROLLBACK == rlbk_retval)
 						|| (YDB_ERR_CALLINAFTERXIT == rlbk_retval)
 							&& (retval == rlbk_retval) && dollar_tlevel);
@@ -163,7 +163,7 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 						(void *)NULL, (const char *)NULL, (int)0, (ydb_buffer_t *)NULL);
 			assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 			if (YDB_ERR_CALLINAFTERXIT == retval)
-				break;	/* The MAIN/TP worker thread(s) have been asked to exit. Return right away. */
+				break;	/* The MAIN worker thread has been asked to exit. Return right away. */
 			assert(YDB_OK == retval);
 		}
 		break;

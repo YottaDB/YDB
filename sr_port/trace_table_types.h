@@ -2,7 +2,7 @@
  *								*
  * Copyright 2011, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,17 +43,6 @@ TRACETYPE(SOCKRFL,	BEGIN,		"chars_read",	"buffer_start",	"stp_free",	"")		/* Mai
 TRACETYPE(SOCKRFL,	OUTOFBAND,	"bytes_read",	"chars_read",	"buffer_start",	"")		/* Out-of-band recognized - interrupted */
 TRACETYPE(SOCKRFL,	EXPBUFGC,	"bytes_read",	"stp_free",	"old_stp_free",	"max_bufflen")	/* Buffer expansion */
 TRACETYPE(SOCKRFL,	RDSTATUS,	"read_status",	"out_of_band",	"out_of_time",	"")		/* Read results */
-
-/* SimpleThreadAPI TP trace types */
-TRACEGROUP(STAPITP)
-TRACETYPE(STAPITP,	ENTRY,		"",		"entry_point",	"workqlocked",	"TID")		/* Entry point */
-TRACETYPE(STAPITP,	LOCKWORKQ,	"thread_start",	"workqueue",	"callblk",	"TID")		/* Locking a work queue header */
-TRACETYPE(STAPITP,	UNLOCKWORKQ,	"",		"workqueue",	"",		"TID")		/* Unlocking of a work queue header */
-TRACETYPE(STAPITP,	SEMWAIT,	"",		"",		"callblk",	"TID")		/* Thread now waiting on msem */
-TRACETYPE(STAPITP,	FUNCDISPATCH,	"function",	"",		"callblk",	"TID")		/* Dispatch function to run */
-TRACETYPE(STAPITP,	SIGCOND,	"",		"",		"callblk",	"TID")		/* When signal condition var */
-TRACETYPE(STAPITP,	REQCOMPLT,	"function",	"retval",	"callblk",	"TID")		/* The current request is complete */
-TRACETYPE(STAPITP,	TPCOMPLT,	"TPLevel",	"workqueue",	"",		"TID")		/* When a TP level commits/completes */
 
 /* Trace to figure out why rts_error_csa() keeps overflowing max nesting (not getting reset in some path) */
 TRACEGROUP(RTSNEST)
