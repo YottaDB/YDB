@@ -70,6 +70,7 @@ GBLREF 	boolean_t		stringpool_unusable;
 GBLREF 	boolean_t		stringpool_unexpandable;
 GBLREF	int			process_exiting;
 #endif
+GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[];
 
 LITREF	mval		literal_notimeout;
 
@@ -185,18 +186,13 @@ void gtm_exit_handler(void)
 	if (exit_handler_active || skip_exit_handler) /* Skip exit handling if specified or if exit handler already active */
 		return;
 	if (simpleThreadAPI_active)
-	{
-		if (!IS_STAPI_WORKER_THREAD)
-		{	/* This is a SimpleThreadAPI environment and the thread that is invoking the exit handler is not the
-			 * MAIN worker thread. This is an out-of-design situation since this would imply concurrently running
-			 * the YottaDB engine in this thread and the MAIN worker thread. Therefore signal the MAIN worker thread
-			 * to run the exit handler stuff, wait for that to finish (it would have run "gtm_exit_handler") and then
-			 * return. All this is already done by "ydb_exit" so invoke it and return.
-			 */
-			 ydb_exit();
-			 return;
-		}
-		/* else : We are the MAIN worker thread so can proceed with exit handling */
+	{	/* This is a SimpleThreadAPI environment and the thread that is invoking the exit handler does not hold
+		 * the YottaDB engine mutex lock. In that case, go through "ydb_exit" which gets that lock and comes back
+		 * again here.
+		 */
+		if (!pthread_equal(ydb_engine_threadsafe_mutex_holder[0], pthread_self()))
+			ydb_exit();
+		return;
 	}
 	exit_handler_active = TRUE;
 	ydb_dmp_tracetbl();

@@ -69,6 +69,7 @@
 #include "gdskill.h"
 #include "jnl.h"
 #include "tp_frame.h"
+#include "mv_stent.h"
 
 GBLREF  stack_frame     	*frame_pointer;
 GBLREF  unsigned char		*msp;

@@ -82,6 +82,7 @@
 #include "generic_signal_handler.h"
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
+#include "sig_init.h"
 
 #ifdef ITIMER_REAL
 # define BSD_TIMER
@@ -139,7 +140,6 @@ int4	time();
 	STATICDEF boolean_t		in_setitimer_error;
 #endif
 
-#define DUMMY_SIG_NUM		0		/* following can be used to see why timer_handler was called */
 #define SAFE_FOR_ANY_TIMER	((INTRPT_OK_TO_INTERRUPT == intrpt_ok_state) && (FALSE == process_exiting) && !fast_lock_count)
 /* In case threads are running, we don't want any unsafe timers to be handled during a timer handler pop. This is because we
  * don't know if the threads will modify the same global variable that the unsafe timer modifies concurrently.
@@ -207,6 +207,7 @@ GBLREF	int4		error_condition;
 GBLREF	int4		outofband;
 GBLREF	int		process_exiting;
 GBLREF	struct sigaction orig_sig_action[];
+GBLREF	boolean_t	stapi_timer_handler_deferred;
 #ifdef YDB_USE_POSIX_TIMERS
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
@@ -215,6 +216,7 @@ GBLREF	boolean_t	posix_timer_created;
 GBLREF	boolean_t	in_nondeferrable_signal_handler;
 GBLREF	boolean_t	gtm_jvm_process;
 GBLREF	boolean_t	exit_handler_active;
+GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
 #endif
 
 error_def(ERR_SETITIMERFAILED);
@@ -722,10 +724,27 @@ STATICFNDEF void timer_handler(int why, siginfo_t *info, void *context)
 		 * Therefore we need this signal forwarding even in the POSIX timer case.
 		 */
 		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGALRM, IS_EXI_SIGNAL_FALSE, NULL, NULL);
+		if (simpleThreadAPI_active)
+		{	/* If SimpleThreadAPI is active, the MAIN worker thread is the one that will receive the timer
+			 * signal. But it cannot continue with "timer_handler" function processing since we do not have
+			 * the YottaDB engine multi-thread mutex. But we cannot do a "pthread_mutex_lock" call here since
+			 * we are inside a signal handler and "pthread_mutex_lock" is not async-signal-safe. Therefore
+			 * we record the fact that a timer invocation happened and let the MAIN worker thread invoke
+			 * "timer_handler" outside of the signal handler as part of its normal processing ("ydb_stm_thread").
+			 */
+			stapi_timer_handler_deferred = TRUE;
+			return;
+		}
+	} else
+	{	/* else: why == DUMMY_SIG_NUM we know that "timer_handler" was called directly, so no need
+		 * to check if the signal needs to be forwarded to appropriate thread.
+		 * But if we are in SimpleThreadAPI mode, check that we hold the YottaDB engine multi-thread lock
+		 * (needed to ensure other threads cannot be concurrently running YottaDB runtime code).
+		 */
+		assert(!simpleThreadAPI_active || (ydb_engine_threadsafe_mutex_holder[0] == pthread_self()));
+		assert(simpleThreadAPI_active || !stapi_timer_handler_deferred);
+		stapi_timer_handler_deferred = FALSE;	/* Clear any pending deferred timer handler flags in SimpleThreadAPI */
 	}
-	/* else: why == DUMMY_SIG_NUM we know that "timer_handler" was called directly, so no need
-	 * to check if the signal needs to be forwarded to appropriate thread.
-	 */
 	assert(gtm_is_main_thread() || gtm_jvm_process);
 	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifdef DEBUG
@@ -1102,7 +1121,10 @@ void sys_canc_timer()
 		assert(FALSE);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_delete()"), CALLFROM, save_errno);
 	}
-	CLEAR_POSIX_TIMER_FIELDS_IF_APPLICABLE;
+	posix_timer_created = FALSE;	/* Note: we do not use CLEAR_POSIX_TIMER_FIELDS_IF_APPLICABLE here since we want
+					 * to keep the non-zero "posix_timer_thread_id" as is (points to the MAIN worker
+					 * thread id) and just clear the fact that a posix timer was created now that we deleted it.
+					 */
 #	else
 	if (-1 == setitimer(ITIMER_REAL, &zero, &old_sys_timer))
 		REPORT_SETITIMER_ERROR("ITIMER_REAL", zero, FALSE, errno);

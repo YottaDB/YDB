@@ -1331,3 +1331,4 @@ GBLDEF	boolean_t		caller_func_is_stapi;	/* Set to TRUE by a SimpleThreadAPI func
 							 * distinguish whether the caller is a direct user invocation or a
 							 * SimpleThreadAPI invocation. Used to issue SIMPLEAPINOTALLOWED error.
 							 */
+GBLDEF	boolean_t		stapi_timer_handler_deferred;	/* TRUE if "ydb_stm_thread" needs to invoke "timer_handler" */

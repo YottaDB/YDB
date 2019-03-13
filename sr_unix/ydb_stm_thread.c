@@ -32,6 +32,7 @@
 #include "gtmci.h"
 #include "gtm_exit_handler.h"
 #include "memcoherency.h"
+#include "sig_init.h"
 
 GBLREF	stm_workq	*stmWorkQueue[];
 GBLREF	boolean_t	simpleThreadAPI_active;
@@ -42,6 +43,7 @@ GBLREF	uint64_t 	stmTPToken;			/* Counter used to generate unique token for Simp
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
 #endif
+GBLREF	boolean_t	stapi_timer_handler_deferred;
 
 /* Routine to manage worker thread(s) for the *_st() interface routines (Simple Thread API aka the
  * Simple Thread Method). Note for the time being, only one worker thread is created. In the future,
@@ -52,8 +54,11 @@ GBLREF	boolean_t	posix_timer_created;
  */
 void *ydb_stm_thread(void *parm)
 {
-	int		status;
-	boolean_t	queueChanged;
+	int			status;
+	boolean_t		queueChanged;
+	libyottadb_routines	save_active_stapi_rtn;
+	ydb_buffer_t		*save_errstr;
+	boolean_t		get_lock;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -71,6 +76,25 @@ void *ydb_stm_thread(void *parm)
 #	endif
 	SHM_WRITE_MEMORY_BARRIER;
 	simpleThreadAPI_active = TRUE;	/* to indicate to caller/creator thread that we are done with setup */
+	/* NARSTODO: Fix the below infinite sleep loop */
+	for ( ; ; )
+	{
+		SLEEP_USEC(1, FALSE);	/* Sleep for 1 second; FALSE to indicate if system call is interrupted, do not
+					 * restart the sleep.
+					 */
+		if (stapi_timer_handler_deferred)
+		{
+			THREADED_API_YDB_ENGINE_LOCK(YDB_NOTTP, NULL, LYDB_RTN_NONE, save_active_stapi_rtn,	\
+										save_errstr, get_lock, status);
+			assert(0 == status);
+			if (0 == status)
+			{
+				timer_handler(DUMMY_SIG_NUM, NULL, NULL);
+				THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+			}
+			/* else: lock failed. Not much we can do. Just keep retrying the sleep loop */
+		}
+	}
 	/* If we reach here, it means the MAIN worker thread has been asked to shut down (i.e. a "ydb_exit" was done).
 	 * Do YottaDB exit processing too as part of the same but before that wait some time for the TP worker threads (if any)
 	 * to terminate. "ydb_stm_thread_exit" takes care of that for us.
