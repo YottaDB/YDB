@@ -786,6 +786,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 					/* NARSTODO: Handle non-zero return from "pthread_create" below */		\
 					if (YDB_OK == status)								\
 					{     	 									\
+						/* NARSTODO: Remove this sleep loop and instead use pthread_cond_signal etc. calls */	\
 						/* Wait for MAIN worker thread to set simpleThreadAPI_active */		\
 						for (i = 0; i < MICROSECS_IN_MSEC; i++) 				\
 						{									\

@@ -66,20 +66,14 @@ int ydb_exit()
 	} else
 	{
 		if (simpleThreadAPI_active)
-		{	/* This is a SimpleThreadAPI environment. We are guaranteed this thread is not the MAIN or TP worker thread
+		{	/* This is a SimpleThreadAPI environment. We are guaranteed this thread is not the MAIN worker thread
 			 * That means we cannot run exit handling code (since that would imply concurrently running YottaDB engine
-			 * in this thread and the MAIN worker thread). So signal the MAIN worker thread (and TP worker threads if
-			 * any) to exit on our behalf. The MAIN worker thread will also invoke the exit handler. Wait for all the
-			 * threads to complete and then return.
+			 * in this thread and the MAIN worker thread). So signal the MAIN worker thread to exit on our behalf.
+			 * The MAIN worker thread will also invoke the exit handler. Wait for all the threads to complete and
+			 * then return.
 			 */
 			assert(!IS_STAPI_WORKER_THREAD);
-			/* The below signals MAIN and TP worker thread(s) to stop execution at a logical point.
-			 * If they are say in the middle of a TP transaction that is in the final retry, we want to wait
-			 * for that to finish before the threads start terminating. Hence the below only sets "forced_thread_exit"
-			 * to TRUE (and not "forced_simplethreadapi_exit" to TRUE). The latter will be set by the MAIN
-			 * worker thread when it reaches a logical point of execution.
-			 */
-			SET_FORCED_THREAD_EXIT;
+			SET_FORCED_THREAD_EXIT; /* The below signals MAIN worker thread to stop execution at a logical point. */
 			/* We signaled the MAIN (and TP) worker threads to terminate. Wait for that to happen before returning. */
 			assert(forced_thread_exit);
 			if (NULL != stmWorkQueue[0])

@@ -48,7 +48,6 @@ GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		ydb_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
 GBLREF  intrpt_state_t          intrpt_ok_state;
-GBLREF	boolean_t		forced_simplethreadapi_exit;
 GBLREF	struct sigaction	orig_sig_action[];
 
 LITREF	gtmImageName		gtmImageNames[];
@@ -72,10 +71,6 @@ void deferred_exit_handler(void)
 	assert(!INSIDE_THREADED_CODE(rname));	/* below code is not thread safe as it does EXIT() etc. */
 	/* To avoid nested calls to this routine, progress the forced_exit state. */
 	SET_FORCED_EXIT_STATE_ALREADY_EXITING;
-	forced_simplethreadapi_exit = TRUE;	/* If SimpleThreadAPI running, signal MAIN worker thread to
-						 * terminate immediately now that we are past the window where exit
-						 * had to be deferred (e.g. crit was held etc.).
-						 */
 	if (exit_handler_active)
 	{
 		assert(FALSE);	/* at this point in time (June 2003) there is no way we know of to get here, hence the assert */
