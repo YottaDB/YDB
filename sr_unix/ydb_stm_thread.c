@@ -32,7 +32,6 @@
 #include "gtmci.h"
 #include "gtm_exit_handler.h"
 #include "memcoherency.h"
-#include "sig_init.h"
 
 GBLREF	stm_workq	*stmWorkQueue[];
 GBLREF	boolean_t	simpleThreadAPI_active;
@@ -89,7 +88,11 @@ void *ydb_stm_thread(void *parm)
 			assert(0 == status);
 			if (0 == status)
 			{
-				timer_handler(DUMMY_SIG_NUM, NULL, NULL);
+				if (stapi_timer_handler_deferred)
+					timer_handler(DUMMY_SIG_NUM, NULL, NULL);
+				/* else: "timer_handler" got invoked already just before we got the thread lock.
+				 * No need to invoke it again.
+				 */
 				THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 			}
 			/* else: lock failed. Not much we can do. Just keep retrying the sleep loop */

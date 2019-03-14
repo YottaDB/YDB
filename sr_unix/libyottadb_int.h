@@ -35,6 +35,7 @@
 #include "error.h"
 #include "setup_error.h"
 #include "sleep.h"
+#include "gt_timer.h"
 
 #define MAX_SAPI_MSTR_GC_INDX	YDB_MAX_NAMES
 
@@ -716,7 +717,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	GBLREF	boolean_t	simpleThreadAPI_active;									\
 	GBLREF	stm_workq	*stmWorkQueue[];	/* Array to hold list of work queues for SimpleThreadAPI */	\
 															\
-	int	i, lock_index, lclStatus;											\
+	int	i, lock_index, lclStatus;										\
 															\
 	/* NARSTODO: Handle case where we already hold pthread lock, say due to error conditions or so. */		\
 	/* NARSTODO: Do we need RECURSIVE pthread_mutex_lock? */							\
@@ -822,9 +823,16 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 {															\
 	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];								\
 	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];							\
+	GBLREF	int		stapi_timer_handler_deferred;								\
 															\
 	int	lock_index;												\
 															\
+	/* Before releasing the YottaDB engine lock, check if a SIGALRM signal handler got deferred in the MAIN		\
+	 * worker thread and is still pending. If so, handle it now since we own the engine lock for sure here		\
+	 * and it is a safe logical point.										\
+	 */														\
+	if (stapi_timer_handler_deferred)										\
+		timer_handler(DUMMY_SIG_NUM, NULL, NULL);								\
 	/* Since this macro can be called from "ydb_init" as part of opening YottaDB for the first time in the process,	\
 	 * we need to handle the case where "lcl_gtm_threadgbl" is NULL in which case we should not skip TREF usages.	\
 	 */														\

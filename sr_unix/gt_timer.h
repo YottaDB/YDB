@@ -79,6 +79,8 @@ typedef struct st_timer_alloc
 #define GT_WAKE
 #define CANCEL_TIMERS			cancel_unsafe_timers()
 
+#define DUMMY_SIG_NUM		0		/* following can be used to see why timer_handler was called */
+
 /* Set a timeout timer, using a local variable as the timeout indicator.
  * Note: This macro establishes a condition handler which cancels the timer in case of an rts_error.
  *       The TIMEOUT_DONE() macro must be used on all normal routine exit paths in order to REVERT the handler.
@@ -214,6 +216,7 @@ void		check_for_deferred_timers(void);
 void		add_safe_timer_handler(int safetmr_cnt, ...);
 void		sys_canc_timer(void);
 void 		simple_timeout_timer(TID tid, int4 hd_len, boolean_t **timedout);
+void		timer_handler(int why, siginfo_t *info, void *context);
 
 STATICFNDCL void	hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag);
 STATICFNDCL void	gt_timers_alloc(void);
@@ -221,7 +224,6 @@ STATICFNDCL void	start_timer_int(TID tid, int4 time_to_expir, void (*handler)(),
 					void *hdata, boolean_t safe_timer);
 STATICFNDCL void	sys_settimer (TID tid, ABS_TIME *time_to_expir);
 STATICFNDCL void	start_first_timer(ABS_TIME *curr_time);
-STATICFNDCL void	timer_handler(int why, siginfo_t *info, void *context);
 STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
 STATICFNDCL GT_TIMER	*add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
 					void *hdata, boolean_t safe_timer);

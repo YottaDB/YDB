@@ -14,8 +14,6 @@
 #ifndef __SIG_INIT_H__
 #define __SIG_INIT_H__
 
-#define DUMMY_SIG_NUM		0		/* following can be used to see why timer_handler was called */
-
 void	sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)(), void (*continue_handler)());
 void	null_handler(int sig);
 
