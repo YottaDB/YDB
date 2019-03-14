@@ -35,7 +35,10 @@ void suspsigs_handler(int sig, siginfo_t* info, void *context)
 	sigset_t	block_susp_sigs, oldsigmask;
 	int		status;
 
-	/* Note - we do not forward these signals to the main routine but depend on our suspend/continue operations instead */
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig, IS_EXI_SIGNAL_FALSE, NULL, NULL);
+	/* Note - we do not forward these signals to the main routine (e.g Go program using the YottaDB GoWrapper)
+	 * but depend on our (i.e. YottaDB's) suspend/continue operations instead.
+	 */
 	switch(sig)
 	{
 		case SIGTTIN:
