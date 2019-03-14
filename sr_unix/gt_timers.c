@@ -365,6 +365,13 @@ void hiber_start(uint4 hiber)
 				cancel_timer(tid);
 				break;
 			}
+			/* If SimpleThreadAPI is active, check if a timer handler invocation got deferred (since the
+			 * SIGALRM signal would be sent to the MAIN worker thread which would have not been in a position
+			 * to invoke "timer_handler" inside the signal handler). If so invoke it now.
+			 */
+			assert(simpleThreadAPI_active || !stapi_timer_handler_deferred);
+			if (stapi_timer_handler_deferred)
+				timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 		} while (FALSE == waitover);
 	}
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
@@ -393,6 +400,10 @@ void hiber_start_wait_any(uint4 hiber)
 	assert(!sigismember(&savemask, SIGALRM));
 	start_timer_int((TID)hiber_start_wait_any, hiber, NULL, 0, NULL, TRUE);
 	sigsuspend(&savemask);				/* unblock SIGALRM and wait for timer interrupt */
+	/* See comment in "hiber_start" function for why the deferred "timer_handler" invocation is done below */
+	assert(simpleThreadAPI_active || !stapi_timer_handler_deferred);
+	if (stapi_timer_handler_deferred)
+		timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 	cancel_timer((TID)hiber_start_wait_any);	/* cancel timer block before reenabling */
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
 }
@@ -772,13 +783,9 @@ void timer_handler(int why, siginfo_t *info, void *context)
 			assert(gtm_is_main_thread() || gtm_jvm_process);
 		}
 	} else
-	{	/* else: why == DUMMY_SIG_NUM we know that "timer_handler" was called directly, so no need
-		 * to check if the signal needs to be forwarded to appropriate thread.
-		 * But if we are in SimpleThreadAPI mode, check that we hold the YottaDB engine multi-thread lock
-		 * (needed to ensure other threads cannot be concurrently running YottaDB runtime code).
-		 */
-		assert(!simpleThreadAPI_active || (ydb_engine_threadsafe_mutex_holder[dollar_tlevel] == pthread_self()));
-	}
+	/* else: why == DUMMY_SIG_NUM we know that "timer_handler" was called directly, so no need
+	 * to check if the signal needs to be forwarded to appropriate thread.
+	 */
 	/* Now that we are going to go through "timer_handler", clear any pending deferred timer handler flags in SimpleThreadAPI */
 	assert(simpleThreadAPI_active || !stapi_timer_handler_deferred);
 	stapi_timer_handler_deferred = FALSE;
