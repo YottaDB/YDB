@@ -234,6 +234,7 @@ enum wcs_ops_trace_t
 	wcs_ops_wtstart6,
 	wcs_ops_wtstart7,
 	wcs_ops_wtstart8,
+	wcs_ops_wtstart9,
 	wcs_ops_wtfini1,
 	wcs_ops_wtfini2,
 	wcs_ops_wtfini3,

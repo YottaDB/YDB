@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -498,6 +498,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			 * "wcs_wtstart" was from a timer handler, there is no need to flush anything. It is just a nice-to-have
 			 * flush call so it is okay to skip flushing in this case.
 			 */
+			WCS_OPS_TRACE(csa, process_id, wcs_ops_wtstart9, cr->blk, GDS_ANY_ABS2REL(csa,cr), 0, 0, 0);
 			if (keep_buff_lock)
 				CLEAR_BUFF_UPDATE_LOCK(csr, &cnl->db_latch);
 			REINSERT_CR_AT_TAIL(csr, ahead, n, csa, csd, wcb_wtstart_lckfail3);
