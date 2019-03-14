@@ -23,7 +23,7 @@
 
 #include "ctrlc_handler.h"
 #include "std_dev_outbndset.h"
-#include "generic_signal_handler.h"
+#include "sig_init.h"
 #include "gtmio.h"
 #include "io.h"
 #include "invocation_mode.h"
@@ -36,8 +36,8 @@ void ctrlc_handler(int sig, siginfo_t *info, void *context)
 	int4    ob_char;
 	int	save_errno;
 
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_ctrlc_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
 	assert(SIGINT == sig);
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig, IS_EXI_SIGNAL_FALSE, NULL, NULL);
 	if (!(MUMPS_CALLIN & invocation_mode))
 	{	/* Normal procedure from MUMPS is to set our outofband trigger to handle this signal */
 		save_errno = errno;

@@ -38,6 +38,7 @@
 #include "gt_timer.h"
 #include "send_msg.h"
 #include "generic_signal_handler.h"
+#include "sig_init.h"
 #include "gtmmsg.h"
 #include "io.h"
 #include "gtmio.h"
@@ -92,8 +93,7 @@ error_def(ERR_KRNLKILL);
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
-	boolean_t		lcl_exi_signal_forwarded;
-	gtm_sigcontext_t	*context_ptr;
+	boolean_t		signal_forwarded;
 	void			(*signal_routine)();
 #	ifdef DEBUG
 	boolean_t		save_in_nondeferrable_signal_handler;
@@ -101,13 +101,14 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	signal_forwarded = (DUMMY_SIG_NUM == sig);	/* Note down whether signal is forwarded or not */
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_generic_signal_handler, sig, IS_EXI_SIGNAL_TRUE, info, context);
 	assert(!thread_block_sigsent || blocksig_initialized);
 	/* If "thread_block_sigsent" is TRUE, it means the threads do not want the master thread to honor external signals
 	 * anymore until the threads complete. Achieve that effect by returning right away from the signal handler.
 	 */
 	if (thread_block_sigsent && sigismember(&block_sigsent, sig))
 		return;
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig, IS_EXI_SIGNAL_TRUE, info, context);
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into timer_handler
 	 * and then came here due to a nested signal (e.g. SIG-15). So save current value of global and restore it at
@@ -119,25 +120,6 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	dont_want_core = FALSE;		/* (re)set in case we recurse */
 	created_core = FALSE;		/* we can deal with a second core if needbe */
 	exi_condition = sig;
-	if (exi_signal_forwarded && (sig != exi_signal_forwarded))
-	{	/* We had forwarded the signal "exi_signal_forwarded" in a previous call to "generic_signal_handler" but
-		 * this call is for a different signal. Forget whatever was recorded in previous forwarding and treat
-		 * this as a fresh signal occurrence (which will be recorded in case it gets forward) by clearing
-		 * evidence of exi_signal forwarding.
-		 */
-		exi_signal_forwarded = 0;
-	}
-	if (sig != exi_signal_forwarded)
-	{	/* Signal has not been forwarded. Note down passed in "info" and "context" into global variables */
-		SET_EXI_SIGINFO_AS_APPROPRIATE(info);
-		SET_EXI_CONTEXT_AS_APPROPRIATE(context);
-	}
-	/* else: Signal has been forwarded. "exi_siginfo" and "exi_context" already point to pre-forwarded "info" and "context"
-	 *	(see FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED macro for details).
-	 */
-	lcl_exi_signal_forwarded = exi_signal_forwarded;	/* Note down global variable in local before clearing global */
-	exi_signal_forwarded = 0;	/* Now that "exi_siginfo" and "exi_context" are set appropriately, clear this global */
-	context_ptr = &exi_context;
 	/* Check if we are fielding nested immediate shutdown signals */
 	if (EXIT_IMMED <= exit_state)
 	{
@@ -200,7 +182,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			break;
 		case SIGQUIT:	/* Handle SIGQUIT specially which we ALWAYS want to defer if possible as it is always sent */
 			dont_want_core = TRUE; assert(IS_DONT_WANT_CORE_TRUE(sig));
-			extract_signal_info(sig, &exi_siginfo, context_ptr, &signal_info);
+			extract_signal_info(sig, info, context, &signal_info);
 			switch(signal_info.infotype)
 			{
 				case GTMSIGINFO_NONE:
@@ -258,7 +240,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			}
 			break;
 		default:
-			extract_signal_info(sig, &exi_siginfo, context_ptr, &signal_info);
+			extract_signal_info(sig, info, context, &signal_info);
 			switch(signal_info.infotype)
 			{
 				case GTMSIGINFO_NONE:
@@ -278,7 +260,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 						SET_FORCED_EXIT_STATE;
 						exit_state++;		/* Make exit pending, may still be tolerant though */
 						need_core = TRUE;
-						MULTI_THREAD_AWARE_FORK_N_CORE(lcl_exi_signal_forwarded);
+						MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded);
 						return;
 					}
 					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
@@ -338,7 +320,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	if (!dont_want_core)
 	{
 		need_core = TRUE;
-		MULTI_THREAD_AWARE_FORK_N_CORE(lcl_exi_signal_forwarded);
+		MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded);
 	}
 	/* If any special routines are registered to be driven on a signal, drive them now */
 	if (0 != exi_condition)

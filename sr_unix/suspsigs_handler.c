@@ -22,6 +22,7 @@
 #include "gtmimagename.h"
 #include "have_crit.h"
 #include "suspsigs_handler.h"
+#include "sig_init.h"
 
 #define MAXINOUT	16
 
@@ -35,7 +36,7 @@ void suspsigs_handler(int sig, siginfo_t* info, void *context)
 	sigset_t	block_susp_sigs, oldsigmask;
 	int		status;
 
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig, IS_EXI_SIGNAL_FALSE, NULL, NULL);
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_suspsigs_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
 	/* Note - we do not forward these signals to the main routine (e.g Go program using the YottaDB GoWrapper)
 	 * but depend on our (i.e. YottaDB's) suspend/continue operations instead.
 	 */

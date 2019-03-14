@@ -34,7 +34,7 @@
 #include "deferred_events.h"
 #include "jobinterrupt_event.h"
 #include "fix_xfer_entry.h"
-#include "generic_signal_handler.h"
+#include "sig_init.h"
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
 
@@ -48,7 +48,7 @@ GBLREF	struct sigaction	orig_sig_action[];
  */
 void jobinterrupt_event(int sig, siginfo_t *info, void *context)
 {
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig, IS_EXI_SIGNAL_FALSE, NULL, NULL);
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_jobinterrupt_event, sig, IS_EXI_SIGNAL_FALSE, info, context);
 	/* Note the (presently unused) args are to match signature for signal handlers in Unix */
 	if (!dollar_zininterrupt)
 		(void)xfer_set_handlers(outofband_event, &jobinterrupt_set, 0);

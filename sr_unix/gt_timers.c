@@ -79,10 +79,9 @@
 #include "gtm_multi_thread.h"
 #include "gtmxc_types.h"
 #include "getjobnum.h"
-#include "generic_signal_handler.h"
+#include "sig_init.h"
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
-#include "sig_init.h"
 
 #ifdef ITIMER_REAL
 # define BSD_TIMER
@@ -207,7 +206,7 @@ GBLREF	int4		error_condition;
 GBLREF	int4		outofband;
 GBLREF	int		process_exiting;
 GBLREF	struct sigaction orig_sig_action[];
-GBLREF	int		stapi_timer_handler_deferred;
+GBLREF	int		stapi_signal_handler_deferred;
 #ifdef YDB_USE_POSIX_TIMERS
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
@@ -217,8 +216,6 @@ GBLREF	boolean_t	in_nondeferrable_signal_handler;
 GBLREF	boolean_t	gtm_jvm_process;
 GBLREF	boolean_t	exit_handler_active;
 #endif
-GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
-GBLREF	uint4		dollar_tlevel;
 
 error_def(ERR_SETITIMERFAILED);
 error_def(ERR_TEXT);
@@ -369,8 +366,8 @@ void hiber_start(uint4 hiber)
 			 * SIGALRM signal would be sent to the MAIN worker thread which would have not been in a position
 			 * to invoke "timer_handler" inside the signal handler). If so invoke it now.
 			 */
-			assert(simpleThreadAPI_active || !stapi_timer_handler_deferred);
-			if (stapi_timer_handler_deferred)
+			assert(simpleThreadAPI_active || !STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler));
+			if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler))
 				timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 		} while (FALSE == waitover);
 	}
@@ -401,8 +398,8 @@ void hiber_start_wait_any(uint4 hiber)
 	start_timer_int((TID)hiber_start_wait_any, hiber, NULL, 0, NULL, TRUE);
 	sigsuspend(&savemask);				/* unblock SIGALRM and wait for timer interrupt */
 	/* See comment in "hiber_start" function for why the deferred "timer_handler" invocation is done below */
-	assert(simpleThreadAPI_active || !stapi_timer_handler_deferred);
-	if (stapi_timer_handler_deferred)
+	assert(simpleThreadAPI_active || !STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler));
+	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler))
 		timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 	cancel_timer((TID)hiber_start_wait_any);	/* cancel timer block before reenabling */
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
@@ -677,6 +674,7 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 			if (tpop->safe || (SAFE_FOR_TIMER_START && (1 > timer_stack_count)
 						&& !(TREF(in_ext_call) && (wcs_stale_fptr == tpop->handler))))
 			{
+				DEBUG_ONLY(STAPI_FAKE_TIMER_HANDLER_WAS_DEFERRED);
 				timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 				/* At this point all timers should have been handled, including a recursive call to
 				 * start_first_timer(), if needed, and SET_DEFERRED_TIMERS_CHECK_NEEDED invoked if
@@ -717,7 +715,6 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	char 		*save_util_outptr;
 	va_list		save_last_va_list_ptr;
 	boolean_t	util_copy_saved = FALSE, safe_for_timer_pop;
-	pthread_t	mutex_holder_thread_id, this_thread_id;
 #	ifdef DEBUG
 	boolean_t	save_in_nondeferrable_signal_handler;
 	ABS_TIME	rel_time, old_at, late_time;
@@ -727,68 +724,10 @@ void timer_handler(int why, siginfo_t *info, void *context)
 
 	SETUP_THREADGBL_ACCESS;
 	assert((DUMMY_SIG_NUM == why) || (SIGALRM == why));
-	if (SIGALRM == why)
-	{	/* If SimpleThreadAPI is active, the MAIN worker thread is usually the one that will receive the SIGALRM
-		 * signal (when using POSIX timers). Note though that it is possible some other thread also receives
-		 * the signal (for example if a C program holding a parent M-lock with SimpleAPI can fork off processes
-		 * that start waiting for a child M-lock with SimpleThreadAPI in which case the lock wake up signal,
-		 * also the same SIGALRM signal, from the parent program would get sent to the child process-id,
-		 * using "crit_wake", which should forward the signal to the MAIN worker thread OR the currently active
-		 * thread that is holding the YottaDB engine lock). In any case, as long as the thread holds the
-		 * YottaDB engine lock, we can continue "timer_handler" processing in this thread. If not, we need
-		 * to defer the invocation until a later point when we do hold the lock (cannot do a "pthread_mutex_lock"
-		 * call here since we are inside a signal handler and "pthread_mutex_lock" is not async-signal-safe).
-		 * Record the fact that a timer invocation happened and let the MAIN worker thread invoke
-		 * "timer_handler" outside of the signal handler as part of its normal processing ("ydb_stm_thread").
-		 */
-		if (simpleThreadAPI_active)
-		{
-			/* If we are not in TP, the YottaDB engine lock index is 0 (i.e. ydb_engine_threadsafe_mutex_holder[0]
-			 * is current lock holder thread if it is non-zero). But if we are in TP, then lock index could be
-			 * "dollar_tlevel"     : e.g. if a "ydb_get_st" call occurs inside of the "ydb_tp_st" call OR
-			 * "dollar_tlevel - 1" : if control is in the TP callback function inside "ydb_tp_st" but not a
-			 *	SimpleThreadAPI call like "ydb_get_st" etc. In this latter case, it is possible any number
-			 *	of threads could get the dollar_tlevel index lock concurrently so we cannot be sure about
-			 *	signal forwarding. Therefore forward only in non-TP. In case of TP, "timer_handler" will be
-			 *	invoked just "ydb_tp_st" is done finishing one TP level when it does the
-			 *	THREADED_API_YDB_ENGINE_UNLOCK call. Therefore it is okay to skip signal forwarding in the TP case.
-			 */
-			if (dollar_tlevel)
-			{
-				stapi_timer_handler_deferred++;
-				return;
-			}
-			this_thread_id = pthread_self();
-			assert(this_thread_id);
-			mutex_holder_thread_id = ydb_engine_threadsafe_mutex_holder[0];
-			if (!pthread_equal(mutex_holder_thread_id, this_thread_id))
-			{
-				stapi_timer_handler_deferred++;
-				/* It is possible we are the MAIN worker thread that gets the SIGALRM signal but another thread
-				 * that is holding the YottaDB engine lock is waiting for the signal to know of a timeout
-				 * (e.g. ydb_lock_st etc.). Therefore forward the signal to that thread too so it
-				 * can invoke the timer handler right away.
-				 * It is possible for the YottaDB engine lock holder pid to change from now by the time the
-				 * forwarded signal gets delivered/handled in the receiving thread. But we do not want forwarding
-				 * again (could lead to indefinite forwardings). Hence the "stapi_timer_handler_deferred" check
-				 * below which ensures a limit on the # of forwardings before "timer_handler" gets invoked.
-				 */
-				if (mutex_holder_thread_id && (4 > stapi_timer_handler_deferred))
-					pthread_kill(mutex_holder_thread_id, SIGALRM);
-				return;
-			}
-		} else
-		{
-			FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGALRM, IS_EXI_SIGNAL_FALSE, NULL, NULL);
-			assert(gtm_is_main_thread() || gtm_jvm_process);
-		}
-	} else
-	/* else: why == DUMMY_SIG_NUM we know that "timer_handler" was called directly, so no need
-	 * to check if the signal needs to be forwarded to appropriate thread.
-	 */
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_timer_handler, why, IS_EXI_SIGNAL_FALSE, info, context);
+	assert(gtm_is_main_thread() || gtm_jvm_process || simpleThreadAPI_active);
 	/* Now that we are going to go through "timer_handler", clear any pending deferred timer handler flags in SimpleThreadAPI */
-	assert(simpleThreadAPI_active || !stapi_timer_handler_deferred);
-	stapi_timer_handler_deferred = FALSE;
+	assert(simpleThreadAPI_active || !STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler));
 	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into generic_signal_handler
@@ -1260,6 +1199,7 @@ void check_for_deferred_timers(void)
 
 	assert(!INSIDE_THREADED_CODE(rname));	/* below code is not thread safe as it does SIGPROCMASK() etc. */
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
+	DEBUG_ONLY(STAPI_FAKE_TIMER_HANDLER_WAS_DEFERRED);
 	timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 }
 
@@ -1300,6 +1240,7 @@ void check_for_timer_pops()
 	}
 	if (timeroot && (1 > timer_stack_count))
 	{
+		DEBUG_ONLY(STAPI_FAKE_TIMER_HANDLER_WAS_DEFERRED);
 		timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 	}
 	if (stolenwhen)

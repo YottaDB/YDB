@@ -27,7 +27,7 @@
 #include "setterm.h"
 #include "continue_handler.h"
 #include "gtmsecshr.h"
-#include "generic_signal_handler.h"
+#include "sig_init.h"
 
 GBLREF volatile int	is_suspended;
 GBLREF io_pair		io_std_device;
@@ -41,7 +41,7 @@ void continue_handler(int sig, siginfo_t *info, void *context)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig, IS_EXI_SIGNAL_FALSE, NULL, NULL);
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_continue_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
 	/* Count how many times we get a continue-process signal (in DEBUG) */
 	DEBUG_ONLY(DBGGSSHR((LOGFLAGS, "continue_handler: pid %d, continue_proc_cnt bumped from %d to %d\n",
 			     process_id, TREF(continue_proc_cnt), TREF(continue_proc_cnt) + 1)));

@@ -31,7 +31,7 @@
 #include "forced_exit_err_display.h"
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
-#include "generic_signal_handler.h"
+#include "sig_init.h"
 #ifdef DEBUG
 #include "wcs_sleep.h"
 #include "wbox_test_init.h"
@@ -109,8 +109,10 @@ void deferred_exit_handler(void)
 		(*signal_routine)();
 	}
 	/* If this is call-in/simpleAPI mode and a handler exists for this signal, call it */
-	sig = exi_siginfo.si_signo;
-	DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("deferred_exit_handler", sig, &exi_siginfo, &exi_context, TRUE);
+	sig = stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info.si_signo;
+	DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("deferred_exit_handler", sig,				\
+		&stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info,		\
+		&stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_context, TRUE);
 	/* Note, we do not drive create_fatal_error zshow_dmp() in this routine since any deferrable signals are
 	 * by definition not fatal.
 	 */

@@ -3,6 +3,9 @@
  * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -46,14 +49,11 @@
 #include "have_crit.h"
 #include "dbcertify.h"
 #include "forced_exit_err_display.h"
+#include "sig_init.h"
 
 /* These fields are defined as globals not because they are used globally but
  * so they will be easily retrievable even in 'pro' cores.
  */
-GBLDEF siginfo_t	exi_siginfo;
-
-GBLDEF gtm_sigcontext_t	exi_context;
-
 GBLREF	int4			forced_exit_err;
 GBLREF	int4			exi_condition;
 GBLREF	enum gtmImageTypes	image_type;
@@ -80,27 +80,13 @@ error_def(ERR_KRNLKILL);
 void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	boolean_t		dbc_critical, exit_now;
-	gtm_sigcontext_t	*context_ptr;
 	void			(*signal_routine)();
 
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_dbcertify_signal_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
 	/* Save parameter value in global variables for easy access in core */
 	dont_want_core = FALSE;		/* (re)set in case we recurse */
 	created_core = FALSE;		/* we can deal with a second core if needbe */
 	exi_condition = sig;
-	if (NULL != info)
-		exi_siginfo = *info;
-	else
-		memset(&exi_siginfo, 0, SIZEOF(*info));
-#if defined(__ia64) && defined(__hpux)
-        context_ptr = (gtm_sigcontext_t *)context;      /* no way to make a copy of the context */
-	memset(&exi_context, 0, SIZEOF(exi_context));
-#else
-	if (NULL != context)
-		exi_context = *(gtm_sigcontext_t *)context;
-	else
-		memset(&exi_context, 0, SIZEOF(exi_context));
-	context_ptr = &exi_context;
-#endif
 	/* Check if we are fielding nested immediate shutdown signals */
 	if (EXIT_IMMED <= exit_state)
 	{
@@ -147,7 +133,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			break;
 		case SIGQUIT:	/* Handle SIGQUIT specially which we ALWAYS want to defer if possible as it is always sent */
 			dont_want_core = TRUE;
-			extract_signal_info(sig, &exi_siginfo, context_ptr, &signal_info);
+			extract_signal_info(sig, info, context, &signal_info);
 			switch(signal_info.infotype)
 			{
 				case GTMSIGINFO_NONE:
@@ -229,7 +215,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			break;
 #endif
 		default:
-			extract_signal_info(sig, &exi_siginfo, context_ptr, &signal_info);
+			extract_signal_info(sig, info, context, &signal_info);
 			switch(signal_info.infotype)
 			{
 				case GTMSIGINFO_NONE:

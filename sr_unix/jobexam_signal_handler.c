@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,6 +35,7 @@
 #include "jobexam_signal_handler.h"
 #include "send_msg.h"
 #include "gtmmsg.h"
+#include "sig_init.h"
 
 GBLREF	uint4			process_id;
 GBLREF	enum gtmImageTypes	image_type;
@@ -48,25 +52,10 @@ error_def(ERR_KILLBYSIGSINFO3);
 
 void jobexam_signal_handler(int sig, siginfo_t *info, void *context)
 {
-	siginfo_t	exi_siginfo;
 	gtmsiginfo_t	signal_info;
-	gtm_sigcontext_t exi_context, *context_ptr;
 
-	if (NULL != info)
-		exi_siginfo = *info;
-	else
-		memset(&exi_siginfo, 0, SIZEOF(*info));
-#if defined(__ia64) && defined(__hpux)
-        context_ptr = (gtm_sigcontext_t *)context;	/* no way to make a copy of the context */
-	memset(&exi_context, 0, SIZEOF(exi_context));
-#else
-	if (NULL != context)
-		exi_context = *(gtm_sigcontext_t *)context;
-	else
-		memset(&exi_context, 0, SIZEOF(exi_context));
-	context_ptr = &exi_context;
-#endif
-	extract_signal_info(sig, &exi_siginfo, context_ptr, &signal_info);
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_jobexam_signal_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
+	extract_signal_info(sig, info, context, &signal_info);
 	switch(signal_info.infotype)
 	{
 		case GTMSIGINFO_NONE:

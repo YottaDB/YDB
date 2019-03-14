@@ -138,6 +138,7 @@
 #define DEFAULT_ZERROR_LEN	(SIZEOF(DEFAULT_ZERROR_STR) - 1)
 #include "gtm_libaio.h"
 #include "gtcm.h"
+#include "sig_init.h"
 
 GBLDEF	gd_region		*db_init_region;
 GBLDEF	sgmnt_data_ptr_t	cs_data;
@@ -1299,20 +1300,6 @@ GBLDEF	int		fork_after_ydb_init;	/* Set to a non-zero value if a "fork" occurs a
 						 * set to TRUE. Used for handling/detecting error scenarios in SimpleAPI and
 						 * SimpleThreadAPI.
 						 */
-GBLDEF siginfo_t		exi_siginfo;		/* Holds the "info" parameter passed by OS in "generic_signal_handler" */
-GBLDEF gtm_sigcontext_t 	exi_context;		/* Holds the "context" parameter passed by OS in "generic_signal_handler" */
-GBLDEF int			exi_signal_forwarded;	/* 0 if no signal forwarding happened in "generic_signal_handler".
-							 * Non-zero signal number if forwarding did happen. In that case,
-							 * "exi_siginfo" and "exi_context" store the "info" and "context"
-							 * passed into "generic_signal_handler" (by the OS) before the
-							 * forwarding. This way we do not lose the original information
-							 * (e.g. if another process-id sent us the signal, forwarding the
-							 * signal from one thread to another thread in the same process
-							 * causes the signal to be treated as having originated in the
-							 * same process and thus loses the sending pid information).
-							 * For example, sending SIGQUIT/SIG-3 should show up as KILLBYSIGUINFO
-							 * but would show up as KILLBYSIGSINFO1 without the pre-forwarding store.
-							 */
 GBLDEF 	struct sigaction	orig_sig_action[NSIG + 1];	/* Array of signal handlers (indexed by signal number) that were
 								 * in-place when YDB initialized.
 								 */
@@ -1331,4 +1318,7 @@ GBLDEF	boolean_t		caller_func_is_stapi;	/* Set to TRUE by a SimpleThreadAPI func
 							 * distinguish whether the caller is a direct user invocation or a
 							 * SimpleThreadAPI invocation. Used to issue SIMPLEAPINOTALLOWED error.
 							 */
-GBLDEF	int			stapi_timer_handler_deferred;	/* non-zero if "ydb_stm_thread" needs to invoke "timer_handler" */
+GBLDEF	int			stapi_signal_handler_deferred;	/* non-zero if signal handler function
+								 * should be invoked in a deferred fashion.
+								 */
+GBLDEF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];

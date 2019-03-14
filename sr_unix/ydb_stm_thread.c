@@ -32,6 +32,7 @@
 #include "gtmci.h"
 #include "gtm_exit_handler.h"
 #include "memcoherency.h"
+#include "sig_init.h"
 
 GBLREF	stm_workq	*stmWorkQueue[];
 GBLREF	boolean_t	simpleThreadAPI_active;
@@ -42,7 +43,6 @@ GBLREF	uint64_t 	stmTPToken;			/* Counter used to generate unique token for Simp
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
 #endif
-GBLREF	int		stapi_timer_handler_deferred;
 
 /* Routine to manage worker thread(s) for the *_st() interface routines (Simple Thread API aka the
  * Simple Thread Method). Note for the time being, only one worker thread is created. In the future,
@@ -81,18 +81,14 @@ void *ydb_stm_thread(void *parm)
 		SLEEP_USEC(1, FALSE);	/* Sleep for 1 second; FALSE to indicate if system call is interrupted, do not
 					 * restart the sleep.
 					 */
-		if (stapi_timer_handler_deferred)
+		if (stapi_signal_handler_deferred)
 		{
 			THREADED_API_YDB_ENGINE_LOCK(YDB_NOTTP, NULL, LYDB_RTN_NONE, save_active_stapi_rtn,	\
 										save_errstr, get_lock, status);
 			assert(0 == status);
 			if (0 == status)
 			{
-				if (stapi_timer_handler_deferred)
-					timer_handler(DUMMY_SIG_NUM, NULL, NULL);
-				/* else: "timer_handler" got invoked already just before we got the thread lock.
-				 * No need to invoke it again.
-				 */
+				STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
 				THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 			}
 			/* else: lock failed. Not much we can do. Just keep retrying the sleep loop */
