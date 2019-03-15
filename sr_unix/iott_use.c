@@ -156,8 +156,11 @@ void iott_use(io_desc *iod, mval *pp)
 						if (tt_ptr->fildes == temp_ptr->fildes)
 						{	/* if this is $PRINCIPAL make sure the ctrlc_handler is enabled */
 							sigemptyset(&act.sa_mask);
-							act.sa_flags = 0;
 							act.sa_handler = ctrlc_handler_ptr;
+							act.sa_flags = SA_SIGINFO;	/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED
+											 * (invoked in "ctrlc_handler") relies on
+											 * "info" and "context" being passed in.
+											 */
 							sigaction(SIGINT, &act, 0);
 							ctrlc_on = TRUE;
 						}
@@ -198,9 +201,18 @@ void iott_use(io_desc *iod, mval *pp)
 					if (!ctrlc_on)
 					{	/* if cenable, ctrlc_handler active anyway, otherwise, depends on ctrap=$c(3) */
 						sigemptyset(&act.sa_mask);
-						act.sa_flags = 0;
-						act.sa_handler = (CTRLC_MSK & tt_ptr->enbld_outofbands.mask)
-							? ctrlc_handler_ptr : SIG_IGN;
+						if (CTRLC_MSK & tt_ptr->enbld_outofbands.mask)
+						{
+							act.sa_handler = ctrlc_handler_ptr;
+							act.sa_flags = SA_SIGINFO;	/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED
+											 * (invoked in "ctrlc_handler") relies on
+											 * "info" and "context" being passed in.
+											 */
+						} else
+						{
+							act.sa_handler = SIG_IGN;
+							act.sa_flags = 0;
+						}
 						sigaction(SIGINT, &act, 0);
 					}
 					break;

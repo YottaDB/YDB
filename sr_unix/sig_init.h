@@ -20,6 +20,8 @@
 #include "jobinterrupt_event.h"
 #include "suspsigs_handler.h"
 #include "jobexam_signal_handler.h"
+#include "jobsp.h"
+#include "op_fnzpeek.h"
 
 /* Below signal handler function types are used as the first parameter to FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED */
 enum sig_handler_t
@@ -31,6 +33,8 @@ enum sig_handler_t
 	sig_hndlr_generic_signal_handler,
 	sig_hndlr_jobexam_signal_handler,
 	sig_hndlr_jobinterrupt_event,
+	sig_hndlr_job_term_handler,
+	sig_hndlr_op_fnzpeek_signal_handler,
 	sig_hndlr_suspsigs_handler,
 	sig_hndlr_timer_handler,
 	sig_hndlr_num_entries
@@ -91,7 +95,7 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	 * Fix below assert and following code if/when assert fails to take any new handler types into account.		\
 	 */														\
 	assert(0 == sig_hndlr_none);											\
-	assert(9 == sig_hndlr_num_entries);										\
+	assert(11 == sig_hndlr_num_entries);										\
 	if (stapi_signal_handler_deferred)										\
 	{	/* Note: The STAPI_CLEAR_SIGNAL_HANDLER_DEFERRED call for each of the deferred signal handler		\
 		 * invocation done below is taken care of by the FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED invocation	\
@@ -131,6 +135,18 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 			assert(stapi_signal_handler_oscontext[sig_hndlr_jobinterrupt_event].sig_forwarded);		\
 			assert(SIGUSR1 == stapi_signal_handler_oscontext[sig_hndlr_jobinterrupt_event].sig_num);	\
 			jobinterrupt_event(DUMMY_SIG_NUM, NULL, NULL);							\
+		}													\
+		if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_job_term_handler))					\
+		{													\
+			assert(stapi_signal_handler_oscontext[sig_hndlr_job_term_handler].sig_forwarded);		\
+			assert(SIGTERM == stapi_signal_handler_oscontext[sig_hndlr_job_term_handler].sig_num);		\
+			job_term_handler(DUMMY_SIG_NUM, NULL, NULL);							\
+		}													\
+		if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_op_fnzpeek_signal_handler))				\
+		{													\
+			assert(stapi_signal_handler_oscontext[sig_hndlr_op_fnzpeek_signal_handler].sig_forwarded);	\
+			assert(SIGTERM == stapi_signal_handler_oscontext[sig_hndlr_op_fnzpeek_signal_handler].sig_num);	\
+			op_fnzpeek_signal_handler(DUMMY_SIG_NUM, NULL, NULL);						\
 		}													\
 		if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_suspsigs_handler))					\
 		{													\

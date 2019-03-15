@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,6 +41,8 @@
 #include "gtm_caseconv.h"
 #include "jnl.h"
 #include "dollarh.h"
+#include "sig_init.h"
+#include "op_fnzpeek.h"
 
 error_def(ERR_BADZPEEKARG);
 error_def(ERR_BADZPEEKFMT);
@@ -88,7 +90,6 @@ GBLREF	int			process_exiting;
 
 LITREF unsigned char lower_to_upper_table[];
 
-STATICFNDCL void op_fnzpeek_signal_handler(int sig, siginfo_t *info, void *context);
 STATICFNDCL int op_fnzpeek_stpcopy(char *zpeekadr, int len, mval *ret, char fmtcode);
 STATICFNDCL uchar_ptr_t op_fnzpeek_uint64fmt(uchar_ptr_t p, gtm_uint64_t n);
 STATICFNDCL uchar_ptr_t op_fnzpeek_hexfmt(uchar_ptr_t p, gtm_uint64_t n, int fmtlen);
@@ -166,6 +167,7 @@ CONDITION_HANDLER(op_fnzpeek_ch)
  */
 void op_fnzpeek_signal_handler(int sig, siginfo_t *info, void *context)
 {
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_op_fnzpeek_signal_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
 	/* We basically want to do UNWIND(NULL, NULL) logic but the UNWIND macro can only be used in a condition
 	 * handler so next is a block that pretends it is our condition handler and does the needful. Note in order
 	 * for this to work, we need to be wrapped in a condition handler even if that condition handler is never
@@ -173,6 +175,7 @@ void op_fnzpeek_signal_handler(int sig, siginfo_t *info, void *context)
 	 */
 	{	/* Needs new block since START_CH declares a new var used in UNWIND() */
 		int arg = 0;	/* Needed for START_CH macro if debugging enabled */
+
 		START_CH(TRUE);
 		assert(!process_exiting);
 		UNWIND(NULL, NULL);
@@ -724,11 +727,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	memset(&new_action, 0, SIZEOF(new_action));
 	sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = SA_SIGINFO;
-#	ifdef __sparc
-	new_action.sa_handler = op_fnzpeek_signal_handler;
-#	else
 	new_action.sa_sigaction = op_fnzpeek_signal_handler;
-#	endif
 	sigaction(SIGBUS, &new_action, &prev_action_bus);
 	sigaction(SIGSEGV, &new_action, &prev_action_segv);
 	/* Attempt to copy return string to stringpool which protected by our handlers. If the copy completes, the return

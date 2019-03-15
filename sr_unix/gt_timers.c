@@ -1172,8 +1172,10 @@ STATICFNDEF void init_timers()
 
 	memset(&act, 0, SIZEOF(act));
 	sigemptyset(&act.sa_mask);
-	act.sa_flags = 0;
 	act.sa_handler = (sighandler_t)timer_handler;
+	act.sa_flags = SA_SIGINFO;	/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "timer_handler")
+					 * relies on "info" and "context" being passed in.
+					 */
 	sigaction(SIGALRM, &act, &prev_alrm_handler);
 	if (first_timeset && 					/* not from timer_handler to prevent dup message */
 	    (SIG_IGN != prev_alrm_handler.sa_handler) &&	/* as set by sig_init */

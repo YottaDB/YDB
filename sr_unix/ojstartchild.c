@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,6 +61,7 @@
 #include "gtm_maxstr.h"
 #include "getzdir.h"
 #include "ydb_logicals.h"	/* needed for GBLDIR_ENV use of "ydbenvname" */
+#include "sig_init.h"
 
 GBLREF	bool			jobpid;	/* job's output files should have the pid appended to them. */
 GBLREF	volatile boolean_t	ojtimeout;
@@ -154,7 +155,6 @@ error_def(ERR_TEXT);
  * not want to run.
  */
 
-STATICFNDCL void job_term_handler(int sig);
 STATICFNDCL int io_rename(job_params_msg *params, const int jobid);
 STATICFNDCL void local_variable_marshalling(void);
 
@@ -189,29 +189,31 @@ static CONDITION_HANDLER(grand_child)
  * successfully forked-off the job.
  */
 
-STATICFNDEF void job_term_handler(int sig)
+void job_term_handler(int sig, siginfo_t *info, void *context)
 {
-		int ret;
-		int status;
-		joberr_t exit_status = joberr_gen;
-		/*
-		 * ret	= 0 - Child is present but not changed the state
-		 *	< 0 - Error. No child present.
-		 *	> 0 - Child PID.
-		 */
-		ret = waitpid(-1, &status, WNOHANG);	/* BYPASSOK */
-		job_errno = errno;
-		if (0 == ret)
-			return;
-		else if (0 > ret)
-		{
-			if (job_errno == ECHILD)
-				exit_status = joberr_sig;
-			else
-				assert(FALSE);
-			UNDERSCORE_EXIT(exit_status);
-		} else
-			return;
+	int ret;
+	int status;
+	joberr_t exit_status = joberr_gen;
+
+	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_job_term_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
+	/*
+	 * ret	= 0 - Child is present but not changed the state
+	 *	< 0 - Error. No child present.
+	 *	> 0 - Child PID.
+	 */
+	ret = waitpid(-1, &status, WNOHANG);	/* BYPASSOK */
+	job_errno = errno;
+	if (0 == ret)
+		return;
+	else if (0 > ret)
+	{
+		if (job_errno == ECHILD)
+			exit_status = joberr_sig;
+		else
+			assert(FALSE);
+		UNDERSCORE_EXIT(exit_status);
+	} else
+		return;
 }
 
 /* This function does not update params->output and params->error when it renames those files. This is fine for now since nothing
@@ -396,8 +398,10 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		ESTABLISH_RET(middle_child, 0);
 
 		sigemptyset(&act.sa_mask);
-		act.sa_flags = 0;
-		act.sa_handler = job_term_handler;
+		act.sa_flags = SA_SIGINFO;	/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "job_term_handler")
+						 * relies on "info" and "context" being passed in.
+						 */
+		act.sa_sigaction = job_term_handler;
 		sigaction(SIGTERM, &act, &old_act);
 
 		OPEN_PIPE(mproc_fds, pipe_status);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,8 @@
 
 #ifndef __JOBSP_H__
 #define __JOBSP_H__
+
+#include "gtm_signal.h"
 
 #define MAX_JOBPAR_LEN		255
 #define MAX_FILSPC_LEN		255
@@ -175,4 +177,6 @@ void ojparams(char *p, job_params_type *job_params);
 void ojgetch_env(job_params_type *jparms);
 void ojchildioclean(void);
 void ojmidchild_send_var(void);
+void job_term_handler(int sig, siginfo_t *info, void *context);
+
 #endif
