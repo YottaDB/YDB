@@ -204,6 +204,7 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	GBLREF	boolean_t	safe_to_fork_n_core;										\
 	GBLREF	uint4		dollar_tlevel;											\
 	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];								\
+	GBLREF	boolean_t	gtm_jvm_process;										\
 																\
 	pthread_t		mutex_holder_thread_id, this_thread_id;								\
 	int			i;												\
@@ -323,12 +324,12 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 			SAVE_OS_SIGNAL_HANDLER_CONTEXT(SIGHNDLRTYPE, CONTEXT);							\
 		}														\
 	} else															\
-	{	/* Invoked after signal forwarding has taken effect while in SimpleThreadAPI mode.				\
-		 * Use stored signal number/info/context and continue the signal handler invocation.				\
-		 * Note that "timer_handler" can be invoked with DUMMY_SIG_NUM even outside of SimpleThreadAPI mode so		\
-		 * account for that in the assert below.									\
+	{	/* Invoked after signal forwarding has taken effect while having multiple threads (currently possible		\
+		 * in SimpleThreadAPI mode or with the Java interface). Use stored signal number/info/context and continue	\
+		 * the signal handler invocation. Note that "timer_handler" can be invoked with DUMMY_SIG_NUM even outside	\
+		 * of SimpleThreadAPI mode so account for that in the assert below.						\
 		 */														\
-		assert(simpleThreadAPI_active || (sig_hndlr_timer_handler == SIGHNDLRTYPE));					\
+		assert(simpleThreadAPI_active || gtm_jvm_process || (sig_hndlr_timer_handler == SIGHNDLRTYPE));			\
 		assert(stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded);						\
 		SIG = stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_num;							\
 		/* Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info" */				\
