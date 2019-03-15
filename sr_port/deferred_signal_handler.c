@@ -14,6 +14,9 @@
 
 #include "have_crit.h"
 #include "gtmxc_types.h"
+#include "gtm_stdio.h"
+#include "gtm_unistd.h"
+#include <sys/syscall.h>	/* for "syscall" */
 
 GBLREF	int		process_exiting;
 GBLREF	VSIG_ATOMIC_T	forced_exit;
@@ -37,13 +40,6 @@ void	deferred_signal_handler(void)
 		return;	/* Process is already exiting. Skip handling deferred events in that case. */
 	if (simpleThreadAPI_active)
 	{
-		if (!gtm_is_main_thread())
-		{	/* This is a SimpleThreadAPI process but not the MAIN worker thread. Timer/Signal handling is
-			 * the responsibility of the MAIN worker threads which will keep checking for this periodically
-			 * so skip this for now in the current thread.
-			 */
-			return;
-		}
 		if (timer_in_handler)
 		{	/* Process is in a timer handler and has multiple threads. Exit handling could
 			 * 	a) do "pthread_mutex_lock" calls (see PTHREAD_MUTEX_LOCK_IF_NEEDED comment in wcs_wtstart.c

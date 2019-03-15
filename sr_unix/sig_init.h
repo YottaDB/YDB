@@ -259,9 +259,12 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 				 * check below which ensures a max limit of 1 signal forwarding.				\
 				 */												\
 				signal_forwarded = STAPI_IS_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE);				\
-				STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG, INFO, CONTEXT);				\
-				if (mutex_holder_thread_id && !signal_forwarded)						\
-					pthread_kill(mutex_holder_thread_id, SIG);						\
+				if (!signal_forwarded)										\
+				{												\
+					STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG, INFO, CONTEXT);			\
+					if (mutex_holder_thread_id)								\
+						pthread_kill(mutex_holder_thread_id, SIG);					\
+				}												\
 				return;												\
 			} else													\
 			{	/* Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info" */		\
