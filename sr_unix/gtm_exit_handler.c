@@ -191,8 +191,10 @@ void gtm_exit_handler(void)
 		 * again here.
 		 */
 		if (!pthread_equal(ydb_engine_threadsafe_mutex_holder[0], pthread_self()))
+		{
 			ydb_exit();
-		return;
+			return;
+		}
 	}
 	exit_handler_active = TRUE;
 	ydb_dmp_tracetbl();
