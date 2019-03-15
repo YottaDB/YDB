@@ -22,6 +22,7 @@
 #include "jobexam_signal_handler.h"
 #include "jobsp.h"
 #include "op_fnzpeek.h"
+#include "memcoherency.h"
 
 /* Below signal handler function types are used as the first parameter to FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED */
 enum sig_handler_t
@@ -74,19 +75,23 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 
 #define	STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG_NUM, INFO, CONTEXT)	\
 {										\
-	stapi_signal_handler_deferred |= (1 << SIGHNDLRTYPE);			\
-	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded = TRUE;	\
 	SAVE_OS_SIGNAL_HANDLER_SIGNUM(SIGHNDLRTYPE, SIG_NUM);			\
 	SAVE_OS_SIGNAL_HANDLER_INFO(SIGHNDLRTYPE, INFO);			\
 	SAVE_OS_SIGNAL_HANDLER_CONTEXT(SIGHNDLRTYPE, CONTEXT);			\
+	SHM_WRITE_MEMORY_BARRIER;						\
+	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded = TRUE;	\
+	SHM_WRITE_MEMORY_BARRIER;						\
+	stapi_signal_handler_deferred |= (1 << SIGHNDLRTYPE);			\
 }
 
 #define	STAPI_CLEAR_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE)			\
 {										\
 	assert(stapi_signal_handler_deferred & (1 << SIGHNDLRTYPE));		\
 	stapi_signal_handler_deferred &= ~(1 << SIGHNDLRTYPE);			\
+	SHM_WRITE_MEMORY_BARRIER;						\
 	assert(stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded);	\
 	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded = FALSE;	\
+	SHM_WRITE_MEMORY_BARRIER;						\
 }
 
 #define	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED									\
