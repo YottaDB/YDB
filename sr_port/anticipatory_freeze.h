@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "gtmimagename.h"		/* needed for IS_GTM_IMAGE */
 #include "jnl.h"			/* needed for REPL_ALLOWED */
 #include "forced_exit_err_display.h"
+#include "sig_init.h"
 
 boolean_t		is_anticipatory_freeze_needed(sgmnt_addrs *csa, int msg_id);
 void			set_anticipatory_freeze(sgmnt_addrs *csa, int msg_id);
@@ -482,6 +483,7 @@ static inline void wait_for_repl_inst_unfreeze_nocsa_jpl(jnlpool_addrs_ptr_t jpl
 	/* If this region is not replicated, do not care for instance freezes */
 	while (jpl->jnlpool_ctl->freeze)
 	{
+		STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
 		if (exit_state != 0)
 		{
 			forced_exit_err_display();
