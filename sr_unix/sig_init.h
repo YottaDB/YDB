@@ -108,8 +108,6 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 		 * invocation done below is taken care of by the FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED invocation	\
 		 * done inside each of these signal handlers at function entry.						\
 		 */													\
-		assert(GET_DEFERRED_STAPI_CHECK_NEEDED);								\
-		CLEAR_DEFERRED_STAPI_CHECK_NEEDED;									\
 		if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_continue_handler))					\
 		{													\
 			assert(stapi_signal_handler_oscontext[sig_hndlr_continue_handler].sig_forwarded);		\
@@ -171,6 +169,7 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 			assert(SIGALRM == stapi_signal_handler_oscontext[sig_hndlr_timer_handler].sig_num);		\
 			timer_handler(DUMMY_SIG_NUM, NULL, NULL);							\
 		}													\
+		CLEAR_DEFERRED_STAPI_CHECK_NEEDED;									\
 	}														\
 }
 
@@ -195,6 +194,41 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	CONTEXT = &stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_context;					\
 }
 
+#define	DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG)						\
+{												\
+	/* This thread got a signal that will trigger exit handler processing. The signal	\
+	 * has been forwarded to the appropriate thread. But it is possible we got a signal	\
+	 * that requires this thread's current C-stack for further analysis (e.g. SIGSEGV).	\
+	 * In this case, we should not return from this thread but wait for the signal handling \
+	 * thread to continue exit processing and let us know when we should do a		\
+	 * "gtm_fork_n_core". This way the core that gets dumped after a fork (which can only	\
+	 * have the current thread's C-stack) will be from this thread rather than the signal	\
+	 * handling thread (it is this thread that got the SIGSEGV and hence this is what the	\
+	 * user cares about). So wait for such a signal from the signal handling thread.	\
+	 * Need to do this only in case the incoming signal SIG would have not set		\
+	 * "dont_want_core" to TRUE in "generic_signal_handler". This is easily identified	\
+	 * by the IS_DONT_WANT_CORE_TRUE macro. Note that we cannot do a "gtm_fork_n_core"	\
+	 * in this thread at any time since the signal handling thread would be concurrently	\
+	 * running the YottaDB engine and we do not want more than one thread running that at	\
+	 * the same time (YottaDB engine is not multi-thread safe yet). Hence waiting for the	\
+	 * signal handling thread to let us know when it is safe for us to take over control of	\
+	 * the YottaDB engine for a short period of time (1 minute) to generate the core.	\
+	 */											\
+	if (!IS_DONT_WANT_CORE_TRUE(SIG))							\
+	{											\
+		for (i = 0; i < SAFE_TO_FORK_N_CORE_TRIES; i++)					\
+		{										\
+			if (safe_to_fork_n_core)						\
+			{	/* signal handling thread gave us okay to "gtm_fork_n_core" */	\
+				break;								\
+			}									\
+			SLEEP_USEC(SAFE_TO_FORK_N_CORE_SLPTIME_USEC, TRUE);			\
+		}										\
+		gtm_fork_n_core();								\
+		safe_to_fork_n_core = FALSE;	/* signal handling thread to resume */		\
+	}											\
+}
+
 #ifdef GTM_PTHREAD
 /* If we detect a case when the signal came to a thread other than the main GT.M thread, this macro will redirect the signal to the
  * main thread if such is defined. Such scenarios is possible, for instance, if we are running along a JVM, which, upon receiving a
@@ -212,7 +246,7 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 																\
 	pthread_t		mutex_holder_thread_id, this_thread_id;								\
 	int			i;												\
-	boolean_t		signal_forwarded;										\
+	boolean_t		signalForwarded;										\
 																\
 	if (DUMMY_SIG_NUM != SIG)												\
 	{	/* This is not a forwarded signal */										\
@@ -263,13 +297,15 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 				 * (could lead to indefinite forwardings). Hence the "STAPI_IS_SIGNAL_HANDLER_DEFERRED"		\
 				 * check below which ensures a max limit of 1 signal forwarding.				\
 				 */												\
-				signal_forwarded = STAPI_IS_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE);				\
-				if (!signal_forwarded)										\
+				signalForwarded = STAPI_IS_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE);				\
+				if (!signalForwarded)										\
 				{												\
 					STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG, INFO, CONTEXT);			\
 					if (mutex_holder_thread_id)								\
 						pthread_kill(mutex_holder_thread_id, SIG);					\
 				}												\
+				if (IS_EXI_SIGNAL)										\
+					DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG);						\
 				return;												\
 			} else													\
 			{	/* Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info" */		\
@@ -289,38 +325,7 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 				/* Now that we have saved OS signal handler information, forward the signal */			\
 				pthread_kill(gtm_main_thread_id, SIG);								\
 				if (IS_EXI_SIGNAL)										\
-				{	/* This thread got a signal that will trigger exit handler processing. The signal	\
-					 * has been forwarded to the appropriate thread. But it is possible we got a signal	\
-					 * that requires this thread's current C-stack for further analysis (e.g. SIGSEGV).	\
-					 * In this case, we should not return from this thread but wait for the signal handling \
-					 * thread to continue exit processing and let us know when we should do a		\
-					 * "gtm_fork_n_core". This way the core that gets dumped after a fork (which can only	\
-					 * have the current thread's C-stack) will be from this thread rather than the signal	\
-					 * handling thread (it is this thread that got the SIGSEGV and hence this is what the	\
-					 * user cares about). So wait for such a signal from the signal handling thread.	\
-					 * Need to do this only in case the incoming signal SIG would have not set		\
-					 * "dont_want_core" to TRUE in "generic_signal_handler". This is easily identified	\
-					 * by the IS_DONT_WANT_CORE_TRUE macro. Note that we cannot do a "gtm_fork_n_core"	\
-					 * in this thread at any time since the signal handling thread would be concurrently	\
-					 * running the YottaDB engine and we do not want more than one thread running that at	\
-					 * the same time (YottaDB engine is not multi-thread safe yet). Hence waiting for the	\
-					 * signal handling thread to let us know when it is safe for us to take over control of	\
-					 * the YottaDB engine for a short period of time (1 minute) to generate the core.	\
-					 */											\
-					if (!IS_DONT_WANT_CORE_TRUE(SIG))							\
-					{											\
-						for (i = 0; i < SAFE_TO_FORK_N_CORE_TRIES; i++)					\
-						{										\
-							if (safe_to_fork_n_core)						\
-							{	/* signal handling thread gave us okay to "gtm_fork_n_core" */	\
-								break;								\
-							}									\
-							SLEEP_USEC(SAFE_TO_FORK_N_CORE_SLPTIME_USEC, TRUE);			\
-						}										\
-						gtm_fork_n_core();								\
-						safe_to_fork_n_core = FALSE;	/* signal handling thread to resume */		\
-					}											\
-				}												\
+					DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG);						\
 				return;												\
 			}													\
 			/* Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info" */			\
