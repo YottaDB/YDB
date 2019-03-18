@@ -726,8 +726,6 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	assert((DUMMY_SIG_NUM == why) || (SIGALRM == why));
 	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_timer_handler, why, IS_EXI_SIGNAL_FALSE, info, context);
 	assert(gtm_is_main_thread() || gtm_jvm_process || simpleThreadAPI_active);
-	/* Now that we are going to go through "timer_handler", clear any pending deferred timer handler flags in SimpleThreadAPI */
-	assert(simpleThreadAPI_active || !STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler));
 	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifdef DEBUG
 	/* Note that it is possible "in_nondeferrable_signal_handler" is non-zero if we first went into generic_signal_handler
