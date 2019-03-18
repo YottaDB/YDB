@@ -245,7 +245,7 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	GBLREF	boolean_t	gtm_jvm_process;										\
 																\
 	pthread_t		mutex_holder_thread_id, this_thread_id;								\
-	int			i;												\
+	int			i, tLevel;											\
 	boolean_t		signalForwarded;										\
 																\
 	if (DUMMY_SIG_NUM != SIG)												\
@@ -272,21 +272,19 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 			 * current lock holder thread if it is non-zero). But if we are in TP, then lock index could be		\
 			 * "dollar_tlevel"     : e.g. if a "ydb_get_st" call occurs inside of the "ydb_tp_st" call OR		\
 			 * "dollar_tlevel - 1" : if control is in the TP callback function inside "ydb_tp_st" but not a		\
-			 *	SimpleThreadAPI call like "ydb_get_st" etc. In this latter case, it is possible any		\
-			 *	number of threads could get the dollar_tlevel index lock concurrently so we cannot		\
-			 *	be sure about signal forwarding. Therefore forward only in non-TP. In case of TP,		\
-			 *	"timer_handler" will be invoked just "ydb_tp_st" is done finishing one TP level			\
-			 *	when it does the THREADED_API_YDB_ENGINE_UNLOCK call. Therefore it is okay to skip		\
-			 *	signal forwarding in the TP case.								\
+			 *	SimpleThreadAPI call like "ydb_get_st" etc.							\
 			 */													\
-			if (dollar_tlevel)											\
-			{													\
-				STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG, INFO, CONTEXT);				\
-				return;												\
-			}													\
 			this_thread_id = pthread_self();									\
 			assert(this_thread_id);											\
-			mutex_holder_thread_id = ydb_engine_threadsafe_mutex_holder[0];						\
+			tLevel = dollar_tlevel;	/* take a local copy of global variable as it could be concurrently changing */	\
+			if (!tLevel)												\
+				mutex_holder_thread_id = ydb_engine_threadsafe_mutex_holder[0];					\
+			else													\
+			{													\
+				mutex_holder_thread_id = ydb_engine_threadsafe_mutex_holder[tLevel];				\
+				if (!mutex_holder_thread_id)									\
+					mutex_holder_thread_id = ydb_engine_threadsafe_mutex_holder[tLevel - 1];		\
+			}													\
 			if (!pthread_equal(mutex_holder_thread_id, this_thread_id))						\
 			{	/* It is possible we are the MAIN worker thread that gets the SIGALRM signal but		\
 				 * another thread that is holding the YottaDB engine lock is waiting for the signal		\
