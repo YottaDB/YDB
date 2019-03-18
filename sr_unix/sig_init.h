@@ -82,6 +82,8 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded = TRUE;	\
 	SHM_WRITE_MEMORY_BARRIER;						\
 	stapi_signal_handler_deferred |= (1 << SIGHNDLRTYPE);			\
+	SHM_WRITE_MEMORY_BARRIER;						\
+	SET_DEFERRED_STAPI_CHECK_NEEDED;					\
 }
 
 #define	STAPI_CLEAR_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE)			\
@@ -106,6 +108,8 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 		 * invocation done below is taken care of by the FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED invocation	\
 		 * done inside each of these signal handlers at function entry.						\
 		 */													\
+		assert(GET_DEFERRED_STAPI_CHECK_NEEDED);								\
+		CLEAR_DEFERRED_STAPI_CHECK_NEEDED;									\
 		if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_continue_handler))					\
 		{													\
 			assert(stapi_signal_handler_oscontext[sig_hndlr_continue_handler].sig_forwarded);		\

@@ -102,6 +102,10 @@ GBLREF	uint4		deferred_signal_handling_needed; /* a bitmask of the below DEFERRE
 							 * indicates whether deferred signals (that will cause us to exit)
 							 * needs to be handled upon leaving deferred zone.
 							 */
+#define	DEFERRED_SIGNAL_HANDLING_STAPI	(1 << 3)	/* Bit in "deferred_signal_handling_neeed" global variable that
+							 * indicates whether deferred signals in SimpleThreadAPI mode
+							 * needs to be handled upon leaving deferred zone.
+							 */
 
 #define	GET_DEFERRED_TIMERS_CHECK_NEEDED	(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_TIMERS)
 #define	SET_DEFERRED_TIMERS_CHECK_NEEDED	(deferred_signal_handling_needed |= (DEFERRED_SIGNAL_HANDLING_TIMERS))
@@ -114,6 +118,10 @@ GBLREF	uint4		deferred_signal_handling_needed; /* a bitmask of the below DEFERRE
 #define	GET_DEFERRED_EXIT_CHECK_NEEDED		(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_EXIT)
 #define	SET_DEFERRED_EXIT_CHECK_NEEDED		(deferred_signal_handling_needed |= (DEFERRED_SIGNAL_HANDLING_EXIT))
 #define	CLEAR_DEFERRED_EXIT_CHECK_NEEDED	(deferred_signal_handling_needed &= (~DEFERRED_SIGNAL_HANDLING_EXIT))
+
+#define	GET_DEFERRED_STAPI_CHECK_NEEDED		(deferred_signal_handling_needed & DEFERRED_SIGNAL_HANDLING_STAPI)
+#define	SET_DEFERRED_STAPI_CHECK_NEEDED		(deferred_signal_handling_needed |= (DEFERRED_SIGNAL_HANDLING_STAPI))
+#define	CLEAR_DEFERRED_STAPI_CHECK_NEEDED	(deferred_signal_handling_needed &= (~DEFERRED_SIGNAL_HANDLING_STAPI))
 
 GBLREF	volatile int4	gtmMallocDepth;
 

@@ -16,7 +16,7 @@
 #include "gtmxc_types.h"
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
-#include <sys/syscall.h>	/* for "syscall" */
+#include "sig_init.h"
 
 GBLREF	int		process_exiting;
 GBLREF	VSIG_ATOMIC_T	forced_exit;
@@ -52,6 +52,9 @@ void	deferred_signal_handler(void)
 			 */
 			return;
 		}
+		assert(!stapi_signal_handler_deferred || GET_DEFERRED_STAPI_CHECK_NEEDED);
+		if (stapi_signal_handler_deferred)
+			STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
 	}
 	if (!OK_TO_INTERRUPT_TRIMMED)
 		return;	/* Not in a position to allow interrupt to happen. Defer interrupt handling to later. */
