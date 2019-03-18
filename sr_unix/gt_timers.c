@@ -362,13 +362,10 @@ void hiber_start(uint4 hiber)
 				cancel_timer(tid);
 				break;
 			}
-			/* If SimpleThreadAPI is active, check if a timer handler invocation got deferred (since the
-			 * SIGALRM signal would be sent to the MAIN worker thread which would have not been in a position
-			 * to invoke "timer_handler" inside the signal handler). If so invoke it now.
+			/* If SimpleThreadAPI is active, check if a signal handler invocation (e.g. SIGALRM, SIGTERM etc.)
+			 * got deferred. If so invoke it now that we are at a logical point.
 			 */
-			assert(simpleThreadAPI_active || !STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler));
-			if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler))
-				timer_handler(DUMMY_SIG_NUM, NULL, NULL);
+			STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
 		} while (FALSE == waitover);
 	}
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
@@ -397,10 +394,7 @@ void hiber_start_wait_any(uint4 hiber)
 	assert(!sigismember(&savemask, SIGALRM));
 	start_timer_int((TID)hiber_start_wait_any, hiber, NULL, 0, NULL, TRUE);
 	sigsuspend(&savemask);				/* unblock SIGALRM and wait for timer interrupt */
-	/* See comment in "hiber_start" function for why the deferred "timer_handler" invocation is done below */
-	assert(simpleThreadAPI_active || !STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler));
-	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler))
-		timer_handler(DUMMY_SIG_NUM, NULL, NULL);
+	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED; /* See comment in "hiber_start" function for why this is done here */
 	cancel_timer((TID)hiber_start_wait_any);	/* cancel timer block before reenabling */
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
 }
