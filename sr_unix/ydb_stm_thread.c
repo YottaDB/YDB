@@ -39,6 +39,9 @@ GBLREF	boolean_t	simpleThreadAPI_active;
 GBLREF	pthread_t	gtm_main_thread_id;
 GBLREF	boolean_t	gtm_main_thread_id_set;
 GBLREF	uint64_t 	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
+GBLREF	int		stapi_signal_handler_deferred;
+GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];
+GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
 #ifdef YDB_USE_POSIX_TIMERS
 GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
@@ -53,11 +56,9 @@ GBLREF	boolean_t	posix_timer_created;
  */
 void *ydb_stm_thread(void *parm)
 {
-	int			status;
-	boolean_t		queueChanged;
-	libyottadb_routines	save_active_stapi_rtn;
-	ydb_buffer_t		*save_errstr;
-	boolean_t		get_lock;
+	int			i, sig_num, status;
+	pthread_t		mutex_holder_thread_id;
+	enum sig_handler_t	sig_handler_type;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -76,22 +77,47 @@ void *ydb_stm_thread(void *parm)
 	SHM_WRITE_MEMORY_BARRIER;
 	simpleThreadAPI_active = TRUE;	/* to indicate to caller/creator thread that we are done with setup */
 	/* NARSTODO: Fix the below infinite sleep loop */
-	for ( ; ; )
+	for ( i = 0; ; i++)
 	{
+		assert(ydb_engine_threadsafe_mutex_holder[0] != pthread_self());
 		SLEEP_USEC(1, FALSE);	/* Sleep for 1 second; FALSE to indicate if system call is interrupted, do not
 					 * restart the sleep.
 					 */
 		if (stapi_signal_handler_deferred)
-		{
-			THREADED_API_YDB_ENGINE_LOCK(YDB_NOTTP, NULL, LYDB_RTN_NONE, save_active_stapi_rtn,	\
-										save_errstr, get_lock, status);
-			assert(0 == status);
+		{	/* A signal handler was deferred. Try getting the YottaDB engine multi-thread mutex lock to
+			 * see if we can invoke the signal handler in this thread. If we cannot get the lock, forward
+			 * the signal to the thread that currently holds the ydb engine mutex lock in the hope that
+			 * it can handle the signal right away. In any case, keep retrying this in a loop periodically
+			 * so we avoid potential hangs due to indefinitely delaying handling of timer signals.
+			 */
+			/* NARSTODO: Handle non-zero return from "pthread_mutex_trylock" below */
+			status = pthread_mutex_trylock(&ydb_engine_threadsafe_mutex[0]);
+			assert((0 == status) || (EBUSY == status));
 			if (0 == status)
 			{
+				ydb_engine_threadsafe_mutex_holder[0] = pthread_self();
 				STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
-				THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+				ydb_engine_threadsafe_mutex_holder[0] = 0;
+				/* NARSTODO: Handle non-zero return from "pthread_mutex_unlock" below */
+				pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
+			} else if (0 == (i % 1000))
+			{	/* Every 1000 iterations of 1-microsecond sleep loop (i.e. every 1 milli-second)
+				 * forward signal to current YottaDB engine multi-thread mutex lock holder thread.
+				 */
+				SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutex_holder_thread_id);
+				assert(!pthread_equal(mutex_holder_thread_id, pthread_self()));
+				if (mutex_holder_thread_id)
+				{
+					for (sig_handler_type = 0; sig_handler_type < sig_hndlr_num_entries; sig_handler_type++)
+					{
+						if (!STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_handler_type))
+							continue;
+						sig_num = stapi_signal_handler_oscontext[sig_handler_type].sig_num;
+						if (sig_num)
+							pthread_kill(mutex_holder_thread_id, sig_num);
+					}
+				}
 			}
-			/* else: lock failed. Not much we can do. Just keep retrying the sleep loop */
 		}
 	}
 	return NULL;

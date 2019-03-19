@@ -52,9 +52,7 @@ void	deferred_signal_handler(void)
 			 */
 			return;
 		}
-		assert(!stapi_signal_handler_deferred || GET_DEFERRED_STAPI_CHECK_NEEDED);
-		if (stapi_signal_handler_deferred)
-			STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
+		STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
 	}
 	if (!OK_TO_INTERRUPT_TRIMMED)
 		return;	/* Not in a position to allow interrupt to happen. Defer interrupt handling to later. */
