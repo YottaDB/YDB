@@ -70,6 +70,11 @@ int ydb_init()
 	boolean_t		error_encountered;
 	DCL_THREADGBL_ACCESS;
 
+	/* If "ydb_init" has already been done and we are not in a situation where a nested callin frame needs to be created,
+	 * then we can skip the "ydb_init" call altogether. Return right away.
+	 */
+	if (ydb_init_complete && (NULL != frame_pointer) && (frame_pointer->type & SFT_CI))
+		return YDB_OK;
 	SETUP_THREADGBL_ACCESS;	/* needed at least by SETUP_GENERIC_ERROR macro in case we go below that code path */
 	/* Single thread the rest of initialization so all of the various not-thread-safe things this routine does in
 	 * addition to initializing both memory and work thread mutexes in gtm_startup() are all completed without race
@@ -306,5 +311,5 @@ int ydb_init()
 	}
 	assert(NULL == TREF(temp_fgncal_stack));
 	THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
-	return 0;
+	return YDB_OK;
 }
