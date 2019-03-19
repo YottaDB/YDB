@@ -688,7 +688,6 @@ STATICFNDEF void start_first_timer(ABS_TIME *curr_time)
 		}
 		assert(GET_DEFERRED_TIMERS_CHECK_NEEDED);
 	}
-	assert(timeroot || !GET_DEFERRED_TIMERS_CHECK_NEEDED);
 	DUMP_TIMER_INFO("At the end of start_first_timer()");
 }
 
