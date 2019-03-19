@@ -1307,6 +1307,11 @@ GBLDEF	void			(*ydb_stm_thread_exit_fnptr)(void);	/* Maintain a pointer to "ydb_
 									 * pulling this (and a lot of other functions) into
 									 * "gtmsecshr" executable resulting in code bloat.
 									 */
+GBLDEF	void			(*ydb_stm_invoke_deferred_signal_handler_fnptr)(void);
+						/* Maintain a pointer to "ydb_stm_invoke_deferred_signal_handler" so we avoid
+						 * pulling this (and a lot of other functions) into
+						 * "gtmsecshr" executable resulting in code bloat.
+						 */
 GBLDEF	boolean_t		safe_to_fork_n_core;	/* Set to TRUE by the MAIN worker thread in "generic_signal_handler"
 							 * to indicate to another thread that forwarded an exit signal
 							 * to invoke "gtm_fork_n_core". The MAIN worker thread will pause while

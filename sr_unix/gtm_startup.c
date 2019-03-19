@@ -137,6 +137,7 @@ GBLREF enum gtmImageTypes	image_type;
 GBLREF int			init_xfer_table(void);
 GBLREF stm_workq		*stmWorkQueue[];
 GBLREF void			(*ydb_stm_thread_exit_fnptr)(void);
+GBLREF void			(*ydb_stm_invoke_deferred_signal_handler_fnptr)(void);
 GBLREF pthread_mutex_t		ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM];
 GBLREF pthread_t		ydb_engine_threadsafe_mutex_holder[STMWORKQUEUEDIM];
 
@@ -297,6 +298,7 @@ void gtm_startup(struct startup_vector *svec)
 	/* Allocate level 0 work queue (primary work queue) */
 	stmWorkQueue[0] = ydb_stm_init_work_queue();	/* Initialize and return address of work descriptor queue block */
 	ydb_stm_thread_exit_fnptr = &ydb_stm_thread_exit;
+	ydb_stm_invoke_deferred_signal_handler_fnptr = ydb_stm_invoke_deferred_signal_handler;
 	for (i = 1; i < STMWORKQUEUEDIM; i++)
 		pthread_mutex_init(&ydb_engine_threadsafe_mutex[i], NULL);
 	/* Pick up the parms for this invocation */
