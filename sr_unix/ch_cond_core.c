@@ -73,6 +73,7 @@ void ch_cond_core(void)
 			 * does not inherit the C-stack of all active threads). Therefore in debug builds at least,
 			 * dump a core right away so we have more information for debugging.
 			 */
+			PRN_ERROR;
 			DUMP_CORE;	/* will not return */
 		}
 #		endif
