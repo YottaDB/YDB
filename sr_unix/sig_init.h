@@ -86,7 +86,6 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	assert(stapi_signal_handler_deferred & (1 << SIGHNDLRTYPE));		\
 	stapi_signal_handler_deferred &= ~(1 << SIGHNDLRTYPE);			\
 	SHM_WRITE_MEMORY_BARRIER;						\
-	assert(stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded);	\
 	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded = FALSE;	\
 	SHM_WRITE_MEMORY_BARRIER;						\
 }
@@ -288,7 +287,6 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 		 * of SimpleThreadAPI mode so account for that in the assert below.						\
 		 */														\
 		assert(simpleThreadAPI_active || gtm_jvm_process || (sig_hndlr_timer_handler == SIGHNDLRTYPE));			\
-		assert(stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded);						\
 		SIG = stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_num;							\
 		/* Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info" */				\
 		INFO = &stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_info;							\

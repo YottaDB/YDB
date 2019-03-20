@@ -34,13 +34,11 @@ void ydb_stm_invoke_deferred_signal_handler()
 	 */
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_continue_handler))
 	{
-		assert(stapi_signal_handler_oscontext[sig_hndlr_continue_handler].sig_forwarded);
 		assert(SIGCONT == stapi_signal_handler_oscontext[sig_hndlr_continue_handler].sig_num);
 		continue_handler(DUMMY_SIG_NUM, NULL, NULL);
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_ctrlc_handler))
 	{
-		assert(stapi_signal_handler_oscontext[sig_hndlr_ctrlc_handler].sig_forwarded);
 		assert(SIGCONT == stapi_signal_handler_oscontext[sig_hndlr_ctrlc_handler].sig_num);
 		ctrlc_handler(DUMMY_SIG_NUM, NULL, NULL);
 	}
@@ -50,12 +48,10 @@ void ydb_stm_invoke_deferred_signal_handler()
 	assert(!STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_dbcertify_signal_handler));
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_generic_signal_handler))
 	{
-		assert(stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_forwarded);
 		generic_signal_handler(DUMMY_SIG_NUM, NULL, NULL);
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_jobexam_signal_handler))
 	{
-		assert(stapi_signal_handler_oscontext[sig_hndlr_jobexam_signal_handler].sig_forwarded);
 		assert((SIGBUS== stapi_signal_handler_oscontext[sig_hndlr_jobexam_signal_handler].sig_num)
 			|| (SIGSEGV
 				== stapi_signal_handler_oscontext[sig_hndlr_jobexam_signal_handler].sig_num));
@@ -63,25 +59,21 @@ void ydb_stm_invoke_deferred_signal_handler()
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_jobinterrupt_event))
 	{
-		assert(stapi_signal_handler_oscontext[sig_hndlr_jobinterrupt_event].sig_forwarded);
 		assert(SIGUSR1 == stapi_signal_handler_oscontext[sig_hndlr_jobinterrupt_event].sig_num);
 		jobinterrupt_event(DUMMY_SIG_NUM, NULL, NULL);
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_job_term_handler))
 	{
-		assert(stapi_signal_handler_oscontext[sig_hndlr_job_term_handler].sig_forwarded);
 		assert(SIGTERM == stapi_signal_handler_oscontext[sig_hndlr_job_term_handler].sig_num);
 		job_term_handler(DUMMY_SIG_NUM, NULL, NULL);
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_op_fnzpeek_signal_handler))
 	{
-		assert(stapi_signal_handler_oscontext[sig_hndlr_op_fnzpeek_signal_handler].sig_forwarded);
 		assert(SIGTERM == stapi_signal_handler_oscontext[sig_hndlr_op_fnzpeek_signal_handler].sig_num);
 		op_fnzpeek_signal_handler(DUMMY_SIG_NUM, NULL, NULL);
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_suspsigs_handler))
 	{
-		assert(stapi_signal_handler_oscontext[sig_hndlr_suspsigs_handler].sig_forwarded);
 		assert((SIGTTIN == stapi_signal_handler_oscontext[sig_hndlr_suspsigs_handler].sig_num)
 			|| (SIGTTOU == stapi_signal_handler_oscontext[sig_hndlr_suspsigs_handler].sig_num)
 			|| (SIGTSTP == stapi_signal_handler_oscontext[sig_hndlr_suspsigs_handler].sig_num));
@@ -89,7 +81,6 @@ void ydb_stm_invoke_deferred_signal_handler()
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler))
 	{
-		assert(stapi_signal_handler_oscontext[sig_hndlr_timer_handler].sig_forwarded);
 		assert(SIGALRM == stapi_signal_handler_oscontext[sig_hndlr_timer_handler].sig_num);
 		timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 	}
