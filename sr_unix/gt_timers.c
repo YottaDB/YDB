@@ -595,6 +595,7 @@ STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 #		endif
 		sevp.sigev_notify_thread_id = posix_timer_thread_id;
 		sevp.sigev_signo = SIGALRM;
+		sevp.sigev_value.sival_ptr = NULL;	/* not used/relied by "timer_handler" but avoids a valgrind warning */
 		if (timer_create(CLOCK_MONOTONIC, &sevp, &posix_timer_id))
 		{
 			save_errno = errno;
