@@ -55,7 +55,7 @@ GBLREF	boolean_t	posix_timer_created;
  */
 void *ydb_stm_thread(void *parm)
 {
-	int			i, sig_num, status;
+	int			i, sig_num, status, tLevel;
 	pthread_t		mutex_holder_thread_id;
 	enum sig_handler_t	sig_handler_type;
 	DCL_THREADGBL_ACCESS;
@@ -99,11 +99,9 @@ void *ydb_stm_thread(void *parm)
 				ydb_engine_threadsafe_mutex_holder[0] = 0;
 				/* NARSTODO: Handle non-zero return from "pthread_mutex_unlock" below */
 				pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
-			} else if (0 == (i % 1000))
-			{	/* Every 1000 iterations of 1-microsecond sleep loop (i.e. every 1 milli-second)
-				 * forward signal to current YottaDB engine multi-thread mutex lock holder thread.
-				 */
-				SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutex_holder_thread_id);
+			} else
+			{
+				SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutex_holder_thread_id, tLevel);
 				assert(!pthread_equal(mutex_holder_thread_id, pthread_self()));
 				if (mutex_holder_thread_id)
 				{
