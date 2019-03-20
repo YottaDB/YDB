@@ -157,11 +157,9 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 
 #ifdef GTM_PTHREAD
 
-#define	SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(HOLDER_THREAD_ID)							\
+#define	SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(HOLDER_THREAD_ID, TLEVEL)						\
 {														\
 	GBLREF	uint4		dollar_tlevel;									\
-														\
-	int			tLevel;										\
 														\
 	/* If not in TP, the YottaDB engine lock index is 0 (i.e. ydb_engine_threadsafe_mutex_holder[0] is	\
 	 * current lock holder thread if it is non-zero). But if we are in TP, then lock index could be		\
@@ -169,14 +167,14 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	 * "dollar_tlevel - 1" : if control is in the TP callback function inside "ydb_tp_st" but not a		\
 	 *	SimpleThreadAPI call like "ydb_get_st" etc.							\
 	 */													\
-	tLevel = dollar_tlevel;	/* take a local copy of global variable as it could be concurrently changing */	\
-	if (!tLevel)												\
+	TLEVEL = dollar_tlevel;	/* take a local copy of global variable as it could be concurrently changing */	\
+	if (!TLEVEL)												\
 		HOLDER_THREAD_ID = ydb_engine_threadsafe_mutex_holder[0];					\
 	else													\
 	{													\
-		HOLDER_THREAD_ID = ydb_engine_threadsafe_mutex_holder[tLevel];					\
+		HOLDER_THREAD_ID = ydb_engine_threadsafe_mutex_holder[TLEVEL];					\
 		if (!HOLDER_THREAD_ID)										\
-			HOLDER_THREAD_ID = ydb_engine_threadsafe_mutex_holder[tLevel - 1];			\
+			HOLDER_THREAD_ID = ydb_engine_threadsafe_mutex_holder[TLEVEL - 1];			\
 	}													\
 }
 
@@ -192,8 +190,10 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	GBLREF	boolean_t	safe_to_fork_n_core;										\
 	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];								\
 	GBLREF	boolean_t	gtm_jvm_process;										\
+	DEBUG_ONLY(GBLREF uint4	dollar_tlevel;)											\
+																\
 	pthread_t		mutex_holder_thread_id, this_thread_id;								\
-	int			i;												\
+	int			i, tLevel;											\
 	boolean_t		signalForwarded;										\
 																\
 	if (DUMMY_SIG_NUM != SIG)												\
@@ -219,8 +219,19 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 			 */													\
 			this_thread_id = pthread_self();									\
 			assert(this_thread_id);											\
-			SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutex_holder_thread_id);						\
-			if (!pthread_equal(mutex_holder_thread_id, this_thread_id))						\
+			SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutex_holder_thread_id, tLevel);					\
+			/* If we are in TP, we hold the mutex lock "ydb_engine_threadsafe_mutex[tLevel]" but it is possible	\
+			 * concurrent threads are creating nested TP transactions in which case the YottaDB engine mutex lock	\
+			 * would move to "ydb_engine_threadsafe_mutex[tLevel+1]" and so on. In order to be sure we are the only	\
+			 * thread currently holding the YottaDB engine mutex lock, we need to acquire the "tLevel+1" lock and	\
+			 * higher but we cannot do that while inside a signal handler therefore we cannot safely determine if	\
+			 * we are the engine lock holder in TP. In that case, we forward the signal to the current holder	\
+			 * thread. Even if we forward to the wrong thread (since we are not determining the engine lock holder	\
+			 * using any other locks), it is okay since the MAIN worker thread ("ydb_stm_thread") will take care of	\
+			 * periodically forwarding the signal to the current engine lock holder thread until it eventually gets	\
+			 * handled.												\
+			 */													\
+			if (tLevel || !pthread_equal(mutex_holder_thread_id, this_thread_id))					\
 			{	/* It is possible we are the MAIN worker thread that gets the SIGALRM signal but		\
 				 * another thread that is holding the YottaDB engine lock is waiting for the signal		\
 				 * to know of a timeout (e.g. ydb_lock_st etc.). Therefore forward the signal to that		\
@@ -241,7 +252,12 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 					DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG);						\
 				return;												\
 			} else													\
-			{	/* Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info" */		\
+			{	/* We are not in TP and hold the YottaDB engine lock "ydb_engine_threadsafe_mutex[0]".		\
+				 * We are guaranteed no new TP transaction happens while we hold this lock.			\
+				 * Therefore we can safely proceed to handle the signal.					\
+				 */												\
+				assert(!dollar_tlevel);										\
+				/* Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info" */		\
 				SAVE_OS_SIGNAL_HANDLER_INFO(SIGHNDLRTYPE, INFO);						\
 				SAVE_OS_SIGNAL_HANDLER_CONTEXT(SIGHNDLRTYPE, CONTEXT);						\
 			}													\
