@@ -122,7 +122,7 @@ void *ydb_stm_thread(void *parm)
 	return NULL;
 }
 
-/* Function that does exit handling for the MAIN worker thread. */
+/* Function that does exit handling in SimpleThreadAPI mode */
 void	ydb_stm_thread_exit(void)
 {
 	gtm_exit_handler(); /* rundown all open database resource */

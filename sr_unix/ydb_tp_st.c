@@ -62,7 +62,7 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 		 *	asserting that TREF(libyottadb_active_rtn) is LYDB_RTN_NONE.
 		 */
 		assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
-		/* Start the TP transaction by asking the MAIN worker thread to do the "op_tstart" (in "ydb_tp_s_common") */
+		/* Start the TP transaction by asking "ydb_tp_s_common" to do the "op_tstart" */
 		lydbrtn = (!nested_tp ? LYDB_RTN_TP_START_TLVL0 : LYDB_RTN_TP_START);
 		retval = ydb_tp_s_common(lydbrtn, (ydb_basicfnptr_t)NULL, (void *)NULL, transid, namecount, varnames);
 		assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
@@ -99,9 +99,7 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 			/* Invoke the user-defined TP callback function */
 			retval = (*tpfn)(new_tptoken, errstr, tpfnparm);
 			if (YDB_OK == retval)
-			{	/* Commit the TP transaction by asking MAIN worker thread to do the "op_tcommit"
-				 * (in "ydb_tp_s_common").
-				 */
+			{	/* Commit the TP transaction by asking "ydb_tp_s_common" to do the "op_tcommit" */
 				lydbrtn = (!nested_tp ? LYDB_RTN_TP_COMMIT_TLVL0 : LYDB_RTN_TP_COMMIT);
 				retval = ydb_tp_s_common(lydbrtn, (ydb_basicfnptr_t)NULL, (void *)NULL,
 							(const char *)NULL, (int)0, (ydb_buffer_t *)NULL);
@@ -120,8 +118,7 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 			{	/* Outermost TP and error code is not a TPRESTART.
 				 * Return it directly to caller of "ydb_tp_st" but before that roll back the
 				 *	TP transaction (if not already done).
-				 * ROLLBACK the TP transaction by asking MAIN worker thread to do the
-				 *	"op_trollback" (in "ydb_tp_s_common").
+				 * ROLLBACK the TP transaction by asking "ydb_tp_s_common" to do the "op_trollback".
 				 * Note that it is possible "retval" is YDB_TP_ROLLBACK (e.g. if the callback
 				 *	function returned YDB_TP_ROLLBACK).
 				 */
@@ -135,14 +132,13 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 					rlbk_retval = ydb_tp_s_common(LYDB_RTN_TP_ROLLBACK_TLVL0, (ydb_basicfnptr_t)NULL,
 								(void *)NULL, (const char *)NULL, (int)0, (ydb_buffer_t *)NULL);
 					/* Note that it is possible the above returns a YDB_ERR_CALLINAFTERXIT error
-					 * in case the MAIN worker thread(s) have been asked to terminate.
+					 * in case the YottaDB process has been asked to terminate.
 					 * Take that into account in the below assert.
 					 * In this case, the TP transaction would not be rolled back yet (so dollar_tlevel
 					 * would still be non-zero) but it is okay to return in this case with this
-					 * error code since the MAIN worker thread will run the exit handler which will
+					 * error code since the exiting logic will run the exit handler which will
 					 * do the needed "op_trollback".
 					 */
-					/* NARSTODO: Investigate implication of above comment once MAIN worker thread is gone */
 					assert((YDB_TP_ROLLBACK == rlbk_retval)
 						|| (YDB_ERR_CALLINAFTERXIT == rlbk_retval)
 							&& (retval == rlbk_retval) && dollar_tlevel);
@@ -156,14 +152,12 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 				 */
 				break;
 			}
-			/* Restart the outermost TP transaction by asking the MAIN worker thread
-			 * to do the "tp_restart" (in "ydb_tp_s_common").
-			 */
+			/* Restart the outermost TP transaction by asking "ydb_tp_s_common" to do the "tp_restart" */
 			retval = ydb_tp_s_common(LYDB_RTN_TP_RESTART_TLVL0, (ydb_basicfnptr_t)NULL,
 						(void *)NULL, (const char *)NULL, (int)0, (ydb_buffer_t *)NULL);
 			assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 			if (YDB_ERR_CALLINAFTERXIT == retval)
-				break;	/* The MAIN worker thread has been asked to exit. Return right away. */
+				break;	/* The YottaDB process has been asked to exit. Return right away. */
 			assert(YDB_OK == retval);
 		}
 		break;
