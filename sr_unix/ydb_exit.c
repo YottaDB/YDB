@@ -37,9 +37,11 @@
 #include "gtm_exit_handler.h"
 #include "dlopen_handle_array.h"
 
-GBLREF	stm_workq		*stmWorkQueue[];
 GBLREF	int			mumps_status;
 GBLREF	struct sigaction	orig_sig_action[];
+#ifdef DEBUG
+GBLREF	pthread_t		ydb_stm_worker_thread_id;
+#endif
 
 /* Routine exposed to call-in user to exit from active YottaDB environment */
 int ydb_exit()
@@ -69,7 +71,8 @@ int ydb_exit()
 		 * above in the THREADED_API_YDB_ENGINE_LOCK call). So we can proceed with exit handling. We are also
 		 * guaranteed this thread is not the MAIN worker thread (asserted below).
 		 */
-		assert(!simpleThreadAPI_active || !IS_STAPI_WORKER_THREAD);
+		assert(!simpleThreadAPI_active
+			|| (ydb_stm_worker_thread_id && !pthread_equal(pthread_self(), ydb_stm_worker_thread_id)));
 		ESTABLISH_NORET(gtmci_ch, error_encountered);
 		if (error_encountered)
 		{	/* "gtmci_ch" encountered an error and transferred control back here. Return after mutex lock cleanup. */

@@ -89,7 +89,6 @@ GBLREF	boolean_t		gtm_main_thread_id_set;
 #endif
 GBLREF	int			dollar_truth;
 GBLREF	tp_frame		*tp_pointer;
-GBLREF	stm_workq		*stmWorkQueue[];
 GBLREF	boolean_t		noThreadAPI_active;
 GBLREF	boolean_t		simpleThreadAPI_active;
 
@@ -248,21 +247,6 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	FGNCAL_UNWIND;		/* note - this is outside the establish since gtmci_ch calso calls fgncal_unwind() which,
 				 * if this failed, would lead to a nested error which we'd like to avoid */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
-	/* This block is a version of the VERIFY_NON_THREADED_API macro that instead does an rts_error when a violation
-	 * is detected.
-	 */
-	if (simpleThreadAPI_active)
-	{
-		if (!IS_STAPI_WORKER_THREAD)
-		{
-			DBGAPITP_ONLY(gtm_fork_n_core());
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIMPLEAPINOTALLOWED);
-		}
-		/* We are in threaded mode but running an unthreaded command in the main work thread which
-		 * is allowed. In that case just fall out (verified).
-		 */
-	} else
-		noThreadAPI_active = TRUE;
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
 	if (!TREF(ci_table))	/* Load the call-in table only once from env variable ydb_ci/GTMCI. */

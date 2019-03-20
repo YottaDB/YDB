@@ -1254,6 +1254,7 @@ GBLDEF	void_ptr_t	*dlopen_handle_array;	/* Array of handles returned from variou
 						 */
 GBLDEF	uint4		dlopen_handle_array_len_alloc, dlopen_handle_array_len_used;	/* Allocated and Used length of the array */
 
+GBLDEF	pthread_t	ydb_stm_worker_thread_id;	/* The thread id of the worker thread in SimpleThreadAPI mode. */
 #ifdef YDB_USE_POSIX_TIMERS
 GBLDEF	pid_t		posix_timer_thread_id;	/* The thread id that gets the SIGALRM signal for timer pops.
 						 * If 0, this is set to a non-zero value in "sys_settimer".
@@ -1264,18 +1265,8 @@ GBLDEF	boolean_t	posix_timer_created;
 
 /* Structures  used for the Simple Thread API */
 
-/* See the description of STMWORKQUEUEDIM in libyottadb_int.h for a better description of how this array of work queues is
- * allocated and used. Summary is it contains one base work queue as stmWorkQueue[0] and TP_MAX_LEVEL additional work queues
- * one for each nested TP level with one extra so that if a call is made that would trip the TPTOODEEP, we don't have to
- * detect it in the front-end but rather wait until op_tstart() is driven in a TP thread to raise the error. It means less
- * doubled up of checking if we can let the regular check do the right thing.
- */
-GBLDEF	stm_workq	*stmWorkQueue[STMWORKQUEUEDIM];	/* A set of queue/thread descriptor blocks. One extra for the
-							 * main workQ and the other so we let op_tstart() raise the TP
-							 * max nesting level error instead of doing it ourselves thus
-							 * checking twice.
-							 */
 GBLDEF	uint64_t	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
+
 /* One of the following two flags must be true - either running a threaded API or we are running something else (M-code, call-in,
  * SimpleAPI) that is NOT threaded.
  */
@@ -1291,6 +1282,7 @@ GBLDEF	boolean_t	noThreadAPI_active;		/* Any non-threaded API active (mumps, cal
  * Note: We initialize only ydb_engine_threadsafe_mutex[0] to PTHREAD_MUTEX_INITIALIZER here. This is needed so
  * the first call to "ydb_init" works correctly. ydb_engine_threadsafe_mutex[1] to ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM-1]
  * are initialized in "gtm_startup" which is invoked from within the first "ydb_init" call.
+ * See the description of STMWORKQUEUEDIM in libyottadb_int.h for more details on how that macro is defined.
  */
 GBLDEF	pthread_mutex_t	ydb_engine_threadsafe_mutex[STMWORKQUEUEDIM] = { PTHREAD_MUTEX_INITIALIZER };
 

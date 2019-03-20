@@ -83,52 +83,6 @@ typedef enum
 	LYDB_VARREF_ISV			/* Referencing an ISV (Intrinsic Special Variable) */
 } ydb_var_types;
 
-/* Structure for isolating YottaDB SimpleAPI calls in its own thread. This is the queue entry that conveys
- * the call from one thread to another. Possible queues are the queue array anchored at stmWorkQueue
- * which is defined in gbldefs.c and described in more detail there.
- */
-typedef struct stm_que_ent_struct				/* SimpleAPI Thread Model */
-{
-	struct
-	{
-		struct stm_que_ent_struct	*fl, *bl;	/* Doubly linked chain for free/busy queue */
-	} que;
-	sem_t			complete;			/* When this is unlocked, it is complete */
-	libyottadb_routines	calltyp;			/* Which routine's call is being migrated */
-	uintptr_t		args[YDB_MAX_SAPI_ARGS];	/* Args that are moving over */
-	uintptr_t		retval;				/* Return value coming back */
-	uint64_t		tptoken;			/* tptoken used to create this call block */
-	ydb_buffer_t		*errstr;			/* errstr passed in by user to return error string if any */
-#	ifdef DEBUG
-	char			*mainqcaller, *tpqcaller;	/* Where queued from */
-#	endif
-} stm_que_ent;
-
-/* Structure that provides the working structures for SimpleThreadAPI access (running YottaDB requests in a known thread).
- * Note we try to keep the mutexes, and queue headers in separate cachelines so conditional load/store work correctly.
- */
-typedef struct stm_work_q_t
-{
-	pthread_mutex_t		mutex;				/* Mutex controlling access to queue and CV */
-	CACHELINE_PAD(SIZEOF(pthread_mutex_t), 1);
-	pthread_cond_t		cond;				/* Worker notifier something may be on queue */
-	CACHELINE_PAD(SIZEOF(pthread_cond_t), 2);
-	stm_que_ent		stm_wqhead;			/* Work queue head/tail */
-	/* TODO SEE - checking for threadid of 0 is verbotten - create a new field that says it is set or not */
-	pthread_t		threadid;			/* Thread associated with the queue */
-	struct stm_work_q_t	*prevWorkQHead;	/* See comment in LYDB_RTN_TPCOMPLT case of ydb_stm_thread.c for purpose */
-} stm_workq;
-
-/* Structure to hold the free stm_que_ent entries for re-use. Again, keeping parts in separate cache lines to minimize
- * interference between them.
- */
-typedef struct
-{
-	pthread_mutex_t 	mutex;				/* Mutex controlling access to free queues */
-	CACHELINE_PAD(SIZEOF(pthread_mutex_t), 1);
-	stm_que_ent		stm_cbqhead;			/* Head element of free callblk queue */
-} stm_freeq;
-
 /* Create a common-ground type between ydb_tpfnptr_t and ydb_tp2fnptr_t by removing the arguments so ydb_tp_common can be
  * called with either one of them. It's just a basic function pointer.
  */
@@ -546,26 +500,6 @@ MBSTART {											\
 	}											\
 } MBEND
 
-/* Macro to lock the condition-variable/queue-mutex and, if requested, see if the related thread is running
- * yet and if not, fire it up with the requested start address. If thread gets started, wait for it to start
- * up before going forward else we run into sync-ing issues (TODO SEE).
- */
-#define LOCK_STM_QHEAD_AND_START_WORK_THREAD(QROOT, STARTTHREAD, THREADROUTINE, STATUS)			\
-MBSTART {												\
-	STATUS = pthread_mutex_lock(&((QROOT)->mutex));							\
-	if (0 != STATUS)										\
-	{	 											\
-		SETUP_SYSCALL_ERROR("pthread_mutex_lock()", STATUS);					\
-	} else if ((STARTTHREAD) && (0 == (uintptr_t)(QROOT)->threadid))				\
-	{	/* The YDB main execution thread is not running yet - start it */			\
-		STATUS = pthread_create(&((QROOT)->threadid), NULL, &THREADROUTINE, NULL);		\
-		if (0 != STATUS)									\
-		{     	 										\
-			SETUP_SYSCALL_ERROR("pthread_create()", STATUS);				\
-		}											\
-	}												\
-} MBEND
-
 #define	SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(ENTRYREF)					\
 {													\
 	ENTRYREF.addr = (simpleThreadAPI_active ? SIMPLETHREADAPI_M_ENTRYREF : SIMPLEAPI_M_ENTRYREF);	\
@@ -620,9 +554,6 @@ MBSTART {												\
 	set_zstatus(&entryref, errnum, NULL, FALSE);							\
 	TREF(ydb_error_code) = errnum;									\
 } MBEND
-
-/* Macro to determine if we are executing in the worker thread */
-#define IS_STAPI_WORKER_THREAD ((NULL != stmWorkQueue[0]) && pthread_equal(pthread_self(), stmWorkQueue[0]->threadid))
 
 /* A process is not allowed to switch "modes" in midstream. This means if a process has started using non-threaded APIs and
  * services, it cannot switch to using threaded APIs and services and vice versa.
@@ -716,7 +647,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];								\
 	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];							\
 	GBLREF	boolean_t	simpleThreadAPI_active;									\
-	GBLREF	stm_workq	*stmWorkQueue[];	/* Array to hold list of work queues for SimpleThreadAPI */	\
+	GBLREF	pthread_t	ydb_stm_worker_thread_id;								\
 															\
 	int	i, lock_index, lclStatus;										\
 															\
@@ -783,7 +714,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 					 */										\
 					assert(0 == lock_index);							\
 					/* Start the MAIN worker thread for SimpleThreadAPI */				\
-					lclStatus = pthread_create(&stmWorkQueue[0]->threadid, NULL,			\
+					lclStatus = pthread_create(&ydb_stm_worker_thread_id, NULL,			\
 										&ydb_stm_thread, NULL);			\
 					/* NARSTODO: Handle non-zero return from "pthread_create" below */		\
 					if (YDB_OK == lclStatus)							\
@@ -876,29 +807,6 @@ MBSTART {													\
 	}													\
 } MBEND
 
-/* Initialize an STM (simple thread mode) mutex */
-#define INIT_STM_QUEUE_MUTEX(MUTEX_PTR) 											\
-MBSTART {															\
-	pthread_mutexattr_t	mattr;												\
-	int			status;												\
-	pthread_mutexattr_init(&mattr);	/* Initialize a mutex attribute block */						\
-	status = pthread_mutexattr_setrobust(&mattr, PTHREAD_MUTEX_ROBUST);							\
-	if (0 != status)													\
-	{															\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutexattr_setrobust()"),	\
-			      RTS_ERROR_LITERAL(__FILE__), __LINE__, status);							\
-	}															\
-	/* Use type error check to find any indications we may be double locking this mutex */					\
-	status = pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_ERRORCHECK);							\
-	if (0 != status)													\
-	{															\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutexattr_settype()"),	\
-			      RTS_ERROR_LITERAL(__FILE__), __LINE__, status);							\
-	}															\
-	pthread_mutex_init(&((MUTEX_PTR)->mutex), &mattr);									\
-	pthread_mutexattr_destroy(&mattr);	/* Destroy mutex attribute block before it goes out of scope */			\
-} MBEND
-
 /* tptoken is a 64-bit quantity. The least significant 57 bits is a counter (that matches the global variable "stmTPToken").
  * When passed to a user function, the current TP depth (dollar_tlevel) which can only go upto 127 (i.e. 7 bits) is bitwise-ORed
  * into the most significant 7 bits thereby generating a 64-bit token.
@@ -941,11 +849,10 @@ MBSTART {															\
 
 int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn);
 void	sapi_save_targ_key_subscr_nodes(void);
-void *ydb_stm_thread(void *parm);
-stm_workq *ydb_stm_init_work_queue(void);
-int ydb_tp_s_common(libyottadb_routines lydbrtn,
+void	*ydb_stm_thread(void *parm);
+int	ydb_tp_s_common(libyottadb_routines lydbrtn,
 			ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames);
-int ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var);
+int	ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var);
 
 /* Below are the 3 functions invoked by "pthread_atfork" during a "fork" call to ensure all SimpleThreadAPI related
  * mutex and condition variables are safely released (without any deadlocks, inconsistent states) in the child after the fork.

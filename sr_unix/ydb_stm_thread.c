@@ -34,7 +34,6 @@
 #include "memcoherency.h"
 #include "sig_init.h"
 
-GBLREF	stm_workq	*stmWorkQueue[];
 GBLREF	boolean_t	simpleThreadAPI_active;
 GBLREF	pthread_t	gtm_main_thread_id;
 GBLREF	boolean_t	gtm_main_thread_id_set;
@@ -126,20 +125,6 @@ void *ydb_stm_thread(void *parm)
 /* Function that does exit handling for the MAIN worker thread. */
 void	ydb_stm_thread_exit(void)
 {
-	int		i, j, status;
-	boolean_t	timed_out, n_timed_out;
-	pthread_t	threadid;
-
 	gtm_exit_handler(); /* rundown all open database resource */
-	/* Now that the DBs are down, let's remove the pthread constructs created for SimpleThreadAPI
-	 * usages. Note return codes ignored here as reporting errors creates more problems than they
-	 * are worth.
-	 */
-	for (i = 1; (NULL != stmWorkQueue[i]) && (STMWORKQUEUEDIM > i); i++)
-	{
-		(void)pthread_cond_destroy(&stmWorkQueue[i]->cond);
-		(void)pthread_mutex_destroy(&stmWorkQueue[i]->mutex);
-	}
-	/* TODO SEE: Also destroy the msems in the free queue blocks and release them if they exist */
 	return;
 }

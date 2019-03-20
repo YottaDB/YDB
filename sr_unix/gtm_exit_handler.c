@@ -63,7 +63,6 @@ GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		skip_exit_handler;
 GBLREF 	boolean_t		is_tracing_on;
 GBLREF	int			fork_after_ydb_init;
-GBLREF	stm_workq		*stmWorkQueue[];
 GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 #ifdef DEBUG
 GBLREF 	boolean_t		stringpool_unusable;

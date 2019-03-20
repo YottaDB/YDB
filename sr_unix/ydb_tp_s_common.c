@@ -33,7 +33,6 @@ GBLREF	int		tprestart_state;
 GBLREF	uint4		dollar_trestart;
 GBLREF	uint4		simpleapi_dollar_trestart;
 GBLREF	boolean_t	noThreadAPI_active;
-GBLREF	stm_workq	*stmWorkQueue[];
 #ifdef DEBUG
 GBLREF	uint4		dollar_tlevel;
 #endif
