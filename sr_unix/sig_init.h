@@ -83,7 +83,6 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 
 #define	STAPI_CLEAR_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE)			\
 {										\
-	assert(stapi_signal_handler_deferred & (1 << SIGHNDLRTYPE));		\
 	stapi_signal_handler_deferred &= ~(1 << SIGHNDLRTYPE);			\
 	SHM_WRITE_MEMORY_BARRIER;						\
 	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_forwarded = FALSE;	\
@@ -195,7 +194,18 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	int			i, tLevel;											\
 	boolean_t		signalForwarded;										\
 																\
-	if (DUMMY_SIG_NUM != SIG)												\
+	/* If SIG is DUMMY_SIG_NUM, we are guaranteed this is a forwarded signal. Otherwise, it could still be forwarded	\
+	 * from a "pthread_kill" invocation from the MAIN worker thread or the thread that randomly got the original signal.	\
+	 * We find that out by using the linux-only SI_TKILL info code to check if this signal came from a "tkill" system call.	\
+	 * Even if the info code is SI_TKILL, it is possible a completely different signal than what was recorded before comes	\
+	 * in. In that case, do not treat that as a forwarded signal but as a new signal. Hence the "sig_num" check below.	\
+	 */															\
+	assert((DUMMY_SIG_NUM == SIG) || (NULL != INFO));									\
+	signalForwarded = ((DUMMY_SIG_NUM == SIG)										\
+				|| (simpleThreadAPI_active									\
+					&& (SI_TKILL == INFO->si_code)								\
+					&& (SIG == stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_num)));			\
+	if (!signalForwarded)													\
 	{	/* This is not a forwarded signal */										\
 		if (simpleThreadAPI_active)											\
 		{	/*													\
