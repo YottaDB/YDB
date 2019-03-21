@@ -648,8 +648,11 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];							\
 	GBLREF	boolean_t	simpleThreadAPI_active;									\
 	GBLREF	pthread_t	ydb_stm_worker_thread_id;								\
+	GBLREF	uint4		dollar_tlevel;										\
+	GBLREF	uint64_t 	stmTPToken;	/* Counter used to generate unique token for SimpleThreadAPI TP */	\
 															\
-	int	i, lock_index, lclStatus;										\
+	int		i, lockIndex, lclStatus, tLevel;								\
+	uint64_t	tpToken;											\
 															\
 	/* NARSTODO: Handle case where we already hold pthread lock, say due to error conditions or so. */		\
 	/* NARSTODO: Do we need RECURSIVE pthread_mutex_lock? */							\
@@ -659,9 +662,26 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	 * we need to handle the case where "lcl_gtm_threadgbl" is NULL in which case we should not skip TREF usages.	\
 	 */														\
 	SAVE_ACTIVE_STAPI_RTN = (NULL != lcl_gtm_threadgbl) ? TREF(libyottadb_active_rtn) : LYDB_RTN_NONE;		\
-	lock_index = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);							\
+	lockIndex = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);							\
+	/* Check for INVTPTRANS error. Note that we cannot detect ALL possible cases of an invalid supplied tptoken.	\
+	 * For example, if the TP callback function of a $TLEVEL=2 TP does a "ydb_get_st" call with a TPTOKEN that	\
+	 * has high order 8 bits set to 1, and low order 56 bits set to same as the tptoken passed in the callback	\
+	 * function, then it won't fail with an INVTPTRANS error even though the "ydb_get_st" call will deadlock	\
+	 * since it will be waiting to get the ydb engine thread lock on index 1 whereas that cannot happen until the	\
+	 * $TLEVEL=2 TP callback function finishes which again cannot finish until the "ydb_get_st" call finishes.	\
+	 */														\
+	if (YDB_NOTTP != TPTOKEN)											\
+	{														\
+		tLevel = dollar_tlevel;											\
+		tpToken = GET_INTERNAL_TPTOKEN((uint64_t)TPTOKEN);							\
+		if (!tLevel || (tpToken != stmTPToken) || !lockIndex || (lockIndex > tLevel))				\
+		{													\
+			SETUP_GENERIC_ERROR(YDB_ERR_INVTPTRANS);							\
+			RETVAL = YDB_ERR_INVTPTRANS;									\
+		}													\
+	}														\
 	if ((LYDB_RTN_NONE != SAVE_ACTIVE_STAPI_RTN)									\
-		&& (ydb_engine_threadsafe_mutex_holder[lock_index] == pthread_self()))					\
+		&& (ydb_engine_threadsafe_mutex_holder[lockIndex] == pthread_self()))					\
 	{	/* We are already in the middle of a SimpleThreadAPI call. Since we already hold the mutex lock as	\
 		 * part of the original SimpleThreadAPI call, skip lock get/release in this nested call.		\
 		 */													\
@@ -698,28 +718,25 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 		if (GET_LOCK)												\
 		{													\
 			/* NARSTODO: Handle non-zero return from "pthread_mutex_lock" below */				\
-			RETVAL = pthread_mutex_lock(&ydb_engine_threadsafe_mutex[lock_index]);				\
+			RETVAL = pthread_mutex_lock(&ydb_engine_threadsafe_mutex[lockIndex]);				\
 			assert(0 == YDB_OK);										\
 			if (YDB_OK == RETVAL)										\
 			{												\
-				ydb_engine_threadsafe_mutex_holder[lock_index] = pthread_self();			\
-				/* NARSTODO: Handle case where non-zero tptoken is passed in first STAPI call		\
-				 * by process (say ydb_get_st()). This should issue a INVTPTRANS error.			\
-				 */											\
+				ydb_engine_threadsafe_mutex_holder[lockIndex] = pthread_self();				\
 				/* Mark this process as having SimpleThreadAPI active if not already done */		\
 				if (!simpleThreadAPI_active && (LYDB_RTN_NONE != CALLTYP))				\
 				{	/* The LYDB_RTN_NONE check above is needed to take into account calls of this	\
 					 * macro from "ydb_init" which are done even in SimpleAPI mode. Those calls	\
 					 * should not mark SimpleThreadAPI as active.					\
 					 */										\
-					assert(0 == lock_index);							\
+					assert(0 == lockIndex);								\
 					/* Start the MAIN worker thread for SimpleThreadAPI */				\
 					lclStatus = pthread_create(&ydb_stm_worker_thread_id, NULL,			\
 										&ydb_stm_thread, NULL);			\
 					/* NARSTODO: Handle non-zero return from "pthread_create" below */		\
 					if (YDB_OK == lclStatus)							\
 					{     	 									\
-						/* NARSTODO: Remove this sleep loop and instead use pthread_cond_signal etc. calls */	\
+				/* NARSTODO: Remove this sleep loop and instead use pthread_cond_signal etc. calls */	\
 						/* Wait for MAIN worker thread to set simpleThreadAPI_active */		\
 						for (i = 0; i < MICROSECS_IN_MSEC; i++) 				\
 						{									\
@@ -757,7 +774,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];							\
 	GBLREF	int		stapi_signal_handler_deferred;								\
 															\
-	int	lock_index;												\
+	int	lockIndex;												\
 															\
 	/* Before releasing the YottaDB engine lock, check if any signal handler got deferred in the MAIN		\
 	 * worker thread and is still pending. If so, handle it now since we own the engine lock for sure here		\
@@ -774,11 +791,11 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 			assert(ERRSTR == TREF(stapi_errstr));								\
 			TREF(stapi_errstr) = SAVE_ERRSTR;								\
 		}													\
-		lock_index = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);						\
-		assert(pthread_self() == ydb_engine_threadsafe_mutex_holder[lock_index]);				\
-		ydb_engine_threadsafe_mutex_holder[lock_index] = 0;							\
+		lockIndex = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);						\
+		assert(pthread_self() == ydb_engine_threadsafe_mutex_holder[lockIndex]);				\
+		ydb_engine_threadsafe_mutex_holder[lockIndex] = 0;							\
 		/* NARSTODO: Handle non-zero return from "pthread_mutex_unlock" below */				\
-		pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lock_index]);						\
+		pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lockIndex]);						\
 	} else if ((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN) || (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN))		\
 	{	/* Undo active rtn indicator reset done in THREADED_API_YDB_ENGINE_LOCK */ 				\
 		 if (NULL != lcl_gtm_threadgbl)										\
