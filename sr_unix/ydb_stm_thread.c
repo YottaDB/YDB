@@ -75,8 +75,8 @@ void *ydb_stm_thread(void *parm)
 #	endif
 	SHM_WRITE_MEMORY_BARRIER;
 	simpleThreadAPI_active = TRUE;	/* to indicate to caller/creator thread that we are done with setup */
-	/* NARSTODO: Fix the below infinite sleep loop */
-	for ( i = 0; ; i++)
+	/* Note: This MAIN worker thread runs indefinitely till the process exits or a "ydb_exit" is done */
+	for ( i = 0; ydb_init_complete; i++)
 	{
 		assert(ydb_engine_threadsafe_mutex_holder[0] != pthread_self());
 		SLEEP_USEC(1, FALSE);	/* Sleep for 1 second; FALSE to indicate if system call is interrupted, do not
@@ -89,7 +89,6 @@ void *ydb_stm_thread(void *parm)
 			 * it can handle the signal right away. In any case, keep retrying this in a loop periodically
 			 * so we avoid potential hangs due to indefinitely delaying handling of timer signals.
 			 */
-			/* NARSTODO: Handle non-zero return from "pthread_mutex_trylock" below */
 			status = pthread_mutex_trylock(&ydb_engine_threadsafe_mutex[0]);
 			assert((0 == status) || (EBUSY == status));
 			if (0 == status)
@@ -100,7 +99,7 @@ void *ydb_stm_thread(void *parm)
 				/* NARSTODO: Handle non-zero return from "pthread_mutex_unlock" below */
 				pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 			} else
-			{
+			{	/* Could not get the YottaDB engine thread lock. So try forward signal to lock holding thread. */
 				SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutex_holder_thread_id, tLevel);
 				assert(!pthread_equal(mutex_holder_thread_id, pthread_self()));
 				if (mutex_holder_thread_id)
