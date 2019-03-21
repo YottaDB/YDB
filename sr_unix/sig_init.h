@@ -207,8 +207,7 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	boolean_t		signalForwarded;										\
 																\
 	assert((DUMMY_SIG_NUM == SIG) || (NULL != INFO));									\
-	signalForwarded = IS_SIGNAL_FORWARDED(SIGHNDLRTYPE, SIG, INFO);								\
-	if (!signalForwarded)													\
+	if (DUMMY_SIG_NUM != SIG)												\
 	{	/* This is not a forwarded signal */										\
 		if (simpleThreadAPI_active)											\
 		{	/*													\
@@ -253,7 +252,7 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 				 * (could lead to indefinite forwardings). Hence the "STAPI_IS_SIGNAL_HANDLER_DEFERRED"		\
 				 * check below which ensures a max limit of 1 signal forwarding.				\
 				 */												\
-				signalForwarded = STAPI_IS_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE);				\
+				signalForwarded = IS_SIGNAL_FORWARDED(SIGHNDLRTYPE, SIG, INFO);					\
 				if (!signalForwarded)										\
 				{												\
 					STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG, INFO, CONTEXT);			\
@@ -269,9 +268,21 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 				 * Therefore we can safely proceed to handle the signal.					\
 				 */												\
 				assert(!dollar_tlevel);										\
-				/* Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info" */		\
-				SAVE_OS_SIGNAL_HANDLER_INFO(SIGHNDLRTYPE, INFO);						\
-				SAVE_OS_SIGNAL_HANDLER_CONTEXT(SIGHNDLRTYPE, CONTEXT);						\
+				signalForwarded = IS_SIGNAL_FORWARDED(SIGHNDLRTYPE, SIG, INFO);					\
+				if (!signalForwarded)										\
+				{	/* Signal was not forwarded.								\
+					 * Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info".	\
+					 */											\
+					SAVE_OS_SIGNAL_HANDLER_INFO(SIGHNDLRTYPE, INFO);					\
+					SAVE_OS_SIGNAL_HANDLER_CONTEXT(SIGHNDLRTYPE, CONTEXT);					\
+				} else												\
+				{	/* Signal was forwarded. Reuse "info" and "context" saved from prior call.		\
+					 * Set "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info".	\
+					 */											\
+					assert(SIG == stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_num);			\
+					INFO = &stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_info;				\
+					CONTEXT = &stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_context;			\
+				}												\
 			}													\
 		} else														\
 		{														\
