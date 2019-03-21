@@ -82,6 +82,16 @@ GBLREF	boolean_t		in_nondeferrable_signal_handler;
 
 LITREF	gtmImageName		gtmImageNames[];
 
+/* The below array is indexed on "exit_state" and is TRUE when a signal is received directly from the OS
+ * (instead of being forwarded). This is used to avoid duplicate issue of FORCEDHALT messages in case
+ * "generic_signal_handler" gets called multiple times for the same external signal (say SIGTERM).
+ * Below are the possibilities.
+ *	(a) by the OS
+ *	(b) by a "pthread_kill" in the FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED macro or
+ *	(c) by a "pthread_kill" from the MAIN worker thread ("ydb_stm_thread")
+ */
+STATICDEF	boolean_t	non_forwarded_sig_seen[EXIT_IMMED];
+
 error_def(ERR_FORCEDHALT);
 error_def(ERR_GTMSECSHRSHUTDN);
 error_def(ERR_KILLBYSIG);
@@ -101,7 +111,13 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	signal_forwarded = (DUMMY_SIG_NUM == sig);	/* Note down whether signal is forwarded or not */
+	signal_forwarded = IS_SIGNAL_FORWARDED(sig_hndlr_generic_signal_handler, sig, info);
+							/* Note down whether signal is forwarded or not */
+	if (!signal_forwarded)
+	{
+		assert(!non_forwarded_sig_seen[exit_state]);
+		non_forwarded_sig_seen[exit_state] = TRUE;
+	}
 	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_generic_signal_handler, sig, IS_EXI_SIGNAL_TRUE, info, context);
 	assert(!thread_block_sigsent || blocksig_initialized);
 	/* If "thread_block_sigsent" is TRUE, it means the threads do not want the master thread to honor external signals
@@ -158,10 +174,15 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				if (DEFER_EXIT_PROCESSING)
 				{
 					SET_FORCED_EXIT_STATE;
-					exit_state++;		/* Make exit pending, may still be tolerant though */
-					assert(!IS_GTMSECSHR_IMAGE);
-					if (exit_handler_active && !ydb_quiet_halt)
-						SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
+					/* Before bumping "exit_state" or sending a ERR_FORCEDHALT message to syslog/console,
+					 * make sure we have not sent the same message already.
+					 */
+					if (non_forwarded_sig_seen[exit_state])
+					{
+						exit_state++;		/* Make exit pending, may still be tolerant though */
+						if (exit_handler_active && !ydb_quiet_halt)
+							SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
+					}
 					return;
 				}
 				DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
@@ -208,7 +229,9 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			if (DEFER_EXIT_PROCESSING)
 			{
 				SET_FORCED_EXIT_STATE;
-				exit_state++;		/* Make exit pending, may still be tolerant though */
+				/* Avoid duplicate bump of "exit_state" */
+				if (non_forwarded_sig_seen[exit_state])
+					exit_state++;		/* Make exit pending, may still be tolerant though */
 				assert(!IS_GTMSECSHR_IMAGE);
 				return;
 			}
@@ -258,7 +281,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					{
 						assert(!IS_GTMSECSHR_IMAGE);
 						SET_FORCED_EXIT_STATE;
-						exit_state++;		/* Make exit pending, may still be tolerant though */
+						if (non_forwarded_sig_seen[exit_state])
+							exit_state++;	/* Make exit pending, may still be tolerant though */
 						need_core = TRUE;
 						MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded);
 						return;
