@@ -52,12 +52,12 @@ enum
 #define	YDB_MAX_STR		(1 * 1024 * 1024)	/* Maximum YottaDB string length */
 #define	YDB_MAX_SUBS		31		/* Maximum subscripts currently supported */
 #define	YDB_MAX_TIME_NSEC	(0x7fffffffllu * 1000llu * 1000llu)	/* Max specified time in (long long) nanoseconds */
-#define	YDB_MAX_YDBERR		(2 ** 30)	/* Maximum (absolute) value for a YottaDB error */
+#define	YDB_MAX_YDBERR		(1 << 30)	/* Maximum (absolute) value for a YottaDB error */
 #define	YDB_MAX_ERRORMSG	1024		/* Will hold any message we return. Not used in YottaDB C code but relied upon
 						 * by the GoWrapper/Golang interface to YottaDB.
 						 */
 /* Minimum values */
-#define	YDB_MIN_YDBERR		(2 ** 27)	/* Minimum (absolute) value for a YottaDB error */
+#define	YDB_MIN_YDBERR		(1 << 27)	/* Minimum (absolute) value for a YottaDB error */
 
 /* Non-error return codes (all positive) */
 #define	YDB_OK		0		/* Successful return code */
