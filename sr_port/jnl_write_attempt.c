@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -141,7 +141,16 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 		if (writer == CURRENT_JNL_IO_WRITER(jb))
 		{
 			if (!was_crit)
+			{
 				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
+				/* Check jb io_writer again now that we have crit */
+				if (writer != CURRENT_JNL_IO_WRITER(jb))
+				{
+					if (!was_crit)
+						rel_crit(jpc->region);
+					break;
+				}
+			}
 			if (FALSE == is_proc_alive(writer, jb->image_count))
 			{	/* no one home, clear the semaphore; */
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
