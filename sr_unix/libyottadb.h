@@ -313,7 +313,7 @@ int	ydb_message(int status, ydb_buffer_t *msg_buff);
 int	ydb_stdout_stderr_adjust(void);
 int	ydb_thread_is_main(void);
 void	ydb_timer_cancel(int timer_id);
-int	ydb_timer_start(int timer_id, unsigned long long limit_nsec, ydb_funcptr_retvoid_t handler, unsigned int hdata_len,
+int	ydb_timer_start(intptr_t timer_id, unsigned long long limit_nsec, ydb_funcptr_retvoid_t handler, unsigned int hdata_len,
 			void *hdata);
 
 /* Utility routines for use in threaded applications - SimpleThreadAPI.
