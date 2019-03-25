@@ -130,7 +130,7 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 			 */
 			if (YDB_MAX_NAMES < namecount)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NAMECOUNT2HI, 4,
-					namecount, LEN_AND_STR(LYDBRTNNAME(lydbrtn)), YDB_MAX_NAMES);
+					LEN_AND_STR(LYDBRTNNAME(lydbrtn)), namecount, YDB_MAX_NAMES);
 			for (curvarname = varnames, mv = varnamearray, mv_top = mv + namecount; mv < mv_top; curvarname++, mv++)
 			{
 				if (IS_INVALID_YDB_BUFF_T(curvarname))

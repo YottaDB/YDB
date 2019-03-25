@@ -44,11 +44,6 @@ TRACETYPE(SOCKRFL,	OUTOFBAND,	"bytes_read",	"chars_read",	"buffer_start",	"")		/
 TRACETYPE(SOCKRFL,	EXPBUFGC,	"bytes_read",	"stp_free",	"old_stp_free",	"max_bufflen")	/* Buffer expansion */
 TRACETYPE(SOCKRFL,	RDSTATUS,	"read_status",	"out_of_band",	"out_of_time",	"")		/* Read results */
 
-/* Trace to figure out why rts_error_csa() keeps overflowing max nesting (not getting reset in some path) */
-TRACEGROUP(RTSNEST)
-TRACETYPE(RTSNEST,	NESTINCR,	"Count",	"PID",		"ThreadID",	"PC")		/* Who bumped rts_error_csa nest */
-TRACETYPE(RTSNEST,	NESTDECR,	"Count",	"PID",		"ThreadID",	"PC")		/* Who decremented the nest count */
-
 /* Trace condition handlers that get invoked */
 TRACEGROUP(CONDHNDLR)
 TRACETYPE(CONDHNDLR,	INVOKED,	"",		"PID",		"ThreadID",	"PC")		/* What condition handlers are invoked */

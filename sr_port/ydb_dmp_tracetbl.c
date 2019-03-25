@@ -78,14 +78,6 @@ void ydb_dmp_tracetbl(void)
 				fprintf(stderr, "   Entry: SOCKRFL_RDSTATUS,  read_status: %d,  out_of_band: %d, out_of_time: %d\n",
 					cur->intfld, (int)(intptr_t)cur->addrfld1, (int)(intptr_t)cur->addrfld2);
 				break;
-			case RTSNEST_NESTINCR:
-				fprintf(stderr, "   Entry: RTSNEST_NESTINCR,  Count: %d,  PID: %d,  TID: 0x"lvaddr",  PC: %p\n",
-					cur->intfld, (int)(intptr_t)cur->addrfld1, (unsigned long)cur->addrfld2, cur->addrfld3);
-				break;
-			case RTSNEST_NESTDECR:
-				fprintf(stderr, "   Entry: RTSNEST_NESTDECR,  Count: %d,  PID: %d,  TID: 0x"lvaddr",  PC: %p\n",
-					cur->intfld, (int)(intptr_t)cur->addrfld1, (unsigned long)cur->addrfld2, cur->addrfld3);
-				break;
 			case CONDHNDLR_INVOKED:
 				fprintf(stderr, "   Entry: CONDHNDLR_INVOKED,  PID: %d,  TID: 0x"lvaddr",  PC: %p\n",
 					(int)(intptr_t)cur->addrfld1, (unsigned long)cur->addrfld2, cur->addrfld3);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -251,9 +251,6 @@ void ch_trace_point() {return;}
 					if (0 != setjmp(ctxt->jmp))						\
 					{									\
 						/* Undo increment done in rts_error_csa() */			\
-						TRCTBL_ENTRY(RTSNEST_NESTDECR, TREF(rts_error_depth),		\
-							     (uintptr_t)process_id, (uintptr_t)pthread_self(),	\
-							     CURRENT_PC);					\
 						if (0 < TREF(rts_error_depth))					\
 							--(TREF(rts_error_depth));				\
 						prev_intrpt_state = ctxt->intrpt_ok_state;			\
@@ -288,9 +285,6 @@ void ch_trace_point() {return;}
 					if (0 != setjmp(ctxt->jmp))						\
 					{									\
 						/* Undo increment done in rts_error_csa() */			\
-						TRCTBL_ENTRY(RTSNEST_NESTDECR, TREF(rts_error_depth),		\
-							     (uintptr_t)process_id, (uintptr_t)pthread_self(),	\
-							     CURRENT_PC);					\
 						if (0 < TREF(rts_error_depth))					\
 							--(TREF(rts_error_depth));				\
 						prev_intrpt_state = ctxt->intrpt_ok_state;			\
@@ -318,9 +312,6 @@ void ch_trace_point() {return;}
 					if (0 != setjmp(ctxt->jmp))						\
 					{									\
 						/* Undo increment done in rts_error_csa() */			\
-						TRCTBL_ENTRY(RTSNEST_NESTDECR, TREF(rts_error_depth),		\
-							     (uintptr_t)process_id, (uintptr_t)pthread_self(),	\
-							     CURRENT_PC);					\
 						if (0 < TREF(rts_error_depth))					\
 							--(TREF(rts_error_depth));				\
 						prev_intrpt_state = ctxt->intrpt_ok_state;			\

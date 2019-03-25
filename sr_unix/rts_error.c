@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,7 +83,6 @@ int rts_error(int argcnt, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	TRCTBL_ENTRY(RTSNEST_NESTINCR, TREF(rts_error_depth), (uintptr_t)process_id, (uintptr_t)pthread_self(), caller_id());
 	PTHREAD_CSA_FROM_GV_CUR_REGION(csa, local_jnlpool);
 	VAR_START(var, argcnt);
 	return rts_error_va(csa, argcnt, var);
@@ -96,7 +95,6 @@ int rts_error_csa(void *csa, int argcnt, ...)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	TRCTBL_ENTRY(RTSNEST_NESTINCR, TREF(rts_error_depth), (uintptr_t)process_id, (uintptr_t)pthread_self(), caller_id());
 	VAR_START(var, argcnt);
 	return rts_error_va(csa, argcnt, var);
 }
@@ -192,7 +190,6 @@ int rts_error_va(void *csa, int argcnt, va_list var)
 	va_end(var_dup);
 	va_end(var);
 	DRIVECH(msgid);				/* Drive the topmost (inactive) condition handler */
-	TRCTBL_ENTRY(RTSNEST_NESTDECR, TREF(rts_error_depth), (uintptr_t)process_id, (uintptr_t)pthread_self(), caller_id());
 	if (0 < TREF(rts_error_depth))
 		--(TREF(rts_error_depth));
 	/* Note -- at one time there was code here to catch if we returned from the condition handlers

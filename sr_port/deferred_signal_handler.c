@@ -13,7 +13,6 @@
 #include "mdef.h"
 
 #include "have_crit.h"
-#include "gtmxc_types.h"
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
 #include "sig_init.h"
