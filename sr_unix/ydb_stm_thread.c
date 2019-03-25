@@ -55,9 +55,10 @@ GBLREF	boolean_t	posix_timer_created;
  */
 void *ydb_stm_thread(void *parm)
 {
-	int			i, sig_num, status, tLevel;
-	pthread_t		mutex_holder_thread_id;
+	int			sig_num, status, tLevel;
+	pthread_t		mutex_holder_thread_id, prev_wake_up_thread_id;
 	enum sig_handler_t	sig_handler_type;
+	uint64_t		i, prev_wake_up_i, prev_diff_i;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -76,10 +77,10 @@ void *ydb_stm_thread(void *parm)
 	SHM_WRITE_MEMORY_BARRIER;
 	simpleThreadAPI_active = TRUE;	/* to indicate to caller/creator thread that we are done with setup */
 	/* Note: This MAIN worker thread runs indefinitely till the process exits or a "ydb_exit" is done */
-	for ( i = 0; ydb_init_complete; i++)
+	for (i = 1, prev_wake_up_i = 0, prev_diff_i = 1; ydb_init_complete; i++)
 	{
 		assert(ydb_engine_threadsafe_mutex_holder[0] != pthread_self());
-		SLEEP_USEC(1, FALSE);	/* Sleep for 1 second; FALSE to indicate if system call is interrupted, do not
+		SLEEP_USEC(1, FALSE);	/* Sleep for 1 micro-second; TRUE to indicate if system call is interrupted, do not
 					 * restart the sleep.
 					 */
 		if (stapi_signal_handler_deferred)
@@ -89,32 +90,56 @@ void *ydb_stm_thread(void *parm)
 			 * it can handle the signal right away. In any case, keep retrying this in a loop periodically
 			 * so we avoid potential hangs due to indefinitely delaying handling of timer signals.
 			 */
-			status = pthread_mutex_trylock(&ydb_engine_threadsafe_mutex[0]);
-			assert((0 == status) || (EBUSY == status));
-			if (0 == status)
+			SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutex_holder_thread_id, tLevel);
+			if (!mutex_holder_thread_id)
 			{
-				ydb_engine_threadsafe_mutex_holder[0] = pthread_self();
-				STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
-				ydb_engine_threadsafe_mutex_holder[0] = 0;
-				/* NARSTODO: Handle non-zero return from "pthread_mutex_unlock" below */
-				pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
-			} else
-			{	/* Could not get the YottaDB engine thread lock. So try forward signal to lock holding thread. */
-				SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutex_holder_thread_id, tLevel);
-				assert(!pthread_equal(mutex_holder_thread_id, pthread_self()));
-				if (mutex_holder_thread_id)
+				status = pthread_mutex_trylock(&ydb_engine_threadsafe_mutex[0]);
+				assert((0 == status) || (EBUSY == status));
+				if (0 == status)
 				{
-					for (sig_handler_type = 0; sig_handler_type < sig_hndlr_num_entries; sig_handler_type++)
-					{
-						if (!STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_handler_type))
-							continue;
-						sig_num = stapi_signal_handler_oscontext[sig_handler_type].sig_num;
-						if (sig_num)
-							pthread_kill(mutex_holder_thread_id, sig_num);
-					}
+					assert(0 == ydb_engine_threadsafe_mutex_holder[0]);
+					ydb_engine_threadsafe_mutex_holder[0] = pthread_self();
+					STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
+					ydb_engine_threadsafe_mutex_holder[0] = 0;
+					/* NARSTODO: Handle non-zero return from "pthread_mutex_unlock" below */
+					pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 				}
+				continue;
 			}
-		}
+			/* YottaDB engine thread lock is held by another thread. So try forward signal to lock holding thread. */
+			assert(!pthread_equal(mutex_holder_thread_id, pthread_self()));
+			if (mutex_holder_thread_id == prev_wake_up_thread_id)
+			{	/* Avoid waking up same thread too frequently (possible if lock holding thread is in TP
+				 * in which case the wake up will result in the signal handler being invoked and returning
+				 * right away because of logic in FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED.
+				 */
+				assert(i > prev_wake_up_i);
+				if ((i - prev_wake_up_i) < prev_diff_i)
+					continue;
+				/* Each "i" corresponds to a microsecond (SLEEP_USEC(1) call). To avoid frequent wake ups,
+				 * wake it up once, then sleep for 10 microseconds, then 100 microsecnds, then 1000 microseconds
+				 * and then come back to 10, 100, 1000 microsecond sequence again. This way we sleep at most
+				 * 1 millisecond between multiple wakeups of the same thread (i.e. do not sleep a lot between
+				 * multiple attempts at wake up) and yet do not waste time on wake-up system calls by doing it
+				 * too frequently either.
+				 */
+				prev_diff_i = prev_diff_i * 10;
+				if (MICROSECS_IN_MSEC < prev_diff_i)	/* time between wakeups should not exceed 1 millisecond */
+					prev_diff_i = 10;
+			} else
+				prev_diff_i = 1;	/* Waking up different thread than before. Reset "prev_diff_i". */
+			prev_wake_up_i = i;
+			prev_wake_up_thread_id = mutex_holder_thread_id;
+			for (sig_handler_type = 0; sig_handler_type < sig_hndlr_num_entries; sig_handler_type++)
+			{
+				if (!STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_handler_type))
+					continue;
+				sig_num = stapi_signal_handler_oscontext[sig_handler_type].sig_num;
+				if (sig_num)
+					pthread_kill(mutex_holder_thread_id, sig_num);
+			}
+		} else
+			prev_diff_i = 1;	/* All pending signal handler handling is done. Reset "prev_diff_i". */
 	}
 	return NULL;
 }
