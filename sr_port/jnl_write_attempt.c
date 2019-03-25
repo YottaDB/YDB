@@ -256,7 +256,7 @@ uint4 jnl_write_attempt(jnl_private_control *jpc, uint4 threshold)
 				 * below (due to the "continue" below under the "SS_NORMAL == status" if check).
 				 */
 				BG_TRACE_PRO_ANY(csa, jnl_phase2_cleanup_if_possible);
-				SLEEP_USEC(1, FALSE);
+				SLEEP_USEC(1, TRUE);
 				if (!was_crit && (0 == (lcnt % ITERATIONS_100K)))
 				{	/* We do not have crit and have slept a while (100K iterations of 1-micro-second each
 					 * == a total of ~ 100 milli-seconds). See if crit can be obtained that way the

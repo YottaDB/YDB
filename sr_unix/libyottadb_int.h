@@ -742,7 +742,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 						{									\
 							if (simpleThreadAPI_active)					\
 								break;							\
-							SLEEP_USEC(1, FALSE);						\
+							SLEEP_USEC(1, TRUE);						\
 						}									\
 						if (MICROSECS_IN_MSEC == i)						\
 						{	/* Worker thread did not reach desired state in given time.	\

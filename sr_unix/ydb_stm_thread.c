@@ -80,8 +80,12 @@ void *ydb_stm_thread(void *parm)
 	for (i = 1, prev_wake_up_i = 0, prev_diff_i = 1; ydb_init_complete; i++)
 	{
 		assert(ydb_engine_threadsafe_mutex_holder[0] != pthread_self());
-		SLEEP_USEC(1, FALSE);	/* Sleep for 1 micro-second; TRUE to indicate if system call is interrupted, do not
-					 * restart the sleep.
+		SLEEP_USEC(1, TRUE);	/* Sleep for 1 micro-second; TRUE to indicate if system call is interrupted,
+					 * restart the sleep. This way we are sure each iteration sleeps for at least
+					 * 1 micro-second. This guarantees that "i" (which is a 64-bit quantity)
+					 * can never overflow in half-a-million years which is okay since that is
+					 * an impossibly high span of time. If the sleep instead ended up being less,
+					 * the span of time needed to overflow "i" could get more likely.
 					 */
 		if (stapi_signal_handler_deferred)
 		{	/* A signal handler was deferred. Try getting the YottaDB engine multi-thread mutex lock to
