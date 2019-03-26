@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,7 +19,7 @@
  * callg() to supress the first parameter being an overall count of the arguments as sometimes, that's
  * not what is needed.
  */
-int ydb_call_variadic_plist_func_s(ydb_vplist_func cgfunc, uintptr_t cvplist)
+int ydb_call_variadic_plist_func(ydb_vplist_func cgfunc, uintptr_t cvplist)
 {
 	return (int)callg_nc((callgncfnptr)cgfunc, (gparam_list *)cvplist);
 }

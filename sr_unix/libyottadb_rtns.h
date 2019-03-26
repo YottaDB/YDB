@@ -24,7 +24,6 @@ where
 */
 
 LYDBRTN(LYDB_RTN_NONE,			"********",				"********"				),	/* No libyottadb routine is running */
-LYDBRTN(LYDB_RTN_CALL_VPLST_FUNC,	"ydb_call_variadic_plist_func_s()",	"ydb_call_variadic_plist_func_st()"	),	/* "ydb_call_variadic_plist_func_s is running */
 LYDBRTN(LYDB_RTN_DATA, 			"ydb_data_s()",				"ydb_data_st()"				),	/* "ydb_data_s" is running */
 LYDBRTN(LYDB_RTN_DELETE_EXCL, 		"ydb_delete_excl_s()",			"ydb_delete_excl_st()"			),	/* "ydb_delete_excl_s" is running */
 LYDBRTN(LYDB_RTN_DELETE, 		"ydb_delete_s()",			"ydb_delete_st()"			),	/* "ydb_delete_s" is running */

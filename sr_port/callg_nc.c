@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,14 +12,12 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-/* This is not an FIS module but it is inspired by callg.c - an FIS module */
+/* This is not an FIS module but it is a derivative of the FIS module callg.c */
 
 #include "mdef.h"
 
-#include <stdarg.h>
-
-#include "callg.h"
 #include "libyottadb.h"
+#include "callg.h"
 
 #define VAR_ARGS4(ar)	ar[0], ar[1], ar[2], ar[3]
 
@@ -49,6 +47,11 @@
 /* This flavor of callg does not make the overall count of parameters the first parm instead relying on the called
  * routine to know what is coming and/or to have made its own count in some fashion that allows the called routine
  * to know how many parms it has.
+ *
+ * Note - this flavor of callg() has the same asserts in it that callg() does except the one assertpro() callg has
+ * is an assert here. This is because we want any assert that actually trips to be in debug mode only and not in
+ * production to minimize the potential for issues with multiple goroutines or threads executing runtime code
+ * without the main thread lock.
  */
 INTPTR_T callg_nc(callgncfnptr fnptr, gparam_list *paramlist)
 {
@@ -101,11 +104,13 @@ INTPTR_T callg_nc(callgncfnptr fnptr, gparam_list *paramlist)
 		case 34:
 		case 35:
 		case 36:
-			/* Only the below function(s) are aware of this extra space for callg_nc */
-			assert(fnptr == (callgncfnptr)ydb_lock_s);
+			/* Only the below functions are aware of this extra space */
+			assert((fnptr == (callgncfnptr)ydb_lock_s)
+			       || (fnptr == (callgncfnptr)ydb_ci_t)
+			       || (fnptr = (callgncfnptr)ydb_cip_t));
 			return (fnptr)(VAR_ARGS36(paramlist->arg));
 		default:
-			assertpro(paramlist->n <= 36);
+			assert(paramlist->n <= 36);
 	}
 	return 0;
 }

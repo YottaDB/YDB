@@ -293,9 +293,9 @@ int	ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		unsigned int *has_ret_value);
 void	ydb_zstatus(char* msg, int len);
 
-int ydb_call_variadic_plist_func_s(ydb_vplist_func cgfunc, uintptr_t cvplist);	/* Used by Golang to call variadic C function */
 
 /* Utility entry points accessable in libyottadb.so */
+int	ydb_call_variadic_plist_func(ydb_vplist_func cgfunc, uintptr_t cvplist);	/* Used by Golang to call variadic C function */
 int	ydb_child_init(void *param);
 int	ydb_ci(const char *c_rtn_name, ...);				/* Call-in interface */
 int	ydb_cip(ci_name_descriptor *ci_info, ...);			/* Slightly faster "ydb_ci" */
@@ -359,8 +359,6 @@ int	ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str);
 /* SimpleAPI via thread interface (aka threaded Simple API).
  * Currently only one main thread runs the YottaDB engine. Once YottaDB itself is multi-threaded, we can support more threads.
  */
-int	ydb_call_variadic_plist_func_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_vplist_func cgfunc, uintptr_t cvplist);
-		/* Used by Golang to call a variadic C function */
 int	ydb_data_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
 			unsigned int *ret_value);
 int	ydb_delete_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,

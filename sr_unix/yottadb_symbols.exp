@@ -32,8 +32,7 @@ lke_main
 mupip_main
 op_read
 to_ulong
-ydb_call_variadic_plist_func_s
-ydb_call_variadic_plist_func_st
+ydb_call_variadic_plist_func
 ydb_child_init
 ydb_ci
 ydb_ci_t
