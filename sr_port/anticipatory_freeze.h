@@ -198,7 +198,7 @@ void clear_fake_enospc_if_master_dead(void);
  * anticipatory freeze. Examples of those databases that don't care are non-replicated databases, databases with
  * "freeze_on_fail" field set to FALSE in the file header etc. Hence the use of INST_FREEZE_ON_ERROR_ENABLED below.
  * Note: Do not use "hiber_start" as that uses timers and if we are already in a timer handler now, nested timers
- * wont work. Since SHORT_SLEEP allows a max of 1000, we use 500 (half a second) for now.
+ * wont work.
  */
 /* #GTM_THREAD_SAFE : The below macro (WAIT_FOR_REPL_INST_UNFREEZE) is thread-safe */
 #define WAIT_FOR_REPL_INST_UNFREEZE(CSA)											\
@@ -483,13 +483,24 @@ static inline void wait_for_repl_inst_unfreeze_nocsa_jpl(jnlpool_addrs_ptr_t jpl
 	/* If this region is not replicated, do not care for instance freezes */
 	while (jpl->jnlpool_ctl->freeze)
 	{
-		STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
 		if (exit_state != 0)
 		{
 			forced_exit_err_display();
 			EXIT(-exi_condition);
 		}
-		SHORT_SLEEP(SLEEP_INSTFREEZEWAIT);
+		/* Invoke this AFTER the "exit_state" check that way if we are already in the exit handler
+		 * when we get a process-terminating signal (e.g. SIGTERM), we avoid double invocation of
+		 * the exit handler but instead exit immediately (which is what EXIT will do if we are
+		 * already in an exit handler).
+		 */
+		STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
+		/* Note that SHORT_SLEEP restarts the sleep in case of an EINTR whereas we want to stop the
+		 * sleep below in case of an interrupt (e.g. a MUPIP STOP that asks us to terminate).
+		 * Therefore do not use SHORT_SLEEP here. Instead use "SLEEP_USEC" with FALSE as the second parameter.
+		 * SLEEP_USEC allows a max of 1000, so assert that SLEEP_INSTFREEZEWAIT is within that range.
+		 */
+		assert(1000 > SLEEP_INSTFREEZEWAIT);
+		SLEEP_USEC((SLEEP_INSTFREEZEWAIT * 1000), FALSE);
 		DEBUG_ONLY(CLEAR_FAKE_ENOSPC_IF_MASTER_DEAD);
 	}
 }
