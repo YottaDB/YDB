@@ -372,14 +372,14 @@ void hiber_start(uint4 hiber)
 }
 
 /* Hibernate by starting a timer and waiting for it or any other timer to pop. */
-void hiber_start_wait_any(uint4 hiber)
+void hiber_start_wait_any(uint4 hiber)	/* "hiber" is in milli-seconds */
 {
 	sigset_t	savemask;
 	int		rc;
 
 	if (1000 > hiber)
 	{
-		SHORT_SLEEP(hiber);			/* note: some platforms call hiber_start */
+		SLEEP_USEC((hiber * 1000), FALSE); /* FALSE passed so we return if an EINTR occurs instead of restarting wait */
 		return;
 	}
 	assertpro(1 > timer_stack_count);		/* timer services are unavailable from within a timer handler */
