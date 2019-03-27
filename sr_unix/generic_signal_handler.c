@@ -90,7 +90,7 @@ LITREF	gtmImageName		gtmImageNames[];
  *	(b) by a "pthread_kill" in the FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED macro or
  *	(c) by a "pthread_kill" from the MAIN worker thread ("ydb_stm_thread")
  */
-STATICDEF	boolean_t	non_forwarded_sig_seen[EXIT_IMMED];
+STATICDEF	boolean_t	non_forwarded_sig_seen[EXIT_IMMED + 1];
 
 error_def(ERR_FORCEDHALT);
 error_def(ERR_GTMSECSHRSHUTDN);
@@ -115,6 +115,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 							/* Note down whether signal is forwarded or not */
 	if (!signal_forwarded)
 	{
+		assert(EXIT_IMMED >= exit_state);
 		assert(!non_forwarded_sig_seen[exit_state]);
 		non_forwarded_sig_seen[exit_state] = TRUE;
 	}
