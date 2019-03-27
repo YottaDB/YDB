@@ -94,7 +94,7 @@ MBSTART	{													\
 	int	status;												\
 														\
 	/* No threadgbl usage in this macro until the following block completes */				\
-	if (!ydb_init_complete || !(frame_pointer->type & SFT_CI))						\
+	if (!ydb_init_complete)											\
 	{	/* Have to initialize things before we can establish an error handler */			\
 		if (0 != (status = ydb_init()))		/* Note - sets fgncal_stack */				\
 		{												\
@@ -115,7 +115,7 @@ MBSTART	{													\
 	int	status;												\
 														\
 	/* No threadgbl usage in this macro until the following block completes */				\
-	if (!ydb_init_complete || !(frame_pointer->type & SFT_CI))						\
+	if (!ydb_init_complete)											\
 	{	/* Have to initialize things before we can establish an error handler */			\
 		if (0 != (status = ydb_init()))		/* Note - sets fgncal_stack */				\
 		{												\
@@ -137,44 +137,92 @@ MBSTART	{													\
  *
  * We need two flavors - one for use in routines with a return value and one without.
  */
-#define LIBYOTTADB_INIT(ROUTINE, RETTYPE)										\
-MBSTART	{														\
-	int		errcode;											\
-															\
-	LIBYOTTADB_RUNTIME_CHECK(RETTYPE, NULL);									\
-	/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet		\
-	 * established the condition handler to take care of these issues so we simulate it's effect by			\
-	 * doing the "set_zstatus", setting TREF(ydb_error_code) and returning the error code.				\
-	 */														\
-	if (LYDB_RTN_NONE != TREF(libyottadb_active_rtn))								\
-	{														\
-		errcode = YDB_ERR_SIMPLEAPINEST;									\
-		SETUP_GENERIC_ERROR_2PARMS(errcode, LYDBRTNNAME(TREF(libyottadb_active_rtn)), LYDBRTNNAME(ROUTINE));	\
-		return RETTYPE errcode;											\
-	}														\
-	TREF(libyottadb_active_rtn) = ROUTINE;										\
-	DBGAPI((stderr, "Entering routine %s\n", LYDBRTNNAME(ROUTINE)));						\
+#define LIBYOTTADB_INIT2(ROUTINE, RETTYPE, DO_SIMPLEAPINEST_CHECK)								\
+MBSTART	{															\
+	int		errcode;												\
+																\
+	GBLREF	int	mumps_status;												\
+																\
+	LIBYOTTADB_RUNTIME_CHECK(RETTYPE, NULL);										\
+	assert(ydb_init_complete);	/* must be set by LIBYOTTADB_RUNTIME_CHECK above */					\
+	/* Check if a nested call-in frame is needed (logic similar to INVOKE_YDB_NESTED_CALLIN_AND_RETURN_ON_ERROR,		\
+	 * but cannot be directly used since the return is slightly different here.						\
+	 */															\
+	if (!(frame_pointer->type & SFT_CI))											\
+	{															\
+		boolean_t		error_encountered;									\
+																\
+		ESTABLISH_NORET(gtmci_ch, error_encountered);									\
+		if (error_encountered)												\
+		{	/* "gtmci_ch" encountered an error and transferred control back here. Return. */			\
+			assert(0 < mumps_status);										\
+			return RETTYPE -mumps_status;										\
+		}														\
+		ydb_nested_callin();            /* Note - sets fgncal_stack */							\
+		REVERT;														\
+	}															\
+	if (DO_SIMPLEAPINEST_CHECK)												\
+	{															\
+		/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet		\
+		 * established the condition handler to take care of these issues so we simulate it's effect by			\
+		 * doing the "set_zstatus", setting TREF(ydb_error_code) and returning the error code.				\
+		 */														\
+		if (LYDB_RTN_NONE != TREF(libyottadb_active_rtn))								\
+		{														\
+			errcode = YDB_ERR_SIMPLEAPINEST;									\
+			SETUP_GENERIC_ERROR_2PARMS(errcode, LYDBRTNNAME(TREF(libyottadb_active_rtn)), LYDBRTNNAME(ROUTINE));	\
+			return RETTYPE errcode;											\
+		}														\
+		TREF(libyottadb_active_rtn) = ROUTINE;										\
+	}															\
+	DBGAPI((stderr, "Entering routine %s\n", LYDBRTNNAME(ROUTINE)));							\
 } MBEND
 
 /* And now for the no return value edition */
-#define LIBYOTTADB_INIT_NORETVAL(ROUTINE)										\
-MBSTART	{														\
-	int		errcode;											\
-															\
-	LIBYOTTADB_RUNTIME_CHECK_NORETVAL(NULL);									\
-	/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet		\
-	 * established the condition handler to take care of these issues so we simulate it's effect by			\
-	 * doing the "set_zstatus", setting TREF(ydb_error_code) and returning the error code.				\
-	 */														\
-	if (LYDB_RTN_NONE != TREF(libyottadb_active_rtn))								\
-	{														\
-		errcode = YDB_ERR_SIMPLEAPINEST;									\
-		SETUP_GENERIC_ERROR_2PARMS(errcode, LYDBRTNNAME(TREF(libyottadb_active_rtn)), LYDBRTNNAME(ROUTINE));	\
-		return;													\
-	}														\
-	TREF(libyottadb_active_rtn) = ROUTINE;										\
-	DBGAPI((stderr, "Entering routine %s\n", LYDBRTNNAME(ROUTINE)));						\
+#define LIBYOTTADB_INIT_NORETVAL2(ROUTINE, DO_SIMPLEAPINEST_CHECK)								\
+MBSTART	{															\
+	int		errcode;												\
+																\
+	LIBYOTTADB_RUNTIME_CHECK_NORETVAL(NULL);										\
+	assert(ydb_init_complete);	/* must be set by LIBYOTTADB_RUNTIME_CHECK_NORETVAL above */				\
+	/* Check if a nested call-in frame is needed (logic similar to INVOKE_YDB_NESTED_CALLIN_AND_RETURN_ON_ERROR,		\
+	 * but cannot be directly used since the return is slightly different here.						\
+	 */															\
+	if (!(frame_pointer->type & SFT_CI))											\
+	{															\
+		boolean_t		error_encountered;									\
+																\
+		ESTABLISH_NORET(gtmci_ch, error_encountered);									\
+		if (error_encountered)												\
+		{	/* "gtmci_ch" encountered an error and transferred control back here. Return. */			\
+			return;													\
+		}														\
+		ydb_nested_callin();            /* Note - sets fgncal_stack */							\
+		REVERT;														\
+	}															\
+	if (DO_SIMPLEAPINEST_CHECK)												\
+	{															\
+		/* Verify simpleAPI routines are not nesting. If we detect a problem here, the routine has not yet		\
+		 * established the condition handler to take care of these issues so we simulate it's effect by			\
+		 * doing the "set_zstatus", setting TREF(ydb_error_code) and returning the error code.				\
+		 */														\
+		if (LYDB_RTN_NONE != TREF(libyottadb_active_rtn))								\
+		{														\
+			errcode = YDB_ERR_SIMPLEAPINEST;									\
+			SETUP_GENERIC_ERROR_2PARMS(errcode, LYDBRTNNAME(TREF(libyottadb_active_rtn)), LYDBRTNNAME(ROUTINE));	\
+			return;													\
+		}														\
+		TREF(libyottadb_active_rtn) = ROUTINE;										\
+	}															\
+	DBGAPI((stderr, "Entering routine %s\n", LYDBRTNNAME(ROUTINE)));							\
 } MBEND
+
+#define	DO_SIMPLEAPINEST_CHECK_FALSE	FALSE
+#define	DO_SIMPLEAPINEST_CHECK_TRUE	TRUE
+
+#define	LIBYOTTADB_INIT(ROUTINE, RETTYPE)	LIBYOTTADB_INIT2(ROUTINE, RETTYPE, DO_SIMPLEAPINEST_CHECK_TRUE)
+#define	LIBYOTTADB_INIT_NORETVAL(ROUTINE)	LIBYOTTADB_INIT_NORETVAL2(ROUTINE, DO_SIMPLEAPINEST_CHECK_TRUE)
+#define	LIBYOTTADB_INIT_NOSIMPLEAPINEST_CHECK(RETTYPE)	LIBYOTTADB_INIT2(LYDB_RTN_NONE, RETTYPE, DO_SIMPLEAPINEST_CHECK_FALSE)
 
 #ifdef YDB_TRACE_API
 # define LIBYOTTADB_DONE 									\
@@ -870,6 +918,8 @@ void	*ydb_stm_thread(void *parm);
 int	ydb_tp_s_common(libyottadb_routines lydbrtn,
 			ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames);
 int	ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var);
+void	ydb_nested_callin(void);
+void	ydb_stm_thread_exit(void);
 
 /* Below are the 3 functions invoked by "pthread_atfork" during a "fork" call to ensure all SimpleThreadAPI related
  * mutex and condition variables are safely released (without any deadlocks, inconsistent states) in the child after the fork.
@@ -877,6 +927,5 @@ int	ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var);
 void	ydb_stm_atfork_prepare(void);
 void	ydb_stm_atfork_parent(void);
 void	ydb_stm_atfork_child(void);
-void	ydb_stm_thread_exit(void);
 
 #endif /*  LIBYOTTADB_INT_H */

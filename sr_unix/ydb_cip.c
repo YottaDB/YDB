@@ -35,8 +35,7 @@ int ydb_cip(ci_name_descriptor* ci_info, ...)
 					 * so needs to be first invocation after SETUP_THREADGBL_ACCESS to avoid any error
 					 * scenarios from not resetting this global variable even though this function returns.
 					 */
-	/* Do not use LIBYOTTADB_INIT to avoid unnecessary SIMPLEAPINEST errors. Instead call LIBYOTTADB_RUNTIME_CHECK macro. */
-	LIBYOTTADB_RUNTIME_CHECK((int), NULL);		/* Note: macro could return from this function in case of errors */
+	LIBYOTTADB_INIT_NOSIMPLEAPINEST_CHECK((int));	/* Avoid SIMPLEAPINEST error check */
 	/* "ydb_ci_exec" already sets up a condition handler "gtmci_ch" so we do not do an
 	 * ESTABLISH_RET of ydb_simpleapi_ch here like is done for other SimpleAPI function calls.
 	 */

@@ -170,6 +170,19 @@ error_def(ERR_SYSCALL);
 	}							\
 }
 
+#define	INVOKE_YDB_NESTED_CALLIN_AND_RETURN_ON_ERROR							\
+MBSTART {												\
+	boolean_t		error_encountered;							\
+													\
+	ESTABLISH_NORET(gtmci_ch, error_encountered);							\
+	if (error_encountered)										\
+	{	/* "gtmci_ch" encountered an error and transferred control back here. Return. */	\
+		return mumps_status;									\
+	}												\
+	ydb_nested_callin();            /* Note - sets fgncal_stack */					\
+	REVERT;												\
+} MBEND
+
 STATICFNDCL callin_entry_list* get_entry(const char *call_name, int internal);
 STATICFNDEF callin_entry_list* get_entry(const char *call_name, int internal)
 {	/* Lookup in a hashtable for entry corresponding to routine name */
@@ -227,7 +240,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	{	/* "ydb_init" has already set up a call-in base frame (either for simpleAPI or for a call-in).
 		 * But the current frame is not a call-in base frame. So set a new/nested call-in base frame up.
 		 */
-		ydb_nested_callin();            /* Note - sets fgncal_stack */
+		INVOKE_YDB_NESTED_CALLIN_AND_RETURN_ON_ERROR;	/* invokes "ydb_nested_callin" */
 	} else if (dollar_tlevel && (tp_pointer->fp == frame_pointer) && tp_pointer->ydb_tp_s_tstart)
 	{	/* Current frame is already a call-in frame. If we are already in a TP transaction and simpleAPI/"ydb_tp_s"
 		 * had started this TP and the current "frame_pointer" was the current even at the time of "ydb_tp_s"
@@ -235,7 +248,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		 * CALLINTCOMMIT or CALLINTROLLBACK situation since simpleAPI and call-ins both create the same SFT_CI
 		 * type of call-in base frame).
 		 */
-		ydb_nested_callin();            /* Note - sets fgncal_stack */
+		INVOKE_YDB_NESTED_CALLIN_AND_RETURN_ON_ERROR;	/* invokes "ydb_nested_callin" */
 		/* Since this is a nested call-in created just for this "ydb_ci" invocation, we need to unwind this call-in
 		 * frame/stack when returning (unlike a regular "ydb_ci" invocation where we keep the environment as is
 		 * in the hope of future "ydb_ci" calls).
@@ -603,7 +616,7 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	{	/* "ydb_init" has already set up a call-in base frame (either for simpleAPI or for a call-in).
 		 * But the current frame is not a call-in base frame. So set a new/nested call-in base frame up.
 		 */
-		ydb_nested_callin();            /* Note - sets fgncal_stack */
+		INVOKE_YDB_NESTED_CALLIN_AND_RETURN_ON_ERROR;	/* invokes "ydb_nested_callin" */
 	} else if (dollar_tlevel && (tp_pointer->fp == frame_pointer) && tp_pointer->ydb_tp_s_tstart)
 	{	/* Current frame is already a call-in frame. If we are already in a TP transaction and simpleAPI/"ydb_tp_s"
 		 * had started this TP and the current "frame_pointer" was the current even at the time of "ydb_tp_s"
@@ -611,7 +624,7 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 		 * CALLINTCOMMIT or CALLINTROLLBACK situation since simpleAPI and call-ins both create the same SFT_CI
 		 * type of call-in base frame).
 		 */
-		ydb_nested_callin();            /* Note - sets fgncal_stack */
+		INVOKE_YDB_NESTED_CALLIN_AND_RETURN_ON_ERROR;	/* invokes "ydb_nested_callin" */
 		/* Since this is a nested call-in created just for this "ydb_ci" invocation, we need to unwind this call-in
 		 * frame/stack when returning (unlike a regular "ydb_ci" invocation where we keep the environment as is
 		 * in the hope of future "ydb_ci" calls).

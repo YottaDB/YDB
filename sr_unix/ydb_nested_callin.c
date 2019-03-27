@@ -19,6 +19,7 @@
 #include "rtnhdr.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
+#include "libyottadb_int.h"
 
 GBLREF  unsigned char		*msp;
 GBLREF  stack_frame     	*frame_pointer;

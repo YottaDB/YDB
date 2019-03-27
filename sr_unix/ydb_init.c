@@ -70,10 +70,8 @@ int ydb_init()
 	boolean_t		error_encountered;
 	DCL_THREADGBL_ACCESS;
 
-	/* If "ydb_init" has already been done and we are not in a situation where a nested callin frame needs to be created,
-	 * then we can skip the "ydb_init" call altogether. Return right away.
-	 */
-	if (ydb_init_complete && (NULL != frame_pointer) && (frame_pointer->type & SFT_CI))
+	/* If "ydb_init" has already been done then we can skip the "ydb_init" call altogether. Return right away. */
+	if (ydb_init_complete)
 		return YDB_OK;
 	SETUP_THREADGBL_ACCESS;	/* needed at least by SETUP_GENERIC_ERROR macro in case we go below that code path */
 	/* Single thread the rest of initialization so all of the various not-thread-safe things this routine does in
@@ -297,16 +295,6 @@ int ydb_init()
 		 * of the previous stack) are kept from being unwound.
 		 */
 		SAVE_FGNCAL_STACK;
-		REVERT;
-	} else if (!(frame_pointer->type & SFT_CI))
-	{
-		ESTABLISH_NORET(gtmci_ch, error_encountered);
-		if (error_encountered)
-		{	/* "gtmci_ch" encountered an error and transferred control back here. Return after mutex lock cleanup. */
-			THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
-			return mumps_status;
-		}
-		ydb_nested_callin();	/* Nested call-in: setup a new CI environment (additional SFT_CI base-frame) */
 		REVERT;
 	}
 	assert(NULL == TREF(temp_fgncal_stack));
