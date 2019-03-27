@@ -84,6 +84,7 @@ int ydb_init()
 	THREADED_API_YDB_ENGINE_LOCK(YDB_NOTTP, NULL, LYDB_RTN_NONE, save_active_stapi_rtn, save_errstr, get_lock, status);
 	if (0 != status)
 	{	/* If not initialized yet, can't rts_error so just return our error code */
+		assert(0 < status);	/* i.e. can only be a system error, not a YDB_ERR_* error code */
 		if (ydb_init_complete)
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("pthread_mutex_lock()"),
 				      CALLFROM, status);
@@ -130,6 +131,7 @@ int ydb_init()
 			 */
 			SETUP_GENERIC_ERROR(ERR_STAPIFORKEXEC);	/* ensure a later call to "ydb_zstatus" returns full error string */
 			THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+			/* "ydb_init" returns positive error code so return ERR_STAPIFORKEXEC, not YDB_ERR_STAPIFORKEXEC. */
 			return ERR_STAPIFORKEXEC;
 		} else
 		{	/* SimpleAPI was active in the parent process before the "fork". We expect the first YottaDB call in
@@ -148,6 +150,7 @@ int ydb_init()
 								 * YottaDB calls happen since "ydb_child_init" did not run clean.
 								 */
 				THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+				/* "ydb_init" returns positive error code hence the negate below */
 				return -status;		/* Negate it back before returning from "ydb_init". */
 			}
 		}
@@ -161,6 +164,7 @@ int ydb_init()
 		assert(!ydb_init_complete);	/* should have been cleared by "ydb_exit" as part of calling "gtm_exit_handler" */
 		SETUP_GENERIC_ERROR(ERR_CALLINAFTERXIT); /* ensure a later call to "ydb_zstatus" returns full error string */
 		THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+		 /* "ydb_init" returns positive error code so return ERR_CALLINAFTERXIT, not YDB_ERR_CALLINAFTERXIT. */
 		return ERR_CALLINAFTERXIT;
 	}
 	if (!ydb_init_complete)
@@ -191,6 +195,7 @@ int ydb_init()
 				FPRINTF(stderr, "%%YDB-E-DISTPATHMAX, Executable path length is greater than maximum (%d)\n",
 													YDB_DIST_PATH_MAX);
 				THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+				/* "ydb_init" returns positive error code so return ERR_DISTPATHMAX, not YDB_ERR_DISTPATHMAX. */
 				return ERR_DISTPATHMAX;
 			}
 			memcpy(tmp_ptr, shlib_info.dli_fname, tmp_len);
@@ -237,6 +242,8 @@ int ydb_init()
 		if (error_encountered)
 		{	/* "gtmci_ch" encountered an error and transferred control back here. Return after mutex lock cleanup. */
 			THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+			/* "ydb_init" returns positive error code so return mumps_status as is (i.e. no negation for YDB_ERR_*) */
+			assert(0 < mumps_status);
 			return mumps_status;
 		}
 		/* Now that a condition handler has been established, it is safe to use "rts_error_csa" going forward.

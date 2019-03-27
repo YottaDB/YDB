@@ -39,6 +39,8 @@
 
 GBLREF	int			mumps_status;
 GBLREF	struct sigaction	orig_sig_action[];
+GBLREF	boolean_t		simpleThreadAPI_active;
+GBLREF	uint4			dollar_tlevel;
 #ifdef DEBUG
 GBLREF	pthread_t		ydb_stm_worker_thread_id;
 #endif
@@ -57,9 +59,27 @@ int ydb_exit()
         SETUP_THREADGBL_ACCESS;
 	if (!ydb_init_complete)
 		return 0;		/* If we aren't initialized, we don't have things to take down so just return */
+	if (dollar_tlevel && simpleThreadAPI_active)
+	{	/* We are inside TP. If $TLEVEL is 2 (i.e. TP depth is 2), in SimpleThreadAPI mode, we cannot differentiate
+		 * if this "ydb_exit" call is happening inside the 1st level TP callback function or a 2nd level TP callback
+		 * function (since "ydb_exit" does not have a "tptoken" parameter). In this case, the thread executing the
+		 * 2nd level TP callback function is the one holding the current YottaDB engine multi-thread lock and so
+		 * the thread invoking "ydb_exit" from the 1st level TP callback function should not be allowed to fall
+		 * through to the below code where the THREADED_API_YDB_ENGINE_LOCK macro call would deadlock. Hence return
+		 * an error in this case. Reuse a pre-existing error that does not allow "ydb_exit" to be called in the
+		 * middle of call-ins. Since we do not necessarily hold the YottaDB engine multi-thread lock at this point,
+		 * we cannot do any ESTABLISH_RET/rts_error_csa etc. calls. Hence just the return of an error code
+		 * (i.e. no populating $zstatus etc. so "ydb_zstatus" will not correspond to this error code etc.).
+		 * "ydb_exit" returns positive error code so return ERR_INVYDBEXIT, not YDB_ERR_INVYDBEXIT below.
+		 */
+		return ERR_INVYDBEXIT;
+	}
 	THREADED_API_YDB_ENGINE_LOCK(YDB_NOTTP, NULL, LYDB_RTN_NONE, save_active_stapi_rtn, save_errstr, get_lock, status);
 	if (0 != status)
+	{
+		assert(0 < status);	/* i.e. can only be a system error, not a YDB_ERR_* error code */
 		return status;		/* Lock failed - no condition handler yet so just return the error code */
+	}
 	if (!ydb_init_complete)
 	{	/* "ydb_init_complete" was TRUE before we got the "THREADED_API_YDB_ENGINE_LOCK" lock but became FALSE
 		 * afterwards. This implies some other concurrent thread did the "ydb_exit" so we can return from this
@@ -77,6 +97,8 @@ int ydb_exit()
 		if (error_encountered)
 		{	/* "gtmci_ch" encountered an error and transferred control back here. Return after mutex lock cleanup. */
 			THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+			/* "ydb_exit" returns positive error code so return mumps_status as is (i.e. no negation for YDB_ERR_*) */
+			assert(0 < mumps_status);
 			return mumps_status;
 		}
 		assert(NULL != frame_pointer);
