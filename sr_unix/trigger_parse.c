@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -129,26 +129,38 @@ GBLREF	volatile boolean_t	timer_in_handler;
 	*NEXT_VAL++ = '\0';								\
 }
 
+/* This macro returns TRUE if the first digit corresponds to a numeric subscript.
+ * The first digit can be a digit, or a '-' (negative number) or a . (decimal number).
+ */
+#define	IS_NUMERIC_SUBSCRIPT(ch)	(ISDIGIT_ASCII(ch) || ('-' == ch) || ('.' == ch))
+
 #define PROCESS_NUMERIC(PTR, LEN, HAVE_STAR, DST_PTR, DST_LEN, MAX_LEN)			\
-{											\
-	UPDATE_DST(PTR, LEN, HAVE_STAR, DST_PTR, DST_LEN, MAX_LEN);			\
-	while (ISDIGIT_ASCII(*PTR))							\
+MBSTART {										\
+	boolean_t	dot_seen = FALSE;						\
+	char		ptrCh;								\
+											\
+	assert(IS_NUMERIC_SUBSCRIPT(*PTR));						\
+	/* In the first iteration of this do/while loop, *PTR could be			\
+	 * '-' or '.' or a decimal digit and all of those are valid usages.		\
+	 * From the second iteration of this loop, the only valid usages are		\
+	 * '.' or a decimal digit. Also only at most one '.' is allowed.		\
+	 */										\
+	do										\
 	{										\
-		if (!HAVE_STAR)								\
+		if ('.' == *PTR)							\
 		{									\
-			if (MAX_LEN < ++DST_LEN)					\
-			{								\
-				util_out_print_gtmio("Subscript too long", FLUSH);	\
-				return FALSE;						\
-			}								\
-			*DST_PTR++ = *PTR++;						\
-		} else									\
-			PTR++;								\
-		LEN--;									\
-	}										\
-}
+			if (!dot_seen)							\
+				dot_seen = TRUE;					\
+			else								\
+				break; /* Allow only one dot in number */		\
+		}									\
+		UPDATE_DST(PTR, LEN, HAVE_STAR, DST_PTR, DST_LEN, MAX_LEN);		\
+		ptrCh = *PTR;								\
+	} while (ISDIGIT_ASCII(ptrCh) || ('.' == ptrCh));				\
+} MBEND
+
 #define PROCESS_STRING(PTR, LEN, HAVE_STAR, DST_PTR, DST_LEN, MAX_LEN)			\
-{											\
+MBSTART {										\
 	char		*ptr1;								\
 	int		add_len;							\
 											\
@@ -172,9 +184,10 @@ GBLREF	volatile boolean_t	timer_in_handler;
 		DST_LEN += add_len;							\
 	}										\
 	PTR = ptr1;									\
-}
-#define PROCESS_AND_GET_NUMERIC(PTR, LEN, HAVE_STAR, DST_PTR, DST_LEN, NUM, MAX_LEN)	\
-{											\
+} MBEND
+
+#define PROCESS_AND_GET_INTEGER(PTR, LEN, HAVE_STAR, DST_PTR, DST_LEN, NUM, MAX_LEN)	\
+MBSTART {										\
 	char		*ptr1;								\
 	int		add_len;							\
 											\
@@ -194,7 +207,7 @@ GBLREF	volatile boolean_t	timer_in_handler;
 		DST_LEN += add_len;							\
 	}										\
 	PTR = ptr1;									\
-}
+} MBEND
 
 #define GET_CLI_STR(QUAL, MAX_OUTPUT_LEN, VALUE, RES)					\
 {											\
@@ -632,7 +645,7 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 	boolean_t	newsub;
 	int		num1;
 	int		num2;
-	char		*ptr;
+	char		ch, *ptr;
 	char		*ptr1;
 	char		*save_dst_ptr;
 	int		save_len;
@@ -651,13 +664,13 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 	start_dst_ptr = dst_ptr = dst;
 	while ((0 < len) && (')' != *ptr))
 	{
-		if (ISDIGIT_ASCII(*ptr) || ('-' == *ptr))
+		ch = *ptr;
+		if (IS_NUMERIC_SUBSCRIPT(ch))
 		{
 			PROCESS_NUMERIC(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
 			newsub = FALSE;
 			valid_sub = TRUE;
-		}
-		else if (ISALPHA_ASCII(*ptr) || ('%' == *ptr))
+		} else if (ISALPHA_ASCII(ch) || ('%' == ch))
 		{
 			if (!newsub)
 			{
@@ -713,7 +726,7 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 			continue;
 		} else
 		{
-			switch (*ptr)
+			switch (ch)
 			{
 				case '"':
 					PROCESS_STRING(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
@@ -744,10 +757,8 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 						num1 = num2 = -1;
 						have_dot = FALSE;
 						if (ISDIGIT_ASCII(*ptr))
-						{
-							PROCESS_AND_GET_NUMERIC(ptr, len, have_star, dst_ptr, dst_len, num1,
+							PROCESS_AND_GET_INTEGER(ptr, len, have_star, dst_ptr, dst_len, num1,
 										MAX_GVSUBS_LEN);
-						}
 						if ('.' == *ptr)
 						{
 							have_dot = TRUE;
@@ -759,10 +770,8 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 							*dst_ptr++ = *ptr++;
 							len--;
 							if (ISDIGIT_ASCII(*ptr))
-							{
-								PROCESS_AND_GET_NUMERIC(ptr, len, have_star, dst_ptr, dst_len, num2,
+								PROCESS_AND_GET_INTEGER(ptr, len, have_star, dst_ptr, dst_len, num2,
 									MAX_GVSUBS_LEN);
-							}
 							if (-1 == num1)
 								num1 = 0;
 						}
@@ -854,34 +863,30 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 						return FALSE;
 					}
 					UPDATE_DST(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
-					if (ISDIGIT_ASCII(*ptr) || ('-' == *ptr))
-					{
+					ch = *ptr;
+					if (IS_NUMERIC_SUBSCRIPT(ch))
 						PROCESS_NUMERIC(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
-					}
-					else if ('"' == *ptr)
-					{
+					else if ('"' == ch)
 						PROCESS_STRING(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
-					} else if ('$' == *ptr)
+					else if ('$' == ch)
 					{
 						if (!process_dollar_char(&ptr, &len, have_star, &dst_ptr, &dst_len))
 						{
 							util_out_print_gtmio("Invalid range value", FLUSH);
 							return FALSE;
 						}
-					} else if ((0 < len) && (',' != *ptr) && (';' != *ptr) && (')' != *ptr))
+					} else if ((0 < len) && (',' != ch) && (';' != ch) && (')' != ch))
 					{
 						util_out_print_gtmio("Invalid string range", FLUSH);
 						return FALSE;
 					} else
 					{	/* A range with no lower end - just scan the numeric or string */
 						ptr1 = ptr;
-						if (ISDIGIT_ASCII(*ptr) || ('-' == *ptr))
-						{
+						if (IS_NUMERIC_SUBSCRIPT(ch))
 							PROCESS_NUMERIC(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
-						} else if ('"' == *ptr1)
-						{
+						else if ('"' == *ptr1)
 							PROCESS_STRING(ptr, len, have_star, dst_ptr, dst_len, MAX_GVSUBS_LEN);
-						} else if ((0 < len) && ((',' != *ptr) && (';' != *ptr) && (')' != *ptr)))
+						else if ((0 < len) && ((',' != ch) && (';' != ch) && (')' != ch)))
 						{
 							util_out_print_gtmio("Range value must be integer or string", FLUSH);
 							return FALSE;
