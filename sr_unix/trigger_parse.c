@@ -114,8 +114,8 @@ GBLREF	volatile boolean_t	timer_in_handler;
 			return FALSE;							\
 		}									\
 		*DST_PTR++ = *PTR++;							\
-	}										\
-	else PTR++;									\
+	} else										\
+		PTR++;									\
 	LEN--;										\
 }
 #define UPDATE_TRIG_PTRS(VAL, NEXT_VAL, LEN, MAX_OUTPUT_LEN)				\
@@ -137,9 +137,11 @@ GBLREF	volatile boolean_t	timer_in_handler;
 #define PROCESS_NUMERIC(PTR, LEN, HAVE_STAR, DST_PTR, DST_LEN, MAX_LEN)			\
 MBSTART {										\
 	boolean_t	dot_seen = FALSE;						\
-	char		ptrCh;								\
+	char		ptrCh, *ptrStart;						\
+	mval		u;								\
 											\
-	assert(IS_NUMERIC_SUBSCRIPT(*PTR));						\
+	ptrStart = PTR;									\
+	assert(IS_NUMERIC_SUBSCRIPT(*ptrStart));					\
 	/* In the first iteration of this do/while loop, *PTR could be			\
 	 * '-' or '.' or a decimal digit and all of those are valid usages.		\
 	 * From the second iteration of this loop, the only valid usages are		\
@@ -147,22 +149,48 @@ MBSTART {										\
 	 */										\
 	do										\
 	{										\
-		if ('.' == *PTR)							\
+		if ('.' == *PTR++)							\
 		{									\
 			if (!dot_seen)							\
 				dot_seen = TRUE;					\
 			else								\
 				break; /* Allow only one dot in number */		\
 		}									\
-		UPDATE_DST(PTR, LEN, HAVE_STAR, DST_PTR, DST_LEN, MAX_LEN);		\
+		LEN--;									\
 		ptrCh = *PTR;								\
 	} while (ISDIGIT_ASCII(ptrCh) || ('.' == ptrCh));				\
+	if (!HAVE_STAR)									\
+	{										\
+		/* Now we have the string corresponding to the number. See if we can	\
+		 * reduce it to a canonic form. For example, 2.0 should reduce to 2.	\
+		 * This lets us correctly detect triggers having ^x(2.0) and ^x(2) as	\
+		 * duplicate. To do that, we convert input string into a number and	\
+		 * then convert the number back to a string before storing it as the	\
+		 * trigger definition.							\
+		 */									\
+		u.mvtype = MV_STR;							\
+		u.str.addr = ptrStart;							\
+		u.str.len = PTR - ptrStart;						\
+		s2n(&u);								\
+		assert(MV_IS_NUMERIC(&u));						\
+		n2s(&u);								\
+		assert(MV_IS_STRING(&u));						\
+		if (MAX_LEN < (DST_LEN + u.str.len))					\
+		{									\
+			util_out_print_gtmio("Trigger definition too long", FLUSH);	\
+			return FALSE;							\
+		}									\
+		memcpy(DST_PTR, u.str.addr, u.str.len);					\
+		DST_PTR += u.str.len;							\
+		DST_LEN += u.str.len;							\
+	}										\
 } MBEND
 
 #define PROCESS_STRING(PTR, LEN, HAVE_STAR, DST_PTR, DST_LEN, MAX_LEN)			\
 MBSTART {										\
 	char		*ptr1;								\
 	int		add_len;							\
+	mval		u;								\
 											\
 	ptr1 = scan_to_end_quote(PTR, LEN, MAX_LEN);					\
 	if (NULL == ptr1)								\
@@ -174,6 +202,25 @@ MBSTART {										\
 	LEN -= add_len;									\
 	if (!HAVE_STAR)									\
 	{										\
+		/* Just like we did in PROCESS_NUMERIC macro, see if the string		\
+		 * is enclosing a canonical number inside double quotes. If so,		\
+		 * strip the quotes away and treat this just as a numeric subscript	\
+		 * (just like the database does).					\
+		 */									\
+		u.mvtype = MV_STR;							\
+		assert('"' == *PTR);							\
+		u.str.addr = PTR + 1;							\
+		assert('"' == PTR[add_len - 1]);					\
+		u.str.len = add_len - 2; /* remove surrounding double quotes */		\
+		if (val_iscan(&u))							\
+		{									\
+			s2n(&u);							\
+			assert(MV_IS_NUMERIC(&u));					\
+			n2s(&u);							\
+			assert(MV_IS_STRING(&u));					\
+			PTR = u.str.addr;						\
+			add_len = u.str.len;						\
+		}									\
 		if (MAX_LEN < (DST_LEN + add_len))					\
 		{									\
 			util_out_print_gtmio("Trigger definition too long", FLUSH);	\
