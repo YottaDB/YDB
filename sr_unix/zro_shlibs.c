@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ * Copyright 2011 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -73,8 +76,16 @@ void zro_shlibs_unlink_all(void)
 		if (0 != status)
 		{
 			dlerr = dlerror();
-			len = STRLEN(dlerr);
-			rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dlclose()"), CALLFROM, ERR_TEXT, 2, len, dlerr);
+			if (NULL != dlerr)
+			{
+				len = STRLEN(dlerr);
+				rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dlclose()"), CALLFROM,
+					ERR_TEXT, 2, len, dlerr);
+			} else
+			{
+				assert(FALSE);
+				rts_error(VARLSTCNT(11) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("dlclose()_2"), CALLFROM);
+			}
 		}
 		free(oshlb);
 	}

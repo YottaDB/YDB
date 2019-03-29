@@ -56,7 +56,7 @@ GBLREF	boolean_t	posix_timer_created;
 void *ydb_stm_thread(void *parm)
 {
 	int			sig_num, status, tLevel;
-	pthread_t		mutex_holder_thread_id, prev_wake_up_thread_id;
+	pthread_t		mutex_holder_thread_id, prev_wake_up_thread_id = 0;
 	enum sig_handler_t	sig_handler_type;
 	uint64_t		i, prev_wake_up_i, prev_diff_i;
 	DCL_THREADGBL_ACCESS;
