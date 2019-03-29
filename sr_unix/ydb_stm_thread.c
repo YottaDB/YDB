@@ -99,14 +99,25 @@ void *ydb_stm_thread(void *parm)
 			{
 				status = pthread_mutex_trylock(&ydb_engine_threadsafe_mutex[0]);
 				assert((0 == status) || (EBUSY == status));
+				/* If status is non-zero, we do not have the YottaDB engine lock so we cannot call
+				 * "rts_error_csa" etc. therefore just silently continue to next iteration.
+				 */
 				if (0 == status)
 				{
 					assert(0 == ydb_engine_threadsafe_mutex_holder[0]);
 					ydb_engine_threadsafe_mutex_holder[0] = pthread_self();
 					STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
 					ydb_engine_threadsafe_mutex_holder[0] = 0;
-					/* NARSTODO: Handle non-zero return from "pthread_mutex_unlock" below */
-					pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
+					status = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
+					/* If status is non-zero, we do have the YottaDB engine lock so we CAN call
+					 * "rts_error_csa" etc. therefore do just that.
+					 */
+					if (status)
+					{
+						assert(FALSE);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+							RTS_ERROR_LITERAL("pthread_mutex_unlock()"), CALLFROM, status);
+					}
 				}
 				continue;
 			}

@@ -290,14 +290,21 @@ void gtm_startup(struct startup_vector *svec)
 	curr_symval->alias_activity = FALSE;
 	/* Initialize several things to do with the YottaDB Simple Thread API (ydb_*_st() functions) */
 	/* This initialization routine does not have a return code so returning a return code back to the caller is not
-	 * currently possible. This could probably be addressed (returning code back to init_gtm() as a TODO SEE but the
-	 * process-killing rts_error suffices for now.
+	 * currently possible. This could probably be addressed but the process-killing rts_error suffices for now.
 	 */
 	/* Allocate level 0 work queue (primary work queue) */
 	ydb_stm_thread_exit_fnptr = &ydb_stm_thread_exit;
 	ydb_stm_invoke_deferred_signal_handler_fnptr = ydb_stm_invoke_deferred_signal_handler;
 	for (i = 1; i < STMWORKQUEUEDIM; i++)
-		pthread_mutex_init(&ydb_engine_threadsafe_mutex[i], NULL);
+	{
+		status = pthread_mutex_init(&ydb_engine_threadsafe_mutex[i], NULL);
+		if (status)
+		{
+			assert(FALSE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				RTS_ERROR_LITERAL("pthread_mutex_init()"), CALLFROM, status);
+		}
+	}
 	/* Pick up the parms for this invocation */
 	if ((GTM_IMAGE == image_type) && (NULL != svec->base_addr))
 		/* We are in the grandchild at this point. This call is made to greet local variables sent from the midchild. There

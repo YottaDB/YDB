@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -179,7 +179,7 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
  * master and non-NULL for the threads.
  * Note: In the future, if more threads are implemented with no region context, we might be better off checking
  * "gtm_main_thread_id" against "pthread_self()". Right now, the former is not maintained in all cases and is
- * hence not used. TODO SEE
+ * hence not used.
  */
 #define	INSIDE_THREADED_CODE(rname) (multi_thread_in_use && (NULL != (rname = pthread_getspecific(thread_gtm_putmsg_rname_key))))
 

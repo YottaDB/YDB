@@ -702,8 +702,6 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	int		i, lockIndex, lclStatus, tLevel;								\
 	uint64_t	tpToken;											\
 															\
-	/* NARSTODO: Handle case where we already hold pthread lock, say due to error conditions or so. */		\
-	/* NARSTODO: Do we need RECURSIVE pthread_mutex_lock? */							\
 	RETVAL = YDB_OK;												\
 	GET_LOCK = TRUE;												\
 	/* Since this macro can be called from "ydb_init" as part of opening YottaDB for the first time in the process,	\
@@ -765,10 +763,9 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	{														\
 		if (GET_LOCK)												\
 		{													\
-			/* NARSTODO: Handle non-zero return from "pthread_mutex_lock" below */				\
 			RETVAL = pthread_mutex_lock(&ydb_engine_threadsafe_mutex[lockIndex]);				\
 			assert(0 == YDB_OK);										\
-			if (YDB_OK == RETVAL)										\
+			if (0 == RETVAL)										\
 			{												\
 				ydb_engine_threadsafe_mutex_holder[lockIndex] = pthread_self();				\
 				/* Mark this process as having SimpleThreadAPI active if not already done */		\
@@ -781,26 +778,37 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 					/* Start the MAIN worker thread for SimpleThreadAPI */				\
 					lclStatus = pthread_create(&ydb_stm_worker_thread_id, NULL,			\
 										&ydb_stm_thread, NULL);			\
-					/* NARSTODO: Handle non-zero return from "pthread_create" below */		\
-					if (YDB_OK == lclStatus)							\
+					if (0 == lclStatus)								\
 					{     	 									\
-				/* NARSTODO: Remove this sleep loop and instead use pthread_cond_signal etc. calls */	\
-						/* Wait for MAIN worker thread to set simpleThreadAPI_active */		\
-						for (i = 0; i < MICROSECS_IN_MSEC; i++) 				\
+						/* Wait for MAIN worker thread to set "simpleThreadAPI_active" */	\
+						for (i = 0; ; i++) 							\
 						{									\
 							if (simpleThreadAPI_active)					\
 								break;							\
+							if (MICROSECS_IN_SEC == i)					\
+							{	/* Worker thread did not reach desired state in given	\
+								 * time. Treat this as if "pthread_create" call failed.	\
+								 */							\
+								lclStatus = ETIMEDOUT;					\
+								break;							\
+							}								\
 							SLEEP_USEC(1, TRUE);						\
 						}									\
-						if (MICROSECS_IN_MSEC == i)						\
-						{	/* Worker thread did not reach desired state in given time.	\
-							 * Treat this as if the "pthread_create" call failed.		\
-							 */								\
-							lclStatus = ETIMEDOUT;						\
-						}									\
+															\
+					}										\
+					if (0 != lclStatus)								\
+					{	/* If lclStatus is non-zero, we do have the YottaDB engine lock so	\
+						 * we CAN call "rts_error_csa" etc. therefore do just that.		\
+						 */									\
+						assert(FALSE);								\
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,		\
+							RTS_ERROR_LITERAL("pthread_create()"), CALLFROM, lclStatus);	\
 					}										\
 				}											\
 			}												\
+			/* If RETVAL is non-zero, we do not have the YottaDB engine lock so we cannot call		\
+			 * "rts_error_csa" etc. therefore just silently return this error code to caller.		\
+			 */												\
 		}													\
 		if (YDB_OK == RETVAL)											\
 		{													\
@@ -822,7 +830,7 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];							\
 	GBLREF	int		stapi_signal_handler_deferred;								\
 															\
-	int	lockIndex;												\
+	int	lockIndex, lclStatus;										\
 															\
 	/* Before releasing the YottaDB engine lock, check if any signal handler got deferred in the MAIN		\
 	 * worker thread and is still pending. If so, handle it now since we own the engine lock for sure here		\
@@ -842,8 +850,15 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 		lockIndex = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);						\
 		assert(pthread_self() == ydb_engine_threadsafe_mutex_holder[lockIndex]);				\
 		ydb_engine_threadsafe_mutex_holder[lockIndex] = 0;							\
-		/* NARSTODO: Handle non-zero return from "pthread_mutex_unlock" below */				\
-		pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lockIndex]);						\
+		lclStatus = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lockIndex]);				\
+		if (lclStatus)												\
+		{	/* If lclStatus is non-zero, we do have the YottaDB engine lock so we CAN call			\
+			 * "rts_error_csa" etc. therefore do just that.							\
+			 */												\
+			assert(FALSE);											\
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,					\
+				RTS_ERROR_LITERAL("pthread_mutex_unlock()"), CALLFROM, lclStatus);			\
+		}													\
 	} else if ((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN) || (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN))		\
 	{	/* Undo active rtn indicator reset done in THREADED_API_YDB_ENGINE_LOCK */ 				\
 		 if (NULL != lcl_gtm_threadgbl)										\
