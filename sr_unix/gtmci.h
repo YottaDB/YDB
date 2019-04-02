@@ -27,8 +27,6 @@
  * problematic, so we picked an arbitrary limit (10) that seems generous. */
 #define CALLIN_MAX_LEVEL	10
 
-#define CALLIN_HASHTAB_SIZE	32
-
 #define SET_CI_ENV(g)				\
 {						\
 	frame_pointer->type |= SFT_CI; 		\
@@ -61,7 +59,7 @@
 void	ci_ret_code_quit(void);
 void	gtmci_isv_save(void);
 void	gtmci_isv_restore(void);
-int 	ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list var, boolean_t internal_use);
+int 	ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list var, boolean_t internal_use);
 #ifdef _AIX
 void	gtmci_cleanup(void);
 #endif

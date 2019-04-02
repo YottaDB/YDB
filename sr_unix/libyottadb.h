@@ -299,6 +299,8 @@ int ydb_call_variadic_plist_func_s(ydb_vplist_func cgfunc, uintptr_t cvplist);	/
 int	ydb_child_init(void *param);
 int	ydb_ci(const char *c_rtn_name, ...);				/* Call-in interface */
 int	ydb_cip(ci_name_descriptor *ci_info, ...);			/* Slightly faster "ydb_ci" */
+int	ydb_ci_tab_open(char *fname, uintptr_t *ret_value);
+int	ydb_ci_tab_switch(uintptr_t new_handle, uintptr_t *ret_old_handle);
 int	ydb_exit(void);
 int	ydb_file_id_free(ydb_fileid_ptr_t fileid);
 int	ydb_file_is_identical(ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
@@ -322,6 +324,8 @@ int	ydb_timer_start(intptr_t timer_id, unsigned long long limit_nsec, ydb_funcpt
 int	ydb_ci_t(uint64_t tptoken, ydb_buffer_t *errstr, const char *c_rtn_name, ...);	/* SimpleThreadAPI version of "ydb_ci" */
 int	ydb_cip_t(uint64_t tptoken, ydb_buffer_t *errstr, ci_name_descriptor *ci_info, ...);
 											/* SimpleThreadAPI version of "ydb_cip" */
+int	ydb_ci_tab_open_t(uint64_t tptoken, ydb_buffer_t *errstr, char *fname, uintptr_t *ret_value);
+int	ydb_ci_tab_switch_t(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t new_handle, uintptr_t *ret_old_handle);
 int	ydb_file_id_free_t(uint64_t tptoken, ydb_buffer_t *errstr, ydb_fileid_ptr_t fileid);
 int	ydb_file_is_identical_t(uint64_t tptoken, ydb_buffer_t *errstr, ydb_fileid_ptr_t fileid1, ydb_fileid_ptr_t fileid2);
 int	ydb_file_name_to_id_t(uint64_t tptoken, ydb_buffer_t *errstr, ydb_string_t *filename, ydb_fileid_ptr_t *fileid);

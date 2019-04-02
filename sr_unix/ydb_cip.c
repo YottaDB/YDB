@@ -41,6 +41,6 @@ int ydb_cip(ci_name_descriptor* ci_info, ...)
 	 */
 	VAR_START(var, ci_info);
 	/* Note: "va_end(var)" done inside "ydb_ci_exec" */
-	retval = ydb_ci_exec(ci_info->rtn_name.address, ci_info->handle, TRUE, var, FALSE);
+	retval = ydb_ci_exec(ci_info->rtn_name.address, ci_info, var, FALSE);
 	return retval;
 }

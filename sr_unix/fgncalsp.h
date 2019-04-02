@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,9 @@
 
 #ifndef __FGNCALSP_H__
 #define  __FGNCALSP_H__
+
+#include "hashtab.h"
+#include "hashtab_str.h"
 
 /* fgncalsp.h - UNIX foreign calls (d &package.label) */
 
@@ -150,6 +153,16 @@ typedef struct parmblk_struct
 	lv_val	*args[MAX_ACTUALS];
 } parmblk_struct;
 
+typedef struct ci_tab_entry {
+	callin_entry_list	*cname_list;
+	hash_table_str		*hashtab;
+	struct ci_tab_entry	*next;
+	int			fname_len;	/* length of "fname" */
+	char			fname[1];	/* null terminated file name that stored this call-in table (hung buffer) */
+} ci_tab_entry_t;
+
+#define	INTERNAL_USE_FALSE	FALSE
+#define	INTERNAL_USE_TRUE	TRUE
 
 /* function prototypes */
 void_ptr_t	fgn_getpak(char *pak_name, int msgtype);
@@ -160,7 +173,9 @@ int 		fgncal_read_args(mstr *inp);
 void 		fgncal_getstr(mstr *inp, mstr *str);
 void 		fgncal_lkbind(mstr *inp);
 void 		fgn_glopref(mval *v);
+
 struct extcall_package_list 	*exttab_parse (mval *package);
-callin_entry_list		*citab_parse (int internal);
+callin_entry_list		*citab_parse(boolean_t internal_use, char *fname);
+ci_tab_entry_t			*ci_tab_entry_open(boolean_t internal_use, char *fname);
 
 #endif

@@ -55,8 +55,6 @@
 #include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsfhead.h"
-#include "hashtab.h"
-#include "hashtab_str.h"
 #include "compiler.h"
 #include "have_crit.h"
 #include "callg.h"
@@ -183,9 +181,10 @@ MBSTART {												\
 	REVERT;												\
 } MBEND
 
-STATICFNDCL callin_entry_list* get_entry(const char *call_name, int internal);
-STATICFNDEF callin_entry_list* get_entry(const char *call_name, int internal)
+STATICFNDCL callin_entry_list* get_entry(ci_tab_entry_t *ci_tab, const char *call_name);
+STATICFNDEF callin_entry_list* get_entry(ci_tab_entry_t *ci_tab, const char *call_name)
 {	/* Lookup in a hashtable for entry corresponding to routine name */
+	hash_table_str	*ci_hashtab;
 	ht_ent_str      *callin_entry;
 	stringkey       symkey;
 	DCL_THREADGBL_ACCESS;
@@ -194,10 +193,8 @@ STATICFNDEF callin_entry_list* get_entry(const char *call_name, int internal)
 	symkey.str.addr = (char *)call_name;
 	symkey.str.len = STRLEN(call_name);
 	COMPUTE_HASH_STR(&symkey);
-	if (!internal)
-		callin_entry = lookup_hashtab_str(TREF(callin_hashtab), &symkey);
-	else
-		callin_entry = lookup_hashtab_str(TREF(ci_filter_hashtab), &symkey);
+	ci_hashtab = ci_tab->hashtab;
+	callin_entry = lookup_hashtab_str(ci_hashtab, &symkey);
 	return (callin_entry ? callin_entry->value : NULL);
 }
 
@@ -207,6 +204,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 {
 	boolean_t		need_rtnobj_shm_free;
 	callin_entry_list	*entry;
+	ci_tab_entry_t		*ci_tab;
 	int4			*lnr_tab_ent;
 	mstr			label, routine;
 	int			has_return, i, len;
@@ -219,9 +217,6 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	parmblk_struct 		param_blk;
 	volatile int		*save_var_on_cstack_ptr;	/* Volatile to match global var type */
 	int			status;
-	boolean_t 		added;
-	stringkey       	symkey;
-	ht_ent_str		*syment;
 	intrpt_state_t		old_intrpt_state;
 	char			**arg_blob_ptr;
 	int			*java_arg_type;
@@ -229,7 +224,6 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	added = FALSE;
 	assert(NULL == TREF(gtmci_retval));
 	TREF(gtmci_retval) = NULL;
 	if (!ydb_init_complete)
@@ -262,29 +256,19 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	ESTABLISH_RET(gtmci_ch, mumps_status);
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
-	if (!TREF(ci_table))	/* Load the call-in table only once from env variable ydb_ci/GTMCI. */
-	{
-		TREF(ci_table) = citab_parse(FALSE);
-		if (!TREF(callin_hashtab))
-		{
-			TREF(callin_hashtab) = (hash_table_str *)malloc(SIZEOF(hash_table_str));
-			(TREF(callin_hashtab))->base = NULL;
-			/* Need to initialize hash table. */
-			init_hashtab_str(TREF(callin_hashtab), CALLIN_HASHTAB_SIZE,
-				HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
-			assert((TREF(callin_hashtab))->base);
-		}
-		for (entry = TREF(ci_table); NULL != entry; entry = entry->next_entry)
-		{	/* Loop over the list and populate the hash table. */
-			symkey.str.addr = entry->call_name.addr;
-			symkey.str.len = entry->call_name.len;
-			COMPUTE_HASH_STR(&symkey);
-			added = add_hashtab_str(TREF(callin_hashtab), &symkey, entry, &syment);
-			assert(added);
-			assert(syment->value == entry);
-		}
+	/* Check if the currently active call-in table is already loaded. If so, use it. */
+	ci_tab = TREF(ci_table_curr);
+	if (NULL == ci_tab)
+	{	/* There is no currently active call-in table. Use the default call-in table if it has been loaded. */
+		ci_tab = TREF(ci_table_default);
 	}
-	if (!(entry = get_entry(c_rtn_name, FALSE)))	/* c_rtn_name not found in the table. */
+	if (NULL == ci_tab)
+	{	/* Neither the active nor the default call-in table is available. Load the default call-in table. */
+		ci_tab = ci_tab_entry_open(INTERNAL_USE_FALSE, NULL);
+		TREF(ci_table_curr) = ci_tab;
+		TREF(ci_table_default) = ci_tab;
+	}
+	if (!(entry = get_entry(ci_tab, c_rtn_name)))	/* c_rtn_name not found in the table. */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	/* The 3rd argument is NULL because we will get lnr_adr via TABENT_PROXY. */
@@ -567,11 +551,12 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 }
 
 /* Common work-routine for ydb_ci() and ydb_cip() to drive callin */
-int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle, va_list temp_var, boolean_t internal_use)
+int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list temp_var, boolean_t internal_use)
 {
 	boolean_t		need_rtnobj_shm_free;
-	va_list			var;
+	ci_tab_entry_t		*ci_tab;
 	callin_entry_list	*entry;
+	va_list			var;
 	int4			*lnr_tab_ent;
 	mstr			label, routine;
 	int			has_return, i;
@@ -585,9 +570,6 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	parmblk_struct 		param_blk;
 	volatile int		*save_var_on_cstack_ptr;	/* Volatile to match global var type */
 	int			status;
-	boolean_t 		added;
-	stringkey       	symkey;
-	ht_ent_str		*syment;
 	intrpt_state_t		old_intrpt_state;
 	boolean_t		ci_ret_code_quit_needed = FALSE;
 	boolean_t		unwind_here = FALSE;
@@ -595,7 +577,6 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 
 	SETUP_THREADGBL_ACCESS;
 	VAR_COPY(var, temp_var);
-	added = FALSE;
 	if (internal_use)
 	{
 		TREF(comm_filter_init) = TRUE;
@@ -640,62 +621,35 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 	if (!c_rtn_name)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
 	if (!internal_use)
-	{
-		if (!TREF(ci_table))	/* load the call-in table only once from env variable ydb_ci/GTMCI  */
-		{
-			TREF(ci_table) = citab_parse(internal_use);
-			if (!TREF(callin_hashtab))
-			{
-				TREF(callin_hashtab) = (hash_table_str *)malloc(SIZEOF(hash_table_str));
-				(TREF(callin_hashtab))->base = NULL;
-				/* Need to initialize hash table */
-				init_hashtab_str(TREF(callin_hashtab), CALLIN_HASHTAB_SIZE,
-					HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
-				assert((TREF(callin_hashtab))->base);
-			}
-			for (entry = TREF(ci_table); NULL != entry; entry = entry->next_entry)
-			{	/* Loop over the list and populate the hash table */
-				symkey.str.addr = entry->call_name.addr;
-				symkey.str.len = entry->call_name.len;
-				COMPUTE_HASH_STR(&symkey);
-				added = add_hashtab_str(TREF(callin_hashtab), &symkey, entry, &syment);
-				assert(added);
-				assert(syment->value == entry);
-			}
+	{	/* Check if the currently active call-in table is already loaded. If so, use it. */
+		ci_tab = TREF(ci_table_curr);
+		if (NULL == ci_tab)
+		{	/* There is no currently active call-in table. Use the default call-in table if it has been loaded. */
+			ci_tab = TREF(ci_table_default);
 		}
-	} else /* Call from the filter command*/
-	{
-		if (!TREF(ci_filter_table))
+		if (NULL == ci_tab)
+		{	/* Neither the active nor the default call-in table is available. Load the default call-in table. */
+			ci_tab = ci_tab_entry_open(INTERNAL_USE_FALSE, NULL);
+			TREF(ci_table_curr) = ci_tab;
+			TREF(ci_table_default) = ci_tab;
+		}
+	} else
+	{	/* Call from the filter command*/
+		ci_tab = TREF(ci_table_internal_filter);
+		if (NULL == ci_tab)
 		{
-			TREF(ci_filter_table) = citab_parse(internal_use);
-			if (!TREF(ci_filter_hashtab))
-			{
-				TREF(ci_filter_hashtab) = (hash_table_str *)malloc(SIZEOF(hash_table_str));
-				(TREF(ci_filter_hashtab))->base = NULL;
-				/* Need to initialize hash table */
-				init_hashtab_str(TREF(ci_filter_hashtab), CALLIN_HASHTAB_SIZE,
-					HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
-				assert((TREF(ci_filter_hashtab))->base);
-			}
-			for (entry = TREF(ci_filter_table); NULL != entry; entry = entry->next_entry)
-			{	/* Loop over the list and populate the hash table */
-				symkey.str.addr = entry->call_name.addr;
-				symkey.str.len = entry->call_name.len;
-				COMPUTE_HASH_STR(&symkey);
-				added = add_hashtab_str(TREF(ci_filter_hashtab), &symkey, entry, &syment);
-				assert(added);
-				assert(syment->value == entry);
-			}
+			ci_tab = ci_tab_entry_open(INTERNAL_USE_TRUE, NULL);
+			TREF(ci_table_internal_filter) = ci_tab;
 		}
 	}
-	if (NULL == callin_handle)
+	entry = (NULL != ci_info) ? ci_info->handle : NULL;
+	if (NULL == entry)
 	{
-		if (!(entry = get_entry(c_rtn_name, internal_use)))	/* c_rtn_name not found in the table */
+		if (!(entry = get_entry(ci_tab, c_rtn_name)))	/* c_rtn_name not found in the table */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
-		if (populate_handle)
-			callin_handle = entry;
-	} else
-		entry = callin_handle;
+		if (NULL != ci_info)
+			ci_info->handle = entry;
+	}
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	/* 3rd argument is NULL because we don't support a line offset from a label in call-ins. Also,
 	 * see comment in ojstartchild.c about "need_rtnobj_shm_free". It is not used here because we will
@@ -850,7 +804,7 @@ int ydb_ci_exec(const char *c_rtn_name, void *callin_handle, int populate_handle
 					break;
 				default:
 					va_end(var);
-					assertpro(FALSE); /* should have been caught by citab_parse */
+					assertpro(FALSE); /* should have been caught by "citab_parse" */
 			}
 		}
 		param_blk.args[i] = push_lvval(&arg_mval);
@@ -1037,7 +991,7 @@ int gtm_ci_filter(const char *c_rtn_name, ...)
 
 	VAR_START(var, c_rtn_name);
 	/* Note: "va_end(var)" done inside "ydb_ci_exec" */
-	return ydb_ci_exec(c_rtn_name, NULL, FALSE, var, TRUE);
+	return ydb_ci_exec(c_rtn_name, NULL, var, TRUE);
 }
 
 #ifdef GTM_PTHREAD

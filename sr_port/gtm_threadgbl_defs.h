@@ -389,11 +389,20 @@ THREADGBLDEF(util_outbuff_ptr,			char *)				/* Pointer to util output buffer */
 THREADGBLDEF(util_outptr,			char *)				/* Pointer within util output buffer */
 
 
-/* GTM Call-in related globals */
-THREADGBLDEF(callin_hashtab, 			hash_table_str *)		/* Callin hash table */
-THREADGBLDEF(ci_table, 				callin_entry_list *)		/* Callin table in the form of a linked list */
-THREADGBLDEF(ci_filter_hashtab,			hash_table_str *)		/* Filter hash table */
-THREADGBLDEF(ci_filter_table,			callin_entry_list *)		/* Filter table list*/
+/* YottaDB Call-in related globals */
+THREADGBLDEF(ci_table_default,			ci_tab_entry_t *)		/* Call-in table corresponding to "ydb_ci" env var.
+										 * Used as default call-in table by "ydb_ci()"
+										 * if TREF(ci_table_curr) is NULL.
+										 */
+THREADGBLDEF(ci_table_internal_filter,		ci_tab_entry_t *)		/* Call-in table corresponding to Internal filter
+										 * (i.e. called from "gtm_ci_filter".
+										 */
+THREADGBLDEF(ci_table_curr, 			ci_tab_entry_t *)		/* Call-in table corresponding to most recent
+										 * "ydb_ci_tab_switch" call; if no such call
+										 * happened, the call-in table corresponding to
+										 * "ydb_ci" env var .
+										 */
+THREADGBLDEF(ci_table_all, 			ci_tab_entry_t *)		/* Linked list of ALL open call-in tables */
 THREADGBLDEF(extcall_package_root,		struct extcall_package_list *)	/* External call table package list */
 THREADGBLDEF(gtmci_nested_level,		unsigned int)			/* Current nested depth of callin environments */
 THREADGBLDEF(comm_filter_init,			boolean_t)			/* Signifying that the filter is in use */

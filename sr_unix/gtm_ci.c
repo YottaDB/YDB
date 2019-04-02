@@ -43,6 +43,6 @@ int gtm_ci(const char *c_rtn_name, ...)
 	 */
 	VAR_START(var, c_rtn_name);
 	/* Note: "va_end(var)" done inside "ydb_ci_exec" */
-	retval = ydb_ci_exec(c_rtn_name, NULL, FALSE, var, FALSE);
+	retval = ydb_ci_exec(c_rtn_name, NULL, var, FALSE);
 	return retval;
 }

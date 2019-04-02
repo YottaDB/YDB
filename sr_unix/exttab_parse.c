@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,6 +48,7 @@ GBLREF	char 			ydb_dist[YDB_PATH_MAX];
 #define	SPACE_BLOCK_SIZE	((NON_GTM64_ONLY(1024) GTM64_ONLY(2048)) - SIZEOF(storElem))
 #define	TABLEN			8
 #define	POINTER_SIZE		6
+#define	CALLIN_HASHTAB_SIZE	32
 
 STATICDEF int	ext_source_line_num;
 STATICDEF int	ext_source_line_len;
@@ -737,7 +738,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 	return pak;
 }
 
-callin_entry_list* citab_parse (boolean_t internal_use)
+callin_entry_list *citab_parse(boolean_t internal_use, char *fname)
 {
 	int			parameter_count, i, fclose_res;
 	uint4			inp_mask, out_mask, mask;
@@ -752,8 +753,8 @@ callin_entry_list* citab_parse (boolean_t internal_use)
 
 	if (!internal_use)
 	{
-		ext_table_file_name = ydb_getenv(YDBENVINDX_CI, NULL_SUFFIX, &is_ydb_env_match);
-		if (!ext_table_file_name) /* environment variable not set */
+		ext_table_file_name = (NULL == fname) ? ydb_getenv(YDBENVINDX_CI, NULL_SUFFIX, &is_ydb_env_match) : fname;
+		if (NULL == ext_table_file_name) /* environment variable not set */
 		{
 			nbytes = SNPRINTF(tmpbuff, SIZEOF(tmpbuff), "%s/%s",
 						ydbenvname[YDBENVINDX_CI] + 1, gtmenvname[YDBENVINDX_CI] + 1);
@@ -910,4 +911,71 @@ STATICFNDEF void ext_stx_error(int in_error, ...)
 	dec_err(VARLSTCNT(6) ERR_EXTSRCLIN, 4, ext_source_line_len, ext_source_line, b - &buf[0], &buf[0]);
 	dec_err(VARLSTCNT(6) ERR_EXTSRCLOC, 4, ext_source_column, ext_source_line_num, LEN_AND_STR(ext_table_name));
 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) in_error);
+}
+
+/* If "fname" is non-NULL,
+ *	This function opens the call-in table pointed to by the file "fname".
+ * If "fname" is NULL,
+ *	a) And internal_use is FALSE, this function opens the call-in table pointed to by the env var "ydb_ci".
+ *	b) And internal_use is TRUE, this function opens the call-in table pointed to by "$ydb_dist/filter_commands.tab".
+ * If the call-in table has already been opened, it returns a pointer to the already open table
+ *	and avoids a duplicate (and heavyweight) open of the call-in table.
+ */
+ci_tab_entry_t *ci_tab_entry_open(boolean_t internal_use, char *fname)
+{
+	boolean_t		added;
+	ci_tab_entry_t		*ci_tab;
+	callin_entry_list	*cname_list, *entry;
+	hash_table_str		*ci_hashtab;
+	ht_ent_str		*syment;
+	stringkey       	symkey;
+	int			fname_len;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	if (NULL != fname)
+	{	/* Check if call-in table corresponding to "fname" has already been opened. If so skip open. */
+		assert(INTERNAL_USE_FALSE == internal_use);
+		fname_len = STRLEN(fname);
+		for (ci_tab = TREF(ci_table_all); NULL != ci_tab; ci_tab = ci_tab->next)
+		{
+			if (ci_tab->fname_len != fname_len)
+				continue;
+			if (strcmp(ci_tab->fname, fname))
+				continue;
+			break;
+		}
+	} else
+	{
+		assert((INTERNAL_USE_FALSE == internal_use) && (NULL == TREF(ci_table_curr))
+			|| (INTERNAL_USE_FALSE != internal_use) && (NULL == TREF(ci_table_internal_filter)));
+		ci_tab = TREF(ci_table_curr);
+	}
+	if (NULL == ci_tab)
+	{
+		cname_list = citab_parse(internal_use, fname);
+		ci_hashtab = (hash_table_str *)malloc(SIZEOF(hash_table_str));
+		ci_hashtab->base = NULL;
+		init_hashtab_str(ci_hashtab, CALLIN_HASHTAB_SIZE, HASHTAB_NO_COMPACT, HASHTAB_NO_SPARE_TABLE);
+		assert((ci_hashtab)->base);
+		for (entry = cname_list; NULL != entry; entry = entry->next_entry)
+		{	/* Loop over the list and populate the hash table */
+			symkey.str.addr = entry->call_name.addr;
+			symkey.str.len = entry->call_name.len;
+			COMPUTE_HASH_STR(&symkey);
+			added = add_hashtab_str(ci_hashtab, &symkey, entry, &syment);
+			assert(added);
+			assert(syment->value == entry);
+		}
+		fname_len = (NULL != fname) ? STRLEN(fname) : 0;
+		ci_tab = get_memory(SIZEOF(ci_tab_entry_t) + fname_len);
+		ci_tab->cname_list = cname_list;
+		ci_tab->hashtab = ci_hashtab;
+		ci_tab->next = TREF(ci_table_all);
+		ci_tab->fname_len = fname_len;
+		if (fname_len)
+			memcpy(ci_tab->fname, fname, fname_len + 1);
+		TREF(ci_table_all) = ci_tab;
+	}
+	return ci_tab;
 }
