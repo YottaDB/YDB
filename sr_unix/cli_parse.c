@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -593,14 +593,9 @@ boolean_t cli_get_sub_quals(CLI_ENTRY *pparm)
 		STRNCPY_STR(local_str, pparm->pval_str, SIZEOF(local_str) - 1);
 		ptr_next_val = local_str;
 		while (NULL != ptr_next_val)
-<<<<<<< HEAD
 		{
 			len_str= STRLEN(ptr_next_val);
 			memcpy(tmp_str, ptr_next_val, len_str);
-=======
-		{	/* WARNING assignment below */
-			STRNCPY_STR(tmp_str, ptr_next_val, (len_str = MIN(STRLEN(ptr_next_val), SIZEOF(tmp_str))));
->>>>>>> 74ea4a3c... GT.M V6.3-006
 			tmp_str[len_str] = 0;
 			tmp_str_ptr = tmp_str;
 			ptr_next_comma = strchr(tmp_str_ptr, ',');

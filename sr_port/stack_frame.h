@@ -92,12 +92,9 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 #define SFT_ZSTEP_ACT	(1 << 7)	/* 0x0080 action frame for a zstep */
 #define SFT_ZINTR	(1 << 8)	/* 0x0100 $zinterrupt frame */
 #define SFT_TRIGR	(1 << 9)	/* 0x0200 Trigger base frame */
-<<<<<<< HEAD
-#define SFT_CI		(1 << 10)	/* 0x0400 Call-in base frame */
-
-=======
 #define SFT_ZTIMEOUT	(1 << 10)	/* 0x0400 ZTIMEOUT frame */
->>>>>>> 74ea4a3c... GT.M V6.3-006
+#define SFT_CI		(1 << 11)	/* 0x0800 Call-in base frame */
+
 #define SFT_ZINTR_OFF	~(SFT_ZINTR)	/* Mask to turn off SFF_ZINTR */
 
 /* The following definition identifies a frame that is running a line of code - either in a routine or what amounts to an XECUTE

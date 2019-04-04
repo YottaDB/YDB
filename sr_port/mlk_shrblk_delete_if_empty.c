@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@ boolean_t mlk_shrblk_delete_if_empty(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	p = (d->parent == 0) ? NULL : (mlk_shrblk_ptr_t)R2A(d->parent);
 	if (p)
 		CHECK_SHRBLKPTR(d->parent, *pctl);
-	assertpro((0 != d->lsib) && (0 != d->rsib));
+	assert((0 != d->lsib) && (0 != d->rsib));
 	l = (mlk_shrblk_ptr_t)R2A(d->lsib);
 	r = (mlk_shrblk_ptr_t)R2A(d->rsib);
 	mlk_shrhash_delete(pctl, d);
@@ -60,22 +60,21 @@ boolean_t mlk_shrblk_delete_if_empty(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 		if ((p != NULL) && (mlk_shrblk_ptr_t)R2A(p->children) == d)
 		{
 			A2R(p->children, r);
-			if (l == r)
-				assertpro((mlk_shrblk_ptr_t)R2A(p->children) == l);
+			assert((l != r) || ((mlk_shrblk_ptr_t)R2A(p->children) == l));
 		}
 		if ((mlk_shrblk_ptr_t)R2A(pctl->ctl->blkroot) == d)
 		{
-			assertpro(p == NULL);
+			assert(NULL == p);
 			A2R(pctl->ctl->blkroot, r);
 		}
 	}
 	if (p)
 	{
-		assertpro(!p->children || ((mlk_shrblk_ptr_t)R2A(p->children) != d));
+		assert(!p->children || ((mlk_shrblk_ptr_t)R2A(p->children) != d));
 		if (p->children)
 		{
 			child = (mlk_shrblk_ptr_t)R2A(p->children);
-			assertpro((mlk_shrblk_ptr_t)R2A(child->parent) == p);
+			assert((mlk_shrblk_ptr_t)R2A(child->parent) == p);
 		}
 	}
 	sub = (mlk_shrsub_ptr_t)R2A(d->value);
@@ -100,7 +99,6 @@ void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	mlk_shrhash_map_t	usedmap;
 	mlk_shrblk_ptr_t	search_shrblk;
 	int			bi, si, bitnum;
-	boolean_t		bitnum_set;
 	mlk_shrhash_ptr_t	shrhash, bucket, search_bucket;
 
 	shrhash = pctl->shrhash;
@@ -119,48 +117,6 @@ void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	bi = hash % num_buckets;
 	bucket = &shrhash[bi];
 	usedmap = bucket->usedmap;
-<<<<<<< HEAD
-	bitnum_set = FALSE;
-	assert(usedmap);
-	if (0 == (usedmap & (1U << MLK_SHRHASH_HIGHBIT)))
-	{	/* High bit is not set. We can use Hopscotch hash algorithm to speedily search */
-		for (si = bi ; 0 != usedmap ; (si = (si + 1) % num_buckets), (usedmap >>= 1))
-		{
-			if (0 == (usedmap & 1U))
-				continue;
-			search_bucket = &shrhash[si];
-			if (search_bucket->hash != hash)
-				continue;
-			assert(0 != search_bucket->shrblk);
-			search_shrblk = (mlk_shrblk_ptr_t)R2A(search_bucket->shrblk);
-			if (d != search_shrblk)
-				continue;
-			bitnum = (num_buckets + si - bi) % num_buckets;
-			bitnum_set = TRUE;
-			assert(MLK_SHRHASH_HIGHBIT > bitnum);
-			break;
-		}
-		assert(usedmap);
-	} else
-	{	/* This is a bucket full situation. We need to do a slower linear search across entire hash bucket array. */
-		for (si = bi; ; )
-		{
-			search_bucket = &shrhash[si];
-			if (search_bucket->hash == hash)
-			{
-				assert(0 != search_bucket->shrblk);
-				search_shrblk = (mlk_shrblk_ptr_t)R2A(search_bucket->shrblk);
-				if (d == search_shrblk)
-				{
-					bitnum = (num_buckets + si - bi) % num_buckets;
-					bitnum_set = TRUE;
-					/* Note that it is possible bitnum is less than or greater than MLK_SHRHASH_HIGHBIT */
-					break;
-				}
-			}
-			si = (si + 1) % num_buckets;
-			assert(si != bi); /* We should have seen the shrblk BEFORE the end of one full scan of the hash array */
-=======
 	for (si = bi ; 0 != usedmap ; (si = (si + 1) % num_buckets), (usedmap >>= 1))
 	{
 		if (0 == (usedmap & 1U))
@@ -177,22 +133,9 @@ void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 			search_bucket->hash = 0;
 			CLEAR_NEIGHBOR(bucket->usedmap, (num_buckets + si - bi) % num_buckets);
 			return;
->>>>>>> 74ea4a3c... GT.M V6.3-006
 		}
 	}
-	assert(bitnum_set);
-	if (bitnum_set)
-	{
-		search_bucket->shrblk = 0;
-		search_bucket->hash = 0;
-		if (MLK_SHRHASH_HIGHBIT > bitnum)
-		{	/* Clear neighbor bit as long as it is within a the valid list of neighbor bits */
-			assert(0 != (bucket->usedmap & (1U << bitnum)));
-			bucket->usedmap &= ~(1U << bitnum);
-		} else
-			assert(bucket->usedmap & (1U << MLK_SHRHASH_HIGHBIT));
-		SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(ctl));
-	}
+	assert(usedmap);
 	return;
 }
 
@@ -207,7 +150,7 @@ void mlk_shrhash_val_build(mlk_shrblk_ptr_t d, uint4 *total_len, hash128_state_t
 {
 	mlk_shrsub_ptr_t	shrsub;
 
-	assertpro(0 != d->value);
+	assert(0 != d->value);
 	if (d->parent)
 		mlk_shrhash_val_build((mlk_shrblk_ptr_t)R2A(d->parent), total_len, hs);
 	shrsub = (mlk_shrsub_ptr_t)R2A(d->value);

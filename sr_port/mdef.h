@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -1429,7 +1429,6 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define MINUTE			60	/* seconds in a minute */
 #define HOUR			3600	/* one hour in seconds 60 * 60 */
 #define ONEDAY			86400	/* seconds in a day */
-<<<<<<< HEAD
 #define MILLISECS_IN_SEC	((int)1E3)	/* millseconds in a second */
 #define MICROSECS_IN_SEC		((int)1E6)	/* microseconds in a second */
 #define MICROSECS_IN_MSEC	((int)1E3)	/* microseconds in a millisecond */
@@ -1440,17 +1439,7 @@ qw_num	gtm_byteswap_64(qw_num num64);
 #define E_9			((int)1E9)
 #define E_18			((long long)1E18)
 
-=======
-#define MILLISECS_IN_SEC	1000	/* millseconds in a second */
-#define MICROSECS_IN_SEC	1000000 /* microseconds in a second */
-#define NANOSECS_IN_SEC		1000000000	/* nanoseconds in a second */
-#define MICROSECS_IN_MSEC	1000	/* microseconds in a millisecond */
-#define NANOSECS_IN_USEC	1000	/* nanoseconds in a microsecond */
-#define E_6			1000000
-#define E_9			1000000000
-#define E_18			1000000000000000000LL
 #define STR_LEN_OF_E_9		10
->>>>>>> 74ea4a3c... GT.M V6.3-006
 #define ASSERT_IN_RANGE(low, x, high)	assert((low <= x) && (x <= high))
 
 #if defined(VMS)

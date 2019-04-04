@@ -225,7 +225,7 @@ void gtm_threadgbl_init(void)
 	TREF(util_outptr) = TREF(util_outbuff_ptr);
 	(TREF(source_buffer)).addr = (char *)aligned_source_buffer;
 	(TREF(source_buffer)).len = MAX_SRCLINE;
-<<<<<<< HEAD
+	(TREF(dollar_ztimeout)).ztimeout_seconds.m[1] = -1000;
 	assert(SIZEOF_ydbmsgprefixbuf >= SIZEOF(DEFAULT_MSGPREFIX));
 	(TREF(ydbmsgprefix)).addr = TADR(ydbmsgprefixbuf);
 	(TREF(ydbmsgprefix)).len = STR_LIT_LEN(DEFAULT_MSGPREFIX);	/* STR_LIT_LEN does not include terminating null byte */
@@ -233,7 +233,4 @@ void gtm_threadgbl_init(void)
 	(TREF(ydbmsgprefix)).addr[(TREF(ydbmsgprefix)).len] = '\0';	/* need null terminated "fac" in "gtm_getmsg" */
 	/* Point "merrors_ctl" facility name to the ydb_msgprefix env var (default or user-specified value) */
 	merrors_ctl.facname = (TREF(ydbmsgprefix)).addr;
-=======
-	(TREF(dollar_ztimeout)).ztimeout_seconds.m[1] = -1000;
->>>>>>> 74ea4a3c... GT.M V6.3-006
 }

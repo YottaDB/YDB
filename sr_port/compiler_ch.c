@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2013 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 74ea4a3c... GT.M V6.3-006
+ *								*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -58,31 +54,17 @@ CONDITION_HANDLER(compiler_ch)
 		 */
 		run_time = TREF(xecute_literal_parse) = FALSE;
 	}
-<<<<<<< HEAD
-	if (cmd_qlf.qlf & CQ_WARNINGS)
-=======
 	if (CQ_WARNINGS & cmd_qlf.qlf)
->>>>>>> 74ea4a3c... GT.M V6.3-006
 		PRN_ERROR;
 	COMPILE_HASHTAB_CLEANUP;
 	reinit_externs();
 	mstr_native_align = save_mstr_native_align;
-<<<<<<< HEAD
-	if (cg_phase == CGP_MACHINE)
-		drop_object_file();
-	if (cg_phase > CGP_NOSTATE)
-=======
 	if (CGP_MACHINE == cg_phase)
 		drop_object_file();
 	if (CGP_NOSTATE < cg_phase)
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	{
 		if (CGP_RESOLVE > cg_phase)
 			close_source_file();
-<<<<<<< HEAD
-		if (cg_phase < CGP_FINI  &&  (cmd_qlf.qlf & CQ_LIST  ||  cmd_qlf.qlf & CQ_CROSS_REFERENCE))
-			close_list_file();
-=======
 		if ((CGP_FINI > cg_phase)  &&  ((CQ_LIST & cmd_qlf.qlf) || (CQ_CROSS_REFERENCE & cmd_qlf.qlf)))
 			close_list_file();
 	}
@@ -96,7 +78,6 @@ CONDITION_HANDLER(compiler_ch)
 	{
 		indr_stringpool = stringpool;
 		stringpool = rts_stringpool;
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	}
 	UNWIND(NULL, NULL);
 }

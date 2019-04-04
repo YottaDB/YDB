@@ -137,15 +137,8 @@ void init_object_file_name(void)
 	fstr.addr = cmd_qlf.object_file.str.addr;
 	assert(!fstr.len || strlen(fstr.addr) == fstr.len);
 	memset(&pblk, 0, SIZEOF(pblk));
-<<<<<<< HEAD
 	pblk.buffer = (char *)object_file_name;
-	pblk.buff_size = MAX_FBUFF;
-	fstr.len = (MV_DEFINED(&cmd_qlf.object_file) ? cmd_qlf.object_file.str.len : 0);
-	fstr.addr = cmd_qlf.object_file.str.addr;
-=======
-	pblk.buffer = object_file_name;
 	pblk.buff_size = MAX_FN_LEN;
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	rout_len = (int)module_name.len;
 	memcpy(&obj_name[0], module_name.addr, rout_len);
 	memcpy(&obj_name[rout_len], DOTOBJ, SIZEOF(DOTOBJ));    /* Includes null terminator */

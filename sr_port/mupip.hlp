@@ -1178,17 +1178,11 @@
 2 FREEZE
    FREEZE
 
-<<<<<<< HEAD
-   Temporarily suspends (freezes) updates to the database. If you prefer a
-   non-YottaDB utility to perform a backup or reorganization, you might use this
-   facility to provide standalone access to your YottaDB database. You might use
-=======
    Temporarily suspends (freezes) updates to the database after ensuring a
    consistent state between memory and secondary storage, which, with
    -ACCESS_METHOD=BG, means after flushing global buffers. If you prefer a
-   non-GT.M utility to perform a backup or reorganization, you might use this
-   facility to provide standalone access to your GT.M database. You might use
->>>>>>> 74ea4a3c... GT.M V6.3-006
+   non-YottaDB utility to perform a backup or reorganization, you might use this
+   facility to provide standalone access to your YottaDB database. You might use
    MUPIP FREEZE to suspend (and later resume) database updates for creating
    mirrored disk configuration or re-integrating a mirror.
 
@@ -1294,11 +1288,7 @@
        needs to update the file before a FREEZE -OFF.
      o -NOAUTORELEASE causes YottaDB to hold off actions that need to update the
        database file until someone issues a MUPIP FREEZE -OFF.
-<<<<<<< HEAD
-     o -The actions that require YottaDB to write to the database file are:
-=======
-     o The actions that require GT.M to write to the database file are:
->>>>>>> 74ea4a3c... GT.M V6.3-006
+     o The actions that require YottaDB to write to the database file are:
 
           o Insufficient global buffers to hold updates - YottaDB must flush
             buffers to make space to do any additional updates
@@ -1331,13 +1321,8 @@
 
      o ON -NOONLINE, the default, causes the freeze to last until OFF, and
        makes management of the FREEZE straightforward.
-<<<<<<< HEAD
      o ON -ONLINE, causes YottaDB to attempt to minimize the impact of the
-       FREEZE on concurrently updating processesby taking a number of
-=======
-     o ON -ONLINE, causes GT.M to attempt to minimize the impact of the
        FREEZE on concurrently updating processes by taking a number of
->>>>>>> 74ea4a3c... GT.M V6.3-006
        actions, as appropriate:
 
           o Switching journal files to provide maximum space
@@ -3140,15 +3125,9 @@
 3 ACcess_method
    ACcess_method
 
-<<<<<<< HEAD
    Specifies the access method (YottaDB buffering strategy) for storing and
-   retrieving data from the global database file. The format of the
-   ACCESS_METHOD qualifier is:
-=======
-   Specifies the access method (GT.M buffering strategy) for storing and
    retrieving data from the database file. The format of the ACCESS_METHOD
    qualifier is:
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
    -AC[CESS_METHOD]=code
 
@@ -3181,30 +3160,20 @@
 3 DEFER_Allocate
    DEFER_Allocate
 
-<<<<<<< HEAD
-   Provides a mechanism to control YottaDB behavior when subsequently extending
-   existing database files, whether using MUPIP EXTEND or auto-extend. To
-   switch an existing database file so it immediately preallocates all
-   blocks, first use MUPIP SET -NODEFER_ALLOCATE to set the switch in the
-   database file header, followed by MUPIP EXTEND -BLOCKS=n, where n >= 0.
-   Failures to preallocate space produce a PREALLOCATEFAIL error. The format
-   of the DEFER_ALLOCATE qualifier is:
-=======
-   With -DEFER_ALLOCATE, GT.M instructs the file system to create the
+   With -DEFER_ALLOCATE, YottaDB instructs the file system to create the
    database file as a sparse file. Before using -DEFER_ALLOCATE, ensure that
    your underlying file system supports sparse files. By default UNIX file
-   systems, and GT.M, use sparse (or lazy) allocation, which defers actual
+   systems, and YottaDB, use sparse (or lazy) allocation, which defers actual
    allocation until blocks are first written. The format of the
    DEFER_ALLOCATE qualifier is:
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
    -[NO]DEFER_Allocate
 
      o Utilities such as du report typically show lower disk space usage for
-       a database file with -DEFER_ALLOCATE because GT.M instructs the file
+       a database file with -DEFER_ALLOCATE because YottaDB instructs the file
        system to defer disk space allocation to the time when there is an
        actual need. With -NODEFER_ALLOCATE, such utilities report higher disk
-       space usage count as GT.M instructs the file system to preallocate
+       space usage count as YottaDB instructs the file system to preallocate
        disk space without waiting for a need to arise.
      o -DEFER_ALLOCATE makes database file extensions lighter weight.
        However, disk activity may tend towards causing fragmentation.
@@ -3218,17 +3187,11 @@
    Epochtaper
 
    Tries to minimize epoch duration by reducing the number of buffers to
-<<<<<<< HEAD
    flush by YottaDB and the file system (via an fsync()) as the epoch
-   (time-based or due to journal file auto-switch) approaches. The format of
-   the -EPOCHTAPER qualifier is:
-=======
-   flush by GT.M and the file system (via an fsync()) as the epoch
    (time-based or due to journal file auto-switch) approaches. Epoch tapering
    reduces the impact of I/O activity during an epoch event. Application that
    experience high load and/or need to reduce latency may benefit from epoch
    tapering. The format of the -EPOCHTAPER qualifier is:
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
    -[NO]EPOCHTAPER
 
@@ -3531,20 +3494,13 @@
 
    -[NO]STAT[S]
 
-<<<<<<< HEAD
-   At database creation, GDE controls this characteristic, which, by default
-   it specifies as STATS (on). When on, this characteristic causes YottaDB to
-   create a small MM database for the associated region to hold the shared
-   statistics.
-=======
      o At database creation, GDE controls this characteristic, which, by
        default it specifies as STATS (on). When on, this characteristic
-       causes GT.M to create a small MM database for the associated region to
+       causes YottaDB to create a small MM database for the associated region to
        hold the shared statistics.
      o A process disables itself from maintaining the shared statistics when
        it fails to open a statsDB. It does not, however, disable subsequently
        starting processes from maintaining the shared statistics.
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
 3 STDnullcoll
    STDnullcoll
@@ -8575,14 +8531,7 @@
 
    **Note**
 
-<<<<<<< HEAD
    This help file is a concise representation of the revision r1.24 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
-=======
-   This help file is a concise representation of revision V6.3-006 of the
-   UNIX Administration and Operations Guide. To obtain a copy of the current
-   revision, go to www.fis-gtm.com and then click on the User Documentation
-   tab.
->>>>>>> 74ea4a3c... GT.M V6.3-006
 

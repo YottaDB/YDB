@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,13 +16,10 @@
 #ifndef OP_INCLUDED
 #define OP_INCLUDED
 
-<<<<<<< HEAD
 #include "op_tstart.h"	/* for "op_tstart" prototype */
-=======
 #include <rtnhdr.h>	/* Avoid changing a few hundred op_* and other modules to put this first */
 #include "hashtab_int4.h"
 #include "hashtab.h"
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
 #ifdef VMS
 /* Define a TWO-argument VMS_ONLY macro (first argument is empty string but is needed because of the VMS-only , that follows) */

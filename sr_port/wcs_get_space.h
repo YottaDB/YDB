@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2012 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 74ea4a3c... GT.M V6.3-006
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,12 +33,8 @@ typedef struct wcs_conflict_trace_struct
 (																\
 	(															\
 	 (cnl->wc_in_free >= ((int4)(NEEDED) + DB_CSH_RDPOOL_SZ))								\
-<<<<<<< HEAD
-	 DEBUG_ONLY( && !(ydb_white_box_test_case_enabled && (WBTEST_FORCE_WCS_GET_SPACE == ydb_white_box_test_case_number)))	\
-=======
-	 DEBUG_ONLY( && !(gtm_white_box_test_case_enabled && ((WBTEST_FORCE_WCS_GET_SPACE == gtm_white_box_test_case_number)	\
-				 || (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == gtm_white_box_test_case_number))))			\
->>>>>>> 74ea4a3c... GT.M V6.3-006
+	 DEBUG_ONLY( && !(ydb_white_box_test_case_enabled && ((WBTEST_FORCE_WCS_GET_SPACE == ydb_white_box_test_case_number)	\
+				 || (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == ydb_white_box_test_case_number))))			\
 	)															\
 	|| wcs_get_space(REG, (NEEDED) + DB_CSH_RDPOOL_SZ, CR)									\
 )

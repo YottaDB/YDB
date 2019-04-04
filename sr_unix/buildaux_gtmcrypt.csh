@@ -4,7 +4,7 @@
 # Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -103,15 +103,10 @@ else
 endif
 
 source $gtm_tools/set_library_path.csh
-<<<<<<< HEAD
-source $gtm_tools/check_unicode_support.csh
-if (! -e $ydb_dist/utf8) mkdir $ydb_dist/utf8
-=======
 source $gtm_tools/check_utf8_support.csh
 if ("TRUE" == "$is_utf8_support") then
-	if (! -e $gtm_dist/utf8) mkdir $gtm_dist/utf8
+	if (! -e $ydb_dist/utf8) mkdir $ydb_dist/utf8
 endif
->>>>>>> 74ea4a3c... GT.M V6.3-006
 # Build and install all encryption libraries and executables.
 env LC_ALL=$utflocale $make install algo=$algorithm image=$plugin_build_type thirdparty=$encryption_lib
 if ($status) then

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -133,13 +133,8 @@ void	lke_show(void)
 				}
 				/* Prevent any modification of the lock space while we make a local copy of it */
 				if (!nocrit)
-<<<<<<< HEAD
-					GRAB_LOCK_CRIT(csa, reg, was_crit);
-				memcpy((uchar_ptr_t)ctl, (uchar_ptr_t)csa->lock_addrs[0], ls_len);
-=======
 					GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
 				memcpy((uchar_ptr_t)ctl, (uchar_ptr_t)csa->mlkctl, ls_len);
->>>>>>> 74ea4a3c... GT.M V6.3-006
 				assert((ctl->max_blkcnt > 0) && (ctl->max_prccnt > 0) && ((ctl->subtop - ctl->subbase) > 0));
 				pctl2 = pctl;
 				if (MLK_CTL_BLKHASH_EXT == pctl.ctl->blkhash)

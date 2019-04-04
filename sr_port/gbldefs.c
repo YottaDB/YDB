@@ -138,12 +138,9 @@
 #define DEFAULT_ZERROR_STR	"Unprocessed $ZERROR, see $ZSTATUS"
 #define DEFAULT_ZERROR_LEN	(SIZEOF(DEFAULT_ZERROR_STR) - 1)
 #include "gtm_libaio.h"
-<<<<<<< HEAD
 #include "gtcm.h"
 #include "sig_init.h"
-=======
 #include "deferred_events_queue.h"
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
 GBLDEF	gd_region		*db_init_region;
 GBLDEF	sgmnt_data_ptr_t	cs_data;
@@ -478,15 +475,9 @@ GBLDEF	mstr_len_t	sizeof_pat_everything = SIZEOF(pat_everything);
 GBLDEF	uint4		*pattern_typemask;
 GBLDEF	pattern		*pattern_list;
 GBLDEF	pattern		*curr_pattern;
-<<<<<<< HEAD
-/* Unicode related data */
-GBLDEF	boolean_t	gtm_utf8_mode;		/* Is GT.M running with Unicode Character Set; Set only after ICU initialization */
-GBLDEF	boolean_t	is_ydb_chset_utf8;	/* Is ydb_chset environment variable set to UTF8 */
-=======
 /* UTF8 related data */
 GBLDEF	boolean_t	gtm_utf8_mode;		/* Is GT.M running with UTF8 Character Set; Set only after ICU initialization */
-GBLDEF	boolean_t	is_gtm_chset_utf8;	/* Is gtm_chset environment variable set to UTF8 */
->>>>>>> 74ea4a3c... GT.M V6.3-006
+GBLDEF	boolean_t	is_ydb_chset_utf8;	/* Is ydb_chset environment variable set to UTF8 */
 GBLDEF	boolean_t	utf8_patnumeric;	/* Should patcode N match non-ASCII numbers in pattern match ? */
 GBLDEF	boolean_t	badchar_inhibit;	/* Suppress malformed UTF-8 characters by default */
 GBLDEF  MSTR_DEF(dollar_zchset, 1, "M");
@@ -790,15 +781,9 @@ GBLDEF	boolean_t	detail_specified;	/* Set to TRUE if -DETAIL is specified in MUP
 GBLDEF	boolean_t	in_mupip_ftok;		/* Used by an assert in repl_inst_read */
 GBLDEF	uint4		section_offset;		/* Used by PRINT_OFFSET_PREFIX macro in repl_inst_dump.c */
 GBLDEF	uint4		mutex_per_process_init_pid;	/* pid that invoked "mutex_per_process_init" */
-<<<<<<< HEAD
 GBLDEF	boolean_t	ydb_quiet_halt;		/* Suppress FORCEDHALT message */
-#ifdef UNICODE_SUPPORTED
-/* Unicode line terminators.  In addition to the following
-=======
-GBLDEF	boolean_t	gtm_quiet_halt;		/* Suppress FORCEDHALT message */
 #ifdef UTF8_SUPPORTED
 /* UTF8 line terminators.  In addition to the following
->>>>>>> 74ea4a3c... GT.M V6.3-006
  * codepoints, the sequence CR LF is considered a single
  * line terminator.
  */

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,11 +38,8 @@
 #include "min_max.h"
 #include "have_crit.h"
 #include "gtm_malloc.h"		/* for verifyAllocatedStorage */
-<<<<<<< HEAD
 #include "ydb_getenv.h"
-=======
 #include "send_msg.h"
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
 /******************************************************************************
  *
@@ -144,24 +141,17 @@ STATICDEF int		call_table_initialized = 0;
  * 						boolean	int	long	float	double	String	byte[] */
 STATICDEF char		ydb_jtype_chars[] = {	'b',	'i',	'l',	'f',	'd',	'j',	'a',
 						'B',	'I',	'L',	'F',	'D',	'J',	'A' };
-<<<<<<< HEAD
 STATICDEF int		ydb_jtype_start_idx = ydb_jboolean,	/* Value of first ydb_j... type for calculation of table indices. */
 			ydb_jtype_count = ydb_jbyte_array - ydb_jboolean + 1;	/* Number of types supported with Java call-outs. */
 
-STATICFNDCL void	extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t java, boolean_t starred);
-STATICFNDCL int		extarg_getsize(void *src, enum ydb_types typ, mval *dst);
-=======
-STATICDEF int		gtm_jtype_start_idx = gtm_jboolean,	/* Value of first gtm_j... type for calculation of table indices. */
-	  		gtm_jtype_count = gtm_jbyte_array - gtm_jboolean + 1;	/* Number of types supported with Java call-outs. */
-STATICFNDCL void	extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t java, boolean_t starred,
+STATICFNDCL void	extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t java, boolean_t starred,
 				int prealloc_size, char *m_label, gparam_list *ext_buff_start, int4 ext_buff_len);
-STATICFNDCL int		extarg_getsize(void *src, enum gtm_types typ, mval *dst, struct extcall_entry_list *entry_ptr);
->>>>>>> 74ea4a3c... GT.M V6.3-006
+STATICFNDCL int		extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct extcall_entry_list *entry_ptr);
 STATICFNDCL void	op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, int4 entry_argcnt,
 				struct extcall_package_list *package_ptr, struct extcall_entry_list *entry_ptr, va_list var);
 STATICFNDCL gparam_list	*set_up_buffer(char *p_list, int len);
 STATICFNDCL void	verify_buffer(char *p_list, int len, char *m_label);
-STATICFNDCL void	free_return_type(INTPTR_T ret_val, enum gtm_types typ);
+STATICFNDCL void	free_return_type(INTPTR_T ret_val, enum ydb_types typ);
 
 static const int buff_boarder_len = 7;
 static const char *buff_front_boarder = "SMARKER";
@@ -185,70 +175,66 @@ STATICFNDCL void verify_buffer(char *p_list, int len, char *m_label)
 	}
 }
 
-STATICFNDCL void free_return_type(INTPTR_T ret_val, enum gtm_types typ)
+STATICFNDCL void free_return_type(INTPTR_T ret_val, enum ydb_types typ)
 {
 	switch (typ)
 	{
-		case gtm_jstring:
-		case gtm_jbyte_array:
+		case ydb_jstring:
+		case ydb_jbyte_array:
 			free((struct extcall_string *)ret_val);
 			break;
-		case gtm_notfound:
-		case gtm_void:
-		case gtm_status:
-		case gtm_int:
-		case gtm_uint:
-		case gtm_long:
-		case gtm_ulong:
-		case gtm_float:
-		case gtm_double:
-		case gtm_pointertofunc:
-		case gtm_pointertofunc_star:
-		case gtm_jboolean:
-		case gtm_jint:
-		case gtm_jlong:
-		case gtm_jfloat:
-		case gtm_jdouble:
-		case gtm_jbig_decimal:
+		case ydb_notfound:
+		case ydb_void:
+		case ydb_status:
+		case ydb_int:
+		case ydb_uint:
+		case ydb_long:
+		case ydb_ulong:
+		case ydb_float:
+		case ydb_double:
+		case ydb_pointertofunc:
+		case ydb_pointertofunc_star:
+		case ydb_jboolean:
+		case ydb_jint:
+		case ydb_jlong:
+		case ydb_jfloat:
+		case ydb_jdouble:
+		case ydb_jbig_decimal:
 			break;
-		case gtm_string_star:
-			free((((gtm_string_t *)ret_val)->address));
-			free(((gtm_string_t *)ret_val));
+		case ydb_string_star:
+			free((((ydb_string_t *)ret_val)->address));
+			free(((ydb_string_t *)ret_val));
 			break;
-		case gtm_float_star:
-			free(((gtm_float_t *)ret_val));
+		case ydb_float_star:
+			free(((ydb_float_t *)ret_val));
 			break;
-		case gtm_double_star:
-			free(((gtm_double_t *)ret_val));
+		case ydb_double_star:
+			free(((ydb_double_t *)ret_val));
 			break;
-		case gtm_int_star:
-			free(((gtm_int_t *)ret_val));
+		case ydb_int_star:
+			free(((ydb_int_t *)ret_val));
 			break;
-		case gtm_uint_star:
-			free(((gtm_uint_t *)ret_val));
+		case ydb_uint_star:
+			free(((ydb_uint_t *)ret_val));
 			break;
-		case gtm_long_star:
-			free(((gtm_long_t *)ret_val));
+		case ydb_long_star:
+			free(((ydb_long_t *)ret_val));
 			break;
-		case gtm_ulong_star:
-			free(((gtm_ulong_t *)ret_val));
+		case ydb_ulong_star:
+			free(((ydb_ulong_t *)ret_val));
 			break;
-		case gtm_char_star:
-			free(((gtm_char_t *)ret_val));
+		case ydb_char_star:
+			free(((ydb_char_t *)ret_val));
 			break;
-		case gtm_char_starstar:
-			free(*((gtm_char_t **)ret_val));
-			free(((gtm_char_t **)ret_val));
+		case ydb_char_starstar:
+			free(*((ydb_char_t **)ret_val));
+			free(((ydb_char_t **)ret_val));
 			break;
 	}
 }
 /* Routine to convert external return values to mval's */
-<<<<<<< HEAD
-STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t java, boolean_t starred)
-=======
-STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t java, boolean_t starred,
+STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t java, boolean_t starred,
 	int prealloc_size, char *m_label, gparam_list *ext_buff_start, int4 ext_buff_len)
->>>>>>> 74ea4a3c... GT.M V6.3-006
 {
 	ydb_int_t		s_int_num;
 	ydb_long_t		str_len, s_long_num;
@@ -406,12 +392,8 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 			if (!src)
 				dst->mvtype = 0;
 			else
-<<<<<<< HEAD
-				extarg2mval(*((char **)src), ydb_char_star, dst, java, starred);
-=======
-				extarg2mval(*((char **)src), gtm_char_star, dst, java, starred, prealloc_size, m_label,
-						ext_buff_start, ext_buff_len);
->>>>>>> 74ea4a3c... GT.M V6.3-006
+				extarg2mval(*((char **)src), ydb_char_star, dst, java, starred,
+						prealloc_size, m_label, ext_buff_start, ext_buff_len);
 			break;
 		case ydb_double_star:
 			double2mval(dst, *((double *)src));
@@ -424,29 +406,25 @@ STATICFNDEF void extarg2mval(void *src, enum gtm_types typ, mval *dst, boolean_t
 }
 
 /* Subroutine to calculate stringpool requirements for an external argument */
-<<<<<<< HEAD
-STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst)
-=======
-STATICFNDEF int extarg_getsize(void *src, enum gtm_types typ, mval *dst, struct extcall_entry_list *entry_ptr)
->>>>>>> 74ea4a3c... GT.M V6.3-006
+STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct extcall_entry_list *entry_ptr)
 {
 	char			*cp, **cpp;
 	struct extcall_string	*sp;
 	if (!src)
 		switch (typ)
 		{
-			case gtm_notfound:
-			case gtm_void:
-			case gtm_status:
-			case gtm_int:
-			case gtm_uint:
-			case gtm_long:
-			case gtm_ulong:
-			case gtm_jboolean:
-			case gtm_jint:
-			case gtm_jlong:
-			case gtm_jfloat:
-			case gtm_jdouble:
+			case ydb_notfound:
+			case ydb_void:
+			case ydb_status:
+			case ydb_int:
+			case ydb_uint:
+			case ydb_long:
+			case ydb_ulong:
+			case ydb_jboolean:
+			case ydb_jint:
+			case ydb_jlong:
+			case ydb_jfloat:
+			case ydb_jdouble:
 				return 0;
 			default:
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_XCRETNULLREF, 2,
@@ -476,19 +454,11 @@ STATICFNDEF int extarg_getsize(void *src, enum gtm_types typ, mval *dst, struct 
 			return 0;
 		case ydb_char_starstar:
 			cpp = (char **)src;
-<<<<<<< HEAD
-			if (*cpp)
-				return STRLEN(*cpp);
-			else
-				return 0;
-		case ydb_char_star:
-=======
 			if (!(*cpp))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_XCRETNULLREF, 2,
 					LEN_AND_STR(entry_ptr->call_name.addr));
 			return STRLEN(*cpp);
-		case gtm_char_star:
->>>>>>> 74ea4a3c... GT.M V6.3-006
+		case ydb_char_star:
 			cp = (char *)src;
 			return STRLEN(cp);
 		case ydb_jstring:
@@ -565,16 +535,16 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 			case ydb_jlong:
 				*types_descr_dptr = 'l';
 				break;
-			case gtm_jfloat:
+			case ydb_jfloat:
 				*types_descr_dptr = 'b';
 				break;
-			case gtm_jdouble:
+			case ydb_jdouble:
 				*types_descr_dptr = 'd';
 				break;
-			case gtm_jstring:
+			case ydb_jstring:
 				*types_descr_dptr = 'j';
 				break;
-			case gtm_jbyte_array:
+			case ydb_jbyte_array:
 				*types_descr_dptr = 'a';
 				break;
 			default:
@@ -764,22 +734,14 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	verifyAllocatedStorage();		/* GTM-8669 verify that argument placement did not trash allocated memory */
 #endif
 	save_mumps_status = mumps_status; 	/* Save mumps_status as a callin from external call may change it. */
-<<<<<<< HEAD
 	save_in_ext_call = TREF(in_ext_call);
-	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);		/* Expected for DEFERRED_SIGNAL_HANDLING_CHECK below */
+	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);	/* Expected for DEFERRED_SIGNAL_HANDLING_CHECK below */
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	TREF(in_ext_call) = save_in_ext_call;
 	if (!save_in_ext_call)
-		DEFERRED_SIGNAL_HANDLING_CHECK;					/* Check for deferred wcs_stale() timer */
-=======
-	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);	/* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
-	TREF(in_ext_call) = TRUE;
-	status = callg((callgfnptr)entry_ptr->fcn, param_list);
-	TREF(in_ext_call) = FALSE;
-	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
+		check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	verify_buffer((char *)param_list, n, entry_ptr->entry_name.addr);
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	mumps_status = save_mumps_status;
 	/* The first byte of the type description argument gets set to 0xFF in case error happened in JNI glue code,
 	 * so check for that and act accordingly.
@@ -818,11 +780,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 		}
 		va_end(var);
 		if (dst)
-<<<<<<< HEAD
-			n += extarg_getsize((void *)&status, ydb_status, dst);
-=======
 			n += extarg_getsize((void *)status, entry_ptr->return_type, dst, entry_ptr);
->>>>>>> 74ea4a3c... GT.M V6.3-006
 		ENSURE_STP_FREE_SPACE(n);
 		/* Convert return values. */
 		for (i = 0, j = 1, m1 = mask & entry_ptr->output_mask; i < argcnt; j++)
@@ -839,14 +797,9 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 		va_end(var_copy);
 		if (dst)
 		{
-<<<<<<< HEAD
 			if (entry_ptr->return_type != ydb_void)
-				extarg2mval((void *)status, entry_ptr->return_type, dst, TRUE, FALSE);
-=======
-			if (entry_ptr->return_type != gtm_void)
-				extarg2mval((void *)status, entry_ptr->return_type, dst, TRUE, FALSE, -1,
-						entry_ptr->entry_name.addr, param_list, call_buff_size);
->>>>>>> 74ea4a3c... GT.M V6.3-006
+				extarg2mval((void *)status, entry_ptr->return_type, dst, TRUE, FALSE,
+						-1, entry_ptr->entry_name.addr, param_list, call_buff_size);
 			else
 			{
 				if (package->str.len)
@@ -987,16 +940,11 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	 * ydb_string_t *) the value in param_list is always a pointer inside the space buffer, where a pointer to an area inside
 	 * the string buffer is stored.
 	 */
-<<<<<<< HEAD
-	param_list = (gparam_list *)malloc(n * 2);
-	free_space_pointer = (ydb_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
-=======
-	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the proctection tags*/
+	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the protection tags*/
 	call_buff_size = 2*n;
 	char param_list_buff[(call_buff_size + 2*buff_boarder_len)];
 	param_list = set_up_buffer(param_list_buff, 2*n);
-	free_space_pointer = (gtm_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
->>>>>>> 74ea4a3c... GT.M V6.3-006
+	free_space_pointer = (ydb_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
 	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
 	/* Load-up the parameter list */
 	VAR_START(var, argcnt);
@@ -1163,25 +1111,16 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	va_end(var);
 	param_list->n = argcnt;
 	save_mumps_status = mumps_status; /* Save mumps_status as a callin from external call may change it */
-<<<<<<< HEAD
 	save_in_ext_call = TREF(in_ext_call);
+	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);
 	TREF(in_ext_call) = TRUE;
 	status = callg((callgfnptr)entry_ptr->fcn, param_list);
 	TREF(in_ext_call) = save_in_ext_call;
 	is_tpretry = (ERR_TPRETRY == mumps_status);	/* note down whether the callg invocation had a TPRETRY error code */
 	mumps_status = save_mumps_status;
-
-	/* Exit from the residual call-in environment(SFT_CI base frame) which might
-=======
-	assert(INTRPT_OK_TO_INTERRUPT == intrpt_ok_state);              /* Expected for DEFERRED_EXIT_HANDLING_CHECK below */
-	TREF(in_ext_call) = TRUE;
-	status = callg((callgfnptr)entry_ptr->fcn, param_list);
-	TREF(in_ext_call) = FALSE;
 	check_for_timer_pops(!entry_ptr->ext_call_behaviors[SIGSAFE]);
 	verify_buffer((char *)param_list, (2*n), entry_ptr->entry_name.addr);
-	mumps_status = save_mumps_status;
-	/* Exit from the residual call-in environment(SFF_CI and base frames) which might
->>>>>>> 74ea4a3c... GT.M V6.3-006
+	/* Exit from the residual call-in environment(SFT_CI base frame) which might
 	 * still exist on M stack when the externally called function in turn called
 	 * into an M routine.
 	 */
@@ -1199,11 +1138,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	}
 	va_end(var);
 	if (dst)
-<<<<<<< HEAD
-		n += extarg_getsize((void *)&status, ydb_status, dst);
-=======
 		n += extarg_getsize((void *)status, entry_ptr->return_type, dst, entry_ptr);
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	ENSURE_STP_FREE_SPACE(n);
 	/* Convert return values */
 	VAR_START(var, argcnt);
@@ -1217,14 +1152,9 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	va_end(var);
 	if (dst)
 	{
-<<<<<<< HEAD
 		if (entry_ptr->return_type != ydb_void)
-			extarg2mval((void *)status, entry_ptr->return_type, dst, FALSE, FALSE);
-=======
-		if (entry_ptr->return_type != gtm_void)
 			extarg2mval((void *)status, entry_ptr->return_type, dst, FALSE, FALSE, -1, entry_ptr->entry_name.addr,
 					param_list, call_buff_size);
->>>>>>> 74ea4a3c... GT.M V6.3-006
 		else
 		{
 			if (package->str.len)
@@ -1236,9 +1166,7 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				  LEN_AND_STR(entry_ptr->call_name.addr), LEN_AND_STR(xtrnl_table_name));
 		}
 	}
-<<<<<<< HEAD
-	free(param_list);
-	check_for_timer_pops();
+	free_return_type(status, entry_ptr->return_type);
 	if (is_tpretry)
 	{	/* A TPRETRY error code occurred inside the "callg" invocation.
 		 * Now that all cleanup (free of param_list etc.) has happened,
@@ -1246,8 +1174,5 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 		 */
 		INVOKE_RESTART;
 	}
-=======
-	free_return_type(status, entry_ptr->return_type);
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	return;
 }

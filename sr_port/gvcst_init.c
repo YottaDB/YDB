@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -174,12 +174,6 @@ GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	uint4			process_id;
-<<<<<<< HEAD
-=======
-
-LITREF char			gtm_release_name[];
-LITREF int4			gtm_release_name_len;
->>>>>>> 74ea4a3c... GT.M V6.3-006
 LITREF mval			literal_statsDB_gblname;
 
 #define MAX_DBINIT_RETRY	3
@@ -452,14 +446,8 @@ void gvcst_init(gd_region *reg)
 			assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state);	/* relied upon by ENABLE_INTERRUPTS
 										 * in "gvcst_init_autoDB_ch".
 										 */
-<<<<<<< HEAD
-			ESTABLISH(gvcst_init_autoDB_ch);
 			if (!ftok_sem_lock(baseDBreg, IMMEDIATE_FALSE))
-			{
-=======
-			if (!ftok_sem_lock(baseDBreg, FALSE))
 			{	/* Use FTOK of the base db as a lock, the same lock obtained when statsdb is auto deleted */
->>>>>>> 74ea4a3c... GT.M V6.3-006
 				assert(FALSE);
 				rts_error_csa(CSA_ARG(baseDBcsa) VARLSTCNT(4) ERR_DBFILERR, 2, DB_LEN_STR(baseDBreg));
 			}
@@ -945,15 +933,10 @@ void gvcst_init(gd_region *reg)
 		csa->persistent_freeze = FALSE;	/* want secshr_db_clnup() to clear an incomplete freeze/unfreeze codepath */
 		csa->regcnt = 1;	/* At this point, only one region points to this csa */
 		csa->db_addrs[0] = csa->db_addrs[1] = NULL;
-<<<<<<< HEAD
-		csa->lock_addrs[0] = csa->lock_addrs[1] = NULL;
-		csa->gd_ptr = owning_gd;
-=======
 		csa->mlkctl = NULL;
 		csa->mlkctl_len = 0;
 		csa->mlkhash = NULL;
-		csa->gd_ptr = addr ? addr : gd_header;
->>>>>>> 74ea4a3c... GT.M V6.3-006
+		csa->gd_ptr = owning_gd;
 		if (csa->gd_ptr)
 			csa->gd_instinfo = csa->gd_ptr->instinfo;
 		/* Note: REPL_ALLOWED(csa) is usable below since "dbfilopn" has special code set csa->repl_state

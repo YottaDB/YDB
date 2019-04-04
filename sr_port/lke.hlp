@@ -372,20 +372,14 @@
      o By default, SHOW displays -A[LL].
      o The SHOW command reports active LOCKs. Information includes the LOCK
        resource name and the process identification (PID) of the LOCK owner.
-<<<<<<< HEAD
-     o LKE SHOW displays lock space usage with a message in the form of:
-       "%YDB-I-LOCKSPACEUSE, Estimated free lock space: xxx% of pppp pages."
-       If the lock space is full, it also displays a LOCKSPACEFULL error.
-=======
      o All invocations of LKE SHOW include utilization information, in the
        form of available/total space, about shared subscript data space
        related to LOCK commands. This information appears as a message of the
-       form: %GTM-I-LOCKSPACEINFO, Region: <region_name>: processes on queue:
+       form: %YDB-I-LOCKSPACEINFO, Region: <region_name>: processes on queue:
        0/160; LOCK slots in use: lll/120; SUBSCRIPT slot bytes in use:
        ssss/5052. Additionally, LKE SHOW also displays a LOCKSPACEUSE
        message. If the lock space is full, LKE SHOW also displays a
        LOCKSPACEFULL error.
->>>>>>> 74ea4a3c... GT.M V6.3-006
      o A LOCK command which finds no room in LOCK_SPACE to queue a waiting
        LOCK, does a slow poll waiting for LOCK_SPACE to become available. If
        LOCK does not acquire the ownership of the named resource with the
@@ -403,7 +397,7 @@
        first 15 characters) and clientPID. The client PID (CLNTPID) is a
        decimal value in UNIX.
 
-       For example, %GTM-I-LOCKSPACEUSE, Estimated free lock space: 50% of 40
+       For example, %YDB-I-LOCKSPACEUSE, Estimated free lock space: 50% of 40
        pages shows the amount of free space along with the number of pages
        configured for lock space
 
@@ -658,14 +652,7 @@
 
    **Note**
 
-<<<<<<< HEAD
    This help file is a concise representation of the revision r1.24 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
-=======
-   This help file is a concise representation of revision V6.3-006 of the
-   UNIX Administration and Operations Guide. To obtain a copy of the current
-   revision, go to www.fis-gtm.com and then click on the User Documentation
-   tab.
->>>>>>> 74ea4a3c... GT.M V6.3-006
 

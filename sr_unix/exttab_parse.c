@@ -38,12 +38,7 @@
 #include "gtm_limits.h"
 #include "restrict.h"
 
-<<<<<<< HEAD
 GBLREF	char 			ydb_dist[YDB_PATH_MAX];
-=======
-GBLREF  volatile boolean_t      timer_in_handler;
-GBLREF	char 			gtm_dist[GTM_PATH_MAX];
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
 #define	CR			0x0A		/* Carriage return */
 #define	NUM_TABS_FOR_GTMERRSTR	2

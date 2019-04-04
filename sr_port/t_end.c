@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -651,7 +651,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 		if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL))
 			/* only reason we currently know why wcs_get_space could fail */
-			assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
+			assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
 		assert(tmp_jnlpool == jnlpool);
 		for (;;)
 		{
@@ -817,14 +817,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	/* in crit, ensure cache-space is available. the out-of-crit check done above might not have been enough */
 	DEBUG_ONLY(tmp_jnlpool = jnlpool;)
 	if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL))
-	{
-<<<<<<< HEAD
-		assert(cnl->wc_blocked);	/* only reason we currently know why wcs_get_space could fail */
-		assert(ydb_white_box_test_case_enabled);
-=======
-		/* only reason we currently know why wcs_get_space could fail */
-		assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
->>>>>>> 74ea4a3c... GT.M V6.3-006
+	{	/* only reason we currently know why wcs_get_space could fail */
+		assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
 		SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 		BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_hist);
 		SET_CACHE_FAIL_STATUS(status, csd);

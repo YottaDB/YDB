@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,15 +32,9 @@ enum
 enum
 {
 	FNERR_NOERR = 0,			/* No error recorded */
-<<<<<<< HEAD
-	FNERR_NOSTATS,				/* BaseDB has NOSTATS set - (should never happen) */
+	FNERR_NOSTATS,				/* BaseDB has NOSTATS set */
 	FNERR_STATSDIR_TRNFAIL,			/* Unable to translate $ydb_statsdir (should never happen) */
 	FNERR_STATSDIR_TRN2LONG,		/* Translation of $ydb_statsdir too long (should never happen) */
-=======
-	FNERR_NOSTATS,				/* BaseDB has NOSTATS set */
-	FNERR_STATSDIR_TRNFAIL,			/* Unable to translate $gtm_statsdir (should never happen) */
-	FNERR_STATSDIR_TRN2LONG,		/* Translation of $gtm_statsdir too long (should never happen) */
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	FNERR_INV_BASEDBFN,			/* BaseDBfn had no '/' making parse fail (should never happen) */
 	FNERR_FTOK_FAIL,			/* The STAT() in gtm_ftok() failed (no rc) (should never hapen) */
 	FNERR_FNAMEBUF_OVERFLOW			/* Not enough space to add the statsdb fname to fname buffer */

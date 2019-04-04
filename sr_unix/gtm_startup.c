@@ -151,22 +151,13 @@ void gtm_startup(struct startup_vector *svec)
 	 * while in UNIX, it's all done with environment variables
 	 * hence, various references to data copied from *svec could profitably be referenced directly
 	 */
-<<<<<<< HEAD
 	char			*temp;
 	mstr			log_name;
 	stack_frame 		*frame_pointer_lcl;
 	static char 		other_mode_buf[] = "OTHER";
-	void			gtm_ret_code();
 	char			*ptr;
 	int			i, status;
-	pthread_mutexattr_t	mattr;
 	mval			noiso_lit, gbllist;
-=======
-	char		*temp;
-	mstr		log_name;
-	stack_frame 	*frame_pointer_lcl;
-	static char 	other_mode_buf[] = "OTHER";
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -360,15 +351,9 @@ void gtm_utf8_init(void)
 	{	/* We are in UTF8 mode - allocate desired UTF8 parse cache and initialize it. This is effectively a 2 dimensional
 		 * structure where both dimensions are variable.
 		 */
-<<<<<<< HEAD
-#       	ifdef UNICODE_SUPPORTED
+#       	ifdef UTF8_SUPPORTED
 		utfcgr_size = OFFSETOF(utfcgr, entry) + (SIZEOF(utfcgr_entry) * TREF(ydb_utfcgr_string_groups));
 		alloc_size = utfcgr_size * TREF(ydb_utfcgr_strings);
-=======
-#       	ifdef UTF8_SUPPORTED
-		utfcgr_size = OFFSETOF(utfcgr, entry) + (SIZEOF(utfcgr_entry) * TREF(gtm_utfcgr_string_groups));
-		alloc_size = utfcgr_size * TREF(gtm_utfcgr_strings);
->>>>>>> 74ea4a3c... GT.M V6.3-006
 		(TREF(utfcgra)).utfcgrs = utfcgrp = (utfcgr *)malloc(alloc_size);
 		memset((char *)utfcgrp, 0, alloc_size);			/* Init to zeros */
 		for (i = 0, p = utfcgrp; TREF(ydb_utfcgr_strings) > i; i++, p = (utfcgr *)((INTPTR_T)p + utfcgr_size))
@@ -379,12 +364,7 @@ void gtm_utf8_init(void)
 		/* Pointer to the last usable utfcgr struct */
 		(TREF(utfcgra)).utfcgrmax = (utfcgr *)((UINTPTR_T)utfcgrp + ((TREF(ydb_utfcgr_strings) - 1) * utfcgr_size));
 		/* Spins to find non-(recently)-referenced cache slot before we overwrite an entry */
-<<<<<<< HEAD
 		TREF(utfcgr_string_lookmax) = TREF(ydb_utfcgr_strings) / UTFCGR_MAXLOOK_DIVISOR;
-#		endif /* UNICODE_SUPPORTED */
-=======
-		TREF(utfcgr_string_lookmax) = TREF(gtm_utfcgr_strings) / UTFCGR_MAXLOOK_DIVISOR;
 #		endif /* UTF8_SUPPORTED */
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	}
 }

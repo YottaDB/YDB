@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -319,13 +319,10 @@ XFER(xf_currhd, op_currhd),
 #endif
 XFER(xf_fnzcollate, op_fnzcollate),
 XFER(xf_fnzatransform, op_fnzatransform),
-<<<<<<< HEAD
+XFER(xf_fnztranslate_fast, op_fnztranslate_fast),
+XFER(xf_fntranslate_fast, op_fntranslate_fast),
 XFER(xf_fnreversequery, op_fnreversequery),
 XFER(xf_gvreversequery, op_gvreversequery),
 XFER(xf_fnq2, op_fnq2),
 XFER(xf_gvq2, op_gvq2),
 XFER(xf_indq2, op_indq2)
-=======
-XFER(xf_fnztranslate_fast, op_fnztranslate_fast),
-XFER(xf_fntranslate_fast, op_fntranslate_fast)
->>>>>>> 74ea4a3c... GT.M V6.3-006

@@ -3,7 +3,7 @@
 ; Copyright (c) 1987-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -12,7 +12,7 @@
 ;	the license, please stop and do not read further.	;
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%OD	;GT.M %OD utility - octal to decimal conversion program
+%OD	;YottaDB %OD utility - octal to decimal conversion program
 	;invoke at INT with %OD in octal to return %OD in decimal
 	;invoke at FUNC as an extrinsic function
 	;if you make heavy use of this routine, consider $ZCALL
@@ -27,10 +27,6 @@ FUNCFM(o)
 	f dg=1:1:$l(o) s d=d*8+$e(o,dg)
 	q d
 FUNC(o)
-<<<<<<< HEAD
 	q:"-"=$ze(o,1) ""
-=======
-	q:o<0 ""
 	q:$l(o)<19 $$FUNCFM(o)
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	q $$CONVERTBASE^%CONVBASEUTIL(o,8,10)

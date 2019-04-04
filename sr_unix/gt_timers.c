@@ -841,21 +841,12 @@ void timer_handler(int why, siginfo_t *info, void *context)
 					 * Otherwise, a hung unsafe timer could cause a subsequent safe timer to be overdue.
 					 */
 					rel_time = sub_abs_time(&at, &old_at);
-<<<<<<< HEAD
 					late_time.tv_sec += rel_time.tv_sec;
 					late_time.tv_nsec += rel_time.tv_nsec;
 					if (late_time.tv_nsec > NANOSECS_IN_SEC)
 					{
 						late_time.tv_sec++;
 						late_time.tv_nsec -= NANOSECS_IN_SEC;
-=======
-					late_time.at_sec += rel_time.at_sec;
-					late_time.at_usec += rel_time.at_usec;
-					if (late_time.at_usec > MICROSECS_IN_SEC)
-					{
-						late_time.at_sec++;
-						late_time.at_usec -= MICROSECS_IN_SEC;
->>>>>>> 74ea4a3c... GT.M V6.3-006
 					}
 #					endif
 				}
@@ -1225,16 +1216,13 @@ void check_for_timer_pops(boolean_t sig_handler_changed)
 	int			rc, stolenwhen = 0;		/* 0 = no, 1 = not first, 2 = first time */
 	sigset_t 		savemask;
 	struct sigaction 	current_sa;
+
 	if (sig_handler_changed)
 	{
-<<<<<<< HEAD
-		if ((sighandler_t)timer_handler != current_sa.sa_handler)	/* check if what we expected */
-=======
 		sigaction(SIGALRM, NULL, &current_sa);	/* get current info */
 		if (!first_timeset)
->>>>>>> 74ea4a3c... GT.M V6.3-006
 		{
-			if (timer_handler != current_sa.sa_handler)	/* check if what we expected */
+			if ((sighandler_t)timer_handler != current_sa.sa_handler)	/* check if what we expected */
 			{
 				init_timers();
 				if (!stolen_timer)
@@ -1257,15 +1245,7 @@ void check_for_timer_pops(boolean_t sig_handler_changed)
 		}
 	}
 	if (timeroot && (1 > timer_stack_count))
-	{
-<<<<<<< HEAD
-		DEBUG_ONLY(STAPI_FAKE_TIMER_HANDLER_WAS_DEFERRED);
-		timer_handler(DUMMY_SIG_NUM, NULL, NULL);
-=======
-		DEFERRED_EXIT_HANDLING_CHECK;                                   /* Check for deferred wcs_stale() timer */
-
->>>>>>> 74ea4a3c... GT.M V6.3-006
-	}
+		DEFERRED_SIGNAL_HANDLING_CHECK;
 	if (stolenwhen)
 	{
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_handler,

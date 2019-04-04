@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1207,11 +1207,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 		return(FALSE);
 	}
-<<<<<<< HEAD
-#	ifdef UNICODE_SUPPORTED
-=======
-#ifdef UTF8_SUPPORTED
->>>>>>> 74ea4a3c... GT.M V6.3-006
+#	ifdef UTF8_SUPPORTED
 	if (utf8_active)
 	{
 		outptr = buffer_start;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,19 +79,11 @@
 #include "alias.h"
 #include "create_fatal_error_zshow_dmp.h"
 #include "have_crit.h"
-<<<<<<< HEAD
 #include "invocation_mode.h"
 #include "iormdef.h"
 #include "ftok_sems.h"
 #include "gtm_putmsg_list.h"
-=======
 #include "ztimeout_routines.h"
-#ifdef UNIX
-# include "iormdef.h"
-# include "ftok_sems.h"
-# include "gtm_putmsg_list.h"
-#endif
->>>>>>> 74ea4a3c... GT.M V6.3-006
 #ifdef GTM_TRIGGER
 # include "gv_trigger.h"
 # include "gtm_trigger.h"
@@ -171,11 +163,7 @@ error_def(ERR_TPSTACKCRIT);
 error_def(ERR_TPSTACKOFLOW);
 error_def(ERR_TPTIMEOUT);
 error_def(ERR_UNSOLCNTERR);
-<<<<<<< HEAD
-=======
-error_def(ERR_VMSMEMORY);
 error_def(ERR_ZTIMEOUT);
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
 boolean_t clean_mum_tstart(void);
 

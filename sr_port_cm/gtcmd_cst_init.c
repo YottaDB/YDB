@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,12 +29,11 @@
 #include "gtcmd.h"
 #include "targ_alloc.h"
 #include "dpgbldir.h"
-<<<<<<< HEAD
 #include "gvcst_protos.h"		/* for "gvcst_init" */
-=======
+#ifdef DEBUG
 #include "mlkdef.h"
 #include "mlk_ops.h"
->>>>>>> 74ea4a3c... GT.M V6.3-006
+#endif
 
 GBLREF int4		gv_keysize;
 GBLREF gv_key		*gv_currkey;

@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
-=======
- * Copyright (c) 2001-2018 Fidelity National Information	*
- * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 74ea4a3c... GT.M V6.3-006
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,12 +23,7 @@
 #include "mmemory.h"
 
 GBLREF boolean_t		run_time;
-<<<<<<< HEAD
-GBLREF spdesc			stringpool, rts_stringpool, indr_stringpool;
-GBLREF unsigned char 		source_file_name[];
-=======
 GBLREF char			source_file_name[];
->>>>>>> 74ea4a3c... GT.M V6.3-006
 GBLREF unsigned short		source_name_len;
 GBLREF command_qualifier	cmd_qlf;
 GBLREF char			cg_phase;

@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2018 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -848,15 +848,9 @@ BUFFLUFAILED	<Error flushing buffers from !AD for database file !AD>/error/fao=4
 MUQUALINCOMP	<Incompatible qualifiers - FILE and REGION>/error/fao=0!/ansi=0
 DISTPATHMAX	<Executable path length is greater than maximum (!UL)>/error/fao=1!/ansi=0
 FILEOPENFAIL	<Failed to open file !AD>/error/fao=2!/ansi=0
-<<<<<<< HEAD
 UNUSEDMSG851	<IMAGENAME nixed in r1.20>/error/fao=0!/ansi=0
-GTMSECSHRPERM	<The gtmsecshr module in $ydb_dist does not have the correct permission and uid>/error/fao=0!/ansi=0
+GTMSECSHRPERM	<The gtmsecshr module in $ydb_dist (!AD) does not have the correct permission: !AD, and UID: !UL>/error/fao=5!/ansi=0
 YDBDISTUNDEF	<Environment variable $ydb_dist is not defined>/error/fao=0!/ansi=0
-=======
-IMAGENAME	<The executing module name should be !AD instead of !AD>/error/fao=4!/ansi=0
-GTMSECSHRPERM	<The gtmsecshr module in $gtm_dist (!AD) does not have the correct permission: !AD, and UID: !UL>/error/fao=5!/ansi=0
-GTMDISTUNDEF	<Environment variable $gtm_dist is not defined>/error/fao=0!/ansi=0
->>>>>>> 74ea4a3c... GT.M V6.3-006
 SYSCALL		<Error received from system call !AD -- called from module !AD at line !UL>/error/fao=5!/ansi=0
 MAXGTMPATH	<The executing module path is greater than the maximum !UL>/error/fao=1!/ansi=0
 TROLLBK2DEEP	<Intended rollback(!SL) deeper than the current $tlevel(!UL)>/error/fao=2!/ansi=0

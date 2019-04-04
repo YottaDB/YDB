@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,22 +82,6 @@ typedef struct				/* lock node.  The member descriptions below are correct if th
 
 typedef struct mlk_shrhash_struct
 {
-<<<<<<< HEAD
-	ptroff_t	shrblk;		/* relative pointer to the shrblk referenced by this hash bucket, or zero for empty. */
-	uint4		hash;		/* hash value associated with the shrblk referenced by this hash bucket
-					 * Compare the hash value before comparing the pvtblk value against the
-					 * shrblk/shrsub chain
-					 */
-	uint4		usedmap;	/* Bitmap representing the bucket neighborhood, with bit N set if (bucket+N) % nbuckets
-					 * is an overflow from this bucket (or the bucket itself, for N=0).
-					 * N == MLK_SHRHASH_HIGHBIT is a special case indicating a bucket full situation was
-					 * encountered and so a linear search has to be used when searching.
-					 */
-} mlk_shrhash;
-
-#define MLK_SHRHASH_NEIGHBORS	((SIZEOF(((mlk_shrhash *)0)->usedmap) * BITS_PER_UCHAR) - 1)
-#define	MLK_SHRHASH_HIGHBIT	MLK_SHRHASH_NEIGHBORS
-=======
 	uint4			shrblk_idx;	/* Index to shrblk referenced by this hash bucket, or zero for empty. */
 	mlk_shrhash_map_t	usedmap;	/* Bitmap representing the bucket neighborhood, with bit N set
 						 * if (bucket+N) % nbuckets is associated with this bucket, i.e.,
@@ -117,7 +101,6 @@ typedef struct mlk_shrhash_struct
  * The number of extra buckets is specified as a fraction of the number of shrblks by the following.
  */
 #define MLK_HASH_EXCESS		(1.0/2.0)
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
 typedef struct				/* the subscript value of a single node in a tree.  Stored separately so that
 					 * the mlk_shrblk's can all have fixed positions, and yet we can

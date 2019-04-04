@@ -36,8 +36,8 @@ GBLREF list_params 	lst_param;
 GBLREF mident		module_name;
 GBLREF unsigned short	source_name_len;
 
-LITREF char		gtm_release_name[];
-LITREF int4		gtm_release_name_len;
+LITREF char             ydb_release_name[];
+LITREF int4             ydb_release_name_len;
 LITREF mval		literal_zero;
 
 static char print_time_buf[20];
@@ -129,35 +129,6 @@ void close_list_file(void)
 	io_curr_device = dev_in_use;
 }
 
-<<<<<<< HEAD
-
-void list_cmd(void)
-{
-	unsigned short cmd_len;
-	unsigned char cmd_line[256];
-	static readonly unsigned char command_line[] =		"COMMAND LINE";
-	static readonly unsigned char command_line_under[] =	"-----------------";
-
-/*	if (lib$get_foreign(&d_cmd, 0, &cmd_len) == SS$_NORMAL)
-	{
-		list_line(command_line);
-		list_line(command_line_under);
-		cmd_line[cmd_len]='\0';
-		list_line(cmd_line);
-	}
-*/
-}
-
-
-LITREF char ydb_release_name[];
-LITREF int4 ydb_release_name_len;
-
-GBLREF unsigned char source_file_name[];
-GBLREF unsigned short source_name_len;
-GBLREF char rev_time_buf[];
-
-=======
->>>>>>> 74ea4a3c... GT.M V6.3-006
 void list_head(bool newpage)
 {
 	short col_2 = 70;

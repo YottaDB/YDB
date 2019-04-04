@@ -3,7 +3,7 @@
 # Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -696,17 +696,10 @@ if (-e GTMDefinedTypesInit.m) then
 	# If we have a utf8 dir (created by buildaux.csh called from buildbdp.csh above), add a link to it for
 	# GTMDefinedTypesInit.m and compile it in UTF8 mode
 	source $gtm_tools/set_library_path.csh
-<<<<<<< HEAD
-	source $gtm_tools/check_unicode_support.csh
-	if (-e $ydb_dist/utf8 && ("TRUE" == "$is_unicode_support")) then
-		if (! -e $ydb_dist/utf8/GTMDefinedTypesInit.m) then
-		    ln -s $ydb_dist/GTMDefinedTypesInit.m $ydb_dist/utf8/GTMDefinedTypesInit.m
-=======
 	source $gtm_tools/check_utf8_support.csh
 	if (-e $gtm_dist/utf8 && ("TRUE" == "$is_utf8_support")) then
 		if (! -e $gtm_dist/utf8/GTMDefinedTypesInit.m) then
 		    ln -s $gtm_dist/GTMDefinedTypesInit.m $gtm_dist/utf8/GTMDefinedTypesInit.m
->>>>>>> 74ea4a3c... GT.M V6.3-006
 		endif
 		if (! -e $ydb_dist/utf8/GDEINITSZ.m) then
 		    ln -s $ydb_dist/GDEINITSZ.m $ydb_dist/utf8/GDEINITSZ.m

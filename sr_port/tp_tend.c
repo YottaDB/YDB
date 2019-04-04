@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -389,7 +389,7 @@ boolean_t	tp_tend()
 			 */
 			if (!csa->now_crit && !is_mm && !WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL))
 				/* only reason we currently know why wcs_get_space could fail */
-				assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
+				assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
 			if (JNL_ENABLED(csa))
 			{	/* compute the total journal record size requirements before grab_crit.
 				 * there is code later that will check for state changes from now to then
@@ -706,14 +706,8 @@ boolean_t	tp_tend()
 					 */
 					if (!WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL))
 					{
-<<<<<<< HEAD
-						assert(cnl->wc_blocked);	/* only reason we currently know
-										 * why wcs_get_space could fail */
-						assert(ydb_white_box_test_case_enabled);
-=======
 						/* only reason we currently know why wcs_get_space could fail */
-						assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
->>>>>>> 74ea4a3c... GT.M V6.3-006
+						assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
 						SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
 						BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_wcsgetspace);
 						SET_CACHE_FAIL_STATUS(status, csd);

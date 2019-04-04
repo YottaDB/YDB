@@ -319,14 +319,10 @@ THREADGBLDEF(ydb_autorelink_keeprtn,		boolean_t)			/* do not let go of objects i
 THREADGBLDEF(open_shlib_root,			open_shlib *)			/* Anchor for open shared library list */
 THREADGBLDEF(parm_pool_ptr,			parm_pool *)			/* Pointer to the parameter pool */
 THREADGBLDEF(parms_cnt,                         unsigned int)                   /* Parameters count */
-<<<<<<< HEAD
 THREADGBLDEF(rts_error_depth,			unsigned int)			/* Recursion level of rts_error_csa() */
 THREADGBLDEF(sapi_query_node_subs,		mstr *)				/* -> Array of YDB_MAX_SUBS mstrs holding subs
 										 * .. to return to ydb_node_*_s(). */
 THREADGBLDEF(sapi_query_node_subs_cnt,		int)				/* Count of subs filled in */
-THREADGBLDEF(statsdb_fnerr_reason,		int)				/* Failure code for "gvcst_set_statsdb_fname" */
-=======
->>>>>>> 74ea4a3c... GT.M V6.3-006
 THREADGBLAR1DEF(zpeek_regname,			char,		NAME_ENTRY_SZ)	/* Last $ZPEEK() region specified */
 THREADGBLDEF(zpeek_regname_len,			int)				/* Length of zpeekop_regname */
 THREADGBLDEF(zpeek_reg_ptr,			gd_region *)			/* Resolved pointer for zpeekop_regname */
@@ -382,13 +378,8 @@ THREADGBLAR1DEF(prombuf,			char,	(MAX_MIDENT_LEN + 1))	/* The prompt buffer size
 										 * least 8 UTF8 characters, but since most
 										 * commonly used UTF8 characters only occupy up
 										 * to 3 bytes, the buffer would at least
-<<<<<<< HEAD
-										 * accommodate 10 Unicode characters in a prompt */
-THREADGBLAR1DEF(tmp_object_file_name,		char,	YDB_PATH_MAX)		/* Hold temporary object name across routines */
-=======
 										 * accommodate 10 UTF8 characters in a prompt */
-THREADGBLAR1DEF(tmp_object_file_name,		char,	GTM_PATH_MAX)		/* Hold temporary object name across routines */
->>>>>>> 74ea4a3c... GT.M V6.3-006
+THREADGBLAR1DEF(tmp_object_file_name,		char,	YDB_PATH_MAX)		/* Hold temporary object name across routines */
 THREADGBLAR1DEF(tp_restart_failhist_arry,	char,	FAIL_HIST_ARRAY_SIZE)	/* tp_restart dbg storage of restart history */
 #ifdef UTF8_SUPPORTED
 THREADGBLDEF(utfcgra,				utfcgr_area)			/* Lookaside cache for UTF8 parsing */

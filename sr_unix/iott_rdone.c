@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -532,16 +532,8 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		if ((TT_EDITING & tt_ptr->ext_cap) && !((TRM_PASTHRU|TRM_NOECHO) & mask))
 		{	/* keep above test in sync with iott_readfl */
 			if (!utf8_active)
-<<<<<<< HEAD
 				iott_recall_array_add(tt_ptr, 1, inchar_width, 1, &INPUT_CHAR);
-#			ifdef UNICODE_SUPPORTED
-=======
-			{
-				tt_ptr->recall_buff.addr[0] = INPUT_CHAR;
-				tt_ptr->recall_buff.len = 1;
-			}
 #			ifdef UTF8_SUPPORTED
->>>>>>> 74ea4a3c... GT.M V6.3-006
 			else
 				iott_recall_array_add(tt_ptr, 1, inchar_width, SIZEOF(INPUT_CHAR), &INPUT_CHAR);
 #			endif

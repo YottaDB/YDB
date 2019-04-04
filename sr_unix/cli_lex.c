@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -168,11 +168,7 @@ void	cli_lex_setup (int argc, char **argv)
 	{	/* We have the cure for a missing or unusable buffer */
 		if (cli_lex_in_ptr)
 			free(cli_lex_in_ptr);
-<<<<<<< HEAD
 		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + parmlen + 1);	/* + 1 needed for NULL byte */
-=======
-		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + parmlen + 1);
->>>>>>> 74ea4a3c... GT.M V6.3-006
 		cli_lex_in_ptr->buflen = parmlen;
 	}
 	cli_lex_in_ptr->argc = argc;
@@ -191,11 +187,7 @@ void cli_str_setup(int addrlen, char *addr)
 	{	/* We have the cure for a missing or unusable buffer */
 		if (cli_lex_in_ptr)
 			free(cli_lex_in_ptr);
-<<<<<<< HEAD
 		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + alloclen + 1);	/* + 1 needed for NULL byte */
-=======
-		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + alloclen + 1);
->>>>>>> 74ea4a3c... GT.M V6.3-006
 		cli_lex_in_ptr->buflen = alloclen;
 	}
 	cli_lex_in_ptr->argv = NULL;
@@ -378,15 +370,9 @@ static void cli_lex_in_expand(int in_len)
 
 char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 {
-<<<<<<< HEAD
 	size_t		in_len;
 	char		cli_fgets_buffer[MAX_LINE], *destbuffer, *retptr = NULL;
-#	ifdef UNICODE_SUPPORTED
-=======
-	size_t	in_len;
-	char	cli_fgets_buffer[MAX_LINE], *destbuffer, *retptr;
 #	ifdef UTF8_SUPPORTED
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	int		mbc_len, u16_off, destsize;
 	int32_t		mbc_dest_len;
 	UErrorCode	errorcode;

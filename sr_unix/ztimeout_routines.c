@@ -3,6 +3,9 @@
  * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -75,8 +78,8 @@ GBLREF	int4			outofband;
 GBLREF	sigset_t		blockalrm;
 GBLREF	spdesc			rts_stringpool;
 GBLREF	void			(*ztimeout_clear_ptr)(void);
-GBLREF	boolean_t		gtm_white_box_test_case_enabled;
-GBLREF	int			gtm_white_box_test_case_number;
+GBLREF	boolean_t		ydb_white_box_test_case_enabled;
+GBLREF	int			ydb_white_box_test_case_number;
 
 LITREF	mval			literal_null, literal_minusone;
 
@@ -246,8 +249,8 @@ void ztimeout_expire_now(void)
 	SETUP_THREADGBL_ACCESS;
 	DBGDFRDEVNT((stderr,"Ztimeout expired, setting xfer handlers\n"));
 #ifdef DEBUG
-	if (gtm_white_box_test_case_enabled &&
-				(WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number))
+	if (ydb_white_box_test_case_enabled &&
+				(WBTEST_ZTIMEOUT_TRACE == ydb_white_box_test_case_number))
 	DBGFPF((stderr,"Ztimeout expired, setting xfer handlers\n"));
 #endif
 	TREF(ztimeout_set_xfer) = xfer_set_handlers(outofband_event, &ztimeout_set, 0, FALSE);
@@ -264,8 +267,8 @@ void ztimeout_set(int4 dummy_param)
 		SAVE_XFER_ENTRY(outofband_event, &ztimeout_set, 0);
 		DBGDFRDEVNT((stderr, "ztimeout_set : ZTIMEOUT Deferred\n"));
 #ifdef DEBUG
-	if (gtm_white_box_test_case_enabled &&
-				(WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number))
+	if (ydb_white_box_test_case_enabled &&
+				(WBTEST_ZTIMEOUT_TRACE == ydb_white_box_test_case_number))
 		DBGFPF((stderr, "ztimeout_set : ZTIMEOUT Deferred\n"));
 #endif
 		return;

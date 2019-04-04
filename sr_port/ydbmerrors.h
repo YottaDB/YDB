@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1513,5 +1513,17 @@
 #define ERR_LOADRECCNT 150384339
 #define ERR_COMMFILTERERR 150384346
 #define ERR_NOFILTERNEST 150384354
+#define ERR_MLKHASHTABERR 150384362
+#define ERR_LOCKCRITOWNER 150384371
+#define ERR_MLKHASHWRONG 150384378
+#define ERR_XCRETNULLREF 150384386
+#define ERR_EXTCALLBOUNDS 150384396
+#define ERR_EXCEEDSPREALLOC 150384402
+#define ERR_ZTIMEOUT 150384408
+#define ERR_ERRWZTIMEOUT 150384418
+#define ERR_MLKHASHRESIZE 150384427
+#define ERR_MLKHASHRESIZEFAIL 150384432
+#define ERR_MLKCLEANED 150384443
+#define ERR_NOTMNAME 150384450
 
 #include "ydberrors.h"

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,28 +66,16 @@ MBSTART {											\
 	} while (TRUE);										\
 } MBEND
 
-<<<<<<< HEAD
 # define SLEEP_USEC(MICROSECONDS, RESTART)					\
 MBSTART {									\
 	assert((MICROSECS_IN_SEC > MICROSECONDS) && (0 < MICROSECONDS));	\
-	NANOSLEEP(((MICROSECONDS) * 1000), RESTART);				\
+	NANOSLEEP(((MICROSECONDS) * NANOSECS_IN_USEC), RESTART);		\
 } MBEND
 
 # define NANOSLEEP(NANOSECONDS, RESTART)				\
 MBSTART {								\
 	assert((NANOSECS_IN_SEC > NANOSECONDS) && (0 < NANOSECONDS));	\
 	CLOCK_NANOSLEEP(NANOSECONDS, RESTART);				\
-=======
-#if !defined(_AIX)
-# define SLEEP_USEC(MICROSECONDS, RESTART)						\
-MBSTART {										\
-	NANOSLEEP(((MICROSECONDS) * NANOSECS_IN_USEC), RESTART);			\
-} MBEND
-
-# define NANOSLEEP(NANOSECONDS, RESTART)						\
-MBSTART {										\
-	CLOCK_NANOSLEEP(NANOSECONDS, RESTART);						\
->>>>>>> 74ea4a3c... GT.M V6.3-006
 } MBEND
 
 #endif /* SLEEP_H */

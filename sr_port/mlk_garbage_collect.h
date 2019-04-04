@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -53,7 +56,7 @@ static inline void prepare_for_gc(mlk_pvtctl_ptr_t pctl)
 				died = !is_proc_alive(old_gc, 0);
 		}
 		if (died)
-			COMPSWAP_UNLOCK(&ctl->lock_gc_in_progress, old_gc, 0, LOCK_AVAILABLE, 0);
+			COMPSWAP_UNLOCK(&ctl->lock_gc_in_progress, old_gc, LOCK_AVAILABLE);
 		if((died || old_gc == 0) && GET_SWAPLOCK(&ctl->lock_gc_in_progress))
 			break;
 	}

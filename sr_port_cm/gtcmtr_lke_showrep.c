@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,10 +45,6 @@
 #include "iosp.h"
 #include "gtcm_find_region.h"
 #include "gvcmz.h"
-<<<<<<< HEAD
-=======
-#include "gtm_string.h"
->>>>>>> 74ea4a3c... GT.M V6.3-006
 #include "interlock.h"
 #include "rel_quant.h"
 #include "do_shmat.h"
@@ -80,11 +76,6 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 		ls_len = csa->mlkctl_len;
 		lke_ctl = (mlk_ctldata *)malloc(ls_len);
 		/* Prevent any modification of the lock space while we make a local copy of it */
-<<<<<<< HEAD
-		GRAB_LOCK_CRIT(csa, gv_cur_region, was_crit);
-		memcpy((uchar_ptr_t)lke_ctl, csa->lock_addrs[0], ls_len);
-		REL_LOCK_CRIT(csa, gv_cur_region, was_crit);
-=======
 		pctl.region = cur_region;
 		pctl.csa = csa;
 		pctl.ctl = (mlk_ctldata_ptr_t)pctl.csa->mlkctl;
@@ -94,7 +85,6 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 		pctl2 = pctl;
 		REL_LOCK_CRIT(pctl, was_crit);
 		pctl2.ctl = lke_ctl;
->>>>>>> 74ea4a3c... GT.M V6.3-006
 		util_cm_print(lnk, 0, NULL, RESET);
 		dnode.len = sreq->nodelength;
 		dnode.addr = sreq->node;

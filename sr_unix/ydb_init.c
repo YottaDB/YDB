@@ -31,7 +31,8 @@
 #include "ydb_getenv.h"
 #include "gtmsecshr.h"
 #include "gtm_savetraps.h"
-#ifdef UNICODE_SUPPORTED
+#include "gtm_permissions.h"
+#ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
 # include "gtm_conv.h"
@@ -63,6 +64,7 @@ int ydb_init()
 	int			save_errno;
 	int			status;
 	struct stat		stat_buf;
+	char			file_perm[MAX_PERM_LEN];
 	Dl_info			shlib_info;
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;
@@ -251,7 +253,7 @@ int ydb_init()
 		 * will return through the ESTABLISH_NORET macro above with "error_encountered" set to a non-zero value
 		 * and so it is enough to do the ydb_engine mutex unlock there instead of before each "rts_error_csa" below.
 		 */
-		UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
+		UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 		/* Ensure that $ydb_dist exists */
 		if (NULL == (dist = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
@@ -274,8 +276,12 @@ int ydb_init()
 				      LEN_AND_LIT("stat for $ydb_dist/gtmsecshr"), CALLFROM, errno);
 		/* Ensure that the call-in can execute $ydb_dist/gtmsecshr. This not sufficient for security purposes */
 		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMSECSHRPERM);
-		else
+		{
+			SNPRINTF(file_perm, SIZEOF(file_perm), "%04o", stat_buf.st_mode & PERMALL);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GTMSECSHRPERM, 5,
+					path_len, path,
+					RTS_ERROR_STRING(file_perm), stat_buf.st_uid);
+		} else
 		{	/* $ydb_dist validated */
 			ydb_dist_ok_to_use = TRUE;
 			memcpy(ydb_dist, dist, dist_len);

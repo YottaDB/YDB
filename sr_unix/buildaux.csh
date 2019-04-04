@@ -4,7 +4,7 @@
 # Copyright (c) 2001-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -74,11 +74,7 @@ if ( $buildaux_status ) then
 	exit $buildaux_status
 endif
 
-<<<<<<< HEAD
-set buildaux_auxillaries = "gde dse gtmsecshr lke mupip gtcm_server gtcm_gnp_server gtmcrypt"
-=======
-set buildaux_auxillaries = "gde gtmsecshr dse geteuid lke mupip gtcm_server gtcm_gnp_server gtmcrypt"
->>>>>>> 74ea4a3c... GT.M V6.3-006
+set buildaux_auxillaries = "gde gtmsecshr dse lke mupip gtcm_server gtcm_gnp_server gtmcrypt"
 set buildaux_utilities = "semstat2 ftok gtcm_pkdisp gtcm_shmclean gtcm_play dbcertify"
 set buildaux_executables = "$buildaux_auxillaries $buildaux_utilities"
 set buildaux_validexecutable = 0
@@ -176,11 +172,7 @@ if (! $skip_auxillaries) then
 	endif
 	set double_quote = '"'
 	set args3 = "$gt_image ${double_quote}${gt_ld_options}${double_quote} $3"
-<<<<<<< HEAD
-	set args3exelist = "dse gtmsecshr lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean"
-=======
-	set args3exelist = "gtmsecshr dse geteuid lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean"
->>>>>>> 74ea4a3c... GT.M V6.3-006
+	set args3exelist = "gtmsecshr dse lke mupip gtcm_server gtcm_gnp_server gtcm_play gtcm_pkdisp gtcm_shmclean"
 	set args3exelist = "$args3exelist semstat2 ftok dbcertify"
 	foreach exe ($args3exelist)
 		set bg = '&'

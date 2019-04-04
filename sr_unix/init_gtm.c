@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,11 +48,8 @@
 #include "show_source_line.h"
 #include "patcode.h"
 #include "collseq.h"
-<<<<<<< HEAD
 #include "libyottadb_int.h"
-=======
 #include "ztimeout_routines.h"
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
 GBLREF boolean_t	utf8_patnumeric;
 GBLREF int4		exi_condition;
@@ -84,13 +81,9 @@ GBLREF pthread_t	gtm_main_thread_id;
 GBLREF boolean_t	gtm_main_thread_id_set;
 GBLREF boolean_t	gtm_jvm_process;
 #endif
-<<<<<<< HEAD
 GBLDEF boolean_t	ydb_init_complete = FALSE;
-=======
-GBLDEF boolean_t	gtm_startup_active = FALSE;
 GBLDEF void             (*ztimeout_action_ptr)(void) = ztimeout_action;
 GBLDEF void             (*ztimeout_clear_ptr)(void) = ztimeout_clear_timer;
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
 STATICFNDCL void assert_on_entry(int4 arg);
 

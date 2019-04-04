@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,15 +58,9 @@ void jnl_prc_vector (jnl_process_vector *pv)
 	GETPWUID(eff_uid, pw);
 	if (pw)
 	{
-<<<<<<< HEAD
 		SNPRINTF(pv->jpv_user, SIZEOF(pv->jpv_user), "%s", pw->pw_name);
 		SNPRINTF(pv->jpv_prcnam, SIZEOF(pv->jpv_prcnam), "%s", pw->pw_name);
-#		ifdef UNICODE_SUPPORTED
-=======
-		SNPRINTF(pv->jpv_user, JPV_LEN_USER, "%s", pw->pw_name);
-		SNPRINTF(pv->jpv_prcnam, JPV_LEN_PRCNAM, "%s", pw->pw_name);
 #		ifdef UTF8_SUPPORTED
->>>>>>> 74ea4a3c... GT.M V6.3-006
 		/* In UTF8 mode, trim the string (if necessary) to contain only as many valid multi-byte characters as can fit in */
 		if (gtm_utf8_mode)
 		{

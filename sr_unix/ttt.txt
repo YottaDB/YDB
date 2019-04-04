@@ -2,7 +2,7 @@
 ;								;
 ;	Copyright 2001, 2014 Fidelity Information Services, Inc	;
 ;								;
-; Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -1064,7 +1064,16 @@ OC_FNZSYSLOG:	pushab	val.0			; /* destination mval */
 		calls	#2,xfer.xf_fnzsyslog
 OC_ZRUPDATE:	irepab	val.2
 		calls	val.1,xfer.xf_zrupdate
-<<<<<<< HEAD
+OC_FNZTRANSLATE_FAST: pushab	val.0
+		pushab	val.2
+		pushab	val.1
+		calls	#3,xfer.xf_fnztranslate_fast
+OC_FNTRANSLATE_FAST: pushab	val.0
+		pushab	val.4
+		pushab	val.3
+		pushab	val.2
+		pushab	val.1
+		calls	#5,xfer.xf_fntranslate_fast
 OC_FNREVERSEQUERY:	irepab	val.3
 		pushab	val.2
 		pushab	val.0
@@ -1082,15 +1091,3 @@ OC_INDQ2:	pushab	val.2
 		pushab	val.1
 		pushab	val.0
 		calls	#3,xfer.xf_indq2
-=======
-OC_FNZTRANSLATE_FAST: pushab	val.0
-		pushab	val.2
-		pushab	val.1
-		calls	#3,xfer.xf_fnztranslate_fast
-OC_FNTRANSLATE_FAST: pushab	val.0
-		pushab	val.4
-		pushab	val.3
-		pushab	val.2
-		pushab	val.1
-		calls	#5,xfer.xf_fntranslate_fast
->>>>>>> 74ea4a3c... GT.M V6.3-006

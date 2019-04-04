@@ -179,7 +179,7 @@ GBLREF	volatile int4	gtmMallocDepth;
  * In VMS, we dont do any signal handling, only exit handling.
  */
 #define	DEFERRED_SIGNAL_HANDLING_CHECK									\
-{													\
+MBSTART {												\
 	char			*rname;									\
 													\
 	if (INSIDE_THREADED_CODE(rname))								\
@@ -187,7 +187,7 @@ GBLREF	volatile int4	gtmMallocDepth;
 		PTHREAD_EXIT_IF_FORCED_EXIT;								\
 	} else if (INTRPT_OK_TO_INTERRUPT == intrpt_ok_state)						\
 		DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED;							\
-}
+} MBEND
 
 /* This is a trimmed down version of the DEFERRED_SIGNAL_HANDLING_CHECK macro which is called
  * when the following conditions are true.
@@ -197,7 +197,7 @@ GBLREF	volatile int4	gtmMallocDepth;
  * (which is used in a lot of places e.g. from the REVERT macro).
  */
 #define	DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED								\
-{													\
+MBSTART {												\
 	DEBUG_ONLY(char		*rname;)								\
 													\
 	GBLREF	int		process_exiting;							\
@@ -213,7 +213,7 @@ GBLREF	volatile int4	gtmMallocDepth;
 	assert(GET_DEFERRED_EXIT_CHECK_NEEDED || (1 != forced_exit));					\
 	if (deferred_signal_handling_needed)								\
 		deferred_signal_handler();								\
-}
+} MBEND
 
 GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => not in use */
 

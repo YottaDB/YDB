@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,7 @@
 #include "continue_handler.h"
 #include "restrict.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #include "gtm_conv.h"
@@ -118,7 +118,7 @@ int dse_main(int argc, char **argv, char **envp)
 	INIT_FNPTR_GLOBAL_VARIABLES;
 	patch_curr_blk = get_dir_root();
 	err_init(util_base_ch);
-	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
+	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, dse_ctrlc_handler, suspsigs_handler, continue_handler);
 	atexit(util_exit_handler);

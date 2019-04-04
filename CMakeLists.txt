@@ -32,14 +32,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-<<<<<<< HEAD
 set(version r125)
-=======
-set(version ${V6.3-006})
-if("${version}" STREQUAL "")
-        set(version V9.9-0)
-endif()
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
@@ -67,15 +60,11 @@ set(install_permissions_script
   WORLD_READ WORLD_EXECUTE
   )
 
-<<<<<<< HEAD
-set_property(DIRECTORY APPEND PROPERTY $<$<CONFIG:Debug>:DEBUG)
-=======
 if(CMAKE_VERSION VERSION_LESS 3.0.0)
     set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS_DEBUG DEBUG)
 else()
     set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:DEBUG>)
 endif()
->>>>>>> 74ea4a3c... GT.M V6.3-006
 
 # Only IA64 and x86_64 architectures use this option
 set(gen_xfer_desc 0)

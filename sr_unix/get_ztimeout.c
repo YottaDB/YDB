@@ -3,6 +3,9 @@
  * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -42,13 +45,12 @@ void get_ztimeout(mval *result)
 	{
 		sys_get_curr_time(&cur_time);
 		cur_time = sub_abs_time(&(TREF(dollar_ztimeout)).end_time, &cur_time);
-		if (0 <= cur_time.at_sec)
+		if (0 <= cur_time.tv_sec)
 		{
-			DBGDFRDEVNT((stderr,"cur_time.at_usec is: %d\n", cur_time.at_usec));
-			ms = DIVIDE_ROUND_DOWN(cur_time.at_usec, MICROSECS_IN_MSEC);
-			SNPRINTF(full_ztimeout, MAX_STRLEN, "%ld.%ld", cur_time.at_sec, ms);
-		}
-		else
+			DBGDFRDEVNT((stderr,"cur_time.tv_nsec is: %d\n", cur_time.tv_nsec));
+			ms = DIVIDE_ROUND_DOWN(cur_time.tv_nsec, NANOSECS_IN_MSEC);
+			SNPRINTF(full_ztimeout, MAX_STRLEN, "%ld.%ld", cur_time.tv_sec, ms);
+		} else
 		{
 			ms = 0;
 			SNPRINTF(full_ztimeout, MAX_STRLEN, "%ld", ms);

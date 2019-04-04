@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -347,15 +347,12 @@ OPCODE_DEF(OC_ZRUPDATE, (OCT_NULL))
 OPCODE_DEF(OC_CDIDX, (OCT_MINT | OCT_CGSKIP | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZCOLLATE, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNZATRANSFORM, (OCT_MVAL | OCT_EXPRLEAF))
-<<<<<<< HEAD
+OPCODE_DEF(OC_FNZTRANSLATE_FAST, (OCT_MVAL | OCT_EXPRLEAF))
+OPCODE_DEF(OC_FNTRANSLATE_FAST, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNREVERSEQUERY, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_GVREVERSEQUERY, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_FNQ2, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_GVQ2, (OCT_MVAL | OCT_EXPRLEAF))
 OPCODE_DEF(OC_INDQ2, (OCT_MVAL | OCT_EXPRLEAF))
-=======
-OPCODE_DEF(OC_FNZTRANSLATE_FAST, (OCT_MVAL | OCT_EXPRLEAF))
-OPCODE_DEF(OC_FNTRANSLATE_FAST, (OCT_MVAL | OCT_EXPRLEAF))
->>>>>>> 74ea4a3c... GT.M V6.3-006
 OPCODE_DEF(OC_LASTOPCODE, (OCT_CGSKIP))
 /* insert new opcodes before OC_LASTOPCODE */

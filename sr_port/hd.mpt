@@ -3,7 +3,7 @@
 ; Copyright (c) 1987-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -12,7 +12,7 @@
 ;	the license, please stop and do not read further.	;
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%HD	;GT.M %HD utility - hexadecimal to decimal conversion program
+%HD	;YottaDB %HD utility - hexadecimal to decimal conversion program
 	;invoke at INT with %HD in hexadecimal to return %HD in decimal
 	;invoke at FUNC as an extrinsic function
 	;if you make heavy use of this routine, consider an external call.
@@ -27,12 +27,8 @@ FUNCFM(h)
 	f c=1:1:$l(h) s dg=$f("0123456789ABCDEF",$e(h,c)) q:'dg  s d=(d*16)+(dg-2)
 	q d
 FUNC(h)
-<<<<<<< HEAD
 	q:"-"=$ze(h,1) ""
 	n d s d=$ze(h,1,2) s:("0x"=d)!("0X"=d) h=$ze(h,3,$zlength(h))
-=======
-	q:$tr(h,"E","e")<0 ""
 	q:$l(h)<15 $$FUNCFM(h)
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	s h=$tr(h,"abcdef","ABCDEF")
 	q $$CONVERTBASE^%CONVBASEUTIL(h,16,10)

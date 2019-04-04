@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,13 +101,9 @@ int gtm_main(int argc, char **argv, char **envp)
 	common_startup_init(GTM_IMAGE, &mumps_cmd_ary[0]);
 	GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
 	err_init(stop_image_conditional_core);
-<<<<<<< HEAD
 	assert(!(noThreadAPI_active || simpleThreadAPI_active));	/* Neither should be set unless we recursed (never!) */
 	noThreadAPI_active = TRUE;
-	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
-=======
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	ydb_chk_dist(argv[0]);
 	cli_lex_setup(argc, argv);

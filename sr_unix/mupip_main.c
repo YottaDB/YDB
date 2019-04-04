@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,7 +65,7 @@
 #include "continue_handler.h"
 #include "gtmio.h"
 
-#ifdef UNICODE_SUPPORTED
+#ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
 # include "gtm_conv.h"
@@ -93,7 +93,7 @@ int mupip_main(int argc, char **argv, char **envp)
 	common_startup_init(MUPIP_IMAGE, &mupip_cmd_ary[0]);
 	invocation_mode = MUMPS_UTILTRIGR;
 	err_init(util_base_ch);
-	UNICODE_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
+	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, NULL, suspsigs_handler, continue_handler);	/* Note: no ^C handler is defined (yet) */
 	atexit(mupip_exit_handler);

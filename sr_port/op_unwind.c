@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,15 +69,11 @@ error_def(ERR_TPQUIT);
 void op_unwind(void)
 {
 	rhdtyp			*rtnhdr;
-<<<<<<< HEAD
-	mv_stent 		*mvc;
 	boolean_t		trig_forced_unwind;
-=======
 	mv_stent		*mvc;
 	int4			event_type, param_val;
 	void (*set_fn)(int4 param);
 
->>>>>>> 74ea4a3c... GT.M V6.3-006
 	DBGEHND_ONLY(stack_frame *prevfp;)
 	DCL_THREADGBL_ACCESS;
 
