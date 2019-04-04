@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,6 +134,14 @@
 		gtmMallocErrorErrno = errno;									\
 		raise_gtmmemory_error();									\
 	}													\
+	/* 0-initialize the allocated memory in debug builds to avoid false use-of-uninitialized-value alarms	\
+	 * from Go MemorySanitizer (and likely tools like Valgrind) when this memory gets used later. This lets	\
+	 * us use debug builds with a clean report from those tools which will help us detect real issues if	\
+	 * introduced at a later point in time. That said, YottaDB knows the memory is uninitialized and	\
+	 * initializes it when needed. So there is no need to initialize it in pro builds as it is an		\
+	 * unnecessary cost where performance matters. Hence the below use of DEBUG_ONLY.			\
+	 */													\
+	DEBUG_ONLY(memset(addr, 0, size));									\
 }
 #  define FREE(size, addr) free(addr);
 #define MAXBACKFILL (16 * 1024)			/* Maximum backfill of large structures */

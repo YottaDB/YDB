@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -249,15 +249,17 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 	SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY;	/* set up gv_altkey to be just the gblname */
 	save_targ = gv_target;
 	/* Check if "gv_target->gvname" matches "gv_altkey->base". If not, there is a name mismatch (out-of-design situation).
-	 * This check is temporary until we catch the situation that caused D9H02-002641.
-	 * It's suspected the original situation has been fixed (see D9I08-002695). But the assertpro will remain until
-	 * gvcst_redo_root_search has been well-tested.
+	 * This check was an "assertpro" (meaning the check is done for pro builds too) intended to stay until we catch the
+	 * situation that caused D9H02-002641. It was suspected the original situation has been fixed (see D9I08-002695).
+	 * And the assertpro was supposed to remain only until gvcst_redo_root_search has been well-tested. And that has been
+	 * the case for many years now (as or Mar 2019) so the assertpro is now a sequence of asserts instead.
 	 */
 	/* --- Check BEGIN --- */
 	gvent = &save_targ->gvname;
 	altkeylen = gv_altkey->end - 1;
-	assertpro(altkeylen && (altkeylen == gvent->var_name.len)
-			&& (0 == memcmp(gv_altkey->base, gvent->var_name.addr, gvent->var_name.len)));
+	assert(altkeylen);
+	assert(altkeylen == gvent->var_name.len);
+	assert(!memcmp(gv_altkey->base, gvent->var_name.addr, gvent->var_name.len));
 	/* --- Check END   --- */
 	if (INVALID_GV_TARGET != reset_gv_target)
 		gbl_target_was_set = TRUE;
