@@ -60,11 +60,7 @@ set(install_permissions_script
   WORLD_READ WORLD_EXECUTE
   )
 
-if(CMAKE_VERSION VERSION_LESS 3.0.0)
-    set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS_DEBUG DEBUG)
-else()
-    set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:DEBUG>)
-endif()
+set_property(DIRECTORY APPEND PROPERTY $<$<CONFIG:Debug>:DEBUG)
 
 # Only IA64 and x86_64 architectures use this option
 set(gen_xfer_desc 0)
