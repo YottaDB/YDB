@@ -136,6 +136,34 @@ error_def(ERR_XCRETNULLREF);
 error_def(ERR_EXTCALLBOUNDS);
 error_def(ERR_EXCEEDSPREALLOC);
 
+/* Allocate a buffer to store list of external call parameters. Need to maintain one buffer for each call-in level possible
+ * since it is possible for external calls to nest in which case the nested external call's buffer should not mess with
+ * the parent external call's malloced buffer. Hence the CALLIN_MAX_LEVEL array definition below.
+ */
+STATICDEF	char		*op_fnfgncal_call_buff[CALLIN_MAX_LEVEL + 2];
+STATICDEF	unsigned int	op_fnfgncal_call_buff_len[CALLIN_MAX_LEVEL + 2];
+
+#define	OP_FNFGNCAL_ALLOCATE(PTR, SIZE)							\
+{											\
+	unsigned int	neededSize, buffLen, callinLevel;				\
+											\
+	callinLevel = TREF(gtmci_nested_level);						\
+	assert(callinLevel < ARRAYSIZE(op_fnfgncal_call_buff_len));			\
+	assert(callinLevel < ARRAYSIZE(op_fnfgncal_call_buff));				\
+	neededSize = SIZE;								\
+	buffLen = op_fnfgncal_call_buff_len[callinLevel];				\
+	if (neededSize > buffLen)							\
+	{										\
+		if (buffLen)								\
+			free(op_fnfgncal_call_buff[callinLevel]);			\
+		/* The * 2 below is to avoid lots of incremental malloc/free calls */	\
+		buffLen = neededSize * 2;						\
+		op_fnfgncal_call_buff[callinLevel] = malloc(buffLen);			\
+		op_fnfgncal_call_buff_len[callinLevel] = buffLen;			\
+	}										\
+	PTR = op_fnfgncal_call_buff[callinLevel];					\
+}
+
 STATICDEF int		call_table_initialized = 0;
 /* The following are one-letter mnemonics for Java argument types (capital letters to denote output direction):
  * 						boolean	int	long	float	double	String	byte[] */
@@ -485,7 +513,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
     struct extcall_package_list *package_ptr, struct extcall_entry_list *entry_ptr, va_list var)
 {
 	boolean_t	error_in_xc = FALSE, save_in_ext_call;
-	char		*free_string_pointer, *free_string_pointer_start, jtype_char;
+	char		*free_string_pointer, *free_string_pointer_start, jtype_char, *param_list_buff;
 	char		*jni_err_buf;
 	char		*types_descr_ptr, *types_descr_dptr, *xtrnl_table_name;
 	gparam_list	*param_list;
@@ -605,9 +633,9 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	 * another pointer from within the space buffer is referencing an area inside the string buffer. Note, however, that certain
 	 * arguments, such as ydb_jfloat_t and ydb_jdouble_t, and ydb_jlong_t on 32-bit boxes, are always passed by reference.
 	 */
-	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the proctection tags*/
+	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the protection tags */
 	call_buff_size = n;
-	char param_list_buff[(call_buff_size + 2*buff_boarder_len)];
+	OP_FNFGNCAL_ALLOCATE(param_list_buff, call_buff_size + 2 * buff_boarder_len);
 	param_list = set_up_buffer(param_list_buff, n);
 	param_list->arg[0] = (void *)types_descr_ptr;
 	/* Adding 3 to account for type descriptions, class name, and method name arguments. */
@@ -820,7 +848,7 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 mask, int4 argcnt, ...)
 {
 	boolean_t	java = FALSE, save_in_ext_call, is_tpretry;
-	char		*free_string_pointer, *free_string_pointer_start;
+	char		*free_string_pointer, *free_string_pointer_start, *param_list_buff;
 	char		*xtrnl_table_name;
 	int		i, pre_alloc_size, rslt, save_mumps_status;
 	int4 		callintogtm_vectorindex, n, call_buff_size;
@@ -940,10 +968,10 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	 * ydb_string_t *) the value in param_list is always a pointer inside the space buffer, where a pointer to an area inside
 	 * the string buffer is stored.
 	 */
-	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the protection tags*/
-	call_buff_size = 2*n;
-	char param_list_buff[(call_buff_size + 2*buff_boarder_len)];
-	param_list = set_up_buffer(param_list_buff, 2*n);
+	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the protection tags */
+	call_buff_size = 2 * n;
+	OP_FNFGNCAL_ALLOCATE(param_list_buff, call_buff_size + 2 * buff_boarder_len);
+	param_list = set_up_buffer(param_list_buff, 2 * n);
 	free_space_pointer = (ydb_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
 	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
 	/* Load-up the parameter list */
