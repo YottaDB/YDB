@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -153,9 +156,20 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 				;       /* scan back from end for rtn name & triggerness */
 			ci += ci ? 1 : 0;
 			clen = object_name_len - ci;
-			if (('o' != object_file_name[ci + --clen])
-					|| ('.' != object_file_name[ci + --clen]))
-				clen = object_name_len - ci;
+			if (2 <= clen)
+			{
+				if ('o' != object_file_name[ci + --clen])
+					clen++;
+				else if ('.' != object_file_name[ci + --clen])
+					clen++;
+			}
+			if (2 <= clen)
+			{
+				if ('m' != object_file_name[ci + --clen])
+					clen++;
+				else if ('.' != object_file_name[ci + --clen])
+					clen++;
+			}
 			clen = MIN(clen, MAX_MIDENT_LEN);
 			memcpy(routine_name.addr, &object_file_name[ci], clen);
 			SET_OBJ(object_file_name, object_name_len);
