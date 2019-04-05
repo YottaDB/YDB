@@ -23,7 +23,7 @@
 #include "mmemory.h"
 
 GBLREF boolean_t		run_time;
-GBLREF char			source_file_name[];
+GBLREF unsigned char		source_file_name[];
 GBLREF unsigned short		source_name_len;
 GBLREF command_qualifier	cmd_qlf;
 GBLREF char			cg_phase;

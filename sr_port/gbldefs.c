@@ -315,8 +315,8 @@ GBLDEF	boolean_t	oldjnlclose_started;
 /* DEFERRED EVENTS */
 GBLDEF	bool		licensed = TRUE;
 
-GBLDEF	volatile int4		num_deferred;
-GBLDEF	volatile	int4	fast_lock_count;	/* Used in wcs_stale */
+GBLDEF	volatile uint4		num_deferred;
+GBLDEF	volatile int4		fast_lock_count;	/* Used in wcs_stale */
 /* REPLICATION RELATED GLOBALS */
 GBLDEF	gtmsource_options_t	gtmsource_options;
 GBLDEF	gtmrecv_options_t	gtmrecv_options;

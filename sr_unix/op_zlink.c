@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,12 +103,12 @@ MBSTART{															\
 } MBEND
 
 
-GBLREF char			object_file_name[];
+GBLREF unsigned char		object_file_name[];
 GBLREF command_qualifier	cmd_qlf;
 GBLREF int			object_file_des;
 GBLREF mident			module_name, routine_name;
 GBLREF mval			dollar_zsource;
-GBLREF short			object_name_len;
+GBLREF unsigned short		object_name_len;
 GBLREF spdesc			rts_stringpool, stringpool;
 
 error_def(ERR_FILENOTFND);

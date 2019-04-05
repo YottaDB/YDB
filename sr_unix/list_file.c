@@ -28,7 +28,8 @@
 
 #define LISTEXT ".lis"
 
-GBLREF char		rev_time_buf[], source_file_name[];
+GBLREF char		rev_time_buf[];
+GBLREF unsigned char	source_file_name[];
 GBLREF command_qualifier cmd_qlf;
 GBLREF int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF io_pair		io_curr_device;
