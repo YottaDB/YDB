@@ -19,45 +19,29 @@
 # Save ydb_passwd / gtm_passwd and ydb_chset / gtm_chset if defined because
 # this script executes in M mode and makes no database accesses
 # Need to distinguish between $ydb_passwd / $gtm_passwd not set at all vs. set to null string
-if [ ! -z "${ydb_passwd+isset}" ] ; then ydb_tmp_passwd=$ydb_passwd
-elif [ ! -z "${gtm_passwd+isset}" ] ; then ydb_tmp_passwd=$gtm_passwd
-else unset ydb_tmp_passwd
-fi
-if [ ! -z "$ydb_chset" ] ; then export ydb_tmp_chset=$ydb_chset
-elif [ ! -z "$gtm_chset " ] ; then export ydb_tmp_chset=$gtm_chset
+# export not needed because these are only used when sourcing this file
+if [ ! -z "${ydb_passwd+isset}" ] ; then ydb_tmp_ydb_passwd=$ydb_passwd ; fi
+if [ ! -z "${gtm_passwd+isset}" ] ; then ydb_tmp_gtm_passwd=$gtm_passwd ; fi
+
+# Save the character set, since the %YDBENV program always runs in M mode
+# even though it generates environment variables for either M or UTF-8 mode.
+# Need to be exported because set^%YDBENV uses them.
+if [ ! -z "$ydb_chset" ] ; then export ydb_tmp_ydb_chset=$ydb_chset ; fi
+if [ ! -z "$gtm_chset" ] ; then export ydb_tmp_gtm_chset=$gtm_chset
 fi
 
-# Save ydb_routines / gtmroutines if defined because
-# this script will overwrite ydb_routines if defined
-# to make sure there is a path to the required routine
-if [ ! -z "$gtmroutines" ] ; then ydb_tmp_routines="$gtmroutines" ; fi
-if [ ! -z "$ydb_routines" ] ; then ydb_tmp_routines="$ydb_routines" ; fi
-
-# Save environment variables if they exist, which may be needed for tmp and log directories
-if [ ! -z "$ydb_rel" ] ; then export ydb_tmp_rel=$ydb_rel ; fi
-if [ ! -z "$gtmver" ] ; then export ydb_tmp_gtmver=$gtmver ; fi
+# Save ydb_routines / gtmroutines if defined because this script
+# needs to ensure that it executes the %YDBENV in $ydb_dist / $gtm_dist.
+# Need to be exported because set^%YDBENV uses them.
+if [ ! -z "$ydb_routines" ] ; then export ydb_tmp_routines="$ydb_routines" ; fi
+if [ ! -z "$gtmroutines" ] ; then export ydb_tmp_gtmroutines="$gtmroutines" ; fi
 
 # Clear environment variables that might interfere with correct operation of %YDBENV
-unset ydb_chset ydb_passwd gtm_chset gtm_passwd
-
-# Set environment variables needed for correct operation of %YDBENV, which exports
-# values that may, and likely will, override these.
-export ydb_dist="YDBDIST"
-export gtm_dist="$ydb_dist"
-
-if [ -s "$ydb_dist/libyottadbutil.so" ] ; then export ydb_routines="$ydb_dist/libyottadbutil.so"
-elif [ -s "$ydb_dist/libgtmutil.so" ] ; then export ydb_routines="$ydb_dist/libgtmutil.so"
-else export ydb_routines="$ydb_dist"
-fi
-export gtmroutines="$ydb_routines"
+unset ydb_chset ydb_dist ydb_passwd ydb_routines gtm_chset gtm_dist gtm_passwd gtmroutines
 
 # Run command to generate environment
 ydb_tmp_env=`mktemp -d -t ydb_env_$$_XXXXXX`
-$ydb_dist/yottadb -run set^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err
-if [ -s $ydb_tmp_env/err ] ; then
-    echo Error file at $ydb_tmp_env is:
-    cat $ydb_tmp_env/err
-else
+if "YDBDIST"/yottadb -run set^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err ; then
     . $ydb_tmp_env/out
     if [ "UTF-8" = "$ydb_chset" ] ; then
 	export ydb_icu_version=`pkg-config --modversion icu-io`
@@ -65,20 +49,14 @@ else
     else unset ydb_icu_version gtm_icu_version
     fi
     rm -rf $ydb_tmp_env
-    $ydb_dist/mupip journal -recover -backward "*" 2>$ydb_tmp/"$USER"_`date -u +%Y%m%d%H%M%S`"UTC_mupip_recover" && \
-	find $ydb_dir/$ydb_rel/g -name \*.mjl_\* -mtime +$ydb_retention -exec rm -f {} \; && \
-	find $ydb_tmp -name "$USER"_\* -mtime +$ydb_retention -exec rm -f {} \;
+else
+    echo Error file at $ydb_tmp_env is:
+    cat $ydb_tmp_env/err
 fi
 
-# Restore ydb_passwd / gtm_passwd if it was set
-if [ ! -z "${ydb_tmp_passwd+isset}" ] ; then
-    export ydb_passwd=$ydb_tmp_passwd ; export gtm_passwd=$ydb_tmp_passwd
-fi
-
-# Restore ydb_routines / gtmroutines if it was set
-if [ ! -z "$ydb_tmp_routines" ] ; then
-    export ydb_routines="$ydb_tmp_routines" ; export gtmroutines="$ydb_tmp_routines"
-fi
+# Restore ydb_passwd / gtm_passwd if either was set
+if [ ! -z "${ydb_tmp_passwd+isset}" ] ; then export ydb_passwd=$ydb_tmp_passwd ; fi
+if [ ! -z "${gtm_tmp_passwd+isset}" ] ; then export gtm_passwd=$ydb_tmp_passwd ; fi
 
 # Clear temporary variables used in this file
-unset ydb_tmp_chset ydb_tmp_env ydb_tmp_gtmver ydb_tmp_passwd ydb_tmp_rel ydb_tmp_routines
+unset ydb_tmp_ydb_chset ydb_tmp_env ydb_tmp_ydb_passwd ydb_tmp_routines gtm_tmp_gtm_chset gtm_tmp_gtm_passwd gtm_tmp_gtmroutines

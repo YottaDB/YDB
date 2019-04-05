@@ -13,23 +13,15 @@
 # Clears environment variables set by ydb_env_set
 # Uses an M program to generate the commands
 
-# reset ydb_routines to include utility routines to ensure %YDBENV is found
-if [ -s "$ydb_dist/libyottadbutil.so" ] ; then export ydb_routines="$ydb_dist/libyottadbutil.so"
-elif [ -s "$ydb_dist/libgtmutil.so" ] ; then export ydb_routines="$ydb_dist/libgtmutil.so"
-else export ydb_routines="$ydb_dist"
-fi
+# Clear environment variables to ensure that %YDBENV runs correctly
+unset ydb_chset ydb_dist ydb_routines gtm_chset gtm_dist gtmroutines
 
-export gtmroutines="$ydb_routines"
-if [ -x "$ydb_dist/yottadb" ] ; then
-    ydb_tmp_env=`mktemp -d -t ydb_env_$$_XXXXXX`
-    $ydb_dist/yottadb -run unset^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err
-    if [ -s $ydb_tmp_env/err ] ; then
-	echo Error file at $ydb_tmp_env is:
-	cat $ydb_tmp_env/err
-    else
-	. $ydb_tmp_env/out
-	rm -rf $ydb_tmp_env
-    fi
+ydb_tmp_env=`mktemp -d -t ydb_env_$$_XXXXXX`
+"YDBDIST"/yottadb -run unset^%YDBENV 1>$ydb_tmp_env/out 2>$ydb_tmp_env/err
+if [ -s $ydb_tmp_env/err ] ; then
+    echo Error file at $ydb_tmp_env is:
+    cat $ydb_tmp_env/err
+else
+    . $ydb_tmp_env/out
+    rm -rf $ydb_tmp_env
 fi
-unset gtmroutines ydb_routines
-unalias gde 2>/dev/null
