@@ -93,13 +93,17 @@ int ydb_exit()
 		 */
 		assert(!simpleThreadAPI_active
 			|| (ydb_stm_worker_thread_id && !pthread_equal(pthread_self(), ydb_stm_worker_thread_id)));
-		ESTABLISH_NORET(gtmci_ch, error_encountered);
+		ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 		if (error_encountered)
-		{	/* "gtmci_ch" encountered an error and transferred control back here. Return after mutex lock cleanup. */
+		{	/* "ydb_simpleapi_ch" encountered an error and transferred control back here.
+			 * Return after mutex lock cleanup.
+			 */
 			THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
-			/* "ydb_exit" returns positive error code so return mumps_status as is (i.e. no negation for YDB_ERR_*) */
-			assert(0 < mumps_status);
-			return mumps_status;
+			/* "ydb_exit" returns positive error code so return TREF(ydb_error_code) as is
+			 * (i.e. no negation for YDB_ERR_* like is common in other ydb_*_s() function calls)
+			 */
+			assert(0 < TREF(ydb_error_code));
+			return TREF(ydb_error_code);
 		}
 		assert(NULL != frame_pointer);
 		/* If process_exiting is set (and the YottaDB environment is still active since "ydb_init_complete" is TRUE
