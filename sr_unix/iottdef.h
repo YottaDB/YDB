@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,12 +83,12 @@ MBSTART {										\
 #define	EXPECT_SETTERM_DONE_TRUE	TRUE
 
 /* Below is converse of SETTERM_IF_NEEDED */
-#define	RESETTERM_IF_NEEDED(ioPtr, expectSettermDone)		\
-MBSTART {							\
-	assert(!expectSettermDone || IS_SETTERM_DONE(ioPtr));	\
-	if (IS_SETTERM_DONE(ioPtr))				\
-		resetterm(ioPtr);				\
-	assert(!IS_SETTERM_DONE(ioPtr));			\
+#define	RESETTERM_IF_NEEDED(ioPtr, expectSettermDone)				\
+MBSTART {									\
+	assert(!expectSettermDone || !IS_GTM_IMAGE || IS_SETTERM_DONE(ioPtr));	\
+	if (IS_SETTERM_DONE(ioPtr))						\
+		resetterm(ioPtr);						\
+	assert(!IS_SETTERM_DONE(ioPtr));					\
 } MBEND
 
 enum	tt_which
