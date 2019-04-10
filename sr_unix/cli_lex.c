@@ -356,7 +356,7 @@ static int	tok_extract (void)
 	return(token_len);
 }
 
-static void cli_lex_in_expand(int in_len)
+void cli_lex_in_expand(int in_len)
 {
 	IN_PARMS	*new_cli_lex_in_ptr;
 

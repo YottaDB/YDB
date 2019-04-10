@@ -70,7 +70,7 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 	MEMCPY_LIT(cbuf, COMMAND);
 	memcpy(cbuf + SIZEOF(COMMAND) - 1, quals->addr, quals->len);
 	cbuf[SIZEOF(COMMAND) - 1 + quals->len] = 0;
-	/* The caller of this function could have their own command parsing tables Nevertheless, we need to parse the string as if
+	/* The caller of this function could have their own command parsing tables. Nevertheless, we need to parse the string as if
 	 * it was a MUMPS compilation command. So we switch temporarily to the MUMPS parsing table "mumps_cmd_ary". Note that the
 	 * only rts_errors possible between save and restore of the cmd_ary are in compile_source_file and those are internally
 	 * handled by source_ch which will transfer control back to us (right after the the call to compile_source_file below)
@@ -97,6 +97,8 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 			*srclen = MAX_FN_LEN;
 			status = cli_get_str("INFILE", srcstr, srclen);
 			assert(status);
+			if (!*srclen)
+				return;	/* No M program to process. Return. */
 		}
 		assert(*srclen);
 		memset(&pblk, 0, SIZEOF(pblk));

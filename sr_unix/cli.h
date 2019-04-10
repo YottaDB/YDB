@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -137,5 +137,6 @@ int cli_is_id(char *p);
 void skip_white_space(void);
 int cli_has_space(char *p);
 char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str);
+void cli_lex_in_expand(int in_len);
 
 #endif

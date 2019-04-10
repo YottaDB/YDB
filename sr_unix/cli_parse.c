@@ -981,8 +981,8 @@ boolean_t cli_negated(char *entry) 		/* entity */
 
 bool cli_get_parm(char *entry, char val_buf[])
 {
-	char		*gets_res, local_str[MAX_LINE], *sp;
-	int		eof, ind, match_ind, parm_len, res;
+	char		*gets_res, local_str[MAX_LINE], *sp, *ptr, *nextptr;
+	int		eof, ind, match_ind, parm_len, res, numtblparms, i;
 	mval		prompt, dummy, *input_line;
 	DCL_THREADGBL_ACCESS;
 
@@ -1019,18 +1019,39 @@ bool cli_get_parm(char *entry, char val_buf[])
 			input_line = push_mval(&dummy);
 			prompt.mvtype = MV_STR;
 			prompt.str.addr = (gpcmd_parm_vals + match_ind)->prompt;
-			for (prompt.str.len = 0, sp = prompt.str.addr; 0 != *sp; sp++, prompt.str.len++)
-				;
+			prompt.str.len = STRLEN(prompt.str.addr);
 			op_write(&prompt);
 			op_read(input_line, (mval *)&literal_notimeout);
-			if (input_line->str.len)
-			{
-				parm_len = input_line->str.len;
+			op_wteol(1);
+			parm_len = input_line->str.len;
+			numtblparms = match_ind;
+			assert(STRLEN(gpcmd_parm_vals[numtblparms].name));
+			if (parm_len)
+			{	/* Input could be a list of values. If so return just the first value. Store the rest of the
+				 * values in the cli token list so later calls to "cli_get_parm" can return those one by one.
+				 */
+				ptr = input_line->str.addr;
+				nextptr = memchr(ptr, ' ', parm_len);
+				if (NULL != nextptr)
+					parm_len = nextptr - ptr;
+				/* Copy first value */
 				TAREF1(parm_str_len, match_ind) = parm_len + 1;
 				GROW_HEAP_IF_NEEDED(match_ind);
-				if (parm_len)
-					memcpy(TAREF1(parm_ary, match_ind), input_line->str.addr, parm_len);
+				memcpy(TAREF1(parm_ary, match_ind), ptr, parm_len);
 				*(TAREF1(parm_ary, match_ind) + parm_len) = '\0';
+				if (NULL != nextptr)
+				{
+					parm_len = input_line->str.len - parm_len - 1;
+					assert(0 <= parm_len);
+					if (parm_len)
+					{
+						ptr = nextptr + 1;
+						cli_lex_in_expand(parm_len);
+						memcpy(cli_lex_in_ptr->in_str, ptr, parm_len);
+						cli_lex_in_ptr->in_str[parm_len] = '\0';
+						cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
+					}
+				}
 			} else
 			{	/* No string was returned so create a real ghost to point to.
 				   Note that this should be revisited since this is NOT what should
@@ -1082,7 +1103,7 @@ int parse_triggerfile_cmd(void)
 	int 		opt_cnt;
 	int 		eof;
 	char		cmd[] = "TRIGGER";
-	char		*ptr;
+	char		*ptr, *nextptr;
         DCL_THREADGBL_ACCESS;
 
         SETUP_THREADGBL_ACCESS;
