@@ -105,6 +105,10 @@ int ydb_exit()
 			assert(0 < TREF(ydb_error_code));
 			return TREF(ydb_error_code);
 		}
+		if (dollar_tlevel)
+		{	/* Cannot take down YottaDB environment while inside an active TP transaction. Issue error. */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
+		}
 		assert(NULL != frame_pointer);
 		/* If process_exiting is set (and the YottaDB environment is still active since "ydb_init_complete" is TRUE
 		 * here), shortcut some of the checks and cleanups we are making in this routine as they are not
