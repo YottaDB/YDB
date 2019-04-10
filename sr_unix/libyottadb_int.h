@@ -620,9 +620,12 @@ MBSTART {												\
 			SETUP_GENERIC_ERROR(ERR_SIMPLEAPINOTALLOWED);						\
 			DBGAPITP_ONLY(gtm_fork_n_core());							\
 			/* No need to reset active routine indicator before returning an error.			\
-			 * Caller would not have done LIBYOTTADB_INIT before invoking this macro. Assert that.	\
+			 * Caller would not have done LIBYOTTADB_INIT before invoking this macro.		\
+			 * Assert that. The only exception is if we were already inside a "ydb_ci_t" or		\
+			 * "ydb_cip_t" so account for that in the assert.					\
 			 */											\
-			assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));					\
+			assert((LYDB_RTN_NONE == TREF(libyottadb_active_rtn))					\
+				|| (LYDB_RTN_YDB_CI == TREF(libyottadb_active_rtn)));				\
 			return YDB_ERR_SIMPLEAPINOTALLOWED;							\
 		}												\
 		caller_func_is_stapi = FALSE;									\
@@ -646,9 +649,12 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 			SETUP_GENERIC_ERROR(ERR_SIMPLEAPINOTALLOWED);						\
 			DBGAPITP_ONLY(gtm_fork_n_core());							\
 			/* No need to reset active routine indicator before returning an error.			\
-			 * Caller would not have done LIBYOTTADB_INIT before invoking this macro. Assert that.	\
+			 * Caller would not have done LIBYOTTADB_INIT before invoking this macro.		\
+			 * Assert that. The only exception is if we were already inside a "ydb_ci_t" or		\
+			 * "ydb_cip_t" so account for that in the assert.					\
 			 */											\
-			assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));					\
+			assert((LYDB_RTN_NONE == TREF(libyottadb_active_rtn))					\
+				|| (LYDB_RTN_YDB_CI == TREF(libyottadb_active_rtn)));				\
 			return;											\
 		}												\
 		caller_func_is_stapi = FALSE;									\
@@ -672,9 +678,12 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 			SETUP_GENERIC_ERROR(ERR_SIMPLEAPINOTALLOWED);						\
 			DBGAPITP_ONLY(gtm_fork_n_core());							\
 			/* No need to reset active routine indicator before returning an error.			\
-			 * Caller would not have done LIBYOTTADB_INIT before invoking this macro. Assert that.	\
+			 * Caller would not have done LIBYOTTADB_INIT before invoking this macro.		\
+			 * Assert that. The only exception is if we were already inside a "ydb_ci_t" or		\
+			 * "ydb_cip_t" so account for that in the assert.					\
 			 */											\
-			assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));					\
+			assert((LYDB_RTN_NONE == TREF(libyottadb_active_rtn))					\
+				|| (LYDB_RTN_YDB_CI == TREF(libyottadb_active_rtn)));				\
 			return NULL;										\
 		}												\
 		caller_func_is_stapi = FALSE;									\
