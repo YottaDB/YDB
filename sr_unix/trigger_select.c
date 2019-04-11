@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -620,8 +620,6 @@ boolean_t trigger_select_tpwrap(char *select_list, uint4 select_list_len, char *
 		op_pars.str.addr = (char *)use_params;
 		if (IS_MUPIP_IMAGE)
 		{
-			PRINTF("\n");
-			FFLUSH(NULL);
 			op_val.str.len = io_std_device.out->trans_name->len;
 			op_val.str.addr = io_std_device.out->trans_name->dollar_io;
 		} else

@@ -75,7 +75,7 @@ GBLREF	uint4	process_id;
 MBSTART {										\
 	/* Only the true runtime runs with the modified terminal settings */		\
 	assert(ttPtr == ((d_tt_struct *)ioPtr->dev_sp));				\
-	if (IS_GTM_IMAGE && (0 == ttPtr->setterm_done_by))				\
+	if (0 == ttPtr->setterm_done_by)						\
 		setterm(ioPtr);								\
 } MBEND
 
@@ -85,7 +85,7 @@ MBSTART {										\
 /* Below is converse of SETTERM_IF_NEEDED */
 #define	RESETTERM_IF_NEEDED(ioPtr, expectSettermDone)				\
 MBSTART {									\
-	assert(!expectSettermDone || !IS_GTM_IMAGE || IS_SETTERM_DONE(ioPtr));	\
+	assert(!expectSettermDone || IS_SETTERM_DONE(ioPtr));			\
 	if (IS_SETTERM_DONE(ioPtr))						\
 		resetterm(ioPtr);						\
 	assert(!IS_SETTERM_DONE(ioPtr));					\
