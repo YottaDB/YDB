@@ -39,7 +39,7 @@ void ydb_stm_invoke_deferred_signal_handler()
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_ctrlc_handler))
 	{
-		assert(SIGCONT == stapi_signal_handler_oscontext[sig_hndlr_ctrlc_handler].sig_num);
+		assert(SIGINT == stapi_signal_handler_oscontext[sig_hndlr_ctrlc_handler].sig_num);
 		ctrlc_handler(DUMMY_SIG_NUM, NULL, NULL);
 	}
 	/* Since dbcertify operates as a standalone tool, it does not have multiple threads and so signal
