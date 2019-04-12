@@ -181,9 +181,12 @@ STATICFNDCL gparam_list	*set_up_buffer(char *p_list, int len);
 STATICFNDCL void	verify_buffer(char *p_list, int len, char *m_label);
 STATICFNDCL void	free_return_type(INTPTR_T ret_val, enum ydb_types typ);
 
-static const int buff_boarder_len = 7;
-static const char *buff_front_boarder = "SMARKER";
-static const char *buff_end_boarder = "EMARKER";
+static const int buff_boarder_len = 8;	/* Needs to be 8-byte aligned or else "free_space_pointer" would not be 4-byte or
+					 * 8-byte aligned for different input parameter types which could later show up
+					 * as a SIGBUS error due to unaligned access on platforms that care about it (e.g. ARM).
+					 */
+static const char *buff_front_boarder = "STMARKER";
+static const char *buff_end_boarder = "ENMARKER";
 
 /* Routine to set up boarders around the external call buffer */
 STATICFNDCL gparam_list *set_up_buffer(char *p_list, int len)
