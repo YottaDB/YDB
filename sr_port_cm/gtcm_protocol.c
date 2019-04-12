@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -31,6 +31,7 @@ LITDEF	gtcm_proto_cpu_info_t	gtcm_proto_cpu_info[] =
 	{LIT_AND_LEN("AXP"),			"AXP"},
 	{LIT_AND_LEN("HP-PA"),			"PAR"},
 	{LIT_AND_LEN("aarch64"),		"AARCH64"},
+	{LIT_AND_LEN("armv6l"),			"ARMV6L"},
 	{LIT_AND_LEN("armv7l"),			"ARMV7L"},
 	{LIT_AND_LEN("x86"),			"X86"},
 	{LIT_AND_LEN("x86_64"),			"X86_64"},
