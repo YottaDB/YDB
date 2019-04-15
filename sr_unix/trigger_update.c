@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1172,6 +1172,8 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	gvnh_spanreg_t		*gvspan;
 	hash128_state_t		set_hash_state, kill_hash_state;
 	uint4			set_hash_totlen, kill_hash_totlen;
+	static char 		*trigptr_buff = NULL;
+	static unsigned int	trigptr_alloclen = 0;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1255,6 +1257,18 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	max_len = (int4)SIZEOF(tfile_rec_val);
 	trigptr = trigger_rec->str.addr + 1;
 	multi_line_xecute = FALSE;
+	if (IS_IN_STRINGPOOL(trigptr, len))
+	{	/* "trigptr" points to the stringpool. Move it out of stringpool as "trigger_parse" invoked below expects that */
+		if (len > trigptr_alloclen)
+		{
+			if (trigptr_alloclen)
+				free(trigptr_buff);
+			trigptr_alloclen = (2 * len);	/* Use "2 *" to avoid lots of incremental malloc/free calls */
+			trigptr_buff = malloc(trigptr_alloclen);
+		}
+		memcpy(trigptr_buff, trigptr, len);
+		trigptr = trigptr_buff;
+	}
 	if (!trigger_parse(trigptr, len, trigvn, values, value_len, &max_len, &multi_line_xecute))
 	{
 		trig_stats[STATS_ERROR_TRIGFILE]++;

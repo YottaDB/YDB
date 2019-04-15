@@ -34,6 +34,9 @@
 #include "compiler.h"
 #include "gtm_utf8.h"
 #include "gtmctype.h"
+#ifdef DEBUG
+#include "stringpool.h"	/* for IS_IN_STRINGPOOL assert */
+#endif
 
 GBLREF CLI_ENTRY                *cmd_ary;
 GBLREF	gd_region		*gv_cur_region;
@@ -1289,6 +1292,12 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 	int		trigvn_len;
 	boolean_t	in_multi_line_xecute, out_multi_line_xecute;
 
+	/* Assert that "input" is not in the stringpool. This is because we could invoke "stp_gcol" below
+	 * (e.g. trigger_parse -> process_subscripts -> PROCESS_NUMERIC -> n2s). If "input" was in the stringpool,
+	 * after the "stp_gcol" invocation, "input" would be pointing to an arbitrary location and could lead to
+	 * incorrect parse errors in this function.
+	 */
+	assert(!IS_IN_STRINGPOOL(input, input_len));
 	max_output_len = *max_len;
 	in_multi_line_xecute = out_multi_line_xecute = *multi_line_xecute;
 	if (in_multi_line_xecute)
