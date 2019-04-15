@@ -58,7 +58,7 @@ int ydb_exit()
 
         SETUP_THREADGBL_ACCESS;
 	if (!ydb_init_complete)
-		return 0;		/* If we aren't initialized, we don't have things to take down so just return */
+		return YDB_OK;		/* If we aren't initialized, we don't have things to take down so just return */
 	if (dollar_tlevel && simpleThreadAPI_active)
 	{	/* We are inside TP. If $TLEVEL is 2 (i.e. TP depth is 2), in SimpleThreadAPI mode, we cannot differentiate
 		 * if this "ydb_exit" call is happening inside the 1st level TP callback function or a 2nd level TP callback
@@ -152,5 +152,5 @@ int ydb_exit()
 		ydb_init_complete = FALSE;
 	}
 	THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
-	return 0;
+	return YDB_OK;
 }
