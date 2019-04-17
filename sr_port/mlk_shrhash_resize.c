@@ -3,6 +3,9 @@
  * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -79,7 +82,6 @@ boolean_t mlk_shrhash_resize(mlk_pvtctl_ptr_t pctl)
 			nbi = hash % shrhash_size_new;
 			new_bucket = &shrhash_new[nbi];
 			fi = mlk_shrhash_find_bucket(&pctl_new, hash);
-			assert(-1 != fi);
 			if (-1 == fi)
 			{	/* Hash insert failure. Try a larger hash table. */
 				status = SHMDT(shrhash_new);
