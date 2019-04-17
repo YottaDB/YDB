@@ -291,7 +291,7 @@ STATICFNDEF char *scan_ident(char *c)
 	return (b == c) ? 0 : b;
 }
 
-/* Function for scaning through words in the call table
+/* Function for scanning through words in the call table
  * that change the way the external call behaves (eg. SIGSAFE)
  * scans through list of key words and fills out any array of booleans
  * inside the extcall_entry_list struct. Note behavioral words must be

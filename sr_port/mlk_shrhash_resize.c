@@ -73,7 +73,7 @@ boolean_t mlk_shrhash_resize(mlk_pvtctl_ptr_t pctl)
 		pctl_new.shrhash_size = shrhash_size_new;
 		pctl_new.hash_fail_cnt = 0;
 
-		for (obi=0 ; obi < shrhash_size_old ; obi++)
+		for (obi = 0; obi < shrhash_size_old; obi++)
 		{
 			if (0 == shrhash_old[obi].shrblk_idx)
 				continue;

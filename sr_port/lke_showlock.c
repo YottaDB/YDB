@@ -86,8 +86,7 @@ void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name)
 		memcpy(name->addr, value->data, value->length);
 		name->len = value->length;
 		name->addr[name->len++] = '(';
-	}
-	else
+	} else
 	{
 		/* perform ZWR translation on the subscript */
 		len1 = name->len - 1;
@@ -104,8 +103,7 @@ void lke_formatlocknode(mlk_shrblk_ptr_t node, mstr* name)
 			assert(name->addr[len1 + len2 - 1] == '"');
 			name->addr[len1] = save_ch;
 			len2 -= 2; /* exclude the enclosing quotes */
-		}
-		else
+		} else
 			format2zwr((sm_uc_ptr_t) value->data, value->length, (unsigned char*) &name->addr[name->len], &len2);
 
 		name->len += len2;

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -75,14 +78,13 @@ void	lke_clear(void)
 	node.len = SIZEOF(nodebuf);
 	one_lock.addr = one_lockbuf;
 	one_lock.len = SIZEOF(one_lockbuf);
-	if (lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0) == 0)
+	if (0 == lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0))
 		return;
 	/* Search all regions specified on the command line */
 	for (reg = gd_header->regions, n = 0; n != gd_header->n_regions; ++reg, ++n)
 	{	/* If region matches and is open */
-		if ((regname.len == 0  ||
-		     reg->rname_len == regname.len  &&  memcmp(reg->rname, regname.addr, regname.len) == 0)  &&
-		    reg->open)
+		if (((0 == regname.len) || (reg->rname_len == regname.len) && (0 == memcmp(reg->rname, regname.addr, regname.len)))
+			&& reg->open)
 		{
 			match = TRUE;
 			util_out_print("!/!AD!/", NOFLUSH, REG_LEN_STR(reg));
@@ -105,7 +107,7 @@ void	lke_clear(void)
 				MLK_PVTCTL_INIT(pctl, reg);
 				/* Prevent any modifications of locks while we are clearing */
 				GRAB_LOCK_CRIT_AND_SYNC(pctl, was_crit);
-				locks = pctl.ctl->blkroot == 0 ? FALSE
+				locks = (0 == pctl.ctl->blkroot) ? FALSE
 							  : lke_cleartree(&pctl, NULL,
 									  (mlk_shrblk_ptr_t)R2A(pctl.ctl->blkroot),
 									  all, interactive, pid, one_lock, exact);

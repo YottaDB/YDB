@@ -14,6 +14,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -44,39 +45,35 @@ void gtcml_chkreg(void)
 	while (reg)
 	{
 		gv_cur_region = reg->region->reg;
-		if (reg->region->refcnt == 0)
+		if (0 == reg->region->refcnt)
 		{
 			gtcml_chklck(reg,FALSE);
-			assert (reg->lock == 0);
-		}
-		else if (reg->region->wakeup < ((mlk_ctldata *)FILE_INFO(gv_cur_region)->s_addrs.mlkctl)->wakeups)
+			assert(0 == reg->lock);
+		} else if (reg->region->wakeup < ((mlk_ctldata *)FILE_INFO(gv_cur_region)->s_addrs.mlkctl)->wakeups)
 		{
 			gtcml_chklck(reg,FALSE);
 			reg->region->wakeup = ((mlk_ctldata *)FILE_INFO(gv_cur_region)->s_addrs.mlkctl)->wakeups;
 			reg->pass = CM_BLKPASS;
-		}
-		else if (--reg->pass == 0)
+		} else if (0 == --reg->pass)
 		{
 			gtcml_chklck(reg,TRUE);
 			reg->pass = CM_BLKPASS;
 		}
 
-		if (reg->lock == 0)
+		if (0 == reg->lock)
 		{
 			if (reg == blkdlist)
 			{
 				blkdlist = reg->next;
 				free(reg);
 				reg = reg1 = blkdlist;
-			}
-			else
+			} else
 			{
 				reg1->next = reg->next;
 				free(reg);
 				reg = reg1->next;
 			}
-		}
-		else
+		} else
 		{
 			reg1 = reg;
 			reg = reg->next;

@@ -3,6 +3,9 @@
  * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -75,7 +78,7 @@ hash_table_int4 *create_utf8_xlate_table(mval *srch, mval *rplc, int4 *xlate)
 		} else
 		{
 			assert(NULL != xlate_hash);
-			if(!lookup_hashtab_int4(xlate_hash, (uint4*)&scode))
+			if (!lookup_hashtab_int4(xlate_hash, (uint4*)&scode))
 			{	/* Store the offset of that character in replace string */
 				add_hashtab_int4(xlate_hash, (uint4*)&scode, (void*)(rprev - rbase + 1), &tabent);
 			}
@@ -92,7 +95,7 @@ hash_table_int4 *create_utf8_xlate_table(mval *srch, mval *rplc, int4 *xlate)
 		} else
 		{
 			assert(NULL != xlate_hash);
-			if(!lookup_hashtab_int4(xlate_hash, (uint4*)&scode))
+			if (!lookup_hashtab_int4(xlate_hash, (uint4*)&scode))
 				add_hashtab_int4(xlate_hash, (uint4*)&scode, (void*)(MAXPOSINT4), &tabent);
 		}
 	}

@@ -89,7 +89,7 @@ void	lke_show(void)
 	node.len = SIZEOF(nodebuf);
 	one_lock.addr = one_lockbuf;
 	one_lock.len = SIZEOF(one_lockbuf);
-	if (lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0) == 0)
+	if (0 == lke_getcli(&all, &wait, &interactive, &pid, &regname, &node, &one_lock, &memory, &nocrit, &exact, 0, 0))
 		return;
 	/* Search all regions specified on the command line */
 	for (reg = gd_header->regions, n = 0; n != gd_header->n_regions; ++reg, ++n)
@@ -150,7 +150,7 @@ void	lke_show(void)
 				MLK_PVTCTL_SET_CTL(pctl2, ctl);
 				if (MLK_CTL_BLKHASH_EXT != pctl.ctl->blkhash)
 					pctl2.shrhash = (mlk_shrhash_ptr_t)R2A(pctl2.ctl->blkhash);
-				locks = (ctl->blkroot == 0)
+				locks = (0 == ctl->blkroot)
 						? FALSE
 						: lke_showtree(NULL, &pctl2, all, wait, pid, one_lock, memory, &shr_sub_len);
 				/* lock space usage consists of: control_block + nodes(locks) +  processes + substrings */
