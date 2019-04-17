@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,8 +71,6 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ENVIRONMENT_INIT,           "$ydb_environment
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ENV_TRANSLATE,              "$ydb_env_translate",              "$gtm_env_translate")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ERROR_ON_JNL_FILE_LOST,     "$ydb_error_on_jnl_file_lost",     "$gtm_error_on_jnl_file_lost")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ETRAP,                      "$ydb_etrap",                      "$gtm_etrap")
-YDBENVINDX_TABLE_ENTRY (YDBENVINDX_EVENT_LOG_LIBPATH,          "$ydb_event_log_libpath",          "$gtm_event_log_libpath")
-YDBENVINDX_TABLE_ENTRY (YDBENVINDX_EVENT_LOG_RTN,              "$ydb_event_log_rtn",              "$gtm_event_log_rtn")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_EXTRACT_NOCOL,              "$ydb_extract_nocol",              "$gtm_extract_nocol")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_FULLBLOCKWRITES,            "$ydb_fullblockwrites",            "$gtm_fullblockwrites")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GBLDIR,                     "$ydb_gbldir",                     "$gtmgbldir")

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,6 +52,7 @@
 #include "ydb_chk_dist.h"
 #include "gtmimagename.h"
 #include "have_crit.h"
+#include "gtm_post_startup_check_init.h"
 
 GBLREF	char		ydb_dist[YDB_PATH_MAX];
 GBLREF	boolean_t	ydb_dist_ok_to_use;
@@ -122,5 +123,6 @@ int ydb_chk_dist(char *image)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_YDBDISTUNVERIF, 4, LEN_AND_STR(ydb_dist), LEN_AND_STR(image));
 	}
 	ydb_dist_ok_to_use = TRUE;
+	gtm_post_startup_check_init();
 	return 0;
 }
