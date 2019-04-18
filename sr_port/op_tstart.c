@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -445,14 +445,17 @@ void	op_tstart(int tstart_flag, ...) /* value of $T when TSTART */
 			tf->extnam_str.addr = ptr;
 		}
 		tf->active_lv = active_lv;
-		if (implicit_tstart && (NULL != active_lv))
+		if (implicit_tstart && (NULL != active_lv) && (0 == (tstart_flag & YDB_TP_S_TSTART)))
 		{	/* If active_lv is non-NULL at the start of an implicit TP (possible for example if implicit TP was
 			 * started from an op_gvdata call made inside op_merge.c) we should not tamper with this active_lv
 			 * as part of the tp_unwind processing of the implicit TP. That active_lv is only for the caller
 			 * (op_merge in this case) to play with. So save this active_lv in the TP frame (to be restored
 			 * later at commit or rollback time) and set active_lv to NULL for the duration of this TP.
 			 * Note: We cannot do this save/restore of active_lv for explicit transactions as those might actually
-			 * tamper with active_lv by freeing that memory (e.g. kill * operations).
+			 * tamper with active_lv by freeing that memory (e.g. kill * operations). We cannot also do this
+			 * save/restore of active_lv for SimpleAPI/SimpleThreadAPI TP (i.e. started by "ydb_tp_s"/"ydb_tp_st"),
+			 * as the TP callback function can free the "active_lv" memory (e.g. "ydb_delete_s" operations). Hence
+			 * the YDB_TP_S_TSTART usage in the above "if" check.
 			 */
 			SET_ACTIVE_LV(NULL, implicit_tstart ? FALSE : TRUE, actlv_op_tstart);
 		}

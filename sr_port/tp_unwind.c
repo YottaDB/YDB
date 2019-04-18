@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -132,7 +132,8 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 		{	/* outermost TCOMMIT. Restore active_lv to what it was at implicit TSTART time if it was non-NULL */
 			assert(NULL != tp_pointer);
 			assert(NULL == tp_pointer->old_tp_frame);
-			if (tp_pointer->implicit_tstart)
+			/* See comment in sr_port/op_tstart.c about YDB_TP_S_TSTART usage for why ydb_tp_s_tstart is used below */
+			if (tp_pointer->implicit_tstart && !tp_pointer->ydb_tp_s_tstart)
 			{
 				lv = tp_pointer->active_lv;
 				if (NULL != lv)
