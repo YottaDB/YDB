@@ -83,7 +83,7 @@ enum
 #endif
 
 /* Value for tptoken for SimpleThreadAPI calls if NOT in a TP transaction */
-#define	YDB_NOTTP	0
+#define	YDB_NOTTP	((uint64_t)0)
 
 /* Macro to create/fill-in a ydb_buffer_t structure from a C string literal (string constant) */
 #define	YDB_LITERAL_TO_BUFFER(LITERAL, BUFFERP)					\
