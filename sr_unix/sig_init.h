@@ -176,6 +176,11 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	}													\
 }
 
+/* Macro returns TRUE if SIG is generated as a direct result of the execution of a specific hardware instruction
+ * within the context of the thread/process.
+ */
+#define	IS_SIG_THREAD_DIRECTED(SIG)	((SIGBUS == SIG) || (SIGFPE == SIG) || (SIGILL == SIG) || (SIGSEGV == SIG))
+
 /* If SIG is DUMMY_SIG_NUM, we are guaranteed this is a forwarded signal. Otherwise, it could still be forwarded
  * from a "pthread_kill" invocation from the MAIN worker thread or the thread that randomly got the original signal.
  * We find that out by using the linux-only SI_TKILL info code to check if this signal came from a "tkill" system call.
@@ -202,9 +207,9 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	GBLREF	boolean_t	gtm_jvm_process;										\
 	DEBUG_ONLY(GBLREF uint4	dollar_tlevel;)											\
 																\
-	pthread_t		mutex_holder_thread_id, this_thread_id;								\
+	pthread_t		mutexHolderThreadId, thisThreadId;								\
 	int			i, tLevel;											\
-	boolean_t		signalForwarded;										\
+	boolean_t		isSigThreadDirected, signalForwarded, thisThreadIsMutexHolder;					\
 																\
 	assert((DUMMY_SIG_NUM == SIG) || (NULL != INFO));									\
 	if (DUMMY_SIG_NUM != SIG)												\
@@ -228,9 +233,9 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 			 * fact that a timer invocation happened and let the MAIN worker thread invoke "timer_handler"		\
 			 * outside of the signal handler as part of its normal processing ("ydb_stm_thread"). 			\
 			 */													\
-			this_thread_id = pthread_self();									\
-			assert(this_thread_id);											\
-			SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutex_holder_thread_id, tLevel);					\
+			thisThreadId = pthread_self();										\
+			assert(thisThreadId);											\
+			SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutexHolderThreadId, tLevel);					\
 			/* If we are in TP, we hold the mutex lock "ydb_engine_threadsafe_mutex[tLevel]" but it is possible	\
 			 * concurrent threads are creating nested TP transactions in which case the YottaDB engine mutex lock	\
 			 * would move to "ydb_engine_threadsafe_mutex[tLevel+1]" and so on. In order to be sure we are the only	\
@@ -240,9 +245,17 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 			 * thread. Even if we forward to the wrong thread (since we are not determining the engine lock holder	\
 			 * using any other locks), it is okay since the MAIN worker thread ("ydb_stm_thread") will take care of	\
 			 * periodically forwarding the signal to the current engine lock holder thread until it eventually gets	\
-			 * handled.												\
+			 * handled. The only exception to this rule is if we are handling a signal that is thread directed	\
+			 * (e.g. SIG-11/SIGSEGV) in which case we check if we hold the "ydb_engine_threadsafe_mutex[tLevel]"	\
+			 * lock and if so we assume there is no other thread holding "ydb_engine_threadsafe_mutex[tLevel+1]"	\
+			 * and treat us as holding the YottaDB engine lock and proceed with signal handling even if we are in	\
+			 * TP. This is to avoid a scenario where we otherwise forward the signal to ourselves eternally (as	\
+			 * we are the YottaDB engine lock holder) and not proceed to invoking the signal handler function.	\
 			 */													\
-			if (tLevel || !pthread_equal(mutex_holder_thread_id, this_thread_id))					\
+			thisThreadIsMutexHolder = pthread_equal(mutexHolderThreadId, thisThreadId);				\
+			isSigThreadDirected = IS_SIG_THREAD_DIRECTED(SIG);							\
+			signalForwarded = IS_SIGNAL_FORWARDED(SIGHNDLRTYPE, SIG, INFO);						\
+			if (!thisThreadIsMutexHolder || (tLevel && (!isSigThreadDirected || signalForwarded)))			\
 			{	/* It is possible we are the MAIN worker thread that gets the SIGALRM signal but		\
 				 * another thread that is holding the YottaDB engine lock is waiting for the signal		\
 				 * to know of a timeout (e.g. ydb_lock_st etc.). Therefore forward the signal to that		\
@@ -252,23 +265,24 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 				 * (could lead to indefinite forwardings). Hence the "STAPI_IS_SIGNAL_HANDLER_DEFERRED"		\
 				 * check below which ensures a max limit of 1 signal forwarding.				\
 				 */												\
-				signalForwarded = IS_SIGNAL_FORWARDED(SIGHNDLRTYPE, SIG, INFO);					\
 				if (!signalForwarded)										\
 				{												\
 					STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG, INFO, CONTEXT);			\
-					if (mutex_holder_thread_id)								\
-						pthread_kill(mutex_holder_thread_id, SIG);					\
+					if (mutexHolderThreadId && !thisThreadIsMutexHolder)					\
+						pthread_kill(mutexHolderThreadId, SIG);						\
 				}												\
 				if (IS_EXI_SIGNAL)										\
 					DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG);						\
 				return;												\
 			} else													\
-			{	/* We are not in TP and hold the YottaDB engine lock "ydb_engine_threadsafe_mutex[0]".		\
-				 * We are guaranteed no new TP transaction happens while we hold this lock.			\
-				 * Therefore we can safely proceed to handle the signal.					\
+			{	/* Two possibilities.										\
+				 * a) We are not in TP and hold the YottaDB engine lock "ydb_engine_threadsafe_mutex[0]".	\
+				 *    We are guaranteed no new TP transaction happens while we hold this lock.			\
+				 *    Therefore we can safely proceed to handle the signal.					\
+				 * b) We are in TP but this is a thread-directed signal and we hold the engine lock at		\
+				 *    the current tlevel.									\
 				 */												\
-				assert(!dollar_tlevel);										\
-				signalForwarded = IS_SIGNAL_FORWARDED(SIGHNDLRTYPE, SIG, INFO);					\
+				assert(thisThreadIsMutexHolder && isSigThreadDirected && !signalForwarded || !dollar_tlevel);	\
 				if (!signalForwarded)										\
 				{	/* Signal was not forwarded.								\
 					 * Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info".	\
@@ -286,8 +300,8 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 			}													\
 		} else														\
 		{														\
-			this_thread_id = pthread_self();									\
-			if (gtm_main_thread_id_set && !pthread_equal(gtm_main_thread_id, this_thread_id))			\
+			thisThreadId = pthread_self();										\
+			if (gtm_main_thread_id_set && !pthread_equal(gtm_main_thread_id, thisThreadId))				\
 			{	/* Only redirect the signal if the main thread ID has been defined, and we are not that. */	\
 				/* Caller wants INFO and CONTEXT to be recorded as forwarding the signal would lose		\
 				 * that information in the forwarded call to the signal handler. Do that first.			\
