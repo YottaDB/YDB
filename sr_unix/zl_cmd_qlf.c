@@ -116,12 +116,17 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 		}
 		assert(pblk.b_name);
 		file.addr = pblk.l_name;
-		file.len = pblk.b_name;
-		if ((0 == pblk.b_ext) && ( MAX_FN_LEN >= (*srclen + SIZEOF(DOTM))))
-		{
-			memcpy(&pblk.l_name[pblk.b_name], DOTM, SIZEOF(DOTM));
-			pblk.b_ext = (SIZEOF(DOTM) - 1);
+		if ((pblk.b_ext != (SIZEOF(DOTM) - 1)) || memcmp(&pblk.l_name[pblk.b_name], DOTM, SIZEOF(DOTM) - 1))
+		{	/* Move any non-".m" extension over to be part of the file name */
+			pblk.b_name += pblk.b_ext;
+			pblk.b_ext = 0;
+			if (MAX_FN_LEN >= (*srclen + SIZEOF(DOTM)))
+			{
+				memcpy(&pblk.l_name[pblk.b_name], DOTM, SIZEOF(DOTM));
+				pblk.b_ext = (SIZEOF(DOTM) - 1);
+			}
 		}
+		file.len = pblk.b_name;
 		source_name_len = pblk.b_dir + pblk.b_name + pblk.b_ext;
 		source_name_len = MIN(source_name_len, MAX_FN_LEN);
 		memcpy(source_file_name, pblk.buffer, source_name_len);
