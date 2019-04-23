@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -171,7 +171,7 @@ MBSTART {					\
 		rel_crit(REG);			\
 } MBEND
 
-/* The below macro returns TRUE if there is some cache-record is likely still dirty in
+/* The below macro returns TRUE if there is some cache-record still dirty in
  *	a) active queue     : (CNL->wcs_active_lvl || CRQ->fl) check OR
  *	b) wip queue        : (CRWIPQ->fl)                     check OR
  *	c) in neither queue : (N_BTS != CNL->wc_in_free)       check
@@ -485,6 +485,7 @@ boolean_t wcs_flu(uint4 options)
 		CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
 		if (!ret)
 		{	/* We expect caller to trigger cache-recovery which will fix the wip queue */
+			REL_CRIT_BEFORE_RETURN(cnl, reg);
 			return FALSE;
 		}
 		WCS_OPS_TRACE(csa, process_id, wcs_ops_flu3, 0, 0, 0, 0, 0);
@@ -517,6 +518,7 @@ boolean_t wcs_flu(uint4 options)
 			CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
 			if (!ret)
 			{	/* We expect caller to trigger cache-recovery which will fix the wip queue */
+				REL_CRIT_BEFORE_RETURN(cnl, reg);
 				return FALSE;
 			}
 			WCS_OPS_TRACE(csa, process_id, wcs_ops_flu5, 0, 0, 0, 0, 0);
@@ -554,6 +556,7 @@ boolean_t wcs_flu(uint4 options)
 						CLEAR_WIP_QUEUE_IF_NEEDED(asyncio, wtstart_or_wtfini_errno, cnl, crwipq, reg, ret);
 						if (!ret)
 						{	/* We expect caller to trigger cache-recovery which will fix wip queue */
+							REL_CRIT_BEFORE_RETURN(cnl, reg);
 							return FALSE;
 						}
 						if (!FLUSH_NOT_COMPLETE(cnl, crq, crwipq, n_bts))
@@ -613,12 +616,18 @@ boolean_t wcs_flu(uint4 options)
 						 * will get confused (see explanation above where variable "in_commit" gets set).
 						 */
 						assert(was_crit);	/* so don't need to rel_crit */
-						cnl->doing_epoch = FALSE;
-						cnl->wcsflu_pid = 0;
+						REL_CRIT_BEFORE_RETURN(cnl, reg);	/* invoke macro as it does other cleanup
+											 * besides just releasing crit.
+											 */
 						return FALSE;
 					}
 					assert(!jnl_enabled || jb->fsync_dskaddr == jb->rsrv_freeaddr);
 					assert(0 == wtstart_or_wtfini_errno);
+					if (is_src_server)
+					{	/* source server does not do "wcs_recover". So return in this case. */
+						REL_CRIT_BEFORE_RETURN(cnl, reg);
+						return FALSE;
+					}
 					wcs_recover(reg);
 					if (jnl_enabled)
 					{
