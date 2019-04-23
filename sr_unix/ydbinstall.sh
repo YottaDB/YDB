@@ -342,6 +342,7 @@ if [ "N" = "$ydb_force_install" ]; then
 	# --force-install is not specified, it is okay to do the os-version check now.
 	osfile="/etc/os-release"
 	osver_supported=0 # Consider platform unsupported by default
+	isdebianbusteronx8664=0	# Set current platform to not be Debian 10 buster/sid on x86_64 by default
 	if [ -f "$osfile" ] ; then
 		osid=`grep -w ID $osfile | cut -d= -f2 | cut -d'"' -f2`
 		osver=`grep -w VERSION_ID $osfile | cut -d= -f2 | cut -d'"' -f2`
@@ -353,10 +354,16 @@ if [ "N" = "$ydb_force_install" ]; then
 				# Ubuntu 18.04 and onwards is considered supported on 64-bit x86 architecture
 				osallowmajorver="18"
 				osallowminorver="04"
-			else
-				if [ "rhel" = "${osid}" ] ; then
-					# RHEL 7.x is considered supported on 64-bit x86 architecture
-					osallowmajorver="7"
+			elif [ "rhel" = "${osid}" ] ; then
+				# RHEL 7.x is considered supported on 64-bit x86 architecture
+				osallowmajorver="7"
+				osallowminorver="0"
+			elif [ "debian" = "${osid}" ] ; then
+				# Only Debian 10 (buster/sid) is considered supported on 64-bit x86 architecture for now.
+				prettyname=`grep -w PRETTY_NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
+				if [ "Debian GNU/Linux buster/sid" = "${prettyname}" ] ; then
+					isdebianbusteronx8664=1
+					osallowmajorver="10"
 					osallowminorver="0"
 				fi
 			fi
@@ -376,12 +383,16 @@ if [ "N" = "$ydb_force_install" ]; then
 			fi
 		fi
 		osmajorver=`echo $osver | cut -d. -f1`
+		# It is possible there is no major version (e.g. Debian 10 buster/sid). In that case, set major version as 10.
+		if [ "" = "$osmajorver" -a 1 = $isdebianbusteronx8664 ] ; then
+			osmajorver="10"
+		fi
 		# It is possible there is no minor version (e.g. Raspbian 9) in which case "cut" will not work
 		# as -f2 will give us 9 again. So use awk in that case which will give us "" as $2.
 		osminorver=`echo $osver | awk -F. '{print $2}'`
 		if [ "" = "$osminorver" ] ; then
 			# Needed by "expr" (since it does not compare "" vs numbers correctly)
-			# in case there is no minor version field (e.g. Raspbian 9).
+			# in case there is no minor version field (e.g. Raspbian 9 or even Debian 10 buster/sid).
 			osminorver="0"
 		fi
 		if [ 1 = `expr "$osmajorver" ">" "$osallowmajorver"` ] ; then
