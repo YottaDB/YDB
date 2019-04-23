@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -64,7 +64,7 @@ RUN locale-gen en_US.UTF-8
 WORKDIR /data
 COPY --from=ydb-release-builder /tmp/yottadb-release /tmp/yottadb-release
 RUN cd /tmp/yottadb-release  \
- && icu-config --version \
+ && pkg-config --modversion icu-io \
       > /tmp/yottadb-release/.icu.vsn \
  && ./ydbinstall \
       --utf8 `cat /tmp/yottadb-release/.icu.vsn` \

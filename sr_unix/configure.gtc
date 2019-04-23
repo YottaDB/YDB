@@ -4,7 +4,7 @@
 # Copyright (c) 2009-2017 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -311,7 +311,8 @@ if [ -d "utf8" ]; then
 			maj=`$echo $ydb_icu_version | cut -f 1 -d "."`
 			if [ "$maj" -ge "49" ] ; then
 				# Assuming the input is of the form 52.1. As of ICU 49 (aka 4.9),
-				# the version reported by icu-config --version is <major><minor>.<milli> and not <major>.<minor>
+				# the version reported by "pkg-config --modversion icu-io"
+				# is <major><minor>.<milli> and not <major>.<minor>
 				majmin=$maj
 			else
 				# Assuming the input is of the form 4.2.1

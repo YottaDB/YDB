@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,9 +134,9 @@ error_def(ERR_ICUVERLT36);
 
 /*
  * The ICU project has used two different formats to specify the version. These format are visible to us
- * through icu-config, the library name and renamed symbols.
+ * through pkg-config, the library name and renamed symbols.
  *
- * icu-config reported the version in the following format from ICU 3.6 until ICU 4.8
+ * pkg-config reported the version in the following format from ICU 3.6 until ICU 4.8
  * 	<major> . <minor> . <sub minor vers...>
  * As of ICU 49 (aka 4.9), the format returned is:
  * 	<major><minor> . <sub minor vers...>

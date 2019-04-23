@@ -60,14 +60,14 @@ if [ -s $ydb_tmp_env/err ] ; then
 else
     . $ydb_tmp_env/out
     if [ "UTF-8" = "$ydb_chset" ] ; then
-	export ydb_icu_version=`icu-config --version`
+	export ydb_icu_version=`pkg-config --modversion icu-io`
 	export gtm_icu_version=$ydb_icu_version
     else unset ydb_icu_version gtm_icu_version
     fi
     rm -rf $ydb_tmp_env
     $ydb_dist/mupip journal -recover -backward "*" 2>$ydb_tmp/"$USER"_`date -u +%Y%m%d%H%M%S`"UTC_mupip_recover" && \
 	find $ydb_dir/$ydb_rel/g -name \*.mjl_\* -mtime +$ydb_retention -exec rm -f {} \; && \
-	find $ydb_tmp -name "$USER"_\* -mtime +$ydb_retention -exec rm -f {} \; 
+	find $ydb_tmp -name "$USER"_\* -mtime +$ydb_retention -exec rm -f {} \;
 fi
 
 # Restore ydb_passwd / gtm_passwd if it was set
