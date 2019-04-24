@@ -60,9 +60,9 @@ GBLREF	uint4			process_id;
 GBLREF	volatile int4		db_fsync_in_prog;	/* for DB_FSYNC macro usage */
 GBLREF	jnl_gbls_t		jgbl;
 GBLREF	bool			in_mupip_freeze;
+GBLREF	boolean_t		is_src_server;
 #ifdef DEBUG
 GBLREF	boolean_t		in_mu_rndwn_file;
-GBLREF	boolean_t		is_src_server;
 GBLREF	boolean_t		mupip_jnl_recover;
 #endif
 
