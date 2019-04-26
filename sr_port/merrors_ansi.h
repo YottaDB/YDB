@@ -138,7 +138,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLINVALID */
 	   0,	/* MBXWRTONLY */
 	   0,	/* MEMORY */
-	   0,	/* UNUSEDMSG305 */
+	   0,	/* DONOBLOCK */
 	   0,	/* UNUSEDMSG306 */
 	   0,	/* UNUSEDMSG307 */
 	   0,	/* UNUSEDMSG308 */
@@ -1535,4 +1535,6 @@ const static readonly int error_ansi[] = {
 	   0,	/* APDCONNFAIL */
 	   0,	/* APDLOGFAIL */
 	   0,	/* STATSDBMEMERR */
+	   0,	/* BUFSPCDELAY */
+	   0,	/* AIOQUEUESTUCK */
 	};

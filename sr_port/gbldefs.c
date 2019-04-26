@@ -182,7 +182,6 @@ GBLDEF	boolean_t	is_updproc,
 			unhandled_stale_timer_pop,
 			gtcm_connection,
 			is_replicator,		/* TRUE => this process can write jnl records to the jnlpool for replicated db */
-	                tp_in_use,		/* TRUE => TP has been used by this process and is thus initialized */
 			dollar_truth = TRUE,
 			ydb_stdxkill,		/* TRUE => Use M Standard X-KILL - FALSE use historical GTM X-KILL (default) */
 			in_timed_tn,		/* TRUE => Timed TP transaction in progress */
@@ -198,11 +197,9 @@ GBLDEF	VSIG_ATOMIC_T	forced_exit;		/* Asynchronous signal/interrupt handler sets
 						 */
 GBLDEF	intrpt_state_t	intrpt_ok_state = INTRPT_OK_TO_INTERRUPT;	/* any other value implies it is not ok to interrupt */
 GBLDEF	unsigned char	*msp,
-			*restart_ctxt,
 			*stackbase,
 			*stacktop,
-			*stackwarn,
-			*restart_pc;
+			*stackwarn;
 GBLDEF	int4		backup_close_errno,
 			backup_write_errno,
 			mubmaxblk,

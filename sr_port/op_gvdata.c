@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,8 @@ GBLREF gv_key		*gv_currkey;
 
 LITREF mval		*fndata_table[2][2];
 
+#define	NONULLSUBS	"$DATA() failed because"
+
 void op_gvdata(mval *v)
 {
 	mint			x;
@@ -37,7 +39,7 @@ void op_gvdata(mval *v)
 
 	SETUP_THREADGBL_ACCESS;
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
-		sgnl_gvnulsubsc();
+		sgnl_gvnulsubsc(NONULLSUBS);
 	acc_meth = REG_ACC_METH(gv_cur_region);
 	if (IS_ACC_METH_BG_OR_MM(acc_meth))
 	{

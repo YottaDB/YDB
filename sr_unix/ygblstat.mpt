@@ -136,7 +136,7 @@ SHOW(wkstat,stat)
 	new i,r,ret,tmp
 	do:$piece($text(version),";",2)>$piece($get(%YGS),"|",2) INITYGS
 	set stat=$get(stat)
-	if ""'=$get(wkstat) do ; ,(%YGS(-1)'=wkstat) do
+	if ""'=$get(wkstat) do
 	. if %YGS<$zlength(wkstat) set wkstat=$zextract(wkstat,$zlength(wkstat)-%YGS(-2),$zlength(wkstat))
 	. else  set:%YGS>$zlength(wkstat) wkstat=$zextract(%YGS(-1),1,%YGS-$zlength(wkstat))_wkstat	; protect against user error
 	. if 1=$zlength(stat,","),""'=stat,"*"'=stat do                                 ; only one statistic
@@ -157,9 +157,9 @@ SHOW(wkstat,stat)
 STAT(pid,stat,gld,reg)
 	; Report requested statistics
 	; If single pid specified, verify that it exists
-	new i,nextpid,nextreg,nextstat,num,offset,r,ret,wkstat,statszm1,tmp,$zgbldir
-	set:$data(gld) $zgbldir=gld
-	set pid=$get(pid),reg=$zconvert($get(reg),"U"),stat=$get(stat)
+	new i,nextpid,nextreg,nextstat,num,offset,r,ret,statszm1,tlen,tmp,wkstat
+	if $data(gld) new $zgbldir set $zgbldir=gld
+	set pid=$get(pid),reg=$zconvert($get(reg),"U"),stat=$get(stat),tlen=0
 	do:'$data(%YGS) INITYGS
 	set statszm1=%YGS(-2)     ; precalculate values to save recalculation
 	; Gather statistics - as a process may terminate after a $order() to get a pid
@@ -172,26 +172,36 @@ STAT(pid,stat,gld,reg)
 	if $zlength(pid)&(pid=+pid) set nextpid=pid do	    		; one process
 	. if $zlength($zsearch("/proc/"_nextpid))!$zlength($zsearch("/proc/"_nextpid)) do	;process exists
 	. . if $zlength(reg)&("*"'=reg) do		; one process, one region
-	. . . set tmp=$get(^%YGS(reg,pid))
-	. . . set wkstat=$select($zlength(tmp):$zextract(tmp,$zlength(tmp)-statszm1,$zlength(tmp)),1:"")
+	. . . set tmp=$get(^%YGS(reg,pid)),tlen=$zlength(tmp)
+	. . . set wkstat=$select(tlen:$zextract(tmp,tlen-statszm1,tlen),1:"")
 	. . else  do			      		; one process, multiple regions
 	. . . set nextreg="",wkstat=%YGS(-1) for  set nextreg=$order(^%YGS(nextreg)) quit:""=nextreg  do
-	. . . . set nextstat=$get(^%YGS(nextreg,pid)),tmp=$zlength(nextstat)
+	. . . . set nextstat=$get(^%YGS(nextreg,pid)),tmp=$zlength(nextstat),tlen=tlen+tmp
 	. . . . set:tmp r=$&gblstat.accumulate(.wkstat,$zextract(nextstat,tmp-statszm1,tmp))
 	. else  set wkstat=""				; process does not exist
 	else  set wkstat=%YGS(-1) if $zlength(reg)&("*"'=reg) do STATREG(reg)	; all processes one region
 	; all processes, all regions
 	else  set nextreg="" for  set nextreg=$order(^%YGS(nextreg)) quit:""=nextreg  do STATREG(nextreg)
-	quit $$SHOW(wkstat,stat)
+	quit $select(tlen:$$SHOW(wkstat,stat),1:"")
 
 STATREG(reg)
 	; Accumulate statistics for all processes in a region
 	; Refer to comments above on need to use $get() wrapper & test $zlength()
 	new nextpid,tmp
 	set nextpid="" for  set nextpid=$order(^%YGS(reg,nextpid)) quit:""=nextpid  do
-	. set nextstat=$get(^%YGS(reg,nextpid)),tmp=$zlength(nextstat)
-	. set:tmp r=$&gblstat.accumulate(.wkstat,$zextract(nextstat,tmp-statszm1,tmp))
+	. set nextstat=$get(^%YGS(reg,nextpid)),tlen=$zlength(nextstat)
+	. set:tlen r=$&gblstat.accumulate(.wkstat,$zextract(nextstat,tlen-statszm1,tlen))
 	quit
+
+IN(pid,gdir,region)	; report on whether a process can be found in a region
+	quit:'$get(pid) ""
+	new gld,reg
+	set gld=$get(gdir),reg=$zconvert($get(region),"U")
+	if ""'=gld new $zgbldir set $zgbldir=gld
+	set:""=reg reg="*"
+	if "*"=reg do  quit ""'=reg				; any region
+	. for  set reg=$order(^%YGS(reg)) quit:(""=reg)  quit:$data(^%YGS(reg,pid))
+	quit $select('$data(^%YGS(reg)):"",1:$data(^%YGS(reg,pid)))
 
 ;	Error message texts - termination by Ctrl-C must be last message
 U249	;"-F-ILLEGALCMDLINE Illegal command line starting with --"_cmdline

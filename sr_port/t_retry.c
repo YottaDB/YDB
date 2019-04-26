@@ -31,7 +31,6 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "tp_frame.h"
 #include "sleep_cnt.h"
@@ -129,7 +128,7 @@ error_def(ERR_NONTPRESTART);
 void t_retry(enum cdb_sc failure)
 {
 	tp_frame		*tf;
-	unsigned char		*end, buff[MAX_ZWR_KEY_SZ];
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, fail_hist[RESTART_CODE_EXPANSION_FACTOR];
 	short			tl;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -139,7 +138,7 @@ void t_retry(enum cdb_sc failure)
 #	endif
 	boolean_t		skip_invoke_restart;
 	boolean_t		redo_root_search_done = FALSE;
-	unsigned int		local_t_tries;
+	unsigned int		c, local_t_tries;
 	mstr			gvname_mstr, reg_mstr;
 	gd_region		*restart_reg;
 	mval			t_restart_entryref;
@@ -188,6 +187,10 @@ void t_retry(enum cdb_sc failure)
 		 */
 		assert(!mupip_jnl_recover || WB_COMMIT_ERR_ENABLED || (CDB_STAGNATE > t_tries));
 		SET_WC_BLOCKED_FINAL_RETRY_IF_NEEDED(csa, cnl, failure);	/* set wc_blocked if cache related status */
+#		ifdef DEBUG
+		if (cnl && (dba_bg == csa->hdr->acc_meth))
+			GTM_WHITE_BOX_TEST(WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY, cnl->wc_blocked, WC_BLOCK_RECOVER); /* or wbox */
+#		endif
 		TREF(prev_t_tries) = t_tries;
 		TREF(rlbk_during_redo_root) = FALSE;
 		switch (t_tries)
@@ -228,10 +231,12 @@ void t_retry(enum cdb_sc failure)
 				gvname_mstr.len = gvname_unknown_len;
 			}
 			assert(gvname_mstr.len != 0);
-			caller_id_flag = FALSE;		/* don't want caller_id in the operator log */
 			restart_reg = gv_cur_region;
 			if (NULL != restart_reg)
 			{
+				assert(IS_STATSDB_REG(restart_reg)	/* global ^%YGS if, and only if, statsDB */
+				? !memcmp(&gv_currkey->base, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN)
+				: memcmp(&gv_currkey->base, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN));
 				reg_mstr.len = restart_reg->dyn.addr->fname_len;
 				reg_mstr.addr = (char *)restart_reg->dyn.addr->fname;
 			} else
@@ -239,6 +244,7 @@ void t_retry(enum cdb_sc failure)
 				reg_mstr.len = 0;
 				reg_mstr.addr = NULL;
 			}
+			caller_id_flag = FALSE;				/* don't want caller_id in the operator log */
 			if (IS_GTM_IMAGE)
 				getzposition(&t_restart_entryref);
 			else
@@ -247,18 +253,28 @@ void t_retry(enum cdb_sc failure)
 				t_restart_entryref.str.addr = NULL;
 				t_restart_entryref.str.len = 0;
 			}
-			assert(('L' != t_fail_hist[t_tries]) || (0 != TAREF1(t_fail_hist_blk, t_tries)));
-			if (cdb_sc_blkmod != failure)
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_NONTPRESTART, 11, reg_mstr.len, reg_mstr.addr,
-					t_tries + 1, t_fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
-					gvname_mstr.addr, 0, tp_blkmod_nomod, t_restart_entryref.str.len,
-					t_restart_entryref.str.addr);
-			else
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_NONTPRESTART, 11, reg_mstr.len, reg_mstr.addr,
-					t_tries + 1, t_fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
-					gvname_mstr.addr, TREF(blkmod_fail_level), TREF(blkmod_fail_type),
-					t_restart_entryref.str.len, t_restart_entryref.str.addr);
 			caller_id_flag = TRUE;
+			for (c = local_t_tries = 0; local_t_tries <= t_tries; local_t_tries++)
+			{	/* in case of non-printable code provide hex representation */
+				if (ISALPHA_ASCII(t_fail_hist[local_t_tries]) || ISDIGIT_ASCII(t_fail_hist[local_t_tries])
+						|| ISPUNCT_ASCII(t_fail_hist[local_t_tries])) /* currently, only is alpha needed */
+					fail_hist[c++] = t_fail_hist[local_t_tries++];
+				else
+				{
+					assert((c + 4) < RESTART_CODE_EXPANSION_FACTOR);
+					memcpy(&fail_hist[c++], "0x", STR_LIT_LEN("0x"));
+					c++;
+					i2hex_blkfill(t_fail_hist[local_t_tries++], &fail_hist[c++], 1);
+					if (local_t_tries < t_tries)
+						fail_hist[c++] = ';';
+				}
+			}
+			assert((cdb_sc_blkmod != t_fail_hist[t_tries]) || (0 != TAREF1(t_fail_hist_blk, t_tries)));
+			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(13) ERR_NONTPRESTART, 11, reg_mstr.len, reg_mstr.addr, c, &fail_hist,
+				TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len, gvname_mstr.addr,
+				((cdb_sc_blkmod == failure) ? TREF(blkmod_fail_level) : 0),
+				((cdb_sc_blkmod == failure) ? TREF(blkmod_fail_type) : tp_blkmod_nomod),
+				t_restart_entryref.str.len, t_restart_entryref.str.addr);
 		}
 		/* If the restart code is something that should not increment t_tries, handle that by decrementing t_tries
 		 * for these special codes just before incrementing it unconditionally. Note that this should be done ONLY IF
@@ -362,7 +378,7 @@ void t_retry(enum cdb_sc failure)
 			 */
 			if (!csa->hold_onto_crit)
 				grab_crit_encr_cycle_sync(gv_cur_region);
-			else if (cnl->wc_blocked)
+			else if (WC_BLOCK_RECOVER == cnl->wc_blocked)
 			{	/* Possible ONLY for online rollback or DSE that grabs crit during startup and never grabs again.
 				 * In such cases grab_crit (such as above) is skipped. As a result wcs_recover is also skipped.
 				 * To avoid this, do wcs_recover if wc_blocked is TRUE. But, that's possible only if white box test

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -174,7 +174,7 @@ int resolve_ref(int errknt)
 					tripref = mxl ? mxl->externalentry : NULL;
 					if (!tripref)
 					{	/* ignore vacuous DO sp sp */
-						curtrip->opcode = OC_NOOP;
+						(void)resolve_optimize(curtrip);	/* let that do the optimization */
 						break;
 					}
 					opnd->oprclass = TJMP_REF;

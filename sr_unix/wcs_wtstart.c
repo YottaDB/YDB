@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -58,7 +58,6 @@
 #include "anticipatory_freeze.h"
 #include "gtmcrypt.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "t_retry.h"
 #include "min_max.h"
@@ -205,7 +204,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	INCR_INTENT_WTSTART(cnl);	/* signal intent to enter wcs_wtstart */
 	/* the above interlocked instruction does the appropriate write memory barrier to publish this change to the world */
 	SHM_READ_MEMORY_BARRIER;	/* need to do this to ensure uptodate value of cnl->wc_blocked is read */
-	if (cnl->wc_blocked)
+	if (WC_BLOCK_RECOVER == cnl->wc_blocked)
 	{
 		WCS_OPS_TRACE(csa, process_id, wcs_ops_wtstart2, 0, 0, 0, 0, 0);
 		DECR_INTENT_WTSTART(cnl);
@@ -300,7 +299,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 							 */
                                                         assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
                                                                 || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
-                                                        SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
                                                         err_status = ERR_DBCCERR;
                                                         break;
                                                 }
@@ -334,7 +333,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			if (INTERLOCK_FAIL == (INTPTR_T)csr)
 			{
 				assert(FALSE);
-				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+				SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 				BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail1);
 				break;
 			}
@@ -759,7 +758,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				{
 					assert(FALSE);
 					csr->epid = 0;
-					SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 					BG_TRACE_PRO_ANY(csa, wcb_wtstart_lckfail4);
 					err_status = ERR_DBCCERR;
 					break;

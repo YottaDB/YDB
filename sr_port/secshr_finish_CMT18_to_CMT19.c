@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 Fidelity National Information		*
+ * Copyright (c) 2017-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,6 @@
 #include "copy.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "repl_msg.h"		/* needed for jnlpool_addrs_ptr_t */
 #include "gtmsource.h"		/* needed for jnlpool_addrs_ptr_t */
@@ -160,7 +159,7 @@ void secshr_finish_CMT18_to_CMT19(sgmnt_addrs *csa)
 		 * decrementing the shared counter but after committing the transaction otherwise)
 		 * so set wc_blocked.
 		 */
-		SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+		SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 		wcblocked_ptr = WCBLOCKED_PHASE2_CLNUP_LIT;
 		BG_TRACE_PRO_ANY(csa, wcb_secshr_db_clnup_phase2_clnup);
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_STR(wcblocked_ptr),

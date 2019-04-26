@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -24,7 +24,11 @@
 #include "gdscc.h"
 #include "filestruct.h"
 #include "jnl.h"
+<<<<<<< HEAD
 #include "hashtab_int4.h"	/* needed for tp.h */
+=======
+#include <rtnhdr.h>
+>>>>>>> a6cd7b01f... GT.M V6.3-008
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "repl_msg.h"		/* for gtmsource.h */

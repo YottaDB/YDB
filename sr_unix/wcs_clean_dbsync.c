@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,7 +26,6 @@
 #include "gdscc.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"			/* for tp_region definition */
 #include "gt_timer.h"		/* for TID definition */
 #include "timers.h"		/* for TIM_DEFER_DBSYNC #define */

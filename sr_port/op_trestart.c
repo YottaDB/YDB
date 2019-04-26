@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +24,6 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "cdb_sc.h"
 #include "jnl.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "tp_restart.h"
 #include "op.h"
@@ -32,6 +32,8 @@ GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];
 GBLREF	unsigned int	t_tries;
 GBLREF	trans_num	tstart_local_tn;	/* copy of global variable "local_tn" at op_tstart time */
 GBLREF	uint4		dollar_tlevel;
+error_def(ERR_TPRETRY);
+error_def(ERR_TRESTMAX);
 
 /* Sets t_fail_hist[t_tries] to cdb_sc_optrestart to indicate an explicit TP restart was requested by the user. Before doing
  * so, it checks if we are in the final retry and issues another error if the explicit restart is requested more than once.
@@ -40,8 +42,6 @@ void	op_trestart_set_cdb_code(void)
 {
 	static	trans_num	trestart_final_retry_local_tn;
 	static	uint4		trestart_final_retry_cnt;
-
-	error_def(ERR_TRESTMAX);
 
 	/* Since this function can be called from the TRESTART and ZMESSAGE (with msgid=ERR_TPRETRY) commands, it is not
 	 * necessary we are in TP at this point. If so, tp_restart will signal the appropriate error so skip the final
@@ -66,7 +66,7 @@ void	op_trestart_set_cdb_code(void)
 			 * message text. The assert below is a reminder for this case.
 			 */
 			assert(1 == (MAX_TP_FINAL_RETRY_TRESTART_CNT - 1));
-			rts_error(VARLSTCNT(1) ERR_TRESTMAX);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TRESTMAX);
 		}
 	}
 	t_fail_hist[t_tries] = cdb_sc_optrestart;
@@ -74,8 +74,6 @@ void	op_trestart_set_cdb_code(void)
 
 void	op_trestart(int newlevel)
 {
-	error_def(ERR_TPRETRY);
-
 	op_trestart_set_cdb_code();
 	assert(1 == newlevel);	/* newlevel probably needs to become GBLREF assigned here and reset to 1 in tp_restart */
 	INVOKE_RESTART;

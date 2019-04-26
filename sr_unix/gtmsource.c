@@ -34,7 +34,6 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"
-#include "hashtab_int4.h"
 #include "tp.h"
 #include "repl_msg.h"
 #include "gtmsource.h"

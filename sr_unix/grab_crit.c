@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -161,7 +161,7 @@ void	grab_crit(gd_region *reg)
 	 */
 	if (csd->file_corrupt && !TREF(skip_file_corrupt_check))
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
-	if (cnl->wc_blocked)
+	if (WC_BLOCK_RECOVER == cnl->wc_blocked)
 		wcs_recover(reg);
 #	ifdef DEBUG
 	if (save_jnlpool != jnlpool)

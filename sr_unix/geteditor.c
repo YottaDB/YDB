@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> a6cd7b01f... GT.M V6.3-008
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +33,7 @@ GBLDEF mstr editor;
 void geteditor(void)
 {
 	char		*edt, **pedt;
-	short		len;
+	mstr_len_t	len;
 	int		iter;
 	char		*editor_list[] =
 			{
@@ -48,11 +53,10 @@ void geteditor(void)
 	WBTEST_ASSIGN_ONLY(WBTEST_BADEDITOR_GETEDITOR, edt, 0);
 	if (edt)
 	{
-		len = strlen(edt) + 1;	/* for zero */
-		editor.len = len - 1;	/* but not for mstr */
+		len = (mstr_len_t)(STRLEN(edt) + 1);	/* for zero */
+		editor.len = len - 1;			/* but not for mstr */
 		editor.addr = (char*) malloc(len);	/* must be zero term */
 		memcpy(editor.addr, edt, len);
-	}
-	else
+	} else
 		editor.len = 0;
 }

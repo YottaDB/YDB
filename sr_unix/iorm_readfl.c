@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -81,7 +81,7 @@ error_def(ERR_IOERROR);
 /* Maintenance of $ZB on a badchar error and returning partial data (if any) */
 void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned char *delimptr, unsigned char *strend)
 {
-	int             tmplen, len;
+	int             tmplen, errlen;
 	unsigned char   *delimend;
 	io_desc         *iod;
 	d_rm_struct	*rm_ptr;
@@ -119,7 +119,7 @@ void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned cha
                 }
         }
 	/* set dollar.device in the output device */
-	SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, BADCHAR_DEVICE_MSG);
+	SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, BADCHAR_DEVICE_MSG, errlen);
 	REVERT_GTMIO_CH(&io_curr_device, ch_set);
 }
 #endif

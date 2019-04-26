@@ -241,7 +241,7 @@ void push_stck(void* val, int val_size, void** addr, int mvst_stck_type);
 				 */
 #define MVST_LVAL	14	/* Same as MVST_MVAL except we are pushing an lv_val instead of an mval */
 #define MVST_TRIGR	15	/* Used to save the base environment for Trigger execution */
-#define MVST_RSTRTPC	16	/* Used to save/restore the restartpc/context across error or jobinterrupt frames */
+#define MVST_RSTRTPC	16	/* Unused */
 #define MVST_STORIG	17	/* This is the origin mv_stent placed on the stack during initialization */
 #define MVST_MRGZWRSV	18	/* Block used to save merge/zwrite control blocks when one or more of them nest */
 #define	MVST_LAST	18	/* update this, mvs_size and mvs_save in mtables.c, and switches in unw_mv_ent.c,

@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2018 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
@@ -16,12 +16,15 @@
 #
 # Note: This script only works when called from buildaux.csh
 #
+#	Arguments:
+#		$1 -	image type (b[ta], d[bg], or p[ro])
 echo ""
 echo "############# Linking GTMCRYPT ###########"
 echo ""
 @ buildaux_gtmcrypt_status = 0
 source $gtm_tools/gtm_env.csh
 
+set gt_image = "$1"
 set supported_list = `$gtm_tools/check_encrypt_support.sh mail`
 if ("ERROR" == "$supported_list") then
 	# This is an error condition. Run check_encrypt_support in debug mode to have some debugging information.
@@ -39,7 +42,7 @@ foreach gpg_agent_pid ($gpg_agent_pids)
 	kill $gpg_agent_pid >&! /dev/null
 end
 set plugin_build_type=""
-switch ($2)
+switch ($gt_image)
 	case "[bB]*":
 		set plugin_build_type="PRO"
 		breaksw

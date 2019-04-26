@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -80,7 +80,7 @@ void op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 		case VALUE:
 			if (status)
 			{
-				retlen = strlen(status);
+				retlen = (uint4)STRLEN(status);
 				if (MAX_STRLEN < retlen)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
 				ENSURE_STP_FREE_SPACE(retlen);
@@ -94,7 +94,7 @@ void op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 		case LENGTH:
 			if (status)
 			{
-				MV_FORCE_MVAL(ret, STRLEN(status));
+				MV_FORCE_MVAL(ret, (int)STRLEN(status));
 				n2s(ret);
 			} else
 				ret->str.len = 0;

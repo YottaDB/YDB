@@ -1558,11 +1558,17 @@
 
    This command displays an output like the following:
 
+<<<<<<< HEAD
    File    /home/jdoe/.yottadb/r1.28_x86_64/g/yottadb.dat
    Region  DEFAULT
    File            /home/jdoe/.yottadb/r1.28_x86_64/g/yottadb.dat
+=======
+   File    /home/jdoe/.fis-gtm/V6.3-007_x86_64/g/gtm.dat
+   Region  DEFAULT
+   File            /home/jdoe/.fis-gtm/V6.3-007_x86_64/g/gtm.dat
+>>>>>>> a6cd7b01f... GT.M V6.3-008
    Region          DEFAULT
-   Date/Time       27-JAN-2014 03:13:40 [$H = 63214,11620]
+   Date/Time       27-JAN-2019 03:13:40 [$H = 63214,11620]
      Access method                          MM  Global Buffers                1024
      Reserved Bytes                          0  Block size (in bytes)         1024
      Maximum record size                   256  Starting VBN                   513
@@ -1593,7 +1599,8 @@
      Defer allocation                     TRUE  Spin sleep time mask    0x00000000
      Async IO                              OFF  WIP queue cache blocks           0
      DB is auto-created                  FALSE  DB shares gvstats             TRUE
-     LOCK shares DB critical section     FALSE
+     LOCK shares DB critical section     FALSE  Read Only                      OFF
+     Recover interrupted                 FALSE
 
    Note that the certain fileheader elements appear depending on the current
    state of database. For example, if Journaling is not enabled in the
@@ -2953,7 +2960,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2018
+   Copyright 2019
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -2980,7 +2987,14 @@
 
    **Note**
 
+<<<<<<< HEAD
    This help file is a concise representation of the revision r1.28 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
+=======
+   This help file is a concise representation of revision V6.3.008 of the
+   UNIX Administration and Operations Guide. To obtain a copy of the current
+   revision, go to www.fis-gtm.com and then click on the User Documentation
+   tab.
+>>>>>>> a6cd7b01f... GT.M V6.3-008
 

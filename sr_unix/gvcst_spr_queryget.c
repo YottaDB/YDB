@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -28,7 +28,6 @@
 #include "jnl.h"		/* needed for tp.h */
 #include "gdskill.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
 #include "mv_stent.h"
 #include "io.h"

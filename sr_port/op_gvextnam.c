@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -146,6 +146,6 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 						in current key */
 	TREF(gv_last_subsc_null) = is_null; /* if true, it indicates that last subscript in current key is null */
 	if (was_null && (NEVER == reg->null_subs))
-		sgnl_gvnulsubsc();
+		sgnl_gvnulsubsc(NULL);
 	return;
 }

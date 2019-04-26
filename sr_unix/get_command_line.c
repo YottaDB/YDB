@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@ GBLREF char **cmd_arg;
 
 void get_command_line(mval *result, boolean_t zcmd_line)
 {
-	int		first_item, len, word_cnt;
+	int		first_item, len, nlen, word_cnt;
 	unsigned char	*cp;
 
 	if (RESTRICTED(zcmdline))
@@ -61,7 +61,9 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 		}
 		for (word_cnt = first_item; word_cnt < cmd_cnt; word_cnt++)
 		{
-			len += STRLEN(cmd_arg[word_cnt]) + 1;		/* include space between arguments */
+			nlen = len + (int)STRLEN(cmd_arg[word_cnt]) + 1;		/* include space between arguments */
+			assert(len < nlen);
+			len = nlen;
 			assert(0 <= len);
 		}
 	}
@@ -79,7 +81,7 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 	result->mvtype = MV_STR; /* initialize mvtype now that mval has been otherwise completely set up */
 	for (word_cnt = first_item; ; *cp++ = ' ')
 	{
-		len = STRLEN(cmd_arg[word_cnt]);
+		len = (int)STRLEN(cmd_arg[word_cnt]);
 		memcpy(cp, cmd_arg[word_cnt], len);
 		if (++word_cnt == cmd_cnt)
 			break;

@@ -44,7 +44,6 @@
 #include "gdscc.h"			/* needed for tp.h */
 #include "gdskill.h"			/* needed for tp.h */
 #include "buddy_list.h"			/* needed for tp.h */
-#include "hashtab_int4.h"		/* needed for tp.h */
 #include "jnl.h"			/* for jnl_format prototype and for tp.h */
 #include "tp.h"				/* needed for T_BEGIN_SETORKILL_NONTP_OR_TP */
 #include "t_begin.h"

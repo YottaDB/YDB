@@ -39,7 +39,6 @@
 #include "interlock.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "gdsbgtr.h"
 #include "repl_msg.h"
@@ -319,7 +318,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	assert((inctn_invalid_op == inctn_opcode) || mu_reorg_upgrd_dwngrd_in_prog || mu_reorg_encrypt_in_prog || update_trans);
 	assert(!need_kip_incr || update_trans || TREF(in_gvcst_redo_root_search));
 	cti = csa->ti;
-	if (cnl->wc_blocked || (is_mm && (csa->total_blks != cti->total_blks)))
+	if ((WC_BLOCK_RECOVER == cnl->wc_blocked) || (is_mm && (csa->total_blks != cti->total_blks)))
 	{	/* If blocked, or we have MM and file has been extended, force repair */
 		status = cdb_sc_helpedout;	/* force retry with special status so philanthropy isn't punished */
 		assert((CDB_STAGNATE > t_tries) || !is_mm || (csa->total_blks == cti->total_blks));
@@ -652,7 +651,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		 * outside crit. The available space must be double-checked inside crit.
 		 */
 		DEBUG_ONLY(tmp_jnlpool = jnlpool;)
-		if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL))
+		if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL, csa))
 			/* only reason we currently know why wcs_get_space could fail */
 			assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
 		assert(tmp_jnlpool == jnlpool);
@@ -819,10 +818,18 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	}
 	/* in crit, ensure cache-space is available. the out-of-crit check done above might not have been enough */
 	DEBUG_ONLY(tmp_jnlpool = jnlpool;)
+<<<<<<< HEAD
 	if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL))
 	{	/* only reason we currently know why wcs_get_space could fail */
 		assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
 		SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+=======
+	if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL, csa))
+	{
+		/* only reason we currently know why wcs_get_space could fail */
+		assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
+		SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
+>>>>>>> a6cd7b01f... GT.M V6.3-008
 		BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_hist);
 		SET_CACHE_FAIL_STATUS(status, csd);
 		assert(tmp_jnlpool == jnlpool);
@@ -905,7 +912,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 						if (cr->blk != bt->blk)
 						{
 							assert(FALSE);
-							SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_crbtmismatch1);
 							status = cdb_sc_crbtmismatch;
 							goto failed;
@@ -951,7 +958,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				}
 				if ((cache_rec_ptr_t)CR_NOTVALID == cr)
 				{
-					SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 					BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_hist);
 					SET_CACHE_FAIL_STATUS(status, csd);
 					goto failed;
@@ -962,7 +969,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					if ((NULL != cr) && (NULL != bt) && (cr->blk != bt->blk))
 					{
 						assert(FALSE);
-						SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+						SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 						BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_crbtmismatch2);
 						status = cdb_sc_crbtmismatch;
 						goto failed;
@@ -1077,7 +1084,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 					if (cr->blk != bt->blk)
 					{
 						assert(FALSE);
-						SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+						SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 						BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_crbtmismatch3);
 						status = cdb_sc_crbtmismatch;
 						goto failed;
@@ -1086,7 +1093,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			}
 			if ((cache_rec_ptr_t)CR_NOTVALID == cr)
 			{
-				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+				SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 				BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_bitmap_nullbt);
 				SET_CACHE_FAIL_STATUS(status, csd);
 				goto failed;
@@ -1140,7 +1147,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 				cr = db_csh_get(cs->blk);
 				if ((cache_rec_ptr_t)CR_NOTVALID == cr)
 				{
-					SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 					BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_jnl_cwset);
 					SET_CACHE_FAIL_STATUS(status, csd);
 					goto failed;
@@ -1312,7 +1319,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_IN_COMMIT | WCSFLU_SPEEDUP_NOBEFORE))
 			{
 				SET_WCS_FLU_FAIL_STATUS(status, csd);
-				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+				SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 				BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_jnl_wcsflu);
 				goto failed;
 			}

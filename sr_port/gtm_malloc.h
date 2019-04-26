@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2003, 2012 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> a6cd7b01f... GT.M V6.3-008
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,7 +22,7 @@
 
 #define GTM_MEMORY_RESERVE_DEFAULT 64	/* 64K reserve "backpocket-cache" released on out-of-memory error */
 
-typedef GTM64_ONLY(gtm_uint8) NON_GTM64_ONLY(unsigned int) gtm_msize_t;
+typedef size_t gtm_msize_t;
 
 /* Each allocated block has the following structure. The actual address returned to the user for 'malloc' and supplied by the
  * user for 'free' is actually the storage beginning at the 'userStorage.userStart' area. This holds true even for storage

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -28,7 +28,6 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include "hashtab_int4.h"
 #include "gdskill.h"
 #include "jnl.h"
 #include "gdscc.h"
@@ -544,10 +543,6 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				}
 			}
 #			endif	/* GTM_TRIGGER */
-			return;
-		case MVST_RSTRTPC:
-			restart_pc = mv_st_ent->mv_st_cont.mvs_rstrtpc.restart_pc_save;
-			restart_ctxt = mv_st_ent->mv_st_cont.mvs_rstrtpc.restart_ctxt_save;
 			return;
 		case MVST_MRGZWRSV:
 			/* Note: The below code restores what was saved in PUSH_MVST_MRGZWRSV_IF_NEEDED.

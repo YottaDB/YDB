@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2017 Fidelity National Information	*
+ * Copyright (c) 2015-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -44,7 +44,6 @@
 #include "filestruct.h"
 #include "gdskill.h"
 #include "buddy_list.h"
-#include "hashtab_int4.h"
 #include "jnl.h"
 #include "tp.h"
 #include "repl_msg.h"
@@ -55,6 +54,7 @@
 #include "is_proc_alive.h"
 #endif
 #ifdef DEBUG	/* Below are needed in case MUR_DEBUG is defined */
+#include "hashtab_int4.h"	/* needed for muprec.h */
 #include "hashtab_int8.h"	/* needed for muprec.h */
 #include "hashtab_mname.h"	/* needed for muprec.h */
 #include "muprec.h"

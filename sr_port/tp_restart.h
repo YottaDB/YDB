@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -24,6 +24,9 @@
 #define	TP_RESTART_HANDLES_ERRORS	TRUE
 
 #define	TPWRAP_HELPER_MAX_ATTEMPTS	16	/* maximum # of iterations allowed to avoid indefinite tp restart loop */
+#define RESTART_CODE_EXPANSION_FACTOR	(CDB_MAX_TRIES * SIZEOF("0x5;"))	/* need 0xn: where n is <CTRL> of 1 or 2 digits, get
+										 *  5 from"0x5:" because of <NUL> term
+										 */
 
 /* Helper function */
 void	op_trestart_set_cdb_code(void);

@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> a6cd7b01f... GT.M V6.3-008
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +17,7 @@
  *								*
  ****************************************************************/
 
+<<<<<<< HEAD
 /* The global modifier record in the directory tree currently can contain an optional 4-byte collation specification
  * right after the 4-byte root block number. There is just one such 4-byte collation spec record possible after the root block.
  */
@@ -45,3 +51,20 @@ MBSTART {									\
 	}									\
 } MBEND;
 
+=======
+#define MAX_SPEC_TYPE_LEN	10
+#define MAX_COLL_TYPE		1	/*The highest collation type supported
+					 *Any changes require corresponding changes to sr_port/get_spec.c */
+
+#define COLL_SPEC		1	/* current default collation spec */
+
+/* GVT leaf node collation header offsets as enum values*/
+enum coll_spec_offsets
+{
+	COLL_SPEC_OFFSET,	/* first  byte of collation record : collation record specification number */
+	COLL_NCT_OFFSET,	/* second byte of collation record : numeric collation for this global name */
+	COLL_ACT_OFFSET,	/* third  byte of collation record : alternative collation for this global name */
+	COLL_VER_OFFSET,	/* fourth byte of collation record : collation library version for this global name */
+	COLL_SPEC_LEN		/* length of the collation record stored in the directory tree per global name */
+};
+>>>>>>> a6cd7b01f... GT.M V6.3-008

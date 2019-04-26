@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -283,6 +283,8 @@ void dse_dmp_fhead (void)
 		util_out_print("  Free Global Buffers            0x!XL", FALSE, freeque_cnt);
 		util_out_print("  wcs_wtstart pid count   0x!XL", TRUE, cnl->in_wtstart);
 		util_out_print("  Write Cache is Blocked              !AD", FALSE, 5, (cnl->wc_blocked ? " TRUE" : "FALSE"));
+		util_out_print("  Write Cache to be recovered         !AD", FALSE, 5,
+				((WC_BLOCK_RECOVER == cnl->wc_blocked) ? " TRUE" : "FALSE"));
 		util_out_print("  wcs_wtstart intent cnt  0x!XL", TRUE, cnl->intent_wtstart);
 		util_out_print(0, TRUE);
 		util_out_print("  Quick database rundown is active    !AD", TRUE, 5, (csd->mumps_can_bypass ? " TRUE" : "FALSE"));

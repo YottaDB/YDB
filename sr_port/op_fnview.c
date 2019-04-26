@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -414,6 +414,8 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_GRABJNLPOOLPH2:
 		case VTK_GRABJNLQIO:
 		case VTK_RELJNLQIO:
+		case VTK_GRABFSYNC:
+		case VTK_RELFSYNC:
 			reg = parmblk.gv_ptr;
 			if (!reg->open)
 				gv_init_reg(reg);
@@ -454,6 +456,12 @@ void	op_fnview(int numarg, mval *dst, ...)
 						SHORT_SLEEP(1);
 				} else if (VTK_RELJNLQIO == vtp->keycode)
 					RELEASE_SWAPLOCK(&csa->jnl->jnl_buff->io_in_prog_latch);
+				else if (VTK_GRABFSYNC == vtp->keycode)
+				{
+					while (!GET_SWAPLOCK(&csa->jnl->jnl_buff->fsync_in_prog_latch))
+						SHORT_SLEEP(1);
+				} else if (VTK_RELFSYNC == vtp->keycode)
+					RELEASE_SWAPLOCK(&csa->jnl->jnl_buff->fsync_in_prog_latch);
 			}
 			break;
 #endif

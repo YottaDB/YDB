@@ -32,7 +32,14 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
+<<<<<<< HEAD
 set(version r129)
+=======
+set(version ${V6.3-008})
+if("${version}" STREQUAL "")
+        set(version V9.9-0)
+endif()
+>>>>>>> a6cd7b01f... GT.M V6.3-008
 
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -109,10 +109,6 @@ void trans_code_finish(void)
 	SETUP_THREADGBL_ACCESS;
 	frame_pointer->type = proc_act_type;
 	proc_act_type = 0;
-	/* Save/restore restart_pc over dispatch of this error handler */
-	PUSH_MV_STENT(MVST_RSTRTPC);
-	mv_chain->mv_st_cont.mvs_rstrtpc.restart_pc_save = restart_pc;
-	mv_chain->mv_st_cont.mvs_rstrtpc.restart_ctxt_save = restart_ctxt;
 	if (0 != dollar_zyerror.str.len)
 	{
 		dummy.mvtype = MV_STR;

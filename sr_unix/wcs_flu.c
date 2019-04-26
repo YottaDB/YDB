@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -281,9 +281,9 @@ boolean_t wcs_flu(uint4 options)
 			 * is okay since "cnl->wc_blocked" would stay set so someone else who gets crit
 			 * (other than the source server) would do the "wcs_recover" call.
 			 */
-			if (!cnl->wc_blocked)
+			if (WC_BLOCK_RECOVER != cnl->wc_blocked)
 			{
-				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+				SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 				BG_TRACE_PRO_ANY(csa, wcb_wcs_flu0);
 				send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
 						LEN_AND_LIT("wcb_wcs_flu0"), process_id, &csa->ti->curr_tn,
@@ -582,20 +582,23 @@ boolean_t wcs_flu(uint4 options)
 				{	/* There are different cases we know of currently when this is possible all of which
 					 * we currently test with white-box test cases.
 					 * (a) If a process encountered an error in the midst of committing in phase2 and
-					 *    secshr_db_clnup completed the commit for it and set wc_blocked to TRUE (even though
-					 *    it was OUT of crit) causing the wcs_wtstart calls done above to do nothing.
+					 *    secshr_db_clnup completed the commit for it and set wc_blocked to 2
+					 *    (even though it was OUT of crit) causing the wcs_wtstart calls done above to do
+					 *    nothing.
 					 * (b) If a process performing multi-region TP transaction encountered an error in
 					 *    phase1 of the commit, but at least one of the participating regions have completed
-					 *    the phase1 and released crit, secshr_db_clnup will set wc_blocked on all the regions
-					 *    (including those that will be OUTSIDE crit) that participated in the commit. Hence,
-					 *    like (a), wcs_wtstart calls done above will return immediately. But phase1 and
-					 *    phase2 commit errors are currently enabled only through white-box testing.
+					 *    the phase1 and released crit, secshr_db_clnup will set wc_blocked to block_and
+					 *    verify on all the regions (including those that will be OUTSIDE crit) that
+					 *    participated in the commit. Hence, like (a), wcs_wtstart calls done above will
+					 *    return immediately. But phase1 and phase2 commit errors are currently enabled
+					 *    only through white-box testing.
 					 * (c) If a test does crash shutdown (kill -9) that hit the process in the middle of
 					 *    wcs_wtstart which means the writes did not complete successfully.
 					 * (d) If WBTEST_WCS_FLU_IOERR/WBTEST_WCS_WTSTART_IOERR white box test case is set that
 					 *    forces wcs_wtstart invocations to end up with I/O errors.
 					 */
 					WCS_OPS_TRACE(csa, process_id, wcs_ops_flu7, 0, 0, 0, wtstart_or_wtfini_errno, 0);
+<<<<<<< HEAD
 					assert((WBTEST_BG_UPDATE_PHASE2FAIL == ydb_white_box_test_case_number)
 						|| (WBTEST_BG_UPDATE_BTPUTNULL == ydb_white_box_test_case_number)
 						|| (WBTEST_BG_UPDATE_DBCSHGET_INVALID == ydb_white_box_test_case_number)
@@ -607,9 +610,33 @@ boolean_t wcs_flu(uint4 options)
 						|| (WBTEST_WCS_WTSTART_IOERR == ydb_white_box_test_case_number)
 						|| (WBTEST_ANTIFREEZE_JNLCLOSE == ydb_white_box_test_case_number)
 						|| ((WBTEST_ANTIFREEZE_OUTOFSPACE == ydb_white_box_test_case_number) && asyncio));
+=======
+#					ifdef DEBUG
+					switch (gtm_white_box_test_case_number)
+					{
+						case WBTEST_ANTIFREEZE_OUTOFSPACE:
+							assert(asyncio);
+							break;
+						case WBTEST_ANTIFREEZE_JNLCLOSE:
+						case WBTEST_BG_UPDATE_BTPUTNULL:
+						case WBTEST_BG_UPDATE_DBCSHGET_INVALID:
+						case WBTEST_BG_UPDATE_DBCSHGETN_INVALID:
+						case WBTEST_BG_UPDATE_DBCSHGETN_INVALID2:
+						case WBTEST_BG_UPDATE_PHASE2FAIL:
+						case WBTEST_CRASH_SHUTDOWN_EXPECTED:
+						case WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY:
+						case WBTEST_MURUNDOWN_KILLCMT06:
+						case WBTEST_WCS_FLU_IOERR:
+						case WBTEST_WCS_WTSTART_IOERR:
+							break;
+						default:
+							assert(FALSE && "not in known white box test");
+					}
+#					endif
+>>>>>>> a6cd7b01f... GT.M V6.3-008
 					if (0 == wtstart_or_wtfini_errno)
 					{
-						SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+						SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 						BG_TRACE_PRO_ANY(csa, wcb_wcs_flu1);
 						send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
 								LEN_AND_LIT("wcb_wcs_flu1"), process_id, &csa->ti->curr_tn,

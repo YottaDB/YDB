@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2010-2018 Fidelity National Information		;
+; Copyright (c) 2010-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	;
@@ -602,7 +602,7 @@
 	;
 	; Make sure all header files added.
 	;
-	Do CommandToPipe("ls -1 $gtm_inc/*.h",.results)
+	Do CommandToPipe("/bin/ls -1 $gtm_inc/*.h",.results)
 	For i=1:1:results(0) Do
 	. Set incname=$ZPiece(results(i),"/",6)
 	. Quit:(""=incname)					; Sometimes get blank lines at end.
@@ -904,7 +904,7 @@
 	;
 	; Make sure all header files added.
 	;
-	Do CommandToPipe("ls -1 $gtm_inc/*.h",.results)
+	Do CommandToPipe("/bin/ls -1 $gtm_inc/*.h",.results)
 	For i=1:1:results(0) Do
 	. Set incname=$ZPiece(results(i),"/",6)
 	. If 0=$Data(exclincl(incname)),0=$Data(inclref(incname)) Do

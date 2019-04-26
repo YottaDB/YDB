@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -586,6 +586,7 @@ typedef struct
 	char		director_token;
 	char		*lexical_ptr;
 	char		window_token;
+	triple		pos_in_chain;
 } parse_save_block;
 
 #define SAVE_PARSE_STATE(SAVE_PARSE_PTR)									\
@@ -600,6 +601,7 @@ MBSTART {													\
 	SAVE_PARSE_PTR->source_error_found = TREF(source_error_found);						\
 	SAVE_PARSE_PTR->source_len = (TREF(source_buffer)).len;							\
 	SAVE_PARSE_PTR->window_token = TREF(window_token);							\
+	SAVE_PARSE_PTR->pos_in_chain = TREF(pos_in_chain);							\
 } MBEND
 
 GBLREF	int4		aligned_source_buffer[MAX_SRCLINE / SIZEOF(int4) + 1];
@@ -617,6 +619,7 @@ MBSTART {													\
 	source_column = SAVE_PARSE_PTR->source_column;								\
 	TREF(source_error_found) = SAVE_PARSE_PTR->source_error_found;						\
 	TREF(window_token) = SAVE_PARSE_PTR->window_token;							\
+	TREF(pos_in_chain) = SAVE_PARSE_PTR->pos_in_chain;							\
 } MBEND
 
 #define RETURN_IF_RTS_ERROR							\

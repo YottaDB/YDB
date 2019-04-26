@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -79,7 +79,7 @@ error_def(ERR_NOPRINCIO);
 /* Maintenance of $KEY, $DEVICE and $ZB on a badchar error */
 void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned char *delimptr, unsigned char *strend)
 {
-	int		tmplen, len;
+	int		tmplen, errlen;
 	unsigned char	*delimend;
 	io_desc		*iod;
 	d_socket_struct	*dsocketptr;
@@ -116,7 +116,7 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 			iod->dollar.key[MIN(delimlen, DD_BUFLEN - 1)] = '\0';
 		}
 	}
-	SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, BADCHAR_DEVICE_MSG);
+	SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, BADCHAR_DEVICE_MSG, errlen);
 }
 #endif
 
@@ -924,7 +924,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 		else	/* TLS not enabled or system call error */
 #		endif
 			errptr = (char *)STRERROR(real_errno);
-		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr);
+		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
 		if (io_curr_device.in == io_std_device.in)
 		{
 			if (!prin_in_dev_failure)
@@ -939,7 +939,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 		{
 			iod->dollar.zeof = TRUE;
 			if (socketptr->ioerror)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, STRLEN(errptr), errptr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);
 		} else
 			iod->dollar.zeof = TRUE;
 	}

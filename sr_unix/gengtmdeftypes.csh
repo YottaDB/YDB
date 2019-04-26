@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2011-2018 Fidelity National Information		#
+# Copyright (c) 2011-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -102,8 +102,12 @@ unsetenv gtm_chset
 set setactive_parms=($gtmver $gtmtyp); source $gtm_tools/setactive.csh > /dev/null
 setenv gtm_dist $proddist
 
-cp $gtm_pct/{decomment.m,scantypedefs.m} .
-cp $gtm_tools/{gtmexcludetypelist.txt,stripmine.awk,xtrgtmtypes.awk} .
+# If gengtmdeftypes.csh is invoked for old versions, point cpfrom_tools/cpfrom_pct to the location of
+# the helper files, typically $gtm_tools/$gtm_pct of gtm_curpro
+if (! $?cpfrom_tools) set cpfrom_tools = $gtm_tools
+if (! $?cpfrom_pct) set cpfrom_pct = $gtm_pct
+cp $cpfrom_pct/{decomment.m,scantypedefs.m} .
+cp $cpfrom_tools/{gtmexcludetypelist.txt,stripmine.awk,xtrgtmtypes.awk} .
 #
 # Create a list of types defined by GTM by reading the header files for types defined there. This allows us to only
 # pay attention to these GTM defined structures later when we process compiler pre-processor output where system header

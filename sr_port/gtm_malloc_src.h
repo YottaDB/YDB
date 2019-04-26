@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -655,8 +655,8 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 	unsigned char	*retVal;
 	storElem 	*uStor, *qHdr;
 	storExtHdr	*sEHdr;
-	gtm_msize_t	tSize;
-	int		sizeIndex, i, hdrSize;
+	gtm_msize_t	tSize, hdrSize;
+	int		sizeIndex, i;
 	unsigned char	*trailerMarker;
 	boolean_t	reentered, was_holder;
 	intrpt_state_t	prev_intrpt_state;
@@ -683,8 +683,8 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 		if (gtmSmInitialized)
 		{
 			PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder);	/* get exclusive thread lock in case threads are in use */
-			hdrSize = OFFSETOF(storElem, userStorage);		/* Size of storElem header */
-			NON_GTM64_ONLY(assertpro((size + hdrSize) >= size));	/* Check for wrap in 32 bit platforms */
+			hdrSize = OFFSETOF(storElem, userStorage);	/* Size of storElem header */
+			assertpro((size + hdrSize) >= size);		/* Check for wrap in all platforms */
 			assert((hdrSize + SIZEOF(markerChar)) < MINTWO);
 			fast_lock_count++;
 			++gtmMallocDepth;				/* Nesting depth of memory calls */

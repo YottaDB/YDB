@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -38,7 +38,6 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "interlock.h"
 #include "repl_msg.h"

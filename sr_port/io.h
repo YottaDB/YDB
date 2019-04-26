@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -534,50 +534,55 @@ MBSTART {											\
 
 #define SET_DOLLARDEVICE_ERRSTR(IOD, ERRSTR)							\
 MBSTART {											\
-	int errlen;										\
-	char *writebuffer;									\
-	errlen = STRLEN(ERRSTR) + 1;	/* +1 for NULL */					\
-	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, errlen, writebuffer);			\
-	memcpy(writebuffer, ERRSTR, errlen);							\
+	char	*WRITEBUFFER;									\
+	int	LEN;										\
+												\
+	LEN = STRLEN(ERRSTR) + 1;	/* +1 for NULL */					\
+	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, LEN, WRITEBUFFER);			\
+	memcpy(WRITEBUFFER, ERRSTR, LEN);							\
 } MBEND
 
-#define SET_DOLLARDEVICE_ONECOMMA_ERRSTR(IOD, ERRSTR)						\
+#define SET_DOLLARDEVICE_ONECOMMA_ERRSTR(IOD, ERRSTR, ERRLEN)					\
 MBSTART {											\
-	char *writebuffer;									\
-	int errlen, prefixlen, len;								\
-	prefixlen = STR_LIT_LEN(ONE_COMMA);							\
-	errlen = STRLEN(ERRSTR) + 1;	/* +1 for NULL */					\
-	len = prefixlen + errlen;								\
-	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, len, writebuffer);			\
-	memcpy(writebuffer, ONE_COMMA, prefixlen);						\
-	memcpy(&writebuffer[prefixlen], ERRSTR, errlen);					\
+	char	*WRITEBUFFER;									\
+	int	LEN;										\
+												\
+	ERRLEN = STRLEN(ERRSTR);								\
+	LEN = STR_LIT_LEN(ONE_COMMA) + ERRLEN + 1;	/* +1 for NULL */			\
+	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, LEN, WRITEBUFFER);			\
+	memcpy(WRITEBUFFER, ONE_COMMA, STR_LIT_LEN(ONE_COMMA));					\
+	WRITEBUFFER += STR_LIT_LEN(ONE_COMMA);							\
+	memcpy(WRITEBUFFER, ERRSTR, ERRLEN + 1);						\
 } MBEND
 
-#define SET_DOLLARDEVICE_ONECOMMA_ERRSTR1_ERRSTR2(IOD, ERRSTR1, ERRSTR2)			\
+#define SET_DOLLARDEVICE_ONECOMMA_ERRSTR1_ERRSTR2(IOD, ERRSTR1, ERRLEN1, ERRSTR2, ERRLEN2)	\
 MBSTART {											\
-	char *writebuffer;									\
-	int errlen1, errlen2, prefixlen, len;							\
-	prefixlen = STR_LIT_LEN(ONE_COMMA);							\
-	errlen1 = STRLEN(ERRSTR1);	/* No NULL char */					\
-	errlen2 = STRLEN(ERRSTR2) + 1;	/* +1 for NULL */					\
-	len = prefixlen + errlen1 + errlen2;							\
-	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, len, writebuffer);			\
-	memcpy(writebuffer, ONE_COMMA, prefixlen);						\
-	memcpy(&writebuffer[prefixlen], ERRSTR1, errlen1);					\
-	memcpy(&writebuffer[prefixlen + errlen1], ERRSTR2, errlen2);				\
+	char	*WRITEBUFFER;									\
+	int	LEN;										\
+												\
+	ERRLEN1 = STRLEN(ERRSTR1);	/* No NULL char */					\
+	ERRLEN2 = STRLEN(ERRSTR2);								\
+	LEN = STR_LIT_LEN(ONE_COMMA) + ERRLEN1 + ERRLEN2 + 1; /* +1 for NULL */			\
+	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, LEN, WRITEBUFFER);			\
+	memcpy(WRITEBUFFER, ONE_COMMA, STR_LIT_LEN(ONE_COMMA));					\
+	WRITEBUFFER += STR_LIT_LEN(ONE_COMMA);							\
+	memcpy(WRITEBUFFER, ERRSTR1, ERRLEN1);							\
+	WRITEBUFFER += ERRLEN1;									\
+	memcpy(WRITEBUFFER, ERRSTR2, ERRLEN2 + 1);						\
 } MBEND
 
 #define SET_DOLLARDEVICE_ONECOMMA_STRERROR(IOD, ERRNO)						\
 MBSTART {											\
-	char *errstring, *writebuffer;								\
-	int errlen, prefixlen, len;								\
-	prefixlen = STR_LIT_LEN(ONE_COMMA);							\
-	errstring = STRERROR(ERRNO);								\
-	errlen = STRLEN(errstring) + 1;	/* +1 for NULL */					\
-	len = prefixlen + errlen;								\
-	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, len, writebuffer);			\
-	memcpy(writebuffer, ONE_COMMA, prefixlen);						\
-	memcpy(&writebuffer[prefixlen], errstring, errlen);					\
+	char	*ERRSTR, *WRITEBUFFER;								\
+	int	ERRLEN, LEN;									\
+												\
+	ERRSTR = STRERROR(ERRNO);								\
+	ERRLEN = STRLEN(ERRSTR);								\
+	LEN = STR_LIT_LEN(ONE_COMMA) + ERRLEN + 1; /* +1 for NULL */				\
+	ALLOCATE_DOLLAR_DEVICE_BUFFER_IF_REQUIRED(IOD, LEN, WRITEBUFFER);			\
+	memcpy(WRITEBUFFER, ONE_COMMA, STR_LIT_LEN(ONE_COMMA));					\
+	WRITEBUFFER += STR_LIT_LEN(ONE_COMMA);							\
+	memcpy(WRITEBUFFER, ERRSTR, ERRLEN + 1);						\
 } MBEND
 
 #define PUT_DOLLAR_DEVICE_INTO_MSTR(IOD, MSTR)							\

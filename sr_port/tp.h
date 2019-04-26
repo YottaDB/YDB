@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -17,10 +17,9 @@
 #define TP_H
 
 #include <sys/types.h>
+#include "hashtab_int4.h"
 
 error_def(ERR_TPNOTACID);
-
-/* HEADER-FILE-DEPENDENCIES : hashtab_int4.h */
 
 #define JNL_LIST_INIT_ALLOC		16		/* initial allocation for si->jnl_list */
 #define	CW_SET_LIST_INIT_ALLOC		64		/* initial allocation for si->cw_set_list */
@@ -428,7 +427,7 @@ typedef struct trans_restart_hist_struct
 				: is_uchar_wcs_code[STATUS - 'A'];			\
 		if (is_wcs_code)							\
 		{									\
-			SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);			\
+			SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);		\
 			BG_TRACE_PRO_ANY(CSA, wc_blocked_wcs_cdb_sc_final_retry);	\
 		}									\
 	}										\

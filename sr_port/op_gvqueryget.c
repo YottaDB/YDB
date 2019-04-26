@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,6 +31,8 @@ GBLREF gd_region	*gv_cur_region;
 GBLREF gv_key		*gv_currkey, *gv_altkey;
 LITREF mval		literal_null;
 
+#define	NONULLSUBS	"Access failed because"		/* Currently only use is from MERGE, but that might change */
+
 boolean_t op_gvqueryget(mval *key, mval *val)
 {
 	boolean_t 	gotit;
@@ -39,7 +42,7 @@ boolean_t op_gvqueryget(mval *key, mval *val)
 
 	SETUP_THREADGBL_ACCESS;
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
-		sgnl_gvnulsubsc();
+		sgnl_gvnulsubsc(NONULLSUBS);
 	switch (REG_ACC_METH(gv_cur_region))
 	{
 	case dba_bg:

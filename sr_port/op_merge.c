@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -52,7 +52,6 @@
 #include "gdscc.h"
 #include "copy.h"
 #include "jnl.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"
 #include "tp.h"
 #include "gtm_string.h"
@@ -87,6 +86,8 @@ GBLREF lvzwrite_datablk *lvzwrite_block;
 #ifdef DEBUG
 GBLREF lv_val		*active_lv;
 #endif
+
+#define	NONULLSUBS	"MERGE failed because"
 
 error_def(ERR_MAXNRSUBSCRIPTS);
 error_def(ERR_MERGEINCOMPL);
@@ -364,7 +365,7 @@ void op_merge(void)
 							 * have become nearly impossible to create a fully standard
 							 * implementation. : From Ed de Moel : 2/1/2
 							 */
-							sgnl_gvnulsubsc();
+							sgnl_gvnulsubsc(NONULLSUBS);
 					}
 				}
 				/* Now put value of ^glvn2 descendant into corresponding descendant under ^glvn1 */

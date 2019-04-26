@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -95,11 +95,11 @@ typedef struct
 
 #define SOCKERROR(iod, socketptr, gtmerror, syserror) 								\
 { 														\
-	int	errlen; 											\
-	char	*errptr; 											\
+	int	ERRLEN; 											\
+	char	*ERRPTR; 											\
 	iod->dollar.za = 9; 											\
-	errptr = (char *)STRERROR(syserror); 									\
-	SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr);								\
+	ERRPTR = (char *)STRERROR(syserror); 									\
+	SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, ERRPTR, ERRLEN);							\
 	assert(ERR_SOCKWRITE == gtmerror);									\
 	if (iod == io_std_device.out)										\
 	{													\
@@ -112,7 +112,7 @@ typedef struct
 		}												\
 	}													\
 	if (socketptr->ioerror) 										\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) gtmerror, 0, ERR_TEXT, 2, STRLEN(errptr), errptr);	\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) gtmerror, 0, ERR_TEXT, 2, ERRLEN, ERRPTR);		\
 }
 
 #define SOCKET_ALLOC(SOCKPTR)										\

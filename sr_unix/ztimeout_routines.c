@@ -29,7 +29,6 @@
 #include "filestruct.h"
 #include "buddy_list.h"         /* needed for tp.h */
 #include "jnl.h"
-#include "hashtab_int4.h"       /* needed for tp.h */
 #include "tp.h"
 #include "send_msg.h"
 #include "gtmmsg.h"             /* for gtm_putmsg() prototype */
@@ -317,11 +316,11 @@ void ztimeout_action(void)
 	mv_stent        *mv_st_ent;
 	DBGDFRDEVNT((stderr, "ztimeout_action driving the ztimeout vector\n"));
 	DBGEHND((stderr, "ztimeout_action: Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
-                         "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, restart_pc, restart_ctxt,
-                         frame_pointer->type));
+                         "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, frame_pointer->restart_pc,
+			 frame_pointer->restart_ctxt, frame_pointer->type));
 	ztimeout_clear_timer();
-	frame_pointer->mpc = restart_pc;
-	frame_pointer->ctxt = restart_ctxt;
+	frame_pointer->mpc = frame_pointer->restart_pc;
+	frame_pointer->ctxt = frame_pointer->restart_ctxt;
 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZTIMEOUT);
 }
 
@@ -338,13 +337,6 @@ void ztimeout_process()
 	/* Below in sync with jobinterrupt_process */
 	frame_pointer->type = proc_act_type;    /* The mark of zorro.. */
         proc_act_type = 0;
-        /* Save restart_pc/ctxt so a resumed frame or ztrap can resume in the corrct place and
-         * not and inappropriate resume point determined by the interrupting code.
-         */
-        PUSH_MV_STENT(MVST_RSTRTPC);
-        mv_st_ent = mv_chain;
-        mv_st_ent->mv_st_cont.mvs_rstrtpc.restart_pc_save = restart_pc;
-        mv_st_ent->mv_st_cont.mvs_rstrtpc.restart_ctxt_save = restart_ctxt;
         /* Now we need to preserve our current environment. This MVST_ZINTR mv_stent type will hold
          * the items deemed necessary to preserve. All other items are the user's responsibility.
          *

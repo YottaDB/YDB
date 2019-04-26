@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -269,12 +269,13 @@ static	int repl_read_file(repl_buff_t *rb)
 		if (nb > (b->buffremaining - read_less))
 			nb = b->buffremaining - read_less;
 	}
-	if (0 <= nb)
+	if (0 < nb)
 	{
 		b->buffremaining -= (uint4)nb;
 		b->readaddr += (uint4)nb;
 		return (SS_NORMAL);
-	}
+	} else if ((0 == nb) && (end_addr != start_addr))
+		return (SS_NORMAL);
 	repl_errno = EREPL_JNLFILEREAD;
 	return (status);
 }

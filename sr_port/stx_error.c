@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -83,8 +83,6 @@ void stx_error_va(int in_error, va_list args)
 
 	SETUP_THREADGBL_ACCESS;
 	VAR_COPY(dup_args, args);
-	if (!TREF(dollar_zcstatus))
-		TREF(dollar_zcstatus) = ERR_ERRORSUMMARY;
 	/* In case of a IS_STX_WARN type of parsing error, we resume parsing so it is important NOT to reset
 	 * the following global variables
 	 *	a) saw_side_effect
@@ -93,10 +91,10 @@ void stx_error_va(int in_error, va_list args)
 	 */
 	if (TREF(xecute_literal_parse))
 	{
-		ins_errtriple(in_error);
 		TREF(source_error_found) = TRUE;
 		return;
 	}
+	TREF(dollar_zcstatus) = !TREF(dollar_zcstatus) ? in_error : ERR_ERRORSUMMARY;
 	is_stx_warn = (CGP_PARSE == cg_phase) && IS_STX_WARN(in_error) GTMTRIG_ONLY( && !TREF(trigger_compile_and_link));
 	if (!is_stx_warn)	/* is current error not of type warning or are we not in CGP_PARSE phase? */
 		TREF(saw_side_effect) = TREF(shift_side_effects) = FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -176,6 +176,7 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 {
 	int		send_size, status, io_ready, save_errno, EMSGSIZE_cnt = 0, EWOULDBLOCK_cnt = 0;
   	ssize_t		bytes_sent;
+	char const	*errptr;
 
 	if (!repl_send_trace_buff)
 		repl_send_trace_buff = malloc(REPL_SEND_TRACE_BUFF_SIZE);
@@ -242,7 +243,13 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.
 				 */
 				assert(repl_tls.enabled);
+<<<<<<< HEAD
 				save_errno = ERR_TLSIOERROR;
+=======
+				errptr = gtm_tls_get_error();
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2,
+						LEN_AND_STR(errptr));
+>>>>>>> a6cd7b01f... GT.M V6.3-008
 			}
 #			else
 			save_errno = ERRNO;
@@ -288,6 +295,7 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 {
 	int		status, max_recv_len, io_ready, save_errno;
 	ssize_t		bytes_recvd;
+	char const	*errptr;
 
 	if (!repl_recv_trace_buff)
 		repl_recv_trace_buff = malloc(REPL_RECV_TRACE_BUFF_SIZE);
@@ -351,8 +359,14 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.
 				 */
 				assert(repl_tls.enabled);
+<<<<<<< HEAD
 				save_errno = ERR_TLSIOERROR;
 				bytes_recvd = -1;	/* to ensure "save_errno" does not get overwritten a few lines later */
+=======
+				errptr = gtm_tls_get_error();
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("recv"), ERR_TEXT, 2,
+						LEN_AND_STR(errptr));
+>>>>>>> a6cd7b01f... GT.M V6.3-008
 			}
 #			else
 			save_errno = ERRNO;

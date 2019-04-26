@@ -34,7 +34,6 @@
 #include "iotimer.h"
 #include "stack_frame.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "send_msg.h"
 #include "gtmmsg.h"		/* for gtm_putmsg() prototype */
@@ -108,8 +107,8 @@ void	op_dmode(void)
 	}
 	++loop_cnt;
 	old_errno = errno;
-	*((INTPTR_T **)&restart_pc) = (INTPTR_T *)CODE_ADDRESS(call_dm);
-	*((INTPTR_T **)&restart_ctxt) = (INTPTR_T *)GTM_CONTEXT(call_dm);
+	*((INTPTR_T **)&frame_pointer->restart_pc) = (INTPTR_T *)CODE_ADDRESS(call_dm);
+	*((INTPTR_T **)&frame_pointer->restart_ctxt) = (INTPTR_T *)GTM_CONTEXT(call_dm);
 	loop_cnt = 0;
 	old_errno = 0;
 	if (tt == io_curr_device.in->type)

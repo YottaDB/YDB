@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -17,6 +17,7 @@
 #include "gtm_string.h"
 #include "cmd_qlf.h"
 #include "cli.h"
+#include "min_max.h"
 
 #define INIT_QUALIF_STR(QUALIF, CQCODE, FIELD)										\
 {															\
@@ -53,16 +54,15 @@ void get_cmd_qlf(command_qualifier *qualif)
 	{
 		qualif->qlf |= CQ_OBJECT;
 		qualif->object_file.mvtype = MV_STR;
-		s = &qualif->object_file.str;
+		s = &qualif->object_file.str;	/* 4SCA: object_file is allocated MAX_FN_LEN bytes */
 		len = s->len;
 		if (FALSE == cli_get_str("OBJECT", s->addr, &len))
 		{
 			s->len = 0;
 			if (glb_cmd_qlf.object_file.mvtype == MV_STR  &&  glb_cmd_qlf.object_file.str.len > 0)
 			{
-				s->len = glb_cmd_qlf.object_file.str.len;
-				memcpy(s->addr, glb_cmd_qlf.object_file.str.addr,
-					s->len);
+				s->len = MIN(glb_cmd_qlf.object_file.str.len, MAX_FN_LEN);
+				memcpy(s->addr, glb_cmd_qlf.object_file.str.addr, s->len);
 			}
 		} else
 			s->len = len;
@@ -114,16 +114,15 @@ void get_cmd_qlf(command_qualifier *qualif)
 	{
 		qualif->qlf |= CQ_LIST;
 		qualif->list_file.mvtype = MV_STR;
-		s = &qualif->list_file.str;
+		s = &qualif->list_file.str;	/* 4SCA: list_file is allocated MAX_FN_LEN bytes */
 		len = s->len;
 		if (FALSE == cli_get_str("LIST", s->addr, &len))
 		{
 			s->len = 0;
 			if (glb_cmd_qlf.list_file.mvtype == MV_STR  &&  glb_cmd_qlf.list_file.str.len > 0)
 			{
-				s->len = glb_cmd_qlf.list_file.str.len;
-				memcpy(s->addr, glb_cmd_qlf.list_file.str.addr,
-					s->len);
+				s->len = MIN(glb_cmd_qlf.list_file.str.len, MAX_FN_LEN);
+				memcpy(s->addr, glb_cmd_qlf.list_file.str.addr, s->len);
 			}
 		} else
 			s->len = len;
@@ -155,14 +154,14 @@ void get_cmd_qlf(command_qualifier *qualif)
         {
 		qualif->qlf |= CQ_CE_PREPROCESS;
 		qualif->ceprep_file.mvtype = MV_STR;
-		s = &qualif->ceprep_file.str;
+		s = &qualif->ceprep_file.str;	/* 4SCA: ceprep_file is allocated MAX_FN_LEN bytes */
 		len = s->len;
 		if (FALSE == cli_get_str("CE_PREPROCESS", s->addr, &len))
 		{
 			s->len = 0;
 			if (glb_cmd_qlf.ceprep_file.mvtype == MV_STR  &&  glb_cmd_qlf.ceprep_file.str.len > 0)
 			{
-				s->len = glb_cmd_qlf.ceprep_file.str.len;
+				s->len = MIN(glb_cmd_qlf.ceprep_file.str.len, MAX_FN_LEN);
 				memcpy(s->addr, glb_cmd_qlf.ceprep_file.str.addr, s->len);
 			}
 		} else

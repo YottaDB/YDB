@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -56,6 +56,8 @@ void new_stack_frame(rhdtyp *rtn_base, unsigned char *context, unsigned char *tr
 	sf->vartab_len = sf->rvector->vartab_len;
 	sf->ctxt = context;
 	sf->mpc = transfer_addr;
+	sf->restart_ctxt = frame_pointer->restart_ctxt;
+	sf->restart_pc = frame_pointer->restart_pc;
 	sf->flags = 0;
 	SET_GLVN_INDX(sf, GLVN_POOL_UNTOUCHED);
 	sf->ret_value = NULL;

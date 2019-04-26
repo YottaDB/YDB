@@ -47,7 +47,6 @@
 #include "outofband.h"
 #include "stack_frame.h"
 #include "stringpool.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
@@ -650,27 +649,35 @@ CONDITION_HANDLER(mdb_condition_handler)
 	{
 		outofband_clear();
 		/* Verify not indirect or that context is unchanged before reset context */
-		assert(NULL != restart_pc);
-		assert((!(SFF_INDCE & frame_pointer->flags)) || (restart_ctxt == frame_pointer->ctxt));
+		assert(NULL != frame_pointer->restart_pc);
+		assert((!(SFF_INDCE & frame_pointer->flags)) || (frame_pointer->restart_ctxt == frame_pointer->ctxt));
 		DBGEHND((stderr, "mdb_condition_handler(1): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
-			 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, restart_pc, restart_ctxt,
-			 frame_pointer->type));
-		frame_pointer->mpc = restart_pc;
-		frame_pointer->ctxt = restart_ctxt;
+			 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, frame_pointer->restart_pc,
+			 frame_pointer->restart_ctxt, frame_pointer->type));
+		frame_pointer->mpc = frame_pointer->restart_pc;
+		frame_pointer->ctxt = frame_pointer->restart_ctxt;
 		MUM_TSTART;
 	} else  if ((int)ERR_CTRLC == SIGNAL)
 	{
 		outofband_clear();
 		if (!trans_action && !dm_action)
 		{	/* Verify not indirect or that context is unchanged before reset context */
-			assert(NULL != restart_pc);
-			assert((!(SFF_INDCE & frame_pointer->flags)) || (restart_ctxt == frame_pointer->ctxt));
+			assert(NULL != frame_pointer->restart_pc);
+			assert((!(SFF_INDCE & frame_pointer->flags)) || (frame_pointer->restart_ctxt == frame_pointer->ctxt));
 			DBGEHND((stderr, "mdb_condition_handler(2): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
+<<<<<<< HEAD
 				 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, restart_pc, restart_ctxt,
 				 frame_pointer->type));
 			frame_pointer->mpc = restart_pc;
 			frame_pointer->ctxt = restart_ctxt;
 			frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
+=======
+				 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, frame_pointer->restart_pc,
+				 frame_pointer->restart_ctxt, frame_pointer->type));
+			frame_pointer->mpc = frame_pointer->restart_pc;
+			frame_pointer->ctxt = frame_pointer->restart_ctxt;
+			frame_pointer->flags &= SSF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
+>>>>>>> a6cd7b01f... GT.M V6.3-008
 			GTMTRIG_ONLY(
 				DBGTRIGR((stderr, "mdb_condition_handler: disabling SFF_NORET_VIA_MUMTSTART_OFF (1) in frame "
 					  "0x"lvaddr"\n", frame_pointer)));
@@ -720,13 +727,14 @@ CONDITION_HANDLER(mdb_condition_handler)
 			 */
 			if (!repeat_error && ((0 != (TREF(dollar_ztrap)).str.len) || ztrap_explicit_null))
 			{	/* Verify not indirect or that context is unchanged before reset context */
-				assert(NULL != restart_pc);
-				assert((!(SFF_INDCE & frame_pointer->flags)) || (restart_ctxt == frame_pointer->ctxt));
+				assert(NULL != frame_pointer->restart_pc);
+				assert((!(SFF_INDCE & frame_pointer->flags))
+						|| (frame_pointer->restart_ctxt == frame_pointer->ctxt));
 				DBGEHND((stderr, "mdb_condition_handler(3): Resetting frame 0x"lvaddr" mpc/context with restart_pc/"
-					 "ctxt 0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, restart_pc,
-					 restart_ctxt, frame_pointer->type));
-				frame_pointer->mpc = restart_pc;
-				frame_pointer->ctxt = restart_ctxt;
+					 "ctxt 0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer,
+					 frame_pointer->restart_pc, frame_pointer->restart_ctxt, frame_pointer->type));
+				frame_pointer->mpc = frame_pointer->restart_pc;
+				frame_pointer->ctxt = frame_pointer->restart_ctxt;
 			}
 			err_act = NULL;
 			dollar_ecode.error_last_ecode = SIGNAL;
@@ -828,13 +836,13 @@ CONDITION_HANDLER(mdb_condition_handler)
 		MUM_TSTART;
 	} else  if ((int)ERR_JOBINTRRQST == SIGNAL)
 	{	/* Verify not indirect or that context is unchanged before reset context */
-		assert(NULL != restart_pc);
-		assert((!(SFF_INDCE & frame_pointer->flags)) || (restart_ctxt == frame_pointer->ctxt));
+		assert(NULL != frame_pointer->restart_pc);
+		assert((!(SFF_INDCE & frame_pointer->flags)) || (frame_pointer->restart_ctxt == frame_pointer->ctxt));
 		DBGEHND((stderr, "mdb_condition_handler(4): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
-			 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, restart_pc, restart_ctxt,
-			 frame_pointer->type));
-		frame_pointer->mpc = restart_pc;
-		frame_pointer->ctxt = restart_ctxt;
+			 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, frame_pointer->restart_pc,
+			 frame_pointer->restart_ctxt, frame_pointer->type));
+		frame_pointer->mpc = frame_pointer->restart_pc;
+		frame_pointer->ctxt = frame_pointer->restart_ctxt;
 		assert(!dollar_zininterrupt);
 		dollar_zininterrupt = TRUE;	/* Note done before outofband is cleared to prevent nesting */
 		outofband_clear();
@@ -857,13 +865,13 @@ CONDITION_HANDLER(mdb_condition_handler)
 	{	/* Verify not indirect or that context is unchanged before reset context */
 		if (((TREF(dollar_ztimeout)).ztimeout_vector.str.len))
 		{
-			assert(NULL != restart_pc);
-			assert((!(SFF_INDCE & frame_pointer->flags)) || (restart_ctxt == frame_pointer->ctxt));
+			assert(NULL != frame_pointer->restart_pc);
+			assert((!(SFF_INDCE & frame_pointer->flags)) || (frame_pointer->restart_ctxt == frame_pointer->ctxt));
 			DBGEHND((stderr, "mdb_condition_handler(5): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
-			"0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, restart_pc, restart_ctxt,
-			frame_pointer->type));
-			frame_pointer->mpc = restart_pc;
-			frame_pointer->ctxt = restart_ctxt;
+			"0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, frame_pointer->restart_pc,
+			frame_pointer->restart_ctxt, frame_pointer->type));
+			frame_pointer->mpc = frame_pointer->restart_pc;
+			frame_pointer->ctxt = frame_pointer->restart_ctxt;
 			assert(!dollar_zininterrupt);
 			proc_act_type = SFT_ZTIMEOUT | SFT_COUNT;/* | SFT_COUNT;*/
 			err_act = &((TREF(dollar_ztimeout)).ztimeout_vector.str);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,7 @@ GBLREF uint4		mu_int_offset[];
 GBLREF uint4		mu_int_errknt;
 GBLREF boolean_t	mu_int_err_ranges;
 GBLREF boolean_t	master_dir;
+GBLREF gd_region	*gv_cur_region;
 GBLREF global_list	*trees;
 GBLREF span_node_integ	*sndata;
 GBLREF boolean_t	null_coll_type_err;
@@ -40,6 +41,9 @@ GBLREF unsigned int	rec_num;
 GBLREF block_id		blk_id;
 GBLREF boolean_t	nct_err_type;
 GBLREF int		rec_len;
+
+error_def(ERR_NULSUBSC);
+
 #define MAX_UTIL_LEN 40
 #define BLOCK_WINDOW 8
 #define LEVEL_WINDOW 3
@@ -93,7 +97,9 @@ void	mu_int_err(
 	MEMCPY_LIT(&util_buff[util_len], TEXT2);
 	util_len += SIZEOF(TEXT2) - 1;
 	util_buff[util_len] = 0;
-	if (sndata->sn_type)
+	if (ERR_NULSUBSC == err)
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) err, 4, LEN_AND_STR((char*)util_buff), DB_LEN_STR(gv_cur_region));
+	else if (sndata->sn_type)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) err, 3, LEN_AND_STR((char*)util_buff),
 				(SPAN_NODE == sndata->sn_type) ? (sndata->span_prev_blk + 2) : (sndata->span_blk_cnt));
 	else

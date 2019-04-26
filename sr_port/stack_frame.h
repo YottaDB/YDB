@@ -78,6 +78,8 @@ typedef struct stack_frame_struct	/* contents of the GT.M MUMPS stack frame */
 	bool		dollar_test;
 	/*uint4		glvn_indx;*/	/* state of glvn pool at frame creation time. For use when gtmpcat is changed. */
 	unsigned char	*for_ctrl_stack;/* NOTE: temporarily using this field for glvn_indx so that gtmpcat works */
+	unsigned char	*restart_pc;	/* interrupt restart program counter */
+	unsigned char	*restart_ctxt;	/* interrupt restart context pointer */
 	mval		*ret_value;
 } stack_frame;
 

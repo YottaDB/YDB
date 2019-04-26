@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2018 Fidelity National Information		#
+# Copyright (c) 2007-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
@@ -109,8 +109,10 @@ msf_temp_mvals_off	=	66
 msf_typ_off		=	68
 msf_flags_off		=	70
 msf_for_ctrl_stack	=	72
+msf_restart_pc_off	=	80
+msf_restart_ctxt_off	=	88
 
-msf_frame_size		=	88
+msf_frame_size		=	104
 
 SFT_COUNT		=	0x01
 SFT_DM			=	0x02

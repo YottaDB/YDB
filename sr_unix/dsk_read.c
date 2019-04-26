@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
@@ -46,7 +46,6 @@
 #include "gdscc.h"
 #include "jnl.h"
 #include "buddy_list.h"         /* needed for tp.h */
-#include "hashtab_int4.h"       /* needed for tp.h */
 #include "have_crit.h"
 #include "tp.h"
 #include "cdb_sc.h"

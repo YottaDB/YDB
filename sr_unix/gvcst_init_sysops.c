@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -1425,7 +1425,7 @@ int db_init(gd_region *reg, boolean_t ok_to_bypass)
 #			include "tab_db_csh_acct_rec.h"
 #			undef TAB_DB_CSH_ACCT_REC
 		}
-		cnl->wc_blocked = FALSE; 	/* Since we are creating shared memory, reset wc_blocked to FALSE */
+		SET_TRACEABLE_VAR(cnl->wc_blocked, WC_UNBLOCK);	/* Since we are creating shared memory, reset wc_blocked to 0 */
 		gvstats_rec_csd2cnl(csa);	/* should be called before "db_auto_upgrade" */
 		reg->dyn.addr->ext_blk_count = csd->extension_size;
 		mlk_shr_init((sm_uc_ptr_t)csa->mlkctl, csd->lock_space_size, csa, (FALSE == read_only));

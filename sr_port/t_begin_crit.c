@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -27,7 +27,6 @@
 #include "jnl.h"
 #include "t_begin_crit.h"
 #include "longset.h"		/* needed for cws_insert.h */
-#include "hashtab_int4.h"	/* needed for cws_insert.h */
 #include "cws_insert.h"
 
 GBLDEF	srch_hist		dummy_hist;

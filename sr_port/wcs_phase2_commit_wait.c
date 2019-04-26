@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2018 Fidelity National Information	*
+ * Copyright (c) 2008-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -89,7 +89,7 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	uint4			lcnt, lcnt_isprcalv_freq, lcnt_isprcalv_next, blocking_pid, start_in_tend;
 	int4			value;
 	boolean_t		is_alive, was_crit;
-	boolean_t		timedout;
+	boolean_t		timedout, any_blocked;
 	block_id		blk;
 	int4			index, crarray_index;
 	cache_rec_ptr_t		cr_lo, cr_top, curcr;
@@ -160,11 +160,13 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 				 * at the end of this module in terms of book-keeping array maintenance.
 				 */
 				crarray_index = 0;
+				any_blocked = FALSE;
 				for (curcr = cr_lo; curcr < cr_top;  curcr++)
 				{
 					blocking_pid = curcr->in_tend;
 					if (!blocking_pid || (blocking_pid == process_id))
 						continue;
+					any_blocked = TRUE;
 					/* If we do not hold crit, the existence of one dead pid is enough for us to know we
 					 * cannot return TRUE (because we are waiting for all phase2 commits to finish and one
 					 * dead pid means all commits will never complete on its own) so return FALSE right away
@@ -206,8 +208,10 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 						}
 					}
 				}
-				if (was_crit && crarray_index && (curcr == cr_top))
-				{	/* We hold crit and found at least one dead pid and found no alive pids in phase2 commit.
+				if (was_crit && (crarray_index || !any_blocked) && (curcr == cr_top))
+				{	/* We hold crit, found no alive pids in phase2 commit, and found either at least one
+					 * dead pid or no blocking pids, the latter indicating that the wcs_phase2_commit_pidcnt
+					 * is wrong.
 					 * No need to wait any more. Return FALSE right away. Caller will invoke "wcs_recover"
 					 * to fix the situation.
 					 */
@@ -246,10 +250,20 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 				BG_TRACE_PRO_ANY(csa, phase2_commit_wait_sleep_in_crit);
 			} else
 				BG_TRACE_PRO_ANY(csa, phase2_commit_wait_sleep_no_crit);
+			if (0 == (lcnt % PHASE2_COMMIT_WAIT))
+			{	/* This is the case where we wait for a particular cache-record.
+				 * Take the c-stack of the PID that is still holding this cr.
+				 */
+				blocking_pid = cr->in_tend;
+				SEND_COMMITWAITPID_GET_STACK_IF_NEEDED(blocking_pid, stuck_cnt, cr, csa);
+			}
 		} else
+		{
 			BG_TRACE_PRO_ANY(csa, phase2_commit_wait_pidcnt);
-		if (lcnt >= PHASE2_COMMIT_WAIT)
-			break;
+			if (0 == (lcnt % PHASE2_COMMIT_WAIT))
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id,
+						lcnt / PHASE2_COMMIT_WAIT, cnl->wcs_phase2_commit_pidcnt, DB_LEN_STR(csa->region));
+		}
 		DEBUG_ONLY(half_time = (phase2_commit_half_wait == lcnt));
 		wcs_sleep(lcnt);
 #		ifdef DEBUG
@@ -334,7 +348,8 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	 * resetting cnl->wcs_phase2_commit_pidcnt. But, ONLINE ROLLBACK called in a crash situation is done only with
 	 * whitebox test cases. So, assert accordingly.
 	 */
-	assert(cnl->wc_blocked || WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED) || WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06)
+	assert(WC_BLOCK_RECOVER == (cnl)->wc_blocked || WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
+			|| WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06)
 			|| WBTEST_ENABLED(WBTEST_DB_WRITE_HANG) || WBTEST_ENABLED(WBTEST_EXPECT_IO_HANG));
 	return FALSE;
 }

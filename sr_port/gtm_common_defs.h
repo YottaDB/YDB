@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -118,7 +118,7 @@ MBSTART {					\
 	char	*mcs_ptr;			\
 	int	mcs_len;			\
 						\
-	mcs_len = STRLEN(SRC) + 1;		\
+	mcs_len = (int)(STRLEN(SRC) + 1);	\
 	mcs_ptr = malloc(mcs_len);		\
 	memcpy(mcs_ptr, SRC, mcs_len);		\
 	DST = mcs_ptr;				\

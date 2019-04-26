@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -23,7 +23,6 @@
 #include "stack_frame.h"
 #include "tp_frame.h"
 #include "mlkdef.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "lv_val.h"
 #include "op.h"
 #include "tp_unwind.h"

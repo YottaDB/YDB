@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -44,7 +44,6 @@
 #include "jnl.h"
 #include "jnl_typedef.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "interlock.h"
 #include "gdsbgtr.h"
@@ -97,6 +96,7 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	sgm_info		*first_sgm_info, *sgm_info_ptr;
 GBLREF	sgm_info		*first_tp_si_by_ftok; /* List of participating regions in the TP transaction sorted on ftok order */
 GBLREF	tp_region		*tp_reg_list;
+GBLREF	tp_region		*tp_reg_free_list;
 GBLREF	boolean_t		tp_kill_bitmaps;
 GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF	int4			n_pvtmods, n_blkmods;
@@ -192,8 +192,8 @@ boolean_t	tp_crit_all_regions()
 						 * encryption keys need to be resynced. We don't want to do that while holding
 						 * crit on any region. So take care of that explicitly here just like csd->freeze.
 						 */
-			assert(!(tmpsi->update_trans & ~UPDTRNS_VALID_MASK));
-			if (FROZEN_HARD(tmpcsa) && tmpsi->update_trans)
+			assert(!tmpsi || !(tmpsi->update_trans & ~UPDTRNS_VALID_MASK));
+			if (FROZEN_HARD(tmpcsa) && tmpsi && tmpsi->update_trans)
 			{
 				tr = tr->fPtr;		/* Increment so we release the crit lock we actually got */
 				x_lock = FALSE;
@@ -250,7 +250,7 @@ boolean_t	tp_tend()
 	jnl_buffer_ptr_t	jbp;
 	jnl_format_buffer	*jfb;
 	sgm_info		*si, *si_last, *tmpsi, *si_not_validated;
-	tp_region		*tr;
+	tp_region		*tr, *prev_tr, *next_tr;
 	sgmnt_addrs		*csa, *repl_csa = NULL;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
@@ -303,10 +303,25 @@ boolean_t	tp_tend()
 	yes_jnl_no_repl = FALSE;
 	jnl_participants = 0;	/* # of regions that had a LOGICAL journal record written for this TP */
 	assert(!IS_DSE_IMAGE && !TREF(in_gvcst_redo_root_search)); /* DSE and gvcst_redo_root_search work in Non-TP */
-	for (tr = tp_reg_list; NULL != tr; tr = tr->fPtr)
+	prev_tr = NULL;
+	for (tr = tp_reg_list; NULL != tr; tr = next_tr)
 	{
+		next_tr = tr->fPtr;
 		TP_CHANGE_REG_IF_NEEDED(tr->reg);
 		csa = cs_addrs;
+		if (!csa->tp_in_use)
+		{
+			/* Region isn't actually part of transaction. Remove it from the tp list and place on free queue */
+			rel_crit(tr->reg);
+			if (prev_tr == NULL)
+				tp_reg_list = next_tr; /* move head forward 1 */
+			else
+				prev_tr->fPtr = next_tr;
+			tr->fPtr = tp_reg_free_list;
+			tp_reg_free_list = tr;
+			continue;
+		}
+		prev_tr = tr;
 		csd = cs_data;
 		cnl = csa->nl;
 		is_mm = (dba_mm == csd->acc_meth);
@@ -317,7 +332,7 @@ boolean_t	tp_tend()
 		sgm_info_ptr = si;
 		*prev_tp_si_by_ftok = si;
 		prev_tp_si_by_ftok = &si->next_tp_si_by_ftok;
-		if ((cnl->wc_blocked) || (is_mm && (csa->total_blks != csd->trans_hist.total_blks)))
+		if ((WC_BLOCK_RECOVER ==  cnl->wc_blocked) || (is_mm && (csa->total_blks != csd->trans_hist.total_blks)))
 		{	/* If blocked, or we have MM and file has been extended, force repair */
 			status = cdb_sc_helpedout; /* special status to prevent punishing altruism */
 			assert((CDB_STAGNATE > t_tries) || !is_mm || (csa->total_blks == csd->trans_hist.total_blks));
@@ -393,7 +408,7 @@ boolean_t	tp_tend()
 			 * We will repeat this check later in crit but it will hopefully have little or nothing to do.
 			 * bypass 1st check if already in crit -- check later
 			 */
-			if (!csa->now_crit && !is_mm && !WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL))
+			if (!csa->now_crit && !is_mm && !WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL, csa))
 				/* only reason we currently know why wcs_get_space could fail */
 				assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
 			if (JNL_ENABLED(csa))
@@ -558,8 +573,7 @@ boolean_t	tp_tend()
 			if (!csa->now_crit)
 			{
 				grab_crit(gv_cur_region); /* Step CMT01 (see secshr_db_clnup.c for CMTxx step descriptions) */
-			}
-			else if (cnl->wc_blocked)
+			} else if (cnl->wc_blocked)
 			{
 				status = cdb_sc_helpedout;
 				goto failed;
@@ -712,11 +726,16 @@ boolean_t	tp_tend()
 				{	/* in crit, ensure cache-space is available.
 					 * the out-of-crit check done above might not be enough
 					 */
-					if (!WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL))
+					if (!WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL, csa))
 					{
 						/* only reason we currently know why wcs_get_space could fail */
+<<<<<<< HEAD
 						assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
 						SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+=======
+						assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
+						SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
+>>>>>>> a6cd7b01f... GT.M V6.3-008
 						BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_wcsgetspace);
 						SET_CACHE_FAIL_STATUS(status, csd);
 						TP_TRACE_HIST(CR_BLKEMPTY, NULL);
@@ -813,7 +832,7 @@ boolean_t	tp_tend()
 							assert(csd == csa->hdr);
 							jgbl.dont_reset_gbl_jrec_time = save_dont_reset_gbl_jrec_time;
 							SET_WCS_FLU_FAIL_STATUS(status, csd);
-							SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_jnl_wcsflu);
 							TP_TRACE_HIST(CR_BLKEMPTY, NULL);
 							goto failed;
@@ -942,7 +961,7 @@ boolean_t	tp_tend()
 							if ((NULL != cr) && (cr->blk != bt->blk))
 							{
 								assert(FALSE);
-								SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+								SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 								BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_crbtmismatch1);
 								status = cdb_sc_crbtmismatch;
 								TP_TRACE_HIST(t1->blk_num, t1->blk_target);
@@ -951,7 +970,7 @@ boolean_t	tp_tend()
 						}
 						if ((cache_rec_ptr_t)CR_NOTVALID == cr)
 						{
-							SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_t1);
 							SET_CACHE_FAIL_STATUS(status, csd);
 							TP_TRACE_HIST(t1->blk_num, t1->blk_target);
@@ -967,7 +986,7 @@ boolean_t	tp_tend()
 								if ((NULL != cr) && (NULL != bt) && (cr->blk != bt->blk))
 								{
 									assert(FALSE);
-									SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+									SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 									BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_crbtmismatch2);
 									status = cdb_sc_crbtmismatch;
 									TP_TRACE_HIST(t1->blk_num, t1->blk_target);
@@ -1070,7 +1089,7 @@ boolean_t	tp_tend()
 						{
 							SET_CACHE_FAIL_STATUS(status, csd);
 							TP_TRACE_HIST(tp_blk, NULL);
-							SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_bitmap);
 							goto failed;
 						}
@@ -1080,7 +1099,7 @@ boolean_t	tp_tend()
 						if (cr->blk != bt->blk)
 						{
 							assert(FALSE);
-							SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_crbtmismatch3);
 							status = cdb_sc_crbtmismatch;
 							TP_TRACE_HIST(tp_blk, NULL);
@@ -1122,7 +1141,7 @@ boolean_t	tp_tend()
 						{
 							TP_TRACE_HIST(cse->blk, cse->blk_target);
 							SET_CACHE_FAIL_STATUS(status, csd);
-							SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_jnl_cwset);
 							goto failed;
 						}

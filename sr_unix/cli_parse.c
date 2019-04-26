@@ -1075,7 +1075,7 @@ boolean_t cli_get_parm(char *entry, char val_buf[])
 			*TAREF1(parm_ary, match_ind) = -1;
 		} else
 		{
-			parm_len = STRLEN(cli_token_buf) + 1;
+			parm_len = (int)(STRLEN(cli_token_buf) + 1);
 			if (MAX_LINE < parm_len)
 			{
 				PRINTF("Parameter string too long\n");

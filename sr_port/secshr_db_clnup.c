@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -34,7 +34,6 @@
 #include "interlock.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "io.h"
 #include "gtmsecshr.h"
@@ -473,7 +472,7 @@ void secshr_db_clnup(enum secshr_db_state secshr_state)
 					 * 	decrementing the shared counter but after committing the transaction otherwise)
 					 * 	so set wc_blocked. This case is folded into phase2 cleanup case below.
 					 */
-					SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 					if (csa->now_crit)
 					{
 						wcblocked_ptr = WCBLOCKED_NOW_CRIT_LIT;

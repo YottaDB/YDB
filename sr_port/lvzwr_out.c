@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -35,7 +35,6 @@
 #include "jnl.h"
 #include "buddy_list.h"
 #include "hashtab_mname.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "merge_def.h"
 #include "gvname_info.h"
@@ -64,6 +63,8 @@ GBLREF zwr_hash_table		*zwrhtab;		/* Used to track aliases during zwrites */
 
 LITDEF MSTR_CONST(semi_star, " ;*");
 LITDEF MSTR_CONST(dzwrtac_clean, "$ZWRTAC=\"\"");
+
+#define	NONULLSUBS	"MERGE failed because"
 
 error_def(ERR_MAXNRSUBSCRIPTS);
 error_def(ERR_MERGEINCOMPL);
@@ -309,7 +310,7 @@ void lvzwr_out(lv_val *lvp)
 				MV_FORCE_STR(subscp);
 				mval2subsc(subscp, gv_currkey, gv_cur_region->std_null_coll);
 				if (!subscp->str.len &&	(ALWAYS != gv_cur_region->null_subs))
-					sgnl_gvnulsubsc();
+					sgnl_gvnulsubsc(NONULLSUBS);
 			}
 			MV_FORCE_STR(val);
 			gvnh_reg = TREF(gd_targ_gvnh_reg);	/* set by op_gvname/op_gvextnam/op_gvnaked done before op_merge */

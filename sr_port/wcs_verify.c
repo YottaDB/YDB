@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -255,13 +255,13 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 		{	/* if wcs_recover is caller, it would have waited for the following fields to become 0.
 			 * if called from DSE CACHE -VERIFY, none of these are guaranteed. So do these checks only for first case.
 			 */
-			if (FALSE == cnl->wc_blocked)
+			if (WC_UNBLOCK == cnl->wc_blocked)
 			{	/* in UNIX this blocks the writer */
 				assert(expect_damage);
 				ret = FALSE;
 				SEND_MSG_CSA(VARLSTCNT(8) ERR_DBFHEADERR4, 6, DB_LEN_STR(reg),
-					RTS_ERROR_TEXT("wc_blocked"), cnl->wc_blocked, TRUE);
-				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+					RTS_ERROR_TEXT("wc_blocked"), cnl->wc_blocked, WC_BLOCK_RECOVER);
+				SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 			}
 			in_wtstart = cnl->in_wtstart;	/* store value in local variable in case the following assert fails */
 			if (0 != in_wtstart)
@@ -277,8 +277,9 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 			if (0 != intent_wtstart)
 			{	/* Two situations are possible.
 				 *	a) A "wcs_wtstart" call is concurrently in progress and that the process has just now
-				 *		incremented intent_wtstart. It will notice cnl->wc_blocked to be TRUE and
-				 *		decrement intent_wtstart right away and return. So we don't need to do anything.
+				 *		incremented intent_wtstart. It will notice cnl->wc_blocked to be
+				 *		2 and decrement intent_wtstart right away and return. So we don't need to do
+				 *		anything.
 				 *	b) A "wcs_wtstart" call had previously increment intent_wtstart but got shot before it
 				 *		could get a chance to decrement the field. In this case, we need to clear the
 				 *		field to recover from this situation.

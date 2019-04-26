@@ -1,9 +1,9 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -142,14 +142,13 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 											 * avoid a sig-11 if srch and rplc are both undefined
 											 * on the first $translate call */
 	{
+		MV_FORCE_STR(srch);
+		MV_FORCE_STR(rplc);
 		if (NULL != xlate_hash)
-		{
+		{	/* about to allocate new one, so free any old, doing this after error checks so as to keep pointer valid */
 			free_hashtab_int4(xlate_hash);
 			free(xlate_hash);
 		}
-
-		MV_FORCE_STR(srch);
-		MV_FORCE_STR(rplc);
 		/* If we had a static xlate_hash and prev_srch, prev_rplc, we could avoid this in rapid succession */
 		xlate_hash = create_utf8_xlate_table(srch, rplc, xlate);
 		prev_gcols = stringpool.gcols;

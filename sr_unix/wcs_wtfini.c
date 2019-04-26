@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2018 Fidelity National Information	*
+ * Copyright (c) 2016-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -172,7 +172,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
                                                          */
 							assert(WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED)
 								|| WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06));
-							SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 							ret_value = ERR_DBCCERR;
 							break;
 						}
@@ -198,7 +198,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			if (INTERLOCK_FAIL == (INTPTR_T)csr)
 			{
 				assert(FALSE);
-				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+				SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 				BG_TRACE_PRO_ANY(csa, wcb_wtfini_lckfail1);
 				ret_value = ERR_DBCCERR;
 				break;
@@ -218,7 +218,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			if (INTERLOCK_FAIL == status)
 			{
 				assert(FALSE);
-				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+				SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 				BG_TRACE_PRO_ANY(csa, wcb_wtfini_lckfail2);
 				ret_value = ERR_DBCCERR;
 			}
@@ -318,8 +318,13 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 				 * likely needed by that pid (e.g. secshr_db_clnup/wcs_recover to complete the flush of the
 				 * before-image block to an online backup file (in case of an error in the midst of commit).
 				 * In that case, we should NOT touch csr->blk so keep csr in the WIP queue until "in_cw_set" clears.
+				 *
+				 * Now sometimes, the update process might have been killed, leaving "in_cw_set" to be non-zero.
+				 * We need to see whether the update process is still alive. If not, reset in_cw_set.
 				 */
 				assert(REQUEUE_TO_WIP == requeue);
+				if (!csr->bt_index && csr->in_cw_set && !is_proc_alive(csr->in_cw_set, 0))
+					csr->in_cw_set = 0;
 				if (csr->bt_index || !csr->in_cw_set)
 					requeue = REQUEUE_TO_FREE;
 			} else
@@ -367,7 +372,7 @@ int	wcs_wtfini(gd_region *reg, boolean_t do_is_proc_alive_check, cache_rec_ptr_t
 			if (INTERLOCK_FAIL == status)
 			{
 				assert(FALSE);
-				SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+				SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 				BG_TRACE_PRO_ANY(csa, wcb_wtfini_lckfail3);
 				ret_value = ERR_DBCCERR;
 				break;

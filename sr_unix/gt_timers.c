@@ -916,6 +916,7 @@ STATICFNDEF GT_TIMER *add_timer(ABS_TIME *atp, TID tid, uint8 time_to_expir, voi
 	SETUP_THREADGBL_ACCESS;
 	/* assert that no timer entry with the same "tid" exists in the timer chain */
 	assert(NULL == find_timer(tid, &tpp));
+	assert(GT_TIMER_INIT_DATA_LEN >= hdata_len);
 	/* obtain a new timer block */
 	ntp = (GT_TIMER *)timefree;
 	lastntp = NULL;

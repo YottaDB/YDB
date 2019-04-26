@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -53,7 +53,6 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "io.h"
 #include "jnl.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "send_msg.h"
 #include "gtmmsg.h"		/* for gtm_putmsg() prototype */
@@ -81,6 +80,7 @@ GBLREF	uint4		process_id;
 GBLREF	bool		remlkreq;
 GBLREF	unsigned char	*restart_ctxt, *restart_pc;
 GBLREF	unsigned int	t_tries;
+GBLREF	stack_frame	*frame_pointer;
 
 error_def(ERR_LOCKINCR2HIGH);
 error_def(ERR_LOCKIS);
@@ -186,7 +186,7 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 		else
 		{
 			sys_get_curr_time(&cur_time);
-			mv_zintcmd = find_mvstent_cmd(ZINTCMD_LOCK, restart_pc, restart_ctxt, FALSE);
+			mv_zintcmd = find_mvstent_cmd(ZINTCMD_LOCK, frame_pointer->restart_pc, frame_pointer->restart_ctxt, FALSE);
 			if (mv_zintcmd)
 			{
 				end_time = mv_zintcmd->mv_st_cont.mvs_zintcmd.end_or_remain;
@@ -301,6 +301,7 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 		for (;;)
 		{
 			SET_OUT_OF_TIME_IF_APPROPRIATE(timeout, &end_time, out_of_time);	/* may set "out_of_time" */
+			assert((!(SFF_INDCE & frame_pointer->flags)) || (frame_pointer->restart_ctxt == frame_pointer->ctxt));
 			if (out_of_time || outofband)
 			{	/* if time expired || control-c, tptimeout, or jobinterrupt encountered */
 				if (outofband || !mlk_check_own(pvt_ptr1))
@@ -326,16 +327,19 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 							{
 								PUSH_MV_STENT(MVST_ZINTCMD);
 								mv_chain->mv_st_cont.mvs_zintcmd.end_or_remain = end_time;
-								mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check = restart_ctxt;
-								mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check = restart_pc;
+								mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check
+									= frame_pointer->restart_ctxt;
+								mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check
+									= frame_pointer->restart_pc;
 								/* save current information from zintcmd_active */
 								mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_prior
 									= TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last;
 								mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_prior
 									= TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last;
-								TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last = restart_pc;
+								TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last
+									= frame_pointer->restart_pc;
 								TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last
-									= restart_ctxt;
+									= frame_pointer->restart_ctxt;
 								TAREF1(zintcmd_active, ZINTCMD_LOCK).count++;
 								mv_chain->mv_st_cont.mvs_zintcmd.command = ZINTCMD_LOCK;
 							}

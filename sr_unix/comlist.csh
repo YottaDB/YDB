@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2018 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	#
@@ -36,9 +36,7 @@
 echo "Start of $0 `date`"
 echo ""
 
-set uname_out = `uname -a`
-
-echo "Built on $HOST : $uname_out"
+echo "Built on $HOST"
 echo ""
 
 echo "arguments: '$1' '$2' '$3' '$4'"
@@ -837,6 +835,25 @@ unset p2
 unset p3
 unset p4
 
+echo "############# OS and other library versions at the time of build #############"
+uname -a
+if ("AIX" == "$HOSTOS") then
+	oslevel -s
+	$gt_cc_compiler -qversion
+else if ("Linux" == $HOSTOS) then
+	if (-X lsb_release) lsb_release -d
+	$gt_cc_compiler --version |& head -1
+endif
+# gpg and related versions"
+if (-X gpg2) then
+	gpg2 --version |& grep -E '^gpg |^libgcrypt '
+else if (-X gpg) then
+	gpg --version |& grep -E '^gpg |^libgcrypt '
+endif
+if (-X gpg-agent) then
+	gpg-agent --version |& grep -E '^gpg-agent '
+endif
+echo "##############################################################################"
 echo ""
 echo "Exit status (should be 0) is : $comlist_status"
 echo ""

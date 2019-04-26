@@ -33,7 +33,6 @@
 #include "min_max.h"		/* needed for MM extend */
 #include "gdsblkops.h"		/* needed for MM extend */
 
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
 #include "copy.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -276,6 +276,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	CANCEL_DB_TIMERS(reg, csa, canceled_dbsync_timer);
 	we_are_last_user = FALSE;
 	inst_is_frozen = IS_REPL_INST_FROZEN && REPL_ALLOWED(csa->hdr);
+	if (FREEZE_LATCH_HELD(csa))
+		rel_latch(&cnl->freeze_latch);
 	if (!csa->persistent_freeze)
 		region_freeze(reg, FALSE, FALSE, FALSE, FALSE, FALSE);
 	if (!csa->lock_crit_with_db && LOCK_CRIT_HELD(csa))
@@ -478,6 +480,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		/* recover + R/W region => one writer except ONLINE ROLLBACK, or standalone with frozen instance,
 		 * leading to safe_mode.
 		 */
+<<<<<<< HEAD
 		assert(!(have_standalone_access && !reg->read_only) || we_are_last_writer || jgbl.onlnrlbk || inst_is_frozen);
 		GTM_WHITE_BOX_TEST(WBTEST_ANTIFREEZE_JNLCLOSE, we_are_last_writer, 1);
 			/* Assume we are the last writer to invoke wcs_flu */
@@ -486,6 +489,29 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			ss_destroy_context(csa->ss_ctx);
 			free(csa->ss_ctx);
 			csa->ss_ctx = NULL;
+=======
+		if (csa->wbuf_dqd && !is_mm)
+		{	/* If we had an orphaned block and were interrupted, mupip_exit_handler will invoke secshr_db_clnup which
+			 * will clear this field and so we should never come to "gds_rundown" with a non-zero wbuf_dqd. The only
+			 * exception is if we are recover/rollback in which case "gds_rundown" (from mur_close_files) is invoked
+			 * BEFORE secshr_db_clnup in mur_close_files.
+			 * Note: It is NOT possible for online rollback to reach here with wbuf_dqd being non-zero. This is because
+			 * the moment we apply the first PBLK, we stop all interrupts and hence can never be interrupted in
+			 * wcs_wtstart or wcs_get_space. Assert accordingly.
+			 */
+			assert(mupip_jnl_recover && !jgbl.onlnrlbk && !safe_mode);
+			if (!was_crit)
+				grab_crit(reg);
+			SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
+			BG_TRACE_PRO_ANY(csa, wcb_gds_rundown1);
+                        send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_gds_rundown1"),
+				     process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
+			csa->wbuf_dqd = 0;
+			wcs_recover(reg);
+			BG_TRACE_PRO_ANY(csa, lost_block_recovery);
+			if (!was_crit)
+				rel_crit(reg);
+>>>>>>> a6cd7b01f... GT.M V6.3-008
 		}
 		/* SS_MULTI: If multiple snapshots are supported, then we have to run through each of the snapshots */
 		assert(1 == MAX_SNAPSHOTS);
@@ -503,6 +529,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				ss_release(NULL);
 				ss_release_lock(reg);
 			}
+<<<<<<< HEAD
 		}
 		/* If cnl->donotflush_dbjnl is set, it means mupip recover/rollback was interrupted and therefore we need not flush
 		 * shared memory contents to disk as they might be in an inconsistent state. Moreover, any more flushing will only
@@ -523,6 +550,17 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				 * Note: It is NOT possible for online rollback to reach here with wbuf_dqd being non-zero. This is
 				 * because the moment we apply the first PBLK, we stop all interrupts and hence can never be
 				 * interrupted in wcs_wtstart or wcs_get_space. Assert accordingly.
+=======
+			if (WC_BLOCK_RECOVER == cnl->wc_blocked && jgbl.onlnrlbk)
+			{	/* if the last update done by online rollback was not committed in the normal code-path but
+				 * was completed by secshr_db_clnup, wc_blocked will be set to TRUE. But, since online
+				 * rollback never invokes grab_crit (since csa->hold_onto_crit is set to TRUE), wcs_recover
+				 * is never invoked. This could result in the last update never getting flushed to the disk
+				 * and if online rollback happened to be the last writer then the shared memory will be
+				 * flushed and removed and the last update will be lost. So, force wcs_recover if we find
+				 * ourselves in such a situation. But, wc_blocked is possible only if phase1 or phase2
+				 * errors are induced using white box test cases
+>>>>>>> a6cd7b01f... GT.M V6.3-008
 				 */
 				assert(mupip_jnl_recover && !jgbl.onlnrlbk && !safe_mode);
 				if (!was_crit)
@@ -545,8 +583,16 @@ int4 gds_rundown(boolean_t cleanup_udi)
 				assert(!safe_mode);
 				if (is_mm)
 				{
+<<<<<<< HEAD
 					MM_DBFILEXT_REMAP_IF_NEEDED(csa, reg);
 					cnl->remove_shm = TRUE;
+=======
+					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
+					BG_TRACE_PRO_ANY(csa, wcb_gds_rundown2);
+					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
+							LEN_AND_LIT("wcb_gds_rundown2"), process_id, &csa->ti->curr_tn,
+							DB_LEN_STR(reg));
+>>>>>>> a6cd7b01f... GT.M V6.3-008
 				}
 				if (cnl->wc_blocked && jgbl.onlnrlbk)
 				{	/* if the last update done by online rollback was not committed in the normal code-path but

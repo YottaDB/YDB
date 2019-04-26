@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -41,8 +41,8 @@ void outofband_action(boolean_t lnfetch_or_start)
 			iott_flush(io_std_device.in);
 		if (lnfetch_or_start)
 		{
-			restart_pc =  frame_pointer->mpc;
-			restart_ctxt = frame_pointer->ctxt;
+			frame_pointer->restart_pc = frame_pointer->mpc;
+			frame_pointer->restart_ctxt = frame_pointer->ctxt;
 		}
 		switch(outofband)
 		{
