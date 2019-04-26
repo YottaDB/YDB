@@ -59,6 +59,7 @@ GBLREF	boolean_t		created_core;			/* Core file was created */
 GBLREF	unsigned int		core_in_progress;
 GBLREF	boolean_t		dont_want_core;
 GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		exit_handler_complete;
 GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		skip_exit_handler;
 GBLREF 	boolean_t		is_tracing_on;
@@ -220,6 +221,7 @@ void gtm_exit_handler(void)
 	 */
 	RUNDOWN_STEP(rundown_state_io, rundown_state_last, 0, IO_RUNDOWN_MACRO);
 	REVERT;
+	exit_handler_complete = TRUE;
 	print_exit_stats();
 	if (need_core && !created_core && !dont_want_core)	/* We needed to core */
 	{

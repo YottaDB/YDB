@@ -21,7 +21,7 @@
 typedef	void *(*gtm_pthread_fnptr_t)(void *parm);
 
 int	gtm_multi_thread(gtm_pthread_fnptr_t fnptr, int ntasks, int max_threads,
-					pthread_t *thr_array, void **ret_array, void *parmarray, int parmElemSize);
+			 pthread_t *thr_array, void **ret_array, void *parmarray, int parmElemSize);
 
 GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => not in use */
 GBLREF	boolean_t	thread_mutex_initialized;	/* TRUE => "thread_mutex" variable is initialized */
@@ -35,7 +35,7 @@ GBLREF	int		ydb_mupjnl_parallel;		/* Maximum # of concurrent threads or procs to
 GBLREF	volatile boolean_t timer_in_handler;
 #ifdef DEBUG
 GBLREF	boolean_t	in_nondeferrable_signal_handler;
-
+/* Values for in_nondeferrable_signal_handler */
 # define	IN_GENERIC_SIGNAL_HANDLER	1
 # define	IN_TIMER_HANDLER		2
 #endif
@@ -183,7 +183,7 @@ int	gtm_multi_thread_helper(thread_parm_t *tparm);
  */
 #define	INSIDE_THREADED_CODE(rname) (multi_thread_in_use && (NULL != (rname = pthread_getspecific(thread_gtm_putmsg_rname_key))))
 
-#else
+#else /* ifndef GTM_PTHREAD */
 
 #define	INITIALIZE_THREAD_MUTEX_IF_NEEDED
 #define	IS_LIBPTHREAD_MUTEX_LOCK_HOLDER 		FALSE

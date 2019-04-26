@@ -46,6 +46,7 @@
 #include "util.h"
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
+#include "gtm_exit_handler.h"
 
 #define	DEFER_EXIT_PROCESSING	((EXIT_PENDING_TOLERANT >= exit_state)			\
 				 && (exit_handler_active || multi_thread_in_use		\
@@ -69,6 +70,8 @@ GBLREF	volatile int4		exit_state;
 GBLREF	volatile unsigned int	core_in_progress;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		exit_handler_complete;
+GBLREF	int			last_sig;
 GBLREF	void			(*call_on_signal)();
 GBLREF	boolean_t		ydb_quiet_halt;
 GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
@@ -111,8 +114,19 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	/* Check for rethrown signal before we check forwarding. When deferred_exit_handler() processes a deferred
+	 * signal, some non-M languages (specifically Golang, perhaps others) rethrow the signal so it comes through
+	 * here twice. Since we run the exit handler logic just prior to invoking non-YDB signal handlers that were
+	 * in place before YDB was initialized, we can check exit_handler_complete to see if it has already run. If
+	 * has, we just drive the non-M main's handler and do an _exit() if it returns.
+	 */
+	if (exit_handler_complete)
+	{
+		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, TRUE);
+		UNDERSCORE_EXIT(sig);
+	}
 	signal_forwarded = IS_SIGNAL_FORWARDED(sig_hndlr_generic_signal_handler, sig, info);
-							/* Note down whether signal is forwarded or not */
+	/* Note down whether signal is forwarded or not */
 	if (!signal_forwarded)
 	{
 		assert(EXIT_IMMED >= exit_state);
@@ -120,6 +134,18 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		non_forwarded_sig_seen[exit_state] = TRUE;
 	}
 	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_generic_signal_handler, sig, IS_EXI_SIGNAL_TRUE, info, context);
+	/* It is possible that the exit handler has been started but not finished when we get a signal. Check that here. If
+	 * true, we just ignore it letting the earlier signal finish its processing.
+	 */
+	if (exit_handler_active && signal_forwarded && (sig == exi_condition))
+	{       /* a) exit_handler_active is TRUE but exit_handler_complete is FALSE implies we are inside but have not
+		 *    completed "gtm_exit_handler".
+		 * b) signal_forwarded implies this is a forwarded signal.
+		 * c) sig == exi_condition implies we already are exiting because of this very same signal.
+		 * In this case, we let the original exit handler invocation continue by returning from this right away.
+		 */
+		return;
+	}
 	assert(!thread_block_sigsent || blocksig_initialized);
 	/* If "thread_block_sigsent" is TRUE, it means the threads do not want the master thread to honor external signals
 	 * anymore until the threads complete. Achieve that effect by returning right away from the signal handler.
@@ -203,7 +229,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			dont_want_core = TRUE; assert(IS_DONT_WANT_CORE_TRUE(sig));
 			break;
 		case SIGQUIT:	/* Handle SIGQUIT specially which we ALWAYS want to defer if possible as it is always sent */
-			dont_want_core = TRUE; assert(IS_DONT_WANT_CORE_TRUE(sig));
+			dont_want_core = TRUE;
+			assert(IS_DONT_WANT_CORE_TRUE(sig));
 			extract_signal_info(sig, info, context, &signal_info);
 			switch(signal_info.infotype)
 			{
@@ -376,11 +403,17 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	{
 		DEBUG_ONLY(in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler);
 		return;
-	} else
-	{
-		/* If this is call-in/simpleAPI mode and a handler exists for this signal, call it */
-		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, TRUE);
 	}
+	/*  Our last main task before we exit (which drives the exit handler) is if the main program of this process
+	 * is not M (meaning simple*API or EasyAPI or various language using call-ins) and if a handler for this signal
+	 * existed when YDB was intialized, we need to drive that handler now. The problem is that some languages (Golang
+	 * specifically), may rethrow this signal which causes an assert failure. To mitigate this problem, we invoke the
+	 * gtm_exit_handler() logic NOW before we give the main program's handler control and if we get the same signal
+	 * again after the exit handler cleanup has run, we just pass it straight to the main's handler and do not
+	 * process it again. (Also done in deferred_exit_handler().
+	 */
+	gtm_exit_handler();
+	DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, TRUE);
 	assert((EXIT_IMMED <= exit_state) || !exit_handler_active);
 	EXIT(-exi_condition);
 }

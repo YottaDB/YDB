@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -615,7 +615,14 @@ void gvcst_remove_statsDB_linkage_all(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	assert(0 == dollar_tlevel);
+	if (dollar_tlevel)
+	{	/* The only time we should be here inside TP is if we are exiting */
+		assert(process_exiting);
+		/* Need to rollback as the following code will be KILLing nodes which needs a non-TP environment
+		 * to be effective.
+		 */
+		OP_TROLLBACK(0);
+	}
 	for (gdhdr_addr = get_next_gdr(NULL); gdhdr_addr; gdhdr_addr = get_next_gdr(gdhdr_addr))
 	{	/* For each global directory */
 		for (statsDBreg = gdhdr_addr->regions, r_top = statsDBreg + gdhdr_addr->n_regions; statsDBreg < r_top; statsDBreg++)
