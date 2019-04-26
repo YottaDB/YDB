@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,13 +22,13 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "min_max.h"
 #include "tp_set_sgm.h"
 #ifdef GTM_TRIGGER
 #include "gtm_trigger_trc.h"
 #endif
+#include "gvcst_protos.h"
 
 GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	tp_region		*tp_reg_free_list;	/* Ptr to list of tp_regions that are unused */
@@ -47,6 +47,11 @@ void tp_set_sgm(void)
 	sgmnt_addrs	*csa;
 
 	csa = cs_addrs;
+	if (!csa->tp_in_use)
+	{
+		csa->tp_in_use= TRUE;
+		gvcst_tp_init(gv_cur_region);
+	}
 	assert(csa == &FILE_INFO(gv_cur_region)->s_addrs);
 	si = csa->sgm_info_ptr;
 	assert(NULL != si);

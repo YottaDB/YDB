@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009, 2015 Fidelity National Information	*
+ * Copyright (c) 2009-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,6 @@
 #include "lv_val.h"
 #include "error.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "gdsroot.h"
 #include "gdsblk.h"
 #include "gtm_facility.h"

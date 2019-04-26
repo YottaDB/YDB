@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,7 +55,6 @@
 #include "shmpool.h"
 #include "wcs_phase2_commit_wait.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "memcoherency.h"
 #include "gtm_c_stack_trace.h"
@@ -737,7 +736,7 @@ void	wcs_mm_recover(gd_region *reg)
 	assert(!cs_addrs->hold_onto_crit || cs_addrs->now_crit);
 	if (!(was_crit = cs_addrs->now_crit))
 		grab_crit(gv_cur_region);
-	SET_TRACEABLE_VAR(cs_addrs->nl->wc_blocked, FALSE);
+	SET_TRACEABLE_VAR(cs_addrs->nl->wc_blocked, WC_UNBLOCK);
 	assert((NULL != cs_addrs->db_addrs[0]) || process_exiting);
 	if ((cs_addrs->total_blks == cs_addrs->ti->total_blks) || (NULL == cs_addrs->db_addrs[0]))
 	{	/* I am the one who actually did the extension, don't need to remap again OR an munmap/mmap failed and we are in

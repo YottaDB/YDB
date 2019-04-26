@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,7 +22,6 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include <rtnhdr.h>
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "repl_msg.h"		/* for gtmsource.h */

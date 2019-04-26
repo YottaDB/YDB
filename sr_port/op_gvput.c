@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,6 +32,8 @@ GBLREF gv_key		*gv_currkey;
 GBLREF bool		gv_replication_error;
 GBLREF bool		gv_replopen_error;
 
+#define	NONULLSUBS	"Update failed because"
+
 error_def(ERR_DBPRIVERR);
 error_def(ERR_GVIS);
 error_def(ERR_PCTYRESERVED);
@@ -58,7 +60,7 @@ void op_gvput(mval *var)
 	if (gv_cur_region->read_only)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	if ((TREF(gv_last_subsc_null) || TREF(gv_some_subsc_null)) && (ALWAYS != gv_cur_region->null_subs))
-		sgnl_gvnulsubsc();
+		sgnl_gvnulsubsc(NONULLSUBS);
 	is_trigger = (STRNCMP_LIT((char *) gv_currkey->base, "#t") == 0) ? TRUE : FALSE;
 	if(is_trigger)
 		assert(gv_currkey->end + 1 <= MAX_KEY_SZ - 4);

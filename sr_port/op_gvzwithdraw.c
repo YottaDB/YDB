@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,6 +42,8 @@ GBLREF	bool		gv_replopen_error;
 GBLREF	jnl_gbls_t	jgbl;
 #endif
 
+#define	NONULLSUBS	"ZKILL/ZWITHDRAW failed because"
+
 error_def(ERR_DBPRIVERR);
 error_def(ERR_PCTYRESERVED);
 
@@ -62,7 +64,7 @@ void op_gvzwithdraw(void)
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	}
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
-		sgnl_gvnulsubsc();
+		sgnl_gvnulsubsc(NONULLSUBS);
 	if (IS_REG_BG_OR_MM(gv_cur_region))
 	{
 		/* No special code needed for spanning globals here since we are in the region we want to be

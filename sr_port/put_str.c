@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,5 @@ oprtype put_str(char *pt, mstr_len_t n)
 	p.str.len = n;
 	p.str.addr = (char *) stringpool.free;
 	stringpool.free += n;
-	/* The line below should be removed as part of GTM-8540; but I can't find a negative test case */
-	s2n(&p);
 	return put_lit(&p);
 }

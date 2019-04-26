@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 Fidelity National Information		*
+ * Copyright (c) 2017-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,6 @@
 #include "interlock.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "io.h"
 #include "gtmsecshr.h"
@@ -539,7 +538,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 			 * its "grab_crit" in t_end/tp_tend and that would wait for P1's phase2 to finish before proceeding
 			 * with cache-recovery and P2's transaction commit.
 			 */
-			SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+			SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 			wcblocked_ptr = WCBLOCKED_NOW_CRIT_LIT;
 			BG_TRACE_PRO_ANY(csa, wcb_secshr_db_clnup_now_crit);
 			send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,

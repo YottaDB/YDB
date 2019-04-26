@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2018 Fidelity National Information	*
+ * Copyright (c) 2007-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,7 +76,7 @@ boolean_t	wcs_write_in_progress_wait(node_local_ptr_t cnl, cache_rec_ptr_t cr, w
 			if ((BUF_OWNER_STUCK == lcnt) && cr->epid)
 				GET_C_STACK_FROM_SCRIPT("WRITEWAITPID", process_id, cr->epid, ONCE);
 #			endif
-			if (BUF_OWNER_STUCK DEBUG_ONLY( * 2) < lcnt)
+			if (0 == lcnt % (BUF_OWNER_STUCK DEBUG_ONLY( * 2)))
 			{	/* sick of waiting */
 				if (0 == cr->dirty)
 				{	/* someone dropped something; assume it was the writer and go on */
@@ -85,20 +85,19 @@ boolean_t	wcs_write_in_progress_wait(node_local_ptr_t cnl, cache_rec_ptr_t cr, w
 				} else
 				{
 					if (cr->epid)
-					{
-#						ifdef DEBUG
-						GET_C_STACK_FROM_SCRIPT("WRITEWAITPID", process_id, cr->epid, TWICE);
-						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_WRITEWAITPID, 6, process_id, TWICE, \
-							cr->epid, cr->blk, DB_LEN_STR(gv_cur_region));
-#						else
-						GET_C_STACK_FROM_SCRIPT("WRITEWAITPID", process_id, cr->epid, ONCE);
-						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_WRITEWAITPID, 6, process_id, ONCE, \
-							cr->epid, cr->blk, DB_LEN_STR(gv_cur_region));
-#						endif
+					{	/* Getting the stack can take some time, so send to the syslog first and check
+						 * that we are still in the same state after.
+						 */
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_WRITEWAITPID, 6, process_id,
+								DEBUG_ONLY(TWICE) PRO_ONLY(ONCE),
+								cr->epid, cr->blk, DB_LEN_STR(gv_cur_region));
+						GET_C_STACK_FROM_SCRIPT("WRITEWAITPID", process_id, cr->epid,
+									DEBUG_ONLY(TWICE) PRO_ONLY(ONCE));
+						if (cr->dirty && cr->epid && !is_proc_alive(cr->epid, 0))
+							return FALSE;
 					}
 					assert((WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)
 						|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number));
-					return FALSE;
 				}
 			}
 			if (WRITER_STILL_OWNS_BUFF(cr, n))

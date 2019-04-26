@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,11 +135,11 @@ void iosocket_buffer_error(socket_struct *socketptr)
 			errptr = gtm_tls_get_error();
 		else
 			errptr = (char *)STRERROR(socketptr->obuffer_errno);
-		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr);
+		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
 		socketptr->obuffer_errno = 0;
 		if (socketptr->ioerror)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"),
-				ERR_TEXT, 2, STRLEN(errptr), errptr);
+				ERR_TEXT, 2, errlen, errptr);
 	} else
 #	endif
 	{

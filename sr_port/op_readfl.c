@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,7 +27,6 @@
 #include "filestruct.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "jnl.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "send_msg.h"
 #include "gtmmsg.h"		/* for gtm_putmsg() prototype */

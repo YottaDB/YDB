@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,6 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "filestruct.h"
-#include "hashtab_int4.h"
 #include "gdskill.h"
 #include "jnl.h"
 #include "gdscc.h"
@@ -69,13 +68,6 @@ void jobinterrupt_process(void)
 	op_commarg(&dollar_zinterrupt, indir_linetail);
 	frame_pointer->type = proc_act_type;	/* The mark of zorro.. */
 	proc_act_type = 0;
-	/* Save restart_pc/ctxt so a resumed frame or ztrap can resume in the corrct place and
-	 * not and inappropriate resume point determined by the interrupting code.
-	 */
-	PUSH_MV_STENT(MVST_RSTRTPC);
-	mv_st_ent = mv_chain;
-	mv_st_ent->mv_st_cont.mvs_rstrtpc.restart_pc_save = restart_pc;
-	mv_st_ent->mv_st_cont.mvs_rstrtpc.restart_ctxt_save = restart_ctxt;
 	/* Now we need to preserve our current environment. This MVST_ZINTR mv_stent type will hold
 	 * the items deemed necessary to preserve. All other items are the user's responsibility.
 	 *

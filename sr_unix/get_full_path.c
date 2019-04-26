@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,20 +71,21 @@ boolean_t get_full_path(char *orig_fn, unsigned int orig_len, char *full_fn, uns
 				*status = ERR_FILENAMETOOLONG;
 				return FALSE;
 			}
-			memcpy(full_fn, cwdbuf, c1 - cwdbuf);
-			memcpy(full_fn + (c1 - cwdbuf), cptr, orig_len - (cptr - orig_fn));
+			memcpy(full_fn, cwdbuf, MIN((c1 - cwdbuf), max_len)); /* 4SCA: max_len is the sizeof full_fn */
+			memcpy(full_fn + (c1 - cwdbuf), cptr, MIN((orig_len - (cptr - orig_fn)), (max_len - (c1 - cwdbuf))));
 		} else
 		{
 			if ('.' == *cptr && '/' == (*(cptr + 1)))
 				cptr += 2;
-			if ((length = (int)(cwd_len + 1 + orig_len - (cptr - orig_fn))) + 1 > max_len)	/* Warning - assignment */
+			if (((length = (int)(cwd_len + 1 + orig_len - (cptr - orig_fn))) + 1) > max_len) /* Warning - assignment */
 			{
 				*status = ERR_FILENAMETOOLONG;
 				return FALSE;
 			}
 			memcpy(full_fn, cwdbuf, cwd_len);
 			full_fn[cwd_len] = '/';
-			memcpy(full_fn + cwd_len + 1, cptr, orig_len - (cptr - orig_fn));
+			memcpy(full_fn + cwd_len + 1, cptr,	/* 4SCA: max_len is the sizeof full_fn */
+								MIN((orig_len - (cptr - orig_fn)), (max_len - cwd_len - 1)));
 		}
 	}
 	*full_len = length;

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,6 +26,8 @@
 GBLREF gv_namehead 	*gv_target;
 GBLREF gd_region	*gv_cur_region;
 
+#define	NONULLSUBS	"$GET() failed because"
+
 /* This code is very similar to op_fngvget.c except, if the gvn is undefined, this returns an undefined value as a signal to
  * op_fnget2, which, in turn, returns a specified "default" value; that slight of hand deals with order of evaluation issues
  * Any changes to this routine most likely have to be made in op_fngvget.c as well.
@@ -36,7 +39,7 @@ void	op_fngvget1(mval *dst)
 
 	SETUP_THREADGBL_ACCESS;
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
-		sgnl_gvnulsubsc();
+		sgnl_gvnulsubsc(NONULLSUBS);
 
 	switch (gv_cur_region->dyn.addr->acc_meth)
 	{

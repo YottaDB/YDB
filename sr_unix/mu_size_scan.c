@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,6 @@
 #include "mvalconv.h"
 #include "t_qread.h"
 #include "longset.h"            /* needed for cws_insert.h */
-#include "hashtab_int4.h"
 #include "cws_insert.h"
 #include <math.h>
 

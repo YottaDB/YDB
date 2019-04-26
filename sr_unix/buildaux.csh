@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2018 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -186,7 +186,7 @@ if (! $skip_auxillaries) then
 		set outfile = "${cmdfile}_buildaux_gtmcrypt.log"
 		set redir=">& $outfile"
 		set outlist = "$outlist $outfile"
-		echo "($gtm_tools/buildaux_gtmcrypt.csh; $err_check) $redir &"				>> $cmdfile.csh
+		echo "($gtm_tools/buildaux_gtmcrypt.csh $gt_image; $err_check) $redir &"		>> $cmdfile.csh
 	endif
 endif
 

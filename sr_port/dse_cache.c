@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -129,10 +129,10 @@ void dse_cache(void)
 			{
 				if (UNIX_ONLY(TRUE)VMS_ONLY(!is_mm))
 				{
-					SET_TRACEABLE_VAR(csa->nl->wc_blocked, TRUE);
+					SET_TRACEABLE_VAR(csa->nl->wc_blocked, WC_BLOCK_RECOVER);
 					/* No need to invoke function "wcs_phase2_commit_wait" as "wcs_recover" does that anyways */
 					wcs_recover(reg);
-					assert(FALSE == csa->nl->wc_blocked);	/* wcs_recover() should have cleared this */
+					assert(WC_UNBLOCK == csa->nl->wc_blocked);	/* wcs_recover() should have cleared this */
 				}
 			}
 			assert(20 == STR_LIT_LEN(DSE_DMP_TIME_FMT)); /* if they are not the same, the !20AD below should change */

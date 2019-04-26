@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,6 @@
 #include "filestruct.h"
 #include "iosp.h"
 #include "jnl.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "gtm_stdlib.h"		/* for ATOI */
@@ -158,7 +157,6 @@ GBLREF	tp_region		*tp_reg_free_list;	/* Ptr to list of tp_regions that are unuse
 GBLREF	tp_region		*tp_reg_list;		/* Ptr to list of tp_regions for this transaction */
 GBLREF	unsigned int		t_tries;
 GBLREF	struct_jrec_tcom	tcom_record;
-GBLREF	boolean_t		tp_in_use;
 GBLREF	uint4			region_open_count;
 GBLREF	sm_uc_ptr_t		reformat_buffer;
 GBLREF	int			reformat_buffer_len;
@@ -1166,7 +1164,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		 */
 		csa->min_total_nontpjnl_rec_size = PINI_RECLEN + MIN_ALIGN_RECLEN;
 	}
-	if (tp_in_use || !IS_GTM_IMAGE)
+	if (!IS_GTM_IMAGE)
 		gvcst_tp_init(reg);	/* Initialize TP structures, else postpone till TP is used (only if GTM) */
 	if (!global_tlvl_info_list)
 	{

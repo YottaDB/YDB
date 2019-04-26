@@ -31,7 +31,6 @@
 #include "stringpool.h"
 #include "svnames.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "error.h"
 #include "op.h"

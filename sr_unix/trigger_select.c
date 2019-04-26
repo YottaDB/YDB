@@ -45,7 +45,6 @@
 #include "gdscc.h"			/* needed for tp.h */
 #include "gdskill.h"			/* needed for tp.h */
 #include "buddy_list.h"			/* needed for tp.h */
-#include "hashtab_int4.h"		/* needed for tp.h */
 #include "jnl.h"			/* needed for tp.h */
 #include "tp.h"
 #include "t_retry.h"

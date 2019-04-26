@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,6 @@
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_mname.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "change_reg.h"
 #include "targ_alloc.h"

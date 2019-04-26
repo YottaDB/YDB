@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,12 +22,12 @@
 #include "gdskill.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
+#include "hashtab_int4.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "copy.h"
 #include "longset.h"		/* also needed for cws_insert.h */
-#include "cws_insert.h"		/* for cw_stagnate_reinitialized */
+#include "cws_insert.h"		/* for cw_stagnate_reinitialized and CWS_RESET */
 #include <rtnhdr.h>
 #include "gtm_trigger_trc.h"
 #include "gv_trigger.h"		/* for TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED macro */

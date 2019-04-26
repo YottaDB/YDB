@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+# Copyright (c) 2001-2019 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -20,8 +21,6 @@
 .include "g_msf.si"
 
 	.DATA
-.extern	restart_pc
-.extern restart_ctxt
 .extern frame_pointer
 
 	.text
@@ -29,10 +28,10 @@
 ENTRY op_restartpc
 	movl	(%esp),%eax
 	subl	$6,%eax
-	movl	%eax,restart_pc
-	movl	frame_pointer,%eax
-	movl	msf_ctxt_off(%eax),%edx
-	movl	%edx,restart_ctxt
+	movl	frame_pointer,%edx
+	movl	%eax,msf_restart_pc_off(%edx)
+	movl	msf_ctxt_off(%edx),%eax
+	movl	%eax,msf_restart_ctxt_off(%edx)
 	ret
 # op_restartpc ENDP
 

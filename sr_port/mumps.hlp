@@ -60,11 +60,11 @@
    stored as standard UNIX files. They are created and edited with standard
    UNIX text editors. GT.M accepts source lines of up to 8192 bytes. When
    GT.M encounters a line with a length greater than 8192 bytes in a source
-   file, it emits a %GTM-W-LSEXPECTED warning. This warning identifies cases
-   where a line greater than 8192 bytes is split into multiple lines, which
-   causes statements beyond the character prior to the limit to execute
-   irrespective of any starting IF, ELSE or FOR commands. The 8192 byte limit
-   applies to XECUTE command arguments and Direct Mode input as well.
+   file, it emits an LSEXPECTED warning. This warning identifies cases where
+   a line greater than 8192 bytes is split into multiple lines, which causes
+   statements beyond the character prior to the limit to execute irrespective
+   of any starting IF, ELSE or FOR commands. The 8192 byte limit applies to
+   XECUTE command arguments and Direct Mode input as well.
 
    GT.M is designed to work with the operating system utilities and enhances
    them when beneficial. The following sections describe the process of
@@ -120,7 +120,7 @@
 2 Copyright
    Copyright
 
-   Copyright 1987 - 2003, 2013 - 2018
+   Copyright 1987 - 2003, 2013 - 2019
 
    Fidelity Information Services, Inc. All rights reserved.
 
@@ -2906,7 +2906,7 @@
    execute the command. When the timeout is zero (0), M makes a single
    attempt to complete the command.
 
-   GT.M caps the maximum timeout to 999,999.999 seconds (about 11.5 days),
+   GT.M caps the maximum timeout to 2,147,483.647 seconds (about 24.8 days),
    and converts values greater than the maximum timeout to that cap. When a
    command has a timeout, M maintains the $TEST intrinsic special variable as
    the command completes. If the command completes successfully, M sets $TEST
@@ -4026,7 +4026,7 @@
    within the expression act in sequence to maintain the naked reference. The
    "FULL_BOOLEAN" and "SIDE_EFFECTS" compiler settings modify this behavior
    if you desire GT.M to provide side effects it would otherwise bypass due
-   to short-circiuting of Boolean expressions.
+   to short-circuiting of Boolean expressions.
 
 3 Examples
    Examples
@@ -4230,6 +4230,18 @@
 
    This passes three values (TYPE, PRNTR, and WAITIM) to the new job, which
    starts at the label PRINTLABELS of the current routine.
+
+   Example:
+
+   set jout="serverjob.mjo"
+   set jerr="serverjob.mje"
+   job @("check(a,b):(OUTPUT="""_jout_""":ERROR="""_jerr_""")")
+
+
+   This passes two values (a and b) to the new job, which starts at the label
+   check of the current routine. It also specifies that the stdout of the
+   jobbed process to be the file name stored in the local variable jout and
+   stderr to be the file name stored in the local variable jerr.
 
    Example:
 
@@ -5144,14 +5156,14 @@
    VIEW "NOLOGNONTP" turns off the logging of NONTPRESTART messages to the
    operator log.
 
-   VIEW "LOGNONTP"[=intexpr] turns on logging of NONTPRESTART messages to the
+   VIEW "LOGNONTP"[:intexpr] turns on logging of NONTPRESTART messages to the
    operator log. If no intexpr is specified, GT.M uses the value of
    environment variable gtm_nontprestart_log_delta, if it is defined, and one
    otherwise (that is, every transaction restart will be logged). A negative
    value of intexpr turns off the logging of NONTPRESTART messages.
 
    Note that it is not possible to perform the operations of
-   gtm_nontprestart_log_first with VIEW "LOGNONTP"[=intexpr].
+   gtm_nontprestart_log_first with VIEW "LOGNONTP"[:intexpr].
 
 4 LOGTPRESTART
    LOGTPRESTART
@@ -5163,14 +5175,14 @@
    VIEW "NOLOGTPRESTART" turns off the logging of TPRESTART messages to the
    operator log.
 
-   VIEW "LOGTPRESTART"[=intexpr] turns on logging of TPRESTART messages to
+   VIEW "LOGTPRESTART"[:intexpr] turns on logging of TPRESTART messages to
    the operator log. If no intexpr is specified, GT.M uses the value of
    environment variable gtm_tprestart_log_delta, if it is defined, and one
    otherwise (that is, every transaction restart will be logged). A negative
    value of intexpr turns off the logging of TPRESTART messages.
 
    Note that it is not possible to perform the operations of
-   gtm_tprestart_log_first with VIEW "LOGTPRESTART"[=intexpr].
+   gtm_tprestart_log_first with VIEW "LOGTPRESTART"[:intexpr].
 
 4 LV_GCOL
    LV_GCOL
@@ -6728,13 +6740,13 @@
    BTD : # of database Block Transitions to Dirty
    CAT : Critical section Total Acquisitions successes
    CFE : Critical section Failed (blocked) acquisition total caused by Epochs
-   CFS : Critical section Failed (blocked) acquisition sum of Squares
+   CFS : Duplicate of CFE
    CFT : Critical section Failed (blocked) acquisition Total
-   CQS : Critical section acquisition Queued sleeps sum of Squares
-   CQT : Critical section acquisition Queued sleeps Total
+   CQS* : Critical section acquisition Queued sleeps sum of Squares
+   CQT* : Critical section acquisition Queued sleeps Total
    CTN : Current Transaction Number of the database for the last committed read-write transaction (TP and non-TP)
-   CYS : Critical section acquisition processor Yields sum of Squares
-   CYT : Critical section acquisition processor Yields Total
+   CYS* : Critical section acquisition processor Yields sum of Squares
+   CYT* : Critical section acquisition processor Yields Total
    DEX : # of Database file EXtentions
    DFL : # of Database FLushes of the entire set of dirty global buffers in shared memory to disk
    DFS : # of times a process does an fsync of the database file. For example: a) after writing an epoch journal record, b) as part of database file extension c) during database rundown d) as part of mupip reorg -truncate etc.
@@ -6785,6 +6797,7 @@
    ZPR : # of $order(,-1) or $ZPRevious() (reverse order) operations (TP and non-TP). The count of $Order(,1) operations are reported under ORD.
    ZTR : # of ZTRigger command operations
    [NT]B[WR] mnemonics are satisfied by either disk access or, for databases that use the BG (buffered global) access method, global buffers in shared memory.
+   GT.M maintains the counters of the mnemonics marked with a * on AIX. On Linux, GT.M does not currently increment the counters of these mnemonics but retains them in the ZSHOW output for backward compatibility.
 
    When $PRINCIPAL input and output are different devices, ZSHOW "D" shows
    them as separate items identified as 0 for input and 0-out for output.
@@ -6952,6 +6965,7 @@
    $Y=20
    $ZA=0
    $ZALLOCSTOR=671584
+   $ZAUDIT=0
    $ZB=""
    $ZCHSET="M"
    $ZCLOSE=0
@@ -6982,12 +6996,13 @@
    $ZQUIT=0
    $ZREALSTOR=694280
    $ZRELDATE="20180614 00:33"
-   $ZROUTINES=". /usr/lib/fis-gtm/V6.3-005_x86_64 /usr/lib/fis-gtm/V6.3-005_x86_64/plugin/o(/usr/lib/fis-gtm/V6.3-005_x86_64/plugin/r)"
+   $ZROUTINES=". /usr/lib/fis-gtm/V6.3-007_x86_64 /usr/lib/fis-gtm/V6.3-007_x86_64/plugin/o(/usr/lib/fis-gtm/V6.3-007_x86_64/plugin/r)"
    $ZSOURCE=""
    $ZSTATUS=""
    $ZSTEP="B"
    $ZSTRPLLIM=0
    $ZSYSTEM=0
+   $ZTIMEOUT=-1
    $ZTDATA=0
    $ZTDELIM=""
    $ZTEXIT=""
@@ -7002,7 +7017,7 @@
    $ZTWORMHOLE=""
    $ZUSEDSTOR=666047
    $ZUT=1528962650791332
-   $ZVERSION="GT.M V6.3-005 Linux x86_64"
+   $ZVERSION="GT.M V6.3-007 Linux x86_64"
    $ZYERROR=""
 
    This example displays the current value of all intrinsic special
@@ -8883,9 +8898,12 @@
    |                   |              | for the region .                    |
    |-------------------+--------------+-------------------------------------|
    |                   |              | Acquires and releases a critical    |
-   | "PROBECRIT"       | region       | section for the region (the         |
-   |                   |              | "probe"), returning a string with   |
-   |                   |              | the following fields:               |
+   |                   |              | section for the region (the         |
+   |                   |              | "probe"), returning a string        |
+   | "PROBECRIT"       | region       | containing following fields, some   |
+   |                   |              | of of which always have zero (0)    |
+   |                   |              | values because they are no longer   |
+   |                   |              | used:                               |
    |-------------------+--------------+-------------------------------------|
    |                   |              | Name of the region(s) holding the   |
    |                   |              | specified gvn.                      |
@@ -11530,6 +11548,12 @@
    can help identify storage related problems. GT.M does not permit
    $ZALLOCSTOR to be SET or NEWed.
 
+2 $ZAUDit
+   $ZAUDit
+
+   $ZAUDIT contains a boolean value that indicates whether Audit Principal
+   Device is enabled. GT.M does not permit $ZAUDIT to be SET or NEWed.
+
 2 $ZB
    $ZB
 
@@ -11685,7 +11709,12 @@
    $ZCstatus
 
    $ZC[STATUS] holds the value of the status code for the last compilation
-   performed by a ZCOMPILE command.
+   performed by a ZCOMPILE command. One (1) indicates a clean compilation, a
+   positive number greater than one is an error code you can turn into text
+   with $ZMESSAGE(), and a negative number is a negated error code that
+   indicates GT.M was not able to produce an object file. The error details
+   appear in the compilation output, so $ZCSTATUS typically contains the code
+   for ERRORSUMMARY.
 
    GT.M does not permit the SET command to modify $ZSTATUS.
 
@@ -11816,14 +11845,16 @@
    a file name for the Global Directory using the name $gtmgbldir and the
    extension .gld in the current working directory.
 
-   $ZGBLDIR is a read-write Intrinsic Special Variable, (i.e., it can appear
-   on the left side of the equal sign (=) in the argument to the SET
+   $ZGBLDIR is a read-write Intrinsic Special Variable, (that is, it can
+   appear on the left side of the equal sign (=) in the argument to the SET
    command). SET $ZGBLDIR="" causes GT.M to assign $ZGBLDIR to the
    translation of gtmgbldir if that environment variable is defined. If it is
    not defined, then SET $ZGBLDIR="" causes GT.M to construct a file name
-   using the name $gtmgbldir.gld in the current directory. GT.M permits
-   $ZGBLDIR to be NEW'd. A $ZGBLDIR value may include an environment
-   variable.
+   using the name $gtmgbldir.gld in the current directory. NEWing $ZGBLDIR is
+   the same as SET $ZGBLDIR="", which as just noted may change its value. For
+   code that immediately SETs $ZGBLDIR after NEW'ng it that behavior doesn't
+   matter, but without an associated SET, such a change may seem
+   counterintuitive. A $ZGBLDIR value may include an environment variable.
 
    SETting $ZGBLDIR also causes GT.M to attempt to open the specified file.
    If the file name is invalid or the file is inaccessible, GT.M triggers an
@@ -11833,9 +11864,6 @@
    command to assign a translation to gtmgbldir. Defining gtmgbldir provides
    a convenient way to use the same Global Directory during a session where
    you repeatedly invoke and leave GT.M.
-
-   Changes to the value of $ZGBLDIR during a GT.M invocation only last for
-   the current invocation and do not change the value of gtmgbldir.
 
    Example:
 
@@ -11873,16 +11901,6 @@
    The SET command attempts to change the value of $ZGBLDIR to test.gld.
    Because the file does not exist, GT.M reports an error and does not change
    the value of $ZGBLDIR.
-
-   **Caution**
-
-   Attempting to restore an inaccessible initial Global Directory that has
-   been NEW'd, can cause an error.
-
-  Note
-
-   Attempting to restore an inaccessible initial Global Directory that has
-   been NEW'd, can cause an error.
 
 2 $ZHorolog
    $ZHorolog
@@ -11985,11 +12003,12 @@
    that depends on the event. For CTRAP characters and ZMAXTPTIME, GT.M uses
    the $ETRAP or $ZTRAP vectors described in more detail in the Error
    Processing chapter. For INTRPT and $ZTEXit, it XECUTEs the interrupt
-   handler code placed in $ZINTERRUPT. If $ZINTERRUPT is an empty string,
-   nothing is done in response to a MUPIP INTRPT. The default value of
+   handler code placed in $ZINTERRUPT. If $ZINTERRUPT is an empty string, the
+   process ignores any MUPIP INTRPT directed at it. The default value of
    $ZINTERRUPT is "IF $ZJOBEXAM()" which redirects a dump of ZSHOW "*" to a
-   file and reports each such occasion to the operator log. For CTRL+C with
-   CENABLE, it enters Direct Mode to give the programmer control.
+   file and reports each such occasion to the operator log. For <CTRL-C> with
+   CENABLE, it enters Direct Mode to give the programmer control. Without
+   CENABLE or CTRAP, GT.M ignores <CTRL-C> on a $PRINCIPAL terminal.
 
    GT.M recognizes most of these events when they occur but transfers control
    to the interrupt vector at the start of each M line, at each iteration of
@@ -11999,22 +12018,23 @@
    (unless zero timeout,) WRITE /WAIT for SOCKETs, and READ for terminals,
    SOCKETs, FIFOs, and PIPEs. If +$ZTEXIT evaluates to a truth value at the
    outermost TCOMMIT or TROLLBACK, GT.M XECUTEs $ZINTERRUPT after completing
-   the commit or rollback. CTRAP characters are recognized when they are
-   typed on OpenVMS but when they are read on UNIX.
+   the commit or rollback. Except for <CTRL-C> GT.M recognizes CTRAP
+   characters when READ. CTRAP characters other than <CTRL-C> tend to be
+   limited by terminal configuration.
 
    If an interrupt event occurs in a long running external call (for example,
    waiting in a message queue), GT.M recognizes the event but makes the
    vector transfer after the external call returns when it reaches the next
    appropriate execution boundary.
 
-   When an interrupt handler is invoked, GT.M saves and restores the current
-   values of $REFERENCE. However, the current device ($IO) is neither saved
-   nor restored. If an interrupt handler changes $IO (via USE), ensure that
-   the interrupt handler restores the current device before returning. To
-   restore the device which was current when the interrupt handler began,
-   specify USE without any deviceparameters. Any attempt to do IO on a device
-   which was actively doing IO when the interrupt was recognized may result
-   in a ZINTERCURSEIO error.
+   When GT.M uses an interrupt handler, it saves and restores the current
+   values of $REFERENCE. However, GT.M does not implicitly save or restore
+   the current device ($IO). If an interrupt handler changes $IO (via USE),
+   ensure that the interrupt handler restores the current device before
+   returning. To restore the device which was current when the interrupt
+   handler began, specify USE without any deviceparameters. Any attempt to do
+   IO on a device which was actively doing IO when the interrupt was
+   recognized may cause a ZINTERCURSEIO error.
 
    Example:
 
@@ -12049,18 +12069,18 @@
 
    If an error occurs while compiling the $ZINTERRUPT code, the error handler
    is not invoked (the error handler is invoked if an error occurs while
-   executing the $ZINTERRUPT code), GT.M sends the GTM-ERRWZINTR message and
-   the compiler error message to the operator log facility. If the GT.M
-   process is at a direct mode prompt or is executing a direct mode command
-   (for example, a FOR loop), GT.M sends also sends the GTM-ERRWZINTR error
-   message to the user console along with the compilation error. In both
-   cases, the interrupted process resumes execution without performing any
-   action specified by the defective $ZINTERRUPT vector.
+   executing the $ZINTERRUPT code), GT.M sends the ERRWZINTR message and the
+   compiler error message to the operator log facility. If the GT.M process
+   is at a direct mode prompt or is executing a direct mode command (for
+   example, a FOR loop), GT.M sends also sends the ERRWZINTR error message to
+   the user console along with the compilation error. In both cases, the
+   interrupted process resumes execution without performing any action
+   specified by the defective $ZINTERRUPT vector.
 
    If GT.M encounters an error during creation of the interrupt handler's
    stack frame (before transferring control to the application code specified
-   by the vector), that error is prefixed with a GTM-ERRWZINTR error. The
-   error handler then executes normal error processing associated with the
+   by the vector), that error is prefixed with a ERRWZINTR error. The error
+   handler then executes normal error processing associated with the
    interrupted routine.
 
    **Note**
@@ -12079,6 +12099,71 @@
    (forcing the interrupting party to try again), or use local variables that
    are not restored by a TRESTART to defer the interrupt action until after
    the final TCOMMIT.
+
+   The interrupt handler is executed by GT.M when on a statement boundary or
+   on an appropriate boundary in a potentially long running COMMAND (in the
+   same place as GT.M recognizes <CTRL-C>). If a GT.M process is in a long
+   running external call (for example; waiting in a message queue) GT.M does
+   not have sufficient control of the process state to immediately drive the
+   interrupt handler. GT.M recognizes the interrupt request and drives the
+   handler after the external call returns to GT.M and the process reaches an
+   appropriate execution boundary.
+
+   Since sending an interrupt signal requires the sender to have appropriate
+   permissions from UNIX, the use of the interrupt facility itself does not
+   present any inherent security exposures. Nonetheless, because the dump
+   files created by the default action contain the values of every local
+   variable in the context at the time they are made, inappropriate access to
+   the dump files could constitute a security exposure. Make sure the design
+   and implementation of any interrupt logic includes careful consideration
+   to security issues.
+
+   If an error occurs while compiling the $ZINTERRUPT code, the action taken
+   depends on the process state at the time the interrupt was received and
+   the error handler is not invoked (the error handler is invoked if an error
+   occurs while executing the $ZINTERRUPT code). If the GT.M process is at a
+   direct mode prompt or is executing a direct mode command (for example, a
+   FOR loop), the error message is sent to the user console along with the
+   ERRWZINTR error (refer to the GT.M Error and Message Recovery Manual). In
+   addition, the ERRWZINTR error is also sent to the operator log facility.
+   IF the process is not at a direct mode prompt or executing a direct mode
+   command, the ERRWZINTR message and the compiler error message are sent to
+   the operator log facility and nothing is displayed on the user's console.
+   In both cases, the interrupted process resumes execution.
+
+   If an error occurs during execution of the interrupt handler's stack frame
+   (before it calls anything), that error is prefixed with the ERRWZINTR
+   error. The error handler then executes normal error processing associated
+   with the module that was interrupted. Any other errors that occur in code
+   called by the interrupt handler are handled by normal error handling.
+
+   **Note**
+
+   The interrupt handler does not operate "outside" the current M environment
+   but rather within the environment of the process.
+
+   If a TP transaction is in progress (0<$TLEVEL), updates to globals are not
+   safe since a TP restart can be signaled at any time prior to the
+   transaction being committed - even after the interrupt handler returns. A
+   TP restart reverses all global updates and unwinds the M stack so it is as
+   if the interrupt never occurred. The interrupt handler is not redriven as
+   part of a transaction restart. Referencing (reading) globals inside an
+   interrupt handler can trigger a TP restart if a transaction is active.
+   When programming interrupt handling, either discard interrupts when
+   0<$TLEVEL (forcing the interrupting party to try again), or use local
+   variables that are not restored by a TRESTART to defer the interrupt
+   action until after the final TCOMMIT.
+
+   Note that it is possible for the interrupt handler to be executed while
+   the process executing the M routine is holding the critical section for
+   one or more regions. Use of this feature may create temporary hangs or
+   pauses while the interrupt handler executes. For the default case where
+   the interrupt handler uses $ZJOBEXAM() to create a dump, the pause
+   duration depends on the number of local variables in the process at the
+   time of the dump and on the speed of the disk being written to. The dumps
+   are slower on a network-mounted disk than on a disk directly connected to
+   the local system. Any interrupt driven code should be designed to account
+   for this issue.
 
 2 $ZINInterrupt
    $ZINInterrupt
@@ -14892,7 +14977,9 @@
 
    Sockets can be attached and detached from the collection of sockets
    associated with a device. Detached sockets belong to a pseudo-device
-   called the "socketpool". A process can detach a socket from a device and
+   called the "socketpool". SOCKET devices use "YGTMSOCKETPOOL" to identify
+   the socket pool; an attempt OPEN a device of that name produces a
+   DEVNAMERESERVED error. A process can detach a socket from a device and
    later attach it to the same device or another device.
 
    **Caution**
@@ -15425,9 +15512,10 @@
    $gtm_dist/mumps -r start^server
 
    When start^server begins, the $PRINCIPAL device is the current device
-   connected a socket and $KEY contains "ESTABLISHED|socket_handle|
-   remote_ip_address". In most cases, a USE command near the beginning of the
-   routine sets various device parameters such as delimiters.
+   which is the incoming connection and $KEY contains
+   "ESTABLISHED|socket_handle| remote_ip_address". In most cases, a USE
+   command near the beginning of the routine sets various device parameters
+   such as delimiters.
 
    The ZSHOW "D" command reports available information on both the local and
    remote sides of a TCP socket including local and remove addresses and
@@ -17084,11 +17172,13 @@
    CTRAP=expr Applies to: Terminals and Printers
 
    Establishes the <CTRL> characters in the expression as trap characters for
-   the current device. When GT.M receives a trap character in the input from
-   a device, GT.M issues a run-time exception. The device does not have to be
-   the current device, that is $IO.
+   the current device. When a READ from a device receives a trap character,
+   GT.M interrupts process execution. The device does not have to be the
+   current device, that is $IO.
 
-   The <CTRL> characters are ASCII 0 though 31.
+   The <CTRL> characters are ASCII 0 though 31. However terminal
+   configuration may prevent of most <CTRL> characters from ever reaching
+   GT.M's CTRAP facility.
 
    For example, the command U $P:CTRAP=$C(26,30,7,19) sets a trap for the
    ASCII characters <SUB>, <RS>, <BEL> and <DC3>.
@@ -19482,11 +19572,11 @@
    else it returns the $ZSTATUS error code.
 
    gtm_exit() cannot be called from an external call function. GT.M reports
-   the error GTM-E-INVGTMEXIT if an external call function invokes
-   gtm_exit(). Since the GT.M run-time system must be operational even after
-   the external call function returns, gtm_exit() is meant to be called only
-   once during a process lifetime, and only from the base C/C++ program when
-   GT.M functions are no longer required by the program.
+   the INVGTMEXIT error if an external call function invokes gtm_exit().
+   Since the GT.M run-time system must be operational even after the external
+   call function returns, gtm_exit() is meant to be called only once during a
+   process lifetime, and only from the base C/C++ program when GT.M functions
+   are no longer required by the program.
 
 3 Standalone_Programs
    Standalone Programs
@@ -19515,7 +19605,7 @@
 
    GT.M currently allows up to 10 levels of nesting, if TP is not used, and
    less than 10 if GT.M supports call-ins from a transaction. GT.M reports
-   the error GTM-E-CIMAXLEVELS when the nesting reaches its limit.
+   the CIMAXLEVELS error when the nesting reaches its limit.
 
    Following are the GT.M commands, Intrinsic Special Variables, and
    functions whose behavior changes in the context of every new nested
@@ -19547,8 +19637,8 @@
 
     1. External calls must not be fenced with TSTART/TCOMMIT if the external
        routine calls back into mumps using call-in mechanism. GT.M reports
-       the error GTM-E-CITPNESTED if nested call-ins are invoked within a TP
-       fence since GT.M currently does not handle TP support across multiple
+       the CITPNESTED error if nested call-ins are invoked within a TP fence
+       since GT.M currently does not handle TP support across multiple
        call-in invocations.
     2. The external application should never call exit() unless it has called
        gtm_exit() previously. GT.M internally installs an exit handler that
@@ -19702,15 +19792,15 @@
    before searching for the gtm_ac_xform and gtm_ac_xback routines. If the
    shared library contains gtm_ac_xform_1, GT.M ignores gtm_ac_xform even if
    it is present. If GT.M finds gtm_ac_xform_1 but does not find
-   gtm_ac_xback_1, it reports a GTM-E-COLLATIONUNDEF error with an additional
-   mismatch warning GTM-E-COLLFNMISSING.
+   gtm_ac_xback_1, it reports a COLLATIONUNDEF error with an additional
+   mismatch COLLFNMISSING warning.
 
    If the application does not use strings longer than 32,767 bytes, the
    alternative collation library need not contain the gtm_ac_xform_1 and
    gtm_ac_xback_1 routines. On the other hand, if the application passes
    strings greater than 32,767 bytes (but less than the maximum support
    string length) and does not provide gtm_xc_xform_1 and gtm_xc_xback_1,
-   GT.M issues the run-time error GTM-E-COLLARGLONG.
+   GT.M issues the COLLARGLONG run-time error.
 
    Note that database key sizes are much more restricted by GT.M than local
    key sizes, and may be restricted further by user configuration.
@@ -19822,7 +19912,7 @@
    With set^%LCLCOL(,ncol), the null collation order can be changed while
    keeping the alternate collation order unchanged. If subscripted local
    variables exist, null collation order cannot be changed. In this case,
-   GT.M issues GTM-E-COLLDATAEXISTS.
+   GT.M issues the COLLDATAEXISTS error.
 
    get^%LCLCOL returns the current local type.
 

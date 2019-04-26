@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,10 +25,9 @@
 #include "copy.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
+#include "hashtab_int4.h"
 #include "tp.h"
 #include "longset.h"		/* needed for cws_insert.h */
-#include "hashtab.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 #include "memcoherency.h"
 #include "wbox_test_init.h"
@@ -99,7 +98,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 	sgmnt_addrs		*csa;
 	node_local_ptr_t	cnl;
 #	ifdef DEBUG
-	boolean_t		wc_blocked;
+	int4			wc_blocked;
 	boolean_t		ready2signal_gvundef_lcl;
 #	endif
 	gv_namehead		*gvt;	/* store local copy of global "gv_target" for faster access */
@@ -490,7 +489,7 @@ enum cdb_sc tp_hist(srch_hist *hist1)
 void	gds_tp_hist_moved(sgm_info *si, srch_hist *hist1)
 {
 	gv_namehead		*gvnh;
-	ht_ent_int4 		*tabent, *topent;
+	ht_ent_int4		*tabent, *topent;
 	sm_long_t               delta;
 	srch_blk_status 	*new_first_tp_hist, *t1;
 	tlevel_info		*tli;

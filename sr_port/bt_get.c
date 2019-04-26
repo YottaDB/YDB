@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,7 +41,7 @@ bt_rec_ptr_t bt_get(int4 block)		/* block = block # to get */
 		if (bt->blk == BT_QUEHEAD)
 			return NULL;
 	}
-	SET_TRACEABLE_VAR(csa->nl->wc_blocked, TRUE);
+	SET_TRACEABLE_VAR(csa->nl->wc_blocked, WC_BLOCK_RECOVER);
 	BG_TRACE_PRO_ANY(csa, wc_blocked_bt_get);
 	return NULL;	/* actually should return BT_INVALID or some such value but callers check only for NULL */
 }

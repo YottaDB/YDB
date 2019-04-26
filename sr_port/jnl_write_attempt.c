@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -136,20 +136,25 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			break;
 		}
 		if (writer == CURRENT_JNL_IO_WRITER(jb))
-		{
+		{	/* It isn't strictly necessary to hold crit here since we are doing an atomic operation on
+			 * io_in_prog_latch, which won't have any effect if the writer changed. If things are in a bad state,
+			 * though, grabbing crit will call wcs_recover() for us.
+			 * However, a grab_crit() here may result in a deadlock, so just do a grab_crit_immediate() and proceed.
+			 */
 			if (!was_crit)
-				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
-			if (FALSE == is_proc_alive(writer, jb->image_count))
-			{	/* no one home, clear the semaphore; */
+				grab_crit_immediate(jpc->region, TRUE);
+			/* If no one home, try to clear the latch. */
+			if ((FALSE == is_proc_alive(writer, jb->image_count))
+				&& COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0))
+			{	/* We cleared the latch, so report it and restart the loop. */
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
 				jnl_send_oper(jpc, ERR_JNLQIOSALVAGE);
-				COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0);
-				if (!was_crit)
+				if (!was_crit && csa->now_crit)		/* Check now_crit in case grab_crit_immediate() failed */
 					rel_crit(jpc->region);
 				*lcnt = 1;
 				continue;
 			}
-			if (!was_crit)
+			if (!was_crit && csa->now_crit)		/* Check now_crit in case grab_crit_immediate() failed */
 				rel_crit(jpc->region);
 			/* this is the interesting case: a process is stuck */
 			BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_stuck);

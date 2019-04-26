@@ -1,7 +1,7 @@
 
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,7 +73,6 @@ GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle
 #include "gdscc.h"
 #include "jnl.h"
 #include "gdskill.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "gtm_permissions.h"
@@ -1024,7 +1023,7 @@ int gtm_init()
 	rhdtyp          	*base_addr;
 	unsigned char   	*transfer_addr;
 	char			*dist;
-	int			dist_len;
+	unsigned int		dist_len;
 	char			gtmsecshr_path[GTM_PATH_MAX];
 	int			gtmsecshr_path_len;
 	struct stat		stat_buf;
@@ -1055,7 +1054,7 @@ int gtm_init()
 		if (NULL == (dist = (char *)GETENV(GTM_DIST)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
 		/* Ensure that $gtm_dist is non-zero and does not exceed GTM_DIST_PATH_MAX */
-		dist_len = STRLEN(dist);
+		dist_len = (unsigned int)STRLEN(dist);
 		if (!dist_len)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
 		else if (GTM_DIST_PATH_MAX <= dist_len)

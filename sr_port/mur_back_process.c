@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -124,8 +124,8 @@ error_def(ERR_TEXT);
 		continue;											\
 }
 
-#define TRANS_NUM_CONT_CHK_FAILED		"Transaction number continuity check failed: [0x%08X] vs [0x%08X]"
-#define SEQ_NUM_CONT_CHK_FAILED			"Sequence number continuity check failed: [0x%08X] vs [0x%08X]"
+#define TRANS_NUM_CONT_CHK_FAILED		"Transaction number continuity check failed: [0x%" PRIX64 "] vs [0x%" PRIX64 "]"
+#define SEQ_NUM_CONT_CHK_FAILED			"Sequence number continuity check failed: [0x%" PRIX64 "] vs [0x%" PRIX64 "]"
 #define TRANS_OR_SEQ_NUM_CONT_CHK_FAILED_SZ	(MAX(SIZEOF(TRANS_NUM_CONT_CHK_FAILED), SIZEOF(SEQ_NUM_CONT_CHK_FAILED)) + 2 * 20)
 
 STATICFNDCL void save_turn_around_point(reg_ctl_list *rctl, jnl_ctl_list *jctl, boolean_t apply_pblk);

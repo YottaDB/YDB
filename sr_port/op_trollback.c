@@ -23,7 +23,6 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
 #include "tp_timeout.h"

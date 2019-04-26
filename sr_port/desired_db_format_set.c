@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Copyright (c) 2005-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -131,7 +131,7 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 	/* Wait for concurrent phase2 commits to complete before switching the desired db format */
 	if (csa->nl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL))
 	{	/* Set wc_blocked so next process to get crit will trigger cache-recovery */
-		SET_TRACEABLE_VAR(csa->nl->wc_blocked, TRUE);
+		SET_TRACEABLE_VAR(csa->nl->wc_blocked, WC_BLOCK_RECOVER);
 		wcblocked_ptr = WCS_PHASE2_COMMIT_WAIT_LIT;
 		send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_STR(wcblocked_ptr),
 			process_id, &csd->trans_hist.curr_tn, DB_LEN_STR(reg));

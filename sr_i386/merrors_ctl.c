@@ -136,7 +136,7 @@ LITDEF	err_msg merrors[] = {
 	{ "JNLINVALID", "!AD is not a valid journal file !/ for database file: !AD", 4 },
 	{ "MBXWRTONLY", "Mailbox is write only, cannot read from it", 0 },
 	{ "MEMORY", "Central memory exhausted during request for !UJ bytes from 0x!XJ", 2 },
-	{ "UNUSEDMSG305", "MTBLKTOOBIG last used in V6.3-003 Dec. 2017", 0 },
+	{ "DONOBLOCK", "Argumentless DO not followed by a block", 0 },
 	{ "UNUSEDMSG306", "MTBLKTOOSM last used in V6.3-003 Dec. 2017", 0 },
 	{ "UNUSEDMSG307", "MTFIXRECSZ last used in V6.3-003 Dec. 2017", 0 },
 	{ "UNUSEDMSG308", "MTIS last used in V6.3-003 Dec. 2017", 0 },
@@ -155,7 +155,7 @@ LITDEF	err_msg merrors[] = {
 	{ "NOTPRINCIO", "Output currently directed to device !AD", 2 },
 	{ "NOTTOEOFONPUT", "Not positioned to EOF on write (sequential organization only)", 0 },
 	{ "NOZBRK", "No zbreak at that location", 0 },
-	{ "NULSUBSC", "!AD Null subscripts are not allowed for current region", 2 },
+	{ "NULSUBSC", "!AD null subscripts are not allowed for database file: !AD", 4 },
 	{ "NUMOFLOW", "Numeric overflow", 0 },
 	{ "PARFILSPC", "Parameter: !AD  file specification: !AD", 4 },
 	{ "PATCLASS", "Illegal character class for pattern code", 0 },
@@ -1128,7 +1128,7 @@ LITDEF	err_msg merrors[] = {
 	{ "GTMERREXIT", "GTM image has exited with errors", 0 },
 	{ "INVMEMRESRV", "Could not allocate GT.M memory reserve (!AD)", 2 },
 	{ "OPCOMMISSED", "!UL errors and !UL MBFULLs sending prior operator messages", 2 },
-	{ "COMMITWAITSTUCK", "Pid !UL timed out after waiting !UL minute(s) for !UL concurrent GT.M process(es) to finish commits in database file !AD", 5 },
+	{ "COMMITWAITSTUCK", "Pid !UL waited !UL minute(s) for !UL concurrent GT.M process(es) to finish commits in database file !AD", 5 },
 	{ "COMMITWAITPID", "Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!XL in database file !AD", 6 },
 	{ "UPDREPLSTATEOFF", "Error replicating global ^!AD as it maps to database !AD which has replication turned OFF", 4 },
 	{ "LITNONGRAPH", "M standard requires graphics in string literals; found non-printable: $ZCHAR(!AD)", 2 },
@@ -1533,6 +1533,8 @@ LITDEF	err_msg merrors[] = {
 	{ "APDCONNFAIL", "Audit Principal Device failed to connect to audit logger", 0 },
 	{ "APDLOGFAIL", "Audit Principal Device failed to log activity", 0 },
 	{ "STATSDBMEMERR", "Process attempted to create stats block in statistics database !AD and received SIGBUS--invalid physical address. Check file system space.", 2 },
+	{ "BUFSPCDELAY", "Request for !UL blocks in region !AD delayed", 3 },
+	{ "AIOQUEUESTUCK", "Waited !UL minutes for AIO work queue to complete (cr = !XL)", 2 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -1658,7 +1660,7 @@ LITDEF	int ERR_MBXRDONLY = 150373314;
 LITDEF	int ERR_JNLINVALID = 150373322;
 LITDEF	int ERR_MBXWRTONLY = 150373330;
 LITDEF	int ERR_MEMORY = 150373340;
-LITDEF	int ERR_UNUSEDMSG305 = 150373346;
+LITDEF	int ERR_DONOBLOCK = 150373344;
 LITDEF	int ERR_UNUSEDMSG306 = 150373354;
 LITDEF	int ERR_UNUSEDMSG307 = 150373362;
 LITDEF	int ERR_UNUSEDMSG308 = 150373370;
@@ -3055,6 +3057,8 @@ LITDEF	int ERR_APDINITFAIL = 150384490;
 LITDEF	int ERR_APDCONNFAIL = 150384498;
 LITDEF	int ERR_APDLOGFAIL = 150384506;
 LITDEF	int ERR_STATSDBMEMERR = 150384514;
+LITDEF	int ERR_BUFSPCDELAY = 150384520;
+LITDEF	int ERR_AIOQUEUESTUCK = 150384530;
 
 
 LITDEF	int merrors_undocarr[] = {
@@ -3091,7 +3095,7 @@ GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1520,
+	1522,
 	&merrors_undocarr[0],
 	26
 };

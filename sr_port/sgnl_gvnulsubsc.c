@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,16 +25,17 @@ GBLREF gv_key		*gv_currkey;
 error_def(ERR_GVIS);
 error_def(ERR_NULSUBSC);
 
-#define	NONULLSUBS	"Update failed because"
+#define	NONULLSUBS	"Access or update failed because"
 
-void sgnl_gvnulsubsc(void)
+void sgnl_gvnulsubsc(char *place)
 {
 	unsigned char	buff[MAX_ZWR_KEY_SZ], *end;
 
 	if ((end = format_targ_key(&buff[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE)) == 0)
-	{	end = &buff[MAX_ZWR_KEY_SZ - 1];
-	}
+		end = &buff[MAX_ZWR_KEY_SZ - 1];
 	gv_currkey->end = 0;
-	rts_error_csa(NULL, VARLSTCNT(8) ERR_NULSUBSC, 2, STRLEN(NONULLSUBS), NONULLSUBS,
+	if (NULL == place)
+		place = NONULLSUBS;
+	rts_error_csa(NULL, VARLSTCNT(10) ERR_NULSUBSC, 4, STRLEN(place), place, DB_LEN_STR(gv_cur_region),
 		ERR_GVIS, 2, end - &buff[0], &buff[0]);
 }

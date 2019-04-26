@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2018 Fidelity National Information	*
+ * Copyright (c) 2007-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,6 +39,7 @@
 #include "wcs_recover.h"
 #include "gtm_c_stack_trace.h"
 #include "wcs_wt.h"
+#include "is_proc_alive.h"
 
 GBLDEF	cache_rec_ptr_t		get_space_fail_cr;	/* gbldefed to be accessible in a pro core */
 GBLDEF	wcs_conflict_trace_t	*get_space_fail_array;	/* gbldefed to be accessilbe in a pro core */
@@ -53,6 +54,8 @@ GBLREF	uint4			process_id;
 error_def(ERR_DBFILERR);
 error_def(ERR_WAITDSKSPACE);
 error_def(ERR_GBLOFLOW);
+error_def(ERR_BUFSPCDELAY);
+error_def(ERR_BUFOWNERSTUCK);
 
 #define	WCS_CONFLICT_TRACE_ARRAYSIZE	64
 #define	LCNT_INTERVAL			DIVIDE_ROUND_UP(UNIX_GETSPACEWAIT, WCS_CONFLICT_TRACE_ARRAYSIZE)
@@ -98,7 +101,7 @@ error_def(ERR_GBLOFLOW);
 }																\
 
 /* go after a specific number of buffers or a particular buffer */
-bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
+boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 {
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
@@ -139,8 +142,10 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	{
 		BG_TRACE_ANY(csa, bufct_buffer_flush);
 		curr_wc_in_free = cnl->wc_in_free;
-		for (lcnt = 1; (cnl->wc_in_free < needed) && ((BUF_OWNER_STUCK AIX_ONLY(* (asyncio ? 4 : 1))) > lcnt); ++lcnt)
+		for (lcnt = 1; cnl->wc_in_free < needed; ++lcnt)
 		{
+			if (0 == lcnt % (BUF_OWNER_STUCK AIX_ONLY(* (asyncio ? 4 : 1))))
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_BUFSPCDELAY, 3, needed, REG_LEN_STR(reg));
 			JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, needed, NULL, TRUE, save_errno);
 			if (cnl->wc_in_free < needed)
 			{
@@ -205,15 +210,22 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 			if (ret)
 				return FALSE;
 		}
-		for (lcnt = 1; (0 != cr->dirty) && (UNIX_GETSPACEWAIT > lcnt); ++lcnt)
+		for (lcnt = 1; 0 != cr->dirty; ++lcnt)
 		{
+			if (0 == (lcnt % UNIX_GETSPACEWAIT))
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_BUFSPCDELAY, 3, needed, REG_LEN_STR(reg));
 			if (0 == (lcnt % LCNT_INTERVAL))
 			{
 				this_idx = (lcnt / LCNT_INTERVAL);
-				assert(this_idx < WCS_CONFLICT_TRACE_ARRAYSIZE);
-				wcs_conflict_trace[this_idx].wcs_active_lvl = cnl->wcs_active_lvl;
-				wcs_conflict_trace[this_idx].io_in_prog_pid = GET_IO_LATCH_PID(csa);
-				wcs_conflict_trace[this_idx].fsync_in_prog_pid = GET_FSYNC_LATCH_PID(csa);
+				if (this_idx < WCS_CONFLICT_TRACE_ARRAYSIZE)
+				{	/* Trace until we run out of space. This is only used if we get to
+					 * WCS_GET_SPACE_RETURN_FAIL() below, which should be fairly infrequent,
+					 * and the results are only for debugging purposes.
+					 */
+					wcs_conflict_trace[this_idx].wcs_active_lvl = cnl->wcs_active_lvl;
+					wcs_conflict_trace[this_idx].io_in_prog_pid = GET_IO_LATCH_PID(csa);
+					wcs_conflict_trace[this_idx].fsync_in_prog_pid = GET_FSYNC_LATCH_PID(csa);
+				}
 			}
 			get_space_fail_arridx = lcnt;
 			max_count = ROUND_UP(cnl->wcs_active_lvl, csd->n_wrt_per_flu);
@@ -291,7 +303,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)
 					&& (0 < gtm_white_box_test_case_count)
 					&& (lcnt >= gtm_white_box_test_case_count))
-				lcnt += UNIX_GETSPACEWAIT;
+				lcnt = ((lcnt + UNIX_GETSPACEWAIT) % UNIX_GETSPACEWAIT) - 1;
 #			endif
 		}
 		if (0 == cr->dirty)

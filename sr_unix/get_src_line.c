@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -410,7 +410,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 					size = 0;
 				} else
 				{
-					memcpy(prev_srcptr, buff, size);
+					memcpy(prev_srcptr, buff, MIN(size, srcsize));
 					/* Strip trailing '\n' if any (if at least one byte was read in) */
 					if (size && ('\n' == buff[size - 1]))
 						size--;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,7 +26,6 @@
 #include "gdscc.h"
 #include "copy.h"
 #include "jnl.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include <rtnhdr.h>
@@ -142,7 +141,7 @@ STATICFNDEF void op_gvname_common(int count, int hash_code, mval *val_arg, va_li
 						in current key */
 	TREF(gv_last_subsc_null) = is_null; /* if true, it indicates that last subscript in current key is null */
 	if (was_null && (NEVER == reg->null_subs))
-		sgnl_gvnulsubsc();
+		sgnl_gvnulsubsc(NULL);
 	TREF(prev_gv_target) = gv_target;	/* note down gv_target in another global for debugging purposes (C9I09-003039) */
 	return;
 }

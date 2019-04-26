@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017 Fidelity National Information		*
+ * Copyright (c) 2017-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,6 @@
 #include "copy.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "repl_msg.h"		/* needed for jnlpool_addrs_ptr_t */
 #include "gtmsource.h"		/* needed for jnlpool_addrs_ptr_t */

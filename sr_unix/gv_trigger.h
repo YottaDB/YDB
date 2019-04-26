@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -199,7 +199,7 @@ typedef struct gvtr_invoke_parms_struct
 	assert(CSD == cs_data);													\
 	/* triggers can be invoked only by updates currently */									\
 	assert(!dollar_tlevel || sgm_info_ptr);											\
-	assert((dollar_tlevel && sgm_info_ptr->update_trans) || (!dollar_tlevel && update_trans)); 				\
+	assert((sgm_info_ptr && (dollar_tlevel && sgm_info_ptr->update_trans)) || (!dollar_tlevel && update_trans)); 		\
 	set_upd_trans_t_err = FALSE;												\
 	ztrig_cycle_mismatch = (CSA->db_dztrigger_cycle && (GVT->db_dztrigger_cycle != CSA->db_dztrigger_cycle));		\
 	db_trigger_cycle_mismatch = (GVT->db_trigger_cycle != cycle);								\
@@ -250,7 +250,7 @@ typedef struct gvtr_invoke_parms_struct
 			assert((tp_pointer->fp == frame_pointer) && (MVST_TPHOLD == mv_chain->mv_st_type)			\
 				&& (msp == (unsigned char *)mv_chain));								\
 			IS_TPWRAP = TRUE;											\
-			assert(!CSA->sgm_info_ptr->tp_set_sgm_done && !CSA->sgm_info_ptr->update_trans);			\
+			assert(!sgm_info_ptr || (!CSA->sgm_info_ptr->tp_set_sgm_done && !CSA->sgm_info_ptr->update_trans));	\
 			tp_set_sgm();												\
 			/* tp_set_sgm above could modify CSA->db_trigger_cycle (from CSD->db_trigger_cycle). Set local variable	\
 			 * cycle to match CSA->db_trigger_cycle so as to pass the updated value to gvtr_init. Also in that	\

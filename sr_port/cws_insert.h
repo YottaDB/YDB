@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -12,6 +12,9 @@
 
 #ifndef CWS_INSERT_H_INCLUDED
 #define CWS_INSERT_H_INCLUDED
+
+#include "hashtab.h"
+#include "hashtab_int4.h"
 
 GBLREF	hash_table_int4	cw_stagnate;
 GBLREF	boolean_t	cw_stagnate_reinitialized;

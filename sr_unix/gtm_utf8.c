@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,7 +101,7 @@ STATICFNDEF int utf8_len_real(utf8_err_type err_type, mstr* str)
 		for (; ptr < ptrtop; charlen++)
 			ptr = (char *)UTF8_MBNEXT(ptr, ptrtop);
 	}
-	assert(ptr == ptrtop);
+	assert(!charlen || (ptr == ptrtop));
 	str->char_len = charlen;
 	return charlen;
 }

@@ -41,7 +41,6 @@
 #include "cli.h"
 #include "jnl.h"
 #include "buddy_list.h"
-#include "hashtab_int4.h"
 #include "tp.h"
 #include "repl_filter.h"
 #include "error.h"

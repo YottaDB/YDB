@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2018 Fidelity National Information	*
+ * Copyright (c) 2015-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,7 +17,6 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "jnl.h"
-#include "hashtab_int4.h"
 #include "gdscc.h"
 #include "buddy_list.h"
 #include "tp.h"

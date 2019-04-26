@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -14,8 +14,6 @@
 	.include "g_msf.si"
 
 	.data
-	.extern	restart_pc
-	.extern restart_ctxt
 	.extern frame_pointer
 
 	.text
@@ -29,8 +27,8 @@
 ENTRY op_restartpc
 	movq	(REG_SP), REG64_ACCUM
 	subq	$6, REG64_ACCUM 				# XFER call size is constant
-	movq	REG64_ACCUM, restart_pc(REG_IP)
-	movq	frame_pointer(REG_IP), REG64_ACCUM
-	movq	msf_ctxt_off(REG64_ACCUM), REG64_SCRATCH1
-	movq	REG64_SCRATCH1, restart_ctxt(REG_IP)
+	movq	frame_pointer(REG_IP), REG64_SCRATCH1
+	movq	REG64_ACCUM, msf_restart_pc_off(REG64_SCRATCH1)
+	movq	msf_ctxt_off(REG64_SCRATCH1), REG64_ACCUM
+	movq	REG64_ACCUM, msf_restart_ctxt_off(REG64_SCRATCH1)
 	ret

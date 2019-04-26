@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -450,14 +450,13 @@ STATICFNDEF char *read_table(char *b, int l, FILE *f)
  */
 STATICFNDEF void put_mstr(mstr *src, mstr *dst)
 {
-	char	*cp;
 	ssize_t	n;
 
 	dst->len = src->len;
 	n = (ssize_t)src->len;
 
 	assert(n >= 0);
-	dst->addr = cp = (char *)get_memory((size_t)(n + 1));
+	dst->addr = (char *)get_memory((size_t)(n + 1));
 	assertpro(NULL != dst->addr); /* 4SCA: NULL return */
 	if (0 < n)
 		memcpy(dst->addr, src->addr, dst->len);

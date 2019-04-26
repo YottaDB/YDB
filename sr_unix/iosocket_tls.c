@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2018 Fidelity National Information	*
+ * Copyright (c) 2014-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -190,7 +190,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			if (NULL == (tls_ctx = (gtm_tls_init(GTM_TLS_API_VERSION, GTMTLS_OP_INTERACTIVE_MODE))))
 			{
 				errp = gtm_tls_get_error();
-				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
+				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				if (socketptr->ioerror)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSINIT, 0, ERR_TEXT, 2, errlen, errp);
 				if (NO_M_TIMEOUT != msec_timeout)
@@ -228,7 +228,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				socketptr->tlsenabled = FALSE;
 				free(extrastr);
 				errp = gtm_tls_get_error();
-				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
+				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
 				return;
 			} else
@@ -246,7 +246,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			{	/* error string available */
 				socketptr->tlsenabled = FALSE;
 				errp = gtm_tls_get_error();
-				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
+				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
 				return;
 			}
@@ -256,7 +256,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 		{
 			socketptr->tlsenabled = FALSE;
 			errp = gtm_tls_get_error();
-			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
+			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
 			if (NO_M_TIMEOUT != msec_timeout)
@@ -324,7 +324,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				} else
 					errp = STRERROR(save_errno);
 				socketptr->tlsenabled = FALSE;
-				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
+				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				if (socketptr->ioerror)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSHANDSHAKE, 0,
 						ERR_TEXT, 2, errlen, errp);
@@ -392,7 +392,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 		if ((0 < socketptr->buffered_length) || (0 < gtm_tls_cachedbytes((gtm_tls_socket_t *)socketptr->tlssocket)))
 		{	/* if anything in input buffer or ready to be read then error */
 			errp = UNREAD_INPUT;
-			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
+			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
 					ERR_TEXT, 2, errlen, errp);
@@ -411,7 +411,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 					errp2 = gtm_tls_get_error();
 				else
 					errp2 = (char *)STRERROR(socketptr->obuffer_errno);
-				SET_DOLLARDEVICE_ONECOMMA_ERRSTR1_ERRSTR2(iod, errp, errp2);
+				SET_DOLLARDEVICE_ONECOMMA_ERRSTR1_ERRSTR2(iod, errp, errlen, errp2, errlen2);
 				if (socketptr->ioerror)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_TLSRENEGOTIATE, 0,
 						ERR_TEXT, 2, errlen, errp, ERR_TEXT, 2, errlen2, errp2);
@@ -461,7 +461,7 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				errp = gtm_tls_get_error();
 			else
 				errp = STRERROR(tls_errno);
-			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
+			SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 			if (socketptr->ioerror)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSRENEGOTIATE, 0,
 					ERR_TEXT, 2, errlen, errp);

@@ -29,7 +29,6 @@
 #include "filestruct.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "jnl.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "send_msg.h"
 #include "gtmmsg.h"		/* for gtm_putmsg() prototype */

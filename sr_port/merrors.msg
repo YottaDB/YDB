@@ -302,7 +302,7 @@ MBXRDONLY	<Mailbox is read only, cannot write to it>/error/fao=0!/ansi=0
 JNLINVALID	<!AD is not a valid journal file !/ for database file: !AD>/error/fao=4!/ansi=0
 MBXWRTONLY	<Mailbox is write only, cannot read from it>/error/fao=0!/ansi=0
 MEMORY		<Central memory exhausted during request for !UJ bytes from 0x!XJ>/fatal/fao=2!/ansi=0
-UNUSEDMSG305	<MTBLKTOOBIG last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+DONOBLOCK	<Argumentless DO not followed by a block>/warning/fao=0!/ansi=0
 UNUSEDMSG306	<MTBLKTOOSM last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
 UNUSEDMSG307	<MTFIXRECSZ last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
 UNUSEDMSG308	<MTIS last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
@@ -321,7 +321,7 @@ JNLCLOSE	<Error closing journal file !AD>/error/fao=2!/ansi=0
 NOTPRINCIO	<Output currently directed to device !AD>/warning/fao=2!/ansi=0
 NOTTOEOFONPUT	<Not positioned to EOF on write (sequential organization only)>/error/fao=0!/ansi=0
 NOZBRK		<No zbreak at that location>/info/fao=0!/ansi=0
-NULSUBSC	<!AD Null subscripts are not allowed for current region>/error/fao=2!/ansi=0
+NULSUBSC	<!AD null subscripts are not allowed for database file: !AD>/error/fao=4!/ansi=0
 NUMOFLOW	<Numeric overflow>/error/fao=0!/ansi=92
 PARFILSPC	<Parameter: !AD  file specification: !AD>/error/fao=4!/ansi=0
 PATCLASS	<Illegal character class for pattern code>/error/fao=0!/ansi=0
@@ -1294,7 +1294,7 @@ GTMSECSHRTMPPATH	<gtmsecshr path is !AD>/info/fao=2!/ansi=0
 GTMERREXIT	<GTM image has exited with errors>/error/fao=0!/ansi=0
 INVMEMRESRV	<Could not allocate GT.M memory reserve (!AD)>/warning/fao=2!/ansi=0
 OPCOMMISSED	<!UL errors and !UL MBFULLs sending prior operator messages>/info/fao=2!/ansi=0
-COMMITWAITSTUCK	<Pid !UL timed out after waiting !UL minute(s) for !UL concurrent GT.M process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
+COMMITWAITSTUCK	<Pid !UL waited !UL minute(s) for !UL concurrent GT.M process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
 COMMITWAITPID	<Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!XL in database file !AD>/error/fao=6!/ansi=0
 UPDREPLSTATEOFF	<Error replicating global ^!AD as it maps to database !AD which has replication turned OFF>/error/fao=4!/ansi=0
 LITNONGRAPH	<M standard requires graphics in string literals; found non-printable: $ZCHAR(!AD)>/warning/fao=2!/ansi=0
@@ -1701,6 +1701,8 @@ APDINITFAIL	<Audit Principal Device failed to initialize audit information>/erro
 APDCONNFAIL	<Audit Principal Device failed to connect to audit logger>/error/fao=0!/ansi=0
 APDLOGFAIL	<Audit Principal Device failed to log activity>/error/fao=0!/ansi=0
 STATSDBMEMERR	<Process attempted to create stats block in statistics database !AD and received SIGBUS--invalid physical address. Check file system space.>/error/fao=2!/ansi=0
+BUFSPCDELAY	<Request for !UL blocks in region !AD delayed>/warning/fao=3!/ansi=0
+AIOQUEUESTUCK	<Waited !UL minutes for AIO work queue to complete (cr = !XL)>/error/fao=2!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

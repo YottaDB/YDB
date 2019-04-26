@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2017 Fidelity National Information	*
+ * Copyright (c) 2004-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,7 +20,6 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "longset.h"		/* needed for cws_insert.h */
-#include "hashtab_int4.h"	/* needed for cws_insert.h */
 #include "cws_insert.h"		/* for CWS_RESET macro */
 #include "gdsblkops.h"		/* for RESET_UPDATE_ARRAY macro */
 #include "t_abort.h"		/* for prototype of "t_abort" */

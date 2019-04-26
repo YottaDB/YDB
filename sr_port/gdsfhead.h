@@ -1541,7 +1541,7 @@ MBSTART {							\
 
 #define	SIGNAL_WRITERS_TO_STOP(cnl)								\
 MBSTART {											\
-	SET_TRACEABLE_VAR((cnl)->wc_blocked, TRUE);	/* to stop all active writers */	\
+	SET_TRACEABLE_VAR((cnl)->wc_blocked, WC_BLOCK_RECOVER);					\
 	/* memory barrier needed to broadcast this information to other processors */		\
 	SHM_WRITE_MEMORY_BARRIER;								\
 } MBEND
@@ -1560,7 +1560,7 @@ MBSTART {	/* We need to ensure that an uptodate value of cnl->intent_wtstart is 
 
 #define	SIGNAL_WRITERS_TO_RESUME(cnl)								\
 MBSTART {											\
-	SET_TRACEABLE_VAR((cnl)->wc_blocked, FALSE); /* to let active writers resume */	\
+	SET_TRACEABLE_VAR((cnl)->wc_blocked, WC_UNBLOCK);						\
 	/* memory barrier needed to broadcast this information to other processors */		\
 	SHM_WRITE_MEMORY_BARRIER;								\
 } MBEND
@@ -2713,6 +2713,7 @@ typedef struct	sgmnt_addrs_struct
 	boolean_t	needs_post_freeze_online_clean;	/* Perform cleanup of online freeze */
 	boolean_t	needs_post_freeze_flushsync;	/* Perform post-freeze flush/sync */
 	block_id	tp_hint;		/* last tp (allocation) hint for this process in this region */
+	boolean_t	tp_in_use;		/* Indices whether or not tp structures are initialized for the given region */
 	boolean_t	statsDB_setup_completed;	/* TRUE if ^%YGS node has been added to this statsDB file.
 							 * Is a copy of reg->statsDB_setup_completed but is present in "csa"
 							 * too to handle was_open regions.
@@ -5163,39 +5164,8 @@ MBSTART {											\
 	FILE_INFO(reg)->owning_gd = reg->owning_gd;						\
 } MBEND
 
-/* Wait for wip queue to be cleared or a specific CR to become non-dirty. RET is non-zero if "wcs_wtfini"
- * returns a non-zero value in any iteration. We wait a max of 1 minute if we do not see any progress in
- * the WIP queue count. If there is evidence of progress, time waited till now does not count towards the 1
- * minute timeout i.e. the 1 minute wait is started afresh.
- */
 #define	WAIT_FOR_WIP_QUEUE_TO_CLEAR(CNL, CRWIPQ, CR, REG, RET)						\
-MBSTART {												\
-	unsigned int	lcnt;										\
-	int		active_cnt, wip_cnt;								\
-													\
-	RET = 0; /* initialize RET in case we do not invoke "wcs_wtfini" below */			\
-	DEBUG_ONLY(active_cnt = CNL->wcs_active_lvl;)	/* for debugging purposes */			\
-	wip_cnt = CNL->wcs_wip_lvl;									\
-	for (lcnt = 1; lcnt < (MAX_WIP_QWAIT AIX_ONLY(* 4)); lcnt++)					\
-	{												\
-		if (!CRWIPQ->fl)									\
-			break;										\
-		DEBUG_ONLY(dbg_wtfini_lcnt = lcnt);     /* used by "wcs_wtfini" */			\
-		RET = wcs_wtfini(REG, CHECK_IS_PROC_ALIVE_TRUE_OR_FALSE(lcnt, BUF_OWNER_STUCK), CR);	\
-		if (RET || (CR && (0 == CR->dirty)))							\
-			break;										\
-		wcs_sleep(lcnt);									\
-		if ((wip_cnt != CNL->wcs_wip_lvl) && (NULL == CR)) /* only for non-specific crs */	\
-		{	/* Change in WIP queue size. Restart wait. Note that "CNL->wcs_wip_lvl" could	\
-			 * have even increased since we last noted it in "wip_cnt". This is because	\
-			 * a concurrent process in "wcs_wtstart" could have moved some more records	\
-			 * from the active queue to the wip queue. Restart wait even in that case.	\
-			 */										\
-			lcnt = 1;									\
-			wip_cnt = CNL->wcs_wip_lvl;							\
-		}											\
-	}												\
-} MBEND
+	RET = wait_for_wip_queue_to_clear(CNL, CRWIPQ, CR, REG)
 
 #define	IS_AIO_ON(X)			(X->asyncio)
 #define	IS_AIO_ON_SEG(SEG)		IS_AIO_ON(SEG)

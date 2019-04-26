@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2017 Fidelity National Information	*
+ * Copyright (c) 2004-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,6 +30,8 @@
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_key		*gv_currkey;
 
+#define	NONULLSUBS	"$INCREMENT() failed because"
+
 error_def(ERR_DBPRIVERR);
 error_def(ERR_GVIS);
 error_def(ERR_PCTYRESERVED);
@@ -48,7 +50,7 @@ void	op_gvincr(mval *increment, mval *result)
 	if (gv_cur_region->read_only)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBPRIVERR, 2, DB_LEN_STR(gv_cur_region));
 	if ((TREF(gv_last_subsc_null) || TREF(gv_some_subsc_null)) && (ALWAYS != gv_cur_region->null_subs))
-		sgnl_gvnulsubsc();
+		sgnl_gvnulsubsc(NONULLSUBS);
 	assert(gv_currkey->end + 1 <= gv_cur_region->max_key_size);
 	MV_FORCE_NUM(increment);
 	switch (gv_cur_region->dyn.addr->acc_meth)

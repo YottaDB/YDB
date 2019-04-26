@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,8 +26,7 @@
 #include "interlock.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab.h"		/* needed for cws_insert.h */
-#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
+#include "hashtab_int4.h"
 #include "tp.h"
 #include "gdsbgtr.h"
 #include "min_max.h"
@@ -206,9 +205,10 @@ cache_rec_ptr_t	db_csh_getn(block_id block)
 		assert((start_cr <= cr) && ((start_cr + max_ent) > cr));
 		/* If ASYNCIO is enabled, once in a while check if there is anything in the wip queue ready to be freed.
 		 * A call to "wcs_wtfini" does just that. Note that "wcs_wtfini" can return FALSE in case of some queue
-		 * interlock issues. But in that case it would have set "cnl->wc_blocked" to TRUE and a cache recovery
-		 * will be issued by the next process that gets crit. We do not rely on the success of the "wcs_wtfini"
-		 * cleanup so proceed even in case of a FALSE return. Hence not checking the return value.
+		 * interlock issues. But in that case it would have set "cnl->wc_blocked" to WC_BLOCK_RECOVER and a
+		 * cache recovery will be issued by the next process that gets crit. We do not rely on the success of
+		 * the "wcs_wtfini" cleanup so proceed even in case of a FALSE return. Hence not checking the return
+		 * value.
 		 */
 		if (asyncio && ((lcnt == pass1) || (lcnt == pass2)))
 		{

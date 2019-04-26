@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -136,14 +136,13 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 	if (!(prev_gcols == stringpool.gcols && srch->str.addr == prev_srch.addr && srch->str.len == prev_srch.len
 			&& rplc->str.addr == prev_rplc.addr && rplc->str.len == prev_rplc.len))
 	{
+		MV_FORCE_STR(srch);
+		MV_FORCE_STR(rplc);
 		if(NULL != xlate_hash)
-		{
+		{	/* about to allocate new one, so free any old, doing this after error checks so as to keep pointer valid */
 			free_hashtab_int4(xlate_hash);
 			free(xlate_hash);
 		}
-
-		MV_FORCE_STR(srch);
-		MV_FORCE_STR(rplc);
 		/* If we had a static xlate_hash and prev_srch, prev_rplc, we could avoid this in rapid succession */
 		xlate_hash = create_utf8_xlate_table(srch, rplc, xlate);
 		prev_gcols = stringpool.gcols;

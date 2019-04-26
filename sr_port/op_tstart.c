@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,6 @@
 #include "stack_frame.h"
 #include "tp_frame.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
 #include "tp.h"
 #include "tp_timeout.h"
 #include "op.h"
@@ -91,7 +90,6 @@ GBLREF  sgmnt_addrs		*cs_addrs;
 GBLREF  gd_region		*gv_cur_region;
 GBLREF	struct_jrec_tcom	tcom_record;
 GBLREF	jnl_gbls_t		jgbl;
-GBLREF	boolean_t		tp_in_use;
 GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	uint4			tstartcycle;
 GBLREF	char			*update_array_ptr;
@@ -169,26 +167,6 @@ void	op_tstart(int implicit_flag, ...) /* value of $T when TSTART */
 		 * done so it will not persist across M lines like it normally would in direct mode.
 		 */
 		tphold_noshift = TRUE;
-	/* If we haven't done any TP until now, turn the flag on to tell gvcst_init to
-	 * initialize it in any regions it opens from now on and initialize it in any
-	 * regions that are already open.
-	 */
-	if (!tp_in_use)
-	{
-		tp_in_use = TRUE;
-		for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
-		{
-			for (r_local = addr_ptr->regions, r_top = r_local + addr_ptr->n_regions; r_local < r_top; r_local++)
-			{
-				if (r_local->open && !r_local->was_open && IS_REG_BG_OR_MM(r_local))
-				{	/* Let's initialize those regions but only if it came through gvcst_init_sysops
-					 * (being a bg or mm region).
-					 */
-					gvcst_tp_init(r_local);
-				}
-			}
-		}
-	}
 	if (0 != jnl_fence_ctl.level)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TPMIXUP, 2, "An M", "a fenced logical");
 	if (dollar_tlevel + 1 >= TP_MAX_NEST)

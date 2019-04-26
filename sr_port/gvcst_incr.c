@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2004-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +24,6 @@
 #include "gdscc.h"		/* needed for tp.h */
 #include "gdskill.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 
 #include "mvalconv.h"		/* for i2mval prototype for the MV_FORCE_MVAL macro */

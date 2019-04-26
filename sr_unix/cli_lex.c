@@ -156,10 +156,13 @@ void	cli_lex_setup (int argc, char **argv)
 	/* Quickly run through the parameters to get a ballpark on the
 	   size of the string needed to store them.
 	*/
-	for (parmindx = 1, parmptr = argv, parmlen = PARM_OVHD; parmindx <= argc; parmptr++, parmindx++)
+	for (parmindx = 0, parmptr = argv, parmlen = PARM_OVHD; parmindx < argc; parmptr++, parmindx++)
 	{
 		if (MAX_LINE < (parmlen + STRLEN(*parmptr) + 1))
+		{	/* Copy as much as possible from the command string */
+			parmlen = MAX_LINE;
 			break;
+		}
 		parmlen += STRLEN(*parmptr) + 1;
 	}
 	/* call-ins may repeatedly initialize cli_lex_setup for every invocation of gtm_init() */
@@ -367,12 +370,12 @@ static void cli_lex_in_expand(int in_len)
 	cli_lex_in_ptr = new_cli_lex_in_ptr;
 }
 
-char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
+char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 {
-	size_t	in_len;
-	char	cli_fgets_buffer[MAX_LINE], *destbuffer, *retptr;
+	size_t		in_len;
+	char		cli_fgets_buffer[MAX_LINE], *retptr = NULL;
 #	ifdef UTF8_SUPPORTED
-	int		mbc_len, u16_off, destsize;
+	int		mbc_len, u16_off;
 	int32_t		mbc_dest_len;
 	UErrorCode	errorcode;
 	UChar		*uc_fgets_ret;
@@ -382,12 +385,13 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 	static FILE	*save_fp; /* Only used in this routine so not using STATICDEF */
 #	endif
 
+	assert(MAX_LINE >= buffersize);
+	if (in_tp)
+		cli_lex_in_ptr->tp = NULL;
 #	ifdef UTF8_SUPPORTED
 	if (gtm_utf8_mode)
 	{
 		cli_fgets_Ubuffer[0] = 0;
-		if (!cli_lex_str)
-			assert(MAX_LINE >= buffersize);
 		if (NULL == save_fp)
 			save_fp = fp;
 		/* there should be no change in fp as it is currently stdin */
@@ -406,8 +410,6 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 			} while (NULL == uc_fgets_ret && !u_feof(u_fp) && ferror(fp) && EINTR == errno);
 			if (NULL == uc_fgets_ret)
 			{
-				if (cli_lex_str)
-					cli_lex_in_ptr->tp = NULL;
 				u_fclose(u_fp);
 				/* clear u_fp in case we enter again */
 				u_fp = NULL;
@@ -420,44 +422,28 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 			{
 				U16_NEXT(cli_fgets_Ubuffer, u16_off, in_len, uc32_cp);
 				mbc_len += U8_LENGTH(uc32_cp);
-				if (!cli_lex_str && mbc_len >= buffersize)
-				{	/* can't expand */
-					mbc_len = buffersize - 1;
-					cli_fgets_Ubuffer[u16_off] = 0;
-					U16_BACK_1(cli_fgets_Ubuffer, 0, u16_off);
-					in_len = u16_off + 1;	/* offset to length */
-					break;
-				}
 			}
-			if (cli_lex_str)
+			if (mbc_len > cli_lex_in_ptr->buflen)
 			{
-				if (mbc_len > cli_lex_in_ptr->buflen)
-					cli_lex_in_expand(mbc_len);		/* for terminating null */
-				destsize = cli_lex_in_ptr->buflen + 1;
+				cli_lex_in_expand(mbc_len);		/* for terminating null */
+				buffersize = cli_lex_in_ptr->buflen + 1;
 				destbuffer = cli_lex_in_ptr->in_str;
-			} else
-			{	/* very unlikely parm is larger than MAX_LINE even i UTF-8 */
-				if (mbc_len >= buffersize)
-					destsize = buffersize - 1;	/* for null */
-				else
-					destsize = buffersize;
-				destbuffer = buffer;
 			}
 			errorcode = U_ZERO_ERROR;
-			u_strToUTF8(destbuffer, destsize, &mbc_dest_len, cli_fgets_Ubuffer, (int4)in_len + 1, &errorcode);
+			u_strToUTF8(destbuffer, buffersize, &mbc_dest_len, cli_fgets_Ubuffer, (int4)in_len + 1, &errorcode);
 			if (U_FAILURE(errorcode))
+			{
 				if (U_BUFFER_OVERFLOW_ERROR == errorcode)
 				{	/* truncate so null terminated */
-					destbuffer[destsize - 1] = 0;
+					destbuffer[buffersize - 1] = 0;
 					retptr = destbuffer;
 				} else
 					retptr = NULL;
-			else
+			} else
 				retptr = destbuffer;	/* Repoint to new home */
-			if (cli_lex_str)
+			if (in_tp)
 				cli_lex_in_ptr->tp = retptr;
-		} else if (cli_lex_str)
-			cli_lex_in_ptr->tp = retptr = NULL;
+		}
 	} else
 	{
 #	endif
@@ -467,26 +453,20 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 		{
 			in_len = strlen(cli_fgets_buffer);
 			assert(in_len <= MAX_LINE);
-			if (cli_lex_str)
+			if (cli_lex_in_ptr->buflen < in_len)
 			{
-				if (cli_lex_in_ptr->buflen < in_len)
-					cli_lex_in_expand((int)in_len);
+				cli_lex_in_expand((int)in_len);
 				destbuffer = cli_lex_in_ptr->in_str;
-				buffersize = cli_lex_in_ptr->buflen;
-			} else
-			{
-				assert(SIZEOF(cli_fgets_buffer) >= buffersize);
-				destbuffer = buffer;
+				buffersize = cli_lex_in_ptr->buflen + 1;
 			}
 			in_len = MIN(in_len, buffersize);
-			retptr = destbuffer;	/* return proper buffer */
 			if ('\n' == cli_fgets_buffer[in_len - 1])
 				cli_fgets_buffer[in_len - 1] = '\0';	 /* replace NL */
 			memcpy(destbuffer, cli_fgets_buffer, in_len);
-			if (cli_lex_str)
-				cli_lex_in_ptr->tp = destbuffer;
-		} else if (cli_lex_str)
-			cli_lex_in_ptr->tp = NULL;
+			retptr = destbuffer;	/* return proper buffer */
+			if (in_tp)
+				cli_lex_in_ptr->tp = retptr;
+		}
 #	ifdef UTF8_SUPPORTED
 	}
 #	endif
@@ -508,17 +488,22 @@ char *cli_fgets(char *buffer, int buffersize, FILE *fp, boolean_t cli_lex_str)
 int	cli_gettoken (int *eof)
 {
 	char	*ptr, *ptr_top;
-	int	arg_no, token_len;
+	int	arg_no, print_len, token_len, avail;
 
 	assert(cli_lex_in_ptr);
 	/* Reading from program argument list */
 	if ((1 < cli_lex_in_ptr->argc) && (NULL == cli_lex_in_ptr->tp))
 	{
 		cli_lex_in_ptr->tp = ptr = cli_lex_in_ptr->in_str;
-		arg_no = 1;
-			/* convert arguments into array */
-		for (ptr_top = ptr + MAX_LINE; (arg_no < cli_lex_in_ptr->argc); arg_no++)
-			ptr += SNPRINTF(ptr, (ptr_top - ptr), "%s%s", (1 < arg_no) ? " " : "", cli_lex_in_ptr->argv[arg_no]);
+		/* MUMPS and GT.CM need at least their path length in the command line TODO: why */
+		avail = cli_lex_in_ptr->buflen - STRLEN(cli_lex_in_ptr->argv[0]);
+		for (ptr_top = ptr + avail, arg_no = 1; (arg_no < cli_lex_in_ptr->argc) && (ptr_top > ptr); arg_no++)
+		{	/* Convert arguments into array */
+			print_len = SNPRINTF(ptr, (ptr_top - ptr), "%s%s", (1 < arg_no) ? " " : "", cli_lex_in_ptr->argv[arg_no]);
+			if ((ptr_top - ptr) <= print_len)
+				break;
+			ptr += print_len;
+		}
 	}
 	if ((NULL == cli_lex_in_ptr->tp) || (1 > strlen(cli_lex_in_ptr->tp)))
 	{
@@ -527,7 +512,7 @@ int	cli_gettoken (int *eof)
 		 * to cli_lex_in_ptr->tp within cli_fgets() after any malloc/free, thus avoiding the problem of
 		 * writing to freed memory if the set were done here.
 		 */
-		cli_fgets(cli_lex_in_ptr->in_str, MAX_LINE, stdin, TRUE);
+		cli_fgets(cli_lex_in_ptr->in_str, cli_lex_in_ptr->buflen + 1, stdin, TRUE);
 		if (NULL != cli_lex_in_ptr->tp)
 			*eof = 0;
 		else
@@ -584,7 +569,7 @@ int cli_look_next_string_token(int *eof)
 
 int cli_get_string_token(int *eof)
 {
-	int		arg_no, token_len, in_len;
+	int		arg_no, token_len;
 	char		*from, *to, *stop;
 	IN_PARMS 	*new_cli_lex_in_ptr;
 
@@ -593,9 +578,8 @@ int cli_get_string_token(int *eof)
 	if (cli_lex_in_ptr->argc > 1 && cli_lex_in_ptr->tp == 0)
 	{
 		cli_lex_in_ptr->tp = cli_lex_in_ptr->in_str;
-		arg_no = 1;
 		/* convert arguments into array */
-		while(arg_no < cli_lex_in_ptr->argc)
+		for (arg_no = 1; arg_no < cli_lex_in_ptr->argc; arg_no++)
 		{
 			if (cli_lex_in_ptr->buflen < (STRLEN(cli_lex_in_ptr->in_str) + STRLEN(cli_lex_in_ptr->argv[arg_no]) + 2))
 				break;					/* if too long, just truncate */
@@ -603,7 +587,7 @@ int cli_get_string_token(int *eof)
 				strcat(cli_lex_in_ptr->in_str, " ");
 			if (cli_has_space(cli_lex_in_ptr->argv[arg_no]))
 			{
-				from = cli_lex_in_ptr->argv[arg_no++];
+				from = cli_lex_in_ptr->argv[arg_no];
 				to = cli_lex_in_ptr->in_str + STRLEN(cli_lex_in_ptr->in_str) - 1;
 				stop = cli_lex_in_ptr->in_str + cli_lex_in_ptr->buflen - 2;
 				*to++ = '\"';
@@ -616,8 +600,8 @@ int cli_get_string_token(int *eof)
 				*to++ = '\"';
 				*to = '\0';
 			} else
-				STRNCAT(cli_lex_in_ptr->in_str, cli_lex_in_ptr->argv[arg_no++],
-					cli_lex_in_ptr->buflen - STRLEN(cli_lex_in_ptr->in_str));
+				STRNCAT(cli_lex_in_ptr->in_str, cli_lex_in_ptr->argv[arg_no],
+						cli_lex_in_ptr->buflen - STRLEN(cli_lex_in_ptr->in_str));
 		}
 	}
 	if ((NULL == cli_lex_in_ptr->tp) || (1 > strlen(cli_lex_in_ptr->tp)))
@@ -627,7 +611,7 @@ int cli_get_string_token(int *eof)
 		 * to cli_lex_in_ptr->tp within cli_fgets() after any malloc/free, thus avoiding the problem of
 		 * writing to freed memory if the set were done here.
 		 */
-		cli_fgets(cli_lex_in_ptr->in_str, MAX_LINE, stdin, TRUE);
+		cli_fgets(cli_lex_in_ptr->in_str, cli_lex_in_ptr->buflen + 1, stdin, TRUE);
 		if (NULL != cli_lex_in_ptr->tp)
 			*eof = 0;
 		else

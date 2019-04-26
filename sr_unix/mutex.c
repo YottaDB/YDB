@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -772,7 +772,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 						|| (jnlpool && (csa == &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs)));
 				if (NULL != csa->hdr)
 				{
-					SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 					BG_TRACE_PRO_ANY(csa, wcb_mutex_salvage); /* no need to use PROBE_BG_TRACE_PRO_ANY macro
 										   * since we already checked for csa->hdr NULL.
 										   */
@@ -1374,7 +1374,8 @@ void mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid)
 		/* else: Step CMT04 did not happen OR Database is not journaled.
 		 *	 Nothing to undo in this db for Steps CMT01, CMT02 and CMT03.
 		 */
-		SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE); /* This will ensure we call "wcs_recover" which
+		SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
+		/* This will ensure we call "wcs_recover" which
 		 * will recover CMT04 and other CMTxx steps.
 		 */
 	}
@@ -1433,7 +1434,7 @@ void mutex_salvage(gd_region *reg)
 		assert((NULL != csa->hdr) || (jnlpool && (csa == &FILE_INFO(jnlpool->jnlpool_dummy_reg)->s_addrs)));
 		if (mutex_salvaged && (NULL != csa->hdr))
 		{
-			SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+			SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 			BG_TRACE_PRO_ANY(csa, wcb_mutex_salvage); /* no need to use PROBE_BG_TRACE_PRO_ANY macro
 								   * since we already checked for csa->hdr non-NULL.
 								   */

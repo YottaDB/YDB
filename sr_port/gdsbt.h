@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,6 +73,9 @@
 			/* actual bts */
 #define HEADER_UPDATE_COUNT 1024
 #define LAST_WBOX_SEQ_NUM 1000
+#define WC_UNBLOCK		0
+#define WC_BLOCK_ONLY		1
+#define WC_BLOCK_RECOVER	2
 
 typedef struct
 {
@@ -555,11 +558,19 @@ typedef struct node_local_struct
 	boolean_t	ccp_jnl_closed;
 	boolean_t	glob_sec_init;
 	uint4		wtstart_pid[MAX_WTSTART_PID_SLOTS];	/* Maintain pids of wcs_wtstart processes */
-	volatile boolean_t wc_blocked;				/* Set to TRUE by process that knows it is leaving the cache in a
-								 * possibly inconsistent state. Next process grabbing crit will do
-								 * cache recovery. This setting also stops all concurrent writers
-								 * from working on the cache. In MM mode, it is used to call
-								 * wcs_recover during a file extension */
+
+	volatile int4 wc_blocked;				/* WC_UNBLOCK = do not block write cache
+								 * WC_BLOCK_ONLY = block write cache and do not attempt any
+								 * cleanup (used for region freeze operations)
+								 * WC_BLOCK_RECOVER = block write cache, verify, and recover
+								 * if necessary (used if cache is left in possibly inconsistent
+								 * state)
+								 * Set to WC_BLOCK_RECOVER by process that knows it is
+								 * leaving the cache in a possibly inconsistent state. Next
+								 * process grabbing crit will do cache recovery.  In MM mode,
+								 * it is used to call wcs_recover during a file extension.
+								 * Setting to WC_BLOCK_ONLY or WC_BLOCK_RECOVER stops all
+								 * concurrent writers from working on the cache. */
 	global_latch_t	wc_var_lock;                            /* latch used for access to various wc_* ref counters */
 	CACHELINE_PAD(SIZEOF(global_latch_t), 1)		/* Keep these two latches in separate cache lines */
 	global_latch_t	db_latch;                               /* latch for interlocking on hppa and tandem */

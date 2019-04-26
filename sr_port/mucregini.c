@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -256,7 +256,7 @@ void mucregini(int4 blk_init_size)
 		csd->flush_time[0] = TIM_FLU_MOD_BG;
 	else
 		csd->flush_time[0] = TIM_FLU_MOD_MM;
-	csd->flush_time[1] = -1;
+	csd->flush_time[1] = 0;
 	csd->yield_lmt = DEFAULT_YIELD_LIMIT;
 	csd->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
 	csd->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;

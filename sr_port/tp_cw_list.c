@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +24,6 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 
 GBLREF	sgm_info	*sgm_info_ptr;
@@ -50,7 +50,7 @@ void tp_cw_list(cw_set_element **cs)
 		|| (is_bg && ((sgm_info_ptr->cw_set_depth + 2) >= (csd->n_bts >> 1))))
 	{	/* catch the case where MUPIP recover or update process gets into this situation */
 		assert(!mupip_jnl_recover && !is_updproc);
-		rts_error(VARLSTCNT(4) ERR_TRANS2BIG, 2, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_TRANS2BIG, 2, REG_LEN_STR(gv_cur_region));
 	}
 	tempcs = (cw_set_element *)get_new_element(sgm_info_ptr->cw_set_list, 1);
 	/* secshr_db_clnup relies on the cw_set_element (specifically the "mode" field) being initialized to a value

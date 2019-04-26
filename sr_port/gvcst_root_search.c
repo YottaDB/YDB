@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,7 +31,6 @@
 #include "jnl.h"		/* needed for tp.h */
 #include "gdskill.h"		/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"			/* needed for T_BEGIN_READ_NONTP_OR_TP macro */
 
 #include "t_end.h"		/* prototypes */
@@ -345,7 +344,7 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 		{
 			assert(NULL != global_collation_mstr.addr);
 			subrec_ptr = get_spec((uchar_ptr_t)global_collation_mstr.addr,
-					      (int)(rlen - (hdr_len + SIZEOF(block_id))), COLL_SPEC);
+						(int)(rlen - (hdr_len + SIZEOF(block_id))), COLL_SPEC);
 			if (subrec_ptr)
 			{
 				gv_target->nct = *(subrec_ptr + COLL_NCT_OFFSET);

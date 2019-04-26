@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -200,6 +200,7 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 {
 	int		send_size, status, io_ready, save_errno, EMSGSIZE_cnt = 0, EWOULDBLOCK_cnt = 0;
   	ssize_t		bytes_sent;
+	char const	*errptr;
 
 	if (!repl_send_trace_buff)
 		repl_send_trace_buff = malloc(REPL_SEND_TRACE_BUFF_SIZE);
@@ -264,9 +265,9 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 			if (-1 == save_errno)
 			{	/* This indicates an error from TLS/SSL layer and not from a system call. */
 				assert(repl_tls.enabled);
-				assert(FALSE);
+				errptr = gtm_tls_get_error();
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"), ERR_TEXT, 2,
-						LEN_AND_STR(gtm_tls_get_error()));
+						LEN_AND_STR(errptr));
 			}
 #			else
 			save_errno = ERRNO;
@@ -312,6 +313,7 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 {
 	int		status, max_recv_len, io_ready, save_errno;
 	ssize_t		bytes_recvd;
+	char const	*errptr;
 
 	if (!repl_recv_trace_buff)
 		repl_recv_trace_buff = malloc(REPL_RECV_TRACE_BUFF_SIZE);
@@ -373,9 +375,9 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 			if (-1 == save_errno)
 			{
 				assert(repl_tls.enabled);
-				assert(FALSE);
+				errptr = gtm_tls_get_error();
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("recv"), ERR_TEXT, 2,
-						LEN_AND_STR(gtm_tls_get_error()));
+						LEN_AND_STR(errptr));
 			}
 #			else
 			save_errno = ERRNO;

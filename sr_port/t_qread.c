@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,7 @@
 #include "interlock.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
+#include "hashtab_int4.h"
 #include "tp.h"
 #include "gdsbgtr.h"
 #include "sleep_cnt.h"
@@ -443,7 +443,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				{
 					assert(cnl->wc_blocked); /* only reason we currently know wcs_get_space could fail */
 					assert(gtm_white_box_test_case_enabled);
-					SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 					BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_db_csh_getn_invalid_blk);
 					set_wc_blocked = TRUE;
 					break;
@@ -554,7 +554,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 		}
 		if (CR_NOTVALID == (sm_long_t)cr)
 		{
-			SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+			SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 			BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_db_csh_get_invalid_blk);
 			set_wc_blocked = TRUE;
 			break;
@@ -731,7 +731,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 							assert(0 == cr->bt_index);
 							if (cr->bt_index)
 							{
-								SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+								SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 								BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_bad_bt_index1);
 								set_wc_blocked = TRUE;
 								break;
@@ -766,7 +766,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 						assert(0 == cr->bt_index);
 						if (cr->bt_index)
 						{
-							SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+							SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 							BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_bad_bt_index2);
 							set_wc_blocked = TRUE;
 							break;

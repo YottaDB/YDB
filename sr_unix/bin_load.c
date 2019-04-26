@@ -1026,8 +1026,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					temp = (unsigned char *)format_targ_key(&key_buffer[0], MAX_ZWR_KEY_SZ, gv_currkey, TRUE);
 					fmtd_key_len = (int)(temp - key_buffer);
 					key_buffer[fmtd_key_len] = '\0';
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_NULSUBSC, 2, STRLEN(TEXT1),
-						TEXT1, ERR_GVIS, 2, fmtd_key_len, &key_buffer[0]);
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_NULSUBSC, 4, LEN_AND_LIT(TEXT1),
+						DB_LEN_STR(gv_cur_region), ERR_GVIS, 2, fmtd_key_len, &key_buffer[0]);
 					ok_to_put = FALSE;
 				}
 				discard_nullcoll_mismatch_record = FALSE;

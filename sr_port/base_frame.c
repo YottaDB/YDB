@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,5 +61,7 @@ void base_frame(rhdtyp *base_address)
 	fp->type = SFT_COUNT;
 	fp->ret_value = NULL;
 	fp->dollar_test = -1;
+	fp->restart_pc = fp->mpc;
+	fp->restart_ctxt = fp->ctxt;
 	DBGEHND((stderr, "base_frame: New base frame allocated at 0x"lvaddr"\n", fp));
 }

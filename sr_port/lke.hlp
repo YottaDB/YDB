@@ -561,7 +561,7 @@
    H[ELP] [options...]
 
    Enter the LKE command for which you want information at the Topic
-   prompt(s) and then press RETURN or CTRL-Z to return to the LKE prompt.
+   prompt(s) and then press RETURN or <CTRL-Z> to return to the LKE prompt.
 
    Example:
 
@@ -625,7 +625,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2018
+   Copyright 2019
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.
@@ -647,7 +647,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.3-006 of the
+   This help file is a concise representation of revision V6.3.008 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

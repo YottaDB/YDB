@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -646,7 +646,7 @@ uint4 mur_open_files(boolean_t retry)
 			if (!wcs_flu(WCSFLU_NONE))
 			{
 				assert(cs_addrs->nl->wcs_phase2_commit_pidcnt); /* only reason why wcs_flu can fail */
-				SET_TRACEABLE_VAR(cs_addrs->nl->wc_blocked, TRUE);
+				SET_TRACEABLE_VAR(cs_addrs->nl->wc_blocked, WC_BLOCK_RECOVER);
 				BG_TRACE_PRO_ANY(cs_addrs, wc_blocked_onln_rlbk);
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wc_blocked_onln_rlbk"),
 					 process_id, &cs_addrs->ti->curr_tn, DB_LEN_STR(gv_cur_region));

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,6 @@
 #include "jnl.h"
 #include "gdskill.h"
 #include "buddy_list.h"
-#include "hashtab_int4.h"
 #include "tp.h"
 #include "cli.h"
 #include "cli_parse.h"

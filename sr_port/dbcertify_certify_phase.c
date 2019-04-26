@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -103,6 +103,7 @@ error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
 error_def(ERR_BITMAPSBAD);
 error_def(ERR_MUPCLIERR);
+error_def(ERR_GBLOFLOW);
 ZOS_ONLY(error_def(ERR_BADTAG);)
 
 /* The final certify phase of certification process */
@@ -1341,8 +1342,8 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 			if (NO_FREE_SPACE == lclmap_not_full)
 			{
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5)
-					ERR_DBCINTEGERR, 2, RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn), ERR_BITMAPSBAD);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GBLOFLOW, 2,
+					RTS_ERROR_STRING((char_ptr_t)psa->ofhdr.dbfn));
 			}
 			if (ROUND_DOWN2(psa->hint_blk, bplmap) != lclmap_not_full)
 				psa->hint_lcl = 1;

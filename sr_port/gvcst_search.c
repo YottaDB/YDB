@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,12 +27,11 @@
 #include "filestruct.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h and cws_insert.h */
+#include "hashtab_int4.h"
 #include "tp.h"
 #include "gvcst_blk_build.h"
 #include "t_qread.h"
 #include "longset.h"		/* needed for cws_insert.h */
-#include "hashtab.h"		/* needed for cws_insert.h */
 #include "cws_insert.h"
 #include "gvcst_protos.h"	/* for gvcst_search_blk,gvcst_search_tail,gvcst_search prototype */
 #include "min_max.h"

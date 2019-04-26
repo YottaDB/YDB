@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,6 @@
 #include "gdskill.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "targ_alloc.h"
 #include "hashtab_mname.h"	/* for COMPUTE_HASH_MNAME */
@@ -146,7 +145,7 @@ LITREF	mval	literal_null;
  * added to the gvt_tp_list which means if a trollback/tprestart occurs we would not undo this gvt's trigger related
  * cycles. To avoid this issue, we add this gvt to the gvt_tp_list always. The macro anyways does nothing if this gvt
  * has already been added so we should be fine correctness and performance wise.
- */														
+ */
 #define	GVTR_HASHTGBL_READ_CLEANUP(do_gvtr_cleanup)									\
 {															\
 	/* Restore gv_target, gv_currkey & gv_altkey */									\

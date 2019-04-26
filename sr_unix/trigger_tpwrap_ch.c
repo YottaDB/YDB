@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,7 +23,6 @@
 #include "gdscc.h"
 #include "error.h"
 #include "jnl.h"			/* needed for tp.h */
-#include "hashtab_int4.h"		/* needed for tp.h */
 #include "buddy_list.h"			/* needed for tp.h */
 #include "tp.h"
 #include "tp_restart.h"

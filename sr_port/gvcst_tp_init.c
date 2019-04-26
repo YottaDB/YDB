@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,8 +24,7 @@
 #include "gdskill.h"
 #include "jnl.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
-#include "hashtab.h"
+#include "hashtab_int4.h"
 #include "tp.h"
 #include "tp_timeout.h"
 #include "gvcst_protos.h"	/* for gvcst_tp_init prototype */

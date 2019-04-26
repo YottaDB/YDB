@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2018 Fidelity National Information	*
+ * Copyright (c) 2013-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,6 +52,9 @@ STATICDEF DH			*dh512, *dh1024;	/* Diffie-Hellman structures for Ephemeral Diffi
 #endif
 #ifndef TLS1_2_VERSION
 #define	TLS1_2_VERSION	0x0303
+#endif
+#ifndef TLS1_3_VERSION
+#define	TLS1_3_VERSION	0x0304
 #endif
 
 /* Below template translates to: Arrange ciphers in increasing order of strength after excluding the following:
@@ -174,6 +177,11 @@ STATICDEF struct gtm_ssl_options gtm_ssl_options_list[] =
 #ifdef	SSL_OP_NO_TLSv1_2
 	DEFINE_SSL_OP(SSL_OP_NO_TLSv1_2),
 #endif
+/*	Special case for NO_TLSv1_3 so defined for pre OpenSSL 1.1.1 */
+#ifndef	SSL_OP_NO_TLSv1_3
+#	define SSL_OP_NO_TLSv1_3	0x0
+#endif
+	DEFINE_SSL_OP(SSL_OP_NO_TLSv1_3),
 #ifdef	SSL_OP_NO_TLSv1_1
 	DEFINE_SSL_OP(SSL_OP_NO_TLSv1_1),
 #endif
@@ -524,6 +532,8 @@ gtm_tls_ctx_t *gtm_tls_init(int version, int flags)
 		return NULL;
 	}
 	SSL_CTX_set_options(ctx, DEPRECATED_SSLTLS_PROTOCOLS);
+	if (0 != SSL_OP_NO_TLSv1_3)
+		SSL_CTX_set_options(ctx, SSL_OP_NO_TLSv1_3);	/* until changes made to handle TLSv1.3 ciphers */
 	/* Read the configuration file for more configuration parameters. */
 	cfg = &gtm_tls_cfg;
 	config_init(cfg);
@@ -1676,11 +1686,17 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 				case TLS1_2_VERSION:
 					ssl_version_ptr = "TLSv1.2";
 					break;
+				case TLS1_3_VERSION:
+					ssl_version_ptr = "TLSv1.3";
+					break;
 				default:
-					assert(FALSE && ssl_version);
+					ssl_version_ptr = NULL;
+					SNPRINTF(conn_info->protocol, SIZEOF(conn_info->protocol), "unknown protocol 0x%X",
+							ssl_version);
 					break;
 			}
-			strncpy(conn_info->protocol, ssl_version_ptr, MAX_ALGORITHM_LEN);
+			if (NULL != ssl_version_ptr)
+				strncpy(conn_info->protocol, ssl_version_ptr, MAX_ALGORITHM_LEN);
 			/* SSL-Session Cipher Algorithm */
 			cipher = SSL_get_current_cipher(ssl);
 			SNPRINTF(conn_info->session_algo, SIZEOF(conn_info->session_algo), "%s", SSL_CIPHER_get_name(cipher));

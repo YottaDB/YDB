@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,6 @@
 #include <rtnhdr.h>
 #include "mv_stent.h"
 #include "stack_frame.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "buddy_list.h"		/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
@@ -141,8 +140,8 @@ CONDITION_HANDLER(tp_restart_ch)
 int tp_restart(int newlevel, boolean_t handle_errors_internally)
 {
 	unsigned char		*cp;
-	unsigned char		*end, buff[MAX_ZWR_KEY_SZ];
-	unsigned int		hist_index;
+	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, fail_hist[RESTART_CODE_EXPANSION_FACTOR];
+	unsigned int		c, hist_index, local_t_tries;
 	tp_frame		*tf;
 	mv_stent		*mvc;
 	tp_region		*tr;
@@ -261,13 +260,15 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 					gvname_mstr.len = end - buff - 1;
 				}
 			}
-			caller_id_flag = FALSE;		/* don't want caller_id in the operator log */
 			assert(0 == cdb_sc_normal);
 			if (cdb_sc_normal == status)
 				t_fail_hist[t_tries] = '0';	/* temporarily reset just for pretty printing */
 			restart_reg = TAREF1(tp_fail_hist_reg, t_tries);
 			if (NULL != restart_reg)
 			{
+				assert(IS_STATSDB_REG(restart_reg)	/* global ^%YGS if, and only if, statsDB */
+				? !memcmp(&gv_currkey->base, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN)
+				: memcmp(&gv_currkey->base, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN));
 				reg_mstr.len = restart_reg->dyn.addr->fname_len;
 				reg_mstr.addr = (char *)restart_reg->dyn.addr->fname;
 			} else
@@ -275,6 +276,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				reg_mstr.len = 0;
 				reg_mstr.addr = NULL;
 			}
+			caller_id_flag = FALSE;		/* don't want caller_id in the operator log */
 			if (IS_GTM_IMAGE)
 				getzposition(TADR(tp_restart_entryref));
 			else
@@ -283,10 +285,27 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 				(TREF(tp_restart_entryref)).str.addr = NULL;
 				(TREF(tp_restart_entryref)).str.len = 0;
 			}
+			caller_id_flag = TRUE;
+			for (c = local_t_tries = 0; local_t_tries <= t_tries; local_t_tries++)
+			{	/* in case of non-printable code provide hex representation */
+				if (ISALPHA_ASCII(t_fail_hist[local_t_tries]) || ISDIGIT_ASCII(t_fail_hist[local_t_tries])
+					|| ISPUNCT_ASCII(t_fail_hist[local_t_tries]))	/* currently, only is alpha needed */
+						fail_hist[c++] = t_fail_hist[local_t_tries++];
+				else
+				{
+					assert((c + 4) < RESTART_CODE_EXPANSION_FACTOR);
+					memcpy(&fail_hist[c++], "0x", STR_LIT_LEN("0x"));
+					c++;
+					i2hex_blkfill(t_fail_hist[local_t_tries++], &fail_hist[c++], 1);
+					if (local_t_tries < t_tries)
+						fail_hist[c++] = ';';
+				}
+			}
+			assert((cdb_sc_blkmod != t_fail_hist[t_tries]) || (0 != TAREF1(t_fail_hist_blk, t_tries)));
 			if (cdb_sc_blkmod != status)
 			{
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(18) ERR_TPRESTART, 16, reg_mstr.len, reg_mstr.addr,
-					t_tries + 1, t_fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
+					c, &fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
 					gvname_mstr.addr, 0, 0, 0, tp_blkmod_nomod,
 					(NULL != sgm_info_ptr) ? sgm_info_ptr->num_of_blks : 0,
 					(NULL != sgm_info_ptr) ? sgm_info_ptr->cw_set_depth : 0, &local_tn,
@@ -294,7 +313,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			} else
 			{
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(18) ERR_TPRESTART, 16, reg_mstr.len, reg_mstr.addr,
-					t_tries + 1, t_fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
+					c, &fail_hist, TAREF1(t_fail_hist_blk, t_tries), gvname_mstr.len,
 					gvname_mstr.addr, n_pvtmods, n_blkmods, TREF(blkmod_fail_level), TREF(blkmod_fail_type),
 					sgm_info_ptr->num_of_blks, sgm_info_ptr->cw_set_depth, &local_tn,
 					(TREF(tp_restart_entryref)).str.len, (TREF(tp_restart_entryref)).str.addr);
@@ -303,7 +322,6 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 			TAREF1(tp_fail_hist_reg, t_tries) = NULL;
 			if ('0' == t_fail_hist[t_tries])
 				t_fail_hist[t_tries] = cdb_sc_normal;	/* get back to where it was */
-			caller_id_flag = TRUE;
 			n_pvtmods = n_blkmods = 0;
 		}
 		/* Should never come here with a normal restart code */

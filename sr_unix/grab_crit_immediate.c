@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,7 +108,7 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover)
 	assert(!mupip_jnl_recover || TREF(skip_file_corrupt_check));
 	if (csd->file_corrupt && !TREF(skip_file_corrupt_check))
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBFLCORRP, 2, DB_LEN_STR(reg));
-	if (cnl->wc_blocked)
+	if (WC_BLOCK_RECOVER == cnl->wc_blocked)
 	{
 		if (ok_for_wcs_recover)
 			wcs_recover(reg);

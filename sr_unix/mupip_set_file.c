@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,6 @@
 #include "timersp.h"
 #include "gt_timer.h"
 #include "buddy_list.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "util.h"
 #include "mupip_set.h"

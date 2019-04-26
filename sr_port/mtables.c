@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,6 @@
 #include "gdskill.h"		/* needed for tp.h & gv_trigger.h */
 #include "jnl.h"		/* needed for tp.h & gv_trigger.h */
 #include "buddy_list.h"		/* needed for tp.h & gv_trigger.h */
-#include "hashtab_int4.h"	/* needed for tp.h & gv_trigger.h */
 #include "tp.h"
 #include "gtmimagename.h"
 #include "arit.h"
@@ -192,7 +191,7 @@ LITDEF boolean_t mvs_save[] =
 	TRUE,	/* MVST_STCK_SP */
 	TRUE,	/* MVST_LVAL */
 	FALSE,	/* MVST_TRIGR */
-	FALSE,	/* MVST_RSTRTPC */
+	FALSE,	/* MVST_RSTRTPC (unused) */
 	TRUE,	/* MVST_STORIG */
 	FALSE	/* MVST_MRGZWRSV */
 };

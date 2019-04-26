@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2016-2017 Fidelity National Information	*
+ * Copyright (c) 2016-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -189,7 +189,7 @@ int wcs_wtstart_fini(gd_region *reg, int nbuffs, cache_rec_ptr_t cr2flush)
 			num_sleeps = 0; /* we are making progress so reset the clock */
 		if (MAX_WTSTART_FINI_SLEEPS < num_sleeps) /* waited long enough; initiate cache recovery */
 		{
-			SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
+			SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
 			break;
 		}
 		if (err_status)

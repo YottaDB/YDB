@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,6 @@
 #include "gdskill.h"	/* needed for tp.h */
 #include "jnl.h"	/* needed for tp.h */
 #include "buddy_list.h"	/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"		/* needed for ua_list for ENSURE_UPDATE_ARRAY_SPACE macro */
 #include "iosp.h"
 #include "bmm_find_free.h"

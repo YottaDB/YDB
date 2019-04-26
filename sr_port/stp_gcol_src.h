@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,6 @@
 #include "stp_parms.h"
 #include "stringpool.h"
 #include "buddy_list.h"		/* needed for tp.h */
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "tp_frame.h"
 #include "mlkdef.h"
@@ -788,7 +787,6 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 				case MVST_STCK:
 				case MVST_STCK_SP:
 				case MVST_PVAL:
-				case MVST_RSTRTPC:
 				case MVST_STORIG:
 				case MVST_ZINTCMD:
 					continue;

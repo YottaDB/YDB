@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,6 @@ mu_swap_blk.c:
 #include "copy.h"
 #include "muextr.h"
 #include "mu_reorg.h"
-#include "hashtab_int4.h"
 #include "cws_insert.h"
 
 /* Include prototypes */

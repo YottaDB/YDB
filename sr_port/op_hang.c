@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,6 @@
 #include "filestruct.h"
 #include "buddy_list.h"		/* needed for tp.h */
 #include "jnl.h"
-#include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
 #include "send_msg.h"
 #include "gtmmsg.h"		/* for gtm_putmsg() prototype */
@@ -63,9 +62,7 @@ GBLREF	uint4		dollar_trestart;
 GBLREF	mv_stent	*mv_chain;
 GBLREF	int4		outofband;
 GBLREF	unsigned char	*restart_pc, *restart_ctxt;
-#ifdef DEBUG
 GBLREF	stack_frame	*frame_pointer;
-#endif
 
 error_def(ERR_SYSCALL);
 
@@ -147,7 +144,7 @@ void op_hang(mval* num)
 		}
 #		endif
 		sys_get_curr_time(&cur_time);
-		mv_zintcmd = find_mvstent_cmd(ZINTCMD_HANG, restart_pc, restart_ctxt, FALSE);
+		mv_zintcmd = find_mvstent_cmd(ZINTCMD_HANG, frame_pointer->restart_pc, frame_pointer->restart_ctxt, FALSE);
 		if (!mv_zintcmd)
 			add_int_to_abs_time(&cur_time, ms, &end_time);
 		else
@@ -186,13 +183,13 @@ void op_hang(mval* num)
 	{
 		PUSH_MV_STENT(MVST_ZINTCMD);
 		mv_chain->mv_st_cont.mvs_zintcmd.end_or_remain = end_time;
-		mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check = restart_ctxt;
-		mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check = restart_pc;
+		mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_check = frame_pointer->restart_ctxt;
+		mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_check = frame_pointer->restart_pc;
 		/* save current information from zintcmd_active */
 		mv_chain->mv_st_cont.mvs_zintcmd.restart_ctxt_prior = TAREF1(zintcmd_active, ZINTCMD_HANG).restart_ctxt_last;
 		mv_chain->mv_st_cont.mvs_zintcmd.restart_pc_prior = TAREF1(zintcmd_active, ZINTCMD_HANG).restart_pc_last;
-		TAREF1(zintcmd_active, ZINTCMD_HANG).restart_pc_last = restart_pc;
-		TAREF1(zintcmd_active, ZINTCMD_HANG).restart_ctxt_last = restart_ctxt;
+		TAREF1(zintcmd_active, ZINTCMD_HANG).restart_pc_last = frame_pointer->restart_pc;
+		TAREF1(zintcmd_active, ZINTCMD_HANG).restart_ctxt_last = frame_pointer->restart_ctxt;
 		TAREF1(zintcmd_active, ZINTCMD_HANG).count++;
 		mv_chain->mv_st_cont.mvs_zintcmd.command = ZINTCMD_HANG;
 		outofband_action(FALSE);

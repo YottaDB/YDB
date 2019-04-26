@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -167,9 +167,9 @@ error_def(ERR_CRYPTBADWRTPOS);
 			}										\
 		}											\
 		if (EAGAIN == write_status)								\
-			SET_DOLLARDEVICE_ERRSTR(IOD, ONE_COMMA_UNAVAILABLE);		\
+			SET_DOLLARDEVICE_ERRSTR(IOD, ONE_COMMA_UNAVAILABLE);				\
 		else											\
-			SET_DOLLARDEVICE_ONECOMMA_STRERROR(IOD, write_status);		\
+			SET_DOLLARDEVICE_ONECOMMA_STRERROR(IOD, write_status);				\
 		IOD->dollar.za = 9;									\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) write_status);					\
 	}												\

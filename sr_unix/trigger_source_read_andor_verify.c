@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2017 Fidelity National Information	*
+ * Copyright (c) 2011-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,6 @@
 #include "gdscc.h"			/* needed for tp.h */
 #include "gdskill.h"			/* needed for tp.h */
 #include "buddy_list.h"			/* needed for tp.h */
-#include "hashtab_int4.h"		/* needed for tp.h */
 #include "jnl.h"			/* needed for tp.h */
 #include "tp.h"				/* for sgm_info */
 #include "tp_frame.h"

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,8 @@ LITREF mval *fnzqgblmod_table[2];
 GBLREF gv_namehead 	*gv_target;
 GBLREF gd_region	*gv_cur_region;
 
+#define	NONULLSUBS	"$ZQGBLMOD() failed because"
+
 void op_fnzqgblmod(mval *v)
 {
 	bool	gblmod;
@@ -33,10 +35,8 @@ void op_fnzqgblmod(mval *v)
 
 	SETUP_THREADGBL_ACCESS;
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
-		sgnl_gvnulsubsc();
-
+		sgnl_gvnulsubsc(NONULLSUBS);
 	gblmod = TRUE;
-
 	if (NULL != gv_cur_region)
 	{
 		if (IS_REG_BG_OR_MM(gv_cur_region))
@@ -49,6 +49,5 @@ void op_fnzqgblmod(mval *v)
 		else
 			assert(FALSE);
 	}
-
 	*v = *fnzqgblmod_table[gblmod];
 }

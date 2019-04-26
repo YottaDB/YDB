@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,6 +30,8 @@ GBLREF	bool		undef_inhibit;
 
 LITREF	mval		literal_null;
 
+#define	NONULLSUBS	"$GET() failed because"
+
 /* From the generated code's point of view, this is a void function.
  * The defined state isn't looked at by MUMPS code.  This routine,
  * however, is used by some servers who would dearly like to know
@@ -43,7 +45,7 @@ boolean_t op_gvget(mval *v)
 
 	SETUP_THREADGBL_ACCESS;
 	if (TREF(gv_last_subsc_null) && NEVER == gv_cur_region->null_subs)
-		sgnl_gvnulsubsc();
+		sgnl_gvnulsubsc(NONULLSUBS);
 	if (IS_REG_BG_OR_MM(gv_cur_region))
 	{
 	 	if (0 == gv_target->root)		/* global does not exist */

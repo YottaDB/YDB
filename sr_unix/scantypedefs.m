@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2010-2018 Fidelity National Information		;
+; Copyright (c) 2010-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ; 								;
 ; 	This source code contains the intellectual property	;
@@ -599,7 +599,7 @@
 	;
 	; Make sure all header files added.
 	;
-	Do CommandToPipe("ls -1 $gtm_inc/*.h",.results)
+	Do CommandToPipe("/bin/ls -1 $gtm_inc/*.h",.results)
 	For i=1:1:results(0) Do
 	. Set incname=$ZPiece(results(i),"/",6)
 	. Quit:(""=incname)					; Sometimes get blank lines at end.
@@ -901,7 +901,7 @@
 	;
 	; Make sure all header files added.
 	;
-	Do CommandToPipe("ls -1 $gtm_inc/*.h",.results)
+	Do CommandToPipe("/bin/ls -1 $gtm_inc/*.h",.results)
 	For i=1:1:results(0) Do
 	. Set incname=$ZPiece(results(i),"/",6)
 	. If 0=$Data(exclincl(incname)),0=$Data(inclref(incname)) Do
@@ -1066,7 +1066,7 @@
 	. . Write TAB,"Set gtmtypes(""",type,""",",fldidx,",""len"")=",types(type,"fullexp",fldidx,"fldlen"),!
 	. . Write TAB,"Set gtmtypes(""",type,""",",fldidx,",""type"")=""",types(type,"fullexp",fldidx,"type"),"""",!
 	. . If "gvstats_rec_t"=type,$Increment(gvstats,types(type,"fullexp",fldidx,"fldlen"))
-	. . Set fld=$ZPiece(types(type,"fullexp",fldidx,"fldname"),".",2,99)	; Eliminate structure (type) header 
+	. . Set fld=$ZPiece(types(type,"fullexp",fldidx,"fldname"),".",2,99)	; Eliminate structure (type) header
 	. . 									; isolating just the field name
 	. . Write TAB,"Set gtmtypfldindx(""",type,""",""",fld,""")=",fldidx,!
 	. . Set lincnt=lincnt+5
