@@ -22,21 +22,22 @@
 FROM ubuntu as ydb-release-builder
 
 ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
- && apt-get install -y \
-      file \
-      cmake \
-      tcsh \
-      libconfig-dev \
-      libelf-dev \
-      libgcrypt-dev \
-      libgpg-error-dev \
-      libgpgme11-dev \
-      libicu-dev \
-      libncurses-dev \
-      libssl-dev \
-      zlib1g-dev \
- && apt-get clean
+RUN apt-get update && \
+    apt-get install -y \
+                    file \
+                    cmake \
+                    tcsh \
+                    libconfig-dev \
+                    libelf-dev \
+                    libgcrypt-dev \
+                    libgpg-error-dev \
+                    libgpgme11-dev \
+                    libicu-dev \
+                    libncurses-dev \
+                    libssl-dev \
+                    zlib1g-dev \
+                    && \
+    apt-get clean
 
 ADD . /tmp/yottadb-src
 RUN mkdir -p /tmp/yottadb-build \
@@ -57,9 +58,17 @@ RUN mkdir -p /tmp/yottadb-build \
 FROM ubuntu as ydb-release
 
 ARG DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
- && apt-get install -y file binutils libelf-dev libicu-dev locales wget \
- && apt-get clean
+RUN apt-get update && \
+    apt-get install -y \
+                    file \
+                    binutils \
+                    libelf-dev \
+                    libicu-dev \
+                    locales \
+                    wget \
+                    vim \
+                    && \
+    apt-get clean
 RUN locale-gen en_US.UTF-8
 WORKDIR /data
 COPY --from=ydb-release-builder /tmp/yottadb-release /tmp/yottadb-release
