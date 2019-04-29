@@ -197,7 +197,7 @@ void gtm_exit_handler(void)
 		}
 	}
 	exit_handler_active = TRUE;
-	ydb_dmp_tracetbl();
+	DEBUG_ONLY(ydb_dmp_tracetbl());
 	attempting = rundown_state_lock;
 	actual_exi_condition = 0;
 	ESTABLISH_NORET(exi_ch, error_seen);	/* "error_seen" is initialized inside this macro */

@@ -71,6 +71,8 @@ GBLREF	volatile unsigned int	core_in_progress;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		exit_handler_complete;
+GBLREF	void			(*exit_handler_fptr)();
+GBLREF	intrpt_state_t		intrpt_ok_state;
 GBLREF	int			last_sig;
 GBLREF	void			(*call_on_signal)();
 GBLREF	boolean_t		ydb_quiet_halt;
@@ -139,7 +141,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	 */
 	if (exit_handler_active && signal_forwarded && (sig == exi_condition))
 	{       /* a) exit_handler_active is TRUE but exit_handler_complete is FALSE implies we are inside but have not
-		 *    completed "gtm_exit_handler".
+		 *    completed the exit handler record at (*exit_handler_fptr).
 		 * b) signal_forwarded implies this is a forwarded signal.
 		 * c) sig == exi_condition implies we already are exiting because of this very same signal.
 		 * In this case, we let the original exit handler invocation continue by returning from this right away.
@@ -404,15 +406,15 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 		DEBUG_ONLY(in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler);
 		return;
 	}
-	/*  Our last main task before we exit (which drives the exit handler) is if the main program of this process
+	/* Our last main task before we exit (which drives the exit handler) is if the main program of this process
 	 * is not M (meaning simple*API or EasyAPI or various language using call-ins) and if a handler for this signal
 	 * existed when YDB was intialized, we need to drive that handler now. The problem is that some languages (Golang
 	 * specifically), may rethrow this signal which causes an assert failure. To mitigate this problem, we invoke the
-	 * gtm_exit_handler() logic NOW before we give the main program's handler control and if we get the same signal
-	 * again after the exit handler cleanup has run, we just pass it straight to the main's handler and do not
-	 * process it again. (Also done in deferred_exit_handler().
+	 * exit handler logic NOW before we give the main program's handler control and if we get the same signal again
+	 * after the exit handler cleanup has run, we just pass it straight to the main's handler and do not process it
+	 * again. (Also done in deferred_exit_handler()).
 	 */
-	gtm_exit_handler();
+	DRIVE_EXIT_HANDLER_IF_EXISTS;
 	DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, TRUE);
 	assert((EXIT_IMMED <= exit_state) || !exit_handler_active);
 	EXIT(-exi_condition);

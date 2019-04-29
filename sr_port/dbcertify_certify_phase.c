@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,6 +86,8 @@ GBLREF	uint4			update_array_size;
 GBLREF	VSIG_ATOMIC_T		forced_exit;			/* Signal came in while we were in critical section */
 GBLREF	int4			exi_condition;
 GBLREF	phase_static_area	*psa_gbl;
+GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		exit_handler_complete;
 
 boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_type blk_type, v15_trans_num tn, int blk_levl);
 void dbc_flush_fhead(phase_static_area *psa);
@@ -123,10 +125,10 @@ void dbcertify_certify_phase(void)
 	phase_static_area *psa;
 	ZOS_ONLY(int	realfiletag;)
 
+	DEFINE_EXIT_HANDLER(dbc_certify_phase_cleanup, TRUE);
 	psa = psa_gbl;
 	DBC_DEBUG(("DBC_DEBUG: Beginning certification phase\n"));
 	psa->phase_one = FALSE;
-	UNIX_ONLY(atexit(dbc_certify_phase_cleanup));
 	psa->block_depth = psa->block_depth_hwm = -1;		/* Initialize no cache */
 
 	/* Check parsing results */
@@ -1516,6 +1518,9 @@ void dbc_certify_phase_cleanup(void)
 {
 	phase_static_area	*psa;
 
+	if (exit_handler_active)
+		return;
+	exit_handler_active = TRUE;
 	psa = psa_gbl;
 	if (NULL == psa)
 		return;
@@ -1539,4 +1544,5 @@ void dbc_certify_phase_cleanup(void)
 		if (!psa->keep_temp_files)
 			dbc_remove_result_file(psa);
 	}
+	exit_handler_complete = TRUE;
 }

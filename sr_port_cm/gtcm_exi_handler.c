@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,16 +32,15 @@
 #include "gtmmsg.h"
 #include "gtcm_exi_handler.h"
 
-#ifdef VMS
-#  define EXICONDITION gtcm_exi_condition
-#else
-#  define EXICONDITION exi_condition
-#endif
+#define EXICONDITION exi_condition
 
 GBLREF	struct NTD		*ntd_root;
 GBLREF	connection_struct	*curr_entry;
 GBLREF	int4			EXICONDITION;
 GBLREF	uint4			process_id;
+GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		exit_handler_complete;
+
 
 error_def(ERR_UNKNOWNFOREX);
 error_def(ERR_GTCMEXITLOOP);
@@ -52,6 +51,9 @@ void gtcm_exi_handler()
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (exit_handler_active)
+		return;
+	exit_handler_active = TRUE;
 	ASSERT_IS_LIBGNPSERVER;
 	ESTABLISH(gtcm_exi_ch);
 	if (ntd_root)
@@ -63,10 +65,7 @@ void gtcm_exi_handler()
 			gtcmtr_terminate(FALSE);
 		}
 	}
+	exit_handler_complete = TRUE;
 	print_exit_stats();
-	VMS_ONLY(
-		if (0 == EXICONDITION)
-		        EXICONDITION = ERR_UNKNOWNFOREX;
-		);
 	PROCDIE(EXICONDITION);
 }

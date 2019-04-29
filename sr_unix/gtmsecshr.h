@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -137,6 +137,7 @@ int		validate_receiver(gtmsecshr_mesg *buf, char *rundir, int rundir_len, int sa
 void		service_request(gtmsecshr_mesg *buf, int msglen, char *rundir, int rundir_len);
 int4		gtmsecshr_sock_init(int caller);
 void		gtmsecshr_sock_cleanup(int);
+void		gtmsecshr_exit_handler(void);
 int4		gtmsecshr_pathname_init(int caller, char *execpath, int execpathln);
 int		continue_proc(pid_t pid);
 

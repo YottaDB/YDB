@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,6 +87,8 @@ GBLREF	pattern			*curr_pattern;
 GBLREF	pattern			mumps_pattern;
 GBLREF	uint4			*pattern_typemask;
 GBLREF	phase_static_area	*psa_gbl;
+GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		exit_handler_complete;
 
 error_def(ERR_FILENAMETOOLONG);
 error_def(ERR_DBNOTGDS);
@@ -133,10 +135,10 @@ void dbcertify_scan_phase(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	DEFINE_EXIT_HANDLER(dbc_scan_phase_cleanup, TRUE);
 	psa = psa_gbl;
 	DBC_DEBUG(("DBC_DEBUG: Beginning scan phase\n"));
 	psa->bsu_keys = TRUE;
-	UNIX_ONLY(atexit(dbc_scan_phase_cleanup));
 	TREF(transform) = TRUE;
 	psa->block_depth = psa->block_depth_hwm = -1;		/* Initialize no cache */
 	initialize_pattern_table();
@@ -848,6 +850,9 @@ void dbc_scan_phase_cleanup(void)
 {
 	phase_static_area	*psa;
 
+	if (exit_handler_active)
+		return;
+	exit_handler_active = TRUE;
 	psa = psa_gbl;
 	if (NULL == psa)
 		return;
@@ -863,4 +868,5 @@ void dbc_scan_phase_cleanup(void)
 		if (!psa->keep_temp_files)
 			dbc_remove_result_file(psa);
 	}
+	exit_handler_complete = TRUE;
 }

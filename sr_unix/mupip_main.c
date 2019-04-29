@@ -90,13 +90,13 @@ int mupip_main(int argc, char **argv, char **envp)
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
+	DEFINE_EXIT_HANDLER(mupip_exit_handler, TRUE);
 	common_startup_init(MUPIP_IMAGE, &mupip_cmd_ary[0]);
 	invocation_mode = MUMPS_UTILTRIGR;
 	err_init(util_base_ch);
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, NULL, suspsigs_handler, continue_handler);	/* Note: no ^C handler is defined (yet) */
-	atexit(mupip_exit_handler);
 	licensed = TRUE;
 	in_backup = FALSE;
 	op_open_ptr = mu_op_open;

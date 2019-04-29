@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,6 +108,8 @@ GBLREF	boolean_t		need_core;
 GBLREF	boolean_t		first_syslog;		/* Defined in util_output.c */
 GBLREF	char			ydb_dist[YDB_PATH_MAX];
 GBLREF	boolean_t		ydb_dist_ok_to_use;
+GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		exit_handler_complete;
 
 LITREF	char			ydb_release_name[];
 LITREF	int4			ydb_release_name_len;
@@ -227,6 +229,7 @@ int main(int argc, char_ptr_t argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
+	DEFINE_EXIT_HANDLER(gtmsecshr_exit_handler, FALSE);
 	assert(MAXPOSINT4 >= GTMSECSHR_MESG_TIMEOUT);
 	common_startup_init(GTMSECSHR_IMAGE, NULL); /* Side-effect : Sets skip_dbtriggers = TRUE if platorm lacks trigger support */
 	err_init(gtmsecshr_cond_hndlr);
@@ -537,10 +540,24 @@ void gtmsecshr_init(char_ptr_t argv[], char **rundir, int *rundir_len)
 	return;
 }
 
+/* The gtmsecshr_exit() routine below is not a true "exit handler" but rather the routine that handles exits (with error)
+ * for gtmsecshr. But its functionality is something we need to do if we are going to exit due to signal so this entry
+ * (gtmsecshr_exit_handler) serves in that capacity matching the signature of other exit handlers so the
+ * DEFINE_EXIT_HANDLER() macro invocation done earlier doesn't get type mismatches in the atexit() it does (but which this
+ * routine does not make use of - it will optimize out in a pro build).
+ */
+void gtmsecshr_exit_handler(void)
+{
+	gtmsecshr_exit(0, FALSE);	/* We have no error code and don't dump */
+}
+
 void gtmsecshr_exit(int exit_code, boolean_t dump)
 {
 	int		gtmsecshr_sem;
 
+	if (exit_handler_active)
+		return;
+	exit_handler_active = TRUE;
 	if (dump)
 		DUMP_CORE;
 	gtmsecshr_sock_cleanup(SERVER);
@@ -555,6 +572,7 @@ void gtmsecshr_exit(int exit_code, boolean_t dump)
 		if (-1 == semctl(gtmsecshr_sem, 0, IPC_RMID, 0))
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_GTMSECSHRREMSEMFAIL, 1, errno);
 	}
+	exit_handler_complete = TRUE;
 	/* Note shutdown message taken care of by generic_signal_handler */
 	EXIT(exit_code);
 }

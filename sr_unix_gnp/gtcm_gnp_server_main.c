@@ -404,6 +404,7 @@ int gtcm_gnp_server_main(int argc, char **argv, char **envp)
 	stp_init(STP_INITSIZE);
 	rts_stringpool = stringpool;
 	getzdir();
+	DEFINE_EXIT_HANDLER(gtcm_exi_handler, TRUE);
 	sig_init(generic_signal_handler, null_handler, suspsigs_handler, continue_handler); /* should do be done before cmi_init */
 
 	/* Redefine handler for SIGHUP to switch log file */
@@ -452,7 +453,6 @@ int gtcm_gnp_server_main(int argc, char **argv, char **envp)
 				ERR_TEXT, 2, LEN_AND_LIT("Network interface initialization failed"), status);
 		EXIT(status);
 	}
-	atexit(gtcm_exi_handler);
 	initialize_pattern_table();
 	/* Pre-allocate some timer blocks. */
 	prealloc_gt_timers();

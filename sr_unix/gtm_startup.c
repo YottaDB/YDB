@@ -242,8 +242,8 @@ void gtm_startup(struct startup_vector *svec)
 	ctrlc_handler_ptr = &ctrlc_handler;
 	if (!IS_MUPIP_IMAGE)
 	{
+		DEFINE_EXIT_HANDLER(gtm_exit_handler, TRUE);
 		sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler, continue_handler);
-		atexit(gtm_exit_handler);
 	}
 	io_init(IS_MUPIP_IMAGE);		/* starts with nocenable for GT.M runtime, enabled for MUPIP */
 	if (!IS_MUPIP_IMAGE)

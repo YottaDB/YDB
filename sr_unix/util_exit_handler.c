@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,6 +40,7 @@
 GBLREF	boolean_t	need_core;
 GBLREF	boolean_t	created_core;
 GBLREF	boolean_t	exit_handler_active;
+GBLREF	boolean_t	exit_handler_complete;
 GBLREF	boolean_t	skip_exit_handler;
 GBLREF	uint4		dollar_tlevel;
 GBLREF	uint4		process_id;
@@ -96,6 +97,7 @@ void util_exit_handler()
 	WITH_CH(exi_ch, gv_rundown(), 0);
 	print_exit_stats();
 	util_out_close();
+	exit_handler_complete = TRUE;
 	GTMCRYPT_CLOSE;
 	if (need_core && !created_core)
 		DUMP_CORE;

@@ -47,9 +47,10 @@ GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		exit_handler_active;
 GBLREF	boolean_t		exit_handler_complete;
+GBLREF	void			(*exit_handler_fptr)();
 GBLREF	boolean_t		ydb_quiet_halt;
-GBLREF	volatile int4           gtmMallocDepth;         /* Recursion indicator */
-GBLREF  intrpt_state_t          intrpt_ok_state;
+GBLREF	volatile int4		gtmMallocDepth;         /* Recursion indicator */
+GBLREF	intrpt_state_t		intrpt_ok_state;
 GBLREF	struct sigaction	orig_sig_action[];
 
 LITREF	gtmImageName		gtmImageNames[];
@@ -117,11 +118,11 @@ void deferred_exit_handler(void)
 	 * is not M (meaning simple*API or EasyAPI or various language using call-ins) and if a handler for this signal
 	 * existed when YDB was intialized, we need to drive that handler now. The problem is that some languages (Golang
 	 * specifically), may rethrow this signal which causes an assert failure. To mitigate this problem, we invoke the
-	 * gtm_exit_handler() logic NOW before we give the main program's handler control and if we get the same signal
-	 * again after the exit handler cleanup has run, we just pass it straight to the main's handler and do not
-	 * process it again. (Also done in generic_exit_handler().
+	 * exit handler logic NOW before we give the main program's handler control so if we get the same signal again
+	 * after the exit handler cleanup has run, we just pass it straight to the main's handler and do not process it
+	 * again. (Also done in generic_exit_handler()).
 	 */
-	gtm_exit_handler();
+	DRIVE_EXIT_HANDLER_IF_EXISTS;
 	sig = stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info.si_signo;
 	DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("deferred_exit_handler", sig,
 		&stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info,

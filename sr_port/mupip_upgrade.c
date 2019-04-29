@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,12 +59,15 @@
 #include "mu_all_version_standalone.h"
 #include "db_write_eof_block.h"
 
+GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		exit_handler_complete;
+
 LITREF  char            	ydb_release_name[];
 LITREF  int4           		ydb_release_name_len;
 
-UNIX_ONLY(static sem_info	*sem_inf;)
+STATICDEF sem_info		*sem_inf;
 
-UNIX_ONLY(static void mupip_upgrade_cleanup(void);)
+STATICFNDCL void mupip_upgrade_cleanup(void);
 
 error_def(ERR_BADDBVER);
 error_def(ERR_DBFILOPERR);
@@ -106,11 +109,12 @@ void mupip_upgrade(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	/* Initialization */
+	DEFINE_EXIT_HANDLER(mupip_upgrade_cleanup, TRUE);
 	/* Structure checks .. */
 	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
 	sem_inf = (sem_info *)malloc(SIZEOF(sem_info) * FTOK_ID_CNT);
 	memset(sem_inf, 0, SIZEOF(sem_info) * FTOK_ID_CNT);
-	atexit(mupip_upgrade_cleanup);
 	db_fn_len = SIZEOF(db_fn);
 	if (!cli_get_str("FILE", db_fn, &db_fn_len))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUNODBNAME);
@@ -141,7 +145,7 @@ void mupip_upgrade(void)
 	mu_outofband_setup();	/* Will ignore user interrupts. Note that now the
 				 * elapsed time for this is order of milliseconds */
 	/* ??? Should we set this just before DB_DO_FILE_WRITE to have smallest time window of ignoring signal? */
-	if (FD_INVALID == (channel = OPEN(db_fn, O_RDWR)))
+	if (FD_INVALID == (channel = OPEN(db_fn, O_RDWR)))	/* Note assignment */
 	{
 		save_errno = errno;
 		if (FD_INVALID != (channel = OPEN(db_fn, O_RDONLY)))
@@ -328,8 +332,12 @@ void mupip_upgrade(void)
 	mupip_exit(SS_NORMAL);
 }
 
-static void mupip_upgrade_cleanup(void)
+STATICFNDEF void mupip_upgrade_cleanup(void)
 {
+	if (exit_handler_active)
+		return;
+	exit_handler_active = TRUE;
 	if (sem_inf)
 		mu_all_version_release_standalone(sem_inf);
+	exit_handler_complete = TRUE;
 }

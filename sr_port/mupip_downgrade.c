@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,9 +56,12 @@
 #define	GTM_VER_LIT		"GT.M "
 #define	MAX_VERSION_LEN		16	/* 16 bytes enough to hold V63000A, longest -VERSION= value possible */
 
-static sem_info	*sem_inf;
+GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		exit_handler_complete;
 
-static void mupip_downgrade_cleanup(void);
+STATICDEF sem_info		*sem_inf;
+
+STATICFNDCL void mupip_downgrade_cleanup(void);
 
 error_def(ERR_BADDBVER);
 error_def(ERR_DBFILOPERR);
@@ -102,12 +105,12 @@ void mupip_downgrade(void)
 	enum db_ver	desired_dbver;
 	int		ftrunc_status;
 
+	/* Initialization */
+	DEFINE_EXIT_HANDLER(mupip_downgrade_cleanup, TRUE);
 	/* Structure checks .. */
 	assert((24 * 1024) == SIZEOF(v15_sgmnt_data));	/* Verify V4 file header hasn't suddenly increased for some odd reason */
-
 	sem_inf = (sem_info *)malloc(SIZEOF(sem_info) * FTOK_ID_CNT);
 	memset(sem_inf, 0, SIZEOF(sem_info) * FTOK_ID_CNT);
-	atexit(mupip_downgrade_cleanup);
 	db_fn_len = SIZEOF(db_fn) - 1;
 	if (!cli_get_str("FILE", db_fn, &db_fn_len))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUNODBNAME);
@@ -139,7 +142,7 @@ void mupip_downgrade(void)
 	 * file header before we have the proper locks obtained for it so after checking, the file is closed again
 	 * so it can be opened under lock to prevent race conditions.
 	 */
-	if (FD_INVALID != (channel = OPEN(db_fn, O_RDONLY)))
+	if (FD_INVALID != (channel = OPEN(db_fn, O_RDONLY)))	/* Note assignment */
 	{
 		DO_FILE_READ(channel, 0, &csd, SIZEOF(sgmnt_data), status, status2);
 		if ((0 == memcmp(csd.label, GDS_LABEL, STR_LIT_LEN(GDS_LABEL))) && (RDBF_STATSDB_MASK == csd.reservedDBFlags))
@@ -396,8 +399,12 @@ void mupip_downgrade(void)
 	mupip_exit(SS_NORMAL);
 }
 
-static void mupip_downgrade_cleanup(void)
+STATICFNDEF void mupip_downgrade_cleanup(void)
 {
+	if (exit_handler_active)
+		return;
+	exit_handler_active = TRUE;
 	if (sem_inf)
 		mu_all_version_release_standalone(sem_inf);
+	exit_handler_complete = TRUE;
 }

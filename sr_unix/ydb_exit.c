@@ -138,12 +138,6 @@ int ydb_exit()
 			}
 		}
 		gtm_exit_handler(); /* rundown all open database resource */
-		/* If libyottadb was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
-		 * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
-		 * 'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
-		 * our exit handler has already been called. Linux and Solaris don't need this, looking at the
-		 * other platforms we support to see if resolutions can be found. SE 05/2007
-		 */
 		REVERT;
 		/* Restore the signal handlers that were saved and overridden during ydb_init()->gtm_startup()->sig_init() */
 		for (sig = 1; sig <= NSIG; sig++)

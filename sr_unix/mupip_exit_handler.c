@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,6 +74,7 @@ GBLREF	boolean_t		need_core;
 GBLREF	boolean_t		created_core;
 GBLREF	unsigned int		core_in_progress;
 GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		exit_handler_complete;
 GBLREF	boolean_t		skip_exit_handler;
 GBLREF	recvpool_addrs		recvpool;
 GBLREF	int			pool_init;
@@ -169,6 +170,7 @@ void mupip_exit_handler(void)
 	print_exit_stats();
 	io_rundown(RUNDOWN_EXCEPT_STD);
 	GTMCRYPT_CLOSE;
+	exit_handler_complete = TRUE;
 	if (need_core && !created_core)
 	{
 		++core_in_progress;

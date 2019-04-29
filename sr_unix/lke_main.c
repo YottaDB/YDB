@@ -92,13 +92,13 @@ int lke_main(int argc, char *argv[], char **envp)
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
+	DEFINE_EXIT_HANDLER(util_exit_handler, TRUE);
 	common_startup_init(LKE_IMAGE, &lke_cmd_ary[0]);
 	licensed = TRUE;
 	err_init(util_base_ch);
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, lke_ctrlc_handler, suspsigs_handler, continue_handler);
-	atexit(util_exit_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	stp_init(STP_INITSIZE);
 	stpgc_ch = &stp_gcol_ch;

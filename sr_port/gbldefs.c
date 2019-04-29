@@ -285,6 +285,7 @@ GBLDEF	boolean_t	need_core;		/* Core file should be created */
 GBLDEF	boolean_t	created_core;		/* core file was created */
 GBLDEF	unsigned int	core_in_progress;	/* creating core NOW if > 0 */
 GBLDEF	boolean_t	dont_want_core;		/* Higher level flag overrides need_core set by lower level rtns */
+GBLDEF	void		(*exit_handler_fptr)();	/* Function pointer for exit handler */
 GBLDEF	boolean_t	exit_handler_active;	/* recursion prevention */
 GBLDEF	boolean_t	exit_handler_complete;	/* used to deal with signal rethrows by non-M programs using simple*API */
 GBLDEF	boolean_t	skip_exit_handler;	/* set for processes that are usually forked off and so should not do gds_rundown */

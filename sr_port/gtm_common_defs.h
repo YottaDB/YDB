@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -143,6 +143,26 @@ MBSTART {					\
 	memset(lcl_ptr, 0, SIZ);		\
 	DST = lcl_ptr;				\
 } MBEND
+
+/* Macro to define the exit handler and optionally set an atexit() for it */
+#define DEFINE_EXIT_HANDLER(EXITHNDLR, ATEXIT)		\
+MBSTART {						\
+	GBLREF void (*exit_handler_fptr)();		\
+							\
+	exit_handler_fptr = &EXITHNDLR;			\
+	if (ATEXIT)					\
+		atexit(EXITHNDLR);			\
+} MBEND
+
+/* Macro to drive the exit handler if it exists  */
+#define DRIVE_EXIT_HANDLER_IF_EXISTS		\
+MBSTART {					\
+	GBLREF void (*exit_handler_fptr)();	\
+						\
+	if (NULL != exit_handler_fptr)		\
+		(*exit_handler_fptr)();		\
+} MBEND
+
 
 /* Shared between GT.M and external plugins */
 #define EXT_NEW 		"_%YGTM"
