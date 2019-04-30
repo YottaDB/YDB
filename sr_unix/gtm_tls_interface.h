@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -153,7 +153,7 @@ int		gtm_tls_errno(void);
  * necessary to initialize the SSL/TLS context are obtained from the configuration file pointed to by `$ydb_crypt_config'.
  *
  * Arguments:
- *   `version' : The API version that the caller understands. Current version is 0x1.
+ *   `version' : The API version that the caller understands. Current version is GTM_TLS_API_VERSION.
  *   `flags'   : Initialization flags as a bitmask. Currently, the only one the API understands is GTMTLS_OP_INTERACTIVE_MODE.
  *               Set this bitmask if the process doing the SSL/TLS initialization is run in an interactive mode. This lets
  *               the API decide if it can prompt for a password if a need arises while decrypting the private key.
@@ -225,15 +225,17 @@ void		gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name);
  *               The plugin searches for the identifier in the configuration file pointed to by `$ydb_crypt_config' to get other
  *               information corresponding to this connection (like, path to the private key, certificate and the format of the
  *               private key).
- *    `flags'  : Additional configuration options. See GTMTLS_OP* macros for more details.
+ *    `flags'  : Example usages are GTMTLS_OP_SOCKET_DEV for the server side of the connection and
+ *		 (GTMTLS_OP_SOCKET_DEV | GTMTLS_OP_CLIENT_MODE) for the client side of the connection.
+ *		 See GTMTLS_OP* macros for more details.
  *
  * Returns a value, of type gtm_tls_socket_t *, representing the initialized SSL/TLS aware socket. This value can be used for actual
  * communication to provide security. In case of an error, INVALID_TLS_SOCKET is returned in which case gtm_tls_get_error()
  * provides the necessary error detail. If `prev_socket' is non-NULL, then that storage area is used for setting up the new socket
  * instead of creating a new storage area.
  *
- * Note 1: If the password corresponding to the `tls_id' has not yet been prefetched by the SSL/TLS API, then the API attempts to
- * read the password from the environment.
+ * Note 1: If the password corresponding to the tls id `id' has not yet been prefetched by the SSL/TLS API,
+ * then the API attempts to read the password from the environment.
  *
  * Note 2: The function honors the GTMTLS_OP_INTERACTIVE_MODE flag passed to the `gtm_tls_init' function. If the application has
  * initialized the SSL/TLS API in a non-interactive mode, this function does not prompt the user for password.
