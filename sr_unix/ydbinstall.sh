@@ -52,6 +52,19 @@ do
 	check_if_util_exists $util
 done
 
+cmd=`basename $0`
+base=`basename -s .sh $0`
+dir=`dirname $0`
+
+# Ensure this is not being sourced so that environment variables in this file do not change the shell environment
+if [ "ydbinstall" != $base ] ; then
+    echo "Please execute ydbinstall/ydbinstall.sh instead of sourcing it"
+    return
+fi
+
+# Ensure this is run from the directory in which it resides to avoid inadvertently deleting files
+cd $dir
+
 # Initialization
 timestamp=`date +%Y%m%d%H%M%S`
 if [ -z "$USER" ] ; then USER=`id -un` ; fi
@@ -100,7 +113,7 @@ dump_info()
 
 err_exit()
 {
-	echo "YottaDB installation aborted due to above error. Run ydbinstall --help for detailed option list"
+	echo "YottaDB installation aborted due to above error. Run $cmd --help for detailed option list"
 	exit 1
 }
 
