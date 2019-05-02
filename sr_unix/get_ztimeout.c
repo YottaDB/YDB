@@ -53,36 +53,12 @@ int get_ztimeout(mval *result)
 		cur_time = sub_abs_time(&(TREF(dollar_ztimeout)).end_time, &cur_time);
 		if (0 <= cur_time.tv_sec)
 		{
-<<<<<<< HEAD
 			DBGDFRDEVNT((stderr,"cur_time.tv_nsec is: %d\n", cur_time.tv_nsec));
 			ms = DIVIDE_ROUND_DOWN(cur_time.tv_nsec, NANOSECS_IN_MSEC);
-			SNPRINTF(full_ztimeout, MAX_STRLEN, "%ld.%ld", cur_time.tv_sec, ms);
-		} else
-		{
-			ms = 0;
-			SNPRINTF(full_ztimeout, MAX_STRLEN, "%ld", ms);
-		}
-		curr_end_ptr = full_ztimeout + STRLEN(full_ztimeout);
-		if ((TREF(dollar_ztimeout)).ztimeout_vector.str.addr)
-		{
-			req_len = STRLEN(":") + (TREF(dollar_ztimeout)).ztimeout_vector.str.len;
-			arr_end_ptr = full_ztimeout + MAX_STRLEN - 1;
-			assert(arr_end_ptr >= (curr_end_ptr + req_len));
-			MEMCPY_LIT(curr_end_ptr , ":");
-			curr_end_ptr += STRLEN(":");
-			assert(curr_end_ptr <= arr_end_ptr);
-			req_len -= STRLEN(":");
-			memcpy(curr_end_ptr, (TREF(dollar_ztimeout)).ztimeout_vector.str.addr,
-					MIN(req_len, (arr_end_ptr - curr_end_ptr)));
-		}
-=======
-			DBGDFRDEVNT((stderr,"cur_time.at_usec is: %d\n", cur_time.at_usec));
-			ms = DIVIDE_ROUND_DOWN(cur_time.at_usec, MICROSECS_IN_MSEC);
 			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, ((NULL == ztimeout_vector_ptr)? "%ld.%ld" : "%ld.%ld:"),
-					cur_time.at_sec, ms);
+					cur_time.tv_sec, ms);
 		} else
 			time_len = SNPRINTF(full_ztimeout, ZTIMEOUTSTRLEN, ((NULL == ztimeout_vector_ptr)? "%ld" : "%ld:"), ms);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	}
 	assert((0 < time_len) && (time_len <= ZTIMEOUTSTRLEN));
 	assert(((0 == ztimeout_vector_len) && (NULL == ztimeout_vector_ptr))

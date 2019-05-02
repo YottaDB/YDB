@@ -189,11 +189,7 @@ void cli_str_setup(uint4 addrlen, char *addr)
 	{	/* We have the cure for a missing or unusable buffer */
 		if (cli_lex_in_ptr)
 			free(cli_lex_in_ptr);
-<<<<<<< HEAD
-		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + alloclen + 1);	/* + 1 needed for NULL byte */
-=======
 		cli_lex_in_ptr = (IN_PARMS *)malloc(SIZEOF(IN_PARMS) + alloclen + 1);	/* + 1 ensures room for <NUL> terminator */
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		cli_lex_in_ptr->buflen = alloclen;
 	}
 	cli_lex_in_ptr->argv = NULL;

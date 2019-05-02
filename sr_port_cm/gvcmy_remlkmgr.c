@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2010 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+ *								*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -64,13 +60,7 @@ bool gvcmy_remlkmgr(unsigned short count)
 	boolean_t	one_try, noresponse_timer;
 	cm_lk_response	*lk_res_ptr, *lk_resume;
 
-<<<<<<< HEAD
-	error_def(ERR_BADSRVRNETMSG);
-	error_def(ERR_TEXT);
-
 	ASSERT_IS_LIBGNPCLIENT;
-=======
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	one_try = TRUE;
 	lk_cm_noresponse = FALSE;
 	noresponse_timer = FALSE;

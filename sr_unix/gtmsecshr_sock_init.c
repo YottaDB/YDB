@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2014 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+ *								*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -77,13 +73,8 @@ error_def(ERR_TEXT);
 int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 {
 	int			ret_status = 0, status, len;
-<<<<<<< HEAD
-	char			*error_mesg;
-	mstr			secshrsock_transnam;
-=======
 	char			*dir_error_mesg, *error_mesg;
-	mstr			secshrsock_lognam, secshrsock_transnam;
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+	mstr			secshrsock_transnam;
 	struct stat		buf;
 	int4			max_sock_path_len;
 
@@ -119,17 +110,12 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 		{
 			dir_error_mesg = NULL;
 			error_mesg = "Unable to locate default tmp directory";
-<<<<<<< HEAD
-		else
-			error_mesg = "$ydb_tmp/$gtm_tmp not a directory";
-=======
 		} else
 		{
-			dir_error_mesg = malloc(GTM_PATH_MAX);
-			SNPRINTF(dir_error_mesg, GTM_PATH_MAX, "$gtm_tmp (%s) is not a directory", gtmsecshr_sockpath);
+			dir_error_mesg = malloc(YDB_PATH_MAX);
+			SNPRINTF(dir_error_mesg, YDB_PATH_MAX, "$ydb_tmp/$gtm_tmp (%s) is not a directory", gtmsecshr_sockpath);
 			error_mesg = dir_error_mesg;
 		}
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		if (SERVER == caller)
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) MAKE_MSG_SEVERE(ERR_GTMSECSHRSOCKET), 3,
 				 RTS_ERROR_STRING((SERVER == caller) ? "Server" : "Caller"), process_id,
@@ -148,33 +134,10 @@ int4 gtmsecshr_pathname_init(int caller, char *execpath, int execpathln)
 	gtmsecshr_sockpath[gtmsecshr_sockpath_len] = '\0';
 	strcpy(gtmsecshr_sockpath + gtmsecshr_sockpath_len , GTMSECSHR_SOCK_PREFIX);
 	gtmsecshr_sockpath_len += (SIZEOF(GTMSECSHR_SOCK_PREFIX) - 1);
-<<<<<<< HEAD
-	/* Servers have already determined the executable name. Use that instead of below. */
-	if (SERVER == caller)
-	{	/* Use path name discovered by gtmsecshr_init() */
-		strcpy(gtmsecshr_path, execpath);
-		gtmsecshr_path[execpathln++] = '/';
-		gtmsecshr_path[execpathln] = '\0';
-		strcat(gtmsecshr_path, GTMSECSHR_EXECUTABLE);
-		gtmsecshr_pathname.addr = gtmsecshr_path;
-		gtmsecshr_pathname.len = execpathln + STRLEN(GTMSECSHR_EXECUTABLE);
-	} else
-	{	/* Discover path name */
-		len = STRLEN(ydb_dist);
-		memcpy(gtmsecshr_path, ydb_dist, len);
-		gtmsecshr_path[len] = '/';
-		memcpy(gtmsecshr_path + len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
-		gtmsecshr_pathname.addr = gtmsecshr_path;
-		gtmsecshr_pathname.len = len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
-		assertpro(YDB_PATH_MAX > gtmsecshr_pathname.len);
-		gtmsecshr_path[gtmsecshr_pathname.len] = '\0';
-	}
-=======
 	/* Servers have already determined the executable name; clients use path name discovered by gtmsecshr_init(). */
-	gtmsecshr_pathname.len = SNPRINTF(gtmsecshr_path, GTM_PATH_MAX, "%s/%s",
-		(SERVER == caller) ? execpath : gtm_dist, GTMSECSHR_EXECUTABLE);
+	gtmsecshr_pathname.len = SNPRINTF(gtmsecshr_path, YDB_PATH_MAX, "%s/%s",
+		(SERVER == caller) ? execpath : ydb_dist, GTMSECSHR_EXECUTABLE);
 	gtmsecshr_pathname.addr = gtmsecshr_path;
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	/* We have different project id here. This guarantees to avoid deadlock, if only one gtm installation is there */
 	if (-1 == (gtmsecshr_key = FTOK(gtmsecshr_path, GTMSECSHR_ID)))
 	{

@@ -991,12 +991,8 @@ void relinkctl_rundown(boolean_t decr_attached, boolean_t do_rtnobj_shm_free)
 			{
 				shm_hdr = NULL;
 				nattached = -1;
-<<<<<<< HEAD
 			}
-			if (0 == nattached)
-=======
 			if ((0 == nattached) && !gtm_pipe_child)
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 			{
 				DBGARLNK((stderr, "relinkctl_rundown : nattached = 0\n"));
 				remove_shm = remove_rctl = TRUE;

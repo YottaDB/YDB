@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -209,13 +209,7 @@ int gtmrecv_end1(boolean_t auto_shutdown)
 	repl_log(gtmrecv_log_fp, TRUE, FALSE, "REPL INFO - Last Recvd Seqno : %llu  Jnl Total : %llu  Msg Total : %llu\n",
 			log_seqno, repl_recv_data_processed, repl_recv_data_recvd);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "REPL INFO - Last Seqno processed by update process : %llu\n", log_seqno1);
-<<<<<<< HEAD
-	gtm_event_log_close();
 	STOP_EXTERNAL_FILTER_IF_NEEDED(gtmrecv_filter, gtmrecv_log_fp, "GTMRECV_END");
-=======
-	if (gtmrecv_filter & EXTERNAL_FILTER)
-		repl_stop_filter();
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	if (auto_shutdown)
 		return (exit_status);
 	else

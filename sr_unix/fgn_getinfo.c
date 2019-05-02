@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2014 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+ *								*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -38,7 +34,7 @@ error_def(ERR_DLLNORTN);
 error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TEXT);
 
-GBLREF char		gtm_dist[GTM_PATH_MAX];
+GBLREF char		ydb_dist[GTM_PATH_MAX];
 
 /* below comments applicable only to tru64 */
 /* dlsym() is bound to return short pointer because of -taso loader flag
@@ -69,10 +65,10 @@ void_ptr_t fgn_getpak(char *package_name, int msgtype)
 	char	 	librarypath[GTM_PATH_MAX], *lpath = NULL;
 	intrpt_state_t	prev_intrpt_state;
 
-	if ((RESTRICTED(library_load_path)) && (0 != memcmp(gtm_dist, package_name, STRLEN(gtm_dist))))
-	{	/* Restrictions in place and the path is not somewhere under $gtm_dist */
+	if ((RESTRICTED(library_load_path)) && (0 != memcmp(ydb_dist, package_name, STRLEN(ydb_dist))))
+	{	/* Restrictions in place and the path is not somewhere under $ydb_dist */
+		SNPRINTF(librarypath, SIZEOF(librarypath), GTM_PLUGIN_FMT_FULL, ydb_dist, strrchr(package_name, '/'));
 		lpath = librarypath;
-		SNPRINTF(lpath, GTM_PATH_MAX, GTM_PLUGIN_FMT_FULL, gtm_dist, strrchr(package_name, '/'));
 	} else
 		lpath = package_name;
 	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);

@@ -137,7 +137,7 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 103	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 104	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */

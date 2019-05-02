@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -391,20 +391,7 @@ STATICFNDEF void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 	char		print_msg[1024];
 
 	assert((EREPL_SEND == repl_errno) || (EREPL_SELECT == repl_errno));
-<<<<<<< HEAD
 	if (EREPL_SEND == repl_errno)
-=======
-	if (REPL_CONN_RESET(status) && EREPL_SEND == repl_errno)
-	{
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection got reset while sending %s message. Status = %d ; %s\n",
-				msgtypestr, status, STRERROR(status));
-		repl_connection_reset = TRUE;
-		repl_close(&gtmrecv_sock_fd);
-		SNPRINTF(print_msg, SIZEOF(print_msg), "Closing connection on receiver side\n");
-		repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
-		return;
-	} else if (EREPL_SEND == repl_errno)
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	{
 #		ifdef GTM_TLS
 		if (ERR_TLSIOERROR == status)
@@ -421,7 +408,6 @@ STATICFNDEF void gtmrecv_repl_send_loop_error(int status, char *msgtypestr)
 			repl_close(&gtmrecv_sock_fd);
 			SNPRINTF(print_msg, SIZEOF(print_msg), "Closing connection on receiver side\n");
 			repl_log(gtmrecv_log_fp, TRUE, TRUE, print_msg);
-			gtm_event_log(GTM_EVENT_LOG_ARGC, "MUPIP", "ERR_REPLWARN", print_msg);
 			return;
 		} else
 		{

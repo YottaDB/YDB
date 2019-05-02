@@ -1,10 +1,6 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD:sr_port/merrors_ansi.h
  * Copyright (c) 2001-2019 Fidelity National Information	*
-=======
- * Copyright (c) 2001-2019 Fidelity National Information 	*
->>>>>>> 7a1d2b3e... GT.M V6.3-007:sr_i386/merrors_ansi.h
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.*

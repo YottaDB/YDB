@@ -97,7 +97,6 @@ int lke_main(int argc, char *argv[], char **envp)
 	err_init(util_base_ch);
 	DEFINE_EXIT_HANDLER(util_exit_handler, TRUE);	/* Must be defined only AFTER err_init() has setup condition handling */
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
-	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, lke_ctrlc_handler, suspsigs_handler, continue_handler);
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	stp_init(STP_INITSIZE);

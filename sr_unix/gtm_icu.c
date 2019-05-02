@@ -29,10 +29,6 @@
 #include <locale.h>		/* needed for setlocale() */
 #include <langinfo.h>		/* needed for nl_langinfo() */
 #ifdef _AIX
-<<<<<<< HEAD
-#include <gtm_limits.h>		/* needed for YDB_PATH_MAX */
-=======
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 #include <sys/ldr.h>		/* needed for loadquery */
 #include <libgen.h>		/* needed for basename */
 #include <errno.h>
@@ -56,8 +52,8 @@
 #endif
 
 ZOS_ONLY(GBLREF	char	*gtm_utf8_locale_object;)
-GBLREF boolean_t		gtm_dist_ok_to_use;
-GBLREF char			gtm_dist[GTM_PATH_MAX];
+GBLREF boolean_t		ydb_dist_ok_to_use;
+GBLREF char			ydb_dist[GTM_PATH_MAX];
 GBLREF	volatile boolean_t	timer_in_handler;
 
 LITREF	char	*ydbenvname[YDBENVINDX_MAX_INDEX];
@@ -206,13 +202,8 @@ static boolean_t parse_ydb_icu_version(char *icu_ver_buf, int len, char *icusymv
 	if (!(IS_ICU_VER_GREATER_THAN_MIN_VER(major_ver, minor_ver)))
 	{
 		/* Construct the first part of the ICUVERLT36 error message. */
-<<<<<<< HEAD
-		SPRINTF(tmp_errstr, "%s is",
+		SNPRINTF(tmp_errstr, SIZEOF(tmp_errstr), "%s is",
 			(is_ydb_env_match ?  ydbenvname[YDBENVINDX_ICU_VERSION] : gtmenvname[YDBENVINDX_ICU_VERSION]));
-=======
-		SNPRINTF(tmp_errstr, SIZEOF(GTM_ICU_VERSION) + STR_LIT_LEN(GTM_ICU_VERSION_SUFFIX), "%s%s", GTM_ICU_VERSION,
-			GTM_ICU_VERSION_SUFFIX);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_ICUVERLT36, 4, LEN_AND_STR(tmp_errstr), major_ver, minor_ver);
 	}
 	return TRUE;
@@ -234,18 +225,6 @@ void gtm_icu_init(void)
 	int		findx, ver;
 	boolean_t	icu_getversion_found = FALSE, gtm_icu_ver_defined, symbols_renamed;
 	UVersionInfo	icu_version;
-<<<<<<< HEAD
-	mstr		trans;
-	char		*envname;
-#	ifdef _AIX
-	int		buflen, prev_dyn_size;
-	char            buf[ICU_LIBNAME_LEN], temp_path[YDB_PATH_MAX], real_path[YDB_PATH_MAX], search_paths[MAX_SEARCH_PATH_LEN];
-	char		*ptr, *each_libpath, *dyn_search_paths = NULL, *search_path_ptr;
-	struct stat	real_path_stat;		/* To see if the resolved real_path exists or not */
-#	endif
-	boolean_t	is_ydb_env_match;
-=======
-	mstr		icu_ver, trans;
 	int		iculdflags = ICU_LIBFLAGS;
 	struct stat	libpath_stat;
 	char		real_path[GTM_PATH_MAX], librarypath[GTM_PATH_MAX];
@@ -257,7 +236,9 @@ void gtm_icu_init(void)
 	struct stat	real_path_stat;		/* To see if the resolved real_path exists or not */
 #	endif
 	intrpt_state_t  prev_intrpt_state;
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+	boolean_t	is_ydb_env_match;
+	mstr		trans;
+	char		*envname;
 
 	assert(!gtm_utf8_mode);
 #	ifdef __MVS__
@@ -328,11 +309,11 @@ void gtm_icu_init(void)
 		/* Try the version named symlink */
 		if (gtm_icu_ver_defined)
 		{
-			SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_FULL, gtm_dist, libname);
+			SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_FULL, ydb_dist, libname);
 			if (0 != Stat(librarypath, &libpath_stat)) /* Try the default named symlink */
-				SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_SHORT ICU_LIBNAME, gtm_dist);
+				SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_SHORT ICU_LIBNAME, ydb_dist);
 		} else	/* Try the default named symlink */
-			SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_SHORT ICU_LIBNAME, gtm_dist);
+			SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_SHORT ICU_LIBNAME, ydb_dist);
 #		ifdef _AIX
 		STRNCAT(librarypath, AIX_SHR_64, SIZEOF(AIX_SHR_64)); /* Append "(shr_64.o)" to library path */
 #		endif
@@ -461,15 +442,6 @@ void gtm_icu_init(void)
 		}
 #		endif
 	}
-<<<<<<< HEAD
-#	ifdef __hpux
-	/* HP-UX dlsym() doesn't allow lookup for symbols that are present in the nested dependent shared libraries
-	 * of ICU_LIBNAME. Workaround is to lookup within the global space (i.e. from invoking module libyottadb)
-	 * where all symbols would have been brought in by previous dlopen() with the RTLD_GLOBAL flag.
-	 */
-	handle = dlopen(NULL, ICU_LIBFLAGS);
-	assertpro(handle);
-#	endif
 	/* Note that a call to "dlopen_handle_array_add(handle)" should normally have been placed here but
 	 * if "dlopen_handle_array_close()" happens on this handle (corresponding to libicuio.so) later and
 	 * any type of error occurs (e.g. CALLINAFTERXIT etc.), it is very likely we would end up invoking
@@ -477,9 +449,7 @@ void gtm_icu_init(void)
 	 * has already been done on libicuio.so. Since this library is so much tied with YottaDB error handling,
 	 * we skip the "dlopen_handle_array_add" (and in turn "dlopen_handle_array_close" at "ydb_exit" time).
 	 */
-=======
 	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	DEBUG_ONLY(symbols_renamed = -1;)
 	for (findx = 0; findx < icu_func_n; ++findx)
 	{

@@ -261,14 +261,9 @@ void ztimeout_expire_now(void)
 	SETUP_THREADGBL_ACCESS;
 	DBGDFRDEVNT((stderr,"Ztimeout expired, setting xfer handlers\n"));
 #ifdef DEBUG
-<<<<<<< HEAD
 	if (ydb_white_box_test_case_enabled &&
-				(WBTEST_ZTIMEOUT_TRACE == ydb_white_box_test_case_number))
-=======
-	if (gtm_white_box_test_case_enabled &&
-				((WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number)
-					|| (WBTEST_ZTIME_DEFER_CRIT == gtm_white_box_test_case_number)))
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+				((WBTEST_ZTIMEOUT_TRACE == ydb_white_box_test_case_number)
+					|| (WBTEST_ZTIME_DEFER_CRIT == ydb_white_box_test_case_number)))
 	DBGFPF((stderr,"Ztimeout expired, setting xfer handlers\n"));
 #endif
 	TREF(ztimeout_set_xfer) = xfer_set_handlers(outofband_event, &ztimeout_set, 0, FALSE);
@@ -286,14 +281,9 @@ void ztimeout_set(int4 dummy_param)
 		SAVE_XFER_ENTRY(outofband_event, &ztimeout_set, 0);
 		DBGDFRDEVNT((stderr, "ztimeout_set : ZTIMEOUT Deferred\n"));
 #ifdef DEBUG
-<<<<<<< HEAD
 	if (ydb_white_box_test_case_enabled &&
-				(WBTEST_ZTIMEOUT_TRACE == ydb_white_box_test_case_number))
-=======
-	if (gtm_white_box_test_case_enabled &&
-				((WBTEST_ZTIMEOUT_TRACE == gtm_white_box_test_case_number)
-					|| (WBTEST_ZTIME_DEFER_CRIT == gtm_white_box_test_case_number)))
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+				((WBTEST_ZTIMEOUT_TRACE == ydb_white_box_test_case_number)
+					|| (WBTEST_ZTIME_DEFER_CRIT == ydb_white_box_test_case_number)))
 		DBGFPF((stderr, "ztimeout_set : ZTIMEOUT Deferred\n"));
 #endif
 		return;

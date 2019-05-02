@@ -561,7 +561,7 @@ MBSTART {												\
 	setup_error(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,						\
 		    RTS_ERROR_LITERAL(CALLNAME), RTS_ERROR_LITERAL(__FILE__), __LINE__, STATUS);	\
 	SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
-	set_zstatus(&entryref, ERR_SYSCALL, NULL, FALSE);						\
+	set_zstatus(&entryref, MAX_ENTRYREF_LEN, ERR_SYSCALL, NULL, FALSE);				\
 	TREF(ydb_error_code) = ERR_SYSCALL;								\
 } MBEND
 
@@ -572,7 +572,7 @@ MBSTART {												\
 	int	errnum = abs(ERRNUM);									\
 	setup_error(CSA_ARG(NULL) VARLSTCNT(1) errnum);							\
 	SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
-	set_zstatus(&entryref, errnum, NULL, FALSE);							\
+	set_zstatus(&entryref, MAX_ENTRYREF_LEN, errnum, NULL, FALSE);					\
 	TREF(ydb_error_code) = errnum;									\
 } MBEND
 
@@ -583,7 +583,7 @@ MBSTART {												\
 	int	errnum = abs(ERRNUM);									\
 	setup_error(CSA_ARG(NULL) VARLSTCNT(4) errnum, 2, (PARM1), (PARM2));				\
 	SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
-	set_zstatus(&entryref, errnum, NULL, FALSE);							\
+	set_zstatus(&entryref, MAX_ENTRYREF_LEN, errnum, NULL, FALSE);					\
 	TREF(ydb_error_code) = errnum;									\
 } MBEND
 
@@ -594,7 +594,7 @@ MBSTART {												\
 	int	errnum = abs(ERRNUM);									\
 	setup_error(CSA_ARG(NULL) VARLSTCNT(5) errnum, 3, (PARM1), (PARM2), (PARM3));			\
 	SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);					\
-	set_zstatus(&entryref, errnum, NULL, FALSE);							\
+	set_zstatus(&entryref, MAX_ENTRYREF_LEN, errnum, NULL, FALSE);					\
 	TREF(ydb_error_code) = errnum;									\
 } MBEND
 

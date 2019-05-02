@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,12 +140,8 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 				rel_crit(curreg);			/* release any crit regions */
 		}
 		reg_reset = FALSE;
-<<<<<<< HEAD
-		if (!process_exiting && lcl_implicit_trollback && tp_pointer->implicit_tstart && !tp_pointer->ydb_tp_s_tstart)
-=======
 		CALL_ZTIMEOUT_IF_DEFERRED;
-		if (!process_exiting && lcl_implicit_trollback && tp_pointer->implicit_tstart)
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+		if (!process_exiting && lcl_implicit_trollback && tp_pointer->implicit_tstart && !tp_pointer->ydb_tp_s_tstart)
 		{	/* This is an implicit TROLLBACK of an implicit TSTART started for a non-tp explicit update.
 			 * gv_currkey needs to be restored to the value it was at the beginning of the implicit TSTART.
 			 * This is necessary so as to maintain $reference accurately (to user-visible global name) in case

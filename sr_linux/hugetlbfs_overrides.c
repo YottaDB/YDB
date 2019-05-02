@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2012, 2013 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+ *								*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -51,7 +47,7 @@
 #include "restrict.h"	/* Needed for restrictions */
 #include "have_crit.h"	/* Needed for defer interrupts */
 
-GBLREF char	 gtm_dist[GTM_PATH_MAX];
+GBLREF char	 ydb_dist[GTM_PATH_MAX];
 GBLDEF long	 gtm_os_hugepage_size = -1;	/* Default Huge Page size of OS. If huge pages are not supported or the
  	 	 	 	 	 	 * value doesn't fit into a *long* it will be equal to the OS page size
  	 	 	 	 	 	 */
@@ -98,7 +94,7 @@ void libhugetlbfs_init(void)
 	if (RESTRICTED(library_load_path))
 	{
 		lpath = librarypath;
-		SNPRINTF(librarypath, GTM_PATH_MAX, GTM_PLUGIN_FMT_SHORT HUGEPAGE_LIB_NAME, gtm_dist);
+		SNPRINTF(librarypath, SIZEOF(librarypath), GTM_PLUGIN_FMT_SHORT HUGEPAGE_LIB_NAME, ydb_dist);
 	} else
 		lpath = HUGEPAGE_LIB_NAME;
 	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);

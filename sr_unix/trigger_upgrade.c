@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -455,7 +455,6 @@ void	trigger_upgrade(gd_region *reg)
 					if (!is_defined)
 						break;
 					STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
-<<<<<<< HEAD
 					STR_PHASH_PROCESS(kill_hash_state, kill_hash_totlen,
 								tmpmval.str.addr, tmpmval.str.len);
 					xecutei++;
@@ -489,6 +488,7 @@ void	trigger_upgrade(gd_region *reg)
 				trigindex = ptr;
 				memcpy(trigname, tmpmval.str.addr, tmpmval.str.len);
 				A2I(ptr, ptr + name_index_len, trig_seq_num);
+				assert(0 < trig_seq_num); /* Auto generated seqnum in the DB must be valid */
 				/* At this point, gv_currkey is ^#t(<gvn>,i) */
 				/* $get(^#t("#TNAME",<trigger name>,"#SEQNUM")) */
 				BUILD_HASHT_SUB_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
@@ -500,80 +500,6 @@ void	trigger_upgrade(gd_region *reg)
 						STR_LIT_LEN(LITERAL_HASHTNAME), trigname, trigname_len,
 						LITERAL_HASHSEQNUM, STR_LIT_LEN(LITERAL_HASHSEQNUM),
 						trigindex, name_index_len, result);
-=======
-					STR_PHASH_PROCESS(kill_hash_state, kill_hash_totlen, tmpmval.str.addr, tmpmval.str.len);
-				} else
-				{	/* Multi-record XECUTE string */
-					/* At this point, gv_currkey is ^#t(<gvn>,i) */
-					xecute_curend = gv_currkey->end; /* note gv_currkey->end so we can restore it later */
-					assert(KEY_DELIMITER == gv_currkey->base[xecute_curend]);
-					tmpmv2 = (mval *)&literal_xecute;
-					COPY_SUBS_TO_GVCURRKEY(tmpmv2, gv_cur_region, gv_currkey, was_null, is_null);
-					xecutei = 1;
-					do
-					{
-						i2mval(&xecuteimval, xecutei);
-						is_defined = gvtr_get_hasht_gblsubs(&xecuteimval, tmpmv);
-						if (!is_defined)
-							break;
-						STR_PHASH_PROCESS(hash_state, hash_totlen, tmpmval.str.addr, tmpmval.str.len);
-						STR_PHASH_PROCESS(kill_hash_state, kill_hash_totlen,
-									tmpmval.str.addr, tmpmval.str.len);
-						xecutei++;
-					} while (TRUE);
-					/* Restore gv_currkey to ^#t(<gvn>,i) */
-					gv_currkey->end = xecute_curend;
-					gv_currkey->base[xecute_curend] = KEY_DELIMITER;
-				}
-				STR_PHASH_RESULT(hash_state, hash_totlen, hash_code);
-				STR_PHASH_RESULT(kill_hash_state, kill_hash_totlen, kill_hash_code);
-				/* Set ^#t(<gvn>,i,"LHASH") */
-				MV_FORCE_UMVAL(tmpmv, kill_hash_code);
-				gvtr_set_hasht_gblsubs((mval *)&literal_lhash, tmpmv);
-				/* Set ^#t(<gvn>,i,"BHASH") */
-				MV_FORCE_UMVAL(tmpmv, hash_code);
-				gvtr_set_hasht_gblsubs((mval *)&literal_bhash, tmpmv);
-				/* Read in ^#t(<gvn>,i,"TRIGNAME") to determine if #SEQNUM/#TNCOUNT needs to be maintained */
-				is_defined = gvtr_get_hasht_gblsubs((mval *)&literal_trigname, tmpmv);
-				assert(is_defined);
-				assert('#' == tmpmval.str.addr[tmpmval.str.len - 1]);
-				tmpmval.str.len--;
-				if ((tmpmval.str.len <= ARRAYSIZE(name_and_index)) &&
-						(NULL != (ptr = memchr(tmpmval.str.addr, '#', tmpmval.str.len))))
-				{	/* Auto-generated name. Need to maintain #SEQNUM/#TNCOUNT */
-					/* Take copy of trigger name into non-stringpool location to avoid stp_gcol issues */
-					trigname_len = ptr - tmpmval.str.addr;
-					ptr++;
-					name_index_len = (tmpmval.str.addr + tmpmval.str.len) - ptr;
-					assert(ARRAYSIZE(name_and_index) >= (trigname_len + 1 + name_index_len));
-					trigname = &name_and_index[0];
-					trigindex = ptr;
-					memcpy(trigname, tmpmval.str.addr, tmpmval.str.len);
-					A2I(ptr, ptr + name_index_len, trig_seq_num);
-					assert(0 < trig_seq_num); /* Auto generated seqnum in the DB must be valid */
-					/* At this point, gv_currkey is ^#t(<gvn>,i) */
-					/* $get(^#t("#TNAME",<trigger name>,"#SEQNUM")) */
-					BUILD_HASHT_SUB_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
-						trigname, trigname_len, LITERAL_HASHSEQNUM, STR_LIT_LEN(LITERAL_HASHSEQNUM));
-					seq_num = gvcst_get(tmpmv) ? mval2i(tmpmv) : 0;
-					if (trig_seq_num > seq_num)
-					{	/* Set ^#t("#TNAME",<trigger name>,"#SEQNUM") = trig_seq_num */
-						SET_TRIGGER_GLOBAL_SUB_SUB_SUB_STR(LITERAL_HASHTNAME,
-							STR_LIT_LEN(LITERAL_HASHTNAME), trigname, trigname_len,
-							LITERAL_HASHSEQNUM, STR_LIT_LEN(LITERAL_HASHSEQNUM),
-							trigindex, name_index_len, result);
-						assert(PUT_SUCCESS == result);
-					}
-					/* set ^#t("#TNAME",<trigger name>,"#TNCOUNT")++ */
-					BUILD_HASHT_SUB_SUB_SUB_CURRKEY(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
-						trigname, trigname_len, LITERAL_HASHTNCOUNT, STR_LIT_LEN(LITERAL_HASHTNCOUNT));
-					tncount = gvcst_get(tmpmv) ? mval2i(tmpmv) + 1 : 1;
-					i2mval(tmpmv, tncount);
-					SET_TRIGGER_GLOBAL_SUB_SUB_SUB_MVAL(LITERAL_HASHTNAME, STR_LIT_LEN(LITERAL_HASHTNAME),
-						trigname, trigname_len, LITERAL_HASHTNCOUNT, STR_LIT_LEN(LITERAL_HASHTNCOUNT),
-						tmpmval, result);
-					trigname_len += 1 + name_index_len; /* in preparation for ^#t("#TNAME") set below */
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 					assert(PUT_SUCCESS == result);
 				}
 				/* set ^#t("#TNAME",<trigger name>,"#TNCOUNT")++ */

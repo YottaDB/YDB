@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -316,11 +316,7 @@ int main()
 			ret = -1;
 		} else
 		{
-<<<<<<< HEAD
-			strcpy(ydb_dist_val, env_var_ptr);
-=======
-			snprintf(gtm_dist_val, MAX_ENV_VAR_VAL_LEN, "%s", env_var_ptr);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+			snprintf(ydb_dist_val, SIZEOF(ydb_dist_val), "%s", env_var_ptr);
 			/* point the path to the real gtmsecshr - for display purposes only */
 			snprintf(gtm_secshr_path, MAX_ENV_VAR_VAL_LEN, "%s%s%s",
 					env_var_ptr, SUB_PATH_TO_GTMSECSHRDIR, GTMSECSHR_BASENAME);
@@ -424,11 +420,6 @@ int main()
 			SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHRSETUIDFAILED);
 		else
 		{	/* call the real gtmsecshr, but have ps display the original gtmsecshr location */
-<<<<<<< HEAD
-			strcpy(gtm_secshr_orig_path, ydb_dist_val);
-			strcat(gtm_secshr_orig_path, GTMSECSHR_BASENAME);
-=======
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 			ret = execl(REL_PATH_TO_GTMSECSHR, gtm_secshr_orig_path, NULL);
 			if (-1 == ret)
 				SYSLOG(LOG_USER | LOG_INFO, ERR_SECSHREXECLFAILED, gtm_secshr_path_display);

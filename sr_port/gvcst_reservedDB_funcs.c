@@ -47,10 +47,7 @@
 #include "util.h"
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
-<<<<<<< HEAD
-=======
 #include "gtm_signal.h"			/* for SIGPROCMASK */
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 LITREF mval		literal_statsDB_gblname;
 

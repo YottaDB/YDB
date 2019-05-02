@@ -177,7 +177,7 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 	if (ERR_REPEATERROR != SIGNAL)
 	{
 		SET_M_ENTRYREF_TO_SIMPLEAPI_OR_SIMPLETHREADAPI(entryref);
-		set_zstatus(&entryref, arg, NULL, FALSE);
+		set_zstatus(&entryref, MAX_ENTRYREF_LEN, arg, NULL, FALSE);
 		errstr = TREF(stapi_errstr);
 		if (NULL != errstr)
 		{	/* We are inside a SimpleThreadAPI call and user wants us to fill error string in addition to returning

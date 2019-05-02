@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,39 +37,13 @@ MBSTART {							\
 
 #define	ICU_LIBFLAGS		(RTLD_NOW | RTLD_GLOBAL)
 
-<<<<<<< HEAD
 #define	ICU_LIBNAME_ROOT	"libicuio"
 #define YOTTADB_IMAGE_NAME	"libyottadb.so"
 #define	ICU_LIBNAME_EXT		"so"
-#define	ICU_LIBNAME		ICU_LIBNAME_ROOT "." ICU_LIBNAME_EXT
-=======
-#define	ICU_LIBNAME_ROOT		"libicuio"
-#if defined(__MVS__)
-#	define GTMSHR_IMAGE_NAME	"libgtmshr.dll"
-#	define	ICU_LIBNAME_EXT		"so"
-#elif defined(__CYGWIN__)
-#	define GTMSHR_IMAGE_NAME	"libgtmshr.dll"
-#	define	ICU_LIBNAME_EXT		"dll"
-#else
-#	define GTMSHR_IMAGE_NAME	"libgtmshr.so"
-#	ifdef _AIX
-	/* Conventionally, AIX archives shared objects into a static library.
-	 * So we need to link with a member of the library instead of the library itself.
-	 */
-#		define	ICU_LIBNAME_EXT	"a"
-	/* AIX system default ICU library uses a different convention for the library name */
-#		define	AIX_SHR_64	"(shr_64.o)"	/* Could also be "(libicuio.so)" */
-#		define	ICU_LIBNAME_DEF	ICU_LIBNAME_ROOT "." ICU_LIBNAME_EXT AIX_SHR_64
-#		define	LIBRARY_PATH_MAX (GTM_PATH_MAX - SIZEOF(AIX_SHR_64))
-#	else
-#		define	ICU_LIBNAME_EXT	"so"
-#	endif
-#endif
 #ifndef LIBRARY_PATH_MAX
 #define	LIBRARY_PATH_MAX GTM_PATH_MAX
 #endif
-#define	ICU_LIBNAME	ICU_LIBNAME_ROOT "." ICU_LIBNAME_EXT
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+#define	ICU_LIBNAME		ICU_LIBNAME_ROOT "." ICU_LIBNAME_EXT
 
 #define	GTM_PLUGIN_FMT_SHORT	"%s/plugin/"
 #define	GTM_PLUGIN_FMT_FULL	"%s/plugin/%s"

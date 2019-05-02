@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -125,21 +125,13 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	int			asyncio_status, defer_allocate_status, defer_status, disk_wait_status, encryptable_status,
 				encryption_complete_status, epoch_taper_status, extn_count_status, fd, fn_len, glbl_buff_status,
 				gtmcrypt_errno, hard_spin_status, inst_freeze_on_error_status, key_size_status, locksharesdbcrit,
-				lock_space_status, mutex_space_status, null_subs_status, qdbrundown_status, rec_size_status,
-				reg_exit_stat, rc, rsrvd_bytes_status, sleep_cnt_status, save_errno, stats_status, status,
-<<<<<<< HEAD
-				status1, stdnullcoll_status, reorg_sleep_nsec_status;
-	int			gtmcrypt_errno;
-	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_hard_spin, new_key_size,
-				new_lock_space, new_mutex_space, new_null_subs, new_rec_size, new_sleep_cnt, new_spin_sleep,
-				new_stdnullcoll, reserved_bytes, spin_sleep_status, read_only_status;
-=======
-				status1, stdnullcoll_status, trigger_flush_limit_status, wrt_per_flu_status;
+				lock_space_status, mutex_space_status, null_subs_status, qdbrundown_status, read_only_status,
+				rec_size_status, reg_exit_stat, reorg_sleep_nsec_status, rc, rsrvd_bytes_status, save_errno,
+				sleep_cnt_status, spin_sleep_status, stats_status, status, status1, stdnullcoll_status,
+				trigger_flush_limit_status, wrt_per_flu_status;
 	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_flush_trigger, new_hard_spin,
 				new_key_size, new_lock_space, new_mutex_space, new_null_subs, new_rec_size, new_sleep_cnt,
-				new_spin_sleep, new_stdnullcoll, new_wrt_per_flu, reserved_bytes, spin_sleep_status,
-				read_only_status;
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+				new_spin_sleep, new_stdnullcoll, new_wrt_per_flu, reserved_bytes;
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;
 	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
@@ -930,15 +922,12 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				SLEEP_SPIN_CNT(csd) = new_sleep_cnt;
 			if (spin_sleep_status)
 				SPIN_SLEEP_MASK(csd) = new_spin_sleep;
-<<<<<<< HEAD
-			if (reorg_sleep_nsec_status)
-				csd->reorg_sleep_nsec = reorg_sleep_nsec;
-=======
 			if (trigger_flush_limit_status)
 				csd->flush_trigger = csd->flush_trigger_top = new_flush_trigger;
 			if (wrt_per_flu_status)
 				csd->n_wrt_per_flu = new_wrt_per_flu;
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+			if (reorg_sleep_nsec_status)
+				csd->reorg_sleep_nsec = reorg_sleep_nsec;
 			/* --------------------- report results ------------------------- */
 			if (asyncio_status)
 			{
@@ -981,18 +970,15 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (spin_sleep_status)
 				util_out_print("Database file !AD now has spin sleep mask !UL",
 					TRUE, fn_len, fn, SPIN_SLEEP_MASK(csd));
-<<<<<<< HEAD
-                        if (reorg_sleep_nsec_status)
-				util_out_print("Database file !AD now has reorg sleep nanoseconds !UL",
-                                        TRUE, fn_len, fn, csd->reorg_sleep_nsec);
-=======
 			if (trigger_flush_limit_status)
 				util_out_print("Database file !AD now has trigger_flush_limit !UL",
 					TRUE, fn_len, fn, csd->flush_trigger_top);
 			if (wrt_per_flu_status)
 				util_out_print("Database file !AD now has writes per flush !UL",
 					TRUE, fn_len, fn, csd->n_wrt_per_flu);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+                        if (reorg_sleep_nsec_status)
+				util_out_print("Database file !AD now has reorg sleep nanoseconds !UL",
+                                        TRUE, fn_len, fn, csd->reorg_sleep_nsec);
 			if (got_standalone)
 			{
 				DB_LSEEKWRITE(NULL, ((unix_db_info *)NULL), NULL, fd, 0, pvt_csd, SIZEOF(sgmnt_data), status);

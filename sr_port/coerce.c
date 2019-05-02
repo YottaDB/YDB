@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,14 +44,6 @@ void coerce(oprtype *a, unsigned short new_type)
 		return;
 	switch (old_op)
 	{
-<<<<<<< HEAD
-		assert(TRIP_REF == ref->operand[0].oprclass);
-		conv = ref->operand[0].oprval.tref->opcode;
-		if ((OC_FORCENUM != old_op) || (OC_LIT == conv))
-		{	/* because compiler generated literals should include their numeric form, we don't need to coerce */
-			assert(ref->operand[0].oprval.tref == ref->exorder.bl);
-			if (OC_LIT == conv)
-=======
 		case OC_FORCENUM:
 			if ((ref->operand[0].oprval.tref != ref->exorder.bl) || (OC_LIT != ref->operand[0].oprval.tref->opcode))
 				break;						/* WARNING possible fallthrough */
@@ -60,7 +52,6 @@ void coerce(oprtype *a, unsigned short new_type)
 			assert(TRIP_REF == ref->operand[0].oprclass);
 			if (OC_LIT == ref->operand[0].oprval.tref->opcode)
 			{	/* compiler generated literals should include their numeric form - no need to coerce */
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 				MV_FORCE_NUMD(&ref->operand[0].oprval.tref->operand[0].oprval.mlit->v);
 			}
 			dqdel(ref, exorder);

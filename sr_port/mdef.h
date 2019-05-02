@@ -26,22 +26,10 @@
 #define CLANG_SCA_ANALYZER_NORETURN
 #endif
 
-<<<<<<< HEAD
-=======
 #ifdef __linux__
 #define CRIT_USE_PTHREAD_MUTEX
 #endif
 
-/* mstr needs to be defined before including "mdefsp.h".  */
-typedef int mstr_len_t;
-#ifndef __vms
-typedef struct
-{
-	unsigned int	char_len;	/* Character length */
-	mstr_len_t	len;
-	char		*addr;
-} mstr;
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 #  define MSTR_CONST(name, string)		mstr name = {0, LEN_AND_LIT(string)}
 #  define MSTR_DEF(name, length, string)	mstr name = {0, length, string}
 #  define MIDENT_CONST(name, string)	    mident name = {0, LEN_AND_LIT(string)}
@@ -1375,7 +1363,7 @@ gtm_uint64_t asc_hex2l(uchar_ptr_t p, int len);
 															\
 	for (num = 0; (0 <= num) && ((cp) < (end)) && ('0' <= (ch = *((unsigned char*)cp))) && ('9' >= ch); ++(cp))	\
 		num = ((num) * 10) + (unsigned int)(ch - (unsigned char)'0');						\
-	assert((0 <= num) || gtm_white_box_test_case_enabled);								\
+	assert((0 <= num) || ydb_white_box_test_case_enabled);								\
 	if (cpbase == ((unsigned char*)cp))										\
 		num = (int)-1;												\
 }

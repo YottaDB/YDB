@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,9 +45,8 @@
 static char rcsid[] = "$Header:$";
 #endif
 
-<<<<<<< HEAD:sr_unix_cm/gtcm_server_main.c
 GBLREF	int		rc_server_id;
-GBLREF	char		image_id[256];
+GBLREF	char		image_id[MAX_IMAGE_NAME_LEN];
 GBLREF	omi_conn_ll	*omi_conns;
 GBLREF	int4		omi_errno;
 GBLREF	int4		gtcm_stime;
@@ -58,40 +57,6 @@ GBLREF	int		history;
 GBLREF	int		authenticate;
 GBLREF	int		ping_keepalive;
 GBLREF	char		*omi_service;
-=======
-#define	MAX_IMAGE_NAME_LEN	256 + 1
-
-GBLDEF short		gtcm_ast_avail;
-GBLDEF int4		gtcm_exi_condition;
-
-/* image_id....allows you to determine info about the server
- * by using the strings command, or running dbx
- */
-GBLDEF char		image_id[MAX_IMAGE_NAME_LEN];
-GBLDEF char		*omi_service = (char *)0;
-GBLDEF FILE		*omi_debug   = (FILE *)0;
-GBLDEF char		*omi_pklog   = (char *)0;
-GBLDEF char		*omi_pklog_addr = (char *)0;
-GBLDEF int		 omi_pkdbg   = 0;
-GBLDEF omi_conn_ll	*omi_conns   = (omi_conn_ll *)0;
-GBLDEF int		 omi_exitp   = 0;
-GBLDEF int		 omi_pid     = 0;
-GBLDEF int4		 omi_errno   = 0;
-GBLDEF int4		 omi_nxact   = 0;	/* # of transactions */
-GBLDEF int4		 omi_nxact2  = 0;	/* transactions since last stat dump */
-GBLDEF int4		 omi_nerrs   = 0;
-GBLDEF int4		 omi_brecv   = 0;
-GBLDEF int4		 omi_bsent   = 0;
-GBLDEF int4		 gtcm_stime  = 0;	/* start time for GT.CM */
-GBLDEF int4		 gtcm_ltime  = 0;	/* last time stats were dumped */
-GBLDEF int		 one_conn_per_inaddr = -1;
-GBLDEF int		 authenticate = 0;	/* authenticate OMI connections */
-GBLDEF int		 psock = -1;		/* pinging socket */
-GBLDEF int		 ping_keepalive = 0;	/* check connections using ping */
-GBLDEF int		 conn_timeout = TIMEOUT_INTERVAL;
-GBLDEF int		 history = 0;
-GBLREF int	 	 rc_server_id;
->>>>>>> 7a1d2b3e... GT.M V6.3-007:sr_unix_cm/gtcm_main.c
 
 /* On OSF/1 (Digital Unix), pointers are 64 bits wide; the only exception to this is C programs for which one may
  * specify compiler and link editor options in order to use (and allocate) 32-bit pointers.  However, since C is
@@ -107,16 +72,10 @@ int gtcm_server_main(int argc, char_ptr_t argv[], char **envp)
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-<<<<<<< HEAD:sr_unix_cm/gtcm_server_main.c
 	common_startup_init(GTCM_SERVER_IMAGE, NULL);	/* The GTCM server does not have any command tables
 							 * so pass command array as NULL.
 							 */
-	SPRINTF(image_id,"%s=gtcm_server", image_id);
-=======
-	ctxt = NULL;
-	common_startup_init(GTCM_SERVER_IMAGE);
 	SNPRINTF(image_id, MAX_IMAGE_NAME_LEN, "%s=gtcm_server", "image_id");
->>>>>>> 7a1d2b3e... GT.M V6.3-007:sr_unix_cm/gtcm_main.c
 #	ifdef SEQUOIA
 	if (!set_pset())
 		EXIT(-1);

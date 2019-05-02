@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -36,33 +36,6 @@ cfilefail:
 	s BOL=""
 	q
 NAME
-<<<<<<< HEAD
-	n namsdisp,namedispmaxlen
-	i '$d(nams(NAME)) d message^GDE(gdeerr("OBJNOTFND"),"""Name"":"_$zwrite($$namedisp(NAME,0))) q
-	d n2calc,n2
-	i log s BOL="!" u @uself w BOL d n2 w ! u @useio s BOL=""
-	q
-n2calc:	s namedispmaxlen=0
-	d namedisplaycalc(NAME) ; sets namedispmaxlen
-	q
-n2:	d namehd,namedisplay(NAME)
-	q
-ALLNAME
-	n namedisp,namedispmaxlen
-	d SHOWNAM^GDEMAP,n1calc
-	d n1
-	i log s BOL="!" u @uself w BOL d n1 w ! u @useio s BOL=""
-	q
-n1calc:	s namedispmaxlen=0
-	s s="#"
-	f  s s=$o(nams(s)) q:'$zl(s)  d namedisplaycalc(s)
-	q
-n1:	d namehd
-	d namscollatecalc ; sets "namscollate" array
-	s s="#" ; skip processing "#" name
-	f  s s=$o(namscollate(s)) q:'$zl(s)  d namedisplay(namscollate(s))
-	q
-=======
 	new namsdisp,namedispmaxlen
 	do ALLNAME(NAME)
 	quit
@@ -74,12 +47,12 @@ ALLNAME(name)
 	; subscript mappings. If none exists throw OBJNOTFND and exit
 	if $data(name) do
 	. set s="" for  set s=$order(nams(s)) quit:'$zl(s)  kill:((s'=name)&($get(nams(s,"SUBS",0))'=name)) tmpnams((s))
-	. if (11'=$data(tmpnams)) zmessage gdeerr("OBJNOTFND"):"Name":$$namedisp(name,0) quit
+	. if (11'=$data(tmpnams)) do message^GDE(gdeerr("OBJNOTFND"),"""Name"":"_$zwrite($$namedisp(name,0))) quit
 	do n1calc(.tmpnams)
 	do n1(.tmpnams)
 	if log set BOL="!" use @uself write BOL do n1(.tmpnams) write ! use @useio set BOL=""
 	kill tmpnams
-	q
+	quit
 n1calc:(namesarray)
 	set namedispmaxlen=0
 	set s="#"
@@ -91,7 +64,6 @@ n1:(namesarray)
 	set s="#" ; skip processing "#" name
 	for  set s=$order(namscollate(s)) quit:'$zlength(s)  do namedisplay(namscollate(s))
 	quit
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 namedisplay:(name)
 	w !,BOL,?x(1),namsdisp(name),?x(2),nams(name)
 	q

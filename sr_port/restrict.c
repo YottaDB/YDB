@@ -14,15 +14,10 @@
  ****************************************************************/
 
 #include "mdef.h"
-<<<<<<< HEAD
 
 #include <errno.h>
 #include <grp.h>
 
-=======
-#include <errno.h>
-#include <grp.h>
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 #include "gtmio.h"
 #include "gtm_common_defs.h"
 #include "gtm_stdio.h"
@@ -33,9 +28,7 @@
 #include "gtm_permissions.h"
 #include "gtm_file_remove.h"
 #include "gtm_time.h"
-<<<<<<< HEAD
 #include "iosp.h"		/* for SS_NORMAL */
-=======
 #include "gtm_netdb.h"
 #include "gtm_socket.h"
 #include "gtm_un.h"
@@ -48,7 +41,6 @@
 #include "iotimer.h"
 #include "io.h"
 #include "dm_audit_log.h"
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 #define RESTRICT_FILENAME		"restrict.txt"
 #define RESTRICT_BREAK			"BREAK"
@@ -86,15 +78,12 @@
 
 GBLDEF	struct restrict_facilities	restrictions;
 GBLDEF	boolean_t			restrict_initialized;
+
 #ifdef DEBUG
 GBLREF	boolean_t			ydb_dist_ok_to_use;
 #endif
-<<<<<<< HEAD
 GBLREF	char				ydb_dist[YDB_PATH_MAX];
-=======
-GBLREF	char				gtm_dist[GTM_PATH_MAX];
 GBLREF	boolean_t			dollar_zaudit;
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 STATICFNDCL void append_filter(char *fpath, char *c_call_name, char *m_ref_name);
 
@@ -102,7 +91,6 @@ error_def(ERR_RESTRICTSYNTAX);
 error_def(ERR_TEXT);
 error_def(ERR_APDINITFAIL);
 
-<<<<<<< HEAD
 #define	PUT_FLNAME_IN_MAPPING_FILE(RPATH, FPATH, C_CALL_NAME, M_REF_NAME, CREATED_NOW, CREATED_NOW_INITIALIZED)		\
 {															\
 	uint4		dummy_stat_rm;											\
@@ -159,39 +147,12 @@ error_def(ERR_APDINITFAIL);
 }
 
 void	append_filter(char *fpath, char *c_call_name, char *m_ref_name)
-=======
-#define	PUT_FLNAME_IN_MAPPING_FILE(RPATH, FPATH, FP, C_CALL_NAME, M_REF_NAME, STAT_RM, SAVE_ERRNO, ERR_STR)	\
-{														\
-	if (!ACCESS(FPATH,F_OK))		/*Filter file exists, now check modified time*/			\
-	{													\
-		Stat(RPATH, &rTime);										\
-		rmtime = rTime.st_mtime;									\
-		Stat(FPATH, &fTime);										\
-		fmtime = fTime.st_mtime;									\
-		if (rmtime > fmtime)	/*Delete the older mapping file and recreate new if required*/		\
-		{												\
-			created_now = TRUE;									\
-			gtm_file_remove(STR_AND_LEN(FPATH), &STAT_RM);						\
-			append_filter(FPATH, FP, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);			\
-		}												\
-		else if(created_now) /*This process created a new file,append to it*/				\
-			append_filter(FPATH, FP, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);			\
-	} else /*File does not exist, create and write mapping*/						\
-	{													\
-		created_now = TRUE;										\
-		append_filter(FPATH, FP, C_CALL_NAME, M_REF_NAME, SAVE_ERRNO, ERR_STR);				\
-	}													\
-}
-
-void append_filter(char * fpath, FILE * fp, char * c_call_name, char * m_ref_name, int * save_errno, char * errstr)
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 {
 	FILE	*fp;
 	char	errstr[MAX_FN_LEN + 1];
 	int	fclose_res;
 
 	Fopen(fp, fpath, "a+");
-<<<<<<< HEAD
 	if (NULL == fp)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("append_filter() Fopen() for" COMM_FILTER_FILENAME), CALLFROM, errno);
@@ -200,62 +161,26 @@ void append_filter(char * fpath, FILE * fp, char * c_call_name, char * m_ref_nam
 	if (0 != fclose_res)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 				LEN_AND_LIT("append_filter() fclose() for" COMM_FILTER_FILENAME), CALLFROM, errno);
-=======
-	if (NULL != fp)
-	{
-		fprintf(fp, "%s : gtm_long_t* %s(I:gtm_char_t*, O:gtm_string_t*)\n",
-							c_call_name, m_ref_name);
-		fclose(fp);
-	} else
-	{
-		*save_errno = errno;
-		SNPRINTF(errstr, SIZEOF(errstr), "fopen() : %s", COMM_FILTER_FILENAME);
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-                                         LEN_AND_STR(errstr), CALLFROM, save_errno);
-	}
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 }
 
 void restrict_init(void)
 {
-<<<<<<< HEAD
 	char		rfpath[YDB_PATH_MAX], rcfpath[YDB_PATH_MAX];
-	char		linebuf[MAX_READ_SZ+1], *lbp, facility[MAX_FACILITY_LEN + 1], group_or_flname[MAX_GROUP_LEN + 1];
-	int		save_errno, fields, status, lineno;
+	char		logger_info[MAX_LOGGER_INFO_LEN + 1];
+	char		linebuf[MAX_READ_SZ + 1], *lbp, facility[MAX_FACILITY_LEN + 1], group_or_flname[MAX_GROUP_LEN + 1];
+	char		*host_info, *opt_strt, *apd_opts_strt, *apd_opts_end;
+	int		save_errno, fields, status, lineno, logger_info_len, opt_len;
 	FILE		*rfp;
 	boolean_t	restrict_one, restrict_all = FALSE;
 	struct group	grp, *grpres;
 	char		*grpbuf = NULL;
 	size_t		grpbufsz;
-	boolean_t	created_now, created_now_initialized = FALSE;
+	boolean_t	created_now = FALSE, created_now_initialized = FALSE, tls = FALSE, audit_opread = FALSE;
 
 	assert(!restrict_initialized);
 	assert(ydb_dist_ok_to_use);
 	SNPRINTF(rfpath, YDB_PATH_MAX, "%s/%s", ydb_dist, RESTRICT_FILENAME);
 	SNPRINTF(rcfpath, YDB_PATH_MAX, "%s/%s", ydb_dist, COMM_FILTER_FILENAME);
-=======
-	char		rfpath[GTM_PATH_MAX], rcfpath[GTM_PATH_MAX];
-	char		logger_info[MAX_LOGGER_INFO_LEN + 1];
-	char		linebuf[MAX_READ_SZ + 1], *lbp, facility[MAX_FACILITY_LEN + 1], group_or_flname[MAX_GROUP_LEN + 1];
-	char		errstr[MAX_FN_LEN + 1];
-	char		*host_info, *opt_strt, *apd_opts_strt, *apd_opts_end;
-	int		save_errno, fields, status, lineno, logger_info_len, opt_len;
-	uint4		statrm;
-	FILE		*rfp, *rcfp;
-	boolean_t	restrict_one, restrict_all = FALSE;
-	struct group	grp, *grpres;
-	char		*grpbuf = NULL;
-	size_t		grpbufsz, audit_prefix_len = 0;
-	boolean_t	created_now = FALSE, tls = FALSE, audit_opread = FALSE;
-	struct stat 	rTime, fTime;
-	time_t 		rmtime, fmtime;
-
-	assert(!restrict_initialized);
-	assert(gtm_dist_ok_to_use);
-	SNPRINTF(rfpath, GTM_PATH_MAX, "%s/%s", gtm_dist, RESTRICT_FILENAME);
-	SNPRINTF(rcfpath, GTM_PATH_MAX, "%s/%s", gtm_dist, COMM_FILTER_FILENAME);
-
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	if (-1 == ACCESS(rfpath, W_OK))
 	{	/* Write access implies no restrictions. Otherwise try reading the file for facilities to restrict. */
 		save_errno = errno;

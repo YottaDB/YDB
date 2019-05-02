@@ -134,25 +134,12 @@ LITREF gtmImageName	gtmImageNames[];
 	UNDERSCORE_EXIT(joberr);									\
 }
 
-<<<<<<< HEAD
-#ifdef AUTORELINK_SUPPORTED
-#define	RELINKCTL_RUNDOWN_MIDDLE_PARENT(NEED_RTNOBJ_SHM_FREE, RTNHDR)			\
-{											\
-	if (NEED_RTNOBJ_SHM_FREE)							\
-		rtnobj_shm_free(RTNHDR, LATCH_GRABBED_FALSE);				\
-	relinkctl_rundown(TRUE, FALSE);							\
-}
-#endif
-
-error_def(ERR_YDBDISTUNVERIF);
-=======
-error_def(ERR_GTMDISTUNVERIF);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 error_def(ERR_JOBFAIL);
 error_def(ERR_JOBLVN2LONG);
 error_def(ERR_JOBPARTOOLONG);
 error_def(ERR_LOGTOOLONG);
 error_def(ERR_TEXT);
+error_def(ERR_YDBDISTUNVERIF);
 
 /* Note that this module uses _exit instead of exit to avoid running the inherited exit handlers which this mid-level process does
  * not want to run.
@@ -203,12 +190,7 @@ static CONDITION_HANDLER(ojlvzwr_ch)
 /* This is to close the window of race condition where the timeout occurs and actually by that time, the middle process had already
  * successfully forked-off the job.
  */
-<<<<<<< HEAD
-
 void job_term_handler(int sig, siginfo_t *info, void *context)
-=======
-STATICFNDEF void job_term_handler(int sig)
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 {
 	int ret;
 	int status;
@@ -405,10 +387,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		 * Test out various parameters and setup everything possible for the actual Job (J), so it(J) can start off without
 		 * much hitch. If any error occurs during this, exit with appropriate status so the waiting parent can diagnose.
 		 */
-		getjobnum();	/* set "process_id" to a value different from parent. This is particularly needed for the
-				 * RELINKCTL_RUNDOWN_MIDDLE_PARENT macro since it does rtnobj_shm_free which deals with latches
-				 * that in turn rely on the "process_id" global variable reflecting the current pid.
-				 */
+		getjobnum();	/* set "process_id" to a value different from parent */
 		skip_exit_handler = TRUE; /* The grandchild and the middle child should never execute gtm_exit_handler() */
 		/* set to TRUE so any child process associated with a pipe device will know it is not the parent in iorm_close() */
 		gtm_pipe_child = TRUE;
@@ -497,36 +476,6 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 			UNDERSCORE_EXIT(status);
 		}
-<<<<<<< HEAD
-		/* Record the fact that this process is interested in the relinkctl files inherited from the parent by
-		 * incrementing the linkctl->hdr->nattached count. This is required by the relinkctl_rundown(TRUE, FALSE)
-		 * call done as part of the RELINKCTL_RUNDOWN_MIDDLE_PARENT macro in the middle child or the grandchild.
-		 * Do this BEFORE the call to job_addr. In case that does a relinkctl_attach of a new relinkctl file,
-		 * we would increment the counter automatically so don't want that to go through a double-increment.
-		 */
-		ARLINK_ONLY(relinkctl_incr_nattached(RTNOBJ_REFCNT_INCR_CNT_FALSE));
-		joberr = joberr_rtn;
-		/* We are the middle child. It is possible the below call to job_addr loads an object into shared memory
-		 * using "rtnobj_shm_malloc". In that case, as part of halting we need to do a "rtnobj_shm_free" to keep
-		 * the rtnobj reference counts in shared memory intact. The variable "need_rtnobj_shm_free" serves this purpose.
-		 * Note that we cannot safely call relinkctl_rundown since we do not want to decrement reference counts for
-		 * routines that have already been loaded by our parent process (which we inherited due to the fork) since
-		 * the parent process is the one that will do the decrement later. We should decrement the count only for
-		 * routines that we load ourselves. And the only one possible is due to the below call to "job_addr".
-		 * Note that the balancing decrement/free happens in the middle child until the grandchild is forked.
-		 * Once the grandchild fork succeeds, the grandchild is incharge of doing this cleanup. This flow is needed
-		 * so the decrement (and potential removal of rtnobj shmid) only happens AFTER when it is needed.
-		 */
-		if (!job_addr(&jparms->routine, &jparms->label, jparms->offset, (char **)&rtnhdr, &transfer_addr,
-			&need_rtnobj_shm_free))
-		{
-			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
-			ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr));
-			UNDERSCORE_EXIT(joberr);
-		}
-
-=======
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		joberr = joberr_sid;
 		if (-1 == setsid())
 		{
@@ -554,7 +503,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		{
 			job_errno = errno;
 			DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
-			ARLINK_ONLY(RELINKCTL_RUNDOWN_MIDDLE_PARENT(need_rtnobj_shm_free, rtnhdr));
+			assert(FALSE);
 			UNDERSCORE_EXIT(joberr);
 		}
 		if (child_pid)
@@ -700,10 +649,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		/* This is now the grandchild process (actual Job process) -- an orphan as soon as the EXIT(EXIT_SUCCESS) above
 		 * occurs. Revert the condition handler established by middle process and establish its own condition handler */
 		REVERT;
-		getjobnum();	/* set "process_id" to a value different from parent (middle child). This is particularly needed
-				 * for the RELINKCTL_RUNDOWN_MIDDLE_PARENT macro since it does rtnobj_shm_free which deals with
-				 * latches that in turn rely on the "process_id" global variable reflecting the current pid.
-				 */
+		getjobnum();	/* set "process_id" to a value different from parent (middle child) */
 		ESTABLISH_RET(grand_child, 0);
 		sigaction(SIGTERM, &old_act, 0);		/* restore the SIGTERM handler */
 		CLOSEFILE_RESET(setup_fds[0], pipe_status);	/* resets "setup_fds[0]" to FD_INVALID */
@@ -866,9 +812,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			*(cmdbuff + jparms->cmdline.len) = 0;
 		} else
 			memset(cmdbuff, 0, TEMP_BUFF_SIZE);
-		/* Do common cleanup in child. Note that the below call to "ojchildioclean" invokes "relinkctl_rundown"
-		 * but that is not needed since we have already done it in the RELINKCTL_RUNDOWN_MIDDLE_PARENT invocation.
-		 */
+		/* Do common cleanup in child. */
 		ojchildioclean();
 
 #ifdef KEEP_zOS_EBCDIC

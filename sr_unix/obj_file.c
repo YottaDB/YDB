@@ -72,12 +72,8 @@ void drop_object_file(void)
 	SETUP_THREADGBL_ACCESS;
 	if (0 < object_file_des)
         {
-<<<<<<< HEAD
-		UNLINK((const char *)object_file_name);
-=======
-		rc = UNLINK(object_file_name);
+		rc = UNLINK((const char *)object_file_name);
 		assert(!rc);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		CLOSE_OBJECT_FILE(object_file_des, rc);		/* Resets "object_file_des" to FD_INVALID */
 		assert(!rc);
 		(void)UNLINK(TADR(tmp_object_file_name));	/* Just in case the temp file was in play */

@@ -3,6 +3,9 @@
 ; Copyright (c) 2006-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -152,46 +155,26 @@ tmpseg:	n squals s s=""
 	f  s s=$o(tmpseg(am,s)) q:'$l(s)  s squals(s)=tmpseg(am,s)
 	s x=$$TSQUALS(am,.squals)
 	q
-<<<<<<< HEAD
-regelm:	i s'="DYNAMIC_SEGMENT",'$d(tmpreg(s)) d message^GDE($$info(gdeerr("QUALBAD")),$zwrite(s))
-	e  i $d(minreg(s)),minreg(s)>rquals(s) d message^GDE(gdeerr("VALTOOSMALL"),$zwrite(rquals(s))_":"_$zwrite(minreg(s))_":"_$zwrite(s))
-	e  i $d(maxreg(s)),maxreg(s)<rquals(s) d message^GDE(gdeerr("VALTOOBIG"),$zwrite(rquals(s))_":"_$zwrite(maxreg(s))_":"_$zwrite(s))
-	i  s verified=0 d message^GDE(gdeerr("REGIS"),$zwrite(REGION))
-	q
-segelm:	i s'="FILE_NAME",'$l(tmpseg(am,s)) d message^GDE($$info(gdeerr("QUALBAD")),$zwrite(s))
-	e  i $d(minseg(am,s)),minseg(am,s)>squals(s) d message^GDE(gdeerr("VALTOOSMALL"),$zwrite(squals(s))_":"_$zwrite(minseg(am,s))_":"_$zwrite(s))
-	e  i $d(maxseg(am,s)),maxseg(am,s)<squals(s) d message^GDE(gdeerr("VALTOOBIG"),$zwrite(squals(s))_":"_$zwrite(maxseg(am,s))_":"_$zwrite(s))
-	i  s verified=0 d message^GDE(gdeerr("SEGIS"),$zwrite(am)_":"_$zwrite(SEGMENT))
-	q
-=======
-regelm:	if s'="DYNAMIC_SEGMENT",'$data(tmpreg(s)) zmessage $$info(gdeerr("QUALBAD")):s
-	else  if $data(minreg(s)),minreg(s)>rquals(s) zmessage gdeerr("VALTOOSMALL"):rquals(s):minreg(s):s
-	else  if $data(maxreg(s)),maxreg(s)<rquals(s) zmessage gdeerr("VALTOOBIG"):rquals(s):maxreg(s):s
+regelm:	if s'="DYNAMIC_SEGMENT",'$data(tmpreg(s)) do message^GDE($$info(gdeerr("QUALBAD")),$zwrite(s))
+	else  if $data(minreg(s)),minreg(s)>rquals(s) do message^GDE(gdeerr("VALTOOSMALL"),$zwrite(rquals(s))_":"_$zwrite(minreg(s))_":"_$zwrite(s))
+	else  if $data(maxreg(s)),maxreg(s)<rquals(s) do message^GDE(gdeerr("VALTOOBIG"),$zwrite(rquals(s))_":"_$zwrite(maxreg(s))_":"_$zwrite(s))
 	if  set verified=0
 	quit
-segelm:	if s'="FILE_NAME",'$length(tmpseg(am,s)) zmessage $$info(gdeerr("QUALBAD")):s
-	else  if $data(minseg(am,s)),minseg(am,s)>squals(s) zmessage gdeerr("VALTOOSMALL"):squals(s):minseg(am,s):s
-	else  if $data(maxseg(am,s)),maxseg(am,s)<squals(s) zmessage gdeerr("VALTOOBIG"):squals(s):maxseg(am,s):s
+segelm:	if s'="FILE_NAME",'$l(tmpseg(am,s)) do message^GDE($$info(gdeerr("QUALBAD")),$zwrite(s))
+	else  if $data(minseg(am,s)),minseg(am,s)>squals(s) do message^GDE(gdeerr("VALTOOSMALL"),$zwrite(squals(s))_":"_$zwrite(minseg(am,s))_":"_$zwrite(s))
+	else  if $data(maxseg(am,s)),maxseg(am,s)<squals(s) do message^GDE(gdeerr("VALTOOBIG"),$zwrite(squals(s))_":"_$zwrite(maxseg(am,s))_":"_$zwrite(s))
 	if  set verified=0
 	quit
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 key2blk:
 	; the computation below allows for at least 1 max-key record in a data OR index block.
 	; since an index block always contains a *-key, we need to account for that too.
 	; bs:block size, y:supportable max key size, f:size of reserved bytes, ks:key size
-<<<<<<< HEAD
-	i REGION="TEMPLATE" q  ; do not do keysize/blksize check for TEMPLATE region as this is not a real region
-	s y=bs-f-SIZEOF("blk_hdr")-len("min_val")-SIZEOF("rec_hdr")-len("hide_subs")-len("bstar_rec")
-	i ks>y s verified=0 d message^GDE(gdeerr("KEYSIZIS"),$zwrite(ks)),message^GDE(gdeerr("KEYFORBLK"),$zwrite(bs)_":"_$zwrite(f)_":"_$zwrite(y)),message^GDE(gdeerr("REGIS"),$zwrite(REGION))
-	q
-=======
 	set len("block_id")=4	;size of block_id
 	set len("bstar_rec")=8	;size for bstar record
 	if REGION="TEMPLATE" quit  ; do not do keysize/blksize check for TEMPLATE region as this is not a real region
 	set y=bs-f-SIZEOF("blk_hdr")-SIZEOF("rec_hdr")-len("block_id")-len("bstar_rec")
-	if ks>y set verified=0 zmessage gdeerr("KEYSIZIS"):ks,gdeerr("KEYFORBLK"):bs:f:y,gdeerr("REGIS"):REGION
+	if ks>y set verified=0 do message^GDE(gdeerr("KEYSIZIS"),$zwrite(ks)),message^GDE(gdeerr("KEYFORBLK"),$zwrite(bs)_":"_$zwrite(f)_":"_$zwrite(y)),message^GDE(gdeerr("REGIS"),$zwrite(REGION))
 	quit
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 buf2blk:	i REGION="TEMPLATE" q
 	i "USER"[am s verified=0 d message^GDE(gdeerr("NOJNL"),$zwrite(am)),message^GDE(gdeerr("REGIS"),$zwrite(REGION)),message^GDE(gdeerr("SEGIS"),$zwrite(am)_":"_$zwrite(SEGMENT))
 	q
@@ -213,31 +196,16 @@ allocchk(rquals)
 ; called from GDEADD.M and GDECHANG.M
 
 RQUALS(rquals)
-<<<<<<< HEAD
-	i '$d(verified) n verified s verified=1
-	s len("min_val")=4   ;size for value field in index block
-	s len("bstar_rec")=8   ;size for bstar record
-	s len("hide_subs")=8   ;size for hidden subscript
-	s s=""
-	f  s s=$o(rquals(s)) q:'$l(s)  d regelm
-	i $d(rquals("FILE_NAME")),$zl(rquals("FILE_NAME"))>(SIZEOF("file_spec")-1) s verified=0
-	i  d message^GDE($$info(gdeerr("VALTOOLONG")),$zwrite(rquals("FILE_NAME"))_":"_$zwrite(SIZEOF("file_spec")-1)_":""Journal filename""") d message^GDE(gdeerr("REGIS"),$zwrite(REGION))
-	s ks="KEY_SIZE",ks=$s($d(rquals(ks)):rquals(ks),$d(regs(REGION,ks)):regs(REGION,ks),1:tmpreg(ks))
-	s x="RECORD_SIZE",x=$s($d(rquals(x)):rquals(x),$d(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
-	d allocchk(.rquals)
-	i REGION="TEMPLATE" s bs=tmpseg(tmpacc,"BLOCK_SIZE"),f=tmpseg(tmpacc,"RESERVED_BYTES")
-=======
 	if '$data(verified) new verified set verified=1
 	set s=""
 	for  set s=$order(rquals(s)) quit:'$length(s)  do regelm
 	quit:'verified verified
 	if $data(rquals("FILE_NAME")),$zlength(rquals("FILE_NAME"))>(SIZEOF("file_spec")-1) set verified=0
-	if  zmessage $$info(gdeerr("VALTOOLONG")):rquals("FILE_NAME"):SIZEOF("file_spec")-1:"Journal filename",gdeerr("REGIS"):REGION
+	if  do message^GDE($$info(gdeerr("VALTOOLONG")),$zwrite(rquals("FILE_NAME"))_":"_$zwrite(SIZEOF("file_spec")-1)_":""Journal filename""") do message^GDE(gdeerr("REGIS"),$zwrite(REGION))
 	set ks="KEY_SIZE",ks=$select($data(rquals(ks)):rquals(ks),$data(regs(REGION,ks)):regs(REGION,ks),1:tmpreg(ks))
 	set x="RECORD_SIZE",x=$select($data(rquals(x)):rquals(x),$data(regs(REGION,x)):regs(REGION,x),1:tmpreg(x))
 	do allocchk(.rquals)
 	if REGION="TEMPLATE" set bs=tmpseg(tmpacc,"BLOCK_SIZE"),f=tmpseg(tmpacc,"RESERVED_BYTES")
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	; note "else" used in two consecutive lines intentionally (instead of using a do block inside one else).
 	; this is because we want the QUIT to quit out of RQUALS and the NEW of SEGMENT,am to happen at the RQUALS level.
 	else  set s="DYNAMIC_SEGMENT",s=$select($data(rquals(s)):rquals(s),$data(regs(REGION,s)):regs(REGION,s),1:0)
@@ -251,23 +219,6 @@ RQUALS(rquals)
 	quit verified
 	;
 SQUALS(am,squals)
-<<<<<<< HEAD
-	i '$d(verified) n verified s verified=1
-	s len("min_val")=4   ;size for value field in index block
-	s len("bstar_rec")=8   ;size for bstar record
-	s len("hide_subs")=8   ;size for hidden subscript
-	n s s s=""
-	f  s s=$o(squals(s)) q:'$l(s)  i $l(squals(s)) d segelm
-	n bs s bs="BLOCK_SIZE"
-	i $d(squals(bs)),squals(bs)#512 s x=squals(bs),squals(bs)=x\512+1*512
-	i  d message^GDE(gdeerr("BLKSIZ512"),$zwrite(x)_":"_$zwrite(squals(bs))),message^GDE(gdeerr("SEGIS"),$zwrite(am)_":"_$zwrite(SEGMENT))
-	s s="WINDOW_SIZE"
-	i SEGMENT="TEMPLATE" s x=tmpreg("RECORD_SIZE") d segreg q verified
-	n REGION s REGION=""
-	f  s REGION=$o(regs(REGION)) q:'$l(REGION)  d
-	. i regs(REGION,"DYNAMIC_SEGMENT")=SEGMENT s bs=regs(REGION,"RECORD_SIZE") d segreg
-	q verified
-=======
 	if '$data(verified) new verified set verified=1
 	new s set s=""
 	for  set s=$order(squals(s)) quit:'$length(s)  do:$length(squals(s)) segelm
@@ -275,14 +226,13 @@ SQUALS(am,squals)
 	new bs set bs="BLOCK_SIZE"
 	if $data(squals(bs)),((minseg(am,"BLOCK_SIZE")'>squals(bs))&(maxseg(am,"BLOCK_SIZE")'<squals(bs))) do
 	. if squals(bs)#512 set x=squals(bs),squals(bs)=((x\512)+1)*512
-	. if  zmessage gdeerr("BLKSIZ512"):x:squals(bs),gdeerr("SEGIS"):am:SEGMENT
+	. if  do message^GDE(gdeerr("BLKSIZ512"),$zwrite(x)_":"_$zwrite(squals(bs))),message^GDE(gdeerr("SEGIS"),$zwrite(am)_":"_$zwrite(SEGMENT))
 	set s="WINDOW_SIZE"
 	if SEGMENT="TEMPLATE" set x=tmpreg("RECORD_SIZE") do segreg quit verified
 	new REGION set REGION=""
 	for  set REGION=$order(regs(REGION)) quit:'$length(REGION)  do
 	. if regs(REGION,"DYNAMIC_SEGMENT")=SEGMENT set bs=regs(REGION,"RECORD_SIZE") do segreg
 	quit verified
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 segreg:
 	if am'="USER" do
 	. set bs="BLOCK_SIZE",bs=$select($data(squals(bs)):squals(bs),$data(segs(SEGMENT,bs)):segs(SEGMENT,bs),1:tmpseg(am,bs))

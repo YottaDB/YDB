@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2014 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+ *								*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -70,69 +66,39 @@ void get_cmd_qlf(command_qualifier *qualif)
 			}
 		} else
 			s->len = len;
-<<<<<<< HEAD
 	} else if (cli_negated("OBJECT"))
-=======
-	} else if (TRUE == cli_negated("OBJECT"))
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		qualif->qlf &= ~CQ_OBJECT;
 	if (CLI_PRESENT == cli_present("CROSS_REFERENCE"))	/* CROSS_REFERENCE is undocumented and apparently not useful */
 		qualif->qlf |= CQ_CROSS_REFERENCE;
-<<<<<<< HEAD
 	else if (cli_negated("CROSS_REFERENCE"))
 		qualif->qlf &= ~CQ_CROSS_REFERENCE;
 
-	if (cli_negated("IGNORE"))
-		qualif->qlf &= ~CQ_IGNORE;
-	else
-=======
-	else if (TRUE == cli_negated("CROSS_REFERENCE"))
-		qualif->qlf &= ~CQ_CROSS_REFERENCE;
 	if (TRUE == cli_present("IGNORE"))
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		qualif->qlf |= CQ_IGNORE;
-	else if (TRUE == cli_negated("IGNORE"))
+	else if (cli_negated("IGNORE"))
 		qualif->qlf &= ~CQ_IGNORE;
 	if (CLI_PRESENT == cli_present("DEBUG"))		/* the only other appearance of CQ_DEBUG is in cmd_qlf.h */
 		qualif->qlf |= CQ_DEBUG;
-<<<<<<< HEAD
 	else if (cli_negated("DEBUG"))
 		qualif->qlf &= ~CQ_DEBUG;
 
-	if (cli_negated("LINE_ENTRY"))
+	if (cli_negated("LINE_ENTRY"))			/* NOLINE_ENTRY appears implies colon syntax on all labels */
 		qualif->qlf &= ~CQ_LINE_ENTRY;
 
 	if (cli_negated("INLINE_LITERALS"))
 		qualif->qlf &= ~CQ_INLINE_LITERALS;
 
-	if (cli_negated("ALIGN_STRINGS"))
-=======
-	else if (TRUE == cli_negated("DEBUG"))
-		qualif->qlf &= ~CQ_DEBUG;
-	if (TRUE == cli_negated("LINE_ENTRY"))			/* NOLINE_ENTRY appears implies colon syntax on all labels */
-		qualif->qlf &= ~CQ_LINE_ENTRY;
-	if (TRUE == cli_negated("INLINE_LITERALS"))
-		qualif->qlf &= ~CQ_INLINE_LITERALS;
-	if (TRUE == cli_negated("ALIGN_STRINGS"))		/* ALIGN_STRINGS is undocument and unimplemented */
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+	if (cli_negated("ALIGN_STRINGS"))		/* ALIGN_STRINGS is undocument and unimplemented */
 		qualif->qlf &= ~CQ_ALIGN_STRINGS;
-	if (TRUE == cli_negated("WARNINGS"))
-		qualif->qlf &= ~CQ_WARNINGS;
-	else if (CLI_PRESENT == cli_present("WARNINGS"))
-		qualif->qlf |= CQ_WARNINGS;
+
 	#ifdef DEBUG
 	if (CLI_PRESENT == cli_present("MACHINE_CODE"))
 		qualif->qlf |= CQ_MACHINE_CODE;
-<<<<<<< HEAD
 	else if (cli_negated("MACHINE_CODE"))
-=======
-	else if (TRUE == cli_negated("MACHINE_CODE"))
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		qualif->qlf &= ~CQ_MACHINE_CODE;
 	#else
 	qualif->qlf &= ~CQ_MACHINE_CODE;
-<<<<<<< HEAD
-#endif
+	#endif
 
 	if (cli_negated("WARNINGS"))
 		qualif->qlf &= ~CQ_WARNINGS;
@@ -143,10 +109,6 @@ void get_cmd_qlf(command_qualifier *qualif)
 	}
 
 	if (cli_negated("LIST"))
-=======
-	#endif
-	if (TRUE == cli_negated("LIST"))
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		qualif->qlf &= (~CQ_LIST & ~CQ_MACHINE_CODE);
 	else if (CLI_PRESENT == cli_present("LIST"))
 	{
@@ -205,11 +167,7 @@ void get_cmd_qlf(command_qualifier *qualif)
 			}
 		} else
 			s->len = len;
-<<<<<<< HEAD
 	} else if (cli_negated("CE_PREPROCESS"))
-=======
-	} else if (TRUE == cli_negated("CE_PREPROCESS"))
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		qualif->qlf &= ~CQ_CE_PREPROCESS;
 #	ifdef USHBIN_SUPPORTED
 	if (CLI_PRESENT == cli_present("DYNAMIC_LITERALS"))

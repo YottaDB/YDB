@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -219,17 +219,10 @@ uint4 jnl_file_open(gd_region *reg, boolean_t init)
 				}  /* if jnl_state */
 			} else
 			{	/* not init and file moved */
-<<<<<<< HEAD
-				SET_JPC_ERR_STR(ERR_JNLOPNERR, ERR_JNLMOVED, buff);
+				SET_JPC_ERR_STR(ERR_JNLOPNERR, ERR_JNLMOVED, buff, OUT_BUFF_SIZE);
 				assert(ydb_white_box_test_case_enabled
 					&& ((WBTEST_JNLOPNERR_EXPECTED == ydb_white_box_test_case_number)
 						|| (WBTEST_JNL_CREATE_FAIL == ydb_white_box_test_case_number)));
-=======
-				SET_JPC_ERR_STR(ERR_JNLOPNERR, ERR_JNLMOVED, buff, OUT_BUFF_SIZE);
-				assert(gtm_white_box_test_case_enabled
-					&& ((WBTEST_JNLOPNERR_EXPECTED == gtm_white_box_test_case_number)
-						|| (WBTEST_JNL_CREATE_FAIL == gtm_white_box_test_case_number)));
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 			}
 		} else
 		{	/* stat failed */

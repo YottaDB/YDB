@@ -3,6 +3,9 @@
 ; Copyright (c) 2010-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -68,33 +71,18 @@ TFSPECP						; scan filespec token by token
 	s filespec=$ze(comline,cp1,cp1+i-1),cp=cp1+i
 	q
 TACCMETH
-<<<<<<< HEAD
 	d GETTOK^GDESCAN
-	i toktype'="TKIDENT" d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"_$zwrite(qual))
-	s value=$tr(token,lower,upper)
+	i (toktype'="TKIDENT")&("TKSTRLIT"'=toktype) d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"_$zwrite(qual))
+	s value=$zconvert(token,"U")
 	i '$data(typevalue("STR2NUM","TACCMETH",value)) d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"_$zwrite(qual))
 	q
 TNULLSUB
 	d GETTOK^GDESCAN
-	i toktype'="TKIDENT" d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"_$zwrite(qual))
-	s value=$tr(token,lower,upper)
+	i (toktype'="TKIDENT")&("TKSTRLIT"'=toktype) d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"_$zwrite(qual))
+	s value=$zconvert(token,"U")
 	i '$data(typevalue("STR2NUM","TNULLSUB",value)) d message^GDE(gdeerr("VALUEBAD"),$zwrite(token)_":"_$zwrite(qual))
 	s value=typevalue("STR2NUM","TNULLSUB",value)
 	q
-=======
-	do GETTOK^GDESCAN
-	zmessage:(("TKIDENT"'=toktype)&("TKSTRLIT"'=toktype)) gdeerr("VALUEBAD"):token:qual
-	set value=$zconvert(token,"U")
-	zmessage:'$data(typevalue("STR2NUM","TACCMETH",value)) gdeerr("VALUEBAD"):token:qual
-	quit
-TNULLSUB
-	do GETTOK^GDESCAN
-	zmessage:(("TKIDENT"'=toktype)&("TKSTRLIT"'=toktype)) gdeerr("VALUEBAD"):token:qual
-	set value=$zconvert(token,"U")
-	zmessage:'$data(typevalue("STR2NUM","TNULLSUB",value)) gdeerr("VALUEBAD"):token:qual
-	set value=typevalue("STR2NUM","TNULLSUB",value)
-	quit
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 TREGION
 	n REGION d REGION s value=REGION
 	q
@@ -322,13 +310,8 @@ collundeferr
 	s $etrap=savetrap
 	d message^GDE(gdeerr("GBLNAMCOLLUNDEF"),""""_coll_""":"_$zwrite(gblname))
 	q
-<<<<<<< HEAD
-strsub(sub,subcnt)
-	n state,xstr,len,iszchar,istart,x,y	; iszchar and istart are initialized in lower level invocations
-=======
 strsub:(sub,subcnt)
 	new state,xstr,len,iszchar,istart,x,y	; iszchar and istart are initialized in lower level invocations
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 						; but needed outside that frame too hence the new done here (in parent)
 	new retsub	; the subscript that is returned after doing $c() transformations
 	new i,previ,doublequote
@@ -336,16 +319,10 @@ strsub:(sub,subcnt)
 	set state=0,len=$zlength(sub),doublequote="""",retsub=""
 	for i=1:1:len set c=$zextract(sub,i) do @state
 	; check if state is terminating
-<<<<<<< HEAD
-	i (state'=2)&(state'=6) d message^GDE(gdeerr("NAMNOTSTRSUBS"),""""_subcnt_""":"_$zwrite(sub))
-	i (state=2) s retsub=retsub_$ze(sub,previ,i-1)
-	q retsub_doublequote
-=======
-	zmessage:((state'=2)&(state'=6)) gdeerr("NAMNOTSTRSUBS"):subcnt:sub
+	if (state'=2)&(state'=6) do message^GDE(gdeerr("NAMNOTSTRSUBS"),""""_subcnt_""":"_$zwrite(sub))
 	set:(state=2) retsub=retsub_$zextract(sub,previ,i-1)
 	; if retsub is a canonical number, strip off the double quotes and return it as a number
 	quit $select(retsub=+retsub:retsub,1:doublequote_retsub_doublequote)
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 0	;
 	i c=doublequote s state=1,previ=i+1
 	e  i c="$" s state=3

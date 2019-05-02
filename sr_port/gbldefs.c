@@ -1214,6 +1214,14 @@ GBLDEF	char		io_setup_errstr[IO_SETUP_ERRSTR_ARRAYSIZE];
 GBLDEF	void		(*mupip_exit_fp)(int4 errnum);	/* Function pointer to mupip_exit() in MUPIP but points to a routine
 							 * that assert fails if run from non-MUPIP builds.
 							 */
+/* Direct mode auditing related global variables */
+GBLDEF	boolean_t	dollar_zaudit;			/* Intrinsic that indicates whether direct mode
+							 * auditing (i.e. APD) is enabled.
+							 * TRUE => Auditing is enabled.
+							 */
+GBLDEF	dm_audit_info	*audit_conn;			/* Stores the APD logger's connection information */
+
+/* YottaDB global variables */
 GBLDEF	CLI_ENTRY	*cmd_ary;	/* Pointer to command table for MUMPS/DSE/LKE etc. */
 
 /* Begin -- GT.CM OMI related global variables */
@@ -1243,7 +1251,7 @@ GBLDEF	int		ping_keepalive;		/* check connections using ping */
 GBLDEF	int		conn_timeout = TIMEOUT_INTERVAL;
 GBLDEF	int		history;
 /* image_id....allows you to determine info about the server by using the strings command, or running dbx */
-GBLDEF	char		image_id[256]= "image_id";
+GBLDEF	char		image_id[MAX_IMAGE_NAME_LEN];
 /* End -- GT.CM OMI related global variables */
 
 GBLDEF	int		ydb_repl_filter_timeout;	/* # of seconds that source server waits before issuing FILTERTIMEDOUT
@@ -1329,10 +1337,3 @@ GBLDEF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 GBLDEF	void			*dummy_ptr;	/* A dummy global variable which works around a suspected Clang compiler issue.
 						 * See use of this global variable in sr_unix/gvcst_spr_queryget.c for details.
 						 */
-
-/* Direct mode auditing related global variables */
-GBLDEF	boolean_t	dollar_zaudit;			/* Intrinsic that indicates whether direct mode
-							 * auditing (i.e. APD) is enabled.
-							 * TRUE => Auditing is enabled.
-							 */
-GBLDEF	dm_audit_info	*audit_conn;			/* Stores the APD logger's connection information */

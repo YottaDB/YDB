@@ -340,14 +340,13 @@ void op_zlink (mval *v, mval *quals)
 		if (srcdir)
 		{	/* A source directory containing routine was found by zro_search() */
 			assert(ZRO_TYPE_OBJLIB != objdir->type);
-<<<<<<< HEAD
 			if (srcdir->str.len)
 			{
 				tslash = ('/' == srcdir->str.addr[srcdir->str.len - 1]) ? 0 : 1; /* for possible '/' in between */
-				if (srcdir->str.len + srcnamelen + tslash > SIZEOF(srcnamebuf) - 1)
+				if ((srcdir->str.len + srcnamelen + tslash) > (SIZEOF(srcnamebuf) - 1))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
 				else
-				{
+				{	/* 4SCA: Protected by rts_error above */
 					memmove(&srcnamebuf[srcdir->str.len + tslash], srcnamebuf, srcnamelen);
 					if (tslash)
 						srcnamebuf[srcdir->str.len] = '/';
@@ -357,21 +356,6 @@ void op_zlink (mval *v, mval *quals)
 				}
 			} else
 				assert(srcnamelen <= (SIZEOF(srcnamebuf) - 1));
-=======
-			if ((srcdir->str.len + srcnamelen) > (SIZEOF(srcnamebuf) - 1))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
-			if (srcdir->str.len)
-			{
-				tslash = ('/' == srcdir->str.addr[srcdir->str.len - 1]) ? 0 : 1;
-				/* 4SCA: Protected by rts_error above */
-				memmove(&srcnamebuf[srcdir->str.len + tslash], srcnamebuf, srcnamelen);
-				if (tslash)
-					srcnamebuf[srcdir->str.len] = '/';
-				memcpy(srcnamebuf, srcdir->str.addr, srcdir->str.len);
-				srcnamelen += srcdir->str.len + tslash;
-				srcnamebuf[srcnamelen] = 0;
-			}
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		}
 		if (objdir)
 		{	/* An object directory or shared library containing the routine was found by zro_search() */

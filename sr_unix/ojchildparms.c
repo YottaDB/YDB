@@ -100,7 +100,9 @@ STATICFNDEF void ojchildparms(job_params_type *jparms, gcall_args *g_args, mval 
 	joberr_t		joberr;
 	rhdtyp			*rtnhdr;
 	char			*transfer_addr;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if ((NULL == sp) && (!((sp = getenv(CHILD_FLAG_ENV)) && sp[0]))) /* note assignment */
 		return;
 	setup_fd = (int)ATOL(sp);

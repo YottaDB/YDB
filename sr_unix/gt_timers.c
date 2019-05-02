@@ -788,16 +788,10 @@ void timer_handler(int why, siginfo_t *info, void *context)
 			break;
 #		if defined(DEBUG) && !defined(_AIX) && !defined(__armv6l__) && !defined(__armv7l__) && !defined(__aarch64__)
 		if (tpop->safe && (TREF(continue_proc_cnt) == last_continue_proc_cnt)
-<<<<<<< HEAD
 			&& !(ydb_white_box_test_case_enabled
 				&& ((WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == ydb_white_box_test_case_number)
-					|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number))))
-=======
-			&& !(gtm_white_box_test_case_enabled
-				&& ((WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == gtm_white_box_test_case_number)
-				|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number)
-				|| (WBTEST_OINTEG_WAIT_ON_START == gtm_white_box_test_case_number))))
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+					|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number)
+					|| (WBTEST_OINTEG_WAIT_ON_START == ydb_white_box_test_case_number))))
 		{	/* Check if the timer is extremely overdue, with the following exceptions:
 			 *	- Unsafe timers can be delayed indefinitely.
 			 *	- AIX and ARM systems (32-bit and 64-bit) tend to arbitrarily delay processes when loaded.

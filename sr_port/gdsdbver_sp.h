@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,11 +36,23 @@ ENUM_ENTRY(GDSMV62002),		/* New field defer_allocate needed for database file pr
 ENUM_ENTRY(GDSMV63000),		/* New field non_null_iv to indicate IV mode for encrypted blocks */
 ENUM_ENTRY(GDSMV63000A),	/* Move fields ftok_counter_halted and access_counter_halted from fileheader to nodelocal */
 ENUM_ENTRY(GDSMV63001),		/* New "asyncio" option; New reservedDBFlags field */
-<<<<<<< HEAD
 ENUM_ENTRY(GDSMV63003),		/* New field "read_only" to indicate a read-only database */
-ENUM_ENTRY(GDSMR122),		/* New field "reorg_sleep_nsec" to slow down reorg update rate (e.g. reduce restarts) by user */
-=======
-ENUM_ENTRY(GDSMV63003),		/* New field read_only to indicate a read-only database */
 ENUM_ENTRY(GDSMV63007),		/* Reuse abandoned field for use controlled stable flush_trigger_top */
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+ENUM_ENTRY(GDSMVFILLER1),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER2),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER3),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER4),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER5),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER6),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER7),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER8),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER9),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER10),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER11),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER12),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER13),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER14),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER15),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMVFILLER16),	/* Space reserved for GT.M changes to minor db format */
+ENUM_ENTRY(GDSMR122),		/* New field "reorg_sleep_nsec" to slow down reorg update rate (e.g. reduce restarts) by user */
 ENUM_ENTRY(GDSMVLAST)

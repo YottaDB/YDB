@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2014 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+ *								*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -156,28 +152,8 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 				hasnode = TRUE;
 				base = node;				/* Update pointers past node name */
 				/* See if the desired (query) node is the local node */
-<<<<<<< HEAD
-				node_name_len = (int)(node - trans.addr);	/* Scanned node including ':' */
-				if (!donot_short_circuit)
-=======
 				node_name_len = (uint4)(node - trans.addr);	/* Scanned node including ':' */
-				query_node_len = MIN((node_name_len - 1), MAX_HOST_NAME_LEN); /* Pure name length, no ':' on end */
-				assert(MAX_HOST_NAME_LEN >= query_node_len);
-				assert(0 < query_node_len);
-				assert(':' == *(trans.addr + query_node_len));
-				memcpy(query_node_name, trans.addr, query_node_len);
-				query_node_name[query_node_len] = 0;
-				localhost_sa_ptr = NULL;	/* Null value needed if not find query node (remote default) */
-				CLIENT_HINTS(hints);
-				if (0 != (errcode = getaddrinfo(query_node_name, NULL, &hints, &ai_ptr)))	/* Assignment! */
-					ai_ptr = NULL;		/* Skip additional lookups */
-				else
-					memcpy((sockaddr_ptr)&query_sas, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
-				CLIENT_HINTS(hints);
-				if (0 == (errcode = getaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr))
-					&& (0 == memcmp(localhost_ai_ptr->ai_addr, (sockaddr_ptr)&query_sas,
-						localhost_ai_ptr->ai_addrlen)))
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+				if (!donot_short_circuit)
 				{
 					query_node_len = node_name_len - 1;		/* Pure name length, no ':' on end */
 					assert(MAX_HOST_NAME_LEN >= query_node_len);

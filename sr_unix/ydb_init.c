@@ -32,6 +32,7 @@
 #include "gtmsecshr.h"
 #include "gtm_savetraps.h"
 #include "gtm_permissions.h"
+#include "gtm_post_startup_check_init.h"
 #ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
 # include "gtm_utf8.h"
@@ -255,7 +256,6 @@ int ydb_init()
 		 * and so it is enough to do the ydb_engine mutex unlock there instead of before each "rts_error_csa" below.
 		 */
 		UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
-		GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 		/* Ensure that $ydb_dist exists */
 		if (NULL == (dist = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_YDBDISTUNDEF);
@@ -286,6 +286,7 @@ int ydb_init()
 		{	/* $ydb_dist validated */
 			ydb_dist_ok_to_use = TRUE;
 			memcpy(ydb_dist, dist, dist_len);
+			gtm_post_startup_check_init();
 		}
 		cli_lex_setup(0, NULL);
 		/* Initialize msp to the maximum so if errors occur during YottaDB startup below,

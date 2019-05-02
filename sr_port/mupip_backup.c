@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -571,13 +571,6 @@ void mupip_backup(void)
 		rptr->backup_hdr = (sgmnt_data_ptr_t)malloc(size);
 		if (TRUE == online)
 		{	/* determine the directory name and prefix for the temp file */
-<<<<<<< HEAD
-=======
-			memset(tempnam_prefix, 0, MAX_FN_LEN);
-			memcpy(tempnam_prefix, gv_cur_region->rname, gv_cur_region->rname_len);
-			SNPRINTF(&tempnam_prefix[gv_cur_region->rname_len], MAX_FN_LEN - gv_cur_region->rname_len, "_%x",
-				process_id);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 			if ((SS_NORMAL == trans_log_name_status)
 					&& (NULL != tempdir_trans.addr) && (0 != tempdir_trans.len))
 				*(tempdir_trans.addr + tempdir_trans.len) = 0;
@@ -645,10 +638,6 @@ void mupip_backup(void)
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ERR_FILENAMETOOLONG);
 			}
-<<<<<<< HEAD
-=======
-			SNPRINTF(tempfilename + tempdir_full.len, MAX_FN_LEN - tempdir_full.len, "/%s_XXXXXX", tempnam_prefix);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 			MKSTEMP(tempfilename, rptr->backup_fd);
 			if (FD_INVALID == rptr->backup_fd)
 			{

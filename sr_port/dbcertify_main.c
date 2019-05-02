@@ -63,6 +63,7 @@
 #include "op.h"
 #include "io.h"
 #include "wbox_test_init.h"
+#include "gtm_post_startup_check_init.h"
 
 GBLREF	boolean_t		gtm_utf8_mode;
 GBLREF	ch_ret_type		(*stpgc_ch)();				/* Function pointer to stp_gcol_ch */
@@ -71,6 +72,7 @@ GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	mstr			default_sysid;
 GBLREF	spdesc			rts_stringpool, stringpool;
 GBLREF	uint4			process_id;
+GBLREF	boolean_t		ydb_dist_ok_to_use;
 
 GBLDEF	CLI_ENTRY		*cmd_ary = &dbcertify_cmd_ary[0];	/* Define cmd_ary to be the DBCERTIFY specific cmd table */
 GBLDEF	phase_static_area	*psa_gbl;				/* Global anchor for static area */
@@ -115,6 +117,8 @@ int dbcertify_main(int argc, char **argv, char **envp)
 	rts_stringpool = stringpool;
 	getjobname();
 	io_init(FALSE);
+	ydb_dist_ok_to_use = TRUE;
+	gtm_post_startup_check_init();
 	OPERATOR_LOG_MSG;
 	/* Platform dependent method to get the option scan going and invoke necessary driver routine */
 	dbcertify_parse_and_dispatch(argc, argv);

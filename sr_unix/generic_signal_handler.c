@@ -44,17 +44,14 @@
 #include "gtmio.h"
 #include "have_crit.h"
 #include "util.h"
-<<<<<<< HEAD
-#include "libyottadb_int.h"
-#include "invocation_mode.h"
-#include "gtm_exit_handler.h"
-=======
 // For gd_region
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdsblk.h"
 #include "gdsfhead.h"
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+#include "libyottadb_int.h"
+#include "invocation_mode.h"
+#include "gtm_exit_handler.h"
 
 #define	DEFER_EXIT_PROCESSING	((EXIT_PENDING_TOLERANT >= exit_state)			\
 				 && (exit_handler_active || multi_thread_in_use		\
@@ -353,12 +350,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 							 process_id, sig, signal_info.send_pid, signal_info.send_uid);
 					break;
 				case GTMSIGINFO_ILOC + GTMSIGINFO_BADR:
-<<<<<<< HEAD
-					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
-=======
 					check_for_statsdb_memerr();
-					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
 					/* SIGABRT is usually delivered when memory corruption is detected by glibc
@@ -377,12 +370,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 							 process_id, sig, signal_info.int_iadr);
 					break;
 				case GTMSIGINFO_BADR:
-<<<<<<< HEAD
-					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
-=======
 					check_for_statsdb_memerr();
-					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER;)
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+					DEBUG_ONLY(in_nondeferrable_signal_handler = IN_GENERIC_SIGNAL_HANDLER);
 					exit_state = EXIT_IMMED;
 					SET_PROCESS_EXITING_TRUE;
 					SEND_AND_PUT_MSG(VARLSTCNT(7) ERR_KILLBYSIGSINFO3, 5, GTMIMAGENAMETXT(image_type),

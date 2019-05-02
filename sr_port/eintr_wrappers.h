@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -350,8 +350,8 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);			\
-	if (gtm_white_box_test_case_enabled					\
-		&& (WBTEST_SYSCONF_WRAPPER == gtm_white_box_test_case_number))	\
+	if (ydb_white_box_test_case_enabled					\
+		&& (WBTEST_SYSCONF_WRAPPER == ydb_white_box_test_case_number))	\
 		{									\
 			DBGFPF((stderr, "will sleep indefinitely now\n"));		\
 			while (TRUE)							\
@@ -423,116 +423,4 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 	} while (-1 == RC && EINTR == errno);										\
 }
 
-<<<<<<< HEAD
-#define GTM_FSYNC(FD, RC)					\
-{								\
-	do							\
-	{							\
-		RC = fsync(FD);					\
-	} while (-1 == RC && EINTR == errno);			\
-}
-
-#if defined(DEBUG) && defined(UNIX)
-#define SYSCONF(PARM, RC)							\
-{										\
-	intrpt_state_t		prev_intrpt_state;				\
-										\
-	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);			\
-	if (ydb_white_box_test_case_enabled					\
-		&& (WBTEST_SYSCONF_WRAPPER == ydb_white_box_test_case_number))	\
-	{									\
-		DBGFPF((stderr, "will sleep indefinitely now\n"));		\
-		while (TRUE)							\
-			LONG_SLEEP(60);						\
-	}									\
-	RC = sysconf(PARM);							\
-	ENABLE_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);		\
-}
-#else
-#define SYSCONF(PARM, RC)							\
-{										\
-	intrpt_state_t		prev_intrpt_state;				\
-										\
-	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);			\
-	RC = sysconf(PARM);							\
-	ENABLE_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);		\
-}
-#endif
-
-/* GTM_FREAD is an EINTR-safe versions of "fread". Retries on EINTR. Returns number of elements read in NREAD.
- * If NREAD < NELEMS, if error then copies errno into RC, if eof then sets RC to 0. Note: RC is not initialized otherwise.
- * Macro is named GTM_FREAD instead of FREAD because AIX defines a macro by the same name in fcntl.h.
- */
-#define GTM_FREAD(BUFF, ELEMSIZE, NELEMS, FP, NREAD, RC)			\
-{										\
-	size_t		elems_to_read, elems_read;				\
-	intrpt_state_t	prev_intrpt_state;					\
-										\
-	DEFER_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);		\
-	elems_to_read = NELEMS;							\
-	for (;;)								\
-	{									\
-		elems_read = fread(BUFF, ELEMSIZE, elems_to_read, FP);		\
-		assert(elems_read <= elems_to_read);				\
-		elems_to_read -= elems_read;					\
-		if (0 == elems_to_read)						\
-			break;							\
-		RC = feof(FP);							\
-		if (RC)								\
-		{	/* Reached EOF. No error. */				\
-			RC = 0;							\
-			break;							\
-		}								\
-		RC = ferror(FP);						\
-		assert(RC);							\
-		clearerr(FP);	/* reset error set by the "fread" */		\
-		/* In case of EINTR, retry "fread" */				\
-		if (EINTR != errno)						\
-			break;							\
-	}									\
-	NREAD = NELEMS - elems_to_read;						\
-	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);		\
-}
-
-/* GTM_FWRITE is an EINTR-safe versions of "fwrite". Retries on EINTR. Returns number of elements written in NWRITTEN.
- * If NWRITTEN < NELEMS, RC holds errno. Note: RC is not initialized (and should not be relied upon by caller) otherwise.
- * Macro is named GTM_FWRITE instead of FWRITE because AIX defines a macro by the same name in fcntl.h.
- */
-#define GTM_FWRITE(BUFF, ELEMSIZE, NELEMS, FP, NWRITTEN, RC)			\
-		RC = gtm_fwrite(BUFF, ELEMSIZE, NELEMS, FP, &(NWRITTEN));
-
-static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE *fp, size_t *nwritten)
-{
-	size_t		elems_to_write, elems_written, rc = 0;
-	int		status;
-	intrpt_state_t	prev_intrpt_state;
-
-	DEFER_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);
-	elems_to_write = nelems;
-	for ( ; (0 != elems_to_write) && (0 != elemsize) ; )
-	{
-		elems_written = fwrite(buff, elemsize, elems_to_write, fp);
-		assert(elems_written <= elems_to_write);
-		elems_to_write -= elems_written;
-		if (0 == elems_to_write)
-			break;
-		/* Note: From the man pages of "feof", "ferror" and "clearerr", they do not manipulate "errno"
-		 * so no need to save "errno" before those calls.
-		 */
-		assert(!feof(fp));
-		status = ferror(fp);
-		assert(status);
-		clearerr(fp);	/* reset error set by the "fwrite" */
-		/* In case of EINTR, retry "fwrite" */
-		rc = errno;
-		if (EINTR != rc)
-			break;
-	}
-	*nwritten = nelems - elems_to_write;
-	ENABLE_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);
-	return rc;
-}
-
-=======
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 #endif

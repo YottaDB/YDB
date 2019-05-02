@@ -69,12 +69,8 @@ unsigned char *set_zstatus(mstr *src, int max_len, int arg, unsigned char **ctxt
 			save_arg = arg;
 			SET_ERR_CODE(frame_pointer, arg);
 		}
-<<<<<<< HEAD
-		src->len = INTCAST(get_symb_line((unsigned char*)src->addr, &b_line, ctxtp) - (unsigned char*)src->addr);
-		copy_entryref = (NULL != b_line);
-=======
 		src->len = INTCAST(get_symb_line((unsigned char*)src->addr, max_len, &b_line, ctxtp) - (unsigned char*)src->addr);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+		copy_entryref = (NULL != b_line);
 	}
 	MV_FORCE_MVAL(&val, arg);
 	n2s(&val);

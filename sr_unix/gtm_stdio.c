@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,12 +87,9 @@ int gtm_fprintf(FILE *stream, const char *format, ...)
 		retval = -1;	/* Now that "errno" has been set, return -1 just like "fprintf" would in case of error */
 	}
 	va_end(printargs);
-<<<<<<< HEAD
 	if (buf != tmpbuf)
 		free(buf);
-=======
 	assert(-1 != retval);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	return retval;
 }
 

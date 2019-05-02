@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -74,13 +74,8 @@ short rc_fnd_file(rc_xdsid *xdsid)
 	short		dsid, node;
 	gd_binding	*map;
 	gd_addr		*addr;
-<<<<<<< HEAD
-	char		buff[1024], *cp, *cp1;
-	mstr		fpath2;
-=======
 	char		buff[1024], *cp, *cp1, msg[MAX_FN_LEN + 1];
-	mstr		fpath1, fpath2;
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+	mstr		fpath2;
 	mval		v;
 	mname_entry	gvname;
 	int		i, keysize;
@@ -102,13 +97,10 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		if (SS_NORMAL != ydb_trans_log_name(YDBENVINDX_DTNDBD, &fpath2, buff, SIZEOF(buff),
 								IGNORE_ERRORS_TRUE, &is_ydb_env_match))
 		{
-<<<<<<< HEAD
-			char msg[256];
-			SPRINTF(msg, "Invalid DB filename, \"%s\"", is_ydb_env_match ? ydbenvname[YDBENVINDX_EVENT_LOG_LIBPATH]
-											: gtmenvname[YDBENVINDX_EVENT_LOG_LIBPATH]);
-=======
-			SNPRINTF(msg, MAX_FN_LEN + 1, "Invalid DB filename, \"%s\"", fpath1.addr);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+			SNPRINTF(msg, SIZEOF(msg), "Invalid DB filename, \"%s\"",
+							is_ydb_env_match
+								? ydbenvname[YDBENVINDX_DTNDBD]
+								: gtmenvname[YDBENVINDX_DTNDBD]);
 			gtcm_rep_err(msg, errno);
 			return RC_BADFILESPEC;
 		}

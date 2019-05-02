@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,12 +64,9 @@
 #include "gtm_zlib.h"
 #include "fork_init.h"
 #include "gtmio.h"
-<<<<<<< HEAD
+#include "util.h"
 #include "io.h"
 #include "getjobnum.h"		/* for SET_PROCESS_ID */
-=======
-#include "util.h"
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 #ifdef GTM_TLS
 #include "gtm_repl.h"
 #endif
@@ -125,12 +122,7 @@ error_def(ERR_TEXT);
 int gtmsource()
 {
 	int			status, log_init_status, waitpid_res, save_errno;
-<<<<<<< HEAD
-	char			print_msg[1024], tmpmsg[1024];
-=======
-	struct stat		stat_buf;
 	char			print_msg[OUT_BUFF_SIZE - 1], tmpmsg[REPL_MSG_SIZE];
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	gd_region		*reg, *region_top;
 	sgmnt_addrs		*csa, *repl_csa;
 	boolean_t		all_files_open, isalive, ftok_counter_halted;

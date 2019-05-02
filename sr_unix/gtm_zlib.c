@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,20 +25,17 @@
 #include "fgncal.h"		/* needed for COPY_DLLERR_MSG() */
 #include "gtm_zlib.h"
 #include "gtmmsg.h"
-<<<<<<< HEAD
-#include "dlopen_handle_array.h"
-=======
 #include "send_msg.h"
 #include "restrict.h"	/* Needed for restrictions */
 #include "have_crit.h"	/* Needed for defer interrupts */
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+#include "dlopen_handle_array.h"
 
 error_def(ERR_DLLNOOPEN);
 error_def(ERR_DLLNORTN);
 error_def(ERR_RESTRICTEDOP);
 error_def(ERR_TEXT);
 
-GBLREF char		gtm_dist[GTM_PATH_MAX];
+GBLREF char		ydb_dist[GTM_PATH_MAX];
 
 void gtm_zlib_init(void)
 {
@@ -66,7 +63,7 @@ void gtm_zlib_init(void)
 	if (RESTRICTED(library_load_path))
 	{
 		lpath = librarypath;
-		SNPRINTF(librarypath, GTM_PATH_MAX, GTM_PLUGIN_FMT_SHORT ZLIB_AIXLIBNAME, gtm_dist);
+		SNPRINTF(librarypath, SIZEOF(librarypath), GTM_PLUGIN_FMT_SHORT ZLIB_AIXLIBNAME, ydb_dist);
 	} else
 		lpath = ZLIB_AIXLIBNAME;
 	/* Attempt to load the AIX packaged zlib first */
@@ -80,7 +77,7 @@ void gtm_zlib_init(void)
 		if (RESTRICTED(library_load_path))
 		{
 			lpath = librarypath;
-			SNPRINTF(librarypath, GTM_PATH_MAX, GTM_PLUGIN_FMT_SHORT ZLIB_LIBNAME, gtm_dist);
+			SNPRINTF(librarypath, SIZEOF(librarypath), GTM_PLUGIN_FMT_SHORT ZLIB_LIBNAME, ydb_dist);
 		} else
 			lpath = ZLIB_LIBNAME;
 		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
@@ -93,7 +90,7 @@ void gtm_zlib_init(void)
 				SNPRINTF(err_msg, MAX_ERRSTR_LEN, "dlopen(%s)", lpath);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, err_msg);
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_RESTRICTEDOP, 1, err_msg);
-				gtm_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* dont use compression */
+				ydb_zlib_cmp_level = ZLIB_CMPLVL_NONE;	/* dont use compression */
 				return;
 			}
 			COPY_DLLERR_MSG(err_str, err_msg);

@@ -811,17 +811,15 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 						num1 = num2 = -1;
 						have_dot = FALSE;
 						if (ISDIGIT_ASCII(*ptr))
+						{
 							PROCESS_AND_GET_INTEGER(ptr, len, have_star, dst_ptr, dst_len, num1,
 										MAX_GVSUBS_LEN);
-<<<<<<< HEAD
-=======
 							if (0 > num1)
 							{
 								util_out_print_gtmio("Alternation integer overflow", FLUSH);
 								return FALSE;
 							}
 						}
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 						if ('.' == *ptr)
 						{
 							have_dot = TRUE;
@@ -833,11 +831,9 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 							*dst_ptr++ = *ptr++;
 							len--;
 							if (ISDIGIT_ASCII(*ptr))
+							{
 								PROCESS_AND_GET_INTEGER(ptr, len, have_star, dst_ptr, dst_len, num2,
 									MAX_GVSUBS_LEN);
-<<<<<<< HEAD
-							if (-1 == num1)
-=======
 								if (0 > num2)
 								{
 									util_out_print_gtmio("Alternation integer overflow", FLUSH);
@@ -845,7 +841,6 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 								}
 							}
 							if (-1 == num1)	/* Pattern range without a defined beginning */
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 								num1 = 0;
 						}
 						switch (*ptr)

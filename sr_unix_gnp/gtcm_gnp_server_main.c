@@ -343,15 +343,15 @@ STATICFNDEF void gtcm_gnp_switch_interrupt(int sig)
 
 int gtcm_gnp_server_main(int argc, char **argv, char **envp)
 {
-	int4			timout;
-	cmi_status_t		status;
-	int			eof, arg_index, parse_ret;
-	cmi_descriptor		service_descr, log_path_descr;
-	unsigned short		service_len, log_path_len;
 	char			*ptr, service[512];
 	char			time_str[CTIME_BEFORE_NL + 2];	/* for GET_CUR_TIME macro */
+	cmi_descriptor		log_path_descr, service_descr;
+	cmi_status_t		status;
+	int			arg_index, eof, parse_ret;
 	pid_t			pid;
 	struct sigaction	act;
+	uint4			timout;
+	unsigned short		log_path_len, service_len;
 	DCL_THREADGBL_ACCESS;
 
         static boolean_t no_fork = FALSE;
@@ -363,7 +363,6 @@ int gtcm_gnp_server_main(int argc, char **argv, char **envp)
 	assert(0 == offsetof(gv_key, top)); /* for integrity of CM_GET_GVCURRKEY */
 	assert(2 == offsetof(gv_key, end)); /* for integrity of CM_GET_GVCURRKEY */
 	assert(4 == offsetof(gv_key, prev)); /* for integrity of CM_GET_GVCURRKEY */
-	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	ydb_chk_dist(argv[0]);
 	/* read comments in gtm.c for cli magic below */
 	cli_lex_setup(argc, argv);
@@ -384,7 +383,7 @@ int gtcm_gnp_server_main(int argc, char **argv, char **envp)
 		CMI_DESC_SET_LENGTH(&service_descr, service_len);
 	else
 		CMI_DESC_SET_LENGTH(&service_descr, 0);
-	if (cli_get_int("TIMEOUT", &timout))
+	if (cli_get_int("TIMEOUT", (int *)&timout))
 	{
 		cm_timeout = TRUE;
 		if (timout > (1 << 21))

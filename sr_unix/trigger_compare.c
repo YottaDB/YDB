@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -262,7 +262,7 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 					assert(('\0' == *ptr) && (key_val.str.len > len));
 					ptr++;
 					A2I(ptr, key_val.str.addr + key_val.str.len, trig_index);
-					assert(-1 != trig_index);
+					assert(0 < trig_index);
 					if (0 <= trig_index)
 						issue_error = FALSE;
 					else
@@ -293,14 +293,6 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(8) ERR_TRIGDEFBAD, 6, trigvn_len, trigvn,
 					LEN_AND_LIT("\"#TRHASH\""), mv_hash.str.len, mv_hash.str.addr);
 		}
-<<<<<<< HEAD
-=======
-		ptr += len;
-		assert(('\0' == *ptr) && (key_val.str.len > len));
-		ptr++;
-		A2I(ptr, key_val.str.addr + key_val.str.len, trig_index);
-		assert(0 < trig_index);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		MV_FORCE_UMVAL(&mv_trig_indx, trig_index);
 		for (sub_indx = 0; sub_indx < NUM_SUBS; sub_indx++)
 		{

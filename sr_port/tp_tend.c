@@ -284,12 +284,9 @@ boolean_t	tp_tend()
 	jnl_tm_t		save_gbl_jrec_time;
 	uint4			max_upd_num, prev_upd_num, upd_num, upd_num_end, upd_num_start;
 #	endif
-<<<<<<< HEAD
 	int4			tprestart_syslog_delta;
-=======
         int4			event_type, param_val;
         void (*set_fn)(int4 param);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

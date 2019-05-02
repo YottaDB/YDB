@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc *
+ * Copyright 2001, 2013 Fidelity Information Services, Inc 	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +38,8 @@
 #else /* defined(__STDC__) */
 #define P(X) ()
 #endif /* !defined(__STDC__) */
+
+#define	MAX_IMAGE_NAME_LEN	256 + 1
 
 /*  Routines */
 void		gtcm_init     P((int argc, char_ptr_t argv[]));

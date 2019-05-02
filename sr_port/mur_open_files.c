@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,12 +76,9 @@
 #include "wcs_recover.h"
 #include "is_proc_alive.h"
 #include "anticipatory_freeze.h"
-<<<<<<< HEAD
 #include "gvcst_protos.h"		/* for "gvcst_init" */
-=======
 #include "gtmrecv.h"
 #include "gtm_ipc.h"
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 #define RELEASE_ACCESS_CONTROL(REGLIST)												\
 {																\
@@ -338,17 +335,12 @@ uint4 mur_open_files(boolean_t retry)
 	 * That is, journal file names specified must be from current global directory.
 	 */
 	if (star_specified || mur_options.update)
-<<<<<<< HEAD
 	{	/* "*" is specified or it is -recover or -rollback. We require ydb_gbldir to be set in all these cases */
 		/* Note: It is possible gd_header is non-NULL at this point (for example if "ydb_app_ensures_isolation"
 		 * env var is defined and "gvinit" was invoked by the following call sequence
 		 *	mupip_main -> init_gtm -> gtm_startup -> op_view -> view_arg_convert -> gvinit).
 		 * Therefore we cannot assert that gd_header is NULL.
 		 */
-=======
-	{	/* "*" is specified or it is -recover or -rollback. We require gtmgbldir to be set in all these cases */
-		assert((NULL == gd_header) || retry);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 		gvinit();	/* read in current global directory */
 		assert(NULL != gd_header);
 	}
@@ -460,11 +452,7 @@ uint4 mur_open_files(boolean_t retry)
 			}
 			if (mur_options.update || mur_options.extr[GOOD_TN])
 			{
-<<<<<<< HEAD
 	        		gvcst_init(rctl->gd);
-=======
-				gvcst_init(rctl->gd, NULL);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 				TP_CHANGE_REG(rctl->gd);
 				if (jgbl.onlnrlbk)
 				{

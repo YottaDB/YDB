@@ -307,15 +307,9 @@ STATICFNDEF int gtm_trigger_invoke(void)
 
 int gtm_trigger_complink(gv_trigger_t *trigdsc, boolean_t dolink)
 {
-<<<<<<< HEAD
-	char		rtnname[YDB_PATH_MAX + 1], rtnname_template[YDB_PATH_MAX + 1];
-	char		objname[YDB_PATH_MAX + 1];
+	char		rtnname[YDB_PATH_MAX], rtnname_template[YDB_PATH_MAX];
+	char		objname[YDB_PATH_MAX];
 	char		zcomp_parms[(YDB_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)
-=======
-	char		rtnname[GTM_PATH_MAX], rtnname_template[GTM_PATH_MAX];
-	char		objname[GTM_PATH_MAX];
-	char		zcomp_parms[(GTM_PATH_MAX * 2) + SIZEOF(mident_fixed) + SIZEOF(OBJECT_PARM) + SIZEOF(NAMEOFRTN_PARM)
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 				    + SIZEOF(EMBED_SOURCE_PARM)];
 	mstr		save_zsource;
 	int		rtnfd, rc, lenobjname, len, retry, save_errno;

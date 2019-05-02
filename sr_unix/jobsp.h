@@ -31,25 +31,9 @@
 
 #define TIMEOUT_ERROR		(MAX_SYSERR + 1)	/* a special value to differentiate it from the rest of errno's */
 
-<<<<<<< HEAD
 #define CHILD_FLAG_ENV		"ydb_j0"
 #define CLEAR_CHILD_FLAG_ENV  	"ydb_j0="""
 #define GBLDIR_ENV		(ydbenvname[YDBENVINDX_GBLDIR] + 1)	/* + 1 to skip leading $ in env var name */
-#define CWD_ENV			"ydb_j2"
-#define IN_FILE_ENV		"ydb_j3"
-#define OUT_FILE_ENV		"ydb_j4"
-#define ERR_FILE_ENV		"ydb_j5"
-#define LOG_FILE_ENV		"ydb_j6"
-#define ROUTINE_ENV		"ydb_j7"
-#define LABEL_ENV		"ydb_j8"
-#define OFFSET_ENV		"ydb_j9"
-#define PRIORITY_ENV		"ydb_ja"
-#define STARTUP_ENV		"ydb_jb"
-=======
-#define CHILD_FLAG_ENV		"gtmj0"
-#define CLEAR_CHILD_FLAG_ENV  	"gtmj0="""
-#define GBLDIR_ENV		"gtmgbldir"
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 #define JOB_SOCKET_PREFIX		"SOCKET:"
 #define IS_JOB_SOCKET(ADDR, LEN)	((LEN >= SIZEOF(JOB_SOCKET_PREFIX)) && (0 == STRNCMP_LIT(ADDR, JOB_SOCKET_PREFIX)))
@@ -180,12 +164,8 @@ int ojchildioset(job_params_type *jparms);
 int ojstartchild(job_params_type *jparms, int argcnt, boolean_t *non_exit_return, int pipe_fds[]);
 void ojparams(char *p, job_params_type *job_params);
 void ojchildioclean(void);
-<<<<<<< HEAD
-void ojmidchild_send_var(void);
-void job_term_handler(int sig, siginfo_t *info, void *context);
-=======
 void ojpassvar_hook(void);
 void local_variable_marshalling(FILE *output);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+void job_term_handler(int sig, siginfo_t *info, void *context);
 
 #endif

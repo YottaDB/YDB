@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -177,25 +177,11 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					{
 						if ((r_ptr >= r_top) || ((cptr_start != parm->str.addr) && is_dollar_view))
 						{
-<<<<<<< HEAD
 							assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
 								/* so below "format2zwr" is guaranteed not to overflow */
+							n = ARRAYSIZE(global_names);
 							format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len, global_names, &n);
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION,2, n, global_names);
-=======
-							PUSH_MV_STENT(MVST_MVAL);
-							tmpmv = &mv_chain->mv_st_cont.mvs_mval;
-							tmpmv->mvtype = MV_STR;
-							n = ZWR_EXP_RATIO(namestr.len);
-							ENSURE_STP_FREE_SPACE(n);
-							tmpmv->str.addr = (char *)stringpool.free;
-							format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len,
-								(uchar_ptr_t)stringpool.free, &n);
-							stringpool.free += n;
-							tmpmv->str.len = n;
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_NOREGION, 2, n,
-								tmpmv->str.addr);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 						}
 						tmpstr.len = r_ptr->rname_len;
 						tmpstr.addr = (char *)r_ptr->rname;
@@ -240,27 +226,12 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			if (MAX_MIDENT_LEN < parmblk->str.len)
 				parmblk->str.len = MAX_MIDENT_LEN;
 			if (!valid_mname(&parmblk->str))
-<<<<<<< HEAD
 			{
 				assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
 					/* so below "format2zwr" is guaranteed not to overflow */
+				n = ARRAYSIZE(global_names);
 				format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
-=======
-			{	/* here & 2 other places use stringpool because we use format2zwr to ensure the message is graphic
-				 * & we don't return from the rts_error, so a fixed or malloc'd location seems even less attractive
-				 */
-				PUSH_MV_STENT(MVST_MVAL);
-				tmpmv = &mv_chain->mv_st_cont.mvs_mval;
-				tmpmv->mvtype = MV_STR;
-				n = ZWR_EXP_RATIO(parm->str.len);
-				ENSURE_STP_FREE_SPACE(n);
-				tmpmv->str.addr = (char *)stringpool.free;
-				format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, (uchar_ptr_t)stringpool.free, &n);
-				stringpool.free += n;
-				tmpmv->str.len = n;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 			}
 			break;
 		case VTP_RTNAME:
@@ -329,7 +300,6 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				assert(src < src_top);
 				for ( ; ; )
 				{
-<<<<<<< HEAD
 					if (',' == *nextsrc)
 						break;
 					nextsrc++;
@@ -344,6 +314,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 						namestr.len = MAX_MIDENT_LEN;	/* to avoid overflow in "format2zwr" */
 					assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
 						/* so below "format2zwr" is guaranteed not to overflow */
+					n = ARRAYSIZE(global_names);
 					format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len, global_names, &n);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
 					assert(FALSE);
@@ -357,6 +328,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 				{
 					assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
 						/* so below "format2zwr" is guaranteed not to overflow */
+					n = ARRAYSIZE(global_names);
 					format2zwr((sm_uc_ptr_t)namestr.addr, namestr.len, global_names, &n);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
 				}
@@ -384,47 +356,6 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					 * case this gvt gets reallocated (due to different keysizes between gld and db).
 					 */
 					if (NULL == (gvspan = gvnh_reg->gvspan))
-=======
-					nextsrc = (unsigned char *)STRTOK_R(NULL, ",", &strtokptr);
-					if (NULL == nextsrc)
-						nextsrc = &global_names[tmpstr.len + 1];
-					if (nextsrc - src >= 2 && '^' == *src)
-					{
-						namestr.addr = (char *)src + 1;		/* skip initial '^' */
-						namestr.len = INTCAST(nextsrc - src - 2); /* don't count initial ^ and trailing 0 */
-						if (namestr.len > MAX_MIDENT_LEN)
-							namestr.len = MAX_MIDENT_LEN;
-						if (valid_mname(&namestr))
-						{
-							memcpy(&lcl_buff.c[0], namestr.addr, namestr.len);
-							gvent.var_name.len = namestr.len;
-						} else
-						{
-							memcpy(&lcl_buff.c[0], src, nextsrc - src - 1);
-							n = MAX_PARMS;
-							format2zwr((sm_uc_ptr_t)&lcl_buff.c, nextsrc - src - 1, global_names, &n);
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, global_names);
-						}
-					} else
-					{
-						memcpy(&lcl_buff.c[0], src, (n = nextsrc - src - 1));
-						PUSH_MV_STENT(MVST_MVAL);
-						tmpmv = &mv_chain->mv_st_cont.mvs_mval;
-						tmpmv->mvtype = MV_STR;
-						n = ZWR_EXP_RATIO(n);
-						ENSURE_STP_FREE_SPACE(n);
-						tmpmv->str.addr = (char *)stringpool.free;
-						format2zwr((sm_uc_ptr_t)&lcl_buff.c, nextsrc - src - 1,
-								(uchar_ptr_t)stringpool.free, &n);
-						stringpool.free += n;
-						tmpmv->str.len = n;
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWGVN, 2, n, tmpmv->str.addr);
-					}
-					tmp_gvt = NULL;
-					gvent.var_name.addr = &lcl_buff.c[0];
-					COMPUTE_HASH_MNAME(&gvent);
-					if (NULL != (tabent = lookup_hashtab_mname(gd_header->tab_ptr, &gvent)))
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 					{
 						ADD_TO_GVT_PENDING_LIST_IF_REG_NOT_OPEN(r_ptr, &gvnh_reg->gvt, NULL);
 					} else
@@ -468,7 +399,7 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 					lvent.var_name.len = MAX_MIDENT_LEN;
 				if (!valid_mname(&lvent.var_name))
 				{
-					n = MAX_PARMS;
+					n = ARRAYSIZE(global_names);
 					format2zwr((sm_uc_ptr_t)parm->str.addr, parm->str.len, global_names, &n);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_VIEWLVN, 2, n, global_names);
 				}

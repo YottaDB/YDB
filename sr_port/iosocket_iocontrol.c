@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,10 +66,7 @@ error_def(ERR_INVCTLMNE);
 #define LISTENING	"LISTENING|"
 #define MAXEVENTLITLEN	(SIZEOF(LISTENING)-1)
 #define MAXZKEYITEMLEN	(MAX_HANDLE_LEN + SA_MAXLITLEN + MAXEVENTLITLEN + 2)	/* 1 pipe and a semicolon */
-<<<<<<< HEAD
-=======
 #define READ		"READ|"
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 void	iosocket_iocontrol(mstr *mn, int4 argcnt, va_list args)
 {

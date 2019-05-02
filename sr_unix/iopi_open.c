@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -224,11 +224,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 		{	/* look in $ydb_dist in case not explicitly listed or not in the $PATH variable */
 			if (ydb_dist_ok_to_use)
 			{	/* build a translated path to command */
-<<<<<<< HEAD
-				SPRINTF(temp, "%s/%s", ydb_dist, token2);
-=======
-				SNPRINTF(temp,  pathsize, "%s/%s", gtm_dist, token2);
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+				SNPRINTF(temp,  pathsize, "%s/%s", ydb_dist, token2);
 				STAT_FILE(temp, &sb, ret_stat);
 				if (0 == ret_stat && (S_ISREG(sb.st_mode)) && (sb.st_mode & (S_IXOTH | S_IXGRP | S_IXUSR)))
 					notfound = FALSE;

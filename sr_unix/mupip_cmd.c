@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -725,11 +725,7 @@ static	CLI_ENTRY	mup_set_qual[] = {
 { "PARTIAL_RECOV_BYPASS", mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
 { "PREVJNLFILE",          mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NEG,     VAL_STR,  0 },
 { "QDBRUNDOWN",           mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-<<<<<<< HEAD
-{ "READ_ONLY",            mupip_set, 0, 0,                      0,                              0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
-=======
 { "READ_ONLY",            mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NEG,     VAL_N_A,  0 },
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 { "RECORD_SIZE",          mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  0 },
 { "REGION",               mupip_set, 0, 0,			0,				0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A,  0 },
 { "REORG_SLEEP_NSEC",     mupip_set, 0, 0,			0,				0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM,  VAL_DCM },

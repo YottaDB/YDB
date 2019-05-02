@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -248,11 +248,8 @@ void dse_dmp_fhead (void)
 				  ! (RDBF_NOSTATS & csd->reservedDBFlags) ? " TRUE" : "FALSE");
 		util_out_print("  LOCK shares DB critical section     !AD", FALSE, 5, csd->lock_crit_with_db ? " TRUE" : "FALSE");
 		util_out_print("  Read Only                      !AD", TRUE, 3, csd->read_only ? " ON" : "OFF");
-<<<<<<< HEAD
-		util_out_print("  Reorg Sleep Nanoseconds !17UL", TRUE, csd->reorg_sleep_nsec);
-=======
 		util_out_print("  Recover interrupted                 !AD", TRUE, 5, (csd->recov_interrupted ? " TRUE" : "FALSE"));
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+		util_out_print("  Reorg Sleep Nanoseconds !17UL", TRUE, csd->reorg_sleep_nsec);
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */

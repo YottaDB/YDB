@@ -3,7 +3,7 @@
 ; Copyright (c) 2001-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ; Copyright (c) 2017-2018 Stephen L Johnson.			;
@@ -29,23 +29,12 @@ GDEINIT
 	s endian("MIPS","A25")=TRUE,glo("A25")=1024
 	s endian("RS6000","AIX")=TRUE,glo("AIX")=1024
 	s endian("S390","OS390")=TRUE,endian("S390X","Linux")=TRUE,glo("OS390")=1024
-<<<<<<< HEAD
 	s endian("armv6l","Linux")=FALSE,glo("Linux")=1024
 	s endian("armv7l","Linux")=FALSE,glo("Linux")=1024
 	s endian("aarch64","Linux")=FALSE,glo("Linux")=1024
-	; The following line is for support of AIX V3.2.5 only and can (and should)
-	; be removed (along with this comment) as soon as we drop support for
-	; AIX V3.2.5.  This change is needed to correspond to the change in
-	; release_name.h.  C9801-000344
-	s glo("AIX325")=glo("AIX")
 	s HEX(0)=1
 	s gtm64=$p($zver," ",4)
-	i "/IA64/RS6000/SPARC/x86_64/x86/S390/S390X/aarch64"[("/"_gtm64) s encsupportedplat=TRUE,gtm64=$s("x86"=gtm64:FALSE,1:TRUE)
-=======
-	s HEX(0)=1
-	s gtm64=$p($zver," ",4)
-	i "/RS6000/x86_64/x86/S390/S390X"[("/"_gtm64) s encsupportedplat=TRUE,gtm64=$s("x86"=gtm64:FALSE,1:TRUE)
->>>>>>> 7a1d2b3e... GT.M V6.3-007
+	i "/RS6000/x86_64/x86/S390/S390X/aarch64"[("/"_gtm64) s encsupportedplat=TRUE,gtm64=$s("x86"=gtm64:FALSE,1:TRUE)
 	e  s (encsupportedplat,gtm64)=FALSE
 	i (gtm64=TRUE) d
 	. f x=1:1:16 s HEX(x)=HEX(x-1)*16 i x#2=0 s TWO(x*4)=HEX(x)
@@ -158,40 +147,6 @@ GDEINIT
 ; instance
 	s maxinst("FILE")=SIZEOF("file_spec")
 ; region
-<<<<<<< HEAD
-	s minreg("ALLOCATION")=200
-	s minreg("BEFORE_IMAGE")=0,minreg("COLLATION_DEFAULT")=0,minreg("STDNULLCOLL")=0
-	s minreg("EXTENSION")=0
-	s minreg("AUTOSWITCHLIMIT")=16384
-	s minreg("ALIGNSIZE")=4096			; geq RECORD_SIZE
-	s minreg("EPOCH_INTERVAL")=1
-	s minreg("SYNC_IO")=0
-	s minreg("YIELD_LIMIT")=0
-	s minreg("INST_FREEZE_ON_ERROR")=0
-	s minreg("BUFFER_SIZE")=2307
-	s minreg("QDBRUNDOWN")=0
-	s minreg("EPOCHTAPER")=0
-	s minreg("AUTODB")=0
-	s minreg("STATS")=0
-	s minreg("LOCK_CRIT_SEPARATE")=0
-	s minreg("RECORD_SIZE")=0
-	s minreg("JOURNAL")=0,minreg("KEY_SIZE")=3,minreg("NULL_SUBSCRIPTS")=0
-	s maxreg("ALLOCATION")=TWO(24),maxreg("BEFORE_IMAGE")=1
-	s maxreg("COLLATION_DEFAULT")=255,maxreg("STDNULLCOLL")=1
-	s maxreg("EXTENSION")=1073741823
-	s maxreg("AUTOSWITCHLIMIT")=8388607
-	s maxreg("ALIGNSIZE")=4194304
-	s maxreg("EPOCH_INTERVAL")=32767
-	s maxreg("SYNC_IO")=1
-	s maxreg("YIELD_LIMIT")=2048
-	s maxreg("INST_FREEZE_ON_ERROR")=1
-	s maxreg("BUFFER_SIZE")=32768
-	s maxreg("QDBRUNDOWN")=1
-	s maxreg("EPOCHTAPER")=1
-	s maxreg("AUTODB")=1
-	s maxreg("STATS")=1
-	s maxreg("LOCK_CRIT_SEPARATE")=1
-=======
 	s minreg("ALIGNSIZE")=4096,maxreg("ALIGNSIZE")=4194304			; geq RECORD_SIZE
 	s minreg("ALLOCATION")=2048,maxreg("ALLOCATION")=8388607
 	s minreg("AUTODB")=0,maxreg("AUTODB")=1
@@ -205,9 +160,8 @@ GDEINIT
 	s minreg("INST_FREEZE_ON_ERROR")=0,maxreg("INST_FREEZE_ON_ERROR")=1
 	s minreg("JOURNAL")=0,maxreg("JOURNAL")=1
 	s minreg("KEY_SIZE")=3
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	s maxreg("KEY_SIZE")=1019	; = max value of KEY->end that returns TRUE for CAN_APPEND_HIDDEN_SUBS(KEY) in gdsfhead.h
-	s minreg("LOCK_CRIT")=0,maxreg("LOCK_CRIT")=1
+	s minreg("LOCK_CRIT_SEPARATE")=0,maxreg("LOCK_CRIT_SEPARATE")=1
 	s minreg("NULL_SUBSCRIPTS")=0,maxreg("NULL_SUBSCRIPTS")=2
 	s minreg("QDBRUNDOWN")=0,maxreg("QDBRUNDOWN")=1
 	s minreg("RECORD_SIZE")=0,maxreg("RECORD_SIZE")=SIZEOF("max_str")
@@ -272,12 +226,6 @@ syntabi:
 	s syntab("ADD","REGION","DYNAMIC_SEGMENT")="REQUIRED"
 	s syntab("ADD","REGION","DYNAMIC_SEGMENT","TYPE")="TSEGMENT"
 	s syntab("ADD","REGION","EPOCHTAPER")="NEGATABLE"
-<<<<<<< HEAD
-	s syntab("ADD","REGION","AUTODB")="NEGATABLE"
-	s syntab("ADD","REGION","STATS")="NEGATABLE"
-	s syntab("ADD","REGION","LOCK_CRIT_SEPARATE")="NEGATABLE"
-=======
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	s syntab("ADD","REGION","INST_FREEZE_ON_ERROR")="NEGATABLE"
 	s syntab("ADD","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
 	s syntab("ADD","REGION","JOURNAL","ALLOCATION")="REQUIRED"
@@ -293,7 +241,7 @@ syntabi:
 	s syntab("ADD","REGION","JOURNAL","FILE_NAME","TYPE")="TFSPEC"
 	s syntab("ADD","REGION","KEY_SIZE")="REQUIRED"
 	s syntab("ADD","REGION","KEY_SIZE","TYPE")="TNUMBER"
-	s syntab("ADD","REGION","LOCK_CRIT")="NEGATABLE"
+	s syntab("ADD","REGION","LOCK_CRIT_SEPARATE")="NEGATABLE"
 	s syntab("ADD","REGION","NULL_SUBSCRIPTS")="NEGATABLE,REQUIRED"
 	s syntab("ADD","REGION","NULL_SUBSCRIPTS","TYPE")="TNULLSUB"
 	s syntab("ADD","REGION","QDBRUNDOWN")="NEGATABLE"
@@ -344,12 +292,6 @@ syntabi:
 	s syntab("CHANGE","REGION","DYNAMIC_SEGMENT")="REQUIRED"
 	s syntab("CHANGE","REGION","DYNAMIC_SEGMENT","TYPE")="TSEGMENT"
 	s syntab("CHANGE","REGION","EPOCHTAPER")="NEGATABLE"
-<<<<<<< HEAD
-	s syntab("CHANGE","REGION","AUTODB")="NEGATABLE"
-	s syntab("CHANGE","REGION","STATS")="NEGATABLE"
-	s syntab("CHANGE","REGION","LOCK_CRIT_SEPARATE")="NEGATABLE"
-=======
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	s syntab("CHANGE","REGION","INST_FREEZE_ON_ERROR")="NEGATABLE"
 	s syntab("CHANGE","REGION","JOURNAL")="NEGATABLE,REQUIRED,LIST"
 	s syntab("CHANGE","REGION","JOURNAL","ALLOCATION")="REQUIRED"
@@ -365,7 +307,7 @@ syntabi:
 	s syntab("CHANGE","REGION","JOURNAL","FILE_NAME","TYPE")="TFSPEC"
 	s syntab("CHANGE","REGION","KEY_SIZE")="REQUIRED"
 	s syntab("CHANGE","REGION","KEY_SIZE","TYPE")="TNUMBER"
-	s syntab("CHANGE","REGION","LOCK_CRIT")="NEGATABLE"
+	s syntab("CHANGE","REGION","LOCK_CRIT_SEPARATE")="NEGATABLE"
 	s syntab("CHANGE","REGION","NULL_SUBSCRIPTS")="NEGATABLE,REQUIRED"
 	s syntab("CHANGE","REGION","NULL_SUBSCRIPTS","TYPE")="TNULLSUB"
 	s syntab("CHANGE","REGION","QDBRUNDOWN")="NEGATABLE"
@@ -416,21 +358,13 @@ syntabi:
 	s syntab("TEMPLATE","REGION","JOURNAL","BEFORE_IMAGE")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","JOURNAL","BUFFER_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","REGION","JOURNAL","BUFFER_SIZE","TYPE")="TNUMBER"
-<<<<<<< HEAD
-	s syntab("TEMPLATE","REGION","JOURNAL","BEFORE_IMAGE")="NEGATABLE"
-	s syntab("TEMPLATE","REGION","EPOCHTAPER")="NEGATABLE"
-	s syntab("TEMPLATE","REGION","AUTODB")="NEGATABLE"
-	s syntab("TEMPLATE","REGION","STATS")="NEGATABLE"
-	s syntab("TEMPLATE","REGION","LOCK_CRIT_SEPARATE")="NEGATABLE"
-=======
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	s syntab("TEMPLATE","REGION","JOURNAL","EXTENSION")="REQUIRED"
 	s syntab("TEMPLATE","REGION","JOURNAL","EXTENSION","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","REGION","JOURNAL","FILE_NAME")="REQUIRED"
 	s syntab("TEMPLATE","REGION","JOURNAL","FILE_NAME","TYPE")="TFSPEC"
 	s syntab("TEMPLATE","REGION","KEY_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","REGION","KEY_SIZE","TYPE")="TNUMBER"
-	s syntab("TEMPLATE","REGION","LOCK_CRIT")="NEGATABLE"
+	s syntab("TEMPLATE","REGION","LOCK_CRIT_SEPARATE")="NEGATABLE"
 	s syntab("TEMPLATE","REGION","NULL_SUBSCRIPTS")="NEGATABLE,REQUIRED"
 	s syntab("TEMPLATE","REGION","NULL_SUBSCRIPTS","TYPE")="TNULLSUB"
 	s syntab("TEMPLATE","REGION","QDBRUNDOWN")="NEGATABLE"

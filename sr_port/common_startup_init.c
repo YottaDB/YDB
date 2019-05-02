@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,12 +44,8 @@ GBLREF	boolean_t		dse_running;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	boolean_t 		span_nodes_disallowed;
-<<<<<<< HEAD
 GBLREF	char			ydb_dist[YDB_PATH_MAX];
 GBLREF	CLI_ENTRY		*cmd_ary;	/* Pointer to command table for MUMPS/DSE/LKE etc. */
-=======
-GBLREF	char			gtm_dist[GTM_PATH_MAX];
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 
 error_def(ERR_MIXIMAGE);
 
@@ -116,19 +112,6 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 	getjobnum();
 	/* Get the OS page size. */
 	get_page_size();
-<<<<<<< HEAD
-=======
-	/* Read gtm_dist. */
-	if (NULL != (dist = GETENV(GTM_DIST)))
-	{
-		len = STRLEN(dist);
-		len = (GTM_PATH_MAX < len) ? GTM_PATH_MAX : len;
-		memcpy(gtm_dist, dist, len);
-		len = MIN(len, PATH_MAX);
-		gtm_dist[len] = '\0';
-	} else
-		gtm_dist[0] = '\0';
->>>>>>> 7a1d2b3e... GT.M V6.3-007
 	/* Setup global variables corresponding to signal blocks. */
 	set_blocksig();
 	/* Do common environment initialization. */
