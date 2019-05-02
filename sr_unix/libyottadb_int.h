@@ -155,6 +155,7 @@ MBSTART	{															\
 		ESTABLISH_NORET(gtmci_ch, error_encountered);									\
 		if (error_encountered)												\
 		{	/* "gtmci_ch" encountered an error and transferred control back here. Return. */			\
+			REVERT;													\
 			assert(0 < mumps_status);										\
 			return RETTYPE -mumps_status;										\
 		}														\
@@ -195,6 +196,7 @@ MBSTART	{															\
 		ESTABLISH_NORET(gtmci_ch, error_encountered);									\
 		if (error_encountered)												\
 		{	/* "gtmci_ch" encountered an error and transferred control back here. Return. */			\
+			REVERT;													\
 			return;													\
 		}														\
 		ydb_nested_callin();            /* Note - sets fgncal_stack */							\

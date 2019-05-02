@@ -99,6 +99,7 @@ int ydb_exit()
 			 * Return after mutex lock cleanup.
 			 */
 			THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+			REVERT;
 			/* "ydb_exit" returns positive error code so return TREF(ydb_error_code) as is
 			 * (i.e. no negation for YDB_ERR_* like is common in other ydb_*_s() function calls)
 			 */

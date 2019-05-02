@@ -244,6 +244,7 @@ int ydb_init()
 		if (error_encountered)
 		{	/* "gtmci_ch" encountered an error and transferred control back here. Return after mutex lock cleanup. */
 			THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+			REVERT;
 			/* "ydb_init" returns positive error code so return mumps_status as is (i.e. no negation for YDB_ERR_*) */
 			assert(0 < mumps_status);
 			return mumps_status;

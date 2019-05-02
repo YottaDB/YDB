@@ -175,6 +175,7 @@ MBSTART {												\
 	ESTABLISH_NORET(gtmci_ch, error_encountered);							\
 	if (error_encountered)										\
 	{	/* "gtmci_ch" encountered an error and transferred control back here. Return. */	\
+		REVERT;											\
 		return mumps_status;									\
 	}												\
 	ydb_nested_callin();            /* Note - sets fgncal_stack */					\
