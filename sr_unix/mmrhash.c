@@ -2,7 +2,7 @@
  *								*
  * Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,7 +21,7 @@
  * compile and run any of them on any platform, but your performance with the
  * non-native version will be less than optimal.
  *
- * This version converted to C for use in GT.M by FIS.
+ * This version converted to C for use in GT.M/YottaDB by FIS/YottaDB.
  *-----------------------------------------------------------------------------*/
 
 #include "mdef.h"
@@ -32,14 +32,14 @@
 
 /*
  * Since this code is largely third-party, its form is somewhat different than
- * other code in GT.M. This is intentional, at least for the initial version,
+ * other code in YottaDB/GT.M. This is intentional, at least for the initial version,
  * in order to allow for comparison with the original. This may be cleaned up
  * in future versions, as no revisions to the original public domain code are
  * expected. The original code is hosted at http://code.google.com/p/smhasher/ .
  *
- * Note also that GT.M is currently only using the 32 bit hash function,
- * MurmurHash3_x86_32(). The 128 bit functions are retained for completeness
- * and possible future use.
+ * Note also that YottaDB/GT.M is currently only using the 32 bit hash function,
+ * MurmurHash3_x86_32(). The 128 bit functions MurmurHash3_x86_128() and MurmurHash3_x64_128()
+ * are retained for completeness and possible future use.
  *
  */
 
@@ -52,7 +52,7 @@
 
 static uint4 fmix ( uint4 h );
 
-static gtm_uint8 fmix64 ( gtm_uint8 k );
+static ydb_uint8 fmix64 ( ydb_uint8 k );
 
 #define ROTL32(X,Y)	(((X) << (Y)) | ((X) >> (32 - (Y))))
 #define ROTL64(X,Y)	(((X) << (Y)) | ((X) >> (64 - (Y))))
@@ -61,7 +61,7 @@ static gtm_uint8 fmix64 ( gtm_uint8 k );
 
 #define GETBLOCK(p,i) (((const uint4 *)p)[(int)i])
 
-#define GETBLOCK64(p,i) (((const gtm_uint8 *)p)[(int)i])
+#define GETBLOCK64(p,i) (((const ydb_uint8 *)p)[(int)i])
 
 #ifdef BIGENDIAN
 #	if defined(__GNUC__) && (__GNUC__>4 || (__GNUC__==4 && __GNUC_MINOR__>=3))
@@ -96,7 +96,7 @@ static FORCE_INLINE uint4 fmix ( uint4 h )
 
 /*----------*/
 
-static FORCE_INLINE gtm_uint8 fmix64 ( gtm_uint8 k )
+static FORCE_INLINE ydb_uint8 fmix64 ( ydb_uint8 k )
 {
   k ^= k >> 33;
   k *= BIG_CONSTANT(0xff51afd7ed558ccd);
@@ -341,14 +341,14 @@ void MurmurHash3_x64_128 ( const void * key, const int len,
   static char	*buff;
   static int	bufflen;
 
-  gtm_uint8 h1 = seed;
-  gtm_uint8 h2 = seed;
+  ydb_uint8 h1 = seed;
+  ydb_uint8 h2 = seed;
 
-  gtm_uint8 c1 = BIG_CONSTANT(0x87c37b91114253d5);
-  gtm_uint8 c2 = BIG_CONSTANT(0x4cf5ad432745937f);
+  ydb_uint8 c1 = BIG_CONSTANT(0x87c37b91114253d5);
+  ydb_uint8 c2 = BIG_CONSTANT(0x4cf5ad432745937f);
 
-  gtm_uint8 k1;
-  gtm_uint8 k2;
+  ydb_uint8 k1;
+  ydb_uint8 k2;
 
   /*----------
    * body   */
@@ -374,7 +374,7 @@ void MurmurHash3_x64_128 ( const void * key, const int len,
   }
 # endif
 
-  const gtm_uint8 * blocks = (const gtm_uint8 *)(data);
+  const ydb_uint8 * blocks = (const ydb_uint8 *)(data);
 
   for(i = 0; i < nblocks; i++)
   {
@@ -407,23 +407,23 @@ void MurmurHash3_x64_128 ( const void * key, const int len,
    */
   switch(len & 15)
   {
-  case 15: k2 ^= ((gtm_uint8)tail[14]) << 48;
-  case 14: k2 ^= ((gtm_uint8)tail[13]) << 40;
-  case 13: k2 ^= ((gtm_uint8)tail[12]) << 32;
-  case 12: k2 ^= ((gtm_uint8)tail[11]) << 24;
-  case 11: k2 ^= ((gtm_uint8)tail[10]) << 16;
-  case 10: k2 ^= ((gtm_uint8)tail[ 9]) << 8;
-  case  9: k2 ^= ((gtm_uint8)tail[ 8]) << 0;
+  case 15: k2 ^= ((ydb_uint8)tail[14]) << 48;
+  case 14: k2 ^= ((ydb_uint8)tail[13]) << 40;
+  case 13: k2 ^= ((ydb_uint8)tail[12]) << 32;
+  case 12: k2 ^= ((ydb_uint8)tail[11]) << 24;
+  case 11: k2 ^= ((ydb_uint8)tail[10]) << 16;
+  case 10: k2 ^= ((ydb_uint8)tail[ 9]) << 8;
+  case  9: k2 ^= ((ydb_uint8)tail[ 8]) << 0;
            k2 *= c2; k2  = ROTL64(k2,33); k2 *= c1; h2 ^= k2;
 
-  case  8: k1 ^= ((gtm_uint8)tail[ 7]) << 56;
-  case  7: k1 ^= ((gtm_uint8)tail[ 6]) << 48;
-  case  6: k1 ^= ((gtm_uint8)tail[ 5]) << 40;
-  case  5: k1 ^= ((gtm_uint8)tail[ 4]) << 32;
-  case  4: k1 ^= ((gtm_uint8)tail[ 3]) << 24;
-  case  3: k1 ^= ((gtm_uint8)tail[ 2]) << 16;
-  case  2: k1 ^= ((gtm_uint8)tail[ 1]) << 8;
-  case  1: k1 ^= ((gtm_uint8)tail[ 0]) << 0;
+  case  8: k1 ^= ((ydb_uint8)tail[ 7]) << 56;
+  case  7: k1 ^= ((ydb_uint8)tail[ 6]) << 48;
+  case  6: k1 ^= ((ydb_uint8)tail[ 5]) << 40;
+  case  5: k1 ^= ((ydb_uint8)tail[ 4]) << 32;
+  case  4: k1 ^= ((ydb_uint8)tail[ 3]) << 24;
+  case  3: k1 ^= ((ydb_uint8)tail[ 2]) << 16;
+  case  2: k1 ^= ((ydb_uint8)tail[ 1]) << 8;
+  case  1: k1 ^= ((ydb_uint8)tail[ 0]) << 0;
            k1 *= c1; k1  = ROTL64(k1,31); k1 *= c2; h1 ^= k1;
   };
 
@@ -441,8 +441,8 @@ void MurmurHash3_x64_128 ( const void * key, const int len,
   h1 += h2;
   h2 += h1;
 
-  ((gtm_uint8*)out)[0] = h1;
-  ((gtm_uint8*)out)[1] = h2;
+  ((ydb_uint8*)out)[0] = h1;
+  ((ydb_uint8*)out)[1] = h2;
 }
 
 /*******************************************************************************
@@ -467,7 +467,7 @@ void MurmurHash3_x64_128 ( const void * key, const int len,
 MBSTART {													\
 	int			ab_count, ab_offset, ab_carry_bytes;						\
 	const unsigned char	*ab_key, *ab_ptr;								\
-	gtm_uint8		c1, c2;										\
+	ydb_uint8		c1, c2;										\
 														\
 	assert((STATEPTR)->carry_bytes + (COUNT) >= 0);								\
 	assert((STATEPTR)->carry_bytes + (COUNT) <= 16);							\
@@ -480,9 +480,9 @@ MBSTART {													\
 	c2 = (STATEPTR)->c.two;											\
 	assert((ab_carry_bytes != 0) || ((c1 == 0) && (c2 == 0)));						\
 	for (; (ab_offset > 8) && (ab_ptr >= ab_key); ab_ptr--, ab_offset--)					\
-		c2 |= LSHIFT_BYTES_SAFE((gtm_uint8)*ab_ptr, (ab_offset - 9));					\
+		c2 |= LSHIFT_BYTES_SAFE((ydb_uint8)*ab_ptr, (ab_offset - 9));					\
 	for (; ab_ptr >= ab_key; ab_ptr--, ab_offset--)								\
-		c1 |= LSHIFT_BYTES_SAFE((gtm_uint8)*ab_ptr, (ab_offset - 1));					\
+		c1 |= LSHIFT_BYTES_SAFE((ydb_uint8)*ab_ptr, (ab_offset - 1));					\
 	assert(((ab_carry_bytes + ab_count) != 0) || ((c1 == 0) && (c2 == 0)));					\
 	assert((ab_count != 0) || (((STATEPTR)->c.one == c1) && ((STATEPTR)->c.two == c2)));			\
 	(STATEPTR)->c.one = c1;											\
@@ -493,13 +493,13 @@ MBSTART {													\
 #define GET_BLOCK(STATEPTR, KEY, K1, K2)									\
 MBSTART {													\
 	int		gb_carry_bytes;										\
-	gtm_uint8	gb_m1, gb_m2, gb_k1, gb_k2, gb_c1, gb_c2;						\
+	ydb_uint8	gb_m1, gb_m2, gb_k1, gb_k2, gb_c1, gb_c2;						\
 														\
 	assert(((STATEPTR)->carry_bytes != 0) || (((STATEPTR)->c.one == 0) && ((STATEPTR)->c.two == 0)));	\
 	assert((STATEPTR)->carry_bytes < 16);									\
 	gb_carry_bytes = (STATEPTR)->carry_bytes;								\
-	gb_m1 = ((gtm_uint8 *)(KEY))[0];									\
-	gb_m2 = ((gtm_uint8 *)(KEY))[1];									\
+	gb_m1 = ((ydb_uint8 *)(KEY))[0];									\
+	gb_m2 = ((ydb_uint8 *)(KEY))[1];									\
 	if (0 == gb_carry_bytes)										\
 	{													\
 		(K1) = gb_m1;											\
@@ -550,7 +550,7 @@ MBSTART {													\
 MBSTART {													\
 	int			ab_count, ab_offset, ab_carry_bytes;						\
 	const unsigned char	*ab_key, *ab_ptr;								\
-	gtm_uint8		c1, c2;										\
+	ydb_uint8		c1, c2;										\
 														\
 	assert((STATEPTR)->carry_bytes + (COUNT) >= 0);								\
 	assert((STATEPTR)->carry_bytes + (COUNT) <= 16);							\
@@ -563,9 +563,9 @@ MBSTART {													\
 	c2 = (STATEPTR)->c.two;											\
 	assert((ab_carry_bytes != 0) || ((c1 == 0) && (c2 == 0)));						\
 	for (; (ab_offset > 8) && (ab_ptr >= ab_key); ab_ptr--, ab_offset--)					\
-		c2 |= LSHIFT_BYTES_SAFE((gtm_uint8)*ab_ptr, (16 - ab_offset));					\
+		c2 |= LSHIFT_BYTES_SAFE((ydb_uint8)*ab_ptr, (16 - ab_offset));					\
 	for (; ab_ptr >= ab_key; ab_ptr--, ab_offset--)								\
-		c1 |= LSHIFT_BYTES_SAFE((gtm_uint8)*ab_ptr, (8 - ab_offset));					\
+		c1 |= LSHIFT_BYTES_SAFE((ydb_uint8)*ab_ptr, (8 - ab_offset));					\
 	assert(((ab_carry_bytes + ab_count) != 0) || ((c1 == 0) && (c2 == 0)));					\
 	assert((ab_count != 0) || (((STATEPTR)->c.one == c1) && ((STATEPTR)->c.two == c2)));			\
 	(STATEPTR)->c.one = c1;											\
@@ -576,12 +576,12 @@ MBSTART {													\
 #define GET_BLOCK(STATEPTR, KEY, K1, K2)									\
 MBSTART {													\
 	int		gb_carry_bytes;										\
-	gtm_uint8	gb_m1, gb_m2, gb_k1, gb_k2, gb_c1, gb_c2;						\
+	ydb_uint8	gb_m1, gb_m2, gb_k1, gb_k2, gb_c1, gb_c2;						\
 														\
 	assert(((STATEPTR)->carry_bytes != 0) || (((STATEPTR)->c.one == 0) && ((STATEPTR)->c.two == 0)));	\
 	gb_carry_bytes = (STATEPTR)->carry_bytes;								\
-	gb_m1 = ((gtm_uint8 *)(KEY))[0];									\
-	gb_m2 = ((gtm_uint8 *)(KEY))[1];									\
+	gb_m1 = ((ydb_uint8 *)(KEY))[0];									\
+	gb_m2 = ((ydb_uint8 *)(KEY))[1];									\
 	if (0 == gb_carry_bytes)										\
 	{													\
 		(K1) = gb_m1;											\
@@ -676,36 +676,36 @@ MBSTART {													\
 
 
 /* This is an endian-independent 16-byte murmur hash function */
-void gtmmrhash_128(const void *key, int len, uint4 seed, gtm_uint16 *out)
+void ydb_mmrhash_128(const void *key, int len, uint4 seed, ydb_uint16 *out)
 {
 	hash128_state_t state;
 
 	HASH128_STATE_INIT(state, seed);
 	assert((state.carry_bytes == 0) && (state.c.one == 0) && (state.c.two == 0));
-	gtmmrhash_128_ingest(&state, key, len);
-	gtmmrhash_128_result(&state, len, out);
+	ydb_mmrhash_128_ingest(&state, key, len);
+	ydb_mmrhash_128_result(&state, len, out);
 }
 
-/* This is the same as gtmmrhash_128 (i.e. is endian independent) except that it generates a 4-byte hash
+/* This is the same as ydb_mmrhash_128 (i.e. is endian independent) except that it generates a 4-byte hash
  * (needed e.g. by STR_HASH macro). To avoid the overhead of an extra function call, we duplicate the
  * code of "gtmmmrhash_128" here.
  */
-void gtmmrhash_32(const void *key, int len, uint4 seed, uint4 *out4)
+void ydb_mmrhash_32(const void *key, int len, uint4 seed, uint4 *out4)
 {
 	hash128_state_t state;
-	gtm_uint16	out16;
+	ydb_uint16	out16;
 
 	HASH128_STATE_INIT(state, seed);
 	assert((state.carry_bytes == 0) && (state.c.one == 0) && (state.c.two == 0));
-	gtmmrhash_128_ingest(&state, key, len);
-	gtmmrhash_128_result(&state, len, &out16);
+	ydb_mmrhash_128_ingest(&state, key, len);
+	ydb_mmrhash_128_result(&state, len, &out16);
 	*out4 = (uint4)out16.one;
 }
 
-void gtmmrhash_128_ingest(hash128_state_t *state, const void *key, int len)
+void ydb_mmrhash_128_ingest(hash128_state_t *state, const void *key, int len)
 {
 	int			i;
-	gtm_uint8		k1, k2;
+	ydb_uint8		k1, k2;
 	const unsigned char	*keyptr;
 
 	if (0 == len)
@@ -733,9 +733,9 @@ void gtmmrhash_128_ingest(hash128_state_t *state, const void *key, int len)
 		PROCESS_BYTES(state, keyptr, len);
 }
 
-void gtmmrhash_128_result(hash128_state_t *state, uint4 total_len, gtm_uint16 *out)
+void ydb_mmrhash_128_result(hash128_state_t *state, uint4 total_len, ydb_uint16 *out)
 {
-	gtm_uint8		k1, k2, h1, h2;
+	ydb_uint8		k1, k2, h1, h2;
 
 	k1 = state->c.one;
 	k2 = state->c.two;
@@ -766,7 +766,7 @@ void gtmmrhash_128_result(hash128_state_t *state, uint4 total_len, gtm_uint16 *o
 	out->two = h2;
 }
 
-void gtmmrhash_128_bytes(const gtm_uint16 *hash, unsigned char *out)
+void ydb_mmrhash_128_bytes(const ydb_uint16 *hash, unsigned char *out)
 {
 #	ifdef BIGENDIAN
 #	define EXTRACT_BYTE(X, N)	(((uint64_t)(X) & ((uint64_t)0xff << (N) * 8)) >> (N) * 8)
@@ -787,17 +787,17 @@ void gtmmrhash_128_bytes(const gtm_uint16 *hash, unsigned char *out)
 	out[14] = EXTRACT_BYTE(hash->two, 6);
 	out[15] = EXTRACT_BYTE(hash->two, 7);
 #	else
-	((gtm_uint8 *)out)[0] = hash->one;
-	((gtm_uint8 *)out)[1] = hash->two;
+	((ydb_uint8 *)out)[0] = hash->one;
+	((ydb_uint8 *)out)[1] = hash->two;
 #	endif
 }
 
-void gtmmrhash_128_hex(const gtm_uint16 *hash, unsigned char *out)
+void ydb_mmrhash_128_hex(const ydb_uint16 *hash, unsigned char *out)
 {
 	int			i;
 	unsigned char		bytes[16], n;
 
-	gtmmrhash_128_bytes(hash, bytes);
+	ydb_mmrhash_128_bytes(hash, bytes);
 	for (i = 0; i < 16; i++)
 	{
 		n = bytes[i] & 0xf;

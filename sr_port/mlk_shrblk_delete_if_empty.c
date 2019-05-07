@@ -107,7 +107,7 @@ void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	HASH128_STATE_INIT(hs, 0);
 	total_len = 0;
 	mlk_shrhash_val_build(d, &total_len, &hs);
-	gtmmrhash_128_result(&hs, total_len, &hashres);
+	ydb_mmrhash_128_result(&hs, total_len, &hashres);
 	DBG_LOCKHASH_N_BITS(hashres.one);
 	hash = (uint4)hashres.one;
 	assert(hash == d->hash);
@@ -155,5 +155,5 @@ void mlk_shrhash_val_build(mlk_shrblk_ptr_t d, uint4 *total_len, hash128_state_t
 		mlk_shrhash_val_build((mlk_shrblk_ptr_t)R2A(d->parent), total_len, hs);
 	shrsub = (mlk_shrsub_ptr_t)R2A(d->value);
 	*total_len += shrsub->length + 1;
-	gtmmrhash_128_ingest(hs, &shrsub->length, shrsub->length + 1);
+	ydb_mmrhash_128_ingest(hs, &shrsub->length, shrsub->length + 1);
 }

@@ -35,10 +35,10 @@ to_ulong
 ydb_call_variadic_plist_func
 ydb_child_init
 ydb_ci
-ydb_ci_t
 ydb_cij
 ydb_cip
 ydb_cip_t
+ydb_ci_t
 ydb_ci_tab_open
 ydb_ci_tab_open_t
 ydb_ci_tab_switch
@@ -75,6 +75,12 @@ ydb_lock_st
 ydb_malloc
 ydb_message
 ydb_message_t
+ydb_mmrhash_128
+ydb_mmrhash_128_bytes
+ydb_mmrhash_128_hex
+ydb_mmrhash_128_ingest
+ydb_mmrhash_128_result
+ydb_mmrhash_32
 ydb_node_next_s
 ydb_node_next_st
 ydb_node_previous_s

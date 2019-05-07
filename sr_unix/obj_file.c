@@ -151,7 +151,7 @@ void buff_emit(void)
 
 	SETUP_THREADGBL_ACCESS;
 	/* Accumulate object code piece in the object hash with progressive murmurhash call */
-	gtmmrhash_128_ingest(TADR(objhash_state), emit_buff, emit_buff_used);
+	ydb_mmrhash_128_ingest(TADR(objhash_state), emit_buff, emit_buff_used);
 	DOWRITERC(object_file_des, emit_buff, emit_buff_used, stat);
 	if (0 != stat)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_OBJFILERR, 2, object_name_len, object_file_name, stat);

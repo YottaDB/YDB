@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -73,19 +76,19 @@ MBSTART {									\
  * at least for triggers since we expect the trigger definition M code to hash to the same value on
  * different endian machines (this is needed so mupip endiancvt does not need to worry about changing
  * ^#t(.*TRHASH.*) nodes. Therefore we came up with a modified 32-bit murmur3 hash
- * implementation that is endian independent (gtmmrhash_32). See mmrhash.c for details.
+ * implementation that is endian independent (ydb_mmrhash_32). See mmrhash.c for details.
  */
 #ifdef UNIX
 #include "mmrhash.h"
-#define STR_HASH(KEY, LEN, HASH, SEED) gtmmrhash_32(KEY, LEN, SEED, (uint4 *)&HASH)
+#define STR_HASH(KEY, LEN, HASH, SEED) ydb_mmrhash_32(KEY, LEN, SEED, (uint4 *)&HASH)
 /* The STR_PHASH* macros are the progressive variants of the STR_HASH macro. */
 #define	STR_PHASH_INIT(STATE, TOTLEN)			HASH128_STATE_INIT(STATE, 0); TOTLEN = 0
-#define	STR_PHASH_PROCESS(STATE, TOTLEN, KEY, LEN)	gtmmrhash_128_ingest(&STATE, KEY, LEN); TOTLEN += LEN
+#define	STR_PHASH_PROCESS(STATE, TOTLEN, KEY, LEN)	ydb_mmrhash_128_ingest(&STATE, KEY, LEN); TOTLEN += LEN
 #define	STR_PHASH_RESULT(STATE, TOTLEN, OUT4)			\
 MBSTART {							\
 	gtm_uint16	out16;					\
 								\
-	gtmmrhash_128_result(&STATE, TOTLEN, &out16);		\
+	ydb_mmrhash_128_result(&STATE, TOTLEN, &out16);		\
 	OUT4 = (uint4)out16.one;				\
 } MBEND
 #else

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -64,7 +67,7 @@ void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix)
 		HASH128_STATE_INIT(hs, 0);
 		total_len = 0;
 		mlk_shrhash_val_build(b, &total_len, &hs);
-		gtmmrhash_128_result(&hs, total_len, &hashres);
+		ydb_mmrhash_128_result(&hs, total_len, &hashres);
 		hash = (uint4)hashres.one;
 		if (hash != b->hash)		/* Should never happen; only here in case things get mangled. */
 			PRINTF("\t\t: [computed shrhash] %x\n", hash);

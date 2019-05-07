@@ -3,6 +3,9 @@
  * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -146,7 +149,7 @@ void lke_clean(void)
 						total_len = 0;
 						mlk_shrhash_val_build(blk,
 								&total_len, &hs);
-						gtmmrhash_128_result(&hs, total_len, &hashres);
+						ydb_mmrhash_128_result(&hs, total_len, &hashres);
 						ti = ((uint4)hashres.one) % num_buckets;
 						for(int foo=0; foo < MLK_SHRHASH_NEIGHBORS + 2; foo++)
 						{
@@ -186,7 +189,7 @@ void lke_clean(void)
 						total_len = 0;
 						mlk_shrhash_val_build(blk,
 								&total_len, &hs);
-						gtmmrhash_128_result(&hs, total_len, &hashres);
+						ydb_mmrhash_128_result(&hs, total_len, &hashres);
 						ti = ((uint4)hashres.one) % num_buckets;
 						free_bucket = &shrhash[ti];
 						free_bucket->usedmap = 0;
@@ -240,7 +243,7 @@ void lke_clean(void)
 							HASH128_STATE_INIT(hs, 0);
 							total_len = 0;
 							mlk_shrhash_val_build(shrblk, &total_len, &hs);
-							gtmmrhash_128_result(&hs, total_len, &hashres);
+							ydb_mmrhash_128_result(&hs, total_len, &hashres);
 							/* If this triggers, it means a bucket was marked as used for a
 							 *  particular hash value, but is in fact used by a different hash
 							 *  value; we can not easily recover from this, and the safest
@@ -261,7 +264,7 @@ void lke_clean(void)
 						total_len = 0;
 						mlk_shrhash_val_build(MLK_SHRHASH_SHRBLK(pvtblk.pvtctl, search_bucket),
 									&total_len, &hs);
-						gtmmrhash_128_result(&hs, total_len, &hashres);
+						ydb_mmrhash_128_result(&hs, total_len, &hashres);
 						ti = ((uint4)hashres.one) % num_buckets;
 						check_bucket = &shrhash[ti];
 						bucket_offset = (num_buckets + fi - ti) % num_buckets;

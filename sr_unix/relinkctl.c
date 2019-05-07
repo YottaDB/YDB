@@ -635,10 +635,10 @@ int relinkctl_get_key(char key[YDB_PATH_MAX], mstr *zro_entry_name)
 
 	SETUP_THREADGBL_ACCESS;
 	HASH128_STATE_INIT(hash_state, 0);
-	gtmmrhash_128_ingest(&hash_state, zro_entry_name->addr, zro_entry_name->len);
-	gtmmrhash_128_ingest(&hash_state, &obj_label, SIZEOF(obj_label));
-	gtmmrhash_128_result(&hash_state, zro_entry_name->len + SIZEOF(obj_label), &hash);
-	gtmmrhash_128_hex(&hash, hexstr);
+	ydb_mmrhash_128_ingest(&hash_state, zro_entry_name->addr, zro_entry_name->len);
+	ydb_mmrhash_128_ingest(&hash_state, &obj_label, SIZEOF(obj_label));
+	ydb_mmrhash_128_result(&hash_state, zro_entry_name->len + SIZEOF(obj_label), &hash);
+	ydb_mmrhash_128_hex(&hash, hexstr);
 	hexstr[32] = '\0';
 	/* If the cumulative path to the relinkctl file exceeds YDB_PATH_MAX, it will be inaccessible, so no point continuing. */
 	if (YDB_PATH_MAX < (TREF(ydb_linktmpdir)).len + SLASH_GTM_RELINKCTL_LEN + SIZEOF(hexstr))

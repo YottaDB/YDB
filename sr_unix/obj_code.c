@@ -292,7 +292,7 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	finish_object_file();	/* Flushes object file buffers and writes remaining native object structures */
 	ENABLE_INTERRUPTS(INTRPT_IN_OBJECT_FILE_COMPILE, prev_intrpt_state);
 	/* Get our 128 bit hash though only the first 8 bytes of it get saved in the routine header */
-	gtmmrhash_128_result(TADR(objhash_state), gtm_object_size, &objhash);
+	ydb_mmrhash_128_result(TADR(objhash_state), gtm_object_size, &objhash);
 	DBGARLNK((stderr, "obj_code: Computed hash value of 0x"lvaddr" for file %.*s\n", objhash.one, object_name_len,
 		  object_file_name));
 	if ((off_t)-1 == lseek(object_file_des, (off_t)(NATIVE_HDR_LEN + OFFSETOF(rhdtyp, objhash)), SEEK_SET))

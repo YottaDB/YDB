@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright 2014 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,11 +56,11 @@ void mupip_hash(void)
 			}
 			if (0 == status)
 				break;
-			gtmmrhash_128_ingest(&hash_state, readbuf, status);
+			ydb_mmrhash_128_ingest(&hash_state, readbuf, status);
 			size += status;
 		}
-		gtmmrhash_128_result(&hash_state, size, &hash);
-		gtmmrhash_128_hex(&hash, hash_hex);
+		ydb_mmrhash_128_result(&hash_state, size, &hash);
+		ydb_mmrhash_128_hex(&hash, hash_hex);
 		util_out_print("!AZ: !AD", TRUE, TAREF1(parm_ary, i), SIZEOF(hash_hex), hash_hex);
 	skipfile:
 		CLOSEFILE_RESET(fd, status);

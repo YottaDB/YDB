@@ -696,6 +696,7 @@ foreach(f
   libydberrors.h
   libydberrors2.h
   main_pragma.h
+  mmrhash.h
   arch.gtc
   gtcm_run.gtc
   gtcm_slist.gtc

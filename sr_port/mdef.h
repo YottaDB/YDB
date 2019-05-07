@@ -66,9 +66,6 @@
 
 #include <sys/types.h>
 
-typedef int 		int4;		/* 4-byte signed integer */
-typedef unsigned int 	uint4;		/* 4-byte unsigned integer */
-
 #define sssize_t	size_t
 
 /* If ever the following macro (SHMDT) is expanded to a multi-line macro, care should be taken to save the errno immediately after

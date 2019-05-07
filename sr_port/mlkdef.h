@@ -320,10 +320,10 @@ MBSTART {													\
 	HASH128_STATE_INIT(accstate, 0);									\
 	for (cp = (PVTBLK)->value, hi = 0; hi < (PVTBLK)->subscript_cnt; hi++)					\
 	{													\
-		gtmmrhash_128_ingest(&accstate, cp, *cp + 1);							\
+		ydb_mmrhash_128_ingest(&accstate, cp, *cp + 1);							\
 		cp += *cp + 1;											\
 		tmpstate = accstate;										\
-		gtmmrhash_128_result(&tmpstate, (cp - (PVTBLK)->value), &hashres);				\
+		ydb_mmrhash_128_result(&tmpstate, (cp - (PVTBLK)->value), &hashres);				\
 		DBG_LOCKHASH_N_BITS(hashres.one);								\
 		MLK_PVTBLK_SUBHASH(PVTBLK, hi) = (uint4)hashres.one;						\
 	}													\

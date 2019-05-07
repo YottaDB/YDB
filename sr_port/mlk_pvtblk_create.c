@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -140,9 +140,9 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 		*cp++ = len;
 		memcpy(cp, (mp_temp)->str.addr, len);
 		cp += len;
-		gtmmrhash_128_ingest(&accstate, cp_prev, len + 1);
+		ydb_mmrhash_128_ingest(&accstate, cp_prev, len + 1);
 		tmpstate = accstate;
-		gtmmrhash_128_result(&tmpstate, (cp - r->value), &hashres);
+		ydb_mmrhash_128_result(&tmpstate, (cp - r->value), &hashres);
 		DBG_LOCKHASH_N_BITS(hashres.one);
 		MLK_PVTBLK_SUBHASH(r, i) = (uint4)hashres.one;
 	}

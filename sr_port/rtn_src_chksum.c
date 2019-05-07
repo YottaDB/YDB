@@ -2,7 +2,7 @@
  *								*
  * Copyright 2013, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@ void rtn_src_chksum_init(gtm_rtn_src_chksum_ctx *ctx)
 void rtn_src_chksum_line(gtm_rtn_src_chksum_ctx *ctx, const void *data, uint4 len)
 {
 #	ifdef UNIX
-	gtmmrhash_128_ingest(&ctx->hash_state, data, len);
+	ydb_mmrhash_128_ingest(&ctx->hash_state, data, len);
 	ctx->total_size += len;
 #	else
 	cvs_MD5Update(&ctx->md5ctx, data, len);
@@ -64,8 +64,8 @@ void rtn_src_chksum_digest(gtm_rtn_src_chksum_ctx *ctx)
 #	ifdef UNIX
 	gtm_uint16 hash;
 
-	gtmmrhash_128_result(&ctx->hash_state, ctx->total_size, &hash);
-	gtmmrhash_128_bytes(&hash, ctx->digest);
+	ydb_mmrhash_128_result(&ctx->hash_state, ctx->total_size, &hash);
+	ydb_mmrhash_128_bytes(&hash, ctx->digest);
 #	else
 	cvs_MD5Final(ctx->digest, &ctx->md5ctx);
 #	endif
