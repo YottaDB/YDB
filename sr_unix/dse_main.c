@@ -109,7 +109,6 @@ int dse_main(int argc, char **argv, char **envp)
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	DEFINE_EXIT_HANDLER(util_exit_handler, TRUE);
 	common_startup_init(DSE_IMAGE, &dse_cmd_ary[0]);
 	licensed = TRUE;
 	TREF(transform) = TRUE;
@@ -119,6 +118,7 @@ int dse_main(int argc, char **argv, char **envp)
 	INIT_FNPTR_GLOBAL_VARIABLES;
 	patch_curr_blk = get_dir_root();
 	err_init(util_base_ch);
+	DEFINE_EXIT_HANDLER(util_exit_handler, TRUE);	/* Must be defined only AFTER err_init() has setup condition handling */
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
 	GTM_ICU_INIT_IF_NEEDED;	/* Note: should be invoked after err_init (since it may error out) and before CLI parsing */
 	sig_init(generic_signal_handler, dse_ctrlc_handler, suspsigs_handler, continue_handler);

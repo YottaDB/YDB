@@ -155,12 +155,13 @@ MBSTART {						\
 } MBEND
 
 /* Macro to drive the exit handler if it exists  */
-#define DRIVE_EXIT_HANDLER_IF_EXISTS		\
-MBSTART {					\
-	GBLREF void (*exit_handler_fptr)();	\
-						\
-	if (NULL != exit_handler_fptr)		\
-		(*exit_handler_fptr)();		\
+#define DRIVE_EXIT_HANDLER_IF_EXISTS					\
+MBSTART {								\
+	GBLREF void (*exit_handler_fptr)();				\
+									\
+	assert(NULL != chnd);	/* Verify err_init() was done first */	\
+	if (NULL != exit_handler_fptr)					\
+		(*exit_handler_fptr)();					\
 } MBEND
 
 
