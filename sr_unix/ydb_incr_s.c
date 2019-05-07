@@ -125,7 +125,6 @@ int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, yd
 			if (!MV_DEFINED(lv_mv))
 				*lv_mv = literal_zero;
 			op_add(lv_mv, increment_mv, lv_mv);
-			assert(!MV_IS_STRING(lv_mv));
 			ret_mval = *lv_mv;
 			ret_mv = &ret_mval;
 			break;
