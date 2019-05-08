@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,10 @@ int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, ch
 
 	SETUP_THREADGBL_ACCESS;
 	if (0 == TREF(sapi_query_node_subs_cnt))
+	{
+		*ret_subs_used = 0;			/* Just return 0 subscripts */
 		return YDB_ERR_NODEEND;	/* No subscripts were returned - return YDB_ERR_NODEEND */
+	}
 	if (-1 == TREF(sapi_query_node_subs_cnt))
 	{	/* No subscripts were returned but we are legitimately returning the basevar name in a reverse $query()
 		 * so no YDB_ERR_NODEEND return code.

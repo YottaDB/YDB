@@ -101,6 +101,7 @@ int ydb_node_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subs
 				 * we do not issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
 				 * Return YDB_ERR_NODEEND for "ydb_node_previous_s" result.
 				 */
+				*ret_subs_used = 0;	/* No values returned */
 				status = YDB_ERR_NODEEND;
 				break;
 			}
