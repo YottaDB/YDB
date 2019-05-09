@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -358,6 +358,13 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 							 * that this clue update be done AFTER the gvcst_search_tail invocation
 							 * (as that needs to pass the previous clue key).
 							 */
+							/* Assert that in case "expand_prev_key" is TRUE and we point to a
+							 * current record that has a previous record (prev_rec.offset is non-zero),
+							 * "gv_altkey" points to a valid key that will be later copied over to
+							 * "pTarg->prev_key" as part of the below macro.
+							 */
+							assert(!expand_prev_key || (0 == pTarg->hist.h[0].prev_rec.offset)
+								|| gv_altkey->end);
 							COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(pTarg, pKey, expand_prev_key);
 						}
 						INCR_DB_CSH_COUNTER(cs_addrs, n_clue_used_tail, 1);

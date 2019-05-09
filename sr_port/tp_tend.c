@@ -2118,6 +2118,8 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 		 * unreliable. Reset it to be safe. See comment in similar section in tp_hist for details on why.
 		 */
 		GVT_CLUE_INVALIDATE_FIRST_REC(gvt);
+		/* Also need to invalidate "prev_key" (see "gvincr_recompute_upd_array.c" for comment on why) */
+		GVT_CLUE_INVALIDATE_PREV_KEY(gvt);
 	}
 	/* At this point, cse->new_buff could be non-NULL either because the same variable was being updated multiple times
 	 * inside of the TP transaction or because cse->recompute_list_head contained more than one variable (in which case

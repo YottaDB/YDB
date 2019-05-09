@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -187,10 +187,10 @@ GBLREF	sgmnt_data_ptr_t	cs_data;
 	}
 	/* exp_key->prev is not initialized. Caller should not rely on this. */
 	/* Due to concurrency issues, it is possible "exp_key" is not a well-formed key (e.g. it might have two successive
-	 * KEY_DELIMITER bytes in the middle of the key). So we cannot add a DBG_CHECK_GVKEY_VALID(exp_key) here.
-	 * But we expect later validation to catch this and restart the transaction (without affecting db integrity).
-	 * So we dont worry about such keys here.
+	 * KEY_DELIMITER bytes in the middle of the key). But we expect later validation to catch this and restart the
+	 * transaction (without affecting db integrity). Hence the use of DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE below.
 	 */
+	DBG_CHECK_GVKEY_VALID(exp_key, DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE);
 	return cdb_sc_normal;
 }
 #endif /* (defined(GVCST_EXPAND_CURR_KEY) || defined(GVCST_EXPAND_PREV_KEY)) */

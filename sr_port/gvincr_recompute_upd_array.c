@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -222,6 +222,14 @@ enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_elemen
 	 * Reset it to be safe. See comment in similar section in tp_hist for details on why.
 	 */
 	if (gv_target->clue.end)
+	{
 		GVT_CLUE_INVALIDATE_FIRST_REC(gv_target);
+		/* Now that we have rescanned the concurrently modified block, a previously valid "prev_key" might no
+		 * longer be valid because the block contents changed (e.g. got shifted). Invalidate it as otherwise a
+		 * future operation that uses "prev_key" (e.g. reverse $order or $query) might give wrong results
+		 * or even get a SIG-11 (e.g. YDB#449).
+		 */
+		GVT_CLUE_INVALIDATE_PREV_KEY(gv_target);
+	}
 	return cdb_sc_normal;
 }

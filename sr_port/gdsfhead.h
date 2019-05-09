@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -3291,24 +3291,45 @@ MBSTART {															\
 	}															\
 } MBEND
 
-/* Do checks on the integrity of GVKEY */
-#	define	DBG_CHECK_GVKEY_VALID(GVKEY)					\
-MBSTART {									\
-	unsigned char	ch, prevch, *ptr, *pend;				\
-										\
-	assert(GVKEY->end < GVKEY->top);					\
-	ptr = &GVKEY->base[0];							\
-	pend = ptr + GVKEY->end;						\
-	assert(KEY_DELIMITER == *pend);						\
-	assert((ptr == pend) || (KEY_DELIMITER == *(pend - 1)));		\
-	prevch = KEY_DELIMITER;							\
-	while (ptr < pend)							\
-	{									\
-		ch = *ptr++;							\
-		assert((KEY_DELIMITER != prevch) || (KEY_DELIMITER != ch));	\
-		prevch = ch;							\
-	}									\
-	/* Do not check GVKEY->prev as it is usually not set. */		\
+/* Do checks on the integrity of GVKEY. If integrity checks fail, it is a restartable situation
+ * so set the donotcommit code passed in to verify the restartability.
+ */
+#	define	DBG_CHECK_GVKEY_VALID(GVKEY, DONOTCOMMIT_CODE)				\
+MBSTART {										\
+	unsigned char	ch, prevch, *ptr, *pend;					\
+	DCL_THREADGBL_ACCESS;								\
+											\
+	SETUP_THREADGBL_ACCESS;								\
+	assert(GVKEY->end < GVKEY->top);						\
+	ptr = &GVKEY->base[0];								\
+	pend = ptr + GVKEY->end;							\
+	assert(DONOTCOMMIT_CODE);							\
+	for ( ; ; )	/* for loop just to break out of restart cases */		\
+	{										\
+		if (KEY_DELIMITER != *pend)						\
+		{									\
+			DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_CODE;)		\
+			break;								\
+		}									\
+		if ((ptr != pend) && (KEY_DELIMITER != *(pend - 1)))			\
+		{									\
+			DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_CODE;)		\
+			break;								\
+		}									\
+		prevch = KEY_DELIMITER;							\
+		while (ptr < pend)							\
+		{									\
+			ch = *ptr++;							\
+			if ((KEY_DELIMITER == prevch) && (KEY_DELIMITER == ch))		\
+			{								\
+				DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_CODE;)	\
+				break;							\
+			}								\
+			prevch = ch;							\
+		}									\
+		break;									\
+	}										\
+	/* Do not check GVKEY->prev as it is usually not set. */			\
 } MBEND
 
 #else
@@ -3316,7 +3337,7 @@ MBSTART {									\
 #	define	DBG_CHECK_GVT_IN_GVTARGETLIST(gvt)
 #	define	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSADDRS)
 #	define	DBG_CHECK_GVTARGET_INTEGRITY(GVT)
-#	define	DBG_CHECK_GVKEY_VALID(GVKEY)
+#	define	DBG_CHECK_GVKEY_VALID(GVKEY, DONOTCOMMIT_CODE)
 #endif
 
 /* The below GBLREFs are for the following macro */
@@ -3441,6 +3462,7 @@ MBSTART {												\
 			DEBUG_ONLY(TREF(donot_commit) |= DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE;)	\
 			GVKEY_INIT(GVT->prev_key, DBKEYSIZE(gv_altkey->end));				\
 		}											\
+		DBG_CHECK_GVKEY_VALID(gv_altkey, DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE);		\
 		COPY_KEY(GVT->prev_key, gv_altkey);							\
 	} else if (NULL != GVT->prev_key)								\
 	{												\
@@ -3577,6 +3599,20 @@ MBSTART {										\
 	DEBUG_ONLY(firstRec->base[2] = KEY_DELIMITER);					\
 	DEBUG_ONLY(firstRec->base[3] = KEY_DELIMITER);					\
 	DEBUG_ONLY(firstRec->end = 3);							\
+} MBEND
+
+#define	GVT_CLUE_INVALIDATE_PREV_KEY(GVT)						\
+MBSTART {										\
+	gv_key		*prevKey;							\
+											\
+	GBLREF	gv_key	*gv_altkey;							\
+											\
+	prevKey = GVT->prev_key;							\
+	if (NULL != prevKey)								\
+	{										\
+		assert(PREV_KEY_NOT_COMPUTED < (1 << (SIZEOF(gv_altkey->end) * 8)));	\
+		prevKey->end = PREV_KEY_NOT_COMPUTED;					\
+	}										\
 } MBEND
 
 #ifdef DEBUG

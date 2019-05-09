@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -211,7 +211,10 @@ boolean_t	gvcst_reversequery2(void)
 					}
 				}
 			}
-			/* At this point, gv_altkey contains the fully expanded key */
+			/* At this point, gv_altkey contains the fully expanded key. Validate it.
+			 * DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE needs to be used to account for restartable scenarios.
+			 */
+			DBG_CHECK_GVKEY_VALID(gv_altkey, DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE);
 			if (!dollar_tlevel)
 			{
 				if ((trans_num)0 == t_end(&gv_target->hist, !two_histories ? NULL : lft_history, TN_NOT_SPECIFIED))
@@ -228,11 +231,6 @@ boolean_t	gvcst_reversequery2(void)
 			assert(cs_data == cs_addrs->hdr);
 			INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_query, 1);
 			TREF(expand_prev_key) = FALSE;
-#			ifdef DEBUG
-			/* Note that "gv_altkey->end" could be 0 in case of reverse $query. So avoid validity check below. */
-			if (gv_altkey->end)
-				DBG_CHECK_GVKEY_VALID(gv_altkey);
-#			endif
 			return found;
 		}
 		t_retry(status);

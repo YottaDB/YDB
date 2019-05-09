@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -157,6 +157,7 @@ GBLREF	uint4			dollar_tlevel;
 		{	/* Since gv_altkey is used elsewhere, ensure that it is in sync with prevKey before performing the search
 			 * and returning to the caller.
 			 */
+			assert(prevKey->end < gv_altkey->top);	/* so the below memcpy is safe */
 			memcpy(gv_altkey->base, prevKey->base, prevKey->end - 1);
 		}
 		assert(prevKey->end);
@@ -381,7 +382,10 @@ GBLREF	uint4			dollar_tlevel;
 		memcpy(prevKeyStart, prevKeyUnCmp, prevKeyUnCmpLen);
 		gv_altkey->end = prevKeyCmpLen + prevKeyUnCmpLen - 1;	/* remove 2nd KEY_DELIMITER from "end" calculation */
 	} else
+	{
 		gv_altkey->end = 0;
+		DEBUG_ONLY(gv_altkey->base[0] = KEY_DELIMITER);	/* so DBG_CHECK_GVKEY_VALID passes check */
+	}
 #	endif
 	return cdb_sc_normal;
 }
