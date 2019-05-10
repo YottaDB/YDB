@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -432,6 +432,7 @@ void op_fnreversequery_va(int sbscnt, mval *dst, va_list var)
 		v1->mvtype = MV_STR;
 		v1->str.len = 0;
 		v1->str.addr = (char *)stringpool.free;
+		push_v1 = TRUE;
 		PUSH_MV_STENT(MVST_MVAL);
 		v2 = &mv_chain->mv_st_cont.mvs_mval;
 		v2->mvtype = 0;	/* initialize it to 0 to avoid "stp_gcol" from getting confused if it gets invoked before v2 has been
