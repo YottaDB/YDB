@@ -497,7 +497,7 @@ void iott_use(io_desc *iod, mval *pp)
 		{
 			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
 			if (0 != status)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LIT_AND_LEN("tcflush input"),
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("tcflush input"),
 					CALLFROM, errno);
 		}
 	} else if (tt_ptr->mupintr && !dollar_zininterrupt)

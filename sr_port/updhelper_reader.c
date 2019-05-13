@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -224,7 +224,7 @@ boolean_t updproc_preread(void)
 		}
 		if (0 == retries)
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DBCCERR, 2, LIT_AND_LEN("Pre-reader"),
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DBCCERR, 2, LEN_AND_LIT("Pre-reader"),
 					ERR_ERRCALL, 3, CALLFROM);
 			return FALSE;
 		}

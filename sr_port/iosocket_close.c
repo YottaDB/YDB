@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -244,7 +244,7 @@ void iosocket_close_range(d_socket_struct *dsocketptr, int start, int end, boole
 	}
 	else if (-1 == null_fd)
 	{
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILEOPENFAIL, 2, LIT_AND_LEN("/dev/null"), save_errno, 0);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FILEOPENFAIL, 2, LEN_AND_LIT("/dev/null"), save_errno, 0);
 	}
 }
 
