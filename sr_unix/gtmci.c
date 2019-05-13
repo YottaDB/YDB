@@ -301,9 +301,9 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ACTLSTTOOLONG, 2, (int)label.len, label.addr);
 	param_blk.argcnt = count;
 	has_return = (ydb_void != entry->return_type);
+	MV_INIT(&arg_mval);
 	if (has_return)
 	{	/* Create mval slot for return value */
-		MV_INIT(&arg_mval);
 		param_blk.retaddr = (void *)push_lvval(&arg_mval);
 		arg_blob_ptr = &arg_blob[0] + GTM64_ONLY(1) NON_GTM64_ONLY(2);
 		java_arg_type = arg_types + 1;
@@ -679,9 +679,9 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 	if (MAX_ACTUALS < param_blk.argcnt)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXACTARG);
 	has_return = (ydb_void == entry->return_type) ? 0 : 1;
+	MV_INIT(&arg_mval);
 	if (has_return)
 	{	/* Create mval slot for return value */
-		MV_INIT(&arg_mval);
 		param_blk.retaddr = (void *)push_lvval(&arg_mval);
 		va_arg(var, void *);	/* advance va_arg */
 	} else
