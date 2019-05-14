@@ -25,7 +25,7 @@
 
 ENTRY	opp_newintrinsic
 	putframe
-	addq	$8, REG_SP		# Burn return PC & 16 byte align frame
+	addq	$8, %rsp		# Burn return PC & 16 byte align frame
 	CHKSTKALIGN			# Verify stack alignment
 	call	op_newintrinsic
 	getframe

@@ -31,7 +31,7 @@
 
 ENTRY	opp_zgoto
 	putframe
-	addq	$8, REG_SP		# Burn return address & 16 byte align stack
+	addq	$8, %rsp		# Burn return address & 16 byte align stack
 	CHKSTKALIGN			# Verify stack alignment
 	call	op_zgoto		# All 4 arg regs passed to opp_zgoto
 	getframe

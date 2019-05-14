@@ -29,14 +29,14 @@
 
 	.text
 ENTRY	compswap
-	movl	REG32_ARG1, REG32_RET0
+	movl	%esi, %eax
 	lock
-	cmpxchgl  REG32_ARG2, 0(REG64_ARG0)	# compare-and-swap
+	cmpxchgl  %edx, 0(%rdi)		# compare-and-swap
 	jnz	fail
-	movl	$1, REG32_RET0			# Return TRUE
+	movl	$1, %eax		# Return TRUE
 	ret
 fail:
-	xor	REG32_RET0, REG32_RET0		# Return FALSE
+	xor	%eax, %eax		# Return FALSE
 	pause
 	ret
 # Below line is needed to avoid the ELF executable from ending up with an executable stack marking.

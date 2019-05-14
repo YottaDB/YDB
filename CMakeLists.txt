@@ -48,7 +48,11 @@ endif()
 # If CMAKE_BUILD_TYPE is set to Debug, then CMAKE_C_FLAGS_DEBUG variable contents will be added at the end of
 # CMAKE_C_FLAGS during compilation (likewise with CMAKE_ASM_FLAGS_DEBUG). Keep these debug variables defined and ready.
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
-set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,--defsym,DEBUG=1")
+if ( CMAKE_COMPILER_IS_GNUCC )
+  set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,--defsym,DEBUG=1")
+else()
+  set(CMAKE_ASM_FLAGS_DEBUG "${CMAKE_ASM_FLAGS_DEBUG} -Wa,-defsym,DEBUG=1")
+endif()
 
 if ( CMAKE_COMPILER_IS_GNUCC )
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -Waddress")

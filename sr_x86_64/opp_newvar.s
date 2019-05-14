@@ -25,7 +25,7 @@
 
 ENTRY	opp_newvar
 	putframe
-	addq	$8, REG_SP		# Burn return address & 16 byte align stack
+	addq	$8, %rsp		# Burn return address & 16 byte align stack
 	CHKSTKALIGN			# Verify stack alignment
 	call	op_newvar
 	getframe

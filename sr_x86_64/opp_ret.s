@@ -24,7 +24,7 @@
 	.extern	op_unwind
 
 ENTRY	opp_ret
-	addq	$8, REG_SP			# Burn return PC & 16 byte align stack
+	addq	$8, %rsp			# Burn return PC & 16 byte align stack
 	CHKSTKALIGN				# Verify stack alignment
 	call	op_unwind
 	getframe

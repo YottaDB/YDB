@@ -25,7 +25,7 @@
 
 ENTRY	opp_zg1
 	putframe
-	addq	$8, REG_SP		# Burn return pc & 16 byte align stack
+	addq	$8, %rsp		# Burn return pc & 16 byte align stack
 	CHKSTKALIGN			# Verify stack alignment
 	call	op_zg1
 	getframe

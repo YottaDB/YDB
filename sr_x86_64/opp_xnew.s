@@ -25,9 +25,9 @@
 
 ENTRY	opp_xnew
 	putframe
-	addq	$8, REG_SP		# Burn return PC & 16 byte align stack
+	addq	$8, %rsp		# Burn return PC & 16 byte align stack
 	CHKSTKALIGN			# Verify stack alignment
-	movb    $0, REG8_ACCUM		# Variable length argument
+	movb    $0, %al			# Variable length argument
 	call	op_xnew
 	getframe
 	ret

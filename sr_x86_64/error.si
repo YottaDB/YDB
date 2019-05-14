@@ -39,26 +39,26 @@ chnd_jmp	=	24
 
 .macro ESTABLISH labelend, labelskip
         call	gtm_asm_establish
-	movq	ctxt(REG_IP), REG64_ACCUM
-	leaq	mdb_condition_handler(REG_IP), REG64_SCRATCH1
-	movq    REG64_SCRATCH1, chnd_ch(%rax)		# ctxt->ch = x
-	addq	$chnd_jmp, REG64_ACCUM			# setjmp(ctxt->jmp)
-	movq	$0, REG64_ARG1
-	movq	REG64_ACCUM, REG64_ARG0
+	movq	ctxt(%rip), %rax
+	leaq	mdb_condition_handler(%rip), %r11
+	movq    %r11, chnd_ch(%rax)		# ctxt->ch = x
+	addq	$chnd_jmp, %rax			# setjmp(ctxt->jmp)
+	movq	$0, %rsi
+	movq	%rax, %rdi
 	call 	__sigsetjmp@PLT
-	cmp	$0,REG32_RET0				# Which return is this?
+	cmp	$0,%eax				# Which return is this?
 	je	\labelend
 	# This is the return when an error was unwound. Need to reduce rts_error_depth before doing anything else
-	movq	gtm_threadgbl(REG_IP), REG64_SCRATCH1	# REG64_RET1 contains threadgbl base
-	movl	ggo_rts_error_depth(REG64_SCRATCH1), REG32_ACCUM
-	cmp	$0, REG32_ACCUM
+	movq	gtm_threadgbl(%rip), %r11	# %r10 contains threadgbl base
+	movl	ggo_rts_error_depth(%r11), %eax
+	cmp	$0, %eax
 	je	\labelskip
-	subl	$1, REG32_ACCUM
-	movl	REG32_ACCUM, ggo_rts_error_depth(REG64_SCRATCH1)
+	subl	$1, %eax
+	movl	%eax, ggo_rts_error_depth(%r11)
 \labelskip:
 	# This is checking for MUM_TSTART returns in which case we don't jump to "return" (outside this macro) but
 	# rather just exit the ESTABLISH macro and continue as if the ESTABLISH had just been done.
-	incl  	REG32_RET0
+	incl  	%eax
 	jne  	\labelend
 	REVERT
 	jmp  	return
@@ -66,8 +66,8 @@ chnd_jmp	=	24
 .endm
 
 .macro REVERT
-	movq	ctxt(REG_IP), REG64_ACCUM		# active_ch = ctxt->save_active_c
-	movq	chnd_save_active(REG64_ACCUM), REG64_ACCUM
-	movq	REG64_ACCUM, active_ch(REG_IP)
-	subq  	$chnd_size, ctxt(REG_IP)		# ctxt--
+	movq	ctxt(%rip), %rax		# active_ch = ctxt->save_active_c
+	movq	chnd_save_active(%rax), %rax
+	movq	%rax, active_ch(%rip)
+	subq  	$chnd_size, ctxt(%rip)		# ctxt--
 .endm

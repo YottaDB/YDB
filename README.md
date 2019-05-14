@@ -28,6 +28,14 @@ YottaDB relies on CMake to generate the Makefiles to build binaries from source.
 Refer to the Release Notes for each release for a list of the Supported platforms
 in which we build and test YottaDB binary distributions.
 
+Note: Both gcc and Clang/LLVM are supported on x86_64. To use Clang/LLVM you would need to
+install the Clang/LLVM packages for your distribution in addition to the packages
+listed below. For example for Ubuntu Linux:
+
+```sh
+ sudo apt-get install clang llvm lld
+ ```
+
 - Install prerequisite packages
 
   ```sh
@@ -66,8 +74,18 @@ in which we build and test YottaDB binary distributions.
       ```-D CMAKE_BUILD\_TYPE=Debug```
   (*Note: title case is important*)
 
+### Build with gcc
   ```sh
   cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
+  make -j `grep -c ^processor /proc/cpuinfo`
+  make install
+  cd yottadb_r123
+  ```
+
+### Build with Clang/LLVM
+  ```sh
+  export CC=/usr/bin/clang
+  cmake -D CMAKE_LINKER:PATH=/usr/bin/ld.lld -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
   make -j `grep -c ^processor /proc/cpuinfo`
   make install
   cd yottadb_r123

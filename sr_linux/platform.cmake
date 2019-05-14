@@ -103,7 +103,13 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-
 # Note: -Wimplicit not explicitly mentioned since it is enabled by Wall
 # Note: -Wuninitialized not explicitly mentioned since it is enabled by Wall
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-char-subscripts -Wno-unused-but-set-variable")
+if (CMAKE_COMPILER_IS_GNUCC)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-char-subscripts -Wno-unused-but-set-variable")
+else()
+  # -Wno-maybe-uninitialized is unsupported on clang/llvm
+  # -Wno-unused-but-set-variable is unsupported on clang/llvm
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-char-subscripts")
+endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wvla")
 
 # Below is an optimization flag related description copied from sr_linux/gtm_env_sp.csh
@@ -113,7 +119,13 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wvla")
 #	-fno-omit-frame-pointer so %rbp always gets set up (required by caller_id()). Default changed in gcc 4.6.
 # All these are needed only in case of pro builds (if compiler optimization if turned on).
 # But they are no-ops in case of a dbg build when optimization is turned off so we include them in all cmake builds.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-defer-pop -fno-strict-aliasing -ffloat-store -fno-omit-frame-pointer")
+if (CMAKE_COMPILER_IS_GNUCC)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-defer-pop -fno-strict-aliasing -ffloat-store -fno-omit-frame-pointer")
+else()
+  # -fno-defer-pop is unsupported on clang/llvm
+  # -ffloat-store is unsupported on clang/llvm
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-strict-aliasing -fno-omit-frame-pointer")
+endif()
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 	# Newer versions of Linux by default include -fstack-protector in gcc. This causes the build to slightly bloat
@@ -122,16 +134,18 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fstack-protector-all")
 else()
 	# For "Release" or "RelWithDebInfo" type of builds, keep this option disabled for performance reasons
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-protector")
-	# Enable (a) link time optimization and (b) use gold linker.
-	# (a) was seen to reduce the size of libyottadb.so by 5% and improve runtimes by 7% on a simple database test
-	# (b) gold linker was seen to slightly (~ 0.1%) improve build times and run times compared to default ld linker.
-	# Use -flto=N where N is number of available CPUs to speed up the link time.
-	include(ProcessorCount)
-	ProcessorCount(NUMCPUS)
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=${NUMCPUS} -fuse-ld=gold")
-	set(CMAKE_AR "gcc-ar")		# needed on some versions of gcc to get -flto working
-	set(CMAKE_RANLIB "gcc-ranlib")	# needed on some versions of gcc to get -flto working
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-protector")
+  if (CMAKE_COMPILER_IS_GNUCC)
+    # Enable (a) link time optimization and (b) use gold linker.
+    # (a) was seen to reduce the size of libyottadb.so by 5% and improve runtimes by 7% on a simple database test
+    # (b) gold linker was seen to slightly (~ 0.1%) improve build times and run times compared to default ld linker.
+    # Use -flto=N where N is number of available CPUs to speed up the link time.
+    include(ProcessorCount)
+    ProcessorCount(NUMCPUS)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=${NUMCPUS} -fuse-ld=gold")
+    set(CMAKE_AR "gcc-ar")		# needed on some versions of gcc to get -flto working
+    set(CMAKE_RANLIB "gcc-ranlib")	# needed on some versions of gcc to get -flto working
+  endif()
 endif()
 
 # On ARM Linux, gcc by default does not include -funwind-tables whereas it does on x86_64 Linux.

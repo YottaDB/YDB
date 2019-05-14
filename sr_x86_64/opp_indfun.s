@@ -25,7 +25,7 @@
 
 ENTRY	opp_indfun
 	putframe
-	addq	$8, REG_SP		# burn return PC
+	addq	$8, %rsp		# burn return PC
 	CHKSTKALIGN			# Verify stack alignment
 	call	op_indfun
 	getframe

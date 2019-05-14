@@ -25,7 +25,7 @@
 
 ENTRY	opp_indglvn
 	putframe
-	addq	$8, REG_SP		# Burn return PC & 16 byte align
+	addq	$8, %rsp		# Burn return PC & 16 byte align
 	CHKSTKALIGN			# Verify stack alignment
 	call	op_indglvn
 	getframe
