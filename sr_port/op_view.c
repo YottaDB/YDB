@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -551,8 +551,11 @@ void	op_view(int numarg, mval *keyword, ...)
 					lct = 0;
 			}
 			if (!found_reg)
+			{
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_GBLNOMAPTOREG, 4,
 					parmblk.value->str.len, parmblk.value->str.addr, REG_LEN_STR(reg));
+				lct = 0;	/* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
+			}
 			if (lct)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COLLDATAEXISTS, 4, LEN_AND_LIT("^"),
 					RTS_ERROR_MVAL(parmblk.value));

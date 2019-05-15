@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -791,6 +791,8 @@ void	wcs_mm_recover(gd_region *reg)
 		assert(WBTEST_ENABLED(WBTEST_MEM_MAP_SYSCALL_FAIL));
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(12) ERR_DBFILERR, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
 				LEN_AND_STR(syscall), CALLFROM, save_errno);
+		mmap_retaddr = NULL;	/* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
+		mmap_sz = 0;		/* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
 	}
 #	if defined(_AIX)
 	mmap_retaddr = (sm_uc_ptr_t)mmap_retaddr + BLK_ZERO_OFF(cs_data->start_vbn);

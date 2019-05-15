@@ -917,7 +917,7 @@ MBSTART {													\
 														\
 	char	msgbuf[YDB_MAX_ERRORMSG];									\
 	mstr	msg;												\
-	int	errNum, status;											\
+	int	errNum, lclStatus;										\
 														\
 	if (NULL != ERRSTR)											\
 	{													\
@@ -926,8 +926,8 @@ MBSTART {													\
 		msg.len = SIZEOF(msgbuf);									\
 		msg.addr = msgbuf;										\
 		errNum = abs(ERRNUM);										\
-		status = gtm_getmsg(errNum, &msg);								\
-		if (ERR_UNKNOWNSYSERR == status)								\
+		lclStatus = gtm_getmsg(errNum, &msg);								\
+		if (ERR_UNKNOWNSYSERR == lclStatus)								\
 		{	/* Unknown message. Just null terminate it */						\
 			msg.addr[0] = '\0';									\
 		} else												\

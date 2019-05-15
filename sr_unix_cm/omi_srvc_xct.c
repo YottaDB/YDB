@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc *
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -313,7 +316,7 @@ int	omi_srvc_xact (omi_conn *cptr)
 			OMI_DBG((omi_debug, "gtcm_server: %6d: Error (PD): %s\n",
 				cptr->stats.id, omi_errlist[eh.type]));
 			if (fatal < 0)
-			break;
+				break;
 			continue;
 		}
 
@@ -406,9 +409,11 @@ int	omi_srvc_xact (omi_conn *cptr)
 			OMI_LI_WRIT(nxact.value, bptr);
 			bptr = buff;
 		}
-	}
-	else
+	} else
+	{
+		blen = 0;	/* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
 		bptr = cptr->bptr;
+	}
 
 /*	Send the response(s) back to the client */
 	if (history)

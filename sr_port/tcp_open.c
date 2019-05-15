@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -160,6 +160,12 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 			sys_get_curr_time(&cur_time);
 			add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
 			utimeout.tv_sec = timeout;
+			utimeout.tv_usec = 0;
+		} else
+		{	/* Initialize "utimeout" even though not necessary for correctness. This is to silence
+			 * [-Wsometimes-uninitialized] warning from CLang/LLVM when "save_utimeout = utimeout" occurs below..
+			 */
+			utimeout.tv_sec = 0;
 			utimeout.tv_usec = 0;
 		}
 		assertpro(FD_SETSIZE > lsock);

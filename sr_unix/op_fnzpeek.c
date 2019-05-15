@@ -649,6 +649,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 					break;
 				default:
 					assert(FALSE);
+					zpeekadr = NULL; /* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
 			}
 			break;
 		case PO_RPCREPL:	/* This set of opcodes all require the receive pool to be initialized. Verify it */
@@ -680,6 +681,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 					break;
 				default:
 					assert(FALSE);
+					zpeekadr = NULL; /* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
 			}
 			break;
 		case PO_PEEK:		/* prmpeekadr set up in argument processing */
@@ -688,6 +690,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 			break;
 		default:
 			assert(FALSE);
+			zpeekadr = NULL; /* needed to silence [-Wsometimes-uninitialized] warning from LLVM compiler */
 	}
 	assert(NULL != zpeekadr);
 	/* Check the rest of the args */

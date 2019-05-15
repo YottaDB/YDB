@@ -109,7 +109,7 @@ void check_and_set_ztimeout(mval * inp_val)
 	sigset_t	savemask;
 	int4		rc;
 	ABS_TIME	cur_time, end_time;
-	int4		msec_timeout;   /* timeout in milliseconds */
+	int4		msec_timeout = -1;   /* no change to timeout in milliseconds */
 	mval		*interim_ptr;
 	boolean_t	is_negative = FALSE;
 	DCL_THREADGBL_ACCESS;

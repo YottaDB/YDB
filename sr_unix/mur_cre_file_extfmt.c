@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -110,7 +110,7 @@ int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 	{	/* Determine if some other parallel process has already created this file. If so, use that. If not create one */
 		assert(!single_reg);
 		GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
-		assert(release_latch);
+		assert(!multi_proc_in_use || release_latch);
 		if ('\0' == mur_shm_hdr->extr_fn[recstat].fn[0])
 		{	/* No one created this file. Let us first determine the name of the extract file we need to create.
 			 * This is needed so each parallel process can create a temporary extract file based on this name.

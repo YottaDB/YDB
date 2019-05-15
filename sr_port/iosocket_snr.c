@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -358,6 +358,7 @@ ssize_t iosocket_snr_utf_prebuffer(io_desc *iod, socket_struct *socketptr, int f
 			break;
 		default:
 			assertpro(iod->ichset != iod->ichset);
+			mblen = 0;	/* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
 	}
 	mblen++;	/* Include first char we were looking at in the required byte length */
 	DBGSOCK2((stdout, "socsnrupb: Length of char: %d\n", mblen));

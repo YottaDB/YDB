@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright 2014 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,14 +29,14 @@
 
 boolean_t mu_interactive(caddr_t message)
 {
-	boolean_t	done = FALSE, mur_error_allowed;
+	boolean_t	mur_error_allowed;
 	unsigned short	len;
 	int		index;
 	char		res[8];
 	char 		*fgets_res;
 	util_out_print(PROCEED_PROMPT, TRUE);
 
-	while (FALSE == done)
+	for ( ; ; )
 	{
 		fgets_res = util_input(res, SIZEOF(res), stdin, FALSE);
 		if (NULL != fgets_res)
@@ -45,12 +48,10 @@ boolean_t mu_interactive(caddr_t message)
 					res[index] = TOUPPER(res[index]);
 				if (0 == memcmp(res, YES_STRING, len))
 				{
-					done = TRUE;
 					mur_error_allowed = TRUE;
 					break;
 				} else if (0 == memcmp(res, NO_STRING, len))
 				{
-					done = TRUE;
 					mur_error_allowed = FALSE;
 					break;
 				}

@@ -252,6 +252,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	{
 		queue_empty = TRUE;
 		n1 = 1; /* set to a non-zero value so dbsync timer canceling (if needed) can happen */
+		n2 = 0;
 		goto writes_completed; /* to avoid unnecessary IF checks in the more common case (BG) */
 	}
 	ahead = &csa->acc_meth.bg.cache_state->cacheq_active;

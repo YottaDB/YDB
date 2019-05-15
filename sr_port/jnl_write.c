@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -336,7 +336,14 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	if (!in_phase2)
 	{
 		jb->blocked = 0;
-		if (0 != jnl_write_extend_if_needed(rlen, jb, lcl_freeaddr, csa, rectype, blk_ptr, jfb, reg, jpc, jnl_rec))
+		assert(NULL == blk_ptr);	/* as otherwise it is a PBLK or AIMG record which is of variable record
+						 * length that conflicts with the "jrt_fixed_size[rectype]" assert done in
+						 * "jnl_write_extend_if_needed" function call below.
+						 */
+		assert(NULL == jfb);		/* as otherwise it is a logical record with formatted journal records which
+						 * is of variable record length (conflicts with the jrt_fixed_size assert).
+						 */
+		if (0 != jnl_write_extend_if_needed(rlen, jb, lcl_freeaddr, csa, rectype, reg, jpc, jnl_rec))
 		{
 			DEBUG_ONLY(jnl_write_recursion_depth--);
 			return; /* let the caller handle the error */

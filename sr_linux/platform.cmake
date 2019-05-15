@@ -103,12 +103,11 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-
 # Note: -Wimplicit not explicitly mentioned since it is enabled by Wall
 # Note: -Wuninitialized not explicitly mentioned since it is enabled by Wall
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-char-subscripts")
 if (CMAKE_COMPILER_IS_GNUCC)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-char-subscripts -Wno-unused-but-set-variable")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-but-set-variable")
 else()
-  # -Wno-maybe-uninitialized is unsupported on clang/llvm
   # -Wno-unused-but-set-variable is unsupported on clang/llvm
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-char-subscripts")
 endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wvla")
 

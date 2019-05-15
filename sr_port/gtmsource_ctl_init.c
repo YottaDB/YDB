@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -358,6 +358,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 				lcl_jnl_fn, DB_LEN_STR(reg), status);
 		else
 			rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_JNLNOREPL, 4, lcl_jnl_fn_len, lcl_jnl_fn, DB_LEN_STR(reg));
+		jnl_fs_block_size = 0;	/* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
 	}
 	assert(SS_NORMAL == status);	/* so jnl_fs_block_size is guaranteed to have been initialized */
 	tmp_ctl->repl_buff = repl_buff_create(tmp_jfh->alignsize, jnl_fs_block_size);

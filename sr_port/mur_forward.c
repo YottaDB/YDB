@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -261,7 +261,7 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 				continue;
 			}
 			GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
-			assert(release_latch);
+			assert(!multi_proc_in_use || release_latch);
 			for ( ; rctl < rctl_top; rctl++, shm_rctl++)
 			{
 				if (shm_rctl->owning_pid)
@@ -501,7 +501,7 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 						if ((rctl == mur_ctl) && stuck)
 						{	/* Check if all processes are stuck for a while. If so assertpro */
 							GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
-							assert(release_latch);
+							assert(!multi_proc_in_use || release_latch);
 							shm_rctl_start = mur_shm_hdr->shm_rctl_start;
 							num_reg_stuck = 0;
 							for (i = 0; i < murgbl.reg_total; i++)
@@ -902,7 +902,7 @@ void mur_shm_forw_token_add(forw_multi_struct *forw_multi, reg_ctl_list *rctl, b
 	if (is_new)
 	{
 		GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
-		assert(release_latch);
+		assert(!multi_proc_in_use || release_latch);
 		/* Check if token is already present in shared memory */
 		COMPUTE_HASH_INT8(&forw_multi->token, hash);
 		assert(mur_forw_mp_hash_buckets);
@@ -1030,7 +1030,7 @@ void mur_shm_forw_token_remove(reg_ctl_list *rctl)
 			 * Clean up the shm_forw_multi structure from shared memory.
 			 */
 			GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch);
-			assert(release_latch);
+			assert(!multi_proc_in_use || release_latch);
 			assert(0 == sfm->num_procs);
 			que_ent = &sfm->same_hash_chain;
 			assert(que_ent->fl);

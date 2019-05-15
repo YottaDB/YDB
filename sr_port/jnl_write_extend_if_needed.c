@@ -3,6 +3,9 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -28,8 +31,7 @@ GBLREF	boolean_t		in_jnl_file_autoswitch;
  * Failure : returns -1
  */
 int jnl_write_extend_if_needed(int4 jrec_len, jnl_buffer_ptr_t jb, uint4 lcl_freeaddr, sgmnt_addrs *csa,
-					enum jnl_record_type rectype, blk_hdr_ptr_t blk_ptr, jnl_format_buffer *jfb,
-					gd_region *reg, jnl_private_control *jpc, jnl_record *jnl_rec)
+				enum jnl_record_type rectype, gd_region *reg, jnl_private_control *jpc, jnl_record *jnl_rec)
 {
 	int4			jrec_len_padded;
 	int4			blocks_needed;
@@ -58,12 +60,6 @@ int jnl_write_extend_if_needed(int4 jrec_len, jnl_buffer_ptr_t jb, uint4 lcl_fre
 			assert(!IS_REPLICATED(rectype)); /* all replicated jnl records should have gone through t_end/tp_tend */
 			assert(jrt_fixed_size[rectype]); /* this is used later in re-computing checksums */
 		}
-		assert(NULL == blk_ptr);	/* as otherwise it is a PBLK or AIMG record which is of variable record
-						 * length that conflicts with the immediately above assert.
-						 */
-		assert(NULL == jfb);		/* as otherwise it is a logical record with formatted journal records which
-						 * is of variable record length (conflicts with the jrt_fixed_size assert).
-						 */
 		assertpro(!in_jnl_file_autoswitch);	/* avoid recursion of jnl_file_extend */
 		if (SS_NORMAL != jnl_flush(reg))
 		{

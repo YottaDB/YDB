@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -209,6 +209,7 @@ int gtmsource_send_heartbeat(time_t *now)
 #		ifdef GTM_TLS
 		if (ERR_TLSIOERROR == status)
 		{
+			gtmsource_local = jnlpool->gtmsource_local;	/* needed by GTMSOURCE_HANDLE_TLSIOERROR macro */
 			GTMSOURCE_HANDLE_TLSIOERROR("send");
 			return (SS_NORMAL);
 		} else

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2005, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,6 +71,8 @@ GBLREF	boolean_t	dse_running;
 	 *															\
 	 * Note the clearing of srcbuffptr is done as a flag that gds_blk_upgrd was run (used by dsk_read).			\
 	 */															\
+	assert((UPGRADE_IF_NEEDED == ydb_blkupgrade_flag) || (UPGRADE_NEVER == ydb_blkupgrade_flag)				\
+								|| (UPGRADE_ALWAYS == ydb_blkupgrade_flag));			\
 	if (!dse_running || (UPGRADE_IF_NEEDED == ydb_blkupgrade_flag))								\
 	{															\
 		if ((fully_upgraded) || (SIZEOF(v15_blk_hdr) > ((v15_blk_hdr_ptr_t)(srcbuffptr))->bsiz))			\
@@ -90,7 +92,7 @@ GBLREF	boolean_t	dse_running;
 		upgrdstatus = SS_NORMAL;											\
 		if (NULL != (void *)(ondskblkver))										\
 			*(ondskblkver) = GDSV6;											\
-	} else if (UPGRADE_ALWAYS == ydb_blkupgrade_flag)									\
+	} else															\
 	{															\
 		upgrdstatus = gds_blk_upgrade((sm_uc_ptr_t)(srcbuffptr), (sm_uc_ptr_t)(trgbuffptr),				\
 					      (curcsd)->blk_size, (ondskblkver));						\

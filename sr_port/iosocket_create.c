@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -258,7 +258,10 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				socketptr->sd = socketptr->temp_sd = FD_INVALID; /* don't mess with 0 */
 			}
 		} else
+		{
 			assertpro(socket_tcpip == protocol || socket_local == protocol);	/* protocol already checked */
+			socketptr = NULL; /* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
+		}
 		socketptr->state = socket_created;
 		socketptr->howcreated = passive ? creator_listen : creator_connect;
 		SOCKET_BUFFER_INIT(socketptr, bfsize);

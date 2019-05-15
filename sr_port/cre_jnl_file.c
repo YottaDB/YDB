@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -156,7 +156,13 @@ uint4	cre_jnl_file(jnl_create_info *info)
 			info->no_rename = TRUE; /* We wanted to rename, but not required anymore */
 			info->no_prev_link = TRUE;	/* No rename => no prev_link */
 		}
-	} /* else we know for sure rename is not required */
+	} else
+	{	/* We know for sure rename is not required. So no need to initialize rename_fn_len since it is used in
+		 * below function call only if "info->no_rename" is FALSE. But need below initialization to avoid
+		 * a LLVM compiler warning.
+		 */
+		rename_fn_len = 0;	/* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
+	}
 	return (cre_jnl_file_common(info, rename_fn, rename_fn_len));
 }
 

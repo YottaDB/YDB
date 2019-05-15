@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,15 +81,8 @@ uint4 jnl_file_extend(jnl_private_control *jpc, uint4 total_jnl_rec_size)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	switch(jpc->region->dyn.addr->acc_meth)
-	{
-	case dba_mm:
-	case dba_bg:
-		csa = &FILE_INFO(jpc->region)->s_addrs;
-		break;
-	default:
-		assertpro(IS_REG_BG_OR_MM(jpc->region));
-	}
+	assert((dba_mm == jpc->region->dyn.addr->acc_meth) || (dba_bg == jpc->region->dyn.addr->acc_meth));
+	csa = &FILE_INFO(jpc->region)->s_addrs;
 	csd = csa->hdr;
 	assert(csa == cs_addrs && csd == cs_data);
 	assert(csa->now_crit || (csd->clustered && (CCST_CLOSED == csa->nl->ccp_state)));

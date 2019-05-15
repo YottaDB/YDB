@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1461,6 +1461,7 @@ int gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 	 * keys, use "SSL_key_update" for that purpose in TLS v1.3.
 	 */
 	ssl_version = SSL_version(ssl);
+	rv = 1;	/* set "rv" at start to success return value of "SSL_renegotiate"/"SSL_key_update" */
 	if (TLS1_3_VERSION > ssl_version)
 		rv = SSL_renegotiate(ssl);	/* Schedule a renegotiation */
 	/* Note: "SSL_key_update" function is available only from OpenSSL 1.1.1 onwards hence the OPENSSL_VERSION_NUMBER check

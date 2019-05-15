@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -103,7 +106,8 @@ int gdsfilext_nojnl(gd_region* reg, uint4 new_total, uint4 old_total)
 			diobuff = &rctl->dio_buff;
 		} else
 			diobuff = &(TREF(dio_buff));
-	}
+	} else
+		diobuff = NULL;
 	status = db_write_eof_block(udi, udi->fd, blk_size, offset, diobuff);
 	if (0 != status)
 	{

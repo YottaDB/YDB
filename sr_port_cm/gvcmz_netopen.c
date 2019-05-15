@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -95,26 +95,23 @@ void gvcmz_netopen_attempt(struct CLB *c)
 	ptr = c->mbf;
 	*ptr++ = CMMS_S_INITPROC;
 	assertpro(!second_attempt);
-	if (!second_attempt)
+	proto_str = (unsigned char *)&myproto;
+	if (!prc_vec)
 	{
-		proto_str = (unsigned char *)&myproto;
-		if (!prc_vec)
-		{
-			prc_vec = malloc(SIZEOF(*prc_vec));
-			jnl_prc_vector(prc_vec);
-		}
-		prc_vec_size = SIZEOF(*prc_vec);
-#ifdef BIGENDIAN
-		memcpy((unsigned char *)&temp_vect, (unsigned char *)prc_vec, SIZEOF(jnl_process_vector));
-		temp_vect.jpv_pid =  GTM_BYTESWAP_32(temp_vect.jpv_pid);
-		temp_vect.jpv_image_count =  GTM_BYTESWAP_32(temp_vect.jpv_image_count);
-		temp_vect.jpv_time =  GTM_BYTESWAP_64(temp_vect.jpv_time);
-		temp_vect.jpv_login_time =  GTM_BYTESWAP_64(temp_vect.jpv_login_time);
-		memcpy(ptr + S_PROTSIZE, (unsigned char *)&temp_vect, SIZEOF(jnl_process_vector));
-#else
-		memcpy(ptr + S_PROTSIZE, (unsigned char *)prc_vec, prc_vec_size);
-#endif
+		prc_vec = malloc(SIZEOF(*prc_vec));
+		jnl_prc_vector(prc_vec);
 	}
+	prc_vec_size = SIZEOF(*prc_vec);
+#	ifdef BIGENDIAN
+	memcpy((unsigned char *)&temp_vect, (unsigned char *)prc_vec, SIZEOF(jnl_process_vector));
+	temp_vect.jpv_pid =  GTM_BYTESWAP_32(temp_vect.jpv_pid);
+	temp_vect.jpv_image_count =  GTM_BYTESWAP_32(temp_vect.jpv_image_count);
+	temp_vect.jpv_time =  GTM_BYTESWAP_64(temp_vect.jpv_time);
+	temp_vect.jpv_login_time =  GTM_BYTESWAP_64(temp_vect.jpv_login_time);
+	memcpy(ptr + S_PROTSIZE, (unsigned char *)&temp_vect, SIZEOF(jnl_process_vector));
+#	else
+	memcpy(ptr + S_PROTSIZE, (unsigned char *)prc_vec, prc_vec_size);
+#	endif
 	memcpy(ptr, proto_str, S_PROTSIZE);
 	c->cbl = S_HDRSIZE + S_PROTSIZE + prc_vec_size;
 	status = cmi_write(c);	/* INITPROC */

@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -229,7 +229,7 @@ void	mur_output_show()
 		assert(!multi_proc_key_exception);
 		DEBUG_ONLY(multi_proc_key_exception = TRUE);	/* "multi_proc_in_use" is still TRUE so set this to avoid asserts */
 		GRAB_MULTI_PROC_LATCH_IF_NEEDED(release_latch); /* Grab a latch for the entire show duration */
-		assert(release_latch);
+		assert(!multi_proc_in_use || release_latch);
 	}
 	for (rctl = mur_ctl, rctl_top = mur_ctl + murgbl.reg_total;  rctl < rctl_top;  rctl++)
 	{

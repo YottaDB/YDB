@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -48,11 +51,13 @@ int	iosocket_rdone(mint *v, int4 msec_timeout)
 					break;
 				default:
 					assertpro(ichset != ichset);
+					codepoint = 0; /* needed to silence [-Wsometimes-uninitialized] warning from CLang/LLVM */
 			}
 			UTF8_ONLY(assert(WEOF != codepoint));
 		} else
-			/* Null length string returns 0 */
+		{	/* Null length string returns 0 */
 			codepoint = 0;
+		}
 		*v = (mint)(codepoint);
 	} else
 		*v = -1;
