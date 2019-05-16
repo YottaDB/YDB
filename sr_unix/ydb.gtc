@@ -16,12 +16,12 @@ if [ ! -f "YDBDIST"/ydb_env_set ] ; then echo Cannot find file "YDBDIST"/ydb_env
 else
     . "YDBDIST"/ydb_env_set
     if [ 0 = $# ] ; then
-	$ydb_dist/mumps -direct
+	$ydb_dist/yottadb -direct
     elif [ "-help" = "$1" -o "-h" = "$1" -o "-?" = "$1" ] ; then
 	echo "ydb -dir[ect] to enter direct mode (halt returns to shell)"
 	echo "ydb -run <entryref> to start executing at an entryref"
 	echo "ydb -help / ydb -h / ydb -? to display this text"
     else
-	$ydb_dist/mumps $*
+	$ydb_dist/yottadb $*
     fi
 fi

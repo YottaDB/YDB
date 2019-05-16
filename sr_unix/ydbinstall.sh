@@ -142,7 +142,7 @@ help_exit()
     echo "--verbose                -> output diagnostic information as the script executes; default is to run quietly"
     echo "options that take a value (e.g, --group) can be specified as either --option=value or --option value"
     echo "options marked with * are likely to be of interest primarily to YottaDB developers"
-    echo "version is defaulted from mumps file if one exists in the same directory as the installer"
+    echo "version is defaulted from yottadb file if one exists in the same directory as the installer"
     echo "This version must run as root."
     echo ""
     echo "Example usages are (assumes latest YottaDB release is r1.24 and latest GT.M version is V6.3-005)"
@@ -436,17 +436,17 @@ if [ "N" = "$ydb_force_install" ]; then
 	fi
 fi
 
-# YottaDB version is required - first see if ydbinstall and mumps are bundled
+# YottaDB version is required - first see if ydbinstall and yottadb/mumps are bundled
 if [ -z "$ydb_version" ] ; then
     tmp=`dirname $0`
-    if [ -e "$tmp/mumps" -a -e "$tmp/_XCMD.m" ] ; then
+    if [ \( -e "$tmp/yottadb" -o -e "$tmp/mumps" \) -a -e "$tmp/_XCMD.m" ] ; then
         ydb_distrib=$tmp
         ydb_dist=$tmp ; export ydb_dist
-        chmod +x $ydb_dist/mumps
+        chmod +x $ydb_dist/yottadb
         tmp=`mktmpdir`
         ydb_routines="$tmp($ydb_dist)" ; export ydb_routines
-        ydb_version=`$ydb_dist/mumps -run %XCMD 'write $piece($zyrelease," ",2)' 2>&1`
-	if [ $? -gt 0 ] ; then echo >&2 "$ydb_dist/mumps -run %XCMD 'write $piece($zyrelease," ",2)' failed with output $ydb_version"; exit 1; fi
+        ydb_version=`$ydb_dist/yottadb -run %XCMD 'write $piece($zyrelease," ",2)' 2>&1`
+	if [ $? -gt 0 ] ; then echo >&2 "$ydb_dist/yottadb -run %XCMD 'write $piece($zyrelease," ",2)' failed with output $ydb_version"; exit 1; fi
         rm -rf $tmp
     fi
 fi
@@ -515,7 +515,9 @@ echo YottaDB/GT.M version to install is required ; err_exit
 fi
 
 # Now that "ydb_version" is determined, get YottaDB/GT.M distribution if ydbinstall is not bundled with distribution
-if [ -f "${ydb_distrib}/mumps" ] ; then gtm_tmpdir=$ydb_distrib
+# Note that r1.26 onwards "yottadb" executable exists so use it. If not, use "mumps" executable (pre-r1.26).
+if [ -f "${ydb_distrib}/yottadb" ] ; then gtm_tmpdir=$ydb_distrib
+elif [ -f "${ydb_distrib}/mumps" ] ; then gtm_tmpdir=$ydb_distrib
 else
     tmp=`echo $ydb_version | tr -d .-`
     ydb_filename=""

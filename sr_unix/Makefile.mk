@@ -48,7 +48,7 @@ ifneq (,$(findstring Linux,$(UNAMESTR)))
 	FILEFLAG = -L
 endif
 # 64 bit version of YottaDB? 0 for yes!
-BIT64 = $(shell file $(FILEFLAG) $(DISTDIR)/mumps | grep -q -E '64-bit|ELF-64'; echo $$?)
+BIT64 = $(shell file $(FILEFLAG) $(DISTDIR)/yottadb | grep -q -E '64-bit|ELF-64'; echo $$?)
 
 # Determine if GPG 2.1+ is installed
 HAVE_GPG21   = 0
@@ -215,14 +215,14 @@ install: all
 	echo "unmaskpwd: gtm_status_t gc_mask_unmask_passwd(I:gtm_string_t*,O:gtm_string_t*[512])" >> $(PLUGINDIR)/gpgagent.tab
 	ln -fs ./$(install_targ) $(PLUGINDIR)/libgtmcrypt.so
 	cp -pf pinentry.m $(PLUGINDIR)/r
-	(cd $(PLUGINDIR)/o      && env ydb_chset=M     ${ydb_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
+	(cd $(PLUGINDIR)/o      && env ydb_chset=M     ${ydb_dist}/yottadb $(PLUGINDIR)/r/pinentry.m)
 ifeq ($(NOT_IN_GTMCRYPTDIR),1)
 	cp -pf *.sh *.m $(GTMCRYPTDIR)/
 	cp -f maskpass $(GTMCRYPTDIR)/
 endif
 ifeq ($(HAVE_UTF8),0)
 	@echo "UTF-8 mode library installation may fail if ydb_icu_version/gtm_icu_version (${ydb_icu_version}/${gtm_icu_version}) is not set"
-	(cd $(PLUGINDIR)/o/utf8 && env ydb_chset=UTF-8 ${ydb_dist}/mumps $(PLUGINDIR)/r/pinentry.m)
+	(cd $(PLUGINDIR)/o/utf8 && env ydb_chset=UTF-8 ${ydb_dist}/yottadb $(PLUGINDIR)/r/pinentry.m)
 endif
 
 uninstall:

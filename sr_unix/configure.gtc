@@ -58,8 +58,8 @@ fi
 # Native shared library extension.
 ext=".so"
 
-isarm_ydb=`file mumps | grep -w "ARM" | wc -l`
-is64bit_ydb=`file mumps | grep -c "64-bit"`
+isarm_ydb=`file yottadb | grep -w "ARM" | wc -l`
+is64bit_ydb=`file yottadb | grep -c "64-bit"`
 
 # Flags to build shared libraries of M routines
 if [ "ibm" = $arch ] ; then ldflags="-brtl -G -bexpfull -bnoentry -b64" ; ldcmd="ld" # AIX
@@ -74,7 +74,7 @@ else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
 # Binaries
-binaries="mupip mumps libyottadb$ext lke dse ftok semstat2"
+binaries="mupip yottadb libyottadb$ext lke dse ftok semstat2"
 
 # Normal scripts - executed by anyone
 nscripts="lowerc_cp"
@@ -671,8 +671,8 @@ if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	fi
 fi
 
-# Change mode to executable for mumps and libyottadb to do the compiles
-chmod 755 $ydbdist/mumps $ydbdist/libyottadb$ext
+# Change mode to executable for yottadb and libyottadb to do the compiles
+chmod 755 $ydbdist/yottadb $ydbdist/libyottadb$ext
 
 ydb_routines=$ydbdist
 ydb_gbldir=$ydbdist/mumps.gld
@@ -688,7 +688,7 @@ $echo ""
 # Ensure we are NOT in UTF-8 mode
 ydb_chset="M"
 export ydb_chset
-(cd $ydbdist; ./mumps -noignore *.m; $echo $?>compstat ; $ldcmd $ldflags -o libyottadbutil$ext *.o )
+(cd $ydbdist; ./yottadb -noignore *.m; $echo $?>compstat ; $ldcmd $ldflags -o libyottadbutil$ext *.o )
 
 # Now work on UTF-8 mode
 if [ "$doutf8" -ne 0 ]; then
@@ -711,7 +711,7 @@ if [ "$doutf8" -ne 0 ]; then
 			LD_LIBRARY_PATH=$save_icu_libpath
 			export LD_LIBRARY_PATH
 		fi
-		(ydb_dist=$ydbdist/utf8; export ydb_dist; cd $ydb_dist; ./mumps -noignore *.m; $echo $?>>$ydbdist/compstat; \
+		(ydb_dist=$ydbdist/utf8; export ydb_dist; cd $ydb_dist; ./yottadb -noignore *.m; $echo $?>>$ydbdist/compstat; \
 		$ldcmd $ldflags -o libyottadbutil$ext *.o)
 	)
 fi
@@ -720,6 +720,12 @@ fi
 ln -s ./libyottadbutil$ext $ydbdist/libgtmutil$ext || echo ln -s ./libyottadbutil$ext $ydbdist/libgtmutil$ext
 if [ "$doutf8" -ne 0 ]; then
 	ln -s ./libyottadbutil$ext $ydbdist/utf8/libgtmutil$ext || echo ln -s ./libyottadbutil$ext $ydbdist/utf8/libgtmutil$ext
+fi
+
+# Install mumps as a soft link to yottadb for backward compatibility purposes just in case
+ln -s ./yottadb $ydbdist/mumps || echo ln -s ./yottadb $ydbdist/mumps
+if [ "$doutf8" -ne 0 ]; then
+	ln -s ./yottadb $ydbdist/utf8/mumps || echo ln -s ./yottadb $ydbdist/utf8/mumps
 fi
 
 # Change mode to executable for the normal binaries
@@ -873,7 +879,7 @@ if [ -d $ydbdist/plugin/gtmcrypt ]; then
 	chmod a-w $ydbdist/plugin/gtmcrypt/*
 fi
 
-# if we had a mumps error then remove executable bit recursively and exit
+# if we had a yottadb compilation error then remove executable bit recursively and exit
 # this could include compile and/or library load errors
 if [ 0 != `grep -c '[1-9]' $ydb_dist/compstat` ]; then
 	$echo ""

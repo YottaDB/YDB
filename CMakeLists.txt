@@ -93,20 +93,20 @@ endif()
 # Choose where to get bootstrap sources.
 set(YDB_DIST "" CACHE PATH "Existing YottaDB Distribution")
 if(YDB_DIST)
-  # Bootstrap using already-installed mumps.
+  # Bootstrap using already-installed yottadb.
   message(STATUS "Using existing ydb_dist=${YDB_DIST} to generate sources.")
   set(gen_bootstrap 1)
   set(gen_bootstrap_dist "${YDB_DIST}")
-  set(gen_bootstrap_mumps "${YDB_DIST}/mumps")
-  set(gen_bootstrap_depend "${gen_bootstrap_mumps}")
+  set(gen_bootstrap_yottadb "${YDB_DIST}/yottadb")
+  set(gen_bootstrap_depend "${gen_bootstrap_yottadb}")
 else()
   # Bootstrap using pre-generated bootstrap sources.
   # We generate them again only for comparison.
   message(STATUS "Bootstrapping from pre-generated sources.")
   set(gen_bootstrap 0)
   set(gen_bootstrap_dist "${YDB_BINARY_DIR}")
-  set(gen_bootstrap_mumps "$<TARGET_FILE:mumps>")
-  set(gen_bootstrap_depend mumps)
+  set(gen_bootstrap_yottadb "$<TARGET_FILE:yottadb>")
+  set(gen_bootstrap_depend yottadb)
 endif()
 
 set(YDB_INSTALL_DIR yottadb_${version} CACHE STRING "Install directory")
@@ -231,7 +231,7 @@ set_source_list(libyottadb       dbcertify_main dbcertify_cmd ftok_main)
 set_source_list(lke              lke dlopen_libyottadb)
 set_source_list(maskpass         maskpass gtmcrypt_util)
 set_source_list(maskpass         ydb_getenv minimal_gbldefs)
-set_source_list(mumps            gtm dlopen_libyottadb)
+set_source_list(yottadb          gtm dlopen_libyottadb)
 set_source_list(mupip            mupip dlopen_libyottadb)
 set_source_list(semstat2         semstat2)
 
@@ -278,7 +278,7 @@ add_custom_command(
     -D ydb_dist=${gen_bootstrap_dist}
     -D gtm_tools=${YDB_SOURCE_DIR}/sr_port
     -D ydb_routines=.
-    -D mumps=${gen_bootstrap_mumps}
+    -D mumps=${gen_bootstrap_yottadb}
     -D "args=${mumps_ttt_args}"
     -D output_file=ttt.log
     -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
@@ -305,7 +305,7 @@ foreach(msg
       -D ydb_dist=${gen_bootstrap_dist}
       -D gtm_tools=${YDB_SOURCE_DIR}/sr_port
       -D ydb_routines=.
-      -D mumps=${gen_bootstrap_mumps}
+      -D mumps=${gen_bootstrap_yottadb}
       -D "args=${mumps_msg_args}"
       -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
     VERBATIM
@@ -410,7 +410,8 @@ function(add_executable target)
   # And add system libraries as a target library for all utilities (e.g. dlopen() etc.).
   target_link_libraries(${target} ${libsyslibs})
 endfunction()
-add_executable(mumps ${mumps_SOURCES})
+
+add_executable(yottadb ${yottadb_SOURCES})
 
 add_executable(dse ${dse_SOURCES})
 list(APPEND with_export dse)
@@ -461,7 +462,7 @@ set_target_properties(libyottadb PROPERTIES
   LINK_DEPENDS "${libyottadb_dep}"
   )
 add_dependencies(libyottadb gen_export)
-add_dependencies(mumps libyottadb)
+add_dependencies(yottadb libyottadb)
 
 # Iterate over the list of GPG related libraries
 foreach(gpglib gpg-error gpgme gcrypt config)
@@ -585,7 +586,7 @@ foreach(f_in
 endforeach()
 
 install(TARGETS
-  mumps
+  yottadb
   dse
   lke
   gtcm_server
@@ -790,14 +791,14 @@ foreach(ydb_chset "" "UTF-8")
     get_filename_component(out_dir "${out}" PATH)
     add_custom_command(
       OUTPUT ${out}
-      DEPENDS ${in} ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps
+      DEPENDS ${in} ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake yottadb
       COMMAND ${CMAKE_COMMAND}
         -D ydb_dist=${YDB_BINARY_DIR}
         -D ydb_routines=.
         -D ydb_chset=${ydb_chset}
         -D ydb_icu_version=${ydb_icu_version}
         -D LC_ALL=${LC_ALL}
-        -D mumps=$<TARGET_FILE:mumps>
+        -D mumps=$<TARGET_FILE:yottadb>
         -D "args=${in}"
         -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
       WORKING_DIRECTORY ${out_dir}
@@ -834,20 +835,20 @@ Halt")
     )
   add_custom_command(
     OUTPUT ${help}help.dat ${help}help.gld
-    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
+    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake yottadb mupip
             ${YDB_BINARY_DIR}/${help}help.in1
             ${YDB_BINARY_DIR}/${help}help.in2
             ${m_routines}
     COMMAND ${CMAKE_COMMAND} -E remove ${help}help.dat ${help}help.gld
     COMMAND ${CMAKE_COMMAND} ${env}
-      -D mumps=$<TARGET_FILE:mumps> -D "args=-run;GDE"
+      -D mumps=$<TARGET_FILE:yottadb> -D "args=-run;GDE"
       -D input_file=${YDB_BINARY_DIR}/${help}help.in1
       -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
     COMMAND ${CMAKE_COMMAND} ${env}
       -D mumps=$<TARGET_FILE:mupip> -D "args=create"
       -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
     COMMAND ${CMAKE_COMMAND} ${env}
-      -D mumps=$<TARGET_FILE:mumps> -D "args=-direct"
+      -D mumps=$<TARGET_FILE:yottadb> -D "args=-direct"
       -D input_file=${YDB_BINARY_DIR}/${help}help.in2
       -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
     VERBATIM
@@ -865,7 +866,7 @@ add_custom_command(
     -D ydb_dist=${YDB_BINARY_DIR}
     -D ydb_routines=.
     -D ydb_gbldir=${YDB_BINARY_DIR}/gtmhelp
-    -D mumps=$<TARGET_FILE:mumps>
+    -D mumps=$<TARGET_FILE:yottadb>
     -D "args=-run;GTMDEFINEDTYPESTODB"
     -P ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake
     VERBATIM
@@ -886,7 +887,7 @@ exit")
     )
   add_custom_command(
     OUTPUT ${YDB_BINARY_DIR}/${help}help.dat_ro
-    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
+    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake yottadb mupip
             ${YDB_BINARY_DIR}/${help}help.in3
             ${help}help.dat ${help}help.gld ${help}help.dat_noro
     COMMAND ${CMAKE_COMMAND} ${env}
@@ -911,7 +912,7 @@ exit")
     )
   add_custom_command(
     OUTPUT ${YDB_BINARY_DIR}/${help}help.dat_noro
-    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake mumps mupip
+    DEPENDS ${YDB_SOURCE_DIR}/sr_unix/mumps.cmake yottadb mupip
             ${YDB_BINARY_DIR}/${help}help.in4
             ${help}help.dat ${help}help.gld
     COMMAND ${CMAKE_COMMAND} ${env}
@@ -965,7 +966,7 @@ if("${CMAKE_BUILD_TYPE}" MATCHES "RelWithDebInfo")
     gtmsecshr_real
     libyottadb
     lke
-    mumps
+    yottadb
     mupip
     semstat2
     )

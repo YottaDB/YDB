@@ -88,8 +88,8 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. . . write "export ydb_gbldir=",tmp2,!,"export gtmgbldir=$ydb_gbldir",!
 	. . . write "export ydb_dir=",env("ydb_dir"),!,"export gtmdir=",env("gtmdir"),!
 	. . . write "export ydb_rel="_env("ydb_rel"),!,"export gtmver=",env("gtmver"),!
-	. . . if $zsearch("./gdedefaults",$increment(zstmp)) write dist,"/mumps -run GDE <gdedefaults",!
-	. . . else  write dist,"/mumps -run GDE <"_dist,"/gdedefaults",!
+	. . . if $zsearch("./gdedefaults",$increment(zstmp)) write dist,"/yottadb -run GDE <gdedefaults",!
+	. . . else  write dist,"/yottadb -run GDE <"_dist,"/gdedefaults",!
 	. . . write dist,"/mupip create",!
 	. . . write dist,"/mupip set -journal=""enable,on,before"" -region ""*""",!
 	. . . write /eof
@@ -165,11 +165,11 @@ set	; Set up environment (environment variables, database, etc.) with default st
 	. write "export ydb_xc_",tmp2,"=",tmp1,"; export GTMXC_",tmp2,"=",tmp1,!
 	set tmp=$zsearch("$ydb_dist/plugin/bin",$increment(zstmp))
 	write:'$find($ztrnlnm("PATH"),dist) "export PATH=",$select($length(tmp):tmp_":",1:""),"$ydb_dist:$PATH",!
-	write "alias gde=""$ydb_dist/mumps -run GDE""",!
+	write "alias gde=""$ydb_dist/yottadb -run GDE""",!
 	quit
 
 unset	; As part of unsetting the environment set by entryref set:
-	; - Remove $ydb_dist from $LD_LIBRARY_PATH 
+	; - Remove $ydb_dist from $LD_LIBRARY_PATH
 	; - Remove $ydb_dist and $ydb_dist/plugin/bin from $PATH
 	new dir,env,i,io,path,tmp,unset
 	set io=$io
@@ -335,4 +335,4 @@ U251	;"-F-YDBGTMMISMATCH YottaDB variable "_ydbvar_"="_env(ydbvar,"path")_" is n
 U252	;"-F-LINKFAIL unable to create link "_env(gtmvar)_" to "_env(ydbvar)
 U253	;"-F-CREATEFAIL unable to create directory "_env(ydbvar)
 U254	;"-F-REQLINKORDIR type of "_envvar_"="_env(envvar,"path")_" - """_env(envvar,"type")_""" is neither a directory nor a symbolic link"
-U255	;"-F-BADINVOCATION Must invoke as mumps -run set^"_$text(+0)_" or mumps -run unset^"_$text(+0)
+U255	;"-F-BADINVOCATION Must invoke as yottadb -run set^"_$text(+0)_" or yottadb -run unset^"_$text(+0)
