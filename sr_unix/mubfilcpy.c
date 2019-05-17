@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -141,7 +144,13 @@ bool	mubfilcpy (backup_reg_list *list)
 	struct stat		stat_buf;
 	off_t			filesize, offset;
 	char 			*inbuf, *ptr, *errptr, *sourcefilename, *sourcedirname;
-	char			tempfilename[MAX_FN_LEN + 1], tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN];
+	char			tempfilename[COMMAND_ARRAY_SIZE];	/* is sized the same as "cmdarray" because a file name
+									 * that is created using system("cp ...") on "cmdarray"
+									 * is later opened using open() on "tempfilename".
+									 * Therefore we do not want the cp to succeed due to
+									 * a bigger "cmdarray" buffer and "open()" to fail.
+									 */
+	char			tempdir[MAX_FN_LEN], prefix[MAX_FN_LEN];
 	char			tmpsrcfname[MAX_FN_LEN], tmpsrcdirname[MAX_FN_LEN], realpathname[PATH_MAX];
 	int                     fstat_res, i, cmdpathlen;
 	uint4			ustatus, size;
