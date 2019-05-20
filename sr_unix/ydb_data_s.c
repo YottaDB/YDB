@@ -93,11 +93,9 @@ int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, un
 	{
 		case LYDB_VARREF_LOCAL:
 			/* Find status of the given local variable. Locate base var lv_val in curr_symval */
-			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, ERR_LVUNDEF_OK_FALSE);
+			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp);
 			if (NULL == lvvalp)
-			{	/* Base local variable does not exist (ERR_LVUNDEF_OK_FALSE above is to ensure we do not
-				 * issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro). Return 0 for $data result.
-				 */
+			{	/* Base local variable does not exist. Return 0 for $data result. */
 				data_value = literal_zero;
 				break;
 			}

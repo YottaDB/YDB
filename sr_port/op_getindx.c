@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,12 +22,13 @@
 #include "do_xform.h"
 #include "undx.h"
 #include "mvalconv.h"
+#include "libyottadb_int.h"
 
 #define IS_INTEGER 0
 
 GBLREF bool		undef_inhibit;
 
-LITREF mval		literal_null ;
+LITREF mval		literal_null;
 
 error_def(ERR_LVNULLSUBS);
 
@@ -100,8 +101,12 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 	}
 	va_end(var);
 	if (!lv || !LV_IS_VAL_DEFINED(lv))
-	{
-		if (undef_inhibit)
+	{	/* If coming in through "ydb_get_s" (SimpleAPI/SimpleThreadAPI), do not issue LVUNDEF here since
+		 * the variable name is most likely not added to the lv hash table which means the LVUNDEF error
+		 * would show a lvn with subscripts but without a local variable name. Let caller "ydb_get_s" figure
+		 * out how to correctly issue the LVUNDEF error. Hence the check for LYDB_RTN_GET below.
+		 */
+		if (undef_inhibit || (LYDB_RTN_GET == TREF(libyottadb_active_rtn)))
 			lv = (lvTreeNode *)&literal_null;
 		else
 		{

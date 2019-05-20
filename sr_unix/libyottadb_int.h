@@ -365,11 +365,8 @@ MBSTART {															\
 	VARLVVALP = (VARTABENTP)->value;											\
 } MBEND
 
-#define	ERR_LVUNDEF_OK_FALSE	FALSE
-#define	ERR_LVUNDEF_OK_TRUE	TRUE
-
 /* Now the NOUPD version */
-#define FIND_BASE_VAR_NOUPD(VARNAMEP, VARMNAMEP, VARTABENTP, VARLVVALP, ERR_LVUNDEF_OK)						\
+#define FIND_BASE_VAR_NOUPD(VARNAMEP, VARMNAMEP, VARTABENTP, VARLVVALP)								\
 MBSTART {															\
 	lv_val		*lv;													\
 																\
@@ -379,12 +376,8 @@ MBSTART {															\
 	COMPUTE_HASH_MNAME((VARMNAMEP));			/* Compute its hash value */					\
 	(VARTABENTP) = lookup_hashtab_mname(&curr_symval->h_symtab, (VARMNAMEP));						\
 	if ((NULL == (VARTABENTP)) || (NULL == (lv_val *)((VARTABENTP)->value)))						\
-	{															\
-		if (ERR_LVUNDEF_OK)												\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVUNDEF);							\
-		else														\
-			VARLVVALP = NULL;											\
-	} else															\
+		VARLVVALP = NULL;												\
+	else															\
 	{															\
 		assert(NULL != LV_GET_SYMVAL((lv_val *)((VARTABENTP)->value)));							\
 		VARLVVALP = (VARTABENTP)->value;										\
@@ -489,8 +482,8 @@ MBSTART	{													\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,				\
 				      LEN_AND_STR(buff), LEN_AND_STR(PARAM2));					\
 		}												\
-		CHECK_MAX_STR_LEN(subs);									\
-		SET_MVAL_FROM_YDB_BUFF_T(mvalp, subs);	/* Generates error if subscript too long */		\
+		CHECK_MAX_STR_LEN(subs);		/* Generates error if subscript too long */		\
+		SET_MVAL_FROM_YDB_BUFF_T(mvalp, subs);								\
 		if (REBUFFER)											\
 		{												\
 			s2pool(&(mvalp->str));	/* Rebuffer in stringpool for protection */			\

@@ -112,10 +112,9 @@ int ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t 
 				 *
 				 * First - locate the base lv_val.
 				 */
-				FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, ERR_LVUNDEF_OK_FALSE);
+				FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp);
 				if (NULL == lvvalp)
-				{	/* Base local variable does not exist (ERR_LVUNDEF_OK_FALSE above is to ensure
-					 * we do not issue a LVUNDEF error inside the FIND_BASE_VAR_NOUPD macro).
+				{	/* Base local variable does not exist.
 					 * Return YDB_ERR_NODEEND (i.e. no more subscripts) for "ydb_subscript_previous_s" result.
 					 */
 					previoussub.mvtype = MV_STR;

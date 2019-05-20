@@ -13,6 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gtm_stdio.h"
 
 #undef DEBUG_LIBYOTTADB		/* Change to #define to enable debugging - must be set prior to include of libyottadb_int.h */
 
@@ -31,8 +32,12 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "outofband.h"
+#include "min_max.h"
+#include "zshow.h"		/* needed for "format2zwr" prototype */
 
 GBLREF	volatile int4	outofband;
+
+LITREF mval		literal_null;
 
 /* Routine to get local, global and ISV values
  *
@@ -52,11 +57,13 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 	boolean_t	gotit;
 	gparam_list	plist;
 	ht_ent_mname	*tabent;
-	int		get_svn_index;
+	int		get_svn_index, i;
 	lv_val		*lvvalp, *src_lv;
 	mname_entry	var_mname;
 	mval		get_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_var_types	get_type;
+	unsigned char	lvundef_buff[512], *ptr;
+	int		avail_len, len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -95,17 +102,21 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 	{
 		case LYDB_VARREF_LOCAL:
 			/* Get the given local variable value storing it in the provided buffer (if it fits) */
-			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp, ERR_LVUNDEF_OK_TRUE);
+			FIND_BASE_VAR_NOUPD(varname, &var_mname, tabent, lvvalp);
 					/* Locate base var lv_val in curr_symval. Issue LVUNDEF error if base lv does not exist. */
 			if (0 == subs_used)
-				/* If no subscripts, this is where to fetch the value from (if it exists) */
+			{	/* If no subscripts, this is where to fetch the value from (if it exists) */
 				src_lv = lvvalp;
-			else
+				if (!src_lv || !LV_IS_VAL_DEFINED(src_lv))
+				{	/* Unsubscripted variable is not defined. Prepare to issue LVUNDEF. */
+					src_lv = (lv_val *)&literal_null;
+				}
+			} else
 			{	/* We have some subscripts - load the varname lv_val and the subscripts into our array for callg
-				 * so we can drive "op_putindx" to locate the mval associated with those subscripts that need to
-				 * be set. Note "op_getindx" raises ERR_LVUNDEF if node is not found. Note that even if a node
-				 * is found, it may not have a value associated with it which we need to detect and raise
-				 * an LVUNDEF error for.
+				 * so we can drive "op_getindx" to locate the mval associated with those subscripts that need to
+				 * be set. Note "op_getindx" usually raises ERR_LVUNDEF if node is not found but since it is being
+				 * called from "ydb_get_s", it has special logic to not raise the ERR_LVUNDEF (see comments in
+				 * "ydb_get_s"). Hence the need to do the LVUNDEF error check after the "op_getindx" call.
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
@@ -113,8 +124,46 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 											LYDBRTNNAME(LYDB_RTN_GET));
 				src_lv = (lv_val *)callg((callgfnptr)op_getindx, &plist);	/* Locate node */
 			}
-			if (!LV_IS_VAL_DEFINED(src_lv))				/* Fetched value should be defined */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVUNDEF);
+			if ((lv_val *)&literal_null == src_lv)	/* it is a case of LVUNDEF */
+			{
+				avail_len = SIZEOF(lvundef_buff);
+				ptr = &lvundef_buff[0];
+				len = MIN(avail_len, varname->len_used);
+				memcpy(ptr, varname->buf_addr, len);
+				ptr += len;
+				avail_len -= len;
+				for (i = 0; i < subs_used; i++)
+				{
+					if (0 == i)
+					{
+						if (1 > avail_len)	/* not enough space to hold output */
+							break;
+						*ptr++ = '(';
+						avail_len--;
+					}
+					len = MIN(avail_len, subsarray[i].len_used);
+					if (len)
+					{
+						if (val_iscan(&plist_mvals[i]))
+							memcpy(ptr, subsarray[i].buf_addr, len);
+						else
+						{
+							len = avail_len;
+							format2zwr((sm_uc_ptr_t)subsarray[i].buf_addr, subsarray[i].len_used,
+									ptr, &len);
+							assert(len <= avail_len);
+						}
+						ptr += len;
+						avail_len -= len;
+					}
+					/* Add ',' or ')' as applicable */
+					if (1 > avail_len)	/* not enough space to hold output */
+						break;
+					*ptr++ = ((subs_used - 1) == i) ? ')' : ',';
+					avail_len--;
+				}
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LVUNDEF, 2, ptr - lvundef_buff, lvundef_buff);
+			}
 			/* Copy value to return buffer */
 			SET_YDB_BUFF_T_FROM_MVAL(ret_value, &src_lv->v, "NULL ret_value->buf_addr", LYDBRTNNAME(LYDB_RTN_GET));
 			break;
