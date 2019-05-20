@@ -2,7 +2,7 @@
  *								*
  * Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -60,8 +60,6 @@ void	tab_to_column(int col);
 
 #define MAX_12BIT			0xfff
 #define MAX_16BIT			0xffff
-#define MAX_32BIT			0xffffffff
-#define MAX_48BIT			0xffffffffffff
 #define STACK_ARG_OFFSET(indx)		(8 * (indx))
 #define MACHINE_FIRST_ARG_REG		AARCH64_REG_X0
 
@@ -94,7 +92,7 @@ void	tab_to_column(int col);
 #define GENERIC_OPCODE_LDA		((uint4)AARCH64_INS_ADD_REG)
 #define GENERIC_OPCODE_NOP		((uint4)AARCH64_INS_NOP)
 
-/* Branch has origin of +0 instructions. However, if the branch was nullified 
+/* Branch has origin of +0 instructions. However, if the branch was nullified
  * in an earlier shrink_trips, the origin is the current instruction itself
 */
 
@@ -243,19 +241,17 @@ void	tab_to_column(int col);
 
 #define GEN_LOAD_IMMED(reg, imval)												\
 {																\
+	assert((2 == SIZEOF(imval)) || (4 == SIZEOF(imval)));									\
 	if (0 <= imval)														\
 	{															\
 		code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, reg, imval & 0xffff);				\
-		if (MAX_16BIT < imval)												\
-		{														\
+		if ((2 < SIZEOF(imval)) && (MAX_16BIT < imval))									\
 			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, reg, (imval & 0xffff0000) >> 16, 1);\
-		}														\
 	} else															\
 	{															\
-		if (-1 * MAX_16BIT < imval)											\
-		{														\
+		if ((2 >= SIZEOF(imval)) || (MAX_16BIT >= -imval))								\
 			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_INV, reg, (-1 * imval) - 1); 		\
-		} else														\
+		else														\
 		{														\
 			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_INV, reg, ((-1 * imval) - 1) & 0xffff);	\
 			code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, reg, (imval & 0xffff0000) >> 16, 1);\

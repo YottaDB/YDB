@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -18,13 +18,9 @@
  * void op_indrzshow(mval *s1, mval *s2)
  */
 
-	.title	opp_indrzshow.s
-
 	.include "linkage.si"
 	.include "g_msf.si"
 #	include "debug.si"
-
-	.sbttl	opp_indrzshow
 
 	.data
 .extern	frame_pointer

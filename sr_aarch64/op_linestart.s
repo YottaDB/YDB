@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -16,8 +16,6 @@
 
 	.include "linkage.si"
 	.include "g_msf.si"
-
-	.sbttl	op_linestart
 
 	.data
 	.extern	frame_pointer

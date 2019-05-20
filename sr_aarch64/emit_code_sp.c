@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -60,21 +60,8 @@ void	emit_base_offset_addr(int base, int offset)
 									    (abs_offst - 1) & 0xffff);
 			}
 			if (MAX_16BIT < abs_offst)
-			{
 				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP_1,
 								(offset & 0xffff0000) >> 16, 0x1);
-				if (MAX_32BIT < abs_offst)
-				{
-					code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP_1,
-									(offset & 0xffff00000000) >> 32, 0x2);
-					if (MAX_48BIT < abs_offst)
-					{
-						code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK,
-										GTM_REG_CODEGEN_TEMP_1,
-										(offset & 0xffff000000000000) >> 48, 0x3);
-					}
-				}
-			}
 			code_buf[code_idx] = CODE_BUF_GEN_DNM(0, 0, base, GTM_REG_CODEGEN_TEMP_1);
 			break;
 		default:
@@ -103,22 +90,8 @@ void	emit_base_offset_load(int base, int offset)
 			{
 				code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16(AARCH64_INS_MOV_IMM, GTM_REG_CODEGEN_TEMP_1, offset);
 				if (MAX_16BIT < abs_offst)
-				{
 					code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK, GTM_REG_CODEGEN_TEMP_1,
 								(offset & 0xffff0000) >> 16, 0x1);
-					if (MAX_32BIT < abs_offst)
-					{
-						code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK,
-										GTM_REG_CODEGEN_TEMP_1,
-										(offset & 0xffff00000000) >> 32, 0x2);
-						if (MAX_48BIT < abs_offst)
-						{
-							code_buf[code_idx++] = CODE_BUF_GEN_D_IMM16_SHIFT(AARCH64_INS_MOVK,
-											GTM_REG_CODEGEN_TEMP_1,
-											(offset & 0xffff000000000000) >> 48, 0x3);
-						}
-					}
-				}
 				code_buf[code_idx++] = (((0 <= offset) ? AARCH64_INS_ADD_REG : AARCH64_INS_SUB_REG)
 								| (GTM_REG_CODEGEN_TEMP_1 << AARCH64_SHIFT_RM)
 								| (GTM_REG_CODEGEN_TEMP_1 << AARCH64_SHIFT_RD)
@@ -578,7 +551,7 @@ void 	format_machine_inst(void)
 				obpt += OPSPC;
 				fmt_rd_rn_shift_immr(size);
 				break;
-				
+
 
 			case 0x52:	/* MOV imm */
 				memcpy(obpt, MOV_INST, SIZEOF(MOV_INST) - 1);
