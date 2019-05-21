@@ -54,7 +54,7 @@ LITREF mval		literal_null;
 int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value)
 {
 	boolean_t	error_encountered;
-	boolean_t	gotit;
+	boolean_t	gotit, nospace;
 	gparam_list	plist;
 	ht_ent_mname	*tabent;
 	int		get_svn_index, i;
@@ -149,9 +149,13 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 						else
 						{
 							len = avail_len;
-							format2zwr((sm_uc_ptr_t)subsarray[i].buf_addr, subsarray[i].len_used,
-									ptr, (int *)&len);
+							nospace = format2zwr((sm_uc_ptr_t)subsarray[i].buf_addr,
+										subsarray[i].len_used, ptr, (int *)&len);
 							assert(len <= avail_len);
+							if (nospace)
+								avail_len = len;	/* set "avail_len" so we break out of for
+											 * loop in the "1 > avail_len" check below.
+											 */
 						}
 						ptr += len;
 						avail_len -= len;

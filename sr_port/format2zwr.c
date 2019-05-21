@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -36,13 +39,13 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
         sm_uc_ptr_t	cp;
 	uint4		ch;
 	int		fastate = 0, ncommas, dstlen, chlen, max_len;
-	boolean_t	isctl, isill;
+	boolean_t	isctl, isill, nospace;
 	uchar_ptr_t	srctop, strnext, tmpptr;
 
 	max_len = *des_len;
 	assert(0 < max_len);
 	dstlen = *des_len = 0;
-
+	nospace = FALSE;
 	if (src_len > 0)
 	{
 		srctop = src + src_len;
@@ -73,8 +76,6 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 			case 1: /* beginning of a new substring followed by a graphic character */
 				if (isill)
 			        {
-					assert(max_len > (dstlen + STR_LIT_LEN(DOLLARZCH)
-								+ MAX_ZWR_ZCHAR_DIGITS + ((dstlen) ? 2 : 0)));
 					if (max_len > (dstlen + STR_LIT_LEN(DOLLARZCH)
 								+ MAX_ZWR_ZCHAR_DIGITS + ((dstlen) ? 2 : 0)))
 					{
@@ -89,12 +90,13 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 						fastate = 3;
 						ncommas = 0;
 					} else
+					{
 						cp = srctop;	/* Not enough space, terminate the loop */
+						nospace = TRUE;
+					}
 					break;
 			        } else if (isctl)
 			        {
-					assert(max_len > (dstlen + STR_LIT_LEN(DOLLARCH)
-								+ MAX_ZWR_DCHAR_DIGITS + ((dstlen) ? 2 : 0)));
 					if (max_len > (dstlen + STR_LIT_LEN(DOLLARCH)
 								+ MAX_ZWR_DCHAR_DIGITS + ((dstlen) ? 2 : 0)))
 					{
@@ -109,10 +111,12 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 						fastate = 2;
 						ncommas = 0;
 					} else
+					{
 						cp = srctop;	/* Not enough space, terminate the loop */
+						nospace = TRUE;
+					}
 			        } else
 				{ /* graphic characters */
-					assert(max_len > (dstlen + 2 + ((!gtm_utf8_mode) ? 1 : chlen)));
 					if (max_len > (dstlen + 2 + ((!gtm_utf8_mode) ? 1 : chlen)))
 					{
 						if (0 == fastate) /* the initial quote in the beginning */
@@ -129,14 +133,16 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 							dstlen += chlen;
 						}
 					} else
+					{
 						cp = srctop;	/* Not enough space, terminate the loop */
+						nospace = TRUE;
+					}
 				}
 				break;
 			case 2: /* subsequent characters following a non-graphic character in the
 				   form of $CHAR(x,) */
 				if (isill)
 				{
-					assert(max_len > (dstlen + STR_LIT_LEN(CLOSE_PAREN_DOLLARZCH) + MAX_ZWR_ZCHAR_DIGITS));
 					if (max_len > (dstlen + STR_LIT_LEN(CLOSE_PAREN_DOLLARZCH) + MAX_ZWR_ZCHAR_DIGITS))
 					{
 						MEMCPY_LIT(des + dstlen, CLOSE_PAREN_DOLLARZCH);
@@ -144,11 +150,13 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 						I2A(des, dstlen, ch);
 						fastate = 3;
 					} else
+					{
 						cp = srctop;	/* Not enough space, terminate the loop */
+						nospace = TRUE;
+					}
 				} else if(isctl)
 				{
 					ncommas++;
-					assert(max_len > (dstlen + STR_LIT_LEN(CLOSE_PAREN_DOLLARCH) + MAX_ZWR_DCHAR_DIGITS));
 					if (max_len > (dstlen + STR_LIT_LEN(CLOSE_PAREN_DOLLARCH) + MAX_ZWR_DCHAR_DIGITS))
 					{
 						if (CHARMAXARGS == ncommas)
@@ -163,11 +171,12 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 						}
 						I2A(des, dstlen, ch);
 					} else
+					{
 						cp = srctop;	/* Not enough space, terminate the loop */
+						nospace = TRUE;
+					}
 				} else
 				{
-					assert(max_len > (dstlen + STR_LIT_LEN(CLOSE_PAREN_QUOTE)
-								+ 1 + ((!gtm_utf8_mode) ? 1 : chlen)));
 					if (max_len > (dstlen + STR_LIT_LEN(CLOSE_PAREN_QUOTE)
 								+ 1 + ((!gtm_utf8_mode) ? 1 : chlen)))
 					{
@@ -183,13 +192,15 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 							des[dstlen++] = '"';
 						fastate = 1;
 					} else
+					{
 						cp = srctop;	/* Not enough space, terminate the loop */
+						nospace = TRUE;
+					}
 				}
 				break;
 			case 3: /* subsequent characters following an illegal character in the form of $ZCHAR(x,) */
 				if(isill)
 				{
-					assert(max_len > (dstlen + STR_LIT_LEN(CLOSE_PAREN_DOLLARZCH) + MAX_ZWR_ZCHAR_DIGITS));
 					if (max_len > (dstlen + STR_LIT_LEN(CLOSE_PAREN_DOLLARZCH) + MAX_ZWR_ZCHAR_DIGITS))
 					{
 						ncommas++;
@@ -205,10 +216,12 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 						}
 						I2A(des, dstlen, ch);
 					} else
+					{
 						cp = srctop;	/* Not enough space, terminate the loop */
+						nospace = TRUE;
+					}
 				} else if (isctl)
 				{
-					assert(max_len > (dstlen + STR_LIT_LEN(CLOSE_PAREN_DOLLARCH) + MAX_ZWR_DCHAR_DIGITS));
 					if (max_len > (dstlen + STR_LIT_LEN(CLOSE_PAREN_DOLLARCH) + MAX_ZWR_DCHAR_DIGITS))
 					{
 						MEMCPY_LIT(des + dstlen, CLOSE_PAREN_DOLLARCH);
@@ -216,11 +229,12 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 						I2A(des, dstlen, ch);
 						fastate = 2;
 					} else
+					{
 						cp = srctop;	/* Not enough space, terminate the loop */
+						nospace = TRUE;
+					}
 				} else
 				{
-					assert(max_len > (dstlen + STR_LIT_LEN(CLOSE_PAREN_QUOTE)
-								+ ((!gtm_utf8_mode) ? 1 : chlen) + ('"' == ch)));
 					if (max_len > (dstlen + STR_LIT_LEN(CLOSE_PAREN_QUOTE)
 								+ ((!gtm_utf8_mode) ? 1 : chlen) + ('"' == ch)))
 					{
@@ -236,7 +250,10 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 							des[dstlen++] = '"';
 						fastate = 1;
 					} else
+					{
 						cp = srctop;	/* Not enough space, terminate the loop */
+						nospace = TRUE;
+					}
 				}
 				break;
 			default:
@@ -249,11 +266,13 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 		switch(fastate)
 		{
 		case 1:
-		        des[dstlen++] = '"';
+			if (!nospace)
+				des[dstlen++] = '"';
 			break;
 		case 2:
 		case 3:
-		        des[dstlen++] = ')';
+			if (!nospace)
+				des[dstlen++] = ')';
 			break;
 		default:
 			assert(FALSE);
@@ -266,6 +285,6 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 	}
 	assertpro(max_len > dstlen);
 	*des_len = dstlen;
-	return 0;
+	return nospace;
 }
 
