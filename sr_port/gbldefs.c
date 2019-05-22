@@ -1326,3 +1326,6 @@ GBLDEF	int			stapi_signal_handler_deferred;	/* non-zero if signal handler functi
 								 * should be invoked in a deferred fashion.
 								 */
 GBLDEF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
+GBLDEF	void			*dummy_ptr;	/* A dummy global variable which works around a suspected Clang compiler issue.
+						 * See use of this global variable in sr_unix/gvcst_spr_queryget.c for details.
+						 */

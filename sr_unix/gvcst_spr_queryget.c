@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -40,9 +43,10 @@
 
 LITREF	mval		literal_batch;
 
-GBLREF gv_key		*gv_currkey, *gv_altkey;
-GBLREF gd_region	*gv_cur_region;
-GBLREF uint4		dollar_tlevel;
+GBLREF	gv_key		*gv_currkey, *gv_altkey;
+GBLREF	gd_region	*gv_cur_region;
+GBLREF	uint4		dollar_tlevel;
+GBLREF	void		*dummy_ptr;
 
 DEFINE_NSB_CONDITION_HANDLER(gvcst_spr_queryget_ch)
 
@@ -76,6 +80,14 @@ boolean_t	gvcst_spr_queryget(mval *cumul_val)
 	 * besides it does not hurt that much since only a M-stack entry gets pushed. So we err on the side of caution.
 	 */
 	val = &mv_chain->mv_st_cont.mvs_mval;
+	/* For reasons not apparent, assigning the local variable "val" to a global variable (in this case the dummy global
+	 * "dummy_ptr") causes "val" to have the correct value in Clang in pro builds. Without the below assignment,
+	 * "val" has been seen to be off by 8 bytes (i.e. 8 bytes more than what it should be) resulting in SIG-11 and/or
+	 * GTMASSERT2 types of failures in the POP_MV_STENT macro due to memory corruption (in the v62000/gtm8108 and
+	 * v55000/gtm7020 subtests) when "val->str.addr = (char *)stringpool.free" happens later in "gvcst_queryget.c".
+	 * Dbg builds using Clang do not seem to have this issue. Also pro and dbg builds using GCC do not seem to have this issue.
+	 */
+	dummy_ptr = val;
 	val->mvtype = 0; /* initialize mval in M-stack in case stp_gcol gets called before mkey gets initialized below */
 	addr = TREF(gd_targ_addr);
 	assert(NULL != addr);
