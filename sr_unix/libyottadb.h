@@ -295,7 +295,7 @@ void	ydb_zstatus(char* msg, int len);
 
 
 /* Utility entry points accessable in libyottadb.so */
-int	ydb_call_variadic_plist_func(ydb_vplist_func cgfunc, uintptr_t cvplist);	/* Used by Golang to call variadic C function */
+int	ydb_call_variadic_plist_func(ydb_vplist_func cgfunc, void *cvplist);	/* Used by Golang to call variadic C function */
 int	ydb_child_init(void *param);
 int	ydb_ci(const char *c_rtn_name, ...);				/* Call-in interface */
 int	ydb_cip(ci_name_descriptor *ci_info, ...);			/* Slightly faster "ydb_ci" */
