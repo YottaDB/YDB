@@ -154,7 +154,7 @@ enum
  */
 #define YDB_COPY_STRING_TO_BUFFER(STRING, BUFFERP, COPY_DONE)	\
 {								\
-	int	len;						\
+	size_t	len;						\
 								\
 	len = strlen(STRING);					\
 	if (len <= (BUFFERP)->len_alloc)			\

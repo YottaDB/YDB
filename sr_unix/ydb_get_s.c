@@ -63,7 +63,7 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 	mval		get_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_var_types	get_type;
 	unsigned char	lvundef_buff[512], *ptr;
-	int		avail_len, len;
+	unsigned int	avail_len, len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -150,7 +150,7 @@ int ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb
 						{
 							len = avail_len;
 							format2zwr((sm_uc_ptr_t)subsarray[i].buf_addr, subsarray[i].len_used,
-									ptr, &len);
+									ptr, (int *)&len);
 							assert(len <= avail_len);
 						}
 						ptr += len;

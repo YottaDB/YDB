@@ -64,7 +64,7 @@ int ydb_message(int errnum, ydb_buffer_t *msg_buff)
 			LEN_AND_LIT("NULL msg_buff"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_MESSAGE)));
 	/* Copy message to user's buffer if there is room */
 	msg_buff->len_used = msg.len;
-	if (msg.len > msg_buff->len_alloc)
+	if ((unsigned)msg.len > msg_buff->len_alloc)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, msg.len, msg_buff->len_alloc);
 	if (msg.len)
 	{

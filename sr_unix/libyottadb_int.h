@@ -412,7 +412,7 @@ MBSTART	{													\
 	MV_FORCE_STR(sRC);											\
 	assert(MV_IS_STRING(sRC));										\
 	dST = YDBBUFF;												\
-	if (sRC->str.len > dST->len_alloc)									\
+	if ((unsigned)sRC->str.len > dST->len_alloc)								\
 	{													\
 		dST->len_used = sRC->str.len;	/* Set len to what it needed to be */				\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2, sRC->str.len, dST->len_alloc);	\
