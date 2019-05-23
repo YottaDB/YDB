@@ -56,7 +56,7 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 	int		rc, tpfn_status, tstart_flag;
 	mval		varnamearray[YDB_MAX_NAMES], *mv, *mv_top;
 	ydb_buffer_t	*curvarname;
-	char		buff[256];			/* sprintf() buffer */
+	char		buff[256];			/* snprintf() buffer */
 	int		nested_tp;
 	DCL_THREADGBL_ACCESS;
 
@@ -135,7 +135,7 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 			{
 				if (IS_INVALID_YDB_BUFF_T(curvarname))
 				{
-					SPRINTF(buff, "Invalid varname array (index %d)", curvarname - varnames);
+					SNPRINTF(buff, SIZEOF(buff), "Invalid varname array (index %d)", curvarname - varnames);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 						      LEN_AND_STR(buff), LEN_AND_LIT(buff));
 				}

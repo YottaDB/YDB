@@ -461,7 +461,7 @@ MBSTART	{													\
 	mval		*mvalp;											\
 	void		**parmp, **parmp_top;									\
 	ydb_buffer_t	*subs;											\
-	char		buff[256];										\
+	char		buff[256];	/* snprintf buffer */							\
 				 										\
 	subs = (ydb_buffer_t *)SUBSARRAY;	 								\
 	if ((COUNT) && (NULL == subs))										\
@@ -478,7 +478,8 @@ MBSTART	{													\
 		 */												\
 		if (IS_INVALID_YDB_BUFF_T(subs))								\
 		{												\
-			SPRINTF(buff, "Invalid subsarray (index %d)", subs - ((ydb_buffer_t *)SUBSARRAY));	\
+			SNPRINTF(buff, SIZEOF(buff), "Invalid subsarray (index %d)",				\
+							subs - ((ydb_buffer_t *)SUBSARRAY));			\
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,				\
 				      LEN_AND_STR(buff), LEN_AND_STR(PARAM2));					\
 		}												\

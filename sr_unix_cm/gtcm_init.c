@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,7 +94,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	struct sigaction 	ignore, act;
 	void			get_page_size();
 	int		  	pid;
-	char			msg[256];
+	char			msg[256];	/* snprintf() buffer */
 	int			save_errno, maxfds;
 
 	ASSERT_IS_LIBGTCM;
@@ -106,7 +106,7 @@ void gtcm_init(int argc, char_ptr_t argv[])
 	if (0 > pid)
 	{
 		save_errno = errno;
-		SPRINTF(msg, "Unable to detach %s from controlling tty", SRVR_NAME);
+		SNPRINTF(msg, SIZEOF(msg), "Unable to detach %s from controlling tty", SRVR_NAME);
 		gtcm_rep_err(msg, save_errno);
 		EXIT(-1);
 	}

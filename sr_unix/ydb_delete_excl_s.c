@@ -42,7 +42,7 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 	ydb_buffer_t	*curvarname;
 	mval		plist_mvals[YDB_MAX_NAMES], *mvalp;
 	void		**parmp, **parmp_top;
-	char		buff[256];		/* sprintf() buffer */
+	char		buff[256];		/* snprintf() buffer */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -92,7 +92,7 @@ int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
 	{	/* Validate each name to make sure is well formed */
 		if (IS_INVALID_YDB_BUFF_T(curvarname))
 		{
-			SPRINTF(buff, "Invalid varname array (index %d)", curvarname - varnames);
+			SNPRINTF(buff, SIZEOF(buff), "Invalid varname array (index %d)", curvarname - varnames);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 					LEN_AND_STR(buff), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DELETE_EXCL)));
 		}

@@ -58,7 +58,7 @@ int ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var)
 	int			subs_used;
 	unsigned long long	timeout_sec;
 	ydb_var_types		var_type;
-	char			buff[256];
+	char			buff[256];	/* snprintf buffer */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -122,7 +122,7 @@ int ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var)
 			 */
 			if (IS_INVALID_YDB_BUFF_T(subptr))
 			{
-				SPRINTF(buff, "Invalid subsarray (index %d)", subptr - subsarray);
+				SNPRINTF(buff, SIZEOF(buff), "Invalid subsarray (index %d)", subptr - subsarray);
 				va_end(varcpy);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 					      LEN_AND_STR(buff), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_LOCK)));
