@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,10 +27,10 @@
 /* Length of the key name (which for databases is an absolute path to the file). */
 #define GTMCRYPT_MAX_KEYNAME_LEN	YDB_PATH_MAX
 
-/* Definitions must match those in gtm_tls_interface.h */
+/* Definitions must match those in ydb_tls_interface.h */
 /* Flag to be used whenever password can be obtained interactively. */
 #define GTMCRYPT_OP_INTERACTIVE_MODE	0x00000001
-/* No environment variable for password - used by gc_update_passwd so must be same in gtmcrypt_interface.h */
+/* No environment variable for password - used by gc_update_passwd so must be same in ydbcrypt_interface.h */
 #define	GTMCRYPT_OP_NOPWDENVVAR		0x00000800
 
 /* Special value that indicates invalid / uninitialized encryption state object. */

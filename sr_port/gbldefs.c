@@ -126,7 +126,7 @@
 //#include "gtmxc_types.h"
 #include "libyottadb_int.h"
 #ifdef GTM_TLS
-#include "gtm_tls_interface.h"
+#include "ydb_tls_interface.h"
 #endif
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"

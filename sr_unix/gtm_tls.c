@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -17,7 +20,7 @@
 
 /* This file defines wrapper functions that defer interrupts, invoke the SSL/TLS function and enable interrupts. This guarantees
  * that system calls invoked by the SSL/TLS library (or OpenSSL) are not interrupted by internal (like SIGALRM) or external
- * signals (like SIGTERM) thereby avoiding any deadlocks. Note that this file has to be maintained in sync with gtm_tls_interface.h.
+ * signals (like SIGTERM) thereby avoiding any deadlocks. Note that this file has to be maintained in sync with ydb_tls_interface.h.
  */
 
 const char		*intrsafe_gtm_tls_get_error(void)

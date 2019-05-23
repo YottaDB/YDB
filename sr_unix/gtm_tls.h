@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,11 +35,11 @@
 #define gtm_tls_add_config		(*gtm_tls_add_config_fptr)
 #define gtm_tls_renegotiate_options	(*gtm_tls_renegotiate_options_fptr)
 
-/* It's important that the "gtm_tls_interface.h" include should be *after* the above macro definitions. This way, the function
+/* It's important that the "ydb_tls_interface.h" include should be *after* the above macro definitions. This way, the function
  * prototypes defined in the header file will automatically be expanded to function pointers saving us the trouble of explicitly
  * defining them once again.
  */
-#include "gtm_tls_interface.h"
+#include "ydb_tls_interface.h"
 
 #undef gtm_tls_get_error
 #undef gtm_tls_errno
@@ -58,7 +61,7 @@
 #undef gtm_tls_renegotiate_options
 
 /* Now, we need to define prototypes for wrapper functions that will be defined in GT.M to defer interrupts before invoking the
- * corresponding TLS function. But, to avoid redefining the prototypes, include the gtm_tls_interface.h once again to automatically
+ * corresponding TLS function. But, to avoid redefining the prototypes, include the ydb_tls_interface.h once again to automatically
  * generate the prototypes.
  */
 #define gtm_tls_get_error		intrsafe_gtm_tls_get_error
@@ -80,8 +83,8 @@
 #define gtm_tls_add_config		intrsafe_gtm_tls_add_config
 #define gtm_tls_renegotiate_options	intrsafe_gtm_tls_renegotiate_options
 
-#undef GTM_TLS_INTERFACE_H	/* Allows us to include gtm_tls_interface.h twice. */
-#include "gtm_tls_interface.h"	/* BYPASSOK : intentional duplicate include. */
+#undef GTM_TLS_INTERFACE_H	/* Allows us to include ydb_tls_interface.h twice. */
+#include "ydb_tls_interface.h"	/* BYPASSOK : intentional duplicate include. */
 
 GBLREF	gtm_tls_ctx_t			*tls_ctx;
 

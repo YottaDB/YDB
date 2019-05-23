@@ -165,11 +165,11 @@ COMMON_LIBS = -lgtmcryptutil -lconfig
 
 # Lists of all files needed for building the encryption plugin.
 crypt_util_srcfiles = gtmcrypt_util.c minimal_gbldefs.c ydb_getenv.c
-crypt_util_hdrfiles = gtmcrypt_util.h gtmcrypt_interface.h ydb_getenv.h ydb_logicals.h ydb_logicals_tab.h
+crypt_util_hdrfiles = gtmcrypt_util.h ydbcrypt_interface.h ydb_getenv.h ydb_logicals.h ydb_logicals_tab.h
 crypt_srcfiles = gtmcrypt_ref.c gtmcrypt_pk_ref.c gtmcrypt_dbk_ref.c gtmcrypt_sym_ref.c
-crypt_hrdfiles = gtmcrypt_ref.h gtmcrypt_pk_ref.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_interface.h
+crypt_hrdfiles = gtmcrypt_ref.h gtmcrypt_pk_ref.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h ydbcrypt_interface.h
 tls_srcfiles = gtm_tls_impl.c
-tls_hdrfiles = gtm_tls_impl.h gtm_tls_interface.h
+tls_hdrfiles = gtm_tls_impl.h ydb_tls_interface.h
 
 all: libgtmcryptutil.so maskpass gcrypt openssl libgtmtls.so
 

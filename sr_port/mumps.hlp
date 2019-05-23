@@ -18687,7 +18687,7 @@
        libgtmcrypt.so and "helper" scripts, for example, add_db_key.sh (see
        below).
      * The plugin interface that YottaDB expects is defined in
-       gtmcrypt_interface.h. Never modify this file - it defines the
+       ydbcrypt_interface.h. Never modify this file - it defines the
        interface that the plugin must provide.
      * $ydb_dist/plugin/libgtmcrypt.so is the shared library containing the
        executables which is dynamically linked by YottaDB and which in turn
@@ -18745,7 +18745,7 @@
    own encryption key, although you can use the same key for multiple files.
    Thus, the gtmcrypt* functions are capable of managing multiple keys for
    multiple database files. Prototypes for these functions are in
-   gtmcrypt_interface.h.
+   ydbcrypt_interface.h.
 
    The core plugin interface functions, all of which return a value of type
    ydb_status_t are:

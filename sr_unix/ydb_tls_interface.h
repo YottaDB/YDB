@@ -52,7 +52,7 @@
 
 /* Note these flags may be in either the ctx or ssl structures but not all
  * may have meaning in both. */
-/* GTMTLS_OP_INTERACTIVE_MODE and GTMTLS_OP_NOPWDENVVAR must match definition in gtmcrypt_interface,h */
+/* GTMTLS_OP_INTERACTIVE_MODE and GTMTLS_OP_NOPWDENVVAR must match definition in ydbcrypt_interface.h */
 /* Whether the library is loaded in an interactive environment so that password prompting can happen if needed. */
 #define GTMTLS_OP_INTERACTIVE_MODE	0x00000001
 /* Turn-on compression for SSL/TLS protocol. */
@@ -75,7 +75,7 @@
 #define GTMTLS_OP_RENEGOTIATE_REQUESTED	0x00000200
 /* No ydb_crypt_config  or tls in config needed for client only use */
 #define GTMTLS_OP_ABSENT_CONFIG		0x00000400
-/* No environment variable for password - used by gc_update_passwd so must be same in gtmcrypt_interface.h */
+/* No environment variable for password - used by gc_update_passwd so must be same in ydbcrypt_interface.h */
 #define GTMTLS_OP_NOPWDENVVAR		0x00000800
 /* Bit mask for VERIFY_LEVEL options - one now and one planned but allow two more */
 #define GTMTLS_OP_VERIFY_LEVEL_MASK	0x0000F000

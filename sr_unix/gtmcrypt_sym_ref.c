@@ -3,6 +3,9 @@
  * Copyright (c) 2013-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -26,7 +29,7 @@
 #include "gtmxc_types.h"
 
 #include "gtmcrypt_util.h"
-#include "gtmcrypt_interface.h"		/* Function prototypes for gtmcrypt*.* functions */
+#include "ydbcrypt_interface.h"		/* Function prototypes for gtmcrypt*.* functions */
 
 #include "gtmcrypt_ref.h"
 #include "gtmcrypt_dbk_ref.h"

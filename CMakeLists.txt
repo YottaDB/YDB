@@ -545,10 +545,10 @@ foreach(f_in
       ${YDB_SOURCE_DIR}/sr_unix/gen_sym_key.sh
       ${YDB_SOURCE_DIR}/sr_unix/gtm_tls_impl.c
       ${YDB_SOURCE_DIR}/sr_unix/gtm_tls_impl.h
-      ${YDB_SOURCE_DIR}/sr_unix/gtm_tls_interface.h
+      ${YDB_SOURCE_DIR}/sr_unix/ydb_tls_interface.h
       ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_dbk_ref.c
       ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_dbk_ref.h
-      ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_interface.h
+      ${YDB_SOURCE_DIR}/sr_unix/ydbcrypt_interface.h
       ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_pk_ref.c
       ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_pk_ref.h
       ${YDB_SOURCE_DIR}/sr_unix/gtmcrypt_ref.c
@@ -685,6 +685,10 @@ foreach(d ${gt_src_list})
   endforeach()
 endforeach()
 
+# Below is the list of header files that are placed in $ydb_dist for C applications that use YottaDB
+# The purpose of some of the files is listed below.
+#	ydb_tls_interface.h  : is needed for users of the TLS plugin
+#	ydbcrypt_interface.h : is needed for users of the Encryption plugin
 set(files)
 foreach(f
   gtm_common_defs.h
@@ -695,13 +699,15 @@ foreach(f
   gtm_stdlib.h
   gtm_string.h
   gtm_strings.h
-  gtmgblstat.xc
   gtmxc_types.h
   libyottadb.h
   libydberrors.h
   libydberrors2.h
   main_pragma.h
   mmrhash.h
+  ydb_tls_interface.h
+  ydbcrypt_interface.h
+  gtmgblstat.xc
   arch.gtc
   gtcm_run.gtc
   gtcm_slist.gtc

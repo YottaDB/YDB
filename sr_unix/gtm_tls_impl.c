@@ -35,7 +35,7 @@
 #include "gtmxc_types.h"
 #include "gtmcrypt_util.h"
 
-#include "gtm_tls_interface.h"
+#include "ydb_tls_interface.h"
 #include "gtm_tls_impl.h"
 #include "ydb_getenv.h"
 

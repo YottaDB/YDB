@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@
 #define MAX_GTMCRYPT_STR_ARG_LEN	256
 #define MAX_GTMCRYPT_ERR_STRLEN		2048
 
-/* next two defines also in gtm_tls_interface.h and should be kept in sync */
+/* next two defines also in ydb_tls_interface.h and should be kept in sync */
 #define GTM_PASSPHRASE_MAX		512	/* obfuscated */
 #define GTM_PASSPHRASE_MAX_ASCII	(GTM_PASSPHRASE_MAX / 2)
 #define PASSPHRASE_ENVNAME_MAX		64

@@ -558,9 +558,9 @@ gtmcryptscripts="$gtmcryptscripts import_and_sign_key.sh gen_sym_hash.sh show_in
 gtmcryptmfile="pinentry.m"
 
 # Gtmcrypt source files
-gtmcryptsrcfiles="Makefile README gtmcrypt_ref.c gtmcrypt_ref.h gtmcrypt_interface.h maskpass.c"
+gtmcryptsrcfiles="Makefile README gtmcrypt_ref.c gtmcrypt_ref.h ydbcrypt_interface.h maskpass.c"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_dbk_ref.c gtmcrypt_dbk_ref.h gtmcrypt_pk_ref.c gtmcrypt_pk_ref.h"
-gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_sym_ref.h gtmcrypt_sym_ref.c gtm_tls_interface.h gtm_tls_impl.h"
+gtmcryptsrcfiles="$gtmcryptsrcfiles gtmcrypt_sym_ref.h gtmcrypt_sym_ref.c ydb_tls_interface.h gtm_tls_impl.h"
 gtmcryptsrcfiles="$gtmcryptsrcfiles gtm_tls_impl.c gtmcrypt_util.c gtmcrypt_util.h $gtmcryptmfile"
 gtmcryptsrcfiles="$gtmcryptsrcfiles minimal_gbldefs.c ydb_getenv.c ydb_getenv.h ydb_logicals.h ydb_logicals_tab.h"
 
@@ -727,6 +727,18 @@ ln -s ./yottadb $ydbdist/mumps || echo ln -s ./yottadb $ydbdist/mumps
 if [ "$doutf8" -ne 0 ]; then
 	ln -s ./yottadb $ydbdist/utf8/mumps || echo ln -s ./yottadb $ydbdist/utf8/mumps
 fi
+
+# Install soft links from gtm*.h files to corresponding ydb*.h files
+ydbhdrfiles="ydb_tls_interface.h ydbcrypt_interface.h"
+for ydbhdrfile in $ydbhdrfiles
+do
+	# Install gtm* header file as a soft link to ydb* header file for backward compatibility purposes just in case
+	gtmhdrfile=`echo $ydbhdrfile | sed 's/ydb/gtm/'`
+	ln -s ./$ydbhdrfile $ydbdist/$gtmhdrfile || echo ln -s ./$ydbhdrfile $ydbdist/$gtmhdrfile
+	if [ "$doutf8" -ne 0 ]; then
+		ln -s ./$ydbhdrfile $ydbdist/utf8/$gtmhdrfile || echo ln -s ./$ydbhdrfile $ydbdist/utf8/$gtmhdrfile
+	fi
+done
 
 # Change mode to executable for the normal binaries
 for i in $binaries

@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,11 +34,11 @@
 #define	gtmcrypt_same_key				(*gtmcrypt_same_key_fnptr)
 #define	gtmcrypt_strerror				(*gtmcrypt_strerror_fnptr)
 
-/* It's important that the "gtmcrypt_interface.h" include should be *after* the above macro definitions. This way, the function
+/* It's important that the "ydbcrypt_interface.h" include should be *after* the above macro definitions. This way, the function
  * prototypes defined in the header file will automatically be expanded to function pointers saving us the trouble of explicitly
  * defining them once again.
  */
-#include "gtmcrypt_interface.h"
+#include "ydbcrypt_interface.h"
 
 #define GTM_MAX_IV_LEN					16
 

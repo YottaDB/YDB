@@ -2,6 +2,9 @@
 ;								;
 ; Copyright (c) 2010-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
+;								;
+; Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
 ; 								;
 ; 	This source code contains the intellectual property	;
 ; 	of its copyright holder(s), and is made available	;
@@ -479,7 +482,7 @@
 	Do ExclInclude("gtm_threadgbl_deftypes.h")
 	Do ExclInclude("gtm_threadgbl_init.h")
 	Do ExclInclude("gtmcrypt_dbk_ref.h")
-	Do ExclInclude("gtmcrypt_interface.h")
+	Do ExclInclude("ydbcrypt_interface.h")
 	Do ExclInclude("gtmcrypt_pk_ref.h")
 	Do ExclInclude("gtmcrypt_ref.h")
 	Do ExclInclude("gtmcrypt_sym_ref.h")
@@ -1066,7 +1069,7 @@
 	. . Write TAB,"Set gtmtypes(""",type,""",",fldidx,",""len"")=",types(type,"fullexp",fldidx,"fldlen"),!
 	. . Write TAB,"Set gtmtypes(""",type,""",",fldidx,",""type"")=""",types(type,"fullexp",fldidx,"type"),"""",!
 	. . If "gvstats_rec_t"=type,$Increment(gvstats,types(type,"fullexp",fldidx,"fldlen"))
-	. . Set fld=$ZPiece(types(type,"fullexp",fldidx,"fldname"),".",2,99)	; Eliminate structure (type) header 
+	. . Set fld=$ZPiece(types(type,"fullexp",fldidx,"fldname"),".",2,99)	; Eliminate structure (type) header
 	. . 									; isolating just the field name
 	. . Write TAB,"Set gtmtypfldindx(""",type,""",""",fld,""")=",fldidx,!
 	. . Set lincnt=lincnt+5

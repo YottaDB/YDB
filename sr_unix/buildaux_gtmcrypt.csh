@@ -57,8 +57,8 @@ set helpers = "$helpers,pinentry-gtm,show_install_config"
 set srcfiles = "gtmcrypt_dbk_ref.c gtmcrypt_pk_ref.c gtmcrypt_sym_ref.c gtmcrypt_ref.c gtm_tls_impl.c maskpass.c"
 set srcfiles = "$srcfiles gtmcrypt_util.c"
 
-set incfiles = "gtmcrypt_interface.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_pk_ref.h gtmcrypt_ref.h"
-set incfiles = "$incfiles gtmcrypt_util.h gtm_tls_impl.h gtm_tls_interface.h"
+set incfiles = "ydbcrypt_interface.h gtmcrypt_dbk_ref.h gtmcrypt_sym_ref.h gtmcrypt_pk_ref.h gtmcrypt_ref.h"
+set incfiles = "$incfiles gtmcrypt_util.h gtm_tls_impl.h ydb_tls_interface.h"
 
 set ydb_dist_plugin = $ydb_dist/plugin
 rm -rf $ydb_dist_plugin

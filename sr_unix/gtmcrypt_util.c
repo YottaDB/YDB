@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,7 @@
 #include "gtmxc_types.h"
 #include "gtmcrypt_util.h"
 
-#include "gtmcrypt_interface.h"
+#include "ydbcrypt_interface.h"
 #include "ydb_getenv.h"
 
 /* Define the global error string here. Since this module gets linked into libgtmcryptutil.so, the error string global gets
