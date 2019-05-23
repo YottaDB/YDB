@@ -729,9 +729,9 @@ EOF
 # Now place it where the system can find it
 # We strip the "r" and "." to perform a numeric comparision between the versions
 # YottaDB will only ever increment versions, so a larger number indicates a newer version
-if [ ! -f ${pcfilepath}/yottadb.pc ] || [ $(grep -oP "^Version: \K.*" ${pcfilepath}/yottadb.pc | cut -c 2- | tr -d .) -lt $(echo $ydb_version | cut -c 2- | tr -d .) ] ; then
+if [ ! -f ${pcfilepath}/yottadb.pc ] || [ $(grep "^Version: " ${pcfilepath}/yottadb.pc | cut -s -d " " -f 2) \< $(echo $ydb_version) ] ; then
     cp ${ydb_installdir}/yottadb.pc ${pcfilepath}/yottadb.pc
     echo $product_name pkg-config file installed successfully at ${pcfilepath}/yottadb.pc
 else
-    echo Skipping $product_name pkg-config file install for ${ydb_version} as newer version $(grep -oP "^Version: \K.*" ${pcfilepath}/yottadb.pc) exists at ${pcfilepath}/yottadb.pc
+    echo Skipping $product_name pkg-config file install for ${ydb_version} as newer version $(grep "^Version: " ${pcfilepath}/yottadb.pc | cut -s -d " " -f 2) exists at ${pcfilepath}/yottadb.pc
 fi
