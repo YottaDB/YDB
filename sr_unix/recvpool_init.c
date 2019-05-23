@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -414,7 +414,7 @@ void recvpool_init(recvpool_user pool_user, boolean_t gtmrecv_startup)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 					LEN_AND_LIT("pthread_mutexattr_setpshared"), CALLFROM, status, 0);
 		}
-#		if PTHREAD_MUTEX_ROBUST_SUPPORTED
+#		ifdef PTHREAD_MUTEX_ROBUST_SUPPORTED
 		status = pthread_mutexattr_setrobust(&write_updated_ctl_attr, PTHREAD_MUTEX_ROBUST);
 		if (0 != status)
 		{

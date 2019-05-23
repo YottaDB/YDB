@@ -2,6 +2,9 @@
  *                                                              *
  * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved. *
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
@@ -368,7 +371,7 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 			audit_conn->conn_type = AUDIT_CONN_TLS;
 			audit_conn->tls_id = (char *)malloc(MAX_TLSID_LEN + 1);
 			audit_conn->tls_id[0] = '\0';
-			if ((3 == fields) && (NULL != tlsid) && ('\0' != tlsid[0]))
+			if ((3 == fields) && ('\0' != tlsid[0]))
 				memcpy(audit_conn->tls_id, tlsid, MAX_TLSID_LEN + 1);
 		}
 	} else

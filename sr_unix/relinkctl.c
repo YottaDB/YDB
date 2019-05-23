@@ -735,7 +735,7 @@ void relinkctl_init_exclu(open_relinkctl_sgm* linkctl)
 		relinkctl_unmap(linkctl);
 		ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, "pthread_mutexattr_setpshared", status);
 	}
-#	if PTHREAD_MUTEX_ROBUST_SUPPORTED
+#	ifdef PTHREAD_MUTEX_ROBUST_SUPPORTED
 	status = pthread_mutexattr_setrobust(&exclu_attr, PTHREAD_MUTEX_ROBUST);
 	if (0 != status)
 	{
@@ -770,7 +770,7 @@ void relinkctl_lock_exclu(open_relinkctl_sgm *linkctl)
 	status = pthread_mutex_lock(&linkctl->hdr->exclu);
 	if (EOWNERDEAD == status)
 	{
-#		if PTHREAD_MUTEX_CONSISTENT_SUPPORTED
+#		ifdef PTHREAD_MUTEX_CONSISTENT_SUPPORTED
 		status = pthread_mutex_consistent(&linkctl->hdr->exclu);
 		if (0 != status)
 			ISSUE_RELINKCTLERR_SYSCALL(&linkctl->zro_entry_name, "pthread_mutex_consistent", status);

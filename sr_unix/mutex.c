@@ -670,7 +670,7 @@ void	gtm_mutex_init(gd_region *reg, int n, bool crash)
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("pthread_mutexattr_setpshared"),
 				CALLFROM, status);
 	}
-#	if PTHREAD_MUTEX_ROBUST_SUPPORTED
+#	ifdef PTHREAD_MUTEX_ROBUST_SUPPORTED
 	status = pthread_mutexattr_setrobust(&crit_attr, PTHREAD_MUTEX_ROBUST);
 	if (0 != status)
 	{
@@ -784,7 +784,7 @@ enum cdb_sc gtm_mutex_lock(gd_region *reg,
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_mutex_salvage"),
 							process_id, &csa->ti->curr_tn, DB_LEN_STR(reg));
 				}
-#				if PTHREAD_MUTEX_CONSISTENT_SUPPORTED
+#				ifdef PTHREAD_MUTEX_CONSISTENT_SUPPORTED
 				status = pthread_mutex_consistent(&csa->critical->mutex);
 				if (0 != status)
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_SYSCALL, 5,
