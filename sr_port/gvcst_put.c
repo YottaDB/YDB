@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1613,12 +1613,16 @@ tn_restart:
 						status = cdb_sc_mkblk;
 						GOTO_RETRY;
 					}
-					/* We want to assert that the left block has enough space for reserved bytes but
+					/* Since the below reasoning is used to disable asserts (related to the reversed_bytes
+					 * field of the file header) in various parts of this C file, tag this as
+					 * BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW and reference this in the various parts.
+					 *
+					 * We want to assert that the left block has enough space for reserved bytes but
 					 * it is possible that it DOES NOT have enough space for reserved bytes if the pre-split
 					 * block was previously populated with a very low reserved bytes setting and if the current
 					 * reserved bytes setting is much higher than what the chosen split point would free up.
-					 * This is an issue waiting to be fixed by GTM-6522. Until then the following assert
-					 * has to remain commented out.
+					 * This is an issue waiting to be fixed by GTM-6522/C9K01-003221. Until then the
+					 * following assert has to remain commented out.
 					 *
 					 * assert(bs1[0].len <= blk_reserved_size);
 					 */
@@ -1877,12 +1881,8 @@ tn_restart:
 					status = cdb_sc_mkblk;
 					GOTO_RETRY;
 				}
-				/* We want to assert that the left block has enough space for reserved bytes but
-				 * it is possible that it DOES NOT have enough space for reserved bytes if the pre-split
-				 * block was previously populated with a very low reserved bytes setting and if the current
-				 * reserved bytes setting is much higher than what the chosen split point would free up.
-				 * This is an issue waiting to be fixed by C9K01-003221. Until then the following assert
-				 * has to remain commented out.
+				/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW in this C file
+				 * for why the below assert is disabled.
 				 *
 				 * assert(bs1[0].len <= blk_reserved_size);
 				 */
@@ -1941,12 +1941,8 @@ tn_restart:
 					status = cdb_sc_mkblk;
 					GOTO_RETRY;
 				}
-				/* We want to assert that the right block has enough space for reserved bytes but
-				 * it is possible that it DOES NOT have enough space for reserved bytes if the pre-split
-				 * block was previously populated with a very low reserved bytes setting and if the current
-				 * reserved bytes setting is much higher than what the chosen split point would free up.
-				 * This is an issue waiting to be fixed by C9K01-003221. Until then the following assert
-				 * has to remain commented out.
+				/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW in this C file
+				 * for why the below assert is disabled.
 				 *
 				 * assert(bs1[0].len <= blk_reserved_size);
 				 */
@@ -2178,10 +2174,15 @@ tn_restart:
 									prev_chain.next_off = (unsigned int)(
 										(prev_rec_offset + (unsigned int)(SIZEOF(rec_hdr))
 										 - (curr - buffaddr)));
-									assert((curr - buffaddr + prev_chain.next_off)
-										<= ((new_blk_size_l < blk_reserved_size
-										? new_blk_size_l : blk_reserved_size)
-										- SIZEOF(off_chain)));
+									/* See first occurrence of tag
+									 * BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW in this
+									 * C file for why the below assert is disabled.
+									 *
+									 * assert((curr - buffaddr + prev_chain.next_off)
+									 *	<= ((new_blk_size_l < blk_reserved_size
+									 *	? new_blk_size_l : blk_reserved_size)
+									 *	- SIZEOF(off_chain)));
+									 */
 									if (dollar_tlevel != cse->t_level)
 									{
 										assert(dollar_tlevel > cse->t_level);
@@ -2238,9 +2239,13 @@ tn_restart:
 												- curr_offset);
 							} else
 								curr_chain.next_off = 0;
-							assert((curr - buffaddr + curr_chain.next_off)
-									<= ((new_blk_size_l < blk_reserved_size
-									? new_blk_size_l : blk_reserved_size) - SIZEOF(off_chain)));
+							/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW
+							 * in this C file for why the below assert is disabled.
+							 *
+							 * assert((curr - buffaddr + curr_chain.next_off)
+							 *		<= ((new_blk_size_l < blk_reserved_size
+							 *		? new_blk_size_l : blk_reserved_size) - SIZEOF(off_chain)));
+							 */
 							if (dollar_tlevel != cse->t_level)
 							{
 								assert(dollar_tlevel > cse->t_level);
@@ -2251,9 +2256,13 @@ tn_restart:
 							}
 							GET_LONGP(curr, &curr_chain);
 						}	/* end of *-key or not alternatives */
-						assert((left_hand_offset + (int)cse_new->next_off) <=
-							((new_blk_size_l < blk_reserved_size ? new_blk_size_l : blk_reserved_size)
-								- SIZEOF(off_chain)));
+						/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW
+						 * in this C file for why the below assert is disabled.
+						 *
+						 * assert((left_hand_offset + (int)cse_new->next_off) <=
+						 *	((new_blk_size_l < blk_reserved_size ? new_blk_size_l : blk_reserved_size)
+						 *		- SIZEOF(off_chain)));
+						 */
 					}	/* end of buffer and cse_new adjustments */
 					prev_first_off = cse_first_off;
 					if (ins_chain_offset)
@@ -2290,9 +2299,13 @@ tn_restart:
 								+ rec_cmpc + SIZEOF(blk_hdr));
 						assert(cse->first_off >= (SIZEOF(blk_hdr) + SIZEOF(rec_hdr)));
 					}
-					assert((ins_chain_offset + (int)cse->next_off) <=
-						((new_blk_size_r < blk_reserved_size ? new_blk_size_r : blk_reserved_size)
-							- SIZEOF(off_chain)));
+					/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW
+					 * in this C file for why the below assert is disabled.
+					 *
+					 * assert((ins_chain_offset + (int)cse->next_off) <=
+					 * 	((new_blk_size_r < blk_reserved_size ? new_blk_size_r : blk_reserved_size)
+					 * 		- SIZEOF(off_chain)));
+					 */
 				}	/* end of of split processing */
 			}	/* end of tp only code */
 			if (!dollar_tlevel)
