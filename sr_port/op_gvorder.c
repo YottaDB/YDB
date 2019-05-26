@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,7 +61,7 @@ void op_gvorder(mval *v)
 	enum db_acc_method	acc_meth;
 	gd_addr			*gd_targ;
 	gd_binding		*gd_map_start, *map, *map_top;
-	gd_region		*save_gv_cur_region;
+	gd_region		*save_gv_cur_region, *reg;
 	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gv_namehead		*gvt, *save_gv_target;
 	gvnh_reg_t		*gvnh_reg;
@@ -166,15 +166,16 @@ void op_gvorder(mval *v)
 		map = gv_srch_map(gd_targ, (char *)&gv_currkey->base[0], gv_currkey->end - 1, SKIP_BASEDB_OPEN_FALSE);
 		for ( ; map < map_top; ++map)
 		{
-			gv_cur_region = map->reg.addr;
+			reg = map->reg.addr;
 			/* If region corresponding to the map is a statsDB region (lowercase region name) then it could contain
 			 * special globals ^%Y* (e.g. ^%YGS) which we don't want to be visible in name-level $order.
 			 * So skip the region altogether.
 			 */
-			if (IS_BASEDB_REGNAME(gv_cur_region))
+			if (IS_BASEDB_REGNAME(reg))
 			{	/* Non-statsDB region */
-				if (!gv_cur_region->open)
-					gv_init_reg(gv_cur_region);
+				if (!reg->open)
+					gv_init_reg(reg);
+				gv_cur_region = reg;	/* Set "gv_cur_region" global only after successful "gv_init_reg" */
 				change_reg();
 				/* Entries in directory tree of region could have empty GVT in which case move on to next entry */
 				acc_meth = REG_ACC_METH(gv_cur_region);

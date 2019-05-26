@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -30,7 +33,7 @@ GBLREF jnlpool_addrs_ptr_t	jnlpool;
 
 void change_reg(void)
 {
-	if (!gv_cur_region)
+	if ((NULL == gv_cur_region) || (FALSE == gv_cur_region->open))
 	{
 		cs_addrs = (sgmnt_addrs *)0;
 		cs_data = (sgmnt_data_ptr_t)0;
