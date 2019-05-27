@@ -37,7 +37,6 @@
 GBLREF	boolean_t	simpleThreadAPI_active;
 GBLREF	pthread_t	gtm_main_thread_id;
 GBLREF	boolean_t	gtm_main_thread_id_set;
-GBLREF	uint64_t 	stmTPToken;			/* Counter used to generate unique token for SimpleThreadAPI TP */
 GBLREF	int		stapi_signal_handler_deferred;
 GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];
 GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
@@ -46,19 +45,26 @@ GBLREF	pid_t		posix_timer_thread_id;
 GBLREF	boolean_t	posix_timer_created;
 #endif
 
-/* Routine to manage worker thread(s) for the *_st() interface routines (Simple Thread API aka the
- * Simple Thread Method). Note for the time being, only one worker thread is created. In the future,
- * if/when YottaDB becomes fully-threaded, more worker threads may be allowed.
+/* Thread (formerly referred to as the MAIN worker thread) that is created when a SimpleThreadAPI call is done in the process.
  *
- * Note there is no parameter or return value from this routine currently (both passed as NULL). The
- * routine signature is dictated by this routine being driven by pthread_create().
+ * This thread's purpose is to be the only thread that receives any SIGALRM (timer signal) signals sent to this process by the
+ * kernel (using "posix_timer_thread_id" global variable which is later used in "sys_settimer" function). Towards that this
+ * thread is in a 1 second sleep loop that will be interrupted if a SIGALRM is received OR if the sleep times out
+ * and then handles the timer signal right away by invoking the "timer_handler" function IF it can get the
+ * YDB engine multi-thread lock. If it cannot get the lock, then it finds the thread that owns that lock currently and
+ * forwards the signal to that thread that way the "timer_handler" function is invoked in a timely fashion from a thread
+ * that can safely invoke it. In addition, if any signals other than SIGALRM also come in directed at this thread, they are
+ * also handled/forwarded in a similar fashion.
+ *
+ * Note there is no parameter or return value from this routine currently (both passed as NULL).
+ * The routine signature (with "dummy_parm" as an input parameter) is dictated by this routine being driven by "pthread_create".
  */
-void *ydb_stm_thread(void *parm)
+void *ydb_stm_thread(void *dummy_parm)
 {
 	int			sig_num, status, tLevel;
-	pthread_t		mutex_holder_thread_id, prev_wake_up_thread_id = 0;
+	pthread_t		mutex_holder_thread_id;
 	enum sig_handler_t	sig_handler_type;
-	uint64_t		i, prev_wake_up_i, prev_diff_i;
+	uint64_t		i;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -76,17 +82,17 @@ void *ydb_stm_thread(void *parm)
 #	endif
 	SHM_WRITE_MEMORY_BARRIER;
 	simpleThreadAPI_active = TRUE;	/* to indicate to caller/creator thread that we are done with setup */
-	/* Note: This MAIN worker thread runs indefinitely till the process exits or a "ydb_exit" is done */
-	for (i = 1, prev_wake_up_i = 0, prev_diff_i = 1; ydb_init_complete; i++)
+	/* Note: This MAIN worker thread runs indefinitely till the process exits OR
+	 * a "ydb_exit" is done hence the check for "ydb_init_complete" below.
+	 */
+	for (i = 1; ydb_init_complete; i++)
 	{
 		assert(ydb_engine_threadsafe_mutex_holder[0] != pthread_self());
-		SLEEP_USEC(1, TRUE);	/* Sleep for 1 micro-second; TRUE to indicate if system call is interrupted,
-					 * restart the sleep. This way we are sure each iteration sleeps for at least
-					 * 1 micro-second. This guarantees that "i" (which is a 64-bit quantity)
-					 * can never overflow in half-a-million years which is okay since that is
-					 * an impossibly high span of time. If the sleep instead ended up being less,
-					 * the span of time needed to overflow "i" could get more likely.
-					 */
+		SLEEP_USEC(MICROSECS_IN_SEC - 1, FALSE);	/* Sleep for 999,999 micro-seconds (i.e. almost 1 second).
+								 * Second parameter is FALSE to indicate do not restart the sleep
+								 * in case of signal interruption but instead check if signal can
+								 * be handled/forwarded right away first (i.e. in a timely fashion).
+								 */
 		if (stapi_signal_handler_deferred)
 		{	/* A signal handler was deferred. Try getting the YottaDB engine multi-thread mutex lock to
 			 * see if we can invoke the signal handler in this thread. If we cannot get the lock, forward
@@ -96,14 +102,16 @@ void *ydb_stm_thread(void *parm)
 			 */
 			SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(mutex_holder_thread_id, tLevel);
 			if (!mutex_holder_thread_id)
-			{
+			{	/* There is no current holder of the YDB engine multi-thread lock. Try to get it. */
 				status = pthread_mutex_trylock(&ydb_engine_threadsafe_mutex[0]);
 				assert((0 == status) || (EBUSY == status));
 				/* If status is non-zero, we do not have the YottaDB engine lock so we cannot call
 				 * "rts_error_csa" etc. therefore just silently continue to next iteration.
 				 */
 				if (0 == status)
-				{
+				{	/* Got the YDB engine lock. Handle SIGALRM (and any other signals if necessary)
+					 * using the STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED macro.
+					 */
 					assert(0 == ydb_engine_threadsafe_mutex_holder[0]);
 					ydb_engine_threadsafe_mutex_holder[0] = pthread_self();
 					STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
@@ -119,42 +127,22 @@ void *ydb_stm_thread(void *parm)
 							RTS_ERROR_LITERAL("pthread_mutex_unlock()"), CALLFROM, status);
 					}
 				}
-				continue;
-			}
-			/* YottaDB engine thread lock is held by another thread. So try forward signal to lock holding thread. */
-			assert(!pthread_equal(mutex_holder_thread_id, pthread_self()));
-			if (mutex_holder_thread_id == prev_wake_up_thread_id)
-			{	/* Avoid waking up same thread too frequently (possible if lock holding thread is in TP
-				 * in which case the wake up will result in the signal handler being invoked and returning
-				 * right away because of logic in FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED.
+				/* else: we got an EBUSY was an error in the "pthread_mutex_trylock" call. This means
+				 * some other thread got the lock after we did the SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID
+				 * call above. Sleep for a bit and try again.
 				 */
-				assert(i > prev_wake_up_i);
-				if ((i - prev_wake_up_i) < prev_diff_i)
-					continue;
-				/* Each "i" corresponds to a microsecond (SLEEP_USEC(1) call). To avoid frequent wake ups,
-				 * wake it up once, then sleep for 10 microseconds, then 100 microsecnds, then 1000 microseconds
-				 * and then come back to 10, 100, 1000 microsecond sequence again. This way we sleep at most
-				 * 1 millisecond between multiple wakeups of the same thread (i.e. do not sleep a lot between
-				 * multiple attempts at wake up) and yet do not waste time on wake-up system calls by doing it
-				 * too frequently either.
-				 */
-				prev_diff_i = prev_diff_i * 10;
-				if (MICROSECS_IN_MSEC < prev_diff_i)	/* time between wakeups should not exceed 1 millisecond */
-					prev_diff_i = 10;
 			} else
-				prev_diff_i = 1;	/* Waking up different thread than before. Reset "prev_diff_i". */
-			prev_wake_up_i = i;
-			prev_wake_up_thread_id = mutex_holder_thread_id;
-			for (sig_handler_type = 0; sig_handler_type < sig_hndlr_num_entries; sig_handler_type++)
-			{
-				if (!STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_handler_type))
-					continue;
-				sig_num = stapi_signal_handler_oscontext[sig_handler_type].sig_num;
-				if (sig_num)
-					pthread_kill(mutex_holder_thread_id, sig_num);
+			{	/* There is a current holder of the YDB engine multi-thread lock. Forward signal to that thread. */
+				for (sig_handler_type = 0; sig_handler_type < sig_hndlr_num_entries; sig_handler_type++)
+				{
+					if (!STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_handler_type))
+						continue;
+					sig_num = stapi_signal_handler_oscontext[sig_handler_type].sig_num;
+					if (sig_num)
+						pthread_kill(mutex_holder_thread_id, sig_num);
+				}
 			}
-		} else
-			prev_diff_i = 1;	/* All pending signal handler handling is done. Reset "prev_diff_i". */
+		}
 	}
 	return NULL;
 }
