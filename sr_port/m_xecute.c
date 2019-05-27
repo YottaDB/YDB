@@ -63,7 +63,15 @@ int m_xecute(void)
 		}
 		/* caution: fall through ??? maybe ??? */
 	case EXPR_GOOD:
-		if (! run_time && (OC_LIT == (ref0 = (TREF(curtchain))->exorder.bl)->opcode)
+		/* Try to see if the string passed to XECUTE can be precompiled at compile time. This is an optimization to
+		 * see if the XECUTE can be avoided without any impact to the M program. Disallow this if we have other
+		 * M commands following the XECUTE in the same M line. This is because if the XECUTE string has a FOR loop
+		 * or IF check in it, those would affect the M commands following the XECUTE if the XECUTE command is removed
+		 * and the string pased to XECUTE is instead compiled. Hence the TK_EOL check of the window_token below.
+		 */
+		if (!run_time
+			&& (TK_EOL == TREF(window_token))
+			&& (OC_LIT == (ref0 = (TREF(curtchain))->exorder.bl)->opcode)
 			&& (ref0->exorder.bl) == TREF(curtchain))
 		{	/* just found a literal and only one and we are not already at run time; WARNING assignment above */
 			/* Can't drive the parsing with the source because there may be emedded quotes, rather must use the literal
