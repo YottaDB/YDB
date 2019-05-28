@@ -242,7 +242,14 @@ typedef struct
 
 #define CHARMAXARGS	256
 #define MAX_FORARGS	127
-#define MAX_SRCLINE	8192	/* maximum length of a program source or indirection line */
+#define MAX_SRCLINE	32766	/* Maximum length of a program source or indirection line (32KiB - 2).
+				 * Note: This is not set to be 32KiB since it has to be less than
+				 * DEF_RM_WIDTH and DEF_RM_RECORDSIZE (which are currently both set to 32KiB - 1).
+				 * See assert comparing DEF_RM_WIDTH and MAX_SRCLINE in sr_unix/source_file.c and
+				 * accompanying comment for details. Changing DEF_RM_WIDTH/DEF_RM_RECORDSIZE is not
+				 * considered a trivial task and since 32KiB - 2 vs 32KiB should make no user-visible
+				 * impact on MAX_SRCLINE, we choose the former.
+				 */
 #define NO_FORMALLIST	(-1)
 
 /* Some errors should not cause stx_error to issue an rts_error. These are the errors related to

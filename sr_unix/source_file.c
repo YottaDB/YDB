@@ -43,6 +43,9 @@
 #include "valid_mname.h"
 #include "stringpool.h"
 #include "gtmmsg.h"
+#ifdef DEBUG
+#include "iormdef.h"		/* for DEF_RM_WIDTH macro */
+#endif
 
 GBLREF char			rev_time_buf[];
 GBLREF unsigned char		object_file_name[];
@@ -225,6 +228,12 @@ boolean_t open_source_file(void)
 	pars.mvtype = MV_STR;
 	pars.str.len = SIZEOF(open_params_list);
 	pars.str.addr = (char *)open_params_list;
+	assert(DEF_RM_WIDTH > MAX_SRCLINE);	/* This ensures that the default width of the device that is opened above
+						 * will automatically read lines greater than MAX_SRCLINE bytes in length
+						 * thereby issuing a LSINSERTED message in "read_source_file" function below.
+						 * If the default width is lower than MAX_SRCLINE, reading a line would be
+						 * truncated when the width is reached which would cause no LSINSERTED message.
+						 */
 	val.mvtype = MV_STR;
 	val.str.len = source_name_len;
 	val.str.addr = (char *)source_file_name;
