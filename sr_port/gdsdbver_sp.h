@@ -37,7 +37,14 @@ ENUM_ENTRY(GDSMV63000),		/* New field non_null_iv to indicate IV mode for encryp
 ENUM_ENTRY(GDSMV63000A),	/* Move fields ftok_counter_halted and access_counter_halted from fileheader to nodelocal */
 ENUM_ENTRY(GDSMV63001),		/* New "asyncio" option; New reservedDBFlags field */
 ENUM_ENTRY(GDSMV63003),		/* New field "read_only" to indicate a read-only database */
-ENUM_ENTRY(GDSMV63007),		/* Reuse abandoned field for use controlled stable flush_trigger_top */
+ENUM_ENTRY(GDSMV63007),		/* Reuse abandoned field for use controlled stable flush_trigger_top.
+				 * Can also correspond to ENUM_ENTRY(GDSMR122) since this enum value was used by both
+				 * YottaDB r1.22 and GT.M V6.3-007. In YottaDB r1.24, no db format changes happened.
+				 * And in YottaDB r1.26, filler space was introduced (GDSMVFILLER1 etc.) so this use
+				 * by GT.M and YottaDB will not happen. Treat GDSMR122 as a special case == GDSMV63007.
+				 * In GDSMR122, this is what happened.
+				 *	New field "reorg_sleep_nsec" to slow down reorg update rate (e.g. reduce restarts) by user
+				 */
 ENUM_ENTRY(GDSMVFILLER1),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER2),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER3),	/* Space reserved for GT.M changes to minor db format */
@@ -54,5 +61,5 @@ ENUM_ENTRY(GDSMVFILLER13),	/* Space reserved for GT.M changes to minor db format
 ENUM_ENTRY(GDSMVFILLER14),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER15),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER16),	/* Space reserved for GT.M changes to minor db format */
-ENUM_ENTRY(GDSMR122),		/* New field "reorg_sleep_nsec" to slow down reorg update rate (e.g. reduce restarts) by user */
+ENUM_ENTRY(GDSMR126),		/* Includes GT.M V6.3-007 */
 ENUM_ENTRY(GDSMVLAST)
