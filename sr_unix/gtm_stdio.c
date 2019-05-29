@@ -89,7 +89,6 @@ int gtm_fprintf(FILE *stream, const char *format, ...)
 	va_end(printargs);
 	if (buf != tmpbuf)
 		free(buf);
-	assert(-1 != retval);
 	return retval;
 }
 

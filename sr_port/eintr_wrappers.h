@@ -199,6 +199,7 @@ MBSTART {									\
 			assert(RC);							\
 			clearerr(FP);	/* reset error set by the "fread" */		\
 			/* In case of EINTR, retry "fread" */				\
+			RC = errno;							\
 			if (EINTR != errno)						\
 				break;							\
 	}									\
@@ -215,7 +216,7 @@ MBSTART {									\
 }
 
 /* GTM_FWRITE is an EINTR-safe versions of "fwrite". Retries on EINTR. Returns number of elements written in NWRITTEN.
- * If NWRITTEN < NELEMS, copies errno into RC. Note: RC is not initialized otherwise.
+ * If NWRITTEN < NELEMS, RC holds errno. Note: RC is not initialized (and should not be relied upon by caller) otherwise.
  * Macro is named GTM_FWRITE instead of FWRITE because AIX defines a macro by the same name in fcntl.h.
  */
 #define GTM_FWRITE(BUFF, ELEMSIZE, NELEMS, FP, NWRITTEN, RC)			\
@@ -224,6 +225,7 @@ RC = gtm_fwrite(BUFF, ELEMSIZE, NELEMS, FP, &(NWRITTEN));
 static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE *fp, size_t *nwritten)
 {
 	size_t		elems_to_write, elems_written, rc = 0;
+	int		status;
 	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);
@@ -235,12 +237,16 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 		elems_to_write -= elems_written;
 		if (0 == elems_to_write)
 			break;
+		/* Note: From the man pages of "feof", "ferror" and "clearerr", they do not manipulate "errno"
+		 * so no need to save "errno" before those calls.
+		 */
 		assert(!feof(fp));
-		rc = ferror(fp);
-		assert(rc);
+		status = ferror(fp);
+		assert(status);
 		clearerr(fp);	/* reset error set by the "fwrite" */
 		/* In case of EINTR, retry "fwrite" */
-		if (EINTR != errno)
+		rc = errno;
+		if (EINTR != rc)
 			break;
 	}
 	*nwritten = nelems - elems_to_write;
