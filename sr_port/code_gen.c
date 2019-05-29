@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,11 @@ void	code_gen(void)
 	}
 	assert(0 == pending_errtriplecode);	/* we should never have a pending ins_errtriple at this point */
 	assert(&t_orig == TREF(curtchain));	/* curtchain should still be pointing to what it was originally */
-	DEBUG_ONLY(chktchain(&t_orig));	/* if this assert fails, then recompile with DEBUG_TRIPLES to catch the issue sooner */
+#	ifdef DEBUG
+	if (!TREF(dollar_zcstatus))
+		chktchain(&t_orig); /* if this assert fails, then recompile with DEBUG_TRIPLES to catch the issue sooner */
+#	endif
+
 	dqloop(&t_orig, exorder, ct)
 	{
 		if (CGP_APPROX_ADDR == cg_phase)
