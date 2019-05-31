@@ -583,6 +583,9 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 		/* stdin becomes pfd_write[0] */
 		if (DEBUG_ONLY(WBTEST_ENABLED(WBTEST_BADDUP_PIPE_STDIN) ||) (-1 == dup2(pfd_write[0], 0)))
 		{
+			WBTEST_ONLY(WBTEST_BADDUP_PIPE_STDIN,
+				errno = EINVAL;	/* Simulate an error in "dup2" */
+			);
 			save_errno = errno;
 			PIPE_ERROR_INIT();
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_mstr.len, dev_mstr.addr,
@@ -595,6 +598,9 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			CLOSEFILE(1, rc);
 			if (DEBUG_ONLY(WBTEST_ENABLED(WBTEST_BADDUP_PIPE_STDOUT) ||) (-1 == dup2(pfd_read[1], 1)))
 			{
+				WBTEST_ONLY(WBTEST_BADDUP_PIPE_STDOUT,
+					errno = EINVAL;	/* Simulate an error in "dup2" */
+				);
 				save_errno = errno;
 				PIPE_ERROR_INIT();
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_mstr.len, dev_mstr.addr,
@@ -607,6 +613,9 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 				CLOSEFILE(2, rc);
 				if (DEBUG_ONLY(WBTEST_ENABLED(WBTEST_BADDUP_PIPE_STDERR1) ||) (-1 == dup2(pfd_read[1], 2)))
 				{
+					WBTEST_ONLY(WBTEST_BADDUP_PIPE_STDERR1,
+						errno = EINVAL;	/* Simulate an error in "dup2" */
+					);
 					save_errno = errno;
 					PIPE_ERROR_INIT();
 					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
@@ -621,6 +630,9 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			CLOSEFILE(2, rc);
 			if (DEBUG_ONLY(WBTEST_ENABLED(WBTEST_BADDUP_PIPE_STDERR2) ||) (-1 == dup2(pfd_read_stderr[1], 2)))
 			{
+				WBTEST_ONLY(WBTEST_BADDUP_PIPE_STDERR2,
+					errno = EINVAL;	/* Simulate an error in "dup2" */
+				);
 				save_errno = errno;
 				PIPE_ERROR_INIT();
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2,
@@ -646,6 +658,9 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 			ret = EXECL(pshell, pshell_name, "-c", pcommand, (char *)NULL);
 		if (-1 == ret)
 		{
+			WBTEST_ONLY(WBTEST_BADEXEC_PIPE_PROCESS,
+				errno = EACCES;	/* Simulate an error in "execl" */
+			);
 			save_errno = errno;
 			PIPE_ERROR_INIT();
 			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_DEVOPENFAIL, 2, dev_mstr.len, dev_mstr.addr,
