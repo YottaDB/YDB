@@ -351,7 +351,7 @@ if [ "N" = "$ydb_force_install" ]; then
 	# --force-install is not specified, it is okay to do the os-version check now.
 	osfile="/etc/os-release"
 	osver_supported=0 # Consider platform unsupported by default
-	isdebianbusteronx8664=0	# Set current platform to not be Debian 10 buster/sid on x86_64 by default
+	isdebianbusteronx8664=0	# Set current platform to not be Debian 10 buster on x86_64 by default
 	if [ -f "$osfile" ] ; then
 		osid=`grep -w ID $osfile | cut -d= -f2 | cut -d'"' -f2`
 		osver=`grep -w VERSION_ID $osfile | cut -d= -f2 | cut -d'"' -f2`
@@ -368,9 +368,11 @@ if [ "N" = "$ydb_force_install" ]; then
 				osallowmajorver="7"
 				osallowminorver="0"
 			elif [ "debian" = "${osid}" ] ; then
-				# Only Debian 10 (buster/sid) is considered supported on 64-bit x86 architecture for now.
+				# Only Debian 10 (buster) is considered supported on 64-bit x86 architecture for now.
+				# Note that the testing distribution is "buster" and its unstable variety is "buster/sid".
+				# We support either at this point hence the -o check below.
 				prettyname=`grep -w PRETTY_NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
-				if [ "Debian GNU/Linux buster/sid" = "${prettyname}" ] ; then
+				if [ "Debian GNU/Linux buster/sid" = "${prettyname}" -o "Debian GNU/Linux 10 (buster)" = "${prettyname}" ] ; then
 					isdebianbusteronx8664=1
 					osallowmajorver="10"
 					osallowminorver="0"
