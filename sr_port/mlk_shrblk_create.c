@@ -13,12 +13,13 @@
  *								*
  ****************************************************************/
 
-#include <stddef.h>
 #include "mdef.h"
-#include "mvalconv.h"
+
+#include <stddef.h>
 
 #include "gtm_string.h"
 
+#include "mvalconv.h"
 #include "mlkdef.h"
 #include "copy.h"
 #include "mlk_shrblk_create.h"
@@ -28,16 +29,7 @@
 #include "filestruct.h"
 #include "mlk_ops.h"
 
-#ifdef MLK_SHRHASH_DEBUG
-#define SHRHASH_DEBUG_ONLY(x) x
-#else
-#define SHRHASH_DEBUG_ONLY(x)
-#endif
-
 boolean_t mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum);
-#ifdef MLK_SHRHASH_DEBUG
-void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
-#endif
 
 #define MAX_TRIES 4
 
@@ -109,14 +101,10 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 
 boolean_t mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum)
 {
-	int			bi, fi, si, mi, loop_cnt, tries = 0;
-	uint4			hash, num_buckets, usedmap;
-	mlk_shrhash_ptr_t	shrhash, bucket, free_bucket, search_bucket, move_bucket;
-	mlk_shrblk_ptr_t	move_shrblk;
-	char			*str_ptr;
-	mlk_shrsub_ptr_t	sub;
+	int			bi, fi;
+	uint4			hash, num_buckets;
+	mlk_shrhash_ptr_t	shrhash, bucket;
 
-	SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(p->ctlptr));
 	shrhash = p->pvtctl.shrhash;
 	num_buckets = p->pvtctl.shrhash_size;
 	hash = MLK_PVTBLK_SUBHASH(p, subnum);
@@ -139,11 +127,10 @@ boolean_t mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum)
 		assert(0 < bucket->shrblk_idx);
 		bucket->hash = hash;
 		SET_NEIGHBOR(bucket->usedmap, 0);
-		SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(p->ctlptr));
 		return TRUE;
 	}
 	fi = mlk_shrhash_find_bucket(&p->pvtctl, hash);
-	if (fi == -1)
+	if (MLK_SHRHASH_FOUND_NO_BUCKET == fi)
 		return FALSE;
 	/* We found one close enough, so store the new data there */
 	mlk_shrhash_insert(&p->pvtctl, bi, fi, MLK_SHRBLK_IDX(p->pvtctl, shr), hash);

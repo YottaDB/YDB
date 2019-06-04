@@ -203,7 +203,7 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 
 mlk_shrblk_ptr_t mlk_shrhash_find(mlk_pvtblk *p, int subnum, unsigned char *subval, unsigned char sublen, mlk_shrblk_ptr_t parent)
 {
-	mlk_shrblk_ptr_t	res = NULL, search_shrblk;
+	mlk_shrblk_ptr_t	res, search_shrblk;
 	mlk_shrsub_ptr_t	search_sub;
 	int			bi, si;
 	uint4			hash, num_buckets;
@@ -216,27 +216,60 @@ mlk_shrblk_ptr_t mlk_shrhash_find(mlk_pvtblk *p, int subnum, unsigned char *subv
 	bi = hash % num_buckets;
 	bucket = &shrhash[bi];
 	usedmap = bucket->usedmap;
-	for (si = bi ; 0 != usedmap ; (si = (si + 1) % num_buckets), (usedmap >>= 1))
-	{
-		if (0 == (usedmap & 1U))
-			continue;
-		search_bucket = &shrhash[si];
-		if (search_bucket->hash != hash)
-			continue;
-		assert(0 != search_bucket->shrblk_idx);
-		search_shrblk = MLK_SHRHASH_SHRBLK(p->pvtctl, search_bucket);
-		/* if the parents don't match (either both null, or one null and the other not, or both non-null but
-		 *  non-matching then we continue
-		 */
-		if (!((NULL == parent) && (0 == search_shrblk->parent))
-				&& ((0 == search_shrblk->parent) || ((mlk_shrblk_ptr_t)R2A(search_shrblk->parent) != parent)))
-			continue;
-		search_sub = (mlk_shrsub_ptr_t)R2A(search_shrblk->value);
-		if (0 != memvcmp(subval, sublen, search_sub->data, search_sub->length))
-			continue;
-		res = search_shrblk;
-		assert(hash == res->hash);
-		break;
-	}
+	res = NULL;
+	if (0 == (usedmap & (1U << MLK_SHRHASH_HIGHBIT)))
+	{	/* High bit is not set. We can use Hopscotch hash algorithm to speedily search */
+		for (si = bi ; 0 != usedmap ; (si = (si + 1) % num_buckets), (usedmap >>= 1))
+		{
+			if (0 == (usedmap & 1U))
+				continue;
+			search_bucket = &shrhash[si];
+			if (search_bucket->hash != hash)
+				continue;
+			assert(0 != search_bucket->shrblk_idx);
+			search_shrblk = MLK_SHRHASH_SHRBLK(p->pvtctl, search_bucket);
+			/* If the parents don't match (either both null, or one null and the other not,
+			 * or both non-null but non-matching then we continue.
+			 */
+			if (!((NULL == parent) && (0 == search_shrblk->parent))
+					&& ((0 == search_shrblk->parent)
+						|| ((mlk_shrblk_ptr_t)R2A(search_shrblk->parent) != parent)))
+				continue;
+			search_sub = (mlk_shrsub_ptr_t)R2A(search_shrblk->value);
+			if (0 != memvcmp(subval, sublen, search_sub->data, search_sub->length))
+				continue;
+			res = search_shrblk;
+			break;
+		}
+	} else
+	{	/* This is a bucket full situation. We need to do a slower linear search across entire hash bucket array. */
+		for (si = bi; ; )
+		{
+			search_bucket = &shrhash[si];
+			if (search_bucket->hash == hash)
+			{
+				assert(0 != search_bucket->shrblk_idx);
+				search_shrblk = MLK_SHRHASH_SHRBLK(p->pvtctl, search_bucket);
+				/* If the parents don't match (either both null, or one null and the other not,
+				 * or both non-null but non-matching then we continue.
+				 */
+				if (((NULL == parent) && (0 == search_shrblk->parent))
+						|| ((0 != search_shrblk->parent)
+							&& ((mlk_shrblk_ptr_t)R2A(search_shrblk->parent) == parent)))
+				{
+					search_sub = (mlk_shrsub_ptr_t)R2A(search_shrblk->value);
+					if (0 == memvcmp(subval, sublen, search_sub->data, search_sub->length))
+					{
+						res = search_shrblk;
+						break;
+					}
+				}
+			}
+			si = (si + 1) % num_buckets;
+			if (si == bi)
+				break;
+		}
+ 	}
+	assert((NULL == res) || (hash == res->hash));
 	return res;
 }

@@ -84,8 +84,10 @@ typedef struct mlk_shrhash_struct
 {
 	uint4			shrblk_idx;	/* Index to shrblk referenced by this hash bucket, or zero for empty. */
 	mlk_shrhash_map_t	usedmap;	/* Bitmap representing the bucket neighborhood, with bit N set
-						 * if (bucket+N) % nbuckets is associated with this bucket, i.e.,
-						 * part of this bucket's neighborhood.
+						 *   if (bucket+N) % nbuckets is associated with this bucket,
+						 *   i.e. part of this bucket's neighborhood.
+						 * N == MLK_SHRHASH_HIGHBIT is a special case indicating a bucket full
+						 * situation was encountered and so a linear search has to be used when searching.
 						 */
 	uint4			hash;		/* Hash value associated with the shrblk referenced by this hash bucket.
 						 * Compare the hash value before comparing the pvtblk value against the
@@ -93,7 +95,9 @@ typedef struct mlk_shrhash_struct
 						 */
 } mlk_shrhash;
 
-#define MLK_SHRHASH_NEIGHBORS		(SIZEOF(mlk_shrhash_map_t) * BITS_PER_UCHAR)
+#define MLK_SHRHASH_NEIGHBORS		((SIZEOF(mlk_shrhash_map_t) * BITS_PER_UCHAR) - 1)
+#define	MLK_SHRHASH_HIGHBIT		MLK_SHRHASH_NEIGHBORS
+
 #define IS_NEIGHBOR(MAP, OFFSET)	(0 != ((MAP) & (((mlk_shrhash_map_t)1) << (OFFSET))))
 #define SET_NEIGHBOR(MAP, OFFSET)	(MAP) |= (((mlk_shrhash_map_t)1) << (OFFSET))
 #define CLEAR_NEIGHBOR(MAP, OFFSET)	(MAP) &= ~(((mlk_shrhash_map_t)1) << (OFFSET))
@@ -166,7 +170,6 @@ typedef mlk_shrhash	*mlk_shrhash_ptr_t;
  */
 #ifdef MLK_SHRHASH_DEBUG
 #	define SHRHASH_DEBUG_ONLY(x) x
-	void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
 #else
 #	define SHRHASH_DEBUG_ONLY(x)
 #endif
