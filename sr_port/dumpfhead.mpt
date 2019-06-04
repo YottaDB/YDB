@@ -3,7 +3,7 @@
 ; Copyright (c) 2016-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -43,14 +43,20 @@ getfields(fldarray,dbname)
 	set typeconvert("int")="int"
 	set typeconvert("int1")="int"
 	set typeconvert("int2")="int"
+	set typeconvert("int32_t")="int"
 	set typeconvert("int4")="int"
 	set typeconvert("int64_t")="hex"
 	set typeconvert("long")="hex"
 	set typeconvert("short")="int"
 	set typeconvert("size_t")="hex"
 	set typeconvert("ssize_t")="hex"
+	set typeconvert("time_t")="hex"
 	set typeconvert("uint1")="uint"
 	set typeconvert("uint2")="uint"
+	set typeconvert("uint32_t")="uint"
+	; Note: uint4 not added to the list because it is translated to "unsigned-int" when ^gtmtypes global is created.
+	; Hence the below line is commented out.
+	; set typeconvert("uint4")="uint"
 	set typeconvert("uint64_t")="hex"
 	set typeconvert("unsigned")="uint"
 	set typeconvert("unsigned-char")="string"
