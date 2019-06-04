@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -34,7 +37,7 @@
 
 #undef EXIT
 #define	EXIT	exit	/* Use system "exit" (not gtm_image_exit) directly since this is a standalone module */
-#define	OUT_LINE	80 + 1
+#define	OUT_LINE	(80 + 1)
 
 static void	usage (char *prog);
 

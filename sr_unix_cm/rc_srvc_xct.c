@@ -64,7 +64,7 @@ GBLDEF rof_struct *rc_overflow = (rof_struct *) 0;
 GBLREF int	history;
 GBLREF int	omi_pid;
 
-#define	OUT_LINE	256 + 1
+#define	OUT_LINE	(256 + 1)
 
 static rc_op   rc_dispatch_table[RC_OP_MAX] = {
 	0,

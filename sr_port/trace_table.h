@@ -53,7 +53,7 @@ enum trace_types
 #undef TRACETYPE
 
 #define TRACE_TABLE_SIZE_DEFAULT	.5 * BIN_ONE_K
-#define TRACE_TABLE_SIZE_MAX		4 * BIN_ONE_K
+#define TRACE_TABLE_SIZE_MAX		128 * BIN_ONE_K
 
 #ifdef DEBUG
 #define TRCTBL_ENTRY(typeval, intval, addrval1, addrval2, addrval3)						\

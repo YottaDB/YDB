@@ -97,7 +97,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 		def.def1_buf = pblk->def2_buf;
 		tmp.len = pblk->def1_size;
 		tmp.addr = pblk->def1_buf;
-		if ((status = (ERR_PARNORMAL != parse_file(&tmp, &def))))
+		if (ERR_PARNORMAL != (status = parse_file(&tmp, &def)))
 			return status;
 		assert(!def.b_node);
 		if (def.b_dir)	def.fnb |= F_HAS_DIR;

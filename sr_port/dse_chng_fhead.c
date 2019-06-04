@@ -60,7 +60,7 @@ GBLREF	uint4		process_id;
 GBLREF	uint4		image_count;
 LITREF	char		*gtm_dbversion_table[];
 
-#define	OUT_LINE	256 + 1
+#define	OUT_LINE	(256 + 1)
 
 error_def(ERR_FREEZE);
 error_def(ERR_BLKSIZ512);

@@ -1224,8 +1224,7 @@ void mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid)
 			jpl->rsrv_write_addr = lastJplCmt->start_write_addr + lastJplCmt->tot_jrec_len;
 			assert(((lastJplCmt->jnl_seqno + 1) == jpl->jnl_seqno) || !lastJplCmt->jnl_seqno);
 			jpl->lastwrite_len = lastJplCmt->tot_jrec_len;
-		}
-		else
+		} else
 		{
 			assert((lastJplCmt->jnl_seqno == jpl->jnl_seqno) || ((lastJplCmt->jnl_seqno + 1) == jpl->jnl_seqno));
 			if (lastJplCmt->jnl_seqno == jpl->jnl_seqno)
@@ -1238,8 +1237,7 @@ void mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid)
 			}
 			/* else : CMT07 < killed and so no rollback needed */
 		}
-	}
-	else
+	} else
 	{
 		/* This is a database shm. Check if a process in t_end/tp_tend was killed BEFORE
 		 * Step CMT08 (see secshr_db_clnup.c) when it would have set cnl->update_underway_tn.
@@ -1288,8 +1286,7 @@ void mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid)
 					 * This reset is a no-op if the kill happened even before CMT06 started.
 					 */
 					SET_JBP_RSRV_FREEADDR(jbp, start_freeaddr + lastJbufCmt->tot_jrec_len);
-				}
-				else
+				} else
 				{
 					/* CMTO6 < killed < CMT08 */
 					assert(lastJbufCmt->curr_tn == csd->trans_hist.curr_tn);
@@ -1306,8 +1303,7 @@ void mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid)
 					{
 						jbp->freeaddr = start_freeaddr;
 						jbp->free = start_freeaddr % jbp->size;
-					}
-					else
+					} else
 						assert(jbp->free == (orig_freeaddr % jbp->size));
 
 					if (jbp->dskaddr > start_freeaddr)
@@ -1339,8 +1335,7 @@ void mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid)
 							jbp->fsync_dskaddr = start_freeaddr;
 							rel_latch(&jbp->fsync_in_prog_latch);
 						}
-					}
-					else
+					} else
 						assert(jbp->dsk == (jbp->dskaddr % jbp->size));
 
 					/* "jnl_write_phase2" is never called with JRT_EPOCH (see assert there
@@ -1359,8 +1354,7 @@ void mutex_clean_dead_owner(gd_region* reg, uint4 holder_pid)
 				}
 				csd->trans_hist.early_tn = csd->trans_hist.curr_tn; /* Undo CMT04 */
 				/* CMT07 is jnlpool related, so no undo done here (in db mutex_salvage) for that */
-			}
-			else
+			} else
 			{
 				/* CMT08 < killed < CMT12.
 				 * -------------------------------------------------------------------

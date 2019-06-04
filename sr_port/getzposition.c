@@ -25,7 +25,7 @@ void getzposition (mval *v)
 	ENSURE_STP_FREE_SPACE(MAX_ENTRYREF_LEN);
 	v->mvtype = MV_STR;
 	v->str.addr = (char *) stringpool.free;
-	stringpool.free = get_symb_line (stringpool.free, MAX_ENTRYREF_LEN, 0, 0);
+	stringpool.free = get_symb_line(stringpool.free, MAX_ENTRYREF_LEN, 0, 0);
 	v->str.len = INTCAST((char *)stringpool.free - v->str.addr);
 	return;
 }

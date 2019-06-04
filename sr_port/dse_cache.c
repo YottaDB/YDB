@@ -3,6 +3,9 @@
  * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,7 +48,7 @@ error_def(ERR_SIZENOTVALID4);
 #define	UNCLEAN_VERIFY		"verification is NOT clean (see operator log for details)"
 #define	RECOVER_DONE		"recovery complete (see operator log for details)"
 #define	RECOVER_NOT_APPLIC	"recovery not applicable with MM access method"
-#define	OUT_LINE	256 + 1
+#define	OUT_LINE		(256 + 1)
 
 error_def(ERR_SIZENOTVALID4);
 

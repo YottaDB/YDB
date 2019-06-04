@@ -424,8 +424,7 @@ void gvcst_init_statsDB(gd_region *baseDBreg, boolean_t do_statsdb_init)
 			sigemptyset(&unblock_sigbus);
 			sigaddset(&unblock_sigbus, SIGBUS);
 			SIGPROCMASK(SIG_UNBLOCK, &unblock_sigbus, NULL, rc);
-		}
-		else
+		} else
 		{	/* Since we got an error while trying to open the statsDB, silently set NOSTATS on baseDB */
 			baseDBreg->reservedDBFlags |= RDBF_NOSTATS;
 			baseDBcsa->reservedDBFlags |= RDBF_NOSTATS;

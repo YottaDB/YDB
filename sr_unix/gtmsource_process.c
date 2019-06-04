@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -229,7 +229,7 @@ STATICDEF	boolean_t	renegotiation_pending = FALSE;
 #endif
 #endif
 
-#define	OUT_LINE	256 + 1
+#define	OUT_LINE	(256 + 1)
 
 error_def(ERR_JNLNEWREC);
 error_def(ERR_JNLSETDATA2LONG);
