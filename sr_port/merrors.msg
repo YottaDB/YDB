@@ -969,7 +969,7 @@ DBTOTBLK	<File header indicates total blocks is 0x!XL but file size indicates to
 DBTN		<Block TN is 0x!16@XQ>/info/fao=1!/ansi=0
 DBNOREGION	<None of the database regions accessible>/error/fao=0!/ansi=0
 DBTNRESETINC	<WARNING: tn_reset for database is incomplete due to integrity errors>/warning/fao=0!/ansi=0
-DBTNLTCTN	<Transaction numbers greater than the current transaction were found>/error/fao=0!/ansi=0
+DBTNLTCTN	<Transaction numbers greater than or equal to the current transaction were found>/error/fao=0!/ansi=0
 DBTNRESET	<Cannot reset transaction number for this region>/error/fao=0!/ansi=0
 MUTEXRSRCCLNUP	<Mutex subsystem leftover resource !AD removed>/info/fao=2!/ansi=0
 SEMWT2LONG	<Process !UL waited !UL second(s) for the !AD lock for region !AD, lock held by pid !UL>/error/fao=7!/ansi=0

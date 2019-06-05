@@ -805,7 +805,7 @@ LITDEF	err_msg merrors[] = {
 	{ "DBTN", "Block TN is 0x!16@XQ", 1 },
 	{ "DBNOREGION", "None of the database regions accessible", 0 },
 	{ "DBTNRESETINC", "WARNING: tn_reset for database is incomplete due to integrity errors", 0 },
-	{ "DBTNLTCTN", "Transaction numbers greater than the current transaction were found", 0 },
+	{ "DBTNLTCTN", "Transaction numbers greater than or equal to the current transaction were found", 0 },
 	{ "DBTNRESET", "Cannot reset transaction number for this region", 0 },
 	{ "MUTEXRSRCCLNUP", "Mutex subsystem leftover resource !AD removed", 2 },
 	{ "SEMWT2LONG", "Process !UL waited !UL second(s) for the !AD lock for region !AD, lock held by pid !UL", 7 },
