@@ -509,7 +509,7 @@ boolean_t cli_numeric_check(CLI_ENTRY *pparm, char *val_str)
 		} else if (!cli_is_dcm(val_str))
 		{
 			SNPRINTF(cli_err_str, MAX_CLI_ERR_STR,
-			  "Unrecognized value: %s, Decimal number expected",
+			  "Unrecognized value: %s, Decimal integer expected",
 			  val_str);
 			retval = FALSE;
 		}

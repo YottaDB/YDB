@@ -68,13 +68,21 @@ MBSTART {											\
 
 # define SLEEP_USEC(MICROSECONDS, RESTART)					\
 MBSTART {									\
-	assert((MICROSECS_IN_SEC > MICROSECONDS) && (0 < MICROSECONDS));	\
+	/* With an 8-byte input MICROSECONDS variable, we can represent		\
+	 * a sleep time corresponding to billions of seconds even when it is	\
+	 * converted into nanoseconds. But with a 4-byte input, we can only	\
+	 * represent around 4 seconds of sleep time. Hence allow a sleep time	\
+	 * of > 1 second only if MICROSECONDS is 8-byte else allow < 1 second.	\
+	 */									\
+	assert((8 == SIZEOF(MICROSECONDS)) || 					\
+			((MICROSECS_IN_SEC > MICROSECONDS) && (0 < MICROSECONDS)));	\
 	NANOSLEEP(((MICROSECONDS) * NANOSECS_IN_USEC), RESTART);		\
 } MBEND
 
 # define NANOSLEEP(NANOSECONDS, RESTART)				\
 MBSTART {								\
-	assert((NANOSECS_IN_SEC > NANOSECONDS) && (0 < NANOSECONDS));	\
+	assert((8 == SIZEOF(NANOSECONDS)) || 				\
+			((NANOSECS_IN_SEC > NANOSECONDS) && (0 < NANOSECONDS)));	\
 	CLOCK_NANOSLEEP(NANOSECONDS, RESTART);				\
 } MBEND
 
