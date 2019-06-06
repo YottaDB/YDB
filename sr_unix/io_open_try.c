@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -421,7 +424,12 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 			if (timed && (0 == msec_timeout))
 				out_of_time = TRUE;
 			if (outofband)
+			{
+				if (timed && !out_of_time)
+					cancel_timer(timer_id);
 				outofband_action(FALSE);
+				assert(FALSE);	/* above line should not return (the "cancel_timer" done above assumes this) */
+			}
 			if (EINTR == errno
 					|| ETXTBSY == errno
 					|| ENFILE == errno
