@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -131,11 +134,16 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 	DEBUG_ONLY(blktn = ((blk_hdr_ptr_t)base_addr)->tn);
 	assert(!IS_MCODE_RUNNING || !cs_addrs->t_commit_crit || (dba_bg != cs_data->acc_meth) || (n_gds_t_op < cse->mode)
 	       || (cse->mode == gds_t_acquired) || ((!cs_data->asyncio && (blktn < ctn)) || (cs_data->asyncio && (blktn <= ctn))));
-	/* With memory instruction reordering (currently possible only on AIX with the POWER architecture) it is possible
-	 * the early_tn we read in the assert below gets executed BEFORE the curr_tn read that happens a few lines above.
-	 * That could then fail this assert (GTM-8523). Account for that with the AIX_ONLY condition below.
+	/* Assert that "curr_tn" is always less than "early_tn" in the database. There are a few exceptions.
+	 * a) With memory instruction reordering it is possible the early_tn we read in the assert below gets executed
+	 *    BEFORE the curr_tn read that happens a few lines above. That could then fail this assert (GTM-8523).
+	 *    Account for that with the dba_mm check below.
+	 * b) A concurrent online rollback can take curr_tn back in time so account for that by the
+	 *    onln_rlbk_pid (non-zero implies online rollback is still running) and
+	 *    MISMATCH_ONLN_RLBK_CYCLES (TRUE return implies online rollback is finished) checks.
 	 */
-	assert((ctn < cs_addrs->ti->early_tn) || write_after_image AIX_ONLY(|| (cs_data->acc_meth == dba_mm)));
+	assert((ctn < cs_addrs->ti->early_tn) || write_after_image || (cs_data->acc_meth == dba_mm)
+		|| (cs_addrs->nl->onln_rlbk_pid || MISMATCH_ONLN_RLBK_CYCLES(cs_addrs, cs_addrs->nl)));
 	((blk_hdr_ptr_t)base_addr)->bver = GDSVCURR;
 	((blk_hdr_ptr_t)base_addr)->tn = ctn;
 	((blk_hdr_ptr_t)base_addr)->bsiz = UINTCAST(array->len);
