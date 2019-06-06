@@ -90,6 +90,7 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	tp_region	*tr;
 	int		tl;
         int4		event_type, param_val;
+	boolean_t	skipped_CALLINTROLLBACK_error;
         void (*set_fn)(int4 param);
 	DCL_THREADGBL_ACCESS;
 
@@ -119,9 +120,28 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 	assert(tstart_gtmci_nested_level <= TREF(gtmci_nested_level));
 	if (!newlevel)
 	{
+		skipped_CALLINTROLLBACK_error = FALSE;
 		if (tstart_gtmci_nested_level != TREF(gtmci_nested_level))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CALLINTROLLBACK, 2,
-					TREF(gtmci_nested_level), tstart_gtmci_nested_level);
+		{	/* We are inside a call-in but the outermost TP was started before the call-in.
+			 * So to unwind the TP, we need to unwind the C-stack/M-stacks which is not easy
+			 * at this point. So issue an error. The only exception is if we are in the process
+			 * of exiting. In that case, we can skip the M stack unwind part ("tp_unwind" etc.)
+			 * but otherwise clean up gv_target clues etc. ("tp_cleanup"). This way we can let
+			 * the exit handler do an "op_trollback" (and terminate the process fine) without
+			 * encountering further errors.
+			 */
+			if (!process_exiting)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CALLINTROLLBACK, 2,
+						TREF(gtmci_nested_level), tstart_gtmci_nested_level);
+			else
+			{
+				skipped_CALLINTROLLBACK_error = TRUE;
+				/* Note: In this situation where the M-stack is not easily unwound (because of an active call-in),
+				 * we need to skip some parts of the following code as it is not safe to do. Those will be
+				 * prefixed with an "if (!skipped_CALLINTROLLBACK_error)" check.
+				 */
+			}
+		}
 		(*tp_timeout_clear_ptr)();	/* Cancel or clear any pending TP timeout */
 		/* Do a rollback type cleanup (invalidate gv_target clues of read as well as
 		 * updated blocks). This is typically needed for a restart.
@@ -140,7 +160,8 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 				rel_crit(curreg);			/* release any crit regions */
 		}
 		reg_reset = FALSE;
-		CALL_ZTIMEOUT_IF_DEFERRED;
+		if (!skipped_CALLINTROLLBACK_error)
+			CALL_ZTIMEOUT_IF_DEFERRED;
 		if (!process_exiting && lcl_implicit_trollback && tp_pointer->implicit_tstart && !tp_pointer->ydb_tp_s_tstart)
 		{	/* This is an implicit TROLLBACK of an implicit TSTART started for a non-tp explicit update.
 			 * gv_currkey needs to be restored to the value it was at the beginning of the implicit TSTART.
@@ -173,18 +194,26 @@ void	op_trollback(int rb_levels)		/* rb_levels -> # of transaction levels by whi
 		}
 		if (NULL != gv_target)
 			gv_target->clue.end = 0;
-		tp_unwind(newlevel, ROLLBACK_INVOCATION, NULL);
+		if (!skipped_CALLINTROLLBACK_error)
+			tp_unwind(newlevel, ROLLBACK_INVOCATION, NULL);
+		else
+			dollar_tlevel = 0;	/* Even though we skipped "tp_unwind", set state of global variable to reflect
+						 * that the TP is fully unwound as later exit handling code relies on this
+						 * (e.g. assert in "secshr_db_clnup" after an OP_TROLLBACK invocation).
+						 */
 		/* Now that we are out of TP, reset the debug-only global variable that is relevant only if we are in TP */
 		DEBUG_ONLY(donot_INVOKE_MUMTSTART = FALSE;)
 		dollar_trestart = 0;
 		if (!reg_reset)
 			RESTORE_GV_CUR_REGION;
-		/* Transaction is complete as the outer transaction has been rolled back. Check now to see if any statsDB
-		 * region initializations were deferred and drive them now if they were.
-		 */
-		if (NULL != TREF(statsDB_init_defer_anchor))
-			gvcst_deferred_init_statsDB();
-		JOBINTR_TP_RETHROW; /* rethrow job interrupt($ZINT) if $ZTEXIT, when coerced to boolean, is true */
+		if (!skipped_CALLINTROLLBACK_error)
+		{	/* Transaction is complete as the outer transaction has been rolled back. Check now to see if any statsDB
+			 * region initializations were deferred and drive them now if they were.
+			 */
+			if (NULL != TREF(statsDB_init_defer_anchor))
+				gvcst_deferred_init_statsDB();
+			JOBINTR_TP_RETHROW; /* rethrow job interrupt($ZINT) if $ZTEXIT, when coerced to boolean, is true */
+		}
 	} else
 	{
 		tp_incr_clean_up(newlevel);
