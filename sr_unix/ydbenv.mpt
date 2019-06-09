@@ -228,6 +228,13 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	set tmp3=$zsearch("$ydb_dist/plugin/bin",$increment(zstmp))
 	set:$zlength(tmp3)&'$zfind(tmp2,":"_tmp3_":") tmp1=tmp3_":"_tmp1
 	do ExportEnv("PATH",tmp1)
+	; Set environment variables to restore ydb_dist / gtm_dist in the event they were set before invoking ydb_env_set
+	do:$data(currenv("ydb_tmp_ydb_dist"))
+	. do ExportEnv("ydb_sav_"_ppid_"_ydb_dist",currenv("ydb_tmp_ydb_dist"))
+	. set unset=unset_"ydb_tmp_ydb_dist "
+	do:$data(currenv("ydb_tmp_gtm_dist"))
+	. do ExportEnv("ydb_sav_"_ppid_"_gtm_dist",currenv("ydb_tmp_gtm_dist"))
+	. set unset=unset_"ydb_tmp_gtm_dist "
 	; As unset always has a extraneous trailing space, the following omits the last character of unset when writing
 	write:" "'=unset setcmd,"ydb_unset_",ppid,setsep,"""",$zextract(unset,2,$zlength(unset)-1),"""",!
 	write "alias gde",setsep,"""$ydb_dist/yottadb -run GDE""",!
@@ -241,10 +248,10 @@ unset	; Unset the environment set by entryref set
 	set unset=" "	; initialize list of variables to be unset
 	do GetCurrEnv	; get current environment
 	do GetPPid	; get parent pid
-	set var="",prefix="ydb_sav_"_ppid_"_",startpos=1+$zlength(prefix)
-	for  set var=$order(currenv(var)) quit:""=var  write:startpos=$zfind(var,prefix) setcmd,$zextract(var,startpos,$zlength(var)),setsep,"'",currenv(var),"'",!
 	set var="ydb_unset_"_ppid
 	write:$data(currenv(var)) unsetcmd,currenv(var)," ",var,!
+	set (var,prefix)="ydb_sav_"_ppid_"_",startpos=1+$zlength(prefix)
+	for  set var=$order(currenv(var)) quit:startpos'=$zfind(var,prefix)  write setcmd,$zextract(var,startpos,$zlength(var)),setsep,"'",currenv(var),"'",!
 	quit
 
 ; Utility labels, expected to be called only from within the routine
@@ -427,9 +434,14 @@ Robustify	; rollback / recover an existing database if needed
 	new allok,cmd,cutoff,fhead,field,fname,io,jnlfile,jnlfilelist,line,region,replon,sem,semid,timestamp,year
 	set io=$io
 	view "setenv":"ydb_dir":env("ydb_dir"),"setenv":"ydb_rel":env("ydb_rel"),"setenv":"ydb_gbldir":ydbgbldir,"setenv":"ydb_repl_instance":ydbreplinst
+	; create files for any regions that don't have database files; they're likely temporary regions
+	; ignore stderr as mupip create will likely complain but attempt to read one line from stdin to ensure command completes
+	open "create":(shell="/bin/sh":command="$ydb_dist/mupip create":readonly)::"pipe"
+	use "create" read line use io close "create"
 	open "fhead":(shell="/bin/sh":command="$ydb_dist/mupip dumpfhead -region ""*"" 2>&1")::"pipe"
 	use "fhead"
 	for  read line quit:$zeof  do
+	. set:"%"=$zextract(line,1,1) $ecode=",U245,"	; mupip dumpfhead reports an error, e.g, a database file does not exist
 	. if 1<$zlength(line,"Fileheader dump of region ") set region=$zpiece(line,"Fileheader dump of region ",2)
 	. else  if 1<$zlength(line,"Dumping fileheader of ") set fhead(region,"fname")=$zpiece(line,"Dumping fileheader of ",2)
 	. else  set fhead(region,$zpiece(line,"""",2))=$zpiece(line,"=",2)
@@ -446,10 +458,10 @@ Robustify	; rollback / recover an existing database if needed
 	for  set region=$order(fhead(region)) quit:'$zlength(region)  set allok=allok*((-1=fhead(region,"sgmnt_data.semid")!$data(sem(fhead(region,"sgmnt_data.semid")))))
 	do:'allok		; Rollback / recover database if not allok
 	. set region=""
-	. for i=0:1 set region=$order(fhead(region)) quit:""=region  do:-1'=fhead(region,"sgmnt_data.semid")
+	. for  set region=$order(fhead(region)) quit:""=region  do:-1'=fhead(region,"sgmnt_data.semid")
 	. . set:2'=fhead(region,"sgmnt_data.jnl_state") $ecode=",U248,"	; rollback/recovery ruled out because open region not before-image journaled
-	. . if 'i do
-	. . . set replok=fhead(region,"sgmnt_data.repl_state")	; set replication state to that of the first region
+	. . if '$data(replok) do
+	. . . set replok=fhead(region,"sgmnt_data.repl_state")	; set replication state to that of the first region requiring rollback/recovery
 	. . . set jnlfilelist=$zpiece($zwrite(fhead(region,"sgmnt_data.jnl_file_name"),1),$zchar(0),1)	; initialize region list with first region
 	. . else  do
 	. . . set:replok'=fhead(region,"sgmnt_data.repl_state") $ecode=",U247,"	; error because not all regions have same replication state
@@ -489,6 +501,7 @@ Defaults
 	; gtmver:::"mkdir -p "_env(gtmvar)_"; cd "_env(gtmvar)_"; mkdir -p g o o/utf8 r ; cd ..":"ln -s "_env(ydbvar)_" "_env(gtmvar):$zpiece($zversion," ",2)_"_"_$zpiece($zversion," ",4)
 
 ;	Error message texts
+U245	;"-F-DUMPFHEADERR MUPIP DUMPFHEAD reports error: ",line
 U246	;"-F-MUPIPERR command """_cmd_""" terminated with non-zero status ("_$zclose_")"
 U247	;"-F-INCONSISTENTREPL replication state "_fhead(region,"sgmnt_data.repl_state")_" for region """_region_" does not match that of prior regions"
 U248	;"-F-NOTBEFOREIMAGEJOURNAL backward rollback/recover not possible because region """_region_""" does not have before-image journaling"

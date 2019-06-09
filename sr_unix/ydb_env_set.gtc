@@ -36,6 +36,10 @@ fi
 if [ ! -z "$ydb_routines" ] ; then export ydb_tmp_routines="$ydb_routines" ; fi
 if [ ! -z "$gtmroutines" ] ; then export ydb_tmp_gtmroutines="$gtmroutines" ; fi
 
+# Save ydb_dist / gtm_dist so that they can be saved by %YDBENV and restored when ydb_env_uset is run
+if [ ! -z "$ydb_dist" ] ; then export ydb_tmp_ydb_dist=$ydb_dist ; fi
+if [ ! -z "$gtm_dist" ] ; then export ydb_tmp_gtm_dist=$gtm_dist ; fi
+
 # Clear environment variables that might interfere with correct operation of %YDBENV
 unset ydb_chset ydb_dist ydb_passwd ydb_routines gtm_chset gtm_dist gtm_passwd gtmroutines
 
