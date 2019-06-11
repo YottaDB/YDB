@@ -24,6 +24,7 @@
 #include "fgncal.h"
 #include "gtmci.h"
 #include "util.h"
+#include "libyottadb_int.h"
 
 GBLREF  unsigned char		*msp;
 GBLREF  int                     mumps_status;
@@ -51,12 +52,25 @@ CONDITION_HANDLER(gtmci_ch)
 		gtm_dump();
 		TERMINATE;
 	}
-	entryref.addr = CALL_IN_M_ENTRYREF;
-	entryref.len = STR_LIT_LEN(CALL_IN_M_ENTRYREF);
-	set_zstatus(&entryref, MAX_ENTRYREF_LEN, SIGNAL, NULL, FALSE);
 	FGNCAL_UNWIND_CLEANUP;
 	if (TREF(comm_filter_init))
 		TREF(comm_filter_init) = FALSE;  /* Exiting from filters */
 	mumps_status = SIGNAL;
-	UNWIND(NULL, NULL);
+	/* The IS_SIMPLEAPI_MODE macro cannot tell the difference between a call-in in the early stages (before any M
+	 * execution frame is created) and an actual simple[Thread]API call. But if this is NOT a call-in, the active
+	 * routine indicator will be set appropriately. In case this is a real simpleAPI invocation, we want
+	 * ydb_simpleapi_ch() to setup $ZSTATUS so we roll off to the next condition handler after asserting that is
+	 * what we expect to find.
+	 */
+	if (!IS_SIMPLEAPI_MODE || (LYDB_RTN_NONE == TREF(libyottadb_active_rtn)))
+	{
+		entryref.addr = CALL_IN_M_ENTRYREF;
+		entryref.len = STR_LIT_LEN(CALL_IN_M_ENTRYREF);
+		set_zstatus(&entryref, MAX_ENTRYREF_LEN, SIGNAL, NULL, FALSE);
+		UNWIND(NULL, NULL);
+	} else
+	{
+		assert(&ydb_simpleapi_ch == (ctxt - 1)->ch);
+		NEXTCH;
+	}
 }
