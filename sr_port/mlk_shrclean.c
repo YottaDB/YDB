@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -80,23 +83,11 @@ void mlk_shrclean(mlk_pvtctl_ptr_t pctl)
 void fill_pid_table(mlk_shrblk_ptr_t d, pid_t *table, mlk_pvtctl_ptr_t pctl)
 {
 	mlk_prcblk_ptr_t	p;
-	mlk_shrblk_ptr_t	d2 = d;
+	mlk_shrblk_ptr_t	dstart = d;
 	int4			index, i, cur;
 
-	if (d2->rsib)
-		d2 = (mlk_shrblk_ptr_t)R2A(d2->rsib);
-	do {
-		if (d2->rsib)
-		{
-			CHECK_SHRBLKPTR(d2->rsib, *pctl);
-			d2 = (mlk_shrblk_ptr_t)R2A(d2->rsib);
-			if (d2->rsib)
-			{
-				CHECK_SHRBLKPTR(d2->rsib, *pctl);
-				d2 = (mlk_shrblk_ptr_t)R2A(d2->rsib);
-			}
-		}
-		CHECK_SHRBLKPTR(d->rsib, *pctl);
+	for ( ; ; )
+	{
 		if (d->children)
 			fill_pid_table((mlk_shrblk_ptr_t)R2A(d->children), table, pctl);
 		if (d->owner)
@@ -109,9 +100,13 @@ void fill_pid_table(mlk_shrblk_ptr_t d, pid_t *table, mlk_pvtctl_ptr_t pctl)
 			index = p->process_id % PROC_TABLE_SIZE;
 			table[index] = p->process_id;
 		}
-		if (d2 == d)
+		CHECK_SHRBLKPTR(d->rsib, *pctl);
+		if (0 == d->rsib)
 			break;
-	} while (d->rsib && (d = (mlk_shrblk_ptr_t)R2A(d->rsib)));
+		d = (mlk_shrblk_ptr_t)R2A(d->rsib);
+		if (dstart == d)
+			break;
+	}
 }
 
 /**
