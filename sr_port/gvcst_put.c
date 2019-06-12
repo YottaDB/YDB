@@ -477,7 +477,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	ht_ent_int4		*tabent;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, old_ch, new_ch;
 	sm_uc_ptr_t		buffaddr;
-	block_id		lcl_root, last_split_bnum;
+	block_id		lcl_root, last_split_bnum, *null_block_id;
 	sgm_info		*si;
 	uint4			nodeflags;
 	boolean_t		write_logical_jnlrecs, can_write_logical_jnlrecs, blk_match, is_split_dir_left;
@@ -868,7 +868,9 @@ tn_restart:
 		SET_CMPC(curr_rec_hdr, 0);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
-		BLK_SEG(bs_ptr, (unsigned char *)&zeroes4byte, SIZEOF(block_id));
+		BLK_ADDR(null_block_id, SIZEOF(block_id), block_id);
+		*null_block_id = 0;
+		BLK_SEG(bs_ptr, (unsigned char *)null_block_id, SIZEOF(block_id));
 		if (0 == BLK_FINI(bs_ptr, bs1))
 		{
 			assert(CDB_STAGNATE > t_tries);
@@ -1870,7 +1872,11 @@ tn_restart:
 							memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 							BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
 						} else
-							BLK_SEG(bs_ptr, (unsigned char *)&zeroes4byte, SIZEOF(block_id));
+						{
+							BLK_ADDR(null_block_id, SIZEOF(block_id), block_id);
+							*null_block_id = 0;
+							BLK_SEG(bs_ptr, (unsigned char *)null_block_id, SIZEOF(block_id));
+						}
 					} else
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + rec_size - SIZEOF(block_id), SIZEOF(block_id));
 				}
