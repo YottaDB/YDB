@@ -507,7 +507,7 @@ U247	;"-F-INCONSISTENTREPL replication state "_fhead(region,"sgmnt_data.repl_sta
 U248	;"-F-NOTBEFOREIMAGEJOURNAL backward rollback/recover not possible because region """_region_""" does not have before-image journaling"
 U249	;"-F-INVCHSET """_chset_""" is not a valid character set"
 U250	;"-F-CREATEFAIL unable to create directory "_env(gtmvar)
-U251	;"-F-YDBGTMMISMATCH YottaDB variable "_ydbvar_"="_env(ydbvar,"path")_" is not equal to GT.m varable "_gtmvar_"="_env(gtmvar,"path")
+U251	;"-F-YDBGTMMISMATCH YottaDB variable "_ydbvar_"="_env(ydbvar,"path")_" is not equal to GT.M variable "_gtmvar_"="_env(gtmvar,"path")
 U252	;"-F-LINKFAIL unable to create link "_env(gtmvar)_" to "_env(ydbvar)
 U253	;"-F-CREATEFAIL unable to create directory "_env(ydbvar)
 U254	;"-F-REQLINKORDIR type of "_envvar_"="_env(envvar,"path")_" - """_env(envvar,"type")_""" is neither a directory nor a symbolic link"
