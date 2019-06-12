@@ -273,8 +273,25 @@ GBLREF	uint4			dollar_tlevel;
 				nTargLen = 0;
 #				ifdef GVCST_SEARCH_BLK
 				if (!level0)
+				{	/* Check if we saw at least one record in this index block (we are guaranteed to
+					 * have at least a star key). If not, this is an empty index block. Most likely,
+					 * a reorg has concurrently moved the contents of this index block. It is definitely
+					 * a restartable situation. So return right away. Not doing so will cause us to
+					 * break out of the surrounding for loop and fail the following assert in the end.
+					 *	assert(pStat->curr_rec.offset >= SIZEOF(blk_hdr));
+					 */
+					if (pRecBase == pBlkBase)
+					{
+						if (dollar_tlevel)
+							TP_TRACE_HIST_MOD(pStat->blk_num, pStat->blk_target,
+								tp_blkmod_gvcst_srch, cs_data,
+								pStat->tn, ((blk_hdr_ptr_t)pBlkBase)->tn, pStat->level);
+						else
+							NONTP_TRACE_HIST_MOD(pStat, t_blkmod_gvcst_srch);
+						return cdb_sc_blkmod;
+					}
 					nMatchCnt = 0;	/* star key */
-				else
+				} else
 #				endif
 				{	/* data block */
 					pPrevRec = pRecBase;
