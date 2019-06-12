@@ -465,7 +465,7 @@ Robustify	; rollback / recover an existing database if needed
 	. . . set jnlfilelist=$zpiece($zwrite(fhead(region,"sgmnt_data.jnl_file_name"),1),$zchar(0),1)	; initialize region list with first region
 	. . else  do
 	. . . set:replok'=fhead(region,"sgmnt_data.repl_state") $ecode=",U247,"	; error because not all regions have same replication state
-	. . . set jnlfilelist=jnlfilelist_","_$zpiece($zwrite(fhead(region,"sgmnt_data.jnl_file_name")),$zchar(0),1)	; add this region's journal file to list
+	. . . set jnlfilelist=jnlfilelist_","_$zpiece($zwrite(fhead(region,"sgmnt_data.jnl_file_name"),1),$zchar(0),1)	; add this region's journal file to list
 	. set cmd="$ydb_dist/mupip journal "_$select(replok:"-rollback -backward ""*""",1:"-recover -backward "_jnlfilelist)
 	. open "robustify":(shell="/bin/sh":command="/bin/sh")::"pipe"
 	. use "robustify"
