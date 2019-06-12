@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,7 +101,14 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 	{	/* Resetting this is necessary to avoid blowing an assert in t_begin that it is 0 at the start of a transaction. */
 		update_trans = 0;
 	} else
-		assert(!update_trans);
+	{	/* We expect "update_trans" to be FALSE because that is a non-TP field whereas we are cleaning up a TP transaction.
+		 * Exception is if the process is exiting abruptly (e.g. an EXIT call in "wait_for_repl_inst_unfreeze_nocsa_jpl").
+		 * In that case, it is possible we are in the middle of "gvcst_bmp_mark_free" which temporarily clears
+		 * "dollar_tlevel" and does non-TP transactions to free up the bitmap using "update_trans". In that case though
+		 * it is okay for us to proceed as nothing else should be relying on "update_trans" in exit handling code anyways.
+		 */
+		assert(!update_trans || process_exiting);
+	}
 	/* Reset trigger state now. Trigger cycles, dollar_ztrigger_invoked and gvt_triggers_read_this_tn are reset only in
 	 * TP_INVALIDATE_TRIGGER_CYCLES_IF_NEEDED. Trigger cycles and dollar_ztrigger_invoked are different from other TP level
 	 * artifacts in that they are maintained through an incremental rollback and restarts so that future trigger operations in
