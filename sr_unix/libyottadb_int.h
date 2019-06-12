@@ -528,7 +528,12 @@ MBSTART	{													\
  * frame has been setup. As long as this macro is only used in places where we know we are dealing with a
  * runtime call (i.e. op_*), then this macro is accurate.
  */
-#define IS_SIMPLEAPI_MODE (frame_pointer->type & SFT_CI)
+#define IS_SIMPLEAPI_MODE	(frame_pointer->type & SFT_CI)
+
+/* The below macro is similar to IS_SIMPLEAPI_MODE except that it does not assume "frame_pointer" global variable
+ * is set up. To be used in places (like condition handlers) where we are not guaranteed this.
+ */
+#define IS_SIMPLEAPI_MODE_SAFE	((NULL != frame_pointer) && (frame_pointer->type & SFT_CI))
 
 #define	ISSUE_TIME2LONG_ERROR_IF_NEEDED(INPUT_TIME_IN_NANOSECONDS)				\
 MBSTART {											\
