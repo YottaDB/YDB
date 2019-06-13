@@ -431,7 +431,7 @@ PathSame(path1,path2)
 	quit realpath1=realpath2
 
 Robustify	; rollback / recover an existing database if needed
-	new allok,cmd,cutoff,fhead,field,fname,io,jnlfile,jnlfilelist,line,region,replon,sem,semid,timestamp,year
+	new allok,cmd,cutoff,fhead,field,fname,io,jnlfile,jnlfilelist,line,region,replon,sem,semid,semkey,timestamp,year
 	set io=$io
 	view "setenv":"ydb_dir":env("ydb_dir"),"setenv":"ydb_rel":env("ydb_rel"),"setenv":"ydb_gbldir":ydbgbldir,"setenv":"ydb_repl_instance":ydbreplinst
 	; create files for any regions that don't have database files; they're likely temporary regions
@@ -449,8 +449,9 @@ Robustify	; rollback / recover an existing database if needed
 	open "ipcs -s":(shell="/bin/sh":command="ipcs -s":readonly)::"pipe"
 	use "ipcs -s"
 	for  read line quit:$zeof  do
+	. set semkey=$zpiece(line," ",1)
 	. set semid=$zpiece(line," ",2)
-	. set:semid?1"0x"."0" sem(semid)=line
+	. set:semkey?1"0x"."0" sem(semid)=""	; this pattern looks for a private semaphore (with a key of 0x00000000)
 	use io close "ipcs -s"
 	; Check whether every region is either not open, or open with an existing shared memory segment
 	; If all regions satisfy one or the other requirement, there is nothing for robustify to do
