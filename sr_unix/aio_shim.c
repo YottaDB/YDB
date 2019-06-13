@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,6 +66,7 @@ GBLREF	boolean_t	multi_thread_in_use;
 #ifdef 	DEBUG
 GBLREF	boolean_t	gtm_jvm_process;
 GBLREF	int		process_exiting;
+GBLREF	boolean_t	simpleThreadAPI_active;
 #endif
 GBLREF	mstr		extnam_str;
 GBLREF	mval		dollar_zgbldir;
@@ -534,7 +535,7 @@ int aio_shim_write(gd_region *reg, struct aiocb *aiocbp)
 	int		save_errno;
 
 	udi = FILE_INFO(reg);
-	assert(gtm_is_main_thread() || (gtm_jvm_process && process_exiting));
+	assert(gtm_is_main_thread() || (gtm_jvm_process && process_exiting) || simpleThreadAPI_active);
 	owning_gd = udi->owning_gd;
 	assert(NULL != owning_gd);
 	if (NULL == (gdi = owning_gd->gd_runtime->thread_gdi))

@@ -1319,6 +1319,11 @@ GBLDEF	void			(*ydb_stm_invoke_deferred_signal_handler_fnptr)(void);
 						 * pulling this (and a lot of other functions) into
 						 * "gtmsecshr" executable resulting in code bloat.
 						 */
+GBLDEF	enum sig_handler_t	ydb_stm_invoke_deferred_signal_handler_type;	/* == sig_hndlr_none most of the times.
+										 * else corresponds to signal handler type that
+										 * is currently being invoked in a deferred fashion
+										 * by "ydb_stm_invoke_deferred_signal_handler"
+										 */
 GBLDEF	boolean_t		safe_to_fork_n_core;	/* Set to TRUE by the MAIN worker thread in "generic_signal_handler"
 							 * to indicate to another thread that forwarded an exit signal
 							 * to invoke "gtm_fork_n_core". The MAIN worker thread will pause while

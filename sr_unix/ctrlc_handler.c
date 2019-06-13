@@ -38,16 +38,10 @@ void ctrlc_handler(int sig, siginfo_t *info, void *context)
 
 	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_ctrlc_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
 	assert(SIGINT == sig);
-	if (!(MUMPS_CALLIN & invocation_mode))
-	{	/* Normal procedure from MUMPS is to set our outofband trigger to handle this signal */
-		save_errno = errno;
-		ob_char = 3;
-		std_dev_outbndset(ob_char);
-		errno = save_errno;
-	} else
-	{	/* If this is call-in/simpleAPI mode and a handler exists for this signal, call it */
-		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("ctrlc_handler", sig, info, context, TRUE);
-		/* If we returned from the caller's handler (or none was driven), we need to exit */
-		EXIT(-1);
-	}
+	assert(!(MUMPS_CALLIN & invocation_mode));
+	/* Normal procedure from MUMPS is to set our outofband trigger to handle this signal */
+	save_errno = errno;
+	ob_char = 3;
+	std_dev_outbndset(ob_char);
+	errno = save_errno;
 }

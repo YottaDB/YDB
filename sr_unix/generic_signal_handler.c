@@ -134,7 +134,7 @@ static inline void check_for_statsdb_memerr()
 
 void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
-	boolean_t		signal_forwarded;
+	boolean_t		signal_forwarded, is_sigterm;
 	void			(*signal_routine)();
 #	ifdef DEBUG
 	boolean_t		save_in_nondeferrable_signal_handler;
@@ -219,9 +219,13 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	switch(sig)
 	{
 		case SIGTERM:
+		case SIGINT:	/* Note: "generic_signal_handler" is SIGINT handler only in SimpleAPI mode
+				 * (see "sig_init" invocation in sr_unix/gtm_startup.c).
+				 */
 			if (!IS_GTMSECSHR_IMAGE)
 			{
-				forced_exit_err = ERR_FORCEDHALT;
+				is_sigterm = (SIGTERM == sig);
+				forced_exit_err = is_sigterm ? ERR_FORCEDHALT : ERR_CTRLC;
 				/* If nothing pending AND we have crit or in wcs_wtstart() or already in exit processing, wait to
 				 * invoke shutdown. wcs_wtstart() manipulates the active queue that a concurrent process in crit
 				 * in bt_put() might be waiting for. interrupting it can cause deadlocks (see C9C11-002178).
@@ -235,7 +239,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					if (non_forwarded_sig_seen[exit_state])
 					{
 						exit_state++;		/* Make exit pending, may still be tolerant though */
-						if (exit_handler_active && !ydb_quiet_halt)
+						if (is_sigterm && exit_handler_active && !ydb_quiet_halt)
 							SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
 					}
 					return;
@@ -245,7 +249,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				SET_PROCESS_EXITING_TRUE; 	/* Set this BEFORE cancelling timers as wcs_phase2_commit_wait
 								 * relies on this.
 								 */
-				if (ERR_FORCEDHALT != forced_exit_err || !ydb_quiet_halt)
+				if (is_sigterm && (ERR_FORCEDHALT != forced_exit_err || !ydb_quiet_halt))
 					SEND_AND_PUT_MSG(VARLSTCNT(1) forced_exit_err);
 			} else
 			{	/* Special case for gtmsecshr - no deferral just exit */

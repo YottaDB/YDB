@@ -51,7 +51,10 @@ void	deferred_signal_handler(void)
 			 */
 			return;
 		}
-		STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
+		/* See comment before ESTABLISH macro in "ydb_stm_invoke_deferred_signal_handler.c" for why
+		 * OK_TO_NEST_FALSE needs to be passed below (to prevent indefinite recursion).
+		 */
+		STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST_FALSE);
 	}
 	if (!OK_TO_INTERRUPT_TRIMMED)
 		return;	/* Not in a position to allow interrupt to happen. Defer interrupt handling to later. */

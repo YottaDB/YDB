@@ -3,6 +3,9 @@
  * Copyright (c) 2017 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -504,8 +507,13 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 			else
 				update_trans = updTrans | UPDTRNS_TCOMMIT_STARTED_MASK;	/* Step CMT11 for Non-TP */
 			INCREMENT_CURR_TN(csd);	/* roll forward Step (CMT12) */
+		} else
+		{	/* else : early_tn == curr_tn and so Step CMT12 is done.
+			 * But ctn corresponds to the post-commit curr_tn value whereas we need it below to
+			 * reflect the pre-commit curr_tn. Therefore go back one tn.
+			 */
+			ctn--;
 		}
-		/* else : early_tn == curr_tn and so Step CMT12 is done */
 		csa->t_commit_crit = T_COMMIT_CRIT_PHASE2;			/* Step CMT13 */
 		/* Check if kill_in_prog flag in file header has to be incremented. */
 		if (dollar_tlevel)

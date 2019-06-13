@@ -243,7 +243,14 @@ void gtm_startup(struct startup_vector *svec)
 	if (!IS_MUPIP_IMAGE)
 	{
 		DEFINE_EXIT_HANDLER(gtm_exit_handler, TRUE);
-		sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler, continue_handler);
+		if (!(MUMPS_CALLIN & invocation_mode))
+			sig_init(generic_signal_handler, ctrlc_handler_ptr, suspsigs_handler, continue_handler);
+		else
+		{	/* SimpleAPI/Call-in invocation of YDB. Ctrl-C should terminate the process.
+			 * Treat it like SIGTERM by using "generic_signal_handler" for SIGINT (Ctrl-C) too.
+			 */
+			sig_init(generic_signal_handler, generic_signal_handler, suspsigs_handler, continue_handler);
+		}
 	}
 	io_init(IS_MUPIP_IMAGE);		/* starts with nocenable for GT.M runtime, enabled for MUPIP */
 	if (!IS_MUPIP_IMAGE)

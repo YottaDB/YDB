@@ -374,7 +374,7 @@ void hiber_start(uint4 hiber)
 			/* If SimpleThreadAPI is active, check if a signal handler invocation (e.g. SIGALRM, SIGTERM etc.)
 			 * got deferred. If so invoke it now that we are at a logical point.
 			 */
-			STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
+			STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST_TRUE);
 		} while (FALSE == waitover);
 	}
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
@@ -403,7 +403,9 @@ void hiber_start_wait_any(uint4 hiber)	/* "hiber" is in milli-seconds */
 	assert(!sigismember(&savemask, SIGALRM));
 	start_timer_int((TID)hiber_start_wait_any, hiber, NULL, 0, NULL, TRUE);
 	sigsuspend(&savemask);				/* unblock SIGALRM and wait for timer interrupt */
-	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED; /* See comment in "hiber_start" function for why this is done here */
+	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST_TRUE);	/* See comment in "hiber_start" function
+										 * for why this is done here.
+										 */
 	cancel_timer((TID)hiber_start_wait_any);	/* cancel timer block before reenabling */
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
 }

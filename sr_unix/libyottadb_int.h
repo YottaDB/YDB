@@ -840,13 +840,13 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];							\
 	GBLREF	int		stapi_signal_handler_deferred;								\
 															\
-	int	lockIndex, lclStatus;										\
+	int	lockIndex, lclStatus;											\
 															\
 	/* Before releasing the YottaDB engine lock, check if any signal handler got deferred in the MAIN		\
 	 * worker thread and is still pending. If so, handle it now since we own the engine lock for sure here		\
 	 * and it is a safe logical point.										\
 	 */														\
-	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;									\
+	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST_TRUE);						\
 	/* Since this macro can be called from "ydb_init" as part of opening YottaDB for the first time in the process,	\
 	 * we need to handle the case where "lcl_gtm_threadgbl" is NULL in which case we should not skip TREF usages.	\
 	 */														\

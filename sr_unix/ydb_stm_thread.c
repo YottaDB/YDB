@@ -114,7 +114,7 @@ void *ydb_stm_thread(void *dummy_parm)
 					 */
 					assert(0 == ydb_engine_threadsafe_mutex_holder[0]);
 					ydb_engine_threadsafe_mutex_holder[0] = pthread_self();
-					STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
+					STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST_TRUE);
 					ydb_engine_threadsafe_mutex_holder[0] = 0;
 					status = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[0]);
 					/* If status is non-zero, we do have the YottaDB engine lock so we CAN call

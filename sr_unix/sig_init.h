@@ -90,12 +90,43 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	SHM_WRITE_MEMORY_BARRIER;						\
 }
 
-#define	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED									\
-{															\
-	GBLREF void	(*ydb_stm_invoke_deferred_signal_handler_fnptr)(void);						\
-															\
-	if (stapi_signal_handler_deferred && (NULL != ydb_stm_invoke_deferred_signal_handler_fnptr))			\
-		(*ydb_stm_invoke_deferred_signal_handler_fnptr)();							\
+#define	OK_TO_NEST_FALSE	FALSE
+#define	OK_TO_NEST_TRUE		TRUE
+
+#define	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST)					\
+{													\
+	GBLREF	void			(*ydb_stm_invoke_deferred_signal_handler_fnptr)(void);		\
+	GBLREF	enum sig_handler_t	ydb_stm_invoke_deferred_signal_handler_type;			\
+													\
+	enum sig_handler_t		lcl_stm_sighndlr_type;						\
+													\
+	if (stapi_signal_handler_deferred && (NULL != ydb_stm_invoke_deferred_signal_handler_fnptr))	\
+	{	/* It is possible that "ydb_stm_invoke_deferred_signal_handler_type" is set to a value	\
+		 * other than sig_hndlr_none at this point (for example with the following C-stack)	\
+		 *   "wait_for_repl_inst_unfreeze_nocsa_jpl"						\
+		 *    -> "ydb_stm_invoke_deferred_signal_handler"					\
+		 *      -> "timer_handler"								\
+		 *        -> "wcs_stale"								\
+		 *          -> "wcs_wtstart"								\
+		 *            -> "wait_for_repl_inst_unfreeze"						\
+		 *              -> "wait_for_repl_inst_unfreeze_nocsa_jpl"				\
+		 *                -> "STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED"			\
+		 *                  -> "ydb_stm_invoke_deferred_signal_handler"				\
+		 * In this case, we want the nested invocation to happen as it might be handling a	\
+		 * deferred SIGTERM (for example) which would terminate the process. Not doing the	\
+		 * nested invocation would cause the process to not exit in a timely fashion.		\
+		 * Hence the need to reset "ydb_stm_invoke_deferred_signal_handler_type" here (as	\
+		 * otherwise "ydb_stm_invoke_deferred_signal_handler" would return immediately).	\
+		 * Therefore, if caller says OK_TO_NEST is TRUE, then we do the reset thereby allowing	\
+		 * the nested invocation. If not, we skip the reset thereby the nested invocation will	\
+		 * return right away.									\
+		 */											\
+		lcl_stm_sighndlr_type = ydb_stm_invoke_deferred_signal_handler_type;			\
+		if (OK_TO_NEST)										\
+			ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;			\
+		(*ydb_stm_invoke_deferred_signal_handler_fnptr)();					\
+		ydb_stm_invoke_deferred_signal_handler_type = lcl_stm_sighndlr_type ;			\
+	}												\
 }
 
 #define	SAVE_OS_SIGNAL_HANDLER_SIGNUM(SIGHNDLRTYPE, SIGNUM)	stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_num = SIGNUM
@@ -201,11 +232,12 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
  */
 #define FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(SIGHNDLRTYPE, SIG, IS_EXI_SIGNAL, INFO, CONTEXT)					\
 {																\
-	GBLREF	pthread_t	gtm_main_thread_id;										\
-	GBLREF	boolean_t	gtm_main_thread_id_set;										\
-	GBLREF	boolean_t	safe_to_fork_n_core;										\
-	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];								\
-	GBLREF	boolean_t	gtm_jvm_process;										\
+	GBLREF	pthread_t		gtm_main_thread_id;									\
+	GBLREF	boolean_t		gtm_main_thread_id_set;									\
+	GBLREF	boolean_t		safe_to_fork_n_core;									\
+	GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[];							\
+	GBLREF	boolean_t		gtm_jvm_process;									\
+	GBLREF	enum sig_handler_t	ydb_stm_invoke_deferred_signal_handler_type;						\
 	DEBUG_ONLY(GBLREF uint4	dollar_tlevel;)											\
 																\
 	pthread_t		mutexHolderThreadId, thisThreadId;								\
@@ -256,6 +288,15 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 			thisThreadIsMutexHolder = pthread_equal(mutexHolderThreadId, thisThreadId);				\
 			isSigThreadDirected = IS_SIG_THREAD_DIRECTED(SIG);							\
 			signalForwarded = IS_SIGNAL_FORWARDED(SIGHNDLRTYPE, SIG, INFO);						\
+			if (signalForwarded && (SIGHNDLRTYPE == ydb_stm_invoke_deferred_signal_handler_type))			\
+			{	/* This is a forwarded signal that we are receiving while we are already executing the		\
+				 * same signal handler in a deferred fashion through "ydb_stm_invoke_deferred_signal_handler".	\
+				 * We do not want to nest the signal handler since those handlers are not re-entrant.		\
+				 * So skip this signal handler invocation and return to the caller so the deferred signal	\
+				 * handler invocation can resume its work.							\
+				 */												\
+				 return;											\
+			}													\
 			if (!thisThreadIsMutexHolder || (tLevel && (!isSigThreadDirected || signalForwarded)))			\
 			{	/* It is possible we are the MAIN worker thread that gets the SIGALRM signal but		\
 				 * another thread that is holding the YottaDB engine lock is waiting for the signal		\

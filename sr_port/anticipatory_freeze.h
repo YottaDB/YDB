@@ -493,7 +493,7 @@ static inline void wait_for_repl_inst_unfreeze_nocsa_jpl(jnlpool_addrs_ptr_t jpl
 		 * the exit handler but instead exit immediately (which is what EXIT will do if we are
 		 * already in an exit handler).
 		 */
-		STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED;
+		STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST_TRUE);
 		/* Note that SHORT_SLEEP restarts the sleep in case of an EINTR whereas we want to stop the
 		 * sleep below in case of an interrupt (e.g. a MUPIP STOP that asks us to terminate).
 		 * Therefore do not use SHORT_SLEEP here. Instead use "SLEEP_USEC" with FALSE as the second parameter.

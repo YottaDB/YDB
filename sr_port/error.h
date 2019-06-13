@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -133,6 +133,7 @@ CONDITION_HANDLER(updproc_ch);
 CONDITION_HANDLER(util_base_ch);
 CONDITION_HANDLER(util_ch);
 CONDITION_HANDLER(ydb_simpleapi_ch);
+CONDITION_HANDLER(ydb_stm_invoke_deferred_signal_handler_ch);
 CONDITION_HANDLER(zro_ins_rec_fail_ch);
 CONDITION_HANDLER(zshow_ch);
 CONDITION_HANDLER(zyerr_ch);

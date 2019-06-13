@@ -67,7 +67,7 @@ MBSTART {														\
 } MBEND
 
 /* Macro to check if a given signal sets the "dont_want_core" variable to TRUE in the function "generic_signal_handler" */
-#define	IS_DONT_WANT_CORE_TRUE(SIG)	((SIGQUIT == SIG) || (SIGTERM == SIG))
+#define	IS_DONT_WANT_CORE_TRUE(SIG)	((SIGQUIT == SIG) || (SIGTERM == SIG) || (SIGINT == SIG))
 
 #define	IS_EXI_SIGNAL_FALSE	FALSE
 #define	IS_EXI_SIGNAL_TRUE	TRUE
