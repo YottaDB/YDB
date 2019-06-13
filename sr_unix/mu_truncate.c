@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -210,9 +213,18 @@ boolean_t mu_truncate(int4 truncate_percent)
 				bmphist.blk_num = lmap_blk_num;
 				bmphist.buffaddr = t_qread(bmphist.blk_num, &bmphist.cycle, &bmphist.cr);
 				lmap_blk_hdr = (blk_hdr_ptr_t)bmphist.buffaddr;
-				if (!(bmphist.buffaddr) || (BM_SIZE(BLKS_PER_LMAP) != lmap_blk_hdr->bsiz))
-				{ /* Could not read the block successfully. Retry. */
+				if (!bmphist.buffaddr)
+				{	/* Could not read the block successfully. Retry. */
 					t_retry((enum cdb_sc)rdfail_detail);
+					continue;
+				}
+				if (BM_SIZE(BLKS_PER_LMAP) != lmap_blk_hdr->bsiz)
+				{	/* We asked for a bitmap block to be read but instead got back a non-bitmap block header.
+					 * The buffer holding the bitmap block must have been reused since we read it.
+					 * It is a restartable situation.
+					 */
+					assert(dba_bg == csd->acc_meth);
+					t_retry(cdb_sc_lostcr);
 					continue;
 				}
 				lmap_addr = bmphist.buffaddr + SIZEOF(blk_hdr);
