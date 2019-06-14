@@ -174,7 +174,7 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	set tmp1=dist_$select("UTF-8"=chset:"/utf8",1:"")
 	set tmp2=$zsearch(tmp1_"/libyottadbutil.so",$increment(zstmp))	; if there is no libyottadbutil.so, check for libgtmutil.so, just ...
 	set:'$zlength(tmp2) tmp2=$zsearch(tmp1_"/libgtmutil.so",$increment(zstmp))	; in case someone is trying to run this with GT.M
-	set path=path_" "_tmp2
+	set:$zlength(tmp2) path=path_" "_tmp2
 	do ExportEnv("ydb_routines",path),ExportEnv("gtmroutines",path)
 	; ydb_log is set here, with the directory structure created if it does not exist
 	; ydb_tmp is set to the same value as ydb_log
@@ -383,9 +383,9 @@ GetCurrEnv
 	new file,i,line,tmp
 	set file="/proc/self/environ"
 	open file:readonly use file
-	read line
+	set line="" for  read tmp quit:$zeof  set line=line_tmp
 	use io close file
-	for i=1:1:$zlength(line,$zchar(0)) set tmp=$zpiece(line,$zchar(0),i),currenv($zpiece(tmp,"=",1))=$zpiece(tmp,"=",2,$zlength(tmp,"="))
+	for i=1:1:$zlength(line,$zchar(0)) set tmp=$zpiece(line,$zchar(0),i) if ""'=tmp s currenv($zpiece(tmp,"=",1))=$zpiece(tmp,"=",2,$zlength(tmp,"="))
 	quit
 
 GetDefaults
