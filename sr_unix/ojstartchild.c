@@ -563,10 +563,12 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 			/* Read status to catch any basic errors */
 			DOREADRC(setup_fds[0], &joberr, SIZEOF(joberr), rc);
 			if (rc < 0)
+			{
 				joberr = joberr_rtn;	/* Assume routine error if there is a problem getting the report */
+				job_errno = errno;
+			}
 			if (joberr_ok != joberr)
 			{
-				job_errno = errno;
 				DOWRITERC(pipe_fds[1], &job_errno, SIZEOF(job_errno), pipe_status);
 				UNDERSCORE_EXIT(joberr);
 			}

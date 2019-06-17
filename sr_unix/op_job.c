@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -277,6 +277,7 @@ int	op_job(int4 argcnt, ...)
 			{
 				if (exit_stat < joberr_stp)		/* one of our EXITs */
 				{
+					assert((joberr_rtn != exit_stat) || (-1 == job_errno));
 					if ((-1 == job_errno) || (0 == job_errno))
 					{
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_JOBFAIL, 0, ERR_TEXT, 2,
