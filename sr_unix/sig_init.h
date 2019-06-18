@@ -246,7 +246,10 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 																\
 	assert((DUMMY_SIG_NUM == SIG) || (NULL != INFO));									\
 	if (DUMMY_SIG_NUM != SIG)												\
-	{	/* This is not a forwarded signal */										\
+	{	/* This is an invocation of the signal handler by the OS. Could be a forwarded signal handler invocation in	\
+		 * case this is invoked by "pthread_kill" from another thread in the function "ydb_stm_thread" or this macro	\
+		 * "FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED" itself. The variable "signalForwarded" tracks this below.		\
+		 */														\
 		if (simpleThreadAPI_active)											\
 		{	/*													\
 			 * Note: The below comment talks about SIGALRM as an example but the same reasoning applies to		\
@@ -312,9 +315,9 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 					STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG, INFO, CONTEXT);			\
 					if (mutexHolderThreadId && !thisThreadIsMutexHolder)					\
 						pthread_kill(mutexHolderThreadId, SIG);						\
+					if (IS_EXI_SIGNAL)									\
+						DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG);					\
 				}												\
-				if (IS_EXI_SIGNAL)										\
-					DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG);						\
 				return;												\
 			} else													\
 			{	/* Two possibilities.										\
@@ -361,10 +364,11 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 			SAVE_OS_SIGNAL_HANDLER_CONTEXT(SIGHNDLRTYPE, CONTEXT);							\
 		}														\
 	} else															\
-	{	/* Invoked after signal forwarding has taken effect while having multiple threads (currently possible		\
-		 * in SimpleThreadAPI mode or with the Java interface). Use stored signal number/info/context and continue	\
-		 * the signal handler invocation. Note that "timer_handler" can be invoked with DUMMY_SIG_NUM even outside	\
-		 * of SimpleThreadAPI mode so account for that in the assert below.						\
+	{	/* Signal handler is explicitly invoked by YottaDB (e.g. by "ydb_stm_invoke_deferred_signal_handler") after	\
+		 * signal forwarding has taken effect while having multiple threads (currently possible	in SimpleThreadAPI	\
+		 * mode or with the Java interface). Use stored signal number/info/context and continue the signal handler	\
+		 * invocation. Note that "timer_handler" can be invoked with DUMMY_SIG_NUM even outside of SimpleThreadAPI	\
+		 * mode so account for that in the assert below.								\
 		 */														\
 		assert(simpleThreadAPI_active || gtm_jvm_process || (sig_hndlr_timer_handler == SIGHNDLRTYPE));			\
 		SIG = stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_num;							\
