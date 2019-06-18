@@ -345,15 +345,15 @@ case ${gtm_hostos}_${gtm_arch} in
     *) echo Architecture `uname -o` on `uname -m` not supported by this script ; err_exit ;;
 esac
 
+osfile="/etc/os-release"
+osid=`grep -w ID $osfile | cut -d= -f2 | cut -d'"' -f2`
 if [ "N" = "$ydb_force_install" ]; then
 	# At this point, we know the current machine architecture is supported by YottaDB
 	# but not yet sure if the OS and/or version is supported. Since
 	# --force-install is not specified, it is okay to do the os-version check now.
-	osfile="/etc/os-release"
 	osver_supported=0 # Consider platform unsupported by default
 	isdebianbusteronx8664=0	# Set current platform to not be Debian 10 buster on x86_64 by default
 	if [ -f "$osfile" ] ; then
-		osid=`grep -w ID $osfile | cut -d= -f2 | cut -d'"' -f2`
 		osver=`grep -w VERSION_ID $osfile | cut -d= -f2 | cut -d'"' -f2`
 		# Set an impossible major/minor version by default in case we do not descend down known platforms in if/else below.
 		osallowmajorver="999"
@@ -369,7 +369,7 @@ if [ "N" = "$ydb_force_install" ]; then
 				osallowminorver="0"
 			elif [ "debian" = "${osid}" ] ; then
 				# Only Debian 10 (buster) is considered supported on 64-bit x86 architecture for now.
-				# Note that the testing distribution is "buster" and its unstable variety is "buster/sid".
+				# Note that the stable distribution is "buster" and its unstable variety is "buster/sid".
 				# We support either at this point hence the -o check below.
 				prettyname=`grep -w PRETTY_NAME $osfile | cut -d= -f2 | cut -d'"' -f2`
 				if [ "Debian GNU/Linux buster/sid" = "${prettyname}" -o "Debian GNU/Linux 10 (buster)" = "${prettyname}" ] ; then
@@ -547,6 +547,23 @@ else
 		arch=`uname -m | tr -d '_'`
 		# Determine current host's OS. We expect the OS name in the tarball.
 		platform=`uname -s | tr '[A-Z]' '[a-z]'`
+		if [ $arch = "x8664" ] ; then
+			# If the current architecture is x86_64 and the distribution is RHEL or Debian then set the
+			# platform to rhel or debian (not linux) as there are specific tarballs for these distributions.
+			#
+			if [ "rhel" = "${osid}" ] ; then
+				# RHEL-specific releases of YottaDB for x86_64 happened only starting r1.10 so do this
+				# only if the requested version is not r1.00 (the only YottaDB release prior to r1.10)
+				if [ "r1.00" != ${ydb_version} ] ; then
+					platform="rhel"
+				fi
+			elif [ "debian" = "${osid}" ] ; then
+				# Debian-specific releases of YottaDB for x86_64 happened only after r1.24
+				if [ "r1.24" \< "${ydb_version}" ]; then
+					platform="debian"
+				fi
+			fi
+		fi
 		yottadb_download_url=""
 		for fullfilename in $yottadb_download_urls
 		do
@@ -560,15 +577,6 @@ else
 				*"$arch"*) ;;			# If tarball has current architecture in its name, consider it
 				*)         continue ;;		# else move on to next tarball
 			esac
-			if [ $platform = "linux" ] ; then
-				# If the current host is a RHEL box then set the OS to RHEL (not Linux) as there is a RHEL-specific tarball.
-				# We check that it is a RHEL box by the existence of the file /etc/redhat-release.
-				# But note that RHEL-specific releases of YottaDB happened only starting r1.10 so do this only
-				# if the requested version is not r1.00 (the only YottaDB release prior to r1.10)
-				if [ -e /etc/redhat-release -a "r1.00" != ${ydb_version} ] ; then
-					platform="rhel"
-				fi
-			fi
 			case $ydb_filename in
 				*"$platform"*) ;;		# If tarball has current architecture in its name, consider it
 				*)             continue ;;	# else move on to next tarball
