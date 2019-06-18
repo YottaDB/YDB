@@ -63,10 +63,13 @@ void	common_startup_init(enum gtmImageTypes img_type, CLI_ENTRY *image_cmd_ary)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	if (image_type)
+	if (image_type && (img_type != image_type))
 	{	/* An image is already loaded. This is possible if a C function that did call-ins
 		 * (and hence has access to the symbols that libyottadb.so exposes) invokes "dlopen_libyottadb"
-		 * more than once for different image types. Do not allow multiple images to be loaded.
+		 * more than once for different image types. Do not allow multiple/different images to be loaded.
+		 * Note that it is possible for multiple calls to "common_startup_init" for the same "img_type" if
+		 * each call encounters an "rts_error_csa" and the user code does not check the return status.
+		 * Hence allow that case by the "img_type != image_type" check above.
 		 */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MIXIMAGE, 4, GTMIMAGENAMETXT(img_type), GTMIMAGENAMETXT(image_type));
 		assert(FALSE);

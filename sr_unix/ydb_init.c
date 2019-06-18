@@ -39,6 +39,8 @@
 # include "gtm_conv.h"
 GBLREF	u_casemap_t 		gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
+#include "stringpool.h"
+#include "stp_parms.h"
 
 GBLREF  stack_frame     	*frame_pointer;
 GBLREF  unsigned char		*fgncal_stack;
@@ -239,8 +241,26 @@ int ydb_init()
 				return ERR_SYSCALL;
 			}
 		} /* else : "ydb_dist" env var is defined. Use that for later verification done inside "common_startup_init" */
+		/* Note: We have not yet established the condition handler stack (is complete only after the ESTABLISH_NORET call
+		 * below) but "rts_error_csa" calls are present in the below function calls. But we do not expect those error
+		 * scenarios to happen (e.g. malloc of a few thousand bytes fails etc.).
+		 */
 		common_startup_init(GTM_IMAGE, &mumps_cmd_ary[0]);
-		err_init(stop_image_conditional_core);
+		/* It is possible that "ydb_init" gets called multiple times in case there is an error before "ydb_init"
+		 * completes and the caller C program does not check the return value of "ydb_init". In that case, we do
+		 * not want to call "err_init" or "stp_init" multiple times since they do "malloc" and that can cause
+		 * process virtual memory to build up rapidly. Hence the "if (NULL == chnd)" check below.
+		 */
+		if (NULL == chnd)
+			err_init(stop_image_conditional_core);
+		/* Just like the "NULL == chnd" above, we check if stringpool already exists and if so free it before allocating
+		 * a new one. We do not reuse the existing one since it might be used a bit and repeated calls could accumulate\
+		 * the usage resulting in the need to expand the stringpool eventually causing an assertpro to fail in stp_gcol
+		 * if we still have not successfully finished a "ydb_init".
+		 */
+		if (NULL != stringpool.top)
+			free(stringpool.base);
+		stp_init(STP_INITSIZE_REQUESTED);
 		ESTABLISH_NORET(gtmci_ch, error_encountered);
 		if (error_encountered)
 		{	/* "gtmci_ch" encountered an error and transferred control back here. Return after mutex lock cleanup. */
