@@ -1287,24 +1287,6 @@ MBSTART {							\
 	JPC->phase2_free = (FREEADDR) % JBP->size;	\
 }
 
-/* Test an edge case when a process is killed just before phase2_commit_index2 is updated at the end of UPDATE_JBP_RSRV_FREEADDR */
-#ifdef DEBUG
-#define DECR_INDEX2_AND_KILL(IDX2, IDX1)									\
-MBSTART {													\
-	/* ydb_white_box_test_case_count is set to 1/0 by test system. Then in t_end/tp_tend (if it's 0)	\
-	 * or in jnl_write (if it's 1), ydb_white_box_test_case_count is set to 2 : to kill the process.	\
-	 */													\
-	if (2 == ydb_white_box_test_case_count)									\
-	{													\
-		DECR_PHASE2_COMMIT_INDEX(IDX2, JNL_PHASE2_COMMIT_ARRAY_SIZE);					\
-		assert(IDX2 == IDX1);										\
-		kill(process_id, SIGKILL);									\
-	}													\
-} MBEND
-#else	/* #ifdef DEBUG */
-#define DECR_INDEX2_AND_KILL(IDX2, IDX1)	/* No-OP */
-#endif	/* #ifdef DEBUG */
-
 #define	UPDATE_JBP_RSRV_FREEADDR(CSA, JPC, JBP, JPL, RLEN, INDEX, IN_PHASE2, JNL_SEQNO, STRM_SEQNO, REPLICATION)	\
 MBSTART {														\
 	uint4			rsrv_freeaddr;										\
@@ -1377,8 +1359,17 @@ MBSTART {														\
 	SHM_WRITE_MEMORY_BARRIER; /* see corresponding SHM_READ_MEMORY_BARRIER in "jnl_phase2_cleanup" */		\
 	JBP->phase2_commit_index2 = nextIndex;										\
 	if (WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06))									\
-	{														\
-		DECR_INDEX2_AND_KILL(JBP->phase2_commit_index2, JBP->phase2_commit_index1);				\
+	{	/* Test an edge case when a process is killed just before phase2_commit_index2 is updated		\
+		 * at the end of UPDATE_JBP_RSRV_FREEADDR.								\
+		 */													\
+		boolean_t cnt_invocations_reached = FALSE;								\
+															\
+		GTM_WHITE_BOX_TEST(WBTEST_MURUNDOWN_KILLCMT06, cnt_invocations_reached, TRUE);				\
+		if (cnt_invocations_reached)										\
+		{													\
+			DECR_PHASE2_COMMIT_INDEX(JBP->phase2_commit_index2, JNL_PHASE2_COMMIT_ARRAY_SIZE);		\
+			kill(process_id, SIGKILL);									\
+		}													\
 	}														\
 } MBEND
 

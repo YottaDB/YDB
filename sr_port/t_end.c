@@ -1497,10 +1497,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			}
 			jnl_write_reserve(csa, jrs, non_tp_jfb_ptr->rectype, non_tp_jfb_ptr->record_size, non_tp_jfb_ptr);
 		}
-#ifdef DEBUG
-		if ((WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06)) && (ydb_white_box_test_case_count == 0))
-			ydb_white_box_test_case_count = 2;
-#endif
 		UPDATE_JRS_RSRV_FREEADDR(csa, jpc, jbp, jrs, jpl, jnl_fence_ctl, replication);	/* updates jbp->rsrv_freeaddr.
 												 * Step CMT06
 												 */

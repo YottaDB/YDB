@@ -493,10 +493,6 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 		SET_JNLBUFF_PREV_JREC_TIME(jb, jnl_rec->prefix.time, DO_GBL_JREC_TIME_CHECK_TRUE);
 			/* Keep jb->prev_jrec_time up to date */
 		jpc->curr_tn = csa->ti->curr_tn;	/* needed below by UPDATE_JBP_RSRV_FREEADDR */
-#ifdef DEBUG
-		if ((WBTEST_ENABLED(WBTEST_MURUNDOWN_KILLCMT06)) && (ydb_white_box_test_case_count == 1))
-			ydb_white_box_test_case_count = 2;
-#endif
 		UPDATE_JBP_RSRV_FREEADDR(csa, jpc, jb, NULL, rlen, commit_index, FALSE, 0, 0, FALSE); /* sets "commit_index" */
 		assert(jb->phase2_commit_array[commit_index].curr_tn == jpc->curr_tn);
 		JNL_PHASE2_WRITE_COMPLETE(csa, jb, commit_index, jpc->new_freeaddr);
