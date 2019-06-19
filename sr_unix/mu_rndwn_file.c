@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -351,7 +351,6 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	jnl_file_header		header;
 	int4			status1;
 	uint4			status2;
-	uint4			index1, index2;
 	int			iter, secshrstat;
 	char			*buff;
 	node_local_ptr_t	cnl;
@@ -1314,25 +1313,11 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			if (!cnl->donotflush_dbjnl)
 			{
 				jpc = csa->jnl;
-				/* Check for a special case when the update/MUMPS process is killed in CMT06
-				 * in UPDATE_JRS_RSRV_FREEADDR before updating pahse2_commit_index2.
-				 * This causes a hang in jnl_flush() from wcs_flu(WCSFLU_NONE) below.
-				 * Restore phase2_commit_index2 by INCRementing it.
-				 */
 				if ((NULL != jpc) && (NULL != jpc->jnl_buff))
 				{
 					jbp = jpc->jnl_buff;
-					index1 = jbp->phase2_commit_index1;
-					index2 = jbp->phase2_commit_index2;
-					if ((index1 == index2) && (jbp->freeaddr < jbp->rsrv_freeaddr)
-						&& (csa->nl->update_underway_tn != csd->trans_hist.curr_tn)
-						&& ((jbp->phase2_commit_array[index1].start_freeaddr +
-							jbp->phase2_commit_array[index1].tot_jrec_len) == jbp->rsrv_freeaddr))
-					{
-						INCR_PHASE2_COMMIT_INDEX(jbp->phase2_commit_index2, JNL_PHASE2_COMMIT_ARRAY_SIZE);
-					}
+					HANDLE_KILL9_IN_CMT06_STEP_IF_NEEDED(csa, jbp);
 				}
-
 				if (cnl->glob_sec_init)
 				{	/* WCSFLU_NONE only is done here, as we aren't sure of the state, so no EPOCHs are
 					 * written. If we write an EPOCH record, recover may get confused. Note that for

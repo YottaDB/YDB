@@ -1287,6 +1287,22 @@ MBSTART {							\
 	JPC->phase2_free = (FREEADDR) % JBP->size;	\
 }
 
+#define	HANDLE_KILL9_IN_CMT06_STEP_IF_NEEDED(CSA, JBP)									\
+{															\
+	jbuf_phase2_in_prog_t	*phs2CMT;										\
+															\
+	/* The following condition implies that a previous update process was killed in CMT06, right before updating	\
+	 * JBP->phase2_commit_index2. Increment index2 & call jnl_phase2_cleanup() to process it as a dead commit.	\
+	 */														\
+	phs2CMT = &JBP->phase2_commit_array[JBP->phase2_commit_index2];							\
+	if ((JBP->freeaddr < JBP->rsrv_freeaddr)									\
+		&& ((phs2CMT->start_freeaddr + phs2CMT->tot_jrec_len) == JBP->rsrv_freeaddr))				\
+	{														\
+		INCR_PHASE2_COMMIT_INDEX(JBP->phase2_commit_index2, JNL_PHASE2_COMMIT_ARRAY_SIZE);			\
+		jnl_phase2_cleanup(CSA, JBP);										\
+	}														\
+}
+
 #define	UPDATE_JBP_RSRV_FREEADDR(CSA, JPC, JBP, JPL, RLEN, INDEX, IN_PHASE2, JNL_SEQNO, STRM_SEQNO, REPLICATION)	\
 MBSTART {														\
 	uint4			rsrv_freeaddr;										\
@@ -1297,16 +1313,8 @@ MBSTART {														\
 	GBLREF	uint4		dollar_tlevel;										\
 															\
 	assert(CSA->now_crit);												\
-	/* The following condition implies that a previous update process was killed in CMT06, right before updating	\
-	 * JBP->phase2_commit_index2. Increment index2 & call jnl_phase2_cleanup() to process it as a dead commit.	\
-	 */														\
-	if ((JBP->phase2_commit_index2 == JBP->phase2_commit_index1) && (JBP->freeaddr < JBP->rsrv_freeaddr)		\
-		&& ((JBP->phase2_commit_array[JBP->phase2_commit_index1].start_freeaddr +				\
-			JBP->phase2_commit_array[JBP->phase2_commit_index1].tot_jrec_len) == JBP->rsrv_freeaddr))	\
-	{														\
-		INCR_PHASE2_COMMIT_INDEX(JBP->phase2_commit_index2, JNL_PHASE2_COMMIT_ARRAY_SIZE);			\
-		jnl_phase2_cleanup(CSA, JBP);										\
-	}														\
+	if (JBP->phase2_commit_index2 == JBP->phase2_commit_index1)							\
+		HANDLE_KILL9_IN_CMT06_STEP_IF_NEEDED(CSA, JBP);								\
 	/* Allocate a slot. But before that, check if the slot array is full.						\
 	 * endIndex + 1 == first_index implies full.	Note: INCR_PHASE2_COMMIT_INDEX macro does the + 1		\
 	 * endIndex     == first_index implies empty.									\
