@@ -324,8 +324,17 @@ boolean_t wcs_flu(uint4 options)
 		/* If we are trying to flush a completed journal file, make sure there is nothing else to do and return. */
 		if (jb->last_eof_written)
 		{
-			assert(jb->fsync_dskaddr == jb->freeaddr);
 			assert(jb->rsrv_freeaddr == jb->freeaddr);
+			if (jb->fsync_dskaddr != jb->freeaddr)
+			{	/* The only known case of this is if a kill -9 occurred in "jnl_file_close" after
+				 * jb->last_eof_written was set to TRUE but before "jnl_fsync" finished executing.
+				 * Assert that this be a crash test and that the current caller is indeed MUPIP RUNDOWN
+				 * or MUPIP RECOVER or MUPIP ROLLBACK (all of which set "in_mu_rndwn_file" in dbg mode).
+				 */
+				assert(WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number);
+				assert(in_mu_rndwn_file);
+				jnl_fsync(reg, jb->dskaddr);
+			}
 			assert((dba_bg != csd->acc_meth) || !csd->jnl_before_image
 				|| (!cnl->wcs_active_lvl && !csa->acc_meth.bg.cache_state->cacheq_active.fl));
 			REL_CRIT_BEFORE_RETURN(cnl, reg);
