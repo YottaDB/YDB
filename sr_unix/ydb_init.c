@@ -254,7 +254,7 @@ int ydb_init()
 		if (NULL == chnd)
 			err_init(stop_image_conditional_core);
 		/* Just like the "NULL == chnd" above, we check if stringpool already exists and if so free it before allocating
-		 * a new one. We do not reuse the existing one since it might be used a bit and repeated calls could accumulate\
+		 * a new one. We do not reuse the existing one since it might be used a bit and repeated calls could accumulate
 		 * the usage resulting in the need to expand the stringpool eventually causing an assertpro to fail in stp_gcol
 		 * if we still have not successfully finished a "ydb_init".
 		 */

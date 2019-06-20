@@ -186,6 +186,15 @@ void gtm_startup(struct startup_vector *svec)
 		svec->user_strpl_size = STP_INITSIZE;
 	else if (svec->user_strpl_size > STP_MAXINITSIZE)
 		svec->user_strpl_size = STP_MAXINITSIZE;
+	/* Note: It is possible for stringpool to be already allocated if caller is "ydb_init". It calls "stp_init"
+	 *	First call  : "ydb_init" -> "stp_init"
+	 *	Second call : "ydb_init" -> "init_gtm" -> "gtm_startup" -> "stp_init"
+	 * If we are the second call, we should be able to skip the "stp_init". But one cannot be sure the two calls
+	 * passed the same stringpool size. So better to free the first one and allocate the second one afresh since
+	 * this is what is going to be used for the rest of the process now that "ydb_init" is done with its stringpool need.
+	 */
+	if (NULL != stringpool.top)
+		free(stringpool.base);
 	stp_init(svec->user_strpl_size);
 	rts_stringpool = stringpool;
 	(TREF(tpnotacidtime)).mvtype = MV_NM | MV_INT;	/* gtm_env_init set up a numeric value, now there's a stp: string it */

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2002, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,6 +23,8 @@
 #include "stringpool.h"
 #include "ydb_trans_log_name.h"
 
+#define	SYSTEM_LITERAL	"47,"
+
 GBLREF	mval	dollar_system;
 GBLREF spdesc	stringpool;
 
@@ -35,6 +37,7 @@ void dollar_system_init(struct startup_vector *svec)
 	error_def(ERR_LOGTOOLONG);
 	error_def(ERR_TRNLOGFAIL);
 
+	ENSURE_STP_FREE_SPACE(MAX_TRANS_NAME_LEN + STR_LIT_LEN(SYSTEM_LITERAL));
 	dollar_system.mvtype = MV_STR;
 	dollar_system.str.addr = (char *)stringpool.free;
 	dollar_system.str.len = STR_LIT_LEN("47,");
@@ -48,6 +51,7 @@ void dollar_system_init(struct startup_vector *svec)
 	} else
 	{
 		assert(SS_NOLOGNAM == status);
+		assert(MAX_TRANS_NAME_LEN > svec->sysid_ptr->len);	/* so the above ENSURE_STP_FREE_SPACE is good enough */
 		dollar_system.str.len += svec->sysid_ptr->len;
 		memcpy(stringpool.free, svec->sysid_ptr->addr, svec->sysid_ptr->len);
                 stringpool.free += svec->sysid_ptr->len ;
