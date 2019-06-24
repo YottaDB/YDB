@@ -50,6 +50,7 @@
 #include "buddy_list.h"		/* needed for tp.h */
 #include "hashtab_int4.h"	/* needed for tp.h */
 #include "tp.h"
+#include "is_defunct_pid.h"
 #endif
 
 GBLREF	uint4			process_id;
@@ -122,6 +123,7 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	char			*mumps_node_ptr;
 	struct_jrec_align	*align_rec;
 	uint4			end_freeaddr;
+	int4			blocking_pid;
 #	endif
 
 	assert(MAX_JNL_WRITE_RECURSION_DEPTH > jnl_write_recursion_depth++);
@@ -262,8 +264,11 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	ADJUST_CHECKSUM(checksum, csd->jnl_checksum, checksum);
 	SET_JREC_CHECKSUM(jnl_rec, rectype, checksum);
 	if (!in_phase2)
-	{
-		assert((!jb->blocked) || (FALSE == is_proc_alive(jb->blocked, 0)));
+	{	/* Check that the pid in jb->blocked is dead if it is not 0. The check handles the case that a pid could be dead
+		 * but its parent could still have not gotten its exit status in which case it could be a defunct.
+		 */
+		DEBUG_ONLY(blocking_pid = jb->blocked);
+		assert(!blocking_pid || is_defunct_pid((uint4)blocking_pid) || (FALSE == is_proc_alive(blocking_pid, 0)));
 		jb->blocked = process_id;
 	}
 	jnl_fs_block_size = jb->fs_block_size;
