@@ -98,7 +98,7 @@ listed below. For example for Ubuntu Linux:
 - Installing YottaDB
 
   Now you are ready to install YottaDB. The default installation path for each release includes the release
-  (e.g. for YottaDB r1.24, the default installation path is /usr/local/lib/yottadb/r124),
+  (e.g. for YottaDB r1.26, the default installation path is /usr/local/lib/yottadb/r126),
   but can be controlled using the ```--installdir``` option. Run ```./ydbinstall --help``` for a list of options.
 
   ```sh
@@ -159,12 +159,12 @@ docker run --rm -it yottadb/yottadb # you can add a specific version after a ":"
 
   This indicates that required libraries are not found. Please consult the list of libraries and check your distributions package manager.
 
-- YottaDB installation fails with %YDB-E-DLLNOOPEN 
+- YottaDB installation fails with %YDB-E-DLLNOOPEN
 
   Example error message that would be printed to the screen:
 
   ```
-  %YDB-E-DLLNOOPEN, Failed to load external dynamic library /usr/local/lib/yottadb/r124/libyottadb.so
+  %YDB-E-DLLNOOPEN, Failed to load external dynamic library /usr/local/lib/yottadb/r126/libyottadb.so
   %YDB-E-TEXT, libtinfo.so.5: cannot open shared object file: No such file or directory
   ```
 
