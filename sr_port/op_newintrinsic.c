@@ -39,6 +39,9 @@ GBLREF int4		gtm_trigger_depth;
 GBLREF mval		dollar_ztwormhole;
 #endif
 
+GBLREF mval		dollar_testv; /* NEW $TEST */
+GBLREF int 		dollar_truth; /* NEW $TEST */
+
 error_def(ERR_NOZTRAPINTRIG);
 
 /* Routine to NEW a special intrinsic variable. Note that gtm_newinstrinsic(),
@@ -90,6 +93,10 @@ void op_newintrinsic(int intrtype)
 			intrinsic = &dollar_ztwormhole;
 			break;
 #		endif
+		case SV_TEST: /* NEW TEST */
+			dollar_testv.m[1] = dollar_truth ? 1000 : 0;
+			intrinsic = &dollar_testv; 
+			break;
 		default:	/* Only above types defined by compiler */
 			assertpro(FALSE && intrtype);
 	}

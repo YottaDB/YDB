@@ -89,6 +89,7 @@ int m_new(void)
 				case SV_ESTACK:
 				case SV_ZYERROR:
 				case SV_ZGBLDIR:
+				case SV_TEST: /* NEW $TEST */
 				GTMTRIG_ONLY(case SV_ZTWORMHOLE:)
 					tmp = maketriple(OC_NEWINTRINSIC);
 					tmp->operand[0] = put_ilit(svn_data[n].opcode);

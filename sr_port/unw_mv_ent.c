@@ -104,6 +104,9 @@ GBLREF zshow_out		*zwr_output;
 GBLREF zwr_hash_table		*zwrhtab;
 GBLREF boolean_t		tp_timeout_deferred;
 
+GBLREF mval			dollar_testv; /* NEW $TEST */
+GBLREF int 			dollar_truth; /* NEW $TEST */
+
 #define FREEIFALLOC(ADR) if (NULL != (ADR)) free(ADR)
 
 void unw_mv_ent(mv_stent *mv_st_ent)
@@ -134,6 +137,12 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 	{
 		case MVST_MSAV:
 			*mv_st_ent->mv_st_cont.mvs_msav.addr = mv_st_ent->mv_st_cont.mvs_msav.v;
+		        /* NEW $TEST beg */
+			if (&dollar_testv == mv_st_ent->mv_st_cont.mvs_msav.addr)
+			{
+			    dollar_truth  = dollar_testv.m[1] ? 1 : 0;
+			} else
+			/*NEW $TEST end*/
 			if (&(TREF(dollar_etrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
 			{
 				ztrap_explicit_null = FALSE;
