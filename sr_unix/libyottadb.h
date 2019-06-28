@@ -44,7 +44,7 @@ enum
 	YDB_SEVERITY_FATAL = 4		/* Fatal - Something happened that is so bad, YottaDB cannot continue */
 };
 
-#define	YDB_RELEASE		126	/* Corresponds to YottaDB release r1.26 (i.e. YDB_ZYRELEASE in sr_linux/release_name.h) */
+#define	YDB_RELEASE		127	/* Corresponds to YottaDB release r1.27 (i.e. YDB_ZYRELEASE in sr_linux/release_name.h) */
 
 /* Maximum values */
 #define	YDB_MAX_IDENT		31		/* Maximum size of global/local name (not including '^') */
