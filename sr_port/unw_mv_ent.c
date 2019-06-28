@@ -103,6 +103,8 @@ GBLREF lvzwrite_datablk		*lvzwrite_block;
 GBLREF zshow_out		*zwr_output;
 GBLREF zwr_hash_table		*zwrhtab;
 GBLREF boolean_t		tp_timeout_deferred;
+GBLREF mval			dollar_testmv;
+GBLREF int 			dollar_truth;
 
 #define FREEIFALLOC(ADR) if (NULL != (ADR)) free(ADR)
 
@@ -134,7 +136,9 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 	{
 		case MVST_MSAV:
 			*mv_st_ent->mv_st_cont.mvs_msav.addr = mv_st_ent->mv_st_cont.mvs_msav.v;
-			if (&(TREF(dollar_etrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
+			if (&dollar_testmv == mv_st_ent->mv_st_cont.mvs_msav.addr)
+				dollar_truth = dollar_testmv.m[1] ? 1 : 0;
+			else if (&(TREF(dollar_etrap)) == mv_st_ent->mv_st_cont.mvs_msav.addr)
 			{
 				ztrap_explicit_null = FALSE;
 				(TREF(dollar_ztrap)).str.len = 0;
@@ -149,7 +153,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 				(TREF(dollar_etrap)).str.len = 0;
 				if ((TREF(save_xfer_root)))
 				{
-				/*If TP timeout or ztimeout, check conditions before popping out */
+				/* If TP timeout or ztimeout, check conditions before popping out */
 					if (((TREF(save_xfer_root))->set_fn == tptimeout_set)
 						|| ((TREF(save_xfer_root))->set_fn == ztimeout_set))
 					{

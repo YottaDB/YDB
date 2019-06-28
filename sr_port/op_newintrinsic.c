@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -38,6 +41,8 @@ GBLREF boolean_t	ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to N
 GBLREF int4		gtm_trigger_depth;
 GBLREF mval		dollar_ztwormhole;
 #endif
+GBLREF mval		dollar_testmv;
+GBLREF int 		dollar_truth;
 
 error_def(ERR_NOZTRAPINTRIG);
 
@@ -90,6 +95,10 @@ void op_newintrinsic(int intrtype)
 			intrinsic = &dollar_ztwormhole;
 			break;
 #		endif
+		case SV_TEST:
+			dollar_testmv.m[1] = dollar_truth ? 1000 : 0;
+			intrinsic = &dollar_testmv;
+			break;
 		default:	/* Only above types defined by compiler */
 			assertpro(FALSE && intrtype);
 	}

@@ -93,6 +93,7 @@ GBLREF mliteral			literal_chain;
 GBLREF mstr			*comline_base, **stp_array;
 GBLREF mval			dollar_system, dollar_zerror, dollar_zgbldir, dollar_zstatus;
 GBLREF mval			dollar_zyerror, zstep_action, dollar_zinterrupt, dollar_zsource, dollar_ztexit;
+GBLREF mval			dollar_testmv;
 GBLREF mv_stent			*mv_chain;
 GBLREF sgm_info			*first_sgm_info;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
@@ -725,6 +726,7 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		MVAL_STPG_ADD(&dollar_ztwormhole);
 #		endif
 		MVAL_STPG_ADD(TADR(last_fnquery_return_varname));
+		MVAL_STPG_ADD(&dollar_testmv);
 		for (index = 0; index < TREF(last_fnquery_return_subcnt); index++)
 			MVAL_STPG_ADD(&TAREF1(last_fnquery_return_sub, index));
 		for (mvs = mv_chain; mvs < (mv_stent *)stackbase; mvs = (mv_stent *)((char *)mvs + mvs->mv_st_next))
