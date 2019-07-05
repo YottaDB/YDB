@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,9 +86,11 @@ error_def(ERR_LOCKINCR2HIGH);
 error_def(ERR_LOCKIS);
 error_def(ERR_LOCKTIMINGINTP);
 
-#define LOCKTIMESTR "LOCK"
-#define ZALLOCTIMESTR "ZALLOCATE"
-#define MAX_WARN_STR_ARG_LEN 256
+#define LOCKTIMESTR		"LOCK"
+#define ZALLOCTIMESTR		"ZALLOCATE"
+#define MAX_WARN_STR_ARG_LEN	256
+#define LOCK_SELF_WAKE_START	1	/* sleep   1 msec at start before checking if wakeup was sent by lock holder */
+#define LOCK_SELF_WAKE_MAX	128	/* sleep 128 msec at max before checking if wakeup was sent by lock holder */
 
 /* We made these messages seperate functions because we did not want to do the MAXSTR_BUFF_DECL(buff) declaration in op_lock2,
  * because  MAXSTR_BUFF_DECL macro would allocate a huge stack every time op_lock2 is called.
@@ -142,7 +144,7 @@ STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr)
  */
 int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 {
-	boolean_t		blocked, timer_on;
+	boolean_t		blocked;
 	signed char		gotit;
 	unsigned short		locks_bckout, locks_done;
 	int4			msec_timeout;	/* timeout in milliseconds */
@@ -150,16 +152,13 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 	unsigned char		action;
 	ABS_TIME		cur_time, end_time, remain_time;
 	mv_stent		*mv_zintcmd;
-#	ifdef VMS
-	int4			status;			/* needed for BLOCKING_PROC_DEAD macro in VMS */
-	int4			icount, time[2];	/* needed for BLOCKING_PROC_DEAD macro in VMS */
-#	endif
+	uint4			sleep_msec;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	gotit = -1;
 	cm_action = laflag;
-	out_of_time = timer_on = FALSE;
+	out_of_time = FALSE;
 	if (CM_ZALLOCATES == cm_action)		/* can't use ? : syntax here because of the way the macros nest */
 		MV_FORCE_MSTIMEOUT(timeout, msec_timeout, ZALLOCTIMESTR);
 	else
@@ -197,15 +196,8 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 				}
 			} else
 				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
-			if (0 < msec_timeout)
-			{
-				start_timer((TID)mlk_lock, msec_timeout, wake_alarm, 0, NULL);
-				timer_on = TRUE;
-			} else
-			{
-				cancel_timer((TID)mlk_lock);
+			if (0 > msec_timeout)
 				out_of_time = TRUE;
-			}
 		}
 	}
 	lckclr();
@@ -291,8 +283,21 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 			assert(have_crit(CRIT_HAVE_ANY_REG));
 			tp_warning(pvt_ptr2);
 		}
+		sleep_msec = LOCK_SELF_WAKE_START;	/* start at LOCK_SELF_WAKE_START msec and double it
+							 * upto LOCK_SELF_WAKE_MAX msec and then cycle back.
+							 */
 		for (;;)
 		{
+			if (NO_M_TIMEOUT != msec_timeout)
+			{
+				sys_get_curr_time(&cur_time);
+				remain_time = sub_abs_time(&end_time, &cur_time);
+				msec_timeout = (int4)(remain_time.tv_sec * MILLISECS_IN_SEC +
+							/* Round up in order to prevent premature timeouts */
+							DIVIDE_ROUND_UP(remain_time.tv_nsec, NANOSECS_IN_MSEC));
+				if (0 >= msec_timeout)
+					out_of_time = TRUE;
+			}
 			if (out_of_time || outofband)
 			{	/* if time expired || control-c, tptimeout, or jobinterrupt encountered */
 				if (outofband || !mlk_check_own(pvt_ptr1))
@@ -306,13 +311,8 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 						gvcmz_clrlkreq();
 						remlkreq = FALSE;
 					}
-					if (outofband  && !out_of_time)
+					if (outofband && !out_of_time)
 					{
-						if (timer_on)
-						{
-							cancel_timer((TID)mlk_lock);
-							timer_on = FALSE;
-						}
 						if (NO_M_TIMEOUT != msec_timeout)
 						{	/* get remain = end_time - cur_time */
 							sys_get_curr_time(&cur_time);
@@ -353,7 +353,10 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 			 * in mlk_shrblk_find. If mlk_lock is invoked for the second (or higher) time in op_lock2 for the
 			 * same lock resource, "mlk_shrblk_find" assumes a sleep has happened in between two locking attempts.
 			 */
-			hiber_start_wait_any(LOCK_SELF_WAKE);
+			hiber_start_wait_any(sleep_msec);
+			sleep_msec = sleep_msec * 2;
+			if (LOCK_SELF_WAKE_MAX <= sleep_msec)
+				sleep_msec = LOCK_SELF_WAKE_START;
 			/* Every reattempt at a blocking lock needs crit which could be a bottleneck. So minimize reattempts.
 			 * The "blk_sequence" check below serves that purpose. If the sequence number is different between
 			 * the shared and private copies, it means the lock state in shared memory has changed since last we
@@ -405,8 +408,6 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 	lks_this_cmd = 0;	/* reset so we can check whether an extrinsic is trying to nest a LOCK operation */
 	if (NO_M_TIMEOUT != msec_timeout)
 	{	/* was timed or immediate */
-		if (timer_on)
-			cancel_timer((TID)mlk_lock);
 		if (blocked)
 		{
 			for (prior = &mlk_pvt_root;  *prior;)
@@ -424,4 +425,3 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 	mlk_stats.n_user_locks_success++;
 	return (TRUE);
 }
-

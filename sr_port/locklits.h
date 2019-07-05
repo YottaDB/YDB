@@ -3,6 +3,9 @@
  * Copyright (c) 2001, 2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -24,5 +27,3 @@
 #define PART_DEAD 1
 #define NOT_DEAD 0
 #define NOT_THERE -1
-
-#define LOCK_SELF_WAKE		 100	/* sleep 100 msec before checking if wakeup was sent by lock holder */

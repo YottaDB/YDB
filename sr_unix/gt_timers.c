@@ -222,12 +222,6 @@ error_def(ERR_SETITIMERFAILED);
 error_def(ERR_TEXT);
 error_def(ERR_TIMERHANDLER);
 
-/* Called when a hiber_start timer pops. Set flag so a given timer will wake up (not go back to sleep). */
-STATICFNDEF void hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag)
-{
-	**waitover_flag = TRUE;
-}
-
 /* Preallocate some memory for timers. */
 void gt_timers_alloc(void)
 {
@@ -315,7 +309,6 @@ void prealloc_gt_timers(void)
 	 *
 	 * First step, fill in the safe timers contained within this module which are always available.
 	 */
-	ADD_SAFE_HNDLR(&hiber_wake);		/* Resident in this module */
 	ADD_SAFE_HNDLR(&hiber_start_wait_any);	/* Resident in this module */
 	ADD_SAFE_HNDLR(&wake_alarm);		/* Standalone module containing only one global reference */
 }
@@ -336,78 +329,19 @@ void sys_get_curr_time(ABS_TIME *atp)
 /* Start hibernating by starting a timer and waiting for it. */
 void hiber_start(uint4 hiber)
 {
-	int4		waitover;
-	int4		*waitover_addr;
-	TID		tid;
-	sigset_t	savemask;
-	int		rc;
-
-	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal */
-	/* sigsuspend() sets the signal mask to 'savemask' and waits for an ALARM signal. If the SIGALRM is a member of savemask,
-	 * this process will never receive SIGALRM, and it will hang indefinitely. One such scenario would be if we interrupted a
-	 * timer handler with kill -15, thus getting all timer setup reset by generic_signal_handler, and the gtm_exit_handler
-	 * ended up invoking hiber_start (when starting gtmsecshr server, for instance). In such situations rely on something other
-	 * than GT.M timers.
-	 */
-	if (sigismember(&savemask, SIGALRM))
-	{	/* normally, if SIGALRMs are blocked, we must already be inside a timer handler, but someone can actually disable
-		 * SIGALRMs, in which case we do not want this assert to trip in pro */
-		assert(1 <= timer_stack_count);
-		SLEEP_USEC((long long)(hiber * 1000LL), TRUE);
-	} else
-	{
-		assertpro(1 > timer_stack_count);	/* if SIGALRMs are not blocked, we cannot be inside a timer handler */
-		waitover = FALSE;			/* when OUR timer pops, it will set this flag */
-		waitover_addr = &waitover;
-		tid = (TID)waitover_addr;		/* unique id of this timer */
-		start_timer_int((TID)tid, hiber, hiber_wake, SIZEOF(waitover_addr), &waitover_addr, TRUE);
-		/* we will loop here until OUR timer pops and sets OUR flag */
-		do
-		{
-			assert(!sigismember(&savemask, SIGALRM));
-			sigsuspend(&savemask);		/* unblock SIGALRM and wait for timer interrupt */
-			if (outofband)
-			{
-				cancel_timer(tid);
-				break;
-			}
-			/* If SimpleThreadAPI is active, check if a signal handler invocation (e.g. SIGALRM, SIGTERM etc.)
-			 * got deferred. If so invoke it now that we are at a logical point.
-			 */
-			STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST_TRUE);
-		} while (FALSE == waitover);
-	}
-	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
+	SLEEP_USEC((long long)(hiber * 1000LL), !outofband);	/* Second parameter is passed as "!outofband" so we
+								 * return from macro if ever an outofband event occurs
+								 * (e.g. MUPIP INTRPT i.e. SIGUSR1 signal etc.).
+								 * Otherwise we keep restarting the sleep on an EINTR.
+								 */
 }
 
 /* Hibernate by starting a timer and waiting for it or any other timer to pop. */
 void hiber_start_wait_any(uint4 hiber)	/* "hiber" is in milli-seconds */
 {
-	sigset_t	savemask;
-	int		rc;
-
-	if (1000 > hiber)
-	{
-		SLEEP_USEC((hiber * 1000), FALSE); /* FALSE passed so we return if an EINTR occurs instead of restarting wait */
-		return;
-	}
-	assertpro(1 > timer_stack_count);		/* timer services are unavailable from within a timer handler */
-	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);	/* block SIGALRM signal and set new timer */
-	/* Even though theoretically it is possible for any signal other than SIGALRM to discontinue the wait in sigsuspend,
-	 * the intended use of this function targets only timer-scheduled events. For that reason, assert that SIGALRMs are
-	 * not blocked prior to scheduling a timer, whose delivery we will be waiting upon, as otherwise we might end up
-	 * waiting indefinitely. Note, however, that the use of SLEEP_USEC in hiber_start, explained in the accompanying
-	 * comment, should not be required in hiber_start_wait_any, as we presently do not invoke this function in interrupt-
-	 * induced code, and so we should not end up here with SIGALARMs blocked.
-	 */
-	assert(!sigismember(&savemask, SIGALRM));
-	start_timer_int((TID)hiber_start_wait_any, hiber, NULL, 0, NULL, TRUE);
-	sigsuspend(&savemask);				/* unblock SIGALRM and wait for timer interrupt */
-	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST_TRUE);	/* See comment in "hiber_start" function
-										 * for why this is done here.
-										 */
-	cancel_timer((TID)hiber_start_wait_any);	/* cancel timer block before reenabling */
-	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);	/* reset signal handlers */
+	SLEEP_USEC((long long)(hiber * 1000LL), FALSE);	/* FALSE passed so we return if an EINTR occurs
+							 * instead of restarting wait.
+							 */
 }
 
 /* Wrapper function for start_timer() that is exposed for outside use. The function ensures that time_to_expir is positive. If

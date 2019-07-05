@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -183,10 +183,7 @@ void op_hang(mval* num)
 			if (0 == ms)
 				return;		/* done HANGing */
 		}
-		if (ms < 10)
-			SLEEP_USEC(ms * 1000, TRUE);	/* Finish the sleep if it is less than 10ms. */
-		else
-			hiber_start(ms);
+		hiber_start(ms);
 	} else	/* the rel_quant below seems legitimate */
 		rel_quant();
 	if (outofband)

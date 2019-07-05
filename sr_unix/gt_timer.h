@@ -142,7 +142,6 @@ MBSTART {									\
 	char		*s_jnl_file_close_timer = "jnl_file_close_timer";			\
 	char		*s_wcs_clean_dbsync = "wcs_clean_dbsync";				\
 	char		*s_wcs_stale = "wcs_stale";						\
-	char		*s_hiber_wake = "hiber_wake";						\
 	char		*s_fake_enospc = "fake_enospc";						\
 	char		*s_simple_timeout_timer = "simple_timeout_timer";			\
 	char		s_unknown[MAX_UNKNOWN_LEN];						\
@@ -168,8 +167,6 @@ MBSTART {									\
 			handler = s_wcs_clean_dbsync;						\
 		else if ((void (*)())wcs_stale_fptr == cur_timer->handler)			\
 			handler = s_wcs_stale;							\
-		else if ((void (*)())hiber_wake == cur_timer->handler)				\
-			handler = s_hiber_wake;							\
 		else if ((void (*)())fake_enospc_ptr == cur_timer->handler)			\
 			handler = s_fake_enospc;						\
 		else if ((void (*)())simple_timeout_timer_ptr == cur_timer->handler)		\
@@ -219,7 +216,6 @@ void		sys_canc_timer(void);
 void 		simple_timeout_timer(TID tid, int4 hd_len, boolean_t **timedout);
 void		timer_handler(int why, siginfo_t *info, void *context);
 
-STATICFNDCL void	hiber_wake(TID tid, int4 hd_len, int4 **waitover_flag);
 STATICFNDCL void	gt_timers_alloc(void);
 STATICFNDCL void	start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
 					void *hdata, boolean_t safe_timer);

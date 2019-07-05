@@ -132,15 +132,13 @@ void *ydb_stm_thread(void *dummy_parm)
 				 * call above. Sleep for a bit and try again.
 				 */
 			} else
-			{	/* There is a current holder of the YDB engine multi-thread lock. Forward signal to that thread. */
-				for (sig_handler_type = 0; sig_handler_type < sig_hndlr_num_entries; sig_handler_type++)
-				{
-					if (!STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_handler_type))
-						continue;
-					sig_num = stapi_signal_handler_oscontext[sig_handler_type].sig_num;
-					if (sig_num)
-						pthread_kill(mutex_holder_thread_id, sig_num);
-				}
+			{	/* There is a current holder of the YDB engine multi-thread lock.
+				 * Note: It might not be safe to forward the signal to that thread as it is possible
+				 * the thread that was holding the YDB engine lock a few instructions above could no
+				 * longer be holding it when it receives the signal and could get confused (in the
+				 * case of the YDBGo wrapper, we saw SIG-11s in arbitary places in go code because of this).
+				 * Hence we do no signal forwarding.
+				 */
 			}
 		}
 	}

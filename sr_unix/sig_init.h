@@ -301,20 +301,16 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 				 return;											\
 			}													\
 			if (!thisThreadIsMutexHolder || (tLevel && (!isSigThreadDirected || signalForwarded)))			\
-			{	/* It is possible we are the MAIN worker thread that gets the SIGALRM signal but		\
-				 * another thread that is holding the YottaDB engine lock is waiting for the signal		\
-				 * to know of a timeout (e.g. ydb_lock_st etc.). Therefore forward the signal to that		\
-				 * thread too so it can invoke the timer handler right away. It is possible for the		\
-				 * YottaDB engine lock holder pid to change from now by the time the forwarded signal		\
-				 * gets delivered/handled in the receiving thread. But we do not want forwarding again		\
-				 * (could lead to indefinite forwardings). Hence the "STAPI_IS_SIGNAL_HANDLER_DEFERRED"		\
-				 * check below which ensures a max limit of 1 signal forwarding.				\
+			{	/* Two possibilities.										\
+				 *  a) We do not hold the YottaDB engine lock OR						\
+				 *  b) We are in TP and this is not a thread-directed signal or this is a thread-directed	\
+				 *	signal that is forwarded. 								\
+				 * In either case, we cannot handle the signal right away. Note down this to be handled in a	\
+				 * deferred manner and return.									\
 				 */												\
 				if (!signalForwarded)										\
 				{												\
 					STAPI_SET_SIGNAL_HANDLER_DEFERRED(SIGHNDLRTYPE, SIG, INFO, CONTEXT);			\
-					if (mutexHolderThreadId && !thisThreadIsMutexHolder)					\
-						pthread_kill(mutexHolderThreadId, SIG);						\
 					if (IS_EXI_SIGNAL)									\
 						DO_FORK_N_CORE_IN_THIS_THREAD_IF_NEEDED(SIG);					\
 				}												\
