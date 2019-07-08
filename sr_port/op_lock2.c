@@ -208,9 +208,9 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 		if (remlkreq)
 		{
 			if (gotit >= 0)
-				gotit = gvcmx_resremlk(cm_action);
+				gotit = gvcmx_resremlk(cm_action, msec_timeout, &end_time);
 			else
-				gotit = gvcmx_reqremlk(cm_action, msec_timeout);	/* REQIMMED if 2nd arg == 0 */
+				gotit = gvcmx_reqremlk(cm_action, msec_timeout, &end_time);	/* REQIMMED if 2nd arg == 0 */
 			if (!gotit)
 			{	/* only REQIMMED returns false */
 				blocked = TRUE;
@@ -288,16 +288,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 							 */
 		for (;;)
 		{
-			if (NO_M_TIMEOUT != msec_timeout)
-			{
-				sys_get_curr_time(&cur_time);
-				remain_time = sub_abs_time(&end_time, &cur_time);
-				msec_timeout = (int4)(remain_time.tv_sec * MILLISECS_IN_SEC +
-							/* Round up in order to prevent premature timeouts */
-							DIVIDE_ROUND_UP(remain_time.tv_nsec, NANOSECS_IN_MSEC));
-				if (0 >= msec_timeout)
-					out_of_time = TRUE;
-			}
+			SET_OUT_OF_TIME_IF_APPROPRIATE(msec_timeout, &end_time, out_of_time);	/* may set "out_of_time" */
 			if (out_of_time || outofband)
 			{	/* if time expired || control-c, tptimeout, or jobinterrupt encountered */
 				if (outofband || !mlk_check_own(pvt_ptr1))
@@ -313,18 +304,12 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 					}
 					if (outofband && !out_of_time)
 					{
+						SET_OUT_OF_TIME_IF_APPROPRIATE(msec_timeout, &end_time, out_of_time);
+								/* may set "out_of_time" */
+						if (out_of_time)
+							break;
 						if (NO_M_TIMEOUT != msec_timeout)
-						{	/* get remain = end_time - cur_time */
-							sys_get_curr_time(&cur_time);
-							remain_time = sub_abs_time(&end_time, &cur_time);
-							msec_timeout = (int4)(remain_time.tv_sec * MILLISECS_IN_SEC +
-								/* Round up in order to prevent premature timeouts */
-								DIVIDE_ROUND_UP(remain_time.tv_nsec, NANOSECS_IN_MSEC));
-							if (0 >= msec_timeout)
-							{
-								out_of_time = TRUE;
-								break;
-							}
+						{
 							if ((tptimeout != outofband) && (ctrlc != outofband))
 							{
 								PUSH_MV_STENT(MVST_ZINTCMD);

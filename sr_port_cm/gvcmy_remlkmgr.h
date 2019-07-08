@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +15,6 @@
 #ifndef GVCMY_REMLKMGR_H_INCLUDED
 #define GVCMY_REMLKMGR_H_INCLUDED
 
-bool gvcmy_remlkmgr(unsigned short count);
+bool gvcmy_remlkmgr(unsigned short count, int4 msec_timeout, ABS_TIME *end_time);
 
 #endif /* GVCMY_REMLKMGR_H_INCLUDED */

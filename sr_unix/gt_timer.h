@@ -36,6 +36,7 @@ typedef void (*timer_hndlr)();	/* Timer handler type */
 typedef struct timespec ABS_TIME;
 
 #include <sys/time.h>
+#include "iotimer.h"	/* for NO_M_TIMEOUT */
 
 /* Type that corresponds to the tv_usec field in a timeval struct.  Valid across all platforms */
 #if defined(__linux__) || defined(__MVS__) || defined(__CYGWIN__)
@@ -124,6 +125,22 @@ MBSTART {									\
 										\
 	cancel_timer((TID)ptr_to_##TIMEOUT_VAR);				\
 } MBEND
+
+#define	SET_OUT_OF_TIME_IF_APPROPRIATE(MSEC_TIMEOUT, END_TIME, OUT_OF_TIME)			\
+{												\
+	ABS_TIME		curTime, remainTime;						\
+												\
+	if (NO_M_TIMEOUT != MSEC_TIMEOUT)							\
+	{											\
+		sys_get_curr_time(&curTime);							\
+		remainTime = sub_abs_time(END_TIME, &curTime);					\
+		MSEC_TIMEOUT = (int4)(remainTime.tv_sec * MILLISECS_IN_SEC +			\
+					/* Round up in order to prevent premature timeouts */	\
+					DIVIDE_ROUND_UP(remainTime.tv_nsec, NANOSECS_IN_MSEC));	\
+		if (0 >= MSEC_TIMEOUT)								\
+			OUT_OF_TIME = TRUE;							\
+	}											\
+}
 
 /* Uncomment the below #define if you want to print the status of the key timer-related variables as well as the entire timer queue
  * when operations such as addition, cancellation, or handling of a timer occur.

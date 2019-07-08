@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "gvcmx.h"
 #include "gvcmy_remlkmgr.h"
 #include "gvcmz.h"
+#include "gt_timer.h"
 
 GBLREF struct NTD	*ntd_root;
 GBLREF unsigned short	lkresponse_count;
@@ -36,7 +37,7 @@ GBLREF unsigned char	lkerror;
 GBLREF unsigned char	cmlk_num;
 GBLREF spdesc		stringpool;
 
-bool gvcmx_reqremlk(unsigned char laflag, int4 time)
+bool gvcmx_reqremlk(unsigned char laflag, int4 msec_timeout, ABS_TIME *end_time)
 {
 	unsigned char	*c_ptr, action, sent;
 	unsigned short	count;
@@ -46,7 +47,7 @@ bool gvcmx_reqremlk(unsigned char laflag, int4 time)
 	ASSERT_IS_LIBGNPCLIENT;
 	if (!ntd_root)
 		return FALSE;
-	if (time == 0)
+	if (0 == msec_timeout)
 		action = CMMS_L_LKREQIMMED;
 	else
 		action = CMMS_L_LKREQUEST;
@@ -96,5 +97,5 @@ bool gvcmx_reqremlk(unsigned char laflag, int4 time)
 			c_ptr = clb_ptr->mbf + clb_ptr->mbl;
 		}
 	}
-	return gvcmy_remlkmgr(count);
+	return gvcmy_remlkmgr(count, msec_timeout, end_time);
 }

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,13 +15,15 @@
 #ifndef GVCMX_INCLUDED
 #define GVCMX_INCLUDED
 
+#include "gt_timer.h"
+
 mint		gvcmx_data(void);
 bool		gvcmx_get(mval *v);
 bool		gvcmx_order(void);
 bool		gvcmx_query(mval *val);
 bool		gvcmx_reversequery(mval *val);
-bool		gvcmx_reqremlk(unsigned char laflag, int4 time);
-bool		gvcmx_resremlk(unsigned char c);
+bool		gvcmx_reqremlk(unsigned char laflag, int4 msec_timeout, ABS_TIME *end_time);
+bool		gvcmx_resremlk(unsigned char c, int4 msec_timeout, ABS_TIME *end_time);
 bool		gvcmx_zprevious(void);
 void		gvcmx_canremlk(void);
 void		gvcmx_kill(bool so_subtree);
