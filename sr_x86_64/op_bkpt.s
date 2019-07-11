@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	#
@@ -210,6 +210,7 @@ l10:
 ENTRY	opp_zst_over_ret
 	subq	$8, %rsp				# Align stack to 16 bytes
 	CHKSTKALIGN					# Verify stack alignment
+<<<<<<< HEAD
 	movq	frame_pointer(%rip), %rax
 	movw	msf_typ_off(%rax), %dx
 	testw	$1, %dx
@@ -217,6 +218,12 @@ ENTRY	opp_zst_over_ret
 	movq	zstep_level(%rip), %rdx
 	movq	msf_old_frame_off(%rax), %rax
 	cmpq	%rax, %rdx
+=======
+	movq	frame_pointer(REG_IP), REG64_ACCUM
+	movq	zstep_level(REG_IP), REG64_ARG2
+	movq	msf_old_frame_off(REG64_ACCUM), REG64_ACCUM
+	cmpq	REG64_ACCUM, REG64_ARG2
+>>>>>>> 91552df2... GT.M V6.3-009
 	jg	l11
 	call	op_zstepret
 l11:

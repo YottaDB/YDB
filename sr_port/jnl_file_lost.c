@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -80,11 +80,18 @@ uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 			csa->jnl->error_reported = TRUE;
 			in_wcs_recover = FALSE;	/* in case we're called in wcs_recover() */
 			if (SS_NORMAL != jpc->status)
+			{
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_stat, 4, JNL_LEN_STR(csa->hdr),
+					DB_LEN_STR(gv_cur_region), jpc->status);
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(7) jnl_stat, 4, JNL_LEN_STR(csa->hdr),
-						DB_LEN_STR(gv_cur_region), jpc->status);
-			else
+					DB_LEN_STR(gv_cur_region), jpc->status);
+			} else
+			{
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_stat, 4, JNL_LEN_STR(csa->hdr),
+					DB_LEN_STR(gv_cur_region));
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_stat, 4, JNL_LEN_STR(csa->hdr),
-						DB_LEN_STR(gv_cur_region));
+					DB_LEN_STR(gv_cur_region));
+			}
 		}
 		if (save_jnlpool != jnlpool)
 			jnlpool = save_jnlpool;

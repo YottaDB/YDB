@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 91552df2... GT.M V6.3-009
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -59,7 +64,7 @@ void urx_putlab (char *lab, int lablen, urx_rtnref *rtn, char *addr)
 
 	if (!found)
 	{	/* Add new label name to list */
-		tmplp = (urx_labref *)malloc(offsetof(urx_labref, name[0]) + lablen);
+		tmplp = (urx_labref *)malloc(SIZEOF(urx_labref) + lablen);
 		tmplp->len = lablen;
 		memcpy(&tmplp->name[0], lab, lablen);
 		tmplp->addr = 0;

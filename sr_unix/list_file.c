@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -49,9 +49,11 @@ static readonly struct
 	unsigned char	wrap;
 	unsigned char	width;
 	unsigned char	v_width[SIZEOF(int4)];
-#ifdef __MVS__
+#	ifdef __MVS__
 	unsigned char	chsetebcdic[8];
-#endif
+#	else
+	unsigned char	chsetm[3];
+#	endif
 	unsigned char	eol;
 } open_params_list = {
 	(unsigned char)iop_newversion,	(unsigned char)iop_wrap,
@@ -63,6 +65,8 @@ static readonly struct
 #	endif
 #	ifdef __MVS__
 	{(unsigned char)iop_chset, 6, 'E', 'B', 'C', 'D', 'I', 'C'},
+#	else
+	{(unsigned char)iop_chset, 1, 'M'},
 #	endif
 	(unsigned char)iop_eol
 	};

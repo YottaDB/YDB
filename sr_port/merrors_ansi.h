@@ -1537,4 +1537,11 @@ const static readonly int error_ansi[] = {
 	   0,	/* STATSDBMEMERR */
 	   0,	/* BUFSPCDELAY */
 	   0,	/* AIOQUEUESTUCK */
+	   0,	/* INVGVPATQUAL */
+	   0,	/* NULLPATTERN */
+	   0,	/* MLKREHASH */
+	   0,	/* MUKEEPPERCENT */
+	   0,	/* MUKEEPNODEC */
+	   0,	/* MUKEEPNOTRUNC */
+	   0,	/* MUTRUNCNOSPKEEP */
 	};

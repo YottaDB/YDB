@@ -976,7 +976,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 			iosocket_destroy(err_dev);
 			err_dev = NULL;
 		}
-		if (reset_mpc)
+		if (reset_mpc) /* Either dev err or ZTRAP, retry the error line */
 		{	/* Reset the mpc such that
 			 *   (a) If the current frame is a counted frame, the error line is retried after the error is handled,
 			 *   (b) If the current frame is "transcendental" code, set frame to return.
@@ -1001,8 +1001,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 					 * pointer to start over. $ETRAP does things somewhat differently in that the current
 					 * frame is always returned from.
 					 */
-					if (SFT_ZINTR & fp->type)
-					{
+					if ((SFT_ZINTR & fp->type) && (SFF_INDCE & fp->flags))
+					{ /* Not modified by a goto or zgoto entry */
 						assert(SFF_INDCE & fp->flags);
 						fp->mpc = fp->ctxt;
 						fp->flags &= SFF_NORET_VIA_MUMTSTART_OFF; /* Frame enterable now with mpc reset */

@@ -342,8 +342,7 @@ enum cdb_sc	op_tcommit(void)
 						 * FALSE.
 						 */
 						SS_INIT_IF_NEEDED(csa, cnl);
-					} else
-						SS_RELEASE_IF_NEEDED(csa, cnl);
+					}
 					read_before_image = ((NULL != jbp) || csa->backup_in_prog || SNAPSHOTS_IN_PROG(csa));
 					/* The following section allocates new blocks required by the transaction it is done
 					 * before going crit in order to reduce the change of having to wait on a read while crit.

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -28,8 +28,21 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "mlk_ops.h"
+#include "mlk_shrhash_add.h"
 
+<<<<<<< HEAD
 boolean_t mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum);
+=======
+#ifdef MLK_SHRHASH_DEBUG
+#define SHRHASH_DEBUG_ONLY(x) x
+#else
+#define SHRHASH_DEBUG_ONLY(x)
+#endif
+
+#ifdef MLK_SHRHASH_DEBUG
+void mlk_shrhash_validate(mlk_ctldata_ptr_t ctl);
+#endif
+>>>>>>> 91552df2... GT.M V6.3-009
 
 #define MAX_TRIES 4
 
@@ -81,8 +94,9 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 	assert(subptr->backpointer < 0);
 	subptr->length = len;
 	memcpy(subptr->data, val, len);
+	assert(p->hash_seed == ctl->hash_seed);
 	ret->hash = MLK_PVTBLK_SUBHASH(p, p->subscript_cnt - nshrs);
-	if (mlk_shrhash_add(p, ret, p->subscript_cnt - nshrs))
+	if (mlk_shrhash_add(&p->pvtctl, ret))
 		return ret;
 	/* We failed to add the block; return the shrblk and shrsub to the free lists */
 	memset(subptr, 0, SIZEOF(mlk_shrsub));
@@ -99,15 +113,22 @@ mlk_shrblk_ptr_t mlk_shrblk_create(mlk_pvtblk *p,
 	return NULL;
 }
 
-boolean_t mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum)
+boolean_t mlk_shrhash_add(mlk_pvtctl *pctl, mlk_shrblk_ptr_t shr)
 {
 	int			bi, fi;
 	uint4			hash, num_buckets;
 	mlk_shrhash_ptr_t	shrhash, bucket;
 
+<<<<<<< HEAD
 	shrhash = p->pvtctl.shrhash;
 	num_buckets = p->pvtctl.shrhash_size;
 	hash = MLK_PVTBLK_SUBHASH(p, subnum);
+=======
+	SHRHASH_DEBUG_ONLY(mlk_shrhash_validate(p->ctlptr));
+	shrhash = pctl->shrhash;
+	num_buckets = pctl->shrhash_size;
+	hash = shr->hash;
+>>>>>>> 91552df2... GT.M V6.3-009
 	bi = hash % num_buckets;
 	bucket = &shrhash[bi];
 	assert(MLK_SHRHASH_MAP_MAX >= bucket->usedmap);
@@ -123,16 +144,21 @@ boolean_t mlk_shrhash_add(mlk_pvtblk *p, mlk_shrblk_ptr_t shr, int subnum)
 	if (0 == bucket->shrblk_idx)
 	{	/* Target bucket is free, so just use it. */
 		assert(!IS_NEIGHBOR(bucket->usedmap, 0));
-		bucket->shrblk_idx = MLK_SHRBLK_IDX(p->pvtctl, shr);
+		bucket->shrblk_idx = MLK_SHRBLK_IDX(*pctl, shr);
 		assert(0 < bucket->shrblk_idx);
 		bucket->hash = hash;
 		SET_NEIGHBOR(bucket->usedmap, 0);
 		return TRUE;
 	}
+<<<<<<< HEAD
 	fi = mlk_shrhash_find_bucket(&p->pvtctl, hash);
 	if (MLK_SHRHASH_FOUND_NO_BUCKET == fi)
+=======
+	fi = mlk_shrhash_find_bucket(pctl, hash);
+	if (fi == -1)
+>>>>>>> 91552df2... GT.M V6.3-009
 		return FALSE;
 	/* We found one close enough, so store the new data there */
-	mlk_shrhash_insert(&p->pvtctl, bi, fi, MLK_SHRBLK_IDX(p->pvtctl, shr), hash);
+	mlk_shrhash_insert(pctl, bi, fi, MLK_SHRBLK_IDX(*pctl, shr), hash);
 	return TRUE;
 }

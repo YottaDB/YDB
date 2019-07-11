@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2004 Sanchez Computer Associates, Inc.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 91552df2... GT.M V6.3-009
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -53,7 +58,7 @@ urx_rtnref *urx_putrtn (char *rtn, int rtnlen, urx_rtnref *anchor)
 	assert(rp0->next == rp1);
 	if (!found)
 	{
-		tmp = (urx_rtnref *)malloc(offsetof(urx_rtnref, name[0]) + rtnlen);
+		tmp = (urx_rtnref *)malloc(SIZEOF(urx_rtnref) + rtnlen);
 		tmp->len = rtnlen;
 		memcpy(&tmp->name[0], rtn, rtnlen);
 		tmp->addr = NULL;

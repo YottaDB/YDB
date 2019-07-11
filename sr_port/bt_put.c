@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 91552df2... GT.M V6.3-009
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -41,7 +46,7 @@ GBLREF 	jnl_gbls_t		jgbl;
 error_def(ERR_BTFAIL);
 error_def(ERR_WCBLOCKED);
 
-bt_rec_ptr_t bt_put(gd_region *reg, int4 block)
+bt_rec_ptr_t bt_put(gd_region *reg, block_id block)
 {
 	bt_rec_ptr_t		bt, q0, q1, hdr;
 	sgmnt_addrs		*csa;
@@ -77,8 +82,8 @@ bt_rec_ptr_t bt_put(gd_region *reg, int4 block)
 						/* only reason we currently know why wcs_get_space could fail */
 						assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
 						BG_TRACE_PRO_ANY(csa, wcb_bt_put);
-						send_msg(VARLSTCNT(8) ERR_WCBLOCKED, 6, LEN_AND_LIT("wcb_bt_put"),
-							process_id, &lcl_tn, DB_LEN_STR(reg));
+						send_msg_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_WCBLOCKED, 6,
+							LEN_AND_LIT("wcb_bt_put"), process_id, &lcl_tn, DB_LEN_STR(reg));
 						return NULL;
 					}
 				}
@@ -88,7 +93,7 @@ bt_rec_ptr_t bt_put(gd_region *reg, int4 block)
 			q0 = (bt_rec_ptr_t)((sm_uc_ptr_t)bt + bt->blkque.fl);
 			q1 = (bt_rec_ptr_t)remqt((que_ent_ptr_t)q0);
 			if (EMPTY_QUEUE == (sm_long_t)q1)
-				rts_error(VARLSTCNT(3) ERR_BTFAIL, 1, 1);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(3) ERR_BTFAIL, 1, 1);
 			bt->blk = block;
 			bt->killtn = lcl_tn;
 			insqt((que_ent_ptr_t)bt, (que_ent_ptr_t)hdr);
@@ -118,9 +123,9 @@ bt_rec_ptr_t bt_put(gd_region *reg, int4 block)
 			break;
 		}
 		if (0 == bt->blkque.fl)
-			rts_error(VARLSTCNT(3) ERR_BTFAIL, 1, 2);
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(3) ERR_BTFAIL, 1, 2);
 		if (lcnt >= csd->n_bts)
-			rts_error(VARLSTCNT(3) ERR_BTFAIL, 1, 3);
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(3) ERR_BTFAIL, 1, 3);
 	}
 	insqt((que_ent_ptr_t)th, (que_ent_ptr_t)csa->th_base);
 	bt->tn = lcl_tn;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -46,13 +46,18 @@ static void ss_print_fil_hdr(snapshot_filhdr_ptr_t);
 
 void	ss_anal_shdw_file(char	*filename, int flen)
 {
-	int			shdw_fd, bitmap_size, shadow_vbn, word, bit, num, tot_blks;
+	int			shdw_fd, num;
 	int			status, db_blk_size;
 	off_t			blk_offset;
 	snapshot_filhdr_t	ss_filhdr;
 	blk_hdr_ptr_t		bp = NULL;
+<<<<<<< HEAD
 	block_id		blkno;
 	unsigned int		*bitmap_buffer;
+=======
+	block_id		blkno, tot_blks, bitmap_size, shadow_vbn, word, bit;
+	unsigned int		*bitmap_buffer = NULL;
+>>>>>>> 91552df2... GT.M V6.3-009
 
 	OPENFILE(filename, O_RDONLY, shdw_fd);
 	if (FD_INVALID == shdw_fd)
@@ -73,7 +78,7 @@ void	ss_anal_shdw_file(char	*filename, int flen)
 			return;
 		}
 	}
-	bitmap_size = (int)(ss_filhdr.ss_info.ss_shmsize - SNAPSHOT_HDR_SIZE);
+	bitmap_size = ss_filhdr.ss_info.ss_shmsize - SNAPSHOT_HDR_SIZE;
 	if (0 >= bitmap_size)
 	{
 		util_out_print("!/Incorrect snapshot file format", TRUE);

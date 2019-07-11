@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 #define GDSFILEXT_H_INCLUDED
 
 #ifdef UNIX
-uint4 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog);
+uint4 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog);
 # define GDSFILEXT(BLOCKS, FILESIZE, TRANS_IN_PROG)	gdsfilext(BLOCKS, FILESIZE, TRANS_IN_PROG)
 #else
 uint4 gdsfilext(uint4 blocks, uint4 filesize);

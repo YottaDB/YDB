@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 1987-2018 Fidelity National Information		;
+; Copyright (c) 1987-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -14,18 +14,16 @@
 	;invoke at FUNC as an extrinsic function
 	;if you make heavy use of this routine, consider $ZCALL
 	;
-	s %HO=$$FUNC(%HO)
+	set %HO=$$FUNC(%HO)
+	quit
+INT	read !,"Hexadecimal: ",%HO set %HO=$$FUNC(%HO)
 	q
-INT	r !,"Hexadecimal: ",%HO s %HO=$$FUNC(%HO)
-	q
-FUNCFM(h)
-	n c,d,dg,o
-	s d=0,h=$tr(h,"abcdef","ABCDEF"),o=""
-	f c=1:1:$l(h) s dg=$f("0123456789ABCDEF",$e(h,c)) q:'dg  s d=(d*16)+(dg-2)
-	f  q:'d  s o=d#8_o,d=d\8
-	q:0<o o
-	q 0
 FUNC(h)
-	q:$tr(h,"E","e")<0 ""
-	q:$l(h)<15 $$FUNCFM(h)
-	q $$CONVERTBASE^%CONVBASEUTIL(h,16,8)
+	quit:"-"=$extract(h) ""		; 0>h risks NUMOFLOW
+	new c,d,dg,l,o
+	set l=$length(h)
+	quit:(15<l) $$CONVERTBASE^%CONVBASEUTIL(h,16,8)
+	set d=0,h=$translate(h,"abcdef","ABCDEF"),o=""
+	for c=1:1:l set dg=$find("0123456789ABCDEF",$e(h,c)) q:'dg  s d=(d*16)+(dg-2)
+	for  quit:'d  set o=d#8_o,d=d\8
+	quit $select(0<o:o,1:0)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,10 +47,10 @@ GBLREF	uint4			process_id;
 void recover_truncate(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg)
 {
 	char			*err_msg;
-	uint4			old_total, cur_total, new_total;
+	block_id		old_total, cur_total, new_total;
 	off_t			old_size, cur_size, new_size;
 	int			ftrunc_status, status;
-	unix_db_info    	*udi;
+	unix_db_info		*udi;
 	int			blk_size, semval;
 	DCL_THREADGBL_ACCESS;
 

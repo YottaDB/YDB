@@ -60,7 +60,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 	int			cnt, cycle;
 	int4			kill_error, temp_long;
 	kill_set		*ks;
-    	off_chain		chain;
+	off_chain		chain;
 	rec_hdr_ptr_t		rp, rp1, rtop;
 	uint4			save_update_trans;
 	unsigned char		temp_buff[MAX_DB_BLK_SIZE];

@@ -104,6 +104,7 @@ if ( $?gtm_version_change == "1" ) then
 
         if ( "ia64" != $mach_type ) then
             setenv gt_as_assembler          "as"
+            setenv gt_as_option_debug_scan  ""
 	    if ("s390x" == $mach_type) then
 	        setenv gt_as_options_common	"-march=z9-109"
 		setenv gt_as_option_debug	"--gdwarf-2"
@@ -121,7 +122,9 @@ if ( $?gtm_version_change == "1" ) then
 		setenv gt_as_option_debug	"--gdwarf"
 	    else
         	setenv gt_as_option_debug      "--gstabs"
+        	setenv gt_as_option_debug_scan "--gdwarf-2 --nocompress-debug-sections"
 	    endif
+            if ($?scan_image) setenv gt_as_option_debug	"--gdwarf-2 --nocompress-debug-sections"
         endif
 
 	# to avoid naming files with .S

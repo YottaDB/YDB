@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -20,6 +20,8 @@
 
 #include <sys/types.h>
 
+#include "mmrhash.h"
+
 typedef struct	mlk_tp_struct
 {
 	struct mlk_tp_struct	*next;		/* next stacking struct */
@@ -37,6 +39,22 @@ typedef struct				/* One of these nodes is required for each process which is bl
 	short		ref_cnt;	/* number of times process references prcblk */
 	short		filler_4byte;
 } mlk_prcblk;
+
+/* Types and macros for computing subscript hash values */
+typedef hash128_state_t				mlk_subhash_state_t;
+typedef gtm_uint8				mlk_subhash_seed_t;
+typedef gtm_uint16				mlk_subhash_res_t;
+typedef uint4					mlk_subhash_val_t;
+#define MLK_SUBHASH_INIT(PVTBLK, STATEVAR)							\
+MBSTART {											\
+	assert(NULL != (PVTBLK)->pvtctl.ctl);							\
+	(PVTBLK)->hash_seed = (PVTBLK)->pvtctl.ctl->hash_seed;					\
+	HASH128_STATE_INIT(STATEVAR, (PVTBLK)->hash_seed);					\
+} MBEND
+#define MLK_SUBHASH_INIT_PVTCTL(PVTCTL, STATEVAR)	HASH128_STATE_INIT(STATEVAR, (PVTCTL)->ctl->hash_seed)
+#define MLK_SUBHASH_INGEST(STATEVAR, DATA, SIZE)	gtmmrhash_128_ingest(&(STATEVAR), (DATA), (SIZE))
+#define MLK_SUBHASH_FINALIZE(STATEVAR, LENGTH, RESVAR)	gtmmrhash_128_result(&(STATEVAR), LENGTH, &(RESVAR))
+#define MLK_SUBHASH_RES_VAL(RES)			((mlk_subhash_val_t)(RES).one)
 
 typedef struct				/* lock node.  The member descriptions below are correct if the entry
 					 * is in the tree.  If the entry is in the free list, then all
@@ -57,7 +75,7 @@ typedef struct				/* lock node.  The member descriptions below are correct if th
 					 * during a direct re-access via pointer from a mlk_pvtblk, the
 					 * sequence numbers do not match, then we must assume that the
 					 * lock was stolen from us by LKE or some other abnormal event. */
-	uint4		hash;		/* The hash value associated with this node, based on the shrsubs of this node
+	mlk_subhash_val_t	hash;	/* The hash value associated with this node, based on the shrsubs of this node
 					 * and its parents. Copied from a mlk_pvtblk via MLK_PVTBLK_SUBHASH().
 					 */
 	int4		auxpid;		/* If non-zero auxowner, this is the pid of the client that is holding the lock */
@@ -65,6 +83,7 @@ typedef struct				/* lock node.  The member descriptions below are correct if th
 	unsigned char	auxnode[16];	/* If non-zero auxowner, this is the nodename of the client that is holding the lock */
 } mlk_shrblk;
 
+/* Types and structures for shrblk lookup hash table */
 #if !defined(MLK_SHRHASH_MAP_32) && !defined(MLK_SHRHASH_MAP_64)
 #define	MLK_SHRHASH_MAP_32
 #endif
@@ -89,7 +108,7 @@ typedef struct mlk_shrhash_struct
 						 * N == MLK_SHRHASH_HIGHBIT is a special case indicating a bucket full
 						 * situation was encountered and so a linear search has to be used when searching.
 						 */
-	uint4			hash;		/* Hash value associated with the shrblk referenced by this hash bucket.
+	mlk_subhash_val_t	hash;		/* Hash value associated with the shrblk referenced by this hash bucket.
 						 * Compare the hash value before comparing the pvtblk value against the
 						 * shrblk/shrsub chain
 						 */
@@ -144,7 +163,9 @@ typedef struct	mlk_ctldata_struct	/* this describes the entire shared lock secti
 	boolean_t	lockspacefull_logged;	/* whether LOCKSPACEFULL has been issued since last being below threshold */
 	boolean_t	gc_needed;		/* whether we've determined that a garbage collection is needed */
 	boolean_t	resize_needed;		/* whether we've determined that a hash table resize is needed */
+	boolean_t	rehash_needed;		/* whether we've determined that a hash table rehash is needed */
 	global_latch_t	lock_gc_in_progress;	/* pid of the process doing the GC, or 0 if none */
+	mlk_subhash_seed_t	hash_seed;		/* seed value to use to initialize hash */
 	int		hash_shmid;		/* shared memory id of hash table, or undefined if internal (see blkhash) */
 } mlk_ctldata;
 
@@ -214,6 +235,7 @@ typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref wh
 	uint4			sequence;		/* shrblk sequence for nodptr node (node we want) */
 	uint4			blk_sequence;		/* shrblk sequence for blocked node (node preventing our lock) */
 	mlk_tp			*tp;			/* pointer to saved tp information */
+	mlk_subhash_seed_t	hash_seed;		/* seed used to initialize hash */
 	uint4			nref_length;		/* the length of the nref portion of the 'value' string. */
 	unsigned short		subscript_cnt;		/* the number of subscripts (plus one for the name) in this nref */
 	unsigned		level : 9;		/* incremental lock level */
@@ -265,7 +287,7 @@ typedef struct	mlk_pvtblk_struct	/* one of these entries exists for each nref wh
 
 /* compute the true size of a mlk_pvtblk, excluding any GT.CM id */
 #define MLK_PVTBLK_SIZE(NREF_LEN, SUBCNT) (ROUND_UP(SIZEOF(mlk_pvtblk) - 1 + (NREF_LEN), SIZEOF(uint4))		\
-						+ SIZEOF(uint4) * (SUBCNT))
+						+ SIZEOF(mlk_subhash_val_t) * (SUBCNT))
 
 #define MLK_PVTBLK_ALLOC(NREF_LEN, SUBCNT, AUX_LEN, RET)							\
 MBSTART {													\
@@ -286,8 +308,10 @@ MBSTART {													\
 } MBEND
 
 /* compute the location of the Nth subscript's hash */
-#define MLK_PVTBLK_SUBHASH(PVTBLK, N) (((uint4 *)&(PVTBLK)->value[ROUND_UP((PVTBLK)->nref_length, SIZEOF(uint4))])[N])
+#define MLK_PVTBLK_SUBHASH(PVTBLK, N)												\
+		(((mlk_subhash_val_t *)&(PVTBLK)->value[ROUND_UP((PVTBLK)->nref_length, SIZEOF(mlk_subhash_val_t))])[N])
 
+<<<<<<< HEAD
 #ifdef DEBUG
 # define	DBG_LOCKHASH_N_BITS(HASH)						\
 {											\
@@ -306,6 +330,35 @@ MBSTART {													\
 		 */									\
 		if (0 == HASH)								\
 			HASH = 1;							\
+=======
+/* populate hash data from nref data - keep in sync with the versions in mlk_pvtblk_create() and mlk_shrhash_delete() */
+#define MLK_PVTBLK_SUBHASH_GEN(PVTBLK)							\
+MBSTART {										\
+	unsigned char		*cp;							\
+	int			hi;							\
+	mlk_subhash_state_t	accstate, tmpstate;					\
+	mlk_subhash_res_t	hashres;						\
+											\
+	MLK_SUBHASH_INIT(PVTBLK, accstate);						\
+	for (cp = (PVTBLK)->value, hi = 0; hi < (PVTBLK)->subscript_cnt; hi++)		\
+	{										\
+		MLK_SUBHASH_INGEST(accstate, cp, *cp + 1);				\
+		cp += *cp + 1;								\
+		tmpstate = accstate;							\
+		MLK_SUBHASH_FINALIZE(tmpstate, (cp - (PVTBLK)->value), hashres);	\
+		MLK_PVTBLK_SUBHASH(PVTBLK, hi) = MLK_SUBHASH_RES_VAL(hashres);		\
+	}										\
+} MBEND
+
+/* ensure that the seed is correct before using pvtblk hashes */
+#define MLK_PVTBLK_SUBHASH_SYNC(PVTBLK)							\
+MBSTART {										\
+	assert(NULL != (PVTBLK)->pvtctl.ctl);						\
+	if ((PVTBLK)->hash_seed != (PVTBLK)->pvtctl.ctl->hash_seed)			\
+	{										\
+		MLK_PVTBLK_SUBHASH_GEN(PVTBLK);						\
+		assert((PVTBLK)->hash_seed == (PVTBLK)->pvtctl.ctl->hash_seed);		\
+>>>>>>> 91552df2... GT.M V6.3-009
 	}										\
 }
 #else

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -77,6 +77,7 @@
 #include "repl_msg.h"
 #include "gtmsource.h"
 #include "db_write_eof_block.h"
+#include "mvalconv.h"
 
 error_def(ERR_BUFFLUFAILED);
 error_def(ERR_DBFILERR);
@@ -95,6 +96,8 @@ error_def(ERR_TEXT);
 error_def(ERR_TRUNCBACKUPPROG);
 error_def(ERR_TRUNCNOTRUN);
 error_def(ERR_TRUNCSSINPROG);
+error_def(ERR_MUKEEPPERCENT);
+error_def(ERR_MUTRUNCNOSPKEEP);
 
 GBLREF	bool			mu_ctrlc_occurred;
 GBLREF	bool			mu_ctrly_occurred;
@@ -105,7 +108,7 @@ GBLREF	gv_namehead		*gv_target;
 GBLREF	inctn_opcode_t		inctn_opcode;
 GBLREF	uint4			update_trans;
 GBLREF	char			*update_array, *update_array_ptr;
-GBLREF  uint4                   update_array_size;
+GBLREF	uint4			update_array_size;
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	uint4			process_id;
 GBLREF	unsigned int		t_tries;
@@ -115,33 +118,30 @@ GBLREF	jnl_gbls_t		jgbl;
 GBLREF	int			num_additional_processors;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 
-boolean_t mu_truncate(int4 truncate_percent)
+boolean_t mu_truncate(int4 truncate_percent, mval *keep_mval)
 {
 	sgmnt_addrs		*csa;
-	sgmnt_data_ptr_t 	csd;
-	int			num_local_maps;
-	int 			lmap_num, lmap_blk_num;
+	sgmnt_data_ptr_t	csd;
+	block_id		num_local_maps, lmap_num, lmap_blk_num, found_busy_blk;
 	int			bml_status, sigkill;
 	int			save_errno;
 	int			ftrunc_status;
-	uint4			jnl_status;
-	uint4			old_total, new_total;
-	uint4			old_free, new_free;
-	uint4			end_blocks;
-	int4			blks_in_lmap, blk;
+	uint4			jnl_status, trunc_blocks, keep_blocks;
+	block_id		old_total, new_total,
+				old_free, new_free;
+	int4			blks_in_lmap, blk, end_blocks;
 	gtm_uint64_t		before_trunc_file_size;
 	off_t			trunc_file_size;
 	off_t			padding;
 	uchar_ptr_t		lmap_addr;
 	boolean_t		was_crit;
-	uint4			found_busy_blk;
 	srch_blk_status		bmphist;
-	srch_blk_status 	*blkhist;
+	srch_blk_status		*blkhist;
 	srch_hist		alt_hist;
 	trans_num		curr_tn;
 	blk_hdr_ptr_t		lmap_blk_hdr;
 	block_id		*blkid_ptr;
-	unix_db_info    	*udi;
+	unix_db_info		*udi;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	char			*err_msg;
@@ -152,6 +152,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 	SETUP_THREADGBL_ACCESS;
 	csa = cs_addrs;
 	csd = cs_data;
+	keep_blocks = 0;
 	if (dba_mm == csd->acc_meth)
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCNOTBG, 2, REG_LEN_STR(gv_cur_region));
@@ -162,11 +163,25 @@ boolean_t mu_truncate(int4 truncate_percent)
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_MUTRUNCNOV4, 2, REG_LEN_STR(gv_cur_region));
 		return TRUE;
 	}
-	if (csa->ti->free_blocks < (truncate_percent * csa->ti->total_blks / 100))
+	trunc_blocks = (truncate_percent * csa->ti->total_blks / 100);
+	if (csa->ti->free_blocks < trunc_blocks)
 	{
 		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_MUTRUNCNOSPACE, 3, REG_LEN_STR(gv_cur_region), truncate_percent);
 		return TRUE;
 	}
+	if (keep_mval->str.addr)
+	{	/* Some value was defined by the user*/
+		keep_blocks = MIN(MV_FORCE_UINT(keep_mval), MAXTOTALBLKS(csd));
+		if (keep_blocks && ('%' == keep_mval->str.addr[keep_mval->str.len - 1]))
+			keep_blocks = (csa->ti->total_blks * keep_blocks) / 100;
+		if ((csa->ti->total_blks - trunc_blocks) < keep_blocks) /*No truncate*/
+		{
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MUTRUNCNOSPKEEP, 4,
+					REG_LEN_STR(gv_cur_region), truncate_percent, keep_blocks);
+			return FALSE;
+		}
+	}
+
 	/* already checked for parallel truncates on this region --- see mupip_reorg.c */
 	gv_target = NULL;
 	assert(csa->nl->trunc_pid == process_id);
@@ -176,8 +191,9 @@ boolean_t mu_truncate(int4 truncate_percent)
 	sigkill = 0;
 	found_busy_blk = 0;
 	memset(&alt_hist, 0, SIZEOF(alt_hist)); /* null-initialize history */
-	assert(csd->bplmap == BLKS_PER_LMAP);
-	end_blocks = old_total % BLKS_PER_LMAP; /* blocks in the last lmap (first one we start scanning) */
+	assert(BLKS_PER_LMAP == csd->bplmap);
+	/* (old_total % BLKS_PER_LMAP) can be cast because it should never be larger then BLKS_PER_LMAP */
+	end_blocks = (int4)(old_total % BLKS_PER_LMAP); /* blocks in the last lmap (first one we start scanning) */
 	if (0 == end_blocks)
 		end_blocks = BLKS_PER_LMAP;
 	num_local_maps = DIVIDE_ROUND_UP(old_total, BLKS_PER_LMAP);
@@ -230,7 +246,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 				lmap_addr = bmphist.buffaddr + SIZEOF(blk_hdr);
 				/* starting from the hint (blk itself), find the first busy or recycled block */
 				blk = bml_find_busy_recycled(blk, lmap_addr, blks_in_lmap, &bml_status);
-				assert(blk < BLKS_PER_LMAP);
+				assert(BLKS_PER_LMAP > blk);
 				if (blk == -1 || blk >= blks_in_lmap)
 				{ /* done with this lmap, continue to next */
 					t_abort(gv_cur_region, csa);
@@ -345,7 +361,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 	}
 	csa->nl->highest_lbm_with_busy_blk = MAX(found_busy_blk, csa->nl->highest_lbm_with_busy_blk);
 	assert(IS_BITMAP_BLK(csa->nl->highest_lbm_with_busy_blk));
-	new_total = MIN(old_total, csa->nl->highest_lbm_with_busy_blk + BLKS_PER_LMAP);
+	new_total = MAX(MIN(old_total, csa->nl->highest_lbm_with_busy_blk + BLKS_PER_LMAP), keep_blocks);
 	if (mu_ctrly_occurred || mu_ctrlc_occurred)
 	{
 		rel_crit(gv_cur_region);
@@ -502,4 +518,3 @@ STATICFNDEF int4 bml_find_busy_recycled(int4 hint, uchar_ptr_t base_addr, int4 b
 	}
 	return -1;
 }
-

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -117,6 +117,7 @@ GBLREF pthread_t	gtm_main_thread_id;
 GBLREF boolean_t	gtm_main_thread_id_set;
 #endif
 
+LITREF	mval		literal_null;
 LITREF mval		skiparg;
 
 error_def(ERR_JNI);
@@ -125,6 +126,7 @@ error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
 error_def(ERR_XCVOIDRET);
 error_def(ERR_ZCARGMSMTCH);
+error_def(ERR_ZCCONVERT);
 error_def(ERR_ZCCTENV);
 error_def(ERR_ZCMAXPARAM);
 error_def(ERR_ZCNOPREALLOUTPAR);
@@ -188,6 +190,28 @@ static const int buff_boarder_len = 8;	/* Needs to be 8-byte aligned or else "fr
 static const char *buff_front_boarder = "STMARKER";
 static const char *buff_end_boarder = "ENMARKER";
 
+/* If the assigned pointer value is NULL, pass back a literal_null */
+#define	VALIDATE_AND_CONVERT_PTR_TO_TYPE(LMVTYPE, TYPE, CONTAINER, DST, SRC)	\
+MBSTART {									\
+	if (NULL == SRC)							\
+		*DST = literal_null;						\
+	else 									\
+	{									\
+		CONTAINER = *((TYPE *)SRC);					\
+		MV_FORCE_##LMVTYPE(DST, CONTAINER);				\
+	}									\
+} MBEND
+
+/* if FLAG is false, set it to true and syslog it once */
+#define ISSUE_ERR_ONCE(FLAG, ...)		\
+{						\
+	if (!FLAG)				\
+	{					\
+		FLAG = TRUE;			\
+		send_msg_csa(__VA_ARGS__);	\
+	}					\
+}
+
 /* Routine to set up boarders around the external call buffer */
 STATICFNDCL gparam_list *set_up_buffer(char *p_list, int len)
 {
@@ -208,6 +232,8 @@ STATICFNDCL void verify_buffer(char *p_list, int len, char *m_label)
 
 STATICFNDCL void free_return_type(INTPTR_T ret_val, enum ydb_types typ)
 {
+	if (0 == ret_val)	/* Nothing to free regardless of type */
+		return;
 	switch (typ)
 	{
 		case ydb_jstring:
@@ -243,8 +269,15 @@ STATICFNDCL void free_return_type(INTPTR_T ret_val, enum ydb_types typ)
 		case ydb_float_star:
 			free(((ydb_float_t *)ret_val));
 			break;
+<<<<<<< HEAD
 		case ydb_double_star:
 			free(((ydb_double_t *)ret_val));
+=======
+		case gtm_string_star:
+			if (NULL != (((gtm_string_t *)ret_val)->address))
+				free((((gtm_string_t *)ret_val)->address));
+			free(((gtm_string_t *)ret_val));
+>>>>>>> 91552df2... GT.M V6.3-009
 			break;
 		case ydb_int_star:
 			free(((ydb_int_t *)ret_val));
@@ -269,9 +302,16 @@ STATICFNDCL void free_return_type(INTPTR_T ret_val, enum ydb_types typ)
 		case ydb_char_star:
 			free(((ydb_char_t *)ret_val));
 			break;
+<<<<<<< HEAD
 		case ydb_char_starstar:
 			free(*((ydb_char_t **)ret_val));
 			free(((ydb_char_t **)ret_val));
+=======
+		case gtm_char_starstar:
+			if (NULL != *((gtm_char_t **)ret_val))
+				free(*((gtm_char_t **)ret_val));
+			free(((gtm_char_t **)ret_val));
+>>>>>>> 91552df2... GT.M V6.3-009
 			break;
 	}
 }
@@ -338,9 +378,9 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 				dst->mvtype = MV_STR;
 				if (sp->len > MAX_STRLEN)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
-				dst->str.len = (mstr_len_t)sp->len;
 				if ((0 < sp->len) && (NULL != sp->addr))
 				{
+					dst->str.len = (mstr_len_t)sp->len;
 					dst->str.addr = sp->addr;
 					s2pool(&dst->str);
 					/* In case of GTMByteArray or GTMString, the buffer is allocated in xc_gateway.c (since the
@@ -348,7 +388,8 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 					 * case of a string the content is immutable). So, if we have determined that the provided
 					 * value buffer is legitimate (non-null and non-empty), we free it on the GT.M side. */
 					free(sp->addr);
-				}
+				} else
+					*dst = literal_null;
 				break;
 			default:
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
@@ -380,6 +421,7 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 			uns_int_num = (ydb_uint_t)(intszofptr_t)src;
 			MV_FORCE_UMVAL(dst, uns_int_num);
 			break;
+<<<<<<< HEAD
 		case ydb_int_star:
 			s_int_num = *((ydb_int_t *)src);
 			MV_FORCE_MVAL(dst, s_int_num);
@@ -387,6 +429,13 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 		case ydb_uint_star:
 			uns_int_num = *((ydb_uint_t *)src);
 			MV_FORCE_UMVAL(dst, uns_int_num);
+=======
+		case gtm_int_star:
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(MVAL, gtm_int_t, s_int_num, dst, src);
+			break;
+		case gtm_uint_star:
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(UMVAL, gtm_uint_t, uns_int_num, dst, src);
+>>>>>>> 91552df2... GT.M V6.3-009
 			break;
 		case ydb_long:
 			s_long_num = (ydb_long_t)src;
@@ -396,6 +445,7 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 			uns_long_num = (ydb_ulong_t)src;
 			MV_FORCE_ULMVAL(dst, uns_long_num);
 			break;
+<<<<<<< HEAD
 		case ydb_long_star:
 			s_long_num = *((ydb_long_t *)src);
 			MV_FORCE_LMVAL(dst, s_long_num);
@@ -403,6 +453,13 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 		case ydb_ulong_star:
 			uns_long_num = *((ydb_ulong_t *)src);
 			MV_FORCE_ULMVAL(dst, uns_long_num);
+=======
+		case gtm_long_star:
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(LMVAL, gtm_long_t, s_long_num, dst, src);
+			break;
+		case gtm_ulong_star:
+			VALIDATE_AND_CONVERT_PTR_TO_TYPE(ULMVAL, gtm_ulong_t, uns_long_num, dst, src);
+>>>>>>> 91552df2... GT.M V6.3-009
 			break;
 #		ifdef GTM64
 		case ydb_int64:
@@ -424,44 +481,80 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 #		endif
 		case ydb_string_star:
 			sp = (struct extcall_string *)src;
-			dst->mvtype = MV_STR;
-			if (sp->len > MAX_STRLEN)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
-			if ((0 <= prealloc_size) && (sp->len > prealloc_size) && (sp->addr >= (char *)ext_buff_start)
-				&& (sp->addr < ((char *)ext_buff_start + ext_buff_len)))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_EXCEEDSPREALLOC, 3, prealloc_size, m_label, sp->len);
-			dst->str.len = (mstr_len_t)sp->len;
-			if ((0 < sp->len) && (NULL != sp->addr))
+			if (NULL == sp) /* If the assigned pointer value is NULL, pass back a literal_null */
+				*dst = literal_null;
+			else
 			{
-				dst->str.addr = sp->addr;
-				s2pool(&dst->str);
+				dst->mvtype = MV_STR;
+				if (sp->len > MAX_STRLEN)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+				if ((0 <= prealloc_size) && (sp->len > prealloc_size)
+						&& (sp->addr >= (char *)ext_buff_start)
+						&& (sp->addr < ((char *)ext_buff_start + ext_buff_len)))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_EXCEEDSPREALLOC, 3,
+							prealloc_size, m_label, sp->len);
+				if ((0 < sp->len) && (NULL != sp->addr))
+				{
+					dst->str.len = (mstr_len_t)sp->len;
+					dst->str.addr = sp->addr;
+					s2pool(&dst->str);
+				} else
+					*dst = literal_null;
 			}
 			break;
+<<<<<<< HEAD
 		case ydb_float_star:
 			float2mval(dst, *((float *)src));
+=======
+		case gtm_float_star:
+			if (NULL == src) /* If the assigned pointer value is NULL, pass back a literal_null */
+				*dst = literal_null;
+			else
+				float2mval(dst, *((float *)src));
+>>>>>>> 91552df2... GT.M V6.3-009
 			break;
 		case ydb_char_star:
 			cp = (char *)src;
-			assert(((INTPTR_T)cp < (INTPTR_T)stringpool.base) || ((INTPTR_T)cp > (INTPTR_T)stringpool.top));
-			dst->mvtype = MV_STR;
-			str_len = STRLEN(cp);
-			if (str_len > MAX_STRLEN)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
-			if ((0 <= prealloc_size) && (str_len > prealloc_size))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_EXCEEDSPREALLOC, 3, prealloc_size, m_label, str_len);
-			dst->str.len = (mstr_len_t)str_len;
-			dst->str.addr = cp;
-			s2pool(&dst->str);
+			if (NULL == cp) /* If the assigned pointer value is NULL, pass back a literal_null */
+				*dst = literal_null;
+			else
+			{
+				assert(((INTPTR_T)cp < (INTPTR_T)stringpool.base) || ((INTPTR_T)cp > (INTPTR_T)stringpool.top));
+				dst->mvtype = MV_STR;
+				str_len = STRLEN(cp);
+				if (str_len > MAX_STRLEN)
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXSTRLEN);
+				if ((0 <= prealloc_size) && (str_len > prealloc_size))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_EXCEEDSPREALLOC,
+									3, prealloc_size, m_label, str_len);
+				dst->str.len = (mstr_len_t)str_len;
+				dst->str.addr = cp;
+				s2pool(&dst->str);
+			}
 			break;
+<<<<<<< HEAD
 		case ydb_char_starstar:
 			if (!src)
 				dst->mvtype = 0;
+=======
+		case gtm_char_starstar:
+			if (NULL == src) /* If the assigned pointer value is NULL, pass back a literal_null */
+				*dst = literal_null;
+>>>>>>> 91552df2... GT.M V6.3-009
 			else
 				extarg2mval(*((char **)src), ydb_char_star, dst, java, starred,
 						prealloc_size, m_label, ext_buff_start, ext_buff_len);
 			break;
+<<<<<<< HEAD
 		case ydb_double_star:
 			double2mval(dst, *((double *)src));
+=======
+		case gtm_double_star:
+			if (NULL == src) /* If the assigned pointer value is NULL, pass back a literal_null */
+				*dst = literal_null;
+			else
+				double2mval(dst, *((double *)src));
+>>>>>>> 91552df2... GT.M V6.3-009
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
@@ -475,6 +568,9 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 {
 	char			*cp, **cpp;
 	struct extcall_string	*sp;
+	static bool		issued_ERR_XCRETNULLREF = FALSE;
+	static bool		issued_ERR_ZCCONVERT = FALSE;
+
 	if (!src)
 		switch (typ)
 		{
@@ -492,8 +588,10 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 			case ydb_jdouble:
 				return 0;
 			default:
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_XCRETNULLREF, 2,
-					LEN_AND_STR(entry_ptr->call_name.addr));
+				/* Handle null pointer return types */
+				ISSUE_ERR_ONCE(issued_ERR_XCRETNULLREF, CSA_ARG(NULL) VARLSTCNT(4)
+						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr))
+				return 0;
 				break;
 		}
 	switch (typ)
@@ -527,9 +625,12 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 			return 0;
 		case ydb_char_starstar:
 			cpp = (char **)src;
-			if (!(*cpp))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_XCRETNULLREF, 2,
-					LEN_AND_STR(entry_ptr->call_name.addr));
+			if (NULL == (*cpp))
+			{
+				ISSUE_ERR_ONCE(issued_ERR_XCRETNULLREF, CSA_ARG(NULL) VARLSTCNT(4)
+						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr))
+				return 0;
+			}
 			return STRLEN(*cpp);
 		case ydb_char_star:
 			cp = (char *)src;
@@ -538,12 +639,19 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 		case ydb_jbyte_array:
 		case ydb_string_star:
 			sp = (struct extcall_string *)src;
-			if (sp->addr == NULL)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_XCRETNULLREF, 2,
-					LEN_AND_STR(entry_ptr->call_name.addr));
-			assert(!((0 < sp->len)
-			    && ((INTPTR_T)sp->addr < (INTPTR_T)stringpool.free)
-			    && ((INTPTR_T)sp->addr >= (INTPTR_T)stringpool.base)));
+			if (NULL == sp->addr)
+			{
+				sp->len = 0;
+				ISSUE_ERR_ONCE(issued_ERR_XCRETNULLREF, CSA_ARG(NULL) VARLSTCNT(4)
+						ERR_XCRETNULLREF, 2, LEN_AND_STR(entry_ptr->call_name.addr))
+			} if (0 > sp->len)
+			{	/* Negative string length. syslog and reset to zero */
+				sp->len = 0;
+				ISSUE_ERR_ONCE(issued_ERR_ZCCONVERT, CSA_ARG(NULL) VARLSTCNT(4)
+						ERR_ZCCONVERT, 2, LEN_AND_STR(entry_ptr->call_name.addr))
+			} else
+				assert(!(((INTPTR_T)sp->addr < (INTPTR_T)stringpool.free)
+					&& ((INTPTR_T)sp->addr >= (INTPTR_T)stringpool.base)));
 			return (int)(sp->len);
 			break;
 		default:
@@ -595,6 +703,8 @@ STATICFNDEF void op_fgnjavacal(mval *dst, mval *package, mval *extref, uint4 mas
 	 * allocate more space than we might strictly need for the arguments, return type, and type descriptor.
 	 */
 	types_descr_ptr = (char *)malloc(MAX(SIZEOF(char) * (argcnt + 2), SIZEOF(char *) * 2));
+	/* zero the contents for unmodified output values */
+	memset(types_descr_ptr, 0, MAX(SIZEOF(char) * (argcnt + 2), SIZEOF(char *) * 2));
 	types_descr_dptr = types_descr_ptr;
 	*types_descr_dptr = (char)entry_argcnt;
 	types_descr_dptr++;
@@ -1013,11 +1123,20 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 	 * ydb_string_t *) the value in param_list is always a pointer inside the space buffer, where a pointer to an area inside
 	 * the string buffer is stored.
 	 */
+<<<<<<< HEAD
 	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the protection tags */
 	call_buff_size = 2 * n;
 	OP_FNFGNCAL_ALLOCATE(param_list_buff, call_buff_size + 2 * buff_boarder_len);
 	param_list = set_up_buffer(param_list_buff, 2 * n);
 	free_space_pointer = (ydb_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
+=======
+	/* Note that this is the nominal buffer size; or, explicitly, the size of buffer without the proctection tags*/
+	call_buff_size = 2*n;
+	char param_list_buff[(call_buff_size + (2 * buff_boarder_len))];
+	memset(param_list_buff, 0, (call_buff_size + (2 * buff_boarder_len)));	/* zero the contents for unmodified output values */
+	param_list = set_up_buffer(param_list_buff, 2*n);
+	free_space_pointer = (gtm_long_t *)((char *)param_list + SIZEOF(intszofptr_t) + (SIZEOF(void *) * argcnt));
+>>>>>>> 91552df2... GT.M V6.3-009
 	free_string_pointer_start = free_string_pointer = (char *)param_list + entry_ptr->parmblk_size;
 	/* Load-up the parameter list */
 	VAR_START(var, argcnt);

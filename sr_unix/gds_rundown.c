@@ -200,7 +200,13 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	 * that the statsdb can safely be deleted at basedb rundown time if we happen to be the last one to rundown the basedb.
 	 */
 	is_statsDB = IS_STATSDB_REG(reg);
-	if (!is_statsDB)
+	if (is_statsDB)
+	{	/* This is a statsdb. Fix reg->read_only & csa->read_write based on csa->orig_read_write.
+		* This is so it reflects real permissions this process has on the statsdb.
+		*/
+		reg->read_only = !csa->orig_read_write;
+		csa->read_write = csa->orig_read_write;		/* Maintain read_only/read_write in parallel */
+	} else
 	{	/* Note that even if the baseDB has RDBF_NOSTATS set, we could have opened the statsDB region
 		 * (for example, if statsDB has read-only permissions, we would have opened it and found it is
 		 * read-only when we tried to add the ^%YGS node and would have disabled stats in the baseDB
@@ -210,19 +216,35 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		BASEDBREG_TO_STATSDBREG(reg, statsDBreg);
 		if (statsDBreg->open)
 		{
-			gv_cur_region = statsDBreg;	/* Switch "gv_cur_region" to do rundown of statsDB */
-			tp_change_reg();
-			gds_rundown(cleanup_udi); /* Ignore errors in statsdb rundown. Continue with baseDB rundown. */
-			gv_cur_region = reg;	/* Restore "gv_cur_region" back to continue rundown of baseDB */
-			tp_change_reg();
-			/* Now that statsdb has been rundown, reset basedb stats back to private memory in case it was
+			/* Now we're running down statsdb, reset basedb stats back to private memory in case it was
 			 * pointing to statsdb shared/mapped memory. Note that the following reset of the stats
 			 * pointer back to the internal stats buffer located is sgmnt_data is normally taken care
 			 * of by the statsdb unlink processing in gvcst_remove_statsDB_linkage() but we keep this
 			 * reset here also to be sure it gets done in case of a statsDB rundown issue.
 			 */
 			csa->gvstats_rec_p = &csa->gvstats_rec;
+			gv_cur_region = statsDBreg;	/* Switch "gv_cur_region" to do rundown of statsDB */
+			tp_change_reg();
+			gds_rundown(cleanup_udi); /* Ignore errors in statsdb rundown. Continue with baseDB rundown. */
+			gv_cur_region = reg;	/* Restore "gv_cur_region" back to continue rundown of baseDB */
+			tp_change_reg();
 		}
+	}
+	/* If this is a read-only database, simply return */
+	if (csd->read_only)
+	{
+		if ((0 != sem_rmid(udi->semid)) && (EINVAL != errno))
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+				ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"), errno);
+		udi->sem_deleted = TRUE;		/* Note that we deleted the semaphore */
+		udi->grabbed_access_sem = FALSE;
+		udi->counter_acc_incremented = FALSE;
+		if ((0 != sem_rmid(udi->ftok_semid)) && (EINVAL != errno))
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+				ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"), errno);
+		udi->grabbed_ftok_sem = FALSE;
+		udi->counter_ftok_incremented = FALSE;
+		return EXIT_NRM;
 	}
 	csa->regcnt--;
 	if (csa->regcnt)
@@ -231,13 +253,6 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		 */
 		reg->open = FALSE;
 		return EXIT_NRM;
-	}
-	if (is_statsDB)
-	{	/* This is a statsdb. Fix reg->read_only & csa->read_write based on csa->orig_read_write.
-		 * This is so it reflects real permissions this process has on the statsdb.
-		 */
-		reg->read_only = !csa->orig_read_write;
-		csa->read_write = csa->orig_read_write;		/* Maintain read_only/read_write in parallel */
 	}
 	/* If the process has standalone access, it has udi->grabbed_access_sem set to TRUE at this point. Note that down in a local
 	 * variable as the udi->grabbed_access_sem is set to TRUE even for non-standalone access below and hence we can't rely on
@@ -365,9 +380,15 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			/* Check # of processes counted on access sem. */
 			if (-1 == (semval = semctl(udi->semid, DB_COUNTER_SEM, GETVAL)))
 			{
+				save_errno = errno;
+				if ((EINVAL == save_errno) && (cleanup_udi))
+				{
+					REVERT;
+					return EXIT_NRM;
+				}
 				assert(FALSE);
-				rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
-					      RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get semval"), CALLFROM, errno);
+				rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL,
+					      5, RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get semval"), CALLFROM, save_errno);
 			}
 			bypassed_access = CAN_BYPASS(semval, csa, inst_is_frozen) || onln_rlbk_pid || csd->file_corrupt;
 			/* Before attempting again in the blocking mode, see if the holding process is an online rollback.
@@ -376,8 +397,12 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			 */
 			holder_pid = semctl(udi->semid, DB_CONTROL_SEM, GETPID);
 			if ((uint4)-1 == holder_pid)
+			{
+				save_errno = errno;
+				assert(FALSE);
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(12) ERR_CRITSEMFAIL, 2, DB_LEN_STR(reg), ERR_SYSCALL, 5,
-					      RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get holder_pid"), CALLFROM, errno);
+					      RTS_ERROR_TEXT("gds_rundown SEMCTL failed to get holder_pid"), CALLFROM, save_errno);
+			}
 			if (!bypassed_access)
 			{	/* We couldn't get it in one shot-- see if we already have it */
 				if (holder_pid == process_id)
@@ -942,7 +967,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 			if (!have_standalone_access)
 			{
 				if (0 != sem_rmid(udi->semid))
-					rts_error_csa(CSA_ARG(csa) VARLSTCNT(8) ERR_DBFILERR, 2, DB_LEN_STR(reg),
+					rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_DBFILERR, 2, DB_LEN_STR(reg),
 						      ERR_TEXT, 2, RTS_ERROR_TEXT("Unable to remove semaphore"), errno);
 				udi->sem_deleted = TRUE;		/* Note that we deleted the semaphore */
 				udi->grabbed_access_sem = FALSE;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,7 +49,7 @@ int4 bml_init(block_id bml)
 	 *    before-image journaling case.
 	 * 2) If in forward recovery, then the database current transaction number is not incremented in gdsfilext (the caller
 	 *    of this function) so we have to create the local bitmap blocks with curr_tn-1 in order to avoid a DBTNTOOLG error.
-         */
+	 */
 	if (JNL_ENABLED(cs_data) && cs_addrs->jnl && cs_addrs->jnl->jnl_buff && cs_addrs->jnl->jnl_buff->before_images)
 		blktn = 0;
 	else if (jgbl.forw_phase_recovery && !JNL_ENABLED(cs_data))     /* forward recovery */

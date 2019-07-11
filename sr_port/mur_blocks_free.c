@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,11 +46,11 @@ error_def(ERR_DYNUPGRDFAIL);
 int4 mur_blocks_free(reg_ctl_list *rctl)
 {
 	int4		x;
-	block_id 	bnum;
-	int 		maps, mapsize, i, j, k, fcnt, status;
-	unsigned char 	*c, *disk, *m_ptr;
-	uint4 		*dskmap, map_blk_size;
-	file_control 	*db_ctl;
+	block_id	bnum, maps;
+	int		mapsize, i, j, k, fcnt, status;
+	unsigned char	*c, *disk, *m_ptr;
+	uint4		*dskmap, map_blk_size;
+	file_control	*db_ctl;
 	enum db_ver	dummy_ondskblkver;
 	unix_db_info	*udi;
 
@@ -94,8 +94,13 @@ int4 mur_blocks_free(reg_ctl_list *rctl)
 		}
 		if (((blk_hdr *)disk)->levl != LCL_MAP_LEVL)
 			util_out_print("Local map block level incorrect.", TRUE);
-		mapsize = (bnum == (cs_data->trans_hist.total_blks/cs_data->bplmap) * cs_data->bplmap ?
-				     cs_data->trans_hist.total_blks - bnum : cs_data->bplmap);
+		/* (cs_data->trans_hist.total_blks - bnum) can be cast because it should never be
+		 * larger then BLKS_PER_LMAP when used
+		 */
+		assert((BLKS_PER_LMAP >= (cs_data->trans_hist.total_blks - bnum)) ||
+				(bnum != ((cs_data->trans_hist.total_blks/cs_data->bplmap) * cs_data->bplmap)));
+		mapsize = (bnum == ((cs_data->trans_hist.total_blks/cs_data->bplmap) * cs_data->bplmap) ?
+					(int)(cs_data->trans_hist.total_blks - bnum) : cs_data->bplmap);
 		j = BPL;
 		dskmap = (uint4*)(disk + SIZEOF(blk_hdr));
 		while (j < mapsize)

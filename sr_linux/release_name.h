@@ -17,6 +17,7 @@
  ****************************************************************/
 
 #ifndef GTM_RELEASE_NAME
+<<<<<<< HEAD
 
 #define GTM_VERSION		"V6.3"
 #define	GTM_ZVERSION		"V6.3-008"
@@ -38,12 +39,30 @@
 # define YDB_PLATFORM		"Linux aarch64"
 #else
 # define YDB_PLATFORM		"Linux x86"
+=======
+#ifdef __CYGWIN__
+#define GTM_RELEASE_NAME 	"GT.M V6.3-009 CYGWIN x86"
+#elif defined(__ia64)
+#define GTM_RELEASE_NAME 	"GT.M V6.3-009 Linux IA64"
+#elif defined(__x86_64__)
+#define GTM_RELEASE_NAME 	"GT.M V6.3-009 Linux x86_64"
+#elif defined(__s390__)
+#define GTM_RELEASE_NAME 	"GT.M V6.3-009 Linux S390X"
+#else
+#define GTM_RELEASE_NAME 	"GT.M V6.3-009 Linux x86"
+#endif
+>>>>>>> 91552df2... GT.M V6.3-009
 #endif
 
 #define GTM_RELEASE_NAME 	"GT.M" " " GTM_ZVERSION " " YDB_PLATFORM
 #define YDB_RELEASE_NAME 	"YottaDB" " " YDB_ZYRELEASE " " YDB_PLATFORM
 #define	YDB_AND_GTM_RELEASE_NAME	GTM_RELEASE_NAME " " "YottaDB" " " YDB_ZYRELEASE
 #define GTM_PRODUCT 		"GT.M"
+<<<<<<< HEAD
 #define YDB_PRODUCT		"YottaDB"
 
 #endif
+=======
+#define GTM_VERSION		"V6.3"
+#define GTM_RELEASE_STAMP	"20190619 13:43"
+>>>>>>> 91552df2... GT.M V6.3-009

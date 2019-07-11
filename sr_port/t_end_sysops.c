@@ -174,7 +174,7 @@ void fileheader_sync(gd_region *reg)
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	th_index_ptr_t		cti;
-	int4			high_blk;
+	block_id		high_blk;
 	size_t			flush_len, sync_size, rounded_flush_len;
 	int4			save_errno;
 	unix_db_info		*udi;
@@ -220,9 +220,9 @@ void fileheader_sync(gd_region *reg)
 /* update a bitmap */
 void	bm_update(cw_set_element *cs, sm_uc_ptr_t lclmap, boolean_t is_mm)
 {
-	int4				bml_full, total_blks, bplmap;
+	int4				bml_full, bplmap;
 	boolean_t			change_bmm;
-	block_id			blkid;
+	block_id			blkid, total_blks;
 	sgmnt_addrs			*csa;
 	sgmnt_data_ptr_t		csd;
 	node_local_ptr_t		cnl;
@@ -445,7 +445,7 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	block_id		blkid;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	node_local_ptr_t        cnl;
+	node_local_ptr_t	cnl;
 	enum gds_t_mode		mode;
 	enum db_ver		desired_db_format;
 	trans_num		dirty_tn;

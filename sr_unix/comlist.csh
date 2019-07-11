@@ -786,9 +786,21 @@ endif
 # To check the length of path of files even insdie gtmsecshr directory, relax permissions first
 $gtm_com/IGS $ydb_dist/gtmsecshr UNHIDE
 set distfiles_log = "dist_files.`basename $gtm_exe`.log"
+<<<<<<< HEAD
 find $ydb_dist -type f >&! $gtm_log/$distfiles_log
 $gtm_com/IGS $ydb_dist/gtmsecshr CHOWN
 awk 'BEGIN {dlen=length(ENVIRON["ydb_dist"]);stat=0} {if ((length($0)-dlen)>50) {stat=1}} END {exit stat}' $gtm_log/$distfiles_log
+=======
+find $gtm_dist -type f >&! $gtm_log/$distfiles_log
+if ($?scan_image) then
+	tar cvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar dbcertify dse ftok geteuid gtmsec* gtcm* libgtmshr.so lke mumps mupip
+	tar rvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar plugin/libgtm* plugin/gtmcrypt/maskpass
+	tar rvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar /usr/lib64/lib{config,gpgme,gpg-error,crypt,ssl,icu*,z,elf}.so*
+	gzip    $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar
+endif
+$gtm_com/IGS $gtm_dist/gtmsecshr CHOWN
+awk 'BEGIN {dlen=length(ENVIRON["gtm_dist"]);stat=0} {if ((length($0)-dlen)>50) {stat=1}} END {exit stat}' $gtm_log/$distfiles_log
+>>>>>>> 91552df2... GT.M V6.3-009
 if ($status) then
 	@ comlist_status++
 	echo "comlist-E-pathlength, the longest path beyond \$ydb_dist exceeds 50 bytes" >> $errorlog

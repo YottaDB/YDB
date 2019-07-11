@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 91552df2... GT.M V6.3-009
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,9 +19,12 @@
 
 #include "mdef.h"
 #include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
 #include "gdsbt.h"
 #include "gdsblk.h"
 #include "gdsbml.h"
+#include "gdsfhead.h"
 
 /* Include prototypes */
 #include "bit_clear.h"
@@ -24,9 +32,14 @@
 
 GBLREF	boolean_t		dse_running;
 
-uint4 bml_busy(uint4 setbusy, sm_uc_ptr_t map)
+uint4 bml_busy(block_id setbusy, sm_uc_ptr_t map)
 {
 	uint4	ret, ret1;
+
+	/* This function is specifically for local maps so the block index
+	 * setbusy should not be larger then BLKS_PER_LMAP
+	 */
+	assert(BLKS_PER_LMAP > setbusy);
 
 	setbusy *= BML_BITS_PER_BLK;
 	ret = bit_clear(setbusy, map);

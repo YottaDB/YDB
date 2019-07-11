@@ -85,7 +85,11 @@ GBLREF int			mlmax;
 GBLREF int 			mvar_index;
 GBLREF hash_table_objcode 	cache_table;
 GBLREF unsigned char		*msp, *stackbase, *stacktop, *stackwarn;
+<<<<<<< HEAD
 GBLREF gtm_uint64_t		stp_array_size;
+=======
+GBLREF uint4			stp_array_size;
+>>>>>>> 91552df2... GT.M V6.3-009
 GBLREF io_log_name		*io_root_log_name;
 GBLREF lvzwrite_datablk		*lvzwrite_block;
 GBLREF mliteral			literal_chain;

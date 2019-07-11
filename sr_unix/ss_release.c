@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2009, 2012 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2009-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 91552df2... GT.M V6.3-009
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,43 +65,47 @@ error_def(ERR_SYSCALL);
 error_def(ERR_SSFILCLNUPFAIL);
 error_def(ERR_SSSHMCLNUPFAIL);
 
-#define CLEANUP_SHADOW_FILE(preserve_snapshot, shadow_file)							 		\
-{																\
-	int		status;											 		\
-	struct stat	stat_buf;												\
-	int		save_errno;												\
-																\
-	if (!preserve_snapshot && (-1 != stat(shadow_file, &stat_buf)))			 					\
-	{															\
-		status = UNLINK(shadow_file);									 		\
-		if (0 != status)												\
-		{														\
-			save_errno = errno;											\
-			if (IS_MUMPS_IMAGE)										 	\
-				send_msg(VARLSTCNT(5) ERR_SSFILCLNUPFAIL, 2, LEN_AND_STR(shadow_file), save_errno);	 	\
-			else													\
-				gtm_putmsg(VARLSTCNT(5) ERR_SSFILCLNUPFAIL, 2, LEN_AND_STR(shadow_file), save_errno);		\
-		}														\
-	}															\
-}																\
+#define CLEANUP_SHADOW_FILE(preserve_snapshot, shadow_file, csa)					\
+{													\
+	int		status;										\
+	struct stat	stat_buf;									\
+	int		save_errno;									\
+													\
+	if (!preserve_snapshot && (-1 != stat(shadow_file, &stat_buf)))					\
+	{												\
+		status = UNLINK(shadow_file);								\
+		if (0 != status)									\
+		{											\
+			save_errno = errno;								\
+			if (IS_MUMPS_IMAGE)								\
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5)					\
+					ERR_SSFILCLNUPFAIL, 2, LEN_AND_STR(shadow_file), save_errno);	\
+			else										\
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5)				\
+					ERR_SSFILCLNUPFAIL, 2, LEN_AND_STR(shadow_file), save_errno);	\
+		}											\
+	}												\
+}													\
 
-#define CLEANUP_SHARED_MEMORY(ss_shmid)												\
-{																\
-	int		save_errno;												\
-	struct shmid_ds ss_shmstat;												\
-																\
-	if ((INVALID_SHMID != ss_shmid) && (0 == shmctl((int)ss_shmid, IPC_STAT, &ss_shmstat)))					\
-	{															\
-		if (0 != shmctl((int)ss_shmid, IPC_RMID, &ss_shmstat))								\
-		{														\
-			save_errno = errno;											\
-			if (IS_MUMPS_IMAGE)											\
-				send_msg(VARLSTCNT(6) ERR_SSSHMCLNUPFAIL, 3, LEN_AND_LIT("shmctl"), ss_shmid, save_errno);	\
-			else													\
-				gtm_putmsg(VARLSTCNT(6) ERR_SSSHMCLNUPFAIL, 3, LEN_AND_LIT("shmctl"), ss_shmid, save_errno);	\
-		}														\
-	}															\
-}																\
+#define CLEANUP_SHARED_MEMORY(ss_shmid, csa)									\
+{														\
+	int		save_errno;										\
+	struct shmid_ds ss_shmstat;										\
+														\
+	if ((INVALID_SHMID != ss_shmid) && (0 == shmctl((int)ss_shmid, IPC_STAT, &ss_shmstat)))			\
+	{													\
+		if (0 != shmctl((int)ss_shmid, IPC_RMID, &ss_shmstat))						\
+		{												\
+			save_errno = errno;									\
+			if (IS_MUMPS_IMAGE)									\
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6)						\
+					ERR_SSSHMCLNUPFAIL, 3, LEN_AND_LIT("shmctl"), ss_shmid, save_errno);	\
+			else											\
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6)					\
+					ERR_SSSHMCLNUPFAIL, 3, LEN_AND_LIT("shmctl"), ss_shmid, save_errno);	\
+		}												\
+	}													\
+}														\
 
 #define ADJUST_SHARED_MEMORY_FIELDS(cnl, ss_shm_ptr)				\
 {										\
@@ -113,8 +122,9 @@ error_def(ERR_SSSHMCLNUPFAIL);
 
 void		ss_release(snapshot_context_ptr_t *ss_ctx)
 {
-	int			status, ss_shmsize;
+	int			status;
 	long			ss_shmid;
+	block_id		ss_shmsize;
 	boolean_t		preserve_snapshot = FALSE;
 	sgmnt_addrs		*csa;
 	DEBUG_ONLY(sgmnt_data	*csd;)
@@ -139,8 +149,8 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 		ss_shm_ptr = (shm_snapshot_ptr_t)(SS_GETSTARTPTR(csa));
 		DBG_ENSURE_PTR_WITHIN_SS_BOUNDS(csa, (sm_uc_ptr_t)ss_shm_ptr);
 		ss_shmid = ss_shm_ptr->ss_info.ss_shmid;
-		CLEANUP_SHADOW_FILE(FALSE, ss_shm_ptr->ss_info.shadow_file);
-		CLEANUP_SHARED_MEMORY(ss_shmid);
+		CLEANUP_SHADOW_FILE(FALSE, ss_shm_ptr->ss_info.shadow_file, csa);
+		CLEANUP_SHARED_MEMORY(ss_shmid, csa);
 		ADJUST_SHARED_MEMORY_FIELDS(cnl, ss_shm_ptr);
 		return;
 	}
@@ -176,8 +186,8 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 			if (cnl->wcs_phase2_commit_pidcnt && !wcs_phase2_commit_wait(csa, NULL))
 			{
 				assert(FALSE);
-				gtm_putmsg(VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1,
-					   cnl->wcs_phase2_commit_pidcnt, DB_LEN_STR(gv_cur_region));
+				gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(7) ERR_COMMITWAITSTUCK, 5, process_id, 1,
+						cnl->wcs_phase2_commit_pidcnt, DB_LEN_STR(gv_cur_region));
 			}
 		}
 		ADJUST_SHARED_MEMORY_FIELDS(cnl, ss_shm_ptr);
@@ -209,10 +219,10 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 			 * delted by the OS until number of processes attached to this shared segment becomes zero. GT.M
 			 * at the end of each transaction, will try to detach itself from this shared memory segment and will
 			 * eventually lead to number of attached processes becoming zero.*/
-			CLEANUP_SHARED_MEMORY(ss_shmid);
+			CLEANUP_SHARED_MEMORY(ss_shmid, csa);
 		/* intentional fall through */
 		case AFTER_SHADOW_FIL_CREAT:
-			CLEANUP_SHADOW_FILE(preserve_snapshot, shadow_file);
+			CLEANUP_SHADOW_FILE(preserve_snapshot, shadow_file, csa);
 		/* intentional fall through */
 		case BEFORE_SHADOW_FIL_CREAT:
 			if (NULL != *ss_ctx)
@@ -223,7 +233,7 @@ void		ss_release(snapshot_context_ptr_t *ss_ctx)
 			break;
 		default:
 			assert(FALSE);
-			GTMASSERT;
+			assertpro(FALSE);
 	}
 	return;
 }

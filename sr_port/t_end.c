@@ -222,7 +222,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	boolean_t		supplementary = FALSE;	/* this variable is initialized ONLY if "replication" is TRUE. */
 	seq_num			strm_seqno, next_strm_seqno;
 	sm_uc_ptr_t		blk_ptr, backup_blk_ptr;
-	int			blkid;
+	block_id		blkid;
 	boolean_t		is_mm;
 	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
@@ -250,8 +250,8 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 #	ifdef GTM_TRIGGER
 	uint4			cycle;
 #	endif
-	snapshot_context_ptr_t  lcl_ss_ctx;
-	th_index_ptr_t     	cti;
+	snapshot_context_ptr_t	lcl_ss_ctx;
+	th_index_ptr_t		cti;
 	jbuf_rsrv_struct_t	*jrs;
 	jrec_rsrv_elem_t	*first_jre, *jre, *jre_top;
         int4			event_type, param_val;
@@ -497,8 +497,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 		 * to FALSE.
 		 */
 		SS_INIT_IF_NEEDED(csa, cnl);
-	} else
-		SS_RELEASE_IF_NEEDED(csa, cnl);
+	}
 	if (0 != cw_depth)
 	{	/* Caution : since csa->backup_in_prog and read_before_image are initialized below
 	 	 * only if (cw_depth), these variables should be used below only within an if (cw_depth).
@@ -1380,7 +1379,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 			SHM_WRITE_MEMORY_BARRIER;
 		}
 	}
-	assert(TN_NOT_SPECIFIED > MAX_TN_V6); /* Ensure TN_NOT_SPECIFIED isn't a valid TN number */
+	assert(TN_NOT_SPECIFIED > MAX_TN_ANY); /* Ensure TN_NOT_SPECIFIED isn't a valid TN number */
 	blktn = (TN_NOT_SPECIFIED == ctn) ? dbtn : ctn;
 	cti->early_tn = dbtn + 1;	/* Step CMT04 */
 	csa->t_commit_crit = T_COMMIT_CRIT_PHASE0;	/* phase0 : write journal records. Step CMT05 */
@@ -1785,11 +1784,6 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	ASSERT_CR_ARRAY_IS_UNPINNED(csd, cr_array, cr_array_index);
 	cr_array_index = 0;
 	csa->t_commit_crit = FALSE;	/* Step CMT19 */
-	/* Phase 2 commits are completed. See if we had done a snapshot init (csa->snapshot_in_prog == TRUE). If so,
-	 * try releasing the resources obtained while snapshot init.
-	 */
-	if (SNAPSHOTS_IN_PROG(csa))
-		SS_RELEASE_IF_NEEDED(csa, cnl);
 
 skip_cr_array:
 	assert(!csa->now_crit || csa->hold_onto_crit);

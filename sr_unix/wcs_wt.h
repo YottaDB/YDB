@@ -41,7 +41,8 @@ MBSTART {													\
 	assert(!(CSR)->in_cw_set);	/* no other process should be needing this buffer */			\
 	cr_new = (cache_rec_ptr_t)GDS_ANY_REL2ABS((CSA), (CSR)->twin); /* Get NEWER twin cr */			\
 	assert((void *)&((cache_rec_ptr_t)GDS_ANY_REL2ABS((CSA), cr_new->twin))->state_que == (void *)(CSR));	\
-	assert(cr_new->dirty); /* NEWER twin should be in ACTIVE queue */					\
+	/* NEWER twin should be in ACTIVE queue, except in rare cases where processes were killed. */		\
+	assert(cr_new->dirty || WBTEST_ENABLED(WBTEST_CRASH_SHUTDOWN_EXPECTED));				\
 	(CSR)->cycle++;	/* increment cycle whenever blk number changes (tp_hist needs it) */			\
 	(CSR)->blk = CR_BLKEMPTY;										\
 	assert(CR_BLKEMPTY != cr_new->blk);	/* NEWER twin should have a valid block number */		\

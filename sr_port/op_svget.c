@@ -52,6 +52,7 @@
 #include "get_reference.h"
 #include "dollar_quit.h"
 #include "ztimeout_routines.h"
+#include "mlkdef.h"
 #ifdef UNIX
 #  include "iormdef.h"
 #  ifdef DEBUG
@@ -101,6 +102,8 @@ GBLREF io_pair		io_std_device;
 GBLREF mstr		dollar_zpin;
 GBLREF mstr		dollar_zpout;
 GBLREF int		process_exiting;
+GBLREF mlk_subhash_val_t	mlk_last_hash;
+
 #ifdef GTM_TRIGGER
 GBLREF	mstr		*dollar_ztname;
 GBLREF	mval		*dollar_ztdata;
@@ -639,6 +642,9 @@ void op_svget(int varnum, mval *v)
 			count = get_ztimeout(v);
 			if (-1 == count)
 				MV_FORCE_MVAL(v, count);
+			break;
+		case SV_ZMLKHASH:
+			i2usmval(v, mlk_last_hash);
 			break;
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSVN);

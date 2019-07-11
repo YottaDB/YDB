@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@ GBLREF	int			mu_map_errs;
 GBLREF	int			disp_trans_errors;
 GBLREF	int			trans_errors;
 
-GBLREF trans_num        largest_tn;
+GBLREF trans_num	largest_tn;
 
 error_def(ERR_DBREADBM);
 error_def(ERR_DBLVLINC);
@@ -67,7 +67,7 @@ void mu_int_maps(void)
 	unsigned char	*local;
 	uchar_ptr_t	blk_base, free_blk_base;
 	boolean_t	agree, disk_full, local_full, master_full;
-	int		maps, mapsize, mcnt, lcnt, bcnt;
+	block_id	maps, mapsize, mcnt, lcnt, bcnt;
 	unsigned int	level;
 	uint_ptr_t	dskmap_p;
 	uint4		dskmap, lfree, *lmap, map_blk_size;
@@ -85,7 +85,7 @@ void mu_int_maps(void)
 	{
 		assert(mapsize == mu_int_data.bplmap);
 		blkno = mcnt * mu_int_data.bplmap;
-		bml_busy(blkno, mu_int_locals);
+		bml_busy(0, mu_int_locals + ((blkno * BML_BITS_PER_BLK) / BITS_PER_UCHAR));
 		blk_base = mu_int_read(blkno, &ondsk_blkver, &free_blk_base);	/* ondsk_blkver set to GDSV4 or GDSV6 (GDSVCURR) */
 		if (!blk_base)
 		{
@@ -123,8 +123,8 @@ void mu_int_maps(void)
 		} else if (GDSVCURR != ondsk_blkver)
 			mu_int_blks_to_upgrd++;
 		map_tn = ((blk_hdr_ptr_t)blk_base)->tn;
- 		if (map_tn >= mu_int_data.trans_hist.curr_tn)
- 		{
+		if (map_tn >= mu_int_data.trans_hist.curr_tn)
+		{
 			if (trans_errors < disp_trans_errors)
 			{
 				mu_int_path[0] = blkno;
@@ -132,11 +132,11 @@ void mu_int_maps(void)
 				mu_int_err(ERR_DBMBTNSIZMX, 0, 0, 0, 0, 0, 0, level);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DBTN, 1, &map_tn);
 			} else
-			   mu_int_errknt++;
+				mu_int_errknt++;
 			trans_errors++;
 			if (map_tn > largest_tn)
 				largest_tn = map_tn;
- 		}
+		}
 		master_full = !bit_set(mcnt, mu_int_master);
 		if (last_bmp == blkno)
 			mapsize = (mu_int_data.trans_hist.total_blks - blkno);

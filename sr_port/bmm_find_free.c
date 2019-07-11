@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,10 +23,9 @@
 /* Returns the location of the first set bit in the field.	*/
 /* The search starts at the hint and wraps if necessary.	*/
 
-int4 bmm_find_free(uint4 hint, uchar_ptr_t base_addr, uint4 total_bits)
+block_id bmm_find_free(block_id hint, uchar_ptr_t base_addr, block_id total_bits)
 {
-	int4		answer, width;
-	uint4		start, top;
+	block_id	start, top, width, answer;
 
 	if (hint >= total_bits)
 		hint = 0;

@@ -77,10 +77,10 @@ error_def(ERR_JNLALLOCGROW);
 error_def(ERR_MUNOACTION);
 error_def(ERR_TEXT);
 
-void mucregini(int4 blk_init_size)
+void mucregini(block_id blk_init_size)
 {
 	int4			status;
-	int4			i;
+	block_id		i;
 	th_index_ptr_t 		th;
 	collseq			*csp;
 	uint4			ustatus, reg_autoswitch;
@@ -217,7 +217,7 @@ void mucregini(int4 blk_init_size)
 	csd->zqgblmod_tn = 0;
 	assert(!csd->multi_site_open);
 	csd->multi_site_open = TRUE;
-	csd->repl_state = repl_closed;              /* default */
+	csd->repl_state = repl_closed;	/* default */
 	if (csd->jnl_file_len)
 	{
 		tmpjnlfile.addr = (char *)csd->jnl_file_name;
@@ -252,7 +252,7 @@ void mucregini(int4 blk_init_size)
 	csd->flush_trigger = csd->flush_trigger_top = FLUSH_FACTOR(csd->n_bts);
 
 	csd->max_update_array_size = csd->max_non_bm_update_array_size
-				       = (int4)ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE);
+					= (int4)ROUND_UP2(MAX_NON_BITMAP_UPDATE_ARRAY_SIZE(csd), UPDATE_ARRAY_ALIGN_SIZE);
 	csd->max_update_array_size += (int4)ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE);
 	/* bt_malloc(cs_addrs) Done by db_init at file open time -- not needed here */
 	if (dba_bg == REG_ACC_METH(gv_cur_region))
@@ -298,7 +298,7 @@ void mucregini(int4 blk_init_size)
 				 * this is because the macro relies on max_tn/max_tn_warn being set and that does not happen
 				 * until a few lines later. hence keeping it simple here by doing a plain assignment of curr_tn.
 				 */
-	csd->max_tn = MAX_TN_V6;
+	csd->max_tn = MAX_TN_DFLT;
 	SET_TN_WARN(csd, csd->max_tn_warn);
 	SET_LATCH_GLOBAL(&csd->next_upgrd_warn.time_latch, LOCK_AVAILABLE);
 }

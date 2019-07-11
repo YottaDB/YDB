@@ -64,6 +64,7 @@ int m_xecute(void)
 		}
 		/* caution: fall through ??? maybe ??? */
 	case EXPR_GOOD:
+<<<<<<< HEAD
 		/* Try to see if the string passed to XECUTE can be precompiled at compile time. This is an optimization to
 		 * see if the XECUTE can be avoided without any impact to the M program. Disallow this if we have other
 		 * M commands following the XECUTE in the same M line. This is because if the XECUTE string has a FOR loop
@@ -75,13 +76,18 @@ int m_xecute(void)
 			&& (OC_LIT == (ref0 = (TREF(curtchain))->exorder.bl)->opcode)
 			&& (ref0->exorder.bl) == TREF(curtchain))
 		{	/* just found a literal and only one and we are not already at run time; WARNING assignment above */
+=======
+		if (!run_time && (OC_LIT == (ref0 = (TREF(curtchain))->exorder.bl)->opcode)
+			&& (ref0->exorder.bl == TREF(curtchain)))
+		{	/* just found a literal, and only one, and we are not already at run time; WARNING assignment above */
+>>>>>>> 91552df2... GT.M V6.3-009
 			/* Can't drive the parsing with the source because there may be emedded quotes, rather must use the literal
 			 * The code in this block sorta/kinda does things like comp_init and op_commarg between a save and restore
 			 * of parser state. If the parse fails or runs into a GOTO, NEW, QUIT or (nested) XECUTE it reverts to
-			 * producing the code for a a run time evaluation of the literal. GOTO and QUIT must deal with the XECUTE
+			 * producing the code for a run time evaluation of the literal. GOTO and QUIT must deal with the XECUTE
 			 * frame and that's why they cause it to defer to run time; they use TREF(xecute_literal_parse), as does
 			 * stc_error and BLOWN_FOR, to recognize this "trial" parse and prevent it from causing too much carnage
-			 * Should anthing else call for a similar approach things might should be considered for refactoring and
+			 * Should anything else call for a similar approach things might/should be considered for refactoring and
 			 * adjustments to some names.
 			 */
 			src = &x.oprval.tref->operand[0].oprval.mlit->v.str;
@@ -93,32 +99,25 @@ int m_xecute(void)
 				parse_state_ptr = malloc(SIZEOF(parse_save_block));
 			SAVE_PARSE_STATE(parse_state_ptr);
 			if (NULL == local_source_buffer)
-				local_source_buffer = malloc(MAX_SRCLINE + 2);
+				local_source_buffer = malloc(MAX_SRCLINE + 1);
 			TREF(lexical_ptr) = (TREF(source_buffer)).addr = local_source_buffer;
-			memcpy((TREF(source_buffer)).addr,src->addr,src->len);
+			memcpy((TREF(source_buffer)).addr, src->addr, src->len);
+			*((TREF(source_buffer)).addr + src->len) = '\0';
 			(TREF(source_buffer)).len = src->len + 1;
-			*((TREF(source_buffer)).addr + src->len) = *((TREF(source_buffer)).addr + src->len + 1) = '\0';
-			TREF(block_level) = 	source_column = 0;
+			TREF(block_level) = 0;
 			lb_init();
 			assert(!TREF(xecute_literal_parse));
 			run_time = TREF(xecute_literal_parse) = TRUE;
 			for (;;)
 			{
-				if (EXPR_FAIL == (rval = (*indir_fcn[indir_linetail])()))
-					break;
-				if (TK_EOL == TREF(window_token))
-					break;
-				if (TK_COMMA == TREF(window_token))
-					advancewindow();
-				else
-				{	/* Allow trailing spaces/comments that we will ignore */
-					while (TK_SPACE == TREF(window_token))
-						advancewindow();
-				}
+				rval = (*indir_fcn[indir_linetail])();
+				if (OC_FORLOOP == tmpchain.exorder.bl->opcode)	/* Evil violation of information hiding */
+					rval = EXPR_FAIL;	/* FOR termination would jmp too far (to EOL) */
+				if ((EXPR_FAIL == rval) || (TK_COMMA != TREF(window_token)))
+					break;			/* Didn't work or processed all arguments */
+				advancewindow();
 			}
 			run_time = TREF(xecute_literal_parse) = FALSE;
-			if (TK_EOL != TREF(window_token))
-				rval = EXPR_FAIL;
 			RESTORE_PARSE_STATE(parse_state_ptr);	/* restore the parse state to the original source */
 			if (EXPR_FAIL == rval)
 			{	/* not so good - remove the failed chain and just leave the literal for the run time form */
@@ -130,7 +129,7 @@ int m_xecute(void)
 		} else
 			rval = EXPR_FAIL;
 		if (EXPR_FAIL == rval)
-		{	/* either not a literal or compiling the literal failed, in which case leave it to run time */
+		{	/* either not useable literal(s) or compiling the literal(s) failed, in which case, leave it to run time */
 			ref0 = maketriple(OC_COMMARG);
 			ref0->operand[0] = x;
 			ref0->operand[1] = put_ilit(indir_linetail);

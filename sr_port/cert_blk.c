@@ -28,9 +28,9 @@
 #include "subscript.h"
 #include "filestruct.h"
 #include "gdscc.h"
-#include "gdskill.h"    /* needed for tp.h */
-#include "jnl.h"        /* needed for tp.h */
-#include "buddy_list.h" /* needed for tp.h */
+#include "gdskill.h"	/* needed for tp.h */
+#include "jnl.h"	/* needed for tp.h */
+#include "buddy_list.h"	/* needed for tp.h */
 #include "tp.h"
 #include "error.h"
 #include "mmemory.h"
@@ -92,8 +92,13 @@ error_def(ERR_DBNONUMSUBS);
 #define TEXT3 " :              LVL=0x"
 #define TEXT4 ","
 
+<<<<<<< HEAD
 #define MAX_UTIL_LEN (STR_LIT_LEN(TEXT0) + BLOCK_WINDOW + STR_LIT_LEN(TEXT3) + LEVEL_WINDOW + STR_LIT_LEN(TEXT4) + 1)
 #define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION, REG)	/* for reg in a message, replace NULL in invocation */ \
+=======
+#define MAX_UTIL_LEN (STRLEN(TEXT0) + BLOCK_WINDOW + STRLEN(TEXT3) + LEVEL_WINDOW + STRLEN(TEXT4) + 1)
+#define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION, REG)	/* for reg in a message, replace NULL in invocation */	\
+>>>>>>> 91552df2... GT.M V6.3-009
 {															\
 	switch (ERROR_ACTION)												\
 	{														\
@@ -125,6 +130,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 	rec_hdr_ptr_t		rp, r_top;
 	int			num_subscripts, fmtd_key_len;
 	uint4			bplmap, mask1, offset, rec_offset, rec_size;
+	block_id		offset_mm;
 	sm_uint_ptr_t		chunk_p;			/* Value is unaligned so will be assigned to chunk */
 	uint4			chunk, blk_size;
 	sm_uc_ptr_t		blk_top, blk_id_ptr, next_tp_child_ptr, key_base, mp, b_ptr;
@@ -143,7 +149,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	boolean_t		is_gvt, is_directory, first_key, full, prev_char_is_delimiter;
-	unsigned int            null_subscript_cnt;
+	unsigned int		null_subscript_cnt;
 	unsigned int		rec_num;
 	unsigned char		key_buffer[MAX_ZWR_KEY_SZ];
 	unsigned char		*temp;
@@ -154,10 +160,10 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 	csa = &FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
 	bplmap = csd->bplmap;
-	assert(bplmap == BLKS_PER_LMAP);
+	assert(BLKS_PER_LMAP == bplmap);
 	blk_levl = bp->levl;
 	blk_size = bp->bsiz;
-	offset = (uint4)blk / bplmap;
+	offset_mm = blk / (block_id)bplmap;
 	util_len=0;
 	assert((STRLEN(TEXT1) + OFFSET_WINDOW + STRLEN(TEXT2)) == STRLEN(TEXT3));
 	MEMCPY_LIT(&util_buff[util_len], TEXT0);
@@ -179,7 +185,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 	 */
 	assert(!chain.flag || dollar_tlevel && (!csa->t_commit_crit
 						|| ((T_COMMIT_CRIT_PHASE1 == csa->t_commit_crit) && (GDS_CREATE_BLK_MAX == blk))));
-	if (!chain.flag && ((offset * bplmap) == (uint4)blk))					/* it's a bitmap */
+	if (!chain.flag && ((offset_mm * (block_id)bplmap) == blk))					/* it's a bitmap */
 	{
 		if ((unsigned char)blk_levl != LCL_MAP_LEVL)
 		{
@@ -198,7 +204,9 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 			return FALSE;
 		}
 		full = TRUE;
-		offset = ((csa->ti->total_blks - blk) >= bplmap) ? bplmap : (csa->ti->total_blks - blk);
+		/* The result of "csa->ti->total_blocls - blk" can be downcasted because it is constrained by the value of bplmap
+		 * which should never be larger the BLKS_PER_LMAP */
+		offset = ((csa->ti->total_blks - blk) >= bplmap) ? bplmap : (uint4)(csa->ti->total_blks - blk);
 		blk_top = (sm_uc_ptr_t)bp + BM_SIZE(offset + (BITS_PER_UCHAR / BML_BITS_PER_BLK) - 1);
 		for (chunk_p = (sm_uint_ptr_t)mp ;  (sm_uc_ptr_t)chunk_p - blk_top < 0 ;  chunk_p++)
 		{
@@ -471,7 +479,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 								fmtd_key_len = (int)(temp - key_buffer);
 								key_buffer[fmtd_key_len] = '\0';
 								RTS_ERROR_FUNC(csa, MAKE_MSG_INFO(ERR_DBNONUMSUBS), util_buff,
-									       error_action, NULL);
+										error_action, NULL);
 								GVKEY_FREE_IF_NEEDED(tmp_gvkey);
 							}
 						}

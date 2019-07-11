@@ -27,8 +27,14 @@
 /* Uncomment the below line to debug the flow of "mur_forward" with multiple parallel processes */
 /* #define	MUR_DEBUG */
 
+<<<<<<< HEAD
 #define JNL_EXTR_LABEL		"YDBJEX08"	/* format of the simple journal extract */
 #define JNL_DET_EXTR_LABEL	"YDBJDX09"	/* format of the detailed journal extract */
+=======
+/* TODO: v7 update?*/
+#define JNL_EXTR_LABEL		"GDSJEX07"	/* format of the simple journal extract */
+#define JNL_DET_EXTR_LABEL	"GDSJDX08"	/* format of the detailed journal extract */
+>>>>>>> 91552df2... GT.M V6.3-009
 
 error_def(ERR_MUINFOSTR);
 error_def(ERR_MUINFOUINT4);
@@ -42,6 +48,14 @@ error_def(ERR_SYSCALL);
 {									\
 	ptr = &murgbl.extr_buff[extract_len];				\
 	ptr = (char *)i2ascl((uchar_ptr_t)ptr, I);			\
+	extract_len += (int)(ptr - &murgbl.extr_buff[extract_len]);	\
+	murgbl.extr_buff[extract_len++] = '\\';				\
+}
+
+#define EXTQWX(I)							\
+{									\
+	ptr = &murgbl.extr_buff[extract_len];				\
+	ptr = (char *)i2asclx((uchar_ptr_t)ptr, I);			\
 	extract_len += (int)(ptr - &murgbl.extr_buff[extract_len]);	\
 	murgbl.extr_buff[extract_len++] = '\\';				\
 }
@@ -712,6 +726,7 @@ typedef struct
 	redirect_list		*redirect;
 	select_list		*user,
 				*database,
+				*patterns,
 				*global,
 				*process;
 	long_list		*id;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -102,6 +102,7 @@ omi_lkextnam(
     reg        = mlk_region_lookup(&lck, cptr->ga);
     OMI_SI_READ(&si, data);
     MLK_PVTBLK_ALLOC(elen, subcnt, si.value + 1, r);
+    MLK_PVTCTL_INIT(r->pvtctl, reg);
     r->translev      = 1;
     r->subscript_cnt = subcnt;
     r->nref_length  = elen;
@@ -109,7 +110,6 @@ omi_lkextnam(
     MLK_PVTBLK_TAIL(r)[0] = si.value;
     memcpy(MLK_PVTBLK_TAIL(r) + 1, data, si.value);
     MLK_PVTBLK_SUBHASH_GEN(r);
-    MLK_PVTCTL_INIT(r->pvtctl, reg);
     if (!mlk_pvtblk_insert(r))
     {
 	MLK_PVTBLK_VALIDATE(r);

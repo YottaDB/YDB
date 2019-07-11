@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -336,6 +336,14 @@ static	boolean_t	repl_cmp_solve_timer_set;
 	if (repl_connection_reset || gtmrecv_wait_for_jnl_seqno)		\
 		return;								\
 }
+#define WACKY_MESSAGE(MSG, SOCK_FD, TYPE)								\
+MBSTART {	/* If the header is wacky, assume it's a rogue transmission and reset the connection */	\
+	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received UNKNOWN message (type = %d / %d). "		\
+	"Discarding it and resetting connection.\n", MSG & REPL_TR_CMP_MSG_TYPE_MASK, TYPE);		\
+	repl_connection_reset = TRUE;									\
+	repl_close(SOCK_FD);										\
+	return;												\
+} MBEND
 
 /* The below macro is used (within this module) to check for errors (and issue appropriate message) after REPL_SEND_LOOP
  * returns.
@@ -2941,7 +2949,8 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				{
 					remote_side->endianness_known = TRUE;
 			                msg_type = ((repl_msg_ptr_t)buffp)->type;
-					assert((REPL_MSGTYPE_LAST > msg_type) || (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg_type)));
+					if (!((REPL_MSGTYPE_LAST > msg_type) || (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg_type))))
+						WACKY_MESSAGE(msg_type, &gtmrecv_sock_fd, 1);	/* impossible message type */
 					if ((REPL_MSGTYPE_LAST < msg_type) && (REPL_MSGTYPE_LAST > GTM_BYTESWAP_32(msg_type)))
 					{
 						remote_side->cross_endian = TRUE;
@@ -2963,6 +2972,8 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					hdr_msg_type = ((repl_msg_ptr_t)buffp)->type;
 					hdr_msg_len = ((repl_msg_ptr_t)buffp)->len;
 				}
+				if (0 >= hdr_msg_len)
+					WACKY_MESSAGE(hdr_msg_type, &gtmrecv_sock_fd, 2);	/* invalid length - overflow */
 				msg_type = hdr_msg_type & REPL_TR_CMP_MSG_TYPE_MASK;
 				if (REPL_TR_CMP_JNL_RECS == msg_type)
 				{
@@ -3038,6 +3049,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 			old_buffp = buffp;
 			buffp += buffered_data_len;
 			buff_unprocessed -= buffered_data_len;
+			assert(0 <= buff_unprocessed);
 			data_len -= buffered_data_len;
 			/* Once we have sent a REPL_RENEG_ACK, the only message we should get is the REPL_RENEG_COMPLETE. */
 			assert(buffp > buff_start);
@@ -3661,14 +3673,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 					break;
 #				endif
 				default:
-					/* Discard the message */
-					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Received UNKNOWN message (type = %d). "
-						"Discarding it.\n", msg_type);
-					assert(FALSE);
-					buffp += buffered_data_len;
-					buff_unprocessed -= buffered_data_len;
-					data_len -= buffered_data_len;
-					break;
+					WACKY_MESSAGE(msg_type, &gtmrecv_sock_fd, 3);	/* undefined message type */
 			}
 			if (repl_connection_reset)
 				return;
@@ -3682,7 +3687,8 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				 * length to buff_unprocessed and reset data_len so that the header is read again.
 				 */
 				data_len = 0;
-				buff_unprocessed += buffered_data_len + processed_hdrlen;
+				buff_unprocessed += (buffered_data_len + processed_hdrlen);
+				assert((0 <= buff_unprocessed) && (buff_unprocessed <= recvpool_size));
 				if (buffp_start != buff_start)
 					memmove(buff_start, buffp_start, buff_unprocessed);
 			} else if (0 != buff_unprocessed)

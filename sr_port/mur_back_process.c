@@ -621,7 +621,7 @@ uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 	int			gtmcrypt_errno;
 	boolean_t		use_new_key, is_trigger;
 	char			s[TRANS_OR_SEQ_NUM_CONT_CHK_FAILED_SZ];	/* for appending sequence or transaction number */
-	uint4			cur_total, old_total;
+	block_id		cur_total, old_total;
 	file_control		*fc;
 	unix_db_info		*udi;
 

@@ -393,6 +393,8 @@ int gtmrecv(void)
 		gtmrecv_exit(gtmrecv_checkhealth() - NORMAL_SHUTDOWN);
 	else if (gtmrecv_options.showbacklog)
 		gtmrecv_exit(gtmrecv_showbacklog() - NORMAL_SHUTDOWN);
+	else if (gtmrecv_options.stopreceiverfilter)
+		gtmrecv_exit(gtmrecv_stopfilter() - NORMAL_SHUTDOWN);
 	else
 		gtmrecv_exit(gtmrecv_statslog() - NORMAL_SHUTDOWN);
 	io_std_device.out = NULL;	/* See comment in gtmsource.c (has similar initialization) for why this is needed) */

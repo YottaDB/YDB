@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2017 Fidelity National Information	*
+ * Copyright (c) 2008-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -51,6 +51,8 @@
 #ifdef GTM_TLS
 #include "gtm_repl.h"
 #endif
+#include "jnl.h"
+#include "repl_filter.h"
 
 GBLREF	repl_msg_ptr_t		gtmrecv_msgp;
 GBLREF	int			gtmrecv_max_repl_msglen;
@@ -68,6 +70,7 @@ GBLREF	volatile time_t		gtmrecv_now;
 GBLREF	boolean_t		gtmrecv_send_cmp2uncmp;
 GBLREF	repl_conn_info_t	*remote_side;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+GBLREF	int			gtmrecv_filter;
 
 error_def(ERR_RECVPOOLSETUP);
 error_def(ERR_REPLCOMM);
@@ -660,6 +663,12 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 		gtmrecv_logstats = FALSE;
 		/* Force all data out to the file before closing the file */
 		repl_log(gtmrecv_log_fp, TRUE, TRUE, "End statistics logging\n");
+	}
+	if ((0 == *pending_data_len) && (gtmrecv_filter &  EXTERNAL_FILTER) && ('\0' == gtmrecv_local->filter_cmd[0]))
+	{
+		repl_log(gtmrecv_log_fp, TRUE, TRUE, "Stopping filter\n");
+		repl_stop_filter();
+		gtmrecv_filter &= ~EXTERNAL_FILTER;
 	}
 	if (0 == *pending_data_len)
 	{

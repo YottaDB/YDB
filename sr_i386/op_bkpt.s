@@ -1,6 +1,7 @@
 #################################################################
 #								#
-#	Copyright 2001, 2010 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2019 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -232,9 +233,6 @@ l10:	call	op_zst_over
 # PUBLIC	opp_zst_over_ret
 ENTRY opp_zst_over_ret
 	movl	frame_pointer,%eax
-	movw	msf_typ_off(%eax),%dx
-	testw	$1,%dx
-	je	l11
 	movl	zstep_level,%edx
 	movl	msf_old_frame_off(%eax),%eax
 	cmpl	%eax,%edx

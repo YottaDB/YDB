@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
@@ -1030,7 +1030,7 @@ int repl_stop_filter(void)
 {	/* Send a special record to indicate stop */
 	int	filter_exit_status, waitpid_res;
 
-	REPL_DPRINT1("Stopping filter\n");
+	REPL_DPRINT1("Stopping filter in repl_stop_filter\n");
 	repl_filter_send(seq_num_zero, NULL, 0, TRUE);
 	repl_filter_close_all_pipes();
 	free(extr_rec);

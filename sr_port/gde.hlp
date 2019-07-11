@@ -2216,7 +2216,14 @@
 
    **Note**
 
+<<<<<<< HEAD
    This help file is a concise representation of the revision r1.30 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
+=======
+   This help file is a concise representation of revision V6.3-009 of the
+   UNIX Administration and Operations Guide. To obtain a copy of the current
+   revision, go to www.fis-gtm.com and then click on the User Documentation
+   tab.
+>>>>>>> 91552df2... GT.M V6.3-009
 

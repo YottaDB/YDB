@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,25 +30,37 @@
 
 boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len)
 {
-	bool	asterisk_not_seen=TRUE;
-	int	pat_counter=0,count=0,jnl_counter=0,i,j=0,k=0,p,q,index1,count1=0,index2;
-	int     sav_jnl=0,pcount=0,jcount=0;
+	bool	escaped_chars[pat_len], asterisk_not_seen=TRUE;
+	int	pat_counter=0, pat_str_escaped_counter=0, count=0, jnl_counter=0, i, j=0, k=0, p, q, index1, count1=0, index2;
+	int     sav_jnl=0, pcount=0, jcount=0, escaped_chars_length=0, pat_str_escaped_len=0;
+	char	pat_str_escaped[pat_len];
 
-	/* correcting the length inconsistencies in padded arrays from $getjpi */
-	for (q = jnl_len - 1; q > 0; q--)
+	/* Adjust the pattern string, to remove the escape chars and make the array of indices to be escaped */
+	memset(escaped_chars, 0, SIZEOF(escaped_chars)*SIZEOF(bool));
+	index1 = index2 = 0;
+	while (index1 < pat_len)
 	{
-		if ( (*(jnl_str + q) == ' ') || (*(jnl_str + q ) == 0))
-			jnl_len-- ;
-		else
-			break;
+		if (*(pat_str + index1) == '\\')
+		{
+			escaped_chars[index2] = TRUE;
+			index1++;
+			if (index1 >= pat_len)
+				break;
+		}
+		pat_str_escaped[index2++] = pat_str[index1++];
 	}
-	while ((jnl_counter < jnl_len) && (pat_counter < pat_len))  /* main loop */
+	assert(index2 <= index1);
+	pat_str_escaped_len = index2;
+	pat_str_escaped[pat_str_escaped_len] = '\0';
+	/* Use the new pattern string */
+	while ((jnl_counter < jnl_len) && (pat_counter < pat_str_escaped_len))  /* main loop */
 	{
-		while ((jnl_counter < jnl_len) && (pat_counter < pat_len)
-				&& (*(pat_str + pat_counter) != '*') && ( *(pat_str + pat_counter) != '%'))
+		while ((jnl_counter < jnl_len) && (pat_counter < pat_str_escaped_len) &&
+				(escaped_chars[pat_counter] ||
+					 ((*(pat_str_escaped + pat_counter) != '*') && (*(pat_str_escaped + pat_counter) != '%'))))
 		{
 			asterisk_not_seen = TRUE;
-			if ( *(jnl_str + jnl_counter) != *(pat_str + pat_counter) )
+			if ( *(jnl_str + jnl_counter) != *(pat_str_escaped + pat_counter) )
 				return(FALSE);  /* characters do not match */
 			else  /* go to next char */
 			{
@@ -57,26 +69,26 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 			}
 		}
 		/* break out of loop if wildcard seen */
-		if ((pat_counter < pat_len) && (jnl_counter < jnl_len) && (*(pat_str + pat_counter) == '%'))
+		if ((pat_counter < pat_str_escaped_len) && (jnl_counter < jnl_len) && (*(pat_str_escaped + pat_counter) == '%'))
 		{	/* simple case of percent: increment pointers and continue */
 			jnl_counter++;
 			pat_counter++;
-		} else if ((pat_counter < pat_len) && (*(pat_str + pat_counter) == '*')) /* gets rough ,fasten seat belts */
-		{
+		} else if ((pat_counter < pat_str_escaped_len) && (*(pat_str_escaped + pat_counter) == '*'))
+		{	/* gets rough ,fasten seat belts */
 			pat_counter++;
 			i = pat_counter;
-			while (asterisk_not_seen && (i < pat_len)) /* find the next occurrence of asterisk to memcmp */
+			while (asterisk_not_seen && (i < pat_str_escaped_len)) /* find the next occurrence of asterisk to memcmp */
 			{
-				if (*(pat_str + i) == '*')
+				if (!escaped_chars[i] && (*(pat_str_escaped + i) == '*'))
 					asterisk_not_seen = FALSE;
 				else
 					i++;
 			}
-			if (i == pat_len)  /* no asterisk found after the current one */
+			if (i == pat_str_escaped_len)  /* no asterisk found after the current one */
 			{
 				if ((i - pat_counter) > jnl_len)
 					return(FALSE);
-				if (!memcmp(jnl_str + (jnl_len - (i - pat_counter)), pat_str + pat_counter, i - pat_counter))
+				if (!memcmp(jnl_str + (jnl_len - (i-pat_counter)), pat_str_escaped + pat_counter, i - pat_counter))
 					return(TRUE);
 				else    /* maybe they do not match or else it contains percent character */
 				{
@@ -84,8 +96,8 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 					count = pat_counter;
 					while (count1 < index1)
 					{
-						if (( *(pat_str + count) == '%') ||
-						    ( *(pat_str + count) == *(jnl_str + (jnl_len - index1) + count1 )))
+						if ((!escaped_chars[count] && ( *(pat_str_escaped + count) == '%')) ||
+						    ( *(pat_str_escaped + count) == *(jnl_str + (jnl_len - index1) + count1 )))
 						{
 							pat_counter++;
 							count++;
@@ -96,16 +108,16 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 							count++;
 						}
 					}
-					if (pat_counter == pat_len)
+					if (pat_counter == pat_str_escaped_len)
 						return(TRUE);
 					else
 						return(FALSE);
 				}
-			} else if (i < pat_len)	/* another asterisk seen before end of string */
+			} else if (i < pat_str_escaped_len)	/* another asterisk seen before end of string */
 			{
 				sav_jnl = jnl_counter;
 				while ((jnl_counter < jnl_len)
-						&& memcmp(jnl_str + jnl_counter, pat_str + pat_counter, i - pat_counter))
+						&& memcmp(jnl_str + jnl_counter, pat_str_escaped + pat_counter, i - pat_counter))
 					jnl_counter++;
 				if (jnl_counter == jnl_len)
 				{
@@ -113,8 +125,8 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 					index2 = pat_counter;
 					while (index2 <= (jnl_len - jcount) + 1)
 					{
-						if (( *(pat_str + pat_counter) == '%') ||
-						    ( *(pat_str + pat_counter) ==  *(jnl_str + sav_jnl)))
+						if ((!escaped_chars[pat_counter] && ( *(pat_str_escaped + pat_counter) == '%')) ||
+						    ( *(pat_str_escaped + pat_counter) ==  *(jnl_str + sav_jnl)))
 						{
 							pat_counter++;
 							sav_jnl++;
@@ -133,18 +145,18 @@ boolean_t	mur_do_wildcard(char *jnl_str, char *pat_str, int jnl_len, int pat_len
 						return(FALSE);
 				}
 				/* synchronize the character pointers after processing an asterisk */
-				if (i < (pat_len - 1))
+				if (i < (pat_str_escaped_len - 1))
 					pat_counter = i + 1;
 				while ((jnl_counter < jnl_len)
-						&& (*(jnl_str + jnl_counter) != *(pat_str + pat_counter))
-						&& (*(pat_str + pat_counter) != '%'))
+						&& (*(jnl_str + jnl_counter) != *(pat_str_escaped + pat_counter))
+						&& ((escaped_chars[pat_counter] || *(pat_str_escaped + pat_counter) != '%')))
 					jnl_counter++;
 				if (jnl_counter == jnl_len) /* if unable to synchronize */
 					return(FALSE);
 			}
 		}
 	}
-	if ((jnl_counter == jnl_len) && (pat_counter == pat_len))
+	if ((jnl_counter == jnl_len) && (pat_counter == pat_str_escaped_len))
 		return TRUE;
 	else
 		return FALSE;

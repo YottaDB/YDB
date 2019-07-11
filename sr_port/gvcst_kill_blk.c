@@ -41,7 +41,7 @@ GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF gv_namehead	*gv_target;
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF uint4		update_array_size;	/* for the BLK_* macros */
-GBLREF sgmnt_addrs      *cs_addrs;
+GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF unsigned int	t_tries;
 GBLREF uint4		dollar_tlevel;
 GBLREF sgm_info		*sgm_info_ptr;
@@ -50,12 +50,12 @@ GBLREF boolean_t	horiz_growth;
 /* delete all records greater than low and less than high in blkhist->blk_num */
 
 enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
-			       char		level,
-			       gv_key  		*search_key,
-			       srch_rec_status	low,
-			       srch_rec_status	high,
-			       boolean_t	right_extra,
-			       cw_set_element	**cseptr)
+				char		level,
+				gv_key		*search_key,
+				srch_rec_status	low,
+				srch_rec_status	high,
+				boolean_t	right_extra,
+				cw_set_element	**cseptr)
 {
 	typedef sm_uc_ptr_t		bytptr;
 
@@ -68,7 +68,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	blk_hdr_ptr_t			old_blk_hdr;
 	rec_hdr_ptr_t			left_ptr;	/*pointer to record before first record to delete*/
 	rec_hdr_ptr_t			del_ptr;	/*pointer to first record to delete*/
-	rec_hdr_ptr_t	       		right_ptr;	/*pointer to record after last record to delete*/
+	rec_hdr_ptr_t			right_ptr;	/*pointer to record after last record to delete*/
 	rec_hdr_ptr_t			right_prev_ptr;
 	rec_hdr_ptr_t			rp, rp1;	/*scratch record pointer*/
 	rec_hdr_ptr_t			first_in_blk, top_of_block, new_rec_hdr, star_rec_hdr;
@@ -89,7 +89,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	blk = blkhist->blk_num;
 	if (dollar_tlevel)
 	{
-		PUT_LONG(&chain1, blk);
+		PUT_LONG(&chain1, blk);	/* TODO: V7 change to PUT_LLONG */
 		if ((1 == chain1.flag) && ((int)chain1.cw_index >= sgm_info_ptr->cw_set_depth))
 		{
 			assert(sgm_info_ptr->tp_csa == cs_addrs);
@@ -343,11 +343,11 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		assert(!old_cse->undo_next_off[0] && !old_cse->undo_offset[0]);
 		assert(!old_cse->undo_next_off[1] && !old_cse->undo_offset[1]);
 	}
-        if ((NULL != cse)  &&  (0 != cse->first_off))
+	if ((NULL != cse)  &&  (0 != cse->first_off))
 	{	/* fix up chains in the block to account for deleted records */
 		prev = NULL;
 		curr = buffer + cse->first_off;
-		GET_LONGP(&curr_chain, curr);
+		GET_LONGP(&curr_chain, curr);	/* TODO: V7 change to GET_LLONGP */
 		while (curr < (bytptr)del_ptr)
 		{	/* follow chain to first deleted record */
 			if (0 == curr_chain.next_off)
@@ -356,7 +356,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				break;	/* special case described below: stop just before the first deleted record */
 			prev = curr;
 			curr += curr_chain.next_off;
-			GET_LONGP(&curr_chain, curr);
+			GET_LONGP(&curr_chain, curr);	/* TODO: V7 change to GET_LLONGP */
 		}
 		if (right_ptr == top_of_block  &&  (bytptr)del_ptr - curr == SIZEOF(off_chain))
 		{
@@ -373,10 +373,10 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				assert(old_cse->undo_offset[0]);
 			}
 			curr_chain.next_off = 0;
-			GET_LONGP(curr, &curr_chain);
+			GET_LONGP(curr, &curr_chain);	/* TODO: V7 change to GET_LLONGP */
 			if (NULL != prev)
 			{	/* adjust previous chain next_off to reflect the fact that the record it refers to is now a *-key */
-				GET_LONGP(&prev_chain, prev);
+				GET_LONGP(&prev_chain, prev);	/* TODO: V7 change to GET_LLONGP */
 				/* store next_off in old_cse before actually changing it in the buffer(for rolling back) */
 				if (horiz_growth)
 				{
@@ -385,7 +385,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 					assert(old_cse->undo_offset[1]);
 				}
 				prev_chain.next_off = (unsigned int)((bytptr)left_ptr - prev + (unsigned int)(SIZEOF(rec_hdr)));
-				GET_LONGP(prev, &prev_chain);
+				GET_LONGP(prev, &prev_chain);	/* TODO: V7 change to GET_LLONGP */
 			} else	/* it's the first (and only) one */
 				cse->first_off = (block_offset)((bytptr)left_ptr - buffer + SIZEOF(rec_hdr));
 		} else if (curr >= (bytptr)del_ptr)
@@ -395,7 +395,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				if (0 == curr_chain.next_off)
 					break;
 				curr += curr_chain.next_off;
-				GET_LONGP(&curr_chain, curr);
+				GET_LONGP(&curr_chain, curr);	/* TODO: V7 change to GET_LLONGP */
 			}
 			/* prev :   ptr to chain record immediately preceding the deleted area,
 			 *	    or 0 if none.
@@ -407,7 +407,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 			{	/* the former end of the chain is going, going, gone */
 				if (NULL != prev)
 				{	/* terminate the chain before the delete */
-					GET_LONGP(&prev_chain, prev);
+					GET_LONGP(&prev_chain, prev);	/* TODO: V7 change to GET_LLONGP */
 					/* store next_off in old_cse before actually changing it in the buffer(for rolling back) */
 					if (horiz_growth)
 					{
@@ -416,7 +416,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 						assert(old_cse->undo_offset[0]);
 					}
 					prev_chain.next_off = 0;
-					GET_LONGP(prev, &prev_chain);
+					GET_LONGP(prev, &prev_chain);	/* TODO: V7 change to GET_LLONGP */
 				} else
 					cse->first_off = 0;		/* the whole chain is gone */
 			} else
@@ -424,7 +424,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 				/* next_rec_shrink is the change in record size due to the new compression count */
 				if (NULL != prev)
 				{
-					GET_LONGP(&prev_chain, prev);
+					GET_LONGP(&prev_chain, prev);	/* TODO: V7 change to GET_LLONGP */
 					/* ??? new compression may be less (ie +) so why are negative shrinks ignored? */
 					/* store next_off in old_cse before actually changing it in the buffer(for rolling back) */
 					if (horiz_growth)
@@ -435,7 +435,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 					}
 					prev_chain.next_off = (unsigned int)(curr - prev - ((bytptr)right_ptr - (bytptr)del_ptr)
 						+ (next_rec_shrink > 0 ? next_rec_shrink : 0));
-					GET_LONGP(prev, &prev_chain);
+					GET_LONGP(prev, &prev_chain);	/* TODO: V7 change to GET_LLONGP */
 				} else	/* curr remains first: adjust the head */
 					cse->first_off = (block_offset)(curr - buffer - ((bytptr)right_ptr - (bytptr)del_ptr)
 						+ (next_rec_shrink > 0 ? next_rec_shrink : 0));

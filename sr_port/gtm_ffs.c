@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,14 +11,15 @@
  ****************************************************************/
 
 #include "mdef.h"
+#include "gdsroot.h"
 #include "gtm_ffs.h"
 
 #define BITS_PER_UCHAR	8
 
-int gtm_ffs (uint4 offset, uchar_ptr_t addr, uint4 size)
+block_id gtm_ffs (block_id offset, uchar_ptr_t addr, block_id size)
 {
 	uchar_ptr_t	c;
-	int		i, j, top;
+	block_id	i, j, top;
 
 	c = addr + (offset / BITS_PER_UCHAR);
 	if (i = (offset & (BITS_PER_UCHAR - 1)))

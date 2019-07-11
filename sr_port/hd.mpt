@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 1987-2018 Fidelity National Information		;
+; Copyright (c) 1987-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	;
@@ -17,6 +17,7 @@
 	; invoke at FUNC as an extrinsic function
 	; if you make heavy use of this routine, consider an external call.
 	;
+<<<<<<< HEAD
 	s %HD=$$FUNC(%HD)
 	q
 INT	r !,"Hexadecimal: ",%HD s %HD=$$FUNC(%HD)
@@ -52,3 +53,16 @@ VALIDVAL(val)
         . q:inv=1
         set:res'=0 res=$extract(val,i,$zlength(val))
         quit res
+=======
+	set %HD=$$FUNC(%HD)
+	quit
+INT	read !,"Hexidecimal: ",%HD set %HD=$$FUNC(%HD)
+	quit
+FUNC(h)
+	quit:"-"=$extract(h) ""		; 0>h risks NUMOFLOW
+	new c,d,dg,l
+	set d=0,h=$translate(h,"abcdef","ABCDEF"),l=$length(h)
+	if (15>l) for c=1:1:l set dg=$find("0123456789ABCDEF",$extract(h,c)) quit:'dg  set d=(d*16)+(dg-2)
+	else  quit $$CONVERTBASE^%CONVBASEUTIL(h,16,10)
+	quit d
+>>>>>>> 91552df2... GT.M V6.3-009

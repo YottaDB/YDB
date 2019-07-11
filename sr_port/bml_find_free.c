@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -11,8 +12,12 @@
 
 #include "mdef.h"
 #include "gdsroot.h"
+#include "gtm_facility.h"
+#include "fileinfo.h"
+#include "gdsbt.h"
 #include "gdsblk.h"
 #include "gdsbml.h"
+#include "gdsfhead.h"
 
 #define	RETURN_IF_FREE(valid, ptr, base_addr)							\
 {												\
@@ -35,17 +40,22 @@
 /* Returns the location of the first set bit in the field. The search starts at the hint and wraps if necessary.
  * If a non-null update array is passed, that is also taken into account while figuring out if any free block is available.
  */
-int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits)
+int4 bml_find_free(block_id hint, uchar_ptr_t base_addr, block_id total_bits)
 {
 	uchar_ptr_t	ptr, top;
 	unsigned char 	valid;
-	int4		bits;
+	block_id	bits;
+
+	/* This function is specifically for local maps so the block indexes
+	 * hint and total_bits should not be larger then BLKS_PER_LMAP
+	 */
+	assert(BLKS_PER_LMAP >= total_bits);
 
 	hint *= BML_BITS_PER_BLK;
 	hint = hint / BITS_PER_UCHAR;
 	total_bits *= BML_BITS_PER_BLK;
 
-	if (hint > total_bits)
+	if (hint > DIVIDE_ROUND_UP(total_bits, BITS_PER_UCHAR))
 		hint = 0;
 	for (ptr = base_addr + hint, top = base_addr + DIVIDE_ROUND_UP(total_bits, BITS_PER_UCHAR) - 1; ptr < top; ptr++)
 	{

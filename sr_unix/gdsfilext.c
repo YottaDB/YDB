@@ -134,23 +134,23 @@ STATICFNDEF int extend_wait_for_write(unix_db_info *udi, int blk_size, off_t new
 	return save_errno;
 }
 
-uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
+uint4	 gdsfilext(block_id blocks, block_id filesize, boolean_t trans_in_prog)
 {
 	sm_uc_ptr_t		old_base[2], mmap_retaddr;
 	boolean_t		was_crit, is_mm;
 	int			fd, result, save_errno, status, to_msg, to_wait, wait_period;
 	DEBUG_ONLY(int		first_save_errno);
-	uint4			new_bit_maps, bplmap, map, new_blocks, new_total, max_tot_blks, old_total;
+	block_id		new_bit_maps, bplmap, map, new_blocks, new_total, max_tot_blks, old_total;
 	uint4			jnl_status;
 	gtm_uint64_t		avail_blocks, mmap_sz;
 	off_t			new_eof, new_size, old_size;
 	trans_num		curr_tn;
 	unix_db_info		*udi;
 	inctn_opcode_t		save_inctn_opcode;
-	int4			prev_extend_blks_to_upgrd;
+	block_id		prev_extend_blks_to_upgrd;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
-	cache_rec_ptr_t         cr;
+	cache_rec_ptr_t		cr;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_NOSPC_ENABLED */
 	char			*db_file_name = "";
 	DCL_THREADGBL_ACCESS;
@@ -168,16 +168,16 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		return (uint4)(NO_FREE_SPACE); /* should this be changed to show extension not allowed ? */
 #	endif
 	/* Both blocks and total blocks are unsigned ints so make sure we aren't asking for huge numbers that will
-	   overflow and end up doing silly things.
-	*/
+	 * overflow and end up doing silly things.
+	 */
 	assert((blocks <= (MAXTOTALBLKS(cs_data) - cs_data->trans_hist.total_blks)) || WBTEST_ENABLED(WBTEST_FILE_EXTEND_ERROR));
 	if (!blocks && (cs_data->defer_allocate || (TRANS_IN_PROG_TRUE == trans_in_prog)))
 		return (uint4)(NO_FREE_SPACE); /* should this be changed to show extension not enabled ? */
 	bplmap = cs_data->bplmap;
 	/* New total of non-bitmap blocks will be number of current, non-bitmap blocks, plus new blocks desired
 	 * There are (bplmap - 1) non-bitmap blocks per bitmap, so add (bplmap - 2) to number of non-bitmap blocks
-	 *      and divide by (bplmap - 1) to get total number of bitmaps for expanded database. (must round up in this
-	 *      manner as every non-bitmap block must have an associated bitmap)
+	 *	and divide by (bplmap - 1) to get total number of bitmaps for expanded database. (must round up in this
+	 *	manner as every non-bitmap block must have an associated bitmap)
 	 * Current number of bitmaps is (total number of current blocks + bplmap - 1) / bplmap.
 	 * Subtract current number of bitmaps from number needed for expanded database to get number of new bitmaps needed.
 	 */
@@ -231,11 +231,11 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	assert(!cs_addrs->hold_onto_crit || was_crit);
 	/* If we are coming from mupip_extend (which gets crit itself) we better have waited for any unfreezes to occur.
 	 * If we are coming from online rollback (when that feature is available), we will come in holding crit and in
-	 * 	the final retry. In that case too, we expect to have waited for unfreezes to occur in the caller itself.
+	 *	the final retry. In that case too, we expect to have waited for unfreezes to occur in the caller itself.
 	 * Therefore if we are coming in holding crit from MUPIP, we expect the db to be unfrozen so no need to wait for
 	 * freeze.
 	 * If we are coming from GT.M and final retry (in which case we come in holding crit) we expect to have waited
-	 * 	for any unfreezes (by invoking tp_crit_all_regions) to occur (TP or non-TP) before coming into this
+	 *	for any unfreezes (by invoking tp_crit_all_regions) to occur (TP or non-TP) before coming into this
 	 *	function. However, there is one exception. In the final retry, if tp_crit_all_regions notices that
 	 *	at least one of the participating regions did ONLY READs, it will not wait for any freeze on THAT region
 	 *	to complete before grabbing crit. Later, in the final retry, if THAT region did an update which caused
@@ -357,7 +357,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		 * of the gdsfilext below) while the global buffer continues to have an incorrect copy of that bitmap block and
 		 * this in turn would cause XXXX failures due to a bad bitmap block in shared memory. (GTM-7519)
 		 */
-		cr = db_csh_get((block_id)old_total);
+		cr = db_csh_get(old_total);
 		if ((NULL != cr) && ((cache_rec_ptr_t)CR_NOTVALID != cr))
 		{
 			assert((0 == cr->dirty) && (0 == cr->bt_index) && !cr->stopped);
@@ -518,7 +518,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	if (blocks / bplmap * bplmap != blocks)
 	{
 		bit_set(blocks / bplmap, MM_ADDR(cs_data)); /* Mark old last local map as having space */
-		if ((int4)blocks > cs_addrs->nl->highest_lbm_blk_changed)
+		if (blocks > cs_addrs->nl->highest_lbm_blk_changed)
 			cs_addrs->nl->highest_lbm_blk_changed = blocks;
 	}
 	curr_tn = cs_addrs->ti->curr_tn;
@@ -570,7 +570,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 		gds_map_moved(mmap_retaddr, old_base[0], old_base[1], mmap_sz); /* updates cs_addrs->db_addrs[1] */
 		cs_addrs->db_addrs[0] = mmap_retaddr;
 		assert(cs_addrs->db_addrs[0] < cs_addrs->db_addrs[1]);
- 	}
+	}
 	GDSFILEXT_CLNUP;
 	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_db_extends, 1);
 	if (!ydb_dbfilext_syslog_disable)

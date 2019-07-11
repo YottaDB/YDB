@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2018 Fidelity National Information	*
+ * Copyright (c) 2017-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -25,7 +25,7 @@ error_def(ERR_SYSUTILCONF);
 
 GBLREF    volatile boolean_t      timer_in_handler;
 
-/*Get the path to system utilities and prepend it to the command*/
+/* Get the path to system utilities and prepend it to the command. Caller sends the max size of the command buffer */
 int gtm_confstr(char *command, int maxsize)
 {
 	char 		pathbuf[MAX_FN_LEN];
@@ -35,16 +35,14 @@ int gtm_confstr(char *command, int maxsize)
 	struct stat 	sb;
 
 	n = confstr(_CS_PATH, NULL, (size_t) 0);
-	if (n)
-	{
-		assert(n <= MAX_FN_LEN);
-		confstr(_CS_PATH, pathbuf, MAX_FN_LEN);
-	} else
+	assert(n <= MAX_FN_LEN);
+	if ((n > maxsize) || (0 == n))
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SYSUTILCONF, 2,
 						LEN_AND_LIT("Path for system utilities not defined"));
 		return -1;
 	}
+	confstr(_CS_PATH, pathbuf, n);
 	cmdlen = strlen(command);
 	path_tok = STRTOK_R(pathbuf, ":", &path_tokptr);
 	assert(cmdlen && (path_tok != NULL));
@@ -52,6 +50,8 @@ int gtm_confstr(char *command, int maxsize)
 	{
 		tok_len = strlen(path_tok);
 		assert((tok_len + cmdlen + 2) < maxsize);
+		if (maxsize <= (tok_len + cmdlen + 2))	/* Path + command will exceed command buffer size */
+			break;
 		cmd_path = malloc(tok_len + cmdlen + 2);
 		cmd_ptr = cmd_path;
 		memcpy(cmd_ptr, path_tok, tok_len);
@@ -66,14 +66,18 @@ int gtm_confstr(char *command, int maxsize)
 		{
 			cmdlen = strlen(cmd_path);
 			assert(maxsize > cmdlen + 1);
+			if (maxsize <= (cmdlen + 1))	/* Path + command will exceed command buffer size */
+			{
+				free(cmd_path);
+				break;
+			}
 			memcpy(command , cmd_path, cmdlen);
 			memcpy(command + cmdlen, " ", 1);
 			command[cmdlen + 1] = '\0';
 			free(cmd_path);
 			return 0;
 		}
-		else
-			free(cmd_path);
+		free(cmd_path);
 	} while (NULL != (path_tok = STRTOK_R(NULL, ":", &path_tokptr) ));
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SYSUTILCONF, 2,
 				LEN_AND_LIT("System utilities not found at the specified path"));

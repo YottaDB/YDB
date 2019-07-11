@@ -61,7 +61,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 		ks = kill_set_tail;
 	else
 	{
-		PUT_LONG(&chain, blk);
+		PUT_LONG(&chain, blk); /* TODO: V7 change to PUT_LLONG */
 		tp_srch_status = NULL;
 		if (chain.flag == 1)
 			tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain.cw_index, &cse);
@@ -76,7 +76,7 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 			if (!committed)
 			{
 				assert(dollar_tlevel >= cse->t_level);
-	     			if (NULL != cse->high_tlevel)
+				if (NULL != cse->high_tlevel)
 				{	/* this is possible only if this block is already part of either of the tree paths
 					 * in gv_target->hist or alt_hist (see gvcst_kill.c) and got a newer cse created as
 					 * part of a gvcst_kill_blk on this block in gvcst_kill.c a little before the call
@@ -182,8 +182,8 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 		ks->blk[ks->used].flag = 0;
 	} else
 	{
-	    	ks->blk[ks->used].block = chain.cw_index;
-	    	ks->blk[ks->used].flag = chain.flag;
+		ks->blk[ks->used].block = chain.cw_index;
+		ks->blk[ks->used].flag = chain.flag;
 	}
 	++ks->used;
 	assert(ks->used <= BLKS_IN_KILL_SET);

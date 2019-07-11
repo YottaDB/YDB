@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -16,30 +16,30 @@
 #ifndef MDQ_H_DEFINED
 #define MDQ_H_DEFINED
 
-/* Define basic working macros for queue management of doubly linked list is defined using elements "n.fl" and "n.bl".
+/* Define basic working macros for queue management of doubly linked list is defined using elements "N.fl" and "N.bl".
  * The DSRINS insert at tail rather than head and so work FIFO rather than LIFO with DQLOOP and associated macros
  */
 
-/* Loop through a linked list given any element as the start (q) and a var to use as loop incrementer */
-#define DQLOOP(q, n, i) for (i = (q)->n.fl; (i) != (q); (i) = (i)->n.fl)
+/* Loop through a linked list given any element as the start (Q) and a var to use as loop incrementer */
+#define DQLOOP(Q, N, I) for (I = (Q)->N.fl; (I) != (Q); (I) = (I)->N.fl)
 
 /* Initialize an element */
-#define DQINIT(q, n) ((q)->n.fl = (q)->n.bl = (q))
+#define DQINIT(Q, N) ((Q)->N.fl = (Q)->N.bl = (Q))
 
-/* Delete one element "x" from the doubly linked list */
-#define DQDEL(x, n) ((x)->n.bl->n.fl = (x)->n.fl, (x)->n.fl->n.bl = (x)->n.bl)
+/* Delete one element "X" from the doubly linked list */
+#define DQDEL(X, N) ((X)->N.bl->N.fl = (X)->N.fl, (X)->N.fl->N.bl = (X)->N.bl)
 
-/* Delete a doubly-linked list of elements from "q->n.fl" to "x->n.bl" (i.e. everything in between "q" and "x" excluding them) */
-#define DQDELCHAIN(q, x, n) ((q)->n.fl = (x), (x)->n.bl = (q))
+/* Delete a doubly-linked list of elements from "Q->N.fl" to "X->N.bl" (i.e. everything in between "Q" and "X" excluding them) */
+#define DQDELCHAIN(Q, X, N) ((Q)->N.fl = (X), (X)->N.bl = (Q))
 
-/* Insert one element "x" in between "q" and "q->n.fl" */
-#define DQINS(q, n, x) ((x)->n.fl = (q)->n.fl, (x)->n.bl = (q), (q)->n.fl = (x), ((x)->n.fl)->n.bl = (x))
+/* Insert one element "X" in between "Q" and "Q->N.fl" */
+#define DQINS(Q, N, X) ((X)->N.fl = (Q)->N.fl, (X)->N.bl = (Q), (Q)->N.fl = (X), ((X)->N.fl)->N.bl = (X))
 
-/* Insert one element "x" in between "q" and "q->n.bl" */
-#define DQRINS(q, n, x) ((x)->n.bl = (q)->n.bl, (x)->n.fl = (q), (q)->n.bl = (x), ((x)->n.bl)->n.fl = (x))
+/* Insert one element "X" in between "Q" and "Q->N.bl" */
+#define DQRINS(Q, N, X) ((X)->N.bl = (Q)->N.bl, (X)->N.fl = (Q), (Q)->N.bl = (X), ((X)->N.bl)->N.fl = (X))
 
-/* Insert a doubly-linked list of elements from "x->n.fl" to "x->n.bl" in between "q" and "q->n.fl" */
-#define DQADD(q, x, n) ((q)->n.fl->n.bl = (x)->n.bl, (x)->n.bl->n.fl = (q)->n.fl, (q)->n.fl = (x)->n.fl, (x)->n.fl->n.bl = (q))
+/* Insert a doubly-linked list of elements from "X->N.fl" to "X->N.bl" in between "Q" and "Q->N.fl" */
+#define DQADD(Q, X, N) ((Q)->N.fl->N.bl = (X)->N.bl, (X)->N.bl->N.fl = (Q)->N.fl, (Q)->N.fl = (X)->N.fl, (X)->N.fl->N.bl = (Q))
 
 /* Define macros actually used which if #define DEBUG_TRIPLES, adds debugging information. Since these macros are
  * used in several different queue types and since these debugging macros only work for the exorder field in triples,
@@ -47,35 +47,53 @@
  * debugging are statically defined.
  */
 
-#define dqloop(q, n, i) DQLOOP(q, n, i)
-#define dqinit(q, n)	DQINIT(q, n)
+#define dqloop(Q, N, I) DQLOOP(Q, N, I)
+#define dqinit(Q, N)	DQINIT(Q, N)
 
+<<<<<<< HEAD
 /*#define DEBUG_TRIPLES / * Uncomment this to do triple debugging, which is also tied to ydb_dbglvl, as of this writing: 0x4000 */
+=======
+/* #define DEBUG_TRIPLES / * Uncomment this to do triple debugging, which is also tied to gtmdbglvl, as of this writing: 0x4000 */
+>>>>>>> 91552df2... GT.M V6.3-009
 #ifndef DEBUG_TRIPLES
-#  define dqdel(x, n)		DQDEL(x, n)
-#  define dqdelchain(q, x, n)	DQDELCHAIN(q, x, n)
-#  define dqins(q, n, x)	DQINS(q, n, x)
-#  define dqrins(q, n, x)	DQRINS(q, n, x)
-#  define dqadd(q, x, n)	DQADD(q, x, n)
-#  define CHKTCHAIN(q, n, b)
+#  define dqdel(X, N)		DQDEL(X, N)
+#  define dqdelchain(Q, X, N)	DQDELCHAIN(Q, X, N)
+#  define dqins(Q, N, X)	DQINS(Q, N, X)
+#  define dqrins(Q, N, X)	DQRINS(Q, N, X)
+#  define dqadd(Q, X, N)	DQADD(Q, X, N)
+#  define CHKTCHAIN(Q, N, B)
 #else
 #  include "compiler.h"
 #  include "gtm_string.h"
 #  include "gtmdbglvl.h"
+<<<<<<< HEAD
 GBLREF	uint4		ydbDebugLevel;
 /* q: head of queue to check; n: the name of queue; b: whether to check main exorder (from curtchain) and any expr_start queue */
 #  define CHKTCHAIN(q, n, b)								\
+=======
+GBLREF	uint4		gtmDebugLevel;
+/* Q: head of queue to check; N: the name of queue; B: whether to check main exorder (from curtchain) and any expr_start queue */
+#  define CHKTCHAIN(Q, N, B)								\
+>>>>>>> 91552df2... GT.M V6.3-009
 MBSTART {										\
 	triple	*c;									\
 	DCL_THREADGBL_ACCESS;								\
 											\
 	SETUP_THREADGBL_ACCESS;								\
 					/* memcmp() is fast and 3 chars sufficient */	\
+<<<<<<< HEAD
  	if ((ydbDebugLevel & GDL_DebugCompiler) && (0 == memcmp(#n, "exorder", 3)))	\
 	{										\
 		if ((triple *)-1 != (triple *)q) /* to avoid post-checking deletes */	\
 			chktchain((triple *)q);						\
 		if (b)									\
+=======
+ 	if ((gtmDebugLevel & GDL_DebugCompiler) && (0 == memcmp(#N, "exorder", 3)))	\
+	{										\
+		if ((triple *)-1 != (triple *)(Q)) /* to avoid post-checking deletes */	\
+			chktchain((triple *)(Q));					\
+		if (B)									\
+>>>>>>> 91552df2... GT.M V6.3-009
 		{									\
 			c = TREF(curtchain);						\
 			chktchain(c);		/* this might be redundant, or not! */	\
@@ -85,6 +103,7 @@ MBSTART {										\
 		}									\
 	}										\
 } MBEND
+<<<<<<< HEAD
 #  define dqdel(x, n)			\
 MBSTART {				\
 	CHKTCHAIN((x), n, FALSE);	\
@@ -96,25 +115,38 @@ MBSTART {				\
 	CHKTCHAIN((q), n, FALSE);	\
 	DQDELCHAIN((q), (x), n);	\
 	CHKTCHAIN((q), n, TRUE);	\
+=======
+#  define dqdel(X, N)		\
+MBSTART {			\
+	CHKTCHAIN(X, N, FALSE);	\
+	DQDEL(X, N);		\
+	CHKTCHAIN(-1, N, TRUE);	\
 } MBEND
-#  define dqins(q, n, x)		\
-MBSTART {				\
-	CHKTCHAIN((q), n, FALSE);	\
-	DQINS((q), n, (x));		\
-	CHKTCHAIN((q), n, TRUE);	\
+#  define dqdelchain(Q, X, N)	\
+MBSTART {			\
+	CHKTCHAIN(Q, N, FALSE);	\
+	DQDELCHAIN(Q, X, N);	\
+	CHKTCHAIN(Q, N, TRUE);	\
+>>>>>>> 91552df2... GT.M V6.3-009
 } MBEND
-#  define dqrins(q, n, x)		\
-MBSTART {				\
-	CHKTCHAIN((q), n, FALSE);	\
-	DQRINS((q), n, (x));		\
-	CHKTCHAIN((q), n, TRUE);	\
+#  define dqins(Q, N, X)	\
+MBSTART {			\
+	CHKTCHAIN(Q, N, FALSE);	\
+	DQINS(Q, N, X);		\
+	CHKTCHAIN(Q, N, TRUE);	\
 } MBEND
-#  define dqadd(q, x, n)		\
-MBSTART {				\
-	CHKTCHAIN((q), n, FALSE);	\
-	CHKTCHAIN((x), n, FALSE);	\
-	DQADD((q), (x), n);		\
-	CHKTCHAIN((q), n, TRUE);	\
+#  define dqrins(Q, N, X)	\
+MBSTART {			\
+	CHKTCHAIN(Q, N, FALSE);	\
+	DQRINS(Q, N, X);	\
+	CHKTCHAIN(Q, N, TRUE);	\
+} MBEND
+#  define dqadd(Q, X, N)	\
+MBSTART {			\
+	CHKTCHAIN(Q, N, FALSE);	\
+	CHKTCHAIN(X, N, FALSE);	\
+	DQADD(Q, X, N);		\
+	CHKTCHAIN(Q, N, TRUE);	\
 } MBEND
 #endif
 

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +13,8 @@
 #ifndef GTM_FFS_INCLUDED
 #define GTM_FFS_INCLUDED
 
-int gtm_ffs(uint4 offset, uchar_ptr_t addr, uint4 size);
+#include "gdsroot.h"
+
+block_id gtm_ffs(block_id offset, uchar_ptr_t addr, block_id size);
 
 #endif /* GTM_FFS_INCLUDED */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -23,7 +23,6 @@
 #include "mmrhash.h"
 
 void mlk_shrhash_delete(mlk_pvtctl_ptr_t ctl, mlk_shrblk_ptr_t d);
-void mlk_shrhash_val_build(mlk_shrblk_ptr_t d, uint4 *total_len, hash128_state_t *hs);
 
 boolean_t mlk_shrblk_delete_if_empty(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 {
@@ -93,9 +92,10 @@ boolean_t mlk_shrblk_delete_if_empty(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 
 void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 {
-	hash128_state_t		hs;
-	gtm_uint16		hashres;
-	uint4			hash, total_len, num_buckets;
+	mlk_subhash_state_t	hs;
+	mlk_subhash_res_t	hashres;
+	mlk_subhash_val_t	hash;
+	uint4			total_len, num_buckets;
 	mlk_shrhash_map_t	usedmap;
 	mlk_shrblk_ptr_t	search_shrblk;
 	int			bi, si, bitnum;
@@ -105,12 +105,17 @@ void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
 	shrhash = pctl->shrhash;
 	num_buckets = pctl->shrhash_size;
 #	ifdef DEBUG
-	HASH128_STATE_INIT(hs, 0);
+	MLK_SUBHASH_INIT_PVTCTL(pctl, hs);
 	total_len = 0;
 	mlk_shrhash_val_build(d, &total_len, &hs);
+<<<<<<< HEAD
 	ydb_mmrhash_128_result(&hs, total_len, &hashres);
 	DBG_LOCKHASH_N_BITS(hashres.one);
 	hash = (uint4)hashres.one;
+=======
+	MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
+	hash = MLK_SUBHASH_RES_VAL(hashres);
+>>>>>>> 91552df2... GT.M V6.3-009
 	assert(hash == d->hash);
 #	else
 	hash = d->hash;
@@ -184,7 +189,7 @@ void mlk_shrhash_delete(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t d)
  *       We could make up for it by taking the hash value out of the shrhash at the cost of an extra R2A() and shrblk reference
  *       for each bucket comparison. For now the selected options seem reasonable.
  */
-void mlk_shrhash_val_build(mlk_shrblk_ptr_t d, uint4 *total_len, hash128_state_t *hs)
+void mlk_shrhash_val_build(mlk_shrblk_ptr_t d, uint4 *total_len, mlk_subhash_state_t *hs)
 {
 	mlk_shrsub_ptr_t	shrsub;
 
@@ -193,5 +198,9 @@ void mlk_shrhash_val_build(mlk_shrblk_ptr_t d, uint4 *total_len, hash128_state_t
 		mlk_shrhash_val_build((mlk_shrblk_ptr_t)R2A(d->parent), total_len, hs);
 	shrsub = (mlk_shrsub_ptr_t)R2A(d->value);
 	*total_len += shrsub->length + 1;
+<<<<<<< HEAD
 	ydb_mmrhash_128_ingest(hs, &shrsub->length, shrsub->length + 1);
+=======
+	MLK_SUBHASH_INGEST(*hs, &shrsub->length, shrsub->length + 1);
+>>>>>>> 91552df2... GT.M V6.3-009
 }

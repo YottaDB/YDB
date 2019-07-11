@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -40,13 +41,16 @@
    Inputs: 1) pointer to local bit map data (blk_ptr + SIZEOF(blk_hdr)).
            2) bit offset to test into bitmap.
 */
-boolean_t gvcst_blk_is_allocated(uchar_ptr_t lbmap, int lm_offset)
+boolean_t gvcst_blk_is_allocated(uchar_ptr_t lbmap, block_id lm_offset)
 {
-	int		uchar_offset, uchar_offset_rem;
+	block_id	uchar_offset, uchar_offset_rem;
 	unsigned char	result_byte;
 	uchar_ptr_t	map_byte;
 
-	assert(BLKS_PER_LMAP * BML_BITS_PER_BLK > lm_offset);
+	/* lm_offset is a bit offset into a local map so,
+	 * it should never be larger then (BLKS_PER_LMAP * BML_BITS_PER_BLK)
+	 */
+	assert((BLKS_PER_LMAP * BML_BITS_PER_BLK) > lm_offset);
 	uchar_offset = lm_offset / BITS_PER_UCHAR;
 	uchar_offset_rem = lm_offset % BITS_PER_UCHAR;
 	map_byte = lbmap + uchar_offset;
@@ -59,19 +63,22 @@ boolean_t gvcst_blk_is_allocated(uchar_ptr_t lbmap, int lm_offset)
 		case 0x03:
 			return FALSE;
 		default:
-			GTMASSERT;
+			assertpro(FALSE);
 	}
 	return FALSE; 	/* Can't get here but keep compiler happy */
 }
 
 /* Similarly this routine tells if the block was EVER allocated (allocated or recycled) */
-boolean_t gvcst_blk_ever_allocated(uchar_ptr_t lbmap, int lm_offset)
+boolean_t gvcst_blk_ever_allocated(uchar_ptr_t lbmap, block_id lm_offset)
 {
-	int		uchar_offset, uchar_offset_rem;
+	block_id	uchar_offset, uchar_offset_rem;
 	unsigned char	result_byte;
 	uchar_ptr_t	map_byte;
 
-	assert(BLKS_PER_LMAP * BML_BITS_PER_BLK > lm_offset);
+	/* lm_offset is a bit offset into a local map so,
+	 * it should never be larger then (BLKS_PER_LMAP * BML_BITS_PER_BLK)
+	 */
+	assert((BLKS_PER_LMAP * BML_BITS_PER_BLK) > lm_offset);
 	uchar_offset = lm_offset / BITS_PER_UCHAR;
 	uchar_offset_rem = lm_offset % BITS_PER_UCHAR;
 	map_byte = lbmap + uchar_offset;
@@ -84,7 +91,7 @@ boolean_t gvcst_blk_ever_allocated(uchar_ptr_t lbmap, int lm_offset)
 		case 0x01:
 			return FALSE;
 		default:
-			GTMASSERT;
+			assertpro(FALSE);
 	}
 	return FALSE; 	/* Can't get here but keep compiler happy */
 }

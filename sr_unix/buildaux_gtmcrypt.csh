@@ -42,6 +42,7 @@ foreach gpg_agent_pid ($gpg_agent_pids)
 	kill $gpg_agent_pid >&! /dev/null
 end
 set plugin_build_type=""
+set plugin_build_scan="FALSE"
 switch ($gt_image)
 	case "[bB]*":
 		set plugin_build_type="PRO"
@@ -51,6 +52,7 @@ switch ($gt_image)
 		breaksw
 	default:
 		set plugin_build_type="DEBUG"
+		if ($?scan_image) set plugin_build_scan="TRUE"
 		breaksw
 endsw
 # First copy all the necessary source and script files to $ydb_dist/plugin/gtmcrypt
@@ -111,7 +113,7 @@ if ("TRUE" == "$is_utf8_support") then
 	if (! -e $ydb_dist/utf8) mkdir $ydb_dist/utf8
 endif
 # Build and install all encryption libraries and executables.
-env LC_ALL=$utflocale $make install algo=$algorithm image=$plugin_build_type thirdparty=$encryption_lib
+env LC_ALL=$utflocale $make install algo=$algorithm image=$plugin_build_type thirdparty=$encryption_lib scan=$plugin_build_scan
 if ($status) then
 	@ buildaux_gtmcrypt_status++
 	echo "buildaux-E-libgtmcrypt, failed to install libgtmcrypt and/or helper scripts"	\

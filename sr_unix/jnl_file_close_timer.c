@@ -49,7 +49,7 @@ void jnl_file_close_timer(void)
 
 	SETUP_THREADGBL_ACCESS;
 
-	/* Check every 1 minute if we have an older generation journal file open. If so, close it.
+	/* Check every 1 minute if we need to close an older generation journal file open; also close any lingering snapshot.
 	 * The only exceptions are
 	 *	a) The source server can have older generations open and they should not be closed.
 	 *	b) If we are in the process of switching to a new journal file while we get interrupted
@@ -69,8 +69,7 @@ void jnl_file_close_timer(void)
 				if (!IS_REG_BG_OR_MM(r_local))
 					continue;
 				csa = REG2CSA(r_local);
-				if (SNAPSHOTS_IN_PROG(csa))
-					SS_RELEASE_IF_NEEDED(csa, (node_local_ptr_t)csa->nl);
+				SS_RELEASE_IF_NEEDED(csa, (node_local_ptr_t)csa->nl);
 				jpc = csa->jnl;
 				if (csa->now_crit)
 				{

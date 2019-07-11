@@ -1626,9 +1626,9 @@ MBSTART {       										\
  */
 #define INCR_BLKS_TO_UPGRD(csa, csd, delta)						\
 MBSTART {										\
-	int4	new_blks_to_upgrd;							\
-	int4	cur_blks_to_upgrd;							\
-	int4	cur_delta;								\
+	block_id	new_blks_to_upgrd;						\
+	block_id	cur_blks_to_upgrd;						\
+	block_id	cur_delta;							\
 											\
 	assert((csd)->createinprogress || (csa)->now_crit);				\
 	cur_delta = (delta);								\
@@ -3817,6 +3817,8 @@ typedef enum
 /* macros to check curr_tn */
 #define MAX_TN_V4	((trans_num)(MAXUINT4 - TN_HEADROOM_V4))
 #define MAX_TN_V6	(MAXUINT8 - TN_HEADROOM_V6)
+#define MAX_TN_DFLT	MAX_TN_V6	/* Max TN of current version */
+#define MAX_TN_ANY	MAX_TN_V6	/* Greatest MAX_TN of all versions*/
 #define TN_INVALID	(MAXUINT8)	/* impossible db tn */
 #define TN_HEADROOM_V4	(2 * MAXTOTALBLKS_V4)
 #define TN_HEADROOM_V6	(2 * MAXTOTALBLKS_V6)
@@ -5367,7 +5369,7 @@ MBSTART {												\
 #define	SKIP_BASEDB_OPEN_TRUE		TRUE
 
 void		assert_jrec_member_offsets(void);
-bt_rec_ptr_t	bt_put(gd_region *r, int4 block);
+bt_rec_ptr_t	bt_put(gd_region *r, block_id block);
 void		bt_que_refresh(gd_region *greg);
 void		bt_init(sgmnt_addrs *cs);
 void		bt_malloc(sgmnt_addrs *csa);
@@ -5393,7 +5395,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 void		wcs_stale(TID tid, int4 hd_len, gd_region **region);
 
 void bmm_init(void);
-int4 bmm_find_free(uint4 hint, uchar_ptr_t base_addr, uint4 total_bits);
+block_id bmm_find_free(block_id hint, uchar_ptr_t base_addr, block_id total_bits);
 
 bool reg_cmcheck(gd_region *reg);
 

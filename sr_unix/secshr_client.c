@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -108,7 +108,11 @@ const static char readonly *secshrstart_error_code[] = {
 	"gtmsecshr startup failed - gtmsecshr unable to chdir to tmp directory",
 	"gtmsecshr startup failed - gtmsecshr unable to determine invocation path",
 	"gtmsecshr startup failed - gtmsecshr not named gtmsecshr",
+<<<<<<< HEAD
 	"gtmsecshr startup failed - $ydb_dist not same as startup path"
+=======
+	"gtmsecshr startup failed - startup path through $gtm_dist not setup correctly - check path and permissions"
+>>>>>>> 91552df2... GT.M V6.3-009
 };
 
 #define MAX_COMM_ATTEMPTS		4	/* 1 to start secshr, 2 maybe slow, 3 maybe really slow, 4 outside max */

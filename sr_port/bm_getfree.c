@@ -77,18 +77,17 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 {
 	cw_set_element	*cs1;
 	sm_uc_ptr_t	bmp;
-	block_id	bml, hint_cycled, hint_limit;
+	block_id	bml, hint_cycled, hint_limit, total_blks, lcnt, local_maps, offset;
 	block_id_ptr_t	b_ptr;
-	int		cw_set_top, depth, lcnt;
-	unsigned int	local_maps, map_size, n_decrements = 0, total_blks;
+	int		cw_set_top, depth;
+	unsigned int	n_decrements = 0;
 	trans_num	ctn;
-	int4		free_bit, offset;
-	uint4		space_needed;
-	uint4		status;
+	int4		free_bit, map_size;
+	uint4		space_needed, status;
 	srch_blk_status	blkhist;
 
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
-	if (hint >= total_blks)            /* for TP, hint can be > total_blks */
+	if (hint >= total_blks)		/* for TP, hint can be > total_blks */
 		hint = 1;
 	hint_cycled = DIVIDE_ROUND_UP(total_blks, BLKS_PER_LMAP);
 	hint_limit = DIVIDE_ROUND_DOWN(hint, BLKS_PER_LMAP);
@@ -133,8 +132,10 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 			hint = bml + 1;				/* start at beginning */
 		}
 		if (ROUND_DOWN2(total_blks, BLKS_PER_LMAP) == bml)
-			map_size = (total_blks - bml);
-		else
+		{	/* Can be cast because result of (total_blks - bml) should never be larger then BLKS_PER_LMAP */
+			assert(BLKS_PER_LMAP >= (total_blks - bml));
+			map_size = (int4)(total_blks - bml);
+		} else
 			map_size = BLKS_PER_LMAP;
 		if (dollar_tlevel)
 		{
@@ -191,8 +192,11 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 			offset = *b_ptr + 1;
 		}
 		if (offset < map_size)
-		{
-			free_bit = bm_find_blk(offset, (sm_uc_ptr_t)bmp + SIZEOF(blk_hdr), map_size, blk_used);
+		{	/* offset can be downcast because to get here it must be less then map_size
+			 * which is constrained to never be larger then BLKS_PER_LMAP
+			 */
+			assert(offset == (int4)offset);
+			free_bit = bm_find_blk((int4)offset, (sm_uc_ptr_t)bmp + SIZEOF(blk_hdr), map_size, blk_used);
 			if (MAP_RD_FAIL == free_bit)
 				return MAP_RD_FAIL;
 		} else
@@ -216,7 +220,7 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
 	 * gets recycled with a non-bitmap block in which case the bit that bm_find_blk returns could be greater than map_size.
 	 * But, this should never happen in final retry.
 	 */
-	if ((map_size <= (uint4)free_bit) && (CDB_STAGNATE <= t_tries))
+	if ((map_size <= free_bit) && (CDB_STAGNATE <= t_tries))
 	{	/* Bad free bit. */
 		assert((NO_FREE_SPACE == free_bit) && (!lcnt));	/* All maps full, should have extended */
 		assertpro(FALSE);
@@ -254,12 +258,11 @@ block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw
  */
 boolean_t	is_free_blks_ctr_ok(void)
 {
+	block_id	bml, free_bml, local_maps, total_blks, free_blocks;
 	boolean_t	blk_used;
-	block_id	bml, free_bit, free_bml, maxbitsthismap;
 	cache_rec_ptr_t	cr;
-	int		cycle;
+	int4		free_bit, maxbitsthismap, cycle;
 	sm_uc_ptr_t	bmp;
-	unsigned int	local_maps, total_blks, free_blocks;
 
 	assert(&FILE_INFO(gv_cur_region)->s_addrs == cs_addrs && cs_addrs->hdr == cs_data && cs_addrs->now_crit);
 	total_blks = (dba_mm == cs_data->acc_meth) ? cs_addrs->total_blks : cs_addrs->ti->total_blks;
@@ -279,7 +282,9 @@ boolean_t	is_free_blks_ctr_ok(void)
 			continue;
 		}
 		assert(free_bml <= (local_maps - 1));
-		maxbitsthismap = (free_bml != (local_maps - 1)) ? BLKS_PER_LMAP : total_blks - bml;
+		/* Can be cast because result of (total_blks - bml) should never be larger then BLKS_PER_LMAP */
+		DEBUG_ONLY(if(free_bml == (local_maps - 1)) assert(BLKS_PER_LMAP >= (total_blks - bml)));
+		maxbitsthismap = (free_bml != (local_maps - 1)) ? BLKS_PER_LMAP : (int4)(total_blks - bml);
 		for (free_bit = 0; free_bit < maxbitsthismap; free_bit++)
 		{
 			free_bit = bm_find_blk(free_bit, (sm_uc_ptr_t)bmp + SIZEOF(blk_hdr), maxbitsthismap, &blk_used);

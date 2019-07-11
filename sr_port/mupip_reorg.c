@@ -23,6 +23,7 @@
  */
 
 #include "mdef.h"
+#include "mvalconv.h"
 
 #include "gtm_string.h"
 
@@ -80,6 +81,9 @@ error_def(ERR_NOSELECT);
 error_def(ERR_NOEXCLUDE);
 error_def(ERR_REORGCTRLY);
 error_def(ERR_REORGINC);
+error_def(ERR_MUKEEPNOTRUNC);
+error_def(ERR_MUKEEPPERCENT);
+error_def(ERR_MUKEEPNODEC);
 
 GBLREF	bool			error_mupip;
 GBLREF	bool			mu_ctrlc_occurred;
@@ -104,7 +108,7 @@ void mupip_reorg(void)
 	boolean_t		resume, reorg_success = TRUE;
 	int			data_fill_factor, index_fill_factor;
 	int			reorg_op, reg_max_rec, reg_max_key, reg_max_blk, status;
-	char			cli_buff[MAX_LINE], *ptr;
+	char			cli_buff[MAX_LINE], *ptr, keep_value_buffer[MAX_LINE + 1];
 	glist			gl_head, exclude_gl_head, *gl_ptr, hasht_gl;
 	uint4			cli_status;
 	mval			reg_nam_mval = DEFINE_MVAL_STRING(MV_STR, 0 , 0 , SIZEOF(MAX_RN_LEN), 0, 0, 0);
@@ -119,6 +123,7 @@ void mupip_reorg(void)
 	trunc_region		*reg_list, *tmp_reg, *reg_iter, *prev_reg;
 	uint4			fs;
 	uint4			lcl_pid;
+	mval			keep_mval = DEFINE_MVAL_STRING(MV_STR | MV_NUM_APPROX, 0 , 0 , 0, 0, 0, 0), *keep_mval_ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -128,6 +133,45 @@ void mupip_reorg(void)
 	reg_list = NULL;
 	if (CLI_PRESENT == cli_present("TRUNCATE"))
 		truncate = TRUE;
+	if (CLI_PRESENT == cli_present("KEEP"))
+	{
+		keep_mval.str.addr = keep_value_buffer;
+		n_len = SIZEOF(keep_value_buffer);
+		keep_mval.str.len = SIZEOF(keep_value_buffer);
+		if (cli_get_str("KEEP", keep_mval.str.addr, &n_len))
+		{
+			keep_mval.str.len = n_len;
+			keep_mval_ptr = (&keep_mval);
+			if ('%' == keep_mval.str.addr[keep_mval.str.len - 1])
+			{
+				STRNCPY_STR(cli_buff, keep_mval.str.addr,keep_mval.str.len);
+				cli_buff[keep_mval.str.len - 1] = '\0';
+				if (!cli_is_dcm(cli_buff))
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUKEEPNODEC);
+					mupip_exit(ERR_MUNOACTION);
+				}
+				if (99 < MV_FORCE_UINT(keep_mval_ptr))
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUKEEPPERCENT);
+					mupip_exit(ERR_MUNOACTION);
+				}
+			} else /* Number of blocks input */
+			{
+				if (!cli_is_dcm(keep_mval.str.addr))
+				{
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUKEEPNODEC);
+					mupip_exit(ERR_MUNOACTION);
+				}
+			}
+		} else
+			keep_mval.str.addr = NULL;
+		if (!truncate)
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MUKEEPNOTRUNC);
+			mupip_exit(ERR_MUNOACTION);
+		}
+	}
 	if ((CLI_PRESENT == cli_present("UPGRADE")) || (CLI_PRESENT == cli_present("DOWNGRADE")))
 	{	/* Note that "mu_reorg_process" is not set to TRUE in case of MUPIP REORG -UPGRADE/DOWNGRADE.
 		 * This is intentional because we are not doing any REORG kind of processing.
@@ -187,6 +231,12 @@ void mupip_reorg(void)
 				break;
 		}
 	}
+	if (CLI_PRESENT == cli_present("NOCOALESCE"))
+		reorg_op |= NOCOALESCE;
+	if (CLI_PRESENT == cli_present("NOSPLIT"))
+		reorg_op |= NOSPLIT;
+	if (CLI_PRESENT == cli_present("NOSWAP"))
+		reorg_op |= NOSWAP;
 	if ((cli_status = cli_present("FILL_FACTOR")) == CLI_PRESENT)
 	{
 		assert(SIZEOF(data_fill_factor) == SIZEOF(int4));
@@ -397,7 +447,7 @@ void mupip_reorg(void)
 			cnl->trunc_pid = process_id;
 			cnl->highest_lbm_with_busy_blk = 0;
 			rel_crit(gv_cur_region);
-			if (!mu_truncate(truncate_percent))
+			if (!mu_truncate(truncate_percent, &keep_mval))
 				mupip_exit(ERR_MUTRUNCFAIL);
 			grab_crit(gv_cur_region);
 			assert(cnl->trunc_pid == process_id);

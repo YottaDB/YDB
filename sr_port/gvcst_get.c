@@ -217,11 +217,11 @@ boolean_t gvcst_get2(mval *v, unsigned char *sn_ptr)
 				} else
 				{
 					if (!sn_ptr)
-                                        {
-                                                ENSURE_STP_FREE_SPACE(data_len);
-                                                assert(stringpool.top - stringpool.free >= data_len);
-                                                memcpy(stringpool.free, (sm_uc_ptr_t)rp + rsiz - data_len, data_len);
-                                        } else
+					{
+						ENSURE_STP_FREE_SPACE(data_len);
+						assert(stringpool.top - stringpool.free >= data_len);
+						memcpy(stringpool.free, (sm_uc_ptr_t)rp + rsiz - data_len, data_len);
+					} else
 						memcpy(sn_ptr, (sm_uc_ptr_t)rp + rsiz - data_len, data_len);
 
 					if (!dollar_tlevel)

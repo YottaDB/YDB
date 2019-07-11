@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 1987-2018 Fidelity National Information		;
+; Copyright (c) 1987-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	;
@@ -17,21 +17,27 @@
 	;invoke at FUNC as an extrinsic function
 	;if you make heavy use of this routine, consider $ZCALL
 	;
-	s %OH=$$FUNC(%OH)
-	q
-INT	r !,"Octal: ",%OH s %OH=$$FUNC(%OH)
-	i %OH="" w !,"Input must be an octal number"
-	q
-FUNCFM(o)
-	n d,dg,h
-	s d=0,h="",o=+o
-	f dg=1:1:$l(o) s d=d*8+$e(o,dg)
-	f  q:'d  s h=$e("0123456789ABCDEF",d#16+1)_h,d=d\16
-	q h
+	set %OH=$$FUNC(%OH)
+	quit
+INT	read !,"Octal: ",%OH set %OH=$$FUNC(%OH)
+	write:%OH="" !,"Input must be an octal number"
+	quit
 FUNC(o)
+<<<<<<< HEAD
 	q:o=0 0
 	q:"-"=$ze(o,1) ""
 	q:o'?1.N ""
 	q:o[8!(o[9) ""
 	q:$l(o)<19 $$FUNCFM(o)
 	q $$CONVERTBASE^%CONVBASEUTIL(o,8,16)
+=======
+	quit:"0"[$get(o) 0
+	quit:"-"=$extract(o) ""
+	quit:(o[8)!(o[9) ""
+	new c,d,h,l
+	set d=0,h="",l=$length(o)
+	quit:(18<l) $$CONVERTBASE^%CONVBASEUTIL(o,8,16)
+	for c=1:1:l s d=d*8+$e(o,c)
+	for  quit:'d  set h=$e("0123456789ABCDEF",d#16+1)_h,d=d\16
+	quit h
+>>>>>>> 91552df2... GT.M V6.3-009

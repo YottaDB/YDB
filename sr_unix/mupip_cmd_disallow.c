@@ -199,6 +199,7 @@ boolean_t cli_disallow_mupip_journal(void)
 					|| d_c_cli_present("USER")
 					|| d_c_cli_present("ID")
 					|| d_c_cli_present("SEQNO")
+					|| d_c_cli_present("GVPATFILE")
 					|| d_c_cli_present("TRANSACTION")) && (d_c_cli_present("RECOVER")
 										|| d_c_cli_present("ROLLBACK")
 										|| d_c_cli_present("VERIFY"));
@@ -216,9 +217,12 @@ boolean_t cli_disallow_mupip_reorg(void)
 				|| d_c_cli_present("EXCLUDE")
 				|| d_c_cli_present("FILL_FACTOR")
 				|| d_c_cli_present("INDEX_FILL_FACTOR")
+				|| d_c_cli_present("NOCOALESCE")
+				|| d_c_cli_present("NOSPLIT")
+				|| d_c_cli_present("NOSWAP")
 				|| d_c_cli_present("RESUME")
-				|| d_c_cli_present("USER_DEFINED_REORG")
-				|| d_c_cli_present("TRUNCATE")) && (d_c_cli_present("UPGRADE")
+				|| d_c_cli_present("TRUNCATE")
+				|| d_c_cli_present("USER_DEFINED_REORG")) && (d_c_cli_present("UPGRADE")
 									|| d_c_cli_present("DOWNGRADE"));
 	CLI_DIS_CHECK_N_RESET;
 	disallow_return_value = d_c_cli_present("UPGRADE") && d_c_cli_present("DOWNGRADE");
@@ -235,6 +239,9 @@ boolean_t cli_disallow_mupip_reorg(void)
 				|| d_c_cli_present("EXCLUDE")
 				|| d_c_cli_present("FILL_FACTOR")
 				|| d_c_cli_present("INDEX_FILL_FACTOR")
+				|| d_c_cli_present("NOCOALESCE")
+				|| d_c_cli_present("NOSPLIT")
+				|| d_c_cli_present("NOSWAP")
 				|| d_c_cli_present("RESUME")
 				|| d_c_cli_present("SELECT")
 				|| d_c_cli_present("TRUNCATE")
@@ -316,7 +323,7 @@ boolean_t cli_disallow_mupip_replic_editinst(void)
 boolean_t cli_disallow_mupip_replic_receive(void)
 {
 	int		disallow_return_value = 0;
-	boolean_t	p1, p2, p3, p4, p5, p6;
+	boolean_t	p1, p2, p3, p4, p5, p6, p7;
 
 	*cli_err_str_ptr = 0;
 
@@ -326,15 +333,16 @@ boolean_t cli_disallow_mupip_replic_receive(void)
 	p4 = d_c_cli_present("STATSLOG");
 	p5 = d_c_cli_present("SHOWBACKLOG");
 	p6 = d_c_cli_present("CHANGELOG");
+	p7 = d_c_cli_present("STOPRECEIVERFILTER");
 
 	/* any MUPIP REPLIC -RECEIVE command should contain at LEAST one of the above qualifiers */
-	disallow_return_value = !(p1 || p2 || p3 || p4 || p5 || p6);
+	disallow_return_value = !(p1 || p2 || p3 || p4 || p5 || p6 || p7);
 	CLI_DIS_CHECK;	/* Note CLI_DIS_CHECK_N_RESET is not used as we want to reuse the computed error string (cli_err_str_ptr)
 			 * for the next check as well in case it fails. Note that this can be done only if both checks use
 			 * exactly the same set of qualifiers (which is TRUE in this case). */
 
 	/* any MUPIP REPLIC -RECEIVE command should contain at MOST one of the above qualifiers */
-	disallow_return_value = cli_check_any2(VARLSTCNT(6) p1, p2, p3, p4, p5, p6);
+	disallow_return_value = cli_check_any2(VARLSTCNT(7) p1, p2, p3, p4, p5, p6, p7);
 	CLI_DIS_CHECK_N_RESET;
 
 	disallow_return_value = (d_c_cli_present("START")
@@ -376,6 +384,15 @@ boolean_t cli_disallow_mupip_replic_receive(void)
 	CLI_DIS_CHECK_N_RESET;
 	/* LOG are not allowed with STATS qualifier */
 	disallow_return_value = (d_c_cli_present("STATSLOG") && d_c_cli_present("LOG"));
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (p7 && (d_c_cli_present("AUTOROLLBACK") || d_c_cli_present("HELPERS") ||
+				d_c_cli_present("INITIALIZE") || d_c_cli_present("LISTENPORT") ||
+				d_c_cli_present("LOG") || d_c_cli_present("LOG_INTERVAL") ||
+				d_c_cli_present("NORESYNC") || d_c_cli_present("PLAINTEXTFALLBACK") ||
+				d_c_cli_present("RESUME") || d_c_cli_present("REUSE") ||
+				d_c_cli_present("STOPSOURCEFILTER") || d_c_cli_present("TIMEOUT") ||
+				d_c_cli_present("TLSID") || d_c_cli_present("UPDATEONLY") ||
+				d_c_cli_present("UPDATERESYNC")));
 	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }

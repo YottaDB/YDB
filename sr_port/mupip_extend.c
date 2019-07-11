@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -71,8 +71,8 @@ void mupip_extend(void)
 {
 	unsigned short	r_len;
 	char		regionname[MAX_RN_LEN];
-	uint4		bplmap, bit_maps, blocks, i, old_total, total, status;
-	int4		tblocks;
+	uint4		bplmap, i, status;
+	block_id	blocks, bit_maps, tblocks, total, old_total;
 	int		fd;
 	boolean_t	defer_alloc;
 

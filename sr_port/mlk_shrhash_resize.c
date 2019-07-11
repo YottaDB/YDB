@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 Fidelity National Information		*
+ * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -23,6 +23,7 @@
 #include "ipcrmid.h"
 #include "do_shmat.h"
 #include "mlk_ops.h"
+#include "mlk_rehash.h"
 
 GBLREF	uint4	process_id;
 
@@ -81,8 +82,15 @@ boolean_t mlk_shrhash_resize(mlk_pvtctl_ptr_t pctl)
 			nbi = hash % shrhash_size_new;
 			new_bucket = &shrhash_new[nbi];
 			fi = mlk_shrhash_find_bucket(&pctl_new, hash);
+<<<<<<< HEAD
 			if (MLK_SHRHASH_FOUND_NO_BUCKET == fi)
 			{	/* Hash insert failure. Try a larger hash table. */
+=======
+			assert(-1 != fi);
+			if (-1 == fi)
+			{	/* Hash insert failure */
+				/* Try a larger hash table */
+>>>>>>> 91552df2... GT.M V6.3-009
 				status = SHMDT(shrhash_new);
 				if (-1 == status)
 					send_msg_csa(CSA_ARG(pctl->csa) VARLSTCNT(8)
@@ -93,6 +101,13 @@ boolean_t mlk_shrhash_resize(mlk_pvtctl_ptr_t pctl)
 							ERR_SYSCALL, 5, LEN_AND_LIT("shm_rmid"), CALLFROM, errno, 0);
 				send_msg_csa(CSA_ARG(pctl->csa) VARLSTCNT(5)
 						ERR_MLKHASHRESIZEFAIL, 3, shrhash_size_old, shrhash_size_new);
+				if (shrhash_size_new > (pctl->ctl->max_blkcnt - pctl->ctl->blkcnt) * 2)
+				{	/* We have more than twice as many hash buckets as we have active shrblks,
+					 * indicating something pathological, so try rehashing instead.
+					 */
+					pctl->ctl->rehash_needed = TRUE;
+					return FALSE;
+				}
 				shrhash_mem_new = NEW_SHRHASH_MEM(shrhash_size_new);
 				shrhash_size_new = shrhash_mem_new / SIZEOF(mlk_shrhash);
 				break;

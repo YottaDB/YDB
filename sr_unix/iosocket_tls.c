@@ -74,7 +74,12 @@ typedef enum
 
 void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *password, mval *extraarg)
 {
+<<<<<<< HEAD
 	int4			devlen, flags, len, length, save_errno, status, status2, timeout, tls_errno, errlen, errlen2;
+=======
+	int4			devlen, extrastr_len, flags, len, length, save_errno, status, status2, timeout, tls_errno;
+	int4			errlen, errlen2;
+>>>>>>> 91552df2... GT.M V6.3-009
 	io_desc			*iod;
 	d_socket_struct 	*dsocketptr;
 	socket_struct		*socketptr;
@@ -398,27 +403,29 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			if ('\0' == idstr[0])
 			{	/* create new section from initial tlsid -renegotiate */
 				charptr = ((gtm_tls_socket_t *)socketptr->tlssocket)->tlsid;
+<<<<<<< HEAD
 				len = STRLEN(charptr);
 				assertpro(MAX_TLSID_LEN >= len);
 				memcpy(idstr, charptr, len);
 				MEMCPY_LIT(&idstr[len], "-" RENEGOTIATE);	/* append dash RENEGOTIATE */
 				len += SIZEOF(RENEGOTIATE);	/* null accounts for dash */
+=======
+				assert(MAX_TLSID_LEN >= STRLEN(charptr));
+				len = SNPRINTF(idstr, SIZEOF(idstr), "%s-" RENEGOTIATE, charptr);
+				assert(SIZEOF(idstr) > len);
+				if (len >= SIZEOF(idstr))
+					len = ((int4) SIZEOF(idstr)) - 1;
+>>>>>>> 91552df2... GT.M V6.3-009
 				idstr[len] = '\0';
 			} else
 				len = STRLEN(idstr);
-			extrastr = malloc(length + 1 + SIZEOF(TLSLABEL) - 1 + len + SIZEOF(COLONBRACKET) - 1
-				+ SIZEOF(BRACKETSSEMIS) - 1);
-			MEMCPY_LIT(extrastr, TLSLABEL);
-			extraptr = extrastr + SIZEOF(TLSLABEL) - 1;
-			STRCPY(extraptr, idstr);
-			extraptr += len;
-			MEMCPY_LIT(extraptr, COLONBRACKET);
-			extraptr = extraptr + SIZEOF(COLONBRACKET) - 1;
-			STRNCPY_STR(extraptr, extraarg->str.addr, length);
-			extraptr += length;
-			MEMCPY_LIT(extraptr, BRACKETSSEMIS);
-			extraptr += SIZEOF(BRACKETSSEMIS) - 1;
-			*extraptr = '\0';
+			extrastr = malloc(length + 1 + STR_LIT_LEN(TLSLABEL) + len + STR_LIT_LEN(COLONBRACKET)
+				+ STR_LIT_LEN(BRACKETSSEMIS));
+			extrastr_len = length + 1 + STR_LIT_LEN(TLSLABEL) + len + STR_LIT_LEN(COLONBRACKET)
+				+ STR_LIT_LEN(BRACKETSSEMIS);
+			len = SNPRINTF(extrastr, extrastr_len, TLSLABEL "%s" COLONBRACKET "%.*s" BRACKETSSEMIS, idstr,
+					extraarg->str.len, extraarg->str.addr);
+			assert(len == extrastr_len - 1);	/* snprintf excludes null terminator in return value */
 		} else
 			extrastr = NULL;
 		status = gtm_tls_renegotiate_options((gtm_tls_socket_t *)socketptr->tlssocket, msec_timeout, idstr,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -88,8 +88,13 @@ MBSTART {											\
 
 #define	ADD_TO_STPARRAY(PTR, PTRARRAY, PTRARRAYCUR, PTRARRAYTOP, TYPE)					\
 {													\
+<<<<<<< HEAD
 	GBLREF mstr		**stp_array;								\
 	GBLREF gtm_uint64_t	stp_array_size;								\
+=======
+	GBLREF mstr	**stp_array;									\
+	GBLREF uint4	stp_array_size;									\
+>>>>>>> 91552df2... GT.M V6.3-009
 													\
 	if (NULL == PTRARRAY)										\
 	{												\

@@ -91,6 +91,7 @@ void stx_error_va(int in_error, va_list args)
 	 */
 	if (TREF(xecute_literal_parse))
 	{
+		ins_errtriple(in_error);
 		TREF(source_error_found) = TRUE;
 		return;
 	}

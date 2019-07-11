@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 Fidelity National Information		*
+ * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,5 +11,8 @@
  ****************************************************************/
 #ifndef WARN_DB_SZ_H_INCLUDED
 #define WARN_DB_SZ_H_INCLUDED
-void warn_db_sz(char *db_fname, uint4 prev_blocks, uint4 curr_blocks, int4 tot_blocks);
+
+#include "gdsroot.h"
+
+void warn_db_sz(char *db_fname, block_id prev_blocks, block_id curr_blocks, block_id tot_blocks);
 #endif /* WARN_DB_SZ_H_INCLUDED */

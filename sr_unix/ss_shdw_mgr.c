@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2009, 2010 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2009-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 91552df2... GT.M V6.3-009
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,15 +33,20 @@
 #include "shmpool.h"
 #include "db_snapshot.h"
 
-#define COMPUTE_BLOCK_OFFSET(blk, word, bit)	\
-{						\
-	word = blk / BLKS_PER_WORD;		\
-	bit = blk % BLKS_PER_WORD;		\
+#define COMPUTE_BLOCK_OFFSET(blk, word, bit)				\
+{									\
+	word = blk / BLKS_PER_WORD;					\
+	/* This can be cast to int4 because				\
+	 * it is a bit offset within a word				\
+	 * and should have a max value of 31 */				\
+	assert((blk % BLKS_PER_WORD) == (int4)(blk % BLKS_PER_WORD));	\
+	bit = (int4)(blk % BLKS_PER_WORD);				\
 }
 
 boolean_t	ss_chk_shdw_bitmap(sgmnt_addrs *csa, snapshot_context_ptr_t lcl_ss_ctx, block_id blk)
 {
-	int			word, bit;
+	block_id		word;
+	int4			bit;
 	unsigned int		*bitmap_addr;
 	unsigned int		concerned_word;
 	node_local_ptr_t	cnl;
@@ -88,7 +98,8 @@ void		ss_set_shdw_bitmap(sgmnt_addrs *csa, snapshot_context_ptr_t lcl_ss_ctx, bl
 {
 	unsigned int		*bitmap_addr;
 	DEBUG_ONLY(unsigned int	prev_val;)
-	int			word, bit;
+	block_id		word;
+	int4			bit;
 	node_local_ptr_t	cnl;
 	shm_snapshot_ptr_t	ss_shm_ptr;
 

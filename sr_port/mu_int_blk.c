@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -181,7 +181,8 @@ boolean_t mu_int_blk(
 		unsigned char *top_key,
 		int top_len,
 		boolean_t eb_ok)	/* boolean indicating whether an empty block here is ok.  This is true when
-					   the parent is a root with only a star key */
+					 * the parent is a root with only a star key
+					 */
 {
 	typedef struct
 	{
@@ -199,7 +200,7 @@ boolean_t mu_int_blk(
 	int		blk_size, buff_length, b_index, cmcc, comp_length, key_size, len, name_len,
 			num_len, rec_size, s_index, start_index, sub_start_index, hdr_len, idx;
 	int		tmp_cmpc, tmp_numsubs, max_allowed_key_size;
-	block_id	child, root_pointer;
+	block_id	child, root_pointer, blk_lmap;
 	sub_list	mu_sub_list[MAX_GVSUBSCRIPTS + 1];
 	sub_num		check_vals;
 	trans_num	blk_tn;
@@ -213,8 +214,9 @@ boolean_t mu_int_blk(
 	mu_int_offset[mu_int_plen] = 0;
 	mu_int_path[mu_int_plen++] = blk;  /* Increment mu_int_plen on entry; decrement explicitly or via mu_int_err() on exit. */
 	mu_int_path[mu_int_plen] = 0;
-	if (!bml_busy(blk, mu_int_locals)) /* block already marked busy */
-	{
+	blk_lmap = (blk / mu_int_data.bplmap) * mu_int_data.bplmap;
+	if (!bml_busy(blk - blk_lmap, mu_int_locals + ((blk_lmap * BML_BITS_PER_BLK) / BITS_PER_UCHAR)))
+	{	/* block already marked busy */
 		mu_int_err(ERR_DBBDBALLOC, TRUE, TRUE, bot_key, bot_len, top_key, top_len, (unsigned int)(level));
 		return FALSE;
 	}
@@ -881,7 +883,9 @@ boolean_t mu_int_blk(
 					mu_int_blk(child, level - 1, FALSE, old_buff, comp_length, buff, buff_length, pstar);
 			} else
 			{
-				if (!bml_busy(child, mu_int_locals))
+				blk_lmap = (child / mu_int_data.bplmap) * mu_int_data.bplmap;
+				if (!bml_busy(child - blk_lmap,
+						mu_int_locals + ((blk_lmap * BML_BITS_PER_BLK) / BITS_PER_UCHAR)))
 				{
 					mu_int_offset[mu_int_plen]=0;
 					mu_int_path[mu_int_plen++]=child;	/* Increment mu_int_plen */
