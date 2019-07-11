@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2015 Fidelity National Information 	*
+ * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,9 +52,10 @@ boolean_t ss_get_lock(gd_region *reg)
 {
 	int			retries, spins, maxspins;
 	int4			max_sleep_mask;
-	sm_global_latch_ptr_t	latch;
-	sgmnt_addrs		*csa;
 	node_local_ptr_t	cnl;
+	sgmnt_addrs		*csa;
+	sm_global_latch_ptr_t	latch;
+	uint4			latch_pid;
 
 	csa = &FILE_INFO(reg)->s_addrs;
 	cnl = csa->nl;
@@ -79,6 +80,8 @@ boolean_t ss_get_lock(gd_region *reg)
 				*/
 				return TRUE;
 			}
+			if (!is_proc_alive(latch_pid = latch->u.parts.latch_pid, 0))	/* WARNING: assignment */
+				COMPSWAP_UNLOCK(latch, latch_pid, 0, LOCK_AVAILABLE, 0);
 		}
 		REST_FOR_LATCH(latch, (-1 == max_sleep_mask) ? SPIN_SLEEP_MASK(csa->hdr) : max_sleep_mask, retries);
 	}

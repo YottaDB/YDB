@@ -205,7 +205,7 @@ boolean_t	gvcst_query2(void)
 					t_retry(status);
 					continue;
 				}
-		    	}
+			}
 			assert(cs_data == cs_addrs->hdr);
 			if (found)
 			{

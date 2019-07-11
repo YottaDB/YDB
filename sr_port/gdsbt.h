@@ -1099,7 +1099,7 @@ typedef mutex_struct_ptr_t	CRIT_PTR_T;
 
 #include "cdb_sc.h"
 
-bt_rec_ptr_t bt_get(int4 block);
+bt_rec_ptr_t bt_get(block_id block);
 void dump_lockhist(void);
 void wait_for_block_flush(bt_rec *bt, block_id block);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,8 +34,12 @@
 #include "lv_val.h"	/* needed for "fgncalsp.h" */
 #include "fgncalsp.h"
 #include "gtm_env_xlate_init.h"
+#include "mvalconv.h"
+
+GBLDEF mlk_subhash_val_t	mlk_last_hash;
 
 GBLREF gd_addr		*gd_header;
+GBLREF mval		dollar_ztslate;
 
 error_def(ERR_LOCKSUB2LONG);
 error_def(ERR_PCTYRESERVED);
@@ -67,8 +71,9 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 	mlk_pvtblk	*r;
 	gd_region	*reg;
 	gd_addr		*gld;
-	hash128_state_t	accstate, tmpstate;
-	gtm_uint16	hashres;
+	mlk_subhash_state_t	accstate, tmpstate;
+	mlk_subhash_res_t	hashres;
+	boolean_t		do_hash;
 
 	/* Get count of mvals including extgbl1 */
 	assert (subcnt >= 2);
@@ -120,12 +125,16 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 	 * Each string is preceeded by 1 byte string len.
 	 */
 	MLK_PVTBLK_ALLOC(len + subcnt, subcnt, 0, r);
+	MLK_PVTCTL_INIT(r->pvtctl, reg);
+	/* We can't do proper hashes for remote locks, so just skip hashing in the remote case. */
+	do_hash = (NULL != r->pvtctl.ctl);
 	r->translev = 1;
 	r->subscript_cnt = subcnt;
 	/* Each string is preceeded by string length byte */
 	r->nref_length = len + subcnt;
 	/* Keep the hash code generation here in sync with MLK_PVTBLK_SUBHASH_GEN() */
-	HASH128_STATE_INIT(accstate, 0);
+	if (do_hash)
+		MLK_SUBHASH_INIT(r, accstate);
 	cp = &r->value[0];
 	/* Copy all strings into the buffer one after another */
 	for (i = 0, VAR_COPY(mp, subptr);  i < subcnt;  i++)
@@ -137,13 +146,17 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 		*cp++ = len;
 		memcpy(cp, (mp_temp)->str.addr, len);
 		cp += len;
-		gtmmrhash_128_ingest(&accstate, cp_prev, len + 1);
-		tmpstate = accstate;
-		gtmmrhash_128_result(&tmpstate, (cp - r->value), &hashres);
-		MLK_PVTBLK_SUBHASH(r, i) = (uint4)hashres.one;
+		if (do_hash)
+		{
+			MLK_SUBHASH_INGEST(accstate, cp_prev, len + 1);
+			tmpstate = accstate;
+			MLK_SUBHASH_FINALIZE(tmpstate, (cp - r->value), hashres);
+			MLK_PVTBLK_SUBHASH(r, i) = MLK_SUBHASH_RES_VAL(hashres);
+		}
 	}
+	if (do_hash)
+		mlk_last_hash = MLK_SUBHASH_RES_VAL(hashres);
 	va_end(mp);
-	MLK_PVTCTL_INIT(r->pvtctl, reg);
 	if (!mlk_pvtblk_insert(r))
 		free(r);
 	return;

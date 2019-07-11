@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,7 +71,7 @@ GBLREF	sgmnt_addrs		*kip_csa;
 GBLREF	boolean_t		mu_reorg_process;
 GBLREF	boolean_t		need_kip_incr;
 GBLREF	uint4			update_trans;
-GBLREF  gv_key                  *gv_altkey;
+GBLREF	gv_key			*gv_altkey;
 GBLREF	char			*update_array, *update_array_ptr;
 GBLREF	uint4			update_array_size;
 GBLREF	inctn_opcode_t		inctn_opcode;
@@ -280,10 +280,9 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	sgmnt_addrs		*csa;
 	node_local_ptr_t	cnl;
 	srch_blk_status		bmlhist, freeblkhist;
-	block_id		hint_blk_num, free_blk_id, parent_blk_id;
+	block_id		hint_blk_num, free_blk_id, parent_blk_id, total_blks, num_local_maps, master_bit;
 	boolean_t		free_blk_recycled;
-	int4			master_bit, num_local_maps, free_bit, hint_bit, maxbitsthismap;
-	uint4			total_blks;
+	int4			free_bit, hint_bit, maxbitsthismap;
 	int			blk_seg_cnt, blk_size;
 	sm_uc_ptr_t		parent_blk_ptr, bn_ptr, saved_blk;
 	blk_segment		*bs1, *bs_ptr;
@@ -312,7 +311,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		t_abort(gv_cur_region, csa);
 		return ABORT_SWAP;
 	}
-	bmlhist.blk_num = (block_id)master_bit * BLKS_PER_LMAP;
+	bmlhist.blk_num = master_bit * BLKS_PER_LMAP;
 	if (NULL == (bmlhist.buffaddr = t_qread(bmlhist.blk_num, (sm_int_ptr_t)&bmlhist.cycle, &bmlhist.cr)))
 	{
 		assert(t_tries < CDB_STAGNATE);
@@ -320,7 +319,9 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 		return RETRY_SWAP;
 	}
 	hint_bit = 0;
-	maxbitsthismap = (master_bit != (num_local_maps - 1)) ? BLKS_PER_LMAP : total_blks - bmlhist.blk_num;
+	/* (total_blks - bmlhist.blk_num) can be cast because it should never be larger then BLKS_PER_LMAP */
+	DEBUG_ONLY(if(master_bit == (num_local_maps - 1)) assert(BLKS_PER_LMAP >= (total_blks - bmlhist.blk_num)));
+	maxbitsthismap = (master_bit != (num_local_maps - 1)) ? BLKS_PER_LMAP : (int4)(total_blks - bmlhist.blk_num);
 	free_bit = bm_find_blk(hint_bit, bmlhist.buffaddr + SIZEOF(blk_hdr), maxbitsthismap, &free_blk_recycled);
 	free_blk_id = bmlhist.blk_num + free_bit;
 	if (DIR_ROOT >= free_blk_id)
@@ -348,7 +349,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	CHECK_AND_RESET_UPDATE_ARRAY;
 	if (free_blk_recycled)
 	{	/* Otherwise, it's a completely free block, in which case no need to read. */
-		freeblkhist.blk_num = (block_id)free_blk_id;
+		freeblkhist.blk_num = free_blk_id;
 		if (NULL == (freeblkhist.buffaddr = t_qread(free_blk_id, (sm_int_ptr_t)&freeblkhist.cycle, &freeblkhist.cr)))
 		{
 			assert(t_tries < CDB_STAGNATE);

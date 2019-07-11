@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2002-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +40,7 @@
 #  endif
 #endif
 /* Now define our version which includes space for a terminating NULL byte */
-#define	GTM_PATH_MAX	PATH_MAX + 1
+#define	GTM_PATH_MAX	(PATH_MAX + 1)
 /* The maximum path to the GT.M distribution is complicated by the paths underneath $gtm_dist.
  * At the top level, there is libgtmshr.{so,sl,dll} which is roughly 12 characters plus 1 for the
  * slash. The path length of gtmsecshrdir/gtmsecshr doesn't  come into play because
@@ -50,7 +51,7 @@
  * realpath() before dlopen()ing. As it stands, the longest path is 47 characters (including the "UTF-8"
  * directory. Thus PATH_MAX - 50 characters should be a good compromise for today and future expansion.
  * Just in case, the build script verify that nothing past $gtm_dist is more than 50 characters long. */
-#define	GTM_DIST_PATH_MAX	GTM_PATH_MAX - 50
+#define	GTM_DIST_PATH_MAX	(GTM_PATH_MAX - 50)
 
 #if defined(LLONG_MAX)		/* C99 and others */
 #define GTM_INT64_MIN LLONG_MIN

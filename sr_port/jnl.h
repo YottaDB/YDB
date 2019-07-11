@@ -1885,7 +1885,8 @@ void	jnl_write_inctn_rec(sgmnt_addrs *csa);
 void	jnl_write_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum);
 void	jnl_write_ztp_logical(sgmnt_addrs *csa, jnl_format_buffer *jfb, uint4 com_csum, seq_num jnl_seqno);
 void	jnl_write_eof_rec(sgmnt_addrs *csa, struct_jrec_eof *eof_record);
-void	jnl_write_trunc_rec(sgmnt_addrs *csa, uint4 orig_total_blks, uint4 orig_free_blocks, uint4 total_blks_after_trunc);
+void	jnl_write_trunc_rec(sgmnt_addrs *csa, block_id orig_total_blks,
+		block_id orig_free_blocks, block_id total_blks_after_trunc);
 void	jnl_write_reserve(sgmnt_addrs *csa, jbuf_rsrv_struct_t *nontp_jbuf_rsrv,
 					enum jnl_record_type rectype, uint4 reclen, void *param1);
 void	jnl_write_phase2(sgmnt_addrs *csa, jbuf_rsrv_struct_t *jbuf_rsrv_ptr);

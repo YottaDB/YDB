@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2018 Fidelity National Information	*
+ * Copyright (c) 2009-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -204,7 +204,7 @@ int gtmcrypt_getkey_by_hash(unsigned char *hash, char *db_path, gtm_keystore_t *
 					errorlen = STRLEN(gtmcrypt_err_string);
 					if (MAX_GTMCRYPT_ERR_STRLEN < errorlen)
 						errorlen = MAX_GTMCRYPT_ERR_STRLEN;
-					strncpy(save_err, gtmcrypt_err_string, errorlen);
+					memcpy(save_err, gtmcrypt_err_string, errorlen);
 					save_err[errorlen] = '\0';
 					UPDATE_ERROR_STRING("Expected hash - " STR_ARG " - %s. %s",
 						ELLIPSIZE(hex_buff), save_err, alert_msg);
@@ -318,10 +318,12 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_keyname_plus(char *keyname, char 
 	assert(keyname);
 	/* Strip off EXT_NEW from autodb paths so that the key lookup works correctly */
 	keynamelen = strlen(keyname);
+	if (GTM_PATH_MAX < keynamelen)
+		keynamelen = GTM_PATH_MAX;
 	ynew_ext = keyname + keynamelen - STRLEN(EXT_NEW);
 	if ((ynew_ext >= keyname) && (0 == strcmp(ynew_ext, EXT_NEW)))
 	{	/* This is an autodb, fixup the path */
-		strncpy(lcl_keyname, keyname, keynamelen - STRLEN(EXT_NEW));
+		memcpy(lcl_keyname, keyname, keynamelen - STRLEN(EXT_NEW));
 		lcl_keyname[keynamelen - STRLEN(EXT_NEW)] = '\0';
 		keyname = lcl_keyname;
 	}
@@ -390,13 +392,15 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 		if (database && (NULL == search_field2))
 		{	/* Newly created AutoDBs have EXT_NEW appended to them, but the crypt cfg doesn't have those keys */
 			search_field_len = strlen(search_field1);
+			if (GTM_PATH_MAX < search_field_len)
+				search_field_len = GTM_PATH_MAX;
 			ynew_ext = search_field1 + search_field_len - STRLEN(EXT_NEW);
 			if (0 == strcmp(ynew_ext, EXT_NEW))
 			{	/* Strip EXT_NEW off the path string for comparison later. Note that this path, minus EXT_NEW,
 				 * is a fully resolved path.
 				 */
 				isautodb = TRUE;
-				strncpy(name_search_field_buff, search_field1, search_field_len - STRLEN(EXT_NEW));
+				memcpy(name_search_field_buff, search_field1, search_field_len - STRLEN(EXT_NEW));
 				name_search_field_buff[search_field_len - STRLEN(EXT_NEW)] = '\0';
 				name_search_field_ptr = name_search_field_buff;
 			}
@@ -419,8 +423,7 @@ STATICFNDEF gtm_keystore_t *keystore_lookup_by_unres_key(char *search_field1, in
 			{
 				if (isautodb)
 				{	/* Append EXT_NEW to see if this a matching AutoDB */
-					strncpy(lcl_key_name_buff, curr->key_name, GTM_PATH_MAX);
-					strcat(lcl_key_name_buff, EXT_NEW);
+					SNPRINTF(lcl_key_name_buff, GTM_PATH_MAX, "%s%s", curr->key_name, EXT_NEW);
 					lcl_key_name = lcl_key_name_buff;
 				} else
 					lcl_key_name = curr->key_name;
@@ -899,9 +902,9 @@ STATICFNDEF void insert_unresolved_key_link(char *keyname, char *keypath, int in
 
 	node = (gtm_keystore_unres_key_link_t *)MALLOC(SIZEOF(gtm_keystore_unres_key_link_t));
 	memset(node->key_name, 0, GTM_PATH_MAX);
-	strncpy(node->key_name, keyname, GTM_PATH_MAX);
+	strncpy(node->key_name, keyname, GTM_PATH_MAX - 1);	/* Callers verified that the name fits in GTM_PATH_MAX */
 	memset(node->key_path, 0, GTM_PATH_MAX);
-	strncpy(node->key_path, keypath, GTM_PATH_MAX);
+	strncpy(node->key_path, keypath, GTM_PATH_MAX - 1);	/* Callers verified that the path fits in GTM_PATH_MAX */
 	node->next = keystore_by_unres_key_head;
 	node->index = index;
 	node->status = status;

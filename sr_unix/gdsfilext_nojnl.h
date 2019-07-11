@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +13,8 @@
 #ifndef GDSFILEX_NOJNL_DEFINED
 #define GDSFILEX_NOJNL_DEFINED
 
-int gdsfilext_nojnl(gd_region* reg, uint4 new_total, uint4 old_total);
+#include "gdsroot.h"
+
+int gdsfilext_nojnl(gd_region* reg, block_id new_total, block_id old_total);
 
 #endif

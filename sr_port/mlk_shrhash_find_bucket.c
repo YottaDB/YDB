@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 Fidelity National Information		*
+ * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,12 +94,19 @@ int mlk_shrhash_find_bucket(mlk_pvtctl_ptr_t pctl, uint4 hash)
 #			endif
 			if (0 == pctl->hash_fail_cnt)
 				pctl->ctl->gc_needed = TRUE;
-			else
-				pctl->ctl->resize_needed = TRUE;
+			else if (1 == pctl->hash_fail_cnt)
+			{
+				if (pctl->ctl->num_blkhash > (pctl->ctl->max_blkcnt - pctl->ctl->blkcnt) * 2)
+				{	/* We have more than twice as many hash buckets as we have active shrblks,
+					 * indicating something pathological, so try rehashing.
+					 */
+					pctl->ctl->rehash_needed = TRUE;
+				} else
+					pctl->ctl->resize_needed = TRUE;
+			}
 			pctl->hash_fail_cnt++;
 			return -1;
 		}
-		pctl->hash_fail_cnt = 0;
 		/* Move the bucket from the mapped bucket to the free bucket */
 		move_bucket = &shrhash[mi];
 		free_bucket = &shrhash[fi];

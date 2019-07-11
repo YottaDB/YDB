@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2017 Fidelity National Information	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,8 @@ GBLREF  jnl_gbls_t      	jgbl;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	gd_region		*gv_cur_region;
 
-void    jnl_write_trunc_rec(sgmnt_addrs *csa, uint4 orig_total_blks, uint4 orig_free_blocks, uint4 total_blks_after_trunc)
+void	jnl_write_trunc_rec(sgmnt_addrs *csa, block_id orig_total_blks,
+				block_id orig_free_blocks, block_id total_blks_after_trunc)
 {
 	struct_jrec_trunc	trunc_rec;
 	jnl_private_control	*jpc;
@@ -53,4 +54,3 @@ void    jnl_write_trunc_rec(sgmnt_addrs *csa, uint4 orig_total_blks, uint4 orig_
 	trunc_rec.prefix.checksum = compute_checksum(INIT_CHECKSUM_SEED, (unsigned char *)&trunc_rec, SIZEOF(struct_jrec_trunc));
 	jnl_write(jpc, JRT_TRUNC, (jnl_record *)&trunc_rec, NULL);
 }
-

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,8 +38,8 @@
 #include "lockconst.h"
 #include "wcs_phase2_commit_wait.h"
 
-LITREF  char                    gtm_release_name[];
-LITREF  int4                    gtm_release_name_len;
+LITREF	char			gtm_release_name[];
+LITREF	int4			gtm_release_name_len;
 
 error_def(ERR_MUINFOUINT8);
 
@@ -103,7 +104,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->creation_mdb_ver = v15_csd->creation_mdb_ver;
 	csd->trans_hist.early_tn = v15_csd->trans_hist.early_tn;
 	csd->trans_hist.curr_tn = v15_csd->trans_hist.curr_tn;	/* INCREMENT_CURR_TN comment added to note curr_tn set is done */
-	csd->max_tn = MAX_TN_V6;		/* New in V5.0-000 */
+	csd->max_tn = MAX_TN_V6;		/* New in V5.0-000 */ /* TODO: V7 change to MAX_TN_DFLT? */
 	SET_TN_WARN(csd, csd->max_tn_warn);	/* New in V5.0-000 */
 	csd->trans_hist.last_mm_sync = v15_csd->trans_hist.last_mm_sync;
 	csd->trans_hist.mm_tn = v15_csd->trans_hist.mm_tn;
@@ -216,10 +217,6 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 		csd->yield_lmt = v15_csd->yield_lmt;
 		memcpy(csd->jnl_file_name, v15_csd->jnl_file_name, JNL_NAME_SIZE);
 		PRINT_JNL_FIELDS(csd);
-		VMS_ONLY(
-			gtm_putmsg(VARLSTCNT(6) ERR_MUINFOUINT8, 4, LEN_AND_LIT("Resync sequence number"),
-						&csd->resync_seqno, &csd->resync_seqno);
-		)
 	}
 	memcpy(csd->reorg_restart_key, v15_csd->reorg_restart_key, SIZEOF(csd->reorg_restart_key));	/* New from V4.2 */
 	memcpy(csd->machine_name, v15_csd->machine_name, MAX_MCNAMELEN);

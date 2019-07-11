@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 Fidelity National Information		*
+ * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,8 +61,8 @@ void lke_clean(void)
 	int			fi, mi;
 	uint4			ti, num_buckets, bucket_offset, loop_cnt, loop_cnt2, total_len;
 	mlk_shrhash_map_t	usedmap, usedmap2;
-	hash128_state_t		hs;
-	gtm_uint16		hashres;
+	mlk_subhash_state_t	hs;
+	mlk_subhash_res_t	hashres;
 	mlk_shrhash_ptr_t	shrhash, search_bucket, check_bucket, free_bucket;
 	mlk_shrblk_ptr_t	shrblk, shr;
 	mlk_shrsub_ptr_t	sub, sub2;
@@ -126,7 +126,7 @@ void lke_clean(void)
 				WBTEST_ONLY(WBTEST_TRASH_HASH_NO_RECOVER,
 						mlk_shrblk_ptr_t	newfreehead;
 
-						HASH128_STATE_INIT(hs, 0);
+						MLK_SUBHASH_INIT(&pvtblk, hs);
 						sub = malloc(SIZEOF(mlk_shrsub) + 23);
 						sub->length = 24;
 						memcpy(sub->data, "A12345670123456776543210", 24);
@@ -144,14 +144,13 @@ void lke_clean(void)
 						A2R(blk->value, sub);
 						A2R(sub->backpointer, blk);
 						total_len = 0;
-						mlk_shrhash_val_build(blk,
-								&total_len, &hs);
-						gtmmrhash_128_result(&hs, total_len, &hashres);
-						ti = ((uint4)hashres.one) % num_buckets;
+						mlk_shrhash_val_build(blk, &total_len, &hs);
+						MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
+						ti = MLK_SUBHASH_RES_VAL(hashres) % num_buckets;
 						for(int foo=0; foo < MLK_SHRHASH_NEIGHBORS + 2; foo++)
 						{
 							check_bucket = &shrhash[(ti + foo) % num_buckets];
-							check_bucket->hash = (uint4)hashres.one;
+							check_bucket->hash = MLK_SUBHASH_RES_VAL(hashres);
 							check_bucket->shrblk_idx = MLK_SHRBLK_IDX(pvtblk.pvtctl, blk);
 						}
 						check_bucket = &shrhash[ti];
@@ -164,7 +163,7 @@ void lke_clean(void)
 				WBTEST_ONLY(WBTEST_TRASH_HASH_RECOVER,
 						mlk_shrblk_ptr_t	newfreehead;
 
-						HASH128_STATE_INIT(hs, 0);
+						MLK_SUBHASH_INIT(&pvtblk, hs);
 						sub = malloc(SIZEOF(mlk_shrsub) + 32);
 						sub->length = 33;
 						memcpy(sub->data, "A12345678901234567890123456789012", 33);
@@ -184,10 +183,9 @@ void lke_clean(void)
 						A2R(blk->value, sub);
 						A2R(sub->backpointer, blk);
 						total_len = 0;
-						mlk_shrhash_val_build(blk,
-								&total_len, &hs);
-						gtmmrhash_128_result(&hs, total_len, &hashres);
-						ti = ((uint4)hashres.one) % num_buckets;
+						mlk_shrhash_val_build(blk, &total_len, &hs);
+						MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
+						ti = MLK_SUBHASH_RES_VAL(hashres) % num_buckets;
 						free_bucket = &shrhash[ti];
 						free_bucket->usedmap = 0;
 						for(int foo=0; foo < MLK_SHRHASH_NEIGHBORS + 2; foo++)
@@ -200,7 +198,7 @@ void lke_clean(void)
 								check_bucket->usedmap = 0;
 							} else
 							{
-								check_bucket->hash = (uint4)hashres.one;
+								check_bucket->hash = MLK_SUBHASH_RES_VAL(hashres);
 								check_bucket->shrblk_idx = MLK_SHRBLK_IDX(pvtblk.pvtctl, blk);
 								/* When the shift reaches the number of bits in the underlying int,
 								 * the following wraps on x86-family processors and goes to zero on
@@ -237,17 +235,17 @@ void lke_clean(void)
 							}
 							shrblk = MLK_SHRHASH_SHRBLK(pvtblk.pvtctl, check_bucket);
 							assert(0 != shrblk->value);
-							HASH128_STATE_INIT(hs, 0);
+							MLK_SUBHASH_INIT(&pvtblk, hs);
 							total_len = 0;
 							mlk_shrhash_val_build(shrblk, &total_len, &hs);
-							gtmmrhash_128_result(&hs, total_len, &hashres);
+							MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
 							/* If this triggers, it means a bucket was marked as used for a
 							 *  particular hash value, but is in fact used by a different hash
 							 *  value; we can not easily recover from this, and the safest
 							 *  course of action is for the user to bring things down ASAP
 							 */
-							if ((((uint4)hashres.one % num_buckets) != fi) ||
-									((uint4)hashres.one != check_bucket->hash))
+							if (((MLK_SUBHASH_RES_VAL(hashres) % num_buckets) != fi) ||
+									(MLK_SUBHASH_RES_VAL(hashres) != check_bucket->hash))
 							{
 								REL_LOCK_CRIT(pvtblk.pvtctl, was_crit);
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MLKHASHWRONG,
@@ -257,18 +255,18 @@ void lke_clean(void)
 					}
 					if (0 != search_bucket->shrblk_idx)
 					{	/* Verify that the value in this bucket should be in this bucket */
-						HASH128_STATE_INIT(hs, 0);
+						MLK_SUBHASH_INIT(&pvtblk, hs);
 						total_len = 0;
 						mlk_shrhash_val_build(MLK_SHRHASH_SHRBLK(pvtblk.pvtctl, search_bucket),
 									&total_len, &hs);
-						gtmmrhash_128_result(&hs, total_len, &hashres);
-						ti = ((uint4)hashres.one) % num_buckets;
+						MLK_SUBHASH_FINALIZE(hs, total_len, hashres);
+						ti = MLK_SUBHASH_RES_VAL(hashres) % num_buckets;
 						check_bucket = &shrhash[ti];
 						bucket_offset = (num_buckets + fi - ti) % num_buckets;
 						if (MLK_SHRHASH_NEIGHBORS <= bucket_offset)
 						{	/* If this triggers, it means the hash was more than 32 away from correct
 								  bucket; not in the right neighborhood -- try moving it */
-							mi = mlk_shrhash_find_bucket(&pvtblk.pvtctl, (uint4)hashres.one);
+							mi = mlk_shrhash_find_bucket(&pvtblk.pvtctl, MLK_SUBHASH_RES_VAL(hashres));
 							shr = MLK_SHRHASH_SHRBLK(pvtblk.pvtctl, search_bucket);
 							if (mi == -1)
 							{	/* If this triggers, it mean the hash table is full and things are
@@ -286,7 +284,7 @@ void lke_clean(void)
 							}
 							mlk_shrhash_insert(&pvtblk.pvtctl, ti, mi,
 										MLK_SHRBLK_IDX(pvtblk.pvtctl, shr),
-										(uint4)hashres.one);
+										MLK_SUBHASH_RES_VAL(hashres));
 							/* Clear old bucket */
 							search_bucket->shrblk_idx = 0;
 							search_bucket->hash = 0;

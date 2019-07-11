@@ -50,8 +50,8 @@
 #include "targ_alloc.h"
 #include "util.h"		/* for util_out_print prototype */
 #include "wcs_flu.h"
-#include "repl_msg.h"			/* for gtmsource.h */
-#include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
+#include "repl_msg.h"		/* for gtmsource.h */
+#include "gtmsource.h"		/* for jnlpool_addrs_ptr_t */
 
 #define	REORG_CONTINUE	1
 #define	REORG_BREAK	2
@@ -82,7 +82,7 @@ GBLREF	unsigned char		t_fail_hist[CDB_MAX_TRIES];
 GBLREF 	unsigned int		t_tries;
 GBLREF	cw_set_element		cw_set[];		/* create write set. */
 GBLREF	unsigned char		cw_set_depth;
-GBLREF	unsigned char    	cw_map_depth;
+GBLREF	unsigned char		cw_map_depth;
 GBLREF	uint4			update_trans;
 
 error_def(ERR_BUFFLUFAILED);
@@ -100,7 +100,7 @@ error_def(ERR_REORGCTRLY);
 /* actually want the following to be a static variable in this module, but getting the address of a
  * static variable through the debugger might be tricky on some platforms. hence use a global variable instead.
  */
-GBLDEF	trans_num		mu_reorg_upgrd_dwngrd_start_tn;
+GBLDEF	trans_num	mu_reorg_upgrd_dwngrd_start_tn;
 
 typedef struct
 {
@@ -130,7 +130,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	gd_region		*reg;
 	int			cycle;
 	int4			blk_seg_cnt, blk_size;	/* needed for BLK_INIT,BLK_SEG and BLK_FINI macros */
-	int4			blocks_left, expected_blks2upgrd, actual_blks2upgrd, total_blks, free_blks;
+	block_id		blocks_left, expected_blks2upgrd, actual_blks2upgrd, total_blks, free_blks;
 	int4			status, status1, mapsize, lcnt, bml_status;
 	reorg_stats_t		reorg_stats;
 	sgmnt_addrs		*csa;
@@ -140,7 +140,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 	srch_blk_status		*blkhist, bmlhist;
 	tp_region		*rptr;
 	trans_num		curr_tn;
-	unsigned char    	save_cw_set_depth;
+	unsigned char		save_cw_set_depth;
 	uint4			lcl_update_trans;
 	unix_db_info		*udi;
 	DCL_THREADGBL_ACCESS;
@@ -263,10 +263,10 @@ void	mu_reorg_upgrd_dwngrd(void)
 			|| (!upgrade && ((total_blks - free_blks) == actual_blks2upgrd)))
 		{
 			util_out_print("Region !AD : Blocks to Upgrade counter indicates no action needed for MUPIP REORG !AD",
-				       TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
+					TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
 			util_out_print("Region !AD : Total Blocks = [0x!XL] : Free Blocks = [0x!XL] : "
-				       "Blocks to upgrade = [0x!XL]",
-				       TRUE, REG_LEN_STR(reg), total_blks, free_blks, actual_blks2upgrd);
+					"Blocks to upgrade = [0x!XL]",
+					TRUE, REG_LEN_STR(reg), total_blks, free_blks, actual_blks2upgrd);
 			util_out_print("Region !AD : MUPIP REORG !AD finished!/", TRUE, REG_LEN_STR(reg), LEN_AND_STR(command));
 			rel_crit(reg);
 			continue;
@@ -388,11 +388,15 @@ void	mu_reorg_upgrd_dwngrd(void)
 			 * ------------------------------------------------------------------------
 			 */
 			curblk = (curbmp == start_bmp) ? start_blk : curbmp;
-			mapsize = (curbmp == last_bmp) ? (stop_blk - curbmp) : BLKS_PER_LMAP;
+			/* (stop_blk - curbmp) can be cast because it should never be larger then BLKS_PER_LMAP if used */
+			assert((BLKS_PER_LMAP >= (stop_blk - curbmp)) || (curbmp != last_bmp));
+			mapsize = (curbmp == last_bmp) ? (int4)(stop_blk - curbmp) : BLKS_PER_LMAP;
 			assert(0 != mapsize);
-			assert(mapsize <= BLKS_PER_LMAP);
+			assert(BLKS_PER_LMAP >= mapsize);
 			db_got_to_v5_once = csd->db_got_to_v5_once;
-			for (lcnt = curblk - curbmp; lcnt < mapsize; lcnt++, curblk++)
+			/* (curblk - curbmp) can be cast because it should never be larger then BLKS_PER_LMAP */
+			assert(BLKS_PER_LMAP > (curblk - curbmp));
+			for (lcnt = (int4)(curblk - curbmp); lcnt < mapsize; lcnt++, curblk++)
 			{
 				if (mu_ctrly_occurred || mu_ctrlc_occurred)
 				{
@@ -555,7 +559,7 @@ void	mu_reorg_upgrd_dwngrd(void)
 									FALSE, GDS_WRITE_PLAIN);
 								/* The directory tree status for now is only used to determine
 								 * whether writing the block to snapshot file (see t_end_sysops.c).
- 								 * For reorg upgrade/downgrade process, the block is updated in a
+								 * For reorg upgrade/downgrade process, the block is updated in a
 								 * sequential way without changing the gv_target. In this case, we
 								 * assume the block is in directory tree so as to have it written to
 								 * the snapshot file.
@@ -720,8 +724,8 @@ void	mu_reorg_upgrd_dwngrd(void)
 			status1 = ERR_MUNOFINISH;
 		} else
 			util_out_print("Region !AD : Total Blocks = [0x!XL] : Free Blocks = [0x!XL] : "
-				       "Blocks to upgrade = [0x!XL]",
-				       TRUE, REG_LEN_STR(reg), total_blks, free_blks, actual_blks2upgrd);
+					"Blocks to upgrade = [0x!XL]",
+					TRUE, REG_LEN_STR(reg), total_blks, free_blks, actual_blks2upgrd);
 		/* Issue success or failure message for this region */
 		if (SS_NORMAL == status1)
 		{	/* issue success only if REORG did not encounter any error in its processing */

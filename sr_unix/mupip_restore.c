@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -114,20 +114,18 @@ void mupip_restore(void)
 {
 	static readonly char	label[] =   GDS_LABEL;
 	char			db_name[MAX_FN_LEN + 1], *inbuf, *p, *blk_ptr;
-	inc_list_struct 	*ptr;
+	inc_list_struct		*ptr;
 	inc_header		inhead;
 	sgmnt_data		old_data;
 	unsigned short		n_len;
 	int4			status, rsize, temp, save_errno, old_start_vbn;
-	uint4			rest_blks, totblks;
 	trans_num		curr_tn;
-	uint4			ii;
-	block_id		blk_num;
+	block_id		blk_num, old_tot_blks, totblks, old_bit_maps, new_bit_maps, rest_blks, i, ii;
 	boolean_t		extend;
 	uint4			cli_status;
 	BFILE			*in;
-	int			i, db_fd;
-	uint4			old_blk_size, orig_size, size, old_tot_blks, bplmap, old_bit_maps, new_bit_maps;
+	int			db_fd;
+	uint4			old_blk_size, orig_size, size, bplmap;
 	off_t			new_eof, offset;
 	off_t			new_size;
 	char			msg_buffer[1024], *newmap;
@@ -154,7 +152,7 @@ void mupip_restore(void)
 	gd_segment		*seg;
 	unix_db_info		*udi;
 	sgmnt_data_ptr_t	csd;
-	ZOS_ONLY(int 		realfiletag;)
+	ZOS_ONLY(int		realfiletag;)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -505,7 +503,7 @@ void mupip_restore(void)
 		}
 		rsize = SIZEOF(muinc_blk_hdr) + inhead.blk_size;
 		for ( ; ; )
-		{        /* All records are of fixed size so process until we get to a zeroed record marking the end */
+		{	/* All records are of fixed size so process until we get to a zeroed record marking the end */
 			COMMON_READ(in, inbuf, rsize, inbuf);	/* Note rsize == sblkh_p */
 			if (0 == sblkh_p->blkid && FALSE == sblkh_p->valid_data)
 			{	/* This is supposed to be the end of list marker (null entry */
@@ -665,7 +663,7 @@ void mupip_restore(void)
 		GET_LONG(temp, (inbuf + rsize - SIZEOF(int4)));
 		rsize = temp;
 		offset = (MM_BLOCK - 1) * DISK_BLOCK_SIZE;
-		assert(SGMNT_HDR_LEN == offset);	/* Still have contiguou master map for now */
+		assert(SGMNT_HDR_LEN == offset);	/* Still have contiguous master map for now */
 		for (i = 0; ; i++)			/* Restore master map */
 		{
 			COMMON_READ(in, inbuf, rsize, inbuf);

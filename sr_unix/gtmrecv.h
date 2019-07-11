@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2017 Fidelity National Information	*
+ * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -373,6 +373,7 @@ typedef struct
 	char		reuse_instname[MAX_INSTNAME_LEN];
 	boolean_t	autorollback;
 	boolean_t	autorollback_verbose;
+	boolean_t	stopreceiverfilter;
 } gtmrecv_options_t;
 
 #include "gtm_inet.h"
@@ -413,5 +414,6 @@ int		gtmrecv_start_helpers(int n_readers, int n_writers);
 void		gtmrecv_reap_helpers(boolean_t wait);
 int		gtmrecv_end_helpers(boolean_t is_rcvr_srvr);
 void		gtmrecv_onln_rlbk_clnup(void);
+int		gtmrecv_stopfilter(void);
 
 #endif

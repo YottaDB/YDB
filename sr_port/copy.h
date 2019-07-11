@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,8 +16,11 @@
 
 #ifdef UNALIGNED_ACCESS_SUPPORTED
 /* Unsigned versions are different from signed ones as we may get sign extension problems when promotion is needed */
+#define GET_LLONGP(X,Y)	(*(gtm_int8 *)(X) = *(gtm_int8 *)(Y))
 #define GET_LONGP(X,Y)	(*(int4 *)(X) = *(int4 *)(Y))
 #define GET_SHORTP(X,Y)	(*(short *)(X) = *(short *)(Y))
+#define GET_LLONG(X,Y)	((X) = *(gtm_int8 *)(Y))
+#define GET_ULLONG(X,Y)	((X) = *(gtm_uint8 *)(Y))
 #define GET_LONG(X,Y)	((X) = *(int4 *)(Y))
 #define GET_ULONG(X,Y)	((X) = *(uint4 *)(Y))
 #define GET_SHORT(X,Y)	((X) = *(short *)(Y))
@@ -24,6 +28,8 @@
 #define GET_CHAR(X,Y)	((X) = *(unsigned char *)(Y))
 #define REF_CHAR(Y)	(*(unsigned char *)Y)
 #define PUT_ZERO(X)	((X) = 0)
+#define PUT_LLONG(X,Y)	(*(gtm_int8*)(X) = (Y))
+#define PUT_ULLONG(X,Y)	(*(gtm_uint8*)(X) = (Y))
 #define PUT_LONG(X,Y)	(*(int4*)(X) = (Y))
 #define PUT_ULONG(X,Y)	(*(uint4*)(X) = (Y))
 #define PUT_SHORT(X,Y)	(*(short*)(X) = (Y))
@@ -31,6 +37,15 @@
 #define PUT_CHAR(X,Y)	(*(unsigned char *)(X) = (Y))
 #else
 #include <sys/types.h>
+#define GET_LLONGP(X,Y)	(*(caddr_t)(X)     = *(caddr_t)(Y),	\
+			 *((caddr_t)(X)+1) = *((caddr_t)(Y)+1),	\
+			 *((caddr_t)(X)+2) = *((caddr_t)(Y)+2),	\
+			 *((caddr_t)(X)+3) = *((caddr_t)(Y)+3),	\
+			 *((caddr_t)(X)+4) = *((caddr_t)(Y)+4),	\
+			 *((caddr_t)(X)+5) = *((caddr_t)(Y)+5),	\
+			 *((caddr_t)(X)+6) = *((caddr_t)(Y)+6),	\
+			 *((caddr_t)(X)+7) = *((caddr_t)(Y)+7))
+
 #define GET_LONGP(X,Y)	(*(caddr_t)(X)     = *(caddr_t)(Y), \
 			 *((caddr_t)(X)+1) = *((caddr_t)(Y)+1), \
 			 *((caddr_t)(X)+2) = *((caddr_t)(Y)+2), \
@@ -39,6 +54,17 @@
 #define GET_SHORTP(X,Y)	(*(caddr_t)(X) = *(caddr_t)(Y), *((caddr_t)(X)+1) = *((caddr_t)(Y)+1))
 
 /* Unsigned versions are same as the signed ones as we do char by char */
+#define GET_LLONG(X,Y)	(*(caddr_t)(&X)     = *(caddr_t)(Y), \
+			 *((caddr_t)(&X)+1) = *((caddr_t)(Y)+1), \
+			 *((caddr_t)(&X)+2) = *((caddr_t)(Y)+2), \
+			 *((caddr_t)(&X)+3) = *((caddr_t)(Y)+3), \
+			 *((caddr_t)(&X)+4) = *((caddr_t)(Y)+4), \
+			 *((caddr_t)(&X)+5) = *((caddr_t)(Y)+5), \
+			 *((caddr_t)(&X)+6) = *((caddr_t)(Y)+6), \
+			 *((caddr_t)(&X)+7) = *((caddr_t)(Y)+7))
+
+#define GET_ULLONG(X,Y)	GET_LLONG
+
 #define GET_LONG(X,Y)	(*(caddr_t)(&X)     = *(caddr_t)(Y), \
 			 *((caddr_t)(&X)+1) = *((caddr_t)(Y)+1), \
 			 *((caddr_t)(&X)+2) = *((caddr_t)(Y)+2), \
@@ -54,6 +80,17 @@
 #define REF_CHAR(Y)	(*(caddr_t)(Y))
 
 #define PUT_ZERO(X)	(memset((caddr_t)&(X), 0, SIZEOF(X)))
+
+#define PUT_LLONG(X,Y)	(*(caddr_t)(X)     = *(caddr_t)(&Y), \
+			 *((caddr_t)(X)+1) = *((caddr_t)(&Y)+1), \
+			 *((caddr_t)(X)+2) = *((caddr_t)(&Y)+2), \
+			 *((caddr_t)(X)+3) = *((caddr_t)(&Y)+3), \
+			 *((caddr_t)(X)+4) = *((caddr_t)(&Y)+4), \
+			 *((caddr_t)(X)+5) = *((caddr_t)(&Y)+5), \
+			 *((caddr_t)(X)+6) = *((caddr_t)(&Y)+6), \
+			 *((caddr_t)(X)+7) = *((caddr_t)(&Y)+7))
+
+#define PUT_ULLONG(X,Y)	PUT_LLONG
 
 #define PUT_LONG(X,Y)	(*(caddr_t)(X)     = *(caddr_t)(&Y), \
 			 *((caddr_t)(X)+1) = *((caddr_t)(&Y)+1), \

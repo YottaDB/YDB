@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,12 +77,13 @@ MBSTART {												\
 boolean_t mu_int_fhead(void)
 {
 	unsigned char		*p1;
-	unsigned int		maps, block_factor;
+	unsigned int		block_factor;
 	gtm_uint64_t		size, native_size, delta_size;
 	trans_num		temp_tn, max_tn_warn;
 	sgmnt_data_ptr_t	mu_data;
 	gd_segment		*seg;
-	int			actual_tot_blks, should_be_tot_blks, gtmcrypt_errno;
+	block_id		actual_tot_blks, should_be_tot_blks, maps;
+	int			gtmcrypt_errno;
 
 	mu_data = &mu_int_data;
 	if (MEMCMP_LIT(mu_data->label, GDS_LABEL))
@@ -148,17 +149,17 @@ boolean_t mu_int_fhead(void)
 	}
 	if (mu_data->trans_hist.curr_tn != mu_data->trans_hist.early_tn)
 		mu_int_err(ERR_DBTNNEQ, 0, 0, 0, 0, 0, 0, 0);
-        if (0 != mu_data->kill_in_prog)
-        {
-                gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUKILLIP, 4, DB_LEN_STR(gv_cur_region), LEN_AND_LIT("MUPIP INTEG"));
-                mu_int_errknt++;
-        }
-        if (0 != mu_data->abandoned_kills)
-        {
-                gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_KILLABANDONED, 4, DB_LEN_STR(gv_cur_region),
+	if (0 != mu_data->kill_in_prog)
+	{
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUKILLIP, 4, DB_LEN_STR(gv_cur_region), LEN_AND_LIT("MUPIP INTEG"));
+		mu_int_errknt++;
+	}
+	if (0 != mu_data->abandoned_kills)
+	{
+		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_KILLABANDONED, 4, DB_LEN_STR(gv_cur_region),
 			LEN_AND_LIT("database could have incorrectly marked busy integrity errors"));
-                mu_int_errknt++;
-        }
+		mu_int_errknt++;
+	}
 	if (MAX_KEY_SZ < mu_data->max_key_size)
 		mu_int_err(ERR_DBMAXKEYEXC, 0, 0, 0, 0, 0, 0, 0);
 	gtmcrypt_errno = 0;
@@ -193,7 +194,8 @@ boolean_t mu_int_fhead(void)
 	}
 	/* Note - ovrhd is incremented once in order to achieve a zero-based
 	 * index of the GDS 'data' blocks (those other than the file header
-	 * and the block table). */
+	 * and the block table).
+	 */
 	switch (mu_data->acc_meth)
 	{
 		default:
@@ -205,7 +207,7 @@ boolean_t mu_int_fhead(void)
 			mu_int_ovrhd = (int4)DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(mu_data) + mu_data->free_space, DISK_BLOCK_SIZE);
 	}
 	assert(mu_data->blk_size == ROUND_UP(mu_data->blk_size, DISK_BLOCK_SIZE));
- 	block_factor =  mu_data->blk_size / DISK_BLOCK_SIZE;
+	block_factor =  mu_data->blk_size / DISK_BLOCK_SIZE;
 	mu_int_ovrhd += 1;
 	if (mu_int_ovrhd != mu_data->start_vbn)
 	{

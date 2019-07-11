@@ -1203,7 +1203,7 @@
    GT.M expects ICU to be compiled with symbol renaming disabled and will
    issue an error at startup if the available version of ICU is built with
    symbol renaming enabled. To use a version of ICU built with symbol
-   renaming enabled, the $gtm_icu_version environment variable indicates the
+   renaming enabled, the gtm_icu_version environment variable indicates the
    MAJOR VERSION and MINOR VERSION numbers of the desired ICU formatted as
    MajorVersion.MinorVersion (for example "3.6" to denote ICU-3.6). When
    $gtm_icu_version is so defined, GT.M attempts to open the specific version
@@ -12022,10 +12022,30 @@
    characters when READ. CTRAP characters other than <CTRL-C> tend to be
    limited by terminal configuration.
 
-   If an interrupt event occurs in a long running external call (for example,
-   waiting in a message queue), GT.M recognizes the event but makes the
-   vector transfer after the external call returns when it reaches the next
+   The interrupt handler is executed by GT.M when on a statement boundary or
+   on an appropriate boundary in a potentially long running COMMAND (in the
+   same place as GT.M recognizes <CTRL-C>). If a GT.M process is in a long
+   running external call (for example; waiting in a message queue) GT.M does
+   not have sufficient control of the process state to immediately drive the
+   interrupt handler. GT.M recognizes the interrupt request and drives the
+   handler after the external call returns to GT.M and the process reaches an
    appropriate execution boundary.
+
+   **Note**
+
+   The interrupt handler does not operate "outside" the current M environment
+   but rather within the environment of the process.
+
+   It is possible for the interrupt handler to be executed while the process
+   executing a TP transaction holds the critical section for one or more
+   regions. Use of this feature may create temporary hangs or pauses while
+   the interrupt handler executes. For the default case where the interrupt
+   handler uses $ZJOBEXAM() to create a dump, the pause duration depends on
+   the number of local variables in the process at the time of the dump and
+   on the speed of the disk being written to. The dumps are slower on a
+   network-mounted disk than on a disk directly connected to the local
+   system. Any interrupt driven code should be designed to account for this
+   issue.
 
    When GT.M uses an interrupt handler, it saves and restores the current
    values of $REFERENCE. However, GT.M does not implicitly save or restore
@@ -12036,57 +12056,29 @@
    IO on a device which was actively doing IO when the interrupt was
    recognized may cause a ZINTERCURSEIO error.
 
-   Example:
-
-   set $zinterrupt="do ^interrupthandler($io)"
-   interrupthandler(currentdev)
-          do ^handleinterrupt ; handle the interrupt
-          use currentdev      ; restore the device which was current when the interrupt was recognized
-          quit
-
-   The use of the INTRPT facility may create a temporary hang or pause while
-   the interrupt handler code is executed. For the default case where the
-   interrupt handler uses IF $ZJOBEXAM() to create a dump, the pause duration
-   depends on the number of local variables in the process at the time of the
-   dump and on the speed of the disk being written to. The dumps are slower
-   on a network-mounted disk than on a disk directly connected to the local
-   system. Any interrupt driven code should be designed to account for this
-   issue.
-
-   **Important**
-
-   Because sending an interrupt signal requires the sender to have
-   appropriate permissions, the use of the job interrupt facility itself does
-   not present any inherent security exposures. Nonetheless, because the dump
-   files created by the default action contain the values of every local
-   variable in the context at the time they are made, inappropriate access to
-   the dump files would constitute a security exposure. Make sure the design
-   and implementation of any interrupt logic includes careful consideration
-   to security issues.
+   Code in $ZINTERRUPT must use routine names in any entryref argument to a
+   DO, GOTO, JOB, ZGOTO or any extrinsic as the arrival of the interrupt can
+   activate the code while executing an arbitrary routine in the application.
 
    During the execution of the interrupt handling code, $ZINITERRUPT
    evaluates to 1 (TRUE).
 
    If an error occurs while compiling the $ZINTERRUPT code, the error handler
-   is not invoked (the error handler is invoked if an error occurs while
-   executing the $ZINTERRUPT code), GT.M sends the ERRWZINTR message and the
-   compiler error message to the operator log facility. If the GT.M process
-   is at a direct mode prompt or is executing a direct mode command (for
-   example, a FOR loop), GT.M sends also sends the ERRWZINTR error message to
-   the user console along with the compilation error. In both cases, the
-   interrupted process resumes execution without performing any action
-   specified by the defective $ZINTERRUPT vector.
+   is not invoked, GT.M sends the ERRWZINTR message and the compiler error
+   message to the operator log facility. If the GT.M process is at a direct
+   mode prompt or is executing a direct mode command (for example, a FOR
+   loop), GT.M sends also sends the ERRWZINTR error message to the user
+   console along with the compilation error. In both cases, the interrupted
+   process resumes execution without performing any action specified by the
+   defective $ZINTERRUPT vector.
 
-   If GT.M encounters an error during creation of the interrupt handler's
-   stack frame (before transferring control to the application code specified
-   by the vector), that error is prefixed with a ERRWZINTR error. The error
-   handler then executes normal error processing associated with the
-   interrupted routine.
-
-   **Note**
-
-   The interrupt handler does not operate "outside" the current M environment
-   but rather within the environment of the process.
+   The error handler is invoked if an error occurs while executing the
+   $ZINTERRUPT code. If an error occurs during execution of the interrupt
+   handler's stack frame (before it calls anything), that error is prefixed
+   with the ERRWZINTR error. The error handler then executes normal error
+   processing associated with the module that was interrupted. Any other
+   errors that occur in code called by the interrupt handler are handled by
+   normal error handling.
 
    TP transaction is in progress (0<$TLEVEL), updates to globals are not safe
    since a TP restart can be signaled at any time prior to the transaction
@@ -12100,70 +12092,24 @@
    are not restored by a TRESTART to defer the interrupt action until after
    the final TCOMMIT.
 
-   The interrupt handler is executed by GT.M when on a statement boundary or
-   on an appropriate boundary in a potentially long running COMMAND (in the
-   same place as GT.M recognizes <CTRL-C>). If a GT.M process is in a long
-   running external call (for example; waiting in a message queue) GT.M does
-   not have sufficient control of the process state to immediately drive the
-   interrupt handler. GT.M recognizes the interrupt request and drives the
-   handler after the external call returns to GT.M and the process reaches an
-   appropriate execution boundary.
+   **Important**
 
-   Since sending an interrupt signal requires the sender to have appropriate
-   permissions from UNIX, the use of the interrupt facility itself does not
-   present any inherent security exposures. Nonetheless, because the dump
+   Because sending an interrupt signal requires the sender to have
+   appropriate permissions, the use of the job interrupt facility itself does
+   not present any inherent security exposures. Nonetheless, because the dump
    files created by the default action contain the values of every local
    variable in the context at the time they are made, inappropriate access to
-   the dump files could constitute a security exposure. Make sure the design
+   the dump files would constitute a security exposure. Make sure the design
    and implementation of any interrupt logic includes careful consideration
    to security issues.
 
-   If an error occurs while compiling the $ZINTERRUPT code, the action taken
-   depends on the process state at the time the interrupt was received and
-   the error handler is not invoked (the error handler is invoked if an error
-   occurs while executing the $ZINTERRUPT code). If the GT.M process is at a
-   direct mode prompt or is executing a direct mode command (for example, a
-   FOR loop), the error message is sent to the user console along with the
-   ERRWZINTR error (refer to the GT.M Error and Message Recovery Manual). In
-   addition, the ERRWZINTR error is also sent to the operator log facility.
-   IF the process is not at a direct mode prompt or executing a direct mode
-   command, the ERRWZINTR message and the compiler error message are sent to
-   the operator log facility and nothing is displayed on the user's console.
-   In both cases, the interrupted process resumes execution.
+   Example:
 
-   If an error occurs during execution of the interrupt handler's stack frame
-   (before it calls anything), that error is prefixed with the ERRWZINTR
-   error. The error handler then executes normal error processing associated
-   with the module that was interrupted. Any other errors that occur in code
-   called by the interrupt handler are handled by normal error handling.
-
-   **Note**
-
-   The interrupt handler does not operate "outside" the current M environment
-   but rather within the environment of the process.
-
-   If a TP transaction is in progress (0<$TLEVEL), updates to globals are not
-   safe since a TP restart can be signaled at any time prior to the
-   transaction being committed - even after the interrupt handler returns. A
-   TP restart reverses all global updates and unwinds the M stack so it is as
-   if the interrupt never occurred. The interrupt handler is not redriven as
-   part of a transaction restart. Referencing (reading) globals inside an
-   interrupt handler can trigger a TP restart if a transaction is active.
-   When programming interrupt handling, either discard interrupts when
-   0<$TLEVEL (forcing the interrupting party to try again), or use local
-   variables that are not restored by a TRESTART to defer the interrupt
-   action until after the final TCOMMIT.
-
-   Note that it is possible for the interrupt handler to be executed while
-   the process executing the M routine is holding the critical section for
-   one or more regions. Use of this feature may create temporary hangs or
-   pauses while the interrupt handler executes. For the default case where
-   the interrupt handler uses $ZJOBEXAM() to create a dump, the pause
-   duration depends on the number of local variables in the process at the
-   time of the dump and on the speed of the disk being written to. The dumps
-   are slower on a network-mounted disk than on a disk directly connected to
-   the local system. Any interrupt driven code should be designed to account
-   for this issue.
+   set $zinterrupt="do ^interrupthandler($io)"
+   interrupthandler(currentdev)
+          do ^handleinterrupt ; handle the interrupt
+          use currentdev      ; restore the device which was current when the interrupt was recognized
+          quit
 
 2 $ZINInterrupt
    $ZINInterrupt
@@ -18708,6 +18654,13 @@
    argument. As a good programming practice, always ensure that count of
    arguments defined in the external call table matches the function
    invocation.
+
+   To protect the process, GT.M turns any return values containing a null
+   pointer to an empty string value and, for the first occurrence in a
+   process, sends one XCRETNULLREF syslog message. If an external call sets a
+   gtm_string length to a negative value, to protect the process, GT.M turns
+   any return with a negative length to an empty string value and, for the
+   first occurrence in a process, sends one XCCONVERT syslog message.
 
    gtmxc_types.h also includes definitions for the following entry points
    exported from libgtmshr:

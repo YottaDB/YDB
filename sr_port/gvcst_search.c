@@ -464,10 +464,10 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_rmisalign;
 		}
-		GET_LONG(nBlkId, (pRec + n0 - SIZEOF(block_id)));
+		GET_LONG(nBlkId, (pRec + n0 - SIZEOF(block_id)));	/* TODO: V7 change to GET_LLONG */
 		if (is_mm)
 		{
-			PUT_LONG(&chain2, nBlkId);
+			PUT_LONG(&chain2, nBlkId);	/* TODO: V7 change to PUT_LLONG */
 			if ((0 == chain2.flag) && (nBlkId > cs_addrs->total_blks))
 			{	/* private copy should be taken care of by .flag */
 				if (cs_addrs->total_blks < cs_addrs->ti->total_blks)

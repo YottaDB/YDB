@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,10 +51,10 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 	gtm_uint64_t		native_size, size;
 	sgmnt_data_ptr_t 	mu_data;
 	int4			mu_int_ovrhd;
-	uint4			total_blks;
+	block_id		total_blks, new_blocks, new_bit_maps, tmpcnt;
 	uint4			status;
-	uint4                   new_bit_maps, bplmap, new_blocks, tmpcnt;
-	enum db_acc_method      acc_meth;
+	uint4			bplmap;
+	enum db_acc_method	acc_meth;
 
 	MUR_CHANGE_REG(rctl);
 	mu_data = cs_data;

@@ -2387,6 +2387,10 @@
     -E[XCLUDE]=global-name-list
     -FI[LL_FACTOR]=integer
     -I[NDEX_FILL_FACTOR]=integer
+    -K[EEP]={pct% | blocks}
+    -NOCO[ALESCE]
+    -NOSP[LIT]
+    -NOSW[AP]
     -R[ESUME]
     -S[ELECT]=global-name-list
     -T[RUNCATE][=percentage]
@@ -2623,6 +2627,63 @@
    factor for index blocks than for data blocks. By default, the
    INDEX_FILL_FACTOR is the value of FILL_FACTOR regardless of whether that
    value is explicitly specified or implicitly obtained by default.
+
+3 Keep
+   Keep
+
+   For a MUPIP REORG -TRUNCATE, -KEEP allows the user to specify, as a
+   decimal integer number of blocks or a percentage from 0% to 99% of the
+   starting total blocks, the total amount of space the truncate operation
+   should leave (not truncate) in the database file at the completion of
+   other REORG operations. The format of the KEEP qualifier is:
+
+   -KEEP={pct%|blocks}
+
+     o Where pct is a decimal integer percentage followed by a percent-sign
+       (%) and alternatively blocks is a decimal integer number of blocks. If
+       REORG cannot meet the keep value, it produces an informational message
+       indicating that it did not perform any truncation, and how many free
+       blocks it left.
+
+3 NOCOalesce
+   NOCOalesce
+
+   -NOCOALESCE specifies to MUPIP REORG to skip actions that increase block
+   density. The format of the NOCOALESCE qualifier is:
+
+   -NOCO[alesce]
+
+     o By default, MUPIP REORG attempts to rearrange blocks which are below
+       the specified fill-factor to pack data more densely. More tightly
+       packed data can decrease block I/O and reduce the storage
+       requirements.
+
+3 NOSPlit
+   NOSPlit
+
+   -NOSPLIT specifies to MUPIP REORG to skip actions that decrease block
+   density. The format of the NOSPLIT qualifier is:
+
+   -NOSP[lit]
+
+     o By default, MUPIP REORG attempts to rearrange blocks which are above
+       the specified fill-factor to pack data less densely. Having empty
+       space in blocks can reduce the need for block splits going forward,
+       which may improve performance.
+
+3 NOSWap
+   NOSWap
+
+   -NOSWAP specifies to MUPIP REORG to skip actions that increase block
+   adjacency. The format of the NOSWAP qualifier is:
+
+   -NOSW[ap]
+
+     o By default, MUPIP REORG attempts to rearrange blocks so logically
+       related blocks have adjacent block numbers. On rotating storage, this
+       tends to improve performance; on solid state storage the results are
+       device specific and may increase device wear. Swap activities tend to
+       generate a lot of journal file volume.
 
 3 Resume
    Resume
@@ -3453,18 +3514,31 @@
    only for all users, including root. This designation augments UNIX
    authorizations and prevents any state updates that normally might require
    an operational action for a database with no current accessing (attached)
-   processes. MUPIP emits an error on attempts to set -READ_ONLY on databases
-   with the BG access method, or to set the access method to BG on databases
-   with -READ_ONLY set. The GT.M help databases have -READ_ONLY set by
-   default. The format of the READ_ONLY qualifier is:
+   processes. Setting the -READ_ONLY attribute on a database file with BG
+   access method or setting the access method to BG on a -READ_ONLY database
+   produces an error. The GT.M help databases have -READ_ONLY set by default.
+   The format of the READ_ONLY qualifier is:
 
    -[NO]REA[D_ONLY]
+
+   -NOREAD_ONLY makes a database file writable for users who have write
+   permissions on the database file. Note that because of the way GT.M
+   handles semaphores for READ_ONLY database files it does not enforce
+   standalone access for setting the characteristic from READ_ONLY to
+   NOREAD_ONLY. However, making a change from READ_ONLY to NOREAD_ONLY
+   without standalone access will likely cause problems, such as errors on
+   termination and failure to release IPC resources that would require
+   additional MUPIP commands to clean up. Therefore FIS recommends using
+   other means such as the following based on fuser return of one (1) to
+   verify there are no processes are accessing the file:
+
+   fuser <db-filename> | awk -F: '{if(length($NF))exit(1)}' && $gtm_dist/mupip set -noread_only -file <db-filename>
 
    **Note**
 
    When the first process connects to a database, it creates a access-control
    semaphore as part of management of the shared resource. However, when a
-   process connects to a -READ_ONLY database , each create a private copy of
+   process connects to a -READ_ONLY database, each create a private copy of
    the in-memory structures for the database and thus a private semaphore.
 
 3 RECord_size
@@ -5935,6 +6009,73 @@
    command line, whenever a parse error of the global qualifier string is
    encountered.
 
+   -GV[PATFILE]=/path/to/pattern-file
+
+   Specifies the location of a pattern file containing a list of patterns for
+   all types of SET journal records that MUPIP JOURNAL -EXTRACT should
+   include or exclude from processing. Use this qualifier to restrict the
+   output of a journal extract by global nodes value (that is, by all types
+   of SET records).
+
+   The following details the syntax of the pattern file, and examples of how
+   MUPIP JOURNAL -EXTRACT responds:
+
+     o When a pattern entry starts with a tilda sign (~), -GVPATFILE excludes
+       the matching global node values from the JOURNAL EXTRACT file. For
+       example, ~(not this value) excludes all globals that exactly match "
+       not this value".
+     o When the pattern does not start a tilda sign (~) or contain an
+       asterisk (*), MUPIP JOURNAL -EXTRACT reports only those global node
+       values that exactly match the pattern. For example: " match this
+       value".
+     o When a pattern contains an asterisk (*), MUPIP JOURNAL -EXTRACT
+       expands it and tries to match multiple characters.
+
+       Example : "*a*b*" matches values like "ab", "..ab", "ab.. ", "a..b",
+       "aaabbabb", and so on but does not match values like "ba", "aaa",
+       "bbb", and so on.
+
+     o When a pattern contains a percentage (%), MUPIP JOURNAL -EXTRACT
+       matches it for one character. Example : "a%b%" matches values like
+       "a1b1" but does not match values like "ab", "aabbc", and so on.
+     o A pattern can be enclosed within parentheses "()" for readability.
+     o When you use any of the following characters in the pattern, you can
+       escape them by preceding the character with "\". Example : "a\**b"
+       matches values like "a*..b" but not "a..b".:
+
+          o "(" and "~" at the beginning.
+          o ")" at the end.
+          o "\", "*", and "%" occurring anywhere within the pattern.
+
+     o In UTF-8 mode, the contents of the pattern file can include Unicode
+       characters.
+     o If a pattern file does not exist, MUPIP JOURNAL -EXTRACT produces the
+       FILEOPENFAIL error and returns a non-zero exit code to the shell.
+
+   You can specify multi-line entries in a pattern file.With multiple lines,
+   MUPIP JOURNAL EXTRACT produces those SET records that match any one of the
+   pattern lines with the exception of exclusion patterns (those starting ~)
+   which take precedence over other non-exclusion patterns.
+
+   Here are a few examples of the pattern file, and how MUPIP JOURNAL
+   -EXTRACT matches the pattern file values:
+
+   > cat matchA_notAA.txt
+   ~(*AA*)
+   *A*
+   > $gtm_dist/mupip journal -extract -gvpatfile=matchA_notAA.txt -forward "*"
+   Extracts global values that contain a single "A", but not "AA".
+   > cat ending22.txt
+   *notmatching*
+   *22
+   > $gtm_dist/mupip journal -extract -gvpatfile=ending22.txt -forward "*"
+   Extracts global values ending with "22", even when there are no globals containing "notmatching".
+   > cat startswithsplchars.txt
+   \**
+   \~*
+   > $gtm_dist/mupip journal -extract -gvpatfile=matchA_notAA.txt -forward "*"
+   Extracts global values that start with a "*" or a "~".
+
    -ID=pid-list
 
    Specifies that JOURNAL processing include or exclude database updates
@@ -6585,314 +6726,57 @@
 2 Start_Source_Server
    Start Source Server
 
-   Command syntax:
+   The MUPIP REPLICATE -SOURCE -START command starts a Source Server process.
+   The general syntax for starting a Source Server in active mode is:
 
    mupip replicate -source -start
-   {-secondary=<hostname:port>|-passive}
-   [-buffsize=<Journal Pool size in bytes>]
-   [-filter=<filter command>]
-   [-freeze[=on|off] -[no]comment[='"<string>"']
-   [-connectparams=<hard tries>,<hard tries period>,
-    <soft tries period>, <alert time>, <heartbeat period>,
-    <max heartbeat wait>]
-   -instsecondary=<replicating instance name>
-   [-[no]jnlf[ileonly]]
-   -log=<log file name> [-log_interval=<integer>]
-   {-rootprimary|-propagateprimary} [{-updok|-updnotok}]
-   [-cmplvl=<compression level>]
-   [-tlsid=<label>]
-   [-[no]plaintextfallback]
-   [-renegotiate_interval=<minutes>]
-
-   Qualifiers:
-
-   -source
-
-   Identifies the Source Server.
-
-   -start
-
-   Starts the Source Server.
-
-   -secondary=<hostname:port>
-
-   Identifies the replicating instance. <hostname:port> specifies an IPv4 or
-   IPv6 address optionally encapsulated by square-brackets ([]) like
-   "127.0.0.1", "::1", "[127.0.0.1]", or "[::1]" or a hostname that resolves
-   to an IPv4 or IPv6 address and the port at which the Receiver Server is
-   waiting for a connection.
-
-   If, in your environment, the same hostname is used for both IPv4 and IPv6,
-   GT.M defaults to IPv6. If you wish to use IPv4, perhaps because you have a
-   Receiver Server running a pre-V6.0-003 version of GT.M that does not
-   support IPv6, set the environment variable gtm_ipv4_only to "TRUE", "YES",
-   or a non-zero integer in order to force GT.M to use IPv4.
-
-   -passive
-
-   Starts the Source Server in passive mode.
-
-   -log=<log file name>
-
-   Specifies the location of the log file. The Source Server logs its
-   unsuccessful connection attempts starting frequently and slowing to
-   approximately once every five minutes. This interval does not affect the
-   rate of connection attempts. The Source Server also directs errors to the
-   log file. Operators should check the Source Server log file for errors.
-
-   -log_interval=<integer>
-
-   Specifies the number of transactions for which the Source Server should
-   wait before writing to the log file. The default logging interval is 1000
-   transactions.
-
-   -log_interval=0 sets the logging interval to the default value.
-
-   -buffsize=<Journal Pool size in bytes>
-
-   Specifies the size of the Journal Pool. The server rounds the size up or
-   down to suit its needs. Any size less than 1 MiB is rounded up to 1 MiB.
-   If you do not specify a qualifier, the size defaults to the GT.M default
-   value of 64 MiB. Remember that you cannot exceed the system-provided
-   maximum shared memory. For systems with high update rates, specify a
-   larger buffer size to avoid the overflows and file I/O that occur when the
-   Source Server reads journal records from journal files. The maximum value
-   is 4294967288(4GiB-8).
-
-   -filter=<filter command>
-
-   Specifies the complete path of the filter program and any associated
-   arguments. If you specify arguments, then enclose the command string in
-   quotation marks. If a filter is active, the Source Server passes the
-   entire output stream to the filter as input. Then, the output from the
-   filter stream passes to the replicating instance. If the filter program is
-   an M program with entry-ref OLD2NEW^FILTER, specify the following path:
-
-   filter="'$gtm_dist/mumps -run OLD2NEW^FILTER'"
-
-   Write the filter as a UNIX process that takes its input from STDIN and
-   writes its output to STDOUT.
-
-   The format of the input and output data is the MUPIP journal file extract
-   format. The filter must maintain a strict 1:1 relationship between
-   transactions on the input stream and transactions on the output stream. If
-   a transaction on the input results in no sets and kills in the output, the
-   filter must still write an empty transaction to the output stream.
-
-   Example:
-
-   extfilter
-     ; A command like mupip replic -source -start -buffsize=$gtm_buffsize
-     ;-instsecondary=$secondary_instance -secondary=$IP_Address:$portno
-     ;-filter="'$gtm_dist/mumps -run OLD2NEW^FILTER'" -log=$SRC_LOG_FILE
-     ;deploys this filter on the Source Server.
-     set $ztrap="goto err"
-     set TSTART="08"
-     set TCOMMIT="09"
-     set EOT="99"
-     set log=$ztrnlnm("filterlog")        ; use the environment variable filterlog (if defined) to specify which logfile to use
-     set:log="" log="log.out"
-     set EOL=$C(10)
-     open log:newversion
-     use $principal:nowrap
-     for  do
-     . use $principal
-     . read extrRec
-     . if $zeof halt
-     . set rectype=$piece(extrRec,"\",1)
-     . if rectype'=EOT do
-     .. if rectype'=TSTART set filtrOut=extrRec_EOL
-     .. else  do
-     ... set filtrOut=extrRec_EOL
-     ... for  read extrRec set filtrOut=filtrOut_extrRec_EOL quit:$zextract(extrRec,1,2)=TCOMMIT
-     ... if $zeof halt
-     .. ; set $x=0 is needed so every write starts at beginning of record position
-     .. ; do not write more than width characters in one output operation to avoid "chopping".
-     .. ; and/or eol in the middle of output stream
-     .. ; default width=32K-1
-     .. ; use $zsubstr to chop at valid character boundary (single or multi byte character)
-     .. set cntr=0,tmp=filtrOut
-     .. for  quit:tmp=""  do
-     ... set cntr=cntr+1,$x=0,record(cntr)=$zsubstr(tmp,1,32767),tmp=$zextract(tmp,$zlength(record(cntr))+1,$zlength(tmp))
-     ... write record(cntr)
-     . use log
-     . write "Received: ",EOL,$s(rectype'=TSTART:extrRec_EOL,1:filtrOut)
-     . if rectype'=EOT write "Sent: ",EOL,filtrOut
-     . else  write "EOT received, halting..." halt
-     quit
-   err
-     set $ztrap=""
-     use log
-     write !!!,"**** ERROR ENCOUNTERED ****",!!!
-     zshow "*"
-     halt
-
-   This example reads logical database updates associated with a transaction
-   from STDIN and writes them to log.out and STDOUT just like the UNIX tee
-   command. It runs on GT.M V5.5-000 where it is no longer required to treat
-   filter output as a transaction. To run this example on a pre-GT.M V5.5-000
-   version, replace the line:
-
-   .. if rectype'=TSTART set filtrOut=extrRec_EOL
-
-   with
-
-   .. if rectype'=TSTART set filtrOut=TSTART_EOL_extrRec_EOL_TCOMMIT_EOL
-
-   to wrap mini-transactions in 08 09.
-
-   -freeze[=on|off] -[no]comment[='"<string>"']
-
-   Promptly sets or clears an Instance Freeze on an instance irrespective of
-   whether a region is enabled for an Instance Freeze. -freeze with no
-   arguments displays the current state of the Instance Freeze on the
-   instance.
-
-   -[no]comment[='"<string>"'] allows specifying a comment/reason associated
-   with an Instance Freeze. Specify -nocomment if you do not wish to specify
-   a comment/reason.
-
-   -connectparams=<hard tries>,<hard tries period>, <soft tries
-   period>,<alert time>,<heartbeat period><max heartbeat wait>
-
-   Specifies the connection retry parameters. If the connection between the
-   Source and Receiver Servers is broken or the Source Server fails to
-   connect to the Receiver Server at startup, the Source Server applies these
-   parameters to the reconnection attempts.
-
-   First, the Source Server makes the number of reconnection attempts
-   specified by the <hard tries> value every <hard tries period>
-   milliseconds. Then, the Source Server attempts reconnection every <soft
-   tries period> seconds and logs an alert message every <alert time>
-   seconds. If the specified <alert time> value is less than <hard
-   tries>*<hard tries period>/1000 + lt;soft tries period>, it is set to the
-   larger value. The Source Server sends a heartbeat message to the Receiver
-   Server every <heartbeat period> seconds and expects a response back from
-   the Receiver Server within <max heartbeat wait> seconds.
-
-   -instsecondary
-
-   Identifies the replicating instance to which the Source Server replicates
-   data.
-
-   With no -instsecondary specified, the Source Server uses the environment
-   variable gtm_repl_instsecondary for the name of the replicating instance.
-
-   With no -instsecondary specified and environment variable
-   gtm_repl_instsecondary not set, mupip replicate -source -checkhealth looks
-   at all the Source Servers (Active or Passive) that are alive and running
-   and those that were abnormally shutdown (kill -9ed). Any Source Server
-   that was kill -15ed or MUPIP STOPped is ignored because GT.M considers
-   those Source Server shut down in the normal way. This command reports
-   something only if it finds at least one Source Server that is alive and
-   running or was abnormally shutdown (kill -9ed). Otherwise it returns a
-   zero (0) status without anything to report even when the Journal Pool
-   exists and GT.M processes (Update Process or Receiver Server on the
-   replicating instance) are up and running.
-
-   You can start multiple Source Servers from the same originating instance
-   as long as each of them specifies a different name for -instsecondary.
-
-   Specify -instsecondary explicitly (by providing a value) or implicitly
-   (through the environment variable gtm_repl_instsecondary) even for
-   starting a Passive Source Server. Whenever it activates, a Passive Source
-   Server connects to this replicating instance.
-
-   Example:
-
-   $ mupip replicate -source -start -buffsize=$gtm_buffsize -secondary=localhost:1234 -log=A2B.log -instsecondary=B
-
-   This command starts the Source Server for the originating instance with
-   instance B as its replicating instance.
-
-   -[no]jnlfileonly
-
-   Forces the Source Server to read transactions from journal files instead
-   of journal pool shared memory. When combined with the SYNC_IO journal
-   option, this feature delays replication of transactions until their
-   journal records are hardened to disk. This may be useful when replicating
-   to a supplementary instance, as a crash and rollback on the primary could
-   otherwise necessitate a rollback of local updates on the receiving
-   instance. The default is -NOJNLFILEONLY.
-
-   -rootprimary
-
-   Assign the current instance as the originating instance. You can specify
-   -rootprimary either explicitly or implicitly to start an instance as an
-   originating instance.
-
-   -updok
-
-   Instructs the Source Server to allow local updates on this instance. This
-   is a synonym for -rootprimary but is named so it better conveys its
-   purpose.
-
-   -propagate[primary]
-
-   Use this optional qualifier to assign the current instance as a
-   propagating instance. Specifying -propagateprimary disables updates on the
-   current instance.
-
-   Note that it is not possible to transition an originating instance to a
-   propagating instance without bringing down the Journal Pool. However, it
-   is possible to transition a propagating instance to an originating
-   instance without bringing down the Journal Pool for an already running
-   passive Source Server (start one with -propagateprimary if none is
-   running).
-
-   Both -rootprimary and -propagateprimary are optional and mutually
-   exclusive. However, FIS recommends you to specify both -rootprimary and
-   -propagateprimary explicitly in the script for clarity.
-
-   Example:
-
-   $ mupip replicate -source -activate -rootprimary
-
-   This command transitions a propagating originating instance to an
-   originating instance without bringing down the Journal Pool.
-
-   With neither -rootprimary nor -propagateprimary specified, GT.M uses a
-   default value of -propagateprimary for the passive Source Server startup
-   command (mupip replic -source -start -passive) and the deactivate
-   qualifier (mupip replicate -source -deactivate). GT.M uses a default value
-   of -rootprimary for the mupip replicate -source -start -secondary=... and
-   the mupip replic -source -activate commands. These default values make the
-   replication script simpler for users who are planning to limit themselves
-   to one originating instance and multiple replicating instance (without any
-   further replicating instances downstream).
-
-   $ export gtm_repl_instance=multisite.repl
-   $ mupip set -journal="enable,before,on" -replication=on -region "*"
-   $ mupip replicate -instance_create -name=America
-   $ mupip replicate -source -start -buffsize=$jnlpool_size -secondary=localhost:1234 -log=A2B.log -instsecondary=Brazil
-
-   This example starts the Source Server at port 1234 for the replicating
-   instance Brazil. The Source Server creates a Journal Pool. A GT.M Process
-   writes the updated journal records to the Journal Pool. Then, the Source
-   Server process transports each record from the Journal Pool to Brazil via
-   a TCP/IP connection.
-
-   **Note**
-
-   Before starting replication, always remember to rundown every replicated
-   database region then start the Source Server.
-
-   **Important**
-
-   GT.M updates to replicated regions are permitted only on the originating
-   instance and disabled on ALL other replicating instances.
-
-   The Source Server records actions and errors in A2B.log. It also
-   periodically record statistics such as the current backlog, the number of
-   journal records sent since the last log, the rate of transmission, the
-   starting and current JNL_SEQNO, and the path of the filter program, if
-   any.
-
-   -updnotok
-
-   Instructs the Source Server to not allow local updates on this instance.
-   This is a synonym for -propagateprimary but is named so it better conveys
-   its purpose.
+   [connection_qualifiers]
+   [instance_freeze_qualifiers]
+   [jnlpool_setup_qualifiers]
+   log_file_management_qualifiers
+   [primary_role_qualifiers]
+   secondary_identification_qualifiers
+   [tls_replication_qualifiers]
+   [replication_filter_qualifier]
+
+   The square brackets [] denote an optional qualifer group. The optional and
+   mandatory qualifiers in each qualifer group are as follows:
+
+   +------------------------------------------------------------------------------------+
+   |             Category              |                   Qualifiers                   |
+   |-----------------------------------+------------------------------------------------|
+   |                                   |  o [-cmplvl=<compression_level>]               |
+   |                                   |  o [-connectparams=<hard_tries>,               |
+   |connection_qualifiers              |    <hard_tries_period>, <soft_tries_period>,   |
+   |                                   |    <alert_time>, <heartbeat_period>,           |
+   |                                   |    <max_heartbeat_wait>]                       |
+   |-----------------------------------+------------------------------------------------|
+   |jnlpool_setup_qualifiers           |  o [-buffsize=<Journal Pool size in bytes>]    |
+   |                                   |  o [-[no]jnlfileonly]                          |
+   |-----------------------------------+------------------------------------------------|
+   |logfile_management_qualifiers      |  o -log=<log file name>                        |
+   |                                   |  o [-log_interval=<integer>]                   |
+   |-----------------------------------+------------------------------------------------|
+   |primary_role_qualifiers            |  o {-rootprimary|-propagateprimary}            |
+   |                                   |  o [{-updok|-updnotok}]                        |
+   |-----------------------------------+------------------------------------------------|
+   |replication_filter_qualifier       |  o -filter=<filter command>                    |
+   |-----------------------------------+------------------------------------------------|
+   |secondary_identification_qualifiers|  o -instsecondary=<secondary_instance_name>    |
+   |                                   |  o -secondary=<hostname:port>                  |
+   |-----------------------------------+------------------------------------------------|
+   |                                   |  o [-[no]plaintextfallback]                    |
+   |tls_replication_qualifiers         |  o [-renegotiate_interval=<minutes>]           |
+   |                                   |  o -tlsid=<label>                              |
+   +------------------------------------------------------------------------------------+
+
+   You can start the Source Server in passive mode with mupip replicate
+   -source -start -passive. The general syntax for starting a Source Server
+   in passive mode is the same as that of starting a Source Server in active
+   mode except that -passive is not compatible with
+   -secondary=<hostname:port>.
+
+   Connection Qualifiers:
 
    -cmplvl=n
 
@@ -6902,9 +6786,9 @@
    9 (as of version 1.2.3.3 of the zlib library) offers the most compression
    (at the cost of the most CPU usage). Specifying -cmplvl without an
    accompanying -start produces an error. In the case of the source server,
-   if N specifies any value outside of the range accepted by the zlib library
-   or if -cmplvl is not specified, the compression level defaults to zero
-   (0). In the case of the receiver server, as long as N is non-zero the
+   if N specifies any value outside of the range accepted by the compression
+   library or if -cmplvl is not specified, the compression level defaults to
+   zero (0). In the case of the receiver server, as long as N is non-zero the
    decompression feature is enabled; since the source server setting
    determines the actual level, any legal non-zero value enables compressed
    operation at the receiver.
@@ -7007,6 +6891,310 @@
    any reason (such as file not found, or insufficient authorization), the
    replication logic logs a DLLNOOPEN error and continues with no
    compression.
+
+   -connectparams=<hard tries>,<hard tries period>, <soft tries
+   period>,<alert time>,<heartbeat period><max heartbeat wait>
+
+   Specifies the connection parameters as a comma delimited series of integer
+   values. If the connection between the Source and Receiver Servers is
+   broken or the Source Server fails to connect to the Receiver Server at
+   startup, the Source Server applies these parameters to the reconnection
+   attempts.
+
+   First, the Source Server makes the number of connection attempts specified
+   by the <hard tries> value every <hard tries period> milliseconds. Then,
+   the Source Server attempts connection every <soft tries period> seconds
+   and logs an alert message every <alert time> seconds. If the specified
+   <alert time> value is less than <hard tries>*<hard tries period>/1000 +
+   <soft tries period>, it is set to the larger value. The Source Server
+   sends a heartbeat message to the Receiver Server every <heartbeat period>
+   seconds and expects a response back from the Receiver Server within <max
+   heartbeat wait>seconds. The default value string is 5,500,5,30,15,60.
+
+   Journal Pool Setup Qualifiers:
+
+   -buffsize=<Journal Pool size in bytes>
+
+   Specifies the size of the Journal Pool. The server rounds the size up or
+   down to suit to align with other specified or implicit requirements. Any
+   size less than 1 MiB is rounded up to 1 MiB. If you do not specify a
+   qualifier, the size defaults to the GT.M default value of 64 MiB. Remember
+   that you cannot exceed the system-provided maximum shared memory. For
+   systems with high update rates, specify a larger buffer size to avoid the
+   overflows and file I/O that occur when the Source Server reads journal
+   records from journal files. The maximum value is 4294967288(4GiB-8). MUPIP
+   REPLICATE -SOURCE ignores -BUFFSIZE if the Journal Pool is already set up.
+   The first Source Server process started on an instance sets up the Journal
+   Pool.
+
+   -[no]jnlfileonly
+
+   Forces the Source Server to read transactions from journal files instead
+   of journal pool shared memory. When combined with the SYNC_IO journal
+   option, this feature delays replication of transactions until their
+   journal records are hardened to disk. This may be useful when replicating
+   to a supplementary instance, as a crash and rollback on the primary could
+   otherwise necessitate a rollback of local updates on the receiving
+   instance. The default is -NOJNLFILEONLY.
+
+   Log File Management Qualifiers:
+
+   -log=<log file name>
+
+   Specifies the location of the log file. The Source Server logs its
+   unsuccessful connection attempts starting frequently and slowing to
+   approximately once every five minutes. This interval does not affect the
+   rate of connection attempts. The Source Server also directs errors to the
+   log file. Operators should check the Source Server log file for errors.
+
+   -log_interval=<integer>
+
+   Specifies the number of transactions for which the Source Server should
+   leave between writing progress to the log file. The default logging
+   interval is 1000 transactions.
+
+   -log_interval=0 sets the logging interval to the default value.
+
+   Replication Filter Qualifiers:
+
+   -filter=<filter command>
+
+   Specifies the complete path of the filter program and any associated
+   arguments. If you specify arguments, then enclose the command string in
+   quotation marks. If a filter is active, the Source Server passes the
+   entire output stream to the filter as input. Then, the output from the
+   filter stream passes to the replicating instance. If the filter program is
+   an M program with entry-ref OLD2NEW^FILTER, specify the following path:
+
+   filter='"$gtm_dist/mumps -run OLD2NEW^FILTER"'
+
+   Write the filter as a UNIX process that takes its input from STDIN and
+   writes its output to STDOUT.
+
+   You can also define an environment variable like export
+   gtmfilter=""$gtm_dist/mumps -run ^OLD2NEW^FILTER"" to bypass shell
+   escaping and use it in the MUPIP command as follows:
+
+   $gtm_dist/mupip replic -receiver -start -listenport=$portno -filter=$gtmfilter -log=$REC_LOG_FILE
+
+   The format of the input and output data is the MUPIP journal file extract
+   format. The filter must maintain a strict 1:1 relationship between
+   transactions on the input stream and transactions on the output stream. If
+   a transaction on the input results in no sets and kills in the output, the
+   filter must still write an empty transaction to the output stream.
+
+   Example:
+
+   extfilter
+     ; A command like the following deploys this filter on the Receiver Server:
+     ; export gtmfilter=""$gtm_dist/mumps -run ^extfilter""
+     ; $gtm_dist/mupip replic -receiver -start -buffsize=$gtm_buffsize
+     ;-listenport=$portno
+     ;-filter=$gtmfilter -log=$REC_LOG_FILE
+     ; deploys this demo filter on the Receiver Server.
+     ;
+     ; This program is a simple filter program that receives journal records
+     ; from standard input and write them back to standard output.
+     ; Journal records between TSTART
+     ; and TCOMMIT are written with single write command.
+     ;
+     ; Do not use this filter program as-is in a production environment.
+     ; While writing filter programs ensure that your programming logic never
+     ; exposes non-public information (NPI) stored in GT.M local variables
+     ; and global variables. You should take additional care about
+     ; managing and sharing GTM_FATAL_ERROR.ZSHOW_DMP_*.txt
+     ; and core dump files that may contain NPI.
+     new TSTART,TCOMMIT,EOT,EOL,log,extrRec,filtrOut,cntr,tmp,rectype,max
+     set $ztrap="goto err"
+     set TSTART="08"
+     set TCOMMIT="09"
+     set EOT="99"
+     set max=1024*1024               ; maximum size of a local variable;
+     set log=$ztrnlnm("filterlog")   ; use environment variable "filterlog" (if defined) to indicate which logfile to use
+     set:log="" log="/dev/null"      ; if filterlog is not defined, write log file output to /dev/null
+     set EOL=$char(10)
+     open log:newversion
+     use $principal:(nowrap:width=max)
+     for  do
+     . use $principal
+     . read extrRec
+     . if $zeof halt
+     . set rectype=$piece(extrRec,"",1)
+     . if rectype'=EOT do
+     .. if rectype'=TSTART set filtrOut=extrRec_EOL
+     .. else  do  ; Write Journal Records within TSTART and TCOMMIT boundary in one go (1MiB limit).
+     ... set filtrOut=extrRec_EOL
+     ... for  read extrRec set filtrOut=filtrOut_extrRec_EOL quit:$zextract(extrRec,1,2)=TCOMMIT
+     ... if $zeof halt
+     .. ; set $x=0 is needed so every write starts at beginning of record position
+     .. ; don't write more than "width" characters in one output operation to avoid "chopping" of output
+     .. ; and/or eol in the middle of output stream
+     .. ; default width=1024*1024
+     .. ; use $zsubstr to chop at valid character boundary (single or multi byte character)
+     .. set tmp=filtrOut
+     .. for  quit:tmp=""  do
+     ... set $x=0,record($increment(cntr))=$zsubstr(tmp,1,max-1),tmp=$zextract(tmp,$zlength(record(cntr))+1,$zlength(tmp))
+     ... write record(cntr)
+     ... kill record(cntr)
+     . use log
+     . write "Received: ",EOL,$select(rectype'=TSTART:extrRec_EOL,1:filtrOut)
+     . if rectype'=EOT write "Sent: ",EOL,filtrOut
+     . else  write "EOT received, halting..." halt
+     quit
+   err
+     set $ztrap=""
+     use log
+     write !!!,"**** ERROR ENCOUNTERED ****",!!!
+     zshow "*"
+     halt
+
+   This example reads logical database updates associated with a transaction
+   from STDIN and writes them to a filter log (if filterlog environment
+   variable is defined) and STDOUT just like the UNIX tee command. It runs on
+   GT.M V5.5-000 where it is no longer required to treat filter output as a
+   transaction. To run this example on a pre-GT.M V5.5-000 version, replace
+   the line:
+
+   .. if rectype'=TSTART set filtrOut=extrRec_EOL
+
+   with
+
+   .. if rectype'=TSTART set filtrOut=TSTART_EOL_extrRec_EOL_TCOMMIT_EOL
+
+   to wrap mini-transactions in 08 09.
+
+   Primary Role Qualifiers:
+
+   -propagate[primary]
+
+   Use this optional qualifier to assign the current instance as a
+   propagating instance. Specifying -propagateprimary disables updates on the
+   current instance.
+
+   Note that it is not possible to transition an originating instance to a
+   propagating instance without bringing down the Journal Pool. However, it
+   is possible to transition a propagating instance to an originating
+   instance without bringing down the Journal Pool for an already running
+   passive Source Server (start one with -propagateprimary if none is
+   running).
+
+   Both -rootprimary and -propagateprimary are optional and mutually
+   exclusive. However, FIS recommends you to specify both -rootprimary and
+   -propagateprimary explicitly in the script for clarity.
+
+   Example:
+
+   $ mupip replicate -source -activate -rootprimary
+
+   This command transitions a propagating originating instance to an
+   originating instance without bringing down the Journal Pool.
+
+   With neither -rootprimary nor -propagateprimary specified, GT.M uses a
+   default value of -propagateprimary for the passive Source Server startup
+   command (mupip replic -source -start -passive) and the deactivate
+   qualifier (mupip replicate -source -deactivate). GT.M uses a default value
+   of -rootprimary for the mupip replicate -source -start -secondary=... and
+   the mupip replic -source -activate commands. These default values make the
+   replication script simpler for users who are planning to limit themselves
+   to one originating instance and multiple replicating instance (without any
+   further replicating instances downstream).
+
+   $ export gtm_repl_instance=multisite.repl
+   $ mupip set -journal="enable,before,on" -replication=on -region "*"
+   $ mupip replicate -instance_create -name=America
+   $ mupip replicate -source -start -buffsize=$jnlpool_size -secondary=localhost:1234 -log=A2B.log -instsecondary=Brazil
+
+   This example starts the Source Server at port 1234 for the replicating
+   instance Brazil. The Source Server creates a Journal Pool. A GT.M Process
+   writes the updated journal records to the Journal Pool. Then, the Source
+   Server process transports each record from the Journal Pool to Brazil via
+   a TCP/IP connection.
+
+   **Note**
+
+     o Before starting replication, always remember to rundown every
+       replicated database region then start the Source Server.
+     o GT.M updates to replicated regions are permitted only on the
+       originating instance and disabled on ALL other replicating instances.
+
+   The Source Server records actions and errors in A2B.log. It also
+   periodically record statistics such as the current backlog, the number of
+   journal records sent since the last log, the rate of transmission, the
+   starting and current JNL_SEQNO, and the path of the filter program, if
+   any.
+
+   -rootprimary
+
+   Assign the current instance as the originating instance. You can specify
+   -rootprimary either explicitly or implicitly to start an instance as an
+   originating instance.
+
+   -updnotok
+
+   Instructs the Source Server to not allow local updates on this instance.
+   This is a synonym for -propagateprimary but is named so it better conveys
+   its purpose.
+
+   -updok
+
+   Instructs the Source Server to allow local updates on this instance. This
+   is a synonym for -rootprimary but is named so it better conveys its
+   purpose.
+
+   Secondary Identification Qualifiers:
+
+   -instsecondary
+
+   Specifies the replicating instance to which the Source Server replicates
+   data. -instsecondary also identifies a Source Server process target for
+   actions like changing to active mode or passive mode, checking Source
+   Server health, or shutting down a Source Server.
+
+   With no -instsecondary specified, the Source Server uses the environment
+   variable gtm_repl_instsecondary for the name of the replicating instance.
+
+   With no -instsecondary specified and environment variable
+   gtm_repl_instsecondary not set, mupip replicate -source -checkhealth looks
+   at all the Source Servers (Active or Passive) that are alive and running
+   and those that were abnormally shutdown (say by a kill -9). Any Source
+   Server that was kill -15ed or MUPIP STOPped is ignored because GT.M
+   considers those Source Server shut down in the normal way. This command
+   reports something only if it finds at least one Source Server that is
+   alive and running or was abnormally shutdown. Otherwise it returns a zero
+   (0) status without anything to report even when the Journal Pool exists
+   and GT.M processes (Update Process or Receiver Server on the replicating
+   instance) are up and running.
+
+   You can start multiple Source Servers from the same originating instance
+   as long as each of them specifies a different name for -instsecondary.
+
+   Specify -instsecondary explicitly (by providing a value) or implicitly
+   (through the environment variable gtm_repl_instsecondary) even for
+   starting a Passive Source Server. Whenever it activates, a Passive Source
+   Server connects to this replicating instance.
+
+   Example:
+
+   $ mupip replicate -source -start -buffsize=$gtm_buffsize -secondary=localhost:1234 -log=A2B.log -instsecondary=B
+
+   This command starts the Source Server for the originating instance with
+   instance B as its replicating instance.
+
+   -secondary=<hostname:port>
+
+   Identifies the replicating instance. <hostname:port> specifies an IPv4 or
+   IPv6 address optionally encapsulated by square-brackets ([]) like
+   "127.0.0.1", "::1", "[127.0.0.1]", or "[::1]" or a hostname that resolves
+   to an IPv4 or IPv6 address and the port at which the Receiver Server is
+   waiting for a connection.
+
+   If, in your environment, the same hostname is used for both IPv4 and IPv6,
+   GT.M defaults to IPv6. If you wish to use IPv4, perhaps because you have a
+   Receiver Server running a pre-V6.0-003 version of GT.M that does not
+   support IPv6, set the environment variable gtm_ipv4_only to "TRUE", "YES",
+   or a non-zero integer in order to force GT.M to use IPv4.
+
+   TLS Replication Qualifiers:
 
    -tlsid=<label>
 
@@ -7183,8 +7371,8 @@
 
    There are two ways to stop an active filter on the Source Server.
 
-     o Execute mupip replicate -source -stopsourcefilter on the originating
-       Source Server.
+     o Execute mupip replicate -source -stopsourcefilter -instsecondary on
+       the originating Source Server.
      o Specify -stopsourcefilter as an option for starting the Receiver
        Server.
 
@@ -7193,6 +7381,45 @@
    If a filter fails to respond within just over a minute to delivery of a
    mini-transaction or TP transaction, a Source or Receiver Server issues a
    FILTERTIMEDOUT error, stops the filter, and exits.
+
+2 Stop_Receiver_Filter
+   Stop Receiver Filter
+
+   Command Syntax:
+
+   mupip replicate -receiver -stopreceiverfilter
+
+   Qualifiers:
+
+   -stopreceiverfilter
+
+   Turns off any active filter on the Receiver Server without turning off the
+   Receiver Server. Using -stopreceiverfilter when no filter is active
+   returns a non-success return code. -stopreceiverfilter is not compatible
+   with any other -receiver qualifier.
+
+2 Freeze_Instance
+   Freeze Instance
+
+   The MUPIP REPLICATE -SOURCE command with instance freeze qualifiers manage
+   the Instance Freeze facility of an instance. The syntax is:
+
+   mupip replicate -source
+     [-[no]comment[='"<string>"']]
+     -freeze[=on|off]
+
+   Qualifiers:
+
+   -[no]comment[='"<string>"']
+
+   Allows specifying a comment/reason associated with an Instance Freeze.
+   Specify -nocomment if you do not wish to specify a comment/reason.
+
+   -freeze[=on|off]
+
+   Sets or clears an Instance Freeze on an instance irrespective of whether a
+   region is enabled for an Instance Freeze. -freeze with no arguments
+   displays the current state of the Instance Freeze on the instance.
 
 2 Check_Server_Health
    Check Server Health
@@ -7469,37 +7696,47 @@
 2 Start_Receiver_Server
    Start Receiver Server
 
-   Command syntax:
+   The MUPIP REPLICATE -RECEIVER -START command starts a Receiver Server and
+   the Update Process. The general syntax for starting a Receiver Server and
+   the Update Process is:
 
    mupip replicate -receiver -start
-    -listenport=<port number>
-    -log=<log file name> [-log_interval="[integer1],[integer2]"]
-    [-autorollback[=verbose]]
-    [-buffsize=<Receive Pool size in bytes>]
-    [-filter=<filter command>]
-    [-noresync]
-    [-stopsourcefilter]
-    [-updateresync=</path/to/bkup-orig-repl-inst-file>
-    {[-resume=<strm_num>|-reuse=<instname>]}
-    [-initialize] [-cmplvl=n]
-    [-tlsid=<label>]
+   [autorollback_qualifier]
+   connection_qualifiers
+   logfile_management_qualifiers
+   [operator_override_qualifiers]
+   [replication_filter_qualifers]
+   [si_replication_qualifiers]
+   [tls_replication_qualifier]
 
-   Qualifiers:
+   The square brackets [] denote an optional qualifer group. The optional and
+   mandatory qualifiers in each qualifer group are as follows:
 
-   -receiver
+   +----------------------------------------------------------------------------------------+
+   |          Category           |                        Qualifiers                        |
+   |-----------------------------+----------------------------------------------------------|
+   |autorollback_qualifier       |  o -autorollback[=verbose]                               |
+   |-----------------------------+----------------------------------------------------------|
+   |connection_qualifiers        |  o [-cmplvl=<compression_level>]                         |
+   |                             |  o -listenport=<port number>                             |
+   |-----------------------------+----------------------------------------------------------|
+   |logfile_management_qualifiers|  o -log=<log file name>                                  |
+   |                             |  o [-log_interval="[integer1],[integer2]"]               |
+   |-----------------------------+----------------------------------------------------------|
+   |operator_override_qualifiers |  o {-noresync |                                          |
+   |                             |    -updateresync=</path/to/bkup-orig-repl-inst-file>}    |
+   |-----------------------------+----------------------------------------------------------|
+   |replication_filter_qualifier |  o -filter=<filter command>                              |
+   |-----------------------------+----------------------------------------------------------|
+   |recvpool_setup_qualifiers    |  o -buffsize=<Receiver Pool size in bytes>               |
+   |-----------------------------+----------------------------------------------------------|
+   |si_replication_qualifiers    |  o [-initialize]                                         |
+   |                             |  o [{-resume=<strm_num>|-reuse=<instname>}]              |
+   |-----------------------------+----------------------------------------------------------|
+   |tls_replication_qualifiers   |  o -tlsid=<label>                                        |
+   +----------------------------------------------------------------------------------------+
 
-   Identifies the Receiver Server.
-
-   -start
-
-   Starts the Receiver Server and Update Process.
-
-   -listenport=<port number>
-
-   Specifies the TCP port number the Receiver Server will listen to for
-   incoming connections from a Source Server. Note that the current
-   implementation of the Receiver Server does not support machines with
-   multiple IP addresses.
+   Autorollback Qualifier:
 
    -autorollback[=verbose]
 
@@ -7543,6 +7780,17 @@
        message "Receiver was not started with -AUTOROLLBACK. Manual ROLLBACK
        required. Shutting down".
 
+   Connection Qualifiers:
+
+   -listenport=<port number>
+
+   Specifies the TCP port number the Receiver Server will listen to for
+   incoming connections from a Source Server. Note that the current
+   implementation of the Receiver Server does not support machines with
+   multiple IP addresses.
+
+   Logfile Management Qualifiers:
+
    -log=<recsrv_log_file_name >
 
    Specifies the location of the log file of the Receiver Server. When -log
@@ -7553,20 +7801,15 @@
 
    -log_interval="[integer1],[integer2]"
 
-   integer1 specifies the number of transactions for which the Receiver
-   Server should wait before writing to its log file. integer2 specifies the
-   number of transactions for which the Update Process should wait before
-   writing to its log file. The default logging interval is 1000
-   transactions.
+   integer1 specifies the number of transactions the Receiver Server should
+   process between updates to its log file. integer2 specifies the number of
+   transactions the Update Process should process between updates to its log
+   file. The default logging interval is 1000 transactions.
 
    If integer1 or integer2 is 0, the logging interval is set to the default
    value.
 
-   -stopsourcefilter
-
-   Starting the Receiver Server with -stopsourcefilter turns off any active
-   filter on the originating Source Server. Use this option at the time of
-   restarting the Receiver Server after a rolling upgrade is complete.
+   Operator Override Qualifiers:
 
    -updateresync=</path/to/bkup-orig-repl-inst-file>
 
@@ -7630,6 +7873,23 @@
    (<bckup_orig_repl_inst_file>). The syntax for -updateresync depends on the
    GT.M version.
 
+   -noresync
+
+   Instructs the Receiver Server to accept a SI replication stream even when
+   the receiver is ahead of the source. In this case, the source and receiver
+   servers exchange history records from the replication instance file to
+   determine the common journal stream sequence number and replication
+   resumes from that point onwards. Specifying -noresync on a BC replication
+   stream produces a NORESYNCSUPPLONLY error. Specifying -noresync on a SI
+   replication stream receiver server where the receiving instance was
+   started with -UPDNOTOK (updates are disabled) produces a
+   NORESYNCUPDATERONLY error. Note also that the noresync qualifier is not
+   the opposite of the resync qualifier of rollback (mupip journal -rollback
+   -resync), which is intended for use under the direction of FIS GT.M
+   support.
+
+   SI Replication Qualifiers:
+
    -initialize
 
    Used when starting a Receiver Server of an SI replication stream with
@@ -7677,20 +7937,7 @@
    number for the current source connection (erasing any record of the older
    Group using the same stream number).
 
-   -noresync
-
-   Instructs the Receiver Server to accept a SI replication stream even when
-   the receiver is ahead of the source. In this case, the source and receiver
-   servers exchange history records from the replication instance file to
-   determine the common journal stream sequence number and replication
-   resumes from that point onwards. Specifying -noresync on a BC replication
-   stream is produces a NORESYNCSUPPLONLY error. Specifying -noresync on a SI
-   replication stream receiver server where the receiving instance was
-   started with -UPDNOTOK (updates are disabled) produces a
-   NORESYNCUPDATERONLY error. Note also that the noresync qualifier is not
-   the opposite of the resync qualifier of rollback (mupip journal -rollback
-   -resync), which is intended for use under the direction of FIS GT.M
-   support.
+   TLS Replication Qualifiers:
 
    -tlsid=<label>
 
@@ -8382,6 +8629,8 @@
    |--------------------------------------+--------------------------+------------------------------------------+----------|
    |                                      |                          |-STATSLOG=[ON|OFF]                        |          |
    |--------------------------------------+--------------------------+------------------------------------------+----------|
+   |                                      |                          |-STOPRECEIVERFILTER                       |V6.3-009  |
+   |--------------------------------------+--------------------------+------------------------------------------+----------|
    |                                      |                          |-STOPSOURCEFILTER                         |          |
    |--------------------------------------+--------------------------+------------------------------------------+----------|
    |                                      |                          |-TIMEOUT=seconds                          |          |
@@ -8455,6 +8704,8 @@
    |                                      |                          |-FULL                                     |          |
    |--------------------------------------+--------------------------+------------------------------------------+----------|
    |                                      |                          |-GLOBAL=<global_list>                     |          |
+   |--------------------------------------+--------------------------+------------------------------------------+----------|
+   |                                      |                          |-GV[PATFILE]=/path/to/pattern-file        |V6.3-009  |
    |--------------------------------------+--------------------------+------------------------------------------+----------|
    |                                      |                          |-ID=<pid_list>                            |          |
    |--------------------------------------+--------------------------+------------------------------------------+----------|
@@ -8638,7 +8889,7 @@
 
    **Note**
 
-   This help file is a concise representation of revision V6.3.008 of the
+   This help file is a concise representation of revision V6.3-009 of the
    UNIX Administration and Operations Guide. To obtain a copy of the current
    revision, go to www.fis-gtm.com and then click on the User Documentation
    tab.

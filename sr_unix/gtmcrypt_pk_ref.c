@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -204,7 +204,7 @@ int gc_pk_gpghome_has_permissions()
 			return -1;
 		}
 		gnupghome_set = TRUE;
-		strncpy(pathname, ptr, pathlen);
+		memcpy(pathname, ptr, pathlen);
 		pathname[pathlen] = '\0';
 	}
 	if (-1 != (perms = access(pathname, R_OK | X_OK)))

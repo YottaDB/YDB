@@ -78,7 +78,7 @@ GBLREF tp_region	*grlist;
 GBLREF uint4		process_id;
 GBLREF uint4		update_array_size;		/* for the BLK_INIT/BLK_SEG/BLK_ADDR macros */
 GBLREF uint4		update_trans;
-GBLREF unsigned char    cw_map_depth;
+GBLREF unsigned char	cw_map_depth;
 GBLREF unsigned char	cw_set_depth;
 GBLREF unsigned char	rdfail_detail;
 GBLREF sgmnt_addrs	*reorg_encrypt_restart_csa;
@@ -144,7 +144,7 @@ void mupip_reorg_encrypt(void)
 	char			key[GTM_PATH_MAX], hash[GTMCRYPT_HASH_LEN];
 	char			*db_name, *bml_lcl_buff;
 	int			db_name_len, gtmcrypt_errno, status, reg_status, status1;
-	int			reg_count, i, total_blks, cycle, lcnt, bml_status;
+	int			reg_count, i, cycle, lcnt, bml_status;
 	int4			blk_seg_cnt, blk_size, mapsize;	/* needed for BLK_INIT,BLK_SEG and BLK_FINI macros */
 	unsigned short		key_len;
 	gd_region		*reg;
@@ -157,19 +157,19 @@ void mupip_reorg_encrypt(void)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
-	block_id		*blkid_ptr, start_blk, start_bmp, last_bmp, curbmp, curblk;
+	block_id		*blkid_ptr, start_blk, start_bmp, last_bmp, curbmp, curblk, total_blks;
 	trans_num		curr_tn, start_tn, blk_tn;
 	sm_uc_ptr_t		blkBase, bml_sm_buff;	/* shared memory pointer to the bitmap global buffer */
 	cache_rec_ptr_t		cr;
 	blk_segment		*bs1, *bs_ptr;
 	sm_uc_ptr_t		bptr, buff;
 	blk_hdr			new_hdr;
-	unsigned char    	save_cw_set_depth;
+	unsigned char		save_cw_set_depth;
 	uint4			lcl_update_trans, pid, bptr_size;
 	jnl_private_control	*jpc;
 #	ifdef DEBUG
 	uint4			reencryption_count;
-	uint4			initial_blk_cnt;
+	block_id		initial_blk_cnt;
 #	endif
 	unix_db_info		*udi;
 	DCL_THREADGBL_ACCESS;
@@ -514,7 +514,9 @@ void mupip_reorg_encrypt(void)
 			 *         (Re)encrypt all BUSY and REUSABLE blocks in the current bitmap
 			 * ------------------------------------------------------------------------
 			 */
-			mapsize = (curbmp == last_bmp) ? (total_blks - curbmp) : BLKS_PER_LMAP;
+			/* (total_blks - curbmp) can be cast because it should never be larger then BLKS_PER_LMAP */
+			DEBUG_ONLY(if(curbmp == last_bmp) assert(BLKS_PER_LMAP >= (total_blks - curbmp)));
+			mapsize = (curbmp == last_bmp) ? (int4)(total_blks - curbmp) : BLKS_PER_LMAP;
 			assert(0 != mapsize);
 			for (lcnt = 0; lcnt < mapsize; lcnt++)
 			{

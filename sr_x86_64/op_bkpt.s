@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2007-2015 Fidelity National Information 	#
+# Copyright (c) 2007-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -210,9 +210,6 @@ ENTRY	opp_zst_over_ret
 	subq	$8, REG_SP				# Align stack to 16 bytes
 	CHKSTKALIGN					# Verify stack alignment
 	movq	frame_pointer(REG_IP), REG64_ACCUM
-	movw	msf_typ_off(REG64_ACCUM), REG16_ARG2
-	testw	$1, REG16_ARG2
-	je	l11
 	movq	zstep_level(REG_IP), REG64_ARG2
 	movq	msf_old_frame_off(REG64_ACCUM), REG64_ACCUM
 	cmpq	REG64_ACCUM, REG64_ARG2

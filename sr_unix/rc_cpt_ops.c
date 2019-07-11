@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -61,6 +62,7 @@ static void rc_cpt_lock(void);
 #define LOW_BYTE_MASK	0x000000FF
 #define HIGH_BYTE_MASK  0x0000FF00
 
+/* TODO: v7 change to handle 64-bit block numbers */
 int rc_cpt_entry(int blk)
 {
 	key_t		rc_key;
@@ -221,10 +223,11 @@ static void rc_cpt_unlock(void)
 			}
 		}
 		if (gv_cur_region)
-			rts_error(VARLSTCNT(9) ERR_DBFILERR,2, DB_LEN_STR(gv_cur_region),
-				  ERR_TEXT, 2, LEN_AND_LIT("Error with rc semaphore unlock"), errno);
+			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(9) ERR_DBFILERR,2, DB_LEN_STR(gv_cur_region),
+					ERR_TEXT, 2, LEN_AND_LIT("Error with rc semaphore unlock"), errno);
 		else
-			rts_error(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Error with rc semaphore unlock"), errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
+					LEN_AND_LIT("Error with rc semaphore unlock"), errno);
 	}
 	return;
 }
@@ -257,10 +260,11 @@ static void rc_cpt_lock(void)
 			}
 		}
 		if (gv_cur_region)
-			rts_error(VARLSTCNT(9) ERR_DBFILERR,2, DB_LEN_STR(gv_cur_region),
-				  ERR_TEXT, 2, LEN_AND_LIT("Error with rc semaphore lock"), errno);
+			rts_error_csa(CSA_ARG(REG2CSA(gv_cur_region)) VARLSTCNT(9) ERR_DBFILERR,2, DB_LEN_STR(gv_cur_region),
+					ERR_TEXT, 2, LEN_AND_LIT("Error with rc semaphore lock"), errno);
 		else
-			rts_error(VARLSTCNT(5) ERR_TEXT, 2, LEN_AND_LIT("Error with rc semaphore lock"), errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TEXT, 2,
+					LEN_AND_LIT("Error with rc semaphore lock"), errno);
 	}
 	rc_locked = TRUE;
 	return;

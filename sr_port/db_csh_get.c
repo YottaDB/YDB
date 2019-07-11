@@ -43,7 +43,7 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 	csd = csa->hdr;
 	assert(dba_mm != csd->acc_meth);
 	hmax = csd->bt_buckets;
-	blk_hash = (block % hmax);
+	blk_hash = (int)(block % hmax);	/* This can be cast because it is constrained by hmax which currently fits into an int */
 	DEBUG_ONLY(cr_low = &csa->acc_meth.bg.cache_state->cache_array[0];)
 	DEBUG_ONLY(cr_high = cr_low + csd->bt_buckets + csd->n_bts;)
 	cr_hash_base = csa->acc_meth.bg.cache_state->cache_array + blk_hash;

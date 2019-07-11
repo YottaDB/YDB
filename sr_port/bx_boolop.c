@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -177,7 +177,13 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 				/* insert COBOOL and copy of following JMP in boolchain; overlay them with STOTEMP and NOOP  */
 				assert(TRIP_REF == tb->operand[0].oprclass);
 				dqins(ref1, exorder, ref0);
-				if (OCT_MVAL & oc_tab[tb->operand[0].oprval.tref->opcode].octype)
+				for (t1 = tb->operand[0].oprval.tref; (OCT_UNARY & oc_tab[t1->opcode].octype); )
+				{	/* leading unary operator no longer needed; leaving would cause problems */
+					assert(TRIP_REF == t1->operand[0].oprclass);
+					t1->opcode = OC_PASSTHRU;
+					t1 = t1->operand[0].oprval.tref;
+				}
+				if (OCT_MVAL & oc_tab[t1->opcode].octype)
 				{						/* do we need a STOTEMP? */
 					STOTEMP_IF_NEEDED(ref0, 0, tb, tb->operand[0]);
 				} else

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -43,18 +44,18 @@ GBLREF	cw_set_element		cw_set[];
 GBLREF	unsigned char		rdfail_detail;
 GBLREF	jnl_format_buffer	*non_tp_jfb_ptr;
 
+error_def(ERR_DSEFAIL);
+
 void bm_setmap(block_id bml, block_id blk, int4 busy)
 {
-	sm_uc_ptr_t	bmp;
-	trans_num	ctn;
-	srch_hist	alt_hist;
-	srch_blk_status	blkhist; /* block-history to fill in for t_write_map which uses "blk_num", "buffaddr", "cr", "cycle" */
-	cw_set_element  *cse;
+	block_id	bitnum;
+	cw_set_element	*cse;
 	int		lbm_status;	/* local bitmap status of input "blk" i.e. BUSY or FREE or RECYCLED  */
 	int4		reference_cnt;
-	uint4		bitnum;
-
-	error_def(ERR_DSEFAIL);
+	trans_num	ctn;
+	sm_uc_ptr_t	bmp;
+	srch_hist	alt_hist;
+	srch_blk_status	blkhist; /* block-history to fill in for t_write_map which uses "blk_num", "buffaddr", "cr", "cycle" */
 
 	t_begin_crit(ERR_DSEFAIL);
 	ctn = cs_addrs->ti->curr_tn;
@@ -65,6 +66,9 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
 	alt_hist.h[0].blk_num = 0;	/* Need for calls to T_END for bitmaps */
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	bitnum = blk - bml;
+	assert(BLKS_PER_LMAP > bitnum);	/* bitnum is a block index in a local map, but no restrictions are placed on blk and bml,
+					 * so verify that bitnum does not exceed the length of a local map
+					 */
 	/* Find out current status in order to determine if there is going to be a state transition */
 	assert(ROUND_DOWN2(blk, cs_data->bplmap) == bml);
 	GET_BM_STATUS(bmp, bitnum, lbm_status);
@@ -94,13 +98,13 @@ void bm_setmap(block_id bml, block_id blk, int4 busy)
 	update_array_ptr += SIZEOF(block_id);
 	t_write_map(&blkhist, (uchar_ptr_t)update_array, ctn, reference_cnt);
 	if (JNL_ENABLED(cs_data))
-        {
-                cse = (cw_set_element *)(&cw_set[0]);
-                cse->new_buff = (unsigned char *)non_tp_jfb_ptr->buff;
-                memcpy(cse->new_buff, bmp, ((blk_hdr_ptr_t)bmp)->bsiz);
-                gvcst_map_build((uint4 *)cse->upd_addr, (uchar_ptr_t)cse->new_buff, cse, cs_addrs->ti->curr_tn);
-                cse->done = TRUE;
-        }
+	{
+		cse = (cw_set_element *)(&cw_set[0]);
+		cse->new_buff = (unsigned char *)non_tp_jfb_ptr->buff;
+		memcpy(cse->new_buff, bmp, ((blk_hdr_ptr_t)bmp)->bsiz);
+		gvcst_map_build((uint4 *)cse->upd_addr, (uchar_ptr_t)cse->new_buff, cse, cs_addrs->ti->curr_tn);
+		cse->done = TRUE;
+	}
 	/* Call t_end till it succeeds or aborts (error will be reported) */
 	while ((trans_num)0 == t_end(&alt_hist, NULL, TN_NOT_SPECIFIED))
 		;

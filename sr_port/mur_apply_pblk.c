@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,8 +55,8 @@ GBLREF	boolean_t		blocksig_initialized;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	reg_ctl_list		*mur_ctl;
 GBLREF	mur_gbls_t		murgbl;
-GBLREF	mur_opt_struct 		mur_options;
-GBLREF 	jnl_gbls_t		jgbl;
+GBLREF	mur_opt_struct		mur_options;
+GBLREF	jnl_gbls_t		jgbl;
 
 error_def(ERR_DBFSYNCERR);
 error_def(ERR_JNLBADRECFMT);
@@ -80,7 +80,7 @@ uint4 mur_apply_pblk(reg_ctl_list *rctl)
 	enum jnl_record_type 	rectype;
 	int			save_errno;
 	jnl_record		*jnlrec;
-        unix_db_info		*udi;
+	unix_db_info		*udi;
 
 	reg = rctl->gd;
 	status = gtm_pthread_init_key(reg);
@@ -224,8 +224,9 @@ uint4 mur_apply_pblk(reg_ctl_list *rctl)
 				{
 					assert(NULL != jctl->next_gen);
 					assert(jctl->next_gen->jfh->recover_interrupted);
-					rctl->jctl_alt_head = jctl->next_gen;/* Save the recover generated journal
-											files we finished processing */
+					rctl->jctl_alt_head = jctl->next_gen;	/* Save the recover generated journal
+										 * files we finished processing
+										 */
 					jctl->next_gen = NULL; /* Since we do not want to process them again */
 				}
 				if ((JRT_INCTN == rectype) && jctl->jfh->recover_interrupted)
@@ -360,8 +361,12 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 	if (IS_BITMAP_BLK(pblkrec.blknum))
 	{	/* Local bitmap block. Determine master map free/busy status and fix it accordingly. */
 		if (ROUND_DOWN2(csd->trans_hist.total_blks, BLKS_PER_LMAP) == pblkrec.blknum)
-			blks_in_lmap = (csd->trans_hist.total_blks - pblkrec.blknum);
-		else
+		{	/* (csd->trans_hist.total_blks - pblkrec.blknum) can be cast because it should never
+			 * be larger then BLKS_PER_LMAP
+			 */
+			assert(BLKS_PER_LMAP >= (csd->trans_hist.total_blks - pblkrec.blknum));
+			blks_in_lmap = (int4)(csd->trans_hist.total_blks - pblkrec.blknum);
+		} else
 			blks_in_lmap = BLKS_PER_LMAP;
 		assert(MM_ADDR(csd) == csa->bmm);
 		if (NO_FREE_SPACE == bml_find_free(0, pblkcontents + SIZEOF(blk_hdr), blks_in_lmap))

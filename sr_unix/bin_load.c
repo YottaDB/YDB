@@ -257,7 +257,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	boolean_t		need_xlation, new_gvn, utf8_extract;
 	boolean_t		is_hidden_subscript, ok_to_put = TRUE, putting_a_sn = FALSE, sn_incmp_gbl_already_killed = FALSE;
 	rec_hdr			*rp, *next_rp;
-	mval			v, tmp_mval, *val;
+	mval			v, tmp_mval, *val = NULL;
 	mname_entry		gvname;
 	mstr			mstr_src, mstr_dest, opstr;
 	collseq			*extr_collseq, *db_collseq, *save_gv_target_collseq;

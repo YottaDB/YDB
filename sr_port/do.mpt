@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;                                                               ;
-; Copyright (c) 1987-2018 Fidelity National Information		;
+; Copyright (c) 1987-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;                                                               ;
 ;       This source code contains the intellectual property     ;
@@ -15,30 +15,20 @@
         ;invoke at FUNC as an extrinsic function
         ;if you make heavy use of this routine, consider $ZCALL
         ;
-        s %DO=$$FUNC(%DO,$g(%DL))
-        q
-INT     n %DL
-        r !,"Decimal: ",%DO r !,"Digits:  ",%DL s %DO=$$FUNC(%DO,%DL)
-        q
-FUNCFM(d,l)
-	q:d=0 $e("000000000000",1,l)
-	n o
-	s o=""
-	f  q:'d  s o=d#8_o,d=d\8
-	q $e("000000000000",1,l-$l(o))_o
+        set %DO=$$FUNC(%DO,$get(%DL,12))
+        quit
+INT     new %DL
+        read !,"Decimal: ",%DO read !,"Digits:  ",%DL  set:""=%DL %DL=12 set %DO=$$FUNC(%DO,%DL)
+        quit
 FUNC(d,l)
-	n isn,i,h,apnd
-	s:'$l($g(l)) l=12
-	s isn=0,i=0,h="",apnd="0"
-	if d["-" do
-	. s isn=1,d=$extract(d,2,$l(d))
-	if ($l(d)<18) do
-	. s h=$$FUNCFM(d,l)
-	else  do
-	. s h=$$CONVERTBASE^%CONVBASEUTIL(d,10,8)
-	if (isn&(h'="0")) do
-	. s h=$$CONVNEG^%CONVBASEUTIL(h,8)
-	. s apnd="7"
-	s i=$l(h)
-	f  q:i'<l  s h=apnd_h,i=i+1
-	q h
+	new i,o,s
+	set o="",l=$get(l,12),s=0
+	if "0"[$get(d) set $piece(s,0,l+1)="" quit s
+	set:"-"=$extract(d) s="7",d=$extract(d,2,9999)
+	if (18>$length(d)) for  quit:'d  set o=d#8_o,d=d\8
+	else  set o=$$CONVERTBASE^%CONVBASEUTIL(d,10,8)
+	set:(("7"=s)&("0"'=o)) o=$$CONVNEG^%CONVBASEUTIL(o,8)
+	set i=$length(o)
+	quit:l'>i o
+	set $piece(s,s,l-i+1)=""
+	quit s_o

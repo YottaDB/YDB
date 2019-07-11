@@ -1130,6 +1130,7 @@ typedef que_head *	que_head_ptr_t;
   typedef qw_num *qw_num_ptr_t;		/* Define 64 bit pointer to qw_num */
   typedef latch_t *latch_ptr_t;		/* Define 64 bit pointer to latch_t */
   typedef ulatch_t *ulatch_ptr_t;	/* Define 64 bit pointer to ulatch_t */
+  typedef volatile gtm_int64_t *vint8_ptr_t; /* Define 64 bit pointer to volatile int8 */
 
   /* Shared memory connotation */
   typedef char_ptr_t sm_c_ptr_t;	/* Define 64 bit pointer to char */
@@ -1143,6 +1144,7 @@ typedef que_head *	que_head_ptr_t;
   typedef gtm_int64_t sm_long_t;	/* Define 64 bit integer type */
   typedef gtm_uint64_t sm_ulong_t;	/* Define 64 bit unsigned integer type */
   typedef global_latch_t *sm_global_latch_ptr_t; /* Define 64 bit pointer to hp_latch */
+  typedef vint8_ptr_t sm_vlong_ptr_t;	/* Define 64 bit pointer to volatile int8*/
 #  ifdef __osf__
 #    pragma pointer_size(restore)
 #  endif
@@ -1162,6 +1164,7 @@ typedef que_head *	que_head_ptr_t;
   typedef qw_num *qw_num_ptr_t;		/* Define 32 bit pointer to qw_num */
   typedef latch_t *latch_ptr_t;		/* Define 32 bit pointer to latch_t */
   typedef ulatch_t *ulatch_ptr_t;	/* Define 32 bit pointer to ulatch_t */
+  typedef volatile gtm_int64_t *vint8_ptr_t; /* Define 32 bit pointer to volatile int8 */
 
   /* Shared memory connotation */
   typedef char_ptr_t sm_c_ptr_t;	/* Define 32 bit pointer to char */
@@ -1175,6 +1178,7 @@ typedef que_head *	que_head_ptr_t;
   typedef INTPTR_T sm_long_t;		/* Define 32 bit integer type */
   typedef UINTPTR_T sm_ulong_t;		/* Define 32 bit unsigned integer type */
   typedef global_latch_t *sm_global_latch_ptr_t; /* Define 32 bit pointer to hp_latch */
+  typedef vint8_ptr_t sm_vlong_ptr_t;	/* Define 32 bit pointer to volatile int8*/
   /* The macro FILL8DCL is used (on a 32 bit system) to provide a filler area of 32 bits and
      the actual 32 bit declared area. Whether the high order word or the low order word of
      the 64 bit area should be filler depends on the endian mode of the machine. This macro

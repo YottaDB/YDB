@@ -1806,11 +1806,6 @@ boolean_t	tp_tend()
 				 * init (csa->snapshot_in_prog == TRUE). If so, try releasing the resources obtained
 				 * while snapshot init.
 				 */
-				if (SNAPSHOTS_IN_PROG(csa))
-				{
-					assert(NULL != si->first_cw_set);
-					SS_RELEASE_IF_NEEDED(csa, cnl);
-				}
 			}
 		}
 		assert(!si->cr_array_index);
@@ -2170,17 +2165,17 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 {
 	blk_hdr_ptr_t		old_block;
-	block_id		bml, free_bit;
+	block_id		bml, total_blks;
 	block_id_ptr_t		b_ptr;
 	boolean_t		before_image_needed, blk_used, is_mm;
 	boolean_t		read_before_image;		/* TRUE if before-image journaling or online backup in progress */
 	cache_rec_ptr_t		cr;
 	cw_set_element		*cse, *bmp_begin_cse;
-	int4			offset;
+	int4			offset, free_bit;
 	jnl_buffer_ptr_t	jbp;				/* jbp is non-NULL only if before-image journaling */
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	uint4			total_blks, map_size;
+	uint4			map_size;
 	unsigned int		bsiz;
 	DCL_THREADGBL_ACCESS;
 
@@ -2203,7 +2198,9 @@ enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse)
 	assert(is_mm || (FALSE == bml_cse->cr->data_invalid));
 	offset = 0;
 	total_blks = is_mm ? csa->total_blks : csa->ti->total_blks;
-	map_size = (ROUND_DOWN2(total_blks, BLKS_PER_LMAP) == bml) ? total_blks - bml : BLKS_PER_LMAP;
+	/* (total_blks - bml) can be cast because the result should never be larger then BLKS_PER_LMAP */
+	assert((BLKS_PER_LMAP >= (total_blks - bml)) || (ROUND_DOWN2(total_blks, BLKS_PER_LMAP) != bml));
+	map_size = (ROUND_DOWN2(total_blks, BLKS_PER_LMAP) == bml) ? (uint4)(total_blks - bml) : BLKS_PER_LMAP;
 	assert(bml >= 0 && bml < total_blks);
 	bmp_begin_cse = si->first_cw_bitmap;	/* stored in a local to avoid pointer de-referencing within the loop below */
 	jbp = (JNL_ENABLED(csa) && csa->jnl_before_image) ? csa->jnl->jnl_buff : NULL;

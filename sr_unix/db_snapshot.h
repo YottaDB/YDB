@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -75,7 +75,7 @@ typedef	struct snapshot_context_struct
 	long			nl_shmid;
 	long			attach_shmid;
 	int			ss_shmcycle;
-	uint4			total_blks;
+	block_id		total_blks;
 	uint4			failure_errno;
 	shm_snapshot_ptr_t	ss_shm_ptr;
 	sm_uc_ptr_t		start_shmaddr;
@@ -84,7 +84,7 @@ typedef	struct snapshot_context_struct
 	char			shadow_file[GTM_PATH_MAX];
 	ss_proc_status		cur_state;
 	/* the property of process triggering snapshot. At present only last bit is used to indicate property of integ process:
-         * 0x0000: Normal Integ, 0x0001:Fast Integ
+	 * 0x0000: Normal Integ, 0x0001:Fast Integ
 	 */
 	uint4			proc_property;
 } snapshot_context_t;

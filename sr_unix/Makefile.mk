@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2018 Fidelity National Information		#
+# Copyright (c) 2013-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -15,6 +15,8 @@
 image = DEBUG
 thirdparty = gcrypt
 algo = AES256CFB
+# Add options for code scanning service
+scan = FALSE
 # If the machine has a libgcrypt version <= 1.4.1, then FIPS mode cannot be turned on.
 gcrypt_nofips = 0
 
@@ -68,7 +70,11 @@ ifneq ($(image),DEBUG)
 	debug_flag =
 	optimize = -O2
 else
-	debug_flag = -g -DDEBUG
+	ifneq ($(scan),TRUE)
+		debug_flag = -g -DDEBUG
+	else
+		debug_flag = -g3 -gdwarf-2 -O0 -fno-builtin -DDEBUG -DBYPASS_MEMCPY_OVERRIDE -DSTATIC_ANALYSIS
+	endif
 	optimize =
 endif
 
@@ -113,8 +119,9 @@ endif
 ifneq (,$(findstring AIX,$(UNAMESTR)))
 	# -qchars=signed forces `char' type to be treated as signed chars.
 	# -qsrcmsg enhances error reporting.
-	# -qmaxmem limits the amount of memory used for local tables of specific, memory-intensive operations (in kilobytes).
-	CFLAGS += -qchars=signed -qsrcmsg -qmaxmem=8192 -D_TPARM_COMPAT
+	# -qmaxmem=-1 does not limit the amount of memory used for local tables of specific,
+	#	memory-intensive operations (in kilobytes).
+	CFLAGS += -qchars=signed -qsrcmsg -qmaxmem=-1 -D_TPARM_COMPAT
 
 	# -qro places string literals in read-only storage.
 	# -qroconst places constants in read-only storage.

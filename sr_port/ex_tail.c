@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -79,9 +79,9 @@ void ex_tail(oprtype *opr)
 			for (t1 = t->operand[1].oprval.tref; TRIP_REF == t1->operand[0].oprclass; t1 = t1->operand[0].oprval.tref)
 				dqdel(t1, exorder);
 			v0 = &t0->operand[0].oprval.mlit->v;
-			assert(MV_NM & v0->mvtype);
+			MV_FORCE_NUMD(v0);
 			v1 = &t1->operand[0].oprval.mlit->v;
-			assert(MV_NM & v1->mvtype);
+			MV_FORCE_NUMD(v1);
 			v = (mval *)mcalloc(SIZEOF(mval));
 			switch (c)
 			{

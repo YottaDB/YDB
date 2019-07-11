@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2018 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,10 +39,33 @@ GBLREF	mur_gbls_t		murgbl;
 
 error_def(ERR_JNLEXTRCTSEQNO);
 
+#define INITIALIZE_FLAGS					\
+	inc_seen = inc_item_seen = exc_item_seen = FALSE;
+
+#define SET_FLAG_IF_INCLUDE_PATTERN_SEEN(PATTERN)		\
+{								\
+	if (!PATTERN->exclude)					\
+		inc_seen = TRUE;				\
+}
+
+#define SET_INCFLAG_OR_RETURN(PATTERN)				\
+{								\
+	if (PATTERN->exclude)					\
+		return FALSE;	/* Exclude this item */		\
+	else							\
+		inc_item_seen = TRUE;				\
+}
+
+#define RETURN_IF_ITEM_DOESNT_MATCH_ANY_INCLUDE_PATTERN		\
+{								\
+	if (inc_seen && !inc_item_seen)				\
+		return FALSE;					\
+}
+
 boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 {
-	boolean_t		exc_item_seen, inc_item_seen, inc_seen, wildcard_match;
-	char			key_buff[MAX_KEY_SZ + 1 + SIZEOF(uint4) * 2], asc_key_buff[MAX_ZWR_KEY_SZ], *ptr;
+	boolean_t		exc_item_seen, inc_item_seen, inc_seen, wildcard_match, exact_match;
+	char			key_buff[MAX_KEY_SZ + 1 + SIZEOF(uint4) * 2], asc_key_buff[MAX_ZWR_KEY_SZ], *ptr, *val_ptr;
 	int			i, key_len, pat_pos, subs_pos;
 	uint4			pini_addr;
 	gv_key			*key;
@@ -57,6 +80,7 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 	uint4			status;
 	int4			pv_len, sl_len;
 	seq_num			rec_token_seq;
+	mstr			mstr_global_value;
 
 	assert(mur_options.selection);
 	rec = jctl->reg_ctl->mur_desc->jnlrec;
@@ -69,6 +93,9 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 	if (SS_NORMAL != status)
 		return TRUE;
 	pv = &plst->jpv;
+	/* Initialize the mstr */
+	mstr_global_value.addr = NULL;
+	mstr_global_value.len = 0;
 	/* Sequence number of this record */
 	rec_token_seq = REC_HAS_TOKEN_SEQ(rectype)
 		? ((jctl->reg_ctl->csd && REPL_ALLOWED(jctl->reg_ctl->csd)) ? GET_JNL_SEQNO(rec) : rec->prefix.tn) : 0;
@@ -83,42 +110,39 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 		key->base[key->end] = '\0';
 		key_len = INTCAST((format_targ_key((uchar_ptr_t)asc_key_buff, MAX_ZWR_KEY_SZ, key, FALSE) -
 				   (unsigned char *)asc_key_buff));
+		/* Get the value of the global, if it is a SET record */
+		if (IS_SET(rectype))
+		{
+			val_ptr = &keystr->text[keystr->length];
+			GET_MSTR_LEN(mstr_global_value.len, val_ptr);
+			mstr_global_value.addr = val_ptr + SIZEOF(mstr_len_t);
+		}
 	}
 	/* Check this record against the various selection lists */
 	if (NULL != mur_options.user)
 	{
-		inc_seen = inc_item_seen = exc_item_seen = FALSE;
+		INITIALIZE_FLAGS;
+		pv_len = real_len(JPV_LEN_USER, (uchar_ptr_t)pv->jpv_user);
 		for (sl_ptr = mur_options.user;  NULL != sl_ptr;  sl_ptr = sl_ptr->next)
 		{
 			wildcard_match = FALSE;
-			if (!sl_ptr->exclude)
-				inc_seen = TRUE;
+			SET_FLAG_IF_INCLUDE_PATTERN_SEEN(sl_ptr);
 			if (sl_ptr->has_wildcard)
-				wildcard_match = mur_do_wildcard(pv->jpv_user, sl_ptr->buff, JPV_LEN_USER, sl_ptr->len);
+				wildcard_match = mur_do_wildcard(pv->jpv_user, sl_ptr->buff, pv_len, sl_ptr->len);
 			if (!wildcard_match)
-			{
-				pv_len = real_len(JPV_LEN_USER, (uchar_ptr_t)pv->jpv_user);
 				sl_len = MIN(sl_ptr->len, JPV_LEN_USER);
-			}
 			if (wildcard_match || (pv_len == sl_len) && (0 == memcmp(pv->jpv_user, sl_ptr->buff, sl_len)))
-			{
-				if (sl_ptr->exclude)
-					exc_item_seen = TRUE;
-				else
-					inc_item_seen = TRUE;
-			}
+				SET_INCFLAG_OR_RETURN(sl_ptr);
 		}
-		if (exc_item_seen || (inc_seen && !inc_item_seen))
-			return FALSE;
+		RETURN_IF_ITEM_DOESNT_MATCH_ANY_INCLUDE_PATTERN;
 	}
 	if ((NULL != mur_options.global) && (NULL != key))
 	{
-		inc_seen = inc_item_seen = exc_item_seen = FALSE;
+		INITIALIZE_FLAGS;
 		for (sl_ptr = mur_options.global;  NULL != sl_ptr;  sl_ptr = sl_ptr->next)
 		{
 			wildcard_match = FALSE;
-			if (!sl_ptr->exclude)
-				inc_seen = TRUE;
+			SET_FLAG_IF_INCLUDE_PATTERN_SEEN(sl_ptr);
 			if (sl_ptr->has_wildcard)
 				wildcard_match = mur_do_wildcard(asc_key_buff, sl_ptr->buff, key_len, sl_ptr->len);
 			i = sl_ptr->len;
@@ -129,23 +153,36 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 				|| (key_len >  i) && (0 == memcmp(asc_key_buff, sl_ptr->buff, i))
 					&& (('(' == asc_key_buff[i]) || (')' == asc_key_buff[i]) || (',' == asc_key_buff[i])))
 			{
-				if (sl_ptr->exclude)
-					exc_item_seen = TRUE;
-				else
-					inc_item_seen = TRUE;
+					SET_INCFLAG_OR_RETURN(sl_ptr);
 			}
 		}
-		if (exc_item_seen || (inc_seen && !inc_item_seen))
-			return FALSE;
+		RETURN_IF_ITEM_DOESNT_MATCH_ANY_INCLUDE_PATTERN;
+	}
+	if ((NULL != mur_options.patterns) && (0 != mstr_global_value.len) && (NULL != mstr_global_value.addr))
+	{
+		INITIALIZE_FLAGS;
+		for (sl_ptr = mur_options.patterns;  NULL != sl_ptr;  sl_ptr = sl_ptr->next)
+		{
+			wildcard_match = exact_match = FALSE;
+			SET_FLAG_IF_INCLUDE_PATTERN_SEEN(sl_ptr);
+			if (sl_ptr->has_wildcard)
+				wildcard_match = mur_do_wildcard(mstr_global_value.addr,
+							sl_ptr->buff, mstr_global_value.len, sl_ptr->len);
+			else
+				exact_match = ((mstr_global_value.len == sl_ptr->len) &&
+						(0 == memcmp(mstr_global_value.addr, sl_ptr->buff, sl_ptr->len)));
+			if (exact_match || wildcard_match)
+				SET_INCFLAG_OR_RETURN(sl_ptr);
+		}
+		RETURN_IF_ITEM_DOESNT_MATCH_ANY_INCLUDE_PATTERN;
 	}
 	if (NULL != mur_options.process)
 	{
-		inc_seen = inc_item_seen = exc_item_seen = FALSE;
+		INITIALIZE_FLAGS;
 		for (sl_ptr = mur_options.process;  NULL != sl_ptr;  sl_ptr = sl_ptr->next)
 		{
 			wildcard_match = FALSE;
-			if (!sl_ptr->exclude)
-				inc_seen = TRUE;
+			SET_FLAG_IF_INCLUDE_PATTERN_SEEN(sl_ptr);
 			if (sl_ptr->has_wildcard)
 				wildcard_match = mur_do_wildcard(pv->jpv_prcnam, sl_ptr->buff, JPV_LEN_PRCNAM, sl_ptr->len);
 			if (!wildcard_match)
@@ -154,51 +191,31 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 				sl_len = MIN(sl_ptr->len, JPV_LEN_PRCNAM);
 			}
 			if (wildcard_match || (pv_len == sl_len) && (0 == memcmp(pv->jpv_prcnam, sl_ptr->buff, sl_len)))
-			{
-				if (sl_ptr->exclude)
-					exc_item_seen = TRUE;
-				else
-					inc_item_seen = TRUE;
-			}
+				SET_INCFLAG_OR_RETURN(sl_ptr);
 		}
-		if (exc_item_seen || (inc_seen && !inc_item_seen))
-			return FALSE;
+		RETURN_IF_ITEM_DOESNT_MATCH_ANY_INCLUDE_PATTERN;
 	}
 	if ((NULL != mur_options.seqno) && (0 != rec_token_seq))
 	{
-		inc_seen = inc_item_seen = exc_item_seen = FALSE;
+		INITIALIZE_FLAGS;
 		for (lll_ptr = mur_options.seqno;  NULL != lll_ptr;  lll_ptr = lll_ptr->next)
 		{
-			if (!lll_ptr->exclude)
-				inc_seen = TRUE;
+			SET_FLAG_IF_INCLUDE_PATTERN_SEEN(lll_ptr);
 			if (lll_ptr->seqno == rec_token_seq)
-			{
-				if (lll_ptr->exclude)
-					exc_item_seen = TRUE;
-				else
-					inc_item_seen = TRUE;
-			}
+				SET_INCFLAG_OR_RETURN(lll_ptr);
 		}
-		if (exc_item_seen || (inc_seen && !inc_item_seen))
-			return FALSE;
+		RETURN_IF_ITEM_DOESNT_MATCH_ANY_INCLUDE_PATTERN;
 	}
 	if (NULL != mur_options.id)
 	{
-		inc_seen = inc_item_seen = exc_item_seen = FALSE;
+		INITIALIZE_FLAGS;
 		for (ll_ptr = mur_options.id;  NULL != ll_ptr;  ll_ptr = ll_ptr->next)
 		{
-			if (!ll_ptr->exclude)
-				inc_seen = TRUE;
+			SET_FLAG_IF_INCLUDE_PATTERN_SEEN(ll_ptr);
 			if (ll_ptr->num == pv->jpv_pid)
-			{
-				if (ll_ptr->exclude)
-					exc_item_seen = TRUE;
-				else
-					inc_item_seen = TRUE;
-			}
+				SET_INCFLAG_OR_RETURN(ll_ptr);
 		}
-		if (exc_item_seen || (inc_seen && !inc_item_seen))
-			return FALSE;
+		RETURN_IF_ITEM_DOESNT_MATCH_ANY_INCLUDE_PATTERN;
 	}
 	if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 	{

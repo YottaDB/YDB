@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,7 +99,7 @@ void alloc_reg(void)
 					x->opcode = OC_NOOP;
 					COMPDBG(PRINTF("   ** Converting triple to NOOP (rsn 2) **\n"););
 					continue;	/* continue, because 'normal' NOOP continues from this switch */
-				}
+				}				/* WARNING else fallthrough */
 			case OC_LINEFETCH:
 				/* this code is a sad hack - it used to assert that there was no temp leak, but in non-short-circuit
 				 * mode there can be a leak, we weren't finding it and the customers were justifiably impatient
@@ -111,7 +111,7 @@ void alloc_reg(void)
 					tempcont[TVAL_REF][c] = 0;	/* prevent leaking TVAL temps */
 				}
 				if (OC_LINESTART == opc)
-					break;
+					break;			/* WARNING else fallthrough */
 			case OC_FETCH:
 				assert((TRIP_REF == x->operand[0].oprclass) && (OC_ILIT == x->operand[0].oprval.tref->opcode));
 				if (x->operand[0].oprval.tref->operand[0].oprval.ilit == mvmax)
@@ -144,11 +144,18 @@ void alloc_reg(void)
 				{
 					x->operand[1].oprclass = NO_REF;
 					opc = x->opcode = OC_EQUNUL;
-				}	/* WARNING fallthrough */
+				}
+				break;
+			case OC_GVSAVTARG:
+				if (x->backptr.que.fl == &x->backptr)
+				{	/* jmp_opto removed all associated OC_GVRECTARGs - must get rid of this OC_GVSAVTARG */
+					opc = x->opcode = OC_NOOP;
+					assert((NO_REF == x->operand[0].oprclass) && (NO_REF == x->operand[1].oprclass));
+				}				/* WARNING fallthrough */
 			default:
 				break;
 		}
-		if (OC_PASSTHRU == x->opcode)
+		if (OC_PASSTHRU == opc)
 		{
 			COMPDBG(PRINTF(" *** OC_PASSTHRU opcode being NOOP'd\n"););
 			remove_backptr(x, &x->operand[0], tempcont);

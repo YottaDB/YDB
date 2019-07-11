@@ -99,6 +99,7 @@ case "[Dd]*":
 		if ("$comque_image" =~ "*scan*") then
 			setenv scan_image 1
 			setenv gt_cc_option_debug "$gt_cc_option_debug_scan"
+			setenv gt_as_option_debug "$gt_as_option_debug_scan"
 		endif
 		set comque_image = "dbg"
 		set comque_as_options_default = \

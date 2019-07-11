@@ -43,6 +43,7 @@
 #include "mlk_prcblk_delete.h"
 #include "mlk_shrblk_find.h"
 #include "mlk_shrhash_resize.h"
+#include "mlk_rehash.h"
 #include "mlk_lock.h"
 #include "t_retry.h"
 #include "gvusr.h"
@@ -105,12 +106,15 @@ uint4 mlk_lock(mlk_pvtblk *p,
 		siz = MLK_PVTBLK_SHRSUB_SIZE(p, p->subscript_cnt);
 		assert(siz >= 0);
 		assert(ctl->blkcnt >= 0);
-		if (ctl->gc_needed || ctl->resize_needed || (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))
+		if (ctl->gc_needed || ctl->resize_needed || ctl->rehash_needed
+			|| (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))
 		{
 			REL_LOCK_CRIT(p->pvtctl, was_crit);
 			prepare_for_gc(&p->pvtctl);
 			GRAB_LOCK_CRIT_AND_SYNC(p->pvtctl, was_crit);
 			assert(ctl->lock_gc_in_progress.u.parts.latch_pid == process_id);
+			if (ctl->rehash_needed)
+				mlk_rehash(&p->pvtctl);
 			if (ctl->resize_needed)
 				mlk_shrhash_resize(&p->pvtctl);
 			else if (ctl->gc_needed || (ctl->subtop - ctl->subfree < siz) || (ctl->blkcnt < p->subscript_cnt))

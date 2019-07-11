@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,13 +134,13 @@ bool	mubinccpy (backup_reg_list *list)
 	mstr			*file;
 	uchar_ptr_t		bm_blk_buff, ptr1, ptr1_top;
 	char_ptr_t		outptr, data_ptr;
-	char 			*c, addr[SA_MAXLEN + 1];
+	char			*c, addr[SA_MAXLEN + 1];
 	sgmnt_data_ptr_t	header;
 	uint4			total_blks, bplmap, gds_ratio, save_blks;
 	int4			status;
 	int4			size1, bsize, bm_num, hint, lmsize, rsize, timeout, outsize,
-				blks_per_buff, counter, i, write_size, read_size, match;
-	size_t			copysize;
+				blks_per_buff, counter, i, match;
+	size_t			copysize, write_size, read_size;
 	off_t			copied, read_offset;
 	int			db_fd, exec_fd;
 	enum db_acc_method	access;
@@ -156,7 +156,7 @@ bool	mubinccpy (backup_reg_list *list)
 	boolean_t		is_bitmap_blk, backup_this_blk;
 	enum db_ver		dummy_odbv;
 	int			rc;
-	int                     fstat_res;
+	int			fstat_res;
 	struct stat		stat_buf;
 	int			user_id;
 	int			group_id;
@@ -332,9 +332,12 @@ bool	mubinccpy (backup_reg_list *list)
 	{
 		if (online && (0 != cs_addrs->shmpool_buffer->failed))
 			break;
-		if (header->trans_hist.total_blks - blk_num_base < blks_per_buff)
+		if ((header->trans_hist.total_blks - blk_num_base) < blks_per_buff)
 		{
-			blks_per_buff = header->trans_hist.total_blks - blk_num_base;
+			/* (header->trans_hist.total_blks - blk_num_base) can be cast because it should fit in an int4 */
+			assert((header->trans_hist.total_blks - blk_num_base) ==
+					(int4)(header->trans_hist.total_blks - blk_num_base));
+			blks_per_buff = (int4)(header->trans_hist.total_blks - blk_num_base);
 			read_size = blks_per_buff * bsize;
 		}
 		DB_LSEEKREAD(udi, db_fd, read_offset, bp, read_size, status);

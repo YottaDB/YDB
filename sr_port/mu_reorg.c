@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -131,13 +131,13 @@ error_def(ERR_MUREORGFAIL);
 #endif
 
 void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *kill_set_list, trans_num tn);
-void reorg_finish(block_id dest_blk_id, int blks_processed, int blks_killed,
-	int blks_reused, int file_extended, int lvls_reduced,
-	int blks_coalesced, int blks_split, int blks_swapped);
+void reorg_finish(block_id dest_blk_id, block_id blks_processed, block_id blks_killed,
+		block_id blks_reused, block_id file_extended, block_id lvls_reduced,
+		block_id blks_coalesced, block_id blks_split, block_id blks_swapped);
 
 void log_detailed_log(char *X, srch_hist *Y, srch_hist *Z, int level, kill_set *kill_set_list, trans_num tn)
 {
-	int 		i;
+	int		i;
 	block_id	bitmap = 1, temp_bitmap;	/* bitmap is initialized to 1, which is not a bitmap block id */
 
 	assert(NULL != (char *)(Y));
@@ -218,10 +218,10 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 	int			pre_order_successor_level, level;
 	static block_id		dest_blk_id = 0;
 	int			tkeysize, altkeylen;
-	int			blks_killed, blks_processed, blks_reused, blks_coalesced, blks_split, blks_swapped,
-				count, file_extended, lvls_reduced;
+	block_id		blks_killed, blks_processed, blks_reused, blks_coalesced, blks_split, blks_swapped,
+				file_extended, lvls_reduced;
 	int			d_max_fill, i_max_fill, blk_size, cur_blk_size, max_fill, toler, d_toler, i_toler;
-	int			cnt1, cnt2;
+	int			cnt1, cnt2, count;
 	kill_set		kill_set_list;
 	sm_uc_ptr_t		rPtr1;
 	enum cdb_sc		status;
@@ -264,7 +264,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		dest_blk_id = cs_data->reorg_restart_block;
 		SET_GV_ALTKEY_TO_GBLNAME_FROM_GV_CURRKEY;
 		altkeylen = gv_altkey->end - 1;
- 		if (altkeylen && (altkeylen == gn->len) && (0 == memcmp(gv_altkey->base, gn->addr, gn->len)))
+		if (altkeylen && (altkeylen == gn->len) && (0 == memcmp(gv_altkey->base, gn->addr, gn->len)))
 			/* Going to resume from current global, so it resumed and make it false */
 			*resume = FALSE;
 	} else
@@ -281,7 +281,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 		gv_currkey->end = gn->len + 1;
 		return TRUE;
 	}
- 	memcpy(&gv_currkey_next_reorg->base[0], &gv_currkey->base[0], gv_currkey->end + 1);
+	memcpy(&gv_currkey_next_reorg->base[0], &gv_currkey->base[0], gv_currkey->end + 1);
 	gv_currkey_next_reorg->end =  gv_currkey->end;
 	if (2 > dest_blk_id)
 		dest_blk_id = 2; /* we know that first block is bitmap and next one is directory tree root */
@@ -325,7 +325,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				{
 					t_retry(status);
 					continue;
-                                }
+				}
 				if (gv_target->hist.depth <= level)
 				{
 					/* Will come here
@@ -534,7 +534,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				{
 					t_retry(status);
 					continue;
-                                }
+				}
 				if (gv_target->hist.depth <= level)
 					break;
 				/* Swap working block with appropriate dest_blk_id block.
@@ -683,7 +683,7 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
 				lvls_reduced++;
 			}
 			break;
-		} 		/* main reduce level loop ends */
+		}		/* main reduce level loop ends */
 		t_abort(gv_cur_region, cs_addrs); /* do crit and other cleanup */
 		if (0 == cnt1)
 			break;
@@ -698,9 +698,9 @@ boolean_t mu_reorg(glist *gl_ptr, glist *exclude_glist_ptr, boolean_t *resume,
  Statistics of reorg for current global.
  Also update dest_blklist_ptr for next globals
 ***********************************************/
-void reorg_finish(block_id dest_blk_id, int blks_processed, int blks_killed,
-	int blks_reused, int file_extended, int lvls_reduced,
-	int blks_coalesced, int blks_split, int blks_swapped)
+void reorg_finish(block_id dest_blk_id, block_id blks_processed, block_id blks_killed,
+		block_id blks_reused, block_id file_extended, block_id lvls_reduced,
+		block_id blks_coalesced, block_id blks_split, block_id blks_swapped)
 {
 	t_abort(gv_cur_region, cs_addrs);
 	file_extended = cs_data->trans_hist.total_blks - file_extended;

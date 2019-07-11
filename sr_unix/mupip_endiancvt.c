@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -113,7 +113,7 @@ typedef struct
 	int			outdb_fd;		/* FD_INVALID if inplace */
 	boolean_t		inplace;		/* update in place */
 	boolean_t		endian_native;		/* original database */
-	uint4			tot_blks;
+	block_id		tot_blks;
 	int			bsize;			/* GDS block size */
 	int4			startvbn;		/* in DISK_BLOCK_SIZE units */
 	block_id		last_blk_cvt;		/* highest block converted so far not lbm */
@@ -138,7 +138,7 @@ typedef struct
 void		endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native);
 int4		endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_data, boolean_t override_specified);
 void		endian_cvt_blk_hdr(blk_hdr_ptr_t blkhdr, boolean_t new_is_native, boolean_t make_empty);
-void		endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhdr, int blknum);
+void		endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhdr, block_id blknum);
 char		*endian_read_dbblk(endian_info *info, block_id blk_to_get);
 void		endian_find_key(endian_info *info, end_gv_key *gv_key, char *rec_p, int rec_len, int blk_levl);
 boolean_t	endian_match_key(end_gv_key *gv_key1, int blk_levl, end_gv_key *key2);
@@ -181,7 +181,7 @@ void mupip_endiancvt(void)
 	endian32_struct		endian_check;
 	endian_info		info;
 	int			gtmcrypt_errno;
-	ZOS_ONLY(int 		realfiletag;)
+	ZOS_ONLY(int		realfiletag;)
 
 	if (CLI_PRESENT == (cli_status = cli_present("OUTDB")))
 	{
@@ -493,7 +493,7 @@ void mupip_endiancvt(void)
 	info.db_fd = db_fd;
 	info.inplace = !outdb_specified;
 	info.endian_native = info.dtblk.native = info.dtblk.dtrnative = endian_native;
-	info.tot_blks = info.bsize = info.startvbn = info.last_blk_cvt = 0;
+	info.tot_blks = info.last_blk_cvt = info.bsize = info.startvbn = 0;
 	info.dtblk.buff = info.dtblk.dtrbuff = NULL;
 	info.dtblk.blkid = -1;			/* invalid block number */
 	info.dtblk.count = 0;
@@ -898,13 +898,13 @@ int4	endian_process(endian_info *info, sgmnt_data *new_data, sgmnt_data *old_dat
 	   This routine based on mubinccpy and dbcertify_scan_phase
 	*/
 	int4		startvbn;
-	int		save_errno, bsize, lbmap_cnt, lbm_status;
+	int		save_errno, bsize, lbm_status;
 	int		buff_native, buff_old, buff_new;
-	int		mm_offset, lm_offset;
+	int		lm_offset;
 	int4		bplmap;
-	uint4		totblks, lbm_done, busy_done, recycled_done, free_done, last_blk_written;
 	off_t		dbptr;
-	block_id	blk_num;
+	block_id	blk_num, totblks, last_blk_written, mm_offset,
+			lbm_done, busy_done, recycled_done, free_done, lbmap_cnt;
 	boolean_t	new_is_native;
 	char		*blk_buff[2], *lbmap_buff[2], *errptr;
 	int		crypt_blk_size, gtmcrypt_errno;
@@ -1409,7 +1409,7 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key)
 	}
 }
 
-void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhdr, int blknum)
+void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhdr, block_id blknum)
 {	/* convert records in new_block, could be data, index, or directory
 	   use converted header fields from blkhdr which is in native format */
 	int		rec1_len, rec1_gvn_len, rec2_cmpc, rec2_len;

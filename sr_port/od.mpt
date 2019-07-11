@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 1987-2018 Fidelity National Information		;
+; Copyright (c) 1987-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -14,16 +14,15 @@
 	;invoke at FUNC as an extrinsic function
 	;if you make heavy use of this routine, consider $ZCALL
 	;
-	s %OD=$$FUNC(%OD)
+	set %OD=$$FUNC(%OD)
+	quit
+INT	read !,"Octal: ",%OD set %OD=$$FUNC(%OD)
 	q
-INT	r !,"Octal: ",%OD s %OD=$$FUNC(%OD)
-	q
-FUNCFM(o)
-	n d,dg
-	s d=0,o=+o
-	f dg=1:1:$l(o) s d=d*8+$e(o,dg)
-	q d
 FUNC(o)
-	q:o<0 ""
-	q:$l(o)<19 $$FUNCFM(o)
-	q $$CONVERTBASE^%CONVBASEUTIL(o,8,10)
+	quit:"0"[$get(o) 0
+	quit:"-"=$extract(o) ""
+	new c,d,l
+	set d=0,l=$length(o)
+	quit:(18<l) $$CONVERTBASE^%CONVBASEUTIL(o,8,10)
+	for c=1:1:l set d=d*8+$extract(o,c)
+	quit d

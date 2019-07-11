@@ -26,6 +26,7 @@
 #include "tp.h"
 #include "t_begin.h"
 #include "have_crit.h"
+#include "db_snapshot.h"
 #ifdef DEBUG
 #include "tp_frame.h"
 #endif
@@ -55,6 +56,7 @@ error_def(ERR_MMREGNOACCESS);
 
 void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcst_routine */
 {
+	sgmnt_addrs		*csa;
 	srch_blk_status		*s;
 	trans_num		histtn;
 	DCL_THREADGBL_ACCESS;
@@ -77,15 +79,16 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 	/* Any changes to the initialization in the two lines below might need a similar change in T_BEGIN_xxx_NONTP_OR_TP macros */
 	update_trans = upd_trans;
 	t_err = err;
-	if ((NULL == cs_addrs->db_addrs[0]) && (dba_mm == cs_addrs->hdr->acc_meth))
+	csa = cs_addrs;
+	if ((NULL == csa->db_addrs[0]) && (dba_mm == csa->hdr->acc_meth))
 	{
-		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_MMREGNOACCESS, 4, REG_LEN_STR(cs_addrs->region),
-					DB_LEN_STR(cs_addrs->region));
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_MMREGNOACCESS, 4, REG_LEN_STR(csa->region),
+					DB_LEN_STR(csa->region));
 	}
 	/* If we use a clue then we must consider the oldest tn in the search history to be the start tn for this transaction */
         /* start_tn manipulation for TP taken care of in tp_hist */
-	UPDATE_CRASH_COUNT(cs_addrs, crash_count);
-	start_tn = cs_addrs->ti->curr_tn;
+	UPDATE_CRASH_COUNT(csa, crash_count);
+	start_tn = csa->ti->curr_tn;
 	/* Note: If gv_target was NULL before the start of a transaction and the only operations done inside the transaction
 	 * are trigger deletions causing bitmap free operations, we can reach here with gv_target being NULL.
 	 */
@@ -123,7 +126,7 @@ void t_begin(uint4 err, uint4 upd_trans) 	/* err --> error code for current gvcs
 	if (non_tp_jfb_ptr)
 		non_tp_jfb_ptr->record_size = 0; /* re-initialize it to 0 since TOTAL_NONTPJNL_REC_SIZE macro uses it */
 	assert(!TREF(donot_commit));
-	assert(!cs_addrs->now_crit || cs_addrs->hold_onto_crit); /* shouldn't hold crit at begin of transaction unless asked to */
+	assert(!csa->now_crit || csa->hold_onto_crit); /* shouldn't hold crit at begin of transaction unless asked to */
 	/* Begin of a fresh transaction. This is analogous to tp_set_sgm done for TP transactions. However, unlike tp_set_sgm,
 	 * we do not sync trigger cycles here. The reasoning is that trigger load events are in-frequent in the field and since
 	 * Non-TP restarts are not as heavy-weight as TP restart, we chose to avoid unconditional memory references here and instead

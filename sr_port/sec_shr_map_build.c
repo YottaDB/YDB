@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,7 +86,12 @@ int sec_shr_map_build(sgmnt_addrs *csa, uint4 *array, unsigned char *base_addr, 
 		++array;
 	}
 	/* Fix the local bitmap full/free status in the mastermap */
-	total_blks = ((csd->trans_hist.total_blks / bplmap) * bplmap == blk) ? csd->trans_hist.total_blks - blk : bplmap;
+	/* The result of (csd->trans_hist.total_blks - blk) can be cast to uint4
+	 * because it should never be larger then BLKS_PER_LMAP
+	 */
+	assert((BLKS_PER_LMAP >= (csd->trans_hist.total_blks - blk)) ||
+			((csd->trans_hist.total_blks / bplmap) * bplmap != blk));
+	total_blks = ((csd->trans_hist.total_blks / bplmap) * bplmap == blk) ? (uint4)(csd->trans_hist.total_blks - blk) : bplmap;
 	bml_full = bml_find_free(0, base_addr, total_blks);
 	if (NO_FREE_SPACE == bml_full)
 	{

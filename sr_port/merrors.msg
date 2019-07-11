@@ -421,7 +421,7 @@ ZCPOSOVR	<External call: Invalid overlapping of arguments in table position !UL>
 ZCINPUTREQ	<External call: Required input argument missing>/error/fao=0!/ansi=0
 JNLTNOUTOFSEQ	<End transaction [0x!16@XQ] of journal !AD different from Begin transaction [0x!16@XQ] of next generation journal !AD>/error/fao=6!/ansi=0
 ACTRANGE	<Alternate Collating Type !UL is out of range>/error/fao=1!/ansi=0
-ZCCONVERT	<External call: error converting output argument>/error/fao=0!/ansi=0
+ZCCONVERT	<External call: error converting output argument from external call !AD>/error/fao=2!/ansi=0
 ZCRTENOTF	<External call routine !AD not found>/error/fao=2!/ansi=0
 GVRUNDOWN	<Error during global database rundown>/error/fao=0!/ansi=0
 LKRUNDOWN	<Error during LOCK database rundown>/error/fao=0!/ansi=0
@@ -1703,6 +1703,13 @@ APDLOGFAIL	<Audit Principal Device failed to log activity>/error/fao=0!/ansi=0
 STATSDBMEMERR	<Process attempted to create stats block in statistics database !AD and received SIGBUS--invalid physical address. Check file system space.>/error/fao=2!/ansi=0
 BUFSPCDELAY	<Request for !UL blocks in region !AD delayed>/warning/fao=3!/ansi=0
 AIOQUEUESTUCK	<Waited !UL minutes for AIO work queue to complete (cr = !XL)>/error/fao=2!/ansi=0
+INVGVPATQUAL	<Invalid Global Value Pattern file qualifier value.  !AD>/error/fao=2!/ansi=0
+NULLPATTERN	<Empty line found in the Pattern file.>/warning/fao=0!/ansi=0
+MLKREHASH	<LOCK hash table rebuilt for region !AD (seed = !UJ)>/info/fao=3!/ansi=0
+MUKEEPPERCENT	<Keep threshold percentage should be from 0 to 99>/error/fao=0!/ansi=0
+MUKEEPNODEC	<Expected decimal integer input for keep>/error/fao=0!/ansi=0
+MUKEEPNOTRUNC	<Keep issued without -truncate>/error/fao=0!/ansi=0
+MUTRUNCNOSPKEEP	<Region !AD has insufficient space to meet truncate target percentage of !UL with keep at !UL blocks>/info/fao=4!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

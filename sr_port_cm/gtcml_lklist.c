@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,6 +62,7 @@ void gtcml_lklist(void)
 		translev = *ptr++; len--;
 		subcnt = *ptr++; len--;
 		MLK_PVTBLK_ALLOC(len, subcnt, 0, new_entry);
+		MLK_PVTCTL_INIT(new_entry->pvtctl, reg_ref->reghead->reg);
 		memcpy(&new_entry->value[0], ptr, len);
 		ptr += len;
 		reg_ref->oper = PENDING;
@@ -70,7 +71,6 @@ void gtcml_lklist(void)
 		new_entry->level = 0;
 		new_entry->nref_length = len;
 		MLK_PVTBLK_SUBHASH_GEN(new_entry);
-		MLK_PVTCTL_INIT(new_entry->pvtctl, reg_ref->reghead->reg);
 		if (!reg_ref->lockdata)
 		{
 			reg_ref->lockdata = new_entry;

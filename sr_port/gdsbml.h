@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,21 +25,21 @@
 #define BMP_EIGHT_BLKS_FREE	255
 
 /* returns the bitmap status (BLK_BUSY|BLK_FREE|etc.) of the "blknum"th block within the local bitmap block "bp" in bml_status */
-#define	GET_BM_STATUS(bp, blknum, bml_status)								\
-{													\
-	sm_uc_ptr_t	ptr;										\
-													\
-	ptr = ((sm_uc_ptr_t)(bp) + SIZEOF(blk_hdr) + ((blknum * BML_BITS_PER_BLK) / BITS_PER_UCHAR));			\
+#define	GET_BM_STATUS(bp, blknum, bml_status)									\
+{														\
+	sm_uc_ptr_t	ptr;											\
+														\
+	ptr = ((sm_uc_ptr_t)(bp) + SIZEOF(blk_hdr) + ((blknum * BML_BITS_PER_BLK) / BITS_PER_UCHAR));		\
 	bml_status = (*ptr >> ((blknum * BML_BITS_PER_BLK) % BITS_PER_UCHAR)) & ((1 << BML_BITS_PER_BLK) - 1);	\
 }
 
 /* sets bitmap status (BLK_BUSY|BLK_FREE etc.) for the "blknum"th block within the local bitmap block "bp" from new_bml_status */
-#define	SET_BM_STATUS(bp, blknum, new_bml_status)								\
+#define	SET_BM_STATUS(bp, blknum, new_bml_status)							\
 {													\
 	sm_uc_ptr_t	ptr;										\
 													\
 	assert(2 == BML_BITS_PER_BLK);									\
-	ptr = ((sm_uc_ptr_t)(bp) + SIZEOF(blk_hdr) + ((blknum * BML_BITS_PER_BLK) / BITS_PER_UCHAR));			\
+	ptr = ((sm_uc_ptr_t)(bp) + SIZEOF(blk_hdr) + ((blknum * BML_BITS_PER_BLK) / BITS_PER_UCHAR));	\
 	*ptr = (*ptr & ~(0x03 << ((blknum * BML_BITS_PER_BLK) % BITS_PER_UCHAR)))			\
 		| ((new_bml_status & 0x03) << ((blknum * BML_BITS_PER_BLK) % BITS_PER_UCHAR));		\
 }
@@ -128,9 +128,9 @@ MBSTART {															\
 		DETERMINE_BML_FUNC_COMMON(FUNC, CS, CSA);									\
 } MBEND
 
-int4 bml_find_free(int4 hint, uchar_ptr_t base_addr, int4 total_bits);
+int4 bml_find_free(block_id hint, uchar_ptr_t base_addr, block_id total_bits);
 int4 bml_init(block_id bml);
-uint4 bml_busy(uint4 setbusy, sm_uc_ptr_t map);
-uint4 bml_free(uint4 setfree, sm_uc_ptr_t map);
-uint4 bml_recycled(uint4 setfree, sm_uc_ptr_t map);
+uint4 bml_busy(block_id setbusy, sm_uc_ptr_t map);
+uint4 bml_free(block_id setfree, sm_uc_ptr_t map);
+uint4 bml_recycled(block_id setfree, sm_uc_ptr_t map);
 

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 1985-2018 Fidelity National Information		;
+; Copyright (c) 1985-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -61,7 +61,7 @@ noopen	. write !,$piece($zstatus,",",2,999),! close %ZD set %ZD=""
 	. if $principal=%ZD write !,"Enter routine "
 	. else  use $principal write:$x>70 ! write x,?$x\10+1*10
 	. set x=dir_$translate($extract(x),"%","_")_$extract(x,2,9999)_".m",r=r+1		;convert % to _
-	. open x:(newversion:noreadonly:blocksize=2048:recordsize=2044)
+	. open x:(newversion:noreadonly:recordsize=2**20)
 	. for  use %ZD write:$principal=%ZD ! read y do:dos  quit:y=ff  set l=l+1 use x write $select(""=y:" ",1:y),!
 	.. set:$zchar(13)=$extract(y,$length(y)) y=$extract(y,1,$length(y)-1)
 	. close x

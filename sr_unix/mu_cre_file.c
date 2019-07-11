@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,7 +89,7 @@ MBSTART {														\
 		 */													\
 		getzposition(&zpos);											\
 		send_msg_csa(CSA_ARG(CSAARG) VARLSTCNT((8 + VARCNT)) ERR_MUCREFILERR, 6, zpos.str.len, zpos.str.addr,	\
-			     DB_LEN_STR(gv_cur_region), REG_LEN_STR(gv_cur_region), ERRORID, __VA_ARGS__);		\
+				DB_LEN_STR(gv_cur_region), REG_LEN_STR(gv_cur_region), ERRORID, __VA_ARGS__);		\
 	}														\
 } MBEND
 #define PUTMSG_ERROR_CSA(CSAARG, VARCNT, ERRORID, ...)									\
@@ -163,7 +163,7 @@ unsigned char mu_cre_file(void)
 	char		path[MAX_FN_LEN + 1], errbuff[OUT_LINE];
 	unsigned char	buff[DISK_BLOCK_SIZE];
 	int		i, lower, upper, norm_vbn;
-        ssize_t         status;
+	ssize_t		status;
 	uint4		raw_dev_size;		/* size of a raw device, in bytes */
 	int4		save_errno;
 	gtm_uint64_t	avail_blocks, blocks_for_create, blocks_for_extension, delta_blocks;
@@ -307,7 +307,7 @@ unsigned char mu_cre_file(void)
 				/* Note: Above macro internally invokes CLEANUP(EXIT_ERR) */
 			if (IS_MUPIP_IMAGE)
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_NOSPACECRE, 4, LEN_AND_STR(path),
-					     &blocks_for_create, &avail_blocks);
+						&blocks_for_create, &avail_blocks);
 			REVERT;
 			return EXIT_ERR;
 		}
@@ -318,7 +318,7 @@ unsigned char mu_cre_file(void)
 					&blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
 			if (IS_MUPIP_IMAGE)	/* Is not mupip, msg already went to operator log */
 				send_msg_csa(CSA_ARG(cs_addrs) VARLSTCNT(8) ERR_LOWSPACECRE, 6, LEN_AND_STR(path),
-					     EXTEND_WARNING_FACTOR, &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
+						EXTEND_WARNING_FACTOR, &blocks_for_extension, DISK_BLOCK_SIZE, &delta_blocks);
 		}
 	}
 	gv_cur_region->dyn.addr->file_cntl = &fc;

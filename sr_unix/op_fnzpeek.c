@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2018 Fidelity National Information	*
+ * Copyright (c) 2013-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -598,7 +598,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 		case PO_JNLREG:		/* r_ptr set from option processing */
 		case PO_JBFREG:
 			csa = &FILE_INFO(r_ptr)->s_addrs;
-			if ((NULL == csa->jnl) || (jnl_open != csa->hdr->jnl_state))
+			if (NULL == csa->jnl)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZPEEKNOJNLINFO, 2, REG_LEN_STR(r_ptr));
 			zpeekadr = (PO_JNLREG == mnemonic_opcode) ? (void *)csa->jnl : (void *)csa->jnl->jnl_buff;
 			break;

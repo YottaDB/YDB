@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Copyright (c) 2013-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -225,8 +225,8 @@ int gc_read_passwd(char *prompt, char *buf, int maxlen, void *tty)
 int gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out)
 {
 	char		tmp[GTM_PASSPHRASE_MAX], mumps_exe[GTM_PATH_MAX], hash_in[GTM_PASSPHRASE_MAX], hash[GTMCRYPT_HASH_LEN];
-	char 		*ptr, *mmap_addrs;
-	int		passwd_len, len, i, save_errno, fd, have_hash, status;
+	char 		*ptr, *distptr, *mmap_addrs;
+	int		passwd_len, len, i, save_errno, fd, have_hash, status, hash_off;
 	struct stat	stat_info;
 
 	have_hash = FALSE;
@@ -253,32 +253,33 @@ int gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out)
 	}
 	if (!have_hash)
 	{
-		if (!(ptr = getenv(USER_ENV)))
-		{
-			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, USER_ENV);
-			return -1;
-		}
-		strncpy(hash_in, ptr, passwd_len);
-		if (!(ptr = getenv(GTM_DIST_ENV)))
+		if (!(distptr = getenv(GTM_DIST_ENV)))
 		{
 			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, GTM_DIST_ENV);
 			return -1;
 		}
-		SNPRINTF(mumps_exe, GTM_PATH_MAX, "%s/%s", ptr, "mumps");
-		if (0 == stat(mumps_exe, &stat_info))
-		{
-			SNPRINTF(tmp, GTM_PASSPHRASE_MAX, "%ld", (long) stat_info.st_ino);
-			len = (int)STRLEN(tmp);
-			if (len < passwd_len)
-				strncpy(hash_in + (passwd_len - len), tmp, len);
-			else
-				strncpy(hash_in, tmp, passwd_len);
-		} else
+		SNPRINTF(mumps_exe, GTM_PATH_MAX, "%s/%s", distptr, "mumps");
+		if (0 != stat(mumps_exe, &stat_info))
 		{
 			save_errno = errno;
 			UPDATE_ERROR_STRING("Cannot find MUMPS executable in %s - %s", ptr, strerror(save_errno));
 			return -1;
 		}
+		if (!(ptr = getenv(USER_ENV)))
+		{
+			UPDATE_ERROR_STRING(ENV_UNDEF_ERROR, USER_ENV);
+			return -1;
+		}
+		memset(hash_in, 0, SIZEOF(hash_in));
+		SNPRINTF(hash_in, passwd_len, "%s", ptr);
+		SNPRINTF(tmp, SIZEOF(tmp), "%ld", (long)stat_info.st_ino);
+		len = (int)STRLEN(tmp);
+		hash_off = 0;
+		if (len < passwd_len)
+			hash_off = passwd_len - len;
+		else
+			len = passwd_len;
+		memcpy(hash_in + hash_off, tmp, len);
 		SHA512(hash_in, passwd_len, hash, status);
 		if (0 != status)
 			return -1;
@@ -381,7 +382,10 @@ int gc_update_passwd(char *name, passwd_entry_t **ppwent, char *prompt, int inte
 		if (0 == (status = gc_mask_unmask_passwd(2, &passwd_str, &passwd_str)))
 		{
 			if (env_value != lpasswd)
-				strcpy(env_value, lpasswd);	/* Store the hexadecimal representation in environment */
+			{	/* env_value was malloc()ed for len + 1 bytes */
+				strncpy(env_value, lpasswd, len);	/* Store the hexadecimal representation in environment */
+				env_value[len] = '\0';
+			}
 			passwd[len / 2] = '\0';		/* null-terminate the password string */
 			*ppwent = pwent;
 		} else

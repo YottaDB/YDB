@@ -23,7 +23,7 @@
 
 GBLREF sgmnt_addrs	*cs_addrs;
 
-bt_rec_ptr_t bt_get(int4 block)		/* block = block # to get */
+bt_rec_ptr_t bt_get(block_id block)		/* block = block # to get */
 {
 	register sgmnt_addrs	*csa;
 	bt_rec_ptr_t		bt;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2018 Fidelity National Information	*
+ * Copyright (c) 2009-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -190,10 +190,10 @@ void	ss_initiate_call_on_signal(void)
 	return;
 }
 
-boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be started */
-			    util_snapshot_ptr_t	util_ss_ptr, 	/* Utility specific snapshot structure */
-			    snapshot_context_ptr_t *ss_ctx, 	/* Snapshot context */
-			    boolean_t preserve_snapshot, 	/* Should the snapshots be preserved ? */
+boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be started */
+			    util_snapshot_ptr_t util_ss_ptr,	/* Utility specific snapshot structure */
+			    snapshot_context_ptr_t *ss_ctx,	/* Snapshot context */
+			    boolean_t preserve_snapshot,	/* Should the snapshots be preserved ? */
 			    char *calling_utility)		/* Who called ss_initiate */
 {
 	boolean_t		debug_mupip = FALSE;
@@ -205,7 +205,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	gtm_uint64_t		db_file_size, native_size;
 	int			dsk_addr = 0;
 	int			fclose_res, fstat_res, group_id, perm, pwrite_res, retries;
-	int			save_errno, shdw_fd, ss_shmsize, ss_shm_vbn, status, tmpfd, user_id;
+	int			save_errno, shdw_fd, status, tmpfd, user_id;
 	ZOS_ONLY(int		realfiletag;)
 	long			ss_shmid = INVALID_SHMID;
 	mstr			tempdir_full, tempdir_log, tempdir_trans;
@@ -218,7 +218,8 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 	snapshot_filhdr_ptr_t	ss_filhdr_ptr;
 	struct perm_diag_data	pdd;
 	struct stat		stat_buf;
-	uint4			crit_counter, fstat_status, prev_ss_shmsize, tempnamprefix_len, tot_blks;
+	uint4			crit_counter, fstat_status, tempnamprefix_len;
+	block_id		tot_blks, ss_shmsize, prev_ss_shmsize, ss_shm_vbn;
 	void			*ss_shmaddr;
 	intrpt_state_t		prev_intrpt_state;
 
@@ -253,9 +254,9 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 			ss_release(NULL);
 		else
 		{
-			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_MAXSSREACHED, 3, MAX_SNAPSHOTS, REG_LEN_STR(reg));
 			ss_release_lock(reg);
 			UNFREEZE_REGION_IF_NEEDED(csd, reg);
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_MAXSSREACHED, 3, MAX_SNAPSHOTS, REG_LEN_STR(reg));
 			return FALSE;
 		}
 	}
@@ -461,7 +462,7 @@ boolean_t	ss_initiate(gd_region *reg, 			/* Region in which snapshot has to be s
 		DEFER_INTERRUPTS(INTRPT_IN_SS_INITIATE, prev_intrpt_state); /* Defer MUPIP STOP till the shared memory is created */
 		tot_blks = csd->trans_hist.total_blks;
 		prev_ss_shmsize = ss_shmsize;
-		ss_shmsize = (int)(ROUND_UP((SNAPSHOT_HDR_SIZE + TOT_BYTES_REQUIRED(tot_blks)), OS_PAGE_SIZE));
+		ss_shmsize = (ROUND_UP((SNAPSHOT_HDR_SIZE + TOT_BYTES_REQUIRED(tot_blks)), OS_PAGE_SIZE));
 		assert((0 == retries) || (0 != prev_ss_shmsize));
 		if (0 == retries)
 		{	/* If this is the first try, then create shared memory anyways. */

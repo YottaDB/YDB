@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2015 Fidelity National Information 	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,8 +56,9 @@ void auto_zlink(int rtnhdridx)
 	rtn.str.len = rname.len;
 	rtn.str.addr = rname.addr;
 	op_zlink(&rtn, NULL);			/* op_zlink() takes care of '%' -> '_' translation of routine name */
-	DEBUG_ONLY(if ('_' == rname_buff.c[0]) rname_buff.c[0] = '%');
-	assert(NULL != (rhd = find_rtn_hdr(&rname)));
+	if ('_' == rname_buff.c[0]) rname_buff.c[0] = '%';
+	if ((NULL == (rhd = find_rtn_hdr(&rname))) && (op_rhdaddr(&rtn, -1)))
+		assert(FALSE && rname.addr); 	/* if the routine is not found, op_rhdaddr should give and error & return FALSE */
 	DBGARLNK((stderr, "auto_zlink: Linked in rtn %.*s to "lvaddr"\n", rname.len, rname.addr, find_rtn_hdr(&rname)));
 	return;
 }
@@ -136,7 +137,7 @@ void explicit_relink_check(rhdtyp *rhd, boolean_t setproxy)
 	SETUP_THREADGBL_ACCESS;
 	assert(NULL != rhd);
 	assert(!rhd->rtn_relinked);	/* Should never be calling recursively linked routine. All such calls should be going
-					 * to the new current routine instead of the recusively linked copy rtnhdr.
+					 * to the new current routine instead of the recursively linked copy rtnhdr.
 					 */
 	/* Routine is already linked, but we need to check if a new version is available. This involves traversing the
 	 * "validation linked list", looking for changes in different $ZROUTINES entries. But we also need to base our

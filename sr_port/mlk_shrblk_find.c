@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,6 +92,7 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 	 */
 	*ret = 0;
 	SETUP_THREADGBL_ACCESS;
+	MLK_PVTBLK_SUBHASH_SYNC(p);
 	for (pnt = NULL , chld_of_pnt = (ptroff_t *)&p->pvtctl.ctl->blkroot , i = p->subscript_cnt , cp = p->value ;
 		i > 0 ; i-- , pnt = d , chld_of_pnt = (ptroff_t *)&d->children, cp += slen)
 	{
@@ -195,6 +196,8 @@ boolean_t	mlk_shrblk_find(mlk_pvtblk *p, mlk_shrblk_ptr_t *ret, UINTPTR_T auxown
 		blocked = mlk_find_blocking_child_lock(p, (mlk_shrblk_ptr_t)R2A(*chld_of_pnt), auxown);
 		TREF(mlk_yield_pid) = 0;	/* clear this just in case "blocked" came back as TRUE */
 	}
+	/* We successfully got shrblks/shrhashes for all nodes of the lock, so clear its fail count. */
+	p->pvtctl.hash_fail_cnt = 0;
 	return blocked;
 }
 
@@ -207,8 +210,10 @@ mlk_shrblk_ptr_t mlk_shrhash_find(mlk_pvtblk *p, int subnum, unsigned char *subv
 	mlk_shrhash_map_t	usedmap;
 	mlk_shrhash_ptr_t	shrhash, bucket, search_bucket;
 
+	assert(LOCK_CRIT_HELD(p->pvtctl.csa));
 	shrhash = p->pvtctl.shrhash;
 	num_buckets = p->pvtctl.shrhash_size;
+	assert(p->hash_seed == p->pvtctl.ctl->hash_seed);
 	hash = MLK_PVTBLK_SUBHASH(p, subnum);
 	bi = hash % num_buckets;
 	bucket = &shrhash[bi];

@@ -184,7 +184,7 @@ void mupip_integ(void)
 	enum cum_type		c_type;
 	enum tot_type		t_type;
 	file_control		*fc;
-	gtm_uint64_t		blocks_free = (gtm_uint64_t)MAXUINT8;
+	gtm_uint64_t		blocks_free = MAXUINT8;
 	gtm_uint64_t		mu_int_tot[TOT_TYPE_MAX][CUM_TYPE_MAX], tot_blks, tot_recs;
 	tp_region		*rptr;
 	sgmnt_addrs		*csa;
@@ -196,7 +196,7 @@ void mupip_integ(void)
 	gd_region		*baseDBreg, *reg;
 	sgmnt_addrs		*baseDBcsa;
 	node_local_ptr_t	baseDBnl;
-	sgmnt_addrs 		*tcsa;
+	sgmnt_addrs		*tcsa;
 	char 			*db_file_name;
 	DCL_THREADGBL_ACCESS;
 
@@ -777,7 +777,7 @@ void mupip_integ(void)
 			 */
 			if (!gv_cur_region->read_only && !ointeg_this_reg)
 			{
-				if ((gtm_uint64_t)MAXUINT8 != blocks_free)
+				if (MAXUINT8 != blocks_free)
 					csd->trans_hist.free_blocks = blocks_free;
 				if (!mu_int_errknt && muint_all_index_blocks && !muint_fast)
 				{
@@ -902,7 +902,7 @@ void mupip_integ(void)
 		&& (0 != MAXTOTALBLKS(tcsa->hdr)))
 	{
 		if ((NULL != gv_cur_region->dyn.addr) && (NULL != gv_cur_region->dyn.addr->fname))
-                        db_file_name = (char *)gv_cur_region->dyn.addr->fname;
+			db_file_name = (char *)gv_cur_region->dyn.addr->fname;
 		else
 			db_file_name = "";
 		warn_db_sz(db_file_name, 0, tcsa->ti->total_blks, MAXTOTALBLKS(tcsa->hdr));

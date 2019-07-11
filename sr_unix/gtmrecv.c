@@ -381,6 +381,8 @@ int gtmrecv(void)
 		gtmrecv_exit(gtmrecv_checkhealth() - NORMAL_SHUTDOWN);
 	else if (gtmrecv_options.showbacklog)
 		gtmrecv_exit(gtmrecv_showbacklog() - NORMAL_SHUTDOWN);
+	else if (gtmrecv_options.stopreceiverfilter)
+		gtmrecv_exit(gtmrecv_stopfilter() - NORMAL_SHUTDOWN);
 	else
 		gtmrecv_exit(gtmrecv_statslog() - NORMAL_SHUTDOWN);
 	assert(!holds_sem[RECV][RECV_POOL_ACCESS_SEM]);

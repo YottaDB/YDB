@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -104,7 +104,7 @@ const static char readonly *secshrstart_error_code[] = {
 	"gtmsecshr startup failed - gtmsecshr unable to chdir to tmp directory",
 	"gtmsecshr startup failed - gtmsecshr unable to determine invocation path",
 	"gtmsecshr startup failed - gtmsecshr not named gtmsecshr",
-	"gtmsecshr startup failed - $gtm_dist not same as startup path"
+	"gtmsecshr startup failed - startup path through $gtm_dist not setup correctly - check path and permissions"
 };
 
 #define MAX_COMM_ATTEMPTS		4	/* 1 to start secshr, 2 maybe slow, 3 maybe really slow, 4 outside max */

@@ -91,6 +91,7 @@ enum
 	SV_ZRELDATE,		/* 76 */
 	SV_ZTIMEOUT,		/* 77 */
 	SV_ZAUDIT,		/* 78 */
+	SV_ZMLKHASH,		/* 79 */
 	SV_NUM_SV,		/* count - should be next to last SV entry just prior to dummy entry below */
 	SV_DUMMY_TO_FORCE_INT = 0x0FFFFFFF	/* to ensure an int on S390 */
 };

@@ -91,6 +91,7 @@ LITDEF nametabent svn_names[] =
 	,{ 4, "ZKEY" }
 	,{ 2, "ZL*" }
 	,{ 8, "ZMAXTPTI*" }
+	,{ 8, "ZMLKHASH" }
 	,{ 3, "ZMO*" }
 	,{ 5, "ZONLN*"}
 	,{ 5, "ZPATN" }, {8, "ZPATNUME*" }
@@ -132,7 +133,7 @@ LITDEF nametabent svn_names[] =
 LITDEF unsigned char svn_index[27] = {
 	 0,  0,  0,  0,  2,  8,  8,  8, 10,	/* a b c d e f g h i */
 	12, 14 ,16, 16, 16, 16, 16, 18, 20,	/* j k l m n o p q r */
-	22, 28, 34 ,34, 34, 34, 35, 36, 103	/* s t u v w x y z ~ */
+	22, 28, 34 ,34, 34, 34, 35, 36, 104	/* s t u v w x y z ~ */
 };
 
 /* These entries correspond to the entries in the svn_names array */
@@ -182,6 +183,7 @@ LITDEF svn_data_type svn_data[] =
 	,{ SV_ZKEY, FALSE , ALL_SYS }
 	,{ SV_ZLEVEL, FALSE, ALL_SYS }
 	,{ SV_ZMAXTPTIME, TRUE, ALL_SYS }
+	,{ SV_ZMLKHASH, FALSE, ALL_SYS }
 	,{ SV_ZMODE, FALSE, ALL_SYS }
 	,{ SV_ZONLNRLBK, FALSE, UNIX_OS }
 	,{ SV_ZPATNUMERIC, FALSE, ALL_SYS }, { SV_ZPATNUMERIC, FALSE, ALL_SYS }

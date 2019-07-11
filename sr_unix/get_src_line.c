@@ -372,7 +372,7 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 	src_tbl->srcbuff = (0 < srcsize) ? malloc(srcsize + 1) : NULL;
 	base = src_tbl->srclines;
 	srcptr = src_tbl->srcbuff;
-	DEBUG_ONLY(srcptr_max = srcptr + srcsize);
+	srcptr_max = srcptr + srcsize;
 	src_tbl->srcrecs = srcrecs;
 	eof_seen = FALSE;
 	for (current = base + 1, top = base + srcrecs ; current < top ; current++)
@@ -403,14 +403,14 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 				size = (int)STRLEN(buff);
 				prev_srcptr = srcptr;
 				srcptr += size;
-				if ((NULL == src_tbl->srcbuff) || (srcptr > (src_tbl->srcbuff + srcsize)))
+				if ((NULL == src_tbl->srcbuff) || (srcptr > srcptr_max))
 				{	/* source file has been concurrently overwritten (and extended or truncated) */
 					srcstat |= CHECKSUMFAIL;
 					eof_seen = TRUE;
 					size = 0;
 				} else
-				{
-					memcpy(prev_srcptr, buff, MIN(size, srcsize));
+				{	/* Read size fits in the destination buffer */
+					memcpy(prev_srcptr, buff, size);
 					/* Strip trailing '\n' if any (if at least one byte was read in) */
 					if (size && ('\n' == buff[size - 1]))
 						size--;

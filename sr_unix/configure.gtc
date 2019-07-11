@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-# Copyright (c) 2009-2017 Fidelity National Information		#
+# Copyright (c) 2009-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -360,6 +360,8 @@ rm sedin$$
 if [ "$doutf8" -ne 0 ]; then
 	if [ ! -d $gtmdist/utf8 ]; then
 		mkdir -p $gtmdist/utf8 $gtmdist/plugin/o/utf8
+		chmod 0755 $gtmdist/utf8 $gtmdist/plugin/o/utf8
+		chown ${owner}:${bingroup} $gtmdist/utf8 $gtmdist/plugin/o/utf8
 	fi
 fi
 
@@ -677,6 +679,7 @@ cd $savedir
 # Optionally remove .o files if they are in a shared library
 if [ -f $gtm_dist/libgtmutil$ext ] ; then
 	chown ${owner}:${bingroup} $gtm_dist/libgtmutil$ext
+	chmod 755 $gtm_dist/libgtmutil$ext
 	$echo ""
 	$echo "Object files of M routines placed in shared library $gtm_dist/libgtmutil$ext"
 	$echo "Keep original .o object files (y or n)? \c"
@@ -685,6 +688,7 @@ if [ -f $gtm_dist/libgtmutil$ext ] ; then
 	$echo ""
 	if [ -f $gtm_dist/utf8/libgtmutil$ext ] ; then
 		chown ${owner}:${bingroup} $gtm_dist/utf8/libgtmutil$ext
+		chmod 755 $gtm_dist/utf8/libgtmutil$ext
 	fi
 fi
 
@@ -751,20 +755,7 @@ if [ "$group" != "" ] ; then
 fi
 
 # leave nothing writeable
-chmod a-w $gtmdist
-chmod a-w $gtmdist/*
-
-if [ -d $gtmdist/utf8 ]; then
-	chmod a-w $gtmdist/utf8/*
-fi
-
-if [ -d $gtmdist/plugin ]; then
-	chmod a-w $gtmdist/plugin/*
-fi
-
-if [ -d $gtmdist/plugin/gtmcrypt ]; then
-	chmod a-w $gtmdist/plugin/gtmcrypt/*
-fi
+chmod -R a-w $gtmdist
 
 # if we had a mumps error then remove executable bit recursively and exit
 # this could include compile and/or library load errors

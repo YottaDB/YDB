@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018 Fidelity National Information		*
+ * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,6 +10,7 @@
  *								*
  ****************************************************************/
 #include "mdef.h"
+#include "gdsroot.h"
 #include "gtmmsg.h"
 #include "send_msg.h"
 #include "warn_db_sz.h"
@@ -21,16 +22,17 @@
 
 error_def(ERR_LOWSPC);
 
-void warn_db_sz(char *db_fname, uint4 prev_blocks, uint4 curr_blocks, int4 tot_blocks)
+void warn_db_sz(char *db_fname, block_id prev_blocks, block_id curr_blocks, block_id tot_blocks)
 {
-	float new_sz_frac;
-	float old_sz_frac;
+	double new_sz_frac;
+	double old_sz_frac;
 	int diff;
 
-	new_sz_frac = (WBTEST_ENABLED(WBTEST_DB_BLOCKS_WARN)) ? SPCWARNTHRESHOLD : (((float)curr_blocks) / tot_blocks) * 100;
+	new_sz_frac = (WBTEST_ENABLED(WBTEST_DB_BLOCKS_WARN)) ?
+			SPCWARNTHRESHOLD : (((double)curr_blocks) / ((double)tot_blocks)) * 100;
 	if (new_sz_frac < SPCWARNTHRESHOLD)
 		return;
-	old_sz_frac = (((float)prev_blocks) / tot_blocks) * 100;
+	old_sz_frac = (((double)prev_blocks) / ((double)tot_blocks)) * 100;
 	/*To check if we've crossed a 1% boundary*/
 	diff = ((int)new_sz_frac) - ((int)old_sz_frac);
 	if (diff >= 1)

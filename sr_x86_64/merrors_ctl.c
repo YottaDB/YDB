@@ -255,7 +255,7 @@ LITDEF	err_msg merrors[] = {
 	{ "ZCINPUTREQ", "External call: Required input argument missing", 0 },
 	{ "JNLTNOUTOFSEQ", "End transaction [0x!16@XQ] of journal !AD different from Begin transaction [0x!16@XQ] of next generation journal !AD", 6 },
 	{ "ACTRANGE", "Alternate Collating Type !UL is out of range", 1 },
-	{ "ZCCONVERT", "External call: error converting output argument", 0 },
+	{ "ZCCONVERT", "External call: error converting output argument from external call !AD", 2 },
 	{ "ZCRTENOTF", "External call routine !AD not found", 2 },
 	{ "GVRUNDOWN", "Error during global database rundown", 0 },
 	{ "LKRUNDOWN", "Error during LOCK database rundown", 0 },
@@ -1535,6 +1535,13 @@ LITDEF	err_msg merrors[] = {
 	{ "STATSDBMEMERR", "Process attempted to create stats block in statistics database !AD and received SIGBUS--invalid physical address. Check file system space.", 2 },
 	{ "BUFSPCDELAY", "Request for !UL blocks in region !AD delayed", 3 },
 	{ "AIOQUEUESTUCK", "Waited !UL minutes for AIO work queue to complete (cr = !XL)", 2 },
+	{ "INVGVPATQUAL", "Invalid Global Value Pattern file qualifier value.  !AD", 2 },
+	{ "NULLPATTERN", "Empty line found in the Pattern file.", 0 },
+	{ "MLKREHASH", "LOCK hash table rebuilt for region !AD (seed = !UJ)", 3 },
+	{ "MUKEEPPERCENT", "Keep threshold percentage should be from 0 to 99", 0 },
+	{ "MUKEEPNODEC", "Expected decimal integer input for keep", 0 },
+	{ "MUKEEPNOTRUNC", "Keep issued without -truncate", 0 },
+	{ "MUTRUNCNOSPKEEP", "Region !AD has insufficient space to meet truncate target percentage of !UL with keep at !UL blocks", 4 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -3059,6 +3066,13 @@ LITDEF	int ERR_APDLOGFAIL = 150384506;
 LITDEF	int ERR_STATSDBMEMERR = 150384514;
 LITDEF	int ERR_BUFSPCDELAY = 150384520;
 LITDEF	int ERR_AIOQUEUESTUCK = 150384530;
+LITDEF	int ERR_INVGVPATQUAL = 150384538;
+LITDEF	int ERR_NULLPATTERN = 150384544;
+LITDEF	int ERR_MLKREHASH = 150384555;
+LITDEF	int ERR_MUKEEPPERCENT = 150384562;
+LITDEF	int ERR_MUKEEPNODEC = 150384570;
+LITDEF	int ERR_MUKEEPNOTRUNC = 150384578;
+LITDEF	int ERR_MUTRUNCNOSPKEEP = 150384587;
 
 
 LITDEF	int merrors_undocarr[] = {
@@ -3095,7 +3109,7 @@ GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1522,
+	1529,
 	&merrors_undocarr[0],
 	26
 };

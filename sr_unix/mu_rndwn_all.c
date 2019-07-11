@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -360,6 +360,8 @@ boolean_t validate_db_shm_entry(shm_parms *parm_buff, char *fname, int *exit_sta
 		mu_gv_cur_reg_free();
 		if (tsd.shmid != shmid)
 		{
+			if (tsd.read_only)
+				return TRUE;
 			SNPRINTF(msgbuff, OUT_BUFF_SIZE, "Shared memory ID (%d) in the DB file header does not match with the one"
 					" reported by \"ipcs\" command (%d)", tsd.shmid, shmid);
 			if (1 < shmstat.shm_nattch)

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +13,7 @@
 #ifndef T_END_DEFINED
 #define T_END_DEFINED
 
-#define TN_NOT_SPECIFIED	(MAX_TN_V6 + 1)
+#define TN_NOT_SPECIFIED	(MAX_TN_ANY + 1)
 trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn);
 
 #endif

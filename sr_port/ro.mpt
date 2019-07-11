@@ -1,6 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 1987, 2011 Fidelity Information Services, Inc	;
+; Copyright (c) 1987-2019 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -28,7 +29,7 @@ CALL    n ctrap,exc,d,k
         n ename,fl,l,lc,out,r,rn,rf,src,x,y,t1,%ZRSET
         n:'$d(%ZC) %ZC n:'$d(%ZD) %ZD n:'$d(%ZH) %ZH
         s %ZC=$g(%ZC,1),%ZD=$g(%ZD,$p),%ZH=$g(%ZH),(fl,lc,r,out)=0
-        o %ZD:(newversion:block=2048:record=2044):0 e  q
+        o %ZD:(newversion:recordsize=2**20):0 e  q
         i $d(%ZR)<10 d CALL^%RSEL q:$d(%ZR)<10
         d work
         q
@@ -55,7 +56,7 @@ main
          . . w !,"If you wish to exit enter a carat (^)",!
          . . s %ZD=""
         . i $zparse(%ZD)="" w "  no such device" s %ZD="" q
-        . o %ZD:(newversion:block=2048:record=2044:exception="g noopen"):0
+        . o %ZD:(newversion:recordsize=2**20:exception="g noopen"):0
         . i '$t  w !,%ZD," is not available" s %ZD="" q
         . q
 noopen  . w !,$p($ZS,",",2,999),! c %ZD s %ZD=""

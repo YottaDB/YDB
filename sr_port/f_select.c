@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -261,7 +261,8 @@ int f_select(oprtype *a, opctype op)
 	SELECT_CLEANUP;	/* restores seven TREFs - see the top of this module */
 	if (shifting)
 	{
-		shifting = ((1 < save_expr_depth) || ((save_start != save_start_orig) && (OC_NOOP != save_start->opcode)));
+		shifting = (((1 < save_expr_depth) && TREF(saw_side_effect))
+			|| ((save_start != save_start_orig) && (OC_NOOP != save_start->opcode)));
 		newtriple(shifting ? OC_GVSAVTARG : OC_NOOP);	/* must have one of these two at expr_start */
 		setcurtchain(oldchain);
 		assert(NULL != save_start);

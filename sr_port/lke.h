@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,8 +26,9 @@ void lke_clean(void);
 void lke_clear(void);
 void lke_growhash(void);
 void lke_help(void);
+void lke_rehash(void);
 void lke_show(void);
-void lke_show_memory(mlk_shrblk_ptr_t bhead, char *prefix);
+void lke_show_memory(mlk_pvtctl_ptr_t pctl, mlk_shrblk_ptr_t bhead, char *prefix);
 void lke_show_hashtable(mlk_pvtctl_ptr_t pctl);
 
 CONDITION_HANDLER(lke_ctrlc_handler);

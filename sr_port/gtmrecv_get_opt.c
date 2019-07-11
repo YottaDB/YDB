@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,6 +58,7 @@ int gtmrecv_get_opt(void)
 	gtmrecv_options.reuse_specified = (CLI_PRESENT == cli_present("REUSE"));
 	gtmrecv_options.resume_specified = (CLI_PRESENT == cli_present("RESUME"));
 	gtmrecv_options.initialize_specified = (CLI_PRESENT == cli_present("INITIALIZE"));
+	gtmrecv_options.stopreceiverfilter = (CLI_PRESENT == cli_present("STOPRECEIVERFILTER"));
 	if (gtmrecv_options.updateresync)
 	{
 		instfilename_len = SIZEOF(gtmrecv_options.updresync_instfilename) - 1;	/* keep 1 byte for trailing NULL */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2019 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -9,12 +9,4 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
-#ifndef CLEAR_CACHE_ARRAY_DEFINED
-#define CLEAR_CACHE_ARRAY_DEFINED
-
-#include "gdsroot.h"
-
-void clear_cache_array(sgmnt_addrs *csa, sgmnt_data_ptr_t csd, gd_region* reg, block_id new_total, block_id old_total);
-
-#endif
+boolean_t mlk_shrhash_add(mlk_pvtctl *pctl, mlk_shrblk_ptr_t shr);

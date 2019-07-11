@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,7 @@ GBLREF	boolean_t	stringpool_unexpandable;
 #define	ADD_TO_STPARRAY(PTR, PTRARRAY, PTRARRAYCUR, PTRARRAYTOP, TYPE)					\
 {													\
 	GBLREF mstr	**stp_array;									\
-	GBLREF int	stp_array_size;									\
+	GBLREF uint4	stp_array_size;									\
 													\
 	if (NULL == PTRARRAY)										\
 	{												\

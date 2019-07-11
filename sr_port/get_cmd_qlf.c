@@ -16,16 +16,6 @@
 #include "cli.h"
 #include "min_max.h"
 
-#define INIT_QUALIF_STR(QUALIF, CQCODE, FIELD)										\
-{															\
-	if ((glb_cmd_qlf.qlf & CQCODE) && (MV_STR == glb_cmd_qlf.FIELD.mvtype) && (0 < glb_cmd_qlf.FIELD.str.len))	\
-	{														\
-		QUALIF->FIELD.mvtype = MV_STR;										\
-		QUALIF->FIELD.str.len = glb_cmd_qlf.FIELD.str.len;							\
-		memcpy(QUALIF->FIELD.str.addr, glb_cmd_qlf.FIELD.str.addr, glb_cmd_qlf.FIELD.str.len);			\
-	}														\
-}
-
 GBLDEF list_params 		lst_param;
 
 GBLREF command_qualifier 	glb_cmd_qlf;
@@ -42,9 +32,6 @@ void get_cmd_qlf(command_qualifier *qualif)
 
 	qualif->qlf = glb_cmd_qlf.qlf;
 	qualif->object_file.mvtype = qualif->list_file.mvtype = qualif->ceprep_file.mvtype = 0;
-	INIT_QUALIF_STR(qualif, CQ_OBJECT, object_file);
-	INIT_QUALIF_STR(qualif, CQ_LIST, list_file);
-	INIT_QUALIF_STR(qualif, CQ_CE_PREPROCESS, ceprep_file);
 	if (gtm_utf8_mode)
 		qualif->qlf |= CQ_UTF8;		/* Mark as being compiled in UTF8 mode */
 	if (CLI_PRESENT == cli_present("OBJECT"))
@@ -54,14 +41,8 @@ void get_cmd_qlf(command_qualifier *qualif)
 		s = &qualif->object_file.str;	/* 4SCA: object_file is allocated MAX_FN_LEN bytes */
 		len = s->len;
 		if (FALSE == cli_get_str("OBJECT", s->addr, &len))
-		{
 			s->len = 0;
-			if (glb_cmd_qlf.object_file.mvtype == MV_STR  &&  glb_cmd_qlf.object_file.str.len > 0)
-			{
-				s->len = MIN(glb_cmd_qlf.object_file.str.len, MAX_FN_LEN);
-				memcpy(s->addr, glb_cmd_qlf.object_file.str.addr, s->len);
-			}
-		} else
+		else
 			s->len = len;
 	} else if (TRUE == cli_negated("OBJECT"))
 		qualif->qlf &= ~CQ_OBJECT;
@@ -104,14 +85,8 @@ void get_cmd_qlf(command_qualifier *qualif)
 		s = &qualif->list_file.str;	/* 4SCA: list_file is allocated MAX_FN_LEN bytes */
 		len = s->len;
 		if (FALSE == cli_get_str("LIST", s->addr, &len))
-		{
 			s->len = 0;
-			if (glb_cmd_qlf.list_file.mvtype == MV_STR  &&  glb_cmd_qlf.list_file.str.len > 0)
-			{
-				s->len = MIN(glb_cmd_qlf.list_file.str.len, MAX_FN_LEN);
-				memcpy(s->addr, glb_cmd_qlf.list_file.str.addr, s->len);
-			}
-		} else
+		else
 			s->len = len;
 	} else if (!(qualif->qlf & CQ_LIST))
 		qualif->qlf &= ~CQ_MACHINE_CODE;
@@ -144,14 +119,8 @@ void get_cmd_qlf(command_qualifier *qualif)
 		s = &qualif->ceprep_file.str;	/* 4SCA: ceprep_file is allocated MAX_FN_LEN bytes */
 		len = s->len;
 		if (FALSE == cli_get_str("CE_PREPROCESS", s->addr, &len))
-		{
 			s->len = 0;
-			if (glb_cmd_qlf.ceprep_file.mvtype == MV_STR  &&  glb_cmd_qlf.ceprep_file.str.len > 0)
-			{
-				s->len = MIN(glb_cmd_qlf.ceprep_file.str.len, MAX_FN_LEN);
-				memcpy(s->addr, glb_cmd_qlf.ceprep_file.str.addr, s->len);
-			}
-		} else
+		else
 			s->len = len;
 	} else if (TRUE == cli_negated("CE_PREPROCESS"))
 		qualif->qlf &= ~CQ_CE_PREPROCESS;

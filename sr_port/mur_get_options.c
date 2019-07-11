@@ -37,31 +37,38 @@
 #include "mupip_exit.h"
 #include "gtm_bintim.h"
 #include "gtmmsg.h"
+#include "io.h"
+#include "file_input.h"
 
 GBLREF	mur_opt_struct	mur_options;
 GBLREF 	mur_gbls_t	murgbl;
 GBLREF 	jnl_gbls_t	jgbl;
 GBLREF	boolean_t	mupip_jnl_recover;
+GBLREF	bool		mupip_error_occurred;
+GBLREF	io_pair		io_curr_device;
 
 error_def(ERR_UNIQNAME);
 error_def(ERR_INVERRORLIM);
 error_def(ERR_INVGLOBALQUAL);
+error_def(ERR_NULLPATTERN);
 error_def(ERR_INVIDQUAL);
 error_def(ERR_INVSEQNOQUAL);
 error_def(ERR_INVQUALTIME);
 error_def(ERR_INVREDIRQUAL);
+error_def(ERR_INVGVPATQUAL);
 error_def(ERR_INVTRNSQUAL);
 error_def(ERR_MUPCLIERR);
 error_def(ERR_NOTPOSITIVE);
 error_def(ERR_RSYNCSTRMVAL);
 
 #define EXCLUDE_CHAR	'~'
-#define STR2PID	asc2i
+#define STR2PID		asc2i
 #define STR2SEQNO	asc2l
 #define	MAX_PID_LEN	10	/* maximum number of decimal digits in the process-id */
-#define REDIRECT_STR		"specify as \"old-file-name=new-file-name,...\""
+#define REDIRECT_STR	"specify as \"old-file-name=new-file-name,...\""
 #define	WILDCARD_CHAR1	'*'
 #define	WILDCARD_CHAR2	'%'
+#define	ESCAPE_CHAR	'\\'
 
 static	char	default_since_time[] = "0 0:0:00",
 		default_lookback_time[] = "0 0:5:00";
@@ -75,14 +82,15 @@ static char	* const extr_parms[] =
 
 void	mur_get_options(void)
 {
-	int4		status;
+	int4		status, pattern_len;
 	uint4		ustatus, state;
 	unsigned short	length;
 	char		*cptr, *ctop, *qual_buffer, inchar;
-	char		*qual_buffer_ptr, *entry, *entry_ptr;
+	char		*gvpatline, *qual_buffer_ptr, *entry, *entry_ptr;
 	char		*file_name_specified, *file_name_expanded;
 	unsigned int 	file_name_specified_len, file_name_expanded_len;
 	int		extr_type, cnt, top, onln_rlbk_val, status2;
+	io_pair		io_save_device, io_gvpatfile_device;
 	boolean_t	global_exclude;
 	long_list	*ll_ptr, *ll_ptr1;
 	long_long_list	*seqno_list, *seqno_list1;
@@ -351,8 +359,8 @@ void	mur_get_options(void)
 			if (!get_full_path(file_name_specified, file_name_specified_len, file_name_expanded,
 				&file_name_expanded_len, GTM_PATH_MAX, &ustatus))
 			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVREDIRQUAL, 2,
-									LEN_AND_LIT("Unable to find full pathname"));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_INVREDIRQUAL, 2,
+									LEN_AND_LIT("Unable to find full pathname"), ustatus);
 				mupip_exit(ERR_MUPCLIERR);
 			}
 			for (tmp_rl_ptr = mur_options.redirect; tmp_rl_ptr != NULL; tmp_rl_ptr = tmp_rl_ptr->next)
@@ -384,8 +392,8 @@ void	mur_get_options(void)
 			if (!get_full_path(file_name_specified, file_name_specified_len, file_name_expanded,
 				&file_name_expanded_len, MAX_FN_LEN, &ustatus))
 			{
-				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVREDIRQUAL, 2,
-										LEN_AND_LIT("Unable to find full pathname"));
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_INVREDIRQUAL, 2,
+									LEN_AND_LIT("Unable to find full pathname"), ustatus);
 				mupip_exit(ERR_MUPCLIERR);
 			}
 			for (tmp_rl_ptr = mur_options.redirect; tmp_rl_ptr != NULL; tmp_rl_ptr = tmp_rl_ptr->next)
@@ -560,9 +568,8 @@ void	mur_get_options(void)
 			sl_ptr->len = length;
 			sl_ptr->buff = (char *)malloc(sl_ptr->len);
 			memcpy(sl_ptr->buff, entry_ptr, length);
-			sl_ptr->has_wildcard = FALSE;
-			sl_ptr->has_wildcard += ((NULL == memchr(sl_ptr->buff, WILDCARD_CHAR1, length)) ? FALSE : TRUE);
-			sl_ptr->has_wildcard += ((NULL == memchr(sl_ptr->buff, WILDCARD_CHAR2, length)) ? FALSE : TRUE);
+			sl_ptr->has_wildcard = ((NULL != memchr(sl_ptr->buff, WILDCARD_CHAR1, length)) ||
+						(NULL != memchr(sl_ptr->buff, WILDCARD_CHAR2, length)));
 		}
 		mur_options.selection = TRUE;
 	}
@@ -634,11 +641,101 @@ void	mur_get_options(void)
 			sl_ptr->len = length;
 			sl_ptr->buff = (char *)malloc(sl_ptr->len);
 			memcpy(sl_ptr->buff, entry_ptr, length);
-			sl_ptr->has_wildcard = FALSE;
-			sl_ptr->has_wildcard += ((NULL == memchr(sl_ptr->buff, WILDCARD_CHAR1, length)) ? FALSE : TRUE);
-			sl_ptr->has_wildcard += ((NULL == memchr(sl_ptr->buff, WILDCARD_CHAR2, length)) ? FALSE : TRUE);
+			sl_ptr->has_wildcard = ((NULL != memchr(sl_ptr->buff, WILDCARD_CHAR1, length)) ||
+						(NULL != memchr(sl_ptr->buff, WILDCARD_CHAR2, length)));
 		}
 		mur_options.selection = TRUE;
+	}
+	/*----- 	-GVPATFILE=(list of strings to search for)	-----*/
+	if (cli_present("GVPATFILE") == CLI_PRESENT)
+	{
+		file_name_specified = (char *)malloc(MAX_FN_LEN + 1);
+		file_name_expanded = (char *)malloc(GTM_PATH_MAX);
+		length = MAX_LINE;
+		if (!CLI_GET_STR_ALL("GVPATFILE", qual_buffer, &length))
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVGVPATQUAL, 2,
+				LEN_AND_LIT("Illegal filename supplied"));
+			mupip_exit(ERR_MUPCLIERR);
+		}
+
+		file_name_specified_len = length;
+		memcpy(file_name_specified, qual_buffer, file_name_specified_len);
+		*(file_name_specified + file_name_specified_len)= '\0';
+		if (!get_full_path(file_name_specified, file_name_specified_len, file_name_expanded, &file_name_expanded_len,
+			GTM_PATH_MAX, &ustatus))
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_INVGVPATQUAL, 2,
+				LEN_AND_LIT("Unable to find full pathname"), ustatus);
+			mupip_exit(ERR_MUPCLIERR);
+		}
+		if (file_name_expanded_len > (MAX_FN_LEN + 1))
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVGVPATQUAL, 2,
+				LEN_AND_LIT("Global Value Patterns filename too long: greater than 255"));
+			mupip_exit(ERR_MUPCLIERR);
+		}
+		/* Save current device */
+		io_save_device = io_curr_device;
+		file_input_init(file_name_expanded, file_name_expanded_len, IOP_REWIND);
+		if (mupip_error_occurred)
+		{
+			assert(!memcmp(&io_curr_device, &io_save_device, SIZEOF(io_curr_device)));
+			mupip_exit(ERR_MUPCLIERR);
+		} else
+			assert(memcmp(&io_save_device, &io_curr_device, SIZEOF(io_curr_device)));
+		io_gvpatfile_device = io_curr_device;
+		while ((0 == io_curr_device.in->dollar.zeof) && (0 <= (pattern_len = file_input_get(&gvpatline, MAX_LINE))))
+		{
+			if (pattern_len < 0)
+				break;
+			assert(pattern_len <= MAX_LINE);
+
+			global_exclude = FALSE;
+			if (EXCLUDE_CHAR == *gvpatline)
+			{
+				global_exclude = TRUE;
+				++gvpatline;
+				--pattern_len;
+			}
+			if ('"' == *gvpatline)
+			{
+				++gvpatline;
+				--pattern_len;
+				if ('"' == gvpatline[pattern_len - 1])
+					gvpatline[--pattern_len] = '\0';
+			}
+			if ('(' == *gvpatline)
+			{
+				++gvpatline;
+				--pattern_len;
+				if (')' == gvpatline[pattern_len-1])
+					gvpatline[--pattern_len] = '\0';
+			}
+
+			if (pattern_len)
+			{
+				sl_ptr1 = (select_list *)malloc(SIZEOF(select_list));
+				sl_ptr1->next = NULL;
+				if (NULL == mur_options.patterns)
+					mur_options.patterns = sl_ptr1;
+				else
+					sl_ptr->next = sl_ptr1;
+				sl_ptr = sl_ptr1;
+				sl_ptr->exclude = global_exclude;
+				sl_ptr->len = pattern_len;
+				sl_ptr->buff = (char *)malloc(sl_ptr->len);
+				memcpy(sl_ptr->buff, gvpatline, pattern_len);
+				sl_ptr->has_wildcard = ((NULL != memchr(sl_ptr->buff, WILDCARD_CHAR1, pattern_len)) ||
+							(NULL != memchr(sl_ptr->buff, WILDCARD_CHAR2, pattern_len)) ||
+							(NULL != memchr(sl_ptr->buff, ESCAPE_CHAR, length)));
+			} else
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NULLPATTERN);
+		}
+		io_curr_device = io_save_device;
+		mur_options.selection = TRUE;
+		free(file_name_specified);
+		free(file_name_expanded);
 	}
 	/*-----		-SEQNO=(list of sequence numbers)	-----*/
 	if (cli_present("SEQNO") == CLI_PRESENT)

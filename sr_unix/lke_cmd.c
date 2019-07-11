@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,6 +68,12 @@ static readonly CLI_ENTRY growhash_qual[] = {
 	{ "" }
 };
 
+static readonly CLI_ENTRY rehash_qual[] = {
+	{ "ALL",      0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+	{ "REGION",   0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
+	{ "" }
+};
+
 /* Main command table (cmd_ary is defined to this array in lke.c)
  * This table contains the names of all commands, and corresponding functions to be
  * dispatched to, and the qualifier sub-tables, containing all legal qualifiers.
@@ -78,6 +84,7 @@ GBLDEF CLI_ENTRY lke_cmd_ary[] = {
 	{ "EXIT",   lke_exit,   0,          0, 0, 0, 0, VAL_DISALLOWED, 0, 0, 0,       0},
 	{ "GROWHASH",  lke_growhash,  growhash_qual, 0, 0, 0, 0, VAL_NOT_REQ,	0, 0, 0,      0},
 	{ "HELP",   util_help,  0,          0, 0, 0, 0, VAL_NOT_REQ,    1, 0, 0,       0},
+	{ "REHASH", lke_rehash, rehash_qual, 0, 0, 0, 0, VAL_NOT_REQ,	0, 0, 0,      0},
 	{ "SHOW",   lke_show,   show_qual,  0, 0, 0, 0, VAL_NOT_REQ,    1, 0, VAL_STR, 0},
 	{ "SPAWN",  util_spawn,	0,          0, 0, 0, 0, VAL_DISALLOWED, 0, 0, 0,       0},
 	{ "" }

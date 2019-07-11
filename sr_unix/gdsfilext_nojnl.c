@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,14 +65,14 @@ error_def(ERR_DBFILERR);
  * We want to avoid jnl and other interferences of gdsfilext.
  */
 /* #GTM_THREAD_SAFE : The below function (gdsfilext_nojnl) is thread-safe */
-int gdsfilext_nojnl(gd_region* reg, uint4 new_total, uint4 old_total)
+int gdsfilext_nojnl(gd_region* reg, block_id new_total, block_id old_total)
 {
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	int 			blk_size, status;
+	int			blk_size, status;
 	off_t			offset;
 	char			*newmap, *aligned_buff;
-	uint4			ii;
+	block_id		ii;
 	unix_db_info		*udi;
 	reg_ctl_list		*rctl;
 	dio_buff_t		*diobuff;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,15 +17,16 @@
 #include "gtm_string.h"
 
 GBLREF mstr **stp_array;
-GBLREF int stp_array_size;
+GBLREF uint4 stp_array_size;
 
 void stp_expand_array(void)
 {
 	mstr **a;
-	int n;
+	uint4 n;
 
 	n = stp_array_size;
 	stp_array_size += STP_MAXITEMS;
+	assert(stp_array_size > n);
 	a = stp_array;
 	stp_array = (mstr **) malloc(stp_array_size * SIZEOF(mstr *));
 	memcpy((uchar_ptr_t)stp_array, (uchar_ptr_t)a, n * SIZEOF(mstr *));

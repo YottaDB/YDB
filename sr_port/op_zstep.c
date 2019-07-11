@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,11 +30,13 @@ IA64_ONLY(int function_type(char*);)
 
 void op_zstep(uint4 code, mval *action)
 {
-	stack_frame	*fp;
 	int4		status;
+	stack_frame	*fp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (neterr_pending || outofband || iott_write_error)
+		return;
 	if (!action)
 		zstep_action = TREF(dollar_zstep);
 	else
@@ -45,45 +47,35 @@ void op_zstep(uint4 code, mval *action)
 	switch(code)
 	{
 		case ZSTEP_INTO:
-			if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
-			{
-				FIX_XFER_ENTRY(xf_linefetch, op_zstepfetch);
-				FIX_XFER_ENTRY(xf_linestart, op_zstepstart);
-				FIX_XFER_ENTRY(xf_zbfetch, op_zstzbfetch);
-				FIX_XFER_ENTRY(xf_zbstart, op_zstzbstart);
-			}
+			FIX_XFER_ENTRY(xf_linefetch, op_zstepfetch);
+			FIX_XFER_ENTRY(xf_linestart, op_zstepstart);
+			FIX_XFER_ENTRY(xf_zbfetch, op_zstzbfetch);
+			FIX_XFER_ENTRY(xf_zbstart, op_zstzbstart);
 			break;
 		case ZSTEP_OVER:
 		case ZSTEP_OUTOF:
 
-			fp = frame_pointer;
-			for (fp = frame_pointer; fp ; fp = fp->old_frame_pointer)
-			{	if (fp->type & SFT_COUNT)
-				{	break;
-				}
-			}
-			zstep_level = (unsigned char *) fp;
-			if (!neterr_pending && 0 == outofband && 0 == iott_write_error)
+			for (fp = frame_pointer; fp && !(fp->type & SFT_COUNT); fp = fp->old_frame_pointer)
+				; /* don't place in a non VM frame if we are in one */
+			zstep_level = (unsigned char *)fp;
+			if (ZSTEP_OVER == code)
 			{
-				if (code == ZSTEP_OVER)
-				{
-					FIX_XFER_ENTRY(xf_linefetch, op_zst_fet_over);
-					FIX_XFER_ENTRY(xf_linestart, op_zst_st_over);
-					FIX_XFER_ENTRY(xf_zbfetch, op_zstzb_fet_over);
-					FIX_XFER_ENTRY(xf_zbstart, op_zstzb_st_over);
-				}
-				else
-				{
-					FIX_XFER_ENTRY(xf_ret, opp_zstepret);
-					FIX_XFER_ENTRY(xf_retarg, opp_zstepretarg);
-					FIX_XFER_ENTRY(xf_linefetch, op_linefetch);
-					FIX_XFER_ENTRY(xf_linestart, op_linestart);
-					FIX_XFER_ENTRY(xf_zbfetch, op_zbfetch);
-					FIX_XFER_ENTRY(xf_zbstart, op_zbstart);
-				}
+				FIX_XFER_ENTRY(xf_linefetch, op_zst_fet_over);
+				FIX_XFER_ENTRY(xf_linestart, op_zst_st_over);
+				FIX_XFER_ENTRY(xf_zbfetch, op_zstzb_fet_over);
+				FIX_XFER_ENTRY(xf_zbstart, op_zstzb_st_over);
+			} else
+			{
+				FIX_XFER_ENTRY(xf_ret, opp_zstepret);
+				FIX_XFER_ENTRY(xf_retarg, opp_zstepretarg);
+				FIX_XFER_ENTRY(xf_linefetch, op_linefetch);
+				FIX_XFER_ENTRY(xf_linestart, op_linestart);
+				FIX_XFER_ENTRY(xf_zbfetch, op_zbfetch);
+				FIX_XFER_ENTRY(xf_zbstart, op_zbstart);
 			}
 			break;
 		default:
 			assertpro(FALSE && code);
 	}
+	return;
 }

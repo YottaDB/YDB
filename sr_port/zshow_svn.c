@@ -104,6 +104,7 @@ static readonly char zio_text[] = "$ZIO";
 static readonly char zjob_text[] = "$ZJOB";
 static readonly char zlevel_text[] = "$ZLEVEL";
 static readonly char zmaxtptime_text[] = "$ZMAXTPTIME";
+static readonly char zmlkhash_text[] = "$ZMLKHASH";
 static readonly char zmode_text[] = "$ZMODE";
 static readonly char zpatnumeric_text[] = "$ZPATNUMERIC";
 static readonly char zproc_text[] = "$ZPROCESS";
@@ -187,6 +188,7 @@ GBLREF int4		gtm_trigger_depth;
 GBLREF spdesc		stringpool;
 GBLREF mstr		dollar_zpin;
 GBLREF mstr		dollar_zpout;
+GBLREF mlk_subhash_val_t	mlk_last_hash;
 
 LITREF mval		literal_zero, literal_one, literal_null;
 LITREF char		gtm_release_name[];
@@ -608,6 +610,12 @@ void zshow_svn(zshow_out *output, int one_sv)
 		case SV_ZMAXTPTIME:
 			MV_FORCE_MVAL(&var, TREF(dollar_zmaxtptime));
 			ZS_VAR_EQU(&x, zmaxtptime_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		case SV_ZMLKHASH:
+			i2usmval(&var, mlk_last_hash);
+			ZS_VAR_EQU(&x, zmlkhash_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
 				break;
