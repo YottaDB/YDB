@@ -33,6 +33,10 @@ int ydb_data_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, i
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	if (NULL != ret_value)
+		*ret_value = YDB_DATA_ERROR;	/* Initialize in case an error causes a premature return before we set a
+						 * meaningful value.
+						 */
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
 	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_DATA, save_active_stapi_rtn, save_errstr, get_lock, retval);

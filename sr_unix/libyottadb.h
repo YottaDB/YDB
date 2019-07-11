@@ -44,6 +44,18 @@ enum
 	YDB_SEVERITY_FATAL = 4		/* Fatal - Something happened that is so bad, YottaDB cannot continue */
 };
 
+/* Enumerated values that can be returned from ydb_data_s()/ydb_data_st() */
+enum
+{
+	YDB_DATA_UNDEF = 0,		/* Node is undefined */
+	YDB_DATA_VALUE_NODESC = 1,	/* Node has a value but no descendants */
+	YDB_DATA_NOVALUE_DESC = 10,	/* Node has no value but has descendants */
+	YDB_DATA_VALUE_DESC = 11,	/* Node has both value and descendants */
+	YDB_DATA_ERROR = 0xffffff00	/* If the call to ydb_data_s()/ydb_data_st() fails, this is the return value. Value has low
+					 * order zeros so it has no bits set that could be set by a successful call.
+					 */
+};
+
 #define	YDB_RELEASE		127	/* Corresponds to YottaDB release r1.27 (i.e. YDB_ZYRELEASE in sr_linux/release_name.h) */
 
 /* Maximum values */
