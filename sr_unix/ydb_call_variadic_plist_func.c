@@ -19,7 +19,7 @@
  * callg() to supress the first parameter being an overall count of the arguments as sometimes, that's
  * not what is needed.
  */
-int ydb_call_variadic_plist_func(ydb_vplist_func cgfunc, void *cvplist)
+int ydb_call_variadic_plist_func(ydb_vplist_func cgfunc, uintptr_t cvplist)
 {
 	return (int)callg_nc((callgncfnptr)cgfunc, (gparam_list *)cvplist);
 }
