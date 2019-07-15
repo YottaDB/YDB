@@ -548,10 +548,12 @@ else
 		# Determine current host's OS. We expect the OS name in the tarball.
 		platform=`uname -s | tr '[A-Z]' '[a-z]'`
 		if [ $arch = "x8664" ] ; then
-			# If the current architecture is x86_64 and the distribution is RHEL or Debian then set the
-			# platform to rhel or debian (not linux) as there are specific tarballs for these distributions.
+			# If the current architecture is x86_64 and the distribution is RHEL (including CentOS and SLES)
+			# or Debian then set the platform to rhel or debian (not linux) as there are specific tarballs
+			# for these distributions.
 			#
-			if [ "rhel" = "${osid}" ] ; then
+			# CentOS and SLES are treated as RHEL to get the correct binary
+			if [ "rhel" = "${osid}" -o "centos" = "${osid}" -o "sles" = "${osid}" ] ; then
 				# RHEL-specific releases of YottaDB for x86_64 happened only starting r1.10 so do this
 				# only if the requested version is not r1.00 (the only YottaDB release prior to r1.10)
 				if [ "r1.00" != ${ydb_version} ] ; then
