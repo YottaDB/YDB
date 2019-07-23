@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "lv_val.h"	/* needed for "callg.h" */
 #include "callg.h"
 #include "op.h"
+#include "libyottadb.h"
 
 #define VAR_ARGS4(ar)	ar[0], ar[1], ar[2], ar[3]
 
@@ -99,8 +100,11 @@ INTPTR_T callg(callgfnptr fnptr, gparam_list *paramlist)
 		case 36:
 			/* Only the below functions are aware of this extra space */
 			assert((fnptr == (callgfnptr)push_parm)
-				|| (fnptr == (callgfnptr)op_fnquery)
-				|| (fnptr == (callgfnptr)op_fnreversequery));
+			       || (fnptr == (callgfnptr)op_fnquery)
+			       || (fnptr == (callgfnptr)op_fnreversequery)
+			       || (fnptr == (callgfnptr)op_xkill)
+			       || (fnptr == (callgfnptr)op_lkname)
+			       );
 			return (fnptr)(paramlist->n, VAR_ARGS36(paramlist->arg));
 		default:
 			assertpro(paramlist->n <= 36);
