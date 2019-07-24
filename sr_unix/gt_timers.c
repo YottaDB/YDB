@@ -430,10 +430,7 @@ STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(),
  	assert(0 <= time_to_expir);
 	sys_get_curr_time(&at);
 	if (first_timeset)
-	{
 		init_timers();
-		first_timeset = FALSE;
-	}
 	/* We expect no timer with id=<tid> to exist in the timer queue currently. This is asserted in "add_timer" call below.
 	 * In pro though, we'll be safe and remove any tids that exist before adding a new entry with the same tid - 2009/10.
 	 * If a few years pass without the assert failing, it might be safe then to remove the PRO_ONLY code below.
@@ -648,12 +645,12 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	int4		cmp, save_error_condition;
 	GT_TIMER	*tpop, *tpop_prev = NULL;
 	ABS_TIME	at;
-	int		save_errno, timer_defer_cnt, offset;
+	int		save_errno, timer_defer_cnt, offset, orig_why;
 	TID 		*deferred_tid;
 	boolean_t	tid_found;
 	char 		*save_util_outptr;
 	va_list		save_last_va_list_ptr;
-	boolean_t	util_copy_saved = FALSE, safe_for_timer_pop;
+	boolean_t	util_copy_saved = FALSE, safe_for_timer_pop, signal_forwarded;
 #	ifdef DEBUG
 	boolean_t	save_in_nondeferrable_signal_handler;
 	ABS_TIME	rel_time, old_at, late_time;
@@ -663,6 +660,8 @@ void timer_handler(int why, siginfo_t *info, void *context)
 
 	SETUP_THREADGBL_ACCESS;
 	assert((DUMMY_SIG_NUM == why) || (SIGALRM == why));
+	orig_why = why;			/* Save original value as FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED may change it */
+	signal_forwarded = IS_SIGNAL_FORWARDED(sig_hndlr_generic_signal_handler, why, info);
 	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_timer_handler, why, IS_EXI_SIGNAL_FALSE, info, context);
 	assert(gtm_is_main_thread() || gtm_jvm_process || simpleThreadAPI_active);
 	DUMP_TIMER_INFO("At the start of timer_handler()");
@@ -684,12 +683,10 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	{
 		SET_DEFERRED_TIMERS_CHECK_NEEDED;
 		INTERLOCK_ADD(&timer_stack_count, UNUSED, -1);
-#		ifdef SIGNAL_PASSTHRU
-		if (SIGALRM == why)
+		if ((SIGALRM == orig_why) || signal_forwarded)
 		{	/* Only drive this handler if we have an actual signal - not a dummy call */
 			DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("timer_handler", why, info, context, FALSE);
 		}
-#		endif
 		return;
 	}
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
@@ -861,14 +858,11 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	if (safe_for_timer_pop)
 		in_nondeferrable_signal_handler = save_in_nondeferrable_signal_handler;
 #	endif
-#	ifdef SIGNAL_PASSTHRU
-	/* If this is call-in/simpleAPI mode and a handler exists for this signal, call it */
-	if ((SIGALRM == why) && (MUMPS_CALLIN & invocation_mode) && IS_SIMPLEAPI_MODE
-	    && (SIG_DFL != orig_sig_action[why].sa_handler) && (SIG_IGN != orig_sig_action[why].sa_handler))
+	/* If this is a call-in/simpleAPI mode and a handler exists for this signal, call it */
+	if ((SIGALRM == orig_why) || signal_forwarded)
 	{
-		DRIVE_SIGNAL_HANDLER_FROM_MAIN("timer_handler2", why, info, context, orig_sig_action[why].sa_handler);
+		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("timer_handler2", why, info, context, orig_sig_action[why].sa_sigaction);
 	}
-#	endif
 	DUMP_TIMER_INFO("At the end of timer_handler()");
 }
 
@@ -1104,27 +1098,21 @@ void cancel_unsafe_timers(void)
 }
 
 /* Initialize timers. */
-STATICFNDEF void init_timers()
+void init_timers()
 {
 	struct sigaction	act;
 
 	memset(&act, 0, SIZEOF(act));
 	sigemptyset(&act.sa_mask);
-	act.sa_handler = (sighandler_t)timer_handler;
-	act.sa_flags = SA_SIGINFO;	/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "timer_handler")
-					 * relies on "info" and "context" being passed in.
-					 */
+	act.sa_sigaction = timer_handler;
+	/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "timer_handler") relies on "info" and "context" being passed in */
+	act.sa_flags = YDB_SIGACTION_FLAGS;
 	sigaction(SIGALRM, &act, &prev_alrm_handler);
-	if (first_timeset && 					/* not from timer_handler to prevent dup message */
-	    (SIG_IGN != prev_alrm_handler.sa_handler) &&	/* as set by sig_init */
-	    (SIG_DFL != prev_alrm_handler.sa_handler)) 		/* utils, compile */
-	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, prev_alrm_handler.sa_handler,
-			LEN_AND_LIT("init_timers"));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, prev_alrm_handler.sa_handler,
-			LEN_AND_LIT("init_timers"));
-		assert(FALSE);
-	}
+	/* Note - YDB used to verify the expected handler here (i.e. either SIG_DFL or SIG_IGN) but that is no longer valid with
+	 * timer initialization being done in gtm_startup now and not waiting for the first timer. In this case, with either
+	 * variant of simple API, the handler could be set for anything by a non-M main program before YDB is initialized.
+	 */
+	first_timeset = FALSE;
 }
 
 /* Check for deferred timers. Drive any timers that have been deferred. In case the system timer is
@@ -1159,7 +1147,7 @@ void check_for_timer_pops(boolean_t sig_handler_changed)
 		sigaction(SIGALRM, NULL, &current_sa);	/* get current info */
 		if (!first_timeset)
 		{
-			if ((sighandler_t)timer_handler != current_sa.sa_handler)	/* check if what we expected */
+			if (timer_handler != current_sa.sa_sigaction)	/* check if what we expected */
 			{
 				init_timers();
 				if (!stolen_timer)
@@ -1170,8 +1158,8 @@ void check_for_timer_pops(boolean_t sig_handler_changed)
 			}
 		} else	/* we haven't set so should be ... */
 		{
-			if ((SIG_IGN != current_sa.sa_handler) &&	/* as set by sig_init */
-			    (SIG_DFL != current_sa.sa_handler)) 	/* utils, compile */
+			if ((SIG_IGN != (sighandler_t)current_sa.sa_sigaction) 		/* as set by sig_init */
+			    && (SIG_DFL != (sighandler_t)current_sa.sa_sigaction)) 	/* utils, compile */
 			{
 				if (!stolen_timer)
 				{
@@ -1185,9 +1173,9 @@ void check_for_timer_pops(boolean_t sig_handler_changed)
 		DEFERRED_SIGNAL_HANDLING_CHECK;
 	if (stolenwhen)
 	{
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_handler,
+		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_sigaction,
 			LEN_AND_STR(whenstolen[stolenwhen - 1]));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_handler,
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_sigaction,
 			LEN_AND_STR(whenstolen[stolenwhen - 1]));
 		assert(FALSE);					/* does not return here */
 	}

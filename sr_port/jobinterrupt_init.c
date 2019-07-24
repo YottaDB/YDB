@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@ void jobinterrupt_init(void)
 	/* Setup new signal handler to just drive condition handler which will do the right thing.  */
 	memset(&new_action, 0, SIZEOF(new_action));
 	sigemptyset(&new_action.sa_mask);
-	new_action.sa_flags = SA_SIGINFO;
+	new_action.sa_flags = YDB_SIGACTION_FLAGS;
 	new_action.sa_sigaction = jobinterrupt_event;
 	sigaction(SIGUSR1, &new_action, NULL);
 
