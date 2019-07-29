@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,18 +14,23 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
+
 #include "stringpool.h"
 #include "op.h"
 #include "stack_frame.h"
 #include "mv_stent.h"
 
-#define PLUS 	1
-#define MINUS 	2
-#define TRAIL	4
-#define COMMA	8
-#define PAREN 	16
-#define FNERROR 7
+#define PLUS 		0x01
+#define MINUS 		0x02
+#define TRAIL		0x04
+#define COMMA		0x08
+#define DOT		0x10
+#define PAREN 		0x20
+
+#define NOTWITHPAREN	(PLUS | MINUS | TRAIL)
+#define NOTWITHDOT	COMMA
 
 GBLREF spdesc	stringpool;
 GBLREF mv_stent	*mv_chain;
@@ -37,9 +42,9 @@ error_def(ERR_FNUMARG);
 
 void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *dst)
 {
-	boolean_t	comma, paren;
-	int 		ct, x, xx, y, z;
-	unsigned char	*ch, *cp, *ff, *ff_top, fncode, sign, *t;
+	boolean_t	needsep, paren;
+	int 		ct, x, xx, y, intlen;
+	unsigned char	*ch, *cp, *ff, *ff_top, fncode, sign, *t, sepchar, decptchar;
 
 	if (!MV_DEFINED(fmt))		/* catch this up front so noundef mode can't cause trouble - so fmt no empty context */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(2) ERR_FNUMARG, 0);
@@ -81,6 +86,9 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 			case  ',':
 				fncode |= COMMA;
 				break;
+			case  '.':
+				fncode |= DOT;
+				break;
 			case  'T':
 			case  't':
 				fncode |= TRAIL;
@@ -91,88 +99,98 @@ void op_fnfnumber(mval *src, mval *fmt, boolean_t use_fract, int fract, mval *ds
 				break;
 			default:
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_FNUMARG, 4, fmt->str.len, fmt->str.addr, 1, --ff);
-			break;
+				break;
 		}
 	}
-	if ((0 != (fncode & PAREN)) && (0 != (fncode & FNERROR)))
+	/* Error checks */
+	if ((0 != (fncode & PAREN)) && (0 != (fncode & NOTWITHPAREN))		/* Test for invalid options given with PAREN */
+	    || ((0 != (fncode & DOT)) && (0 != (fncode & NOTWITHDOT))))		/* Test for invalid option(s) given with DOT */
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_FNARGINC, 2, fmt->str.len, fmt->str.addr);
-	else
+	/* Formatting - the number is already formatted as a standard numeric string by the MV_FORCE_STR() macros above so
+	 * we just need to rearrange it according to the formatting options.
+	 */
+	sign = 0;
+	paren = FALSE;
+	if ('-' == *ch)
 	{
-		sign = 0;
-		paren = FALSE;
-		if ('-' == *ch)
-		{
-			sign = '-';
-			ch++;
-			ct--;
-		}
-		if (0 != (fncode & PAREN))
-		{
-			if ('-' == sign)
-			{
-				*cp++ = '(';
-				sign = 0;
-				paren = TRUE;
-			}
-			else *cp++ = ' ';
-		}
-		/* Only add '+' if > 0 */
-		if ((0 != (fncode & PLUS)) && (0 == sign))
-		{	/* Need to make into num and check for int 0 in case was preprocessed by op_fnj3() */
-			MV_FORCE_NUM(dst);
-			if ((0 == (dst->mvtype & MV_INT)) || (0 != dst->m[1]))
-				sign = '+';
-		}
-		if ((0 != (fncode & MINUS)) && ('-' == sign))
-			sign = 0;
-		if ((0 == (fncode & TRAIL)) && (0 != sign))
-			*cp++ = sign;
-		if (0 != (fncode & COMMA))
-		{
-			comma = FALSE;
-			for (x = 0, t = ch; (('.' != *t) && (++x < ct)); t++)
-				;
-			z = x;
-			if ((y = x % 3) > 0)
-			{
-				while (y-- > 0)
-					*cp++ = *ch++;
-				comma = TRUE;
-			}
-			for ( ; (0 != (x / 3)); x -= 3, cp += 3, ch +=3)
-			{
-				if (comma)
-					*cp++ = ',';
-				else
-					comma = TRUE;
-				memcpy(cp, ch, 3);
-			}
-			if (z < ct)
-			{
-				xx = ct - z;
-				memcpy(cp, ch, xx);
-				cp += xx;
-			}
-		} else
-		{
-			memcpy(cp, ch, ct);
-			cp += ct;
-		}
-		if (0 != (fncode & TRAIL))
-		{
-			if (sign != 0) *cp++ = sign;
-			else *cp++ = ' ';
-		}
-		if (0 != (fncode & PAREN))
-		{
-			if (paren)*cp++ = ')';
-			else *cp++ = ' ';
-		}
-		dst->mvtype = MV_STR;
-		dst->str.addr = (char *)stringpool.free;
-		dst->str.len = INTCAST(cp - stringpool.free);
-		stringpool.free = cp;
-		return;
+		sign = '-';
+		ch++;
+		ct--;
 	}
-	assertpro(FALSE);
+	if (0 != (fncode & PAREN))
+	{
+		if ('-' == sign)
+		{
+			*cp++ = '(';
+			sign = 0;
+			paren = TRUE;
+		} else
+			*cp++ = ' ';
+	}
+	/* Only add '+' if > 0 */
+	if ((0 != (fncode & PLUS)) && (0 == sign))
+	{	/* Need to make into num and check for int 0 in case was preprocessed by op_fnj3() */
+		MV_FORCE_NUM(dst);
+		if ((0 == (dst->mvtype & MV_INT)) || (0 != dst->m[1]))
+			sign = '+';
+	}
+	if ((0 != (fncode & MINUS)) && ('-' == sign))
+		sign = 0;
+	if ((0 == (fncode & TRAIL)) && (0 != sign))
+		*cp++ = sign;
+	if ((0 != (fncode & COMMA)) || (0 != (fncode & DOT)))
+	{
+		/* Decide which characters we are using for the decimal point and the separator chars */
+		decptchar = '.';
+		sepchar = ',';
+		if (0 != (fncode & DOT))
+		{	/* Reverse the separator and decimal point characters */
+			decptchar = ',';
+			sepchar = '.';
+		}
+		/* Find end of decimal chars to left of decimal point */
+		for (intlen = 0, t = ch; (('.' != *t) && (++intlen < ct)); t++)
+			;
+		x = intlen;			/* x is working copy of the length of integer part of number */
+		needsep = FALSE;
+		if (0 < (y = x % 3))		/* Note assignment */
+		{
+			while (0 < y--)
+				*cp++ = *ch++;
+			needsep = TRUE;
+		}
+		for ( ; (0 != (x / 3)); x -= 3, cp += 3, ch +=3)
+		{
+			if (needsep)
+				*cp++ = sepchar;
+			else
+				needsep = TRUE;
+			memcpy(cp, ch, 3);
+		}
+		/* Done with the integer part of the value - now finish up with the decimal point (only if a
+		 * fractional part exists) and the fractional part - again if it exists.
+		 */
+		if (intlen < ct)
+		{	/* Add chars contain decimal point char plus any digits to the right of it */
+			assert('.' == *ch);
+			ch++;			/* Get past the '.' as we are changing it to our separator */
+			*cp++ = decptchar;
+			xx = ct - intlen - 1;
+			memcpy(cp, ch, xx);
+			cp += xx;
+		}
+	} else
+	{
+		memcpy(cp, ch, ct);
+		cp += ct;
+	}
+	if (0 != (fncode & TRAIL))
+		*cp++ = (sign != 0) ? sign : ' ';
+	if (0 != (fncode & PAREN))
+		*cp++ = paren ? ')' : ' ';
+	dst->mvtype = MV_STR;
+	dst->str.addr = (char *)stringpool.free;
+	dst->str.len = INTCAST(cp - stringpool.free);
+	stringpool.free = cp;
+	return;
 }
