@@ -70,6 +70,10 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int 
 	ISSUE_TIME2LONG_ERROR_IF_NEEDED(timeout_nsec);
 	/* Setup and validate the varname */
 	VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
+	if (0 > subs_used)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
+	if (YDB_MAX_SUBS < subs_used)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 	/* ISV references are not supported for this call */
 	if (LYDB_VARREF_ISV == var_type)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
@@ -86,7 +90,7 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int 
 	 * us to do it again.
 	 */
 	COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 2,
-							LYDBRTNNAME(LYDB_RTN_LOCK_INCR));
+				   LYDBRTNNAME(LYDB_RTN_LOCK_INCR));
 	callg((callgfnptr)op_lkname, &plist);
 	/* At this point, the private lock block has been created. Remaining task before calling "op_incrlock" is to
 	 * convert the timeout value from nanoseconds to seconds

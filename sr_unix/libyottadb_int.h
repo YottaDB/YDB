@@ -445,7 +445,7 @@ MBSTART	{															\
 		printf("Index %d - parmp: 0x%08lx, parmp_top: 0x%08lx,  ", idx, (gtm_uint8)parmp, (gtm_uint8)parmp_top);	\
 		printf("mval (type %d) value: %.*s\n", ((mval *)(*parmp))->mvtype, ((mval *)(*parmp))->str.len,			\
 		       ((mval *)(*parmp))->str.addr);										\
-		fflush(stdout); \
+		fflush(stdout);													\
 	}															\
 	printf("******** End of dump\n");											\
 	fflush(stdout);														\
@@ -460,7 +460,7 @@ MBSTART	{															\
 #define COPY_PARMS_TO_CALLG_BUFFER(COUNT, SUBSARRAY, PLIST, PLIST_MVALS, REBUFFER, STARTIDX, PARAM2)		\
 MBSTART	{													\
 	mval		*mvalp;											\
-	void		**parmp, **parmp_top;									\
+	void		**parmp, **parmp_top, **parmp_max;							\
 	ydb_buffer_t	*subs;											\
 	char		buff[256];	/* snprintf buffer */							\
 				 										\
@@ -469,11 +469,14 @@ MBSTART	{													\
 	{       /* count of subscripts is non-zero but no subscript specified - error */			\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SUBSARRAYNULL, 3, (COUNT), LEN_AND_STR(PARAM2));	\
 	}													\
+	parmp_max = &PLIST.arg[ARRAYSIZE(PLIST.arg) - 1];	/* Point to last valid arg slot */		\
 	/* Now for each subscript */										\
 	for (parmp = &PLIST.arg[STARTIDX], parmp_top = parmp + (COUNT), mvalp = &PLIST_MVALS[0];		\
 	     parmp < parmp_top;											\
 	     parmp++, mvalp++, subs++)										\
-	{	/* Pull each subscript descriptor out of param list and put in our parameter buffer.	    	\
+	{	/* Validate parmp not out of bounds */								\
+		assert(parmp <= parmp_max);									\
+		/* Pull each subscript descriptor out of param list and put in our parameter buffer.		\
 		 * A subscript has been specified - copy it to the associated mval and put its address		\
 		 * in the param list. But before that, do validity checks on input ydb_buffer_t.		\
 		 */												\

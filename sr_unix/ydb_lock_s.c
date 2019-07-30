@@ -87,27 +87,35 @@ int ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVNAMECOUNT, 2, LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_LOCK)));
 	if (YDB_MAX_NAMES < namecount)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_NAMECOUNT2HI, 4,
-				LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_LOCK)), namecount, YDB_MAX_NAMES);
+			      LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_LOCK)), namecount, YDB_MAX_NAMES);
 	/* Need to validate all parms before we can do the unlock of all locks held by us */
 	VAR_COPY(varcpy, var);		/* Used to validate parms, then var is used to process them */
 	for (parmidx = 0; parmidx < namecount; parmidx++)
 	{	/* Simplified version of the processing loop below that validates things */
 		varname = va_arg(varcpy, ydb_buffer_t *);
+		/* Validate the varname */
+		VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
+		/* Validate the subscripts */
 		subs_used = va_arg(varcpy, int);
 		if (0 > subs_used)
 		{
 			va_end(varcpy);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MINNRSUBSCRIPTS);
+			SNPRINTF(buff, SIZEOF(buff), "Invalid subsarray for %.*s", varname->len_used, varname->buf_addr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MINNRSUBSCRIPTS, 0, ERR_TEXT, 2, LEN_AND_STR(buff));
+		}
+		if (YDB_MAX_SUBS < subs_used)
+		{
+			va_end(varcpy);
+			SNPRINTF(buff, SIZEOF(buff), "Invalid subsarray for %.*s", varname->len_used, varname->buf_addr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MAXNRSUBSCRIPTS, 0, ERR_TEXT, 2, LEN_AND_STR(buff));
 		}
 		subsarray = va_arg(varcpy, ydb_buffer_t *);
 		if ((0 < subs_used) && (NULL == subsarray))
 		{       /* Count of subscripts is non-zero but no subscript specified - error */
 			va_end(varcpy);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SUBSARRAYNULL, 3, subs_used,
-									LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_LOCK)));
+				      LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_LOCK)));
 		}
-		/* Validate the varname */
-		VALIDATE_VARNAME(varname, var_type, var_svn_index, FALSE);
 		/* ISV references are not supported for this call */
 		if (LYDB_VARREF_ISV == var_type)
 		{
