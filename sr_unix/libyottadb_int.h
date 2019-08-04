@@ -920,7 +920,7 @@ MBSTART {													\
 														\
 	if (NULL != ERRSTR)											\
 	{													\
-		assert(simpleThreadAPI_active);									\
+		assert(simpleThreadAPI_active || !ydb_init_complete);						\
 		/* The below code is similar to that in ydb_mesage.c */						\
 		msg.len = SIZEOF(msgbuf);									\
 		msg.addr = msgbuf;										\
