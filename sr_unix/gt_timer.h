@@ -219,7 +219,6 @@ void		cancel_unsafe_timers(void);
 void		clear_timers(void);
 void		hiber_start(uint4 hiber);
 void		hiber_start_wait_any(uint4 hiber);
-void		init_timers(void);
 void		gtm_start_timer(TID tid, int4 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
 void		start_timer(TID tid, int4 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
 ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2);
@@ -241,7 +240,8 @@ STATICFNDCL void	sys_settimer (TID tid, ABS_TIME *time_to_expir);
 STATICFNDCL void	start_first_timer(ABS_TIME *curr_time);
 STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
 STATICFNDCL GT_TIMER	*add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
-				   void *hdata, boolean_t safe_timer);
+					void *hdata, boolean_t safe_timer);
 STATICFNDCL void	remove_timer(TID tid);
+STATICFNDCL void	init_timers(void);
 
 #endif

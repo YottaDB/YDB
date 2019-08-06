@@ -40,10 +40,6 @@ void continue_handler(int sig, siginfo_t *info, void *context)
 	gtmsiginfo_t	sig_info;
 	DCL_THREADGBL_ACCESS;
 
-	/* Note none of the pause/resume type signals are eligible for fowarding to the main (non-YDB) main process's
-	 * handlers (SIGCONT, SIGSTOP, SISTSTP, SIGTTIN, SIGTTOU) so the DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY macro is
-	 * not used here.
-	 */
 	SETUP_THREADGBL_ACCESS;
 	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_continue_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
 	/* Count how many times we get a continue-process signal (in DEBUG) */

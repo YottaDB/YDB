@@ -46,7 +46,6 @@
 #include "op.h"
 #include "indir_enum.h"
 #include "invocation_mode.h"
-#include "sig_init.h"
 
 LITDEF nametabent filter_names[] =
 {
@@ -157,12 +156,12 @@ void iott_use(io_desc *iod, mval *pp)
 						if (tt_ptr->fildes == temp_ptr->fildes)
 						{	/* if this is $PRINCIPAL make sure the ctrlc_handler is enabled */
 							sigemptyset(&act.sa_mask);
-							act.sa_sigaction = ctrlc_handler_ptr;
-							/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "ctrlc_handler") relies
-							 * on "info" and "context" being passed in.
-							 */
-							act.sa_flags = YDB_SIGACTION_FLAGS;
-							sigaction(SIGINT, &act, NULL);
+							act.sa_handler = ctrlc_handler_ptr;
+							act.sa_flags = SA_SIGINFO;	/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED
+											 * (invoked in "ctrlc_handler") relies on
+											 * "info" and "context" being passed in.
+											 */
+							sigaction(SIGINT, &act, 0);
 							ctrlc_on = TRUE;
 						}
 					}
@@ -179,10 +178,9 @@ void iott_use(io_desc *iod, mval *pp)
 							if (0 == (CTRLC_MSK & tt_ptr->enbld_outofbands.mask))
 							{	/* but only if ctrap=$c(3) is not active */
 								sigemptyset(&act.sa_mask);
-								act.sa_flags = YDB_SIGACTION_FLAGS;
-								/* Setting handler to null handler still allows to be forwarded */
-								act.sa_sigaction = null_handler;
-								sigaction(SIGINT, &act, NULL);
+								act.sa_flags = 0;
+								act.sa_handler = SIG_IGN;
+								sigaction(SIGINT, &act, 0);
 							}
 							ctrlc_on = FALSE;
 						}
@@ -204,11 +202,18 @@ void iott_use(io_desc *iod, mval *pp)
 					{	/* if cenable, ctrlc_handler active anyway, otherwise, depends on ctrap=$c(3) */
 						sigemptyset(&act.sa_mask);
 						if (CTRLC_MSK & tt_ptr->enbld_outofbands.mask)
-							act.sa_sigaction = ctrlc_handler_ptr;
-						else
-							act.sa_sigaction = null_handler;
-						act.sa_flags = YDB_SIGACTION_FLAGS;
-						sigaction(SIGINT, &act, NULL);
+						{
+							act.sa_handler = ctrlc_handler_ptr;
+							act.sa_flags = SA_SIGINFO;	/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED
+											 * (invoked in "ctrlc_handler") relies on
+											 * "info" and "context" being passed in.
+											 */
+						} else
+						{
+							act.sa_handler = SIG_IGN;
+							act.sa_flags = 0;
+						}
+						sigaction(SIGINT, &act, 0);
 					}
 					break;
 				case iop_downscroll:

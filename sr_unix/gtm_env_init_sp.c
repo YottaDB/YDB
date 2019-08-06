@@ -3,7 +3,7 @@
  * Copyright (c) 2004-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,7 +29,6 @@
 #include "gtm_unistd.h"
 #include "gtm_stdio.h"
 #include "gtm_stdlib.h"
-#include "gtm_signal.h"
 
 #include "gtmio.h"
 #include "gtmimagename.h"
@@ -60,7 +59,6 @@
 #include "eintr_wrappers.h"
 #include "utfcgr.h"
 #include "gtm_reservedDB.h"
-#include "ydb_sigfwd_init.h"
 
 #define	DEFAULT_NON_BLOCKED_WRITE_RETRIES	10	/* default number of retries */
 #ifdef __MVS__
@@ -185,7 +183,7 @@ void	gtm_env_init_sp(void)
 		ydb_zlib_cmp_level = ZLIB_CMPLVL_MIN;	/* no compression in this case */
 	ydb_principal_editing_defaults = 0;
 	if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_PRINCIPAL_EDITING, &trans, buf, YDB_PATH_MAX,
-						      IGNORE_ERRORS_TRUE, NULL)))
+												IGNORE_ERRORS_TRUE, NULL)))
 	{
 		assert(trans.len < YDB_PATH_MAX);
 		trans.addr[trans.len] = '\0';
@@ -231,7 +229,7 @@ void	gtm_env_init_sp(void)
 			is_ydb_chset_utf8 = TRUE;
 #			ifdef __MVS__
 			if ((SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_CHSET_LOCALE, &trans, buf, YDB_PATH_MAX,
-								       IGNORE_ERRORS_TRUE, NULL)))
+													IGNORE_ERRORS_TRUE, NULL)))
 				&& (0 < trans.len))
 			{	/* full path to 64 bit ASCII UTF-8 locale object */
 				gtm_utf8_locale_object = malloc(trans.len + 1);
@@ -239,7 +237,7 @@ void	gtm_env_init_sp(void)
 				gtm_utf8_locale_object[trans.len] = '\0';
 			}
 			if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_DONT_TAG_UTF8_ASCII, &trans, buf, YDB_PATH_MAX,
-								      IGNORE_ERRORS_TRUE, NULL)))
+													IGNORE_ERRORS_TRUE, NULL)))
 			{	/* We to tag UTF8 files as ASCII so we can read them, this var disables that */
 				if (status = ydb_logical_truth_value(YDBENVINDX_DONT_TAG_UTF8_ASCII, FALSE, &is_defined)
 						&& is_defined)
@@ -248,7 +246,7 @@ void	gtm_env_init_sp(void)
 #			endif
 			/* Initialize $ZPATNUMERIC only if $ZCHSET is "UTF-8" */
 			if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_PATNUMERIC, &trans, buf, YDB_PATH_MAX,
-								      IGNORE_ERRORS_TRUE, NULL))
+													IGNORE_ERRORS_TRUE, NULL))
 			    && STR_LIT_LEN(UTF8_NAME) == trans.len
 			    && !strncasecmp(buf, UTF8_NAME, STR_LIT_LEN(UTF8_NAME)))
 			{
@@ -261,17 +259,17 @@ void	gtm_env_init_sp(void)
 	}
 	/* Initialize variable that controls number of retries for non-blocked writes to a pipe on unix */
 	ydb_non_blocked_write_retries = ydb_trans_numeric(YDBENVINDX_NON_BLOCKED_WRITE_RETRIES, &is_defined,
-							  IGNORE_ERRORS_TRUE, NULL);
+												IGNORE_ERRORS_TRUE, NULL);
 	if (!is_defined)
 		ydb_non_blocked_write_retries = DEFAULT_NON_BLOCKED_WRITE_RETRIES;
 	/* Initialize variable that controls the behavior on journal error */
 	TREF(error_on_jnl_file_lost) = ydb_trans_numeric(YDBENVINDX_ERROR_ON_JNL_FILE_LOST, &is_defined,
-							 IGNORE_ERRORS_FALSE, NULL);
+											IGNORE_ERRORS_FALSE, NULL);
 	if (MAX_JNL_FILE_LOST_OPT < TREF(error_on_jnl_file_lost))
 		TREF(error_on_jnl_file_lost) = JNL_FILE_LOST_TURN_OFF; /* default behavior */
 	/* Initialize variable that controls jnl release timeout */
 	(TREF(replgbl)).jnl_release_timeout = ydb_trans_numeric(YDBENVINDX_JNL_RELEASE_TIMEOUT, &is_defined,
-								IGNORE_ERRORS_TRUE, NULL);
+												IGNORE_ERRORS_TRUE, NULL);
 	if (!is_defined)
 		(TREF(replgbl)).jnl_release_timeout = DEFAULT_JNL_RELEASE_TIMEOUT;
 	else if (0 > (TREF(replgbl)).jnl_release_timeout) /* consider negative timeout value as zero */
@@ -286,8 +284,8 @@ void	gtm_env_init_sp(void)
 		TREF(dbinit_max_delta_secs) = hrtbt_cntr_delta;
 	/* Initialize variable that controls the location of GT.M custom errors file (used for anticipatory freeze) */
 	if ((SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_CUSTOM_ERRORS, &trans, buf, YDB_PATH_MAX,
-						       IGNORE_ERRORS_TRUE, NULL)))
-	    && (0 < trans.len))
+											IGNORE_ERRORS_TRUE, NULL)))
+		&& (0 < trans.len))
 	{
 		assert(YDB_PATH_MAX > trans.len);
 		(TREF(ydb_custom_errors)).addr = malloc(trans.len + 1); /* +1 for '\0'; This memory is never freed */
@@ -309,11 +307,11 @@ void	gtm_env_init_sp(void)
 	if (!IS_GTMSECSHR_IMAGE)
 	{	/* Set default or supplied value for $ydb_linktmpdir */
 		if (SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_LINKTMPDIR, &trans, buf, YDB_PATH_MAX,
-							      IGNORE_ERRORS_TRUE, NULL)))
+												IGNORE_ERRORS_TRUE, NULL)))
 		{	/* Else use default $ydb_tmp value or its default */
 			if ((SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_TMP, &trans, buf, YDB_PATH_MAX,
-								       IGNORE_ERRORS_TRUE, NULL)))
-			    || (0 == trans.len))
+												IGNORE_ERRORS_TRUE, NULL)))
+					|| (0 == trans.len))
 			{	/* Nothing for $ydb_tmp either - use DEFAULT_GTM_TMP which is already a string */
 				trans.addr = DEFAULT_GTM_TMP;
 				trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
@@ -361,7 +359,7 @@ void	gtm_env_init_sp(void)
 		TREF(ydb_autorelink_keeprtn) = FALSE;
 	/* See if ydb_autorelink_ctlmax is set */
 	TREF(ydb_autorelink_ctlmax) = ydb_trans_numeric(YDBENVINDX_AUTORELINK_CTLMAX, &is_defined,
-							IGNORE_ERRORS_TRUE, &is_ydb_env_match);
+										IGNORE_ERRORS_TRUE, &is_ydb_env_match);
 	if (!is_defined)
 		TREF(ydb_autorelink_ctlmax) = RELINKCTL_DEFAULT_ENTRIES;
 	else if (TREF(ydb_autorelink_ctlmax) > RELINKCTL_MAX_ENTRIES)
@@ -435,7 +433,7 @@ void	gtm_env_init_sp(void)
 	if (is_ydb_chset_utf8)
 	{
 		if (SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_LOCALE, &trans, buf, YDB_PATH_MAX,
-							      IGNORE_ERRORS_TRUE, &is_ydb_env_match)))
+											IGNORE_ERRORS_TRUE, &is_ydb_env_match)))
 		{
 			if ((0 < trans.len) && (YDB_PATH_MAX > trans.len))
 			{	/* Something was specified - need to clear LC_ALL and set LC_CTYPE but need room in buf[]
@@ -448,12 +446,12 @@ void	gtm_env_init_sp(void)
 				{
 					if (is_ydb_env_match)
 						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_INVLOCALE, 2,
-							     LEN_AND_STR(ydbenvname[YDBENVINDX_LOCALE]),
-							     status);
+							LEN_AND_STR(ydbenvname[YDBENVINDX_LOCALE]),
+							status);
 					else
 						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_INVLOCALE, 2,
-							     LEN_AND_STR(gtmenvname[YDBENVINDX_LOCALE]),
-							     status);
+							LEN_AND_STR(gtmenvname[YDBENVINDX_LOCALE]),
+							status);
 				}
 			}
 		}
@@ -475,15 +473,15 @@ void	gtm_env_init_sp(void)
 	 */
 	/* Using MAX_FN_LEN below instead of YDB_PATH_MAX because csa->nl->statsdb_fname[] size is MAX_FN_LEN + 1 */
 	if ((SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_STATSDIR, &trans, buf, MAX_STATSDIR_LEN,
-						       IGNORE_ERRORS_TRUE, NULL)))
-	    || (0 == trans.len))
+											IGNORE_ERRORS_TRUE, NULL)))
+			|| (0 == trans.len))
 	{	/* Either no translation for $ydb_statsdir or the current and/or expanded value of $ydb_statsdir exceeds the
 		 * max path length. For either case $ydb_statsdir needs to be (re)set so try to use $ydb_tmp instead - note
 		 * from here down we'll (re)set $ydb_statsdir so it ALWAYS has a (valid) value for mu_cre_file() to later use.
 		 */
 		if ((SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_TMP, &trans, buf, MAX_STATSDIR_LEN,
-							       IGNORE_ERRORS_TRUE, NULL)))
-		    || (0 == trans.len))
+											IGNORE_ERRORS_TRUE, NULL)))
+				|| (0 == trans.len))
 		{	/* Nothing for $ydb_tmp - use DEFAULT_GTM_TMP instead */
 			trans.addr = DEFAULT_GTM_TMP;
 			trans.len = SIZEOF(DEFAULT_GTM_TMP) - 1;
@@ -495,18 +493,4 @@ void	gtm_env_init_sp(void)
 		assert(0 == status);
 	}
 	assert(MAX_STATSDIR_LEN >= trans.len);
-	/* Check for signal forwarding for any signals being enabled or disabled */
-	ydb_sigfwd_init();
-	if ((SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_SIGNAL_FWD, &trans, buf, YDB_PATH_MAX,
-						       IGNORE_ERRORS_TRUE, NULL)))
-	    && (0 < trans.len))
-	{
-		set_sigfwd_mask((unsigned char *)trans.addr, trans.len, TRUE);
-	}
-	if ((SS_NORMAL == (status = ydb_trans_log_name(YDBENVINDX_SIGNAL_NOFWD, &trans, buf, YDB_PATH_MAX,
-						       IGNORE_ERRORS_TRUE, NULL)))
-	    && (0 < trans.len))
-	{
-		set_sigfwd_mask((unsigned char *)trans.addr, trans.len, FALSE);
-	}
 }

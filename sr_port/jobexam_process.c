@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,7 +29,9 @@
 #include "io.h"
 #include "stack_frame.h"
 #include "jobexam_process.h"
-#include "jobexam_signal_handler.h"
+#ifdef UNIX
+#  include "jobexam_signal_handler.h"
+#endif
 #include "send_msg.h"
 #include "callg.h"
 #include "zshow.h"
@@ -53,7 +55,7 @@ GBLREF io_pair		io_std_device, io_curr_device;
 GBLREF mv_stent		*mv_chain;
 GBLREF unsigned char    *msp, *stackwarn, *stacktop;
 GBLREF boolean_t        created_core;
-GBLREF sigset_t		blockalrm;
+UNIX_ONLY(GBLREF sigset_t blockalrm;)
 DEBUG_ONLY(GBLREF boolean_t ok_to_UNWIND_in_exit_handling;)
 
 LITREF	mval		literal_zero;
@@ -77,8 +79,10 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	char			saved_util_outbuff[OUT_BUFF_SIZE];
 	int			rc, saved_util_outbuff_len;
 	char			save_dump_file_name_buff[YDB_PATH_MAX];
+#	ifdef UNIX
 	struct sigaction	new_action, prev_action;
 	sigset_t		savemask;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -100,6 +104,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 		input_dump_file_name = dump_file_name;
 		saved_mv_stent = FALSE;
 	}
+#	ifdef UNIX
 	/* Block out timer calls that might trigger processing that could fail. We especially want to prevent
 	 * nesting of signal handlers since the longjump() function used by the UNWIND macro is undefined on
 	 * Tru64 when signal handlers are nested.
@@ -108,10 +113,15 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 	/* Setup new signal handler to just drive condition handler which will do the right thing */
 	memset(&new_action, 0, SIZEOF(new_action));
 	sigemptyset(&new_action.sa_mask);
-	new_action.sa_flags = YDB_SIGACTION_FLAGS;
+	new_action.sa_flags = SA_SIGINFO;
+#	ifdef __sparc
+	new_action.sa_handler = jobexam_signal_handler;
+#	else
 	new_action.sa_sigaction = jobexam_signal_handler;
+#	endif
 	sigaction(SIGBUS, &new_action, &prev_action);
-	sigaction(SIGSEGV, &new_action, NULL);
+	sigaction(SIGSEGV, &new_action, 0);
+#	endif
 	*dump_file_spec = empty_str_mval;
 	dev_in_use = io_curr_device;		/* Save current IO device */
 	/* Save text in util_outbuff which can be detrimentally overwritten by ZSHOW.
@@ -162,11 +172,13 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 			POP_MV_STENT();
 		}
 	}
+#	ifdef UNIX
 	/* Restore the signal handlers how they were */
-	sigaction(SIGBUS, &prev_action, NULL);
-	sigaction(SIGSEGV, &prev_action, NULL);
+	sigaction(SIGBUS, &prev_action, 0);
+	sigaction(SIGSEGV, &prev_action, 0);
 	/* Let the timers pop again.. */
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
+#	endif
 }
 
 /* This routine is broken out as another ep so we can do cleanup processing in jobexam_process if
@@ -238,7 +250,7 @@ CONDITION_HANDLER(jobexam_dump_ch)
 	 * 3) Unwind the errant frames so we can return to the user without screwing
 	 *    up the task that got interrupted to do this examine.
 	 */
-#	ifdef DEBUG
+#	if defined(DEBUG) && defined(UNIX)
 	if (DUMPABLE)
 	{	/* For debug UNIX issues, let's make a core if we would have made one in open code */
 		save_created_core = created_core;

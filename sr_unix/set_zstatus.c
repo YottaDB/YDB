@@ -123,7 +123,7 @@ unsigned char *set_zstatus(mstr *src, int max_len, int arg, unsigned char **ctxt
          * (further down the pike) is likely to load the text of the module into storage if it can. So we bypass
          * ecode setting for these two fatal errors. 02/2008 se
 	 */
-	if ((ERR_MEMORY != arg) && !IS_SIMPLEAPI_MODE)
+	if ((ERR_MEMORY != arg) && !IS_SIMPLEAPI_MODE_SAFE)
 		ecode_set(arg);
 	return (b_line);
 }

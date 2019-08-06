@@ -23,7 +23,6 @@
 #include "gtmsiginfo.h"
 #include "sleep.h"
 #include "sleep_cnt.h"
-#include "ydb_sigfwd_init.h"
 
 /* Define debugging macros for signal handling - uncomment the define below to enable but note it emits
  * output to stderr.
@@ -35,43 +34,36 @@
 # define DBGSIGHND(x)
 #endif
 
-GBLREF	void (*ydb_stm_thread_exit_fnptr)(void);
+GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 
-/* Define a type for a sighandler_t variation for when SA_SIGINFO is used. Also, when we share signal handling with a
- * main in simpleAPI mode and need to drive the non-YottaDB base routine's handler for a signal, we need to move it to
- * a matching type because Linux does not define the handler with information attributes (the siginfo_t and context
- * parameters sent when SA_SIGINFO is specified) without some exotic C99* flag. Use this type to drive the handler.
+/* When we share signal handling with a main in simpleAPI mode and need to drive the non-YottaDB base routine's handler
+ * for a signal, we need to move it to a matching type because Linux does not define the handler with information
+ * attributes (the siginfo_t and context parameters sent when SA_SIGINFO is specified) without some exotic C99* flag.
+ * Use this type to drive the handler.
  */
-typedef void (*siginfohandler_t)(int sig, siginfo_t *info, void *context);
+typedef void (*nonYDB_sighandler_t)(int, siginfo_t *, void *);
 
-#define IS_HANDLER_DEFINED(SIGNAL) 						\
-	((SIG_DFL != (sighandler_t)orig_sig_action[(SIGNAL)].sa_sigaction)	\
-	 && (SIG_IGN != (sighandler_t)orig_sig_action[(SIGNAL)].sa_sigaction))
+#define IS_HANDLER_DEFINED(SIGNAL) \
+	((SIG_DFL != orig_sig_action[(SIGNAL)].sa_handler) && (SIG_IGN != orig_sig_action[(SIGNAL)].sa_handler))
 
-#define DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY(NAME, SIGNAL, INFO, CONTEXT, DRIVEEXIT)						\
-MBSTART {															\
-	siginfohandler_t	sighandler;											\
-	boolean_t		driveit;											\
-																\
-	if ((MUMPS_CALLIN & invocation_mode) && IS_HANDLER_DEFINED(SIGNAL))							\
-	{															\
-		assert((0 < (SIGNAL)) && (NSIG >= (SIGNAL)));									\
-		QUERY_SIGFWD_BIT(SIGNAL, driveit);										\
-		if (driveit)													\
-		{														\
-			if (DRIVEEXIT)												\
-			{													\
-				DBGSIGHND((stderr, "%s: Driving ydb_stm_thread_exit() prior to signal passthru\n", NAME));	\
-				if (NULL != ydb_stm_thread_exit_fnptr)		      	       	      		   		\
-					(*ydb_stm_thread_exit_fnptr)();								\
-			}													\
-			sighandler = orig_sig_action[(SIGNAL)].sa_sigaction; 							\
-			DBGSIGHND((stderr, "%s: Passing signal %d through to the caller\n", (NAME), (SIGNAL)));			\
-			(*sighandler)((SIGNAL), (INFO), (CONTEXT));	/* Note - likely to NOT return */			\
-			DBGSIGHND((stderr, "%s: Returned from signal passthru for signal %d\n", (NAME), (SIGNAL)));		\
-		} else			   		      	     	      	  	 					\
-			DBGSIGHND((stderr, "%s: Signal %d is not enabled for forwarding\n", (NAME), (SIGNAL)));			\
-	}															\
+#define DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY(NAME, SIGNAL, INFO, CONTEXT, DRIVEEXIT)					\
+MBSTART {														\
+	nonYDB_sighandler_t	sighandler;										\
+															\
+	if ((MUMPS_CALLIN & invocation_mode) && IS_HANDLER_DEFINED(SIGNAL))						\
+	{														\
+		assert((0 < (SIGNAL)) && (NSIG >= (SIGNAL)));								\
+		if (DRIVEEXIT)												\
+		{													\
+			DBGSIGHND((stderr, "%s: Driving ydb_stm_thread_exit() prior to signal passthru\n", NAME));	\
+			if (NULL != ydb_stm_thread_exit_fnptr)								\
+				(*ydb_stm_thread_exit_fnptr)();								\
+		}													\
+		sighandler = (nonYDB_sighandler_t)(orig_sig_action[(SIGNAL)].sa_handler);				\
+		DBGSIGHND((stderr, "%s: Passing signal %d through to the caller\n", (NAME), (SIGNAL)));			\
+		(*sighandler)((SIGNAL), (INFO), (CONTEXT));	/* Note - likely to NOT return */			\
+		DBGSIGHND((stderr, "%s: Returned from signal passthru for signal %d\n", (NAME), (SIGNAL)));		\
+	}														\
 } MBEND
 
 /* Macro to check if a given signal sets the "dont_want_core" variable to TRUE in the function "generic_signal_handler" */

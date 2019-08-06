@@ -3,9 +3,6 @@
  * Copyright (c) 2015 Fidelity National Information 		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -19,8 +16,6 @@
 #include <signal.h>	/* BYPASSOK(gtm_signal.h) */
 
 #include "gtm_multi_thread.h"	/* for INSIDE_THREADED_CODE macro */
-
-#define YDB_SIGACTION_FLAGS (SA_SIGINFO | SA_ONSTACK)	/* Go requires SA_ONSTACK, we require SA_SIGINFO */
 
 #define SIGPROCMASK(FUNC, NEWSET, OLDSET, RC)							\
 MBSTART {											\

@@ -376,8 +376,8 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 }
 #endif
 
-void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)(), void (*continue_handler)());
-void null_handler(int sig, siginfo_t *info, void *context);
-void ydb_stm_invoke_deferred_signal_handler(void);
+void	sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)(), void (*continue_handler)());
+void	null_handler(int sig);
+void	ydb_stm_invoke_deferred_signal_handler(void);
 
 #endif

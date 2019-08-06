@@ -56,7 +56,9 @@ void jobinterrupt_event(int sig, siginfo_t *info, void *context)
 	/* If we are in SIMPLEAPI mode and the original handler was neither SIG_DFL or SIG_IGN, drive the originally
 	 * defined handler before we replaced them.
 	 */
+#	ifdef SIGNAL_PASSTHRU
 	DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("jobinterrupt_event", sig, info, context, FALSE);
+#	endif
 }
 
 /* Call back routine from xfer_set_handlers to complete outofband setup */
