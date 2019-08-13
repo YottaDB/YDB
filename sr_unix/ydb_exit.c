@@ -15,6 +15,8 @@
 
 #include "mdef.h"
 
+#include <sys/mman.h>
+
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
 #include "gdsroot.h"
@@ -41,14 +43,17 @@ GBLREF	int			mumps_status;
 GBLREF	struct sigaction	orig_sig_action[];
 GBLREF	boolean_t		simpleThreadAPI_active;
 GBLREF	uint4			dollar_tlevel;
+GBLREF	stack_t			oldaltstack;
+GBLREF	char			*altstackptr;
 #ifdef DEBUG
 GBLREF	pthread_t		ydb_stm_worker_thread_id;
 #endif
+OS_PAGE_SIZE_DECLARE
 
 /* Routine exposed to call-in user to exit from active YottaDB environment */
 int ydb_exit()
 {
-	int			status, sig;
+	int			status, sig, save_errno;
 	pthread_t		thisThread, threadid;
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;
@@ -92,7 +97,7 @@ int ydb_exit()
 		 * guaranteed this thread is not the MAIN worker thread (asserted below).
 		 */
 		assert(!simpleThreadAPI_active
-			|| (ydb_stm_worker_thread_id && !pthread_equal(pthread_self(), ydb_stm_worker_thread_id)));
+		       || (ydb_stm_worker_thread_id && !pthread_equal(pthread_self(), ydb_stm_worker_thread_id)));
 		ESTABLISH_NORET(ydb_simpleapi_ch, error_encountered);
 		if (error_encountered)
 		{	/* "ydb_simpleapi_ch" encountered an error and transferred control back here.
@@ -118,7 +123,7 @@ int ydb_exit()
 		if (!process_exiting)
 		{	/* Do not allow ydb_exit() to be invoked from external calls (unless process_exiting) */
 			if (!(SFT_CI & frame_pointer->type) || !(MUMPS_CALLIN & invocation_mode)
-					|| (1 < TREF(gtmci_nested_level)))
+			    || (1 < TREF(gtmci_nested_level)))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVYDBEXIT);
 			/* Now get rid of the whole M stack - end of YottaDB environment */
 			while (NULL != frame_pointer)
@@ -138,6 +143,26 @@ int ydb_exit()
 			}
 		}
 		gtm_exit_handler(); /* rundown all open database resource */
+		if (NULL != altstackptr)
+		{	/* We allocated a (larger) alt stack - reinstall the old one */
+			status = sigaltstack(&oldaltstack, NULL);
+			if (0 == status)
+			{	/* If resetting the stack succeeded, then we can go ahead and unmap it, else we need to keep it */
+				status = munmap(altstackptr, YDB_ALTSTACK_SIZE + (OS_PAGE_SIZE * 2));
+				if (0 != status)
+				{
+					save_errno = errno;
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("munmap"),
+						      CALLFROM, save_errno);
+				}
+				altstackptr = NULL;
+			} else
+			{
+				save_errno = errno;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("sigaltstack"),
+					      CALLFROM, save_errno);
+			}
+		}
 		REVERT;
 		/* Restore the signal handlers that were saved and overridden during ydb_init()->gtm_startup()->sig_init() */
 		for (sig = 1; sig <= NSIG; sig++)

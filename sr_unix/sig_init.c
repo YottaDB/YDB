@@ -20,6 +20,7 @@
 #include "gtm_string.h"
 #include "gtm_signal.h"
 #include "gtm_stdio.h"
+#include <sys/mman.h>
 
 #include "io.h"
 #include "gtmio.h"
@@ -33,30 +34,85 @@
 GBLREF	boolean_t		gtm_jvm_process;
 #endif
 GBLREF	struct sigaction	orig_sig_action[];
+GBLREF	stack_t			oldaltstack;
+GBLREF	char			*altstackptr;
+OS_PAGE_SIZE_DECLARE
 
-void	null_handler(int sig);
 
 void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)(), void (*continue_handler)())
 {
 	struct sigaction 	ignore, null_action, def_action, susp_action, gen_action, ctrlc_action, cont_action;
-	int			sig;
+	int			sig, rc, save_errno;
+	stack_t			newaltstack;
         DCL_THREADGBL_ACCESS;
 
         SETUP_THREADGBL_ACCESS;
+	if (MUMPS_CALLIN & invocation_mode)
+	{	/* For call-ins and simple (threaded) api, if an alternate stack is defined, see if it is big enough for
+		 * us to use. As an example, Go (1.12.6 currently) allocates a 32K alternate stack which is completely
+		 * inappropriate for YDB since jnl_file_close() alone takes 67K in a single stack variable. If the stack
+		 * is too small, supply a larger one.
+		 */
+		rc = sigaltstack(NULL, &oldaltstack);	/* Get current alt stack definition */
+		if (0 != rc)
+		{
+			save_errno = errno;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("sigaltstack()"), CALLFROM,
+				      save_errno);
+		}
+		DBGSIGHND((stderr, "sig_init: Alt stack definition: 0x"lvaddr",  flags: 0x%08lx,  size: %d\n",
+			   oldaltstack.ss_sp, oldaltstack.ss_flags, oldaltstack.ss_size));
+		if ((0 < oldaltstack.ss_size) && (YDB_ALTSTACK_SIZE > oldaltstack.ss_size))
+		{	/* Altstack exists but is too small - make one larger that is aligned (both start and length) */
+			assert(0 == (YDB_ALTSTACK_SIZE & (OS_PAGE_SIZE - 1)));	/* Make sure len is page aligned */
+			altstackptr = mmap(NULL, YDB_ALTSTACK_SIZE + (OS_PAGE_SIZE * 2), (PROT_READ + PROT_WRITE + PROT_EXEC),
+					   (MAP_PRIVATE + MAP_ANONYMOUS), -1, 0);
+			if (MAP_FAILED == altstackptr)
+			{
+				save_errno = errno;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("mmap()"), CALLFROM,
+					      save_errno);
+			}
+			rc = mprotect(altstackptr, OS_PAGE_SIZE, PROT_READ);	/* Protect the first page (bottom) of stack */
+			if (0 != rc)
+			{
+				save_errno = errno;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("mprotect()"), CALLFROM,
+					      save_errno);
+			}
+			/* Protect the last page (top) of stack */
+			rc = mprotect(altstackptr + YDB_ALTSTACK_SIZE + OS_PAGE_SIZE, OS_PAGE_SIZE, PROT_READ);
+			if (0 != rc)
+			{
+				save_errno = errno;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("mprotect()"), CALLFROM,
+					      errno);
+			}
+			newaltstack.ss_sp = altstackptr + OS_PAGE_SIZE;
+			newaltstack.ss_flags = 0;
+			newaltstack.ss_size = YDB_ALTSTACK_SIZE;
+			rc = sigaltstack(&newaltstack, NULL);
+			if (0 != rc)
+			{
+				save_errno = errno;
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("sigaltstack()"),
+					      CALLFROM, save_errno);
+			}
+			DBGSIGHND((stderr, "sig_init: Changing alt stack to: 0x"lvaddr",  flags: 0x%08lx,  size: %d\n",
+				   newaltstack.ss_sp, newaltstack.ss_flags, newaltstack.ss_size));
+		}
+	}
 	memset(&ignore, 0, SIZEOF(ignore));
 	sigemptyset(&ignore.sa_mask);
-	/* Initialize handler definitions we deal with. Note susp_action gets a copy of ignore but we'll be doing more with it
-	 * in the next section.
+	/* Initialize handler definitions we deal with. All signals except those setup for SIG_DFL/SIG_IGN are setup
+	 * to receive all info since those signals may need to be forwarded.
 	 */
-	null_action = def_action = susp_action = ignore;
+	null_action = def_action = ignore;
 	ignore.sa_handler = SIG_IGN;
-	null_action.sa_handler = null_handler;
 	def_action.sa_handler = SIG_DFL;
-	/* These signals need the additional information we get by adding SA_SIGINFO. Then fine tune how we handle certain
-	 * classes of handlers.
-	 */
-	susp_action.sa_flags = SA_SIGINFO;
-	gen_action = ctrlc_action = cont_action = susp_action;
+	null_action.sa_flags = YDB_SIGACTION_FLAGS;
+	susp_action = gen_action = ctrlc_action = cont_action = null_action;
+	null_action.sa_sigaction = null_handler;
 	susp_action.sa_sigaction = suspsig_handler;
 	gen_action.sa_sigaction = signal_handler;
 	ctrlc_action.sa_sigaction = ctrlc_handler;
@@ -66,7 +122,8 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 	{
 		sigaction(sig, NULL, &orig_sig_action[sig]);	/* Save original handler */
 #		ifdef DEBUG_SIGNAL_HANDLING
-		if ((SIG_DFL != orig_sig_action[sig].sa_handler) && (SIG_IGN != orig_sig_action[sig].sa_handler))
+		if ((SIG_DFL != (sighandler_t)orig_sig_action[sig].sa_handler)
+		    && (SIG_IGN != (sighandler_t)orig_sig_action[sig].sa_handler))
 		{
 			DBGSIGHND((stderr, "sig_init: Note pre-existing handler for signal %d (handler = "lvaddr")\n",
 				   sig, orig_sig_action[sig].sa_handler));
@@ -80,8 +137,8 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
         			 */
 				sigaction(sig, &null_action, NULL);
 				break;
-			case SIGCLD:
-				/* Default handling necessary for SIGCLD signal. CAUTION: consider the affect on JOB (timeout)
+			case SIGCHLD:
+				/* Default handling necessary for SIGCHLD signal. CAUTION: consider the affect on JOB (timeout)
 				 * implementation before changing this behavior (like defuncts, ECHILD errors, etc.).
 				 */
 				sigaction(sig, &def_action, NULL);
@@ -156,20 +213,28 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 				break;
 			default:
 				/* If we are in call-in/simpleAPI mode and a non-default handler is installed, leave it
-				 * installed. Otherwise, set the signal to IGNORE. Note this may initially be true of some
-				 * signals we setup later (e.g. timers, intrpt, etc) but they'll be replaced when they get
-				 * setup and we still have a record of what was there in orig_sig_action[].
+				 * installed. Otherwise, set the signal to be ignored (SIG_IGN). Note this may initially
+				 * be true of some signals we setup later (e.g. timers, intrpt, etc) but they'll be
+				 * replaced when they get setup and we still have a record of what was there in
+				 * orig_sig_action[]. Note we cannot use the IS_SIMPLEAPI_MODE macro here because initialization
+				 * (ydb_init()) is not far enough along to have created a stackframe we can check so this check
+				 * *always* fails with IS_SIMPLEAPI_MODE. We have to manually check the invocation mode instead.
 				 */
-				if ((MUMPS_CALLIN & invocation_mode) && IS_SIMPLEAPI_MODE
-				    && (SIG_DFL != orig_sig_action[sig].sa_handler) && (SIG_IGN != orig_sig_action[sig].sa_handler))
+				if ((MUMPS_CALLIN & invocation_mode) && (SIG_DFL != (sighandler_t)orig_sig_action[sig].sa_sigaction)
+				    && (SIG_IGN != (sighandler_t)orig_sig_action[sig].sa_sigaction))
+				{
+					DBGSIGHND((stderr, "sig_init: Bypassing ignoring of signal %d as caller's handler exists\n",
+						   sig));
 					break;
+				};
+				DBGSIGHND((stderr, "sig_init: Setting signal %d to be ignored\n", sig));
 				sigaction(sig, &ignore, NULL);
 		}
 	}
 }
 
 /* Provide null signal handler */
-void	null_handler(int sig)
-{
-	/* */
+void null_handler(int sig, siginfo_t *info, void *context)
+{	/* Just forward the signal if there's a handler for it - otherwise ignore it */
+	//DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("null_handler", sig, info, context, FALSE);
 }

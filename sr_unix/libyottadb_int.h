@@ -37,6 +37,7 @@
 #include "sleep.h"
 #include "gt_timer.h"
 #include "sig_init.h"
+#include "invocation_mode.h"
 
 #define MAX_SAPI_MSTR_GC_INDX	YDB_MAX_NAMES
 
@@ -444,7 +445,7 @@ MBSTART	{															\
 		printf("Index %d - parmp: 0x%08lx, parmp_top: 0x%08lx,  ", idx, (gtm_uint8)parmp, (gtm_uint8)parmp_top);	\
 		printf("mval (type %d) value: %.*s\n", ((mval *)(*parmp))->mvtype, ((mval *)(*parmp))->str.len,			\
 		       ((mval *)(*parmp))->str.addr);										\
-		fflush(stdout);													\
+		fflush(stdout); \
 	}															\
 	printf("******** End of dump\n");											\
 	fflush(stdout);														\
@@ -459,7 +460,7 @@ MBSTART	{															\
 #define COPY_PARMS_TO_CALLG_BUFFER(COUNT, SUBSARRAY, PLIST, PLIST_MVALS, REBUFFER, STARTIDX, PARAM2)		\
 MBSTART	{													\
 	mval		*mvalp;											\
-	void		**parmp, **parmp_top, **parmp_max;							\
+	void		**parmp, **parmp_top;									\
 	ydb_buffer_t	*subs;											\
 	char		buff[256];	/* snprintf buffer */							\
 				 										\
@@ -468,14 +469,11 @@ MBSTART	{													\
 	{       /* count of subscripts is non-zero but no subscript specified - error */			\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SUBSARRAYNULL, 3, (COUNT), LEN_AND_STR(PARAM2));	\
 	}													\
-	parmp_max = &PLIST.arg[ARRAYSIZE(PLIST.arg) - 1];	/* Point to last valid arg slot */		\
 	/* Now for each subscript */										\
 	for (parmp = &PLIST.arg[STARTIDX], parmp_top = parmp + (COUNT), mvalp = &PLIST_MVALS[0];		\
 	     parmp < parmp_top;											\
 	     parmp++, mvalp++, subs++)										\
-	{	/* Validate parmp not out of bounds */								\
-		assert(parmp <= parmp_max);									\
-		/* Pull each subscript descriptor out of param list and put in our parameter buffer.		\
+	{	/* Pull each subscript descriptor out of param list and put in our parameter buffer.	    	\
 		 * A subscript has been specified - copy it to the associated mval and put its address		\
 		 * in the param list. But before that, do validity checks on input ydb_buffer_t.		\
 		 */												\
@@ -529,14 +527,10 @@ MBSTART	{													\
  * though because if a call-in has returned to its caller in gtmci.c, but not yet to the call-in's caller,
  * there is also no executable frame (and likewise during initialization of a call-in before the executable
  * frame has been setup. As long as this macro is only used in places where we know we are dealing with a
- * runtime call (i.e. op_*), then this macro is accurate.
+ * runtime call (i.e. op_*), then this macro is accurate. Note there are various places in MUPIP where this
+ * macro is used that also have issues with frame_pointer being NULL.
  */
-#define IS_SIMPLEAPI_MODE	(frame_pointer->type & SFT_CI)
-
-/* The below macro is similar to IS_SIMPLEAPI_MODE except that it does not assume "frame_pointer" global variable
- * is set up. To be used in places (like condition handlers) where we are not guaranteed this.
- */
-#define IS_SIMPLEAPI_MODE_SAFE	((NULL != frame_pointer) && (frame_pointer->type & SFT_CI))
+#define IS_SIMPLEAPI_MODE	((NULL != frame_pointer) && (frame_pointer->type & SFT_CI))
 
 #define	ISSUE_TIME2LONG_ERROR_IF_NEEDED(INPUT_TIME_IN_NANOSECONDS)				\
 MBSTART {											\

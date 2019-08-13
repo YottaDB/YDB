@@ -3,6 +3,9 @@
  * Copyright (c) 2015 Fidelity National Information 		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -16,6 +19,13 @@
 #include <signal.h>	/* BYPASSOK(gtm_signal.h) */
 
 #include "gtm_multi_thread.h"	/* for INSIDE_THREADED_CODE macro */
+
+/* Describe the flags needed when it replaces/sets a signal handler. SA_ONSTACK is required by Go so that signal handlers
+ * use an alternate stack if available. Go provides a (too small) stack that we replace at the top of sig_init().
+ * The SA_SIGINFO flag gives us full information about the signal interrupt when we enter a signal handler. This is
+ * needed both by us and to effectively forward a signal we receive to the caller's signal handler that we replaced.
+ */
+#define YDB_SIGACTION_FLAGS (SA_SIGINFO | SA_ONSTACK)
 
 #define SIGPROCMASK(FUNC, NEWSET, OLDSET, RC)							\
 MBSTART {											\

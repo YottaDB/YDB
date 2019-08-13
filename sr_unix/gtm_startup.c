@@ -293,9 +293,10 @@ void gtm_startup(struct startup_vector *svec)
 	ce_init();	/* initialize compiler escape processing */
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();
+	init_timers();		/* Init these now so we can do signal forwarding consistently (if/when #410 is un-reverted) */
 	/* Initialize zwrite subsystem. Better to do it now when we have storage to allocate than
 	 * if we fail and storage allocation may not be possible. To that end, pretend we have
-	 * seen alias acitivity so those structures are initialized as well.
+	 * seen alias activity so those structures are initialized as well.
 	 */
 	assert(FALSE == curr_symval->alias_activity);
 	curr_symval->alias_activity = TRUE;			/* Temporary during lvzwr_init() */

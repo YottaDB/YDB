@@ -1343,3 +1343,5 @@ GBLDEF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 GBLDEF	void			*dummy_ptr;	/* A dummy global variable which works around a suspected Clang compiler issue.
 						 * See use of this global variable in sr_unix/gvcst_spr_queryget.c for details.
 						 */
+GBLDEF stack_t			oldaltstack;	/* The altstack descriptor that WAS in effect (if any) */
+GBLDEF char			*altstackptr;	/* The new altstack buffer we allocate for Go (for now) (if any) */

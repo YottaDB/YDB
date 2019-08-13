@@ -30,21 +30,26 @@
 //#define DEBUG_SIGNAL_HANDLING
 #ifdef DEBUG_SIGNAL_HANDLING
 # define DBGSIGHND(x) DBGFPF(x)
+# define DBGSIGHND_ONLY(x) x
 #else
 # define DBGSIGHND(x)
+# define DBGSIGHND_ONLY(x)
 #endif
 
-GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
+GBLREF void (*ydb_stm_thread_exit_fnptr)(void);
 
-/* When we share signal handling with a main in simpleAPI mode and need to drive the non-YottaDB base routine's handler
- * for a signal, we need to move it to a matching type because Linux does not define the handler with information
- * attributes (the siginfo_t and context parameters sent when SA_SIGINFO is specified) without some exotic C99* flag.
- * Use this type to drive the handler.
+#define YDB_ALTSTACK_SIZE	(256 * 1024)	/* Required size for alt-stack */
+
+/* Define a type for a sighandler_t variation for when SA_SIGINFO is used. Also, when we share signal handling with a
+ * main in simpleAPI mode and need to drive the non-YottaDB base routine's handler for a signal, we need to move it to
+ * a matching type because Linux does not define the handler with information attributes (the siginfo_t and context
+ * parameters sent when SA_SIGINFO is specified) without some exotic C99* flag. Use this type to drive the handler.
  */
 typedef void (*nonYDB_sighandler_t)(int, siginfo_t *, void *);
 
-#define IS_HANDLER_DEFINED(SIGNAL) \
-	((SIG_DFL != orig_sig_action[(SIGNAL)].sa_handler) && (SIG_IGN != orig_sig_action[(SIGNAL)].sa_handler))
+#define IS_HANDLER_DEFINED(SIGNAL) 						\
+	((SIG_DFL != (sighandler_t)orig_sig_action[(SIGNAL)].sa_sigaction)	\
+	 && (SIG_IGN != (sighandler_t)orig_sig_action[(SIGNAL)].sa_sigaction))
 
 #define DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY(NAME, SIGNAL, INFO, CONTEXT, DRIVEEXIT)					\
 MBSTART {														\

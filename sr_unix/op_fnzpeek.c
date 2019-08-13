@@ -729,7 +729,7 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	/* Setup new signal handler to just drive condition handler which will do the right thing */
 	memset(&new_action, 0, SIZEOF(new_action));
 	sigemptyset(&new_action.sa_mask);
-	new_action.sa_flags = SA_SIGINFO;
+	new_action.sa_flags = YDB_SIGACTION_FLAGS;
 	new_action.sa_sigaction = op_fnzpeek_signal_handler;
 	sigaction(SIGBUS, &new_action, &prev_action_bus);
 	sigaction(SIGSEGV, &new_action, &prev_action_segv);

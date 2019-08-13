@@ -397,12 +397,12 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		ESTABLISH_RET(middle_child, 0);
 
 		sigemptyset(&act.sa_mask);
-		act.sa_flags = SA_SIGINFO;	/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "job_term_handler")
-						 * relies on "info" and "context" being passed in.
-						 */
+		/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "job_term_handler") relies on "info" and "context"
+		 * being passed in.
+		 */
+		act.sa_flags = YDB_SIGACTION_FLAGS;
 		act.sa_sigaction = job_term_handler;
 		sigaction(SIGTERM, &act, &old_act);
-
 		OPEN_PIPE(mproc_fds, pipe_status);
 		if (-1 == pipe_status)
 		{
@@ -653,7 +653,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		REVERT;
 		getjobnum();	/* set "process_id" to a value different from parent (middle child) */
 		ESTABLISH_RET(grand_child, 0);
-		sigaction(SIGTERM, &old_act, 0);		/* restore the SIGTERM handler */
+		sigaction(SIGTERM, &old_act, NULL);		/* restore the SIGTERM handler */
 		CLOSEFILE_RESET(setup_fds[0], pipe_status);	/* resets "setup_fds[0]" to FD_INVALID */
 		/* Since middle child and grand child go off independently, it is possible the grandchild executes
 		 * "relinkctl_rundown(TRUE,...)" a little before the middle child has done "relinkctl_rundown(FALSE,...)"
