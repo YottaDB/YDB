@@ -42,6 +42,7 @@
 #include "gtm_stdio.h"
 #include "gtm_select.h"
 #include "eintr_wrappers.h"
+#include "dogetaddrinfo.h"
 
 #include "copy.h"
 #include "gt_timer.h"
@@ -114,7 +115,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		port_len = 0;
 		I2A(port_buffer, port_len, port);
 		port_buffer[port_len]='\0';
-		if (0 != (errcode = getaddrinfo(NULL, port_buffer, &hints, &ai_ptr)))
+		if (0 != (errcode = dogetaddrinfo(NULL, port_buffer, &hints, &ai_ptr)))
 		{
 			RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
 			return -1;
@@ -266,7 +267,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 		port_len = 0;
 		I2A(port_buffer, port_len, port);
 		port_buffer[port_len]='\0';
-		if (0  != (errcode = getaddrinfo(addr, port_buffer, &hints, &remote_ai_head)))
+		if (0  != (errcode = dogetaddrinfo(addr, port_buffer, &hints, &remote_ai_head)))
 		{
 			RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
 			return -1;

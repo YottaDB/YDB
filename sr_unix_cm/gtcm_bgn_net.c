@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc 	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,25 +18,24 @@
 
 #include "mdef.h"
 
+#include <errno.h>
 #include "gtm_stdlib.h"
 #include "gtm_unistd.h"		/* for close() used by CLOSEFILE_RESET */
 #include "gtm_time.h"		/* for GTM_CTIME() and GTM_TIME() */
 #include "gtm_string.h"
+#include "gtm_ctype.h"
+#include "gtm_stdio.h"
+#include "gtm_socket.h"
+#include "gtm_netdb.h"
 
 #ifndef lint
 static char rcsid[] = "$Header:$";
 #endif
 
-#include <errno.h>
-#include "gtm_ctype.h"
-
-#include "gtm_stdio.h"
-
 #include "gtcm.h"
 #include "gtmio.h"
-#include "gtm_socket.h"
-#include "gtm_netdb.h"
 #include "gtm_ipv6.h"
+#include "dogetaddrinfo.h"
 
 GBLREF char	*omi_service;
 GBLREF int	rc_server_id;
@@ -109,7 +108,7 @@ int gtcm_bgn_net(omi_conn_ll *cll)
 		hints.ai_family = AF_INET;
 	}
 	/*  Bind an address to the socket */
-	if (0 != (errcode = getaddrinfo(NULL, omi_service, &hints, &ai_ptr)))
+	if (0 != (errcode = dogetaddrinfo(NULL, omi_service, &hints, &ai_ptr)))
 	{
 		RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
 		return errcode;

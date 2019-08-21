@@ -32,6 +32,7 @@
 #include "setzdir.h"
 #include "gtmmsg.h" /* for gtm_putmsg */
 #include "min_max.h"
+#include "dogetaddrinfo.h"
 
 #define LOCALHOSTNAME "localhost"
 #define LOCALHOSTNAME6 "::1"
@@ -163,12 +164,12 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 					query_node_name[query_node_len] = 0;
 					localhost_sa_ptr = NULL; /* Null value needed if not find query node (remote default) */
 					CLIENT_HINTS(hints);
-					errcode = getaddrinfo(query_node_name, NULL, &hints, &ai_ptr);
+					errcode = dogetaddrinfo(query_node_name, NULL, &hints, &ai_ptr);
 					if (0 == errcode)
 					{
 						memcpy((sockaddr_ptr)&query_sas, ai_ptr->ai_addr, ai_ptr->ai_addrlen);
 						CLIENT_HINTS(hints);
-						if (0 == (errcode = getaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr))
+						if (0 == (errcode = dogetaddrinfo(LOCALHOSTNAME, NULL, &hints, &localhost_ai_ptr))
 							&& (0 == memcmp(localhost_ai_ptr->ai_addr, (sockaddr_ptr)&query_sas,
 												localhost_ai_ptr->ai_addrlen)))
 						{
@@ -182,7 +183,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
 										LEN_AND_LIT("gethostname"), CALLFROM, errno);
 							CLIENT_HINTS(hints);
-							errcode = getaddrinfo(local_node_name, NULL, &hints, &localhost_ai_ptr);
+							errcode = dogetaddrinfo(local_node_name, NULL, &hints, &localhost_ai_ptr);
 							if (0 != errcode)
 								localhost_ai_ptr = NULL;	/* Empty address list */
 							for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;
@@ -200,7 +201,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 						if (!localhost_sa_ptr)
 						{
 							CLIENT_HINTS(hints);
-							errcode = getaddrinfo(LOCALHOSTNAME6, NULL, &hints, &localhost_ai_ptr);
+							errcode = dogetaddrinfo(LOCALHOSTNAME6, NULL, &hints, &localhost_ai_ptr);
 							if (0 != errcode)
 								localhost_ai_ptr = NULL;	/* Empty address list */
 							for (temp_ai_ptr = localhost_ai_ptr; temp_ai_ptr!= NULL;

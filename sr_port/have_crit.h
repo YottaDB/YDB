@@ -84,6 +84,7 @@ typedef enum
 	INTRPT_IN_DB_JNL_LSEEKWRITE,	/* Deferring interrupts in DB_/JNL_LSEEKWRITE() call */
 	INTRPT_IN_JNL_QIO,		/* Deferring interrupts in journal qio, replacing jnl_qio_in_prog. */
 	INTRPT_IN_MLK_CLEANUP,		/* Deferring interrupts around lock table cleanup code */
+	INTPRT_IN_DO_GETADDRINFO,	/* Deferring interrupts around getaddrinfo() while in dogetaddrinfo() */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 
@@ -273,10 +274,10 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 	}											\
 }
 
-#define	OK_TO_SEND_MSG	((INTRPT_IN_X_TIME_FUNCTION != intrpt_ok_state) 				\
-			&& (INTRPT_IN_LOG_FUNCTION != intrpt_ok_state)					\
-			&& (INTRPT_IN_FUNC_WITH_MALLOC != intrpt_ok_state)				\
-			&& (INTRPT_IN_FORK_OR_SYSTEM != intrpt_ok_state))
+#define	OK_TO_SEND_MSG	((INTRPT_IN_X_TIME_FUNCTION != intrpt_ok_state) 	\
+			 && (INTRPT_IN_LOG_FUNCTION != intrpt_ok_state)		\
+			 && (INTRPT_IN_FUNC_WITH_MALLOC != intrpt_ok_state)	\
+			 && (INTRPT_IN_FORK_OR_SYSTEM != intrpt_ok_state))
 
 uint4	have_crit(uint4 crit_state);
 void	deferred_signal_handler(void);

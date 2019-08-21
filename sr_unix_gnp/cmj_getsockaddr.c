@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,6 +15,7 @@
 
 #include "mdef.h"
 
+#include <errno.h>
 #include "gtm_socket.h"
 #include "gtm_netdb.h"
 #include "gtm_ipv6.h"
@@ -23,10 +24,9 @@
 #include "gtm_inet.h"
 #include "gtm_ctype.h"
 
-#include <errno.h>
-
 #include "cmidef.h"
 #include "eintr_wrappers.h"
+#include "dogetaddrinfo.h"
 
 #define IPV6_SEPARATOR ']'
 #define IPV6_START '['
@@ -115,7 +115,7 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 			*(addr_str_ptr + iplen) = '\0';
 			/* obtain ipv4/6 address for host tnd_str */
 			CLIENT_HINTS(hints);
-			if (0 != (errcode = getaddrinfo(addr_str_ptr, port_str, &hints, &ai_ptr)))
+			if (0 != (errcode = dogetaddrinfo(addr_str_ptr, port_str, &hints, &ai_ptr)))
 			{
 				*(addr_str_ptr + iplen) = addr_end;
 				return CMI_BADIPADDRPORT;
@@ -129,7 +129,7 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 				memcpy(hn, CMI_DESC_POINTER(nod), CMI_DESC_LENGTH(nod));
 				hn[CMI_DESC_LENGTH(nod)] = '\0';
 				CLIENT_HINTS(hints);
-				while ((EAI_AGAIN == (errcode = getaddrinfo(hn, port_str, &hints, &ai_ptr))) && (0 < loop_limit))
+				while ((EAI_AGAIN == (errcode = dogetaddrinfo(hn, port_str, &hints, &ai_ptr))) && (0 < loop_limit))
 				{
 					loop_limit--;
 				}
@@ -139,7 +139,7 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 				return SS_NORMAL;
 			}
 			SERVER_HINTS(hints, (ipv4_only ? AF_INET : AF_UNSPEC));
-			if (0 != (errcode = getaddrinfo(NULL, port_str, &hints, &ai_ptr)))
+			if (0 != (errcode = dogetaddrinfo(NULL, port_str, &hints, &ai_ptr)))
 			{
 				return CMI_BADIPADDRPORT;
 			}
@@ -155,7 +155,7 @@ cmi_status_t cmj_getsockaddr(cmi_descriptor *nod, cmi_descriptor *tnd, struct ad
 	{	/* neither host nor port is specified */
 		/* use the services db */
 		SERVER_HINTS(hints, (ipv4_only ? AF_INET : AF_UNSPEC));
-		if (0 != (errcode = getaddrinfo(NULL, GTCM_SERVER_NAME, &hints, &ai_ptr)))
+		if (0 != (errcode = dogetaddrinfo(NULL, GTCM_SERVER_NAME, &hints, &ai_ptr)))
 			return CMI_NOSERVENT;
 	}
 	*ai_ptr_ptr = ai_ptr;

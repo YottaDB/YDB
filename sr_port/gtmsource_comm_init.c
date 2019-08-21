@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -43,6 +46,7 @@
 #include "repl_sp.h"
 #include "repl_comm.h"
 #include "repl_log.h"
+#include "dogetaddrinfo.h"
 
 GBLDEF	int			gtmsource_sock_fd = FD_INVALID;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
@@ -55,16 +59,17 @@ error_def(ERR_TEXT);
 int gtmsource_comm_init(void)
 {
 	/* Initialize communication stuff */
-	struct	linger	disable_linger = {0, 0};
-	char	error_string[1024];
-	int	err_status;
-	struct addrinfo *ai_ptr = NULL, *ai_head = NULL, hints;
+	struct addrinfo 	*ai_ptr = NULL, *ai_head = NULL, hints;
 	gtmsource_local_ptr_t   gtmsource_local;
-	char	*host;
-	char	port_buffer[NI_MAXSERV];
-	int	port_len;
-	int	errcode;
-	int	tries;
+	intrpt_state_t  	prev_intrpt_state;
+	struct linger		disable_linger = {0, 0};
+	char			error_string[1024];
+	int			err_status;
+	char			*host;
+	char			port_buffer[NI_MAXSERV];
+	int			port_len;
+	int			errcode;
+	int			tries;
 
 	if (FD_INVALID != gtmsource_sock_fd) /* Initialization done already */
 		return(0);
@@ -75,18 +80,16 @@ int gtmsource_comm_init(void)
 	host = gtmsource_local->secondary_host;
 	CLIENT_HINTS(hints);
 	for (tries = 0;
-	     tries < MAX_GETHOST_TRIES &&
-	     EAI_AGAIN == (errcode = getaddrinfo(host, port_buffer, &hints, &ai_head));
-	      tries++);
+	     (tries < MAX_GETHOST_TRIES) && (EAI_AGAIN == (errcode = dogetaddrinfo(host, port_buffer, &hints, &ai_head)));
+	     tries++);
 	if (0 != errcode)
 		RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
-	/* find one address valid for creating socket */
+	/* Find one address valid for creating socket */
 	assert(ai_head);
 	for(ai_ptr = ai_head; NULL != ai_ptr; ai_ptr = ai_ptr->ai_next)
 	{
-		if (FD_INVALID == (gtmsource_sock_fd = socket(ai_ptr->ai_family, ai_ptr->ai_socktype,
-								ai_ptr->ai_protocol)))
-				err_status = errno;
+		if (FD_INVALID == (gtmsource_sock_fd = socket(ai_ptr->ai_family, ai_ptr->ai_socktype, ai_ptr->ai_protocol)))
+			err_status = errno;
 		else
 		{
 			err_status = 0;
@@ -112,7 +115,7 @@ int gtmsource_comm_init(void)
 	{
 		err_status = ERRNO;
 		SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket disable linger : %s",
-				STRERROR(err_status));
+			 STRERROR(err_status));
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
 	}
 	return(0);

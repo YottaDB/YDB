@@ -44,6 +44,7 @@
 #include "gtm_caseconv.h"
 #include "util.h"
 #include "trans_log_name.h"
+#include "dogetaddrinfo.h"
 
 error_def(ERR_ADDRTOOLONG);
 error_def(ERR_GETSOCKNAMERR);
@@ -158,7 +159,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 				port_buffer_len = 0;
 				I2A(port_buffer, port_buffer_len, port);
 				port_buffer[port_buffer_len]='\0';
-				if (0 != (errcode = getaddrinfo(NULL, port_buffer, &hints, &addr_info_ptr)))
+				if (0 != (errcode = dogetaddrinfo(NULL, port_buffer, &hints, &addr_info_ptr)))
 				{
 					close(sd);
 					RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
@@ -199,7 +200,7 @@ socket_struct *iosocket_create(char *sockaddr, uint4 bfsize, int file_des, boole
 					memcpy(temp_addr, sockaddr, addrlen);
 				temp_addr[addrlen] = 0;
 				CLIENT_HINTS(hints);
-				if (0 != (errcode = getaddrinfo(temp_addr, port_buffer, &hints, &addr_info_ptr)))
+				if (0 != (errcode = dogetaddrinfo(temp_addr, port_buffer, &hints, &addr_info_ptr)))
 				{
 					RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
 					return NULL;

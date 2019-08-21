@@ -43,6 +43,7 @@
 #include "fgncal.h"		/* Needed for MAX_ERRSTR_LEN */
 #include "eintr_wrappers.h"
 #include "compiler.h"		/* Needed for MAX_SRCLINE */
+#include "dogetaddrinfo.h"
 
 #define	ON			1		/* Used to enable socket options */
 #define STRINGIFY(S)		#S
@@ -357,7 +358,7 @@ int	dm_audit_init(char *host_info, boolean_t is_tls)
 		port_len = STRLEN(port_buffer);
 		port_buffer[port_len]='\0';
 		CLIENT_HINTS(hints);
-		if (0  != (errcode = getaddrinfo(host, port_buffer, &hints, &remote_ai_head)))
+		if (0  != (errcode = dogetaddrinfo(host, port_buffer, &hints, &remote_ai_head)))
 		{
 			free_dm_audit_info();
 			RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
