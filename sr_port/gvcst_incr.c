@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2004, 2010 Fidelity Information Services, Inc	*
+ * Copyright 2004, 2010 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -52,7 +55,7 @@ void	gvcst_incr(mval *increment, mval *result)
 	 */
 	increment_delta_mval = *increment;
 	/* Since we should be caring about just the numeric part, nullify the string part of the mval */
-	increment_delta_mval.str.len = 0;
+	increment_delta_mval.mvtype &= ~MV_STR; 	/* Remove string designation */
 	gvcst_put(&increment_delta_mval);
 	assert(!in_gvcst_incr);	/* should have been reset by gvcst_put */
 	in_gvcst_incr = FALSE;	/* just in case it is not reset already by gvcst_put */
