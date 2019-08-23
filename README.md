@@ -53,11 +53,11 @@ listed below. For example for Ubuntu Linux:
 
 - Building YottaDB from source tarball
 
-  The YottaDB source tarball extracts to a directory with the version number in the name, e.g. ```yottadb_r123```
+  The YottaDB source tarball extracts to a directory with the version number in the name, e.g. ```yottadb_r128```
 
   ```sh
-  tar xzf yottadb_r123_src.tar.gz
-  cd yottadb_r123_src
+  tar xzf yottadb_r128_src.tar.gz
+  cd yottadb_r128_src
   ```
 
   You should find this README, LICENSE, COPYING and CMakeLists.txt file and sr\_\* directories.
@@ -79,7 +79,7 @@ listed below. For example for Ubuntu Linux:
   cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
   make -j `grep -c ^processor /proc/cpuinfo`
   make install
-  cd yottadb_r123
+  cd yottadb_r128
   ```
 
 ### Build with Clang/LLVM
@@ -88,7 +88,7 @@ listed below. For example for Ubuntu Linux:
   cmake -D CMAKE_LINKER:PATH=/usr/bin/ld.lld -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
   make -j `grep -c ^processor /proc/cpuinfo`
   make install
-  cd yottadb_r123
+  cd yottadb_r128
   ```
 
   Note that the ```make install``` command above does not create the final installed YottaDB.
@@ -98,7 +98,7 @@ listed below. For example for Ubuntu Linux:
 - Installing YottaDB
 
   Now you are ready to install YottaDB. The default installation path for each release includes the release
-  (e.g. for YottaDB r1.26, the default installation path is /usr/local/lib/yottadb/r126),
+  (e.g. for YottaDB r1.28, the default installation path is /usr/local/lib/yottadb/r128),
   but can be controlled using the ```--installdir``` option. Run ```./ydbinstall --help``` for a list of options.
 
   ```sh
@@ -164,7 +164,7 @@ docker run --rm -it yottadb/yottadb # you can add a specific version after a ":"
   Example error message that would be printed to the screen:
 
   ```
-  %YDB-E-DLLNOOPEN, Failed to load external dynamic library /usr/local/lib/yottadb/r126/libyottadb.so
+  %YDB-E-DLLNOOPEN, Failed to load external dynamic library /usr/local/lib/yottadb/r128/libyottadb.so
   %YDB-E-TEXT, libtinfo.so.5: cannot open shared object file: No such file or directory
   ```
 
