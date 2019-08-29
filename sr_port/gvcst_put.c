@@ -231,19 +231,27 @@ error_def(ERR_UNIMPLOP);
 }
 
 #ifdef DEBUG
-# define DBG_SAVE_VAL_AT_FUN_ENTRY							\
-{	/* Save copy of "val" at function entry.					\
-	 * Make sure this is not touched by any nested trigger code */			\
-	dbg_lcl_val = val;								\
-	dbg_vallen = val->str.len;							\
-	memcpy(dbg_valbuff, val->str.addr, MIN(ARRAYSIZE(dbg_valbuff), dbg_vallen));	\
+# define DBG_SAVE_VAL_AT_FUN_ENTRY								\
+{	/* Save copy of "val" at function entry.						\
+	 * Make sure this is not touched by any nested trigger code */				\
+	dbg_lcl_val = val;									\
+	if (MV_STR & val->mvtype)								\
+	{											\
+		dbg_vallen = val->str.len;							\
+		memcpy(dbg_valbuff, val->str.addr, MIN(ARRAYSIZE(dbg_valbuff), dbg_vallen));	\
+	}											\
 }
 
-# define DBG_CHECK_VAL_AT_FUN_EXIT										\
-{	/* Check "val" is same as what it was at function entry.(i.e. was not touched by nested trigger code).	\
-	 * The only exception is if $ZTVAL changed "val" in which case gvcst_put would have been redone. */	\
-	assert(dbg_vallen == dbg_lcl_val->str.len);								\
-	assert(0 == memcmp(dbg_valbuff, dbg_lcl_val->str.addr, MIN(ARRAYSIZE(dbg_valbuff), dbg_vallen)));	\
+# define DBG_CHECK_VAL_AT_FUN_EXIT											\
+{	/* Check "val" is same as what it was at function entry.(i.e. was not touched by nested trigger code).		\
+	 * The only exception is if $ZTVAL changed "val" in which case gvcst_put would have been redone.		\
+	 */														\
+	if ((MV_STR & dbg_lcl_val->mvtype) && (MV_STR & val->mvtype))							\
+	{	/* If both are (still) string, compare the buffer */							\
+		assert(dbg_vallen == dbg_lcl_val->str.len);								\
+		assert(0 == memcmp(dbg_valbuff, dbg_lcl_val->str.addr, MIN(ARRAYSIZE(dbg_valbuff), dbg_vallen)));	\
+	} else														\
+		assert(0 == memcmp(val, dbg_lcl_val, SIZEOF(mval)));							\
 }
 #else
 # define DBG_SAVE_VAL_AT_FUN_ENTRY
