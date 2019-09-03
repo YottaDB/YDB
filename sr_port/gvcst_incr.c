@@ -56,6 +56,7 @@ void	gvcst_incr(mval *increment, mval *result)
 	increment_delta_mval = *increment;
 	/* Since we should be caring about just the numeric part, nullify the string part of the mval */
 	increment_delta_mval.mvtype &= ~MV_STR; 	/* Remove string designation */
+	increment_delta_mval.str.len = 0;		/* Needed for various asserts/checks in gvcst_put() [temp see YDB#483] */
 	gvcst_put(&increment_delta_mval);
 	assert(!in_gvcst_incr);	/* should have been reset by gvcst_put */
 	in_gvcst_incr = FALSE;	/* just in case it is not reset already by gvcst_put */
