@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -22,9 +25,11 @@
 /* we return strings for >18 digit 64-bit numbers, so pull in stringpool */
 #include "stringpool.h"
 
-GBLREF spdesc   stringpool;
+GBLREF	spdesc   	stringpool;
+GBLREF	boolean_t	bool_expr_saw_sqlnull;
 
-LITREF int4 ten_pwr[];
+LITREF	int4		ten_pwr[];
+LITREF	mval		literal_zero;
 
 #define BUFF_LEN	32 /* MAX of 16, 21 and 32 */
 
@@ -84,18 +89,24 @@ void i2mval(mval *v, int i)
 {
 	int4	n;
 
-	v->mvtype = MV_NM;
-	if (i < 0)
+	if (bool_expr_saw_sqlnull)
 	{
-		v->sgn = 1;
-		n = -i;
+		*v = literal_zero;
+		bool_expr_saw_sqlnull = FALSE;
 	} else
 	{
-		n = i;
-		v->sgn = 0;
+		v->mvtype = MV_NM;
+		if (i < 0)
+		{
+			v->sgn = 1;
+			n = -i;
+		} else
+		{
+			n = i;
+			v->sgn = 0;
+		}
+		xi2mval(v, n);
 	}
-
-	xi2mval(v, n);
 }
 
 /* xi2mval does the bulk of the conversion for i2mval and i2usmval.

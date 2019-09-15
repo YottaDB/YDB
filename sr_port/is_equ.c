@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,12 +16,19 @@
 
 #include "gtm_string.h"
 
+GBLREF	boolean_t	bool_expr_saw_sqlnull;
+
 int is_equ(mval *u,mval *v)
 {
 	int		land, lor, utyp, vtyp;
 
 	utyp = u->mvtype;
 	vtyp = v->mvtype;
+	if ((utyp & MV_SQLNULL) || (vtyp & MV_SQLNULL))
+	{
+		bool_expr_saw_sqlnull = TRUE;
+		return 0;
+	}
 	land = utyp & vtyp;
 	lor = utyp | vtyp;
 	if ((land & MV_NM) != 0 && (lor & MV_NUM_APPROX) == 0)

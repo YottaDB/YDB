@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -121,7 +121,7 @@ error_def(ERR_TEXT);
 error_def(ERR_UNIMPLOP);
 error_def(ERR_ZDIROUTOFSYNC);
 
-LITREF mval		literal_zero, literal_one, literal_null;
+LITREF mval		literal_zero, literal_one, literal_null, literal_sqlnull;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
 LITREF char		ydb_release_stamp[];
@@ -419,6 +419,9 @@ void op_svget(int varnum, mval *v)
 			v->mvtype = MV_STR;
 			v->str.addr = (char *)ydb_release_name;
 			v->str.len = ydb_release_name_len;
+			break;
+		case SV_ZYSQLNULL:
+			*v = literal_sqlnull;
 			break;
 		case SV_ZSYSTEM:
 			MV_FORCE_MVAL(v, dollar_zsystem);

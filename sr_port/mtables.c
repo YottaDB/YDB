@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017,2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017,2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -235,6 +235,7 @@ LITDEF mval literal_notimeout	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 0, 
  * --------------------------------------------------------------------------------------------------------------------------
  */
 LITDEF mval literal_null	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX, 0, 0, 0, 0, 0, 0);
+LITDEF mval literal_sqlnull	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX | MV_SQLNULL, 0, 0, 0, 0, 0, 0);
 LITDEF mval literal_numoflow	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_NUM_APPROX, EXPHI, 0, 0, 0, 0, 1);
 /* Create mval to hold batch type TSTART. "BA" or "BATCH" mean the same.
  * We define the shorter version here to try reduce the time taken for comparison.

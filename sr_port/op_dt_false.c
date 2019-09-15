@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,9 +15,15 @@
 #include "mdef.h"
 #include "op.h"
 
-GBLREF	int dollar_truth;
+GBLREF	int		dollar_truth;
+GBLREF	boolean_t	bool_expr_saw_sqlnull;
 
 void op_dt_false(void)
 {
-	dollar_truth = FALSE;
+	if (bool_expr_saw_sqlnull)
+	{
+		dollar_truth = FALSE;
+		bool_expr_saw_sqlnull = FALSE;
+	} else
+		dollar_truth = FALSE;
 }

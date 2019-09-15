@@ -390,6 +390,9 @@ typedef long		ulimit_t;	/* NOT int4; the UNIX ulimit function returns a value of
 #define MV_UTF_LEN     256	/* 0x0100 */
 #define MV_ALIASCONT   512	/* 0x0200 */
 
+/* YDB additions to MV_* type bit masks. These go down to reduce the chances of colliding with GT.M changes */
+#define MV_SQLNULL   32768	/* 0x8000 */
+
 #define	MV_INT_OFF			~(MV_INT)			/* Mask to turn off MV_INT */
 #define	MV_STR_OFF			~(MV_STR)			/* Mask to turn off MV_STR */
 #define	MV_CANONICAL_OFF		~(MV_CANONICAL)			/* Mask to turn off MV_CANONICAL */
