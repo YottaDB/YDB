@@ -20,7 +20,7 @@
 
 #define GTM_VERSION		"V6.3"
 #define	GTM_ZVERSION		"V6.3-007"
-#define	YDB_ZYRELEASE		"r1.28"		/* changes here should be reflected in YDB_RELEASE in sr_unix/libyottadb.h */
+#define	YDB_ZYRELEASE		"r1.29"		/* changes here should be reflected in YDB_RELEASE in sr_unix/libyottadb.h */
 
 /* Note: YDB_RELEASE_STAMP is set as part of the cmake build process.
  * Example values are
