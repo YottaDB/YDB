@@ -58,23 +58,13 @@
 
    In the YottaDB programming environment, source routines are generated and
    stored as standard UNIX files. They are created and edited with standard
-<<<<<<< HEAD
-   UNIX text editors. YottaDB accepts source lines of up to 8192 bytes. When
-   YottaDB encounters a line with a length greater than 8192 bytes in a source
+   UNIX text editors. YottaDB accepts source lines of up to 32K bytes. When
+   YottaDB encounters a line with a length greater than 32K bytes in a source
    file, it emits a %YDB-W-LSEXPECTED warning. This warning identifies cases
-   where a line greater than 8192 bytes is split into multiple lines, which
+   where a line greater than 32K bytes is split into multiple lines, which
    causes statements beyond the character prior to the limit to execute
-   irrespective of any starting IF, ELSE or FOR commands. The 8192 byte limit
+   irrespective of any starting IF, ELSE or FOR commands. The 32K byte limit
    applies to XECUTE command arguments and Direct Mode input as well.
-=======
-   UNIX text editors. GT.M accepts source lines of up to 8192 bytes. When
-   GT.M encounters a line with a length greater than 8192 bytes in a source
-   file, it emits an LSEXPECTED warning. This warning identifies cases where
-   a line greater than 8192 bytes is split into multiple lines, which causes
-   statements beyond the character prior to the limit to execute irrespective
-   of any starting IF, ELSE or FOR commands. The 8192 byte limit applies to
-   XECUTE command arguments and Direct Mode input as well.
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
    YottaDB is designed to work with the operating system utilities and enhances
    them when beneficial. The following sections describe the process of
@@ -2929,11 +2919,7 @@
    execute the command. When the timeout is zero (0), M makes a single
    attempt to complete the command.
 
-<<<<<<< HEAD
    YottaDB caps the maximum timeout to 999,999.999 seconds (about 11.5 days),
-=======
-   GT.M caps the maximum timeout to 2,147,483.647 seconds (about 24.8 days),
->>>>>>> a6cd7b01f... GT.M V6.3-008
    and converts values greater than the maximum timeout to that cap. When a
    command has a timeout, M maintains the $TEST intrinsic special variable as
    the command completes. If the command completes successfully, M sets $TEST
@@ -4052,13 +4038,8 @@
    the evaluation of the first false argument, however any global references
    within the expression act in sequence to maintain the naked reference. The
    "FULL_BOOLEAN" and "SIDE_EFFECTS" compiler settings modify this behavior
-<<<<<<< HEAD
    if you desire YottaDB to provide side effects it would otherwise bypass due
-   to short-circiuting of Boolean expressions.
-=======
-   if you desire GT.M to provide side effects it would otherwise bypass due
    to short-circuiting of Boolean expressions.
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
 3 Examples
    Examples
@@ -5188,24 +5169,14 @@
    VIEW "NOLOGNONTP" turns off the logging of NONTPRESTART messages to the
    operator log.
 
-<<<<<<< HEAD
-   VIEW "LOGNONTP"[=intexpr] turns on logging of NONTPRESTART messages to the
+   VIEW "LOGNONTP"[:intexpr] turns on logging of NONTPRESTART messages to the
    operator log. If no intexpr is specified, YottaDB uses the value of
    environment variable ydb_nontprestart_log_delta, if it is defined, and one
-=======
-   VIEW "LOGNONTP"[:intexpr] turns on logging of NONTPRESTART messages to the
-   operator log. If no intexpr is specified, GT.M uses the value of
-   environment variable gtm_nontprestart_log_delta, if it is defined, and one
->>>>>>> a6cd7b01f... GT.M V6.3-008
    otherwise (that is, every transaction restart will be logged). A negative
    value of intexpr turns off the logging of NONTPRESTART messages.
 
    Note that it is not possible to perform the operations of
-<<<<<<< HEAD
-   ydb_nontprestart_log_first with VIEW "LOGNONTP"[=intexpr].
-=======
-   gtm_nontprestart_log_first with VIEW "LOGNONTP"[:intexpr].
->>>>>>> a6cd7b01f... GT.M V6.3-008
+   ydb_nontprestart_log_first with VIEW "LOGNONTP"[:intexpr].
 
 4 LOGTPRESTART
    LOGTPRESTART
@@ -5217,24 +5188,14 @@
    VIEW "NOLOGTPRESTART" turns off the logging of TPRESTART messages to the
    operator log.
 
-<<<<<<< HEAD
-   VIEW "LOGTPRESTART"[=intexpr] turns on logging of TPRESTART messages to
+   VIEW "LOGTPRESTART"[:intexpr] turns on logging of TPRESTART messages to
    the operator log. If no intexpr is specified, YottaDB uses the value of
    environment variable ydb_tprestart_log_delta, if it is defined, and one
-=======
-   VIEW "LOGTPRESTART"[:intexpr] turns on logging of TPRESTART messages to
-   the operator log. If no intexpr is specified, GT.M uses the value of
-   environment variable gtm_tprestart_log_delta, if it is defined, and one
->>>>>>> a6cd7b01f... GT.M V6.3-008
    otherwise (that is, every transaction restart will be logged). A negative
    value of intexpr turns off the logging of TPRESTART messages.
 
    Note that it is not possible to perform the operations of
-<<<<<<< HEAD
-   ydb_tprestart_log_first with VIEW "LOGTPRESTART"[=intexpr].
-=======
-   gtm_tprestart_log_first with VIEW "LOGTPRESTART"[:intexpr].
->>>>>>> a6cd7b01f... GT.M V6.3-008
+   ydb_tprestart_log_first with VIEW "LOGTPRESTART"[:intexpr].
 
 4 LV_GCOL
    LV_GCOL
@@ -7043,11 +7004,7 @@
    $ZQUIT=0
    $ZREALSTOR=694280
    $ZRELDATE="20180614 00:33"
-<<<<<<< HEAD
-   $ZROUTINES=". /home/user/.yottadb/r1.28_x86_64/o*(/home/user/.yottadb/r1.28_x86_64/r /home/user/.yottadb/r) /usr/local/lib/yottadb/r128/libyottadbutil.so"
-=======
-   $ZROUTINES=". /usr/lib/fis-gtm/V6.3-007_x86_64 /usr/lib/fis-gtm/V6.3-007_x86_64/plugin/o(/usr/lib/fis-gtm/V6.3-007_x86_64/plugin/r)"
->>>>>>> a6cd7b01f... GT.M V6.3-008
+   $ZROUTINES=". /home/user/.yottadb/r1.30_x86_64/o*(/home/user/.yottadb/r1.30_x86_64/r /home/user/.yottadb/r) /usr/local/lib/yottadb/r130/libyottadbutil.so"
    $ZSOURCE=""
    $ZSTATUS=""
    $ZSTEP="B"
@@ -11898,27 +11855,17 @@
    a file name for the Global Directory using the name $ydb_gbldir and the
    extension .gld in the current working directory.
 
-<<<<<<< HEAD
    $ZGBLDIR is a read-write Intrinsic Special Variable, (i.e., it can appear
    on the left side of the equal sign (=) in the argument to the SET
    command). SET $ZGBLDIR="" causes YottaDB to assign $ZGBLDIR to the
    translation of ydb_gbldir if that environment variable is defined. If it is
    not defined, then SET $ZGBLDIR="" causes YottaDB to construct a file name
-   using the name $ydb_gbldir.gld in the current directory. YottaDB permits
-   $ZGBLDIR to be NEW'd. A $ZGBLDIR value may include an environment
-   variable.
-=======
-   $ZGBLDIR is a read-write Intrinsic Special Variable, (that is, it can
-   appear on the left side of the equal sign (=) in the argument to the SET
-   command). SET $ZGBLDIR="" causes GT.M to assign $ZGBLDIR to the
-   translation of gtmgbldir if that environment variable is defined. If it is
-   not defined, then SET $ZGBLDIR="" causes GT.M to construct a file name
-   using the name $gtmgbldir.gld in the current directory. NEWing $ZGBLDIR is
+   using the name $ydb_gbldir.gld in the current directory.  NEWing $ZGBLDIR is
    the same as SET $ZGBLDIR="", which as just noted may change its value. For
    code that immediately SETs $ZGBLDIR after NEW'ng it that behavior doesn't
    matter, but without an associated SET, such a change may seem
    counterintuitive. A $ZGBLDIR value may include an environment variable.
->>>>>>> a6cd7b01f... GT.M V6.3-008
+
 
    SETting $ZGBLDIR also causes YottaDB to attempt to open the specified file.
    If the file name is invalid or the file is inaccessible, YottaDB triggers an
@@ -11929,12 +11876,9 @@
    a convenient way to use the same Global Directory during a session where
    you repeatedly invoke and leave YottaDB.
 
-<<<<<<< HEAD
    Changes to the value of $ZGBLDIR during a YottaDB invocation only last for
    the current invocation and do not change the value of ydb_gbldir.
 
-=======
->>>>>>> a6cd7b01f... GT.M V6.3-008
    Example:
 
    $ ydb_gbldir=test.gld
@@ -12087,23 +12031,16 @@
    OPENs of disk files and FIFOs, OPENs of SOCKETs with the CONNECT parameter
    (unless zero timeout,) WRITE /WAIT for SOCKETs, and READ for terminals,
    SOCKETs, FIFOs, and PIPEs. If +$ZTEXIT evaluates to a truth value at the
-<<<<<<< HEAD
    outermost TCOMMIT or TROLLBACK, YottaDB XECUTEs $ZINTERRUPT after completing
-   the commit or rollback. CTRAP characters are recognized when they are
-   typed on OpenVMS but when they are read on UNIX.
-=======
-   outermost TCOMMIT or TROLLBACK, GT.M XECUTEs $ZINTERRUPT after completing
    the commit or rollback. Except for <CTRL-C> GT.M recognizes CTRAP
    characters when READ. CTRAP characters other than <CTRL-C> tend to be
    limited by terminal configuration.
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
    If an interrupt event occurs in a long running external call (for example,
    waiting in a message queue), YottaDB recognizes the event but makes the
    vector transfer after the external call returns when it reaches the next
    appropriate execution boundary.
 
-<<<<<<< HEAD
    When an interrupt handler is invoked, YottaDB saves and restores the current
    values of $REFERENCE. However, the current device ($IO) is neither saved
    nor restored. If an interrupt handler changes $IO (via USE), ensure that
@@ -12112,16 +12049,7 @@
    specify USE without any deviceparameters. Any attempt to do IO on a device
    which was actively doing IO when the interrupt was recognized may result
    in a ZINTERCURSEIO error.
-=======
-   When GT.M uses an interrupt handler, it saves and restores the current
-   values of $REFERENCE. However, GT.M does not implicitly save or restore
-   the current device ($IO). If an interrupt handler changes $IO (via USE),
-   ensure that the interrupt handler restores the current device before
-   returning. To restore the device which was current when the interrupt
-   handler began, specify USE without any deviceparameters. Any attempt to do
-   IO on a device which was actively doing IO when the interrupt was
-   recognized may cause a ZINTERCURSEIO error.
->>>>>>> a6cd7b01f... GT.M V6.3-008
+
 
    Example:
 
@@ -12156,33 +12084,18 @@
 
    If an error occurs while compiling the $ZINTERRUPT code, the error handler
    is not invoked (the error handler is invoked if an error occurs while
-<<<<<<< HEAD
-   executing the $ZINTERRUPT code), YottaDB sends the YDB-ERRWZINTR message and
+   executing the $ZINTERRUPT code), YottaDB sends the YDB-E-ERRWZINTR message and
    the compiler error message to the operator log facility. If the YottaDB
    process is at a direct mode prompt or is executing a direct mode command
-   (for example, a FOR loop), YottaDB sends also sends the YDB-ERRWZINTR error
+   (for example, a FOR loop), YottaDB sends also sends the YDB-EERRWZINTR error
    message to the user console along with the compilation error. In both
    cases, the interrupted process resumes execution without performing any
    action specified by the defective $ZINTERRUPT vector.
-=======
-   executing the $ZINTERRUPT code), GT.M sends the ERRWZINTR message and the
-   compiler error message to the operator log facility. If the GT.M process
-   is at a direct mode prompt or is executing a direct mode command (for
-   example, a FOR loop), GT.M sends also sends the ERRWZINTR error message to
-   the user console along with the compilation error. In both cases, the
-   interrupted process resumes execution without performing any action
-   specified by the defective $ZINTERRUPT vector.
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
    If YottaDB encounters an error during creation of the interrupt handler's
    stack frame (before transferring control to the application code specified
-<<<<<<< HEAD
-   by the vector), that error is prefixed with a YDB-ERRWZINTR error. The
+   by the vector), that error is prefixed with a YDB-E-ERRWZINTR error. The
    error handler then executes normal error processing associated with the
-=======
-   by the vector), that error is prefixed with a ERRWZINTR error. The error
-   handler then executes normal error processing associated with the
->>>>>>> a6cd7b01f... GT.M V6.3-008
    interrupted routine.
 
    **Note**
@@ -17274,15 +17187,9 @@
    CTRAP=expr Applies to: Terminals and Printers
 
    Establishes the <CTRL> characters in the expression as trap characters for
-<<<<<<< HEAD
    the current device. When YottaDB receives a trap character in the input from
    a device, YottaDB issues a run-time exception. The device does not have to be
    the current device, that is $IO.
-=======
-   the current device. When a READ from a device receives a trap character,
-   GT.M interrupts process execution. The device does not have to be the
-   current device, that is $IO.
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
    The <CTRL> characters are ASCII 0 though 31. However terminal
    configuration may prevent of most <CTRL> characters from ever reaching
@@ -19683,21 +19590,12 @@
    close all such resources. On successful exit, ydb_exit() returns zero (0),
    else it returns the $ZSTATUS error code.
 
-<<<<<<< HEAD
    ydb_exit() cannot be called from an external call function. YottaDB reports
    the error YDB-E-INVYDBEXIT if an external call function invokes
    ydb_exit(). Since the YottaDB run-time system must be operational even after
    the external call function returns, ydb_exit() is meant to be called only
    once during a process lifetime, and only from the base C/C++ program when
    YottaDB functions are no longer required by the program.
-=======
-   gtm_exit() cannot be called from an external call function. GT.M reports
-   the INVGTMEXIT error if an external call function invokes gtm_exit().
-   Since the GT.M run-time system must be operational even after the external
-   call function returns, gtm_exit() is meant to be called only once during a
-   process lifetime, and only from the base C/C++ program when GT.M functions
-   are no longer required by the program.
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
 3 Standalone_Programs
    Standalone Programs
@@ -19724,15 +19622,9 @@
    The nested call-in stack unwinds automatically when the External Call
    function returns to YottaDB.
 
-<<<<<<< HEAD
    YottaDB currently allows up to 10 levels of nesting, if TP is not used, and
    less than 10 if YottaDB supports call-ins from a transaction. YottaDB reports
    the error YDB-E-CIMAXLEVELS when the nesting reaches its limit.
-=======
-   GT.M currently allows up to 10 levels of nesting, if TP is not used, and
-   less than 10 if GT.M supports call-ins from a transaction. GT.M reports
-   the CIMAXLEVELS error when the nesting reaches its limit.
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
    Following are the YottaDB commands, Intrinsic Special Variables, and
    functions whose behavior changes in the context of every new nested
@@ -19763,14 +19655,7 @@
    Rules to Follow in Call-Ins
 
     1. External calls must not be fenced with TSTART/TCOMMIT if the external
-<<<<<<< HEAD
        routine calls back into mumps using call-in mechanism.
-=======
-       routine calls back into mumps using call-in mechanism. GT.M reports
-       the CITPNESTED error if nested call-ins are invoked within a TP fence
-       since GT.M currently does not handle TP support across multiple
-       call-in invocations.
->>>>>>> a6cd7b01f... GT.M V6.3-008
     2. The external application should never call exit() unless it has called
        ydb_exit() previously. YottaDB internally installs an exit handler that
        should never be bypassed.
@@ -19921,28 +19806,17 @@
 
    YottaDB searches the shared library for the gtm_ac_xform_1 and gtm_ac_xback_1
    before searching for the gtm_ac_xform and gtm_ac_xback routines. If the
-<<<<<<< HEAD
    shared library contains gtm_ac_xform_1, YottaDB ignores gtm_ac_xform even if
    it is present. If YottaDB finds gtm_ac_xform_1 but does not find
    gtm_ac_xback_1, it reports a YDB-E-COLLATIONUNDEF error with an additional
    mismatch warning YDB-E-COLLFNMISSING.
-=======
-   shared library contains gtm_ac_xform_1, GT.M ignores gtm_ac_xform even if
-   it is present. If GT.M finds gtm_ac_xform_1 but does not find
-   gtm_ac_xback_1, it reports a COLLATIONUNDEF error with an additional
-   mismatch COLLFNMISSING warning.
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
    If the application does not use strings longer than 32,767 bytes, the
    alternative collation library need not contain the gtm_ac_xform_1 and
    gtm_ac_xback_1 routines. On the other hand, if the application passes
    strings greater than 32,767 bytes (but less than the maximum support
    string length) and does not provide gtm_xc_xform_1 and gtm_xc_xback_1,
-<<<<<<< HEAD
    YottaDB issues the run-time error YDB-E-COLLARGLONG.
-=======
-   GT.M issues the COLLARGLONG run-time error.
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
    Note that database key sizes are much more restricted by YottaDB than local
    key sizes, and may be restricted further by user configuration.
@@ -20054,11 +19928,7 @@
    With set^%LCLCOL(,ncol), the null collation order can be changed while
    keeping the alternate collation order unchanged. If subscripted local
    variables exist, null collation order cannot be changed. In this case,
-<<<<<<< HEAD
    YottaDB issues YDB-E-COLLDATAEXISTS.
-=======
-   GT.M issues the COLLDATAEXISTS error.
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
    get^%LCLCOL returns the current local type.
 

@@ -868,13 +868,9 @@ tn_restart:
 		SET_CMPC(curr_rec_hdr, 0);
 		BLK_INIT(bs_ptr, bs1);
 		BLK_SEG(bs_ptr, (sm_uc_ptr_t)curr_rec_hdr, SIZEOF(rec_hdr));
-<<<<<<< HEAD
 		BLK_ADDR(null_block_id, SIZEOF(block_id), block_id);
 		*null_block_id = 0;
 		BLK_SEG(bs_ptr, (unsigned char *)null_block_id, SIZEOF(block_id));
-=======
-		BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, SIZEOF(block_id));
->>>>>>> a6cd7b01f... GT.M V6.3-008
 		if (0 == BLK_FINI(bs_ptr, bs1))
 		{
 			assert(CDB_STAGNATE > t_tries);
@@ -1877,15 +1873,11 @@ tn_restart:
 							memcpy(va, ((sm_uc_ptr_t)rp + rec_size) - value.len, value.len);
 							BLK_SEG(bs_ptr, (unsigned char *)va, value.len);
 						} else
-<<<<<<< HEAD
 						{
 							BLK_ADDR(null_block_id, SIZEOF(block_id), block_id);
 							*null_block_id = 0;
 							BLK_SEG(bs_ptr, (unsigned char *)null_block_id, SIZEOF(block_id));
 						}
-=======
-							BLK_SEG(bs_ptr, (unsigned char *)&zeroes_blkid, SIZEOF(block_id));
->>>>>>> a6cd7b01f... GT.M V6.3-008
 					} else
 						BLK_SEG(bs_ptr, (sm_uc_ptr_t)rp + rec_size - SIZEOF(block_id), SIZEOF(block_id));
 				}

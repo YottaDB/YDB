@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -445,13 +445,8 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 				if (CR_NOTVALID == (sm_long_t)cr)
 				{
 					assert(cnl->wc_blocked); /* only reason we currently know wcs_get_space could fail */
-<<<<<<< HEAD
 					assert(ydb_white_box_test_case_enabled);
-					SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
-=======
-					assert(gtm_white_box_test_case_enabled);
 					SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
->>>>>>> a6cd7b01f... GT.M V6.3-008
 					BG_TRACE_PRO_ANY(csa, wc_blocked_t_qread_db_csh_getn_invalid_blk);
 					set_wc_blocked = TRUE;
 					break;

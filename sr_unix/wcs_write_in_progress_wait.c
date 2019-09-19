@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -99,14 +99,9 @@ boolean_t	wcs_write_in_progress_wait(node_local_ptr_t cnl, cache_rec_ptr_t cr, w
 						if (cr->dirty && cr->epid && !is_proc_alive(cr->epid, 0))
 							return FALSE;
 					}
-<<<<<<< HEAD
 					assert((WBTEST_DB_WRITE_HANG == ydb_white_box_test_case_number)
 						|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number));
 					return FALSE;
-=======
-					assert((WBTEST_DB_WRITE_HANG == gtm_white_box_test_case_number)
-						|| (WBTEST_EXPECT_IO_HANG == gtm_white_box_test_case_number));
->>>>>>> a6cd7b01f... GT.M V6.3-008
 				}
 			}
 			if (WRITER_STILL_OWNS_BUFF(cr, n))

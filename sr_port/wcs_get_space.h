@@ -34,19 +34,6 @@ boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr);
  * a minimum number of buffers are available at all times. Macro should be used whenever second arg is non-zero.
  * WBTEST_FORCE_WCS_GET_SPACE and WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY force wcs_get_space to be called, regardless of wc_in_free.
  */
-<<<<<<< HEAD
-#define WCS_GET_SPACE(REG, NEEDED, CR)												\
-(																\
-	(															\
-	 (cnl->wc_in_free >= ((int4)(NEEDED) + DB_CSH_RDPOOL_SZ))								\
-	 DEBUG_ONLY( && !(ydb_white_box_test_case_enabled && ((WBTEST_FORCE_WCS_GET_SPACE == ydb_white_box_test_case_number)	\
-				 || (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == ydb_white_box_test_case_number))))			\
-	)															\
-	|| wcs_get_space(REG, (NEEDED) + DB_CSH_RDPOOL_SZ, CR)									\
-)
-
-bool wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr);
-=======
 static inline boolean_t WCS_GET_SPACE(gd_region *reg, int needed, cache_rec_ptr_t cr, sgmnt_addrs *csa)
 {
 	/* process_id is required for FREEZE_LATCH_HELD */
@@ -65,15 +52,13 @@ static inline boolean_t WCS_GET_SPACE(gd_region *reg, int needed, cache_rec_ptr_
 		if (!was_latch)
 			rel_latch(&csa->nl->freeze_latch);
 	}
->>>>>>> a6cd7b01f... GT.M V6.3-008
-
 	if ((wc_in_free_copy < ((int4) needed + DB_CSH_RDPOOL_SZ))
 #	ifdef DEBUG
-		|| (gtm_white_box_test_case_enabled
-			&& ((WBTEST_FORCE_WCS_GET_SPACE == gtm_white_box_test_case_number)
-				|| (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == gtm_white_box_test_case_number)))
+	    || (ydb_white_box_test_case_enabled
+		&& ((WBTEST_FORCE_WCS_GET_SPACE == ydb_white_box_test_case_number)
+		    || (WBTEST_FORCE_WCS_GET_SPACE_CACHEVRFY == ydb_white_box_test_case_number)))
 #	endif
-	)
+	    )
 		return wcs_get_space(reg, needed + DB_CSH_RDPOOL_SZ, cr);
 	else
 		return TRUE;

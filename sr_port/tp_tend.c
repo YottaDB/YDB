@@ -729,13 +729,8 @@ boolean_t	tp_tend()
 					if (!WCS_GET_SPACE(gv_cur_region, si->cw_set_depth + 1, NULL, csa))
 					{
 						/* only reason we currently know why wcs_get_space could fail */
-<<<<<<< HEAD
 						assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
-						SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
-=======
-						assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
 						SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
->>>>>>> a6cd7b01f... GT.M V6.3-008
 						BG_TRACE_PRO_ANY(csa, wc_blocked_tp_tend_wcsgetspace);
 						SET_CACHE_FAIL_STATUS(status, csd);
 						TP_TRACE_HIST(CR_BLKEMPTY, NULL);

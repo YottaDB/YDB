@@ -229,19 +229,11 @@
    Perform the following tasks before you begin a database backup.
 
      * Ensure adequate disk space for target location and temporary files.
-<<<<<<< HEAD
        Set the environment variable ydb_baktmpdir to specify the directory
        where MUPIP BACKUP creates temporary files. If ydb_baktmpdir is not
        defined, uses the current working directory. Do not place temporary
        files in the current directory for large databases in production
        environments.
-=======
-       Set the environment variable gtm_baktmpdir to specify the directory
-       where MUPIP BACKUP creates temporary files. If gtm_baktmpdir is not
-       defined, GT.M uses the deprecated GTM_BAKTMPDIR environment variable
-       if defined, and otherwise uses the current working directory. Do not
-       place temporary files in the current directory for large databases in
-       production environments.
      * If you are backing up an encrypted datababase, you need to backup your
        $gtmcrypt_config file and securely preserve the encryption key. You
        also need to backup the related algorithms used to generate that key.
@@ -254,7 +246,6 @@
        the data from the encrypted regions. Therefore, ensure that you have
        procedures in place to securely handle password storage and retrieval
        of the encryption key.
->>>>>>> a6cd7b01f... GT.M V6.3-008
      * When using replication, ensure that the Source/Receiver process is
        alive (MUPIP REPLIC -SOURCE/-RECEIVER -CHECKHEALTH). Always backup the
        replicating instance file with the database (BACKUP -REPLINST).
@@ -4349,7 +4340,6 @@
 
    ALL[OCATION]=blocks
 
-<<<<<<< HEAD
    Sets the allocation size of the journal file. YottaDB uses this information
    to determine when it should first review the disk space available for the
    journal file. The size of the journal file at creation time is a constant
@@ -4361,15 +4351,6 @@
    space available is not much more than the extension size. YottaDB provides
    these extension checks as an operational aid for identifying, before space
    runs out, that a file system holding the journal file is low on space.
-=======
-   ALLOCATION is the size at which GT.M should start checking for free space.
-
-   The size of the journal file at creation time is a constant (depending on
-   the GT.M version) but once the journal file reaches the size specified by
-   ALLOCATION, every EXTENSION produces a check of free space available on
-   the device used for the journal file.
-
->>>>>>> a6cd7b01f... GT.M V6.3-008
    When there is no more free space available on the file system holding a
    journal file, YottaDB shuts off journaling for the corresponding database
    file.
@@ -4490,14 +4471,10 @@
 
    EX[TENSION]=blocks
 
-<<<<<<< HEAD
    blocks specifies the size of the journal file extension by which file
    expands and becomes full.
 
    EXTENSION=blocks specifies when YottaDB should review disk space available
-=======
-   EXTENSION=blocks specifies when GT.M should review disk space available
->>>>>>> a6cd7b01f... GT.M V6.3-008
    for the journal file after the ALLOCATION has been used up. It also
    specifies how much space should be available at each review.
 
@@ -4548,7 +4525,6 @@
    values do not result in physical disk block allocation for the journal
    file.
 
-<<<<<<< HEAD
    The values determine when YottaDB checks the file systems to see if it has
    enough space to hold an extension worth of journal data. When a journal
    file reaches the size of ALLOCATION and any multiple of EXTENSION, YottaDB
@@ -4556,13 +4532,11 @@
    three times the EXTENSION, it writes warnings to the operator log. YottaDB
    provides these extension checks as an operational aid for identifying,
    before space runs out, that a file system holding the journal file is low
-   on space. When there is no more free space available ) on the file system
+   on space. When there is no more free space available on the file system
    holding a journal file or there is no authorization of a process
    attempting to autoswitch a journal file, YottaDB shuts off journaling for the
    corresponding database file.
 
-=======
->>>>>>> a6cd7b01f... GT.M V6.3-008
    The default EXTENSION value is 2048 blocks. The minimum EXTENSION is zero
    (0) blocks and the maximum is 1073741823 (one less than 1 giga) blocks.
 
@@ -5660,7 +5634,6 @@
 
    The following qualifiers are compatible only with -ROLLBACK.
 
-<<<<<<< HEAD
    -FET[CHRESYNC]=<port number>
 
    In an LMS configuration, rollbacks the replicating instance to a common
@@ -5729,12 +5702,6 @@
    state, YottaDB rolls back the database/journal files to the last consistent
    state. Under normal operating conditions, this qualifier is not needed.
 
-=======
-   -FET[CHRESYNC]
-
-   -RES[YNC]=<journal sequence number>
-
->>>>>>> a6cd7b01f... GT.M V6.3-008
 3 Control_Qualifiers
    Control Qualifiers
 
@@ -7976,11 +7943,63 @@
 
    -online
 
-<<<<<<< HEAD
-   The <port number> is the communication port number that the rollback
-   command uses when fetching the reference point. Always use the same <port
-   number> on the originating instance for rollback as the one used by the
-   Receiver Server.
+   Specifies that ROLLBACK can run without requiring exclusive access to the
+   database and the replication instance file. Any utility/command attempted
+   while MUPIP JOURNAL -ONLINE -ROLLBACK operates waits for ROLLBACK to
+   complete; the $gtm_db_startup_max_wait environment variable configures the
+   wait period.
+
+   -fetchresync
+
+   When there are unreplicated updates on a former primary/secondary
+   instance, it cannot become a new replicating instance as its journal
+   sequence number is higher than the journal sequence number of its new
+   replication source. Use -ROLLBACK -FETCHRESYNC to roll back a BC/SI
+   replicating instance to a journal sequence number that matches the journal
+   sequence number of its replication source and generate a lost transaction
+   file containing the unreplicated updates for the organization to
+   reconcile. After the reconcilation (or rejection as the case may be) of
+   the lost transaction file, run MUPIP REPLICATE -SOURCE -LOSTTNCOMPLETE to
+   provide confirmation to GT.M that you have applied the lost transaction
+   file. For -FETCHRESYNC to work on the replicating instance, you need to
+   ensure that an active Source Server is running on the replication
+   source/originating instance.
+
+   The format of the -FETCHRESYNC qualifier is:
+
+   -fetchresync=<port number>
+   -[no]brokentrans=[/dev/null|<brokentrans.broken>]
+   -[no]losttrans=[/dev/null|<unreplicated_updates.lost>]
+
+     o <portno> is the port number that the Receiver Server uses to listen
+       for incoming connection from the Source Server of the originating
+       instance. Always use the same <port number> on the originating
+       instance for rollback as the one used by the Receiver Server.
+     o -LOSTTRANS and -BROKENTRANS allows you to specify the name and
+       location of the lost transaction file and broken transaction file.
+     o -LOSTTRANS=/dev/null or -NOLOSTTRANS disables lost transaction file
+       processing when there is no need to apply lost transaction files.
+     o Remember that unless you have a backup of the database and the journal
+       files, you cannot undo a ROLLBACK/RECOVER operation.
+     o A lost transaction file may sometimes contain data that is critical
+       for your application. Use -LOSTRANS=/dev/null or -NOLOSTTRANS with
+       ROLLBACK/RECOVER only when you are sure that there is a lost
+       transaction file whose transactions you purposely want to discard from
+       your database.
+     o Unless business considerations dictate otherwise, your database
+       administration scripts/procedure should allow the organization to
+       intervene when there is a need to apply or discard a lost transaction
+       file.
+     o If you have broken transactions, they may have appeared due to system
+       failures that occurred during processing. Do not reconcile these
+       transactions as they are not considered to be committed.
+     o In your Receiver Server startup scripts, FIS recommends placing MUPIP
+       JOURNAL -ROLLBACK -BACKWARD -ONLINE -FETCHRESYNC after starting the
+       passive Source Server but before starting the Receiver Server.
+     o Stopping a ROLLBACK operation before it completes or losing the TCP
+       connection over which replication operates may corrupt the database
+       file header. To recover, wait up to 60 seconds for the operation to
+       timeout and then reissue the command.
 
    **Important**
 
@@ -8010,66 +8029,15 @@
    The extracted lost transactions list may contain broken transactions due
    to system failures that occurred during processing. Do not resolve these
    transactions-they are not considered to be committed.
-=======
-   Specifies that ROLLBACK can run without requiring exclusive access to the
-   database and the replication instance file. Any utility/command attempted
-   while MUPIP JOURNAL -ONLINE -ROLLBACK operates waits for ROLLBACK to
-   complete; the $gtm_db_startup_max_wait environment variable configures the
-   wait period.
 
-   -fetchresync
+   **Caution**
 
-   When there are unreplicated updates on a former primary/secondary
-   instance, it cannot become a new replicating instance as its journal
-   sequence number is higher than the journal sequence number of its new
-   replication source. Use -ROLLBACK -FETCHRESYNC to roll back a BC/SI
-   replicating instance to a journal sequence number that matches the journal
-   sequence number of its replication source and generate a lost transaction
-   file containing the unreplicated updates for the organization to
-   reconcile. After the reconcilation (or rejection as the case may be) of
-   the lost transaction file, run MUPIP REPLICATE -SOURCE -LOSTTNCOMPLETE to
-   provide confirmation to GT.M that you have applied the lost transaction
-   file. For -FETCHRESYNC to work on the replicating instance, you need to
-   ensure that an active Source Server is running on the replication
-   source/originating instance.
+   The database header may get corrupted if you suspend an ongoing ROLLBACK
+   -FETECHRESYNC operation or if the TCP connection between the two instances
+   gets broken. The workaround is to restart the ROLLBACK -FETCHRESYNC
+   operation or wait 60 seconds for the FETCHRESYNC operation to timeout.
 
-   The format of the -FETCHRESYNC qualifier is:
->>>>>>> a6cd7b01f... GT.M V6.3-008
-
-   -fetchresync=<port number>
-   -[no]brokentrans=[/dev/null|<brokentrans.broken>]
-   -[no]losttrans=[/dev/null|<unreplicated_updates.lost>]
-
-     o <portno> is the port number that the Receiver Server uses to listen
-       for incoming connection from the Source Server of the originating
-       instance.
-     o -LOSTTRANS and -BROKENTRANS allows you to specify the name and
-       location of the lost transaction file and broken transaction file.
-     o -LOSTTRANS=/dev/null or -NOLOSTTRANS disables lost transaction file
-       processing when there is no need to apply lost transaction files.
-     o Remember that unless you have a backup of the database and the journal
-       files, you cannot undo a ROLLBACK/RECOVER operation.
-     o A lost transaction file may sometimes contain data that is critical
-       for your application. Use -LOSTRANS=/dev/null or -NOLOSTTRANS with
-       ROLLBACK/RECOVER only when you are sure that there is a lost
-       transaction file whose transactions you purposely want to discard from
-       your database.
-     o Unless business considerations dictate otherwise, your database
-       administration scripts/procedure should allow the organization to
-       intervene when there is a need to apply or discard a lost transaction
-       file.
-     o If you have broken transactions, they may have appeared due to system
-       failures that occurred during processing. Do not reconcile these
-       transactions as they are not considered to be committed.
-     o In your Receiver Server startup scripts, FIS recommends placing MUPIP
-       JOURNAL -ROLLBACK -BACKWARD -ONLINE -FETCHRESYNC after starting the
-       passive Source Server but before starting the Receiver Server.
-     o Stopping a ROLLBACK operation before it completes or losing the TCP
-       connection over which replication operates may corrupt the database
-       file header. To recover, wait up to 60 seconds for the operation to
-       timeout and then reissue the command.
-
-   Example:
+Example:
 
    $ mupip journal -rollback -fetchresync=2299 -losttrans="glo.lost"
    -backward
@@ -8374,352 +8342,6 @@
 
    The following table summarizes the qualifiers.
 
-<<<<<<< HEAD
-   +------------------------------------------------------------------------------------------------------------+
-   |            Main Qualifier            |      MUPIP Command       |            Options/Qualifiers            |
-   |                                      |                          |                                          |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |-EDITINSTANCE                         |REPLICATE                 |-CHANGE                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-DETAIL                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-OFFSET=hexa                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-VALUE=hexa                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-SIZE=hexa                                |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-VALUE=hexa                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-[NO]QDBRUNDOWN                           |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |-FENCES=<fence-options-list>          |JOURNAL-RECOVER-ROLLBACK  |ALWAYS                                    |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |NONE                                      |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |PROCESS                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |-OFF                                  |FREEZE                    |-OVERRIDE                                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-RECORD                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |-ON                                   |FREEZE                    |-[NO]ONLINE                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-[NO]AUTORELEASE                          |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |-INSTANCE_CREATE                      |REPLICATE                 |-NAME                                     |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-NOREPLACE                                |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-SUPPLEMENTARY                            |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-[NO]QDBRUNDOWN                           |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |BACKUP                    |                                          |
-   |-JOURNAL=<journal-options-list>       |                          |ALIGNSIZE=integer                         |
-   |                                      |SET                       |                                          |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |ALLOCATION=integer                        |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |AUTOSWITCHLIMIT=integer                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |BEFORE_IMAGES                             |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |BUFFER_SIZE=integer                       |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |DISABLE                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |ENABLE                                    |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |EPOCH_INTERVAL=integer                    |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |EXTENSION=integer                         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |FILENAME=file_name                        |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |OFF                                       |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |ON                                        |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |SYNC_IO                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |YIELD_LIMIT=integer                       |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |-RECOVER                  |                                          |
-   |-LOOKBACK_LIMIT=lookback-option-list  |                          |TIME="time"                               |
-   |                                      |-ROLLBACK                 |                                          |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |OPERATIONS=integer                        |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |-RECEIVER                             |REPLICATE                 |-AUTOROLLBACK                             |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-BUFFSIZE=integer                         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-CHANGELOG                                |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-CHECKHEALTH                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-CMPLVL=integer                           |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-FILTER=filter_name                       |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-he[lpers]=[m[,n]]                        |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-INITIALIZE                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-CMPLVL=n                                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-LISTENPORT=integer [                     |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-AUTOROLLBACK[=VERBOSE]]                  |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-LOG=logfile                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-LOG_INTERVAL=integer                     |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-NORESYNC                                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-RESUME=strm_num                          |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-REUSE=instname                           |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-RSYNC_STRM=strm_num                      |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-SHOWBACKLOG                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-SHUTDOWN                                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-START                                    |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-STATSLOG=[ON|OFF]                        |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-STOPSOURCEFILTER                         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-TIMEOUT=seconds                          |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |TLSID=label                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-UPDATEONLY                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-UPDOK                                    |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-UPDNOTOK                                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-UPDATERESYNC=/path/to/bkup-orig-inst     |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |-RECOVER                              |JOURNAL                   |-AFTER=time                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-APPLY_AFTER_IMAGE                        |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-BACKWARD                                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-BEFORE=time                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-BROKENTRANS=file                         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-CHAIN                                    |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-CHECKTN                                  |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-[NO]ER[ROR_LIMIT][=integer]              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-FENCES=fence-option-list                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-FORWARD                                  |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-FULL                                     |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-GLOBAL=<global_list>                     |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-ID=<pid_list>                            |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-INTERACTIVE                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-LOOKBACK_LIMIT=<lookback_limit_options>  |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-LOSTTRANS[=file]                         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-PARA[LLEL][=n]                           |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-RED[IRECT]=file-pair-list                |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-SINCE=time                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-VERBOSE                                  |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-VERIFY                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |-EXTRACT                              |JOURNAL                   |-AFTER=time                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-BEFORE=time                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-BROKENTRANS=file                         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-CHAIN                                    |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-CHECKTN                                  |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-[NO]ER[ROR_LIMIT]=integer]               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-FENCES=fence-option-list                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-FULL                                     |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-GLOBAL=<global_list>                     |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-ID=<pid_list>                            |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-INTERACTIVE                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-LOOKBACK_LIMIT=<lookback_limit_options>  |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-LOSTTRANS[=file]                         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-REGION                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-SINCE=time                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-VERBOSE                                  |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-VERIFY                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |-ROLLBACK                             |JOURNAL                   |-APPLY_AFTER_IMAGE                        |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-BACKWARD                                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-BEFORE=time                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-BROKENTRANS=file                         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-[NO]ER[ROR_LIMIT][=integer]              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-FENCES=fence-option-list                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-FETCHRESYNC                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-LOOKBACK_LIMIT=<lookback_limit_options>  |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-LOSTTRANS[=file]                         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-ONLINE                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-PARA[LLEL][=n]                           |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-RES[YNC]=hexa;journal_sequence_number    |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-VERBOSE                                  |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-VERIFY                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |-SHOW=<show-option-list>              |JOURNAL                   |-ACTIVE_PROCESSES                         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-ALL                                      |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-BROKEN_TRANSACTIONS                      |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-HEADER                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-PROCESSES                                |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-STATISTICS                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-AFTER=time                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-USER=user-list                           |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-TRANSACTION=[KILL|SET]                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-INTERACTIVE                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-GLOBAL=<global_list>                     |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-ID=<pid_list>                            |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-INTERACTIVE                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-PARA[LLEL][=n]                           |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |-SINCE                                |BACKUP                    |-BYTESTREAM                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-COMPREHENSIVE                            |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-DATABASE                                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-INCREMENTAL                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-RECORD                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |-SO[URCE]                             |REPLICATE                 |-ACTIVATE                                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-BUFFSIZE=Buffer_size                     |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-CHANGELOG                                |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-CHECKHEALTH                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-CMPLVL=integer                           |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-CONNECTPARAMS=connection_options         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-DEACTIVATE                               |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-DETAIL                                   |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-FILTER=filter_name                       |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-FREEZE=on|off                            |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-[NO]COMMENT=string                       |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-INSTSECONDARY=secondary_instance name    |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-NOJNLFILEONLY                            |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-JNLPOOL-LOG=log_file                     |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-LOG_INTERVAL=integer                     |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-LOSTTNCOMPLETE                           |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-NEEDRESTART                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-PASSIVE                                  |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-[NO]PLAINTEXTFALLBACK                    |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-PROPAGATEPRIMARY                         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-RENEGOTIATE_INTERVAL=minutes             |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-ROOTPRIMARY                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-SECONDARY=secondary_instance_name        |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-SHOWBACKLOG                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-SHUTDOWN                                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-START                                    |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-STATSLOG                                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-STOPSOURCEFILTER                         |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-TIMEOUT=seconds                          |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-TLSID=label                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-UPDOK                                    |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-UPDNOTOK                                 |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |                          |-ZEROBACKLOG                              |
-   |--------------------------------------+--------------------------+------------------------------------------|
-   |                                      |DOWNGRADE                 |                                          |
-   |-VERSION={V4|V5}                      |                          |file-name                                 |
-   |                                      |UPGRADE                   |                                          |
-   +------------------------------------------------------------------------------------------------------------+
-=======
    +-----------------------------------------------------------------------------------------------------------------------+
    |            Main Qualifier            |      MUPIP Command       |            Options/Qualifiers            |   GT.M   |
    |                                      |                          |                                          | Version* |
@@ -9068,7 +8690,6 @@
    * Denotes the GT.M version in which the qualifier or command was first
    introduced. This column is maintained for qualifiers and command
    introduced in GT.M versions starting with GT.M V5.4-002.
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
 1 Copyright
    Copyright
@@ -9100,14 +8721,7 @@
 
    **Note**
 
-<<<<<<< HEAD
    This help file is a concise representation of the revision r1.28 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
-=======
-   This help file is a concise representation of revision V6.3.008 of the
-   UNIX Administration and Operations Guide. To obtain a copy of the current
-   revision, go to www.fis-gtm.com and then click on the User Documentation
-   tab.
->>>>>>> a6cd7b01f... GT.M V6.3-008
 

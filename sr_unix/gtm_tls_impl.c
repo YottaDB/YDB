@@ -1724,40 +1724,7 @@ int gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info
 		if ((X509_V_OK == verify_result) || (GTMTLS_OP_ABSENT_CONFIG & tls_ctx->flags))
 		{	/* return information for Socket clients even without a config file */
 			/* SSL-Session Protocol */
-<<<<<<< HEAD
 			SNPRINTF(conn_info->protocol, SIZEOF(conn_info->protocol), "%s", SSL_get_version(ssl));
-=======
-			switch (ssl_version = SSL_version(ssl))
-			{
-				case SSL2_VERSION:
-					ssl_version_ptr = "SSLv2";
-					break;
-
-				case SSL3_VERSION:
-					ssl_version_ptr = "SSLv3";
-					break;
-
-				case TLS1_VERSION:
-					ssl_version_ptr = "TLSv1";
-					break;
-				case TLS1_1_VERSION:
-					ssl_version_ptr = "TLSv1.1";
-					break;
-				case TLS1_2_VERSION:
-					ssl_version_ptr = "TLSv1.2";
-					break;
-				case TLS1_3_VERSION:
-					ssl_version_ptr = "TLSv1.3";
-					break;
-				default:
-					ssl_version_ptr = NULL;
-					SNPRINTF(conn_info->protocol, SIZEOF(conn_info->protocol), "unknown protocol 0x%X",
-							ssl_version);
-					break;
-			}
-			if (NULL != ssl_version_ptr)
-				strncpy(conn_info->protocol, ssl_version_ptr, MAX_ALGORITHM_LEN);
->>>>>>> a6cd7b01f... GT.M V6.3-008
 			/* SSL-Session Cipher Algorithm */
 			cipher = SSL_get_current_cipher(ssl);
 			SNPRINTF(conn_info->session_algo, SIZEOF(conn_info->session_algo), "%s", SSL_CIPHER_get_name(cipher));

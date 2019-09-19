@@ -818,18 +818,11 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	}
 	/* in crit, ensure cache-space is available. the out-of-crit check done above might not have been enough */
 	DEBUG_ONLY(tmp_jnlpool = jnlpool;)
-<<<<<<< HEAD
-	if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL))
-	{	/* only reason we currently know why wcs_get_space could fail */
-		assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
-		SET_TRACEABLE_VAR(cnl->wc_blocked, TRUE);
-=======
 	if (!is_mm && !WCS_GET_SPACE(reg, cw_set_depth + 1, NULL, csa))
 	{
 		/* only reason we currently know why wcs_get_space could fail */
-		assert(csa->nl->wc_blocked || gtm_white_box_test_case_enabled);
+		assert(csa->nl->wc_blocked || ydb_white_box_test_case_enabled);
 		SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);
->>>>>>> a6cd7b01f... GT.M V6.3-008
 		BG_TRACE_PRO_ANY(csa, wc_blocked_t_end_hist);
 		SET_CACHE_FAIL_STATUS(status, csd);
 		assert(tmp_jnlpool == jnlpool);

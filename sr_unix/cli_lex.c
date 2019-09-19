@@ -376,11 +376,7 @@ void cli_lex_in_expand(int in_len)
 char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 {
 	size_t		in_len;
-<<<<<<< HEAD
-	char		cli_fgets_buffer[MAX_LINE], *destbuffer, *retptr = NULL;
-=======
 	char		cli_fgets_buffer[MAX_LINE], *retptr = NULL;
->>>>>>> a6cd7b01f... GT.M V6.3-008
 #	ifdef UTF8_SUPPORTED
 	int		mbc_len, u16_off;
 	int32_t		mbc_dest_len;
@@ -444,22 +440,13 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 				{	/* truncate so null terminated */
 					destbuffer[buffersize - 1] = 0;
 					retptr = destbuffer;
-<<<<<<< HEAD
-				}
-=======
 				} else
 					retptr = NULL;
->>>>>>> a6cd7b01f... GT.M V6.3-008
 			} else
 				retptr = destbuffer;	/* Repoint to new home */
 			if (in_tp)
 				cli_lex_in_ptr->tp = retptr;
-<<<<<<< HEAD
-		} else if (cli_lex_str)
-			cli_lex_in_ptr->tp = NULL;
-=======
 		}
->>>>>>> a6cd7b01f... GT.M V6.3-008
 	} else
 	{
 #	endif

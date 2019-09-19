@@ -598,21 +598,8 @@ boolean_t wcs_flu(uint4 options)
 					 *    forces wcs_wtstart invocations to end up with I/O errors.
 					 */
 					WCS_OPS_TRACE(csa, process_id, wcs_ops_flu7, 0, 0, 0, wtstart_or_wtfini_errno, 0);
-<<<<<<< HEAD
-					assert((WBTEST_BG_UPDATE_PHASE2FAIL == ydb_white_box_test_case_number)
-						|| (WBTEST_BG_UPDATE_BTPUTNULL == ydb_white_box_test_case_number)
-						|| (WBTEST_BG_UPDATE_DBCSHGET_INVALID == ydb_white_box_test_case_number)
-						|| (WBTEST_BG_UPDATE_DBCSHGETN_INVALID == ydb_white_box_test_case_number)
-						|| (WBTEST_BG_UPDATE_DBCSHGETN_INVALID2 == ydb_white_box_test_case_number)
-						|| (WBTEST_CRASH_SHUTDOWN_EXPECTED == ydb_white_box_test_case_number)
-						|| (WBTEST_MURUNDOWN_KILLCMT06 == ydb_white_box_test_case_number)
-						|| (WBTEST_WCS_FLU_IOERR == ydb_white_box_test_case_number)
-						|| (WBTEST_WCS_WTSTART_IOERR == ydb_white_box_test_case_number)
-						|| (WBTEST_ANTIFREEZE_JNLCLOSE == ydb_white_box_test_case_number)
-						|| ((WBTEST_ANTIFREEZE_OUTOFSPACE == ydb_white_box_test_case_number) && asyncio));
-=======
 #					ifdef DEBUG
-					switch (gtm_white_box_test_case_number)
+					switch (ydb_white_box_test_case_number)
 					{
 						case WBTEST_ANTIFREEZE_OUTOFSPACE:
 							assert(asyncio);
@@ -633,7 +620,6 @@ boolean_t wcs_flu(uint4 options)
 							assert(FALSE && "not in known white box test");
 					}
 #					endif
->>>>>>> a6cd7b01f... GT.M V6.3-008
 					if (0 == wtstart_or_wtfini_errno)
 					{
 						SET_TRACEABLE_VAR(cnl->wc_blocked, WC_BLOCK_RECOVER);

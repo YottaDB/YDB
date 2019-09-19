@@ -302,19 +302,11 @@ boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 			/* Reduce the wait time to encounter errors associated with
 			 * WBTEST_JNL_FILE_LOST_DSKADDR faster
 			 */
-<<<<<<< HEAD
 			if (ydb_white_box_test_case_enabled
-					&& (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)
-					&& (0 < ydb_white_box_test_case_count)
-					&& (lcnt >= ydb_white_box_test_case_count))
-				lcnt += UNIX_GETSPACEWAIT;
-=======
-			if (gtm_white_box_test_case_enabled
-					&& (WBTEST_JNL_FILE_LOST_DSKADDR == gtm_white_box_test_case_number)
-					&& (0 < gtm_white_box_test_case_count)
-					&& (lcnt >= gtm_white_box_test_case_count))
+			    && (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)
+			    && (0 < ydb_white_box_test_case_count)
+			    && (lcnt >= ydb_white_box_test_case_count))
 				lcnt = ((lcnt + UNIX_GETSPACEWAIT) % UNIX_GETSPACEWAIT) - 1;
->>>>>>> a6cd7b01f... GT.M V6.3-008
 #			endif
 		}
 		if (0 == cr->dirty)

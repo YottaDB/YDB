@@ -1,14 +1,10 @@
 /****************************************************************
  *								*
-<<<<<<< HEAD
- * Copyright 2001, 2013 Fidelity Information Services, Inc	*
- *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
-=======
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
->>>>>>> a6cd7b01f... GT.M V6.3-008
+ *								*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -17,15 +13,22 @@
  *								*
  ****************************************************************/
 
-<<<<<<< HEAD
-/* The global modifier record in the directory tree currently can contain an optional 4-byte collation specification
+/* The global modifier record in the directory tree can contain an optional (currently 4-byte) collation specification
  * right after the 4-byte root block number. There is just one such 4-byte collation spec record possible after the root block.
  */
-#define COLL_SPEC_LEN		4	/* length of the collation record stored in the directory tree per global name */
-#define COLL_SPEC		1	/* first byte of collation record : hardcoded type of 1 */
-#define COLL_NCT_OFFSET		1	/* second byte of collation record : numeric collation for this global name */
-#define	COLL_ACT_OFFSET		2	/* third  byte of collation record : alternative collation for this global name */
-#define	COLL_VER_OFFSET		3	/* fourth byte of collation record : collation library version for this global name */
+#define MAX_SPEC_TYPE_LEN	10
+#define MAX_COLL_TYPE		1	/* The highest collation type supported */
+#define COLL_SPEC		1	/* Current default collation spec */
+
+/* GVT leaf node collation header offsets as enum values */
+enum coll_spec_offsets
+{
+	COLL_SPEC_OFFSET,	/* first  byte of collation record : collation record specification number */
+	COLL_NCT_OFFSET,	/* second byte of collation record : numeric collation for this global name */
+	COLL_ACT_OFFSET,	/* third  byte of collation record : alternative collation for this global name */
+	COLL_VER_OFFSET,	/* fourth byte of collation record : collation library version for this global name */
+	COLL_SPEC_LEN		/* length of the collation record stored in the directory tree per global name */
+};
 
 /* This macro sets collation information (nct, act and ver) of a GVT/global based on information found in a record
  * corresponding to a leaf level block in the directory tree (record pointer SPEC_REC_ADDR, record length SPEC_REC_LEN).
@@ -50,21 +53,3 @@ MBSTART {									\
 		RET = FALSE;							\
 	}									\
 } MBEND;
-
-=======
-#define MAX_SPEC_TYPE_LEN	10
-#define MAX_COLL_TYPE		1	/*The highest collation type supported
-					 *Any changes require corresponding changes to sr_port/get_spec.c */
-
-#define COLL_SPEC		1	/* current default collation spec */
-
-/* GVT leaf node collation header offsets as enum values*/
-enum coll_spec_offsets
-{
-	COLL_SPEC_OFFSET,	/* first  byte of collation record : collation record specification number */
-	COLL_NCT_OFFSET,	/* second byte of collation record : numeric collation for this global name */
-	COLL_ACT_OFFSET,	/* third  byte of collation record : alternative collation for this global name */
-	COLL_VER_OFFSET,	/* fourth byte of collation record : collation library version for this global name */
-	COLL_SPEC_LEN		/* length of the collation record stored in the directory tree per global name */
-};
->>>>>>> a6cd7b01f... GT.M V6.3-008

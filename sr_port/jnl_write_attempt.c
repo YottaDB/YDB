@@ -145,7 +145,6 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			 * However, a grab_crit() here may result in a deadlock, so just do a grab_crit_immediate() and proceed.
 			 */
 			if (!was_crit)
-<<<<<<< HEAD
 			{
 				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
 				/* Check jb io_writer again now that we have crit */
@@ -157,21 +156,11 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 				}
 			}
 			if (FALSE == is_proc_alive(writer, jb->image_count))
-			{	/* no one home, clear the semaphore; */
+			{	/* No one home, clear the semaphore */
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
 				jnl_send_oper(jpc, ERR_JNLQIOSALVAGE);
 				COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, LOCK_AVAILABLE);
 				if (!was_crit)
-=======
-				grab_crit_immediate(jpc->region, TRUE);
-			/* If no one home, try to clear the latch. */
-			if ((FALSE == is_proc_alive(writer, jb->image_count))
-				&& COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, jb->image_count, LOCK_AVAILABLE, 0))
-			{	/* We cleared the latch, so report it and restart the loop. */
-				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
-				jnl_send_oper(jpc, ERR_JNLQIOSALVAGE);
-				if (!was_crit && csa->now_crit)		/* Check now_crit in case grab_crit_immediate() failed */
->>>>>>> a6cd7b01f... GT.M V6.3-008
 					rel_crit(jpc->region);
 				*lcnt = 1;
 				continue;

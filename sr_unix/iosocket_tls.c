@@ -74,7 +74,7 @@ typedef enum
 
 void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *password, mval *extraarg)
 {
-	int4			devlen, flags, len, length, save_errno, status, status2, timeout, tls_errno;
+	int4			devlen, flags, len, length, save_errno, status, status2, timeout, tls_errno, errlen, errlen2;
 	io_desc			*iod;
 	d_socket_struct 	*dsocketptr;
 	socket_struct		*socketptr;
@@ -223,13 +223,8 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 				socketptr->tlsenabled = FALSE;
 				free(extrastr);
 				errp = gtm_tls_get_error();
-<<<<<<< HEAD
-				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
-=======
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
->>>>>>> a6cd7b01f... GT.M V6.3-008
 				return;
 			} else
 				free(extrastr);
@@ -246,13 +241,8 @@ void	iosocket_tls(mval *optionmval, int4 msec_timeout, mval *tlsid, mval *passwo
 			{	/* error string available */
 				socketptr->tlsenabled = FALSE;
 				errp = gtm_tls_get_error();
-<<<<<<< HEAD
-				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, LEN_AND_STR(errp));
-=======
 				SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errp, errlen);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_TLSCONVSOCK, 0, ERR_TEXT, 2, errlen, errp);
->>>>>>> a6cd7b01f... GT.M V6.3-008
 				return;
 			}
 		}

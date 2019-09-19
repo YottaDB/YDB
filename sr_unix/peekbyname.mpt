@@ -3,7 +3,7 @@
 ; Copyright (c) 2015-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -35,13 +35,8 @@
 ; format: (Optional) specifies the output format in one character as defined in the "format" argument in the $ZPEEK() documentation.
 ;        This argument overrides the automatic format detection by the %PEEKBYNAME utility.
 
-<<<<<<< HEAD
-%PEEKBYNAME(field,regindex,format)
-	if '$quit write "YDB-E-EXTRINSIC Use $$ rather than DO to invoke ",$text(+0) quit
-=======
 %PEEKBYNAME(field,regindex,format,gldpath)
-	if '$quit write "GTM-E-EXTRINSIC Use $$ rather than DO to invoke ",$text(+0) quit
->>>>>>> a6cd7b01f... GT.M V6.3-008
+	if '$quit write "YDB-E-EXTRINSIC Use $$ rather than DO to invoke ",$text(+0) quit
 	new anindexval,aregname,digits,etrap,first,ishexnum,land,length,mnemonicandreg,offset,pattern,rest,type,typeindex
 	new dim,ret,idx,off
 	set etrap=$etrap
@@ -79,11 +74,7 @@
 	else  do error("UNSUPSTRUCT",first)
 	do
 	.	new $zgbldir
-<<<<<<< HEAD
-	.	set $zgbldir=$ztrnlnm("ydb_dist")_"/gtmhelp.gld"
-=======
-	.	set $zgbldir=$select($length($get(gldpath)):gldpath,1:$ztrnlnm("gtm_dist"))_"/gtmhelp.gld"
->>>>>>> a6cd7b01f... GT.M V6.3-008
+	.	set $zgbldir=$select($length($get(gldpath)):gldpath,1:$ztrnlnm("ydb_dist"))_"/gtmhelp.gld"
 	.	set typeindex=$get(^gtmtypfldindx(first,rest))
 	.	do:0=+typeindex error("INVALID",first,rest)
 	.	set type=^gtmtypes(first,typeindex,"type")
@@ -142,11 +133,7 @@ LIST(output,gldpath)
 ; Iterate through names of the structures defined in ^gtmtypes and execute given command for each one
 listiterate(out,gldpath)
 	new $zgbldir,fieldname,i,j,struct,write
-<<<<<<< HEAD
-	set $zgbldir=$ztrnlnm("ydb_dist")_"/gtmhelp.gld"
-=======
-	set $zgbldir=$select($length($get(gldpath)):gldpath,1:$ztrnlnm("gtm_dist"))_"/gtmhelp.gld"
->>>>>>> a6cd7b01f... GT.M V6.3-008
+	set $zgbldir=$select($length($get(gldpath)):gldpath,1:$ztrnlnm("ydb_dist"))_"/gtmhelp.gld"
 	set write=100>$zdata(out)
 	for i=1:1 set struct=$piece($text(struct+i),";",2) quit:""=struct  do
 	. for j=1:1  set fieldname=$get(^gtmtypes(struct,j,"name")) quit:""=fieldname  do
@@ -156,12 +143,8 @@ listiterate(out,gldpath)
 
 data(field,gldpath)
 	new $etrap set $etrap="set $ecode="""" quit:$quit 0 quit"
-<<<<<<< HEAD
-	quit $data(^|"$ydb_dist/gtmhelp.gld"|gtmtypfldindx($piece(field,"."),$piece(field,".",2,$length(field,".")))) quit
-=======
-	set gbldirpath=$select($length($get(gldpath)):gldpath,1:$ztrnlnm("gtm_dist"))_"/gtmhelp.gld"
+	set gbldirpath=$select($length($get(gldpath)):gldpath,1:$ztrnlnm("ydb_dist"))_"/gtmhelp.gld"
 	quit $data(^|gbldirpath|gtmtypfldindx($piece(field,"."),$piece(field,".",2,$length(field,".")))) quit
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
 ; the below error definitions derived from merrors.msg are relatively complete so older version where they weren't defined get info
 ERRPBNPARMREQ		;150383746;"A first parameter value "_first_" requires a second parameter specified containing "_args

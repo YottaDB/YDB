@@ -65,20 +65,9 @@
 #include "filestruct.h"
 #include "gdscc.h"
 #include "gdskill.h"
-<<<<<<< HEAD
 #include "jnl.h"
 #include "tp_frame.h"
 #include "mv_stent.h"
-=======
-#include "buddy_list.h"		/* needed for tp.h */
-#include "tp.h"
-#include "gtm_permissions.h"
-#include "gtm_post_startup_check_init.h"
-
-#if defined(__x86_64__)
-extern	void	opp_ciret();
-#endif
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
 GBLREF  stack_frame     	*frame_pointer;
 GBLREF  unsigned char		*msp;
@@ -211,7 +200,7 @@ callin_entry_list *ci_find_rtn_entry(ci_tab_entry_t *ci_tab, const char *call_na
 
 /* Java-specific version of call-in handler. */
 int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
-		unsigned int *has_ret_value)
+	    unsigned int *has_ret_value)
 {
 	callin_entry_list	*entry;
 	ci_tab_entry_t		*ci_tab;
@@ -1038,221 +1027,6 @@ int ydb_jinit()
 }
 #endif
 
-<<<<<<< HEAD
-=======
-/* Initialization routine - can be called directly by call-in caller or can be driven by gtm_ci*() implicitly. But
- * if other GT.M services are to be used prior to a gtm_ci*() call (like timers, gtm_malloc/free, etc), this routine
- * should be called first.
- */
-int gtm_init()
-{
-	rhdtyp          	*base_addr;
-	unsigned char   	*transfer_addr;
-	char			*dist;
-	unsigned int		dist_len;
-	char			gtmsecshr_path[GTM_PATH_MAX];
-	int			gtmsecshr_path_len;
-	struct stat		stat_buf;
-	char			file_perm[MAX_PERM_LEN];
-	DCL_THREADGBL_ACCESS;
-
-	SETUP_THREADGBL_ACCESS;
-	if (NULL == lcl_gtm_threadgbl)
-	{	/* This will likely need some attention before going to a threaded model */
-		assert(!gtm_startup_active);
-		GTM_THREADGBL_INIT;
-	}
-	/* A prior invocation of gtm_exit would have set process_exiting = TRUE. Use this to disallow gtm_init to be
-	 * invoked after a gtm_exit
-	 */
-	if (process_exiting)
-	{
-		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CALLINAFTERXIT);
-		return ERR_CALLINAFTERXIT;
-	}
-	if (!gtm_startup_active)
-	{	/* call-in invoked from C as base. GT.M hasn't been started up yet. */
-		common_startup_init(GTM_IMAGE);
-		err_init(stop_image_conditional_core);
-		UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
-		/* Ensure that $gtm_dist exists */
-		if (NULL == (dist = (char *)GETENV(GTM_DIST)))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
-		/* Ensure that $gtm_dist is non-zero and does not exceed GTM_DIST_PATH_MAX */
-		dist_len = (unsigned int)STRLEN(dist);
-		if (!dist_len)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_GTMDISTUNDEF);
-		else if (GTM_DIST_PATH_MAX <= dist_len)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_DISTPATHMAX, 1, GTM_DIST_PATH_MAX);
-		/* Verify that $gtm_dist/gtmsecshr is available with setuid root */
-		memcpy(gtmsecshr_path, gtm_dist, dist_len);
-		gtmsecshr_path[dist_len] =  '/';
-		memcpy(gtmsecshr_path + dist_len + 1, GTMSECSHR_EXECUTABLE, STRLEN(GTMSECSHR_EXECUTABLE));
-		gtmsecshr_path_len = dist_len + 1 + STRLEN(GTMSECSHR_EXECUTABLE);
-		assertpro(GTM_PATH_MAX > gtmsecshr_path_len);
-		gtmsecshr_path[gtmsecshr_path_len] = '\0';
-		if (-1 == Stat(gtmsecshr_path, &stat_buf))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-					LEN_AND_LIT("stat for $gtm_dist/gtmsecshr"), CALLFROM, errno);
-		/* Ensure that the call-in can execute $gtm_dist/gtmsecshr. This not sufficient for security purposes */
-		if ((ROOTUID != stat_buf.st_uid) || !(stat_buf.st_mode & S_ISUID))
-		{
-			SNPRINTF(file_perm, SIZEOF(file_perm), "%04o", stat_buf.st_mode & PERMALL);
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_GTMSECSHRPERM, 5,
-					gtmsecshr_path_len, gtmsecshr_path,
-					RTS_ERROR_STRING(file_perm), stat_buf.st_uid);
-		}
-		else
-		{	/* $gtm_dist validated */
-			gtm_dist_ok_to_use = TRUE;
-			memcpy(gtm_dist, dist, dist_len);
-			gtm_post_startup_check_init();
-		}
-		cli_lex_setup(0, NULL);
-		/* Initialize msp to the maximum so if errors occur during GT.M startup below,
-		 * the unwind logic in gtmci_ch() will get rid of the whole stack.
-		 */
-		msp = (unsigned char *)-1L;
-		GTMTRIG_DBG_ONLY(ch_at_trigger_init = &mdb_condition_handler);
-	}
-	ESTABLISH_RET(gtmci_ch, mumps_status);
-	if (!gtm_startup_active)
-	{	/* GT.M is not active yet. Create GT.M startup environment */
-		invocation_mode = MUMPS_CALLIN;
-		init_gtm();			/* Note - this initializes fgncal_stackbase */
-		gtm_savetraps(); /* nullify default $ZTRAP handling */
-		assert(IS_VALID_IMAGE && (n_image_types > image_type));	/* assert image_type is initialized */
-		assert(gtm_startup_active);
-		assert(frame_pointer->flags & SFF_CI);
-		TREF(gtmci_nested_level) = 1;
-		/* Now that GT.M is initialized. Mark the new stack pointer (msp) so that errors
-		 * while executing an M routine do not unwind stack below this mark. It important that
-		 * the call-in frames (SFF_CI) that hold nesting information (eg. $ECODE/$STACK data
-		 * of the previous stack) are kept from being unwound.
-		 */
-		SAVE_FGNCAL_STACK;
-	} else if (!(frame_pointer->flags & SFF_CI))
-	{	/* Nested call-in: setup a new CI environment (SFF_CI frame on top of base-frame).
-		 * Temporarily mark the beginning of the new stack so that initialization errors in
-		 * call-in frame do not unwind entries of the previous stack (see gtmci_ch). For the
-		 * duration that temp_fgncal_stack has a non-NULL value, it overrides fgncal_stack.
-		 */
-		TREF(temp_fgncal_stack) = msp;
-		/* Generate CIMAXLEVELS error if gtmci_nested_level > CALLIN_MAX_LEVEL */
-		if (CALLIN_MAX_LEVEL < TREF(gtmci_nested_level))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CIMAXLEVELS, 1, TREF(gtmci_nested_level));
-		/* Disallow call-ins within a TP boundary since TP restarts are not supported
-		 * currently across nested call-ins. When we implement TP restarts across call-ins,
-		 * this error needs be changed to a Warning or Notification. Tp allowed if a filter
-		 * call is being made from inside GT.M.
-		 */
-		if (dollar_tlevel && ((!TREF(comm_filter_init)) || (TREF(gtmci_nested_level))))
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CITPNESTED);
-		base_addr = make_cimode();
-		transfer_addr = PTEXT_ADR(base_addr);
-		gtm_init_env(base_addr, transfer_addr);
-#if defined(__x86_64__)
-		SET_CI_ENV(opp_ciret);
-#else
-		SET_CI_ENV(ci_ret_code_exit);
-#endif
-		gtmci_isv_save();
-		(TREF(gtmci_nested_level))++;
-		/* Now that the base-frames for this call-in level have been created, we can create the mv_stent
-		 * to save the previous call-in level's fgncal_stack value and clear the override. When this call-in
-		 * level pops, fgncal_stack will be restored to the value for the previous level. When a given call
-		 * at *this* level finishes, this current value of fgncal_stack is where the stack is unrolled to to
-		 * be ready for the next call.
-		 */
-		SAVE_FGNCAL_STACK;
-		TREF(temp_fgncal_stack) = NULL;		/* Drop override */
-	}
-	REVERT;
-	assert(NULL == TREF(temp_fgncal_stack));
-	return 0;
-}
-
-/* routine exposed to call-in user to exit from active GT.M environment */
-int gtm_exit()
-{
-        DCL_THREADGBL_ACCESS;
-
-        SETUP_THREADGBL_ACCESS;
-	if (!gtm_startup_active)
-		return 0;		/* GT.M environment not setup yet - quietly return */
-	ESTABLISH_RET(gtmci_ch, mumps_status);
-	assert(NULL != frame_pointer);
-	/* Do not allow gtm_exit() to be invoked from external calls */
-	if (!(SFF_CI & frame_pointer->flags) || !(MUMPS_CALLIN & invocation_mode) || (1 < TREF(gtmci_nested_level)))
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVGTMEXIT);
-	/* Now get rid of the whole M stack - end of GT.M environment */
-	while (NULL != frame_pointer)
-	{
-		while ((NULL != frame_pointer) && !(frame_pointer->flags & SFF_CI))
-		{
-#			ifdef GTM_TRIGGER
-			if (SFT_TRIGR & frame_pointer->type)
-				gtm_trigger_fini(TRUE, FALSE);
-			else
-#			endif
-				op_unwind();
-		}
-		if (NULL != frame_pointer)
-		{	/* unwind the current invocation of call-in environment */
-			assert(frame_pointer->flags & SFF_CI);
-			ci_ret_code_quit();
-		}
-	}
-	gtm_exit_handler(); /* rundown all open database resource */
-	/* If libgtmshr was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
-	 * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
-	 * 'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
-	 * our exit handler has already been called. Linux and Solaris don't need this, looking at the
-	 * other platforms we support to see if resolutions can be found. SE 05/2007
-	 */
-#	ifdef _AIX
-	unatexit(gtm_exit_handler);
-#	endif
-	REVERT;
-	gtm_startup_active = FALSE;
-	return 0;
-}
-
-/* Routine to fetch $ZSTATUS after an error has been raised */
-void gtm_zstatus(char *msg, int len)
-{
-	int msg_len;
-	msg_len = (len <= dollar_zstatus.str.len) ? len - 1 : dollar_zstatus.str.len;
-	memcpy(msg, dollar_zstatus.str.addr, msg_len);
-	msg[msg_len] = 0;
-}
-
->>>>>>> a6cd7b01f... GT.M V6.3-008
-#ifdef _AIX
-/* If libyottadb was loaded via (or on account of) dlopen() and is later unloaded via dlclose()
- * the exit handler on AIX and HPUX still tries to call the registered atexit() handler causing
- * 'problems'. AIX 5.2 and later have the below unatexit() call to unregister the function if
- * our exit handler has already been called. Linux and Solaris don't need this, looking at the
- * other platforms we support to see if resolutions can be found. This routine will be called
- * by the OS when libyottadb is unloaded. Specified with the -binitfini loader option on AIX
- * to be run when the shared library is unloaded. 06/2007 SE
- */
-void gtmci_cleanup(void)
-{	/* This code is only for callin cleanup */
-	if (MUMPS_CALLIN != invocation_mode)
-		return;
-	/* If we have already run the exit handler, no need to do so again */
-	if (ydb_init_complete)
-	{
-		ydb_exit_handler();
-		ydb_init_complete = FALSE;
-	}
-	/* Unregister exit handler .. AIX only for now */
-	unatexit(gtm_exit_handler);
-}
-#endif
-
 /* The java plug-in has some very direct references to some of these routines that
  * cannot be changed by the pre-processor so for now, we have some stub routines
  * that take care of the translation. These routines are exported along with their
@@ -1268,6 +1042,7 @@ ydb_status_t gtm_init()
 {
 	return ydb_init();
 }
+
 #ifdef GTM_PTHREAD
 ydb_status_t gtm_jinit()
 {
@@ -1275,6 +1050,7 @@ ydb_status_t gtm_jinit()
 	return ydb_init();
 }
 #endif
+
 ydb_status_t gtm_exit()
 {
 	return ydb_exit();

@@ -92,27 +92,8 @@ error_def(ERR_DBNONUMSUBS);
 #define TEXT3 " :              LVL=0x"
 #define TEXT4 ","
 
-<<<<<<< HEAD
-#define MAX_UTIL_LEN STR_LIT_LEN(TEXT0) + BLOCK_WINDOW + STR_LIT_LEN(TEXT3) + LEVEL_WINDOW + STR_LIT_LEN(TEXT4) + 1
-#define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION)								\
-{														\
-	switch (ERROR_ACTION)											\
-	{													\
-	case ASSERTPRO_ON_CERT_FAIL:										\
-	case RTS_ERROR_ON_CERT_FAIL:										\
-		rts_error_csa(CSA_ARG(CSA) VARLSTCNT(4) MAKE_MSG_INFO(ERR), 2, LEN_AND_STR((char_ptr_t)BUFF));	\
-		/* WARNING fallthrough (because the message is INFO) */						\
-	case SEND_MSG_ON_CERT_FAIL:										\
-		send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) MAKE_MSG_INFO(ERR), 2, LEN_AND_STR((char_ptr_t)BUFF));	\
-		if ((ASSERTPRO_ON_CERT_FAIL != ERROR_ACTION) || (INFO == SEVMASK(ERR)))				\
-			break;											\
-		assertpro(0 == ERR);										\
-	default:												\
-		assert(ERROR_ACTION);										\
-	}													\
-=======
-#define MAX_UTIL_LEN STRLEN(TEXT0) + BLOCK_WINDOW + STRLEN(TEXT3) + LEVEL_WINDOW + STRLEN(TEXT4) + 1
-#define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION, REG)	/* for reg in a message, replace NULL in invocation */	\
+#define MAX_UTIL_LEN (STR_LIT_LEN(TEXT0) + BLOCK_WINDOW + STR_LIT_LEN(TEXT3) + LEVEL_WINDOW + STR_LIT_LEN(TEXT4) + 1)
+#define	RTS_ERROR_FUNC(CSA, ERR, BUFF, ERROR_ACTION, REG)	/* for reg in a message, replace NULL in invocation */ \
 {															\
 	switch (ERROR_ACTION)												\
 	{														\
@@ -136,7 +117,6 @@ error_def(ERR_DBNONUMSUBS);
 	default:													\
 		assert(ERROR_ACTION);											\
 	}														\
->>>>>>> a6cd7b01f... GT.M V6.3-008
 }
 
 int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int4 error_action, gv_namehead *gvt)

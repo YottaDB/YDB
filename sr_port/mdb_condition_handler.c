@@ -665,19 +665,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 			assert(NULL != frame_pointer->restart_pc);
 			assert((!(SFF_INDCE & frame_pointer->flags)) || (frame_pointer->restart_ctxt == frame_pointer->ctxt));
 			DBGEHND((stderr, "mdb_condition_handler(2): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
-<<<<<<< HEAD
-				 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, restart_pc, restart_ctxt,
-				 frame_pointer->type));
-			frame_pointer->mpc = restart_pc;
-			frame_pointer->ctxt = restart_ctxt;
-			frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
-=======
 				 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, frame_pointer->restart_pc,
 				 frame_pointer->restart_ctxt, frame_pointer->type));
 			frame_pointer->mpc = frame_pointer->restart_pc;
 			frame_pointer->ctxt = frame_pointer->restart_ctxt;
-			frame_pointer->flags &= SSF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
->>>>>>> a6cd7b01f... GT.M V6.3-008
+			frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;	/* Frame enterable now with mpc reset */
 			GTMTRIG_ONLY(
 				DBGTRIGR((stderr, "mdb_condition_handler: disabling SFF_NORET_VIA_MUMTSTART_OFF (1) in frame "
 					  "0x"lvaddr"\n", frame_pointer)));

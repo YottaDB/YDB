@@ -61,7 +61,7 @@ int ydb_init()
 {
 	unsigned char   	*transfer_addr;
 	char			*dist, *tmp_ptr;
-	int			dist_len, tmp_len;
+	size_t			dist_len, tmp_len;
 	char			path[YDB_PATH_MAX];
 	int			path_len;
 	int			save_errno;

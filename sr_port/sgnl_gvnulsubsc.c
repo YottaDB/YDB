@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,11 +28,7 @@ GBLREF gv_key		*gv_currkey;
 error_def(ERR_GVIS);
 error_def(ERR_NULSUBSC);
 
-<<<<<<< HEAD
-#define	NONULLSUBS	"DB access failed because"
-=======
 #define	NONULLSUBS	"Access or update failed because"
->>>>>>> a6cd7b01f... GT.M V6.3-008
 
 void sgnl_gvnulsubsc(char *place)
 {
