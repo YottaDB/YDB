@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -20,14 +20,13 @@
 
 	.data
 	.extern	neterr_pending
-	.extern	restart_pc
 
 	.text
 	.extern	gvcmz_neterr
 	.extern	async_action
 	.extern	outofband_clear
 
- 
+
 ENTRY op_forintrrpt
 	stp	x29, x30, [sp, #-16]!
 	mov	x29, sp

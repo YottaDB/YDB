@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -23,9 +23,7 @@
 	.sbttl	op_restartpc
 
 	.data
-	.extern	restart_pc
-	.extern restart_ctxt
-	.extern frame_pointer
+	.extern frame_pointer				// Note this indirectly used as its addr is in R5
 
 	.text
 
@@ -37,13 +35,11 @@
  * or tested. Should that change, the alignment should be fixed and implement use of the CHKSTKALIGN macro made.
  */
 ENTRY op_restartpc
-	sub	r4, lr, #8			/* xfer call size is constant, 4 for ldr and 4 for blx */
-	ldr	r1, =restart_pc
-	str	r4, [r1]
-	ldr	r12, [r5]
-	ldr	r4, [r12, #msf_ctxt_off]
-	ldr	r2, =restart_ctxt
-	str	r4, [r2]
+	sub	r4, lr, #8				// Xfer call size is constant, 4 for ldr and 4 for blx
+	ldr	r12, [r5]				// Load content of 'frame_pointer' global var
+	str	r4, [r12, #msf_restart_pc_off]		// Save restart pc in current stack frame
+	ldr	r2, [r12, #msf_ctxt_off]		// Fetch frame's resume context
+	str	r2, [r12, #msf_restart_ctxt_off]	// Save as the restart context in this frame as well
 	bx	lr
 
 	.end

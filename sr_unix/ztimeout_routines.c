@@ -69,7 +69,6 @@ GBLREF	unsigned short		proc_act_type;
 GBLREF	mv_stent		*mv_chain;
 GBLREF	int			dollar_truth;
 GBLREF	mstr			extnam_str;
-GBLREF	unsigned char		*restart_pc, *restart_ctxt;
 GBLREF	dollar_ecode_type	dollar_ecode;
 GBLREF	dollar_stack_type	dollar_stack;
 GBLREF	boolean_t		ztrap_explicit_null;

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -18,12 +18,10 @@
 	.include "g_msf.si"
 
 	.data
-	.extern	restart_pc
-	.extern restart_ctxt
-	.extern frame_pointer
+	.extern frame_pointer				// Note this indirectly used as its addr is in x19
 
 	.text
- 
+
 /*
  * Routine to save the address of the *start* of this call along with its context as the restart point should this
  * process encounter a restart situation (return from $ZTRAP or outofband call typically).
@@ -33,11 +31,9 @@
  */
 
 ENTRY op_restartpc
-	sub	x13, x30, #8			/* xfer call size is constant, 4 for ldr and 4 for blr */
-	ldr	x10, =restart_pc
-	str	x13, [x10]
-	ldr	x12, [x19]
-	ldr	x13, [x12, #msf_ctxt_off]
-	ldr	x11, =restart_ctxt
-	str	x13, [x11]
+	sub	x13, x30, #8				// Xfer call size is constant, 4 for ldr and 4 for blr
+	ldr	x10, [x19]				// Load contents of frame_pointer
+	str	x13, [x10, #msf_restart_pc_off]		// Save restart pc in stack frame
+	ldr	x12, [x10, #msf_ctxt_off]		// Fetch frame's resume context
+	str	x12, [x10, #msf_restart_ctxt_off]	// Save as the restart context in this frame as well
 	ret
