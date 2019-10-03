@@ -138,15 +138,21 @@ else()
 	# For "Release" or "RelWithDebInfo" type of builds, keep this option disabled for performance reasons
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-stack-protector")
   if (CMAKE_COMPILER_IS_GNUCC)
-    # Enable (a) link time optimization and (b) use gold linker.
-    # (a) was seen to reduce the size of libyottadb.so by 5% and improve runtimes by 7% on a simple database test
-    # (b) gold linker was seen to slightly (~ 0.1%) improve build times and run times compared to default ld linker.
-    # Use -flto=N where N is number of available CPUs to speed up the link time.
-    include(ProcessorCount)
-    ProcessorCount(NUMCPUS)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=${NUMCPUS} -fuse-ld=gold")
-    set(CMAKE_AR "gcc-ar")		# needed on some versions of gcc to get -flto working
-    set(CMAKE_RANLIB "gcc-ranlib")	# needed on some versions of gcc to get -flto working
+    # Avoid using LTO on armv6l due to excessive link time plus creates many undefs due to failed/missing plugins
+    if (NOT ("${arch}" STREQUAL "armv6l"))
+      # Enable (a) link time optimization and (b) use gold linker.
+      # (a) was seen to reduce the size of libyottadb.so by 5% and improve runtimes by 7% on a simple database test
+      # (b) gold linker was seen to slightly (~ 0.1%) improve build times and run times compared to default ld linker.
+      # Use -flto=N where N is number of available CPUs to speed up the link time.
+      include(ProcessorCount)
+      ProcessorCount(NUMCPUS)
+      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto=${NUMCPUS} -fuse-ld=gold")
+      set(CMAKE_AR "gcc-ar")		# needed on some versions of gcc to get -flto working
+      set(CMAKE_RANLIB "gcc-ranlib")	# needed on some versions of gcc to get -flto working
+      message("*** Production build using LTO")
+    else()
+      message("*** Production build not using LTO due to issues building on armv6l")
+    endif()
   endif()
 endif()
 

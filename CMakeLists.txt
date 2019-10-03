@@ -90,6 +90,11 @@ else()
   message(FATAL_ERROR "--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
+# Record what we plan to do (dump various make options)
+message("*** CMAKE_C_FLAGS:            ${CMAKE_C_FLAGS}")
+message("*** CMAKE_ASM_FLAGS:          ${CMAKE_ASM_FLAGS}")
+message("*** CMAKE_ASM_FLAGS_DEBUG:    ${CMAKE_ASM_FLAGS_DEBUG}")
+message("*** CMAKE_ASM_COMPILE_OBJECT: ${CMAKE_ASM_COMPILE_OBJECT}")
 # Choose where to get bootstrap sources.
 set(YDB_DIST "" CACHE PATH "Existing YottaDB Distribution")
 if(YDB_DIST)
