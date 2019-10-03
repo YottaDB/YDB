@@ -176,9 +176,10 @@ int ydb_init()
 	{	/* Call-in or SimpleAPI or SimpleThreadAPI invoked from C as base.
 		 * YottaDB hasn't been started up yet. Start it now.
 		 */
-		if (NULL == (dist = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
-		{	/* In a call-in and "ydb_dist" env var is not defined. Set it to full path of libyottadb.so
-			 * that contains the currently invoked "ydb_init" function.
+		if ((NULL == (dist = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
+			|| (NULL == getenv("gtm_dist")) || (strcmp(getenv("gtm_dist"), getenv("ydb_dist"))))
+		{	/* In a call-in and "ydb_dist" or "gtm_dist" env var is not defined or not the same. Set them to full path
+             * of libyottadb.so that contains the currently invoked "ydb_init" function.
 			 */
 			if (0 == dladdr(&ydb_init, &shlib_info))
 			{	/* Could not find "ydb_init" symbol (current running function) in any loaded shared libraries.
