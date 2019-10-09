@@ -310,6 +310,8 @@ collundeferr
 	s $etrap=savetrap
 	d message^GDE(gdeerr("GBLNAMCOLLUNDEF"),""""_coll_""":"_$zwrite(gblname))
 	q
+STRSUB(sub,subcnt)
+	quit $$strsub(sub,subcnt)
 strsub:(sub,subcnt)
 	new state,xstr,len,iszchar,istart,x,y	; iszchar and istart are initialized in lower level invocations
 						; but needed outside that frame too hence the new done here (in parent)
