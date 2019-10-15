@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,25 +20,46 @@
 
 #include "op.h"
 #include "mvalconv.h"
+#include "xoshiro.h"
+#include <errno.h>
 
 GBLREF uint4	process_id;
+GBLREF uint64_t sm64_x;
+GBLREF uint64_t x256_s[4];
+
+error_def(ERR_RANDARGNEG);
 
 void op_fnrandom (int4 interval, mval *ret)
 {
-	static int4	seed = 0;
-	error_def	(ERR_RANDARGNEG);
 	int4		random;
+	FILE		*file;
 
+	if (0 == sm64_x)
+	{	// initialize the random number generator if uninitialized
+		file = fopen("/dev/urandom", "r");
+		if (NULL == file)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				      LEN_AND_LIT("fopen() of /dev/urandom"), CALLFROM, errno);
+		else
+		{
+			if (0 == fread(&sm64_x, sizeof(sm64_x), 1, file))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SYSCALL, 5,
+					      LEN_AND_LIT("fread() of /dev/urandom"), CALLFROM);
+			else
+			{
+				if (0 != fclose(file))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+						      LEN_AND_LIT("fclose() of /dev/urandom"), CALLFROM, errno);
+				for (int i = 0; i < 4; i++)
+					x256_s[i] = sm64_next();
+			}
+		}
+	}
 	if (interval < 1)
 	{
 		rts_error(VARLSTCNT(1) ERR_RANDARGNEG);
 	}
-	if (seed == 0)
-	{
-		seed = (int4)(time(0) * process_id);
-		srand48(seed);
-	}
-	random	= (int4)(interval * drand48());
-	random	= random & 0x7fffffff;  /* to make sure that the sign bit(msb) is off*/
+	// get a random number and convert it to a positive 4 byte integer then mod it by the interval
+	random	= (int4)(x256_next() >> 33) % interval;
 	MV_FORCE_MVAL(ret, random);
 }
