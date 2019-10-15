@@ -225,10 +225,10 @@ open_relinkctl_sgm *relinkctl_attach(mstr *obj_container_name, mstr *objpath, in
 int relinkctl_open(open_relinkctl_sgm *linkctl, boolean_t object_dir_missing)
 {
 #	ifdef AUTORELINK_SUPPORTED
-	int			fd, i, j, rc, save_errno, shmid, status, stat_res, user_id, group_id, perm;
+	int			fd = 0, i, j, rc, save_errno, shmid, status, stat_res, user_id, group_id, perm;
 	struct stat     	stat_buf;
 	size_t			shm_size;
-	boolean_t		is_mu_rndwn_rlnkctl, shm_removed, rctl_create_attempted, rctl_existed, need_shmctl;
+	boolean_t		is_mu_rndwn_rlnkctl, shm_removed, rctl_create_attempted = FALSE, rctl_existed, need_shmctl;
 	relinkshm_hdr_t		*shm_base;
 	rtnobjshm_hdr_t		*rtnobj_shm_hdr;
 	relinkctl_data		*hdr;

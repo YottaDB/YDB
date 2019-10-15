@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2010 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -96,7 +99,7 @@ void	strpiecediff(mstr *oldstr, mstr *newstr, mstr *delim,
 	int		curpiece, bufflen, newbufflen, skippcs, save_skippcs;
 	int		delim_len, old_len, new_len, match_res, old_match_len, new_match_len, pcdiff_len;
 	uint4		nextmin, nextmax, prev_nextmin;
-	char		*old_ptr, *old_top, *new_ptr, *new_top, *next_ptr, *old_end, *new_end;
+	char		*old_ptr, *old_top, *new_ptr, *new_top, *next_ptr, *old_end = NULL, *new_end = NULL;
 	uchar_ptr_t	delim_ptr;
 	static	char	pcdiff_buff[PIECEDIFF_START_BUFSIZ], *pcdiff_start = &pcdiff_buff[0], *pcdiff_top = ARRAYTOP(pcdiff_buff);
 	char		*pcdiff_ptr = pcdiff_start, *tmpbuff;

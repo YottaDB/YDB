@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,7 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover)
 	node_local_ptr_t	cnl;
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -126,4 +126,3 @@ boolean_t grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover)
 	}
 	return(TRUE);
 }
-

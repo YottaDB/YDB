@@ -85,7 +85,7 @@ error_def(ERR_TEXT);
 /* Side-effect: This macro might update the global variable "*mur_back_pre_resolve_seqno" */
 #define SAVE_PRE_RESOLVE_SEQNO(rectype, rec_time, rec_token_seq)						\
 {														\
-	boolean_t	was_holder;										\
+	boolean_t	was_holder = FALSE;									\
 														\
 	/* Before operating on global variable "mur_back_pre_resolve_seqno", get thread lock */			\
 	PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */		\
@@ -111,7 +111,7 @@ error_def(ERR_TEXT);
 /* #GTM_THREAD_SAFE : The below macro (MUR_BACK_PROCESS_ERROR) is thread-safe */
 #define MUR_BACK_PROCESS_ERROR(JCTL, MESSAGE_STRING)								\
 {														\
-	boolean_t	was_holder;										\
+	boolean_t	was_holder = FALSE;									\
 														\
 	if (JCTL->after_end_of_data)										\
 	{													\
@@ -483,7 +483,7 @@ uint4	mur_back_phase1(reg_ctl_list *rctl)
 	mur_read_desc_t		*mur_desc;
 	jnl_record		*jnlrec;
 	enum jnl_record_type	rectype;
-	boolean_t		was_holder;
+	boolean_t		was_holder = FALSE;
 	mur_back_opt_t		mur_back_options;
 
 	status = gtm_pthread_init_key(rctl->gd);
@@ -601,18 +601,18 @@ uint4	mur_back_phase2(reg_ctl_list *rctl)
 /* #GTM_THREAD_SAFE : The below function (mur_back_processing_one_region) is thread-safe */
 uint4	mur_back_processing_one_region(mur_back_opt_t *mur_back_options)
 {
-	boolean_t		apply_pblk_this_region, first_epoch, reached_trnarnd, skip_rec, this_reg_resolved, was_holder;
+	boolean_t		apply_pblk_this_region, first_epoch, reached_trnarnd, skip_rec, this_reg_resolved, was_holder = FALSE;
 	enum jnl_record_type	rectype;
 	enum rec_fence_type	rec_fence;
-	int			idx, reg_total, strm_idx;
+	int			idx, reg_total, strm_idx = 0;
 	jnl_ctl_list		*jctl;
 	jnl_record		*jnlrec;
 	jnl_string		*keystr;
-	jnl_tm_t		rec_time;
+	jnl_tm_t		rec_time = 0;
 	multi_struct		*multi;
 	mur_read_desc_t		*mur_desc;
 	reg_ctl_list		*rctl;
-	seq_num			rec_token_seq, save_resync_seqno, save_strm_seqno, strm_seqno;
+	seq_num			rec_token_seq, save_resync_seqno, save_strm_seqno, strm_seqno = 0;
 	token_num		token, last_tcom_token;
 	trans_num		prev_tn, rec_tn;
 	uint4			max_blk_size, max_rec_size;

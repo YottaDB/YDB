@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -85,7 +85,7 @@ STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg
 	int		max_key;
 	unsigned char	*ptr, *end_ptr;
 	gd_region	*reg, *reg_start, *reg_top;
-	gd_addr		*addr_ptr;
+	gd_addr		*addr_ptr = NULL;
 	ht_ent_mname	*tabent;
 	gv_namehead	*gvt;
 	gvnh_reg_t	*gvnh_reg;

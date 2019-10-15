@@ -63,7 +63,7 @@ void_ptr_t fgn_getpak(char *package_name, int msgtype)
 	char_ptr_t	dummy_err_str;
 	char		err_str[MAX_ERRSTR_LEN]; /* needed as util_out_print doesn't handle 64bit pointers */
 	char	 	librarypath[GTM_PATH_MAX], *lpath = NULL;
-	intrpt_state_t	prev_intrpt_state;
+	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 
 	if ((RESTRICTED(library_load_path)) && (0 != memcmp(ydb_dist, package_name, STRLEN(ydb_dist))))
 	{	/* Restrictions in place and the path is not somewhere under $ydb_dist */

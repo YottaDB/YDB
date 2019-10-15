@@ -164,7 +164,7 @@ int4 gds_rundown(boolean_t cleanup_udi)
 	boolean_t		bypassed_ftok = FALSE, bypassed_access = FALSE, may_bypass_ftok, inst_is_frozen;
 	boolean_t		ftok_counter_halted, access_counter_halted;
 	int			secshrstat;
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	gv_namehead		*currgvt;
 	gd_region		*baseDBreg;
 	sgmnt_addrs		*baseDBcsa;

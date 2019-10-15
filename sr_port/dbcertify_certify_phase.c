@@ -415,7 +415,7 @@ void dbcertify_certify_phase(void)
 boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_type blk_type, v15_trans_num tn, int blk_levl)
 {
 	int		blk_len, blk_size, restart_cnt, save_block_depth, tmp_blk_levl;
-	int		gvtblk_index, dtblk_index, blk_index, bottom_tree_index;
+	int		gvtblk_index, dtblk_index, blk_index = 0, bottom_tree_index;
 	int		curr_blk_len, curr_blk_levl, curr_rec_len, ins_rec_len;
 	int		curr_rec_shrink, curr_rec_offset, blks_this_lmap;
 	int		prev_rec_offset, new_blk_len, new_rec_len, remain_offset, remain_len, blk_seg_cnt;
@@ -428,7 +428,7 @@ boolean_t dbc_split_blk(phase_static_area *psa, block_id blk_num, enum gdsblk_ty
 	boolean_t	got_root, level_0, completed, insert_point, restart_transaction;
 	blk_segment	*bs_ptr, *bs1, *blk_sega_p, *blk_array_top;
 	rec_hdr_ptr_t	ins_rec_hdr, next_rec_hdr, new_star_hdr;
-	dbc_gv_key	*last_rec_key;
+	dbc_gv_key	*last_rec_key = NULL;
 	uchar_ptr_t	blk_endp, blk_p, bmp_ptr, chr_p, cp1, lcl_map_p, mid_point, new_blk_p, next_rec_p, rec_p;
 	unsigned short	us_rec_len;
 	v15_trans_num	curr_tn;

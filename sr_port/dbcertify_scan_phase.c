@@ -419,7 +419,7 @@ void dbc_write_p1out(phase_static_area *psa, void *obuf, int olen)
 /* Routine to process a database block */
 void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 {
-	int		rec_len, rec1_cmpc, rec2_cmpc, key_len, blk_levl, rec1_len, rec2_len, rec2_rlen;
+	int		rec_len, rec1_cmpc, rec2_cmpc, key_len = 0, blk_levl, rec1_len, rec2_len, rec2_rlen;
 	int		tmp_cmpc;
 	int		free_bytes, blk_len;
 	int		save_errno, mm_offset;

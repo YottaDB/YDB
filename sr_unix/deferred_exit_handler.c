@@ -66,7 +66,7 @@ void deferred_exit_handler(void)
 {
 	void			(*signal_routine)();
 	char			*rname;
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	int			sig;
 	DCL_THREADGBL_ACCESS;
 

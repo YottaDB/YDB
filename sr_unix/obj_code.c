@@ -124,7 +124,7 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	mline		*mlx, *mly;
 	gtm_uint16	objhash;
 	var_tabent	*vptr;
-	intrpt_state_t	prev_intrpt_state;
+	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	struct stat	src_stat, obj_stat;
 	struct timespec	times[2];	/* for "futimens" call */
 	DCL_THREADGBL_ACCESS;

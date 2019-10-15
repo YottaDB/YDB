@@ -570,7 +570,7 @@ STATICFNDEF void do_flow_control(uint4 write_pos)
 	int			tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int			torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
 	int			status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
-	int			read_pos;
+	int			read_pos = 0;
 	seq_num			temp_seq_num;
 	DCL_THREADGBL_ACCESS;
 
@@ -1638,7 +1638,7 @@ STATICFNDEF void process_tr_buff(int msg_type)
 	repl_old_triple_jnl_t		old_triple_content;
 	uLongf				destlen;
 	int				cmpret, cur_data_len, rc;
-	repl_msg_ptr_t			msgp, msgp_top;
+	repl_msg_ptr_t			msgp = NULL, msgp_top;
 	int4				histinfo_strm_num;
 	uint4				write_len, pre_filter_write_len, pre_filter_write;
 	boolean_t			uncmpfail;
@@ -2691,13 +2691,13 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 {
 	/* The work-horse of the Receiver Server */
 	boolean_t			dont_reply_to_heartbeat = FALSE, is_repl_cmpc;
-	boolean_t			uncmpfail, send_cross_endian, recvpool_prepared, copied_to_recvpool;
+	boolean_t			uncmpfail, send_cross_endian, recvpool_prepared, copied_to_recvpool = FALSE;
 	gtmrecv_local_ptr_t		gtmrecv_local;
 	gtm_time4_t			ack_time;
-	int4				msghdrlen, strm_num, processed_hdrlen;
+	int4				msghdrlen, strm_num, processed_hdrlen = 0;
 	int4				need_histinfo_num;
 	int				cmpret;
-	int				msg_type, msg_len, hdr_msg_type, hdr_msg_len;
+	int				msg_type = 0, msg_len, hdr_msg_type, hdr_msg_len;
 	int				torecv_len, recvd_len, recvd_this_iter;	/* needed for REPL_RECV_LOOP */
 	int				tosend_len, sent_len, sent_this_iter;	/* needed for REPL_SEND_LOOP */
 	int				status, poll_dir;			/* needed for REPL_{SEND,RECV}_LOOP */
@@ -2717,7 +2717,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 	seq_num				ack_seqno, temp_ack_seqno;
 	seq_num				request_from, recvd_jnl_seqno;
 	sgmnt_addrs			*repl_csa;
-	uchar_ptr_t			old_buffp, buffp_start;
+	uchar_ptr_t			old_buffp, buffp_start = NULL;
 	uint4				recvd_start_flags, len;
 	uLong				cmplen;
 	uLongf				destlen;

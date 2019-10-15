@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -193,9 +193,9 @@ enum cdb_sc	op_tcommit(void)
 	sgmnt_addrs		*csa, *next_csa;
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
-	sgm_info		*si, *temp_si;
+	sgm_info		*si, *temp_si = NULL;
 	enum cdb_sc		status;
-	cw_set_element		*cse, *last_cw_set_before_maps, *csetemp, *first_cse;
+	cw_set_element		*cse = NULL, *last_cw_set_before_maps = NULL, *csetemp, *first_cse;
 	blk_ident		*blk, *blk_top, *next_blk;
 	block_id		bit_map, next_bm, new_blk;
 	cache_rec_ptr_t		cr;

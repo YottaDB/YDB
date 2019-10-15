@@ -102,7 +102,7 @@ void mupip_downgrade(void)
  	struct stat    	stat_buf;
 	ZOS_ONLY(int	realfiletag;)
 	unsigned char	new_master_map[MASTER_MAP_SIZE_V4];
-	enum db_ver	desired_dbver;
+	enum db_ver	desired_dbver= GDSNOVER;
 	int		ftrunc_status;
 
 	/* Initialization */

@@ -38,7 +38,7 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 {
         sm_uc_ptr_t	cp;
 	uint4		ch;
-	int		fastate = 0, ncommas, dstlen, chlen, max_len;
+	int		fastate = 0, ncommas = 0, dstlen, chlen, max_len;
 	boolean_t	isctl, isill, nospace;
 	uchar_ptr_t	srctop, strnext, tmpptr;
 
@@ -287,4 +287,3 @@ int format2zwr(sm_uc_ptr_t src, int src_len, unsigned char *des, int *des_len)
 	*des_len = dstlen;
 	return nospace;
 }
-

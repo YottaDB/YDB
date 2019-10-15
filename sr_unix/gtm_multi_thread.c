@@ -3,7 +3,7 @@
  * Copyright (c) 2015 Fidelity National Information 		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -187,7 +187,7 @@ int	gtm_multi_thread(gtm_pthread_fnptr_t fnptr, int ntasks, int max_threads,
 #ifdef GTM_PTHREAD
 int	gtm_multi_thread_helper(thread_parm_t *tparm)
 {
-	boolean_t		was_holder;
+	boolean_t		was_holder = FALSE;
 	gtm_pthread_fnptr_t	fnptr;
 	int			ntasks, nexttask;
 	int			parmElemSize, rc1;

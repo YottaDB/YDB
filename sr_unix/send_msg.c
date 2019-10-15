@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,10 +91,10 @@ void send_msg_va(void *csa, int arg_count, va_list var)
         int		dummy, fao_actual, fao_count, i, msg_id, freeze_msg_id;
         char    	msg_buffer[1024];
         mstr    	msg_string;
-	char		*save_util_outptr;
+	char		*save_util_outptr = NULL;
 	va_list		save_last_va_list_ptr;
 	boolean_t	util_copy_saved = FALSE;
-	boolean_t	freeze_needed = FALSE, was_holder;
+	boolean_t	freeze_needed = FALSE, was_holder = FALSE;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* used by CHECK_IF_FREEZE_ON_ERROR_NEEDED and FREEZE_INSTANCE_IF_NEEDED */
 	DCL_THREADGBL_ACCESS;
 

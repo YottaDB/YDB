@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -149,7 +149,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	unix_db_info		*udi;
 	inctn_opcode_t		save_inctn_opcode;
 	int4			prev_extend_blks_to_upgrd;
-	jnl_private_control	*jpc;
+	jnl_private_control	*jpc = NULL;
 	jnl_buffer_ptr_t	jbp;
 	cache_rec_ptr_t         cr;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_NOSPC_ENABLED */
@@ -160,7 +160,7 @@ uint4	 gdsfilext(uint4 blocks, uint4 filesize, boolean_t trans_in_prog)
 	assert(!IS_DSE_IMAGE);
 	assert((cs_addrs->nl == NULL) || (process_id != cs_addrs->nl->trunc_pid)); /* mu_truncate shouldn't extend file... */
 	assert(!process_exiting);
-	DEBUG_ONLY(old_base[0] = old_base[1] = NULL);
+	old_base[0] = old_base[1] = NULL;
 	assert(!gv_cur_region->read_only);
 	udi = FILE_INFO(gv_cur_region);
 	is_mm = (dba_mm == cs_addrs->hdr->acc_meth);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -202,7 +202,7 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 {
 	block_id		gvt_root;
 	boolean_t		clue, flush_cache;
-	boolean_t		next_fenced_was_null, write_logical_jnlrecs, jnl_format_done;
+	boolean_t		next_fenced_was_null = FALSE, write_logical_jnlrecs, jnl_format_done;
 	boolean_t		left_extra, right_extra;
 	boolean_t		want_root_search = FALSE, is_dummy, succeeded, key_exists;
 	rec_hdr_ptr_t		rp;
@@ -213,7 +213,7 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 	enum cdb_sc		cdb_status;
 	int			lev, end, target_key_size;
 	uint4			prev_update_trans, actual_update;
-	jnl_format_buffer	*jfb, *ztworm_jfb;
+	jnl_format_buffer	*jfb = NULL, *ztworm_jfb;
 	jnl_action_code		operation;
 	kill_set		kill_set_head, *ks, *temp_ks;
 	node_local_ptr_t	cnl;
@@ -233,11 +233,11 @@ void	gvcst_kill2(boolean_t do_subtree, boolean_t *span_status, boolean_t killing
 	boolean_t		is_tpwrap;
 	boolean_t		lcl_implicit_tstart;	/* local copy of the global variable "implicit_tstart" */
 	gtm_trigger_parms	trigparms;
-	gvt_trigger_t		*gvt_trigger;
+	gvt_trigger_t		*gvt_trigger = NULL;
 	gvtr_invoke_parms_t	gvtr_parms;
 	int			gtm_trig_status, idx;
-	unsigned char		*save_msp;
-	mv_stent		*save_mv_chain;
+	unsigned char		*save_msp = NULL;
+	mv_stent		*save_mv_chain = NULL;
 	mval			*ztold_mval = NULL, ztvalue_new, ztworm_val;
 #	endif
 #	ifdef DEBUG

@@ -193,7 +193,7 @@ uint4 cre_jnl_file_common(jnl_create_info *info, char *rename_fn, int rename_fn_
 	trans_num		db_tn;
 	uint4			temp_offset, temp_checksum, pfin_offset, eof_offset;
 	uint4			jnl_fs_block_size;
-	sgmnt_addrs		*csa;
+	sgmnt_addrs		*csa = NULL;
 
 	jrecbuf = NULL;
 	csa = info->csa;

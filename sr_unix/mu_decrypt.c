@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -50,9 +53,9 @@
  */
 int mu_decrypt(char *fname, int fname_len, uint4 off, uint4 len, char *type, int type_len)
 {
-	int		fd, save_errno, gtmcrypt_errno, i, status, iv_len;
-	char		hash[GTMCRYPT_HASH_LEN], iv[GTM_MAX_IV_LEN], *iv_ptr, *buff, *buff_ptr;
-	boolean_t	is_encrypted, is_journal;
+	int		fd = 0, save_errno, gtmcrypt_errno, i, status, iv_len;
+	char		hash[GTMCRYPT_HASH_LEN], iv[GTM_MAX_IV_LEN], *iv_ptr = NULL, *buff, *buff_ptr;
+	boolean_t	is_encrypted = FALSE, is_journal;
 	gtmcrypt_key_t	key_handle;
 	jrec_prefix	*prefix;
 	blk_hdr		*header;

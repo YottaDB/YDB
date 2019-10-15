@@ -75,7 +75,7 @@ void mutex_deadlock_check(CRIT_PTR_T criticalPtr, sgmnt_addrs *csa)
 	int4		save_crit_count;
 	boolean_t	passed_cur_region;
 	gd_region	*region;
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	assert(csa);
 	if (in_mutex_deadlock_check)
 		return;

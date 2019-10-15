@@ -1,7 +1,10 @@
-/****************************************************************
+ /****************************************************************
  *								*
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -23,7 +26,7 @@ mlk_shrblk_ptr_t mlk_shrblk_merge(mlk_shrblk_ptr_t lhead, mlk_shrblk_ptr_t rhead
 /* Do an in-place sort of this level of shrblks, starting from head, returning the new first shrblk. */
 mlk_shrblk_ptr_t mlk_shrblk_sort(mlk_shrblk_ptr_t head)
 {
-	mlk_shrblk_ptr_t	lhead, rhead;
+	mlk_shrblk_ptr_t	lhead, rhead = NULL;
 
 	if (head->rsib == 0 || head->lsib == 0)
 		return head;

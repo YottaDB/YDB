@@ -65,7 +65,7 @@ char gtcmtr_lke_showrep(struct CLB *lnk, show_request *sreq)
 	mstr 			dnode;
 	show_reply		srep;
 	uint4			status;
-	boolean_t		was_crit;
+	boolean_t		was_crit = FALSE;
 	mlk_pvtctl		pctl, pctl2;
 
 	ASSERT_IS_LIBGNPSERVER;

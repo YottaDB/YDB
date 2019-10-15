@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017, 2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,14 +40,14 @@ int f_query(oprtype *a, opctype op)
 	enum order_dir	direction;
 	enum order_obj	object;
 	int4		intval;
-	opctype		gv_oc;
-	oprtype		*tmpa, *tmpa0, *tmpa1, tmpa2;
+	opctype		gv_oc = 0;
+	oprtype		*tmpa = NULL, *tmpa0 = NULL, *tmpa1 = NULL, tmpa2;
 	oprtype		control_slot, dir_opr, *dir_oprptr, *next_oprptr;
 	save_se		save_state;
 	short int	column;
 	triple		*chain2, *obp, tmpchain2;
 	triple		*oldchain, *r, *r0, *r1, *r2, *sav_dirref, *triptr;
-	triple		*sav_gv1, *sav_gvn, *sav_lvn, *sav_ref;
+	triple		*sav_gv1 = NULL, *sav_gvn, *sav_lvn, *sav_ref;
 	static opctype	query_opc[LAST_OBJECT][LAST_DIRECTION] =
 	{
 		/* FORWARD	BACKWARD		TBD */

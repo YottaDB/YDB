@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -425,7 +425,7 @@ STATICFNDEF uint4	gvtr_process_range(gv_namehead *gvt, gvtr_subs_t *subsdsc, int
 	char		keybuff[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
 	gv_key		*out_key;
 	uint4		len, len1, min, nelems;
-	gvt_trigger_t	*gvt_trigger;
+	gvt_trigger_t	*gvt_trigger = NULL;
 	char		*dststart, *dstptr, *srcptr, ch;
 	boolean_t	ret;
 	int		cmpres;
@@ -643,8 +643,8 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 	boolean_t		quote_imbalance, colon_imbalance, end_of_subscript;
 	uint4			paren_imbalance;
 	gvtr_subs_t		*subsdsc;
-	mname_entry		*lvnamedsc;
-	uint4			*lvindexdsc, status;
+	mname_entry		*lvnamedsc = NULL;
+	uint4			*lvindexdsc = NULL, status;
 	int			ctype;
 	char			save_rtn_name[MAX_TRIGNAME_LEN], save_var_name[MAX_MIDENT_LEN];
 	uint4			save_rtn_name_len, save_var_name_len;
@@ -1479,7 +1479,7 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
 	gv_trigger_t		*trigdsc, *trigstop, *trigstart;
 	int			gtm_trig_status, tfxb_status, num_triggers_invoked, trigmax, trig_list_offset;
-	mstr			*ztupd_mstr;
+	mstr			*ztupd_mstr = NULL;
 	mval			*keysub_mval;
 	mval			*lvvalarray[MAX_GVSUBSCRIPTS + 1];
 	mval			*ztupd_mval, dummy_mval;

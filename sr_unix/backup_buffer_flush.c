@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,7 @@ boolean_t backup_buffer_flush(gd_region *reg)
 {
 	int			write_size, fd;
 	int4			status;
-	sgmnt_addrs		*csa;
+	sgmnt_addrs		*csa = NULL;
 	shmpool_buff_hdr_ptr_t	sbufh_p;
 	shmpool_blk_hdr_ptr_t	sblkh_p, next_sblkh_p;
 	DEBUG_ONLY(int		flush_cnt;)

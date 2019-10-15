@@ -61,12 +61,12 @@ void dse_cache(void)
 	sgmnt_data_ptr_t	csd;
 	mval			dollarh_mval, zdate_mval;
 	int4			size;
-	uint4			offset, value, old_value, lcnt;
+	uint4			offset, value, old_value = 0, lcnt;
 	char			dollarh_buffer[MAXNUMLEN], zdate_buffer[SIZEOF(DSE_DMP_TIME_FMT)];
 	char			temp_str[OUT_LINE], temp_str1[OUT_LINE];
 	sm_uc_ptr_t		chng_ptr;
 	cache_rec_ptr_t		cr_que_lo;
-	boolean_t		is_mm, was_hold_onto_crit, wc_blocked_ok;
+	boolean_t		is_mm, was_hold_onto_crit = FALSE, wc_blocked_ok;
 	uintszofptr_t		section_offset;
 
 	all_present = (CLI_PRESENT == cli_present("ALL"));

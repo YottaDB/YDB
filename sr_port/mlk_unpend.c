@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@ GBLREF short	crash_count;
 
 void mlk_unpend(mlk_pvtblk *p)
 {
-	boolean_t		was_crit;
+	boolean_t		was_crit = FALSE;
 	sgmnt_addrs		*csa;
 
 	csa = p->pvtctl.csa;

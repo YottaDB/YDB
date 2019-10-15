@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,7 +52,7 @@ int f_select(oprtype *a, opctype op)
 	boolean_t	first_time, got_true, save_saw_side, saw_se_in_select, *save_se_base, save_shift, shifting, throwing;
 	opctype		old_op;
 	oprtype		*cnd, endtrip, target, tmparg;
-	triple		dmpchain, *loop_save_start, *loop_save_start_orig, *oldchain, *r, *ref, *savechain, *save_start,
+	triple		dmpchain, *loop_save_start = NULL, *loop_save_start_orig = NULL, *oldchain = NULL, *r, *ref, *savechain, *save_start,
 			*save_start_orig, tmpchain, *triptr;
 	uint4		save_expr_depth, save_se_depth;
 	mval		*v;

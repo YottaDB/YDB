@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -63,7 +66,7 @@ GBLREF	gid_t	group_id, effective_group_id;
 
 #define GETCWD(buffer, size, getcwd_res)					\
 {										\
-	intrpt_state_t		prev_intrpt_state;				\
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
 	getcwd_res = getcwd(buffer, size);					\

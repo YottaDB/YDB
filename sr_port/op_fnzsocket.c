@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -120,7 +120,7 @@ LITDEF char *zsocket_howcreated_names[] = {"LISTEN", "ACCEPTED", "CONNECT", "PRI
 void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 {
 	VMS_ONLY(int	numarg;)
-	int		zsocket_item, zsocket_type, tmpnum, numret, index, index2;
+	int		zsocket_item, zsocket_type, tmpnum, numret = 0, index, index2;
 	int4		stat, len, len2;
 	mval		*arg1, *arg2, tmpmval;
 	mval		*keyword;
@@ -134,7 +134,7 @@ void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...)
 	io_log_name	*tlp;		/* logical record for translated name for $principal */
 	int		nldone;		/* 0 if not $ZPIN or $ZPOUT, 1 if $ZPIN and 2 if $ZPOUT */
 	d_socket_struct		*dsocketptr;
-	socket_struct		*socketptr;
+	socket_struct		*socketptr = NULL;
 #ifdef	GTM_TLS
 	int			tls_options_mask, optionoffset, optionlen;
 	gtm_tls_socket_t	*tls_sock;

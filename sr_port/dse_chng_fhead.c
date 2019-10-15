@@ -72,7 +72,7 @@ void dse_chng_fhead(void)
 {
 	int4		x, index_x, save_x, fname_len;
 	unsigned short	buf_len;
-	boolean_t	was_crit, was_hold_onto_crit, corrupt_file_present;
+	boolean_t	was_crit, was_hold_onto_crit = FALSE, corrupt_file_present;
 	boolean_t	override = FALSE;
 	int4		nocrit_present;
 	int4		location_present, value_present, size_present, size;

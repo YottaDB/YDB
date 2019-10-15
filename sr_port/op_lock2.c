@@ -149,7 +149,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 	unsigned short		locks_bckout, locks_done;
 	int4			msec_timeout;	/* timeout in milliseconds */
 	mlk_pvtblk		*pvt_ptr1, *pvt_ptr2, **prior, *already_locked;
-	unsigned char		action;
+	unsigned char		action = '\0';
 	ABS_TIME		cur_time, end_time, remain_time;
 	mv_stent		*mv_zintcmd;
 	uint4			sleep_msec;

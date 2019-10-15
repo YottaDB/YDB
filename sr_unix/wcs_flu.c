@@ -209,12 +209,12 @@ boolean_t wcs_flu(uint4 options)
 {
 	boolean_t		was_crit, ret;
 	boolean_t		fix_in_wtstart, flush_hdr, jnl_enabled, sync_epoch, write_epoch, need_db_fsync, in_commit;
-	boolean_t		flush_msync, speedup_nobefore, clean_dbsync, return_early, epoch_already_current, asyncio;
+	boolean_t		flush_msync, speedup_nobefore, clean_dbsync, return_early, epoch_already_current = FALSE, asyncio;
 	boolean_t		force_epoch;
 	boolean_t		latch_salvaged;
 	unsigned int		lcnt, pass;
 	int			n_bts, save_errno, wtstart_or_wtfini_errno;
-	jnl_buffer_ptr_t	jb;
+	jnl_buffer_ptr_t	jb = NULL;
 	jnl_private_control	*jpc;
 	uint4			jnl_status, to_wait, to_msg;
 	unix_db_info    	*udi;

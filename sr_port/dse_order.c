@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -48,7 +51,7 @@ int dse_order(block_id srch,
 	cache_rec_ptr_t	dummy_cr;
 	int4		dummy_int;
 	short int	rsize, size;
-	sm_uc_ptr_t	bp, b_top, key_top, ptr, rp, r_top;
+	sm_uc_ptr_t	bp, b_top, key_top, ptr, rp, r_top = NULL;
 	unsigned short	cc;
 
 	last = 0;

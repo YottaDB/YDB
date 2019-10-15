@@ -455,8 +455,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	char			fmtcode;
 	boolean_t		arg_supplied, attach_success;
 	unsigned char		mnemonic[NAME_ENTRY_SZ], *nptr, *cptr, *cptrend, *argptr;
-	int			mnemonic_len, mnemonic_index, mnemonic_opcode, arglen, arryidx;
-	gd_region		*r_top, *r_ptr;
+	int			mnemonic_len, mnemonic_index, mnemonic_opcode, arglen, arryidx = 0;
+	gd_region		*r_top, *r_ptr = NULL;
 	replpool_identifier	replpool_id;
 	unsigned int		full_len;
 	unsigned char		argument_uc_buf[ARGUMENT_MAX_LEN];

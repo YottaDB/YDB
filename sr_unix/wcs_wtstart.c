@@ -141,29 +141,29 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	boolean_t               need_jnl_sync, queue_empty, got_lock, bmp_status, do_asyncio, wtfini_called_once;
 	cache_que_head_ptr_t	ahead, whead;
 	cache_state_rec_ptr_t	csr, csrfirst;
-	int4                    err_status = 0, n, n1, n2, max_ent, max_writes, save_errno;
+	int4                    err_status = 0, n = 0, n1, n2, max_ent, max_writes, save_errno;
         size_t                  size ;
 	jnl_buffer_ptr_t        jb;
         jnl_private_control     *jpc;
 	node_local_ptr_t	cnl;
 	off_t			blk_1_off, offset;
-	sgmnt_addrs		*csa;
+	sgmnt_addrs		*csa = NULL;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		blk_ptr;
 	uint4			saved_dsk_addr;
 	unix_db_info		*udi;
-	cache_rec_ptr_t		cr, cr_lo, cr_hi;
+	cache_rec_ptr_t		cr = NULL, cr_lo, cr_hi;
 	static	int4		error_message_loop_count = 0;
 	uint4			index;
 	boolean_t		is_mm, was_crit;
 	uint4			curr_wbox_seq_num;
 	int			try_sleep, rc;
-	gd_region		*sav_cur_region;
-	sgmnt_addrs		*sav_cs_addrs;
-	sgmnt_data		*sav_cs_data;
-	jnlpool_addrs_ptr_t	sav_jnlpool;
+	gd_region		*sav_cur_region = NULL;
+	sgmnt_addrs		*sav_cs_addrs = NULL;
+	sgmnt_data		*sav_cs_data = NULL;
+	jnlpool_addrs_ptr_t	sav_jnlpool = NULL;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_ERROR_POLICY_CSA */
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	char			*in, *out;
 	int			in_len;
 	int4			gtmcrypt_errno = 0;
@@ -173,7 +173,6 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 	void_ptr_t              retcsrptr;
 	boolean_t		keep_buff_lock, pushed_region;
 	cache_rec_ptr_t		older_twin;
-
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

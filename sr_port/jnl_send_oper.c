@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -38,7 +41,7 @@ error_def(ERR_JNLSENDOPER);
 
 void jnl_send_oper(jnl_private_control *jpc, uint4 status)
 {
-	sgmnt_addrs		*csa;
+	sgmnt_addrs		*csa = NULL;
 	sgmnt_data_ptr_t	csd;
 	jnl_buffer_ptr_t	jb;
 	uint4			now_writer, fsync_pid;

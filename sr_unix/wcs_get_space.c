@@ -108,7 +108,7 @@ bool	wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 	node_local_ptr_t        cnl;
 	cache_que_head_ptr_t	q0, base, crwipq = NULL;
 	int4			count, dummy_errno, flsh_trigger, i, k, max_count, n, save_errno = 0;
-	uint4			lcnt, size, to_wait, to_msg, this_idx;
+	uint4			lcnt, size, to_wait = 0, to_msg, this_idx;
 	wcs_conflict_trace_t	wcs_conflict_trace[WCS_CONFLICT_TRACE_ARRAYSIZE];
 	cache_rec		cr_contents;
 	boolean_t		asyncio, ret;

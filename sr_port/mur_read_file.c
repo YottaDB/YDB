@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -974,7 +974,7 @@ uint4	mur_fopen(jnl_ctl_list *jctl, reg_ctl_list *rctl)
 	char		jrecbuf[PINI_RECLEN + EPOCH_RECLEN + PFIN_RECLEN + EOF_RECLEN];
 	jnl_record	*jrec;
 	int		cre_jnl_rec_size;
-	boolean_t	was_holder;
+	boolean_t	was_holder = FALSE;
 	uint4		status;
 	sgmnt_addrs	*csa;
 	int		gtmcrypt_errno;

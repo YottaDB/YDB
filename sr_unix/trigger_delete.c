@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -565,7 +565,7 @@ int4 trigger_delete(char *trigvn, int trigvn_len, mval *trigger_count, int index
 	char			tmp_trig_str[MAX_BUFF_SIZE];
 	int4			trig_len;
 	char			trig_name[MAX_TRIGNAME_LEN];
-	int			trig_name_len;
+	int			trig_name_len = 0;
 	int			tmp_len;
 	char			*tt_val[NUM_SUBS];
 	uint4			tt_val_len[NUM_SUBS];

@@ -3,6 +3,9 @@
  * Copyright (c) 2017-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,7 +48,7 @@ void secshr_rel_crit(gd_region *reg, boolean_t is_exiting, boolean_t is_repl_reg
 	sgmnt_addrs		*csa;
 	node_local_ptr_t	cnl;
 	int			crashcnt;
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 
 #	ifdef DEBUG
 	if (!is_repl_reg)

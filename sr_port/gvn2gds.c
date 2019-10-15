@@ -166,7 +166,7 @@ boolean_t convert_key_to_db(mval *gvn, int start, int stop, gv_key *gvkey, unsig
 	int 		isrc;
 	char		strbuff[MAX_KEY_SZ + 1], *str, *str_top;
 	char 		fnname[MAX_LEN_FOR_CHAR_FUNC], *c;
-	boolean_t	is_zchar;
+	boolean_t	is_zchar = FALSE;
 	int4		num;
 	DCL_THREADGBL_ACCESS;
 

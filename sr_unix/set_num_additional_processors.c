@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,7 +51,7 @@ void set_num_additional_processors(void)
 {
 	long			numcpus;
 #	ifdef __hpux
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	struct pst_dynamic	psd;
 	DEFER_INTERRUPTS(INTRPT_IN_SET_NUM_ADD_PROCS, prev_intrpt_state);
 

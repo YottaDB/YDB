@@ -71,7 +71,7 @@ void gtm_fork_n_core(void)
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd, tmp_csd;
 	gd_region		*reg, *r_top;
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	DEBUG_ONLY(struct rlimit rlim;)
 
 #	ifdef DEBUG

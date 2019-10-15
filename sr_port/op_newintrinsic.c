@@ -54,8 +54,8 @@ error_def(ERR_NOZTRAPINTRIG);
 */
 void op_newintrinsic(int intrtype)
 {
-	mval		*intrinsic;
-	boolean_t	stored_explicit_null, etrap_was_active;
+	mval		*intrinsic = NULL;
+	boolean_t	stored_explicit_null, etrap_was_active = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

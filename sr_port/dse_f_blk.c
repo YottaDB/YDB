@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,7 @@ GBLREF gd_region	*gv_cur_region;
 
 #define MAX_UTIL_LEN 33
 
-static boolean_t	was_crit, was_hold_onto_crit, nocrit_present;
+static boolean_t	was_crit, was_hold_onto_crit = FALSE, nocrit_present;
 
 error_def(ERR_CTRLC);
 error_def(ERR_DSEBLKRDFAIL);
@@ -486,4 +486,3 @@ CONDITION_HANDLER(dse_f_blk_ch)
 		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	NEXTCH;
 }
-

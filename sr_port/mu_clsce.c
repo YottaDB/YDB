@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -98,35 +101,35 @@ enum cdb_sc mu_clsce(int level, int i_max_fill, int d_max_fill, kill_set *kill_s
 			old_levelp_cur_prev_key[MAX_KEY_SZ+1],
 			old_levelp_cur_key[MAX_KEY_SZ+1]; /* keys in private memory */
 	unsigned short	temp_ushort;
-	int		new_levelp_cur_cmpc, new_levelp_cur_next_cmpc, tkeycmpc,
-			oldblk1_last_cmpc, newblk1_mid_cmpc, newblk1_last_cmpc;
+	int		new_levelp_cur_cmpc = 0, new_levelp_cur_next_cmpc = 0, tkeycmpc,
+			oldblk1_last_cmpc, newblk1_mid_cmpc = 0, newblk1_last_cmpc;
 	int		tmp_cmpc;
-	int		levelp, level2;
+	int		levelp, level2 = 0;
 	int		old_blk1_sz, old_blk2_sz;
 	int		old_levelp_cur_prev_keysz,
 			old_levelp_cur_keysz,
-			old_levelp_cur_next_keysz,
+			old_levelp_cur_next_keysz = 0,
 			newblk1_last_keysz,
-			newblk2_first_keysz,
-			new_blk2_ances_first_keysz;
+			newblk2_first_keysz = 0,
+			new_blk2_ances_first_keysz = 0;
 	int		old_levelp_cur_keylen,
-			new_levelp_cur_keylen,
+			new_levelp_cur_keylen = 0,
 			old_levelp_cur_next_keylen,
-			new_levelp_cur_next_keylen,
+			new_levelp_cur_next_keylen = 0,
 			oldblk1_last_keylen,
 			newblk1_last_keylen,
 			newblk2_first_keylen;
-	int		rec_size, piece_len, tkeylen, old_levelp_rec_offset;
+	int		rec_size, piece_len = 0, tkeylen, old_levelp_rec_offset;
 	int		blk_seg_cnt, blk_size;
 	enum cdb_sc	status;
 	sm_uc_ptr_t 	oldblk1_last_key, old_levelp_cur_next_key,
-			newblk1_last_key, newblk2_first_key, new_blk2_ances_first_key; /* shared memory keys */
+			newblk1_last_key, newblk2_first_key = NULL, new_blk2_ances_first_key = NULL; /* shared memory keys */
 	sm_uc_ptr_t 	rec_base, old_levelp_blk_base,
-			bn_ptr1, bn_ptr2, blk2_ances_remain, old_blk1_base, old_blk2_base,
-			new_blk1_top, new_blk2_first_rec_base, new_blk2_remain; /* shared memory pointers */
+			bn_ptr1, bn_ptr2, blk2_ances_remain = NULL, old_blk1_base, old_blk2_base,
+			new_blk1_top, new_blk2_first_rec_base, new_blk2_remain = NULL; /* shared memory pointers */
 	sm_uc_ptr_t 	rPtr1, rPtr2;
-	rec_hdr_ptr_t	star_rec_hdr, old_last_rec_hdr1, new_rec_hdr1, new_rec_hdr2,
-			blk2_ances_hdr, new_levelp_cur_hdr, new_levelp_cur_next_hdr;
+	rec_hdr_ptr_t	star_rec_hdr, old_last_rec_hdr1 = NULL, new_rec_hdr1 = NULL, new_rec_hdr2 = NULL,
+			blk2_ances_hdr = NULL, new_levelp_cur_hdr = NULL, new_levelp_cur_next_hdr = NULL;
 	blk_segment	*bs_ptr1, *bs_ptr2;
 	srch_hist	*blk1ptr, *blk2ptr; /* blk2ptr is for right sibling's hist from a minimum sub-tree containing both blocks */
 	srch_blk_status	*old_blk1_stat, *old_blk2_stat, *old_levelp_blk_stat;

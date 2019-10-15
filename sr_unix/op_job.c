@@ -106,13 +106,13 @@ int	op_job(int4 argcnt, ...)
 	int4			msec_timeout;	/* timeout in milliseconds */
 	boolean_t		timed, single_attempt, non_exit_return;
 	unsigned char		buff[128], *c;
-	int4			status, exit_stat, term_sig, stop_sig;
+	int4			status, exit_stat = 0, term_sig, stop_sig;
 	pid_t			zjob_pid = 0; 	/* zjob_pid should exactly match in type with child_pid(ojstartchild.c) */
 	int			pipe_fds[2], pipe_status;
 #	ifdef _BSD
 	union wait		wait_stat;
 #	else
-	int4			wait_stat;
+	int4			wait_stat = 0;
 #	endif
 	job_params_type		job_params;
 	char			combuf[128];

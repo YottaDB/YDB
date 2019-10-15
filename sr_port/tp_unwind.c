@@ -108,7 +108,7 @@ void	tp_unwind(uint4 newlevel, enum tp_unwind_invocation invocation_type, int *t
 	boolean_t	restore_lv, rollback_locks;
 	int		elemindx, rc;
 	lvTree		*lvt_child;
-	intrpt_state_t	prev_intrpt_state;
+	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 
 	/* We are about to clean up structures. Defer MUPIP STOP/signal handling until function end. */
 	DEFER_INTERRUPTS(INTRPT_IN_TP_UNWIND, prev_intrpt_state);

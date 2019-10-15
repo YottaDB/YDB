@@ -450,7 +450,7 @@ typedef struct
 */
 #define SUBS_ARRAY_2_TRIPLES(REF1, SB1, SB2, SUBSCRIPTS, XTRA)									\
 {																\
-	boolean_t	PROTECT_LVN, SE_NOTIFY;											\
+	boolean_t	PROTECT_LVN, SE_NOTIFY = FALSE;										\
 	triple 		*REF2;													\
 																\
 	if (PROTECT_LVN = (TREF(side_effect_base))[TREF(expr_depth)])	/* NOTE assignment */					\

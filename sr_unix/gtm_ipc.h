@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,23 +50,23 @@
 	JNLPOOL->pool_init = JNLPOOL->recv_pool = FALSE;			\
 }
 
-#define JNLPOOL_SHMDT(JNLPOOL, RC, SAVE_ERRNO)				\
-{									\
-	jnlpool_ctl_ptr_t	save_jnlpool_ctl;			\
-	intrpt_state_t		prev_intrpt_state;			\
-									\
-	SAVE_ERRNO = 0; /* clear any left-over value */			\
-	assert(NULL != JNLPOOL);					\
-	assert(NULL != JNLPOOL->jnlpool_ctl);				\
-	assert((NULL == JNLPOOL->jnlpool_dummy_reg)			\
-		|| !REG2CSA(JNLPOOL->jnlpool_dummy_reg)->now_crit);	\
-	DEFER_INTERRUPTS(INTRPT_IN_SHMDT, prev_intrpt_state);		\
-	save_jnlpool_ctl = JNLPOOL->jnlpool_ctl;			\
-	JNLPOOL->jnlpool_ctl = NULL;					\
-	RC = SHMDT(save_jnlpool_ctl);					\
-	SAVE_ERRNO = errno;						\
-	JNLPOOL_CLEAR_FIELDS(JNLPOOL);					\
-	ENABLE_INTERRUPTS(INTRPT_IN_SHMDT, prev_intrpt_state);		\
+#define JNLPOOL_SHMDT(JNLPOOL, RC, SAVE_ERRNO)					\
+{										\
+	jnlpool_ctl_ptr_t	save_jnlpool_ctl;				\
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+										\
+	SAVE_ERRNO = 0; /* clear any left-over value */				\
+	assert(NULL != JNLPOOL);						\
+	assert(NULL != JNLPOOL->jnlpool_ctl);					\
+	assert((NULL == JNLPOOL->jnlpool_dummy_reg)				\
+		|| !REG2CSA(JNLPOOL->jnlpool_dummy_reg)->now_crit);		\
+	DEFER_INTERRUPTS(INTRPT_IN_SHMDT, prev_intrpt_state);			\
+	save_jnlpool_ctl = JNLPOOL->jnlpool_ctl;				\
+	JNLPOOL->jnlpool_ctl = NULL;						\
+	RC = SHMDT(save_jnlpool_ctl);						\
+	SAVE_ERRNO = errno;							\
+	JNLPOOL_CLEAR_FIELDS(JNLPOOL);						\
+	ENABLE_INTERRUPTS(INTRPT_IN_SHMDT, prev_intrpt_state);			\
 }
 
 key_t gtm_ftok(const char *path, int id);

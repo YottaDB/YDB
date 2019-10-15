@@ -281,12 +281,12 @@ uint4 mur_open_files(boolean_t retry)
 	redirect_list			*rl_ptr;
 	replpool_identifier		replpool_id;
 	sgmnt_data_ptr_t		csd;
-	sgmnt_addrs			*csa;
+	sgmnt_addrs			*csa = NULL;
 	file_control			*fc;
 	freeze_status			reg_frz_status;
-	intrpt_state_t			prev_intrpt_state;
+	intrpt_state_t			prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	onln_rlbk_reg_list		*reglist = NULL, *rl, *rl_last, *save_rl, *rl_new;
-	boolean_t			x_lock, wait_for_kip, replinst_file_corrupt = FALSE, inst_requires_rlbk;
+	boolean_t			x_lock, wait_for_kip, replinst_file_corrupt = FALSE, inst_requires_rlbk = FALSE;
 	boolean_t			jnlpool_sem_created;
 	sgmnt_addrs			*tmpcsa;
 	sgmnt_data			*tmpcsd;
@@ -295,10 +295,10 @@ uint4 mur_open_files(boolean_t retry)
 	int4				status;
 	boolean_t			locks_released = FALSE;
 	int				save_errno;
-	unix_db_info			*udi;
+	unix_db_info			*udi = NULL;
 	char				time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
 	const char			*verbose_ptr;
-	gtmsource_local_ptr_t		gtmsourcelocal_ptr;
+	gtmsource_local_ptr_t		gtmsourcelocal_ptr = NULL;
 	DEBUG_ONLY(int			semval;)
 	DEBUG_ONLY(jnl_buffer_ptr_t	jb;)
 	boolean_t			recov_interrupted;

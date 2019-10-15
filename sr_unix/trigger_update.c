@@ -1163,7 +1163,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	char			xecute_buffer[MAX_BUFF_SIZE + MAX_XECUTE_LEN];
 	unsigned char		*dispbuff;
 	mval			multi_jrec, *trigjrec;
-	char			*trigjrecptr;
+	char			*trigjrecptr = NULL;
 	int			trigjreclen;
 	io_pair			io_save_device;
 	int4			max_xecute_size;
@@ -1171,7 +1171,7 @@ boolean_t trigger_update_rec(mval *trigger_rec, boolean_t noprompt, uint4 *trig_
 	gvnh_reg_t		*gvnh_reg;
 	char			utilprefix[1024];
 	int			utilprefixlen, displen;
-	int			reg_index, min_reg_index, max_reg_index;
+	int			reg_index = 0, min_reg_index = 0, max_reg_index = 0;
 	boolean_t		first_gtmio;
 	boolean_t		jnl_format_done, new_name_check_done, new_name, first_error;
 	trig_stats_t		this_trig_status, overall_trig_status;
@@ -1548,7 +1548,7 @@ STATICFNDEF trig_stats_t trigupdrec_reg(char *trigvn, uint4 trigvn_len, boolean_
 	boolean_t		newtrigger;
 	int			set_index, kill_index, tmp_index;
 	boolean_t		db_matched_kill, db_matched_set, tmp_matched_kill, tmp_matched_set;
-	boolean_t		full_match, new_match;
+	boolean_t		full_match, new_match = FALSE;
 	boolean_t		kill_cmp, set_cmp;
 	boolean_t		is_set;
 	int			oprtype, oprstart, oprend, set_kill_bitmask;

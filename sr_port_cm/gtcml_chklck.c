@@ -46,7 +46,7 @@ void gtcml_chklck(cm_lckblkreg *reg, bool timed)
 	cm_lckblklck	*lck, *lckroot, *lcktofree;
 	cm_lckblkprc 	*prc, *prc1;
 	mlk_shrblk_ptr_t d;
-	boolean_t	stop_waking, timeout, was_crit;
+	boolean_t	stop_waking, timeout, was_crit = FALSE;
 	sgmnt_addrs	*csa;
 	int4		icount, status, time[2];
 	mlk_pvtctl	pctl;

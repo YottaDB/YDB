@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -285,12 +285,12 @@ STATICFNDEF boolean_t fill_src_tbl_via_mfile(routine_source **src_tbl_result, rh
 	char			srcnamebuf[SIZEOF(mident_fixed) + STR_LIT_LEN(DOTM) + 1];
 	FILE			*fp;
 	gtm_rtn_src_chksum_ctx	checksum_ctx;
-	int			fclose_res, fdd, fsd, line_indx, *lt_ptr, rc, size, srcfilnamlen, srcrecs;
+	int			fclose_res, fdd, fsd, line_indx, *lt_ptr, rc, size = 0, srcfilnamlen, srcrecs;
 	mstr			*base, *current, src, *top;
 	off_t			srcsize;
 	routine_source		*src_tbl;
 	struct stat		srcfile_stat;
-	unsigned char		*srcptr, *srcptr_max, *srcstart, *eol_srcstart, *prev_srcptr;
+	unsigned char		*srcptr, *srcptr_max, *srcstart, *eol_srcstart, *prev_srcptr = NULL;
 	zro_ent			*srcdir;
 
 	srcstat = 0;

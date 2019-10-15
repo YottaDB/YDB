@@ -223,7 +223,7 @@ void gtm_icu_init(void)
 	char_ptr_t	err_str;
 	icu_func_t	fptr;
 	int		findx, ver;
-	boolean_t	icu_getversion_found = FALSE, gtm_icu_ver_defined, symbols_renamed;
+	boolean_t	icu_getversion_found = FALSE, gtm_icu_ver_defined, symbols_renamed = FALSE;
 	UVersionInfo	icu_version;
 	int		iculdflags = ICU_LIBFLAGS;
 	struct stat	libpath_stat;
@@ -235,7 +235,7 @@ void gtm_icu_init(void)
 	char		*ptr, *each_libpath, *dyn_search_paths = NULL, *search_path_ptr;
 	struct stat	real_path_stat;		/* To see if the resolved real_path exists or not */
 #	endif
-	intrpt_state_t  prev_intrpt_state;
+	intrpt_state_t  prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	boolean_t	is_ydb_env_match;
 	mstr		trans;
 	char		*envname;

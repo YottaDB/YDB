@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -51,7 +54,7 @@ void op_setzp1(mval *src, int delim, mval *expr, int ind, mval *dst)
 	size_t		str_len, delim_cnt;
 	int		len, pfx_str_len, sfx_start_offset, sfx_str_len, rep_str_len, pfx_scan_offset;
 	int		cpy_cache_lines;
-	unsigned char	ldelimc, lc, *start_sfx, *str_addr, *end_pfx, *end_src, *start_pfx;
+	unsigned char	ldelimc, lc = '\0', *start_sfx, *str_addr, *end_pfx, *end_src, *start_pfx;
 	boolean_t	do_scan;
 	mval		dummymval;	/* It's value is not used but is part of the call to op_fnp1() */
 	fnpc		*cfnpc, *pfnpc;

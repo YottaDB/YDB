@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,7 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *fr
 	int4			status;
 	file_control		*fc;
 	unsigned char		*tmp_ptr;
-	int			in_len, gtmcrypt_errno;
+	int			in_len, gtmcrypt_errno = 0;
 	char			*in;
 	gd_segment		*seg;
 	boolean_t		db_is_encrypted, use_new_key;
@@ -72,7 +72,7 @@ uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *fr
 	sgmnt_addrs		*csa;
 	unix_db_info		*udi;
 	boolean_t		read_failed;
-	shm_snapshot_t		*ss_shm_ptr;
+	shm_snapshot_t		*ss_shm_ptr = NULL;
 
 	have_blk = FALSE;
 	csa = cs_addrs;

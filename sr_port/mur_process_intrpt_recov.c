@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,8 +64,8 @@ uint4 mur_process_intrpt_recov()
 	jnl_create_info			jnl_info;
 	uint4				status, status2;
 	uint4				max_autoswitchlimit, max_jnl_alq, max_jnl_deq, freeblks;
-	sgmnt_addrs			*csa;
-	sgmnt_data_ptr_t		csd;
+	sgmnt_addrs			*csa = NULL;
+	sgmnt_data_ptr_t		csd = NULL;
 	jnl_private_control		*jpc;
 	jnl_buffer_ptr_t		jbp;
 	boolean_t			jfh_changed;

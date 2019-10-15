@@ -444,17 +444,17 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	boolean_t		jnl_format_done, is_dummy, needfmtjnl, fits, lcl_span_status, want_root_search = FALSE;
 	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
 	block_id		allocation_clue, tp_root, gvt_for_root, blk_num, last_split_blk_num[MAX_BT_DEPTH];
-	block_index		left_hand_index, ins_chain_index, root_blk_cw_index, next_blk_index;
+	block_index		left_hand_index, ins_chain_index, root_blk_cw_index = 0, next_blk_index;
 	block_offset		next_offset, first_offset, ins_off1, ins_off2, old_curr_chain_next_off;
-	cw_set_element		*cse, *cse_new, *old_cse;
-	gv_namehead		*save_targ, *split_targ, *dir_tree;
+	cw_set_element		*cse, *cse_new, *old_cse = NULL;
+	gv_namehead		*save_targ, *split_targ, *dir_tree = NULL;
 	enum cdb_sc		status, status2;
 	gv_key			*temp_key, *src_key;
 	static gv_key		*gv_altkey2;
 	uchar_ptr_t		subrec_ptr;
 	mstr			value;
 	off_chain		chain1, curr_chain, prev_chain, chain2;
-	rec_hdr_ptr_t		curr_rec_hdr, extra_rec_hdr, next_rec_hdr, new_star_hdr, rp, tmp_rp;
+	rec_hdr_ptr_t		curr_rec_hdr, extra_rec_hdr, next_rec_hdr, new_star_hdr, rp, tmp_rp = NULL;
 	srch_blk_status		*bh, *bq, *tp_srch_status;
 	srch_hist		*dir_hist;
 	int			cur_blk_size, blk_seg_cnt, delta, i, j, left_hand_offset, n, ins_chain_offset,
@@ -463,14 +463,14 @@ void	gvcst_put2(mval *val, span_parms *parms)
 				offset_sum, rec_cmpc, tmp_cmpc, target_key_size, tp_lev, undo_index, cur_val_offset,
 				curr_offset, bh_level;
 	uint4			segment_update_array_size, key_top, cp2_len, bs1_2_len, bs1_3_len;
-	char			*va, last_split_direction[MAX_BT_DEPTH];
+	char			*va = NULL, last_split_direction[MAX_BT_DEPTH];
 	sm_uc_ptr_t		cp1, cp2, curr;
-	unsigned short		extra_record_blkid_off, rec_size, tmp_rsiz;
+	unsigned short		extra_record_blkid_off, rec_size, tmp_rsiz = 0;
 	unsigned int		prev_rec_offset, prev_rec_match, curr_rec_offset, curr_rec_match;
-	boolean_t		copy_extra_record, level_0, new_rec, no_pointers, succeeded, key_exists;
+	boolean_t		copy_extra_record = FALSE, level_0, new_rec, no_pointers, succeeded, key_exists;
 	boolean_t		make_it_null, gbl_target_was_set, duplicate_set, new_rec_goes_to_right, need_extra_block_split;
 	key_cum_value		*tempkv;
-	jnl_format_buffer	*jfb, *ztworm_jfb;
+	jnl_format_buffer	*jfb = NULL, *ztworm_jfb;
 	jnl_action		*ja;
 	mval			*set_val;	/* actual right-hand-side value of the SET or $INCR command */
 	mval			*val_forjnl;
@@ -500,11 +500,11 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	boolean_t		is_tpwrap;
 	boolean_t		ztval_gvcst_put_redo, skip_hasht_read;
 	gtm_trigger_parms	trigparms;
-	gvt_trigger_t		*gvt_trigger;
+	gvt_trigger_t		*gvt_trigger = NULL;
 	gvtr_invoke_parms_t	gvtr_parms;
 	int			gtm_trig_status;
-	unsigned char		*save_msp;
-	mv_stent		*save_mv_chain;
+	unsigned char		*save_msp = NULL;
+	mv_stent		*save_mv_chain = NULL;
 	mval			*ztold_mval = NULL;
 	mval			*ztval_mval;
 	mint			dlr_data;

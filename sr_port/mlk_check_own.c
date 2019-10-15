@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -46,7 +49,7 @@ boolean_t	mlk_check_own(mlk_pvtblk *x)
 {
 	int4		status;
 	int4		icount, time[2];
-	boolean_t	ret_val, was_crit;
+	boolean_t	ret_val, was_crit = FALSE;
 	sgmnt_addrs	*csa;
 
 	if (!x->blocked)

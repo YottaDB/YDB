@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -172,7 +172,7 @@ boolean_t incr_link(int *file_desc, zro_ent *dummy, uint4 fname_len, char *fname
 bool addr_fix(int file, struct exec *fhead, urx_rtnref *urx_lcl, rhdtyp *code)
 {
 	res_list 	*res_root, *new_res, *res_temp, *res_temp1;
-	char 		*symbols, *sym_temp, *sym_temp1, *symtop, *res_addr;
+	char 		*symbols = NULL, *sym_temp, *sym_temp1, *symtop, *res_addr;
 	struct relocation_info rel[RELREAD];
 	int		numrel, rel_read, i, string_size, sym_size;
 	size_t		status;

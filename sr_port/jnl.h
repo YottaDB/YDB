@@ -1434,7 +1434,7 @@ MBSTART {														\
 
 #define	TP_FINISH_JNL_PHASE2_IN_JNLBUFF_AND_JNLPOOL(JNL_FENCE_CTL, REPLICATION, JNLPOOL)				\
 MBSTART {														\
-	sgmnt_addrs	*csa;												\
+	sgmnt_addrs	*csa = NULL;											\
 	sgm_info	*si;												\
 															\
 	for (csa = JNL_FENCE_CTL.fence_list;  JNL_FENCE_LIST_END != csa;  csa = csa->next_fenced)			\

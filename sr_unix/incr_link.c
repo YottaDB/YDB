@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -187,7 +187,7 @@ boolean_t incr_link(int *file_desc, zro_ent *zro_entry, uint4 fname_len, char *f
 #	ifdef ZLINK_BYPASS
 	va_list			save_last_va_list_ptr;
 	boolean_t		util_copy_saved;
-	char			*save_util_outptr;
+	char			*save_util_outptr = NULL;
 	int4			save_error_condition;
 #	endif
 #	endif /* AUTORELINK_SUPPORTED */

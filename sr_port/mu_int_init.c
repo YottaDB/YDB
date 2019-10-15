@@ -57,7 +57,7 @@ boolean_t mu_int_init(void)
 	file_control		*fc;
 	boolean_t		standalone;
 	char			msgbuff[MSGBUF_SIZE], *msgptr;
-	int			gtmcrypt_errno, read_len;
+	int			gtmcrypt_errno = 0, read_len;
 	gd_segment		*seg;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	tsd;

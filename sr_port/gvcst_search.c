@@ -92,7 +92,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 	boolean_t		already_built, expand_prev_key, is_mm, skip_search_blk;
 	ht_ent_int4		*tabent;
 	sm_uc_ptr_t		buffaddr;
-	trans_num		blkhdrtn, oldest_hist_tn;
+	trans_num		blkhdrtn, oldest_hist_tn = 0;
 	int			hist_size;
 	unsigned short		bsiz;
 #	ifdef DEBUG

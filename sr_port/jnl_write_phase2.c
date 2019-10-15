@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@ void	jnl_write_phase2(sgmnt_addrs *csa, jbuf_rsrv_struct_t *jrs)
 	boolean_t		need_pini_adjustment;	/* TRUE => first ALIGN needs to set pini_addr of JNL_FILE_FIRST_RECORD */
 	cw_set_element		*cse;
 	enum jnl_record_type	rectype;
-	jnl_buffer_ptr_t	jbp;
+	jnl_buffer_ptr_t	jbp = NULL;
 	jnl_format_buffer	*jfb;
 	jnl_private_control	*jpc;
 	struct_jrec_tcom	*tcom_record_ptr;
@@ -46,7 +46,7 @@ void	jnl_write_phase2(sgmnt_addrs *csa, jbuf_rsrv_struct_t *jrs)
 	uint4			common_csum, pini_addr, reclen, freeaddr, prev_freeaddr, start_freeaddr;
 	void			*param1;
 	jbuf_phase2_in_prog_t	*phs2cmt;
-	int			commit_index;
+	int			commit_index = 0;
 	boolean_t		write_to_jnlbuff, write_to_jnlpool;
 
 	assert(JNL_ALLOWED(csa));

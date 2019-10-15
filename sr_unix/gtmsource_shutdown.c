@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,7 @@ int gtmsource_shutdown(boolean_t auto_shutdown, int exit_status)
 	boolean_t		all_dead, first_time, ftok_counter_halted, regrab_lock, sem_incremented;
 	uint4			savepid[NUM_GTMSRC_LCL];
 	int			status, shutdown_status, save_errno, max_loopcnt;
-	int4			index, maxindex, lcnt, num_src_servers_running;
+	int4			index, maxindex = 0, lcnt, num_src_servers_running;
 	unix_db_info		*udi;
 	gtmsource_local_ptr_t	gtmsourcelocal_ptr;
 #ifdef DEBUG
@@ -335,4 +335,3 @@ void gtmsource_sigstop(void)
 		gtmsource_stop(FALSE);
 	return;
 }
-

@@ -85,19 +85,19 @@ error_def(ERR_INVALIDRIP);
 
 cache_rec_ptr_t	db_csh_getn(block_id block)
 {
-	cache_rec_ptr_t		cr, hdr, midnite, our_midnite, q0, start_cr, poollimit_cr;
+	cache_rec_ptr_t		cr, hdr, midnite, our_midnite, q0, start_cr, poollimit_cr = NULL;
 	bt_rec_ptr_t		bt;
 	gd_region		*reg;
 	unsigned int		lcnt, ocnt;
 	int			max_ent, pass0, pass0cnt, pass1, pass2, pass3, rip;
 	int4			flsh_trigger;
-	uint4			first_r_epid, latest_r_epid;
+	uint4			first_r_epid = 0, latest_r_epid;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	srch_blk_status		*tp_srch_status;
 	ht_ent_int4		*tabent;
 	boolean_t		asyncio, dont_flush_buff;
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 #	ifdef DEBUG
 	cache_rec_ptr_t		cr_old;
 #	endif

@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,7 +38,7 @@ void setzdir(mval *newdir, mval *full_path_of_newdir)
 	 * Callers should save return value if needed.
 	 */
 	char 		directory[GTM_MAX_DIR_LEN], *getcwd_res, *err_str;
-	uint4		length, status;
+	uint4		length = 0, status;
 
 	assert(NULL != newdir || NULL != full_path_of_newdir);
 	if (NULL != newdir)

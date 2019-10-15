@@ -691,7 +691,7 @@ int gtmsource_process(void)
 	repl_msg_ptr_t			send_msgp;
 	repl_cmpmsg_ptr_t		send_cmpmsgp;
 	repl_start_reply_msg_ptr_t	reply_msgp;
-	boolean_t			rollback_first, secondary_ahead, secondary_was_rootprimary;
+	boolean_t			rollback_first, secondary_ahead, secondary_was_rootprimary = FALSE;
 	boolean_t			intfilter_error, skip_last_histinfo_check, msg_is_cross_endian, retval;
 	int				semval, cmpret;
 	uLongf				cmpbuflen;

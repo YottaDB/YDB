@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -183,21 +183,21 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 	desc_struct	*d;
 	signed char	schar;
 	unsigned char	type, type2;
-	caddr_t		c, ctop, outptr, outtop, outtop1, message_next, message_top;
+	caddr_t		c = NULL, ctop, outptr, outtop, outtop1, message_next, message_top;
 	uchar_ptr_t 	ret_ptr;
 	unsigned char	uchar;
 	short		sshort, *s;
 	unsigned short	ushort;
-	int		i, nexti, length, field_width, repeat_count, int_val, chwidth, orig_chwidth, cwidth;
+	int		i, nexti, length = 0, field_width, repeat_count, int_val = 0, chwidth = 0, orig_chwidth, cwidth;
 	unsigned int	ch;
-	UINTPTR_T	addr_val;
-	ssize_t		chlen;
+	UINTPTR_T	addr_val = 0;
+	ssize_t		chlen = 0;
 	boolean_t	indirect;
 	qw_num_ptr_t	val_ptr;
 	unsigned char	numa[22];
 	unsigned char	*numptr, *prefix;
-	boolean_t	right_justify, isprintable, line_begin;
-	int		prefix_len;
+	boolean_t	right_justify, isprintable, line_begin = FALSE;
+	int		prefix_len = 0;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -652,7 +652,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 /* 2nd arg: length of system long message (not used in Unix implementation) */
 {
 	sigset_t		savemask;
-	char			*img_type, *offset;
+	char			*img_type = NULL, *offset;
 	char 			temp_inst_fn[MAX_FN_LEN + 1], fn[MAX_FN_LEN + 1];
 	mstr			log_nam, trans_name;
 	uint4			ustatus;
@@ -663,7 +663,7 @@ void	util_out_send_oper(char *addr, unsigned int len)
 	int			fd;
 	upd_helper_ctl_ptr_t	upd_helper_ctl;
 	upd_helper_entry_ptr_t	helper, helper_top;
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
 	if (first_syslog)

@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -23,7 +26,7 @@ int m_view(void)
 {
 	oprtype argv[CHARMAXARGS], *argp;
 	unsigned short count;
-	triple *view, *parm, *parm1;
+	triple *view = NULL, *parm = NULL, *parm1;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

@@ -59,7 +59,7 @@ GBLREF	uint4			dollar_tlevel;
 {
 	/* register variables named in perceived order of declining impact */
 	register int		nFlg, nTargLen, nMatchCnt, nTmp;
-	sm_uc_ptr_t		pBlkBase, pRecBase, pTop, pRec, pPrevRec;
+	sm_uc_ptr_t		pBlkBase, pRecBase, pTop, pRec, pPrevRec = NULL;
 	unsigned char		*pCurrTarg, *pTargKeyBase;
 #	ifdef GVCST_SEARCH_TAIL
 	unsigned char		*pOldKeyBase, *pCurrTargPos;

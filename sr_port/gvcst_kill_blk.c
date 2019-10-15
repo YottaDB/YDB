@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -63,21 +66,21 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	unsigned short			temp_ushort;
 	int4				temp_long;
 	int				tmp_cmpc;
-	int				blk_size, blk_seg_cnt, lmatch, rmatch, targ_len, prev_len, targ_base, next_rec_shrink,
+	int				blk_size, blk_seg_cnt, lmatch, rmatch, targ_len = 0, prev_len = 0, targ_base = 0, next_rec_shrink,
 					temp_int, blkseglen;
 	bool				kill_root, first_copy;
 	blk_hdr_ptr_t			old_blk_hdr;
 	rec_hdr_ptr_t			left_ptr;	/*pointer to record before first record to delete*/
 	rec_hdr_ptr_t			del_ptr;	/*pointer to first record to delete*/
 	rec_hdr_ptr_t	       		right_ptr;	/*pointer to record after last record to delete*/
-	rec_hdr_ptr_t			right_prev_ptr;
+	rec_hdr_ptr_t			right_prev_ptr = NULL;
 	rec_hdr_ptr_t			rp, rp1;	/*scratch record pointer*/
 	rec_hdr_ptr_t			first_in_blk, top_of_block, new_rec_hdr, star_rec_hdr;
 	blk_segment			*bs1, *bs_ptr;
 	block_index			new_block_index;
 	unsigned char			*skb;
 	static readonly block_id	zeroes = 0;
-	cw_set_element			*cse, *old_cse;
+	cw_set_element			*cse, *old_cse = NULL;
 	bytptr				curr, prev, right_bytptr;
 	off_chain			chain1, curr_chain, prev_chain;
 	block_id			blk;

@@ -97,7 +97,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 	int		fstat_res;
 	int		p_offset, len;
 	boolean_t	mknod_err , stat_err, dir_err;
-	int 		save_mknod_err, save_stat_err, save_gsn_err;
+	int 		save_mknod_err = 0, save_stat_err, save_gsn_err;
 	int		gso_stat, gsn_stat, sockoptval;
 	in_port_t	sockport;
 	GTM_SOCKLEN_TYPE	socknamelen;

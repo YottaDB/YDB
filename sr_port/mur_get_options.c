@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,10 +87,10 @@ void	mur_get_options(void)
 	unsigned int 	file_name_specified_len, file_name_expanded_len;
 	int		extr_type, cnt, top, onln_rlbk_val, status2;
 	boolean_t	global_exclude;
-	long_list	*ll_ptr, *ll_ptr1;
-	long_long_list	*seqno_list, *seqno_list1;
-	redirect_list	*rl_ptr, *rl_ptr1, *tmp_rl_ptr;
-	select_list	*sl_ptr, *sl_ptr1;
+	long_list	*ll_ptr = NULL, *ll_ptr1;
+	long_long_list	*seqno_list = NULL, *seqno_list1;
+	redirect_list	*rl_ptr = NULL, *rl_ptr1, *tmp_rl_ptr;
+	select_list	*sl_ptr = NULL, *sl_ptr1;
 	boolean_t	interactive, parse_error, uniqname_error = FALSE;
 	DCL_THREADGBL_ACCESS;
 

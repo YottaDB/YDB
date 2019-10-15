@@ -145,7 +145,7 @@ boolean_t mu_truncate(int4 truncate_percent)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jbp;
 	char			*err_msg;
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 	off_t			offset;
 	DCL_THREADGBL_ACCESS;
 
@@ -502,4 +502,3 @@ STATICFNDEF int4 bml_find_busy_recycled(int4 hint, uchar_ptr_t base_addr, int4 b
 	}
 	return -1;
 }
-

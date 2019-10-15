@@ -733,7 +733,7 @@ STATICFNDEF boolean_t trigger_select(char *select_list, uint4 select_list_len)
 {
 	boolean_t		dump_all;
 	char			save_select_list[MAX_BUFF_SIZE];
-	char			*sel_ptr, *strtok_ptr, *prev_ptr, *ptr1, *ptr2;
+	char			*sel_ptr, *strtok_ptr, *prev_ptr = NULL, *ptr1, *ptr2;
 	int			gbl_len, prev_len;
 	mname_entry		gvname;
 	int			len, len1, badpos;

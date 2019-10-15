@@ -196,7 +196,7 @@ boolean_t mu_int_blk(
 	unsigned short	temp_ushort;
 	boolean_t	first_key, is_top, pstar, valid_gbl, hasht_global;
 	boolean_t	muint_range_done = FALSE, nct_checked = FALSE;
-	int		blk_size, buff_length, b_index, cmcc, comp_length, key_size, len, name_len,
+	int		blk_size, buff_length, b_index, cmcc, comp_length, key_size, len, name_len = 0,
 			num_len, rec_size, s_index, start_index, sub_start_index, hdr_len, idx;
 	int		tmp_cmpc, tmp_numsubs, max_allowed_key_size;
 	block_id	child, root_pointer;

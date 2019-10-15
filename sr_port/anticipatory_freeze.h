@@ -411,7 +411,7 @@ MBSTART {															\
 	GBLREF uint4	process_id;												\
 	int		lcl_status;												\
 	sgmnt_addrs	*local_csa = CSA;											\
-	intrpt_state_t	prev_intrpt_state;											\
+	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;											\
 																\
 	if (NULL != local_csa)													\
 		WAIT_FOR_REPL_INST_UNFREEZE_SAFE(local_csa);									\

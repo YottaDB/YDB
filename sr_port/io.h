@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -434,16 +434,16 @@ LITREF unsigned char ebcdic_spaces_block[];
 	GBLREF io_pair		io_std_device;											\
 	GBLREF boolean_t	in_prin_gtmio;											\
 																\
-	intrpt_state_t		prev_intrpt_state;										\
+	intrpt_state_t		prevIntrptState = INTRPT_OK_TO_INTERRUPT;							\
 																\
 	if (CHANDLER_EXISTS && (&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)						\
 			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out))					\
 	{															\
-		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
+		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prevIntrptState);							\
 		ESTABLISH(gtmio_ch);												\
 		SET_CH = TRUE;													\
 		in_prin_gtmio = TRUE;												\
-		ENABLE_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
+		ENABLE_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prevIntrptState);							\
 	} else															\
 		SET_CH = FALSE;													\
 }
@@ -454,16 +454,16 @@ LITREF unsigned char ebcdic_spaces_block[];
 	GBLREF io_pair		io_std_device;											\
 	GBLREF boolean_t	in_prin_gtmio;											\
 																\
-	intrpt_state_t		prev_intrpt_state;										\
+	intrpt_state_t		prevIntrptStateRet = INTRPT_OK_TO_INTERRUPT;							\
 																\
 	if (CHANDLER_EXISTS && (&gtmio_ch != active_ch->ch) && (NULL != (IOD)->out)						\
 			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out))					\
 	{															\
-		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
+		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prevIntrptStateRet);							\
 		ESTABLISH_RET(gtmio_ch, VALUE);											\
 		SET_CH = TRUE;													\
 		in_prin_gtmio = TRUE;												\
-		ENABLE_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
+		ENABLE_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prevIntrptStateRet);							\
 	} else															\
 		SET_CH = FALSE;													\
 }
@@ -474,16 +474,16 @@ LITREF unsigned char ebcdic_spaces_block[];
 	GBLREF boolean_t		in_prin_gtmio;										\
 	DEBUG_ONLY(GBLREF io_pair	io_std_device;)										\
 																\
-	intrpt_state_t		prev_intrpt_state;										\
+	intrpt_state_t		prevIntrptStateRevert = INTRPT_OK_TO_INTERRUPT;							\
 																\
 	if (SET_CH)														\
 	{															\
 		assert((&gtmio_ch == active_ch->ch) && (NULL != (IOD)->out)							\
 			&& (NULL != io_std_device.out) && ((IOD)->out == io_std_device.out));					\
-		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
+		DEFER_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prevIntrptStateRevert);						\
 		in_prin_gtmio = FALSE;												\
 		REVERT;														\
-		ENABLE_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prev_intrpt_state);							\
+		ENABLE_INTERRUPTS(INTRPT_IN_GTMIO_CH_SET, prevIntrptStateRevert);						\
 	}															\
 }
 

@@ -3,6 +3,9 @@
  * Copyright (c) 2017 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -55,7 +58,7 @@ void secshr_finish_CMT18_to_CMT19(sgmnt_addrs *csa)
 	char			*wcblocked_ptr;
 	cw_set_element		*cs, *cs_ptr, *cs_top, *first_cw_set, *next_cs;
 	node_local_ptr_t	cnl;
-	sgm_info		*si;
+	sgm_info		*si = NULL;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		blk_ptr;
 	trans_num		currtn;

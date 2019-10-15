@@ -3,6 +3,9 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -55,7 +58,7 @@ void	repl_phase2_cleanup(jnlpool_addrs *jpa)
 	qw_off_t		currWriteaddr, newWriteaddr;
 	uint4			stuckPid;
 	int			index1, index2;
-	jpl_phase2_in_prog_t	*phs2cmt, *deadCmt, *begCmt, *maxCmt, *topCmt;
+	jpl_phase2_in_prog_t	*phs2cmt, *deadCmt, *begCmt, *maxCmt, *topCmt = NULL;
 	jnlpool_ctl_ptr_t	jpl;
 	boolean_t		was_latch_owner;
 

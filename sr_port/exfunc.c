@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -27,7 +30,7 @@ int exfunc(oprtype *a, boolean_t alias_target)
 	triple		*calltrip, *calltrip_opr1_tref, *counttrip, *funret, *labelref, *masktrip;
 	triple		*oldchain, *ref0, *routineref, tmpchain, *triptr;
 #	if defined(USHBIN_SUPPORTED) || defined(VMS)
-	triple		*tripsize;
+	triple		*tripsize = NULL;
 #	endif
 	DCL_THREADGBL_ACCESS;
 

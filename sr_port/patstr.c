@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -139,22 +139,22 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 {
 	pat_strlit		strlit;
 	boolean_t		dfa, done, infinite;
-	boolean_t		dfa_fixed_len, fixed_len, prev_fixed_len, split_atom, start_dfa;
-	int4			lower_bound, upper_bound, alloclen;
+	boolean_t		dfa_fixed_len, fixed_len, prev_fixed_len, split_atom, start_dfa = FALSE;
+	int4			lower_bound = 0, upper_bound = 0, alloclen;
 	gtm_uint64_t		bound;
 	unsigned char		curchar, symbol, *inchar, *in_top, *buffptr;
-	uint4			pattern_mask, last_leaf_mask, y_max, mbit;
+	uint4			pattern_mask = 0, last_leaf_mask, y_max, mbit;
 	uint4			*patmaskptr;
 	int			atom_map, count, total_min, total_max;
 	int			min[MAX_PATTERN_ATOMS], max[MAX_PATTERN_ATOMS], size[MAX_PATTERN_ATOMS];
 	struct leaf		leaves, *lv_ptr;
 	struct e_table		expand, *exp_ptr;
 	int			exp_temp[CHAR_CLASSES];
-	int			leaf_num, curr_leaf_num, min_dfa, curr_min_dfa, sym_num;
+	int			leaf_num = 0, curr_leaf_num, min_dfa = 0, curr_min_dfa, sym_num;
 	int 			seqcnt, charpos, leafcnt, cursize;
 	int4			bitpos;
 	alternation		init_alt;
-	alternation		*cur_alt;
+	alternation		*cur_alt = NULL;
 	mstr			alttail;
 	int4			status;
 	int4			altactive;
@@ -163,7 +163,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	int			chidx;
 	int			bit;
 	int			seq;
-	int			altmin, altmax;
+	int			altmin = 0, altmax = 0;
 	int			saw_delimiter = 0;
 	int4			altlen, bytelen;
 	int4			allmask;
@@ -172,7 +172,7 @@ int patstr(mstr *instr, ptstr *obj, unsigned char **relay)
 	unsigned char		*let_go;
 	uint4			*fstchar, *lastpatptr, *outchar, *topchar;
 	int			any_alt = FALSE;
-	int			altcount, altsimplify;
+	int			altcount = 0, altsimplify;
 	int			low_in, high_in, size_in, jump;
 	boolean_t		topseen = FALSE;/* If TRUE it means we found inchar to be == in_top and so did NOT scan the NEXT
 						 * byte in inchar (to be stored in curchar). Therefore from this point onwards,

@@ -25,7 +25,8 @@
  */
 int dogetaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res)
 {
-	int	status, prev_intrpt_state;
+	int		status;
+	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 
 	DEFER_INTERRUPTS(INTPRT_IN_DO_GETADDRINFO, prev_intrpt_state);
 	status = getaddrinfo(node, service, hints, res);

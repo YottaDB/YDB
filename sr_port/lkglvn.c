@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,7 @@ int lkglvn(boolean_t gblvn)
 	char		*lknam, lkname_buf[MAX_MIDENT_LEN + 1], x;
 	opctype		ox;
 	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS + 1];
-	triple		*oldchain, *ref, tmpchain, *triptr;
+	triple		*oldchain = NULL, *ref, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

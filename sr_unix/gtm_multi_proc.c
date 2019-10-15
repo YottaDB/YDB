@@ -3,7 +3,7 @@
  * Copyright (c) 2015-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -104,7 +104,7 @@ int	gtm_multi_proc(gtm_multi_proc_fnptr_t fnptr, int ntasks, int max_procs,
 	void			**ret_ptr;
 	uchar_ptr_t		parm_ptr;
 	multi_proc_shm_hdr_t	*mp_hdr;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */
-	intrpt_state_t		prev_intrpt_state;
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
 
 	assert(!multi_proc_in_use);
 	if (!max_procs || (max_procs > ntasks))
@@ -253,7 +253,7 @@ void	gtm_multi_proc_helper(void)
 	int			parmElemSize;
 	uchar_ptr_t		parm_ptr;
 	gtm_multi_proc_fnptr_t	fnptr;
-	boolean_t		release_latch;
+	boolean_t		release_latch = FALSE;
 
 #	ifdef MUR_DEBUG
 	fprintf(stderr, "pid = %d : Started\n", process_id);

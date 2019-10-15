@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -27,7 +30,7 @@ int	iorm_rdone(mint *v, int4 msec_timeout)
 {
 	mval		tmp;
 	int		ret;
-        uint4		codepoint;
+        uint4		codepoint = 0;
 	gtm_chset_t	ichset;
 
 	*v = -1;

@@ -1066,8 +1066,8 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 	boolean_t	have_num_in_str;
 	uint		i;
 	uint4		len;
-	int		low;
-	int		num;
+	int		low = 0;
+	int		num = 0;
 	char		*ptr;
 	char		*ptr1;
 	boolean_t	have_error = FALSE;
@@ -1308,7 +1308,7 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 	char		*ptr2;
 	int4		rec_num;
 	CLI_ENTRY       *save_cmd_ary;
-	boolean_t	set_present;
+	boolean_t	set_present = FALSE;
 	int		trigvn_len;
 	boolean_t	in_multi_line_xecute, out_multi_line_xecute;
 

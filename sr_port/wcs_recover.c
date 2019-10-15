@@ -123,7 +123,7 @@ void wcs_recover(gd_region *reg)
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	int4			dummy_errno, blk_size;
-	uint4			jnl_status, epid, r_epid;
+	uint4			jnl_status, epid = 0, r_epid;
 	int4			bt_buckets;
 	inctn_opcode_t		save_inctn_opcode;
 	unsigned int		bplmap, lcnt, total_rip_wait;
@@ -131,8 +131,8 @@ void wcs_recover(gd_region *reg)
 	blk_hdr_ptr_t		blk_ptr, cr_buff, cr_alt_buff;
 	INTPTR_T		bp_lo, bp_top;
 	boolean_t		asyncio, twinning_on, wcs_wtfini_ret;
-	jnl_private_control	*jpc;
-	jnl_buffer_ptr_t	jbp;
+	jnl_private_control	*jpc = NULL;
+	jnl_buffer_ptr_t	jbp = NULL;
 	sgm_info		*si;
 #	ifdef DEBUG
 	blk_hdr_ptr_t		cr_old_buff, cr_new_buff;

@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,19 +31,19 @@
  * since gtm_stdio.h may be included in a non-GT.M compilation, we define the macros differently based on the UNIX compiler switch,
  * which should only be defined within GT.M.
  */
-#  define FDOPEN(VAR, FILE_DES, MODE)					\
-{									\
-	intrpt_state_t		prev_intrpt_state;			\
-									\
-	DEFER_INTERRUPTS(INTRPT_IN_FDOPEN, prev_intrpt_state);		\
-	VAR = fdopen(FILE_DES, MODE);					\
-	ENABLE_INTERRUPTS(INTRPT_IN_FDOPEN, prev_intrpt_state);		\
+#  define FDOPEN(VAR, FILE_DES, MODE)						\
+{										\
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+										\
+	DEFER_INTERRUPTS(INTRPT_IN_FDOPEN, prev_intrpt_state);			\
+	VAR = fdopen(FILE_DES, MODE);						\
+	ENABLE_INTERRUPTS(INTRPT_IN_FDOPEN, prev_intrpt_state);			\
 }
 
 /* Fopen() is not fully capitalized because there is an FOPEN() macro on AIX. */
 #  define Fopen(VAR, PATH, MODE)						\
 {										\
-	intrpt_state_t		prev_intrpt_state;				\
+	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
 	VAR = fopen(PATH, MODE);						\

@@ -65,7 +65,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	uint4			local_node_len, query_node_len, node_name_len;
 	parse_blk		def;
 	char			local_node_name[MAX_HOST_NAME_LEN + 1], query_node_name[MAX_HOST_NAME_LEN + 1];
-	char			*base, *ptr, *top, *del, *node, *name, *ext, ch;
+	char			*base, *ptr, *top, *del, *node, *name, *ext = NULL, ch;
 	char			**hostaddrlist;
 	char			def_string[MAX_FN_LEN + 1];
 	boolean_t		hasnode, hasdir, hasname, hasext, wilddir, wildname;

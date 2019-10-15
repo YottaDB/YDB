@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -39,7 +42,7 @@ error_def(ERR_DSEBLKRDFAIL);
 boolean_t dse_r_dmp(void)
 {
 	block_id	blk;
-	boolean_t	was_crit, was_hold_onto_crit;
+	boolean_t	was_crit, was_hold_onto_crit = FALSE;
 	cache_rec_ptr_t	dummy_cr;
 	int4		count, dummy_int, nocrit_present;
 	sm_uc_ptr_t	bp, b_top, rp;

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -78,7 +78,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	int			length, dstlen;
 	mval			tmp_sbs, *last_fnquery_ret;
 	mval			*varname, *v1, *v2, *mv, tmpmv;
-	mval			*arg1, **argpp, *args[MAX_LVSUBSCRIPTS], **argpp2, *lfrsbs, *argp2;
+	mval			*arg1 = NULL, **argpp, *args[MAX_LVSUBSCRIPTS], **argpp2, *lfrsbs, *argp2;
 	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
 	mstr			format_out, *retsub;
 	lv_val			*v;

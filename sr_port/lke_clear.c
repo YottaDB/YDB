@@ -63,7 +63,7 @@ error_def(ERR_NOLOCKMATCH);
 void	lke_clear(void)
 {
 	bool		locks, all = TRUE, wait = FALSE, interactive = TRUE, match = FALSE, memory = FALSE, nocrit = FALSE;
-	boolean_t	exact = TRUE, was_crit;
+	boolean_t	exact = TRUE, was_crit = FALSE;
 	int4		pid;
 	int		n;
 	char		regbuf[MAX_RN_LEN], nodebuf[32], one_lockbuf[MAX_KEY_SZ];

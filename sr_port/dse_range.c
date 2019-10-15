@@ -2,6 +2,9 @@
  *								*
  *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -45,7 +48,7 @@ void dse_range(void)
     cache_rec_ptr_t	dummy_cr;
     char		level, lower[MAX_KEY_SZ + 1], targ_key[MAX_KEY_SZ + 1], upper[MAX_KEY_SZ + 1];
     block_id		from, to, blk, blk_child;
-    boolean_t		busy_matters, free, got_lonely_star, index, lost, low, star, up, was_crit, was_hold_onto_crit;
+    boolean_t		busy_matters, free, got_lonely_star, index, lost, low, star, up, was_crit, was_hold_onto_crit = FALSE;
     int			cnt, dummy, lower_len, upper_len;
     int4		dummy_int, nocrit_present;
     short int		rsize, size, size1;

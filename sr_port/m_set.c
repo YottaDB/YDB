@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -130,12 +130,12 @@ int m_set(void)
 	boolean_t	curtchain_switched;	/* set to TRUE if a setcurtchain was done */
 	boolean_t	temp_subs_was_FALSE;
 	boolean_t	used_glvn_slot;
-	int		delimlen, first_val_lit, index, last_val_lit, nakedzalias, setop;
+	int		delimlen, first_val_lit = 0, index, last_val_lit, nakedzalias, setop;
 	int		first_setleft_invalid;	/* set to TRUE if the first setleft target is invalid */
-	opctype		put_oc;
+	opctype		put_oc = 0;
 	oprtype		delimval, firstval, lastval, resptr, *result, v, control_slot, first_control_slot;
-	triple		*curtargchain, *delimiter, discardcurtchain, *first, *get, *jmptrp1, *jmptrp2, *last, *obp, *put;
-	triple		*s, *s0, *s1, save_targchain, *save_curtchain, *save_curtchain1, *sub, targchain, *tmp;
+	triple		*curtargchain, *delimiter, discardcurtchain, *first = NULL, *get, *jmptrp1, *jmptrp2, *last, *obp, *put = NULL;
+	triple		*s = NULL, *s0, *s1, save_targchain, *save_curtchain, *save_curtchain1, *sub, targchain, *tmp;
 	triple		*ref;
 	mint		delimlit;
 	mval		*delim_mval;
