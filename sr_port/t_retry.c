@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -235,8 +235,8 @@ void t_retry(enum cdb_sc failure)
 			if (NULL != restart_reg)
 			{
 				assert(IS_STATSDB_REG(restart_reg)	/* global ^%YGS if, and only if, statsDB */
-				? !memcmp(&gv_currkey->base, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN)
-				: memcmp(&gv_currkey->base, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN));
+				       ? !memcmp(&gv_currkey->base, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN)
+				       : memcmp(&gv_currkey->base, STATSDB_GBLNAME, STATSDB_GBLNAME_LEN));
 				reg_mstr.len = restart_reg->dyn.addr->fname_len;
 				reg_mstr.addr = (char *)restart_reg->dyn.addr->fname;
 			} else

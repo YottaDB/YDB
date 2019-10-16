@@ -2013,7 +2013,7 @@ tn_restart:
 								|| ((tmp_rsiz - extra_record_blkid_off)
 									== SIZEOF(off_chain) + COLL_SPEC_LEN));
 						} else
-						extra_record_blkid_off = tmp_rsiz - SIZEOF(off_chain);
+							extra_record_blkid_off = tmp_rsiz - SIZEOF(off_chain);
 						assert(extra_record_blkid_off);
 						last_possible_left_offset = curr_rec_offset + extra_record_blkid_off;
 					} else
