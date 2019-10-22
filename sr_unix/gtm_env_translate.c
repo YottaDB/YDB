@@ -94,7 +94,8 @@ mval *gtm_env_translate(mval *val1, mval *val2, mval *val_xlated)
 	return val1;
 }
 
-mval *ydb_gbldir_translate(mval *val1, mval *val_xlated) {
+mval *ydb_gbldir_translate(mval *val1, mval *val_xlated)
+{
 	ydb_string_t	in1, in2, in3, out;
 	int		ret_ydb_gbldir_xlate;
 	char		pakname[PATH_MAX + 1];
