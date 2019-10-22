@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,7 +39,9 @@
 #ifdef DEBUG
 #include "gtm_caseconv.h"
 #endif
+#include "gtm_env_xlate_init.h"
 
+GBLREF	mstr		env_ydb_gbldir_xlate;
 GBLREF	gd_addr		*gd_header;
 GBLREF	gv_namehead	*gv_target_list;
 
@@ -75,6 +77,7 @@ Notes:          NONE
 gd_addr *zgbldir(mval *v)
 {
 	gd_addr		*gd_ptr;
+	mval		trans_val;
 	gdr_name	*name;
 	mstr		temp_mstr, *tran_name;
 
@@ -87,7 +90,14 @@ gd_addr *zgbldir(mval *v)
 		temp_mstr.len = STRLEN(YDB_GBLDIR);
 		tran_name = get_name(&temp_mstr);
 	} else
-		tran_name = get_name(&v->str);
+	{
+		// if ydb_gbldir_translate is set
+		if (0 != env_ydb_gbldir_xlate.len)
+			// then call a translation on get_name(&v->str) and save that to tran_name
+			tran_name = get_name((&ydb_gbldir_translate(v, &trans_val)->str));
+		else
+			tran_name = get_name(&v->str);
+	}
 	gd_ptr = gd_load(tran_name);
 	name = (gdr_name *)malloc(SIZEOF(gdr_name));
 	if (name->name.len = v->str.len)	/* Note embedded assignment */

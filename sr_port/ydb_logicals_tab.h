@@ -74,6 +74,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ETRAP,                      "$ydb_etrap",    
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_EXTRACT_NOCOL,              "$ydb_extract_nocol",              "$gtm_extract_nocol")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_FULLBLOCKWRITES,            "$ydb_fullblockwrites",            "$gtm_fullblockwrites")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GBLDIR,                     "$ydb_gbldir",                     "$gtmgbldir")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GBLDIR_TRANSLATE,           "$ydb_gbldir_translate",           "")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_GDSCERT,                    "$ydb_gdscert",                    "$gtm_gdscert")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_ICU_VERSION,                "$ydb_icu_version",                "$gtm_icu_version")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_IPV4_ONLY,                  "$ydb_ipv4_only",                  "$gtm_ipv4_only")
@@ -179,4 +180,3 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_WHITE_BOX_TEST_CASE_COUNT,  "$ydb_white_box_t
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_WHITE_BOX_TEST_CASE_ENABLE, "$ydb_white_box_test_case_enable", "$gtm_white_box_test_case_enable")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_WHITE_BOX_TEST_CASE_NUMBER, "$ydb_white_box_test_case_number", "$gtm_white_box_test_case_number")
 #endif
-

@@ -612,7 +612,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 						clnuprtn.len = scan_ident(tbp) - tbp;
 						clnuprtn.addr[clnuprtn.len] = 0;
 						pak->package_clnup_rtn =
-						  (clnupfptr)fgn_getrtn(pak->package_handle, &clnuprtn, ERROR);
+						  (clnupfptr)fgn_getrtn(pak->package_handle, &clnuprtn, ERROR, FGN_ERROR_IF_NOT_FOUND);
 					} else
 						ext_stx_error(ERR_ZCCLNUPRTNMISNG, ext_table_file_name);
 					continue;
@@ -776,7 +776,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 		 * the shared libary, or we fail to locate a routine that is called from the
 		 * application, we issue rts_error message (in extab_parse.c).
 		 */
-		entry_ptr->fcn = fgn_getrtn(pak->package_handle, &entry_ptr->call_name, INFO);
+		entry_ptr->fcn = fgn_getrtn(pak->package_handle, &entry_ptr->call_name, INFO, FGN_ERROR_IF_NOT_FOUND);
 #		ifdef DEBUG_EXTCALL
 		FPRINTF(stderr, "   package entry point: %s, address: %x\n", entry_ptr->entry_name.addr, entry_ptr->fcn);
 #		endif

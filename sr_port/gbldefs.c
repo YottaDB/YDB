@@ -220,7 +220,8 @@ GBLDEF	mstr		*comline_base,
 			*err_act,
 			**stp_array,
 			extnam_str,
-			env_gtm_env_xlate;
+			env_gtm_env_xlate,
+			env_ydb_gbldir_xlate;
 GBLDEF MSTR_CONST(default_sysid, "gtm_sysid");	/* Keep this as "gtm_sysid" and not "ydb_sysid" for backward compatibility
 						 * with GT.M applications that migrate to YottaDB.
 						 */

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -98,7 +98,7 @@ void zro_search(mstr *objstr, zro_ent **objdir, mstr *srcstr, zro_ent **srcdir, 
 					memcpy(objfn, objstr->addr, rtnname.len);
 					objfn[rtnname.len] = 0;
 					rtnname.addr = objfn;
-					if (NULL != (op->shrsym = (void *)fgn_getrtn(op->shrlib, &rtnname, SUCCESS)))
+					if (NULL != (op->shrsym = (void *)fgn_getrtn(op->shrlib, &rtnname, SUCCESS, FGN_ERROR_IF_NOT_FOUND)))
 						/* Note assignment above */
 						op_result = op;
 				}

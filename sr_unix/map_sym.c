@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,9 +68,9 @@ boolean_t map_collseq(int act, collseq *ret_collseq)
 	if (NULL == (handle = fgn_getpak(envptr, INFO)))
 		return FALSE;
 	dlopen_handle_array_add(handle);
-	if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym_1, SUCCESS)))
+	if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym_1, SUCCESS, FGN_ERROR_IF_NOT_FOUND)))
 	{
-		if ((ret_collseq->xback = fgn_getrtn(handle, &xback_sym_1, SUCCESS)))
+		if ((ret_collseq->xback = fgn_getrtn(handle, &xback_sym_1, SUCCESS, FGN_ERROR_IF_NOT_FOUND)))
 		{
 			coll_lib_found = TRUE;
 			ret_collseq->argtype = 1;
@@ -86,9 +86,9 @@ boolean_t map_collseq(int act, collseq *ret_collseq)
 	}
 	if ( FALSE == coll_lib_found)
 	{
-		if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym, SUCCESS)))
+		if ((ret_collseq->xform = fgn_getrtn(handle, &xform_sym, SUCCESS, FGN_ERROR_IF_NOT_FOUND)))
 		{
-			if ((ret_collseq->xback = fgn_getrtn(handle, &xback_sym, SUCCESS)))
+			if ((ret_collseq->xback = fgn_getrtn(handle, &xback_sym, SUCCESS, FGN_ERROR_IF_NOT_FOUND)))
 			{
 				coll_lib_found = TRUE;
 				ret_collseq->argtype = 0;
@@ -105,9 +105,9 @@ boolean_t map_collseq(int act, collseq *ret_collseq)
 			ERR_FGNSYM;
 	}
 	assert(TRUE == coll_lib_found);
-	if (!(ret_collseq->verify = fgn_getrtn(handle, &verify_sym, INFO)))
+	if (!(ret_collseq->verify = fgn_getrtn(handle, &verify_sym, INFO, FGN_ERROR_IF_NOT_FOUND)))
 		ERR_FGNSYM;
-	if (!(ret_collseq->version = fgn_getrtn(handle, &version_sym, INFO)))
+	if (!(ret_collseq->version = fgn_getrtn(handle, &version_sym, INFO, FGN_ERROR_IF_NOT_FOUND)))
 		ERR_FGNSYM;
 	return TRUE;
 }

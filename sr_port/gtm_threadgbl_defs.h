@@ -260,7 +260,7 @@ THREADGBLDEF(ydb_dbgflags_freq,			int)
 THREADGBLDEF(ydb_dbgflags_freq_cntr,		int)
 #endif
 THREADGBLDEF(gtm_env_init_started,		boolean_t)			/* gtm_env_init flag envvar processing */
-THREADGBLFPTR(gtm_env_xlate_entry,		int,		())		/* gtm_env_xlate() function pointer */
+THREADGBLFPTR(gtm_env_xlate_entry,		int,		())		/* gtm_env_xlate() or ydb_env_xlate() function pointer */
 THREADGBLDEF(ydb_environment_init,		boolean_t)			/* indicates a development environment rather
 										 * than a production environment */
 THREADGBLFPTR(gtm_sigusr1_handler,		void, 		(void))		/* SIGUSR1 signal handler function ptr */
@@ -351,6 +351,7 @@ THREADGBLDEF(view_region_list,			tp_region *)			/* used by view_arg_convert and 
 THREADGBLDEF(view_region_free_list,		tp_region *)			/* used by view_arg_convert and op_view/view_dbop */
 THREADGBLDEF(ydb_error_code,			int)				/* Error reflected back to condition handler - it
 										 * is saved here so the ESTABLISHer has access */
+THREADGBLFPTR(ydb_gbldir_xlate_entry,		int,		())		/* ydb_gbldir_xlate() function pointer */
 THREADGBLDEF(zdate_form,			int4)				/* Control for default $zdate() format */
 THREADGBLAR1DEF(zintcmd_active,			zintcmd_active_info,	ZINTCMD_LAST)	/* Interrupted timed commands */
 THREADGBLDEF(zro_root,				zro_ent *)			/* Anchor for zroutines structure entry array */

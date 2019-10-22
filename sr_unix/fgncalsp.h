@@ -157,10 +157,12 @@ typedef struct ci_tab_entry {
 
 #define	INTERNAL_USE_FALSE	FALSE
 #define	INTERNAL_USE_TRUE	TRUE
+#define FGN_OK_IF_NOT_FOUND	TRUE
+#define FGN_ERROR_IF_NOT_FOUND	FALSE
 
 /* function prototypes */
 void_ptr_t	fgn_getpak(char *pak_name, int msgtype);
-fgnfnc 		fgn_getrtn(void_ptr_t pak_handle, mstr *sym_name, int msgtype);
+fgnfnc 		fgn_getrtn(void_ptr_t pak_handle, mstr *sym_name, int msgtype, boolean_t ok_not_found);
 void		fgn_closepak(void_ptr_t pak_handle, int msgtype);
 int 		fgncal_getint(mstr *inp);
 int 		fgncal_read_args(mstr *inp);

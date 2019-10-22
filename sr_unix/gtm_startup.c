@@ -289,6 +289,7 @@ void gtm_startup(struct startup_vector *svec)
 	dollar_system_init(svec);
 	init_callin_functable();
 	gtm_env_xlate_init();
+	ydb_gbldir_xlate_init();
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	ce_init();	/* initialize compiler escape processing */
 	prealloc_gt_timers();

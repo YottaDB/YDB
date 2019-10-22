@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -25,6 +25,7 @@
 #include "stringpool.h"
 #include "ydb_trans_log_name.h"
 
+GBLREF	mstr	env_ydb_gbldir_xlate;
 GBLREF mstr	env_gtm_env_xlate;
 
 error_def(ERR_LOGTOOLONG);
@@ -47,5 +48,25 @@ void gtm_env_xlate_init(void)
 	env_gtm_env_xlate.len = tn.len;
 	env_gtm_env_xlate.addr = (char *)malloc(tn.len);
 	memcpy(env_gtm_env_xlate.addr, buf, tn.len);
+	return;
+}
+
+void ydb_gbldir_xlate_init(void)
+{
+	int4		status;
+	mstr		tn;
+	char		buf[YDB_PATH_MAX];
+
+	env_ydb_gbldir_xlate.len = 0; /* default */
+	if (SS_NORMAL != (status = ydb_trans_log_name(YDBENVINDX_GBLDIR_TRANSLATE, &tn, buf, SIZEOF(buf), IGNORE_ERRORS_FALSE, NULL)))
+	{
+		assert(SS_NOLOGNAM == status);
+		return;
+	}
+	if (0 == tn.len)
+		return;
+	env_ydb_gbldir_xlate.len = tn.len;
+	env_ydb_gbldir_xlate.addr = (char *)malloc(tn.len);
+	memcpy(env_ydb_gbldir_xlate.addr, buf, tn.len);
 	return;
 }

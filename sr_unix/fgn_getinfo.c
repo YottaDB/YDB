@@ -105,10 +105,11 @@ void_ptr_t fgn_getpak(char *package_name, int msgtype)
  * package_handle - DLL handle returned by fgn_getpak
  * entry_name - symbol name to be looked up
  * msgtype - message severity of the errors reported if any.
+ * ok_not_found - should be either FGN_ERROR_IF_NOT_FOUND (true) or FGN_ERROR_IF_NOT_FOUND (false)
  * Note: If msgtype is SUCCESS, errors are not issued. It is useful if the callers are not
  * interested in message report and not willing to have condition handler overhead (eg. zro_search).
  */
-fgnfnc fgn_getrtn(void_ptr_t package_handle, mstr *entry_name, int msgtype)
+fgnfnc fgn_getrtn(void_ptr_t package_handle, mstr *entry_name, int msgtype, boolean_t ok_not_found)
 {
 	void_ptr_t	sym_addr;
 	char_ptr_t	dummy_err_str;
@@ -117,7 +118,7 @@ fgnfnc fgn_getrtn(void_ptr_t package_handle, mstr *entry_name, int msgtype)
 
 	if (!(sym_addr = dlsym(package_handle, entry_name->addr)))
 	{
-		if (SUCCESS != msgtype)
+		if ((SUCCESS != msgtype) && !ok_not_found)
 		{
 			assert(!(msgtype & ~SEV_MSK));
 			COPY_DLLERR_MSG(dummy_err_str, err_str);
