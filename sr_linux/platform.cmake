@@ -93,7 +93,11 @@ else()
   # independent. So don't add -fPIC
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -fPIC ")
 endif()
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign")
+# There was a bogus warning involving iosocket_close.c which we could not address and believe to be a GCC bug.
+# Therefore, we have disabled the -Wmaybe-uninitialized warning until that bug plus many others that make this warning
+# largely unusable are fixed.
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wmaybe-uninitialized -Wreturn-type -Wpointer-sign")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wno-maybe-uninitialized -Wreturn-type -Wpointer-sign")
 # Add flags for warnings that we want and don't want.
 # First enable Wall. That will include a lot of warnings. In them, disable a few. Below is a comment from sr_linux/gtm_env_sp.csh
 # on why these warnings specifically are disabled.
