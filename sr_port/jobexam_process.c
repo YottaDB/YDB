@@ -68,7 +68,7 @@ error_def(ERR_OUTOFSPACE);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 
-void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
+void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spec)
 {
 	mval			*input_dump_file_name;
 	io_pair			dev_in_use;
@@ -139,7 +139,7 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 		assert(saved_util_outbuff_len <= SIZEOF(saved_util_outbuff));
 		memcpy(saved_util_outbuff, TREF(util_outbuff_ptr), saved_util_outbuff_len);
 	}
-	jobexam_dump(input_dump_file_name, dump_file_spec, save_dump_file_name_buff);
+	jobexam_dump(input_dump_file_name, dump_file_spec, save_dump_file_name_buff, zshowcodes);
 	/* If any errors occur in job_exam_dump, the condition handler will unwind the stack to this point and return.  */
 	if (0 != saved_util_outbuff_len)
 	{	/* Restore util_outbuff values */
@@ -172,10 +172,10 @@ void jobexam_process(mval *dump_file_name, mval *dump_file_spec)
 /* This routine is broken out as another ep so we can do cleanup processing in jobexam_process if
  * we trigger the condition handler and unwind.
  */
-void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_file_name_buff)
+void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_file_name_buff, mval *zshowcodes)
 {
 	unsigned char		dump_file_name[DEFAULT_DUMP_FILE_TOTSIZE], *dump_file_name_ptr;
-	mval			def_file_name, parms, zshowall;
+	mval			def_file_name, parms, zshowops;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -214,10 +214,17 @@ void jobexam_dump(mval *dump_filename_arg, mval *dump_file_spec, char *fatal_fil
 	/* Open, use, and zshow into new file, then close and reset current io device */
 	op_open(dump_file_spec, &parms, (mval *)&literal_zero, 0);
 	op_use(dump_file_spec, &parms);
-	zshowall.mvtype = MV_STR;
-	zshowall.str.addr = "*";
-	zshowall.str.len = 1;
-	op_zshow(&zshowall, ZSHOW_DEVICE, NULL);
+	zshowops.mvtype = MV_STR;
+	if (0 == zshowcodes->str.len)
+	{
+		zshowops.str.addr = "*";
+		zshowops.str.len = 1;
+	} else
+	{
+		zshowops.str.addr = zshowcodes->str.addr;
+		zshowops.str.len = zshowcodes->str.len;
+	}
+	op_zshow(&zshowops, ZSHOW_DEVICE, NULL);
 	parms.str.addr = (char *)dumpable_error_dump_file_noparms;
 	parms.str.len = SIZEOF(dumpable_error_dump_file_noparms);
 	op_close(dump_file_spec, &parms);

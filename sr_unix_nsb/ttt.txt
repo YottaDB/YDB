@@ -1,6 +1,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-;	Copyright 2001, 2014 Fidelity Information Services, Inc	;
+; Copyright 2001, 2014 Fidelity Information Services, Inc	;
+;								;
+; Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
@@ -387,6 +390,7 @@ OC_FNZGETSYI:	pushab	val.0
 		pushab	val.1
 		calls	#3,xfer.xf_fngetsyi
 OC_FNZJOBEXAM:	pushab	val.0
+		pushab	val.2
 		pushab	val.1
 		calls	#2,xfer.xf_fnzjobexam
 OC_FNZLKID:	pushab	val.0
