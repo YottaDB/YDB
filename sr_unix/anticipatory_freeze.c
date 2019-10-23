@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -436,7 +436,7 @@ void clear_fake_enospc_if_master_dead(void)
 {
 	gd_addr				*addr_ptr;
 	gd_region			*r_top, *r_local;
-	sgmnt_addrs			*csa = NULL;
+	sgmnt_addrs			*csa;
 
 	assert(!multi_thread_in_use);	/* fake-enospc would not have been set if in threaded-code */
 	assert(jnlpool && jnlpool->jnlpool_ctl);

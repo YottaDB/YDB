@@ -2,7 +2,7 @@
  *								*
  * Copyright 2010, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -63,7 +63,7 @@ GBLREF	int	process_exiting;
 int dollar_quit(void)
 {
 	stack_frame	*sf;
-	int		xfer_index = 0;
+	int		xfer_index;
 
 	union
 	{

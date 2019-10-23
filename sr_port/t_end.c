@@ -204,18 +204,18 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	enum cdb_sc		status;
 	int			int_depth, tmpi;
 	uint4			jnl_status;
-	jnl_private_control	*jpc = NULL;
-	jnl_buffer_ptr_t	jbp = NULL, jbbp = NULL; /* jbp is non-NULL if journaling, jbbp is non-NULL only if before-image journaling */
-	sgmnt_addrs		*csa = NULL, *repl_csa;
+	jnl_private_control	*jpc;
+	jnl_buffer_ptr_t	jbp, jbbp; /* jbp is non-NULL if journaling, jbbp is non-NULL only if before-image journaling */
+	sgmnt_addrs		*csa, *repl_csa;
 	DEBUG_ONLY(sgmnt_addrs	*jnlpool_csa = NULL;)
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	sgm_info		*dummysi = NULL;	/* needed as a dummy parameter for {mm,bg}_update */
 	srch_blk_status		*t1;
-	trans_num		valid_thru, oldest_hist_tn = 0, dbtn, blktn, temp_tn, epoch_tn, old_block_tn;
+	trans_num		valid_thru, oldest_hist_tn, dbtn, blktn, temp_tn, epoch_tn, old_block_tn;
 	unsigned char		cw_depth, cw_bmp_depth, buff[MAX_ZWR_KEY_SZ], *end;
 	jnldata_hdr_ptr_t	jnl_header;
-	uint4			total_jnl_rec_size = 0, tmp_cw_set_depth, prev_cw_set_depth = 0;
+	uint4			total_jnl_rec_size, tmp_cw_set_depth, prev_cw_set_depth;
 	DEBUG_ONLY(unsigned int	tot_jrec_size;)
 	jnlpool_ctl_ptr_t	jpl;
 	jnlpool_addrs_ptr_t	save_jnlpool, tmp_jnlpool;
@@ -225,10 +225,10 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	sm_uc_ptr_t		blk_ptr, backup_blk_ptr;
 	int			blkid;
 	boolean_t		is_mm;
-	boolean_t		read_before_image = FALSE; /* TRUE if before-image journaling or online backup in progress
+	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress
 						    * This is used to read before-images of blocks whose cs->mode is gds_t_create */
 	boolean_t		write_inctn = FALSE;	/* set to TRUE in case writing an inctn record is necessary */
-	boolean_t		decremented_currtn = FALSE, retvalue, recompute_cksum, cksum_needed;
+	boolean_t		decremented_currtn, retvalue, recompute_cksum, cksum_needed;
 	unsigned int		free_seen; /* free_seen denotes the block is going to be set free rather than recycled */
 	boolean_t		in_mu_truncate = FALSE, jnlpool_crit_acquired = FALSE;
 	boolean_t		was_crit;
@@ -236,7 +236,7 @@ trans_num t_end(srch_hist *hist1, srch_hist *hist2, trans_num ctn)
 	unsigned int		bsiz, crindex;
 	jnl_tm_t		save_gbl_jrec_time;
 	enum gds_t_mode		mode;
-	uint4			prev_cr_array_index = 0;
+	uint4			prev_cr_array_index;
 	seq_num			temp_jnl_seqno;
 #	ifdef DEBUG
 	boolean_t		ready2signal_gvundef_lcl;

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,7 +38,7 @@ GBLREF mv_stent		*mv_chain;
 void lv_newname(ht_ent_mname *hte, symval *sym)
 {
 	lv_val		*lv, *var;
-	tp_frame	*tf, *first_tf_saveall = NULL;
+	tp_frame	*tf, *first_tf_saveall;
 	tp_var		*restore_ent;
 
 	assert(hte);
@@ -59,6 +59,7 @@ void lv_newname(ht_ent_mname *hte, symval *sym)
 	 * in its tp_frame and save the entry there. This is so var set in later TP frame levels still get restored
 	 * even if the TSTART frame they were created in gets committed.
 	 */
+	DEBUG_ONLY(first_tf_saveall = NULL);
 	for (tf = tp_pointer; (NULL != tf) && (tf->sym == sym); tf = tf->old_tp_frame)
 	{
 		if (tf->tp_save_all_flg)

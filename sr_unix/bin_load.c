@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -254,18 +254,18 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	unsigned char		hdr_lvl, src_buff[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ],
 				cmpc_str[MAX_KEY_SZ + 1], dup_key_str[MAX_KEY_SZ + 1], sn_key_str[MAX_KEY_SZ + 1], *sn_key_str_end;
 	unsigned char		*end_buff, *gvn_char, *subs, mych;
-	unsigned short		rec_len, next_cmpc, numsubs = 0, num_subscripts;
-	int			len, current, last, max_key = 0, max_rec = 0, fmtd_key_len;
+	unsigned short		rec_len, next_cmpc, numsubs, num_subscripts;
+	int			len, current, last, max_key, max_rec, fmtd_key_len;
 
-	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos = 0, sn_hold_buff_size = 0, i;
-	uint4			max_data_len, max_subsc_len, gblsize = 0, data_len, num_of_reg = 0;
+	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size, i;
+	uint4			max_data_len, max_subsc_len, gblsize, data_len, num_of_reg = 0;
 	ssize_t			subsc_len, extr_std_null_coll;
 	gtm_uint64_t		iter, key_count, rec_count, tmp_rec_count, global_key_count;
 	gtm_uint64_t		first_failed_rec_count, failed_record_count;
 	off_t			last_sn_error_offset = 0, file_offset_base = 0, file_offset = 0;
 	boolean_t		need_xlation, new_gvn, utf8_extract;
 	boolean_t		is_hidden_subscript, ok_to_put = TRUE, putting_a_sn = FALSE, sn_incmp_gbl_already_killed = FALSE;
-	rec_hdr			*rp = NULL, *next_rp;
+	rec_hdr			*rp, *next_rp;
 	mval			v, tmp_mval, *val;
 	mname_entry		gvname;
 	mstr			mstr_src, mstr_dest, opstr;
@@ -274,11 +274,11 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	gv_key			*tmp_gvkey, *sn_gvkey, *sn_savekey, *save_orig_key;
 	gv_key			*orig_gv_currkey_ptr = NULL;
 	char			std_null_coll[BIN_HEADER_NUMSZ + 1], *sn_hold_buff = NULL, *sn_hold_buff_temp;
-	int			in_len, gtmcrypt_errno, n_index = 0, encrypted_hash_array_len, null_iv_array_len;
+	int			in_len, gtmcrypt_errno, n_index, encrypted_hash_array_len, null_iv_array_len;
 	char			*inbuf, *encrypted_hash_array_ptr, *curr_hash_ptr, *null_iv_array_ptr, null_iv_char;
 	int4			index;
 	gtmcrypt_key_t		*encr_key_handles;
-	boolean_t		encrypted_version, mixed_encryption = FALSE, valid_gblname;
+	boolean_t		encrypted_version, mixed_encryption, valid_gblname;
 	char			index_err_buf[1024];
 	gvnh_reg_t		*gvnh_reg;
 	gd_region		*dummy_reg, *reg_ptr = NULL;
@@ -398,10 +398,6 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		extr_std_null_coll = 0;
 	/* Encrypted versions to date. */
 	encrypted_version = ('5' <= hdr_lvl) && ('6' != hdr_lvl); /* Includes 5, 7, 8, and 9. */
-    // initialize extr_collhdr to get rid of compiler warning
-    extr_collhdr.ver = 0;
-    extr_collhdr.nct = 0;
-    extr_collhdr.act = 0;
 	if (encrypted_version)
 	{
 		encrypted_hash_array_len = file_input_bin_get((char **)&ptr, &file_offset_base,
@@ -602,10 +598,6 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		while (*cp1++)
 			;
 		gvname.var_name.len = INTCAST((char *)cp1 - gvname.var_name.addr - 1);
-        // initialize to get rid of bogus compiler warning
-        db_collhdr.act = 0;
-        db_collhdr.ver = 0;
-        db_collhdr.nct = 0;
 		if (('2' >= hdr_lvl) || new_gvn)
 		{
 			if ((HASHT_GBLNAME_LEN == gvname.var_name.len)

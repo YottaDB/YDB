@@ -3,9 +3,6 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,7 +32,7 @@ void lb_init(void)
 {
 	int				num_subs, y;
 	short int			sav_last_src_col, source_col;
-	int4				skip_count = 0;
+	int4				skip_count;
 	unsigned char			*cp, *cp1;
 	boolean_t			possible_sentinel;
 	struct ce_sentinel_desc		*shp;

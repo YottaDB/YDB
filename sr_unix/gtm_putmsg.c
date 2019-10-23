@@ -3,9 +3,6 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -42,10 +39,10 @@ GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 /* #GTM_THREAD_SAFE : The below function (gtm_putmsg) is thread-safe */
 void gtm_putmsg(int argcnt, ...)
 {
-	boolean_t	was_holder = FALSE;
+	boolean_t	was_holder;
 	sgmnt_addrs	*csa;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by PTHREAD_CSA_FROM_GV_CUR_REGION */
-	boolean_t	release_latch = FALSE;
+	boolean_t	release_latch;
 	va_list		var;
 	DCL_THREADGBL_ACCESS;
 
@@ -64,8 +61,8 @@ void gtm_putmsg(int argcnt, ...)
 /* #GTM_THREAD_SAFE : The below function (gtm_putmsg_csa) is thread-safe */
 void gtm_putmsg_csa(void *csa, int argcnt, ...)
 {
-	boolean_t	was_holder = FALSE;
-	boolean_t	release_latch = FALSE;
+	boolean_t	was_holder;
+	boolean_t	release_latch;
 	va_list		var;
 
 	VAR_START(var, argcnt);
@@ -81,10 +78,10 @@ void gtm_putmsg_csa(void *csa, int argcnt, ...)
 /* #GTM_THREAD_SAFE : The below function (gtm_putmsg_noflush) is thread-safe */
 void gtm_putmsg_noflush(int argcnt, ...)
 {
-	boolean_t	was_holder = FALSE;
+	boolean_t	was_holder;
 	sgmnt_addrs	*csa;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by PTHREAD_CSA_FROM_GV_CUR_REGION */
-	boolean_t	release_latch = FALSE;
+	boolean_t	release_latch;
 	va_list		var;
 	DCL_THREADGBL_ACCESS;
 
@@ -102,8 +99,8 @@ void gtm_putmsg_noflush(int argcnt, ...)
 /* #GTM_THREAD_SAFE : The below function (gtm_putmsg_noflush_csa) is thread-safe */
 void gtm_putmsg_noflush_csa(void *csa, int argcnt, ...)
 {
-	boolean_t	was_holder = FALSE;
-	boolean_t	release_latch = FALSE;
+	boolean_t	was_holder;
+	boolean_t	release_latch;
 	va_list		var;
 
 	VAR_START(var, argcnt);

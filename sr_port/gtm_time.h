@@ -3,9 +3,6 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -24,7 +21,7 @@
 
 #define STRFTIME(dest, maxsize, format, timeptr, res)				\
 {										\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION, prev_intrpt_state);		\
 	res = strftime(dest, maxsize, format, timeptr);				\
@@ -42,7 +39,7 @@ typedef time_t	now_t;
 {																\
 	char	*time_ptr = &time_str[0];											\
 	now_t	now;														\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;							\
+	intrpt_state_t		prev_intrpt_state;										\
 																\
 	if ((time_t)-1 == (now = time(NULL)))											\
 		MEMCPY_LIT(time_ptr, "****** time failed *****\n"); /* keep string len same as CTIME_BEFORE_NL */		\
@@ -68,7 +65,7 @@ typedef time_t	now_t;
 
 #define GTM_MKTIME(VAR, TIME)							\
 {										\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION, prev_intrpt_state);		\
 	VAR = mktime(TIME);							\
@@ -77,7 +74,7 @@ typedef time_t	now_t;
 
 #define GTM_GMTIME(VAR, TIME)							\
 {										\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION, prev_intrpt_state);		\
 	VAR = gmtime(TIME);							\
@@ -86,7 +83,7 @@ typedef time_t	now_t;
 
 #define GTM_LOCALTIME(VAR, TIME)						\
 {										\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_X_TIME_FUNCTION, prev_intrpt_state);		\
 	VAR = localtime(TIME);							\
@@ -97,7 +94,7 @@ typedef time_t	now_t;
 #define GTM_CTIME(VAR, TIME)										\
 {													\
 	GBLREF	boolean_t	multi_thread_in_use;							\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;				\
+	intrpt_state_t		prev_intrpt_state;							\
 													\
 	/* "ctime" is not thread-safe. Make sure threads are not in use by callers of GTM_CTIME */	\
 	GTM_PTHREAD_ONLY(assert(!multi_thread_in_use));							\

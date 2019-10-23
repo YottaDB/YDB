@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -173,7 +173,7 @@ void	dm_read (mval *v)
 	int		ioptr_width;		/* display width of the IO device */
 	int		outlen;			/* total characters in line so far */
 	int		match_length, msk_in, msk_num, num_chars_left, num_lines_above, right, selstat, status, up;
-	int		utf8_more = 0, utf8_seen;
+	int		utf8_more, utf8_seen;
 	io_desc 	*io_ptr;
 	io_termmask	mask_term;
 	mv_stent	*mvc, *mv_zintdev;
@@ -185,9 +185,9 @@ void	dm_read (mval *v)
 	unsigned char	*current_ptr;		/* insert next character into buffer here */
 	unsigned char	escape_sequence[ESC_LEN];
 	unsigned char	inbyte, *outptr, *outtop, *ptr, *ptrnext, *ptrtop;
-	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr = NULL;	/* to build up multi byte for character */
+	unsigned char	more_buf[GTM_MB_LEN_MAX + 1], *more_ptr;	/* to build up multi byte for character */
 	unsigned short	escape_length = 0;
-	wint_t		*buffer_32_start = NULL, codepoint, *current_32_ptr, inchar, *ptr32;
+	wint_t		*buffer_32_start, codepoint, *current_32_ptr, inchar, *ptr32;
 #	ifdef __MVS__
 	wint_t		asc_inchar;
 #	endif

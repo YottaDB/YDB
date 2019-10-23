@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -371,9 +371,9 @@ CONDITION_HANDLER(updproc_ch)
 int updproc(void)
 {
 	seq_num			jnl_seqno; /* the current jnl_seq no of the Update process */
-	seq_num			start_jnl_seqno = 0;
+	seq_num			start_jnl_seqno;
 	uint4			status;
-	gld_dbname_list 	*gld_db_files = NULL, *curr;
+	gld_dbname_list 	*gld_db_files, *curr;
 	recvpool_ctl_ptr_t	recvpool_ctl;
 	upd_proc_local_ptr_t	upd_proc_local;
 	sgmnt_addrs		*repl_csa;

@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,7 +100,7 @@ int updhelper_writer(void)
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	jnl_private_control	*jpc;
-	jnl_buffer_ptr_t	jbp = NULL;
+	jnl_buffer_ptr_t	jbp;
 	boolean_t		flushed;
 
 	call_on_signal = updhelper_writer_sigstop;

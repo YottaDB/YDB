@@ -173,7 +173,7 @@ void	op_view(int numarg, mval *keyword, ...)
 	gv_namehead		*gvnh;
 	hash_table_mname	*table;
 	ht_ent_mname		*tabent, *table_base_orig, *topent;
-	int			acnt, clrlen, lcnt, lct = 0, icnt, msk, ncol, nct, size, status, table_size_orig;
+	int			acnt, clrlen, lcnt, lct, icnt, msk, ncol, nct, size, status, table_size_orig;
 	int4			testvalue, tmpzdefbufsiz;
 	jnl_buffer_ptr_t	jb;
 	lv_blk			*lvbp;

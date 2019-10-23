@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,7 +30,7 @@
  */
 #define PUTENV(VAR, ARG)							\
 {										\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);	\
 	VAR = putenv(ARG);							\
@@ -52,13 +52,13 @@
 #  define STRTO64L	strtoll
 #  define STRTOU64L	strtoull
 # endif
-#define MKSTEMP(template,mkstemp_res)						\
-{										\
-        intrpt_state_t          prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
-										\
-	DEFER_INTERRUPTS(INTRPT_IN_MKSTEMP, prev_intrpt_state);			\
-	mkstemp_res = mkstemp(template);					\
-	ENABLE_INTERRUPTS(INTRPT_IN_MKSTEMP, prev_intrpt_state);		\
+#define MKSTEMP(template,mkstemp_res)					\
+{									\
+        intrpt_state_t          prev_intrpt_state;			\
+									\
+	DEFER_INTERRUPTS(INTRPT_IN_MKSTEMP, prev_intrpt_state);		\
+	mkstemp_res = mkstemp(template);				\
+	ENABLE_INTERRUPTS(INTRPT_IN_MKSTEMP, prev_intrpt_state);	\
 }
 # if defined(STATIC_ANALYSIS)
 #  define SYSTEM	system

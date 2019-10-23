@@ -3,9 +3,6 @@
  * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -46,7 +43,7 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 {
 	boolean_t		exc_item_seen, inc_item_seen, inc_seen, wildcard_match;
 	char			key_buff[MAX_KEY_SZ + 1 + SIZEOF(uint4) * 2], asc_key_buff[MAX_ZWR_KEY_SZ], *ptr;
-	int			i, key_len = 0, pat_pos, subs_pos;
+	int			i, key_len, pat_pos, subs_pos;
 	uint4			pini_addr;
 	gv_key			*key;
 	jnl_record		*rec;

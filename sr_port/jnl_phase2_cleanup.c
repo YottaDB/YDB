@@ -3,9 +3,6 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -48,7 +45,7 @@ void	jnl_phase2_cleanup(sgmnt_addrs *csa, jnl_buffer_ptr_t jbp)
 {
 	uint4			currFreeaddr, newFreeaddr, stuckPid;
 	int			index1, index2;
-	jbuf_phase2_in_prog_t	*phs2cmt, *deadCmt, *begCmt, *maxCmt, *topCmt = NULL;
+	jbuf_phase2_in_prog_t	*phs2cmt, *deadCmt, *begCmt, *maxCmt, *topCmt;
 	boolean_t		was_latch_owner;
 	DEBUG_ONLY(uint4	jbp_freeaddr1;)
 

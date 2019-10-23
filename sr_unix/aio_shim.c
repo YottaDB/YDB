@@ -256,7 +256,7 @@ STATICFNDCL void clean_wip_queue(unix_db_info *udi)
 	cache_state_rec_ptr_t   cstt;
 	struct aiocb 		*aiocbp;
 	sgmnt_data_ptr_t	csd;
-	sgmnt_addrs		*csa = NULL;
+	sgmnt_addrs		*csa;
 	struct gd_info		*gdi;
 	node_local_ptr_t	cnl;
 	int			num_ios, lcnt;

@@ -3,9 +3,6 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -172,7 +169,7 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 	int		match, alt_size, charlen, bytelen, pat_found;
 	mval		alt_pat, alt_str;
 	pte_csh		*tmp_pte;
-	unsigned char	*strtmp = NULL, *strnext;
+	unsigned char	*strtmp, *strnext;
 
 	if (PTE_MAX_ENTRIES <= repcnt)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_PATALTER2LARGE, 1, PTE_MAX_ENTRIES);
@@ -343,3 +340,4 @@ int do_patalt(uint4 *firstalt, unsigned char *strptr, unsigned char *strtop, int
 		pte_csh_insert((char *)firstalt, (char *)strptr, totchar, repcnt, match);
 	return match;
 }
+

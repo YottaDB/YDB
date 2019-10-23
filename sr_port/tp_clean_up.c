@@ -83,7 +83,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 	block_id	cseblk, histblk;
 	cache_rec_ptr_t	cr;
 	int4		upd_trans;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

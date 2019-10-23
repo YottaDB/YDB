@@ -3,9 +3,6 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -53,7 +50,7 @@ uint4 mur_block_count_correct(reg_ctl_list *rctl)
 {
 	gtm_uint64_t		native_size, size;
 	sgmnt_data_ptr_t 	mu_data;
-	int4			mu_int_ovrhd = 0;
+	int4			mu_int_ovrhd;
 	uint4			total_blks;
 	uint4			status;
 	uint4                   new_bit_maps, bplmap, new_blocks, tmpcnt;

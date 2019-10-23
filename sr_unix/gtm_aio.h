@@ -3,9 +3,6 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -53,7 +50,7 @@ struct aiocb {
 
 #define AIO_ERROR(AIOCBP, STATUS)						\
 MBSTART	{									\
-	intrpt_state_t          prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t          prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_AIO_ERROR, prev_intrpt_state);		\
 	STATUS = aio_error((AIOCBP)->aio_handle);				\
@@ -88,7 +85,7 @@ MBSTART	{									\
 
 #define AIO_ERROR(AIOCBP, STATUS)						\
 MBSTART {									\
-	intrpt_state_t          prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t          prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_AIO_ERROR, prev_intrpt_state);       	\
 	STATUS = aio_error(AIOCBP);						\

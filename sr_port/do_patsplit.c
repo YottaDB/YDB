@@ -3,9 +3,6 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -53,7 +50,7 @@ int do_patsplit(mval *str, mval *pat)
 	ptstr		fixed_ptstr, left_ptstr, right_ptstr;
 	uint4		cnt[2], tot_min[2], tot_max[2];		/* index 0 is for left, index 1 is for right */
 	uint4		code, *fixed_patptr, flags, *patptr, *patptr_end, *patptr_start, *right_patptr, tempuint, *tmp_patptr;
-	unsigned char	*fixednext, *fixedptr, *maxfixedptr, *rightnext = NULL, *rightptr, *strptr, *strtop;
+	unsigned char	*fixednext, *fixedptr, *maxfixedptr, *rightnext, *rightptr, *strptr, *strtop;
 
 	MV_FORCE_STR(str);
 	patptr = (uint4 *)pat->str.addr;

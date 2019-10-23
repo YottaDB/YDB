@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -55,8 +55,8 @@ static readonly unsigned char apos_ok[] =
 
 void advancewindow(void)
 {
-	unsigned char	*cp1, *cp2, *cp3, *cptop, *cptr = NULL;
-	unsigned char	*error = NULL, errtxt[(3 + 1) UTF8_ONLY(* GTM_MB_LEN_MAX)], x;	/* up to 3 digits/byte & a comma */
+	unsigned char	*cp1, *cp2, *cp3, *cptop, *cptr;
+	unsigned char	*error, errtxt[(3 + 1) UTF8_ONLY(* GTM_MB_LEN_MAX)], x;	/* up to 3 digits/byte & a comma */
 	char		*tmp;
 	int		y, charlen;
 #	ifdef UTF8_SUPPORTED

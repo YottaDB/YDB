@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,8 +69,8 @@ tp_region	*insert_region(	gd_region	*reg,
 {
 	boolean_t	t_retry_needed;
 	enc_info_t	*encr_ptr;
-	int4		local_fid_index = 0, match;
-	sgmnt_addrs	*csa = NULL, *tr_csa;
+	int4		local_fid_index, match;
+	sgmnt_addrs	*csa, *tr_csa;
 	tp_region	*tr, *tr_last, *tr_new, *tr_resort;
 	unique_file_id	local_id;
 	int		save_errno;

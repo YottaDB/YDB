@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,7 +91,7 @@ boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t
 	sgmnt_addrs			*csa;
 	gd_region			*reg, *reg_top;
 	gd_segment			*seg;
-	int				gtmcrypt_errno = 0, got_encrypted_block = 0;
+	int				gtmcrypt_errno, got_encrypted_block;
 	int				wb_counter = 1;
 
 	max_zwr_len = private_blksz = 0;

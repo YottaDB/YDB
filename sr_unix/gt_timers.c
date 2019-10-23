@@ -652,7 +652,7 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	int		save_errno, timer_defer_cnt, offset, orig_why;
 	TID 		*deferred_tid;
 	boolean_t	tid_found;
-	char 		*save_util_outptr = NULL;
+	char 		*save_util_outptr;
 	va_list		save_last_va_list_ptr;
 	boolean_t	util_copy_saved = FALSE, safe_for_timer_pop, signal_forwarded;
 #	ifdef DEBUG

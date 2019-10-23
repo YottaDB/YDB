@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,7 +58,7 @@ void wait_for_disk_space(sgmnt_addrs *csa, char *fn, int fd, off_t offset, char 
 	sgmnt_addrs	*repl_csa;
 	jnlpool_addrs_ptr_t	save_jnlpool;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_NOSPC_ENABLED */
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 #	ifdef DEBUG
 		uint4	lcl_lseekwrite_target;
 #	endif

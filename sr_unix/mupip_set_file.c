@@ -119,18 +119,18 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	boolean_t		bypass_partial_recov, got_standalone, need_standalone = FALSE, acc_meth_changing;
 	char			acc_spec[MAX_ACC_METH_LEN + 1], *command = "MUPIP SET VERSION", *errptr, exit_stat, *fn,
 				ver_spec[MAX_DB_VER_LEN + 1];
-	enum db_acc_method	access = dba_dummy, access_new;
-	enum db_ver		desired_dbver = GDSVLAST;
+	enum db_acc_method	access, access_new;
+	enum db_ver		desired_dbver;
 	gd_region		*temp_cur_region;
 	int			asyncio_status, defer_allocate_status, defer_status, disk_wait_status, encryptable_status,
-				encryption_complete_status, epoch_taper_status, extn_count_status, fd = 0, fn_len, glbl_buff_status,
+				encryption_complete_status, epoch_taper_status, extn_count_status, fd, fn_len, glbl_buff_status,
 				gtmcrypt_errno, hard_spin_status, inst_freeze_on_error_status, key_size_status, locksharesdbcrit,
 				lock_space_status, mutex_space_status, null_subs_status, qdbrundown_status, read_only_status,
 				rec_size_status, reg_exit_stat, reorg_sleep_nsec_status, rc, rsrvd_bytes_status, save_errno,
 				sleep_cnt_status, spin_sleep_status, stats_status, status, status1, stdnullcoll_status,
 				trigger_flush_limit_status, wrt_per_flu_status;
 	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_flush_trigger, new_hard_spin,
-				new_key_size, new_lock_space, new_mutex_space, new_null_subs = 0, new_rec_size, new_sleep_cnt,
+				new_key_size, new_lock_space, new_mutex_space, new_null_subs, new_rec_size, new_sleep_cnt,
 				new_spin_sleep, new_stdnullcoll, new_wrt_per_flu, reserved_bytes;
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;

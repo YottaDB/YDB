@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,7 +58,7 @@ char gtcmtr_lke_clearrep(struct CLB *lnk, clear_request	*creq)
 	mstr			dnode;
 	show_reply		srep;
 	uint4			status;
-	boolean_t		was_crit = FALSE;
+	boolean_t		was_crit;
 	mlk_pvtctl		pctl;
 
 	ASSERT_IS_LIBGNPSERVER;

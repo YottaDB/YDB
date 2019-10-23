@@ -88,7 +88,7 @@ void libhugetlbfs_init(void)
 	void		*handle;
 	char	 	librarypath[GTM_PATH_MAX], *lpath = NULL;
 	char		err_msg[GTM_PATH_MAX];
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	assert(!hugetlb_is_attempted);
 	if (RESTRICTED(library_load_path))

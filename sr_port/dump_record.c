@@ -69,7 +69,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 	int4		util_len, head;
 	uint4 		ch;
 	int		buf_len, field_width,fastate, chwidth = 0;
-        ssize_t   	chlen = 0;
+        ssize_t   	chlen;
 	block_id	blk_id;
 	boolean_t	rechdr_displayed = FALSE;
 

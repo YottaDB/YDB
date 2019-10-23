@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -241,7 +241,7 @@ void mupip_cvtgbl(void)
 int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *line3_len, uint4 *max_rec_size, int *utf8_extract,
 		int *dos)
 {
-	char	*c, *c1, *ctop, *line1, *line2 = NULL, *line3, *ptr;
+	char	*c, *c1, *ctop, *line1, *line2, *line3, *ptr;
 	int	len, line2_len, ret;
 	mval	v;
 	uint4	max_io_size;

@@ -87,7 +87,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 {
 	boolean_t		is_bg;
 	cache_que_heads_ptr_t	cache_state;
-	cache_rec_ptr_t		clru = NULL, cr_top, start_cr = NULL;
+	cache_rec_ptr_t		clru, cr_top, start_cr;
 	cache_rec_ptr_t		cr;
 	char			*wcblocked_ptr;
 	cw_set_element		*cs, *cs_top, *first_cw_set, *next_cs;
@@ -95,7 +95,7 @@ void	secshr_finish_CMT08_to_CMT14(sgmnt_addrs *csa, jnlpool_addrs_ptr_t update_j
 	int			max_bts, old_mode;
 	node_local_ptr_t	cnl;
 	seq_num			strm_seqno;
-	sgm_info		*si = NULL;
+	sgm_info		*si;
 	sgmnt_data_ptr_t	csd;
 	sm_uc_ptr_t		blk_ptr;
 	srch_blk_status		*t1;

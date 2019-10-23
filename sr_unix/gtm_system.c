@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,7 +44,7 @@ int gtm_system_internal(const char *sh, const char *opt, const char *rtn, const 
 	int			stat;		/* child exit status */
 	int			rc, ret;	/* return value from waitpid */
 	int			len, shlen;
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t		prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

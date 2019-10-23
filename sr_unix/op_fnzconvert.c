@@ -3,9 +3,6 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -58,9 +55,9 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 	int		index;
 	int32_t		src_ustr_len, src_chlen, dst_chlen, ulen, dstlen = 0;
 	UErrorCode	status;
-	char		*dstbase = NULL;
+	char		*dstbase;
 	UChar		src_ustr[MAX_ZCONVBUFF], dst_ustr[MAX_ZCONVBUFF], *src_ustr_ptr, *dst_ustr_ptr;
-	intrpt_state_t  prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t  prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 

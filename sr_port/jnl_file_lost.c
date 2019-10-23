@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,7 @@ error_def(ERR_REPLJNLCLOSED);
 uint4 jnl_file_lost(jnl_private_control *jpc, uint4 jnl_stat)
 {	/* Notify operator and terminate journaling */
 	unsigned int	status;
-	sgmnt_addrs	*csa = NULL;
+	sgmnt_addrs	*csa;
 	jnlpool_addrs_ptr_t	save_jnlpool;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* needed by INST_FREEZE_ON_MSG_ENABLED */
 	seq_num		reg_seqno, jnlseqno;

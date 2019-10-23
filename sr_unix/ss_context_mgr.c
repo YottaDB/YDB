@@ -2,7 +2,7 @@
  *								*
  * Copyright 2009, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,7 +77,7 @@ boolean_t	ss_create_context(snapshot_context_ptr_t lcl_ss_ctx, int ss_shmcycle)
 	node_local_ptr_t		cnl;
 	sgmnt_addrs			*csa;
 	int				shdw_fd, status;
-	void				*ss_shmaddr = NULL;
+	void				*ss_shmaddr;
 	ZOS_ONLY(int			realfiletag;)
 
 	ZOS_ONLY(error_def(ERR_BADTAG);)

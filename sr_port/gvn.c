@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,7 @@ int gvn(void)
 	int		hash_code;
 	opctype		ox;
 	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS + 1];
-	triple		*oldchain = NULL, *ref, *s, tmpchain, *triptr;
+	triple		*oldchain, *ref, *s, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

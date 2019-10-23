@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -835,7 +835,7 @@ void	rtnobj_shm_free(rhdtyp *rhead, boolean_t latch_grabbed)
 	open_relinkctl_sgm	*linkctl;
 	relinkshm_hdr_t		*shm_hdr;
 	int			maxObjIndex, sizeIndex;
-	int			min_index, max_index, min_free_index, max_free_index, shm_index = 0;
+	int			min_index, max_index, min_free_index, max_free_index, shm_index;
 	gtm_uint64_t		elemSize, origElemSize, objLen;
 	rtnobj_hdr_t		*rtnobj, *prev_rtnobj, *rtnobj2;
 	rtnobj_sm_off_t		shm_index_off;

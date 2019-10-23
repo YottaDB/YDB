@@ -147,7 +147,7 @@ int repl_ctl_create(repl_ctl_element **ctl, gd_region *reg, int jnl_fn_len, char
 	int			status;
 	int 			gtmcrypt_errno;
 	uint4			jnl_status;
-	boolean_t		did_jnl_ensure_open = FALSE, open_jnl_file_by_name = FALSE, was_crit;
+	boolean_t		did_jnl_ensure_open = FALSE, open_jnl_file_by_name, was_crit;
 	int4			lcl_jnl_fn_len;
 	char			lcl_jnl_fn[JNL_NAME_SIZE];
 	struct stat		stat_buf;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -134,7 +134,7 @@ boolean_t gvcst_queryget2(mval *val, unsigned char *sn_ptr)
 	int		rsiz, key_size, data_len;
 	rec_hdr_ptr_t	rp;
 	srch_blk_status	*bh;
-	srch_hist	*rt_history = NULL;
+	srch_hist	*rt_history;
 	unsigned short	temp_ushort;
 	int		tmp_cmpc;
 	DEBUG_ONLY(unsigned char *save_strp = NULL);

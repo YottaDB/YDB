@@ -146,7 +146,7 @@ void op_zlink (mval *v, mval *quals)
 				objnamebuf[MAX_FN_LEN + 1],
 				srcnamebuf[MAX_FN_LEN + 1];
 	command_qualifier	save_qlf;
-	int			initial_object_file_des, qlf, save_errno, status, tslash = 0;
+	int			initial_object_file_des, qlf, save_errno, status, tslash;
 	linktyp			type;
 	mstr			srcstr, objstr, file;
 	mval			qualifier;

@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -84,7 +84,7 @@ void gtm_zlib_init(void);
 #define ZLIB_COMPRESS(CMPBUFF_PTR, CMPLEN, UNCMPBUFF_PTR, UNCMPLEN, ZLIB_CMP_LEVEL, RC)					\
 {															\
 	GBLREF zlib_cmp_func_t		zlib_compress_fnptr;								\
-	intrpt_state_t			prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;					\
+	intrpt_state_t			prev_intrpt_state;								\
 															\
 	DEFER_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP, prev_intrpt_state);							\
 	assert(0 < (signed)(CMPLEN));											\
@@ -97,7 +97,7 @@ void gtm_zlib_init(void);
 #define ZLIB_UNCOMPRESS(UNCMPBUFF_PTR, UNCMPLEN, CMPBUFF_PTR, CMPLEN, RC)						\
 {															\
 	GBLREF zlib_uncmp_func_t	zlib_uncompress_fnptr;								\
-	intrpt_state_t			prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;					\
+	intrpt_state_t			prev_intrpt_state;								\
 															\
 	DEFER_INTERRUPTS(INTRPT_IN_ZLIB_CMP_UNCMP, prev_intrpt_state);							\
 	assert(0 < (signed)(UNCMPLEN));											\

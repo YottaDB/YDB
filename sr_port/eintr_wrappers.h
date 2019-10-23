@@ -54,7 +54,7 @@
 
 #define CLOSE(FD, RC)									\
 {											\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;		\
+	intrpt_state_t		prev_intrpt_state;					\
 											\
 	do										\
 	{										\
@@ -101,7 +101,7 @@
 
 #define FCLOSE(STREAM, RC)								\
 {											\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;		\
+	intrpt_state_t		prev_intrpt_state;					\
 											\
 	do										\
 	{										\
@@ -145,7 +145,7 @@
 
 #define FSTAT_FILE(FDESC, INFO, RC)						\
 {										\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t		prev_intrpt_state;				\
 										\
 	do									\
 	{									\
@@ -178,8 +178,8 @@
 #define GTM_FREAD(BUFF, ELEMSIZE, NELEMS, FP, NREAD, RC)			\
 MBSTART {									\
 	size_t		elems_to_read, elems_read;				\
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;		\
-										\
+	intrpt_state_t	prev_intrpt_state;					\
+	\
 	DEFER_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);		\
 	elems_to_read = NELEMS;							\
 	for (;;)								\
@@ -226,7 +226,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 {
 	size_t		elems_to_write, elems_written, rc = 0;
 	int		status;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_EINTR_WRAPPERS, prev_intrpt_state);
 	elems_to_write = nelems;
@@ -353,7 +353,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 #if defined(DEBUG)
 #define SYSCONF(PARM, RC)							\
 {										\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);			\
 	if (ydb_white_box_test_case_enabled					\
@@ -369,7 +369,7 @@ static inline size_t gtm_fwrite(void *buff, size_t elemsize, size_t nelems, FILE
 #else
 #define SYSCONF(PARM, RC)							\
 {										\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_SYSCONF, prev_intrpt_state);			\
 	RC = sysconf(PARM);							\

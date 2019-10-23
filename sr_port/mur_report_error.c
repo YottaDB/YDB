@@ -3,9 +3,6 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries. *
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -47,7 +44,7 @@ error_def(ERR_UNKNOWNRECTYPE);
 /* #GTM_THREAD_SAFE : The below function (mur_output_error) is thread-safe */
 boolean_t mur_report_error(jnl_ctl_list *jctl, enum mur_error code)
 {
-	boolean_t	ret, was_holder = FALSE;
+	boolean_t	ret, was_holder;
 
 	PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder);
 	switch (code)

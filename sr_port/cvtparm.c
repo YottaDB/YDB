@@ -2,9 +2,6 @@
  *								*
  *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -44,7 +41,7 @@ int4 cvtparm(int iocode, mval *src, mval *dst)
 	int4 		status, nl,  tim[2];
 	int		siz, cnt, strlen;
 	short		ns;
-	unsigned char 	*cp = NULL, msk;
+	unsigned char 	*cp, msk;
 	io_termmask 	lngmsk;
 
 	assert(MV_DEFINED(src));

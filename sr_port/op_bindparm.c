@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ error_def(ERR_STACKOFLOW);
 void op_bindparm(int frmc, int frmp_arg, ...)
 {
 	va_list		var;
-	uint4		mask = 0;
+	uint4		mask;
 	register lv_val *a;
 	var_tabent	*parm_name;
 	int		i;
@@ -54,7 +54,7 @@ void op_bindparm(int frmc, int frmp_arg, ...)
 	int		actc;
 	unsigned int	*prev_count_ptr;
 	unsigned int	prev_count;
-	lv_val		**actp = NULL;		/* actual pointer */
+	lv_val		**actp;		/* actual pointer */
 	lv_val		*new_var;
 	mvs_ntab_struct	*ntab;
 	ht_ent_mname	*tabent, **htepp;

@@ -45,7 +45,7 @@ int m_new(void)
 	int		count, n;
 	mvar		*var;
 	oprtype		tmparg;
-	triple		*fetch, *next, *org, *ref, *s, *tmp = NULL;
+	triple		*fetch, *next, *org, *ref, *s, *tmp;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

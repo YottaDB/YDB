@@ -262,8 +262,8 @@ CONDITION_HANDLER(gtm_trigger_ch)
 	}
 	mumps_status = SIGNAL;
 	/* We are about to no longer have a trigger stack frame and thus re-enter trigger no-mans-land */
-	DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND, prev_intrpt_state_start_ch);
-	assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state_start_ch); /* relied upon by ENABLE_INTERRUPTS in "gtm_trigger_invoke" */
+	DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND, prev_intrpt_state);
+	assert(INTRPT_OK_TO_INTERRUPT == prev_intrpt_state); /* relied upon by ENABLE_INTERRUPTS in "gtm_trigger_invoke" */
 	gtm_trigger_depth--;	/* Bypassing gtm_trigger_invoke() so do maint on depth indicator */
 	assert(0 <= gtm_trigger_depth);
 	/* Return back to gtm_trigger with error code */
@@ -273,7 +273,7 @@ CONDITION_HANDLER(gtm_trigger_ch)
 STATICFNDEF int gtm_trigger_invoke(void)
 {	/* Invoke trigger M routine. Separate so error returns to gtm_trigger with proper retcode */
 	int		rc;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -532,7 +532,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	symval			*new_symval;
 	uint4			dollar_tlevel_start;
 	stack_frame		*fp;
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t		prev_intrpt_state;
 #	ifdef DEBUG
 	condition_handler	*tmpctxt;
 #	endif

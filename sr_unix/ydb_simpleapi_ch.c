@@ -97,7 +97,7 @@ GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
  */
 CONDITION_HANDLER(ydb_simpleapi_ch)
 {
-	sgmnt_addrs		*csa = NULL;
+	sgmnt_addrs		*csa;
 	unix_db_info		*udi;
 	gd_addr			*addr_ptr;
 	gd_region		*reg_top, *reg_local;

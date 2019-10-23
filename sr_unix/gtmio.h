@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -612,7 +612,7 @@ MBSTART {													\
 		size_t		gtmioBuffLen;									\
 		sm_uc_ptr_t	gtmioBuff;									\
 		int		block_cnt = 0;									\
-		intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;					\
+		intrpt_state_t	prev_intrpt_state;								\
 														\
 		gtmioBuffLen = FBUFF_LEN;									\
 		gtmioBuff = (sm_uc_ptr_t)(FBUFF);								\
@@ -691,7 +691,7 @@ MBSTART {													\
 		size_t		gtmioBuffLen;									\
 		sm_uc_ptr_t	gtmioBuff;									\
 		int		block_cnt = 0;									\
-		intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;					\
+		intrpt_state_t	prev_intrpt_state;								\
 														\
 		GBLREF	int	ydb_non_blocked_write_retries;							\
 														\
@@ -836,7 +836,7 @@ MBSTART {											\
 
 #define FFLUSH(STREAM)							\
 MBSTART {								\
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t	prev_intrpt_state;				\
 									\
 	DEFER_INTERRUPTS(INTRPT_IN_FFLUSH, prev_intrpt_state);		\
 	fflush(STREAM);							\
@@ -849,7 +849,7 @@ MBSTART {								\
 MBSTART {									\
 	GBLREF boolean_t	multi_thread_in_use;				\
 	char			*rname;						\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t		prev_intrpt_state;				\
 	/* Use the right system call based on threads are in use or not */	\
 	DEFER_INTERRUPTS(INTRPT_IN_GETC, prev_intrpt_state);			\
 	if (!INSIDE_THREADED_CODE(rname))					\
@@ -861,7 +861,7 @@ MBSTART {									\
 
 #define CLEARERR(STREAM)						\
 MBSTART {								\
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t	prev_intrpt_state;				\
 									\
 	DEFER_INTERRUPTS(INTRPT_IN_IO_READ, prev_intrpt_state);		\
 	clearerr(STREAM);						\
@@ -870,7 +870,7 @@ MBSTART {								\
 
 #define FEOF(STREAM, RC)						\
 MBSTART {								\
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t	prev_intrpt_state;				\
 									\
 	DEFER_INTERRUPTS(INTRPT_IN_IO_READ, prev_intrpt_state);		\
 	RC = feof(STREAM);						\

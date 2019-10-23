@@ -91,8 +91,6 @@ int	omi_srvc_xact (omi_conn *cptr)
 	char		buff[OMI_BUFSIZ], *bptr, *xend, *bend;
 	char		msg[OMI_MSG_SIZE];
 
-	rh.op_type.octet[0] = '\0'; // get rid of compiler warning
-
 #ifdef BSD_TCP
 	int		 cc, save_errno;
 

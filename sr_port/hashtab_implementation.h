@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -489,8 +489,6 @@ void EXPAND_HASHTAB(HASH_TABLE *table, int minsize)
 		DBGHASHTAB((stderr, "EXPAND_HASHTAB:free base (%lx) \n", table->base));
 		free(table->base); 	/* Deallocate old table entries */
 	}
-	temptab.spare_base = NULL;
-	temptab.spare_base_size = 0;
 	if (!table->dont_keep_spare_table)
 	{
 		temptab.spare_base = table->base; /* let's keep a spare in case we just have to clear the DELETED entries */

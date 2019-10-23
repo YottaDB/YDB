@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -82,13 +82,13 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	boolean_t	first_copy, new_rtblk_star_only, create_root = FALSE, split_required, insert_in_left;
 	unsigned char	curr_prev_key[MAX_KEY_SZ+1], new_blk1_last_key[MAX_KEY_SZ+1];
 	unsigned short  temp_ushort;
-	int		rec_size, new_ins_keycmpc, tkeycmpc, new_ances_currkeycmpc = 0, old_ances_currkeycmpc;
+	int		rec_size, new_ins_keycmpc, tkeycmpc, new_ances_currkeycmpc, old_ances_currkeycmpc;
 	int		tmp_cmpc;
-	block_index	left_index = 0, right_index;
+	block_index	left_index, right_index;
 	block_offset 	ins_off, ins_off2;
 	int		level;
 	int		new_ins_keysz, new_ances_currkeysz, new_blk1_last_keysz, newblk2_first_keysz, next_gv_currkeysz;
-	int		old_ances_currkeylen, new_ins_keylen, new_ances_currkeylen = 0, tkeylen, newblk2_first_keylen;
+	int		old_ances_currkeylen, new_ins_keylen, new_ances_currkeylen, tkeylen, newblk2_first_keylen;
 	int		old_blk1_last_rec_size, old_blk1_sz, save_blk_piece_len, old_right_piece_len;
 	int		delta, max_fill;
 	enum cdb_sc	status;
@@ -96,7 +96,7 @@ enum cdb_sc mu_split(int cur_level, int i_max_fill, int d_max_fill, int *blks_cr
 	block_id	allocation_clue;
 	sm_uc_ptr_t 	rPtr1, rPtr2, rec_base, key_base, next_gv_currkey,
 			bn_ptr1, bn_ptr2, save_blk_piece,
-			old_blk_after_currec, ances_currkey = NULL,
+			old_blk_after_currec, ances_currkey,
 			old_blk1_base,
 			new_blk1_top, new_blk2_top,
 			new_blk2_frec_base, new_blk2_rem,

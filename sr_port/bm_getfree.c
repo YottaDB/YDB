@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,12 +77,12 @@ error_def(ERR_DBMBMINCFREFIXED);
 block_id bm_getfree(block_id hint, boolean_t *blk_used, unsigned int cw_work, cw_set_element *cs, int *cw_depth_ptr)
 {
 	cw_set_element	*cs1;
-	sm_uc_ptr_t	bmp = NULL;
+	sm_uc_ptr_t	bmp;
 	block_id	bml, hint_cycled, hint_limit;
 	block_id_ptr_t	b_ptr;
-	int		cw_set_top, depth = 0, lcnt;
+	int		cw_set_top, depth, lcnt;
 	unsigned int	local_maps, map_size, n_decrements = 0, total_blks;
-	trans_num	ctn = 0;
+	trans_num	ctn;
 	int4		free_bit, offset;
 	uint4		space_needed;
 	uint4		status;

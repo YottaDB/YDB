@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -64,7 +64,7 @@ void	grab_crit(gd_region *reg)
 	sgmnt_data_ptr_t	csd;
 	enum cdb_sc		status;
 	mutex_spin_parms_ptr_t	mutex_spin_parms;
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t		prev_intrpt_state;
 #	ifdef DEBUG
 	sgmnt_addrs		*jnlpool_csa;
 	jnlpool_addrs_ptr_t	local_jnlpool, save_jnlpool;

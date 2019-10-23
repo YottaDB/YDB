@@ -2,7 +2,7 @@
  *								*
  * Copyright 2012 Fidelity Information Services, Inc		*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@ lv_val *op_rfrshlvn(uint4 indx, opctype oc)
 	glvn_pool_entry		*slot;
 	ht_ent_mname		*tabent;
 	mname_entry		targ_key;
-	lv_val			*lv = NULL;
+	lv_val			*lv;
 	lvname_info		*lvn_info;
 	unsigned char		buff[512], *end;
 	DCL_THREADGBL_ACCESS;

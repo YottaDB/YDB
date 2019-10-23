@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,7 @@ void mlk_unlock(mlk_pvtblk *p)
 	int			status;
 	mlk_shrblk_ptr_t	d, pnt;
 	mlk_ctldata_ptr_t	ctl;
-	boolean_t		stop_waking, was_crit = FALSE;
+	boolean_t		stop_waking, was_crit;
 	sgmnt_addrs		*csa;
 	float			ls_free;	/* Free space in bottleneck subspace */
 

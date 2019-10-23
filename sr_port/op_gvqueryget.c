@@ -2,9 +2,6 @@
  *								*
  *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -35,7 +32,7 @@ LITREF mval		literal_null;
 
 boolean_t op_gvqueryget(mval *key, mval *val)
 {
-	boolean_t 	gotit = FALSE;
+	boolean_t 	gotit;
 	gv_key		*save_key;
 	gvnh_reg_t	*gvnh_reg;
 	DCL_THREADGBL_ACCESS;

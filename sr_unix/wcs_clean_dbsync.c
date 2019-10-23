@@ -3,9 +3,6 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -70,7 +67,7 @@ void	wcs_clean_dbsync(TID tid, int4 hd_len, sgmnt_addrs **csaptr)
 	boolean_t		dbsync_defer_timer;
 	gd_region               *reg, *save_region;
 	jnl_private_control	*jpc;
-	jnl_buffer_ptr_t	jbp = NULL;
+	jnl_buffer_ptr_t	jbp;
 	node_local_ptr_t	cnl;
 	sgmnt_addrs		*csa, *check_csaddrs, *save_csaddrs;
 	sgmnt_data_ptr_t	csd, save_csdata;

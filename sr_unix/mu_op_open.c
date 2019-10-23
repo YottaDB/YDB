@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,7 +67,7 @@ int mu_op_open(mval *v, mval *p, mval *t, mval *mspace)
 	char		buf1[MAX_TRANS_NAME_LEN]; /* buffer to hold translated name */
 	int4		stat;		/* status */
 	io_log_name	*naml;		/* logical record for passed name */
-	io_log_name	*tl = NULL;		/* logical record for translated name */
+	io_log_name	*tl;		/* logical record for translated name */
 	mstr		tn;			/* translated name 	  */
 
 	MV_FORCE_STR(v);

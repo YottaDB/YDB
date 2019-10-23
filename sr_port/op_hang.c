@@ -101,7 +101,7 @@ void op_hang(mval* num)
 	double		tmp;
 	mv_stent	*mv_zintcmd;
 	ABS_TIME	cur_time, end_time;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

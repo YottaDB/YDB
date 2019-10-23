@@ -3,9 +3,6 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -62,7 +59,7 @@ error_def(ERR_GVPUTFAIL);
 
 enum cdb_sc gvcst_dataget(mint *dollar_data, mval *val)
 {
-	boolean_t	gotit, gotspan, gotpiece, check_rtsib = FALSE;
+	boolean_t	gotit, gotspan, gotpiece, check_rtsib;
 	mint		dollar_data_ctrl, dollar_data_piece, dollar_data_null, dg_info;
 	mval		val_ctrl, val_piece;
 	int		gblsize, i, total_len, oldend, tmp_numsubs;

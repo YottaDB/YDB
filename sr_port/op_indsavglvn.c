@@ -2,7 +2,7 @@
  *								*
  * Copyright 2012 Fidelity Information Services, Inc		*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,8 +42,8 @@ void op_indsavglvn(mval *target, uint4 slot, uint4 do_ref)
 	int             rval;
 	mstr            *obj, object;
 	oprtype         v, getdst;
-	opctype		put_oc = 0;
-	triple          *s = NULL, *s1, *sub, *share;
+	opctype		put_oc;
+	triple          *s, *s1, *sub, *share;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

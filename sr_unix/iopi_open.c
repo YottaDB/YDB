@@ -144,7 +144,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 	char *token3;
 	int notfound = FALSE;
 	int ret_stat;
-	int pathsize, path_len = 0;
+	int pathsize, path_len;
 	int cmd_string_size;
 
 	path = ydb_getenv(YDBENVINDX_GENERIC_PATH, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH);
@@ -291,7 +291,7 @@ short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 time
 	int		p_offset = 0;
 	int		file_des_write;
 	int		file_des_read = 0;
-	int		file_des_read_stderr = 0;
+	int		file_des_read_stderr;
 	int		param_offset = 0;
 	struct stat 	sb;
 	int 		ret_stat;

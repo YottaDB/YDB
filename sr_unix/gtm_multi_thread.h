@@ -48,7 +48,7 @@ error_def(ERR_SYSCALL);
 
 #define PTHREAD_COND_SIGNAL(COND, RVAL)						\
 MBSTART {									\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
 	(RVAL) = pthread_cond_signal(COND);					\
@@ -57,7 +57,7 @@ MBSTART {									\
 
 #define PTHREAD_COND_TIMEDWAIT(COND, MUTEX, TIMEOUT, RVAL)			\
 MBSTART {									\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;	\
+	intrpt_state_t		prev_intrpt_state;				\
 										\
 	DEFER_INTERRUPTS(INTRPT_IN_PTHREAD_NB, prev_intrpt_state);		\
 	(RVAL) = pthread_cond_timedwait(COND, MUTEX, TIMEOUT);			\

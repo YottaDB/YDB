@@ -26,7 +26,7 @@
 const char		*intrsafe_gtm_tls_get_error(void)
 {
 	const char	*rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_get_error_fptr)();
@@ -37,7 +37,7 @@ const char		*intrsafe_gtm_tls_get_error(void)
 int			intrsafe_gtm_tls_errno(void)
 {
 	int		rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_errno_fptr)();
@@ -48,7 +48,7 @@ int			intrsafe_gtm_tls_errno(void)
 gtm_tls_ctx_t		*intrsafe_gtm_tls_init(int version, int flags)
 {
 	gtm_tls_ctx_t	*rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_init_fptr)(version, flags);
@@ -58,7 +58,7 @@ gtm_tls_ctx_t		*intrsafe_gtm_tls_init(int version, int flags)
 
 void			intrsafe_gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
 {
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	(*gtm_tls_prefetch_passwd_fptr)(tls_ctx, env_name);
@@ -68,7 +68,7 @@ void			intrsafe_gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name)
 gtm_tls_socket_t	*intrsafe_gtm_tls_socket(gtm_tls_ctx_t *ctx, gtm_tls_socket_t *prev_socket, int sockfd, char *id, int flags)
 {
 	gtm_tls_socket_t	*rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_socket_fptr)(ctx, prev_socket, sockfd, id, flags);
@@ -79,7 +79,7 @@ gtm_tls_socket_t	*intrsafe_gtm_tls_socket(gtm_tls_ctx_t *ctx, gtm_tls_socket_t *
 int			intrsafe_gtm_tls_connect(gtm_tls_socket_t *socket)
 {
 	int		rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_connect_fptr)(socket);
@@ -90,7 +90,7 @@ int			intrsafe_gtm_tls_connect(gtm_tls_socket_t *socket)
 int			intrsafe_gtm_tls_accept(gtm_tls_socket_t *socket)
 {
 	int		rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_accept_fptr)(socket);
@@ -101,7 +101,7 @@ int			intrsafe_gtm_tls_accept(gtm_tls_socket_t *socket)
 int			intrsafe_gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 {
 	int		rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_renegotiate_fptr)(socket);
@@ -112,7 +112,7 @@ int			intrsafe_gtm_tls_renegotiate(gtm_tls_socket_t *socket)
 int			intrsafe_gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info)
 {
 	int		rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_get_conn_info_fptr)(socket, conn_info);
@@ -123,7 +123,7 @@ int			intrsafe_gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info
 int			intrsafe_gtm_tls_send(gtm_tls_socket_t *socket, char *buf, int send_len)
 {
 	int		rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_send_fptr)(socket, buf, send_len);
@@ -134,7 +134,7 @@ int			intrsafe_gtm_tls_send(gtm_tls_socket_t *socket, char *buf, int send_len)
 int			intrsafe_gtm_tls_recv(gtm_tls_socket_t *socket, char *buf, int recv_len)
 {
 	int		rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_recv_fptr)(socket, buf, recv_len);
@@ -145,7 +145,7 @@ int			intrsafe_gtm_tls_recv(gtm_tls_socket_t *socket, char *buf, int recv_len)
 int			intrsafe_gtm_tls_cachedbytes(gtm_tls_socket_t *socket)
 {
 	int		rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_cachedbytes_fptr)(socket);
@@ -155,7 +155,7 @@ int			intrsafe_gtm_tls_cachedbytes(gtm_tls_socket_t *socket)
 
 void			intrsafe_gtm_tls_socket_close(gtm_tls_socket_t *socket)
 {
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	(*gtm_tls_socket_close_fptr)(socket);
@@ -164,7 +164,7 @@ void			intrsafe_gtm_tls_socket_close(gtm_tls_socket_t *socket)
 
 void			intrsafe_gtm_tls_session_close(gtm_tls_socket_t **socket)
 {
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	(*gtm_tls_session_close_fptr)(socket);
@@ -173,7 +173,7 @@ void			intrsafe_gtm_tls_session_close(gtm_tls_socket_t **socket)
 
 void			intrsafe_gtm_tls_fini(gtm_tls_ctx_t **ctx)
 {
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	(*gtm_tls_fini_fptr)(ctx);
@@ -183,7 +183,7 @@ void			intrsafe_gtm_tls_fini(gtm_tls_ctx_t **ctx)
 int			intrsafe_gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *obs_passwd)
 {
 	int		rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_store_passwd_fptr)(tls_ctx, tlsid, obs_passwd);
@@ -194,7 +194,7 @@ int			intrsafe_gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, c
 int			intrsafe_gtm_tls_add_config(gtm_tls_ctx_t *tls_ctx, const char *idstr, const char *configstr)
 {
 	int		rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_add_config_fptr)(tls_ctx, idstr, configstr);
@@ -206,10 +206,11 @@ int			intrsafe_gtm_tls_renegotiate_options(gtm_tls_socket_t *socket, int msec_ti
 				char *idstr, char *configstr, int tlsid_present)
 {
 	int		rv;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	rv = (*gtm_tls_renegotiate_options_fptr)(socket, msec_timeout, idstr, configstr, tlsid_present);
 	ENABLE_INTERRUPTS(INTRPT_IN_TLS_FUNCTION, prev_intrpt_state);
 	return rv;
 }
+

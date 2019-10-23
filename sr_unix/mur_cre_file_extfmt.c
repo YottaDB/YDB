@@ -72,14 +72,14 @@ error_def(ERR_FILENOTCREATE);
 
 int4 mur_cre_file_extfmt(jnl_ctl_list *jctl, int recstat)
 {
-	fi_type			*file_info = NULL;
+	fi_type			*file_info;
 	char			*ptr, rename_fn[MAX_FN_LEN + 1];
 	int			rename_fn_len, base_len, fn_exten_size, tmplen, rctl_index;
 	uint4			status;
 	mval			op_val, op_pars;
 	boolean_t		is_stdout;	/* Output will go STDOUT?. Matters only for single-region in this function */
-	boolean_t		need_rel_latch, copy_from_shm, single_reg, release_latch = FALSE, key_reset = FALSE;
-	boolean_t		is_dummy_gbldir, fname_is_devnull = FALSE;
+	boolean_t		need_rel_latch, copy_from_shm, single_reg, release_latch, key_reset;
+	boolean_t		is_dummy_gbldir, fname_is_devnull;
 	reg_ctl_list		*rctl;
 	gd_region		*reg;
 	shm_reg_ctl_t		*shm_rctl_start, *shm_rctl;

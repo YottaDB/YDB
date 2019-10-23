@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -92,7 +92,7 @@ boolean_t	wcs_phase2_commit_wait(sgmnt_addrs *csa, cache_rec_ptr_t cr)
 	boolean_t		timedout;
 	block_id		blk;
 	int4			index, crarray_index;
-	cache_rec_ptr_t		cr_lo, cr_top = NULL, curcr;
+	cache_rec_ptr_t		cr_lo, cr_top, curcr;
 	phase2_wait_trace_t	crarray[MAX_PHASE2_WAIT_CR_TRACE_SIZE];
 #	ifdef DEBUG
 	uint4			incrit_pid, phase2_commit_half_wait;

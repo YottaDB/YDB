@@ -361,7 +361,7 @@ void gvcst_init(gd_region *reg)
 	unsigned char		cstatus;
 	statsdb_recreate_errors	statsdb_rcerr;
 	jbuf_rsrv_struct_t	*nontp_jbuf_rsrv_lcl;
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t		prev_intrpt_state;
 	key_t			ftok_key;
 	int			ftok_semid;
 	gd_addr			*owning_gd;

@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -63,7 +63,7 @@ void	jnl_file_close(gd_region *reg, boolean_t clean, boolean_t in_jnl_switch)
 {
 	jnl_file_header		*header;
 	unsigned char		hdr_base[REAL_JNL_HDR_LEN + MAX_IO_BLOCK_SIZE];
-	sgmnt_addrs		*csa = NULL;
+	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jb;

@@ -69,7 +69,7 @@ error_def(ERR_LOCKCRITOWNER);
 void	lke_show(void)
 {
 	bool			locks, all = TRUE, wait = TRUE, interactive = FALSE, match = FALSE, memory = TRUE, nocrit = TRUE;
-	boolean_t		exact = FALSE, was_crit = FALSE;
+	boolean_t		exact = FALSE, was_crit;
 	int4			pid;
 	size_t			ls_len;
 	int			n;
@@ -77,7 +77,7 @@ void	lke_show(void)
 	mlk_ctldata_ptr_t	ctl;
 	mstr			regname, node, one_lock;
 	gd_region		*reg;
-	sgmnt_addrs		*csa = NULL;
+	sgmnt_addrs		*csa;
 	int			shr_sub_len = 0;
 	float			ls_free = 0;	/* Free space in bottleneck subspace */
 	mlk_pvtctl		pctl, pctl2;

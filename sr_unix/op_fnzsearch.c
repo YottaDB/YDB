@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,7 +83,7 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 	plength		*match_len;
 	glob_t		globbuf;
 	boolean_t	absolute;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 #	ifdef _AIX
 	boolean_t	use_stat;
 	struct		stat statbuf;
@@ -256,12 +256,12 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 STATICFNDEF CONDITION_HANDLER(fnzsrch_ch)
 {
 	START_CH(TRUE);
-	/* START_CH() defines prev_intrpt_state_start_ch */
+	/* START_CH() defines prev_intrpt_state */
 	if (NULL != TREF(fnzsearch_globbuf_ptr))
 	{
-		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state_start_ch);
+		DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		globfree(TREF(fnzsearch_globbuf_ptr));
-		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state_start_ch);
+		ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 		TREF(fnzsearch_globbuf_ptr) = NULL;
 	}
 	TREF(lv_null_subs) = TREF(fnzsearch_nullsubs_sav);

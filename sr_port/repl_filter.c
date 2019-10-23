@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1112,7 +1112,7 @@ int jnl_v22TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	uint4			jlen, tcom_num = 0, tupd_num = 0;
 	jrec_prefix 		*prefix;
 	uint4 			trigupd_type = NO_TRIG_JREC;
-	boolean_t		promote_uupd_to_tupd = FALSE;
+	boolean_t		promote_uupd_to_tupd;
 
 	jb = jnl_buff;
 	cb = conv_buff;
@@ -1229,9 +1229,9 @@ int jnl_v44TOv22(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	int			status, reclen, conv_reclen;
 	uint4			jlen, tcom_num = 0, tupd_num = 0;
 	jrec_prefix 		*prefix;
-	seq_num			this_upd_seqno, this_strm_seqno = 0;
+	seq_num			this_upd_seqno, this_strm_seqno;
 	uint4 			trigupd_type = NO_TRIG_JREC;
-	boolean_t		promote_uupd_to_tupd = FALSE, receiver_supports_triggers, hasht_seen;
+	boolean_t		promote_uupd_to_tupd, receiver_supports_triggers, hasht_seen;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -1416,7 +1416,7 @@ int jnl_v24TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	uint4			jlen, tcom_num = 0, tupd_num = 0;
 	jrec_prefix 		*prefix;
 	uint4 			trigupd_type = NO_TRIG_JREC;
-	boolean_t		promote_uupd_to_tupd = FALSE;
+	boolean_t		promote_uupd_to_tupd;
 
 	jb = jnl_buff;
 	cb = conv_buff;
@@ -1530,7 +1530,7 @@ int jnl_v44TOv24(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	uint4			jlen, tcom_num = 0, tupd_num = 0;
 	jrec_prefix 		*prefix;
 	uint4 			trigupd_type = NO_TRIG_JREC;
-	boolean_t		promote_uupd_to_tupd = FALSE;
+	boolean_t		promote_uupd_to_tupd;
 
 	jb = jnl_buff;
 	cb = conv_buff;
@@ -1641,7 +1641,7 @@ int jnl_v44TOv44(uchar_ptr_t jnl_buff, uint4 *jnl_len, uchar_ptr_t conv_buff, ui
 	uint4			jlen, tcom_num = 0, tupd_num = 0;
 	jrec_prefix 		*prefix;
 	uint4 			trigupd_type = NO_TRIG_JREC;
-	boolean_t		promote_uupd_to_tupd = FALSE;
+	boolean_t		promote_uupd_to_tupd;
 
 	jb = jnl_buff;
 	cb = conv_buff;

@@ -71,7 +71,7 @@ void lke_clean(void)
 	mlk_shrsub_ptr_t	sub, sub2;
 	gd_region		*reg;
 	int			n;
-	boolean_t		was_crit = FALSE;
+	boolean_t		was_crit;
 	mlk_pvtblk		pvtblk;
 	DEBUG_ONLY(mlk_shrblk_ptr_t		blk);
 	struct timespec		start_clock, end_clock;

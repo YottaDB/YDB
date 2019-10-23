@@ -122,7 +122,7 @@ void unw_mv_ent(mv_stent *mv_st_ent)
 	socket_interrupt 	*sockintr;
 	socket_struct		*socketptr;
 	zintcmd_ops		zintcmd_command;
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t		prev_intrpt_state;
 	int4			event_type, param_val;
 	void (*set_fn)		(int4 param);
 	UNIX_ONLY(d_tt_struct	*tt_ptr;)

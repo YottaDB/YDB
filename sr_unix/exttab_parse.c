@@ -505,7 +505,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 	enum ydb_types			ret_tok, parameter_types[MAX_ACTUALS], pr;
 	FILE				*ext_table_file_handle;
 	int				fclose_res, i, keywordlen, len;
-	int				parameter_alloc_values[MAX_ACTUALS], parameter_count, ret_pre_alloc_val = 0;
+	int				parameter_alloc_values[MAX_ACTUALS], parameter_count, ret_pre_alloc_val;
 	mstr				callnam, clnuprtn, rtnnam, trans, val;
 	struct extcall_entry_list	*entry_ptr;
 	struct extcall_package_list	*pak;

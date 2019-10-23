@@ -61,7 +61,7 @@ void mval_write(zshow_out *output, mval *v, boolean_t flush)
 {
         sm_uc_ptr_t	cp;
 	uint4		ch;
-	int		fastate = 0, ncommas = 0, src_len, src_cnt, strstart, chlen;
+	int		fastate = 0, ncommas, src_len, src_cnt, strstart, chlen;
 	boolean_t	isctl, isill;
 	char		*strnext;
 	mval		*graphic_str, lmv;

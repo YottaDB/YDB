@@ -62,7 +62,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 {
 	int		temp_1;
 	char		*errptr;
-	int4		errlen = 0, last_errno, save_errno;
+	int4		errlen, last_errno, save_errno;
 	int		d_socket_struct_len, res, nfds, sockerror;
 	fd_set		writefds;
 	boolean_t	no_time_left = FALSE;

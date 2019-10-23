@@ -242,7 +242,7 @@ boolean_t	tp_tend()
 	boolean_t		is_mm, release_crit, x_lock, do_validation;
 	boolean_t		replication = FALSE, region_is_frozen;
 	boolean_t		supplementary = FALSE;	/* this variable is initialized ONLY if "replication" is TRUE. */
-	seq_num			strm_seqno = 0, next_strm_seqno = 0;
+	seq_num			strm_seqno, next_strm_seqno;
 	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		cr;
 	cw_set_element		*cse, *first_cw_set, *bmp_begin_cse;
@@ -255,7 +255,7 @@ boolean_t	tp_tend()
 	sgmnt_data_ptr_t	csd;
 	node_local_ptr_t	cnl;
 	srch_blk_status		*t1;
-	trans_num		ctn, oldest_hist_tn = 0, epoch_tn, old_block_tn;
+	trans_num		ctn, oldest_hist_tn, epoch_tn, old_block_tn;
 	trans_num		valid_thru;	/* buffers touched by this transaction will be valid thru this tn */
 	enum cdb_sc		status;
 	gd_region		*save_gv_cur_region;
@@ -267,8 +267,8 @@ boolean_t	tp_tend()
 	uint4			total_jnl_rec_size, in_tend;
 	uint4			lcl_update_trans;
 	jnlpool_addrs_ptr_t	save_jnlpool, update_jnlpool, local_jnlpool;
-	jnlpool_ctl_ptr_t	jpl = NULL;
-	boolean_t		read_before_image = FALSE; /* TRUE if before-image journaling or online backup in progress */
+	jnlpool_ctl_ptr_t	jpl;
+	boolean_t		read_before_image; /* TRUE if before-image journaling or online backup in progress */
 	blk_hdr_ptr_t		old_block;
 	unsigned int		bsiz;
 	cache_rec_ptr_t		*tp_cr_array;
@@ -276,8 +276,8 @@ boolean_t	tp_tend()
 	gv_namehead		*prev_target, *curr_target;
 	enum gds_t_mode		mode;
 	boolean_t		ss_need_to_restart, new_bkup_started;
-	seq_num			temp_jnl_seqno = 0;
-	jbuf_rsrv_struct_t	*jrs = NULL;
+	seq_num			temp_jnl_seqno;
+	jbuf_rsrv_struct_t	*jrs;
 #	ifdef DEBUG
 	char			upd_num_seen[256];
 	int			tmp_jnl_participants;
@@ -1916,7 +1916,7 @@ failed_skip_revert:
 enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 {
 	blk_segment		*bs1, *bs_ptr;
-	boolean_t		new_rec = FALSE;
+	boolean_t		new_rec;
 	cache_rec_ptr_t		cr;
 	char			*va;
 	enum cdb_sc		status;

@@ -61,10 +61,10 @@ int gtmsource_comm_init(void)
 	/* Initialize communication stuff */
 	struct addrinfo 	*ai_ptr = NULL, *ai_head = NULL, hints;
 	gtmsource_local_ptr_t   gtmsource_local;
-	intrpt_state_t  	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t  	prev_intrpt_state;
 	struct linger		disable_linger = {0, 0};
 	char			error_string[1024];
-	int			err_status = 0;
+	int			err_status;
 	char			*host;
 	char			port_buffer[NI_MAXSERV];
 	int			port_len;

@@ -92,7 +92,7 @@ error_def(ERR_CRYPTOPFAILED);
 {																\
 	int			errid;												\
 	const char		*errptr;											\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;							\
+	intrpt_state_t		prev_intrpt_state;										\
 																\
 	errid = ERRID;														\
 	assert(IS_CRYPTERR_MASK(errid));											\
@@ -219,7 +219,7 @@ MBSTART {															\
 /* Process specific initialization - dlopen libgtmcrypt.so and invoke gtmcrypt_init() */
 #define INIT_PROC_ENCRYPTION(RC)												\
 {																\
-	intrpt_state_t prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;								\
+	intrpt_state_t prev_intrpt_state;											\
 																\
 	RC = 0;															\
 	if (!gtmcrypt_initialized)												\
@@ -243,7 +243,7 @@ MBSTART {															\
 #define GTMCRYPT_INIT_BOTH_CIPHER_CONTEXTS(CSA, HASH, DB_PATH_LENGTH, DB_PATH, ENCRYPT_KEY_HANDLE, RC)				\
 {																\
 	gtm_string_t	hash_string, db_path_string;										\
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;								\
+	intrpt_state_t	prev_intrpt_state;											\
 																\
 	ENCRYPT_KEY_HANDLE = GTMCRYPT_INVALID_KEY_HANDLE;									\
 	if (gtmcrypt_initialized)												\
@@ -280,7 +280,7 @@ MBSTART {															\
 #define GTMCRYPT_INIT_CIPHER_CONTEXT(KEYNAME_LENGTH, KEYNAME, IV_LENGTH, IV, KEY_HANDLE, OPERATION, RC)				\
 {																\
 	gtm_string_t	keyname, iv;												\
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;								\
+	intrpt_state_t	prev_intrpt_state;											\
 																\
 	KEY_HANDLE = GTMCRYPT_INVALID_KEY_HANDLE;										\
 	if (gtmcrypt_initialized)												\
@@ -307,7 +307,7 @@ MBSTART {															\
 /* Safely remove the specified handle to a particular symmetric key. */
 #define GTMCRYPT_REMOVE_CIPHER_CONTEXT(KEY_HANDLE, RC)										\
 {																\
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;								\
+	intrpt_state_t	prev_intrpt_state;											\
 																\
 	RC = 0;															\
 	if (gtmcrypt_initialized && (GTMCRYPT_INVALID_KEY_HANDLE != KEY_HANDLE))						\
@@ -331,7 +331,7 @@ MBSTART {															\
 #define GTMCRYPT_HASH_GEN(CSA, FILENAME_LENGTH, FILENAME, KEY_PATH_LENGTH, KEY_PATH, HASH, RC)					\
 {																\
 	gtm_string_t	filename_string, hash_string, key_path_string;								\
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;								\
+	intrpt_state_t	prev_intrpt_state;											\
 																\
 	if (gtmcrypt_initialized)												\
 	{															\
@@ -456,7 +456,7 @@ MBSTART {															\
 {																\
 	int		i;													\
 	unsigned char	c;													\
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;								\
+	intrpt_state_t	prev_intrpt_state;											\
 																\
 	assert(INBUF);														\
 	if (gtmcrypt_initialized && (GTMCRYPT_INVALID_KEY_HANDLE != KEY_HANDLE))						\
@@ -500,7 +500,7 @@ MBSTART {															\
 #else
 #  define GTMCRYPT_ENCRYPT_DECRYPT_WITH_IV(CSA, KEY_HANDLE, INBUF, INBUF_LEN, OUTBUF, OPERATION, IV_MODE, IV, RC)		\
 {																\
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;								\
+	intrpt_state_t	prev_intrpt_state;											\
 	char		*gcedwiv_inbuf = (char *)(INBUF);									\
 																\
 	assert(gcedwiv_inbuf);													\
@@ -531,7 +531,7 @@ MBSTART {															\
 /* Shut down the encryption for this process. */
 #define GTMCRYPT_CLOSE														\
 {																\
-	intrpt_state_t prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;								\
+	intrpt_state_t prev_intrpt_state;											\
 																\
 	if (gtmcrypt_initialized)												\
 	{															\

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,7 @@ error_def(ERR_TEXT);
 void op_close(mval *v, mval *p)
 {
 	char		buf[MAX_TRANS_NAME_LEN];  /* buffer to hold translated name */
-	io_desc		*ciod = NULL;		/*  close io descriptor */
+	io_desc		*ciod;		/*  close io descriptor */
 	io_log_name	*l;
 	io_log_name	*prev;
 	io_log_name	*tl;		/* logical record for translated name */

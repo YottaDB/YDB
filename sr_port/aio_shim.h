@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,7 +28,7 @@
 #define AIO_SHIM_RETURN(AIOCBP, RET)	 	MBSTART { RET = aio_return(AIOCBP);} MBEND
 #define AIO_SHIM_ERROR(AIOCBP, RET)							\
 MBSTART {										\
-	intrpt_state_t		prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;					\
+	intrpt_state_t		prev_intrpt_state;					\
 											\
 	/* Defer interrupts around aio_error() to prevent pthread mutex deadlock. */	\
 	DEFER_INTERRUPTS(INTRPT_IN_AIO_ERROR, prev_intrpt_state);			\

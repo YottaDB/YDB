@@ -3,9 +3,6 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -38,7 +35,7 @@ int m_merge(void)
 	int		type;
 	boolean_t	used_glvn_slot;
 	mval		mv;
-	opctype 	put_oc = 0;
+	opctype 	put_oc;
 	oprtype 	mopr, control_slot;
 	triple		*obp, *ref, *restart, *s1, *sub, tmpchain;
 	DCL_THREADGBL_ACCESS;

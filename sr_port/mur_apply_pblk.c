@@ -3,9 +3,6 @@
  * Copyright (c) 2003-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries. *
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -72,7 +69,7 @@ error_def(ERR_ORLBKNOSTP);
 /* #GTM_THREAD_SAFE : The below function (mur_apply_pblk) is thread-safe */
 uint4 mur_apply_pblk(reg_ctl_list *rctl)
 {
-	boolean_t		was_holder = FALSE, apply_intrpt_pblk;
+	boolean_t		was_holder, apply_intrpt_pblk;
 	gd_region		*reg;
 	uint4			status;
 	jnl_ctl_list		*tmpjctl;
@@ -328,7 +325,7 @@ uint4 mur_apply_pblk(reg_ctl_list *rctl)
 /* #GTM_THREAD_SAFE : The below function (mur_output_pblk) is thread-safe */
 uint4 mur_output_pblk(reg_ctl_list *rctl)
 {
-	boolean_t		was_holder = FALSE;
+	boolean_t		was_holder;
 	jnl_ctl_list		*jctl;
 	file_control		*db_ctl;
 	struct_jrec_blk		pblkrec;

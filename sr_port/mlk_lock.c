@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,7 +83,7 @@ uint4 mlk_lock(mlk_pvtblk *p,
 	mlk_shrblk_ptr_t	d;
 	int			siz, retval, status;
 	uint4 old_gc;
-	boolean_t		blocked, was_crit = FALSE, added;
+	boolean_t		blocked, was_crit, added;
 	sgmnt_addrs		*csa;
 	connection_struct	*curr_entry;	/* for GT.CM GNP server */
 	DCL_THREADGBL_ACCESS;

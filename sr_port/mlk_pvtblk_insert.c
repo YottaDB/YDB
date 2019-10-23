@@ -34,7 +34,7 @@ GBLREF	bool		remlkreq;
 int mlk_pvtblk_insert(mlk_pvtblk *pblk)
 {
 	bool new;
-	mlk_pvtblk *temp, *inlist1, *inlist2, *save_store = NULL;
+	mlk_pvtblk *temp, *inlist1, *inlist2, *save_store;
 
 	if (pblk->pvtctl.region->dyn.addr->acc_meth == dba_cm)
 	{

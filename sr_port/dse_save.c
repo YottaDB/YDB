@@ -3,9 +3,6 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -43,7 +40,7 @@ error_def(ERR_DSEMAXBLKSAV);
 void dse_save(void)
 {
 	block_id	blk;
-	boolean_t	was_crit, was_hold_onto_crit = FALSE;
+	boolean_t	was_crit, was_hold_onto_crit;
 	cache_rec_ptr_t dummy_cr;
 	char		buff[MAX_COMMENT_LEN], *ptr, util_buff[MAX_UTIL_LEN];
 	int		i, j, util_len;

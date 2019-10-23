@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,7 +69,7 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	 */
 
 	uint4			cnt, lcnt ;
-        ssize_t			offset = 0;
+        ssize_t			offset ;
         trans_num 		max_tn, tmp_8byte;
 	INTPTR_T		bp_lo, bp_top, bp, cr_base, cr_top, bt_top_off, bt_base_off;
 	sm_uc_ptr_t		bptmp, bp_bmp;
@@ -84,12 +84,12 @@ boolean_t	wcs_verify(gd_region *reg, boolean_t expect_damage, boolean_t caller_i
 	cache_state_rec_ptr_t	cstt, cstt_prev;
 	sm_uc_ptr_t		jnl_buff_expected;
 	boolean_t		(*blkque_array)[] = NULL; /* TRUE indicates we saw the cr or bt of that array index */
-	int4			n_bts = 0;	/* a copy of csd->n_bts since it is used frequently in this routine */
+	int4			n_bts;	/* a copy of csd->n_bts since it is used frequently in this routine */
 	trans_num		dummy_tn;
 	int4			bml_status, in_wtstart, intent_wtstart, wcs_phase2_commit_pidcnt;
 	block_id		curbmp;
 	jnl_private_control	*jpc;
-	jnl_buffer_ptr_t	jbp = NULL;
+	jnl_buffer_ptr_t	jbp;
 #	ifdef DEBUG
 	mval			rand_lru;
 #	endif

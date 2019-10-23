@@ -211,7 +211,7 @@ void	mur_output_show()
 	int			rectype, size;
 	pini_list_struct	*plst;
 	ht_ent_int4 		*tabent, *topent;
-	boolean_t		first_time = TRUE, ok_to_show[NUM_SHW_TYPES], release_latch = FALSE;
+	boolean_t		first_time = TRUE, ok_to_show[NUM_SHW_TYPES], release_latch;
 	int			index;
 	jnl_proc_time		tmp_jpv_time;
 	multi_proc_shm_hdr_t	*mp_hdr;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */

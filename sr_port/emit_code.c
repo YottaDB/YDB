@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -145,7 +145,7 @@ void trip_gen(triple *ct)
 	oprtype		*saved_opr[MAX_ARGS];
 	uint4		oct;
 	short		tp;		/* template pointer */
-	const short	*tsp = NULL;		/* template short pointer */
+	const short	*tsp;		/* template short pointer */
 	triple		*ttp;		/* temp triple pointer */
 	int		irep_index;
 	oprtype		*irep_opr;
@@ -373,7 +373,7 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	boolean_t	oc_int;
 	oprtype		*opr;
 	triple		*ct;
-	int		cnt, cnttop, reg = 0, words_to_move, reg_offset, save_reg_offset, targ_reg;
+	int		cnt, cnttop, reg, words_to_move, reg_offset, save_reg_offset, targ_reg;
 	int		branch_idx, branch_offset, loop_top_idx, instr;
 
 	code_idx = 0;
@@ -859,7 +859,7 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 #ifndef __x86_64__ /* For x86_64, this is defined in emit_code_sp.c */
 void emit_jmp(uint4 branchop, short **instp, int reg)
 {
-	uint4 	branchop_opposite = 0;
+	uint4 	branchop_opposite;
 	int	src_reg;
 	int	skip_idx;
 	NON_RISC_ONLY(int tmp_code_idx;)
@@ -1054,7 +1054,7 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 	unsigned char	reg, op_mod, op_reg;
 	int		offset, immediate;
 	int		upper_idx, lower_idx;
-	triple		*ct = NULL;
+	triple		*ct;
 	int		low, extra, high;
 	unsigned int	save_inst, inst;
 	GTM64_ONLY(int	next_ptr_offset = 8;)
@@ -1680,7 +1680,7 @@ int get_arg_reg(void)
 /* VAX reg to local machine reg */
 int gtm_reg(int vax_reg)
 {
-	int	reg = 0;
+	int	reg;
 
 	switch (vax_reg & 0x0f)	/* mask out VAX register mode field */
 	{

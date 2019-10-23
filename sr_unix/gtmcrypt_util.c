@@ -230,7 +230,7 @@ int gc_mask_unmask_passwd(int nparm, gtm_string_t *in, gtm_string_t *out)
 {
 	char		tmp[GTM_PASSPHRASE_MAX], mumps_exe[YDB_PATH_MAX], hash_in[GTM_PASSPHRASE_MAX], hash[GTMCRYPT_HASH_LEN];
 	char 		*ptr, *mmap_addrs;
-	int		passwd_len, len, i, save_errno, fd = 0, have_hash, status;
+	int		passwd_len, len, i, save_errno, fd, have_hash, status;
 	struct stat	stat_info;
 
 	have_hash = FALSE;

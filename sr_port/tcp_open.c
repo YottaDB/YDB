@@ -73,7 +73,7 @@ int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /
 	char			temp_addr[SA_MAXLEN + 1], addr[SA_MAXLEN + 1];
 	char 			*from, *to, *errptr, *temp_ch;
 	char			ipname[SA_MAXLEN];
-	int			match, sock = 0, sendbufsize, ii, on = 1, temp_1 = -2;
+	int			match, sock, sendbufsize, ii, on = 1, temp_1 = -2;
 	GTM_SOCKLEN_TYPE	size;
 	int4                    rv, msec_timeout;
 	struct addrinfo		*ai_ptr = NULL, *remote_ai_ptr, *remote_ai_head, hints;

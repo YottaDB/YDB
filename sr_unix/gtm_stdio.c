@@ -68,7 +68,7 @@ int gtm_fprintf(FILE *stream, const char *format, ...)
 	size_t		retval, buflen, retlen;
 	sigset_t	savemask;
 	char		*buf, tmpbuf[256];
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	retval = 0;
 	va_start(printargs, format);

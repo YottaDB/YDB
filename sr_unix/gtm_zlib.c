@@ -56,7 +56,7 @@ void gtm_zlib_init(void)
 	int		findx;
 	void		*fptr;
 	char 		librarypath[GTM_PATH_MAX], *lpath = NULL;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	assert(ydb_zlib_cmp_level);
 #ifdef _AIX

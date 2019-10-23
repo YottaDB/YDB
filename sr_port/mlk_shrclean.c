@@ -54,7 +54,7 @@ void mlk_shrclean(mlk_pvtctl_ptr_t pctl)
 {
 	pid_t pid_table[PROC_TABLE_SIZE];
 	char dead_table[PROC_TABLE_SIZE];
-	boolean_t	was_crit = FALSE;
+	boolean_t	was_crit;
 
 	was_crit = LOCK_CRIT_HELD(pctl->csa);
 	assert(was_crit);

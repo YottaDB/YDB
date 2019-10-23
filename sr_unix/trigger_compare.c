@@ -214,14 +214,14 @@ boolean_t search_triggers(char *trigvn, int trigvn_len, char **values, uint4 *va
 	boolean_t		have_value;
 	mval			key_val;
 	int4			len;
-	boolean_t		multi_record, kill_cmp = FALSE, first_match_kill_cmp;
+	boolean_t		multi_record, kill_cmp, first_match_kill_cmp;
 	mval			mv_hash;
 	mval			mv_trig_indx;
 	boolean_t		match, first_match;
 	char			*ptr, *ptr2;
 	int			sub_indx;
 	int			trig_hash_index;
-	int			trig_index = 0;
+	int			trig_index;
 	char			*xecute_buff;
 	int4			xecute_len;
 	unsigned char		util_buff[MAX_TRIG_UTIL_LEN];	/* needed for HASHT_GVN_DEFINITION_RETRY_OR_ERROR macro */

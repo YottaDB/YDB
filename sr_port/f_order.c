@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017, 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,10 +41,10 @@ int f_order(oprtype *a, opctype op)
 	enum order_dir	direction;
 	enum order_obj	object;
 	int4		intval;
-	opctype		gv_oc = 0;
+	opctype		gv_oc;
 	oprtype		control_slot, dir_opr, *dir_oprptr, *next_oprptr;
 	short int	column;
-	triple		*oldchain, *r, *sav_dirref, *sav_gv1 = NULL, *sav_gvn = NULL, *sav_lvn, *sav_ref, *triptr;
+	triple		*oldchain, *r, *sav_dirref, *sav_gv1, *sav_gvn, *sav_lvn, *sav_ref, *triptr;
 	triple		*chain2, *obp, tmpchain2;
 	save_se		save_state;
 	static opctype order_opc[LAST_OBJECT][LAST_DIRECTION] =

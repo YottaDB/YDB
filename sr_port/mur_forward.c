@@ -188,7 +188,7 @@ int	mur_forward_multi_proc_init(reg_ctl_list *rctl)
 
 int	mur_forward_multi_proc(reg_ctl_list *rctl)
 {
-	boolean_t		multi_proc, this_reg_stuck, release_latch = FALSE, ok_to_play;
+	boolean_t		multi_proc, this_reg_stuck, release_latch, ok_to_play;
 	boolean_t		cancelled_dbsync_timer;
 	reg_ctl_list		*rctl_top, *prev_rctl;
 	jnl_ctl_list		*jctl;
@@ -207,12 +207,12 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 	shm_forw_multi_t	*sfm;
 	multi_struct 		*multi;
 	jnl_tm_t		adjusted_resolve_time;
-	shm_reg_ctl_t		*shm_rctl_start = NULL, *shm_rctl, *first_shm_rctl;
+	shm_reg_ctl_t		*shm_rctl_start, *shm_rctl, *first_shm_rctl;
 	size_t			shm_size, reccnt, copy_size;
 	int4			*size_ptr;
 	char			*shmPtr; /* not using "shm_ptr" since it is already used in an AIX include file */
 	int			shmid;
-	multi_proc_shm_hdr_t	*mp_hdr = NULL;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */
+	multi_proc_shm_hdr_t	*mp_hdr;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -885,7 +885,7 @@ void mur_shm_forw_token_add(forw_multi_struct *forw_multi, reg_ctl_list *rctl, b
 	shm_forw_multi_t	*sfm;
 	que_ent_ptr_t		hash_start, hash_elem, free_elem;
 	gtm_uint64_t		hash;
-	boolean_t		found, release_latch = FALSE;
+	boolean_t		found, release_latch;
 	int			hash_index, num_reg_seen_forward;
 	shm_reg_ctl_t		*shm_rctl_start, *shm_rctl;
 	int			rctl_index;
@@ -998,7 +998,7 @@ void mur_shm_forw_token_remove(reg_ctl_list *rctl)
 	que_ent_ptr_t		que_ent;
 	shm_reg_ctl_t		*shm_rctl_start, *shm_rctl;
 	int			rctl_index;
-	boolean_t		release_latch = FALSE;
+	boolean_t		release_latch;
 #	ifdef MUR_DEBUG
 	int			num_procs_start;
 #	endif

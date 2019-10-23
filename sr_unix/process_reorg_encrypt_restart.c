@@ -3,9 +3,6 @@
  * Copyright (c) 2015-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -29,7 +26,7 @@ GBLREF	uint4		update_trans;
 
 void process_reorg_encrypt_restart(void)
 {
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 	enc_info_t	*encr_ptr;
 	int		gtmcrypt_errno;
 	gd_segment	*seg;

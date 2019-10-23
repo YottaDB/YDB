@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,7 +57,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	jnl_private_control	*jpc;
 	jnl_buffer_ptr_t	jb;
 	uint4			lcnt, saved_dsk_addr, saved_status;
-	sgmnt_addrs		*csa = NULL;
+	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
 	int4			lck_state;
 	int			fsync_ret, save_errno;

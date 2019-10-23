@@ -3,9 +3,6 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
- * All rights reserved.						*
- *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -53,7 +50,7 @@ boolean_t dse_b_dmp(void)
 {
 	cache_rec_ptr_t cr;
 	block_id	blk;
-	boolean_t	free, invalid_bitmap = FALSE, is_mm, was_crit, was_hold_onto_crit = FALSE;
+	boolean_t	free, invalid_bitmap = FALSE, is_mm, was_crit, was_hold_onto_crit;
 	enum db_ver	ondsk_blkver;
 	int4		bplmap, count, dummy_int, head, iter1, iter2, len, lmap_num, mapsize, nocrit_present, util_len;
 	sm_uc_ptr_t	bp, b_top, mb, rp;

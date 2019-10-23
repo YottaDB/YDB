@@ -113,7 +113,7 @@
 /* #GTM_THREAD_SAFE : The below macro (MALLOC) is thread-safe because caller ensures serialization with locks */
 #  define MALLOC(size, addr)											\
 {														\
-	intrpt_state_t  prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;						\
+	intrpt_state_t  prev_intrpt_state;									\
 														\
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);									\
 	if (!ydbSystemMalloc											\
@@ -459,7 +459,7 @@ void gtmSmInit(void)	/* Note renamed to gtmSmInit_dbg when included in gtm_mallo
 	char		*ascNum;
 	storElem	*uStor;
 	int		i, sizeIndex, testSize, blockSize, save_errno;
-	intrpt_state_t  prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t  prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -658,8 +658,8 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 	gtm_msize_t	tSize;
 	int		sizeIndex, i, hdrSize;
 	unsigned char	*trailerMarker;
-	boolean_t	reentered, was_holder = FALSE;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	boolean_t	reentered, was_holder;
+	intrpt_state_t	prev_intrpt_state;
 	void		*rval;
 
 	if (ydbSystemMalloc)
@@ -838,8 +838,8 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 	unsigned char	*trailerMarker;
 	int 		sizeIndex, hdrSize, saveIndex, dqIndex, freedElemCnt;
 	gtm_msize_t	saveSize, allocSize;
-	boolean_t	was_holder = FALSE;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	boolean_t	was_holder;
+	intrpt_state_t	prev_intrpt_state;
 
 	if (ydbSystemMalloc)
 	{
@@ -1072,7 +1072,7 @@ void release_unused_storage(void)	/* Note renamed to release_unused_storage_dbg 
 void raise_gtmmemory_error(void)	/* Note renamed to raise_gtmmemory_error_dbg when included in gtm_malloc_dbg.c */
 {
 	void		*addr;
-	boolean_t	was_holder = FALSE;
+	boolean_t	was_holder;
 
 	assert(IS_PTHREAD_LOCKED_AND_HOLDER);
 #	ifndef DEBUG
@@ -1454,8 +1454,8 @@ void printMallocDump(void)
 void *system_malloc(size_t size)
 {
 	void		*rval;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
-	boolean_t	was_holder = FALSE;
+	intrpt_state_t	prev_intrpt_state;
+	boolean_t	was_holder;
 
 	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 	rval = malloc(size);
@@ -1470,7 +1470,7 @@ void *system_malloc(size_t size)
 
 void system_free(void *addr)
 {
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 
 	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 	free(addr);

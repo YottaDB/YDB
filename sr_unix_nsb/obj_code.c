@@ -96,7 +96,7 @@ void	obj_code (uint4 src_lines, void *checksum_ctx)
 	mline		*mlx, *mly;
 	var_tabent	*vptr;
 	int4		lnr_pad_len;
-	intrpt_state_t	prev_intrpt_state = INTRPT_OK_TO_INTERRUPT;
+	intrpt_state_t	prev_intrpt_state;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@ static void ss_print_fil_hdr(snapshot_filhdr_ptr_t);
 
 void	ss_anal_shdw_file(char	*filename, int flen)
 {
-	int			shdw_fd, bitmap_size, shadow_vbn, word, bit, num = 0, tot_blks;
+	int			shdw_fd, bitmap_size, shadow_vbn, word, bit, num, tot_blks;
 	int			status, db_blk_size;
 	off_t			blk_offset;
 	snapshot_filhdr_t	ss_filhdr;

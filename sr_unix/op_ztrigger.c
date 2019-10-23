@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -119,7 +119,7 @@ void op_ztrigger(void)
 	sgmnt_addrs			*csa;
 	sgmnt_data_ptr_t		csd;
 	enum cdb_sc			cdb_status;
-	jnl_format_buffer		*jfb = NULL, *ztworm_jfb;
+	jnl_format_buffer		*jfb, *ztworm_jfb;
 	uint4				nodeflags;
 	boolean_t			write_logical_jnlrecs, jnl_format_done;
 	boolean_t			is_tpwrap;
@@ -132,7 +132,7 @@ void op_ztrigger(void)
 	int				gtm_trig_status, rc;
 	unsigned int			idx;
 	unsigned char			*save_msp;
-	mv_stent			*save_mv_chain = NULL;
+	mv_stent			*save_mv_chain;
 #	ifdef DEBUG
 	boolean_t			is_mm;
 	GTMTRIG_ONLY(enum cdb_sc	save_cdb_status;)
