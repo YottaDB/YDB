@@ -305,8 +305,10 @@ void obj_code (uint4 src_lines, void *checksum_ctx)
 	 * ensuring object file timestamp is greater than source file timestamp.
 	 * But if we are compiling a trigger, we create a temporary .m and .o file and are going to delete both soon after
 	 * the compilation so do not waste time sleeping (and slowing down trigger compiles) in that case.
+	 * Also, if env var $ydb_recompile_newer_src has been set to TRUE, then it is okay for the .o and .m files
+	 * to have the same timestamp. So skip this step.
 	 */
-	if (!TREF(trigger_compile_and_link))
+	if (!TREF(trigger_compile_and_link) && !TREF(ydb_recompile_newer_src))
 	{
 		STAT_FILE((char *)source_file_name, &src_stat, status);
 		if (0 == status)

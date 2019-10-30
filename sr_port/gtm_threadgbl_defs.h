@@ -540,6 +540,7 @@ THREADGBLAR1DEF(ydbmsgprefixbuf,		char,	32)	/* The message prefix buffer size is
 								 */
 THREADGBLDEF(ydbmsgprefix,			mstr)		/* mstr pointing to msgprefixbuf containing the YDB prompt */
 THREADGBLDEF(trig_forced_unwind,		boolean_t)	/* set/used by "gtm_trigger_fini", "op_unwind" and "unw_mv_ent" */
+THREADGBLDEF(ydb_recompile_newer_src,		boolean_t)	/* set based on env var `ydb_recompile_newer_src` */
 
 /* Debug values */
 #ifdef DEBUG

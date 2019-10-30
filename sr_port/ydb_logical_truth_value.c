@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,7 +45,7 @@ boolean_t ydb_logical_truth_value(ydbenvindx_t envindx, boolean_t negate, boolea
 	tn.addr = buf;
 	if (NULL != is_defined)
 		*is_defined = FALSE;
-	if (SS_NORMAL == (status = ydb_trans_log_name(envindx, &tn, buf, SIZEOF(buf), dont_sendmsg_on_log2long, NULL)))
+	if (SS_NORMAL == (status = ydb_trans_log_name(envindx, &tn, buf, SIZEOF(buf), IGNORE_ERRORS_TRUE, NULL)))
 	{
 		if (NULL != is_defined)
 			*is_defined = TRUE;
@@ -73,10 +73,7 @@ boolean_t ydb_logical_truth_value(ydbenvindx_t envindx, boolean_t negate, boolea
 		}
 	} else
 	{
-		assert(SS_NOLOGNAM == status); /* Because any other status code would have caused an "rts_error"
-						* to have been done inside "ydb_trans_log_name" which meant
-						* control would have not gotten back to this caller code.
-						*/
+		assert((SS_NOLOGNAM == status) || (SS_LOG2LONG == status));
 		return (FALSE);
 	}
 }

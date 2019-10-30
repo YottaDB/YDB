@@ -444,19 +444,26 @@ void op_zlink (mval *v, mval *quals)
 						rts_error_csa(CSA_ARG(NULL)VARLSTCNT(8) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
 							ERR_TEXT, 2, LEN_AND_STR(err_code));
 					}
-					if (!IS_STAT1_MTIME_OLDER_THAN_STAT2(src_stat, obj_stat))
-					{	/* src_stat.mtim is newer than or equal to obj_stat.mtime.
-						 * If src is newer than object, we have to recompile it.
-						 * If src is equal to object, it is an unusual scenario since as part of object
-						 *	file generation we ensure the object file timestamp is newer than the
-						 *	source file. Examples of this scenario are where a .m and .o exist and
-						 *	the .m is copied over from another .m (so the new .m and pre-existing .o
-						 *	do not match in contents and a recompile is needed). In this case, we
-						 *	err on the side of caution and recompile.
-						 */
+					/* Check if recompile is needed.
+					 * a) If $ydb_recompile_newer_src env var is not set to TRUE, then we check if
+					 *	src_stat.mtim is newer than or equal to obj_stat.mtime.
+					 *    If src is newer than object, we have to recompile it.
+					 *    If src is equal to object, it is an unusual scenario since as part of object
+					 *	file generation we ensure the object file timestamp is newer than the
+					 *	source file. Examples of this scenario are where a .m and .o exist and
+					 *	the .m is copied over from another .m (so the new .m and pre-existing .o
+					 *	do not match in contents and a recompile is needed). In this case, we
+					 *	err on the side of caution and recompile.
+					 * b) If $ydb_recompile_newer_src env var is set to TRUE, then we check if
+					 *	src_stat.mtim is newer than obj_stat.mtime (we skip the case if they are equal).
+					 *	Only in that case, we recompile it.
+					 */
+					compile = ((!TREF(ydb_recompile_newer_src)
+								&& !IS_STAT1_MTIME_OLDER_THAN_STAT2(src_stat, obj_stat))
+							|| (TREF(ydb_recompile_newer_src)
+								&& IS_STAT1_MTIME_OLDER_THAN_STAT2(obj_stat, src_stat)));
+					if (compile)
 						CLOSE_OBJECT_FD(object_file_des, status);
-						compile = TRUE;
-					}
 				} else
 				{
 					compile = TRUE;
