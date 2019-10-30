@@ -118,7 +118,7 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 	ctrlc_action.sa_sigaction = ctrlc_handler;
 	cont_action.sa_sigaction = continue_handler;
 	/* Save the current handler for each signal in orig_sig_action[] array indexed by the signal number */
-	for (sig = 1; sig <= NSIG; sig++)
+	for (sig = 1; sig <= (NSIG - 1); sig++)
 	{
 		sigaction(sig, NULL, &orig_sig_action[sig]);	/* Save original handler */
 #		ifdef DEBUG_SIGNAL_HANDLING
@@ -210,6 +210,10 @@ void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_
 			case SIGTRAP:
 				/* These are all being handled by the generic_signal_handler. */
 				sigaction(sig, &gen_action, NULL);
+				break;
+			case SIGKILL:
+			case SIGSTOP:
+				/* As SIGKILL and SIGSTOP cannot be caught, we are bypassing them. */
 				break;
 			default:
 				/* If we are in call-in/simpleAPI mode and a non-default handler is installed, leave it
