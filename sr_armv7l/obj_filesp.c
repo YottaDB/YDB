@@ -57,14 +57,6 @@
 #include "release_name.h"
 #include "min_max.h"
 
-/* The following definitions are required for the new(for ELF files) create/close_obj_file.c functions */
-#ifdef __linux__
-#define ELF64_LINKER_FLAG       0x10
-#else
-#define ELF64_LINKER_FLAG       0x18
-#endif /* __linux__ */
-
-
 /* Platform specific action instructions when routine called from foreign language. Returns -1 to caller */
 #define MIN_LINK_PSECT_SIZE     0
 LITDEF mach_inst jsb_action[JSB_ACTION_N_INS] = {0xe30f0fff, 0xe34f0fff, 0xe12fff1e};
@@ -151,7 +143,7 @@ void finish_object_file(void)
         Elf32_Shdr	*shdr, *text_shdr, *symtab_shdr, *strtab_shdr;
         Elf_Scn		*text_scn, *symtab_scn, *strtab_scn;
         Elf_Data	*text_data, *symtab_data, *strtab_data;
-        Elf32_Sym	symEntries[3];
+        Elf32_Sym	symEntries[YDB_HIGHSYM_INDX_P1];	/* Max symbol table index plus 1 */
 	char		errbuff[128];
 
         buff_flush();
@@ -217,12 +209,12 @@ void finish_object_file(void)
         ehdr->e_ident[EI_VERSION] = EV_CURRENT;
         ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
         ehdr->e_ident[EI_OSABI] = ELFOSABI_SYSV;
-        ehdr->e_ident[EI_ABIVERSION] = 0;
+        ehdr->e_ident[EI_ABIVERSION] = 0;	/* No ABI version info defined for LINUX */
         ehdr->e_type = ET_REL;
         ehdr->e_machine = EM_ARM;
         ehdr->e_version = EV_CURRENT;
 	ehdr->e_shoff = ROUND_UP2(SIZEOF(Elf32_Ehdr), SECTION_ALIGN_BOUNDARY);
-        ehdr->e_flags = EF_ARM_EABI_VER5;
+        ehdr->e_flags = EF_ARM_EABI_VER5;	/* Allows 32 bit executable to run under aarch64 */
 
         if (NULL == (text_scn = elf_newscn(elf)))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
@@ -310,6 +302,7 @@ void finish_object_file(void)
         symtab_shdr->sh_type = SHT_SYMTAB;
         symtab_shdr->sh_entsize = SIZEOF(Elf32_Sym);
         symtab_shdr->sh_link = SEC_STRTAB_INDX;
+	symtab_shdr->sh_info = YDB_HIGHSYM_INDX_P1;	/* Highest symtab index used + 1 */
         elf_flagehdr(elf, ELF_C_SET, ELF_F_DIRTY);
         if (0 > elf_update(elf, ELF_C_WRITE))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
