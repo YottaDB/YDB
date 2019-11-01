@@ -98,6 +98,11 @@ endif()
 # largely unusable are fixed.
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wmaybe-uninitialized -Wreturn-type -Wpointer-sign")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wno-maybe-uninitialized -Wreturn-type -Wpointer-sign")
+# gcc 6.3.0 is known to have -Wmisleading-indentation. And gcc 4.8.5 is known to not have that.
+# Not sure what the intermediate versions support so we add this warning flag only for versions >= 6.3.0
+if(${CMAKE_C_COMPILER_VERSION} STRGREATER "6.3.0")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wmisleading-indentation")
+endif()
 # Add flags for warnings that we want and don't want.
 # First enable Wall. That will include a lot of warnings. In them, disable a few. Below is a comment from sr_linux/gtm_env_sp.csh
 # on why these warnings specifically are disabled.
