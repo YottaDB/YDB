@@ -18,12 +18,12 @@
 #include <rtnhdr.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 #include <obj_filesp.h>	/* see HDR_FILE_INCLUDE_SYNTAX comment in mdef.h for why <> syntax is needed */
 
-/* YottaDB objects define 3 symbols in the symbol table. The Elf64_shdr->sh_info field we fill in during object
- * creation is documented to be one more than the highest symbol table index used. In our case, the highest
- * index (0 based) is 2 so we set the sh_info field to 3. This define provides the value to use both for
- * the sh_info field and the dimension of the symbol table array (symEntries[]).
+/* YottaDB objects define 2 local symbols in the symbol table. The Elf64_shdr->sh_info field we fill in
+ * during object creation is documented to be ONE MORE than the highest local symbol table index used.
+ * In our case, the highest local symbol index (0 based) is 1 so we set the sh_info field to 2. This
+ * define provides the value to use for sh_info on all platforms.
  */
-#define YDB_HIGHSYM_INDX_P1 (2 + 1)
+#define YDB_MAX_LCLSYM_INDX_P1 (1 + 1)
 
 #define OUTPUT_SYMBOL_SIZE (SIZEOF(int4) + sym_table_size)
 #define PADCHARS	"PADDING PADDING"
