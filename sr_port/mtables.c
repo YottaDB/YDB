@@ -479,7 +479,9 @@ LITDEF mstr chset_names[CHSET_MAX_IDX_ALL] =
 	{8, 8, "UTF-16BE"},
 	{5, 5, "ASCII"},
 	{6, 6, "EBCDIC"},
-	{6, 6, "BINARY"}
+	{6, 6, "BINARY"},
+	{3, 3, "DEC"},
+	{3, 3, "HEX"}
 };
 /* This array holds the ICU converter handles corresponding to the respective
  * CHSET name in the table chset_names[]

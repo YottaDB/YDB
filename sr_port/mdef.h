@@ -1769,6 +1769,8 @@ typedef enum
 	CHSET_ASCII,
 	CHSET_EBCDIC,
 	CHSET_BINARY,
+	CHSET_DEC,
+	CHSET_HEX,
 	CHSET_MAX_IDX_ALL	/* maximum number of CHSETs supported */
 } gtm_chset_t;
 

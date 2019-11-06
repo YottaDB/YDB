@@ -60,6 +60,7 @@ INVTPTRANS	<Invalid TP transaction - either invalid TP token or transaction not 
 THREADEDAPINOTALLOWED	<Process cannot switch to using threaded Simple API while already using Simple API>/error/fao=0
 SIMPLEAPINOTALLOWED	<Process cannot switch to using Simple API while already using threaded Simple API>/error/fao=0
 STAPIFORKEXEC	<Calls to YottaDB are not supported after a fork() if threaded Simple API functions were in use in parent. Call exec() first>/error/fao=0
+INVVALUE	<Invalid !AD value for !AD : !AD >/error/fao=6
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

@@ -48,6 +48,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "THREADEDAPINOTALLOWED", "Process cannot switch to using threaded Simple API while already using Simple API", 0 },
 	{ "SIMPLEAPINOTALLOWED", "Process cannot switch to using Simple API while already using threaded Simple API", 0 },
 	{ "STAPIFORKEXEC", "Calls to YottaDB are not supported after a fork() if threaded Simple API functions were in use in parent. Call exec() first", 0 },
+	{ "INVVALUE", "Invalid !AD value for !AD : !AD ", 6 },
 };
 
 
@@ -60,7 +61,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	31,
+	32,
 	&ydberrors_undocarr[0],
 	0
 };
