@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -910,7 +910,7 @@ void	gvtr_db_read_hasht(sgmnt_addrs *csa)
 			}
 			/* Initialize trigdsc->numsubs */
 			assert(numsubs);
-			assert(MAX_GVSUBSCRIPTS > numsubs);
+			assert(MAX_GVSUBSCRIPTS >= numsubs);
 			trigdsc->numsubs = numsubs;
 			/* Allocate trigdsc->subsarray */
 			trigdsc->subsarray = (gvtr_subs_t *)get_new_element(gvt_trigger->gv_trig_list,

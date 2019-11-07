@@ -113,7 +113,7 @@ GDEINIT
 	s SIZEOF("mident")=32
 	s SIZEOF("reg_jnl_deq")=4
 	s SIZEOF("rec_hdr")=4	;GTM-6941
-	s MAXGVSUBS=31						; needs to be equal to (MAX_GVSUBSCRIPTS-1) in mdef.h at all times
+	s MAXGVSUBS=31						; needs to be equal to (MAX_GVSUBSCRIPTS) in mdef.h at all times
 	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32	; maximum name length allowed is 31 characters
 	s MAXSTRLEN=(2**20)					; needs to be equal to MAX_STRLEN in mdef.h at all times
 	s (PARNAMLN,PARREGLN,PARSEGLN)=MAXNAMLN

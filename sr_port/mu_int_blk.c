@@ -567,7 +567,7 @@ boolean_t mu_int_blk(
 					{
 						for (;  (mu_sub_list[s_index].index < (short int)rec_cmpc - 1) &&
 								mu_sub_list[s_index].index > 0;)
-							if (MAX_GVSUBSCRIPTS <= s_index++)
+							if (MAX_GVSUBSCRIPTS < s_index++)
 								break;
 						if (s_index)
 							s_index--;
@@ -590,10 +590,10 @@ boolean_t mu_int_blk(
 						for (;  buff[b_index];  b_index++)
 							;
 						b_index++;
-						if (MAX_GVSUBSCRIPTS <= s_index++)
+						if (MAX_GVSUBSCRIPTS < s_index++)
 							break;
 					}
-					if (MAX_GVSUBSCRIPTS < s_index)
+					if (MAX_GVSUBSCRIPTS < (s_index - 1))
 					{
 						mu_int_err(ERR_DBMAXNRSUBS, TRUE, TRUE, buff,
 							comp_length, top_key, top_len, (unsigned int)blk_levl);

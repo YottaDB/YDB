@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -80,9 +80,9 @@ void op_gvnaked_fast(UNIX_ONLY_COMMA(int count_arg) int hash_code_dummy, mval *v
 
 STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg, va_list var)
 {
-	boolean_t	was_null, is_null, sbs_cnt;
+	boolean_t	was_null, is_null;
 	mval		*val;
-	int		max_key;
+	int		max_key, sbs_cnt;
 	unsigned char	*ptr, *end_ptr;
 	gd_region	*reg, *reg_start, *reg_top;
 	gd_addr		*addr_ptr;
@@ -103,7 +103,7 @@ STATICFNDEF void op_gvnaked_common(int count, int hash_code_dummy, mval *val_arg
 		while (ptr < end_ptr)
 			if (KEY_DELIMITER == *ptr++)
 				sbs_cnt++;
-		if (MAX_GVSUBSCRIPTS < (count + sbs_cnt))
+		if (MAX_GVSUBSCRIPTS < (count + sbs_cnt - 1))
 		{
 			gv_currkey->end = 0;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);

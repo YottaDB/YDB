@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -407,7 +407,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 				}
 				is_gvt = TRUE;	/* no need to do this if it was already TRUE but we save an if check */
 			}
-			if (MAX_GVSUBSCRIPTS <= num_subscripts)
+			if (MAX_GVSUBSCRIPTS < num_subscripts)
 			{
 				RTS_ERROR_FUNC(csa, ERR_DBMAXNRSUBS, util_buff, error_action);
 				return FALSE;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,6 +23,8 @@
 #include "show_source_line.h"
 #include "hashtab_mname.h"
 
+
+
 GBLREF	boolean_t	run_time;
 
 error_def(ERR_EXPR);
@@ -39,7 +41,8 @@ int gvn(void)
 	char		x;
 	int		hash_code;
 	opctype		ox;
-	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS + 1];
+	/* The subscripts array needs to be 2 larger than max subscripts to actually hold the maximum number of subscripts */
+	oprtype		*sb1, *sb2, subscripts[MAX_GVSUBSCRIPTS + 2];
 	triple		*oldchain, *ref, *s, tmpchain, *triptr;
 	DCL_THREADGBL_ACCESS;
 

@@ -1851,9 +1851,9 @@ enum
 	LVNULLSUBS_NEVER,	/* LVNULLSUBS_NO plus LV subscripts prohibited in $DATA, $GET, $ORDER, $QUERY, KILL, etc */
 	LVNULLSUBS_LAST
 };
-#define MAX_GVSUBSCRIPTS 32
-#define MAX_LVSUBSCRIPTS 32
-#define MAX_INDSUBSCRIPTS 32
+#define MAX_GVSUBSCRIPTS 31
+#define MAX_LVSUBSCRIPTS 31
+#define MAX_INDSUBSCRIPTS 31
 #define MAX_FOR_STACK 32
 
 #define PUSH_PARM_OVERHEAD	4	/* This extra space in the array is needed because push_parm() is capable of handling 32

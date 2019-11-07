@@ -47,7 +47,7 @@ GBLREF	volatile boolean_t	timer_in_handler;
 #define MAX_PIECE_VALUE		((BITS_PER_INT * 1024) - 1)	/* Largest value allowed in -pieces string */
 #define MAX_PIECE_INT		((MAX_PIECE_VALUE + 1) / 32)	/* Number of integers it takes to hold MAX_PIECE_VALUE bits */
 #define	MAX_PIECE_CHARS		(MAX_PIECE_INT * 4)		/* Number of 8-bit bytes in MAX_PIECE_INT integers */
-#define MAX_LVN_COUNT		MAX_GVSUBSCRIPTS	/* Maximum number of "lvn=" in trigger subscript */
+#define MAX_LVN_COUNT		(MAX_GVSUBSCRIPTS + 1)	/* Maximum number of "lvn=" in trigger subscript */
 #define MAX_OPTIONS_LEN		1024			/* Maximum size of the "options" string */
 #define MAX_DCHAR_LEN		1024			/* Maximum size of $C or $ZCH string */
 #define MAX_DELIM_LEN		1024			/* Maximum size of the string for a delimiter - $C, $ZCH, "x", ... */
@@ -1012,7 +1012,7 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 						util_out_print_gtmio("Empty subscript not allowed", FLUSH);
 						return FALSE;
 					}
-					if (MAX_GVSUBSCRIPTS <= ++subsc_count)
+					if (MAX_GVSUBSCRIPTS < ++subsc_count)
 					{
 						util_out_print_gtmio("Too many subscripts", FLUSH);
 						return FALSE;
@@ -1044,7 +1044,8 @@ STATICFNDEF boolean_t process_subscripts(char *subscr_str, uint4 *subscr_len, ch
 		util_out_print_gtmio("Empty subscript not allowed", FLUSH);
 		return FALSE;
 	}
-	if ((')' == *ptr) && (MAX_GVSUBSCRIPTS <= ++subsc_count))
+	/* must be incremented before the check or the too many subscripts trigger will fail to produce an error */
+	if ((')' == *ptr) && (MAX_GVSUBSCRIPTS < ++subsc_count))
 	{
 		util_out_print_gtmio("Too many subscripts", FLUSH);
 		return FALSE;

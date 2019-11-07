@@ -1001,7 +1001,7 @@ STATICFNDEF void parse_gvn(mval *gvn)
 				continue;
 			}
 			spt->str.len = INTCAST(mpsp - spt->str.addr);
-			if (MAX_GVSUBSCRIPTS <= count)
+			if (MAX_GVSUBSCRIPTS < count)
 				MPROF_RTS_ERROR((CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS));
 			(TREF(mprof_ptr))->gvargs.args[count++] = spt++;
 			if (',' != *c_ref)

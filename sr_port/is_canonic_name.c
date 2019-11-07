@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -132,7 +132,7 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 	subs_count = -1;
 	*contains_env = 0;
 	subs_max = gvn ? MAX_GVSUBSCRIPTS : MAX_LVSUBSCRIPTS;
-	for (isrc = 0; (isrc < src->str.len) && (subs_count < subs_max);)
+	for (isrc = 0; (isrc < src->str.len) && (subs_count <= subs_max);)
 	{
 		letter = src->str.addr[isrc];
 		switch (state)
@@ -398,7 +398,7 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 		subs_count = 0;
 		*stop = isrc;
 	}
-	assert((('^' == src->str.addr[0]) ? MAX_GVSUBSCRIPTS : MAX_LVSUBSCRIPTS) > subs_count);
+	assert((('^' == src->str.addr[0]) ? MAX_GVSUBSCRIPTS : MAX_LVSUBSCRIPTS) >= subs_count);
 	assert((0 < isrc) && (isrc == src->str.len));
 	*subscripts = subs_count;
 	return TRUE;

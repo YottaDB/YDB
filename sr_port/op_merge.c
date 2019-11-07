@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -426,7 +426,7 @@ void op_merge(void)
 				do
 				{
 					LV_SBS_DEPTH(dst_lv, is_base_var, sbs_depth);
-					if ((MAX_LVSUBSCRIPTS - 1) <= sbs_depth)
+					if (MAX_LVSUBSCRIPTS <= sbs_depth)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_MERGEINCOMPL, 0, ERR_MAXNRSUBSCRIPTS);
 					opstr.addr = (char *)buff;
 					opstr.len = MAX_ZWR_KEY_SZ;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -210,7 +210,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 				/* make sure another subscript will fit */
 				is_base_var = LV_IS_BASE_VAR(lv);
 				LV_SBS_DEPTH(lv, is_base_var, sbs_depth);
-				if (MAX_LVSUBSCRIPTS <= (sbs_depth + 1))
+				if (MAX_LVSUBSCRIPTS <= sbs_depth)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 				/* add the subscript for the "code" */
 				lv_child = op_putindx(VARLSTCNT(2) lv, mv_child);
@@ -228,7 +228,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 					/* make sure the subscript will fit */
 					is_base_var = LV_IS_BASE_VAR(lv_child);
 					LV_SBS_DEPTH(lv_child, is_base_var, sbs_depth);
-					if (MAX_LVSUBSCRIPTS <= (sbs_depth + 1))
+					if (MAX_LVSUBSCRIPTS <= sbs_depth)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 					/* add the subscript */
 					lv_child = op_putindx(VARLSTCNT(2) lv_child, mv_child);
@@ -264,11 +264,11 @@ void zshow_output(zshow_out *out, const mstr *str)
 				/* Check if we can add two more subscripts 1) out->code & 2) out->line_num */
 				is_base_var = LV_IS_BASE_VAR(lv);
 				LV_SBS_DEPTH(lv, is_base_var, sbs_depth);
-				if (MAX_LVSUBSCRIPTS <= (sbs_depth + 2))
+				if (MAX_LVSUBSCRIPTS <= (sbs_depth + 1))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_MAXNRSUBSCRIPTS);
 				out->out_var.lv.child = op_putindx(VARLSTCNT(2) lv, mv);
 				DEBUG_ONLY(LV_SBS_DEPTH(out->out_var.lv.child, FALSE, dbg_sbs_depth);)
-				assert(MAX_LVSUBSCRIPTS > (dbg_sbs_depth + 1));
+				assert(MAX_LVSUBSCRIPTS > dbg_sbs_depth);
 			}
 			if (str)
 			{
@@ -305,7 +305,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 						 * is already done in the previous if block (MAX_LVSUBSCRIPTS error)
 						 */
 						DEBUG_ONLY(LV_SBS_DEPTH(lv_child, FALSE, dbg_sbs_depth);)
-						assert(MAX_LVSUBSCRIPTS > (dbg_sbs_depth + 1));
+						assert(MAX_LVSUBSCRIPTS > dbg_sbs_depth);
 						lv = op_putindx(VARLSTCNT(2) lv_child, mv);
 						ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
 						mv->mvtype = MV_STR;
@@ -330,7 +330,7 @@ void zshow_output(zshow_out *out, const mstr *str)
 				lv_child = out->out_var.lv.child;
 				assert(NULL != lv_child);
 				DEBUG_ONLY(LV_SBS_DEPTH(lv_child, FALSE, dbg_sbs_depth);)
-				assert(MAX_LVSUBSCRIPTS > (dbg_sbs_depth + 1));
+				assert(MAX_LVSUBSCRIPTS > dbg_sbs_depth);
 				lv = op_putindx(VARLSTCNT(2) lv_child, mv);
 				ENSURE_STP_FREE_SPACE((int)(out->ptr - out->buff));
 				mv->str.addr = (char *)stringpool.free;

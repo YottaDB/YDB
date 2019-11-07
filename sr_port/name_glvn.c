@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,8 +37,10 @@ int name_glvn(boolean_t gblvn, oprtype *a)
 	char		x;
 	int		fnname_type;
 	/* Note:  MAX_LVSUBSCRIPTS and MAX_GVSUBSCRIPTS are currently equal.  Should that change,
-			this should also change */
-	oprtype		subscripts[MAX_LVSUBSCRIPTS + 1], *sb1, *sb2;
+			this should also change. The subscripts array has a size of 2 more than
+			the max because it needs a size of 2 more than the max to actually hold
+			the maximum number of subscripts. */
+	oprtype		subscripts[MAX_LVSUBSCRIPTS + 2], *sb1, *sb2;
 	triple 		*ref, *root;
 	DCL_THREADGBL_ACCESS;
 
@@ -94,7 +99,7 @@ int name_glvn(boolean_t gblvn, oprtype *a)
 	{
 		for (;;)
 		{
-			if (sb1 - sb2 > MAX_GVSUBSCRIPTS)
+			if ((MAX_GVSUBSCRIPTS + 1) < (sb1 - sb2))
 			{
 				stx_error(ERR_MAXNRSUBSCRIPTS);
 				return FALSE;

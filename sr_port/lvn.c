@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +31,7 @@ error_def(ERR_SIDEEFFECTEVAL);
 int lvn(oprtype *a, opctype index_op, triple *parent)
 {
 	char		x;
-	oprtype		*sb, *sb1, *sb2, subscripts[MAX_LVSUBSCRIPTS];
+	oprtype		*sb, *sb1, *sb2, subscripts[MAX_LVSUBSCRIPTS + 1];
 	triple 		*ref, *root;
 	DCL_THREADGBL_ACCESS;
 
