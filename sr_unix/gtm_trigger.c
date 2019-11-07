@@ -861,14 +861,15 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 	/* restore frame_pointer stored at msp (see base_frame.c) */
         frame_pointer = *(stack_frame**)msp;
 	msp += SIZEOF(stack_frame *);           /* Remove frame save pointer from stack */
-	if (!forced_unwind)
-	{	/* Remove the "do not return to me" flag only on non-error unwinds. Note this flag may have already been
-		 * turned off by an earlier tp_restart if this is not an implicit_tstart situation.
-		 */
-		assert(!tp_pointer->implicit_tstart || (SFF_NORET_VIA_MUMTSTART & frame_pointer->flags));
-		frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;
-		DBGTRIGR((stderr, "gtm_trigger_fini: turning off SFF_NORET_VIA_MUMTSTART(2) in frame 0x"lvaddr"\n", frame_pointer));
-	} else
+	/* Remove the "do not return to me". Note this flag may have already been turned off by an earlier tp_restart if
+	 * this is not an implicit_tstart situation. Note we must ALWAYS turn this flag back off here because we're the
+	 * one who set it because we could be in a state where a simpleapi call to set a variable drove a trigger. If that
+	 * trigger gets an error and we don't turn this flag off, it causes error_return() to assert fail.
+	 */
+	assert(forced_unwind || !tp_pointer->implicit_tstart || (SFF_NORET_VIA_MUMTSTART & frame_pointer->flags));
+	frame_pointer->flags &= SFF_NORET_VIA_MUMTSTART_OFF;
+	DBGTRIGR((stderr, "gtm_trigger_fini: turning off SFF_NORET_VIA_MUMTSTART(2) in frame 0x"lvaddr"\n", frame_pointer));
+	if (forced_unwind)
 	{	/* Error unwind, make sure certain cleanups are done */
 #		ifdef DEBUG
 		assert(!dollar_tlevel || (tstart_trigger_depth <= gtm_trigger_depth));
