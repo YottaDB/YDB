@@ -71,7 +71,7 @@ GBLREF boolean_t	run_time;
 GBLREF int4		gtm_object_size;
 DEBUG_ONLY(GBLREF int   obj_bytes_written;)
 
-#define GTM_LANG	"MUMPS"
+#define YDB_LANG	"M"
 static char static_string_tbl[] = {
 	/* Offset 0 */  '\0',
 	/* Offset 1 */  '.', 't', 'e', 'x', 't', '\0',
@@ -79,10 +79,10 @@ static char static_string_tbl[] = {
 	/* Offset 15 */ '.', 's', 'y', 'm', 't', 'a', 'b', '\0'
 };
 
-#define SPACE_STRING_ALLOC_LEN  (SIZEOF(static_string_tbl) +    \
-				 SIZEOF(GTM_LANG) + 1 +		\
-				 SIZEOF(GTM_PRODUCT) + 1 +      \
-				 SIZEOF(GTM_RELEASE_NAME) + 1 + \
+#define SPACE_STRING_ALLOC_LEN  (SIZEOF(static_string_tbl) +	\
+				 SIZEOF(YDB_LANG) +		\
+				 SIZEOF(GTM_PRODUCT) +		\
+				 SIZEOF(GTM_RELEASE_NAME) +	\
 				 SIZEOF(mident_fixed))
 
 /* Following constants has to be in sync with above static string array(static_string_tbl) */
@@ -152,8 +152,8 @@ void finish_object_file(void)
 	strEntrySize = SIZEOF(static_string_tbl);
 	memcpy((string_tbl + symIndex), static_string_tbl, strEntrySize);
 	symIndex += strEntrySize;
-	strEntrySize = SIZEOF(GTM_LANG);
-	memcpy((string_tbl + symIndex), GTM_LANG, strEntrySize);
+	strEntrySize = SIZEOF(YDB_LANG);
+	memcpy((string_tbl + symIndex), YDB_LANG, strEntrySize);
 	symIndex += strEntrySize;
 	strEntrySize = SIZEOF(GTM_PRODUCT);
 	memcpy((string_tbl + symIndex), GTM_PRODUCT, strEntrySize);
@@ -234,7 +234,12 @@ void finish_object_file(void)
 	text_shdr->sh_flags = SHF_ALLOC | SHF_EXECINSTR;
 	text_shdr->sh_entsize = gtm_object_size;
 	memcpy((string_tbl +  symIndex), module_name.addr, module_name.len);
-	string_tbl[symIndex + module_name.len] = '\0';
+	/* Setting module name into string table. Since string table must end with a null, set all remaining
+	 * characters in the mident to 0s.
+	 */
+	memset(&string_tbl[symIndex + module_name.len], '\0', SIZEOF(mident_fixed) - module_name.len);
+	/* Make sure we just zeroed to the end of the string table */
+	assert(SPACE_STRING_ALLOC_LEN == (symIndex + SIZEOF(mident_fixed)));
 
 	if (NULL == (strtab_scn = elf_newscn(elf)))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_OBJFILERR, 2, object_name_len, object_file_name,
