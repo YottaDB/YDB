@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -30,7 +33,7 @@ void gvzwr_init(unsigned short t, mval *val, int4 pat)
 	MV_FORCE_STR(val);
 	gvzwrite_block->type = pat;
 	if (NULL == gvzwrite_block->sub)
-		gvzwrite_block->sub = (zwr_sub_lst *)malloc(SIZEOF(zwr_sub_lst) * MAX_GVSUBSCRIPTS);
+		gvzwrite_block->sub = (zwr_sub_lst *)malloc(SIZEOF(zwr_sub_lst) * (MAX_GVSUBSCRIPTS + 1));
 	gvzwrite_block->pat = val;
 	gvzwrite_block->mask = gvzwrite_block->subsc_count = 0;
 	gvzwrite_block->fixed = TRUE;

@@ -1851,6 +1851,10 @@ enum
 	LVNULLSUBS_NEVER,	/* LVNULLSUBS_NO plus LV subscripts prohibited in $DATA, $GET, $ORDER, $QUERY, KILL, etc */
 	LVNULLSUBS_LAST
 };
+/* Arrays using MAX_xxSUBSCRIPTS often contain the variable name in position 0 and sometimes
+ * contain a null in the last position so there will often be a +1 or +2 when these constants
+ * are used.
+ */
 #define MAX_GVSUBSCRIPTS 31
 #define MAX_LVSUBSCRIPTS 31
 #define MAX_INDSUBSCRIPTS 31
