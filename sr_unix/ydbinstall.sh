@@ -75,9 +75,11 @@ dump_info()
     if [ -n "$gtm_copyenv" ] ; then echo gtm_copyenv " : " $gtm_copyenv ; fi
     if [ -n "$gtm_copyexec" ] ; then echo gtm_copyexec " : " $gtm_copyexec ; fi
     if [ -n "$ydb_debug" ] ; then echo ydb_debug " : " $ydb_debug ; fi
+    if [ -n "$ydb_deprecated" ] ; then echo ydb_deprecated " : " $ydb_deprecated ; fi
     if [ -n "$ydb_dist" ] ; then echo ydb_dist " : " $ydb_dist ; fi
     if [ -n "$ydb_distrib" ] ; then echo ydb_distrib " : " $ydb_distrib ; fi
     if [ -n "$gtm_dryrun" ] ; then echo gtm_dryrun " : " $gtm_dryrun ; fi
+    if [ -n "$ydb_encplugin" ] ; then echo ydb_encplugin " : " $ydb_encplugin ; fi
     if [ -n "$ydb_filename" ] ; then echo ydb_filename " : " $ydb_filename ; fi
     if [ -n "$ydb_flavor" ] ; then echo ydb_flavor " : " $ydb_flavor ; fi
     if [ -n "$ydb_force_install" ] ; then echo ydb_force_install " : " $ydb_force_install ; fi
@@ -94,12 +96,14 @@ dump_info()
     if [ -n "$gtm_linkenv" ] ; then echo gtm_linkenv " : " $gtm_linkenv ; fi
     if [ -n "$gtm_linkexec" ] ; then echo gtm_linkexec " : " $gtm_linkexec ; fi
     if [ -n "$gtm_overwrite_existing" ] ; then echo gtm_overwrite_existing " : " $gtm_overwrite_existing ; fi
+    if [ -n "$ydb_posix" ] ; then echo ydb_posix " : " $ydb_posix ; fi
     if [ -n "$gtm_prompt_for_group" ] ; then echo gtm_prompt_for_group " : " $gtm_prompt_for_group ; fi
     if [ -n "$gtm_sf_dirname" ] ; then echo gtm_sf_dirname " : " $gtm_sf_dirname ; fi
     if [ -n "$gtm_tmpdir" ] ; then echo gtm_tmpdir " : " $gtm_tmpdir ; fi
     if [ -n "$gtm_user" ] ; then echo gtm_user " : " $gtm_user ; fi
     if [ -n "$gtm_verbose" ] ; then echo gtm_verbose " : " $gtm_verbose ; fi
     if [ -n "$ydb_version" ] ; then echo ydb_version " : " $ydb_version ; fi
+    if [ -n "$ydb_zlib" ] ; then echo ydb_zlib " : " $ydb_zlib ; fi
     if [ -n "$gtm_gtm" ] ; then echo gtm_gtm " : " $gtm_gtm ; fi
     if [ -n "$ydb_routines" ] ; then echo ydb_routines " : " $ydb_routines ; fi
     if [ -n "$timestamp" ] ; then echo timestamp " : " $timestamp ; fi
@@ -124,6 +128,7 @@ help_exit()
     echo "--debug                  -> turn on debugging with set -x"
     echo "--distrib dirname or URL -> source directory for YottaDB/GT.M distribution tarball, local or remote"
     echo "--dry-run                -> do everything short of installing YottaDB, including downloading the distribution"
+    echo "--encplugin              -> compile and install the encryption plugin"
     echo "--force-install          -> install even if the current platform is not supported"
     echo "--group group            -> group that should own the YottaDB installation"
     echo "--group-restriction      -> limit execution to a group; defaults to unlimited if not specified"
@@ -132,17 +137,20 @@ help_exit()
     echo "--installdir dirname     -> directory where YottaDB is to be installed; defaults to /usr/local/lib/yottadb/version"
     echo "--keep-obj               -> keep .o files of M routines (normally deleted on platforms with YottaDB support for routines in shared libraries)"
     echo "--linkenv dirname        -> create link in dirname to gtmprofile and gtmcshrc files; incompatible with copyenv"
+    echo "--nodeprecated           -> do not install deprecated components, specifically %DSEWRAP"
     echo "--linkexec dirname       -> create link in dirname to gtm script; incompatible with copyexec"
     echo "--overwrite-existing     -> install into an existing directory, overwriting contents; defaults to requiring new directory"
+    echo "--posix                  -> download and install the POSIX plugin"
     echo "--preserveRemoveIPC      -> do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
     echo "--prompt-for-group       -> YottaDB installation script will prompt for group; default is yes for production releases V5.4-002 or later, no for all others"
     echo "--ucaseonly-utils        -> install only upper case utility program names; defaults to both if not specified"
     echo "--user username          -> user who should own YottaDB installation; default is root"
     echo "--utf8 ICU_version       -> install UTF-8 support using specified  major.minor ICU version; specify default to use versionprovided by OS as default"
     echo "--verbose                -> output diagnostic information as the script executes; default is to run quietly"
-    echo "options that take a value (e.g, --group) can be specified as either --option=value or --option value"
-    echo "options marked with * are likely to be of interest primarily to YottaDB developers"
-    echo "version is defaulted from yottadb file if one exists in the same directory as the installer"
+    echo "--zlib                   -> download and install the zlib plugin"
+    echo "Options that take a value (e.g, --group) can be specified as either --option=value or --option value."
+    echo "Options marked with \"*\" are likely to be of interest primarily to YottaDB developers."
+    echo "Version is defaulted from yottadb file if one exists in the same directory as the installer."
     echo "This version must run as root."
     echo ""
     echo "Example usages are (assumes latest YottaDB release is r1.28 and latest GT.M version is V6.3-007)"
@@ -205,6 +213,10 @@ if [ -n "$ydb_overwrite_existing" ] ; then gtm_overwrite_existing="$ydb_overwrit
 if [ -n "$ydb_prompt_for_group" ] ; then gtm_prompt_for_group="$ydb_prompt_for_group" ; fi
 if [ -n "$ydb_verbose" ] ; then gtm_verbose="$ydb_verbose" ; fi
 if [ -z "$ydb_change_removeipc" ] ; then ydb_change_removeipc="yes" ; fi
+if [ -z "$ydb_deprecated" ] ; then ydb_deprecated="Y" ; fi
+if [ -z "$ydb_encplugin" ] ; then ydb_encplugin="N" ; fi
+if [ -z "$ydb_posix" ] ; then ydb_posix="N" ; fi
+if [ -z "$ydb_zlib" ] ; then ydb_zlib="N" ; fi
 # GTM prefixed versions (for backwards compatibility)
 if [ -z "$gtm_buildtype" ] ; then gtm_buildtype="pro" ; fi
 if [ -z "$gtm_keep_obj" ] ; then gtm_keep_obj="N" ; fi
@@ -255,6 +267,7 @@ while [ $# -gt 0 ] ; do
             fi
             shift ;;
         --dry-run) gtm_dryrun="Y" ; shift ;;
+	--encplugin) ydb_encplugin="Y" ; shift ;;
 	--force-install) ydb_force_install="Y" ; shift ;;
         --gtm)
             gtm_gtm="Y"
@@ -292,7 +305,9 @@ while [ $# -gt 0 ] ; do
             fi
             unset gtm_copyexec
             shift ;;
+	--nodeprecated) ydb_deprecated="N" ; shift ;;
         --overwrite-existing) gtm_overwrite_existing="Y" ; shift ;;
+	--posix) ydb_posix="Y" ; shift ;;
         --preserveRemoveIPC) ydb_change_removeipc="no" ; shift ;; # must come before group*
         --prompt-for-group) gtm_prompt_for_group="Y" ; shift ;;
         --ucaseonly-utils) gtm_lcase_utils="N" ; shift ;;
@@ -309,8 +324,10 @@ while [ $# -gt 0 ] ; do
                 else echo "--utf8 needs a value" ; err_exit
                 fi
             fi
+	    ydb_utf8="Y" ;
             shift ;;
         --verbose) gtm_verbose="Y" ; shift ;;
+	--zlib) ydb_zlib="Y" ; shift ;;
         -*) echo Unrecognized option "$1" ; err_exit ;;
         *) if [ -n "$ydb_version" ] ; then echo Nothing must follow the YottaDB/GT.M version ; err_exit
             else ydb_version=$1 ; shift ; fi
@@ -665,6 +682,9 @@ else echo y  >>$gtm_configure_in		# Response to : "Should UTF-8 support be insta
         echo $ydb_icu_version >>$gtm_configure_in	# Response to : "Enter ICU version"
     fi
 fi
+if [ "Y" = $ydb_deprecated ] ; then echo y >>$gtm_configure_in # Response to : "Should deprecated components be installed?"
+else echo n >>$gtm_configure_in			# Response to : "Should deprecated components be installed?"
+fi
 echo $gtm_lcase_utils >>$gtm_configure_in	# Response to : "Do you want uppercase and lowercase versions of the MUMPS routines?"
 if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj >>$gtm_configure_in ; fi	# Response to : "Object files of M routines placed in shared library $ydb_dist/libyottadbutil$ext. Keep original .o object files (y or n)?"
 echo n >>$gtm_configure_in			# Response to : "Installation completed. Would you like all the temporary files removed from this directory?"
@@ -746,4 +766,73 @@ if [ ! -f ${pcfilepath}/yottadb.pc ] || [ $(grep "^Version: " ${pcfilepath}/yott
     echo $product_name pkg-config file installed successfully at ${pcfilepath}/yottadb.pc
 else
     echo Skipping $product_name pkg-config file install for ${ydb_version} as newer version $(grep "^Version: " ${pcfilepath}/yottadb.pc | cut -s -d " " -f 2) exists at ${pcfilepath}/yottadb.pc
+fi
+
+# install optional components if they were selected
+
+if [ "Y" = $ydb_posix ] ; then
+	. ${ydb_installdir}/ydb_env_set
+	mkdir posix_tmp
+	cd posix_tmp
+	curl -fSsLO https://gitlab.com/YottaDB/Util/YDBposix/-/archive/master/YDBposix-master.tar.gz
+	tar xzf YDBposix-master.tar.gz
+	cd YDBposix-master
+	mkdir build && cd build
+	cmake ..
+	make -j `grep -c ^processor /proc/cpuinfo` && sudo make install
+	cd ..
+	if [ "Y" = $ydb_utf8 ] ; then
+		mkdir build_UTF8 && cd build_UTF8
+		cmake -DMUMPS_UTF8_MODE=1 ..
+		make && sudo make install
+		cd ..
+	fi
+	cd ..
+	cd ..
+	. ${ydb_installdir}/ydb_env_unset
+	sudo rm -R posix_tmp
+fi
+
+if [ "Y" = $ydb_encplugin ] ; then
+	. ${ydb_installdir}/ydb_env_set
+	mkdir enc_tmp
+	cd enc_tmp
+	sudo tar -xf ${ydb_installdir}/plugin/gtmcrypt/source.tar
+	sudo ydb_dist=${ydb_installdir} make -j `grep -c ^processor /proc/cpuinfo`
+	sudo ydb_dist=${ydb_installdir} make install
+	. ${ydb_installdir}/ydb_env_unset
+	cd ..
+	sudo rm -R enc_tmp
+	# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
+	mv ${ydb_installdir}/plugin/gtmcrypt ${ydb_installdir}/plugin/ydbcrypt
+	ln -s ${ydb_installdir}/plugin/ydbcrypt ${ydb_installdir}/plugin/gtmcrypt
+fi
+
+if [ "Y" = $ydb_zlib ] ; then
+	. ${ydb_installdir}/ydb_env_set
+	mkdir zlib_tmp
+	cd zlib_tmp
+	curl -fSsLO https://gitlab.com/YottaDB/Util/ydbzlib/-/archive/master/ydbzlib-master.tar.gz
+	tar xzf ydbzlib-master.tar.gz
+	cd ydbzlib-master
+	gcc -c -fPIC -I${ydb_installdir} gtmzlib.c
+	gcc -o libgtmzlib.so -shared gtmzlib.o
+	sudo cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
+	sudo cp _ZLIB.m ${ydb_installdir}/plugin/r
+	${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
+	if [ "Y" = $ydb_utf8 ] ; then
+		mkdir utf8
+		cd utf8
+		export ydb_chset="UTF-8"
+		. ${ydb_installdir}/utf8/ydb_env_set
+		${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
+		sudo cp _ZLIB.o ${ydb_installdir}/plugin/o/utf8
+		. ${ydb_installdir}/ydb_env_unset
+		cd ..
+	fi
+	sudo cp _ZLIB.o ${ydb_installdir}/plugin/o
+	. ${ydb_installdir}/ydb_env_unset
+	cd ..
+	cd ..
+	sudo rm -R zlib_tmp
 fi
