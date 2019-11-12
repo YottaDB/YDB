@@ -1,7 +1,7 @@
 #!/bin/sh -
 #################################################################
 #                                                               #
-# Copyright (c) 2014-2017 Fidelity National Information		#
+# Copyright (c) 2014-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -34,6 +34,7 @@
 # 2015-10-13  0.14 GT.M Staff   - Fix a few minor bugs
 # 2017-06-05  0.15 GT.M Staff	- GT.M install script should set RemoveIPC no in systemd linux distributions
 # 2017-09-19  0.16 GT.M Staff	- Treat i686 as i586; Fix an interaction bug in gtminstall resulting from the above change
+# 2019-07-14  0.17 GT.M Staff   - Add an option (--filename) to pass the file name of GT.M distribution tarball
 
 # Turn on debugging if set
 if [ "Y" = "$gtm_debug" ] ; then set -x ; fi
@@ -100,6 +101,7 @@ err_exit()
     echo "--copyexec dirname - copy gtm script to dirname; incompatible with linkexec"
     echo "--debug - * turn on debugging with set -x"
     echo "--distrib dirname or URL - source directory for GT.M distribution tarball, local or remote"
+    echo "--filename filename - name of GT.M distribution tarball"
     echo "--dry-run - do everything short of installing GT.M, including downloading the distribution"
     echo "--group group - group that should own the GT.M installation"
     echo "--group-restriction - limit execution to a group; defaults to unlimited if not specified"
@@ -130,14 +132,17 @@ err_exit()
 
 mktmpdir()
 {
-    case `uname -s` in
-        AIX | SunOS) tmpdirname="/tmp/${USER}_$$_${timestamp}"
-            ( umask 077 ; mkdir $tmpdirname ) ;;
-        HP-UX) tmpdirname=`mktemp`
-            ( umask 077 ; mkdir $tmpdirname ) ;;
-        *) tmpdirname=`mktemp -d` ;;
-    esac
-    echo $tmpdirname
+	tmpdirname="/tmp/gtminstall_${timestamp}"
+	mkdir $tmpdirname
+	mkdirstatus=$?
+	while [ 0 -ne $mkdirstatus ] ; do
+		let i++
+		tmpdirname="/tmp/gtminstall_${timestamp}_$i"
+		mkdir $tmpdirname
+		mkdirstatus=$?
+
+	done
+	echo $tmpdirname
 }
 
 read_yes_no()
@@ -173,7 +178,8 @@ while [ $# -gt 0 ] ; do
             else if [ 1 -lt "$#" ] ; then gtm_buildtype=$2 ; shift
                 else echo "--buildtype needs a value" ; err_exit
                 fi
-            fi ;;
+            fi
+	    shift ;;
         --copyenv*) tmp=`echo $1 | cut -s -d = -f 2-`
             if [ -n "$tmp" ] ; then gtm_copyenv=$tmp
             else if [ 1 -lt "$#" ] ; then gtm_copyenv=$2 ; shift
@@ -195,6 +201,13 @@ while [ $# -gt 0 ] ; do
             if [ -n "$tmp" ] ; then gtm_distrib=$tmp
             else if [ 1 -lt "$#" ] ; then gtm_distrib=$2 ; shift
                 else echo "--distrib needs a value" ; err_exit
+                fi
+            fi
+            shift ;;
+        --filename) tmp=`echo $1 | cut -s -d = -f 2-`
+            if [ -n "$tmp" ] ; then gtm_filename=$tmp
+            else if [ 1 -lt "$#" ] ; then gtm_filename=$2 ; shift
+                else echo "--filename needs a value" ; err_exit
                 fi
             fi
             shift ;;
@@ -370,7 +383,9 @@ fi
 if [ -f "${gtm_distrib}/mumps" ] ; then gtm_tmp=$gtm_distrib
 else
     tmp=`echo $gtm_version | tr -d .-`
-    gtm_filename=gtm_${tmp}_${gtm_hostos}_${gtm_flavor}_${gtm_buildtype}.tar.gz
+    if [ -z "$gtm_filename" ] ; then
+	    gtm_filename=gtm_${tmp}_${gtm_hostos}_${gtm_flavor}_${gtm_buildtype}.tar.gz
+    fi
     case $gtm_distrib in
         http://sourceforge.net/projects/fis-gtm | https://sourceforge.net/projects/fis-gtm)
             if [ "Y" = "$gtm_verbose" ] ; then
@@ -503,7 +518,7 @@ else echo y  >>$gtm_configure_in
 fi
 echo $gtm_lcase_utils >>$gtm_configure_in
 if [ "Y" = $gtm_shlib_support ] ; then echo $gtm_keep_obj >>$gtm_configure_in ; fi
-echo n >>$gtm_configure_in
+echo y >>$gtm_configure_in
 if [ "Y" = "$gtm_verbose" ] ; then echo Prepared configuration file ; cat $gtm_configure_in ; dump_info ; fi
 
 

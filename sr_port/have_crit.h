@@ -83,6 +83,7 @@ typedef enum
 	INTRPT_IN_DB_JNL_LSEEKWRITE,	/* Deferring interrupts in DB_/JNL_LSEEKWRITE() call */
 	INTRPT_IN_JNL_QIO,		/* Deferring interrupts in journal qio, replacing jnl_qio_in_prog. */
 	INTRPT_IN_MLK_CLEANUP,		/* Deferring interrupts around lock table cleanup code */
+	INTRPT_IN_JNL_FSYNC,		/* Deferring interrupts in jnl_fsync() while holding the latch */
 	INTRPT_NUM_STATES		/* Should be the *last* one in the enum. */
 } intrpt_state_t;
 

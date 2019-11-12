@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +20,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "gdsblk.h"
+#include "gdsdbver.h"
 #include "min_max.h"		/* needed for gdsblkops.h */
 #include "gdsblkops.h"
 #include "gdscc.h"
@@ -47,26 +49,29 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF sgmnt_data_ptr_t	cs_data;
 GBLREF srch_hist	dummy_hist;
 GBLREF uint4		update_array_size;
-GBLREF unsigned short 	patch_comp_count;
+GBLREF unsigned short	patch_comp_count;
 
 error_def(ERR_AIMGBLKFAIL);
 error_def(ERR_DBRDONLY);
 error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DSEFAIL);
+error_def(ERR_DSEINVALBLKID);
 
 void dse_rmrec(void)
 {
 	blk_segment	*bs1, *bs_ptr;
 	block_id	blk;
+	boolean_t	long_blk_id;
 	char		comp_key[MAX_KEY_SZ + 1];
 	int4		blk_seg_cnt, blk_size, count;
+	long		blk_id_size;
 	short int	size, i, rsize;
 	srch_blk_status	blkhist;
 	uchar_ptr_t	lbp, b_top, rp, r_top, key_top, rp_base;
 	unsigned short	cc, cc_base;
 
-        if (gv_cur_region->read_only)
-                rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+	if (gv_cur_region->read_only)
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSENOBML, DSEBLKCUR)))		/* WARNING: assignment */
 		return;
@@ -83,7 +88,21 @@ void dse_rmrec(void)
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	lbp = (uchar_ptr_t)malloc(blk_size);
 	memcpy(lbp, blkhist.buffaddr, blk_size);
-
+	if (((blk_hdr_ptr_t)lbp)->bver > BLK_ID_32_VER)
+	{
+#		ifdef BLK_NUM_64BIT
+		long_blk_id = TRUE;
+		blk_id_size = SIZEOF(block_id_64);
+#		else
+		t_abort(gv_cur_region, cs_addrs);
+		free(lbp);
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#		endif
+	} else
+	{
+		long_blk_id = FALSE;
+		blk_id_size = SIZEOF(block_id_32);
+	}
 	if (((blk_hdr_ptr_t)lbp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = lbp + cs_addrs->hdr->blk_size;
 	else if (((blk_hdr_ptr_t)lbp)->bsiz < SIZEOF(blk_hdr))
@@ -141,7 +160,7 @@ void dse_rmrec(void)
 			r_top = b_top;
 		}
 		if (((blk_hdr_ptr_t)lbp)->levl)
-			key_top = r_top - SIZEOF(block_id);
+			key_top = r_top - blk_id_size;
 		else
 		{
 			for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )

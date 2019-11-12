@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2017 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -103,7 +103,7 @@ endif
 
 # Define image type-specific information.
 
-version $p1 $p2
+set setactive_parms = ( $p1 $p2 ) ; source $gtm_tools/setactive.csh
 
 
 # Default lint options.

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -103,12 +104,12 @@ enum cdb_sc	gvcst_rtsib(srch_hist *full_hist, int level)
 	{
 		--old;
 		GET_USHORT(rec_size, &rp->rsiz);
-		if ((sm_uc_ptr_t)rp + rec_size > buffer_address + (unsigned int)((blk_hdr_ptr_t)buffer_address)->bsiz)
+		if (((sm_uc_ptr_t)rp + rec_size) > (buffer_address + (unsigned int)((blk_hdr_ptr_t)buffer_address)->bsiz))
 		{
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_rmisalign;
 		}
-		GET_LONG(blk, ((sm_int_ptr_t)((sm_uc_ptr_t)rp + rec_size - SIZEOF(block_id))));
+		GET_BLK_ID(blk, (sm_uc_ptr_t)rp + rec_size - SIZEOF(block_id));
 		new->tn = cs_addrs->ti->curr_tn;
 		new->cse = NULL;
 		if (NULL == (buffer_address = t_qread(blk, &new->cycle, &new->cr)))

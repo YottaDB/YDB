@@ -40,7 +40,6 @@ GBLREF gd_addr		*original_header;
 error_def(ERR_SIZENOTVALID4);
 
 #define	DB_ABS2REL(X)		(uintszofptr_t)((uintszofptr_t)(X) - (uintszofptr_t)csa->nl)
-#define MAX_UTIL_LEN		40
 #define	CLEAN_VERIFY		"verification is clean"
 #define	UNCLEAN_VERIFY		"verification is NOT clean (see operator log for details)"
 #define	RECOVER_DONE		"recovery complete (see operator log for details)"

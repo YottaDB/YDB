@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,8 +31,6 @@ GBLREF bool		patch_find_root_search;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region	*gv_cur_region;
 GBLREF gd_addr		*original_header;
-
-#define MAX_UTIL_LEN	64
 
 STATICFNDCL void print_reg_if_mismatch(char *key, int keylen);
 
@@ -110,7 +108,7 @@ void dse_f_key(void)
 	if (!dse_ksrch(path[0], &path[1], &offset[0], &targ_key[0], size))
 	{	memcpy(util_buff, "!/Key not found, would be in block  ", 36);
 		util_len = 36;
-		util_len += i2hex_nofill(path[patch_path_count - 2], (uchar_ptr_t)&util_buff[util_len], 8);
+		util_len += i2hexl_nofill(path[patch_path_count - 2], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 		memcpy(&util_buff[util_len], ".", 1);
 		util_len += 1;
 		util_buff[util_len] = 0;
@@ -119,7 +117,7 @@ void dse_f_key(void)
 	} else
 	{	memcpy(util_buff, "!/Key found in block  ", 22);
 		util_len = 22;
-		util_len += i2hex_nofill(path[patch_path_count - 1], (uchar_ptr_t)&util_buff[util_len], 8);
+		util_len += i2hexl_nofill(path[patch_path_count - 1], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 		memcpy(&util_buff[util_len], ".", 1);
 		util_len += 1;
 		util_buff[util_len] = 0;
@@ -129,10 +127,13 @@ void dse_f_key(void)
 	for (count = 0; count < root_path_count ;count++)
 	{	memcpy(util_buff, "	", 1);
 		util_len = 1;
-		util_len += i2hex_nofill(root_path[count], (uchar_ptr_t)&util_buff[util_len], 8);
+		util_len += i2hexl_nofill(root_path[count], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 		memcpy(&util_buff[util_len], ":", 1);
 		util_len += 1;
-		util_len += i2hex_nofill(root_offset[count], (uchar_ptr_t)&util_buff[util_len], 4);
+		/* Using MAX_HEX_SHORT for int value because to save line space
+		 * since the value should always fit in 2-bytes
+		 */
+		util_len += i2hex_nofill(root_offset[count], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_SHORT);
 		memcpy(&util_buff[util_len], ", ", 1);
 		util_len += 1;
 		util_buff[util_len] = 0;
@@ -143,10 +144,13 @@ void dse_f_key(void)
 	{	for (count = 0; count < patch_path_count ;count++)
 		{	memcpy(util_buff, "	", 1);
 			util_len = 1;
-			util_len += i2hex_nofill(path[count], (uchar_ptr_t)&util_buff[util_len], 8);
+			util_len += i2hexl_nofill(path[count], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 			memcpy(&util_buff[util_len], ":", 1);
 			util_len += 1;
-			util_len += i2hex_nofill(offset[count], (uchar_ptr_t)&util_buff[util_len], 4);
+			/* Using MAX_HEX_SHORT for int value because to save line space
+			 * since the value should always fit in 2-bytes
+			 */
+			util_len += i2hex_nofill(offset[count], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_SHORT);
 			memcpy(&util_buff[util_len], ", ", 1);
 			util_len += 1;
 			util_buff[util_len] = 0;
@@ -156,7 +160,7 @@ void dse_f_key(void)
 	} else
 	{	memcpy(util_buff, "	", 1);
 		util_len = 1;
-		util_len += i2hex_nofill(root_path[count], (uchar_ptr_t)&util_buff[util_len], 8);
+		util_len += i2hexl_nofill(root_path[count], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 		memcpy(&util_buff[util_len], "!/", 2);
 		util_len += 2;
 		util_buff[util_len] = 0;

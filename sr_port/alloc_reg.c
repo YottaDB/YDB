@@ -106,10 +106,7 @@ void alloc_reg(void)
 				 * so the following code now makes the leak go away
 				 */
 				for (c = temphigh[TVAL_REF]; 0 <= c; c--)
-				{
-					assert((GTM_BOOL != TREF(gtm_fullbool)) || (0 == tempcont[TVAL_REF][c]));
 					tempcont[TVAL_REF][c] = 0;	/* prevent leaking TVAL temps */
-				}
 				if (OC_LINESTART == opc)
 					break;			/* WARNING else fallthrough */
 			case OC_FETCH:

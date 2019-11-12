@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -37,8 +38,6 @@
 #include "t_abort.h"
 #include "gtmmsg.h"
 
-#define MAX_UTIL_LEN 80
-
 GBLREF block_id		patch_curr_blk;
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF cw_set_element	cw_set[];
@@ -61,6 +60,9 @@ void dse_rest(void)
 {
 	blk_segment	*bs1, *bs_ptr;
 	block_id	to, from;
+#ifndef BLK_NUM_64BIT
+	block_id_64	from2;
+#endif
 	char		util_buff[MAX_UTIL_LEN], rn[MAX_RN_LEN + 1];
 	gd_binding	*map;
 	gd_region	*region;
@@ -87,8 +89,18 @@ void dse_rest(void)
 		return;
 	if (CLI_PRESENT == cli_present("FROM"))
 	{	/* don't use dse_getblk because we're working out of the save set, not the db */
-		if (!cli_get_hex("FROM", (uint4 *)&from))
+#ifdef BLK_NUM_64BIT
+		if (!cli_get_hex64("FROM", (gtm_uint8 *)(&from)))
 			from = patch_curr_blk;
+#else
+		if (!cli_get_hex64("FROM", (gtm_uint8 *)(&from2)))
+			from = patch_curr_blk;
+		else
+		{
+			assert(from2 == (block_id_32)from2);
+			from = (block_id_32)from2;
+		}
+#endif
 	} else
 	 	from = to;
 	if (CLI_PRESENT == cli_present("REGION"))
@@ -153,7 +165,7 @@ void dse_rest(void)
 	}
 	memcpy(util_buff, "!/Restoring block ", 18);
 	util_len = 18;
-	util_len += i2hex_nofill(to, (uchar_ptr_t)&util_buff[util_len], 8);
+	util_len += i2hexl_nofill(to, (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 	memcpy(&util_buff[util_len], " from version !UL", 17);
 	util_len += 17;
 	util_buff[util_len] = 0;
@@ -163,7 +175,7 @@ void dse_rest(void)
 	{
 		memcpy(util_buff, " of block ", 10);
 		util_len = 10;
-		util_len += i2hex_nofill(from, (uchar_ptr_t)&util_buff[util_len], 8);
+		util_len += i2hexl_nofill(from, (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 		util_buff[util_len] = 0;
 		assert(ARRAYSIZE(util_buff) >= util_len);
 		util_out_print(util_buff, FALSE);

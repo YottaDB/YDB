@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,29 +22,30 @@
 #include "mupint.h"
 #include "mvalconv.h"
 #include "collseq.h"
+#include "muextr.h"
+#include "mupip_size.h"
+#include "mu_getkey.h"
 
-GBLDEF	gv_key		*muint_start_key;
-GBLDEF	gv_key		*muint_end_key;
-GBLDEF	int		muint_start_keyend;
-GBLDEF	int		muint_end_keyend;
 
-GBLREF  boolean_t	muint_key;
-GBLREF	boolean_t	muint_subsc;
+GBLREF	boolean_t	mu_subsc;
+GBLREF	boolean_t	mu_key;
+GBLREF	int		mu_sub_idx_st;
+GBLREF	int		mu_sub_idx_end;
 
 #define	CLNUP_AND_RETURN_FALSE			\
 {						\
-	GVKEY_FREE_IF_NEEDED(muint_start_key);	\
-	GVKEY_FREE_IF_NEEDED(muint_end_key);	\
+	GVKEY_FREE_IF_NEEDED(mu_start_key);	\
+	GVKEY_FREE_IF_NEEDED(mu_end_key);	\
 	return FALSE;				\
 }
 
-int mu_int_getkey(unsigned char *key_buff, int keylen)
+int mu_getkey(unsigned char *key_buff, int keylen)
 {
 	int4		keysize;
 	mval		tmpmval;
 	unsigned char	*top, *startsrc, *src, *dest, slit[MAX_KEY_SZ + 1], *tmp;
 	int		iter;
-	gv_key		*muint_tmpkey;
+	gv_key		*mu_tmpkey;
 	gd_region	*reg;
 	boolean_t	nullsubs_seen;
 
@@ -64,22 +66,22 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 	top = src + keylen;
 	startsrc = src;
 	keysize = DBKEYSIZE(MAX_KEY_SZ);
-	assert(MUINTKEY_FALSE == muint_key);
+	assert(MUKEY_FALSE == mu_key);
 	for (iter = 0, top = src + keylen; (iter < 2) && (src < top); iter++)
 	{
-		muint_tmpkey = NULL;	/* GVKEY_INIT macro requires this */
-		GVKEY_INIT(muint_tmpkey, keysize);
+		mu_tmpkey = NULL;	/* GVKEY_INIT macro requires this */
+		GVKEY_INIT(mu_tmpkey, keysize);
 		if (!iter)
 		{
-			assert(NULL == muint_start_key);
-			muint_start_key = muint_tmpkey;	/* used by CLNUP_AND_RETURN_FALSE macro */
+			assert(NULL == mu_start_key);
+			mu_start_key = mu_tmpkey;	/* used by CLNUP_AND_RETURN_FALSE macro */
 		} else
 		{
-			assert(NULL == muint_end_key);
-			muint_end_key = muint_tmpkey;	/* used by CLNUP_AND_RETURN_FALSE macro */
+			assert(NULL == mu_end_key);
+			mu_end_key = mu_tmpkey;
 		}
 		nullsubs_seen = FALSE;
-		dest = muint_tmpkey->base;
+		dest = mu_tmpkey->base;
 		if ('^' != *src++)
 		{
 			util_out_print("Error in SUBSCRIPT qualifier : Key does not begin with '^' at offset !UL in !AD",
@@ -107,16 +109,17 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 				CLNUP_AND_RETURN_FALSE;
 			}
 		}
+		iter ? (mu_sub_idx_end = dest - mu_tmpkey->base) : (mu_sub_idx_st = dest - mu_tmpkey->base);
 		*dest++ = 0;
 		*dest = 0;
-		muint_tmpkey->end = dest - muint_tmpkey->base;
+		mu_tmpkey->end = dest - mu_tmpkey->base;
 		if (!iter)
-			muint_start_keyend = muint_start_key->end;
+			mu_start_keyend = mu_start_key->end;
 		else
-			muint_end_keyend = muint_end_key->end;
+			mu_end_keyend = mu_end_key->end;
 		if ('(' == *src)
 		{
-			muint_subsc = TRUE;
+			mu_subsc = TRUE;
 			src++;
 			for ( ; src < top; )
 			{
@@ -173,7 +176,7 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 				 * properties. For now assume standard null collation is FALSE in all regions. And note down
 				 * if any null subscript was seen. If so do recomputation of key as db files get switched in integ.
 				 */
-				mval2subsc(&tmpmval, muint_tmpkey, STD_NULL_COLL_FALSE);
+				mval2subsc(&tmpmval, mu_tmpkey, STD_NULL_COLL_FALSE);
 				if ((src >= top) || (',' != *src))
 					break;
 				src++;
@@ -195,8 +198,8 @@ int mu_int_getkey(unsigned char *key_buff, int keylen)
 		}
 		if (':' == *src)
 			src++;
-		if (MUINTKEY_NULLSUBS != muint_key)
-			muint_key = (nullsubs_seen ? MUINTKEY_NULLSUBS : MUINTKEY_TRUE);
+		if (MUKEY_NULLSUBS != mu_key)
+			mu_key = (nullsubs_seen ? MUKEY_NULLSUBS : MUKEY_TRUE);
 	}
 	if (src < top)
 	{

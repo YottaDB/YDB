@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2017 Fidelity National Information	*
+ * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -279,8 +279,12 @@ uint4	mur_forward_play_cur_jrec(reg_ctl_list *rctl)
 	 * (set in mur_forward) even if rctl->gd->open is non-NULL. So don't use that.
 	 * Only then can we call gvcst_root_search() to find out collation set up for this global.
 	 */
-	assert(gv_cur_region == rctl->gd);
-	assert(!mur_options.update || (gv_cur_region->open && (NULL != rctl->csa)));
+	if (!TREF(skip_DB_exists_check))
+	{
+		assert(gv_cur_region == rctl->gd);
+		assert(!mur_options.update || (gv_cur_region->open && (NULL != rctl->csa)));
+	} else
+		gv_cur_region = rctl->gd;
 	is_set_kill_zkill_ztrig = (boolean_t)(IS_SET_KILL_ZKILL_ZTRIG(rectype));
 	if (is_set_kill_zkill_ztrig)
 	{

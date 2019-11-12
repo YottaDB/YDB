@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2010 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -86,7 +87,7 @@ enum cdb_sc	gvcst_lftsib(srch_hist *full_hist)
 	while (--new >= new_base)
 	{
 		--old;
-		GET_LONG(blk, ((sm_int_ptr_t)(bp + rtop - SIZEOF(block_id))));
+		GET_BLK_ID(blk, bp + rtop - SIZEOF(block_id));
 		new->tn = cs_addrs->ti->curr_tn;
 		new->cse = NULL;
 		if (NULL == (buffer_address = t_qread(blk, &new->cycle, &new->cr)))

@@ -38,14 +38,14 @@
 #include "min_max.h"
 
 GBLREF	gd_region		*gv_cur_region;
+GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	sgm_info		*sgm_info_ptr;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
-GBLREF	sgm_info		*sgm_info_ptr;
-GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			bml_save_dollar_tlevel;
-GBLREF	unsigned char		rdfail_detail;
-GBLREF	inctn_opcode_t		inctn_opcode;
+GBLREF	uint4			dollar_tlevel;
 GBLREF	uint4			update_trans;
+GBLREF	unsigned char		rdfail_detail;
 
 error_def(ERR_GVKILLFAIL);
 error_def(ERR_IGNBMPMRKFREE);
@@ -54,23 +54,21 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 {
 	blk_hdr_ptr_t		bp;
 	blk_ident		*ksb;
-	block_id		blk;
+	block_id		blk, temp_blk;
 	boolean_t		flush_cache = FALSE, was_crit;
+	bt_rec_ptr_t		bt;
 	cache_rec_ptr_t		cr;
-	int			cnt, cycle;
-	int4			kill_error, temp_long;
+	inctn_opcode_t		save_inctn_opcode;
+	int4			cnt, cycle, kill_error;
 	kill_set		*ks;
 	off_chain		chain;
 	rec_hdr_ptr_t		rp, rp1, rtop;
-	uint4			save_update_trans;
-	unsigned char		temp_buff[MAX_DB_BLK_SIZE];
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
-	unsigned short		temp_ushort;
 	trans_num		ret_tn;
-	inctn_opcode_t		save_inctn_opcode;
-	bt_rec_ptr_t		bt;
-	unsigned int		bsiz, level;
+	uint4			bsiz, level, save_update_trans;
+	unsigned char		temp_buff[MAX_DB_BLK_SIZE];
+	unsigned short		temp_ushort;
 #	ifdef DEBUG
 	uint4			save_dollar_tlevel;
 #	endif
@@ -106,6 +104,7 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 				{
 					chain.flag = 1;
 					chain.next_off = 0;
+					assert(ksb->block < (1 << CW_INDEX_MAX_BITS));
 					chain.cw_index = ksb->block;
 					assert(SIZEOF(chain) == SIZEOF(blk));
 					blk = *(block_id *)&chain;
@@ -148,19 +147,20 @@ void	gvcst_expand_free_subtree(kill_set *ks_head)
 						kill_error = cdb_sc_rmisalign;
 						rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_GVKILLFAIL, 2, 1, &kill_error);
 					}
-					GET_LONG(temp_long, (block_id_ptr_t)((sm_uc_ptr_t)rp1 - SIZEOF(block_id)));
+					GET_BLK_ID(temp_blk, (sm_uc_ptr_t)rp1 - SIZEOF(block_id));
 					if (dollar_tlevel)
 					{
 						assert(sgm_info_ptr->tp_csa == cs_addrs);
-						chain = *(off_chain *)&temp_long;
+						chain = *(off_chain *)&temp_blk;
+						assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 						assertpro(!((1 == chain.flag) &&
 							((int)chain.cw_index >= sgm_info_ptr->cw_set_depth)));
-						assert(chain.flag || temp_long < csa->ti->total_blks);
+						assert(chain.flag || (temp_blk < csa->ti->total_blks));
 					}
 					level = ((blk_hdr_ptr_t)temp_buff)->levl;
-					gvcst_delete_blk(temp_long, level - 1, TRUE);
+					gvcst_delete_blk(temp_blk, level - 1, TRUE);
 					if ((1 == level) && !dollar_tlevel && cs_data->dsid && !flush_cache)
-						rc_cpt_entry(temp_long);	/* Invalidate single block */
+						rc_cpt_entry(temp_blk);	/* Invalidate single block */
 				}
 				ksb->level = 0;
 			} else

@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2018 Fidelity National Information		;
+; Copyright (c) 2001-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -11,12 +11,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
  New ansiopen,err,fn,i1,in,lo,msg,out,outansi,severe,txt,up,vms
- Set severe("warning")=0
- Set severe("success")=1
- Set severe("error")=2
- Set severe("info")=3
- Set severe("fatal")=4
- Set severe("severe")=4
+ Set (severe("warning"),ival(0))=0
+ Set (severe("success"),ival("A"))=1
+ Set (severe("error"),ival("B"))=2
+ Set (severe("info"),ival("D"))=3
+ Set (severe("fatal"),severe("severe"),ival("I"),ival("S"))=4	; treating Spanning errors as Index makes them report as Data
+ Set ival("T")=5
  Set up="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
  Set lo="abcdefghijklmnopqrstuvwxyz"
  ;
@@ -112,10 +112,10 @@
  . . Write !,"Cannot process more than 4095 messages."
  . . Write !,"Overflow occurred at:",!,msg
  . ; Expect a line like:
- . ; MNEMONIC <error message text>/severity/fao=###!/ansi=### ! comment
+ . ; MNEMONIC <error message text>/severity/fao=###!/ansi=###/integ-id ! comment
  . ;   or:
- . ; MNEMONIC "error message text"/severity/fao=###!/ansi=### ! comment
- . For i1=1:1 Quit:$Extract($TRanslate(msg,$Char(9)," "),i1)=" "
+ . ; MNEMONIC "error message text"/severity/fao=###!/ansi=###/integ-id ! comment - integ-id is currently optional
+  . For i1=1:1 Quit:$Extract($TRanslate(msg,$Char(9)," "),i1)=" "
  . Set outmsg(cnt)=$Extract(msg,1,i1-1)
  . For i1=i1:1 Quit:$Extract(msg,i1)="<"  Quit:$Extract(msg,i1)=""""
  . Set text=""""
@@ -125,7 +125,7 @@
  . . Set:$Extract(msg,i1)="""" text=text_"\" Set text=text_$Extract(msg,i1)
  . . Quit
  . Set text=text_""""
- . Set (severity,fao)="",ansi="none",lomsg=$TRanslate($Extract(msg,i1+1,$Length(msg)),up_$Char(9,32),lo)
+ . Set (severity,fao,ival)="",ansi="none",lomsg=$TRanslate($Extract(msg,i1+1,$Length(msg)),up_$Char(9,32),lo)
  . For  Quit:lomsg=""  Do
  . . New key,ok,s,val
  . . If $Extract(lomsg,1,2)="!/" Set lomsg=$Extract(lomsg,2,$Length(lomsg)) Quit
@@ -137,6 +137,10 @@
  . . . Quit
  . . Set ok=0
  . . For i1=2:1:$Length(lomsg)+1 Quit:$Extract(lomsg,i1)="/"
+ . . If ""=ival Do  Quit
+ . . . Set ival=$ZCONVERT($Piece($Piece(lomsg,"ansi=",2),"/",2),"U")
+ . . . If ""=ival Set ival=0 Quit
+ . . . Set lomsg=$Extract(lomsg,1,$Length(lomsg)-$Length(ival)-$Length("/"))
  . . Set key=$Piece($Extract(lomsg,2,i1-1),"=",1),val=$TRanslate($Piece($Extract(lomsg,2,i1-1),"=",2),"!")
  . . If key="" Do  Quit
  . . . Use $Principal Write !!,"Message file format error in ",in,":"
@@ -146,6 +150,7 @@
  . . If $Data(severe(key)) Set severity=severe(key),ok=1
  . . If 'ok,$Extract("fao",1,$Length(key))=key Set:+val=val fao=val,ok=1
  . . If 'ok,$Extract("ansi",1,$Length(key))=key Set:+val=val ansi=val,ok=1
+ . . if ok,""'=ival,'$Data(ival(ival)) Set ok=0,lomsg=ival
  . . Do:'ok
  . . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . . Write !,"Error message specification:",!,msg
@@ -165,13 +170,14 @@
  . . Quit
  . Set outmsg(cnt,"code")=(facnum+2048)*65536+((cnt+4096)*8)+severity
  . For msgcnt=1:1:undocmsgcnt  If outmsg(cnt)=undocmnemonic(msgcnt)  Set undocmnemonic(msgcnt,"code")=cnt-1 Quit
- . If 'vms Use out Write $Char(9),"{ """,outmsg(cnt),""", ",text,", ",fao," },",!
+ . If 'vms Use out Write $Char(9),"{ """,outmsg(cnt),""", ",text,", ",fao,", ",ival(ival)," },",!
  . If ansiopen,ansi="none" Set ansi=0 ; Make !/ansi= specification optional (except for first one)
  . Quit:ansi="none"
  . Do:'ansiopen
  . . Open outansi:newversion Use outansi
  . . Do hdr Set ansiopen=1 Write !,"const static readonly int error_ansi[] = {",!
  . . Quit
+ . Set:""'=ival integ(outmsg(cnt))=ival
  . Use outansi Write $Char(9),$Justify(ansi,4),",",$Char(9),"/* ",outmsg(cnt)," */",!
  . Quit
  Use out
@@ -194,6 +200,10 @@
  Write $Char(9),"&"_undocarr_"[0],",!
  Write $Char(9),undocmsgcnt,!,"};",!!
  If ansiopen Use outansi Write $Char(9),"};",! Close outansi
+ ; 3 following lines produce a sorted list & count of mupip integ errors that have been categorized for the table in the A&O guide
+ ;zwrite integ
+ ;set x="",ival=0 for  set x=$o(integ(x)) quit:'$length(x)  if $increment(ival)
+ ;zwrite ival
  Quit
 hdr
  Set prevout=$IO

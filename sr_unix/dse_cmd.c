@@ -50,8 +50,8 @@
  ************************************************************/
 
 static readonly CLI_PARM dse_ftime_parm_values[] = {
-	{ "FLUSH_TIME", "Flush Time: ", PARM_REQ},
-	{ "", "" }
+{ "FLUSH_TIME", "Flush Time: ", PARM_REQ},
+{ "", "" }
 };
 
 static readonly CLI_ENTRY dse_add_qual[] = {
@@ -95,115 +95,115 @@ static readonly CLI_ENTRY dse_all_qual[] = {
 };
 
 static readonly CLI_ENTRY true_false_nochange[] = {
-	{ "FALSE",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	 0 },
-	{ "NOCHANGE",	0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED,	0,	NEG,	VAL_N_A, 0 },
-	{ "TRUE",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NEG,	VAL_N_A,	 0 },
-	{ "", 0, 0 }
+{ "FALSE",    0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
+{ "NOCHANGE", 0, 0, 0, 0, 0, DEFA_PRESENT, VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
+{ "TRUE",     0, 0, 0, 0, 0, 0,            VAL_DISALLOWED, 0, NEG, VAL_N_A, 0 },
+{ "", 0, 0 }
 };
 
 static readonly CLI_ENTRY never_always_allowexisting[] = {
-	{ "ALWAYS",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_STR,	 0 },
-	{ "EXISTING",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_STR,	 0 },
-	{ "FALSE",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_STR,	 0 },
-	{ "NEVER",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_STR,	 0 },
-	{ "TRUE",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_STR,	 0 },
-	{ "", 0, 0 }
+{ "ALWAYS",   0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0 },
+{ "EXISTING", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0 },
+{ "FALSE",    0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0 },
+{ "NEVER",    0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0 },
+{ "TRUE",     0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0 },
+{ "", 0, 0 }
 };
 
 static readonly CLI_ENTRY db_vers[] = {
-	{ "V4",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A,	 0 },
-	{ "V6",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0,	NON_NEG,	VAL_N_A, 	 0 },
-	{ "" }
+{ "V4", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+{ "V6", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+{ "" }
 };
 
 static readonly CLI_ENTRY dse_cfhead_qual[] = {
-{ "ABANDONED_KILLS",           0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "AVG_BLKS_READ",             0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "BLKS_TO_UPGRADE",           0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "BLK_SIZE",                  0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "BLOCKS_FREE",               0, 0, 0,                     0, 			 0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "B_BYTESTREAM",              0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "B_COMPREHENSIVE",           0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "B_DATABASE",                0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "B_INCREMENTAL",             0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "B_RECORD",                  0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "CERT_DB_VER",               0, 0, 0,                     db_vers,             0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
-{ "COMMITWAIT_SPIN_COUNT",     0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "CORRUPT_FILE",              0, 0, 0,                     true_false_nochange, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
-{ "CRIT",                      0, 0, 0,                     0,                   0, 0, VAL_N_A,     0, NEG,     0,        0       },
-{ "CURRENT_TN",                0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "DB_WRITE_FMT",              0, 0, 0,                     db_vers,             0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
-{ "DECLOCATION",               0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "DECVALUE",                  0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "DEF_COLLATION",             0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "DUALSITE_RESYNC_SEQNO",     0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "ENCRYPTION_HASH",           0, 0, 0,                     0,                   0, 0, VAL_N_A,	    0, NON_NEG, 0,        0       },
-{ "EPOCHTAPER",                0, 0, 0,			    0,                   0, 0, VAL_N_A,     0, NEG,     0,        0       },
-{ "FLUSH_TIME",                0, 0, dse_ftime_parm_values, 0,                   0, 0, VAL_NOT_REQ, 0, NON_NEG, VAL_TIME, 0       },
-{ "FREEZE",                    0, 0, 0,                     true_false_nochange, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
-{ "FULLY_UPGRADED",            0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "GOT2V5ONCE",                0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "GVSTATSRESET",              0, 0, 0,                     0,                   0, 0, VAL_N_A,     0, NON_NEG, 0,        0       },
-{ "HARD_SPIN_COUNT",           0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "HEXLOCATION",               0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "HEXVALUE",                  0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "INHIBIT_KILLS",             0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "INTERRUPTED_RECOV",         0, 0, 0,                     true_false_nochange, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
-{ "JNL_SYNCIO",                0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
-{ "JNL_YIELD_LIMIT",           0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "KEY_MAX_SIZE",              0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "KILL_IN_PROG",              0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "LOCATION",                  0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "MACHINE_NAME",              0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
-{ "MAX_TN",                    0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "MBM_SIZE",                  0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "ABANDONED_KILLS",           0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "AVG_BLKS_READ",             0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "BLKS_TO_UPGRADE",           0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "BLK_SIZE",                  0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "BLOCKS_FREE",               0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "B_BYTESTREAM",              0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "B_COMPREHENSIVE",           0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "B_DATABASE",                0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "B_INCREMENTAL",             0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "B_RECORD",                  0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "CERT_DB_VER",               0, 0, 0,                     db_vers,                    0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "COMMITWAIT_SPIN_COUNT",     0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "CORRUPT_FILE",              0, 0, 0,                     true_false_nochange,        0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "CRIT",                      0, 0, 0,                     0,                          0, 0, VAL_N_A,     0, NEG,     0,        0       },
+{ "CURRENT_TN",                0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "DB_WRITE_FMT",              0, 0, 0,                     db_vers,                    0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "DECLOCATION",               0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "DECVALUE",                  0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "DEF_COLLATION",             0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "DUALSITE_RESYNC_SEQNO",     0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "ENCRYPTION_HASH",           0, 0, 0,                     0,                          0, 0, VAL_N_A,     0, NON_NEG, 0,        0       },
+{ "EPOCHTAPER",                0, 0, 0,                     0,                          0, 0, VAL_N_A,     0, NEG,     0,        0       },
+{ "FLUSH_TIME",                0, 0, dse_ftime_parm_values, 0,                          0, 0, VAL_NOT_REQ, 0, NON_NEG, VAL_TIME, 0       },
+{ "FREEZE",                    0, 0, 0,                     true_false_nochange,        0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "FULLY_UPGRADED",            0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "GOT2V5ONCE",                0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "GVSTATSRESET",              0, 0, 0,                     0,                          0, 0, VAL_N_A,     0, NON_NEG, 0,        0       },
+{ "HARD_SPIN_COUNT",           0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "HEXLOCATION",               0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "HEXVALUE",                  0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "INHIBIT_KILLS",             0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "INTERRUPTED_RECOV",         0, 0, 0,                     true_false_nochange,        0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "JNL_SYNCIO",                0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "JNL_YIELD_LIMIT",           0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "KEY_MAX_SIZE",              0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "KILL_IN_PROG",              0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "LOCATION",                  0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "MACHINE_NAME",              0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "MAX_TN",                    0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "MBM_SIZE",                  0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
 /* Maintain MUTEX_* qualifiers for backward compatibility; remove these entries after sufficient time has passed for users to have
  * made the switch to the synonymn qualifiers that don't have the MUTEX_ prefix.
  */
-{ "MUTEX_HARD_SPIN_COUNT",     0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "MUTEX_SLEEP_SPIN_COUNT",    0, 0, 0,                     0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "MUTEX_SPIN_SLEEP_MASK",     0, 0, 0,                     0, 		         0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "MUTEX_HARD_SPIN_COUNT",     0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "MUTEX_SLEEP_SPIN_COUNT",    0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "MUTEX_SPIN_SLEEP_MASK",     0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 /* End MUTEX_* qualifiers */
-{ "NULL_SUBSCRIPTS",           0, 0, 0,                     never_always_allowexisting, 0, 0, VAL_REQ, 0, NON_NEG, VAL_STR, 0     },
-{ "ONLINE_NBB",                0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
-{ "OVERRIDE",                  0, 0, 0,			    0,                   0, 0, VAL_N_A,     0, 0,       0,        0       },
-{ "PRE_READ_TRIGGER_FACTOR",   0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "QDBRUNDOWN",                0, 0, 0,                     0,                   0, 0, VAL_N_A,     0, NEG,     0,        0       },
-{ "RC_SRV_COUNT",              0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "RECORD_MAX_SIZE",           0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "REFERENCE_COUNT",           0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "REG_SEQNO",                 0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "RESERVED_BYTES",            0, 0, 0, 	   	    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "SIZE",                      0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "SLEEP_SPIN_COUNT",          0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "SPIN_SLEEP_MASK",           0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "STDNULLCOLL",               0, 0, 0, 		    true_false_nochange, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
-{ "STRM_NUM",                  0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "STRM_REG_SEQNO",            0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "TIMERS_PENDING",            0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "TOTAL_BLKS",                0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "TRIGGER_FLUSH",             0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "UPD_RESERVED_AREA",         0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "UPD_WRITER_TRIGGER_FACTOR", 0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "VALUE",                     0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "WAIT_DISK",                 0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "WARN_MAX_TN",               0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "WRITES_PER_FLUSH",          0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
-{ "ZQGBLMOD_SEQNO",            0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
-{ "ZQGBLMOD_TN",               0, 0, 0, 		    0,                   0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "NULL_SUBSCRIPTS",           0, 0, 0,                     never_always_allowexisting, 0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "ONLINE_NBB",                0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "OVERRIDE",                  0, 0, 0,                     0,                          0, 0, VAL_N_A,     0, 0,       0,        0       },
+{ "PRE_READ_TRIGGER_FACTOR",   0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "QDBRUNDOWN",                0, 0, 0,                     0,                          0, 0, VAL_N_A,     0, NEG,     0,        0       },
+{ "RC_SRV_COUNT",              0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "RECORD_MAX_SIZE",           0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "REFERENCE_COUNT",           0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "REG_SEQNO",                 0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "RESERVED_BYTES",            0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "SIZE",                      0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "SLEEP_SPIN_COUNT",          0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "SPIN_SLEEP_MASK",           0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "STDNULLCOLL",               0, 0, 0,                     true_false_nochange,        0, 0, VAL_REQ,     0, NON_NEG, VAL_STR,  0       },
+{ "STRM_NUM",                  0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "STRM_REG_SEQNO",            0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "TIMERS_PENDING",            0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "TOTAL_BLKS",                0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "TRIGGER_FLUSH",             0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "UPD_RESERVED_AREA",         0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "UPD_WRITER_TRIGGER_FACTOR", 0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "VALUE",                     0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "WAIT_DISK",                 0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "WARN_MAX_TN",               0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "WRITES_PER_FLUSH",          0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_DCM },
+{ "ZQGBLMOD_SEQNO",            0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
+{ "ZQGBLMOD_TN",               0, 0, 0,                     0,                          0, 0, VAL_REQ,     0, NON_NEG, VAL_NUM,  VAL_HEX },
 { "" }
 };
 
 static readonly CLI_ENTRY dse_change_qual[] = {
-{ "BLOCK",      0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
-{ "BSIZ",       0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
-{ "CMPC",       dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
-{ "FILEHEADER", dse_chng_fhead, dse_cfhead_qual, 0, 0, cli_disallow_dse_chng_fhead, 0, VAL_DISALLOWED, 0, 0,       0,       0       },	/* BYPASSOK */
-{ "LEVEL",      0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
-{ "OFFSET",     dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
-{ "RECORD",     dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
-{ "RSIZ",       dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
-{ "TN",         0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },	/* BYPASSOK */
+{ "BLOCK",      0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "BSIZ",       0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "CMPC",       dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "FILEHEADER", dse_chng_fhead, dse_cfhead_qual, 0, 0, cli_disallow_dse_chng_fhead, 0, VAL_DISALLOWED, 0, 0,       0,       0       },
+{ "LEVEL",      0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "OFFSET",     dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "RECORD",     dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "RSIZ",       dse_chng_rhead, 0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "TN",         0,              0,               0, 0, 0,                           0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
 { "" }
 };
 
@@ -270,8 +270,8 @@ static readonly CLI_ENTRY dse_eval_qual[] = {
 };
 
 static readonly CLI_PARM dse_freg_parm_values[] = {
-	{ "REGION", "*", PARM_REQ},
-	{ "", "" }
+{ "REGION", "*", PARM_REQ},
+{ "", "" }
 };
 
 static readonly CLI_ENTRY dse_find_qual[] = {
@@ -289,8 +289,8 @@ static readonly CLI_ENTRY dse_find_qual[] = {
 };
 
 static readonly CLI_ENTRY dse_integrit_qual[] = {
-{ "BLOCK",   0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
-{ "CRIT",    0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG,     0,       0       },
+{ "BLOCK", 0, 0, 0, 0, 0, 0, VAL_REQ, 0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "CRIT",  0, 0, 0, 0, 0, 0, VAL_N_A, 0, NEG,     0,       0       },
 { "" }
 };
 
@@ -319,15 +319,15 @@ static readonly CLI_ENTRY dse_over_qual[] = {
 };
 
 static readonly CLI_ENTRY dse_range_qual[] = {
-{ "BUSY",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG,	VAL_N_A, 0	 },
-{ "CRIT",  0, 0, 0, 0, 0, 0, VAL_N_A, 	    0, NEG, 	0,       0       },
-{ "FROM",  0, 0, 0, 0, 0, 0, VAL_REQ,	    0, NON_NEG,	VAL_NUM, VAL_HEX },
-{ "INDEX", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG,	VAL_N_A, 0	 },
-{ "LOST",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG,	VAL_N_A, 0	 },
-{ "LOWER", 0, 0, 0, 0, 0, 0, VAL_REQ,	    0, NON_NEG,	VAL_STR, 0	 },
-{ "STAR",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG,	VAL_N_A, 0	 },
-{ "TO",	   0, 0, 0, 0, 0, 0, VAL_REQ,	    0, NON_NEG,	VAL_NUM, VAL_HEX },
-{ "UPPER", 0, 0, 0, 0, 0, 0, VAL_REQ,	    0, NON_NEG,	VAL_STR, 0	 },
+{ "BUSY",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG,     VAL_N_A, 0       },
+{ "CRIT",  0, 0, 0, 0, 0, 0, VAL_N_A,        0, NEG,     0,       0       },
+{ "FROM",  0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "INDEX", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0       },
+{ "LOST",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0       },
+{ "LOWER", 0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0       },
+{ "STAR",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0       },
+{ "TO",    0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, VAL_HEX },
+{ "UPPER", 0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0       },
 { "" }
 };
 

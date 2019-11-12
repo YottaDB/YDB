@@ -2494,6 +2494,14 @@
 
    The optional qualifiers for MUPIP REORG are:
 
+3 Downgrade
+   Downgrade
+
+   Downgrades blocks to a prior major version DB format. Use REORG -DOWNGRADE
+   only when you have determined there is a clear reason to downgrade the DB
+   format of a database to a prior format and there are no conditions that
+   preclude that possibility.
+
 3 Encrypt
    Encrypt
 
@@ -2785,6 +2793,14 @@
 
    TRUNCATE does not complete if there is a concurrent online BACKUP or use
    of the snapshot mechanism, for example by INTEG.
+
+3 UPgrade
+   UPgrade
+
+   Upgrade blocks to current DB version format. Use REORG -UPGRADE when it is
+   a part of a release notes procedure to upgrade the DB version format of a
+   database or when you encounter a database integrity error that requires
+   running REORG -UPGRADE.
 
 3 Examples
    Examples
@@ -3729,7 +3745,7 @@
    vary in measurement speed and estimate accuracy. The format of the MUPIP
    SIZE command is:
 
-   MUPIP SI[ZE] [-h[euristic]=estimation_technique] [-s[elect]=global-name-list] [-r[egion]=region-list] [-a[djacency]=integer]
+   MUPIP SI[ZE] [-h[euristic]=estimation_technique] [-se[lect]=global-name-list] [-r[egion]=region-list] [-a[djacency]=integer] [-su[bscript]]=global-list
 
    The optional qualifiers of MUPIP SIZE are:
 
@@ -3749,16 +3765,18 @@
      o scan,level=<lvl>
 
        Traverses the global variable tree and counts the actual number of
-       records and blocks at levels from the root down to the level specified
-       by lvl (default is 0, the data blocks). If the given level is
-       non-negative, it is the lowest block level of the global for which the
-       count is requested. So, 0 means all blocks, 1 means all index blocks,
-       2 means all index blocks of level 2 and above, and so on. SCAN counts
-       a negative level from the root of the global tree where -1 means
-       children of the root.
+       records at levels from the root down to the level specified by lvl;
+       the number of records at a level is the same as the number of blocks
+       at the next lower level. The default is 1, which gives the count of
+       level 0 blocks, which are the blocks containing data rather than
+       metadata. If the given level is non-negative, it is the lowest block
+       level of the global for which the count is requested. So, 0 means all
+       blocks, 1 means all index blocks, 2 means all index blocks of level 2
+       and above, and so on. SCAN counts a negative level from the root of
+       the global tree where -1 means children of the root.
 
-       The technique reports the results for levels other than 0 show
-       adjacency for the next lower (one less) level.
+       Specifying, a level 0 to get a record count for data increases the
+       processing work close to an order of magnitude.
 
      o arsample,samples=<smpls>
 
@@ -3801,8 +3819,10 @@
 
    -Select
 
-   Specifies the global variables on which MUPIP SIZE runs. If -SELECT is not
-   specified, MUPIP SIZE selects all global variables.
+   Specifies the global variables on which MUPIP SIZE runs. -SELECT is
+   incompatible with -SUBSCRIPT.If neither -SELECT or -SUBSCRIPT is
+   specified, MUPIP SIZE selects all global variables in the specified
+   region(s).
 
    The format of the SELECT qualifier is:
 
@@ -3841,6 +3861,22 @@
    This example estimates the size of global variables g1, g2 and g3 using
    accept/reject sampling with the default number of samples regardless of
    the region in which they reside.
+
+   -Subscript
+
+   Specifies the subscripted/non-subscripted global variables on which MUPIP
+   SIZE runs. -SUBSCRIPT is incompatible with -SELECT.
+
+   The format of the SUBSCRIPT qualifier is:
+
+   -su[bscript]=global-list
+
+   global-name-list can be:
+
+     o A range of global variables denoted by start:end syntax. For example,
+       -subscript="^g1:^g4".
+     o A range of subscripted global variables denoted by start:end syntax.
+       For example, -subscript="^g(1):^g(4)".
 
    **Note**
 
@@ -5757,6 +5793,14 @@
 
    -CHECKTN is incompatible with -BACKWARD.
 
+   -[CO]RRUPTDB
+
+   Extracts journal records into a single file even if the database is
+   corrupt or missing. Always specify a journal file name when you are using
+   -CORRUPTDB. -CORRUPTDB does not recognize the wildcard character "*" for
+   journal file name and is incompatible with -FENCES, -LOST, and -BROKEN
+   qualifiers.
+
    -[NO]ER[ROR_LIMIT][=integer]
 
    Specifies the number of errors that MUPIP JOURNAL processing accepts. When
@@ -6739,8 +6783,8 @@
    [tls_replication_qualifiers]
    [replication_filter_qualifier]
 
-   The square brackets [] denote an optional qualifer group. The optional and
-   mandatory qualifiers in each qualifer group are as follows:
+   The square brackets [] denote an optional qualifier group. The optional
+   and mandatory qualifiers in each qualifier group are as follows:
 
    +------------------------------------------------------------------------------------+
    |             Category              |                   Qualifiers                   |
@@ -7709,8 +7753,8 @@
    [si_replication_qualifiers]
    [tls_replication_qualifier]
 
-   The square brackets [] denote an optional qualifer group. The optional and
-   mandatory qualifiers in each qualifer group are as follows:
+   The square brackets [] denote an optional qualifier group. The optional
+   and mandatory qualifiers in each qualifier group are as follows:
 
    +----------------------------------------------------------------------------------------+
    |          Category           |                        Qualifiers                        |
@@ -8363,6 +8407,8 @@
    |-----------+----------------+-----------------------------------------------------+--------|
    |           |                |-BA[CKWARD] | -FO[RWARD]                             |        |
    |-----------+----------------+-----------------------------------------------------+--------|
+   |           |                |-CO[RRUPTDB]                                         |V6.3-010|
+   |-----------+----------------+-----------------------------------------------------+--------|
    |L[OAD]     |file-name       |-BE[GIN]=integer                                     |        |
    |-----------+----------------+-----------------------------------------------------+--------|
    |           |                |-BLOCK_DENSITY                                       |        |
@@ -8377,7 +8423,9 @@
    |-----------+----------------+-----------------------------------------------------+--------|
    |           |                |-O[NERROR]                                           |        |
    |-----------+----------------+-----------------------------------------------------+--------|
-   |REO[RG]    |                |-ENCR[YPT]=key                                       |V6.3-000|
+   |REO[RG]    |                |-D[OWNGRADE]                                         |        |
+   |-----------+----------------+-----------------------------------------------------+--------|
+   |           |                |-ENCR[YPT]=key                                       |V6.3-000|
    |-----------+----------------+-----------------------------------------------------+--------|
    |           |                |-E[XCLUDE]=global-name-list                          |        |
    |-----------+----------------+-----------------------------------------------------+--------|
@@ -8385,7 +8433,13 @@
    |-----------+----------------+-----------------------------------------------------+--------|
    |           |                |-I[NDEX_FILL_FACTOR]=integer                         |        |
    |-----------+----------------+-----------------------------------------------------+--------|
-   |           |                |-REG[ION]                                            |V5.5-000|
+   |           |                |-K[EEP]={pct%|blocks}                                |V6.3-009|
+   |-----------+----------------+-----------------------------------------------------+--------|
+   |           |                |-NOCO[ALESCE]                                        |V6.3-009|
+   |-----------+----------------+-----------------------------------------------------+--------|
+   |           |                |-NOSP[LIT]                                           |V6.3-009|
+   |-----------+----------------+-----------------------------------------------------+--------|
+   |           |                |-NOSW[AP]                                            |V6.3-009|
    |-----------+----------------+-----------------------------------------------------+--------|
    |           |                |-R[ESUME]                                            |        |
    |-----------+----------------+-----------------------------------------------------+--------|
@@ -8886,11 +8940,4 @@
    information in this publication is accurate as of its publication date;
    such information is subject to change without notice. FIS is not
    responsible for any errors or defects.
-
-   **Note**
-
-   This help file is a concise representation of revision V6.3-009 of the
-   UNIX Administration and Operations Guide. To obtain a copy of the current
-   revision, go to www.fis-gtm.com and then click on the User Documentation
-   tab.
 

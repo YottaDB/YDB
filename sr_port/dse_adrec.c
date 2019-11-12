@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,6 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+#include "gdsdbver.h"
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -53,25 +55,29 @@ error_def(ERR_CPBEYALLOC);
 error_def(ERR_DBRDONLY);
 error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DSEFAIL);
+error_def(ERR_DSEINVALBLKID);
 error_def(ERR_GVIS);
 error_def(ERR_REC2BIG);
 
 void dse_adrec(void)
 {
-	block_id	blk, blk_ptr;
 	blk_segment	*bs1, *bs_ptr;
+	block_id	blk, blk_ptr;
+	block_id_32	temp;
+	boolean_t	long_blk_id;
 	char		data[MAX_LINE], key[MAX_KEY_SZ + 1];
 	int		data_len, key_len;
 	int4		blk_seg_cnt, blk_size;
-	short int	new_len, rsize, size;
+	long		blk_id_size;
 	sgmnt_addrs	*csa;
+	short int	new_len, rsize, size;
 	sm_uc_ptr_t	b_top, key_top, lbp, new_bp, rp, r_top;
 	srch_blk_status	blkhist;
 	unsigned short	cc;
 
 	csa = cs_addrs;
 	if (gv_cur_region->read_only)
-                rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_DBRDONLY, 2, DB_LEN_STR(gv_cur_region));
 	CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 	if (BADDSEBLK == (blk = dse_getblk("BLOCK", DSENOBML, DSEBLKCUR)))		/* WARNING: assignment */
 		return;
@@ -89,6 +95,21 @@ void dse_adrec(void)
 		rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
 	lbp = (uchar_ptr_t)malloc(blk_size);
 	memcpy(lbp, blkhist.buffaddr, blk_size);
+	if (((blk_hdr_ptr_t)lbp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
+	{
+#		ifdef BLK_NUM_64BIT
+		long_blk_id = TRUE;
+		blk_id_size = SIZEOF(block_id_64);
+#		else
+		t_abort(gv_cur_region, csa);
+		free(lbp);
+		rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#		endif
+	} else
+	{
+		long_blk_id = FALSE;
+		blk_id_size = SIZEOF(block_id_32);
+	}
 	if (((blk_hdr_ptr_t)lbp)->bsiz > blk_size)
 		((blk_hdr_ptr_t)lbp)->bsiz = blk_size;
 	else if (((blk_hdr_ptr_t)lbp)->bsiz < SIZEOF(blk_hdr))
@@ -103,14 +124,34 @@ void dse_adrec(void)
 			free(lbp);
 			return;
 		}
-		if (BADDSEBLK == (blk_ptr = dse_getblk("POINTER", DSENOBML, DSEBLKNOCUR)))		/* WARNING: assignment */
+		if (BADDSEBLK == (blk_ptr = dse_getblk("POINTER", DSENOBML, DSEBLKNOCUR)))	/* WARNING: assignment */
 		{
 			t_abort(gv_cur_region, csa);
 			free(lbp);
 			return;
 		}
-		MEMCP(&data[0], (char *)&blk_ptr, 0, SIZEOF(block_id), SIZEOF(block_id));
-		data_len = SIZEOF(block_id);
+		if (long_blk_id)
+		{
+#			ifdef BLK_NUM_64BIT
+			MEMCP(&data[0], (char *)&blk_ptr, 0, SIZEOF(block_id_64), SIZEOF(block_id_64));
+			data_len = SIZEOF(block_id_64);
+#			else
+			t_abort(gv_cur_region, csa);
+			free(lbp);
+			rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#			endif
+		} else
+		{
+			if (blk_ptr != (block_id_32)blk_ptr){
+				util_out_print("Error: adding 64-bit pointer to pre-V7 block", TRUE);
+				t_abort(gv_cur_region, csa);
+				free(lbp);
+				return;
+			}
+			temp = (block_id_32)blk_ptr;
+			MEMCP(&data[0], (char *)&temp, 0, SIZEOF(block_id_32), SIZEOF(block_id_32));
+			data_len = SIZEOF(block_id_32);
+		}
 	} else
 	{
 		if (CLI_PRESENT != cli_present("DATA"))
@@ -137,8 +178,8 @@ void dse_adrec(void)
 	if (CLI_PRESENT == cli_present("RECORD"))
 	{
 		if (!(rp = skan_rnum(lbp, TRUE)))
-		{	/* a FALSE return from skan_rnum means either a cli parser problem or a record beyond the end of the block
-			 * both of which cause output
+		{	/* a FALSE return from skan_rnum means either a cli parser problem or
+			 * a record beyond the end of the block both of which cause output
 			 */
 			t_abort(gv_cur_region, csa);
 			free(lbp);
@@ -147,8 +188,8 @@ void dse_adrec(void)
 	} else if (CLI_PRESENT == cli_present("OFFSET"))
 	{
 		if (!(rp = skan_offset(lbp, TRUE)))
-		{	/* a FALSE return from skan_rnum means either a cli parser problem or an offset beyond the end of the block
-			 * both of which cause output
+		{	/* a FALSE return from skan_offset means either a cli parser problem or
+			 * an offset beyond the end of the block both of which cause output
 			 */
 			t_abort(gv_cur_region, csa);
 			free(lbp);
@@ -180,7 +221,7 @@ void dse_adrec(void)
 		if (r_top >= b_top)
 			r_top = b_top;
 		if (((blk_hdr_ptr_t)lbp)->levl)
-			key_top = r_top - SIZEOF(block_id);
+			key_top = r_top - blk_id_size;
 		else
 		{
 			for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )

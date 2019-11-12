@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,12 +30,14 @@ error_def(ERR_DSEBLKRDFAIL);
 boolean_t dse_is_blk_free (block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr)
 {
 	sm_uc_ptr_t	bp;
-	uint4		index, offset, status;
+	int4		status;
+	block_id	index, offset;
 
-	index =  (blk / cs_addrs->hdr->bplmap) * cs_addrs->hdr->bplmap;
+	index = (blk / cs_addrs->hdr->bplmap) * cs_addrs->hdr->bplmap;
 	offset = blk - index;
-	if(!(bp = t_qread (index, cycle, cr)))
+	if (!(bp = t_qread (index, cycle, cr)))
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
-	status = dse_lm_blk_free(offset * BML_BITS_PER_BLK, bp + SIZEOF(blk_hdr));
+	assert(offset == (int4)offset); /* offset is an index to an lmap and should never be larger then BLKS_PER_LMAP */
+	status = dse_lm_blk_free((int4)offset, bp + SIZEOF(blk_hdr));
 	return (0 != status);	/* status == 00 => busy;  01, 11, 10 (not currently legal) => free */
 }

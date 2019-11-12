@@ -31,6 +31,8 @@
 /* Include prototypes */
 #include "t_end.h"
 #include "t_retry.h"
+#include "collseq.h"
+#include "mu_getkey.h"
 #include "mupip_size.h"
 #include "util.h"
 #include "t_begin.h"
@@ -65,6 +67,10 @@ GBLREF	int4			process_id;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned int		t_tries;
+GBLREF	boolean_t		mu_key;
+GBLREF	boolean_t		null_coll_key;
+GBLREF	gv_key			*mu_start_key;
+GBLREF	gv_key			*mu_end_key;
 
 #define APPROX_F_MAX		500		/* Approximate upper bound for the number of records per index block in
 						 * a database. The estimated max fanning factor is initially APPROX_F_MAX.
@@ -149,6 +155,8 @@ int4 mu_size_arsample(glist *gl_ptr, uint4 M, int seed)
 	if (!seed)
 		seed = (int4)(time(0) * process_id);
 	srand48(seed);
+	if (MUKEY_NULLSUBS == mu_key)
+		CHECK_COLL_KEY(gl_ptr, null_coll_key);
 	/* do random traversals until M of them are accepted at level 1 */
 	INIT_STATS(rstat);
 	for (k = 1; rstat.N[1] < M; k++)

@@ -114,7 +114,6 @@
 
    -A[LL]
    -L[OCK]
-   -[NO]C[RIT]
    -[NO]EXACT
    -[NO]I[NTERACTIVE]
    -O[UTPUT]="file-name"
@@ -135,19 +134,6 @@
      o Issue a CLEAR - ALL only when there are no active GT.M processes using
        LOCKs, or when you can predict the effect on the application.
      o By default, CLEAR -ALL operates interactively (-INTERACTIVE).
-
-   -[NO]C[RIT]
-
-   Allows LKE CLEAR to work even if another process is holding a critical
-   section.
-
-   **Caution**
-
-   This can damage current LOCKs and the LOCK mechanism. It is intended for
-   use only under the direction of FIS.
-
-   By default LKE operates in CRIT mode and ensures a consistent view of
-   LOCKs by using the database critical section(s).
 
    -[NO]EXACT
 
@@ -644,11 +630,4 @@
    information in this publication is accurate as of its publication date;
    such information is subject to change without notice. FIS is not
    responsible for any errors or defects.
-
-   **Note**
-
-   This help file is a concise representation of revision V6.3-009 of the
-   UNIX Administration and Operations Guide. To obtain a copy of the current
-   revision, go to www.fis-gtm.com and then click on the User Documentation
-   tab.
 

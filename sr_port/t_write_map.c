@@ -114,6 +114,7 @@ void t_write_map (
 		while (reference_cnt--)
 		{
 			blkid = *updptr;
+			assert(blkid == (int4)blkid);
 			assert((int4)blkid < csa->hdr->bplmap);
 			updptr++;
 		}

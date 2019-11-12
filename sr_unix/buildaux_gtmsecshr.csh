@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2015 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -23,8 +23,13 @@ echo ""
 source $gtm_tools/gtm_env.csh
 
 set aix_loadmap_option = ''
-$gtm_com/IGS $3/gtmsecshr "STOP"	# stop any active gtmsecshr processes
-$gtm_com/IGS $3/gtmsecshr "RMDIR"	# remove root-owned gtmsecshr, gtmsecshrdir, gtmsecshrdir/gtmsecshr files/dirs
+$gtm_com/IGS $3/gtmsecshr "STOP"		# stop any active gtmsecshr processes
+$gtm_com/IGS $3/gtmsecshr "RMDIR"		# remove root-owned gtmsecshr, gtmsecshrdir, gtmsecshrdir/gtmsecshr files/dirs
+if ( -d $3/utf8/gtmsecshrdir ) then
+	# In case gtmsecshr in utf8/ dir is not a softlink (possible if this is an installation from a GT.M kit)
+	$gtm_com/IGS $3/utf8/gtmsecshr "STOP"	# stop any active gtmsecshr processes
+	$gtm_com/IGS $3/utf8/gtmsecshr "RMDIR"	# remove root-owned gtmsecshr* files/dirs
+endif
 foreach file (gtmsecshr gtmsecshr_wrapper)
 	if ( $HOSTOS == "AIX") then
 	    set aix_loadmap_option = "-bcalls:$gtm_map/$file.loadmap"
@@ -49,12 +54,15 @@ foreach file (gtmsecshr gtmsecshr_wrapper)
 	endif
 end
 mkdir ../gtmsecshrdir
-mv ../gtmsecshr ../gtmsecshrdir	  	# move actual gtmsecshr into subdirectory
-mv ../gtmsecshr_wrapper ../gtmsecshr	  # rename wrapper to be actual gtmsecshr
+mv ../gtmsecshr ../gtmsecshrdir		# move actual gtmsecshr into subdirectory
+mv ../gtmsecshr_wrapper ../gtmsecshr	# rename wrapper to be actual gtmsecshr
 
 # add symbolic link to gtmsecshrdir in utf8 if utf8 exists
-if ( -d utf8 ) then
-	cd utf8; ln -s ../gtmsecshrdir gtmsecshrdir; cd -
+if ( -d $3/utf8 ) then
+	cd $3/utf8
+	ln -s ../gtmsecshrdir .
+	ln -s ../gtmsecshr .
+	cd -
 endif
 $gtm_com/IGS $3/gtmsecshr "CHOWN" # make gtmsecshr, gtmsecshrdir, gtmsecshrdir/gtmsecshr files/dirs root owned
 if ($status) @ buildaux_gtmsecshr_status++

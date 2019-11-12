@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,7 +65,7 @@ error_def(ERR_FAKENOSPCLEARED);
  */
 void fake_enospc(void)
 {
-#	ifdef DEBUG
+#	if defined (DEBUG) && !defined (STATIC_ANALYSIS)
 	boolean_t	ok_to_interrupt;
 	uint4		deferred_count;
 	char		enospc_enable_list[MAX_REGIONS];
@@ -180,7 +180,7 @@ void fake_enospc(void)
 /* This is a timer routine used by fake_enospc, above. */
 void handle_deferred_syslog(void)
 {
-#	ifdef DEBUG
+#	if defined (DEBUG) && !defined (STATIC_ANALYSIS)
 	boolean_t	ok_to_interrupt;
 	uint4		deferred_count;
 

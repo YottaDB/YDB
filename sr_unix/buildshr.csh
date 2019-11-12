@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2015 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -69,7 +69,7 @@ default:
 
 endsw
 
-version $1 $2
+set setactive_parms = ( $1 $2 ) ; source $gtm_tools/setactive.csh
 if ( $buildshr_status != 0 ) then
 	echo "buildshr-I-usage, Usage: buildshr.csh <version> <image type> <target directory>"
 	exit $buildshr_status

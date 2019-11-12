@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,8 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
-#include <signal.h>
+#include "gtm_signal.h"
 
 #include "gtmctype.h"
 #include "gdsroot.h"
@@ -41,41 +40,53 @@
 #include "gtm_utf8.h"
 #endif
 
-GBLDEF bool             wide_out;
-GBLDEF char             patch_comp_key[MAX_KEY_SZ + 1];
-GBLDEF unsigned short   patch_comp_count;
-GBLDEF int              patch_rec_counter;
-
-GBLREF sgmnt_addrs      *cs_addrs;
-GBLREF VSIG_ATOMIC_T	util_interrupt;
-GBLREF int              patch_is_fdmp;
-GBLREF int              patch_fdmp_recs;
-GBLREF gd_region    	*gv_cur_region;
+GBLDEF bool		wide_out;
+GBLDEF char		patch_comp_key[MAX_KEY_SZ + 1];
+GBLREF gd_region	*gv_cur_region;
 GBLREF gv_namehead	*gv_target;
+GBLDEF int		patch_rec_counter;
+GBLREF int		patch_is_fdmp;
+GBLREF int		patch_fdmp_recs;
+GBLREF sgmnt_addrs	*cs_addrs;
+GBLDEF unsigned short	patch_comp_count;
+GBLREF VSIG_ATOMIC_T	util_interrupt;
 
-#define MAX_UTIL_LEN		80
-#define	NUM_BYTES_PER_LINE	20
+error_def(ERR_DSEINVALBLKID);
 
-sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_t b_top)
+#define NUM_BYTES_PER_LINE	20
+
+sm_uc_ptr_t dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr_t b_top)
 {
-	sm_uc_ptr_t	r_top, key_top, cptr0, cptr1, cptr_top, cptr_base = NULL, cptr_next = NULL;
+	block_id	blk_id;
+	boolean_t	rechdr_displayed = FALSE, long_blk_id;
 	char		key_buf[MAX_KEY_SZ + 1], *temp_ptr, *temp_key, util_buff[MAX_UTIL_LEN];
 	char		*prefix_str, *space_str, *dot_str, *format_str;
-	unsigned short	cc;
-	int		tmp_cmpc;
-	unsigned short 	size;
+	int		tmp_cmpc, buf_len, field_width, fastate, chwidth = 0;
 	int4		util_len, head;
-	uint4 		ch;
-	int		buf_len, field_width,fastate, chwidth = 0;
-        ssize_t   	chlen;
-	block_id	blk_id;
-	boolean_t	rechdr_displayed = FALSE;
+	long		blk_id_size;
+	sm_uc_ptr_t	r_top, key_top, cptr0, cptr1, cptr_top, cptr_base = NULL, cptr_next = NULL;
+	ssize_t		chlen;
+	uint4		ch;
+	unsigned short	cc, size;
 
 	if (rp >= b_top)
 		return NULL;
 	head = cli_present("HEADER");
 	GET_SHORT(size, &((rec_hdr_ptr_t)rp)->rsiz);
 	cc = EVAL_CMPC((rec_hdr_ptr_t)rp);
+	if(((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
+	{
+#		ifdef BLK_NUM_64BIT
+		long_blk_id = TRUE;
+		blk_id_size = SIZEOF(block_id_64);
+#		else
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#		endif
+	} else
+	{
+		long_blk_id = FALSE;
+		blk_id_size = SIZEOF(block_id_32);
+	}
 	if ((CLI_NEGATED != head) && !patch_is_fdmp)
 	{
 		MEMCPY_LIT(util_buff, "Rec:");
@@ -83,7 +94,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 		util_len += i2hex_nofill(patch_rec_counter, (uchar_ptr_t)&util_buff[util_len], 4);
 		MEMCPY_LIT(&util_buff[util_len], "  Blk ");
 		util_len += SIZEOF("  Blk ") - 1;
-		util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len], 8);
+		util_len += i2hexl_nofill(blk, (uchar_ptr_t)&util_buff[util_len], 16);
 		MEMCPY_LIT(&util_buff[util_len], "  Off ");
 		util_len += SIZEOF("  Off ") - 1;
 		util_len += i2hex_nofill((int)(rp - bp), (uchar_ptr_t)&util_buff[util_len], 4);
@@ -106,7 +117,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 	if (cc > patch_comp_count)
 		cc = patch_comp_count;
 	if (((blk_hdr_ptr_t)bp)->levl)
-		key_top = r_top - SIZEOF(block_id);
+		key_top = r_top - blk_id_size;
 	else
 	{
 		for (key_top = rp + SIZEOF(rec_hdr);  key_top < r_top;)
@@ -125,14 +136,21 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 			patch_fdmp_recs++;
 	} else
 	{
-		if (r_top - SIZEOF(block_id) >= key_top)
+		if ((r_top - blk_id_size) >= key_top)
 		{
-			GET_LONG(blk_id, key_top);
+			if(long_blk_id == TRUE)
+#				ifdef BLK_NUM_64BIT
+				GET_BLK_ID_64(blk_id, key_top);
+#				else
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#				endif
+			else
+				GET_BLK_ID_32(blk_id, key_top);
 			if ((((blk_hdr_ptr_t)bp)->levl) || (blk_id <= cs_addrs->ti->total_blks))
 			{
 				MEMCPY_LIT(util_buff, "Ptr ");
 				util_len = SIZEOF("Ptr ") - 1;
-				util_len += i2hex_nofill(blk_id, (uchar_ptr_t)&util_buff[util_len], SIZEOF(blk_id) * 2);
+				util_len += i2hexl_nofill(blk_id, (uchar_ptr_t)&util_buff[util_len], 16);
 				MEMCPY_LIT(&util_buff[util_len], "  ");
 				util_len += SIZEOF("  ") - 1;
 				util_buff[util_len] = 0;
@@ -142,7 +160,7 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 		util_out_print("Key ", FALSE);
 		if ((r_top == b_top)
 			&& ((blk_hdr_ptr_t)bp)->levl && !EVAL_CMPC((rec_hdr_ptr_t)rp)
-			&& ((r_top - rp) == (SIZEOF(rec_hdr) + SIZEOF(block_id))))
+			&& ((r_top - rp) == (SIZEOF(rec_hdr) + blk_id_size)))
 		{	/* *-key */
 			assert('\0' == patch_comp_key[0]);
 			assert('\0' == patch_comp_key[1]);
@@ -183,8 +201,9 @@ sm_uc_ptr_t  dump_record(sm_uc_ptr_t rp, block_id blk, sm_uc_ptr_t bp, sm_uc_ptr
 			for (cptr0 = rp;  cptr0 < r_top;  cptr0 += NUM_BYTES_PER_LINE)
 			{
 				if (util_interrupt)
-				{ /* return, rather than signal ERR_CTRLC so that the calling routine
-				     can deal with that signal and do the appropriate cleanup */
+				{/* return, rather than signal ERR_CTRLC so that the calling routine
+				  * can deal with that signal and do the appropriate cleanup
+				  */
 					return NULL;
 				}
 				util_len = 8;

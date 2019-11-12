@@ -25,6 +25,7 @@
 #include "collseq.h"
 #include "gdsblk.h"
 #include "format_targ_key.h"
+#include "nametabtyp.h"
 
 GBLREF block_id		mu_int_path[];
 GBLREF int		mu_int_plen;
@@ -44,23 +45,28 @@ GBLREF int		rec_len;
 
 error_def(ERR_NULSUBSC);
 
-#define MAX_UTIL_LEN 40
+#define MAX_UTIL_LEN 50
 #define BLOCK_WINDOW 8
 #define LEVEL_WINDOW 3
 #define OFFSET_WINDOW 4
 
+#define INDEX_INDX 4
 #define TEXT1 ":     "
 #define TEXT2 " "
 #define TEXT3 ":"
 #define TEXT4 ", "
+#define	TABINTRO "        Nature: #"	/* using 8 spaces for <TAB> makes the SIZEOF() work; using # to make regex a bit easier */
 
-#if defined(UNIX)
+LITDEF nametabent mu_int_sev_names[] =
+{
+	{0, ""},
+	{6, "Access"},
+	{6, "Benign"},
+	{9, "DANGER***"},
+	{4, "Data"},
+	{9, "Transient"}
+};
 #define	NEWLINE	"\n"
-#elif defined(VMS)
-#define	NEWLINE	"\r\n"
-#else
-#error UNSUPPORTED_PLATFORM
-#endif
 
 void	mu_int_err(
 		int err,
@@ -72,18 +78,35 @@ void	mu_int_err(
 		int has_top,
 	      	unsigned int level)
 {
-	int		i, util_len, fmtd_key_len;
-	unsigned char	util_buff[MAX_UTIL_LEN];
-	unsigned char 	span_key[MAX_KEY_SZ + 1];
-	unsigned char	temp_bot;
-	unsigned char	key_buffer[MAX_KEY_SZ];
-	unsigned char	*temp;
+	const err_ctl		*ec;
+	const err_msg		*em;
+	const nametabent	*mu_int_sev;
+	int			fmtd_key_len, i, mu_int_sev_idx, util_len;
+	unsigned char		key_buffer[MAX_KEY_SZ];
+	unsigned char 		span_key[MAX_KEY_SZ + 1];
+	unsigned char		*temp;
+	unsigned char		temp_bot;
+	unsigned char		util_buff[MAX_UTIL_LEN];
 
 	if (!mu_int_errknt)
 		util_out_print("!/Block:Offset Level", TRUE);
 	mu_int_errknt++;
 	mu_int_plen--;
 	util_len=0;
+	if (NULL != (ec = err_check(err)))
+	{
+		GET_MSG_INFO(err, ec, em);
+		mu_int_sev_idx = em->mu_int_sev_idx;
+		if (mu_int_sev_idx)
+		{
+			mu_int_sev_idx -= ((0 != level) && (INDEX_INDX == mu_int_sev_idx)); /* if not data, Index -> Danger */
+			mu_int_sev = &mu_int_sev_names[mu_int_sev_idx];
+			MEMCPY_LIT(&util_buff[util_len], TABINTRO);
+			util_len += SIZEOF(TABINTRO) - 1;
+			memcpy(&util_buff[util_len], mu_int_sev->name, mu_int_sev->len);
+			util_len += mu_int_sev->len;
+		}
+	}
 	MEMCPY_LIT(&util_buff[util_len], NEWLINE);
 	util_len += SIZEOF(NEWLINE) - 1;
 	i2hex_blkfill(mu_int_path[mu_int_plen], &util_buff[util_len], BLOCK_WINDOW);

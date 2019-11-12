@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -246,6 +246,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 								{
 									if (chain1.cw_index < si->cw_set_depth)
 									{
+										assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 										tp_get_cw(si->first_cw_set,
 												(int)chain1.cw_index, &cse1);
 										assert(NULL != cse1);
@@ -266,6 +267,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 							if (chain1.flag)
 							{
 								assert(blk_target != cs_addrs->dir_tree);
+								assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 								tp_get_cw(si->first_cw_set, (int)chain1.cw_index, &cse1);
 								assert(NULL != cse1);
 								blk_target->root = cse1->blk;
@@ -310,6 +312,7 @@ void	tp_clean_up(tp_cleanup_state clnup_state)
 							chain1 = *(off_chain *)&histblk;
 							if (chain1.flag)
 							{
+								assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 								tp_get_cw(si->first_cw_set, (int)chain1.cw_index, &cse1);
 								if (cse == cse1)
 								{

@@ -39,6 +39,8 @@ echo ""
 echo "arguments: '$1' '$2' '$3' '$4'"
 echo ""
 
+source $gtm_tools/gtm_env.csh
+setenv gtm_curpro `source $gtm_tools/versions.csh ; echo $gtm_curpro`
 echo "-------------------------"
 echo "locale output at start"
 echo "-------------------------"
@@ -110,7 +112,7 @@ switch ( $p3 )
 case "gtm_bta":
 	setenv	comlist_gt_as	"`alias gt_as_bta` $p1"
 	setenv	comlist_gt_cc	"`alias gt_cc_bta` $p2"
-	version $p4 b
+	set setactive_parms = ( $p4 b ) ; source $gtm_tools/setactive.csh
 	@ comlist_status = $status
 	set p3 = $gtm_bta
 	set asmtgbltype = "pro"
@@ -119,7 +121,7 @@ case "gtm_bta":
 case "gtm_dbg":
 	setenv	comlist_gt_as	"`alias gt_as_dbg` $p1"
 	setenv	comlist_gt_cc	"`alias gt_cc_dbg` $p2"
-	version $p4 d
+	set setactive_parms = ( $p4 d ) ; source $gtm_tools/setactive.csh
 	@ comlist_status = $status
 	set p3 = $gtm_dbg
 	set asmtgbltype = "dbg"
@@ -128,7 +130,7 @@ case "gtm_dbg":
 case "gtm_pro":
 	setenv	comlist_gt_as	"`alias gt_as_pro` $p1"
 	setenv	comlist_gt_cc	"`alias gt_cc_pro` $p2"
-	version $p4 p
+	set setactive_parms = ( $p4 p ) ; source $gtm_tools/setactive.csh
 	@ comlist_status = $status
 	set p3 = $gtm_pro
 	set asmtgbltype = "pro"

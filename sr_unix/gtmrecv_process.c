@@ -247,6 +247,7 @@ static	boolean_t	repl_cmp_solve_timer_set;
 
 #define ISSUE_REPLCOMM_ERROR(REASON, SAVE_ERRNO)									\
 {															\
+	SEND_SYSMSG_REPLCOMM(LEN_AND_LIT(REASON));									\
 	if (0 != SAVE_ERRNO)												\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_REPLCOMM, 0, ERR_TEXT, 2, LEN_AND_LIT(REASON), SAVE_ERRNO);\
 	else														\
@@ -832,7 +833,7 @@ STATICFNDEF int gtmrecv_est_conn(void)
 		ISSUE_REPLCOMM_ERROR("Error getting socket recv buffsize", errno);
 	repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection established, using TCP send buffer size %d receive buffer size %d\n",
 			repl_max_send_buffsize, repl_max_recv_buffsize);
-	repl_log_conn_info(gtmrecv_sock_fd, gtmrecv_log_fp);
+	repl_log_conn_info(gtmrecv_sock_fd, gtmrecv_log_fp, FALSE);
 	/* re-determine endianness of other side */
 	remote_side->endianness_known = FALSE;
 	/* re-determine journal format of other side */
@@ -2925,17 +2926,22 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 				{
 					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Connection reset. Status = %d ; %s\n",
 							status, STRERROR(status));
-					repl_connection_reset = TRUE;
-					repl_close(&gtmrecv_sock_fd);
-					return;
 				} else
 				{
-					ISSUE_REPLCOMM_ERROR("Error in receiving from source. Error in recv", status);
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Error in receiving from source."
+						 " Error in recv: %d ; %s\n", status, STRERROR(status));
+					SEND_SYSMSG_REPLCOMM(LEN_AND_LIT("Error in receiving from source. Error in recv"));
+					repl_log_conn_info(gtmrecv_sock_fd, gtmrecv_log_fp, TRUE);
 				}
 			} else if (EREPL_SELECT == repl_errno)
 			{
+					repl_log(gtmrecv_log_fp, TRUE, TRUE, "Error in receiving from source."
+						 " Error in select: %d ; %s\n", status, STRERROR(status));
 					ISSUE_REPLCOMM_ERROR("Error in receiving from source. Error in select", status);
 			}
+			repl_connection_reset = TRUE;
+			repl_close(&gtmrecv_sock_fd);
+			return;
 		}
 		if (repl_connection_reset)
 			return;

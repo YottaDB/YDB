@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,8 +33,6 @@ GBLREF sgmnt_addrs	*cs_addrs;
 
 error_def(ERR_DSEBLKRDFAIL);
 
-#define MAX_UTIL_LEN 40
-
 void dse_integ(void)
 {
 	block_id	blk;
@@ -53,7 +51,7 @@ void dse_integ(void)
 		return;
 	memcpy(util_buff, "!/Checking integrity of block ", 30);
 	util_len = 30;
-	util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len], 8);
+	util_len += i2hexl_nofill(blk, (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 	memcpy(&util_buff[util_len], ":", 1);
 	util_len += 1;
 	util_buff[util_len] = 0;

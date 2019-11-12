@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-# Copyright (c) 2010-2018 Fidelity National Information		#
+# Copyright (c) 2010-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -182,10 +182,14 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
     # Set $gtm_tmp
     tmp_gtm_tmp=`uname -s`
     if [ "HP-UX" = $tmp_gtm_tmp -o "SunOS" = $tmp_gtm_tmp ] ; then
-        tmp_gtm_tmp=/var/tmp/fis-gtm/$gtmver
+        tmp_gtm_tmp=/var/tmp/fis-gtm
     else
-        tmp_gtm_tmp=/tmp/fis-gtm/$gtmver
+        tmp_gtm_tmp=/tmp/fis-gtm
     fi
+    if [ ! -d "$tmp_gtm_tmp" ] ; then
+    	mkdir $tmp_gtm_tmp ; chmod a+rw,+t $tmp_gtm_tmp
+    fi
+    tmp_gtm_tmp=$tmp_gtm_tmp/$gtmver
     if [ -d "$tmp_gtm_tmp" ] ; then
         gtm_tmp=$tmp_gtm_tmp
     else

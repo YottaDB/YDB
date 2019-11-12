@@ -182,7 +182,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 			chain.cw_index = cse->index;
 			chain.next_off = cse->next_off;
 			ptr = base_addr + cse->ins_off;
-			GET_LONGP(ptr, &chain);
+			GET_BLK_IDP(ptr, &chain);
 			cse->index = 0;
 			cse->ins_off = 0;
 			cse->next_off = 0;
@@ -245,7 +245,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 						integ_error_found = TRUE;
 						break;
 					}
-					GET_LONGP(&chain, c);
+					GET_BLK_IDP(&chain, c);
 					if (chain.flag)
 					{
 						assert(NULL == input_base_addr);
@@ -257,7 +257,7 @@ void gvcst_blk_build(cw_set_element *cse, sm_uc_ptr_t base_addr, trans_num ctn)
 					break;
 				if (chainptr < ptrtop)
 				{
-					GET_LONGP(&chain, chainptr);
+					GET_BLK_IDP(&chain, chainptr);
 					assert(1 == chain.flag || (skip_block_chain_tail_check && (0 == chain.next_off)));
 					assert(chain.cw_index < sgm_info_ptr->cw_set_depth);
 					offset = chain.next_off;

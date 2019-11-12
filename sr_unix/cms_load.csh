@@ -1,7 +1,7 @@
 #! /usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2001-2018 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -88,6 +88,9 @@ if (-e $dst_ver) then
 		if (-e $gtm_root/$dst_ver/$image/gtmsecshr) then
 			$gtm_com/IGS $gtm_root/$dst_ver/$image/gtmsecshr "STOP"	# stop gtmsecshr in case it is running
 		endif
+		if (-d $gtm_root/$dst_ver/$image/utf8/gtmsecshrdir) then
+			$gtm_com/IGS $gtm_root/$dst_ver/$image/utf8/gtmsecshr "STOP"
+		endif
 	end
 	# Verify if anybody is using this version before deleting
 	if ($platform_name == "linux") then
@@ -118,8 +121,12 @@ if (-e $dst_ver) then
 	else if (! $mods_only) then
 		echo "Deleting existing $dst_dir directory structure"
 		foreach image (pro bta dbg)
+			# remove root-owned gtmsecshr* files/dirs
 			if (-e $gtm_root/$dst_ver/$image/gtmsecshrdir) then
-				$gtm_com/IGS $gtm_root/$dst_ver/$image/gtmsecshr "RMDIR" # remove root-owned gtmsecshr* files/dirs
+				$gtm_com/IGS $gtm_root/$dst_ver/$image/gtmsecshr "RMDIR"
+			endif
+			if (-d $gtm_root/$dst_ver/$image/utf8/gtmsecshrdir) then
+				$gtm_com/IGS $gtm_root/$dst_ver/$image/utf8/gtmsecshr "RMDIR"
 			endif
 		end
 		rm -rf $dst_ver

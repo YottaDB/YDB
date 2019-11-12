@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,6 @@
 #define FREE_CHAR	DOT_CHAR
 #define BUSY_CHAR	"X"
 #define CORRUPT_CHAR	"?"
-#define MAX_UTIL_LEN	80
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF int		patch_is_fdmp, patch_rec_counter;
@@ -48,11 +47,15 @@ error_def(ERR_DSEBLKRDFAIL);
 
 boolean_t dse_b_dmp(void)
 {
-	cache_rec_ptr_t cr;
-	block_id	blk;
+	cache_rec_ptr_t	cr;
+	block_id	blk, lmap_num;
+	block_cnt	count;
 	boolean_t	free, invalid_bitmap = FALSE, is_mm, was_crit, was_hold_onto_crit;
 	enum db_ver	ondsk_blkver;
-	int4		bplmap, count, dummy_int, head, iter1, iter2, len, lmap_num, mapsize, nocrit_present, util_len;
+#	ifndef BLK_NUM_64BIT
+	gtm_int8	count2;
+#	endif
+	int4		bplmap, dummy_int, head, iter1, iter2, len, mapsize, nocrit_present, util_len, lmap_indx, mask2;
 	sm_uc_ptr_t	bp, b_top, mb, rp;
 	unsigned char	mask, util_buff[MAX_UTIL_LEN];
 
@@ -61,8 +64,18 @@ boolean_t dse_b_dmp(void)
 		return FALSE;
 	if (CLI_PRESENT == cli_present("COUNT"))
 	{
-		if (!cli_get_hex("COUNT", (uint4 *)&count))
+#		ifdef BLK_NUM_64BIT
+		if (!cli_get_hex64("COUNT", (gtm_uint8 *)&count))
 			return FALSE;
+#		else
+		if (!cli_get_hex64("COUNT", (gtm_uint8 *)&count2))
+			return FALSE;
+		else
+		{
+			assert(count2 == (int4)count2);
+			count = (int4)count2;
+		}
+#		endif
 		if (count < 1)
 			return FALSE;
 	} else
@@ -77,7 +90,7 @@ boolean_t dse_b_dmp(void)
 	DSE_GRAB_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
 	for ( ; ; )
 	{
-		if (blk / bplmap * bplmap != blk)
+		if (((blk / bplmap) * bplmap) != blk)
 		{
 			if (!(bp = t_qread(blk, &dummy_int, &cr)))
 			{
@@ -97,15 +110,16 @@ boolean_t dse_b_dmp(void)
 			else
 				b_top = bp + ((blk_hdr_ptr_t) bp)->bsiz;
 			if (CLI_NEGATED != head && !patch_is_fdmp)
-			{	memcpy(util_buff, "Block ", 6);
+			{
+				memcpy(util_buff, "Block ", 6);
 				util_len = 6;
-				util_len += i2hex_nofill(blk, &util_buff[util_len], 8);
+				util_len += i2hexl_nofill(blk, &util_buff[util_len], MAX_HEX_INT8);
 				memcpy(&util_buff[util_len], "   Size ", 8);
 				util_len += 8;
-				util_len += i2hex_nofill(((blk_hdr_ptr_t)bp)->bsiz, &util_buff[util_len], 8);
+				util_len += i2hex_nofill(((blk_hdr_ptr_t)bp)->bsiz, &util_buff[util_len], MAX_HEX_INT);
 				memcpy(&util_buff[util_len], "   Level !UL   TN ", 18);
 				util_len += 18;
-				util_len += i2hexl_nofill(((blk_hdr_ptr_t)bp)->tn, &util_buff[util_len], 16);
+				util_len += i2hexl_nofill(((blk_hdr_ptr_t)bp)->tn, &util_buff[util_len], MAX_HEX_INT8);
 				memcpy(&util_buff[util_len], " ", 1);
 				util_len++;
 				ondsk_blkver = (!is_mm ? cr->ondsk_blkver : GDSV6);
@@ -144,10 +158,13 @@ boolean_t dse_b_dmp(void)
 				{
 					memcpy(util_buff, "Block ", 6);
 					util_len = 6;
-					util_len += i2hex_nofill(blk, &util_buff[util_len], 8);
+					util_len += i2hexl_nofill(blk, &util_buff[util_len], MAX_HEX_INT8);
 					memcpy(&util_buff[util_len], "   Size ", 8);
 					util_len += 8;
-					util_len += i2hex_nofill(mapsize, &util_buff[util_len], 4);
+					/* Using MAX_HEX_SHORT for int value because to save line space
+					 * since the value should always fit in 2-bytes
+					 */
+					util_len += i2hex_nofill(mapsize, &util_buff[util_len], MAX_HEX_SHORT);
 					memcpy(&util_buff[util_len], "   Master Status: Cannot Determine (bplmap == 0)!/", 50);
 					util_len += 50;
 					util_buff[util_len] = 0;
@@ -156,17 +173,17 @@ boolean_t dse_b_dmp(void)
 				{
 					mb = cs_addrs->bmm + blk / (8 * bplmap);
 					lmap_num = blk / bplmap;
-					mask = 1 << ( lmap_num - lmap_num / 8 * 8);
-					free = 	mask & *mb;
+					mask = 1 << (lmap_num - ((lmap_num / 8) * 8));
+					free = mask & *mb;
 					memcpy(util_buff, "Block ", 6);
 					util_len = 6;
-					util_len += i2hex_nofill(blk, &util_buff[util_len], 8);
+					util_len += i2hexl_nofill(blk, &util_buff[util_len], MAX_HEX_INT8);
 					memcpy(&util_buff[util_len], "  Size ", 7);
 					util_len += 7;
-					util_len += i2hex_nofill(((blk_hdr_ptr_t)bp)->bsiz, &util_buff[util_len], 8);
+					util_len += i2hex_nofill(((blk_hdr_ptr_t)bp)->bsiz, &util_buff[util_len], MAX_HEX_INT);
 					memcpy(&util_buff[util_len], "  Level !SB  TN ", 16);
 					util_len += 16;
-					util_len += i2hexl_nofill(((blk_hdr_ptr_t)bp)->tn, &util_buff[util_len], 16);
+					util_len += i2hexl_nofill(((blk_hdr_ptr_t)bp)->tn, &util_buff[util_len], MAX_HEX_INT8);
 					memcpy(&util_buff[util_len], " ", 1);
 					util_len++;
 					ondsk_blkver = (!is_mm ? cr->ondsk_blkver : GDSV6);
@@ -174,7 +191,7 @@ boolean_t dse_b_dmp(void)
 					memcpy(&util_buff[util_len], gtm_dbversion_table[ondsk_blkver], len);
 					util_len += len;
 					util_buff[util_len] = 0;
-					util_out_print((caddr_t)util_buff, FALSE, ((blk_hdr_ptr_t) bp)->levl );
+					util_out_print((caddr_t)util_buff, FALSE, ((blk_hdr_ptr_t)bp)->levl );
 					util_len = 0;
 					memcpy(&util_buff[util_len], "   Master Status: !AD!/",23);
 					util_len = 23;
@@ -184,13 +201,14 @@ boolean_t dse_b_dmp(void)
 			}
 			if (CLI_PRESENT != head)
 			{
-				util_out_print("           !_Low order                         High order", TRUE);
-				lmap_num = 0;
-				while (lmap_num < bplmap)
-				{	memcpy(util_buff, "Block ", 6);
+				util_out_print("                       !_Low order                         High order", TRUE);
+				lmap_indx = 0;
+				while (lmap_indx < bplmap)
+				{
+					memcpy(util_buff, "Block ", 6);
 					util_len = 6;
-					i2hex_blkfill(blk + lmap_num, &util_buff[util_len], 8);
-					util_len += 8;
+					i2hexl_blkfill(blk + lmap_indx, &util_buff[util_len], MAX_HEX_INT8);
+					util_len += 16;
 					memcpy(&util_buff[util_len], ":!_|  ", 6);
 					util_len += 6;
 					util_buff[util_len] = 0;
@@ -199,22 +217,22 @@ boolean_t dse_b_dmp(void)
 					{
 						for (iter2 = 0; iter2 < 8; iter2++)
 						{
-							mask = dse_lm_blk_free(lmap_num * BML_BITS_PER_BLK, bp + SIZEOF(blk_hdr));
-							if (!mask)
+							mask2 = dse_lm_blk_free(lmap_indx, bp + SIZEOF(blk_hdr));
+							if (!mask2)
 								util_out_print("!AD", FALSE, 1, BUSY_CHAR);
-							else if (BLK_FREE == mask)
+							else if (BLK_FREE == mask2)
 								util_out_print("!AD", FALSE, 1, FREE_CHAR);
-							else if (BLK_RECYCLED == mask)
+							else if (BLK_RECYCLED == mask2)
 								util_out_print("!AD", FALSE, 1, REUSABLE_CHAR);
 							else {
 								invalid_bitmap = TRUE;
 								util_out_print("!AD", FALSE, 1, CORRUPT_CHAR);
 							}
-							if (++lmap_num >= bplmap)
+							if (++lmap_indx >= bplmap)
 								break;
 						}
 						util_out_print("  ", FALSE);
-						if (lmap_num >= bplmap)
+						if (lmap_indx >= bplmap)
 							break;
 					}
 					util_out_print("|", TRUE);

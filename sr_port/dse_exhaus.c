@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,8 +13,7 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
-#include <signal.h>
+#include "gtm_signal.h"
 
 #include "gdsroot.h"
 #include "gtm_facility.h"
@@ -29,9 +29,6 @@
 /* Include prototypes */
 #include "t_qread.h"
 
-#define MAX_UTIL_LEN 32
-
-
 GBLREF block_id		patch_find_blk, patch_left_sib, patch_path[MAX_BT_DEPTH + 1], patch_right_sib;
 GBLREF boolean_t	patch_exh_found, patch_find_root_search, patch_find_sibs;
 GBLREF global_root_list	*global_roots_head;
@@ -40,8 +37,9 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF short int	patch_path_count;
 GBLREF VSIG_ATOMIC_T	util_interrupt;
 
-error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_CTRLC);
+error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEINVALBLKID);
 
 void dse_exhaus(int4 pp, int4 op)
 {
@@ -53,11 +51,26 @@ void dse_exhaus(int4 pp, int4 op)
 	global_dir_path	*d_ptr, *temp;
 	short		temp_short;
 	sm_uc_ptr_t	bp, b_top, nrp, nr_top, ptr, rp, r_top;
+	boolean_t	long_blk_id;
+	long		blk_id_size;
 
 	last = 0;
 	patch_path_count++;
 	if (!(bp = t_qread(patch_path[pp - 1], &dummy_int, &dummy_cr)))
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+	if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
+	{
+#		ifdef BLK_NUM_64BIT
+		long_blk_id = TRUE;
+		blk_id_size = SIZEOF(block_id_64);
+#		else
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#		endif
+	} else
+	{
+		long_blk_id = FALSE;
+		blk_id_size = SIZEOF(block_id_32);
+	}
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
 	else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t) bp)->bsiz)
@@ -75,15 +88,30 @@ void dse_exhaus(int4 pp, int4 op)
 		r_top = rp + temp_short;
 		if (r_top > b_top)
 			r_top = b_top;
-		if (SIZEOF(block_id) > (r_top - rp))
+		if (blk_id_size > (r_top - rp))
 			break;
 		if (((blk_hdr_ptr_t)bp)->levl)
-			GET_LONG(patch_path[pp], (r_top - SIZEOF(block_id)));
-		else
+		{
+			if (long_blk_id == TRUE)
+#				ifdef BLK_NUM_64BIT
+				GET_BLK_ID_64(patch_path[pp], (r_top - SIZEOF(block_id_64)));
+#				else
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#				endif
+			else
+				GET_BLK_ID_32(patch_path[pp], (r_top - SIZEOF(block_id_32)));
+		} else
 		{
 			for (ptr = rp + SIZEOF(rec_hdr); (*ptr++ || *ptr++) && (ptr <= r_top);)
 				;
-			GET_LONG(patch_path[pp], ptr);
+			if (long_blk_id == TRUE)
+#				ifdef BLK_NUM_64BIT
+				GET_BLK_ID_64(patch_path[pp], ptr);
+#				else
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#				endif
+			else
+				GET_BLK_ID_32(patch_path[pp], ptr);
 		}
 		patch_offset[op] = (int4)(rp - bp);
 		if (patch_path[pp] == patch_find_blk)
@@ -104,15 +132,29 @@ void dse_exhaus(int4 pp, int4 op)
 					nr_top = nrp + temp_short;
 					if (nr_top > b_top)
 						nr_top = b_top;
-					if (SIZEOF(block_id) <= (nr_top - nrp))
+					if (blk_id_size <= (nr_top - nrp))
 					{
 						if (((blk_hdr_ptr_t)bp)->levl)
-							GET_LONG(patch_right_sib, (nr_top - SIZEOF(block_id)));
+							if (long_blk_id == TRUE)
+#								ifdef BLK_NUM_64BIT
+								GET_BLK_ID_64(patch_right_sib, (nr_top - SIZEOF(block_id_64)));
+#								else
+								rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#								endif
+							else
+								GET_BLK_ID_32(patch_right_sib, (nr_top - SIZEOF(block_id_32)));
 						else
 						{
 							for (ptr = rp + SIZEOF(rec_hdr); (*ptr++ || *ptr++) && (ptr <= nr_top);)
 								;
-							GET_LONG(patch_right_sib, ptr);
+							if (long_blk_id == TRUE)
+#								ifdef BLK_NUM_64BIT
+								GET_BLK_ID_64(patch_right_sib, ptr);
+#								else
+								rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#								endif
+							else
+								GET_BLK_ID_32(patch_right_sib, ptr);
 						}
 					}
 				} else
@@ -137,10 +179,15 @@ void dse_exhaus(int4 pp, int4 op)
 					{
 						memcpy(util_buff, "	", 1);
 						util_len = 1;
-						util_len += i2hex_nofill(d_ptr->block, (uchar_ptr_t)&util_buff[util_len], 8);
+						util_len += i2hexl_nofill(d_ptr->block, (uchar_ptr_t)&util_buff[util_len],
+								MAX_HEX_INT8);
 						memcpy(&util_buff[util_len], ":", 1);
 						util_len += 1;
-						util_len += i2hex_nofill(d_ptr->offset, (uchar_ptr_t)&util_buff[util_len], 4);
+						/* Using MAX_HEX_SHORT for int value because to save line space
+						 * since the value should always fit in 2-bytes
+						 */
+						util_len += i2hex_nofill(d_ptr->offset, (uchar_ptr_t)&util_buff[util_len],
+								MAX_HEX_SHORT);
 						util_buff[util_len] = 0;
 						util_out_print(util_buff, FALSE);
 						temp = d_ptr;
@@ -154,16 +201,21 @@ void dse_exhaus(int4 pp, int4 op)
 				{
 					memcpy(util_buff, "	", 1);
 					util_len = 1;
-					util_len += i2hex_nofill(patch_path[count], (uchar_ptr_t)&util_buff[util_len], 8);
+					util_len += i2hexl_nofill(patch_path[count], (uchar_ptr_t)&util_buff[util_len],
+							MAX_HEX_INT8);
 					memcpy(&util_buff[util_len], ":", 1);
 					util_len += 1;
-					util_len += i2hex_nofill(patch_offset[count], 	(uchar_ptr_t)&util_buff[util_len], 4);
+					/* Using MAX_HEX_SHORT for int value because to save line space
+					 * since the value should always fit in 2-bytes
+					 */
+					util_len += i2hex_nofill(patch_offset[count], 	(uchar_ptr_t)&util_buff[util_len],
+							MAX_HEX_SHORT);
 					util_buff[util_len] = 0;
 					util_out_print(util_buff,FALSE);
 				}
 				memcpy(util_buff, "	", 1);
 				util_len = 1;
-				util_len += i2hex_nofill(patch_path[count], (uchar_ptr_t)&util_buff[util_len], 8);
+				util_len += i2hexl_nofill(patch_path[count], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 				util_buff[util_len] = 0;
 				util_out_print(util_buff, TRUE);
 				patch_path_count++;

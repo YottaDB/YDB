@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2002, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2002-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -24,18 +25,19 @@
 GBLREF	mval	dollar_system;
 GBLREF spdesc	stringpool;
 
+error_def(ERR_LOGTOOLONG);
+error_def(ERR_TRNLOGFAIL);
+
 void dollar_system_init(struct startup_vector *svec)
 {
 	int4		status;
 	mstr		val, tn;
 	char		buf[MAX_TRANS_NAME_LEN];
 
-	error_def(ERR_LOGTOOLONG);
-	error_def(ERR_TRNLOGFAIL);
-
 	dollar_system.mvtype = MV_STR;
 	dollar_system.str.addr = (char *)stringpool.free;
 	dollar_system.str.len = STR_LIT_LEN("47,");
+	ENSURE_STP_FREE_SPACE(dollar_system.str.len);
 	memcpy(stringpool.free, "47,", dollar_system.str.len);
 	stringpool.free += dollar_system.str.len;
 	val.addr = SYSID;
@@ -53,10 +55,10 @@ void dollar_system_init(struct startup_vector *svec)
 	}
 #	ifdef UNIX
 	else if (SS_LOG2LONG == status)
-		rts_error(VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(SYSID), SIZEOF(buf) - 1);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, LEN_AND_LIT(SYSID), SIZEOF(buf) - 1);
 #	endif
 	else
-		rts_error(VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(SYSID), status);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TRNLOGFAIL, 2, LEN_AND_LIT(SYSID), status);
 	assert(stringpool.free < stringpool.top);	/* it's process initialization after all */
 	return;
 }

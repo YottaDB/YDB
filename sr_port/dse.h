@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,9 +22,13 @@ error_def(ERR_DSEWCREINIT);
 #define DSEBMLOK		FALSE
 #define DSENOBML		TRUE
 #define PATCH_SAVE_SIZE		128
-#define SPAN_START_BYTE 	0x02
-#define SPAN_BYTE_MAX  		255
+#define SPAN_START_BYTE		0x02
+#define SPAN_BYTE_MAX		255
 #define SPAN_BYTE_MIN		1
+#define MAX_UTIL_LEN		80	/* The width of the char buffer used by various DSE files to write output to
+					 * before passing to util_out_print()
+					 * Set to 80 in order to match standard terminal width
+					 */
 
 #define	GET_CURR_TIME_IN_DOLLARH_AND_ZDATE(dollarh_mval, dollarh_buffer, zdate_mval, zdate_buffer)				\
 {	/* gets current time in the mval "dollarh_mval" in dollarh format and in the mval "zdate_mval" in ZDATE format		\

@@ -45,6 +45,7 @@
 #include "gtmmsg.h"
 #include "mu_getlst.h"
 #include "warn_db_sz.h"
+#include "mu_getkey.h"
 
 error_def(ERR_MUNOACTION);
 error_def(ERR_MUNOFINISH);
@@ -58,9 +59,19 @@ GBLREF bool			mu_ctrlc_occurred;
 GBLREF bool			mu_ctrly_occurred;
 GBLREF int			muint_adj;
 GBLREF int4			mu_int_adj[MAX_BT_DEPTH + 1];
-GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF sgmnt_data_ptr_t		cs_data;
 GBLREF tp_region		*grlist;
-GBLREF	unsigned char		rdfail_detail;
+GBLREF unsigned char		rdfail_detail;
+GBLDEF boolean_t mu_subsc	= FALSE;
+GBLDEF boolean_t mu_key		= MUKEY_FALSE;
+GBLDEF int mu_sub_idx_st	= 0;
+GBLDEF int mu_sub_idx_end	= 0;
+GBLDEF boolean_t null_coll_key	= FALSE;
+GBLREF boolean_t		null_coll_key;
+GBLREF gv_key			*mu_start_key;
+GBLREF gv_key			*mu_end_key;
+GBLREF int			mu_start_keyend;
+GBLREF int			mu_end_keyend;
 
 typedef struct {
 	enum {arsample, scan, impsample}	heuristic;
@@ -89,6 +100,9 @@ void mupip_size(void)
 	unsigned short		BUFF_LEN = SIZEOF(buff), n_len;
 	sgmnt_addrs 		*tcsa;
 	char 			*db_file_name;
+	unsigned char           key_buff[2048];
+	unsigned short          keylen;
+	boolean_t		subscr = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -105,13 +119,53 @@ void mupip_size(void)
 		mu_getlst("REGION", SIZEOF(tp_region));
 	}
 	mupip_size_check_error();
+	if (CLI_PRESENT == cli_present("SUBSCRIPT"))
+        {
+		if (NULL == gv_target)
+			gv_target = (gv_namehead *)targ_alloc(DUMMY_GLOBAL_VARIABLE_LEN, NULL, NULL);
+		subscr = TRUE;
+                keylen = SIZEOF(key_buff);
+                if (0 == cli_get_str("SUBSCRIPT", (char *)key_buff, &keylen))
+                        mupip_exit(ERR_MUPCLIERR);
+                if (FALSE == mu_getkey(key_buff, keylen))
+		{
+			error_mupip = TRUE;
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_MUSIZEINVARG, 2, LEN_AND_LIT("SUBSCRIPT"));
+		}
+		mupip_size_check_error();
+		assert(mu_key);
+		/* or else "mu_getkey" call above would have returned FALSE */
+		/* Create the buff with the global names only to be selected by gv_select below */
+		p_end = cli_buff;
+		memcpy(p_end ,"^",1);
+		p_end++;
+		memcpy(p_end , mu_start_key->base, mu_sub_idx_st);
+		p_end += mu_sub_idx_st;
+		if (mu_sub_idx_end)
+		{
+			memcpy(p_end ,":^",2);
+			p_end += 2;
+			memcpy(p_end, mu_end_key->base, mu_sub_idx_end);
+			p_end += mu_sub_idx_end;
+		}
+		*p_end = '\0';
+		n_len = p_end - cli_buff;
+		gv_target->regcnt--;
+		gv_target = NULL;
+        }
 	/* SELECT qualifier */
-	memset(cli_buff, 0, SIZEOF(cli_buff));
-	n_len = SIZEOF(cli_buff);
-	if (CLI_PRESENT != cli_present("SELECT"))
+	if (!subscr)
 	{
-		n_len = 1;
-		cli_buff[0] = '*';
+		memset(cli_buff, 0, SIZEOF(cli_buff));
+		n_len = SIZEOF(cli_buff);
+	}
+	if ((CLI_PRESENT != cli_present("SELECT")))
+	{
+		if (!subscr)
+		{	/* No select or subscript */
+			n_len = 1;
+			cli_buff[0] = '*';
+		}
 	}
 	else if (FALSE == cli_get_str("SELECT", cli_buff, &n_len))
 	{
@@ -244,12 +298,18 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 	int				cycle;
 	int4				random;
 	int4				rCnt;				/* number of entries in valBlk */
+	int4				musz_rec = 0;
 	register gv_namehead		*pTarg;
 	register srch_blk_status	*pCurr;
 	register srch_hist		*pTargHist;
 	trans_num			tn;
 	unsigned char			nLevl;
 	unsigned short			nRecLen;
+	unsigned char			buff[MAX_KEY_SZ + 1];
+	boolean_t			first_key = TRUE, musz_range_done;
+	int				name_len, key_size, buff_length, rec_len, blk_size;
+	unsigned short			rec_cmpc;
+	uchar_ptr_t			key_base, ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -280,11 +340,13 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 	pCurr->cr = cr;
 	for (;;)
 	{
+		musz_range_done = FALSE;
+		musz_rec = 0;
 		assert(pCurr->level == nLevl);
 		pCurr->cse = NULL;
 		pCurr->blk_num = nBlkId;
 		pCurr->buffaddr = pBlkBase;
-		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen)
+		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen, musz_range_done)
 		{	/* enumerate records in block */
 			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
 			if (cdb_sc_normal != status)
@@ -292,12 +354,35 @@ enum cdb_sc mu_size_rand_traverse(double *r, double *a)
 				assert(CDB_STAGNATE > t_tries);
 				return status;
 			}
-			valBlk[rCnt] = nBlkId;
 			CHECK_ADJACENCY(nBlkId, nLevl, a[nLevl]);
+			if (mu_subsc) /*Subscript option chosen */
+			{
+				rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)pRec);
+				key_base = pRec + SIZEOF(rec_hdr);
+				if ((((rec_hdr *)pRec)->rsiz) != BSTAR_REC_SIZE) /* Did not find the star key */
+				{
+					GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key,
+							name_len, key_size,buff, buff_length, rec_len);
+					if (mu_end_key)
+					{
+						if (memcmp(buff, mu_end_key->base, mu_end_key->end + 1) > 0)
+							musz_range_done = TRUE;
+					} else
+					{
+						if (memcmp(buff, mu_start_key->base, mu_start_key->end + 1) > 0)
+							musz_range_done = TRUE;
+					}
+					if (memcmp(buff, mu_start_key->base, mu_start_key->end + 1) < 0)
+						continue;
+				}
+				valBlk[musz_rec] = nBlkId;
+				musz_rec++;
+			} else
+				valBlk[rCnt] = nBlkId;
 		}
-		r[nLevl] = rCnt;
+		(mu_subsc) ? (r[nLevl] = musz_rec) : (r[nLevl] = rCnt);
 		/* randomly select next block */
-		random = (int4)(rCnt * drand48());
+		random = ((mu_subsc) ? (int4)(musz_rec * drand48()) : (int4)(rCnt * drand48()));
 		random = random & 0x7fffffff; /* to make sure that the sign bit(msb) is off */
 		nBlkId = valBlk[random];
 		if (is_mm && (nBlkId > cs_addrs->total_blks))

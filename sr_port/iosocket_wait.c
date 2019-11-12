@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -61,6 +61,7 @@ GBLREF int			dollar_truth;
 
 error_def(ERR_GETNAMEINFO);
 error_def(ERR_GETSOCKNAMERR);
+error_def(ERR_SETSOCKOPTERR);
 error_def(ERR_SOCKACPT);
 error_def(ERR_SOCKWAIT);
 error_def(ERR_TEXT);
@@ -464,8 +465,9 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boolean_t selectfirst)
 {
 	char            	*errptr;
+	GTM_SOCKLEN_TYPE	size, addrlen;
+	int			rv, len, errcode, keepalive_opt, save_errno;
 	int4            	errlen;
-	int			rv, len, errcode, save_errno;
 	char			port_buffer[NI_MAXSERV], ipaddr[SA_MAXLEN + 1];
 #ifdef USE_POLL
 	struct pollfd		poll_fds;
@@ -474,12 +476,14 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 #ifdef USE_SELECT
 	fd_set			select_fdset;
 #endif
-	struct timeval		utimeout;
-	GTM_SOCKLEN_TYPE	size, addrlen;
 	socket_struct		*newsocketptr;
-	struct sockaddr_storage	peer;           /* socket address + port */
 	struct sockaddr		*peer_sa_ptr;
+	struct sockaddr_storage	peer;           /* socket address + port */
+	struct timeval		utimeout;
+	static readonly char 	action[] = "ACCEPT";
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	if (gtm_max_sockets <= dsocketptr->n_socket)
 	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_SOCKMAX, 1, gtm_max_sockets);
@@ -584,6 +588,9 @@ int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boole
 		if (NULL != newsocketptr->local.saddr_ip)
 			free(newsocketptr->local.saddr_ip);
 		STRNDUP(ipaddr, SA_MAXLEN, newsocketptr->local.saddr_ip);
+		keepalive_opt = TREF(gtm_socket_keepalive_idle);	/* deviceparameter would give more granular control */
+		if (keepalive_opt && !iosocket_tcp_keepalive(newsocketptr, keepalive_opt, action))
+			return -1;				/* iosocket_tcp_keepalive issues rts_error rather than return */
 	}
 	newsocketptr->state = socket_connected;
 	newsocketptr->passive = FALSE;

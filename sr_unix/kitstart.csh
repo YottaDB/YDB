@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2011-2018 Fidelity National Information		#
+# Copyright (c) 2011-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -36,12 +36,6 @@ set euser = `$gtm_dist/geteuid`
 if ("$euser" != "root") then
 	echo "You must have root privileges to run kitstart"
 	exit -1
-endif
-
-if (-e /etc/csh.cshrc) then
-	# on lester (HPUX), /etc/csh.cshrc does not seem to be invoked at tcsh startup so invoke it explicitly
-	# this is what defines the "version" alias used down below.
-	source /etc/csh.cshrc
 endif
 
 # we need s_linux and s_linux64 here
@@ -180,7 +174,7 @@ if (! $?logfile) then
 endif
 ########################################################################################
 
-version $version p  # Set the current version so that relative paths work
+set setactive_parms = ( $version p ) ; source $gtm_tools/setactive.csh
 cmsver $version	    # Set appropriate path to locate $version sources in CMS, the default is V990
 set zver = `$gtm_dist/mumps -run %XCMD 'write $zversion'`
 set releasever = $zver[2]
@@ -408,9 +402,11 @@ else
 	echo "FAIL:gtmpcat was not found"
 endif
 
+set verowner = `filetest -U: $gtm_ver`
+set vergroup = `filetest -G: $gtm_ver`
 find $dist -type f -exec chmod 444 {} \;
 find $dist -type d -exec chmod 755 {} \;
-chown -R library:gtc $dist
+chown -R ${verowner}:${vergroup} $dist
 echo "Files in $dist"
 /bin/ls -lR $dist
 echo ""

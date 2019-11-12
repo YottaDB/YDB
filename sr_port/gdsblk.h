@@ -110,7 +110,7 @@
 	else								\
 	{								\
 		PVAL = PREC + NRECLEN - SIZEOF(block_id);		\
-		GET_LONG(NBLKID, PVAL);					\
+		GET_BLK_ID(NBLKID, PVAL);					\
 	}								\
 }
 

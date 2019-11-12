@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,6 +18,7 @@ typedef struct err_msg_struct
 	char		*tag;
 	char		*msg;
 	int		parm_count;
+	int		mu_int_sev_idx;
 } err_msg;
 
 typedef struct err_ctl_struct

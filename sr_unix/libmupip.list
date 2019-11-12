@@ -64,6 +64,7 @@ mu_extr_getblk
 mu_extr_ident
 mu_extract
 mu_freeze_ch
+mu_getkey
 mu_getlst
 mu_gv_stack_init
 mu_gvis
@@ -71,7 +72,6 @@ mu_int_blk
 mu_int_ch
 mu_int_err
 mu_int_fhead
-mu_int_getkey
 mu_int_init
 mu_int_maps
 mu_int_read

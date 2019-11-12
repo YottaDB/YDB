@@ -243,9 +243,9 @@ void restore_next_off(cw_set_element *cse)
 		if (cse->undo_offset[iter])
 		{
 			ptr = cse->new_buff + cse->undo_offset[iter];
-			GET_LONGP(&chain, ptr);
+			GET_BLK_IDP(&chain, ptr);
 			chain.next_off = cse->undo_next_off[iter];
-			GET_LONGP(ptr, &chain);
+			GET_BLK_IDP(ptr, &chain);
 			cse->undo_offset[iter] = cse->undo_next_off[iter] = 0;
 		} else
 			assert(!cse->undo_next_off[iter]);

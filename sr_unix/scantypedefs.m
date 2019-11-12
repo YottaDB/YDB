@@ -612,10 +612,11 @@
 	; Run it through the pre-processor to expand pre-processor statements selecting conditional
 	; typedefs, etc. Disable all warnings which may occur in older sources and newer compilers
 	;
-	Do CommandToPipe("gt_cc_"_gtmtyp_" -w -E "_ExtraCcParms_" "_cfile_" > "_cfile_"exp",.results)
+	set cmdToPipe="$gt_cc_"_gtmtyp_" -I$gtm_inc -w -E "_ExtraCcParms_" "_cfile_" > "_cfile_"exp"
+	Do CommandToPipe(cmdToPipe,.results)
 	Do:(0'=results(0))
 	. Use $P
-	. Do DoWrite("Error messages from pre-processor compile: gt_cc_"_gtmtyp_" -E "_ExtraCcParms_" "_cfile_" > "_cfile_"exp")
+	. Do DoWrite("Error messages from pre-processor compile: "_cmdToPipe)
 	. For i=1:1:results(0) Write results(i),!
 	. Do Error("BADPREPCOMP","E","Pre-process compile failed - aborting")
 	;
@@ -968,13 +969,13 @@
 	; Need to build and execute this routine now.
 	;
 	Set outfile=$ZPiece(cfile,".",1)
-	Set ccCmd="gt_cc_"_gtmtyp_$Select(("OS390"'=$ZPiece($ZVersion," ",3)):" -O0",1:" -qNOOPT")_" -o "_outfile_".o "
+	Set ccCmd="$gt_cc_"_gtmtyp_$Select(("OS390"'=$ZPiece($ZVersion," ",3)):" -O0",1:" -qNOOPT")_" -I$gtm_inc -o "_outfile_".o "
 	Do CommandToPipe(ccCmd_ExtraCcLdParms_" "_ExtraCcParms_" "_outfile_".c",.compresults)
 	Do:((0'=compresults(0))!(FALSE=$$StatFile(outfile_".o")))
 	. Do dbgzwrite("compresults",$get(lastpipecmd))
 	. Do dbgzwrite("compresults","Results from compile of "_outfile)
 	. Do Error("COMPFAIL","F","Compile of offsets routine failed")
-	Set ldCmd="gt_ld -o "_outfile_" $gt_ld_options_pro -L$gtm_obj $gt_ld_sysrtns ${gt_ld_syslibs:s/-lncurses//} "
+	Set ldCmd="$gt_ld_linker -o "_outfile_" $gt_ld_options_pro -L$gtm_obj $gt_ld_sysrtns ${gt_ld_syslibs:s/-lncurses//} "
 	Do CommandToPipe(ldCmd_ExtraCcLdParms_" "_outfile_".o",.linkresults)
 	Do:(FALSE=$$StatFile(outfile))
 	. Set file=outfile_".link_output.txt"

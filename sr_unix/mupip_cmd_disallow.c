@@ -201,6 +201,10 @@ boolean_t cli_disallow_mupip_journal(void)
 										|| d_c_cli_present("ROLLBACK")
 										|| d_c_cli_present("VERIFY"));
 	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  d_c_cli_present("CORRUPTDB") && d_c_cli_present("FENCES");
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value =  d_c_cli_present("CORRUPTDB") && (d_c_cli_present("BROKEN") || d_c_cli_present("LOST"));
+	CLI_DIS_CHECK_N_RESET;
 	return FALSE;
 }
 
@@ -621,6 +625,8 @@ boolean_t cli_disallow_mupip_size(void)
 			(d_c_cli_present("HEURISTIC.ARSAMPLE") || d_c_cli_present("HEURISTIC.IMPSAMPLE") ||
 			!d_c_cli_present("HEURISTIC.SEED"))
 				);
+	CLI_DIS_CHECK_N_RESET;
+	disallow_return_value = (d_c_cli_present("SELECT") && d_c_cli_present("SUBSCRIPT"));
 	CLI_DIS_CHECK_N_RESET;
 
 	return disallow_return_value;

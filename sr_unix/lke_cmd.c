@@ -31,47 +31,47 @@
 #include "lke_cmd_disallow.h"
 
 static readonly CLI_ENTRY clear_qual[] = {
-	{ "ALL",          0, 0, 0, 0, 0, 0, VAL_DISALLOWED,   0, NON_NEG, VAL_N_A, 0 },
-	{ "EXACT",	  0, 0, 0, 0, 0, 0, VAL_DISALLOWED,   0, NEG,     VAL_N_A, 0 },
-	{ "INTERACTIVE",  0, 0, 0, 0, 0, 0, VAL_DISALLOWED,   0, NEG,     VAL_N_A, 0 },
-	{ "LOCK", 	  0, 0, 0, 0, 0, 0, VAL_REQ,	   1, NON_NEG, VAL_STR, 0 },
-	{ "OUTPUT", 	  0, 0, 0, 0, 0, 0, VAL_REQ, 	   1, NON_NEG, VAL_STR, 0 },
-	{ "PID", 	  0, 0, 0, 0, 0, 0, VAL_REQ, 	   1, NON_NEG, VAL_NUM, VAL_DCM },
-	{ "REGION", 	  0, 0, 0, 0, 0, 0, VAL_REQ, 	   0, NON_NEG, VAL_STR, 0 },
-	{ "" }
+{ "ALL",         0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0       },
+{ "EXACT",       0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG,     VAL_N_A, 0       },
+{ "INTERACTIVE", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG,     VAL_N_A, 0       },
+{ "LOCK",        0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
+{ "OUTPUT",      0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
+{ "PID",         0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, VAL_DCM },
+{ "REGION",      0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0       },
+{ "" }
 };
 
 static readonly CLI_ENTRY show_qual[] = {
-	{ "ALL",      0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
-	{ "CRITICAL", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG,     VAL_N_A, 0 },
-	{ "LOCK",     0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
-	{ "MEMORY",   0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
-	{ "OUTPUT",   0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0 },
-	{ "PID",      0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, VAL_DCM },
-	{ "REGION",   0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
-	{ "WAIT",     0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0 },
-	{ "" }
+{ "ALL",      0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0       },
+{ "CRITICAL", 0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG,     VAL_N_A, 0       },
+{ "LOCK",     0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
+{ "MEMORY",   0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0       },
+{ "OUTPUT",   0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_STR, 0       },
+{ "PID",      0, 0, 0, 0, 0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, VAL_DCM },
+{ "REGION",   0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0       },
+{ "WAIT",     0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_STR, 0       },
+{ "" }
 };
 
 /* These must be alphabetized */
 static readonly CLI_ENTRY clnup_qual[] = {
-	{ "ALL",      0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
-	{ "INTEG",    0, 0, 0, 0, 0, 0, VAL_DISALLOWED,	0, NON_NEG, VAL_N_A, 0 },
-	{ "PERIODIC", 0, 0, 0, 0, 0, 0, VAL_REQ,	0, NON_NEG, VAL_NUM, 0 },
-	{ "REGION",   0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
-	{ "" }
+{ "ALL",      0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+{ "INTEG",    0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+{ "PERIODIC", 0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_NUM, 0 },
+{ "REGION",   0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
+{ "" }
 };
 
 static readonly CLI_ENTRY growhash_qual[] = {
-	{ "ALL",      0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
-	{ "REGION",   0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
-	{ "" }
+{ "ALL",    0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+{ "REGION", 0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
+{ "" }
 };
 
 static readonly CLI_ENTRY rehash_qual[] = {
-	{ "ALL",      0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
-	{ "REGION",   0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
-	{ "" }
+{ "ALL",    0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, VAL_N_A, 0 },
+{ "REGION", 0, 0, 0, 0, 0, 0, VAL_REQ,        0, NON_NEG, VAL_STR, 0 },
+{ "" }
 };
 
 /* Main command table (cmd_ary is defined to this array in lke.c)
@@ -79,13 +79,13 @@ static readonly CLI_ENTRY rehash_qual[] = {
  * dispatched to, and the qualifier sub-tables, containing all legal qualifiers.
  */
 GBLDEF CLI_ENTRY lke_cmd_ary[] = {
-	{ "CLEAR",  lke_clear,  clear_qual, 0, 0, cli_disallow_lke_clear, 0, VAL_NOT_REQ,    2, 0, VAL_STR, 0},
-	{ "CLNUP",  lke_clean,  clnup_qual, 0, 0, 0, 0, VAL_NOT_REQ,	0, 0, 0,      0},
-	{ "EXIT",   lke_exit,   0,          0, 0, 0, 0, VAL_DISALLOWED, 0, 0, 0,       0},
-	{ "GROWHASH",  lke_growhash,  growhash_qual, 0, 0, 0, 0, VAL_NOT_REQ,	0, 0, 0,      0},
-	{ "HELP",   util_help,  0,          0, 0, 0, 0, VAL_NOT_REQ,    1, 0, 0,       0},
-	{ "REHASH", lke_rehash, rehash_qual, 0, 0, 0, 0, VAL_NOT_REQ,	0, 0, 0,      0},
-	{ "SHOW",   lke_show,   show_qual,  0, 0, 0, 0, VAL_NOT_REQ,    1, 0, VAL_STR, 0},
-	{ "SPAWN",  util_spawn,	0,          0, 0, 0, 0, VAL_DISALLOWED, 0, 0, 0,       0},
-	{ "" }
+{ "CLEAR",    lke_clear,    clear_qual,    0, 0, cli_disallow_lke_clear, 0, VAL_NOT_REQ,    2, 0, VAL_STR, 0},
+{ "CLNUP",    lke_clean,    clnup_qual,    0, 0, 0,                      0, VAL_NOT_REQ,    0, 0, 0,       0},
+{ "EXIT",     lke_exit,     0,             0, 0, 0,                      0, VAL_DISALLOWED, 0, 0, 0,       0},
+{ "GROWHASH", lke_growhash, growhash_qual, 0, 0, 0,                      0, VAL_NOT_REQ,    0, 0, 0,       0},
+{ "HELP",     util_help,    0,             0, 0, 0,                      0, VAL_NOT_REQ,    1, 0, 0,       0},
+{ "REHASH",   lke_rehash,   rehash_qual,   0, 0, 0,                      0, VAL_NOT_REQ,    0, 0, 0,       0},
+{ "SHOW",     lke_show,     show_qual,     0, 0, 0,                      0, VAL_NOT_REQ,    1, 0, VAL_STR, 0},
+{ "SPAWN",    util_spawn,   0,             0, 0, 0,                      0, VAL_DISALLOWED, 0, 0, 0,       0},
+{ "" }
 };

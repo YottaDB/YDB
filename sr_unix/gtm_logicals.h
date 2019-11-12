@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -77,6 +77,7 @@
 #define	GTM_PRINCIPAL			"$gtm_principal"
 #define	GTM_PROMPT			"$gtm_prompt"
 #define	GTM_SIDE_EFFECT			"$gtm_side_effects"
+#define	GTM_SOCKET_KEEPALIVE_IDLE	"$gtm_socket_keepalive_idle"
 #define	SYSID				"$gtm_sysid"
 #define	GTM_MPROF_TESTING		"$gtm_trace_gbl_name"
 #define	GTM_TRACE_GROUPS		"$gtm_trace_groups"

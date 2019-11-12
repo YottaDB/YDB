@@ -1,7 +1,8 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-#	Copyright 2001 Sanchez Computer Associates, Inc.	#
+# Copyright (c) 2001-2019 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -96,7 +97,7 @@ endif
 echo " "
 
 
-version $lintimage_ver $lintimage_image
+set setactive_parms = ( $lintimage_ver $lintimage_image ) ; source $gtm_tools/setactive.csh
 if ( ! -d $gtm_ver/log ) then
 	mkdir $gtm_ver/log
 	chmod 775 $gtm_ver/log

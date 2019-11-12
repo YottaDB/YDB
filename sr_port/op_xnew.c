@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -55,7 +56,7 @@ CONDITION_HANDLER(zbreak_zstep_xnew_ch);
  *	 in umw_mv_stent().
  */
 
-void op_xnew(UNIX_ONLY_COMMA(unsigned int argcnt_arg) mval *s_arg, ...)
+void op_xnew(unsigned int argcnt_arg, mval *s_arg, ...)
 {
 	boolean_t		added;
 	ht_ent_mname		*tabent1, *tabent2;
@@ -65,11 +66,11 @@ void op_xnew(UNIX_ONLY_COMMA(unsigned int argcnt_arg) mval *s_arg, ...)
 	lv_val			*lvp, *lvtab1;
 	lv_xnew_var		*xnewvar;
 	mval			*s;
+	stack_frame		*fp;
 	va_list			var;
 	var_tabent		lvent;
 
-	VMS_ONLY(va_count(argcnt));
-	UNIX_ONLY(argcnt = argcnt_arg);		/* need to preserve stack copy on i386 */
+	argcnt = argcnt_arg;
 	htold = &curr_symval->h_symtab;
 	shift = symbinit();
 	DBGRFCT((stderr, "\n\n****op_xnew: **** New symbol table (0x"lvaddr") replaced previous table (0x"lvaddr")\n\n",
@@ -147,6 +148,21 @@ void op_xnew(UNIX_ONLY_COMMA(unsigned int argcnt_arg) mval *s_arg, ...)
 			XNEWREF_CNTNRS_IN_TREE(lvtab1);				/* note macro has LV_GET_CHILD exists check */
 		}
 	}
+	if (!frame_pointer->type)
+	{	/* only needed for uncounted frame types, i.e. indirection; not for others with a SFF_INDCE flag like XECUTE */
+		for (fp = fp_save = frame_pointer; (SFF_INDCE & fp->flags) && (fp->old_frame_pointer); fp = fp->old_frame_pointer)
+			;
+		if (fp != fp_save)
+		{	/* one or more (nested) indirections created this exclusive new */
+			assert(fp);
+			ESTABLISH(zbreak_zstep_xnew_ch);
+			fp_save = frame_pointer;
+			frame_pointer = fp;					/* pretend we're in the original frame */
+			gtm_fetch(0, 0);					/* refetch everything in old table into new */
+			frame_pointer = fp_save;				/* restore the proper frame_pointer */
+			REVERT;
+		}
+	}
 	if (shift)
 		guard_against_zbzst();
 	return;
@@ -188,8 +204,7 @@ STATICFNDEF void guard_against_zbzst(void)
 		ESTABLISH(zbreak_zstep_xnew_ch);
 		fp_save = frame_pointer;
 		frame_pointer = fp_prev;				/* pretend we're in the original frame */
-		UNIX_ONLY(gtm_fetch(0, 0));				/* refetch everything in the old table into the new one */
-		VMS_ONLY(fetch_all());					/* call an assembly interlude so VMS gets to gtm_fetch */
+		gtm_fetch(0, 0);					/* refetch everything in the old table into the new one */
 		frame_pointer = fp_save;				/* restore the proper frame_pointer */
 		REVERT;
 	}

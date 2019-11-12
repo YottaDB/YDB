@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2005, 2011 Fidelity Information Services, Inc	*
+ * Copyright (c) 2005-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,7 +20,7 @@
 
 void wbox_test_init(void)
 {
-#	ifdef DEBUG
+#	if defined (DEBUG) && !defined (STATIC_ANALYSIS)
 	mstr	envvar_logical, trans_name;
 	char	trans_bufr[MAX_TRANS_NAME_LEN];
 

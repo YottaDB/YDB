@@ -58,7 +58,7 @@ error_def(ERR_ZINTRECURSEIO);
 
 boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t update_bufsiz)
 {
-	int		temp_1;
+	int		temp_1, keepalive_opt;
 	char		*errptr;
 	int4		errlen, last_errno, save_errno;
 	int		d_socket_struct_len, res, nfds, sockerror;
@@ -76,8 +76,11 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 	int		errcode, real_errno;
 	char		ipaddr[SA_MAXLEN + 1];
 	char		port_buffer[NI_MAXSERV];
+	static readonly char 	action[] = "CONNECT";
 	GTM_SOCKLEN_TYPE	sockbuflen, tmp_addrlen;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	DBGSOCK((stdout, "socconn: ************* Entering socconn - msec_timeout: %d\n",msec_timeout));
 	/* check for validity */
 	dsocketptr = sockptr->dev;
@@ -493,7 +496,6 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 		}
 		hiber_start(100);
 	} while (res < 0);
-
 	sockptr->state = socket_connected;
 	sockptr->first_read = sockptr->first_write = TRUE;
 	/* update dollar_key */
@@ -560,6 +562,9 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 		}
 		STRNDUP(ipaddr, SA_MAXLEN, sockptr->remote.saddr_ip);
 		strncpy(&iod->dollar.key[len], sockptr->remote.saddr_ip, DD_BUFLEN - 1 - len);
+		keepalive_opt = TREF(gtm_socket_keepalive_idle);	/* deviceparameter would give more granular control */
+		if (keepalive_opt && !iosocket_tcp_keepalive(sockptr, keepalive_opt, action))
+			return FALSE;				/* iosocket_tcp_keepalive issues rts_error rather than return */
 	} else
 	{	/* getsockname does not return info for AF_UNIX connected socket so copy from remote side */
 		local_ai_ptr->ai_socktype = sockptr->remote.ai.ai_socktype;

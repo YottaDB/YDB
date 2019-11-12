@@ -156,9 +156,9 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 			if (('o' != object_file_name[ci + --clen])
 					|| ('.' != object_file_name[ci + --clen]))
 				clen = object_name_len - ci;
-			clen = MIN(clen, MAX_MIDENT_LEN);
-			memcpy(routine_name.addr, &object_file_name[ci], clen);
 			SET_OBJ(object_file_name, object_name_len);
+			clen = object_name_len = MIN(clen, MAX_MIDENT_LEN);
+			memcpy(routine_name.addr, &object_file_name[ci], clen);
 		}
 	}
 	assert(!last || *srclen);

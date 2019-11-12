@@ -120,17 +120,18 @@
 2 Copyright
    Copyright
 
-   Copyright 1987 - 2003, 2013 - 2019
+   Copyright 2019
 
-   Fidelity Information Services, Inc. All rights reserved.
+   Fidelity National Information Services, Inc. and/or its subsidiaries. All
+   rights reserved.
 
    Permission is granted to copy, distribute and/or modify this document
    under the terms of the GNU Free Documentation License, Version 1.3 or any
    later version published by the Free Software Foundation; with no Invariant
    Sections, no Front-Cover Texts and no Back-Cover Texts.
 
-   GT.M(TM) is a trademark of Fidelity Information Services, Inc. Other
-   trademarks are the property of their respective owners.
+   GT.M(TM) is a trademark of Fidelity National Information Services, Inc.
+   Other trademarks are the property of their respective owners.
 
    This document contains a description of GT.M and the operating
    instructions pertaining to the various functions that comprise the system.
@@ -9201,21 +9202,32 @@
 
    Returns the transformed representation of the first argument expr in a
    normalized form using the alternative transform specified by the second
-   argument intexpr; the return can be used as an operand to the follows (])
-   or sorts-after (]]) operator such that, if both operands are in the
-   normalized form, the result is independent of alternative collation. The
-   format for the $ZATRANSFORM() function is:
+   argument intexpr; the transformed representation can be used as an operand
+   to the follows (]) or sorts-after (]]) operator such that, if both
+   operands are in the normalized form, the result is independent of
+   alternative collation. The format for the $ZATRANSFORM() function is:
 
-   $ZTRANSFORM(expr,intexpr[,{0|1}][,{0|1}])
+   $ZATRANSFORM(expr,intexpr[,{0|1|2|-2}][,{0|1}])
 
-   Please see the section on $ZCOLLATE() for a similar alternative.
+   The 2 and -2 work in M mode for the 'M' collation (collation 0), or any
+   user defined collation which supplies the necessary plugin functionality.
+   In UTF-8 mode, these argument values produce a ZATRANSCOL error. If the
+   plugin for the specified collation does not support this "next character"
+   functionality, the function produces a COLLATIONUNDEF error in response to
+   an an attempt to invoke it. If an external collation library is used and
+   encounters a gtm_ac_xutil failure, ZATRANSFORM produces an ERR_ZATRANSCOL.
+   If an external collation library is used and does not supply a
+   gtm_ac_xutil function, ZATRANSFORM produces an ERR_COLLATIONUNDEF when
+   operations -2 or 2 are specified. To use these operations with external
+   collation libraries, the libraries must supply a function called
+   'gtm_ac_xutil'.
 
 3 Examples
    Examples
 
    Example:
 
-   GTM>write $ztransform("John Smythe",1)]$zatransform("Jane Smith",2)
+   GTM>write $zatransform("John Smythe",1)]$zatransform("Jane Smith",2)
    0
    GTM>
 
@@ -9629,10 +9641,8 @@
 
    Example:
 
-   GTM>write $ZCHSET
-   M
    GTM>Write $zconvert("HAPPY NEW YEAR","T")
-   %GTM-E-BADCASECODE, T is not a valid case conversion code
+   Happy New Year
 
    Example:
 
@@ -19933,7 +19943,13 @@
    Transformation
 
    gtm_ac_xform_1 or gtm_ac_xform routines transforms subscripts to the
-   alternative collation sequence.>
+   alternative collation sequence.
+
+   This routine returns altered keys to the original subscripts. The syntax
+   of this routine is:
+
+   #include "gtm_descript.h"
+   long gtm_ac_xback(gtm_descriptor *in, int level, gtm_descriptor *out, int *outlen)
 
    If the application uses subscripted lvns longer than 32,767 bytes (but
    less than 1,048,576 bytes), the alternative collation library must contain
@@ -19945,10 +19961,10 @@
    #include "gtm_descript.h"
    int gtm_ac_xform_1(gtm32_descriptor* in, int level, gtm32_descriptor* out, int* outlen);
 
-4 Input_Arguments
-   Input Arguments
+4 Input_Arguments_for_gtm_ac_xform1
+   Input Arguments for gtm_ac_xform1
 
-   The input arguments for gtm_ac_xform are:
+   The input arguments for gtm_ac_xform1 are:
 
    in: a gtm32_descriptor containing the string to be transformed.
 
@@ -19957,8 +19973,10 @@
 
    out: a gtm32_descriptor to be filled with the transformed key.
 
-4 Output_Arguments
-   Output Arguments
+4 Output_Arguments_for_gtm_ac_xform1
+   Output Arguments for gtm_ac_xform1
+
+   The output arguments for gtm_ac_xform1 are:
 
    return value: A long word status code.
 
@@ -19973,8 +19991,8 @@
    #include "gtm_descript.h"
    long gtm_ac_xform(gtm_descriptor *in, int level, gtm_descriptor *out, int *outlen)
 
-5 Input_Arguments
-   Input Arguments
+4 Input_Arguments_for_gtm_ac_xform
+   Input Arguments for gtm_ac_xform
 
    The input arguments for gtm_ac_xform are:
 
@@ -19985,8 +20003,8 @@
 
    out: a gtm_descriptor to be filled with the transformed key.
 
-5 Output_Arguments
-   Output Arguments
+4 Output_Arguments_for_gtm_ac_xform
+   Output Arguments for gtm_ac_xform
 
    The output arguments for gtm_ac_xform are:
 
@@ -20073,7 +20091,7 @@
    The syntax of gtm_ac_xback_1 is:
 
    #include "gtm_descript.h"
-   long gtm_ac_xback_1 ( gtm32_descriptor *src, int level, gtm32_descriptor *dst, int *dstlen)
+   long gtm_ac_xback_1(gtm32_descriptor *src, int level, gtm32_descriptor *dst, int *dstlen)
 
    The arguments of gtm_ac_xback_1 are identical to those of gtm_ac_xform_1.
 
@@ -20102,9 +20120,9 @@
    };
    long gtm_ac_xback (in, level, out, outlen)
         gtm_descriptor *in;    /* the input string */
-        int level;            /* the subscript level */
-        gtm_descriptor *out;    /* output buffer */
-        int *outlen;        /* the length of the output string */
+        int level;             /* the subscript level */
+        gtm_descriptor *out;   /* output buffer */
+        int *outlen;           /* the length of the output string */
    {
      int n;
      unsigned char *cp, *cout;
@@ -20120,6 +20138,47 @@
      *outlen = in->len;
      return 0;
    }
+
+3 Transform_Utility
+   Transform Utility
+
+   This routine returns a next or previous character in the collation
+   sequence. The syntax of this routine is:
+
+   #include "gtm_descript.h"
+   long gtm_ac_xutil (gtm32_descriptor *in, int level, gtm32_descriptor *out, int *outlen, int op, int honor_numeric)
+
+4 Input_Arguments
+   Input Arguments
+
+   The input arguments of gtm_ac_xutil are:
+
+     o in: Specifies the input string; gtm_ac_xutil considers the first
+       character of the input string.
+     o level: Currently unused and should not be examined or changed.
+     o honor_numeric: Boolean variable to specify whether to use standard
+       GT.M collation for digits.
+
+          o TRUE: use standard GT.M collation for digits before any other
+            character
+          o FALSE: treat digits the same as all other characters
+
+4 Output_Arguments
+   Output Arguments
+
+   The output arguments of gtm_ac_xutil are:
+
+     o out: Supplies the one (1) character result string produced by applying
+       the collation operation if a result was possible.
+     o outlen: Supplies to the caller the length of the returned string- 0 or
+       1.
+     o op: Supplies the collation operation as follows:
+
+          o 0: collation value of the given character
+          o 1: character collating before the given character if it exists
+          o 2: character collating after the given character if it exists
+
+   The gtm_ac_xutil function returns 0 on success and -1 on failure.
 
 3 Version_Control
    Version Control

@@ -240,7 +240,7 @@ void zwr_out_print(char * buff, int bufflen)
 	FPRINTF(stderr,"\n");
 }
 
-void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
+void bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_len)
 {
 	unsigned char		*ptr, *cp1, *cp2, *btop, *gvkey_char_ptr, *tmp_ptr, *tmp_key_ptr, *c, *ctop, *ptr_base;
 	unsigned char		hdr_lvl, src_buff[MAX_KEY_SZ + 1], dest_buff[MAX_ZWR_KEY_SZ],
@@ -251,7 +251,8 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	int			tmp_cmpc, sn_chunk_number, expected_sn_chunk_number = 0, sn_hold_buff_pos, sn_hold_buff_size;
 	uint4			max_data_len, max_subsc_len, gblsize, data_len, num_of_reg = 0;
 	ssize_t			subsc_len, extr_std_null_coll;
-	gtm_uint64_t		iter, key_count, rec_count, tmp_rec_count, global_key_count;
+	gtm_uint64_t		iter, key_count, tmp_rec_count, global_key_count;
+	DEBUG_ONLY(gtm_uint64_t		saved_begin = 0);
 	gtm_uint64_t		first_failed_rec_count, failed_record_count;
 	off_t			last_sn_error_offset = 0, file_offset_base = 0, file_offset = 0;
 	boolean_t		need_xlation, new_gvn, utf8_extract;
@@ -416,13 +417,19 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		new_gvn = TRUE;
 	} else
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_OLDBINEXTRACT, 1, hdr_lvl - '0');
-	if (begin < 2)
+	if (begin < 2) /* WARNING: begin can never be less than 2 */
 		begin = 2;
+#ifdef DEBUG
+	if ((WBTEST_ENABLED(WBTEST_FAKE_BIG_KEY_COUNT)) && (2UL < begin))
+		saved_begin = begin, begin = 2;
+	else if (WBTEST_ENABLED(WBTEST_FAKE_BIG_KEY_COUNT))
+		saved_begin = FAKE_BIG_KEY_COUNT;
+#endif
 	for (iter = 2; iter < begin; iter++)
 	{
 		if (!(len = file_input_bin_get((char **)&ptr, &file_offset_base, (char **)&ptr_base, DO_RTS_ERROR_TRUE)))
 		{
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, begin);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, &begin);
 			util_out_print("Error reading record number: !@UQ\n", TRUE, &iter);
 			mupip_error_occurred = TRUE;
 			return;
@@ -433,15 +440,6 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			iter--;
 		}
 	}
-	assert(iter == begin);
-	util_out_print("Beginning LOAD at record number: !UL\n", TRUE, begin);
-	max_data_len = 0;
-	max_subsc_len = 0;
-	global_key_count = key_count = 0;
-	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, 4294967196U); /* (2**32)-100=4294967196 */
-	rec_count = begin - 1;
-	extr_collseq = db_collseq = NULL;
-	need_xlation = FALSE;
 	assert(NULL == tmp_gvkey);	/* GVKEY_INIT macro relies on this */
 	GVKEY_INIT(tmp_gvkey, DBKEYSIZE(MAX_KEY_SZ));	/* tmp_gvkey will point to malloced memory after this */
 	assert(NULL == sn_gvkey);	/* GVKEY_INIT macro relies on this */
@@ -450,10 +448,19 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	GVKEY_INIT(sn_savekey, DBKEYSIZE(MAX_KEY_SZ));	/* sn_gvkey will point to malloced memory after this */
 	assert(NULL == save_orig_key);	/* GVKEY_INIT macro relies on this */
 	GVKEY_INIT(save_orig_key, DBKEYSIZE(MAX_KEY_SZ));	/* sn_gvkey will point to malloced memory after this */
+	assert(iter == begin);
+	global_key_count = key_count = 0;
+	max_data_len = max_subsc_len = 0;
+	extr_collseq = db_collseq = NULL;
 	gvnh_reg = NULL;
-	for ( ; !mupip_DB_full; )
+	need_xlation = FALSE;
+	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, saved_begin);
+	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, begin, saved_begin);
+	iter = begin - 1; /* WARNING: iter can never be zero because begin can never be less than 2 */
+	util_out_print("Beginning LOAD at record number: !@UQ\n", TRUE, &begin);
+	while (!mupip_DB_full)
 	{
-		if (++rec_count > end)
+		if ((++iter > end) || (0 == iter))
 			break;
 		next_cmpc = 0;
 		if (mupip_error_occurred && ONERROR_STOP == onerror)
@@ -465,7 +472,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		{
 			util_out_print("!AD:!_  Key cnt: !@UQ  max subsc len: !UL  max data len: !UL", TRUE,
 				LEN_AND_LIT("LOAD TOTAL"), &key_count, max_subsc_len, max_data_len);
-			tmp_rec_count = (rec_count == begin) ? rec_count : rec_count - 1;
+			tmp_rec_count = (iter == begin) ? iter : iter - 1;
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_INFO(ERR_LOADRECCNT), 1, &tmp_rec_count);
 			mu_gvis();
 			util_out_print(0, TRUE);
@@ -479,7 +486,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			extr_collhdr = *((coll_hdr *)(ptr));
 			assert(hdr_lvl > '2');
 			new_gvn = TRUE;			/* next record will contain a new gvn */
-			rec_count--;	/* Decrement as this record does not count as a record for loading purposes */
+			iter--;	/* Decrement as this record does not count as a record for loading purposes */
 			continue;
 		}
 		if (encrypted_version)
@@ -497,7 +504,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 							SNPRINTF(index_err_buf, SIZEOF(index_err_buf),
 								"Encryption handle expected in the range [0; %d) but found %d",
 								n_index, index);
-							SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld", rec_count );
+							SNPRINTF(msg_buff, SIZEOF(msg_buff), "%" PRIu64, iter );
 							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(9) MAKE_MSG_SEVERE(ERR_RECLOAD),
 								2, LEN_AND_STR(msg_buff), ERR_TEXT, 2,
 								RTS_ERROR_TEXT(index_err_buf), ERR_GVFAILCORE);
@@ -574,7 +581,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			COMPUTE_HASH_MNAME(&gvname);
 			if (mu_load_error)
 			{
-				switch_db = check_db_status_for_global(&gvname, MU_FMT_BINARY, &failed_record_count, rec_count,
+				switch_db = check_db_status_for_global(&gvname, MU_FMT_BINARY, &failed_record_count, iter,
 								&first_failed_rec_count, reg_list, num_of_reg);
 				if (!switch_db)
 					continue;
@@ -589,12 +596,12 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				if ((ERR_DBFILERR == error_condition) || (ERR_STATSDBNOTSUPP == error_condition))
 				{
 					insert_reg_to_list(reg_list, db_init_region, &num_of_reg);
-					first_failed_rec_count = rec_count;
+					first_failed_rec_count = iter;
 					mu_load_error = TRUE;
 				} else
 				{
 					failed_record_count = 0;
-					SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld", rec_count);
+					SNPRINTF(msg_buff, SIZEOF(msg_buff), "%" PRIu64, iter);
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RECLOAD, 2, LEN_AND_STR(msg_buff));
 				}
 				failed_record_count++;
@@ -611,7 +618,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 		GET_USHORT(rec_len, &rp->rsiz);
 		if ((max_rec < rec_len) || (0 != EVAL_CMPC(rp)) || (gvname.var_name.len > rec_len) || mupip_error_occurred)
 		{
-			bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+			bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
 			mu_gvis();
 			DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 			continue;
@@ -669,7 +676,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			GET_USHORT(rec_len, &rp->rsiz);
 			if (rec_len + (unsigned char *)rp > btop)
 			{
-				bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+				bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
 				mu_gvis();
 				DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 				break;
@@ -689,7 +696,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					gv_currkey->end = cp2 - gv_currkey->base - 1;
 					gv_currkey->base[gv_currkey->end] = 0;
 					gv_currkey->base[gv_currkey->end - 1] = 0;
-					bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+					bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
 					mu_gvis();
 					DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 					break;
@@ -763,7 +770,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			}
 			if (gv_currkey->end >= max_key)
 			{
-				bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+				bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
 				mu_gvis();
 				DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 				continue;
@@ -778,7 +785,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 			if (!valid_gblname)
 			{
 				mupip_error_occurred = TRUE;
-				bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+				bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
 				mu_gvis();
 				DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 				break;
@@ -792,7 +799,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 				if (MAX_GVSUBSCRIPTS < num_subscripts)
 				{
 					mupip_error_occurred = TRUE;
-					bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+					bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
 					mu_gvis();
 					DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 					break;
@@ -807,7 +814,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 							if (!mu_int_possub[subtocheck.one][subtocheck.two])
 							{
 								mupip_error_occurred = TRUE;
-								bin_call_db(ERR_COR, (INTPTR_T)rec_count,
+								bin_call_db(ERR_COR, (INTPTR_T)iter,
 									(INTPTR_T)global_key_count);
 								mu_gvis();
 								DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
@@ -823,7 +830,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 							if (!mu_int_negsub[subtocheck.one][subtocheck.two])
 							{
 								mupip_error_occurred = TRUE;
-								bin_call_db(ERR_COR, (INTPTR_T)rec_count,
+								bin_call_db(ERR_COR, (INTPTR_T)iter,
 									(INTPTR_T)global_key_count);
 								mu_gvis();
 								DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
@@ -833,7 +840,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 						if (!mupip_error_occurred && ((STR_SUB_PREFIX != mych) || (*subs)))
 						{
 							mupip_error_occurred = TRUE;
-							bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+							bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
 							mu_gvis();
 							DISPLAY_FILE_OFFSET_OF_RECORD_AND_REST_OF_BLOCK;
 							break;
@@ -1095,7 +1102,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					if ((ERR_JNLFILOPN == error_condition) || (ERR_DBPRIVERR == error_condition) ||
 						(ERR_GBLOFLOW == error_condition))
 					{
-						first_failed_rec_count = rec_count;
+						first_failed_rec_count = iter;
 						insert_reg_to_list(reg_list, gv_cur_region, &num_of_reg);
 						mu_load_error = TRUE;
 						failed_record_count++;
@@ -1104,7 +1111,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 					{
 						if (ERR_DBFILERR == error_condition)
 							failed_record_count++;
-						bin_call_db(ERR_COR, (INTPTR_T)rec_count, (INTPTR_T)global_key_count);
+						bin_call_db(ERR_COR, (INTPTR_T)iter, (INTPTR_T)global_key_count);
 						file_offset = file_offset_base + ((unsigned char *)rp - ptr_base);
 						util_out_print("!_!_at File offset : [0x!16@XQ]", TRUE, &file_offset);
 						DISPLAY_CURRKEY;
@@ -1146,17 +1153,18 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	if (NULL != sn_hold_buff)
 		free(sn_hold_buff);
 	file_input_close();
-	tmp_rec_count = (rec_count == begin) ? rec_count : rec_count - 1;
+	tmp_rec_count = (iter == begin) ? iter : iter - 1;
 	if (0 != first_failed_rec_count)
 	{
 		if (tmp_rec_count > first_failed_rec_count)
-			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld to %lld", first_failed_rec_count, tmp_rec_count);
+			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%" PRIu64 " to %" PRIu64,
+					first_failed_rec_count, tmp_rec_count);
 		else
-			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld", tmp_rec_count);
+			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%" PRIu64, tmp_rec_count);
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RECLOAD, 2, LEN_AND_STR(msg_buff));
 	}
-	util_out_print("LOAD TOTAL!_!_Key Cnt: !@UQ  Max Subsc Len: !UL  Max Data Len: !UL", TRUE, &key_count, max_subsc_len,
-			max_data_len);
+	util_out_print("LOAD TOTAL!_!_Key Cnt: !@UQ  Max Subsc Len: !UL  Max Data Len: !UL", TRUE,
+			&key_count, max_subsc_len, max_data_len);
 	if (failed_record_count)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FAILEDRECCOUNT, 1, &failed_record_count);
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_INFO(ERR_LOADRECCNT), 1, &tmp_rec_count);

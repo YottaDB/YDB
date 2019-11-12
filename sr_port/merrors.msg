@@ -203,7 +203,7 @@ DBCCERR		<Interlock instruction failure in critical mechanism for region !AD>/er
 DUPTOKEN	<Token 0x!16@XQ is duplicate in the journal file !AD for database !AD>/error/fao=5!/ansi=0
 DBJNLNOTMATCH	<Database !AD points to journal file name !AD but the journal file points to database file !AD>/error/fao=6!/ansi=0
 DBFILERR	<Error with database file !AD>/error/fao=2!/ansi=0
-DBNOTGDS	<!AD - Unrecognized database file format>/error/fao=2!/ansi=0
+DBNOTGDS	<!AD - Unrecognized database file format>/error/fao=2!/ansi=0/A
 DBOPNERR	<Error opening database file !AD>/error/fao=2!/ansi=0
 DBRDERR		<Cannot read database file !AD after opening>/error/fao=2!/ansi=0
 CCEDUMPNOW	<>/fatal/fao=0!/ansi=0
@@ -303,7 +303,7 @@ JNLINVALID	<!AD is not a valid journal file !/ for database file: !AD>/error/fao
 MBXWRTONLY	<Mailbox is write only, cannot read from it>/error/fao=0!/ansi=0
 MEMORY		<Central memory exhausted during request for !UJ bytes from 0x!XJ>/fatal/fao=2!/ansi=0
 DONOBLOCK	<Argumentless DO not followed by a block>/warning/fao=0!/ansi=0
-UNUSEDMSG306	<MTBLKTOOSM last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
+ZATRANSCOL	<The collation requested has no implementation for the requested operation>/error/fao=0!/ansi=0
 UNUSEDMSG307	<MTFIXRECSZ last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
 UNUSEDMSG308	<MTIS last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
 UNUSEDMSG309	<MTRDBADBLK last used in V6.3-003 Dec. 2017>/error/fao=0!/ansi=0
@@ -321,7 +321,7 @@ JNLCLOSE	<Error closing journal file !AD>/error/fao=2!/ansi=0
 NOTPRINCIO	<Output currently directed to device !AD>/warning/fao=2!/ansi=0
 NOTTOEOFONPUT	<Not positioned to EOF on write (sequential organization only)>/error/fao=0!/ansi=0
 NOZBRK		<No zbreak at that location>/info/fao=0!/ansi=0
-NULSUBSC	<!AD null subscripts are not allowed for database file: !AD>/error/fao=4!/ansi=0
+NULSUBSC	<!AD Null subscripts are not allowed for database file: !AD>/error/fao=4!/ansi=0/I
 NUMOFLOW	<Numeric overflow>/error/fao=0!/ansi=92
 PARFILSPC	<Parameter: !AD  file specification: !AD>/error/fao=4!/ansi=0
 PATCLASS	<Illegal character class for pattern code>/error/fao=0!/ansi=0
@@ -430,7 +430,7 @@ FILENOTFND	<File !AD not found>/error/fao=2!/ansi=0
 MUFILRNDWNFL	<File !AD rundown failed>/error/fao=2!/ansi=0
 JNLTMQUAL1	<Time qualifier BEFORE_TIME="!AZ" is less than SINCE_TIME="!AZ">/error/fao=2!/ansi=0
 FORCEDHALT	<Image HALTed by MUPIP STOP>/fatal/fao=0!/ansi=0
-LOADEOF		<Load error: EOF reached prior to BEGIN record !UL.  No records loaded.>/error/fao=1!/ansi=0
+LOADEOF		<Load error: EOF reached prior to BEGIN record !@UQ.  No records loaded.>/error/fao=1!/ansi=0
 WILLEXPIRE	<This copy of GT.M will expire within one week>/info/fao=0!/ansi=0
 LOADEDBG	<Load error: END smaller than BEGIN.  No records loaded.>/error/fao=0!/ansi=0
 LABELONLY	<Routine !AD was compiled for label-only entry>/error/fao=2!/ansi=0
@@ -469,20 +469,20 @@ ZLNOOBJECT	<No object module was produced>/error/fao=0!/ansi=0
 ZLMODULE	<Object file name does not match module name: !AD>/error/fao=2!/ansi=0
 DBBLEVMX	<!AD Block level higher than maximum>/info/fao=2!/ansi=0
 DBBLEVMN	<!AD Block level less than zero>/info/fao=2!/ansi=0
-DBBSIZMN	<!AD Block too small>/error/fao=2!/ansi=0
-DBBSIZMX	<!AD Block larger than file block size>/error/fao=2!/ansi=0
-DBRSIZMN	<!AD Physical record too small>/error/fao=2!/ansi=0
-DBRSIZMX	<!AD Physical record too large>/error/fao=2!/ansi=0
-DBCMPNZRO	<!AD First record of block has nonzero compression count>/error/fao=2!/ansi=0
+DBBSIZMN	<!AD Block too small>/error/fao=2!/ansi=0/I
+DBBSIZMX	<!AD Block larger than file block size>/error/fao=2!/ansi=0/I
+DBRSIZMN	<!AD Physical record too small>/error/fao=2!/ansi=0/I
+DBRSIZMX	<!AD Physical record too large>/error/fao=2!/ansi=0/I
+DBCMPNZRO	<!AD First record of block has nonzero compression count>/error/fao=2!/ansi=0/I
 DBSTARSIZ	<!AD Star record has wrong size> /info /fao=2!/ansi=0
-DBSTARCMP	<!AD Star record has nonzero compression count> /info /fao=2!/ansi=0
+DBSTARCMP	<!AD Star record has nonzero compression count> /info /fao=2!/ansi=0/D
 DBCMPMX		<!AD Record compression count is too large> /info /fao=2!/ansi=0
-DBKEYMX		<!AD Key too long>/error/fao=2!/ansi=0
-DBKEYMN		<!AD Key too short>/error/fao=2!/ansi=0
-DBCMPBAD	<!AD Compression count not maximal>/warning/fao=2!/ansi=0
-DBKEYORD	<!AD Keys out of order>/error/fao=2!/ansi=0
-DBPTRNOTPOS	<!AD Block pointer negative>/error/fao=2!/ansi=0
-DBPTRMX		<!AD Block pointer larger than file maximum>/error/fao=2!/ansi=0
+DBKEYMX		<!AD Key too long>/error/fao=2!/ansi=0/I
+DBKEYMN		<!AD Key too short>/error/fao=2!/ansi=0/I
+DBCMPBAD	<!AD Compression count not maximal>/warning/fao=2!/ansi=0/I
+DBKEYORD	<!AD Keys out of order>/error/fao=2!/ansi=0/I
+DBPTRNOTPOS	<!AD Block pointer negative>/error/fao=2!/ansi=0/D
+DBPTRMX		<!AD Block pointer larger than file maximum>/error/fao=2!/ansi=0/D
 DBPTRMAP	<!AD Block pointer is a bit map block number> /info /fao=2!/ansi=0
 IFBADPARM	<External Interface Bad Parameter>/error/fao=0!/ansi=0
 IFNOTINIT	<External Interface must first call GTM$INIT or M routine>/error/fao=0!/ansi=0
@@ -493,7 +493,7 @@ LOADFILERR	<Error with load file !AD>/error/fao=2!/ansi=0
 NOREGION	<REGION not found: !AD>/error/fao=2!/ansi=0
 PATLOAD		<Error loading pattern file !AD>/error/fao=2!/ansi=0
 EXTRACTFILERR	<Error with extract file !AD>/error/fao=2!/ansi=0
-FREEZE		<Region: !AD is already frozen>/info/fao=2!/ansi=0
+FREEZE		<Region: !AD is already frozen>/info/fao=2!/ansi=0/T
 NOSELECT	<None of the selected variables exist -- halting>/warning/fao=0!/ansi=0
 EXTRFAIL	<Extract failed for the global ^!AD. MUPIP INTEG should be run.>/error/fao=2!/ansi=0
 LDBINFMT	<Unrecognized header for load file>/error/fao=0!/ansi=0
@@ -657,7 +657,7 @@ INVBITLEN	<Invalid size of the bit string>/error/fao=0!/ansi=0
 INVBITSTR	<Invalid bit string>/error/fao=0!/ansi=0
 INVBITPOS	<Invalid position in the bit string>/error/fao=0!/ansi=0
 PARNORMAL	<Parse successful>/success/fao=0!/ansi=0
-PARBUFSM	<Parse buffer too small>/error/fao=0!/ansi=0
+FILEPATHTOOLONG	<Filename including the path cannot be longer than 255 characters>/error/fao=0!/ansi=0
 RMWIDTHTOOBIG	<File record size or width too big>/error/fao=0!/ansi=72
 PATTABNOTFND	<Pattern table !AD not found>/error/fao=2!/ansi=0
 OBJFILERR	<Error with object file I/O on file !AD>/error/fao=2!/ansi=0
@@ -705,7 +705,7 @@ DBFHEADERR4	<Database file !AD: control problem: !AD was 0x!XL expecting 0x!XL> 
 DBADDRANGE	<Database file !AD, element location 0x!XJ: blk = 0x!XL: control 0x!XJ was outside !AD range 0x!XJ to 0x!XJ> /info /fao=9!/ansi=0
 DBQUELINK	<Database file !AD, element location 0x!XJ: blk = 0x!XL: control !AD queue problem: was 0x!XJ, expecting 0x!XJ> /info /fao=8!/ansi=0
 DBCRERR		<Database file !AD, cr location 0x!XJ blk = 0x!XL error: !AD was 0x!XL, expecting 0x!XL -- called from module !AD at line !UL> /info /fao=11!/ansi=0
-MUSTANDALONE	<Could not get exclusive access to !AD> /info /fao=2!/ansi=0
+MUSTANDALONE	<Could not get exclusive access to !AD> /info /fao=2!/ansi=0/A
 MUNOACTION	<MUPIP unable to perform requested action> /error /fao=0!/ansi=0
 RMBIGSHARE	<File with BIGRECORD specified may only be shared if READONLY>/error/fao=0!/ansi=0
 TPRESTART	<Database !AD; code: !AD; blk: 0x!XL in glbl: ^!AD; pvtmods: !UL, blkmods: !UL, blklvl: !UL, type: !UL, readset: !UL, writeset: !UL, local_tn: 0x!16@XQ, zpos: !AD> /info /fao=16!/ansi=0
@@ -763,7 +763,7 @@ UNUSEDMSG762	<LQLENGTHNA last used in V6.3-003A>/error/fao=0!/ansi=0
 ADDRTOOLONG	<Socket address !AD of length !UL is longer than the maximum permissible length !UL>/error/fao=4!/ansi=0
 GTMSECSHRGETSEMFAIL	<error getting semaphore errno = !UL>/warning/fao=1!/ansi=0
 CPBEYALLOC	<Attempt to copy beyond the allocated buffer>/error/fao=0!/ansi=0
-DBRDONLY	<Database file !AD read only>/error/fao=2!/ansi=0
+DBRDONLY	<Database file !AD read only>/error/fao=2!/ansi=0/T
 DUPTN		<Duplicate transaction found [TN = 0x!16@XQ] at offset 0x!XL in journal file !AD>/warning/fao=4!/ansi=0
 TRESTLOC	<Transaction start: !AD, Transaction failure: !AD>/error/fao=4!/ansi=0
 REPLPOOLINST	<Error with replication pool (id = !UL) for instance file !AD>/error/fao=3!/ansi=0
@@ -776,7 +776,7 @@ KRNLKILL	<Process was terminated by SIGDANGER signal from the system -- System s
 MEMORYRECURSIVE	<Memory Subsystem called recursively>/fatal/fao=0!/ansi=0
 FREEZEID	<Cache !AD on !AD by freeze id 0x!XL with match 0x!XL from 0x!XJ>/info/fao=7!/ansi=0
 BLKWRITERR	<Unable to queue disk write for block 0x!XL.  Will keep trying.>/info/fao=1!/ansi=0
-UNUSEDMSG779	<STOPTIMEOUT last used in V6.3-000A>/error/fao=0!/ansi=0
+DSEINVALBLKID	<Trying to edit DB with 64-bit block IDs using pre-V7 DSE>/error/fao=0!/ansi=0
 PINENTRYERR	<Custom pinentry program failure>/error/fao=0!/ansi=0
 BCKUPBUFLUSH	<Unable to flush buffer for online backup>/error/fao=0!/ansi=0
 NOFORKCORE	<Unable to fork off process to create core.  Core creation postponed.>/warning/fao=0!/ansi=0
@@ -842,7 +842,7 @@ FILEIDGBLSEC	<File ID in global section does not match with the database file !A
 GBLSECNOTGDS	<Global Section !AD is not a GT.M global section>/error/fao=2!/ansi=0
 BADGBLSECVER	<Global Section !AD does not match the current database version>/error/fao=2!/ansi=0
 RECSIZENOTEVEN	<RECORDSIZE [!UL] needs to be a multiple of 2 if ICHSET or OCHSET is UTF-16, UTF-16LE or UTF-16BE>/error/fao=1!/ansi=0
-BUFFLUFAILED	<Error flushing buffers from !AD for database file !AD>/error/fao=4!/ansi=0
+BUFFLUFAILED	<Error flushing buffers from !AD for database file !AD>/error/fao=4!/ansi=0/T
 MUQUALINCOMP	<Incompatible qualifiers - FILE and REGION>/error/fao=0!/ansi=0
 DISTPATHMAX	<$gtm_dist path is greater than maximum (!UL)>/error/fao=1!/ansi=0
 FILEOPENFAIL	<Failed to open file !AD>/error/fao=2!/ansi=0
@@ -883,7 +883,7 @@ SIGMAPERR	<Signal was caused by an address not mapped to an object>/fatal/fao=0!
 SIGACCERR	<Signal was caused by invalid permissions for mapped object>/fatal/fao=0!/ansi=0
 TRNLOGFAIL	<Translation of (VMS) logical name or (UNIX) environment variable !AD failed>/error/fao=2!/ansi=0
 INVDBGLVL	<Invalid non-numeric debug level specified !AD in (VMS) logical name or (UNIX) environment variable !AD>/error/fao=4!/ansi=0
-DBMAXNRSUBS	<!AD Maximum number of subscripts exceeded>/info/fao=2!/ansi=0
+DBMAXNRSUBS	<!AD Maximum number of subscripts exceeded>/info/fao=2!/ansi=0/I
 GTMSECSHRSCKSEL	<gtmsecshr select on socket failed>/error/fao=0!/ansi=0
 GTMSECSHRTMOUT	<gtmsecshr exiting due to idle timeout>/info/fao=0!/ansi=0
 GTMSECSHRRECVF	<gtmsecshr receive on server socket failed>/error/fao=0!/ansi=0
@@ -901,73 +901,73 @@ MUINFOUINT4	<!AD : !UL [0x!XL]>/info/fao=4!/ansi=0
 NLMISMATCHCALC	<Location of !AD expected at 0x!XL, but found at 0x!XL>/error/fao=4!/ansi=0
 RELINKCTLFULL	<Relinkctl file for directory !AD is full (maximum entries !UL)>/error/fao=3!/ansi=0
 MUPIPSET2BIG	<!UL too large, maximum !AD allowed is !UL>/warning/fao=4!/ansi=0
-DBBADNSUB	<!AD Bad numeric subscript>/error/fao=2!/ansi=0
-DBBADKYNM	<!AD Bad key name>/error/fao=2!/ansi=0
-DBBADPNTR	<!AD Bad pointer value in directory>/error/fao=2!/ansi=0
-DBBNPNTR	<!AD Bit map block number as pointer>/error/fao=2!/ansi=0
-DBINCLVL	<!AD Block at incorrect level>/error/fao=2!/ansi=0
-DBBFSTAT	<!AD Block busy/free status unknown (local bitmap corrupted)>/error/fao=2!/ansi=0
-DBBDBALLOC	<!AD Block doubly allocated>/error/fao=2!/ansi=0
-DBMRKFREE	<!AD Block incorrectly marked free>/error/fao=2!/ansi=0
-DBMRKBUSY	<!AD Block incorrectly marked busy>/warning/fao=2!/ansi=0
-DBBSIZZRO	<!AD Block size equals zero>/error/fao=2!/ansi=0
-DBSZGT64K	<!AD Block size is greater than 64K>/error/fao=2!/ansi=0
-DBNOTMLTP	<!AD Block size not a multiple of 512 bytes>/error/fao=2!/ansi=0
-DBTNTOOLG	<!AD Block transaction number too large>/info/fao=2!/ansi=0
-DBBPLMLT512	<!AD Blocks per local map is less than 512>/error/fao=2!/ansi=0
-DBBPLMGT2K	<!AD Blocks per local map is greater than 2K>/error/fao=2!/ansi=0
+DBBADNSUB	<!AD Bad numeric subscript>/error/fao=2!/ansi=0/I
+DBBADKYNM	<!AD Bad key name>/error/fao=2!/ansi=0/I
+DBBADPNTR	<!AD Bad pointer value in directory>/error/fao=2!/ansi=0/D
+DBBNPNTR	<!AD Bit map block number as pointer>/error/fao=2!/ansi=0/D
+DBINCLVL	<!AD Block at incorrect level>/error/fao=2!/ansi=0/D
+DBBFSTAT	<!AD Block busy/free status unknown (local bitmap corrupted)>/error/fao=2!/ansi=0/D
+DBBDBALLOC	<!AD Block doubly allocated>/error/fao=2!/ansi=0/I
+DBMRKFREE	<!AD Block incorrectly marked free>/error/fao=2!/ansi=0/D
+DBMRKBUSY	<!AD Block incorrectly marked busy>/warning/fao=2!/ansi=0/B
+DBBSIZZRO	<!AD Block size equals zero>/error/fao=2!/ansi=0/A
+DBSZGT64K	<!AD Block size is greater than 64K>/error/fao=2!/ansi=0/A
+DBNOTMLTP	<!AD Block size not a multiple of 512 bytes>/error/fao=2!/ansi=0/A
+DBTNTOOLG	<!AD Block transaction number too large>/info/fao=2!/ansi=0/T
+DBBPLMLT512	<!AD Blocks per local map is less than 512>/error/fao=2!/ansi=0/D
+DBBPLMGT2K	<!AD Blocks per local map is greater than 2K>/error/fao=2!/ansi=0/D
 MUINFOUINT8	<!AD : !@ZQ [0x!16@XQ]>/info/fao=4!/ansi=0
-DBBPLNOT512	<!AD Blocks per local map is not 512>/error/fao=2!/ansi=0
+DBBPLNOT512	<!AD Blocks per local map is not 512>/error/fao=2!/ansi=0/D
 MUINFOSTR	<!AD : !AD>/info/fao=4!/ansi=0
-DBUNDACCMT	<!AD Cannot determine access method; trying with BG>/info/fao=2!/ansi=0
-DBTNNEQ		<!AD Current tn and early tn are not equal>/info/fao=2!/ansi=0
+DBUNDACCMT	<!AD Cannot determine access method; trying with BG>/info/fao=2!/ansi=0/B
+DBTNNEQ		<!AD Current tn and early tn are not equal>/info/fao=2!/ansi=0/T
 MUPGRDSUCC	<Database file !AD successfully !AD to !AD>/success/fao=6!/ansi=0
 DBDSRDFMTCHNG	<Database file !AD, Desired DB Format set to !AD by !AD with pid !UL [0x!XL] at transaction number [0x!16@XQ]>/info/fao=9!/ansi=0
-DBFGTBC		<!AD File size larger than block count would indicate>/warning/fao=2!/ansi=0
-DBFSTBC		<!AD File size smaller than block count would indicate>/error/fao=2!/ansi=0
-DBFSTHEAD	<!AD File smaller than database header>/error/fao=2!/ansi=0
-DBCREINCOMP	<!AD Header indicates database file creation was interrupted before completion>/error/fao=2!/ansi=0
-DBFLCORRP	<!AD Header indicates database file is corrupt>/error/fao=2!/ansi=0
-DBHEADINV	<!AD Header size not valid for database>/error/fao=2!/ansi=0
-DBINCRVER	<!AD Incorrect version of GT.M database>/error/fao=2!/ansi=0
-DBINVGBL	<!AD Invalid mixing of global names>/error/fao=2!/ansi=0
-DBKEYGTIND	<!AD Key greater than index key>/error/fao=2!/ansi=0
-DBGTDBMAX	<!AD Key larger than database maximum>/error/fao=2!/ansi=0
-DBKGTALLW	<!AD Key larger than maximum allowed length>/error/fao=2!/ansi=0
-DBLTSIBL	<!AD Keys less than sibling's index key>/error/fao=2!/ansi=0
-DBLRCINVSZ	<!AD Last record of block has invalid size>/error/fao=2!/ansi=0
+DBFGTBC		<!AD File size larger than block count would indicate>/warning/fao=2!/ansi=0/T
+DBFSTBC		<!AD File size smaller than block count would indicate>/error/fao=2!/ansi=0/D
+DBFSTHEAD	<!AD File smaller than database header>/error/fao=2!/ansi=0/A
+DBCREINCOMP	<!AD Header indicates database file creation was interrupted before completion>/error/fao=2!/ansi=0/A
+DBFLCORRP	<!AD Header indicates database file is corrupt>/error/fao=2!/ansi=0/A
+DBHEADINV	<!AD Header size not valid for database>/error/fao=2!/ansi=0/A
+DBINCRVER	<!AD Incorrect version of GT.M database>/error/fao=2!/ansi=0/A
+DBINVGBL	<!AD Invalid mixing of global names>/error/fao=2!/ansi=0/I
+DBKEYGTIND	<!AD Key greater than index key>/error/fao=2!/ansi=0/I
+DBGTDBMAX	<!AD Key larger than database maximum>/error/fao=2!/ansi=0/I
+DBKGTALLW	<!AD Key larger than maximum allowed length>/error/fao=2!/ansi=0/I
+DBLTSIBL	<!AD Keys less than sibling's index key>/error/fao=2!/ansi=0/I
+DBLRCINVSZ	<!AD Last record of block has invalid size>/error/fao=2!/ansi=0/I
 MUREUPDWNGRDEND	<Region !AD : MUPIP REORG UPGRADE/DOWNGRADE finished by pid !UL [0x!XL] at transaction number [0x!16@XQ]>/info/fao=5!/ansi=0
-DBLOCMBINC	<!AD Local bit map incorrect>/warning/fao=2!/ansi=0
-DBLVLINC	<!AD Local bitmap block level incorrect>/warning/fao=2!/ansi=0
-DBMBSIZMX	<!AD Map block too large>/warning/fao=2!/ansi=0
-DBMBSIZMN	<!AD Map block too small>/error/fao=2!/ansi=0
-DBMBTNSIZMX	<!AD Map block transaction number too large>/info/fao=2!/ansi=0
-DBMBMINCFRE	<!AD Master bit map incorrectly asserts this local map has free space>/warning/fao=2!/ansi=0
-DBMBPINCFL	<!AD Master bit map incorrectly marks this local map full>/warning/fao=2!/ansi=0
-DBMBPFLDLBM	<!AD Master bit map shows this map full, agreeing with disk local map>/warning/fao=2!/ansi=0
-DBMBPFLINT	<!AD Master bit map shows this map full, agreeing with MUPIP INTEG>/warning/fao=2!/ansi=0
-DBMBPFLDIS	<!AD Master bit map shows this map full, in disagreement with both disk and INTEG result>/warning/fao=2!/ansi=0
-DBMBPFRDLBM	<!AD Master bit map shows this map has space, agreeing with disk local map>/warning/fao=2!/ansi=0
-DBMBPFRINT	<!AD Master bit map shows this map has space, agreeing with MUPIP INTEG>/warning/fao=2!/ansi=0
+DBLOCMBINC	<!AD Local bit map incorrect>/warning/fao=2!/ansi=0/B
+DBLVLINC	<!AD Local bitmap block level incorrect>/warning/fao=2!/ansi=0/B
+DBMBSIZMX	<!AD Map block too large>/warning/fao=2!/ansi=0/B
+DBMBSIZMN	<!AD Map block too small>/error/fao=2!/ansi=0/B
+DBMBTNSIZMX	<!AD Map block transaction number too large>/info/fao=2!/ansi=0/T
+DBMBMINCFRE	<!AD Master bit map incorrectly asserts this local map has free space>/warning/fao=2!/ansi=0/B
+DBMBPINCFL	<!AD Master bit map incorrectly marks this local map full>/warning/fao=2!/ansi=0/B
+DBMBPFLDLBM	<!AD Master bit map shows this map full, agreeing with disk local map>/warning/fao=2!/ansi=0/B
+DBMBPFLINT	<!AD Master bit map shows this map full, agreeing with MUPIP INTEG>/warning/fao=2!/ansi=0/B
+DBMBPFLDIS	<!AD Master bit map shows this map full, in disagreement with both disk and INTEG result>/warning/fao=2!/ansi=0/B
+DBMBPFRDLBM	<!AD Master bit map shows this map has space, agreeing with disk local map>/warning/fao=2!/ansi=0/B
+DBMBPFRINT	<!AD Master bit map shows this map has space, agreeing with MUPIP INTEG>/warning/fao=2!/ansi=0/B
 DBMAXKEYEXC	<!AD Maximum key size for database exceeds design maximum>/error/fao=2!/ansi=0
 DBMXRSEXCMIN	<!AD Maximum record size for database is less than the design minimum>/error/fao=2!/ansi=0
 MUPIPSET2SML	<!UL too small, minimum !AD allowed is !UL>/warning/fao=4!/ansi=0
-DBREADBM	<!AD Read error on bitmap>/error/fao=2!/ansi=0
-DBCOMPTOOLRG	<!AD Record has too large compression count>/error/fao=2!/ansi=0
+DBREADBM	<!AD Read error on bit map>/error/fao=2!/ansi=0/D
+DBCOMPTOOLRG	<!AD Record has too large compression count>/error/fao=2!/ansi=0/I
 DBVERPERFWARN2	<Peformance warning: Database !AD is not fully upgraded. Run MUPIP REORG UPGRADE for best overall performance>/warning/fao=2!/ansi=0
-DBRBNTOOLRG	<!AD Root block number greater than last block number in file>/error/fao=2!/ansi=0
-DBRBNLBMN	<!AD Root block number is a local bit map number>/error/fao=2!/ansi=0
-DBRBNNEG	<!AD Root block number negative>/error/fao=2!/ansi=0
-DBRLEVTOOHI	<!AD Root level higher than maximum>/error/fao=2!/ansi=0
-DBRLEVLTONE	<!AD Root level less than one>/error/fao=2!/ansi=0
-DBSVBNMIN	<!AD Start VBN smaller than possible>/error/fao=2!/ansi=0
-DBTTLBLK0	<!AD Total blocks equal zero>/error/fao=2!/ansi=0
+DBRBNTOOLRG	<!AD Root block number greater than last block number in file>/error/fao=2!/ansi=0/D
+DBRBNLBMN	<!AD Root block number is a local bit map number>/error/fao=2!/ansi=0/D
+DBRBNNEG	<!AD Root block number negative>/error/fao=2!/ansi=0/D
+DBRLEVTOOHI	<!AD Root level higher than maximum>/error/fao=2!/ansi=0/D
+DBRLEVLTONE	<!AD Root level less than one>/error/fao=2!/ansi=0/D
+DBSVBNMIN	<!AD Start VBN smaller than possible>/error/fao=2!/ansi=0/A
+DBTTLBLK0	<!AD Total blocks equal zero>/error/fao=2!/ansi=0/A
 DBNOTDB		<!AD File does not have a valid GDS file header>/error/fao=2!/ansi=0
 DBTOTBLK	<File header indicates total blocks is 0x!XL but file size indicates total blocks would be 0x!XL>/error/fao=2!/ansi=0
 DBTN		<Block TN is 0x!16@XQ>/info/fao=1!/ansi=0
-DBNOREGION	<None of the database regions accessible>/error/fao=0!/ansi=0
+DBNOREGION	<None of the database regions accessible>/error/fao=0!/ansi=0/T
 DBTNRESETINC	<WARNING: tn_reset for database is incomplete due to integrity errors>/warning/fao=0!/ansi=0
-DBTNLTCTN	<Transaction numbers greater than the current transaction were found>/error/fao=0!/ansi=0
+DBTNLTCTN	<Transaction numbers greater than the current transaction were found>/error/fao=0!/ansi=0/T
 DBTNRESET	<Cannot reset transaction number for this region>/error/fao=0!/ansi=0
 MUTEXRSRCCLNUP	<Mutex subsystem leftover resource !AD removed>/info/fao=2!/ansi=0
 SEMWT2LONG	<Process !UL waited !UL second(s) for the !AD lock for region !AD, lock held by pid !UL>/error/fao=7!/ansi=0
@@ -1012,7 +1012,7 @@ TCGETATTR	<Error while getting terminal attributes on file descriptor !UL>/error
 TCSETATTR	<Error while setting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 IOWRITERR	<IO Write by pid 0x!XL to blk 0x!XL of database file !AD failed.  Pid 0x!XL retrying the IO.>/error/fao=5!/ansi=0
 REPLINSTWRITE	<Error writing [0x!XL] bytes at offset [0x!16@XQ] in replication instance file !AD>/error/fao=4!/ansi=0
-DBBADFREEBLKCTR	<Database !AD free blocks counter in file header: 0x!XL appears incorrect, should be 0x!XL.  Auto-corrected.>/warning/fao=4!/ansi=0
+DBBADFREEBLKCTR	<Database !AD free blocks counter in file header: 0x!XL appears incorrect, should be 0x!XL.  Auto-corrected.>/warning/fao=4!/ansi=0/B
 REQ2RESUME	<Request to resume suspended processing received from process !UL owned by userid !UL>/info/fao=2!/ansi=0
 TIMERHANDLER	<Incorrect SIGALRM handler (0x!XJ) found by !AD>/warning/fao=3!/ansi=0
 FREEMEMORY	<Error occurred freeing memory from 0x!XJ>/error/fao=1!/ansi=0
@@ -1206,7 +1206,7 @@ DBWCVERIFYEND	<Database file !AD, write cache verification finished by pid !UL [
 MUPIPSIG	<!AD (signal !UL) issued from process !UL [0x!XL] to process !UL [0x!XL]>/info/fao=7!/ansi=0
 HTSHRINKFAIL	<Hash table compaction failed to allocate new smaller table due to lack of memory>/warning/fao=0!/ansi=0
 STPEXPFAIL	<Stringpool expansion failed. It could not expand to !UL bytes.>/error/fao=1!/ansi=0
-DBBTUWRNG	<The blocks-to-upgrade file-header field is incorrect. Expected 0x!XL, found 0x!XL>/warning/fao=2!/ansi=0
+DBBTUWRNG	<The blocks-to-upgrade file-header field is incorrect. Expected 0x!XL, found 0x!XL>/warning/fao=2!/ansi=0/T
 DBBTUFIXED	<The blocks-to-upgrade file-header field has been changed to the correct value>/info/fao=0!/ansi=0
 DBMAXREC2BIG	<Maximum record size (!UL) is too large for this block size (!UL) - Maximum is !UL>/error/fao=3!/ansi=0
 DBCSCNNOTCMPLT	<Specified DBCERTIFY SCAN output file is not complete - Rerun scan>/error/fao=0!/ansi=0
@@ -1240,8 +1240,8 @@ RSVDBYTE2HIGH	<Record size (!UL) is greater than the maximum allowed for region 
 BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0
 BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0
 VMSMEMORY2	<Central storage exhausted during allocation of dynamic file descriptor with !UL bytes - check page file quota and page file size>/error/fao=1!/ansi=0
-LOADBGSZ2	<Load error: BEGIN too large.  No records loaded.>/error/fao=0!/ansi=0
-LOADEDSZ2	<Load error: END too large.  No records loaded.>/error/fao=0!/ansi=0
+UNUSEDMSG1243	<LOADBGSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
+UNUSEDMSG1244	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
 REPLINSTMISMTCH	<Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)>/error/fao=8!/ansi=0
 REPLINSTREAD	<Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD>/error/fao=4!/ansi=0
 REPLINSTDBMATCH	<Replication instance file !AD has seqno [0x!16@XQ] while database has a different seqno [0x!16@XQ]>/error/fao=4!/ansi=0
@@ -1478,9 +1478,9 @@ CUSTOMFILOPERR	<Error while doing !AD operation on file !AD>/error/fao=4!/ansi=0
 CUSTERRNOTFND	<Error mnemonic !AD specified in custom errors file is not valid for this version of GT.M>/error/fao=2!/ansi=0
 CUSTERRSYNTAX	<Syntax error in file !AD at line number !UL>/error/fao=3!/ansi=0
 ORLBKINPROG	<Online ROLLBACK in progress by PID !UL in region !AD>/info/fao=3!/ansi=0
-DBSPANGLOINCMP	<!AD Spanning node is missing. Block no !UL of spanning node is missing>/error/fao=3!/ansi=0
-DBSPANCHUNKORD	<!AD Chunk of !UL blocks is out of order>/error/fao=3!/ansi=0
-DBDATAMX	<!AD Record too large>/error/fao=2!/ansi=0
+DBSPANGLOINCMP	<!AD Spanning node is missing. Block no !UL of spanning node is missing>/error/fao=3!/ansi=0/S
+DBSPANCHUNKORD	<!AD Chunk of !UL blocks is out of order>/error/fao=3!/ansi=0/S
+DBDATAMX	<!AD Record too large>/error/fao=2!/ansi=0/I
 DBIOERR		<Error while doing write operation on region !AD (!AD)>/error/fao=4!/ansi=0
 INITORRESUME	<UPDATERESYNC on a Supplementary Instance must additionally specify INITIALIZE or RESUME>/error/fao=0!/ansi=0
 GTMSECSHRNOARG0	<gtmsecshr cannot identify its origin - argv[0] is null>/fatal/fao=0!/ansi=0
@@ -1556,7 +1556,7 @@ SOCKACCEPT	<Socket accept failed>/error/fao=0!/ansi=0
 NOSOCKHANDLE	<No socket handle specified in WRITE /PASS>/error/fao=0!/ansi=0
 TRIGLOADFAIL	<MUPIP TRIGGER or $ZTRIGGER operation failed. Failure code: !AD.>/error/fao=2!/ansi=0
 SOCKPASSDATAMIX	<Attempt to use a LOCAL socket for both READ/WRITE and PASS/ACCEPT>/error/fao=0!/ansi=0
-NOGTCMDB	<!AD does not support operation on GT.CM database region: !AD>/error/fao=4!/ansi=0
+NOGTCMDB	<!AD does not support operation on GT.CM database region: !AD>/error/fao=4!/ansi=0/B
 NOUSERDB	<!AD does not support operation on non-GDS format region: !AD>/error/fao=4!/ansi=0
 DSENOTOPEN	<DSE could not open region !AD - see DSE startup error message for cause>/error/fao=2!/ansi=0
 ZSOCKETATTR	<Attribute "!AD" invalid for $ZSOCKET function>/error/fao=2!/ansi=0
@@ -1629,7 +1629,7 @@ DBGLDMISMATCH	<Database file !AD has !AZ whereas !AZ !AD in global directory !AD
 DBBLKSIZEALIGN	<Database file !AD has AIO=ON and block_size=!UL which is not a multiple of filesystem block size !UL>/error/fao=4!/ansi=0
 ASYNCIONOMM	<Database file !AD!AD cannot !AD>/error/fao=6!/ansi=0
 RESYNCSEQLOW	<MUPIP JOURNAL -ROLLBACK -FORWARD -RESYNC=!@ZQ [0x!16@XQ] requested is lower than !@ZQ [0x!16@XQ] which is the starting sequence number of the instance>/error/fao=4!/ansi=0
-DBNULCOL	<!AD NULL collation representation differs from the database file header setting>/error/fao=2!/ansi=0
+DBNULCOL	<!AD NULL collation representation differs from the database file header setting>/error/fao=2!/ansi=0/I
 UTF16ENDIAN	<The device previously set UTF-16 endianness to !AD and cannot change to !AD>/error/fao=4!/ansi=0
 OFRZACTIVE	<Region !AD has an Online Freeze>/warning/fao=2!/ansi=0
 OFRZAUTOREL	<Online Freeze automatically released for region !AD>/warning/fao=2!/ansi=0
@@ -1639,12 +1639,12 @@ OFRZNOTHELD	<Online Freeze had been automatically released for at least one regi
 AIOBUFSTUCK	<Waited !UL minutes for PID: !UL to finish AIO disk write of block: !UL [0x!XL] aio_error=!UL>/error/fao=5!/ansi=0
 DBDUPNULCOL	<Discarding !AD=!AD key due to duplicate null collation record>/error/fao=4!/ansi=0
 CHANGELOGINTERVAL	<!AD Server is now logging to !AD every !UL transactions>/info/fao=5!/ansi=0
-DBNONUMSUBS	<!AD Key contains a numeric form of subscript in a global defined to collate all subscripts as strings>/error/fao=2!/ansi=0
+DBNONUMSUBS	<!AD Key contains a numeric form of subscript in a global defined to collate all subscripts as strings>/error/fao=2!/ansi=0/B
 AUTODBCREFAIL	<Automatic creation of database file !AD associated with region !AD failed; see associated messages for details>/error/fao=4!/ansi=0
 RNDWNSTATSDBFAIL	<Rundown of statistics database region !AD (DB !AD) failed at/in !AD with following error: !AD>/error/fao=8!/ansi=0
 STATSDBNOTSUPP	<Attempted operation is not supported on statistics database file !AD>/error/fao=2!/ansi=0
 TPNOSTATSHARE	<VIEW "[NO]STATSHARE" is not allowed inside a TP transaction>/error/fao=0!/ansi=0
-FNTRANSERROR	<Buffer too small error occurred trying to translate filename !AD>/error/fao=2!/ansi=0
+FNTRANSERROR	<Filename including path exceeded 255 chars while trying to resolve filename !AD>/error/fao=2!/ansi=0
 NOCRENETFILE	<Database file !AD not created; cannot create across network>/error/fao=2!/ansi=0
 DSKSPCCHK	<Error while checking for available disk space to create file !AD>/error/fao=2!/ansi=0
 NOCREMMBIJ	<MM access method not compatible with BEFORE image journaling; Database file !AD not created>/error/fao=2!/ansi=0
@@ -1652,7 +1652,7 @@ FILECREERR	<Error !AD for file !AD during DB creation>/error/fao=4!/ansi=0
 RAWDEVUNSUP	<RAW device for region !AD is not supported>/error/fao=2!/ansi=0
 DBFILECREATED	<Database file !AD created>/info/fao=2!/ansi=0
 PCTYRESERVED	<Attempted operation not supported on ^%Y* namespace>/error/fao=0!/ansi=0
-REGFILENOTFOUND	<Database file !AD corresponding to region !AD cannot be found>/info/fao=4!/ansi=0
+REGFILENOTFOUND	<Database file !AD corresponding to region !AD cannot be found>/info/fao=4!/ansi=0/A
 DRVLONGJMP	<Fake internal error that drives longjmp()>/error/fao=0!/ansi=0
 INVSTATSDB	<Database file !AD associated with statistics database region !AD is not a valid statistics database>/error/fao=4!/ansi=0
 STATSDBERR	<Error in/at !AD attempting to use a statistics database: !AD>/error/fao=4!/ansi=0

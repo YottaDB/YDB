@@ -280,6 +280,12 @@ void	gtm_env_init(void)
 		val.len = SIZEOF(GTM_MAX_SOCKETS) - 1;
 		if ((tmsock = trans_numeric(&val, &is_defined, TRUE)) && MAX_MAX_N_SOCKET > tmsock) /* Note assignment!! */
 			gtm_max_sockets = tmsock;
+		/* Initialize TCP_KEEPIDLE and by implication SO_KEEPALIVE */
+		val.addr = GTM_SOCKET_KEEPALIVE_IDLE;
+		val.len = SIZEOF(GTM_SOCKET_KEEPALIVE_IDLE) - 1;
+		TREF(gtm_socket_keepalive_idle) = trans_numeric(&val, &is_defined, TRUE);
+		if (0 > TREF(gtm_socket_keepalive_idle))
+			TREF(gtm_socket_keepalive_idle) = 0;
 		/* Initialize storage to allocate and keep in our back pocket in case run out of memory */
 		outOfMemoryMitigateSize = GTM_MEMORY_RESERVE_DEFAULT;
 		val.addr = GTM_MEMORY_RESERVE;

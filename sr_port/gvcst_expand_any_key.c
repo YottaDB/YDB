@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,7 +108,7 @@ enum cdb_sc gvcst_expand_any_key (srch_blk_status *blk_stat, sm_uc_ptr_t rec_top
 			while (0 != cur_level)
 			{
 				tblk_size = ((blk_hdr_ptr_t)blk_base)->bsiz;
-				GET_LONG(tblk_num, blk_base + tblk_size - SIZEOF(block_id));
+				GET_BLK_ID(tblk_num, blk_base + tblk_size - SIZEOF(block_id));
 				if (0 == tblk_num  || cs_data->trans_hist.total_blks - 1 < tblk_num)
 				{
 					assert(t_tries < CDB_STAGNATE);

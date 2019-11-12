@@ -2278,7 +2278,8 @@ MBSTART {											\
 												\
 	if (TSD->createinprogress)								\
 		gtm_errcode = ERR_DBCREINCOMP;							\
-	if (TSD->file_corrupt && !mupip_jnl_recover && !TREF(in_mupip_integ))			\
+	if (TSD->file_corrupt && !mupip_jnl_recover && !TREF(in_mupip_integ) &&			\
+			!(IS_MUPIP_IMAGE && TREF(skip_file_corrupt_check)))			\
 		gtm_errcode = ERR_DBFLCORRP;							\
 	if ((dba_mm == TSD->acc_meth) && TSD->blks_to_upgrd)					\
 		gtm_errcode = ERR_MMNODYNUPGRD;							\

@@ -210,7 +210,9 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 	char			*shmPtr; /* not using "shm_ptr" since it is already used in an AIX include file */
 	int			shmid;
 	multi_proc_shm_hdr_t	*mp_hdr;	/* Pointer to "multi_proc_shm_hdr_t" structure in shared memory */
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	status = 0;
 	/* Although we made sure the # of tasks is the same as the # of processes forked off (in the "gtm_multi_proc"
 	 * invocation in "mur_forward"), it is possible one of the forked process finishes one invocation of
@@ -339,8 +341,8 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 						 */
 			if (NULL == rctl->csa)
 			{
-				assert(!rctl->db_present);
-				assert(!rctl->gd->open);
+				assert(TREF(skip_DB_exists_check) || !rctl->db_present);
+				assert(TREF(skip_DB_exists_check) || !rctl->gd->open);
 				rctl->csa = cs_addrs;
 				rctl->csa->miscptr = rctl;
 			} else
@@ -350,7 +352,7 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 											 * updated in "mur_sort_files".
 											 */
 			}
-			assert(rctl->csd == cs_data);
+			assert(TREF(skip_DB_exists_check) || (rctl->csd == cs_data));
 			rctl->sgm_info_ptr = cs_addrs->sgm_info_ptr;
 			assert(!reg->open || (NULL != cs_addrs->dir_tree));
 			gv_target = cs_addrs->dir_tree;

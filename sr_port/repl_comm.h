@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -56,6 +57,18 @@ for (msg_ptr = (unsigned char *)(BUFF), recvd_len = 0, recvd_this_iter = torecv_
      && ((recvd_len += recvd_this_iter), (torecv_len -= recvd_this_iter), (torecv_len > 0));					\
      msg_ptr += recvd_this_iter, recvd_this_iter = torecv_len)
 
+#define SEND_SYSMSG_REPLCOMM(REASON)									\
+{													\
+	send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, REASON);			\
+}
+
+#define REPL_RECV_LOOP_FETCHRESYNC(SOCK_FD, BUFF, LEN, TIMEOUT)	\
+for (msg_ptr = (unsigned char *)(BUFF), recvd_len = 0, recvd_this_iter = torecv_len = (LEN) GTMTLS_ONLY_COMMA(poll_dir = -1);   \
+     ((SS_NORMAL == (status = repl_recv(SOCK_FD, msg_ptr, &recvd_this_iter, TIMEOUT GTMTLS_ONLY_COMMA(&poll_dir)))) ||		\
+	((EREPL_RECV == repl_errno) && (REPL_CONN_RESET(status))));				                        	\
+     msg_ptr += recvd_this_iter, recvd_this_iter = torecv_len)
+
+
 #define REPL_COMM_MAX_INTR_CNT	3	/* # of iterations we'll let select() be interrupted before we give up and assume timeout */
 #define REPL_COMM_LOG_EAGAIN_INTERVAL	10	/* every these many times select() returns EAGAIN, we log a message */
 #define REPL_COMM_LOG_EWDBLCK_INTERVAL	10	/* every these many times send() returns EWOULDBLOCK, we log a message */
@@ -85,6 +98,6 @@ int get_send_sock_buff_size(int sockfd, int *buflen);
 int get_recv_sock_buff_size(int sockfd, int *buflen);
 int set_send_sock_buff_size(int sockfd, int buflen);
 int set_recv_sock_buff_size(int sockfd, int buflen);
-void repl_log_conn_info(int sock_fd, FILE *log_fp);
+void repl_log_conn_info(int sock_fd, FILE *log_fp, boolean_t debug);
 
 #endif /* REPL_COMM_H */

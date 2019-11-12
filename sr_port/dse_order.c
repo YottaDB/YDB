@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "gdsblk.h"
+#include "gdsdbver.h"
 #include "copy.h"
 #include "dse.h"
 
@@ -36,6 +37,7 @@ GBLREF short int	patch_path_count;
 GBLREF unsigned short	patch_comp_count;
 
 error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEINVALBLKID);
 
 int dse_order(block_id srch,
 	      block_id_ptr_t pp,
@@ -45,8 +47,10 @@ int dse_order(block_id srch,
 	      bool dir_data_blk)
 {
 	block_id	last;
+	boolean_t	long_blk_id;
 	cache_rec_ptr_t	dummy_cr;
 	int4		dummy_int;
+	long		blk_id_size;
 	short int	rsize, size;
 	sm_uc_ptr_t	bp, b_top, key_top, ptr, rp, r_top;
 	unsigned short	cc;
@@ -55,6 +59,19 @@ int dse_order(block_id srch,
 	patch_path_count++;
 	if (!(bp = t_qread(srch, &dummy_int, &dummy_cr)))
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+	if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER)
+	{
+#		ifdef BLK_NUM_64BIT
+		long_blk_id = TRUE;
+		blk_id_size = SIZEOF(block_id_64);
+#		else
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#		endif
+	} else
+	{
+		long_blk_id = FALSE;
+		blk_id_size = SIZEOF(block_id_32);
+	}
 	if (((blk_hdr_ptr_t)bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
 	else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)bp)->bsiz)
@@ -69,21 +86,35 @@ int dse_order(block_id srch,
 			r_top = rp + SIZEOF(rec_hdr);
 		else
 			r_top = rp + rsize;
-		if ((r_top > b_top) || (r_top == b_top && ((blk_hdr*)bp)->levl))
+		if ((r_top > b_top) || ((r_top == b_top) && ((blk_hdr*)bp)->levl))
 		{
-			if ((SIZEOF(rec_hdr) + SIZEOF(block_id) != (b_top - rp)) || EVAL_CMPC((rec_hdr *)rp))
+			if (((SIZEOF(rec_hdr) + blk_id_size) != (b_top - rp)) || EVAL_CMPC((rec_hdr *)rp))
 				return FALSE;
-			if (dir_data_blk && !((blk_hdr_ptr_t)bp)->levl)
+			if (dir_data_blk && !(((blk_hdr_ptr_t)bp)->levl))
 			{
 				for (ptr = rp + SIZEOF(rec_hdr); (*ptr++ || *ptr++) && (ptr <= b_top);)
 					;
-				GET_LONGP(pp, ptr);
+				if (long_blk_id == TRUE)
+#					ifdef BLK_NUM_64BIT
+					GET_BLK_ID_64(*pp,ptr);
+#					else
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#					endif
+				else
+					GET_BLK_ID_32(*pp,ptr);
 			} else
-				GET_LONGP(pp, b_top - SIZEOF(block_id));
+				if (long_blk_id == TRUE)
+#					ifdef BLK_NUM_64BIT
+					GET_BLK_ID_64(*pp,b_top - SIZEOF(block_id_64));
+#					else
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#					endif
+				else
+					GET_BLK_ID_32(*pp,b_top - SIZEOF(block_id_32));
 			break;
 		} else
 		{
-			if ((SIZEOF(block_id) + SIZEOF(rec_hdr)) > (r_top - rp))
+			if ((blk_id_size + SIZEOF(rec_hdr)) > (r_top - rp))
 				break;
 			if (dir_data_blk && !((blk_hdr_ptr_t)bp)->levl)
 			{
@@ -91,7 +122,7 @@ int dse_order(block_id srch,
 					;
 				key_top = ptr;
 			} else
-				key_top = r_top - SIZEOF(block_id);
+				key_top = r_top - blk_id_size;
 			if (EVAL_CMPC((rec_hdr_ptr_t)rp) > patch_comp_count)
 				cc = patch_comp_count;
 			else
@@ -103,11 +134,19 @@ int dse_order(block_id srch,
 				size = 0;
 			memcpy(&patch_comp_key[cc], rp + SIZEOF(rec_hdr), size);
 			patch_comp_count = cc + size;
-			GET_LONGP(pp, key_top);
+			if (long_blk_id == TRUE)
+#				ifdef BLK_NUM_64BIT
+				GET_BLK_ID_64(*pp, key_top);
+#				else
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#				endif
+			else
+				GET_BLK_ID_32(*pp, key_top);
 			if (0 >= memvcmp(targ_key, targ_len, patch_comp_key, patch_comp_count))
 				break;
 		}
 	}
+	assert((rp - bp) == (int4)(rp - bp));
 	*op = (int4)(rp - bp);
 	if ((*pp == patch_find_blk) && !dir_data_blk)
 	{
@@ -119,8 +158,17 @@ int dse_order(block_id srch,
 			r_top = rp + rsize;
 			if (r_top > b_top)
 				r_top = b_top;
-			if (SIZEOF(block_id) <= (r_top - rp))
-				GET_LONG(patch_right_sib, r_top - SIZEOF(block_id));
+			if (blk_id_size <= (r_top - rp))
+			{
+				if (long_blk_id == TRUE)
+#					ifdef BLK_NUM_64BIT
+					GET_BLK_ID_64(patch_right_sib, r_top - SIZEOF(block_id_64));
+#					else
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#					endif
+				else
+					GET_BLK_ID_32(patch_right_sib, r_top - SIZEOF(block_id_32));
+			}
 		}
 		return TRUE;
 	}

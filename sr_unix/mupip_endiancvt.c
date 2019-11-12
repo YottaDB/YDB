@@ -438,7 +438,7 @@ void mupip_endiancvt(void)
 	info.is_encrypted = endian_native ? old_data->is_encrypted : GTM_BYTESWAP_32(old_data->is_encrypted);
 	info.encryption_hash_cutoff = endian_native
 		? old_data->encryption_hash_cutoff
-		: GTM_BYTESWAP_32(old_data->encryption_hash_cutoff);
+		: BLK_ID_BYTESWAP(old_data->encryption_hash_cutoff);
 	if (USES_ANY_KEY(&info))
 	{	/* Database is encrypted. Initialize encryption and setup the keys to be used in later encryption/decryption */
 		info.database_fn = &db_name[0];
@@ -669,8 +669,10 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 
 	/************* MOSTLY STATIC DATABASE STATE FIELDS **************************/
 	SWAP_SD4(blk_size);
+	assert(SIZEOF(int4) == SIZEOF(old->master_map_len));
 	SWAP_SD4(master_map_len);
 	SWAP_SD4(bplmap);
+	assert(SIZEOF(int4) == SIZEOF(old->start_vbn));
 	SWAP_SD4(start_vbn);
 	assert(SIZEOF(int4) == SIZEOF(old->acc_meth));		/* enum */
 	SWAP_SD4_CAST(acc_meth, enum db_acc_method);
@@ -797,7 +799,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(ccp_jnl_before);
 	SWAP_SD4(clustered);
 	SWAP_SD4(unbacked_cache);
-        /* RC server related fields sb zero when not active	*/
+	/* RC server related fields sb zero when not active	*/
 	SWAP_SD4(rc_srv_cnt);
 	SWAP_SD4(dsid);
 	SWAP_SD4(rc_node);
@@ -1376,9 +1378,9 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key)
 				return -1;
 			if (0 != blk_levl && BSTAR_REC_SIZE == rec_len)
 			{	/* down to the next level */
-				GET_ULONG(blk_ptr, rec_p + SIZEOF(rec_hdr));
+				GET_BLK_ID(blk_ptr, rec_p + SIZEOF(rec_hdr));
 				if (!blk_is_native)
-					blk_ptr = GTM_BYTESWAP_32(blk_ptr);
+					blk_ptr = BLK_ID_BYTESWAP(blk_ptr);
 				if (blk_ptr > info->tot_blks)
 					return -1;	/* past end of database */
 				blk_to_get = blk_ptr;
@@ -1390,9 +1392,9 @@ block_id	endian_find_dtblk(endian_info *info, end_gv_key *gv_key)
 				if (0 == blk_levl)
 					return blk_to_get;	/* found dtleaf block we are looking for */
 				ptroffset = found_gv_key.end - EVAL_CMPC((rec_hdr *)rec_p) + 1;
-				GET_ULONG(blk_ptr, (rec_p + SIZEOF(rec_hdr) + ptroffset));
+				GET_BLK_ID(blk_ptr, rec_p + SIZEOF(rec_hdr) + ptroffset);
 				if (!blk_is_native)
-					blk_ptr = GTM_BYTESWAP_32(blk_ptr);
+					blk_ptr = BLK_ID_BYTESWAP(blk_ptr);
 				if (blk_ptr > info->tot_blks)
 					return -1;	/* past end of database */
 				blk_to_get = blk_ptr;
@@ -1485,9 +1487,9 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 		else if (SIZEOF(block_id) <= ((rec1_ptr + rec1_len) - ++key_top) &&
 			 (SIZEOF(block_id) + MAX_SPEC_TYPE_LEN) >= ((rec1_ptr + rec1_len) - key_top))
 		{	/* record value long enough for block_id but not longer than block_id plus collation information */
-			GET_LONG(ptr2blk, key_top);
+			GET_BLK_ID(ptr2blk, key_top);
 			if (new_is_native)
-				ptr2blk = GTM_BYTESWAP_32(ptr2blk);
+				ptr2blk = BLK_ID_BYTESWAP(ptr2blk);
 			if (ptr2blk <= info->tot_blks)
 			{	/* might be a pointer so need to check the hard way */
 				gv_key.key = rec1_ptr + SIZEOF(rec_hdr);
@@ -1520,9 +1522,9 @@ void endian_cvt_blk_recs(endian_info *info, char *new_block, blk_hdr_ptr_t blkhd
 			} else
 				assert((key_top + SIZEOF(block_id) == blk_top) || blk_levl);	/* must be last if not leaf */
 			assert((key_top + SIZEOF(block_id)) <= (rec1_ptr + rec1_len));
-			GET_LONG(ptr2blk, key_top);
-			ptr2blk_swap = GTM_BYTESWAP_32(ptr2blk);
-			PUT_LONG(key_top, ptr2blk_swap);
+			GET_BLK_ID(ptr2blk, key_top);
+			ptr2blk_swap = BLK_ID_BYTESWAP(ptr2blk);
+			PUT_BLK_ID(key_top, ptr2blk_swap);
 #ifdef DEBUG
 			if (new_is_native)
 				ptr2blk = ptr2blk_swap;
