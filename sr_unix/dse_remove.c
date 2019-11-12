@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,9 +23,8 @@ void dse_remove(void)
 {
 
 	if (cli_present("RECORD") == CLI_PRESENT)
-	{	dse_rmrec();
-	}else if (cli_present("BLOCK") == CLI_PRESENT)
-	{	dse_rmsb();
-	}
+		dse_rmrec();
+	else if (cli_present("BLOCK") == CLI_PRESENT)
+		dse_rmsb();
 	return;
 }

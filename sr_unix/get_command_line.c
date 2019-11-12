@@ -51,13 +51,18 @@ void get_command_line(mval *result, boolean_t zcmd_line)
 		first_item = 1;
 		if (zcmd_line)
 		{	/* $ZCMDLINE returns the processed command line. Remove "-direct" and/or "-run <runarg>" from cmd line */
-			cp = (unsigned char *)cmd_arg[1];
-			if ('-' == *cp++)
+			if (!memcmp(cmd_arg[1], "-", STRLEN(cmd_arg[1])))
 			{
-				first_item++;
-				if ('r' == TOLOWER(*cp))
+				first_item += 2;
+				cp = (unsigned char *)cmd_arg[2];
+			} else
+			{
+				cp = (unsigned char *)cmd_arg[1];
+				if ('-' == *cp++)
 					first_item++;
 			}
+			if ((1 < first_item) && ('r' == TOLOWER(*cp)))
+				first_item++;
 		}
 		for (word_cnt = first_item; word_cnt < cmd_cnt; word_cnt++)
 		{

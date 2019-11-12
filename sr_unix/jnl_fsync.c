@@ -61,6 +61,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 	sgmnt_data_ptr_t	csd;
 	int4			lck_state;
 	int			fsync_ret, save_errno;
+	intrpt_state_t		prev_intrpt_state;
 	DEBUG_ONLY(uint4	onln_rlbk_pid;)
 
 	csa = &FILE_INFO(reg)->s_addrs;
@@ -96,7 +97,10 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 			}
 			BG_TRACE_PRO_ANY(csa, n_jnl_fsync_tries);
 			if (GET_SWAPLOCK(&jb->fsync_in_prog_latch))
+			{
+				DEFER_INTERRUPTS(INTRPT_IN_JNL_FSYNC, prev_intrpt_state);
 				break;
+			}
 			wcs_sleep(lcnt);
 			/* trying to wake up the lock holder one iteration before calling c_script */
 			if ((lcnt % FSYNC_WAIT_HALF_TIME) == (FSYNC_WAIT_HALF_TIME - 1))
@@ -139,6 +143,7 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 					save_errno = errno;
 					assert(WBTEST_ENABLED(WBTEST_FSYNC_SYSCALL_FAIL));
 					RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
+					ENABLE_INTERRUPTS(INTRPT_IN_JNL_FSYNC, prev_intrpt_state);
 					send_msg_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
 						ERR_TEXT, 2, RTS_ERROR_TEXT("Error with fsync"), save_errno);
 					rts_error_csa(CSA_ARG(csa) VARLSTCNT(9) ERR_JNLFSYNCERR, 2, JNL_LEN_STR(csd),
@@ -151,7 +156,10 @@ void jnl_fsync(gd_region *reg, uint4 fsync_addr)
 			}
 		}
 		if (process_id == CURRENT_JNL_FSYNC_WRITER(jb))
+		{
 			RELEASE_SWAPLOCK(&jb->fsync_in_prog_latch);
+			ENABLE_INTERRUPTS(INTRPT_IN_JNL_FSYNC, prev_intrpt_state);
+		}
 	}
 	assert(process_id != CURRENT_JNL_FSYNC_WRITER(jb));
 	return;

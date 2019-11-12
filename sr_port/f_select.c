@@ -37,9 +37,9 @@ MBSTART {						\
 	TREF(side_effect_base) = save_se_base;		\
 	TREF(side_effect_depth) = save_se_depth;	\
 	TREF(expr_depth) = save_expr_depth;		\
+	TREF(shift_side_effects) = save_shift;		\
 	TREF(expr_start) = save_start;			\
 	TREF(expr_start_orig) = save_start_orig;	\
-	TREF(shift_side_effects) = save_shift;		\
 } MBEND
 
 int f_select(oprtype *a, opctype op)
@@ -49,7 +49,7 @@ int f_select(oprtype *a, opctype op)
  * the return is TRUE for success and FALSE for a failure
  */
 {
-	boolean_t	first_time, got_true, save_saw_side, saw_se_in_select, *save_se_base, save_shift, shifting, throwing;
+	boolean_t	first_time, got_true, save_saw_side, *save_se_base, save_shift, saw_se_in_select, shifting, throwing;
 	opctype		old_op;
 	oprtype		*cnd, endtrip, target, tmparg;
 	triple		dmpchain, *loop_save_start, *loop_save_start_orig, *oldchain, *r, *ref, *savechain, *save_start,
@@ -60,17 +60,18 @@ int f_select(oprtype *a, opctype op)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	save_expr_depth = TREF(expr_depth);
 	save_saw_side = TREF(saw_side_effect);
+	save_start_orig = TREF(expr_start_orig);
+	save_start = TREF(expr_start);
 	save_shift = TREF(shift_side_effects);
+	save_expr_depth = TREF(expr_depth);
 	save_se_depth = TREF(side_effect_depth);
 	save_se_base = TREF(side_effect_base);
-	save_start = TREF(expr_start);
 #	ifdef DEBUG
 	if (NULL != save_start)
 		CHKTCHAIN(save_start, exorder, FALSE);
+	oldchain = TREF(curtchain);
 #	endif
-	save_start_orig = TREF(expr_start_orig);
 	TREF(expr_start) = TREF(expr_start_orig) = NULL;
 	TREF(expr_depth) = 0;
 	TREF(saw_side_effect) = FALSE;
@@ -78,8 +79,13 @@ int f_select(oprtype *a, opctype op)
 	TREF(side_effect_depth) = INITIAL_SIDE_EFFECT_DEPTH;
 	TREF(side_effect_base) = malloc(SIZEOF(boolean_t) * TREF(side_effect_depth));
 	memset((char *)(TREF(side_effect_base)), 0, SIZEOF(boolean_t) * TREF(side_effect_depth));
+<<<<<<< HEAD
 	if (shifting = (save_shift && (!save_saw_side || (YDB_BOOL == TREF(ydb_fullbool)))))	/* WARNING assignment */
 	{
+=======
+	if (shifting = (save_shift && (!save_saw_side || (GTM_BOOL == TREF(gtm_fullbool)))))	/* WARNING assignment */
+	{	/* shift in progress or needed so use a temporary chain */
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 		dqinit(&tmpchain, exorder);
 		oldchain = setcurtchain(&tmpchain);
 		INCREMENT_EXPR_DEPTH;	/* Don't want to hit bottom with each expression, so start at 1 rather than 0 */
@@ -92,44 +98,44 @@ int f_select(oprtype *a, opctype op)
 					 */
 	first_time = TRUE;
 	got_true = throwing = FALSE;
+<<<<<<< HEAD
 	endtrip = put_tjmp(noop);
 	cnd = NULL;
+=======
+	endtrip = put_tjmp(r);
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 	savechain = NULL;
 	for (;;)
 	{
-		if (NULL == cnd)
-			cnd = (oprtype *)mcalloc(SIZEOF(oprtype));
-		if (shifting && !got_true)
-		{
+		cnd = (oprtype *)mcalloc(SIZEOF(oprtype));
+		if (shifting)
+		{	/* be ready to back out discarded stuff; use pre-shifting characteristics just during Boolean evaluation */
 			loop_save_start = TREF(expr_start);
 			loop_save_start_orig = TREF(expr_start_orig);
+			TREF(shift_side_effects) = save_shift;
+			TREF(saw_side_effect) = save_saw_side;
 		}
-		if (!bool_expr(FALSE, cnd))
+		if (!bool_expr(FALSE, cnd))				/* process a Boolean */
 		{
 			SELECT_CLEANUP;
 			if (shifting)
 				setcurtchain(oldchain);
-			else if ((NULL != savechain)
-					/* the below guards against returning to a chain that should
-					 * be abandoned because of an error */
-					&& (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
-				setcurtchain(savechain);
+			else if ((NULL != savechain) && (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
+				setcurtchain(savechain);		/* error means return to original chain */
 			return FALSE;
 		}
-		if (TK_COLON != TREF(window_token))
+		if (TK_COLON != TREF(window_token))			/* next comes a colon */
 		{
 			SELECT_CLEANUP;
 			if (shifting)
 				setcurtchain(oldchain);
-			else if ((NULL != savechain)
-					/* the below guards against returning to a chain that should
-					 * be abandoned because of an error */
-					&& (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
-				setcurtchain(savechain);
+			else if ((NULL != savechain) && (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
+				setcurtchain(savechain);		/* error means return to original chain */
 			stx_error(ERR_COLON);
 			return FALSE;
 		}
 		advancewindow();
+<<<<<<< HEAD
 		triptr = (TREF(curtchain))->exorder.bl;
 		boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
 		if (NULL != boolexprfinish)
@@ -139,68 +145,80 @@ int f_select(oprtype *a, opctype op)
 		if (!got_true && OC_LIT == triptr->opcode)
 		{	/* it is a literal not following an already optimizing TRUE, so optimize it */
 			v = &triptr->operand[0].oprval.mlit->v;
+=======
+		assert((got_true ? &dmpchain : (shifting ? &tmpchain : oldchain)) == TREF(curtchain));
+		if (shifting)	/* if shifting return to supression of side effect games for the expression */
+			TREF(shift_side_effects) = TREF(saw_side_effect) = FALSE;
+		for (triptr = (TREF(curtchain))->exorder.bl; !got_true; triptr = triptr->exorder.bl)
+		{	/* get back, get back to where we once belonged - to find an indicator of the actual result */
+			if (OC_NOOP == triptr->opcode)
+				continue;				/* keep looking */
+			if (OC_LIT != triptr->opcode)
+				break;					/* Boolean was not a literal */
+			v = &triptr->operand[0].oprval.mlit->v;		/* Boolean was a literal, so optimize it */
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 			dqdel(triptr, exorder);
 			/* Remove OC_BOOLEXPRSTART and OC_BOOLEXPRFINISH opcodes too */
 			REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);	/* Note: Will set "boolexprfinish" to NULL */
 			unuse_literal(v);
 			dqinit(&dmpchain, exorder);
 			if (0 == MV_FORCE_BOOL(v))
-			{	/* it's FALSE: discard the corresponding value */
-				throwing = TRUE;
+			{	/* Boolean FALSE: discard the corresponding value */
+				assert(NULL == savechain);
 				savechain = setcurtchain(&dmpchain);
+				assert(shifting ? (&tmpchain == savechain) : (oldchain == savechain));
+				throwing = TRUE;
 			} else
-			{	/* it's TRUE: take this argument and disregard any following */
+			{	/* Boolean TRUE: take this argument and disregard any following arguments */
 				assert(!throwing && (NULL == savechain));
-				got_true = TRUE;
 				if (first_time && shifting)
-				{
 					setcurtchain(oldchain);
-					DECREMENT_EXPR_DEPTH;
-					shifting = FALSE;
-					TREF(expr_start) = TREF(expr_start_orig) = NULL;
-				}
+				got_true = TRUE;
 			}
+			break;
 		}
-		if (EXPR_FAIL == expr(&tmparg, MUMPS_EXPR))
+		if (EXPR_FAIL == expr(&tmparg, MUMPS_EXPR))		/* now a corresponding value */
 		{
 			SELECT_CLEANUP;
 			if (shifting)
 				setcurtchain(oldchain);
-			else if ((NULL != savechain)
-					/* the below guards against returning to a chain that should
-					 * be abandoned because of an error */
-					&& (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
-				setcurtchain(savechain);
+			else if ((NULL != savechain) && (((TREF(curtchain)) != &t_orig) || (!ALREADY_RTERROR)))
+				setcurtchain(savechain);		/* error means return to original chain */
 			return FALSE;
 		}
 		assert(TRIP_REF == tmparg.oprclass);
 		if (throwing)
-		{	/* finished with the false argument so put things back to normal */
-			assert(savechain);
-			setcurtchain(savechain);
-			if (shifting)
-			{
-				TREF(expr_start) = loop_save_start;
-				TREF(expr_start_orig) = loop_save_start_orig;
-			}
-			savechain = NULL;
-			throwing = FALSE;
+		{	/* finished a useless argument so see what's next */
+			assert(shifting ? (&tmpchain == savechain) : (savechain == oldchain));
+			if (!got_true)
+			{	/* discarded arg with a literal FALSE; stop throwing as later arguments may have value */
+				if (shifting)
+				{
+					TREF(expr_start) = loop_save_start;
+					TREF(expr_start_orig) = loop_save_start_orig;
+				}
+				TREF(shift_side_effects) = save_shift;
+				setcurtchain(savechain);
+				DEBUG_ONLY(savechain = NULL);
+				dqinit(&dmpchain, exorder);
+				throwing = FALSE;
+			}	/* even if no more arguments, do the above to keep state management consistent */
 			if (TK_COMMA != TREF(window_token))
 				break;
 			advancewindow();
 			continue;
 		}
+		assert(!throwing && (&dmpchain != TREF(curtchain)));
 		old_op = tmparg.oprval.tref->opcode;
 		if (first_time)
 		{
-			first_time = FALSE;
 			if (got_true && (OC_LIT == old_op))
-			{	/* if this is the only possible result, NOOP the OC_PASSTHRU so tmparg becomes the return value */
+			{	/* if the value is also a literal, turn the OC_PASSTHRU into the return value */
 				assert((OC_PASSTHRU == r->opcode) && (NO_REF == r->operand[0].oprclass));
 				r = tmparg.oprval.tref;
 			} else
-			{
-				if ((OC_LIT == old_op) || (oc_tab[old_op].octype & OCT_MVADDR))
+			{	/* build a home for the result */
+				if ((OC_LIT == old_op) || (OCT_MVADDR & oc_tab[old_op].octype))
 				{
 					ref = newtriple(OC_STOTEMP);
 					ref->operand[0] = tmparg;
@@ -208,8 +226,9 @@ int f_select(oprtype *a, opctype op)
 				}
 				r->operand[0] = target = tmparg;
 			}
+			first_time = FALSE;
 		} else if (OC_PASSTHRU == r->opcode)
-		{
+		{	/* add to the list of possible results */
 			ref = newtriple(OC_STO);
 			ref->operand[0] = target;
 			ref->operand[1] = tmparg;
@@ -221,6 +240,7 @@ int f_select(oprtype *a, opctype op)
 				ref->operand[1] = put_tref(tmparg.oprval.tref->operand[0].oprval.tref);
 			}
 		}
+<<<<<<< HEAD
 		if (!got_true)
 		{	/* jump to the end in case the run time value should turn out to be (the first) TRUE */
 			ref = newtriple(OC_JMP);
@@ -229,73 +249,104 @@ int f_select(oprtype *a, opctype op)
 			*cnd = put_tjmp(boolexprfinish2);
 			/* No need for INSERT_OC_JMP_BEFORE_OC_BOOLEXPRFINISH since OC_JMP has been inserted already above */
 		}
+=======
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 		if (TK_COMMA != TREF(window_token))
 			break;
 		advancewindow();
-		if (got_true && (NULL == savechain))
-		{
-			if (shifting)
-			{
-				loop_save_start = TREF(expr_start);
-				loop_save_start_orig = TREF(expr_start_orig);
-			}
+		if (got_true)
+		{	/* Boolean literal TRUE; now we have the value, start throwing out upcoming useless arguments */
+			assert(NULL == savechain);
 			assert((dmpchain.exorder.fl == dmpchain.exorder.bl) && (dmpchain.exorder.fl == &dmpchain));
 			savechain = setcurtchain(&dmpchain);	/* discard arguments after a compile time TRUE */
+			if (shifting)
+				savechain = &tmpchain;
+			throwing = TRUE;
+			continue;
 		}
-		cnd = NULL;
+		if (OC_PASSTHRU == r->opcode)
+		{	/* Not the case where the 1st argument has both a literal Boolean and a literal result */
+			ref = newtriple(OC_JMP);		/* jump to end in case the value turns out to be (the first) TRUE */
+			ref->operand[0] = endtrip;
+			tnxtarg(cnd);
+		}
 	}
 	if (got_true)
-	{
+	{	/* FALSE throwing cleans up after itself */
+		assert(!throwing ? (NULL == savechain) : (shifting ? (&tmpchain == savechain) : (oldchain == savechain)));
 		if (shifting)
-		{
+		{	/* clean up any discards and ensure we're working on the intended chain */
 			TREF(expr_start) = loop_save_start;
 			TREF(expr_start_orig) = loop_save_start_orig;
+			setcurtchain(&tmpchain);
 		}
-		if (NULL != savechain)
-			setcurtchain(savechain);		/* if we discarded things, return the chain to normal */
+		if (throwing)
+		{	/* if we might have discarded things, return the chain to normal */
+			assert(savechain);
+			setcurtchain(savechain);
+		}
 	} else
 	{	/* if we didn't find a TRUE at compile time, then insert a possible error in case there's no TRUE at run time */
-		tmparg = put_ilit(ERR_SELECTFALSE);
-		if (first_time)
+		assert(!throwing);
+		assert(shifting ? (&tmpchain == TREF(curtchain)) : (oldchain == TREF(curtchain)));
+		if (!first_time)
+		{	/* if we ended with a runtime evaluation make sure it has its jump */
+			ref = newtriple(OC_JMP);		/* jump to end in case the value turns out to be (the first) TRUE */
+			ref->operand[0] = endtrip;
+			tnxtarg(cnd);
+		} else
 		{	/* if all values were literals and FALSE, supply a dummy evaluation so we reach the error gracefully */
 			PUT_LITERAL_TRUTH(FALSE, r);
 			r->opcode = OC_LIT;
 			ins_triple(noop);
 			ins_triple(r);
 		}
+		tmparg = put_ilit(ERR_SELECTFALSE);
 		ref = newtriple(OC_RTERROR);
 		ref->operand[0] = tmparg;
-		ref->operand[1] = put_ilit(FALSE);		/* Not a subroutine reference */
+		ref->operand[1] = put_ilit(FALSE);		/* flag as not a subroutine reference */
 	}
+	assert(shifting ? (&tmpchain == TREF(curtchain)) : (oldchain == TREF(curtchain)));
 	if (OC_PASSTHRU == r->opcode)
+<<<<<<< HEAD
 	{
 		ins_triple(noop);
 		ins_triple(r);
 	}
+=======
+		ins_triple(r);					/* 1st arg was not literal:literal */
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 	saw_se_in_select = TREF(saw_side_effect);		/* note this down before it gets reset by DECREMENT_EXPR_DEPTH */
 	if (shifting)
 		DECREMENT_EXPR_DEPTH;				/* clean up */
 	assert(!TREF(expr_depth));
 	save_se_base[save_expr_depth] |= (TREF(side_effect_base))[TREF(expr_depth)];
 	TREF(saw_side_effect) = saw_se_in_select | save_saw_side;
-	SELECT_CLEANUP;	/* restores seven TREFs - see the top of this module */
+	SELECT_CLEANUP;						/* restores TREFs - see macro definition at top of this module */
 	if (shifting)
-	{
-		shifting = (((1 < save_expr_depth) && TREF(saw_side_effect))
-			|| ((save_start != save_start_orig) && (OC_NOOP != save_start->opcode)));
-		newtriple(shifting ? OC_GVSAVTARG : OC_NOOP);	/* must have one of these two at expr_start */
-		setcurtchain(oldchain);
-		assert(NULL != save_start);
-		dqadd(save_start, &tmpchain, exorder);
-		save_start = tmpchain.exorder.bl;
-		if (shifting)
-		{	/* only play this game if something else started it */
-			assert(OC_GVSAVTARG == save_start->opcode);
-			triptr = newtriple(OC_GVRECTARG);
-			triptr->operand[0] = put_tref(save_start);
+	{	/* get the tmpchain into the shiftchain and add OC_GVSAVTARG / OC_GVRECTARG as needed */
+		assert(&tmpchain == TREF(curtchain) && (TREF(expr_start) == save_start) && (NULL != save_start));
+		if (tmpchain.exorder.fl == tmpchain.exorder.bl)
+			setcurtchain(oldchain);
+		else
+		{
+			shifting = (((1 < save_expr_depth) && TREF(saw_side_effect))
+				|| ((save_start != save_start_orig) && (OC_NOOP != save_start->opcode)));
+			newtriple(shifting ? OC_GVSAVTARG : OC_NOOP);	/* must have one of these two at expr_start */
+			setcurtchain(oldchain);
+			assert(NULL != save_start);
+			dqadd(save_start, &tmpchain, exorder);
+			save_start = tmpchain.exorder.bl;
+			if (shifting)
+			{	/* only play this game if something else started it */
+				assert(OC_GVSAVTARG == save_start->opcode);
+				triptr = newtriple(OC_GVRECTARG);
+				triptr->operand[0] = put_tref(save_start);
+			}
+			TREF(expr_start) = save_start;
 		}
-		TREF(expr_start) = save_start;
 	}
+	assert(oldchain == TREF(curtchain));
 	*a = put_tref(r);
 	return TRUE;
 }

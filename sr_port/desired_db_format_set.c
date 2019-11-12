@@ -176,7 +176,6 @@ int4	desired_db_format_set(gd_region *reg, enum db_ver new_db_format, char *comm
 		case GDSV6:
 			csd->max_tn = MAX_TN_V6;
 			break;
-		/* TODO: Add case for V7 */
 		default:
 			assertpro((GDSV4 == new_db_format) || (GDSV6 == new_db_format));
 	}

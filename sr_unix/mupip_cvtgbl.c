@@ -49,11 +49,9 @@ GBLDEF	int		onerror;
 
 error_def(ERR_LDBINFMT);
 error_def(ERR_LOADBGSZ);
-error_def(ERR_LOADBGSZ2);
 error_def(ERR_LOADINVCHSET);
 error_def(ERR_LOADEDBG);
 error_def(ERR_LOADEDSZ);
-error_def(ERR_LOADEDSZ2);
 error_def(ERR_MAXSTRLEN);
 error_def(ERR_MUNOFINISH);
 error_def(ERR_MUPCLIERR);
@@ -65,9 +63,13 @@ error_def(ERR_MUPCLIERR);
 void mupip_cvtgbl(void)
 {
 	char		fn[MAX_FN_LEN + 1], *line1_ptr, *line3_ptr;
-	gtm_int64_t	begin_i8, end_i8;
+	gtm_uint64_t	begin, end;
 	int		dos, i, file_format, line1_len, line3_len, utf8;
+<<<<<<< HEAD
 	uint4	        begin, end, max_rec_size;
+=======
+	uint4	        cli_status, max_rec_size;
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 	unsigned char	buff[MAX_ONERROR_VALUE_LEN];
 	unsigned short	fn_len, len;
 	boolean_t	ignore_chset;
@@ -108,32 +110,30 @@ void mupip_cvtgbl(void)
 	mu_outofband_setup();
 	if (cli_present("BEGIN") == CLI_PRESENT)
 	{
-	        if (!cli_get_int64("BEGIN", &begin_i8))
+	        if (!cli_get_uint64("BEGIN", &begin))
 			mupip_exit(ERR_MUPCLIERR);
-		if (1 > begin_i8)
+		if (1 > begin)
 			mupip_exit(ERR_LOADBGSZ);
-		else if (MAXUINT4 < begin_i8)
-			mupip_exit(ERR_LOADBGSZ2);
-		begin = (uint4) begin_i8;
 	} else
 	{
 		begin = 1;
-		begin_i8 = 1;
 	}
 	if (cli_present("END") == CLI_PRESENT)
 	{
-	        if (!cli_get_int64("END", &end_i8))
+	        if (!cli_get_uint64("END", &end))
 			mupip_exit(ERR_MUPCLIERR);
-		if (1 > end_i8)
+		if (1 > end)
 			mupip_exit(ERR_LOADEDSZ);
-		else if (MAXUINT4 < end_i8)
-			mupip_exit(ERR_LOADEDSZ2);
-		if (end_i8 < begin_i8)
+		if (end < begin)
 			mupip_exit(ERR_LOADEDBG);
-		end = (uint4) end_i8;
 	} else
+<<<<<<< HEAD
 		end = MAXUINT4;
 	if (cli_present("FILL_FACTOR") == CLI_PRESENT)
+=======
+		end = MAXUINT8;
+	if ((cli_status = cli_present("FILL_FACTOR")) == CLI_PRESENT)
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 	{
 		assert(SIZEOF(gv_fillfactor) == SIZEOF(int4));
 	        if (!cli_get_int("FILL_FACTOR", (int4 *)&gv_fillfactor))

@@ -34,6 +34,8 @@
 /* Include prototypes */
 #include "t_end.h"
 #include "t_retry.h"
+#include "collseq.h"
+#include "mu_getkey.h"
 #include "mupip_size.h"
 #include "util.h"
 #include "t_begin.h"
@@ -65,6 +67,10 @@ GBLREF	int			muint_adj;
 GBLREF	uint4			mu_int_adj[];
 GBLREF	uint4			process_id;
 GBLREF	unsigned int		t_tries;
+GBLREF	boolean_t		null_coll_key;
+GBLREF	gv_key			*mu_start_key;
+GBLREF	gv_key			*mu_end_key;
+GBLREF boolean_t 		mu_key;
 
 #define MAX_RECS_PER_BLK	65535
 #define	MAX_RELIABLE		10000		/* Used to tweak the error estimates */
@@ -138,6 +144,8 @@ int4 mu_size_impsample(glist *gl_ptr, int4 M, int4 seed)
 	if (!seed)
 		seed = (int4)(time(0) * process_id);
 	srand48(seed);
+	if (MUKEY_NULLSUBS == mu_key)
+		CHECK_COLL_KEY(gl_ptr, null_coll_key);
 	/* do M random traversals */
 	INIT_STATS(rstat);
 	for (k = 1; k <= M; k++)

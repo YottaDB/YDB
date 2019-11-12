@@ -61,11 +61,13 @@ void	gvcst_delete_blk(block_id blk, int level, boolean_t committed)
 		ks = kill_set_tail;
 	else
 	{
-		PUT_LONG(&chain, blk); /* TODO: V7 change to PUT_LLONG */
+		PUT_BLK_ID(&chain, blk);
 		tp_srch_status = NULL;
 		if (chain.flag == 1)
+		{
+			assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 			tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain.cw_index, &cse);
-		else
+		} else
 		{
 			if (NULL != (tabent = lookup_hashtab_int4(sgm_info_ptr->blks_in_use, (uint4 *)&blk)))
 				tp_srch_status = (srch_blk_status *)tabent->value;

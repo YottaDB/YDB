@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +23,6 @@
 #include "util.h"
 #include "dse.h"
 
-#define MAX_UTIL_LEN 56
-
 void dse_eval(void)
 {
 	int4		util_len;
@@ -40,7 +39,7 @@ void dse_eval(void)
 		return;
 	memcpy(util_buff, "Hex:  ", 6);
 	util_len = 6;
-	util_len += i2hexl_nofill(num, (uchar_ptr_t)&util_buff[util_len], 16);
+	util_len += i2hexl_nofill(num, (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 	memcpy(&util_buff[util_len],"   Dec:  !@UQ", 13);
 	util_len += 13;
 	util_buff[util_len] = 0;

@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -50,6 +55,7 @@ boolean_t map_collseq(int act, collseq *ret_collseq)
 	static MSTR_CONST(xform_sym, "gtm_ac_xform");
 	static MSTR_CONST(xback_sym, "gtm_ac_xback");
 	static MSTR_CONST(verify_sym, "gtm_ac_verify");
+	static MSTR_CONST(xutil_sym, "gtm_ac_xutil");
 	static MSTR_CONST(version_sym, "gtm_ac_version");
 	DCL_THREADGBL_ACCESS;
 
@@ -109,5 +115,16 @@ boolean_t map_collseq(int act, collseq *ret_collseq)
 		ERR_FGNSYM;
 	if (!(ret_collseq->version = fgn_getrtn(handle, &version_sym, INFO, FGN_ERROR_IF_NOT_FOUND)))
 		ERR_FGNSYM;
+
+	/*
+	 * This is not fatal so don't warn, ERR_FGNSYM or close the dll.
+	 * The xutil routine is only needed for the -2/2
+	 * zatransform collation functionality.  Other operations do not use it.
+	 */
+	if (!(ret_collseq->xutil = fgn_getrtn(handle, &xutil_sym, SUCCESS)))
+	{
+		ret_collseq->xutil = NULL;
+	}
+
 	return TRUE;
 }

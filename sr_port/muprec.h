@@ -27,8 +27,13 @@
 /* Uncomment the below line to debug the flow of "mur_forward" with multiple parallel processes */
 /* #define	MUR_DEBUG */
 
+<<<<<<< HEAD
 #define JNL_EXTR_LABEL		"YDBJEX08"	/* format of the simple journal extract */
 #define JNL_DET_EXTR_LABEL	"YDBJDX09"	/* format of the detailed journal extract */
+=======
+#define JNL_EXTR_LABEL		"GDSJEX07"	/* format of the simple journal extract */
+#define JNL_DET_EXTR_LABEL	"GDSJDX08"	/* format of the detailed journal extract */
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 
 error_def(ERR_MUINFOSTR);
 error_def(ERR_MUINFOUINT4);
@@ -278,8 +283,21 @@ MBSTART {												\
 		/* One might theoretically get an interrupt which unlinks and clears the file between	\
 		 * the if() and DEFER_INTERRUPTS(), so just in case, ignore errors if the filename has	\
 		 * been cleared.									\
+		 *											\
+		 * Also, if the file does not exist (erno == ENOENT), don't take any action		\
+		 * as consensus is we can treat that as a success, someone else having done our		\
+		 * work for us.	(GTM-9193)								\
+		 *											\
+		 * We set up a whitebox test which assigns rc & errno to test this condition.		\
+		 * We check that we aren't substituting our failure for a real failure			\
+		 * (Note the comma operator for assigning both errno & rc)				\
 		 */											\
-		if (-1 == rc)										\
+		if ( (-1 != rc) )									\
+		{											\
+			GTM_WHITE_BOX_TEST(WBTEST_JNLEXT_PREREMOVED, rc, (errno = ENOENT,-1))		\
+		}											\
+													\
+		if ((-1 == rc) && (ENOENT != errno))							\
 		{											\
 			assert(FALSE);									\
 			save_errno = errno;								\
@@ -696,6 +714,7 @@ typedef struct
 				lookback_opers;
 	boolean_t		forward,
 				update,
+				corruptdb,
 				rollback,
 				rollback_losttnonly,
 				verify,
@@ -1311,6 +1330,7 @@ void			mur_rem_jctls(reg_ctl_list *rctl);
 boolean_t		mur_report_error(jnl_ctl_list *jctl, enum mur_error code);
 multi_struct 		*mur_token_lookup(token_num token, off_jnl_t rec_time, enum rec_fence_type fence);
 int			gtmrecv_fetchresync(int port, seq_num *resync_seqno, seq_num max_reg_seqno);
+void			gtmrecv_fetchresync_connect(int port);
 void 			mur_tp_resolve_time(jnl_tm_t max_lvrec_time);
 void			mur_show_header(jnl_ctl_list *jctl);
 boolean_t		mur_select_rec(jnl_ctl_list *jctl);

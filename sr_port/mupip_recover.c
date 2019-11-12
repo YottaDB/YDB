@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -194,6 +194,16 @@ void	mupip_recover(void)
 	DEBUG_ONLY(jgbl.in_mupjnl = TRUE;)
 	jgbl.mur_extract = mur_options.extr[GOOD_TN]; /* journal extract process */
 	jgbl.mur_update = mur_options.update;
+	if (mur_options.corruptdb)
+	{
+		/* In this case, SKIP the checks for existence of DB files or whether the DB is corrupt */
+		TREF(skip_DB_exists_check) = TRUE;
+		TREF(skip_file_corrupt_check) = TRUE;
+	} else
+	{
+		/* Initialize the TREF variables to FALSE. */
+		TREF(skip_DB_exists_check) = FALSE;
+	}
 	mur_open_files_status = mur_open_files(FALSE);
 	if (WBTEST_ENABLED(WBTEST_KILL_ROLLBACK))
 		kill(getpid(), SIGKILL);
@@ -220,7 +230,12 @@ void	mupip_recover(void)
 		for (regno = 0; regno < reg_total; regno++)
 		{
 			rctl = &mur_ctl[regno];
-			if (!REPL_ALLOWED(rctl->csd))
+			jctl = rctl->jctl;
+			if (mur_options.corruptdb)
+			{
+				if (!REPL_ALLOWED(jctl->jfh))
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLEXTRCTSEQNO);
+			} else if (!REPL_ALLOWED(rctl->csd))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JNLEXTRCTSEQNO);
 		}
 	}
@@ -252,6 +267,8 @@ void	mupip_recover(void)
 			rctl->csa->hdr->turn_around_point = FALSE; /* Reset turn around point field */
 		}
 	}
+	if (TREF(skip_DB_exists_check))
+		db_absent = FALSE;
 	if (!mur_options.update && jgbl.mur_extract && (db_absent || IS_REPL_INST_FROZEN))
 	{
 		if (TREF(jnl_extract_nocol))

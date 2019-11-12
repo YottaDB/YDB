@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -72,23 +72,22 @@ error_def(ERR_FREEZECTRL);
 
 void dse_chng_fhead(void)
 {
-	int4		x, index_x, save_x, fname_len;
-	unsigned short	buf_len;
+	block_cnt	blkcnt;
+#	ifndef BLK_NUM_64BIT
+	block_id_64	blkcnt2;
+#	endif
 	boolean_t	was_crit, was_hold_onto_crit, corrupt_file_present;
-	boolean_t	override = FALSE;
-	int4		nocrit_present;
-	int4		location_present, value_present, size_present, size;
-	uint4		location;
-	boolean_t	max_tn_present, max_tn_warn_present, curr_tn_present, change_tn;
+	boolean_t	override = FALSE, max_tn_present, max_tn_warn_present, curr_tn_present, change_tn;
+	char		temp_str[OUT_LINE], temp_str1[OUT_LINE], buf[MAX_LINE], *fname_ptr, hash_buff[GTMCRYPT_HASH_LEN];
+	const char	*freeze_msg[] = { "UNFROZEN", "FROZEN" };
 	gtm_uint64_t	value, old_value;
+	int		gethostname_res, gtmcrypt_errno;
+	int4		x, index_x, save_x, fname_len, nocrit_present, location_present, value_present, size_present, size;
 	seq_num		seq_no;
-	trans_num	tn, prev_tn, max_tn_old, max_tn_warn_old, curr_tn_old, max_tn_new, max_tn_warn_new, curr_tn_new;
-	char		temp_str[OUT_LINE], temp_str1[OUT_LINE], buf[MAX_LINE], *fname_ptr;
-	int		gethostname_res;
 	sm_uc_ptr_t	chng_ptr;
-	const char 	*freeze_msg[] = { "UNFROZEN", "FROZEN" } ;
-	char		hash_buff[GTMCRYPT_HASH_LEN];
-	int		gtmcrypt_errno;
+	trans_num	tn, prev_tn, max_tn_old, max_tn_warn_old, curr_tn_old, max_tn_new, max_tn_warn_new, curr_tn_new;
+	uint4		location;
+	unsigned short	buf_len;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -112,10 +111,10 @@ void dse_chng_fhead(void)
 #	endif
 	{
 		DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-                util_out_print("Region: !AD  is frozen by another user, not releasing freeze.",
-                                        TRUE, REG_LEN_STR(gv_cur_region));
-                rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FREEZE, 2, REG_LEN_STR(gv_cur_region));
-                return;
+		util_out_print("Region: !AD  is frozen by another user, not releasing freeze.",
+				TRUE, REG_LEN_STR(gv_cur_region));
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FREEZE, 2, REG_LEN_STR(gv_cur_region));
+		return;
 
 	}
 	prev_tn = cs_addrs->ti->curr_tn;
@@ -193,7 +192,7 @@ void dse_chng_fhead(void)
 			(SIZEOF(gtm_int64_t) == size)))
 		{
 			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
-                        rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIZENOTVALID8);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SIZENOTVALID8);
 		}
 		if ((0 > (int4)size) || ((uint4)SGMNT_HDR_LEN < (uint4)location)
 				|| ((uint4)SGMNT_HDR_LEN < ((uint4)location + (uint4)size)))
@@ -243,10 +242,25 @@ void dse_chng_fhead(void)
 					&value, &value, size, size);
 		}
 	}
-	if ((CLI_PRESENT == cli_present("TOTAL_BLKS")) && (cli_get_hex("TOTAL_BLKS", (uint4 *)&x)))
-		cs_addrs->ti->total_blks = x;
-	if ((CLI_PRESENT == cli_present("BLOCKS_FREE")) && (cli_get_hex("BLOCKS_FREE", (uint4 *)&x)))
-		cs_addrs->ti->free_blocks = x;
+#	ifdef BLK_NUM_64BIT
+	if ((CLI_PRESENT == cli_present("TOTAL_BLKS")) && (cli_get_hex64("TOTAL_BLKS", (gtm_uint8 *)&blkcnt)))
+		cs_addrs->ti->total_blks = blkcnt;
+	if ((CLI_PRESENT == cli_present("BLOCKS_FREE")) && (cli_get_hex64("BLOCKS_FREE", (gtm_uint8 *)&blkcnt)))
+		cs_addrs->ti->free_blocks = blkcnt;
+#	else
+	if ((CLI_PRESENT == cli_present("TOTAL_BLKS")) && (cli_get_hex64("TOTAL_BLKS", (gtm_uint8 *)&blkcnt2)))
+	{
+		assert(blkcnt2 == (block_id_32)blkcnt2);
+		blkcnt = (block_id_32)blkcnt2;
+		cs_addrs->ti->total_blks = blkcnt;
+	}
+	if ((CLI_PRESENT == cli_present("BLOCKS_FREE")) && (cli_get_hex64("BLOCKS_FREE", (gtm_uint8 *)&blkcnt2)))
+	{
+		assert(blkcnt2 == (block_id_32)blkcnt2);
+		blkcnt = (block_id_32)blkcnt2;
+		cs_addrs->ti->free_blocks = blkcnt;
+	}
+#	endif
 	if ((CLI_PRESENT == cli_present("BLK_SIZE")) && (cli_get_int("BLK_SIZE", &x)))
 	{
 		if (!(x % DISK_BLOCK_SIZE) && (0 != x))
@@ -396,13 +410,6 @@ void dse_chng_fhead(void)
 		assert(max_tn_warn_new >= curr_tn_new);
 	} else
 	{
-		/* if (max_tn_present)
-			util_out_print("MAX_TN value not changed", TRUE);
-		   if (max_tn_warn_present)
-			util_out_print("WARN_MAX_TN value not changed", TRUE);
-		   if (curr_tn_present)
-			util_out_print("CURRENT_TN value not changed", TRUE);
-		*/
 		assert(max_tn_old == cs_data->max_tn);
 		assert(max_tn_warn_old == cs_data->max_tn_warn);
 		assert(curr_tn_old == cs_addrs->ti->curr_tn);
@@ -455,11 +462,19 @@ void dse_chng_fhead(void)
 	if ((CLI_PRESENT == cli_present("TRIGGER_FLUSH")) && (cli_get_int("TRIGGER_FLUSH", &x)))
 		cs_data->flush_trigger = cs_data->flush_trigger_top = x;
 	if ((CLI_PRESENT == cli_present("GOT2V5ONCE")) && (cli_get_int("GOT2V5ONCE", &x)))
+<<<<<<< HEAD
                 cs_data->db_got_to_v5_once = (boolean_t)x;
 	change_fhead_timer_ms("STALENESS_TIMER", cs_data->staleness, 5000, TRUE);
 	change_fhead_timer_ms("TICK_INTERVAL", cs_data->ccp_tick_interval, 100, TRUE);
 	change_fhead_timer_ms("QUANTUM_INTERVAL", cs_data->ccp_quantum_interval, 1000, FALSE);
 	change_fhead_timer_ms("RESPONSE_INTERVAL", cs_data->ccp_response_interval, 60000, FALSE);
+=======
+		cs_data->db_got_to_v5_once = (boolean_t)x;
+	change_fhead_timer("STALENESS_TIMER", cs_data->staleness, 5000, TRUE);
+	change_fhead_timer("TICK_INTERVAL", cs_data->ccp_tick_interval, 100, TRUE);
+	change_fhead_timer("QUANTUM_INTERVAL", cs_data->ccp_quantum_interval, 1000, FALSE);
+	change_fhead_timer("RESPONSE_INTERVAL", cs_data->ccp_response_interval, 60000, FALSE);
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 	if ((CLI_PRESENT == cli_present("B_BYTESTREAM")) && (cli_get_hex64("B_BYTESTREAM", &tn)))
 		cs_data->last_inc_backup = tn;
 	if ((CLI_PRESENT == cli_present("B_COMPREHENSIVE")) && (cli_get_hex64("B_COMPREHENSIVE", &tn)))
@@ -616,32 +631,32 @@ void dse_chng_fhead(void)
 			}
 		}
 	}
-        if (CLI_PRESENT == cli_present("KILL_IN_PROG"))
-        {
-                buf_len = SIZEOF(buf);
-                if (cli_get_str("KILL_IN_PROG", buf, &buf_len))
-                {
-                        lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
-                        if (0 == STRCMP(buf, "NONE"))
-                                cs_data->kill_in_prog = 0;
-                        else
-                        {
-                                if (('0' == buf[0]) && ('\0' == buf[1]))
-                                        x = 0;
-                                else
-                                {
-                                        x = ATOI(buf);
-                                        if (0 == x)
-                                                x = -1;
-                                }
-                                if (0 > x)
-                                        util_out_print("Invalid value for kill_in_prog qualifier", TRUE);
-                                else
-                                        cs_data->kill_in_prog = x;
-                        }
-                }
-        }
-        if (CLI_PRESENT == cli_present("MACHINE_NAME"))
+	if (CLI_PRESENT == cli_present("KILL_IN_PROG"))
+	{
+		buf_len = SIZEOF(buf);
+		if (cli_get_str("KILL_IN_PROG", buf, &buf_len))
+		{
+			lower_to_upper((uchar_ptr_t)buf, (uchar_ptr_t)buf, buf_len);
+			if (0 == STRCMP(buf, "NONE"))
+				cs_data->kill_in_prog = 0;
+			else
+			{
+				if (('0' == buf[0]) && ('\0' == buf[1]))
+					x = 0;
+				else
+				{
+					x = ATOI(buf);
+					if (0 == x)
+						x = -1;
+				}
+				if (0 > x)
+					util_out_print("Invalid value for kill_in_prog qualifier", TRUE);
+				else
+					cs_data->kill_in_prog = x;
+			}
+		}
+	}
+	if (CLI_PRESENT == cli_present("MACHINE_NAME"))
 	{
 		buf_len = SIZEOF(buf);
 		if (cli_get_str("MACHINE_NAME", buf, &buf_len))

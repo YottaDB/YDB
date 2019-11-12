@@ -86,11 +86,6 @@ if (! -e $tmpdir) then
     endif
 endif
 #
-# Set the version we will run with - note $gtmroutines not reset by version (setactive*.csh)
-#
-set setactive_parms=(p $gtmtyp); source $gtm_tools/setactive.csh > /dev/null
-set proddist=$gtm_dist
-setenv gtmroutines "$tmpdir $gtm_dist"
 pushd $tmpdir
 #
 
@@ -99,8 +94,8 @@ pushd $tmpdir
 #
 unsetenv gtm_chset
 #
-set setactive_parms=($gtmver $gtmtyp); source $gtm_tools/setactive.csh > /dev/null
-setenv gtm_dist $proddist
+set setactive_parms=($gtmver $gtmtyp); source $gtm_tools/setactive.csh
+setenv gtmroutines "$tmpdir $gtm_dist"
 
 # If gengtmdeftypes.csh is invoked for old versions, point cpfrom_tools/cpfrom_pct to the location of
 # the helper files, typically $gtm_tools/$gtm_pct of gtm_curpro

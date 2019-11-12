@@ -201,6 +201,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 		full = TRUE;
 		/* The result of "csa->ti->total_blocls - blk" can be downcasted because it is constrained by the value of bplmap
 		 * which should never be larger the BLKS_PER_LMAP */
+		assert(((csa->ti->total_blks - blk) >= bplmap) || (BLKS_PER_LMAP >= (csa->ti->total_blks - blk)));
 		offset = ((csa->ti->total_blks - blk) >= bplmap) ? bplmap : (uint4)(csa->ti->total_blks - blk);
 		blk_top = (sm_uc_ptr_t)bp + BM_SIZE(offset + (BITS_PER_UCHAR / BML_BITS_PER_BLK) - 1);
 		for (chunk_p = (sm_uint_ptr_t)mp ;  (sm_uc_ptr_t)chunk_p - blk_top < 0 ;  chunk_p++)
@@ -371,7 +372,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 				prev_char_is_delimiter = (KEY_DELIMITER == prior_expkey[rec_cmpc - 1]);
 			}
 			assert(key_base < (sm_uc_ptr_t)r_top);	/* otherwise we would have signalled ERR_DBRSIZMN error */
-			for (blk_id_ptr = key_base ;  ; )
+			for (blk_id_ptr = key_base; ; )
 			{
 				if (KEY_DELIMITER == *blk_id_ptr++)
 				{
@@ -501,7 +502,7 @@ int cert_blk (gd_region *reg, block_id blk, blk_hdr_ptr_t bp, block_id root, int
 		/* Check for proper child block numbers */
 		if ((0 != blk_levl) || (0 != is_directory))
 		{
-			GET_LONG(child, blk_id_ptr);
+			GET_BLK_ID(child, blk_id_ptr);
 			chain = *(off_chain *)&child;
 			/* In TP, child block number can be greater than the total_blks for blocks created within TP.
 			 * Dont do any checks on such blocks.

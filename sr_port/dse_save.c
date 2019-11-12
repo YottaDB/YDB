@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
@@ -31,7 +31,6 @@
 #include "gtmmsg.h"
 
 #define MAX_COMMENT_LEN 100
-#define MAX_UTIL_LEN 80
 
 GBLDEF save_strct	patch_save_set[PATCH_SAVE_SIZE];
 GBLDEF uint4		patch_save_count = 0;
@@ -45,6 +44,9 @@ error_def(ERR_DSEMAXBLKSAV);
 void dse_save(void)
 {
 	block_id	blk;
+#ifndef BLK_NUM_64BIT
+	block_id_64	blk2;
+#endif
 	boolean_t	was_crit, was_hold_onto_crit;
 	cache_rec_ptr_t dummy_cr;
 	char		buff[MAX_COMMENT_LEN], *ptr, util_buff[MAX_UTIL_LEN];
@@ -57,11 +59,18 @@ void dse_save(void)
 	memset(util_buff, 0, MAX_UTIL_LEN);
 	if (CLI_PRESENT == cli_present("LIST"))
 	{
-		if (cli_get_hex("BLOCK", (uint4 *)&blk))
+#ifdef BLK_NUM_64BIT
+		if (cli_get_hex64("BLOCK", (gtm_uint8 *)&blk))
 		{
+#else
+		if (cli_get_hex64("BLOCK", (gtm_uint8 *)&blk2))
+		{
+			assert(blk2 == (block_id_32)blk2);
+			blk = (block_id_32)blk2;
+#endif
 			util_len = SIZEOF("!/Saved versions of block ");
 			memcpy(util_buff, "!/Saved versions of block ", util_len);
-			util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len-1], 8);
+			util_len += i2hexl_nofill(blk, (uchar_ptr_t)&util_buff[util_len-1], MAX_HEX_INT8);
 			util_buff[util_len-1] = 0;
 			util_out_print(util_buff, TRUE);
 			for (i = j = 0;  i < patch_save_count;  i++)
@@ -85,7 +94,7 @@ void dse_save(void)
 		{
 			util_len = SIZEOF("Block ");
 			memcpy(util_buff, "Block ", util_len);
-			util_len += i2hex_nofill(patch_save_set[i].blk, (uchar_ptr_t)&util_buff[util_len-1], 8);
+			util_len += i2hexl_nofill(patch_save_set[i].blk, (uchar_ptr_t)&util_buff[util_len-1], MAX_HEX_INT8);
 			util_buff[util_len-1] = 0;
 			util_out_print(util_buff, TRUE);
 			j++;
@@ -118,7 +127,7 @@ void dse_save(void)
 			j = patch_save_set[i].ver + 1;
 	util_len = SIZEOF("!/Saving version !UL of block ");
 	memcpy(util_buff, "!/Saving version !UL of block ", util_len);
-	util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len-1], 8);
+	util_len += i2hexl_nofill(blk, (uchar_ptr_t)&util_buff[util_len-1], MAX_HEX_INT8);
 	util_buff[util_len-1] = 0;
 	assert(ARRAYSIZE(util_buff) >= util_len);
 	util_out_print(util_buff, TRUE, j);

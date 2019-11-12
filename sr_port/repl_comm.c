@@ -88,6 +88,8 @@
  */
 
 GBLDEF	int			repl_max_send_buffsize, repl_max_recv_buffsize;
+GBLREF  boolean_t               is_rcvr_server;
+GBLREF  boolean_t               is_src_server;
 #ifdef GTM_TLS
 GBLREF	gtm_tls_ctx_t		*tls_ctx;
 GBLREF	char			dl_err[MAX_ERRSTR_LEN];
@@ -227,6 +229,10 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 		{
 			bytes_sent = GTMTLS_ONLY(repl_tls.enabled ? gtm_tls_send(repl_tls.sock, (char *)buff, send_size)
 							: ) send(sock_fd, (char *)buff, send_size, 0);	/* BYPASSOK(send) */
+			if (WBTEST_ENABLED(WBTEST_REPLCOMM_SEND_SRC) && is_src_server)
+			{
+				GTM_WHITE_BOX_TEST(WBTEST_REPLCOMM_SEND_SRC, bytes_sent, -1);
+			}
 			if (0 <= bytes_sent)
 			{
 				assert(0 < bytes_sent);
@@ -258,6 +264,11 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 #			else
 			save_errno = ERRNO;
 #			endif
+			if (WBTEST_ENABLED(WBTEST_REPLCOMM_SEND_SRC) && is_src_server)
+			{
+				repl_log(stderr, TRUE, TRUE,"Changing save errno\n");
+				save_errno = 70;
+			}
 			assert((EMSGSIZE != save_errno) && (EWOULDBLOCK != save_errno));
 			if (EINTR == save_errno)
 			{
@@ -291,6 +302,7 @@ int repl_send(int sock_fd, unsigned char *buff, int *send_len, int timeout GTMTL
 				break;
 		}
 		repl_errno = EREPL_SEND;
+		repl_log(stderr, TRUE, TRUE, "Returning err: %d\n",save_errno);
 		return save_errno;
 	} else if (!io_ready)
 		return SS_NORMAL;
@@ -338,6 +350,17 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 		{
 			bytes_recvd = GTMTLS_ONLY(repl_tls.enabled ? gtm_tls_recv(repl_tls.sock, (char *)buff, max_recv_len)
 							 : ) recv(sock_fd, (char *)buff, max_recv_len, 0);	/* BYPASSOK */
+			if (((WBTEST_ENABLED(WBTEST_FETCHCOMM_ERR)) || (WBTEST_ENABLED(WBTEST_FETCHCOMM_HISTINFO)))
+				 && !(is_rcvr_server || is_src_server))
+			{	/* Induce the test only in mupip rollback process*/
+				repl_log(stderr, TRUE, TRUE, "Inducing error\n");
+				repl_log(stdout, TRUE, TRUE,"gtm_wbox_input_test_case_count is : %d\n",
+								gtm_wbox_input_test_case_count);
+				GTM_WHITE_BOX_TEST(WBTEST_FETCHCOMM_ERR, bytes_recvd, -1);
+				GTM_WHITE_BOX_TEST(WBTEST_FETCHCOMM_HISTINFO, bytes_recvd, -1);
+				LONG_SLEEP(5);
+				repl_log(stdout, TRUE, TRUE, "bytes_recvd: %d\n",bytes_recvd);
+			}
 			if (0 < bytes_recvd)
 			{
 				*recv_len = (int)bytes_recvd;
@@ -377,9 +400,14 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 #			endif
 			if (0 == bytes_recvd)
 				save_errno = ECONNRESET;
+<<<<<<< HEAD
 			if (EINTR == save_errno)
 			{
 				eintr_handling_check();
+=======
+			if ((EINTR == save_errno) && !((WBTEST_ENABLED(WBTEST_FETCHCOMM_ERR)) ||
+					(WBTEST_ENABLED(WBTEST_FETCHCOMM_HISTINFO))))
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 				continue;
 			} else if (ETIMEDOUT == save_errno)
 			{
@@ -399,8 +427,25 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 			break;
 		}
 		repl_errno = EREPL_RECV;
+		if ((WBTEST_ENABLED(WBTEST_REPLCOMM_ERR) && is_rcvr_server) ||
+                 (WBTEST_ENABLED(WBTEST_REPLCOMM_ERR_SRC) && is_src_server))
+		{
+			repl_log(stderr, TRUE, TRUE, "Changing save_errno\n");
+			save_errno = 113;
+		}
+		if (((WBTEST_ENABLED(WBTEST_FETCHCOMM_ERR)) || (WBTEST_ENABLED(WBTEST_FETCHCOMM_HISTINFO)))
+								&& !(is_rcvr_server || is_src_server))
+		{
+			repl_log(stdout, TRUE, TRUE, "Changing save_errno\n");
+			GTM_WHITE_BOX_TEST(WBTEST_FETCHCOMM_ERR, save_errno, ECONNRESET);
+			if (WBTEST_ENABLED(WBTEST_FETCHCOMM_HISTINFO) && (-1 == bytes_recvd))
+			{
+				save_errno = ECONNRESET;
+				gtm_wbox_input_test_case_count = 9; /* Do not go to white box again*/
+			}
+		}
 		return save_errno;
-	} else if (!io_ready)
+	} else if (!io_ready)	/* Select call timedout with no errors */
 		return SS_NORMAL;
 	save_errno = ERRNO;
 	repl_errno = EREPL_SELECT;
@@ -472,17 +517,18 @@ int set_recv_sock_buff_size(int sockfd, int buflen)
 	return set_sock_buff_size(sockfd, buflen, SO_RCVBUF);
 }
 
-void repl_log_conn_info(int sock_fd, FILE *log_fp)
+void repl_log_conn_info(int sock_fd, FILE *log_fp,boolean_t debug)
 {
 	struct sockaddr_storage	local, remote;
 	struct sockaddr		*local_sa_ptr, *remote_sa_ptr;
 	GTM_SOCKLEN_TYPE	len;
 	int			save_errno;
-	char			*errptr, local_ip[SA_MAXLEN], remote_ip[SA_MAXLEN];
+	char			*errptr, local_ip[SA_MAXLEN], remote_ip[SA_MAXLEN], *debpr;
 	char			port_buffer[NI_MAXSERV];
 	char			local_port_buffer[NI_MAXSERV], remote_port_buffer[NI_MAXSERV];
 	int			errcode;
 
+	debug ? (debpr = "Debug ") : (debpr = "");
 	len = SIZEOF(local);
 	local_sa_ptr = (struct sockaddr *)&local;
 	remote_sa_ptr = (struct sockaddr *)&remote;
@@ -522,8 +568,8 @@ void repl_log_conn_info(int sock_fd, FILE *log_fp)
 		strcpy(remote_port_buffer, "*UNKNOWN*");
 		strcpy(remote_ip, "*UNKNOWN*");
 	}
-	repl_log(log_fp, TRUE, TRUE, "Connection information:: Local: %s:%s Remote: %s:%s\n", local_ip, local_port_buffer,
-			remote_ip, remote_port_buffer);
+	repl_log(log_fp, TRUE, TRUE, "%sConnection information:: Local: %s:%s Remote: %s:%s\n", debpr,
+				local_ip, local_port_buffer, remote_ip, remote_port_buffer);
 	return;
 }
 

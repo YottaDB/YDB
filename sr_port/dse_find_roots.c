@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,6 +17,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "gdsblk.h"
+#include "gdsdbver.h"
 #include "dsefind.h"
 #include "copy.h"
 #include "dse.h"
@@ -29,18 +31,35 @@ GBLREF block_id		patch_path[MAX_BT_DEPTH + 1];
 GBLREF int4		patch_offset[MAX_BT_DEPTH + 1];
 GBLREF short int	patch_path_count;
 
+error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEINVALBLKID);
+
 void dse_find_roots(block_id index)
 {
+	boolean_t	long_blk_id;
+	cache_rec_ptr_t	dummy_cr;
+	global_dir_path	*d_ptr;
 	int		count;
 	int4		dummy_int;
-	cache_rec_ptr_t dummy_cr;
+	long		blk_id_size;
 	short		temp_short;
 	sm_uc_ptr_t	bp, b_top, rp, r_top, key_top;
-	global_dir_path	*d_ptr;
-	error_def(ERR_DSEBLKRDFAIL);
 
-	if(!(bp = t_qread(index,&dummy_int,&dummy_cr)))
-		rts_error(VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+	if (!(bp = t_qread(index,&dummy_int,&dummy_cr)))
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+	if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
+	{
+#		ifdef BLK_NUM_64BIT
+		long_blk_id = TRUE;
+		blk_id_size = SIZEOF(block_id_64);
+#		else
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#		endif
+	} else
+	{
+		long_blk_id = FALSE;
+		blk_id_size = SIZEOF(block_id_32);
+	}
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
 	else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
@@ -52,15 +71,22 @@ void dse_find_roots(block_id index)
 		r_top = rp + temp_short;
 		if (r_top > b_top)
 			r_top = b_top;
-		if (r_top - rp < SIZEOF(block_id))
+		if ((r_top - rp) < blk_id_size)
 			break;
 		global_roots_tail->link = (global_root_list *)malloc(SIZEOF(global_root_list));
 		global_roots_tail = global_roots_tail->link;
 		global_roots_tail->link = 0;
 		for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
-			if(!*key_top++ && !*key_top++)
+			if (!*key_top++ && !*key_top++)
 				break;
-		GET_LONG(global_roots_tail->root,key_top);
+		if (long_blk_id == TRUE)
+#			ifdef BLK_NUM_64BIT
+			GET_BLK_ID_64(global_roots_tail->root, key_top);
+#			else
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#			endif
+		else
+			GET_BLK_ID_32(global_roots_tail->root, key_top);
 		global_roots_tail->dir_path = (global_dir_path *)malloc(SIZEOF(global_dir_path));
 		d_ptr = global_roots_tail->dir_path;
 		for (count = 0; ; count++)
@@ -70,6 +96,7 @@ void dse_find_roots(block_id index)
 				d_ptr->next = (global_dir_path *)malloc(SIZEOF(global_dir_path));
 			else
 			{	d_ptr->next = 0;
+				assert((rp - bp) == (int4)(rp - bp));
 				d_ptr->offset = (int4)(rp - bp);
 				break;
 			}

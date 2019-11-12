@@ -386,7 +386,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 				assert(&cw_set[cs->index] < cs);
 				assert((SIZEOF(blk_hdr) + SIZEOF(rec_hdr)) <= cs->ins_off);
 				assert((cs->ins_off + SIZEOF(block_id)) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
-				PUT_LONG(db_addr[0] + cs->ins_off, cw_set[cs->index].blk);
+				PUT_BLK_ID(db_addr[0] + cs->ins_off, cw_set[cs->index].blk);
 				if (((nxt = cs + 1) < &cw_set[cw_set_depth]) && (gds_t_write_root == nxt->mode))
 				{	/* If the next cse is a WRITE_ROOT, it contains a second block pointer
 					 * to resolve though it operates on the current cse's block.
@@ -395,7 +395,7 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 					assert(&cw_set[nxt->index] < nxt);
 					assert((SIZEOF(blk_hdr) + SIZEOF(rec_hdr)) <= nxt->ins_off);
 					assert((nxt->ins_off + SIZEOF(block_id)) <= ((blk_hdr_ptr_t)db_addr[0])->bsiz);
-					PUT_LONG(db_addr[0] + nxt->ins_off, cw_set[nxt->index].blk);
+					PUT_BLK_ID(db_addr[0] + nxt->ins_off, cw_set[nxt->index].blk);
 				}
 			}
 		} else
@@ -404,13 +404,14 @@ enum cdb_sc	mm_update(cw_set_element *cs, trans_num ctn, trans_num effective_tn,
 			{	/* TP resolve pointer references to new blocks */
 				for (chain_ptr = db_addr[0] + cs->first_off; ; chain_ptr += chain.next_off)
 				{
-					GET_LONGP(&chain, chain_ptr);
+					GET_BLK_IDP(&chain, chain_ptr);
 					assert(1 == chain.flag);
-					assert((int)(chain_ptr - db_addr[0] + chain.next_off)
+					assert((int)(chain_ptr - db_addr[0] + chain.next_off + SIZEOF(block_id))
 							<= (int)(((blk_hdr_ptr_t)db_addr[0])->bsiz));
+					assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 					assert((int)chain.cw_index < sgm_info_ptr->cw_set_depth);
-					tp_get_cw(si->first_cw_set, chain.cw_index, &cs_ptr);
-					PUT_LONG(chain_ptr, cs_ptr->blk);
+					tp_get_cw(si->first_cw_set, (int)chain.cw_index, &cs_ptr);
+					PUT_BLK_ID(chain_ptr, cs_ptr->blk);
 					if (0 == chain.next_off)
 						break;
 				}
@@ -1140,7 +1141,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 				assert(cs - cw_set > cs->index);
 				assert((SIZEOF(blk_hdr) + SIZEOF(rec_hdr)) <= cs->ins_off);
 				assert((cs->ins_off + SIZEOF(block_id)) <= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
-				PUT_LONG((blk_ptr + cs->ins_off), cw_set[cs->index].blk);
+				PUT_BLK_ID((blk_ptr + cs->ins_off), cw_set[cs->index].blk);
 				if (((nxt = cs + 1) < &cw_set[cw_set_depth]) && (gds_t_write_root == nxt->mode))
 				{	/* If the next cse is a WRITE_ROOT, it contains a second block pointer
 					 * to resolve though it operates on the current cse's block.
@@ -1149,7 +1150,7 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 					assert(nxt - cw_set > nxt->index);
 					assert(SIZEOF(blk_hdr) <= nxt->ins_off);
 					assert(nxt->ins_off <= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
-					PUT_LONG((blk_ptr + nxt->ins_off), cw_set[nxt->index].blk);
+					PUT_BLK_ID((blk_ptr + nxt->ins_off), cw_set[nxt->index].blk);
 				}
 			}
 		} else
@@ -1158,13 +1159,14 @@ enum cdb_sc	bg_update_phase2(cw_set_element *cs, trans_num ctn, trans_num effect
 			{	/* TP - resolve pointer references to new blocks */
 				for (chain_ptr = blk_ptr + cs->first_off; ; chain_ptr += chain.next_off)
 				{
-					GET_LONGP(&chain, chain_ptr);
+					GET_BLK_IDP(&chain, chain_ptr);
 					assert(1 == chain.flag);
-					assert((chain_ptr - blk_ptr + chain.next_off + SIZEOF(block_id))
-							<= ((blk_hdr_ptr_t)blk_ptr)->bsiz);
+					assert((int)(chain_ptr - blk_ptr + chain.next_off + SIZEOF(block_id))
+							<= (int)((blk_hdr_ptr_t)blk_ptr)->bsiz);
+					assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 					assert((int)chain.cw_index < sgm_info_ptr->cw_set_depth);
 					tp_get_cw(si->first_cw_set, (int)chain.cw_index, &cs_ptr);
-					PUT_LONG(chain_ptr, cs_ptr->blk);
+					PUT_BLK_ID(chain_ptr, cs_ptr->blk);
 					if (0 == chain.next_off)
 						break;
 				}

@@ -346,17 +346,24 @@ typedef UINTPTR_T uintszofptr_t;
 #ifdef __sparc
 #	define  SPARC_ONLY(X) X
 #else
-#define  SPARC_ONLY(X)
+#define SPARC_ONLY(X)
 #endif
-#define BITS_PER_UCHAR  8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
+#define BITS_PER_UCHAR	8 /* note, C does not require this to be 8, see <limits.h> for definitions of CHAR_BIT and UCHAR_MAX */
 
 #define MAXPOSINT4		((int4)0x7fffffff)
-#define	MAX_DIGITS_IN_INT	10	/* maximum number of decimal digits in a  4-byte integer */
-#define	MAX_DIGITS_IN_INT8	20	/* maximum number of decimal digits in an 8-byte integer */
-#define	MAX_HEX_DIGITS_IN_INT	 8 	/* maximum number of hexadecimal digits in a  4-byte integer */
-#define	MAX_HEX_DIGITS_IN_INT8	16	/* maximum number of hexadecimal digits in an 8-byte integer */
+#define MAX_DIGITS_IN_INT	10	/* maximum number of decimal digits in a  4-byte integer */
+#define MAX_DIGITS_IN_INT8	20	/* maximum number of decimal digits in an 8-byte integer */
+#define MAX_HEX_DIGITS_IN_SHORT	 4	/* maximum number if hexadecimal digits in a  2-byte integer */
+#define MAX_HEX_DIGITS_IN_INT	 8	/* maximum number of hexadecimal digits in a  4-byte integer */
+#define MAX_HEX_DIGITS_IN_INT8	16	/* maximum number of hexadecimal digits in an 8-byte integer */
 
-#define MAX_DIGITS_IN_EXP       2       /* maximum number of decimal digits in an exponent */
+/* These are renames of above macros to cut the number of characters in the macro name in order to
+ * make it easier to fit the macro on a cramped line */
+#define MAX_HEX_SHORT		MAX_HEX_DIGITS_IN_SHORT
+#define MAX_HEX_INT		MAX_HEX_DIGITS_IN_INT
+#define MAX_HEX_INT8		MAX_HEX_DIGITS_IN_INT8
+
+#define MAX_DIGITS_IN_EXP	2	/* maximum number of decimal digits in an exponent */
 #define MAX_HOST_NAME_LEN	256
 #define MAX_LONG_IN_DOUBLE	0xFFFFFFFFFFFFF /*Max Fraction part in IEEE double format*/
 #define MAX_INT_IN_BYTE		255

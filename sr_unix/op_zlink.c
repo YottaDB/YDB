@@ -37,6 +37,8 @@
 #endif
 #include "arlinkdbg.h"
 #include "relinkctl.h"
+#include "toktyp.h"		/* Needed for "valid_mname.h" */
+#include "valid_mname.h"
 
 typedef enum
 {
@@ -103,13 +105,21 @@ MBSTART{															\
 } MBEND
 
 
+<<<<<<< HEAD
 GBLREF unsigned char		object_file_name[];
+=======
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 GBLREF command_qualifier	cmd_qlf;
 GBLREF int			object_file_des;
 GBLREF mident			module_name, routine_name;
 GBLREF mval			dollar_zsource;
+<<<<<<< HEAD
 GBLREF unsigned short		object_name_len;
+=======
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 GBLREF spdesc			rts_stringpool, stringpool;
+GBLREF unsigned char		object_file_name[];
+GBLREF unsigned short		object_name_len;
 
 error_def(ERR_FILENOTFND);
 error_def(ERR_FILEPARSE);
@@ -145,11 +155,14 @@ void op_zlink (mval *v, mval *quals)
 				obj_file[MAX_FN_LEN + 1],
 				objnamebuf[MAX_FN_LEN + 1],
 				srcnamebuf[MAX_FN_LEN + 1];
+<<<<<<< HEAD
 	command_qualifier	save_qlf;
 	int			qlf, save_errno, status, tslash;
+=======
+	int			initial_object_file_des, qlf, save_errno, status, tslash;
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 	linktyp			type;
 	mstr			srcstr, objstr, file;
-	mval			qualifier;
 	parse_blk		pblk;
 	struct stat		obj_stat, src_stat;
 	unsigned short		objnamelen, srcnamelen;
@@ -167,8 +180,10 @@ void op_zlink (mval *v, mval *quals)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
 			      RTS_ERROR_LITERAL("Filename/path exceeds max length"));
 	DBGARLNK((stderr, "op_zlink: Call to (re)link routine %.*s\n", v->str.len, v->str.addr));
+	assert((SIZEOF(DOTM) == SIZEOF(DOTOBJ)) && (SIZEOF(srcnamebuf) == SIZEOF(objnamebuf)));
 	object_file_des = FD_INVALID;
 	srcdir = objdir = NULL;
+<<<<<<< HEAD
 	if (quals)
 	{	/* Explicit ZLINK from generated code or from gtm_trigger() */
 		boolean_t expdir;
@@ -187,60 +202,96 @@ void op_zlink (mval *v, mval *quals)
 		file.addr = pblk.buffer;
 		file.len = pblk.b_esl;
 		type = NOTYPE;
+=======
+	expdir = FALSE;
+	module_name.len = object_name_len = 0;
+	memset(&pblk, 0, SIZEOF(pblk));
+	pblk.buff_size = MAX_FN_LEN;
+	pblk.buffer = inputf;
+	pblk.fop = F_SYNTAXO;
+	status = parse_file(&v->str, &pblk);
+	if (!(status & 1))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, v->str.len, v->str.addr, status);
+	if (pblk.fnb & F_WILD)
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
+			      ERR_WILDCARD, 2, v->str.len, v->str.addr);
+	/* 4SCA: file.len is bounded by MAX_FN_LEN in parse_file() */
+	file.addr = pblk.buffer;
+	file.len = pblk.b_esl;
+	type = NOTYPE;
+	if (pblk.b_ext)
+	{	/* 4SCA: file.len is decremented by the extension length pblk.b_ext */
+		file.len -= pblk.b_ext;
+		type = (('o' == pblk.l_ext[1]) && (2 == pblk.b_ext)) ? OBJ : SRC;
+	}
+	srcnamelen = MIN(v->str.len, MAX_FN_LEN);
+	memcpy(srcnamebuf, v->str.addr, srcnamelen);
+	if ('%' == srcnamebuf[0])
+		srcnamebuf[0] = '_';
+	INIT_CMD_QLF_STRINGS(cmd_qlf, obj_file, list_file, ceprep_file, MAX_FN_LEN);
+	if (!TREF(trigger_compile_and_link))						/* triggers don't rely on $ZCOMPILE */
+		zl_cmd_qlf(&(TREF(dollar_zcompile)), &cmd_qlf, srcnamebuf, &srcnamelen, !quals);
+	if (NULL != quals)	/* after initization w default quals, override with any actual quals */
+		zl_cmd_qlf(&quals->str, &cmd_qlf, srcnamebuf, &srcnamelen, TRUE);
+	objnamelen = MIN(pblk.b_name, MAX_MIDENT_LEN);
+	memcpy(objnamebuf, pblk.l_name, objnamelen);
+	if (!TREF(trigger_compile_and_link) &&
+		(objnamelen - object_name_len) || memcmp(objnamebuf, object_file_name, objnamelen))
+	{	/* appear to have an object name that differs from the file name */
+		assert(MAX_MIDENT_LEN >= object_name_len);
+		objnamelen = object_name_len;
+		memcpy(objnamebuf, object_file_name, objnamelen);
+	}
+	if (NULL != quals)
+	{	/* Explicit ZLINK from generated code or from gtm_trigger() */
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 		expdir = (0 != (pblk.fnb & F_HAS_DIR));
-		if (pblk.b_ext)
-		{	/* 4SCA: file.len is decremented by the extension length pblk.b_ext */
-			file.len -= pblk.b_ext;
-			if (('o' == pblk.l_ext[1]) && (2 == pblk.b_ext))
-				type = OBJ;
-			else
-				type = SRC;
-		}
 		if (!expdir)
-		{
+		{	/* if the directory was not explicit, skip past it */
 			file.addr = pblk.l_name;
 			file.len = pblk.b_name;
+		} else if (SRC != type)
+		{	/* if we have an explicit, directory shift the object name to make room and fill in the directory */
+			assert((OBJ == type) || (NOTYPE == type));
+			assert(MAX_FN_LEN > (objnamelen + pblk.b_dir));
+			memmove(&objnamebuf[pblk.b_dir], objnamebuf, objnamelen);
+			memcpy(objnamebuf, file.addr, pblk.b_dir);
+			objnamelen += pblk.b_dir;
 		}
-		if (!TREF(trigger_compile_and_link))
-		{
+		assert(MAX_FN_LEN > (objnamelen + SIZEOF(DOTOBJ)));
+		memcpy(&objnamebuf[objnamelen], DOTOBJ, SIZEOF(DOTOBJ));		/* Copies null terminator */
+		objnamelen += STR_LIT_LEN(DOTOBJ);
+		if (TREF(trigger_compile_and_link))
+		{	/* trigger sources don't have a .m extension */
+			assert(OBJ == type);
+			srcnamelen -= (SIZEOF(DOTOBJ) - 1);
+			srcnamebuf[srcnamelen] = 0;
+		} else
+		{	/* maintain $ZSOURCE */
 			ENSURE_STP_FREE_SPACE(file.len);
 			memcpy(stringpool.free, file.addr, file.len);
 			dollar_zsource.str.addr = (char *)stringpool.free;
 			dollar_zsource.str.len = file.len;
 			stringpool.free += file.len;
+			if (OBJ == type)
+				memcpy(&srcnamebuf[srcnamelen], DOTM, SIZEOF(DOTM));	/* Copies null terminator */
 		}
-		if (OBJ == type)
-		{	/* Object file extension specified */
-			objnamelen = file.len + pblk.b_ext;
-			assert(MAX_FN_LEN >= objnamelen);
-			memmove(objnamebuf, file.addr, objnamelen);
-			objnamebuf[objnamelen] = 0;
-		} else if (SRC == type)
-		{	/* Non-object file extension specified */
+		if (SRC == type)
+		{	/* source file extension specified */
 			srcnamelen = file.len + pblk.b_ext;
 			assert(MAX_FN_LEN >= srcnamelen);
-			memmove(srcnamebuf, file.addr, srcnamelen);
+			memcpy(srcnamebuf, file.addr, srcnamelen);
 			srcnamebuf[srcnamelen] = 0;
-			objnamelen = file.len;
-			if (pblk.b_name > MAX_MIDENT_LEN)
-				objnamelen = expdir ? (pblk.b_dir + MAX_MIDENT_LEN) : MAX_MIDENT_LEN;
-			assert((MAX_FN_LEN + 1) >= (objnamelen + SIZEOF(DOTOBJ)));
-			memcpy(objnamebuf, file.addr, objnamelen);
-			memcpy(&objnamebuf[objnamelen], DOTOBJ, SIZEOF(DOTOBJ));	/* Copies null terminator */
-			objnamelen += STR_LIT_LEN(DOTOBJ);
-		} else
-		{	/* No file extension specified */
-			assert((SIZEOF(DOTM) == SIZEOF(DOTOBJ)) && (SIZEOF(srcnamebuf) == SIZEOF(objnamebuf)));
+		}
+		if (NOTYPE == type)
+		{	/* No file extension specified - object done above, so do source */
 			if ((file.len + SIZEOF(DOTM)) > SIZEOF(srcnamebuf))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
-			memmove(srcnamebuf, file.addr, file.len);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
+					RTS_ERROR_LITERAL("Filename/path exceeds max length"));
+			memcpy(srcnamebuf, file.addr, file.len);
 			srcnamelen = file.len + SIZEOF(DOTM) - 1;
 			assert(MAX_FN_LEN >= srcnamelen);
 			memcpy(&srcnamebuf[file.len], DOTM, SIZEOF(DOTM));		/* Copies null terminator */
-			objnamelen = file.len + SIZEOF(DOTOBJ) - 1;
-			assert(MAX_FN_LEN >= objnamelen);
-			memcpy(objnamebuf, file.addr, file.len);
-			memcpy(&objnamebuf[file.len], DOTOBJ, SIZEOF(DOTOBJ));		/* Copies null terminator */
 		}
 		if (!expdir)
 		{	/* No full or relative directory specified on file to link - fill it in */
@@ -251,52 +302,47 @@ void op_zlink (mval *v, mval *quals)
 				zro_search(&objstr, &objdir, NULL, NULL, SKIP_SHLIBS);
 				if (NULL == objdir)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
-						      dollar_zsource.str.addr, ERR_FILENOTFND, 2, dollar_zsource.str.len,
-						      dollar_zsource.str.addr);
+						      dollar_zsource.str.addr, ERR_FILENOTFND, 2, objnamelen, objnamebuf);
 			} else if (SRC == type)
 			{	/* Explicit ZLINK of source - locate both source and object*/
 				srcstr.addr = srcnamebuf;
 				srcstr.len = srcnamelen;
 				zro_search(&objstr, &objdir, &srcstr, &srcdir, SKIP_SHLIBS);
 				if (NULL == srcdir)
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf,
-						      ERR_FILENOTFND, 2, srcnamelen, srcnamebuf);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
+						      dollar_zsource.str.addr, ERR_FILENOTFND,2, srcnamelen, srcnamebuf);
 			} else
 			{	/* Explicit ZLINK no file type specified - locate both source and object */
 				srcstr.addr = srcnamebuf;
 				srcstr.len = srcnamelen;
 				zro_search(&objstr, &objdir, &srcstr, &srcdir, PROBE_SHLIBS);
 				if ((NULL == objdir) && (NULL == srcdir))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
-						      dollar_zsource.str.addr, ERR_FILENOTFND,2, dollar_zsource.str.len,
-						      dollar_zsource.str.addr);
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_ZLINKFILE, 2, dollar_zsource.str.len,
+						dollar_zsource.str.addr, ERR_FILENOTFND,2, srcnamelen, srcnamebuf,
+						ERR_FILENOTFND,2, objnamelen, objnamebuf);
 			}
 		}
 	} else
 	{	/* auto-ZLINK for execution, ZBREAK, $TEXT(), or ZEDIT (i.e. non-specific call to op_zlink()) */
-		type = NOTYPE;
-		memcpy(srcnamebuf, v->str.addr, v->str.len);
-		memcpy(&srcnamebuf[v->str.len], DOTM, SIZEOF(DOTM));
-		srcnamelen = v->str.len + SIZEOF(DOTM) - 1;
+		assert(NOTYPE == type);
+		memcpy(srcnamebuf, pblk.l_name, pblk.b_name);
+		memcpy(&srcnamebuf[pblk.b_name], DOTM, SIZEOF(DOTM));
+		srcnamelen = pblk.b_name + SIZEOF(DOTM) - 1;
 		if ('%' == srcnamebuf[0])
 			srcnamebuf[0] = '_';
-		memcpy(objnamebuf, srcnamebuf, v->str.len);
-		memcpy(&objnamebuf[v->str.len], DOTOBJ, SIZEOF(DOTOBJ));		/* Copies null terminator */
-		objnamelen = v->str.len + SIZEOF(DOTOBJ) - 1;
+		assert(MAX_FN_LEN > (objnamelen + SIZEOF(DOTOBJ)));
+		memcpy(&objnamebuf[objnamelen], DOTOBJ, SIZEOF(DOTOBJ));		/* Copies null terminator */
+		objnamelen += (SIZEOF(DOTOBJ) - 1);
 		srcstr.addr = srcnamebuf;
 		srcstr.len = srcnamelen;
 		objstr.addr = objnamebuf;
 		objstr.len = objnamelen;
 		zro_search(&objstr, &objdir, &srcstr, &srcdir, PROBE_SHLIBS);
 		if (NULL == srcdir)
-		{
 			if (NULL == objdir)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
-				      ERR_FILENOTFND, 2, v->str.len, v->str.addr);
-			qualifier.mvtype = MV_STR;
-			qualifier.str = TREF(dollar_zcompile);
-			quals = &qualifier;
-		} else if (NULL == objdir)
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
+				      ERR_FILENOTFND, 2, srcnamelen, srcnamebuf, ERR_FILENOTFND, 2, objnamelen, objnamebuf);
+		else if (NULL == objdir)
 			type = SRC;
 	}
 	if (OBJ == type)
@@ -305,7 +351,8 @@ void op_zlink (mval *v, mval *quals)
 		{	/* Object file found via zro_search() */
 			assert(ZRO_TYPE_OBJLIB != objdir->type);
 			if ((objdir->str.len + objnamelen + 2) > (SIZEOF(objnamebuf) - 1))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
+					      RTS_ERROR_LITERAL("Filename/path exceeds max length"));
 			if (objdir->str.len)
 			{
 				tslash = ('/' == objdir->str.addr[objdir->str.len - 1]) ? 0 : 1;
@@ -324,23 +371,26 @@ void op_zlink (mval *v, mval *quals)
 		OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, object_file_des);
 		if (FD_INVALID == object_file_des)
 		{	/* Could not find object file */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr,
-				      errno);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, errno);
 		}
 		/* Note - if explicit ZLINK, objdir can be NULL if link is from a directory not mentioned in $ZROUTINES */
 		CHECK_OBJECT_HISTORY(objnamebuf, objdir, RECENT_ZHIST);
 		if (IL_RECOMPILE == INCR_LINK(&object_file_des, objdir, RECENT_ZHIST, objnamelen, objnamebuf))
 		{
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, dollar_zsource.str.len, dollar_zsource.str.addr,
-				      ERR_VERSION);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_VERSION);
 		}
 		CLOSE_OBJECT_FD(object_file_des, status);
 	} else
 	{	/* Either NO file extension specified or is SOURCE file extension type */
-		INIT_CMD_QLF_STRINGS(cmd_qlf, obj_file, list_file, ceprep_file, MAX_FN_LEN);
 		if (srcdir)
 		{	/* A source directory containing routine was found by zro_search() */
 			assert(ZRO_TYPE_OBJLIB != objdir->type);
+<<<<<<< HEAD
+=======
+			if ((srcdir->str.len + srcnamelen) > (SIZEOF(srcnamebuf) - 1))
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
+					      RTS_ERROR_LITERAL("Filename/path exceeds max length"));
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 			if (srcdir->str.len)
 			{
 				tslash = ('/' == srcdir->str.addr[srcdir->str.len - 1]) ? 0 : 1; /* for possible '/' in between */
@@ -373,7 +423,8 @@ void op_zlink (mval *v, mval *quals)
 				return;
 			}
 			if ((objdir->str.len + objnamelen) > (SIZEOF(objnamebuf) - 1))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZLINKFILE, 2, v->str.len, v->str.addr);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_TEXT, 2,
+					      RTS_ERROR_LITERAL("Filename/path exceeds max length"));
 			if (objdir->str.len)
 			{
 				tslash = ('/' == objdir->str.addr[objdir->str.len - 1]) ? 0 : 1;
@@ -400,7 +451,7 @@ void op_zlink (mval *v, mval *quals)
 				if (ENOENT != save_errno)
 				{
 					err_code = STRERROR(save_errno);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
 						      ERR_TEXT, 2, LEN_AND_STR(err_code));
 				}
 			} else
@@ -421,7 +472,7 @@ void op_zlink (mval *v, mval *quals)
 				if (FD_INVALID != object_file_des)	/* Chose object file if open, ignore error */
 					CLOSE_OBJECT_FILE(object_file_des, status);
 				err_code = STRERROR(save_errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 					ERR_TEXT, 2, LEN_AND_STR(err_code));
 			}
 		} else
@@ -441,9 +492,10 @@ void op_zlink (mval *v, mval *quals)
 						if (FD_INVALID != object_file_des)	/* Close object file if open */
 							CLOSE_OBJECT_FILE(object_file_des, status);
 						err_code = STRERROR(save_errno);
-						rts_error_csa(CSA_ARG(NULL)VARLSTCNT(8) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
+						rts_error_csa(CSA_ARG(NULL)VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 							ERR_TEXT, 2, LEN_AND_STR(err_code));
 					}
+<<<<<<< HEAD
 					/* Check if recompile is needed.
 					 * a) If $ydb_recompile_newer_src env var is not set to TRUE, then we check if
 					 *	src_stat.mtim is newer than or equal to obj_stat.mtime.
@@ -463,6 +515,11 @@ void op_zlink (mval *v, mval *quals)
 							|| (TREF(ydb_recompile_newer_src)
 								&& IS_STAT1_MTIME_OLDER_THAN_STAT2(obj_stat, src_stat)));
 					if (compile)
+=======
+					if ((src_stat.st_mtime > obj_stat.st_mtime) || ((src_stat.st_mtime == obj_stat.st_mtime)
+						&& (src_stat.st_nmtime > obj_stat.st_nmtime)))
+					{
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 						CLOSE_OBJECT_FD(object_file_des, status);
 				} else
 				{
@@ -472,25 +529,17 @@ void op_zlink (mval *v, mval *quals)
 			} else if (!obj_found)
 			{
 				assert(FD_INVALID == object_file_des);	/* Make sure closed */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, objnamelen, objnamebuf,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 					      ERR_FILENOTFND, 2, objnamelen, objnamebuf);
 			}
 		}
 		if (compile)
 		{	/* (Re)Compile source file */
-			module_name.len = 0;
-			if (!TREF(trigger_compile_and_link))
-			{
-				INIT_CMD_QLF_STRINGS(cmd_qlf, obj_file, list_file, ceprep_file, MAX_FN_LEN);
-				zl_cmd_qlf(&(TREF(dollar_zcompile)), &cmd_qlf, srcnamebuf, &srcnamelen, !quals);/*  */
-				if (quals)	/* after initization with default qualifers, override with any actual qualifers */
-					zl_cmd_qlf(&quals->str, &cmd_qlf, srcnamebuf, &srcnamelen, TRUE);
-			}
 			qlf = cmd_qlf.qlf;
 			if (!(qlf & CQ_OBJECT) && (SRC != type))
 			{
 				assert(FD_INVALID == object_file_des);	/* Make sure no object file open */
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_ZLNOOBJECT);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_ZLNOOBJECT);
 			}
 			COMBINE_OBJ_DIR_W_NAME();
 			zlcompile(srcnamelen, (uchar_ptr_t)srcnamebuf);
@@ -507,7 +556,7 @@ void op_zlink (mval *v, mval *quals)
 			{
 				save_errno = errno;
 				err_code = STRERROR(save_errno);
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf,
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_ZLINKFILE, 2, v->str.len, v->str.addr,
 					ERR_ZLNOOBJECT, 0, ERR_TEXT, 2, LEN_AND_STR(err_code));
 			}
 		} else
@@ -524,17 +573,13 @@ void op_zlink (mval *v, mval *quals)
 		{	/* Failure due only to version mismatch, so recompile */
 			assertpro(!compile);
 			if (!src_found)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_VERSION);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZLINKFILE, 2, objnamelen, objnamebuf, ERR_FILENOTFND,
+					2, srcnamelen, srcnamebuf, ERR_VERSION);
 			if (!compile)
 			{
-				module_name.len = 0;
 				if (!TREF(trigger_compile_and_link))
-				{
-					zl_cmd_qlf(&(TREF(dollar_zcompile)), &cmd_qlf, srcnamebuf, &srcnamelen, !quals);
-					if (quals)	/* after initization w default quals, override with any actual quals */
-						zl_cmd_qlf(&quals->str, &cmd_qlf, srcnamebuf, &srcnamelen, TRUE);
 					COMBINE_OBJ_DIR_W_NAME();
-				} else if (!MV_DEFINED(&cmd_qlf.object_file))
+				else if (!MV_DEFINED(&cmd_qlf.object_file))
 				{
 					cmd_qlf.object_file.mvtype = MV_STR;
 					cmd_qlf.object_file.str.addr = objnamebuf;
@@ -546,7 +591,7 @@ void op_zlink (mval *v, mval *quals)
 			zlcompile(srcnamelen, (uchar_ptr_t)srcnamebuf);
 			assertpro(FALSE == TREF(compile_time) && (stringpool.base == rts_stringpool.base));	/* sb back in rts */
 			if (!(cmd_qlf.qlf & CQ_OBJECT) && (SRC != type))
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, srcnamelen, srcnamebuf, ERR_ZLNOOBJECT);
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZLINKFILE, 2, v->str.len, v->str.addr, ERR_ZLNOOBJECT);
 			assert(FD_INVALID == object_file_des);	/* zlcompile() should have driven obj_code() which closes it */
 			OPEN_OBJECT_FILE(objnamebuf, O_RDONLY, object_file_des);
 			CHECK_OBJECT_HISTORY(objnamebuf, objdir, RECENT_ZHIST);

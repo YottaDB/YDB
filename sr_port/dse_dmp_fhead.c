@@ -50,7 +50,6 @@
 #include "mutex.h"
 #include "db_snapshot.h"
 
-#define MAX_UTIL_LEN    	64
 #define NEXT_EPOCH_TIME_SPACES	"                   " /* 19 spaces, we have 19 character field width to output Next Epoch Time */
 
 GBLREF	sgmnt_addrs	*cs_addrs;

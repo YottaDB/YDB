@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -22,6 +22,7 @@
 #define MIN_COLLTYPE	0
 #define XFORM	0
 #define XBACK	1
+#define XUTIL	2
 #define	GTM_NULL_TEXT "GTM NULL COLL"
 #define STD_NULL_TEXT "STD NULL COLL"
 
@@ -95,6 +96,7 @@ typedef struct collseq_struct {
 	int			act;
 	int4			(*xform)();
 	int4			(*xback)();
+	int4			(*xutil)();	/* for zatransform -2/2 prev/next functionality */
 	int4			(*version)();
 	int4			(*verify)();
 	int			argtype;

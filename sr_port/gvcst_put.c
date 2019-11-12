@@ -746,6 +746,7 @@ tn_restart:
 		curr_chain = *(off_chain *)&lcl_root;
 		if (curr_chain.flag)
 		{
+			assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 			tp_get_cw(si->first_cw_set, (int)curr_chain.cw_index, &cse);
 			tp_root = cse->blk;
 			assert(tp_root);
@@ -767,8 +768,8 @@ tn_restart:
 		{
 			tmp_rp = (rec_hdr_ptr_t)(dir_hist->h[0].buffaddr + dir_hist->h[0].curr_rec.offset);
 			EVAL_CMPC2(tmp_rp, tmp_cmpc);
-			GET_LONG(tp_root, (dir_hist->h[0].buffaddr + SIZEOF(rec_hdr)
-					   + dir_hist->h[0].curr_rec.offset + gv_altkey->end + 1 - tmp_cmpc));
+			GET_BLK_ID(tp_root, dir_hist->h[0].buffaddr + SIZEOF(rec_hdr)
+						+ dir_hist->h[0].curr_rec.offset + gv_altkey->end + 1 - tmp_cmpc);
 			if (dollar_tlevel)
 			{
 				gvt_for_root = dir_hist->h[0].blk_num;
@@ -1212,6 +1213,7 @@ tn_restart:
 				GOTO_RETRY;
 			}
 			chain1 = *(off_chain *)&blk_num;
+			assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 			if ((1 == chain1.flag) && ((int)chain1.cw_index >= si->cw_set_depth))
 			{
 				assert(si->tp_csa == csa);
@@ -1389,7 +1391,7 @@ tn_restart:
 					/* find chain records before and after the new one */
 					for ( ; ; curr += curr_chain.next_off)
 					{	/* try to make offset_sum identify the first chain entry after the new record */
-						GET_LONGP(&curr_chain, curr);
+						GET_BLK_IDP(&curr_chain, curr);
 						assert(1 == curr_chain.flag);
 						if (0 == curr_chain.next_off)
 							break;
@@ -1411,13 +1413,13 @@ tn_restart:
 						/* 			   ---|---------------v
 						 * [blk_hdr]...[existing rec ( )]...[new rec ( )]... */
 						curr_chain.next_off = ins_chain_offset - offset_sum;
-						GET_LONGP(curr, &curr_chain);
+						GET_BLK_IDP(curr, &curr_chain);
 					} else
 					{	/* update the chain record before the new one */
 						/* 			   ---|---------------v--------------------v
 						 * [blk_hdr]...[existing rec ( )]...[new rec ( )]...[existing rec ( )] */
 						curr_chain.next_off = (unsigned int)(ins_chain_offset - (curr - buffaddr));
-						GET_LONGP(curr, &curr_chain);
+						GET_BLK_IDP(curr, &curr_chain);
 						cse->next_off = value.len + (offset_sum - curr_rec_offset - next_rec_shrink1);
 					}
 				}
@@ -1990,7 +1992,7 @@ tn_restart:
 					cse_first_off = (int4)cse->first_off;
 					offset_sum = cse_first_off;
 					curr = buffaddr + offset_sum;
-					GET_LONGP(&curr_chain, curr);
+					GET_BLK_IDP(&curr_chain, curr);
 					assert(1 == curr_chain.flag);
 					/* Determine "last_possible_left_offset" and "extra_record_blkid_off" */
 					copy_extra_record = (!new_rec_goes_to_right && copy_extra_record);
@@ -2068,7 +2070,7 @@ tn_restart:
 							last_possible_left_offset += SIZEOF(off_chain);
 						if (offset_sum < last_possible_left_offset)
 						{	/* it's not an immediate hit */
-							for ( ; ; curr += curr_chain.next_off, GET_LONGP(&curr_chain, curr))
+							for ( ; ; curr += curr_chain.next_off, GET_BLK_IDP(&curr_chain, curr))
 							{	/* follow chain upto split point */
 								assert(1 == curr_chain.flag);
 								if (0 == curr_chain.next_off)
@@ -2104,7 +2106,7 @@ tn_restart:
 								if (!extra_record_blkid_off && (offset_sum != cse_first_off))
 								{	/* bring curr up to the match */
 									curr += curr_chain.next_off;
-									GET_LONGP(&curr_chain, curr);
+									GET_BLK_IDP(&curr_chain, curr);
 								}
 								curr_offset = curr - buffaddr;
 								undo_index = 0;
@@ -2131,7 +2133,7 @@ tn_restart:
 										cse->undo_offset[0] = (block_offset)curr_offset;
 										undo_index = 1;
 									}
-									GET_LONGP(curr, &prev_chain);
+									GET_BLK_IDP(curr, &prev_chain);
 								}
 								if (extra_record_blkid_off)
 								{
@@ -2139,7 +2141,7 @@ tn_restart:
 									{	/* bring curr up to the match */
 										curr += curr_chain.next_off;
 										curr_offset += curr_chain.next_off;
-										GET_LONGP(&curr_chain, curr);
+										GET_BLK_IDP(&curr_chain, curr);
 									}
 									if (dollar_tlevel != cse->t_level)
 									{
@@ -2153,7 +2155,7 @@ tn_restart:
 									}
 									prev_chain = curr_chain;
 									prev_chain.next_off = 0;
-									GET_LONGP(curr, &prev_chain);
+									GET_BLK_IDP(curr, &prev_chain);
 									cse_new->next_off = BSTAR_REC_SIZE;
 								}
 								offset_sum += curr_chain.next_off;
@@ -2200,10 +2202,10 @@ tn_restart:
 														     buffaddr);
 										undo_index = 1;
 									}
-									GET_LONGP(curr, &prev_chain);
+									GET_BLK_IDP(curr, &prev_chain);
 									/* bring curr up to the match */
 									curr += curr_chain.next_off;
-									GET_LONGP(&curr_chain, curr);
+									GET_BLK_IDP(&curr_chain, curr);
 								}
 								offset_sum += curr_chain.next_off;
 								if (dollar_tlevel != cse->t_level)
@@ -2216,7 +2218,7 @@ tn_restart:
 														      buffaddr);
 								}
 								curr_chain.next_off = 0;
-								GET_LONGP(curr, &curr_chain);
+								GET_BLK_IDP(curr, &curr_chain);
 							}
 						} else
 						{	/* found the split and no *-key issue: just terminate before the split */
@@ -2259,7 +2261,7 @@ tn_restart:
 								cse->undo_next_off[0] = old_curr_chain_next_off;
 								cse->undo_offset[0] = (block_offset)(curr - buffaddr);
 							}
-							GET_LONGP(curr, &curr_chain);
+							GET_BLK_IDP(curr, &curr_chain);
 						}	/* end of *-key or not alternatives */
 						/* See first occurrence of tag BLK_RESERVED_SIZE_ASSERT_COMMENT_OUT_FOR_NOW
 						 * in this C file for why the below assert is disabled.
@@ -2618,7 +2620,7 @@ tn_restart:
 					curr_chain.cw_index = ins_chain_index;
 					curr_chain.next_off = 0;
 					curr = cse->new_buff + ins_off2;
-					GET_LONGP(curr, &curr_chain);
+					GET_BLK_IDP(curr, &curr_chain);
 					cse->done = TRUE;
 					gv_target->clue.end = 0;
 				}

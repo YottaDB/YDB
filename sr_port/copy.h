@@ -28,12 +28,12 @@
 #define GET_CHAR(X,Y)	((X) = *(unsigned char *)(Y))
 #define REF_CHAR(Y)	(*(unsigned char *)Y)
 #define PUT_ZERO(X)	((X) = 0)
-#define PUT_LLONG(X,Y)	(*(gtm_int8*)(X) = (Y))
-#define PUT_ULLONG(X,Y)	(*(gtm_uint8*)(X) = (Y))
-#define PUT_LONG(X,Y)	(*(int4*)(X) = (Y))
-#define PUT_ULONG(X,Y)	(*(uint4*)(X) = (Y))
-#define PUT_SHORT(X,Y)	(*(short*)(X) = (Y))
-#define PUT_USHORT(X,Y)	(*(unsigned short*)(X) = (Y))
+#define PUT_LLONG(X,Y)	(*(gtm_int8 *)(X) = (Y))
+#define PUT_ULLONG(X,Y)	(*(gtm_uint8 *)(X) = (Y))
+#define PUT_LONG(X,Y)	(*(int4 *)(X) = (Y))
+#define PUT_ULONG(X,Y)	(*(uint4 *)(X) = (Y))
+#define PUT_SHORT(X,Y)	(*(short *)(X) = (Y))
+#define PUT_USHORT(X,Y)	(*(unsigned short *)(X) = (Y))
 #define PUT_CHAR(X,Y)	(*(unsigned char *)(X) = (Y))
 #else
 #include <sys/types.h>

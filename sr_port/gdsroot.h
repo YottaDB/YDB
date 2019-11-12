@@ -16,6 +16,7 @@
 #ifndef GDSROOT_H
 #define GDSROOT_H
 
+#include "copy.h"
 #include <sys/types.h>
 
 #define DIR_ROOT 1
@@ -39,7 +40,7 @@
  * Align it to 4-byte boundary as this macro is mostly used by targ_alloc which allocates 3 keys one for gv_target->clue,
  * one for gv_target->first_rec and one for gv_target->last_rec. The alignment ensures all 3 fields start at aligned boundary.
  * In the following macro, we can ideally use the ROUND_UP2 macro but since this is used in a typedef (of "key_cum_value")
- * in gdscc.h, we cannot use that macro as it contains GTMASSERT expressions to do the 2-power check. To avoid this,
+ * in gdscc.h, we cannot use that macro as it contains GTMASSERT expressions to do the 2-power check. To avoid this,	[BYPASSOK]
  * we use the ROUND_UP macro (which has no checks). It is ok to do that instead of the more-efficient ROUND_UP2 macro
  * as the second parameter is a constant so all this should get evaluated at compile-time itself.
  */
@@ -47,19 +48,47 @@
 
 /* Possible states for TREF(in_mu_swap_root_state) (part of MUPIP REORG -TRUNCATE) */
 #define MUSWP_NONE		0	/* default; not in mu_swap_root */
-#define MUSWP_INCR_ROOT_CYCLE 	1	/* moving a root block; need to increment root_search_cycle */
+#define MUSWP_INCR_ROOT_CYCLE	1	/* moving a root block; need to increment root_search_cycle */
 #define MUSWP_FREE_BLK		2	/* freeing a directory block; need to write leaf blocks to snapshot file */
 #define MUSWP_DIRECTORY_SWAP	3	/* moving a directory block; just checked by cert_blk */
 
-typedef	gtm_uint64_t	trans_num;
-typedef	uint4		trans_num_4byte;
+typedef gtm_uint64_t	trans_num;
+typedef uint4		trans_num_4byte;
 
-typedef	int4		block_id;	/* allows for GDS block #s to have 32 bits but see GDS_MAX_BLK_BITS below */
-					/* NOTE : GDEVERIF.m assumes block_id to be int4. Fix that if this changes */
+typedef int4		block_id_32;	/* block_id type used pre-V7 kept for compatibility with old DBs
+					 * allows for GDS block #s to have 32 bits but see GDS_MAX_BLK_BITS below
+					 */
+typedef gtm_int8	block_id_64;	/* block_id type used in V7+
+					 * allows for GDS block #s to have 64 bits but see GDS_MAX_BLK_BITS below
+					 */
+typedef block_id_32	block_id;	/* default block id type used in current release
+					 * NOTE : GDEVERIF.m assumes block_id to be int4. Fix that if this changes
+					 */
+typedef block_id_32	block_cnt;	/* type for storing a count of blocks (ex. the total number of blocks) */
 
-#define	GDS_MAX_BLK_BITS	30	/* see blk_ident structure in gdskill.h for why this cannot be any greater */
-#define	GDS_MAX_VALID_BLK	(1<<GDS_MAX_BLK_BITS - 1)	/* the maximum valid block # that a GT.M database can have */
-#define	GDS_CREATE_BLK_MAX	(block_id)(-1)	/* i.e. 0xFFFFFFFF which also has 31st bit 1 indicating it is a created block */
+#undef BLK_NUM_64BIT			/* Disable 64-bit block ID handling in DSE */
+
+/* These are memory access macros relabeled for explicit block_id references */
+#define PUT_BLK_ID_32(X,Y)	PUT_LONG(X,Y)
+#define GET_BLK_ID_32(X,Y)	GET_LONG(X,Y)
+#define GET_BLK_ID_32P(X,Y)	GET_LONGP(X,Y)
+#define PUT_BLK_ID_64(X,Y)	PUT_LLONG(X,Y)
+#define GET_BLK_ID_64(X,Y)	GET_LLONG(X,Y)
+#define GET_BLK_ID_64P(X,Y)	GET_LLONGP(X,Y)
+
+/* These are memory access macros for general case block_id references
+ * instead of a specific block_id width
+ */
+#define PUT_BLK_ID(X,Y)		PUT_BLK_ID_32(X,Y)
+#define GET_BLK_ID(X,Y)		GET_BLK_ID_32(X,Y)
+#define GET_BLK_IDP(X,Y)	GET_BLK_ID_32P(X,Y)
+
+/* This is the byte swap macro used for endian changing relabeled for block_id references */
+#define BLK_ID_BYTESWAP(X)	GTM_BYTESWAP_32(X)
+
+#define GDS_MAX_BLK_BITS	30	/* see blk_ident structure in gdskill.h for why this cannot be any greater */
+#define GDS_MAX_VALID_BLK	(1<<GDS_MAX_BLK_BITS - 1)	/* the maximum valid block # that a GT.M database can have */
+#define GDS_CREATE_BLK_MAX	(block_id)(-1)	/* i.e. 0xFFFFFFFF which also has 31st bit 1 indicating it is a created block */
 
 enum db_acc_method
 {	dba_rms,

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,8 +37,6 @@ GBLREF short			crash_count;
 GBLREF gd_addr			*original_header;
 
 error_def(ERR_DBRDONLY);
-
-#define MAX_UTIL_LEN 80
 
 void dse_crit(void)
 {

@@ -182,6 +182,7 @@ THREADGBLDEF(prev_gv_target,			gv_namehead *)			/* saves the last gv_target for 
 THREADGBLDEF(ready2signal_gvundef,		boolean_t)			/* TRUE if GET operation about to signal GVUNDEF */
 THREADGBLDEF(redo_rootsrch_ctxt,		redo_root_search_context)	/* context to be saved and restored during
 										 * gvcst_redo_root_search */
+THREADGBLDEF(skip_DB_exists_check,		boolean_t)			/* skip check for whether the DB file exists */
 THREADGBLDEF(skip_file_corrupt_check,		boolean_t)			/* skip file_corrupt check in grab_crit */
 THREADGBLDEF(tpnotacidtime,			mval)				/* limit for long non-ACID ops in transactions */
 THREADGBLDEF(tp_restart_count,			uint4)				/* tp_restart counter */
@@ -279,6 +280,7 @@ THREADGBLDEF(gtmsecshr_comkey,			unsigned int)			/* Hashed version key for gtmse
 THREADGBLDEF(gvcst_statsDB_open_ch_active,	boolean_t)			/* Condition handler is active */
 THREADGBLDEF(in_zwrite,				boolean_t)			/* ZWrite is active */
 THREADGBLDEF(is_socketpool,			boolean_t)			/* True when device-to-be-opened is socketpool */
+THREADGBLDEF(gtm_socket_keepalive_idle,		int)				/* Initialized from $gtm_socket_keepalive_idle */
 THREADGBLDEF(in_mupip_integ,			boolean_t)			/* To let DO_DB_HDR_CHECK skip DBFLCORRP */
 THREADGBLDEF(lab_lnr,				lnr_tabent **)			/* Passes address from op_rhd_ext to op_extcall etc.
 										 * Points into either lab_proxy or linkage table

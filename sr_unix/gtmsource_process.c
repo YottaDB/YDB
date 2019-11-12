@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -634,24 +634,25 @@ void gtmsource_recv_ctl(void)
 				repl_log(gtmsource_log_fp, TRUE, TRUE,
 					"Connection reset while attempting to receive from secondary."
 					" Status = %d ; %s\n", status, STRERROR(status));
+			} else
+			{
+				repl_log(gtmsource_log_fp, TRUE, TRUE,
+					"Error receiving Control message from Receiver. Error in recv."
+					" Status = %d ; %s\n", status, STRERROR(status));
+				repl_log_conn_info(gtmsource_sock_fd, gtmsource_log_fp, TRUE);
+				SEND_SYSMSG_REPLCOMM(LEN_AND_LIT("Error receiving Control message from Receiver. Error in recv."));
+			}
 				repl_close(&gtmsource_sock_fd);
 				SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 				gtmsource_state = gtmsource_local->gtmsource_state
 					= GTMSOURCE_WAITING_FOR_CONNECTION;
 				return;
-			} else
-			{
-				SNPRINTF(err_string, SIZEOF(err_string),
-						"Error receiving Control message from Receiver. Error in recv : %s",
-						STRERROR(status));
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
-						 LEN_AND_STR(err_string));
-			}
 		} else if (EREPL_SELECT == repl_errno)
 		{
 			SNPRINTF(err_string, SIZEOF(err_string),
 					"Error receiving Control message from Receiver. Error in select : %s",
 					STRERROR(status));
+			SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_string));
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 					 LEN_AND_STR(err_string));
 		}
@@ -702,6 +703,7 @@ int gtmsource_process(void)
 	gtmsource_state_t		gtmsource_state_sav;
 	uint4				phase2_commit_index1;
 	int				phase2_commit_wait_cnt;
+	boolean_t			close_retry = FALSE;
 	DEBUG_ONLY(uchar_ptr_t		save_inbuff;)
 	DEBUG_ONLY(uchar_ptr_t		save_outbuff;)
 	DCL_THREADGBL_ACCESS;
@@ -876,15 +878,35 @@ int gtmsource_process(void)
 					repl_log(gtmsource_log_fp, TRUE, TRUE,
 					       "Connection reset while sending XOFF_ACK due to possible update process shutdown. "
 					       "Status = %d ; %s\n", status, STRERROR(status));
+						close_retry = TRUE;
+				} else
+#				ifdef _AIX
+				if (ENETUNREACH == status)
+#				else
+				if (ECOMM == status) /*Communication error in send */
+#				endif
+				{
+					repl_log(gtmsource_log_fp, TRUE, TRUE,"Error sending XOFF_ACK_ME message."
+						" Error in send : %d, %s\n", status, STRERROR(status));
+					repl_log_conn_info(gtmsource_sock_fd, gtmsource_log_fp, TRUE);
+					close_retry = TRUE;
+				}
+				if (close_retry)
+				{
 					repl_close(&gtmsource_sock_fd);
 					SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 					gtmsource_state = gtmsource_local->gtmsource_state = GTMSOURCE_WAITING_FOR_CONNECTION;
+					close_retry = FALSE;
 					continue;
-				}
-				SNPRINTF(err_string, SIZEOF(err_string), "Error sending XOFF_ACK_ME message. Error in send : %s",
-						STRERROR(status));
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
+				} else
+				{
+					SNPRINTF(err_string, SIZEOF(err_string),
+						"Error sending XOFF_ACK_ME message. Error in send : %s\n",
+							STRERROR(status));
+					SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_string));
+					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 						LEN_AND_STR(err_string));
+				}
 			} else if (EREPL_SELECT == repl_errno)
 			{
 				SNPRINTF(err_string, SIZEOF(err_string), "Error receiving RESTART SEQNO/sending XOFF_ACK_ME.  "
@@ -1725,6 +1747,7 @@ int gtmsource_process(void)
 							break; /* the outerloop will continue */
 						if (EREPL_SEND == repl_errno)
 						{
+<<<<<<< HEAD
 #							ifdef GTM_TLS
 							if (ERR_TLSIOERROR == status)
 							{
@@ -1732,31 +1755,76 @@ int gtmsource_process(void)
 								break;
 							} else
 #							endif
+=======
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 							if (REPL_CONN_RESET(status))
 							{
 								repl_log(gtmsource_log_fp, TRUE, TRUE,
 									"Connection reset while sending seqno data from "
 									INT8_FMT" "INT8_FMTX" to "INT8_FMT" "INT8_FMTX
+<<<<<<< HEAD
 									". Status = %d ; %s\n", pre_read_seqno, pre_read_seqno,
 									post_read_seqno, post_read_seqno, status, STRERROR(status));
+=======
+									". Status = %d ; %s\n", pre_read_seqno,
+									pre_read_seqno, post_read_seqno, post_read_seqno,
+									 status, STRERROR(status));
+								close_retry = TRUE;
+							} else
+# 							ifdef _AIX
+							if (ENETUNREACH == status)
+#							else
+							if (ECOMM == status) /*Communication error in send */
+#							endif
+							{
+								repl_log(gtmsource_log_fp, TRUE, TRUE,
+									"Error sending DATA"
+									" from "INT8_FMT" "INT8_FMTX" to "INT8_FMT" "
+									INT8_FMTX" . Error in send: %s\n",
+									pre_read_seqno, pre_read_seqno, post_read_seqno,
+									post_read_seqno, STRERROR(status));
+								repl_log_conn_info(gtmsource_sock_fd, gtmsource_log_fp,
+											TRUE);
+								SNPRINTF(err_string, SIZEOF(err_string),
+                                                                	"Error sending DATA. Error in send : %s",
+										STRERROR(status));
+								close_retry = TRUE;
+							}
+							if (close_retry)
+							{
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 								repl_close(&gtmsource_sock_fd);
 								SHORT_SLEEP(GTMSOURCE_WAIT_FOR_RECEIVER_CLOSE_CONN);
 								gtmsource_state = gtmsource_local->gtmsource_state
 									= GTMSOURCE_WAITING_FOR_CONNECTION;
+<<<<<<< HEAD
+=======
+								close_retry = FALSE;
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 								break;
 							} else
 							{
 								SNPRINTF(err_string, SIZEOF(err_string),
+<<<<<<< HEAD
 									"Error sending DATA. Error in send : %s", STRERROR(status));
 								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0,
 											ERR_TEXT, 2, LEN_AND_STR(err_string));
+=======
+                                                                	"Error sending DATA. Error in send : %s",
+										STRERROR(status));
+								SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_string));
+								rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0,
+									 ERR_TEXT, 2, LEN_AND_STR(err_string));
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 							}
 						}
 						assert(EREPL_SELECT == repl_errno);
 						if (EREPL_SELECT == repl_errno)
 						{
 							SNPRINTF(err_string, SIZEOF(err_string),
-								"Error sending DATA. Error in select : %s", STRERROR(status));
+								"Error sending DATA. Error in select : %s",
+											STRERROR(status));
+							SEND_SYSMSG_REPLCOMM(LEN_AND_STR(err_string));
 							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2,
 								  LEN_AND_STR(err_string));
 						}

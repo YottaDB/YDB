@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -58,7 +58,8 @@ void mucblkini(void)
 	blk_hdr_ptr_t		bp1, bp2;
 	rec_hdr_ptr_t		rp;
 	unix_db_info		*udi;
-	int4			tmp, bmpsize, status;
+	int4			bmpsize, status;
+	block_id		blk;
 
 	udi = FILE_INFO(gv_cur_region);
 	bp1 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
@@ -93,8 +94,8 @@ void mucblkini(void)
 	rp = (rec_hdr_ptr_t)((uchar_ptr_t)bp1 + SIZEOF(blk_hdr));
 	BSTAR_REC(rp);
 	c = CST_BOK(rp);
-	tmp = DIR_DATA;
-	PUT_LONG(c, tmp);
+	blk = DIR_DATA;
+	PUT_BLK_ID(c, blk);
 	bp1->bver = GDSVCURR;
 	bp1->levl = 1;
 	bp1->bsiz = BSTAR_REC_SIZE + SIZEOF(blk_hdr);

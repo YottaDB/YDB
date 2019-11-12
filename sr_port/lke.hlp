@@ -114,7 +114,6 @@
 
    -A[LL]
    -L[OCK]
-   -[NO]C[RIT]
    -[NO]EXACT
    -[NO]I[NTERACTIVE]
    -O[UTPUT]="file-name"
@@ -136,6 +135,7 @@
        LOCKs, or when you can predict the effect on the application.
      o By default, CLEAR -ALL operates interactively (-INTERACTIVE).
 
+<<<<<<< HEAD
    -[NO]C[RIT]
 
    Allows LKE CLEAR to work even if another process is holding a critical
@@ -149,6 +149,8 @@
    By default LKE operates in CRIT mode and ensures a consistent view of
    LOCKs by using the database critical section(s).
 
+=======
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
    -[NO]EXACT
 
    Limits the CLEAR command to the exact resource name specified with
@@ -650,8 +652,11 @@
    date; such information is subject to change without notice.  YottaDB is
    not responsible for any errors or defects.
 
+<<<<<<< HEAD
    **Note**
 
    This help file is a concise representation of the revision r1.30 of the
    Administration and Operations Guide. To obtain a copy of the current
    revision, go to https://docs.yottadb.com/AdminOpsGuide/index.html.
+=======
+>>>>>>> 3d3cd0dd... GT.M V6.3-010

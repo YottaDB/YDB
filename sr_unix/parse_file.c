@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -42,7 +42,7 @@
 error_def(ERR_FILENOTFND);
 error_def(ERR_GETADDRINFO);
 error_def(ERR_GETNAMEINFO);
-error_def(ERR_PARBUFSM);
+error_def(ERR_FILEPATHTOOLONG);
 error_def(ERR_PARNORMAL);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
@@ -102,7 +102,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	 */
 	status = trans_log_name(file, &trans, pblk->buffer, pblk->buff_size + 1, dont_sendmsg_on_log2long);
 	if (SS_LOG2LONG == status)
-		return ERR_PARBUFSM;
+		return ERR_FILEPATHTOOLONG;
 	assert(trans.addr == pblk->buffer);
 	memset(&def, 0, SIZEOF(def));	/* Initial the defaults to zero */
 	if (pblk->def1_size > 0)
@@ -114,7 +114,11 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 		def.def1_buf = pblk->def2_buf;
 		tmp.len = pblk->def1_size;
 		tmp.addr = pblk->def1_buf;
+<<<<<<< HEAD
 		if (ERR_PARNORMAL != (status = parse_file(&tmp, &def)))
+=======
+		if (ERR_PARNORMAL != (status = parse_file(&tmp, &def)))	/* Note Assignment */
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 			return status;
 		assert(!def.b_node);
 		if (def.b_dir)	def.fnb |= F_HAS_DIR;
@@ -271,7 +275,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 		}
 		/* If parse buffer is not large enough, return error */
 		if (def_trans.str.len + trans.len > pblk->buff_size)
-			return ERR_PARBUFSM;
+			return ERR_FILEPATHTOOLONG;
 		/* Construct full filename to parse prefixing given filename with default path prefix */
 		if (0 < def_trans.str.len)
 		{
@@ -386,7 +390,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 		{	/* Use default filename if we didn't find one */
 			diff = (int)(name - node);
 			if (def.b_name + diff > pblk->buff_size)
-				return ERR_PARBUFSM;
+				return ERR_FILEPATHTOOLONG;
 			memcpy(name, def.l_name, def.b_name);
 			ptr += def.b_name;
 		}
@@ -399,7 +403,7 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 		{	/* Use default file extension if we didn't find one */
 			diff = (int)((ext - node));
 			if (def.b_ext + diff > pblk->buff_size)
-				return ERR_PARBUFSM;
+				return ERR_FILEPATHTOOLONG;
 			memcpy(ext, def.l_ext, def.b_ext);
 			ptr += def.b_ext;
 		}
@@ -411,9 +415,9 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 		diff = (int)(name - base);
 		diff = def.b_dir - diff;
 		if ((pblk->b_name + pblk->b_ext + ((0 < def.b_dir) ? def.b_dir : 0 )) > pblk->buff_size)
-			return ERR_PARBUFSM;
+			return ERR_FILEPATHTOOLONG;
 		if (0 < diff)
-			memmove(name + diff, name, pblk->b_name + pblk->b_ext);	/* the return ERR_PARBUFSM ensures this is safe */
+			memmove(name + diff, name, pblk->b_name + pblk->b_ext);	/*return ERR_FILEPATHTOOLONG ensures this is safe*/
 		else if (0 > diff)
 			memcpy(name + diff, name, pblk->b_name + pblk->b_ext);
 		memcpy(base, def.l_dir, def.b_dir);

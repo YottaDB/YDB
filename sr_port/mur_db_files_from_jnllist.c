@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -68,7 +68,9 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 #if defined(VMS)
 	io_status_block_disk	iosb;
 #endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	db_tot = 0;
 	tdblist = head.next = NULL;
 	cptr = jnl_file_list;
@@ -93,7 +95,8 @@ gld_dbname_list *mur_db_files_from_jnllist(char *jnl_file_list, unsigned short j
 					(char *)&db_fname[0], &db_fname_len, YDB_PATH_MAX, &ustatus))
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_FILEPARSE, 2, seg->fname_len, seg->fname, ustatus);
-			return NULL;
+			if (!TREF(skip_DB_exists_check))
+				return NULL;
 		}
 		assert(db_fname_len && (db_fname_len < MAX_FN_LEN + 1));
 		seg->fname_len = db_fname_len;

@@ -68,7 +68,7 @@ default:
 endsw
 
 
-version $1 $2
+set setactive_parms = ( $1 $2 ) ; source $gtm_tools/setactive.csh
 if ( $buildaux_status ) then
 	echo "buildaux-I-usage, Usage: buildaux.csh <version> <image type> <target directory> [auxillary]"
 	exit $buildaux_status

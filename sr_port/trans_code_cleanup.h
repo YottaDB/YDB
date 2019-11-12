@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,6 +50,7 @@ error_def(ERR_ERRWZTIMEOUT);
 			break;						\
 		case (SFT_ZTIMEOUT | SFT_COUNT):			\
 			errmsg = ERR_ERRWZTIMEOUT;			\
+			break;						\
 		default:						\
 			assertpro(FALSE && fp->type);			\
 	}								\

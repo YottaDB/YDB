@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2005, 2011 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2005-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -22,8 +27,13 @@
 
 void wbox_test_init(void)
 {
+<<<<<<< HEAD
 #	ifdef DEBUG
 	mstr	trans_name;
+=======
+#	if defined (DEBUG) && !defined (STATIC_ANALYSIS)
+	mstr	envvar_logical, trans_name;
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 	char	trans_bufr[MAX_TRANS_NAME_LEN];
 
 	if (SS_NORMAL == ydb_trans_log_name(YDBENVINDX_WHITE_BOX_TEST_CASE_ENABLE, &trans_name,

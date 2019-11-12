@@ -65,7 +65,6 @@ static void rc_cpt_lock(void);
 #define LOW_BYTE_MASK	0x000000FF
 #define HIGH_BYTE_MASK  0x0000FF00
 
-/* TODO: v7 change to handle 64-bit block numbers */
 int rc_cpt_entry(int blk)
 {
 	key_t		rc_key;

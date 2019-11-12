@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2015 Fidelity National Information 	*
+ * Copyright (c) 2005-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,9 +30,11 @@
 #  define GDS_V40	"02"
 #  define GDS_V50	"03"
 #endif
+
 #define GDS_CURR	GDS_V50
-#define MAX_DB_VER_LEN		2
-#define GDSVCURR ((enum db_ver)(GDSVLAST - 1))
+#define MAX_DB_VER_LEN	2
+#define GDSVCURR 	((enum db_ver)(GDSVLAST - 1))
+#define BLK_ID_32_VER	((enum db_ver)GDSV6) /* The last version to use 32-bit block IDs */
 
 /* Database major version as an enum quantity. Used to index the dbversion table in mtables.c */
 enum db_ver

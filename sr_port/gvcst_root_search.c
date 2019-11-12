@@ -293,8 +293,8 @@ enum cdb_sc gvcst_root_search(boolean_t donot_restart)
 					T_RETRY_AND_CLEANUP(cdb_sc_rmisalign, donot_restart);
 					continue;
 				}
-				GET_LONG(lcl_root, (rp + hdr_len));
-				if (rlen > hdr_len + SIZEOF(block_id))
+				GET_BLK_ID(lcl_root, rp + hdr_len);
+				if (rlen > (hdr_len + SIZEOF(block_id)))
 				{
 					assert(NULL != global_collation_mstr.addr || 0 == global_collation_mstr.len);
 					if (global_collation_mstr.len < rlen - (hdr_len + SIZEOF(block_id)))

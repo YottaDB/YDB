@@ -433,6 +433,10 @@ void	mur_get_options(void)
 			mupip_exit(ERR_MUPCLIERR);
 		}
 	}
+	/*----- 	-CORRUPTDB 	-----*/
+	mur_options.corruptdb = cli_present("CORRUPTDB") == CLI_PRESENT;
+	if (mur_options.corruptdb)
+		mur_options.fences = FENCE_NONE;
 	DEBUG_ONLY(jgbl.mur_fences_none = (FENCE_NONE == mur_options.fences);)
 	/*-----		-[NO]INTERACTIVE	-----*/
 	interactive = (boolean_t) isatty(0);
@@ -672,7 +676,7 @@ void	mur_get_options(void)
 				LEN_AND_LIT("Unable to find full pathname"), ustatus);
 			mupip_exit(ERR_MUPCLIERR);
 		}
-		if (file_name_expanded_len > (MAX_FN_LEN + 1))
+		if (file_name_expanded_len > MAX_FN_LEN)
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVGVPATQUAL, 2,
 				LEN_AND_LIT("Global Value Patterns filename too long: greater than 255"));
@@ -691,7 +695,7 @@ void	mur_get_options(void)
 		{
 			if (pattern_len < 0)
 				break;
-			assert(pattern_len <= MAX_LINE);
+			assert(pattern_len < MAX_LINE);
 
 			global_exclude = FALSE;
 			if (EXCLUDE_CHAR == *gvpatline)

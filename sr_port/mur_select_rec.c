@@ -97,8 +97,13 @@ boolean_t	mur_select_rec(jnl_ctl_list *jctl)
 	mstr_global_value.addr = NULL;
 	mstr_global_value.len = 0;
 	/* Sequence number of this record */
-	rec_token_seq = REC_HAS_TOKEN_SEQ(rectype)
-		? ((jctl->reg_ctl->csd && REPL_ALLOWED(jctl->reg_ctl->csd)) ? GET_JNL_SEQNO(rec) : rec->prefix.tn) : 0;
+	if (mur_options.corruptdb)
+	{
+		rec_token_seq = REC_HAS_TOKEN_SEQ(rectype)
+			? ((jctl->jfh && REPL_ALLOWED(jctl->jfh)) ? GET_JNL_SEQNO(rec) : rec->prefix.tn) : 0;
+	} else
+		rec_token_seq = REC_HAS_TOKEN_SEQ(rectype)
+			? ((jctl->reg_ctl->csd && REPL_ALLOWED(jctl->reg_ctl->csd)) ? GET_JNL_SEQNO(rec) : rec->prefix.tn) : 0;
 	if (IS_SET_KILL_ZKILL_ZTRIG(rectype))
 	{	/* Translate internal format of jnl_record key to ascii */
 		keystr = (jnl_string *)&rec->jrec_set_kill.mumps_node;

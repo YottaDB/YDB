@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries. *
@@ -22,6 +22,8 @@
  * 2. Single record ( Eg: Error loading record number: 3 )
  */
 #define MAX_RECLOAD_ERR_MSG_SIZE ((STR_LEN_OF_E_9 * 2) + SIZEOF(" to ") + 1)
+
+#define	FAKE_BIG_KEY_COUNT	4294967196UL /* (2**32)-100=4294967196 */
 
 #define ONERROR_STOP		0
 #define ONERROR_PROCEED		1
@@ -45,11 +47,16 @@
 	continue; /* continue, when (onerror = ONERROR_PROCEED) or when user selects Yes in ONERROR_INTERACTIVE */		\
 }
 
-void		bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len);
+void		bin_load(gtm_uint64_t begin, gtm_uint64_t end, char *line1_ptr, int line1_len);
 void		go_call_db(int routine, char *parm1, int parm2, int val_off1, int val_len1);
 int		go_get(char **in_ptr, int max_len, uint4 max_rec_size);
+<<<<<<< HEAD
 void		go_load(uint4 begin, uint4 end, unsigned char *recbuf, char *line3_ptr, int line3_len, uint4 max_rec_size, int fmt,
 			int dos);
+=======
+void		go_load(gtm_uint64_t begin, gtm_uint64_t end, unsigned char *recbuf, char *line3_ptr, int line3_len,
+			uint4 max_rec_size, int fmt, int utf8_extract, int dos);
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 void		goq_load(void);
 int		get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *line3_len, uint4 *max_rec_size,
 			int *utf8_extract, int *dos, boolean_t ignore_chset);

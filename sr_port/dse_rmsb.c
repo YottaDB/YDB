@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,11 +29,12 @@ GBLREF save_strct	patch_save_set[PATCH_SAVE_SIZE];
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF uint4		patch_save_count;
 
-#define MAX_UTIL_LEN 80
-
 void dse_rmsb(void)
 {
 	block_id	blk;
+#ifndef BLK_NUM_64BIT
+	block_id_64	blk2;
+#endif
 	char		util_buff[MAX_UTIL_LEN];
 	int		util_len;
 	uint4		found_index, version;
@@ -47,8 +49,19 @@ void dse_rmsb(void)
 		}
 	} else
 		version = 0;
-	if (!cli_get_hex("BLOCK", (uint4 *)&blk))	/* don't use dse_getblk - working out of the save set, not the db */
+	/* don't use dse_getblk - working out of the save set, not the db */
+#ifdef BLK_NUM_64BIT
+	if (!cli_get_hex64("BLOCK", (gtm_uint8 *)&blk))
 		blk = patch_curr_blk;
+#else
+	if (!cli_get_hex64("BLOCK", (gtm_uint8 *)&blk2))
+		blk = patch_curr_blk;
+	else
+	{
+		assert(blk2 == (block_id_32)blk2);
+		blk = (block_id_32)blk2;
+	}
+#endif
 	found_index = 0;
 	for (i = 0; i < patch_save_count; i++)
 	{
@@ -86,7 +99,7 @@ void dse_rmsb(void)
 	}
 	util_len = SIZEOF("!/Removing version !UL of block ");
 	memcpy(util_buff, "!/Removing version !UL of block ", util_len);
-	util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len-1], 8);
+	util_len += i2hexl_nofill(blk, (uchar_ptr_t)&util_buff[util_len-1], MAX_HEX_INT8);
 	util_buff[util_len-1] = 0;
 	assert(ARRAYSIZE(util_buff) >= util_len);
 	util_out_print(util_buff, TRUE, version);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,7 +24,7 @@
 #include "gtmmsg.h"
 
 GBLREF block_id		patch_curr_blk;
-GBLREF gd_region        *gv_cur_region;
+GBLREF gd_region	*gv_cur_region;
 GBLREF sgmnt_addrs	*cs_addrs;
 
 error_def(ERR_BLKINVALID);
@@ -33,11 +33,24 @@ error_def(ERR_CANTBITMAP);
 block_id dse_getblk(char *element, boolean_t nobml, boolean_t carry_curr)
 {
 	block_id	blk;
+#ifndef BLK_NUM_64BIT
+	block_id_64	blk2;
+#endif
 
-	if (!cli_get_hex(element, (uint4 *)&blk))
-		blk = patch_curr_blk;
-	else
+#ifdef BLK_NUM_64BIT
+	if (cli_get_hex64(element, (gtm_uint8 *)(&blk)))
 		CLEAR_DSE_COMPRESS_KEY;
+	else
+		blk = patch_curr_blk;
+#else
+	if (cli_get_hex64(element, (gtm_uint8 *)(&blk2)))
+	{
+		assert(blk2 == (block_id_32)blk2); /* Verify that blk2 won't overflow an int4 */
+		blk = (block_id_32)blk2;
+		CLEAR_DSE_COMPRESS_KEY;
+	} else
+		blk = patch_curr_blk;
+#endif
 	if ((blk < 0) || (blk >= cs_addrs->ti->total_blks))
 	{
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_BLKINVALID, 4, blk, DB_LEN_STR(gv_cur_region),

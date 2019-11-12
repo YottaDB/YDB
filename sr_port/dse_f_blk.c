@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -21,6 +21,7 @@
 
 #include "error.h"
 #include "gdsroot.h"
+#include "gdsdbver.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
 #include "gdsbt.h"
@@ -38,33 +39,35 @@
 GBLDEF boolean_t	patch_exh_found, patch_find_root_search, patch_find_sibs;
 GBLDEF block_id		patch_find_blk, patch_left_sib, patch_right_sib;
 GBLDEF block_id		patch_path[MAX_BT_DEPTH + 1], patch_path1[MAX_BT_DEPTH + 1];
+GBLREF gd_region	*gv_cur_region;
 GBLDEF global_root_list	*global_roots_head, *global_roots_tail;
 GBLDEF int4		patch_offset[MAX_BT_DEPTH + 1], patch_offset1[MAX_BT_DEPTH + 1];
-GBLDEF short int	patch_dir_path_count, patch_path_count;
-
 GBLREF sgmnt_addrs	*cs_addrs;
-GBLREF gd_region	*gv_cur_region;
-
-#define MAX_UTIL_LEN 33
+GBLDEF short int	patch_dir_path_count, patch_path_count;
 
 static boolean_t	was_crit, was_hold_onto_crit, nocrit_present;
 
 error_def(ERR_CTRLC);
 error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEINVALBLKID);
 
 void dse_f_blk(void)
 {
 	block_id		last, look;
-	boolean_t		exhaust;
+	boolean_t		exhaust, long_blk_id;
 	cache_rec_ptr_t		dummy_cr;
 	char			targ_key[MAX_KEY_SZ + 1], util_buff[MAX_UTIL_LEN];
 	global_dir_path		*d_ptr, *dtemp;
 	global_root_list	*temp;
 	int			util_len, lvl, parent_lvl;
 	int4			dummy_int;
-	sm_uc_ptr_t		blk_id, bp, b_top, key_top, rp, r_top, sp, srp, s_top;
+	long			blk_id_size;
 	short int		count, rsize, size;
+<<<<<<< HEAD
 	DCL_THREADGBL_ACCESS;
+=======
+	sm_uc_ptr_t		blk_id, bp, b_top, key_top, rp, r_top, sp, srp, s_top;
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 
 	SETUP_THREADGBL_ACCESS;
 	if (BADDSEBLK == (patch_find_blk = dse_getblk("BLOCK", DSENOBML, DSEBLKCUR)))		/* WARNING: assignment */
@@ -81,6 +84,21 @@ void dse_f_blk(void)
 	{
 		if (!(bp = t_qread(look, &dummy_int, &dummy_cr)))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+		if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
+		{
+#			ifdef BLK_NUM_64BIT
+			long_blk_id = TRUE;
+			blk_id_size = SIZEOF(block_id_64);
+#			else
+			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
+			REVERT;
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#			endif
+		} else
+		{
+			long_blk_id = FALSE;
+			blk_id_size = SIZEOF(block_id_32);
+		}
 		if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 			b_top = bp + cs_addrs->hdr->blk_size;
 		else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t) bp)->bsiz)
@@ -98,7 +116,7 @@ void dse_f_blk(void)
 		for (key_top = rp + SIZEOF(rec_hdr); (key_top < r_top) && *key_top++; )
 			;
 		lvl = ((blk_hdr_ptr_t)bp)->levl;
-		if (lvl && key_top > (blk_id = r_top - SIZEOF(block_id)))	/* NOTE assignment */
+		if (lvl && (key_top > (blk_id = r_top - blk_id_size)))	/* NOTE assignment */
 			key_top = blk_id;
 		size = key_top - rp - SIZEOF(rec_hdr);
 		if (SIZEOF(targ_key) < size)
@@ -109,7 +127,17 @@ void dse_f_blk(void)
 			break; /* out-of-design level (integ error in db). do not descend anymore. do exhaustive search */
 		parent_lvl = lvl;
 		/* while it is an index block with only a *-record keep looking in child blocks for key */
-		GET_ULONG(look, blk_id);
+		if (long_blk_id == TRUE)
+		{
+#			ifdef BLK_NUM_64BIT
+			GET_BLK_ID_64(look, blk_id);
+#			else
+			DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit, nocrit_present, cs_addrs, gv_cur_region);
+			REVERT;
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#			endif
+		} else
+			GET_BLK_ID_32(look, blk_id);
 	} while (TRUE);
 	patch_path_count = 1;
 	patch_path[0] = get_dir_root();
@@ -158,8 +186,8 @@ void dse_f_blk(void)
 							{
 								memcpy(util_buff, "	", 1);
 								util_len = 1;
-								util_len += i2hex_nofill(d_ptr->block,
-									(uchar_ptr_t)&util_buff[util_len], 8);
+								util_len += i2hexl_nofill(d_ptr->block,
+									(uchar_ptr_t)&util_buff[util_len], 16);
 								memcpy(&util_buff[util_len], ":", 1);
 								util_len += 1;
 								util_len += i2hex_nofill(d_ptr->offset,
@@ -179,8 +207,8 @@ void dse_f_blk(void)
 						{
 							memcpy(util_buff, "	", 1);
 							util_len = 1;
-							util_len += i2hex_nofill(patch_path[count],
-								(uchar_ptr_t)&util_buff[util_len], 8);
+							util_len += i2hexl_nofill(patch_path[count],
+								(uchar_ptr_t)&util_buff[util_len], 16);
 							memcpy(&util_buff[util_len], ":", 1);
 							util_len += 1;
 							util_len += i2hex_nofill(patch_offset[count],
@@ -192,7 +220,8 @@ void dse_f_blk(void)
 						}
 						memcpy(util_buff, "	", 1);
 						util_len = 1;
-						util_len += i2hex_nofill(patch_path[count], (uchar_ptr_t)&util_buff[util_len], 8);
+						util_len += i2hexl_nofill(patch_path[count], (uchar_ptr_t)&util_buff[util_len],
+								MAX_HEX_INT8);
 						util_buff[util_len] = 0;
 						util_out_print(util_buff, TRUE);
 					}
@@ -254,6 +283,22 @@ void dse_f_blk(void)
 				if (!(sp = t_qread(patch_find_root_search ? patch_path[lvl] : patch_path1[lvl], &dummy_int,
 					&dummy_cr)))
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+				if (((blk_hdr_ptr_t)sp)->bver > BLK_ID_32_VER) /* Check to see if using 32 or 64 bit block_id */
+				{
+#					ifdef BLK_NUM_64BIT
+					long_blk_id = TRUE;
+					blk_id_size = SIZEOF(block_id_64);
+#					else
+					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
+							nocrit_present, cs_addrs, gv_cur_region);
+					REVERT;
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#					endif
+				} else
+				{
+					long_blk_id = FALSE;
+					blk_id_size = SIZEOF(block_id_32);
+				}
 				if (((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size)
 					s_top = sp + cs_addrs->hdr->blk_size;
 				else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz)
@@ -267,7 +312,18 @@ void dse_f_blk(void)
 				srp = sp + SIZEOF(blk_hdr);
 				GET_SHORT(rsize, &((rec_hdr_ptr_t)srp)->rsiz);
 				srp += rsize;
-				GET_LONG(look, srp - SIZEOF(block_id));
+				if (long_blk_id == TRUE)
+				{
+#					ifdef BLK_NUM_64BIT
+					GET_BLK_ID_64(look, srp - SIZEOF(block_id_64));
+#					else
+					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
+							nocrit_present, cs_addrs, gv_cur_region);
+					REVERT;
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#					endif
+				} else
+					GET_BLK_ID_32(look, srp - SIZEOF(block_id_32));
 				if ((patch_find_root_search ? patch_path[lvl + 1] : patch_path1[lvl + 1]) != look)
 					break;
 			}
@@ -281,7 +337,18 @@ void dse_f_blk(void)
 					srp += rsize;
 					if (srp > s_top)
 						break;
-					GET_LONG(look, srp - SIZEOF(block_id));
+					if (long_blk_id == TRUE)
+					{
+#						ifdef BLK_NUM_64BIT
+						GET_BLK_ID_64(look, srp - SIZEOF(block_id_64));
+#						else
+						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
+								nocrit_present, cs_addrs, gv_cur_region);
+						REVERT;
+						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#						endif
+					} else
+						GET_BLK_ID_32(look, srp - SIZEOF(block_id_32));
 				}
 				if ((patch_find_root_search ? patch_path[lvl] : patch_path1[lvl]) != look)
 				{
@@ -300,6 +367,22 @@ void dse_f_blk(void)
 				{
 					if (!(sp = t_qread(last, &dummy_int, &dummy_cr)))
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+					if (((blk_hdr_ptr_t)sp)->bver > BLK_ID_32_VER) /* Check if using 32 or 64 bit block_id */
+					{
+#						ifdef BLK_NUM_64BIT
+						long_blk_id = TRUE;
+						blk_id_size = SIZEOF(block_id_64);
+#						else
+						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
+								nocrit_present, cs_addrs, gv_cur_region);
+						REVERT;
+						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#						endif
+					} else
+					{
+						long_blk_id = FALSE;
+						blk_id_size = SIZEOF(block_id_32);
+					}
 					if (((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size)
 						s_top = sp + cs_addrs->hdr->blk_size;
 					else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz)
@@ -315,7 +398,18 @@ void dse_f_blk(void)
 						last = 0;
 						break;
 					}
-					GET_LONG(last, s_top - SIZEOF(block_id));
+					if (long_blk_id == TRUE)
+					{
+#						ifdef BLK_NUM_64BIT
+						GET_BLK_ID_64(last, s_top - SIZEOF(block_id_64));
+#						else
+						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
+								nocrit_present, cs_addrs, gv_cur_region);
+						REVERT;
+						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#						endif
+					} else
+						GET_BLK_ID_32(last, s_top - SIZEOF(block_id_32));
 					if (last >= cs_addrs->ti->total_blks)
 					{
 						util_out_print("Error: sibling search got 0x!XL which exceeds total blocks 0x!XL",
@@ -338,6 +432,22 @@ void dse_f_blk(void)
 				if (!(sp = t_qread(patch_find_root_search ? patch_path[lvl] : patch_path1[lvl], &dummy_int,
 					&dummy_cr)))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+				if (((blk_hdr_ptr_t)sp)->bver > BLK_ID_32_VER) /* Check to see if using 32 or 64 bit block_id */
+				{
+#					ifdef BLK_NUM_64BIT
+					long_blk_id = TRUE;
+					blk_id_size = SIZEOF(block_id_64);
+#					else
+					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
+							nocrit_present, cs_addrs, gv_cur_region);
+					REVERT;
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#					endif
+				} else
+				{
+					long_blk_id = FALSE;
+					blk_id_size = SIZEOF(block_id_32);
+				}
 				if (((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size)
 					s_top = sp + cs_addrs->hdr->blk_size;
 				else if (SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz)
@@ -348,7 +458,18 @@ void dse_f_blk(void)
 					break;
 				} else
 					s_top = sp + ((blk_hdr_ptr_t)sp)->bsiz;
-				GET_LONG(look, s_top - SIZEOF(block_id));
+				if (long_blk_id == TRUE)
+				{
+#					ifdef BLK_NUM_64BIT
+					GET_BLK_ID_64(look, s_top - SIZEOF(block_id_64));
+#					else
+					DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
+							nocrit_present, cs_addrs, gv_cur_region);
+					REVERT;
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#					endif
+				} else
+					GET_BLK_ID_32(look, s_top - SIZEOF(block_id_32));
 				if (look >= cs_addrs->ti->total_blks)
 				{
 					util_out_print("Error: sibling search got 0x!XL which exceeds total blocks 0x!XL",
@@ -370,7 +491,18 @@ void dse_f_blk(void)
 					srp += rsize;
 					if (srp > s_top)
 						break;
-					GET_LONG(look, srp - SIZEOF(block_id));
+					if (long_blk_id == TRUE)
+					{
+#						ifdef BLK_NUM_64BIT
+						GET_BLK_ID_64(look, srp - SIZEOF(block_id_64));
+#						else
+						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
+								nocrit_present, cs_addrs, gv_cur_region);
+						REVERT;
+						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#						endif
+					} else
+						GET_BLK_ID_32(look, srp - SIZEOF(block_id_32));
 					if (look >= cs_addrs->ti->total_blks)
 					{
 						util_out_print("Error: sibling search got 0x!XL which exceeds total blocks 0x!XL",
@@ -389,6 +521,22 @@ void dse_f_blk(void)
 				{
 					if (!(sp = t_qread(look, &dummy_int, &dummy_cr)))	/* NOTE assignment */
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+					if (((blk_hdr_ptr_t)sp)->bver > BLK_ID_32_VER) /* Check if using 32 or 64 bit block_id */
+					{
+#						ifdef BLK_NUM_64BIT
+						long_blk_id = TRUE;
+						blk_id_size = SIZEOF(block_id_64);
+#						else
+						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
+								nocrit_present, cs_addrs, gv_cur_region);
+						REVERT;
+						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#						endif
+					} else
+					{
+						long_blk_id = FALSE;
+						blk_id_size = SIZEOF(block_id_32);
+					}
 					if (!(((blk_hdr_ptr_t)sp)->bsiz > cs_addrs->hdr->blk_size) &&
 							(SIZEOF(blk_hdr) > ((blk_hdr_ptr_t)sp)->bsiz))
 					{
@@ -405,7 +553,18 @@ void dse_f_blk(void)
 					srp = sp + SIZEOF(blk_hdr);
 					GET_SHORT(rsize, &((rec_hdr_ptr_t)srp)->rsiz);
 					srp += rsize;
-					GET_LONG(look, srp - SIZEOF(block_id));
+					if (long_blk_id == TRUE)
+					{
+#						ifdef BLK_NUM_64BIT
+						GET_BLK_ID_64(look, srp - SIZEOF(block_id_64));
+#						else
+						DSE_REL_CRIT_AS_APPROPRIATE(was_crit, was_hold_onto_crit,
+								nocrit_present, cs_addrs, gv_cur_region);
+						REVERT;
+						rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#						endif
+					} else
+						GET_BLK_ID_32(look, srp - SIZEOF(block_id_32));
 					if (look >= cs_addrs->ti->total_blks)
 					{
 						util_out_print("Error: sibling search got 0x!XL which exceeds total blocks 0x!XL",
@@ -432,10 +591,13 @@ void dse_f_blk(void)
 	{
 		memcpy(util_buff, "	", 1);
 		util_len = 1;
-		util_len += i2hex_nofill(patch_path[count], (uchar_ptr_t)&util_buff[util_len], 8);
+		util_len += i2hexl_nofill(patch_path[count], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 		memcpy(&util_buff[util_len], ":", 1);
 		util_len += 1;
-		util_len += i2hex_nofill(patch_offset[count], (uchar_ptr_t)&util_buff[util_len], 4);
+		/* Using MAX_HEX_SHORT for int value because to save line space
+		 * since the value should always fit in 2-bytes
+		 */
+		util_len += i2hex_nofill(patch_offset[count], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_SHORT);
 		memcpy(&util_buff[util_len], ",", 1);
 		util_len += 1;
 		util_buff[util_len] = 0;
@@ -453,10 +615,13 @@ void dse_f_blk(void)
 		{
 			memcpy(util_buff, "	", 1);
 			util_len = 1;
-			util_len += i2hex_nofill(patch_path1[count], (uchar_ptr_t)&util_buff[util_len], 8);
+			util_len += i2hexl_nofill(patch_path1[count], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 			memcpy(&util_buff[util_len], ":", 1);
 			util_len += 1;
-			util_len += i2hex_nofill(patch_offset1[count], (uchar_ptr_t)&util_buff[util_len], 4);
+			/* Using MAX_HEX_SHORT for int value because to save line space
+			 * since the value should always fit in 2-bytes
+			 */
+			util_len += i2hex_nofill(patch_offset1[count], (uchar_ptr_t)&util_buff[util_len], MAX_HEX_SHORT);
 			memcpy(&util_buff[util_len], ",", 1);
 			util_len += 1;
 			util_buff[util_len] = 0;
@@ -466,8 +631,8 @@ void dse_f_blk(void)
 		assert(patch_find_root_search);		/* OK to assert since pro works as desired */
 	memcpy(util_buff, "	", 1);
 	util_len = 1;
-	util_len += i2hex_nofill(patch_find_root_search ? patch_path[count] : patch_path1[count],
-		(uchar_ptr_t)&util_buff[util_len], 8);
+	util_len += i2hexl_nofill(patch_find_root_search ? patch_path[count] : patch_path1[count],
+		(uchar_ptr_t)&util_buff[util_len], 16);
 	memcpy(&util_buff[util_len], "!/", 2);
 	util_len += 2;
 	util_buff[util_len] = 0;

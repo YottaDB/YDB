@@ -35,6 +35,8 @@
 /* Include prototypes */
 #include "t_end.h"
 #include "t_retry.h"
+#include "collseq.h"
+#include "mu_getkey.h"
 #include "mupip_size.h"
 #include "util.h"
 #include "t_begin.h"
@@ -70,9 +72,15 @@ GBLREF	uint4			mu_int_adj[];
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	unsigned int		t_tries;
+GBLREF	boolean_t		mu_subsc;
+GBLREF	block_id                mu_int_adj_prev[MAX_BT_DEPTH + 1];
+GBLREF	boolean_t		mu_key;
+GBLREF	boolean_t		null_coll_key;
+GBLREF  gv_key			*mu_start_key;
+GBLREF	gv_key			*mu_end_key;
 
+STATICDEF	uint4		mu_size_cumulative[MAX_BT_DEPTH + 1][CUMULATIVE_TYPE_MAX];
 STATICDEF	int		targ_levl;
-STATICDEF	uint4		total_recs, total_scans;
 STATICDEF	INTPTR_T	saveoff[MAX_BT_DEPTH + 1];
 
 STATICFNDCL enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skiprecs);
@@ -81,20 +89,43 @@ STATICFNDCL enum cdb_sc read_block(block_id nBlkId, sm_uc_ptr_t *pBlkBase_ptr, i
 #define ANY_ROOT_LEVL		(MAX_BT_DEPTH + 5)	/* overload invalid level value */
 #define	MAX_SCANS		200000000		/* catch infinite loops */
 
+/* No MBSTART and MBEND below as the macro uses, continue and break. */
+#define CHECK_KEY_RANGE(MUSZ_START_KEY, MUSZ_END_KEY, BUFF, RCNT, MUSZ_RANGE_DONE)		\
+{												\
+		if (MUSZ_END_KEY)								\
+		{										\
+			if (memcmp(BUFF, MUSZ_END_KEY->base, MUSZ_END_KEY->end + 1) > 0)	\
+				MUSZ_RANGE_DONE = TRUE;						\
+		} else										\
+		{										\
+			if (memcmp(BUFF, MUSZ_START_KEY->base, MUSZ_START_KEY->end + 1) > 0)	\
+			MUSZ_RANGE_DONE = TRUE;							\
+		}										\
+		if (memcmp(BUFF, MUSZ_START_KEY->base, MUSZ_START_KEY->end + 1) < 0)		\
+		{										\
+			RCNT--;									\
+			continue;								\
+		}										\
+}
+
 int4 mu_size_scan(glist *gl_ptr, int4 level)
 {
 	block_id		nBlkId;
-	boolean_t		equal, tn_aborted, verify_reads;
+	boolean_t		equal, tn_aborted, verify_reads, retry=FALSE;
 	enum cdb_sc		status;
 	trans_num		ret_tn;
 	int			h, i, k;
 	int4			nLevl;
 	sm_uc_ptr_t		pBlkBase;
 	unsigned int		lcl_t_tries;
+	unsigned char		mu_size_root_lvl;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	inctn_opcode = inctn_invalid_op;
+	memset(mu_size_cumulative,0, SIZEOF(mu_size_cumulative));
+	memset(mu_int_adj, 0, SIZEOF(int4) * (MAX_BT_DEPTH + 1));
+	memset(mu_int_adj_prev, 0, SIZEOF(mu_int_adj_prev));
 	/* set gv_target/gv_currkey/gv_cur_region/cs_addrs/cs_data to correspond to <globalname,reg> in gl_ptr */
 	DO_OP_GVNAME(gl_ptr);
 	if (0 == gv_target->root)
@@ -103,12 +134,13 @@ int4 mu_size_scan(glist *gl_ptr, int4 level)
 		return EXIT_NRM;
 	}
 	gv_target->alt_hist->depth = MAX_BT_DEPTH;	/* initialize: don't copy to saveoff if restart before a single success */
-	total_recs = total_scans = 0;
 	for (k = 0; k <= MAX_BT_DEPTH; k++)
 	{
 		saveoff[k] = 0;
 		gv_target->hist.h[k].cr = NULL;		/* initialize for optimization in read_block which bumps cr refer bits */
 	}
+	if (MUKEY_NULLSUBS == mu_key)
+		CHECK_COLL_KEY(gl_ptr, null_coll_key);
 	targ_levl = 0;
 	/* Read the root block and convert negative levels to positive. Negative levels are defined to be counted from root with
 	 * -1 identifying the children of root
@@ -136,6 +168,7 @@ int4 mu_size_scan(glist *gl_ptr, int4 level)
 		}
 		break;
 	}
+	mu_size_root_lvl =  nLevl;
 	if (level < 0)
 		level += nLevl;
 	if (level < 0 || nLevl < level)
@@ -152,7 +185,11 @@ int4 mu_size_scan(glist *gl_ptr, int4 level)
 		nLevl = ANY_ROOT_LEVL;
 		status = read_block(nBlkId, &pBlkBase, &nLevl, ANY_ROOT_LEVL);
 		if (cdb_sc_normal == status)
+		{
+			if (!retry)
+				CHECK_ADJACENCY(nBlkId, nLevl, mu_int_adj[nLevl]);
 			status = dfs(nLevl, pBlkBase, TRUE, TRUE);
+		}
 		if (cdb_sc_endtree != status)
 		{
 			assert(cdb_sc_normal != status);	/* should have continued recursive search */
@@ -171,12 +208,18 @@ int4 mu_size_scan(glist *gl_ptr, int4 level)
 				for (i = targ_levl; i <= gv_target->alt_hist->depth; i++)
 					saveoff[i] = gv_target->alt_hist->h[i - targ_levl].curr_rec.offset;
 			}
+			retry = TRUE;
 			continue;
 		}
 		break;
 	}
-	util_out_print("Level          Blocks          Records         Adjacent", FLUSH);
-	util_out_print("!5UL !15UL !16UL !16UL", FLUSH, level, total_scans, total_recs, mu_int_adj[level ? level : 1]);
+	for (i = mu_size_root_lvl; i >= level; i--)
+	{
+		util_out_print("Level          Blocks          Records         Adjacent", FLUSH);
+		util_out_print("!5UL !15UL !16UL !16UL", FLUSH, i, mu_size_cumulative[i][BLK],
+							mu_size_cumulative[i][REC], mu_int_adj[i]);
+
+	}
 	if (mu_ctrlc_occurred || mu_ctrly_occurred)
 		return EXIT_ERR;
 	return EXIT_NRM;
@@ -193,11 +236,17 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 	sm_uc_ptr_t			pTop, pRec, child_pBlkBase;
 	srch_hist			sibhist;
 	unsigned short			nRecLen;
+	unsigned short			rec_cmpc;
+	uchar_ptr_t			key_base, ptr;
+	boolean_t			first_key = TRUE, musz_range_done = FALSE;
+	int				name_len, key_size, buff_length, rec_len;
+	unsigned char			buff[MAX_KEY_SZ + 1];
 
-	assert(total_scans < MAX_SCANS);
+
+	assert(mu_size_cumulative[lvl][BLK] < MAX_SCANS);
 	if (lvl == targ_levl)
 	{	/* reached the bottom. count records in this block and validate */
-		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen)
+		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen, musz_range_done)
 		{
 			GET_AND_CHECK_RECLEN(status, nRecLen, pRec, pTop, nBlkId);
 			if (cdb_sc_normal != status)
@@ -209,14 +258,36 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 			 					 * does not overrun the boundaries of the mu_int_adj array.
 								 */
 			if (lvl)
-				CHECK_ADJACENCY(nBlkId, lvl, mu_int_adj[lvl]);
+				CHECK_ADJACENCY(nBlkId, lvl -1, mu_int_adj[lvl - 1]);
+			rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)pRec);
+			key_base = pRec + SIZEOF(rec_hdr);
+			GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key, name_len, key_size,buff, buff_length, rec_len);
+			if (mu_subsc) /* Subscript option chosen */
+			{
+				CHECK_KEY_RANGE(mu_start_key, mu_end_key, buff, rCnt, musz_range_done);
+				if (musz_range_done)
+				{
+					if (!lvl) /* Dont count at data level */
+						break;
+					else
+						continue;
+				}
+			}
 		}
 		incr_recs = rCnt;
 		incr_scans = 1;
 	} else if (lvl > targ_levl)
 	{	/* visit each child */
+<<<<<<< HEAD
+=======
+		/* Assumption on the fact that level > 0 is always true for this case,
+		 * since lowest the level can go is 0 and is checked before callign dfs.
+		 */
+		assert(lvl);
+		first_iter = TRUE;
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 		gv_target->hist.h[lvl - targ_levl].curr_rec.offset = saveoff[lvl];
-		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen)
+		BLK_LOOP(rCnt, pRec, pBlkBase, pTop, nRecLen, musz_range_done)
 		{
 			boolean_t first_iter;
 
@@ -228,26 +299,56 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 			}
 			curroff = (INTPTR_T)(pRec - pBlkBase);
 			gv_target->hist.h[lvl - targ_levl].curr_rec.offset = curroff;
-			if (skiprecs && (curroff < saveoff[lvl]))
-				continue;	/* skip these guys, we've already counted over there */
+			rec_cmpc = EVAL_CMPC((rec_hdr_ptr_t)pRec);
+			key_base = pRec + SIZEOF(rec_hdr);
+			if ((((rec_hdr *)pRec)->rsiz) == BSTAR_REC_SIZE) /* Found the star key */
+			{
+				if (skiprecs && (curroff < saveoff[lvl]))
+					continue;	/* skip these guys, we've already counted over there */
+			} else
+			{
+				GET_KEY_CPY_BUFF(key_base, rec_cmpc, ptr, first_key, name_len,
+								key_size,buff, buff_length, rec_len);
+				if (mu_subsc) /* Subscript option chosen */
+				{
+					CHECK_KEY_RANGE(mu_start_key, mu_end_key, buff, rCnt, musz_range_done);
+				}
+				if (skiprecs && (curroff < saveoff[lvl]))
+					continue;	/* skip these guys, we've already counted over there */
+			}
 			status = read_block(nBlkId, &child_pBlkBase, &child_nLevl, lvl - 1);
 			if (status != cdb_sc_normal)
 				return status;
 			last_rec = ((pRec + nRecLen) == pTop);
+			if (lvl && (nBlkId != mu_int_adj_prev[lvl - 1]))
+				CHECK_ADJACENCY(nBlkId, lvl - 1, mu_int_adj[lvl - 1]);
 			first_iter = (curroff == saveoff[lvl]);
 			next_endtree = endtree && last_rec;
 			next_skiprecs = skiprecs && first_iter;
 			status = dfs(lvl - 1, child_pBlkBase, next_endtree, next_skiprecs);
 			if (status != cdb_sc_normal)
+			{
+				if (cdb_sc_endtree == status)
+				{
+					mu_size_cumulative[lvl][REC] += rCnt + 1;
+					mu_size_cumulative[lvl][BLK]++;
+				}
 				return status;
+<<<<<<< HEAD
+=======
+			}
+			first_iter = FALSE;
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 		}
+		incr_recs = rCnt;
+		incr_scans = 1;
 	}
 	/* make sure we can really move on from this block to the next: validate all blocks down to here */
 	memcpy(&sibhist.h[0], &gv_target->hist.h[lvl], SIZEOF(srch_blk_status) * (gv_target->hist.depth - lvl + 2));
 	if ((trans_num)0 == t_end(&sibhist, NULL, TN_NOT_SPECIFIED))
 		return cdb_sc_restarted;
-	total_recs += incr_recs;
-	total_scans += incr_scans;
+	mu_size_cumulative[lvl][BLK] += incr_scans;
+	mu_size_cumulative[lvl][REC] += incr_recs;
 	if (endtree || mu_ctrlc_occurred || mu_ctrly_occurred)
 		return cdb_sc_endtree;	/* note: usage slightly different from elsewhere, since we've already done validation */
 	assert(lvl >= targ_levl);

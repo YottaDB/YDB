@@ -282,7 +282,11 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	sgmnt_data_ptr_t	csd;
 	sgmnt_addrs		*csa;
 	srch_blk_status		bmlhist, freeblkhist;
+<<<<<<< HEAD
 	block_id		hint_blk_num, free_blk_id, total_blks, num_local_maps, master_bit;
+=======
+	block_id		hint_blk_num, free_blk_id, parent_blk_id, total_blks, num_local_maps, master_bit, temp_blk;
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 	boolean_t		free_blk_recycled;
 	int4			free_bit, hint_bit, maxbitsthismap;
 	int			blk_seg_cnt, blk_size;
@@ -294,7 +298,6 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	cw_set_element		*tmpcse;
 	jnl_buffer_ptr_t	jbbp; /* jbbp is non-NULL only if before-image journaling */
 	unsigned short		temp_ushort;
-	unsigned long		temp_long;
 	unsigned char		save_cw_set_depth;
 	DCL_THREADGBL_ACCESS;
 
@@ -413,7 +416,7 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	bpntr_end = curr_offset + hdr_len + SIZEOF(block_id);
 	BLK_SEG(bs_ptr, parent_blk_ptr + SIZEOF(blk_hdr), curr_offset + hdr_len - SIZEOF(blk_hdr));
 	BLK_ADDR(bn_ptr, SIZEOF(block_id), unsigned char);
-	PUT_LONG(bn_ptr, free_blk_id);
+	PUT_BLK_ID(bn_ptr, free_blk_id);
 	BLK_SEG(bs_ptr, bn_ptr, SIZEOF(block_id));
 	BLK_SEG(bs_ptr, parent_blk_ptr + bpntr_end, parent_blk_size - bpntr_end);
 	assert(blk_seg_cnt == parent_blk_size);
@@ -434,8 +437,8 @@ block_id swap_root_or_directory_block(int parent_blk_lvl, int child_blk_lvl, src
 	cw_map_depth = cw_set_depth;
 	cw_set_depth = save_cw_set_depth;
 	update_array_ptr += SIZEOF(block_id);
-	temp_long = 0;
-	PUT_LONG(update_array_ptr, temp_long);
+	temp_blk = 0;
+	PUT_BLK_ID(update_array_ptr, temp_blk);
 	update_array_ptr += SIZEOF(block_id);
 	assert(1 == cw_set[cw_map_depth - 1].reference_cnt);
 	/* 4. Child block gets marked recycled in bitmap. (GVCST_BMP_MARK_FREE) */

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2015 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -25,6 +25,6 @@ if ( $1 == "" ) then
 	exit -1
 endif
 
-version $1 b
+set setactive_parms = ( $1 b ) ; source $gtm_tools/setactive.csh
 $gtm_tools/buildbdp.csh $1 bta $gtm_vrt/bta
 exit $status

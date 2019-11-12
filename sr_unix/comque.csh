@@ -150,7 +150,7 @@ endif
 echo " "
 
 
-version $comque_ver $comque_image
+set setactive_parms = ( $comque_ver $comque_image ) ; source $gtm_tools/setactive.csh
 if ( ! -d $gtm_ver/log ) then
 	mkdir $gtm_ver/log
 	chmod 775 $gtm_ver/log

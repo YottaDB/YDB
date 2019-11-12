@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -15,12 +15,6 @@
 
 #ifndef MUPINT_H
 #define MUPINT_H
-
-/*  requires gdsroot.h */
-
-#define	MUINTKEY_FALSE		0 /* -subscript was NOT specified as part of mupip integ */
-#define	MUINTKEY_TRUE		1 /* -subscript was specified as part of mupip integ */
-#define	MUINTKEY_NULLSUBS	2 /* -subscript was specified as part of mupip integ AND there was at least one null subscript */
 
 #define	RETURN_AFTER_DB_OPEN_FALSE	FALSE
 #define	RETURN_AFTER_DB_OPEN_TRUE	TRUE
@@ -78,11 +72,9 @@ boolean_t mu_int_blk(block_id blk, char level, boolean_t is_root, unsigned char 
 boolean_t mu_int_fhead(void);
 boolean_t mu_int_init(void);
 void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_open);
-int mu_int_getkey(unsigned char *key_buff, int keylen);
 uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *free_buff);
 void mu_int_err(int err, boolean_t do_path, boolean_t do_range, unsigned char *bot, int has_bot,
 	unsigned char *top, int has_top, unsigned int level);
 void mu_int_maps(void);
 void mu_int_write(block_id blk, uchar_ptr_t ptr);
-
 #endif

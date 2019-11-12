@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -113,7 +113,7 @@ if ((HASHT_GBL = IS_GVKEY_HASHT_FULL_GBLNAME(KEYLENGTH, PTR)) && !IGNORE)						\
 		{														\
 			FIRST_FAILED_REC_COUNT = 0;										\
 			mu_gvis();												\
-			SNPRINTF(MSG_BUFF, SIZEOF(MSG_BUFF), "%lld", ITER );							\
+			SNPRINTF(MSG_BUFF, SIZEOF(MSG_BUFF), "%" PRIu64, ITER );						\
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RECLOAD, 2, LEN_AND_STR(MSG_BUFF));			\
 		}														\
 		FAILED_RECORD_COUNT++;												\
@@ -139,9 +139,10 @@ STATICFNDEF boolean_t get_mname_from_key(char *ptr, int key_length, char *key, g
 	{
 		tmp_rec_count = iter - 1;
 		if (tmp_rec_count > first_failed_rec_count)
-			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld to %lld", first_failed_rec_count, tmp_rec_count );
+			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%" PRIu64 " to " "%" PRIu64,
+					first_failed_rec_count, tmp_rec_count );
 		else
-			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld", tmp_rec_count );
+			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%" PRIu64, tmp_rec_count );
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RECLOAD, 2, LEN_AND_STR(msg_buff));
 			return FALSE;
 	}
@@ -151,13 +152,19 @@ STATICFNDEF boolean_t get_mname_from_key(char *ptr, int key_length, char *key, g
 	return TRUE;
 }
 
+<<<<<<< HEAD
 void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, int line3_len, uint4 max_rec_size, int fmt,
 	int dos)
+=======
+void go_load(gtm_uint64_t begin, gtm_uint64_t end, unsigned char *rec_buff, char *line3_ptr, int line3_len, uint4 max_rec_size,
+		int fmt, int utf8_extract, int dos)
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 {
 	boolean_t	format_error = FALSE, hasht_ignored = FALSE, hasht_gbl = FALSE;
 	boolean_t	is_setextract, mu_load_error = FALSE, switch_db, go_format_val_read;
 	char		*add_off, *ptr, *val_off;
 	gtm_uint64_t	iter, tmp_rec_count, key_count, first_failed_rec_count, failed_record_count, index;
+	DEBUG_ONLY(gtm_uint64_t		saved_begin = 0);
 	int		add_len, len, keylength, keystate, val_len, val_len1, val_off1;
 	mstr            src, des;
 	uint4	        max_data_len, max_subsc_len, num_of_reg;
@@ -171,8 +178,14 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 		assert((MU_FMT_GO == fmt) || (MU_FMT_ZWR == fmt));
 		mupip_exit(ERR_LOADFILERR);
 	}
-	if (begin < 3)
+	if (begin < 3) /* WARNING: begin can never be less than 3 */
 		begin = 3;
+#ifdef DEBUG
+	if ((WBTEST_ENABLED(WBTEST_FAKE_BIG_KEY_COUNT)) && (3UL < begin))
+		saved_begin = begin, begin = 3;
+	else if (WBTEST_ENABLED(WBTEST_FAKE_BIG_KEY_COUNT))
+		saved_begin = FAKE_BIG_KEY_COUNT;
+#endif
 	ptr = line3_ptr;
 	len = line3_len;
 	go_format_val_read = FALSE;
@@ -182,17 +195,17 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 		if (len < 0)	/* The IO device has signalled an end of file */
 		{
 			++iter;
-			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, begin);
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_LOADEOF, 1, &begin);
 			mupip_error_occurred = TRUE;
 			util_out_print("Error reading record number: !@UQ\n", TRUE, &iter);
 			return;
 		}
 	}
 	assert(iter == begin);
-	num_of_reg = 0;
-	util_out_print("Beginning LOAD at record number: !UL\n", TRUE, begin);
-	des.len = key_count = max_data_len = max_subsc_len = 0;
+	key_count = 0;
+	des.len = max_data_len = max_subsc_len = num_of_reg = 0;
 	des.addr = (char *)rec_buff;
+<<<<<<< HEAD
 	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, 4294967196U); /* (2**32)-100=4294967196 */
 	reg_list = (gd_region **) malloc(gd_header->n_regions * SIZEOF(gd_region *));
 	for (index = 0; index < gd_header->n_regions; index++)
@@ -200,8 +213,15 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 	failed_record_count = 0;
 	first_failed_rec_count = 0;
 	for (iter = begin - 1; ;)
+=======
+	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, key_count, saved_begin);
+	GTM_WHITE_BOX_TEST(WBTEST_FAKE_BIG_KEY_COUNT, begin, saved_begin);
+	iter = begin - 1; /* WARNING: iter can never be zero because begin can never be less than 3 */
+	util_out_print("Beginning LOAD at record number: !@UQ\n", TRUE, &begin);
+	while (TRUE)
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 	{
-		if (++iter > end)
+		if ((++iter > end) || (0 == iter))
 			break;
 		if (mupip_error_occurred && ONERROR_STOP == onerror)
 			break;
@@ -275,7 +295,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 				{
 					first_failed_rec_count = 0;
 					mu_gvis();
-					SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld", iter );
+					SNPRINTF(msg_buff, SIZEOF(msg_buff), "%" PRIu64, iter);
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RECLOAD, 2, LEN_AND_STR(msg_buff));
 					mu_load_error = FALSE;
 				}
@@ -330,7 +350,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 								 &first_failed_rec_count, reg_list, num_of_reg);
 					if (!switch_db)
 					{
-						if (++iter > end)
+						if ((++iter > end) || (0 == iter))
 						{
 							iter--; /* Decrement as didn't load key */
 							break;
@@ -349,7 +369,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 					insert_reg_to_list(reg_list, db_init_region, &num_of_reg);
 					first_failed_rec_count = iter;
 					mu_load_error = TRUE;
-					if (++iter > end)
+					if ((++iter > end) || (0 == iter))
 					{
 						iter--;	/* Decrement as didn't load key */
 						break;
@@ -361,7 +381,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 				} else
 				{
 					mu_gvis();
-					SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld", iter );
+					SNPRINTF(msg_buff, SIZEOF(msg_buff), "%" PRIu64, iter);
 					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RECLOAD, 2, LEN_AND_STR(msg_buff));
 					mu_load_error = FALSE;
 				}
@@ -372,7 +392,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 			}
 			mu_load_error = FALSE;
 			first_failed_rec_count = 0;
-			if (++iter > end)
+			if ((++iter > end) || (0 == iter))
 			{
 				iter--;	/* Decrement as didn't load key */
 				break;
@@ -382,7 +402,7 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 			if (mupip_error_occurred)
 			{
 				mu_gvis();
-				SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld", iter );
+				SNPRINTF(msg_buff, SIZEOF(msg_buff), "%" PRIu64, iter);
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RECLOAD, 2, LEN_AND_STR(msg_buff));
 				break;
 			}
@@ -413,13 +433,14 @@ void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, i
 	if (0 != first_failed_rec_count)
 	{
 		if (tmp_rec_count > first_failed_rec_count)
-			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld to %lld", first_failed_rec_count , tmp_rec_count);
+			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%" PRIu64 " to %" PRIu64,
+					first_failed_rec_count , tmp_rec_count);
 		else
-			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%lld", tmp_rec_count );
+			SNPRINTF(msg_buff, SIZEOF(msg_buff), "%" PRIu64, tmp_rec_count );
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_RECLOAD, 2, LEN_AND_STR(msg_buff));
 	}
-	util_out_print("LOAD TOTAL!_!_Key Cnt: !@UQ  Max Subsc Len: !UL  Max Data Len: !UL",TRUE,&key_count,max_subsc_len,
-			max_data_len);
+	util_out_print("LOAD TOTAL!_!_Key Cnt: !@UQ  Max Subsc Len: !UL  Max Data Len: !UL", TRUE,
+			&key_count, max_subsc_len, max_data_len);
 	if (failed_record_count)
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_FAILEDRECCOUNT, 1, &failed_record_count);
 	gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(3) MAKE_MSG_INFO(ERR_LOADRECCNT), 1, &tmp_rec_count);

@@ -344,8 +344,8 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 						 */
 			if (NULL == rctl->csa)
 			{
-				assert(!rctl->db_present);
-				assert(!rctl->gd->open);
+				assert(TREF(skip_DB_exists_check) || !rctl->db_present);
+				assert(TREF(skip_DB_exists_check) || !rctl->gd->open);
 				rctl->csa = cs_addrs;
 				rctl->csa->miscptr = rctl;
 			} else
@@ -355,7 +355,7 @@ int	mur_forward_multi_proc(reg_ctl_list *rctl)
 											 * updated in "mur_sort_files".
 											 */
 			}
-			assert(rctl->csd == cs_data);
+			assert(TREF(skip_DB_exists_check) || (rctl->csd == cs_data));
 			rctl->sgm_info_ptr = cs_addrs->sgm_info_ptr;
 			assert(!reg->open || (NULL != cs_addrs->dir_tree));
 			gv_target = cs_addrs->dir_tree;

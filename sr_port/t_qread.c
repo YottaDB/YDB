@@ -177,6 +177,7 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 			if (1 == chain1.flag)
 			{
 				assert(sgm_info_ptr->cw_set_depth);
+				assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 				if ((int)chain1.cw_index < sgm_info_ptr->cw_set_depth)
 					tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain1.cw_index, &cse);
 				else

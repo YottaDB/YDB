@@ -107,6 +107,7 @@ cw_set_element *t_write (
 		chain = *(off_chain *)&blk;
 		if (chain.flag == 1)
 		{
+			assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 			tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain.cw_index, &cse);
 			blk = cse->blk;
 		} else

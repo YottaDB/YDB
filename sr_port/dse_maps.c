@@ -47,8 +47,6 @@
 #include "process_deferred_stale.h"
 #include "gvcst_blk_build.h"
 
-#define MAX_UTIL_LEN 80
-
 GBLREF boolean_t	unhandled_stale_timer_pop;
 GBLREF char		*update_array, *update_array_ptr;
 GBLREF gd_region	*gv_cur_region;
@@ -62,20 +60,20 @@ error_def(ERR_DBRDONLY);
 error_def(ERR_DSEBLKRDFAIL);
 error_def(ERR_DSEFAIL);
 
-
 void dse_maps(void)
 {
 	blk_segment		*bs1, *bs_ptr;
-	block_id		blk, bml_blk;
+	block_id		blk, bml_blk, bml_index, blk_index;
+	block_cnt		total_blks, bml_list_size;
 	boolean_t		was_crit;
 	cache_rec_ptr_t		dummy_cr;
 	char			util_buff[MAX_UTIL_LEN];
 	int			util_len;
 	int4			blk_seg_cnt, blk_size;		/* needed for BLK_INIT, BLK_SEG and BLK_FINI macros */
-	sm_uc_ptr_t		bp;
-	int4			blk_index, blks_in_bitmap, bml_index, bml_list_size, bml_size, bplmap, dummy_int, total_blks;
+	int4			blks_in_bitmap, bml_size, bplmap, dummy_int;
 	sgmnt_addrs		*csa;
 	sgmnt_data_ptr_t	csd;
+	sm_uc_ptr_t		bp;
 	srch_blk_status		blkhist;
 	uchar_ptr_t		blk_ptr;
 	unsigned char		*bml_list;
@@ -105,7 +103,7 @@ void dse_maps(void)
 		total_blks = csa->ti->total_blks;
 		assert(ROUND_DOWN2(blk_size, 2 * SIZEOF(int4)) == blk_size);
 		bml_size = BM_SIZE(bplmap);
-		bml_list_size = (total_blks + bplmap - 1) / bplmap * bml_size;
+		bml_list_size = ((total_blks + bplmap - 1) / bplmap) * bml_size;
 		bml_list = (unsigned char *)malloc(bml_list_size);
 		for (blk_index = 0, bml_index = 0;  blk_index < total_blks; blk_index += bplmap, bml_index++)
 			bml_newmap((blk_hdr_ptr_t)(bml_list + bml_index * bml_size), bml_size, csa->ti->curr_tn);
@@ -127,7 +125,7 @@ void dse_maps(void)
 			CWS_RESET;
 			CHECK_AND_RESET_UPDATE_ARRAY;	/* reset update_array_ptr to update_array */
 			assert(csa->ti->early_tn == csa->ti->curr_tn);
-			blk_ptr = bml_list + bml_index * bml_size;
+			blk_ptr = bml_list + (bml_index * bml_size);
 			blkhist.blk_num = blk_index;
 			if (!(blkhist.buffaddr = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr)))
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
@@ -141,7 +139,11 @@ void dse_maps(void)
 		/* Fill in master map */
 		for (blk_index = 0, bml_index = 0;  blk_index < total_blks; blk_index += bplmap, bml_index++)
 		{
-			blks_in_bitmap = (blk_index + bplmap <= total_blks) ? bplmap : total_blks - blk_index;
+			/* (total_blks - blk_index) is used to determine the number of blks in the last lmap of the DB
+			 * so the value should never be larger then BLKS_PER_LMAP and thus fit in a int4
+			 */
+			assert((blk_index + bplmap <= total_blks) || (BLKS_PER_LMAP >= (total_blks - blk_index)));
+			blks_in_bitmap = (blk_index + bplmap <= total_blks) ? bplmap : (int4)(total_blks - blk_index);
 			assert(1 < blks_in_bitmap);	/* the last valid block in the database should never be a bitmap block */
 			if (NO_FREE_SPACE != bml_find_free(0, (bml_list + bml_index * bml_size) + SIZEOF(blk_hdr), blks_in_bitmap))
 				bit_set(blk_index / bplmap, csa->bmm);
@@ -206,7 +208,7 @@ void dse_maps(void)
 	}
 	MEMCPY_LIT(util_buff, "!/Block ");
 	util_len = SIZEOF("!/Block ") - 1;
-	util_len += i2hex_nofill(blk, (uchar_ptr_t)&util_buff[util_len], 8);
+	util_len += i2hexl_nofill(blk, (uchar_ptr_t)&util_buff[util_len], MAX_HEX_INT8);
 	memcpy(&util_buff[util_len], " is marked !AD in its local bit map.!/",
 		SIZEOF(" is marked !AD in its local bit map.!/") - 1);
 	util_len += SIZEOF(" is marked !AD in its local bit map.!/") - 1;

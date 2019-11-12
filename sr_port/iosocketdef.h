@@ -409,6 +409,7 @@ void iosocket_close_one(d_socket_struct *dsocketptr, int index);
 int iosocket_accept(d_socket_struct *dsocketptr, socket_struct *socketptr, boolean_t selectfirst);
 ssize_t iosocket_output_buffer(socket_struct *socketptr);
 void iosocket_buffer_error(socket_struct *socketptr);
+boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, char * act);
 #ifdef GTM_TLS
 void    iosocket_tls(mval *optionmval, int4 timeoutarg, mval *tlsid, mval *password, mval *extraarg);
 #endif

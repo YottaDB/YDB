@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2018 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -25,7 +25,7 @@ if ( $1 == "" ) then
 	exit -1
 endif
 
-version $1 p
+set setactive_parms = ( $1 p ) ; source $gtm_tools/setactive.csh
 $gtm_tools/buildbdp.csh $1 pro $gtm_vrt/pro
 # Extract the debug symbols from each executable
 if ( "$HOSTOS" == "Linux" ) then

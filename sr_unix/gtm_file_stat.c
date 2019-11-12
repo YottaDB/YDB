@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,6 +25,8 @@
 #include "gtmmsg.h"
 
 #define DOT '.'
+
+error_def(ERR_FILEPATHTOOLONG);
 
 /* Checks the status of a file.
  * Output Parameter
@@ -61,7 +63,11 @@ int gtm_file_stat(mstr *file, mstr *def, mstr *ret, boolean_t check_prv, uint4 *
 		}
 		*status = parse_file(file, &pblk);
 		if (!(*status & 1))
+		{
 			file_not_found = TRUE;
+			if (ERR_FILEPATHTOOLONG == *status)
+				return FILE_STAT_ERROR;
+		}
 		pblk.buffer[pblk.b_esl] = 0;
 		tmpfile->addr =  pblk.buffer;
 		tmpfile->len = pblk.b_esl;

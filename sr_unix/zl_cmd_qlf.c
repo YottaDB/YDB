@@ -163,6 +163,7 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 				;       /* scan back from end for rtn name & triggerness */
 			ci += ci ? 1 : 0;
 			clen = object_name_len - ci;
+<<<<<<< HEAD
 			if (2 <= clen)
 			{
 				if ('o' != object_file_name[ci + --clen])
@@ -179,7 +180,14 @@ void zl_cmd_qlf(mstr *quals, command_qualifier *qualif, char *srcstr, unsigned s
 			}
 			clen = MIN(clen, MAX_MIDENT_LEN);
 			memcpy(routine_name.addr, &object_file_name[ci], clen);
+=======
+			if (('o' != object_file_name[ci + --clen])
+					|| ('.' != object_file_name[ci + --clen]))
+				clen = object_name_len - ci;
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 			SET_OBJ(object_file_name, object_name_len);
+			clen = object_name_len = MIN(clen, MAX_MIDENT_LEN);
+			memcpy(routine_name.addr, &object_file_name[ci], clen);
 		}
 	}
 	assert(!last || *srclen);

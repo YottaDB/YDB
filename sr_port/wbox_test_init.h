@@ -203,6 +203,16 @@ typedef enum {
 	WBTEST_ZTIME_DEFER_CRIT,		/* 154 : Defer ZTIMEOUT when CRIT is held */
 	WBTEST_LOW_MEMORY,			/* 155 : In tests that limit vmemuse, exit gracefully when system calls,
 						   external libraries, etc.  fail to allocate more memory */
+	WBTEST_JNLPROCSTUCK_FORCE,		/* 156 : Mess with jnl_sub_write_attempt to force a JNLPROCSTUCK message */
+	WBTEST_JNLEXT_PREREMOVED,		/* 157 : During a MUR_JNLEXT_UNLINK return status that the file does not exist.*/
+	WBTEST_REPLCOMM_ERR,			/* 158 : Reconnect in case of replicaton communication errors */
+	WBTEST_REPL_INIT_ERR,			/* 159 : Error in setting up the sockets */
+	WBTEST_REPL_INIT_ERR2,			/* 160 : Error at listen */
+	WBTEST_REPLCOMM_ERR_SRC,                /* 161 : Communication error in recv source server side */
+	WBTEST_REPLCOMM_SEND_SRC,		/* 162 : Communication error in send at source side */
+	WBTEST_SOCKET_KEEPALIVE,		/* 163 : shorten keepalive parameters so test fails fast */
+	WBTEST_FETCHCOMM_ERR,			/* 164 : Communication error during fetchresync rollback */
+	WBTEST_FETCHCOMM_HISTINFO		/* 165 : Communication error during fetchresync rollback HISTINFO */
 	/* Note 1: when adding new white box test cases, please make use of WBTEST_ENABLED and WBTEST_ASSIGN_ONLY (defined below)
 	 * whenever applicable
 	 * Note 2: when adding a new white box test case, see if an existing WBTEST_UNUSED* slot can be leveraged.
@@ -215,8 +225,13 @@ typedef enum {
 	WBTEST_YDB_RENAMEFAIL,			/* 202 : Exercise RENAMEFAIL error codepath in "cre_jnl_file_intrpt_rename" */
 } wbtest_code_t;
 
+<<<<<<< HEAD
 #ifdef DEBUG
 /* Make sure to setenv ydb_white_box_test_case_count if you are going to use GTM_WHITE_BOX_TEST */
+=======
+#if defined (DEBUG) && !defined (STATIC_ANALYSIS)
+/* Make sure to setenv gtm_white_box_test_case_count if you are going to use GTM_WHITE_BOX_TEST */
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 #define GTM_WHITE_BOX_TEST(input_test_case_num, lhs, rhs)						\
 {													\
 	if (ydb_white_box_test_case_enabled && (ydb_white_box_test_case_number == input_test_case_num))	\
@@ -241,8 +256,13 @@ typedef enum {
 #define WBTEST_ONLY(WBTEST_NUMBER, ...)
 #endif
 
+<<<<<<< HEAD
 #ifdef DEBUG
 #define WBTEST_ENABLED(WBTEST_NUMBER)	(ydb_white_box_test_case_enabled && (WBTEST_NUMBER == ydb_white_box_test_case_number))
+=======
+#if defined (DEBUG) && !defined (STATIC_ANALYSIS)
+#define WBTEST_ENABLED(WBTEST_NUMBER)	(gtm_white_box_test_case_enabled && (WBTEST_NUMBER == gtm_white_box_test_case_number))
+>>>>>>> 3d3cd0dd... GT.M V6.3-010
 #define ENABLE_WBTEST_ABANDONEDKILL									\
 {													\
 	int	sleep_counter;										\
@@ -268,9 +288,14 @@ typedef enum {
 	}												\
 }
 #else
+#define WB_PHASE2_COMMIT_ERR	FALSE
 #define WBTEST_ENABLED(WBTEST_NUMBER)	FALSE
 #define ENABLE_WBTEST_ABANDONEDKILL
+#ifdef DEBUG
+#define WB_COMMIT_ERR_ENABLED		FALSE
+#else
 #define WB_COMMIT_ERR_ENABLED
+#endif
 #define WBTEST_ASSIGN_ONLY(WBTEST_NUMBER, LHS, RHS)
 #endif
 

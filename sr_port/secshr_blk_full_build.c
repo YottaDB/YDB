@@ -79,7 +79,7 @@ int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 				assert(FALSE);
 				return -1;
 			}
-			PUT_LONG((blk_ptr + cs->ins_off), ((cw_set_element *)(cw_set + cs->index))->blk);
+			PUT_BLK_ID((blk_ptr + cs->ins_off), ((cw_set_element *)(cw_set + cs->index))->blk);
 			if (is_write_root)
 				break;
 			cs++;
@@ -119,7 +119,7 @@ int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 				assert(cs->index < si->cw_set_depth);
 				chain.cw_index = cs->index;
 				chain.next_off = cs->next_off;
-				GET_LONGP(chain_ptr, &chain);
+				GET_BLK_IDP(chain_ptr, &chain);
 				cs->ins_off = cs->next_off = 0;
 			}
 		} else
@@ -131,7 +131,7 @@ int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 		{
 			for (chain_ptr = blk_ptr + cs->first_off; ; chain_ptr += chain.next_off)
 			{
-				GET_LONGP(&chain, chain_ptr);
+				GET_BLK_IDP(&chain, chain_ptr);
 				if ((1 == chain.flag)
 					&& ((chain_ptr - blk_ptr + SIZEOF(block_id)) <= ((blk_hdr *)blk_ptr)->bsiz)
 					&& (chain.cw_index < si->cw_set_depth))
@@ -140,7 +140,7 @@ int secshr_blk_full_build(boolean_t is_tp, sgmnt_addrs *csa,
 					sgm_info_ptr = si;	/* needed by "tp_get_cw" */
 					tp_get_cw(si->first_cw_set, chain.cw_index, &cs_ptr);
 					sgm_info_ptr = save_si;
-					PUT_LONG(chain_ptr, cs_ptr->blk);
+					PUT_BLK_ID(chain_ptr, cs_ptr->blk);
 					if (0 == chain.next_off)
 						break;
 				} else

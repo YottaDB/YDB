@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2018 Fidelity National Information		#
+# Copyright (c) 2001-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
@@ -68,6 +68,8 @@ if ($helponly) then
 endif
 
 source $gtm_root/$gtm_verno/tools/gtm_cshrc.csh
+source $gtm_root/$gtm_verno/tools/gtm_env.csh
+setenv gtm_curpro `source $gtm_root/$gtm_verno/tools/versions.csh ; echo $gtm_curpro`
 
 \unalias unalias >& /dev/null  # TCSH does not let you alias unalias
 unalias cd chown rm touch echo grep sed awk sort cat mv ls
@@ -106,7 +108,7 @@ endif
 
 cd $gtm_root/$RUNALL_VERSION/${RUNALL_IMAGE}/obj
 
-version $RUNALL_VERSION $RUNALL_IMAGE
+set setactive_parms = ( $RUNALL_VERSION $RUNALL_IMAGE ) ; source $gtm_tools/setactive.csh
 
 if ($?RUNALL_BYPASS_VERSION_CHECK == 0) then
 	if ($gtm_verno =~ V[4-8]* || $gtm_verno == "V990" ) then

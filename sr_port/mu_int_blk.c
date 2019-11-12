@@ -57,14 +57,14 @@ GBLREF bool			mu_ctrly_occurred, mu_ctrlc_occurred;
 GBLREF boolean_t		block;
 GBLREF boolean_t		master_dir;
 GBLREF boolean_t		muint_fast;
-GBLREF boolean_t		muint_key;
-GBLREF boolean_t		muint_subsc;
+GBLREF boolean_t		mu_key;
+GBLREF boolean_t		mu_subsc;
 GBLREF boolean_t		tn_reset_this_reg;
 GBLREF int			disp_maxkey_errors;
 GBLREF int			disp_trans_errors;
 GBLREF int			maxkey_errors;
-GBLREF int			muint_end_keyend;
-GBLREF int			muint_start_keyend;
+GBLREF int			mu_end_keyend;
+GBLREF int			mu_start_keyend;
 GBLREF int			mu_int_plen;
 GBLREF int			trans_errors;
 GBLREF uint4			mu_int_adj[];
@@ -75,8 +75,8 @@ GBLREF block_id			mu_int_path[];
 GBLREF int4			mu_int_blks_to_upgrd;
 GBLREF global_list		*trees;
 GBLREF global_list		*trees_tail;
-GBLREF gv_key			*muint_end_key;
-GBLREF gv_key			*muint_start_key;
+GBLREF gv_key			*mu_end_key;
+GBLREF gv_key			*mu_start_key;
 GBLREF sgmnt_data		mu_int_data;
 GBLREF trans_num		largest_tn;
 GBLREF span_node_integ		*sndata;
@@ -520,11 +520,11 @@ boolean_t mu_int_blk(
 			}
 			if (!master_dir)
 			{	/* master_directory has no subscripts; block splits don't preserve numeric integrity in index */
-				if (muint_subsc)
+				if (mu_subsc)
 				{
-					if (muint_end_key)
+					if (mu_end_key)
 					{
-						if (memcmp(buff, muint_end_key->base, muint_end_key->end + 1) > 0)
+						if (memcmp(buff, mu_end_key->base, mu_end_key->end + 1) > 0)
 						{
 							if (level)
 								muint_range_done = TRUE;
@@ -536,14 +536,14 @@ boolean_t mu_int_blk(
 								return TRUE;
 							}
 						}
-						if (memcmp(buff, muint_start_key->base, muint_start_key->end + 1) < 0)
+						if (memcmp(buff, mu_start_key->base, mu_start_key->end + 1) < 0)
 						{
 							mu_int_cum[RECS][level]--;
 							continue;
 						}
 					} else
 					{
-						if (memcmp(buff, muint_start_key->base, muint_start_key->end + 1) > 0)
+						if (memcmp(buff, mu_start_key->base, mu_start_key->end + 1) > 0)
 						{
 							if (level)
 								muint_range_done = TRUE;
@@ -555,7 +555,7 @@ boolean_t mu_int_blk(
 								return TRUE;
 							}
 						}
-						if (memcmp(buff, muint_start_key->base, muint_start_key->end + 1) < 0)
+						if (memcmp(buff, mu_start_key->base, mu_start_key->end + 1) < 0)
 						{
 							mu_int_cum[RECS][level]--;
 							continue;
@@ -853,7 +853,7 @@ boolean_t mu_int_blk(
 		}
 		if (level)
 		{
-			GET_LONG(child, ptr);
+			GET_BLK_ID(child, ptr);
 			if (child < 0)
 			{
 				mu_int_err(ERR_DBPTRNOTPOS, TRUE, TRUE, buff, comp_length, top_key, top_len,
@@ -903,8 +903,8 @@ boolean_t mu_int_blk(
 		{
 			if (master_dir)
 			{
-				for (c0 = c_base = (uchar_ptr_t)rec_base + SIZEOF(rec_hdr), cc = MAX_MIDENT_LEN;
-							*c0 && cc;  c0++, cc--);
+				for (c0 = c_base = ((uchar_ptr_t)rec_base + SIZEOF(rec_hdr)), cc = MAX_MIDENT_LEN;
+							*c0 && cc; c0++, cc--);
 				if (!cc && *c0) /*Key value too long*/
 				{
 					mu_int_err(ERR_DBKEYMX, TRUE, TRUE, buff, comp_length, top_key, top_len,
@@ -912,7 +912,7 @@ boolean_t mu_int_blk(
 					free(free_blk_base);
 					return FALSE;
 				}
-				GET_LONG(root_pointer, ((block_id *)(c0 + 2)));
+				GET_BLK_ID(root_pointer, c0 + 2);
 				if (root_pointer > mu_int_data.trans_hist.total_blks || root_pointer < 2)
 				{	/* 0=master map, 1=dir root*/
 					mu_int_err(ERR_DBBADPNTR, TRUE, TRUE, buff, comp_length, top_key,
@@ -932,7 +932,7 @@ boolean_t mu_int_blk(
 					for (c2 = muint_temp_buff, cc = 0;  *c2 && cc < rec_cmpc;  cc++)
 						*c1++ = *c2++;
 				}
-				for (cc = (c1 - temp_buff);  ((c_base < c0) && (cc <= MAX_MIDENT_LEN)); cc++)
+				for (cc = (c1 - temp_buff); ((c_base < c0) && (cc <= MAX_MIDENT_LEN)); cc++)
 					*c1++ = *c_base++;
 				if (cc > MAX_MIDENT_LEN)
 				{
@@ -944,20 +944,20 @@ boolean_t mu_int_blk(
 				*c1 = 0;
 				assert(SIZEOF(muint_temp_buff) == SIZEOF(temp_buff));
 				memcpy(muint_temp_buff, temp_buff, SIZEOF(temp_buff));
-				if (muint_key)
+				if (mu_key)
 				{
-					if (muint_end_key)	/* range */
+					if (mu_end_key)	/* range */
 					{
 						len = (int)(c1 - temp_buff + 1);
-						if ((0 < memcmp(muint_start_key->base, temp_buff, len < muint_start_keyend ?
-									len : muint_start_keyend))
-							|| (0 >  memcmp(muint_end_key->base, temp_buff, len < muint_end_keyend ?
-									len : muint_end_keyend)))
+						if ((0 < memcmp(mu_start_key->base, temp_buff, len < mu_start_keyend ?
+									len : mu_start_keyend))
+							|| (0 >  memcmp(mu_end_key->base, temp_buff, len < mu_end_keyend ?
+									len : mu_end_keyend)))
 								continue;
 					} else
 					{
-						if (((muint_start_keyend - 1) != (c1 - temp_buff))
-							|| (memcmp(muint_start_key->base, temp_buff, muint_start_keyend)))
+						if (((mu_start_keyend - 1) != (c1 - temp_buff))
+							|| (memcmp(mu_start_key->base, temp_buff, mu_start_keyend)))
 								continue;
 					}
 				}

@@ -139,7 +139,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* MBXWRTONLY */
 	   0,	/* MEMORY */
 	   0,	/* DONOBLOCK */
-	   0,	/* UNUSEDMSG306 */
+	   0,	/* ZATRANSCOL */
 	   0,	/* UNUSEDMSG307 */
 	   0,	/* UNUSEDMSG308 */
 	   0,	/* UNUSEDMSG309 */
@@ -493,7 +493,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* INVBITSTR */
 	   0,	/* INVBITPOS */
 	   0,	/* PARNORMAL */
-	   0,	/* PARBUFSM */
+	   0,	/* FILEPATHTOOLONG */
 	  72,	/* RMWIDTHTOOBIG */
 	   0,	/* PATTABNOTFND */
 	   0,	/* OBJFILERR */
@@ -612,7 +612,11 @@ const static readonly int error_ansi[] = {
 	   0,	/* MEMORYRECURSIVE */
 	   0,	/* FREEZEID */
 	   0,	/* BLKWRITERR */
+<<<<<<< HEAD:sr_port/merrors_ansi.h
 	   0,	/* UNUSEDMSG781 */
+=======
+	   0,	/* DSEINVALBLKID */
+>>>>>>> 3d3cd0dd... GT.M V6.3-010:sr_i386/merrors_ansi.h
 	   0,	/* PINENTRYERR */
 	   0,	/* BCKUPBUFLUSH */
 	   0,	/* NOFORKCORE */
@@ -1075,9 +1079,15 @@ const static readonly int error_ansi[] = {
 	   0,	/* RSVDBYTE2HIGH */
 	   0,	/* BKUPTMPFILOPEN */
 	   0,	/* BKUPTMPFILWRITE */
+<<<<<<< HEAD:sr_port/merrors_ansi.h
 	   0,	/* UNUSEDMSG1244 */
 	   0,	/* LOADBGSZ2 */
 	   0,	/* LOADEDSZ2 */
+=======
+	   0,	/* VMSMEMORY2 */
+	   0,	/* UNUSEDMSG1243 */
+	   0,	/* UNUSEDMSG1244 */
+>>>>>>> 3d3cd0dd... GT.M V6.3-010:sr_i386/merrors_ansi.h
 	   0,	/* REPLINSTMISMTCH */
 	   0,	/* REPLINSTREAD */
 	   0,	/* REPLINSTDBMATCH */

@@ -158,7 +158,7 @@ boolean_t dse_fdmp(sm_uc_ptr_t data, int len)
 	{
 		assert(ZWR_FMT == dse_dmp_format);
 		*work_char_ptr++ = '=';
-		if(is_snblk && !snbid)
+		if (is_snblk && !snbid)
 		{
 			*work_char_ptr++ = '"';
 			*work_char_ptr++ = '"';

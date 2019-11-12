@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@ GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF unsigned short	patch_comp_count;
 
 error_def(ERR_DSEBLKRDFAIL);
+error_def(ERR_DSEINVALBLKID);
 
 int dse_ksrch(block_id srch,
 	      block_id_ptr_t pp,
@@ -43,15 +44,30 @@ int dse_ksrch(block_id srch,
 	      char *targ_key,
 	      int targ_len)
 {
+	boolean_t	long_blk_id;
 	cache_rec_ptr_t dummy_cr;
 	int		rsize, tmp_cmpc;
 	int4		cmp, dummy_int;
-	ssize_t		size;
+	long		blk_id_size;
 	sm_uc_ptr_t	blk_id, bp, b_top, key_top, rp, r_top;
+	ssize_t		size;
 	unsigned short	cc, dummy_short;
 
-	if(!(bp = t_qread(srch, &dummy_int, &dummy_cr)))
+	if (!(bp = t_qread(srch, &dummy_int, &dummy_cr)))
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEBLKRDFAIL);
+	if (((blk_hdr_ptr_t)bp)->bver > BLK_ID_32_VER) /* Check blk version to see if using 32 or 64 bit block_id */
+	{
+#		ifdef BLK_NUM_64BIT
+		long_blk_id = TRUE;
+		blk_id_size = SIZEOF(block_id_64);
+#		else
+		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#		endif
+	} else
+	{
+		long_blk_id = FALSE;
+		blk_id_size = SIZEOF(block_id_32);
+	}
 	if (((blk_hdr_ptr_t) bp)->bsiz > cs_addrs->hdr->blk_size)
 		b_top = bp + cs_addrs->hdr->blk_size;
 	else if (((blk_hdr_ptr_t) bp)->bsiz < SIZEOF(blk_hdr))
@@ -71,7 +87,7 @@ int dse_ksrch(block_id srch,
 			r_top = rp + rsize;
 		if (r_top > b_top)
 			r_top = b_top;
-		if (r_top - rp < (((blk_hdr_ptr_t)bp)->levl ? SIZEOF(block_id) : MIN_DATA_SIZE) + SIZEOF(rec_hdr))
+		if ((r_top - rp) < ((((blk_hdr_ptr_t)bp)->levl ? blk_id_size : MIN_DATA_SIZE) + SIZEOF(rec_hdr)))
 		{
 			*pp = 0;
 			break;
@@ -79,7 +95,7 @@ int dse_ksrch(block_id srch,
 		for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top ; )
 			if (!*key_top++ && !*key_top++)
 				break;
-		if (((blk_hdr_ptr_t)bp)->levl && key_top > (blk_id = r_top - SIZEOF(block_id)))
+		if (((blk_hdr_ptr_t)bp)->levl && (key_top > (blk_id = (r_top - blk_id_size))))
 			key_top = blk_id;
 		if (EVAL_CMPC((rec_hdr_ptr_t)rp) > patch_comp_count)
 			cc = patch_comp_count;
@@ -91,8 +107,16 @@ int dse_ksrch(block_id srch,
 		if (size < 0)
 			size = 0;
 		memcpy(&patch_comp_key[cc], rp + SIZEOF(rec_hdr), size);
-		patch_comp_count = (int)(cc + size);
-		GET_LONGP(pp, key_top);
+		assert((cc + size) == (unsigned short)(cc + size));
+		patch_comp_count = (unsigned short)(cc + size);
+		if (long_blk_id == TRUE)
+#			ifdef BLK_NUM_64BIT
+			GET_BLK_ID_64(*pp, key_top);
+#			else
+			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#			endif
+		else
+			GET_BLK_ID_32(*pp, key_top);
 		cmp = memvcmp(targ_key, targ_len, &patch_comp_key[0], patch_comp_count);
 		if (0 > cmp)
 			break;
@@ -105,13 +129,20 @@ int dse_ksrch(block_id srch,
 				for (key_top = rp + SIZEOF(rec_hdr); key_top < r_top; )
 					if (!*key_top++ && !*key_top++)
 						break;
-				GET_LONG(ksrch_root, key_top);
+				if (long_blk_id == TRUE)
+#					ifdef BLK_NUM_64BIT
+					GET_BLK_ID_64(ksrch_root, key_top);
+#					else
+					rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(1) ERR_DSEINVALBLKID);
+#					endif
+				else
+					GET_BLK_ID_32(ksrch_root, key_top);
 			}
 			return TRUE;
 		}
 	}
 	patch_path_count++;
-	if (((blk_hdr_ptr_t) bp)->levl && *pp > 0 && *pp < cs_addrs->ti->total_blks && (*pp % cs_addrs->hdr->bplmap)
+	if (((blk_hdr_ptr_t) bp)->levl && (*pp > 0) && (*pp < cs_addrs->ti->total_blks) && (*pp % cs_addrs->hdr->bplmap)
 	    && dse_ksrch(*pp, pp + 1, off + 1, targ_key, targ_len))
 		return TRUE;
 	return FALSE;

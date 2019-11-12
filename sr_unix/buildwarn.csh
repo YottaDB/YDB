@@ -2,7 +2,8 @@
 #
 #################################################################
 #								#
-#	Copyright 2004, 2007 Fidelity Information Services, Inc	#
+# Copyright (c) 2004-2019 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -57,7 +58,7 @@ if ( $buildwarn_status != 0 ) then
 	exit $buildwarn_status
 endif
 
-version $1 $2
+set setactive_parms = ( $1 $2 ) ; source $gtm_tools/setactive.csh
 
 pushd $gtm_ver/log
 

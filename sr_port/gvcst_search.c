@@ -155,6 +155,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 				chain1 = *(off_chain *)&leaf_blk_hist->blk_num;
 				if (chain1.flag == 1)
 				{
+					assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 					assert((int)chain1.cw_index < sgm_info_ptr->cw_set_depth);
 					tp_get_cw(sgm_info_ptr->first_cw_set, (int)chain1.cw_index, &cse);
 				} else
@@ -184,6 +185,7 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			chain1 = *(off_chain *)&leaf_blk_hist->blk_num;
 			if (chain1.flag == 1)
 			{
+				assert((SIZEOF(int) * 8) >= CW_INDEX_MAX_BITS);
 				if ((int)chain1.cw_index >= sgm_info_ptr->cw_set_depth)
 				{
 					assert(sgm_info_ptr->tp_csa == cs_addrs);
@@ -507,10 +509,10 @@ enum cdb_sc 	gvcst_search(gv_key *pKey,		/* Key to search for */
 			assert(CDB_STAGNATE > t_tries);
 			return cdb_sc_rmisalign;
 		}
-		GET_LONG(nBlkId, (pRec + n0 - SIZEOF(block_id)));	/* TODO: V7 change to GET_LLONG */
+		GET_BLK_ID(nBlkId, pRec + n0 - SIZEOF(block_id));
 		if (is_mm)
 		{
-			PUT_LONG(&chain2, nBlkId);	/* TODO: V7 change to PUT_LLONG */
+			PUT_BLK_ID(&chain2, nBlkId);
 			if ((0 == chain2.flag) && (nBlkId > cs_addrs->total_blks))
 			{	/* private copy should be taken care of by .flag */
 				if (cs_addrs->total_blks < cs_addrs->ti->total_blks)
