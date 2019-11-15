@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,7 +34,7 @@ GBLREF uint4		process_id;
 
 void dump_lockhist(void)
 {
-#ifdef DEBUG	/* should only be called conditional on DEBUG, but play it safe */
+#	ifdef DEBUG	/* should only be called conditional on DEBUG, but play it safe */
 	int4   		lockIdx, lockIdx_first;
 	node_local_ptr_t locknl;
 
@@ -46,9 +46,9 @@ void dump_lockhist(void)
 	{
 		if (NULL != locknl->lockhists[lockIdx].lock_addr)
 		{
-			FPRINTF(stderr, "%.4s %16lx %16lx %6d %6d %d\n",
-				locknl->lockhists[lockIdx].lock_op,
-				locknl->lockhists[lockIdx].lock_addr,
+			FPRINTF(stderr, "%.4s %16llx %16llx %6d %6d %d\n",	/* Note not using lvaddr here for the address */
+				locknl->lockhists[lockIdx].lock_op,		/* .. formats as would no longer line up with */
+				locknl->lockhists[lockIdx].lock_addr,		/* .. the headers. */
 				locknl->lockhists[lockIdx].lock_callr,
 				locknl->lockhists[lockIdx].lock_pid,
 				locknl->lockhists[lockIdx].loop_cnt,
@@ -60,5 +60,5 @@ void dump_lockhist(void)
 			break;						/* Completed the loop */
 	}
 	FFLUSH(stderr);
-#endif
+#	endif
 }

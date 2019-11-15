@@ -3,6 +3,9 @@
  * Copyright (c) 2017-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -40,7 +43,8 @@ void	secshr_send_DBCLNUPINFO_msg(sgmnt_addrs *csa, int numargs, gtm_uint64_t *ar
 	{
 		if (0 != i)
 			strcat(secshr_string, " : ");
-		len = SNPRINTF(secshr_string_delta, SECSHR_STR_DELTASIZE, "%s = [0x%08lx]", argarray[i], argarray[i+1]);
+		len = SNPRINTF(secshr_string_delta, SECSHR_STR_DELTASIZE, "%s = [0x%016llx]", (char *)(UINTPTR_T)argarray[i],
+			       argarray[i + 1]);
 		STRNCAT(secshr_string, secshr_string_delta, len);
 		assert(ARRAYSIZE(secshr_string) > strlen(secshr_string));
 	}

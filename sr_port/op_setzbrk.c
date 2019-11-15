@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -43,12 +43,8 @@
 # include "gdsbt.h"			/* for gdsfhead.h */
 # include "gdsfhead.h"
 # include "trigger_read_andor_locate.h"
-# include "gtm_trigger_trc.h"
-#else
-# define DBGIFTRIGR(x)
-# define DBGTRIGR(x)
-# define DBGTRIGR_ONLY(x)
 #endif
+#include "gtm_trigger_trc.h"
 
 GBLREF z_records		zbrk_recs;
 GBLREF mident_fixed		zlink_mname;

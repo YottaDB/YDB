@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,13 +23,7 @@
 #include "op.h"
 #include "outofband.h"
 #include "min_max.h"
-#ifdef GTM_TRIGGER
-# include "gtm_trigger_trc.h"
-#else
-# define DBGIFTRIGR(x)
-# define DBGTRIGR(x)
-# define DBGTRIGR_ONLY(x)
-#endif
+#include "gtm_trigger_trc.h"
 
 #define	INFO_MSK(error)	(error & ~SEV_MSK | INFO)
 

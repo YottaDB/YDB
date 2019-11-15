@@ -101,7 +101,7 @@
 #endif
 
 #ifdef GTM64
-#  define gmaAdr "%016lx"
+#  define gmaAdr "%016llx"
 #  define gmaFill "         "
 #  define gmaLine "--------"
 #else

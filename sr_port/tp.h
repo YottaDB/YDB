@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -679,9 +679,9 @@ typedef enum
 	DEBUG_ONLY(was_dollar_ztrigger_invoked = dollar_ztrigger_invoked;)							\
 	DEBUG_ONLY(were_gvt_triggers_read_this_tn = TREF(gvt_triggers_read_this_tn);)						\
 	/* $ZTRIGGER() was invoked. Clean up csa->db_dztrigger_cycle as necessary. */						\
-	DBGTRIGR((stderr, "INVALIDATE_TRIG_CYCLE(): %s:%d t_tries %d, $tlevel=%d state=%d wasDZ=%d wasTREAD=%d\n",		\
-				__FILE__, __LINE__, t_tries, dollar_tlevel, STATE,						\
-				was_dollar_ztrigger_invoked, were_gvt_triggers_read_this_tn));					\
+	DEBUG_ONLY(DBGTRIGR((stderr, "INVALIDATE_TRIG_CYCLE(): %s:%d t_tries %d, $tlevel=%d state=%d wasDZ=%d wasTREAD=%d\n",	\
+			     __FILE__, __LINE__, t_tries, dollar_tlevel, STATE,							\
+			     was_dollar_ztrigger_invoked, were_gvt_triggers_read_this_tn)));					\
 	if (dollar_ztrigger_invoked)												\
 	{															\
 		if ((STATE == TP_COMMIT) || (STATE == TP_ROLLBACK))								\

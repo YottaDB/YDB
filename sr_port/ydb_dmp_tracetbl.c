@@ -79,7 +79,7 @@ void ydb_dmp_tracetbl(void)
 					cur->intfld, (int)(intptr_t)cur->addrfld1, (int)(intptr_t)cur->addrfld2);
 				break;
 			case CONDHNDLR_INVOKED:
-				fprintf(stderr, "   Entry: CONDHNDLR_INVOKED,  PID: %d,  TID: 0x"lvaddr",  PC: %p\n",
+				fprintf(stderr, "   Entry: CONDHNDLR_INVOKED,  PID: %d,  TID: 0x%08lx,  PC: %p\n",
 					(int)(intptr_t)cur->addrfld1, (unsigned long)cur->addrfld2, cur->addrfld3);
 				break;
 			default:

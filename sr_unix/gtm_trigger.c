@@ -563,7 +563,7 @@ int gtm_trigger(gv_trigger_t *trigdsc, gtm_trigger_parms *trigprm)
 	{	/* Create new trigger base frame first that back-stops stack unrolling and return to us */
 		if (GTM_TRIGGER_DEPTH_MAX < (gtm_trigger_depth + 1))	/* Verify we won't nest too deep */
 			rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(3) ERR_MAXTRIGNEST, 1, GTM_TRIGGER_DEPTH_MAX);
-		DBGTRIGR((stderr, "gtm_trigger: Invoking new trigger at frame_pointer 0x%016lx  ctxt value: 0x%016lx\n",
+		DBGTRIGR((stderr, "gtm_trigger: Invoking new trigger at frame_pointer 0x"lvaddr"  ctxt value: 0x"lvaddr"\n",
 			  frame_pointer, ctxt));
 		/* Protect against interrupts while we have only a trigger base frame on the stack */
 		DEFER_INTERRUPTS(INTRPT_IN_TRIGGER_NOMANS_LAND, prev_intrpt_state);
@@ -898,7 +898,7 @@ void gtm_trigger_fini(boolean_t forced_unwind, boolean_t fromzgoto)
 				OP_TROLLBACK(-1);
 		}
 	}
-	DBGTRIGR((stderr, "gtm_trigger: Unwound to trigger invoking frame: frame_pointer 0x%016lx  ctxt value: 0x%016lx\n",
+	DBGTRIGR((stderr, "gtm_trigger: Unwound to trigger invoking frame: frame_pointer 0x"lvaddr"  ctxt value: 0x"lvaddr"\n",
 		  frame_pointer, ctxt));
 	/* Re-allow interruptions now that our base frame is gone.
 	 * Normally we would have the new state stored in "prev_intrpt_state" but that is not possible here because

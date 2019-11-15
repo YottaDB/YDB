@@ -613,14 +613,10 @@ void dbc_process_block(phase_static_area *psa, int blk_num, gtm_off_t dbptr)
 				PRINTF("       Blknum           Offset  Blktype  BlkLvl   Blksize   Free"
 				       "   Key\n");
 			}
-			GTM64_ONLY(PRINTF("   0x%08x %16lx %s %5d   %9d %6d   %s%s\n", blk_num, dbptr,
+			PRINTF("   0x%08x %016llx %s %5d   %9d %6d   %s%s\n", blk_num, dbptr,
 			       (have_dt_blk ? "   DT   " : "   GVT  "),
 			       ((v15_blk_hdr_ptr_t)psa->block_buff)->levl,
-			       ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz, free_bytes, key_pfx, key_ptr));
-			NON_GTM64_ONLY(PRINTF("   0x%08x %16llx %s %5d   %9d %6d   %s%s\n", blk_num, dbptr,
-			       (have_dt_blk ? "   DT   " : "   GVT  "),
-			       ((v15_blk_hdr_ptr_t)psa->block_buff)->levl,
-			       ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz, free_bytes, key_pfx, key_ptr));
+			       ((v15_blk_hdr_ptr_t)psa->block_buff)->bsiz, free_bytes, key_pfx, key_ptr);
 		}
 		psa->blks_too_big++;
 		/* Prepare the record to put to the output file */

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2010, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,6 +29,7 @@
 # define DBGTRIGR_ONLY(x) x
 # include "gtm_stdio.h"
 # include "gtmio.h"
+# include "io.h"
 #else
 # define DBGIFTRIGR(x)
 # define DBGTRIGR(x)

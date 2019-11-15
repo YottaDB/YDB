@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,13 +23,7 @@
 #include "stringpool.h"
 #include "compiler.h"
 #include "min_max.h"
-#ifdef GTM_TRIGGER
-# include "gtm_trigger_trc.h"
-#else
-# define DBGIFTRIGR(x)
-# define DBGTRIGR(x)
-# define DBGTRIGR_ONLY(x)
-#endif
+#include "gtm_trigger_trc.h"
 #include "stack_frame.h"
 
 GBLREF	spdesc		stringpool;

@@ -121,8 +121,12 @@ static inline int gtm_abrt() { abort(); return 0;}
 #  define STATIC_ANALYSIS_ONLY(statement)
 #endif
 
+/* Define a long value type that can be used when printing out addresses with printf() type substitution. It's the right
+ * size and format for both 32 and 64 bit addresses or any other value whose size varies between 32 and 64 bits depending
+ * on the architecture.
+ */
 #ifdef GTM64
-# define lvaddr "%016lx"
+# define lvaddr "%016llx"
 #else
 # define lvaddr "%08lx"
 #endif

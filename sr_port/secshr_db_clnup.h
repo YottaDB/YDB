@@ -3,6 +3,9 @@
  * Copyright (c) 2004-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -49,11 +52,11 @@ MBSTART {									\
 
 #define	SECSHR_ACCOUNTING_MAX_ARGS	32	/* max args in "argarray" passed to "secshr_send_DBCLNUPINFO_msg" */
 
-#define		SECSHR_ACCOUNTING(NUMARGS, ARGARRAY, VALUE)	\
-MBSTART {							\
-	ARGARRAY[NUMARGS++] = (INTPTR_T)#VALUE;			\
-	ARGARRAY[NUMARGS++] = VALUE;				\
-	assert(NUMARGS <= ARRAYSIZE(ARGARRAY));			\
+#define	SECSHR_ACCOUNTING(NUMARGS, ARGARRAY, VALUE)	\
+MBSTART {						\
+	ARGARRAY[NUMARGS++] = (UINTPTR_T)#VALUE;	\
+	ARGARRAY[NUMARGS++] = VALUE;			\
+	assert(NUMARGS <= ARRAYSIZE(ARGARRAY));		\
 } MBEND
 
 #ifdef DEBUG_CHECK_LATCH

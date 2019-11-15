@@ -71,6 +71,7 @@ typedef struct err_ctl_struct
 # define DBGEHND_ONLY(x) x
 # include "gtm_stdio.h"
 # include "gtmio.h"
+# include "io.h"
 #else
 # define DBGEHND(x)
 # define DBGEHND_ONLY(x)

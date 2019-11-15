@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -133,7 +133,7 @@ void op_zg1(int4 level)
 	 * context (gtm_trigger_depth > 0 and the stackframe we would unwind to is not the first trigger base frame).
 	 * Note bypass this error in the special zgoto 0 case which is effectively a halt.
 	 */
-	DBGEHND((stderr, "op_zg1: dollar_ecode.index: %d  gtm_trigger_depth: %d  unwtrglvls: %d  fp:0x%016lx\n", dollar_ecode.index,
+	DBGEHND((stderr, "op_zg1: dollar_ecode.index: %d  gtm_trigger_depth: %d  unwtrglvls: %d  fp:0x"lvaddr"\n", dollar_ecode.index,
 		 gtm_trigger_depth, unwtrglvls, fp));
 	if ((0 != level) && (0 < dollar_ecode.index) && (0 < gtm_trigger_depth)
 	    && ((0 >= (gtm_trigger_depth - unwtrglvls)) || ((1 == gtm_trigger_depth) && (SFT_TRIGR & fp->type))))
@@ -141,7 +141,7 @@ void op_zg1(int4 level)
 #	endif
 	/* Perform actual unwinding of the frames */
 	GOFRAMES(unwframes, FALSE, TRUE);
-	DBGEHND((stderr, "op_zg1: Unwound from level %d to level %d  which is %d frames ending in stackframe 0x%016lx with"
+	DBGEHND((stderr, "op_zg1: Unwound from level %d to level %d  which is %d frames ending in stackframe 0x"lvaddr" with"
 		 " type 0x%04lx\n", curlvl, level, unwframes, frame_pointer, (frame_pointer ? frame_pointer->type : 0xffff)));
 	assert(level == dollar_zlevel());
 #	ifdef GTM_TRIGGER

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,19 +101,19 @@ void	goframes(int4 frames)
 #		ifdef GTM_TRIGGER
 		if (!(SFT_TRIGR & frame_pointer->type))
 		{	/* Normal frame unwind */
-			DBGTRIGR((stderr, "goframes: unwinding regular frame at %016lx\n", frame_pointer));
+			DBGTRIGR((stderr, "goframes: unwinding regular frame at 0x"lvaddr"\n", frame_pointer));
 			op_unwind();
-			DBGTRIGR((stderr, "goframes: after regular frame unwind: frame_pointer 0x%016lx  ctxt value: 0x%016lx\n",
+			DBGTRIGR((stderr, "goframes: after regular frame unwind: frame_pointer 0x"lvaddr"  ctxt value: 0x"lvaddr"\n",
 				  frame_pointer, ctxt));
 		} else
 		{	/* Trigger base frame unwind (special case) */
-			DBGTRIGR((stderr, "goframes: unwinding trigger base frame at %016lx\n", frame_pointer));
+			DBGTRIGR((stderr, "goframes: unwinding trigger base frame at 0x"lvaddr"\n", frame_pointer));
 			gtm_trigger_fini(TRUE, fromzgoto);
 			goframes_unwound_trigger = TRUE;
 		}
 #		else
 		/* If triggers are not enabled, just a normal unwind */
-		DBGEHND((stderr, "goframes: unwinding regular frame at %016lx\n", frame_pointer));
+		DBGEHND((stderr, "goframes: unwinding regular frame at 0x"lvaddr"\n", frame_pointer));
 		op_unwind();
 #		endif
 		assert(FALSE == skip_error_ret);	/* op_unwind() should have read and reset this */
@@ -126,7 +126,7 @@ void	goframes(int4 frames)
 		 * something else (unwtrigrframe only set when ZGOTO with entryref specified). So if the flag says we should never
 		 * land on a trigger frame, go ahead and unwind that one too.
 		 */
-		DBGTRIGR((stderr, "goframes: unwinding trailing trigger base frame at %016lx\n", frame_pointer));
+		DBGTRIGR((stderr, "goframes: unwinding trailing trigger base frame at 0x"lvaddr"\n", frame_pointer));
 		gtm_trigger_fini(TRUE, fromzgoto);
 		goframes_unwound_trigger = TRUE;
 	}
