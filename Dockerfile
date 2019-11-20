@@ -55,7 +55,7 @@ RUN mkdir -p /tmp/yottadb-build \
       -D YDB_INSTALL_DIR:STRING=yottadb-release \
       -D CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
       /tmp/yottadb-src \
- && make -j `grep -c ^processor /proc/cpuinfo` \
+ && make -j $(nproc) \
  && make install
 
 # Stage 2: YottaDB release image
