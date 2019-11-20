@@ -18,8 +18,10 @@
 # Use with data persistence:
 #   $ docker run --rm -e ydb_chset=utf-8 -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
 
+ARG OS_VSN=18.04
+
 # Stage 1: YottaDB build image
-FROM ubuntu as ydb-release-builder
+FROM ubuntu:${OS_VSN} as ydb-release-builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
@@ -50,12 +52,13 @@ RUN mkdir -p /tmp/yottadb-build \
  && cmake \
       -D CMAKE_INSTALL_PREFIX:PATH=/tmp \
       -D YDB_INSTALL_DIR:STRING=yottadb-release \
+      -D CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
       /tmp/yottadb-src \
  && make -j `grep -c ^processor /proc/cpuinfo` \
  && make install
 
 # Stage 2: YottaDB release image
-FROM ubuntu as ydb-release
+FROM ubuntu:${OS_VSN} as ydb-release
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
