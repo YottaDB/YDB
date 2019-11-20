@@ -14,7 +14,7 @@ stages:
   stage: build
   script:
     - mkdir docker-images
-    - docker build --pull -t yottadb/${REPO}:latest -f ${DOCKERFILE} .
+    - docker build ${ARGS} --pull -t yottadb/${REPO}:latest -f ${DOCKERFILE} .
     - docker save yottadb/${REPO}:latest > docker-images/${REPO}.tar
 
 build-ubuntu:
@@ -22,6 +22,13 @@ build-ubuntu:
   variables:
     DOCKERFILE: Dockerfile
     REPO: yottadb
+
+build-ubuntu-debug:
+  extends: .build
+  variables:
+    DOCKERFILE: Dockerfile
+    REPO: yottadb-debug
+    ARGS: --build-arg CMAKE_BUILD_TYPE=Debug
 
 build-centos:
   extends: .build
@@ -51,6 +58,11 @@ push-ubuntu:
   variables:
     REPO: yottadb
 
+push-ubuntu-debug:
+  extends: .push
+  variables:
+    REPO: yottadb-debug
+
 push-centos:
   extends: .push
   variables:
@@ -76,6 +88,11 @@ push-release-ubuntu:
   extends: .push-release
   variables:
     REPO: yottadb
+
+push-release-ubuntu-debug:
+  extends: .push-release
+  variables:
+    REPO: yottadb-debug
 
 push-release-centos:
   extends: .push-release

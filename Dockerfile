@@ -23,6 +23,7 @@ ARG OS_VSN=18.04
 # Stage 1: YottaDB build image
 FROM ubuntu:${OS_VSN} as ydb-release-builder
 
+ARG CMAKE_BUILD_TYPE=Release
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y \
