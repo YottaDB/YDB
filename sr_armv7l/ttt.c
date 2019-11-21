@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -322,7 +322,7 @@ LITDEF short ttt[4515] = {
 /* 1969 */	SIZEOF(char *) * (short int)xf_fnzsearch,VXT_END,
 /* 1971 */	VXI_PUSHAB,VXT_VAL,0,VXI_PUSHAB,VXT_VAL,1,VXI_CALLS,VXT_LIT,
 /* 1979 */	2,VXT_XFER,SIZEOF(char *) * (short int)xf_fnzsetprv,VXT_END,
-/* 1983 */	VXI_PUSHAB,VXT_VAL,0,VXI_PUSHL,VXT_VAL,2,VXI_PUSHL,VXT_VAL,
+/* 1983 */	VXI_PUSHAB,VXT_VAL,0,VXI_PUSHAB,VXT_VAL,2,VXI_PUSHL,VXT_VAL,
 /* 1991 */	1,VXI_CALLS,VXT_LIT,3,VXT_XFER,SIZEOF(char *) * (short int)xf_fnzsigproc,VXT_END,
 /* 1998 */	VXT_IREPAB,VXT_VAL,2,VXI_PUSHAB,VXT_VAL,0,VXI_CALLS,VXT_VAL,
 /* 2006 */	1,VXT_XFER,SIZEOF(char *) * (short int)xf_fnzsocket,VXT_END,

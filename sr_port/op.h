@@ -131,7 +131,7 @@ void	op_fnzqgblmod(mval *v);
 void	op_fnzreverse(mval *src, mval *dst);
 int	op_fnzsearch(mval *file, mint indx, mint mfunc, mval *ret);		/***type int added***/
 void	op_fnzsetprv(mval *prv, mval *ret);
-void	op_fnzsigproc(int processid, int signum, mval *retcode);
+void	op_fnzsigproc(int processid, mval *sigval, mval *retcode);
 void	op_fnzsocket(UNIX_ONLY_COMMA(int numarg) mval *dst, ...);
 void	op_fnzsqlexpr(mval *value, mval *target);
 void	op_fnzsqlfield(int findex, mval *target);

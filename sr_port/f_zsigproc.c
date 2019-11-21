@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries. 	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -33,8 +36,8 @@ int f_zsigproc(oprtype *a, opctype op)
 		return FALSE;
 	}
 	advancewindow();
-	/* 2nd argument is the signal number to send */
-	if (EXPR_FAIL == expr(&(r->operand[1]), MUMPS_INT))
+	/* 2nd argument is the signal name or number to send */
+	if (EXPR_FAIL == expr(&(r->operand[1]), MUMPS_EXPR))
 		return FALSE;	/* Improper signal number argument */
 	ins_triple(r);
 	*a = put_tref(r);

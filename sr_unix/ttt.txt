@@ -458,7 +458,7 @@ OC_FNZSETPRV:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fnzsetprv
 OC_FNZSIGPROC:	pushab	val.0
-		pushl	val.2
+		pushab	val.2
 		pushl	val.1
 		calls	#3,xfer.xf_fnzsigproc
 OC_FNZSOCKET:	irepab  val.2
