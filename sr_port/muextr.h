@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.      *
+ * All rights reserved.                                         *
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -104,8 +107,9 @@ typedef struct coll_hdr_struct
 #define MU_FMT_ZWR			3
 #define GOQ_BLK_SIZE			2048
 #define FORMAT_STR_MAX_SIZE		50
-#define LABEL_STR_MAX_SIZE 		128
-#define EXTR_DEFAULT_LABEL		"GT.M MUPIP EXTRACT"
+#define BIN_LABEL_STR_MAX_SIZE 		128
+#define ZWR_GO_LABEL_MAX_SIZE		1024
+#define EXTR_DEFAULT_LABEL		"YottaDB MUPIP EXTRACT"
 
 #define V4_BIN_HEADER_VERSION		"4"
 #define V4_BIN_HEADER_LABEL		"GDS BINARY EXTRACT LEVEL "V4_BIN_HEADER_VERSION

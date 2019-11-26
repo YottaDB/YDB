@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,6 +68,7 @@
 #include "is_proc_alive.h"
 #include "gtm_reservedDB.h"
 #include "min_max.h"
+#include "gtm_common_defs.h"
 
 GBLREF	int			(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	bool			mu_ctrlc_occurred;
@@ -81,6 +82,7 @@ GBLREF	boolean_t		jnlpool_init_needed;
 GBLREF	mstr			sys_output;
 GBLREF	tp_region		*grlist;
 GBLREF	sgmnt_data_ptr_t	cs_data;
+GBLREF	IN_PARMS 		*cli_lex_in_ptr;
 
 error_def(ERR_DBNOREGION);
 error_def(ERR_EXTRACTCTRLY);
@@ -131,9 +133,9 @@ STATICDEF boolean_t 			is_binary_format;
 STATICDEF gd_region			**opened_regions;
 STATICDEF uint4				opened_region_count;
 
-#define BINARY_FORMAT_STRING	"BINARY"
-#define ZWR_FORMAT_STRING	"ZWR"
-#define GO_FORMAT_STRING	"GO"
+#define BINARY_FORMAT_STRING		"BINARY"
+#define ZWR_FORMAT_STRING		"ZWR"
+#define GO_FORMAT_STRING		"GO"
 
 #define	WRITE_NUMERIC(nmfield)						\
 {									\
@@ -201,10 +203,11 @@ void mu_extract(void)
 {
 	int				stat_res, truncate_res, index, index2;
 	int				reg_max_rec, reg_max_key, reg_max_blk, reg_std_null_coll;
-	int				iter, format, local_errno, int_nlen;
+	int				iter, format, local_errno, int_nlen, str_len, max_label_len;
 	boolean_t			freeze, override, logqualifier, success, success2;
 	char				format_buffer[FORMAT_STR_MAX_SIZE],  ch_set_name[MAX_CHSET_NAME + 1], cli_buff[MAX_LINE],
-					label_buff[LABEL_STR_MAX_SIZE];
+					bin_label_buff[BIN_LABEL_STR_MAX_SIZE], zwr_go_label_buff[ZWR_GO_LABEL_MAX_SIZE],
+					**cli_argv, *realpath_val ;
 	glist				gl_head, *gl_ptr, *next_gl_ptr;
 	gd_region			*reg, *region_top;
 	mu_extr_stats			global_total, grand_total, spangbl_total;
@@ -231,6 +234,7 @@ void mu_extract(void)
 	int				use_null_iv;
 	tp_region			*rptr;
 	uint4				pid;
+	char *				value_str[2];	/* holds realpath_val & cli_lex_in_ptr->in_str for copying to label buff */
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -240,7 +244,7 @@ void mu_extract(void)
 	/* Initialize all local character arrays to zero before using */
 	memset(cli_buff, 0, SIZEOF(cli_buff));
 	memset(outfilename, 0, SIZEOF(outfilename));
-	memset(label_buff, 0, SIZEOF(label_buff));
+	memset(bin_label_buff, 0, SIZEOF(bin_label_buff));
 	memset(format_buffer, 0, SIZEOF(format_buffer));
 	active_device = io_curr_device.out;
 	mu_outofband_setup();
@@ -493,13 +497,13 @@ void mu_extract(void)
 			outptr[label_len++] = ' ';
 		} else
 			label_len = 0;
-		buflen = SIZEOF(label_buff);
-		if (FALSE == cli_get_str("LABEL", label_buff, &buflen))
+		buflen = SIZEOF(bin_label_buff);
+		if (FALSE == cli_get_str("LABEL", bin_label_buff, &buflen))
 		{
 			MEMCPY_LIT(&outptr[label_len], EXTR_DEFAULT_LABEL);
-			buflen = STR_LIT_LEN(EXTR_DEFAULT_LABEL);
+	                buflen = STR_LIT_LEN(EXTR_DEFAULT_LABEL);
 		} else
-			memcpy(&outptr[label_len], label_buff, buflen);
+			memcpy(&outptr[label_len], bin_label_buff, buflen);
 		label_len += buflen;
 		if (label_len > BIN_HEADER_LABELSZ)
 		{	/* Label size exceeds the space, so truncate the label and back off to the valid beginning
@@ -555,22 +559,57 @@ void mu_extract(void)
 	} else
 	{
 		assert((MU_FMT_GO == format) || (MU_FMT_ZWR == format));
-		label_len = SIZEOF(label_buff);
-		if (FALSE == cli_get_str("LABEL", label_buff, &label_len))
+		cli_argv = cli_lex_in_ptr->argv;
+		/* max_label_len is calculated To represent label in the form of
+		 * `YDBname, space, Path, space, arguments, space, UTF-8 name, '\n'`
+		 */
+		max_label_len = (gtm_utf8_mode ? ZWR_GO_LABEL_MAX_SIZE - (STR_LIT_LEN(UTF8_NAME) + 3) : ZWR_GO_LABEL_MAX_SIZE - 2);
+		max_label_len -= 1;	/* Accomodate the '\n' character addition */
+		label_len = max_label_len;
+		/* If label is not specified we form the default label by combining absolute path, command & parameters */
+		if (FALSE == cli_get_str("LABEL", zwr_go_label_buff, &label_len))
 		{
-			MEMCPY_LIT(label_buff, EXTR_DEFAULT_LABEL);
+			MEMCPY_LIT(zwr_go_label_buff, EXTR_DEFAULT_LABEL);		/* Adding the default label */
 			label_len = STR_LIT_LEN(EXTR_DEFAULT_LABEL);
+			zwr_go_label_buff[label_len++] = ' ';		/* Adding seperator */
+			if (0 < cli_lex_in_ptr->argc)		/* Checks the presence of commandline arguments */
+			{	/* If realpath returns NULL here, it is not fatal,
+				 * as already extract has reached its intended method.
+				 */
+				realpath_val = realpath(cli_argv[0], NULL);
+				assert(NULL != realpath_val);
+				value_str[0] = realpath_val;
+				value_str[1] = cli_lex_in_ptr->in_str;
+				/* Copy path, command and arguments to label buffer */
+				for (iter = 0; iter < 2; iter++)
+				{
+					if ((0 == iter) && (NULL == realpath_val))
+						continue;
+					str_len = STRLEN(value_str[iter]);
+					/* This condition ensures that the value being copied doesn't
+					 * exceed MAX space and accomodates "UTF-8" addition at the end.
+					 */
+					if (max_label_len < (label_len + str_len))
+						str_len = max_label_len - label_len;
+					memcpy(zwr_go_label_buff + label_len, value_str[iter], str_len);
+					label_len += str_len;
+					if (0 == iter)
+						zwr_go_label_buff[label_len++] = ' ';		/* Adding seperator */
+				}
+				if (NULL != realpath_val)
+					system_free(realpath_val);
+			}
 		}
 		if (gtm_utf8_mode)
 		{
-			label_buff[label_len++] = ' ';
-			MEMCPY_LIT(&label_buff[label_len], UTF8_NAME);
+			zwr_go_label_buff[label_len++] = ' ';
+			MEMCPY_LIT(&zwr_go_label_buff[label_len], UTF8_NAME);
 			label_len += STR_LIT_LEN(UTF8_NAME);
 		}
-		label_buff[label_len++] = '\n';
+		zwr_go_label_buff[label_len++] = '\n';
 		op_val.mvtype = MV_STR;
 		op_val.str.len = label_len;
-		op_val.str.addr = label_buff;
+		op_val.str.addr = zwr_go_label_buff;
 		op_write(&op_val);
 		op_horolog(&val);
 		op_fnzdate(&val, &datefmt, &null_str, &null_str, &val);

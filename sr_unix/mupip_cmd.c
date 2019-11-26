@@ -279,7 +279,7 @@ static	CLI_PARM	mup_extract_parm[] = {
 };
 
 static readonly CLI_PARM mup_extr_label_parm[] = {
-	{ "LABEL", "GT.M MUPIP EXTRACT", PARM_REQ},
+	{ "LABEL", "YottaDB MUPIP EXTRACT", PARM_REQ},
 	{ "", "" }
 };
 
