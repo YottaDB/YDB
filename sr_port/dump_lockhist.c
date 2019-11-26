@@ -30,6 +30,13 @@
 GBLREF gd_region	*gv_cur_region;
 GBLREF uint4		process_id;
 
+/* For 32 bit processes, addresses are a bit smaller so define a format that works for either */
+#ifdef GTM64
+# define myaddr "0x"lvaddr
+#else
+# define myaddr "        0x"lvaddr
+#endif
+
 /* Routine to dump the lock history array on demand starting with most recent and working backwards */
 
 void dump_lockhist(void)
@@ -40,13 +47,13 @@ void dump_lockhist(void)
 
 	locknl = FILE_INFO(gv_cur_region)->s_addrs.nl;
 	FPRINTF(stderr, "\nProcess lock history (in reverse order) -- Current pid: %d\n", process_id);	/* Print headers */
-	FPRINTF(stderr, "Func          LockAddr          Caller    Pid  Retry TrIdx\n");
+	FPRINTF(stderr, "Func            LockAddr             Caller    Pid  Retry TrIdx\n");
 	FPRINTF(stderr, "----------------------------------------------------------\n");
 	for (lockIdx_first = lockIdx = locknl->lockhist_idx; ;)
 	{
 		if (NULL != locknl->lockhists[lockIdx].lock_addr)
 		{
-			FPRINTF(stderr, "%.4s %16llx %16llx %6d %6d %d\n",	/* Note not using lvaddr here for the address */
+			FPRINTF(stderr, "%.4s "myaddr" "myaddr" %6d %6d %d\n",	/* Note not using lvaddr here for the address */
 				locknl->lockhists[lockIdx].lock_op,		/* .. formats as would no longer line up with */
 				locknl->lockhists[lockIdx].lock_addr,		/* .. the headers. */
 				locknl->lockhists[lockIdx].lock_callr,
