@@ -394,6 +394,10 @@ OC_FNZGETSYI:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#3,xfer.xf_fngetsyi
+OC_FNZHASH:	pushab	val.0
+		pushl	val.2
+		pushab	val.1
+		calls	#2,xfer.xf_fnzhash
 OC_FNZJ2:	pushab	val.0
 		pushl	val.2
 		pushab	val.1

@@ -719,6 +719,7 @@ int		f_zdate(oprtype *a, opctype op);
 int		f_zdebug(oprtype *a, opctype op);
 int		f_zechar(oprtype *a, opctype op);
 int		f_zgetsyi(oprtype *a, opctype op);
+int		f_zhash(oprtype *a, opctype op);
 int		f_zjobexam(oprtype *a, opctype op);
 int		f_zparse(oprtype *a, opctype op);
 int		f_zpeek(oprtype *a, opctype op);

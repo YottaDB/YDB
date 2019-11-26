@@ -285,6 +285,7 @@ LITDEF nametabent fun_names[] =
 	,{7, "ZGETJPI"}
 	,{7, "ZGETLKI"}
 	,{7, "ZGETSYI"}
+	,{5, "ZHASH"}
 	,{5, "ZINCR"}, {8, "ZINCREME*"}
 	,{2, "ZJ"}, {8, "ZJUSTIFY"}
 	,{8, "ZJOBEXAM"}
@@ -316,7 +317,7 @@ LITDEF unsigned char fun_index[27] =
 {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-	39, 43, 47, 47, 48, 48, 48, 48, 122	/* s t u v w x y z ~ */
+	39, 43, 47, 47, 48, 48, 48, 48, 123	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -374,6 +375,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZGETJPI, ALL_SYS }
 	,{ OC_FNZGETLKI, VMS_OS }
 	,{ OC_FNZGETSYI, VMS_OS }
+	,{ OC_FNZHASH, ALL_SYS }
 	,{ OC_FNINCR, ALL_SYS }, { OC_FNINCR, ALL_SYS }
 	,{ OC_FNZJ2, ALL_SYS }, { OC_FNZJ2, ALL_SYS }
 	,{ OC_FNZJOBEXAM, ALL_SYS }
@@ -455,6 +457,7 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_mint_mstr,
 	f_two_mstrs,
 	f_zgetsyi,
+	f_zhash,
 	f_incr, f_incr,
 	f_justify, f_justify,
 	f_zjobexam,

@@ -114,6 +114,7 @@ void	op_fnzechar(UNIX_ONLY_COMMA(int cnt) mval *dst, ...);
 void	op_fnzextract(int last, int first, mval *src, mval *dest);
 void	op_fnzfile(mval *name, mval *key, mval *ret);
 int4	op_fnzfind(mval *src, mval *del, mint first, mval *dst);
+void	op_fnzhash(mval *string, int salt, mval *ret);
 void	op_fnzj2(mval *src, int len, mval *dst);
 void	op_fnzjobexam(mval *prelimSpec, mval *zshowcodes, mval *finalSpec);
 void	op_fnzlength(mval *a1, mval *a0);
