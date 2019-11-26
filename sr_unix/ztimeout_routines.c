@@ -113,7 +113,7 @@ void check_and_set_ztimeout(mval * inp_val)
 	sigset_t	savemask;
 	int4		rc;
 	ABS_TIME	cur_time, end_time;
-	int4		msec_timeout = -1;   /* no change to timeout in milliseconds */
+	uint8		nsec_timeout;   /* timeout in nanoseconds */
 	mval		*interim_ptr;
 	mval		ztimeout_vector, ztimeout_seconds;
 	boolean_t	is_negative = FALSE;
@@ -170,7 +170,7 @@ void check_and_set_ztimeout(mval * inp_val)
 				ztimeout_seconds.str.len = STRLEN(local_str_val);
 				ztimeout_seconds.mvtype = MV_STR;
 				interim_ptr = &ztimeout_seconds;
-				MV_FORCE_MSTIMEOUT(interim_ptr, msec_timeout, ZTIMEOUTSTR);
+				MV_FORCE_NSTIMEOUT(interim_ptr, nsec_timeout, ZTIMEOUTSTR);
 				if (colon_ptr == (local_str_end - 1)) /* Form : timeout: */
 					NULLIFY_VECTOR;
 				/* Done with the contents of ztimeout_seconds */
@@ -185,12 +185,12 @@ void check_and_set_ztimeout(mval * inp_val)
 			STRNLEN(tok_ptr, MAX_SRCLINE, ztimeout_seconds.str.len);
 			ztimeout_seconds.mvtype = MV_STR;
 			interim_ptr = &ztimeout_seconds;
-			MV_FORCE_MSTIMEOUT(interim_ptr, msec_timeout, ZTIMEOUTSTR);
+			MV_FORCE_NSTIMEOUT(interim_ptr, nsec_timeout, ZTIMEOUTSTR);
 			/* Done with the contents of ztimeout_seconds */
 			ztimeout_seconds.str.addr = NULL;
 			ztimeout_seconds.str.len = 0;
 		}
-		if (msec_timeout >= 0)
+		if (0 <= nsec_timeout)
 		/* Will be zero for both 0 and negative value */
 		{
 			/* If only timeout specified or timeout:,
@@ -220,23 +220,23 @@ void check_and_set_ztimeout(mval * inp_val)
 	(TREF(dollar_ztimeout)).ztimeout_seconds = ztimeout_seconds;
 	if (!is_negative)
 	{
-		if (!msec_timeout)
+		if (!nsec_timeout)
 		{ /* Immediately transfer control to vector */
 			TREF(in_ztimeout) = TRUE;
 			cancel_timer(ZTIMEOUT_TIMER_ID);
 			start_timer(ZTIMEOUT_TIMER_ID, 0, &ztimeout_expire_now, 0, NULL);
-		} else if (0 < msec_timeout)
+		} else if (0 < nsec_timeout)
 		{
 			if (!TREF(in_ztimeout))
 				TREF(in_ztimeout) = TRUE;
 			else	/* Cancel the previous timer and start a new one */
 				cancel_timer(ZTIMEOUT_TIMER_ID);
 			sys_get_curr_time(&cur_time);
-			add_int_to_abs_time(&cur_time, msec_timeout, &(TREF(dollar_ztimeout)).end_time);
-			start_timer(ZTIMEOUT_TIMER_ID, msec_timeout,
+			add_uint8_to_abs_time(&cur_time, nsec_timeout, &(TREF(dollar_ztimeout)).end_time);
+			start_timer(ZTIMEOUT_TIMER_ID, nsec_timeout,
 						&ztimeout_expire_now, 0, NULL);
 			DBGDFRDEVNT((stderr,"Started ztimeout timer with timeout: %d\n",
-								msec_timeout));
+								nsec_timeout));
 		}
 	}
 	assert(!local_str_val);

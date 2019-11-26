@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2012 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -113,8 +113,7 @@ void mu_upgrd_header(v15_sgmnt_data *v15_csd, sgmnt_data *csd)
 	csd->trans_hist.lock_sequence = v15_csd->trans_hist.lock_sequence;
 	csd->trans_hist.total_blks = v15_csd->trans_hist.total_blks;
 	csd->trans_hist.free_blocks = v15_csd->trans_hist.free_blocks;
-	csd->flush_time[0] = v15_csd->flush_time[0];
-	csd->flush_time[1] = v15_csd->flush_time[1];
+	csd->flush_time = v15_csd->flush_time[0] * (uint8)NANOSECS_IN_MSEC;
 	csd->flush_trigger = v15_csd->flush_trigger;
 	csd->n_wrt_per_flu = v15_csd->n_wrt_per_flu;
 	csd->wait_disk_space = v15_csd->wait_disk_space;

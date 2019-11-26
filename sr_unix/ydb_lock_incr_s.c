@@ -40,9 +40,8 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, const ydb_buffer_t *varname
 	int			parmidx, timeoutms, lock_rc;
 	gparam_list		plist;
 	boolean_t		error_encountered;
-	mval			timeout_mval, varname_mval;
+	mval			 varname_mval;
 	mval			plist_mvals[YDB_MAX_SUBS + 1];
-	unsigned long long	timeout_sec;
 	ydb_var_types		var_type;
 	int			var_svn_index;
 	DCL_THREADGBL_ACCESS;
@@ -96,9 +95,7 @@ int ydb_lock_incr_s(unsigned long long timeout_nsec, const ydb_buffer_t *varname
 	 * convert the timeout value from nanoseconds to seconds
 	 */
 	assert(MAXPOSINT4 >= (timeout_nsec / NANOSECS_IN_MSEC));	/* Or else a TIME2LONG error would have been issued above */
-	timeout_sec = (timeout_nsec / NANOSECS_IN_SEC);
-	i2mval(&timeout_mval, (int)timeout_sec);
-	lock_rc = op_incrlock(&timeout_mval);
+	lock_rc = op_incrlock_common(timeout_nsec);
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* The counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;

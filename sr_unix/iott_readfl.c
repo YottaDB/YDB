@@ -140,7 +140,7 @@ void iott_readfl_badchar(mval *vmvalptr, wint_t *dataptr32, int datalen,
 }
 #endif
 
-int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseconds */
+int	iott_readfl(mval *v, int4 length, uint8 nsec_timeout)	/* timeout in milliseconds */
 {
 	boolean_t	ret, nonzerotimeout, timed, insert_mode, edit_mode, utf8_active, zint_restart, buffer_moved;
 	uint4		mask;
@@ -249,13 +249,13 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 			no_up_or_down_cursor_yet = tt_state->no_up_or_down_cursor_yet;
 			insert_mode = tt_state->insert_mode;
 			/* The below two asserts ensure the invocation of "iott_rdone" after a job interrupt has
-			 * the exact same "msec_timeout" as well as "timed" variable context. This is needed to
+			 * the exact same "nsec_timeout" as well as "timed" variable context. This is needed to
 			 * ensure that the "end_time" usages in the post-interrupt invocation always happen
 			 * only if the pre-interrupt invocation had initialized "end_time".
 			 * Note: Since "timed" is not yet set, we cannot use it but instead use the variables that it derives from.
 			 */
-			assert((NO_M_TIMEOUT != msec_timeout) == tt_state->timed);
-			assert(msec_timeout == tt_state->msec_timeout);
+			assert((NO_M_TIMEOUT != nsec_timeout) == tt_state->timed);
+			assert(nsec_timeout == tt_state->nsec_timeout);
 			end_time = tt_state->end_time;
 			zb_ptr = tt_state->zb_ptr;
 			zb_top = tt_state->zb_top;
@@ -347,7 +347,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 	if (!zint_restart)
 		dx = dx_start;
 	nonzerotimeout = FALSE;
-	if (NO_M_TIMEOUT == msec_timeout)
+	if (NO_M_TIMEOUT == nsec_timeout)
 	{
 		timed = FALSE;
 		input_timeval.tv_sec = 100;
@@ -355,9 +355,9 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 	} else
 	{
 		timed = TRUE;
-		input_timeval.tv_sec = msec_timeout / MILLISECS_IN_SEC;
-		input_timeval.tv_usec = (msec_timeout % MILLISECS_IN_SEC) * MICROSECS_IN_MSEC;
-		if (!msec_timeout)
+		input_timeval.tv_sec = nsec_timeout / NANOSECS_IN_SEC;
+		input_timeval.tv_usec = (nsec_timeout % NANOSECS_IN_SEC) / NANOSECS_IN_USEC;
+		if (!nsec_timeout)
 		{
 			if (!zint_restart)
 				iott_mterm(io_ptr);
@@ -366,7 +366,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 			nonzerotimeout = TRUE;
    			sys_get_curr_time(&cur_time);
 			if (!zint_restart)
-				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+				add_uint8_to_abs_time(&cur_time, nsec_timeout, &end_time);
 		}
 	}
 	do
@@ -415,14 +415,14 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 #				ifdef DEBUG
 				/* Store debug-only context used later to assert when restoring this context */
 				tt_state->timed = timed;
-				tt_state->msec_timeout = msec_timeout;
+				tt_state->nsec_timeout = nsec_timeout;
 #				endif
 				tt_ptr->mupintr = TRUE;
 			} else
 			{
 				instr = outlen = 0;
 				SEND_KEYPAD_LOCAL;
-				if (!msec_timeout)
+				if (!nsec_timeout)
 					iott_rterm(io_ptr);
 			}
 			REVERT_GTMIO_CH(&io_curr_device, ch_set);
@@ -574,7 +574,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				io_ptr->dollar.za = 9;
 				std_dev_outbndset(INPUT_CHAR);	/* it needs ASCII?	*/
 				SEND_KEYPAD_LOCAL;
-				if (!msec_timeout)
+				if (!nsec_timeout)
 					iott_rterm(io_ptr);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
 				break;
@@ -1183,7 +1183,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 	} while (outlen < length);
 	*zb_ptr++ = 0;
 	memcpy(io_ptr->dollar.key, io_ptr->dollar.zb, (zb_ptr - io_ptr->dollar.zb));
-	if (!msec_timeout)
+	if (!nsec_timeout)
 	{
 		iott_rterm(io_ptr);
 		if (0 == outlen && ((io_ptr->dollar.zb + 1) == zb_ptr)) /* No input and no delimiter seen */
@@ -1243,7 +1243,7 @@ term_error:
 	io_ptr->dollar.za = 9;
 	tt_ptr->discard_lf = FALSE;
 	SEND_KEYPAD_LOCAL;	/* to turn keypad off if possible */
-	if (!msec_timeout)
+	if (!nsec_timeout)
 		iott_rterm(io_ptr);
 	RESETTERM_IF_NEEDED(io_ptr, EXPECT_SETTERM_DONE_TRUE);
 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_errno);

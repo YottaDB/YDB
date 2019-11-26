@@ -744,7 +744,7 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 				err_status = save_errno;
 				if (!skip_in_trans)
 				{	/* We have an error from the write. Could be disk space or a real error. Handle it.
-					 * Note: This write will be automatically retried after csd->flush_time[0] msec, if this
+					 * Note: This write will be automatically retried after csd->flush_time nanosec, if this
 					 * was called through a timer-pop, otherwise, error (return value from this function)
 					 * should be handled (including ignored) by the caller.
 					 */

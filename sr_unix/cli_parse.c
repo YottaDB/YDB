@@ -65,9 +65,9 @@ static CLI_PARM 	*gpcmd_parm_vals;		/* pointer to parameters for command */
 GBLREF char 		cli_token_buf[];
 GBLREF CLI_ENTRY 	*cmd_ary;
 
-GBLREF IN_PARMS *cli_lex_in_ptr;
+GBLREF IN_PARMS		*cli_lex_in_ptr;
 
-LITREF	mval		literal_notimeout;
+LITREF mval		literal_notimeout;
 
 error_def(ERR_CLIERR);
 error_def(ERR_MUNOACTION);

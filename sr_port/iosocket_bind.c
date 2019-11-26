@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@ error_def(ERR_SOCKBIND);
 error_def(ERR_SOCKINIT);
 error_def(ERR_TEXT);
 
-boolean_t iosocket_bind(socket_struct *socketptr, int4 msec_timeout, boolean_t update_bufsiz, boolean_t newversion)
+boolean_t iosocket_bind(socket_struct *socketptr, uint8 nsec_timeout, boolean_t update_bufsiz, boolean_t newversion)
 {
 	int			temp_1 = 1;
 	char			*errptr, *charptr;
@@ -75,10 +75,10 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 msec_timeout, boolean_t u
 		socketptr->sd = socketptr->temp_sd;
 		socketptr->temp_sd = FD_INVALID;
 	}
-	if (NO_M_TIMEOUT != msec_timeout)
+	if (NO_M_TIMEOUT != nsec_timeout)
 	{
 		sys_get_curr_time(&cur_time);
-		add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+		add_uint8_to_abs_time(&cur_time, nsec_timeout, &end_time);
 	}
 	do
 	{
@@ -175,14 +175,17 @@ boolean_t iosocket_bind(socket_struct *socketptr, int4 msec_timeout, boolean_t u
 				case EINTR:
 					break;
 				case EADDRINUSE:
-					if (NO_M_TIMEOUT != msec_timeout)
+					if (NO_M_TIMEOUT != nsec_timeout)
 					{
 						sys_get_curr_time(&cur_time);
 						cur_time = sub_abs_time(&end_time, &cur_time);
-						msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
-							/* Round up in order to prevent premature timeouts */
-							DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
-						if (msec_timeout > 0)
+						if (0 > cur_time.tv_sec)
+						{
+							cur_time.tv_sec = 0;
+							cur_time.tv_nsec = 0;
+						}
+						nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+						if (0 != nsec_timeout)
 							no_time_left = FALSE;
 					} else
 						no_time_left = FALSE;	/* retry */

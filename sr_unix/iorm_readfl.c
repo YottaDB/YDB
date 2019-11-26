@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -124,7 +124,7 @@ void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned cha
 }
 #endif
 
-int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseconds */
+int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseconds */
 {
 	boolean_t	ret, timed, utf_active, line_term_seen = FALSE, rdone = FALSE, zint_restart;
 	char		inchar, *temp, *temp_start;
@@ -161,8 +161,8 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 	struct timeval	poll_interval;
 	int		poll_status;
 	fd_set		input_fds;
-	int4 sleep_left;
-	int4 sleep_time;
+	uint8		sleep_left;
+	int4		sleep_time;
 	struct stat	statbuf;
 	int		fstat_res;
 	off_t		cur_position;
@@ -408,7 +408,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 		}
 		PIPE_DEBUG(PRINTF("piperfl: .. mv_stent found - bytes_read: %d max_bufflen: %d"
 				  "  interrupts: %d\n", bytes_read, exp_width, TREF(pipefifo_interrupt)); DEBUGPIPEFLUSH);
-		PIPE_DEBUG(PRINTF("piperfl: .. timeout: %d\n", msec_timeout); DEBUGPIPEFLUSH);
+		PIPE_DEBUG(PRINTF("piperfl: .. timeout: %llu\n", nsec_timeout); DEBUGPIPEFLUSH);
 		PIPE_DEBUG(if (pipeintr->end_time_valid) PRINTF("piperfl: .. endtime: %d/%d\n", end_time.tv_sec,
 								end_time.tv_nsec / NANOSECS_IN_USEC); DEBUGPIPEFLUSH);
 		PIPE_DEBUG(PRINTF("piperfl: .. buffer address: 0x%08lx  stringpool: 0x%08lx\n",
@@ -459,7 +459,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 	if (utf_active || !rm_ptr->fixed)
 		bytes_read = 0;
 	out_of_time = FALSE;
-	if (NO_M_TIMEOUT == msec_timeout)
+	if (NO_M_TIMEOUT == nsec_timeout)
 	{
 		timed = FALSE;
 		assert(!pipeintr->end_time_valid);
@@ -469,37 +469,36 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 		 * read completing, the timer handler changes out_of_time to TRUE. In the READ x:0 case for a PIPE, if an attempt to
 		 * read one character in non-blocking mode succeeds, we set blocked_in to TRUE (to prevent a 2nd timer), set the
 		 * PIPE to blocking mode and start the timer for one second. We set timed to TRUE for both READ x:n and x:0;
-		 * msec_timeout is 0 for a READ x:0 unless it's a PIPE which has read one character and started a 1 second timer. If
+		 * nsec_timeout is 0 for a READ x:0 unless it's a PIPE which has read one character and started a 1 second timer. If
 		 * timed is TRUE, we manage the timer outcome at the end of this routine.
 		 */
 		timed = TRUE;
-		if (0 < msec_timeout)
+		if (0 < nsec_timeout)
 		{	/* For the READ x:n case, start a timer and clean it up in the (timed) clause at the end of this routine if
 			 * it has not expired.
 			 */
 			sys_get_curr_time(&cur_time);
 			if (!zint_restart || !pipeintr->end_time_valid)
-				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+				add_uint8_to_abs_time(&cur_time, nsec_timeout, &end_time);
 			else
-			{	/* Compute appropriate msec_timeout using end_time from restart data. */
+			{	/* Compute appropriate nsec_timeout using end_time from restart data. */
 				end_time = pipeintr->end_time;	/* Restore end_time for timeout */
 				cur_time = sub_abs_time(&end_time, &cur_time);
 				if (0 > cur_time.tv_sec)
 				{
-					msec_timeout = -1;
+					nsec_timeout = 0;
 					out_of_time = TRUE;
 				} else
-					msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
-							      DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
-				if (rm_ptr->follow && !out_of_time && !msec_timeout)
-					msec_timeout = 1;
+					nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+				if (rm_ptr->follow && !out_of_time && !nsec_timeout)
+					nsec_timeout = 1;
 				PIPE_DEBUG(PRINTF("piperfl: Taking timeout end time from read restart data - "
-						  "computed msec_timeout: %d\n", msec_timeout); DEBUGPIPEFLUSH);
+						  "computed nsec_timeout: %llu\n", nsec_timeout); DEBUGPIPEFLUSH);
 			}
-			PIPE_DEBUG(PRINTF("msec_timeout: %d\n", msec_timeout); DEBUGPIPEFLUSH);
+			PIPE_DEBUG(PRINTF("nsec_timeout: %llu\n", nsec_timeout); DEBUGPIPEFLUSH);
 			/* if it is a disk read with follow don't start timer, as we use a sleep loop instead */
-			if ((0 < msec_timeout) && !rm_ptr->follow)
-				start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
+			if ((0 < nsec_timeout) && !rm_ptr->follow)
+				start_timer(timer_id, nsec_timeout, wake_alarm, 0, NULL);
 		} else
 		{	/* Except for the one-character read case with a PIPE device described above, a READ x:0 sets out_of_time to
 			 * TRUE.
@@ -541,23 +540,22 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				PIPE_DEBUG(PRINTF(" %d fixed\n", pid); DEBUGPIPEFLUSH);
 				if (timed)
 				{
-					/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
-					if (0 < msec_timeout)
+					/* recalculate nsec_timeout and sleep_left as &end_time - &current_time */
+					if (0 < nsec_timeout)
 					{
 						/* get the current time */
 						sys_get_curr_time(&current_time);
 						time_left = sub_abs_time(&end_time, &current_time);
 						if (0 > time_left.tv_sec)
 						{
-							msec_timeout = -1;
+							nsec_timeout = 0;
 							out_of_time = TRUE;
 						} else
-							msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
-									DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
+							nsec_timeout = (time_left.tv_sec * (uint8)NANOSECS_IN_SEC) + time_left.tv_nsec;
 						/* make sure it terminates with out_of_time */
-						if (!out_of_time && !msec_timeout)
-							msec_timeout = 1;
-						sleep_left = msec_timeout;
+						if (!out_of_time && !nsec_timeout)
+							nsec_timeout = 1;
+						sleep_left = nsec_timeout;
 					} else
 						sleep_left = 0;
 				}
@@ -589,22 +587,25 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 						   If not a timed read then just sleep 100 ms */
 						if (TRUE == timed)
 						{
-							/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
+							/* recalculate nsec_timeout and sleep_left as &end_time - &current_time */
 							/* get the current time */
 							sys_get_curr_time(&current_time);
 							time_left = sub_abs_time(&end_time, &current_time);
 							if (0 > time_left.tv_sec)
 							{
-								msec_timeout = -1;
+								nsec_timeout = 0;
 								out_of_time = TRUE;
 							} else
-								msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC
-									+ DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
+								nsec_timeout = (time_left.tv_sec * (uint8)NANOSECS_IN_SEC)
+									+ time_left.tv_nsec;
 							/* make sure it terminates with out_of_time */
-							if (!out_of_time && !msec_timeout)
-								msec_timeout = 1;
-							sleep_left = msec_timeout;
-							sleep_time = MIN(100, sleep_left);
+							if (!out_of_time && !nsec_timeout)
+								nsec_timeout = 1;
+							sleep_left = nsec_timeout;
+							sleep_time = MIN(100, (sleep_left / NANOSECS_IN_MSEC));
+							/* If timer has under 1 ms left, set sleep_time to 1 ms */
+							if (0 == sleep_time && sleep_left != 0)
+								sleep_time = 1;
 						} else
 							sleep_time = 100;
 						if (0 < sleep_time)
@@ -619,7 +620,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 							mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = tot_bytes_read;
 							mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
 							pipeintr->who_saved = pipewhich_readfl;
-							if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+							if ((0 < nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 							{
 								pipeintr->end_time = end_time;
 								pipeintr->end_time_valid = TRUE;
@@ -651,7 +652,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				 * cancel that timer later in this routine if it has not expired before the return.
 				 */
 				DOREADRLTO2(fildes, temp, width, out_of_time, &blocked_in, rm_ptr->is_pipe, flags, status,
-					    &tot_bytes_read, timer_id, &msec_timeout, pipe_zero_timeout, FALSE, pipe_or_fifo);
+					    &tot_bytes_read, timer_id, &nsec_timeout, pipe_zero_timeout, FALSE, pipe_or_fifo);
 				PIPE_DEBUG(PRINTF(" %d fixed\n", pid); DEBUGPIPEFLUSH);
 				if ((0 < status) || ((0 > status) && (0 < tot_bytes_read)))
 				{
@@ -690,7 +691,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 					mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = tot_bytes_read;
 					mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
 					pipeintr->who_saved = pipewhich_readfl;
-					if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+					if ((0 < nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 					{
 						pipeintr->end_time = end_time;
 						pipeintr->end_time_valid = TRUE;
@@ -720,23 +721,22 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				/* rms-file device in follow mode */
 				if (timed)
 				{
-					/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
-					if (0 < msec_timeout)
+					/* recalculate nsec_timeout and sleep_left as &end_time - &current_time */
+					if (0 < nsec_timeout)
 					{
 						/* get the current time */
 						sys_get_curr_time(&current_time);
 						time_left = sub_abs_time(&end_time, &current_time);
 						if (0 > time_left.tv_sec)
 						{
-							msec_timeout = -1;
+							nsec_timeout = 0;
 							out_of_time = TRUE;
 						} else
-							msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
-									DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
+							nsec_timeout = (time_left.tv_sec * (uint8)NANOSECS_IN_SEC) + time_left.tv_nsec;
 						/* make sure it terminates with out_of_time */
-						if (!out_of_time && !msec_timeout)
-							msec_timeout = 1;
-						sleep_left = msec_timeout;
+						if (!out_of_time && !nsec_timeout)
+							nsec_timeout = 1;
+						sleep_left = nsec_timeout;
 					} else
 						sleep_left = 0;
 				}
@@ -786,7 +786,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 							 */
 							if (TRUE == timed)
 							{
-								/* recalculate msec_timeout and sleep_left as
+								/* recalculate nsec_timeout and sleep_left as
 								 * &end_time - &current_time.
 								 */
 								/* get the current time */
@@ -794,17 +794,19 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 								time_left = sub_abs_time(&end_time, &current_time);
 								if (0 > time_left.tv_sec)
 								{
-									msec_timeout = -1;
+									nsec_timeout = 0;
 									out_of_time = TRUE;
 								} else
-									msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC
-										+ DIVIDE_ROUND_UP(time_left.tv_nsec,
-													NANOSECS_IN_MSEC));
+									nsec_timeout = (time_left.tv_sec * (uint8)NANOSECS_IN_SEC)
+										+ time_left.tv_nsec;
 								/* make sure it terminates with out_of_time */
-								if (!out_of_time && !msec_timeout)
-									msec_timeout = 1;
-								sleep_left = msec_timeout;
-								sleep_time = MIN(100, sleep_left);
+								if (!out_of_time && !nsec_timeout)
+									nsec_timeout = 1;
+								sleep_left = nsec_timeout;
+								sleep_time = MIN(100, (sleep_left / NANOSECS_IN_MSEC));
+								/* If timer has under 1 ms left, set sleep_time to 1 ms */
+								if (0 == sleep_time && sleep_left != 0)
+									sleep_time = 1;
 							} else
 								sleep_time = 100;
 							if (0 < sleep_time)
@@ -822,7 +824,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 								mv_chain->mv_st_cont.mvs_zintdev.buffer_valid =
 									TRUE;
 								pipeintr->who_saved = pipewhich_readfl;
-								if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+								if ((0 < nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 								{
 									pipeintr->end_time = end_time;
 									pipeintr->end_time_valid = TRUE;
@@ -863,7 +865,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 						DOREADRLTO2(fildes, rm_ptr->tmp_buffer, CHUNK_SIZE,
 							    out_of_time, &blocked_in, rm_ptr->is_pipe, flags,
 							    status, &chunk_bytes_read, timer_id,
-							    &msec_timeout, pipe_zero_timeout, pipe_or_fifo, pipe_or_fifo);
+							    &nsec_timeout, pipe_zero_timeout, pipe_or_fifo, pipe_or_fifo);
 						if ((0 < status) || ((0 > status) && (0 < chunk_bytes_read)))
 						{
 							if (rm_ptr->input_encrypted)
@@ -890,7 +892,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 						mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = bytes_count;
 						mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
 						pipeintr->who_saved = pipewhich_readfl;
-						if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+						if ((0 < nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 						{
 							pipeintr->end_time = end_time;
 							pipeintr->end_time_valid = TRUE;
@@ -1001,14 +1003,14 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 			{	/* need to refill the buffer */
 				if (rm_ptr->follow)
 				{
-					buff_len = iorm_get_fol(io_ptr, &tot_bytes_read, &msec_timeout, timed, zint_restart,
+					buff_len = iorm_get_fol(io_ptr, &tot_bytes_read, &nsec_timeout, timed, zint_restart,
 								&follow_timeout, end_time);
 					/* this will include the total bytes read including any stripped pad chars */
 					fol_bytes_read = rm_ptr->fol_bytes_read;
 				} else
 				{
 					buff_len = iorm_get(io_ptr, &blocked_in, rm_ptr->is_pipe, flags, &tot_bytes_read,
-						    timer_id, &msec_timeout, pipe_zero_timeout, zint_restart);
+						    timer_id, &nsec_timeout, pipe_zero_timeout, zint_restart);
 					/* not using fol_bytes_read for non-follow mode */
 					fol_bytes_read = buff_len;
 				}
@@ -1027,7 +1029,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 					mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = 0;
 					mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
 					pipeintr->who_saved = pipewhich_readfl;
-					if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+					if ((0 < nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 					{
 						pipeintr->end_time = end_time;
 						pipeintr->end_time_valid = TRUE;
@@ -1167,23 +1169,22 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				/* rms-file device in follow mode */
 				if (timed)
 				{
-					/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
-					if (0 < msec_timeout)
+					/* recalculate nsec_timeout and sleep_left as &end_time - &current_time */
+					if (0 < nsec_timeout)
 					{
 						/* get the current time */
 						sys_get_curr_time(&current_time);
 						time_left = sub_abs_time(&end_time, &current_time);
 						if (0 > time_left.tv_sec)
 						{
-							msec_timeout = -1;
+							nsec_timeout = 0;
 							out_of_time = TRUE;
 						} else
-							msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
-									DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
+							nsec_timeout = (time_left.tv_sec * (uint8)NANOSECS_IN_SEC) + time_left.tv_nsec;
 						/* make sure it terminates with out_of_time */
-						if (!out_of_time && !msec_timeout)
-							msec_timeout = 1;
-						sleep_left = msec_timeout;
+						if (!out_of_time && !nsec_timeout)
+							nsec_timeout = 1;
+						sleep_left = nsec_timeout;
 					} else
 						sleep_left = 0;
 				}
@@ -1206,11 +1207,11 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 					/* need to check BOM */
 					if (rm_ptr->follow)
 					{
-						status = iorm_get_bom_fol(io_ptr, &tot_bytes_read, &msec_timeout, timed,
+						status = iorm_get_bom_fol(io_ptr, &tot_bytes_read, &nsec_timeout, timed,
 									  &bom_timeout, end_time);
 					} else
 						status = iorm_get_bom(io_ptr, &blocked_in, rm_ptr->is_pipe, flags, &tot_bytes_read,
-							      timer_id, &msec_timeout, pipe_zero_timeout);
+							      timer_id, &nsec_timeout, pipe_zero_timeout);
 					/* if we got an interrupt then the iorm_get_bom did not complete so not as much state
 					   needs to be saved*/
 					if (outofband && (pipe_or_fifo || rm_ptr->follow))
@@ -1222,7 +1223,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 						mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = 0;
 						mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
 						pipeintr->who_saved = pipewhich_readfl;
-						if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+						if ((0 < nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 						{
 							pipeintr->end_time = end_time;
 							pipeintr->end_time_valid = TRUE;
@@ -1304,7 +1305,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 								 */
 								if (TRUE == timed)
 								{
-									/* recalculate msec_timeout and sleep_left as
+									/* recalculate nsec_timeout and sleep_left as
 									 * &end_time - &current_time.
 									 */
 									/* get the current time */
@@ -1312,18 +1313,19 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 									time_left = sub_abs_time(&end_time, &current_time);
 									if (0 > time_left.tv_sec)
 									{
-										msec_timeout = -1;
+										nsec_timeout = 0;
 										out_of_time = TRUE;
 									} else
-										msec_timeout = (int4)(time_left.tv_sec *
-														MILLISECS_IN_SEC
-											+ DIVIDE_ROUND_UP(time_left.tv_nsec,
-														NANOSECS_IN_MSEC));
+										nsec_timeout = (time_left.tv_sec * (uint8)NANOSECS_IN_SEC)
+											+ time_left.tv_nsec;
 									/* make sure it terminates with out_of_time */
-									if (!out_of_time && !msec_timeout)
-										msec_timeout = 1;
-									sleep_left = msec_timeout;
-									sleep_time = MIN(100, sleep_left);
+									if (!out_of_time && !nsec_timeout)
+										nsec_timeout = 1;
+									sleep_left = nsec_timeout;
+									sleep_time = MIN(100, (sleep_left / NANOSECS_IN_MSEC));
+									/* If timer has under 1 ms left, set sleep_time to 1 ms */
+									if (0 == sleep_time && sleep_left != 0)
+										sleep_time = 1;
 								} else
 									sleep_time = 100;
 								if (0 < sleep_time)
@@ -1341,7 +1343,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 									mv_chain->mv_st_cont.mvs_zintdev.buffer_valid =
 										TRUE;
 									pipeintr->who_saved = pipewhich_readfl;
-									if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+									if ((0 < nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 									{
 										pipeintr->end_time = end_time;
 										pipeintr->end_time_valid = TRUE;
@@ -1383,7 +1385,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 							DOREADRLTO2(fildes, rm_ptr->tmp_buffer, CHUNK_SIZE,
 								    out_of_time, &blocked_in, rm_ptr->is_pipe, flags,
 								    status, &utf_tot_bytes_read, timer_id,
-								    &msec_timeout, pipe_zero_timeout, pipe_or_fifo, pipe_or_fifo);
+								    &nsec_timeout, pipe_zero_timeout, pipe_or_fifo, pipe_or_fifo);
 							if ((0 < status) || ((0 > status) && (0 < utf_tot_bytes_read)))
 							{
 								if (rm_ptr->input_encrypted)
@@ -1410,7 +1412,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 							mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = bytes_count;
 							mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = TRUE;
 							pipeintr->who_saved = pipewhich_readfl;
-							if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+							if ((0 < nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 							{
 								pipeintr->end_time = end_time;
 								pipeintr->end_time_valid = TRUE;
@@ -1889,8 +1891,8 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 		ret = FALSE;
 	}
 	if (timed)
-	{	/* No timer if msec_timeout is zero, so handle the timer in the else. */
-		if (msec_timeout == 0)
+	{	/* No timer if nsec_timeout is zero, so handle the timer in the else. */
+		if (nsec_timeout == 0)
 		{
 			if (!rm_ptr->is_pipe || FALSE == blocked_in)
 			{

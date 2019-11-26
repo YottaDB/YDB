@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,13 +58,13 @@ int op_readfl(mval *v, int4 length, mval *timeout)
 	char		*start_ptr, *save_ptr;
 	int		b_length;
 	int4		stat;		/* status */
-	int4		msec_timeout;
+	uint8		nsec_timeout;
 	size_t		cnt, insize, outsize;
 	unsigned char	*temp_ch;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, READTIMESTR);
+	MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, READTIMESTR);
 	/* Length is in units of characters, MAX_STRLEN and allocation unit in stp is bytes. Compute the worst case need in bytes.
 	 * Worst case, every UTF char is 4 bytes
 	 */
@@ -81,7 +81,7 @@ int op_readfl(mval *v, int4 length, mval *timeout)
 	ENSURE_STP_FREE_SPACE(b_length + ESC_LEN);
 	v->str.addr = (char *)stringpool.free;
 	active_device = io_curr_device.in;
-	stat = (io_curr_device.in->disp_ptr->readfl)(v, length, msec_timeout);
+	stat = (io_curr_device.in->disp_ptr->readfl)(v, length, nsec_timeout);
 	if (IS_AT_END_OF_STRINGPOOL(v->str.addr, 0))
 		stringpool.free += v->str.len;	/* see iott_readfl */
 	assert((int4)v->str.len <= b_length);
@@ -103,5 +103,5 @@ int op_readfl(mval *v, int4 length, mval *timeout)
 	}
 #	endif
 	active_device = 0;
-	return ((NO_M_TIMEOUT != msec_timeout) ? stat : FALSE);
+	return ((NO_M_TIMEOUT != nsec_timeout) ? stat : FALSE);
 }

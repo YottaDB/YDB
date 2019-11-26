@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -756,8 +756,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(trans_hist.total_blks);
 	SWAP_SD4(trans_hist.free_blocks);
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
-	SWAP_SD4(flush_time[0]);
-	SWAP_SD4(flush_time[1]);
+	SWAP_SD8(flush_time);
 	SWAP_SD4(flush_trigger);
 	SWAP_SD4(n_wrt_per_flu);
 	SWAP_SD4(wait_disk_space);

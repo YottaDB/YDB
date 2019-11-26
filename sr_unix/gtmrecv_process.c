@@ -3310,7 +3310,7 @@ STATICFNDEF void do_main_loop(boolean_t crash_restart)
 #						ifdef REPL_CMP_SOLVE_TESTING
 						if (TREF(ydb_environment_init))
 						{
-							start_timer((TID)repl_cmp_solve_rcv_timeout, 15 * 60 * 1000,
+							start_timer((TID)repl_cmp_solve_rcv_timeout, 15 * 60 * (uint8)NANOSECS_IN_SEC,
 									repl_cmp_solve_rcv_timeout, 0, NULL);
 							repl_cmp_solve_timer_set = TRUE;
 						}
@@ -3704,8 +3704,8 @@ STATICFNDEF void gtmrecv_heartbeat_timer(TID tid, int4 interval_len, int *interv
 	UNIX_ONLY(assert(*interval_ptr == heartbeat_period);)	/* interval_len and interval_ptr are dummies on VMS */
 	gtmrecv_now += heartbeat_period;
 	REPL_DPRINT2("Starting heartbeat timer with %d s\n", heartbeat_period);
-	start_timer((TID)gtmrecv_heartbeat_timer, heartbeat_period * 1000, gtmrecv_heartbeat_timer, SIZEOF(heartbeat_period),
-			&heartbeat_period); /* start_timer expects time interval in milli seconds, heartbeat_period is in seconds */
+	start_timer((TID)gtmrecv_heartbeat_timer, heartbeat_period * (uint8)NANOSECS_IN_SEC, gtmrecv_heartbeat_timer, SIZEOF(heartbeat_period),
+			&heartbeat_period); /* start_timer expects time interval in nanoseconds, heartbeat_period is in seconds */
 }
 
 STATICFNDEF void gtmrecv_main_loop(boolean_t crash_restart)
@@ -3781,8 +3781,8 @@ void gtmrecv_process(boolean_t crash_restart)
 	gtmrecv_alloc_msgbuff();
 	gtmrecv_now = time(NULL);
 	heartbeat_period = GTMRECV_HEARTBEAT_PERIOD; /* time keeper, well sorta */
-	start_timer((TID)gtmrecv_heartbeat_timer, heartbeat_period * 1000, gtmrecv_heartbeat_timer, SIZEOF(heartbeat_period),
-			&heartbeat_period); /* start_timer expects time interval in milli seconds, heartbeat_period is in seconds */
+	start_timer((TID)gtmrecv_heartbeat_timer, heartbeat_period * (uint8)NANOSECS_IN_SEC, gtmrecv_heartbeat_timer, SIZEOF(heartbeat_period),
+			&heartbeat_period); /* start_timer expects time interval in nanoseconds, heartbeat_period is in seconds */
 	do
 	{
 		gtmrecv_main_loop(crash_restart);

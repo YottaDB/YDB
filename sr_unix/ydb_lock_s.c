@@ -52,11 +52,10 @@ int ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var)
 	int			parmidx, lock_rc, sub_idx, var_svn_index;
 	gparam_list		plist;
 	boolean_t		error_encountered;
-	mval			timeout_mval, varname_mval;
+	mval			varname_mval;
 	mval			plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_buffer_t		*varname, *subsarray, *subptr;
 	int			subs_used;
-	unsigned long long	timeout_sec;
 	ydb_var_types		var_type;
 	char			buff[256];	/* snprintf buffer */
 	DCL_THREADGBL_ACCESS;
@@ -170,17 +169,13 @@ int ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var)
 		callg((callgfnptr)op_lkname, &plist);
 	}
 	va_end(var);
-	/* At this point, all of the private lock blocks have been created. Remaining task before calling "op_lock2" is to
-	 * convert the timeout value from microseconds to seconds.
-	 */
 	assert(MAXPOSINT4 >= (timeout_nsec / NANOSECS_IN_MSEC));	/* Or else a TIME2LONG error would have been issued above */
-	timeout_sec = (timeout_nsec / NANOSECS_IN_SEC);
-	i2mval(&timeout_mval, (int)timeout_sec);
-	/* The generated code typically calls "op_lock" but that routine just calls "op_lock2" */
-	lock_rc = op_lock2(&timeout_mval, CM_LOCKS);
+	/* At this point, all of the private lock blocks have been created. */
+	/* The generated code typically calls "op_lock" but that routine just calls "op_lock2"
+	 * which calls "op_lock2_common" after converting seconds to nanoseconds */
+	lock_rc = op_lock2_common(timeout_nsec, CM_LOCKS);
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	LIBYOTTADB_DONE;
 	REVERT;
 	return lock_rc ? YDB_OK : YDB_LOCK_TIMEOUT;
 }
-

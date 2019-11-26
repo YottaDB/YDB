@@ -90,7 +90,7 @@ error_def(ERR_FORCEDHALT);
 error_def(ERR_JNLREADEOF);
 error_def(ERR_SYSCALL);
 
-#define STUCK_TIME	(16 * MILLISECS_IN_SEC)
+#define STUCK_TIME	(16 * (uint8)NANOSECS_IN_SEC)
 
 static	void	(* const extraction_routine[])() =
 {

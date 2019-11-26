@@ -144,10 +144,31 @@ STATICFNDCL void tp_warning(mlk_pvtblk *pvt_ptr)
  */
 int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 {
+
+	uint8			nsec_timeout;	/* timeout in nanoseconds */
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	cm_action = laflag;
+	out_of_time = FALSE;
+	if (CM_ZALLOCATES == cm_action)		/* can't use ? : syntax here because of the way the macros nest */
+		MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, ZALLOCTIMESTR);
+	else
+		MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, LOCKTIMESTR);
+	return op_lock2_common(nsec_timeout, laflag);
+}
+
+/*
+ * -----------------------------------------------
+ * See op_lock2 above. op_lock2_common does the same thing as
+ * op_lock2 except the timeout value passed to it is already
+ * in nanoseconds.
+ */
+int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanoseconds */
+{
 	boolean_t		blocked;
 	signed char		gotit;
 	unsigned short		locks_bckout, locks_done;
-	int4			msec_timeout;	/* timeout in milliseconds */
 	mlk_pvtblk		*pvt_ptr1, *pvt_ptr2, **prior, *already_locked;
 	unsigned char		action;
 	ABS_TIME		cur_time, end_time, remain_time;
@@ -158,14 +179,9 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 	SETUP_THREADGBL_ACCESS;
 	gotit = -1;
 	cm_action = laflag;
-	out_of_time = FALSE;
-	if (CM_ZALLOCATES == cm_action)		/* can't use ? : syntax here because of the way the macros nest */
-		MV_FORCE_MSTIMEOUT(timeout, msec_timeout, ZALLOCTIMESTR);
-	else
-		MV_FORCE_MSTIMEOUT(timeout, msec_timeout, LOCKTIMESTR);
-	if (NO_M_TIMEOUT != msec_timeout)
+	if (NO_M_TIMEOUT != timeout)
 	{
-		if (0 == msec_timeout)
+		if (0 == timeout)
 			out_of_time = TRUE;
 		else
 		{
@@ -175,12 +191,10 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 			{
 				end_time = mv_zintcmd->mv_st_cont.mvs_zintcmd.end_or_remain;
 				remain_time = sub_abs_time(&end_time, &cur_time);	/* get remaing time to sleep */
-				if (0 <= remain_time.tv_sec)
-					msec_timeout = (int4)((remain_time.tv_sec * MILLISECS_IN_SEC) +
-						/* Round up in order to prevent premature timeouts */
-						DIVIDE_ROUND_UP(remain_time.tv_nsec, NANOSECS_IN_MSEC));
+				if ((0 <= remain_time.tv_sec) && (0 <= remain_time.tv_nsec))
+					timeout = ((remain_time.tv_sec * (uint8)NANOSECS_IN_SEC) + remain_time.tv_nsec);
 				else
-					msec_timeout = 0;
+					timeout = 0;
 				TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_pc_last
 					= mv_zintcmd->mv_st_cont.mvs_zintcmd.restart_pc_prior;
 				TAREF1(zintcmd_active, ZINTCMD_LOCK).restart_ctxt_last
@@ -195,9 +209,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 					mv_zintcmd->mv_st_cont.mvs_zintcmd.restart_pc_check = NULL;
 				}
 			} else
-				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
-			if (0 > msec_timeout)
-				out_of_time = TRUE;
+				add_uint8_to_abs_time(&cur_time, timeout, &end_time);
 		}
 	}
 	lckclr();
@@ -208,9 +220,9 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 		if (remlkreq)
 		{
 			if (gotit >= 0)
-				gotit = gvcmx_resremlk(cm_action, msec_timeout, &end_time);
+				gotit = gvcmx_resremlk(cm_action, timeout, &end_time);
 			else
-				gotit = gvcmx_reqremlk(cm_action, msec_timeout, &end_time);	/* REQIMMED if 2nd arg == 0 */
+				gotit = gvcmx_reqremlk(cm_action, timeout, &end_time);	/* REQIMMED if 2nd arg == 0 */
 			if (!gotit)
 			{	/* only REQIMMED returns false */
 				blocked = TRUE;
@@ -278,7 +290,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 			mlk_bckout(pvt_ptr2, action);
 		}
 		assert(!pvt_ptr2->granted && (pvt_ptr2 == pvt_ptr1));
-		if (dollar_tlevel && msec_timeout && (CDB_STAGNATE <= t_tries))
+		if (dollar_tlevel && timeout && (CDB_STAGNATE <= t_tries))
 		{
 			assert(have_crit(CRIT_HAVE_ANY_REG));
 			tp_warning(pvt_ptr2);
@@ -288,7 +300,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 							 */
 		for (;;)
 		{
-			SET_OUT_OF_TIME_IF_APPROPRIATE(msec_timeout, &end_time, out_of_time);	/* may set "out_of_time" */
+			SET_OUT_OF_TIME_IF_APPROPRIATE(timeout, &end_time, out_of_time);	/* may set "out_of_time" */
 			if (out_of_time || outofband)
 			{	/* if time expired || control-c, tptimeout, or jobinterrupt encountered */
 				if (outofband || !mlk_check_own(pvt_ptr1))
@@ -304,11 +316,11 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 					}
 					if (outofband && !out_of_time)
 					{
-						SET_OUT_OF_TIME_IF_APPROPRIATE(msec_timeout, &end_time, out_of_time);
+						SET_OUT_OF_TIME_IF_APPROPRIATE(timeout, &end_time, out_of_time);
 								/* may set "out_of_time" */
 						if (out_of_time)
 							break;
-						if (NO_M_TIMEOUT != msec_timeout)
+						if (NO_M_TIMEOUT != timeout)
 						{
 							if ((tptimeout != outofband) && (ctrlc != outofband))
 							{
@@ -391,7 +403,7 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 		remlkreq = FALSE;
 	}
 	lks_this_cmd = 0;	/* reset so we can check whether an extrinsic is trying to nest a LOCK operation */
-	if (NO_M_TIMEOUT != msec_timeout)
+	if (NO_M_TIMEOUT != timeout)
 	{	/* was timed or immediate */
 		if (blocked)
 		{

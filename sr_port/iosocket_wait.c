@@ -66,10 +66,9 @@ error_def(ERR_ZINTRECURSEIO);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 
-boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
+boolean_t iosocket_wait(io_desc *iod, uint8 nsec_timeout)
 {
-	struct 	timeval  	utimeout, *utimeoutptr;
-	ABS_TIME		cur_time, end_time;
+	ABS_TIME		utimeout, *utimeoutptr, cur_time, end_time;
 	nfds_t			poll_nfds;
 	struct pollfd		*poll_fds;
 	socket_struct		**poll_socketptr;	/* matching poll_fds */
@@ -192,31 +191,33 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 		}
 		if (nselect)
 		{
-			if (NO_M_TIMEOUT != msec_timeout)
+			if (NO_M_TIMEOUT != nsec_timeout)
 			{
-				utimeout.tv_sec = msec_timeout / MILLISECS_IN_SEC;
-				utimeout.tv_usec = (msec_timeout % MILLISECS_IN_SEC) * MICROSECS_IN_MSEC;
+				utimeout.tv_sec = nsec_timeout / NANOSECS_IN_SEC;
+				utimeout.tv_nsec = (nsec_timeout % NANOSECS_IN_SEC);
 				sys_get_curr_time(&cur_time);
 				if (!retry_accept && (!zint_restart || !sockintr->end_time_valid))
-					add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+					add_uint8_to_abs_time(&cur_time, nsec_timeout, &end_time);
 				else
-				{       /* end_time taken from restart data. Compute what msec_timeout should be so timeout timer
+				{       /* end_time taken from restart data. Compute what nsec_timeout should be so timeout timer
 				   	gets set correctly below.  Or retry after failed accept.
 					*/
 					DBGSOCK((stdout, "socwait: Taking timeout end time from wait restart data\n"));
 					cur_time = sub_abs_time(&end_time, &cur_time);
-					msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
-						/* Round up in order to prevent premature timeouts */
-						DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
-					if (0 > msec_timeout)
+					if (0 > cur_time.tv_sec)
 					{
-						msec_timeout = -1;
+						cur_time.tv_sec = 0;
+						cur_time.tv_nsec = 0;
+					}
+					nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+					if (0 == nsec_timeout)
+					{
 						utimeout.tv_sec = 0;
-						utimeout.tv_usec = 0;
+						utimeout.tv_nsec = 0;
 					} else
 					{
 						utimeout.tv_sec = cur_time.tv_sec;
-						utimeout.tv_usec = (gtm_tv_usec_t)(cur_time.tv_nsec / NANOSECS_IN_USEC);
+						utimeout.tv_nsec = cur_time.tv_nsec;
 					}
 				}
 			}
@@ -225,11 +226,11 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 			{
 				if ((0 < rconnected) || (0 <rlisten))
 					poll_timeout = 0;
-				else if (NO_M_TIMEOUT == msec_timeout)
+				else if (NO_M_TIMEOUT == nsec_timeout)
 					poll_timeout = -1;
 				else
 					poll_timeout = (utimeout.tv_sec * MILLISECS_IN_SEC) +
-						DIVIDE_ROUND_UP(utimeout.tv_usec, MICROSECS_IN_MSEC);
+						DIVIDE_ROUND_UP(utimeout.tv_nsec, NANOSECS_IN_MSEC);
 				poll_fd = -1;
 				rv = poll(poll_fds, poll_nfds, poll_timeout);
 				if (0 > rv && EINTR == errno)
@@ -244,7 +245,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 							mv_chain->mv_st_cont.mvs_zintdev.io_ptr = iod;
 							mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
 							sockintr->who_saved = sockwhich_wait;
-							if (NO_M_TIMEOUT != msec_timeout)
+							if (NO_M_TIMEOUT != nsec_timeout)
 							{
 								sockintr->end_time = end_time;
 								sockintr->end_time_valid = TRUE;
@@ -261,20 +262,23 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 						assertpro(FALSE);      /* Should *never* return from outofband_action */
 						return FALSE;   /* For the compiler.. */
 					}
-					if (NO_M_TIMEOUT != msec_timeout)
+					if (NO_M_TIMEOUT != nsec_timeout)
 					{
 						sys_get_curr_time(&cur_time);
 						cur_time = sub_abs_time(&end_time, &cur_time);
-						msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
-							/* Round up in order to prevent premature timeouts */
-							DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
-						if (0 >msec_timeout)
+						if (0 > cur_time.tv_sec)
+						{
+							cur_time.tv_sec = 0;
+							cur_time.tv_nsec = 0;
+						}
+						nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+						if (0 == nsec_timeout)
 						{
 							rv = 0;		/* time out */
 							break;
 						}
 						utimeout.tv_sec = cur_time.tv_sec;
-						utimeout.tv_usec = (gtm_tv_usec_t)(cur_time.tv_nsec / NANOSECS_IN_USEC);
+						utimeout.tv_nsec = cur_time.tv_nsec;
 					}
 				} else
 					break;	/* either other error or done */
@@ -282,7 +286,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 			if ((rv == 0) && (0 == rconnected) && (0 == rlisten))
 			{	/* none selected or prior pending event */
 				iod->dollar.key[0] = '\0';
-				if (NO_M_TIMEOUT != msec_timeout)
+				if (NO_M_TIMEOUT != nsec_timeout)
 				{
 					dollar_truth = FALSE;
 					REVERT_GTMIO_CH(&iod->pair, ch_set);
@@ -299,7 +303,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 		} else if ((0 == rlisten) && (0 == rconnected))
 		{	/* nothing to select and no pending events */
 			iod->dollar.key[0] = '\0';
-			if (NO_M_TIMEOUT != msec_timeout)
+			if (NO_M_TIMEOUT != nsec_timeout)
 				dollar_truth = FALSE;
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return FALSE;
@@ -366,7 +370,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 		{	/* unexpected nothing to do */
 			assert((0 < oldestlistencycle) || (0 < oldestconnectedcycle));
 			iod->dollar.key[0] = '\0';
-			if (NO_M_TIMEOUT != msec_timeout)
+			if (NO_M_TIMEOUT != nsec_timeout)
 			{
 				dollar_truth = FALSE;
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
@@ -416,7 +420,7 @@ boolean_t iosocket_wait(io_desc *iod, int4 msec_timeout)
 		}
 		break;
 	}
-	if (NO_M_TIMEOUT != msec_timeout)
+	if (NO_M_TIMEOUT != nsec_timeout)
 		dollar_truth = TRUE;
 	REVERT_GTMIO_CH(&iod->pair, ch_set);
 	return TRUE;

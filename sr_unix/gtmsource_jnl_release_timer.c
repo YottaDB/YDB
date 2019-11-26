@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2011 Fidelity Information Services, Inc	*
+ * Copyright 2011 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,9 +32,9 @@ int gtmsource_start_jnl_release_timer(void)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* start_timer expects > 0 time interval in milli seconds, idle_timeout is in seconds */
+	/* start_timer expects > 0 time interval in nanoseconds, idle_timeout is in seconds */
 	if ((TREF(replgbl)).jnl_release_timeout)
-		start_timer((TID)gtmsource_jnl_release_timer, (TREF(replgbl)).jnl_release_timeout * MILLISECS_IN_SEC,
+		start_timer((TID)gtmsource_jnl_release_timer, (TREF(replgbl)).jnl_release_timeout * (uint8)NANOSECS_IN_SEC,
 			gtmsource_jnl_release_timer, 0, NULL);
 	return (SS_NORMAL);
 }

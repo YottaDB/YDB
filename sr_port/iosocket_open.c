@@ -71,7 +71,7 @@ error_def(ERR_ZINTRECURSEIO);
 
 #define ESTABLISHED		"ESTABLISHED"
 
-short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 timepar)
+short	iosocket_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint8 timepar)
 {
 	char			addr[SA_MAXLITLEN], *errptr, sockaddr[SA_MAXLITLEN],
 				temp_addr[SA_MAXLITLEN], dev_type[MAX_DEV_TYPE_LEN];

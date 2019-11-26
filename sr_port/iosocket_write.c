@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -286,7 +286,7 @@ void iosocket_output_timed(socket_struct *socketptr)
 	if ((0 < socketptr->obuffer_length) && (0 == socketptr->obuffer_errno))
 	{
 		socketptr->obuffer_timer_set = TRUE;
-		start_timer((TID)socketptr, socketptr->obuffer_flush_time, iosocket_output_timed,
+		start_timer((TID)socketptr, socketptr->obuffer_flush_time * (uint8)NANOSECS_IN_MSEC, iosocket_output_timed,
 			SIZEOF(socketptr), (char *)&socketptr);
 	}
 }
@@ -324,7 +324,7 @@ ssize_t	iosocket_write_buffered(socket_struct *socketptr, char *buffer, size_t l
 		if (!socketptr->obuffer_timer_set)
 		{
 			socketptr->obuffer_timer_set = TRUE;
-			start_timer((TID)socketptr, socketptr->obuffer_flush_time, iosocket_output_timed,
+			start_timer((TID)socketptr, socketptr->obuffer_flush_time * (uint8)NANOSECS_IN_MSEC, iosocket_output_timed,
 				SIZEOF(socketptr), (char *)&socketptr);
 		}
 	}

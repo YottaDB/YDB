@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,7 +123,7 @@ void iosocket_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned
 /* VMS uses the UCX interface; should support others that emulate it
  * width == 0 is a flag for non-fixed length read. timeout is in milliseconds
  */
-int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
+int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 {
 	int		ret, byteperchar;
 	boolean_t 	timed, vari, more_data, terminator, has_delimiter, requeue_done, do_delim_conv, need_get_chset;
@@ -159,7 +159,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 	{
 		if (iod == io_std_device.in)
 		{
-			result = ionl_readfl(v, width, msec_timeout);
+			result = ionl_readfl(v, width, nsec_timeout);
 			REVERT_GTMIO_CH(&iod->pair, ch_set);
 			return result;
 		} else
@@ -268,7 +268,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		assert(chars_read <= bytes_read);
 		DBGSOCK((stdout, "socrfl: .. mv_stent found - bytes_read: %d  chars_read: %d  max_bufflen: %d"
 			 "  interrupts: %d\n", bytes_read, chars_read, max_bufflen, socketus_interruptus));
-		DBGSOCK((stdout, "socrfl: .. msec_timeout: %d\n", msec_timeout));
+		DBGSOCK((stdout, "socrfl: .. nsec_timeout: %llu\n", nsec_timeout));
 		DBGSOCK_ONLY2(if (sockintr->end_time_valid) DBGSOCK((stdout, "socrfl: .. endtime: %d/%d\n", end_time.tv_sec,
 								     end_time.tv_nsec / NANOSECS_IN_USEC)));
 		DBGSOCK((stdout, "socrfl: .. buffer address: 0x"lvaddr"  stringpool: 0x"lvaddr"\n",
@@ -331,7 +331,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 	}
 	need_get_chset = FALSE;		/* if we change ichset, make sure converter available */
 	time_for_read.tv_sec  = 0;
-	if (0 == msec_timeout)
+	if (0 == nsec_timeout)
 		time_for_read.tv_nsec = 0;
 	else
 		time_for_read.tv_nsec = (socketptr->def_moreread_timeout ? socketptr->moreread_timeout : INITIAL_MOREREAD_TIMEOUT)
@@ -340,14 +340,14 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		 socketptr->moreread_timeout, socketptr->def_moreread_timeout, time_for_read.tv_nsec / NANOSECS_IN_USEC));
 	timer_id = (TID)iosocket_readfl;
 	out_of_time = FALSE;
-	if (NO_M_TIMEOUT == msec_timeout)
+	if (NO_M_TIMEOUT == nsec_timeout)
 	{
 		timed = FALSE;
 		assert(!sockintr->end_time_valid);
 	} else
 	{
 		timed = TRUE;
-		if (0 < msec_timeout)
+		if (0 < nsec_timeout)
 		{	/* There is time to wait */
 			/* Set blocking I/O */
 			FCNTL2(socketptr->sd, F_GETFL, flags);
@@ -372,25 +372,28 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 			}
 			sys_get_curr_time(&cur_time);
 			if (!sockintr->end_time_valid)
-				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+				add_uint8_to_abs_time(&cur_time, nsec_timeout, &end_time);
 			else
-			{	/* End_time taken from restart data. Compute what msec_timeout should be so timeout timer
+			{	/* End_time taken from restart data. Compute what nsec_timeout should be so timeout timer
 				 * gets set correctly below.
 				 */
 			 	end_time = sockintr->end_time;	 /* Restore end_time for timeout */
 				cur_time = sub_abs_time(&end_time, &cur_time);
-				msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
-						DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
-				if (0 >= msec_timeout)
+				if (0 > cur_time.tv_sec)
 				{
-					msec_timeout = -1;
+					cur_time.tv_sec = 0;
+					cur_time.tv_nsec = 0;
+				}
+				nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+				if (0 == nsec_timeout)
+				{
 					out_of_time = TRUE;
 				}
 				DBGSOCK((stdout, "socrfl: Taking timeout end time from read restart data - "
-					 "computed msec_timeout: %d\n", msec_timeout));
+					 "computed nsec_timeout: %llu\n", nsec_timeout));
 			}
-			if (0 < msec_timeout)
-				start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
+			if (0 < nsec_timeout)
+				start_timer(timer_id, nsec_timeout, wake_alarm, 0, NULL);
 		} else
 		{
 			out_of_time = TRUE;
@@ -791,7 +794,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		}
 		if (timed)
 		{
-			if (0 < msec_timeout)
+			if (0 < nsec_timeout)
 			{
 				sys_get_curr_time(&cur_time);
 				cur_time = sub_abs_time(&end_time, &cur_time);
@@ -810,7 +813,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 		status = 0;	/* Don't treat a <CTRL-C> or timeout as an error */
 	if (timed)
 	{
-		if (0 < msec_timeout)
+		if (0 < nsec_timeout)
 		{
 			FCNTL3(socketptr->sd, F_SETFL, flags, fcntl_res);
 			if (fcntl_res < 0)
@@ -850,7 +853,7 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 			mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.addr = (char *)stringpool.free;
 			mv_chain->mv_st_cont.mvs_zintdev.curr_sp_buffer.len = bytes_read;
 			sockintr->who_saved = sockwhich_readfl;
-			if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+			if ((0 < nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 			{
 				sockintr->end_time = end_time;
 				sockintr->end_time_valid = TRUE;
@@ -865,8 +868,8 @@ int	iosocket_readfl(mval *v, int4 width, int4 msec_timeout)
 			DBGSOCK((stdout, "socrfl: .. mv_stent: bytes_read: %d  chars_read: %d  max_bufflen: %d  "
 				 "interrupts: %d  buffer_start: 0x"lvaddr"\n",
 				 bytes_read, chars_read, max_bufflen, socketus_interruptus, stringpool.free));
-			DBGSOCK_ONLY(if (sockintr->end_time_valid) DBGSOCK((stdout, "socrfl: .. endtime: %d/%d  msec_timeout: %d\n",
-									    end_time.tv_sec, end_time.tv_nsec / NANOSECS_IN_USEC, msec_timeout)));
+			DBGSOCK_ONLY(if (sockintr->end_time_valid) DBGSOCK((stdout, "socrfl: .. endtime: %d/%d  nsec_timeout: %llu\n",
+									    end_time.tv_sec, end_time.tv_nsec / NANOSECS_IN_USEC, nsec_timeout)));
 			TRCTBL_ENTRY(SOCKRFL_OUTOFBAND, bytes_read, (INTPTR_T)chars_read, stringpool.free, NULL); /* BYPASSOK */
 		}
 		REVERT_GTMIO_CH(&iod->pair, ch_set);

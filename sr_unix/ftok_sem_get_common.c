@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,8 +69,8 @@ error_def(ERR_FTOKERR);
 error_def(ERR_MAXSEMGETRETRY);
 error_def(ERR_SEMWT2LONG);
 
-#define	MAX_SEM_DSE_WT	(MILLISECS_IN_SEC * (30 / 2)) /* Actually 30 seconds before giving up - two semops with 15 second */
-#define	MAX_SEM_WT	(MILLISECS_IN_SEC * (60 / 2)) /* Actually 60 seconds before giving up - two semops with 30 second */
+#define	MAX_SEM_DSE_WT	((uint8)NANOSECS_IN_SEC * (30 / 2)) /* Actually 30 seconds before giving up - two semops with 15 second */
+#define	MAX_SEM_WT	((uint8)NANOSECS_IN_SEC * (60 / 2)) /* Actually 60 seconds before giving up - two semops with 30 second */
 
 /* If running in-house we want to debug live semop hangs. So, we will be continuing to hang until we get a successful semop with
  * stack traces taken every MAX_SEM_DSE_WT/MAX_SEM_WT seconds.

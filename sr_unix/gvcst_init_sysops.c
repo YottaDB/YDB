@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -328,8 +328,8 @@ MBSTART {											\
 
 #define	START_SEM_TIMERS(SEM_STACKTRACE_TIME, SEM_TIMEDOUT, MAX_HRTBT_DELTA)		\
 MBSTART {										\
-	TIMEOUT_INIT(SEM_TIMEDOUT, MAX_HRTBT_DELTA * MILLISECS_IN_SEC);			\
-	TIMEOUT_INIT(SEM_STACKTRACE_TIME, MAX_HRTBT_DELTA * MILLISECS_IN_SEC / 2);	\
+	TIMEOUT_INIT(SEM_TIMEDOUT, MAX_HRTBT_DELTA * (uint8)NANOSECS_IN_SEC);			\
+	TIMEOUT_INIT(SEM_STACKTRACE_TIME, MAX_HRTBT_DELTA * (uint8)NANOSECS_IN_SEC / 2);	\
 } MBEND
 
 #define	CANCEL_SEM_TIMERS(SEM_STACKTRACE_TIME, SEM_TIMEDOUT)	\

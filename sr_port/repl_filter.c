@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -222,7 +222,7 @@
 #define MORE_TO_TRANSFER -99
 #define DUMMY_TCOMMIT_LENGTH 3	/* A dummy commit is 09\n */
 
-#define REPL_FILTER_HALF_TIMEOUT	((ydb_repl_filter_timeout * MILLISECS_IN_SEC) / 2)
+#define REPL_FILTER_HALF_TIMEOUT	((ydb_repl_filter_timeout * (uint8)NANOSECS_IN_SEC) / 2)
 
 /* repl_filter_recv receive state */
 

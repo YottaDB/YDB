@@ -70,7 +70,7 @@ error_def(ERR_GETNAMEINFO);
 error_def(ERR_GTMEISDIR);
 error_def(ERR_TEXT);
 
-boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_timeout, mval *mspace)	/* timeout in msec */
+boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_timeout, mval *mspace)	/* timeout in nanosec */
 {
 	uint4		status;
 	mstr		tn;		/* translated name */
@@ -127,10 +127,10 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 	namebuf[tn.len] = '\0';
 	buf = namebuf;
 	timer_id = (TID)io_open_try;
-	if (NO_M_TIMEOUT == msec_timeout)
+	if (NO_M_TIMEOUT == nsec_timeout)
 		timed = FALSE;
 	else
-		timed = (0 != msec_timeout);
+		timed = (0 != nsec_timeout);
 	if (0 == iod)
 	{
 		if (0 == tl->iod)
@@ -411,7 +411,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 		if (dir_err)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GTMEISDIR, 2, LEN_AND_STR(buf));
 		if (timed)
-			start_timer(timer_id, msec_timeout, wake_alarm, 0, NULL);
+			start_timer(timer_id, nsec_timeout, wake_alarm, 0, NULL);
 		/* RW permissions for owner and others as determined by umask. */
 		umask_orig = umask(000);	/* determine umask (destructive) */
 		(void)umask(umask_orig);	/* reset umask */
@@ -421,7 +421,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 		 */
 		while ((-1 == (file_des = OPEN3(buf, SETOCLOEXEC(oflag), umask_creat))) && !out_of_time)
 		{
-			if (timed && (0 == msec_timeout))
+			if (timed && (0 == nsec_timeout))
 				out_of_time = TRUE;
 			if (outofband)
 			{
@@ -448,7 +448,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 					oflag |= O_NONBLOCK;
 					while ((-1 == (file_des = OPEN3(buf, SETOCLOEXEC(oflag), umask_creat))) && !out_of_time)
 					{
-						if (0 == msec_timeout)
+						if (0 == nsec_timeout)
 							out_of_time = TRUE;
 						if (outofband)
 							outofband_action(FALSE);
@@ -468,7 +468,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 					oflag &= ~O_RDONLY;
 					while ((-1 == (file_des_w = OPEN3(buf, SETOCLOEXEC(oflag), umask_creat))) && !out_of_time)
 					{
-						if (0 == msec_timeout)
+						if (0 == nsec_timeout)
 							out_of_time = TRUE;
 						if (outofband)
 							outofband_action(FALSE);
@@ -601,7 +601,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 			assert(io_ptr->state >= 0 && io_ptr->state < n_io_dev_states);
 			assert(ff == io_ptr->type);
 			dev_name.iod = tl->iod->pair.out;
-			if (TRUE == ioff_open(&dev_name, pp, file_des_w, mspace, msec_timeout))
+			if (TRUE == ioff_open(&dev_name, pp, file_des_w, mspace, nsec_timeout))
 				(tl->iod->pair.out)->state = dev_open;
 			else if (dev_open == (tl->iod->pair.out)->state)
 				(tl->iod->pair.out)->state = dev_closed;
@@ -613,7 +613,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 	}
 #	endif
 	iod->newly_created = filecreated;
-	status = (iod->disp_ptr->open)(naml, pp, file_des, mspace, msec_timeout);
+	status = (iod->disp_ptr->open)(naml, pp, file_des, mspace, nsec_timeout);
 	if (TRUE == status)
 		iod->state = dev_open;
 	else
@@ -659,7 +659,7 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_ti
 		iod->dollar.zeof = TRUE;
 	active_device = 0;
 	iod->newly_created = FALSE;
-	if ((NO_M_TIMEOUT != msec_timeout) && IS_MCODE_RUNNING)
+	if ((NO_M_TIMEOUT != nsec_timeout) && IS_MCODE_RUNNING)
 		return (status);
 	else
 		return TRUE;

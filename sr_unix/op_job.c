@@ -103,7 +103,7 @@ int	op_job(int4 argcnt, ...)
 	int4			offset;
 	mval			*routine, *param_buf;
 	mval			*timeout;	/* timeout in milliseconds */
-	int4			msec_timeout;	/* timeout in milliseconds */
+	uint8			nsec_timeout;	/* timeout in nanoseconds */
 	boolean_t		timed, single_attempt, non_exit_return;
 	unsigned char		buff[128], *c;
 	int4			status, exit_stat, term_sig, stop_sig;
@@ -165,11 +165,11 @@ int	op_job(int4 argcnt, ...)
 	}
 	/* Start the timer */
 	ojtimeout = timed = FALSE;
-	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, JOBTIMESTR);
-	if ((0 < msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+	MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, JOBTIMESTR);
+	if ((0 < nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 	{
 		timed = TRUE;
-		start_timer((TID)&tid, msec_timeout, job_timer_handler, 0, NULL);
+		start_timer((TID)&tid, nsec_timeout, job_timer_handler, 0, NULL);
 	}
 	if (argcnt)
 	{

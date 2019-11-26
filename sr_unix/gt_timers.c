@@ -40,7 +40,7 @@
  * void hiber_start(uint4 hiber)
  *      used to sleep for hiber milliseconds
  *
- * void start_timer(TID tid, int4 time_to_expir, void (*handler)(), int4 dlen, char *data)
+ * void start_timer(TID tid, uint8 time_to_expir, void (*handler)(), int4 dlen, char *data)
  *	Used to start a new timer.
  *
  * void cancel_timer(TID tid)
@@ -347,10 +347,10 @@ void hiber_start_wait_any(uint4 hiber)	/* "hiber" is in milli-seconds */
 
 /* Wrapper function for start_timer() that is exposed for outside use. The function ensures that time_to_expir is positive. If
  * negative value or 0 is passed, set time_to_expir to 0 and invoke start_timer(). The reason we have not merged this functionality
- * with start_timer() is because there is no easy way to determine whether the function is invoked from inside GT.M or by an
+ * with start_timer() is because there is no easy way to determine whether the function is invoked from inside YottaDB or by an
  * external routine.
  * Arguments:	tid 		- timer id
- *		time_to_expir	- time to expiration in msecs
+ *		time_to_expir	- time to expiration in nanosecs
  *		handler		- pointer to handler routine
  *		hdata_len       - length of handler data next arg
  *		hdata		- data to pass to handler (if any)
@@ -363,17 +363,17 @@ void gtm_start_timer(TID tid,
 {
 	if (0 >= time_to_expir)
 		time_to_expir = 0;
-	start_timer(tid, time_to_expir, handler, hdata_len, hdata);
+	start_timer(tid, time_to_expir * (uint8)NANOSECS_IN_MSEC, handler, hdata_len, hdata);
 }
 
 /* Start the timer. If timer chain is empty or this is the first timer to expire, actually start the system timer.
  * Arguments:	tid 		- timer id
- *		time_to_expir	- time to expiration in msecs
+ *		time_to_expir	- time to expiration in nanosecs
  *		handler		- pointer to handler routine
  *      	hdata_len       - length of handler data next arg
  *      	hdata		- data to pass to handler (if any)
  */
-void start_timer(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata)
+void start_timer(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata)
 {
 	sigset_t	savemask;
 	boolean_t	safe_timer = FALSE, safe_to_add = FALSE;
@@ -423,7 +423,7 @@ void start_timer(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
 /* Internal version of start_timer that does not protect itself, assuming this has already been done.
  * Otherwise does as explained above in start_timer.
  */
-STATICFNDEF void start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata, boolean_t safe_timer)
+STATICFNDEF void start_timer_int(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len, void *hdata, boolean_t safe_timer)
 {
 	ABS_TIME	at;
 	GT_TIMER 	*newt;
@@ -905,7 +905,7 @@ STATICFNDEF GT_TIMER *find_timer(TID tid, GT_TIMER **tprev)
  *      	hdata   	- data to pass to timer rtn if any
  *      	safe_timer	- timer's handler is in safe_handlers array
  */
-STATICFNDEF GT_TIMER *add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
+STATICFNDEF GT_TIMER *add_timer(ABS_TIME *atp, TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len,
 	void *hdata, boolean_t safe_timer)
 {
 	GT_TIMER	*tp, *tpp, *ntp, *lastntp;
@@ -962,7 +962,7 @@ STATICFNDEF GT_TIMER *add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void
 	ntp->hd_len = hdata_len;
 	if (0 < hdata_len)
 		memcpy(ntp->hd_data, hdata, hdata_len);
-	add_int_to_abs_time(atp, time_to_expir, &ntp->expir_time);
+	add_uint8_to_abs_time(atp, time_to_expir, &ntp->expir_time);
 	ntp->start_time.tv_sec = atp->tv_sec;
 	ntp->start_time.tv_nsec = atp->tv_nsec;
 	tp = (GT_TIMER *)timeroot;

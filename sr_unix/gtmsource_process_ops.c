@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1269,7 +1269,7 @@ boolean_t	gtmsource_get_cmp_info(int4 *repl_zlib_cmp_level_ptr)
 	 * within 1 or 15 minutes, depending on whether this is a white-box test or not */
 #	ifdef REPL_CMP_SOLVE_TESTING
 	if (TREF(ydb_environment_init))
-			start_timer((TID)repl_cmp_solve_src_timeout, 15 * 60 * 1000, repl_cmp_solve_src_timeout, 0, NULL);
+			start_timer((TID)repl_cmp_solve_src_timeout, 15 * 60 * NANOSECS_IN_SEC, repl_cmp_solve_src_timeout, 0, NULL);
 #	endif
 	/*************** Receive REPL_CMP_SOLVE message ***************/
 	if (!gtmsource_repl_recv((repl_msg_ptr_t)&solve_msg, REPL_MSG_CMPINFOLEN, REPL_CMP_SOLVE, "REPL_CMP_SOLVE"))

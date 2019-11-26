@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -26,6 +29,10 @@
 #include "min_max.h"
 #include "gtmimagename.h"
 #include "gtmmsg.h"
+
+#define MAXFACTOR	(10 * 100 * 60 * 60)	/* (decisec / millisec) * (decisec / sec) * (sec /min) * (min / hour) */
+#define NANO		TRUE
+#define MILLI		FALSE
 
 error_def(ERR_CLISTRTOOLONG);
 
@@ -300,16 +307,17 @@ boolean_t cli_get_str(char *entry, char *dst, unsigned short *max_len)
 
 /*
  * --------------------------------------------------
- * Find the qualifier and convert its value to millisecounds and return it in dst
+ * Find the qualifier and convert its value to milliseconds
+ * or nanoseconds then return it in dst
  *
  * Return:
  *	TRUE	- OK
  *	FALSE	- Could not convert to time
  * --------------------------------------------------
  */
-boolean_t cli_get_time(char *entry, uint4 *dst)
+
+boolean_t cli_get_time_common(char *entry, uint8 *dst, boolean_t is_nano)
 {
-#define MAXFACTOR (10 * 100 * 60 * 60)	/* (decisec / millisec) * (decisec / sec) * (sec /min) * (min / hour) */
 	char		buf[MAX_LINE + 1], *cp, local_str[MAX_LINE + 1];
 	unsigned int	factor;
 	DCL_THREADGBL_ACCESS;
@@ -329,7 +337,10 @@ boolean_t cli_get_time(char *entry, uint4 *dst)
 				{
 					if (MAXFACTOR < factor)
 						return FALSE;
-					*dst = *dst + (uint4)(STRTOUL(cp + 1, NULL, 10) * factor);
+					if (is_nano)
+						*dst = *dst + (uint8)(STRTOUL(cp + 1, NULL, 10) * factor * (uint8)NANOSECS_IN_MSEC);
+					else
+						*dst = *dst + (uint8)(STRTOUL(cp + 1, NULL, 10) * factor);
 					/* #define MAXFACTOR shows the series for factor */
 					factor = ((10 == factor) ? 100 : 60) * factor;
 				}
@@ -340,6 +351,34 @@ boolean_t cli_get_time(char *entry, uint4 *dst)
 		return TRUE;
 	}
 	return FALSE;
+}
+
+ /*
+  * --------------------------------------------------
+  * The following functions pass values into cli_get_time_common,
+  * allowing for a convenient entry point to convert the qualifier
+  * to either nanoseconds or milliseconds.
+  *
+  * Return:
+  *	TRUE	- OK
+  *	FALSE	- Could not convert to time
+  * --------------------------------------------------
+  */
+
+boolean_t cli_get_time_ms(char *entry, uint4 *dst)
+{
+	boolean_t	return_value;
+	uint8		dst_tmp;
+
+	dst_tmp = (uint8)(uintptr_t)dst;
+	return_value = cli_get_time_common(entry, &dst_tmp, MILLI);
+	*dst = (uint4)dst_tmp;
+	return return_value;
+}
+
+boolean_t cli_get_time_ns(char *entry, uint8 *dst)
+{
+	return cli_get_time_common(entry, dst, NANO);
 }
 
 
@@ -472,4 +511,3 @@ boolean_t cli_get_defertime(char *entry, int4 *dst)
 	}
 	return FALSE;
 }
-

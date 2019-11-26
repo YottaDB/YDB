@@ -18,7 +18,7 @@
 #include "libyottadb_int.h"
 #include "libydberrors.h"
 
-/* Simple YottaDB wrapper for gtm_start_timer() */
+/* Simple YottaDB wrapper for start_timer() */
 int	ydb_timer_start(intptr_t timer_id, unsigned long long limit_nsec, ydb_funcptr_retvoid_t handler, unsigned int hdata_len,
 			void *hdata)
 {
@@ -44,9 +44,7 @@ int	ydb_timer_start(intptr_t timer_id, unsigned long long limit_nsec, ydb_funcpt
 	}
 	ISSUE_TIME2LONG_ERROR_IF_NEEDED(limit_nsec);
 	assert(MAXPOSINT4 >= (limit_nsec / NANOSECS_IN_MSEC));	/* Or else a TIME2LONG error would have been issued above */
-	timeout_msec = (limit_nsec / NANOSECS_IN_MSEC);
-	timeoutms = (int)timeout_msec;
-	gtm_start_timer(timer_id, timeoutms, handler, hdata_len, hdata);
+	start_timer(timer_id, limit_nsec, handler, hdata_len, hdata);
 	LIBYOTTADB_DONE;
 	REVERT;
 	return YDB_OK;

@@ -86,13 +86,13 @@ typedef struct st_timer_alloc
  * Note: This macro establishes a condition handler which cancels the timer in case of an rts_error.
  *       The TIMEOUT_DONE() macro must be used on all normal routine exit paths in order to REVERT the handler.
  */
-#define TIMEOUT_INIT(TIMEOUT_VAR, TIMEOUT_MILLISECS)									\
+#define TIMEOUT_INIT(TIMEOUT_VAR, TIMEOUT_NANOSECS)									\
 MBSTART {														\
 	boolean_t	*ptr_to_##TIMEOUT_VAR = &(TIMEOUT_VAR);								\
 	boolean_t	got_error;											\
 															\
 	TIMEOUT_VAR = FALSE;												\
-	start_timer((TID)ptr_to_##TIMEOUT_VAR, TIMEOUT_MILLISECS, simple_timeout_timer,					\
+	start_timer((TID)ptr_to_##TIMEOUT_VAR, TIMEOUT_NANOSECS, simple_timeout_timer,					\
 			SIZEOF(ptr_to_##TIMEOUT_VAR), &ptr_to_##TIMEOUT_VAR);						\
 	ESTABLISH_NORET(timer_cancel_ch, got_error);									\
 	if (got_error)													\
@@ -111,12 +111,12 @@ MBSTART {									\
 } MBEND
 
 /* Lighter versions with no condition handler, for when it is safe to have the timer hang around after it is no longer relevant. */
-#define TIMEOUT_INIT_NOCH(TIMEOUT_VAR, TIMEOUT_MILLISECS)								\
+#define TIMEOUT_INIT_NOCH(TIMEOUT_VAR, TIMEOUT_NANOSECS)								\
 MBSTART {														\
 	boolean_t	*ptr_to_##TIMEOUT_VAR = &(TIMEOUT_VAR);								\
 															\
 	TIMEOUT_VAR = FALSE;												\
-	start_timer((TID)ptr_to_##TIMEOUT_VAR, TIMEOUT_MILLISECS, simple_timeout_timer,					\
+	start_timer((TID)ptr_to_##TIMEOUT_VAR, TIMEOUT_NANOSECS, simple_timeout_timer,					\
 			SIZEOF(ptr_to_##TIMEOUT_VAR), &ptr_to_##TIMEOUT_VAR);						\
 } MBEND
 #define TIMEOUT_DONE_NOCH(TIMEOUT_VAR)						\
@@ -126,20 +126,21 @@ MBSTART {									\
 	cancel_timer((TID)ptr_to_##TIMEOUT_VAR);				\
 } MBEND
 
-#define	SET_OUT_OF_TIME_IF_APPROPRIATE(MSEC_TIMEOUT, END_TIME, OUT_OF_TIME)			\
-{												\
-	ABS_TIME		curTime, remainTime;						\
-												\
-	if (NO_M_TIMEOUT != MSEC_TIMEOUT)							\
-	{											\
-		sys_get_curr_time(&curTime);							\
-		remainTime = sub_abs_time(END_TIME, &curTime);					\
-		MSEC_TIMEOUT = (int4)(remainTime.tv_sec * MILLISECS_IN_SEC +			\
-					/* Round up in order to prevent premature timeouts */	\
-					DIVIDE_ROUND_UP(remainTime.tv_nsec, NANOSECS_IN_MSEC));	\
-		if (0 >= MSEC_TIMEOUT)								\
-			OUT_OF_TIME = TRUE;							\
-	}											\
+#define	SET_OUT_OF_TIME_IF_APPROPRIATE(NSEC_TIMEOUT, END_TIME, OUT_OF_TIME)					\
+{														\
+	ABS_TIME		curTime, remainTime;								\
+														\
+	if (NO_M_TIMEOUT != NSEC_TIMEOUT)									\
+	{													\
+		sys_get_curr_time(&curTime);									\
+		remainTime = sub_abs_time(END_TIME, &curTime);							\
+		if (remainTime.tv_sec >= 0)									\
+			NSEC_TIMEOUT = (remainTime.tv_sec * (uint8)NANOSECS_IN_SEC) + remainTime.tv_nsec;	\
+		else												\
+			NSEC_TIMEOUT = 0;									\
+		if (0 >= NSEC_TIMEOUT)										\
+			OUT_OF_TIME = TRUE;									\
+	}													\
 }
 
 /* Uncomment the below #define if you want to print the status of the key timer-related variables as well as the entire timer queue
@@ -190,7 +191,7 @@ MBSTART {									\
 			handler = s_simple_timeout_timer;					\
 		else										\
 		{										\
-			SNPRINTF(s_unknown, MAX_UNKNOWN_LEN, "%p", (void *)handler);				\
+			SNPRINTF(s_unknown, MAX_UNKNOWN_LEN, "%p", (void *)handler);		\
 			handler = s_unknown;							\
 		}										\
 		FPRINTF(stderr, "  - timer #%d:\n"						\
@@ -214,6 +215,7 @@ MBSTART {									\
 
 int4		abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2);
 void		add_int_to_abs_time(ABS_TIME *atps, int4 ival, ABS_TIME *atpd);
+void		add_uint8_to_abs_time(ABS_TIME *atps, uint8 ival, ABS_TIME *atpd);
 void		cancel_timer(TID tid);
 void		cancel_unsafe_timers(void);
 void		clear_timers(void);
@@ -221,7 +223,7 @@ void		hiber_start(uint4 hiber);
 void		hiber_start_wait_any(uint4 hiber);
 void		init_timers(void);
 void		gtm_start_timer(TID tid, int4 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
-void		start_timer(TID tid, int4 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
+void		start_timer(TID tid, uint8 time_to_expir, void(* handler)(), int4 data_length, void *handler_data);
 ABS_TIME	sub_abs_time(ABS_TIME *atp1, ABS_TIME *atp2);
 void		sys_get_curr_time(ABS_TIME *atp);
 void		prealloc_gt_timers(void);
@@ -235,12 +237,12 @@ void 		simple_timeout_timer(TID tid, int4 hd_len, boolean_t **timedout);
 void		timer_handler(int why, siginfo_t *info, void *context);
 
 STATICFNDCL void	gt_timers_alloc(void);
-STATICFNDCL void	start_timer_int(TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
+STATICFNDCL void	start_timer_int(TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len,
 					void *hdata, boolean_t safe_timer);
 STATICFNDCL void	sys_settimer (TID tid, ABS_TIME *time_to_expir);
 STATICFNDCL void	start_first_timer(ABS_TIME *curr_time);
 STATICFNDCL GT_TIMER	*find_timer(TID tid, GT_TIMER **tprev);
-STATICFNDCL GT_TIMER	*add_timer(ABS_TIME *atp, TID tid, int4 time_to_expir, void (*handler)(), int4 hdata_len,
+STATICFNDCL GT_TIMER	*add_timer(ABS_TIME *atp, TID tid, uint8 time_to_expir, void (*handler)(), int4 hdata_len,
 				   void *hdata, boolean_t safe_timer);
 STATICFNDCL void	remove_timer(TID tid);
 

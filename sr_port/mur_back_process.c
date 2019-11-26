@@ -536,7 +536,7 @@ uint4	mur_back_phase1(reg_ctl_list *rctl)
 				 * sets the value to jgbl.mur_tp_resolve_time but later finds other regions with records
 				 * having timestamps less than jgbl.mur_tp_resolve_time. See GTM-7204 for more details.
 				 */
-				assert(((TIM_DEFER_DBSYNC * 2) >= (jgbl.mur_tp_resolve_time - jnlrec->prefix.time))
+				assert((((int4)(TIM_DEFER_DBSYNC/NANOSECS_IN_MSEC) * 2) >= (jgbl.mur_tp_resolve_time - jnlrec->prefix.time))
 						|| ((WBTEST_CRASH_SHUTDOWN_EXPECTED  == ydb_white_box_test_case_number)
 							&& murgbl.intrpt_recovery));
 				return ERR_CHNGTPRSLVTM;

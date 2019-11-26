@@ -15,6 +15,6 @@
 #ifndef GVCMY_REMLKMGR_H_INCLUDED
 #define GVCMY_REMLKMGR_H_INCLUDED
 
-bool gvcmy_remlkmgr(unsigned short count, int4 msec_timeout, ABS_TIME *end_time);
+bool gvcmy_remlkmgr(unsigned short count, uint8 nsec_timeout, ABS_TIME *end_time);
 
 #endif /* GVCMY_REMLKMGR_H_INCLUDED */

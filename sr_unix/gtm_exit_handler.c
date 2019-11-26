@@ -72,7 +72,7 @@ GBLREF	int			process_exiting;
 #endif
 GBLREF	pthread_t		ydb_engine_threadsafe_mutex_holder[];
 
-LITREF	mval		literal_notimeout;
+LITREF	mval			literal_notimeout;
 
 enum rundown_state
 {

@@ -58,7 +58,7 @@ error_def(ERR_STACKOFLOW);
 error_def(ERR_TEXT);
 error_def(ERR_ZINTRECURSEIO);
 
-boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t update_bufsiz)
+boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t update_bufsiz)
 {
 	int		temp_1;
 	char		*errptr;
@@ -80,7 +80,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 	char		port_buffer[NI_MAXSERV];
 	GTM_SOCKLEN_TYPE	sockbuflen, tmp_addrlen;
 
-	DBGSOCK((stdout, "socconn: ************* Entering socconn - msec_timeout: %d\n",msec_timeout));
+	DBGSOCK((stdout, "socconn: ************* Entering socconn - nsec_timeout: %llu\n", nsec_timeout));
 	/* check for validity */
 	dsocketptr = sockptr->dev;
 	assert(NULL != dsocketptr);
@@ -102,8 +102,8 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 		mv_zintdev = io_find_mvstent(iod, FALSE);
 		assert(NULL != mv_zintdev);
 		/* See later comment about "xf_restartpc" on why below two asserts are valid */
-		assert((NO_M_TIMEOUT == msec_timeout) || sockintr->end_time_valid);
-		assert((NO_M_TIMEOUT != msec_timeout) || !sockintr->end_time_valid);
+		assert((NO_M_TIMEOUT == nsec_timeout) || sockintr->end_time_valid);
+		assert((NO_M_TIMEOUT != nsec_timeout) || !sockintr->end_time_valid);
 		if (sockintr->end_time_valid)
 			/* Restore end_time for timeout */
 			end_time = sockintr->end_time;
@@ -124,10 +124,10 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 			 end_time.tv_nsec / NANOSECS_IN_USEC));
 		real_dsocketptr->mupintr = dsocketptr->mupintr = FALSE;
 		real_sockintr->who_saved = sockintr->who_saved = sockwhich_invalid;
-	} else if (NO_M_TIMEOUT != msec_timeout)
+	} else if (NO_M_TIMEOUT != nsec_timeout)
 	{
 		sys_get_curr_time(&cur_time);
-		add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+		add_uint8_to_abs_time(&cur_time, nsec_timeout, &end_time);
 	}
 	real_sockintr->end_time_valid = sockintr->end_time_valid = FALSE;
 	last_errno = 0;
@@ -286,7 +286,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 						need_connect = FALSE;
 						break;
 					case EINTR:
-						if (outofband && 0 != msec_timeout)
+						if (outofband && (0 != nsec_timeout))
 						{	/* handle outofband unless zero timeout */
 							save_errno = 0;
 							need_socket = need_connect = FALSE;
@@ -295,23 +295,24 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 					case EINPROGRESS:
 					case EALREADY:
 						need_socket = need_connect = FALSE;
-						if (0 != msec_timeout)
+						if (0 != nsec_timeout)
 							need_select = TRUE;
 					/* fall through */
 					case ETIMEDOUT:	/* the other side bound but not listening */
 					case ECONNREFUSED:
 					case ENOENT:    /* LOCAL socket not there */
-						if (!no_time_left && (0 != msec_timeout) && (NO_M_TIMEOUT != msec_timeout))
+						if (!no_time_left && (0 != nsec_timeout) && (NO_M_TIMEOUT != nsec_timeout))
 						{
 							sys_get_curr_time(&cur_time);
 							cur_time = sub_abs_time(&end_time, &cur_time);
-							msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
-								/* Round up in order to prevent premature timeouts */
-								DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
-							if (0 >= msec_timeout)
-								msec_timeout = 0;
+							if (0 > cur_time.tv_sec)
+							{
+								cur_time.tv_sec = 0;
+								cur_time.tv_nsec = 0;
+							}
+							nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
 						}
-						if (0 == msec_timeout)
+						if (0 == nsec_timeout)
 							no_time_left = TRUE;
 						else if (!no_time_left)
 						{
@@ -339,16 +340,14 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 			sockerror = 0;
 			do
 			{ /* unless outofband loop on select if connection continuing */
-				if (NO_M_TIMEOUT == msec_timeout)
+				if (NO_M_TIMEOUT == nsec_timeout)
 					sel_time = NULL;
 				else
 				{
 					sys_get_curr_time(&cur_time);
 					cur_time = sub_abs_time(&end_time, &cur_time);
-					msec_timeout = (int4)(cur_time.tv_sec * MILLISECS_IN_SEC +
-						/* Round up in order to prevent premature timeouts */
-						DIVIDE_ROUND_UP(cur_time.tv_nsec, NANOSECS_IN_MSEC));
-					if (0 < msec_timeout)
+					nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
+					if (0 < nsec_timeout)
 						sel_time = (struct timeval *)&cur_time;
 					else
 					{	/* timed out so done */
@@ -371,7 +370,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 					{	/* got it */
 						save_errno = 0;
 						break;
-					} else if (0 == res && 0 != sockerror)
+					} else if (0 == res && (0 != sockerror))
 					{
 						if (EINTR == sockerror)
 						{ /* loop on select */
@@ -466,15 +465,15 @@ boolean_t iosocket_connect(socket_struct *sockptr, int4 msec_timeout, boolean_t 
 			} else
 				sockptr->state = socket_connect_inprogress;
 			real_sockintr->who_saved = sockintr->who_saved = sockwhich_connect;
-			if (NO_M_TIMEOUT != msec_timeout)
+			if (NO_M_TIMEOUT != nsec_timeout)
 			{
 				real_sockintr->end_time = sockintr->end_time = end_time;
 				real_sockintr->end_time_valid  = sockintr->end_time_valid = TRUE;
 			} else
-			{	/* Note that "end_time" is uninitialized in this case (i.e. if "msec_timeout" is NO_M_TIMEOUT)
+			{	/* Note that "end_time" is uninitialized in this case (i.e. if "nsec_timeout" is NO_M_TIMEOUT)
 				 * but it is okay since when it is restored, we are guaranteed that the post-interrupt
 				 * invocation of "iosocket_connect" (after the jobinterrupt is handled) will use the
-				 * restored "end_time" only if "msec_timeout" (which will have the exact same value as the
+				 * restored "end_time" only if "nsec_timeout" (which will have the exact same value as the
 				 * pre-interrupt invocation of "iosocket_connect" thanks to the xf_restartpc invocation
 				 * in OC_IOCONTROL in ttt.txt) is not NO_M_TIMEOUT.
 				 */

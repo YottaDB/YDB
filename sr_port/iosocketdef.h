@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -383,8 +383,8 @@ typedef struct d_socket_struct_type
 	struct socket_struct_type 	*socket[1];			/* Array size determined by ydb_max_sockets */
 } d_socket_struct;
 
-boolean_t iosocket_bind(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz, boolean_t newversion);
-boolean_t iosocket_connect(socket_struct *socketptr, int4 timepar, boolean_t update_bufsiz);
+boolean_t iosocket_bind(socket_struct *socketptr, uint8 timepar, boolean_t update_bufsiz, boolean_t newversion);
+boolean_t iosocket_connect(socket_struct *socketptr, uint8 timepar, boolean_t update_bufsiz);
 boolean_t iosocket_delimiter(unsigned char *delimiter_buffer, int4 delimiter_len, socket_struct *socketptr, boolean_t rm);
 void iosocket_idelim_conv(socket_struct *socketptr, gtm_chset_t to_chset);
 void iosocket_odelim_conv(socket_struct *socketptr, gtm_chset_t to_chset);

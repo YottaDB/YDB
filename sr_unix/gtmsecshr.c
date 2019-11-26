@@ -229,7 +229,6 @@ int main(int argc, char_ptr_t argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	assert(MAXPOSINT4 >= GTMSECSHR_MESG_TIMEOUT);
 	common_startup_init(GTMSECSHR_IMAGE, NULL); /* Side-effect : Sets skip_dbtriggers = TRUE if platorm lacks trigger support */
 	err_init(gtmsecshr_cond_hndlr);
 	DEFINE_EXIT_HANDLER(gtmsecshr_exit_handler, FALSE);

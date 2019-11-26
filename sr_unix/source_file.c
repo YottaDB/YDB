@@ -61,8 +61,8 @@ GBLREF unsigned short		source_name_len;
 GBLREF short int		source_line;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
 
-LITREF	mval		literal_null;
 LITREF	mval		literal_notimeout;
+LITREF	mval		literal_null;
 LITREF	mval		literal_zero;
 
 static bool	tt_so_do_once;

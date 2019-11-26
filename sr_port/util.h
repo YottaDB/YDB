@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,7 @@ boolean_t	util_out_save(char *dst, int *dstlen_ptr);
 #ifdef DEBUG
 void		util_out_syslog_dump(void);
 
-#define		UTIL_OUT_SYSLOG_INTERVAL 50
+#define		UTIL_OUT_SYSLOG_INTERVAL (50 * (uint8)NANOSECS_IN_MSEC)
 #endif
 #endif
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -495,7 +495,7 @@ MBSTART {											\
 } MBEND
 
 #define DOREADRLTO2(FDESC, FBUFF, FBUFF_LEN, TOFLAG, BLOCKED_IN, ISPIPE, FLAGS, RLEN,				\
-			TOT_BYTES_READ, TIMER_ID, MSEC_TIMEOUT, PIPE_ZERO_TIMEOUT, UTF_VAR_PF, PIPE_OR_FIFO)	\
+			TOT_BYTES_READ, TIMER_ID, NSEC_TIMEOUT, PIPE_ZERO_TIMEOUT, UTF_VAR_PF, PIPE_OR_FIFO)	\
 MBSTART {													\
 	ssize_t		gtmioStatus;										\
 	int		skip_read = FALSE;									\
@@ -532,8 +532,8 @@ MBSTART {													\
 						   loaded systems but timeout on incomplete reads.  		\
 						   Any characters						\
 						   read to this point will be returned. */ 			\
-						*MSEC_TIMEOUT = 1 * MILLISECS_IN_SEC;				\
-						start_timer(TIMER_ID, *MSEC_TIMEOUT, wake_alarm, 0, NULL);	\
+						*NSEC_TIMEOUT = 1 * (uint8)NANOSECS_IN_SEC;			\
+						start_timer(TIMER_ID, *NSEC_TIMEOUT, wake_alarm, 0, NULL);	\
 					}									\
 					gtmioBuffLen -= gtmioStatus;						\
 					gtmioBuff += gtmioStatus;						\

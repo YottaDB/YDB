@@ -32,8 +32,8 @@
 #define TTDEF_BUF_SZ 		MAX_SRCLINE
 #define TTDEF_PG_WIDTH 		255
 
-#define IOTT_FLUSH_WAIT		300
-#define IOTT_FLUSH_RETRY	50
+#define IOTT_FLUSH_WAIT		(300 * (uint8)NANOSECS_IN_MSEC)
+#define IOTT_FLUSH_RETRY	(50 * (uint8)NANOSECS_IN_MSEC)
 #define IOTT_BUFF_LEN		3072
 #define IOTT_BUFF_MIN		128
 
@@ -127,7 +127,7 @@ typedef struct
 	unsigned char	more_buf[GTM_MB_LEN_MAX + 1];
 #	ifdef DEBUG
 	boolean_t	timed;
-	int4		msec_timeout;
+	uint8		nsec_timeout;
 #	endif
 } tt_interrupt;
 

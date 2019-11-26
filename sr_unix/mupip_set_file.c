@@ -909,7 +909,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				csd->asyncio = (CLI_PRESENT == asyncio_status);
 			if (extn_count_status)
 				csd->extension_size = (uint4)new_extn_count;
-			change_fhead_timer("FLUSH_TIME", csd->flush_time,
+			change_fhead_timer_ns("FLUSH_TIME", &csd->flush_time,
 					   (dba_bg == access_new ? TIM_FLU_MOD_BG : TIM_FLU_MOD_MM),
 					   FALSE);
 			if (CLI_NEGATED == inst_freeze_on_error_status)

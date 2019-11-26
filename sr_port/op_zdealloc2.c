@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -32,6 +35,8 @@ GBLREF mlk_pvtblk	*mlk_pvt_root;
 GBLREF unsigned char	cm_action;
 GBLREF tp_frame		*tp_pointer;
 
+LITREF mval		literal_notimeout;
+
 error_def(ERR_TPLOCK);
 
 /*
@@ -48,7 +53,7 @@ void op_zdealloc2(mval *timeout, UINTPTR_T auxown)
 	mlk_pvtblk	**prior;
 	bool		specific;
 
-	assert(NO_M_TIMEOUT == timeout->m[1]);
+	assert(is_equ((mval *)&literal_notimeout, timeout));
 	if (lks_this_cmd)
 	{
 		specific = TRUE;

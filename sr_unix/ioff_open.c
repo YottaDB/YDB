@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -24,7 +27,7 @@
 
 GBLREF io_pair io_curr_device;
 
-short ioff_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 msec_timeout)
+short ioff_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 nsec_timeout)
 {
 	io_desc		*iod;
  	d_rm_struct	*d_rm;
@@ -53,5 +56,5 @@ short ioff_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 msec
 	}
 	d_rm->fifo = TRUE;
 	iod->type = rm;
-	return iorm_open(dev_name, pp, fd, mspace, msec_timeout);
+	return iorm_open(dev_name, pp, fd, mspace, nsec_timeout);
 }

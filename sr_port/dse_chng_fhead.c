@@ -446,7 +446,7 @@ void dse_chng_fhead(void)
 	}
 	if ((CLI_PRESENT == cli_present("TIMERS_PENDING")) && (cli_get_int("TIMERS_PENDING", &x)))
 		cs_addrs->nl->wcs_timers = x - 1;
-	change_fhead_timer("FLUSH_TIME", cs_data->flush_time,
+	change_fhead_timer_ns("FLUSH_TIME", &cs_data->flush_time,
 			(dba_bg == cs_data->acc_meth ? TIM_FLU_MOD_BG : TIM_FLU_MOD_MM), FALSE);
 	if ((CLI_PRESENT == cli_present("WRITES_PER_FLUSH")) && (cli_get_int("WRITES_PER_FLUSH", &x)))
 		cs_data->n_wrt_per_flu = x;
@@ -454,10 +454,10 @@ void dse_chng_fhead(void)
 		cs_data->flush_trigger = cs_data->flush_trigger_top = x;
 	if ((CLI_PRESENT == cli_present("GOT2V5ONCE")) && (cli_get_int("GOT2V5ONCE", &x)))
                 cs_data->db_got_to_v5_once = (boolean_t)x;
-	change_fhead_timer("STALENESS_TIMER", cs_data->staleness, 5000, TRUE);
-	change_fhead_timer("TICK_INTERVAL", cs_data->ccp_tick_interval, 100, TRUE);
-	change_fhead_timer("QUANTUM_INTERVAL", cs_data->ccp_quantum_interval, 1000, FALSE);
-	change_fhead_timer("RESPONSE_INTERVAL", cs_data->ccp_response_interval, 60000, FALSE);
+	change_fhead_timer_ms("STALENESS_TIMER", cs_data->staleness, 5000, TRUE);
+	change_fhead_timer_ms("TICK_INTERVAL", cs_data->ccp_tick_interval, 100, TRUE);
+	change_fhead_timer_ms("QUANTUM_INTERVAL", cs_data->ccp_quantum_interval, 1000, FALSE);
+	change_fhead_timer_ms("RESPONSE_INTERVAL", cs_data->ccp_response_interval, 60000, FALSE);
 	if ((CLI_PRESENT == cli_present("B_BYTESTREAM")) && (cli_get_hex64("B_BYTESTREAM", &tn)))
 		cs_data->last_inc_backup = tn;
 	if ((CLI_PRESENT == cli_present("B_COMPREHENSIVE")) && (cli_get_hex64("B_COMPREHENSIVE", &tn)))

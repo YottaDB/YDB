@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -16,7 +19,7 @@
 #include "io.h"
 #include "iousdef.h"
 
-short ious_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, int4 timeout)
+short ious_open(io_log_name *dev, mval *pp, int file_des, mval *mspace, uint8 timeout)
 {
 	io_desc *iod;
 	dev_dispatch_struct *fgn_driver;

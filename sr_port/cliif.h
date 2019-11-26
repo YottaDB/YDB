@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -22,7 +25,9 @@ boolean_t	cli_get_num(char *entry, int4 *dst);
 boolean_t	cli_get_num64(char *entry, gtm_int64_t *dst);
 boolean_t	cli_get_str(char *entry, char *dst, unsigned short *max_len);
 boolean_t	cli_get_str_ele(char *inbuff, char *dst, unsigned short *dst_len, boolean_t upper_case);
-boolean_t	cli_get_time(char *entry, uint4 *dst);
+boolean_t	cli_get_time_common(char *entry, uint8 *dst, boolean_t is_nano);
+boolean_t	cli_get_time_ms(char *entry, uint4 *dst);
+boolean_t	cli_get_time_ns(char *entry, uint8 *dst);
 boolean_t	cli_get_value(char *entry, char val_buf[]);
 boolean_t	cli_negated(char *entry);
 boolean_t	cli_str_to_hex(char *str, uint4 *dst);

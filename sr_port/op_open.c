@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,7 @@ int op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
 {
 	char		buf1[MAX_TRANS_NAME_LEN];	/* buffer to hold translated name */
 	char		*c1;				/* used to compare $P name */
-	int4		msec_timeout;			/* timeout converted to number of milliseconds */
+	uint8		nsec_timeout;			/* timeout converted to number of nanoseconds */
 	int4		stat;				/* status */
 	int		nlen;				/* len of $P name */
 	io_log_name	*naml;				/* logical record for passed name */
@@ -86,7 +86,7 @@ int op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
 	if (mspace)
 		MV_FORCE_STR(mspace);
 	assert((unsigned char)*devparms->str.addr < n_iops);
-	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, OPENTIMESTR);
+	MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, OPENTIMESTR);
 	if (dollar_principal || io_root_log_name->iod)
 	{
 		/* make sure that dollar_principal is defined or iod has been defined for the root */
@@ -158,6 +158,6 @@ int op_open(mval *device, mval *devparms, mval *timeout, mval *mspace)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) stat);
 		}
 	}
-	stat = io_open_try(naml, tl, devparms, msec_timeout, mspace);
+	stat = io_open_try(naml, tl, devparms, nsec_timeout, mspace);
 	return (stat);
 }

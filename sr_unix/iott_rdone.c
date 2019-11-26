@@ -61,7 +61,7 @@ error_def(ERR_ZINTRECURSEIO);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
 
-int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
+int	iott_rdone (mint *v, uint8 nsec_timeout)	/* timeout in nanoseconds */
 {
 	boolean_t	ret = FALSE, timed, utf8_active, zint_restart, first_time;
 	unsigned char	inbyte;
@@ -119,13 +119,13 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		if (mv_chain == mv_zintdev)
 			POP_MV_STENT();         /* pop if top of stack */
 		/* The below two asserts ensure the invocation of "iott_rdone" after a job interrupt has
-		 * the exact same "msec_timeout" as well as "timed" variable context. This is needed to
+		 * the exact same "nsec_timeout" as well as "timed" variable context. This is needed to
 		 * ensure that the "end_time" usages in the post-interrupt invocation always happen
 		 * only if the pre-interrupt invocation had initialized "end_time".
 		 * Note: Since "timed" is not yet set, we cannot use it but instead use the variables that it derives from.
 		 */
-		assert((NO_M_TIMEOUT != msec_timeout) == tt_state->timed);
-		assert(msec_timeout == tt_state->msec_timeout);
+		assert((NO_M_TIMEOUT != nsec_timeout) == tt_state->timed);
+		assert((nsec_timeout) == tt_state->nsec_timeout);
 		end_time = tt_state->end_time;
 		if (utf8_active)
 		{
@@ -173,7 +173,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		}
 	}
 	out_of_time = FALSE;
-	if (NO_M_TIMEOUT == msec_timeout)
+	if (NO_M_TIMEOUT == nsec_timeout)
 	{
 		timed = FALSE;
 		input_timeval.tv_sec  = 100;
@@ -181,9 +181,9 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 	} else
 	{
 		timed = TRUE;
-		input_timeval.tv_sec = msec_timeout / MILLISECS_IN_SEC;
-		input_timeval.tv_usec = (msec_timeout % MILLISECS_IN_SEC) * MICROSECS_IN_MSEC;
-		if (0 == msec_timeout)
+		input_timeval.tv_sec = nsec_timeout / NANOSECS_IN_SEC;
+		input_timeval.tv_usec = (nsec_timeout % NANOSECS_IN_SEC) / NANOSECS_IN_USEC;
+		if (0 == nsec_timeout)
 		{
 			if (!zint_restart)
 				iott_mterm(io_ptr);
@@ -191,7 +191,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		{
 			sys_get_curr_time(&cur_time);
 			if (!zint_restart)
-				add_int_to_abs_time(&cur_time, msec_timeout, &end_time);
+				add_uint8_to_abs_time(&cur_time, nsec_timeout, &end_time);
 		}
 	}
 	first_time = TRUE;
@@ -204,10 +204,10 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 				tt_state = &tt_ptr->tt_state_save;
 				tt_state->exp_length = 0;
 				tt_state->who_saved = ttrdone;
-				/* Note that "end_time" might be uninitialized in some cases (e.g. if "msec_timeout" is
+				/* Note that "end_time" might be uninitialized in some cases (e.g. if "nsec_timeout" is
 				 * NO_M_TIMEOUT or 0) but it is okay since when it is restored, we are guaranteed that
 				 * the post-interrupt invocation of "iott_rdone" (after the jobinterrupt is handled)
-				 * will use the restored "end_time" only if "msec_timeout" (which will have the exact
+				 * will use the restored "end_time" only if "nsec_timeout" (which will have the exact
 				 * same value as the pre-interrupt invocation of "iott_rdone" thanks to the xf_restartpc
 				 * invocation in OC_RDONE in ttt.txt) is not NO_M_TIMEOUT or 0.
 				 */
@@ -229,7 +229,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 #				ifdef DEBUG
 				/* Store debug-only context used later to assert when restoring this context */
 				tt_state->timed = timed;
-				tt_state->msec_timeout = msec_timeout;
+				tt_state->nsec_timeout = nsec_timeout;
 #				endif
 				PUSH_MV_STENT(MVST_ZINTDEV);	/* used as a flag only */
 				mv_chain->mv_st_cont.mvs_zintdev.buffer_valid = FALSE;
@@ -237,7 +237,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 				tt_ptr->mupintr = TRUE;
 			} else
 			{
-				if (timed && (0 == msec_timeout))
+				if (timed && (0 == nsec_timeout))
 					iott_rterm(io_ptr);
 			}
 			REVERT_GTMIO_CH(&io_curr_device, ch_set);
@@ -248,7 +248,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 		{
 			if (timed)
 			{
-				if (0 != msec_timeout)
+				if (0 != nsec_timeout)
 				{
 					sys_get_curr_time(&cur_time);
 					cur_time = sub_abs_time(&end_time, &cur_time);
@@ -283,7 +283,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 			if (EINTR != errno)
 			{
 				io_ptr->dollar.za = 9;
-				if (timed && (0 == msec_timeout))
+				if (timed && (0 == nsec_timeout))
 					iott_rterm(io_ptr);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;
@@ -380,7 +380,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 				std_dev_outbndset(INPUT_CHAR);
 				if (timed)
 				{
-					if (0 == msec_timeout)
+					if (0 == nsec_timeout)
 				  		iott_rterm(io_ptr);
 				}
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
@@ -452,7 +452,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 						io_ptr->dollar.za = 9;
 						if (timed)
 						{
-							if (0 == msec_timeout)
+							if (0 == nsec_timeout)
 								iott_rterm(io_ptr);
 						}
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1)  status);
@@ -465,7 +465,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 			if (errno != EINTR)
 			{
 				io_ptr->dollar.za = 9;
-				if (timed && (0 == msec_timeout))
+				if (timed && (0 == nsec_timeout))
 					iott_rterm(io_ptr);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 				break;
@@ -506,7 +506,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 	} while (!out_of_time);
 	if (timed)
 	{
-		if (0 == msec_timeout)
+		if (0 == nsec_timeout)
 			iott_rterm(io_ptr);
 	}
 	if (mask & TRM_READSYNC)

@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@
 #define CHECK_SEMVAL_GRT_SEMOP(SEMID, SEMNUM, SEMOP) {}
 #endif
 
-#define MAX_SEM_WAIT_TIME (1000 * 60) /* 60 seconds */
+#define MAX_SEM_WAIT_TIME ((uint8)NANOSECS_IN_SEC * 60) /* 60 seconds */
 int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops);
 
 #endif /*GTM_C_STACK_TRACE_SEMOP_INCLUDED*/

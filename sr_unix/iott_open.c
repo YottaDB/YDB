@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,7 +49,7 @@ error_def(ERR_NOTERMINFODB);
 error_def(ERR_TCGETATTR);
 error_def(ERR_ZINTRECURSEIO);
 
-short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
+short iott_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 timeout)
 {
 	unsigned char	ch;
 	d_tt_struct	*tt_ptr;

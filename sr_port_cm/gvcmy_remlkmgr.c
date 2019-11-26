@@ -49,9 +49,9 @@ error_def(ERR_BADSRVRNETMSG);
 error_def(ERR_TEXT);
 
 #define CM_LKWAIT_TIME		100 /* ms */
-#define CM_LKNORESPONSE_TIME	60 * 1000 /* ms */
+#define CM_LKNORESPONSE_TIME	60 * (uint8)NANOSECS_IN_SEC /* ns */
 
-bool gvcmy_remlkmgr(unsigned short count, int4 msec_timeout, ABS_TIME *end_time)
+bool gvcmy_remlkmgr(unsigned short count, uint8 nsec_timeout, ABS_TIME *end_time)
 {
 	char		errbuf[CM_ERRBUFF_SIZE];
 	unsigned char	*c_ptr;
@@ -68,7 +68,7 @@ bool gvcmy_remlkmgr(unsigned short count, int4 msec_timeout, ABS_TIME *end_time)
 	{
 		while (lkresponse_count < count && !lkerror)
 		{
-			SET_OUT_OF_TIME_IF_APPROPRIATE(msec_timeout, end_time, out_of_time);	/* may set "out_of_time" */
+			SET_OUT_OF_TIME_IF_APPROPRIATE(nsec_timeout, end_time, out_of_time);	/* may set "out_of_time" */
 			if (!one_try && (outofband || out_of_time))
 			{
 				lkstatus = CMMS_L_LKCANCEL;
@@ -128,7 +128,7 @@ bool gvcmy_remlkmgr(unsigned short count, int4 msec_timeout, ABS_TIME *end_time)
 			{
 				if (lkerror || ((lksusp_sent == lksusp_rec) && (CMMS_L_LKCANCEL == lkstatus)))
 					break;
-				SET_OUT_OF_TIME_IF_APPROPRIATE(msec_timeout, end_time, out_of_time);	/* may set "out_of_time" */
+				SET_OUT_OF_TIME_IF_APPROPRIATE(nsec_timeout, end_time, out_of_time);	/* may set "out_of_time" */
 				if (outofband || out_of_time)
 				{
 					lkstatus = CMMS_L_LKCANCEL;

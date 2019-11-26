@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -216,7 +219,7 @@ void tp_start_timer(int4 timeout_seconds)
 	assert(!in_timed_tn);
 	DBGWTIME((stderr, "%s tp_start_timer: Starting timer for tptimeout\n" VMS_ONLY("\n"), asccurtime));
 	in_timed_tn = TRUE;
-	start_timer(TP_TIMER_ID, (1000 * timeout_seconds), &tp_expire_now, 0, NULL);
+	start_timer(TP_TIMER_ID, ((uint8)NANOSECS_IN_SEC * timeout_seconds), &tp_expire_now, 0, NULL);
 }
 
 /* ------------------------------------------------------------------

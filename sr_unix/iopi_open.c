@@ -280,7 +280,7 @@ int parse_pipe(char *cmd_string, char *ret_token)
 #define INVALID_CMD2	"$PATH undefined, Invalid command string: "
 #define	PIPEOPENSTR	"PIPEOPEN"
 
-short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
+short iopi_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 timeout)
 {
 	io_desc		*iod;
 	io_desc		*stderr_iod;

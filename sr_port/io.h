@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -202,18 +202,18 @@ io_log_name *get_log_name(mstr *v, bool insert);
  * the IO dispatch table are NULL in the IO dispatch tables, they have to remain. */
 typedef struct dev_dispatch_struct
 {
-	short	(*open)(io_log_name *, mval *, int, mval *, int4);
+	short	(*open)(io_log_name *, mval *, int, mval *, uint8);
 	void	(*close)(io_desc *, mval *);
 	void	(*use)(io_desc *, mval *);
-	int	(*read)(mval *, int4);
-	int	(*rdone)(mint *, int4);
+	int	(*read)(mval *, uint8);
+	int	(*rdone)(mint *, uint8);
 	void	(*write)(mstr *);
 	void	(*wtone)(int);
 	void	(*wteol)(int4, io_desc *);
 	void	(*wtff)(void);
 	void	(*wttab)(int4);
 	void	(*flush)(io_desc *);
-	int	(*readfl)(mval *, int4, int4);
+	int	(*readfl)(mval *, int4, uint8);
 	void	(*iocontrol)(mstr *, int4, va_list);
 	void	(*dlr_device)(mstr *);
 	void	(*dlr_key)(mstr *);
@@ -226,23 +226,23 @@ void io_init(boolean_t term_ctrl);
 bool io_is_rm(mstr *name);
 bool io_is_sn(mstr *tn);
 struct mv_stent_struct *io_find_mvstent(io_desc *io_ptr, boolean_t clear_mvstent);
-boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, int4 msec_timeout, mval *mspace);
+boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_timeout, mval *mspace);
 enum io_dev_type io_type(mstr *tn);
 void io_init_name(void);
 
-#define ioxx_open(X)		short io##X##_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 msec_timeout)
-#define ioxx_dummy(X)		short io##X##_dummy(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 msec_timeout)
+#define ioxx_open(X)		short io##X##_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 nsec_timeout)
+#define ioxx_dummy(X)		short io##X##_dummy(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 msec_timeout)
 #define ioxx_close(X)		void io##X##_close(io_desc *iod, mval *pp)
 #define ioxx_use(X)		void io##X##_use(io_desc *iod, mval *pp)
-#define ioxx_read(X)		int io##X##_read(mval *v, int4 msec_timeout)
-#define ioxx_rdone(X)		int io##X##_rdone (mint *v, int4 msec_timeout)
+#define ioxx_read(X)		int io##X##_read(mval *v, uint8 nsec_timeout)
+#define ioxx_rdone(X)		int io##X##_rdone (mint *v, uint8 nsec_timeout)
 #define ioxx_write(X)		void io##X##_write(mstr *v)
 #define ioxx_wtone(X)		void io##X##_wtone(int c)
 #define ioxx_wteol(X)		void io##X##_wteol(int4 cnt, io_desc *iod)
 #define ioxx_wtff(X)		void io##X##_wtff(void)
 #define ioxx_wttab(X)		void io##X##_wttab(int4 x)
 #define ioxx_flush(X)		void io##X##_flush(io_desc *iod)
-#define ioxx_readfl(X)		int io##X##_readfl(mval *v, int4 width, int4 msec_timeout)
+#define ioxx_readfl(X)		int io##X##_readfl(mval *v, int4 width, uint8 nsec_timeout)
 #define xx_iocontrol(X)		void X##_iocontrol(mstr *mn, int4 argcnt, va_list args)
 #define xx_dlr_device(X)	void X##_dlr_device(mstr *d)
 #define xx_dlr_key(X)		void X##_dlr_key(mstr *d)
@@ -286,10 +286,10 @@ uchar_ptr_t iott_escape(uchar_ptr_t strin, uchar_ptr_t strtop, io_desc *io_ptr);
 
 /* iosocket_ prototypes */
 boolean_t iosocket_listen(io_desc *iod, unsigned short len);
-boolean_t iosocket_wait(io_desc *iod, int4 timepar);
+boolean_t iosocket_wait(io_desc *iod, uint8 timepar);
 void iosocket_poolinit(void);
-void iosocket_pass_local(io_desc *iod, pid_t pid, int4 timeout, int argcnt, va_list args);
-void iosocket_accept_local(io_desc *iod, mval *handlevar, pid_t pid, int4 timeout, int argcnt, va_list args);
+void iosocket_pass_local(io_desc *iod, pid_t pid, uint8 timeout, int argcnt, va_list args);
+void iosocket_accept_local(io_desc *iod, mval *handlevar, pid_t pid, uint8 timeout, int argcnt, va_list args);
 
 /* tcp_ prototypes used by mupip */
 int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive);

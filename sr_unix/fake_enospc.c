@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -42,11 +45,11 @@ STATICDEF	uint4		syslog_deferred = 0;
 error_def(ERR_TEXT);
 error_def(ERR_FAKENOSPCLEARED);
 
-#define ENOSPC_FROZEN_DURATION		(16 * MILLISECS_IN_SEC)
-#define ENOSPC_UNFROZEN_DURATION	(16 * MILLISECS_IN_SEC * ((rand() % 120) + 1))	/* 16 seconds to 32 minutes */
-#define ENOSPC_GDWAIT_INTERVAL		(2 * MILLISECS_IN_SEC)
-#define ENOSPC_RETRY_INTERVAL		MILLISECS_IN_SEC
-#define DEFERRED_SYSLOG_INTERVAL	MILLISECS_IN_SEC
+#define ENOSPC_FROZEN_DURATION		(16 * (uint8)NANOSECS_IN_SEC)
+#define ENOSPC_UNFROZEN_DURATION	(16 * (uint8)NANOSECS_IN_SEC * ((rand() % 120) + 1))	/* 16 seconds to 32 minutes */
+#define ENOSPC_GDWAIT_INTERVAL		(2 * (uint8)NANOSECS_IN_SEC)
+#define ENOSPC_RETRY_INTERVAL		(uint8)NANOSECS_IN_SEC
+#define DEFERRED_SYSLOG_INTERVAL	(uint8)NANOSECS_IN_SEC
 #define MAX_REGIONS			50
 #define	NONE				0				/* 1/2 probablility */
 #define	DB_ON				1				/* 1/6 probablility */

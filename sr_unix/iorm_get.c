@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -114,7 +114,7 @@ int	gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, in
 
 /* When we get to this routine it is guaranteed that rm_ptr->done_1st_read is FALSE. */
 
-int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, boolean_t timed,
+int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, uint8 *nsec_timeout, boolean_t timed,
 			 boolean_t *bom_timeout, ABS_TIME end_time)
 {
 	int		status, fildes;
@@ -142,23 +142,24 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 	if (timed)
 	{
 		/* check iorm_get_bom_fol.... for msc_timeout */
-		/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
-		if (0 < *msec_timeout)
+		/* recalculate nsec_timeout and sleep_left as &end_time - &current_time */
+		if (0 < *nsec_timeout)
 		{
 			/* get the current time */
 			sys_get_curr_time(&current_time);
 			time_left = sub_abs_time(&end_time, &current_time);
 			if (0 > time_left.tv_sec)
 			{
-				*msec_timeout = -1;
+				*nsec_timeout = 0;
 				*bom_timeout = TRUE;
 			} else
-				*msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
-						       DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
+				*nsec_timeout = (time_left.tv_sec * (uint8)NANOSECS_IN_SEC) + time_left.tv_nsec;
 			/* make sure it terminates with bom_timeout */
-			if (!*bom_timeout && !*msec_timeout)
-				*msec_timeout = 1;
-			sleep_left = *msec_timeout;
+			if (!*bom_timeout && !*nsec_timeout)
+				*nsec_timeout = 1;
+			sleep_left = (int)(*nsec_timeout / NANOSECS_IN_MSEC);
+			if (0 == sleep_left && *nsec_timeout > 0) /* We round up an extra millisecond to avoid early timeouts */
+				sleep_left = 1;
 		} else
 			sleep_left = 0;
 	}
@@ -188,22 +189,23 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 			   If not a timed read then just sleep 100 ms */
 			if (TRUE == timed)
 			{
-				/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
+				/* recalculate nsec_timeout and sleep_left as &end_time - &current_time */
 				/* get the current time */
 				sys_get_curr_time(&current_time);
 				time_left = sub_abs_time(&end_time, &current_time);
 				if (0 > time_left.tv_sec)
 				{
-					*msec_timeout = -1;
+					*nsec_timeout = 0;
 					*bom_timeout = TRUE;
 				} else
-					*msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
-							       DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
+					*nsec_timeout = (time_left.tv_sec * (uint8)NANOSECS_IN_SEC) + time_left.tv_nsec;
 
 				/* make sure it terminates with bom_timeout */
-				if ((!*bom_timeout) && (!*msec_timeout))
-					*msec_timeout = 1;
-				sleep_left = *msec_timeout;
+				if ((!*bom_timeout) && (!*nsec_timeout))
+					*nsec_timeout = 1;
+				sleep_left = (int)(*nsec_timeout / NANOSECS_IN_MSEC);
+				if (0 == sleep_left && *nsec_timeout > 0) /* We round up an extra millisecond to avoid early timeouts */
+					sleep_left = 1;
 				sleep_time = MIN(100,sleep_left);
 			} else
 				sleep_time = 100;
@@ -248,7 +250,7 @@ int	iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, 
 }
 
 /* If we are in this routine then it is a fixed utf disk read with rm_ptr->follow = TRUE */
-int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, boolean_t timed,
+int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, uint8 *nsec_timeout, boolean_t timed,
 		     boolean_t zint_restart, boolean_t *follow_timeout, ABS_TIME end_time)
 {
 	boolean_t	ret;
@@ -316,7 +318,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 	if (!rm_ptr->done_1st_read)
 	{
 		PIPE_DEBUG(PRINTF("do iorm_get_bom_fol: bytes2read: %d\n", bytes2read); DEBUGPIPEFLUSH;)
-		status = iorm_get_bom_fol(io_ptr, tot_bytes_read, msec_timeout, timed, &bom_timeout, end_time);
+		status = iorm_get_bom_fol(io_ptr, tot_bytes_read, nsec_timeout, timed, &bom_timeout, end_time);
 		if (!rm_ptr->done_1st_read && outofband)
 		{
 			PIPE_DEBUG(PRINTF("return since iorm_get_bom_fol went outofband\n"); DEBUGPIPEFLUSH;);
@@ -347,22 +349,23 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 		PIPE_DEBUG(PRINTF("iorm_get_fol: bytes2read after bom: %d\n", bytes2read); DEBUGPIPEFLUSH;);
 		if (timed)
 		{
-			/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
-			if (0 < *msec_timeout)
+			/* recalculate nsec_timeout and sleep_left as &end_time - &current_time */
+			if (0 < *nsec_timeout)
 			{
 				/* get the current time */
 				sys_get_curr_time(&current_time);
 				time_left = sub_abs_time(&end_time, &current_time);
 				if (0 > time_left.tv_sec)
 				{
-					*msec_timeout = -1;
+					*nsec_timeout = 0;
 					*follow_timeout = TRUE;
 				} else
-					*msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
-							       DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
+					*nsec_timeout = (time_left.tv_sec * (uint8)NANOSECS_IN_SEC) + time_left.tv_nsec;
 				/* make sure it terminates with follow_timeout */
-				if (!*follow_timeout && !*msec_timeout) *msec_timeout = 1;
-				sleep_left = *msec_timeout;
+				if (!*follow_timeout && !*nsec_timeout) *nsec_timeout = 1;
+				sleep_left = (int)(*nsec_timeout / NANOSECS_IN_MSEC);
+				if (0 == sleep_left && *nsec_timeout > 0) /* We round up an extra millisecond to avoid early timeouts */
+					sleep_left = 1;
 			} else
 				sleep_left = 0;
 		}
@@ -394,21 +397,22 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 				   If not a timed read then just sleep 100 ms */
 				if (TRUE == timed)
 				{
-					/* recalculate msec_timeout and sleep_left as &end_time - &current_time */
+					/* recalculate nsec_timeout and sleep_left as &end_time - &current_time */
 					/* get the current time */
 					sys_get_curr_time(&current_time);
 					time_left = sub_abs_time(&end_time, &current_time);
 					if (0 > time_left.tv_sec)
 					{
-						*msec_timeout = -1;
+						*nsec_timeout = 0;
 						*follow_timeout = TRUE;
 					} else
-						*msec_timeout = (int4)(time_left.tv_sec * MILLISECS_IN_SEC +
-								       DIVIDE_ROUND_UP(time_left.tv_nsec, NANOSECS_IN_MSEC));
+						*nsec_timeout = (time_left.tv_sec * (uint8)NANOSECS_IN_SEC) + time_left.tv_nsec;
 
 					/* make sure it terminates with follow_timeout */
-					if (!*follow_timeout && !*msec_timeout) *msec_timeout = 1;
-					sleep_left = *msec_timeout;
+					if (!*follow_timeout && !*nsec_timeout) *nsec_timeout = 1;
+					sleep_left = (int)(*nsec_timeout / NANOSECS_IN_MSEC);
+					if (0 == sleep_left && *nsec_timeout > 0) /* We round up an extra millisecond to avoid early timeouts */
+						sleep_left = 1;
 					sleep_time = MIN(100,sleep_left);
 				} else
 					sleep_time = 100;
@@ -526,7 +530,7 @@ int	iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, bool
 /* When we get to this routine it is guaranteed that rm_ptr->done_1st_read is FALSE. */
 
 int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4 *tot_bytes_read,
-		     TID timer_id, int4 *msec_timeout, boolean_t pipe_zero_timeout)
+		     TID timer_id, uint8 *nsec_timeout, boolean_t pipe_zero_timeout)
 {
 	int		fildes, status = 0;
 	int4		bytes2read, bytes_read, reclen, bom_bytes2read, bom_bytes_read;
@@ -565,7 +569,7 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 		{
 			DOREADRLTO2(fildes, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt], 1,
 				    out_of_time, blocked_in, ispipe, flags, status, tot_bytes_read,
-				    timer_id, msec_timeout, pipe_zero_timeout, FALSE, pipe_or_fifo);
+				    timer_id, nsec_timeout, pipe_zero_timeout, FALSE, pipe_or_fifo);
 			/* Decrypt the read bytes even if they turned out to not contain a BOM. */
 			if ((0 < status) || ((0 > status) && (0 < *tot_bytes_read)))
 			{
@@ -592,7 +596,7 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 					  rm_ptr->bom_buf_cnt, bom_bytes2read - rm_ptr->bom_buf_cnt); DEBUGPIPEFLUSH;);
 			DOREADRLTO2(fildes, &rm_ptr->bom_buf[rm_ptr->bom_buf_cnt], bom_bytes2read - rm_ptr->bom_buf_cnt,
 				    out_of_time, blocked_in, ispipe, flags, status, tot_bytes_read,
-				    timer_id, msec_timeout, pipe_zero_timeout, FALSE, pipe_or_fifo);
+				    timer_id, nsec_timeout, pipe_zero_timeout, FALSE, pipe_or_fifo);
 			/* Decrypt the read bytes even if they turned out to not contain a BOM. */
 			if ((0 < status) || ((0 > status) && (0 < *tot_bytes_read)))
 			{
@@ -651,7 +655,7 @@ int	iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, 
 }
 
 int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4 *tot_bytes_read,
-		 TID timer_id, int4 *msec_timeout, boolean_t pipe_zero_timeout, boolean_t zint_restart)
+		 TID timer_id, uint8 *nsec_timeout, boolean_t pipe_zero_timeout, boolean_t zint_restart)
 {
 	boolean_t	ret;
 	char		inchar, *temp;
@@ -709,7 +713,7 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 		PIPE_DEBUG(PRINTF("do iorm_get_bom: bytes2read: %d\n", bytes2read); DEBUGPIPEFLUSH;)
 		/* need to check for BOM *//* smw do this later perhaps or first */
 		status = iorm_get_bom(io_ptr, blocked_in, ispipe, flags, tot_bytes_read,
-				      timer_id, msec_timeout, pipe_zero_timeout);
+				      timer_id, nsec_timeout, pipe_zero_timeout);
 		if (!rm_ptr->done_1st_read && (pipe_or_fifo && outofband))
 		{
 			PIPE_DEBUG(PRINTF("return since iorm_get_bom went outofband\n"); DEBUGPIPEFLUSH;);
@@ -747,7 +751,7 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 		 */
 		PIPE_DEBUG(PRINTF("pipeget: bytes2read after bom: %d\n", bytes2read); DEBUGPIPEFLUSH;);
 		DOREADRLTO2(fildes, rm_ptr->inbuf_pos, (int)bytes2read, out_of_time, blocked_in, ispipe,
-			    flags, status, tot_bytes_read, timer_id, msec_timeout, pipe_zero_timeout, FALSE, pipe_or_fifo);
+			    flags, status, tot_bytes_read, timer_id, nsec_timeout, pipe_zero_timeout, FALSE, pipe_or_fifo);
 		if ((0 < status) || ((0 > status) && (0 < *tot_bytes_read)))
 		{	/* Decrypt. */
 			if (rm_ptr->input_encrypted)
@@ -780,7 +784,7 @@ int	iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4
 	}
 
 	/* if some bytes were read prior to timeout then process them as if no timeout occurred */
-	if (0 > status && *tot_bytes_read && (!*msec_timeout || (errno == EINTR && out_of_time)))
+	if (0 > status && *tot_bytes_read && (!*nsec_timeout || (errno == EINTR && out_of_time)))
 		status = *tot_bytes_read;
 
 	if (0 > status)

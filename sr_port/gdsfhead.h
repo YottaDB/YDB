@@ -1979,7 +1979,7 @@ typedef struct sgmnt_data_struct
 	th_index	trans_hist;		/* transaction history - if moved from 1st filehdr block, change TH_BLOCK */
 	char		filler_trans_hist[8];
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
-	int4		flush_time[2];
+	uint8		flush_time;
 	int4		flush_trigger;
 	int4		n_wrt_per_flu;		/* Number of writes per flush call. Overloaded for BG and MM */
 	int4		wait_disk_space;        /* seconds to wait for diskspace before giving up on a db block write */

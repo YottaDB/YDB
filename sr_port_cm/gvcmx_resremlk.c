@@ -37,7 +37,7 @@ GBLREF unsigned char	lkerror;
 GBLREF unsigned char	cmlk_num;
 GBLREF spdesc		stringpool;
 
-bool gvcmx_resremlk(unsigned char laflag, int4 msec_timeout, ABS_TIME *end_time)
+bool gvcmx_resremlk(unsigned char laflag, uint8 nsec_timeout, ABS_TIME *end_time)
 {
 	unsigned char	*c_ptr;
 	unsigned short	count;
@@ -89,5 +89,5 @@ bool gvcmx_resremlk(unsigned char laflag, int4 msec_timeout, ABS_TIME *end_time)
 			c_ptr = clb_ptr->mbf + clb_ptr->mbl;
 		}
 	}
-	return gvcmy_remlkmgr(count, msec_timeout, end_time);
+	return gvcmy_remlkmgr(count, nsec_timeout, end_time);
 }

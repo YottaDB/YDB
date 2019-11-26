@@ -3,6 +3,9 @@
  * Copyright (c) 2011-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -54,7 +57,7 @@ int try_semop_get_c_stack(int semid, struct sembuf sops[], int nsops)
 		if (TREF(semwait2long))
 		{
 			TREF(semwait2long) = FALSE;
-			start_timer((TID)semwt2long_handler,(int4)MAX_SEM_WAIT_TIME, semwt2long_handler, 0, NULL);
+			start_timer((TID)semwt2long_handler, MAX_SEM_WAIT_TIME, semwt2long_handler, 0, NULL);
 		}
 		rc = semop(semid, sops, nsops);
 		if (-1 == rc)

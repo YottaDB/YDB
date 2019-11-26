@@ -316,7 +316,7 @@ STATICFNDEF void gtcm_gnp_server_actions(void)
 		} else
 			CMI_IDLE(CM_SERV_WAIT_FOR_INPUT);
 		if (cm_timeout && (0 == gtcm_users))
-                        start_timer((TID)&cm_shutdown, closewait, gtcm_shutdown_ast, 0, NULL);
+                        start_timer((TID)&cm_shutdown, closewait * (uint8)NANOSECS_IN_MSEC, gtcm_shutdown_ast, 0, NULL);
 	}
 	return;
 }

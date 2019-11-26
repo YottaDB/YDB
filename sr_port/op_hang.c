@@ -124,10 +124,6 @@ void op_hang(mval* num)
 	{
 		if ((TREF(tpnotacidtime)).m[1] < ms)
 			TPNOTACID_CHECK(HANGSTR);
-#		ifdef _AIX	/* AIX times are a bit wobbly, so nudge any 1sec. hang aiming to landing in the next sec */
-		if (1000 == ms)		/* some apps expect a HANG 1 (1000 MS) to land in the next second */
-			ms +=2;		/* push a bit (in milliseconds) */
-#		endif
 #		if defined(DEBUG)
 		if (WBTEST_ENABLED(WBTEST_DEFERRED_TIMERS) && (3 > ydb_white_box_test_case_count) && (123000 == ms))
 		{	/* LONG_SLEEP messes with signals */

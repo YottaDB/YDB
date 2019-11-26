@@ -148,7 +148,7 @@ void gtcm_loop(omi_conn_ll *cll)
 	    if (FD_ISSET(cptr->fd, &r_fds))
 	    {
 	    	servtime_expired = FALSE; /* inside hang handler this is set TRUE */
-		start_timer((TID)gtcm_loop, per_conn_servtime * 1000, hang_handler, 0, NULL);
+		start_timer((TID)gtcm_loop, (uint8)per_conn_servtime * NANOSECS_IN_SEC, hang_handler, 0, NULL);
 
 		curr_conn = cptr;
 		res = omi_srvc_xact(cptr);
@@ -260,5 +260,3 @@ void gcore_server(void)
 	} else if (!pid)  /* child */
 		DUMP_CORE;
 }
-
-

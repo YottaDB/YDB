@@ -523,16 +523,17 @@ mval *underr_strict(mval *start, ...);
    macro has been added. If uses are added, this needs to be revisited. 01/2008 se
 */
 #define ZTIMEOUTSTR "ZTIMEOUT"
-#define MV_FORCE_MSTIMEOUT(TMV, TMS, NOTACID)	/* requires a flock of include files especially for TP */		\
+#define MV_FORCE_NSTIMEOUT(TMV, TNS, NOTACID)	/* requires a flock of include files especially for TP */		\
 MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 	double			tmpdouble;										\
 															\
 	GBLREF uint4		dollar_tlevel;										\
 	GBLREF uint4		dollar_trestart;									\
+	LITREF mval		literal_notimeout;									\
 															\
 	MV_FORCE_NUM(TMV);												\
-	if (NO_M_TIMEOUT == TMV->m[1])											\
-		TMS = NO_M_TIMEOUT;											\
+	if (is_equ((mval *)&literal_notimeout, TMV))									\
+		TNS = NO_M_TIMEOUT;											\
 	else														\
 	{														\
 		assert(MV_BIAS >= 1000);        /* if formats change scale may need attention */			\
@@ -540,17 +541,17 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 		{	/* TMV is an integer. m[1] directly has the # of milliseconds we want.				\
 			 * If it is negative though, set timeout to 0.							\
 			 */												\
-			TMS = TMV->m[1];										\
-			if (0 > TMS)											\
-				TMS = 0;										\
+			TNS = TMV->m[1] * (uint8)NANOSECS_IN_MSEC;							\
+			if (0 > TNS)											\
+				TNS = 0;										\
 		} else if (0 == TMV->sgn) 	/* if sign is 0 it means TMV is positive */				\
-		{	/* Cap positive timeout at MAXPOSINT4 */							\
-			tmpdouble = mval2double(TMV) * (double)1000;							\
-			TMS = ((double)MAXPOSINT4 >= tmpdouble) ? (int)tmpdouble : (int)MAXPOSINT4;			\
+		{	/* Cap positive timeout at MAXUINT8 */								\
+			tmpdouble = mval2double(TMV) * (double)NANOSECS_IN_SEC;						\
+			TNS = ((double)MAXUINT8 >= tmpdouble) ? (uint8)tmpdouble : (uint8)MAXUINT8;			\
 		} else													\
-			TMS = 0;		/* sign is not zero, implies TMV is negative, set timeout to 0 */	\
+			TNS = 0;		/* sign is not zero, implies TMV is negative, set timeout to 0 */	\
 	}														\
-	if ((STRNCMP_LIT(NOTACID, "ZTIMEOUTSTR")) && ((TREF(tpnotacidtime)).m[1] < TMS))				\
+	if ((STRNCMP_LIT(NOTACID, "ZTIMEOUTSTR")) && (((TREF(tpnotacidtime)).m[1] * (uint8)NANOSECS_IN_MSEC) < TNS))	\
 		TPNOTACID_CHECK(NOTACID);										\
 } MBEND
 

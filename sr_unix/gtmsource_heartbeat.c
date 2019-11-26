@@ -71,8 +71,8 @@ void gtmsource_heartbeat_timer(TID tid, int4 interval_len, int *interval_ptr)
 	gtmsource_now += heartbeat_period;			/* cannot use *interval_ptr on VMS */
 	REPL_DPRINT4("Repeating heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n", heartbeat_period,
 					gtmsource_now, time(NULL));
-	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * 1000, gtmsource_heartbeat_timer, SIZEOF(heartbeat_period),
-			&heartbeat_period); /* start_timer expects time interval in milli seconds, heartbeat_period is in seconds */
+	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * (uint8)NANOSECS_IN_SEC, gtmsource_heartbeat_timer, SIZEOF(heartbeat_period),
+			&heartbeat_period); /* start_timer expects time interval in nanoseconds, heartbeat_period is in seconds */
 }
 
 int gtmsource_init_heartbeat(void)
@@ -108,8 +108,8 @@ int gtmsource_init_heartbeat(void)
 	 * this code may have to be revisited. Also, modify the check in gtmsource_process (prev_now != (save_now = gtmsource_now))
 	 * to be something like (hearbeat_period < difftime((save_now = gtmsource_now), prev_now)). Vinaya 2003, Sep 08
 	 */
-	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * 1000, gtmsource_heartbeat_timer, SIZEOF(heartbeat_period),
-			&heartbeat_period); /* start_timer expects time interval in milli seconds, heartbeat_period is in seconds */
+	start_timer((TID)gtmsource_heartbeat_timer, heartbeat_period * (uint8)NANOSECS_IN_SEC, gtmsource_heartbeat_timer, SIZEOF(heartbeat_period),
+			&heartbeat_period); /* start_timer expects time interval in nanoseconds, heartbeat_period is in seconds */
 	REPL_DPRINT4("Started heartbeat timer with %d s\tSource now is %ld\tTime now is %ld\n",
 			heartbeat_period, gtmsource_now, time(NULL));
 	heartbeat_stalled = FALSE;

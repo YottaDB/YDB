@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -23,7 +26,7 @@
 
 GBLREF io_pair	io_curr_device;
 
-int	iorm_rdone(mint *v, int4 msec_timeout)
+int	iorm_rdone(mint *v, uint8 nsec_timeout)
 {
 	mval		tmp;
 	int		ret;
@@ -31,7 +34,7 @@ int	iorm_rdone(mint *v, int4 msec_timeout)
 	gtm_chset_t	ichset;
 
 	*v = -1;
-	ret = iorm_readfl(&tmp, -1, msec_timeout);
+	ret = iorm_readfl(&tmp, -1, nsec_timeout);
 	if (ret)
 	{
 		if (0 != tmp.str.len)

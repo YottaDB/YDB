@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,9 +36,9 @@
 
 #define BUFF_SIZE	65535
 
-GBLREF int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
+GBLREF	int		(*op_open_ptr)(mval *v, mval *p, mval *t, mval *mspace);
 GBLREF	uint4		dollar_tlevel;
-GBLREF io_pair		io_curr_device;
+GBLREF	io_pair		io_curr_device;
 
 LITREF	mval		literal_notimeout;
 LITREF	mval		literal_zero;

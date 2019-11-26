@@ -67,7 +67,7 @@
 #endif
 
 #ifdef MUTEX_MSEM_WAKE
-#define MUTEX_MAX_WAIT        		(MUTEX_CONST_TIMEOUT_VAL * MILLISECS_IN_SEC)
+#define MUTEX_MAX_WAIT        		(MUTEX_CONST_TIMEOUT_VAL * (uint8)NANOSECS_IN_SEC)
 #endif
 
 #define	PROBE_BG_TRACE_PRO_ANY(CSA, EVENT)					\

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -54,7 +54,7 @@ LITREF unsigned char	io_params_size[];
 /* WARNING, this routine is called from ioff_open as well as from the dispatch table. */
 /* WARNING, this routine is called from iopi_open as well as from the dispatch table. */
 
-short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, int4 timeout)
+short	iorm_open(io_log_name *dev_name, mval *pp, int fd, mval *mspace, uint8 timeout)
 {
 	io_desc		*iod;
  	d_rm_struct	*d_rm;

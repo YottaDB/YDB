@@ -165,7 +165,7 @@ void dse_dmp_fhead (void)
 			util_out_print("  Cache freeze id            FROZEN BY ROOT", FALSE);
 		else
 			util_out_print("  Cache freeze id                0x!XL", FALSE, (csd->freeze)? csd->freeze : 0);
-		dse_puttime(csd->flush_time, "  Flush timer            !AD", TRUE);
+		dse_puttime(&csd->flush_time, "  Flush timer            !AD", TRUE);
 		util_out_print("  Freeze match                   0x!XL", FALSE, csd->image_count ? csd->image_count : 0);
 		util_out_print("  Flush trigger         !12UL", TRUE, csd->flush_trigger);
 		util_out_print("  Freeze online                 !AD", FALSE, 11,

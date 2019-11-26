@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1249,7 +1249,7 @@ void	wcs_timer_start(gd_region *reg, boolean_t io_ok)
 			INCR_CNT(&cnl->wcs_timers, &cnl->wc_var_lock);
 			INSERT_WT_PID(csa);
 			start_timer((TID)reg,
-				    csd->flush_time[0] * (dba_bg == acc_meth ? 1 : csd->defer_time),
+				    (csd->flush_time * (dba_bg == acc_meth ? 1 : csd->defer_time)),
 				    &wcs_stale, SIZEOF(reg_parm), (char *)&reg_parm);
 			BG_TRACE_ANY(csa, stale_timer_started);
 		}
@@ -1416,7 +1416,7 @@ void	wcs_stale(TID tid, int4 hd_len, gd_region **region)
 	 */
 	if (0 != fast_lock_count || (need_new_timer && (0 >= cnl->wcs_timers)))
 	{
-		start_timer((TID)reg, csd->flush_time[0] * (dba_bg == acc_meth ? 1 : csd->defer_time),
+		start_timer((TID)reg, (csd->flush_time * (dba_bg == acc_meth ? 1 : csd->defer_time)),
 			    &wcs_stale, SIZEOF(region), (char *)region);
 		BG_TRACE_ANY(csa, stale_timer_started);
 	} else

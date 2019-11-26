@@ -182,6 +182,7 @@ void	op_idiv(mval *u, mval *v, mval *q);
 mval	*op_igetdst(void);
 void	op_igetsrc(mval *v);
 int	op_incrlock(mval *timeout);
+int	op_incrlock_common(uint8 timeout);
 void	op_inddevparms(mval *devpsrc, int4 ok_iop_parms, mval *devpiopl);
 void	op_indfnname(mval *dst, mval *target, mval *value);
 void	op_indfnname2(mval *finaldst, mval *depthval, mval *prechomp);
@@ -215,6 +216,7 @@ void	op_lkinit(void);
 void	op_lkname(UNIX_ONLY_COMMA(int subcnt) mval *extgbl1, ...);
 int	op_lock(mval *timeout);
 int	op_lock2(mval *timeout, unsigned char laflag);
+int	op_lock2_common(uint8 timeout, unsigned char laflag);
 void	op_lvpatwrite(UNIX_ONLY_COMMA(int4 count) UINTPTR_T arg1, ...);
 void	op_lvzwrite(UNIX_ONLY_COMMA(int4 count) long arg1, ...);
 /*	op_merge     : prototype defined separately in op_merge.h */

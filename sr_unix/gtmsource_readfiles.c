@@ -89,7 +89,7 @@ MBSTART {													\
 	ctl->max_seqno_eof_addr = MAX_SEQNO_EOF_ADDR;								\
 } MBEND
 
-#define BUNCHING_TIME	(8 * MILLISECS_IN_SEC)
+#define BUNCHING_TIME	(8 * (uint8)NANOSECS_IN_SEC)
 
 #define	GTMSRC_DO_JNL_FLUSH_IF_POSSIBLE(CTL, CSA)									\
 MBSTART {														\

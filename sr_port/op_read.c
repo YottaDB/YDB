@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,18 +59,18 @@ int op_read(mval *v, mval *timeout)
 {
 	char		*save_ptr, *start_ptr;
 	int		stat;
-	int4		msec_timeout;
+	uint8		nsec_timeout;
 	mval		val;
 	size_t		cnt, insize, outsize;
 	unsigned char	*temp_ch;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, READTIMESTR);
+	MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, READTIMESTR);
 	active_device = io_curr_device.in;
 	v->mvtype = MV_STR;
 	v->str.len = 0;
-	stat = (io_curr_device.in->disp_ptr->read)(v, msec_timeout);
+	stat = (io_curr_device.in->disp_ptr->read)(v, nsec_timeout);
 	if (IS_AT_END_OF_STRINGPOOL(v->str.addr, 0))
 		stringpool.free += v->str.len;	/* see UNIX iott_readfl */
 	assert(stringpool.free <= stringpool.top);
@@ -98,5 +98,5 @@ int op_read(mval *v, mval *timeout)
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_APDLOGFAIL);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_APDLOGFAIL);
 	}
-	return ((NO_M_TIMEOUT != msec_timeout) ? stat : FALSE);
+	return ((NO_M_TIMEOUT != nsec_timeout) ? stat : FALSE);
 }

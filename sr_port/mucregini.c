@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -253,10 +256,9 @@ void mucregini(int4 blk_init_size)
 	csd->max_update_array_size += (int4)ROUND_UP2(MAX_BITMAP_UPDATE_ARRAY_SIZE, UPDATE_ARRAY_ALIGN_SIZE);
 	/* bt_malloc(cs_addrs) Done by db_init at file open time -- not needed here */
 	if (dba_bg == REG_ACC_METH(gv_cur_region))
-		csd->flush_time[0] = TIM_FLU_MOD_BG;
+		csd->flush_time = TIM_FLU_MOD_BG;
 	else
-		csd->flush_time[0] = TIM_FLU_MOD_MM;
-	csd->flush_time[1] = -1;
+		csd->flush_time = TIM_FLU_MOD_MM;
 	csd->yield_lmt = DEFAULT_YIELD_LIMIT;
 	csd->mutex_spin_parms.mutex_hard_spin_count = MUTEX_HARD_SPIN_COUNT;
 	csd->mutex_spin_parms.mutex_sleep_spin_count = MUTEX_SLEEP_SPIN_COUNT;

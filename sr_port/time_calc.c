@@ -61,7 +61,7 @@ int4	abs_time_comp(ABS_TIME *atp1, ABS_TIME *atp2)
  *	atpd	- destination time structure
  * ---------------------------------------------------------------------
  */
-void	add_int_to_abs_time(ABS_TIME *atps, int4 ival,ABS_TIME *atpd)
+void	add_int_to_abs_time(ABS_TIME *atps, int4 ival, ABS_TIME *atpd)
 {
 	gtm_uint8	ival_sec, ival_nsec;
 
@@ -76,6 +76,33 @@ void	add_int_to_abs_time(ABS_TIME *atps, int4 ival,ABS_TIME *atpd)
 	}
 	ival_sec  = ival / MILLISECS_IN_SEC;					/* milliseconds -> seconds */
 	ival_nsec = (ival - (ival_sec * MILLISECS_IN_SEC)) * NANOSECS_IN_MSEC;	/* nanosecond remainder */
+	atpd->tv_sec = atps->tv_sec + ival_sec;
+	if ((atpd->tv_nsec = atps->tv_nsec + ival_nsec) >= NANOSECS_IN_SEC)
+	{
+		/* nanosecond overflow */
+		atpd->tv_nsec -= NANOSECS_IN_SEC;
+		atpd->tv_sec  += 1;		/* carry */
+	}
+}
+
+/*
+ * ---------------------------------------------------------------------
+ * Add 8 byte unsigned integer to absolute time
+ *	Absolute time structure is seconds & nanoseconds.
+ *	Integer value is in nanoseconds.
+ *
+ * Arguments:
+ *	atps	- source time structure
+ *	ival	- integer to be added to source structure (nanoseconds)
+ *	atpd	- destination time structure
+ * ---------------------------------------------------------------------
+ */
+void add_uint8_to_abs_time(ABS_TIME *atps, uint8 ival, ABS_TIME *atpd)
+{
+	gtm_uint8	ival_sec, ival_nsec;
+
+	ival_sec  = ival / NANOSECS_IN_SEC;			/* nanoseconds -> seconds */
+	ival_nsec = ival - (ival_sec * NANOSECS_IN_SEC);		/* nanosecond remainder */
 	atpd->tv_sec = atps->tv_sec + ival_sec;
 	if ((atpd->tv_nsec = atps->tv_nsec + ival_nsec) >= NANOSECS_IN_SEC)
 	{

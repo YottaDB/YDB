@@ -25,7 +25,7 @@
 # define DBGGSSHR(x)
 #endif
 #define ABSOLUTE_PATH(X)	('/' == X[0])
-#define GTMSECSHR_MESG_TIMEOUT  30 * MILLISECS_IN_SEC
+#define GTMSECSHR_MESG_TIMEOUT  (30 * (uint8)NANOSECS_IN_SEC)
 #define GTMSECSHR_PERMS		0666
 
 /* Exit codes from gtmsecshr - note matching text entries are in message table in secshr_client.c */

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -33,7 +33,7 @@ GBLDEF int (*callintogtm_vectortable[])()=
 {
 	(int_fptr)hiber_start,
 	(int_fptr)hiber_start_wait_any,
-	(int_fptr)start_timer,
+	(int_fptr)gtm_start_timer,
 	(int_fptr)cancel_timer,
 	(int_fptr)malloc,
 	(int_fptr)free,

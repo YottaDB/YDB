@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -303,7 +303,7 @@ void iorm_close(io_desc *iod, mval *pp)
 					 * out, set dollar_zclose = -99.
 					 */
 					timer_id = (TID)iorm_close;
-					start_timer(timer_id, pipe_timeout * 1000, wake_alarm, 0, NULL);
+					start_timer(timer_id, pipe_timeout * (uint8)NANOSECS_IN_SEC, wake_alarm, 0, NULL);
 				}
 				do
 				{

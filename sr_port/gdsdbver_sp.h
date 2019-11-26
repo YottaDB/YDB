@@ -62,4 +62,5 @@ ENUM_ENTRY(GDSMVFILLER14),	/* Space reserved for GT.M changes to minor db format
 ENUM_ENTRY(GDSMVFILLER15),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMVFILLER16),	/* Space reserved for GT.M changes to minor db format */
 ENUM_ENTRY(GDSMR126),		/* Includes GT.M V6.3-007 */
+ENUM_ENTRY(GDSMR130),
 ENUM_ENTRY(GDSMVLAST)

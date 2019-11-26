@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -299,13 +302,13 @@ typedef struct
 int gtm_utf_bomcheck(io_desc *iod, gtm_chset_t *chset, unsigned char *buffer, int len);
 void iorm_cond_wteol(io_desc *iod);
 int iorm_get_bom(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4 *tot_bytes_read,
-		 TID timer_id, int4 *msec_timeout, boolean_t colon_zero);
-int iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, boolean_t timed,
+		 TID timer_id, uint8 *nsec_timeout, boolean_t colon_zero);
+int iorm_get_bom_fol(io_desc *io_ptr, int4 *tot_bytes_read, uint8 *nsec_timeout, boolean_t timed,
 		     boolean_t *bom_timeout, ABS_TIME end_time);
-int iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, int4 *msec_timeout, boolean_t timed, boolean_t zint_restart,
+int iorm_get_fol(io_desc *io_ptr, int4 *tot_bytes_read, uint8 *nsec_timeout, boolean_t timed, boolean_t zint_restart,
 		 boolean_t *follow_timeout, ABS_TIME end_time);
 int iorm_get(io_desc *io_ptr, int *blocked_in, boolean_t ispipe, int flags, int4 *tot_bytes_read,
-	     TID timer_id, int4 *msec_timeout, boolean_t colon_zero, boolean_t zint_restart);
+	     TID timer_id, uint8 *nsec_timeout, boolean_t colon_zero, boolean_t zint_restart);
 int iorm_write_utf_ascii(io_desc *iod, char *string, int len);
 void iorm_write_utf(mstr *v);
 void iorm_readfl_badchar(mval *vmvalptr, int datalen, int delimlen, unsigned char *delimptr, unsigned char *strend);

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -202,8 +202,13 @@ void db_auto_upgrade(gd_region *reg)
 				/* YottaDB r122 introduced "reorg_sleep_nsec" to slow down reorg update rate by user */
 				csd->reorg_sleep_nsec = 0;
 			case GDSMV63007:	/* Note: This is also the case for GDSMR122 */
-				break;
 			case GDSMR126:
+				csd->flush_time = csd->flush_time * NANOSECS_IN_MSEC;
+				/* Note: This is a little-endian solution and will need to be modified if we
+				 * ever support big-endian.
+				 */
+				break;
+			case GDSMR130:
 		/* When adding a new minor version, the following template should be maintained
 		 * a) If there are any file header fields added in the new minor version, initialize the fields to default values
 		 *    in the last case (i.e. above this comment block). Do not add a "break" for the above "case" block.

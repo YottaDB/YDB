@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -52,18 +55,18 @@ error_def(ERR_IONOTOPEN);
 int op_rdone(mval *v, mval *timeout)
 {
 	char		*start_ptr,temp_buf[TMP_BUF_LEN];
-	int	x;
-	int4		msec_timeout;
+	int		x;
+	uint8		nsec_timeout;
 	size_t		insize, outsize, stat;
 	unsigned char	*temp_buf_ptr;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	MV_FORCE_MSTIMEOUT(timeout, msec_timeout, READTIMESTR);
+	MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, READTIMESTR);
 	active_device = io_curr_device.in;
 	x = -1;
 	assert(SIZEOF(mint) == SIZEOF(x));
-	stat = (io_curr_device.in->disp_ptr->rdone)((mint *)&x, msec_timeout);
+	stat = (io_curr_device.in->disp_ptr->rdone)((mint *)&x, nsec_timeout);
 #	if defined(KEEP_zOS_EBCDIC)
 	if (DEFAULT_CODE_SET != active_device->in_code_set)
 	{
@@ -77,5 +80,5 @@ int op_rdone(mval *v, mval *timeout)
 #	endif
 	MV_FORCE_MVAL(v, x);
 	active_device = 0;
-	return ((NO_M_TIMEOUT != msec_timeout) ? stat : FALSE);
+	return ((NO_M_TIMEOUT != nsec_timeout) ? stat : FALSE);
 }
