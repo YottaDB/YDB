@@ -33,12 +33,14 @@ void op_fnzhash(mval *string, int salt, mval *ret)
 	ret->mvtype = 0; /* we initialize this string to keep the garbage collector from worrying about an incomplete string  */
 	MV_FORCE_STR(string);
 	MurmurHash3_x64_128(string->str.addr, string->str.len, salt, &hash_out);
-	ENSURE_STP_FREE_SPACE(HASHED_STRING_LEN);
+	ENSURE_STP_FREE_SPACE(HASHED_STRING_LEN + 2); /* need 2 more for the 0x prefix */
 	str_out = (unsigned char *)stringpool.free;
+	*str_out++ = '0';
+	*str_out++ = 'x';
 	ydb_mmrhash_128_hex(&hash_out, str_out);
-	stringpool.free += HASHED_STRING_LEN;
-	assert(stringpool.free <= stringpool.top);
-	ret->str.addr = (char *)str_out;
-	ret->str.len = HASHED_STRING_LEN;
+	ret->str.addr = (char *)stringpool.free;
+	ret->str.len = (HASHED_STRING_LEN + 2);
 	ret->mvtype = MV_STR;
+	stringpool.free += (HASHED_STRING_LEN + 2);
+	assert(stringpool.free <= stringpool.top);
 }
