@@ -60,6 +60,8 @@
 #include "interlock.h"
 #include "cache.h"
 #include "hashtab_objcode.h"
+#include "gtm_env_xlate_init.h"
+#include "gtmdbglvl.h"
 
 GBLREF spdesc			stringpool;
 GBLREF int4			cache_hits, cache_fails;
@@ -89,6 +91,9 @@ GBLREF int4			gtm_trigger_depth;
 GBLREF uint4			process_id;
 GBLREF boolean_t		dmterm_default;
 GBLREF mstr			extnam_str;
+GBLREF mstr			env_ydb_gbldir_xlate;
+GBLREF mval			dollar_zgbldir;
+GBLREF uint4			ydbDebugLevel;
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_GBLNOMAPTOREG);
@@ -276,6 +281,29 @@ void	op_fnview(int numarg, mval *dst, ...)
 					assertpro(FALSE && TREF(ydb_fullbool));
 			}
 			dst->str = tmpstr;
+			break;
+		case VTK_GBLDIRXLATE:
+			if (arg1 == NULL || arg1->str.len == 0)
+			{
+				arg1 = &dollar_zgbldir;
+				YDB_GBLENV_XLATE_DEBUG("$View: arg1 undefined, using zgbldir=%.*s",
+					(int) arg1->str.len, arg1->str.addr);
+			}
+			if (env_ydb_gbldir_xlate.len > 0)
+			{
+				tmpstr = ydb_gbldir_translate(arg1, &tmpmval)->str;
+				YDB_GBLENV_XLATE_DEBUG("$View: perform translation: arg1=%.*s tmpstr=%.*s",
+					(int) arg1->str.len, arg1->str.addr,
+					(int) tmpstr.len, tmpstr.addr);
+			} else
+			{
+				tmpstr = arg1->str;
+				YDB_GBLENV_XLATE_DEBUG("$View: translation not enabled, passing: arg1=tmpstr=%.*s",
+					(int) tmpstr.len, tmpstr.addr);
+			}
+			s2pool(&tmpstr);
+			dst->str = tmpstr;
+			dst->mvtype = vtp->restype;
 			break;
 		case VTK_GVDUPSETNOOP:
 			if (gvdupsetnoop)

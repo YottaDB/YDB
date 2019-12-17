@@ -89,7 +89,7 @@ void	mlk_pvtblk_create (int subcnt, mval *extgbl1, va_list subptr)
 		subcnt--;
 		extgbl1 = gtm_env_translate(extgbl1, extgbl2, &val_xlated);
 		if (extgbl1->str.len)
-			gld = zgbldir(extgbl1);
+			gld = zgbldir_opt(extgbl1, TRUE);
 		else
 		{
 			if (!gd_header)

@@ -31,6 +31,7 @@ typedef struct gvt_container_struct
 
 boolean_t	get_first_gdr_name(gd_addr *current_gd_header, mstr *log_nam);
 gd_addr		*zgbldir(mval *v);
+gd_addr		*zgbldir_opt(mval *v, boolean_t env_translated);
 gd_addr		*zgbldir_name_lookup_only(mval *v);
 gd_addr		*gd_load(mstr *v);
 gd_addr		*get_next_gdr(gd_addr *prev);

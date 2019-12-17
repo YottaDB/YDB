@@ -144,8 +144,8 @@ void op_svput(int varnum, mval *v)
 				|| memcmp(dollar_zgbldir.str.addr, v->str.addr, dollar_zgbldir.str.len))
 			{
 				if (0 == v->str.len)
-				{	/* set $zgbldir="" */
-					dpzgbini();	/* sets gd_header to NULL */
+				{
+					dpzgbini();
 				} else
 				{
 					gd_header = zgbldir(v);

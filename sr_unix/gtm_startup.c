@@ -265,6 +265,9 @@ void gtm_startup(struct startup_vector *svec)
 		cenable();	/* cenable unless the environment indicates otherwise - 2 steps because this can report errors */
 	jobinterrupt_init();
 	getzdir();
+	gtm_env_xlate_init();
+	ydb_gbldir_xlate_init();
+	init_callin_functable();
 	dpzgbini();
 	zco_init();
 	/* a base addr of 0 indicates a gtm_init call from an rpc server */
@@ -286,9 +289,6 @@ void gtm_startup(struct startup_vector *svec)
 		trap_env_init();
 	zdate_form_init(svec);
 	dollar_system_init(svec);
-	init_callin_functable();
-	gtm_env_xlate_init();
-	ydb_gbldir_xlate_init();
 	SET_LATCH_GLOBAL(&defer_latch, LOCK_AVAILABLE);
 	ce_init();	/* initialize compiler escape processing */
 	prealloc_gt_timers();

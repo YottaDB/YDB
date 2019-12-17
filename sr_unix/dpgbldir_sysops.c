@@ -40,13 +40,18 @@
 #include "dpgbldir.h"
 #include "dpgbldir_sysops.h"
 #include "ydb_logicals.h"
+#include "trans_log_name.h"
+#include "gtm_env_xlate_init.h"
+#include "gtmdbglvl.h"
 
 char LITDEF gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE] =
 {
 	GDE_LABEL_LITERAL
 };
 
-GBLREF mval 	dollar_zgbldir;
+GBLREF uint4	ydbDebugLevel;
+GBLREF mstr	env_ydb_gbldir_xlate;
+GBLREF mval	dollar_zgbldir;
 GBLREF gd_addr	*gd_header;
 
 error_def(ERR_ZGBLDIRACC);
@@ -172,28 +177,51 @@ void file_read(file_pointer *file_ptr, int4 size, uchar_ptr_t buff, int4 pos)
 
 void dpzgbini(void)
 {
-	mstr		temp_mstr;
-	char		temp_buff[MAX_FN_LEN + 1];
+	mstr		gbldirenv_mstr, trnlnm_mstr, *tran_mstr;
+	mval		tran_mval, temp_mval;
+	char		temp_buff1[MAX_FN_LEN + 1];
+	char		temp_buff2[MAX_FN_LEN + 1];
 	uint4		status;
 	parse_blk	pblk;
 
-	temp_mstr.addr = (char *)YDB_GBLDIR;
-	temp_mstr.len = STRLEN(YDB_GBLDIR);
-	dollar_zgbldir.str.len = temp_mstr.len;
-	memset(&pblk, 0, SIZEOF(pblk));
-	pblk.buffer = temp_buff;
-	pblk.buff_size = MAX_FN_LEN;
-	pblk.def1_buf = DEF_GDR_EXT;
-	pblk.def1_size = SIZEOF(DEF_GDR_EXT) - 1;
-	status = parse_file(&temp_mstr, &pblk);
+	gbldirenv_mstr.addr = (char *)YDB_GBLDIR;
+	gbldirenv_mstr.len = STRLEN(YDB_GBLDIR);
 
 	dollar_zgbldir.mvtype = MV_STR;
 	dollar_zgbldir.str.addr = (char *)YDB_GBLDIR;
-	if (status & 1)
+	dollar_zgbldir.str.len = STRLEN(YDB_GBLDIR);
+
+	/* Translate the logical name (environment variable) ydb_gbldir/gtmgbldir
+	 * which would be done in parse_file but we need to know the its value
+	 * so that we can attempt to go global directory translation
+	 */
+	status = trans_log_name(&gbldirenv_mstr, &trnlnm_mstr, temp_buff1, MAX_FN_LEN + 1, dont_sendmsg_on_log2long);
+	YDB_GBLENV_XLATE_DEBUG("dpzgbini: lnm=%.*s status=%d trnlnm=%.*s",
+		(int) gbldirenv_mstr.len, gbldirenv_mstr.addr,
+		status,
+		(int) trnlnm_mstr.len, trnlnm_mstr.addr);
+	if (status != SS_LOG2LONG)
 	{
-		dollar_zgbldir.str.len = pblk.b_esl;
-		dollar_zgbldir.str.addr = pblk.buffer;
+		temp_mval.str = trnlnm_mstr;
+		temp_mval.mvtype = MV_STR;
+		tran_mstr = env_ydb_gbldir_xlate.len?
+			(&ydb_gbldir_translate(&temp_mval, &tran_mval)->str) : &trnlnm_mstr;
+		YDB_GBLENV_XLATE_DEBUG("dpzgbini: translate=%d tran_mstr=%.*s",
+			env_ydb_gbldir_xlate.len,
+			(int) tran_mstr->len, tran_mstr->addr);
+		memset(&pblk, 0, SIZEOF(pblk));
+		pblk.buffer = temp_buff2;
+		pblk.buff_size = MAX_FN_LEN;
+		pblk.def1_buf = DEF_GDR_EXT;
+		pblk.def1_size = SIZEOF(DEF_GDR_EXT) - 1;
+		status = parse_file(tran_mstr, &pblk);
+		if (status & 1)
+		{
+			dollar_zgbldir.str.len = env_ydb_gbldir_xlate.len? trnlnm_mstr.len : pblk.b_esl;
+			dollar_zgbldir.str.addr = env_ydb_gbldir_xlate.len? trnlnm_mstr.addr : pblk.buffer;
+		}
 	}
+
 	s2pool(&dollar_zgbldir.str);
 	gd_header = NULL;
 }

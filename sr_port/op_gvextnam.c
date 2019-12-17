@@ -84,7 +84,7 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 {
 	boolean_t	was_null, is_null;
 	mstr		*tmp_mstr_ptr;
-	mval		*val, *val2, val_xlated;
+	mval		*val, *val2, val_xlated, *val1_orig;
 	mname_entry	gvname;
 	uint4		max_key;
 	gd_addr		*tmpgd;
@@ -95,12 +95,13 @@ STATICFNDEF void op_gvextnam_common(int count, int hash_code, mval *val1, va_lis
 	SETUP_THREADGBL_ACCESS;
 	val2 = va_arg(var, mval *);
 	MV_FORCE_STR(val1);
-	val1 = gtm_env_translate(val1, val2, &val_xlated);
+	val1_orig = val1;
+	val1 = gtm_env_translate(val1_orig, val2, &val_xlated);
 	assert(!TREF(gv_extname_size) || (NULL != extnam_str.addr));
 	if (val1->str.len)
 	{
-		tmp_mstr_ptr = &val1->str;
-		tmpgd = zgbldir(val1);
+		tmp_mstr_ptr = &val1_orig->str;
+		tmpgd = zgbldir_opt(val1, TRUE);
 	} else
 	{
 		/* Null external reference, ensure that gd_header is not NULL */
