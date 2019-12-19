@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -123,7 +126,7 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 {
 	static int xlate[NUM_CHARS];
 	static hash_table_int4 *xlate_hash = NULL;
-	static mstr prev_srch = {0, 0}, prev_rplc = {0, 0};
+	static mstr prev_srch = {0, 0, NULL}, prev_rplc = {0, 0, NULL};
 	static unsigned int prev_gcols = 0;
 
 	MV_FORCE_STR(src);
@@ -133,10 +136,13 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 		MV_FORCE_LEN(srch);
 		MV_FORCE_LEN(rplc);
 	}
-	if (!(prev_gcols == stringpool.gcols && srch->str.addr == prev_srch.addr && srch->str.len == prev_srch.len
-			&& rplc->str.addr == prev_rplc.addr && rplc->str.len == prev_rplc.len))
+	if (!((prev_gcols == stringpool.gcols) && (srch->str.addr == prev_srch.addr) && (srch->str.len == prev_srch.len)
+			&& (rplc->str.addr == prev_rplc.addr) && (rplc->str.len == prev_rplc.len))
+			|| ((NULL == prev_srch.addr) && (NULL == prev_rplc.addr)))	/* We need the last line of this if statement to
+											 * avoid a sig-11 if srch and rplc are both undefined
+											 * on the first $translate call */
 	{
-		if(NULL != xlate_hash)
+		if (NULL != xlate_hash)
 		{
 			free_hashtab_int4(xlate_hash);
 			free(xlate_hash);
@@ -210,12 +216,15 @@ void op_fnztranslate_common(mval *src, mval *dst, int *xlate)
 void op_fnztranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 {
 	static int xlate[NUM_CHARS];
-	static mstr prev_srch = {0, 0}, prev_rplc = {0, 0};
+	static mstr prev_srch = {0, 0, NULL}, prev_rplc = {0, 0, NULL};
 	static unsigned int prev_gcols = 0;
 
 	MV_FORCE_STR(src);
-	if (!(prev_gcols == stringpool.gcols && srch->str.addr == prev_srch.addr && srch->str.len == prev_srch.len
-			&& rplc->str.addr == prev_rplc.addr && rplc->str.len == prev_rplc.len))
+	if (!((prev_gcols == stringpool.gcols) && (srch->str.addr == prev_srch.addr) && (srch->str.len == prev_srch.len)
+			&& (rplc->str.addr == prev_rplc.addr) && (rplc->str.len == prev_rplc.len))
+			|| ((NULL == prev_srch.addr) && (NULL == prev_rplc.addr)))	/* We need the last line of this if statement to ensure
+											 * the error message is produced if srch and rplc are
+											 * are both undefined on the first $translate call */
 	{
 		MV_FORCE_STR(srch);
 		MV_FORCE_STR(rplc);
