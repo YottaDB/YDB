@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -490,8 +490,8 @@ char *cli_fgets(char *destbuffer, int buffersize, FILE *fp, boolean_t in_tp)
 
 int	cli_gettoken (int *eof)
 {
-	char	*ptr, *ptr_top;
-	int	arg_no, print_len, token_len, avail;
+	char	*ptr, *ptr_top, *eq_pos, *cur_arg;
+	int	arg_no, print_len, token_len, avail, max_space, eq_len;
 
 	assert(cli_lex_in_ptr);
 	/* Reading from program argument list */
@@ -502,8 +502,20 @@ int	cli_gettoken (int *eof)
 		avail = cli_lex_in_ptr->buflen - STRLEN(cli_lex_in_ptr->argv[0]);
 		for (ptr_top = ptr + avail, arg_no = 1; (arg_no < cli_lex_in_ptr->argc) && (ptr_top > ptr); arg_no++)
 		{	/* Convert arguments into array */
-			print_len = SNPRINTF(ptr, (ptr_top - ptr), "%s%s", (1 < arg_no) ? " " : "", cli_lex_in_ptr->argv[arg_no]);
-			if ((ptr_top - ptr) <= print_len)
+			max_space = (ptr_top - ptr);
+			cur_arg = cli_lex_in_ptr->argv[arg_no];
+			/* If a qualifier and value pair is present in command line and the value part is having space
+			 * we need to add quotes explicitly here as it would have been removed by shell and it is needed by cli
+			 * to evaluate the value part with spaces as a single unit .i.e. -label=word1 word2 -> -label="word1 word2"
+			 */
+			if ((NULL != strchr(cur_arg, ' ')) && (NULL != (eq_pos = strchr(cur_arg, '='))))
+			{
+				eq_len = eq_pos - cur_arg + 1;
+				print_len = SNPRINTF(ptr, max_space, "%s%.*s\"%s\"", (1 < arg_no) ? " " : "", eq_len,
+							cur_arg, eq_pos + 1);
+			} else
+				print_len = SNPRINTF(ptr, max_space, "%s%s", (1 < arg_no) ? " " : "", cur_arg);
+			if (max_space <= print_len)
 				break;
 			ptr += print_len;
 		}
