@@ -46,7 +46,7 @@ GBLREF	volatile int4	outofband;
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
  * YottaDB runtime routines.
  */
-int ydb_node_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
+int ydb_node_previous_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
 			int *ret_subs_used, ydb_buffer_t *ret_subsarray)
 {
 	boolean_t	error_encountered;

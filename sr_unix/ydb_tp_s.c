@@ -24,7 +24,7 @@ GBLREF	uint4		dollar_tlevel;
  *   tpfn        - Pointer to a function that executes user-specified code inside of the TSTART/TCOMMIT fence.
  *   tpfnparm   - Parameter that is passed to the user C function "tpfn". Can be NULL if not needed.
  */
-int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames)
+int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, const ydb_buffer_t *varnames)
 {
 	boolean_t		error_encountered;
 	mval			tid;

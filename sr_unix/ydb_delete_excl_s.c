@@ -35,11 +35,11 @@ GBLREF	volatile int4	outofband;
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
  * YottaDB runtime routines.
  */
-int ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames)
+int ydb_delete_excl_s(int namecount, const ydb_buffer_t *varnames)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;
-	ydb_buffer_t	*curvarname;
+	const ydb_buffer_t	*curvarname;
 	mval		plist_mvals[YDB_MAX_NAMES], *mvalp;
 	void		**parmp, **parmp_top;
 	char		buff[256];		/* snprintf() buffer */

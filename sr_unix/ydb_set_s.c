@@ -36,7 +36,7 @@ GBLREF	volatile int4	outofband;
  *   subsarray  - an array of "subs_used" subscripts (not looked at if "subs_used" is 0)
  *   value	- Value to be set into local/global/ISV
  */
-int ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *value)
+int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const ydb_buffer_t *value)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;

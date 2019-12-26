@@ -27,7 +27,7 @@ GBLREF	uint4		dollar_trestart;
  * Parms and return - same as ydb_tp_s() except for the addition of tptoken and errstr.
  */
 int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void *tpfnparm, const char *transid,
-		int namecount, ydb_buffer_t *varnames)
+		int namecount, const ydb_buffer_t *varnames)
 {
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;

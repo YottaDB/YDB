@@ -34,7 +34,7 @@ GBLREF	volatile int4	outofband;
  *   - subs_used    - The number of subscripts specified in the subsarray parm
  *   - subsarray    - An array of 'subs_used' ydb_buffer_t structures containing the definitions of the subscripts.
  */
-int ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray)
+int ydb_lock_incr_s(unsigned long long timeout_nsec, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray)
 {
 	va_list			var;
 	int			parmidx, timeoutms, lock_rc;

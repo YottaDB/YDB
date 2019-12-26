@@ -23,8 +23,8 @@ GBLREF	boolean_t	caller_func_is_stapi;
  *
  * Parms and return - same as ydb_lock_incr_s() except for the addition of tptoken and errstr.
  */
-int ydb_lock_incr_st(uint64_t tptoken, ydb_buffer_t *errstr, unsigned long long timeout_nsec, ydb_buffer_t *varname, int subs_used,
-		     ydb_buffer_t *subsarray)
+int ydb_lock_incr_st(uint64_t tptoken, ydb_buffer_t *errstr, unsigned long long timeout_nsec, const ydb_buffer_t *varname, int subs_used,
+		     const ydb_buffer_t *subsarray)
 {
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;

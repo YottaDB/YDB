@@ -348,56 +348,56 @@ int	ydb_timer_start_t(uint64_t tptoken, ydb_buffer_t *errstr, int timer_id, unsi
 					ydb_funcptr_retvoid_t handler, unsigned int hdata_len, void *hdata);
 
 /* Simple API routine declarations */
-int	ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, unsigned int *ret_value);
-int	ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int deltype);
-int	ydb_delete_excl_s(int namecount, ydb_buffer_t *varnames);
-int	ydb_get_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
-int	ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *increment, ydb_buffer_t *ret_value);
+int	ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, unsigned int *ret_value);
+int	ydb_delete_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, int deltype);
+int	ydb_delete_excl_s(int namecount, const ydb_buffer_t *varnames);
+int	ydb_get_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
+int	ydb_incr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const ydb_buffer_t *increment, ydb_buffer_t *ret_value);
 int	ydb_lock_s(unsigned long long timeout_nsec, int namecount, ...);
-	/* ... above translates to one or more sets of [ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray] */
-int	ydb_lock_decr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
-int	ydb_lock_incr_s(unsigned long long timeout_nsec, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
-int	ydb_node_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int *ret_subs_used,
+	/* ... above translates to one or more sets of [ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray] */
+int	ydb_lock_decr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray);
+int	ydb_lock_incr_s(unsigned long long timeout_nsec, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray);
+int	ydb_node_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, int *ret_subs_used,
 			ydb_buffer_t *ret_subsarray);
-int	ydb_node_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int *ret_subs_used,
+int	ydb_node_previous_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, int *ret_subs_used,
 			ydb_buffer_t *ret_subsarray);
-int	ydb_set_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *value);
+int	ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const ydb_buffer_t *value);
 int	ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr);
-int	ydb_subscript_next_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
-int	ydb_subscript_previous_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
-int	ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames);
+int	ydb_subscript_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
+int	ydb_subscript_previous_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
+int	ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, const ydb_buffer_t *varnames);
 int	ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str);
 
 /* SimpleAPI via thread interface (aka threaded Simple API).
  * Currently only one main thread runs the YottaDB engine. Once YottaDB itself is multi-threaded, we can support more threads.
  */
-int	ydb_data_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
+int	ydb_data_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
 			unsigned int *ret_value);
-int	ydb_delete_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
+int	ydb_delete_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
 			int deltype);
-int	ydb_delete_excl_st(uint64_t tptoken, ydb_buffer_t *errstr, int namecount, ydb_buffer_t *varnames);
-int	ydb_get_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
+int	ydb_delete_excl_st(uint64_t tptoken, ydb_buffer_t *errstr, int namecount, const ydb_buffer_t *varnames);
+int	ydb_get_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
 			ydb_buffer_t *ret_value);
-int	ydb_incr_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
-			ydb_buffer_t *increment, ydb_buffer_t *ret_value);
+int	ydb_incr_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
+			const ydb_buffer_t *increment, ydb_buffer_t *ret_value);
 int	ydb_lock_st(uint64_t tptoken, ydb_buffer_t *errstr, unsigned long long timeout_nsec, int namecount, ...);
-	/* ... above translates to one or more sets of [ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray] */
-int	ydb_lock_decr_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray);
-int	ydb_lock_incr_st(uint64_t tptoken, ydb_buffer_t *errstr, unsigned long long timeout_nsec, ydb_buffer_t *varname,
-			int subs_used, ydb_buffer_t *subsarray);
-int	ydb_node_next_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
+	/* ... above translates to one or more sets of [ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray] */
+int	ydb_lock_decr_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray);
+int	ydb_lock_incr_st(uint64_t tptoken, ydb_buffer_t *errstr, unsigned long long timeout_nsec, const ydb_buffer_t *varname,
+			int subs_used, const ydb_buffer_t *subsarray);
+int	ydb_node_next_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
 			int *ret_subs_used, ydb_buffer_t *ret_subsarray);
-int	ydb_node_previous_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
+int	ydb_node_previous_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
 			int *ret_subs_used, ydb_buffer_t *ret_subsarray);
-int	ydb_set_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray,
-			ydb_buffer_t *value);
+int	ydb_set_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
+			const ydb_buffer_t *value);
 int	ydb_str2zwr_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *str, ydb_buffer_t *zwr);
-int	ydb_subscript_next_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used,
-			ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
-int	ydb_subscript_previous_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *varname, int subs_used,
-			ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
+int	ydb_subscript_next_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used,
+			const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
+int	ydb_subscript_previous_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used,
+			const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
 int	ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void *tpfnparm, const char *transid, int namecount,
-			ydb_buffer_t *varnames);
+			const ydb_buffer_t *varnames);
 int	ydb_zwr2str_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *zwr, ydb_buffer_t *str);
 
 #include "libydberrors.h"	/* needed for various errors returned by SimpleAPI/SimpleThreadAPI (e.g. YDB_ERR_TPTIMEOUT etc.) */

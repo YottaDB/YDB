@@ -23,7 +23,7 @@ GBLREF	boolean_t	caller_func_is_stapi;
  *
  * Parms and return - same as ydb_delete_excl_s() except for the addition of tptoken and errstr.
  */
-int ydb_delete_excl_st(uint64_t tptoken, ydb_buffer_t *errstr, int namecount, ydb_buffer_t *varnames)
+int ydb_delete_excl_st(uint64_t tptoken, ydb_buffer_t *errstr, int namecount, const ydb_buffer_t *varnames)
 {
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;

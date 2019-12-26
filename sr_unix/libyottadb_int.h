@@ -938,7 +938,7 @@ int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, ch
 void	sapi_save_targ_key_subscr_nodes(void);
 void	*ydb_stm_thread(void *parm);
 int	ydb_tp_s_common(libyottadb_routines lydbrtn,
-			ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames);
+			ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, const ydb_buffer_t *varnames);
 int	ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var);
 void	ydb_nested_callin(void);
 void	ydb_stm_thread_exit(void);

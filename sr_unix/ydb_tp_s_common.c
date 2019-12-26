@@ -49,13 +49,13 @@ GBLREF	uint4		dollar_tlevel;
  *   tpfnparm    - Parameter that is passed to the user C function "tpfn". Can be NULL if not needed.
  */
 int ydb_tp_s_common(libyottadb_routines lydbrtn,
-			ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, ydb_buffer_t *varnames)
+			ydb_basicfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, const ydb_buffer_t *varnames)
 {
 	boolean_t	error_encountered;
 	mval		tid;
 	int		rc, tpfn_status, tstart_flag;
 	mval		varnamearray[YDB_MAX_NAMES], *mv, *mv_top;
-	ydb_buffer_t	*curvarname;
+	const ydb_buffer_t	*curvarname;
 	char		buff[256];			/* snprintf() buffer */
 	int		nested_tp;
 	DCL_THREADGBL_ACCESS;

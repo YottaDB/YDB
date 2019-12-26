@@ -44,7 +44,7 @@ LITREF	mval		literal_one, literal_zero;
  *   increment  - increment value (converted from string to number if needed)
  *   ret_value	- Post-increment value of local/global variable stored/returned here (if room)
  */
-int ydb_incr_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, ydb_buffer_t *increment, ydb_buffer_t *ret_value)
+int ydb_incr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const ydb_buffer_t *increment, ydb_buffer_t *ret_value)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;

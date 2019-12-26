@@ -47,7 +47,7 @@ LITREF	mval		literal_zero;
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
  * YottaDB runtime routines.
  */
-int ydb_data_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, unsigned int *ret_value)
+int ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, unsigned int *ret_value)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;

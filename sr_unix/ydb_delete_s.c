@@ -47,7 +47,7 @@ GBLREF	volatile int4	outofband;
  * as they are not ever being used to create a new node or are otherwise kept for any reason by the
  * YottaDB runtime routines.
  */
-int ydb_delete_s(ydb_buffer_t *varname, int subs_used, ydb_buffer_t *subsarray, int deltype)
+int ydb_delete_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, int deltype)
 {
 	boolean_t	error_encountered;
 	gparam_list	plist;
