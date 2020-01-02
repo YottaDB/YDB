@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -486,6 +486,19 @@ void	op_fnview(int numarg, mval *dst, ...)
 		case VTK_REGION:
 			gblnamestr = &parmblk.str;
 			assert(NULL != gd_header); /* "view_arg_convert" call done above would have set this (for VTP_DBKEY case) */
+			if ((1 == gblnamestr->len) && ('*' == gblnamestr->addr[0]))
+			{	/* It is a special namespace case (i.e. "^*"). In that case, find out the map corresponding to
+				 * the "*" namespace. This is the first map entry past the local locks map entry. So return the
+				 * region name corresponding to that.
+				 */
+				reg = gd_header->maps[1].reg.addr;
+				tmpstr.addr = (char *)reg->rname;
+				tmpstr.len = reg->rname_len;
+				s2pool(&tmpstr);
+				dst->str = tmpstr;
+				dst->mvtype = vtp->restype;
+				break;
+			}
 			if (gd_header->n_gblnames)
 			{
 				gname = gv_srch_gblname(gd_header, gblnamestr->addr, gblnamestr->len);

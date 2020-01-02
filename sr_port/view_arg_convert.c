@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -225,7 +225,11 @@ void view_arg_convert(viewtab_entry *vtp, int vtp_parm, mval *parm, viewparm *pa
 			parmblk->str.len = (char *)c - parmblk->str.addr;
 			if (MAX_MIDENT_LEN < parmblk->str.len)
 				parmblk->str.len = MAX_MIDENT_LEN;
-			if (!valid_mname(&parmblk->str))
+			/* The "&&" check in the below if is to support $VIEW("REGION","^*") syntax as a valid mname
+			 * even though "*" is not a valid global name. The caller ("op_fnview") knows to handle this case.
+			 */
+			if (!valid_mname(&parmblk->str)
+				&& ((VTK_REGION != vtp->keycode) || (1 != parmblk->str.len) || ('*' != *parmblk->str.addr)))
 			{
 				assert((MAX_MIDENT_LEN * MAX_ZWR_EXP_RATIO) < ARRAYSIZE(global_names));
 					/* so below "format2zwr" is guaranteed not to overflow */
