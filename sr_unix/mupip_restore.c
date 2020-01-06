@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -304,7 +304,7 @@ void mupip_restore(void)
 				if ((0 == cli_get_int("NETTIMEOUT", (int4 *)&timeout)) || (0 > timeout))
 					timeout = DEFAULT_BKRS_TIMEOUT;
 				in = (BFILE *)malloc(SIZEOF(BFILE));
-				if (0 > (in->fd = tcp_open(addr, port, timeout, TRUE)))
+				if (0 > (in->fd = tcp_open(addr, port, (uint8)timeout, TRUE)))
 				{
 					util_out_print("Error establishing TCP connection to !AD.",
 						TRUE, ptr->input_file.len, ptr->input_file.addr);

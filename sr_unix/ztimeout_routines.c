@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -177,6 +177,8 @@ void check_and_set_ztimeout(mval * inp_val)
 				ztimeout_seconds.str.addr = NULL;
 				ztimeout_seconds.str.len = 0;
 			}
+			else
+				nsec_timeout = 0;
 			free(local_str_val);
 			local_str_val = NULL;
 		} else /* Both specified, extract timeout from token pointer */

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -292,7 +292,7 @@ void iosocket_pass_local(io_desc *iod, pid_t pid, uint8 timeout, int argcnt, va_
 void iosocket_accept_local(io_desc *iod, mval *handlevar, pid_t pid, uint8 timeout, int argcnt, va_list args);
 
 /* tcp_ prototypes used by mupip */
-int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive);
+int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive);
 
 bool same_device_check(mstr tname, char *buf);
 

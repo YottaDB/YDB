@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,6 @@ void change_fhead_timer_common(char *timer_name, uint8 *timer_address, uint8 def
 			status = cli_get_time_ns((char *)timer_name, &value);
 		else
 		{
-			value_tmp = (uint4)value;
 			status = cli_get_time_ms((char *)timer_name, &value_tmp);
 			value = (uint8)value_tmp;
 		}

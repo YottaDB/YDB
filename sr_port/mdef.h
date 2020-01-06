@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -709,7 +709,7 @@ void stx_error(int in_error, ...);
 void stx_error_va(int in_error, va_list args);
 void ins_errtriple(int4 in_error);
 
-int4 timeout2msec(int4 timeout);
+int4 timeout2msec(uint8 timeout);
 
 /* the RTS_ERROR_TEXT macro will stay till all existing references to it have been renamed to RTS_ERROR_{LITERAL,STRING} */
 #define	RTS_ERROR_TEXT(STRING)		LENGTH_AND_STRING(STRING)

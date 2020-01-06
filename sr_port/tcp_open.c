@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -67,7 +67,7 @@ error_def(ERR_SYSCALL);
 error_def(ERR_TCPCONNTIMEOUT);
 error_def(ERR_TEXT);
 
-int tcp_open(char *host, unsigned short port, int4 timeout, boolean_t passive) /* host needs to be NULL terminated */
+int tcp_open(char *host, unsigned short port, uint8 timeout, boolean_t passive) /* host needs to be NULL terminated */
 {
 	boolean_t		no_time_left = FALSE, error_given = FALSE;
 	char			temp_addr[SA_MAXLEN + 1], addr[SA_MAXLEN + 1];

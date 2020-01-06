@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -258,7 +261,7 @@ bool	mubinccpy (backup_reg_list *list)
 			assert(SIZEOF(timeout) == SIZEOF(int));
 			if ((0 == cli_get_int("NETTIMEOUT", (int4 *)&timeout)) || (0 > timeout))
 				timeout = DEFAULT_BKRS_TIMEOUT;
-			if (0 > (backup->fd = tcp_open(addr, port, timeout, FALSE)))
+			if (0 > (backup->fd = tcp_open(addr, port, (uint8)timeout, FALSE)))
 			{
 				util_out_print("ERROR: Cannot open tcp connection due to the above error.", TRUE);
 				util_out_print("WARNING: Backup !AD is not valid.", TRUE, file->len, file->addr);

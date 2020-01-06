@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -131,7 +131,7 @@ boolean_t ftok_sem_get2(gd_region *reg, boolean_t *stacktrace_time, boolean_t *t
  */
 boolean_t ftok_sem_get(gd_region *reg, boolean_t incr_cnt, int project_id, boolean_t immediate, boolean_t *ftok_counter_halted)
 {
-	uint4			semop_wait_time;
+	uint8			semop_wait_time;
 	unix_db_info		*udi;
 	boolean_t		stacktrace_time = FALSE, sem_timeout, bypass = FALSE, result;
 	semwait_status_t	retstat;
