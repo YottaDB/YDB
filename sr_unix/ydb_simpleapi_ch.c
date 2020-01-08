@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -185,8 +185,9 @@ CONDITION_HANDLER(ydb_simpleapi_ch)
 			 */
 			assert(simpleThreadAPI_active);
 			ydb_zstatus(errstr->buf_addr, errstr->len_alloc);
-			/* errstr->buf_addr points to a null-terminated string. So no need for errstr->len_used.
-			 * Therefore set it to the actual length of the error string.
+			/* The call to ydb_zstatus() won't set the message unless len_alloc is more than one byte.
+			 * Note that the returned buffer (in errstr->buf_addr) is null terminated so we can just set
+			 * the output length equal to the actual length of the error string.
 			 * If errstr->len_used > errstr->len_alloc - 1, then user knows they got a truncated error string
 			 * and need to pass in a bigger buffer to avoid truncation in future SimpleThreadAPI calls.
 			 */

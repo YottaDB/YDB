@@ -305,7 +305,7 @@ int	ydb_jinit(void);
 #	endif
 int	ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, unsigned int *io_vars_mask,
 		unsigned int *has_ret_value);
-void	ydb_zstatus(char* msg, int len);
+int	ydb_zstatus(char* msg, int len);
 
 
 /* Utility entry points accessable in libyottadb.so */

@@ -3,7 +3,7 @@
  * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,7 +49,7 @@ GBLREF boolean_t	is_tracing_on;
 	}													\
 	if (stat)												\
 	{													\
-		gtm_zstatus(&err_str[0], 2 * OUT_BUFF_SIZE);							\
+		ydb_zstatus(&err_str[0], 2 * OUT_BUFF_SIZE);							\
 		gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4,					\
 							LEN_AND_LIT(ROUTINE), strlen(err_str), err_str);	\
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_COMMFILTERERR, 4, LEN_AND_LIT(ROUTINE), 		\
