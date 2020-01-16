@@ -40,7 +40,9 @@
 #include "invocation_mode.h"
 #include "sighnd_debug.h"
 
-#define MAX_SAPI_MSTR_GC_INDX	YDB_MAX_NAMES
+#define MAX_SAPI_MSTR_GC_INDX		YDB_MAX_NAMES
+#define YDB_GET_VALUE_SIZE_ONLY		TRUE
+#define YDB_GET_VALUE_FULL_VALUE	FALSE
 
 GBLREF	symval		*curr_symval;
 GBLREF	stack_frame	*frame_pointer;
@@ -549,6 +551,21 @@ MBSTART	{													\
 	dST->len_used = sRC->str.len;										\
 } MBEND
 
+#define GET_REQUIRED_YDB_BUFF_T_SIZE_FROM_MVAL(YDBBUFF, MVALP, PARAM1, PARAM2)					\
+MBSTART	{													\
+	mval		*sRC;	/* named so to avoid name collision with caller */				\
+	ydb_buffer_t	*dST;	/* named so to avoid name collision with caller */				\
+														\
+	sRC = MVALP;												\
+	/* It is possible source mval is not of type MV_STR. But ydb_buff_t needs one				\
+	 * so convert incoming mval to a string.								\
+	 */													\
+	MV_FORCE_STR(sRC);											\
+	assert(MV_IS_STRING(sRC));										\
+	dST = YDBBUFF;												\
+	dST->len_used = sRC->str.len;	/* Set len to what it needs to be */					\
+} MBEND
+
 /* Debug macro to dump the PLIST structure that is being passed into a runtime opcode. To use, be sure to
  * set DEBUG_LIBYOTTADB *prior* to including libyottadb_int.h
  */
@@ -939,6 +956,15 @@ void	ydb_stm_atfork_prepare(void);
 void	ydb_stm_atfork_parent(void);
 void	ydb_stm_atfork_child(void);
 
+/* Declarations for routines used by Simple API */
+unsigned int get_value_and_subtree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
+	ydb_var_types data_type, char *ydb_caller_fn);
+void ydb_get_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value,
+	ydb_var_types get_type, int get_svn_index, boolean_t only_return_size, char *ydb_caller_fn);
+int get_next_node(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, int *ret_subs_used,
+	ydb_buffer_t *ret_subsarray, ydb_var_types nodenext_type, char *ydb_caller_fn);
+void ydb_set_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const ydb_buffer_t *value,
+	ydb_var_types set_type, int set_svn_index, char *ydb_caller_fn);
 void	ydb_issue_invvarname_error(const ydb_buffer_t *varname);
 
 /* Use NO_THREADGBL_DEFTYPES here to keep these inline routines from expanding in gtm_threadgbl_deftypes.c where they are

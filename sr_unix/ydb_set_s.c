@@ -39,12 +39,7 @@ GBLREF	volatile int4	outofband;
 int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const ydb_buffer_t *value)
 {
 	boolean_t	error_encountered;
-	gparam_list	plist;
-	ht_ent_mname	*tabent;
 	int		set_svn_index;
-	lv_val		*lvvalp, *dst_lv;
-	mname_entry	var_mname;
-	mval		set_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_buffer_t	null_ydb_buff;
 	ydb_var_types	set_type;
 	DCL_THREADGBL_ACCESS;
@@ -84,6 +79,23 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 				      LEN_AND_LIT("Invalid value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_SET)));
 		CHECK_MAX_STR_LEN(value);		/* Generates error is value is too long */
 	}
+	ydb_set_value(varname, subs_used, subsarray, value, set_type, set_svn_index, (char *)LYDBRTNNAME(LYDB_RTN_SET));
+	LIBYOTTADB_DONE;
+	REVERT;
+	return YDB_OK;
+}
+
+void ydb_set_value(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const ydb_buffer_t *value,
+		ydb_var_types set_type, int set_svn_index, char *ydb_caller_fn)
+{
+	gparam_list	plist;
+	ht_ent_mname	*tabent;
+	lv_val		*lvvalp, *dst_lv;
+	mname_entry	var_mname;
+	mval		set_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	/* Separate actions depending on the type of SET being done */
 	switch(set_type)
 	{
@@ -104,8 +116,7 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_putindx */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE, 1,
-											LYDBRTNNAME(LYDB_RTN_SET));
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, TRUE, 1, ydb_caller_fn);
 				dst_lv = (lv_val *)callg((callgfnptr)op_putindx, &plist);	/* Locate/create node */
 			}
 			SET_MVAL_FROM_YDB_BUFF_T(&dst_lv->v, value);	/* Set value into located/created node */
@@ -123,8 +134,7 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 			gvname.str.len = varname->len_used - 1;
 			plist.arg[0] = &gvname;
 			/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_gvname */
-			COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
-											LYDBRTNNAME(LYDB_RTN_SET));
+			COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, ydb_caller_fn);
 			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
 			SET_MVAL_FROM_YDB_BUFF_T(&set_value, value);	/* Put value to set into mval for "op_gvput" */
 			INIT_MVAL_BEFORE_USE_IN_M_CODE(&set_value);	/* Do additional initialization of result mval as it could
@@ -145,7 +155,4 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 			assertpro(FALSE);
 	}
 	TREF(sapi_mstrs_for_gc_indx) = 0; /* mstrs in this array (added by RECORD_MSTR_FOR_GC) no longer need to be protected */
-	LIBYOTTADB_DONE;
-	REVERT;
-	return YDB_OK;
 }

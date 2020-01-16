@@ -25,8 +25,10 @@ where
 
 LYDBRTN(LYDB_RTN_NONE,			"********",				"********"				),	/* No libyottadb routine is running */
 LYDBRTN(LYDB_RTN_DATA, 			"ydb_data_s()",				"ydb_data_st()"				),	/* "ydb_data_s" is running */
+LYDBRTN(LYDB_RTN_DECODE,		"ydb_decode_s()",			"ydb_decode_st()"			),	/* "ydb_decode_s" is running */
 LYDBRTN(LYDB_RTN_DELETE_EXCL, 		"ydb_delete_excl_s()",			"ydb_delete_excl_st()"			),	/* "ydb_delete_excl_s" is running */
 LYDBRTN(LYDB_RTN_DELETE, 		"ydb_delete_s()",			"ydb_delete_st()"			),	/* "ydb_delete_s" is running */
+LYDBRTN(LYDB_RTN_ENCODE,		"ydb_encode_s()",			"ydb_encode_st()"			),	/* "ydb_encode_s" is running */
 LYDBRTN(LYDB_RTN_GET, 			"ydb_get_s()",				"ydb_get_st()"				),	/* "ydb_get_s" is running */
 LYDBRTN(LYDB_RTN_INCR,			"ydb_incr_s()",				"ydb_incr_st()"				),	/* "ydb_incr_s" is running */
 LYDBRTN(LYDB_RTN_LOCK, 			"ydb_lock_s()",				"ydb_lock_st()"				),	/* "ydb_lock_s" is running */

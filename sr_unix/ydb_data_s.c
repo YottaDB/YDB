@@ -50,12 +50,7 @@ LITREF	mval		literal_zero;
 int ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, unsigned int *ret_value)
 {
 	boolean_t	error_encountered;
-	gparam_list	plist;
-	ht_ent_mname	*tabent;
 	int		data_svn_index;
-	lv_val		*lvvalp, *src_lv;
-	mname_entry	var_mname;
-	mval		data_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_var_types	data_type;
 	DCL_THREADGBL_ACCESS;
 
@@ -88,6 +83,25 @@ int ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 	if (NULL == ret_value)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			LEN_AND_LIT("NULL ret_value"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_DATA)));
+
+	*ret_value = get_value_and_subtree(varname, subs_used, subsarray, data_type, (char *)LYDBRTNNAME(LYDB_RTN_DATA));
+	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
+	LIBYOTTADB_DONE;
+	REVERT;
+	return YDB_OK;
+}
+
+unsigned int get_value_and_subtree(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
+			ydb_var_types data_type, char *ydb_caller_fn)
+{
+	mname_entry	var_mname;
+	ht_ent_mname	*tabent;
+	lv_val		*lvvalp, *src_lv;
+	mval		data_value, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	gparam_list	plist;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	/* Separate actions depending on type of DATA being done */
 	switch(data_type)
 	{
@@ -109,8 +123,7 @@ int ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 				 */
 				plist.arg[0] = lvvalp;				/* First arg is lv_val of the base var */
 				/* Setup plist (which would point to plist_mvals[] array) for callg invocation of op_getindx */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
-											LYDBRTNNAME(LYDB_RTN_DATA));
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, ydb_caller_fn);
 				src_lv = (lv_val *)callg((callgfnptr)op_srchindx, &plist);	/* Locate node */
 			}
 			op_fndata(src_lv, &data_value);
@@ -128,8 +141,7 @@ int ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 			if (0 < subs_used)
 			{
 				plist.arg[0] = &gvname;
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
-											LYDBRTNNAME(LYDB_RTN_DATA));
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, ydb_caller_fn);
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to  key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
@@ -141,9 +153,5 @@ int ydb_data_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 			assertpro(FALSE);
 			break;
 	}
-	*ret_value = mval2i(&data_value);
-	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
-	LIBYOTTADB_DONE;
-	REVERT;
-	return YDB_OK;
+	return mval2i(&data_value);
 }

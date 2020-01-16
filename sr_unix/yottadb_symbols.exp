@@ -45,12 +45,16 @@ ydb_ci_tab_switch
 ydb_ci_tab_switch_t
 ydb_data_s
 ydb_data_st
+ydb_decode_s
+ydb_decode_st
 ydb_delete_excl_s
 ydb_delete_excl_st
 ydb_delete_s
 ydb_delete_st
 ydb_eintr_handler
 ydb_eintr_handler_t
+ydb_encode_s
+ydb_encode_st
 ydb_exit
 ydb_file_id_free
 ydb_file_id_free_t

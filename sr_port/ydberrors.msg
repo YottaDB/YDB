@@ -82,6 +82,7 @@ ZCPREALLVALSTR	<Pre-allocation allowed only for output or input/output variables
 ZSHOWSTACKRANGE	<Invalid stack level value !SL for ZSHOW "V">/error/fao=1
 GVDBGNAKEDUNSET	<Invalid GVNAKED in gv_optimize: $REFERENCE was unset. Opcodes seen: !AD>/error/fao=2
 GVDBGNAKEDMISMATCH	<Invalid GVNAKED in gv_optimize: $REFERENCE did not match OP_GVNAKED: !AD !!= !AD. Opcodes seen: !AD>/error/fao=6
+JANSSONDLNOOPEN	<Attempt to open jansson JSON library failed.>/error/fao=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

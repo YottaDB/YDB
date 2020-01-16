@@ -73,6 +73,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "ZSHOWSTACKRANGE", "Invalid stack level value !SL for ZSHOW \"V\"", 1, 0 },
 	{ "GVDBGNAKEDUNSET", "Invalid GVNAKED in gv_optimize: $REFERENCE was unset. Opcodes seen: !AD", 2, 0 },
 	{ "GVDBGNAKEDMISMATCH", "Invalid GVNAKED in gv_optimize: $REFERENCE did not match OP_GVNAKED: !AD !!= !AD. Opcodes seen: !AD", 6, 0 },
+	{ "JANSSONDLNOOPEN", "Attempt to open jansson JSON library failed.", 0, 0 },
 };
 
 
@@ -86,8 +87,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	56,
+	57,
 	&ydberrors_undocarr[0],
 	0
 };
-

@@ -50,12 +50,7 @@ int ydb_node_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 		    int *ret_subs_used, ydb_buffer_t *ret_subsarray)
 {
 	boolean_t	error_encountered;
-	gparam_list	plist;
-	ht_ent_mname	*tabent;
 	int		nodenext_svn_index, status;
-	lv_val		*lvvalp, *next_lv;
-	mname_entry	var_mname;
-	mval		varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
 	ydb_var_types	nodenext_type;
 	DCL_THREADGBL_ACCESS;
 
@@ -85,6 +80,24 @@ int ydb_node_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 	if (NULL == ret_subs_used)
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_PARAMINVALID, 4,
 			      LEN_AND_LIT("NULL ret_subs_used"), LEN_AND_STR(LYDBRTNNAME(LYDB_RTN_NODE_NEXT)));
+	status = get_next_node(varname, subs_used, subsarray, ret_subs_used, ret_subsarray, nodenext_type,  (char *)LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
+	LIBYOTTADB_DONE;
+	REVERT;
+	return status;
+}
+
+int get_next_node(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, int *ret_subs_used,
+			ydb_buffer_t *ret_subsarray, ydb_var_types nodenext_type, char *ydb_caller_fn)
+{
+	gparam_list	plist;
+	ht_ent_mname	*tabent;
+	int		status;
+	lv_val		*lvvalp;
+	mname_entry	var_mname;
+	mval		varnamemv, gvname, plist_mvals[YDB_MAX_SUBS + 1];
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
 	status = YDB_OK;
 	/* Separate actions depending on type of variable for which the next subscript is being located */
 	switch(nodenext_type)
@@ -109,11 +122,10 @@ int ydb_node_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 				plist.arg[0] = NULL;			/* arg1: destination mval not supplied in simpleAPI mode */
 				plist.arg[1] = &varnamemv;		/* arg2: varname mval */
 				plist.arg[2] = lvvalp;			/* arg3: varname lv_val */
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 3,
-							LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 3, ydb_caller_fn);
 				callg((callgfnptr)op_fnquery, &plist);	/* Drive "op_fnquery" to locate next node */
 			}
-			status = sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, (char *)LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
+			status = sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, ydb_caller_fn);
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Global variable subscript-next processing is the same regardless of argument count:
@@ -130,13 +142,12 @@ int ydb_node_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 			if (0 < subs_used)
 			{
 				plist.arg[0] = &gvname;
-				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1,
-							LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
+				COPY_PARMS_TO_CALLG_BUFFER(subs_used, subsarray, plist, plist_mvals, FALSE, 1, ydb_caller_fn);
 				callg((callgfnptr)op_gvname, &plist);	/* Drive "op_gvname" to create key */
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
 			op_gvquery(NULL);				/* Locate next subscript this level */
-			status = sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, (char *)LYDBRTNNAME(LYDB_RTN_NODE_NEXT));
+			status = sapi_return_subscr_nodes(ret_subs_used, ret_subsarray, ydb_caller_fn);
 			break;
 		case LYDB_VARREF_ISV:
 			/* The VALIDATE_VARNAME macro call done above should have already issued an error in this case */
@@ -146,7 +157,5 @@ int ydb_node_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 	}
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* the counter should have never become non-zero in this function */
 	TREF(sapi_query_node_subs_cnt) = 0;
-	LIBYOTTADB_DONE;
-	REVERT;
 	return status;
 }
