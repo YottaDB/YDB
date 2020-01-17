@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,6 +35,7 @@
 #include "gtm_unistd.h"
 #include "gtm_select.h"
 #include "min_max.h"
+#include "gtm_fcntl.h"
 
 #define	ESTABLISHED	"ESTABLISHED"
 
@@ -60,7 +61,7 @@ error_def(ERR_ZINTRECURSEIO);
 
 boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t update_bufsiz)
 {
-	int		temp_1;
+	int		temp_1, flags, flags_orig;
 	char		*errptr;
 	int4		errlen, last_errno, save_errno;
 	int		d_socket_struct_len, res, nfds, sockerror;
@@ -72,7 +73,7 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 	d_socket_struct *dsocketptr, *real_dsocketptr;
 	socket_interrupt *sockintr, *real_sockintr;
 	ABS_TIME	cur_time, end_time;
-	struct timeval	*sel_time;
+	struct timeval	*sel_time, cur_timeval;
 	mv_stent	*mv_zintdev;
 	struct addrinfo *remote_ai_ptr, *raw_ai_ptr, *local_ai_ptr;
 	int		errcode, real_errno;
@@ -143,6 +144,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 			memcpy(remote_ai_ptr, sockptr->remote.ai_head, SIZEOF(struct addrinfo));
 		if (need_socket && (FD_INVALID != sockptr->sd))
 		{
+			if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
+			{
+				sockptr->nonblocking = FALSE;
+				flags = flags_orig;
+				fcntl(sockptr->sd, F_SETFL, flags);
+			}
 			close(sockptr->sd);
 			sockptr->sd = FD_INVALID;
 		}
@@ -194,6 +201,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					save_errno = errno;
 					errptr = (char *)STRERROR(save_errno);
 					errlen = STRLEN(errptr);
+					if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
+					{
+						sockptr->nonblocking = FALSE;
+						flags = flags_orig;
+						fcntl(sockptr->sd, F_SETFL, flags);
+					}
 					close(sockptr->sd);	/* Don't leave a dangling socket around */
 					sockptr->sd = FD_INVALID;
 					if (NULL != sockptr->remote.ai_head)
@@ -213,6 +226,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					save_errno = errno;
 					errptr = (char *)STRERROR(save_errno);
 					errlen = STRLEN(errptr);
+					if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
+					{
+						sockptr->nonblocking = FALSE;
+						flags = flags_orig;
+						fcntl(sockptr->sd, F_SETFL, flags);
+					}
 					close(sockptr->sd);	/* Don't leave a dangling socket around */
 					sockptr->sd = FD_INVALID;
 					if (NULL != sockptr->remote.ai_head)
@@ -233,6 +252,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 						save_errno = errno;
 						errptr = (char *)STRERROR(save_errno);
 						errlen = STRLEN(errptr);
+						if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
+						{
+							sockptr->nonblocking = FALSE;
+							flags = flags_orig;
+							fcntl(sockptr->sd, F_SETFL, flags);
+						}
 						close(sockptr->sd);	/* Don't leave a dangling socket around */
 						sockptr->sd = FD_INVALID;
 						if (NULL != sockptr->remote.ai_head)
@@ -253,6 +278,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 						save_errno = errno;
 						errptr = (char *)STRERROR(save_errno);
 						errlen = STRLEN(errptr);
+						if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
+						{
+							sockptr->nonblocking = FALSE;
+							flags = flags_orig;
+							fcntl(sockptr->sd, F_SETFL, flags);
+						}
 						close(sockptr->sd);	/* Don't leave a dangling socket around */
 						sockptr->sd = FD_INVALID;
 						if (NULL != sockptr->remote.ai_head)
@@ -272,6 +303,14 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 		{
 			/* Use plain connect to allow jobinterrupt */
 			assert(FD_INVALID != sockptr->sd);
+			/* If a timeout is set, set the socket descriptor to non-blocking mode */
+			if ((NO_M_TIMEOUT != nsec_timeout) && (0 != nsec_timeout))
+			{
+				sockptr->nonblocking = TRUE;
+				flags_orig = fcntl(sockptr->sd, F_GETFL);
+				flags = flags_orig | O_NONBLOCK;
+				fcntl(sockptr->sd, F_SETFL, flags);
+			}
 			res = connect(sockptr->sd, SOCKET_REMOTE_ADDR(sockptr), remote_ai_ptr->ai_addrlen);	 /* BYPASSOK */
 			if (res < 0)
 			{
@@ -334,6 +373,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 						break;
 				}
 			} /* if connect failed */
+			if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
+			{
+				sockptr->nonblocking = FALSE;
+				flags = flags_orig;
+				fcntl(sockptr->sd, F_SETFL, flags);
+			}
 		}
 		if (need_select)
 		{
@@ -348,8 +393,11 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 					cur_time = sub_abs_time(&end_time, &cur_time);
 					nsec_timeout = (cur_time.tv_sec * (uint8)NANOSECS_IN_SEC) + cur_time.tv_nsec;
 					if (0 < nsec_timeout)
-						sel_time = (struct timeval *)&cur_time;
-					else
+					{
+						cur_timeval.tv_sec = cur_time.tv_sec;
+						cur_timeval.tv_usec = cur_time.tv_nsec / NANOSECS_IN_USEC;
+						sel_time = (struct timeval *)&cur_timeval;
+					} else
 					{	/* timed out so done */
 						save_errno = res = 0;
 						no_time_left = TRUE;
@@ -415,6 +463,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 		{
 			if (FD_INVALID != sockptr->sd)
 			{
+				if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
+				{
+					sockptr->nonblocking = FALSE;
+					flags = flags_orig;
+					fcntl(sockptr->sd, F_SETFL, flags);
+				}
 				close(sockptr->sd);	/* Don't leave a dangling socket around */
 				sockptr->sd = FD_INVALID;
 			}
@@ -451,6 +505,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 			{	/* the operation would not be resumed, no need to save socket device states */
 				if (!need_socket)
 				{
+					if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
+					{
+						sockptr->nonblocking = FALSE;
+						flags = flags_orig;
+						fcntl(sockptr->sd, F_SETFL, flags);
+					}
 					close(sockptr->sd);
 					sockptr->sd = FD_INVALID;
 				}
@@ -459,6 +519,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 			}
 			if (need_connect)
 			{	/* no connect in progress */
+				if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
+				{
+					sockptr->nonblocking = FALSE;
+					flags = flags_orig;
+					fcntl(sockptr->sd, F_SETFL, flags);
+				}
 				close(sockptr->sd);	/* Don't leave a dangling socket around */
 				sockptr->sd = FD_INVALID;
 				sockptr->state = socket_created;
@@ -530,6 +596,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 			errlen = STRLEN(errptr);
 			if (FD_INVALID != sockptr->sd)
 			{
+				if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
+				{
+					sockptr->nonblocking = FALSE;
+					flags = flags_orig;
+					fcntl(sockptr->sd, F_SETFL, flags);
+				}
 				close(sockptr->sd);	/* Don't leave a dangling socket around */
 				sockptr->sd = FD_INVALID;
 			}
@@ -545,6 +617,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 		{
 			if (FD_INVALID != sockptr->sd)
 			{
+				if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
+				{
+					sockptr->nonblocking = FALSE;
+					flags = flags_orig;
+					fcntl(sockptr->sd, F_SETFL, flags);
+				}
 				close(sockptr->sd);	/* Don't leave a dangling socket around */
 				sockptr->sd = FD_INVALID;
 			}
@@ -560,6 +638,12 @@ boolean_t iosocket_connect(socket_struct *sockptr, uint8 nsec_timeout, boolean_t
 		{
 			if (FD_INVALID != sockptr->sd)
 			{
+				if (sockptr->nonblocking) /* turn off the socket's nonblocking flag if it was enabled */
+				{
+					sockptr->nonblocking = FALSE;
+					flags = flags_orig;
+					fcntl(sockptr->sd, F_SETFL, flags);
+				}
 				close(sockptr->sd);	/* Don't leave a dangling socket around */
 				sockptr->sd = FD_INVALID;
 			}
