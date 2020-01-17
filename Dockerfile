@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -16,12 +16,12 @@
 #   $ docker build -t yottadb/yottadb:latest .
 #
 # Use with data persistence:
-#   $ docker run --rm -e ydb_chset=utf-8 -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
+#   $ docker run --rm -v `pwd`/ydb-data:/data -ti yottadb/yottadb:latest
 
-ARG OS_VSN=18.04
+ARG OS_VSN=buster
 
 # Stage 1: YottaDB build image
-FROM ubuntu:${OS_VSN} as ydb-release-builder
+FROM debian:${OS_VSN} as ydb-release-builder
 
 ARG CMAKE_BUILD_TYPE=Release
 ARG DEBIAN_FRONTEND=noninteractive
@@ -59,7 +59,7 @@ RUN mkdir -p /tmp/yottadb-build \
  && make install
 
 # Stage 2: YottaDB release image
-FROM ubuntu:${OS_VSN} as ydb-release
+FROM debian:${OS_VSN} as ydb-release
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
@@ -71,6 +71,12 @@ RUN apt-get update && \
                     locales \
                     wget \
                     vim \
+		    procps \
+		    make \
+		    golang \
+		    git \
+		    clang \
+		    cargo \
                     && \
     apt-get clean
 RUN locale-gen en_US.UTF-8
@@ -83,8 +89,22 @@ RUN cd /tmp/yottadb-release  \
       --utf8 `cat /tmp/yottadb-release/.icu.vsn` \
       --installdir /opt/yottadb/current \
  && rm -rf /tmp/yottadb-release
-ENV gtmdir=/data \
+ENV ydb_dir=/data \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
-    LC_ALL=en_US.UTF-8
+    LC_ALL=C.UTF-8 \
+    ydb_chset=UTF-8
+# MUPIP RUNDOWN need in the following chain because otherwise ENTRYPOINT complains
+# about inability to run %XCMD and rundown needed. Cause not known, but this workaround works
+# and is otherwise benign.
+RUN . /opt/yottadb/current/ydb_env_set \
+ && go get -t lang.yottadb.com/go/yottadb \
+ && go test lang.yottadb.com/go/yottadb \
+ && git clone https://gitlab.com/oesiman/yottadb-perl.git \
+ && cd yottadb-perl \
+ && perl Makefile.PL \
+ && make test TEST_DB=1 \
+ && make install \
+ && echo "zsystem \"mupip rundown -relinkctl\"" | /opt/yottadb/current/ydb -dir
 ENTRYPOINT ["/opt/yottadb/current/ydb"]
+CMD ["-run", "%XCMD", "zsystem \"bash\""]
