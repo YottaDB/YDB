@@ -1,3 +1,15 @@
+#################################################################
+#								#
+# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
 image: docker:latest
 
 services:
@@ -36,6 +48,12 @@ build-centos:
     DOCKERFILE: Dockerfile-centos
     REPO: yottadb-centos
 
+build-debian:
+  extends: .build
+  variables:
+    DOCKERFILE: Dockerfile-debian
+    REPO: yottadb-debian
+
 .push:
   stage: push
   script:
@@ -68,6 +86,11 @@ push-centos:
   variables:
     REPO: yottadb-centos
 
+push-debian:
+  extends: .push
+  variables:
+    REPO: yottadb-debian
+
 .push-release:
   stage: push
   script:
@@ -98,3 +121,8 @@ push-release-centos:
   extends: .push-release
   variables:
     REPO: yottadb-centos
+
+push-release-debian:
+  extends: .push-release
+  variables:
+    REPO: yottadb-debian
