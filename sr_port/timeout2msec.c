@@ -35,6 +35,6 @@
 int4	timeout2msec (uint8 timeout)
 {
 
-	/* less than 0, make it 0; if multiplying by 1000 causes arithmetic overflow, cap the value */
-	return (0 > timeout) ? 0 : ((MAXPOSINT4 > (timeout * MILLISECS_IN_SEC)) ? (timeout * MILLISECS_IN_SEC) : MAXPOSINT4);
+	/* if multiplying by 1000 causes arithmetic overflow, cap the value */
+	return (((uint8)MAXPOSINT4 > (timeout * MILLISECS_IN_SEC)) ? (int4)(timeout * MILLISECS_IN_SEC) : MAXPOSINT4);
 }

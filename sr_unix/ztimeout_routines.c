@@ -192,25 +192,21 @@ void check_and_set_ztimeout(mval * inp_val)
 			ztimeout_seconds.str.addr = NULL;
 			ztimeout_seconds.str.len = 0;
 		}
-		if (0 <= nsec_timeout)
-		/* Will be zero for both 0 and negative value */
-		{
-			/* If only timeout specified or timeout:,
-			 * retain the old vector
-			 */
-			if (!only_timeout)
-			{ /* Change both */
-				NULLIFY_VECTOR;
-				vector_ptr = (char *)malloc(max_read_len + 1);
-				tok_ptr = STRTOK_R(NULL, ":", &strtokptr); /* Next token is the vector */
-				memcpy(vector_ptr, tok_ptr, max_read_len);
-				vector_ptr[max_read_len] = '\0';
-				ztimeout_vector.str.addr = vector_ptr;
-				ztimeout_vector.str.len = max_read_len + 1;
-				ztimeout_vector.mvtype = MV_STR;
-				free(local_str_val);
-				local_str_val = NULL;
-			}
+		/* If only timeout specified or timeout:,
+		 * retain the old vector
+		 */
+		if (!only_timeout)
+		{ /* Change both */
+			NULLIFY_VECTOR;
+			vector_ptr = (char *)malloc(max_read_len + 1);
+			tok_ptr = STRTOK_R(NULL, ":", &strtokptr); /* Next token is the vector */
+			memcpy(vector_ptr, tok_ptr, max_read_len);
+			vector_ptr[max_read_len] = '\0';
+			ztimeout_vector.str.addr = vector_ptr;
+			ztimeout_vector.str.len = max_read_len + 1;
+			ztimeout_vector.mvtype = MV_STR;
+			free(local_str_val);
+			local_str_val = NULL;
 		}
 	}
 	if (ztimeout_vector.str.len)
