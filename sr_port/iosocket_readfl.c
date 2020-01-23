@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -335,7 +335,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 		time_for_read.tv_nsec = 0;
 	else
 		time_for_read.tv_nsec = (socketptr->def_moreread_timeout ? socketptr->moreread_timeout : INITIAL_MOREREAD_TIMEOUT)
-					* NANOSECS_IN_MSEC;
+					* (uint8)NANOSECS_IN_MSEC;
 	DBGSOCK((stdout, "socrfl: moreread_timeout = %d def_moreread_timeout= %d time = %d \n",
 		 socketptr->moreread_timeout, socketptr->def_moreread_timeout, time_for_read.tv_nsec / NANOSECS_IN_USEC));
 	timer_id = (TID)iosocket_readfl;
@@ -540,7 +540,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 				one_read_done = TRUE;
 				DBGSOCK((stdout, "socrfl: before moreread_timeout = %d timeout = %d \n",
 					 socketptr->moreread_timeout, time_for_read.tv_nsec / NANOSECS_IN_USEC));
-				time_for_read.tv_nsec = DEFAULT_MOREREAD_TIMEOUT * NANOSECS_IN_MSEC;
+				time_for_read.tv_nsec = DEFAULT_MOREREAD_TIMEOUT * (uint8)NANOSECS_IN_MSEC;
 				DBGSOCK((stdout, "socrfl: after timeout = %d \n", time_for_read.tv_nsec / NANOSECS_IN_USEC));
 			}
 			DBGSOCK((stdout, "socrfl: Bytes read: %d\n", status));

@@ -3,7 +3,7 @@
  * Copyright (c) 2018 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -329,7 +329,7 @@ void lke_clean(void)
 		} else
 		{
 			sleep_time -= (end_clock.tv_sec - 1 - start_clock.tv_sec) * MICROSECS_IN_SEC;
-			sleep_time -= (NANOSECS_IN_SEC + end_clock.tv_nsec - start_clock.tv_nsec) / NANOSECS_IN_USEC;
+			sleep_time -= ((uint8)NANOSECS_IN_SEC + end_clock.tv_nsec - start_clock.tv_nsec) / NANOSECS_IN_USEC;
 		}
 		if (sleep_time > 0)
 			SLEEP_USEC(sleep_time, 0);

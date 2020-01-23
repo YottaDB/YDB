@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,7 @@ MBSTART {														\
 	{														\
 		repl_tls.renegotiate_state = REPLTLS_WAITING_FOR_RENEG_TIMEOUT;						\
 		TIMEOUT_DONE_NOCH(NEXT_RENEG_HRTBT);									\
-		TIMEOUT_INIT_NOCH(NEXT_RENEG_HRTBT, gtmsource_options.renegotiate_interval * NANOSECS_IN_SEC);		\
+		TIMEOUT_INIT_NOCH(NEXT_RENEG_HRTBT, gtmsource_options.renegotiate_interval * (uint8)NANOSECS_IN_SEC);	\
 	}														\
 } MBEND
 
