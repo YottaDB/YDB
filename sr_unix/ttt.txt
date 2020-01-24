@@ -2,7 +2,7 @@
 ;								;
 ; Copyright 2001, 2014 Fidelity Information Services, Inc	;
 ;								;
-; Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -394,10 +394,6 @@ OC_FNZGETSYI:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#3,xfer.xf_fngetsyi
-OC_FNZHASH:	pushab	val.0
-		pushl	val.2
-		pushab	val.1
-		calls	#2,xfer.xf_fnzhash
 OC_FNZJ2:	pushab	val.0
 		pushl	val.2
 		pushab	val.1
@@ -1096,3 +1092,7 @@ OC_INDQ2:	pushab	val.2
 		pushab	val.1
 		pushab	val.0
 		calls	#3,xfer.xf_indq2
+OC_FNZYHASH:	pushab	val.0
+		pushl	val.2
+		pushab	val.1
+		calls	#2,xfer.xf_fnzyhash

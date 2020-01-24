@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
-* Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+* Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
 * All rights reserved.						*
 *								*
 *	This source code contains the intellectual property	*
@@ -18,14 +18,14 @@
 
 #define HASHED_STRING_LEN	(128 / 4) /* We need 1 byte for every hex digit in the 128 bit value. */
 
-/* This routine ($ZHASH) exposes the MurmurHash3 routine to M code. It takes 2 parameters from the user:
+/* This routine ($ZYHASH) exposes the MurmurHash3 routine to M code. It takes 2 parameters from the user:
  * string: the string to hash
  * salt: an optional salt for the hash that defaults to 0 if not present
  *
  * There is also an additional parameter ret which is used to return an mval containing
  * the MurmurHash3 hash of string. This mval is then returned to the M user.
  */
-void op_fnzhash(mval *string, int salt, mval *ret)
+void op_fnzyhash(mval *string, int salt, mval *ret)
 {
 	ydb_uint16	hash_out;
 	unsigned char	*str_out;

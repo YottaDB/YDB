@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
-* Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+* Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
 * All rights reserved.						*
 *								*
 *	This source code contains the intellectual property	*
@@ -17,11 +17,11 @@
 #include "toktyp.h"
 #include "advancewindow.h"
 
-/* This is the compiler routine for $ZHASH which exposes the MurmurHash3 routine to M code. It takes 2 parameters:
+/* This is the compiler routine for $ZYHASH which exposes the MurmurHash3 routine to M code. It takes 2 parameters:
  * string: the string to hash
  * salt: an optional salt for the hash that defaults to 0 if not present
  */
-int f_zhash(oprtype *a, opctype op)
+int f_zyhash(oprtype *a, opctype op)
 {
 	triple	*r;
 	DCL_THREADGBL_ACCESS;

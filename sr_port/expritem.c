@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -285,7 +285,6 @@ LITDEF nametabent fun_names[] =
 	,{7, "ZGETJPI"}
 	,{7, "ZGETLKI"}
 	,{7, "ZGETSYI"}
-	,{5, "ZHASH"}
 	,{5, "ZINCR"}, {8, "ZINCREME*"}
 	,{2, "ZJ"}, {8, "ZJUSTIFY"}
 	,{8, "ZJOBEXAM"}
@@ -310,6 +309,7 @@ LITDEF nametabent fun_names[] =
 	,{7, "ZTRNLNM"}
 	,{2, "ZW"}, {6, "ZWIDTH"}
 	,{3, "ZWR"}, {6, "ZWRITE"}
+	,{6, "ZYHASH"}
 };
 
 /* Index into fun_names array where entries that start with each letter of the alphabet begin. */
@@ -375,7 +375,6 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZGETJPI, ALL_SYS }
 	,{ OC_FNZGETLKI, VMS_OS }
 	,{ OC_FNZGETSYI, VMS_OS }
-	,{ OC_FNZHASH, ALL_SYS }
 	,{ OC_FNINCR, ALL_SYS }, { OC_FNINCR, ALL_SYS }
 	,{ OC_FNZJ2, ALL_SYS }, { OC_FNZJ2, ALL_SYS }
 	,{ OC_FNZJOBEXAM, ALL_SYS }
@@ -400,6 +399,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZTRNLNM, ALL_SYS }
 	,{ OC_FNZWIDTH, ALL_SYS }, { OC_FNZWIDTH, ALL_SYS }
 	,{ OC_FNZWRITE, ALL_SYS }, { OC_FNZWRITE, ALL_SYS }
+	,{ OC_FNZYHASH, ALL_SYS }
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -457,7 +457,6 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_mint_mstr,
 	f_two_mstrs,
 	f_zgetsyi,
-	f_zhash,
 	f_incr, f_incr,
 	f_justify, f_justify,
 	f_zjobexam,
@@ -481,7 +480,8 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_ztrigger, f_ztrigger,
 	f_ztrnlnm,
 	f_zwidth, f_zwidth,
-	f_zwrite, f_zwrite
+	f_zwrite, f_zwrite,
+	f_zyhash
 };
 
 int expritem(oprtype *a)

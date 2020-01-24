@@ -2,7 +2,7 @@
 ;								;
 ; Copyright 2001, 2014 Fidelity Information Services, Inc	;
 ;								;
-; Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -197,10 +197,6 @@ OC_FNGVGET1:	pushab	val.0
 OC_FNGET1:	pushab	val.0
 		pushab	val.1
 		calls	#2,xfer.xf_fnget1
-OC_FNZHASH:	pushab	val.0
-		pushl	val.2
-		pushab	val.1
-		calls	#2,xfer.xf_fnzhash
 OC_FNINCR:	pushab	val.0		; /* result of $INCR */
 		pushab	val.2		; /* r->operand[1] = increment */
 		pushab	val.1		; /* r->operand[0] = local-variable to increment */
@@ -1059,3 +1055,7 @@ OC_FNTRANSLATE_FAST: pushab   val.0
 		pushab val.2
 		pushab val.1
 		calls   #5,xfer.xf_fntranslate_fast
+OC_FNZYHASH:	pushab	val.0
+		pushl	val.2
+		pushab	val.1
+		calls	#2,xfer.xf_fnzyhash

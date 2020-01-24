@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -719,7 +719,6 @@ int		f_zdate(oprtype *a, opctype op);
 int		f_zdebug(oprtype *a, opctype op);
 int		f_zechar(oprtype *a, opctype op);
 int		f_zgetsyi(oprtype *a, opctype op);
-int		f_zhash(oprtype *a, opctype op);
 int		f_zjobexam(oprtype *a, opctype op);
 int		f_zparse(oprtype *a, opctype op);
 int		f_zpeek(oprtype *a, opctype op);
@@ -736,6 +735,7 @@ int		f_ztrigger(oprtype *a, opctype op);
 int		f_ztrnlnm(oprtype *a, opctype op);
 int		f_zwidth(oprtype *a, opctype op);
 int		f_zwrite(oprtype *a, opctype op);
+int		f_zyhash(oprtype *a, opctype op);
 mlabel		*get_mladdr(mident *c);
 mvar		*get_mvaddr(mident *c);
 int		glvn(oprtype *a);
