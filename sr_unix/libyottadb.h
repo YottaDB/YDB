@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -244,6 +244,8 @@ typedef	int		ydb_int_t;
 typedef	unsigned int	ydb_uint_t;
 typedef	long		ydb_long_t;
 typedef	unsigned long	ydb_ulong_t;
+typedef int64_t		ydb_int64_t;
+typedef uint64_t	ydb_uint64_t;
 typedef	float		ydb_float_t;
 typedef	double		ydb_double_t;
 typedef	char		ydb_char_t;

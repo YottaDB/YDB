@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -698,10 +698,16 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 				case ydb_ulong:
 					va_arg(var, ydb_long_t);
 					break;
+				case ydb_int64:				/* 64 bit int sizes are the same so group them */
+				case ydb_uint64:
+					va_arg(var, ydb_int64_t);
+					break;
 				case ydb_int_star:			/* Address-of sizes are the same so group them */
 				case ydb_uint_star:
 				case ydb_long_star:
 				case ydb_ulong_star:
+				case ydb_int64_star:
+				case ydb_uint64_star:
 				case ydb_float_star:
 				case ydb_double_star:
 				case ydb_char_star:
@@ -740,6 +746,12 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 					i2usmval(&arg_mval, (int)va_arg(var, ydb_ulong_t));
 #					endif
 					break;
+				case ydb_int64:
+					i82mval(&arg_mval, (ydb_int64_t)va_arg(var, ydb_int64_t));
+					break;
+				case ydb_uint64:
+					ui82mval(&arg_mval, (ydb_uint64_t)va_arg(var, ydb_uint64_t));
+					break;
                                 case ydb_int_star:
                                         i2mval(&arg_mval, *va_arg(var, ydb_int_t *));
                                         break;
@@ -759,6 +771,12 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 #					else
 					i2usmval(&arg_mval, (int)*va_arg(var, ydb_ulong_t *));
 #					endif
+					break;
+				case ydb_int64_star:
+					i82mval(&arg_mval, (ydb_int64_t)*va_arg(var, ydb_int64_t *));
+					break;
+				case ydb_uint64_star:
+					ui82mval(&arg_mval, (ydb_uint64_t)*va_arg(var, ydb_uint64_t *));
 					break;
 				case ydb_float:
 					float2mval(&arg_mval, (ydb_float_t)va_arg(var, ydb_double_t));
@@ -909,6 +927,12 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 					*va_arg(temp_var, ydb_ulong_t *) =
 						GTM64_ONLY(mval2ui8(arg_ptr)) NON_GTM64_ONLY(mval2ui(arg_ptr));
 					break;
+				case ydb_int64_star:
+					*va_arg(temp_var, ydb_ulong_t *) = mval2ui8(arg_ptr);
+					break;
+				case ydb_uint64_star:
+					*va_arg(temp_var, ydb_ulong_t *) = mval2ui8(arg_ptr);
+					break;
 				case ydb_float_star:
 					*va_arg(temp_var, ydb_float_t *) = mval2double(arg_ptr);
 					break;
@@ -942,6 +966,8 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
                                 case ydb_uint_star:
 				case ydb_long_star:
 				case ydb_ulong_star:
+				case ydb_int64_star:
+				case ydb_uint64_star:
 				case ydb_float_star:
 				case ydb_double_star:
 				case ydb_char_star:
@@ -955,6 +981,10 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
  				case ydb_long:			/* Long sizes are the same so group them */
 				case ydb_ulong:
 					va_arg(temp_var, ydb_long_t);
+					break;
+				case ydb_int64:				/* 64 bit int sizes are the same so group them */
+				case ydb_uint64:
+					va_arg(temp_var, ydb_int64_t);
 					break;
 				case ydb_float:
 				case ydb_double:

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,12 +70,16 @@ enum ydb_types
 	ydb_uint,
 	ydb_long,
 	ydb_ulong,
+	ydb_int64,
+	ydb_uint64,
 	ydb_float,
 	ydb_double,
 	ydb_int_star,
 	ydb_uint_star,
 	ydb_long_star,
 	ydb_ulong_star,
+	ydb_int64_star,
+	ydb_uint64_star,
 	ydb_string_star,
 	ydb_float_star,
 	ydb_char_star,

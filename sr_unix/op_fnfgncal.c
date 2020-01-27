@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -221,6 +221,8 @@ STATICFNDCL void free_return_type(INTPTR_T ret_val, enum ydb_types typ)
 		case ydb_uint:
 		case ydb_long:
 		case ydb_ulong:
+		case ydb_int64:
+		case ydb_uint64:
 		case ydb_float:
 		case ydb_double:
 		case ydb_pointertofunc:
@@ -254,6 +256,12 @@ STATICFNDCL void free_return_type(INTPTR_T ret_val, enum ydb_types typ)
 		case ydb_ulong_star:
 			free(((ydb_ulong_t *)ret_val));
 			break;
+		case ydb_int64_star:
+			free(((ydb_int64_t *)ret_val));
+			break;
+		case ydb_uint64_star:
+			free(((ydb_uint64_t *)ret_val));
+			break;
 		case ydb_char_star:
 			free(((ydb_char_t *)ret_val));
 			break;
@@ -269,8 +277,10 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 {
 	ydb_int_t		s_int_num;
 	ydb_long_t		str_len, s_long_num;
+	ydb_int64_t		s_int64_num;
 	ydb_uint_t		uns_int_num;
 	ydb_ulong_t		uns_long_num;
+	ydb_uint64_t		uns_int64_num;
 	char			*cp;
 	struct extcall_string	*sp;
 
@@ -388,6 +398,22 @@ STATICFNDEF void extarg2mval(void *src, enum ydb_types typ, mval *dst, boolean_t
 			uns_long_num = *((ydb_ulong_t *)src);
 			MV_FORCE_ULMVAL(dst, uns_long_num);
 			break;
+		case ydb_int64:
+			s_int64_num = (ydb_int64_t)src;
+			MV_FORCE_MVAL(dst, s_int64_num);
+			break;
+		case ydb_uint64:
+			uns_int64_num = (ydb_uint64_t)src;
+			MV_FORCE_UMVAL(dst, uns_int64_num);
+			break;
+		case ydb_int64_star:
+			s_int64_num = *((ydb_int64_t *)src);
+			MV_FORCE_MVAL(dst, s_int64_num);
+			break;
+		case ydb_uint64_star:
+			uns_int64_num = *((ydb_uint64_t *)src);
+			MV_FORCE_UMVAL(dst, uns_int64_num);
+			break;
 		case ydb_string_star:
 			sp = (struct extcall_string *)src;
 			dst->mvtype = MV_STR;
@@ -472,11 +498,15 @@ STATICFNDEF int extarg_getsize(void *src, enum ydb_types typ, mval *dst, struct 
 		case ydb_uint:
 		case ydb_long:
 		case ydb_ulong:
+		case ydb_int64:
+		case ydb_uint64:
 		case ydb_float_star:
 		case ydb_int_star:
 		case ydb_uint_star:
 		case ydb_long_star:
 		case ydb_ulong_star:
+		case ydb_int64_star:
+		case ydb_uint64_star:
 		case ydb_jboolean:
 		case ydb_jint:
 		case ydb_jlong:
@@ -1002,6 +1032,13 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				param_list->arg[i] = (void *)GTM64_ONLY((gtm_int64_t)) NON_GTM64_ONLY((ydb_long_t))
 					(MV_ON(m1, v) ? GTM64_ONLY(mval2i8(v)) NON_GTM64_ONLY(mval2i(v)) : 0);
 				break;
+			case ydb_uint64:
+				param_list->arg[i] = (void *)(ydb_uint64_t)(MV_ON(m1, v) ? mval2ui8(v) : 0);
+				/* Note: output xc_long and xc_ulong is an error as described above. */
+				break;
+			case ydb_int64:
+				param_list->arg[i] = (void *)(ydb_int64_t)(MV_ON(m1, v) ? mval2i8(v) : 0);
+				break;
 			case ydb_char_star:
 				param_list->arg[i] = free_string_pointer;
 				if (MASK_BIT_ON(m1))
@@ -1061,6 +1098,16 @@ void op_fnfgncal(uint4 n_mvals, mval *dst, mval *package, mval *extref, uint4 ma
 				param_list->arg[i] = free_space_pointer;
 				GTM64_ONLY(*((gtm_uint64_t *)free_space_pointer) = MV_ON(m1, v) ? (gtm_uint64_t)mval2ui8(v) : 0);
 				NON_GTM64_ONLY(*((ydb_ulong_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_ulong_t)mval2ui(v) : 0);
+				free_space_pointer++;
+				break;
+			case ydb_int64_star:
+				param_list->arg[i] = free_space_pointer;
+				*((gtm_int64_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_int64_t)mval2i8(v) : 0;
+				free_space_pointer++;
+				break;
+			case ydb_uint64_star:
+				param_list->arg[i] = free_space_pointer;
+				*((gtm_uint64_t *)free_space_pointer) = MV_ON(m1, v) ? (ydb_uint64_t)mval2ui8(v) : 0;
 				free_space_pointer++;
 				break;
 			case ydb_string_star:
