@@ -2,7 +2,7 @@
  *								*
  * Copyright 2011, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -127,7 +127,7 @@ void MurmurHash3_x86_32 ( const void * key, int len,
 
   /*----------
    * body   */
-# ifndef UNALIGNED_ACCESS_SUPPORTED
+# ifndef UNALIGNED_ACCESS_FULLY_SUPPORTED
   /* Murmur3 hash works only on 4-byte aligned keys so align key to avoid unaligned access error
    * messages from an architecture that does not support it.
    */
@@ -220,7 +220,7 @@ void MurmurHash3_x86_128 ( const void * key, const int len,
 
   /*----------
    * body   */
-# ifndef UNALIGNED_ACCESS_SUPPORTED
+# ifndef UNALIGNED_ACCESS_FULLY_SUPPORTED
   /* Murmur3 hash works only on 4-byte aligned keys so align key to avoid unaligned access error
    * messages from an architecture that does not support it.
    */
@@ -352,7 +352,7 @@ void MurmurHash3_x64_128 ( const void * key, const int len,
 
   /*----------
    * body   */
-# ifndef UNALIGNED_ACCESS_SUPPORTED
+# ifndef UNALIGNED_ACCESS_FULLY_SUPPORTED
   /* Murmur3 hash works only on 4-byte aligned keys so align key to avoid unaligned access error
    * messages from an architecture that does not support it.
    */
@@ -811,4 +811,3 @@ void ydb_mmrhash_128_hex(const ydb_uint16 *hash, unsigned char *out)
 /*******************************************************************************/
 
 /*-----------------------------------------------------------------------------*/
-

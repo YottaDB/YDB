@@ -224,9 +224,20 @@ typedef UINTPTR_T uintszofptr_t;
 #	define Linux390_ONLY(X)
 #endif
 
-#if !defined(__alpha) && !defined(__sparc) && !defined(__hpux) && !defined(mips) && !defined(__ia64)
-#	define UNALIGNED_ACCESS_SUPPORTED
+/* This macro always being true works for its current use in copy.h on AARCH64, ARMV6l, ARMV7l and x86_64 which are all of the platforms
+ * that YottaDB currently supports.
+ */
+#define UNALIGNED_ACCESS_SUPPORTED
+
+
+/* On 32 bit ARM (ARMV6l and ARMV7l), unaligned access is supported for some assembly operations but not for others. In the rare circumstances where
+ * a string passed to an MMRHASH function is not 4 byte aligned, that function can cause a SIG-11. This does not appear to be the case for AARCH64
+ * (64 bit ARM).
+ */
+#if !defined(__armv6l__) && !defined(__armv7l__)
+#	define UNALIGNED_ACCESS_FULLY_SUPPORTED
 #endif
+
 
 #if defined(__i386) || defined(__x86_64__) || defined(_AIX) || defined (__sun)							\
 		|| defined(__armv6l__) || defined(__armv7l__) || defined(__aarch64__)
