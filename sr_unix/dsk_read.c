@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -143,7 +146,8 @@ int4	dsk_read (block_id blk, sm_uc_ptr_t buff, enum db_ver *ondsk_blkver, boolea
 	} else
 		buff_is_modified_after_lseekread = FALSE;
 	assert(NULL != cnl);
-	INCR_GVSTATS_COUNTER(csa, cnl, n_dsk_read, 1);
+	if (dba_mm != csd->acc_meth)
+		INCR_GVSTATS_COUNTER(csa, cnl, n_dsk_read, 1);
 	enc_save_buff = buff;
 	/* The value of MUPIP_REORG_IN_PROG_LOCAL_DSK_READ indicates that this is a direct call from mupip_reorg_encrypt, operating
 	 * on a local buffer.

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -28,7 +31,8 @@ sm_uc_ptr_t mm_read(block_id blk)
 	assert((cs_addrs->total_blks <= cs_addrs->ti->total_blks) || !IS_MCODE_RUNNING);
 	assert(blk >= 0);
 
-	INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_dsk_read, 1);
+	if (dba_mm != cs_addrs->hdr->acc_meth)
+		INCR_GVSTATS_COUNTER(cs_addrs, cs_addrs->nl, n_dsk_read, 1);
 	if (blk < cs_addrs->total_blks) 		/* use the private copy of total_blks */
 		return (MM_BASE_ADDR(cs_addrs) + (off_t)cs_addrs->hdr->blk_size * blk);
 
