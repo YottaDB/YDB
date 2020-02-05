@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,7 +37,7 @@ error_def(ERR_STACKOFLOW);
 
 /* Note this module follows the basic pattern of op_newvar which handles the same
    function except for local vars instead of intrinsic vars. */
-void gtm_newintrinsic(mval *intrinsic)
+int gtm_newintrinsic(mval *intrinsic)
 {
 	mv_stent 	*mv_st_ent, *mvst_tmp, *mvst_prev;
 	stack_frame	*fp, *fp_prev, *fp_fix;
@@ -56,6 +56,7 @@ void gtm_newintrinsic(mval *intrinsic)
 		PUSH_MV_STENT(MVST_MSAV);
 		mv_chain->mv_st_cont.mvs_msav.v = *intrinsic;
 		mv_chain->mv_st_cont.mvs_msav.addr = intrinsic;
+		shift_size = 0;
 	} else
 	{	/* Current (youngest) frame IS an indirect frame.
 		   The situation is more complex because this is not a true stackframe.
@@ -90,8 +91,7 @@ void gtm_newintrinsic(mval *intrinsic)
 			{
 				msp = old_sp;
 	   			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKOFLOW);
-			}
-	   		else
+			} else
 	   			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STACKCRIT);
 	   	}
 		/* Ready, set, shift the younger indirect frames to make room for mv_stent */
@@ -156,5 +156,5 @@ void gtm_newintrinsic(mval *intrinsic)
 		intrinsic->mvtype = MV_STR;
 		intrinsic->str.len = 0;
 	}
-	return;
+	return shift_size;
 }

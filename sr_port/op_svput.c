@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,6 +52,7 @@
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
 
+GBLREF stack_frame	*frame_pointer;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_addr		*gd_header;
@@ -100,7 +101,7 @@ error_def(ERR_ZTWORMHOLE2BIG);
 
 void op_svput(int varnum, mval *v)
 {
-	int	i, ok, state;
+	int	i, ok, state, shift_size;
 	char	*vptr;
 	int4	previous_gtm_strpllim;
 	int4  	event_type, param_val;
@@ -208,8 +209,10 @@ void op_svput(int varnum, mval *v)
 				}
 				if ((TREF(dollar_etrap)).str.len > 0)
 				{
-					gtm_newintrinsic(&(TREF(dollar_etrap)));
+					shift_size = gtm_newintrinsic(&(TREF(dollar_etrap)));
+					assert((0 == shift_size) || (0 != (frame_pointer->flags & SFF_INDCE)));
 					NULLIFY_TRAP(TREF(dollar_etrap));
+					v = (mval *)(((char *)v) - shift_size);
 				}
 				(TREF(dollar_ztrap)).mvtype = MV_STR;
 				(TREF(dollar_ztrap)).str = v->str;
