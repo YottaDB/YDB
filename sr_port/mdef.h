@@ -393,10 +393,15 @@ typedef long		ulimit_t;	/* NOT int4; the UNIX ulimit function returns a value of
 #define MV_RETARG      128	/* 0x0080 */
 #define MV_UTF_LEN     256	/* 0x0100 */
 #define MV_ALIASCONT   512	/* 0x0200 */
-
 /* YDB additions to MV_* type bit masks. These go down to reduce the chances of colliding with GT.M changes */
 #define MV_SQLNULL   32768	/* 0x8000 */
+/* The below mask is all valid values of an mval type when not in one of the special conditions designated by the two "special
+ * values" noted below (MV_LVCOPIED and MV_LV_TREE).
+ */
+#define MV_ALLMASK (MV_NUM_MASK | MV_STR | MV_NUM_APPROX | MV_CANONICAL | MV_SYM | MV_SUBLIT | MV_RETARG | MV_UTF_LEN \
+		    | MV_ALIASCONT | MV_SQLNULL)
 
+#define MV_ALLMASK_OFF 			~(MV_ALLMASK)			/* Mask of bits that shouldn't be on */
 #define	MV_INT_OFF			~(MV_INT)			/* Mask to turn off MV_INT */
 #define	MV_STR_OFF			~(MV_STR)			/* Mask to turn off MV_STR */
 #define	MV_CANONICAL_OFF		~(MV_CANONICAL)			/* Mask to turn off MV_CANONICAL */
@@ -418,6 +423,20 @@ typedef long		ulimit_t;	/* NOT int4; the UNIX ulimit function returns a value of
 #define MV_BIAS	      1000
 #define MV_BIAS_PWR	 3
 
+/* Macro to validate an mval - currently limited to validating that an mval has a type consisting of valid bits and
+ * that if the mval has a string value, the length is within expectations. This macro can be expanded as desired
+ * and its usage spread as desired.
+ */
+#ifdef DEBUG
+#  define DBG_VALIDATE_MVAL(MV)											\
+MBSTART {													\
+	assert((0 != ((MV)->mvtype & MV_ALLMASK)) && (0 == ((MV)->mvtype & MV_ALLMASK_OFF)));			\
+	assert((0 == ((MV)->mvtype & MV_STR)) || ((0 <= (MV)->str.len) && (MAX_STRLEN >= (MV)->str.len)));	\
+} MBEND
+#else
+#  define DBG_VALIDATE_MVAL(MV)
+#endif
+
 #define NR_REG		16
 #define NUL		 0x00
 #define SP		 0x20
@@ -425,8 +444,8 @@ typedef long		ulimit_t;	/* NOT int4; the UNIX ulimit function returns a value of
 
 #define MAX_STRLEN_32K			32767
 /* MAX_STRLEN for local variable is changed from 32767 to 1048576 (1 MB) */
-#define MAX_STRLEN	 		(1 * 1024 * 1024)  /*maximum GT.M string size (1 MB)*/
-#define MAX_DBSTRLEN			(32 * 1024 - 1) /* Maximum database string size */
+#define MAX_STRLEN	 		(1 * 1024 * 1024)	/* Maximum YottaDB string size (1 MB) */
+#define MAX_DBSTRLEN			((32 * 1024) - 1) 	/* Maximum database string size */
 /* Initial buffer size allocated for a GT.M string which can geometrically be increased upto the size enough to fit in MAX_STRLEN */
 #define MAX_STRBUFF_INIT	 	(32 * 1024)
 

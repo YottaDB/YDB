@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  * 								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidaries.       *
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -182,6 +182,7 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
 		dstbase = NULL;	/* 4SCA: Assigned value is garbage or undefined, but below memcpy protected by dstlen */
 	MV_INIT_STRING(dst, dstlen, dstbase);
 	stringpool.free += dstlen;
+	DBG_VALIDATE_MVAL(dst);
 	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 }
 
@@ -226,7 +227,7 @@ static inline char* get_val(conv_type type, char *val, int sz, int *val_len)
 			val++;
 		}
 	} else
-	{/* Validates digits to be of decimal type */
+	{	/* Validates digits to be of decimal type */
 		while (sz && ISDIGIT(*val))
 		{
 			sz--;
@@ -238,8 +239,7 @@ static inline char* get_val(conv_type type, char *val, int sz, int *val_len)
 	 * hence the size will not be equal to zero
 	 */
 	if (0 != sz)
-	{
-		/* Case: input is similar to "kjdl", all invalid chars
+	{	/* Case: input is similar to "kjdl", all invalid chars
 		 * The while loops don't iterate over the string
 		 * hence the val and val_ptr will point to the same address
 		 */
@@ -288,9 +288,10 @@ static inline char* get_val(conv_type type, char *val, int sz, int *val_len)
  *  	size of the valid input is passed through val_len
  *
  ***************************************************************************************************/
-static inline char* get_dec(char *val, int sz, int *val_len )
+static inline char* get_dec(char *val, int sz, int *val_len)
 {
 	conv_type type = TYPE_DEC_POS;
+
 	/* Case: null input */
 	if (0 == sz)
 		return NULL;
@@ -322,7 +323,7 @@ static inline char* get_hex(char *val, int sz, int *val_len)
 	/* Case: null input */
 	if (0 == sz)
 		return NULL;
-	/* Case:0x or 0X is ignored as they don't count towards the value to be converted */
+	/* Case: 0x or 0X are ignored - they don't count towards the value to be converted */
 	if ((1 < sz) && ('0' == val[0] && ('x' == val[1] || 'X' == val[1])))
 	{
 		val += 2;
@@ -358,7 +359,7 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 	/* DEC & HEX conversions specific */
 	char            fmode[DH_TYPE_LEN], tmode[DH_TYPE_LEN];
 	char 		*val_ptr;
-	unsigned char	*strpool_ptr, *str_pool;	/* It is desirable to use local pointers to the stringpool.free as direct manipulation is expensive */
+	unsigned char	*strpool_ptr, *str_pool;	/* Local stringpool pointers */
 	qw_num		i8val;
 	int		strpool_len, dstlen, len;
 	boolean_t	is_dh_type = FALSE;
@@ -376,23 +377,23 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 	}
 	/* Explicitly checking DEC and HEX category as ICU only supports UTF conversions */
 	if (is_dh_type && (0 == memcmp(fmode, D_STR, DH_TYPE_LEN)) && (0 == memcmp(tmode, H_STR, DH_TYPE_LEN)))
-	{ /* This block handles DEC to HEX conversion */
+	{	/* This block handles DEC to HEX conversion */
 		if (NULL == (val_ptr = get_dec(src->str.addr, src->str.len, &dstlen)))	/* Warning: assignment */
 		{	/* Default output on invalid input */
 			val_ptr = "0";
 			dstlen = 1;
 		}
 		i8val = asc2l((uchar_ptr_t)val_ptr, dstlen);
-		/* Handling -ve number input by computing the 2's complement and converting that to hex
-		 * As we dont throw an error when a null input is passed it is required to check if the src len is 0
+		/* Handling -ve number input by computing the 2's complement and converting that to hex.
+		 * Also verify source length > 0 since we allow a null input.
 		 */
 		if ((0 != src->str.len) && ('-' == *(src->str.addr)))
-			i8val = ((~i8val) + 1);		/* As INT8 is valid on all currently supported platforms. There is no need for additional handling here */
+			i8val = ((~i8val) + 1);
 		ENSURE_STP_FREE_SPACE(dstlen);
 		strpool_len = dstlen;
 		str_pool = stringpool.free;
 		i2hexl(i8val, str_pool, dstlen);
-		while ('0' == *str_pool)	/* Trimming the output of leading zero's */
+		while ((1 < dstlen) && ('0' == *str_pool))	/* Trimming the output of leading zero's */
 		{
 			str_pool++;
 			dstlen--;
@@ -409,16 +410,15 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 			}
 			if (0 < len)
 			{
-				/* Values 8-E in the highest order digit represents negative hex values, so no F needed here */
+				/* Values 8-E in the highest order digit represent negative hex values, so no F needed here */
 				if ('7' < *strpool_ptr)
 				{
 					str_pool = strpool_ptr;
 					dstlen = len;
 				} else
 				{	/* Value of the highest order digit if less than 7 it needs additional F to represent
-					 * negitivity hence the pointer is moved back once to include F
+					 * negativity hence the pointer is moved back one to include F
 					 */
-
 					str_pool = strpool_ptr - 1;
                                  	dstlen = len + 1;
 				}
@@ -426,19 +426,21 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 		}
 		MV_INIT_STRING(dst, dstlen, str_pool);
 		stringpool.free += strpool_len;
+		DBG_VALIDATE_MVAL(dst);
 	} else if (is_dh_type && (0 == memcmp(fmode, H_STR, DH_TYPE_LEN)) && (0 == memcmp(tmode, D_STR, DH_TYPE_LEN)))
-	{/* This block handles HEX to DEC conversion */
+	{	/* This block handles HEX to DEC conversion */
 		if (NULL == (val_ptr = get_hex(src->str.addr, src->str.len, &dstlen)))	/* Warning: assignment */
         	{	/* Default output on invalid input */
 			val_ptr = "0";
 			dstlen = 1;
                 }
-		i8val = asc_hex2l((uchar_ptr_t)val_ptr, dstlen);	/* asc_hex2l is case agnostic as it converts to input string to upper case internally */
+		i8val = asc_hex2l((uchar_ptr_t)val_ptr, dstlen);	/* asc_hex2l does its own case conversion */
 		ui82mval(dst, i8val);
+		DBG_VALIDATE_MVAL(dst);
 	} else
-	{	/* UTF Family of input */
+	{	/* UTF character set conversions */
 		if (!gtm_utf8_mode)
-		{ /* UTF8 not enabled, report error rather than silently ignoring the conversion */
+		{	/* UTF8 not enabled, report error rather than silently ignoring the conversion */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVFCN, 0, ERR_TEXT, 2,
 				LEN_AND_LIT("Unicode translations with $ZCONVERT() are not allowed in the current $ZCHSET"));
 		}
@@ -448,9 +450,9 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 		if (NULL == (to = get_chset_desc(&ochset->str)))	/* Warning: assignment */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, ochset->str.len, ochset->str.addr);
 		dstlen = gtm_conv(from, to, &src->str, NULL, NULL);
-		/* Using an assert here as the dstlen is computed locally in gtm_conv and not obtained from user */
-		assert(-1 != dstlen);
+		assert(0 < dstlen);	/* Should not be negative since args were validated above */
 		MV_INIT_STRING(dst, dstlen, stringpool.free);
-		stringpool.free += dst->str.len;
+		stringpool.free += dstlen;
+		DBG_VALIDATE_MVAL(dst);
 	}
 }
