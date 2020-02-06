@@ -3,7 +3,7 @@
 ; Copyright (c) 1987-2018 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.  ;
+; Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.  ;
 ; All rights reserved.                                          ;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -34,7 +34,7 @@ FUNC(d,l)
 	; Length by default is set to 8
 	set:'$l($g(l)) l=8
 	; max values are one greater than actual unsigned 64/32 bit values
-	set isn=0,i=0,h="",apnd="0",k=d,maxp="18446744073709551616",maxn="923372036854775808"
+	set isn=0,i=0,h="",apnd="0",k=d,maxp="18446744073709551616",maxn="9223372036854775809"
 	; Input length without sign is considered for conversion in case of signed values
 	set fval=$zextract(d,1)
 	set:fval="-" isn=1,k=$extract(d,2,$length(d)),apnd="F"

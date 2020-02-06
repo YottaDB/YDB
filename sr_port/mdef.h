@@ -1777,7 +1777,9 @@ typedef struct repl_conn_info_struct
 
 #endif	/* Replication instance file related structures */
 
-/* Enumerator codes for supported CHSETs in GT.M */
+/* Enumerator codes for supported CHSETs in GT.M.
+ * This enum table must match the order of the chset_names table defined in mtables.c.
+ */
 typedef enum
 {
 	CHSET_M,

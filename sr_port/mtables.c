@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017,2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -469,7 +469,8 @@ LITDEF int	alphanumeric_table_len = (SIZEOF(alphanumeric_table) - 1);
 
 LITDEF mstr chset_names[CHSET_MAX_IDX_ALL] =
 { /* Supported character set (CHSET) codes for the 3-argument form of $ZCONVERT.
-   *  Note: Update the *_CHSET_LEN macros below if new CHSETs are added.
+   *  Note: 1) Its order depends on gtm_chset_t defined in mdef.h.
+   *	    2) Update the *_CHSET_LEN macros below if new CHSETs are added.
    */
 	{1, 1, "M"},	/* "M" should be the first CHSET (0th index of "chset_names" array). verify_chset() callers rely on this.
 			 * $ZCONVERT doesn't support M, but I/O does */

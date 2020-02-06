@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright 2012 Fidelity Information Services, Inc		*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidaries.  	*
+ * All rights reserved. 					*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -65,7 +68,7 @@ UConverter* get_chset_desc(const mstr* chset)
 
 /* Routine to verify given parameter against supported CHSETs.
  * Valid arguments (case-insensitive):
- *	"M", "UTF-8", "UTF-16", "UTF-16LE" and "UTF-16BE"
+ *	"M", "DEC", "HEX", "UTF-8", "UTF-16", "UTF-16LE" and "UTF-16BE"
  * Returns
  *	-1 (if invalid argument) or
  *	0  (if "M") or
