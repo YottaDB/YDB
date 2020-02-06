@@ -3,7 +3,7 @@
 ; Copyright (c) 2006-2017 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
-; Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -14,6 +14,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 gdeget:	;read in an existing GD or create a default
 LOAD
+	set wrongendian=0
+RESTART ; used to re-run this routine from the start if wrong endianness is detected
 	n abs,contents,rel,xregs,xsegs,reglist,map,$et,ptrsize
 	i debug s $et="b"
 	e  s $et="g ABORT^GDE:($p($p($zs,"","",3),""-"")'=""%GDE"") u io w !,$p($zs,"","",3,999),! d GETOUT^GDEEXIT zg 0"
@@ -103,11 +105,17 @@ LOAD
 	s contents("end")=$$bin2num($ze(rec,abs,abs+ptrsize-1)),abs=abs+ptrsize
 	i (gldfmt>8) s abs=abs+16	; reserved for runtime fillers
 	i contents("regioncnt")'=contents("segmentcnt") d message^GDE(gdeerr("INPINTEG"),"""""")
-	i contents("regioncnt")-1>contents("mapcnt") d message^GDE(gdeerr("INPINTEG"),"""""")
+	i contents("regioncnt")-1>contents("mapcnt") do
+	. if wrongendian do message^GDE(gdeerr("INPINTEG"),"""""") ; if this is clearly invalid in both endians, throw an error
+	. set wrongendian=1 ; otherwise you've detected wrong endianness and should restart this from the beginning
+	. zgoto -1:RESTART ; unwind the stack frame and restart this routine
 ; verify offsets
 	i abs'=(SIZEOF("gd_header")+SIZEOF("gd_contents")+1) d message^GDE(gdeerr("INPINTEG"),"""""")
 	s x=contents("maps")
-	i x+1'=(abs-SIZEOF("gd_header")) d message^GDE(gdeerr("INPINTEG"),"""""")
+	if x+1'=(abs-SIZEOF("gd_header")) do
+	. if wrongendian do message^GDE(gdeerr("INPINTEG"),"""""") ; if this is clearly invalid in both endians, throw an error
+	. set wrongendian=1 ; otherwise you've detected wrong endianness and should restart this from the beginning
+	. zgoto -1:RESTART ; unwind the stack frame and restart this routine
 	s x=x+(contents("mapcnt")*SIZEOF("gd_map"))
 	i (gldfmt>8)  s x=x+contents("varmapslen")		; add variable maps section too if available
 	i x'=contents("regions") d message^GDE(gdeerr("INPINTEG"),"""""")
@@ -233,7 +241,7 @@ badfile ;file access failed
 bin2num:(bin)	; binary number -> number
 	n num,i
 	s num=0
-	i endian=TRUE f i=$zl(bin):-1:1 s num=$za(bin,i)*HEX($zl(bin)-i*2)+num
+	if wrongendian for i=$zl(bin):-1:1 set num=$za(bin,i)*HEX($zl(bin)-i*2)+num
 	e  f i=1:1:$zl(bin) s num=$za(bin,i)*HEX(i-1*2)+num
 	q num
 	;
