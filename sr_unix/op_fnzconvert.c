@@ -207,8 +207,8 @@ void	op_fnzconvert2(mval *src, mval *kase, mval *dst)
  ***************************************************************************************************/
 static inline char* get_val(conv_type *type, char *val, int sz, int *val_len, char *orig_val, int orig_sz)
 {
-	char *val_ptr;
-	char *type_str;
+	char	*val_ptr;
+	char	*type_str;
 
 	/* Ignore leading 0's as they don't count towards computation */
 	while (sz && ('0' == *val))
@@ -256,28 +256,28 @@ static inline char* get_val(conv_type *type, char *val, int sz, int *val_len, ch
 		} else	/* Length of valid chars */
 			*val_len = val - val_ptr;
 	}
-	/* After validating input value character set, the below conditions check if the value is in convertable range */
+	/* After validating input value character set,
+	 * the below conditions check if the value is in convertable range
+	 */
 	if (TYPE_DEC_POS == *type)
-	{	/* Decimal Positive value range check. When value length is 20 the check is required here as not all values are supported at this length */
+	{	/* Decimal Positive value range check. When value length is
+		 * 20 the check is required here as not all values are supported at this length
+		 */
 		if ((MAX_DEC_LEN < *val_len) || ((MAX_DEC_LEN == *val_len) && (0 < STRNCMP_STR(val_ptr, MAX_POS, *val_len))))
-		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVVALUE, 6, orig_sz, orig_val, RTS_ERROR_STRING(type_str),
-	                              	RTS_ERROR_LITERAL("$ZCO[nvert]. Supports conversion of positive numbers only in the range '0 to 18446744073709551615'"));
-		}
+	                              RTS_ERROR_LITERAL("$ZCO[nvert]. Supports conversion of positive numbers only in the range '0 to 18446744073709551615'"));
 	} else if (TYPE_DEC_NEG == *type)
-	{	/* Decimal Negative value range check. When value length is 19 the check is required here as not all values are supported at this length */
+	{	/* Decimal Negative value range check. When value length is
+		 * 19 the check is required here as not all values are supported at this length
+		 */
 		if (((MAX_DEC_LEN - 1) < *val_len) || (((MAX_DEC_LEN - 1) == *val_len) && (0 < STRNCMP_STR(val_ptr, MAX_NEG, *val_len))))
-		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVVALUE, 6, orig_sz, orig_val, RTS_ERROR_STRING(type_str),
-	                              	RTS_ERROR_LITERAL("$ZCO[nvert]. Supports conversion of negative numbers only in the range '-9223372036854775808 to 0'"));
-		}
+	                              RTS_ERROR_LITERAL("$ZCO[nvert]. Supports conversion of negative numbers only in the range '-9223372036854775808 to 0'"));
 	} else
 	{	/* Hexadecimal max number of digits supported for conversion */
         	if (MAX_HEX_LEN < *val_len)
-        	{
                 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVVALUE, 6, orig_sz, orig_val, RTS_ERROR_STRING(type_str),
-                        	RTS_ERROR_LITERAL("$ZCO[nvert]. Supports only hexadecimal value of length 16"));
-              	}
+                        	      RTS_ERROR_LITERAL("$ZCO[nvert]. Supports only hexadecimal value of length 16"));
 	}
 	return val_ptr;
 }
@@ -296,10 +296,10 @@ static inline char* get_val(conv_type *type, char *val, int sz, int *val_len, ch
  ***************************************************************************************************/
 static inline char* get_dec(char *val, int sz, int *val_len, conv_type *inp_type)
 {
-	char *orig_val = val;
-	int orig_sz = sz;
-	*inp_type = TYPE_DEC_POS;
+	char 	*orig_val = val;
+	int 	orig_sz = sz;
 
+	*inp_type = TYPE_DEC_POS;
 	/* Case: null input */
 	if (0 == sz)
 	{
@@ -331,10 +331,10 @@ static inline char* get_dec(char *val, int sz, int *val_len, conv_type *inp_type
  ***************************************************************************************************/
 static inline char* get_hex(char *val, int sz, int *val_len, conv_type *inp_type)
 {
-	char *orig_val = val;
-	int orig_sz = sz;
-	*inp_type = TYPE_HEX;
+	char 	*orig_val = val;
+	int 	orig_sz = sz;
 
+	*inp_type = TYPE_HEX;
 	/* Case: null input */
 	if (0 == sz)
 	{
@@ -388,14 +388,10 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
         MV_FORCE_STR(ochset);
 	fmode = verify_chset(&ichset->str);
 	if (0 > fmode)		/* Validating input CHSET */
-	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, ichset->str.len, ichset->str.addr);
-	}
 	tmode = verify_chset(&ochset->str);
 	if (0 > tmode)		/* Validating output CHSET */
-	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, ochset->str.len, ochset->str.addr);
-	}
 	/* Check if the input and output CHSET is of type DEC or HEX */
 	if (((CHSET_DEC == fmode) || (CHSET_HEX == fmode)) && ((CHSET_HEX == tmode) || (CHSET_DEC == tmode)))
 	{
@@ -411,8 +407,14 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 			 * Also verify source length > 0 since we allow a null input.
 			 */
 			if (TYPE_DEC_NEG == inp_type)
-				i8val = ((~i8val) + 1);		/* As INT8 is valid on all currently supported platforms. There is no need for additional handling here */
-			if ((TYPE_DEC_NEG == inp_type) && (dstlen == 1))	/* When the dstlen is 1 we need an additional character to prefix F for hexadecimal negative numbers ranging 0-7 */
+				/* As INT8 is valid on all currently supported platforms.
+				 * There is no need for additional handling here.
+				 */
+				i8val = ((~i8val) + 1);
+			/* When the dstlen is 1 we need an additional character space
+			 * to prefix F for hexadecimal negative numbers ranging 0-7
+			 */
+			if ((TYPE_DEC_NEG == inp_type) && (dstlen == 1))
 				dstlen = dstlen + 1;
 			ENSURE_STP_FREE_SPACE(dstlen);
 			strpool_len = dstlen;
@@ -434,15 +436,16 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 					len--;
 				}
 				if (0 < len)
-				{
-					/* Values 8-E in the highest order digit represent negative hex values, so no F needed here */
+				{	/* As values 8-E in the highest order digit represents
+					 * negative hex values, F is not required to be prefixed here.
+					 */
 					if ('7' < *strpool_ptr)
 					{
 						str_pool = strpool_ptr;
 						dstlen = len;
 					} else
-					{	/* Value of the highest order digit if less than 7 it needs additional F to represent
-						 * negativity hence the pointer is moved back one to include F
+					{	/* Value of the highest order digit if less than 7 needs additional F to represent
+						 * negativity. So the pointer is moved back one to include F.
 						 */
 						str_pool = strpool_ptr - 1;
                 	                 	dstlen = len + 1;
@@ -462,10 +465,9 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 			i8val = asc_hex2l((uchar_ptr_t)val_ptr, dstlen);	/* asc_hex2l does its own case conversion */
 			ui82mval(dst, i8val);
 			DBG_VALIDATE_MVAL(dst);
-		} else
-		{	/* Invalid input and output CHSET combination DEC,DEC or HEX,HEX */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVZCONVERT, 6, RTS_ERROR_LITERAL("$ZCO[nvert] in M mode."),ichset->str.len, ichset->str.addr, ochset->str.len, ochset->str.addr);
-		}
+		} else	/* Invalid input and output CHSET combination DEC,DEC or HEX,HEX */
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVZCONVERT, 6, RTS_ERROR_LITERAL("$ZCO[nvert] in M mode."),
+				      ichset->str.len, ichset->str.addr, ochset->str.len, ochset->str.addr);
 	} else if (gtm_utf8_mode)
 	{	/* UTF Family of input */
 		/* The only supported names are: "UTF-8", "UTF-16", "UTF-16LE" and "UTF-16BE */
@@ -478,9 +480,8 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 		MV_INIT_STRING(dst, dstlen, stringpool.free);
 		stringpool.free += dstlen;
 		DBG_VALIDATE_MVAL(dst);
-	} else
-	{	/* In a NON-UTF mode UTF Family of CHSET is used */
+	} else	/* In a NON-UTF mode UTF Family of CHSET is used */
 		/* Report error as the input and output categories are not supported in this context */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVZCONVERT, 6, RTS_ERROR_LITERAL("$ZCO[nvert] in M mode."),ichset->str.len, ichset->str.addr, ochset->str.len, ochset->str.addr);
-	}
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVZCONVERT, 6, RTS_ERROR_LITERAL("$ZCO[nvert] in M mode."),
+			      ichset->str.len, ichset->str.addr, ochset->str.len, ochset->str.addr);
 }
