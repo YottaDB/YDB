@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,15 +29,8 @@
 GBLREF	stack_frame		*frame_pointer;
 GBLREF	spdesc			stringpool;
 
-#ifdef UNIX
 LITDEF 	mstr	createdby_text[6] = {{0, LEN_AND_LIT("DO")}, {0, LEN_AND_LIT("XECUTE")}, {0, LEN_AND_LIT("$$")},
 				     {0, LEN_AND_LIT("ZINTR")}, {0, LEN_AND_LIT("TRIGGER")}, {0, LEN_AND_LIT("ZTIMEOUT")}};
-#endif
-
-#ifdef VMS
-LITDEF 	mstr	createdby_text[4] = {{LEN_AND_LIT("DO")}, {LEN_AND_LIT("XECUTE")}, {LEN_AND_LIT("$$")},
-                                     {LEN_AND_LIT("ZINTR")}};
-#endif
 
 void	get_frame_creation_info(int level, int cur_zlevel, mval *result)
 {

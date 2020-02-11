@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -274,7 +277,7 @@ MBSTART {												\
 		BYTELEN = 0;										\
 		for (BIT = 0; BIT < PAT_MAX_BITS; BIT++)						\
 		{											\
-			MBIT = (1 << BIT);								\
+			MBIT = (1U << BIT);								\
 			if ((MBIT & CODE & PATM_LONGFLAGS) && !(MBIT & pat_allmaskbits))		\
 				BUF[BYTELEN++] = codelist[patmaskseq(MBIT)];				\
 		}											\

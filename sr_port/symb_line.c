@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -113,6 +113,8 @@ unsigned char *symb_line(unsigned char *in_addr, unsigned char *out, int max_len
 			if ((offset /= 10) == 0)
 				break;
 		}
+		if (0 > ct)
+			ct = 0;
 		len = MIN(OFFSET_LEN - ct, max_len);
 		memcpy (out, &temp[ct], len);
 		out += len;
