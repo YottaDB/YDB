@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -29,8 +29,7 @@
 
 	.text
 	.extern	numcmp
-	.extern	s2n
-	.extern underr
+	.extern	mval2num
 
 arg2_save	= -24
 arg1_save	= -16
@@ -42,16 +41,13 @@ ENTRY op_forinit
 	mov	x29, sp
 	ldr	x9, [x19]
 	str	x24, [x9, #msf_ctxt_off]
-	sub	sp, sp, #32					/* Allocate save area */
-	CHKSTKALIGN						/* Verify stack alignment */
-	str	x0, [x29, #arg0_save]				/* Save args to avoid getting modified across function calls */
+	sub	sp, sp, #32				/* Allocate save area */
+	CHKSTKALIGN					/* Verify stack alignment */
+	str	x0, [x29, #arg0_save]			/* Save args to avoid getting modified across function calls */
 	str	x2, [x29, #arg2_save]
-	mov	x0, x1						/* Save 2nd argument (REG64_ARG1) */
-	mv_force_defined x0
-	str	x0, [x29, #arg1_save]				/* Save (possibly modified) 2nd argument (REG64_ARG1) */
-	mv_force_num x0
-	ldr	x0, [x29, #arg1_save]
-	ldr	w15, [x0, #mval_l_m1]
+	mov	x0, x1					/* Copy 2nd argument as 1st argument for mval2num call */
+	bl	mval2num				/* Convert to a numeric. Issue ZYSQLNULLNOTVALID error if needed */
+	ldr	w15, [x0, #mval_l_m1]			/* x0 holds potentially updated `mval *` value from mval2num() call */
 	cmp	w15, wzr
 	b.mi	l2
 	mv_if_int x0, l1

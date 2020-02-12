@@ -2,7 +2,7 @@
 #								#
 # Copyright 2001, 2012 Fidelity Information Services, Inc	#
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -43,6 +43,9 @@ mval_m_sublit		=	0x040
 mval_m_retarg		=	0x080
 mval_m_utflen		=	0x100
 mval_m_aliascont	=	0x200
+
+# YDB additions to MV_* type bit masks. These go backward/downward to reduce the chances of colliding with GT.M changes */
+mval_m_sqlnull		=	0x8000
 
 mval_byte_len		=	32				/* Length of mval in bytes */
 mval_qword_len		=	((mval_byte_len + 7) / 8)	/* Length of mval in quadwords (8 byte words) */

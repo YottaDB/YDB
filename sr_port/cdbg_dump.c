@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -115,11 +115,24 @@ void cdbg_dump_curtchain(void)
 	}
 }
 
+/* Routine to dump all triples on "TREF(boolchain_ptr)" chain - also callable from debugger */
+void cdbg_dump_boolchain(void)
+{
+	triple	*ct, *chain;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	chain = TREF(boolchain_ptr);
+	dqloop(chain, exorder, ct)
+	{
+		PRINTF("\n ************************ Triple Start **********************\n");
+		cdbg_dump_triple(ct, 0);
+	}
+}
+
 /* Routine to dump a single triple and its followers */
 void cdbg_dump_triple(triple *dtrip, int indent)
 {
-	int		len;
-
 	PRINTF("%s Triple %s [opc %d at 0x"lvaddr"]   fwdptr: 0x"lvaddr"   bkwdptr: 0x"lvaddr
 	       "  srcline: %d  colmn: %d  rtaddr: %d\n",
 	       cdbg_indent(indent), oc_tab_graphic[dtrip->opcode], dtrip->opcode, (long unsigned int)dtrip,
@@ -206,10 +219,17 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 			break;
 		case TJMP_REF:
 			if (opr->oprval.tref)
-				PRINTF("%s   tjmp-ref jump list ptr: 0x"lvaddr"\n", cdbg_indent(indent),
+				PRINTF("%s   tjmp-ref: 0x"lvaddr"  jump list ptr: 0x"lvaddr"\n", cdbg_indent(indent),
+						(long unsigned int)opr->oprval.tref,
 						(long unsigned int)&opr->oprval.tref->jmplist);
 			else
 				PRINTF("%s   ** Warning ** oprval.tref is NULL\n", cdbg_indent(indent));
+			break;
+		case TNXT_REF:
+			rtrip = opr->oprval.tref->exorder.fl;
+			PRINTF("%s   tnxt-ref: 0x"lvaddr"  jump list ptr: 0x"lvaddr"\n", cdbg_indent(indent),
+						(long unsigned int)rtrip,
+						(long unsigned int)&rtrip->jmplist);
 			break;
 		case TRIP_REF:
 			rtrip = opr->oprval.tref;
@@ -217,7 +237,7 @@ void cdbg_dump_operand(int indent, oprtype *opr, int opnum)
 			cdbg_dump_triple(rtrip, indent + 1);
 			break;
 		case INDR_REF:
-			cdbg_dump_operand(indent, opr->oprval.indr, opnum);
+			cdbg_dump_operand(indent + 1, opr->oprval.indr, opnum);
 			break;
 		case TSIZ_REF:
 			if (opr->oprval.tsize)

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,13 +38,21 @@
 #include "tp.h"			/* needed by "gvname_info.h" */
 #include "gvname_info.h"	/* needed by "op_merge.h" */
 #include "op_merge.h"
+#include "mint2mval.h"
+#include "mval2mint.h"
+#include "bool2mint.h"
+#include "bool2mval.h"
+#include "mval2num.h"
+#include "bool_andor.h"
+#include "bool_init.h"
+#include "bool_finish.h"
 
 /* Below is the list of function prototypes for Assembly functions which do not have a header file with the prototype
  * and which are used in the transfer table.
  */
-int mint2mval(), mval2bool(), mval2mint(), mval2num(), op_contain(), op_currtn(), op_equ(), op_equnul(),
-    op_extjmp(), op_fnget(), op_follow(), op_forcenum(), op_forinit(), op_gettruth(), op_iretmvad(), op_neg(),
-    op_numcmp(), op_pattern(), op_restartpc(), op_sorts_after(), op_sto(), op_zhelp(), opp_break(), opp_commarg(),
+int op_bxrelop(), op_currtn(),
+    op_extjmp(), op_fnget(), op_forcenum(), op_forinit(), op_gettruth(), op_iretmvad(), op_mval2bool(), op_neg(),
+    op_restartpc(), op_sto(), op_zhelp(), opp_break(), opp_commarg(),
     opp_hardret(), opp_inddevparms(), opp_indfnname(), opp_indfun(), opp_indglvn(), opp_indincr(), opp_indlvadr(),
     opp_indlvarg(), opp_indlvnamadr(), opp_indmerge(), opp_indpat(), opp_indrzshow(), opp_indsavglvn(), opp_indsavlvn(),
     opp_indset(), opp_indtext(), opp_iretmval(), opp_newintrinsic(), opp_newvar(), opp_rterror(), opp_setzbrk(), opp_svput(),

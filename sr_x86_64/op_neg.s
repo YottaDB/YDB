@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -37,6 +37,8 @@ ENTRY	op_neg
 	CHKSTKALIGN					# Verify stack alignment
 	movq	%rax, save_ret0(%rsp)			# Save dest mval addr across potential call
 	mv_force_defined %r10, isdefined
+	testw	$mval_m_sqlnull, mval_w_mvtype(%r10)
+	jnz	sqlnull					# jump to `sqlnull` label if MV_SQLNULL bit is set
 	mv_if_number %r10, numer			# Branch if numeric
 	movq	%r10, save_ret1(%rsp)			# Save src mval (may not be original if noundef set)
 	movq	%r10, %rdi				# Move src mval to parm reg for s2n()
@@ -49,6 +51,15 @@ numer:
 	movl	mval_l_m1(%r10), %r10d
 	negl	%r10d
 	movl	%r10d, mval_l_m1(%rax)
+	jmp	done
+sqlnull:
+	# If v=$ZYSQLNULL, then u = -v should also be set to $ZYSQLNULL
+	# Copy the Mval from %r10 [r10] to %rax [rax].
+	movq	%rax, %rdi
+	movq	%r10, %rsi
+	movl	$mval_qword_len, %ecx
+	REP
+	movsq
 	jmp	done
 float:
 	movw	$mval_m_nm, mval_w_mvtype(%rax)

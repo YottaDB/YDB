@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,15 +41,15 @@ error_def(ERR_LABELUNKNOWN);
 
 int resolve_ref(int errknt)
 {	/* simplify operand references where possible and make literals dynamic when in that mode */
-	int	actcnt;
-	mlabel	*mlbx;
-	mline	*mxl;
-	oprtype *opnd;
-	tbp	*tripbp;
-	triple	*chktrip, *curtrip, *tripref;
+	int		actcnt;
+	mlabel		*mlbx;
+	mline		*mxl;
+	oprtype		*opnd;
+	tbp		*tripbp;
+	triple		*chktrip, *curtrip, *tripref, *looptrip;
 #	ifndef i386
-	oprtype *j, *k;
-	triple	*ref, *ref1;
+	oprtype		*j, *k;
+	triple		*ref, *ref1;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
@@ -79,24 +79,6 @@ int resolve_ref(int errknt)
 						    && (OC_LIT == curtrip->operand[1].oprval.tref->opcode))
 						{
 							curtrip->opcode = OC_STOLITC;
-							continue;
-						}
-						break;
-					case OC_EQU:	/* see counterpart in alloc_reg.c */
-						if ((TRIP_REF == curtrip->operand[0].oprclass)
-						    && (OC_LIT == curtrip->operand[0].oprval.tref->opcode)
-						    && (0 == curtrip->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len))
-						{
-							curtrip->operand[0] = curtrip->operand[1];
-							curtrip->operand[1].oprclass = NO_REF;
-							curtrip->opcode = OC_EQUNUL;
-							continue;
-						} else if ((TRIP_REF == curtrip->operand[1].oprclass)
-						    && (OC_LIT == curtrip->operand[1].oprval.tref->opcode)
-						    && (0 == curtrip->operand[1].oprval.tref->operand[0].oprval.mlit->v.str.len))
-						{
-							curtrip->operand[1].oprclass = NO_REF;
-							curtrip->opcode = OC_EQUNUL;
 							continue;
 						}
 						break;
@@ -154,8 +136,24 @@ int resolve_ref(int errknt)
 #			ifndef i386
 			}
 #			endif
-			for (opnd = curtrip->operand; opnd < ARRAYTOP(curtrip->operand); opnd++)
+			for (looptrip = curtrip, opnd = looptrip->operand; opnd < ARRAYTOP(looptrip->operand); )
 			{
+				switch(looptrip->opcode)
+				{
+				case OC_BXRELOP:
+					if (TRIP_REF == opnd->oprclass)
+					{	/* Iterate over all parameters of the current triple */
+						tripref = opnd->oprval.tref;
+						if (OC_PARAMETER == tripref->opcode)
+						{
+							looptrip = tripref;
+							opnd = looptrip ->operand;
+							continue;
+						}
+					}
+				default:
+					break;
+				}
 				if (INDR_REF == opnd->oprclass)
 					*opnd = *(opnd->oprval.indr);
 				switch (opnd->oprclass)
@@ -166,15 +164,15 @@ int resolve_ref(int errknt)
 					/* caution:  fall through */
 				case TJMP_REF:
 					tripbp = (tbp *)mcalloc(SIZEOF(tbp));
-					tripbp->bpt = curtrip;
+					tripbp->bkptr = looptrip;
 					dqins(&opnd->oprval.tref->jmplist, que, tripbp);
-					continue;
+					break;
 				case MNXL_REF:	/* external reference to the routine (not within the routine) */
 					mxl = opnd->oprval.mlin->child;
 					tripref = mxl ? mxl->externalentry : NULL;
 					if (!tripref)
 					{	/* ignore vacuous DO sp sp */
-						(void)resolve_optimize(curtrip);	/* let that do the optimization */
+						(void)resolve_optimize(looptrip);	/* let that do the optimization */
 						break;
 					}
 					opnd->oprclass = TJMP_REF;
@@ -194,17 +192,19 @@ int resolve_ref(int errknt)
 						stx_error(ERR_LABELMISSING, 2, mlbx->mvname.len, mlbx->mvname.addr);
 						TREF(source_error_found) = 0;
 						tripref = newtriple(OC_RTERROR);
-						tripref->operand[0] = put_ilit(OC_JMP == curtrip->opcode
-							? ERR_LABELNOTFND : ERR_LABELUNKNOWN); /* special error for GOTO jmp */
+						tripref->operand[0]
+							= put_ilit((OC_JMP == looptrip->opcode)
+								? ERR_LABELNOTFND
+								: ERR_LABELUNKNOWN); /* special error for GOTO jmp */
 						tripref->operand[1] = put_ilit(TRUE);	/* This is a subroutine/func reference */
 						opnd->oprval.tref = tripref;
 						opnd->oprclass = TJMP_REF;
 					}
-					continue;
+					break;
 				case MFUN_REF:
 					assert(!run_time);
-					assert(OC_JMP == curtrip->opcode);
-					chktrip = curtrip->exorder.bl;
+					assert(OC_JMP == looptrip->opcode);
+					chktrip = looptrip->exorder.bl;
 					assert((OC_EXCAL == chktrip->opcode) || (OC_EXFUN == chktrip->opcode));
 					assert(TRIP_REF == chktrip->operand[1].oprclass);
 					chktrip = chktrip->operand[1].oprval.tref;
@@ -271,13 +271,14 @@ int resolve_ref(int errknt)
 						opnd->oprval.tref = tripref;
 						opnd->oprclass = TJMP_REF;
 					}
-					continue;
+					break;
 				case TRIP_REF:
-					resolve_tref(curtrip, opnd);
-					continue;
+					resolve_tref(looptrip, opnd);
+					break;
 				default:
 					break;
 				}
+				opnd++;
 			}
 			opnd = &curtrip->destination;
 			if (opnd->oprclass == TRIP_REF)
@@ -305,6 +306,6 @@ void resolve_tref(triple *curtrip, oprtype *opnd)
 		*opnd = tripref->operand[0];
 	}
 	tripbp = (tbp *)mcalloc(SIZEOF(tbp));
-	tripbp->bpt = curtrip;
+	tripbp->bkptr = curtrip;
 	dqins(&opnd->oprval.tref->backptr, que, tripbp);
 }

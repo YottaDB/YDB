@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -47,10 +47,12 @@ ENTRY op_forcenum
 	ldr	r1, [fp, #save_r1]
 	ldr	r0, [fp, #save_r0]
 	ldrh	r4, [r1, #mval_w_mvtype]
+	tst	r4, #mval_m_sqlnull
+	bne	l40				/* jump to l40 if MV_SQLNULL bit is set */
 	tst	r4, #mval_m_str
-	beq	l20
+	beq	l20				/* jump to l20 if MV_STR bit is not set */
 	tst	r4, #mval_m_num_approx
-	beq	l40
+	beq	l40				/* jump to l40 if MV_NUM_APPROX bit is not set */
 l20:
 	tst	r4, #mval_m_int_without_nm
 	beq	l30

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -108,7 +108,6 @@ static readonly char zlevel_text[] = "$ZLEVEL";
 static readonly char zmaxtptime_text[] = "$ZMAXTPTIME";
 static readonly char zmode_text[] = "$ZMODE";
 static readonly char zpatnumeric_text[] = "$ZPATNUMERIC";
-static readonly char zproc_text[] = "$ZPROCESS";
 static readonly char zprompt_text[] = "$ZPROMPT";
 static readonly char zpos_text[] = "$ZPOSITION";
 static readonly char zquit_text[] = "$ZQUIT";
@@ -143,6 +142,7 @@ static readonly char zversion_text[] = "$ZVERSION";
 static readonly char zreldate_text[] = "$ZRELDATE";
 static readonly char zyerror_text[] = "$ZYERROR";
 static readonly char zyrelease_text[] = "$ZYRELEASE";
+static readonly char zysqlnull_text[] = "$ZYSQLNULL";
 static readonly char zonlnrlbk_text[] = "$ZONLNRLBK";
 static readonly char zclose_text[] = "$ZCLOSE";
 static readonly char zkey_text[] = "$ZKEY";
@@ -191,7 +191,7 @@ GBLREF spdesc		stringpool;
 GBLREF mstr		dollar_zpin;
 GBLREF mstr		dollar_zpout;
 
-LITREF mval		literal_zero, literal_one, literal_null;
+LITREF mval		literal_zero, literal_one, literal_null, literal_sqlnull;
 LITREF char		gtm_release_name[];
 LITREF int4		gtm_release_name_len;
 LITREF char		ydb_release_stamp[];
@@ -250,7 +250,6 @@ void zshow_svn(zshow_out *output, int one_sv)
 {
 	mstr		x;
 	mval		var, zdir;
-       	stack_frame	*fp;
 	int 		count, save_dollar_zlevel;
 	char		*c1, *c2;
 	char		zdir_error[ZDIR_ERR_LEN];
@@ -924,6 +923,13 @@ void zshow_svn(zshow_out *output, int one_sv)
 			var.str.addr = (char *)ydb_release_name;
 			var.str.len = ydb_release_name_len;
 			ZS_VAR_EQU(&x, zyrelease_text);
+			mval_write(output, &var, TRUE);
+			if (SV_ALL != one_sv)
+				break;
+		/* CAUTION: fall through */
+		case SV_ZYSQLNULL:
+			ZS_VAR_EQU(&x, zysqlnull_text);
+			memcpy(&var, &literal_sqlnull, SIZEOF(mval));
 			mval_write(output, &var, TRUE);
 			break;
 		/* NOTE: fall through ended */

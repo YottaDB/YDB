@@ -1,3 +1,18 @@
+/****************************************************************
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
+ *	This source code contains the intellectual property	*
+ *	of its copyright holder(s), and is made available	*
+ *	under a license.  If you do not know the terms of	*
+ *	the license, please stop and do not read further.	*
+ *								*
+ ****************************************************************/
+/* This module is derived from FIS code.
+ ****************************************************************
+ */
+
 #include "mdef.h"
 
 #include "mdq.h"
@@ -5,6 +20,7 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "mmemory.h"
+#include "is_equ.h"
 
 GBLREF mliteral 	literal_chain;
 GBLREF hash_table_str	*complits_hashtab;

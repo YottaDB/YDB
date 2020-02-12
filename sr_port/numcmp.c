@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -95,6 +98,12 @@ long numcmp(mval *u, mval *v)
 	int		u_m0, v_m0, u_m1, v_m1;
 	int		u_mvtype;
 
+	if (MV_IS_SQLNULL(u) || MV_IS_SQLNULL(v))
+	{
+		MV_FORCE_DEFINED(u);
+		MV_FORCE_DEFINED(v);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZYSQLNULLNOTVALID);
+	}
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
 

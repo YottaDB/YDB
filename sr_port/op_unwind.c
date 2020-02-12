@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,6 +46,7 @@
 #include "deferred_events_queue.h"
 #include "ztimeout_routines.h"
 #include "jobinterrupt_event.h"
+#include "bool_zysqlnull.h"
 
 GBLREF	void			(*unw_prof_frame_ptr)(void);
 GBLREF	stack_frame		*frame_pointer, *zyerr_frame;
@@ -140,6 +141,7 @@ void op_unwind(void)
 	DRAIN_GLVN_POOL_IF_NEEDED;
 	PARM_ACT_UNSTACK_IF_NEEDED;
 	USHBIN_ONLY(rtnhdr = frame_pointer->rvector);	/* Save rtnhdr for cleanup call below */
+	bool_zysqlnull_unwind();
 	frame_pointer = frame_pointer->old_frame_pointer;
 	DBGEHND((stderr, "op_unwind: Stack frame 0x"lvaddr" unwound - frame 0x"lvaddr" now current - New msp: 0x"lvaddr"\n",
 		 prevfp, frame_pointer, msp));

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -643,13 +643,16 @@ void op_svget(int varnum, mval *v)
 		default:
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVSVN);
 	}
-	if (!(MVTYPE_IS_STRING(v->mvtype)))
-	{	/* in case op_svget is called at compile time; shouldn't hurt much any time */
-		assert(MVTYPE_IS_NUMERIC(v->mvtype));
-		n2s(v);
-	} else if (!(MVTYPE_IS_NUMERIC(v->mvtype)))
+	if (!(MVTYPE_IS_SQLNULL(v->mvtype)))
 	{
-		assert(MVTYPE_IS_STRING(v->mvtype));
-		s2n(v);
+		if (!(MVTYPE_IS_STRING(v->mvtype)))
+		{	/* in case op_svget is called at compile time; shouldn't hurt much any time */
+			assert(MVTYPE_IS_NUMERIC(v->mvtype));
+			n2s(v);
+		} else if (!(MVTYPE_IS_NUMERIC(v->mvtype)))
+		{
+			assert(MVTYPE_IS_STRING(v->mvtype));
+			s2n(v);
+		}
 	}
 }

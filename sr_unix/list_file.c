@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -137,6 +137,7 @@ void list_head(bool newpage)
 	unsigned char page_no_buf[10];
 	mval head;
 
+	return;
 	if (newpage)
 		op_wtff();
 
@@ -218,7 +219,7 @@ void list_line(char *c)
 void list_line_number(void)
 {
 	unsigned char buf[8];
-	int n,m, i, q;
+	int n, i, q;
 	unsigned char *pt;
 	mval out;
 

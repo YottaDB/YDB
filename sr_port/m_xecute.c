@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,7 @@ int m_xecute(void)
 	mstr		*src;
 	oprtype		*cr, x;
 	triple		*obp, *oldchain, *ref0, *ref1, tmpchain, *triptr;
+	triple		*boolexprfinish, *boolexprfinish2;
 	mval		*v;
 	DCL_THREADGBL_ACCESS;
 
@@ -143,13 +144,19 @@ int m_xecute(void)
 		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
 		if (!bool_expr(FALSE, cr))
 			return FALSE;
-		for (triptr = (TREF(curtchain))->exorder.bl; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
+		triptr = (TREF(curtchain))->exorder.bl;
+		boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
+		if (NULL != boolexprfinish)
+			triptr = triptr->exorder.bl;
+		for ( ; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
 			;
 		if (OC_LIT == triptr->opcode)
 		{	/* it is a literal so optimize it */
 			v = &triptr->operand[0].oprval.mlit->v;
 			unuse_literal(v);
 			dqdel(triptr, exorder);
+			/* Remove OC_BOOLEXPRSTART and OC_BOOLEXPRFINISH opcodes too */
+			REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);	/* Note: Will set "boolexprfinish" to NULL */
 			if (0 == MV_FORCE_BOOL(v))
 				setcurtchain(oldchain);	/* it's FALSE so just discard the whole thing */
 			else
@@ -171,10 +178,24 @@ int m_xecute(void)
 			ref0 = newtriple(OC_JMP);
 			ref1 = newtriple(OC_GVRECTARG);
 			ref1->operand[0] = put_tref(TREF(expr_start));
-			*cr = put_tjmp(ref1);
+			if (NULL != boolexprfinish)
+			{
+				INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
+				dqdel(boolexprfinish2, exorder);
+				dqins(ref0, exorder, boolexprfinish2);
+				*cr = put_tjmp(boolexprfinish2);
+			} else
+			{
+				*cr = put_tjmp(ref1);
+				boolexprfinish2 = NULL;
+			}
 			tnxtarg(&ref0->operand[0]);
 		} else
-			tnxtarg(cr);
+		{
+			INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
+			*cr = put_tjmp(boolexprfinish2);
+		}
+		INSERT_OC_JMP_BEFORE_OC_BOOLEXPRFINISH(boolexprfinish2);
 		return TRUE;
 	}
 	obp = oldchain->exorder.bl;

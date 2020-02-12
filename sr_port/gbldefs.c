@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -141,6 +141,7 @@
 #include "sig_init.h"
 #include "deferred_events_queue.h"
 #include "dm_audit_log.h"
+#include "bool_zysqlnull.h"
 
 GBLDEF	gd_region		*db_init_region;
 GBLDEF	sgmnt_data_ptr_t	cs_data;
@@ -1343,7 +1344,16 @@ GBLDEF	void			*dummy_ptr;	/* A dummy global variable which works around a suspec
 						 */
 GBLDEF	stack_t			oldaltstack;	/* The altstack descriptor that WAS in effect (if any) */
 GBLDEF	char			*altstackptr;	/* The new altstack buffer we allocate for Go (for now) (if any) */
-GBLDEF	boolean_t		bool_expr_saw_sqlnull;	/* Set to TRUE during the evaluation of a boolean expression if ever
-							 * we see an operand that has the value of $ZYSQLNULL. Cleared at the
-							 * end of the boolean expression evaluation.
+GBLDEF	boolZysqlnullArray_t	*boolZysqlnull;	/* Pointer to the `boolZysqlnullArray_t` structure corresponding to the
+						 * boolean expression evaluated in the current M frame (`frame_pointer`).
+						 */
+GBLDEF	bool_sqlnull_t		*boolZysqlnullCopy;	/* This variable is used only by `bool_zysqlnull_depth_check()` but since
+							 * that is a `static inline` function, we cannot declare it as `static`
+							 * inside that function as otherwise it would result in a copy of that
+							 * variable defined in each caller of the `bool_zysqlnull_depth_check()`
+							 * function. Hence the need to use GBLDEF instead here.
 							 */
+GBLDEF	int			boolZysqlnullCopyAllocLen;	/* The GBLDEF is needed here instead of a `static` in
+								 * `bool_zysqlnull_depth_check()` for the same reason as
+								 * the comment described against GBLDEF of `boolZysqlnullCopy`.
+								 */

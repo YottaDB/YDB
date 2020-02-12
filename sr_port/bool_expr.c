@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *                                                              *
  *      This source code contains the intellectual property     *
@@ -32,8 +32,10 @@ int bool_expr(boolean_t sense, oprtype *addr)
  */
 {
 	mval		*v;
+	opctype		andor_opcode;
 	oprtype		x;
 	triple		*t1, *t2;
+	triple		*boolexprstart, *boolexprfinish;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -49,14 +51,22 @@ int bool_expr(boolean_t sense, oprtype *addr)
 		DECREMENT_EXPR_DEPTH;
 		return TRUE;
 	}
+	t1 = x.oprval.tref;
+	t1 = (OCT_BOOL & oc_tab[t1->opcode].octype) ? bool_return_leftmost_triple(x.oprval.tref) : t1;
+	boolexprstart = maketriple(OC_BOOLEXPRSTART);
+	dqins(t1->exorder.bl, exorder, boolexprstart);
 	coerce(&x, OCT_BOOL);
-	UNARY_TAIL(&x);
+	boolexprfinish = newtriple(OC_BOOLEXPRFINISH);
+	boolexprfinish->operand[0] = put_tref(boolexprstart);	/* This helps locate the corresponding OC_BOOLEXPRSTART
+								 * given a OC_BOOLEXPRFINISH.
+								 */
+	UNARY_TAIL(&x, 0);
 	for(t2 = t1 = x.oprval.tref; OCT_UNARY & oc_tab[t1->opcode].octype; t2 = t1, t1 = t1->operand[0].oprval.tref)
 		;
 	if (OCT_ARITH & oc_tab[t1->opcode].octype)
-		ex_tail(&t2->operand[0]);
+		ex_tail(&t2->operand[0], 0);
 	else if (OCT_BOOL & oc_tab[t1->opcode].octype)
-		bx_boollit(t1);
+		bx_boollit(t1, 0);
 	/* It is possible "ex_tail" or "bx_boollit" is invoked above and has a compile-time error. In that case,
 	 * "ins_errtriple" would be invoked which does a "dqdelchain" that could remove "t1" from the "t_orig"
 	 * triple execution chain and so it is no longer safe to do "dqdel" etc. on "t1".
@@ -73,10 +83,16 @@ int bool_expr(boolean_t sense, oprtype *addr)
 		MV_FORCE_NUMD(v);
 		PUT_LITERAL_TRUTH(MV_FORCE_BOOL(v), t2);
 		dqdel(t1, exorder);
+		REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);
 		DECREMENT_EXPR_DEPTH;
 		return TRUE;
 	}
-	bx_tail(x.oprval.tref, sense, addr);
+	/* Pass CALLER_IS_BOOL_EXPR_FALSE if IF is caller of `bool_expr()`.
+	 * Pass CALLER_IS_BOOL_EXPR_TRUE in all other cases.
+	 * Since IF is the only one that comes in with the TRUE sense, we do a `!sense` to achieve this.
+	 */
+	andor_opcode = bx_get_andor_opcode(x.oprval.tref->opcode, OC_NOOP);
+	bx_tail(x.oprval.tref, sense, addr, 0, andor_opcode, !sense, 0, IS_LAST_BOOL_OPERAND_TRUE);
 	DECREMENT_EXPR_DEPTH;
 	return TRUE;
 }

@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2016 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -40,10 +40,12 @@ ENTRY	op_forcenum
 	mv_force_num %r10, l10
 	movq 	save_ret1(%rsp), %r10
 	movq	save_ret0(%rsp), %rax
+	testw	$mval_m_sqlnull, mval_w_mvtype(%r10)
+	jnz	l40					# jump to l40 if MV_SQLNULL bit is set
 	testw	$mval_m_str, mval_w_mvtype(%r10)
-	jz	l20
+	jz	l20					# jump to l20 if MV_STR bit is not set
 	testw	$mval_m_num_approx, mval_w_mvtype(%r10)
-	jz	l40
+	jz	l40					# jump to l40 if MV_NUM_APPROX bit is not set
 l20:
 	testw	$mval_m_int_without_nm, mval_w_mvtype(%r10)
 	jz	l30

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -89,8 +92,8 @@ int do_pattern(mval *str, mval *pat)
 	patptr = (uint4 *) pat->str.addr;
 	GET_ULONG(tempuint, patptr);
 	if (tempuint)
-	{	/* tempuint non-zero implies fixed length pattern string. this in turn implies we are not called from op_pattern.s
-		 * but instead called from gvzwr_fini(), gvzwr_var(), lvzwr_fini(), lvzwr_var() etc.
+	{	/* tempuint non-zero implies fixed length pattern string. this in turn implies we are not called from
+		 * pattern_operator.c but instead called from gvzwr_fini(), gvzwr_var(), lvzwr_fini(), lvzwr_var() etc.
 		 * in this case, call do_patfixed() as the code below and code in do_patsplit() assumes we are dealing with a
 		 * variable length pattern string. changing all the callers to call do_patfixed() directly instead of this extra
 		 * redirection was considered, but not felt worth it since the call to do_pattern() is not easily macroizable

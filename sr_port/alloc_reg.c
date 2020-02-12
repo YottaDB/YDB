@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,7 +56,6 @@ STATICFNDCL void remove_backptr(triple *curtrip, oprtype *opnd, char (*tempcont)
 void alloc_reg(void)
 {
 	triple		*x, *y, *ref;
-	tbp		*b;
 	oprtype 	*j;
 	opctype 	opc, opx;
 	char		tempcont[VALUED_REF_TYPES][MAX_TEMP_COUNT], dest_type;
@@ -132,22 +131,6 @@ void alloc_reg(void)
 				    && (OC_LIT == x->operand[1].oprval.tref->opcode))
 					opc = x->opcode = OC_STOLIT;
 				break;
-			case OC_EQU:
-				/* Check to see if the operation is a x="" or a ""=x, if so (and this is a very common case)
-				 * use special opcode OC_EQUNUL, which takes one argument and just checks length for zero
-				 */
-				if ((TRIP_REF == x->operand[0].oprclass) && (OC_LIT == x->operand[0].oprval.tref->opcode)
-				    && (0 == x->operand[0].oprval.tref->operand[0].oprval.mlit->v.str.len))
-				{
-					x->operand[0] = x->operand[1];
-					x->operand[1].oprclass = NO_REF;
-					opc = x->opcode = OC_EQUNUL;
-				} else if ((TRIP_REF == x->operand[1].oprclass) && (OC_LIT == x->operand[1].oprval.tref->opcode)
-					   && (0 == x->operand[1].oprval.tref->operand[0].oprval.mlit->v.str.len))
-				{
-					x->operand[1].oprclass = NO_REF;
-					opc = x->opcode = OC_EQUNUL;
-				}	/* WARNING fallthrough */
 			default:
 				break;
 		}
@@ -157,7 +140,7 @@ void alloc_reg(void)
 			remove_backptr(x, &x->operand[0], tempcont);
 			x->opcode = OC_NOOP;
 			x->operand[0].oprclass = NO_REF;
-			assert(NO_REF == x->operand[1].oprclass);
+			assert((NO_REF == x->operand[1].oprclass) || (TRIP_REF == x->operand[1].oprclass));
 			continue;
 		}
 		if (NO_REF == (dest_type = x->destination.oprclass))	/* Note assignment */
@@ -166,7 +149,7 @@ void alloc_reg(void)
 			if ((oct & OCT_VALUE) && (x->backptr.que.fl != &x->backptr) && !(oct & OCT_CGSKIP))
 			{
 				if (!(oct & OCT_MVADDR) && (x->backptr.que.fl->que.fl == &x->backptr)
-				    && (OC_STO == (y = x->backptr.que.fl->bpt)->opcode) && (y->operand[1].oprval.tref == x)
+				    && (OC_STO == (y = x->backptr.que.fl->bkptr)->opcode) && (y->operand[1].oprval.tref == x)
 				    && (OC_VAR == y->operand[0].oprval.tref->opcode))
 				{
 					x->destination = y->operand[0];
@@ -175,10 +158,25 @@ void alloc_reg(void)
 				} else
 				{
 					oct &= OCT_VALUE | OCT_MVADDR;
-					assert((OCT_MVAL == oct) || (OCT_MINT == oct) || ((OCT_MVADDR | OCT_MVAL) == oct)
-						|| (OCT_CDADDR == oct));
-					r = (OCT_MVAL == oct) ? TVAL_REF : (((OCT_MVADDR | OCT_MVAL) == oct)
-						? TVAD_REF : ((OCT_MINT == oct) ? TINT_REF : TCAD_REF));
+					switch(oct)
+					{
+					case OCT_MVAL:
+						r = TVAL_REF;
+						break;
+					case OCT_MINT:
+					case OCT_BOOL:
+						r = TINT_REF;
+						break;
+					case (OCT_MVADDR | OCT_MVAL):
+						r = TVAD_REF;
+						break;
+					case OCT_CDADDR:
+						r = TCAD_REF;
+						break;
+					default:
+						assert(FALSE);
+						break;
+					}
 					for (c = 0; tempcont[r][c] && (MAX_TEMP_COUNT > c); c++)
 						;
 					if (MAX_TEMP_COUNT <= c)
@@ -247,7 +245,7 @@ void remove_backptr(triple *curtrip, oprtype *opnd, char (*tempcont)[MAX_TEMP_CO
 	{
 		dqloop(&ref->backptr, que, b)
 		{
-			if (b->bpt == curtrip)
+			if (b->bkptr == curtrip)
 			{
 				dqdel(b, que);
 				break;

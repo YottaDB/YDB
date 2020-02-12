@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,25 +50,25 @@ error_def(ERR_STACKCRIT);
 #define TEST_FAKE_STRINGPOOL_FULL
 #endif
 
-#define COPY_ARG_TO_STP								\
+#define COPY_ARG_TO_STP(ARG)							\
 {										\
 	boolean_t	has_str_repsn;						\
 										\
-	has_str_repsn = MV_IS_STRING(arg) || !MV_DEFINED(arg);			\
+	has_str_repsn = MV_IS_STRING(ARG) || !MV_DEFINED(ARG);			\
 	TEST_FAKE_STRINGPOOL_FULL;						\
-	mval_lex(arg, &format_out);						\
-	if (MV_IS_CANONICAL(arg))						\
+	mval_lex(ARG, &format_out);						\
+	if (MV_IS_CANONICAL(ARG))						\
 	{ /*  mval_lex doesn't create string representation for canonical arg	\
 	   * that already has a string representation. */			\
-		assert(arg->str.len  == format_out.len );			\
-		assert(arg->str.addr == format_out.addr);			\
+		assert(ARG->str.len  == format_out.len );			\
+		assert(ARG->str.addr == format_out.addr);			\
 		TEST_FAKE_STRINGPOOL_FULL;					\
-		ENSURE_STP_FREE_SPACE(arg->str.len);				\
-		memcpy(stringpool.free, arg->str.addr, arg->str.len);		\
-			/* use arg 'coz gcol doesn't preserve format_out  */	\
+		ENSURE_STP_FREE_SPACE(ARG->str.len);				\
+		memcpy(stringpool.free, ARG->str.addr, ARG->str.len);		\
+			/* use ARG 'coz gcol doesn't preserve format_out  */	\
 	}									\
 	if (has_str_repsn)							\
-	{	/* mval_lex copies arg at stringpool.free and USUALLY leaves	\
+	{	/* mval_lex copies ARG at stringpool.free and USUALLY leaves	\
 		 * stringpool.free unchanged. Caller (us) has to update		\
 		 * stringpool.free to keep dst protected. EXCEPT: MV_FORCE_STR	\
 		 * in mval_lex creates string representation for canonical	\
@@ -87,7 +87,7 @@ error_def(ERR_STACKCRIT);
 	for ( ; ; ) 									\
 	{										\
 		arg = va_arg(var, mval *);						\
-		COPY_ARG_TO_STP;							\
+		COPY_ARG_TO_STP(arg);							\
 		dst->str.len += format_out.len;						\
 		depth_count--;								\
 		if (0 == depth_count)							\
@@ -217,7 +217,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 			*stringpool.free++ = ((fnname_type & FNVBAR) ? '|' : '[');
 			dst->str.len++;
 			arg = va_arg(var, mval *);
-			COPY_ARG_TO_STP;
+			COPY_ARG_TO_STP(arg);
 			dst->str.len += format_out.len;
 			sub_count--;
 			if (fnname_type & FNEXTGBL2)
@@ -225,7 +225,7 @@ void op_fnname(UNIX_ONLY_COMMA(int sub_count) mval *finaldst, ...)
 				*stringpool.free++ = ',';
 				dst->str.len++;
 				arg = va_arg(var, mval *);
-				COPY_ARG_TO_STP;
+				COPY_ARG_TO_STP(arg);
 				dst->str.len += format_out.len;
 				sub_count--;
 			}

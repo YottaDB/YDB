@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,16 +21,28 @@
 
 LITREF int4	ten_pwr[];
 LITREF mval	literal_zero;
+LITREF mval	literal_sqlnull;
 
-void	op_mul (mval *u, mval *v, mval *p)
+void	op_mul(mval *u, mval *v, mval *p)
 {
-	bool		promo;
+	boolean_t	promo;
 	int4		c, exp;
 	mval		w, z;
+	int		u_mvtype, v_mvtype;
 
+	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
+	if (MV_IS_SQLNULL(u) || MV_IS_SQLNULL(v))
+	{
+		MV_FORCE_DEFINED(u);
+		MV_FORCE_DEFINED(v);
+		*p = literal_sqlnull;
+		return;
+	}
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
-	if (u->mvtype & MV_INT & v->mvtype)
+	u_mvtype = u->mvtype;
+	v_mvtype = v->mvtype;
+	if (u_mvtype & MV_INT & v_mvtype)
 	{
 		promo = eb_int_mul(u->m[1], v->m[1], p->m);
 		if (!promo)
@@ -43,12 +55,12 @@ void	op_mul (mval *u, mval *v, mval *p)
 			promote(&w); promote(&z);
 			u = &w;	     v = &z;
 		}
-	} else if (u->mvtype & MV_INT)
+	} else if (u_mvtype & MV_INT)
 	{
 		w = *u;
 		promote(&w);
 		u = &w;
-	} else if (v->mvtype & MV_INT)
+	} else if (v_mvtype & MV_INT)
 	{
 		w = *v;
 		promote(&w);

@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright 2001 Sanchez Computer Associates, Inc.		*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -26,7 +29,7 @@ void make_commarg(oprtype *x,mint ind)
 	ref = x->oprval.tref;
 	if (ref->opcode != OC_INDGLVN)
 	{
-		assert(ref->opcode == OC_COMVAL || ref->opcode == OC_COMINT || ref->opcode == OC_COBOOL);
+		assert((OC_COMVAL == ref->opcode) || (OC_COMINT == ref->opcode) || (OC_COBOOL == ref->opcode));
 		dqdel(ref,exorder);
 		assert(ref->operand[0].oprclass == TRIP_REF);
 		ref = ref->operand[0].oprval.tref;

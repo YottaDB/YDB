@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -31,6 +34,7 @@ int m_do(void)
 	int		opcd;
 	oprtype		*cr;
 	triple		*calltrip, *labelref, *obp, *oldchain, *ref0, *ref1, *routineref, tmpchain, *triptr;
+	triple		*boolexprfinish, *boolexprfinish2;
 #	ifndef __i386
 	triple		*tripsize;
 #	endif
@@ -171,13 +175,19 @@ int m_do(void)
 		cr = (oprtype *)mcalloc(SIZEOF(oprtype));
 		if (!bool_expr(FALSE, cr))
 			return FALSE;
-		for (triptr = (TREF(curtchain))->exorder.bl; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
+		triptr = (TREF(curtchain))->exorder.bl;
+		boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
+		if (NULL != boolexprfinish)
+			triptr = triptr->exorder.bl;
+		for ( ; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
 			;
 		if (OC_LIT == triptr->opcode)
 		{	/* it's a literal so optimize it */
 			v = &triptr->operand[0].oprval.mlit->v;
 			unuse_literal(v);
 			dqdel(triptr, exorder);
+			/* Remove OC_BOOLEXPRSTART and OC_BOOLEXPRFINISH opcodes too */
+			REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);	/* Note: Will set "boolexprfinish" to NULL */
 			if (0 == MV_FORCE_BOOL(v))
 			{
 				setcurtchain(oldchain);		/* it's a FALSE so just discard the whole thing */
@@ -221,10 +231,24 @@ int m_do(void)
 			ref0 = newtriple(OC_JMP);
 			ref1 = newtriple(OC_GVRECTARG);
 			ref1->operand[0] = put_tref(TREF(expr_start));
-			*cr = put_tjmp(ref1);
+			if (NULL != boolexprfinish)
+			{
+				INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
+				dqdel(boolexprfinish2, exorder);
+				dqins(ref0, exorder, boolexprfinish2);
+				*cr = put_tjmp(boolexprfinish2);
+			} else
+			{
+				*cr = put_tjmp(ref1);
+				boolexprfinish2 = NULL;
+			}
 			tnxtarg(&ref0->operand[0]);
 		} else
-			tnxtarg(cr);
+		{
+			INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
+			*cr = put_tjmp(boolexprfinish2);
+		}
+		INSERT_OC_JMP_BEFORE_OC_BOOLEXPRFINISH(boolexprfinish2);
 	} else
 	{	/* the code below is the same as for the case of a postconditional known at compile time to be TRUE */
 		obp = oldchain->exorder.bl;

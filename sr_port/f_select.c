@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,7 +53,8 @@ int f_select(oprtype *a, opctype op)
 	opctype		old_op;
 	oprtype		*cnd, endtrip, target, tmparg;
 	triple		dmpchain, *loop_save_start, *loop_save_start_orig, *oldchain, *r, *ref, *savechain, *save_start,
-			*save_start_orig, tmpchain, *triptr;
+			*save_start_orig, tmpchain, *triptr, *noop;
+	triple		*boolexprfinish, *boolexprfinish2;
 	uint4		save_expr_depth, save_se_depth;
 	mval		*v;
 	DCL_THREADGBL_ACCESS;
@@ -85,9 +86,13 @@ int f_select(oprtype *a, opctype op)
 		TREF(expr_start) = TREF(expr_start_orig) = &tmpchain;
 	}
 	r = maketriple(op);
+	noop = maketriple(OC_NOOP);	/* This is the jump target. Need this to be separate from `r`. Finally before inserting
+					 * `r` in the triple chain, we first insert `noop`. This lets the caller `bool_expr()`
+					 * insert OC_BOOLEXPRSTART triples BEFORE `r` without unbalanced OC_BOOLEXPRFINISH issues.
+					 */
 	first_time = TRUE;
 	got_true = throwing = FALSE;
-	endtrip = put_tjmp(r);
+	endtrip = put_tjmp(noop);
 	cnd = NULL;
 	savechain = NULL;
 	for (;;)
@@ -125,12 +130,18 @@ int f_select(oprtype *a, opctype op)
 			return FALSE;
 		}
 		advancewindow();
-		for (triptr = (TREF(curtchain))->exorder.bl; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
+		triptr = (TREF(curtchain))->exorder.bl;
+		boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
+		if (NULL != boolexprfinish)
+			triptr = triptr->exorder.bl;
+		for ( ; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
 			;	/* get back, get back to where we once belonged - to find an indicator of the actual result */
 		if (!got_true && OC_LIT == triptr->opcode)
 		{	/* it is a literal not following an already optimizing TRUE, so optimize it */
 			v = &triptr->operand[0].oprval.mlit->v;
 			dqdel(triptr, exorder);
+			/* Remove OC_BOOLEXPRSTART and OC_BOOLEXPRFINISH opcodes too */
+			REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);	/* Note: Will set "boolexprfinish" to NULL */
 			unuse_literal(v);
 			dqinit(&dmpchain, exorder);
 			if (0 == MV_FORCE_BOOL(v))
@@ -214,7 +225,9 @@ int f_select(oprtype *a, opctype op)
 		{	/* jump to the end in case the run time value should turn out to be (the first) TRUE */
 			ref = newtriple(OC_JMP);
 			ref->operand[0] = endtrip;
-			tnxtarg(cnd);
+			INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
+			*cnd = put_tjmp(boolexprfinish2);
+			/* No need for INSERT_OC_JMP_BEFORE_OC_BOOLEXPRFINISH since OC_JMP has been inserted already above */
 		}
 		if (TK_COMMA != TREF(window_token))
 			break;
@@ -247,6 +260,7 @@ int f_select(oprtype *a, opctype op)
 		{	/* if all values were literals and FALSE, supply a dummy evaluation so we reach the error gracefully */
 			PUT_LITERAL_TRUTH(FALSE, r);
 			r->opcode = OC_LIT;
+			ins_triple(noop);
 			ins_triple(r);
 		}
 		ref = newtriple(OC_RTERROR);
@@ -254,7 +268,10 @@ int f_select(oprtype *a, opctype op)
 		ref->operand[1] = put_ilit(FALSE);		/* Not a subroutine reference */
 	}
 	if (OC_PASSTHRU == r->opcode)
+	{
+		ins_triple(noop);
 		ins_triple(r);
+	}
 	saw_se_in_select = TREF(saw_side_effect);		/* note this down before it gets reset by DECREMENT_EXPR_DEPTH */
 	if (shifting)
 		DECREMENT_EXPR_DEPTH;				/* clean up */

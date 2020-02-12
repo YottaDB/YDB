@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -130,12 +130,12 @@ int m_set(void)
 	boolean_t	curtchain_switched;	/* set to TRUE if a setcurtchain was done */
 	boolean_t	temp_subs_was_FALSE;
 	boolean_t	used_glvn_slot;
-	int		delimlen, first_val_lit, index, last_val_lit, nakedzalias, setop;
+	int		first_val_lit, index, last_val_lit, nakedzalias, setop;
 	int		first_setleft_invalid;	/* set to TRUE if the first setleft target is invalid */
 	opctype		put_oc;
 	oprtype		delimval, firstval, lastval, resptr, *result, v, control_slot, first_control_slot;
 	triple		*curtargchain, *delimiter, discardcurtchain, *first, *get, *jmptrp1, *jmptrp2, *last, *obp, *put;
-	triple		*s, *s0, *s1, save_targchain, *save_curtchain, *save_curtchain1, *sub, targchain, *tmp;
+	triple		*s, *s1, save_targchain, *save_curtchain, *save_curtchain1, *sub, targchain, *tmp;
 	triple		*ref;
 	mint		delimlit;
 	mval		*delim_mval;
@@ -607,6 +607,8 @@ int m_set(void)
 					{	/* Generate test for first being <= 0 */
 						jmptrp1 = maketriple(OC_COBOOL);
 						jmptrp1->operand[0] = first->operand[0];
+						ADD_BOOL_ZYSQLNULL_PARMS(jmptrp1, INIT_GBL_BOOL_DEPTH, OC_NOOP, OC_NOOP,
+							CALLER_IS_BOOL_EXPR_FALSE, IS_LAST_BOOL_OPERAND_FALSE, INIT_GBL_BOOL_DEPTH);
 						DQINSCURTARGCHAIN(jmptrp1);
 						jmptrp1 = maketriple(OC_JMPLEQ);
 						DQINSCURTARGCHAIN(jmptrp1);
@@ -641,6 +643,8 @@ int m_set(void)
 					{	/* Last is not literal. Do test if it is greater than 0 */
 						jmptrp1 = maketriple(OC_COBOOL);
 						jmptrp1->operand[0] = last->operand[0];
+						ADD_BOOL_ZYSQLNULL_PARMS(jmptrp1, INIT_GBL_BOOL_DEPTH, OC_NOOP, OC_NOOP,
+							CALLER_IS_BOOL_EXPR_FALSE, IS_LAST_BOOL_OPERAND_FALSE, INIT_GBL_BOOL_DEPTH);
 						DQINSCURTARGCHAIN(jmptrp1);
 						jmptrp1 = maketriple(OC_JMPLEQ);
 						DQINSCURTARGCHAIN(jmptrp1);

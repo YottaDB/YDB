@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,11 +25,9 @@
 /* we return strings for >18 digit 64-bit numbers, so pull in stringpool */
 #include "stringpool.h"
 
-GBLREF	spdesc   	stringpool;
-GBLREF	boolean_t	bool_expr_saw_sqlnull;
+GBLREF spdesc   stringpool;
 
-LITREF	int4		ten_pwr[];
-LITREF	mval		literal_zero;
+LITREF int4 ten_pwr[];
 
 #define BUFF_LEN	32 /* MAX of 16, 21 and 32 */
 
@@ -89,24 +87,18 @@ void i2mval(mval *v, int i)
 {
 	int4	n;
 
-	if (bool_expr_saw_sqlnull)
+	v->mvtype = MV_NM;
+	if (i < 0)
 	{
-		*v = literal_zero;
-		bool_expr_saw_sqlnull = FALSE;
+		v->sgn = 1;
+		n = -i;
 	} else
 	{
-		v->mvtype = MV_NM;
-		if (i < 0)
-		{
-			v->sgn = 1;
-			n = -i;
-		} else
-		{
-			n = i;
-			v->sgn = 0;
-		}
-		xi2mval(v, n);
+		n = i;
+		v->sgn = 0;
 	}
+
+	xi2mval(v, n);
 }
 
 /* xi2mval does the bulk of the conversion for i2mval and i2usmval.
@@ -443,6 +435,7 @@ boolean_t isint(mval *v, int4 *intval)
 	assert(!is_canonical || (MVTYPE_IS_NUMERIC(mvtype) && !MVTYPE_IS_NUM_APPROX(mvtype)));
 	if (!MVTYPE_IS_NUMERIC(mvtype) || MVTYPE_IS_NUM_APPROX(mvtype))
 		return FALSE;
+	assert(!MVTYPE_IS_SQLNULL(mvtype));
 	assert(v->m[1] < MANT_HI);
 	if (mvtype & MV_INT)
 	{

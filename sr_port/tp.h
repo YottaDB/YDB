@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -933,6 +933,38 @@ MBSTART {											\
  * transition or 3rd to 3rd retry transition. Therefore we need to release crit only if (CDB_STAGNATE - 1) > t_tries.
  */
 #define NEED_TO_RELEASE_CRIT(T_TRIES, STATUS)		(((CDB_STAGNATE - 1) > T_TRIES)	|| (cdb_sc_instancefreeze == STATUS))
+
+#define MV_FORCE_NSTIMEOUT(TMV, TNS, NOTACID)	/* requires a flock of include files especially for TP */		\
+MBSTART {					/* also requires threaddef DCL and SETUP*/				\
+	double			tmpdouble;										\
+															\
+	GBLREF uint4		dollar_tlevel;										\
+	GBLREF uint4		dollar_trestart;									\
+	LITREF mval		literal_notimeout;									\
+															\
+	MV_FORCE_NUM(TMV);												\
+	if (is_equ((mval *)&literal_notimeout, TMV))									\
+		TNS = NO_M_TIMEOUT;											\
+	else														\
+	{														\
+		assert(MV_BIAS >= 1000);        /* if formats change scale may need attention */			\
+		if (TMV->mvtype & MV_INT)										\
+		{	/* TMV is an integer. m[1] directly has the # of milliseconds we want.				\
+			 * If it is negative though, set timeout to 0.							\
+			 */												\
+			TNS = TMV->m[1] * (uint8)NANOSECS_IN_MSEC;							\
+			if (0 > TNS)											\
+				TNS = 0;										\
+		} else if (0 == TMV->sgn) 	/* if sign is 0 it means TMV is positive */				\
+		{	/* Cap positive timeout at MAXUINT8 */								\
+			tmpdouble = mval2double(TMV) * (double)NANOSECS_IN_SEC;						\
+			TNS = ((double)MAXUINT8 >= tmpdouble) ? (uint8)tmpdouble : (uint8)MAXUINT8;			\
+		} else													\
+			TNS = 0;		/* sign is not zero, implies TMV is negative, set timeout to 0 */	\
+	}														\
+	if ((STRNCMP_LIT(NOTACID, "ZTIMEOUTSTR")) && (((TREF(tpnotacidtime)).m[1] * (uint8)NANOSECS_IN_MSEC) < TNS))	\
+		TPNOTACID_CHECK(NOTACID);										\
+} MBEND
 
 void tp_get_cw(cw_set_element *cs, int depth, cw_set_element **cs1);
 void tp_clean_up(tp_cleanup_state clnup_state);

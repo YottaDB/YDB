@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,7 +59,6 @@ error_def(ERR_STACKCRIT);
  * destination buffer */
 void mval_write(zshow_out *output, mval *v, boolean_t flush)
 {
-        sm_uc_ptr_t	cp;
 	uint4		ch;
 	int		fastate = 0, ncommas, src_len, src_cnt, strstart, chlen;
 	boolean_t	isctl, isill;
@@ -68,7 +67,13 @@ void mval_write(zshow_out *output, mval *v, boolean_t flush)
 
 	MV_FORCE_STR(v);
 	src_len = v->str.len;
-	if (src_len > 0)
+	if (MV_IS_SQLNULL(v)) {
+		mstr	sqlnull;
+
+		sqlnull.addr = DOLLAR_ZYSQLNULL_STRING;
+		sqlnull.len = DOLLAR_ZYSQLNULL_STRLEN;
+		zshow_output(output, &sqlnull);
+	} else if (src_len > 0)
 	{
 		if (val_iscan(v))
 		{

@@ -27,6 +27,7 @@ OC_BINDPARM:	irepl	val.2
 		calls	val.1,xfer.xf_bindparm
 OC_BOOLFINI:	incl	val.1
 OC_BOOLINIT:	clrl	val.0
+		calls	#0,xfer.xf_boolinit
 OC_BREAK:	jsb	xfer.xf_break
 OC_CALL-BYTE:	pushl	val.2
 		jsb	xfer.xf_callb
@@ -57,22 +58,35 @@ OC_CLRTEST:	bicb2	#1,r10
 OC_CLRALSVARS:	pushab	val.1
 		calls	#1,xfer.xf_clralsvars
 OC_COBOOL-MINT:	tstl	val.1
-OC_COBOOL-MVAL:	movab	val.1,r1
+OC_COBOOL-MVAL: pushl	val.3
+		pushl	val.2
+		pushab	val.1
 		jsb	xfer.xf_mval2bool
-OC_COMINT-MVAL: movab	val.1,r1
-		jsb	xfer.xf_mval2mint
+OC_COMINT-BOOL: pushl	val.2
+		pushl	val.1
+		calls	#2,xfer.xf_bool2mint
+		movl	r0,val.0
+OC_COMINT-MINT: pushl	val.2
+		pushl	val.1
+		calls	#2,xfer.xf_bool2mint
+		movl	r0,val.0
+OC_COMINT-MVAL: pushl	val.2
+		pushab	val.1
+		calls	#2,xfer.xf_mval2mint
 		movl	r0,val.0
 OC_COMMARG:	pushl	val.2
 		pushab	val.1
 		jsb	xfer.xf_commarg
-OC_COMVAL-MINT:	movab	val.0,r0
-		movl	val.1,r1
-		jsb	xfer.xf_mint2mval
-OC_CONUM:	movab	val.1,r1
-		jsb	xfer.xf_mval2num
-OC_CONTAIN:	movab	val.1,r0
-		movab	val.2,r1
-		jsb	xfer.xf_contain
+OC_COMVAL-MINT:	pushab	val.0
+		pushl	val.2
+		pushl	val.1
+		calls	#3,xfer.xf_mint2mval
+OC_COMVAL-BOOL:	pushab	val.0
+		pushl	val.2
+		pushl	val.1
+		calls	#3,xfer.xf_bool2mval
+OC_CONUM:	pushab	val.1
+		calls	#1,xfer.xf_mval2num
 OC_CURRHD:	jsb	xfer.xf_currhd
 		movl	r0,val.0
 OC_CURRTN:	movab	val.0,r1
@@ -85,11 +99,6 @@ OC_DIV:		pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#3,xfer.xf_div
-OC_EQU:		movab	val.2,r1
-		movab	val.1,r0
-		jsb	xfer.xf_equ
-OC_EQUNUL:	movab	val.1,r0
-		jsb	xfer.xf_equnul
 OC_EXCAL:	irepab	val.5
 		pushl	val.4
 		pushl	val.3
@@ -486,9 +495,9 @@ OC_FNZTRNLNM:	pushab	val.0
 OC_FNZWIDTH:    pushab  val.0		   ; /* destination mval */
 		pushab  val.1		   ; /* string */
 		calls   #2,xfer.xf_fnzwidth
-OC_FOLLOW:	movab	val.1,r0
-		movab	val.2,r1
-		jsb	xfer.xf_follow
+OC_FNZYISSQLNULL:	pushab	val.0		; /* destination mval */
+			pushab	val.1		; /* input mval that is checked for equality with $ZYSQLNULL */
+			calls	#2,xfer.xf_fnzyissqlnull
 OC_FORCENUM:	movab	val.0,r0
 		movab	val.1,r1
 		jsb	xfer.xf_forcenum
@@ -673,16 +682,6 @@ OC_JMPNEQ-LONG:	bneq	#6
 		jmp	jmp.1
 OC_JMPNEQ-WORD:	beql	#3
 		brw	jmp.1
-OC_JMPTCLR-BYTE:	blbc	r10,jmp.1
-OC_JMPTCLR-LONG:	blbs	r10,#6
-			jmp	jmp.1
-OC_JMPTCLR-WORD:	blbs	r10,#3
-			brw	jmp.1
-OC_JMPTSET-BYTE:	blbs	r10,jmp.1
-OC_JMPTSET-LONG:	blbc	r10,#6
-			jmp	jmp.1
-OC_JMPTSET-WORD:	blbc	r10,#3
-			brw	jmp.1
 OC_JOB:		jsb 	xfer.xf_restartpc
 		irepab	val.7
 		pushab	val.6
@@ -760,18 +759,12 @@ OC_NEWVAR:	pushl	val.1
 		jsb	xfer.xf_newvar
 OC_NULLEXP:	calls	#0,xfer.xf_nullexp
 		movl    r0,addr.0
-OC_NUMCMP:	movab	val.1,r0
-		movab	val.2,r1
-		jsb	xfer.xf_numcmp
 OC_OPEN:	jsb 	xfer.xf_restartpc
 		pushab	val.4
 		pushab	val.3
 		pushab	val.2
 		pushab	val.1
 		calls	#4,xfer.xf_open
-OC_PATTERN:	movab	val.1,r0
-		movab	val.2,r1
-		jsb	xfer.xf_pattern
 OC_PUTINDX:	irepab	val.2
 		calls	val.1,xfer.xf_putindx
 		movl	r0,addr.0
@@ -872,9 +865,12 @@ OC_SETZPIECE:	pushab	val.0
 		pushab	val.2
 		pushab	val.1
 		calls	#6,xfer.xf_setzpiece
-OC_SORTS_AFTER:	movab	val.1,r0
-		movab	val.2,r1
-		jsb	xfer.xf_sorts_after
+OC_BXRELOP:	pushl	val.5
+		pushl	val.4
+		pushl	val.3
+		pushab	val.2
+		pushab	val.1
+		jsb	xfer.xf_bxrelop
 OC_SRCHINDX:	irepab	val.2
 		calls	val.1,xfer.xf_srchindx
 		movl	r0,addr.0
@@ -1096,3 +1092,7 @@ OC_FNZYHASH:	pushab	val.0
 		pushl	val.2
 		pushab	val.1
 		calls	#2,xfer.xf_fnzyhash
+OC_ANDOR:	pushl	val.1
+		calls	#1,xfer.xf_bool_andor
+OC_BOOLEXPRSTART:	calls	#0,xfer.xf_boolexprstart
+OC_BOOLEXPRFINISH:	calls	#0,xfer.xf_boolexprfinish

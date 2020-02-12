@@ -3,7 +3,7 @@
  * Copyright (c) 2013-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -576,8 +576,8 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
 					      RTS_ERROR_LITERAL("mnemonic argument (array index)"));
 			break;
-		case PO_PEEK:			/* Argument is address of form 0Xhhhhhhhh[hhhhhhhh] */
-			if (('0' != *cptr++) || ('x' != *cptr) && ('X' != *cptr))
+		case PO_PEEK:			/* Argument is address of form 0Xhhhhhhhh[hhhhhhhh] so has to be at least 2 bytes */
+			if ((2 >= arglen) || (('0' != *cptr++) || ('x' != *cptr) && ('X' != *cptr)))
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADZPEEKARG, 2,
 					      RTS_ERROR_LITERAL("mnemonic argument (peek base address)"));
 			cptr++;			/* Bump past 'x' or 'X' - rest of arg should be hex value */

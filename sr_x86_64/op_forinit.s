@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -23,6 +23,7 @@
 
 	.text
 	.extern	numcmp
+	.extern	mval2num
 	.extern	s2n
 
 arg0_save	= 0
@@ -38,12 +39,9 @@ ENTRY	op_forinit
 	CHKSTKALIGN					# Verify stack alignment
 	movq	%rdx, arg2_save(%rsp)			# Save args to avoid getting modified across function calls
 	movq	%rdi, arg0_save(%rsp)
-	movq	%rsi, %rax				# Copy 2nd argument (%rsi)
-	mv_force_defined %rax, t1
-	movq	%rax, arg1_save(%rsp)			# Save (possibly modified) 2nd argument (%rsi)
-	mv_force_num %rax, t2
-	movq	arg1_save(%rsp), %rax			# Restore 2nd argument (%rsi)
-	cmpl	$0, mval_l_m1(%rax)
+	movq	%rsi, %rdi				# Copy 2nd argument (%rsi) as 1st argument for mval2num call
+	call	mval2num				# Convert to a numeric. Issue ZYSQLNULLNOTVALID error if needed.
+	cmpl	$0, mval_l_m1(%rax)			# %rax holds potentially updated `mval *` value from mval2num() call
 	js	l2
 	mv_if_int %rax, l1
 	testb 	$mval_esign_mask, mval_b_exp(%rax)

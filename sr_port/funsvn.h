@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,15 +15,17 @@
 #ifndef FUNSVN_H
 #define FUNSVN_H
 
+#include "svnames.h"
+
 typedef struct {
-	opctype opcode;
-	bool can_set;
-	char os_syst;
+	enum isvopcode	opcode;
+	bool		can_set;
+	char		os_syst;
 } svn_data_type;
 
 typedef struct{
-    opctype opcode;
-    char os_syst;
+    opctype		opcode;
+    char		os_syst;
 } fun_data_type;
 
 #endif /*  FUNSVN_H */

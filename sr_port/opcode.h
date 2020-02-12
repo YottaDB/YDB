@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,6 +11,9 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+
+#ifndef OPCODE_included
+#define OPCODE_included
 
 #define OPCODE_DEF(A,B) A,
 
@@ -21,3 +24,5 @@ enum opcode_enum
 };
 
 #undef OPCODE_DEF
+
+#endif /* OPCODE_included */

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -517,6 +517,8 @@ void	tab_to_column(int col);
 
 #define GEN_MVAL_COPY(src_reg, trg_reg, size)											\
 {																\
+	int	words_to_move;													\
+																\
 	for (words_to_move = size / SIZEOF(UINTPTR_T); D_REG_COUNT <= words_to_move; words_to_move -= D_REG_COUNT)		\
         {															\
 		code_buf[code_idx++] = (ARM_INS_VLDMIA										\

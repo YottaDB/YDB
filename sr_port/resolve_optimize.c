@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,14 +39,13 @@ GBLREF src_line_struct		src_head;
 error_def(ERR_DONOBLOCK);
 
 boolean_t resolve_optimize(triple *curtrip)
-{	/* a when all lines have been parsed optimization, might someday do more */
-	boolean_t negative, optimized = FALSE;
-	int	i, sav_col;
-	mstr	src_line;
-	mval	tmp_mval, accumulator, *mval_x, *mval_y;
-	triple	*ref, *y, *x, *triple_temp;
-	triple	*line_offset, *label, *routine;
+{	/* a when all lines have been parsed optimization, current only applied for $TEXT() */
+	int		i, sav_col;
+	mval		tmp_mval;
+	mstr		src_line;
+	triple		*line_offset, *label, *routine;
 	src_line_struct	*cur_line;
+	boolean_t	negative, optimized = FALSE;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

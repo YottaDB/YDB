@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
 #include "compiler.h"
 #include "opcode.h"
@@ -26,13 +27,14 @@
 #include "patcode.h"
 #include "sorts_after.h"
 #include "stringpool.h"
+#include "is_equ.h"
 
 LITREF octabstruct	oc_tab[];
 
 error_def(ERR_NUMOFLOW);
 error_def(ERR_PATNOTFOUND);
 
-void bx_boollit(triple *t)
+void bx_boollit(triple *t, int depth)
 /* search the Boolean in t (recursively) for literal leaves; the logic is similar to bx_tail
  * the rest of the arguments parallel those in bx_boolop and used primarily handling basic Boolean operations (ON, NOR, AND, NAND)
  * to get the jump target and sense right for the left-hand operand of the operation
@@ -52,24 +54,27 @@ void bx_boollit(triple *t)
 
 	SETUP_THREADGBL_ACCESS;
 	assert(OCT_BOOL & oc_tab[t->opcode].octype);
+	assert((OC_BOOLINIT != t->opcode) || (NO_REF == t->operand[0].oprclass));
+	if (OC_BOOLINIT == t->opcode)
+		return;
 	assert(TRIP_REF == t->operand[0].oprclass);
-	assert((OC_COBOOL != t->opcode) && (OC_COM != t->opcode) || (TRIP_REF == t->operand[1].oprclass));
+	assert(((OC_COBOOL != t->opcode) && (OC_COM != t->opcode))
+		|| (TRIP_REF == t->operand[1].oprclass));
 	for (opr = t->operand, j = 0; opr < ARRAYTOP(t->operand); opr++, j++)
 	{	/* checkout an operand to see if we can simplify it */
 		p = opr;
 		for (optrip[j] = opr->oprval.tref; OCT_UNARY & oc_tab[(c = optrip[j]->opcode)].octype; optrip[j] = p->oprval.tref)
 		{	/* find the real object of affection; WARNING assignment above */
-			assert((TRIP_REF == optrip[j]->operand[0].oprclass) && (NO_REF == optrip[j]->operand[1].oprclass));
 			p = &optrip[j]->operand[0];
 		}
 		if (OCT_ARITH & oc_tab[c].octype)
-			ex_tail(p);								/* chained arithmetic */
+			ex_tail(p, depth);			/* chained arithmetic */
 		else if (OCT_BOOL & oc_tab[c].octype)
-			bx_boollit(optrip[j]);
+			bx_boollit(optrip[j], depth);
 		RETURN_IF_RTS_ERROR;
 		assert(OC_COMVAL != optrip[j]->opcode);
 		neg = num = 0;
-		UNARY_TAIL(opr);
+		UNARY_TAIL(opr, depth);
 		for (ref0 = t->operand[j].oprval.tref; OCT_UNARY & oc_tab[ref0->opcode].octype; ref0 = ref0->operand[0].oprval.tref)
 			;
 		optrip[j] = ref0;
@@ -172,11 +177,11 @@ void bx_boollit(triple *t)
 			break;
 		case OC_NGT:
 		case OC_GT:
-			tvr = 0 < numcmp(v[0], v[1]);
+			tvr = (0 < numcmp(v[0], v[1]));
 			break;
 		case OC_NLT:
 		case OC_LT:
-			tvr = 0 > numcmp(v[0], v[1]);
+			tvr = (0 > numcmp(v[0], v[1]));
 			break;
 		case OC_NPATTERN:
 		case OC_PATTERN:
@@ -188,7 +193,7 @@ void bx_boollit(triple *t)
 			break;
 		case OC_NSORTS_AFTER:
 		case OC_SORTS_AFTER:
-			tvr = 0 < sorts_after(v[0], v[1]);
+			tvr = (0 < sorts_after(v[0], v[1]));
 			break;
 		default:
 			assertpro(FALSE);

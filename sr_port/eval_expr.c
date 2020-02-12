@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -56,8 +59,7 @@ int eval_expr(oprtype *a)
 	triple		*argtrip, *parm, *ref, *ref1, *t1, *t2;
 	mliteral	*m1, *m2;
 	mval		tmp_mval;
-	int i = 0;
-	unsigned short	type;
+	enum octype_t	type;
 
 	DCL_THREADGBL_ACCESS;
 	SETUP_THREADGBL_ACCESS;
@@ -152,7 +154,7 @@ int eval_expr(oprtype *a)
 						{	/* chain stores args to manage later insert of temps to hold lvn */
 							tripbp = &ref1->backptr;
 							assert((tripbp == tripbp->que.fl) && (tripbp == tripbp->que.bl));
-							tripbp->bpt = ref1;
+							tripbp->bkptr = ref1;
 							dqins(catbp, que, tripbp);
 						}
 					}
@@ -176,10 +178,10 @@ int eval_expr(oprtype *a)
 					}
 					dqloop(catbp, que, tripbp)
 					{	/* work chained arguments which are in reverse order */
-						argtrip = tripbp->bpt;
+						argtrip = tripbp->bkptr;
 						assert(NULL != argtrip);
 						dqdel(tripbp, que);
-						tripbp->bpt = NULL;
+						tripbp->bkptr = NULL;
 						if (!saw_local)
 							continue;
 						/* some need to insert temps */
@@ -197,7 +199,7 @@ int eval_expr(oprtype *a)
 								ISSUE_SIDEEFFECTEVAL_WARNING(t1->src.column + 1);
 						}
 					}					/* end of side effect processing */
-					assert((catbp == catbp->que.fl) && (catbp == catbp->que.bl) && (NULL == catbp->bpt));
+					assert((catbp == catbp->que.fl) && (catbp == catbp->que.bl) && (NULL == catbp->bkptr));
 					assert(op_count > 1);
 					ref->operand[0] = put_ilit(op_count);
 					ins_triple(ref);

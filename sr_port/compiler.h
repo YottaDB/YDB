@@ -15,6 +15,8 @@
 #ifndef COMPILER_H_INCLUDED
 #define COMPILER_H_INCLUDED
 
+#include "opcode.h"
+
 /* Values for oprclass - Changes made here need to be reflected in cdbg_dump opr_type_names table */
 typedef enum
 {
@@ -44,7 +46,7 @@ typedef enum
 				 * **** WARNING **** Do NOT reorder
 				 */
 
-typedef unsigned int	opctype;
+typedef enum opcode_enum	opctype;
 
 typedef struct	mvarstruct
 {
@@ -123,6 +125,7 @@ typedef struct	oprtypestruct
 	} oprval;
 } oprtype;
 
+/* tbp stands for triple back pointer */
 typedef struct	tbptype
 {
 	struct
@@ -130,7 +133,7 @@ typedef struct	tbptype
 		struct	tbptype		*fl,
 					*bl;
 	}			que;
-	struct	tripletype	*bpt;
+	struct	tripletype	*bkptr;
 } tbp;
 
 typedef struct
@@ -138,6 +141,8 @@ typedef struct
 	uint4			line;
 	uint4			column;
 } source_address;
+
+#define	NUM_TRIPLE_OPERANDS	2
 
 typedef struct	tripletype
 {
@@ -151,40 +156,42 @@ typedef struct	tripletype
 				jmplist;	/* triples which jump to this one */
 	source_address		src;
 	int			rtaddr;		/* relative run time address of triple */
-	oprtype			operand[2],	/* Note: operand[0] corresponds to val.1 in ttt.txt
+	oprtype			operand[NUM_TRIPLE_OPERANDS],	/* Note: operand[0] corresponds to val.1 in ttt.txt
 						 *	 operand[1] corresponds to val.2 in ttt.txt
 						 */
 				destination;	/* Note: corresponds to val.0 in ttt.txt */
 } triple;
 
+/* Values for octype */
+enum octype_t {
+	OCT_NULL	= 0,
+	OCT_MVAL	= 1,
+	OCT_MINT	= 2,
+	OCT_MVADDR	= 4,
+	OCT_CDADDR	= 8,
+	OCT_BOOL	= 16,
+	OCT_VALUE	= (OCT_MVAL | OCT_MINT | OCT_CDADDR | OCT_BOOL),
+	OCT_JUMP	= 32,
+	OCT_EXPRLEAF	= 64,
+	OCT_CGSKIP	= 128,
+	OCT_COERCE	= 256,
+	OCT_ARITH	= 512,
+	OCT_UNARY	= 1024,
+	OCT_NEGATED	= 2048,
+	OCT_REL		= 4096,
+};
+
 typedef struct
 {
-	uint4		octype;
+	enum octype_t		octype;
 } octabstruct;
-
-/* Values for octype */
-#define OCT_NULL	0
-#define OCT_MVAL	1
-#define OCT_MINT	2
-#define OCT_MVADDR	4
-#define OCT_CDADDR	8
-#define OCT_VALUE	(OCT_MVAL | OCT_MINT | OCT_CDADDR)
-#define OCT_BOOL	16
-#define OCT_JUMP	32
-#define OCT_EXPRLEAF	64
-#define OCT_CGSKIP	128
-#define OCT_COERCE	256
-#define OCT_ARITH	512
-#define OCT_UNARY	1024
-#define OCT_NEGATED	2048
-#define OCT_REL	4096
 
 typedef struct
 {
 	char			name[20];
 	opctype			bo_type;
 	char			uo_type;
-	unsigned short		opr_type;
+	enum octype_t		opr_type;
 } toktabtype;
 
 /* These two structures really belong in glvn_pool.h, but gtmpcat doesn't know to include that file. So put them here for now. */
@@ -566,11 +573,11 @@ MBSTART {												\
 } MBEND
 
 /* Macro to decide whether an invocation of unary tail has any promise */
-#define UNARY_TAIL(OPR)											\
+#define UNARY_TAIL(OPR, DEPTH)										\
 MBSTART {												\
 	assert(TRIP_REF == (OPR)->oprclass);								\
 	if (OCT_UNARY & oc_tab[(OPR)->oprval.tref->opcode].octype)					\
-		unary_tail(OPR);									\
+		unary_tail(OPR, DEPTH);									\
 } MBEND
 
 /* the following structure and macros save and restore parsing state and as of this writing are only used by m_xecute */
@@ -654,15 +661,185 @@ MBSTART {									\
 # define CDREF_REF CDLT_REF
 #endif
 
+#define	NBITS_IN_BOOL_DEPTH	11	/* Allows for a max boolean nesting depth of 2047.
+					 * Note: 2047 is hardcoded in BOOLEXPRTOODEEP message in ydberrors.msg
+					 * so any changes to NBITS_IN_BOOL_DEPTH should correspondingly change that hardcoding too.
+					 */
+#define	NBITS_IN_OPCODE		10	/* allows for a max of 1024 opcodes in opcode_def.h */
+
+#define	CHECK_AND_RETURN_IF_BOOLEXPRTOODEEP(DEPTH)					\
+{											\
+	if ((1 << NBITS_IN_BOOL_DEPTH) <= (DEPTH + 1))					\
+	{										\
+		stx_error(ERR_BOOLEXPRTOODEEP);						\
+		RETURN_IF_RTS_ERROR;							\
+	}										\
+}
+
+/* The below COMBINE_* and SPLIT_* macros exist for 2 purposes.
+ *	a) To conserve object file space. The # of parameters in a triple/opcode is reduced by
+ *		combining multiple parameters into one. This reduces the size of the generated object file.
+ *		At runtime, the incoming parameter is split into the individual parameters using the reverse type of macros.
+ *	b) To reduce runtime overhead (YDB#484 $ZYSQLNULL changes) for boolean expressions that do not use $ZYSQLNULL.
+ *		All parameters in a triple that are needed at runtime only if $ZYSQLNULL is encountered in the boolean
+ *		expression are combined into one in the generated code so we do not spend time passing all these unnecessary
+ *		parameters at runtime. There is an additional cost for splitting the parameter into the individual components
+ *		in case $ZYSQLNULL is encountered at runtime but that is considered acceptable given it is a rare case
+ *		(currently only when Octo is in use) compared to the most common case of no $ZYSQLNULL.
+ */
+#define	COMBINE_ANDOR_OPCODE_JMP_OPCODE_JMP_DEPTH_INVERT(COMBINED_OPCODE, ANDOR_OPCODE, JMP_OPCODE, JMP_DEPTH, INVERT)	\
+{															\
+	/* Assert that it is safe to combine the 4 parameters into 1 4-byte int */					\
+	assert(OC_LASTOPCODE < (1 << NBITS_IN_OPCODE));									\
+	assert((0 <= ANDOR_OPCODE) && (OC_LASTOPCODE > ANDOR_OPCODE));							\
+	assert((0 <= JMP_OPCODE) && (OC_LASTOPCODE > JMP_OPCODE));							\
+	assert((unsigned int)(1 << NBITS_IN_BOOL_DEPTH) > (unsigned int)(JMP_DEPTH + 1));				\
+	assert((0 == INVERT) || (1 == INVERT));										\
+	assert(8 * SIZEOF(int) >= (2 * NBITS_IN_OPCODE + NBITS_IN_BOOL_DEPTH + 1));					\
+	COMBINED_OPCODE = (ANDOR_OPCODE | (JMP_OPCODE << NBITS_IN_OPCODE)						\
+				| (JMP_DEPTH << (2 * NBITS_IN_OPCODE))							\
+				| (INVERT << (2 * NBITS_IN_OPCODE + NBITS_IN_BOOL_DEPTH)));				\
+}
+
+#define	SPLIT_ANDOR_OPCODE_JMP_OPCODE_JMP_DEPTH_INVERT(COMBINED_OPCODE, ANDOR_OPCODE, JMP_OPCODE, JMP_DEPTH, INVERT)	\
+{															\
+	INVERT = (COMBINED_OPCODE >> ((2 * NBITS_IN_OPCODE) + NBITS_IN_BOOL_DEPTH));					\
+	JMP_DEPTH = ((COMBINED_OPCODE >> (2 * NBITS_IN_OPCODE)) & ((1 << NBITS_IN_BOOL_DEPTH) - 1));			\
+	JMP_OPCODE = ((COMBINED_OPCODE >> NBITS_IN_OPCODE) & ((1 << NBITS_IN_OPCODE) - 1));				\
+	ANDOR_OPCODE = (COMBINED_OPCODE & ((1 << NBITS_IN_OPCODE) - 1));						\
+}
+
+#define	COMBINE_ANDOR_OPCODE_DEPTH_OPRINDX(COMBINED_OPCODE, ANDOR_OPCODE, DEPTH, OPRINDX)					\
+{																\
+	/* Assert that it is safe to combine the 3 parameters into 1 4-byte int */						\
+	assert(OC_LASTOPCODE < (1 << NBITS_IN_OPCODE));										\
+	assert((0 <= ANDOR_OPCODE) && (OC_LASTOPCODE > ANDOR_OPCODE));								\
+	assert((0 <= DEPTH) && ((1 << NBITS_IN_BOOL_DEPTH) > DEPTH));								\
+	assert((0 == OPRINDX) || (1 == OPRINDX));										\
+	assert(8 * SIZEOF(int) >= (NBITS_IN_OPCODE + NBITS_IN_BOOL_DEPTH + 1));							\
+	COMBINED_OPCODE = (ANDOR_OPCODE | (DEPTH << NBITS_IN_OPCODE) | (OPRINDX << (NBITS_IN_OPCODE + NBITS_IN_BOOL_DEPTH)));	\
+}
+
+#define	SPLIT_ANDOR_OPCODE_DEPTH_OPRINDX(COMBINED_OPCODE, ANDOR_OPCODE, DEPTH, OPRINDX)			\
+{													\
+	OPRINDX = (COMBINED_OPCODE >> (NBITS_IN_OPCODE + NBITS_IN_BOOL_DEPTH));				\
+	DEPTH = ((COMBINED_OPCODE >> NBITS_IN_OPCODE) & ((1 << NBITS_IN_BOOL_DEPTH) - 1));		\
+	ANDOR_OPCODE = (COMBINED_OPCODE & ((1 << NBITS_IN_OPCODE) - 1));				\
+}
+
+#define	LOGICAL_NOT(ANDOR_OPCODE)		\
+{						\
+	switch(ANDOR_OPCODE)			\
+	{					\
+	case OC_AND:				\
+		ANDOR_OPCODE = OC_NAND;		\
+		break;				\
+	case OC_NAND:				\
+		ANDOR_OPCODE = OC_AND;		\
+		break;				\
+	case OC_OR:				\
+		ANDOR_OPCODE = OC_NOR;		\
+		break;				\
+	case OC_NOR:				\
+		ANDOR_OPCODE = OC_OR;		\
+		break;				\
+	case OC_NOOP:				\
+		break;				\
+	default:				\
+		assert(FALSE);			\
+		break;				\
+	}					\
+}
+
+#define	ADD_BOOL_ZYSQLNULL_PARMS(T, DEPTH, JMP_OPCODE, ANDOR_OPCODE, CALLER_IS_BOOL_EXPR, IS_LAST_BOOL_OPERAND, JMP_DEPTH)	\
+{																\
+	triple		*parms1;												\
+	opctype		andOrOpcode;												\
+	uint4		combined_opcode;											\
+	boolean_t	invert;													\
+																\
+	assert(NO_REF != T->operand[0].oprclass);										\
+	assert(NO_REF == T->operand[1].oprclass);										\
+	parms1 = maketriple(OC_PARAMETER);											\
+	T->operand[1] = put_tref(parms1);											\
+	andOrOpcode = ANDOR_OPCODE;												\
+	if (OC_LASTOPCODE <= andOrOpcode)											\
+	{															\
+		andOrOpcode = andOrOpcode - OC_LASTOPCODE;									\
+		LOGICAL_NOT(andOrOpcode);											\
+	}															\
+	invert = (CALLER_IS_BOOL_EXPR && IS_LAST_BOOL_OPERAND);									\
+	COMBINE_ANDOR_OPCODE_JMP_OPCODE_JMP_DEPTH_INVERT(combined_opcode, andOrOpcode, JMP_OPCODE, JMP_DEPTH, invert);		\
+	parms1->operand[0] = make_ilit((mint)DEPTH);										\
+	parms1->operand[1] = make_ilit((mint)combined_opcode);									\
+}
+
+#define	INIT_GBL_BOOL_DEPTH	-1	/* initial value for the global variable `gbl_bool_depth` */
+
+#define	CALLER_IS_BOOL_EXPR_FALSE	FALSE
+#define	CALLER_IS_BOOL_EXPR_TRUE	TRUE
+
+/* Remove OC_BOOLEXPRSTART and OC_BOOLEXPRFINISH opcodes for a variety of reasons.
+ * For example, if literal optimization occurs at compile time (e.g. IF 1 ...).
+ */
+#define	REMOVE_BOOLEXPRSTART_AND_FINISH(BOOLEXPRFINISH)			\
+{									\
+	triple	*boolExprStart;						\
+									\
+	if (NULL != BOOLEXPRFINISH)					\
+	{								\
+		dqdel(BOOLEXPRFINISH, exorder);				\
+		boolExprStart = BOOLEXPRFINISH->operand[0].oprval.tref;	\
+		dqdel(boolExprStart, exorder);				\
+		BOOLEXPRFINISH = NULL;					\
+	}								\
+}
+
+/* Note: If at runtime, we execute OC_BOOLEXPRSTART (generated in `bool_expr()`) but, before reaching
+ * the corresponding OC_BOOLEXPRFINI opcode we take a jump opcode (e.g. OC_JMPNEQ etc.) and branch away
+ * we need to finish the active boolean expression hence the OC_BOOLEXPRFINISH inserted here.
+ */
+#define	INSERT_BOOLEXPRFINISH_AFTER_JUMP(BOOLEXPRFINISH, BOOLEXPRFINISH2)		\
+{											\
+	triple	*boolExprFinish3;							\
+											\
+	if (NULL != BOOLEXPRFINISH)							\
+	{										\
+		BOOLEXPRFINISH2 = newtriple(OC_BOOLEXPRFINISH);				\
+		/* Link new OC_BOOLEXPRFINISH triple to same OC_BOOLEXPRSTART */	\
+		BOOLEXPRFINISH2->operand[0] = BOOLEXPRFINISH->operand[0];		\
+	} else										\
+		BOOLEXPRFINISH2 = NULL;							\
+}
+
+#define	INSERT_OC_JMP_BEFORE_OC_BOOLEXPRFINISH(BOOLEXPRFINISH)		\
+{									\
+	triple	*jmpref;						\
+									\
+	if (NULL != BOOLEXPRFINISH)					\
+	{								\
+		jmpref = maketriple(OC_JMP);				\
+		jmpref->operand[0] = put_tnxt(BOOLEXPRFINISH);		\
+		dqins(BOOLEXPRFINISH->exorder.bl, exorder, jmpref);	\
+	}								\
+}
+
+#define	IS_LAST_BOOL_OPERAND_FALSE	FALSE
+#define	IS_LAST_BOOL_OPERAND_TRUE	TRUE
+
 int		actuallist(oprtype *opr);
 int		bool_expr(boolean_t sense, oprtype *addr);
-void		bx_boollit(triple *t);
-void		bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr);
-void		bx_relop(triple *t, opctype cmp, opctype tst, oprtype *addr);
-void		bx_tail(triple *t, boolean_t sense, oprtype *addr);
+void		bx_boollit(triple *t, int depth);
+void		bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean_t sense, oprtype *addr, int depth,
+			opctype andor_opcode, boolean_t caller_is_bool_expr, int jmp_depth, boolean_t is_last_bool_operand);
+void		bx_insert_oc_andor(opctype andor_opcode, int depth, triple *leftmost[NUM_TRIPLE_OPERANDS]);
+void		bx_relop(triple *t, opctype cmp, boolean_t sense, oprtype *addr, int depth, opctype andor_opcode,
+					boolean_t caller_is_bool_expr, int jmp_depth, boolean_t is_last_bool_operand);
+void		bx_tail(triple *t, boolean_t sense, oprtype *addr, int depth, opctype andor_opcode,
+						boolean_t caller_is_bool_expr, int jmp_depth, boolean_t is_last_bool_operand);
 void		chktchain(triple *head);
 void		code_gen(void);
-void		coerce(oprtype *a, unsigned short new_type);
+void		coerce(oprtype *a, enum octype_t new_type);
 int		comp_fini(int status, mstr *obj, opctype retcode, oprtype *retopr, oprtype *dst, mstr_len_t src_len);
 void		comp_init(mstr *src, oprtype *dst);
 void		comp_indr(mstr *obj);
@@ -674,7 +851,7 @@ int		expratom(oprtype *a);
 int		exfunc(oprtype *a, boolean_t alias_target);
 int		expritem(oprtype *a);
 int		expr(oprtype *a, int m_type);
-void		ex_tail(oprtype *opr);
+void		ex_tail(oprtype *opr, int depth);
 int		extern_func(oprtype *a);
 int		f_ascii(oprtype *a, opctype op);
 int		f_char(oprtype *a, opctype op);
@@ -739,6 +916,7 @@ int		f_ztrnlnm(oprtype *a, opctype op);
 int		f_zwidth(oprtype *a, opctype op);
 int		f_zwrite(oprtype *a, opctype op);
 int		f_zyhash(oprtype *a, opctype op);
+int		f_zyissqlnull(oprtype *a, opctype op);
 mlabel		*get_mladdr(mident *c);
 mvar		*get_mvaddr(mident *c);
 int		glvn(oprtype *a);
@@ -756,6 +934,7 @@ int		lvn(oprtype *a,opctype index_op,triple *parent);
 void		make_commarg(oprtype *x, mint ind);
 oprtype		make_gvsubsc(mval *v);
 triple		*maketriple(opctype op);
+oprtype		make_ilit(mint x);
 int		name_glvn(boolean_t gblvn, oprtype *a);
 triple		*newtriple(opctype op);
 int		nref(void);
@@ -782,7 +961,7 @@ boolean_t	resolve_optimize(triple *curtrip);
 int		resolve_ref(int errknt);
 void		resolve_tref(triple *, oprtype *);
 triple		*setcurtchain(triple *x);
-void		unary_tail(oprtype *opr);
+void		unary_tail(oprtype *opr, int depth);
 /* VMS uses same code generator as USHBIN so treat as USHBIN for these compiler routines */
 #		if defined(USHBIN_SUPPORTED) || defined(VMS)
 void		shrink_trips(void);
@@ -798,5 +977,9 @@ boolean_t	unuse_literal(mval *x);
 void		walktree(mvar *n,void (*f)(),char *arg);
 void		wrtcatopt(triple *r, triple ***lpx, triple **lptop);
 int		zlcompile(unsigned char len, unsigned char *addr);		/***type int added***/
+
+/* Helper functions */
+triple		*bool_return_leftmost_triple(triple *t);
+opctype		bx_get_andor_opcode(opctype ref_opcode, opctype andor_opcode);
 
 #endif /* COMPILER_H_INCLUDED */

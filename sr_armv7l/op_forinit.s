@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -32,11 +32,9 @@
 
 	.text
 	.extern	numcmp
-	.extern	s2n
-	.extern underr
+	.extern	mval2num
 
 arg2_save	= -12
-arg1_save	=  -8
 arg0_save	=  -4
 FRAME_SIZE	=  16					/* 16 bytes of save area */
 
@@ -49,12 +47,9 @@ ENTRY op_forinit
 	CHKSTKALIGN					/* Verify stack alignment */
 	str	r0, [fp, #arg0_save]			/* Save args to avoid getting modified across function calls */
 	str	r2, [fp, #arg2_save]
-	mov	r0, r1					/* Save 2nd argument (r1) */
-	mv_force_defined r0
-	str	r0, [fp, #arg1_save]			/* Save (possibly modified) 2nd argument (r1) */
-	mv_force_num r0
-	ldr	r0, [fp, #arg1_save]
-	ldr	r12, [r0, #mval_l_m1]
+	mov	r0, r1					/* Copy 2nd argument as 1st argument for mval2num call */
+	bl	mval2num				/* Convert to a numeric. Issue ZYSQLNULLNOTVALID error if needed */
+	ldr	r12, [r0, #mval_l_m1]			/* r0 holds potentially updated `mval *` value from mval2num() call */
 	cmp	r12, #0
 	bmi	l2
 	mv_if_int r0, l1

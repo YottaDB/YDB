@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,6 +86,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	lvTree			*lvt;
 	int			i, j, nexti;
 	boolean_t		found, is_num, last_sub_null, nullsubs_implies_firstsub, is_str, push_v1, is_simpleapi_mode;
+	boolean_t		is_sqlnull;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -119,14 +120,15 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 		nexti = i + 1;
 		if (is_str)
 		{
-			if ((0 == arg1->str.len) && (nexti != sbscnt) && (LVNULLSUBS_NEVER == TREF(lv_null_subs)))
+			is_sqlnull = MV_IS_SQLNULL(arg1);
+			if (!is_sqlnull && (0 == arg1->str.len) && (nexti != sbscnt) && (LVNULLSUBS_NEVER == TREF(lv_null_subs)))
 			{	/* This is not the last subscript, we don't allow nulls subs and it was null */
 				va_end(var);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVNULLSUBS);
 			}
 			if (is_num = MV_IS_CANONICAL(arg1))
 				MV_FORCE_NUM(arg1);
-			else if ((nexti == sbscnt) && (0 == arg1->str.len))
+			else if ((nexti == sbscnt) && !is_sqlnull && (0 == arg1->str.len))
 			{	/* The last search argument is a null string. For this situation, there is the possibility
 				 * of a syntax collision if (1) the user had (for example) specified $Q(a(1,3,"") to get
 				 * the first a(1,3,x) node or (2) this is the "next" element that was legitimately returned
@@ -183,7 +185,8 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 		if (!is_num)
 		{
 			assert(!TREE_KEY_SUBSCR_IS_CANONICAL(arg1->mvtype));
-			if (TREF(local_collseq))
+			/* Do not do collation transformations in case of $ZYSQLNULL */
+			if (TREF(local_collseq) && !is_sqlnull)
 			{
 				ALLOC_XFORM_BUFF(arg1->str.len);
 				/* D9607-258 changed xback to xform and added xform_args[] to hold mval pointing to
@@ -203,6 +206,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 			node = lvAvlTreeLookupStr(lvt, arg1, &parent);
 		} else
 		{
+			assert(!MV_IS_SQLNULL(arg1));
 			tmp_sbs = *arg1;
 			arg1 = &tmp_sbs;
 			MV_FORCE_NUM(arg1);
@@ -354,7 +358,9 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				v2->mvtype = 0;	/* Initialize it to 0 to avoid "stp_gcol" from getting confused
 						 * if it gets invoked before v2 has been completely setup.
 						 */
-				if (TREF(local_collseq))
+				is_sqlnull = MV_IS_SQLNULL(mv);
+				/* Do not do collation transformations in case of $ZYSQLNULL */
+				if (TREF(local_collseq) && !is_sqlnull)
 				{
 					ALLOC_XFORM_BUFF(mv->str.len);
 					assert(NULL != TREF(lcl_coll_xform_buff));
@@ -369,13 +375,14 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				 * it lives in the stringpool so it is protected and survives the trip back to our
 				 * caller.
 				 */
-				v2->mvtype = MV_STR;		/* Now has an active value we need for a bit yet */
+				v2->mvtype = (!is_sqlnull ? MV_STR : (MV_STR | MV_SQLNULL));
+								/* Now has an active value we need for a bit yet */
 				if (!IS_ADDR_IN_STRINGPOOL(v2->str.addr))
 					s2pool(&v2->str);
 				/* Save subscripts to identify a loop in case last subscript value is actually NULL */
 				if (last_sub_null)
 				{
-					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype = MV_STR;
+					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype = v2->mvtype;
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr =
 						v2->str.addr;
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len =
@@ -440,7 +447,9 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				v2->mvtype = 0;	/* Initialize it to 0 to avoid "stp_gcol" from getting confused
 						 * if it gets invoked before v2 has been completely setup.
 						 */
-				if (TREF(local_collseq))
+				is_sqlnull = MV_IS_SQLNULL(mv);
+				/* Do not do collation transformations in case of $ZYSQLNULL */
+				if (TREF(local_collseq) && !is_sqlnull)
 				{
 					ALLOC_XFORM_BUFF(mv->str.len);
 					assert(NULL != TREF(lcl_coll_xform_buff));
@@ -455,7 +464,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				 * order could cause "stp_gcol" (if invoked in between) to get confused since v2->str is
 				 * not yet initialized with current subscript (in the M-stack).
 				 */
-				v2->mvtype = MV_STR;
+				v2->mvtype = (!is_sqlnull ? MV_STR : (MV_STR | MV_SQLNULL));
 				mval_lex(v2, &format_out);
 				if (format_out.addr != (char *)stringpool.free)	/* BYPASSOK */
 				{	/* We must put the string on the string pool ourself - mval_lex didn't do it
@@ -471,7 +480,8 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 					memcpy(stringpool.free, v2->str.addr, v2->str.len);
 					if (last_sub_null)
 					{
-						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype = MV_STR;
+						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype
+							= MV_STR;
 						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr
 							= (char *)stringpool.free;
 						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len
@@ -483,7 +493,8 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				{
 					if (last_sub_null)
 					{
-						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype = MV_STR;
+						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype
+							= v2->mvtype;
 						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr
 							= (char *)stringpool.free;
 						TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@ GBLREF hash_table_str	*complits_hashtab;
 
 LITREF octabstruct	oc_tab[];
 
-void coerce(oprtype *a, unsigned short new_type)
+void coerce(oprtype *a, enum octype_t new_type)
 /* ensure operand (*a) is of the desired type new_type */
 {
 
@@ -36,8 +36,8 @@ void coerce(oprtype *a, unsigned short new_type)
 	stringkey	litkey;
 	triple		*coerc, *ref;
 
-	assert ((OCT_MVAL == new_type) || (OCT_MINT == new_type) || (OCT_BOOL == new_type));
-	assert (TRIP_REF == a->oprclass);
+	assert((OCT_MVAL == new_type) || (OCT_MINT == new_type) || (OCT_BOOL == new_type));
+	assert(TRIP_REF == a->oprclass);
 	ref = a->oprval.tref;
 	old_op = ref->opcode;
 	if (new_type & oc_tab[old_op].octype)
@@ -93,6 +93,8 @@ void coerce(oprtype *a, unsigned short new_type)
 		conv = OC_COMVAL;
 	coerc = newtriple(conv);
 	coerc->operand[0] = put_tref(ref);
+	if ((OC_COMINT == conv) || (OC_COMVAL == conv))
+		coerc->operand[1] = make_ilit((mint)INIT_GBL_BOOL_DEPTH);
 	*a = put_tref(coerc);
 	return;
 }

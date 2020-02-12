@@ -149,6 +149,7 @@ void	op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blin
 void	op_fnztrnlnm(mval *name, mval *table, int4 ind, mval *mode, mval *case_blind, mval *item, mval *ret);
 void	op_fnzwidth(mval *str, mval *dst);
 void	op_fnzwrite(boolean_t direction, mval *str, mval *dst);
+void	op_fnzyissqlnull(mval *src, mval *dst);
 void	op_fnzatransform(mval *src, int col, int reverse, int forcenum, mval *dst);
 int	op_forchk1();
 int	op_forintrrpt();

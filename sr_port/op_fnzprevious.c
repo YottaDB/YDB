@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,7 +25,7 @@
 
 void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 {
-	int		cur_subscr, length;
+	int		length;
 	mval		tmp_sbs;
 	lvTreeNode	*node;
 	lvTree		*lvt;
@@ -38,7 +38,7 @@ void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 		MV_FORCE_DEFINED(key);
 		/* If last subscript is null, $zprev returns the last subscript in that level. */
 		get_last = FALSE;
-		if (MV_IS_STRING(key) && (0 == key->str.len))
+		if (MV_IS_STRING(key) && !MV_IS_SQLNULL(key) && (0 == key->str.len))
 			get_last = TRUE;
 		if (get_last)
 			node = lvAvlTreeCollatedLast(lvt);
@@ -48,7 +48,8 @@ void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 			if (!is_canonical)
 			{
 				assert(!TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype));
-				if (TREF(local_collseq))
+				/* If input "key" is $ZYSQLNULL, then do not do collation transformations */
+				if (TREF(local_collseq) && !MV_IS_SQLNULL(key))
 				{
 					ALLOC_XFORM_BUFF(key->str.len);
 					tmp_sbs.mvtype = MV_STR;
@@ -65,6 +66,7 @@ void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 				 * But input mval could be read-only so cannot modify that even if temporarily.
 				 * So take a copy of the mval and modify that instead.
 				 */
+				assert(!MV_IS_SQLNULL(key));
 				tmp_sbs = *key;
 				key = &tmp_sbs;
 				MV_FORCE_NUM(key);
@@ -85,7 +87,8 @@ void op_fnzprevious(lv_val *src, mval *key, mval *dst)
 		 * until the entire codebase gets fixed to maintain MV_CANONICAL bit accurately at which point,
 		 * this RESET can be removed */
 		TREE_KEY_SUBSCR_RESET_MV_CANONICAL_BIT(dst);
-		if (TREF(local_collseq) && MV_IS_STRING(dst))
+		/* Do not do collation transformations in case of $ZYSQLNULL */
+		if (TREF(local_collseq) && MV_IS_STRING(dst) && !MV_IS_SQLNULL(dst))
 		{
 			ALLOC_XFORM_BUFF(dst->str.len);
 			assert(NULL != TREF(lcl_coll_xform_buff));

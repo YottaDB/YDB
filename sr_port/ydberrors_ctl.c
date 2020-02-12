@@ -50,6 +50,8 @@ LITDEF	err_msg ydberrors[] = {
 	{ "STAPIFORKEXEC", "Calls to YottaDB are not supported after a fork() if threaded Simple API functions were in use in parent. Call exec() first", 0 },
 	{ "INVVALUE", "!AD is invalid !AD value for !AD", 6 },
 	{ "INVZCONVERT", "!AD Translation between !AD and !AD is not supported", 6 },
+	{ "ZYSQLNULLNOTVALID", "$ZYSQLNULL cannot be used as an integer, numeric, gvn subscript/value or lock subscript", 0 },
+	{ "BOOLEXPRTOODEEP", "Boolean expression depth exceeds maximum supported limit of 2047", 0 },
 };
 
 
@@ -62,7 +64,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	33,
+	35,
 	&ydberrors_undocarr[0],
 	0
 };

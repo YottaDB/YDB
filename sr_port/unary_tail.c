@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,23 +27,22 @@ LITREF octabstruct	oc_tab[];
 
 error_def(ERR_NUMOFLOW);
 
-void unary_tail(oprtype *opr)
-{	/* collapse any string of unary operators that cam be simplified
+void unary_tail(oprtype *opr, int depth)
+{	/* collapse any string of unary operators that can be simplified
 	 * opr is a pointer to a operand structure to process
 	 */
 	int		com, comval, drop, neg, num;
 	mval		*mv, *v;
 	opctype		c, c1, c2, pending_coerce;
-	oprtype		*p;
 	triple		*t, *t1, *t2, *ta, *ref0;
-	uint4		w;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(TRIP_REF == opr->oprclass);
 	t = ta = t2 = opr->oprval.tref;
 	assert(OCT_UNARY & oc_tab[t->opcode].octype);
-	assert((TRIP_REF == t->operand[0].oprclass) && (NO_REF == t->operand[1].oprclass));
+	assert((TRIP_REF == t->operand[0].oprclass)
+		&& ((NO_REF == t->operand[1].oprclass) || (TRIP_REF == t->operand[1].oprclass)));
 	com = comval = drop = neg = num = 0;
 	pending_coerce = OC_NOOP;
 	do
@@ -75,8 +74,10 @@ void unary_tail(oprtype *opr)
 					pending_coerce = c1;
 				} else if ((OC_NOOP != c1) && !(OCT_UNARY & oc_tab[c1].octype))
 					break;
-				assert((NO_REF == t1->operand[1].oprclass) && ((NO_REF == t2->operand[1].oprclass)
-					|| ((INDR_REF == t2->operand[1].oprclass) && (OC_LIT == c2))));
+				assert(((NO_REF == t1->operand[1].oprclass) || (TRIP_REF == t1->operand[1].oprclass))
+					&& ((NO_REF == t2->operand[1].oprclass)
+						|| (TRIP_REF == t2->operand[1].oprclass)
+						|| ((INDR_REF == t2->operand[1].oprclass) && (OC_LIT == c2))));
 				drop++;			/* use a count of potential "extra" operands */
 				if (OC_LIT != c2)
 					continue;	/* this keeps the loop going */
@@ -106,7 +107,7 @@ void unary_tail(oprtype *opr)
 				}
 				assert(OC_LIT == c);
 				t = ta;
-				if (OC_NOOP != pending_coerce && OC_COMVAL != pending_coerce)
+				if ((OC_NOOP != pending_coerce) && (OC_COMVAL != pending_coerce))
 				{	/* add back a coercion if we need it;
 					 * a COMVAL preceding a LIT is unneeded (and will cause an error).
 					 * this leaves a COBOOL but removing earier and readding here is easier to follow & cleaner
@@ -169,7 +170,7 @@ void unary_tail(oprtype *opr)
 			default:	/* something other than a unary operator or a literal - stop and do what can be done */
 				if (OCT_ARITH & oc_tab[c2].octype)
 				{	/* some arithmetic */
-					ex_tail(&t1->operand[0]);
+					ex_tail(&t1->operand[0], depth);
 					RETURN_IF_RTS_ERROR;
 					if (OC_LIT == t2->opcode)
 					{
@@ -199,6 +200,12 @@ void unary_tail(oprtype *opr)
 					}
 					/* numeric conversion only - just pick one and throw any others away */
 					t1 = t->operand[0].oprval.tref;
+					/* TODO: The below code does not handle OC_COBOOL yet. For now, this code is
+					 * unreachable (because of the `if (TRUE || ...)` check above (line 186 at the time of
+					 * this writing). Therefore it is ok to not handle OC_COBOOL now. But it will
+					 * need to be if/when this code becomes reachable again. Hence the assert below.
+					 */
+					assert(OC_COBOOL != t->opcode);
 					if (OC_COBOOL == t->opcode)
 					{	/* keep Boolean processing happy by leaving one of these alone/behind */
 						c = OC_COBOOL;
@@ -214,6 +221,7 @@ void unary_tail(oprtype *opr)
 						t2 = t1->operand[0].oprval.tref;
 						dqdel(t1, exorder);
 					}
+					assert(OC_COBOOL != c2);
 					if (neg && (OC_COBOOL == c2))
 					{	/* preserving both a COBOOL and a NEG */
 						assert(t2 == t->operand[0].oprval.tref);
@@ -329,6 +337,7 @@ void unary_tail(oprtype *opr)
 				}
 				for (t1 = ta->operand[0].oprval.tref; (OCT_UNARY & oc_tab[t1->opcode].octype) ; t1 = t2, drop--)
 				{	/* a complement always requires a COBOOL but if the COMs cancelled out, it can go */
+					assert(OC_COBOOL != t1->opcode); /* See comment against similar assert above */
 					if ((OC_COBOOL == t1->opcode) && (1 & com))
 					{
 						assert(0 < drop);

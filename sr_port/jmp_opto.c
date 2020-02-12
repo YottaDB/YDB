@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,13 +27,13 @@ LITREF octabstruct	oc_tab[];	/* op-code table */
 GBLREF triple		t_orig;		/* head of triples */
 GBLREF uint4		ydbDebugLevel;
 
-#define IND_NOT_DEFINED ((unsigned char)-2)
-#define JOPT_NO_OPT 1
-#define JOPT_REP_JMP 2
-#define JOPT_REF_NXT_TRP 3
-#define NO_ENTRY ((unsigned char)-1)
-#define NUM_JO_TBL_ELE 11
-#define PTR_NOT_DEFINED 0
+#define IND_NOT_DEFINED		((unsigned char)-2)
+#define JOPT_NO_OPT		1
+#define JOPT_REP_JMP		2
+#define JOPT_REF_NXT_TRP	3
+#define NO_ENTRY		((unsigned char)-1)
+#define NUM_JO_TBL_ELE		9
+#define PTR_NOT_DEFINED		0
 
 typedef struct
 {
@@ -47,85 +47,57 @@ LITDEF readonly jump_opto_struct jump_opto_table[NUM_JO_TBL_ELE] =
 	{	OC_JMP,		/* opcode */
 		0,		/* index */
 		{
-			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_NO_OPT,	/* OC_JMPTSET */
-			 JOPT_NO_OPT,	/* OC_JMPTCLR */	 JOPT_NO_OPT,	/* OC_JMPEQU */
-			 JOPT_NO_OPT,	/* OC_JMPNEQ */		 JOPT_NO_OPT,	/* OC_JMPGTR */
-			 JOPT_NO_OPT,	/* OC_JMPLEQ */		 JOPT_NO_OPT,	/* OC_JMPLSS */
-			 JOPT_NO_OPT,	/* OC_JMPGEQ */		 JOPT_NO_OPT,	/* HALT */
-			 JOPT_NO_OPT	/* RET */
-		}
-	},
-	{	OC_JMPTSET,	/* opcode */
-		1,		/* index */
-		{
-			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_REP_JMP,	/* OC_JMPTSET */
-			 JOPT_REF_NXT_TRP, /* OC_JMPTCLR */	 JOPT_NO_OPT,	/* OC_JMPEQU */
-			 JOPT_NO_OPT,	/* OC_JMPNEQ */		 JOPT_NO_OPT,	/* OC_JMPGTR */
-			 JOPT_NO_OPT,	/* OC_JMPLEQ */		 JOPT_NO_OPT,	/* OC_JMPLSS */
-			 JOPT_NO_OPT,	/* OC_JMPGEQ */		 JOPT_NO_OPT,	/* HALT */
-			 JOPT_NO_OPT	/* RET */
-		}
-	},
-	{	OC_JMPTCLR,	/* opcode */
-		2,		/* index */
-		{
-			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_REF_NXT_TRP,	/* OC_JMPTSET */
-			 JOPT_REP_JMP,	/* OC_JMPTCLR */	 JOPT_NO_OPT,	/* OC_JMPEQU */
-			 JOPT_NO_OPT,	/* OC_JMPNEQ */		 JOPT_NO_OPT,	/* OC_JMPGTR */
-			 JOPT_NO_OPT,	/* OC_JMPLEQ */		 JOPT_NO_OPT,	/* OC_JMPLSS */
-			 JOPT_NO_OPT,	/* OC_JMPGEQ */		 JOPT_NO_OPT,	/* HALT */
-			 JOPT_NO_OPT	/* RET */
-		}
-	},
-	{	OC_JMPEQU,	/* opcode */
-		3,		/* index */
-		{
-			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_NO_OPT,	/* OC_JMPTSET */
-			 JOPT_NO_OPT,	/* OC_JMPTCLR */	 JOPT_REP_JMP,	/* OC_JMPEQU */
-			 JOPT_REF_NXT_TRP, /* OC_JMPNEQ */	 JOPT_REF_NXT_TRP,	/* OC_JMPGTR */
-			 JOPT_NO_OPT,	/* OC_JMPLEQ */		 JOPT_REF_NXT_TRP,	/* OC_JMPLSS */
-			 JOPT_NO_OPT,	/* OC_JMPGEQ */		 JOPT_NO_OPT,	/* HALT */
-			 JOPT_NO_OPT	/* RET */
-		}
-	},
-	{	OC_JMPNEQ,	/* opcode */
-		4,		/* index */
-		{
-			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_NO_OPT,	/* OC_JMPTSET */
-			 JOPT_NO_OPT,	/* OC_JMPTCLR */	 JOPT_REF_NXT_TRP,	/* OC_JMPEQU */
-			 JOPT_REP_JMP,	/* OC_JMPNEQ */		 JOPT_NO_OPT,	/* OC_JMPGTR */
-			 JOPT_NO_OPT,	/* OC_JMPLEQ */		 JOPT_NO_OPT,	/* OC_JMPLSS */
-			 JOPT_NO_OPT,	/* OC_JMPGEQ */		 JOPT_NO_OPT,	/* HALT */
-			 JOPT_NO_OPT	/* RET */
-		}
-	},
-	{	OC_JMPGTR,	/* opcode */
-		5,		/* index */
-		{
-			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_NO_OPT,		/* OC_JMPTSET */
-			 JOPT_NO_OPT,	/* OC_JMPTCLR */	 JOPT_REF_NXT_TRP,	/* OC_JMPEQU */
-			 JOPT_REP_JMP,	/* OC_JMPNEQ */		 JOPT_REP_JMP,		/* OC_JMPGTR */
-			 JOPT_REF_NXT_TRP, /* OC_JMPLEQ */	 JOPT_REF_NXT_TRP,	/* OC_JMPLSS */
+			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_NO_OPT,		/* OC_JMPEQU */
+			 JOPT_NO_OPT,	/* OC_JMPNEQ */		 JOPT_NO_OPT,		/* OC_JMPGTR */
+			 JOPT_NO_OPT,	/* OC_JMPLEQ */		 JOPT_NO_OPT,		/* OC_JMPLSS */
 			 JOPT_NO_OPT,	/* OC_JMPGEQ */		 JOPT_NO_OPT,		/* HALT */
 			 JOPT_NO_OPT	/* RET */
 		}
 	},
-	{	OC_JMPLEQ,	/* opcode */
-		6,		/* index */
+	{	OC_JMPEQU,	/* opcode */
+		1,		/* index */
 		{
-			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_NO_OPT,	/* OC_JMPTSET */
-			 JOPT_NO_OPT,	/* OC_JMPTCLR */	 JOPT_NO_OPT,	/* OC_JMPEQU */
+			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_REP_JMP,		/* OC_JMPEQU */
+			 JOPT_REF_NXT_TRP, /* OC_JMPNEQ */	 JOPT_REF_NXT_TRP,	/* OC_JMPGTR */
+			 JOPT_NO_OPT,	/* OC_JMPLEQ */		 JOPT_REF_NXT_TRP,	/* OC_JMPLSS */
+			 JOPT_NO_OPT,	/* OC_JMPGEQ */		 JOPT_NO_OPT,		/* HALT */
+			 JOPT_NO_OPT	/* RET */
+		}
+	},
+	{	OC_JMPNEQ,	/* opcode */
+		2,		/* index */
+		{
+			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_REF_NXT_TRP,	/* OC_JMPEQU */
+			 JOPT_REP_JMP,	/* OC_JMPNEQ */		 JOPT_NO_OPT,		/* OC_JMPGTR */
+			 JOPT_NO_OPT,	/* OC_JMPLEQ */		 JOPT_NO_OPT,		/* OC_JMPLSS */
+			 JOPT_NO_OPT,	/* OC_JMPGEQ */		 JOPT_NO_OPT,		/* HALT */
+			 JOPT_NO_OPT	/* RET */
+		}
+	},
+	{	OC_JMPGTR,	/* opcode */
+		3,		/* index */
+		{
+			 JOPT_REP_JMP,	/* OC_JMP */		JOPT_REF_NXT_TRP,	/* OC_JMPEQU */
+			 JOPT_REP_JMP,	/* OC_JMPNEQ */		JOPT_REP_JMP,		/* OC_JMPGTR */
+			 JOPT_REF_NXT_TRP,/* OC_JMPLEQ */	JOPT_REF_NXT_TRP,	/* OC_JMPLSS */
+			 JOPT_NO_OPT,	/* OC_JMPGEQ */		JOPT_NO_OPT,		/* HALT */
+			 JOPT_NO_OPT	/* RET */
+		}
+	},
+	{	OC_JMPLEQ,	/* opcode */
+		4,		/* index */
+		{
+			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_NO_OPT,		/* OC_JMPEQU */
 			 JOPT_NO_OPT,	/* OC_JMPNEQ */		 JOPT_REF_NXT_TRP,	/* OC_JMPGTR */
-			 JOPT_REP_JMP,	/* OC_JMPLEQ */		 JOPT_NO_OPT,	/* OC_JMPLSS */
-			 JOPT_NO_OPT,	/* OC_JMPGEQ */		 JOPT_NO_OPT,	/* HALT */
+			 JOPT_REP_JMP,	/* OC_JMPLEQ */		 JOPT_NO_OPT,		/* OC_JMPLSS */
+			 JOPT_NO_OPT,	/* OC_JMPGEQ */		 JOPT_NO_OPT,		/* HALT */
 			 JOPT_NO_OPT	/* RET */
 		}
 	},
 	{	OC_JMPLSS,	/* opcode */
-		7,		/* index */
+		5,		/* index */
 		{
-			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_NO_OPT,	/* OC_JMPTSET */
-			 JOPT_NO_OPT,	/* OC_JMPTCLR */	 JOPT_REF_NXT_TRP,	/* OC_JMPEQU */
+			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_REF_NXT_TRP,	/* OC_JMPEQU */
 			 JOPT_REP_JMP,	/* OC_JMPNEQ */		 JOPT_REF_NXT_TRP,	/* OC_JMPGTR */
 			 JOPT_REP_JMP,	/* OC_JMPLEQ */		 JOPT_REP_JMP,	/* OC_JMPLSS */
 			 JOPT_REF_NXT_TRP,	/* OC_JMPGEQ */		 JOPT_NO_OPT,	/* HALT */
@@ -133,10 +105,9 @@ LITDEF readonly jump_opto_struct jump_opto_table[NUM_JO_TBL_ELE] =
 		}
 	},
 	{	OC_JMPGEQ,	/* opcode */
-		8,		/* index */
+		6,		/* index */
 		{
-			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_NO_OPT,	/* OC_JMPTSET */
-			 JOPT_NO_OPT,	/* OC_JMPTCLR */	 JOPT_NO_OPT,	/* OC_JMPEQU */
+			 JOPT_REP_JMP,	/* OC_JMP */		 JOPT_NO_OPT,	/* OC_JMPEQU */
 			 JOPT_NO_OPT,	/* OC_JMPNEQ */		 JOPT_NO_OPT,	/* OC_JMPGTR */
 			 JOPT_NO_OPT,	/* OC_JMPLEQ */		 JOPT_REF_NXT_TRP,	/* OC_JMPLSS */
 			 JOPT_REP_JMP,	/* OC_JMPGEQ */		 JOPT_NO_OPT,	/* HALT */
@@ -144,10 +115,9 @@ LITDEF readonly jump_opto_struct jump_opto_table[NUM_JO_TBL_ELE] =
 		}
 	},
 	{	OC_ZHALT,	/* opcode */
-		9,		/* index */
+		7,		/* index */
 		{
-			 JOPT_NO_OPT,	/* OC_JMP */		 JOPT_NO_OPT,	/* OC_JMPTSET */
-			 JOPT_NO_OPT,	/* OC_JMPTCLR */	 JOPT_NO_OPT,	/* OC_JMPEQU */
+			 JOPT_NO_OPT,	/* OC_JMP */		 JOPT_NO_OPT,	/* OC_JMPEQU */
 			 JOPT_NO_OPT,	/* OC_JMPNEQ */		 JOPT_NO_OPT,	/* OC_JMPGTR */
 			 JOPT_NO_OPT,	/* OC_JMPLEQ */		 JOPT_NO_OPT,	/* OC_JMPLSS */
 			 JOPT_NO_OPT,	/* OC_JMPGEQ */		 JOPT_NO_OPT,	/* HALT */
@@ -155,10 +125,9 @@ LITDEF readonly jump_opto_struct jump_opto_table[NUM_JO_TBL_ELE] =
 		}
 	},
 	{	OC_RET,		/* opcode */
-		10,		/* index */
+		8,		/* index */
 		{
-			 JOPT_NO_OPT,	/* OC_JMP */		 JOPT_NO_OPT,	/* OC_JMPTSET */
-			 JOPT_NO_OPT,	/* OC_JMPTCLR */	 JOPT_NO_OPT,	/* OC_JMPEQU */
+			 JOPT_NO_OPT,	/* OC_JMP */		 JOPT_NO_OPT,	/* OC_JMPEQU */
 			 JOPT_NO_OPT,	/* OC_JMPNEQ */		 JOPT_NO_OPT,	/* OC_JMPGTR */
 			 JOPT_NO_OPT,	/* OC_JMPLEQ */		 JOPT_NO_OPT,	/* OC_JMPLSS */
 			 JOPT_NO_OPT,	/* OC_JMPGEQ */		 JOPT_NO_OPT,	/* HALT */
@@ -279,7 +248,7 @@ void jmp_opto(void)
 						{
 							dqloop(&jump_trip->jmplist, que, b)
 							{
-								if (b->bpt = cur_trip)
+								if (b->bkptr = cur_trip)
 								{
 									dqdel(b, que);
 									break;
@@ -304,7 +273,7 @@ void jmp_opto(void)
 							assert(TJMP_REF == jump_trip->operand[0].oprclass);
 							dqloop(&jump_trip->jmplist, que, b)
 							{
-								if (b->bpt = cur_trip)
+								if (b->bkptr = cur_trip)
 								{
 									dqdel(b, que);
 									break;

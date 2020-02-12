@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -207,10 +207,11 @@ typedef struct lvTreeStruct
 /* Macro to return if a given "lvTreeNode *" pointer is a null subscript string.
  * Input "node" could actually be any one of "lvTreeNodeNum *" or "lvTreeNode *".
  * A null subscript string is of actual type "lvTreeNode *". To minimize the checks, we check for the MV_STR bit in the mvtype.
+ * But note that we should also check that the MV_SQLNULL bit is not set ($ZYSQLNULL has MV_STR bit set but is not a null subscript)
  * This is asserted below. For "lvTreeNodeNum *", the MV_STR bit is guaranteed not to be set. That leaves us with "lvTreeNode *".
  */
-#define	LV_NODE_KEY_IS_STRING(NODE)	(DBG_ASSERT(NULL != NODE)					\
-					MVTYPE_IS_STRING(NODE->key_mvtype))
+#define	LV_NODE_KEY_IS_STRING(NODE)	(DBG_ASSERT(NULL != NODE)							\
+					MVTYPE_IS_STRING(NODE->key_mvtype) && !MVTYPE_IS_SQLNULL(NODE->key_mvtype))
 
 #define	LV_NODE_KEY_IS_NULL_SUBS(NODE)	(LV_NODE_KEY_IS_STRING(NODE) && (0 == NODE->key_len))
 

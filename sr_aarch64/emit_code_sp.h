@@ -2,7 +2,7 @@
  *								*
  * Copyright 2003, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson. All rights reserved.	*
@@ -326,6 +326,8 @@ void	tab_to_column(int col);
 /* Use ldp/stp to copy two 8 byte registers at a time */
 #define GEN_MVAL_COPY(src_reg, trg_reg, size)											\
 {																\
+	int	words_to_move;													\
+																\
 	for (words_to_move = size / (2 * SIZEOF(UINTPTR_T));  0 < words_to_move; words_to_move--)				\
         {															\
 		code_buf[code_idx++] = CODE_BUF_GEN_TN2_IMM7(AARCH64_INS_LDP, GTM_REG_CODEGEN_TEMP, GTM_REG_CODEGEN_TEMP_1,	\

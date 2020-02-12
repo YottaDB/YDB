@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -38,11 +41,11 @@ typedef struct jmpchntype
 int m_if(void)
 /* compiler module for IF */
 {
-	boolean_t	first_time, is_commarg, t_set;
-	int		sense;
+	boolean_t	first_time, is_commarg;
 	jmpchn		*jmpchain, *nxtjmp;
-	oprtype		*ta_opr, x, y;
+	oprtype		*ta_opr, x;
 	triple		ifpos_in_chain, *jmpref, *ref1, *ref2, *oldchain, tmpchain, *triptr;
+	triple		*boolexprfinish, *boolexprfinish2, *cobool, *gettruth;
 	mval		*v;
 	DCL_THREADGBL_ACCESS;
 
@@ -58,7 +61,12 @@ int m_if(void)
 	oldchain = NULL;
 	if (TK_SPACE == TREF(window_token))
 	{
-		jmpref = newtriple(OC_JMPTCLR);
+		gettruth = newtriple(OC_GETTRUTH);
+		cobool = newtriple(OC_COBOOL);
+		cobool->operand[0] = put_tref(gettruth);
+		ADD_BOOL_ZYSQLNULL_PARMS(cobool, INIT_GBL_BOOL_DEPTH, OC_NOOP, OC_NOOP,
+						CALLER_IS_BOOL_EXPR_FALSE, IS_LAST_BOOL_OPERAND_FALSE, INIT_GBL_BOOL_DEPTH);
+		jmpref = newtriple(OC_JMPEQU);
 		jmpref->operand[0] = x;
 		nxtjmp = (jmpchn *)mcalloc(SIZEOF(jmpchn));
 		nxtjmp->jmptrip = jmpref;
@@ -75,24 +83,35 @@ int m_if(void)
 					setcurtchain(oldchain);					/* reset from discard chain */
 				 return FALSE;
 			}
-			for (triptr = (TREF(curtchain))->exorder.bl; OC_NOOP == triptr->opcode; triptr = triptr->exorder.bl)
+			triptr = (TREF(curtchain))->exorder.bl;
+			boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
+			if (NULL != boolexprfinish)
+				triptr = triptr->exorder.bl;
+			for ( ; (OC_NOOP == triptr->opcode); triptr = triptr->exorder.bl)
 				;
 			if ((OC_JMPNEQ == triptr->opcode)					/* WARNING: assignments */
 				&& (OC_COBOOL == (ref1 = triptr->exorder.bl)->opcode)
 				&& (OC_INDGLVN == (ref2 = ref1->exorder.bl)->opcode))
 			{	/* short-circuit only optimization that turns a trailing INDGLVN COBOOL into separate indirect IF */
-				triptr->opcode = OC_JMPTSET;
-				triptr->operand[0] = put_indr(ta_opr);
-				dqdel(ref1, exorder);;
+				REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish); /* Note: Will set "boolexprfinish" to NULL */
+				dqdel(triptr, exorder);
+				dqdel(ref1, exorder);
 				ref2->opcode = OC_COMMARG;
 				ref2->operand[1] = put_ilit((mint)indir_if);
-			}
-			if (OC_LIT == triptr->opcode)
+				gettruth = newtriple(OC_GETTRUTH);
+				cobool = newtriple(OC_COBOOL);
+				cobool->operand[0] = put_tref(gettruth);
+				ADD_BOOL_ZYSQLNULL_PARMS(cobool, INIT_GBL_BOOL_DEPTH, OC_NOOP, OC_NOOP,
+							CALLER_IS_BOOL_EXPR_FALSE, IS_LAST_BOOL_OPERAND_FALSE, INIT_GBL_BOOL_DEPTH);
+				jmpref = newtriple(OC_JMPNEQ);
+				jmpref->operand[0] = put_indr(ta_opr);
+			} else if (OC_LIT == triptr->opcode)
 			{	/* it is a literal so we optimize it */
 				dqdel(triptr, exorder);
+				REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish); /* Note: Will set "boolexprfinish" to NULL */
 				v = &triptr->operand[0].oprval.mlit->v;
 				unuse_literal(v);
-				if (t_set = (0 == MV_FORCE_BOOL(v)))	/* WARNING: assignment */
+				if (0 == MV_FORCE_BOOL(v))	/* WARNING: assignment */
 				{	/* it's FALSE, insert clear of $TEST */
 					newtriple(OC_CLRTEST);
 					if (TK_SPACE == TREF(director_token))			/* if there are trailing spaces */
@@ -113,10 +132,8 @@ int m_if(void)
 					advancewindow();
 					continue;	/* leave first_time in case next arg is also a literal */
 				}
-			} else
-				t_set = (OC_JMPTSET == (TREF(curtchain))->exorder.bl->opcode);
-			if (!t_set)
-				newtriple(OC_CLRTEST);
+			}
+			newtriple(OC_CLRTEST);
 			if (TREF(expr_start) != TREF(expr_start_orig) && (OC_NOOP != (TREF(expr_start))->opcode))
 			{
 				assert((OC_GVSAVTARG == (TREF(expr_start))->opcode));
@@ -129,11 +146,15 @@ int m_if(void)
 			nxtjmp = (jmpchn *)mcalloc(SIZEOF(jmpchn));
 			nxtjmp->jmptrip = jmpref;
 			dqins(jmpchain, link, nxtjmp);
-			tnxtarg(ta_opr);
+			if (NULL != boolexprfinish)
+			{
+				INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
+				*ta_opr = put_tjmp(boolexprfinish2);
+			} else
+				tnxtarg(ta_opr);
 			if (first_time)
 			{
-				if (!t_set)
-					newtriple(OC_SETTEST);
+				newtriple(OC_SETTEST);
 				if (TREF(expr_start) != TREF(expr_start_orig) && (OC_NOOP != (TREF(expr_start))->opcode))
 				{
 					assert((OC_GVSAVTARG == (TREF(expr_start))->opcode));

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -3449,7 +3449,7 @@ MBSTART {													\
 	{													\
 		MV_FORCE_DEFINED(mvarg);									\
 		mval2subsc(mvarg, gv_currkey, reg->std_null_coll);						\
-		is_null = (MV_IS_STRING(mvarg) && (0 == mvarg->str.len));					\
+		is_null = (MV_IS_STRING(mvarg) && !MV_IS_SQLNULL(mvarg) && (0 == mvarg->str.len));		\
 	}													\
 } MBEND
 

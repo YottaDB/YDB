@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,10 +38,10 @@
 #include "getzposition.h"
 #include "min_max.h"
 #include "mvalconv.h"
+#include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
-#include "mvalconv.h"
 
 GBLREF boolean_t	gtm_utf8_mode;
 GBLREF io_pair		io_curr_device;
@@ -54,12 +54,9 @@ error_def(ERR_TEXT);
 
 int op_readfl(mval *v, int4 length, mval *timeout)
 {
-	char		*start_ptr, *save_ptr;
 	int		b_length;
 	int4		stat;		/* status */
 	uint8		nsec_timeout;
-	size_t		cnt, insize, outsize;
-	unsigned char	*temp_ch;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -88,6 +85,10 @@ int op_readfl(mval *v, int4 length, mval *timeout)
 #	if defined(KEEP_zOS_EBCDIC)
 	if (DEFAULT_CODE_SET != active_device->in_code_set)
 	{
+		unsigned char	*temp_ch;
+		size_t		cnt, insize, outsize;
+		char		*start_ptr, *save_ptr;
+
 		cnt = insize = outsize = v->str.len;
 		assert(stringpool.free >= stringpool.base);
 		ENSURE_STP_FREE_SPACE(cnt);

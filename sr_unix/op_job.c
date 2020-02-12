@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -53,6 +53,7 @@
 #include "getzposition.h"
 #include "iosocketdef.h"
 #include "min_max.h"
+#include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
@@ -103,7 +104,7 @@ int	op_job(int4 argcnt, ...)
 	mval			*routine, *param_buf;
 	mval			*timeout;	/* timeout in milliseconds */
 	uint8			nsec_timeout;	/* timeout in nanoseconds */
-	boolean_t		timed, single_attempt, non_exit_return;
+	boolean_t		timed, non_exit_return;
 	unsigned char		buff[128], *c;
 	int4			status, exit_stat, term_sig, stop_sig;
 	pid_t			zjob_pid = 0; 	/* zjob_pid should exactly match in type with child_pid(ojstartchild.c) */

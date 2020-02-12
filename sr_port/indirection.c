@@ -1,10 +1,9 @@
-
 /****************************************************************
  *								*
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,10 +36,8 @@ error_def(ERR_SIDEEFFECTEVAL);
 
 int indirection(oprtype *a)
 {
-	char		c;
-	oprtype		*sb1, *sb2, subs[MAX_INDSUBSCRIPTS], x;
-	triple		*next, *ref;
-	int		parens, oldlen, len;
+	triple		*ref;
+	int		oldlen, len;
 	char		*start, *end, *oldend;
 	boolean_t	concat_athashes;
 	DCL_THREADGBL_ACCESS;
@@ -57,7 +54,7 @@ int indirection(oprtype *a)
 		return FALSE;
 	}
 	coerce(a, OCT_MVAL);
-	ex_tail(a);
+	ex_tail(a, 0);
 	/* Note: A RETURN_IF_RTS_ERROR check is usually present after all "ex_tail" calls. But that is not needed here.
 	 * This is because we do not do any triple chain manipulations like is done in the other callers. And we want
 	 * to proceed with executing the generated code even if it is going to issue an error (OC_RTERROR triple

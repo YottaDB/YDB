@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -32,10 +32,13 @@
 ENTRY op_neg
 	stp	x29, x30, [sp, #-16]!
 	mov	x29, sp
-	CHKSTKALIGN						/* Verify stack alignment */
+	CHKSTKALIGN					/* Verify stack alignment */
 
 	mov	x27, x0
 	mv_force_defined x1
+	ldrh	w13, [x1, #mval_w_mvtype]
+	tst	w13, #mval_m_sqlnull
+	b.ne	sqlnull					/* jump to l40 if MV_SQLNULL bit is set */
 	mv_if_number x1, numer
 	mov	x28, x1
 	mov	x0, x1
@@ -49,6 +52,15 @@ numer:
 	ldr	x1, [x1, #mval_l_m1]
 	sub	x1, xzr, x1
 	str	x1, [x0, #mval_l_m1]
+	b	done
+sqlnull:
+	/* Copy the Mval from [x1] to [x0] */
+	mov	w11, #mval_byte_len
+mvalcopy:
+	ldp	x12, x13, [x1], #+16
+	stp	x12, x13, [x0], #+16
+	subs	w11, w11, #16
+	b.gt	mvalcopy
 	b	done
 float:
 	mov	w3, #mval_m_nm

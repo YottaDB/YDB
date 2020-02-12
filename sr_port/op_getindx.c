@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,7 +35,7 @@ error_def(ERR_LVNULLSUBS);
 lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 {
 	VMS_ONLY(int		argcnt;)
-	boolean_t		is_canonical;
+	boolean_t		is_canonical, is_sqlnull;
 	int			arg1;
 	int                     length;
 	mval			*key;
@@ -66,22 +66,27 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 		{
 			assert(!TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype));
 			assert(MV_IS_STRING(key));
-			if ((0 == key->str.len) && (LVNULLSUBS_NEVER == TREF(lv_null_subs)))
+			is_sqlnull = MV_IS_SQLNULL(key);
+			/* If input "key" is $ZYSQLNULL, then do not do NULLSUBS checks or collation transformations */
+			if (!is_sqlnull)
 			{
-				va_end(var);
-				rts_error(VARLSTCNT(1) ERR_LVNULLSUBS);
-			}
-			if (TREF(local_collseq))
-			{
-				ALLOC_XFORM_BUFF(key->str.len);
-				tmp_sbs.mvtype = MV_STR;
-				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
-				assert(NULL != TREF(lcl_coll_xform_buff));
-				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
-				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
-				tmp_sbs.str.len = length;
-				s2pool(&(tmp_sbs.str));
-				key = &tmp_sbs;
+				if ((0 == key->str.len) && (LVNULLSUBS_NEVER == TREF(lv_null_subs)))
+				{
+					va_end(var);
+					rts_error(VARLSTCNT(1) ERR_LVNULLSUBS);
+				}
+				if (TREF(local_collseq))
+				{
+					ALLOC_XFORM_BUFF(key->str.len);
+					tmp_sbs.mvtype = MV_STR;
+					tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+					assert(NULL != TREF(lcl_coll_xform_buff));
+					tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
+					do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
+					tmp_sbs.str.len = length;
+					s2pool(&(tmp_sbs.str));
+					key = &tmp_sbs;
+				}
 			}
 			lv = lvAvlTreeLookupStr(lvt, key, &parent);
 		} else
@@ -89,6 +94,7 @@ lv_val	*op_getindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			 * But input mval could be read-only so cannot modify that even if temporarily.
 			 * So take a copy of the mval and modify that instead.
 			 */
+			assert(!MV_IS_SQLNULL(key));
 			tmp_sbs = *key;
 			key = &tmp_sbs;
 			MV_FORCE_NUM(key);

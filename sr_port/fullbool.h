@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,9 +32,9 @@ enum gtm_se_type
 #define TRACK_JMP_TARGET(T, REF0)												\
 MBSTART {	/* T is triple to tag; REF0 is the new target triple with which it's tagged */					\
 	tripbp = &T->jmplist;						/* borrow jmplist to track jmp targets */		\
-	assert(NULL == tripbp->bpt);												\
+	assert(NULL == tripbp->bkptr);												\
 	assert((tripbp == tripbp->que.fl) && (tripbp == tripbp->que.bl));							\
-	tripbp->bpt = REF0;						/* point to the new location */				\
+	tripbp->bkptr = REF0;						/* point to the new location */				\
 	dqins(TREF(bool_targ_ptr), que, tripbp);			/* queue jmplist for clean-up */			\
 } MBEND
 

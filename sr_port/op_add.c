@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,17 +18,18 @@
 
 LITREF int4	ten_pwr[] ;
 LITREF mval	literal_zero;
+LITREF mval	literal_sqlnull;
 
 error_def(ERR_NUMOFLOW);
 
 void add_mvals(mval *u, mval *v, int subtraction, mval *result)
 {
-        int delta, uexp, vexp, exp;
-        int4 m0, m1, n0, n1, x, factor;
-	char usign, vsign, rsign;
+        int	delta, uexp, vexp, exp;
+        int4	m0, m1, n0, n1, x, factor;
+	char	usign, vsign, rsign;
 
         m1 = u->m[1];
-        if ((u->mvtype & MV_INT) == 0)
+        if (0 == (u->mvtype & MV_INT))
         {
 		usign = u->sgn;
                 m0 = u->m[0];
@@ -46,7 +50,7 @@ void add_mvals(mval *u, mval *v, int subtraction, mval *result)
                         ;
         }
         n1 = v->m[1];
-        if ((v->mvtype & MV_INT) == 0)
+        if (0 == (v->mvtype & MV_INT))
         {
                 n0 = v->m[0];
                 vexp = v->e;
@@ -229,6 +233,14 @@ void op_add (mval *u, mval *v, mval *s)
         int4    m0, m1;
 	char	utype, vtype;
 
+	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
+	if (MV_IS_SQLNULL(u) || MV_IS_SQLNULL(v))
+	{
+		MV_FORCE_DEFINED(u);
+		MV_FORCE_DEFINED(v);
+		*s = literal_sqlnull;
+		return;
+	}
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
 	utype = u->mvtype;
@@ -266,6 +278,14 @@ void op_sub (mval *u, mval *v, mval *s)
         int4    m0, m1;
 	char	utype, vtype;
 
+	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
+	if (MV_IS_SQLNULL(u) || MV_IS_SQLNULL(v))
+	{
+		MV_FORCE_DEFINED(u);
+		MV_FORCE_DEFINED(v);
+		*s = literal_sqlnull;
+		return;
+	}
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
 	utype = u->mvtype;

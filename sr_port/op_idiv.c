@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2011 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,23 +21,34 @@
 
 LITREF int4	ten_pwr[];
 LITREF mval	literal_zero;
+LITREF mval	literal_sqlnull;
 
 error_def(ERR_NUMOFLOW);
+error_def(ERR_DIVZERO);
 
 void	op_idiv(mval *u, mval *v, mval *q)
 {
-	bool		promo;
+	boolean_t	promo;
 	int4		z, c, exp;
 	mval		w, y;
+	int		u_mvtype, v_mvtype;
 
-	error_def	(ERR_DIVZERO);
-
+	/* If u or v is $ZYSQLNULL, the result is $ZYSQLNULL */
+	if (MV_IS_SQLNULL(u) || MV_IS_SQLNULL(v))
+	{
+		MV_FORCE_DEFINED(u);
+		MV_FORCE_DEFINED(v);
+		*q = literal_sqlnull;
+		return;
+	}
 	MV_FORCE_NUM(u);
 	MV_FORCE_NUM(v);
-	assert((v->mvtype & MV_INT) || (0 != v->m[0]) || (0 != v->m[1]));
-	if ((v->mvtype & MV_INT)  &&  v->m[1] == 0)
+	u_mvtype = u->mvtype;
+	v_mvtype = v->mvtype;
+	assert((v_mvtype & MV_INT) || (0 != v->m[0]) || (0 != v->m[1]));
+	if ((v_mvtype & MV_INT) && (0 == v->m[1]))
 		rts_error(VARLSTCNT(1) ERR_DIVZERO);
-	if (u->mvtype & MV_INT & v->mvtype)
+	if (u_mvtype & MV_INT & v_mvtype)
 	{
 		promo = eb_int_div(u->m[1], v->m[1], q->m);
 		if (!promo)
@@ -53,12 +64,12 @@ void	op_idiv(mval *u, mval *v, mval *q)
 			u = &w;
 			v = &y;
 		}
-	} else  if (u->mvtype & MV_INT)
+	} else  if (u_mvtype & MV_INT)
 	{
 		w = *u;
 		promote(&w);
 		u = &w;
-	} else  if (v->mvtype & MV_INT)
+	} else  if (v_mvtype & MV_INT)
 	{
 		w = *v;
 		promote(&w);

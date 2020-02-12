@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,13 +34,12 @@
 #include "numcmp.h"
 #include "patcode.h"
 #include "mvalconv.h"
-#include "follow.h"
+#include "zwr_follow.h"
 #include "gtm_string.h"
 #include "alias.h"
 #include "promodemo.h"	/* for "demote" prototype used in LV_NODE_GET_KEY */
 #include "jobsp.h"
-
-#define eb_less(u, v)    (numcmp(u, v) < 0)
+#include "numcmp.h"
 
 #define COMMON_STR_PROCESSING(NODE)										\
 {														\
@@ -48,7 +47,7 @@
 	mval 		tmp_sbs;										\
 														\
 	assert(MV_STR & mv.mvtype);										\
-	if (TREF(local_collseq))										\
+	if (TREF(local_collseq) && !MVTYPE_IS_SQLNULL(mv.mvtype))						\
 	{													\
 		key_mstr = mv.str;										\
 		mv.str.len = 0;	/* protect from "stp_gcol", if zwr_sub->subsc_list[n].actual points to mv */	\
@@ -74,7 +73,7 @@
 			if (zwr_sub->subsc_list[n].first)							\
 			{											\
 				if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first) &&				\
-						(!follow(&mv, zwr_sub->subsc_list[n].first) &&			\
+						(!zwr_follow(&mv, zwr_sub->subsc_list[n].first) &&		\
 						(mv.str.len != zwr_sub->subsc_list[n].first->str.len ||		\
 					  	memcmp(mv.str.addr, zwr_sub->subsc_list[n].first->str.addr,	\
 						mv.str.len))))							\
@@ -83,7 +82,7 @@
 			if (do_lev && zwr_sub->subsc_list[n].second)						\
 			{											\
 				if (MV_IS_CANONICAL(zwr_sub->subsc_list[n].second) ||				\
-						(!follow(zwr_sub->subsc_list[n].second, &mv) &&			\
+						(!zwr_follow(zwr_sub->subsc_list[n].second, &mv) &&		\
 						(mv.str.len != zwr_sub->subsc_list[n].second->str.len ||	\
 					  	memcmp(mv.str.addr,						\
 						zwr_sub->subsc_list[n].second->str.addr,			\
@@ -96,33 +95,33 @@
 		lvzwr_var((lv_val *)NODE, n + 1);								\
 }
 
-#define COMMON_NUMERIC_PROCESSING(NODE)								\
-{												\
-	do_lev = TRUE;										\
-	if (n < lvzwrite_block->subsc_count)							\
-	{											\
-		if (zwr_sub->subsc_list[n].subsc_type == ZWRITE_PATTERN)			\
-		{										\
-			if (!do_pattern(&mv, zwr_sub->subsc_list[n].first))			\
-				do_lev = FALSE;							\
-		} else  if (zwr_sub->subsc_list[n].subsc_type != ZWRITE_ALL)			\
-		{										\
-			if (zwr_sub->subsc_list[n].first)					\
-			{									\
-		 		if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first)		\
-						|| eb_less(&mv, zwr_sub->subsc_list[n].first))	\
-					do_lev = FALSE;						\
-			}									\
-			if (do_lev && zwr_sub->subsc_list[n].second)				\
-			{									\
-				if (MV_IS_CANONICAL(zwr_sub->subsc_list[n].second)		\
-						&& eb_less(zwr_sub->subsc_list[n].second, &mv))	\
-					do_lev = FALSE;						\
-			}									\
-		}										\
-	}											\
-	if (do_lev)										\
-		lvzwr_var((lv_val *)NODE, n + 1);						\
+#define COMMON_NUMERIC_PROCESSING(NODE)									\
+{													\
+	do_lev = TRUE;											\
+	if (n < lvzwrite_block->subsc_count)								\
+	{												\
+		if (zwr_sub->subsc_list[n].subsc_type == ZWRITE_PATTERN)				\
+		{											\
+			if (!do_pattern(&mv, zwr_sub->subsc_list[n].first))				\
+				do_lev = FALSE;								\
+		} else  if (zwr_sub->subsc_list[n].subsc_type != ZWRITE_ALL)				\
+		{											\
+			if (zwr_sub->subsc_list[n].first)						\
+			{										\
+		 		if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first)			\
+						|| (0 > numcmp(&mv, zwr_sub->subsc_list[n].first)))	\
+					do_lev = FALSE;							\
+			}										\
+			if (do_lev && zwr_sub->subsc_list[n].second)					\
+			{										\
+				if (MV_IS_CANONICAL(zwr_sub->subsc_list[n].second)			\
+						&& (0 > numcmp(zwr_sub->subsc_list[n].second, &mv)))	\
+					do_lev = FALSE;							\
+			}										\
+		}											\
+	}												\
+	if (do_lev)											\
+		lvzwr_var((lv_val *)NODE, n + 1);							\
 }
 
 GBLREF lvzwrite_datablk	*lvzwrite_block;
@@ -165,8 +164,6 @@ void lvzwr_var(lv_val *lv, int4 n)
 	mval		mv;
 	int             length;
 	lv_val		*var;
-	char		*top;
-	int4		i;
 	boolean_t	do_lev, verify_hash_add, htent_added, value_printed_pending;
 	zwr_sub_lst	*zwr_sub;
 	ht_ent_addr	*tabent_addr;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -91,6 +91,8 @@ unsigned char *mval2subsc(mval *in_val, gv_key *out_key, boolean_t std_null_coll
 		mvt = in_val->mvtype | MV_NUM_APPROX;
 	} else
 		mvt = (uint4)in_val->mvtype;
+	if (MVTYPE_IS_SQLNULL(mvt))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZYSQLNULLNOTVALID);
 	if (!(mvt & (MV_NM | MV_NUM_APPROX)))
 	{	/* Not currently in numeric form.  Is it cannonical? */
 		if (val_iscan(in_val))

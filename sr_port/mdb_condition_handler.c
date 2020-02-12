@@ -92,6 +92,7 @@
 #include "iottdef.h"
 #include "trace_table.h"
 #include "caller_id.h"
+#include "bool_zysqlnull.h"
 
 GBLREF	boolean_t		created_core, dont_want_core, in_gvcst_incr, run_time;
 GBLREF	boolean_t		ztrap_explicit_null;		/* whether $ZTRAP was explicitly set to NULL in this frame */
@@ -213,9 +214,6 @@ boolean_t clean_mum_tstart(void);
  */
 boolean_t clean_mum_tstart(void)
 {
-	stack_frame	*save_zyerr_frame, *fp, *fpprev;
-	boolean_t	save_check_flag;
-
 	if (NULL != zyerr_frame)
 	{
 		while ((NULL != frame_pointer) && (NULL != zyerr_frame))
@@ -244,13 +242,11 @@ CONDITION_HANDLER(mdb_condition_handler)
 	int			src_line_max = MAX_ENTRYREF_LEN;
 	mstr			src_line_d;
 	io_desc			*err_dev;
-	tp_region		*tr;
-	gd_region		*reg_top, *reg_save, *reg_local;
+	gd_region		*reg_top, *reg_local;
 	gd_addr			*addr_ptr;
 	jnlpool_addrs_ptr_t	local_jnlpool;
 	sgmnt_addrs		*csa;
 	stack_frame		*fp;
-	boolean_t		error_in_zyerror;
 	boolean_t		repeat_error, etrap_handling, reset_mpc;
 	int			level, rc;
 	boolean_t		reserve_sock_dev = FALSE;
@@ -281,7 +277,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 	if (NULL != alias_retarg)
 		CLEAR_ALIAS_RETARG;
 	assert(NULL == TREF(gtmci_retval));
-	TREF(gtmci_retval) = NULL;		/* Clear any dangling set */
+	TREF(gtmci_retval) = NULL;			/* Clear any dangling set */
+	bool_zysqlnull_finish_error_if_needed();	/* Clean up any in-progress boolean expression evaluation */
 	if ((int)ERR_UNSOLCNTERR == SIGNAL)
 	{
 		/* This is here for linking purposes.  We want to delay the receipt of

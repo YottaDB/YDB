@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -10,6 +13,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gdsroot.h"
 #include "gtm_facility.h"
 #include "fileinfo.h"
@@ -22,11 +26,10 @@
 #include "patcode.h"
 #include "sgnl.h"
 #include "mvalconv.h"
-#include "follow.h"
+#include "zwr_follow.h"
 #include "gtm_string.h"
 #include "gtmimagename.h"
-
-#define eb_less(u, v)	(numcmp(u, v) < 0)
+#include "numcmp.h"
 
 GBLREF gv_key		*gv_currkey;
 GBLREF gvzwrite_datablk *gvzwrite_block;
@@ -158,12 +161,12 @@ void gvzwr_var(uint4 data, int4 n)
 						if (MV_IS_CANONICAL(&mv))
 						{
 							if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first)
-							    || eb_less(&mv, zwr_sub->subsc_list[n].first))
+									|| (0 > numcmp(&mv, zwr_sub->subsc_list[n].first)))
 								do_lev = FALSE;
 						} else
 						{
 							if (!MV_IS_CANONICAL(zwr_sub->subsc_list[n].first)
-							    && (!follow(&mv, zwr_sub->subsc_list[n].first) &&
+							    && (!zwr_follow(&mv, zwr_sub->subsc_list[n].first) &&
 								(mv.str.len != zwr_sub->subsc_list[n].first->str.len ||
 								 memcmp(mv.str.addr,
 									zwr_sub->subsc_list[n].first->str.addr,
@@ -177,12 +180,12 @@ void gvzwr_var(uint4 data, int4 n)
 						if (MV_IS_CANONICAL(&mv))
 						{
 							if (MV_IS_CANONICAL(zwr_sub->subsc_list[n].second)
-							    && eb_less(zwr_sub->subsc_list[n].second, &mv))
+									&& (0 > numcmp(zwr_sub->subsc_list[n].second, &mv)))
 								do_lev = FALSE;
 						} else
 						{
 							if (MV_IS_CANONICAL(zwr_sub->subsc_list[n].second)
-							    ||	(!follow(zwr_sub->subsc_list[n].second, &mv) &&
+							    ||	(!zwr_follow(zwr_sub->subsc_list[n].second, &mv) &&
 								 (mv.str.len != zwr_sub->subsc_list[n].second->str.len ||
 								  memcmp(mv.str.addr,
 									 zwr_sub->subsc_list[n].second->str.addr,

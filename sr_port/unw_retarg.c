@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -44,6 +44,7 @@
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
 #include "ztimeout_routines.h"
+#include "bool_zysqlnull.h"
 
 GBLREF	void			(*unw_prof_frame_ptr)(void);
 GBLREF	stack_frame		*frame_pointer, *zyerr_frame;
@@ -74,12 +75,13 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	rhdtyp		*rtnhdr;
 	mval		ret_value, *trg;
 	boolean_t	got_ret_target;
-	stack_frame	*prevfp;
 	lv_val		*srclv, *srclvc, *base_lv;
 	symval		*symlv, *symlvc;
-	int4		srcsymvlvl;
 	int4		event_type, param_val;
-	void (*set_fn)(int4 param);
+	void		(*set_fn)(int4 param);
+#	ifdef DEBUG_ERRHND
+	stack_frame	*prevfp;
+#	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -183,6 +185,7 @@ int unw_retarg(mval *src, boolean_t alias_return)
 	DRAIN_GLVN_POOL_IF_NEEDED;
 	PARM_ACT_UNSTACK_IF_NEEDED;
 	USHBIN_ONLY(rtnhdr = frame_pointer->rvector);	/* Save rtnhdr for cleanup call below */
+	bool_zysqlnull_unwind();
 	frame_pointer = frame_pointer->old_frame_pointer;
 	DBGEHND((stderr, "unw_retarg: Stack frame 0x"lvaddr" unwound - frame 0x"lvaddr" now current - New msp: 0x"lvaddr"\n",
 		 prevfp, frame_pointer, msp));

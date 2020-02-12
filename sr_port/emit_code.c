@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -213,6 +213,7 @@ void trip_gen(triple *ct)
 			case OC_FORLCLDO:
 			case OC_CALLSP:
 #				ifdef __x86_64__
+				assert(0 < ttt[tp]);
 				tsp = (short *)&ttt[ttt[tp]];
 				if ((-128 <= tsp[CALL_4LCLDO_XFER]) && (127 >= tsp[CALL_4LCLDO_XFER]))
 					off = jmp_offset - XFER_BYTE_INST_SIZE;
@@ -223,24 +224,34 @@ void trip_gen(triple *ct)
 				else
 				{
 					call_4lcldo_variant = JMP_LONG_INST_SIZE;	/* used by emit_jmp */
+					assert(0 < ttt[tp + 1]);
 					tsp = (short *)&ttt[ttt[tp + 1]];
 					if ((-128 <= tsp[CALL_4LCLDO_XFER]) && (127 >= tsp[CALL_4LCLDO_XFER]))
 						off = jmp_offset - XFER_BYTE_INST_SIZE;
 					else
 						off = jmp_offset - XFER_LONG_INST_SIZE;
-					if ((-32768 > (off - JMP_LONG_INST_SIZE)) &&
-						(32767 < (off - JMP_LONG_INST_SIZE)))
+					if ((-32768 > (off - JMP_LONG_INST_SIZE)) && (32767 < (off - JMP_LONG_INST_SIZE)))
+					{
+						assert(0 < ttt[tp + 2]);
 						tsp = (short *)&ttt[ttt[tp + 2]];
+					}
 				}
 				break;
 #				else
 				off = (jmp_offset - CALL_INST_SIZE)/INST_SIZE;	/* [kmk] */
 				if ((-128 <= off) && (127 >= off))
+				{
+					assert(0 < ttt[tp]);
 					tsp = &ttt[ttt[tp]];
-				else if ((-32768 <= off) && (32767 >= off))
+				} else if ((-32768 <= off) && (32767 >= off))
+				{
+					assert(0 < ttt[tp + 1]);
 					tsp = &ttt[ttt[tp + 1]];
-				else
+				} else
+				{
+					assert(0 < ttt[tp + 2]);
 					tsp = &ttt[ttt[tp + 2]];
+				}
 				break;
 #				endif /* __x86_64__ */
 			case OC_JMP:
@@ -250,10 +261,9 @@ void trip_gen(triple *ct)
 			case OC_JMPLEQ:
 			case OC_JMPNEQ:
 			case OC_JMPLSS:
-			case OC_JMPTSET:
-			case OC_JMPTCLR:
 			case OC_LDADDR:
 			case OC_FORLOOP:
+				assert(0 < ttt[tp]);
 				tsp = &ttt[ttt[tp]];
 				break;
 			default:
@@ -261,19 +271,22 @@ void trip_gen(triple *ct)
 		}
 	} else if (OCT_COERCE & oct)
 	{
-		switch (oc_tab[ct->operand[0].oprval.tref->opcode].octype & (OCT_VALUE | OCT_BOOL))
+		switch (oc_tab[ct->operand[0].oprval.tref->opcode].octype & OCT_VALUE)
 		{
 			case OCT_MVAL:
+				assert(0 < ttt[tp]);
 				tp = ttt[tp];
 				break;
 			case OCT_MINT:
+				assert(0 < ttt[tp + 3]);
 				tp = ttt[tp + 3];
 				break;
 			case OCT_BOOL:
+				assert(0 < ttt[tp + 4]);
 				tp = ttt[tp + 4];
 				break;
 			default:
-				assertpro(FALSE && (oc_tab[ct->operand[0].oprval.tref->opcode].octype & (OCT_VALUE | OCT_BOOL)));
+				assertpro(FALSE && (oc_tab[ct->operand[0].oprval.tref->opcode].octype & OCT_VALUE));
 				break;
 		}
 		tsp = &ttt[tp];
@@ -373,8 +386,8 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 	boolean_t	oc_int;
 	oprtype		*opr;
 	triple		*ct;
-	int		cnt, cnttop, reg, words_to_move, reg_offset, save_reg_offset, targ_reg;
-	int		branch_idx, branch_offset, loop_top_idx, instr;
+	int		cnt, reg;
+	int		instr;
 
 	code_idx = 0;
 	switch (cg_phase)
@@ -655,6 +668,8 @@ short *emit_vax_inst (short *inst, oprtype **fst_opr, oprtype **lst_opr)
 					 * we put the whole mval copy code gen thing in a loop so we can do this regardless of how
 					 * big it gets.
 					 */
+					int	cnttop, words_to_move, reg_offset, save_reg_offset, targ_reg;
+
 					for (words_to_move = MVAL_INT_SIZE, reg_offset = 0; words_to_move;)
 					{
 						reg = MACHINE_FIRST_ARG_REG;
@@ -1051,12 +1066,9 @@ void emit_pcrel(void)
 void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_reg)
 {
 	boolean_t	inst_emitted;
-	unsigned char	reg, op_mod, op_reg;
+	unsigned char	reg;
 	int		offset, immediate;
-	int		upper_idx, lower_idx;
 	triple		*ct;
-	int		low, extra, high;
-	unsigned int	save_inst, inst;
 	GTM64_ONLY(int	next_ptr_offset = 8;)
 	if (TRIP_REF == opr->oprclass)
 	{
@@ -1323,6 +1335,12 @@ void emit_trip(oprtype *opr, boolean_t val_output, uint4 generic_inst, int trg_r
 							memcpy(obpt, &vdat_immed[0], VDAT_IMMED_SIZE);
 							obpt += VDAT_IMMED_SIZE;
 							obpt = i2asc((uchar_ptr_t)obpt, immediate);
+							*obpt++ = SP;
+							*obpt++ = '[';
+							*obpt++ = '0';
+							*obpt++ = 'x';
+							obpt = i2asclx((uchar_ptr_t)obpt, immediate);
+							*obpt++ = ']';
 							EMIT_TRIP_ILIT_GEN;
 							inst_emitted = TRUE;
 							break;
@@ -1722,7 +1740,6 @@ int gtm_reg(int vax_reg)
 
 void emit_push(int reg)
 {
-	int	arg_reg_i;
 	int	stack_offset;
 
 	switch (cg_phase)
@@ -1772,8 +1789,6 @@ void emit_push(int reg)
 
 void emit_pop(int count)
 {
-	int	stack_adjust;
-
 	assert(stack_depth >= count);
 	stack_depth -= count;
 	/* It's possible we lost count after a jsb (see VXI_JSB). */

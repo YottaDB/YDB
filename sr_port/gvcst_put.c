@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -258,8 +258,6 @@ error_def(ERR_UNIMPLOP);
 
 CONDITION_HANDLER(gvcst_put_ch)
 {
-	int rc;
-
 	START_CH(TRUE);
 	if ((int)ERR_TPRETRY == SIGNAL)
 	{	/* delay tp_restart till after the long jump and some other stuff */
@@ -290,6 +288,8 @@ void	gvcst_put(mval *val)
 	parms.enable_trigger_read_and_fire = TRUE;
 	parms.enable_jnl_format = TRUE;
 	lcl_root = gv_target->root;
+	if (MV_IS_SQLNULL(val))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_ZYSQLNULLNOTVALID);
 	/* deal with possibility of spanning nodes */
 	DEBUG_ONLY(save_dollar_tlevel = dollar_tlevel);
 	fits = RECORD_FITS_IN_A_BLOCK(val, gv_currkey, cs_data->blk_size, parms.blk_reserved_bytes);
@@ -445,7 +445,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	blk_segment		*bs1, *bs_ptr, *new_blk_bs;
 	block_id		allocation_clue, tp_root, gvt_for_root, blk_num, last_split_blk_num[MAX_BT_DEPTH];
 	block_index		left_hand_index, ins_chain_index, root_blk_cw_index, next_blk_index;
-	block_offset		next_offset, first_offset, ins_off1, ins_off2, old_curr_chain_next_off;
+	block_offset		ins_off1, ins_off2, old_curr_chain_next_off;
 	cw_set_element		*cse, *cse_new, *old_cse;
 	gv_namehead		*save_targ, *split_targ, *dir_tree;
 	enum cdb_sc		status, status2;
@@ -460,9 +460,9 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	int			cur_blk_size, blk_seg_cnt, delta, i, j, left_hand_offset, n, ins_chain_offset,
 				new_blk_size_l, new_blk_size_r, new_blk_size_single, new_blk_size, blk_reserved_size,
 				last_possible_left_offset, new_rec_size, next_rec_shrink, next_rec_shrink1, start_len,
-				offset_sum, rec_cmpc, tmp_cmpc, target_key_size, tp_lev, undo_index, cur_val_offset,
+				offset_sum, rec_cmpc, tmp_cmpc, target_key_size, undo_index, cur_val_offset,
 				curr_offset, bh_level;
-	uint4			segment_update_array_size, key_top, cp2_len, bs1_2_len, bs1_3_len;
+	uint4			segment_update_array_size, bs1_2_len, bs1_3_len;
 	char			*va, last_split_direction[MAX_BT_DEPTH];
 	sm_uc_ptr_t		cp1, cp2, curr;
 	unsigned short		extra_record_blkid_off, rec_size, tmp_rsiz;
@@ -471,8 +471,6 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	boolean_t		make_it_null, gbl_target_was_set, duplicate_set, new_rec_goes_to_right, need_extra_block_split;
 	key_cum_value		*tempkv;
 	jnl_format_buffer	*jfb, *ztworm_jfb;
-	jnl_action		*ja;
-	mval			*set_val;	/* actual right-hand-side value of the SET or $INCR command */
 	mval			*val_forjnl;
 	ht_ent_int4		*tabent;
 	unsigned char		buff[MAX_ZWR_KEY_SZ], *end, old_ch, new_ch;
@@ -480,7 +478,7 @@ void	gvcst_put2(mval *val, span_parms *parms)
 	block_id		lcl_root, last_split_bnum, *null_block_id;
 	sgm_info		*si;
 	uint4			nodeflags;
-	boolean_t		write_logical_jnlrecs, can_write_logical_jnlrecs, blk_match, is_split_dir_left;
+	boolean_t		write_logical_jnlrecs, blk_match, is_split_dir_left;
 	boolean_t		split_to_right;	/* FALSE if a block split creates a new block on the left of the split point.
 						 *	In this case, a "t_create" is needed for the new block on the left
 						 *	and a "t_write" is needed for the current block (right side of split).

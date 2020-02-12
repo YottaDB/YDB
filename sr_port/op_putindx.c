@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -137,25 +137,29 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 		{
 			assert(MV_IS_STRING(key));
 			assert(!TREE_KEY_SUBSCR_IS_CANONICAL(key->mvtype));
-			if (!key->str.len)
+			/* If input "key" is $ZYSQLNULL, then do not do NULLSUBS checks or collation transformations */
+			if (!MV_IS_SQLNULL(key))
 			{
-				if (LVNULLSUBS_OK != TREF(lv_null_subs))	/* Error for both LVNULLSUBS_{NO,NEVER} */
+				if (!key->str.len)
 				{
-					va_end(var);
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVNULLSUBS);
+					if (LVNULLSUBS_OK != TREF(lv_null_subs))	/* Error for both LVNULLSUBS_{NO,NEVER} */
+					{
+						va_end(var);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LVNULLSUBS);
+					}
 				}
-			}
-			if (TREF(local_collseq))
-			{	/* Do collation transformations */
-				ALLOC_XFORM_BUFF(key->str.len);
-				tmp_sbs.mvtype = MV_STR;
-				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
-				assert(NULL != TREF(lcl_coll_xform_buff));
-				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
-				do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
-				tmp_sbs.str.len = length;
-				s2pool(&(tmp_sbs.str));
-				key = &tmp_sbs;
+				if (TREF(local_collseq))
+				{	/* Do collation transformations */
+					ALLOC_XFORM_BUFF(key->str.len);
+					tmp_sbs.mvtype = MV_STR;
+					tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+					assert(NULL != TREF(lcl_coll_xform_buff));
+					tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
+					do_xform(TREF(local_collseq), XFORM, &key->str, &tmp_sbs.str, &length);
+					tmp_sbs.str.len = length;
+					s2pool(&(tmp_sbs.str));
+					key = &tmp_sbs;
+				}
 			}
 			if (lvt = LV_GET_CHILD(lv))	/* caution: assignment */
 				assert(MV_LV_TREE == lvt->ident);
@@ -167,6 +171,7 @@ lv_val	*op_putindx(UNIX_ONLY_COMMA(int argcnt) lv_val *start, ...)
 			 * But input mval could be read-only so cannot modify that even if temporarily.
 			 * So take a copy of the mval and modify that instead.
 			 */
+			assert(!MV_IS_SQLNULL(key));
 			tmp_sbs = *key;
 			key = &tmp_sbs;
 			MV_FORCE_NUM(key);

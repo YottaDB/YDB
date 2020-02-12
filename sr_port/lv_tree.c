@@ -3,7 +3,7 @@
  * Copyright (c) 2011-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -238,15 +238,31 @@ STATICFNDEF void lvAvlTreeNodeFltConv(lvTreeNodeNum *fltNode)
 		(retVAL) = -1; /* aSUBSCR is a number, but bNODE is a string */						\
 }
 
-#define	LV_AVL_TREE_STRKEY_CMP(aSUBSCR, aSUBSCR_ADDR, aSUBSCR_LEN, bNODE, retVAL)			\
-{													\
-	/* aSUBSCR is a string */									\
-	assert(!TREE_KEY_SUBSCR_IS_CANONICAL((aSUBSCR)->mvtype));					\
-	assert(MVTYPE_IS_STRING((aSUBSCR)->mvtype));							\
-	if (TREE_KEY_SUBSCR_IS_CANONICAL((bNODE)->key_mvtype))						\
-		(retVAL) = 1;	/* aSUBSCR is a string, but bNODE is a number */			\
-	else /* aSUBSCR and bNODE are both strings */							\
-		MEMVCMP(aSUBSCR_ADDR, aSUBSCR_LEN, (bNODE)->key_addr, (bNODE)->key_len, (retVAL));	\
+#define	LV_AVL_TREE_STRKEY_CMP(aSUBSCR, aSUBSCR_ADDR, aSUBSCR_LEN, bNODE, retVAL)				\
+{														\
+	int	bNodeMvtype;											\
+														\
+	/* aSUBSCR is a string */										\
+	assert(!TREE_KEY_SUBSCR_IS_CANONICAL((aSUBSCR)->mvtype));						\
+	assert(MVTYPE_IS_STRING((aSUBSCR)->mvtype));								\
+	bNodeMvtype = (bNODE)->key_mvtype;									\
+	if (TREE_KEY_SUBSCR_IS_CANONICAL(bNodeMvtype))								\
+		(retVAL) = 1;	/* aSUBSCR is a string, but bNODE is a number */				\
+	else if (!MVTYPE_IS_SQLNULL(bNodeMvtype))								\
+	{													\
+		if (!MVTYPE_IS_SQLNULL((aSUBSCR)->mvtype))							\
+		{	/* aSUBSCR and bNODE are both strings */						\
+			MEMVCMP(aSUBSCR_ADDR, aSUBSCR_LEN, (bNODE)->key_addr, (bNODE)->key_len, (retVAL));	\
+		} else												\
+		{	/* aSUBSCR is $ZYSQLNULL but bNode is a string */					\
+			(retVAL) = 1;										\
+		}												\
+	} else													\
+	{	/* bNODE is $ZYSQLNULL. This collates at the very end after all numbers and strings.		\
+		 * Check if aSUBSCR is also $ZYSQLNULL. Or else return -1.					\
+		 */												\
+		(retVAL) = (MVTYPE_IS_SQLNULL((aSUBSCR)->mvtype) ? 0 : -1);					\
+	}													\
 }
 
 #ifdef DEBUG
@@ -345,9 +361,27 @@ int lvAvlTreeNodeSubscrCmp(lvTreeNode *aNode, lvTreeNode *bNode)
 		assert(!MVTYPE_IS_STRING(b_mvtype));
 		return(1);	/* aNode is a string, but bNode is a number */
 	}
-	/* aNode and bNode are both strings */
 	assert(MVTYPE_IS_STRING(b_mvtype));
-	MEMVCMP(aNode->key_addr, aNode->key_len, bNode->key_addr, bNode->key_len, retVal);
+	/* Check for $ZYSQLNULL. That is handled specially (collates LAST after all strings). */
+	if (!MVTYPE_IS_SQLNULL(b_mvtype))
+	{	/* bNode is a string */
+		if (!MVTYPE_IS_SQLNULL(a_mvtype))
+		{	/* aNode and bNode are both strings */
+			MEMVCMP(aNode->key_addr, aNode->key_len, bNode->key_addr, bNode->key_len, retVal);
+		} else
+		{	/* aNode is $ZYSQLNULL but bNode is a string */
+			retVal = 1;
+		}
+	} else
+	{	/* bNode is $ZYSQLNULL */
+		if (!MVTYPE_IS_SQLNULL(a_mvtype))
+		{	/* aNode is a string and bNode is $ZYSQLNULL */
+			retVal = -1;
+		} else
+		{	/* aNode and bNode are both $ZYSQLNULL */
+			retVal = 0;
+		}
+	}
 	return retVal;
 }
 #endif
@@ -482,7 +516,6 @@ lvTreeNode *lvAvlTreeKeyPrev(lvTree *lvt, treeKeySubscr *key)
 lvTreeNode *lvAvlTreeNext(lvTreeNode *node)
 {
 	lvTreeNode	*next, *tmp, *parent;
-	DEBUG_ONLY(lvTree	*lvt;)
 
 	assert(NULL != node);
 	next = node->avl_right;
@@ -602,7 +635,7 @@ lvTreeNode *lvAvlTreeKeyCollatedNext(lvTree *lvt, treeKeySubscr *key)
 	SETUP_THREADGBL_ACCESS;
 	if (TREF(local_collseq_stdnull))
 	{
-		if (MV_IS_STRING(key) && (0 == key->str.len))
+		if (MV_IS_STRING(key) && !MV_IS_SQLNULL(key) && (0 == key->str.len))
 		{	/* want the subscript AFTER the null subscript. That is the FIRST node in the tree
 			 * unless the first one happens to also be the null subscript. In that case, we need
 			 * to hop over that and get the next node in the tree.
@@ -661,7 +694,6 @@ lvTreeNode *lvAvlTreeNodeCollatedNext(lvTreeNode *node)
 /* Returns the collated predecessor of the input "node" taking into account the currently effective null collation scheme */
 lvTreeNode *lvAvlTreeNodeCollatedPrev(lvTreeNode *node)
 {
-	boolean_t	get_prev;
 	lvTree		*lvt;
 	lvTreeNode	*nullsubsparent;
 	DCL_THREADGBL_ACCESS;
@@ -708,7 +740,7 @@ lvTreeNode *lvAvlTreeKeyCollatedPrev(lvTree *lvt, treeKeySubscr *key)
 	SETUP_THREADGBL_ACCESS;
 	if (TREF(local_collseq_stdnull))
 	{	/* Needs special handling like is done in "lvAvlTreeNodeCollatedPrev" */
-		if (MV_IS_STRING(key) && (0 == key->str.len))
+		if (MV_IS_STRING(key) && !MV_IS_SQLNULL(key) && (0 == key->str.len))
 		{	/* Input key is null subscript. This is the earliest subscript in standard null collation order */
 			return NULL;
 		}
@@ -735,7 +767,6 @@ lvTreeNode *lvAvlTreeKeyCollatedPrev(lvTree *lvt, treeKeySubscr *key)
 /* Function to clone an avl tree (used by the LV_TREE_CLONE macro). Uses recursion to descend the tree. */
 lvTreeNode *lvAvlTreeCloneSubTree(lvTreeNode *node, lvTree *lvt, lvTreeNode *avl_parent, boolean_t refCntMaint)
 {
-        lvTreeNodeVal	*dupVal;
         lvTreeNode        *cloneNode, *left, *right;
         lvTreeNode        *leftSubTree, *rightSubTree;
 	lvTree		*lvt_child;
@@ -822,11 +853,10 @@ STATICFNDEF boolean_t lvAvlTreeLookupKeyCheck(treeKeySubscr *key)
 
 boolean_t lvTreeIsWellFormed(lvTree *lvt)
 {
-	lvTreeNode	*avl_root, *tmpNode, *minNode, *maxNode, *sbs_parent, *avl_node, *node;
+	lvTreeNode	*avl_root, *tmpNode, *minNode, *maxNode, *sbs_parent;
 	treeSrchStatus	*lastLookup;
 	lvTree		*tmplvt;
-	int		nm_node_cnt, sbs_depth;
-	lv_val		*base_lv;
+	int		sbs_depth;
 
 	if (NULL != lvt)
 	{
@@ -1595,7 +1625,7 @@ STATICFNDEF lvTreeNode *lvAvlTreeSingleRotation(lvTreeNode *rebalanceNode, lvTre
 /* Comments before "lvAvlTreeSingleRotation" function definition describe what this function does */
 STATICFNDEF lvTreeNode *lvAvlTreeDoubleRotation(lvTreeNode *rebalanceNode, lvTreeNode *anchorNode, int4 balanceFactor)
 {
-	lvTreeNode	*newRoot, *node, *rebalanceChild, *anchorChild;
+	lvTreeNode	*newRoot, *rebalanceChild, *anchorChild;
 	int		balance;
 
 	TREE_DEBUG1("DOING DOUBLE ROTATION\n");
@@ -1684,9 +1714,8 @@ lvTreeNode *lvAvlTreeNodeInsert(lvTree *lvt, treeKeySubscr *key, lvTreeNode *par
 	lvTreeNode 	*node, *t_root, *tmp_parent, *anchorNode, *tmpNode, **nodePtr;
 	lvTreeNode	*rebalanceNode, *rebalanceNodeParent;
 	lvTreeNodeNum	*fltNode;
-	int		balanceFactor, curBalance, cmp, key_mvtype;
+	int		balanceFactor, curBalance, key_mvtype;
 	treeSrchStatus	*lastLookup;
-	DEBUG_ONLY(lvTreeNode	*dbg_node);
 
 	assert(MV_DEFINED(key));
 	/* At time of node insertion into tree, ensure that if we have MV_CANONICAL bit set, then MV_STR bit is not set.
@@ -1718,8 +1747,13 @@ lvTreeNode *lvAvlTreeNodeInsert(lvTree *lvt, treeKeySubscr *key, lvTreeNode *par
 			fltNode->key_m1 = key->m[1];
 		}
 	} else
-	{	/* Initialize lvTreeNode structure */
-		node->key_mvtype = MV_STR;	/* do not use input mvtype as it might have MV_NM or MV_NUM_APPROX bits set */
+	{	/* Initialize lvTreeNode structure. Clear MV_NM and/or MV_NUM_APPROX bits if they are set. */
+		if (!MVTYPE_IS_SQLNULL(key_mvtype))
+		{
+			node->key_mvtype = MV_STR;	/* Do not use input mvtype as it might have MV_NM/MV_NUM_APPROX bits set */
+		} else {
+			node->key_mvtype = MV_STR | MV_SQLNULL;
+		}
 		node->key_len = key->str.len;
 		node->key_addr = key->str.addr;
 	}

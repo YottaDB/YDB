@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,6 +22,7 @@
 
 void cdbg_dump_t_orig(void);
 void cdbg_dump_curtchain(void);
+void cdbg_dump_boolchain(void);
 void cdbg_dump_triple(triple *dtrip, int indent);
 void cdbg_dump_shrunk_triple(triple *dtrip, int old_size, int new_size);
 void cdbg_dump_operand(int indent, oprtype *opr, int opnum);

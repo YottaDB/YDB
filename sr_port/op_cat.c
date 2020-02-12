@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,15 +22,16 @@
 
 #define MAX_NUM_LEN 64
 
-GBLREF spdesc stringpool;
+GBLREF spdesc	stringpool;
+
+LITREF mval	literal_sqlnull;
 
 void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 {
-	va_list var;
-	mval *in, *src;
-	int maxlen, i;
-	VMS_ONLY(int srcargs;)
-	unsigned char *cp, *base;
+	va_list		var;
+	mval		*in;
+	int		maxlen, i;
+	unsigned char	*cp, *base;
 	error_def(ERR_MAXSTRLEN);
 
 	VAR_START(var, dst);
@@ -41,6 +45,11 @@ void op_cat(UNIX_ONLY_COMMA(int srcargs) mval *dst, ...)
 		   use MAX_NUM_LEN to estimate lengths of strings from to-be-converted numbers.
 		*/
 		in = va_arg(var, mval *);
+		if (MV_IS_SQLNULL(in))
+		{	/* If at least one operand in a string concatenation is $ZYSQLNULL, then the return value is $ZYSQLNULL */
+			*dst = literal_sqlnull;
+			return;
+		}
 		maxlen += (MV_IS_STRING(in)) ? (in)->str.len : MAX_NUM_LEN;
 		if (maxlen > MAX_STRLEN)
 		{

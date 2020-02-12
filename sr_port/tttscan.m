@@ -3,6 +3,9 @@
 ; Copyright (c) 2001-2015 Fidelity National Information 	;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
+; Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	;
+; All rights reserved.						;
+;								;
 ;	This source code contains the intellectual property	;
 ;	of its copyright holder(s), and is made available	;
 ;	under a license.  If you do not know the terms of	;
@@ -51,7 +54,7 @@ head	i tok'?1"OC_"1.AN.1"_".AN s z=1,em="invalid opcode name" d err,scan q
 	d scan
 	s z=0
 	q
-body	i dir=":"!((dir="-")&(tok?1"OC_"1.AN)) s z=0 q
+body	i dir=":"!((dir="-")&(tok?1"OC_"1.AN.1"_".AN)) s z=0 q
 	i $d(vxi(tok)) s ttt(ttt)=vxi(tok,1),ttt=ttt+1
 	e  i tok="irepab" s ttt(ttt)="VXT_IREPAB",ttt=ttt+1
 	e  i tok="irepl" s ttt(ttt)="VXT_IREPL",ttt=ttt+1

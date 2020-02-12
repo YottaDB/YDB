@@ -62,6 +62,8 @@ SIMPLEAPINOTALLOWED	<Process cannot switch to using Simple API while already usi
 STAPIFORKEXEC	<Calls to YottaDB are not supported after a fork() if threaded Simple API functions were in use in parent. Call exec() first>/error/fao=0
 INVVALUE	<!AD is invalid !AD value for !AD>/error/fao=6
 INVZCONVERT	<!AD Translation between !AD and !AD is not supported>/error/fao=6
+ZYSQLNULLNOTVALID	<$ZYSQLNULL cannot be used as an integer, numeric, gvn subscript/value or lock subscript>/error/fao=0
+BOOLEXPRTOODEEP	<Boolean expression depth exceeds maximum supported limit of 2047>/error/fao=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
 !

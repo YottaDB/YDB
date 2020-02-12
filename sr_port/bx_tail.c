@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -33,16 +36,19 @@ LITREF octabstruct oc_tab[];
  *			jmpf addr	jmpf addr
  **/
 
-void bx_tail(triple *t, boolean_t sense, oprtype *addr)
+void bx_tail(triple *t, boolean_t sense, oprtype *addr, int depth, opctype andor_opcode,
+						boolean_t caller_is_bool_expr, int jmp_depth, boolean_t is_last_bool_operand)
 /*
  * work a Boolean expression along to final form
- * triple		*t;     triple to be processed
+ * triple	*t;     triple to be processed
  * boolean_t	sense;  code to be generated is jmpt or jmpf
- * oprtype		*addr;  address to jmp
+ * oprtype	*addr;  address to jmp
+ * int		depth;	boolean expression recursion depth
  */
 {
-	opctype	c;
-	triple	*ref;
+	opctype		c;
+	triple		*ref;
+	opctype		jmp_opcode, new_andor_opcode;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -55,61 +61,60 @@ void bx_tail(triple *t, boolean_t sense, oprtype *addr)
 	switch (c)
 	{
 	case OC_COBOOL:
-		ex_tail(&t->operand[0]);
+		ex_tail(&t->operand[0], depth);
 		RETURN_IF_RTS_ERROR;
-		if (OC_GETTRUTH == t->operand[0].oprval.tref->opcode)
-		{
-			dqdel(t->operand[0].oprval.tref, exorder);
-			t->opcode = sense ? OC_JMPTSET : OC_JMPTCLR;
-			t->operand[0] = put_indr(addr);
-			return;
-		}
-		ref = maketriple(sense ? OC_JMPNEQ : OC_JMPEQU);
+		jmp_opcode = sense ? OC_JMPNEQ : OC_JMPEQU;
+		ref = maketriple(jmp_opcode);
 		ref->operand[0] = put_indr(addr);
 		dqins(t, exorder, ref);
+		ADD_BOOL_ZYSQLNULL_PARMS(t, depth, jmp_opcode, andor_opcode, caller_is_bool_expr, is_last_bool_operand, jmp_depth);
 		return;
 	case OC_COM:
-		bx_tail(t->operand[0].oprval.tref, !sense, addr);
+		ref = t->operand[0].oprval.tref;
+		new_andor_opcode = bx_get_andor_opcode(ref->opcode, andor_opcode);
+		bx_tail(ref, !sense, addr, depth, new_andor_opcode, caller_is_bool_expr, jmp_depth, is_last_bool_operand);
 		RETURN_IF_RTS_ERROR;
 		t->opcode = OC_NOOP;				/* maybe operand or target, so noop, rather than dqdel the com */
 		t->operand[0].oprclass = NO_REF;
 		return;
 	case OC_NEQU:
 	case OC_EQU:
-		bx_relop(t, OC_EQU, sense ? OC_JMPNEQ : OC_JMPEQU, addr);
+		bx_relop(t, c, sense, addr, depth, andor_opcode, caller_is_bool_expr, jmp_depth, is_last_bool_operand);
 		break;
 	case OC_NPATTERN:
 	case OC_PATTERN:
-		bx_relop(t, OC_PATTERN, sense ? OC_JMPNEQ : OC_JMPEQU, addr);
+		bx_relop(t, c, sense, addr, depth, andor_opcode, caller_is_bool_expr, jmp_depth, is_last_bool_operand);
 		break;
 	case OC_NFOLLOW:
 	case OC_FOLLOW:
-		bx_relop(t, OC_FOLLOW, sense ? OC_JMPGTR : OC_JMPLEQ, addr);
+		bx_relop(t, c, sense, addr, depth, andor_opcode, caller_is_bool_expr, jmp_depth, is_last_bool_operand);
 		break;
 	case OC_NSORTS_AFTER:
 	case OC_SORTS_AFTER:
-		bx_relop(t, OC_SORTS_AFTER, sense ? OC_JMPGTR : OC_JMPLEQ, addr);
+		bx_relop(t, c, sense, addr, depth, andor_opcode, caller_is_bool_expr, jmp_depth, is_last_bool_operand);
 		break;
 	case OC_NCONTAIN:
 	case OC_CONTAIN:
-		bx_relop(t, OC_CONTAIN, sense ? OC_JMPNEQ : OC_JMPEQU, addr);
+		bx_relop(t, c, sense, addr, depth, andor_opcode, caller_is_bool_expr, jmp_depth, is_last_bool_operand);
 		break;
 	case OC_NGT:
 	case OC_GT:
-		bx_relop(t, OC_NUMCMP, sense ? OC_JMPGTR : OC_JMPLEQ, addr);
+		bx_relop(t, c, sense, addr, depth, andor_opcode, caller_is_bool_expr, jmp_depth, is_last_bool_operand);
 		break;
 	case OC_NLT:
 	case OC_LT:
-		bx_relop(t, OC_NUMCMP, sense ? OC_JMPLSS : OC_JMPGEQ, addr);
+		bx_relop(t, c, sense, addr, depth, andor_opcode, caller_is_bool_expr, jmp_depth, is_last_bool_operand);
 		break;
 	case OC_NAND:
 	case OC_AND:
-		bx_boolop(t, FALSE, sense, sense, addr);
+		bx_boolop(t, FALSE, sense, sense, addr, depth + 1, andor_opcode, caller_is_bool_expr,
+										jmp_depth, is_last_bool_operand);
 		RETURN_IF_RTS_ERROR;
 		break;
 	case OC_NOR:
 	case OC_OR:
-		bx_boolop(t, TRUE, !sense, sense, addr);
+		bx_boolop(t, TRUE, !sense, sense, addr, depth + 1, andor_opcode, caller_is_bool_expr,
+										jmp_depth, is_last_bool_operand);
 		RETURN_IF_RTS_ERROR;
 		break;
 	default:

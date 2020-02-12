@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,10 +42,10 @@
 #include "mvalconv.h"
 #include "restrict.h"
 #include "dm_audit_log.h"
+#include "is_equ.h"		/* for MV_FORCE_NSTIMEOUT macro */
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
-#include "mvalconv.h"
 
 GBLREF io_pair		io_curr_device;
 GBLREF io_desc		*active_device;
@@ -56,12 +56,8 @@ error_def(ERR_APDLOGFAIL);
 
 int op_read(mval *v, mval *timeout)
 {
-	char		*save_ptr, *start_ptr;
 	int		stat;
 	uint8		nsec_timeout;
-	mval		val;
-	size_t		cnt, insize, outsize;
-	unsigned char	*temp_ch;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -76,6 +72,10 @@ int op_read(mval *v, mval *timeout)
 #	ifdef KEEP_zOS_EBCDIC
 	if (DEFAULT_CODE_SET != io_curr_device.in->in_code_set)
 	{
+		unsigned char	*temp_ch;
+		size_t		cnt, insize, outsize;
+		char		*save_ptr, *start_ptr;
+
 		cnt = insize = outsize = v->str.len;
 		assert(stringpool.free >= stringpool.base);
 		ENSURE_STP_FREE_SPACE(cnt);

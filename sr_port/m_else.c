@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,7 +23,7 @@ error_def(ERR_SPOREOL);
 
 int m_else(void)
 {
-	triple	*jmpref, elsepos_in_chain;
+	triple	*jmpref, elsepos_in_chain, *gettruth, *cobool;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -32,7 +35,12 @@ int m_else(void)
 		stx_error(ERR_SPOREOL);
 		return FALSE;
 	}
-	jmpref = newtriple(OC_JMPTSET);
+	gettruth = newtriple(OC_GETTRUTH);
+	cobool = newtriple(OC_COBOOL);
+	cobool->operand[0] = put_tref(gettruth);
+	ADD_BOOL_ZYSQLNULL_PARMS(cobool, INIT_GBL_BOOL_DEPTH, OC_NOOP, OC_NOOP,
+					CALLER_IS_BOOL_EXPR_FALSE, IS_LAST_BOOL_OPERAND_FALSE, INIT_GBL_BOOL_DEPTH);
+	jmpref = newtriple(OC_JMPNEQ);
 	FOR_END_OF_SCOPE(0, jmpref->operand[0]);
 	if (!linetail())
 	{	tnxtarg(&jmpref->operand[0]);

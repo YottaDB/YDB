@@ -310,6 +310,7 @@ LITDEF nametabent fun_names[] =
 	,{2, "ZW"}, {6, "ZWIDTH"}
 	,{3, "ZWR"}, {6, "ZWRITE"}
 	,{6, "ZYHASH"}
+	,{11, "ZYISSQLNULL"}
 };
 
 /* Index into fun_names array where entries that start with each letter of the alphabet begin. */
@@ -317,7 +318,7 @@ LITDEF unsigned char fun_index[27] =
 {
 	 0,  2,  2,  4,  6,  8, 12, 14, 14,	/* a b c d e f g h i */
 	17, 19, 19, 21, 21, 25, 27, 29, 35,	/* j k l m n o p q r */
-	39, 43, 47, 47, 48, 48, 48, 48, 123	/* s t u v w x y z ~ */
+	39, 43, 47, 47, 48, 48, 48, 48, 124	/* s t u v w x y z ~ */
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -400,6 +401,7 @@ LITDEF fun_data_type fun_data[] =
 	,{ OC_FNZWIDTH, ALL_SYS }, { OC_FNZWIDTH, ALL_SYS }
 	,{ OC_FNZWRITE, ALL_SYS }, { OC_FNZWRITE, ALL_SYS }
 	,{ OC_FNZYHASH, ALL_SYS }
+	,{ OC_FNZYISSQLNULL, ALL_SYS }
 };
 
 /* Each entry corresponds to an entry in fun_names */
@@ -481,7 +483,8 @@ GBLDEF int (*fun_parse[])(oprtype *, opctype) =		/* contains addresses so can't 
 	f_ztrnlnm,
 	f_zwidth, f_zwidth,
 	f_zwrite, f_zwrite,
-	f_zyhash
+	f_zyhash,
+	f_zyissqlnull
 };
 
 int expritem(oprtype *a)
@@ -494,7 +497,6 @@ int expritem(oprtype *a)
 	tbp		argbp, *funcbp, *tripbp;
 	triple		*argtrip, *functrip, *ref, *t1, *t2, *t3;
 	unsigned char	type;
-	unsigned int	argcnt;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -710,7 +712,9 @@ int expritem(oprtype *a)
 			case OC_FNZPREVIOUS:	/* only has 1 arg, but uses 2 for lvn interface */
 			case OC_INDINCR:	/* $increment() gets a pass because its ordering needs no protection */
 				return TRUE;
-		}	/* default falls through */
+			default:
+				break;
+		}
 		assert(0 < TREF(expr_depth));
 		/* This block protects lvn evaluations in earlier arguments from changes caused by side effects in later
 		 * arguments by capturing the prechange value in a temporary; coerce or preexisting temporary might already
@@ -726,15 +730,15 @@ int expritem(oprtype *a)
 		funcbp = &functrip->backptr;		/* borrow backptr to track args */
 		tripbp = &argbp;
 		dqinit(tripbp, que);
-		tripbp->bpt = NULL;
-		assert(NULL == funcbp->bpt);
+		tripbp->bkptr = NULL;
+		assert(NULL == funcbp->bkptr);
 		assert((funcbp == funcbp->que.fl) && (funcbp == funcbp->que.bl));
 		saw_se = saw_local = FALSE;
 		for (argtrip = t1; ; argtrip = t1)
 		{	/* work functrip,oprval.tref arguments forward */
 			if (argtrip != functrip)
 				tripbp = &argtrip->backptr;
-			assert(NULL == tripbp->bpt);
+			assert(NULL == tripbp->bkptr);
 			for (j = argtrip->operand; j < ARRAYTOP(argtrip->operand); j++)
 			{	/* process all (two) operands */
 				t1 = j->oprval.tref;
@@ -759,14 +763,14 @@ int expritem(oprtype *a)
 				if (!saw_local)
 					continue;			/* no local yet to worry about */
 				saw_se = TRUE;
-				if (NULL != tripbp->bpt)
+				if (NULL != tripbp->bkptr)
 				{	/* this one's already flagged */
 					assert((ARRAYTOP(argtrip->operand) - 1) == j);
 					continue;
 				}
 				/* chain stores args to manage later insert of temps to hold left values */
 				assert((tripbp == tripbp->que.fl) && (tripbp == tripbp->que.bl));
-				tripbp->bpt = argtrip;
+				tripbp->bkptr = argtrip;
 				dqins(funcbp, que, tripbp);
 			}
 			if ((NULL == t1) || (OC_PARAMETER != t1->opcode))
@@ -779,10 +783,10 @@ int expritem(oprtype *a)
 		se_warn = SE_WARN_ON;
 		dqloop(funcbp, que, tripbp)
 		{	/* work chained arguments which are in reverse order */
-			argtrip = tripbp->bpt;
+			argtrip = tripbp->bkptr;
 			assert(NULL != argtrip);
 			dqdel(tripbp, que);
-			tripbp->bpt = NULL;
+			tripbp->bkptr = NULL;
 			if (!saw_local)
 				continue;
 			/* found some need to insert temps */
@@ -807,7 +811,7 @@ int expritem(oprtype *a)
 					saw_se = TRUE;
 			}
 		}
-		assert((funcbp == funcbp->que.fl) && (funcbp == funcbp->que.bl) && (NULL == funcbp->bpt));
+		assert((funcbp == funcbp->que.fl) && (funcbp == funcbp->que.bl) && (NULL == funcbp->bkptr));
 		return TRUE;	/* end of order of evaluation processing for functions*/
 	case TK_COLON:
 		stx_error(ERR_EXPR);

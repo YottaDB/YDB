@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,6 +14,7 @@
  ****************************************************************/
 
 #include "mdef.h"
+
 #include "gtm_string.h"
 #include "compiler.h"
 #include "mdq.h"
@@ -28,23 +29,22 @@
 LITREF mval		literal_minusone, literal_one, literal_zero;
 LITREF octabstruct	oc_tab[];
 
-void ex_tail(oprtype *opr)
+void ex_tail(oprtype *opr, int depth)
 /* work a non-leaf operand toward final form
  * contains code to do arthimetic on literals at compile time
  * and code to bracket Boolean expressions with BOOLINIT and BOOLFINI
  */
 {
-	boolean_t	stop, tv;
 	mval		*v, *v0, *v1;
-	opctype		c;
+	opctype		c, andor_opcode;
 	oprtype		*i;
-	triple		*bftrip, *bitrip, *t, *t0, *t1, *t2;
-	uint		bexprs, oct;
+	triple		*bftrip, *bitrip, *t, *t0, *t1, *t2, *depthtrip;
+	enum octype_t	oct;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	assert(TRIP_REF == opr->oprclass);
-	UNARY_TAIL(opr);	/* this is first because it can change opr and thus whether we should even process the tail */
+	UNARY_TAIL(opr, depth); /* this is first because it can change opr and thus whether we should even process the tail */
 	RETURN_IF_RTS_ERROR;
 	t = opr->oprval.tref; /* Refind t since UNARY_TAIL may have shifted it */
 	c = t->opcode;
@@ -63,10 +63,10 @@ void ex_tail(oprtype *opr)
 					;
 				if (OCT_BOOL & oc_tab[t0->opcode].octype)
 				{
-					bx_boollit(t0);
+					bx_boollit(t0, depth);
 					RETURN_IF_RTS_ERROR;
 				}
-				ex_tail(i);			/* chained Boolean or arithmetic */
+				ex_tail(i, depth);	/* chained Boolean or arithmetic */
 				RETURN_IF_RTS_ERROR;
 			}
 		}
@@ -149,33 +149,32 @@ void ex_tail(oprtype *opr)
 			assert(opr->oprval.tref == t);
 			return;
 		}
-		if ((OC_COMINT == c) && (OC_BOOLINIT == (t0 = t->operand[0].oprval.tref)->opcode)) /* WARNING assignment */
-			opr->oprval.tref = t0;
 		return;
 	}
 	/* the following code deals with Booleans where the expression is not directly managing flow - those go through bool_expr */
-	for (t1 = t; ; t1 = t2)
-	{
-		assert(TRIP_REF == t1->operand[0].oprclass);
-		t2 = t1->operand[0].oprval.tref;
-		if (!(OCT_BOOL & oc_tab[t2->opcode].octype))
-			break;
-	}
+	t1 = bool_return_leftmost_triple(t);
 	bitrip = maketriple(OC_BOOLINIT);
 	DEBUG_ONLY(bitrip->src = t->src);
 	dqins(t1->exorder.bl, exorder, bitrip);
 	t2 = t->exorder.fl;
 	assert((OC_COMVAL == t2->opcode) || (OC_COMINT == t2->opcode));
 	assert(&t2->operand[0] == opr);				/* check next operation ensures an expression */
-	if (OC_COMINT == t2->opcode)
-		dqdel(t2, exorder);
+	/* Overwrite depth (set in coerce.c to INIT_GBL_BOOL_DEPTH) to current bool expr depth */
+	assert(TRIP_REF == t2->operand[1].oprclass);
+	depthtrip = t2->operand[1].oprval.tref;
+	assert(OC_ILIT == depthtrip->opcode);
+	assert(ILIT_REF == depthtrip->operand[0].oprclass);
+	assert(INIT_GBL_BOOL_DEPTH == depthtrip->operand[0].oprval.ilit);
+	depthtrip->operand[0].oprval.ilit = (mint)(depth + 1);
 	bftrip = maketriple(OC_BOOLFINI);
 	DEBUG_ONLY(bftrip->src = t->src);
 	bftrip->operand[0] = put_tref(bitrip);
 	opr->oprval.tref = bitrip;
 	dqins(t, exorder, bftrip);
 	i = (oprtype *)mcalloc(SIZEOF(oprtype));
-	bx_tail(t, FALSE, i);
+	andor_opcode = bx_get_andor_opcode(t->opcode, OC_NOOP);
+	CHECK_AND_RETURN_IF_BOOLEXPRTOODEEP(depth + 1);
+	bx_tail(t, FALSE, i, depth + 1, andor_opcode, CALLER_IS_BOOL_EXPR_FALSE, depth + 1, IS_LAST_BOOL_OPERAND_TRUE);
 	RETURN_IF_RTS_ERROR;
 	*i = put_tnxt(bftrip);
 	return;

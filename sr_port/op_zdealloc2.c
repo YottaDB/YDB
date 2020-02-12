@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -27,6 +27,7 @@
 #include "mlk_unlock.h"
 #include "gvcmx.h"
 #include "lckclr.h"
+#include "is_equ.h"
 
 GBLREF boolean_t	gtcm_connection;
 GBLREF bool		remlkreq;

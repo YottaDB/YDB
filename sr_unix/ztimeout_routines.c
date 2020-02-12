@@ -60,8 +60,8 @@
 #include "wbox_test_init.h"
 #include "gtmio.h"
 #include "compiler.h"
+#include "is_equ.h"
 #include "gtm_common_defs.h"
-
 
 GBLREF	stack_frame		*frame_pointer, *error_frame;
 GBLREF	spdesc			stringpool;
@@ -101,16 +101,15 @@ error_def(ERR_ZTIMEOUT);
 
 void check_and_set_ztimeout(mval * inp_val)
 {
-	int 		timeout_seconds, max_read_len;
+	int 		max_read_len;
 	char		*vector_ptr = NULL;
 	char		*tok_ptr;
 	char		*local_str_val = NULL, *local_str_end, *strtokptr;
 	char		*colon_ptr = NULL;
-	double 		float_timeout;
 	boolean_t	only_timeout = FALSE;
 	sigset_t	savemask;
 	int4		rc;
-	ABS_TIME	cur_time, end_time;
+	ABS_TIME	cur_time;
 	uint8		nsec_timeout;   /* timeout in nanoseconds */
 	mval		*interim_ptr;
 	mval		ztimeout_vector, ztimeout_seconds;
@@ -312,7 +311,6 @@ void ztimeout_set(int4 dummy_param)
 /* Driven at recognition point of ztimeout by outofband_action() */
 void ztimeout_action(void)
 {
-	mv_stent        *mv_st_ent;
 	DBGDFRDEVNT((stderr, "ztimeout_action driving the ztimeout vector\n"));
 	DBGEHND((stderr, "ztimeout_action: Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
                          "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, frame_pointer->restart_pc,
@@ -326,7 +324,6 @@ void ztimeout_action(void)
 void ztimeout_process()
 {
 	mv_stent        *mv_st_ent;
-	int		level2go;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

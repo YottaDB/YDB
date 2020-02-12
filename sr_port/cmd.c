@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -207,11 +210,12 @@ LITDEF struct
 		,{m_zwrite, 1, 1, ALL_SYS}, {m_zwrite, 1, 1, ALL_SYS}
 	};
 
-	boolean_t	sense, shifting;
+	boolean_t	shifting;
 	char		*c;
 	int		rval, x;
 	oprtype		*cr;
 	triple		*fetch0, *oldchain, *ref0, *ref1, *temp_expr_start, tmpchain, *triptr;
+	triple		*boolexprfinish, *boolexprfinish2;
 	mval		*v;
 	DCL_THREADGBL_ACCESS;
 
@@ -256,6 +260,7 @@ LITDEF struct
 		assert(m_zinvcmd != cmd_data[x].fcn);
 		cr = NULL;
 		shifting = FALSE;
+		boolexprfinish = NULL;
 	} else
 	{
 		advancewindow();
@@ -267,6 +272,9 @@ LITDEF struct
 		}
 		/* the next block could be simpler if done earlier, but doing it here picks up any Boolean optimizations  */
 		triptr = (TREF(curtchain))->exorder.bl;
+		boolexprfinish = (OC_BOOLEXPRFINISH == triptr->opcode) ? triptr : NULL;
+		if (NULL != boolexprfinish)
+			triptr = triptr->exorder.bl;
 		while (OC_NOOP == triptr->opcode)
 			triptr = triptr->exorder.bl;
 		if (OC_LIT == triptr->opcode)
@@ -279,6 +287,8 @@ LITDEF struct
 			}
 			unuse_literal(v);
 			dqdel(triptr, exorder);				/* if it's TRUE, so just pretend it never appeared */
+			/* Remove OC_BOOLEXPRSTART and OC_BOOLEXPRFINISH opcodes too */
+			REMOVE_BOOLEXPRSTART_AND_FINISH(boolexprfinish);	/* Note: Will set "boolexprfinish" to NULL */
 		}
 		if (shifting = ((TREF(expr_start) != TREF(expr_start_orig)) && (OC_NOOP != (TREF(expr_start))->opcode)))
 		{	/* NOTE - assignment above */
@@ -317,12 +327,22 @@ LITDEF struct
 		setcurtchain(oldchain);
 		return TRUE;
 	}
-	if ((EXPR_FAIL != rval) && cr)
+	if ((EXPR_FAIL != rval) && (NULL != cr))
 	{
 		if (fetch0 != curr_fetch_trip)
 		{
 			assert(OC_FETCH == curr_fetch_trip->opcode);
-			*cr = put_tjmp(curr_fetch_trip);
+			if (NULL != boolexprfinish)
+			{
+				INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
+				dqdel(boolexprfinish2, exorder);
+				dqins(curr_fetch_trip->exorder.bl, exorder, boolexprfinish2);
+				*cr = put_tjmp(boolexprfinish2);
+			} else
+			{
+				*cr = put_tjmp(curr_fetch_trip);
+				boolexprfinish2 = NULL;
+			}
 		} else
 		{
 			if (shifting)
@@ -330,11 +350,25 @@ LITDEF struct
 				ref0 = newtriple(OC_JMP);
 				ref1 = newtriple(OC_GVRECTARG);
 				ref1->operand[0] = put_tref(temp_expr_start);
-				*cr = put_tjmp(ref1);
+				if (NULL != boolexprfinish)
+				{
+					INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
+					dqdel(boolexprfinish2, exorder);
+					dqins(ref0, exorder, boolexprfinish2);
+					*cr = put_tjmp(boolexprfinish2);
+				} else
+				{
+					*cr = put_tjmp(ref1);
+					boolexprfinish2 = NULL;
+				}
 				tnxtarg(&ref0->operand[0]);
 			} else
-				tnxtarg(cr);
+			{
+				INSERT_BOOLEXPRFINISH_AFTER_JUMP(boolexprfinish, boolexprfinish2);
+				*cr = put_tjmp(boolexprfinish2);
+			}
 		}
+		INSERT_OC_JMP_BEFORE_OC_BOOLEXPRFINISH(boolexprfinish2);
 	}
 	return rval;
 }

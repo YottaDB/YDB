@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,7 +26,7 @@ error_def(ERR_NUMOFLOW);
 LITREF mval literal_null;
 LITREF int4 ten_pwr[];
 
-char *s2n (mval *u)
+char *s2n(mval *u)
 {
 	boolean_t	digit, dot, dotseen, exp, exneg, isdot, tail;
 	char		*c, *d, *eos, *w;
@@ -37,6 +37,7 @@ char *s2n (mval *u)
 	i = 0;
 	assertpro(MV_DEFINED(u));
 	c = u->str.addr;
+	assert(!MV_IS_SQLNULL(u));
 	if (0 == u->str.len)
 	{	/* Substitute pre-converted NULL/0 value */
 		TREF(s2n_intlit) = 1;

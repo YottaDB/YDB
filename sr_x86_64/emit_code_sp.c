@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -427,7 +427,6 @@ void print_instruction()
 		i2hex(code_buf[prev_idx], obpt, 2);
 		obpt += 2;
 	}
-	obpt += 10;
 	*obpt++ = '\n';
 	*obpt++ = '\t';
 	*obpt++ = '\t';
@@ -499,7 +498,6 @@ void clear_memory_reg()
 void format_machine_inst()
 {
 	int		next_inst_byte_meaning = one_byte_opcode;
-	int		i, tot_inst_len = 0;
 	unsigned char	inst_curr_byte;
 	/* None of the flags below are currently used but may be in the near future so are left here */
 	boolean_t	lock_prefix_seen;

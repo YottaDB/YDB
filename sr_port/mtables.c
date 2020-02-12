@@ -238,7 +238,7 @@ LITDEF mval literal_notimeout	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT, 51,
  * --------------------------------------------------------------------------------------------------------------------------
  */
 LITDEF mval literal_null	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX, 0, 0, 0, 0, 0, 0);
-LITDEF mval literal_sqlnull	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_INT | MV_NUM_APPROX | MV_SQLNULL, 0, 0, 0, 0, 0, 0);
+LITDEF mval literal_sqlnull	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_NUM_APPROX | MV_SQLNULL, 0, 0, 0, 0, 0, 0);
 LITDEF mval literal_numoflow	= DEFINE_MVAL_LITERAL(MV_STR | MV_NM | MV_NUM_APPROX, EXPHI, 0, 0, 0, 0, 1);
 /* Create mval to hold batch type TSTART. "BA" or "BATCH" mean the same.
  * We define the shorter version here to try reduce the time taken for comparison.
@@ -319,7 +319,7 @@ LITDEF mval *fnzdata_table[2][2] =
 	{&literal_oneten, &literal_oneeleven}
 };
 
-LITDEF mval *fnzqgblmod_table[2] =
+LITDEF mval *literal_zero_one_table[2] =
 {
 	&literal_zero, &literal_one
 };

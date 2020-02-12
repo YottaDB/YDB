@@ -393,7 +393,8 @@ typedef long		ulimit_t;	/* NOT int4; the UNIX ulimit function returns a value of
 #define MV_RETARG      128	/* 0x0080 */
 #define MV_UTF_LEN     256	/* 0x0100 */
 #define MV_ALIASCONT   512	/* 0x0200 */
-/* YDB additions to MV_* type bit masks. These go down to reduce the chances of colliding with GT.M changes */
+
+/* YDB additions to MV_* type bit masks. These go backward/downward to reduce the chances of colliding with GT.M changes */
 #define MV_SQLNULL   32768	/* 0x8000 */
 /* The below mask is all valid values of an mval type when not in one of the special conditions designated by the two "special
  * values" noted below (MV_LVCOPIED and MV_LV_TREE).
@@ -518,7 +519,12 @@ mval *underr_strict(mval *start, ...);
 #define MV_FORCE_STR(X)		(MV_FORCE_DEFINED(X), MV_FORCE_STRD(X))
 #define MV_FORCE_STRD(X)	(DBG_ASSERT(MV_DEFINED(X)) (0 == ((X)->mvtype & MV_STR)) ? n2s(X) : NULL)
 #define MV_FORCE_NUM(X)		(MV_FORCE_DEFINED(X), MV_FORCE_NUMD(X))
-#define MV_FORCE_NUMD(X)	(DBG_ASSERT(MV_DEFINED(X)) (0 == ((X)->mvtype & MV_NM )) ? s2n(X) : NULL)
+#define MV_FORCE_NUMD(X)	(DBG_ASSERT(MV_DEFINED(X)) (0 == ((X)->mvtype & MV_NM ))					\
+					? s2n(X)										\
+					: (MV_IS_SQLNULL(X)									\
+						? (char *)(intptr_t)rts_error_csa(CSA_ARG(NULL)					\
+											VARLSTCNT(1) ERR_ZYSQLNULLNOTVALID)	\
+						: NULL))
 #define MV_FORCE_BOOL(X)	(MV_FORCE_NUM(X), (X)->m[1] ? TRUE : FALSE)
 #define MV_FORCE_INT(M)		(MV_FORCE_DEFINED(M), MV_FORCE_INTD(M))
 #define MV_FORCE_INTD(M)	(DBG_ASSERT(MV_DEFINED(M)) (M)->mvtype & MV_INT ? (M)->m[1]/MV_BIAS : mval2i(M))
@@ -542,38 +548,6 @@ mval *underr_strict(mval *start, ...);
    macro has been added. If uses are added, this needs to be revisited. 01/2008 se
 */
 #define ZTIMEOUTSTR "ZTIMEOUT"
-#define MV_FORCE_NSTIMEOUT(TMV, TNS, NOTACID)	/* requires a flock of include files especially for TP */		\
-MBSTART {					/* also requires threaddef DCL and SETUP*/				\
-	double			tmpdouble;										\
-															\
-	GBLREF uint4		dollar_tlevel;										\
-	GBLREF uint4		dollar_trestart;									\
-	LITREF mval		literal_notimeout;									\
-															\
-	MV_FORCE_NUM(TMV);												\
-	if (is_equ((mval *)&literal_notimeout, TMV))									\
-		TNS = NO_M_TIMEOUT;											\
-	else														\
-	{														\
-		assert(MV_BIAS >= 1000);        /* if formats change scale may need attention */			\
-		if (TMV->mvtype & MV_INT)										\
-		{	/* TMV is an integer. m[1] directly has the # of milliseconds we want.				\
-			 * If it is negative though, set timeout to 0.							\
-			 */												\
-			TNS = TMV->m[1] * (uint8)NANOSECS_IN_MSEC;							\
-			if (0 > TNS)											\
-				TNS = 0;										\
-		} else if (0 == TMV->sgn) 	/* if sign is 0 it means TMV is positive */				\
-		{	/* Cap positive timeout at MAXUINT8 */								\
-			tmpdouble = mval2double(TMV) * (double)NANOSECS_IN_SEC;						\
-			TNS = ((double)MAXUINT8 >= tmpdouble) ? (uint8)tmpdouble : (uint8)MAXUINT8;			\
-		} else													\
-			TNS = 0;		/* sign is not zero, implies TMV is negative, set timeout to 0 */	\
-	}														\
-	if ((STRNCMP_LIT(NOTACID, "ZTIMEOUTSTR")) && (((TREF(tpnotacidtime)).m[1] * (uint8)NANOSECS_IN_MSEC) < TNS))	\
-		TPNOTACID_CHECK(NOTACID);										\
-} MBEND
-
 #define INVOKE_RESTART	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPRETRY);
 
 #define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0 ? s2n(X) : 0 ) \
@@ -584,6 +558,7 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 #define MV_IS_STRING(X)		(((X)->mvtype & MV_STR) != 0)
 #define MV_DEFINED(X)		(((X)->mvtype & (MV_STR | MV_NM)) != 0)
 #define MV_IS_CANONICAL(X)	(((X)->mvtype & MV_NM) ? (((X)->mvtype & MV_NUM_APPROX) == 0) : (boolean_t)val_iscan(X))
+#define	MV_IS_SQLNULL(X)	((X)->mvtype & MV_SQLNULL)
 #define MV_INIT(X)		((X)->mvtype = 0, (X)->fnpc_indx = UTF8_ONLY((X)->utfcgr_indx =) 0xff)
 #define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = UTF8_ONLY((X)->utfcgr_indx =) 0xff,	\
 				      (X)->str.len = INTCAST(LEN), (X)->str.addr = (char *)ADDR)
@@ -595,6 +570,11 @@ MBSTART {					/* also requires threaddef DCL and SETUP*/				\
 #define MVTYPE_IS_INT(X)	(0 != ((X) & MV_INT))
 #define MVTYPE_IS_NUM_APPROX(X)	(0 != ((X) & MV_NUM_APPROX))
 #define MVTYPE_IS_STRING(X)	(0 != ((X) & MV_STR))
+#define MVTYPE_IS_SQLNULL(X)	(0 != ((X) & MV_SQLNULL))
+
+/* Below macro defines the string representation of $ZYSQLNULL (e.g. ZWRITE, ZSHOW etc.) */
+#define	DOLLAR_ZYSQLNULL_STRING	"$ZYSQLNULL"
+#define	DOLLAR_ZYSQLNULL_STRLEN	STR_LIT_LEN(DOLLAR_ZYSQLNULL_STRING)
 
 /* DEFINE_MVAL_LITERAL is intended to be used to define a string mval where the string is a literal or defined with type
  * "readonly".  In other words, the value of the string does not change.  Since we expect all callers of this macro to use
@@ -1406,7 +1386,6 @@ void gtm_free(void *addr);
 void system_free(void *addr);
 int gtm_memcmp (const void *, const void *, size_t);
 DEBUG_ONLY(void printMallocInfo(void);)
-int is_equ(mval *u, mval *v);
 char is_ident(mstr *v);
 int val_iscan(mval *v);
 void mcfree(void);
