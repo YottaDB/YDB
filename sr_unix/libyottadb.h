@@ -364,11 +364,11 @@ int	ydb_node_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer
 int	ydb_node_previous_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, int *ret_subs_used,
 			ydb_buffer_t *ret_subsarray);
 int	ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, const ydb_buffer_t *value);
-int	ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr);
+int	ydb_str2zwr_s(const ydb_buffer_t *str, ydb_buffer_t *zwr);
 int	ydb_subscript_next_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
 int	ydb_subscript_previous_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
 int	ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, const ydb_buffer_t *varnames);
-int	ydb_zwr2str_s(ydb_buffer_t *zwr, ydb_buffer_t *str);
+int	ydb_zwr2str_s(const ydb_buffer_t *zwr, ydb_buffer_t *str);
 
 /* SimpleAPI via thread interface (aka threaded Simple API).
  * Currently only one main thread runs the YottaDB engine. Once YottaDB itself is multi-threaded, we can support more threads.
@@ -393,14 +393,14 @@ int	ydb_node_previous_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffe
 			int *ret_subs_used, ydb_buffer_t *ret_subsarray);
 int	ydb_set_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *subsarray,
 			const ydb_buffer_t *value);
-int	ydb_str2zwr_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *str, ydb_buffer_t *zwr);
+int	ydb_str2zwr_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *str, ydb_buffer_t *zwr);
 int	ydb_subscript_next_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used,
 			const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
 int	ydb_subscript_previous_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *varname, int subs_used,
 			const ydb_buffer_t *subsarray, ydb_buffer_t *ret_value);
 int	ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void *tpfnparm, const char *transid, int namecount,
 			const ydb_buffer_t *varnames);
-int	ydb_zwr2str_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *zwr, ydb_buffer_t *str);
+int	ydb_zwr2str_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *zwr, ydb_buffer_t *str);
 
 #include "libydberrors.h"	/* needed for various errors returned by SimpleAPI/SimpleThreadAPI (e.g. YDB_ERR_TPTIMEOUT etc.) */
 

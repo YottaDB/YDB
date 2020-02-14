@@ -23,7 +23,7 @@ GBLREF	boolean_t	caller_func_is_stapi;
  *
  * Parms and return - same as ydb_zwr2str_s() except for the addition of tptoken and errstr.
  */
-int ydb_zwr2str_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_buffer_t *zwr, ydb_buffer_t *str)
+int ydb_zwr2str_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t *zwr, ydb_buffer_t *str)
 {
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;

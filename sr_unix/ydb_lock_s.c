@@ -54,7 +54,7 @@ int ydb_lock_s_va(unsigned long long timeout_nsec, int namecount, va_list var)
 	boolean_t		error_encountered;
 	mval			varname_mval;
 	mval			plist_mvals[YDB_MAX_SUBS + 1];
-	ydb_buffer_t		*varname, *subsarray, *subptr;
+	const ydb_buffer_t	*varname, *subsarray, *subptr;
 	int			subs_used;
 	ydb_var_types		var_type;
 	char			buff[256];	/* snprintf buffer */

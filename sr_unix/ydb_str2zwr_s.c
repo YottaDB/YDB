@@ -27,7 +27,7 @@ GBLREF	volatile int4	outofband;
  *   str	- The input string in subscript representation
  *   zwr	- The output string in zwrite representation
  */
-int ydb_str2zwr_s(ydb_buffer_t *str, ydb_buffer_t *zwr)
+int ydb_str2zwr_s(const ydb_buffer_t *str, ydb_buffer_t *zwr)
 {
 	mval		src, dst;
 	boolean_t	error_encountered;
