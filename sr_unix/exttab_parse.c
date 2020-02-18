@@ -186,12 +186,16 @@ const static int default_pre_alloc_value[] =
 	0, /* uint */
 	0, /* long */
 	0, /* unsigned long */
+	0, /* 64 bit int */
+	0, /* unsigned 64 bit int */
 	0, /* float */
 	0, /* double */
 	1, /* pointer to int */
 	1, /* pointer to unsigned int */
 	1, /* pointer to long */
 	1, /* pointer to unsigned long */
+	1, /* pointer to 64 bit int */
+	1, /* pointer to unsigned 64 bit int */
 	1, /* pointer to string */
 	1, /* pointer to float */
 	100, /* pointer to char */
