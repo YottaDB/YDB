@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,7 +31,7 @@
 #include "min_max.h"
 #include "gt_timer.h"
 
-GBLREF	int		num_additional_processors;
+GBLREF	int		num_additional_processors, process_exiting;
 GBLREF	uint4		process_id;
 GBLREF	volatile int4	fast_lock_count;		/* Stop interrupts while we have our parts exposed */
 
@@ -48,8 +48,12 @@ boolean_t grab_latch(sm_global_latch_ptr_t latch, int max_timeout_in_secs)
 
 	assert(process_id == getpid());	/* Make sure "process_id" global variable is reliable (used below in an assert) */
 	if (process_id == latch->u.parts.latch_pid)
-	{	/* Already have lock */
-		assert(FALSE);	/* Don't expect caller to call us if we hold the lock already. in pro be safe and return */
+	{	/* Already have lock - this shouldn't normally happen but can happen if a fatal interrupt catches us just right
+		 * so pro we always play safe and return but with a debug build, allow only process_exiting to continue. This
+		 * should normally not be a problem since we won't be returning to the code that grabbed the lock if we are
+		 * exiting.
+		 */
+		assert(process_exiting);
 		return TRUE;
 	}
 	skip_time_calc = !max_timeout_in_secs || (GRAB_LATCH_INDEFINITE_WAIT == max_timeout_in_secs);
