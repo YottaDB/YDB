@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,11 +106,13 @@ void mutex_deadlock_check(CRIT_PTR_T criticalPtr, sgmnt_addrs *csa)
 		{
 			if ((NULL != repl_csa) && (repl_csa->critical == criticalPtr))
 			{	/* grab_lock going for crit on the jnlpool region. gv_cur_region points to the current region of
-				 * interest, which better have REPL_ENABLED or REPL_WAS_ENABLED. Assert that. The only known
-				 * exception is the update process which could be adding a history record to the replication
-				 * instance file in which case it would have no region of interest (i.e. cs_addrs could be NULL).
+				 * interest, which better have REPL_ENABLED or REPL_WAS_ENABLED. Assert that. The most common
+				 * way this can happen is with the update process which could be adding a history record to the
+				 * replication instance file in which case it would have no region of interest (i.e. cs_addrs
+				 * could be NULL) but it is also possible when a simpleapi call comes in and is in the process
+				 * of opening a database file which notices the jnlpool counter semaphore has overflown.
 				 */
-				assert((is_updproc && (NULL == cs_addrs)) || REPL_ALLOWED(cs_addrs));
+				assert((NULL == cs_addrs) || REPL_ALLOWED(cs_addrs));
 				/* Most likely, we will have crit on gv_cur_region but it is rarely possible we do not
 				 * (e.g. in the below call sequence
 				 *	gvcst_init -> jnlpool_init -> repl_inst_ftok_counter_halted -> grab_lock
