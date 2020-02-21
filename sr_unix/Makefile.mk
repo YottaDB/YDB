@@ -3,7 +3,7 @@
 # Copyright (c) 2013-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -222,7 +222,7 @@ ifeq ($(NOT_IN_GTMCRYPTDIR),1)
 endif
 ifeq ($(HAVE_UTF8),0)
 	@echo "UTF-8 mode library installation may fail if ydb_icu_version/gtm_icu_version (${ydb_icu_version}/${gtm_icu_version}) is not set"
-	(cd $(PLUGINDIR)/o/utf8 && env ydb_chset=UTF-8 ${ydb_dist}/yottadb $(PLUGINDIR)/r/pinentry.m)
+	(cd $(PLUGINDIR)/o/utf8 && env ydb_chset=UTF-8 && env ydb_icu_version=${ydb_icu_version} ${ydb_dist}/yottadb $(PLUGINDIR)/r/pinentry.m)
 endif
 
 uninstall:

@@ -3,7 +3,7 @@
 # Copyright (c) 2014-2017 Fidelity National Information         #
 # Services, Inc. and/or its subsidiaries. All rights reserved.  #
 #								#
-# Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson.				#
@@ -794,13 +794,12 @@ if [ "Y" = $ydb_posix ] ; then
 fi
 
 if [ "Y" = $ydb_encplugin ] ; then
-	. ${ydb_installdir}/ydb_env_set
+	export ydb_icu_version=$ydb_icu_version
 	mkdir enc_tmp
 	cd enc_tmp
 	sudo tar -xf ${ydb_installdir}/plugin/gtmcrypt/source.tar
 	sudo ydb_dist=${ydb_installdir} make -j `grep -c ^processor /proc/cpuinfo`
 	sudo ydb_dist=${ydb_installdir} make install
-	. ${ydb_installdir}/ydb_env_unset
 	cd ..
 	sudo rm -R enc_tmp
 	# rename gtmcrypt to ydbcrypt and create a symbolic link for backward compatibility
