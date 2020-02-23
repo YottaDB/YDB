@@ -244,8 +244,10 @@ typedef	int		ydb_int_t;
 typedef	unsigned int	ydb_uint_t;
 typedef	long		ydb_long_t;
 typedef	unsigned long	ydb_ulong_t;
-typedef int64_t		ydb_int64_t;
-typedef uint64_t	ydb_uint64_t;
+#if UINTPTR_MAX == 0xffffffffffffffff
+typedef int64_t		ydb_int64_t;		/* Only currently usable in 64 bit mode */
+typedef uint64_t	ydb_uint64_t;		/* Only currently usable in 64 bit mode */
+#endif
 typedef	float		ydb_float_t;
 typedef	double		ydb_double_t;
 typedef	char		ydb_char_t;
