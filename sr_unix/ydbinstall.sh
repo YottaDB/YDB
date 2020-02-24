@@ -774,9 +774,9 @@ if [ "Y" = $ydb_posix ] ; then
 	. ${ydb_installdir}/ydb_env_set
 	mkdir posix_tmp
 	cd posix_tmp
-	curl -fSsLO https://gitlab.com/YottaDB/Util/YDBposix/-/archive/master/YDBposix-master.tar.gz
-	tar xzf YDBposix-master.tar.gz
-	cd YDBposix-master
+	curl -fSsLO https://gitlab.com/YottaDB/Util/YDBPosix/-/archive/master/YDBPosix-master.tar.gz
+	tar xzf YDBPosix-master.tar.gz
+	cd YDBPosix-master
 	mkdir build && cd build
 	cmake ..
 	make -j `grep -c ^processor /proc/cpuinfo` && sudo make install
