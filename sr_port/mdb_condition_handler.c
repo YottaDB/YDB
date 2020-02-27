@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -126,6 +126,7 @@ GBLREF	volatile bool		neterr_pending, std_dev_outbnd;
 GBLREF	volatile boolean_t	dollar_zininterrupt;
 GBLREF	volatile int4		gtmMallocDepth, outofband;
 GBLREF	xfer_entry_t		xfer_table[];
+GBLREF	unsigned short		lks_this_cmd;		/* Locks in the current command */
 #ifdef DEBUG
 GBLREF	boolean_t		donot_INVOKE_MUMTSTART;
 #endif
@@ -536,6 +537,7 @@ CONDITION_HANDLER(mdb_condition_handler)
 	if ((SUCCESS != SEVERITY) && (INFO != SEVERITY))
 	{
 		ENABLE_AST;
+		lks_this_cmd = 0;			/* Current cmd won't resume so reset lock count for interrupted cmd */
 		if ((0 == dollar_tlevel) || (CDB_STAGNATE > t_tries))
 		{	/* Only release crit if we are NOT in TP *or* if we are in TP, we aren't in final retry */
 			for (addr_ptr = get_next_gdr(NULL); addr_ptr; addr_ptr = get_next_gdr(addr_ptr))
