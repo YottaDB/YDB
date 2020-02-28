@@ -95,6 +95,7 @@ dump_info()
     if [ -n "$gtm_lcase_utils" ] ; then echo gtm_lcase_utils " : " $gtm_lcase_utils ; fi
     if [ -n "$gtm_linkenv" ] ; then echo gtm_linkenv " : " $gtm_linkenv ; fi
     if [ -n "$gtm_linkexec" ] ; then echo gtm_linkexec " : " $gtm_linkexec ; fi
+    if [ -n "$ydb_octo" ] ; then echo ydb_octo " : " $ydb_octo ; fi
     if [ -n "$gtm_overwrite_existing" ] ; then echo gtm_overwrite_existing " : " $gtm_overwrite_existing ; fi
     if [ -n "$ydb_posix" ] ; then echo ydb_posix " : " $ydb_posix ; fi
     if [ -n "$gtm_prompt_for_group" ] ; then echo gtm_prompt_for_group " : " $gtm_prompt_for_group ; fi
@@ -139,6 +140,7 @@ help_exit()
     echo "--linkenv dirname        -> create link in dirname to gtmprofile and gtmcshrc files; incompatible with copyenv"
     echo "--nodeprecated           -> do not install deprecated components, specifically %DSEWRAP"
     echo "--linkexec dirname       -> create link in dirname to gtm script; incompatible with copyexec"
+    echo "--octo parameters        -> download and install Octo; As the POSIX plugin is required for Octo, this will install the POSIX plugin; Specify optional cmake parameters for Octo as necessary"
     echo "--overwrite-existing     -> install into an existing directory, overwriting contents; defaults to requiring new directory"
     echo "--posix                  -> download and install the POSIX plugin"
     echo "--preserveRemoveIPC      -> do not allow changes to RemoveIPC in /etc/systemd/login.conf if needed; defaults to allow changes"
@@ -216,7 +218,9 @@ if [ -z "$ydb_change_removeipc" ] ; then ydb_change_removeipc="yes" ; fi
 if [ -z "$ydb_deprecated" ] ; then ydb_deprecated="Y" ; fi
 if [ -z "$ydb_encplugin" ] ; then ydb_encplugin="N" ; fi
 if [ -z "$ydb_posix" ] ; then ydb_posix="N" ; fi
+if [ -z "$ydb_octo" ] ; then ydb_octo="N" ; fi
 if [ -z "$ydb_zlib" ] ; then ydb_zlib="N" ; fi
+if [ -z "$ydb_utf8" ] ; then ydb_utf8="N" ; fi
 # GTM prefixed versions (for backwards compatibility)
 if [ -z "$gtm_buildtype" ] ; then gtm_buildtype="pro" ; fi
 if [ -z "$gtm_keep_obj" ] ; then gtm_keep_obj="N" ; fi
@@ -306,6 +310,11 @@ while [ $# -gt 0 ] ; do
             unset gtm_copyexec
             shift ;;
 	--nodeprecated) ydb_deprecated="N" ; shift ;;
+	--octo*) tmp=`echo $1 | cut -s -d = -f 2-`
+	    if [ -n "$tmp" ] ; then octo_cmake=$tmp ; fi
+	    ydb_octo="Y" ;
+	    ydb_posix="Y" ;
+	    shift ;;
         --overwrite-existing) gtm_overwrite_existing="Y" ; shift ;;
 	--posix) ydb_posix="Y" ; shift ;;
         --preserveRemoveIPC) ydb_change_removeipc="no" ; shift ;; # must come before group*
@@ -787,8 +796,7 @@ if [ "Y" = $ydb_posix ] ; then
 		make && sudo make install
 		cd ..
 	fi
-	cd ..
-	cd ..
+	cd ../..
 	. ${ydb_installdir}/ydb_env_unset
 	sudo rm -R posix_tmp
 fi
@@ -811,15 +819,18 @@ if [ "Y" = $ydb_zlib ] ; then
 	. ${ydb_installdir}/ydb_env_set
 	mkdir zlib_tmp
 	cd zlib_tmp
-	curl -fSsLO https://gitlab.com/YottaDB/Util/ydbzlib/-/archive/master/ydbzlib-master.tar.gz
-	tar xzf ydbzlib-master.tar.gz
-	cd ydbzlib-master
+	curl -fSsLO https://gitlab.com/YottaDB/Util/YDBZlib/-/archive/master/YDBZlib-master.tar.gz
+	tar xzf YDBZlib-master.tar.gz
+	cd YDBZlib-master
 	gcc -c -fPIC -I${ydb_installdir} gtmzlib.c
 	gcc -o libgtmzlib.so -shared gtmzlib.o
 	sudo cp gtmzlib.xc libgtmzlib.so ${ydb_installdir}/plugin
 	sudo cp _ZLIB.m ${ydb_installdir}/plugin/r
 	${ydb_installdir}/mumps ${ydb_installdir}/plugin/r/_ZLIB
 	if [ "Y" = $ydb_utf8 ] ; then
+		if [ "default" = $ydb_icu_version ] ; then
+			ydb_icu_version=`pkg-config --modversion icu-io`
+		fi
 		mkdir utf8
 		cd utf8
 		export ydb_chset="UTF-8"
@@ -831,7 +842,25 @@ if [ "Y" = $ydb_zlib ] ; then
 	fi
 	sudo cp _ZLIB.o ${ydb_installdir}/plugin/o
 	. ${ydb_installdir}/ydb_env_unset
-	cd ..
-	cd ..
+	cd ../..
 	sudo rm -R zlib_tmp
+fi
+
+if [ "Y" = $ydb_octo ] ; then
+	export ydb_dist=${ydb_installdir}
+	curl -fSsLO https://gitlab.com/YottaDB/DBMS/YDBOcto/-/archive/master/YDBOcto-master.tar.gz
+	tar xzf YDBOcto-master.tar.gz
+	cd YDBOcto-master
+	mkdir build
+	cd build
+	if [ "rhel" = "${osid}" -o "centos" = "${osid}" -o "sles" = "${osid}" ] ; then
+		cmake3 ${octo_cmake} ..
+	else
+		cmake ${octo_cmake} ..
+	fi
+	make -j `grep -c ^processor /proc/cpuinfo`
+	sudo -E make install
+	cd ../..
+	sudo rm -R YDBOcto-master
+	sudo rm YDBOcto-master.tar.gz
 fi
