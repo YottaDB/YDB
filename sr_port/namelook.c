@@ -1,6 +1,8 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2007 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -25,7 +27,7 @@ int namelook(const unsigned char offset_tab[], const nametabent *name_tab, char 
 	unsigned char		temp[NAME_ENTRY_SZ], x;
 	const nametabent	*top, *i;
 
-	if (strlength > NAME_ENTRY_SZ)
+	if ((NAME_ENTRY_SZ < strlength) || (0 >= strlength))
 		return -1;
 	lower_to_upper(&temp[0], (uchar_ptr_t)str, strlength);
 	if ((x = temp[0]) == '%')
