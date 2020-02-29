@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -300,11 +300,15 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 				 */												\
 				 return;											\
 			}													\
-			if (!thisThreadIsMutexHolder || (tLevel && (!isSigThreadDirected || signalForwarded)))			\
+			if (!thisThreadIsMutexHolder										\
+					|| (!IS_EXI_SIGNAL && (tLevel && (!isSigThreadDirected || signalForwarded))))		\
 			{	/* Two possibilities.										\
 				 *  a) We do not hold the YottaDB engine lock OR						\
-				 *  b) We are in TP and this is not a thread-directed signal or this is a thread-directed	\
-				 *	signal that is forwarded. 								\
+				 *  b) We hold the YottaDB engine lock but this is not a signal that terminates the process	\
+				 *	(e.g. SIGALRM) and we are in TP and this is not a thread-directed signal or this is	\
+				 *	a thread-directed signal that is forwarded. If this signal is one that terminates the	\
+				 *	process, we assume that we are the mutex lock holder (even if we cannot confirm/acquire	\
+				 *	 the "tLevel+1" lock) and go to handle it.						\
 				 * In either case, we cannot handle the signal right away. Note down this to be handled in a	\
 				 * deferred manner and return.									\
 				 */												\
@@ -320,10 +324,10 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 				 * a) We are not in TP and hold the YottaDB engine lock "ydb_engine_threadsafe_mutex[0]".	\
 				 *    We are guaranteed no new TP transaction happens while we hold this lock.			\
 				 *    Therefore we can safely proceed to handle the signal.					\
-				 * b) We are in TP but this is a thread-directed signal and we hold the engine lock at		\
-				 *    the current tlevel.									\
+				 * b) We are in TP and hold the engine lock at the current Level				\
+				 *      1) this is a thread-directed signal OR							\
+				 *      2) this is not a thread-directed signal but is a process terminating signal		\
 				 */												\
-				assert(thisThreadIsMutexHolder && isSigThreadDirected && !signalForwarded || !dollar_tlevel);	\
 				if (!signalForwarded)										\
 				{	/* Signal was not forwarded.								\
 					 * Reset "INFO" and "CONTEXT" to be usable by a later call to "extract_signal_info".	\
