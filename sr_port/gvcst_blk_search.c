@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -137,7 +137,7 @@ error_def(ERR_TEXT);
 
 static	void	gvcst_search_fail(srch_blk_status *pStat)
 {
-	char		buff[OUT_LINE], crbuff[SIZEOF(blk_hdr_ptr_t) + 1], regbuff[MAX_RN_LEN + 1];
+	char		buff[OUT_LINE], regbuff[MAX_RN_LEN + 1];
 	uint4		len;
 
 	assert(CDB_STAGNATE <= t_tries);
@@ -146,11 +146,11 @@ static	void	gvcst_search_fail(srch_blk_status *pStat)
 	{
 		if (NULL != pStat->cr)
 		{
-			SNPRINTF(crbuff, OUT_LINE, ": crbuff = 0x%lX", pStat->cr->buffaddr);
+			SNPRINTF(buff, OUT_LINE, ": buff = 0x%lX", pStat->cr->buffaddr);
 			cert_blk(gv_cur_region, pStat->cr->blk, (blk_hdr_ptr_t)GDS_ANY_REL2ABS(cs_addrs, pStat->cr->buffaddr),
 				0,  SEND_MSG_ON_CERT_FAIL, NULL);
 		} else
-			crbuff[0] = '\0';
+			buff[0] = '\0';
 		len = (6 * SIZEOF(long unsigned int)) + gv_cur_region->rname_len + 1
 			+ STRLEN("Possible data corruption in region ")
 			+ STRLEN(" : blk = 0x : buff = 0x : cr = 0x%  : csa = 0x% : csalock = 0x%");
@@ -159,7 +159,7 @@ static	void	gvcst_search_fail(srch_blk_status *pStat)
 		SNPRINTF(buff, len, "Possible data corruption in region %s : blk = 0x%lX : buff = 0x%lX : cr = 0x%lX %s : "
 				"csa = 0x%lX : csalock = 0x%lX",
 				regbuff, (long unsigned int)pStat->blk_num, (long unsigned int)pStat->buffaddr,
-				(long unsigned int)pStat->cr, crbuff, (long unsigned int)cs_addrs,
+				(long unsigned int)pStat->cr, buff, (long unsigned int)cs_addrs,
 				(long unsigned int)cs_addrs->mlkctl);
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(buff));
 	}

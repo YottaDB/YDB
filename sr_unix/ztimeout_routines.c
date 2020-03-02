@@ -148,6 +148,7 @@ void check_and_set_ztimeout(mval * inp_val)
 		}
 		free(local_str_val);
 		local_str_val = NULL;
+		nsec_timeout = 0;
 	} else
 	{	/* Some form of timeout specified */
 		if (inp_val->m[1] < 0) /* Negative timeout specified, cancel the timer */

@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -868,12 +871,18 @@ void	iorm_use(io_desc *iod, mval *pp)
 			{
 				rm_ptr->fsblock_buffer_size = disk_block_multiple;
 				if (NULL != rm_ptr->fsblock_buffer)
+				{
 					free(rm_ptr->fsblock_buffer);
+					rm_ptr->fsblock_buffer = NULL;
+				}
 				break;
 			}
 			/* Request to buffer with buffer size different from before; clear out existing buffer */
 			if (NULL != rm_ptr->fsblock_buffer)
+			{
 				free(rm_ptr->fsblock_buffer);
+				rm_ptr->fsblock_buffer = NULL;
+			}
 			/* Grab the FS block size */
 			fwrite_buffer_size = (size_t)get_fs_block_size(rm_ptr->fildes);
 			fwrite_buffer_size = (size_t)(fwrite_buffer_size << disk_block_multiple);

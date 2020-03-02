@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -171,9 +171,10 @@ CONDITION_HANDLER(trans_code_ch)
 		{
 			assert(gtm_err_dev->state != dev_open);
 			iosocket_destroy(gtm_err_dev);
+			gtm_err_dev = NULL;
 		}
 #		ifdef UNIX
-		if (gtmsocket != gtm_err_dev->type)
+		if ((NULL != gtm_err_dev) && (gtmsocket != gtm_err_dev->type))
 			remove_rms(gtm_err_dev);
 #		endif
 		gtm_err_dev = NULL;

@@ -33,6 +33,10 @@ int namelook(const unsigned char offset_tab[], const nametabent *name_tab, char 
 	lower_to_upper(&temp[0], (uchar_ptr_t)str, strlength);
 	if ((x = temp[0]) == '%')
 		return -1;
+	if (('A' > x) || ('Z' < x)) /* This enforces the boundaries of the offset_tab which is always used
+	 			 * for indexes from A to Z.
+				 */
+		return -1;
 	i = name_tab + offset_tab[x -= 'A'];
 	top = name_tab + offset_tab[++x];
 	assert(i == top || i->name[0] >= temp[0]);

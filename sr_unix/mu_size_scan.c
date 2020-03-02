@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -207,6 +207,9 @@ enum cdb_sc dfs(int lvl, sm_uc_ptr_t pBlkBase, boolean_t endtree, boolean_t skip
 				assert(CDB_STAGNATE > t_tries);
 				return status;
 			}
+			assert((MAX_BT_DEPTH + 1) > lvl);	/* this assert ensures that the CHECK_ADJACENCY macro
+			 					 * does not overrun the boundaries of the mu_int_adj array.
+								 */
 			if (lvl)
 				CHECK_ADJACENCY(nBlkId, lvl, mu_int_adj[lvl]);
 		}

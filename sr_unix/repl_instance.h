@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -157,7 +157,7 @@ typedef struct gtmsrc_lcl_struct
 
 #define	COPY_GTMSRCLCL_TO_GTMSOURCELOCAL(srclcl, sourcelocal)							\
 {														\
-	memcpy(&(sourcelocal)->secondary_instname[0], &(srclcl)->secondary_instname[0], MAX_INSTNAME_LEN - 1);	\
+	memmove(&(sourcelocal)->secondary_instname[0], &(srclcl)->secondary_instname[0], MAX_INSTNAME_LEN - 1);	\
 	(sourcelocal)->read_jnl_seqno = (srclcl)->resync_seqno;							\
 	(sourcelocal)->connect_jnl_seqno = (srclcl)->connect_jnl_seqno;						\
 }

@@ -1987,7 +1987,7 @@ void	gtmsource_set_next_histinfo_seqno(boolean_t detect_new_histinfo)
 	repl_histinfo		next_histinfo, prev_histinfo;
 	gtmsource_local_ptr_t	gtmsource_local;
 	repl_msg_t		instnohist_msg;
-	char			histdetail[256];
+	char			histdetail[MAX_REPL_OPMSG_LEN];
 	seq_num			read_seqno;
 
 	DEBUG_ONLY(sgmnt_addrs	*csa;)
