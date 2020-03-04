@@ -3,6 +3,7 @@
  * Copyright 2001, 2007 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
