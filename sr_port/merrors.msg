@@ -3,7 +3,7 @@
 ! Copyright (c) 2001-2019 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
-! Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	!
+! Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	!
 ! All rights reserved.						!
 !								!
 !	This source code contains the intellectual property	!
@@ -1274,7 +1274,7 @@ DLRCILLEGAL	<!_!AD!/!_!_!_Illegal $CHAR() value !UL>/error/fao=3!/ansi=0
 NONUTF8LOCALE	<Locale has character encoding (!AD) which is not compatible with UTF-8 character set>/error/fao=2!/ansi=0
 INVDLRCVAL	<Invalid $CHAR() value !UL>/error/fao=1!/ansi=0
 DBMISALIGN	<File header indicates total blocks is 0x!XL but file size indicates total blocks would be between 0x!XL and 0x!XL. Reconstruct the database from a backup or extend it by at least !UL blocks.>/error/fao=4!/ansi=0
-LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with gtm_chset>/error/fao=2!/ansi=0
+LOADINVCHSET	<Extract file CHSET (!AD) is incompatible with ydb_chset/gtm_chset>/error/fao=2!/ansi=0
 DLLCHSETM	<Routine !AD in library !AD was compiled with CHSET=M which is different from $ZCHSET. Recompile with CHSET=UTF-8 and re-link.>/error/fao=4!/ansi=0
 DLLCHSETUTF8	<Routine !AD in library !AD was compiled with CHSET=UTF-8 which is different from $ZCHSET. Recompile with CHSET=M and re-link.>/error/fao=4!/ansi=0
 BOMMISMATCH	<!AD Byte Order Marker found when !AD character set specified>/error/fao=4!/ansi=0
