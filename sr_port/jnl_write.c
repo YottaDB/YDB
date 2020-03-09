@@ -3,7 +3,7 @@
  * Copyright (c) 2003-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,7 +123,6 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	char			*mumps_node_ptr;
 	struct_jrec_align	*align_rec;
 	uint4			end_freeaddr;
-	int4			blocking_pid;
 #	endif
 
 	assert(MAX_JNL_WRITE_RECURSION_DEPTH > jnl_write_recursion_depth++);
@@ -264,11 +263,12 @@ void	jnl_write(jnl_private_control *jpc, enum jnl_record_type rectype, jnl_recor
 	ADJUST_CHECKSUM(checksum, csd->jnl_checksum, checksum);
 	SET_JREC_CHECKSUM(jnl_rec, rectype, checksum);
 	if (!in_phase2)
-	{	/* Check that the pid in jb->blocked is dead if it is not 0. The check handles the case that a pid could be dead
-		 * but its parent could still have not gotten its exit status in which case it could be a defunct.
+	{	/* Previously, we used to check that the pid in jb->blocked (if non-zero) is dead.
+		 * But that can no longer be done since pthread_mutex_trylock() (in mutex.c) can return EOWNERDEAD
+		 * even if the process is actually not dead (i.e. is_proc_alive() still returns TRUE). This means we
+		 * could have salvaged crit and come here even though the process that held crit is not yet dead (but
+		 * has started the final stages of termination). Hence that check has been removed.
 		 */
-		DEBUG_ONLY(blocking_pid = jb->blocked);
-		assert(!blocking_pid || is_defunct_pid((uint4)blocking_pid) || (FALSE == is_proc_alive(blocking_pid, 0)));
 		jb->blocked = process_id;
 	}
 	jnl_fs_block_size = jb->fs_block_size;
