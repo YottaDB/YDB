@@ -120,7 +120,20 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		TREF(bool_targ_ptr) = &(TREF(bool_targ_anchor));		/* mcalloc won't persist over multiple compiles */
 		dqinit(TREF(bool_targ_ptr), que);
 	}
-	if (OC_BOOLFINI == (bfini = t->exorder.fl)->opcode)			/* WARNING assignment */
+	/* Check if OC_BOOLFINI follows `t`. Note that there could be one or more number of OC_COM triples in between.
+	 * In that case, we need to skip them to check for OC_BOOLFINI.
+	 */
+	for (bfini = t->exorder.fl; ; bfini = bfini->exorder.fl)
+	{
+		if (OC_BOOLFINI == bfini->opcode)
+			break;
+		if (OC_COM != bfini->opcode)
+		{
+			bfini = NULL;
+			break;
+		}
+	}
+	if (NULL != bfini)
 	{	/* ex_tail wraps bools that produce a value with OC_BOOLINIT (clr) and OC_BOOLFINI (set) followed by an OC_COMVAL */
 		assert((TRIP_REF == bfini->operand[0].oprclass) && (OC_BOOLINIT ==  bfini->operand[0].oprval.tref->opcode));
 		assert(NO_REF == bfini->operand[0].oprval.tref->operand[0].oprclass);
@@ -129,8 +142,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		DEBUG_ONLY(binit->src = bfini->operand[0].oprval.tref->src);
 		ref1 = (TREF(boolchain_ptr))->exorder.bl;
 		dqins(ref1, exorder, binit);
-	} else
-		bfini = binit = NULL;
+	}
 	for (i = t->operand; i < ARRAYTOP(t->operand); i++)
 	{
 		assert(NULL != TREF(boolchain_ptr));
@@ -244,7 +256,7 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		}
 	}
 	TRACK_JMP_TARGET(t, (TREF(boolchain_ptr))->exorder.bl);			/* track the operator as well as the operands */
-	if (bfini == t->exorder.fl)
+	if (NULL != bfini)
 	{	/* if OC_BOOLINIT/OC_BOOLFINI pair, move them to the new chain */
 		assert((NULL != binit) && (OC_BOOLFINI == bfini->opcode) && (OC_BOOLINIT == binit->opcode));
 		assert((OC_COMVAL == bfini->exorder.fl->opcode) && (TRIP_REF == bfini->exorder.fl->operand[0].oprclass));
@@ -271,7 +283,6 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		if ((OCT_JUMP & oc_tab[(ref1 = bfini->exorder.bl)->opcode].octype)	/* WARNING assignment */
 				&& (INDR_REF == ref1->operand[0].oprclass) && (NO_REF == ref1->operand[0].oprval.indr->oprclass))
 			*ref1->operand[0].oprval.indr = put_tnxt(bfini);	/* unresolved JMP around BOOLFINI goes to COMVAL */
-		bfini = binit = NULL;
 	}
 	assert(OCT_BOOL & oc_tab[t->opcode].octype);
 	t->opcode = OC_NOOP;							/* wipe out the original boolean op */
