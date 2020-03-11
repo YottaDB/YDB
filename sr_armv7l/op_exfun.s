@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017-2018 Stephen L Johnson.			#
@@ -34,6 +34,7 @@
 	.include "linkage.si"
 	.include "g_msf.si"
 	.include "stack.si"
+#	include "arm.h"
 #	include "debug.si"
 
 	.sbttl	op_exfun
@@ -63,29 +64,25 @@ ENTRY op_exfun
 
 	cmp	r3, #0
 	addne	lr, #4					/* if one or more args, a "mov sp, fp" to skip */
-
+	/*
+	 * Short branch offset - Multiples of 4 in the range --- 33554432 to 33554428
+	 * Long branch offset - Any 32 bit address
+	 */
 	ldr	r4, [lr]				/* verify the instruction immediately after return */
-	lsr	r4, r4, #24
-	cmp	r4, #0xea				/* The instruction is a short branch */
+	ldr	r12, =ARM_INS_B_MASK
+	and	r4, r12
+	ldr	r12, =ARM_INS_SHORT_BRANCH
+	cmp	r4, r12					/* The instruction is a short branch */
 	beq	inst_ok
 	/*
 	 * The instructions might be a long branch
 	 */
-	ldr	r4, [lr]
-	ldr	r12, =0xe1a0c00f			/* mov  r12, pc */
+	ldr	r4, [lr, #16]
+	ldr	r12, =ARM_INS_BX_R12			/* bx r12 */
 	cmp	r4, r12
-	bne	error
-	ldr	r4, [lr, #4]
-	ldr	r12, =0xe51f4000			/* ldr  r4, [pc] */
-	cmp	r4, r12
-	bne	error
-	ldr	r4, [lr, #8]
-	ldr	r12, =0xea000000			/* b  pc */
-        cmp     r4, r12
 	beq	inst_ok
 error:
 	ldr	r1, =ERR_GTMCHECK
-	ldr	r1, [r1]
 	mov	r0, #1
 	bl	rts_error
 	b	retlab

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2002 Sanchez Computer Associates, Inc.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017 Stephen L Johnson. All rights reserved.	*
@@ -62,6 +62,11 @@
 #define ARM_INS_ORRS		((unsigned)0xe19 << ARM_SHIFT_OP)
 #define ARM_INS_ANDS		((unsigned)0xe21 << ARM_SHIFT_OP)
 #define ARM_INS_NOP		((unsigned)0xe32 << ARM_SHIFT_OP | 0x0f000)
+
+/* Instructions used to validate the branch in op_exfun.s and op_mprofexfun.s */
+#define ARM_INS_SHORT_BRANCH	0xea000000
+#define ARM_INS_BX_R12		0xe12fff1c
+#define ARM_INS_B_MASK		0xff000000
 
 #define ARM_REG2IMM_BIT		((unsigned)0x020 << ARM_SHIFT_OP)	/* Converts ADD/SUB register to ADD/SUB immediate */
 
