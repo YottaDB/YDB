@@ -63,6 +63,7 @@ enum
 #define	YDB_MAX_NAMES		35		/* Maximum number of variable names can be specified in a single ydb_*_s() call */
 #define	YDB_MAX_STR		(1 * 1024 * 1024)	/* Maximum YottaDB string length */
 #define	YDB_MAX_SUBS		31		/* Maximum subscripts currently supported */
+#define	YDB_MAX_PARMS		32		/* Maximum parameters to an M call (call-in) */
 #define	YDB_MAX_TIME_NSEC	(0x7fffffffllu * 1000llu * 1000llu)	/* Max specified time in (long long) nanoseconds */
 #define	YDB_MAX_YDBERR		(1 << 30)	/* Maximum (absolute) value for a YottaDB error */
 #define	YDB_MAX_ERRORMSG	1024		/* Will hold any message we return. Not used in YottaDB C code but relied upon
@@ -287,6 +288,16 @@ typedef struct
 	void		*handle;
 } ci_name_descriptor;
 
+/* Structure that ydb_ci_get_info() returns for a given entry point. Note this structure is here for use by various wrappers
+ * and are not intended for use by users as this structure is subject to change as new wrappers are developed and/or the
+ * current wrappers are extended.
+ */
+typedef struct
+{
+	unsigned int	input_mask;			/* Bit mask of input args (LSB = 1st parm) */
+	unsigned int	output_mask;			/* Bit mask of output args (LSB = 1st parm */
+} ci_parm_type;
+
 /* Java types with special names for clarity. */
 typedef	ydb_int_t	ydb_jboolean_t;
 typedef	ydb_int_t	ydb_jint_t;
@@ -315,6 +326,8 @@ int	ydb_call_variadic_plist_func(ydb_vplist_func cgfunc, uintptr_t cvplist);	/* 
 int	ydb_child_init(void *param);
 int	ydb_ci(const char *c_rtn_name, ...);				/* Call-in interface */
 int	ydb_cip(ci_name_descriptor *ci_info, ...);			/* Slightly faster "ydb_ci" */
+int	ydb_ci_get_info(const char *rtnname, ci_parm_type *pptype);
+int	ydb_ci_get_info_t(uint64_t tptoken, ydb_buffer_t *errstr, const char *rtnname, ci_parm_type *pptype);
 int	ydb_ci_tab_open(char *fname, uintptr_t *ret_value);
 int	ydb_ci_tab_switch(uintptr_t new_handle, uintptr_t *ret_old_handle);
 int	ydb_exit(void);

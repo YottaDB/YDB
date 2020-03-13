@@ -182,8 +182,7 @@ MBSTART {												\
 	REVERT;												\
 } MBEND
 
-STATICFNDCL callin_entry_list* get_entry(ci_tab_entry_t *ci_tab, const char *call_name);
-STATICFNDEF callin_entry_list* get_entry(ci_tab_entry_t *ci_tab, const char *call_name)
+callin_entry_list *ci_find_rtn_entry(ci_tab_entry_t *ci_tab, const char *call_name)
 {	/* Lookup in a hashtable for entry corresponding to routine name */
 	hash_table_str	*ci_hashtab;
 	ht_ent_str      *callin_entry;
@@ -254,22 +253,7 @@ int ydb_cij(const char *c_rtn_name, char **arg_blob, int count, int *arg_types, 
 	FGNCAL_UNWIND;		/* note - this is outside the establish since gtmci_ch calso calls fgncal_unwind() which,
 				 * if this failed, would lead to a nested error which we'd like to avoid */
 	ESTABLISH_RET(gtmci_ch, mumps_status);
-	if (!c_rtn_name)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CIRCALLNAME);
-	/* Check if the currently active call-in table is already loaded. If so, use it. */
-	ci_tab = TREF(ci_table_curr);
-	if (NULL == ci_tab)
-	{	/* There is no currently active call-in table. Use the default call-in table if it has been loaded. */
-		ci_tab = TREF(ci_table_default);
-	}
-	if (NULL == ci_tab)
-	{	/* Neither the active nor the default call-in table is available. Load the default call-in table. */
-		ci_tab = ci_tab_entry_open(INTERNAL_USE_FALSE, NULL);
-		TREF(ci_table_curr) = ci_tab;
-		TREF(ci_table_default) = ci_tab;
-	}
-	if (!(entry = get_entry(ci_tab, c_rtn_name)))	/* c_rtn_name not found in the table. */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
+	entry = ci_load_table_rtn_entry(c_rtn_name, &ci_tab);   /* load ci table, locate entry for return name */
 	lref_parse((unsigned char*)entry->label_ref.addr, &routine, &label, &i);
 	/* The 3rd argument is NULL because we will get lnr_adr via TABENT_PROXY. */
 	if (!job_addr(&routine, &label, 0, (char **)&base_addr, &xfer_addr))
@@ -641,7 +625,7 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 	entry = (NULL != ci_info) ? ci_info->handle : NULL;
 	if (NULL == entry)
 	{
-		if (!(entry = get_entry(ci_tab, c_rtn_name)))	/* c_rtn_name not found in the table */
+		if (!(entry = ci_find_rtn_entry(ci_tab, c_rtn_name)))	/* c_rtn_name not found in the table */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_CINOENTRY, 2, LEN_AND_STR(c_rtn_name));
 		if (NULL != ci_info)
 			ci_info->handle = entry;

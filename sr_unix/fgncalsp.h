@@ -49,7 +49,6 @@
 typedef int4	(*fgnfnc)();
 typedef void	(*clnupfptr)();
 
-
 /* A chain of packages, each package has a list of "entries", that is external routine entry points.  */
 
 struct extcall_package_list
@@ -181,5 +180,7 @@ void 		fgn_glopref(mval *v);
 struct extcall_package_list 	*exttab_parse (mval *package);
 callin_entry_list		*citab_parse(boolean_t internal_use, char *fname);
 ci_tab_entry_t			*ci_tab_entry_open(boolean_t internal_use, char *fname);
+callin_entry_list		*ci_find_rtn_entry(ci_tab_entry_t *ci_tab, const char *call_name);
+callin_entry_list		*ci_load_table_rtn_entry(const char *crtnname, ci_tab_entry_t **citab);
 
 #endif

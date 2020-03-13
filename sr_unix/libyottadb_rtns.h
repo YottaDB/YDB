@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,3 +65,4 @@ LYDBRTN(LYDB_RTN_YDB_CI,		"********",				"ydb_ci_t()"				),	/* "ydb_cip_helper" 
 LYDBRTN(LYDB_RTN_YDB_CIP,		"********",				"ydb_cip_t()"				),	/* "ydb_cip_helper" is running */
 LYDBRTN(LYDB_RTN_YDB_CI_TAB_OPEN,	"ydb_ci_tab_open()",			"ydb_ci_tab_open_t()"			),	/* "ydb_ci_tab_open" is running */
 LYDBRTN(LYDB_RTN_YDB_CI_TAB_SWITCH,	"ydb_ci_tab_switch()",			"ydb_ci_tab_switch_t()"			),	/* "ydb_ci_tab_switch" is running */
+LYDBRTN(LYDB_RTN_YDB_CI_GET_INFO,	"ydb_ci_get_info()",			"ydb_ci_get_info_t()"			),	/* "ydb_ci_get_info" is running */
