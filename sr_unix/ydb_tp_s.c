@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,13 +26,7 @@ GBLREF	uint4		dollar_tlevel;
  */
 int ydb_tp_s(ydb_tpfnptr_t tpfn, void *tpfnparm, const char *transid, int namecount, const ydb_buffer_t *varnames)
 {
-	boolean_t		error_encountered;
-	mval			tid;
-	int			rc, save_dollar_tlevel, tpfn_status, tstart_flag;
-	mval			varnamearray[YDB_MAX_NAMES], *mv, *mv_top;
-	ydb_buffer_t		*curvarname;
-	char			buff[256];			/* sprintf() buffer */
-	libyottadb_routines	lydbrtn;
+	libyottadb_routines     lydbrtn;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;

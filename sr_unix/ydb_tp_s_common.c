@@ -1,6 +1,6 @@
 /***************************************************************
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -76,8 +76,7 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 	if (LYDB_RTN_TP_TLVL0 > lydbrtn)
 	{
 		nested_tp = TRUE;
-		assert(LYDB_RTN_TP_RESTART != lydbrtn);	/* Callers ensure this value is never passed */
-		assert(LYDB_RTN_TP_ROLLBACK != lydbrtn);	/* Callers ensure this value is never passed */
+		assert(LYDB_RTN_TP_RESTART != lydbrtn);		/* Callers ensure this value is never passed */
 	} else
 	{
 		nested_tp = FALSE;
@@ -269,7 +268,6 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 		tpfn_status = YDB_TP_RESTART;
 		break;
 	case LYDB_RTN_TP_ROLLBACK:
-		assert(!nested_tp);
 		assert(YDB_OK == tpfn_status);
 		/* Set "tpfn_status" so we fall through to the OP_TROLLBACK below */
 		tpfn_status = YDB_TP_ROLLBACK;
@@ -298,7 +296,9 @@ int ydb_tp_s_common(libyottadb_routines lydbrtn,
 		} else
 		{	/* We were already inside a transaction when we entered this "ydb_tp_s" invocation.
 			 * So bubble the error back to the caller until we go back to the outermost "ydb_tp_s" invocation.
+			 * But before that, rollback the current TP level if returning a non-zero error code.
 			 */
+			OP_TROLLBACK(-1);
 		}
 	}
 	assert(0 == TREF(sapi_mstrs_for_gc_indx));	/* The counter should have been reset in this function */

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -106,14 +106,32 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 			}
 			assert(LYDB_RTN_NONE == TREF(libyottadb_active_rtn));
 			if (nested_tp)
-			{	/* If nested TP, return success/error code directly back to caller of "ydb_tp_st" */
+			{	/* If nested TP, return success/error code directly back to caller of "ydb_tp_st".
+				 * But before that, do rollback if returning a non-zero error code.
+				 * Do not do that in case of YDB_TP_RESTART error code as it is possible for
+				 * a restart inside a nested TP inside ydb_ci_t() reset `dollar_tlevel` to 1 as part
+				 * of `tp_restart(1,...)` call in `mdb_condition_handler.c`. Attempting an incremental
+				 * rollback in that case would result in an error because dollar_tlevel is not > 1.
+				 */
+				if ((YDB_TP_RESTART != retval) && (YDB_OK != retval))
+				{	/* Rollback the TP transaction by asking "ydb_tp_s_common" to do the "op_trollback" */
+					assert(1 < dollar_tlevel);
+					rlbk_retval = ydb_tp_s_common(LYDB_RTN_TP_ROLLBACK, (ydb_basicfnptr_t)NULL, (void *)NULL,
+								(const char *)NULL, (int)0, (ydb_buffer_t *)NULL);
+					assert((YDB_TP_ROLLBACK == rlbk_retval)
+						|| (YDB_ERR_CALLINAFTERXIT == rlbk_retval)
+							&& (retval == rlbk_retval) && dollar_tlevel);
+				}
+				assert(1 <= dollar_tlevel);
 				break;
 			}
 			/* If we reach here, it means we are in the outermost TP */
 			if (YDB_OK == retval)
 			{	/* Outermost TP committed successfully. Return success to caller of "ydb_tp_st". */
+				assert(0 == dollar_tlevel);
 				break;
 			}
+			assert(1 >= dollar_tlevel);	/* See `dollar_tlevel` use below for why it can be 0 */
 			if (YDB_TP_RESTART != retval)
 			{	/* Outermost TP and error code is not a TPRESTART.
 				 * Return it directly to caller of "ydb_tp_st" but before that roll back the
