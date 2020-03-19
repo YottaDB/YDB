@@ -19,7 +19,7 @@
 /* Opens the call-in table specified in "fname". And returns a handle to the opened table in "ret_value".
  * Returns YDB_OK if call is successful. And a negative number (error) otherwise.
  */
-int ydb_ci_tab_open(char *fname, uintptr_t *ret_handle)
+int ydb_ci_tab_open(const char *fname, uintptr_t *ret_handle)
 {
 	boolean_t	error_encountered;
 	ci_tab_entry_t	*ci_tab;
