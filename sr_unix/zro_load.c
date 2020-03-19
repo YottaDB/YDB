@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,8 +29,6 @@
 #include "zro_shlibs.h"
 #include "gtm_limits.h"
 
-#define GETTOK		zro_gettok(&lp, top, &tok)
-
 error_def(ERR_DIRONLY);
 error_def(ERR_FILEPARSE);
 error_def(ERR_FSEXP);
@@ -39,6 +37,40 @@ error_def(ERR_MAXARGCNT);
 error_def(ERR_NOLBRSRC);
 error_def(ERR_QUALEXP);
 error_def(ERR_ZROSYNTAX);
+
+#define	COPY_TO_EXP_BUFF(STR, LEN, EXP_BUFF, EXP_LEN_USED, EXP_ALLOC_LEN)	\
+MBSTART {									\
+	int	new_len_used;							\
+	char	*tmpExpBuff;							\
+										\
+	assert(LEN);								\
+	new_len_used = LEN + EXP_LEN_USED;					\
+	if (EXP_ALLOC_LEN < new_len_used)					\
+	{	/* Current allocation not enough. Allocate more. */		\
+		EXP_ALLOC_LEN = (new_len_used * 2);				\
+		tmpExpBuff = (char *)malloc(EXP_ALLOC_LEN);			\
+		memcpy(tmpExpBuff, EXP_BUFF, EXP_LEN_USED);			\
+		free(EXP_BUFF);							\
+		EXP_BUFF = tmpExpBuff;						\
+	}									\
+	memcpy((char *)EXP_BUFF + EXP_LEN_USED, STR, LEN);			\
+	EXP_LEN_USED += LEN;							\
+	assert(EXP_LEN_USED <= EXP_ALLOC_LEN);					\
+} MBEND
+
+#define	COPY_ZROENT_AS_APPROPRIATE(OP, PBLK, EXP_BUFF, EXP_LEN_USED, EXP_ALLOC_LEN)				\
+{														\
+	char	*has_envvar;											\
+														\
+	has_envvar = memchr(OP->str.addr, '$', OP->str.len);							\
+	if (has_envvar)												\
+	{	/* Copy object/source directory (with env vars expanded) into what becomes final $ZROUTINES */	\
+		COPY_TO_EXP_BUFF(PBLK.buffer, PBLK.b_esl, EXP_BUFF, EXP_LEN_USED, EXP_ALLOC_LEN);		\
+	} else													\
+	{	/* Copy object/source directory as is (e.g. ".") into what becomes final $ZROUTINES */		\
+		COPY_TO_EXP_BUFF(OP->str.addr, OP->str.len, EXP_BUFF, EXP_LEN_USED, EXP_ALLOC_LEN);		\
+	}													\
+}
 
 /* Routine to parse the value of $ZROUTINES and create the list of structures that define the (new) routine
  * search list order and define which (if any) directories can use auto-relink.
@@ -60,6 +92,8 @@ void zro_load(mstr *str)
 	struct  stat		outbuf;
 	int			stat_res;
 	char			tranbuf[MAX_FN_LEN + 1];
+	int			exp_len_used, exp_alloc_len;
+	char			*exp_buff;
 	parse_blk		pblk;
 	DCL_THREADGBL_ACCESS;
 
@@ -74,7 +108,7 @@ void zro_load(mstr *str)
 	array[0].count = 0;
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = tranbuf;
-	toktyp = GETTOK;
+	toktyp = zro_gettok(&lp, top, &tok);
 	if (ZRO_EOL == toktyp)
 	{	/* Null string - set default - implies current working directory only */
 		array[0].count = 1;
@@ -177,15 +211,15 @@ void zro_load(mstr *str)
 			arlink_enabled |= arlink_thisdir_enable;	/* Cumulative value of enabled dirs */
 			array[0].count++;
 			array[oi].str = tok;
-			toktyp = GETTOK;
+			toktyp = zro_gettok(&lp, top, &tok);
 			if (ZRO_LBR == toktyp)
 			{
 				if (ZRO_TYPE_OBJLIB == array[oi].type)
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr,
 						      ERR_NOLBRSRC);
-				toktyp = GETTOK;
+				toktyp = zro_gettok(&lp, top, &tok);
 				if (ZRO_DEL == toktyp)
-					toktyp = GETTOK;
+					toktyp = zro_gettok(&lp, top, &tok);
 				if ((ZRO_IDN != toktyp) && (ZRO_RBR != toktyp))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZROSYNTAX, 2, str->len, str->addr,
 						      ERR_QUALEXP);
@@ -221,11 +255,11 @@ void zro_load(mstr *str)
 					array[si].type = ZRO_TYPE_SOURCE;
 					array[si].str = tok;
 					si++;
-					toktyp = GETTOK;
+					toktyp = zro_gettok(&lp, top, &tok);
 					if (ZRO_DEL == toktyp)
-						toktyp = GETTOK;
+						toktyp = zro_gettok(&lp, top, &tok);
 				}
-				toktyp = GETTOK;
+				toktyp = zro_gettok(&lp, top, &tok);
 			} else
 			{
 				if ((ZRO_TYPE_OBJLIB != array[oi].type) && ((ZRO_DEL == toktyp) || (ZRO_EOL == toktyp)))
@@ -242,7 +276,7 @@ void zro_load(mstr *str)
 			if (ZRO_EOL == toktyp)
 				break;
 			if (ZRO_DEL == toktyp)
-				toktyp = GETTOK;
+				toktyp = zro_gettok(&lp, top, &tok);
 			else
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZROSYNTAX, 2, str->len, str->addr);
 			oi = si;
@@ -277,7 +311,10 @@ void zro_load(mstr *str)
 	assert(ZRO_TYPE_COUNT == (TREF(zro_root))->type);
 	oi = (TREF(zro_root))->count;
 	assert(oi);
-	for (op = TREF(zro_root) + 1; 0 < oi--;)
+	exp_alloc_len = 512;		/* Initial allocation */
+	exp_buff = (char *)malloc(exp_alloc_len);
+	exp_len_used = 0;
+	for (op = TREF(zro_root) + 1; 0 < oi--; )
 	{
 		assert((ZRO_TYPE_OBJECT == op->type) || (ZRO_TYPE_OBJLIB == op->type));
 		if (op->str.len)
@@ -286,35 +323,68 @@ void zro_load(mstr *str)
 			pblk.fnb = 0;
 			status = parse_file(&op->str, &pblk);
 			if (!(status & 1))
+			{
+				free(exp_buff);
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
 					      ERR_FILEPARSE, 2, op->str.len, op->str.addr, status);
+			}
+			/* Copy object directory into what will become final $ZROUTINES */
+			COPY_ZROENT_AS_APPROPRIATE(op, pblk, exp_buff, exp_len_used, exp_alloc_len);
+			if (NULL != op->relinkctl_sgmaddr)
+				COPY_TO_EXP_BUFF("*", 1, exp_buff, exp_len_used, exp_alloc_len);	/* Add "*" to objdir */
 			op->str.addr = (char *)malloc(pblk.b_esl + 1);
 			op->str.len = pblk.b_esl;
 			memcpy(op->str.addr, pblk.buffer, pblk.b_esl);
 			op->str.addr[pblk.b_esl] = 0;
-		}
-		if (ZRO_TYPE_OBJLIB == (op++)->type)
-			continue;
-		assert(ZRO_TYPE_COUNT == op->type);
-		si = (op++)->count;
-		for (; 0 < si--; op++)
+		} else
+			COPY_TO_EXP_BUFF(".", 1, exp_buff, exp_len_used, exp_alloc_len); /* Empty objdir == "." */
+		if (ZRO_TYPE_OBJLIB != (op++)->type)
 		{
-			assert(ZRO_TYPE_SOURCE == op->type);
-			if (op->str.len)
+			assert(ZRO_TYPE_COUNT == op->type);
+			si = (op++)->count;
+			COPY_TO_EXP_BUFF("(", 1, exp_buff, exp_len_used, exp_alloc_len);
+			for (; 0 < si--; op++)
 			{
-				pblk.buff_size = MAX_FN_LEN;
-				pblk.fnb = 0;
-				status = parse_file(&op->str, &pblk);
-				if (!(status & 1))
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2, str->len, str->addr,
-						      ERR_FILEPARSE, 2, op->str.len, op->str.addr, status);
-				op->str.addr = (char *)malloc(pblk.b_esl + 1);
-				op->str.len = pblk.b_esl;
-				memcpy(op->str.addr, pblk.buffer, pblk.b_esl);
-				op->str.addr[pblk.b_esl] = 0;
+				assert(ZRO_TYPE_SOURCE == op->type);
+				if (op->str.len)
+				{
+					pblk.buff_size = MAX_FN_LEN;
+					pblk.fnb = 0;
+					status = parse_file(&op->str, &pblk);
+					if (!(status & 1))
+					{
+						free(exp_buff);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_ZROSYNTAX, 2,
+								str->len, str->addr,
+								ERR_FILEPARSE, 2, op->str.len, op->str.addr, status);
+					}
+					/* Copy object directory into what will become final $ZROUTINES */
+					COPY_ZROENT_AS_APPROPRIATE(op, pblk, exp_buff, exp_len_used, exp_alloc_len);
+					op->str.addr = (char *)malloc(pblk.b_esl + 1);
+					op->str.len = pblk.b_esl;
+					memcpy(op->str.addr, pblk.buffer, pblk.b_esl);
+					op->str.addr[pblk.b_esl] = 0;
+				} else
+				{
+					assert(0 == si);
+					COPY_TO_EXP_BUFF(".", 1, exp_buff, exp_len_used, exp_alloc_len);
+				}
+				if (si)
+				{	/* Add space before next srcdir */
+					COPY_TO_EXP_BUFF(" ", 1, exp_buff, exp_len_used, exp_alloc_len);
+				}
 			}
+			COPY_TO_EXP_BUFF(")", 1, exp_buff, exp_len_used, exp_alloc_len);
 		}
+		if (oi)
+			COPY_TO_EXP_BUFF(" ", 1, exp_buff, exp_len_used, exp_alloc_len); /* Add space for next objdir */
 	}
+	if ((TREF(dollar_zroutines)).addr)
+		free ((TREF(dollar_zroutines)).addr);
+	(TREF(dollar_zroutines)).addr = (char *)malloc(exp_len_used);
+	memcpy((TREF(dollar_zroutines)).addr, exp_buff, exp_len_used);
+	(TREF(dollar_zroutines)).len = exp_len_used;
+	free(exp_buff);
 	ARLINK_ONLY(TREF(arlink_enabled) = arlink_enabled);	/* Set if any zro entry is enabled for autorelink */
 	(TREF(set_zroutines_cycle))++;			/* Signal need to recompute zroutines histories for each linked routine */
 }

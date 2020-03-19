@@ -175,11 +175,6 @@ void op_svput(int varnum, mval *v)
 			/* The string(v) should be parsed and loaded before setting $zroutines
 			 * to retain the old value in case errors occur while loading */
 			zro_load(&v->str);
-			if ((TREF(dollar_zroutines)).addr)
-				free ((TREF(dollar_zroutines)).addr);
-			(TREF(dollar_zroutines)).addr = (char *)malloc(v->str.len);
-			memcpy((TREF(dollar_zroutines)).addr, v->str.addr, v->str.len);
-			(TREF(dollar_zroutines)).len = v->str.len;
 			break;
 		case SV_ZSOURCE:
 			MV_FORCE_STR(v);

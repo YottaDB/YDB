@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,8 +66,5 @@ void zro_init(void)
 			tn.addr = def2.addr;
 		}
 	}
-	(TREF(dollar_zroutines)).len = tn.len;
-	(TREF(dollar_zroutines)).addr = (char *)malloc (tn.len);
-	memcpy((TREF(dollar_zroutines)).addr, tn.addr, tn.len);
-	zro_load(TADR(dollar_zroutines));
+	zro_load(&tn);
 }
