@@ -3,7 +3,7 @@
  * Copyright (c) 2007-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -303,9 +303,9 @@ boolean_t wcs_get_space(gd_region *reg, int needed, cache_rec_ptr_t cr)
 			 * WBTEST_JNL_FILE_LOST_DSKADDR faster
 			 */
 			if (ydb_white_box_test_case_enabled
-			    && (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)
-			    && (0 < ydb_white_box_test_case_count)
-			    && (lcnt >= ydb_white_box_test_case_count))
+					&& (WBTEST_JNL_FILE_LOST_DSKADDR == ydb_white_box_test_case_number)
+					&& (0 < ydb_white_box_test_case_count)
+					&& (lcnt >= ydb_white_box_test_case_count))
 				lcnt = ((lcnt + UNIX_GETSPACEWAIT) % UNIX_GETSPACEWAIT) - 1;
 #			endif
 		}

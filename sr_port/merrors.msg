@@ -1296,7 +1296,7 @@ GTMSECSHRTMPPATH	<gtmsecshr path is !AD>/info/fao=2!/ansi=0
 UNUSEDMSG1296	<GTMERREXIT nixed in r1.20 because it is a VMS only error>/error/fao=0!/ansi=0
 INVMEMRESRV	<Could not allocate YottaDB memory reserve (!AD)>/warning/fao=2!/ansi=0
 OPCOMMISSED	<!UL errors and !UL MBFULLs sending prior operator messages>/info/fao=2!/ansi=0
-COMMITWAITSTUCK	<Pid !UL timed out after waiting !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
+COMMITWAITSTUCK	<Pid !UL waited !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD>/error/fao=5!/ansi=0
 COMMITWAITPID	<Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!XL in database file !AD>/error/fao=6!/ansi=0
 UPDREPLSTATEOFF	<Error replicating global ^!AD as it maps to database !AD which has replication turned OFF>/error/fao=4!/ansi=0
 LITNONGRAPH	<M standard requires graphics in string literals; found non-printable: $ZCHAR(!AD)>/warning/fao=2!/ansi=0

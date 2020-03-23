@@ -2919,7 +2919,7 @@
    execute the command. When the timeout is zero (0), M makes a single
    attempt to complete the command.
 
-   YottaDB caps the maximum timeout to 999,999.999 seconds (about 11.5 days),
+   YottaDB caps the maximum timeout to 2,147,483,647 seconds (about 24.8 days),
    and converts values greater than the maximum timeout to that cap. When a
    command has a timeout, M maintains the $TEST intrinsic special variable as
    the command completes. If the command completes successfully, M sets $TEST
@@ -11562,7 +11562,7 @@
    $ZAUDit
 
    $ZAUDIT contains a boolean value that indicates whether Audit Principal
-   Device is enabled. GT.M does not permit $ZAUDIT to be SET or NEWed.
+   Device is enabled. YottaDB does not permit $ZAUDIT to be SET or NEWed.
 
 2 $ZB
    $ZB
@@ -11722,7 +11722,7 @@
    performed by a ZCOMPILE command. One (1) indicates a clean compilation, a
    positive number greater than one is an error code you can turn into text
    with $ZMESSAGE(), and a negative number is a negated error code that
-   indicates GT.M was not able to produce an object file. The error details
+   indicates YottaDB was not able to produce an object file. The error details
    appear in the compilation output, so $ZCSTATUS typically contains the code
    for ERRORSUMMARY.
 
@@ -12022,7 +12022,7 @@
    $ZINTERRUPT is "IF $ZJOBEXAM()" which redirects a dump of ZSHOW "*" to a
    file and reports each such occasion to the operator log. For <CTRL-C> with
    CENABLE, it enters Direct Mode to give the programmer control. Without
-   CENABLE or CTRAP, GT.M ignores <CTRL-C> on a $PRINCIPAL terminal.
+   CENABLE or CTRAP, YottaDB ignores <CTRL-C> on a $PRINCIPAL terminal.
 
    YottaDB recognizes most of these events when they occur but transfers control
    to the interrupt vector at the start of each M line, at each iteration of
@@ -12032,7 +12032,7 @@
    (unless zero timeout,) WRITE /WAIT for SOCKETs, and READ for terminals,
    SOCKETs, FIFOs, and PIPEs. If +$ZTEXIT evaluates to a truth value at the
    outermost TCOMMIT or TROLLBACK, YottaDB XECUTEs $ZINTERRUPT after completing
-   the commit or rollback. Except for <CTRL-C> GT.M recognizes CTRAP
+   the commit or rollback. Except for <CTRL-C> YottaDB recognizes CTRAP
    characters when READ. CTRAP characters other than <CTRL-C> tend to be
    limited by terminal configuration.
 
@@ -12087,7 +12087,7 @@
    executing the $ZINTERRUPT code), YottaDB sends the YDB-E-ERRWZINTR message and
    the compiler error message to the operator log facility. If the YottaDB
    process is at a direct mode prompt or is executing a direct mode command
-   (for example, a FOR loop), YottaDB sends also sends the YDB-EERRWZINTR error
+   (for example, a FOR loop), YottaDB sends also sends the YDB-E-EERRWZINTR error
    message to the user console along with the compilation error. In both
    cases, the interrupted process resumes execution without performing any
    action specified by the defective $ZINTERRUPT vector.
@@ -12115,13 +12115,13 @@
    are not restored by a TRESTART to defer the interrupt action until after
    the final TCOMMIT.
 
-   The interrupt handler is executed by GT.M when on a statement boundary or
+   The interrupt handler is executed by YottaDB when on a statement boundary or
    on an appropriate boundary in a potentially long running COMMAND (in the
-   same place as GT.M recognizes <CTRL-C>). If a GT.M process is in a long
-   running external call (for example; waiting in a message queue) GT.M does
+   same place as YottaDB recognizes <CTRL-C>). If a YottaDB process is in a long
+   running external call (for example; waiting in a message queue) YottaDB does
    not have sufficient control of the process state to immediately drive the
-   interrupt handler. GT.M recognizes the interrupt request and drives the
-   handler after the external call returns to GT.M and the process reaches an
+   interrupt handler. YottaDB recognizes the interrupt request and drives the
+   handler after the external call returns to YottaDB and the process reaches an
    appropriate execution boundary.
 
    Since sending an interrupt signal requires the sender to have appropriate
@@ -12136,11 +12136,11 @@
    If an error occurs while compiling the $ZINTERRUPT code, the action taken
    depends on the process state at the time the interrupt was received and
    the error handler is not invoked (the error handler is invoked if an error
-   occurs while executing the $ZINTERRUPT code). If the GT.M process is at a
+   occurs while executing the $ZINTERRUPT code). If the YottaDB process is at a
    direct mode prompt or is executing a direct mode command (for example, a
    FOR loop), the error message is sent to the user console along with the
-   ERRWZINTR error (refer to the GT.M Error and Message Recovery Manual). In
-   addition, the ERRWZINTR error is also sent to the operator log facility.
+   ERRWZINTR error (refer to the YottaDB Messages and Recovery Procedures Manual).
+   In addition, the ERRWZINTR error is also sent to the operator log facility.
    IF the process is not at a direct mode prompt or executing a direct mode
    command, the ERRWZINTR message and the compiler error message are sent to
    the operator log facility and nothing is displayed on the user's console.
@@ -12620,7 +12620,7 @@
 2 $ZRELdate
    $ZRELdate
 
-   $ZRELDATE provides the UTC date / time of the build GT.M build in the form
+   $ZRELDATE provides the UTC date / time of the YottaDB build in the form
    YYYYMMDD 24:60 (using $ZDATE() notation). While $ZVERSION is probably a
    better identifier for most uses, $ZRELDATE may be a helpful alternative
    for those testing pre-release builds.
@@ -12980,20 +12980,20 @@
    $ZQuit
 
    $ZQUIT indicates whether the functionality associated with the
-   gtm_zquit_anyway environment variable is enabled. If the environment
-   variable gtm_zquit_anyway is defined and evaluates to 1 or any
-   case-independent string or leading substrings of "TRUE" or "YES", GT.M
+   ydb_zquit_anyway environment variable is enabled. If the environment
+   variable ydb_zquit_anyway is defined and evaluates to 1 or any
+   case-independent string or leading substrings of "TRUE" or "YES", YottaDB
    sets $ZQUIT to 1 and executes code of the form QUIT <expr< as if it were
    SET <tmp>=<expr> QUIT:$QUIT tmp QUIT, where <tmp> is a temporary local
-   variable in the GT.M runtime system that is not visible to the application
+   variable in the YottaDB runtime system that is not visible to the application
    code. The value of $ZQUIT is a compile time setting, that is it can be set
    during run-time but it has no effect on the behavior existing object code
    - it only effects code generated by auto-ZLINK or the ZCOMPILE command.
    This setting has no effect on late bound code such as that in XECUTE
    arguments, $ETRAP, $ZTRAP device EXCEPTIONS.
 
-   If gtm_zquit_anyway is not defined or evaluates to 0 or any
-   case-independent string or leading substrings of "FALSE" or "NO", GT.M set
+   If ydb_zquit_anyway is not defined or evaluates to 0 or any
+   case-independent string or leading substrings of "FALSE" or "NO", YottaDB sets
    $ZQUIT to 0 executes QUIT <expr> as specified by the standard. This
    feature is helpful when you want to run a block of code both as a routine
    and as an extrinsic function. Consider the following example:
@@ -13003,7 +13003,7 @@
      write "Hello ",expr1,!
      quit
 
-   When the gtm_zquit_anyway functionality is diabled, extrinsic function
+   When the ydb_zquit_anyway functionality is diabled, extrinsic function
    invocations return an error as per the standard.
 
    YDB>write $zquit
@@ -13012,7 +13012,7 @@
    Hello jdoe
      %GTM-E-QUITARGREQD, Quit from an extrinsic must have an argument
 
-   However, if you enable the gtm_zquit_anyway feature, extrinsic function
+   However, if you enable the ydb_zquit_anyway feature, extrinsic function
    invocations do not return an error.
 
    YDB>write $zquit
@@ -13262,19 +13262,19 @@
 
      o The optional timeout in seconds specifies with millisecond accuracy
        how long from the current time the timer interrupts the process. If
-       the specified timeout is negative, GT.M cancels the timer. If the
-       timeout is zero, GT.M treats it as it would a DO of the vector.
+       the specified timeout is negative, YottaDB cancels the timer. If the
+       timeout is zero, YottaDB treats it as it would a DO of the vector.
      o The optional labelref specifies a code vector defining a fragment of M
-       code to which GT.M transfers control as if with a DO when the timeout
+       code to which YottaDB transfers control as if with a DO when the timeout
        expires. If the timeout is missing, the assignment must start with a
        colon and only changes the vector, and in this case, if the timeout is
-       the empty string, GT.M removes any current vector.
+       the empty string, YottaDB removes any current vector.
 
-   Note that GT.M only recognizes interrupts such as from $ZTIMEOUT at points
+   Note that YottaDB only recognizes interrupts such as from $ZTIMEOUT at points
    where it can properly resume operation, such as the beginning of a line,
    when waiting on a command with a timeout, or when starting a FOR
    iteration. When a timeout occurs, if the last assignment specified no
-   vector, GT.M uses the current $ETRAP or $ZTRAP. GT.M rejects an attempted
+   vector, YottaDB uses the current $ETRAP or $ZTRAP. YottaDB rejects an attempted
    KILL of $ZTIMeout with the VAREXPECTED error and an attempted NEW of
    $ZTIMeout with the SVNONEW error.
 
@@ -17193,7 +17193,7 @@
 
    The <CTRL> characters are ASCII 0 though 31. However terminal
    configuration may prevent of most <CTRL> characters from ever reaching
-   GT.M's CTRAP facility.
+   YottaDB's CTRAP facility.
 
    For example, the command U $P:CTRAP=$C(26,30,7,19) sets a trap for the
    ASCII characters <SUB>, <RS>, <BEL> and <DC3>.
@@ -18727,10 +18727,10 @@
    libyottadb.h also includes definitions for the following entry points
    exported from libyottadb:
 
-   void gtm_hiber_start(ydb_uint_t mssleep);
-   void gtm_hiber_start_wait_any(ydb_uint_t mssleep)
-   void gtm_start_timer(ydb_tid_t tid, ydb_int_t time_to_expir, void (*handler)(), ydb_int_t hdata_len, void \*hdata);
-   void gtm_cancel_timer(ydb_tid_t tid);
+   void ydb_hiber_start(ydb_uint_t mssleep);
+   void ydb_hiber_start_wait_any(ydb_uint_t mssleep)
+   void ydb_start_timer(ydb_tid_t tid, ydb_int_t time_to_expir, void (*handler)(), ydb_int_t hdata_len, void \*hdata);
+   void ydb_cancel_timer(ydb_tid_t tid);
 
    where:
 
@@ -18741,9 +18741,9 @@
      * hdata_len - 0 or length of data to pass to handler as a parameter
      * hdata - NULL or address of data to pass to handler as a parameter
 
-   gtm_hiber_start() always sleeps until the time expires;
-   gtm_hiber_start_wait_any() sleeps until the time expires or an interrupt
-   by any signal (including another timer). gtm_start_timer() starts a timer
+   ydb_hiber_start() always sleeps until the time expires;
+   ydb_hiber_start_wait_any() sleeps until the time expires or an interrupt
+   by any signal (including another timer). ydb_start_timer() starts a timer
    but returns immediately (no sleeping) and drives the given handler when
    time expires unless the timer is canceled.
 
@@ -22128,7 +22128,6 @@ Appendix A. M Coding Standards - Do's and Don'ts
            alias containers. Lines containing SET $ZWRTACn=<value> are no-ops
            unless they have a preceding SET $ZWRTAC="" and an alias container
            variable association. In the ZWRITE or ZSHOW "V" output of an
-           alias container, SET $ZWRTAC lines appear in the order that GT.M
-           expects for restoration. FIS can change the use of $ZWRTAC in GT.M
-           at any time.
+           alias container, SET $ZWRTAC lines appear in the order that YottaDB
+           expects for restoration.
 

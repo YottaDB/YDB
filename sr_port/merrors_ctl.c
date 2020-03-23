@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.*
@@ -1132,7 +1132,7 @@ LITDEF	err_msg merrors[] = {
 	{ "UNUSEDMSG1296", "GTMERREXIT nixed in r1.20 because it is a VMS only error", 0 },
 	{ "INVMEMRESRV", "Could not allocate YottaDB memory reserve (!AD)", 2 },
 	{ "OPCOMMISSED", "!UL errors and !UL MBFULLs sending prior operator messages", 2 },
-	{ "COMMITWAITSTUCK", "Pid !UL timed out after waiting !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD", 5 },
+	{ "COMMITWAITSTUCK", "Pid !UL waited !UL minute(s) for !UL concurrent YottaDB process(es) to finish commits in database file !AD", 5 },
 	{ "COMMITWAITPID", "Pid !UL waited !UL minute(s) for pid !UL to finish commits to block 0x!XL in database file !AD", 6 },
 	{ "UPDREPLSTATEOFF", "Error replicating global ^!AD as it maps to database !AD which has replication turned OFF", 4 },
 	{ "LITNONGRAPH", "M standard requires graphics in string literals; found non-printable: $ZCHAR(!AD)", 2 },
@@ -1581,3 +1581,4 @@ GBLDEF	err_ctl merrors_ctl = {
 	&merrors_undocarr[0],
 	26
 };
+

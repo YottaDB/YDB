@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -146,28 +146,31 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			 */
 			if (!was_crit)
 			{
-				grab_crit(jpc->region);	/* jnl_write_attempt has an assert about have_crit that this relies on */
-				/* Check jb io_writer again now that we have crit */
-				if (writer != CURRENT_JNL_IO_WRITER(jb))
-				{
-					if (!was_crit)
+				grab_crit_immediate(jpc->region, TRUE);
+						/* jnl_write_attempt has an assert about have_crit that this relies on */
+				if (csa->now_crit)
+				{	/* Check jb io_writer again now that we have crit */
+					if (writer != CURRENT_JNL_IO_WRITER(jb))
+					{
 						rel_crit(jpc->region);
-					break;
+						break;
+					}
 				}
 			}
-			if (FALSE == is_proc_alive(writer, jb->image_count))
-			{	/* No one home, clear the semaphore */
+			/* If no one home, try to clear the semaphore */
+			if ((FALSE == is_proc_alive(writer, jb->image_count))
+					&& COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, LOCK_AVAILABLE))
+			{	/* We cleared the latch, so report it and restart the loop. */
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
 				jnl_send_oper(jpc, ERR_JNLQIOSALVAGE);
-				COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, LOCK_AVAILABLE);
-				if (!was_crit)
+				if (!was_crit && csa->now_crit)	/* csa->now_crit needed in case "grab_crit_immediate()" failed */
 					rel_crit(jpc->region);
 				*lcnt = 1;
 				continue;
 			}
-			if (!was_crit && csa->now_crit)		/* Check now_crit in case grab_crit_immediate() failed */
+			if (!was_crit && csa->now_crit)		/* csa->now_crit needed in case "grab_crit_immediate()" failed */
 				rel_crit(jpc->region);
-			/* this is the interesting case: a process is stuck */
+			/* This is the interesting case. A process is stuck. */
 			BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_stuck);
 			if (IS_REPL_INST_FROZEN)
 			{	/* Restart if instance frozen. */
