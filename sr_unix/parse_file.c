@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -268,10 +268,10 @@ int4 parse_file(mstr *file, parse_blk *pblk)
 	for (; ptr < top;)
 	{
 		ch = *ptr;
-		if ('.' == ch)
+		if (('.' == ch) && (DOT2 != state))
 		{	/* Could be /./ or /../ or name.name */
 			ptr++;
-			state = (DOT1 == state) ? ((DOT2 == state) ? NAME : DOT2) : DOT1;
+			state = ((DOT1 == state) ? DOT2 : DOT1);
 		} else if (ch == '/')
 		{	/* We must still be doing the path */
 			ptr++;
