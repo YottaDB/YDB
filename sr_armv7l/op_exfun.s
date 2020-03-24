@@ -65,7 +65,7 @@ ENTRY op_exfun
 	cmp	r3, #0
 	addne	lr, #4					/* if one or more args, a "mov sp, fp" to skip */
 	/*
-	 * Short branch offset - Multiples of 4 in the range --- 33554432 to 33554428
+	 * Short branch offset - Multiples of 4 in the range --- -33554432 to 33554428
 	 * Long branch offset - Any 32 bit address
 	 */
 	ldr	r4, [lr]				/* verify the instruction immediately after return */
@@ -77,7 +77,11 @@ ENTRY op_exfun
 	/*
 	 * The instructions might be a long branch
 	 */
+.ifdef __armv7l__
 	ldr	r4, [lr, #16]
+.else	/* __armv6l__ */
+	ldr	r4, [lr, #20]
+.endif
 	ldr	r12, =ARM_INS_BX_R12			/* bx r12 */
 	cmp	r4, r12
 	beq	inst_ok
