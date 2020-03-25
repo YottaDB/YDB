@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -211,7 +211,13 @@ MBSTART {												\
 	 */												\
 	assert(!INSIDE_THREADED_CODE(rname));								\
 	assert(!GET_DEFERRED_EXIT_CHECK_NEEDED || (1 == forced_exit));					\
-	assert(GET_DEFERRED_EXIT_CHECK_NEEDED || (1 != forced_exit));					\
+	/* Note: The order of the operands in the `||` check below matters. If it is coded as		\
+	 * `GET_DEFERRED_EXIT_CHECK_NEEDED || (1 != forced_exit)`, it is possible that the		\
+	 * GET_DEFERRED_EXIT_CHECK_NEEDED macro returns FALSE but before the `1 != forced_exit`		\
+	 * part gets checked, an interrupt (say MUPIP STOP) occurs that ends up setting `forced_exit`	\
+	 * to 1 and returning back to the assert and failing the assert.				\
+	 */												\
+	assert((1 != forced_exit) || GET_DEFERRED_EXIT_CHECK_NEEDED);					\
 	if (deferred_signal_handling_needed)								\
 		deferred_signal_handler();								\
 } MBEND
