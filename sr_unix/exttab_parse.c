@@ -814,7 +814,7 @@ struct extcall_package_list *exttab_parse(mval *package)
 	return pak;
 }
 
-callin_entry_list *citab_parse(boolean_t internal_use, char *fname)
+callin_entry_list *citab_parse(boolean_t internal_use, const char *fname)
 {
 	int			parameter_count, i, fclose_res;
 	uint4			inp_mask, out_mask, mask;
@@ -829,7 +829,7 @@ callin_entry_list *citab_parse(boolean_t internal_use, char *fname)
 
 	if (!internal_use)
 	{
-		ext_table_file_name = (NULL == fname) ? ydb_getenv(YDBENVINDX_CI, NULL_SUFFIX, &is_ydb_env_match) : fname;
+		ext_table_file_name = (NULL == fname) ? ydb_getenv(YDBENVINDX_CI, NULL_SUFFIX, &is_ydb_env_match) : (char *)fname;
 		if (NULL == ext_table_file_name) /* environment variable not set */
 		{
 			nbytes = SNPRINTF(tmpbuff, SIZEOF(tmpbuff), "%s/%s",
@@ -1009,7 +1009,7 @@ STATICFNDEF void ext_stx_error(int in_error, ...)
  * If the call-in table has already been opened, it returns a pointer to the already open table
  *	and avoids a duplicate (and heavyweight) open of the call-in table.
  */
-ci_tab_entry_t *ci_tab_entry_open(boolean_t internal_use, char *fname)
+ci_tab_entry_t *ci_tab_entry_open(boolean_t internal_use, const char *fname)
 {
 	boolean_t		added;
 	ci_tab_entry_t		*ci_tab;
