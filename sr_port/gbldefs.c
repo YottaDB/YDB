@@ -206,6 +206,7 @@ GBLDEF	int4		backup_close_errno,
 			backup_write_errno,
 			mubmaxblk,
 			forced_exit_err,
+			forced_exit_sig,
 			exit_state,
 			restore_read_errno;
 GBLDEF	volatile int4	outofband;
@@ -1312,6 +1313,7 @@ GBLDEF	int		fork_after_ydb_init;	/* Set to a non-zero value if a "fork" occurs a
 GBLDEF 	struct sigaction	orig_sig_action[NSIG + 1];	/* Array of signal handlers (indexed by signal number) that were
 								 * in-place when YDB initialized.
 								 */
+GBLDEF	void			*ydb_sig_handlers[NSIG + 1];	/* Array of signal handler routine function pointers used by YDB */
 GBLDEF	void			(*ydb_stm_thread_exit_fnptr)(void);	/* Maintain a pointer to "ydb_stm_thread_exit" so we avoid
 									 * pulling this (and a lot of other functions) into
 									 * "gtmsecshr" executable resulting in code bloat.
@@ -1363,3 +1365,16 @@ GBLDEF	int			terminal_settings_changed_fd;	/* This gbldef checks if a Tcsetattr 
 								 * so that mu_reset_term_characterstics() will only restore the
 								 * terminal state if it has been modified.
 								 */
+GBLDEF	int			ydb_main_lang = YDB_MAIN_LANG_C;	/* Setting for main-language in use defaulting to C */
+
+/* Block of fields used to handle interrupts in alternate signal handling mode (non-M main handles signals and passes them
+ * to YottaDB to be processed).
+ */
+GBLDEF	sig_pending		sigPendingQue;		/* Anchor of queue of pending signals to be processed */
+GBLDEF	sig_pending		sigPendingFreeQue;	/* Anchor of queue of free pending signal blocks - should be a short queue */
+GBLDEF	sig_pending		sigInProgressQue;	/* Anchor for queue of signals being processed */
+GBLDEF	pthread_mutex_t		sigPendingMutex;	/* Used to control access to sigPendingQue */
+GBLDEF	GPCallback		go_panic_callback;	/* Address of C routine to drive Go rtn and drive a panic - used
+							 * for Go panic after an alternate deferred fatal signal is handled.
+							 */
+GBLDEF	void (*process_pending_signals_fptr)(void);	/* Function pointer for process_pending_signals() */

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,8 @@
 
 GBLREF	int4			exi_condition;
 GBLREF	void			(*call_on_signal)();
-GBLREF	int			forced_exit_err;
+GBLREF	int4			forced_exit_err;
+GBLREF	int4			forced_exit_sig;
 GBLREF	uint4			process_id;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	enum gtmImageTypes	image_type;
@@ -52,6 +53,7 @@ GBLREF	boolean_t		ydb_quiet_halt;
 GBLREF	volatile int4		gtmMallocDepth;         /* Recursion indicator */
 GBLREF	intrpt_state_t		intrpt_ok_state;
 GBLREF	struct sigaction	orig_sig_action[];
+GBLREF	GPCallback		go_panic_callback;
 
 LITREF	gtmImageName		gtmImageNames[];
 
@@ -73,6 +75,8 @@ void deferred_exit_handler(void)
 	SETUP_THREADGBL_ACCESS;
 	assert(!INSIDE_THREADED_CODE(rname));	/* below code is not thread safe as it does EXIT() etc. */
 	/* To avoid nested calls to this routine, progress the forced_exit state. */
+	DBGSIGHND_ONLY(fprintf(stderr, "deferred_exit_handler: Entering deferred exit handling state - forced_exit_err: %d,  "
+			       "forced_exit_sig: %d\n", forced_exit_err, forced_exit_sig); fflush(stderr));
 	SET_FORCED_EXIT_STATE_ALREADY_EXITING;
 	if (exit_handler_active)
 	{
@@ -95,7 +99,7 @@ void deferred_exit_handler(void)
 	SET_PROCESS_EXITING_TRUE;
 #	ifdef DEBUG
 	if (ydb_white_box_test_case_enabled && (WBTEST_DEFERRED_TIMERS == ydb_white_box_test_case_number)
-		&& (2 == ydb_white_box_test_case_count))
+	    && (2 == ydb_white_box_test_case_count))
 	{
 		DEFER_INTERRUPTS(INTRPT_NO_TIMER_EVENTS, prev_intrpt_state);
 		DBGFPF((stderr, "DEFERRED_SIGNAL_HANDLER: will sleep for 20 seconds\n"));
@@ -123,9 +127,20 @@ void deferred_exit_handler(void)
 	 * again. (Also done in generic_exit_handler()).
 	 */
 	DRIVE_EXIT_HANDLER_IF_EXISTS;
-	sig = stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info.si_signo;
-	DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("deferred_exit_handler", sig,
-		&stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info,
-		&stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_context, TRUE);
+	if (!USING_ALTERNATE_SIGHANDLING)
+	{
+		sig = stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info.si_signo;
+		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("deferred_exit_handler", sig,
+			&stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_info,
+			&stapi_signal_handler_oscontext[sig_hndlr_generic_signal_handler].sig_context, TRUE);
+	} else
+	{	/* The main() entry point of this process is not YottaDB but is something else that is using alternate signal
+		 * handling (currently only Go is supported). For Go, we cannot EXIT here. We need to drive a panic() to
+		 * unwind everything now that YottaDB state information has been cleaned up (by the exit handler). For Go,
+		 * drive a callback routine to do the panic() for us given the signal that caused this state.
+		 */
+		DRIVE_ALTSIG_CALLBACK(sig);
+		return;
+	}
 	EXIT(-exi_condition);
 }

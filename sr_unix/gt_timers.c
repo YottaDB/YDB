@@ -1,10 +1,9 @@
-
 /****************************************************************
  *								*
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2018 Stephen L Johnson.			*
@@ -54,7 +53,6 @@
 #include "gtm_time.h"
 #include "gtm_string.h"
 #include "gtmimagename.h"
-
 #include <errno.h>
 #include <stddef.h>
 #include <stdarg.h>
@@ -216,7 +214,6 @@ GBLREF	boolean_t	posix_timer_created;
 #ifdef DEBUG
 GBLREF	boolean_t	in_nondeferrable_signal_handler;
 GBLREF	boolean_t	gtm_jvm_process;
-GBLREF	boolean_t	exit_handler_active;
 #endif
 
 error_def(ERR_SETITIMERFAILED);
@@ -282,6 +279,8 @@ void set_blocksig(void)
 	sigaddset(&block_sigsent, SIGTSTP);
 	sigaddset(&block_sigsent, SIGCONT);
 	sigaddset(&block_sigsent, SIGALRM);
+	assert(YDBSIGNOTIFY == SIGUSR2);		/* Just recording which signal this actually is */
+	sigaddset(&block_sigsent, YDBSIGNOTIFY);	/* Used in alternate signal processing */
 	sigfillset(&block_worker);
 	sigdelset(&block_worker, SIGSEGV);
 	sigdelset(&block_worker, SIGKILL);
@@ -529,7 +528,12 @@ STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 #	ifdef YDB_USE_POSIX_TIMERS
 	if (!posix_timer_created)
 	{	/* No posix timer has yet been created */
-		sevp.sigev_notify = SIGEV_THREAD_ID;
+		memset(&sevp, 0, sizeof(sevp));		/* Initialize parm block to eliminate garbage then fill in what we want */
+		/* When using alternate signal handling, Go is handling the signals so there is no requirement that SIGALRM be sent
+		 * to the "signal thread" (ydb_stm_thread) and in fact, that can result in a slowdown since if the signal was
+		 * instead sent to a Go thread, it wouldn't have to make an expensive runtime change to process it.
+		 */
+		sevp.sigev_notify = (USING_ALTERNATE_SIGHANDLING ? SIGEV_SIGNAL : SIGEV_THREAD_ID);
 		if (0 == posix_timer_thread_id)
 			posix_timer_thread_id = syscall(SYS_gettid);
 		/* Note: The man pages of "timer_create" indicate we need to fill "sevp.sigev_notify_thread_id" with the thread id
@@ -539,15 +543,15 @@ STATICFNDEF void sys_settimer(TID tid, ABS_TIME *time_to_expir)
 #		ifndef sigev_notify_thread_id
 #		define sigev_notify_thread_id _sigev_un._tid
 #		endif
-		sevp.sigev_notify_thread_id = posix_timer_thread_id;
+		if (!USING_ALTERNATE_SIGHANDLING)	/* No special thread selected if using alternate signal handling */
+			sevp.sigev_notify_thread_id = posix_timer_thread_id;
 		sevp.sigev_signo = SIGALRM;
-		sevp.sigev_value.sival_ptr = NULL;	/* not used/relied by "timer_handler" but avoids a valgrind warning */
 		if (timer_create(CLOCK_MONOTONIC, &sevp, &posix_timer_id))
 		{
 			save_errno = errno;
 			assert(FALSE);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7)
-					ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_create()"), CALLFROM, save_errno);
+				      ERR_SYSCALL, 5, RTS_ERROR_LITERAL("timer_create()"), CALLFROM, save_errno);
 		}
 		posix_timer_created = TRUE;
 	}
@@ -665,8 +669,11 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	SETUP_THREADGBL_ACCESS;
 	assert((DUMMY_SIG_NUM == why) || (SIGALRM == why));
 	orig_why = why;			/* Save original value as FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED may change it */
-	signal_forwarded = IS_SIGNAL_FORWARDED(sig_hndlr_generic_signal_handler, why, info);
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_timer_handler, why, IS_EXI_SIGNAL_FALSE, info, context);
+	if (!USING_ALTERNATE_SIGHANDLING)
+	{
+		signal_forwarded = IS_SIGNAL_FORWARDED(sig_hndlr_generic_signal_handler, why, info);
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_timer_handler, why, IS_EXI_SIGNAL_FALSE, info, context);
+	}
 	assert(gtm_is_main_thread() || gtm_jvm_process || simpleThreadAPI_active);
 	DUMP_TIMER_INFO("At the start of timer_handler()");
 #	ifdef DEBUG
@@ -682,13 +689,16 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	 * All other routines which manipulate the timer data structure block SIGALRM (using SIGPROCMASK), so timer_handler()
 	 * can't conflict with them. As long as those routines can't be invoked asynchronously while timer_handler (or another
 	 * of those routines) is running, there can be no conflict, and the timer structures are safe from concurrent manipulation.
+	 *
+	 * For alternate signal handling, in which the main routine (non-M) does the signal handling and then notifies us of them
+	 * occurring, this routine is similarly gated by the simple API engine lock so interference is not possible.
 	 */
 	if (1 < INTERLOCK_ADD(&timer_stack_count, UNUSED, 1))
 	{
 		SET_DEFERRED_TIMERS_CHECK_NEEDED;
 		INTERLOCK_ADD(&timer_stack_count, UNUSED, -1);
 #		ifdef SIGNAL_PASSTHRU
-		if ((SIGALRM == orig_why) || signal_forwarded)
+		if (!USING_ALTERNATE_SIGHANDLING && ((SIGALRM == orig_why) || signal_forwarded))
 		{	/* Only drive this handler if we have an actual signal - not a dummy call */
 			DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("timer_handler", why, info, context, FALSE);
 		}
@@ -697,7 +707,7 @@ void timer_handler(int why, siginfo_t *info, void *context)
 	}
 	CLEAR_DEFERRED_TIMERS_CHECK_NEEDED;
 	save_errno = errno;
-	save_error_condition = error_condition;	/* aka SIGNAL */
+	save_error_condition = error_condition;		/* aka SIGNAL */
 	timer_active = FALSE;				/* timer has popped; system timer not active anymore */
 	sys_get_curr_time(&at);
 	tpop = (GT_TIMER *)timeroot;
@@ -727,10 +737,10 @@ void timer_handler(int why, siginfo_t *info, void *context)
 			break;
 #		if defined(DEBUG) && !defined(_AIX) && !defined(__armv6l__) && !defined(__armv7l__) && !defined(__aarch64__)
 		if (tpop->safe && (TREF(continue_proc_cnt) == last_continue_proc_cnt)
-			&& !(ydb_white_box_test_case_enabled
-				&& ((WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == ydb_white_box_test_case_number)
-					|| (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number)
-					|| (WBTEST_OINTEG_WAIT_ON_START == ydb_white_box_test_case_number))))
+		    && !(ydb_white_box_test_case_enabled
+			 && ((WBTEST_SIGTSTP_IN_JNL_OUTPUT_SP == ydb_white_box_test_case_number)
+			     || (WBTEST_EXPECT_IO_HANG == ydb_white_box_test_case_number)
+			     || (WBTEST_OINTEG_WAIT_ON_START == ydb_white_box_test_case_number))))
 		{	/* Check if the timer is extremely overdue, with the following exceptions:
 			 *	- Unsafe timers can be delayed indefinitely.
 			 *	- AIX and ARM systems (32-bit and 64-bit) tend to arbitrarily delay processes when loaded.
@@ -762,8 +772,8 @@ void timer_handler(int why, siginfo_t *info, void *context)
 			{
 #				ifdef DEBUG
 				if (ydb_white_box_test_case_enabled
-					&& (WBTEST_DEFERRED_TIMERS == ydb_white_box_test_case_number)
-					&& ((void *)tpop->handler != (void*)jnl_file_close_timer_ptr))
+				    && (WBTEST_DEFERRED_TIMERS == ydb_white_box_test_case_number)
+				    && ((void *)tpop->handler != (void*)jnl_file_close_timer_ptr))
 				{
 					DBGFPF((stderr, "TIMER_HANDLER: handled a timer\n"));
 					timer_pop_cnt++;
@@ -805,7 +815,7 @@ void timer_handler(int why, siginfo_t *info, void *context)
 			timer_defer_cnt++;
 #			ifdef DEBUG
 			if (ydb_white_box_test_case_enabled
-				&& (WBTEST_DEFERRED_TIMERS == ydb_white_box_test_case_number))
+			    && (WBTEST_DEFERRED_TIMERS == ydb_white_box_test_case_number))
 			{
 				if (!deferred_tids)
 				{
@@ -866,7 +876,7 @@ void timer_handler(int why, siginfo_t *info, void *context)
 #	endif
 #	ifdef SIGNAL_PASSTHRU
 	/* If this is a call-in/simpleAPI mode and a handler exists for this signal, call it */
-	if ((SIGALRM == orig_why) || signal_forwarded)
+	if (!USING_ALTERNATE_SIGHANDLING && ((SIGALRM == orig_why) || signal_forwarded))
 	{
 		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("timer_handler2", why, info, context, orig_sig_action[why].sa_sigaction);
 	}
@@ -1111,16 +1121,22 @@ void init_timers()
 {
 	struct sigaction	act;
 
-	memset(&act, 0, SIZEOF(act));
-	sigemptyset(&act.sa_mask);
-	act.sa_sigaction = timer_handler;
-	/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "timer_handler") relies on "info" and "context" being passed in */
-	act.sa_flags = YDB_SIGACTION_FLAGS;
-	sigaction(SIGALRM, &act, &prev_alrm_handler);
-	/* Note - YDB used to verify the expected handler here (i.e. either SIG_DFL or SIG_IGN) but that is no longer valid with
-	 * timer initialization being done in gtm_startup now and not waiting for the first timer. In this case, with either
-	 * variant of simple API, the handler could be set for anything by a non-M main program before YDB is initialized.
-	 */
+	if (!USING_ALTERNATE_SIGHANDLING)
+	{
+		memset(&act, 0, SIZEOF(act));
+		sigemptyset(&act.sa_mask);
+		act.sa_sigaction = timer_handler;
+		/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "timer_handler") relies on "info" and "context" being passed in */
+		act.sa_flags = YDB_SIGACTION_FLAGS;
+		sigaction(SIGALRM, &act, &prev_alrm_handler);
+		/* Note - YDB used to verify the expected handler here (i.e. either SIG_DFL or SIG_IGN) but that is no longer valid with
+		 * timer initialization being done in gtm_startup now and not waiting for the first timer. In this case, with either
+		 * variant of simple API, the handler could be set for anything by a non-M main program before YDB is initialized.
+		 */
+	} else
+	{	/* We use an alternate method to drive signals here */
+		SET_ALTERNATE_SIGHANDLER(SIGALRM, &ydb_altalrm_sighandler);
+	}
 	first_timeset = FALSE;
 }
 
@@ -1151,29 +1167,32 @@ void check_for_timer_pops(boolean_t sig_handler_changed)
 	sigset_t 		savemask;
 	struct sigaction 	current_sa;
 
-	if (sig_handler_changed)
-	{
-		sigaction(SIGALRM, NULL, &current_sa);	/* get current info */
-		if (!first_timeset)
+	if (!USING_ALTERNATE_SIGHANDLING)
+	{	/* If managing our own signals, verify handler for SIGALRM is as it should be */
+		if (sig_handler_changed)
 		{
-			if (timer_handler != current_sa.sa_sigaction)	/* check if what we expected */
+			sigaction(SIGALRM, NULL, &current_sa);	/* get current info */
+			if (!first_timeset)
 			{
-				init_timers();
-				if (!stolen_timer)
+				if (timer_handler != current_sa.sa_sigaction)	/* check if what we expected */
 				{
-					stolen_timer = TRUE;
-					stolenwhen = 1;
+					init_timers();
+					if (!stolen_timer)
+					{
+						stolen_timer = TRUE;
+						stolenwhen = 1;
+					}
 				}
-			}
-		} else	/* we haven't set so should be ... */
-		{
-			if ((SIG_IGN != (sighandler_t)current_sa.sa_sigaction) 		/* as set by sig_init */
-			    && (SIG_DFL != (sighandler_t)current_sa.sa_sigaction)) 	/* utils, compile */
+			} else	/* we haven't set so should be ... */
 			{
-				if (!stolen_timer)
+				if ((SIG_IGN != (sighandler_t)current_sa.sa_sigaction) 		/* as set by sig_init */
+				    && (SIG_DFL != (sighandler_t)current_sa.sa_sigaction)) 	/* utils, compile */
 				{
-					stolen_timer = TRUE;
-					stolenwhen = 2;
+					if (!stolen_timer)
+					{
+						stolen_timer = TRUE;
+						stolenwhen = 2;
+					}
 				}
 			}
 		}
@@ -1182,10 +1201,11 @@ void check_for_timer_pops(boolean_t sig_handler_changed)
 		DEFERRED_SIGNAL_HANDLING_CHECK;
 	if (stolenwhen)
 	{
+		assert(!USING_ALTERNATE_SIGHANDLING);
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_sigaction,
-			LEN_AND_STR(whenstolen[stolenwhen - 1]));
+			     LEN_AND_STR(whenstolen[stolenwhen - 1]));
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_TIMERHANDLER, 3, current_sa.sa_sigaction,
-			LEN_AND_STR(whenstolen[stolenwhen - 1]));
+			      LEN_AND_STR(whenstolen[stolenwhen - 1]));
 		assert(FALSE);					/* does not return here */
 	}
 }

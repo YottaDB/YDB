@@ -40,7 +40,7 @@ enum
 	YDB_SEVERITY_WARNING = 0,	/* Warning - Something is potentially incorrect */
 	YDB_SEVERITY_SUCCESS = 1,	/* Success */
 	YDB_SEVERITY_ERROR = 2,		/* Error - Something is definitely incorrect */
-	YDB_SEVERITY_INFORMATIONAL = 3,	/* Informational - won't see these returned as they continue running */
+	YDB_SEVERITY_INFORMATIONAL = 3,	/* Informational - generally won't see these returned as they continue running */
 	YDB_SEVERITY_FATAL = 4		/* Fatal - Something happened that is so bad, YottaDB cannot continue */
 };
 
@@ -56,6 +56,15 @@ enum
 					 */
 };
 
+/* Enumerated languages - Used in ydb_lang_init() so we know what language our main routine is in (and which wrapper in use) */
+enum
+{	/* Note these need to be specifically enumerated so they have correct values when pulled into the Go wrapper's
+	 * error_codes.go file when created by 'go generate'.
+	 */
+	YDB_MAIN_LANG_C = 0,		/* Main routine written in C (or M) or is otherwise C-compatible */
+	YDB_MAIN_LANG_GO = 1		/* Main routine is written in Go so handle signals differently */
+};
+
 #define	YDB_RELEASE		129	/* Corresponds to YottaDB release r1.29 (i.e. YDB_ZYRELEASE in sr_linux/release_name.h) */
 
 /* Maximum values */
@@ -67,7 +76,7 @@ enum
 #define	YDB_MAX_TIME_NSEC	(0x7fffffffllu * 1000llu * 1000llu)	/* Max specified time in (long long) nanoseconds */
 #define	YDB_MAX_YDBERR		(1 << 30)	/* Maximum (absolute) value for a YottaDB error */
 #define	YDB_MAX_ERRORMSG	1024		/* Will hold any message we return. Not used in YottaDB C code but relied upon
-						 * by the GoWrapper/Golang interface to YottaDB.
+						 * by (at least) the GoWrapper/Go interface to YottaDB.
 						 */
 /* Minimum values */
 #define	YDB_MIN_YDBERR		(1 << 27)	/* Minimum (absolute) value for a YottaDB error */
@@ -83,6 +92,8 @@ enum
 #define	YDB_TP_ROLLBACK		(YDB_INT_MAX - 2)	/* 0x7ffffffd */
 #define	YDB_NOTOK		(YDB_INT_MAX - 3)	/* 0x7ffffffc */
 #define	YDB_LOCK_TIMEOUT	(YDB_INT_MAX - 4)	/* 0x7ffffffb */
+#define YDB_DEFER_HANDLER	(YDB_INT_MAX - 5)	/* 0x7ffffffa - defer this signal handler (used in Go wrapper) */
+
 
 /* Miscellaneous defines */
 #ifndef TRUE
@@ -317,6 +328,7 @@ typedef	ydb_char_t	ydb_jbig_decimal_t;
 typedef	int		(*ydb_tpfnptr_t)(void *tpfnparm);					   /* For use in SimpleAPI */
 typedef	int		(*ydb_tp2fnptr_t)(uint64_t tptoken, ydb_buffer_t *errstr, void *tpfnparm); /* For use in SimpleThreadAPI */
 typedef	uintptr_t	(*ydb_vplist_func)(uintptr_t cnt, ...);
+typedef void		(*GPCallback)(int sigtype);	/* Type of Go callback "panic" routine */
 
 #	ifdef GTM_PTHREAD
 int	ydb_jinit(void);
@@ -344,8 +356,10 @@ void	ydb_free(void *ptr);
 int	ydb_hiber_start(unsigned long long sleep_nsec);
 int	ydb_hiber_start_wait_any(unsigned long long sleep_nsec);
 int	ydb_init(void);
+int	ydb_main_lang_init(int langid, void *parm);	/* Warning! Intended for use by Go wrapper only */
 void	*ydb_malloc(size_t size);
 int	ydb_message(int status, ydb_buffer_t *msg_buff);
+int	ydb_sig_dispatch(ydb_buffer_t *errstr, int signum);
 int	ydb_stdout_stderr_adjust(void);
 int	ydb_thread_is_main(void);
 void	ydb_timer_cancel(intptr_t timer_id);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -38,6 +38,7 @@
 #include "gt_timer.h"
 #include "sig_init.h"
 #include "invocation_mode.h"
+#include "sighnd_debug.h"
 
 #define MAX_SAPI_MSTR_GC_INDX	YDB_MAX_NAMES
 
@@ -45,6 +46,7 @@ GBLREF	symval		*curr_symval;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	uint4		process_id;
 GBLREF 	boolean_t	ydb_init_complete;
+GBLREF	sig_pending	sigPendingQue;		/* Queue of pending signals handled in alternate signal handling mode */
 
 LITREF	char		ctypetab[NUM_CHARS];
 LITREF	nametabent	svn_names[];
@@ -92,11 +94,19 @@ typedef int (*ydb_basicfnptr_t)();
 /* Macros to startup YottaDB runtime if it is not going yet - one for routines with return values, one for not */
 #define LIBYOTTADB_RUNTIME_CHECK(RETTYPE, ERRSTR)								\
 MBSTART	{													\
+	GBLREF boolean_t exit_handler_active;									\
 	int	status;												\
 														\
+	/* If exit_handler_active is set, the context for calling YDB is gone */				\
+	if (exit_handler_active)										\
+	{													\
+		SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(YDB_ERR_CALLINAFTERXIT, (ydb_buffer_t *)ERRSTR);		\
+		return RETTYPE YDB_ERR_CALLINAFTERXIT;								\
+	}													\
 	/* No threadgbl usage in this macro until the following block completes */				\
 	if (!ydb_init_complete)											\
 	{	/* Have to initialize things before we can establish an error handler */			\
+		assert(!USING_ALTERNATE_SIGHANDLING);	/* Go uses ydb_main_lang_init() instead */		\
 		if (0 != (status = ydb_init()))		/* Note - sets fgncal_stack */				\
 		{												\
 			SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(-status, (ydb_buffer_t *)ERRSTR);			\
@@ -113,11 +123,19 @@ MBSTART	{													\
 /* Macros to startup YottaDB runtime if it is not going yet - one for returns, one for not */
 #define LIBYOTTADB_RUNTIME_CHECK_NORETVAL(ERRSTR)								\
 MBSTART	{													\
+	GBLREF boolean_t exit_handler_active;									\
 	int	status;												\
 														\
+	/* If exit_handler_active is set, the context for calling YDB is gone */				\
+	if (exit_handler_active)										\
+	{													\
+		SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(YDB_ERR_CALLINAFTERXIT, (ydb_buffer_t *)ERRSTR);		\
+		return;												\
+	}													\
 	/* No threadgbl usage in this macro until the following block completes */				\
 	if (!ydb_init_complete)											\
 	{	/* Have to initialize things before we can establish an error handler */			\
+		assert(!USING_ALTERNATE_SIGHANDLING);	/* Go uses ydb_main_lang_init() instead */		\
 		if (0 != (status = ydb_init()))		/* Note - sets fgncal_stack */				\
 		{												\
 			SET_STAPI_ERRSTR_MULTI_THREAD_SAFE(-status, (ydb_buffer_t *)ERRSTR);			\
@@ -225,7 +243,7 @@ MBSTART	{															\
 
 #define	LIBYOTTADB_INIT(ROUTINE, RETTYPE)	LIBYOTTADB_INIT2(ROUTINE, RETTYPE, DO_SIMPLEAPINEST_CHECK_TRUE)
 #define	LIBYOTTADB_INIT_NORETVAL(ROUTINE)	LIBYOTTADB_INIT_NORETVAL2(ROUTINE, DO_SIMPLEAPINEST_CHECK_TRUE)
-#define	LIBYOTTADB_INIT_NOSIMPLEAPINEST_CHECK(RETTYPE)	LIBYOTTADB_INIT2(LYDB_RTN_NONE, RETTYPE, DO_SIMPLEAPINEST_CHECK_FALSE)
+#define	LIBYOTTADB_INIT_NOSIMPLEAPINEST_CHECK(RETTYPE) LIBYOTTADB_INIT2(LYDB_RTN_NONE, RETTYPE, DO_SIMPLEAPINEST_CHECK_FALSE)
 
 #ifdef YDB_TRACE_API
 # define LIBYOTTADB_DONE 									\
@@ -623,7 +641,7 @@ MBSTART {												\
  * To that end, the following macros verify these conditions.
  */
 #define VERIFY_NON_THREADED_API 										\
-	MBSTART {	/* If threaded API but in worker thread, that is OK */					\
+MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 	GBLREF boolean_t noThreadAPI_active;									\
 	GBLREF boolean_t simpleThreadAPI_active;								\
 	GBLREF boolean_t caller_func_is_stapi;									\
@@ -708,187 +726,6 @@ MBSTART {	/* If threaded API but in worker thread, that is OK */						\
 		noThreadAPI_active = TRUE;									\
 } MBEND
 
-/* Macro invoked by all ydb_*_st() and ydb_*_t() functions to get the appropriate multi-thread safe mutex and return.
- * TPTOKEN, ERRSTR, CALLTYP are input parameters passed in from the caller function.
- * SAVE_ACTIVE_STAPI_RTN, SAVE_ERRSTR, GET_LOCK, RETVAL are output parameters from this macro. Except for RETVAL,
- * the rest of the output parameters will need to be later passed as is to THREADED_API_YDB_ENGINE_UNLOCK (i.e. at unlock time).
- */
-#define THREADED_API_YDB_ENGINE_LOCK(TPTOKEN, ERRSTR, CALLTYP, SAVE_ACTIVE_STAPI_RTN, SAVE_ERRSTR, GET_LOCK, RETVAL)	\
-{															\
-	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];								\
-	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];							\
-	GBLREF	boolean_t	simpleThreadAPI_active;									\
-	GBLREF	pthread_t	ydb_stm_worker_thread_id;								\
-	GBLREF	uint4		dollar_tlevel;										\
-	GBLREF	uint64_t 	stmTPToken;	/* Counter used to generate unique token for SimpleThreadAPI TP */	\
-															\
-	int		i, lockIndex, lclStatus, tLevel;								\
-	uint64_t	tpToken;											\
-															\
-	RETVAL = YDB_OK;												\
-	GET_LOCK = TRUE;												\
-	/* Since this macro can be called from "ydb_init" as part of opening YottaDB for the first time in the process,	\
-	 * we need to handle the case where "lcl_gtm_threadgbl" is NULL in which case we should not skip TREF usages.	\
-	 */														\
-	SAVE_ACTIVE_STAPI_RTN = (NULL != lcl_gtm_threadgbl) ? TREF(libyottadb_active_rtn) : LYDB_RTN_NONE;		\
-	lockIndex = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);							\
-	/* Check for INVTPTRANS error. Note that we cannot detect ALL possible cases of an invalid supplied tptoken.	\
-	 * For example, if the TP callback function of a $TLEVEL=2 TP does a "ydb_get_st" call with a TPTOKEN that	\
-	 * has high order 8 bits set to 1, and low order 56 bits set to same as the tptoken passed in the callback	\
-	 * function, then it won't fail with an INVTPTRANS error even though the "ydb_get_st" call will deadlock	\
-	 * since it will be waiting to get the ydb engine thread lock on index 1 whereas that cannot happen until the	\
-	 * $TLEVEL=2 TP callback function finishes which again cannot finish until the "ydb_get_st" call finishes.	\
-	 */														\
-	if (YDB_NOTTP != TPTOKEN)											\
-	{														\
-		tLevel = dollar_tlevel;											\
-		tpToken = GET_INTERNAL_TPTOKEN((uint64_t)TPTOKEN);							\
-		if (!tLevel || (tpToken != stmTPToken) || !lockIndex || (lockIndex > tLevel))				\
-		{													\
-			SETUP_GENERIC_ERROR(YDB_ERR_INVTPTRANS);							\
-			RETVAL = YDB_ERR_INVTPTRANS;									\
-		}													\
-	}														\
-	if ((LYDB_RTN_NONE != SAVE_ACTIVE_STAPI_RTN)									\
-		&& (ydb_engine_threadsafe_mutex_holder[lockIndex] == pthread_self()))					\
-	{	/* We are already in the middle of a SimpleThreadAPI call. Since we already hold the mutex lock as	\
-		 * part of the original SimpleThreadAPI call, skip lock get/release in this nested call.		\
-		 */													\
-		if (LYDB_RTN_TP == CALLTYP)										\
-		{	/* Disallow starting a new TP transaction */							\
-			SETUP_GENERIC_ERROR_2PARMS(YDB_ERR_SIMPLEAPINEST, LYDBRTNNAME(SAVE_ACTIVE_STAPI_RTN),		\
-							LYDBRTNNAME(CALLTYP));						\
-			RETVAL = YDB_ERR_SIMPLEAPINEST;									\
-		} else													\
-		{													\
-			if ((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN) || (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN))	\
-			{	/* We are the thread that started a "ydb_ci_t"/"ydb_cip_t" call. And that same thread	\
-				 * has done an external call in the call-in M code which in turn wants to do the	\
-				 * current SimpleThreadAPI function call. Allow all calls while inside the call-in by	\
-				 * shutting off the active rtn indicator for the duration of this SimpleThreadAPI call.	\
-				 */											\
-				assert(NULL != lcl_gtm_threadgbl);							\
-				TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;						\
-			}												\
-			/* else: It is possible we are the thread that started a "ydb_set_st"/"ydb_kill_st" which	\
-			 * invoked a trigger M code that did an external call and the C code reinvoked the current	\
-			 * SimpleThreadAPI function. In this case, we allow all calls but do not reset the active rtn	\
-			 * indicator. The corresponding SimpleAPI function invocation will issue the needed		\
-			 * SIMPLEAPINEST error. The reason we do not issue the error here is because CALLTYP would most	\
-			 * likely be LYDB_RTN_NONE at this point if this is a "ydb_init" call (a utility function).	\
-			 * In that case, deferring the error would give us a more accurate SIMPLEAPINEST error message	\
-			 * when the non-utility SimpleAPI function is made a little later.				\
-			 */												\
-			GET_LOCK = FALSE;										\
-		}													\
-	}														\
-	if (YDB_OK == RETVAL)												\
-	{														\
-		if (GET_LOCK)												\
-		{													\
-			RETVAL = pthread_mutex_lock(&ydb_engine_threadsafe_mutex[lockIndex]);				\
-			assert(0 == YDB_OK);										\
-			if (0 == RETVAL)										\
-			{												\
-				ydb_engine_threadsafe_mutex_holder[lockIndex] = pthread_self();				\
-				/* Mark this process as having SimpleThreadAPI active if not already done */		\
-				if (!simpleThreadAPI_active && (LYDB_RTN_NONE != CALLTYP))				\
-				{	/* The LYDB_RTN_NONE check above is needed to take into account calls of this	\
-					 * macro from "ydb_init" which are done even in SimpleAPI mode. Those calls	\
-					 * should not mark SimpleThreadAPI as active.					\
-					 */										\
-					assert(0 == lockIndex);								\
-					/* Start the MAIN worker thread for SimpleThreadAPI */				\
-					lclStatus = pthread_create(&ydb_stm_worker_thread_id, NULL,			\
-										&ydb_stm_thread, NULL);			\
-					if (0 == lclStatus)								\
-					{     	 									\
-						/* Wait for MAIN worker thread to set "simpleThreadAPI_active" */	\
-						for (i = 0; ; i++) 							\
-						{									\
-							if (simpleThreadAPI_active)					\
-								break;							\
-							if (MICROSECS_IN_SEC == i)					\
-							{	/* Worker thread did not reach desired state in given	\
-								 * time. Treat this as if "pthread_create" call failed.	\
-								 */							\
-								lclStatus = ETIMEDOUT;					\
-								break;							\
-							}								\
-							SLEEP_USEC(1, TRUE);						\
-						}									\
-															\
-					}										\
-					if (0 != lclStatus)								\
-					{	/* If lclStatus is non-zero, we do have the YottaDB engine lock so	\
-						 * we CAN call "rts_error_csa" etc. therefore do just that.		\
-						 */									\
-						assert(FALSE);								\
-						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,		\
-							RTS_ERROR_LITERAL("pthread_create()"), CALLFROM, lclStatus);	\
-					}										\
-				}											\
-			}												\
-			/* If RETVAL is non-zero, we do not have the YottaDB engine lock so we cannot call		\
-			 * "rts_error_csa" etc. therefore just silently return this error code to caller.		\
-			 */												\
-		}													\
-		if (YDB_OK == RETVAL)											\
-		{													\
-			if (NULL != lcl_gtm_threadgbl)									\
-			{												\
-				SAVE_ERRSTR = TREF(stapi_errstr);							\
-				TREF(stapi_errstr) = ERRSTR;	/* Set this so "ydb_simpleapi_ch" can fill in		\
-								 * error string in case error is seen.			\
-								 */							\
-			} else												\
-				SAVE_ERRSTR = NULL;									\
-		}													\
-	}														\
-}
-
-#define THREADED_API_YDB_ENGINE_UNLOCK(TPTOKEN, ERRSTR, SAVE_ACTIVE_STAPI_RTN, SAVE_ERRSTR, RELEASE_LOCK)		\
-{															\
-	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];								\
-	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];							\
-	GBLREF	int		stapi_signal_handler_deferred;								\
-															\
-	int	lockIndex, lclStatus;											\
-															\
-	/* Before releasing the YottaDB engine lock, check if any signal handler got deferred in the MAIN		\
-	 * worker thread and is still pending. If so, handle it now since we own the engine lock for sure here		\
-	 * and it is a safe logical point.										\
-	 */														\
-	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST_TRUE);						\
-	/* Since this macro can be called from "ydb_init" as part of opening YottaDB for the first time in the process,	\
-	 * we need to handle the case where "lcl_gtm_threadgbl" is NULL in which case we should not skip TREF usages.	\
-	 */														\
-	if (RELEASE_LOCK)												\
-	{														\
-		if (NULL != lcl_gtm_threadgbl)										\
-		{													\
-			assert(ERRSTR == TREF(stapi_errstr));								\
-			TREF(stapi_errstr) = SAVE_ERRSTR;								\
-		}													\
-		lockIndex = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);						\
-		assert(pthread_self() == ydb_engine_threadsafe_mutex_holder[lockIndex]);				\
-		ydb_engine_threadsafe_mutex_holder[lockIndex] = 0;							\
-		lclStatus = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lockIndex]);				\
-		if (lclStatus)												\
-		{	/* If lclStatus is non-zero, we do have the YottaDB engine lock so we CAN call			\
-			 * "rts_error_csa" etc. therefore do just that.							\
-			 */												\
-			assert(FALSE);											\
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,					\
-				RTS_ERROR_LITERAL("pthread_mutex_unlock()"), CALLFROM, lclStatus);			\
-		}													\
-	} else if ((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN) || (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN))		\
-	{	/* Undo active rtn indicator reset done in THREADED_API_YDB_ENGINE_LOCK */ 				\
-		 if (NULL != lcl_gtm_threadgbl)										\
-			TREF(libyottadb_active_rtn) = SAVE_ACTIVE_STAPI_RTN;						\
-	}														\
-}
-
 #define VERIFY_THREADED_API(RETTYPE, ERRSTR)									\
 MBSTART {													\
 	GBLREF boolean_t noThreadAPI_active;									\
@@ -946,10 +783,11 @@ MBSTART {													\
 			assert('\0' == msg.addr[msg.len]);	/* assert null termination */			\
 		/* Copy message to user's buffer depending on available room */					\
 		SNPRINTF((ERRSTR)->buf_addr, (ERRSTR)->len_alloc, "%d,%s,%s", ERRNUM,				\
-			(noThreadAPI_active ? SIMPLEAPI_M_ENTRYREF : SIMPLETHREADAPI_M_ENTRYREF), msg.addr);	\
+			 (noThreadAPI_active ? SIMPLEAPI_M_ENTRYREF : SIMPLETHREADAPI_M_ENTRYREF), msg.addr);	\
 	}													\
 }
 
+/* Define routines before get to inline routine definitions */
 int	sapi_return_subscr_nodes(int *ret_subs_used, ydb_buffer_t *ret_subsarray, char *ydb_caller_fn);
 void	sapi_save_targ_key_subscr_nodes(void);
 void	*ydb_stm_thread(void *parm);
@@ -965,5 +803,239 @@ void	ydb_stm_thread_exit(void);
 void	ydb_stm_atfork_prepare(void);
 void	ydb_stm_atfork_parent(void);
 void	ydb_stm_atfork_child(void);
+
+/* Use NO_THREADGBL_DEFTYPES here to keep these inline routines from expanding in gtm_threadgbl_deftypes.c where they are
+ * unnecessary and cause build issues of the gtm_threadgbl_deftypes executable that builds gtm_threadgbl_deftypes.h.
+ */
+#ifndef NO_THREADGBL_DEFTYPES
+/* Inline func invoked by all ydb_*_st() and ydb_*_t() functions to get the appropriate multi-thread safe mutex and return.
+ * TPTOKEN, ERRSTR, CALLTYP are input parameters passed in from the caller function.
+ * SAVE_ACTIVE_STAPI_RTN, SAVE_ERRSTR, GET_LOCK, RETVAL are output parameters from this macro. Except for RETVAL,
+ * the rest of the output parameters will need to be later passed as is to threaded_api_ydb_engine_unlock (i.e. at unlock time).
+ */
+static inline void threaded_api_ydb_engine_lock(uint64_t TPTOKEN, ydb_buffer_t *ERRSTR, int CALLTYP,
+						libyottadb_routines *SAVE_ACTIVE_STAPI_RTN, ydb_buffer_t **SAVE_ERRSTR,
+						boolean_t *GET_LOCK, int *RETVAL)
+{
+	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];
+	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
+	GBLREF	boolean_t	simpleThreadAPI_active;
+	GBLREF	pthread_t	ydb_stm_worker_thread_id;
+	GBLREF	uint4		dollar_tlevel;
+	GBLREF	uint64_t 	stmTPToken;	/* Counter used to generate unique token for SimpleThreadAPI TP */
+
+	int		i, lockIndex, lclStatus, tLevel;
+	uint64_t	tpToken;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	DBGSIGHND_ONLY(fprintf(stderr, "threaded_api_ydb_engine_lock: Obtaining lock for %s - tptoken: %"PRIu64",  "
+			       "save area 0x%p\n", LYDBRTNNAME(CALLTYP), TPTOKEN, ERRSTR); fflush(stderr));
+	*RETVAL = YDB_OK;
+	*GET_LOCK = TRUE;
+	/* Since this macro can be called from "ydb_init" as part of opening YottaDB for the first time in the process,
+	 * we need to handle the case where "lcl_gtm_threadgbl" is NULL in which case we should skip TREF usages.
+	 */
+	*SAVE_ACTIVE_STAPI_RTN = (NULL != lcl_gtm_threadgbl) ? TREF(libyottadb_active_rtn) : LYDB_RTN_NONE;
+	lockIndex = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);
+	/* Check for INVTPTRANS error. Note that we cannot detect ALL possible cases of an invalid supplied tptoken.
+	 * For example, if the TP callback function of a $TLEVEL=2 TP does a "ydb_get_st" call with a TPTOKEN that
+	 * has high order 8 bits set to 1, and low order 56 bits set to same as the tptoken passed in the callback
+	 * function, then it won't fail with an INVTPTRANS error even though the "ydb_get_st" call will deadlock
+	 * since it will be waiting to get the ydb engine thread lock on index 1 whereas that cannot happen until the
+	 * $TLEVEL=2 TP callback function finishes which again cannot finish until the "ydb_get_st" call finishes.
+	 */
+	if (YDB_NOTTP != TPTOKEN)
+	{
+		tLevel = dollar_tlevel;
+		tpToken = GET_INTERNAL_TPTOKEN((uint64_t)TPTOKEN);
+		if (!tLevel || (tpToken != stmTPToken) || !lockIndex || (lockIndex > tLevel))
+		{
+			SETUP_GENERIC_ERROR(YDB_ERR_INVTPTRANS);
+			*RETVAL = YDB_ERR_INVTPTRANS;
+		}
+	}
+	if (ydb_engine_threadsafe_mutex_holder[lockIndex] == pthread_self())
+	{	/* This thread already holds this lock - check for special conditions */
+		if (LYDB_RTN_NONE != *SAVE_ACTIVE_STAPI_RTN)
+		{	/* We are already in the middle of a SimpleThreadAPI call. Since we already hold the mutex lock as
+			 * part of the original SimpleThreadAPI call, skip lock get/release in this nested call.
+			 */
+			if (LYDB_RTN_TP == CALLTYP)
+			{	/* Disallow starting a new TP transaction */
+				SETUP_GENERIC_ERROR_2PARMS(YDB_ERR_SIMPLEAPINEST, LYDBRTNNAME(*SAVE_ACTIVE_STAPI_RTN),
+							   LYDBRTNNAME(CALLTYP));
+				*RETVAL = YDB_ERR_SIMPLEAPINEST;
+			} else
+			{
+				if ((LYDB_RTN_YDB_CI == *SAVE_ACTIVE_STAPI_RTN) || (LYDB_RTN_YDB_CIP == *SAVE_ACTIVE_STAPI_RTN))
+				{	/* We are the thread that started a "ydb_ci_t"/"ydb_cip_t" call. And that same thread
+					 * has done an external call in the call-in M code which in turn wants to do the
+					 * current SimpleThreadAPI function call. Allow all calls while inside the call-in by
+					 * shutting off the active rtn indicator for the duration of this SimpleThreadAPI call.
+					 */
+					assert(NULL != lcl_gtm_threadgbl);
+					TREF(libyottadb_active_rtn) = LYDB_RTN_NONE;
+				}
+				/* else: It is possible we are the thread that started a "ydb_set_st"/"ydb_kill_st" which
+				 * invoked a trigger M code that did an external call and the C code reinvoked the current
+				 * SimpleThreadAPI function. In this case, we allow all calls but do not reset the active rtn
+				 * indicator. The corresponding SimpleAPI function invocation will issue the needed
+				 * SIMPLEAPINEST error. The reason we do not issue the error here is because CALLTYP would most
+				 * likely be LYDB_RTN_NONE at this point if this is a "ydb_init" call (a utility function).
+				 * In that case, deferring the error would give us a more accurate SIMPLEAPINEST error message
+				 * when the non-utility SimpleAPI function is made a little later.
+				 */
+				*GET_LOCK = FALSE;
+			}
+		} else
+		{	/* During development of alternate signal handling, there was a case where there was a hang. The hang
+			 * was ydb_exit() waiting to get the YDB engine lock so it could clean up. Problem was, when checking
+			 * what thread actually held the lock, we found that it was the CURRENT thread. The only thing on the
+			 * C stack besides ydb_exit() were a couple of cgo references so this was a cgo invocation of ydb_exit()
+			 * which could only come from yottadb.Exit() and specifically, it had to have been done as part of
+			 * defer processing as part of panic processing. Our best conjecture on what could cause this strange
+			 * situation is the following:
+			 *   1. Go process/thread/goroutine drives some simplethreadAPI interface.
+			 *   2. The YDB engine grabs the YDB engine lock.
+			 *   3. A signal or other fatal error occurs resulting in a call to panic() which unwinds the C stack
+			 *      of each thread/goroutine dispensing with them (freeing those who are cgo-only threads for reuse).
+			 *   4. One of the last of these defer'd routines will be yottadb.Exit() which drives ydb_exit() which
+			 *      itself tries to get the YDB engine lock. When the call to ydb_exit() is done, it tries to get
+			 *      the 0 level engine lock (which this thread already owns).
+			 * By setting *GET_LOCK to FALSE, we don't require getting the lock if we already hold it in this odd
+			 * situation. When we are finished here, ydb_exit() will release the lock which is fine as the routine
+			 * that originally got the lock in this thread no longer exists so will never try to also free the
+			 * lock.
+			 *
+			 * If a different thread originally got the lock, we would hang until the timer expired (which is likely
+			 * the normal case when a signal-killed process is running down).
+			 */
+			*GET_LOCK = FALSE;
+		}
+	}
+	if (YDB_OK == *RETVAL)
+	{
+		if (*GET_LOCK)
+		{
+			*RETVAL = pthread_mutex_lock(&ydb_engine_threadsafe_mutex[lockIndex]);
+			assert(0 == YDB_OK);
+			if (0 == *RETVAL)
+			{
+				ydb_engine_threadsafe_mutex_holder[lockIndex] = pthread_self();
+				/* Mark this process as having SimpleThreadAPI active if not already done */
+				if (!simpleThreadAPI_active && (LYDB_RTN_NONE != CALLTYP))
+				{	/* The LYDB_RTN_NONE check above is needed to take into account calls of this
+					 * macro from "ydb_init" which are done even in SimpleAPI mode. Those calls
+					 * should not mark SimpleThreadAPI as active.
+					 */
+					assert(0 == lockIndex);
+					/* Start the signal thread - in normal signal handling, this thread handles all of the
+					 * SIGALRM signals and many of the other signals if they get forwarded. In alternate
+					 * signal handling mode, this thread makes sure all queued pending signals get driven
+					 * by polling for them. It gets awakened by a YDBSIGNOTIFY signal when a pending signal
+					 * is queued.
+					 */
+					lclStatus = pthread_create(&ydb_stm_worker_thread_id, NULL, &ydb_stm_thread, NULL);
+					if (0 == lclStatus)
+					{
+						/* Wait for MAIN worker thread to set "simpleThreadAPI_active" */
+						for (i = 0; ; i++)
+						{
+							if (simpleThreadAPI_active)
+								break;
+							if (MICROSECS_IN_SEC == i)
+							{	/* Worker thread did not reach desired state in given
+								 * time. Treat this as if "pthread_create" call failed.
+								 */
+								lclStatus = ETIMEDOUT;
+								break;
+							}
+							SLEEP_USEC(1, TRUE);
+						}
+					}
+					if (0 != lclStatus)
+					{	/* If lclStatus is non-zero, we do have the YottaDB engine lock so
+						 * we CAN call "rts_error_csa" etc. therefore do just that.
+						 */
+						assert(FALSE);
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+							      RTS_ERROR_LITERAL("pthread_create()"), CALLFROM, lclStatus);
+					}
+				}
+			}
+			/* If *RETVAL is non-zero, we do not have the YottaDB engine lock so we cannot call
+			 * "rts_error_csa" etc. therefore just silently return this error code to caller.
+			 */
+		}
+		if (YDB_OK == *RETVAL)
+		{
+			if (NULL != lcl_gtm_threadgbl)
+			{
+				*SAVE_ERRSTR = TREF(stapi_errstr);
+				TREF(stapi_errstr) = ERRSTR;	/* Set this so "ydb_simpleapi_ch" can fill in
+								 * error string in case error is seen.
+								 */
+			} else
+				*SAVE_ERRSTR = NULL;
+		}
+	}
+	DBGSIGHND((stderr, "threaded_api_ydb_engine_lock: Lock granted for %s with: tptoken %"PRIu64", save area 0x%p\n",
+		   LYDBRTNNAME(CALLTYP), TPTOKEN, ERRSTR));
+	/* Now that we have the engine lock, see if there are any pending (alternate) signals waiting to be processed */
+	PROCESS_PENDING_ALTERNATE_SIGNALS;
+}
+
+static inline void threaded_api_ydb_engine_unlock(uint64_t TPTOKEN, ydb_buffer_t *ERRSTR,
+						  libyottadb_routines SAVE_ACTIVE_STAPI_RTN, ydb_buffer_t *SAVE_ERRSTR,
+						  boolean_t RELEASE_LOCK)
+{
+	GBLREF	pthread_mutex_t	ydb_engine_threadsafe_mutex[];
+	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];
+	GBLREF	int		stapi_signal_handler_deferred;
+
+	int	lockIndex, lclStatus;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	DBGSIGHND((stderr, "threaded_api_ydb_engine_unlock: Releasing lock for tptoken: %"PRIu64", save area 0x%p\n", TPTOKEN, ERRSTR));
+	/* Before releasing the YottaDB engine lock, check if there is a pending signal that needs to be processed
+	 * while we hold the engine lock.
+	 */
+	PROCESS_PENDING_ALTERNATE_SIGNALS;
+	/* Also before releasing the YottaDB engine lock, check if any signal handler got deferred in the MAIN
+	 * worker thread and is still pending. If so, handle it now since we own the engine lock for sure here
+	 * and it is a safe logical point.
+	 */
+	STAPI_INVOKE_DEFERRED_SIGNAL_HANDLER_IF_NEEDED(OK_TO_NEST_TRUE);
+	/* Since this macro can be called from "ydb_init" as part of opening YottaDB for the first time in the process,
+	 * we need to handle the case where "lcl_gtm_threadgbl" is NULL in which case we should not skip TREF usages.
+	 */
+	if (RELEASE_LOCK)
+	{
+		if (NULL != lcl_gtm_threadgbl)
+		{
+			assert(ERRSTR == TREF(stapi_errstr));
+			TREF(stapi_errstr) = SAVE_ERRSTR;
+		}
+		lockIndex = GET_TPDEPTH_FROM_TPTOKEN((uint64_t)TPTOKEN);
+		assert(pthread_self() == ydb_engine_threadsafe_mutex_holder[lockIndex]);
+		ydb_engine_threadsafe_mutex_holder[lockIndex] = 0;
+		lclStatus = pthread_mutex_unlock(&ydb_engine_threadsafe_mutex[lockIndex]);
+		if (lclStatus)
+		{	/* If lclStatus is non-zero, we do have the YottaDB engine lock so we CAN call
+			 * "rts_error_csa" etc. therefore do just that.
+			 */
+			assert(FALSE);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
+				RTS_ERROR_LITERAL("pthread_mutex_unlock()"), CALLFROM, lclStatus);
+		}
+	} else if ((LYDB_RTN_YDB_CI == SAVE_ACTIVE_STAPI_RTN) || (LYDB_RTN_YDB_CIP == SAVE_ACTIVE_STAPI_RTN))
+	{	/* Undo active rtn indicator reset done in threaded_api_ydb_engine_lock */
+		 if (NULL != lcl_gtm_threadgbl)
+			TREF(libyottadb_active_rtn) = SAVE_ACTIVE_STAPI_RTN;
+	}
+}
+#endif /* !NO_THREADGBL_DEFTYPES */
 
 #endif /*  LIBYOTTADB_INT_H */

@@ -46,12 +46,13 @@ int ydb_ci_get_info_t(uint64_t tptoken, ydb_buffer_t *errstr, const char *rtnnam
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_YDB_CI_GET_INFO, save_active_stapi_rtn, save_errstr, get_lock, retval);
+	threaded_api_ydb_engine_lock(tptoken, errstr, LYDB_RTN_YDB_CI_GET_INFO, &save_active_stapi_rtn, &save_errstr, &get_lock,
+				     &retval);
 	if (YDB_OK == retval)
 	{
 		caller_func_is_stapi = TRUE;	/* used to inform below SimpleAPI call that caller is SimpleThreadAPI */
 		retval = ydb_ci_get_info(rtnname, pptype);
-		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
+		threaded_api_ydb_engine_unlock(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
 	}
 	return retval;
 }

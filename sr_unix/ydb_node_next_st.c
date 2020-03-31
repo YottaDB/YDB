@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,18 +29,18 @@ int ydb_node_next_st(uint64_t tptoken, ydb_buffer_t *errstr, const ydb_buffer_t 
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;
 	boolean_t		get_lock;
-	intptr_t		retval;
+	int			retval;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_NODE_NEXT, save_active_stapi_rtn, save_errstr, get_lock, retval);
+	threaded_api_ydb_engine_lock(tptoken, errstr, LYDB_RTN_NODE_NEXT, &save_active_stapi_rtn, &save_errstr, &get_lock, &retval);
 	if (YDB_OK == retval)
 	{
 		caller_func_is_stapi = TRUE;	/* used to inform below SimpleAPI call that caller is SimpleThreadAPI */
 		retval = ydb_node_next_s(varname, subs_used, subsarray, ret_subs_used, ret_subsarray);
-		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
+		threaded_api_ydb_engine_unlock(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
 	}
-	return (int)retval;
+	return retval;
 }

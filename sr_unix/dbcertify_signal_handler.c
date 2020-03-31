@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -123,7 +123,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			 */
 			if ((EXIT_PENDING_TOLERANT >= exit_state) && (dbc_critical || exit_handler_active))
 			{
-				SET_FORCED_EXIT_STATE;
+				SET_FORCED_EXIT_STATE(sig);
 				exit_state++;		/* Make exit pending, may still be tolerant though */
 				return;
 			}
@@ -158,7 +158,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
 			if ((EXIT_PENDING_TOLERANT >= exit_state) && (dbc_critical || exit_handler_active))
 			{
-				SET_FORCED_EXIT_STATE;
+				SET_FORCED_EXIT_STATE(sig);
 				exit_state++;		/* Make exit pending, may still be tolerant though */
 				return;
 			}
@@ -205,7 +205,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
 			if ((EXIT_PENDING_TOLERANT >= exit_state) && (dbc_critical || exit_handler_active))
 			{
-				SET_FORCED_EXIT_STATE;
+				SET_FORCED_EXIT_STATE(sig);
 				exit_state++;		/* Make exit pending, may still be tolerant though */
 				return;
 			}
@@ -231,7 +231,7 @@ void dbcertify_signal_handler(int sig, siginfo_t *info, void *context)
 					/* If nothing pending AND we have crit or already exiting, wait to invoke shutdown */
 					if ((EXIT_PENDING_TOLERANT >= exit_state) && (dbc_critical || exit_handler_active))
 					{
-						SET_FORCED_EXIT_STATE;
+						SET_FORCED_EXIT_STATE(sig);
 						exit_state++;		/* Make exit pending, may still be tolerant though */
 						need_core = TRUE;
 						gtm_fork_n_core();	/* Generate "virgin" core while we can */

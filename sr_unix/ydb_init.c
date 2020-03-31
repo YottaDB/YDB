@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -86,7 +86,7 @@ int ydb_init()
 	 * after the condition handling stack is setup below. But if YDB is initialized, we establish the handler before
 	 * much of anything happens.
 	 */
-	THREADED_API_YDB_ENGINE_LOCK(YDB_NOTTP, NULL, LYDB_RTN_NONE, save_active_stapi_rtn, save_errstr, get_lock, status);
+	threaded_api_ydb_engine_lock(YDB_NOTTP, NULL, LYDB_RTN_NONE, &save_active_stapi_rtn, &save_errstr, &get_lock, &status);
 	if (0 != status)
 	{	/* If not initialized yet, can't rts_error so just return our error code */
 		assert(0 < status);	/* i.e. can only be a system error, not a YDB_ERR_* error code */
@@ -101,7 +101,7 @@ int ydb_init()
 	}
 	if (NULL == lcl_gtm_threadgbl)
 	{	/* This means the SETUP_THREADGBL_ACCESS done at the beginning of this function (before getting the
-		 * "THREADED_API_YDB_ENGINE_LOCK" multi-thread lock) saw the global variable "gtm_threadgbl" as NULL.
+		 * "threaded_api_ydb_engine_lock" multi-thread lock) saw the global variable "gtm_threadgbl" as NULL.
 		 * But it is possible we reach here after one thread has done the initialization and released the
 		 * multi-thread lock. So redo the SETUP_THREADGBL_ACCESS.
 		 */
@@ -135,7 +135,7 @@ int ydb_init()
 			 * because "ydb_init" was already run in this process.
 			 */
 			SETUP_GENERIC_ERROR(ERR_STAPIFORKEXEC);	/* ensure a later call to "ydb_zstatus" returns full error string */
-			THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+			threaded_api_ydb_engine_unlock(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 			/* "ydb_init" returns positive error code so return ERR_STAPIFORKEXEC, not YDB_ERR_STAPIFORKEXEC. */
 			return ERR_STAPIFORKEXEC;
 		} else
@@ -154,7 +154,7 @@ int ydb_init()
 				ydb_init_complete = FALSE;	/* Force "ydb_init" to be invoked again in case any more
 								 * YottaDB calls happen since "ydb_child_init" did not run clean.
 								 */
-				THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+				threaded_api_ydb_engine_unlock(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 				/* "ydb_init" returns positive error code hence the negate below */
 				return -status;		/* Negate it back before returning from "ydb_init". */
 			}
@@ -168,7 +168,7 @@ int ydb_init()
 		 */
 		assert(!ydb_init_complete);	/* should have been cleared by "ydb_exit" as part of calling "gtm_exit_handler" */
 		SETUP_GENERIC_ERROR(ERR_CALLINAFTERXIT); /* ensure a later call to "ydb_zstatus" returns full error string */
-		THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+		threaded_api_ydb_engine_unlock(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 		 /* "ydb_init" returns positive error code so return ERR_CALLINAFTERXIT, not YDB_ERR_CALLINAFTERXIT. */
 		return ERR_CALLINAFTERXIT;
 	}
@@ -179,7 +179,7 @@ int ydb_init()
 		if ((NULL == (dist = ydb_getenv(YDBENVINDX_DIST_ONLY, NULL_SUFFIX, NULL_IS_YDB_ENV_MATCH)))
 			|| (NULL == getenv("gtm_dist")) || (strcmp(getenv("gtm_dist"), getenv("ydb_dist"))))
 		{	/* In a call-in and "ydb_dist" or "gtm_dist" env var is not defined or not the same. Set them to full path
-             * of libyottadb.so that contains the currently invoked "ydb_init" function.
+			 * of libyottadb.so that contains the currently invoked "ydb_init" function.
 			 */
 			if (0 == dladdr(&ydb_init, &shlib_info))
 			{	/* Could not find "ydb_init" symbol (current running function) in any loaded shared libraries.
@@ -187,7 +187,7 @@ int ydb_init()
 				 */
 				FPRINTF(stderr, "%%YDB-E-SYSCALL, Error received from system call dladdr()"
 					"-- called from module %s at line %d\n%s\n", __FILE__, __LINE__, dlerror());
-				THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+				threaded_api_ydb_engine_unlock(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 				return ERR_SYSCALL;
 			}
 			/* Temporarily copy shlib_info.dli_fname onto a local buffer as we cannot modify the former
@@ -200,7 +200,7 @@ int ydb_init()
 			{
 				FPRINTF(stderr, "%%YDB-E-DISTPATHMAX, Executable path length is greater than maximum (%d)\n",
 													YDB_DIST_PATH_MAX);
-				THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+				threaded_api_ydb_engine_unlock(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 				/* "ydb_init" returns positive error code so return ERR_DISTPATHMAX, not YDB_ERR_DISTPATHMAX. */
 				return ERR_DISTPATHMAX;
 			}
@@ -227,7 +227,7 @@ int ydb_init()
 				FPRINTF(stderr, "%%YDB-E-SYSCALL, Error received from system call setenv(ydb_dist)"
 					"-- called from module %s at line %d\n%%SYSTEM-E-ENO%d, %s\n",
 					__FILE__, __LINE__, save_errno, STRERROR(save_errno));
-				THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+				threaded_api_ydb_engine_unlock(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 				return ERR_SYSCALL;
 			}
 			status = setenv(gtmenvname[YDBENVINDX_DIST] + 1, path, TRUE);	/* + 1 to skip leading $ */
@@ -238,7 +238,7 @@ int ydb_init()
 				FPRINTF(stderr, "%%YDB-E-SYSCALL, Error received from system call setenv(gtm_dist)"
 					"-- called from module %s at line %d\n%%SYSTEM-E-ENO%d, %s\n",
 					__FILE__, __LINE__, save_errno, STRERROR(save_errno));
-				THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+				threaded_api_ydb_engine_unlock(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 				return ERR_SYSCALL;
 			}
 		} /* else : "ydb_dist" env var is defined. Use that for later verification done inside "common_startup_init" */
@@ -265,7 +265,7 @@ int ydb_init()
 		ESTABLISH_NORET(gtmci_ch, error_encountered);
 		if (error_encountered)
 		{	/* "gtmci_ch" encountered an error and transferred control back here. Return after mutex lock cleanup. */
-			THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+			threaded_api_ydb_engine_unlock(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 			REVERT;
 			/* "ydb_init" returns positive error code so return mumps_status as is (i.e. no negation for YDB_ERR_*) */
 			assert(0 < mumps_status);
@@ -334,6 +334,6 @@ int ydb_init()
 		REVERT;
 	}
 	assert(NULL == TREF(temp_fgncal_stack));
-	THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+	threaded_api_ydb_engine_unlock(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 	return YDB_OK;
 }

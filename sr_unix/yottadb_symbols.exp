@@ -74,6 +74,7 @@ ydb_lock_incr_s
 ydb_lock_incr_st
 ydb_lock_s
 ydb_lock_st
+ydb_main_lang_init
 ydb_malloc
 ydb_message
 ydb_message_t
@@ -89,6 +90,7 @@ ydb_node_previous_s
 ydb_node_previous_st
 ydb_set_s
 ydb_set_st
+ydb_sig_dispatch
 ydb_stdout_stderr_adjust
 ydb_stdout_stderr_adjust_t
 ydb_str2zwr_s

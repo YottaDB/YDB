@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,6 +47,7 @@
 #include "indir_enum.h"
 #include "invocation_mode.h"
 #include "sig_init.h"
+#include "libyottadb.h"
 
 LITDEF nametabent filter_names[] =
 {
@@ -156,13 +157,19 @@ void iott_use(io_desc *iod, mval *pp)
 						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
 						if (tt_ptr->fildes == temp_ptr->fildes)
 						{	/* if this is $PRINCIPAL make sure the ctrlc_handler is enabled */
-							sigemptyset(&act.sa_mask);
-							act.sa_sigaction = ctrlc_handler_ptr;
-							/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "ctrlc_handler") relies
-							 * on "info" and "context" being passed in.
-							 */
-							act.sa_flags = YDB_SIGACTION_FLAGS;
-							sigaction(SIGINT, &act, NULL);
+							if (!USING_ALTERNATE_SIGHANDLING)
+							{
+								sigemptyset(&act.sa_mask);
+								act.sa_sigaction = ctrlc_handler_ptr;
+								/* FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED (invoked in "ctrlc_handler") relies
+								 * on "info" and "context" being passed in.
+								 */
+								act.sa_flags = YDB_SIGACTION_FLAGS;
+								sigaction(SIGINT, &act, NULL);
+							} else
+							{	/* Make sure this handler is enabled */
+								SET_ALTERNATE_SIGHANDLER(SIGINT, &ydb_altmain_sighandler);
+							}
 							ctrlc_on = TRUE;
 						}
 					}
@@ -170,19 +177,25 @@ void iott_use(io_desc *iod, mval *pp)
 				case iop_nocenable:
 					/* Note that this parameter is ignored in callin/simpleapi mode because ^C in this mode
 					 * is treated as a process termination request.
-					*/
+					 */
 					if (ctrlc_on && !RESTRICTED(cenable) && !(MUMPS_CALLIN & invocation_mode))
 					{	/* if it's already nocenable, no need to change */
 						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
 						if (tt_ptr->fildes == temp_ptr->fildes)
-						{	/* if this is $PRINCIPAL may disable the ctrlc_handler */
+						{	/* If this is $PRINCIPAL may disable the ctrlc_handler */
 							if (0 == (CTRLC_MSK & tt_ptr->enbld_outofbands.mask))
-							{	/* but only if ctrap=$c(3) is not active */
-								sigemptyset(&act.sa_mask);
-								act.sa_flags = YDB_SIGACTION_FLAGS;
-								/* Setting handler to null handler still allows to be forwarded */
-								act.sa_sigaction = null_handler;
-								sigaction(SIGINT, &act, NULL);
+							{	/* But only if ctrap=$c(3) is not active */
+								if (!USING_ALTERNATE_SIGHANDLING)
+								{
+									sigemptyset(&act.sa_mask);
+									act.sa_flags = YDB_SIGACTION_FLAGS;
+									/* Setting handler to null handler still allows to be forwarded */
+									act.sa_sigaction = null_handler;
+									sigaction(SIGINT, &act, NULL);
+								} else
+								{	/* Disable a handler for this signal (ignored) */
+									SET_ALTERNATE_SIGHANDLER(SIGINT, NULL);
+								}
 							}
 							ctrlc_on = FALSE;
 						}
@@ -241,7 +254,7 @@ void iott_use(io_desc *iod, mval *pp)
 					break;
 				case iop_noescape:
 					mask_in &= (~TRM_ESCAPE);
-					default:
+				default:
 					break;
 				case iop_eraseline:
 					if (NULL != CLR_EOL)
@@ -260,18 +273,18 @@ void iott_use(io_desc *iod, mval *pp)
 					}
 					switch (fil_type)
 					{
-					case 0:
-						iod->write_filter |= CHAR_FILTER;
-						break;
-					case 1:
-						iod->write_filter |= ESC1;
-						break;
-					case 2:
-						iod->write_filter &= ~CHAR_FILTER;
-						break;
-					case 3:
-						iod->write_filter &= ~ESC1;
-						break;
+						case 0:
+							iod->write_filter |= CHAR_FILTER;
+							break;
+						case 1:
+							iod->write_filter |= ESC1;
+							break;
+						case 2:
+							iod->write_filter &= ~CHAR_FILTER;
+							break;
+						case 3:
+							iod->write_filter &= ~ESC1;
+							break;
 					}
 					break;
 				case iop_nofilter:
@@ -322,13 +335,13 @@ void iott_use(io_desc *iod, mval *pp)
 					terminator_specified = TRUE;
 					temp_ptr = (d_tt_struct *)d_in->dev_sp;
 					if (mask_term.mask[0] == NUL &&
-						mask_term.mask[1] == NUL &&
-						mask_term.mask[2] == NUL &&
-						mask_term.mask[3] == NUL &&
-						mask_term.mask[4] == NUL &&
-						mask_term.mask[5] == NUL &&
-						mask_term.mask[6] == NUL &&
-						mask_term.mask[7] == NUL)
+					    mask_term.mask[1] == NUL &&
+					    mask_term.mask[2] == NUL &&
+					    mask_term.mask[3] == NUL &&
+					    mask_term.mask[4] == NUL &&
+					    mask_term.mask[5] == NUL &&
+					    mask_term.mask[6] == NUL &&
+					    mask_term.mask[7] == NUL)
 						temp_ptr->default_mask_term = TRUE;
 					else
 						temp_ptr->default_mask_term = FALSE;
@@ -404,64 +417,64 @@ void iott_use(io_desc *iod, mval *pp)
 						gtm_tputs(gtm_tparm(CURSOR_ADDRESS, d_out->dollar.y, d_out->dollar.x), 1, outc);
 					break;
 				case iop_ipchset:
-					{
+				{
 #						ifdef KEEP_zOS_EBCDIC
-						if ((iconv_t)0 != iod->input_conv_cd)
-						{
-							ICONV_CLOSE_CD(iod->input_conv_cd);
-						}
-						SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
-						if (DEFAULT_CODE_SET != iod->in_code_set)
-							ICONV_OPEN_CD(iod->input_conv_cd,
-								(char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
-#						endif
-						GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
-						SET_ENCODING(temp_chset, &chset_mstr);
-						if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
-							break;	/* ignore UTF chsets if not utf8_mode. */
-						if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2,
-								 chset_mstr.len, chset_mstr.addr);
-						iod->ichset = temp_chset;
-						break;
+					if ((iconv_t)0 != iod->input_conv_cd)
+					{
+						ICONV_CLOSE_CD(iod->input_conv_cd);
 					}
+					SET_CODE_SET(iod->in_code_set, (char *)(pp->str.addr + p_offset + 1));
+					if (DEFAULT_CODE_SET != iod->in_code_set)
+						ICONV_OPEN_CD(iod->input_conv_cd,
+							      (char *)(pp->str.addr + p_offset + 1), INSIDE_CH_SET);
+#						endif
+					GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+					SET_ENCODING(temp_chset, &chset_mstr);
+					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
+						break;	/* ignore UTF chsets if not utf8_mode. */
+					if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2,
+							      chset_mstr.len, chset_mstr.addr);
+					iod->ichset = temp_chset;
+					break;
+				}
 				case iop_opchset:
-					{
+				{
 #						ifdef KEEP_zOS_EBCDIC
-						if ((iconv_t)0 != iod->output_conv_cd)
-						{
-							ICONV_CLOSE_CD(iod->output_conv_cd);
-						}
-						SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
-						if (DEFAULT_CODE_SET != iod->out_code_set)
-							ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET,
-								(char *)(pp->str.addr + p_offset + 1));
-#						endif
-						GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
-						SET_ENCODING(temp_chset, &chset_mstr);
-						if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
-							break;	/* ignore UTF chsets if not utf8_mode. */
-						if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2,
-								 chset_mstr.len, chset_mstr.addr);
-						iod->ochset = temp_chset;
-						break;
-					}
-				case iop_chset:
+					if ((iconv_t)0 != iod->output_conv_cd)
 					{
-						GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
-						SET_ENCODING(temp_chset, &chset_mstr);
-						if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
-							break;	/* ignore UTF chsets if not utf8_mode. */
-						if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
-							rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2,
-								 chset_mstr.len, chset_mstr.addr);
-						iod->ichset = iod->ochset = temp_chset;
-						break;
+						ICONV_CLOSE_CD(iod->output_conv_cd);
 					}
+					SET_CODE_SET(iod->out_code_set, (char *)(pp->str.addr + p_offset + 1));
+					if (DEFAULT_CODE_SET != iod->out_code_set)
+						ICONV_OPEN_CD(iod->output_conv_cd, INSIDE_CH_SET,
+							      (char *)(pp->str.addr + p_offset + 1));
+#						endif
+					GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+					SET_ENCODING(temp_chset, &chset_mstr);
+					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
+						break;	/* ignore UTF chsets if not utf8_mode. */
+					if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2,
+							      chset_mstr.len, chset_mstr.addr);
+					iod->ochset = temp_chset;
+					break;
+				}
+				case iop_chset:
+				{
+					GET_ADDR_AND_LEN(chset_mstr.addr, chset_mstr.len);
+					SET_ENCODING(temp_chset, &chset_mstr);
+					if (!gtm_utf8_mode && IS_UTF_CHSET(temp_chset))
+						break;	/* ignore UTF chsets if not utf8_mode. */
+					if (IS_UTF16_CHSET(temp_chset))		/* UTF16 is not valid for TTY */
+						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2,
+							      chset_mstr.len, chset_mstr.addr);
+					iod->ichset = iod->ochset = temp_chset;
+					break;
+				}
 			}
 			p_offset += ((IOP_VAR_SIZE == io_params_size[ch]) ?
-				(unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
+				     (unsigned char)*(pp->str.addr + p_offset) + 1 : io_params_size[ch]);
 		}
 		temp_ptr = (d_tt_struct *)d_in->dev_sp;
 		Tcsetattr(tt_ptr->fildes, TCSANOW, &t, status, save_errno, CHANGE_TERM_TRUE);
@@ -475,7 +488,7 @@ void iott_use(io_desc *iod, mval *pp)
 			temp_ptr->term_ctrl = mask_in;
 			/* reset the mask to default if chset was changed without specifying new terminators or Default */
 			if ((!terminator_specified && (old_ichset != iod->ichset)) ||
-				(terminator_specified && temp_ptr->default_mask_term))
+			    (terminator_specified && temp_ptr->default_mask_term))
 			{
 				memset(&mask_term.mask[0], 0, SIZEOF(io_termmask));
 				if (CHSET_M != iod->ichset)
@@ -493,7 +506,7 @@ void iott_use(io_desc *iod, mval *pp)
 			TCFLUSH(tt_ptr->fildes, TCIFLUSH, status);
 			if (0 != status)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("tcflush input"),
-					CALLFROM, errno);
+					      CALLFROM, errno);
 		}
 	} else if (tt_ptr->mupintr && !dollar_zininterrupt)
 	{	/* The interrupted read was not properly resumed so clear it now */

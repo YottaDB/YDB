@@ -12,9 +12,13 @@
  *								*
  ****************************************************************/
 #include "mdef.h"
-#include "cmidef.h"
+
 #include "gtm_string.h"
 #include <errno.h>
+
+#include "cmidef.h"
+#include "generic_signal_handler.h"
+#include "sig_init.h"
 
 GBLREF struct NTD *ntd_root;
 
@@ -40,29 +44,30 @@ cmi_status_t cmj_netinit(void)
 	FD_ZERO(&tsk->rs);
 	FD_ZERO(&tsk->ws);
 	FD_ZERO(&tsk->es);
-
-
-	/* to support CMI_MUTEX_ macros */
+	/* To support CMI_MUTEX_ macros */
 	sigemptyset(&tsk->mutex_set);
 	sigaddset(&tsk->mutex_set, SIGIO);
 	sigaddset(&tsk->mutex_set, SIGURG);
-
-	/* setup signal handlers */
-	/* I/O - SIGURG, SIGIO are I/O interrupts - highest priority */
-	sa.sa_flags = SA_SIGINFO;
-	sa.sa_handler = NULL;
-	sa.sa_sigaction = cmj_handler;
-	sigemptyset(&sa.sa_mask);
-	sigaddset(&sa.sa_mask, SIGURG);
-	rval = sigaction(SIGIO, &sa, NULL);
-	if (rval < 0)
-		return errno;
-
-	sigemptyset(&sa.sa_mask);
-	sigaddset(&sa.sa_mask, SIGIO);
-	rval = sigaction(SIGURG, &sa, NULL);
-	if (rval < 0)
-		return errno;
-
+	/* Setup signal handlers */
+	if (!USING_ALTERNATE_SIGHANDLING)
+	{	/* I/O - SIGURG, SIGIO are I/O interrupts - highest priority */
+		sa.sa_flags = SA_SIGINFO;
+		sa.sa_handler = NULL;
+		sa.sa_sigaction = cmj_handler;
+		sigemptyset(&sa.sa_mask);
+		sigaddset(&sa.sa_mask, SIGURG);
+		rval = sigaction(SIGIO, &sa, NULL);
+		if (rval < 0)
+			return errno;
+		sigemptyset(&sa.sa_mask);
+		sigaddset(&sa.sa_mask, SIGIO);
+		rval = sigaction(SIGURG, &sa, NULL);
+		if (rval < 0)
+			return errno;
+	} else
+	{	/* Set the handlers for these signals into the dispatch array for alternate signal handling */
+		SET_ALTERNATE_SIGHANDLER(SIGIO, &ydb_altio_sighandler);
+		SET_ALTERNATE_SIGHANDLER(SIGURG, &ydb_altio_sighandler);
+	}
 	return SS_NORMAL;
 }

@@ -3,7 +3,7 @@
  * Copyright (c) 2012-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,7 @@
 #include "jnl.h"			/* needed for REPL_ALLOWED */
 #include "forced_exit_err_display.h"
 #include "sig_init.h"
+#include "sighnd_debug.h"
 
 boolean_t		is_anticipatory_freeze_needed(sgmnt_addrs *csa, int msg_id);
 void			set_anticipatory_freeze(sgmnt_addrs *csa, int msg_id);
@@ -478,6 +479,7 @@ static inline void wait_for_repl_inst_unfreeze_nocsa_jpl(jnlpool_addrs_ptr_t jpl
 {
 	GBLREF	int4			exit_state;
 	GBLREF	int4			exi_condition;
+	GBLREF	sig_pending		sigPendingQue;		/* Queue of pending signals handled in alt signal handling mode */
 
 	assert((NULL != jpl) && (NULL != jpl->jnlpool_ctl));
 	/* If this region is not replicated, do not care for instance freezes */
@@ -488,6 +490,10 @@ static inline void wait_for_repl_inst_unfreeze_nocsa_jpl(jnlpool_addrs_ptr_t jpl
 			forced_exit_err_display();
 			EXIT(-exi_condition);
 		}
+		/* Within this polling "sleep loop" waiting for the freeze to be lifted, we need to also periodically check if
+		 * there are any pending interrupts if we are doing alternate signal handling.
+		 */
+		PROCESS_PENDING_ALTERNATE_SIGNALS;
 		/* Invoke this AFTER the "exit_state" check that way if we are already in the exit handler
 		 * when we get a process-terminating signal (e.g. SIGTERM), we avoid double invocation of
 		 * the exit handler but instead exit immediately (which is what EXIT will do if we are

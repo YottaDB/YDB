@@ -66,3 +66,5 @@ LYDBRTN(LYDB_RTN_YDB_CIP,		"********",				"ydb_cip_t()"				),	/* "ydb_cip_helper
 LYDBRTN(LYDB_RTN_YDB_CI_TAB_OPEN,	"ydb_ci_tab_open()",			"ydb_ci_tab_open_t()"			),	/* "ydb_ci_tab_open" is running */
 LYDBRTN(LYDB_RTN_YDB_CI_TAB_SWITCH,	"ydb_ci_tab_switch()",			"ydb_ci_tab_switch_t()"			),	/* "ydb_ci_tab_switch" is running */
 LYDBRTN(LYDB_RTN_YDB_CI_GET_INFO,	"ydb_ci_get_info()",			"ydb_ci_get_info_t()"			),	/* "ydb_ci_get_info" is running */
+/* ydb_sig_dispatch() is called from (currently only) the Go wrapper but if this changes, this may need to be uncommented */
+/*LYDBRTN(LYDB_RTN_YDB_SIG_DISPATCH,	"ydb_sig_dispatch()",			"ydb_sig_dispatch()"			),*/	/* "ydb_sig_dispatch() and signal handler are running */

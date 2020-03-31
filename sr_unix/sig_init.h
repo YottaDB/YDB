@@ -16,9 +16,12 @@
 #define SIG_INIT_H_INCLUDED
 
 #include "gtm_string.h"
+#include "gtm_semaphore.h"
 
-#include "generic_signal_handler.h"
 #include "memcoherency.h"
+#include "libyottadb.h"
+#include "generic_signal_handler.h"
+#include "alternate_sighandling.h"
 
 /* Below signal handler function types are used as the first parameter to FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED */
 enum sig_handler_t
@@ -44,7 +47,8 @@ enum sig_handler_t
  * same process and thus loses the sending pid information). For example, sending SIGQUIT/SIG-3 should show up as KILLBYSIGUINFO
  * but would show up as KILLBYSIGSINFO1 without the pre-forwarding store.
  */
-typedef struct {
+typedef struct
+{
 	int			sig_num;	/* Signal number */
 	boolean_t		sig_forwarded;	/* Whether signal "sig_num" got forwarded */
 	siginfo_t		sig_info;	/* "info" from OS signal handler invocation */
@@ -53,6 +57,7 @@ typedef struct {
 
 GBLREF	int			stapi_signal_handler_deferred;
 GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
+GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 
 #ifdef DEBUG
 /* This macro is used by a few places that invoke "timer_handler" with DUMMY_SIG_NUM (e.g. "check_for_timer_pops")
@@ -190,6 +195,7 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 #define	SET_YDB_ENGINE_MUTEX_HOLDER_THREAD_ID(HOLDER_THREAD_ID, TLEVEL)						\
 {														\
 	GBLREF	uint4		dollar_tlevel;									\
+	GBLREF	pthread_t	ydb_engine_threadsafe_mutex_holder[];						\
 														\
 	/* If not in TP, the YottaDB engine lock index is 0 (i.e. ydb_engine_threadsafe_mutex_holder[0] is	\
 	 * current lock holder thread if it is non-zero). But if we are in TP, then lock index could be		\
@@ -219,11 +225,14 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
  * Even if the info code is SI_TKILL, it is possible a completely different signal than what was recorded before comes
  * in. In that case, do not treat that as a forwarded signal but as a new signal. Hence the "sig_num" check below.
  */
-#define	IS_SIGNAL_FORWARDED(SIGHNDLRTYPE, SIG, INFO)						\
-	((DUMMY_SIG_NUM == SIG)									\
-		|| (simpleThreadAPI_active							\
-			&& (SI_TKILL == INFO->si_code)						\
-			&& (SIG == stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_num)))	\
+#define	IS_SIGNAL_FORWARDED(SIGHNDLRTYPE, SIG, INFO)					\
+	((DUMMY_SIG_NUM == SIG)								\
+	     || (simpleThreadAPI_active && (SI_TKILL == INFO->si_code)			\
+		 && (SIG == stapi_signal_handler_oscontext[SIGHNDLRTYPE].sig_num)))
+
+/* Values to pass to FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED() macro below as the IS_EXI_SIGNAL parameter */
+#define	IS_EXI_SIGNAL_FALSE	FALSE
+#define	IS_EXI_SIGNAL_TRUE	TRUE
 
 /* If we detect a case when the signal came to a thread other than the main GT.M thread, this macro will redirect the signal to the
  * main thread if such is defined. Such scenarios is possible, for instance, if we are running along a JVM, which, upon receiving a
@@ -244,6 +253,7 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 	int			i, tLevel;											\
 	boolean_t		isSigThreadDirected, signalForwarded, thisThreadIsMutexHolder;					\
 																\
+	assert(!USING_ALTERNATE_SIGHANDLING);											\
 	assert((DUMMY_SIG_NUM == SIG) || (NULL != INFO));									\
 	if (DUMMY_SIG_NUM != SIG)												\
 	{	/* This is an invocation of the signal handler by the OS. Could be a forwarded signal handler invocation in	\
@@ -380,8 +390,10 @@ GBLREF	sig_info_context_t	stapi_signal_handler_oscontext[sig_hndlr_num_entries];
 }
 #endif
 
+int drain_signal_queues(ydb_buffer_t *errstr);
 void sig_init(void (*signal_handler)(), void (*ctrlc_handler)(), void (*suspsig_handler)(), void (*continue_handler)());
 void null_handler(int sig, siginfo_t *info, void *context);
 void ydb_stm_invoke_deferred_signal_handler(void);
+void setup_altstack(void);
 
 #endif

@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001 Sanchez Computer Associates, Inc.		*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,18 +24,6 @@
 #include "sleep.h"
 #include "sleep_cnt.h"
 
-/* Define debugging macros for signal handling - uncomment the define below to enable but note it emits
- * output to stderr.
- */
-//#define DEBUG_SIGNAL_HANDLING
-#ifdef DEBUG_SIGNAL_HANDLING
-# define DBGSIGHND(x) DBGFPF(x)
-# define DBGSIGHND_ONLY(x) x
-#else
-# define DBGSIGHND(x)
-# define DBGSIGHND_ONLY(x)
-#endif
-
 GBLREF void (*ydb_stm_thread_exit_fnptr)(void);
 
 #define YDB_ALTSTACK_SIZE	(256 * 1024)	/* Required size for alt-stack */
@@ -51,6 +39,12 @@ typedef void (*nonYDB_sighandler_t)(int, siginfo_t *, void *);
 	((SIG_DFL != (sighandler_t)orig_sig_action[(SIGNAL)].sa_sigaction)	\
 	 && (SIG_IGN != (sighandler_t)orig_sig_action[(SIGNAL)].sa_sigaction))
 
+/* This macro was originally added when YDB added a Go wrapper but after some rework, the Go wrapper now handles the signals
+ * and lets YottaDB know about with "alternate signal handling mode". But since signal control is not likely to go away and
+ * because we are adding wrappers for other languages, we are keeping this macro around and driving signals that come in
+ * with it so the original signal handlers (if any were instantiated before the YDB engine was initialized) get driven when
+ * a signal comes in.
+ */
 #define DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY(NAME, SIGNAL, INFO, CONTEXT, DRIVEEXIT)					\
 MBSTART {														\
 	nonYDB_sighandler_t	sighandler;										\
@@ -73,9 +67,6 @@ MBSTART {														\
 
 /* Macro to check if a given signal sets the "dont_want_core" variable to TRUE in the function "generic_signal_handler" */
 #define	IS_DONT_WANT_CORE_TRUE(SIG)	((SIGQUIT == SIG) || (SIGTERM == SIG) || (SIGINT == SIG))
-
-#define	IS_EXI_SIGNAL_FALSE	FALSE
-#define	IS_EXI_SIGNAL_TRUE	TRUE
 
 #define	MULTI_THREAD_AWARE_FORK_N_CORE(SIGNAL_FORWARDED)								\
 {															\

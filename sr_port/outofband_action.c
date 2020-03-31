@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -28,6 +28,7 @@ GBLREF unsigned char	*restart_ctxt, *restart_pc;
 GBLREF void             (*tp_timeout_action_ptr)(void);
 GBLREF volatile int4 	ctrap_action_is, outofband;
 GBLREF void		(*ztimeout_action_ptr)(void);
+
 error_def(ERR_CTRAP);
 error_def(ERR_CTRLC);
 error_def(ERR_CTRLY);
@@ -49,19 +50,30 @@ void outofband_action(boolean_t lnfetch_or_start)
 			case (ctrly):		/* This signal is ignored in simpleAPI */
 				if (!(IS_SIMPLEAPI_MODE))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLY);
+				else
+					outofband_clear();
 				break;
 			case (ctrlc):
 				/* Note this outofband is currently allowed for simpleAPI functions.
-				 * It exits the process in simpleAPI mode.
+				 * It exits the process in simple*API mode.
 				 */
 				if (!(IS_SIMPLEAPI_MODE))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_CTRLC);
 				else
+				{	/* If we are running with Go, just return as we'll panic instead of exit */
+					if (YDB_MAIN_LANG_GO == ydb_main_lang)
+						return;
+					/* This exit() call is not ideal but there is no other well defined way to unwind
+					 * intermixed YDB and non-YDB frames back to the shell or even some user stack level.
+					 */
 					exit(ERR_CTRLC);
+				}
 				break;
 			case (ctrap):		/* This signal is ignored in simpleAPI */
 				if (!(IS_SIMPLEAPI_MODE))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
+				else
+					outofband_clear();
 				break;
 			case (tptimeout):
 				/* Currently following is nothing but an rts_error.
@@ -73,9 +85,14 @@ void outofband_action(boolean_t lnfetch_or_start)
 			case (jobinterrupt):	/* This signal is ignored in simpleAPI */
 				if (!(IS_SIMPLEAPI_MODE))
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBINTRRQST);
+				else
+					outofband_clear();
 				break;
-			case (ztimeout): /* Following is basically rts_error */
-				(*ztimeout_action_ptr)();
+			case (ztimeout): /* Following is basically rts_error (ignored for simpleAPI) */
+				if (!(IS_SIMPLEAPI_MODE))
+					(*ztimeout_action_ptr)();
+				else
+					outofband_clear();
 				break;
 			default:
 				assertpro(FALSE);

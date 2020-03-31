@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 #include "gtm_unistd.h"
 #include "gtm_inet.h"
 #include "gtm_signal.h"
-
+#include "gtm_stdio.h"
 #include <sys/shm.h>
 
 #include "gdsroot.h"
@@ -51,6 +51,8 @@
 #include "op.h"
 #include "trace_table.h"
 #include "libyottadb_int.h"
+#include "gtmio.h"
+#include "caller_id.h"
 
 GBLREF	int4			exi_condition;
 GBLREF	uint4			dollar_tlevel;
@@ -64,7 +66,6 @@ GBLREF	volatile int4		fast_lock_count;
 GBLREF	boolean_t		skip_exit_handler;
 GBLREF 	boolean_t		is_tracing_on;
 GBLREF	int			fork_after_ydb_init;
-GBLREF	void			(*ydb_stm_thread_exit_fnptr)(void);
 #ifdef DEBUG
 GBLREF 	boolean_t		stringpool_unusable;
 GBLREF 	boolean_t		stringpool_unexpandable;
@@ -183,8 +184,13 @@ void gtm_exit_handler(void)
 		 */
 		return;
 	}
-	if (exit_handler_active || skip_exit_handler) /* Skip exit handling if specified or if exit handler already active */
+	/* Skip exit handling if specified or if exit handler already active */
+	if (exit_handler_active || skip_exit_handler)
+	{
+		DBGSIGHND_ONLY(fprintf(stderr, "gtm_exit_handler: Entered but already active/complete (%d/%d) - nothing to do\n",
+				       exit_handler_active, exit_handler_complete); fflush(stderr));
 		return;
+	}
 	if (simpleThreadAPI_active)
 	{	/* This is a SimpleThreadAPI environment and the thread that is invoking the exit handler does not hold
 		 * the YottaDB engine mutex lock. In that case, go through "ydb_exit" which gets that lock and comes back
@@ -195,6 +201,8 @@ void gtm_exit_handler(void)
 			ydb_exit();
 			return;
 		}
+		DBGSIGHND_ONLY(fprintf(stderr, "gtm_exit_handler: Entered in simpleThreadAPI mode.. (thread %p) from %p\n",
+				       (void *)pthread_self(), (void *)caller_id()); fflush(stderr));
 	}
 	exit_handler_active = TRUE;
 	DEBUG_ONLY(ydb_dmp_tracetbl());
@@ -220,6 +228,11 @@ void gtm_exit_handler(void)
 	 * to be treated as an error in rundown (it is how a pipe close happens normally).
 	 */
 	RUNDOWN_STEP(rundown_state_io, rundown_state_last, 0, IO_RUNDOWN_MACRO);
+	/* One last step before finishing up is to drain our signal queues if we were using this. This will release any
+	 * threads blocked on signals as the in-process queues are also cleaned up and their internal msems posted.
+	 */
+	if (USING_ALTERNATE_SIGHANDLING)
+		drain_signal_queues(NULL);
 	REVERT;
 	exit_handler_complete = TRUE;
 	print_exit_stats();
@@ -230,4 +243,10 @@ void gtm_exit_handler(void)
 	}
 	if (actual_exi_condition && !(MUMPS_CALLIN & invocation_mode))
 		PROCDIE(actual_exi_condition);
+	DBGSIGHND_ONLY(if (USING_ALTERNATE_SIGHANDLING)
+		{
+			fprintf(stderr, "gtm_exit_handler(): Complete - returning\n");
+			fflush(stderr);
+		}
+	);
 }

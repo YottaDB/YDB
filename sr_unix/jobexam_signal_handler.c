@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,9 +23,9 @@
  */
 
 #include "mdef.h"
-#include "gtm_string.h"
 
-#include <signal.h>
+#include "gtm_string.h"
+#include "gtm_signal.h"
 #include "gtm_inet.h"
 
 #include "gtm_stdio.h"
@@ -54,6 +54,9 @@ void jobexam_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	gtmsiginfo_t	signal_info;
 
+	/* Note we don't need to bypass this like in other handlers because this handler is not in use when using
+	 * simple[Threaded]API.
+	 */
 	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_jobexam_signal_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
 	extract_signal_info(sig, info, context, &signal_info);
 	switch(signal_info.infotype)
@@ -95,7 +98,7 @@ void jobexam_signal_handler(int sig, siginfo_t *info, void *context)
 	 */
 	need_core = TRUE;
 	gtm_fork_n_core();
-	/* Note this routine do NOT invoke create_fatal_error_zshow_dmp() because it would in turn call jobexam
+	/* Note this routine does NOT invoke create_fatal_error_zshow_dmp() because it would in turn call jobexam
 	 * again which would loop us right back around to here. We basically want to do UNWIND(NULL, NULL) logic
 	 * but the UNWIND macro can only be used in a condition handler so next is a block that pretends it is
 	 * our condition handler and does the needful.

@@ -167,7 +167,6 @@ CONDITION_HANDLER(op_fnzpeek_ch)
  */
 void op_fnzpeek_signal_handler(int sig, siginfo_t *info, void *context)
 {
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_op_fnzpeek_signal_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
 	/* We basically want to do UNWIND(NULL, NULL) logic but the UNWIND macro can only be used in a condition
 	 * handler so next is a block that pretends it is our condition handler and does the needful. Note in order
 	 * for this to work, we need to be wrapped in a condition handler even if that condition handler is never
@@ -726,7 +725,13 @@ void	op_fnzpeek(mval *structid, int offset, int len, mval *format, mval *ret)
 	 * Tru64 when signal handlers are nested.
 	 */
 	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
-	/* Setup new signal handler to just drive condition handler which will do the right thing */
+	/* Setup new signal handler to just drive condition handler which will do the right thing.
+	 *
+	 * Note we don't do any special handling here for alternate signal handling - first off, getting that to even work in this
+	 * confined area where we will ALWAYS hold the engine lock makes alternate signal handling unnecessarily complicated if
+	 * not impossible and secondly, this is a momentary reset of the handlers that is quickly undone so normal signal
+	 * handling returns.
+	 */
 	memset(&new_action, 0, SIZEOF(new_action));
 	sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = YDB_SIGACTION_FLAGS;

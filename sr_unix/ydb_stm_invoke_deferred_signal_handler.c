@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,6 +70,10 @@ void ydb_stm_invoke_deferred_signal_handler()
 	/* Invoke "generic_signal_handler" first as that handles a process-terminating signal.
 	 * If this signal is pending, invoking the handler will most likely terminate the process.
 	 * No need to check for other deferred signal types.
+	 *
+	 * Note, several of the asserts below had '|| USING_ALTERNATE_SIGHANDLING' added to them. This is because the
+	 * stapi_signal_handler_oscontext[] array is maintained by FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED() macro which
+	 * is not used in alternate signal handling.
 	 */
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_generic_signal_handler))
 	{
@@ -79,14 +83,15 @@ void ydb_stm_invoke_deferred_signal_handler()
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_continue_handler))
 	{
-		assert(SIGCONT == stapi_signal_handler_oscontext[sig_hndlr_continue_handler].sig_num);
+		assert((SIGCONT == stapi_signal_handler_oscontext[sig_hndlr_continue_handler].sig_num)
+		       || USING_ALTERNATE_SIGHANDLING);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_continue_handler;
 		continue_handler(DUMMY_SIG_NUM, NULL, NULL);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_ctrlc_handler))
 	{
-		assert(SIGINT == stapi_signal_handler_oscontext[sig_hndlr_ctrlc_handler].sig_num);
+		assert((SIGINT == stapi_signal_handler_oscontext[sig_hndlr_ctrlc_handler].sig_num) || USING_ALTERNATE_SIGHANDLING);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_continue_handler;
 		ctrlc_handler(DUMMY_SIG_NUM, NULL, NULL);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
@@ -97,30 +102,33 @@ void ydb_stm_invoke_deferred_signal_handler()
 	assert(!STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_dbcertify_signal_handler));
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_jobexam_signal_handler))
 	{
-		assert((SIGBUS== stapi_signal_handler_oscontext[sig_hndlr_jobexam_signal_handler].sig_num)
-			|| (SIGSEGV
-				== stapi_signal_handler_oscontext[sig_hndlr_jobexam_signal_handler].sig_num));
+		assert((SIGBUS == stapi_signal_handler_oscontext[sig_hndlr_jobexam_signal_handler].sig_num)
+		       || (SIGSEGV == stapi_signal_handler_oscontext[sig_hndlr_jobexam_signal_handler].sig_num)
+		       || USING_ALTERNATE_SIGHANDLING);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_jobexam_signal_handler;
 		jobexam_signal_handler(DUMMY_SIG_NUM, NULL, NULL);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_jobinterrupt_event))
 	{
-		assert(SIGUSR1 == stapi_signal_handler_oscontext[sig_hndlr_jobinterrupt_event].sig_num);
+		assert((SIGUSR1 == stapi_signal_handler_oscontext[sig_hndlr_jobinterrupt_event].sig_num)
+		       || USING_ALTERNATE_SIGHANDLING);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_jobinterrupt_event;
 		jobinterrupt_event(DUMMY_SIG_NUM, NULL, NULL);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_job_term_handler))
 	{
-		assert(SIGTERM == stapi_signal_handler_oscontext[sig_hndlr_job_term_handler].sig_num);
+		assert((SIGTERM == stapi_signal_handler_oscontext[sig_hndlr_job_term_handler].sig_num)
+		       || USING_ALTERNATE_SIGHANDLING);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_job_term_handler;
 		job_term_handler(DUMMY_SIG_NUM, NULL, NULL);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_op_fnzpeek_signal_handler))
 	{
-		assert(SIGTERM == stapi_signal_handler_oscontext[sig_hndlr_op_fnzpeek_signal_handler].sig_num);
+		assert((SIGTERM == stapi_signal_handler_oscontext[sig_hndlr_op_fnzpeek_signal_handler].sig_num)
+		       || USING_ALTERNATE_SIGHANDLING);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_op_fnzpeek_signal_handler;
 		op_fnzpeek_signal_handler(DUMMY_SIG_NUM, NULL, NULL);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
@@ -128,15 +136,17 @@ void ydb_stm_invoke_deferred_signal_handler()
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_suspsigs_handler))
 	{
 		assert((SIGTTIN == stapi_signal_handler_oscontext[sig_hndlr_suspsigs_handler].sig_num)
-			|| (SIGTTOU == stapi_signal_handler_oscontext[sig_hndlr_suspsigs_handler].sig_num)
-			|| (SIGTSTP == stapi_signal_handler_oscontext[sig_hndlr_suspsigs_handler].sig_num));
+		       || (SIGTTOU == stapi_signal_handler_oscontext[sig_hndlr_suspsigs_handler].sig_num)
+		       || (SIGTSTP == stapi_signal_handler_oscontext[sig_hndlr_suspsigs_handler].sig_num)
+		       || USING_ALTERNATE_SIGHANDLING);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_suspsigs_handler;
 		suspsigs_handler(DUMMY_SIG_NUM, NULL, NULL);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;
 	}
 	if (STAPI_IS_SIGNAL_HANDLER_DEFERRED(sig_hndlr_timer_handler))
 	{
-		assert(SIGALRM == stapi_signal_handler_oscontext[sig_hndlr_timer_handler].sig_num);
+		assert((SIGALRM == stapi_signal_handler_oscontext[sig_hndlr_timer_handler].sig_num)
+		       || USING_ALTERNATE_SIGHANDLING);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_timer_handler;
 		timer_handler(DUMMY_SIG_NUM, NULL, NULL);
 		ydb_stm_invoke_deferred_signal_handler_type = sig_hndlr_none;

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -49,16 +49,20 @@ GBLREF	struct sigaction	orig_sig_action[];
  */
 void jobinterrupt_event(int sig, siginfo_t *info, void *context)
 {
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_jobinterrupt_event, sig, IS_EXI_SIGNAL_FALSE, info, context);
+	if (!USING_ALTERNATE_SIGHANDLING)
+	{
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_jobinterrupt_event, sig, IS_EXI_SIGNAL_FALSE, info, context);
+	}
 	/* Note the (presently unused) args are to match signature for signal handlers in Unix */
 	if (!dollar_zininterrupt)
 		(void)xfer_set_handlers(outofband_event, &jobinterrupt_set, 0, FALSE);
 	/* If we are in SIMPLEAPI mode and the original handler was neither SIG_DFL or SIG_IGN, drive the originally
 	 * defined handler before we replaced them.
 	 */
-#	ifdef SIGNAL_PASSTHRU
-	DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("jobinterrupt_event", sig, info, context, FALSE);
-#	endif
+	if (!USING_ALTERNATE_SIGHANDLING)
+	{
+		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("jobinterrupt_event", sig, info, context, FALSE);
+	}
 }
 
 /* Call back routine from xfer_set_handlers to complete outofband setup */

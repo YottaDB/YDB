@@ -53,6 +53,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "ZYSQLNULLNOTVALID", "$ZYSQLNULL cannot be used as an integer, numeric, gvn subscript/value or lock subscript", 0 },
 	{ "BOOLEXPRTOODEEP", "Boolean expression depth exceeds maximum supported limit of 2047", 0 },
 	{ "TPCALLBACKINVRETVAL", "Invalid return type for TP callback function", 0 },
+	{ "INVMAINLANG", "Invalid main routine language id specified: !UL", 1 },
 };
 
 
@@ -65,7 +66,7 @@ GBLDEF	err_ctl ydberrors_ctl = {
 	256,
 	"YDB",
 	&ydberrors[0],
-	36,
+	37,
 	&ydberrors_undocarr[0],
 	0
 };

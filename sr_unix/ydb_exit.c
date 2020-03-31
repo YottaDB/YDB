@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,8 +43,7 @@ GBLREF	int			mumps_status;
 GBLREF	struct sigaction	orig_sig_action[];
 GBLREF	boolean_t		simpleThreadAPI_active;
 GBLREF	uint4			dollar_tlevel;
-GBLREF	stack_t			oldaltstack;
-GBLREF	char			*altstackptr;
+GBLREF	int4			exi_condition;
 #ifdef DEBUG
 GBLREF	pthread_t		ydb_stm_worker_thread_id;
 #endif
@@ -53,7 +52,7 @@ OS_PAGE_SIZE_DECLARE
 /* Routine exposed to call-in user to exit from active YottaDB environment */
 int ydb_exit()
 {
-	int			status, sig, save_errno;
+	int			status, sig, save_errno, rc;
 	pthread_t		thisThread, threadid;
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;
@@ -70,7 +69,7 @@ int ydb_exit()
 		 * function (since "ydb_exit" does not have a "tptoken" parameter). In this case, the thread executing the
 		 * 2nd level TP callback function is the one holding the current YottaDB engine multi-thread lock and so
 		 * the thread invoking "ydb_exit" from the 1st level TP callback function should not be allowed to fall
-		 * through to the below code where the THREADED_API_YDB_ENGINE_LOCK macro call would deadlock. Hence return
+		 * through to the below code where the threaded_api_ydb_engine_lock macro call would deadlock. Hence return
 		 * an error in this case. Reuse a pre-existing error that does not allow "ydb_exit" to be called in the
 		 * middle of call-ins. Since we do not necessarily hold the YottaDB engine multi-thread lock at this point,
 		 * we cannot do any ESTABLISH_RET/rts_error_csa etc. calls. Hence just the return of an error code
@@ -79,21 +78,23 @@ int ydb_exit()
 		 */
 		return ERR_INVYDBEXIT;
 	}
-	THREADED_API_YDB_ENGINE_LOCK(YDB_NOTTP, NULL, LYDB_RTN_NONE, save_active_stapi_rtn, save_errstr, get_lock, status);
+	threaded_api_ydb_engine_lock(YDB_NOTTP, NULL, LYDB_RTN_NONE, &save_active_stapi_rtn, &save_errstr, &get_lock, &status);
 	if (0 != status)
 	{
 		assert(0 < status);	/* i.e. can only be a system error, not a YDB_ERR_* error code */
 		return status;		/* Lock failed - no condition handler yet so just return the error code */
 	}
 	if (!ydb_init_complete)
-	{	/* "ydb_init_complete" was TRUE before we got the "THREADED_API_YDB_ENGINE_LOCK" lock but became FALSE
+	{	/* "ydb_init_complete" was TRUE before we got the "threaded_api_ydb_engine_lock" lock but became FALSE
 		 * afterwards. This implies some other concurrent thread did the "ydb_exit" so we can return from this
 		 * "ydb_exit" call without doing anything more.
 		 */
+		DBGSIGHND((stderr, "ydb_exit(): ydb_exit() entered -- nothing to do\n"));
 	} else
 	{
+		DBGSIGHND((stderr, "ydb_exit(): ydb_exit() entered -- engine shutdown commencing\n"));
 		/* If this is a SimpleThreadAPI environment and we hold the YottaDB engine multi-thread mutex lock (obtained
-		 * above in the THREADED_API_YDB_ENGINE_LOCK call). So we can proceed with exit handling. We are also
+		 * above in the threaded_api_ydb_engine_lock call). So we can proceed with exit handling. We are also
 		 * guaranteed this thread is not the MAIN worker thread (asserted below).
 		 */
 		assert(!simpleThreadAPI_active
@@ -103,7 +104,7 @@ int ydb_exit()
 		{	/* "ydb_simpleapi_ch" encountered an error and transferred control back here.
 			 * Return after mutex lock cleanup.
 			 */
-			THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+			threaded_api_ydb_engine_unlock(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 			REVERT;
 			/* "ydb_exit" returns positive error code so return TREF(ydb_error_code) as is
 			 * (i.e. no negation for YDB_ERR_* like is common in other ydb_*_s() function calls)
@@ -143,34 +144,25 @@ int ydb_exit()
 			}
 		}
 		gtm_exit_handler(); /* rundown all open database resource */
-		if (NULL != altstackptr)
-		{	/* We allocated a (larger) alt stack - reinstall the old one */
-			status = sigaltstack(&oldaltstack, NULL);
-			if (0 == status)
-			{	/* If resetting the stack succeeded, then we can go ahead and unmap it, else we need to keep it */
-				status = munmap(altstackptr, YDB_ALTSTACK_SIZE + (OS_PAGE_SIZE * 2));
-				if (0 != status)
-				{
-					save_errno = errno;
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("munmap"),
-						      CALLFROM, save_errno);
-				}
-				altstackptr = NULL;
-			} else
-			{
-				save_errno = errno;
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("sigaltstack"),
-					      CALLFROM, save_errno);
-			}
-		}
+		/* Note - we used to restore the alternate stack (altstackptr) here to what was used before but this
+		 * caused issues when multiple threads were shutting down suddenly (like with a signal). In this
+		 * situation, this routine can run while other threads are still active. It is not predictably the
+		 * last thing to run. In this situation, restoring the old altsig handler did so while the previous
+		 * altstack was still in use in some thread causing a sig-11 when that thread came back and tried to
+		 * reference its now non-existent stack.
+		 */
 		REVERT;
 		/* Restore the signal handlers that were saved and overridden during ydb_init()->gtm_startup()->sig_init() */
-		for (sig = 1; sig <= NSIG; sig++)
-			sigaction(sig, &orig_sig_action[sig], NULL);
+		if (!USING_ALTERNATE_SIGHANDLING)
+		{	/* Only done if using "regular" signal handling (done by YDB instead of main language) */
+			for (sig = 1; sig <= NSIG; sig++)
+				sigaction(sig, &orig_sig_action[sig], NULL);
+		} else
+			sigaction(YDBSIGNOTIFY, &orig_sig_action[YDBSIGNOTIFY], NULL);	/* Restore one signal handler we used */
 		/* We might have opened one or more shlib handles using "dlopen". Do a "dlclose" of them now. */
 		dlopen_handle_array_close();
 		ydb_init_complete = FALSE;
 	}
-	THREADED_API_YDB_ENGINE_UNLOCK(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
+	threaded_api_ydb_engine_unlock(YDB_NOTTP, NULL, save_active_stapi_rtn, save_errstr, get_lock);
 	return YDB_OK;
 }

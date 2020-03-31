@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,8 +42,7 @@
 #define NOCONCEAL_OPTION "NO_CONCEAL"
 
 static readonly mval empty_str_mval = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, 0, 0, 0, 0);
-static readonly mval no_conceal_op  = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(NOCONCEAL_OPTION) - 1,
-							 NOCONCEAL_OPTION, 0, 0);
+static readonly mval no_conceal_op  = DEFINE_MVAL_LITERAL(MV_STR, 0, 0, SIZEOF(NOCONCEAL_OPTION) - 1, NOCONCEAL_OPTION, 0, 0);
 static unsigned char dumpable_error_dump_file_parms[2] = {iop_newversion, iop_eol};
 static unsigned char dumpable_error_dump_file_noparms[1] = {iop_eol};
 
@@ -77,7 +76,7 @@ void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spe
 	char			saved_util_outbuff[OUT_BUFF_SIZE];
 	int			rc, saved_util_outbuff_len;
 	char			save_dump_file_name_buff[YDB_PATH_MAX];
-	struct sigaction	new_action, prev_action;
+	struct sigaction	new_action, prev_action_sigbus, prev_action_sigsegv;
 	sigset_t		savemask;
 	DCL_THREADGBL_ACCESS;
 
@@ -103,6 +102,11 @@ void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spe
 	/* Block out timer calls that might trigger processing that could fail. We especially want to prevent
 	 * nesting of signal handlers since the longjump() function used by the UNWIND macro is undefined on
 	 * Tru64 when signal handlers are nested.
+	 *
+	 * Note we don't do any special handling here for alternate signal handling - first off, getting that to even work in this
+	 * confined area where we will ALWAYS hold the engine lock makes alternate signal handling unnecessarily complicated if
+	 * not impossible and secondly, this is a momentary reset of the handlers that is quickly undone so normal signal
+	 * handling returns.
 	 */
 	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 	/* Setup new signal handler to just drive condition handler which will do the right thing */
@@ -110,8 +114,8 @@ void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spe
 	sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = YDB_SIGACTION_FLAGS;
 	new_action.sa_sigaction = jobexam_signal_handler;
-	sigaction(SIGBUS, &new_action, &prev_action);
-	sigaction(SIGSEGV, &new_action, NULL);
+	sigaction(SIGBUS, &new_action, &prev_action_sigbus);
+	sigaction(SIGSEGV, &new_action, &prev_action_sigsegv);
 	*dump_file_spec = empty_str_mval;
 	dev_in_use = io_curr_device;		/* Save current IO device */
 	/* Save text in util_outbuff which can be detrimentally overwritten by ZSHOW.
@@ -163,8 +167,8 @@ void jobexam_process(mval *dump_file_name, mval *zshowcodes, mval *dump_file_spe
 		}
 	}
 	/* Restore the signal handlers how they were */
-	sigaction(SIGBUS, &prev_action, NULL);
-	sigaction(SIGSEGV, &prev_action, NULL);
+	sigaction(SIGBUS, &prev_action_sigbus, NULL);
+	sigaction(SIGSEGV, &prev_action_sigsegv, NULL);
 	/* Let the timers pop again.. */
 	SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 }

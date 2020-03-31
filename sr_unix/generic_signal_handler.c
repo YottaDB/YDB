@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -37,14 +37,14 @@
 #include "gtmimagename.h"
 #include "gt_timer.h"
 #include "send_msg.h"
-#include "generic_signal_handler.h"
 #include "sig_init.h"
+#include "generic_signal_handler.h"
 #include "gtmmsg.h"
 #include "io.h"
 #include "gtmio.h"
 #include "have_crit.h"
 #include "util.h"
-// For gd_region
+/* For gd_region */
 #include "gdsroot.h"
 #include "gdsbt.h"
 #include "gdsblk.h"
@@ -52,6 +52,7 @@
 #include "libyottadb_int.h"
 #include "invocation_mode.h"
 #include "gtm_exit_handler.h"
+#include "sighnd_debug.h"
 
 #define	DEFER_EXIT_PROCESSING	((EXIT_PENDING_TOLERANT >= exit_state)			\
 				 && (exit_handler_active || multi_thread_in_use		\
@@ -66,6 +67,7 @@
 }
 
 GBLREF	int4			forced_exit_err;
+GBLREF	int4			forced_exit_sig;
 GBLREF	int4			exi_condition;
 GBLREF	boolean_t		dont_want_core;
 GBLREF	boolean_t		created_core;
@@ -88,6 +90,7 @@ GBLREF	gd_region		*gv_cur_region;
 GBLREF	boolean_t		blocksig_initialized;
 GBLREF	struct sigaction	orig_sig_action[];
 GBLREF	sigset_t		blockalrm;
+GBLREF	GPCallback		go_panic_callback;
 #ifdef DEBUG
 GBLREF	boolean_t		in_nondeferrable_signal_handler;
 #endif
@@ -101,6 +104,10 @@ LITREF	gtmImageName		gtmImageNames[];
  *	(a) by the OS
  *	(b) by a "pthread_kill" in the FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED macro or
  *	(c) by a "pthread_kill" from the MAIN worker thread ("ydb_stm_thread")
+ *
+ * Note that when using alternate signal handling (currently, only with the Go wrapper), this mechanism is
+ * still active but it is "harder" to get it to happen because each succeeding signal must be "noticed" as
+ * pending before this handler gets driven.
  */
 STATICDEF	boolean_t	non_forwarded_sig_seen[EXIT_IMMED + 1];
 
@@ -139,12 +146,14 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	void			(*signal_routine)();
 	int			rc;
 	sigset_t		savemask;
+	boolean_t		using_alternate_sighandling;
 #	ifdef DEBUG
 	boolean_t		save_in_nondeferrable_signal_handler;
 #	endif
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+	using_alternate_sighandling = USING_ALTERNATE_SIGHANDLING;	/* Simpler local version */
 	/* Check for rethrown signal before we check forwarding. When deferred_exit_handler() processes a deferred
 	 * signal, some non-M languages (specifically Golang, perhaps others) rethrow the signal so it comes through
 	 * here twice. Since we run the exit handler logic just prior to invoking non-YDB signal handlers that were
@@ -153,29 +162,45 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	 */
 	if (exit_handler_complete)
 	{
-		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, TRUE);
-		UNDERSCORE_EXIT(sig);
+		if (!using_alternate_sighandling)	/* Go does not send us signals so no need to forward */
+		{
+			DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, TRUE);
+			UNDERSCORE_EXIT(sig);
+		}
+		return;		/* Nothing we can do if exit handler has run */
 	}
-	signal_forwarded = IS_SIGNAL_FORWARDED(sig_hndlr_generic_signal_handler, sig, info);
-	/* Note down whether signal is forwarded or not */
-	if (!signal_forwarded)
+	if (!using_alternate_sighandling)
 	{
+		signal_forwarded = IS_SIGNAL_FORWARDED(sig_hndlr_generic_signal_handler, sig, info);
+		/* Note down whether signal is forwarded or not */
+		if (!signal_forwarded)
+		{
+			assert(EXIT_IMMED >= exit_state);
+			assert(!non_forwarded_sig_seen[exit_state]);
+			non_forwarded_sig_seen[exit_state] = TRUE;
+		}
+		FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_generic_signal_handler, sig, IS_EXI_SIGNAL_TRUE, info, context);
+		/* It is possible that the exit handler has been started but not finished when we get a signal. Check that here. If
+		 * true, we just ignore it letting the earlier signal finish its processing.
+		 */
+		if (exit_handler_active && signal_forwarded && (sig == exi_condition))
+		{       /* a) exit_handler_active is TRUE but exit_handler_complete is FALSE implies we are inside but have not
+			 *    completed the exit handler record at (*exit_handler_fptr).
+			 * b) signal_forwarded implies this is a forwarded signal.
+			 * c) sig == exi_condition implies we already are exiting because of this very same signal.
+			 * In this case, we let the original exit handler invocation continue by returning from this right away.
+			 */
+			return;
+		}
+	} else
+	{	/* Note signals are never considered "forwarded" in alterate sighandling mode - at least in the sense of the
+		 * the code when the regular "C" signal handling is in effect. Alternate signal handling is where YDB is
+		 * "notified" of signals having occurred so have no need to be "forwarded" to different threads.
+		 */
+		signal_forwarded = FALSE;
 		assert(EXIT_IMMED >= exit_state);
 		assert(!non_forwarded_sig_seen[exit_state]);
 		non_forwarded_sig_seen[exit_state] = TRUE;
-	}
-	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_generic_signal_handler, sig, IS_EXI_SIGNAL_TRUE, info, context);
-	/* It is possible that the exit handler has been started but not finished when we get a signal. Check that here. If
-	 * true, we just ignore it letting the earlier signal finish its processing.
-	 */
-	if (exit_handler_active && signal_forwarded && (sig == exi_condition))
-	{       /* a) exit_handler_active is TRUE but exit_handler_complete is FALSE implies we are inside but have not
-		 *    completed the exit handler record at (*exit_handler_fptr).
-		 * b) signal_forwarded implies this is a forwarded signal.
-		 * c) sig == exi_condition implies we already are exiting because of this very same signal.
-		 * In this case, we let the original exit handler invocation continue by returning from this right away.
-		 */
-		return;
 	}
 	assert(!thread_block_sigsent || blocksig_initialized);
 	/* If "thread_block_sigsent" is TRUE, it means the threads do not want the master thread to honor external signals
@@ -235,7 +260,7 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 				 */
 				if (DEFER_EXIT_PROCESSING)
 				{
-					SET_FORCED_EXIT_STATE;
+					SET_FORCED_EXIT_STATE(sig);
 					/* Before bumping "exit_state" or sending a ERR_FORCEDHALT message to syslog/console,
 					 * make sure we have not sent the same message already.
 					 */
@@ -291,7 +316,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 			/* If nothing pending AND we have crit or already in exit processing, wait to invoke shutdown */
 			if (DEFER_EXIT_PROCESSING)
 			{
-				SET_FORCED_EXIT_STATE;
+				SET_FORCED_EXIT_STATE(sig);
+				forced_exit_sig = sig;
 				/* Avoid duplicate bump of "exit_state" */
 				if (non_forwarded_sig_seen[exit_state])
 					exit_state++;		/* Make exit pending, may still be tolerant though */
@@ -341,9 +367,13 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 					forced_exit_err = ERR_KILLBYSIGUINFO;
 					/* If nothing pending AND we have crit or already exiting, wait to invoke shutdown */
 					if (DEFER_EXIT_PROCESSING)
-					{
+					{	/* Note: since Go, using alternate signal handling, does not provide information
+						 * about the signal, we cannot be here since we cannot identify a "sent" signal.
+						 * Assert this.
+						 */
+						assert(!using_alternate_sighandling);
 						assert(!IS_GTMSECSHR_IMAGE);
-						SET_FORCED_EXIT_STATE;
+						SET_FORCED_EXIT_STATE(sig);
 						if (non_forwarded_sig_seen[exit_state])
 							exit_state++;	/* Make exit pending, may still be tolerant though */
 						need_core = TRUE;
@@ -450,10 +480,23 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	 * specifically), may rethrow this signal which causes an assert failure. To mitigate this problem, we invoke the
 	 * exit handler logic NOW before we give the main program's handler control and if we get the same signal again
 	 * after the exit handler cleanup has run, we just pass it straight to the main's handler and do not process it
-	 * again. (Also done in deferred_exit_handler()).
+	 * again. (Also done in deferred_exit_handler()). If this process is using alternate signal handling, we'll return
+	 * to the engine but further calls into the runtime will be prohibited because of the exit handler shutting things
+	 * down.
 	 */
 	DRIVE_EXIT_HANDLER_IF_EXISTS;
-	DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, TRUE);
+	if (!using_alternate_sighandling)
+	{
+		DRIVE_NON_YDB_SIGNAL_HANDLER_IF_ANY("generic_signal_handler", sig, info, context, TRUE);
+	} else
+	{	/* The main() entry point of this process is not YottaDB but is something else that is using alternate signal
+		 * handling (currently only Go is supported). For Go, we cannot EXIT here. We need to drive a panic() to
+		 * unwind everything now that YottaDB state information has been cleaned up (by the exit handler). For Go,
+		 * drive a callback routine to do the panic() for us given the signal that caused this state.
+		 */
+		DRIVE_ALTSIG_CALLBACK(sig);
+		return;		/* The above should not return so this is for the compiler */
+	}
 	assert((EXIT_IMMED <= exit_state) || !exit_handler_active);
 	EXIT(-exi_condition);
 }

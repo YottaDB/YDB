@@ -3,7 +3,7 @@
  * Copyright (c) 2015 Fidelity National Information 		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,11 +30,12 @@
 #define SIGPROCMASK(FUNC, NEWSET, OLDSET, RC)							\
 MBSTART {											\
 	GBLREF	boolean_t	multi_thread_in_use;						\
+	GBLREF	boolean_t	simpleThreadAPI_active;						\
 												\
 	char	*rname;										\
 												\
 	/* Use the right system call based on threads are in use or not */			\
-	if (!INSIDE_THREADED_CODE(rname))							\
+	if (!INSIDE_THREADED_CODE(rname) && !simpleThreadAPI_active)				\
 		RC = sigprocmask(FUNC, NEWSET, OLDSET);	/* BYPASSOK(sigprocmask) */		\
 	else											\
 		RC = pthread_sigmask(FUNC, NEWSET, OLDSET);					\

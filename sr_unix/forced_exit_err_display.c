@@ -3,6 +3,9 @@
  * Copyright (c) 2016 Fidelity National Information		*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -20,7 +23,7 @@
 #include "gtmimagename.h"
 #include "forced_exit_err_display.h"
 
-GBLREF	int			forced_exit_err;
+GBLREF	int4			forced_exit_err;
 GBLREF	gtmsiginfo_t		signal_info;
 GBLREF	enum gtmImageTypes	image_type;
 GBLREF	uint4			process_id;

@@ -16,8 +16,16 @@
 #ifndef HAVE_CRIT_H_INCLUDED
 #define HAVE_CRIT_H_INCLUDED
 
-#include <signal.h>				/* needed for VSIG_ATOMIC_T */
-#include <deferred_exit_handler.h>
+#include "gtm_signal.h"				/* needed for VSIG_ATOMIC_T */
+
+#include "deferred_exit_handler.h"
+#ifdef DEBUG
+#include "wbox_test_init.h"
+#endif
+#include "gt_timer.h"
+#include "gtm_multi_thread.h"
+#include "gtm_multi_proc.h"
+#include "gtmsiginfo.h"
 
 /* states of CRIT passed as argument to have_crit() */
 #define CRIT_HAVE_ANY_REG	0x00000001
@@ -26,14 +34,6 @@
 #define CRIT_RELEASE		0x00000008
 #define CRIT_ALL_REGIONS	0x00000010
 #define	CRIT_IN_WTSTART		0x00000020	/* check if csa->in_wtstart is true */
-
-#ifdef DEBUG
-#include "wbox_test_init.h"
-#endif
-#include "gt_timer.h"
-#include "gtm_multi_thread.h"
-#include "gtm_multi_proc.h"
-#include "gtmsiginfo.h"
 
 typedef enum
 {
@@ -92,6 +92,9 @@ GBLREF	intrpt_state_t	intrpt_ok_state;
 
 GBLREF	uint4		deferred_signal_handling_needed; /* a bitmask of the below DEFERRED_SIGNAL_HANDLING_NEEDED_* macros */
 
+/* Can't include sig_init.h until the interrupt definitions above were done. This included needed to define sig_pending type */
+#include "sig_init.h"
+
 #define	DEFERRED_SIGNAL_HANDLING_TIMERS	(1 << 0)	/* Bit in "deferred_signal_handling_neeed" global variable that
 							 * indicates whether deferred timer(s) needs to be handled
 							 * upon leaving deferred zone.
@@ -138,19 +141,23 @@ GBLREF	volatile int4	gtmMallocDepth;
  * the current deferred window. Since we do not want forced_exit state to ever regress, and there might be several signals delivered
  * within the same deferred window, assert that forced_exit is either 0 or 1 before setting it to 1.
  */
-#define SET_FORCED_EXIT_STATE									\
+#define SET_FORCED_EXIT_STATE(SIG)								\
 {												\
 	char			*rname;								\
 	GBLREF VSIG_ATOMIC_T	forced_exit;							\
+	GBLREF int		forced_exit_sig;						\
 												\
-	/* Below code is not thread safe as it modifies global variable "forced_exit" */	\
+	/* Below code is not thread safe as it modifies global variables "forced_exit"		\
+	 * and "forced_exit_sig".								\
+	 */											\
 	assert(!INSIDE_THREADED_CODE(rname));							\
 	assert((0 == forced_exit) || (1 == forced_exit));					\
 	forced_exit = 1;									\
+	forced_exit_sig = SIG;		/* Record the signal forcing us to exit */		\
 	/* Whenever "forced_exit" gets set to 1, set the corresponding deferred event too */	\
 	SET_DEFERRED_EXIT_CHECK_NEEDED;								\
-	SET_FORCED_THREAD_EXIT; /* Signal any running threads to stop */			\
-	SET_FORCED_MULTI_PROC_EXIT; /* Signal any parallel processes to stop */			\
+	SET_FORCED_THREAD_EXIT; 	/* Signal any running threads to stop */		\
+	SET_FORCED_MULTI_PROC_EXIT; 	/* Signal any parallel processes to stop */		\
 }
 
 /* Set the value of forced_exit to 2. This should indicate that we are already in the exit processing, and do not want to handle any
@@ -199,10 +206,10 @@ MBSTART {												\
  */
 #define	DEFERRED_SIGNAL_HANDLING_CHECK_TRIMMED								\
 MBSTART {												\
-	DEBUG_ONLY(char		*rname;)								\
+	DEBUG_ONLY(char				*rname;)						\
 													\
-	GBLREF	int		process_exiting;							\
-	GBLREF	VSIG_ATOMIC_T	forced_exit;								\
+	GBLREF	int				process_exiting;					\
+	GBLREF	VSIG_ATOMIC_T			forced_exit;						\
 													\
 	/* The forced_exit state of 2 indicates that the exit is already in progress, so we do not	\
 	 * need to process any deferred events. Note if threads are running, check if forced_exit is	\
@@ -220,6 +227,7 @@ MBSTART {												\
 	assert((1 != forced_exit) || GET_DEFERRED_EXIT_CHECK_NEEDED);					\
 	if (deferred_signal_handling_needed)								\
 		deferred_signal_handler();								\
+	PROCESS_PENDING_ALTERNATE_SIGNALS;								\
 } MBEND
 
 GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => not in use */

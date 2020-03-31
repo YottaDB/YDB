@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -255,7 +255,10 @@ void gtm_startup(struct startup_vector *svec)
 		{	/* SimpleAPI/Call-in invocation of YDB. Ctrl-C should terminate the process.
 			 * Treat it like SIGTERM by using "generic_signal_handler" for SIGINT (Ctrl-C) too.
 			 */
-			sig_init(generic_signal_handler, generic_signal_handler, suspsigs_handler, continue_handler);
+			if (USING_ALTERNATE_SIGHANDLING)
+				sig_init_lang_altmain();
+			else
+				sig_init(generic_signal_handler, generic_signal_handler, suspsigs_handler, continue_handler);
 		}
 	}
 	io_init(IS_MUPIP_IMAGE);		/* starts with nocenable for GT.M runtime, enabled for MUPIP */

@@ -857,8 +857,8 @@ CONDITION_HANDLER(mdb_condition_handler)
 			assert(NULL != frame_pointer->restart_pc);
 			assert((!(SFF_INDCE & frame_pointer->flags)) || (frame_pointer->restart_ctxt == frame_pointer->ctxt));
 			DBGEHND((stderr, "mdb_condition_handler(5): Resetting frame 0x"lvaddr" mpc/context with restart_pc/ctxt "
-			"0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, frame_pointer->restart_pc,
-			frame_pointer->restart_ctxt, frame_pointer->type));
+				 "0x"lvaddr"/0x"lvaddr" - frame has type 0x%04lx\n", frame_pointer, frame_pointer->restart_pc,
+				 frame_pointer->restart_ctxt, frame_pointer->type));
 			frame_pointer->mpc = frame_pointer->restart_pc;
 			frame_pointer->ctxt = frame_pointer->restart_ctxt;
 			assert(!dollar_zininterrupt);

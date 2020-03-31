@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,9 @@ void ctrlc_handler(int sig, siginfo_t *info, void *context)
 	int4    ob_char;
 	int	save_errno;
 
+	/* Note we don't need to bypass this like in other handlers because this handler is not in use when using
+	 * simple[Threaded]API.
+	 */
 	FORWARD_SIG_TO_MAIN_THREAD_IF_NEEDED(sig_hndlr_ctrlc_handler, sig, IS_EXI_SIGNAL_FALSE, info, context);
 	assert(SIGINT == sig);
 	assert(!(MUMPS_CALLIN & invocation_mode));

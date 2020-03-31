@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,7 +42,7 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK((int), errstr);
 	VERIFY_THREADED_API((int), errstr);
-	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_TP, save_active_stapi_rtn, save_errstr, get_lock, retval);
+	threaded_api_ydb_engine_lock(tptoken, errstr, LYDB_RTN_TP, &save_active_stapi_rtn, &save_errstr, &get_lock, &retval);
 	if (YDB_OK != retval)
 		return retval;
 	for ( ; ;) /* for loop only there to let us break from various cases without having a deep if-then-else structure */
@@ -183,7 +183,7 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 		}
 		break;
 	}
-	THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
+	threaded_api_ydb_engine_unlock(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
 	assert((YDB_NOTTP != tptoken) || (YDB_TP_RESTART != retval));
-	return (int)retval;
+	return retval;
 }

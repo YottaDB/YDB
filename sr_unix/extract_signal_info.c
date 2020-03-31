@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -21,7 +21,6 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
-
 #include <sys/types.h>
 #ifndef __MVS__
 #  include <sys/param.h>
@@ -30,15 +29,11 @@
 #include "gtm_stdlib.h"
 #include "gtm_stdio.h"
 #include "gtm_unistd.h"
-
-#if defined(__ia64) && defined(__hpux)
-#include <sys/uc_access.h>
-#include <machine/sys/reg_struct.h>
-#endif /* __ia64 */
-
 #include "gtm_signal.h"
 
 #include "gtmsiginfo.h"
+#include "sig_init.h"
+#include "libyottadb.h"
 
 /* GCC on HPPA does not have SI_USER defined */
 #if !defined(SI_USER) && defined(__GNUC__)
@@ -76,7 +71,8 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
 {
 	memset(gtmsi, 0, SIZEOF(*gtmsi));
 	gtmsi->signal = sig;
-	if (NULL != info)
+	/* Note if using Go (only alternate signal handling user), there is no siginfo or context information */
+	if ((NULL != info) && !USING_ALTERNATE_SIGHANDLING)
 	{
 		switch(info->si_code)
 		{

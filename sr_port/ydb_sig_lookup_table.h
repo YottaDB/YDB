@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,7 +39,7 @@ YDBSIGNAL("SIGPROF",	SIGPROF)	/* 27 */
 YDBSIGNAL("SIGPWR",	SIGPWR)		/* 30 */
 YDBSIGNAL("SIGQUIT",	SIGQUIT)	/* 3 */
 YDBSIGNAL("SIGSEGV",	SIGSEGV)	/* 11 */
-YDBSIGNAL("SIGSTKFLT",	SIGSTKFLT)	/* 16 */
+YDBSIGNAL("SIGSTKFLT",	SIGSTKFLT)	/* 16 (obsolete) */
 YDBSIGNAL("SIGSTOP",	SIGSTOP)	/* 19 */
 YDBSIGNAL("SIGSYS",	SIGSYS)		/* 31 */
 YDBSIGNAL("SIGTERM",	SIGTERM)	/* 15 */

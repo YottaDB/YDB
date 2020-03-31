@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -60,10 +60,18 @@ void extract_signal_info(int sig, siginfo_t *info, gtm_sigcontext_t *context, gt
  * request of Roger 4/2000]. If one of the terminal signals is received (i.e. not
  * sent by another user, we will go to the immediate exit state.
  */
+enum
+{
+	EXIT_NOTPENDING,	/* 0 */
+	EXIT_PENDING_TOLERANT,	/* 1 */
+	EXIT_PENDING,		/* 2 */
+	EXIT_IMMED		/* 3 */
+};
 
-#define EXIT_NOTPENDING		0
-#define EXIT_PENDING_TOLERANT	1
-#define EXIT_PENDING		2
-#define EXIT_IMMED		3
+/* Macro to check if a signal was deferred (used by ydb_altmain_sighandler() to tell ydb_sig_dispatch()
+ * where a signal was deferred or not). The two EXIT_PENDING* states indicate that a signal was
+ * deferred after calling generic_signal_handler().
+ */
+#define IS_SIGNAL_DEFERRED ((EXIT_PENDING_TOLERANT == exit_state) || (EXIT_PENDING == exit_state))
 
 #endif /* ifndef GTM_SIGNAL_INFO_H */

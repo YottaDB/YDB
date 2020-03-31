@@ -21,26 +21,26 @@ GBLREF	boolean_t	caller_func_is_stapi;
  * of most of that currently but also the check in LIBYOTTADB_INIT*() macro will happen in ydb_timer_cancel() still
  * so no need for it here. The one exception to this is that we need to make sure the run time is alive.
  *
- * Parms and return - same as ydb_delete_s() except for the addition of tptoken and errstr.
+ * Parms and return - same as ydb_timer_cancel() except for the addition of tptoken and errstr.
  */
 void ydb_timer_cancel_t(uint64_t tptoken, ydb_buffer_t *errstr, intptr_t timer_id)
 {
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;
 	boolean_t		get_lock;
-	intptr_t		retval;
+	int			retval;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
 	LIBYOTTADB_RUNTIME_CHECK_NORETVAL(errstr);
 	VERIFY_THREADED_API_NORETVAL(errstr);
-	THREADED_API_YDB_ENGINE_LOCK(tptoken, errstr, LYDB_RTN_TIMER_CANCEL,
-					save_active_stapi_rtn, save_errstr, get_lock, retval);
+	threaded_api_ydb_engine_lock(tptoken, errstr, LYDB_RTN_TIMER_CANCEL, &save_active_stapi_rtn, &save_errstr, &get_lock,
+				     &retval);
 	if (YDB_OK == retval)
 	{
 		caller_func_is_stapi = TRUE;	/* used to inform below SimpleAPI call that caller is SimpleThreadAPI */
 		(void)ydb_timer_cancel(timer_id);
-		THREADED_API_YDB_ENGINE_UNLOCK(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
+		threaded_api_ydb_engine_unlock(tptoken, errstr, save_active_stapi_rtn, save_errstr, get_lock);
 	}
 	return;
 }
