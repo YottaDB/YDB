@@ -612,7 +612,7 @@ else
 			yottadb_download_url="https://gitlab.com/YottaDB/DB/YDB${fullfilename}"
 			break					# Now that we found one tarball, stop looking at other choices
 		done
-		if [ $yottadb_download_url = "" ]; then echo Unable to find YottaDB tarball for ${ydb_version} $platform $arch ; err_exit; fi
+		if [ "$yottadb_download_url" = "" ]; then echo Unable to find YottaDB tarball for ${ydb_version} $platform $arch ; err_exit; fi
                 wget $wget_flags $gtm_tmpdir $yottadb_download_url
                 if [ ! -f ${gtm_tmpdir}/${ydb_filename} ]; then echo Unable to download YottaDB distribution $ydb_filename ; err_exit; fi
             else echo Error during wget of YottaDB distribution file ${ydb_distrib}/${ydb_filename} ; err_exit
