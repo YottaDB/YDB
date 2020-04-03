@@ -466,8 +466,8 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 			ui82mval(dst, i8val);
 			DBG_VALIDATE_MVAL(dst);
 		} else	/* Invalid input and output CHSET combination DEC,DEC or HEX,HEX */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVZCONVERT, 6, RTS_ERROR_LITERAL("$ZCO[nvert] in M mode."),
-				      ichset->str.len, ichset->str.addr, ochset->str.len, ochset->str.addr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVZCONVERT, 4,
+				ichset->str.len, ichset->str.addr, ochset->str.len, ochset->str.addr);
 	} else if (gtm_utf8_mode)
 	{	/* UTF Family of input */
 		/* The only supported names are: "UTF-8", "UTF-16", "UTF-16LE" and "UTF-16BE */
@@ -482,6 +482,6 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 		DBG_VALIDATE_MVAL(dst);
 	} else	/* In a NON-UTF mode UTF Family of CHSET is used */
 		/* Report error as the input and output categories are not supported in this context */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVZCONVERT, 6, RTS_ERROR_LITERAL("$ZCO[nvert] in M mode."),
-			      ichset->str.len, ichset->str.addr, ochset->str.len, ochset->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVZCONVERT, 4,
+			ichset->str.len, ichset->str.addr, ochset->str.len, ochset->str.addr);
 }
