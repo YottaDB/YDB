@@ -265,19 +265,19 @@ static inline char* get_val(conv_type *type, char *val, int sz, int *val_len, ch
 		 */
 		if ((MAX_DEC_LEN < *val_len) || ((MAX_DEC_LEN == *val_len) && (0 < STRNCMP_STR(val_ptr, MAX_POS, *val_len))))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVVALUE, 6, orig_sz, orig_val, RTS_ERROR_STRING(type_str),
-	                              RTS_ERROR_LITERAL("$ZCO[nvert]. Supports conversion of positive numbers only in the range '0 to 18446744073709551615'"));
+				RTS_ERROR_LITERAL("$ZCO[nvert]. Range is '0 to 18446744073709551615'"));
 	} else if (TYPE_DEC_NEG == *type)
 	{	/* Decimal Negative value range check. When value length is
 		 * 19 the check is required here as not all values are supported at this length
 		 */
 		if (((MAX_DEC_LEN - 1) < *val_len) || (((MAX_DEC_LEN - 1) == *val_len) && (0 < STRNCMP_STR(val_ptr, MAX_NEG, *val_len))))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVVALUE, 6, orig_sz, orig_val, RTS_ERROR_STRING(type_str),
-	                              RTS_ERROR_LITERAL("$ZCO[nvert]. Supports conversion of negative numbers only in the range '-9223372036854775808 to 0'"));
+				RTS_ERROR_LITERAL("$ZCO[nvert]. Range is '-9223372036854775808 to 0'"));
 	} else
 	{	/* Hexadecimal max number of digits supported for conversion */
         	if (MAX_HEX_LEN < *val_len)
                 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVVALUE, 6, orig_sz, orig_val, RTS_ERROR_STRING(type_str),
-                        	      RTS_ERROR_LITERAL("$ZCO[nvert]. Supports only hexadecimal value of length 16"));
+				RTS_ERROR_LITERAL("$ZCO[nvert]. Range is '0 to FFFFFFFFFFFFFFFF'"));
 	}
 	return val_ptr;
 }

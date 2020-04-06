@@ -61,7 +61,7 @@ THREADEDAPINOTALLOWED	<Process cannot switch to using threaded Simple API while 
 SIMPLEAPINOTALLOWED	<Process cannot switch to using Simple API while already using threaded Simple API>/error/fao=0
 STAPIFORKEXEC	<Calls to YottaDB are not supported after a fork() if threaded Simple API functions were in use in parent. Call exec() first>/error/fao=0
 INVVALUE	<!AD is invalid !AD value for !AD>/error/fao=6
-INVZCONVERT	<$ZCO[nvert] translation between !AD and !AD is not supported>/error/fao=4
+INVZCONVERT	<Translation between !AD and !AD is not supported>/error/fao=4
 ZYSQLNULLNOTVALID	<$ZYSQLNULL cannot be used as an integer, numeric, gvn subscript/value or lock subscript>/error/fao=0
 BOOLEXPRTOODEEP	<Boolean expression depth exceeds maximum supported limit of 2047>/error/fao=0
 !
