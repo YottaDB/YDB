@@ -44,6 +44,7 @@ error_def(ERR_TEXT);
 #define DH_TYPE_LEN 3
 #define MAX_POS "18446744073709551615"
 #define MAX_NEG "9223372036854775808"
+#define DEC_RANGE_ERR_STR "$ZCONVERT. Range is -" MAX_NEG " to " MAX_POS
 
 typedef enum
 {
@@ -265,19 +266,19 @@ static inline char* get_val(conv_type *type, char *val, int sz, int *val_len, ch
 		 */
 		if ((MAX_DEC_LEN < *val_len) || ((MAX_DEC_LEN == *val_len) && (0 < STRNCMP_STR(val_ptr, MAX_POS, *val_len))))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVVALUE, 6, orig_sz, orig_val, RTS_ERROR_STRING(type_str),
-				RTS_ERROR_LITERAL("$ZCO[nvert]. Range is '0 to 18446744073709551615'"));
+				RTS_ERROR_LITERAL(DEC_RANGE_ERR_STR));
 	} else if (TYPE_DEC_NEG == *type)
 	{	/* Decimal Negative value range check. When value length is
 		 * 19 the check is required here as not all values are supported at this length
 		 */
 		if (((MAX_DEC_LEN - 1) < *val_len) || (((MAX_DEC_LEN - 1) == *val_len) && (0 < STRNCMP_STR(val_ptr, MAX_NEG, *val_len))))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVVALUE, 6, orig_sz, orig_val, RTS_ERROR_STRING(type_str),
-				RTS_ERROR_LITERAL("$ZCO[nvert]. Range is '-9223372036854775808 to 0'"));
+				RTS_ERROR_LITERAL(DEC_RANGE_ERR_STR));
 	} else
 	{	/* Hexadecimal max number of digits supported for conversion */
         	if (MAX_HEX_LEN < *val_len)
                 	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_INVVALUE, 6, orig_sz, orig_val, RTS_ERROR_STRING(type_str),
-				RTS_ERROR_LITERAL("$ZCO[nvert]. Range is '0 to FFFFFFFFFFFFFFFF'"));
+				RTS_ERROR_LITERAL("$ZCONVERT. Range is 0 to FFFFFFFFFFFFFFFF"));
 	}
 	return val_ptr;
 }
