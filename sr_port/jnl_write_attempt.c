@@ -133,7 +133,7 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 			*lcnt = 1;	/* !!! this should be detected and limited by the caller !!! */
 			break;
 		}
-		if (*lcnt <= JNL_MAX_FLUSH_TRIES)
+		if (JNL_MAX_FLUSH_TRIES >= *lcnt)
 		{
 			wcs_sleep(*lcnt);
 			break;
@@ -162,7 +162,8 @@ static uint4 jnl_sub_write_attempt(jnl_private_control *jpc, unsigned int *lcnt,
 					&& COMPSWAP_UNLOCK(&jb->io_in_prog_latch, writer, LOCK_AVAILABLE))
 			{	/* We cleared the latch, so report it and restart the loop. */
 				BG_TRACE_PRO_ANY(csa, jnl_blocked_writer_lost);
-				jnl_send_oper(jpc, ERR_JNLQIOSALVAGE);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(5) ERR_JNLQIOSALVAGE, 3, DB_LEN_STR(jpc->region), writer);
+				jnl_send_oper(jpc, ERR_JNLFLUSH);
 				if (!was_crit && csa->now_crit)	/* csa->now_crit needed in case "grab_crit_immediate()" failed */
 					rel_crit(jpc->region);
 				*lcnt = 1;

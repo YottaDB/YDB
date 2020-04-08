@@ -1348,7 +1348,7 @@ LITDEF	err_msg merrors[] = {
 	{ "UNUSEDMSG1514", "SEQNUMSEARCHTIMEOUT nixed in r1.24 because it was unused starting GT.M V6.3-000", 0 },
 	{ "FTOKKEY", "FTOK key 0x!XL", 1 },
 	{ "SEMID", "Semaphore id !UL", 1 },
-	{ "JNLQIOSALVAGE", "Journal IO lock salvaged", 0 },
+	{ "JNLQIOSALVAGE", "Journal IO lock for database file !AD salvaged from dead process !UL", 3 },
 	{ "FAKENOSPCLEARED", "DEBUG: All fake ENOSPC flags were cleared !UL heartbeats ago", 1 },
 	{ "MMFILETOOLARGE", "Size of !AD region (!AD) is larger than maximum size supported for memory mapped I/O on this platform", 4 },
 	{ "BADZPEEKARG", "Missing, invalid or surplus !AD parameter for $ZPEEK()", 2 },

@@ -306,8 +306,9 @@ gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
 }
 # endif
 # define MMAP_FD(FD, SIZE, OFFSET, READ_ONLY)	mmap((caddr_t)NULL, SIZE, MM_PROT_FLAGS(READ_ONLY), GTM_MM_FLAGS, FD, OFFSET)
-# define MSYNC(BEGPTR, ENDPTR)			(BEGPTR ? DBG_ASSERT(BEGPTR < ENDPTR) msync(BEGPTR, (ENDPTR - BEGPTR), MS_SYNC)	\
-							: 0)
+# define MSYNC(BEGPTR, ENDPTR)		(BEGPTR											\
+						? (DBG_ASSERT(BEGPTR < ENDPTR) msync(BEGPTR, (ENDPTR - BEGPTR), MS_SYNC))	\
+						: 0)
 # define MM_PROT_FLAGS(READ_ONLY)		(READ_ONLY ? PROT_READ : (PROT_READ | PROT_WRITE))
 # define MM_BASE_ADDR(CSA) 			(sm_uc_ptr_t)CSA->db_addrs[0]
 # define SET_MM_BASE_ADDR(CSA, CSD)

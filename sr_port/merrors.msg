@@ -1514,7 +1514,7 @@ JNLFILRDOPN	<Error opening journal file !AD for read for database file !AD>/erro
 UNUSEDMSG1514	<SEQNUMSEARCHTIMEOUT nixed in r1.24 because it was unused starting GT.M V6.3-000>/error/fao=0!/ansi=0
 FTOKKEY		<FTOK key 0x!XL>/info/fao=1!/ansi=0
 SEMID		<Semaphore id !UL>/info/fao=1!/ansi=0
-JNLQIOSALVAGE	<Journal IO lock salvaged>/info/fao=0!/ansi=0
+JNLQIOSALVAGE	<Journal IO lock for database file !AD salvaged from dead process !UL>/info/fao=3!/ansi=0
 FAKENOSPCLEARED	<DEBUG: All fake ENOSPC flags were cleared !UL heartbeats ago>/info/fao=1!/ansi=0
 MMFILETOOLARGE	<Size of !AD region (!AD) is larger than maximum size supported for memory mapped I/O on this platform>/error/fao=4!/ansi=0
 BADZPEEKARG	<Missing, invalid or surplus !AD parameter for $ZPEEK()>/error/fao=2!/ansi=0
