@@ -3,6 +3,9 @@
  * Copyright (c) 2006-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *                                                              *
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidaries.	*
+ * All rights reserved.						*
+ * 								*
  *      This source code contains the intellectual property     *
  *      of its copyright holder(s), and is made available       *
  *      under a license.  If you do not know the terms of       *
@@ -28,8 +31,8 @@ error_def(ERR_COMMA);
  * For 2 argument $ZCONVERT, if 2nd argument is a literal, must be one of
  * "U", "L", or "T" (case independent) or else raise BADCASECODE error.
  * For 3 argument $ZCONVERT, if 2nd or 3rd arguments are literals, they
- * must be one of "UTF-8", "UTF-16LE", or "UTF-16BE" (case independent)
- * or else raise BADCHSET error.
+ * must be one of "DEC", "HEX", "UTF-8", "UTF-16", "UTF-16LE", or "UTF-16BE" (case independent)
+ * or else raise INVZCONVERT error.
  */
 int f_zconvert(oprtype *a, opctype op)
 {
@@ -67,7 +70,7 @@ int f_zconvert(oprtype *a, opctype op)
 		if (mode->operand[0].oprval.tref->opcode == OC_LIT &&
 		    0 >= verify_chset((tmpstr = &mode->operand[0].oprval.tref->operand[0].oprval.mlit->v.str)))
 		{
-			stx_error(ERR_BADCHSET, 2, tmpstr->len, tmpstr->addr);
+			stx_error(ERR_INVZCONVERT);
 			return FALSE;
 		}
 		advancewindow();
@@ -78,7 +81,7 @@ int f_zconvert(oprtype *a, opctype op)
 		if (mode2->operand[0].oprval.tref->opcode == OC_LIT &&
 		    0 >= verify_chset((tmpstr = &mode2->operand[0].oprval.tref->operand[0].oprval.mlit->v.str)))
 		{
-			stx_error(ERR_BADCHSET, 2, tmpstr->len, tmpstr->addr);
+			stx_error(ERR_INVZCONVERT);
 			return FALSE;
 		}
 	}

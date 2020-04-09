@@ -33,7 +33,6 @@ GBLREF	spdesc 		stringpool;
 GBLREF	casemap_t	casemaps[];
 
 error_def(ERR_BADCASECODE);
-error_def(ERR_BADCHSET);
 error_def(ERR_ICUERROR);
 error_def(ERR_MAXSTRLEN);
 error_def(ERR_INVFCN);
@@ -380,19 +379,25 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 	char 		*val_ptr;
 	unsigned char	*strpool_ptr, *str_pool;	/* Local stringpool pointers */
 	qw_num		i8val;
-	int		strpool_len, dstlen, len;
+	int		strpool_len, dstlen, len, chset1, chset2;
 	boolean_t	is_dh_type = FALSE;
 	conv_type	inp_type;
 
 	MV_FORCE_STR(src);
 	MV_FORCE_STR(ichset);
         MV_FORCE_STR(ochset);
-	fmode = verify_chset(&ichset->str);
-	if (0 > fmode)		/* Validating input CHSET */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, ichset->str.len, ichset->str.addr);
-	tmode = verify_chset(&ochset->str);
-	if (0 > tmode)		/* Validating output CHSET */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, ochset->str.len, ochset->str.addr);
+	/* Get the input and output CHSET index to chset_names table.
+	 * Index values equal to or less than 0 are not supported.
+	 */
+	chset1 = verify_chset(&ichset->str);
+	chset2 = verify_chset(&ochset->str);
+	if ((0 > chset1) || (0 > chset2))
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVZCONVERT);
+	else
+	{
+		fmode = chset1;
+		tmode = chset2;
+	}
 	/* Check if the input and output CHSET is of type DEC or HEX */
 	if (((CHSET_DEC == fmode) || (CHSET_HEX == fmode)) && ((CHSET_HEX == tmode) || (CHSET_DEC == tmode)))
 	{
@@ -467,15 +472,14 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 			ui82mval(dst, i8val);
 			DBG_VALIDATE_MVAL(dst);
 		} else	/* Invalid input and output CHSET combination DEC,DEC or HEX,HEX */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVZCONVERT, 4,
-				ichset->str.len, ichset->str.addr, ochset->str.len, ochset->str.addr);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVZCONVERT);
 	} else if (gtm_utf8_mode)
 	{	/* UTF Family of input */
 		/* The only supported names are: "UTF-8", "UTF-16", "UTF-16LE" and "UTF-16BE */
-		if (NULL == (from = get_chset_desc(&ichset->str)))	/* Warning: assignment */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, ichset->str.len, ichset->str.addr);
-		if (NULL == (to = get_chset_desc(&ochset->str)))	/* Warning: assignment */
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_BADCHSET, 2, ochset->str.len, ochset->str.addr);
+		from = get_chset_desc(&ichset->str);
+		to = get_chset_desc(&ochset->str);
+		if ((NULL == from) || (NULL == to))
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVZCONVERT);
 		dstlen = gtm_conv(from, to, &src->str, NULL, NULL);
 		assert(0 <= dstlen);	/* Should be positive and non-zero since args were validated above */
 		MV_INIT_STRING(dst, dstlen, stringpool.free);
@@ -483,6 +487,5 @@ void	op_fnzconvert3(mval *src, mval* ichset, mval* ochset, mval* dst)
 		DBG_VALIDATE_MVAL(dst);
 	} else	/* In a NON-UTF mode UTF Family of CHSET is used */
 		/* Report error as the input and output categories are not supported in this context */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_INVZCONVERT, 4,
-			ichset->str.len, ichset->str.addr, ochset->str.len, ochset->str.addr);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_INVZCONVERT);
 }

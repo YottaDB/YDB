@@ -49,7 +49,7 @@ LITDEF	err_msg ydberrors[] = {
 	{ "SIMPLEAPINOTALLOWED", "Process cannot switch to using Simple API while already using threaded Simple API", 0 },
 	{ "STAPIFORKEXEC", "Calls to YottaDB are not supported after a fork() if threaded Simple API functions were in use in parent. Call exec() first", 0 },
 	{ "INVVALUE", "!AD is invalid !AD value for !AD", 6 },
-	{ "INVZCONVERT", "Translation between !AD and !AD is not supported", 4 },
+	{ "INVZCONVERT", "Translation supported only between DEC/HEX OR between UTF-8/UTF-16/UTF-16LE/UTF-16BE", 0 },
 	{ "ZYSQLNULLNOTVALID", "$ZYSQLNULL cannot be used as an integer, numeric, gvn subscript/value or lock subscript", 0 },
 	{ "BOOLEXPRTOODEEP", "Boolean expression depth exceeds maximum supported limit of 2047", 0 },
 };
