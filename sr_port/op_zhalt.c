@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2017 Fidelity National Information	*
+ * Copyright (c) 2011-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -94,6 +94,6 @@ void op_zhalt(int4 retcode, boolean_t is_zhalt)
 	if (retcode && !is_zhalt)
 		EXIT(0); 			/* unless this is a op_dmode or dm_read exit */
 	create_fatal_error_zshow_dmp(MAKE_MSG_SEVERE(ERR_RESTRICTEDOP));
-	exi_condition = 0;
+	exi_condition = SIGQUIT;
 	stop_image_no_core();
 }

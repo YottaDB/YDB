@@ -83,6 +83,7 @@ GBLREF	block_id	gtm_tp_allocation_clue;	/* block# hint to start allocation for c
 GBLREF	boolean_t	gtm_stdxkill;		/* Use M Standard exclusive kill instead of historical GTM */
 GBLREF	boolean_t	ztrap_new;		/* Each time $ZTRAP is set it is automatically NEW'd */
 GBLREF	size_t		gtm_max_storalloc;	/* Used for testing: creates an allocation barrier */
+GBLREF	boolean_t	gtm_nofflf;		/* Used to control "write #" behavior ref GTM-9136 */
 
 void	gtm_env_init(void)
 {
@@ -418,6 +419,13 @@ void	gtm_env_init(void)
 		temp_gtm_strpllim = trans_numeric(&val, &is_defined, TRUE);
 		if (0 < temp_gtm_strpllim)
 			TREF(gtm_strpllim) = temp_gtm_strpllim;
+		/* gtm_nofflf for GTM-9136.  Default is FALSE */
+		val.addr = GTM_NOFFLF;
+		val.len = SIZEOF(GTM_NOFFLF) - 1;
+		ret = logical_truth_value(&val, FALSE, &is_defined);
+		if (is_defined)
+		        gtm_nofflf = ret;
+
 		/* Platform specific initializations */
 		gtm_env_init_sp();
 	}

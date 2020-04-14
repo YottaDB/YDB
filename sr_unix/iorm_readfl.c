@@ -16,7 +16,7 @@
 #include "gtm_fcntl.h"
 #include "gtm_string.h"
 #include "gtm_stdio.h"
-#include "gtm_unistd.h"
+#include "gtm_stdlib.h"
 
 #include "io.h"
 #include "iotimer.h"
@@ -30,30 +30,36 @@
 #include "min_max.h"
 #include "outofband.h"
 #include "mv_stent.h"
+#include "send_msg.h"
+#include "svnames.h"
+#include "op.h"
+#include "util.h"
+#include "gtmcrypt.h"
+#include "error.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #endif
-#include "gtmcrypt.h"
-#include "error.h"
 
-GBLREF	io_pair		io_curr_device;
+GBLREF	boolean_t       dollar_zininterrupt, gtm_utf8_mode, prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF	io_pair		io_curr_device, io_std_device;
+GBLREF	mval		dollar_zstatus;
+GBLREF	mv_stent      	*mv_chain;
 GBLREF	spdesc		stringpool;
 GBLREF	volatile bool	out_of_time;
-GBLREF  boolean_t       gtm_utf8_mode;
 GBLREF	volatile int4	outofband;
-GBLREF	mv_stent      	*mv_chain;
-GBLREF  boolean_t    	dollar_zininterrupt;
 #ifdef UTF8_SUPPORTED
-LITREF	UChar32		u32_line_term[];
-LITREF	mstr		chset_names[];
 GBLREF	UConverter	*chset_desc[];
+LITREF mstr            chset_names[];
+LITREF	UChar32		u32_line_term[];
 #endif
+
+error_def(ERR_DEVICEWRITEONLY);
 error_def(ERR_IOEOF);
+error_def(ERR_IOERROR);
+error_def(ERR_NOPRINCIO);
 error_def(ERR_SYSCALL);
 error_def(ERR_ZINTRECURSEIO);
-error_def(ERR_DEVICEWRITEONLY);
-error_def(ERR_IOERROR);
 
 #define fl_copy(a, b) (a > b ? b : a)
 
@@ -228,6 +234,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 		{
 			save_errno = errno;
 			SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ, not socket*/
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM, save_errno);
 		}
 		if (flags & O_NONBLOCK)
@@ -237,6 +244,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 			{
 				save_errno = errno;
 				SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+				ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
 					save_errno);
 			}
@@ -252,6 +260,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 		{
 			save_errno = errno;
 			SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ, not socket*/
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7, RTS_ERROR_LITERAL("lseek"),
 				      RTS_ERROR_LITERAL("iorm_readfl()"), CALLFROM, save_errno);
 		} else
@@ -280,6 +289,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				{
 					save_errno = errno;
 					SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+					ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, RTS_ERROR_LITERAL("fstat"),
 						      CALLFROM, save_errno);
 				}
@@ -296,6 +306,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 					{
 						save_errno = errno;
 						SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+						ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE); /* FALSE, FALSE: READ, not socket*/
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
 							      RTS_ERROR_LITERAL("lseek"), RTS_ERROR_LITERAL(
 								      "Error setting file pointer to beginning of file"),
@@ -307,6 +318,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 					{
 						save_errno = errno;
 						SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+						ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE); /* FALSE, FALSE: READ, not socket*/
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(9) ERR_IOERROR, 7,
 							      RTS_ERROR_LITERAL("lseek"), RTS_ERROR_LITERAL(
 								      "Error restoring file pointer"), CALLFROM, save_errno);
@@ -505,6 +517,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 			{
 				save_errno = errno;
 				SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+				ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ, not socket*/
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
 					save_errno);
 			}
@@ -513,6 +526,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 			{
 				save_errno = errno;
 				SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+				ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"), CALLFROM,
 					save_errno);
 			}
@@ -558,7 +572,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				}
 				/* if zeof is set in follow mode then ignore any previous zeof */
 				if (TRUE == io_ptr->dollar.zeof)
-					io_ptr->dollar.zeof = FALSE;
+					io_ptr->dollar.zeof = prin_in_dev_failure = FALSE;
 				do
 				{
 					/* in follow mode a read will return an EOF if no more bytes are available. */
@@ -739,7 +753,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				}
 				/* if zeof is set in follow mode then ignore any previous zeof */
 				if (TRUE == io_ptr->dollar.zeof)
-					io_ptr->dollar.zeof = FALSE;
+					io_ptr->dollar.zeof = prin_in_dev_failure = FALSE;
 			}
 			do
 			{
@@ -1187,7 +1201,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				}
 				/* if zeof is set in follow mode then ignore any previous zeof */
 				if (TRUE == io_ptr->dollar.zeof)
-					io_ptr->dollar.zeof = FALSE;
+					io_ptr->dollar.zeof = prin_in_dev_failure = FALSE;
 			}
 			do
 			{
@@ -1854,7 +1868,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 						if (out_of_time)
 							status = -2;
 						else
-							continue;		/* Ignore interrupt if not our wakeup */
+							continue;			/* Ignore interrupt if not our wakeup */
 					}
 					break;
 				}
@@ -1874,7 +1888,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 	if ((-1 == status) && (EINTR != real_errno))
 	{
 		v->str.len = 0;
-		v->str.addr = (char *)stringpool.free;		/* ensure valid address */
+		v->str.addr = (char *)stringpool.free;					/* ensure valid address */
 		if (EAGAIN != real_errno)
 		{	/* Cancel the timer before taking the error return */
 			if (timed && !out_of_time)
@@ -1882,6 +1896,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 			io_ptr->dollar.za = 9;
 			/* save error in $device */
 			SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, real_errno);
+			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ, not socket*/
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) real_errno);
 		}
 		ret = FALSE;
@@ -1897,6 +1912,7 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 				{
 					save_errno = errno;
 					SET_DOLLARDEVICE_ONECOMMA_STRERROR(io_ptr, save_errno);
+					ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE); /* FALSE, FALSE: READ, not socket*/
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5, LEN_AND_LIT("fcntl"),
 						      CALLFROM, save_errno);
 				}
@@ -1919,22 +1935,23 @@ int	iorm_readfl (mval *v, int4 width, int4 msec_timeout) /* timeout in milliseco
 		if (rm_ptr->follow)
 		{
 			if (TRUE == io_ptr->dollar.zeof)
-				io_ptr->dollar.zeof = FALSE; /* no EOF in follow mode */
+				io_ptr->dollar.zeof = prin_in_dev_failure = FALSE; /* no EOF in follow mode */
 			REVERT_GTMIO_CH(&io_curr_device, ch_set);
 			return FALSE;
 		}
 		/* on end of file set $za to 9 */
+		io_ptr->dollar.za = 9;
+		*dollarx_ptr = 0;
+		(*dollary_ptr)++;
 		if (WBTEST_ENABLED(WBTEST_DOLLARDEVICE_BUFFER))
 			SET_DOLLARDEVICE_ERRSTR(io_ptr, ONE_COMMA_DEV_DET_EOF_DOLLARDEVICE);
 		else
 			SET_DOLLARDEVICE_ERRSTR(io_ptr, ONE_COMMA_DEV_DET_EOF);
-		io_ptr->dollar.za = 9;
-		if ((TRUE == io_ptr->dollar.zeof) && (RM_READ == saved_lastop))
+		ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
+		if (!prin_dm_io && (TRUE == io_ptr->dollar.zeof) && (RM_READ == saved_lastop))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 		io_ptr->dollar.zeof = TRUE;
-		*dollarx_ptr = 0;
-		(*dollary_ptr)++;
-		if (io_ptr->error_handler.len > 0)
+		if (!prin_dm_io && (0 < io_ptr->error_handler.len))
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 		if ((pipe_zero_timeout || rm_ptr->fifo) && out_of_time)
 		{

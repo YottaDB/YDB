@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2014-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -19,6 +20,7 @@ int ceil_log2_64bit(gtm_uint64_t num)
 	int		ret;
 
 	assert(num);
+	STATIC_ANALYSIS_ONLY(if (0 == num) return 0); /* 4SCA: No caller can pass in zero */
 	num--;
 	ret = 0;
 	if (((gtm_uint64_t)1 << 32) <= num)
@@ -53,6 +55,7 @@ int ceil_log2_32bit(uint4 num)
 	int		ret;
 
 	assert(num);
+	STATIC_ANALYSIS_ONLY(if (0 == num) return 0); /* 4SCA: No caller can pass in zero */
 	num--;
 	ret = 0;
 	if ((1 << 16) <= num)

@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001 Sanchez Computer Associates, Inc.	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -14,6 +15,7 @@
 
 GBLREF boolean_t	created_core;
 GBLREF boolean_t	dont_want_core;
+GBLREF int4		exi_condition;
 
 CONDITION_HANDLER(terminate_ch)
 {

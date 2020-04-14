@@ -32,7 +32,7 @@ endif
 # This script needs root privileges to
 # - test install GT.M
 # - set file ownership to 40535
-set euser = `$gtm_dist/geteuid`
+set euser = `whoami`
 if ("$euser" != "root") then
 	echo "You must have root privileges to run kitstart"
 	exit -1

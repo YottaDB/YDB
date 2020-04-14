@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -57,21 +57,17 @@ GBLDEF	char			facility[MAX_INSTNAME_LEN + 100];
 GBLDEF	boolean_t		util_out_print_vaparm_flush;
 #endif
 
+GBLREF	boolean_t		blocksig_initialized, err_same_as_out, hup_on, is_rcvr_server, is_src_server, is_updproc;
 GBLREF	io_pair			io_std_device;
-GBLREF	boolean_t		blocksig_initialized;
-GBLREF	sigset_t		block_sigsent;
-GBLREF	boolean_t		err_same_as_out;
 GBLREF	gd_addr			*gd_header;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
-GBLREF	boolean_t		is_src_server;
-GBLREF	boolean_t		is_rcvr_server;
-GBLREF	boolean_t		is_updproc;
-GBLREF	uint4			is_updhelper;
 GBLREF	recvpool_addrs		recvpool;
-GBLREF	uint4			process_id;
+GBLREF	sigset_t		block_sigsent;
+GBLREF	uint4			is_updhelper, process_id;
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 
 error_def(ERR_REPLINSTACC);
+error_def(ERR_TERMHANGUP);
 error_def(ERR_TEXT);
 
 #define	ZTRIGBUFF_INIT_ALLOC		1024	/* start at 1K */
@@ -782,7 +778,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 	use_gtmio = ((NULL != io_std_device.out) && (!IS_GTMSECSHR_IMAGE) && err_same_as_out);
 	switch (flush)
 	{
-		case NOFLUSH:
+		case NOFLUSH_OUT:
 			break;
 		case RESET:
 			break;
@@ -869,7 +865,7 @@ void	util_out_print_vaparm(caddr_t message, int flush, va_list var, int faocnt)
 	}
 	switch (flush)
 	{
-		case NOFLUSH:
+		case NOFLUSH_OUT:
 			break;
 		case FLUSH:
 		case RESET:
@@ -929,8 +925,9 @@ void util_cond_flush(void)
 
 	SETUP_THREADGBL_ACCESS;
 	ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
-	if (TREF(util_outptr) != TREF(util_outbuff_ptr))
-		util_out_print(NULL, FLUSH);
+	assert(((int)ERR_TERMHANGUP != SIGNAL) || ((tt == io_std_device.in->type) && hup_on));
+	if ((TREF(util_outptr) != TREF(util_outbuff_ptr)) && ((int)ERR_TERMHANGUP != SIGNAL))	/* if a PRINCIPAL device terminal */
+		util_out_print(NULL, FLUSH);	/* disappeared, sending stuff to it with a PRN_ERROR just complicates things */
 }
 
 #ifdef DEBUG

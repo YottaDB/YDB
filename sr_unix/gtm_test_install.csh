@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh
 #################################################################
 #								#
-# Copyright (c) 2011-2018 Fidelity National Information		#
+# Copyright (c) 2011-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -216,7 +216,7 @@ setenv gtmdir $save_gtm_dist/test_gtm_utf8
 # make gtm set the utf locale
 unsetenv LC_CTYPE
 if ($?gtm_icu_version) then
-	# unset gtm_icu_version to test gtmprofile.gtc setting it using icu-config
+	# unset gtm_icu_version to test gtmprofile.gtc setting it
 	setenv save_icu $gtm_icu_version
 	unsetenv gtm_icu_version
 endif

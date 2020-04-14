@@ -1,7 +1,8 @@
 #!/bin/sh
 #################################################################
 #								#
-#	Copyright 2001, 2012 Fidelity Information Services, Inc	#
+# Copyright (c) 2001-2019 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -14,7 +15,7 @@ echo=ECHO
 arch=ARCH
 tmpfile="/tmp/tmp$$"
 
-if [ "`$gtm_dist/geteuid`" != "root" ] ; then
+if [ "`whoami`" != "root" ] ; then
 $echo "If you want to perform a rundown on anyone"
 $echo "else's MUMPS process, you must run this program as root."
 $echo \\n
@@ -43,7 +44,7 @@ then
 fi
 rm -f $tmpfile
 
-if [ "`$gtm_dist/geteuid`" != "root" ] ; then
+if [ "`whoami`" != "root" ] ; then
 	$echo "You are not root. Unable to terminate some GT.M processes"
 else
 	$echo "Do you want to stop GT.M server(s) if present? (y or n)\c"

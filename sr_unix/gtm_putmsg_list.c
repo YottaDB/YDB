@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -69,8 +69,8 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 		 * the output of a mupip journal command where the region specific output might be intermixed.
 		 */
 		assert((NULL != rname) && ('\0' != rname[0]));
-		util_out_print(rname, NOFLUSH);
-		util_out_print(COLON_SEPARATOR, NOFLUSH);
+		util_out_print(rname, NOFLUSH_OUT);
+		util_out_print(COLON_SEPARATOR, NOFLUSH_OUT);
 	}
 #	endif
 	for (; ; )
@@ -87,7 +87,7 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 		gtm_getmsg(msg_id, &msg_string);
 		if (NULL == msg)
 		{
-			util_out_print(msg_string.addr, NOFLUSH, msg_id);
+			util_out_print(msg_string.addr, NOFLUSH_OUT, msg_id);
 			if (0 < arg_count)
 			{
 				/* --------------------------
@@ -116,7 +116,7 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 					fao_count = MAX_FAO_PARMS;
 			} else
 				fao_actual = fao_count = 0;
-			util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
+			util_out_print_vaparm(msg_string.addr, NOFLUSH_OUT, var, fao_count);
 			va_end(var);	/* needed before used as dest in copy */
 			VAR_COPY(var, TREF(last_va_list_ptr));			/* How much we unwound */
 			arg_count -= fao_count;
@@ -134,7 +134,7 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 		if (0 == arg_count)
 			break;
 		if (!IS_GTMSECSHR_IMAGE)
-			util_out_print("!/", NOFLUSH);
+			util_out_print("!/", NOFLUSH_OUT);
 	}
 	FREEZE_INSTANCE_IF_NEEDED(csa, freeze_needed, freeze_msg_id, local_jnlpool);
 }

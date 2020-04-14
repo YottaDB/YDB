@@ -129,6 +129,7 @@ LITREF int4		gtm_release_stamp_len;
 
 void op_svget(int varnum, mval *v)
 {
+	boolean_t	lcl_compile_time;
 	io_log_name	*tl;
 	int 		count;
 	gtm_uint64_t	ucount;
@@ -644,6 +645,9 @@ void op_svget(int varnum, mval *v)
 	} else if (!(MVTYPE_IS_NUMERIC(v->mvtype)))
 	{
 		assert(MVTYPE_IS_STRING(v->mvtype));
+		lcl_compile_time = TREF(compile_time);
+		TREF(compile_time) = TRUE;
 		s2n(v);
+		TREF(compile_time) = lcl_compile_time;
 	}
 }

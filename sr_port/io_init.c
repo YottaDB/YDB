@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -25,20 +25,13 @@
 #include "term_setup.h"
 #include "trans_log_name.h"
 
+GBLREF boolean_t	err_same_as_out, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF int		(*op_open_ptr)(mval *v, mval *p, const mval *t, mval *mspace);
+GBLREF io_log_name	*io_root_log_name;	/* root of linked list	*/
+GBLREF io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if defined */
 GBLREF io_pair		io_curr_device;		/* current device	*/
 GBLREF io_pair		io_std_device;		/* standard device	*/
-GBLREF io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if defined */
-GBLREF bool		prin_in_dev_failure;
-GBLREF bool		prin_out_dev_failure;
-GBLREF int		(*op_open_ptr)(mval *v, mval *p, const mval *t, mval *mspace);
-
-GBLREF io_log_name	*io_root_log_name;	/* root of linked list	*/
-GBLREF mstr		sys_input;
-GBLREF mstr		sys_output;
-GBLREF mstr		gtm_principal;
-#ifdef UNIX
-GBLREF boolean_t	err_same_as_out;
-#endif
+GBLREF mstr		gtm_principal, sys_input, sys_output;
 
 LITREF	mval	literal_zero;
 

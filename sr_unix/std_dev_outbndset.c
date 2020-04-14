@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,10 +19,8 @@
 
 #define SHFT_MSK 0x00000001
 
-GBLREF boolean_t		ctrlc_on;
-GBLREF volatile io_pair		io_std_device;
-GBLREF volatile int4		spc_inp_prc;
-GBLREF volatile bool		ctrlu_occurred;
+GBLREF boolean_t		ctrlc_on, hup_on;
+GBLREF volatile io_pair	io_std_device;
 GBLREF volatile bool		std_dev_outbnd;
 
 /* NOTE: xfer_set_handlers() returns success or failure for attempts to set
@@ -44,16 +42,15 @@ void std_dev_outbndset(int4 ob_char)
 		mask = SHFT_MSK << ob_char;
 		if (mask & tt_ptr->enbld_outofbands.mask)
 			(void)xfer_set_handlers(outofband_event, &ctrap_set, ob_char, FALSE);
-		else if (mask & CTRLC_MSK)
+		else if (CTRLC_MSK & mask)
 		{
 			if (ctrlc_on)
 		        	(void)xfer_set_handlers(outofband_event, &ctrlc_set, 0, FALSE);
 		} else if (mask & CTRLY_MSK)
 	        	(void)xfer_set_handlers(outofband_event, &ctrly_set, 0, FALSE);
-		else if ((CTRL_U == ob_char) && (spc_inp_prc & (SHFT_MSK << CTRL_U)))
-			ctrlu_occurred = TRUE;
+		else if (hup_on && (SIGHUP_MSK & mask))
+			(void)xfer_set_handlers(outofband_event, &ctrap_set, ob_char, FALSE);
 		else
-			assertpro((mask & tt_ptr->enbld_outofbands.mask) || (mask & CTRLC_MSK) || (mask & CTRLY_MSK)
-				|| ((CTRL_U == ob_char) && (spc_inp_prc & (SHFT_MSK << CTRL_U))));
+			assertpro((mask & tt_ptr->enbld_outofbands.mask) || (OUTOFBAND_MSK & mask));
 	}
 }

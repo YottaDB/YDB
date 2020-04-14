@@ -12,9 +12,8 @@
 
 #include "mdef.h"
 
-#ifdef UNIX
 #include <errno.h>
-#endif
+#include "gtm_stdlib.h"
 
 #include "gdsroot.h"
 #include "gdskill.h"
@@ -42,24 +41,27 @@
 #include "getzposition.h"
 #include "restrict.h"
 #include "dm_audit_log.h"
+#include "svnames.h"
+#include "util.h"
 #ifdef DEBUG
 #include "have_crit.h"		/* for the TPNOTACID_CHECK macro */
 #endif
 
 #define	DIRECTMODESTR	"DIRECT MODE (any TP RESTART will fail)"
 
-GBLREF	uint4		dollar_trestart;
-GBLREF	io_pair		io_curr_device;
-GBLREF	io_pair		io_std_device;
+GBLREF	boolean_t	prin_dm_io, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF	io_pair		io_curr_device, io_std_device;
+GBLREF	mval		dollar_zstatus;
 GBLREF	stack_frame	*frame_pointer;
-GBLREF	unsigned char	*restart_pc;
-GBLREF	unsigned char	*restart_ctxt;
+GBLREF	uint4		dollar_trestart;
+GBLREF	unsigned char	*restart_ctxt, *restart_pc;
 
 LITREF	mval		literal_notimeout;
 
-error_def(ERR_NOTPRINCIO);
-error_def(ERR_NOPRINCIO);
 error_def(ERR_APDLOGFAIL);
+error_def(ERR_NOPRINCIO);
+error_def(ERR_NOTPRINCIO);
+error_def(ERR_TERMWRITE);
 
 void	op_dmode(void)
 {
@@ -92,16 +94,16 @@ void	op_dmode(void)
 		save_device = io_curr_device;
 	}
 	io_curr_device = io_std_device;
-	if ((TRUE == io_curr_device.in->dollar.zeof) || kill)
-		op_zhalt(ERR_NOPRINCIO, FALSE);	/* op_zhalt doesn't restrict this because it's a halt with a return code */
-	/* The following code avoids an infinite loop on UNIX systems when there is an error in writing to the principal device
+	if ((prin_in_dev_failure && (TRUE == io_curr_device.in->dollar.zeof)) || kill)
+		ISSUE_NOPRINCIO_IF_NEEDED((kill ? io_curr_device.out : io_curr_device.in), kill, FALSE);    /* kill means WRITE */
+	/* The following code avoids an infinite loop when there is an error in writing to the principal device
 	 * resulting in a call to the condition handler and an eventual return to this location
 	 */
 	if ((loop_cnt > 0) && (errno == old_errno))
 	{	/* Tried and failed 2x to write to principal device */
 		kill = TRUE;
-		send_msg_csa(NULL, VARLSTCNT(1) ERR_NOPRINCIO);
-		rts_error_csa(NULL, VARLSTCNT(1) ERR_NOPRINCIO);
+		prin_out_dev_failure = TRUE;
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TERMWRITE, 0, old_errno);
 	}
 	++loop_cnt;
 	old_errno = errno;
@@ -130,6 +132,7 @@ void	op_dmode(void)
 	{
 		prompt.mvtype = MV_STR;
 		prompt.str = TREF(gtmprompt);
+		prin_dm_io = TRUE;
 		op_write(&prompt);
 		op_read(input_line, (mval *)&literal_notimeout);
 		/* Check if auditing for direct mode is enabled. Also check if
@@ -144,6 +147,7 @@ void	op_dmode(void)
 		}
 	}
 	op_wteol(1);
+	prin_dm_io = FALSE;
 	io_curr_device = save_device;
 	dmode_intruptd = FALSE;
 	/* Only executes command when Direct Mode Auditing

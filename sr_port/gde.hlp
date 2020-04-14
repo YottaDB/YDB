@@ -1764,7 +1764,7 @@
    size is 512 blocks or less the warning comes at the last successful update
    before the database becomes full.
 
-   The maximum EXTENSION is 65,535 blocks.
+   The maximum EXTENSION is 1,048,575 blocks.
 
    By default, GDE uses an EXTENSION of 100 blocks.
 
@@ -1919,7 +1919,7 @@
    |------------------------------+-----------+-----+-----------------------|
    | -[NO]E[NCRYPTION]            | FALSE     | -   | -                     |
    |------------------------------+-----------+-----+-----------------------|
-   | -EX[TENSION_COUNT]=size      | 100       | 0   | 65,535                |
+   | -EX[TENSION_COUNT]=size      | 100       | 0   | 1,048,575             |
    | (blocks)                     |           |     |                       |
    |------------------------------+-----------+-----+-----------------------|
    | -F[ILE_NAME]=file-name       | mumps.dat | -   | 255                   |

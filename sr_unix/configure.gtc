@@ -57,7 +57,7 @@ else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
 # Binaries
-binaries="mupip mumps libgtmshr$ext lke dse  geteuid ftok semstat2"
+binaries="mupip mumps libgtmshr$ext lke dse ftok semstat2"
 
 # Normal scripts - executed by anyone
 nscripts="gtmbase lowerc_cp"
@@ -85,10 +85,7 @@ if [ $deliver_gtcm = "yes" ]; then
 	pathmods="$pathmods gtcm_run.gtc gtcm_slist.gtc"
 fi
 
-# geteuid is no longer executable in distribution so change it
-chmod 755 ./geteuid
-
-if [ "`./geteuid`" != "root" ] ; then
+if [ "`whoami`" != "root" ] ; then
 	$echo "You must run Configure as root."
 	exit
 fi
@@ -776,7 +773,7 @@ read resp
 
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
-		*.gtc gtm* gde* GDE*.o _*.m _*.o mumps.dat mumps.gld geteuid $other_object_files $csh_script_files lowerc_cp\
+		*.gtc gtm* gde* GDE*.o _*.m _*.o mumps.dat mumps.gld $other_object_files $csh_script_files lowerc_cp\
 		*.hlp core *.h *.m *help.dat *help.gld COPYING README.txt
 	\rm -rf GETPASS.o plugin GTMHELP.o custom_errors_sample.txt
 	if [ -d utf8 ]; then

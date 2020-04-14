@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,13 +14,14 @@
  *  Should change bool to boolean_t together on Unix and VMS
  */
 
-#define	OUTOFBAND_MSK 0x02000008
-#define CTRLC_MSK 0x00000008
-#define CTRLY_MSK 0x02000000
+#define OUTOFBAND_MSK	0x02000018
+#define CTRLC_MSK	0x00000008
+#define SIGHUP_MSK	0x00000010
+#define CTRLY_MSK	0x02000000
 #define CTRLC     3
+#define CTRLD     4
 #define CTRLY	  25
 #define MAXOUTOFBAND 31
-
 enum outofbands
 {
 	ctrly = 1,
@@ -28,7 +29,8 @@ enum outofbands
 	ctrap,
 	tptimeout,
 	jobinterrupt,
-	ztimeout
+	ztimeout,
+	sighup
 };
 
 #define OUTOFBAND_RESTARTABLE(event)	(jobinterrupt == (event))

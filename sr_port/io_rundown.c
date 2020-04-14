@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,11 +17,9 @@
 #include "io_params.h"
 #include "error.h"
 
+GBLREF boolean_t	prin_in_dev_failure, prin_out_dev_failure;
 GBLREF io_log_name	*io_root_log_name;
-
 GBLREF io_pair		io_std_device;
-GBLREF bool		prin_in_dev_failure;
-GBLREF bool		prin_out_dev_failure;
 
 void io_dev_close(io_log_name *d);
 

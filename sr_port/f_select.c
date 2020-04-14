@@ -186,8 +186,8 @@ int f_select(oprtype *a, opctype op)
 				r = tmparg.oprval.tref;
 			} else
 			{	/* build a home for the result */
-				if ((OC_LIT == old_op) || (OCT_MVADDR & oc_tab[old_op].octype))
-				{
+				if ((OC_LIT == old_op) || (OC_FNTEXT == old_op) || (OCT_MVADDR & oc_tab[old_op].octype))
+				{	/* need a temp for these - OP_FNTEXT because it may later become an OC_LIT */
 					ref = newtriple(OC_STOTEMP);
 					ref->operand[0] = tmparg;
 					tmparg = put_tref(ref);

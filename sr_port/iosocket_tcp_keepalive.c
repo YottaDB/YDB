@@ -35,6 +35,7 @@ error_def(ERR_SETSOCKOPTERR);
 
 boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, char *act)
 {
+	boolean_t		trap;
 	char			*errptr;
 	d_socket_struct		*dsocketptr;
 	int			keepalive_got;
@@ -59,7 +60,7 @@ boolean_t iosocket_tcp_keepalive(socket_struct *socketptr, int keepalive_opt, ch
 	}
 #	endif
 #	endif
-real_errno = 0;
+	real_errno = 0;
 	DEBUG_ONLY(keepalive_got_len = SIZEOF(keepalive_got);)
 	if (-1 == (status = setsockopt(socketptr->sd, SOL_SOCKET, SO_KEEPALIVE, &keepalive_opt, SIZEOF(keepalive_opt))))
 	{
@@ -82,6 +83,7 @@ real_errno = 0;
 		dsocketptr = socketptr->dev;
 		errptr = (char *)STRERROR(real_errno);
 		errlen = STRLEN(errptr);
+		trap = socketptr->ioerror;
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(dsocketptr->iod, errptr, errlen);
 #		ifdef DEBUG
 #		ifndef DEBUG_SOCK
@@ -102,7 +104,8 @@ real_errno = 0;
 			socketptr->sd = FD_INVALID;
 		}
 		SOCKET_FREE(socketptr);
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
+		if (trap)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_SETSOCKOPTERR, 5,
 			      LEN_AND_STR(keepalive_opt ? "TCP_KEEPIDLE" : "SO_KEEPALIVE"), real_errno, errlen, errptr);
 		return FALSE;
 	}

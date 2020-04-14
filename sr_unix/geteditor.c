@@ -15,6 +15,7 @@
 #include "gtm_string.h"
 #include "gtm_stdlib.h"
 #include "gtm_unistd.h"
+#include "gtm_limits.h"
 
 #include "eintr_wrappers.h"
 #include "geteditor.h"
@@ -25,7 +26,7 @@ GBLDEF mstr editor;
 void geteditor(void)
 {
 	char		*edt, **pedt;
-	mstr_len_t	len;
+	size_t		len;
 	int		iter;
 	char		*editor_list[] =
 			{
@@ -38,16 +39,20 @@ void geteditor(void)
 	edt = GETENV("EDITOR");
 	pedt = &editor_list[0];
 	do {
-		if (0 == ACCESS(edt, (F_OK|X_OK))) /* if the file exists and is executable we are good */
+		if (0 == ACCESS(edt, (F_OK|X_OK)))	/* File exists and is executable, use it */
 			break;
 		edt = *pedt++;
 	} while (edt);
 	WBTEST_ASSIGN_ONLY(WBTEST_BADEDITOR_GETEDITOR, edt, 0);
 	if (edt)
 	{
-		len = (mstr_len_t)(STRLEN(edt) + 1);	/* for zero */
-		editor.len = len - 1;			/* but not for mstr */
-		editor.addr = (char*) malloc(len);	/* must be zero term */
+		len = strlen(edt);
+		if (PATH_MAX < len)			/* 4SCA: access() ensures path is < PATH_MAX */
+			len = PATH_MAX;
+		editor.len = (mstr_len_t)len;
+		if (PATH_MAX >= len)			/* 4SCA: Increment behind a guard */
+			len++;
+		editor.addr = (char*) malloc(len);	/* must be null terminated */
 		memcpy(editor.addr, edt, len);
 	} else
 		editor.len = 0;

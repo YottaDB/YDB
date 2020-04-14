@@ -576,7 +576,7 @@ foreach i ( $comlist_liblist )
 		# Exclude files that define the same externals
 		# (e.g., "main" and the VMS CLI [command line interpreter] emulator arrays):
 		set exclude = "^gtm\.o|^gtm_main\.o|^lke\.o|^lke_cmd\.o|^dse\.o|^dse_cmd\.o|^dbcertify\.o"
-		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^gtmsecshr\.o|^gtmsecshr_wrapper\.o|^geteuid\.o"
+		set exclude = "$exclude|^mupip\.o|^mupip_cmd\.o|^gtmsecshr\.o|^gtmsecshr_wrapper\.o"
 		set exclude = "$exclude|^semstat2\.o|^ftok\.o|^msg\.o|^gtcm_main\.o|^gtcm_play\.o|^gtcm_pkdisp\.o|^gtcm_shmclean\.o"
 		set exclude = "$exclude|^omi_srvc_xct\.o|^omi_sx_play\.o"
 		set exclude = "$exclude|^gtcm_gnp_server\.o|^dbcertify_cmd\.o"
@@ -673,8 +673,6 @@ endif
 if (-e GTMDefinedTypesInit.m) then
 	# Need a different name for each build type as they can be different
 	cp -f GTMDefinedTypesInit.m $gtm_pct/GTMDefinedTypesInit${bldtype}.m
-	cp -f gdeinitsz.m $gtm_pct/gdeinitsz.m
-	mv -f gdeinitsz.m GDEINITSZ.m
 	setenv LC_CTYPE C
 	setenv gtm_chset M
 	./mumps GTMDefinedTypesInit.m
@@ -683,13 +681,6 @@ if (-e GTMDefinedTypesInit.m) then
 		@ comlist_status++
 		echo "${errmsg}" >> $errorlog
 	endif
-	ls -l GDEINITSZ.m
-	./mumps GDEINITSZ.m
-	if ($status) then
-		@ comlist_status++
-		echo "${errmsg}" >> $errorlog
-		set errmsg = "COMLIST_E-FAIL Failed to compile generated $gtm_pct/GDEINITSZ.m"
-	endif
 	# If we have a utf8 dir (created by buildaux.csh called from buildbdp.csh above), add a link to it for
 	# GTMDefinedTypesInit.m and compile it in UTF8 mode
 	source $gtm_tools/set_library_path.csh
@@ -697,9 +688,6 @@ if (-e GTMDefinedTypesInit.m) then
 	if (-e $gtm_dist/utf8 && ("TRUE" == "$is_utf8_support")) then
 		if (! -e $gtm_dist/utf8/GTMDefinedTypesInit.m) then
 		    ln -s $gtm_dist/GTMDefinedTypesInit.m $gtm_dist/utf8/GTMDefinedTypesInit.m
-		endif
-		if (! -e $gtm_dist/utf8/GDEINITSZ.m) then
-		    ln -s $gtm_dist/GDEINITSZ.m $gtm_dist/utf8/GDEINITSZ.m
 		endif
 		pushd utf8
 		# Switch to UTF8 mode
@@ -711,12 +699,6 @@ if (-e GTMDefinedTypesInit.m) then
 		../mumps GTMDefinedTypesInit.m
 		if ($status) then
 			set errmsg = "COMLIST_E-FAIL Failed to compile generated $gtm_exe/utf8/GTMDefinedTypes.m"
-			@ comlist_status++
-			echo "${errmsg}" >> $errorlog
-		endif
-		../mumps GDEINITSZ.m
-		if ($status) then
-			set errmsg = "COMLIST_E-FAIL Failed to compile generated $gtm_exe/utf8/GDEINITSZ.m"
 			@ comlist_status++
 			echo "${errmsg}" >> $errorlog
 		endif
@@ -787,7 +769,7 @@ $gtm_com/IGS $gtm_dist/gtmsecshr UNHIDE
 set distfiles_log = "dist_files.`basename $gtm_exe`.log"
 find $gtm_dist -type f >&! $gtm_log/$distfiles_log
 if ($?scan_image) then
-	tar cvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar dbcertify dse ftok geteuid gtmsec* gtcm* libgtmshr.so lke mumps mupip
+	tar cvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar dbcertify dse ftok gtmsec* gtcm* libgtmshr.so lke mumps mupip
 	tar rvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar plugin/libgtm* plugin/gtmcrypt/maskpass
 	tar rvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar /usr/lib64/lib{config,gpgme,gpg-error,crypt,ssl,icu*,z,elf}.so*
 	gzip    $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar

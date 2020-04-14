@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,39 +15,6 @@
 
 boolean_t util_is_log_open(void);
 
-#ifdef VMS
-#include <descrip.h>
-
-/* defines for util_out_send_oper in util_output.c */
-
-#define SNDOPR_TRIES 3
-#define SNDOPR_DELAY 10
-#define GTMOPCOMMISSED1 "%GTM-I-OPCOMMISSED "
-#define GTMOPCOMMISSED2 " errors and "
-#define GTMOPCOMMISSED3 " MBFULLs sending prior operator messages"
-
-/* While the maximum for OPER_LOG_SIZE is 1906 (found from experimentation), we
-   set it's maximum to 1904 being the largest 4 byte aligned size we can use. This
-   4 byte aligned size is necessary to make the header length calculation done as
-   SIZEOF(oper) - SIZEOF(oper.text) work correctly. If a size is used that is not
-   4 byte aligned, this calculation will incorrectly contain the compiler pad chars
-   causing garbage at the end of operator log lines. SE 9/2001
-*/
-#define	OPER_LOG_SIZE 1904
-
-typedef struct
-{
-	unsigned int	req_code : 8;
-	unsigned int	target   : 24;
-	uint4		mess_code;
-	char		text[OPER_LOG_SIZE];
-} oper_msg_struct;
-
-void util_in_open(struct dsc$descriptor_s *file_prompt);
-void util_out_open(struct dsc$descriptor_s *file_prompt);
-void util_log_open(char *filename, uint4 len);
-void util_out_write(unsigned char *addr, unsigned int len);
-#else /* UNIX */
 #include "gtm_stdio.h"		/* for FILE * */
 void		util_in_open(void *);
 char		*util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leading_spaces);
@@ -57,7 +24,6 @@ boolean_t	util_out_save(char *dst, int *dstlen_ptr);
 void		util_out_syslog_dump(void);
 
 #define		UTIL_OUT_SYSLOG_INTERVAL 50
-#endif
 #endif
 
 /* This value determines how many levels of nesting are allowed for protection of util_outbuff. */
@@ -102,7 +68,7 @@ void		util_out_syslog_dump(void);
 }
 
 #define OUT_BUFF_SIZE	2048
-#define	NOFLUSH		0
+#define NOFLUSH_OUT	0
 #define FLUSH		1
 #define RESET		2
 #define OPER		4

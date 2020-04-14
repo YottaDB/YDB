@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 #include <wchar.h>
 #include "gtm_string.h"
 #include "gtm_select.h"
+#include "gtm_stdlib.h"
 
 #include "io_params.h"
 #include "io.h"
@@ -34,26 +35,24 @@
 #include "std_dev_outbndset.h"
 #include "wake_alarm.h"
 #include "min_max.h"
+#include "svnames.h"
+#include "op.h"
+#include "util.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
 
-GBLDEF	int4		spc_inp_prc;			/* dummy: not used currently */
-GBLDEF	bool		ctrlu_occurred;			/* dummy: not used currently */
+GBLREF	boolean_t	dollar_zininterrupt, gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
 GBLDEF	int		term_error_line;		/* record for cores */
-
-GBLREF	io_pair		io_curr_device;
-GBLREF	io_pair		io_std_device;
-GBLREF	bool		prin_in_dev_failure;
+GBLREF	int4		ctrap_action_is, exi_condition;
+GBLREF	io_pair		io_curr_device, io_std_device;
 GBLREF	spdesc		stringpool;
-GBLREF	volatile int4	outofband;
+GBLREF	mval		dollar_zstatus;
 GBLREF	mv_stent	*mv_chain;
+GBLREF	volatile int4	outofband;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
-GBLREF	boolean_t	dollar_zininterrupt;
-GBLREF	int4		ctrap_action_is;
-GBLREF	boolean_t	gtm_utf8_mode;
 
 #ifdef UTF8_SUPPORTED
 LITREF	UChar32		u32_line_term[];
@@ -83,9 +82,10 @@ static readonly unsigned char	eraser[3] = { NATIVE_BS, NATIVE_SP, NATIVE_BS };
 error_def(ERR_CTRAP);
 error_def(ERR_IOEOF);
 error_def(ERR_NOPRINCIO);
-error_def(ERR_ZINTRECURSEIO);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
+error_def(ERR_TERMHANGUP);
+error_def(ERR_ZINTRECURSEIO);
 
 #ifdef UTF8_SUPPORTED
 
@@ -266,6 +266,8 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		io_ptr->dollar.zeof = FALSE;
 		dx_start = (int)io_ptr->dollar.x;
 	}
+	if ((sighup == outofband) || ((int)ERR_TERMHANGUP == SIGNAL))
+		TERMHUP_NOPRINCIO_CHECK(FALSE);				/* FALSE for READ */
 	v->str.len = 0;
 	ret = TRUE;
 	mask = tt_ptr->term_ctrl;
@@ -374,6 +376,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				tt_state->zb_ptr = zb_ptr;
 				tt_state->zb_top = zb_top;
 				tt_ptr->mupintr = TRUE;
+				REVERT_GTMIO_CH(&io_curr_device, ch_set);
 			} else
 			{
 				instr = outlen = 0;
@@ -381,7 +384,6 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				if (!msec_timeout)
 					iott_rterm(io_ptr);
 			}
-			REVERT_GTMIO_CH(&io_curr_device, ch_set);
 			outofband_action(FALSE);
 			break;
 		}
@@ -413,11 +415,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		} else if (0 < (rdlen = (int)(read(tt_ptr->fildes, &inbyte, 1))))	/* This read is protected */
 		{
 			assert(0 != FD_ISSET(tt_ptr->fildes, &input_fd));
-			/* --------------------------------------------------
-			 * set prin_in_dev_failure to FALSE to indicate that
-			 * input device is working now.
-			 * --------------------------------------------------
-			 */
+			/* set prin_in_dev_failure to FALSE to indicate input device is working now */
 			prin_in_dev_failure = FALSE;
 			if (tt_ptr->canonical)
 			{
@@ -918,16 +916,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 				io_ptr->dollar.x = 0;
 				io_ptr->dollar.za = 0;
 				io_ptr->dollar.y++;
-				if (io_curr_device.in == io_std_device.in)
-				{
-					if (!prin_in_dev_failure)
-						prin_in_dev_failure = TRUE;
-					else
-					{
-						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
-						stop_image_no_core();
-					}
-				}
+				ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
 				if (io_ptr->dollar.zeof)
 				{
 					io_ptr->dollar.za = 9;
@@ -1132,7 +1121,7 @@ int	iott_readfl(mval *v, int4 length, int4 msec_timeout)	/* timeout in milliseco
 		}
 	}
 	SEND_KEYPAD_LOCAL	/* to turn keypad off if possible */
-	if (outofband && jobinterrupt != outofband)
+	if (outofband && (jobinterrupt != outofband))
 	{
 		v->str.len = 0;
 		io_ptr->dollar.za = 9;

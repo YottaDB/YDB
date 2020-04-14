@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2012-2018 Fidelity National Information		#
+# Copyright (c) 2012-2019 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -27,7 +27,7 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
-set(version ${V6.3-010})
+set(version ${V6.3-011})
 if("${version}" STREQUAL "")
         set(version V9.9-0)
 endif()
@@ -76,14 +76,10 @@ set(extralibs "")
 message("--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 # Establish platform
 # Except for Solaris, CMAKE_COMPILER_IS_GNUCC is true
-if("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   include(sr_linux/platform.cmake)
-elseif("${CMAKE_SYSTEM_NAME}" MATCHES "HP-UX")
-  include(sr_hpux/platform.cmake)
-elseif("${CMAKE_SYSTEM_NAME}" MATCHES "AIX")
+elseif(${CMAKE_SYSTEM_NAME} STREQUAL "AIX")
   include(sr_aix/platform.cmake)
-elseif("${CMAKE_SYSTEM_NAME}" MATCHES "SunOS")
-  include(sr_sun/platform.cmake)
 else()
   message(FATAL_ERROR "--> OS = ${CMAKE_SYSTEM_NAME} / ARCH = ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
@@ -220,7 +216,6 @@ set_source_list(gtm_threadgbl_deftypes gtm_threadgbl_deftypes)
 set_source_list(dbcertify        dbcertify dbcertify_cmd)
 set_source_list(dse              dse dse_cmd)
 set_source_list(ftok             ftok)
-set_source_list(geteuid          geteuid)
 set_source_list(gtcm_gnp_server  gtcm_gnp_server)
 set_source_list(gtcm_pkdisp      gtcm_pkdisp)
 set_source_list(gtcm_play        gtcm_play omi_srvc_xct)
@@ -380,7 +375,7 @@ foreach(exp exe shr)
   add_custom_command(
     OUTPUT ${out}
     DEPENDS ${in} gen_gtm_threadgbl_deftypes
-    COMMAND tcsh -f ${GTM_SOURCE_DIR}/sr_linux/genexport.csh ${in} ${out}
+    COMMAND tcsh -f ${GTM_SOURCE_DIR}/${srdir}/genexport.csh ${in} ${out}
     )
 endforeach()
 
@@ -420,10 +415,6 @@ list(APPEND with_export dse)
 
 add_executable(dbcertify		${dbcertify_SOURCES})
 target_link_libraries(dbcertify		libdbcertify libmupip libmumps libstub)
-
-add_executable(geteuid			${geteuid_SOURCES})
-target_link_libraries(geteuid		libmumps)
-add_dependencies(geteuid		gen_gtm_threadgbl_deftypes)
 
 add_executable(gtmsecshr		${gtmsecshr_SOURCES})
 add_dependencies(gtmsecshr		gen_gtm_threadgbl_deftypes)
@@ -599,7 +590,6 @@ install(TARGETS
   mumps
   dse
   lke
-  geteuid
   gtcm_server
   gtcm_gnp_server
   gtcm_pkdisp
@@ -624,7 +614,6 @@ set(m_files_sr_port
   gdeexit.m
   gdehelp.m
   gdeinit.m
-  gdeinitsz.m
   gdelocks.m
   gdelog.m
   gdemap.m
@@ -745,23 +734,46 @@ install(FILES ${scripts}
   PERMISSIONS ${install_permissions_script}
   )
 
-find_program(ICUCONFIG NAMES icu-config)
-if(ICUCONFIG)
-  execute_process(
-    COMMAND ${ICUCONFIG} --version
-    OUTPUT_VARIABLE icu_version
-    RESULT_VARIABLE icu_failed
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-  if(icu_failed)
-    message(FATAL_ERROR "Command\n ${ICUCONFIG} --version\nfailed (${icu_failed}).")
-  elseif("x${icu_version}" MATCHES "^x([0-9]+\\.[0-9]+)")
-    set(gtm_icu_version "${CMAKE_MATCH_1}")
-  else()
-    message(FATAL_ERROR "Command\n ${ICUCONFIG} --version\nproduced unrecognized output:\n ${icu_version}")
-  endif()
+if(${CMAKE_SYSTEM_NAME} STREQUAL "AIX")
+  set(gtm_icu_version "")
 else()
-  message(FATAL_ERROR "Unable to find 'icu-config'.  Set ICUCONFIG in CMake cache.")
+  find_program(ICUCONFIG NAMES icu-config)
+  if(ICUCONFIG)
+    execute_process(
+      COMMAND ${ICUCONFIG} --version
+      OUTPUT_VARIABLE icu_version
+      RESULT_VARIABLE icu_failed
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+    if(icu_failed)
+      message(FATAL_ERROR "Command\n ${ICUCONFIG} --version\nfailed (${icu_failed}).")
+    elseif("x${icu_version}" MATCHES "^x([0-9]+\\.[0-9]+)")
+      set(gtm_icu_version "${CMAKE_MATCH_1}")
+    else()
+      message(FATAL_ERROR "Command\n ${ICUCONFIG} --version\nproduced unrecognized output:\n ${icu_version}")
+    endif()
+  else()
+    include(FindPkgConfig)
+    pkg_check_modules(ICUIO icu-io)
+    if(ICUIO_FOUND)
+      if("x${ICUIO_VERSION}" MATCHES "^x([0-9]+\\.[0-9]+)")
+	set(gtm_icu_version "${CMAKE_MATCH_1}")
+      else()
+	message(FATAL_ERROR "Command\n pkg-config icu-io\nproduced unrecognized output:\n ${ICUIO_VERSION}")
+      endif()
+    else()
+      pkg_check_modules(ICU icu)
+      if(ICU_FOUND)
+	if("x${ICU_VERSION}" MATCHES "^x([0-9]+\\.[0-9]+)")
+	  set(gtm_icu_version "${CMAKE_MATCH_1}")
+	else()
+	  message(FATAL_ERROR "Command\n pkg-config icu\nproduced unrecognized output:\n ${ICU_VERSION}")
+	endif()
+      else()
+	message(FATAL_ERROR "Unable to find 'icu-config'.  Set ICUCONFIG in CMake cache.")
+      endif()
+    endif()
+  endif()
 endif()
 
 find_program(LOCALECFG NAMES locale)

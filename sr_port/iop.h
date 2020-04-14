@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -225,4 +225,8 @@ IOP_DESC(206, iop_outseek, IOP_VAR_SIZE, IOP_OPEN_OK | IOP_USE_OK, IOP_SRC_STR),
 IOP_DESC(207, iop_inrewind, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
 IOP_DESC(208, iop_outrewind, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
 IOP_DESC(209, iop_buffered, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
-IOP_DESC(210, n_iops, 0, 0, 0)
+IOP_DESC(210, iop_fflf, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
+IOP_DESC(211, iop_nofflf, 0, IOP_OPEN_OK | IOP_USE_OK, 0),
+IOP_DESC(212, iop_hupenable, 0, IOP_USE_OK, 0),
+IOP_DESC(213, iop_nohupenable, 0, IOP_USE_OK, 0),
+IOP_DESC(214, n_iops, 0, 0, 0)

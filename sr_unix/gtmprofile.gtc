@@ -74,15 +74,27 @@ if [ $gtm_dist != "$old_gtm_dist" ] ; then
     if [ -f "$gtm_dist/libgtmutil.$tmp_gtm_shlib" ] ; then gtmroutines="$gtm_dist/libgtmutil.$tmp_gtm_shlib $gtm_dist"
     else gtmroutines=$gtm_dist ; fi
     export gtmroutines
-    # Set $gtm_icu_version if icu-config is available - should be set before checking for UTF-8 mode
-    if [ -z "$gtm_icu_version" -a -n "`which icu-config`" ] ; then
-	gtm_icu_version=`icu-config --version | gtm_chset=M $gtm_dist/mumps -run %XCMD 'Read x Write $FNumber(x*$Select(+x>5:.1,1:1),"",1)'`
-        export gtm_icu_version
-	# Add library path to LD_LIBRARY_PATH
-	extendlibpath=`icu-config --libdir`
-	if [ "" = "$LD_LIBRARY_PATH" ]; then LD_LIBRARY_PATH="$extendlibpath"; else LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$extendlibpath";fi; export LD_LIBRARY_PATH
-	if [ "ibm" = "$arch" ]; then
-		if [ "" = "$LIBPATH" ]; then LIBPATH="$extendlibpath"; else LIBPATH="$LIBPATH:$extendlibpath";fi; export LIBPATH;
+    # Set $gtm_icu_version - should be set before checking for UTF-8 mode
+    if [ -z "$gtm_icu_version" ] ; then
+	if [ -x "$(command -v pkg-config)" -a $(pkg-config --exists icu-io; echo $?) -eq 0 ]; then
+		versioncmd="pkg-config --modversion icu-io"
+		libcmd="pkg-config --variable=libdir icu-io"
+	elif [ -x "$(command -v icu-config)" ] ; then
+		versioncmd="icu-config --version"
+		libcmd="icu-config --libdir"
+	elif [ -x "$(command -v pkg-config)" -a $(pkg-config --exists icu; echo $?) -eq 0 ]; then
+		versioncmd="pkg-config --modversion icu"
+		libcmd="pkg-config --variable=libdir icu"
+	fi
+	if [ -n "$versioncmd" ]; then
+		gtm_icu_version=`$versioncmd | gtm_chset=M $gtm_dist/mumps -run %XCMD 'Read x Write $FNumber(x*$Select(+x>5:.1,1:1),"",1)'`
+		extendlibpath=`$libcmd`
+		export gtm_icu_version
+		# Add library path to LD_LIBRARY_PATH
+		if [ "" = "$LD_LIBRARY_PATH" ]; then LD_LIBRARY_PATH="$extendlibpath"; else LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$extendlibpath";fi; export LD_LIBRARY_PATH
+		if [ "ibm" = "$arch" ]; then
+			if [ "" = "$LIBPATH" ]; then LIBPATH="$extendlibpath"; else LIBPATH="$LIBPATH:$extendlibpath";fi; export LIBPATH;
+		fi
 	fi
     fi
 

@@ -503,11 +503,11 @@ jnlhd:
 	w !,BOL,?x(1),$tr($j("",104)," ","-")
 	q
 seghd:
-	s x(0)=32,x(1)=1,x(2)=33,x(3)=53,x(4)=57,x(5)=61,x(6)=67,x(7)=78,x(8)=84
+	s x(0)=32,x(1)=1,x(2)=33,x(3)=53,x(4)=57,x(5)=61,x(6)=67,x(7)=78,x(8)=88
 	w !,BOL,!,BOL,?x(0),"*** SEGMENTS ***"
 	w !,BOL,?x(1),"Segment",?x(2),"File (def ext: .dat)",?x(3),"Acc",?x(4),"Typ",?x(5),"Block",?x(6),$j("Alloc",10)
 	w ?x(7),"Exten",?x(8),"Options"
-	w !,BOL,?x(1),$tr($j("",91)," ","-")
+	w !,BOL,?x(1),$tr($j("",94)," ","-")
 	q
 maphd:
 	s x="*** MAP"_$s($l(mapreg):" for region "_mapreg,1:"")_" ***"
@@ -557,7 +557,7 @@ tmpjnlhd:
 	w !,BOL,?x(1),$tr($j("",90)," ","-")
 	q
 tmpseghd:
-	s x(0)=32,x(1)=1,x(2)=18,x(3)=38,x(4)=42,x(5)=46,x(6)=52,x(7)=63,x(8)=69
+	s x(0)=32,x(1)=1,x(2)=18,x(3)=38,x(4)=42,x(5)=46,x(6)=52,x(7)=63,x(8)=72
 	w !,BOL,!,BOL,?x(1),"Segment",?x(2),"Active",?x(3),"Acc",?x(4),"Typ",?x(5),"Block",?x(6),$j("Alloc",10)
 	w ?x(7),"Exten",?x(8),"Options"
 	w !,BOL,?x(1),$tr($j("",78)," ","-")

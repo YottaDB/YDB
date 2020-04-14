@@ -109,13 +109,14 @@ PROMPTGO
 	; prompt for inputs, execute
 	set d("io")=$io
 	if '$data(%zdebug) new $etrap set $etrap="zgoto "_$zlevel_":err^"_$text(+0) do
-	. zshow "d":d									; save original $p settings
+	. zshow "d":d										; save original $p settings
 	. set x=$piece($piece(d("D",1),"CTRA=",2)," ")
 	. set:""=x x=""""""
-	. set d("use")="$principal:(ctrap="_x_":exception=",x=$piece(d("D",1),"EXCE=",2),x=$zwrite($extract(x,2,$length(x)-1))
+	. set d("use")="$principal:(ctrap="_x
+	. set x=$piece(d("D",1),"EXCE=",2),x=$zwrite($extract(x,2,$length(x)-1))
 	. set:""=x x=""""""
-	. set d("use")=d("use")_x_":"_$select($find(d("D",1),"NOCENE"):"nocenable",1:"cenable")_")"
-	. use $principal:(ctrap=$char(3,4):exception="":nocenable)
+	. set d("use")=d("use")_":exception="_x_":"_$select($find(d("D",1),"NOCENE"):"nocenable",1:"cenable")_")"
+	. use $principal:(ctrap=$char(3,4):exception="halt:$zeof!($zstatus[""TERMWRITE"")  "_$etrap:nocenable)
 	new gld,pid,reg,stat
 	if $zsearch("")         ; clear $zsearch() context
 	read "Process id / $JOB [default all processes]: ",pid,! set:0'<+pid pid="*"

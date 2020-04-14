@@ -509,7 +509,7 @@ LITDEF	err_msg merrors[] = {
 	{ "FREEZECTRL", "Control Y or control C encountered during attempt to freeze the database. Aborting freeze.", 0, 0 },
 	{ "JNLFLUSH", "Error flushing journal buffers to journal file !AD", 2, 0 },
 	{ "CCPSIGDMP", "CCP non fatal dump, continuing operation. Report to your GT.M Support Channel.", 0, 0 },
-	{ "NOPRINCIO", "Unable to write to principal device", 0, 0 },
+	{ "NOPRINCIO", "Unable to !AD principal device: !AD at !AD due to: !AD", 8, 0 },
 	{ "INVPORTSPEC", "Invalid port specification", 0, 0 },
 	{ "INVADDRSPEC", "Invalid IP address specification", 0, 0 },
 	{ "MUREENCRYPTEND", "Database !AD : MUPIP REORG ENCRYPT finished by pid !UL at transaction number [0x!16@XQ]", 4, 0 },
@@ -1542,6 +1542,7 @@ LITDEF	err_msg merrors[] = {
 	{ "MUKEEPNODEC", "Expected decimal integer input for keep", 0, 0 },
 	{ "MUKEEPNOTRUNC", "Keep issued without -truncate", 0, 0 },
 	{ "MUTRUNCNOSPKEEP", "Region !AD has insufficient space to meet truncate target percentage of !UL with keep at !UL blocks", 4, 0 },
+	{ "TERMHANGUP", "Terminal has disconnected", 0, 0 },
 };
 
 LITDEF	int ERR_ACK = 150372361;
@@ -3073,6 +3074,7 @@ LITDEF	int ERR_MUKEEPPERCENT = 150384562;
 LITDEF	int ERR_MUKEEPNODEC = 150384570;
 LITDEF	int ERR_MUKEEPNOTRUNC = 150384578;
 LITDEF	int ERR_MUTRUNCNOSPKEEP = 150384587;
+LITDEF	int ERR_TERMHANGUP = 150384594;
 
 
 LITDEF	int merrors_undocarr[] = {
@@ -3109,7 +3111,7 @@ GBLDEF	err_ctl merrors_ctl = {
 	246,
 	"GTM",
 	&merrors[0],
-	1529,
+	1530,
 	&merrors_undocarr[0],
 	26
 };

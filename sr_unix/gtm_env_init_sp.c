@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2018 Fidelity National Information	*
+ * Copyright (c) 2004-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -83,16 +83,12 @@
 		TRANS.len--;						\
 }
 
-GBLREF	uint4			gtm_principal_editing_defaults;	/* ext_cap flags if tt */
-GBLREF	boolean_t		is_gtm_chset_utf8;
-GBLREF	boolean_t		utf8_patnumeric;
-GBLREF	boolean_t		badchar_inhibit;
-GBLREF	boolean_t		gtm_quiet_halt;
-GBLREF	int			gtm_non_blocked_write_retries;	/* number for retries for non_blocked write to pipe */
+GBLREF	boolean_t		badchar_inhibit, dmterm_default, hup_on, gtm_quiet_halt, is_gtm_chset_utf8, utf8_patnumeric;
+GBLREF	boolean_t		ipv4_only;		/* If TRUE, only use AF_INET. */
 GBLREF	char			*gtm_core_file;
 GBLREF	char			*gtm_core_putenv;
-GBLREF	boolean_t		dmterm_default;
-GBLREF	boolean_t		ipv4_only;		/* If TRUE, only use AF_INET. */
+GBLREF	int			gtm_non_blocked_write_retries;	/* number for retries for non_blocked write to pipe */
+GBLREF	uint4			gtm_principal_editing_defaults;	/* ext_cap flags if tt */
 ZOS_ONLY(GBLREF	char		*gtm_utf8_locale_object;)
 ZOS_ONLY(GBLREF	boolean_t	gtm_tag_utf8_as_ascii;)
 GBLREF	volatile boolean_t	timer_in_handler;
@@ -196,6 +192,12 @@ void	gtm_env_init_sp(void)
 	gtm_zlib_cmp_level = trans_numeric(&val, &is_defined, TRUE);
 	if (GTM_CMPLVL_OUT_OF_RANGE(gtm_zlib_cmp_level))
 		gtm_zlib_cmp_level = ZLIB_CMPLVL_MIN;	/* no compression in this case */
+	/* Check for and and setup gtm_hupenable if specified */
+	val.addr = GTM_HUPENABLE;
+	val.len = SIZEOF(GTM_HUPENABLE) - 1;
+	ret = logical_truth_value(&val, FALSE, &is_defined);
+	if (is_defined)
+		hup_on = ret;
 	gtm_principal_editing_defaults = 0;
 	val.addr = GTM_PRINCIPAL_EDITING;
 	val.len = SIZEOF(GTM_PRINCIPAL_EDITING) - 1;

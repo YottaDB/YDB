@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,24 +16,29 @@
 #include <errno.h>
 
 #include "gtm_stdio.h"
-#include "gtm_unistd.h"
+#include "gtm_stdlib.h"
 #include "io.h"
 #include "iormdef.h"
 #include "iormdefsp.h"
 #include "gtmio.h"
 #include "min_max.h"
+#include "gtmcrypt.h"
+#include "send_msg.h"
+#include "error.h"
+#include "svnames.h"
+#include "op.h"
+#include "util.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_conv.h"
 #include "gtm_utf8.h"
 #endif
-#include "gtmcrypt.h"
-#include "send_msg.h"
-#include "error.h"
 
-GBLREF io_pair		io_curr_device;
+GBLREF boolean_t	prin_in_dev_failure, prin_out_dev_failure;
+GBLREF io_pair		io_curr_device, io_std_device;
 #ifdef UTF8_SUPPORTED
 LITREF mstr		chset_names[];
 #endif
+GBLREF mval		dollar_zstatus;
 
 error_def(ERR_CRYPTBADWRTPOS);
 error_def(ERR_DEVICEREADONLY);

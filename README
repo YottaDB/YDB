@@ -25,16 +25,16 @@ To build GT.M for Linux, do the following steps:
 
 2. Unpack the GT.M sources
    The GT.M source tarball extracts to a directory with the version number in
-   the name, fis-gtm-V6.3-010
-   $ tar xfz fis-gtm-V6.3-010.tar.gz
-   $ cd fis-gtm-V6.3-010
+   the name, fis-gtm-V6.3-011
+   $ tar xfz fis-gtm-V6.3-011.tar.gz
+   $ cd fis-gtm-V6.3-011
 
    You should find this README, LICENSE, COPYING and CMakeLists.txt file and
    sr_* source directories.
 
 3. Building GT.M -
    <fis-gtm-build> can be a sub directory of the source directory,
-   fis-gtm-V6.3-010, or any other valid path.
+   fis-gtm-V6.3-011, or any other valid path.
 
    $ mkdir <fis-gtm-build>
    $ cd <fis-gtm-build>
@@ -53,16 +53,16 @@ To build GT.M for Linux, do the following steps:
    #
    #     -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package
    #
-   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V6.3-010
+   $ cmake -D CMAKE_INSTALL_PREFIX:PATH=${PWD}/package <path to>/fis-gtm-V6.3-011
 
    $ make
 
    $ make install
 
-   $ cd package/lib/fis-gtm/V6.3-010_x86_64
+   $ cd package/lib/fis-gtm/V6.3-011_x86_64
 
    # Now you are ready to install GT.M. Answer a few questions and install it.
-   # The recommended installation path is /opt/fis-gtm/V6.3-010_x86_64
+   # The recommended installation path is /opt/fis-gtm/V6.3-011_x86_64
 
    $ sudo ./configure
 

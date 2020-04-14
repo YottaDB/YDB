@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015 Fidelity National Information 		*
+ * Copyright (c) 2015-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,11 +14,12 @@
 #include "io.h"
 #include "error.h"
 
-GBLREF boolean_t in_prin_gtmio;
+GBLREF boolean_t in_prin_gtmio, prin_dm_io;
 
 CONDITION_HANDLER(gtmio_ch)
 {
 	START_CH(TRUE);
 	in_prin_gtmio = FALSE;
+	prin_dm_io = FALSE;
 	NEXTCH;
 }

@@ -24,9 +24,11 @@ GBLREF unsigned char	*restart_ctxt, *restart_pc;
 GBLREF void             (*tp_timeout_action_ptr)(void);
 GBLREF volatile int4 	ctrap_action_is, outofband;
 GBLREF void		(*ztimeout_action_ptr)(void);
+
 error_def(ERR_CTRAP);
 error_def(ERR_CTRLC);
 error_def(ERR_CTRLY);
+error_def(ERR_TERMHANGUP);
 error_def(ERR_JOBINTRRQST);
 
 void outofband_action(boolean_t lnfetch_or_start)
@@ -50,6 +52,9 @@ void outofband_action(boolean_t lnfetch_or_start)
 				break;
 			case (ctrap):
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_CTRAP, 1, ctrap_action_is);
+				break;
+			case (sighup):
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TERMHANGUP);
 				break;
 			case (tptimeout):
 				/*

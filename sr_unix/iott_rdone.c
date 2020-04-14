@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,6 +18,7 @@
 #include <gtm_signal.h>
 #include "gtm_string.h"
 #include "gtm_select.h"
+#include "gtm_stdlib.h"
 
 #include "io.h"
 #include "iottdef.h"
@@ -32,31 +33,33 @@
 #include "error.h"
 #include "std_dev_outbndset.h"
 #include "wake_alarm.h"
+#include "svnames.h"
+#include "op.h"
+#include "util.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
 
-GBLREF	volatile int4	outofband;
-GBLREF	boolean_t	dollar_zininterrupt;
+GBLREF	bool		out_of_time;
+GBLREF	boolean_t	dollar_zininterrupt, gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF	int4		ctrap_action_is, exi_condition;
+GBLREF	io_pair		io_curr_device, io_std_device;
+GBLREF	mval		dollar_zstatus;
 GBLREF	mv_stent	*mv_chain;
 GBLREF	stack_frame	*frame_pointer;
 GBLREF	unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
-GBLREF	io_pair		io_curr_device;
-GBLREF	io_pair		io_std_device;
-GBLREF	bool		prin_in_dev_failure;
-GBLREF	int4		ctrap_action_is;
-GBLREF	bool		out_of_time;
-GBLREF	boolean_t	gtm_utf8_mode;
+GBLREF	volatile int4	outofband;
 
 LITREF	unsigned char	lower_to_upper_table[];
 
 error_def(ERR_CTRAP);
 error_def(ERR_IOEOF);
 error_def(ERR_NOPRINCIO);
-error_def(ERR_ZINTRECURSEIO);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_STACKCRIT);
+error_def(ERR_TERMHANGUP);
+error_def(ERR_ZINTRECURSEIO);
 
 int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 {
@@ -85,6 +88,8 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 
 	io_ptr = io_curr_device.in;
 	ESTABLISH_RET_GTMIO_CH(&io_curr_device, -1, ch_set);
+	if ((sighup == outofband) || ((int)ERR_TERMHANGUP == SIGNAL))
+		TERMHUP_NOPRINCIO_CHECK(FALSE);				/* FALSE for READ */
 	assert(io_ptr->state == dev_open);
 	iott_flush(io_curr_device.out);
 	tt_ptr = (d_tt_struct*) io_ptr->dev_sp;
@@ -444,16 +449,7 @@ int	iott_rdone (mint *v, int4 msec_timeout)	/* timeout in milliseconds */
 			 * read() found zero characters; assume connection dropped.
 			 * ---------------------------------------------------------
 			 */
-			if (io_curr_device.in == io_std_device.in)
-			{
-				if (!prin_in_dev_failure)
-					prin_in_dev_failure = TRUE;
-				else
-				{
-					send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
-					stop_image_no_core();
-				}
-			}
+			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);	/* FALSE, FALSE: READ, not socket*/
 			if (io_ptr->dollar.zeof)
 			{
 				io_ptr->dollar.za = 9;

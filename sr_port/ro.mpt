@@ -10,7 +10,6 @@
 ;								;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %RO     ;routine output
-        ;last modified by R. Partridge
         ;invoke ^%RO to get interaction
         ;invoke CALL^%RO with %ZR - routine array,
         ;%ZC - strip comments, %ZD - device, %ZH - header label

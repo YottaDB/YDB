@@ -90,27 +90,19 @@ typedef struct
 /* For buffered output, wait this long for socket to be ready to output */
 #define DEFAULT_WRITE_WAIT		200
 
-#define SOCKERROR(iod, socketptr, gtmerror, syserror) 								\
-{ 														\
+#define SOCKWRTERROR(IOD, SOCKPTR, GTMERR, SYSERR) 								\
+MBSTART { 													\
 	int	ERRLEN; 											\
 	char	*ERRPTR; 											\
-	iod->dollar.za = 9; 											\
-	ERRPTR = (char *)STRERROR(syserror); 									\
-	SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, ERRPTR, ERRLEN);							\
-	assert(ERR_SOCKWRITE == gtmerror);									\
-	if (iod == io_std_device.out)										\
-	{													\
-		if (!prin_out_dev_failure)									\
-			prin_out_dev_failure = TRUE;								\
-		else												\
-		{												\
-			send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);					\
-			stop_image_no_core();									\
-		}												\
-	}													\
-	if (socketptr->ioerror) 										\
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) gtmerror, 0, ERR_TEXT, 2, ERRLEN, ERRPTR);		\
-}
+	IOD->dollar.za = 9; 											\
+														\
+	ISSUE_NOPRINCIO_IF_NEEDED(IOD, TRUE, !SOCKPTR->ioerror);	/* TRUE indicates WRITE */		\
+	ERRPTR = (char *)STRERROR(SYSERR); 									\
+	SET_DOLLARDEVICE_ONECOMMA_ERRSTR(IOD, ERRPTR, ERRLEN);							\
+	assert(ERR_SOCKWRITE == GTMERR);									\
+	if (SOCKPTR->ioerror)											\
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) GTMERR, 0, ERR_TEXT, 2, ERRLEN, ERRPTR);		\
+} MBEND
 
 #define SOCKET_ALLOC(SOCKPTR)										\
 {													\

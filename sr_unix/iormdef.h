@@ -143,10 +143,7 @@ error_def(ERR_CRYPTBADWRTPOS);
  * NOPRINCIO error.
  */
 #define ISSUE_NOPRINCIO_IF_NEEDED_RM(VAR, CMP_SIGN, IOD)						\
-{													\
-	GBLREF io_pair		io_std_device;								\
-	GBLREF bool		prin_out_dev_failure;							\
-													\
+MBSTART {												\
 	int			write_status;								\
 													\
 	if (0 CMP_SIGN VAR)										\
@@ -155,17 +152,8 @@ error_def(ERR_CRYPTBADWRTPOS);
 			prin_out_dev_failure = FALSE;							\
 	} else												\
 	{												\
+		ISSUE_NOPRINCIO_IF_NEEDED(iod, TRUE, FALSE); /* TRUE, FALSE: WRITE, not socket */	\
 		write_status = (-1 == VAR) ? errno : VAR;						\
-		if (IOD == io_std_device.out)								\
-		{											\
-			if (!prin_out_dev_failure)							\
-				prin_out_dev_failure = TRUE;						\
-			else										\
-			{										\
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);			\
-				stop_image_no_core();							\
-			}										\
-		}											\
 		if (EAGAIN == write_status)								\
 			SET_DOLLARDEVICE_ERRSTR(IOD, ONE_COMMA_UNAVAILABLE);				\
 		else											\
@@ -173,7 +161,7 @@ error_def(ERR_CRYPTBADWRTPOS);
 		IOD->dollar.za = 9;									\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) write_status);					\
 	}												\
-}
+} MBEND
 
 /* Operations for this device type */
 #define RM_NOOP		0

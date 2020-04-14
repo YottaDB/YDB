@@ -73,6 +73,7 @@
 #define	DISABLE_ALIGN_STRINGS		"$gtm_disable_alignstr"
 #define	GTM_MAX_SOCKETS			"$gtm_max_sockets"
 #define	GTM_MEMORY_RESERVE		"$gtm_memory_reserve"
+#define	GTM_NOFFLF			"$gtm_nofflf"
 #define	GTM_NOUNDEF			"$gtm_noundef"
 #define	GTM_PRINCIPAL			"$gtm_principal"
 #define	GTM_PROMPT			"$gtm_prompt"
@@ -154,4 +155,5 @@
 #define GTM_UTFCGR_STRINGS		"$gtm_utfcgr_strings"
 #define GTM_UTFCGR_STRING_GROUPS	"$gtm_utfcgr_string_groups"
 #define GTM_STRPLLIM			"$gtm_string_pool_limit"
+#define GTM_HUPENABLE			"$gtm_hupenable"
 

@@ -150,8 +150,9 @@ GBLDEF	bool		out_of_time;
 GBLDEF	io_pair		io_curr_device;		/* current device	*/
 GBLDEF	io_pair		io_std_device;		/* standard device	*/
 GBLDEF	io_log_name	*dollar_principal;	/* pointer to log name GTM$PRINCIPAL if defined */
-GBLDEF	bool		prin_in_dev_failure;
-GBLDEF	bool		prin_out_dev_failure;
+GBLDEF	boolean_t	prin_dm_io;		/* used by op_dmode so mdb_condition_handler and iorm_readfl know it's active */
+GBLDEF	boolean_t	prin_in_dev_failure;	/* used in I/O to perform NOPRINCIO detection on input */
+GBLDEF	boolean_t	prin_out_dev_failure;	/* used in I/O to perform NOPRINCIO detection on output */
 GBLDEF	io_desc		*active_device;
 GBLDEF	bool		error_mupip,
 			file_backed_up,
@@ -1161,6 +1162,7 @@ GBLDEF	int		gtm_mupjnl_parallel;		/* Maximum # of concurrent threads or procs to
 							 * Currently only mupip journal commands use this.
 							 */
 GBLDEF	boolean_t	ctrlc_on;			/* TRUE in cenable mode; FALSE in nocenable mode */
+GBLDEF	boolean_t	hup_on;				/* TRUE if SIGHUP is enabled; otherwise FALSE */
 #ifdef DEBUG
 GBLDEF	int		gtm_db_counter_sem_incr;	/* Value used to bump the counter semaphore by every process.
 							 * Default is 1. Higher values exercise the ERANGE code better
@@ -1203,3 +1205,4 @@ GBLDEF	boolean_t	dollar_zaudit;			/* Intrinsic that indicates whether direct mod
 							 * TRUE => Auditing is enabled.
 							 */
 GBLDEF	dm_audit_info	*audit_conn;			/* Stores the APD logger's connection information */
+GBLDEF	boolean_t	gtm_nofflf;			/* GTM-9136 TRUE only to suppress LF after FF in "write #" */

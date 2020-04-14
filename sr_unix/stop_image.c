@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,8 +66,6 @@ void stop_image_conditional_core(void)
 void stop_image_no_core(void)
 {
 	PRN_ERROR;
-	if (0 == exi_condition)
-		exi_condition = SIGQUIT;
 	need_core = FALSE;
 	EXIT(-exi_condition);
 }
