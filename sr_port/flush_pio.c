@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,13 +20,12 @@
 #include "iosocketdef.h"
 #include "send_msg.h"
 #include "error.h"
+#include "svnames.h"
+#include "gtm_string.h"
 
-GBLDEF boolean_t	exiting_on_dev_out_error = FALSE;
-
-GBLREF io_pair		io_std_device;
-GBLREF io_pair		io_curr_device;
-GBLREF bool		prin_out_dev_failure;
-GBLREF boolean_t	in_prin_gtmio;
+GBLREF boolean_t	in_prin_gtmio, prin_out_dev_failure;
+GBLREF io_log_name	*dollar_principal, *io_root_log_name;
+GBLREF io_pair		io_curr_device, io_std_device;
 
 STATICDEF int		writing_to_pio = 0;
 
@@ -47,13 +46,15 @@ void flush_pio(void)
 
 void write_text_newline_and_flush_pio(mstr *text)
 {
-	io_pair		save_io_curr_device;
-	int		i, status, msg_length;
-	char		*msg_start, c;
 	boolean_t	mupintr, encrypted;
+	char		*msg_start, c;
+	int		i, status, msg_length;
+	io_log_name	*tl;
+	io_pair		save_io_curr_device;
+	mval		dev, zstatus;
 
 	/* We have already tried to stop the image, so returning here should not be allowed. */
-	if (exiting_on_dev_out_error)
+	if (prin_out_dev_failure)
 		return;
 	/* If we are not yet stopping the image, make sure we are not nesting on this function. */
 	if (3 > writing_to_pio)
@@ -160,12 +161,8 @@ void write_text_newline_and_flush_pio(mstr *text)
 				return;
 			}
 		}
-		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
 	}
-	exiting_on_dev_out_error = TRUE;
-	stop_image_no_core();
+	prin_out_dev_failure = TRUE;
+	assert(0 < writing_to_pio);
 	writing_to_pio--;
-	/* No assert for writing_to_pio being non-negative because if we made it past the stop_image_no_core() call above, something
-	 * is seriously wrong, and there is no point counting on an assert.
-	 */
 }

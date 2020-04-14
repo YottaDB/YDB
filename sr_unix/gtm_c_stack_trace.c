@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Copyright (c) 2012-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -40,7 +40,8 @@ error_def(ERR_TEXT);
  */
 void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uint4 count)
 {
-	int4		messagelen, arr_len;
+	size_t		messagelen;
+	uint4		arr_len;
 	char 	 	*command;
 	char		*currpos;
 	int		save_errno;
@@ -54,7 +55,8 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	messagelen = STRLEN(message);
+	if (MAX_STRLEN < (messagelen = strlen(message)))
+		messagelen = MAX_STRLEN;
 	assert(SIZEOF(count) <= SIZEOF(pid_t));
 	arr_len = GTM_MAX_DIR_LEN + messagelen + (3 * MAX_PIDSTR_LEN) + 5;	/* 4 spaces and a terminator */
 	if (!(TREF(gtm_waitstuck_script)).len)
@@ -103,7 +105,7 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 		currpos = (char *)i2asc((unsigned char*)currpos, (unsigned int)count);
 		*currpos++ = 0;
 		assert(currpos - (TREF(gtm_waitstuck_script)).addr <= (TREF(gtm_waitstuck_script)).len);
-		status = SYSTEM(((char *)((TREF(gtm_waitstuck_script)).addr)));
+		status = SYSTEM(command);	/* command has been "enhanced" but still starts at the same address */
 		if (-1 == status)
 		{	/* SYSTEM failed */
 			save_errno = errno;

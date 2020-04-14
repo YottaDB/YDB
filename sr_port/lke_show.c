@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -48,9 +48,9 @@
 #include "do_shmat.h"
 #include "mlk_ops.h"
 
-#define NOFLUSH 0
-#define FLUSH	1
-#define RESET	2
+#define NOFLUSH_OUT	0
+#define FLUSH		1
+#define RESET		2
 
 GBLREF	gd_addr		*gd_header;
 GBLREF	short		crash_count;
@@ -99,7 +99,7 @@ void	lke_show(void)
 			&& reg->open)
 		{
 			match = TRUE;
-			util_out_print("!/!AD!/", NOFLUSH, REG_LEN_STR(reg));
+			util_out_print("!/!AD!/", NOFLUSH_OUT, REG_LEN_STR(reg));
 			/* If distributed database, the region is located on another node */
 			if (reg->dyn.addr->acc_meth == dba_cm)
 			{

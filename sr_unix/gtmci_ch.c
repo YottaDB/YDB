@@ -26,12 +26,11 @@
 #include "util.h"
 #include "libyottadb_int.h"
 
-GBLREF  unsigned char		*msp;
-GBLREF  int                     mumps_status;
-GBLREF  unsigned char		*fgncal_stack;
+GBLREF  boolean_t		created_core, dont_want_core;
 GBLREF  dollar_ecode_type 	dollar_ecode;
-GBLREF  boolean_t		created_core;
-GBLREF  boolean_t		dont_want_core;
+GBLREF  int                     mumps_status;
+GBLREF	int4			exi_condition;
+GBLREF  unsigned char		*fgncal_stack, *msp;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -20,16 +20,16 @@
 
 #include "gtm_socket.h"
 #include "gtm_inet.h"
+#include "gtm_stdlib.h"
 
 #include "gt_timer.h"
 #include "io.h"
 #include "iottdef.h"
 #include "iosocketdef.h"
 #include "error.h"
+#include "util.h"
 
-#ifndef VMS
 GBLREF	io_pair		io_std_device;
-#endif
 
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_NOSOCKETINDEV);

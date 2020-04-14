@@ -559,7 +559,7 @@ typedef enum
 		if (ret)									\
 			FIRST_GTMIO = FALSE;							\
 	} else											\
-		util_out_print_gtmio("!AD", NOFLUSH, *UTILPREFIXLEN, UTILPREFIX);		\
+		util_out_print_gtmio("!AD", NOFLUSH_OUT, *UTILPREFIXLEN, UTILPREFIX);		\
 }
 
 #define	SET_DISP_TRIGVN(REG, DISP_TRIGVN, DISP_TRIGVN_LEN, TRIGVN, TRIGVN_LEN)			\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -24,6 +24,7 @@
 #include "gtm_termios.h"
 #include "gtm_unistd.h"
 #include "gtm_signal.h"	/* for SIGPROCMASK used inside Tcsetattr */
+#include "gtm_stdlib.h"
 
 #include "io_params.h"
 #include "io.h"
@@ -45,9 +46,14 @@
 #include "restrict.h"
 #include "op.h"
 #include "indir_enum.h"
+<<<<<<< HEAD
 #include "invocation_mode.h"
 #include "sig_init.h"
 #include "libyottadb.h"
+=======
+#include "svnames.h"
+#include "util.h"
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 
 LITDEF nametabent filter_names[] =
 {
@@ -63,11 +69,11 @@ LITDEF unsigned char filter_index[27] =
 	,4, 4, 4
 };
 
-GBLREF boolean_t		ctrlc_on, dollar_zininterrupt;
-GBLREF char			*CURSOR_ADDRESS, *CLR_EOL, *CLR_EOS;
-GBLREF io_pair			io_std_device;
-GBLREF io_pair			io_curr_device;
-GBLREF void 			(*ctrlc_handler_ptr)();
+GBLREF boolean_t	ctrlc_on, dollar_zininterrupt, hup_on, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF char		*CURSOR_ADDRESS, *CLR_EOL, *CLR_EOS;
+GBLREF io_pair		io_curr_device, io_std_device;
+GBLREF mval		dollar_zstatus;
+GBLREF void		(*ctrlc_handler_ptr)();
 
 LITREF unsigned char	io_params_size[];
 
@@ -120,6 +126,10 @@ void iott_use(io_desc *iod, mval *pp)
 		if (0 != status)
 		{
 			save_errno = errno;
+<<<<<<< HEAD
+=======
+			ISSUE_NOPRINCIO_IF_NEEDED(io_curr_device.out, FALSE, FALSE);	/* FALSE, FALSE: READ (sorta), not socket */
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_TCGETATTR, 1, tt_ptr->fildes, save_errno);
 		}
 		flush_input = FALSE;
@@ -297,6 +307,34 @@ void iott_use(io_desc *iod, mval *pp)
 					break;
 				case iop_nohostsync:
 					t.c_iflag &= ~IXOFF;
+					break;
+				case iop_hupenable:
+					if (!hup_on)
+					{	/* if it's already hupenable, no need to change */
+						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
+						if (tt_ptr->fildes == temp_ptr->fildes)
+						{	/* if $PRINCIPAL, enable hup_handler; similar code in term_setup.c */
+							sigemptyset(&act.sa_mask);
+							act.sa_flags = 0;
+							act.sa_handler = ctrlc_handler_ptr;
+							sigaction(SIGHUP, &act, 0);
+							hup_on = TRUE;
+						}
+					}
+					break;
+				case iop_nohupenable:
+					if (hup_on)
+					{	/* if it's already nohupenable, no need to change */
+						temp_ptr = (d_tt_struct *)io_std_device.in->dev_sp;
+						if (tt_ptr->fildes == temp_ptr->fildes)
+						{	/* if $PRINCIPAL, disable the hup_handler */
+							sigemptyset(&act.sa_mask);
+							act.sa_flags = 0;
+							act.sa_handler = SIG_IGN;
+							sigaction(SIGHUP, &act, 0);
+							hup_on = FALSE;
+						}
+					}
 					break;
 				case iop_insert:
 					if (io_curr_device.in == io_std_device.in)

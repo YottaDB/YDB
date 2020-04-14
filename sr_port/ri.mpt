@@ -25,10 +25,11 @@
 	. zshow "d":d										; save original $p settings
 	. set x=$piece($piece(d("D",1),"CTRA=",2)," ")
 	. set:""=x x=""""""
-	. set d("use")="$principal:(ctrap="_x_":exception=",x=$piece(d("D",1),"EXCE=",2),x=$zwrite($extract(x,2,$length(x)-1))
+	. set d("use")="$principal:(ctrap="_x
+	. set x=$piece(d("D",1),"EXCE=",2),x=$zwrite($extract(x,2,$length(x)-1))
 	. set:""=x x=""""""
-	. set d("use")=d("use")_x_":"_$select($find(d("D",1),"NOCENE"):"nocenable",1:"cenable")_")"
-	. use $principal:(ctrap=$char(3,4):exception="":nocenable)
+	. set d("use")=d("use")_":exception="_x_":"_$select($find(d("D",1),"NOCENE"):"nocenable",1:"cenable")_")"
+	. use $principal:(ctrap=$char(3,4):exception="halt:$zeof!($zstatus[""TERMWRITE"")  "_$etrap:nocenable)
 	set dos=0									; the label selects dos/not for entire file
 	read !,"Formfeed delimited <No>? ",x
 	set ff=$select("Y"=$translate($extract(x),"y","Y"):$zchar(13,12),1:"")

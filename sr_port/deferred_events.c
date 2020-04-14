@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -81,7 +81,7 @@ volatile short 			xfer_table_events[DEFERRED_EVENTS];
 GBLREF  global_latch_t		defer_latch;
 
 /* -------------------------------------------------------
- * Act only on first recieved.
+ * Act only on first received.
  * -------------------------------------------------------
  */
 GBLDEF	volatile int4	first_event = no_event;
@@ -115,7 +115,6 @@ error_def(ERR_DEFEREVENT);
 boolean_t xfer_set_handlers(int4  event_type, void (*set_fn)(int4 param), int4 param_val, boolean_t popped_entry)
 {
 	boolean_t 	is_first_event = FALSE;
-
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -339,7 +338,7 @@ boolean_t xfer_reset_handlers(int4 event_type)
 	reset_type_is_set_type =  (event_type == first_event);
 #	ifdef DEBUG
 	if (!reset_type_is_set_type)
- 		rts_error(VARLSTCNT(4) ERR_DEFEREVENT, 2, event_type, first_event);
+ 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DEFEREVENT, 2, event_type, first_event);
 #	endif
 
 #	ifdef DEBUG_DEFERRED_EVENT
@@ -434,7 +433,7 @@ void async_action(bool lnfetch_or_start)
 			 * those transfer table functions for more than one M-line. If "outofband" is set to 0, the call to
 			 * "outofband_action" below will do nothing and we will end up running with the op_*intrrpt* transfer
 			 * table functions indefinitely. In this case M-FOR loops are known to return incorrect results which
-			 * might lead to application integrity issues. It is therefore considered safer to GTMASSERT as we
+			 * might lead to application integrity issues. It is therefore considered safer to assertpro as we
 			 * will at least have the core for analysis.
 			 */
 			assertpro(0 != outofband);

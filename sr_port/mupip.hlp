@@ -3792,11 +3792,13 @@
      o If -HEURISTIC is not specified, MUPIP SIZE uses the
        ARSAMPLE,SAMPLE=1000 estimation technique.
 
-   The 2 sigma column for the two sampling techniques shows the dispersion of
-   the samples (in blocks) and the probability (rounded to a whole
-   percentage) that the actual value falls farther away from the reported
-   value by more than two sigma. With the scan method the "sample" is
-   "complete," so any inaccuracy comes from concurrent updates.
+   The 2 sigma column for the two sampling techniques addresses the
+   dispersion of the samples (in blocks) by giving the probability (rounded
+   to a whole percentage) that the actual value falls farther away from the
+   reported value by more than two sigma; in other words, larger values
+   indicate less confidence in the accuracy of the result. With the scan
+   method the "sample" is "complete," so any inaccuracy comes from concurrent
+   updates.
 
    **Important**
 

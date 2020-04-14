@@ -131,6 +131,7 @@ typedef struct io_desc_struct
 	unsigned int			width;
 	bool				perm;		/* permanent	*/
 	bool				wrap;		/* if FALSE trunc */
+	boolean_t                       fflf;           /* if TRUE "write #" emits FF+LF on disk files, otherwise bare LF */
 	enum io_dev_type		type;
 	enum io_dev_state		state;
 	struct
@@ -608,6 +609,7 @@ MBSTART {											\
 	}											\
 } MBEND
 
+<<<<<<< HEAD
 /* The below macro is called before an "op_close" that is followed by a restore of "io_curr_device".
  * In that case, we need to make sure the restored "io_curr_device" after the "op_close()" does not point
  * to the just now closed/freed device. The "IN_IS_CURR_DEVICE" and "OUT_IS_CURR_DEVICE" output parameters
@@ -646,4 +648,50 @@ MBSTART {										\
 	if (OUT_IS_CURR_DEVICE)								\
 		io_curr_device.out = io_std_device.out;					\
 } MBEND
+=======
+/* Set prin_*_dev_failure if a read or write failed on the principal device. If it is a recurrence,
+ * issue the NOPRINCIO error.
+ */
+#define ISSUE_NOPRINCIO_IF_NEEDED(IOD, WRITE, SOCNOERR)							\
+MBSTART {												\
+	/* the following literal and the game played with it deal with the suppression of the */	\
+	/* maintenance of $ZSTATUS while in direct mode */						\
+	LITDEF mstr    dm_did_it = {0, LEN_AND_LIT("Direct Mode activity")};				\
+	LITDEF mstr    silent_soc = {0, LEN_AND_LIT("socket with IOERROR disabled")};			\
+	mval dev, zpos, zstatus;									\
+													\
+	if ((IOD) == ((WRITE) ? io_std_device.out : io_std_device.in))					\
+	{												\
+		if ((WRITE) ? prin_out_dev_failure : prin_in_dev_failure)				\
+		{											\
+			util_out_print("", RESET);	/* Reset output buffer */			\
+			op_svget(SV_ZPOS, &zpos);							\
+			if (memcmp("+1^GTM$DMOD", zpos.str.addr, STR_LIT_LEN("+1^GTM$DMOD")))		\
+			{	/* not in base direct mode so do noisy exit */				\
+				dev.str.len = (WRITE) ? io_std_device.out->trans_name->len		\
+					: io_std_device.in->trans_name->len;				\
+				dev.str.addr = (WRITE) ? io_std_device.out->trans_name->dollar_io	\
+					: io_std_device.in->trans_name->dollar_io;			\
+				if (SOCNOERR)								\
+					zstatus.str = silent_soc;	/* suppressing socket errors */	\
+				else									\
+					zstatus.str = dollar_zstatus.str;				\
+				if (0 == zstatus.str.len)						\
+					zstatus.str = dm_did_it;	/* in case there's no zstatus */\
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(10) ERR_NOPRINCIO, 8, 		\
+					RTS_ERROR_STRING((WRITE) ? "WRITE to" : "READ from"),		\
+					dev.str.len, dev.str.addr, zpos.str.len, zpos.str.addr,		\
+					zstatus.str.len, zstatus.str.addr);				\
+			} else if (!prin_out_dev_failure)	/* in direct mode so go quietly */	\
+				flush_pio();			/* unless output is still OK */		\
+			stop_image_no_core();								\
+		}											\
+		if (WRITE)										\
+			prin_out_dev_failure = TRUE;							\
+		else											\
+			prin_in_dev_failure = TRUE;							\
+	}												\
+} MBEND
+
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 #endif /* IO_H */

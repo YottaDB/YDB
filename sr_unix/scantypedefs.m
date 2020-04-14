@@ -1043,9 +1043,9 @@
 	;
 	; Start of last phase - write out the GTM structure definition file
 	;
-	Set sdfile="GTMDefinedTypesInit.m",gdeinitfile="gdeinitsz.m"
-	Open sdfile:New,gdeinitfile:New
-	For f=sdfile,gdeinitfile do Prolog(f)
+	Set sdfile="GTMDefinedTypesInit.m"
+	Open sdfile:New
+	For f=sdfile do Prolog(f)
 	Set lincnt=32,(fldcnt,gvstats,strctcnt)=0
 	Use sdfile
 	;
@@ -1102,12 +1102,6 @@
 	Set endline=" Finished writing GTMDefinedTypesInit.m output file ("_lincnt_" lines written for "_strctcnt
 	Set endline=endline_" structures with "_fldcnt_" fields)"
 	Do DoWrite($ZDate($Horolog,"24:60:SS")_endline)
-	Use gdeinitfile
-	Write TAB,"Set SIZEOF(""gvstats"")=",gvstats,!
-	Write TAB,"Quit",!
-	Close gdeinitfile
-	Use $Principal
-	Do DoWrite($ZDate($Horolog,"24:60:SS")_" Finished writing "_gdeinitfile_" output file with gvstatsize = "_gvstats)
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;

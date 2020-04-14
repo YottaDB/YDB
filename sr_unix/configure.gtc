@@ -74,7 +74,11 @@ else echo "Shared libary ldflags not set for this platform"; exit 1
 fi
 
 # Binaries
+<<<<<<< HEAD
 binaries="mupip yottadb libyottadb$ext lke dse ftok semstat2"
+=======
+binaries="mupip mumps libgtmshr$ext lke dse ftok semstat2"
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 
 # Normal scripts - executed by anyone
 nscripts="lowerc_cp"
@@ -102,9 +106,13 @@ if [ $deliver_gtcm = "yes" ]; then
 	pathmods="$pathmods gtcm_run.gtc gtcm_slist.gtc"
 fi
 
+<<<<<<< HEAD
 ydb_id=`command -v id`
 euid=`$ydb_id -un`	# Get effective user id
 if [ "$euid" != "root" ] ; then
+=======
+if [ "`whoami`" != "root" ] ; then
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 	$echo "You must run Configure as root."
 	exit 1
 fi
@@ -847,7 +855,11 @@ if [ ! -t 0 ] ; then echo "$resp"; fi
 if [ "$resp" = "Y" -o "$resp" = "y" ] ; then
 	\rm -rf $binaries $pathmods $rscripts $nscripts $dirs configure \
 		*.gtc gtm* gde* GDE*.o _*.m _*.o mumps.dat mumps.gld $other_object_files $csh_script_files lowerc_cp\
+<<<<<<< HEAD
 		*.hlp core *.h *.m *help.dat *help.gld COPYING README.md README.txt
+=======
+		*.hlp core *.h *.m *help.dat *help.gld COPYING README.txt
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 	\rm -rf GETPASS.o plugin GTMHELP.o custom_errors_sample.txt
 	if [ -d utf8 ]; then
 		\rm -rf utf8

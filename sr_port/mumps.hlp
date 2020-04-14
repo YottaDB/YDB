@@ -5170,10 +5170,17 @@
    operator log.
 
    VIEW "LOGNONTP"[:intexpr] turns on logging of NONTPRESTART messages to the
+<<<<<<< HEAD
    operator log. If no intexpr is specified, YottaDB uses the value of
    environment variable ydb_nontprestart_log_delta, if it is defined, and one
    otherwise (that is, every transaction restart will be logged). A negative
    value of intexpr turns off the logging of NONTPRESTART messages.
+=======
+   operator log. If no intexpr is specified, GT.M uses the value of
+   environment variable gtm_nontprestart_log_delta, if it is defined, and one
+   otherwise (that is, it logs every transaction restart) A zero (0) or
+   negative value of intexpr turns off the logging of NONTPRESTART messages.
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 
    Note that it is not possible to perform the operations of
    ydb_nontprestart_log_first with VIEW "LOGNONTP"[:intexpr].
@@ -5189,10 +5196,17 @@
    operator log.
 
    VIEW "LOGTPRESTART"[:intexpr] turns on logging of TPRESTART messages to
+<<<<<<< HEAD
    the operator log. If no intexpr is specified, YottaDB uses the value of
    environment variable ydb_tprestart_log_delta, if it is defined, and one
    otherwise (that is, every transaction restart will be logged). A negative
    value of intexpr turns off the logging of TPRESTART messages.
+=======
+   the operator log. If no intexpr is specified, GT.M uses the value of
+   environment variable gtm_tprestart_log_delta, if it is defined, and one
+   otherwise (that is, it logs every transaction restart). A zero (0) or
+   negative value of intexpr turns off the logging of TPRESTART messages.
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 
    Note that it is not possible to perform the operations of
    ydb_tprestart_log_first with VIEW "LOGTPRESTART"[:intexpr].
@@ -13946,13 +13960,19 @@
    | WRITE !   |         | increment $Y                   | current record  |
    |           |         |                                | to WIDTH        |
    |-----------+---------+--------------------------------+-----------------|
-   |           |         |                                | Write PAD bytes |
-   |           |         |                                | to bring the    |
-   |           |         | Write <FF>,<LF>, set $X to 0,  | current record  |
-   | WRITE #   | either  | increment $Y                   | to WIDTH, then  |
-   |           |         |                                | a <FF> followed |
-   |           |         |                                | by WIDTH-1 PAD  |
-   |           |         |                                | bytes           |
+   |           |         | Write <FF>,<LF> or <FF>, set   |                 |
+   |           |         | $X and $Y to 0. See the        |                 |
+   |           |         | documentation for the USE and  |                 |
+   |           |         | OPEN commands to understand    | Write PAD bytes |
+   |           |         | how the [NO]FFLF device        | to bring the    |
+   |           |         | parameter and the gtm_nofflf   | current record  |
+   | WRITE #   | either  | environment variable affects   | to WIDTH, then  |
+   |           |         | the operation of "WRITE #". If | a <FF> followed |
+   |           |         | the device parameter is        | by WIDTH-1 PAD  |
+   |           |         | unused, and the environment    | bytes           |
+   |           |         | variable is unset, the default |                 |
+   |           |         | behavior of "WRITE #" is to    |                 |
+   |           |         | write <FF>,<LF>.               |                 |
    |-----------+---------+--------------------------------+-----------------|
    |           |         |                                | After a WRITE,  |
    |           |         |                                | if $X >0,       |
@@ -14023,10 +14043,20 @@
      o An attempt to OPEN a non-zero length file WRITEONLY without either
        NEWVERSION or TRUNCATE in UTF mode produces an OPENDEVFAIL due to the
        fact that any existing BOM information cannot be verified.
+<<<<<<< HEAD
      o Note that with YottaDB SD encryption, because of the state information
        associated with encryption processing, encrypted files require the
        file to be WRITEn or READ from the beginning rather than from an
        arbitrary position.
+=======
+     o GT.M SD encryption, because of the state information associated with
+       encryption processing, requires encrypted files to be WRITEn or READ
+       from the beginning rather than from an arbitrary position.
+     o HEREDOCs in shell scripts that drive input to GT.M present to GT.M as
+       SD files, and by default terminate with a success - zero (0) status
+       unless GT.M terminates with a ZHALT that supplies an alternative
+       status.
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 
 3 _Binary_Files
     Binary Files
@@ -15796,6 +15826,43 @@
    The environment variable TERM must specify a terminfo entry that matches
    both what the terminal (or terminal emulator) sends and expects.
 
+5 FFLF
+   FFLF
+
+   [NO]FFLF Applies to: SD
+
+   The [NO]FFLF deviceparameter controls whether WRITE # produces only a
+   form-feed (<FF>) or a form-feed and line-feed (<FF><LF>). Previously, GT.M
+   used <FF><LF> which deviated from the standard, but out of concern for
+   existing practice the default remains <FF><LF>.
+
+   Additionally, the "gtm_nofflf" environment variable controls the default
+   WRITE # behavior of GT.M. If it is unset or set to 0, N[O] or F[ALSE], the
+   default behavior is unchanged. If it is set to 1, Y[ES] or T[RUE], the
+   default behavior of WRITE # is changed to produce only a form-feed (<FF>),
+   though M programs can still control behavior by specifying the FFLF
+   deviceparameter.
+
+   Example:
+
+   GTM>zprint ^fflf
+   fflf
+     set file="/tmp/myfile"
+     open file:(newversion:wrap:stream:nofflf)
+     use file
+     write #,"Hello"
+     close file
+     zsystem "od -tcd1 /tmp/myfile"
+     quit
+   GTM>do ^fflf
+   0000000   \f    H    e    l    l    o   \n
+             12   72  101  108  108  111   10
+   0000007
+   GTM>halt
+
+   This example opens the file "myfile", and sets the NOFFLF deviceparameter
+   with OPEN. It will write the sequence "<FF>Hello<LF>" to the file.
+
 5 FIFO
    FIFO
 
@@ -16931,6 +16998,8 @@
    |----------------------+-----+----+------+------+------+-----|
    | EXCEPTION=expr       | X   | X  | X    | X    | X    | X   |
    |----------------------+-----+----+------+------+------+-----|
+   | [NO]FFLF             |     | X  |      |      |      |     |
+   |----------------------+-----+----+------+------+------+-----|
    | FIFO                 |     |    | X    |      |      |     |
    |----------------------+-----+----+------+------+------+-----|
    | [NO]FIXED            |     | X  | X    | X    |      |     |
@@ -17427,6 +17496,25 @@
    the driver for the device detects an error, or an entryref to which YottaDB
    transfers control, as appropriate for the current ydb_ztrap_form.
 
+5 FFLF
+   FFLF
+
+   [NO]FFLF Applies to: SD
+
+   The [NO]FFLF deviceparameter controls whether WRITE # produces only a
+   form-feed (<FF>) or a form-feed and line-feed (<FF><LF>). Previously, GT.M
+   used <FF><LF> which deviated from the standard, but out of concern for
+   existing practice the default remains <FF><LF>.
+
+   Additionally, the "gtm_nofflf" environment variable controls the default
+   WRITE # behavior of GT.M. If it is unset or set to 0, N[O] or F[ALSE], the
+   default behavior is unchanged. If it is set to 1, Y[ES] or T[RUE], the
+   default behavior of WRITE # is changed to produce only a form-feed (<FF>),
+   though M programs can still control behavior by specifying the FFLF
+   deviceparameter.
+
+   For an example, refer to the description of FFLF deviceparameter of OPEN.
+
 5 FILTER
    FILTER
 
@@ -17482,6 +17570,27 @@
    load is high.
 
    By default, HOSTSYNC is disabled.
+
+5 HUPENABLE
+   HUPENABLE
+
+   [NO]HUPENABLE Applies to: TRM
+
+   [NO]HOSTSYNC Applies to: Terminal PRINCIPAL devices
+
+   Enables or disables the recognition by the process of the loss ("hang up")
+   of PRINCIPAL device terminal. When enabled the proces receives an
+   TERMHANGUP error if the O/S signals that the terminal assigned to the
+   process as the PRINCIPAL device has disconnected. If GT.M is configured to
+   ignore such a signal, a process may subsequently receive an IOEOF or a
+   TERMWRITE error from an attempt to respectively READ from, or WRITE to the
+   missing device. GT.M terminates a process that ignores more than one of
+   these messages and, if the process is not in Direct Mode, sends a
+   NOPRINCIO message to the operator log.
+
+   If defined, the gtm_hupeable environment variable determines the initial
+   process behavior, and if that is undefined GT.M does not immeidately
+   report a terminal disconnect.
 
 5 IKEY
    IKEY
@@ -18076,6 +18185,8 @@
    |---------------------+-----+----+------+------+------+-----|
    | EXCEPTION=expr      | X   | X  | X    | X    | X    | X   |
    |---------------------+-----+----+------+------+------+-----|
+   | [NO]FFLF            |     | X  |      |      |      |     |
+   |---------------------+-----+----+------+------+------+-----|
    | [NO]FILTER[=expr]   | X   |    |      |      | X    | X   |
    |---------------------+-----+----+------+------+------+-----|
    | FLUSH               | X   |    |      |      |      | X   |
@@ -18262,6 +18373,8 @@
    | [NO]ESCAPE         |      | X   |       |
    |--------------------+------+-----+-------|
    | EXCEPTION=expr     | X    | X   | X     |
+   |--------------------+------+-----+-------|
+   | [NO]FFLF           | X    | X   |       |
    |--------------------+------+-----+-------|
    | [NO]FILTER[=expr]  |      | X   |       |
    |--------------------+------+-----+-------|
@@ -19866,13 +19979,9 @@
    ydb_collate_n.
 
    An active process can use the %LCLCOL utility to define the collation
-   sequence for subscripts of local variables. %LCLCOL has these extrinsic
-   entry points:
+   sequence for subscripts of local variables.
 
    set^%LCLCOL(n)changes the local collation to the type specified by n.
-
-   If the collation sequence is not available, the routine returns a false
-   (0) and does not modify the local collation sequence.
 
    Example:
 
@@ -20281,28 +20390,6 @@
 
    set^%GBLDEF(gname,nct,act)
 
-   where:
-
-     * The first argument, gname, is the name of the global. If the global
-       name appears as a literal, it must be enclosed in quotation marks ("
-       "). The must be a legal M variable name, including the leading caret
-       (^).
-     * The second argument, nct, is an integer that determines whether
-       numeric subscripts are treated as strings. The value is FALSE (0) if
-       numeric subscripts are to collate before strings, as in standard M,
-       and TRUE (1) if numeric subscripts are to be treated as strings (for
-       example, where 10 collates before 9).
-     * The third argument, act, is an integer specifying the active collation
-       sequence from 0, standard M collation, to 255.
-     * If the global contains data, this function returns a FALSE (0) and
-       does not modify the existing collation sequence definition.
-     * If the global's subscripts span multiple regions, the function returns
-       a false (0). Use the global directory (GBLNAME object in GDE) to set
-       collation characteristics for a global whose subscripts span multiple
-       regions.
-     * Always execute this function outside of a TSTART/TCOMMIT fence. If
-       $TLEVEL is non-zero, the function returns a false(0).
-
    Example:
 
    YDB>kill ^G
@@ -20325,29 +20412,11 @@
 
    get^%GBLDEF(gname[,reg])
 
-   where gname specifies the global variable name. When gname spans multiple
-   regions, reg specifies a region in the span.
-
-   This function returns the data associated with the global name as a comma
-   delimited string having the following pieces:
-
-     * A truth-valued integer specifying FALSE (0) if numeric subscripts
-       collate before strings, as in standard M, and TRUE (1) if numeric
-       subscripts are handled as strings.
-     * An integer specifying the collation sequence.
-     * An integer specifying the version, or revision level, of the currently
-       implemented collation sequence.
-
    **Note**
 
    get^%GBLDEF(gname) returns global specific characteristics, which can
    differ from collation characteristics defined for the database file at
    MUPIP CREATE time from settings in the global directory.
-
-   A "0" return from $$get^%gbldef(gname[,reg]) indicates that the global has
-   no special characteristics and uses the region default collation, while a
-   "0,0,0" return indicates that the global is explicitly defined to M
-   collation.
 
    DSE DUMP -FILEHEADER command displays region collation whenever the
    collation is other than M standard collation.
@@ -20367,15 +20436,6 @@
    use the extrinsic entry point:
 
    kill^%GBLDEF(gname)
-
-     o If the global contains data, the function returns a false (0) and does
-       not modify the global.
-     o If the global's subscript span multiple regions, the function returns
-       a false (0). Use the global directory (GBLNAME object in GDE) to set
-       collation characteristics for a global whose subscripts span multiple
-       regions.
-     o Always execute this function outside of a TSTART/TCOMMIT fence. If
-       $TLEVEL is non-zero, the function returns a false (0).
 
 3 Example_of_Upper_and_Lower_Case_Alphabetic_Collation_Sequence
    Example of Upper and Lower Case Alphabetic Collation Sequence

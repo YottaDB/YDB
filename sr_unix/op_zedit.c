@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -71,19 +71,26 @@ void op_zedit(mval *v, mval *p)
 	src.len = v->str.len;
 	src.addr = v->str.addr;
 	if (0 == src.len)
+	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, src.len, src.addr);
+		return;
+	}
 	memset(&pblk, 0, SIZEOF(pblk));
 	pblk.buffer = es;
 	pblk.buff_size = MAX_FN_LEN;
 	status = parse_file(&src, &pblk);
 	if (!(status & 1))
+	{
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_ZEDFILSPEC, 2, src.len, src.addr, status);
+		return;
+	}
 	has_ext = 0 != (pblk.fnb & F_HAS_EXT);
 	exp_dir = 0 != (pblk.fnb & F_HAS_DIR);
 	if (!(pblk.fnb & F_HAS_NAME))
 	{
 		assert(!has_ext);
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, pblk.b_esl, pblk.buffer);
+		return;
 	}
 	if (!exp_dir)
 	{
@@ -102,15 +109,20 @@ void op_zedit(mval *v, mval *p)
 		{
 			typ = STR_LIT_LEN(DOTM);
 			if (path_len + typ > MAX_FN_LEN)
+			{
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, path_len, es);
+				return;
+			}
 			memcpy(&es[path_len], DOTM, STR_LIT_LEN(DOTM));
 			path_len += typ;
 		}
 	} else
 	{
 		if ((STR_LIT_LEN(DOTOBJ) == pblk.b_ext) && !MEMCMP_LIT(ptr + pblk.b_name, DOTOBJ))
+		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, path_len, es);
-		else if ((STR_LIT_LEN(DOTM) == pblk.b_ext) && !MEMCMP_LIT(ptr + pblk.b_name, DOTM))
+			return;
+		} else if ((STR_LIT_LEN(DOTM) == pblk.b_ext) && !MEMCMP_LIT(ptr + pblk.b_name, DOTM))
 			typ = STR_LIT_LEN(DOTM);
 	}
 	dollar_zsource.str.addr = es;
@@ -145,7 +157,10 @@ void op_zedit(mval *v, mval *p)
 			assert(ZRO_TYPE_SOURCE == srcdir->type);
 			tslash = ('/' == srcdir->str.addr[srcdir->str.len - 1]) ? 0 : 1;
 			if (path_len + srcdir->str.len + tslash >= SIZEOF(es))
+			{
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_ZEDFILSPEC, 2, src.len, src.addr);
+				return;
+			}
 			memmove(&es[ srcdir->str.len + tslash], &es[0], path_len);
 			if (tslash)
 				es[ srcdir->str.len ] = '/';

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -174,8 +174,13 @@ void send_msg_va(void *csa, int arg_count, va_list var)
 				fao_count = MAX_FAO_PARMS;
 			}
                 } else
+<<<<<<< HEAD
                         fao_count = 0;
                 util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
+=======
+                        fao_actual = fao_count = 0;
+                util_out_print_vaparm(msg_string.addr, NOFLUSH_OUT, var, fao_count);
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 		va_end(var);	/* need this before used as dest in copy */
 		VAR_COPY(var, TREF(last_va_list_ptr));
 		va_end(TREF(last_va_list_ptr));
@@ -187,7 +192,7 @@ void send_msg_va(void *csa, int arg_count, va_list var)
                                 PRINT_CALLERID;
                         break;
                 }
-                util_out_print("!/", NOFLUSH);
+                util_out_print("!/", NOFLUSH_OUT);
         }
         util_out_print(NULL, OPER);
 	RESTORE_UTIL_OUT_BUFFER(save_util_outptr, save_last_va_list_ptr, util_copy_saved);

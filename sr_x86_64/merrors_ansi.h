@@ -1,10 +1,7 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2021 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information 	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
- *								*
- * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.*
- * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -12,7 +9,6 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
-
 
 const static readonly int error_ansi[] = {
 	   0,	/* ACK */
@@ -99,7 +95,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* INDEXTRACHARS */
 	   0,	/* CORRUPTNODE */
 	   0,	/* INDRMAXLEN */
-	   0,	/* UNUSEDMSG268 */
+	   0,	/* INSFFBCNT */
 	   0,	/* INTEGERRS */
 	   0,	/* INVCMD */
 	   0,	/* INVFCN */
@@ -108,7 +104,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* IOEOF */
 	   0,	/* IONOTOPEN */
 	   0,	/* MUPIPINFO */
-	   0,	/* UNUSEDMSG277 */
+	   0,	/* IVTIME */
 	   0,	/* JOBFAIL */
 	  13,	/* JOBLABOFF */
 	   0,	/* JOBPARNOVAL */
@@ -201,7 +197,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* TXTSRCFMT */
 	   0,	/* UIDMSG */
 	   0,	/* UIDSND */
-	   6,	/* LVUNDEF */
+	   6,	/* UNDEF */
 	   0,	/* UNIMPLOP */
 	  39,	/* VAREXPECTED */
 	   0,	/* VARRECBLKSZ */
@@ -221,14 +217,14 @@ const static readonly int error_ansi[] = {
 	   0,	/* ZPARSETYPE */
 	   0,	/* ZPARSFLDBAD */
 	   0,	/* ZPIDBADARG */
-	   0,	/* UNUSEDMSG390 */
-	   0,	/* UNUSEDMSG391 */
+	   0,	/* ZPRIVARGBAD */
+	   0,	/* ZPRIVSYNTAXERR */
 	  13,	/* ZPRTLABNOTFND */
 	   0,	/* VIEWAMBIG */
 	   0,	/* VIEWNOTFOUND */
-	   0,	/* UNUSEDMSG395 */
+	   0,	/* ZSETPRVARGBAD */
 	   0,	/* INVSPECREC */
-	   0,	/* UNUSEDMSG397 */
+	   0,	/* ZSETPRVSYNTAX */
 	   0,	/* ZSRCHSTRMCT */
 	   0,	/* VERSION */
 	   0,	/* MUNOTALLSEC */
@@ -251,8 +247,8 @@ const static readonly int error_ansi[] = {
 	  58,	/* ZCARGMSMTCH */
 	  58,	/* ZCCONMSMTCH */
 	   0,	/* ZCOPT0 */
-	   0,	/* UNUSEDMSG420 */
-	   0,	/* UNUSEDMSG421 */
+	   0,	/* ZCSTATUS */
+	   0,	/* ZCUSRRTN */
 	   0,	/* ZCPOSOVR */
 	   0,	/* ZCINPUTREQ */
 	   0,	/* JNLTNOUTOFSEQ */
@@ -391,7 +387,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOCCPPID */
 	   0,	/* CCPJNLOPNERR */
 	   0,	/* LCKSGONE */
-	   0,	/* UNUSEDMSG560 */
+	   0,	/* ZLKIDBADARG */
 	   0,	/* DBFILOPERR */
 	   0,	/* CCERDERR */
 	   0,	/* CCEDBCL */
@@ -468,7 +464,7 @@ const static readonly int error_ansi[] = {
 	  72,	/* RMWIDTHPOS */
 	  13,	/* OFFSETINV */
 	   0,	/* JOBPARTOOLONG */
-	   0,	/* UNUSEDMSG637 */
+	   0,	/* JOBARGMISSING */
 	   0,	/* RUNPARAMERR */
 	   0,	/* FNNAMENEG */
 	   0,	/* ORDER2 */
@@ -533,7 +529,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBBMMSTR */
 	   0,	/* DBROOTBURN */
 	   0,	/* REPLSTATEERR */
-	   0,	/* UNUSEDMSG702 */
+	   0,	/* VMSMEMORY */
 	   0,	/* DBDIRTSUBSC */
 	   0,	/* TIMEROVFL */
 	   0,	/* GTMASSERT */
@@ -559,7 +555,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* FILEIDMATCH */
 	   0,	/* EXTSRCLIN */
 	   0,	/* EXTSRCLOC */
-	   0,	/* UNUSEDMSG728 */
+	   0,	/* BIGNOACL */
 	   0,	/* ERRCALL */
 	   0,	/* ZCCTENV */
 	   0,	/* ZCCTOPN */
@@ -664,11 +660,11 @@ const static readonly int error_ansi[] = {
 	   0,	/* DSKSPACEFLOW */
 	   0,	/* GVINCRFAIL */
 	   0,	/* ISOLATIONSTSCHN */
-	   0,	/* UNUSEDMSG833 */
+	   0,	/* REPLGBL2LONG */
 	   0,	/* TRACEON */
 	   0,	/* TOOMANYCLIENTS */
 	   0,	/* NOEXCLUDE */
-	   0,	/* UNUSEDMSG837 */
+	   0,	/* GVINCRISOLATION */
 	   0,	/* EXCLUDEREORG */
 	   0,	/* REORGINC */
 	   0,	/* ASC2EBCDICCONV */
@@ -682,9 +678,9 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUQUALINCOMP */
 	   0,	/* DISTPATHMAX */
 	   0,	/* FILEOPENFAIL */
-	   0,	/* UNUSEDMSG851 */
+	   0,	/* IMAGENAME */
 	   0,	/* GTMSECSHRPERM */
-	   0,	/* YDBDISTUNDEF */
+	   0,	/* GTMDISTUNDEF */
 	   0,	/* SYSCALL */
 	   0,	/* MAXGTMPATH */
 	   0,	/* TROLLBK2DEEP */
@@ -833,8 +829,8 @@ const static readonly int error_ansi[] = {
 	   0,	/* JNLNEWREC */
 	   0,	/* REPLFTOKSEM */
 	   0,	/* SOCKNOTPASSED */
-	   0,	/* UNUSEDMSG1002 */
-	   0,	/* UNUSEDMSG1003 */
+	   0,	/* EXTRIOERR */
+	   0,	/* EXTRCLOSEERR */
 	   0,	/* CONNSOCKREQ */
 	   0,	/* REPLEXITERR */
 	   0,	/* MUDESTROYSUC */
@@ -843,7 +839,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOTALLDBOPN */
 	   0,	/* MUSELFBKUP */
 	   0,	/* DBDANGER */
-	   0,	/* UNUSEDMSG1012 */
+	   0,	/* TRUNCATEFAIL */
 	   0,	/* TCGETATTR */
 	   0,	/* TCSETATTR */
 	   0,	/* IOWRITERR */
@@ -1000,9 +996,9 @@ const static readonly int error_ansi[] = {
 	   0,	/* INVZROENT */
 	   0,	/* DDPLOGERR */
 	   0,	/* GETSOCKNAMERR */
-	   0,	/* INVYDBEXIT */
+	   0,	/* INVGTMEXIT */
 	   0,	/* CIMAXPARAM */
-	   0,	/* UNUSEDMSG1171 */
+	   0,	/* CITPNESTED */
 	   0,	/* CIMAXLEVELS */
 	   0,	/* JOBINTRRETHROW */
 	   0,	/* STARFILE */
@@ -1075,9 +1071,9 @@ const static readonly int error_ansi[] = {
 	   0,	/* RSVDBYTE2HIGH */
 	   0,	/* BKUPTMPFILOPEN */
 	   0,	/* BKUPTMPFILWRITE */
+	   0,	/* VMSMEMORY2 */
+	   0,	/* UNUSEDMSG1243 */
 	   0,	/* UNUSEDMSG1244 */
-	   0,	/* UNUSEDMSG1245 */
-	   0,	/* UNUSEDMSG1246 */
 	   0,	/* REPLINSTMISMTCH */
 	   0,	/* REPLINSTREAD */
 	   0,	/* REPLINSTDBMATCH */
@@ -1127,7 +1123,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* RLBKLOSTTNONLY */
 	   0,	/* KILLBYSIGSINFO3 */
 	   0,	/* GTMSECSHRTMPPATH */
-	   0,	/* UNUSEDMSG1296 */
+	   0,	/* GTMERREXIT */
 	   0,	/* INVMEMRESRV */
 	   0,	/* OPCOMMISSED */
 	   0,	/* COMMITWAITSTUCK */
@@ -1215,9 +1211,9 @@ const static readonly int error_ansi[] = {
 	   0,	/* DBBADUPGRDSTATE */
 	   0,	/* WRITEWAITPID */
 	   0,	/* ZGOCALLOUTIN */
-	   0,	/* UNUSEDMSG1384 */
+	   0,	/* REPLNOXENDIAN */
 	   0,	/* REPLXENDIANFAIL */
-	   0,	/* UNUSEDMSG1386 */
+	   0,	/* ZGOTOINVLVL2 */
 	   0,	/* GTMSECSHRCHDIRF */
 	   0,	/* JNLORDBFLU */
 	   0,	/* ZCCLNUPRTNMISNG */
@@ -1343,7 +1339,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* NOTALLDBRNDWN */
 	   0,	/* TPRESTNESTERR */
 	   0,	/* JNLFILRDOPN */
-	   0,	/* UNUSEDMSG1514 */
+	   0,	/* SEQNUMSEARCHTIMEOUT */
 	   0,	/* FTOKKEY */
 	   0,	/* SEMID */
 	   0,	/* JNLQIOSALVAGE */
@@ -1357,13 +1353,13 @@ const static readonly int error_ansi[] = {
 	   0,	/* ZPEEKNORPLINFO */
 	   0,	/* MMREGNOACCESS */
 	   0,	/* MALLOCMAXUNIX */
-	   0,	/* UNUSEDMSG1528 */
+	   0,	/* MALLOCMAXVMS */
 	   0,	/* HOSTCONFLICT */
 	   0,	/* GETADDRINFO */
 	   0,	/* GETNAMEINFO */
 	   0,	/* SOCKBIND */
 	   0,	/* INSTFRZDEFER */
-	   0,	/* UNUSEDMSG1534 */
+	   0,	/* UNUSEDMSG1532 */
 	   0,	/* REGOPENFAIL */
 	   0,	/* REPLINSTNOSHM */
 	   0,	/* DEVPARMTOOSMALL */
@@ -1373,7 +1369,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GBLNOMAPTOREG */
 	   0,	/* ISSPANGBL */
 	   0,	/* TPNOSUPPORT */
-	   0,	/* UNUSEDMSG1544 */
+	   0,	/* UNUSEDMSG1542 */
 	   0,	/* ZATRANSERR */
 	   0,	/* FILTERTIMEDOUT */
 	   0,	/* TLSDLLNOOPEN */
@@ -1400,7 +1396,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* BLKINVALID */
 	   0,	/* CANTBITMAP */
 	   0,	/* AIMGBLKFAIL */
-	   0,	/* YDBDISTUNVERIF */
+	   0,	/* GTMDISTUNVERIF */
 	   0,	/* CRYPTNOAPPEND */
 	   0,	/* CRYPTNOSEEK */
 	   0,	/* CRYPTNOTRUNC */

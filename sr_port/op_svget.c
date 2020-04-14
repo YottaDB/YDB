@@ -134,6 +134,7 @@ LITREF int4		ydb_release_name_len;
 
 void op_svget(int varnum, mval *v)
 {
+	boolean_t	lcl_compile_time;
 	io_log_name	*tl;
 	int 		count;
 	gtm_uint64_t	ucount;
@@ -666,6 +667,7 @@ void op_svget(int varnum, mval *v)
 	}
 	if (!(MVTYPE_IS_SQLNULL(v->mvtype)))
 	{
+<<<<<<< HEAD
 		if (!(MVTYPE_IS_STRING(v->mvtype)))
 		{	/* in case op_svget is called at compile time; shouldn't hurt much any time */
 			assert(MVTYPE_IS_NUMERIC(v->mvtype));
@@ -675,5 +677,12 @@ void op_svget(int varnum, mval *v)
 			assert(MVTYPE_IS_STRING(v->mvtype));
 			s2n(v);
 		}
+=======
+		assert(MVTYPE_IS_STRING(v->mvtype));
+		lcl_compile_time = TREF(compile_time);
+		TREF(compile_time) = TRUE;
+		s2n(v);
+		TREF(compile_time) = lcl_compile_time;
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 	}
 }

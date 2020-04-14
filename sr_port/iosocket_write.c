@@ -21,6 +21,7 @@
 #include "gtm_poll.h"
 #include "gtm_socket.h"
 #include "gtm_inet.h"
+#include "gtm_stdlib.h"
 #include "gtm_stdio.h"
 #include "gtm_string.h"
 #include "eintr_wrappers.h"
@@ -36,31 +37,31 @@
 #include "send_msg.h"
 #include "error.h"
 #include "rel_quant.h"
+#include "svnames.h"
+#include "op.h"
+#include "util.h"
 #ifdef GTM_TLS
 #include "gtm_tls.h"
 #endif
 
-GBLREF io_pair			io_curr_device;
-#ifdef UNIX
-GBLREF io_pair			io_std_device;
-GBLREF bool			prin_out_dev_failure;
-#endif
-
+GBLREF boolean_t		prin_in_dev_failure, prin_out_dev_failure;
+GBLREF io_pair			io_curr_device, io_std_device;
 GBLREF mstr			chset_names[];
-GBLREF UConverter		*chset_desc[];
+GBLREF	mval			dollar_zstatus;
 GBLREF spdesc			stringpool;
+GBLREF UConverter		*chset_desc[];
 #ifdef GTM_TLS
 GBLREF	gtm_tls_ctx_t		*tls_ctx;
 #endif
 
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_DELIMSIZNA);
-UNIX_ONLY(error_def(ERR_NOPRINCIO);)
+error_def(ERR_NOPRINCIO);
 error_def(ERR_NOSOCKETINDEV);
 error_def(ERR_SOCKPASSDATAMIX);
 error_def(ERR_SOCKWRITE);
 error_def(ERR_TEXT);
-UNIX_ONLY(error_def(ERR_TLSIOERROR);)
+error_def(ERR_TLSIOERROR);
 error_def(ERR_ZFF2MANY);
 error_def(ERR_ZINTRECURSEIO);
 
@@ -75,7 +76,7 @@ error_def(ERR_ZINTRECURSEIO);
 	gtmioBuff = (sm_uc_ptr_t)(SBUFF);										\
 	for (;;)													\
         {														\
-		gtmioChunk = gtmioBuffLen VMS_ONLY(> VMS_MAX_TCP_IO_SIZE ? VMS_MAX_TCP_IO_SIZE : gtmioBuffLen);		\
+		gtmioChunk = gtmioBuffLen;		\
 		SEND((SOCKETPTR)->sd, gtmioBuff, gtmioChunk, SFLAGS, gtmioStatus);					\
 		if ((ssize_t)-1 != gtmioStatus)										\
 	        {													\
@@ -135,16 +136,18 @@ void iosocket_buffer_error(socket_struct *socketptr)
 		else
 			errptr = (char *)STRERROR(socketptr->obuffer_errno);
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
-		socketptr->obuffer_errno = 0;
+		ISSUE_NOPRINCIO_IF_NEEDED(iod, TRUE, !socketptr->ioerror);	/* TRUE indicates WRITE */
 		if (socketptr->ioerror)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_TLSIOERROR, 2, LEN_AND_LIT("send"),
 				ERR_TEXT, 2, errlen, errptr);
+		if (!prin_out_dev_failure)
+			socketptr->obuffer_errno = 0;
 	} else
 #	endif
 	{
 		save_obuffer_errno = socketptr->obuffer_errno;
 		socketptr->obuffer_errno = 0;
-		SOCKERROR(iod, socketptr, ERR_SOCKWRITE, save_obuffer_errno);
+		SOCKWRTERROR(iod, socketptr, ERR_SOCKWRITE, save_obuffer_errno);
 	}
 }
 
@@ -362,11 +365,9 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 	dsocketptr = (d_socket_struct *)iod->dev_sp;
 	if (0 >= dsocketptr->n_socket)
 	{
-#		ifndef VMS
 		if (iod == io_std_device.out)
 			ionl_write(v);
 		else
-#		endif
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOSOCKETINDEV);
 		REVERT_GTMIO_CH(&iod->pair, ch_set);
 		return;
@@ -410,14 +411,12 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			DBGSOCK2((stdout, "socwrite: TCP send of BOM-BE with rc %d\n", status));
 			if (0 != status)
 			{
-				SOCKERROR(iod, socketptr, ERR_SOCKWRITE, status);
+				SOCKWRTERROR(iod, socketptr, ERR_SOCKWRITE, status);
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
 			}
-#ifdef UNIX
 			else if (iod == io_std_device.out)
 				prin_out_dev_failure = FALSE;
-#endif
 		}
 		socketptr->first_write = FALSE;
 
@@ -504,7 +503,7 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 							  socketptr->odelimiter0.len, status));
 						if (0 != status)
 						{
-							SOCKERROR(iod, socketptr, ERR_SOCKWRITE, status);
+							SOCKWRTERROR(iod, socketptr, ERR_SOCKWRITE, status);
 							REVERT_GTMIO_CH(&iod->pair, ch_set);
 							return;
 						}
@@ -545,14 +544,12 @@ void	iosocket_write_real(mstr *v, boolean_t convert_output)
 			DBGSOCK2((stdout, "socwrite: TCP data send of %d bytes with rc %d\n", b_len, status));
 			if (0 != status)
 			{
-				SOCKERROR(iod, socketptr, ERR_SOCKWRITE, status);
+				SOCKWRTERROR(iod, socketptr, ERR_SOCKWRITE, status);
 				REVERT_GTMIO_CH(&iod->pair, ch_set);
 				return;
 			}
-#ifdef UNIX
 			else if (iod == io_std_device.out)
 				prin_out_dev_failure = FALSE;
-#endif
 			dollarx(iod, (uchar_ptr_t)out, (uchar_ptr_t)out + b_len);
 			DBGSOCK2((stdout, "socwrite: $x/$y updated by dollarx():  $x: %d  $y: %d  filter: %d  escape:  %d\n",
 				  iod->dollar.x, iod->dollar.y, iod->write_filter, iod->esc_state));

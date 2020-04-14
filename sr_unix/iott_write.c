@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -15,8 +15,9 @@
 
 #include "mdef.h"
 #include "gtm_unistd.h"
+#include "gtm_stdlib.h"
 
-#include <signal.h>
+#include "gtm_signal.h"
 #include "gtm_string.h"
 #include <errno.h>
 #include <wctype.h>
@@ -31,18 +32,23 @@
 #include "dollarx.h"
 #include "have_crit.h"
 #include "iott_flush_time.h"
+#include "svnames.h"
+#include "op.h"
+#include "util.h"
+#include "outofband.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
 
-GBLREF io_pair		io_curr_device;
-GBLREF io_pair		io_std_device;
-GBLREF bool		prin_out_dev_failure;
-GBLREF boolean_t	gtm_utf8_mode;
-GBLREF int		process_exiting;
+GBLREF boolean_t	gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
+GBLREF int		exi_condition, process_exiting;
+GBLREF io_pair		io_curr_device, io_std_device;
+GBLREF mval		dollar_zstatus;
+GBLREF volatile int4	outofband;
 
 error_def(ERR_NOPRINCIO);
+error_def(ERR_TERMHANGUP);
 error_def(ERR_TERMWRITE);
 error_def(ERR_ZINTRECURSEIO);
 
@@ -59,6 +65,8 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 	tt_ptr = io_ptr->dev_sp;
 	assert(tt_ptr->write_active == FALSE);
 	ESTABLISH_GTMIO_CH(&io_ptr->pair, ch_set);
+	if ((sighup == outofband) || ((int)ERR_TERMHANGUP == SIGNAL))
+		TERMHUP_NOPRINCIO_CHECK(TRUE);				/* TRUE for WRITE */
 	tt_ptr->write_active = TRUE;
  	buff_left = IOTT_BUFF_LEN - (int)((tt_ptr->tbuffp - tt_ptr->ttybuff));
 	assert(buff_left > IOTT_BUFF_MIN || prin_out_dev_failure);
@@ -93,7 +101,7 @@ void  iott_write_buffered_text(io_desc *io_ptr, char *text, int textlen)
 			}
 		} else 	/* (0 != status) */
 		{
-			ISSUE_NOPRINCIO_IF_NEEDED_TT(io_ptr);
+			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, TRUE, FALSE);		/* TRUE, FALSE: WRITE, not socket */
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TERMWRITE, 0, status);
 		}
 	}

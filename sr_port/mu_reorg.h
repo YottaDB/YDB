@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,8 +18,8 @@
 #ifndef FLUSH
 #define FLUSH 1
 #endif
-#ifndef NOFLUSH
-#define NOFLUSH 0
+#ifndef NOFLUSH_OUT
+#define NOFLUSH_OUT 0
 #endif
 
 /* Following definitions give some default values for reorg */

@@ -676,8 +676,6 @@ endif
 if (-e GTMDefinedTypesInit.m) then
 	# Need a different name for each build type as they can be different
 	cp -f GTMDefinedTypesInit.m $gtm_pct/GTMDefinedTypesInit${bldtype}.m
-	cp -f gdeinitsz.m $gtm_pct/gdeinitsz.m
-	mv -f gdeinitsz.m GDEINITSZ.m
 	setenv LC_CTYPE C
 	setenv gtm_chset M
 	./mumps GTMDefinedTypesInit.m
@@ -685,13 +683,6 @@ if (-e GTMDefinedTypesInit.m) then
 		set errmsg = "COMLIST-E-FAIL Failed to compile generated $gtm_exe/GTMDefinedTypes.m"
 		@ comlist_status++
 		echo "${errmsg}" >> $errorlog
-	endif
-	ls -l GDEINITSZ.m
-	./mumps GDEINITSZ.m
-	if ($status) then
-		@ comlist_status++
-		echo "${errmsg}" >> $errorlog
-		set errmsg = "COMLIST_E-FAIL Failed to compile generated $gtm_pct/GDEINITSZ.m"
 	endif
 	# If we have a utf8 dir (created by buildaux.csh called from buildbdp.csh above), add a link to it for
 	# GTMDefinedTypesInit.m and compile it in UTF8 mode
@@ -701,9 +692,12 @@ if (-e GTMDefinedTypesInit.m) then
 		if (! -e $gtm_dist/utf8/GTMDefinedTypesInit.m) then
 		    ln -s $gtm_dist/GTMDefinedTypesInit.m $gtm_dist/utf8/GTMDefinedTypesInit.m
 		endif
+<<<<<<< HEAD
 		if (! -e $ydb_dist/utf8/GDEINITSZ.m) then
 		    ln -s $ydb_dist/GDEINITSZ.m $ydb_dist/utf8/GDEINITSZ.m
 		endif
+=======
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 		pushd utf8
 		# Switch to UTF8 mode
 		if ( "OS/390" == $HOSTOS ) setenv gtm_chset_locale $utflocale      # LC_CTYPE not picked up right
@@ -714,12 +708,6 @@ if (-e GTMDefinedTypesInit.m) then
 		../mumps GTMDefinedTypesInit.m
 		if ($status) then
 			set errmsg = "COMLIST_E-FAIL Failed to compile generated $gtm_exe/utf8/GTMDefinedTypes.m"
-			@ comlist_status++
-			echo "${errmsg}" >> $errorlog
-		endif
-		../mumps GDEINITSZ.m
-		if ($status) then
-			set errmsg = "COMLIST_E-FAIL Failed to compile generated $gtm_exe/utf8/GDEINITSZ.m"
 			@ comlist_status++
 			echo "${errmsg}" >> $errorlog
 		endif
@@ -790,10 +778,17 @@ $gtm_com/IGS $ydb_dist/gtmsecshr UNHIDE
 set distfiles_log = "dist_files.`basename $gtm_exe`.log"
 find $ydb_dist -type f >&! $gtm_log/$distfiles_log
 if ($?scan_image) then
+<<<<<<< HEAD
 	tar cvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar dbcertify dse ftok geteuid gtmsec* gtcm* libgtmshr.so lke mumps mupip
 	tar rvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar plugin/libgtm* plugin/gtmcrypt/maskpass
 	tar rvf $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar /usr/lib64/lib{config,gpgme,gpg-error,crypt,ssl,icu*,z,elf}.so*
 	gzidbp    $ydb_dist/veracode-${gtm_verno}-${HOST:ar}.tar
+=======
+	tar cvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar dbcertify dse ftok gtmsec* gtcm* libgtmshr.so lke mumps mupip
+	tar rvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar plugin/libgtm* plugin/gtmcrypt/maskpass
+	tar rvf $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar /usr/lib64/lib{config,gpgme,gpg-error,crypt,ssl,icu*,z,elf}.so*
+	gzip    $gtm_dist/veracode-${gtm_verno}-${HOST:ar}.tar
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 endif
 $gtm_com/IGS $ydb_dist/gtmsecshr CHOWN
 awk 'BEGIN {dlen=length(ENVIRON["ydb_dist"]);stat=0} {if ((length($0)-dlen)>50) {stat=1}} END {exit stat}' $gtm_log/$distfiles_log

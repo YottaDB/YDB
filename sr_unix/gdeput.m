@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2017 Fidelity National Information		;
+; Copyright (c) 2006-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	;
@@ -250,10 +250,11 @@ csegment:
 	s rec=rec_$$num2bin(2,$zl(segs(s,"FILE_NAME")))
 	s rec=rec_segs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$zl(segs(s,"FILE_NAME")))," ",ZERO)
 	s rec=rec_$$num2bin(2,segs(s,"BLOCK_SIZE"))
-	s rec=rec_$$num2bin(2,segs(s,"EXTENSION_COUNT"))
+	set rec=rec_$tr($j("",2)," ",ZERO)						 ;alignment
+	set rec=rec_$$num2bin(4,segs(s,"EXTENSION_COUNT"))
 	s rec=rec_$$num2bin(4,segs(s,"ALLOCATION"))
-	i (gtm64=TRUE) s rec=rec_$tr($j("",12)," ",ZERO)						;reserved for clb + padding
-	e  s rec=rec_$tr($j("",4)," ",ZERO)								;reserved for clb
+	if (gtm64=TRUE) s rec=rec_$tr($j("",8)," ",ZERO)				;reserved for clb + padding
+	e  s rec=rec_$tr($j("",4)," ",ZERO)						;reserved for clb
 	s rec=rec_".DAT"
 	s rec=rec_$c(+segs(s,"DEFER"))
 	s rec=rec_ZERO											;DYNAMIC segment
@@ -274,7 +275,7 @@ csegment:
 	i (encsupportedplat=TRUE) s rec=rec_$$num2bin(4,segs(s,"ENCRYPTION_FLAG"))
 	e  s rec=rec_$$num2bin(4,0)
 	s rec=rec_$$num2bin(4,segs(s,"ASYNCIO"))
-	s rec=rec_filler16byte			; runtime filler
+	set rec=rec_filler16byte			; runtime filler (read_only +  filler)
 	q
 cgblname:(s)
 	n len,coll,ver

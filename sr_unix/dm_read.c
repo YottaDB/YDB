@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -40,11 +40,15 @@
 #include "dm_read.h"
 #include "gtm_tputs.h"
 #include "op.h"
+#include "send_msg.h"
+#include "svnames.h"
+#include "util.h"
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
 #include "gtm_utf8.h"
 #endif
 
+<<<<<<< HEAD
 GBLREF bool		prin_in_dev_failure;
 GBLREF boolean_t	dollar_zininterrupt, gtm_utf8_mode;
 GBLREF char		*CLR_EOL, *CURSOR_DOWN, *CURSOR_LEFT, *CURSOR_RIGHT, *CURSOR_UP;
@@ -63,6 +67,25 @@ GBLREF unsigned char	*msp, *stackbase, *stacktop, *stackwarn;
 GBLREF volatile int4	outofband;
 GBLREF	boolean_t	dmterm_default;
 GBLREF	volatile boolean_t	timer_in_handler;
+=======
+GBLREF boolean_t		dmterm_default, dollar_zininterrupt, gtm_utf8_mode, prin_in_dev_failure,
+				prin_out_dev_failure;
+GBLREF char			*CLR_EOL, *CURSOR_DOWN, *CURSOR_LEFT, *CURSOR_RIGHT, *CURSOR_UP;
+GBLREF char			*KEY_BACKSPACE, *KEY_DC, *KEY_DOWN, *KEY_INSERT, *KEY_LEFT, *KEY_RIGHT, *KEY_UP;
+GBLREF char			*KEYPAD_LOCAL, *KEYPAD_XMIT;
+GBLREF int			AUTO_RIGHT_MARGIN, EAT_NEWLINE_GLITCH;
+GBLDEF int			comline_index, recall_num;
+GBLREF io_desc			*active_device;
+GBLREF io_pair			io_curr_device, io_std_device;
+GBLREF mstr			*comline_base;
+GBLREF mval			dollar_zstatus;
+GBLREF mv_stent			*mv_chain;
+GBLREF spdesc			stringpool;
+GBLREF stack_frame		*frame_pointer;
+GBLREF unsigned char		*msp, *stackbase, *stacktop, *stackwarn;
+GBLREF volatile int4		outofband;
+GBLREF volatile boolean_t	timer_in_handler;
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 
 LITREF unsigned char	lower_to_upper_table[];
 #ifdef UTF8_SUPPORTED
@@ -89,6 +112,7 @@ static	unsigned char	recall_error_msg[][MAX_ERR_MSG_LEN] =
 };
 
 error_def(ERR_IOEOF);
+error_def(ERR_NOPRINCIO);
 error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_ZINTDIRECT);
@@ -444,6 +468,7 @@ void	dm_read (mval *v)
 			}
 		} else if (0 == status)
 		{	/* select() says there's something to read, but read() found zero characters; assume connection dropped. */
+<<<<<<< HEAD
 			HANDLE_EINTR_OUTSIDE_SYSTEM_CALL;
 			if (io_curr_device.in == io_std_device.in)
 			{
@@ -452,6 +477,9 @@ void	dm_read (mval *v)
 				else
 					EXIT(errno);
 			}
+=======
+			ISSUE_NOPRINCIO_IF_NEEDED(io_ptr, FALSE, FALSE);		/* FALSE, FALSE: READ tt not socket */
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 			tt_ptr->discard_lf = FALSE;
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_IOEOF);
 		} else if (0 < status)

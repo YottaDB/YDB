@@ -83,9 +83,9 @@ int resolve_ref(int errknt)
 						}
 						break;
 					case OC_FNTEXT:
-						if (resolve_optimize(curtrip))	/* only deals with $TEXT(), but could do more */
-						{
-							curtrip = curtrip->exorder.bl;	/* Backup to rescan change to curtrip */
+						if (resolve_optimize(curtrip))
+						{	/* no need to backup and rescan in this case */
+							assert(OC_LITC == curtrip->opcode);
 							continue;
 						}	/* WARNING fallthrough*/
 					default:
@@ -129,8 +129,8 @@ int resolve_ref(int errknt)
 			{
 #			endif
 				if ((OC_FNTEXT == curtrip->opcode) && (resolve_optimize(curtrip)))
-				{ /* resolve_optimize now only deals with $TEXT(), but could do more by removing 1st term below */
-					curtrip = curtrip->exorder.bl;	/* Backup to rescan after changing curtrip */
+				{	/* no need to backup and rescan in this case */
+					assert(OC_LIT == curtrip->opcode);
 					continue;
 				}
 #			ifndef i386

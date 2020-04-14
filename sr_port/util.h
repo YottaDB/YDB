@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -18,6 +18,7 @@
 
 boolean_t util_is_log_open(void);
 
+<<<<<<< HEAD
 #ifdef VMS
 #include <descrip.h>
 
@@ -51,6 +52,8 @@ void util_out_open(struct dsc$descriptor_s *file_prompt);
 void util_log_open(char *filename, uint4 len);
 void util_out_write(unsigned char *addr, unsigned int len);
 #else /* UNIX */
+=======
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 #include "gtm_stdio.h"		/* for FILE * */
 void		util_in_open(void *);
 char		*util_input(char *buffer, int buffersize, FILE *fp, boolean_t remove_leading_spaces);
@@ -60,7 +63,6 @@ boolean_t	util_out_save(char *dst, int *dstlen_ptr);
 void		util_out_syslog_dump(void);
 
 #define		UTIL_OUT_SYSLOG_INTERVAL (50 * (uint8)NANOSECS_IN_MSEC)
-#endif
 #endif
 
 /* This value determines how many levels of nesting are allowed for protection of util_outbuff. */
@@ -105,7 +107,7 @@ void		util_out_syslog_dump(void);
 }
 
 #define OUT_BUFF_SIZE	2048
-#define	NOFLUSH		0
+#define NOFLUSH_OUT	0
 #define FLUSH		1
 #define RESET		2
 #define OPER		4

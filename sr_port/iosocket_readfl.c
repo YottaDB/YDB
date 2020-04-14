@@ -16,12 +16,12 @@
 /* iosocket_readfl.c */
 #include "mdef.h"
 #include <errno.h>
-#include "gtm_stdio.h"
 #include "gtm_time.h"
 #ifdef __MVS__
 #include <sys/time.h>
 #endif
 #include "gtm_socket.h"
+#include "gtm_stdlib.h"
 #include "gtm_inet.h"
 #include "gtm_string.h"
 #include "gtm_fcntl.h"
@@ -42,30 +42,32 @@
 #include "send_msg.h"
 #include "error.h"
 #include "trace_table.h"
+#include "svnames.h"
+#include "op.h"
+#include "util.h"
 #ifdef GTM_TLS
 #include "gtm_tls.h"
 #endif
 
-GBLREF	stack_frame      	*frame_pointer;
-GBLREF	unsigned char    	*stackbase, *stacktop, *msp, *stackwarn;
-GBLREF	mv_stent         	*mv_chain;
-GBLREF	io_pair 		io_curr_device;
-GBLREF	io_pair			io_std_device;
-GBLREF	bool			prin_in_dev_failure;
 GBLREF	bool			out_of_time;
-GBLREF	spdesc 			stringpool;
-GBLREF	volatile int4		outofband;
-GBLREF	mstr			chset_names[];
-GBLREF	UConverter		*chset_desc[];
-GBLREF  boolean_t       	dollar_zininterrupt;
+GBLREF	boolean_t		dollar_zininterrupt, gtm_utf8_mode, prin_in_dev_failure, prin_out_dev_failure;
 GBLREF	int			socketus_interruptus;
-GBLREF	boolean_t		gtm_utf8_mode;
+GBLREF	io_pair 		io_curr_device, io_std_device;
+GBLREF	mstr			chset_names[];
+GBLREF	mv_stent		*mv_chain;
+GBLREF	mval			dollar_zstatus;
+GBLREF	spdesc 			stringpool;
+GBLREF	stack_frame		*frame_pointer;
+GBLREF	UConverter		*chset_desc[];
+GBLREF	unsigned char		*stackbase, *stacktop, *msp, *stackwarn;
+GBLREF	volatile int4		outofband;
 
 error_def(ERR_BOMMISMATCH);
 error_def(ERR_CURRSOCKOFR);
 error_def(ERR_GETSOCKOPTERR);
 error_def(ERR_IOEOF);
 error_def(ERR_MAXSTRLEN);
+error_def(ERR_NOPRINCIO);
 error_def(ERR_NOSOCKETINDEV);
 error_def(ERR_SETSOCKOPTERR);
 error_def(ERR_SOCKPASSDATAMIX);
@@ -73,7 +75,6 @@ error_def(ERR_STACKCRIT);
 error_def(ERR_STACKOFLOW);
 error_def(ERR_TEXT);
 error_def(ERR_ZINTRECURSEIO);
-error_def(ERR_NOPRINCIO);
 
 #ifdef UTF8_SUPPORTED
 /* Maintenance of $KEY, $DEVICE and $ZB on a badchar error */
@@ -545,7 +546,7 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 			}
 			DBGSOCK((stdout, "socrfl: Bytes read: %d\n", status));
 			bytes_read += (int)status;
-			if (iod == io_std_device.out)
+			if (iod == io_std_device.out)	/* Not clear what purpose this serves */
 				prin_in_dev_failure = FALSE;
 			/* In case the CHSET changes from non-UTF-16 to UTF-16 and a read has already been done, there's no way to
 			 * read the BOM bytes & to determine the variant. So default to UTF-16BE, if not already determined.
@@ -931,23 +932,13 @@ int	iosocket_readfl(mval *v, int4 width, uint8 nsec_timeout)
 #		endif
 			errptr = (char *)STRERROR(real_errno);
 		SET_DOLLARDEVICE_ONECOMMA_ERRSTR(iod, errptr, errlen);
-		if (io_curr_device.in == io_std_device.in)
-		{
-			if (!prin_in_dev_failure)
-				prin_in_dev_failure = TRUE;
-			else
-			{
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOPRINCIO);
-				stop_image_no_core();
-			}
+		ISSUE_NOPRINCIO_IF_NEEDED(iod, FALSE, !socketptr->ioerror);	/* FALSE indicates READ */
+		if (socketptr->ioerror && (prin_in_dev_failure || (0 < iod->error_handler.len) || iod->dollar.zeof))
+		{	/* no delay if permitting errors and we lost the device or have and EXCEPTION handler */
+			iod->dollar.zeof = TRUE;
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);
 		}
-		if (iod->dollar.zeof || -1 == status || 0 < iod->error_handler.len)
-		{
-			iod->dollar.zeof = TRUE;
-			if (socketptr->ioerror)
-				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_IOEOF, 0, ERR_TEXT, 2, errlen, errptr);
-		} else
-			iod->dollar.zeof = TRUE;
+		iod->dollar.zeof = TRUE;
 	}
 	DBGSOCK_ONLY(
 		if (!ret && out_of_time)

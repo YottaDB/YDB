@@ -39,7 +39,7 @@
 #define IS_BSTAR_REC(r)		((r)->rsiz == BSTAR_REC_SIZE)
 #define GAC_RSIZE(rsize,r,tob)	if ((uchar_ptr_t)(r) + ((rsize) = ((rec_hdr_ptr_t)(r))->rsiz) > tob) return(-1)
 #define MIN_DATA_SIZE           1 + 2     /*    1 byte of key + 2 nulls for terminator     */
-#define MAX_EXTN_COUNT          65535
+#define MAX_EXTN_COUNT          1048575
 #define MIN_EXTN_COUNT          0
 #define	MAX_DB_BLK_SIZE		((1 << 16) - 512)	/* 64Kb - 512 (- 512 to take care of VMS's max I/O capabilities) */
 

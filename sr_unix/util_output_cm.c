@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,7 +50,7 @@ void util_cm_print(clb_struct *lnk, int code, char *message, int flush, ...)
 	{
 		ASSERT_SAFE_TO_UPDATE_THREAD_GBLS;
 		util_out_print(NULL, RESET);	/* Clear any pending messages */
-		util_out_print_vaparm(message, NOFLUSH, var, MAXPOSINT4);
+		util_out_print_vaparm(message, NOFLUSH_OUT, var, MAXPOSINT4);
 		msglen = (size_t)(TREF(util_outptr) - TREF(util_outbuff_ptr));
 		memcpy(outptr, TREF(util_outbuff_ptr), msglen);
 		outptr += msglen;
@@ -59,7 +59,7 @@ void util_cm_print(clb_struct *lnk, int code, char *message, int flush, ...)
 	va_end(var);
 	switch (flush)
 	{
-		case NOFLUSH:
+		case NOFLUSH_OUT:
 			break;
 		case FLUSH  :
 			*outptr++ = 0 ;

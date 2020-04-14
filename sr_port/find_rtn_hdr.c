@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -15,7 +20,11 @@
 #include "mdef.h"
 
 #include "gtm_string.h"
+<<<<<<< HEAD
 #include "ident.h"
+=======
+#include <rtnhdr.h>
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 #include "min_max.h"
 #include "stack_frame.h"
 #include "compiler.h"	/* for WANT_CURRENT_RTN_MSTR macro */
@@ -56,12 +65,7 @@ boolean_t find_rtn_tabent(rtn_tabent **res, mstr *name)
 
 	len = name->len;
 	rtn_name.len = MIN(MAX_MIDENT_LEN, len);
-#ifdef VMS
-	rtn_name.addr = &rtn_name_buff.c[0];
-	CONVERT_IDENT(rtn_name.addr, name->addr, name->len);
-#else
 	rtn_name.addr = name->addr;
-#endif
 	bot = rtn_names + 1;	/* Exclude the first NULL entry */
 	top = rtn_names_end + 1;/* Include the last entry */
 	for ( ; ; )

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2017 Fidelity National Information	*
+ * Copyright (c) 2003-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -97,7 +97,7 @@ GBLREF	sgmnt_data		*cs_data;
 GBLREF	uint4			process_id;
 GBLREF	void			(*call_on_signal)();
 #ifdef DEBUG
-GBLREF	boolean_t		exiting_on_dev_out_error;
+GBLREF	boolean_t		prin_out_dev_failure;
 #endif
 
 error_def(ERR_FILERENAME);

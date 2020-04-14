@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -36,7 +36,8 @@ void iorm_wtff(void)
 	temp.len = SIZEOF(FORM_FEED) - 1;
 	temp.addr = FORM_FEED;
 	iorm_write(&temp);
-	iorm_wteol(1, iod);
+	if (iod->fflf)			/* GTM-9136: If fflf is FALSE, we don't follow the FF with an NL */
+		iorm_wteol(1, iod);
 	iod->dollar.x = 0;
 	iod->dollar.y = 0;
 	REVERT_GTMIO_CH(&io_curr_device, ch_set);

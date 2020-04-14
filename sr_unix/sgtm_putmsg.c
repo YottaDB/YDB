@@ -82,7 +82,7 @@ void sgtm_putmsg(char *out_str, size_t out_str_len, ...)
 		} else
 			fao_count = 0;
 
-		util_out_print_vaparm(msg_string.addr, NOFLUSH, var, fao_count);
+		util_out_print_vaparm(msg_string.addr, NOFLUSH_OUT, var, fao_count);
 		va_end(var);	/* need before using as dest in va_copy */
 		VAR_COPY(var, TREF(last_va_list_ptr));
 		va_end(TREF(last_va_list_ptr));
@@ -91,7 +91,7 @@ void sgtm_putmsg(char *out_str, size_t out_str_len, ...)
 		if (0 >= arg_count)
 			break;
 
-		util_out_print("!/", NOFLUSH);
+		util_out_print("!/", NOFLUSH_OUT);
 	}
 	va_end(var);
 

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -113,6 +113,8 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 	int		utf8_len;
 	int		subs_max;
 	boolean_t 	gvn;
+	register char	*cpt;
+	char		*lastcpt;
 	enum
 	{
 		BEFORE_NAME,
@@ -132,9 +134,15 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 	subs_count = -1;
 	*contains_env = 0;
 	subs_max = gvn ? MAX_GVSUBSCRIPTS : MAX_LVSUBSCRIPTS;
+<<<<<<< HEAD
 	for (isrc = 0; (isrc < src->str.len) && (subs_count <= subs_max);)
+=======
+	isrc = 0;
+	lastcpt = src->str.addr + src->str.len;
+	for (cpt = src->str.addr; (cpt < lastcpt) && (subs_count < subs_max);)
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 	{
-		letter = src->str.addr[isrc];
+		letter = *cpt;
 		switch (state)
 		{
 			case BEFORE_NAME:		/* start of name */
@@ -190,8 +198,9 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 				}
 				if ('0' == letter) /* Canonic number cannot start with 0 unless is single char */
 				{
-					if (++isrc < src->str.len)
-						letter = src->str.addr[isrc];
+					++isrc;
+					if (++cpt < lastcpt)
+						letter = *cpt;
 					else
 						return FALSE;	/* Cannot end with "0" */
 					if (term == letter)
@@ -217,13 +226,14 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 					instring = !instring;
 					if (instring)
 						break;
-					if (isrc + 1 >= src->str.len)
+					if (cpt + 1 >= lastcpt)
 						return FALSE;
-					if ('_' != src->str.addr[isrc + 1])
+					if ('_' != *(cpt+1))
 						break;
 					isrc++;
-					if (++isrc < src->str.len)
-						letter = src->str.addr[isrc];
+					cpt++;
+					if (++isrc, ++cpt < lastcpt)
+						letter = *cpt;
 					else
 						return FALSE;
 					if ('$' != letter)
@@ -294,22 +304,26 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 			case IN_CHAR_FUNC:		/* $[Z]CHAR() */
 				previous = letter;	/* in $CHAR() - must be ASCII */
 				if (('Z' == letter) || ('z' == letter))
-				{	if (++isrc < src->str.len)
-						letter = src->str.addr[isrc];
+				{
+					++isrc;
+					if (++cpt < lastcpt)
+						letter = *cpt;
 					else
 						return FALSE;
 					previous = 'Z';
 				}
 				if (!(('C' == letter) || ('c' == letter)))
 					return FALSE;
-				if (++isrc < src->str.len)
-					letter = src->str.addr[isrc];
+				++isrc;
+				if (++cpt < lastcpt)
+					letter = *cpt;
 				else
 					return FALSE;
 				if (('H' == letter) || ('h' == letter))
 				{
-					if (++isrc < src->str.len)
-						letter = src->str.addr[isrc];
+					++isrc;
+					if (++cpt < lastcpt)
+						letter = *cpt;
 					else
 						return FALSE;
 					if (!(('A' == letter) || ('a' == letter) || (('(' == letter) && ('Z' == previous))))
@@ -318,29 +332,32 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 					return FALSE;
 				if ('(' != letter)
 				{
-					if (++isrc < src->str.len)
-						letter = src->str.addr[isrc];
+					++isrc;
+					if (++cpt < lastcpt)
+						letter = *cpt;
 					else
 						return FALSE;
 					if (!(('R' == letter) || ('r' == letter)))
 						return FALSE;
-					if (++isrc < src->str.len)
-						letter = src->str.addr[isrc];
+					++isrc;
+					if (++cpt < lastcpt)
+						letter = *cpt;
 					else
 						return FALSE;
 				}
 				if ('(' != letter)
 					return FALSE;
-				for (++isrc ;isrc < src->str.len; isrc++)
+				for (++isrc,++cpt ;cpt < lastcpt; isrc++, cpt++)
 				{
-					letter = src->str.addr[isrc];
+					letter = *cpt;
 					if (ISDIGIT_ASCII(letter))
 						continue;
 					if (!((',' == letter) || (')' == letter)))
 						return FALSE;
 					previous = letter;
-					if (++isrc < src->str.len)
-						letter = src->str.addr[isrc];
+					++isrc;
+					if (++cpt < lastcpt)
+						letter = *cpt;
 					else
 						return FALSE;
 					if (')' == previous)
@@ -348,12 +365,13 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 					if (!ISDIGIT_ASCII(letter))
 						return FALSE;
 				}
-				if (isrc > src->str.len)
+				if (cpt > lastcpt)
 					return FALSE;
 				if ('_' == letter)
 				{
-					if (++isrc < src->str.len)
-						letter = src->str.addr[isrc];
+					++isrc;
+					if (++cpt < lastcpt)
+						letter = *cpt;
 					else
 						return FALSE;
 					if ('$' == letter)
@@ -378,17 +396,18 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 		}
 #		ifdef UTF8_SUPPORTED
 		if (!gtm_utf8_mode || (0 == (letter & 0x80)))
-			isrc++;
-		else if (0 < (utf8_len = UTF8_MBFOLLOW(&src->str.addr[isrc++])))
+			isrc++, cpt++;
+		else if (0 < (utf8_len = UTF8_MBFOLLOW((isrc++, cpt++))))
 		{	/* multi-byte increment */
 			assert(4 > utf8_len);
 			if (0 > utf8_len)
 				rts_error_csa(CSA_ARG(NULL)
-					VARLSTCNT(6) ERR_BADCHAR, 4, 1, &src->str.addr[isrc - 1], LEN_AND_LIT(UTF8_NAME));
+					VARLSTCNT(6) ERR_BADCHAR, 4, cpt-1, LEN_AND_LIT(UTF8_NAME));
 			isrc += utf8_len;
+			cpt += utf8_len;
 		}
 #		endif
-		NON_UTF8_ONLY(isrc++);
+		NON_UTF8_ONLY({cpt++; isrc++});
 	}
 	if ((END_OF_PROCESSING != state) && (EXPECT_NEXT_LETTER_OF_NAME != state))
 		return FALSE;
@@ -398,8 +417,13 @@ boolean_t parse_gv_name_and_subscripts(mval *src, int *subscripts, int *start, i
 		subs_count = 0;
 		*stop = isrc;
 	}
+<<<<<<< HEAD
 	assert((('^' == src->str.addr[0]) ? MAX_GVSUBSCRIPTS : MAX_LVSUBSCRIPTS) >= subs_count);
 	assert((0 < isrc) && (isrc == src->str.len));
+=======
+	assert((('^' == src->str.addr[0]) ? MAX_GVSUBSCRIPTS : MAX_LVSUBSCRIPTS) > subs_count);
+	assert((0 < isrc) && (isrc == src->str.len) && (cpt == lastcpt));
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 	*subscripts = subs_count;
 	return TRUE;
 }

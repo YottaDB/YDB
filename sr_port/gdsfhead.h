@@ -2490,7 +2490,8 @@ typedef struct	gd_segment_struct
 	unsigned short		fname_len;
 	unsigned char		fname[MAX_FN_LEN + 1];
 	unsigned short		blk_size;
-	unsigned short		ext_blk_count;
+	char			align_filler[2];	/* filler to align the sizes */
+	uint4			ext_blk_count;
 	uint4			allocation;
 	struct CLB		*cm_blk;
 	unsigned char		defext[4];

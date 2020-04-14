@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -28,12 +28,12 @@
 #include "iott_flush_time.h"
 #include "deferred_events.h"
 
-GBLREF io_pair		io_curr_device;
-GBLREF io_pair		io_std_device;
-GBLREF bool		prin_out_dev_failure;
+GBLREF boolean_t	prin_out_dev_failure;
 GBLREF int		process_exiting;
+GBLREF io_pair		io_curr_device, io_std_device;
 
 error_def(ERR_NOPRINCIO);
+error_def(ERR_TERMWRITE);
 
 void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 {
@@ -66,8 +66,12 @@ void iott_flush_buffer(io_desc *io_ptr, boolean_t new_write_flag)
 			}
 		} else 	/* (0 != status) */
 		{
-			tt_ptr->write_active = FALSE;		/* In case we come back this-a-way */
-			ISSUE_NOPRINCIO_IF_NEEDED_TT(io_ptr);
+			tt_ptr->write_active = FALSE;				/* In case we come back this-a-way */
+			if ((io_ptr == io_std_device.out) && !prin_out_dev_failure)
+			{
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(3) ERR_TERMWRITE, 0, status);
+				prin_out_dev_failure = TRUE;			/* set flag for NOPRINCIO, to give app a chance */
+			}
 			xfer_set_handlers(tt_write_error_event, tt_write_error_set, status, FALSE);
 		}
 	}

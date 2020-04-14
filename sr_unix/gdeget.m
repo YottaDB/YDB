@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2017 Fidelity National Information		;
+; Copyright (c) 2006-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	;
@@ -38,7 +38,10 @@ RESTART ; used to re-run this routine from the start if wrong endianness is dete
 	i gldfmt>6 s reghasv550fields=TRUE
 	s reghasv600fields=FALSE
 	i gldfmt>7 s reghasv600fields=TRUE
-	s v631=0
+	s v6310=0
+	if (label="GTCGBDUNX012")!(label="GTCGBDUNX112") set label=hdrlab,v6310=1,update=1  ;autoconvert
+	if (v6310=1) new SIZEOF do v6310init
+	set v631=0
 	i (label="GTCGBDUNX011")!(label="GTCGBDUNX111") s label=hdrlab,v631=1,update=1  ;autoconvert
 	i (v631=1) n SIZEOF d v631init
 	s v63a=0
@@ -352,7 +355,7 @@ region:
 	i (reghasv600fields=TRUE)  d
 	. s regs(s,"INST_FREEZE_ON_ERROR")=$$bin2num($ze(rec,rel)),rel=rel+1
 	. s regs(s,"QDBRUNDOWN")=$$bin2num($ze(rec,rel)),rel=rel+1
-	e  d
+	else  do
 	. s regs(s,"INST_FREEZE_ON_ERROR")=0
 	. s regs(s,"QDBRUNDOWN")=0
 	s l=$$bin2num($ze(rec,rel)),rel=rel+1 ;jnl_file_len
@@ -386,11 +389,21 @@ segment:
 	s l=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"FILE_NAME")=$ze(rec,rel,rel+l-1),rel=rel+SIZEOF("file_spec")
 	s segs(s,"BLOCK_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
-	s segs(s,"EXTENSION_COUNT")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
+	if (gldfmt>12) do
+	. if $$bin2num($zextract(rec,rel,rel+1))'=0 zm gdeerr("INPINTEG")
+	. set rel=rel+2 set segs(s,"EXTENSION_COUNT")=$$bin2num($zextract(rec,rel,rel+3)),rel=rel+4
+	if (gldfmt<=12) set segs(s,"EXTENSION_COUNT")=$$bin2num($zextract(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"ALLOCATION")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
+<<<<<<< HEAD
 	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) d message^GDE(gdeerr("INPINTEG"),"""""")	; reserved for clb
 	s rel=rel+$s((gtm64=TRUE):12,1:4)							; padding
 	i $ze(rec,rel,rel+3)'=".DAT" d message^GDE(gdeerr("INPINTEG"),"""""")
+=======
+	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) zm gdeerr("INPINTEG")	; reserved for clb
+	if (gldfmt>12) set rel=rel+$select((gtm64=TRUE):8,1:4)							; padding
+	else  set rel=rel+$select((gtm64=TRUE):12,1:4)
+	i $ze(rec,rel,rel+3)'=".DAT" zm gdeerr("INPINTEG")
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 	s rel=rel+4
 	s segs(s,"DEFER")=$$bin2num($ze(rec,rel))
 	s rel=rel+1
@@ -424,7 +437,7 @@ segment:
 	e  do
 	. s segs(s,"ASYNCIO")=defseg("ASYNCIO")
 	. if (seghasencrflag=TRUE)&(gtm64=TRUE) s rel=rel+4 ; Padding bytes for 64 bit platforms
-	i (gldfmt>8) s rel=rel+16	; reserved for runtime fillers
+	if (gldfmt>8) set rel=rel+16     	 ; reserved for runtime fillers
 	s abs=abs+SIZEOF("gd_segment")-v30
 	q
 gblname:(i)
@@ -777,7 +790,7 @@ v63ainit:
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=1048576
 	s SIZEOF("reg_jnl_deq")=4
-	d Init^GDEINITSZ
+	d gvstats^GDEINIT
 	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32	; maximum name length allowed is 31 characters
 	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
 	q
@@ -807,7 +820,39 @@ v631init:
 	s SIZEOF("dsk_blk")=512
 	s SIZEOF("max_str")=1048576
 	s SIZEOF("reg_jnl_deq")=4
-	d Init^GDEINITSZ
+	d gvstats^GDEINIT
 	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32	; maximum name length allowed is 31 characters
 	s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
 	q
+v6310init:
+	if (olabel="GTCGBDUNX012") do
+	. s SIZEOF("am_offset")=332
+	. s SIZEOF("file_spec")=256
+	. s SIZEOF("gd_contents")=80
+	. s SIZEOF("gd_header")=16
+	. s SIZEOF("gd_map")=16
+	. s SIZEOF("gd_region")=412
+	. s SIZEOF("gd_region_padding")=0
+	. s SIZEOF("gd_segment")=368
+	else  do
+	. s SIZEOF("am_offset")=340
+	. s SIZEOF("file_spec")=256
+	. s SIZEOF("gd_contents")=120
+	. s SIZEOF("gd_header")=16
+	. s SIZEOF("gd_map")=24
+	. s SIZEOF("gd_region")=424
+	. s SIZEOF("gd_region_padding")=4
+	. s SIZEOF("gd_segment")=384
+	s SIZEOF("blk_hdr")=16
+        s SIZEOF("dsk_blk")=512
+        s SIZEOF("gd_gblname")=40
+        s SIZEOF("gd_inst_info")=SIZEOF("file_spec")    ; --> size of the "gd_inst_info" structure (defined in gdsfhead.h)
+        s SIZEOF("max_str")=1048576
+        s SIZEOF("mident")=32
+        s SIZEOF("reg_jnl_deq")=4
+        s SIZEOF("rec_hdr")=4
+	d gvstats^GDEINIT
+	s MAXNAMLN=SIZEOF("mident")-1,MAXREGLN=32,MAXSEGLN=32   ; maximum name length allowed is 31 characters
+        s PARNAMLN=31,PARREGLN=31,PARSEGLN=31
+        q
+

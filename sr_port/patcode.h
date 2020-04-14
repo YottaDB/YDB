@@ -108,7 +108,7 @@
  * multiplication. With the increase of PAT_MAX_REPEAT from 32K to 1MB, the values of result and
  * the expression value can potentially be as large as (1MB * 1MB).
  * NOTE: The macro expects result to be declared with type gtm_uint64_t */
-#define BOUND_MULTIPLY(x, y, result) 	(((result = (((gtm_uint64_t)x) * ((gtm_uint64_t)y))) >= PAT_MAX_REPEAT) ? PAT_MAX_REPEAT : (int)(result))
+#define BOUND_MULTIPLY(X, Y, RESULT) 	(((RESULT = (((gtm_uint64_t)X) * ((gtm_uint64_t)Y))) >= (gtm_uint64_t)PAT_MAX_REPEAT) ? PAT_MAX_REPEAT : (int)(RESULT))	/* BYPASSOKLENGTH */
 
 /*  Compiled Pattern
  *  -----------------

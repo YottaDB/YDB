@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,7 +33,7 @@ error_def(ERR_RPARENMISSING);
 LITREF unsigned char io_params_size[];
 LITREF dev_ctl_struct dev_param_control[];
 LITDEF nametabent dev_param_names[] =
-{
+{						/* Must be in sync with dev_param_index[], zshow_param_index[] & dev_param_data[] */
 	 {2,"AF*"}
 	,{2,"AL*"}	,{4,"ALLO"}
 	,{2,"AP*"}
@@ -75,6 +76,7 @@ LITDEF nametabent dev_param_names[] =
 	,{3,"EXT*"}	,{4,"EXTE"}
 	,{4,"EXTG*"}
 
+	,{4,"FFLF"}
 	,{1,"F"}	,{3,"FIE*"}	,{5,"FIELD"}
 	,{3,"FIF*"}	,{4,"FIFO"}
 	,{3,"FIL*"}
@@ -90,6 +92,7 @@ LITDEF nametabent dev_param_names[] =
 	,{2,"HE*"}
 	,{3,"HOL*"}
 	,{3,"HOS*"}	,{4,"HOST"}
+	,{2,"HU*"}
 
 	,{6,"ICHSET"}
 	,{4,"IKEY"}
@@ -130,6 +133,7 @@ LITDEF nametabent dev_param_names[] =
 	,{6,"NOEMPT*"}	,{9,"NOEMPTERM"}
 	,{4,"NOES*"}	,{6,"NOESCA"}
 	,{5,"NOEXT*"}
+	,{6,"NOFFLF"}
 	,{5,"NOFIL*"}
 	,{5,"NOFIX*"}
 	,{5,"NOFLA*"}
@@ -137,6 +141,7 @@ LITDEF nametabent dev_param_names[] =
 	,{4,"NOHE*"}
 	,{5,"NOHOL*"}
 	,{5,"NOHOS*"}	,{6,"NOHOST"}
+	,{4,"NOHU*"}
 	,{4,"NOIN*"}	,{6,"NOINSE"}
 	,{5,"NOLAB*"}
 	,{5,"NOLOW*"}
@@ -272,31 +277,31 @@ LITDEF nametabent dev_param_names[] =
 	,{4,"ZWRA*"}
 };
 
-/* Offset of letter in dev_param_names */
+/* Offset of letter in dev_param_names.  Adding an entry there will push every entry below that letter down by 1*/
 LITDEF	uint4 dev_param_index[27] =
 {
 /*	A    B    C    D    E    F    G    H    I    J    K    L    M    N   */
-	0,   5,   9,   26,  34,  49,  64,  66,  70,  79,  79,  80,  88,  91,
-
+	0,   5,   9,   26,  34,  49,  65,  67,  72,  81,  81,  82,  90,  93,
 
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	157, 165, 184, 185, 198, 218, 228, 234, 235, 250, 251, 252, 266
+	161, 169, 188, 189, 202, 222, 232, 238, 239, 254, 255, 256, 270
 };
 
 /* Offset of string within letter in dev_param_names */
-/* maintained in conjunction with zshow_params.h   = offset in letter, letter  */
+/* maintained in conjunction with zshow_params.h   = offset in letter, letter */
+/* Ie: a = 0 & z = 25, so (currently) BLOC is the third entry in the 'B' section of dev_param_names[] */
 LITDEF zshow_index zshow_param_index[] =
 {
 /*	ALLO     BLOC    COMMAND   CONV     CTRA     DELE   DEST     EBCD     EDIT    EMPTERM 	EXCE     EXTE     FIELD    */
-	{2,0},   {2,1},   {9,2},  {12,2},  {16,2},  {1,3},  {3,3},  {1,4},   {4,4},   {6,4},   {11,4},   {13,4},  {2,5},
+	{2,0},   {2,1},   {9,2},  {12,2},  {16,2},  {1,3},  {3,3},  {1,4},   {4,4},   {6,4},   {11,4},   {13,4},  {3,5},
 /*	FIL     FIXED  FOLLOW */
-	{5,5},  {8,5},  {14,5},
+	{6,5},  {9,5},  {15,5},
 /*  	HOST    ICHSET   INDEPENDENT  INSE     LAB */
 	{3,7},	{0,8},   {2,8},      {7,8},   {1,11},
 /*	LENG     NOCENE   NODEST    NOECHO   NOEDIT   NOEMPTERM NOESCA   NOFOLLOW  NOHOST   NOINSE     */
-	{3,11},  {7,13},  {10,13},  {15,13}, {17,13}, {19,13},  {21,13}, {27,13},  {31,13}, {33,13},
+	{3,11},  {7,13},  {10,13},  {15,13}, {17,13}, {19,13},  {21,13}, {28,13},  {32,13}, {34,13},
 /*	NOPAST   NOREADS  NOTTSY   NOTYPE   NOWRAP   OCHSET   PAD     PARSE   PAST     PRMMBX   RCHK    */
-	{39,13}, {44,13}, {55,13}, {57,13}, {63,13}, {1,14},  {8,15}, {11,15}, {13,15}, {17,15}, {1,17},
+	{41,13}, {46,13}, {57,13}, {59,13}, {65,13}, {1,14},  {8,15}, {11,15}, {13,15}, {17,15}, {1,17},
 /*      READ     READS	  REC      SHAR     SHELL    STDERR   STREAM   TERM     TTSY     TYPE    UIC     */
 	{2,17},  {4,17},  {5,17},  {6,18},  {8,18},  {17,18}, {15,18}, {1,19},  {7,19},  {9,19}, {1,20},
 /*      WAIT     WCHK    WIDTH   WRITE  */
@@ -318,7 +323,7 @@ int deviceparameters(oprtype *c, char who_calls)
 	boolean_t	parse_warn;
 
 	static readonly unsigned char dev_param_data[] =
-	{
+	{							/* must be in sync with dev_param_names[] */
 		 iop_after
 		,iop_allocation	,iop_allocation
 		,iop_append
@@ -361,6 +366,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_extension ,iop_extension
 		,iop_extgap
 
+		,iop_fflf
 		,iop_field ,iop_field ,iop_field
 		,iop_fifo, iop_fifo
 		,iop_filter
@@ -376,6 +382,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_header
 		,iop_hold
 		,iop_hostsync, iop_hostsync
+		,iop_hupenable
 
 		,iop_ipchset
 		,iop_input_key
@@ -416,6 +423,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_noempterm ,iop_noempterm
 		,iop_noescape ,iop_noescape
 		,iop_inhextgap
+		,iop_nofflf
 		,iop_nofilter
 		,iop_nofixed
 		,iop_noflag
@@ -423,6 +431,7 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_noheader
 		,iop_nohold
 		,iop_nohostsync ,iop_nohostsync
+		,iop_nohupenable
 		,iop_noinsert ,iop_noinsert
 		,iop_nolabel
 		,iop_nolowercase

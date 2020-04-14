@@ -448,6 +448,7 @@ void gtm_icu_init(void)
 		}
 #		endif
 	}
+<<<<<<< HEAD
 	/* Note that a call to "dlopen_handle_array_add(handle)" should normally have been placed here but
 	 * if "dlopen_handle_array_close()" happens on this handle (corresponding to libicuio.so) later and
 	 * any type of error occurs (e.g. CALLINAFTERXIT etc.), it is very likely we would end up invoking
@@ -463,6 +464,8 @@ void gtm_icu_init(void)
 					  * to avoid the warning.
 				  	  */
 	#endif
+=======
+>>>>>>> 04cc1b83 (GT.M V6.3-011)
 	DEBUG_ONLY(symbols_renamed = -1;)
 	for (findx = 0; findx < icu_func_n; ++findx)
 	{
@@ -538,6 +541,7 @@ void gtm_icu_init(void)
 			}
 		}
 	}
+	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 	gtm_utf8_mode = TRUE;
 	/* gtm_wcswidth()/U_ISPRINT() in util_format() can henceforth be safely called now that ICU initialization is complete */
 	gtm_conv_init();

@@ -92,12 +92,12 @@ LITREF	char 			*trigger_subs[];
 {													\
 	if ((INTCAST(OUT_PTR - OUT_BUFF) + VAL_LEN) > MAX_BUFF_SIZE)					\
 	{												\
-		util_out_print_gtmio("!AD", NOFLUSH, (unsigned int)(OUT_PTR - OUT_BUFF), OUT_BUFF);	\
+		util_out_print_gtmio("!AD", NOFLUSH_OUT, (unsigned int)(OUT_PTR - OUT_BUFF), OUT_BUFF);	\
 		OUT_PTR = OUT_BUFF;									\
 	}												\
 	if (VAL_LEN > MAX_BUFF_SIZE)									\
 	{												\
-		util_out_print_gtmio("!AD", NOFLUSH, VAL_LEN, VAL);					\
+		util_out_print_gtmio("!AD", NOFLUSH_OUT, VAL_LEN, VAL);					\
 		OUT_PTR = OUT_BUFF;									\
 	} else												\
 	{												\
@@ -449,11 +449,14 @@ STATICFNDEF void write_gbls_or_names(char *gbl_name, uint4 gbl_name_len, boolean
 	/* If ^#t needs to be upgraded, issue error. Cannot read older ^#t format that newer version does not always understand */
 	if (cs_addrs->hdr->hasht_upgrade_needed)
 		rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_NEEDTRIGUPGRD, 2, DB_LEN_STR(gv_cur_region));
+	assert((0 < gbl_name_len) && (MAX_MIDENT_LEN >= gbl_name_len));
+	STATIC_ANALYSIS_ONLY(gbl_name_len = MIN(gbl_name_len, MAX_MIDENT_LEN));	/* 4SCA: GV names from DB are <= MAX_MIDENT_LEN */
 	memcpy(save_name, gbl_name, gbl_name_len);
 	wildcard = (NULL != (ptr = memchr(gbl_name, '*', gbl_name_len)));
 	if (wildcard)
 	{
-		gbl_name_len--;
+		STATIC_ANALYSIS_ONLY(if (0 < gbl_name_len))	/* 4SCA: GV names from DB <= MAX_MIDENT_LEN and > 0*/
+			gbl_name_len--;
 		assert(INTCAST(ptr - gbl_name) == gbl_name_len);
 	}
 	memcpy(curr_name, gbl_name, gbl_name_len);

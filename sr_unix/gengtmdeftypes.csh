@@ -86,6 +86,13 @@ if (! -e $tmpdir) then
     endif
 endif
 #
+# Set the version we will run with - note $gtmroutines not reset by version (setactive*.csh)
+#
+if ($?usecurpro) then
+	set setactive_parms=(p $gtmtyp); source $gtm_tools/setactive.csh
+	set proddist=$gtm_dist
+	setenv gtmroutines "$tmpdir $gtm_dist"
+endif
 pushd $tmpdir
 #
 
@@ -95,7 +102,9 @@ pushd $tmpdir
 unsetenv gtm_chset
 #
 set setactive_parms=($gtmver $gtmtyp); source $gtm_tools/setactive.csh
-setenv gtmroutines "$tmpdir $gtm_dist"
+if ($?proddist) then
+	setenv gtm_dist $proddist
+endif
 
 # If gengtmdeftypes.csh is invoked for old versions, point cpfrom_tools/cpfrom_pct to the location of
 # the helper files, typically $gtm_tools/$gtm_pct of gtm_curpro
@@ -159,8 +168,12 @@ if (0 == $status) then
     exit 1
 endif
 if (-e scantypedefs-DEBUG-zshowdump.txt) mv -f scantypedefs-DEBUG-zshowdump.txt $ourdir
+if ( ! -e GTMDefinedTypesInit.m )  then
+    echo "*** $0 halted due to absence of GTMDefinedTypesInit.m -- tmpdir $tmpdir not removed"
+    popd
+    exit 1
+endif
 mv -f GTMDefinedTypesInit.m $ourdir
-mv -f gdeinitsz.m $ourdir
 popd
 rm -fr $tmpdir >& /dev/null
 echo "gengtmdeftypes.csh complete"

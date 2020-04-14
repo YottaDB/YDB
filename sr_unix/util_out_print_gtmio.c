@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2014-2015 Fidelity National Information	*
+ * Copyright (c) 2014-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
@@ -57,7 +57,7 @@ void	util_out_print_gtmio(caddr_t message, int flush, ...)
 	 */
 	if (STRCMP(message, "!AD") || (FLUSH != flush))
 	{
-		util_out_print_vaparm(message, NOFLUSH, var, MAXPOSINT4);
+		util_out_print_vaparm(message, NOFLUSH_OUT, var, MAXPOSINT4);
 		src = TREF(util_outbuff_ptr);
 		assert(NULL != TREF(util_outptr));
 		srclen = INTCAST(TREF(util_outptr) - src) + 1;	/* 1 is for '\n' */

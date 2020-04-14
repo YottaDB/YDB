@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2002-2018 Fidelity National Information		;
+; Copyright (c) 2002-2019 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -155,11 +155,10 @@ qualifiers(ref)							; qualifier lister
 	quit
 	;
 error								; Error handler called by $etrap
-	if ($zstatus'["IOEOF") do				; EOF is not a "real" error
-	. write !,"Error in GT.M help utility - look at ",$zjobexam("gtmhelpdmp")," for additional information",!
-	. quit
-	use @pio,IO(1)						; restore $P state and original $IO
 	set $ecode=""						; caller loses error trace, but generally called by direct mode
+	quit:($zstatus["IOEOF")&($principal=$io)		; EOF is not a "real" error
+	use @pio,IO(1)						; restore $P state and original $IO
+	write !,"Error in GT.M help utility - look at ",$zjobexam("gtmhelpdmp")," for additional information",!
 	quit
 MATCH()								; return array MATCH containing all global references that match
 	; the TOPIC array.

@@ -117,8 +117,7 @@ void op_fntranslate_common(mval *src, mval *dst, mval *rplc, int4 *xlate, hash_t
 		dstlen += copy_length;
 	}
 	MV_INIT_STRING(dst, dstlen, stringpool.free);
-	dst->mvtype |= MV_UTF_LEN; /* set character length since we know it */
-	dst->str.char_len = char_len;
+	dst->mvtype &= ~MV_UTF_LEN;	/* character length unknown because translation may modify effective UTF representation */
 	stringpool.free = (unsigned char *)dstptr;
 }
 
