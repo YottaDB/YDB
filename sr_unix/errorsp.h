@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -107,7 +107,8 @@ GBLREF int			process_exiting;
 #define SEVERE		4
 #define SEV_MSK		7
 
-#define IS_GTM_ERROR(err) ((err & FACMASK(merrors_ctl.facnum))  &&  (MSGMASK(err, merrors_ctl.facnum) <= merrors_ctl.msg_cnt))
+#define IS_GTM_ERROR(err) \
+	(((err & 0x0FFFFFFF) & FACMASK(merrors_ctl.facnum))  &&  (MSGMASK(err, merrors_ctl.facnum) <= merrors_ctl.msg_cnt))
 #define CHECKHIGHBOUND(hptr)  assert(hptr < (chnd_end + (!process_exiting ? 0 : CONDSTK_RESERVE)))
 #define CHECKLOWBOUND(hptr)   assert(hptr >= (&chnd[0] - 1)) /* Low check for chnd - 1 in case last handler setup new handler */
 
@@ -554,8 +555,7 @@ unsigned char *set_zstatus(mstr *src, int max_len, int arg, unsigned char **ctxt
 
 #define EXIT_HANDLER(x)
 
-#define SEND_CALLERID(callee) send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_CALLERID, 3, LEN_AND_STR((callee)), caller_id());
-#define PRINT_CALLERID util_out_print(" -- generated from 0x!XJ.", NOFLUSH_OUT, caller_id())
+#define SEND_CALLERID(callee) send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_CALLERID, 3, LEN_AND_STR((callee)), caller_id(1));
 #define UNIX_EXIT_STATUS_MASK	0xFF
 
 void err_init(void (*x)());

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -244,7 +244,8 @@ void dse_dmp_fhead (void)
 				  ! (RDBF_NOSTATS & csd->reservedDBFlags) ? " TRUE" : "FALSE");
 		util_out_print("  LOCK shares DB critical section     !AD", FALSE, 5, csd->lock_crit_with_db ? " TRUE" : "FALSE");
 		util_out_print("  Read Only                      !AD", TRUE, 3, csd->read_only ? " ON" : "OFF");
-		util_out_print("  Recover interrupted                 !AD", TRUE, 5, (csd->recov_interrupted ? " TRUE" : "FALSE"));
+		util_out_print("  Recover interrupted                 !AD", FALSE, 5, (csd->recov_interrupted ? " TRUE" : "FALSE"));
+		util_out_print("  Full Block Write                 !UL", TRUE, csd->write_fullblk);
 	}
 	if (CLI_PRESENT == cli_present("ALL"))
 	{	/* Only dump if -/ALL as if part of above display */
@@ -335,7 +336,6 @@ void dse_dmp_fhead (void)
 	}
 	if (NEED_TO_DUMP("ENVIRONMENT"))
 	{
-		util_out_print("  Full Block Writes                       !UL", FALSE, csa->do_fullblockwrites);
 		util_out_print("  Full Block Write Len  !12UL", TRUE, csa->fullblockwrite_len);
 	}
 	if (NEED_TO_DUMP("DB_CSH"))

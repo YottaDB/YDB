@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 Fidelity National Information	*
+ * Copyright (c) 2018-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -116,7 +116,6 @@ void check_and_set_ztimeout(mval * inp_val)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 	local_str_val = (char *)malloc(inp_val->str.len + 1);
 	memcpy(local_str_val, inp_val->str.addr, inp_val->str.len);
 	local_str_end = local_str_val + inp_val->str.len;
@@ -212,6 +211,7 @@ void check_and_set_ztimeout(mval * inp_val)
 		op_commarg(&ztimeout_vector, indir_linetail);
 		op_unwind();
 	}
+	SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 	(TREF(dollar_ztimeout)).ztimeout_vector = ztimeout_vector;
 	(TREF(dollar_ztimeout)).ztimeout_seconds = ztimeout_seconds;
 	if (!is_negative)

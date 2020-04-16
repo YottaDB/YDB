@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -14,7 +14,7 @@
 #define CALLER_ID_H_INCLUDED
 
 #include <sys/types.h>
-caddr_t caller_id(void);
+caddr_t caller_id(unsigned int extra_frames);
 
 #endif
 

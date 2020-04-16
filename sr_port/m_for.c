@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -135,7 +136,7 @@ int m_for(void)
 		sav->operand[1] = control_slot;
 	} else
 	{
-		DEBUG_ONLY(control_ref = (TREF(curtchain))->exorder.bl);
+		control_ref = (TREF(curtchain))->exorder.bl;
 		if (!lvn(&control_variable, OC_SAVLVN, NULL))
 		{
 			FOR_POP(BLOWN_FOR);
@@ -154,7 +155,11 @@ int m_for(void)
 			dqins(s->exorder.bl, exorder, share);
 			dqins(share->exorder.bl, exorder, push);
 		}
-		assert(OC_VAR == control_ref->exorder.fl->opcode);
+		if (OC_VAR != control_ref->exorder.fl->opcode)
+		{
+			FOR_POP(BLOWN_FOR);
+			return FALSE;
+		}
 		assert(MVAR_REF == control_ref->exorder.fl->operand[0].oprclass);
 	}
 	if (TK_EQUAL != TREF(window_token))

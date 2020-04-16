@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -117,7 +117,8 @@ void mupip_set(void)
 		|| (CLI_PRESENT == cli_present("TRIGGER_FLUSH_LIMIT"))
 		|| (CLI_PRESENT == cli_present("VERSION"))
 		|| (CLI_PRESENT == cli_present("WAIT_DISK"))
-		|| (CLI_PRESENT == cli_present("WRITES_PER_FLUSH")))
+		|| (CLI_PRESENT == cli_present("WRITES_PER_FLUSH"))
+		|| (CLI_PRESENT == cli_present("FULLBLKWRT")))
 	{
 		if (SS_NORMAL != (status = mupip_set_file(db_fn_len, db_fn)))
 			mupip_exit(status);

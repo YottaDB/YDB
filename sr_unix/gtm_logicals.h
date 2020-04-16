@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,6 @@
 #define	GTM_BLKUPGRADE_FLAG		"$gtm_blkupgrade_flag"
 #define	GTM_DBFILEXT_SYSLOG_DISABLE	"$gtm_dbfilext_syslog_disable"
 #define	GTM_ENV_XLATE			"$gtm_env_translate"
-#define	GTM_FULLBLOCKWRITES		"$gtm_fullblockwrites"
 #define	GTM_GDSCERT			"$gtm_gdscert"
 #define	GTM_GVDUPSETNOOP		"$gtm_gvdupsetnoop"
 #define	GTM_GBLDIR			"$gtmgbldir"

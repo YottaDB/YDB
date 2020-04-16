@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -253,7 +253,7 @@ GBLDEF	buddy_list	*noisolation_buddy_list;	/* a buddy_list for maintaining the g
 GBLDEF	int4		exi_condition;
 GBLDEF	uint4		gtmDebugLevel;
 GBLDEF	boolean_t	gtmSystemMalloc;
-GBLDEF	caddr_t		smCallerId;			/* Caller of top level malloc/free */
+GBLDEF	uint4		smCallerIdExtraLevels;	/* Extra stack levels to account for in caller_id */
 GBLDEF	int		process_exiting;
 GBLDEF	int4		dollar_zsystem;
 GBLDEF	int4		dollar_zeditor;
@@ -717,7 +717,6 @@ GBLDEF	boolean_t	gvdupsetnoop = TRUE;	/* if TRUE, duplicate SETs do not change G
 						 * incremented and logical SET journal records will be written. By default, this
 						 * behavior is turned ON. GT.M has a way of turning it off with a VIEW command.
 						 */
-GBLDEF	int4		gtm_fullblockwrites;	/* Do full (not partial) 1. file system block writes, or 2. database block writes */
 GBLDEF	volatile boolean_t	in_wcs_recover;	/* TRUE if in "wcs_recover", used by "bt_put" and "generic_exit_handler" */
 GBLDEF	boolean_t	in_gvcst_incr;		/* set to TRUE by gvcst_incr, set to FALSE by gvcst_put
 						 * distinguishes to gvcst_put, if the current db operation is a SET or $INCR */

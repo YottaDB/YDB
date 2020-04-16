@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2019 Fidelity National Information		;
+; Copyright (c) 2001-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -173,6 +173,7 @@ GDEINIT
 	s minsegcommon("MUTEX_SLOTS")=64	; keep this in sync with MIN_CRIT_ENTRY in gdsbt.h
 	s maxsegcommon("MUTEX_SLOTS")=32768	; keep this in sync with MAX_CRIT_ENTRY in gdsbt.h
 	s minsegcommon("RESERVED_BYTES")=0,maxsegcommon("RESERVED_BYTES")=HEX(4)-SIZEOF("dsk_blk")
+	s minsegcommon("FULLBLKWRT")=0,maxsegcommon("FULLBLKWRT")=2
 ; bg
 	m minseg("BG")=minsegcommon,maxseg("BG")=maxsegcommon	; copy over all common stuff into BG access method first
 	; now add BG specific overrides; GTM64_WC_MAX_BUFFS defined in gdsbt.h
@@ -186,6 +187,7 @@ GDEINIT
 	; So if we are reading an older format .gld file, we can use these as the default values.
 	s defseg("ALLOCATION")=100
 	s defseg("ASYNCIO")=0
+	s defseg("FULLBLKWRT")=0
 	s defseg("BLOCK_SIZE")=4096
 	s defseg("BUCKET_SIZE")=""
 	s defseg("DEFER_ALLOCATE")=1
@@ -244,6 +246,8 @@ syntabi:
 	s syntab("ADD","SEGMENT","ALLOCATION")="REQUIRED"
 	s syntab("ADD","SEGMENT","ALLOCATION","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","ASYNCIO")="NEGATABLE"
+	s syntab("ADD","SEGMENT","FULLBLKWRT")="REQUIRED"
+	s syntab("ADD","SEGMENT","FULLBLKWRT","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","BLOCK_SIZE")="REQUIRED"
 	s syntab("ADD","SEGMENT","BLOCK_SIZE","TYPE")="TNUMBER"
 	s syntab("ADD","SEGMENT","BUCKET_SIZE")="REQUIRED"
@@ -310,6 +314,8 @@ syntabi:
 	s syntab("CHANGE","SEGMENT","ALLOCATION")="REQUIRED"
 	s syntab("CHANGE","SEGMENT","ALLOCATION","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","ASYNCIO")="NEGATABLE"
+	s syntab("CHANGE","SEGMENT","FULLBLKWRT")="REQUIRED"
+	s syntab("CHANGE","SEGMENT","FULLBLKWRT","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","BLOCK_SIZE")="REQUIRED"
 	s syntab("CHANGE","SEGMENT","BLOCK_SIZE","TYPE")="TNUMBER"
 	s syntab("CHANGE","SEGMENT","BUCKET_SIZE")="REQUIRED"
@@ -367,6 +373,8 @@ syntabi:
 	s syntab("TEMPLATE","SEGMENT","ALLOCATION")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","ALLOCATION","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","ASYNCIO")="NEGATABLE"
+	s syntab("TEMPLATE","SEGMENT","FULLBLKWRT")="REQUIRED"
+	s syntab("TEMPLATE","SEGMENT","FULLBLKWRT","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","BLOCK_SIZE")="REQUIRED"
 	s syntab("TEMPLATE","SEGMENT","BLOCK_SIZE","TYPE")="TNUMBER"
 	s syntab("TEMPLATE","SEGMENT","BUCKET_SIZE")="REQUIRED"
@@ -431,8 +439,8 @@ syntabi:
 	s syntab("VERIFY","TEMPLATE")=""
 	q
 UNIX:
-	s hdrlab="GTCGBDUNX013"         ; must be concurrently maintained in gbldirnam.h!!!
-	i (gtm64=TRUE) s hdrlab="GTCGBDUNX113" ; the high order digit is a 64-bit flag
+	s hdrlab="GTCGBDUNX014"         ; must be concurrently maintained in gbldirnam.h!!!
+	i (gtm64=TRUE) s hdrlab="GTCGBDUNX114" ; the high order digit is a 64-bit flag
 	s tfile="$gtmgbldir"
 	s accmeth="\BG\MM"
 	s helpfile="$gtm_dist/gdehelp.gld"

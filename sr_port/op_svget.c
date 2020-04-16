@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -165,10 +165,10 @@ void op_svget(int varnum, mval *v)
 	switch (varnum)
 	{
 		case SV_HOROLOG:
-			op_horolog(v);
+			op_zhorolog(v, FALSE);
 			break;
 		case SV_ZHOROLOG:
-			op_zhorolog(v);
+			op_zhorolog(v, TRUE);
 			break;
 		case SV_ZUT:
 			op_zut(v);
@@ -624,7 +624,7 @@ void op_svget(int varnum, mval *v)
 			get_dlr_zkey(v);
 			break;
 		case SV_ZSTRPLLIM:
-			count = TREF(gtm_strpllim);
+			count = stringpool.strpllim;
 			MV_FORCE_MVAL(v, count);
 			break;
 		case SV_ZTIMEOUT:

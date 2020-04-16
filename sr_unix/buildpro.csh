@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2019 Fidelity National Information		#
+# Copyright (c) 2001-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -26,20 +26,24 @@ if ( $1 == "" ) then
 endif
 
 set setactive_parms = ( $1 p ) ; source $gtm_tools/setactive.csh
-$gtm_tools/buildbdp.csh $1 pro $gtm_vrt/pro
+$gtm_tools/buildbdp.csh $1 pro $gtm_ver/pro
+set buildstatus=$status
+
 # Extract the debug symbols from each executable
 if ( "$HOSTOS" == "Linux" ) then
-	rm stripping_log.txt >& /dev/null
-	echo "Stripping debug symbols and generating .debug files. Leaving log at `pwd`/stripping_log.txt"
+	set outfile = "strip_debug_symbols.out"
+	rm -f $outfile
+	echo "Stripping debug symbols and generating .debug files. Leaving log at $PWD/$outfile"
 	foreach file (`find ../ -executable -type f`)
-		echo "Stripping $file"
-		objcopy --only-keep-debug $file $file.debug >> stripping_log.txt
-		strip -g $file >> stripping_log.txt
-		objcopy --add-gnu-debuglink=$file.debug $file >> stripping_log.txt
+		if ($file:e =~ {sh,csh}) continue
+		echo "Stripping $file"				>>&! $outfile
+		objcopy --only-keep-debug $file $file.debug	>>&! $outfile
+		strip -g $file					>>&! $outfile
+		objcopy --add-gnu-debuglink=$file.debug $file	>>&! $outfile
 	end
 endif
 
 # strip removes the restricted permissions of gtmsecshr. Fix it
 $gtm_com/IGS $gtm_dist/gtmsecshr CHOWN
 
-exit $status
+exit $buildstatus

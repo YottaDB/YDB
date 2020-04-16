@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,8 +22,11 @@
 #include "stringpool.h"
 #include "gtm_string.h"
 #include "gtm_utf8.h"
+#include "gtmdbglvl.h"
 
-GBLREF	boolean_t	run_time;
+GBLREF boolean_t	run_time;
+GBLREF triple		t_orig;
+GBLREF uint4		gtmDebugLevel;
 
 error_def(ERR_EXPR);
 error_def(ERR_MAXARGCNT);
@@ -58,8 +61,8 @@ int eval_expr(oprtype *a)
 	mval		tmp_mval;
 	int i = 0;
 	unsigned short	type;
-
 	DCL_THREADGBL_ACCESS;
+
 	SETUP_THREADGBL_ACCESS;
 	if (!expratom(&optyp_1))
 	{	/* If didn't already add an error of our own, do so now with catch all expression error */
@@ -80,7 +83,18 @@ int eval_expr(oprtype *a)
 				for (ref = (TREF(curtchain))->exorder.bl; oc_tab[ref->opcode].octype & OCT_BOOL;
 					ref = ref->exorder.bl)
 						;
+				assert(ref->exorder.bl != ref);
+				if (&t_orig == ref->exorder.fl)
+				{
+					ref1 = maketriple(OC_NOOP);
+					dqins(ref, exorder, ref1);
+				}
+				assert(&t_orig != ref->exorder.fl);
 				TREF(expr_start) = TREF(expr_start_orig) = ref;
+#				ifdef DEBUG
+				if (GDL_DebugCompiler & gtmDebugLevel)
+					CHKTCHAIN(TREF(expr_start), exorder, FALSE);
+#				endif
 			}
 			switch (bin_opcode)
 			{
@@ -231,12 +245,20 @@ int eval_expr(oprtype *a)
 			} else
 			{
 				advancewindow();
+#				ifdef DEBUG
+				if ((GDL_DebugCompiler & gtmDebugLevel) && (NULL != TREF(expr_start)))
+					CHKTCHAIN(TREF(expr_start), exorder, FALSE);
+#				endif
 				if (!expratom(&optyp_2))
 				{
 					stx_error(ERR_RHMISSING);
 					return EXPR_FAIL;
 				}
 			}
+#			ifdef DEBUG
+			if ((GDL_DebugCompiler & gtmDebugLevel) && (NULL != TREF(expr_start)))
+				CHKTCHAIN(TREF(expr_start), exorder, FALSE);
+#			endif
 			coerce(&optyp_2, type);
 			ref1 = optyp_1.oprval.tref;
 			if (((OC_VAR == ref1->opcode) || (OC_GETINDX == ref1->opcode))

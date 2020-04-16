@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,6 +56,7 @@
 #include "wcs_backoff.h"
 #include "wcs_wt.h"
 #include "wcs_recover.h"
+#include "util.h"
 
 GBLDEF srch_blk_status	*first_tp_srch_status;	/* the first srch_blk_status for this block in this transaction */
 GBLDEF unsigned char	rdfail_detail;	/* t_qread uses a 0 return to indicate a failure (no buffer filled) and the real
@@ -165,6 +166,17 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	is_mm = (dba_mm == csd->acc_meth);
 	/* We better hold crit in the final retry (TP & non-TP). Only exception is journal recovery */
 	assert((t_tries < CDB_STAGNATE) || csa->now_crit || mupip_jnl_recover);
+	if (TREF(in_mupip_integ) && TREF(instance_frozen_crit_skipped))
+	{
+		assert(!dollar_tlevel);
+#		ifdef DEBUG
+		if (WBTEST_ENABLED(WBTEST_MUINTEG_TQREAD))
+		{
+			util_out_print("Whitebox test : t_qread returns NULL", TRUE);
+			return (sm_uc_ptr_t)NULL;
+		}
+#		endif
+	}
 	if (dollar_tlevel)
 	{
 		assert(sgm_info_ptr);
@@ -392,6 +404,11 @@ sm_uc_ptr_t t_qread(block_id blk, sm_int_ptr_t cycle, cache_rec_ptr_ptr_t cr_out
 	{
 		if (NULL == (cr = db_csh_get(blk)))
 		{	/* not in memory */
+			if (TREF(in_mupip_integ) && TREF(instance_frozen_crit_skipped))
+			{	/* We don't want to read the block from Disk when retrying the block in case of integ errors*/
+				rel_crit(gv_cur_region);
+				return (sm_uc_ptr_t)NULL;
+			}
 			if (clustered && (NULL != (bt = bt_get(blk))) && (FALSE == bt->flushing))
 				bt = NULL;
 			if (!csa->now_crit)

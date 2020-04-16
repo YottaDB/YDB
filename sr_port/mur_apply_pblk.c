@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -402,7 +402,7 @@ uint4 mur_output_pblk(reg_ctl_list *rctl)
 	/* If full-block-writes are enabled, round size up to next full logical filesys block. We want to use "dbfilop" to
 	 * do the write but it does not honour full-block-writes setting. So prepare the buffer accordingly before invoking it.
 	 */
-	if (csa->do_fullblockwrites)
+	if (csd->write_fullblk)
 	{	/* Determine full-block-write size corresponding to the current PBLK record block size (need to write only as
 		 * many full-blocks as needed for current block size). For example, with database block size 16K, current block
 		 * size (in the pblk record) is 3K and filesystem pagesize (fullblockwrite_len) is 4K, it is enough to only

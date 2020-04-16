@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -802,7 +802,7 @@ MBSTART {								\
 	coidx = ++cnl->crit_ops_index;					\
 	if (CRIT_OPS_ARRAY_SIZE <= coidx)				\
 		cnl->crit_ops_index = coidx = 0;			\
-	cnl->crit_ops_array[coidx].call_from = (caddr_t)caller_id();	\
+	cnl->crit_ops_array[coidx].call_from = (caddr_t)caller_id(0);	\
 	cnl->crit_ops_array[coidx].epid = process_id;			\
 	cnl->crit_ops_array[coidx].crit_act = (X);			\
 	cnl->crit_ops_array[coidx].curr_tn = (NULL != CSA->hdr) ?	\
@@ -890,7 +890,7 @@ MBSTART {								\
 		lcknl->lockhist_idx = lockidx = 0;			\
 	GET_LONGP(&lcknl->lockhists[lockidx].lock_op[0], (OP));		\
 	lcknl->lockhists[lockidx].lock_addr = (sm_int_ptr_t)(LOC);	\
-	lcknl->lockhists[lockidx].lock_callr = (caddr_t)caller_id();	\
+	lcknl->lockhists[lockidx].lock_callr = (caddr_t)caller_id(0);	\
 	lcknl->lockhists[lockidx].lock_pid = (int4)(ID);		\
 	lcknl->lockhists[lockidx].loop_cnt = (int4)(CNT);		\
 } MBEND

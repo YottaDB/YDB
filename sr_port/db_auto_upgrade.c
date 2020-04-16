@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -193,8 +193,11 @@ void db_auto_upgrade(gd_region *reg)
 			case GDSMV63003:
 				/*  GT.M v63007 added stable user control of flush_trigger using flush_trigger_top */
 				csd->flush_trigger_top = FLUSH_FACTOR(csd->n_bts);	/* more predictable than flush_trigger */
-				break;
 			case GDSMV63007:
+				/* GT.M V63012 added fullblkwrt option */
+				csd->write_fullblk = 0;
+				break;
+			case GDSMV63012:
 				/* Nothing to do for this version since it is GDSMVCURR for now. */
 				assert(FALSE);		/* When this assert fails, it means a new GDSMV* was created, */
 				break;			/* 	so a new "case" needs to be added BEFORE the assert. */

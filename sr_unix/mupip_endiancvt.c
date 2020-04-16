@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2019 Fidelity National Information	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -686,6 +686,7 @@ void endian_header(sgmnt_data *new, sgmnt_data *old, boolean_t new_is_native)
 	SWAP_SD4(extension_size);
 	SWAP_SD4(def_coll);
 	SWAP_SD4(def_coll_ver);
+	SWAP_SD4(write_fullblk);
 	assert(SIZEOF(int4) == SIZEOF(old->std_null_coll));	/* boolean_t */
 	SWAP_SD4(std_null_coll);
 	SWAP_SD4(null_subs);

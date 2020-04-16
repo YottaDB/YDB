@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -247,7 +247,7 @@ int m_set(void)
 					 */
 					put = maketriple(OC_CLRALSVARS);
 					put->operand[0] = resptr;
-					dqins(targchain.exorder.bl, exorder, put);
+					dqrins(&targchain, exorder, put);
 					advancewindow();
 					break;
 				}
@@ -266,7 +266,7 @@ int m_set(void)
 				if (OC_PUTINDX == v.oprval.tref->opcode)
 				{
 					dqdel(v.oprval.tref, exorder);
-					dqins(targchain.exorder.bl, exorder, v.oprval.tref);
+					dqrins(&targchain, exorder, v.oprval.tref);
 					sub = v.oprval.tref;
 					put_oc = OC_PUTINDX;
 					if (TREF(temp_subs))
@@ -288,7 +288,7 @@ int m_set(void)
 			put = maketriple((!alias_processing ? OC_STO : (have_lh_alias ? OC_SETALS2ALS : OC_SETALSIN2ALSCT)));
 			put->operand[0] = v;
 			put->operand[1] = resptr;
-			dqins(targchain.exorder.bl, exorder, put);
+			dqrins(&targchain, exorder, put);
 			break;
 		case TK_CIRCUMFLEX:
 			if (alias_processing)
@@ -305,12 +305,12 @@ int m_set(void)
 			}
 			assert((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc) || (OC_GVEXTNAM == put_oc));
 			dqdel(sub, exorder);
-			dqins(targchain.exorder.bl, exorder, sub);
+			dqrins(&targchain, exorder, sub);
 			if (TREF(temp_subs))
 				create_temporaries(sub, put_oc);
 			put = maketriple(OC_GVPUT);
 			put->operand[0] = resptr;
-			dqins(targchain.exorder.bl, exorder, put);
+			dqrins(&targchain, exorder, put);
 			break;
 		case TK_ATSIGN:
 			if (alias_processing)
@@ -335,7 +335,7 @@ int m_set(void)
 			put = maketriple(OC_STOGLVN);
 			put->operand[0] = control_slot;
 			put->operand[1] = resptr;
-			dqins(targchain.exorder.bl, exorder, put);
+			dqrins(&targchain, exorder, put);
 			break;
 		case TK_DOLLAR:
 			if (alias_processing)
@@ -366,7 +366,7 @@ int m_set(void)
 						put = maketriple(OC_PSVPUT);
 					put->operand[0] = put_ilit(svn_data[index].opcode);
 					put->operand[1] = resptr;
-					dqins(targchain.exorder.bl, exorder, put);
+					dqrins(&targchain, exorder, put);
 				} else
 				{	/* OC_RTERROR triple would have been inserted in curtchain by ins_errtriple
 					 * (invoked by stx_error). To maintain consistency with the "if" portion of
@@ -377,7 +377,7 @@ int m_set(void)
 					tmp = tmp->exorder.bl;	/* corresponds to newtriple(OC_RTERROR) in ins_errtriple */
 					assert(OC_RTERROR == tmp->opcode);
 					dqdel(tmp, exorder);
-					dqins(targchain.exorder.bl, exorder, tmp);
+					dqrins(&targchain, exorder, tmp);
 				}
 				break;
 			}
@@ -395,7 +395,7 @@ int m_set(void)
 				tmp = tmp->exorder.bl;	/* corresponds to newtriple(OC_RTERROR) in ins_errtriple */
 				assert(OC_RTERROR == tmp->opcode);
 				dqdel(tmp, exorder);
-				dqins(targchain.exorder.bl, exorder, tmp);
+				dqrins(&targchain, exorder, tmp);
 				advancewindow();	/* skip past the function name */
 				advancewindow();	/* skip past the left paren */
 				/* Parse the remaining arguments until corresponding RIGHT-PAREN/SPACE/EOL is reached */
@@ -445,7 +445,7 @@ int m_set(void)
 					if (OC_PUTINDX == v.oprval.tref->opcode)
 					{
 						dqdel(v.oprval.tref, exorder);
-						dqins(targchain.exorder.bl, exorder, v.oprval.tref);
+						dqrins(&targchain, exorder, v.oprval.tref);
 						sub = v.oprval.tref;
 						put_oc = OC_PUTINDX;
 						if (TREF(temp_subs))
@@ -485,7 +485,7 @@ int m_set(void)
 					}
 					assert((OC_GVNAME == put_oc) || (OC_GVNAKED == put_oc) || (OC_GVEXTNAM == put_oc));
 					dqdel(sub, exorder);
-					dqins(targchain.exorder.bl, exorder, sub);
+					dqrins(&targchain, exorder, sub);
 					if (TREF(temp_subs))
 						create_temporaries(sub, put_oc);
 					get = maketriple(OC_FNGVGET);
@@ -498,7 +498,7 @@ int m_set(void)
 				}
 				s->operand[0] = put_tref(get);
 				/* Code to fetch args for target triple are on targchain. Put get there now too. */
-				dqins(targchain.exorder.bl, exorder, get);
+				dqrins(&targchain, exorder, get);
 				if (!is_extract)
 				{	/* Set $[z]piece */
 					delimiter = newtriple(OC_PARAMETER);
@@ -659,8 +659,8 @@ int m_set(void)
 			advancewindow();
 			if (!parse_warn)
 			{
-				dqins(targchain.exorder.bl, exorder, s);
-				dqins(targchain.exorder.bl, exorder, put);
+				dqrins(&targchain, exorder, s);
+				dqrins(&targchain, exorder, put);
 				/* Put result operand on the chain. End of chain depends on whether or not
 				 * we are calling the shortcut or the full set-piece code
 				 */

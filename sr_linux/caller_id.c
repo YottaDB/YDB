@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2015 Fidelity National Information	*
+ * Copyright (c) 2008-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,7 +36,7 @@
 #include "gt_timer.h"
 #include "caller_id.h"
 
-#define MAX_TRACE_DEPTH		3
+#define MAX_TRACE_DEPTH		5
 /* We need the callers caller of caller_id */
 #define RETURN_ADDRESS_DEPTH	2
 
@@ -47,7 +47,7 @@ GBLREF	volatile boolean_t	timer_in_handler;
 
 static boolean_t caller_id_reent = FALSE;	/* If ever true, our helper gets a lobotomy */
 
-caddr_t caller_id(void)
+caddr_t caller_id(unsigned int extra_frames)
 {
 	void		*trace[MAX_TRACE_DEPTH];
 	int		rc, trace_size;
@@ -85,7 +85,7 @@ caddr_t caller_id(void)
 		SIGPROCMASK(SIG_SETMASK, &savemask, NULL, rc);
 	/* backtrace will return call stack with address.*/
 	if (RETURN_ADDRESS_DEPTH <= trace_size)
-		return (caddr_t)trace[RETURN_ADDRESS_DEPTH];
+		return (caddr_t)trace[RETURN_ADDRESS_DEPTH + extra_frames];
 	else
 		return NULL;
 }

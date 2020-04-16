@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -303,6 +303,7 @@ void	assert_jrec_member_offsets(void)
 CONDITION_HANDLER(gvcst_init_autoDB_ch)
 {
 	gd_region	*reg;
+	unix_db_info	*udi;
 
 	START_CH(TRUE);
 	if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
@@ -314,8 +315,11 @@ CONDITION_HANDLER(gvcst_init_autoDB_ch)
 		STATSDBREG_TO_BASEDBREG(db_init_region, reg);
 	else
 		reg = db_init_region;
-	if ((NULL != ftok_sem_reg) && !ftok_sem_release(reg, FALSE, FALSE))	/* release ftok lock on the base region */
+	udi = FILE_INFO(reg);
+	if (udi->grabbed_ftok_sem && !ftok_sem_release(reg, FALSE, FALSE))	/* release ftok lock on the base region */
 		assert(FALSE);
+	if (ftok_sem_reg == reg)
+		ftok_sem_reg = NULL;
 	/* Enable interrupts in case we are here with intrpt_ok_state == INTRPT_IN_GVCST_INIT due to an rts error.
 	 * Normally we would have the new state stored in "prev_intrpt_state" but that is not possible here because
 	 * the corresponding DEFER_INTERRUPTS happened in "gvcst_init" (a different function) so we have an assert
@@ -932,6 +936,7 @@ void gvcst_init(gd_region *reg, gd_addr *addr)
 		csa->mlkctl = NULL;
 		csa->mlkctl_len = 0;
 		csa->mlkhash = NULL;
+		csa->mlkhash_shmid = INVALID_SHMID;
 		csa->gd_ptr = addr ? addr : gd_header;
 		if (csa->gd_ptr)
 			csa->gd_instinfo = csa->gd_ptr->instinfo;

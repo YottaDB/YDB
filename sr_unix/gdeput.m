@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2019 Fidelity National Information		;
+; Copyright (c) 2006-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -247,7 +247,7 @@ csegment:
 	s rec=rec_$$num2bin(2,$zl(segs(s,"FILE_NAME")))
 	s rec=rec_segs(s,"FILE_NAME")_$tr($j("",SIZEOF("file_spec")-$zl(segs(s,"FILE_NAME")))," ",ZERO)
 	s rec=rec_$$num2bin(2,segs(s,"BLOCK_SIZE"))
-	set rec=rec_$tr($j("",2)," ",ZERO)						 ;alignment
+	set rec=rec_$$num2bin(2,segs(s,"FULLBLKWRT"))
 	set rec=rec_$$num2bin(4,segs(s,"EXTENSION_COUNT"))
 	s rec=rec_$$num2bin(4,segs(s,"ALLOCATION"))
 	if (gtm64=TRUE) s rec=rec_$tr($j("",8)," ",ZERO)				;reserved for clb + padding

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,7 +39,7 @@ error_def(ERR_DSEWCREINIT);
 	GBLREF spdesc		stringpool;											\
 	LITREF mval		literal_null;											\
 																\
-	op_horolog(&dollarh_mval); /* returns $H value in stringpool */								\
+	op_zhorolog(&dollarh_mval, FALSE); /* returns $H value in stringpool */							\
 	assert(SIZEOF(dollarh_buffer) >= dollarh_mval.str.len);									\
 	/* if op_fnzdate (called below) calls stp_gcol, dollarh_mval might get corrupt because it is not known to stp_gcol.	\
 	 * To prevent problems, copy from stringpool to local buffer */								\

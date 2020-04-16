@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -11,7 +11,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-
+#include "gtm_string.h"
 #include "compiler.h"
 #include "opcode.h"
 #include "toktyp.h"
@@ -86,9 +86,9 @@ int exfunc(oprtype *a, boolean_t alias_target)
 			routineref = maketriple(OC_CURRHD);
 			labelref = maketriple(OC_LABADDR);
 			ref0 = maketriple(OC_PARAMETER);
-			dqins(calltrip->exorder.bl, exorder, routineref);
-			dqins(calltrip->exorder.bl, exorder, labelref);
-			dqins(calltrip->exorder.bl, exorder, ref0);
+			dqrins(calltrip, exorder, routineref);
+			dqrins(calltrip, exorder, labelref);
+			dqrins(calltrip, exorder, ref0);
 			labelref->operand[0] = calltrip->operand[0];
 			labelref->operand[1] = put_tref(ref0);
 			ref0->operand[0] = calltrip->operand[1];

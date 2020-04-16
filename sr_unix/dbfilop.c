@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -122,6 +122,8 @@ uint4 dbfilop(file_control *fc)
 			set_gdid_from_stat(&udi->fileid, &stat_buf);
 			udi->raw = (S_ISCHR(stat_buf.st_mode) || S_ISBLK(stat_buf.st_mode));
 			udi->fn = (char *)gv_cur_region->dyn.addr->fname;
+			if (seg->full_blkwrt)
+				csa->fullblockwrite_len = get_fs_block_size(udi->fd);
 			break;
 		case FC_CLOSE:
 			CLOSEFILE_RESET(udi->fd, save_errno);	/* resets "udi->fd" to FD_INVALID */

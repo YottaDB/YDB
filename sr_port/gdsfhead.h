@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,7 +68,7 @@ typedef struct cache_rec_struct
 {
 	struct
 	{
-		sm_off_t 	fl;
+		sm_off_t	fl;
 		sm_off_t	bl;
 	}
 			blkque,		/* cache records whose block numbers hash to the same location */
@@ -142,8 +142,8 @@ typedef struct cache_rec_struct
 					 * in progress. This is used by wcs_recover to decide whether to place a cr into
 					 * the active or wip queue.
 					 */
-	bool		needs_first_write; 	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for gtm_fullblockwrites) */
+	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
+						 *  note it (only applicable for fullblockwrites) */
 	/* bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
 } cache_rec;
 
@@ -161,7 +161,7 @@ typedef struct
 {
 	struct
 	{
-		sm_off_t 	fl;
+		sm_off_t	fl;
 		sm_off_t	bl;
 	}
 			state_que;	/* WARNING from this point, this structure must be identical to a cache_rec */
@@ -172,7 +172,7 @@ typedef struct
 			/* volatile required as this value is referenced outside of the lock in db_csh_getn() */
 	} interlock;
 	block_id	blk;
-	uint4		refer; 		/* reference bit for the LRU algorithm */
+	uint4		refer;		/* reference bit for the LRU algorithm */
 	enum db_ver	ondsk_blkver;	/* Actual block version from block header as it exists on disk
 					   (prior to any dynamic conversion that may have occurred when read in).
 					*/
@@ -231,8 +231,8 @@ typedef struct
 					 * in progress. This is used by wcs_recover to decide whether to place a cr into
 					 * the active or wip queue.
 					 */
-	bool		needs_first_write; 	/* If this block needs to be written to disk for the first time,
-						 *  note it (only applicable for gtm_fullblockwrites) */
+	bool		needs_first_write;	/* If this block needs to be written to disk for the first time,
+						 *  note it (only applicable for fullblockwrites) */
 	/*bool		filler4bytealign[1];	 Note: Make sure any changes here are reflected in "cache_state_rec" too */
 } cache_state_rec;
 
@@ -261,7 +261,7 @@ typedef struct
 #endif
 
 typedef cache_que_head	*cache_que_head_ptr_t;
-typedef cache_rec 	*cache_rec_ptr_t;
+typedef cache_rec	*cache_rec_ptr_t;
 typedef cache_rec	**cache_rec_ptr_ptr_t;
 typedef cache_state_rec	*cache_state_rec_ptr_t;
 typedef cache_que_heads	*cache_que_heads_ptr_t;
@@ -300,7 +300,7 @@ gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
 # define MSYNC(BEGPTR, ENDPTR)			(BEGPTR ? DBG_ASSERT(BEGPTR < ENDPTR) msync(BEGPTR, (ENDPTR - BEGPTR), MS_SYNC)	\
 							: 0)
 # define MM_PROT_FLAGS(READ_ONLY)		(READ_ONLY ? PROT_READ : (PROT_READ | PROT_WRITE))
-# define MM_BASE_ADDR(CSA) 			(sm_uc_ptr_t)CSA->db_addrs[0]
+# define MM_BASE_ADDR(CSA)			(sm_uc_ptr_t)CSA->db_addrs[0]
 # define SET_MM_BASE_ADDR(CSA, CSD)
 # ifdef _AIX
 #  define MEM_MAP_SYSCALL "shmat()"
@@ -393,7 +393,7 @@ MBSTART {												\
 #define	GVKEY_INCREMENT_ORDER(KEY)			\
 MBSTART {						\
 	int		end;				\
-	unsigned char 	*base = KEY->base;		\
+	unsigned char	*base = KEY->base;		\
 							\
 	end = KEY->end;					\
 	assert(KEY_DELIMITER == base[end - 1]);		\
@@ -916,7 +916,7 @@ MBSTART {													\
 				 * non-bitmap block (i.e. without invoking gvcst_map_build). MUPIP JOURNAL	\
 				 * RECOVER also could do the same thing while applying an AIMG record. In both	\
 				 * cases, "write_after_image" would be TRUE.					\
-				 * 										\
+				 *										\
 				 * b) In case this is a twinned cache-record, for the older twin "in_cw_set"	\
 				 * will be set to non-zero, but "in_tend" will be set to FALSE. Since we are	\
 				 * outside of crit at this point, it is possible cr->twin field might be 0	\
@@ -1252,7 +1252,7 @@ MBSTART {										\
 #endif
 
 /* Every process that initializes journal pool has two aspects of validation.
- * 1. 	Validate whether this process can do logical updates to the journal pool that is initialized. If not, the process should
+ * 1.	Validate whether this process can do logical updates to the journal pool that is initialized. If not, the process should
  *	issue SCNDDBNOUPD error. Examples of this would be a GT.M update that happens on a non-supplementary Receiver Side.
  *
  * 2.	Validate whether the process is attached to the correct journal pool. If not, REPLINSTMISMTCH should be issued. This check
@@ -1284,7 +1284,7 @@ MBSTART {															\
 	assert(JNLPOOL_VALIDATED >= jnlpool_validate_check);									\
 	if (JNLPOOL_VALIDATED != jnlpool_validate_check)									\
 	{															\
-		do_REPLINSTMISMTCH_check = (!(REPLINSTMISMTCH_CHECK_DONE & jnlpool_validate_check) 				\
+		do_REPLINSTMISMTCH_check = (!(REPLINSTMISMTCH_CHECK_DONE & jnlpool_validate_check)				\
 						&& ((GTMRELAXED != JNLPOOL_USER) || !IS_GTM_IMAGE));				\
 		if (!(SCNDDBNOUPD_CHECK_DONE & jnlpool_validate_check) && SCNDDBNOUPD_CHECK_NEEDED)				\
 		{														\
@@ -1293,7 +1293,7 @@ MBSTART {															\
 				 * as that would cause us not to honor instance freeze (in case gtm_custom_errors env var is	\
 				 * non-null) for database reads that this process later does (for example reading a block	\
 				 * might require us to flush a dirty buffer to disk which should pause if the instance is	\
-				 * frozen).					 						\
+				 * frozen).											\
 				 */												\
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_SCNDDBNOUPD);					\
 			}													\
@@ -1488,7 +1488,7 @@ MBSTART {											\
 #define SIZEOF_FILE_HDR_MIN	(SGMNT_HDR_LEN + MASTER_MAP_SIZE_V4)
 #define SIZEOF_FILE_HDR_MAX	(SGMNT_HDR_LEN + MASTER_MAP_SIZE_MAX)
 #define MM_BLOCK		(SGMNT_HDR_LEN / DISK_BLOCK_SIZE + 1)	/* gt.m numbers blocks from 1 */
-#define TH_BLOCK	 	1
+#define TH_BLOCK		1
 
 #define JNL_NAME_SIZE	        256  /* possibly expanded when opened. Macro value should not change as it is used in db file hdr */
 #define JNL_NAME_EXP_SIZE	1024 /* MAXPATHLEN, before jnl_buffer in shared memory */
@@ -1500,9 +1500,9 @@ MBSTART {											\
 #define MAXTOTALBLKS_MAX	(MASTER_MAP_SIZE_MAX * 8 * BLKS_PER_LMAP)
 #define MAXTOTALBLKS(SGD)	(MASTER_MAP_SIZE(SGD) * 8 * BLKS_PER_LMAP)
 #define	IS_BITMAP_BLK(blk)	(ROUND_DOWN2(blk, BLKS_PER_LMAP) == blk)	/* TRUE if blk is a bitmap */
-/* 	V6 - 8K fileheader (= 16 blocks) + 248K mastermap (= 496 blocks) + 1
- * 	V5 - 8K fileheader (= 16 blocks) + 56K mastermap (= 112 blocks) + 1
- * 	V4 - 8K fileheader (= 16 blocks) + 16K mastermap (= 32 blocks) + 1
+/*	V6 - 8K fileheader (= 16 blocks) + 248K mastermap (= 496 blocks) + 1
+ *	V5 - 8K fileheader (= 16 blocks) + 56K mastermap (= 112 blocks) + 1
+ *	V4 - 8K fileheader (= 16 blocks) + 16K mastermap (= 32 blocks) + 1
  */
 #define START_VBN_V6		513
 #define START_VBN_V5		129
@@ -1591,25 +1591,25 @@ MBSTART {								\
 	/* else possible if wcs_verify had reset this flag */		\
 } MBEND
 
-#define ENSURE_JNL_OPEN(csa, reg)                                                 					\
-MBSTART {                                                                               				\
-	boolean_t		was_crit;                                               				\
+#define ENSURE_JNL_OPEN(csa, reg)                                                					\
+MBSTART {                                                                              				\
+	boolean_t		was_crit;                                              				\
 	jnl_private_control	*jpc;											\
 	sgmnt_data_ptr_t	csd;											\
 	uint4			jnl_status;										\
 															\
-	assert(cs_addrs == csa);                                                        				\
-	assert(gv_cur_region == reg);                                                   				\
-	assert(FALSE == reg->read_only);                                                				\
+	assert(cs_addrs == csa);                                                       				\
+	assert(gv_cur_region == reg);                                                  				\
+	assert(FALSE == reg->read_only);                                               				\
 	csd = csa->hdr;													\
 	if (JNL_ENABLED(csd))												\
-	{                                                                       					\
-		was_crit = csa->now_crit;                                         					\
-		if (!was_crit)                                                  					\
-			grab_crit(reg);                                         					\
-		jnl_status = JNL_ENABLED(csd) ? jnl_ensure_open(reg, csa) : 0;    	                             	\
-		if (!was_crit)                                                  					\
-			rel_crit(reg);                                          					\
+	{                                                                      					\
+		was_crit = csa->now_crit;                                        					\
+		if (!was_crit)                                                 					\
+			grab_crit(reg);                                        					\
+		jnl_status = JNL_ENABLED(csd) ? jnl_ensure_open(reg, csa) : 0;   	                            	\
+		if (!was_crit)                                                 					\
+			rel_crit(reg);                                         					\
 		if (0 != jnl_status)											\
 		{													\
 			jpc = csa->jnl;											\
@@ -1621,14 +1621,14 @@ MBSTART {                                                                       
 				rts_error_csa(CSA_ARG(csa) VARLSTCNT(6) jnl_status, 4, JNL_LEN_STR(csd),		\
 						DB_LEN_STR(gv_cur_region));						\
 		}													\
-	}                                                                       					\
+	}                                                                      					\
 } MBEND
 
 #define JNL_ENSURE_OPEN_WCS_WTSTART(csa, reg, num_bufs, cr2flush, CHILLWAIT, RET)		\
-MBSTART {       										\
+MBSTART {      										\
 	if ((CHILLWAIT) && !FREEZE_LATCH_HELD(csa))						\
 		WAIT_FOR_REGION_TO_UNCHILL(csa, csa->hdr);					\
-	ENSURE_JNL_OPEN(csa, reg);                              				\
+	ENSURE_JNL_OPEN(csa, reg);                             				\
 	if (csa->hdr->asyncio)									\
 		RET = wcs_wtstart_fini(reg, num_bufs, cr2flush);				\
 	else											\
@@ -1712,7 +1712,7 @@ MBSTART {												\
 	if (0 == (RDBF_NOSTATS & (CSA)->reservedDBFlags))						\
 	{												\
 		(CSA)->gvstats_rec_p->COUNTER += INCREMENT;		/* private or shared stats */	\
-		(CNL)->gvstats_rec.COUNTER += INCREMENT;		/* database stats */ 		\
+		(CNL)->gvstats_rec.COUNTER += INCREMENT;		/* database stats */		\
 	}												\
 } MBEND
 
@@ -1994,8 +1994,9 @@ typedef struct sgmnt_data_struct
 	char		filler_384[12];
 	/************* FIELDS RELATED TO DB TRANSACTION HISTORY *****************************/
 	th_index	trans_hist;		/* transaction history - if moved from 1st filehdr block, change TH_BLOCK */
-	char		filler_trans_hist[8];
 	/************* FIELDS RELATED TO WRITE CACHE FLUSHING *******************************/
+	int4		write_fullblk;
+	char		filler[4];
 	int4		flush_time[2];
 	int4		flush_trigger;
 	int4		n_wrt_per_flu;		/* Number of writes per flush call. Overloaded for BG and MM */
@@ -2213,7 +2214,7 @@ typedef struct
 
 typedef struct
 {
-	int 	filler;
+	int	filler;
 } sgmm_addrs;
 
 #define MAX_NM_LEN	MAX_MIDENT_LEN
@@ -2249,7 +2250,7 @@ typedef struct
 /* definition for NULL_SUBSCRIPTS */
 #define NEVER		0
 #define ALWAYS		1
-#define ALLOWEXISTING 	2
+#define ALLOWEXISTING	2
 
 #define OFFSET(x,y) ((uchar_ptr_t)x - (uchar_ptr_t)y)
 
@@ -2338,7 +2339,7 @@ MBSTART {												\
 	DEBUG_ONLY(enc_info_t	before);								\
 													\
 	DEBUG_ONLY(COPY_ENC_INFO_INT(SRC, &before, REORG_ENCRYPT_CYCLE));				\
-	/* This is to have the following memcmp succeed; normally, the issued_db_init_crypt_warning 	\
+	/* This is to have the following memcmp succeed; normally, the issued_db_init_crypt_warning	\
 	 * field is never updated once set.								\
 	 */												\
 	DEBUG_ONLY(before.issued_db_init_crypt_warning = (DST)->issued_db_init_crypt_warning);		\
@@ -2480,12 +2481,12 @@ typedef struct	gd_segment_struct
 	unsigned short		fname_len;
 	unsigned char		fname[MAX_FN_LEN + 1];
 	unsigned short		blk_size;
-	char			align_filler[2];	/* filler to align the sizes */
+	unsigned short		full_blkwrt;
 	uint4			ext_blk_count;
 	uint4			allocation;
 	struct CLB		*cm_blk;
 	unsigned char		defext[4];
-	char			defer_time; 	/* Was passed in cs_addrs */
+	char			defer_time;	/* Was passed in cs_addrs */
 	unsigned char		file_type;
 	unsigned char		buckets;	/* Was passed in FAB */
 	unsigned char		windows;	/* Was passed in FAB */
@@ -2519,9 +2520,9 @@ typedef struct	gd_region_struct
 	gd_seg_addr		stat;
 	bool			open;
 	bool			lock_write;	/* Field is not currently used by GT.M */
-	char            	null_subs;	/* 0 ->NEVER(previous NO), 1->ALWAYS(previous YES), 2->ALLOWEXISTING
+	char           	null_subs;	/* 0 ->NEVER(previous NO), 1->ALWAYS(previous YES), 2->ALLOWEXISTING
 						* i.e. will allow read null subs but prohibit set */
-	unsigned char 		jnl_state;
+	unsigned char		jnl_state;
 	/* deleted gbl_lk_root and lcl_lk_root, obsolete fields */
 	uint4			jnl_alq;
 	uint4			jnl_deq;
@@ -2555,7 +2556,7 @@ typedef struct	gd_region_struct
 							 *	corresponding base region.
 							 */
 	bool			epoch_taper;
-	bool			reservedDBFlags; 	/* Flags for reservedDB types and/or features */
+	bool			reservedDBFlags;	/* Flags for reservedDB types and/or features */
 	bool			lock_crit_with_db;	/* controls whether LOCK crit is separate (0) or shared with DB (1) */
 	/* All fields before this point are relied upon by GDE. All fields after this point are relied upon only by
 	 * the runtime logic (i.e. it is one big filler/padding area as far as GDE is concerned).
@@ -2599,7 +2600,7 @@ typedef struct	sgmnt_addrs_struct
 	struct sgm_info_struct			*sgm_info_ptr;
 	gd_region				*region;		/* the region corresponding to this csa */
 	struct hash_table_mname_struct		*gvt_hashtab;		/* NON-NULL only if regcnt > 1;
-								 	 * Maintains all gv_targets mapped to this db file */
+									 * Maintains all gv_targets mapped to this db file */
 	void					*miscptr;	/* pointer to rctl for this region (if jgbl.forw_phase_recovery)
 								 * pointer to gvt_hashtab for this region (if DSE_IMAGE)
 								 * pointer to repl_rctl for this region (if source server)
@@ -2609,7 +2610,7 @@ typedef struct	sgmnt_addrs_struct
 	gtmcrypt_key_t				encr_key_handle;
 	gtmcrypt_key_t				encr_key_handle2;
 	enc_info_t				*encr_ptr;	/* Copy of encryption info from the database file header */
-	struct snapshot_context_struct 		*ss_ctx;
+	struct snapshot_context_struct		*ss_ctx;
 	union
 	{
 		sgmm_addrs	mm;
@@ -2627,7 +2628,7 @@ typedef struct	sgmnt_addrs_struct
 	/* 8-byte aligned at this point on all platforms (32-bit, 64-bit or Tru64 which is a mix of 32-bit and 64-bit pointers) */
 	cache_rec_ptr_t	our_midnite;		/* anchor if we are using a gbuff_limit */
 	size_t		fullblockwrite_len;	/* Length of a full block write */
-	sm_off_t 	our_lru_cache_rec_off;	/* last used cache pointer for when we are using a gbuff_limit */
+	sm_off_t	our_lru_cache_rec_off;	/* last used cache pointer for when we are using a gbuff_limit */
 	uint4		total_blks;		/* Last we knew, file was this big. Used to signal MM processing file was
 						 * extended and needs to be remapped. In V55000 was used with BG to detect
 						 * file truncates. It is no longer used for that purpose: it was not necessary
@@ -2666,7 +2667,7 @@ typedef struct	sgmnt_addrs_struct
 	boolean_t	snapshot_in_prog;	/* true if snapshots are in progress for this region */
 	int4		ref_cnt;		/* count of number of times csa->nl->ref_cnt was incremented by this process */
 	int4		fid_index;		/* index for region ordering based on unique_id */
-	int4		do_fullblockwrites;	/* This region enabled for full block writes */
+	char		filler[4];
 	int4		regnum;			/* Region number (region open counter) used by journaling so all tokens
 						   have a unique prefix per region (and all regions have same prefix)
 						*/
@@ -2724,8 +2725,8 @@ typedef struct	sgmnt_addrs_struct
 	gd_addr		*gd_ptr;		/* global directory for region */
 	struct jnlpool_addrs_struct	*jnlpool;	/* NULL until put, kill, or other function requiring jnlpool */
 	struct mlk_shrhash_struct	*mlkhash;	/* Pointer to shared lock hash array. Set by GRAB_LOCK_CRIT(). */
-	int				mlkhash_shmid;	/* Shared memory id of attached lock hash array, or zero if internal.
-							 * Set by GRAB_LOCK_CRIT().
+	int				mlkhash_shmid;	/* Shared memory id of attached lock hash array, or INVALID_SHMID
+							 * if internal. Set by GRAB_LOCK_CRIT_AND_SYNC().
 							 */
 } sgmnt_addrs;
 
@@ -2846,7 +2847,7 @@ typedef struct
 
 #define MERGE_SUPER_HIST(SUPER_HIST, HIST1, HIST2)								\
 MBSTART {	/* Possible enhancement: do memcpy instead of loop */						\
-	srch_hist 	*hist;											\
+	srch_hist	*hist;											\
 	srch_blk_status	*t0, *t1;										\
 														\
 	(SUPER_HIST)->depth = 1 + (HIST1)->depth + (HIST2)->depth;						\
@@ -2907,7 +2908,7 @@ typedef struct	gv_namehead_struct
 	gv_key		*prev_key;			/* Points to fully expanded previous key. Used by $zprevious.
 							 * Valid only if clue->end is non-zero.
 							 */
-	boolean_t	noisolation;     		/* whether isolation is turned on or off for this global */
+	boolean_t	noisolation;    		/* whether isolation is turned on or off for this global */
 	block_id	root;				/* Root of global variable tree */
 	mname_entry	gvname;				/* the name of the global */
 	srch_hist	hist;				/* block history array */
@@ -3404,7 +3405,7 @@ MBSTART {													\
 	if (mvarg->mvtype & MV_SUBLIT)										\
 	{													\
 		is_null = ((STR_SUB_PREFIX == *(unsigned char *)mvarg->str.addr)				\
-					&& (KEY_DELIMITER == *(mvarg->str.addr + 1))); 				\
+					&& (KEY_DELIMITER == *(mvarg->str.addr + 1)));				\
 		if (gv_target->collseq || gv_target->nct)							\
 		{												\
 			/* collation transformation should be done at the server's end for CM regions */	\
@@ -3613,7 +3614,7 @@ MBSTART {											\
 /* Bit masks for the update_trans & si->update_trans variables */
 #define	UPDTRNS_DB_UPDATED_MASK		(1 << 0)	/* 1 if this region was updated by this non-TP/TP transaction */
 #define	UPDTRNS_JNL_LOGICAL_MASK	(1 << 1)	/* 1 if logical jnl record was written in this region's
-	          					 * journal file by this TP transaction. Maintained only for TP.
+	         					 * journal file by this TP transaction. Maintained only for TP.
 							 */
 #define	UPDTRNS_JNL_REPLICATED_MASK	(1 << 2)	/* 1 if there is at least one logical jnl record written in this
 							 * region's journal file by this TP transaction that needs to be
@@ -3734,7 +3735,7 @@ MBSTART {												\
 #define HIST_SIZE(h)		( (SIZEOF(int4) * 2) + (SIZEOF(srch_blk_status) * ((h).depth + 1)) )
 
 /* Start of lock space in a bg file, therefore also doubles as overhead size for header, bt and wc queues F = # of wc blocks */
-#define LOCK_BLOCK(X) 		(DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(X) + BT_SIZE(X), DISK_BLOCK_SIZE))
+#define LOCK_BLOCK(X)		(DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(X) + BT_SIZE(X), DISK_BLOCK_SIZE))
 #define LOCK_BLOCK_SIZE(X)	(DIVIDE_ROUND_UP(SIZEOF_FILE_HDR(X) + BT_SIZE(X), OS_PAGE_SIZE))
 #define	LOCK_SPACE_SIZE(X)	(ROUND_UP2(((sgmnt_data_ptr_t)X)->lock_space_size, OS_PAGE_SIZE))
 /* In case of an encrypted database, we maintain both encrypted and decrypted versions of the block in shared memory
@@ -3767,7 +3768,7 @@ typedef struct
 # pragma pointer_size(long)
 #endif
 
-typedef replpool_identifier 	*replpool_id_ptr_t;
+typedef replpool_identifier	*replpool_id_ptr_t;
 
 #if defined(__osf__) && defined(__alpha)
 # pragma pointer_size(restore)
@@ -3874,11 +3875,11 @@ MBSTART {									\
 	sgmnt_data_ptr_t	local_csd;					\
 	sgmnt_addrs		*local_csa;					\
 										\
-	/* Instead of using CSA and CSD directly in DECR_CNT, assign it to 	\
-	 * local variables as the caller can potentially pass the global 	\
-	 * kip_csa as the second argument(which also happens to be the 		\
+	/* Instead of using CSA and CSD directly in DECR_CNT, assign it to	\
+	 * local variables as the caller can potentially pass the global	\
+	 * kip_csa as the second argument(which also happens to be the		\
 	 * the third argument which will be reset to NULL below) thereby	\
-	 * leading to SEG faults in the calls to DECR_CNT. Similar 		\
+	 * leading to SEG faults in the calls to DECR_CNT. Similar		\
 	 * modifications are in INCR_KIP and their CAREFUL counterparts */	\
 	local_csd = CSD;							\
 	local_csa = CSA;							\
@@ -3965,8 +3966,8 @@ MBSTART {						\
 	{						\
 		if (!FROZEN_HARD(CSA))			\
 			break;				\
-		if (MAXHARDCRITS < lcnt1)       	\
-			wcs_backoff(lcnt1);     	\
+		if (MAXHARDCRITS < lcnt1)      	\
+			wcs_backoff(lcnt1);    	\
 	}						\
 } MBEND
 
@@ -3990,8 +3991,8 @@ MBSTART {														\
 			send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_OFRZCRITSTUCK, 2, REG_LEN_STR((CSA)->region));	\
 			crit_stuck = TRUE;										\
 		}													\
-		if (MAXHARDCRITS < lcnt1)       									\
-			wcs_backoff(lcnt1);     									\
+		if (MAXHARDCRITS < lcnt1)      									\
+			wcs_backoff(lcnt1);    									\
 	}														\
 	if (crit_stuck)													\
 		send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_OFRZCRITREL, 2, REG_LEN_STR((CSA)->region));			\
@@ -4036,7 +4037,7 @@ MBSTART {										\
 		prevcsa = tmpcsa;							\
 	}										\
 	/* tmpcsa could not be equal to CSA in case CSA was never added to this list	\
-	 * (possible in case of errors during gvcst_init). In dbg, the only case we 	\
+	 * (possible in case of errors during gvcst_init). In dbg, the only case we	\
 	 * know of this is if an external signal causes exit processing before db_init	\
 	 * completes. Assert accordingly.						\
 	 */										\
@@ -4223,16 +4224,16 @@ MBSTART {														\
 		assert(status || (SHADOW_FIL_OPEN_FAIL == lcl_ss_ctx->cur_state)					\
 			|| (SNAPSHOT_SHM_ATTACH_FAIL  == lcl_ss_ctx->cur_state)						\
 			|| (SNAPSHOT_NOT_INITED == lcl_ss_ctx->cur_state));						\
-	} else if ((SHADOW_FIL_OPEN_FAIL == lcl_ss_ctx->cur_state) 							\
+	} else if ((SHADOW_FIL_OPEN_FAIL == lcl_ss_ctx->cur_state)							\
 			|| (SNAPSHOT_SHM_ATTACH_FAIL == lcl_ss_ctx->cur_state))						\
 	{	/* Previous attempt at snapshot context creation failed (say, snapshot file open failed) and the error	\
-		 * has been reported in the shared memory. However, the snapshot is not yet complete. So, set 		\
+		 * has been reported in the shared memory. However, the snapshot is not yet complete. So, set		\
 		 * snapshot_in_prog to FALSE since the ongoing snapshot is not valid (as indicated by us in the prior	\
-		 * transaction/retry inside crit) 									\
-		 * Note that we will be doing this 'if' check unconditionally until MUPIP INTEG detects the error in 	\
+		 * transaction/retry inside crit)									\
+		 * Note that we will be doing this 'if' check unconditionally until MUPIP INTEG detects the error in	\
 		 * shared memory which can be avoided by making GT.M itself set CNL->snapshot_in_prog to FALSE when it	\
 		 * detects inside crit that snapshot initialization failed for this process and hence the ongoing	\
-		 * snapshot is no longer valid. This way we don't wait for MUPIP INTEG to detect and terminate the 	\
+		 * snapshot is no longer valid. This way we don't wait for MUPIP INTEG to detect and terminate the	\
 		 * snapshots												\
 		 */													\
 		SS_RELEASE_IF_NEEDED(CSA, CNL);										\
@@ -4251,7 +4252,7 @@ MBSTART {										\
 	assert(NULL != ss_shm_ptr);							\
 	assert(SNAPSHOT_INIT_DONE == LCL_SS_CTX->cur_state);				\
 	assert(0 == LCL_SS_CTX->failure_errno);						\
-	assert((-1 != CNL->ss_shmid) && 						\
+	assert((-1 != CNL->ss_shmid) &&						\
 		(LCL_SS_CTX->attach_shmid == CNL->ss_shmid));				\
 	assert(NULL != LCL_SS_CTX->start_shmaddr);					\
 	assert(0 == STRCMP(LCL_SS_CTX->shadow_file, ss_shm_ptr->ss_info.shadow_file));	\
@@ -4294,8 +4295,8 @@ MBSTART {											\
  * bitmasks or some alternate mechanism to optionalize the before image'ing of FREE blocks, this condition must be tweaked
  * accordingly. For now, INTEG is the only snapshot initiator.
  */
-# define BEFORE_IMAGE_NEEDED(read_before_image, CS, csa, csd, blk_no, retval)				 		\
-MBSTART {													 	\
+# define BEFORE_IMAGE_NEEDED(read_before_image, CS, csa, csd, blk_no, retval)						\
+MBSTART {														\
 	retval = (read_before_image && csd->db_got_to_v5_once);								\
 	retval = retval && (!WAS_FREE(CS->blk_prior_state) || SNAPSHOTS_IN_PROG(csa));				\
 	retval = retval && (!ONLY_SS_BEFORE_IMAGES(csa) || !ss_chk_shdw_bitmap(csa, SS_CTX_CAST(csa->ss_ctx), blk_no));\
@@ -4321,12 +4322,12 @@ MBSTART {															\
 		assert(lcl_ss_ctx->ss_shmcycle <= CNL->ss_shmcycle);								\
 		if (!cnl_snapshot_in_prog || ss_shm_ptr->failure_errno)								\
 		{	/* No on going snapshots or on going snapshot is invalid. Even if we encountered error during snapshot	\
-			 * context creation outside crit, we ignore it as the snapshot is no more active/valid. 		\
+			 * context creation outside crit, we ignore it as the snapshot is no more active/valid.		\
 			 */													\
 			CLEAR_SNAPSHOTS_IN_PROG(CSA);										\
 		} else if (lcl_ss_ctx->ss_shmcycle == CNL->ss_shmcycle)								\
 		{	/* Neither new snapshots started nor existing ones completed. However, it's possible that we might have \
-			 * encountered error during snapshot context creation outside crit. If the values noted outside crit 	\
+			 * encountered error during snapshot context creation outside crit. If the values noted outside crit	\
 			 * matches with the global values, then the error is genuine. If not, then we might have done operations\
 			 * (shm attach and file open) when things in the shared memory were in flux in which case we need to	\
 			 * restart												\
@@ -4338,7 +4339,7 @@ MBSTART {															\
 			switch(cur_state)											\
 			{													\
 				case SNAPSHOT_INIT_DONE:									\
-					/* Most common case. Ensure the local values of snapshot context matches with the 	\
+					/* Most common case. Ensure the local values of snapshot context matches with the	\
 					 * values stored in shared memory */							\
 					assert(csa_snapshot_in_prog);								\
 					DBG_ENSURE_SNAPSHOT_GOOD_TO_GO(lcl_ss_ctx, CNL);					\
@@ -4347,8 +4348,8 @@ MBSTART {															\
 					assert(0 != lcl_failure_errno);								\
 					assert(FALSE == SNAPSHOTS_IN_PROG(CSA));						\
 					if (lcl_ss_ctx->nl_shmid == CNL->ss_shmid)						\
-					{	/* Error encountered outside crit is genuine. Indicate MUPIP INTEG that the 	\
-						 * snapshot is no more valid 							\
+					{	/* Error encountered outside crit is genuine. Indicate MUPIP INTEG that the	\
+						 * snapshot is no more valid							\
 						 */										\
 						send_msg_csa(CSA_ARG(CSA) VARLSTCNT(4) ERR_SSATTACHSHM, 1,			\
 								lcl_ss_ctx->nl_shmid, lcl_failure_errno);			\
@@ -4361,10 +4362,10 @@ MBSTART {															\
 					assert(0 != lcl_failure_errno);								\
 					assert(FALSE == SNAPSHOTS_IN_PROG(CSA));						\
 					if (0 == STRCMP(lcl_ss_ctx->shadow_file, ss_shm_ptr->ss_info.shadow_file))		\
-					{	/* Error encountered outside crit is genuine. Indicate MUPIP INTEG that the 	\
+					{	/* Error encountered outside crit is genuine. Indicate MUPIP INTEG that the	\
 						 * snapshot is no more valid							\
 						 */										\
-						send_msg_csa(CSA_ARG(CSA) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("open"), 	\
+						send_msg_csa(CSA_ARG(CSA) VARLSTCNT(7) ERR_SSFILOPERR, 4, LEN_AND_LIT("open"),	\
 							LEN_AND_STR(lcl_ss_ctx->shadow_file), lcl_failure_errno);		\
 						ss_shm_ptr->failure_errno = lcl_failure_errno;					\
 						ss_shm_ptr->failed_pid = process_id;						\
@@ -4386,7 +4387,7 @@ MBSTART {										\
 	 * before imaged. If error happens while writing to the snapshot file, then	\
 	 * ss_write_block will mark the appropriate error in the shared memory		\
 	 * which INTEG will later query and report accordingly. So, just continue	\
-	 * as if nothing happened. 							\
+	 * as if nothing happened.							\
 	 */										\
 	if (!ss_chk_shdw_bitmap(csa, lcl_ss_ctx, blkid))				\
 		if (!ss_write_block(csa, blkid, cr, mm_blk_ptr, lcl_ss_ctx))		\
@@ -4920,11 +4921,11 @@ typedef struct span_subs_struct {
  * that this assumption is true. In future, if the length of the special subscript for spanning node changes, the following macro
  * needs to be fixed accordingly.
  */
-#define SPAN_SUBSCOPY_SRC2DST(DST, SRC) 						\
+#define SPAN_SUBSCOPY_SRC2DST(DST, SRC)						\
 MBSTART {										\
 	assert(SPAN_SUBS_LEN == 3);							\
-	*((DST) + 0) = *((SRC) + 0); 							\
-	*((DST) + 1) = *((SRC) + 1); 							\
+	*((DST) + 0) = *((SRC) + 0);							\
+	*((DST) + 1) = *((SRC) + 1);							\
 	*((DST) + 2) = *((SRC) + 2);							\
 } MBEND
 
@@ -4963,7 +4964,7 @@ typedef struct
 # define IS_SN_DUMMY(len, addr) ((1 == (len)) && ('\0' == *(unsigned char *)(addr)))
 # define RTS_ERROR_IF_SN_DISALLOWED											\
 MBSTART {														\
-	GBLREF	boolean_t 		span_nodes_disallowed;								\
+	GBLREF	boolean_t		span_nodes_disallowed;								\
 															\
 	if (span_nodes_disallowed)											\
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_UNIMPLOP, 0,	ERR_TEXT, 2,				\
@@ -4975,7 +4976,7 @@ MBSTART {	/* We've encountered a spanning node dummy value. Check if spanning no
 	 * this is potentially a spanning node. We cannot do an op_tstart to check so we issue an error instead.	\
 	 */														\
 	GBLREF	sgmnt_data_ptr_t	cs_data;									\
-	GBLREF	boolean_t 		span_nodes_disallowed;								\
+	GBLREF	boolean_t		span_nodes_disallowed;								\
 															\
 	if (span_nodes_disallowed)											\
 	{														\
@@ -5133,7 +5134,7 @@ MBSTART {						\
 #define RESTORE_CURRKEY(KEY, OLDEND)			\
 MBSTART {						\
 	(KEY)->end = OLDEND;				\
-	(KEY)->base[OLDEND - 1] = 0; 			\
+	(KEY)->base[OLDEND - 1] = 0;			\
 	(KEY)->base[OLDEND] = 0;			\
 } MBEND
 #define COMPUTE_CHUNK_SIZE(KEY, BLKSZ, RESERVED)					\
@@ -5251,7 +5252,7 @@ gd_binding	*gv_srch_map_linear(gd_binding *start_map, char *key, int key_len);
 gd_binding	*gv_srch_map_linear_backward(gd_binding *start_map, char *key, int key_len);
 gd_gblname	*gv_srch_gblname(gd_addr *addr, char *key, int key_len);
 gvnh_reg_t	*gv_bind_name(gd_addr *addr, mname_entry *targ);
-void 		gv_bind_subsname(gd_addr *addr, gv_key *key, gvnh_reg_t *gvnh_reg);
+void		gv_bind_subsname(gd_addr *addr, gv_key *key, gvnh_reg_t *gvnh_reg);
 
 void db_csh_ini(sgmnt_addrs *cs);
 void db_csh_ref(sgmnt_addrs *cs_addrs, boolean_t init);

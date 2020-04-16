@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 Fidelity National Information	*
+ * Copyright (c) 2017-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,6 +40,7 @@ struct restrict_facilities
 	boolean_t	pipe_filter;
 	boolean_t	library_load_path;	/* V6.3-007 */
 	uint4		dm_audit_enable;
+	boolean_t	logdenials;		/* V6.3-012 */
 };
 
 GBLREF	struct restrict_facilities	restrictions;

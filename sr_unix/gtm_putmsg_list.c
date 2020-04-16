@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -20,6 +20,7 @@
 #include "fao_parm.h"
 #include "error.h"
 #include "util.h"
+#include "util_format.h"
 #include "util_out_print_vaparm.h"
 #include "gtmmsg.h"
 #include "gtm_putmsg_list.h"
@@ -32,6 +33,7 @@
 #include "gdsfhead.h"
 #include "filestruct.h"
 #include "anticipatory_freeze.h"	/* for SET_ANTICIPATORY_FREEZE_IF_NEEDED */
+#include "restrict.h"			/* For GTM-7759 logging control */
 
 #define	COLON_SEPARATOR		" : "
 
@@ -45,6 +47,8 @@
 /* #GTM_THREAD_SAFE : The below function (gtm_putmsg_list) is thread-safe because caller ensures serialization with locks */
 void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 {
+	GBLREF      boolean_t               gtm_dist_ok_to_use;
+
 	int		i, msg_id, fao_actual, fao_count, dummy, freeze_msg_id;
 	char		msg_buffer[1024];
 	mstr		msg_string;
@@ -53,6 +57,11 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 	boolean_t	freeze_needed = FALSE;
 	char		*rname;
 	jnlpool_addrs_ptr_t	local_jnlpool;	/* used by CHECK_IF_FREEZE_ON_ERROR_NEEDED and FREEZE_INSTANCE_IF_NEEDED */
+	boolean_t	mustlog;
+	va_list var_sav;
+	char fmt_buf[2048];
+	char *fmt_ptr;
+	int f_actual, f_count;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -76,6 +85,8 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 	for (; ; )
 	{
 		msg_id = va_arg(var, int);
+	 	mustlog = ( gtm_dist_ok_to_use && (!(RESTRICTED(logdenials))) &&
+			(MSGFLAG(msg_id) & MSGMUSTLOG) ); /* GTM-7759 logging unless restricted */
 		CHECK_IF_FREEZE_ON_ERROR_NEEDED(csa, msg_id, freeze_needed, freeze_msg_id, local_jnlpool);
 		--arg_count;
 		if (NULL == (ctl = err_check(msg_id)))
@@ -85,6 +96,23 @@ void gtm_putmsg_list(void *csa, int arg_count, va_list var)
 		msg_string.addr = msg_buffer;
 		msg_string.len = sizeof msg_buffer;
 		gtm_getmsg(msg_id, &msg_string);
+		if (mustlog)
+		{				/* If this message must be sysloged for GTM-7759, do it here */
+			va_copy(var_sav, var);
+			fmt_ptr = &fmt_buf[0];
+			if ((0 < arg_count) && msg)
+			{				/* We don't consume arg_count here */
+				f_actual = va_arg(var_sav, int);
+				f_count = f_actual < msg->parm_count ? f_actual : msg->parm_count;
+				if (MAX_FAO_PARMS < f_count)
+					f_count = MAX_FAO_PARMS;
+			} else
+				f_actual = f_count = 0;
+			fmt_ptr = util_format(msg_string.addr, var_sav, fmt_ptr, SIZEOF(fmt_buf) - 1, f_count);
+			*fmt_ptr = '\0';
+			send_msg_csa(CSA_ARG(csa) VARLSTCNT(4) ERR_TEXT, 2, LEN_AND_STR(fmt_buf));
+			va_end(var_sav);
+		}
 		if (NULL == msg)
 		{
 			util_out_print(msg_string.addr, NOFLUSH_OUT, msg_id);

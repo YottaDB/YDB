@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -112,7 +112,7 @@ static inline void grab_lock_crit_and_sync(mlk_pvtctl_ptr_t pctl, boolean_t *ret
 
 			new_shmid = pctl->ctl->hash_shmid;
 			rel_lock_crit(pctl, *ret_was_crit);
-			if (pctl->csa->mlkhash_shmid != 0)
+			if (INVALID_SHMID != pctl->csa->mlkhash_shmid)
 			{
 				SHMDT(pctl->csa->mlkhash);
 			}

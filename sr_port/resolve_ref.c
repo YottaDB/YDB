@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -51,6 +51,16 @@ int resolve_ref(int errknt)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+#	ifdef DEBUG
+	if (!run_time && (gtmDebugLevel & GDL_DebugCompiler))
+	{	/* ensure that "borrowing" of backpointers has not left any trace */
+		dqloop(&t_orig, exorder, curtrip)
+		{
+			tripbp = &curtrip->backptr;
+			assert((tripbp == tripbp->que.fl) && (tripbp == tripbp->que.bl) && (NULL == tripbp->bpt));
+		}
+	}
+#	endif
 	if (errknt && !(cmd_qlf.qlf & CQ_IGNORE))
 	{
 		assert(!run_time);
@@ -125,7 +135,7 @@ int resolve_ref(int errknt)
 							ref1 = maketriple(OC_LITC);
 							ref1->src = tripref->src;
 							ref1->operand[0] = put_tref(tripref);
-							dqins(curtrip->exorder.bl, exorder, ref1);
+							dqrins(curtrip, exorder, ref1);
 							*k = put_tref(ref1);
 						}
 					}
@@ -134,7 +144,8 @@ int resolve_ref(int errknt)
 			}
 		}
 #		endif
-		COMPDBG(PRINTF("\n\n\n********************* New Compilation -- Begin resolve_ref scan **********************\n"););
+		COMPDBG(PRINTF("\n\n\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> New Compilation <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");)
+		COMPDBG(PRINTF("\n\n\n**************************** Begin resolve_ref scan ****************************\n"););
 		dqloop(&t_orig, exorder, curtrip)
 		{	/* If the optimization was not executed earlier */
 			COMPDBG(PRINTF(" ************************ Triple Start **********************\n"););
@@ -284,21 +295,21 @@ int resolve_ref(int errknt)
 	return errknt;
 }
 
-
-/* If for example there are nested $SELECT routines feeding a value to a SET $PIECE/$EXTRACT, this nested checking is
- * necessary to make sure no OC_PASSTHRUs remain in the parameter chain to get turned into OC_NOOPs that will
- * cause assertpro in emit_code.
- */
+/* insert backpointers from operands to the triples that use them */
 void resolve_tref(triple *curtrip, oprtype *opnd)
 {
 	triple	*tripref;
 	tbp	*tripbp;
 
 	while (OC_PASSTHRU == (tripref = opnd->oprval.tref)->opcode)		/* note the assignment */
-	{	/* As many OC_PASSTHRUs as are stacked, we devour */
+	{	/* If, for example, there are nested $SELECT() functions feeding a value to a SET $PIECE/$EXTRACT, we need to ensure
+		 * no OC_PASSTHRUs remain in the parameter chain as alloc_reg would turn them into OC_NOOPs, which would cause
+		 * an assertpro in emit_code; as many OC_PASSTHRUs as are stacked, we devour.
+		 */
 		COMPDBG(PRINTF(" ** Passthru replacement: Operand at 0x%08lx replaced by operand at 0x%08lx\n",
 			       (unsigned long)opnd, (unsigned long)&tripref->operand[0]););
 		assert(TRIP_REF == tripref->operand[0].oprclass);
+		assert((NO_REF == tripref->operand[1].oprclass) && (NO_REF == tripref->destination.oprclass));
 		*opnd = tripref->operand[0];
 	}
 	tripbp = (tbp *)mcalloc(SIZEOF(tbp));

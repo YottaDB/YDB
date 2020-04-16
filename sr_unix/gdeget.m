@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2006-2019 Fidelity National Information		;
+; Copyright (c) 2006-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -33,6 +33,9 @@ LOAD
 	i gldfmt>6 s reghasv550fields=TRUE
 	s reghasv600fields=FALSE
 	i gldfmt>7 s reghasv600fields=TRUE
+	s v6311=0
+	if (label="GTCGBDUNX013")!(label="GTCGBDUNX113") set label=hdrlab,v6311=1,update=1  ;autoconvert
+	s v6311=0
 	s v6310=0
 	if (label="GTCGBDUNX012")!(label="GTCGBDUNX112") set label=hdrlab,v6310=1,update=1  ;autoconvert
 	if (v6310=1) new SIZEOF do v6310init
@@ -201,7 +204,9 @@ LOAD
 	. f s="BLOCK_SIZE","BUCKET_SIZE","DEFER" d tmpseg(am,s)
 	. i (gldfmt>9) d tmpseg(am,"DEFER_ALLOCATE")
 	. i (seghasencrflag=TRUE) d tmpseg(am,"ENCRYPTION_FLAG")
-	. f s="EXTENSION_COUNT","FILE_TYPE","GLOBAL_BUFFER_COUNT","LOCK_SPACE" d tmpseg(am,s)
+	. f s="EXTENSION_COUNT","FILE_TYPE" d tmpseg(am,s)
+	. i (gldfmt>13) d tmpseg(am,"FULLBLKWRT")
+	. f s="GLOBAL_BUFFER_COUNT","LOCK_SPACE" d tmpseg(am,s)
 	. i (gldfmt>8) d tmpseg(am,"MUTEX_SLOTS")
 	. i 'v30 d tmpseg(am,"RESERVED_BYTES")					;autoconvert, can be condensed someday
 	. d tmpseg(am,"WINDOW_SIZE")
@@ -378,9 +383,13 @@ segment:
 	s l=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"FILE_NAME")=$ze(rec,rel,rel+l-1),rel=rel+SIZEOF("file_spec")
 	s segs(s,"BLOCK_SIZE")=$$bin2num($ze(rec,rel,rel+1)),rel=rel+2
+	s segs(s,"FULLBLKWRT")=0
 	if (gldfmt>12) do
-	. if $$bin2num($zextract(rec,rel,rel+1))'=0 zm gdeerr("INPINTEG")
-	. set rel=rel+2 set segs(s,"EXTENSION_COUNT")=$$bin2num($zextract(rec,rel,rel+3)),rel=rel+4
+	. if gldfmt=13 do
+	. . if $$bin2num($zextract(rec,rel,rel+1))'=0 zm gdeerr("INPINTEG")
+	. . else  set rel=rel+2
+	. else  set segs(s,"FULLBLKWRT")=$$bin2num($zextract(rec,rel,rel+1)),rel=rel+2
+	. set segs(s,"EXTENSION_COUNT")=$$bin2num($zextract(rec,rel,rel+3)),rel=rel+4
 	if (gldfmt<=12) set segs(s,"EXTENSION_COUNT")=$$bin2num($zextract(rec,rel,rel+1)),rel=rel+2
 	s segs(s,"ALLOCATION")=$$bin2num($ze(rec,rel,rel+3)),rel=rel+4
 	i $ze(rec,rel,rel+ptrsize-1)'=$tr($j("",ptrsize)," ",ZERO) zm gdeerr("INPINTEG")	; reserved for clb

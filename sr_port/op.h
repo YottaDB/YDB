@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -167,7 +167,6 @@ void	op_gvzwithdraw(void);
 void	op_gvzwrite(UNIX_ONLY_COMMA(int4 count) int4 pat, ...);
 void	op_hang(mval *num);
 void	op_hardret(void);
-void	op_horolog(mval *s);
 void	op_idiv(mval *u, mval *v, mval *q);
 mval	*op_igetdst(void);
 void	op_igetsrc(mval *v);
@@ -284,7 +283,7 @@ void    op_zrupdate(int argcnt, ...);
 void	op_ztrigger(void);
 void	op_zhalt(boolean_t is_zhalt, int4 retcode);
 void	op_zhelp_xfr(mval *subject, mval *lib);
-void	op_zhorolog(mval *s);
+void	op_zhorolog(mval *s, boolean_t z);
 void	op_zlink(mval *v, mval *quals);
 void	op_zmess(unsigned int cnt, ...);
 void	op_zprevious(mval *v);

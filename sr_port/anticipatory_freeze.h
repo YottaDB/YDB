@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -495,6 +495,13 @@ static inline void wait_for_repl_inst_unfreeze(sgmnt_addrs *csa)
 	assert(NULL != csa);
 	if (INSTANCE_FREEZE_HONORED(csa, local_jnlpool))
 	{
+#ifdef underconstruction
+		if (TREF(in_mupip_integ) && !TREF(integ_cannotskip_crit))
+		{
+			TREF(instance_frozen_crit_skipped) = TRUE;
+			return;		/* MUPIP INTEG. Don't wait any further for the freeze to be lifted. */
+		}
+#endif
 		reg = csa->region;
 		if (!IS_GTM_IMAGE)
 		{

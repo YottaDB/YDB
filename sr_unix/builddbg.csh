@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2019 Fidelity National Information		#
+# Copyright (c) 2001-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -26,5 +26,5 @@ if ( $1 == "" ) then
 endif
 
 set setactive_parms = ( $1 d ) ; source $gtm_tools/setactive.csh
-$gtm_tools/buildbdp.csh $1 dbg $gtm_vrt/dbg
+$gtm_tools/buildbdp.csh $1 dbg $gtm_ver/dbg
 exit $status

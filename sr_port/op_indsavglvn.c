@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -67,7 +68,7 @@ void op_indsavglvn(mval *target, uint4 slot, uint4 do_ref)
 					s->operand[1] = v;
 				}
 				share->operand[1] = put_ilit(OC_SAVLVN);
-				dqins(s->exorder.bl, exorder, share);
+				dqrins(s, exorder, share);
 			}
 			break;
 		case TK_CIRCUMFLEX:
@@ -91,7 +92,7 @@ void op_indsavglvn(mval *target, uint4 slot, uint4 do_ref)
 					dqins(sub, exorder, s);
 				}
 				share->operand[1] = put_ilit(put_oc);
-				dqins(sub->exorder.bl, exorder, share);
+				dqrins(sub, exorder, share);
 			}
 			break;
 		case TK_ATSIGN:

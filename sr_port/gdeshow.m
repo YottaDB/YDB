@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2019 Fidelity National Information		;
+; Copyright (c) 2001-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -32,6 +32,7 @@ COMMANDS
 cfilefail:
 	s BOL=""
 	q
+
 NAME
 	new namsdisp,namedispmaxlen
 	do ALLNAME(NAME)
@@ -242,6 +243,7 @@ BG	w ?x(8),"GLOB=",$j(segs(s,"GLOBAL_BUFFER_COUNT"),4)
 	w !,BOL,?x(8),"MSLT=",$j(segs(s,"MUTEX_SLOTS"),4)
 	w !,BOL,?x(8),"DALL=",$s(segs(s,"DEFER_ALLOCATE"):" YES",1:"  NO")
 	w !,BOL,?x(8),"AIO =",$s(segs(s,"ASYNCIO"):"  ON",1:" OFF")
+	w !,BOL,?x(8),"FBWR=",$j(segs(s,"FULLBLKWRT"),4)
 	q
 MM	w ?x(8),$s(segs(s,"DEFER"):"DEFER",1:"NODEFER")
 	w !,BOL,?x(8),"LOCK=",$j(segs(s,"LOCK_SPACE"),4)
@@ -249,6 +251,7 @@ MM	w ?x(8),$s(segs(s,"DEFER"):"DEFER",1:"NODEFER")
 	w !,BOL,?x(8),"ENCR= OFF"
 	w !,BOL,?x(8),"MSLT=",$j(segs(s,"MUTEX_SLOTS"),4)
 	w !,BOL,?x(8),"DALL=",$s(segs(s,"DEFER_ALLOCATE"):" YES",1:"  NO")
+	w !,BOL,?x(8),"FBWR=",$j(segs(s,"FULLBLKWRT"),4)
 	q
 segmentc:
 	n s,q,val,synval,tmpval,type,am
@@ -334,6 +337,7 @@ t1:	d tmpreghd
 	w !,BOL,?x(8),"MSLT =",$j(tmpseg("BG","MUTEX_SLOTS"),4)
 	w !,BOL,?x(8),"DALL =",$s(tmpseg("BG","DEFER_ALLOCATE"):" YES",1:"  NO")
 	w !,BOL,?x(8),"AIO  =",$s(tmpseg("BG","ASYNCIO"):"  ON",1:" OFF")
+	w !,BOL,?x(8),"FBWR =",$j(tmpseg("BG","FULLBLKWRT"),4)
 	w !,BOL,?x(1),"<default>"
 	w ?x(2),$s(tmpacc="MM":"   *",1:"")
 	w ?x(3),"MM"
@@ -345,6 +349,7 @@ t1:	d tmpreghd
 	w !,BOL,?x(8),"LOCK =",$j(tmpseg("MM","LOCK_SPACE"),4)
 	w !,BOL,?x(8),"MSLT =",$j(tmpseg("MM","MUTEX_SLOTS"),4)
 	w !,BOL,?x(8),"DALL =",$s(tmpseg("MM","DEFER_ALLOCATE"):" YES",1:"  NO")
+	w !,BOL,?x(8),"FBWR =",$j(tmpseg("MM","FULLBLKWRT"),4)
 	q
 tmpjnlbd:
 	w !,BOL,?x(1),"<default>",?x(2),$s($zl(tmpreg("FILE_NAME")):$$namedisp(tmpreg("FILE_NAME"),1),1:"<based on DB file-spec>")

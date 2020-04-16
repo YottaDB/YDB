@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -10,7 +10,7 @@
  *								*
  ****************************************************************/
 #include "mdef.h"
-
+#include "gtm_string.h"
 #include "compiler.h"
 #include "opcode.h"
 #include "indir_enum.h"
@@ -34,8 +34,11 @@ int f_incr(oprtype *a, opctype op)
 	/* may need to evaluate the increment (2nd arg) early and use result later: prepare to juggle triple chains */
 	dqinit(&targchain, exorder);	/* a place for the operation and the target */
 	dqinit(&tmpexpr, exorder);	/* a place to juggle the shifted chain in case it's active */
+	triptr = maketriple(OC_NOOP);
+	dqrins(&tmpexpr, exorder, triptr);
 	triptr = TREF(expr_start);
 	savptr = TREF(expr_start_orig);	/* but make sure expr_start_orig == expr_start since this is a new chain */
+	assert(&tmpexpr != tmpexpr.exorder.bl);
 	TREF(expr_start_orig) = TREF(expr_start) = &tmpexpr;
 	oldchain = setcurtchain(&targchain);	/* save the result of the first argument 'cause it evaluates 2nd */
 	switch (TREF(window_token))
@@ -86,14 +89,18 @@ int f_incr(oprtype *a, opctype op)
 	}
 	coerce(increment, OCT_MVAL);
 	ins_triple(r);
-	if (&tmpexpr != tmpexpr.exorder.bl)
+	if (&tmpexpr != tmpexpr.exorder.bl->exorder.bl)
 	{	/* one or more OC_GVNAME may have shifted so add to the end of the shift chain */
 		assert(TREF(shift_side_effects));
+		assert(&tmpexpr != tmpexpr.exorder.bl);
 		dqadd(TREF(expr_start), &tmpexpr, exorder);	/* this is a violation of info hiding */
 		TREF(expr_start) = tmpexpr.exorder.bl;
-		assert(OC_GVSAVTARG == (TREF(expr_start))->opcode);
-		triptr = newtriple(OC_GVRECTARG);	/* restore the result of the last gvn to preserve $referece (the naked) */
-		triptr->operand[0] = put_tref(TREF(expr_start));
+		if (OC_GVSAVTARG == (TREF(expr_start))->opcode)
+		{
+			triptr = newtriple(OC_GVRECTARG);	/* restore result of last gvn to preserve $reference (the naked) */
+			triptr->operand[0] = put_tref(TREF(expr_start));
+		} else
+			assert(OC_NOOP == (TREF(expr_start))->opcode);
 	}
 	if (!TREF(shift_side_effects) || (GTM_BOOL != TREF(gtm_fullbool)) || (OC_INDINCR != r->opcode))
 	{	/* put it on the end of the main chain as there's no reason to play more with the ordering */
@@ -105,9 +112,11 @@ int f_incr(oprtype *a, opctype op)
 		newtriple(OC_GVSAVTARG);
 		setcurtchain(oldchain);
 		assert(NULL != TREF(expr_start));
+		assert(&targchain != targchain.exorder.bl);
 		dqadd(TREF(expr_start), &targchain, exorder);	/* this is a violation of info hiding */
 		TREF(expr_start) = targchain.exorder.bl;
-		triptr = newtriple(OC_GVRECTARG);
+		assert(OC_GVSAVTARG == (TREF(expr_start))->opcode);
+		triptr = newtriple(OC_GVRECTARG);	/* restore the result of the last gvn to preserve $referece (the naked) */
 		triptr->operand[0] = put_tref(TREF(expr_start));
 	}
 	/* $increment() args need to avoid side effect processing but that's handled in expritem so eval_expr gets $i()'s SE flag */

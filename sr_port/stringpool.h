@@ -12,9 +12,11 @@
 
 typedef struct
 {
-	unsigned char *base, *free, *top, *lasttop, *invokestpgcollevel;
-	unsigned int gcols; /* some optimizations need to know if the stringpool garbage collected  */
-	unsigned char prvprt;
+	unsigned char	*base, *free, *top, *lasttop, *invokestpgcollevel;
+	unsigned int	gcols;		/* some optimizations need to know if the stringpool garbage collected  */
+	unsigned int	strpllim;	/* non-zero value is user specified guard on expansion */
+	boolean_t	strpllimwarned;	/* if limit is in place, has been exceeded, and not recovered from */
+	unsigned char	prvprt;		/* stores memory protections used in guarding stp space */
 } spdesc;
 
 void	stp_expand_array(void);

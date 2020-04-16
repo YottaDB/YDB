@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -71,7 +71,9 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 	int			trynum;
 	uint4			curr_wbox_seq_num;
 #	endif
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	*return_value = FALSE;
 	jnlpool_init_needed = TRUE;
 	ESTABLISH(mu_int_reg_ch);
@@ -124,6 +126,7 @@ void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_
 	}
 	if (!ointeg_this_reg || read_only)
 	{
+		TREF(integ_cannotskip_crit) = TRUE;
 		status = region_freeze(gv_cur_region, TRUE, FALSE, TRUE, FALSE, !read_only);
 		switch (status)
 		{

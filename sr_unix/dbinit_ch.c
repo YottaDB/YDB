@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -105,6 +105,7 @@ void db_init_err_cleanup(boolean_t retry_dbinit)
 		}
 		if (udi->shm_created && (INVALID_SHMID != udi->shmid))
 		{
+			assert(INVALID_SHMID == csa->mlkhash_shmid);
 			shm_rmid(udi->shmid);
 			udi->shmid = INVALID_SHMID;
 			udi->shm_created = FALSE;

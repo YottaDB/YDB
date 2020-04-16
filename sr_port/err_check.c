@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2012 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -34,10 +35,11 @@ STATICDEF const err_ctl *all_errors[] = { &merrors_ctl, &gdeerrors_ctl,
 const err_ctl *err_check(int errnum) {
 	/* errnum structure:
 	 *  ___________________________________________
-	 * |     1     FACILITY     1   MSG_IDX     SEV|
+	 * | 0fff1     FACILITY     1   MSG_IDX     SEV|
 	 * |___________________________________________|
 	 *  31   27                 15            3   0
 	 *
+	 * fff - flag bits since GTM-7759
 	 */
 	const err_ctl *fac;
 	int errtype;
@@ -52,7 +54,7 @@ const err_ctl *err_check(int errnum) {
 
 		/* These conditions ensure: The facility bits are identical, the message index
 		 * doesn't exceed the array size and is larger than zero */
-		if (((errnum >> MSGFAC) == (FACMASK(fac->facnum) >> MSGFAC))
+		if ((((errnum & 0x0FFFFFFF) >> MSGFAC) == (FACMASK(fac->facnum) >> MSGFAC))
 				&& (msg_id <= fac->msg_cnt) && (1 <= msg_id))
 			return fac;
 	}

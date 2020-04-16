@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -89,7 +89,7 @@
 GBLREF	VSIG_ATOMIC_T		forced_exit;
 GBLREF	boolean_t		mupip_jnl_recover;
 GBLREF	boolean_t		is_src_server, is_updproc;
-GBLREF	gd_region		*gv_cur_region;
+GBLREF	gd_region		*ftok_sem_reg, *gv_cur_region;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	sgmnt_data_ptr_t	cs_data;
 GBLREF	uint4			process_id;
@@ -1064,6 +1064,8 @@ int4 gds_rundown(boolean_t cleanup_udi)
 		assert(seg->file_cntl->file_info);
 		free(seg->file_cntl->file_info);
 		free(seg->file_cntl);
+		assert(NULL == ftok_sem_reg);
+		ftok_sem_reg = NULL;		/* always assigning this is less burden than an if mirroring the above assert */
 		seg->file_cntl = NULL;
 	}
 	return EXIT_NRM;

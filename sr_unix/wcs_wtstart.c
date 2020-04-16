@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -538,12 +538,24 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			else
 				assert(IS_GDS_BLK_DOWNGRADE_NEEDED(csr->ondsk_blkver) || (GDSV6 == csr->ondsk_blkver));
 #			endif
-			if (csa->do_fullblockwrites)
+			if (csd->write_fullblk)
 			{	/* See similiar logic in wcs_wtstart.c */
+#			ifdef DEBUG
+				if (WBTEST_ENABLED(WBTEST_FULLBLKWRT_DB) && (3 == csr->blk))
+				{
+					DBGFPF((stdout,"Rounding the write size: %d with %d\n", size, \
+					((FULL_DATABASE_WRITE == csd->write_fullblk && csr->needs_first_write) ? \
+					csd->blk_size : csa->fullblockwrite_len)));
+				}
+#			endif
 				size = (int)ROUND_UP(size,
-						(FULL_DATABASE_WRITE == csa->do_fullblockwrites && csr->needs_first_write)
+						(FULL_DATABASE_WRITE == csd->write_fullblk && csr->needs_first_write)
 						? csd->blk_size : csa->fullblockwrite_len);
 			}
+#                       ifdef DEBUG
+			else if (WBTEST_ENABLED(WBTEST_FULLBLKWRT_DB) && (3 == csr->blk))
+				DBGFPF((stdout, "Not rounding the write size\n"));
+#			endif
 			assert(size <= csd->blk_size);
 			INCR_GVSTATS_COUNTER(csa, cnl, n_dsk_write, 1);
 			save_bp = bp;
@@ -664,6 +676,16 @@ int4	wcs_wtstart(gd_region *region, int4 writes, wtstart_cr_list_t *cr_list_ptr,
 			{	/* Due to csa->in_wtstart protection (at the beginning of this module), we are guaranteed
 				 * that the write below won't be interrupted by another nested wcs_wtstart
 				 */
+#ifdef DEBUG
+				/* Going to do a write below, check the size being written for full blk writes */
+				if (WBTEST_ENABLED(WBTEST_FULLBLKWRT_DB) && (3 == csr->blk))
+				{
+					DBGFPF((stdout, "Region : %s Blk num : %ld ",region->rname, csr->blk));
+					DBGFPF((stdout, "needs_first_write : %d ", csr->needs_first_write));
+					DBGFPF((stdout, "size written: %ld ", size));
+					DBGFPF((stdout, "fullblkwrite_len : %ld\n", csa->fullblockwrite_len));
+				}
+#endif
 				offset = BLK_ZERO_OFF(csd->start_vbn) + (off_t)csr->blk * csd->blk_size;
 				if (!do_asyncio)
 				{

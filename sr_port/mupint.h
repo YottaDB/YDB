@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,11 +65,13 @@ unsigned char	span_node_buf[MAX_KEY_SZ];	/* Spanning node key */
 }span_node_integ;
 
 boolean_t mu_int_blk(block_id blk, char level, boolean_t is_root, unsigned char *bot_key,
-	int bot_len, unsigned char *top_key, int top_len, boolean_t eb_ok);
+	int bot_len, unsigned char *top_key, int top_len, boolean_t eb_ok, enum db_ver ondsk_blkver,
+	boolean_t retry_block_from_buffer);
 boolean_t mu_int_fhead(void);
 boolean_t mu_int_init(void);
 void mu_int_reg(gd_region *reg, boolean_t *return_value, boolean_t return_after_open);
 uchar_ptr_t mu_int_read(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *free_buff);
+uchar_ptr_t mu_int_read_buffer(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *free_buff);
 void mu_int_err(int err, boolean_t do_path, boolean_t do_range, unsigned char *bot, int has_bot,
 	unsigned char *top, int has_top, unsigned int level);
 void mu_int_maps(void);

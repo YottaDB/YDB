@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2016 Fidelity National Information		#
+# Copyright (c) 2001-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -23,21 +23,6 @@
 #
 #	This script defines the following environment variables:
 #
-#		gtm_inc		- pathname of source directory containing C and assembly
-#				  language header files (*.h and, usually, *.si)
-#
-#		gtm_pct		- pathname of source directory containing all of the GT.M
-#				  sources for GDE and the percent utilities and the
-#				  sources for the GT.M runtime help facility
-#
-#		gtm_src		- pathname of source directory containing the C and
-#				  assembly language sources
-#
-#		gtm_tools	- pathname of source directory containing everything else
-#				  (shell scripts and their corresponding input files, awk
-#				  and sed programs, installation scripts, etc.) used in
-#				  building or maintaining GT.M
-#
 #		gtmroutines	- pathname for GT.M to lookup M sources and object files
 #
 #		gt_as_option_I	- assembler option(s) specifying the location(s) of the
@@ -48,12 +33,16 @@
 #
 ###########################################################################################
 #
+# This file is copied to $gtm_root/<version>/ only because V63011 and prior versions source it.
+# Copying to $gtm_root/<version>/ can be avoided if there are no V63011 and prior versions.
 
-# Define useful env vars
-setenv gtm_inc	"$gtm_vrt/inc"
-setenv gtm_pct	"$gtm_vrt/pct"
-setenv gtm_src	"$gtm_vrt/src"
-setenv gtm_tools	"$gtm_vrt/tools"
+# These env vars are set in setactive.csh. They are duplicated here only because V63011 and prior versions need it.
+# These lines can be removed once there are no V63011 and prior versions.
+setenv gtm_inc	"$gtm_ver/inc"
+setenv gtm_pct	"$gtm_ver/pct"
+setenv gtm_src	"$gtm_ver/src"
+setenv gtm_tools	"$gtm_ver/tools"
+####################################
 
 if !($?gtmroutines) then
 	setenv gtmroutines ""
@@ -65,14 +54,19 @@ if ($?gtm_chset) then
 else if ("utf8" == "$gtm_exe:t") then
 	set utf="/utf8"
 endif
-# Rebuild gtmroutines while trying to preserve the old value.
+
+# The only place where gtmsrc.csh is sourced is setactive.csh. The current setactive.csh simply sets $gtmroutines to "."
+# But this "rebuild" of gtmroutines is necessary when sourcing setactive.csh of versions V63011 and earlier, which do
+# not set gtmroutines to ".". This section can be removed once there are no V63011 and prior versions.
 set rtns = ($gtmroutines:x)
 if (0 < $#rtns) then
 	@ rtncnt = $#rtns
 	# Strip off "$gtm_exe/plugin/o($gtm_exe/plugin/r)" if present; assumption, it's at the end
 	if ("$rtns[$rtncnt]" =~ "*/plugin/o*(*/plugin/r)") @ rtncnt--
 	# Strip off "$gtm_exe"; assumption, it's next to last or the last
-	if ("${rtns[$rtncnt]:s;/utf8;;:s;*;;}" == "${gtmsrc_last_exe:s;/utf8;;:s;*;;}") @ rtncnt--
+	if ($?gtmsrc_last_exe) then
+		if ("${rtns[$rtncnt]:s;/utf8;;:s;*;;}" == "${gtmsrc_last_exe:s;/utf8;;:s;*;;}") @ rtncnt--
+	endif
 	setenv gtmroutines "$rtns[-$rtncnt]"
 	unset rtncnt
 else
@@ -84,8 +78,7 @@ else
 	setenv gtmroutines "$gtmroutines $gtm_exe$utf"
 endif
 setenv gtmsrc_last_exe	$gtm_exe
-unset rtns
-unset utf8
+unset rtns utf8
 
 setenv	gtm_version_change	`date`
 source $gtm_tools/gtm_env.csh

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2018 Fidelity National Information	*
+ * Copyright (c) 2015-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -19,6 +19,11 @@ LITREF	int4	ten_pwr[];
 
 error_def(ERR_WEIRDSYSTIME);
 
+#define DECIMAL_BASE	10	/* stolen from gdsfhead which is silly to include here */
+#define FLOAT_SKEW	10	/* 1 order of magnitude microsec shrinkage to prevent floating point arithmetic from allowing
+				 * ordered comparisons with other time ISVs to seem like time can go backward
+				 */
+
 void op_zut(mval *s)
 {
 	struct timeval	tv;
@@ -30,28 +35,23 @@ void op_zut(mval *s)
 	microseconds = (1LL * MICROSECS_IN_SEC * tv.tv_sec) + tv.tv_usec;
 	if ((microseconds < 0) && (microseconds > E_18))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_WEIRDSYSTIME);
-	if (microseconds < E_6)
+	msectmp = microseconds;
+	/* Count the number of digits */
+	for (numdigs = 0; msectmp; numdigs++, msectmp /= DECIMAL_BASE)
+		;
+	if (numdigs <= NUM_DEC_DG_1L)
 	{
-		s->m[1] = ((int4)microseconds * 1000);
-		s->mvtype = MV_INT | MV_NM;
+		s->m[0] = 0;
+		s->m[1] = (int4)microseconds * ten_pwr[NUM_DEC_DG_1L - numdigs];
 	} else
 	{
-		msectmp = microseconds;
-		/* Count the number of digits */
-		for (numdigs = 0; msectmp; numdigs++, msectmp /= 10);
-		if (numdigs <= NUM_DEC_DG_1L)
-		{
-			s->m[0] = 0;
-			s->m[1] = (int4)microseconds * ten_pwr[NUM_DEC_DG_1L - numdigs];
-		} else
-		{
-			pwr = ten_pwr[numdigs - NUM_DEC_DG_1L];
-			s->m[0] = (microseconds % pwr) * ten_pwr[NUM_DEC_DG_2L - numdigs];
-			s->m[1] = microseconds / pwr;
-		}
-		s->mvtype = MV_NM;
-		s->e = MV_XBIAS + numdigs;
+		microseconds -= FLOAT_SKEW;	/* to prevent floating arithmetic from making time appear to run backwards */
+		pwr = ten_pwr[numdigs - NUM_DEC_DG_1L];
+		s->m[0] = (microseconds % pwr) * ten_pwr[NUM_DEC_DG_2L - numdigs];
+		s->m[1] = microseconds / pwr;
 	}
+	s->mvtype = MV_NM;
+	s->e = MV_XBIAS + numdigs;
 	s->sgn = 0;
 	return;
 }

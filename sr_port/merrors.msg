@@ -1,6 +1,6 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !								!
-! Copyright (c) 2001-2019 Fidelity National Information		!
+! Copyright (c) 2001-2020 Fidelity National Information		!
 ! Services, Inc. and/or its subsidiaries. All rights reserved.	!
 !								!
 !	This source code contains the intellectual property	!
@@ -21,6 +21,7 @@
 !   (Note that the first entry in this file MUST have
 !   an !/ansi= specification; any subsequent ones are
 !   optional.)
+! See the end of this file for comments on the format
 !
 !     M1, Naked indicator undefined
 !     M2, Invalid combination with P _fncodatom_
@@ -176,7 +177,6 @@
 !
 !
 !
-!
 !  In addition all messages of the LMU and GTLP message facility are not documented as Licensing is out of GT.M since V4.2.
 !
 ACK		<>/success/fao=0!/ansi=0
@@ -204,8 +204,8 @@ DUPTOKEN	<Token 0x!16@XQ is duplicate in the journal file !AD for database !AD>/
 DBJNLNOTMATCH	<Database !AD points to journal file name !AD but the journal file points to database file !AD>/error/fao=6!/ansi=0
 DBFILERR	<Error with database file !AD>/error/fao=2!/ansi=0
 DBNOTGDS	<!AD - Unrecognized database file format>/error/fao=2!/ansi=0/A
-DBOPNERR	<Error opening database file !AD>/error/fao=2!/ansi=0
-DBRDERR		<Cannot read database file !AD after opening>/error/fao=2!/ansi=0
+DBOPNERR	<Error opening database file !AD>/error/fao=2!/ansi=0//1
+DBRDERR		<Cannot read database file !AD after opening>/error/fao=2!/ansi=0//1
 CCEDUMPNOW	<>/fatal/fao=0!/ansi=0
 DEVPARINAP	<Device parameter inappropriate to this command>/error/fao=0!/ansi=0
 RECORDSTAT	<!AD:!_  Key cnt: !@ZQ  max subsc len: !UL  max rec len: !UL  max node len: !UL>/info/fao=6!/ansi=0
@@ -237,7 +237,7 @@ JNLEXTEND	<Journal file extension error for file !AD>/error/fao=2!/ansi=0
 FCHARMAXARGS	<Argument count of $CHAR function exceeded the maximum of 255>/error/fao=0!/ansi=0
 FCNSVNEXPECTED	<Function or special variable expected in this context>/error/fao=0!/ansi=0
 FNARGINC	<Format specifiers to $FNUMBER are incompatible: "!AD">/error/fao=2!/ansi=2
-JNLACCESS	<Error accessing journal file !AD>/error/fao=2!/ansi=0
+JNLACCESS	<Error accessing journal file !AD>/error/fao=2!/ansi=0//1
 TRANSNOSTART	<ZTCOMMIT(s) issued without corresponding ZTSTART(s)>/error/fao=0!/ansi=44
 FNUMARG		<$FNUMBER format specifier "!AD" contains an illegal character: "!AD">/error/fao=4!/ansi=0
 FOROFLOW	<FOR commands nested more than !UL deep on a line>/error/fao=1!/ansi=0
@@ -287,7 +287,7 @@ LABELMISSING	<Label referenced but not defined: !AD>/error/fao=2!/ansi=13
 LABELUNKNOWN	<Label referenced but not defined>/error/fao=0!/ansi=13
 DIVZERO		<Attempt to divide by zero>/error/fao=0!/ansi=9
 LKNAMEXPECTED	<An identifier is expected after a ^ in this context>/error/fao=0!/ansi=0
-JNLRDERR	<Error reading journal file !AD.  Unable to initialize.>/error/fao=2!/ansi=0
+JNLRDERR	<Error reading journal file !AD.  Unable to initialize.>/error/fao=2!/ansi=0//1
 LOADRUNNING	<Cannot ZLINK an active routine !AD>/error/fao=2!/ansi=25
 LPARENMISSING	<Left parenthesis expected>/error/fao=0!/ansi=0
 LSEXPECTED	<A line separator is expected here>/error/fao=0!/ansi=0
@@ -298,9 +298,9 @@ MAXNRSUBSCRIPTS	<Maximum number of subscripts exceeded>/error/fao=0!/ansi=0
 MAXSTRLEN	<Maximum string length exceeded>/error/fao=0!/ansi=75
 ENCRYPTCONFLT2	<A concurrent MUPIP REORG -ENCRYPT changed the encryption key for !AD before the process could initialize it. !AD>/warning/fao=4!/ansi=0
 JNLFILOPN	<Error opening journal file !AD for database file !AD>/error/fao=4!/ansi=0
-MBXRDONLY	<Mailbox is read only, cannot write to it>/error/fao=0!/ansi=0
+MBXRDONLY	<Mailbox is read only, cannot write to it>/error/fao=0!/ansi=0//1
 JNLINVALID	<!AD is not a valid journal file !/ for database file: !AD>/error/fao=4!/ansi=0
-MBXWRTONLY	<Mailbox is write only, cannot read from it>/error/fao=0!/ansi=0
+MBXWRTONLY	<Mailbox is write only, cannot read from it>/error/fao=0!/ansi=0//1
 MEMORY		<Central memory exhausted during request for !UJ bytes from 0x!XJ>/fatal/fao=2!/ansi=0
 DONOBLOCK	<Argumentless DO not followed by a block>/warning/fao=0!/ansi=0
 ZATRANSCOL	<The collation requested has no implementation for the requested operation>/error/fao=0!/ansi=0
@@ -333,7 +333,7 @@ PATUPPERLIM	<Pattern code upper limit is less than lower limit>/error/fao=0!/ans
 PCONDEXPECTED	<Post-conditional expression expected but not found>/error/fao=0!/ansi=0
 PRCNAMLEN	<Process name !AD length is greater than !SL>/error/fao=3!/ansi=0
 RANDARGNEG	<Random number generator argument must be greater than or equal to one>/error/fao=0!/ansi=3
-DBPRIVERR	<No privilege for attempted update operation for file: !AD>/error/fao=2!/ansi=0
+DBPRIVERR	<No privilege for attempted update operation for file: !AD>/error/fao=2!/ansi=0//1
 REC2BIG		<Record size (!UL) is greater than maximum (!UL) for region: !AD>/error/fao=4!/ansi=75
 RHMISSING	<Right-hand side of expression expected>/error/fao=0!/ansi=0
 DEVICEREADONLY	<Cannot write to read-only device>/error/fao=0!/ansi=62
@@ -399,7 +399,7 @@ MUNOTALLSEC	<WARNING: not all global sections accessed were successfully rundown
 MUSECDEL	<Section !AD deleted>/info/fao=2!/ansi=0
 MUSECNOTDEL	<Section !AD not deleted>/info/fao=2!/ansi=0
 RPARENREQD	<!_!AD!/!_!_!_Right parenthesis expected>/error/fao=2!/ansi=0
-ZGBLDIRACC	<Cannot access global directory !AD!AD!AD.>/error/fao=6!/ansi=26
+ZGBLDIRACC	<Cannot access global directory !AD!AD!AD.>/error/fao=6!/ansi=26//1
 GVNAKEDEXTNM	<Cannot reference different global directory in a naked reference>/error/fao=0!/ansi=0
 EXTGBLDEL	<Invalid delimiter for extended global syntax>/error/fao=0!/ansi=0
 DSEWCINITCON	<No action taken, enter YES at CONFIRMATION prompt to initialize global buffers>/info/fao=0!/ansi=0
@@ -661,7 +661,7 @@ FILEPATHTOOLONG	<Filename including the path cannot be longer than 255 character
 RMWIDTHTOOBIG	<File record size or width too big>/error/fao=0!/ansi=72
 PATTABNOTFND	<Pattern table !AD not found>/error/fao=2!/ansi=0
 OBJFILERR	<Error with object file I/O on file !AD>/error/fao=2!/ansi=0
-SRCFILERR	<Error with source file I/O on file !AD>/error/fao=2!/ansi=0
+SRCFILERR	<Error with source file I/O on file !AD>/error/fao=2!/ansi=0//1
 NEGFRACPWR	<Invalid operation: fractional power of negative number>/error/fao=0!/ansi=95
 MTNOSKIP	<SKIP operation not supported on this device>/error/fao=0!/ansi=0
 CETOOMANY	<Too many compiler escape substitutions in a single statement>/error/fao=0!/ansi=0
@@ -726,7 +726,7 @@ EXTSRCLOC	<!_!_At column !UL, line !UL, source module !AD>/info/fao=4!/ansi=0
 BIGNOACL	<Existing file found when BIGRECORD specified with UDF format but no GT.M ACE, perhaps lost during COPY>/error/fao=0!/ansi=0
 ERRCALL		<Error called from !AD line !UL>/error/fao=3!/ansi=0
 ZCCTENV		<Environmental variable for external package !AD not set>/error/fao=2!/ansi=0
-ZCCTOPN		<Unable to open external call table: !AD>/error/fao=2!/ansi=0
+ZCCTOPN		<Unable to open external call table: !AD>/error/fao=2!/ansi=0//1
 ZCCTNULLF	<External call table contains no records: !AD>/error/fao=2!/ansi=0
 ZCUNAVAIL	<Package, !AD unavailable>/error/fao=2!/ansi=0
 ZCENTNAME	<No entry name found in external call table>/error/fao=0!/ansi=0
@@ -763,7 +763,7 @@ UNUSEDMSG762	<LQLENGTHNA last used in V6.3-003A>/error/fao=0!/ansi=0
 ADDRTOOLONG	<Socket address !AD of length !UL is longer than the maximum permissible length !UL>/error/fao=4!/ansi=0
 GTMSECSHRGETSEMFAIL	<error getting semaphore errno = !UL>/warning/fao=1!/ansi=0
 CPBEYALLOC	<Attempt to copy beyond the allocated buffer>/error/fao=0!/ansi=0
-DBRDONLY	<Database file !AD read only>/error/fao=2!/ansi=0/T
+DBRDONLY	<Database file !AD read only>/error/fao=2!/ansi=0/T/1
 DUPTN		<Duplicate transaction found [TN = 0x!16@XQ] at offset 0x!XL in journal file !AD>/warning/fao=4!/ansi=0
 TRESTLOC	<Transaction start: !AD, Transaction failure: !AD>/error/fao=4!/ansi=0
 REPLPOOLINST	<Error with replication pool (id = !UL) for instance file !AD>/error/fao=3!/ansi=0
@@ -795,7 +795,7 @@ JNLNMBKNOTPRCD	<Journal file !AD does not match the current journal file !AD of 
 REPLFILIOERR	<Replication subsystem file I/O error !AD>/error/fao=2!/ansi=0
 REPLBRKNTRANS	<Replication subsystem found seqno !16@XQ broken or missing in the journal files>/error/fao=1!/ansi=0
 TTWIDTHTOOBIG	<Terminal WIDTH exceeds the maximum allowed limit>/error/fao=0!/ansi=0
-REPLLOGOPN	<Replication subsystem could not open log file !AD: !AD.  Logging done to !AD.>/error/fao=6!/ansi=0
+REPLLOGOPN	<Replication subsystem could not open log file !AD: !AD.  Logging done to !AD.>/error/fao=6!/ansi=0//1
 REPLFILTER	<Replication filter subsystem failure>/error/fao=0!/ansi=0
 GBLMODFAIL	<Global variable Conflict Test failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 TTLENGTHTOOBIG	<Terminal LENGTH exceeds the maximum allowed limit>/error/fao=0!/ansi=0
@@ -803,11 +803,11 @@ TPTIMEOUT	<Transaction timeout>/error/fao=0!/ansi=0
 DEFEREVENT	<Transfer table reset for event type !UL when set for type !UL>/info/fao=2!/ansi=0
 JNLFILNOTCHG	<Journal file not changed>/error/fao=0!/ansi=0
 EVENTLOGERR	<Error in event logging subsystem>/error/fao=0!/ansi=0
-UPDATEFILEOPEN	<Update file open error>/error/fao=0!/ansi=0
+UPDATEFILEOPEN	<Update file open error>/error/fao=0!/ansi=0//1
 JNLBADRECFMT	<Journal File Record Format Error encountered for file !AD at disk address 0x!XL>/error/fao=3!/ansi=0
 NULLCOLLDIFF	<Null collation order must be the same for all regions> /error/fao=0!/ansi=0
 MUKILLIP	<Kill in progress indicator is set for file !AD - this !AD operation is likely to result in incorrectly marked busy errors>/warning/fao=4!/ansi=0
-JNLRDONLY	<Journal file !AD read only>/error/fao=2!/ansi=0
+JNLRDONLY	<Journal file !AD read only>/error/fao=2!/ansi=0//1
 ANCOMPTINC	<Deviceparameter !AD is not compatible with any other deviceparameters in the !AD command>/error/fao=4!/ansi=0
 ABNCOMPTINC	<Deviceparameter !AD and deviceparameter !AD are not compatible in the !AD command>/error/fao=6!/ansi=0
 RECLOAD		<Error loading record number: !AD>/error/fao=2!/ansi=0
@@ -845,7 +845,7 @@ RECSIZENOTEVEN	<RECORDSIZE [!UL] needs to be a multiple of 2 if ICHSET or OCHSET
 BUFFLUFAILED	<Error flushing buffers from !AD for database file !AD>/error/fao=4!/ansi=0/T
 MUQUALINCOMP	<Incompatible qualifiers - FILE and REGION>/error/fao=0!/ansi=0
 DISTPATHMAX	<$gtm_dist path is greater than maximum (!UL)>/error/fao=1!/ansi=0
-FILEOPENFAIL	<Failed to open file !AD>/error/fao=2!/ansi=0
+FILEOPENFAIL	<Failed to open file !AD>/error/fao=2!/ansi=0//1
 IMAGENAME	<The executing module name should be !AD instead of !AD>/error/fao=4!/ansi=0
 GTMSECSHRPERM	<The gtmsecshr module in $gtm_dist (!AD) does not have the correct permission: !AD, and UID: !UL>/error/fao=5!/ansi=0
 GTMDISTUNDEF	<Environment variable $gtm_dist is not defined>/error/fao=0!/ansi=0
@@ -880,7 +880,7 @@ SIGFLTUND	<Signal was caused by a floating point underflow>/fatal/fao=0!/ansi=0
 SIGFLTRES	<Signal was caused by a floating point inexact result>/fatal/fao=0!/ansi=0
 SIGFLTINV	<Signal was caused by an invalid floating point operation>/fatal/fao=0!/ansi=0
 SIGMAPERR	<Signal was caused by an address not mapped to an object>/fatal/fao=0!/ansi=0
-SIGACCERR	<Signal was caused by invalid permissions for mapped object>/fatal/fao=0!/ansi=0
+SIGACCERR	<Signal was caused by invalid permissions for mapped object>/fatal/fao=0!/ansi=0//1
 TRNLOGFAIL	<Translation of (VMS) logical name or (UNIX) environment variable !AD failed>/error/fao=2!/ansi=0
 INVDBGLVL	<Invalid non-numeric debug level specified !AD in (VMS) logical name or (UNIX) environment variable !AD>/error/fao=4!/ansi=0
 DBMAXNRSUBS	<!AD Maximum number of subscripts exceeded>/info/fao=2!/ansi=0/I
@@ -965,13 +965,13 @@ DBTTLBLK0	<!AD Total blocks equal zero>/error/fao=2!/ansi=0/A
 DBNOTDB		<!AD File does not have a valid GDS file header>/error/fao=2!/ansi=0
 DBTOTBLK	<File header indicates total blocks is 0x!XL but file size indicates total blocks would be 0x!XL>/error/fao=2!/ansi=0
 DBTN		<Block TN is 0x!16@XQ>/info/fao=1!/ansi=0
-DBNOREGION	<None of the database regions accessible>/error/fao=0!/ansi=0/T
+DBNOREGION	<None of the database regions accessible>/error/fao=0!/ansi=0/T/1
 DBTNRESETINC	<WARNING: tn_reset for database is incomplete due to integrity errors>/warning/fao=0!/ansi=0
 DBTNLTCTN	<Transaction numbers greater than the current transaction were found>/error/fao=0!/ansi=0/T
 DBTNRESET	<Cannot reset transaction number for this region>/error/fao=0!/ansi=0
 MUTEXRSRCCLNUP	<Mutex subsystem leftover resource !AD removed>/info/fao=2!/ansi=0
 SEMWT2LONG	<Process !UL waited !UL second(s) for the !AD lock for region !AD, lock held by pid !UL>/error/fao=7!/ansi=0
-REPLINSTOPEN	<Error opening replication instance file !AD>/error/fao=2!/ansi=0
+REPLINSTOPEN	<Error opening replication instance file !AD>/error/fao=2!/ansi=0//1
 REPLINSTCLOSE	<Error closing replication instance file !AD>/error/fao=2!/ansi=0
 JOBSETUP	<Error receiving !AD from parent process>/error/fao=2!/ansi=0
 DBCRERR8	<Database file !AD, cr location 0x!XJ blk = 0x!XL error: !AD was 0x!16@XQ, expecting 0x!16@XQ -- called from module !AD at line !UL> /info /fao=11!/ansi=0
@@ -1011,7 +1011,7 @@ TRUNCATEFAIL	<Truncating !AD from 0x!XL VMS blocks to 0x!XL blocks failed>/error
 TCGETATTR	<Error while getting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 TCSETATTR	<Error while setting terminal attributes on file descriptor !UL>/error/fao=1!/ansi=0
 IOWRITERR	<IO Write by pid 0x!XL to blk 0x!XL of database file !AD failed.  Pid 0x!XL retrying the IO.>/error/fao=5!/ansi=0
-REPLINSTWRITE	<Error writing [0x!XL] bytes at offset [0x!16@XQ] in replication instance file !AD>/error/fao=4!/ansi=0
+REPLINSTWRITE	<Error writing [0x!XL] bytes at offset [0x!16@XQ] in replication instance file !AD>/error/fao=4!/ansi=0//1
 DBBADFREEBLKCTR	<Database !AD free blocks counter in file header: 0x!XL appears incorrect, should be 0x!XL.  Auto-corrected.>/warning/fao=4!/ansi=0/B
 REQ2RESUME	<Request to resume suspended processing received from process !UL owned by userid !UL>/info/fao=2!/ansi=0
 TIMERHANDLER	<Incorrect SIGALRM handler (0x!XJ) found by !AD>/warning/fao=3!/ansi=0
@@ -1094,7 +1094,7 @@ CIPARTYPE	<Invalid type specification for O/IO directive - expected pointer type
 CIUNTYPE	<Unknown parameter type encountered>/error/fao=0!/ansi=0
 CINOENTRY	<No entry specified for !AD in the call-in table>/error/fao=2!/ansi=0
 JNLINVSWITCHLMT	<Journal AUTOSWITCHLIMIT [!UL] falls outside of allowed limits [!UL] and [!UL]>/error/fao=3!/ansi=0
-SETZDIR		<Cannot change working directory to !AD>/error/fao=2!/ansi=0
+SETZDIR		<Cannot change working directory to !AD>/error/fao=2!/ansi=0//1
 JOBACTREF	<Actual parameter in job command passed by reference>/error/fao=0!/ansi=40
 ECLOSTMID	<$ECODE overflow, the first and last ecodes are retained, but some intervening ecodes have been lost>/warning/fao=0!/ansi=0
 ZFF2MANY	<Number of characters specified for ZFF deviceparameter (!UL) is more than the maximum allowed (!UL)>/error/fao=2!/ansi=0
@@ -1237,13 +1237,13 @@ CHNGTPRSLVTM	<Mupip will change tp_resolve_time from !UL to !UL because expected
 JNLUNXPCTERR	<Unexpected error encountered for Journal !AD at disk address 0x!XL>/error/fao=3!/ansi=0
 OMISERVHANG	<GTCM OMI server is hung>/info/fao=0!/ansi=0
 RSVDBYTE2HIGH	<Record size (!UL) is greater than the maximum allowed for region !AD with Block size (!UL) and Reserved bytes (!UL)>/error/fao=5!/ansi=0
-BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0
-BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0
+BKUPTMPFILOPEN	<Open of backup temporary file !AD failed>/error/fao=2!/ansi=0//1
+BKUPTMPFILWRITE	<Write to backup temporary file !AD failed>/error/fao=2!/ansi=0//1
 VMSMEMORY2	<Central storage exhausted during allocation of dynamic file descriptor with !UL bytes - check page file quota and page file size>/error/fao=1!/ansi=0
 UNUSEDMSG1243	<LOADBGSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
 UNUSEDMSG1244	<LOADEDSZ2 last used in V6.3-009>/error/fao=0!/ansi=0
 REPLINSTMISMTCH	<Process has replication instance file !AD (jnlpool shmid = !UL) open but database !AD is bound to instance file !AD (jnlpool shmid = !UL)>/error/fao=8!/ansi=0
-REPLINSTREAD	<Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD>/error/fao=4!/ansi=0
+REPLINSTREAD	<Error reading [0x!XL] bytes at offset [0x!16@XQ] from replication instance file !AD>/error/fao=4!/ansi=0//1
 REPLINSTDBMATCH	<Replication instance file !AD has seqno [0x!16@XQ] while database has a different seqno [0x!16@XQ]>/error/fao=4!/ansi=0
 REPLINSTNMSAME	<Primary and Secondary instances have the same replication instance name !AD>/error/fao=2!/ansi=0
 REPLINSTNMUNDEF	<Replication instance name not defined>/error/fao=0!/ansi=0
@@ -1317,7 +1317,7 @@ CRYPTDLNOOPEN		<Could not load encryption library while opening encrypted file !
 CRYPTNOV4		<!AD is an encrypted database. Cannot downgrade(to V4) with Encryption option enabled.>/error/fao=2!/ansi=0
 CRYPTNOMM		<!AD is an encrypted database. Cannot support MM access method.>/error/fao=2!/ansi=0
 READONLYNOBG		<Read-only cannot be enabled on non-MM databases>/error/fao=0!/ansi=0
-CRYPTKEYFETCHFAILED	<Could not retrieve encryption key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
+CRYPTKEYFETCHFAILED	<Could not retrieve encryption key corresponding to file !AD. !AD>/error/fao=4!/ansi=0//1
 CRYPTKEYFETCHFAILEDNF	<Could not retrieve encryption key during !AD operation key. !AD>/error/fao=4!/ansi=0
 CRYPTHASHGENFAILED	<Could not generate cryptographic hash for symmetric key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
 CRYPTNOKEY	<No encryption key specified>/error/fao=0!/ansi=0
@@ -1331,8 +1331,8 @@ IOERROR		<Error occured while doing !AD in !AD operation -- called from module !
 MAXSSREACHED	<Maximum snapshots - !UL - for region !AD reached. Please wait for the existing snapshots to complete before starting a new one.>/error/fao=3!/ansi=0
 SNAPSHOTNOV4	<Cannot downgrade (to V4) while snapshots are in progress. Currently !UL snapshots are in progress for region !AD.>/error/fao=3!/ansi=0
 SSV4NOALLOW	<Database snapshots are supported only on fully upgraded V5 databases. !AD has V4 format blocks.>/error/fao=2!/ansi=0
-SSTMPDIRSTAT	<Cannot access temporary directory !AD>/error/fao=2!/ansi=0
-SSTMPCREATE	<Cannot create the temporary file in directory !AD for the requested snapshot>/error/fao=2!/ansi=0
+SSTMPDIRSTAT	<Cannot access temporary directory !AD>/error/fao=2!/ansi=0//1
+SSTMPCREATE	<Cannot create the temporary file in directory !AD for the requested snapshot>/error/fao=2!/ansi=0//1
 JNLFILEDUP	<Journal files !AD and !AD are the same>/error/fao=4!/ansi=0
 SSPREMATEOF	<Premature end of file while reading block !UL of size: !UL bytes at offset: !UL from !AD>/error/fao=5!/ansi=0
 SSFILOPERR	<Error while doing !AD operation on file !AD>/error/fao=4!/ansi=0
@@ -1383,7 +1383,7 @@ REPLNOXENDIAN	<!AD side is running on a GT.M version that does not support cross
 REPLXENDIANFAIL	<!AD side encountered error while doing endian conversion at journal sequence number 0x!16@XQ>/error/fao=3!/ansi=0
 ZGOTOINVLVL2	<ZGOTO 0:entryref is not valid on VMS (UNLINK is a UNIX only feature)>/error/fao=0!/ansi=0
 GTMSECSHRCHDIRF	<gtmsecshr unable to chdir to its temporary directory (!AD)>/error/fao=2!/ansi=0
-JNLORDBFLU	<Error flushing database blocks to !AD. See related messages in the operator log>/error/fao=2!/ansi=0
+JNLORDBFLU	<Error flushing database blocks to !AD. See related messages in the operator log>/error/fao=2!/ansi=0//1
 ZCCLNUPRTNMISNG	<External call: Cleanup routine name missing. Cannot continue>/error/fao=0!/ansi=0
 ZCINVALIDKEYWORD	<External call: Invalid keyword found. Cannot continue>/error/fao=0!/ansi=0
 REPLMULTINSTUPDATE	<Previous updates in the current transaction are to !AD so updates to !AD (in !AD) not allowed>/error/fao=6!/ansi=0
@@ -1405,8 +1405,8 @@ BADREGION	<Region is not BG, MM, or CM>/error/fao=0!/ansi=0
 LOCKSPACEUSE	<Estimated free lock space: !UL% of !UL pages>/info/fao=2!/ansi=0
 JIUNHNDINT	<An error during $ZINTERRUPT processing was not handled: !AD>/error/fao=2!/ansi=0
 GTMASSERT2	<!AD - Assert failed !AD line !UL for expression (!AD)>/fatal/fao=7!/ansi=0
-ZTRIGNOTRW	<ZTRIGGER cannot operate on read-only region !AD>/error/fao=2!/ansi=0
-TRIGMODREGNOTRW	<Trigger(s) cannot be added/changed/deleted/upgraded because region !AD is read-only>/error/fao=2!/ansi=0
+ZTRIGNOTRW	<ZTRIGGER cannot operate on read-only region !AD>/error/fao=2!/ansi=0//1
+TRIGMODREGNOTRW	<Trigger(s) cannot be added/changed/deleted/upgraded because region !AD is read-only>/error/fao=2!/ansi=0//1
 INSNOTJOINED	<Replicating Instance !AD is not a member of the same Group as Instance !AD>/error/fao=4!/ansi=0
 INSROLECHANGE	<Supplementary Instance !AD and non-Supplementary Instance !AD belong to the same Group>/error/fao=4!/ansi=0
 INSUNKNOWN	<Supplementary Instance !AD has no instance definition for non-Supplementary Instance !AD>/error/fao=4!/ansi=0
@@ -1444,7 +1444,7 @@ REPLONLNRLBK	<ONLINE ROLLBACK detected. Starting afresh>/error/fao=0!/ansi=0
 !
 SRVLCKWT2LNG	<PID !UL is holding the source server lock. Waited for !UL seconds. Now exiting>/error/fao=2!/ansi=0
 IGNBMPMRKFREE	<Ignoring bitmap free-up operation for region !AD (!AD) due to concurrent ONLINE ROLLBACK>/info/fao=4!/ansi=0
-PERMGENFAIL	<Failed to determine access permissions to use for creation of !AD for file !AD>/error/fao=4!/ansi=0
+PERMGENFAIL	<Failed to determine access permissions to use for creation of !AD for file !AD>/error/fao=4!/ansi=0//1
 PERMGENDIAG	<Permissions: Proc(uid:!UL,gid:!UL!AD), DB File(uid:!UL,gid:!UL,perm:!AD), Lib File(gid:!UL,perm:!AD)>/info/fao=11!/ansi=0
 MUTRUNC1ATIME	<Process with PID !UL already performing truncate in region !AD>/info/fao=3!/ansi=0
 MUTRUNCBACKINPROG	<Truncate detected concurrent backup in progress for region !AD>/info/fao=2!/ansi=0
@@ -1503,13 +1503,13 @@ MUSIZEFAIL	<MUPIP SIZE : failed.  Failure code: !AD.>/error/fao=2!/ansi=0
 SIDEEFFECTEVAL	<Extrinsic ($$), External call ($&) or $INCREMENT() with potential side effects in actuallist, function arguments, non-Boolean binary operands or subscripts>/warning/fao=0!/ansi=0
 CRYPTINIT2	<Could not initialize encryption library !AD. !AD>/error/fao=4!/ansi=0
 CRYPTDLNOOPEN2	<Could not load encryption library !AD. !AD>/error/fao=4!/ansi=0
-CRYPTBADCONFIG	<Could not retrieve data from encrypted file !AD due to bad encryption configuration. !AD>/error/fao=4!/ansi=0
+CRYPTBADCONFIG	<Could not retrieve data from encrypted file !AD due to bad encryption configuration. !AD>/error/fao=4!/ansi=0//1
 DBCOLLREQ	<JOURNAL EXTRACT proceeding without collation information for globals in database. !AD !AD>/warning/fao=4!/ansi=0
 SETEXTRENV	<Database files are missing or Instance is frozen; supply the database files, wait for the freeze to lift or define gtm_extract_nocol to extract possibly incorrect collation>/error/fao=0!/ansi=0
 NOTALLDBRNDWN	<Not all regions were successfully rundown>/error/fao=0!/ansi=0
 TPRESTNESTERR	<TP restart signaled while handing error - treated as nested error - Use TROLLBACK in error handler to avoid this>/error/fao=0!/ansi=0
 JNLFILRDOPN	<Error opening journal file !AD for read for database file !AD>/error/fao=4!/ansi=0
-SEQNUMSEARCHTIMEOUT	<Timed out trying to find sequence number !@ZQ [0x!16@XQ] in Journal File(s). See above messages for details. Source server exiting>/error/fao=2!/ansi=0
+SEQNUMSEARCHTIMEOUT	<Timed out trying to find sequence number !@ZQ [0x!16@XQ] in Journal File(s). See above messages for details. Source server exiting>/error/fao=2!/ansi=0//1
 FTOKKEY		<FTOK key 0x!XL>/info/fao=1!/ansi=0
 SEMID		<Semaphore id !UL>/info/fao=1!/ansi=0
 JNLQIOSALVAGE	<Journal IO lock salvaged>/info/fao=0!/ansi=0
@@ -1615,7 +1615,7 @@ INVLOCALE	<Attempt to reset locale to supplied value of $gtm_locale (!AD) failed
 NOMORESEMCNT	<!AD counter semaphore has reached its maximum and stopped counting for !AZ !AD. Run MUPIP JOURNAL -ROLLBACK -BACKWARD, MUPIP JOURNAL -RECOVER -BACKWARD or MUPIP RUNDOWN to restore the database files and shared resources to a clean state>/info/fao=5!/ansi=0
 SETQUALPROB	<Error getting !AD qualifier value>/error/fao=2!/ansi=0
 EXTRINTEGRITY	<Database !AD potentially contains spanning nodes or data encrypted with two different keys>/error/fao=2!/ansi=0
-CRYPTKEYRELEASEFAILED	<Could not safely release encryption key corresponding to file !AD. !AD>/error/fao=4!/ansi=0
+CRYPTKEYRELEASEFAILED	<Could not safely release encryption key corresponding to file !AD. !AD>/error/fao=4!/ansi=0//1
 MUREENCRYPTSTART	<Database !AD : MUPIP REORG ENCRYPT started by pid !UL at transaction number [0x!16@XQ]>/info/fao=4!/ansi=0
 MUREENCRYPTV4NOALLOW	<Database (re)encryption supported only on fully upgraded V5 databases. !AD has V4 format blocks>/error/fao=2!/ansi=0
 ENCRYPTCONFLT	<MUPIP REORG -ENCRYPT and MUPIP EXTRACT -FORMAT=BIN cannot run concurrently - skipping !AD on region: !AD, file: !AD>/error/fao=6!/ansi=0
@@ -1652,7 +1652,7 @@ FILECREERR	<Error !AD for file !AD during DB creation>/error/fao=4!/ansi=0
 RAWDEVUNSUP	<RAW device for region !AD is not supported>/error/fao=2!/ansi=0
 DBFILECREATED	<Database file !AD created>/info/fao=2!/ansi=0
 PCTYRESERVED	<Attempted operation not supported on ^%Y* namespace>/error/fao=0!/ansi=0
-REGFILENOTFOUND	<Database file !AD corresponding to region !AD cannot be found>/info/fao=4!/ansi=0/A
+REGFILENOTFOUND	<Database file !AD corresponding to region !AD cannot be found>/info/fao=4!/ansi=0/A/1
 DRVLONGJMP	<Fake internal error that drives longjmp()>/error/fao=0!/ansi=0
 INVSTATSDB	<Database file !AD associated with statistics database region !AD is not a valid statistics database>/error/fao=4!/ansi=0
 STATSDBERR	<Error in/at !AD attempting to use a statistics database: !AD>/error/fao=4!/ansi=0
@@ -1662,9 +1662,9 @@ JNLSWITCHRETRY	<Retrying previously abandoned switch of journal file !AD for dat
 JNLSWITCHFAIL	<Failed to switch journal file !AD for database file !AD>/error/fao=4!/ansi=0
 CLISTRTOOLONG	<!AZ specified is !UL bytes long which is greater than the allowed maximum of !UL bytes>/error/fao=3!/ansi=0
 LVMONBADVAL	<Value for local variable !AD changed inappropriately between two points for indexes !UL and !UL - expected value: !AD  actual value: !AD - Generating core>/error/fao=8!/ansi=0
-RESTRICTEDOP	<Attempt to perform a restricted operation: !AZ>/error/fao=1!/ansi=0
+RESTRICTEDOP	<Attempt to perform a restricted operation: !AZ>/error/fao=1!/ansi=0//1
 RESTRICTSYNTAX	<Syntax error in file !AD at line number !UL. All facilities restricted for process.>/error/fao=3!/ansi=0
-MUCREFILERR	<Error in/at !AD creating database !AD (region !AD)>/error/fao=6!/ansi=0
+MUCREFILERR	<Error in/at !AD creating database !AD (region !AD)>/error/fao=6!/ansi=0//1
 JNLBUFFPHS2SALVAGE	<Salvaged journal records from process !UL for database file !AD at transaction number [0x!16@XQ] and journal-sequence-number/unique-token [0x!16@XQ] with journal file starting offset [0x!XL] and length [0x!XL]>/info/fao=7!/ansi=0
 JNLPOOLPHS2SALVAGE	<Salvaged journal records from process !UL for replication instance file !AD at journal sequence number [0x!16@XQ] with journal pool starting offset [0x!16@XQ] and length [0x!XL]>/info/fao=6!/ansi=0
 MURNDWNARGLESS	<Argumentless MUPIP RUNDOWN started with process id !UL by userid !UL from directory !AD>/info/fao=4!/ansi=0
@@ -1711,7 +1711,26 @@ MUKEEPNODEC	<Expected decimal integer input for keep>/error/fao=0!/ansi=0
 MUKEEPNOTRUNC	<Keep issued without -truncate>/error/fao=0!/ansi=0
 MUTRUNCNOSPKEEP	<Region !AD has insufficient space to meet truncate target percentage of !UL with keep at !UL blocks>/info/fao=4!/ansi=0
 TERMHANGUP	<Terminal has disconnected>/error/fao=0!/ansi=0
+DBFILNOFULLWRT	<Disabling fullblock writes. !AD !AD !UL>/warning/fao=5!/ansi=0
 !
 ! If there are UNUSEDMSG* lines unused for more than one year and at least two non-patch releases, use them before adding new lines.
+!
+!  This file is processed by sr_port/msg.m which produces the output files merrors_ansi.h & merrors_ctl.c
+!  which are used in the build process.  The format of the lines below is:
+!	MNEMONIC <error message text>/severity[+flag]/fao=###!/ansi=###/integ-id ! comment
+!  Where
+!	MNEMONIC - The base error message code in upper case.  Generaly this will be prefixed with ERR_ in messages
+!	<error message text>	- A VMS style Formatted Ascii Output string (including FAO escapes) between angle brackets.
+!	severity 		- A lower case error level indication, optionally postfixed with "+flag" where
+!				  flag is a digit from 0 through 7.  The recognized severity strings are "warning",
+!				  "success", "error", "info" & "fatal".
+!	fao=### 		- The expected number of FAO arguments to be consumed by the message.
+!	ansi=### 		- If non-zero, the ANSI error associated with the GT.M error.
+!	integ-id 		- An optional one character database integrity flag associated with the error
+!				  as defined in A&O Guide MUPIP Integ Error Classification Table.  The
+!				  expected values are 'A', 'B', 'D', 'I', 'S' & 'T'
+!	Flags 			- The optional one digit flag (0-7 inclusive) attached to the severity code
+!				  may further characterize the error.  Currently the only defined value for
+!				  this flag is '1', which signifies that the error should be syslogged when it occurs.
 !
 	.end

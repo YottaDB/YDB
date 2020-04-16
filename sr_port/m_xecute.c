@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,10 +59,11 @@ int m_xecute(void)
 		}
 		/* caution: fall through ??? maybe ??? */
 	case EXPR_GOOD:
-		if (!run_time && (OC_LIT == (ref0 = (TREF(curtchain))->exorder.bl)->opcode)
-			&& (ref0->exorder.bl == TREF(curtchain)))
-		{	/* just found a literal, and only one, and we are not already at run time; WARNING assignment above */
-			/* Can't drive the parsing with the source because there may be emedded quotes, rather must use the literal
+		for (ref0 = tmpchain.exorder.bl, ref1 = ref0->exorder.bl; OC_NOOP == ref1->opcode; ref1 = ref1->exorder.bl)
+			;	/*  WARNING very evil violations of information hiding above and below */
+		if (!run_time && (OC_LIT == ref0->opcode) && (&tmpchain == ref1))
+		{	/* Just found a literal, and only one, and we are not already at run time.
+			 * Can't drive the parsing with the source because there may be emedded quotes, rather must use the literal
 			 * The code in this block sorta/kinda does things like comp_init and op_commarg between a save and restore
 			 * of parser state. If the parse fails or runs into a GOTO, NEW, QUIT or (nested) XECUTE it reverts to
 			 * producing the code for a run time evaluation of the literal. GOTO and QUIT must deal with the XECUTE
@@ -102,10 +103,12 @@ int m_xecute(void)
 			RESTORE_PARSE_STATE(parse_state_ptr);	/* restore the parse state to the original source */
 			if (EXPR_FAIL == rval)
 			{	/* not so good - remove the failed chain and just leave the literal for the run time form */
+				TREF(last_source_column) = source_column - 1;
 				dqinit(&tmpchain, exorder);
 				ins_triple(ref0);
 				pending_errtriplecode = 0;	/* forget the error - leave it to runtime */
 				TREF(source_error_found) = 0;
+
 			}
 		} else
 			rval = EXPR_FAIL;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2019 Fidelity National Information	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -135,12 +135,13 @@ error_def(ERR_TLSHANDSHAKE);
 int gtmsource_est_conn()
 {
 	char			print_msg[PROC_OPS_PRINT_MSG_LEN], msg_str[1024], *errmsg;
-	int			connection_attempts, alert_attempts, save_errno, status;
+	int			connection_attempts, alert_attempts, save_errno, comminit_retval, status;
 	int			send_buffsize, recv_buffsize, tcp_s_bufsize;
 	int 			logging_period, logging_interval; /* logging period = soft_tries_period*logging_interval */
 	int			hardtries_period, hardtries_count;
 	int 			logging_attempts;
 	int			secondary_addrlen;
+	boolean_t		throw_errors = TRUE;
 	sockaddr_ptr		secondary_sa;
 	gtmsource_local_ptr_t	gtmsource_local;
 
@@ -160,31 +161,39 @@ int gtmsource_est_conn()
 	remote_side->endianness_known = FALSE;
 	/* Connect to the secondary - use hard tries, soft tries ... */
 	connection_attempts = 0;
-	gtmsource_comm_init(); /* set up gtmsource_local.secondary_ai */
+	comminit_retval = gtmsource_comm_init(throw_errors); /* set up gtmsource_local.secondary_ai */
 	hardtries_period = gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_PERIOD];
 	hardtries_count = gtmsource_local->connect_parms[GTMSOURCE_CONN_HARD_TRIES_COUNT];
 	repl_log(gtmsource_log_fp, TRUE, TRUE, "Connect hard tries count = %d, Connect hard tries period = %d\n",
 				hardtries_count, hardtries_period);
 	do
 	{
-		secondary_sa = (sockaddr_ptr)(&gtmsource_local->secondary_inet_addr);
-		secondary_addrlen = gtmsource_local->secondary_addrlen;
-		CONNECT_SOCKET(gtmsource_sock_fd, secondary_sa, secondary_addrlen, status);
-		if (0 == status)
-			break;
-		repl_log(gtmsource_log_fp, TRUE, TRUE, "%d hard connection attempt failed : %s\n", connection_attempts + 1,
-			 STRERROR(errno));
-		repl_close(&gtmsource_sock_fd);
-		if (REPL_MAX_CONN_HARD_TRIES_PERIOD > hardtries_period)
+		if ((FD_INVALID == gtmsource_sock_fd) || (0 != comminit_retval))
+		{ /* gtmsource_comm_init failed to initialize the socket. Report error and retry gtmsource_comm_init. */
+			repl_log(gtmsource_log_fp, TRUE, TRUE,
+				 "%d hard connection attempt failed : Error with source server connection initiation\n",
+					connection_attempts + 1);
+		} else
 		{
-			SHORT_SLEEP(hardtries_period);
+			secondary_sa = (sockaddr_ptr)(&gtmsource_local->secondary_inet_addr);
+			secondary_addrlen = gtmsource_local->secondary_addrlen;
+			CONNECT_SOCKET(gtmsource_sock_fd, secondary_sa, secondary_addrlen, status);
+			if (0 == status)
+				break;
+			repl_log(gtmsource_log_fp, TRUE, TRUE, "%d hard connection attempt failed : %s\n", connection_attempts + 1,
+				 STRERROR(errno));
+			repl_close(&gtmsource_sock_fd);
+			if (REPL_MAX_CONN_HARD_TRIES_PERIOD > hardtries_period)
+			{
+				SHORT_SLEEP(hardtries_period);
+			}
+			else
+				LONG_SLEEP_MSEC(hardtries_period);
+			gtmsource_poll_actions(FALSE);
+			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+				return (SS_NORMAL);
 		}
-		else
-			LONG_SLEEP_MSEC(hardtries_period);
-		gtmsource_poll_actions(FALSE);
-		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
-			return (SS_NORMAL);
-		gtmsource_comm_init();
+		comminit_retval = gtmsource_comm_init(throw_errors);
 	} while (++connection_attempts < hardtries_count);
 	gtmsource_poll_actions(FALSE);
 	if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
@@ -204,23 +213,40 @@ int gtmsource_est_conn()
 		connection_attempts = 0;
 		do
 		{
-			secondary_sa = (sockaddr_ptr)(&gtmsource_local->secondary_inet_addr);
-			secondary_addrlen = gtmsource_local->secondary_addrlen;
-			CONNECT_SOCKET(gtmsource_sock_fd, secondary_sa, secondary_addrlen, status);
-			if (0 == status)
-				break;
-			repl_close(&gtmsource_sock_fd);
-			if (0 == (connection_attempts + 1) % logging_interval)
+			if ((FD_INVALID == gtmsource_sock_fd) || (0 != comminit_retval))
+			{ /* gtmsource_comm_init failed to initialize the socket. Report error and retry gtmsource_comm_init. */
+				if (0 == (connection_attempts + 1) % logging_interval)
+				{
+					repl_log(gtmsource_log_fp, TRUE, TRUE,
+					"%d soft connection attempt failed : Error with source server connection initiation\n",
+						 connection_attempts + 1);
+					logging_attempts++;
+					throw_errors = TRUE;
+				} else /* Decrease the frequency of showing the connection failure error messages */
+					throw_errors = FALSE;
+			} else
 			{
-				repl_log(gtmsource_log_fp, TRUE, TRUE, "%d soft connection attempt failed : %s\n",
-					 connection_attempts + 1, STRERROR(errno));
-				logging_attempts++;
+				secondary_sa = (sockaddr_ptr)(&gtmsource_local->secondary_inet_addr);
+				secondary_addrlen = gtmsource_local->secondary_addrlen;
+				CONNECT_SOCKET(gtmsource_sock_fd, secondary_sa, secondary_addrlen, status);
+				if (0 == status)
+					break;
+				save_errno = errno;
+				repl_close(&gtmsource_sock_fd);
+				if (0 == (connection_attempts + 1) % logging_interval)
+				{
+					repl_log(gtmsource_log_fp, TRUE, TRUE, "%d soft connection attempt failed : %s\n",
+						 connection_attempts + 1, STRERROR(save_errno));
+					logging_attempts++;
+					throw_errors = TRUE;
+				} else /* Decrease the frequency of showing the connection failure error messages */
+					throw_errors = FALSE;
+				LONG_SLEEP(gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
+				gtmsource_poll_actions(FALSE);
+				if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+					return (SS_NORMAL);
 			}
-			LONG_SLEEP(gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
-			gtmsource_poll_actions(FALSE);
-			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
-				return (SS_NORMAL);
-			gtmsource_comm_init();
+			comminit_retval = gtmsource_comm_init(throw_errors);
 			connection_attempts++;
 			if (0 == (connection_attempts % logging_interval) && 0 == (logging_attempts % alert_attempts))
 			{ 	/* Log ALERT message */

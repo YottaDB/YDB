@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -159,7 +159,7 @@ typedef struct	mlk_ctldata_struct	/* this describes the entire shared lock secti
 	boolean_t	rehash_needed;		/* whether we've determined that a hash table rehash is needed */
 	global_latch_t	lock_gc_in_progress;	/* pid of the process doing the GC, or 0 if none */
 	mlk_subhash_seed_t	hash_seed;		/* seed value to use to initialize hash */
-	int		hash_shmid;		/* shared memory id of hash table, or undefined if internal (see blkhash) */
+	int		hash_shmid;		/* shared memory id of hash table, or INVALID_SHMID if internal. */
 } mlk_ctldata;
 
 /* Define types for shared memory resident structures */
@@ -362,7 +362,7 @@ typedef struct mlk_stats_struct
 
 #define CHECK_SHRBLKPTR(RPTR, PCTL)											\
 	assert((RPTR == 0)												\
-		|| (((mlk_shrblk_ptr_t)R2A(RPTR) > (PCTL).shrblk) 							\
+		|| (((mlk_shrblk_ptr_t)R2A(RPTR) > (PCTL).shrblk)							\
 			&& ((mlk_shrblk_ptr_t)R2A(RPTR) < ((PCTL).shrblk + (PCTL).ctl->max_blkcnt + 1))))
 
 #define INVALID_LSIB_MARKER	0x1ee4c0de

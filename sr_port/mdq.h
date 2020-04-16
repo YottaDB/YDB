@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,9 +43,34 @@
  * the test to see if should do debugging is not elegant but it does allow decent debugging. Note those macros without
  * debugging are statically defined.
  */
-
+#  define OCQ_NOOP 0L		/* This needs to align with OC_NOOP, which is 0, but 'twould make a mess to do the includes */
+#  define OCQ_INVALID -1L
 #define dqloop(Q, N, I) DQLOOP(Q, N, I)
-#define dqinit(Q, N)	DQINIT(Q, N)
+#ifdef GTM_MALLOC_BUILD		/* gtm_malloc doesn't deal with triples and the include they require make for trouble */
+#define dqinit(Q, N) DQINIT(Q, N)
+#define DQTRIPCHK(Q, N)
+#else
+#define dqinit(Q, N)					\
+MBSTART {						\
+	if (!memcmp(#N, "exorder", 3))			\
+		((triple *)(Q))->opcode = OCQ_INVALID;	\
+	DQINIT(Q, N); 					\
+} MBEND
+#define DQTRIPCHK(Q, N) assert((0 != memcmp(#N, "exorder", 3)) || (OCQ_INVALID != ((triple *)(Q))->opcode))
+#endif
+#  define dqnoop(Q)						\
+MBSTART {							\
+	triple *REF;						\
+								\
+	if ((OCQ_INVALID == ((triple *)(Q))->opcode) 		\
+		&& (((triple *)(Q))->exorder.bl == (Q)))	\
+	{							\
+		REF =  maketriple(OCQ_NOOP);			\
+		DQINIT(REF, exorder);				\
+		DQINS((Q), exorder, REF);			\
+	}							\
+	CHKTCHAIN(Q, N, TRUE);					\
+} MBEND
 
 /* #define DEBUG_TRIPLES / * Uncomment this to do triple debugging, which is also tied to gtmdbglvl, as of this writing: 0x4000 */
 #ifndef DEBUG_TRIPLES
@@ -56,8 +81,6 @@
 #  define dqadd(Q, X, N)	DQADD(Q, X, N)
 #  define CHKTCHAIN(Q, N, B)
 #else
-#  include "compiler.h"
-#  include "gtm_string.h"
 #  include "gtmdbglvl.h"
 GBLREF	uint4		gtmDebugLevel;
 /* Q: head of queue to check; N: the name of queue; B: whether to check main exorder (from curtchain) and any expr_start queue */
@@ -68,7 +91,7 @@ MBSTART {										\
 											\
 	SETUP_THREADGBL_ACCESS;							\
 					/* memcmp() is fast and 3 chars sufficient */	\
- 	if ((gtmDebugLevel & GDL_DebugCompiler) && (0 == memcmp(#N, "exorder", 3)))	\
+	if ((GDL_DebugCompiler & gtmDebugLevel) && (0 == memcmp(#N, "exorder", 3)))	\
 	{										\
 		if ((triple *)-1 != (triple *)(Q)) /* to avoid post-checking deletes */	\
 			chktchain((triple *)(Q));					\
@@ -96,22 +119,25 @@ MBSTART {			\
 } MBEND
 #  define dqins(Q, N, X)	\
 MBSTART {			\
+	DQTRIPCHK (Q, N);	\
 	CHKTCHAIN(Q, N, FALSE);	\
 	DQINS(Q, N, X);		\
 	CHKTCHAIN(Q, N, TRUE);	\
 } MBEND
 #  define dqrins(Q, N, X)	\
 MBSTART {			\
+	DQTRIPCHK (Q, N);	\
 	CHKTCHAIN(Q, N, FALSE);	\
 	DQRINS(Q, N, X);	\
 	CHKTCHAIN(Q, N, TRUE);	\
 } MBEND
-#  define dqadd(Q, X, N)	\
-MBSTART {			\
-	CHKTCHAIN(Q, N, FALSE);	\
-	CHKTCHAIN(X, N, FALSE);	\
-	DQADD(Q, X, N);		\
-	CHKTCHAIN(Q, N, TRUE);	\
+#  define dqadd(Q, X, N)				\
+MBSTART {						\
+	DQTRIPCHK (Q, N);				\
+	CHKTCHAIN(Q, N, FALSE);				\
+	CHKTCHAIN(X, N, FALSE);				\
+	DQADD(Q, X, N);					\
+	CHKTCHAIN(Q, N, ((Q) != TREF(expr_start)));	\
 } MBEND
 #endif
 

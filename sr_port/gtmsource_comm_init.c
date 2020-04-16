@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,9 @@
 #include "repl_sp.h"
 #include "repl_comm.h"
 #include "repl_log.h"
+#include "util.h"	/* util_out_print in GTM_PUTMSG_CSA_ADDRINFO */
 
+#define RESOLUTION_FAILURE_PREFIX	"Failure in resolving "
 GBLDEF	int			gtmsource_sock_fd = FD_INVALID;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF  FILE			*gtmsource_log_fp;
@@ -52,7 +54,7 @@ error_def(ERR_REPLCOMM);
 error_def(ERR_GETADDRINFO);
 error_def(ERR_TEXT);
 
-int gtmsource_comm_init(void)
+int gtmsource_comm_init(boolean_t print_addresolve_error)
 {
 	/* Initialize communication stuff */
 	struct	linger	disable_linger = {0, 0};
@@ -61,7 +63,7 @@ int gtmsource_comm_init(void)
 	struct addrinfo *ai_ptr = NULL, *ai_head = NULL, hints;
 	gtmsource_local_ptr_t   gtmsource_local;
 	char	*host;
-	char	port_buffer[NI_MAXSERV];
+	char	port_buffer[NI_MAXSERV], hostinfo[SIZEOF(RESOLUTION_FAILURE_PREFIX) + MAX_HOST_NAME_LEN + NI_MAXSERV];
 	int	port_len;
 	int	errcode;
 	int	tries;
@@ -77,43 +79,49 @@ int gtmsource_comm_init(void)
 	for (tries = 0;
 	     tries < MAX_GETHOST_TRIES &&
 	     EAI_AGAIN == (errcode = getaddrinfo(host, port_buffer, &hints, &ai_head));
-	      tries++);
-	if (0 != errcode)
-		RTS_ERROR_ADDRINFO(NULL, ERR_GETADDRINFO, errcode);
-	/* find one address valid for creating socket */
-	assert(ai_head);
-	for(ai_ptr = ai_head; NULL != ai_ptr; ai_ptr = ai_ptr->ai_next)
+	      tries++)
+		;
+	if ((0 != errcode) && print_addresolve_error)
 	{
-		if (FD_INVALID == (gtmsource_sock_fd = socket(ai_ptr->ai_family, ai_ptr->ai_socktype,
-								ai_ptr->ai_protocol)))
-				err_status = errno;
-		else
+		SNPRINTF(hostinfo, SIZEOF(hostinfo), "%s%s:%s", RESOLUTION_FAILURE_PREFIX, host, port_buffer);
+		GTM_PUTMSG_CSA_ADDRINFO(NULL, ERR_GETADDRINFO, errcode, hostinfo);
+	}
+	if (ai_head)
+	{
+		for(ai_ptr = ai_head; NULL != ai_ptr; ai_ptr = ai_ptr->ai_next)
 		{
-			err_status = 0;
-			break;
+			if (FD_INVALID == (gtmsource_sock_fd = socket(ai_ptr->ai_family, ai_ptr->ai_socktype,
+									ai_ptr->ai_protocol)))
+					err_status = errno;
+			else
+			{
+				err_status = 0;
+				break;
+			}
+		}
+		if (0 != err_status)
+		{
+			freeaddrinfo(ai_head); /* prevent mem-leak */
+			SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket create : %s",
+				 STRERROR(err_status));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
+		}
+		assert(NULL != ai_ptr);
+		assert(SIZEOF(gtmsource_local->secondary_inet_addr) >= ai_ptr->ai_addrlen);
+		/* only save the addrinfo and address after the socket is successfuly created */
+		gtmsource_local->secondary_af = ai_ptr->ai_family;
+		gtmsource_local->secondary_addrlen = ai_ptr->ai_addrlen;
+		memcpy((struct sockaddr*)(&gtmsource_local->secondary_inet_addr), ai_ptr->ai_addr, ai_ptr->ai_addrlen);
+		freeaddrinfo(ai_head); /* prevent mem-leak */
+		/* A connection breakage should get rid of the socket */
+		if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_LINGER,
+				(const void *)&disable_linger, SIZEOF(disable_linger)))
+		{
+			err_status = ERRNO;
+			SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket disable linger : %s",
+					STRERROR(err_status));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
 		}
 	}
-	if (0 != err_status)
-	{
-		freeaddrinfo(ai_head); /* prevent mem-leak */
-		SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket create : %s",
-			 STRERROR(err_status));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
-	}
-	assert(NULL != ai_ptr);
-	assert(SIZEOF(gtmsource_local->secondary_inet_addr) >= ai_ptr->ai_addrlen);
-	/* only save the addrinfo and address after the socket is successfuly created */
-	gtmsource_local->secondary_af = ai_ptr->ai_family;
-	gtmsource_local->secondary_addrlen = ai_ptr->ai_addrlen;
-	memcpy((struct sockaddr*)(&gtmsource_local->secondary_inet_addr), ai_ptr->ai_addr, ai_ptr->ai_addrlen);
-	freeaddrinfo(ai_head); /* prevent mem-leak */
-	/* A connection breakage should get rid of the socket */
-	if (-1 == setsockopt(gtmsource_sock_fd, SOL_SOCKET, SO_LINGER, (const void *)&disable_linger, SIZEOF(disable_linger)))
-	{
-		err_status = ERRNO;
-		SNPRINTF(error_string, SIZEOF(error_string), "Error with source server socket disable linger : %s",
-				STRERROR(err_status));
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_REPLCOMM, 0, ERR_TEXT, 2, RTS_ERROR_STRING(error_string));
-	}
-	return(0);
+	return(errcode);
 }

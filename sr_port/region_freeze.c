@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,7 +65,7 @@ STATICDEF	sgmnt_data_ptr_t	rf_csd_sav;
 	caller_id_flag = FALSE;								\
 	send_msg_csa(CSA_ARG(CSA) VARLSTCNT(9) ERR_FREEZEID, 7, LEN_AND_STR(STATE),	\
 			DB_LEN_STR(region),						\
-			freeze_id, FREEZE_MATCH, caller_id());				\
+			freeze_id, FREEZE_MATCH, caller_id(0));				\
 	caller_id_flag = TRUE;								\
 }
 

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2019 Fidelity National Information		#
+# Copyright (c) 2001-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -21,9 +21,9 @@
 #				"a" => current active (in current process) release
 #				"d" => current development release
 #				"p" => current production release
-#		$2 -	"gtm_bta" => lint bta images ($gtm_vrt/bta)
-#			"gtm_dbg" => lint dbg images ($gtm_vrt/dbg)
-#			"gtm_pro" => lint pro images ($gtm_vrt/pro)
+#		$2 -	"gtm_bta" => lint bta images ($gtm_ver/bta)
+#			"gtm_dbg" => lint dbg images ($gtm_ver/dbg)
+#			"gtm_pro" => lint pro images ($gtm_ver/pro)
 #		$3 -	any lint options in addition to the defaults
 #
 ##################################################################################

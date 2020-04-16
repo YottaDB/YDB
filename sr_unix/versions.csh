@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2001-2019 Fidelity National Information		#
+# Copyright (c) 2001-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 #	This source code contains the intellectual property	#
@@ -20,6 +20,6 @@
 ############################################
 
 #	gtm_curpro is the current production version
-setenv	gtm_curpro	"V63010"
+setenv	gtm_curpro	"V63011"
 #	gtm_verno is the current production version
 setenv	gtm_verno	$gtm_curpro

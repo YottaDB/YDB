@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2015-2018 Fidelity National Information	*
+ * Copyright (c) 2015-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,4 +35,5 @@ ENUM_ENTRY(GDSMV63000A),	/* Move fields ftok_counter_halted and access_counter_h
 ENUM_ENTRY(GDSMV63001),		/* New "asyncio" option; New reservedDBFlags field */
 ENUM_ENTRY(GDSMV63003),		/* New field read_only to indicate a read-only database */
 ENUM_ENTRY(GDSMV63007),		/* Reuse abandoned field for use controlled stable flush_trigger_top */
+ENUM_ENTRY(GDSMV63012),		/* New fullblklwrt option */
 ENUM_ENTRY(GDSMVLAST)

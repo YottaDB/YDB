@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -48,7 +48,7 @@ GBLREF	int		*ht_sizes;
 
 #define DEBUGHASHTABLE 0
 
-#define CALLERID ((unsigned char *)caller_id())
+#define HASHTAB_CALLERID ((unsigned char *)caller_id(0))
 
 /* For manual calls to raise_gtmmemory_error() */
 #define SET_GTMMEMORY_ERROR_VARS(SIZE, ERROR)		\
@@ -58,7 +58,7 @@ GBLREF	int		*ht_sizes;
 	GBLREF	int		gtmMallocErrorErrno;	\
 							\
 	gtmMallocErrorSize = SIZE;			\
-	gtmMallocErrorCallerid = CALLERID;		\
+	gtmMallocErrorCallerid = HASHTAB_CALLERID;	\
 	gtmMallocErrorErrno = ERROR;			\
 }
 

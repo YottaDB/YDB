@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -24,6 +24,10 @@
 #include "util.h"
 #include "mupint.h"
 #include "gtmmsg.h"
+#include "sleep_cnt.h"
+#include "wcs_sleep.h"
+#include "gtm_time.h"
+#include "gtm_c_stack_trace.h"
 
 /* Include prototypes */
 #include "bit_set.h"
@@ -41,6 +45,9 @@ GBLREF	int			disp_map_errors;
 GBLREF	int			mu_map_errs;
 GBLREF	int			disp_trans_errors;
 GBLREF	int			trans_errors;
+GBLREF	boolean_t		debug_mupip;
+GBLREF	sgmnt_data		*cs_data;
+GBLREF	sgmnt_addrs		*cs_addrs;
 
 GBLREF trans_num	largest_tn;
 
@@ -65,16 +72,40 @@ error_def(ERR_DBTN);
 void mu_int_maps(void)
 {
 	unsigned char	*local;
-	uchar_ptr_t	blk_base, free_blk_base;
-	boolean_t	agree, disk_full, local_full, master_full;
+	char		time_str[CTIME_BEFORE_NL + 2]; /* for GET_CUR_TIME macro */
+	uchar_ptr_t	blk_base, buff_blk_base, free_blk_base;
+	boolean_t	wait_on_kip, agree, disk_full, local_full, master_full;
 	block_id	maps, mapsize, mcnt, lcnt, bcnt;
 	unsigned int	level;
 	uint_ptr_t	dskmap_p;
-	uint4		dskmap, lfree, *lmap, map_blk_size;
+	uint4		dskmap, lfree, *lmap, map_blk_size, crit_counter;
 	block_id	blkno, last_bmp;
 	enum db_ver	ondsk_blkver;
 	trans_num map_tn;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
+	/* Before going into mu_int_maps, check if there are any KIPs and wait for them */
+	crit_counter = 1;
+	wait_on_kip = (cs_data && cs_data->kill_in_prog) || mu_int_data.kill_in_prog;
+	if (wait_on_kip)
+	{
+		GET_CUR_TIME(time_str);
+		util_out_print("!/MUPIP INFO: mu_int_maps: !AD : Start kill-in-prog wait.", TRUE,
+			CTIME_BEFORE_NL, time_str);
+	}
+	while (((cs_data && cs_data->kill_in_prog) || mu_int_data.kill_in_prog) && (MAX_CRIT_TRY > crit_counter++))
+	{
+		if (cs_addrs)
+			GET_C_STACK_FOR_KIP(cs_addrs->nl->kip_pid_array, crit_counter, MAX_CRIT_TRY, 1, MAX_KIP_PID_SLOTS);
+		wcs_sleep(crit_counter);
+	}
+	if (wait_on_kip)
+	{
+		GET_CUR_TIME(time_str);
+		util_out_print("!/MUPIP INFO: mu_int_maps: !AD : Done with kill-in-prog wait.", TRUE,
+			CTIME_BEFORE_NL, time_str);
+	}
 	mu_int_offset[0] = 0;
 	maps = (mu_int_data.trans_hist.total_blks + mu_int_data.bplmap - 1) / mu_int_data.bplmap;
 	local = mu_int_locals;
@@ -142,6 +173,66 @@ void mu_int_maps(void)
 			mapsize = (mu_int_data.trans_hist.total_blks - blkno);
 		disk_full = (NO_FREE_SPACE == bml_find_free(0, blk_base + SIZEOF(blk_hdr), mapsize));
 		agree = TRUE;
+		if (TREF(instance_frozen_crit_skipped))
+		{
+			/* Do a pre-check for comparison of bitmap on disk with that prepared by integ.
+			 * If there is a mismatch, then read the block from buffer.
+			 */
+			if (debug_mupip)
+				util_out_print("!/MUPIP INFO: mu_int_maps: 1st round of pre-check with block from Disk", TRUE);
+			for (lcnt = 0, dskmap_p = (uint_ptr_t)(blk_base + SIZEOF(blk_hdr)), lmap = (uint4 *)local;
+				lcnt < mapsize;
+				lcnt += SIZEOF(int4) * BITS_PER_UCHAR / BML_BITS_PER_BLK,
+				dskmap_p++, lmap++)  /* # of bits/ bits per blk */
+			{
+				GET_LONG(dskmap, dskmap_p);
+
+				if ((dskmap & SIXTEEN_BLKS_FREE) != *lmap)
+				{
+					if (debug_mupip)
+						util_out_print(
+							"!/MUPIP INFO: mu_int_maps: 1st precheck failed. retrying block in buffer",
+								TRUE);
+					if (free_blk_base);
+						free(free_blk_base);
+					free_blk_base = NULL;
+					buff_blk_base = mu_int_read_buffer(blkno, &ondsk_blkver, &free_blk_base);
+					break;
+				}
+			}
+			/* Do the precheck once more if the block is read from buffer. Determine which block to use further. */
+			if ((lcnt < mapsize) && buff_blk_base)
+			{
+				if (debug_mupip)
+					util_out_print(
+						"!/MUPIP INFO: mu_int_maps: Doing 2nd round of pre-check with block from Buffer",
+							TRUE);
+				for (lcnt = 0, dskmap_p = (uint_ptr_t)(buff_blk_base + SIZEOF(blk_hdr)), lmap = (uint4 *)local;
+					lcnt < mapsize;
+					lcnt += SIZEOF(int4) * BITS_PER_UCHAR / BML_BITS_PER_BLK,
+					dskmap_p++, lmap++)  /* # of bits/ bits per blk */
+				{
+					GET_LONG(dskmap, dskmap_p);
+
+					if ((dskmap & SIXTEEN_BLKS_FREE) != *lmap)
+					{
+						if (debug_mupip)
+							util_out_print(
+							"!/MUPIP INFO: mu_int_maps: precheck with Block from buffer also failed.",
+								TRUE);
+						break;
+					}
+				}
+				if (lcnt >= mapsize)
+				{
+					if (debug_mupip)
+						util_out_print("!/MUPIP INFO: mu_int_maps: Block from buffer succeeds precheck",
+										TRUE);
+					blk_base = buff_blk_base;
+				}
+			}
+		}
+		/* Continue with the block chosen above (always in blk_base) */
 		for (lcnt = 0, dskmap_p = (uint_ptr_t)(blk_base + SIZEOF(blk_hdr)), lmap = (uint4 *)local;
 			lcnt < mapsize;
 			lcnt += SIZEOF(int4) * BITS_PER_UCHAR / BML_BITS_PER_BLK,
@@ -186,8 +277,13 @@ void mu_int_maps(void)
 					mu_int_path[0] = blkno;
 					mu_int_plen = 1;
 					if (mu_map_errs < disp_map_errors)
+					{
+						if (TREF(instance_frozen_crit_skipped))
+							util_out_print(
+	"Instance Frozen. Please wait for the freeze to be lifted before verifying and, if necessary, fixing the following errors.",
+								 TRUE);
 						mu_int_err(ERR_DBLOCMBINC, 0, 0, 0, 0, 0, 0, level);
-					else
+					} else
 						mu_int_errknt++;
 				}
 				for (bcnt = 0;  bcnt < SIZEOF(int4) * BITS_PER_UCHAR / BML_BITS_PER_BLK;  bcnt++)
@@ -263,7 +359,8 @@ void mu_int_maps(void)
 			} else
 				mu_int_errknt++;
 		}
-		free(free_blk_base);
+		if (free_blk_base)
+			free(free_blk_base);
 	}
 	if (mu_map_errs >= disp_map_errors)
 	{

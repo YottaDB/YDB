@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2019 Fidelity National Information	*
+ * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -114,11 +114,14 @@ ZOS_ONLY(error_def(ERR_TEXT);)
 	ss_filhdr_ptr->ss_info.ss_shmsize = ss_shm_ptr->ss_info.ss_shmsize;			\
 }
 
-#define GET_CRIT_AND_DECR_INHIBIT_KILLS(REG, CNL)			\
-{									\
-	grab_crit(REG);							\
-	DECR_INHIBIT_KILLS(CNL);					\
-	rel_crit(REG);							\
+#define GET_CRIT_AND_DECR_INHIBIT_KILLS(REG, CNL)				\
+{										\
+	grab_crit(REG);								\
+	if (!(TREF(in_mupip_integ) && TREF(instance_frozen_crit_skipped)))	\
+	{									\
+		DECR_INHIBIT_KILLS(CNL);					\
+		rel_crit(REG);							\
+	}									\
 }
 
 #define SS_INIT_SHM(SS_SHMSIZE, SS_SHMADDR, SS_SHMID, RESIZE_NEEDED, RC)				\
@@ -222,7 +225,9 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 	block_id		tot_blks, ss_shmsize, prev_ss_shmsize, ss_shm_vbn;
 	void			*ss_shmaddr;
 	intrpt_state_t		prev_intrpt_state;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	assert(IS_MUPIP_IMAGE);
 	assert(NULL != calling_utility);
 	csa = &FILE_INFO(reg)->s_addrs;
@@ -449,7 +454,7 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 	{
 		final_retry = (MAX_TRY_FOR_TOT_BLKS == retries);
 		/* On all but the 4th retry (inclusive of retries = -1), release crit */
-		if (!final_retry)
+		if ((!final_retry) && (csa->now_crit))	/* In MUPIP INTEG and instance freeze, it is possible we don't have crit */
 			rel_crit(reg);
 		/*
 		 * Outside crit (on the final retry, we will be holding crit while calculating the below):
@@ -525,13 +530,11 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 		if (wait_for_zero_kip)
 		{	/* after inhibitting kills wait once for up to a minute; if that's insufficient, it's probably abandoned */
 			/* Release crit before going into the wait loop */
-			rel_crit(reg);
-			if (debug_mupip)
-			{
-				GET_CUR_TIME(time_str);
-				util_out_print("!/MUPIP INFO: !AD : Start kill-in-prog wait for database !AD", TRUE,
-					CTIME_BEFORE_NL, time_str, DB_LEN_STR(reg));
-			}
+			if (csa->now_crit)	/* In MUPIP INTEG and instance freeze, it is possible we don't have crit */
+				rel_crit(reg);
+			GET_CUR_TIME(time_str);
+			util_out_print("!/MUPIP INFO: !AD : Start kill-in-prog wait for database !AD", TRUE,
+				CTIME_BEFORE_NL, time_str, DB_LEN_STR(reg));
 			while (csd->kill_in_prog && (MAX_CRIT_TRY > crit_counter++))
 			{
 				GET_C_STACK_FOR_KIP(kip_pids_arr_ptr, crit_counter, MAX_CRIT_TRY, 1, MAX_KIP_PID_SLOTS);
@@ -557,7 +560,7 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 	 * that occurs henceforth should do a DECR_INHIBIT_KILLS and rel_crit before exiting to let the other processes
 	 * proceed gracefully
 	 */
-	assert(csa->now_crit);
+	assert((TREF(in_mupip_integ) && TREF(instance_frozen_crit_skipped)) || csa->now_crit);
 	assert(NULL != ss_shmaddr);
 	assert(0 == ((long)ss_shmaddr % OS_PAGE_SIZE));
 	assert(0 == ss_shmsize % OS_PAGE_SIZE);
@@ -600,21 +603,26 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 	/* ===================== STEP 5: Flush the pending updates in the global cache =================== */
 	/* For a readonly database for the current process, we cannot do wcs_flu. We would have waited for the active queues
 	 * to complete in mu_int_reg after doing a freeze. Now that we have crit, unfreeze the region
+	 * We can't do any of it If, however, we don't have crit (instance frozen, and we didn't wait for the freeze to be held off)
 	 */
-	if (reg->read_only)
+	if (!(TREF(in_mupip_integ) && TREF(instance_frozen_crit_skipped)))
 	{
-		region_freeze(reg, FALSE, FALSE, FALSE, FALSE, FALSE);
-	}
-	else if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_MSYNC_DB)) /* wcs_flu guarantees that all the pending
-								   * phase 2 commits are done with before returning */
-	{
-		assert(process_id != csd->freeze); /* We would not have frozen the region if the database is read-write */
-		gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4, LEN_AND_STR(calling_utility), DB_LEN_STR(reg));
-		GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
-		return FALSE;
+		if (reg->read_only)
+		{
+			region_freeze(reg, FALSE, FALSE, FALSE, FALSE, FALSE);
+		}
+		else if (!wcs_flu(WCSFLU_FLUSH_HDR | WCSFLU_WRITE_EPOCH | WCSFLU_MSYNC_DB)) /* wcs_flu guarantees that all the
+								   * pending phase 2 commits are done with before returning */
+		{
+			assert(process_id != csd->freeze); /* We would not have frozen the region if the database is read-write */
+			gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_BUFFLUFAILED, 4,
+							LEN_AND_STR(calling_utility), DB_LEN_STR(reg));
+			GET_CRIT_AND_DECR_INHIBIT_KILLS(reg, cnl);
+			return FALSE;
+		}
 	}
 	assert(0 < cnl->num_snapshots_in_effect || (!SNAPSHOTS_IN_PROG(cnl)));
-	assert(csa->now_crit);
+	assert((TREF(in_mupip_integ) && TREF(instance_frozen_crit_skipped)) || csa->now_crit);
 	/* ========== STEP 6: Copy the file header, master map and the native file size into a private structure =========== */
 	memcpy(util_ss_ptr->header, csd, SGMNT_HDR_LEN);
 	memcpy(util_ss_ptr->master_map, MM_ADDR(csd), MASTER_MAP_SIZE(csd));
@@ -662,7 +670,8 @@ boolean_t	ss_initiate(gd_region *reg,			/* Region in which snapshot has to be st
 	SHM_WRITE_MEMORY_BARRIER;
 	cnl->ss_shmcycle++;	/* indicate that the ss_shmid field of cnl is being reused */
 	lcl_ss_ctx->ss_shmcycle = cnl->ss_shmcycle;
-	rel_crit(reg);
+	if (csa->now_crit)	/* In MUPIP INTEG and instance freeze, it is possible we don't have crit */
+		rel_crit(reg);
 	if ((csa->onln_rlbk_cycle != csa->nl->onln_rlbk_cycle) || csa->nl->onln_rlbk_pid)
 	{	/* A concurrent online rollback happened since we did the gvcst_init. The INTEG is not reliable.
 		 * Cleanup and exit

@@ -1,0 +1,319 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;								;
+; Copyright (c) 2020 Fidelity National Information		;
+; Services, Inc. and/or its subsidiaries. All rights reserved.	;
+;								;
+;	This source code contains the intellectual property	;
+;	of its copyright holder(s), and is made available	;
+;	under a license.  If you do not know the terms of	;
+;	the license, please stop and do not read further.	;
+;								;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; The ^%JSWRITE utility routine converts a glv structure or a series of SET @ arguments to a string of JS objects.
+; The format of the ^%JSWRITE utility is:
+;
+; ^%JSWRITE(glvnode,[expr1,expr2])
+;
+; * glvnode specifies the string containing the subscripted/unsubscripted global or local variable name.
+;   When glvnode evaluates to an empty string ("") or there are no arguments, %JSWRITE considers all
+;   subscripted local variables in scope for conversion.
+; * If expr1 specifies "#", ^%JSWRITE returns JS objects of the entire tree starting from the glvnode
+;   till the end of the glv.
+; * If expr1 specifies "*", ^%JSWRITE returns JS objects for all nodes descending from the specified glv node.
+; * Specifying "*" and "#" together produces an error.
+; * Specifying [expr1], that is, with a leading "["and trailing "]", ^%JSWRITE displays the JSON objects in an
+;   array collection. Without [], you need to transform the object strings to the desired destination object format.
+; * If expr2 specifies "noglvname", ^%JSWRITE removes the first key containing the name of the glv root from the
+;   JS object output.
+; * The default $ETRAP for %JSWRITE is if (""=$etrap) new $etrap set $etrap="do errorobj"_"^"_$text(+0),$zstatus="".
+;   To override the default error handler, set $ETRAP to any non-empty value.
+; * When appropriate, enclose invocations of ^%JSWRITE in a TSTART/COMMIT boundary to prevent any blurred copy of the
+;   data that is actively updated.
+; * When appropriate, use GT.M alias containers to take appropriate local variables temporarily out of scope and then
+;   run the argumentless form of ^%JSWRITE.
+; * As %JSWRITE relies on the ZWRITE format of the data stored in the variables, it does not produce the
+;   BADCHAR run time error when it encounters malformed characters during processing.
+; Examples:
+;
+; GTM>set glvn="demodevtest(""Developer2"")"
+; GTM>do ^%JSWRITE(glvn,"*") ; JS Object Strings: All descendants of demodevtest("Developer2")
+; GTM>do ^%JSWRITE(glvn,"[*]") ; Array: All descendants of demodevtest("Developer2")
+; GTM>do ^%JSWRITE(glvn,"#"); JS Object Strings: All descendants of demodevtest starting from demodevtest("Developer2")
+; GTM>do ^%JSWRITE(glvn,"[#]"); Array: All descendants of demodevtest starting from demodevtest("Developer2")
+; $ $gtm_dist/mumps -r %XCMD 'ZWRITE ^demodevtest' | $gtm_dist/mumps -r STDIN^%JSWRITE
+;
+; Utility Label:
+; STDIN^%JSWRITE [singlesub]
+;
+; With the STDIN label, the %JSWRITE utility routine expects a valid SET @ argument (like the one from the ZWRITE command)
+; as its standard input over a named/unnamed pipe device and returns an array of objects. This construct ensures that
+; $ZUSEDSTOR remains consistently low even for processing large data for conversion. STDIN^%JSWRITE automatically terminates
+; the process with a non-zero exit status when it does not receive a READ terminator for 120 seconds from standard input.
+;
+; When "singlesub" is specified as an argument, ^%JSWRITE expects ZWRITE lines for single subscript glvs.
+; Here ^%JSWRITE implicitly removes the unsubscripted glv name and returns an array collection of objects in the
+; form of [{"key1":value,"key2":value,...},{"key1":value,"key2":value,...}] where:
+;
+; *    key1 is the subscript
+; *    value is the right side of the =.
+;
+; The subscript first received by STDIN^%JSWRITE singlesub denotes the start of the object. When ^%JSWRITE finds the
+; same subscript, it ends the current object boundary and starts the boundary of a new object.
+;
+; Example:
+;
+; $ $gtm_dist/mumps -r ^RTN
+; abc("firstname")="John"
+; abc("lastname")="Doe"
+; abc("firstname")="Jane"
+; abc("lastname")="Doe"
+; $ $gtm_dist/mumps -r ^RTN | $gtm_dist/mumps -r STDIN^%JSWRITE singlesub
+; [{"firstname":"John","lastname":"Doe"},
+; {"firstname":"Jane","lastname":"Doe"}]
+%JSWRITE(glvnode,expr2,expr3)
+	if (""=$etrap) new $etrap set $etrap="do errorobj"_"^"_$text(+0),$zstatus=""
+	new wantarray,traversalmethod,wantglvname,exprcode,isvalidexpr2
+	; exprcode	: a number from 0 to 7 each denoting the presence or absence of expressions
+	; isvalidexpr2	: whether expr2 (when specified) is valid
+	; traversalmethod can be * or #. The default is *.
+	; # returns JS object strings of the entire tree starting from the glvnode till the end of the glv.
+	; * returns JS object string for all nodes descending from the specified glv node.
+	; wantarray	: whether the request is for a JS array string
+	; wantglvname	: whether to include the glv name in the output
+	; set the defaults
+	set wantarray=1,traversalmethod="*",wantglvname=1,exprcode=0,isvalidexpr2=0
+	; find the exprcode of the user specified expressions
+	; 0: Nothing		4: expr3
+	; 1: glvnode		5: glvnode,expr3
+	; 2: expr2		6: expr2, expr3
+	; 3: glvnode, expr2	7: glvnode, expr2, expr3
+	if $data(glvnode),$increment(exprcode,1)
+	if $data(expr2),$increment(exprcode,2)
+	if $data(expr3),$increment(exprcode,4)
+	if ($select(2=exprcode:1,6=exprcode:1,1:0)) do  quit
+	. write $text(+0),@$piece($text(@("U274")),";",2)
+	if ($select(7=exprcode:1,5=exprcode:1,4=exprcode:1,1:0)),("noglvname"'=expr3),($length(expr3)) do  quit
+	. write $text(+0),@$piece($text(@("U276")),";",2),!
+	if ($select(7=exprcode:1,5=exprcode:1,4=exprcode:1,1:0)),(expr3="noglvname") set wantglvname=0
+	if ((0=exprcode)!(4=exprcode)) do navlv quit
+	set:(1=exprcode) expr2="*"
+	set:$select("[#]"=expr2:0,"[*]"=expr2:0,"*"=expr2:0,"#"=expr2:0,1:1) isvalidexpr2=1
+	if ($select(3=exprcode:1,7=exprcode:1,2=exprcode:1,6=exprcode:1,1:0)),isvalidexpr2 do  quit
+	. write $text(+0),@$piece($text(@("U275")),";",2)
+	set:("[#]"=expr2) wantarray=1,traversalmethod="#"
+	set:("[*]"=expr2) wantarray=1,traversalmethod="*"
+	set:("*"=expr2) wantarray=0,traversalmethod="*"
+	set:("#"=expr2) wantarray=0,traversalmethod="#"
+	do:("*"=traversalmethod) nodedescendants(glvnode)
+	do:("#"=traversalmethod) glvdescendants(glvnode)
+	quit
+nodedescendants(glvnode)
+	new startcomm
+	; startcomm	: whether to start comma; used in navvar(glvnode) when the request is for the array form
+	set startcomm=0
+	write:wantarray "["
+	do navvar(glvnode)   ; navigate the descendants of only the glvnode
+	write:wantarray "]"
+	quit
+navvar(glvnode)		;  uses $order() to navigate
+	new base,nextnode,status,type,x,y
+	; base		: The unsubscripted name
+	; nextnode	: The next node in glvnode to navigate
+	; status	: Status of zdata to determine whether we need recursion
+	; type		: g for global and s for subscript; set variables according to the type
+	; x & y		: counter type variable
+	; first determine whether the name is a global or a subscript
+	; g for global and s for subscript; set variables according to the type
+	if (glvnode=$qsubscript(glvnode,0)) set type="g",base=glvnode
+	else  set type="s",base=$qsubscript(glvnode,0),glvnode=$extract(glvnode,1,$length(glvnode)-1)_",",nextnode=glvnode
+	set x=""
+        for  do setnextnode set x=$order(@nextnode) quit:x=""  do
+	. do setnextnode
+	. set status=$data(@nextnode)
+	. do:(status#2)
+	. . write:startcomm&wantarray ",",!
+	. . write:startcomm&('wantarray) !
+	. . write $select(wantglvname:$$fmtglv(nextnode_"="_$zwrite(@nextnode)),1:$$fmtnoglv(nextnode_"="_$zwrite(@nextnode)))
+	. . set startcomm=1
+	. do:(10<=status) navvar(nextnode)  ; when nodes have data and need recursion
+	quit
+setnextnode 		; called from navvar
+	set:type="s" nextnode=glvnode_$zwrite(x)_")"
+	set:type="g" nextnode=base_"("_$zwrite(x)_")"
+	quit
+glvdescendants(glvnode) ; Entry point for travesal method #
+	new startcomm,zy
+	; startcomm	: whether to start comma
+	; zy		: the constructed zwrite line
+	write:wantarray "["
+	set startcomm=0
+	for  set glvnode=$query(@glvnode) quit:""=glvnode  do
+	. set zy=glvnode_"="_$zwrite($get(@glvnode))
+	. write:startcomm&wantarray ",",!
+	. write:startcomm&('wantarray) !
+	. write $select(wantglvname:$$fmtglv(zy),1:$$fmtnoglv(zy))
+	. set startcomm=1
+	write:wantarray "]"
+	quit
+errorobj ; the default error handler invoked when ""=$etrap
+	write "{'Error':"_"'"_$$escapehex($zstatus)_"'}"
+	set $ecode=""
+	quit
+navlv ; entry point for traversing across lv
+	new counter,glvnode,lv,lvc,lvname,more,x,y
+	; counter	: counter variable
+	; glvnode	: the name of the variable what needs conversion to JSON object collection
+	; lv		: target for ZSHOW:"V"
+	; lvc		: counter for the seconds subscript of lv
+	; lvname	: name of the glv
+	; more		: determines whether to follow the next node for more data. zshow "V":lv
+	;		  breaks output to chunk of 8192 bytes when data exceeds 8192 bytes. ;
+	; x,y		: counter type variables
+	zshow "V":lv
+	set counter=0,(glvnode(counter),x)=""
+	for  set x=$order(lv("V",x)) quit:""=x  do:'(lv("V",x)["$ZWRTAC")&("*"'=$extract(lv("V",x)))&(lv("V",x)["(")
+	. set more=x+1
+	. for  quit:'$zdata(lv("V",more))!(lv("V",more)["=")  do
+	. . set lv("V",x)=lv("V",x)_lv("V",more)
+	. . if $increment(more)
+	. write $select(wantglvname:$$fmtglv(lv("V",x)),1:$$fmtnoglv(lv("V",x))),!
+	quit
+fmtnoglv(zwriteline)	; For noglvname requests
+	new findeq,i,nxtlvl,qline,quote,value,varname
+	; findeq	: find result
+	; i		: counter variable
+	; nxtlvl	: next subscript
+	; qline		: output after running $qsubscript()
+	; quote		: quote value
+	; value		: value of the node as per zwrite line
+	; varname	: name of the variable as per the zwrite line
+	set findeq=$find(zwriteline,"="),varname=$extract(zwriteline,1,findeq-2),quote="'" ; same as fmtnoglv
+	set qline=""	;  omits the glv name as there is no need for the unsubsname
+	for i=1:1:$qlength(varname) do  ;we still have to across all subscripts even if we are not including the glv name
+	. set nxtlvl=$$escapehex($qsubscript(varname,i))
+	. if ('$length(qline)) set qline="{"_quote_nxtlvl_quote  ; this adds the { at the start of the object str
+	. else  set qline=qline_":{"_quote_nxtlvl_quote
+	set value=$extract(zwriteline,findeq,$length(zwriteline))
+	set:""""=$extract(value) value=$extract(value,2,$length(value)-1)
+	set quote=$$toquoteornot(value)
+	set qline=qline_":"_quote_$$escapehex(value)_quote_$tr($justify(" ",i)," ","}")
+	;need to remove leading and trailing characters and replace single quote with double quote
+	quit "{"_$translate($extract(qline,2,$length(qline)-1),"'","""")_"}"
+fmtglv(zwriteline) 	; For glvname requests.
+			; Both fmtglv and fmtnoglv use slightly different logic. They
+			; are seperate entry point to avoid unnecessary ifs.
+	new findeq,i,nxtlvl,qline,quote,value,varname
+	; findeq	: find the position of equal sign in zwrline
+	; i		: counter variable
+	; nxtlvl	: next subscript
+	; qline		: output after running $qsubscript()
+	; quote		: quote value
+	; value		: value of the node as per zwrite line
+	; varname	: name of the variable as per the zwrite line
+	set findeq=$find(zwriteline,"="),varname=$extract(zwriteline,1,findeq-2),quote="'" ; same as fmtglv
+	set qline="'"_$qsubscript(varname,0)_"'"	;  get the master node
+	for i=1:1:$qlength(varname) do
+	. set nxtlvl=$$escapehex($qsubscript(varname,i))
+	. set qline=qline_":{"_quote_nxtlvl_quote
+	set value=$extract(zwriteline,findeq,$length(zwriteline))
+	set:""""=$extract(value) value=$extract(value,2,$length(value)-1)
+	set quote=$$toquoteornot(value)
+	set qline=qline_":"_quote_$$escapehex(value)_quote_$translate($justify(" ",i)," ","}")
+	quit "{"_$tr(qline,"'","""")_"}"
+escapehex(value)	; escape characters that have a special meaning in Javascript runtime environments.
+			; First check whether there is anything to escape.
+	quit:$translate(value,$char(10,27,34,38,39,60,62,91,93,123,125),"")=value value
+ 	new asciicode,c,character,counter,javascriptStr,pos,ppos
+	; asciicode     : holds the ascii code of characters to escape
+	; c             : character code to escape
+	; character     : holds value of $char(asciicode) to prevent multiple invocations of $char(asciicode)
+	; counter       : counter type variable
+	; javascriptStr	: holds the value after escaping a character
+	; pos  		: position of the current occurrence of character in value
+	; ppos 		: position of previous occurrence of character in value
+	for asciicode=34,38,39,60,62,91,93,123,125 set character=$char(asciicode) do:value[character
+	. set ppos=1,pos=1,javascriptStr=""
+	. for  set pos=$find(value,character,pos) quit:'pos  do
+	. . set javascriptStr=javascriptStr_$extract(value,ppos,pos-2)_"\u"_$$FUNC^%DH(asciicode,4),ppos=pos
+	. set javascriptStr=javascriptStr_$extract(value,ppos,$length(value))
+	. set value=javascriptStr     ; assign the escaped string to value
+	quit value
+toquoteornot(val)  ; determine whether to quote a value or not.. ;
+	quit:((""=val)!("."=val)) "'"
+	quit:"{"=$extract(val) "" ; do not quote when the input is a {key:value} pair
+	quit $select(val?.N1".".N:"",val?.N:"",1:"'")
+STDIN ; Use as $gtm_dist/mumps -r %XCMD 'zwrite ^var' | $gtm_dist/mumps -r STDIN^%JSWRITE [singlesub]
+	new wantsinglesub,zcmdline
+	; wantsinglesub	: whether the request is for singlesub
+	; zcmdline	: lowercase of $zcmdline
+	if (""=$etrap) new $etrap set $etrap="do errorobj"_"^"_$text(+0),$zstatus=""
+	set wantsinglesub=0
+	set zcmdline=$$FUNC^%TRIM($$FUNC^%LCASE($zcmdline))
+	set:"singlesub"=zcmdline wantsinglesub=1
+	if "singlesub"'=zcmdline,$length(zcmdline) use $p write $text(+0),@$piece($text(@("U277")),";",2) zhalt 11
+	do stdinfmtglv:'wantsinglesub,stdinfmtsinglesub:wantsinglesub
+	quit
+stdinfmtsinglesub
+	new currsub,formattedstr,getsub,resetsub,start,io,zwriteline,zwrleft
+	; currsub	: current subscript
+	; formattedstr	: holding the result of $$fmtnoglv
+	; getsub	: flag to find the subscript of the glv
+	; resetsub	: the subscript that identifies the starting javascript object boundary
+	; start		: point of start of the javascript array
+	; zwriteline	: input value
+	; zwrleft	: left side of zwrline
+	set (getsub,start)=0,resetsub="",io=$io
+	write "["
+	for  use io do readfromstdin quit:$zeof  do:$length(zwriteline)
+	. use $principal
+	. set zwrleft=$piece(zwriteline,"=",1)
+	. set:'getsub resetsub=$qsubscript(zwrleft,1),currsub=resetsub,getsub=1
+	. set:getsub currsub=$qsubscript(zwrleft,1)
+	. set formattedstr=$$fmtnoglv(zwriteline)
+	. if ((currsub'=resetsub)!$qlength(zwrleft)=0) do
+	. . write:start ",",!
+	. . write formattedstr,!
+	. . set start=1
+	. else  do
+	. . if start,(currsub=resetsub) write "}"
+	. . write:start ",",!
+	. . write:(currsub=resetsub) "{"
+	. . write $extract(formattedstr,2,$length(formattedstr)-1)
+	. set start=1
+	use $principal
+	write "}]",!
+	quit
+readfromstdin ; reads from stdin. READ time out after 120 seconds.
+	read zwriteline:120
+	if '$test use $principal write $text(+0),@$piece($text(@("U278")),";",2) zhalt 12
+	quit
+stdinfmtglv
+	new io,start,zwrleft,zwrright
+	; io		: to hold the value for $io
+	; start		: When start=1, start placing commas
+	; zwrleft	: left side = of the zwriteline
+	; zwrright	: right side = of the zwriteline
+	set io=$io,start=0
+	use $principal
+	write "["
+	for  quit:$zeof  do
+	. use io do readfromstdin
+	. if $length(zwriteline) do
+	. . set zwrleft=$piece(zwriteline,"=",1)
+	. . use $principal
+	. . write:start ",",!
+	. . if 0=$qlength(zwrleft)  do
+	. . . set zwrright=$piece(zwriteline,"=",2)
+	. . . write "{""",$$escapehex(zwrleft),""":"
+	. . . write:""""=$extract(zwrright) """",$$escapehex($extract(zwrright,2,$length(zwrright)-1)),"""","}"
+	. . . write:""""'=$extract(zwrright) zwrright,"}"
+	. . . set start=1
+	. . else  write $$fmtglv(zwriteline) set start=1
+	use $principal
+	write "]",!
+	quit
+U274	;"-E-EXPR1NOTFOUND. No first expression specified. Specify the global or local variable node as the first expression."
+U275	;"-E-ILLEGALEXPR2. Illegal second expression--"_expr2_". Specify *, #, [*], or [#]."
+U276	;"-E-ILLEGALEXPR3. Illegal third expression--"_expr3_". Specify either an empty string or ""noglvname""."
+U277	;"-E-ILLEGALARG1. Illegal argument--"_$zcmdline_". Specify either ""singlesub"" or leave it blank."
+U278	;"-E-READTIMEOUT. Timeout occurred. STDIN did not receive a read terminator after 120 seconds."

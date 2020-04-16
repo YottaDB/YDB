@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -489,6 +489,10 @@ int expritem(oprtype *a)
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
+#	ifdef DEBUG
+	if (NULL != TREF(expr_start))
+		CHKTCHAIN(TREF(expr_start), exorder, FALSE);
+#	endif
 	assert(svn_index[26] == (SIZEOF(svn_names)/SIZEOF(nametabent)));
 	assert(SIZEOF(svn_names)/SIZEOF(nametabent) == SIZEOF(svn_data)/SIZEOF(svn_data_type)); /* are all SVNs covered? */
 	assert(fun_index[26] == (SIZEOF(fun_names)/SIZEOF(nametabent)));

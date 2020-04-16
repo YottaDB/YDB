@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2004-2019 Fidelity National Information	*
+ * Copyright (c) 2004-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,7 +70,6 @@ GBLREF	boolean_t	dollar_zquit_anyway;	/* if TRUE compile QUITs to not care wheth
 GBLREF	uint4		gtmDebugLevel; 		/* Debug level (0 = using default sm module so with
 						   a DEBUG build, even level 0 implies basic debugging) */
 GBLREF	boolean_t	gtmSystemMalloc;	/* Use the system's malloc() instead of our own */
-GBLREF	int4		gtm_fullblockwrites;	/* Do full (not partial) database block writes */
 GBLREF	boolean_t	certify_all_blocks;
 GBLREF	uint4		gtm_blkupgrade_flag;	/* controls whether dynamic block upgrade is attempted or not */
 GBLREF	boolean_t	gtm_dbfilext_syslog_disable;	/* control whether db file extension message is logged or not */
@@ -95,7 +94,6 @@ void	gtm_env_init(void)
 	mstr			val, trans;
 	uint4			tdbglvl, tmsock, reservesize, memsize, cachent, trctblsize, trctblbytes;
 	uint4			max_threads, max_procs;
-	int4			temp_gtm_strpllim;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -219,29 +217,6 @@ void	gtm_env_init(void)
 		gtm_tp_allocation_clue = (block_id)trans_numeric(&val, &is_defined, TRUE);
 		if (!is_defined)
 			gtm_tp_allocation_clue = (block_id)MAXTOTALBLKS_MAX;
-		/* Full Database-block Write mode */
-		val.addr = GTM_FULLBLOCKWRITES;
-		val.len = SIZEOF(GTM_FULLBLOCKWRITES) - 1;
-		gtm_fullblockwrites = (int)logical_truth_value(&val, FALSE, &is_defined);
-		if (!is_defined) /* Variable not defined */
-			gtm_fullblockwrites = DEFAULT_FBW_FLAG;
-		else if (!gtm_fullblockwrites) /* Set to false */
-			gtm_fullblockwrites = FALSE;
-		else /* Set to true, exam for FULL_DATABASE_WRITE */
-		{
-			gtm_fullblockwrites = trans_numeric(&val, &is_defined, TRUE);
-			switch(gtm_fullblockwrites)
-			{
-			case FULL_FILESYSTEM_WRITE:
-			case FULL_DATABASE_WRITE:
-				/* Both these values are valid */
-				break;
-			default:
-				/* Else, assume FULL_FILESYSTEM_WRITE */
-				gtm_fullblockwrites = FULL_FILESYSTEM_WRITE;
-				break;
-			}
-		}
 		/* GDS Block certification */
 		val.addr = GTM_GDSCERT;
 		val.len = SIZEOF(GTM_GDSCERT) - 1;
@@ -413,12 +388,6 @@ void	gtm_env_init(void)
 		gtm_mupjnl_parallel = trans_numeric(&val, &is_defined, TRUE);
 		if (!is_defined)
 			gtm_mupjnl_parallel = 1;
-		/* See if $gtm_string_pool_limit is set */
-		val.addr = GTM_STRPLLIM;
-		val.len = SIZEOF(GTM_STRPLLIM) - 1;
-		temp_gtm_strpllim = trans_numeric(&val, &is_defined, TRUE);
-		if (0 < temp_gtm_strpllim)
-			TREF(gtm_strpllim) = temp_gtm_strpllim;
 		/* gtm_nofflf for GTM-9136.  Default is FALSE */
 		val.addr = GTM_NOFFLF;
 		val.len = SIZEOF(GTM_NOFFLF) - 1;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -330,7 +330,7 @@ boolean_t t_commit_cleanup(enum cdb_sc status, int signal)
 		 * we need to revisit the commit logic and fix the error as we are past the point where we no longer can roll-back
 		 * the transaction.
 		 */
-		assert(0 == signal);
+		assert(signal || gtm_white_box_test_case_enabled);
 		send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DBCOMMITCLNUP, 6, process_id, process_id, signal, trstr,
 				DB_LEN_STR(xactn_err_region));
 		/* if t_ch() (a condition handler) was driving this routine, then doing send_msg() here is not a good idea

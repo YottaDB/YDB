@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2014 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -113,7 +114,7 @@ lvTree *lvtree_getslot(symval *sym)
 		}
 	}
 	assert(lvt);
-	DBGRFCT((stderr, ">> lvtree_getslot(): Allocating new lvTree at 0x"lvaddr" by routine 0x"lvaddr"\n", lvt, caller_id()));
+	DBGRFCT((stderr, ">> lvtree_getslot(): Allocating new lvTree at 0x"lvaddr" by routine 0x"lvaddr"\n", lvt, caller_id(0)));
 	return lvt;
 }
 
@@ -155,6 +156,6 @@ lvTreeNode *lvtreenode_getslot(symval *sym)
 	}
 	assert(lv);
 	DBGRFCT((stderr, ">> lvtreenode_getslot(): Allocating new lvTreeNode at 0x"lvaddr" by routine 0x"lvaddr"\n",
-			lv, caller_id()));
+			lv, caller_id(0)));
 	return lv;
 }

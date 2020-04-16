@@ -134,25 +134,27 @@
 
    A Global Directory looks like this:
 
-                                   *** TEMPLATES ***
+                                     *** TEMPLATES ***
                                                                              Std      Inst
                                                 Def      Rec   Key Null      Null     Freeze Qdb   Epoch              LOCK
     Region                                     Coll     Size  Size Subs      Coll Jnl on Err Rndwn Taper AutoDB Stats Crit
     ----------------------------------------------------------------------------------------------------------------------
-   <default>                                     0      256    64 NEVER     N    N   N      N     Y     N      Y     Sep
-    Segment          Active              Acc Typ Block      Alloc Exten Options
+    <default>                                     0      256    64 NEVER     N    N   N      N     Y     N      Y     Sep
+    Segment          Active              Acc Typ Block      Alloc Exten    Options
     ------------------------------------------------------------------------------
-   <default>         *                 BG  DYN  4096        100   100 GLOB =1024
-                                                                        LOCK =  40
-                                                                        RES  =   0
-                                                                        ENCR = OFF
-                                                                        MSLT =1024
-                                                                        DALL = YES
-                                                                        AIO  = OFF
-    <default>                            MM  DYN  4096        100   100 DEFER
-                                                                        LOCK =  40
-                                                                        MSLT =1024
-                                                                        DALL = YES
+    <default>          *                 BG  DYN  4096        100   100    GLOB =1024
+                                                                           LOCK =  40
+                                                                           RES  =   0
+                                                                           ENCR = OFF
+                                                                           MSLT =1024
+                                                                           DALL = YES
+                                                                           AIO  = OFF
+                                                                           FBWR =   0
+    <default>                            MM  DYN  4096        100   100    DEFER
+                                                                           LOCK =  40
+                                                                           MSLT =1024
+                                                                           DALL = YES
+                                                                           FBWR =   0
             *** NAMES ***
     Global                             Region
     ------------------------------------------------------------------------------
@@ -164,15 +166,16 @@
     -------------------------------------------------------------------------------------------------------------------------------------------
     DEFAULT                         DEFAULT                            0      256    64 NEVER     N    N   N      N     Y     N      Y     Sep
                                    *** SEGMENTS ***
-    Segment                         File (def ext: .dat)Acc Typ Block      Alloc Exten Options
-    -------------------------------------------------------------------------------------------
-    DEFAULT                         mumps.dat           BG  DYN  4096        100   100 GLOB=1024
-                                                                                       LOCK=  40
-                                                                                       RES =   0
-                                                                                       ENCR= OFF
-                                                                                       MSLT=1024
-                                                                                       DALL= YES
-                                                                                       AIO = OFF
+    Segment                         File (def ext: .dat)Acc Typ Block      Alloc Exten     Options
+    ----------------------------------------------------------------------------------------------
+    DEFAULT                         mumps.dat           BG  DYN  4096        100   100     GLOB=1024
+                                                                                           LOCK=  40
+                                                                                           RES =   0
+                                                                                           ENCR= OFF
+                                                                                           MSLT=1024
+                                                                                           DALL= YES
+                                                                                           AIO = OFF
+                                                                                           FBWR=   0
                                      *** MAP ***
       -  -  -  -  -  -  -  -  -  - Names -  -  - -  -  -  -  -  -  -
     From                            Up to                            Region / Segment / File(def ext: .dat)
@@ -1784,6 +1787,29 @@
    your choice for a database file as long as it is valid on your operating
    system.
 
+   -FU[LLBLKWRT]={0|1|2}
+
+   Determines whether GT.M writes only valid database blocks contents, or a
+   full block including meaningless trailing content. Full block writes are
+   more efficient with some secondary storage because they avoid
+   read-before-write.
+
+     o When -FULLBLKWRT=2, a process writes all newly allocated database
+       blocks in their entirety regardless of their actual valid contents.
+       This relieves some file systems from tracking as much unallocated
+       space and thus reduces file system metadata maintenance.
+     o When -FULLBLKWRT=1, a process writes entire file system blocks in
+       their entirety regardless of their actual valid contents, on some file
+       systems, this avoids reading in advance of most writes and thus
+       reduces file system load and increases response time.
+     o When -FULLBLKWRT=0 (the default), a process writes only valid data.
+       FIS advises using the same value of -FULLBLKWRT for all processes.
+
+   **Note**
+
+   When the file system block size and the database block size are the same
+   there is no difference between the settings of 1 and 2.
+
    -G[LOBAL_BUFFER_COUNT]=size
 
    Specifies the number of global buffers for a file. Global buffers reside
@@ -1924,6 +1950,8 @@
    |------------------------------+-----------+-----+-----------------------|
    | -F[ILE_NAME]=file-name       | mumps.dat | -   | 255                   |
    | (chars)                      |           |     |                       |
+   |------------------------------+-----------+-----+-----------------------|
+   | -FU[LLBLKWRT]={0|1|2}        | 0         | 0   | 2                     |
    |------------------------------+-----------+-----+-----------------------|
    | -G[LOBAL_BUFFER_COUNT]=size  | 1024      | 64  | 2,097,151*            |
    | (blocks)                     |           |     |                       |
@@ -2161,6 +2189,8 @@
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
    |-F[ILE_NAME]=file-name (chars)              |**     |1A     |255A/N                |-    |-    |X    |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
+   |-FU[LLBLKWRT]={0|1|2}                       |0      |0      |2                     |-    |-    |X    |
+   |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
    |-G[LOBAL_BUFFER_COUNT]=size(blocks)         |1,024  |64     |2,147,483,647 ***     |-    |-    |X    |
    |                                            |***    |       |                      |     |     |     |
    |--------------------------------------------+-------+-------+----------------------+-----+-----+-----|
@@ -2193,7 +2223,7 @@
 1 Copyright
    Copyright
 
-   Copyright 2019
+   Copyright 2020
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

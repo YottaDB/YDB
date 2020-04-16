@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 Fidelity National Information	*
+ * Copyright (c) 2017-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -52,6 +52,7 @@
 #define ZSYSTEM_FILTER			"ZSYSTEM_FILTER"
 #define PIPE_FILTER			"PIPE_FILTER"
 #define	RESTRICT_LIBRARY		"LIBRARY"
+#define	RESTRICT_LOGDENIALS		"LOGDENIALS"
 #define APD_ENABLE			"APD_ENABLE"
 #define MAX_READ_SZ			1024	/* Restrict Mnemonic shouldn't exceed this limit */
 #define MAX_FACILITY_LEN		64
@@ -63,7 +64,7 @@
 #define STRINGIFY(S)			#S
 #define BOUNDED_FMT(LIMIT,TYPE)		"%" STRINGIFY(LIMIT) TYPE
 #define FACILITY_FMTSTR			BOUNDED_FMT(MAX_FACILITY_LEN, "[A-Za-z0-9_]")
-#define GROUP_FMTSTR			BOUNDED_FMT(MAX_GROUP_LEN, "[A-Za-z0-9_^%]")
+#define GROUP_FMTSTR			BOUNDED_FMT(MAX_GROUP_LEN, "[A-Za-z0-9_^%.-]")
 /* Direct Mode Auditing options */
 #define	AUDIT_OPT_TLS			"TLS"
 #define	AUDIT_OPT_TLS_LEN		STR_LIT_LEN(AUDIT_OPT_TLS)
@@ -350,6 +351,9 @@ void restrict_init(void)
 							restrictions.zhalt_op = restrict_one;
 						else if (0 == STRNCASECMP(facility, RESTRICT_LIBRARY, SIZEOF(RESTRICT_LIBRARY)))
 							restrictions.library_load_path = restrict_one;
+						else if (0 == STRNCASECMP(facility, RESTRICT_LOGDENIALS,
+								SIZEOF(RESTRICT_LOGDENIALS)))
+							restrictions.logdenials = restrict_one;
 						else
 						{	/* Parse error - restrict everything */
 							send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_RESTRICTSYNTAX, 3,
@@ -379,6 +383,7 @@ void restrict_init(void)
 			restrictions.halt_op = TRUE;
 			restrictions.zhalt_op = TRUE;
 			restrictions.library_load_path = TRUE;
+			restrictions.logdenials = TRUE;
 		}
 	}
 	restrict_initialized = TRUE;
