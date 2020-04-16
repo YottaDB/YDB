@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -45,6 +45,7 @@
 #include "filestruct.h"		/* needed for jnl.h */
 #include "jnl.h"
 #include "tp_timeout.h"
+#include "stp_parms.h"
 #ifdef GTM_TRIGGER
 #include "gv_trigger.h"
 #endif
@@ -366,7 +367,8 @@ void op_svput(int varnum, mval *v)
 				 * is in process, allow the timeout to be recognized.
 				 */
 				if ((TREF(save_xfer_root)) &&
-				(((TREF(save_xfer_root))->set_fn == tptimeout_set) || ((TREF(save_xfer_root))->set_fn == ztimeout_set)))
+				(((TREF(save_xfer_root))->set_fn == tptimeout_set)
+					|| ((TREF(save_xfer_root))->set_fn == ztimeout_set)))
 				{
 					if ((tp_timeout_deferred || TREF(ztimeout_deferred)) && !dollar_zininterrupt)
 					{
@@ -477,11 +479,12 @@ void op_svput(int varnum, mval *v)
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_UNIMPLOP);
 #			endif
 		case SV_ZSTRPLLIM:
-			previous_gtm_strpllim = TREF(gtm_strpllim);
-			MV_FORCE_NUM(v);
-			TREF(gtm_strpllim) = MV_FORCE_INT(v);
-			if ((TREF(gtm_strpllim) <= 0) || (TREF(gtm_strpllim) >= previous_gtm_strpllim))
-				TREF(gtm_strpllimwarned) =  FALSE;
+			previous_gtm_strpllim = stringpool.strpllim;
+			stringpool.strpllim = MV_FORCE_INT(v);
+			if ((stringpool.strpllim <= 0) || (stringpool.strpllim >= previous_gtm_strpllim))
+				stringpool.strpllimwarned =  FALSE;
+			else if (STP_GCOL_TRIGGER_FLOOR > stringpool.strpllim)
+				stringpool.strpllim += STP_GCOL_TRIGGER_FLOOR;
 			break;
 		case SV_ZTIMEOUT:
 			check_and_set_ztimeout(v);

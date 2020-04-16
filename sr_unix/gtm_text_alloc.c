@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2017 Fidelity National Information	*
+ * Copyright (c) 2007-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -95,7 +95,7 @@ error_def(ERR_TRNLOGFAIL);
 #define DECR_SUM(x, y) {x -= y; assert(0 <= x);}
 #define SET_MAX(max, tst) max = MAX(max, tst)
 #define SET_ELEM_MAX(idx) SET_MAX(freeElemMax[idx], freeElemCnt[idx])
-#define CALLERID ((unsigned char *)caller_id())
+#define CALLERID ((unsigned char *)caller_id(0))
 #ifdef DEBUG
 #  define TRACE_TXTALLOC(addr,len) {if (GDL_SmTrace & ydbDebugLevel) \
  			FPRINTF(stderr, "TxtAlloc at 0x"lvaddr" of %ld bytes from 0x"lvaddr"\n", addr, len, CALLERID);}

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -326,7 +326,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	int			csd_size;
 	char                    now_running[MAX_REL_NAME];
 	boolean_t		is_gtm_shm, is_statsdb, rc_cpt_removed, statsDBexists;
-	boolean_t		glob_sec_init, db_shm_in_sync, remove_shmid, ftok_counter_halted;
+	boolean_t		glob_sec_init, db_shm_in_sync, remove_shmid, remove_mlk_shmid, ftok_counter_halted;
 	boolean_t		crypt_warning, do_crypt_init, need_statsdb_rundown;
 	boolean_t		baseDBrundown_status, statsDBrundown_status;
 	sgmnt_data_ptr_t	csd, tsd = NULL;
@@ -362,6 +362,7 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	gd_region		*statsDBreg, *save_ftok_sem_reg;
 	gd_segment		*statsDBseg;
 	jnl_buffer_ptr_t	jbp;
+	int			mlk_shmid;
 #	ifdef DEBUG
 	boolean_t		already_grabbed_ftok_sem = FALSE;
 #	endif
@@ -1281,6 +1282,8 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			cnl->in_crit = 0;
 			csa->now_crit = FALSE;
 			reg->open = TRUE;
+			if (csd->write_fullblk)
+				csa->fullblockwrite_len = get_fs_block_size(udi->fd);
 			if (rc_cpt_removed) /* reset RC values if we've rundown the RC CPT */
 				csd->rc_srv_cnt = csd->dsid = csd->rc_node = 0;
 			/* At this point we are holding standalone access and are about to invoke wcs_recover/wcs_flu. If
@@ -1373,13 +1376,24 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 			/* Write master-map (in addition to file header) as wcs_flu done above would not have updated it */
 			csd_size = SIZEOF_FILE_HDR(csd); 	/* SIZEOF(sgmnt_data) + master-map */
 			TREF(donot_write_inctn_in_wcs_recover) = FALSE;
+			/* Remove lock hash shared memory if needed */
+			if (remove_shmid && (INVALID_SHMID != csa->mlkctl->hash_shmid))
+			{
+				remove_mlk_shmid = TRUE;
+				mlk_shmid = csa->mlkctl->hash_shmid;
+			}
+			else
+				remove_mlk_shmid = FALSE;
+
 		} else
 		{	/* In this case, we just want to clear a few fields in the file header but we do NOT want to
 			 * write the master map which we don't have access to at this point so set csd_size accordingly.
 			 */
 			csd = tsd;
 			csd_size = tsd_size;	/* SIZEOF(sgmnt_data) */
+			remove_mlk_shmid = FALSE;	/* We don't have mlkctl to check, so just leave it. */
 		}
+
 		reg->open = FALSE;
 		/* If wcs_flu returned FALSE, it better be because of MUPIP RUNDOWN run with OVERRIDE qualifier. */
 		assert(wcs_flu_success || (override_present && !standalone));
@@ -1464,6 +1478,24 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 	/* Remove the shared memory only if it is a GT.M created one. */
 	if (is_gtm_shm)
 	{
+		if (remove_mlk_shmid)
+		{
+			if (0 != shm_rmid(mlk_shmid))
+			{
+				save_errno = errno;
+				if (!SHM_REMOVED(save_errno))
+				{
+					assert(FALSE);
+					RNDWN_ERR("!AD -> Error removing lock shared memory.", reg);
+					/* Fall through and attempt removing main shared memory */
+				}
+			} else
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SHMREMOVED, 3, mlk_shmid, DB_LEN_STR(reg));
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_SHMREMOVED, 3, mlk_shmid, DB_LEN_STR(reg));
+			}
+
+		}
 		if (remove_shmid) /* Note: remove_shmid is defined only if is_gtm_shm is TRUE */
 		{
 			if (0 != shm_rmid(udi->shmid))

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -117,6 +117,14 @@ void alloc_reg(void)
 					x->operand[1].oprclass = NO_REF;
 				}
 				break;
+			case OC_PASSTHRU:
+				COMPDBG(PRINTF(" *** OC_PASSTHRU opcode being NOOP'd\n"););
+				remove_backptr(x, &x->operand[0], tempcont);
+				x->opcode = OC_NOOP;
+				x->operand[0].oprclass = NO_REF;
+				assert(NO_REF == x->operand[1].oprclass);
+				assert(NO_REF == x->destination.oprclass);
+				continue;
 			case OC_STO:
 				/* If we are storing a literal e.g. s x="hi", don't call op_sto, because we do not
 				 * need to check if the literal is defined.  OC_STOLIT will be an in-line copy.
@@ -135,6 +143,7 @@ void alloc_reg(void)
 			default:
 				break;
 		}
+<<<<<<< HEAD
 		if (OC_PASSTHRU == opc)
 		{
 			COMPDBG(PRINTF(" *** OC_PASSTHRU opcode being NOOP'd\n"););
@@ -144,6 +153,8 @@ void alloc_reg(void)
 			assert((NO_REF == x->operand[1].oprclass) || (TRIP_REF == x->operand[1].oprclass));
 			continue;
 		}
+=======
+>>>>>>> f33a273c... GT.M V6.3-012
 		if (NO_REF == (dest_type = x->destination.oprclass))	/* Note assignment */
 		{
 			oct = oc_tab[opc].octype;

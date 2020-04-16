@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -59,7 +59,7 @@ GBLREF	int			pool_init;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
 GBLREF	jnlpool_addrs_ptr_t	jnlpool_head;
 GBLREF	recvpool_addrs		recvpool;
-GBLREF	gd_region		*ftok_sem_reg;
+
 #ifdef DEBUG
 GBLREF	boolean_t		is_jnlpool_creator;
 error_def(ERR_TEXT);
@@ -134,29 +134,18 @@ void gv_rundown(void)
 #	endif
 	for (jnlpool = jnlpool_head; jnlpool; jnlpool = jnlpool->next)
 		jnlpool_detach();
-	/* Clean up any left-over ftok semaphores. This part of the code can be reached by almost all of the exit handling routines.
-	 * If the ftok semaphore is grabbed, but not released, ftok_sem_reg will have a non-null value and grabbed_ftok_sem will be
-	 * TRUE. We cannot rely on gv_cur_region always as it is used in so many places in so many ways.
-	 * Note: Typically, it should suffice to check for ftok_sem_reg being non-null and pass that to ftok_sem_release. But, there
-	 * are some cases where ftok_sem_reg can be NULL and yet jnlpool->jnlpool_dummy_reg is non-null and the process holds an
-	 * ftok semaphore. For instance, if GT.M opened a particular region and then did a jnlpool_init which ended up with an
-	 * rts_erro (after obtaining the ftok semaphore on jnlpool_dummy_reg), gds_rundown done above (to rundown the database) sets
-	 * ftok_sem_reg to NULL (as part of ftok_sem_release). But, jnlpool_dummy_reg is still non-null and the lingering ftok
-	 * should be released. So, even though a subset of the below conditions should be enough, we check for all there cases just
-	 * to be safe.
+	/* Once upon a time this used ftok_sem_reg to release a possibly still held semaphore, but attempts to do that exploded if
+	 * the region was closed because the structures needed by FILE_INFO had been released; this could happen due to bypass. So
+	 * this approach was relegated to the mists of time on the theory that gds_rundown did the best it could with the semaphores
+	 * and, if bypass was involved, some required operational action will deal with them. We still check for possible remaining
+	 * replication journal pool semaphores and deal with those.
 	 * Note that we use FALSE for the decr_cnt parameter (2nd parameter) to "ftok_sem_release". This is to avoid incorrect
 	 * removal of the ftok semaphore in case the counter is down to 1 but there are processes which did not bump the counter
 	 * (due to the counter overflowing) that are still accessing the semaphore. Even though we don't decrement the counter,
 	 * the SEM_UNDO will take care of doing the actual decrement when this process terminates. The only consequence is
-	 * we will not be removing the ftok semaphore when the last process to use it dies (requiring a mupip rundown to clean
-	 * it up). But that is considered okay since these are abnormal exit conditions anyways and hopefully unlikely in practice.
+	 * we don't remove the ftok semaphore when the last process to use it dies, requiring mupip rollback/recover/rundown to
+	 * clean it up. But that is considered okay because these are unclean exit conditions with that documented requirement.
 	 */
-	if (ftok_sem_reg)
-	{
-		udi = FILE_INFO(ftok_sem_reg);
-		assert(udi->grabbed_ftok_sem);
-		ftok_sem_release(ftok_sem_reg, FALSE, TRUE);
-	}
 	for (jnlpool = jnlpool_head; jnlpool; jnlpool = jnlpool->next)
 		if (jnlpool->jnlpool_dummy_reg && jnlpool->pool_init)
 		{

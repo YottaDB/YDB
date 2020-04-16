@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -61,6 +61,8 @@ boolean_t resolve_optimize(triple *curtrip)
 		{
 			if (source_line == cur_line->line)
 			{	/* this just spits out a warning */
+				if (!(cmd_qlf.qlf & CQ_WARNINGS))
+					break;
 				src_line = TREF(source_buffer);
 				TREF(source_buffer) = cur_line->str;
 				TREF(last_source_column) = curtrip->src.column;

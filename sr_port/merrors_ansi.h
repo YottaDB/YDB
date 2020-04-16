@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD:sr_port/merrors_ansi.h
  * Copyright (c) 2001-2022 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2020 Fidelity National Information 	*
+>>>>>>> f33a273c... GT.M V6.3-012:sr_i386/merrors_ansi.h
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.*
@@ -1545,4 +1549,5 @@ const static readonly int error_ansi[] = {
 	   0,	/* MUKEEPNOTRUNC */
 	   0,	/* MUTRUNCNOSPKEEP */
 	   0,	/* TERMHANGUP */
+	   0,	/* DBFILNOFULLWRT */
 	};

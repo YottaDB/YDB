@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -120,10 +120,13 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				ver_spec[MAX_DB_VER_LEN + 1];
 	enum db_acc_method	access, access_new;
 	enum db_ver		desired_dbver;
+	uint4                   fbwsize;
+	int4			dblksize;
 	gd_region		*temp_cur_region;
 	int			asyncio_status, defer_allocate_status, defer_status, disk_wait_status, encryptable_status,
 				encryption_complete_status, epoch_taper_status, extn_count_status, fd, fn_len, glbl_buff_status,
 				gtmcrypt_errno, hard_spin_status, inst_freeze_on_error_status, key_size_status, locksharesdbcrit,
+<<<<<<< HEAD
 				lock_space_status, mutex_space_status, null_subs_status, qdbrundown_status, read_only_status,
 				rec_size_status, reg_exit_stat, reorg_sleep_nsec_status, rc, rsrvd_bytes_status, save_errno,
 				sleep_cnt_status, spin_sleep_status, stats_status, status, status1, stdnullcoll_status,
@@ -131,6 +134,16 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_flush_trigger, new_hard_spin,
 				new_key_size, new_lock_space, new_mutex_space, new_null_subs, new_rec_size, new_sleep_cnt,
 				new_spin_sleep, new_stdnullcoll, new_wrt_per_flu, reserved_bytes;
+=======
+				lock_space_status, mutex_space_status, null_subs_status, qdbrundown_status, rec_size_status,
+				reg_exit_stat, rc, rsrvd_bytes_status, sleep_cnt_status, save_errno, stats_status, status,
+				status1, stdnullcoll_status, trigger_flush_limit_status, wrt_per_flu_status,
+				full_blkwrt_status;
+	int4			defer_time, new_cache_size, new_disk_wait, new_extn_count, new_flush_trigger, new_hard_spin,
+				new_key_size, new_lock_space, new_mutex_space, new_null_subs, new_rec_size, new_sleep_cnt,
+				new_spin_sleep, new_stdnullcoll, new_wrt_per_flu, reserved_bytes, spin_sleep_status,
+				read_only_status, new_full_blkwrt;
+>>>>>>> f33a273c... GT.M V6.3-012
 	sgmnt_data_ptr_t	csd, pvt_csd;
 	tp_region		*rptr, single;
 	unsigned short		acc_spec_len = MAX_ACC_METH_LEN, ver_spec_len = MAX_DB_VER_LEN;
@@ -211,6 +224,24 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 		} else
 		{
 			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("EXTENSION COUNT"));
+			exit_stat |= EXIT_ERR;
+		}
+	}
+	if (full_blkwrt_status = cli_present("FULLBLKWRT"))
+	{
+		if (cli_get_int("FULLBLKWRT", &new_full_blkwrt))
+		{
+			/* minimum is 0 & mupip_cmd defines this qualifier to not accept negative values, so no min check */
+			if (new_full_blkwrt > FULL_DATABASE_WRITE)
+			{
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_MUPIPSET2BIG, 4, new_full_blkwrt,
+					LEN_AND_LIT("FULLBLKWRT"), 2);
+				exit_stat |= EXIT_ERR;
+			}
+			need_standalone = TRUE;
+		} else
+		{
+			gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_SETQUALPROB, 2, LEN_AND_LIT("FULLBLKWRT"));
 			exit_stat |= EXIT_ERR;
 		}
 	}
@@ -737,6 +768,14 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 				DO_CLNUP_AND_SET_EXIT_STAT(exit_stat, reg_exit_stat);
 				continue;
 			}
+			if (full_blkwrt_status)
+			{
+				fbwsize = get_fs_block_size(fd);
+				dblksize = pvt_csd->blk_size;
+				if (0 != fbwsize && (0 == dblksize % fbwsize) &&
+						(0 == (BLK_ZERO_OFF(pvt_csd->start_vbn)) % fbwsize))
+					pvt_csd->write_fullblk = new_full_blkwrt;
+			}
 			csd = pvt_csd;
 		} else /* if (!need_standalone) */
 		{
@@ -973,9 +1012,30 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 			if (wrt_per_flu_status)
 				util_out_print("Database file !AD now has writes per flush !UL",
 					TRUE, fn_len, fn, csd->n_wrt_per_flu);
+<<<<<<< HEAD
                         if (reorg_sleep_nsec_status)
 				util_out_print("Database file !AD now has reorg sleep nanoseconds !UL",
                                         TRUE, fn_len, fn, csd->reorg_sleep_nsec);
+=======
+			if (full_blkwrt_status)
+			{
+				switch(csd->write_fullblk)
+				{
+					case 0:
+						util_out_print("Database file !AD now has full blk writes: !AD",
+							TRUE, fn_len, fn, LEN_AND_LIT("disabled"));
+						break;
+					case 1:
+						util_out_print("Database file !AD now has full blk writes: !AD",
+							TRUE, fn_len, fn, LEN_AND_LIT("file system block writes"));
+						break;
+					case 2:
+						util_out_print("Database file !AD now has full blk writes: !AD",
+							TRUE, fn_len, fn, LEN_AND_LIT("full DB block writes"));
+						break;
+				}
+			}
+>>>>>>> f33a273c... GT.M V6.3-012
 			if (got_standalone)
 			{
 				DB_LSEEKWRITE(NULL, ((unix_db_info *)NULL), NULL, fd, 0, pvt_csd, SIZEOF(sgmnt_data), status);
@@ -988,6 +1048,7 @@ int4 mupip_set_file(int db_fn_len, char *db_fn)
 					util_out_print("Database file !AD not changed: ", TRUE, fn_len, fn);
 					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_DBRDERR, 2, fn_len, fn);
 				}
+
 				if (defer_status && (dba_mm == pvt_csd->acc_meth))
 					util_out_print("Database file !AD now has defer_time set to !SL",
 							TRUE, fn_len, fn, pvt_csd->defer_time);

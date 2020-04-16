@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -145,6 +145,7 @@ error_def(ERR_NOSPACECRE);
 error_def(ERR_PARNORMAL);
 error_def(ERR_PREALLOCATEFAIL);
 error_def(ERR_RAWDEVUNSUP);
+error_def(ERR_DBFILNOFULLWRT);
 
 /* Condition handler primarily to handle ERR_MEMORY errors by cleaning up the file that we created
  * before passing on control to higher level condition handlers.
@@ -185,6 +186,8 @@ unsigned char mu_cre_file(void)
 	sgmnt_addrs	*baseDBcsa;
 	struct stat	stat_buf;
 	struct perm_diag_data	pdd;
+	uint4		fbwsize;
+	int4		dblksize;
 	ZOS_ONLY(int	realfiletag;)
 	DCL_THREADGBL_ACCESS;
 
@@ -352,6 +355,42 @@ unsigned char mu_cre_file(void)
 		REVERT;
 		return EXIT_ERR;
 	}
+	cs_data->write_fullblk = gv_cur_region->dyn.addr->full_blkwrt;
+	if (cs_data->write_fullblk)
+        {       /* We have been asked to do FULL BLOCK WRITES for this database. On *NIX, attempt to get the filesystem
+                 * blocksize from statvfs. This allows a full write of a blockwithout the OS having to fetch the old
+                 * block for a read/update operation. We will round the IOs to the next filesystem blocksize if the
+                 * following criteria are met:
+                 *
+                 * 1) Database blocksize must be a whole multiple of the filesystem blocksize for the above
+                 *    mentioned reason.
+                 *
+                 * 2) Filesystem blocksize must be a factor of the location of the first data block
+                 *    given by the start_vbn.
+                 *
+                 * The saved length (if the feature is enabled) will be the filesystem blocksize and will be the
+                 * length that a database IO is rounded up to prior to initiation of the IO.
+                 */
+                fbwsize = get_fs_block_size(udi->fd);
+                dblksize = seg->blk_size;
+                if (0 == fbwsize || (0 != dblksize % fbwsize) || (0 != (BLK_ZERO_OFF(cs_data->start_vbn)) % fbwsize))
+		{
+                        cs_data->write_fullblk = 0;         /* This region is not fullblockwrite enabled */
+			if (!IS_STATSDB_REGNAME(gv_cur_region))
+			{
+				if (!fbwsize)
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_DBFILNOFULLWRT, 5,
+					LEN_AND_LIT("Could not get native filesize"),
+					LEN_AND_LIT("File size extracted: "), fbwsize);
+				else if (0 != dblksize % fbwsize)
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_DBFILNOFULLWRT, 5,
+					LEN_AND_LIT("Database block size not a multiple of file system block size\n"),
+					LEN_AND_LIT("DB blocks size: "), dblksize);
+			}
+		}
+                /* Report this length in DSE even if not enabled */
+                cs_addrs->fullblockwrite_len = fbwsize;              /* Length for rounding fullblockwrite */
+        }
 	cs_data->trans_hist.total_blks = gv_cur_region->dyn.addr->allocation;
 	/* There are (bplmap - 1) non-bitmap blocks per bitmap, so add (bplmap - 2) to number of non-bitmap blocks
 	 * and divide by (bplmap - 1) to get total number of bitmaps for expanded database. (must round up in this

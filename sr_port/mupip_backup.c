@@ -637,6 +637,30 @@ void mupip_backup(void)
 				mubclnup(rptr, need_to_del_tempfile);
 				mupip_exit(ERR_FILENAMETOOLONG);
 			}
+<<<<<<< HEAD
+=======
+			/* GTM-9182 : If there's just enough space for the temp filepath, BUT NOT for the backup filepath, backup
+			 *  succeeds even though the full pathname of backup file exceeds MAX_FN_LEN. This should NOT be allowed.
+			 * This check is not required for backup files having full pathnames
+			 */
+			for (index=0; index < file->len; index++)
+			{
+				if ('/' == file->addr[index])
+					break;
+			}
+			if ((index >= file->len) && (MAX_FN_LEN < (tempdir_full.len + file->len)))
+			{
+				tempdir_trans.addr[tempdir_trans.len] = '/';
+				tempdir_trans.len++;
+				memcpy(&tempdir_trans.addr[tempdir_trans.len], file->addr, file->len);
+				tempdir_trans.len += file->len;
+				gtm_putmsg_csa(CSA_ARG(cs_addrs) VARLSTCNT(4) ERR_FILEPARSE, 2, tempdir_trans.len,
+						tempdir_trans.addr);
+				mubclnup(rptr, need_to_del_tempfile);
+				mupip_exit(ERR_FILENAMETOOLONG);
+			}
+			SNPRINTF(tempfilename + tempdir_full.len, MAX_FN_LEN - tempdir_full.len, "/%s_XXXXXX", tempnam_prefix);
+>>>>>>> f33a273c... GT.M V6.3-012
 			MKSTEMP(tempfilename, rptr->backup_fd);
 			if (FD_INVALID == rptr->backup_fd)
 			{

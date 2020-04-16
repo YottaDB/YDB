@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -46,8 +46,8 @@ GBLREF	volatile int4		crit_count;
 GBLREF	short			crash_count;
 GBLREF	uint4 			process_id;
 GBLREF	node_local_ptr_t	locknl;
-#ifdef DEBUG
 GBLREF	jnlpool_addrs_ptr_t	jnlpool;
+#ifdef DEBUG
 GBLREF	jnl_gbls_t		jgbl;
 #endif
 GBLREF	boolean_t		mupip_jnl_recover;
@@ -90,6 +90,13 @@ void	grab_crit(gd_region *reg)
 			LONG_SLEEP(1);
 		FPRINTF(stderr, "MUPIP BACKUP resumed in grab_crit\n");
 		cnl->wbox_test_seq_num = 3;
+	}
+#	endif
+#	ifdef underconstruction
+	if (TREF(in_mupip_integ) && IS_REPL_INST_FROZEN && !TREF(integ_cannotskip_crit))
+	{
+		TREF(instance_frozen_crit_skipped) = TRUE;
+		return;
 	}
 #	endif
 	assert(!csa->hold_onto_crit);

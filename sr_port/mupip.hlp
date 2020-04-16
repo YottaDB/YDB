@@ -2945,31 +2945,36 @@
 2 RESTORE
    RESTORE
 
-   Integrates one or more BACKUP -BYTESTREAM files into a corresponding
-   database. The transaction number in the first incremental backup must be
-   one more than the current transaction number of the database. Otherwise,
-   MUPIP RESTORE terminates with an error.
+   Incrementally restores the output of the BACKUP -BYTESTREAM to a database
+   file at the backup location.
 
    The format of the RESTORE command is:
 
-   RE[STORE] [-NET[TIMEOUT]] [-[NO]E[XTEND]] file-name bytestrm-bkup-list
+   RE[STORE] [-NET[TIMEOUT]] [-[NO]E[XTEND]] dbfile bytestream-bkup-list|<TCP_socket_address>
 
-     o file-name identifies the name of the database file that RESTORE uses
-       as a starting point.
-     o bytestrm-bkup-list specifies one or more bytestream backup files
-       (generated with BACKUP -BYTESTREAM) to RESTORE into the database file
-       specified with file-name. The file-list are separated by commas (,)
-       and must be in sequential order, from the oldest transaction number to
-       the most recent transaction number. RESTORE may take its input from a
-       UNIX file on any device that supports such files.
+     o dbfile identifies the name of the database file that RESTORE uses as a
+       starting point.
+     o When BACKUP -BYTESTREAM directs the output to disks or pipes,
+       bytestream-bkup-list specifies a comma (,) seperated list of one or
+       more bytestream files to RESTORE into the database file specified with
+       file-name. The list and must be in sequential order, from the oldest
+       transaction number to the most recent transaction number.
+       bytestream-bkup-listmay also include a list of pipe commands.
 
-       bytestrm-bkup-list may also include a comma separated list of pipe
-       commands or TCP socket addresses (a combination of IPv4 or IPV6
-       hostname and a port number) from where MUPIP RESTORE receives
-       bytestream backup files (produced with BACKUP -BYTESTREAM).
+       <TCP_socket_address> specifies a combination of IPv4 or IPV6 hostname
+       and a port number (for example, tcp://hostname1:portno) for which
+       RESTORE sets up a listening process to restore the bytestream data
+       from an active BACKUP -BYTESTREAM process to the database file. In
+       both these cases:
 
-     o The current transaction number in the database must match the starting
-       transaction number of each successive input to the RESTORE.
+          o The transaction number in the first incremental backup must be
+            one more than the current transaction number of the database.
+            Otherwise, the integrity checking mechanism of MUPIP RESTORE
+            produces an error.
+          o You can incrementally restore BACKUP -BYTESTREAM data from either
+            a TCP stream or multiple bytestream files to only one database
+            file with one MUPIP RESTORE command.
+
      o If the BACKUP -BYTESTREAM was created using -TRANSACTION=1, create a
        new database with MUPIP CREATE and do not access it, except the
        standalone MUPIP commands INTEG -FILE, EXTEND, and SET before
@@ -3009,6 +3014,23 @@
 
    This command uses a pipe to restore gtm.dat since its last DATABASE backup
    from the bytestream backup stored in online5pipe.inc.gz.
+
+   $ mupip backup -bytestream region1,region2 tcp://hostname1:port1,tcp://hostname1:port2 -nettimeout=420
+
+   This command starts a MUPIP process waiting for a listening MUPIP RESTORE
+   processes to send bytestream data of region1 and region2.
+
+   $ mupip restore region1.dat tcp://hostname1:port1 -nettimeout=420
+
+   This command start a TCP listening process to receive the bytstream data
+   from region1 of the previous MUPIP BACKUP -BYTSTREAM command.
+
+   $ mupip restore region2.dat tcp://hostname1:port2 -nettimeout=420
+
+   This command start a TCP listening process to receive the bytstream data
+   from region2 of the previous MUPIP BACKUP -BYTSTREAM command. Note that
+   you cannot start RESTORE for region2 before the backup of region1
+   completes.
 
 2 RUNDOWN
    RUNDOWN
@@ -3145,6 +3167,7 @@
     -ENCRYPTI[ONCOMPELTE]
     -EX[TENSION_COUNT]=integer(no of blocks)
     -F[LUSH_TIME]=integer
+    -FU[LLBLKWRT]={0|1|2}
     -G[LOBAL_BUFFERS]=integer
     -H[ARD_SPIN_COUNT]=integer
     -[NO]INST[_FREEZE_ON_ERROR]
@@ -3336,6 +3359,30 @@
    qualifier is:
 
    -F[LUSH_TIME]=[[[HOURS:]MINUTES:]SECONDS:]CENTISECONDS
+
+3 FUllblkwrt
+   FUllblkwrt
+
+   Determines whether GT.M writes only valid database blocks contents, or a
+   full block including meaningless trailing content. Full block writes are
+   more efficient with some secondary storage because they avoid
+   read-before-write. The format of the FULLBLKWRT qualifier is:
+
+   -FU[LLBLKWRT]={0|1|2}
+
+     o When -FULLBLKWRT=2, a process writes all newly allocated database
+       blocks in their entirety regardless of their actual valid contents.
+       This relieves some file systems from tracking as much unallocated
+       space and thus reduces file system metadata maintenance.
+     o When -FULLBLKWRT=1, a process writes entire file system blocks in
+       their entirety regardless of their actual valid contents, on some file
+       systems, this avoids reading in advance of most writes and thus
+       reduces file system load and increases response time.
+     o When -FULLBLKWRT=0 (the default), a process writes only valid data.
+       FIS advises using the same value of -FULLBLKWRT for all processes.
+
+   Note that when the file system block size and the database block size are
+   the same there is no difference between the settings of 1 and 2.
 
 3 Global_buffers
    Global_buffers
@@ -3831,11 +3878,15 @@
 
    global-name-list can be:
 
-     o A comma separated list of global variables.
+     o A comma separated list of global variables. For example,
+       -select='^a,^x)'
+     o Global variables may be subscripted. For example,
+       -select='^g1(""""a"""")'. Note that string subscripts require
+       sufficient quotes to make it though the shell parsing to reach MUPIP.
      o A range of global variables denoted by start:end syntax. For example,
-       -select="g1:g4".
-     o A global variable with wildcards, for example, "g*" (the name must be
-       escaped to avoid shell filename expansion)
+       -select='^g1:^g4(""""c"""")'.
+     o A global variable with wildcards, for example, -select='^g*'. Note the
+       name must be escaped to avoid shell filename expansion.
      o "*" to select all global variables.
 
    -Region
@@ -3847,7 +3898,7 @@
 
    Examples:
 
-   $ mupip size -heuristic="impsample,samples=2000" -select="y*" -region="AREG"
+   $ mupip size -heuristic="impsample,samples=2000" -select='^y*' -region="AREG"
 
    This example estimates the size of all global variable starting with "y".
    It uses importance sampling with 2000 samples on the region AREG.
@@ -3857,7 +3908,7 @@
    This example counts the number of blocks and records at 1 level below the
    root of the database tree.
 
-   $ mupip size -heuristic="arsample" -select="g1:g3"
+   $ mupip size -heuristic="arsample" -select='^g1:^g3'
 
    This example estimates the size of global variables g1, g2 and g3 using
    accept/reject sampling with the default number of samples regardless of
@@ -8581,7 +8632,13 @@ Example:
    |           |                |-E[XTENSION_COUNT]=integer(no of blocks)             |        |
    |-----------+----------------+-----------------------------------------------------|--------|
    |           |                |-F[LUSH_TIME]=integer                                |        |
+<<<<<<< HEAD
    |-----------+----------------+-----------------------------------------------------|--------|
+=======
+   |-----------+----------------+-----------------------------------------------------+--------|
+   |           |                |-FU[LLBLKWRT]={0|1|2}                                |V6.3-012|
+   |-----------+----------------+-----------------------------------------------------+--------|
+>>>>>>> f33a273c... GT.M V6.3-012
    |           |                |-G[LOBAL_BUFFERS]=integer                            |        |
    |-----------+----------------+-----------------------------------------------------|--------|
    |           |                |-H[ARD_SPIN_COUNT]=integer                           |V6.3-003|
@@ -9008,7 +9065,7 @@ Example:
 1 Copyright
    Copyright
 
-   Copyright 2019
+   Copyright 2020
 
    Fidelity National Information Services, Inc. and/or its subsidiaries. All
    rights reserved.

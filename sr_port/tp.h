@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -394,7 +394,7 @@ typedef struct trans_restart_hist_struct
 	this_restart_hist->t_tries = t_tries;								\
 	this_restart_hist->dollar_tlevel = dollar_tlevel;						\
 	this_restart_hist->retry_code = RETRY_CODE;							\
-	this_restart_hist->call_from = (caddr_t)caller_id();						\
+	this_restart_hist->call_from = (caddr_t)caller_id(0);						\
 	if ((NULL != jnlpool) && (NULL != jnlpool->jnlpool_ctl))						\
 		this_restart_hist->seq_or_tn.jnl_seqno = jnlpool->jnlpool_ctl->jnl_seqno;		\
 	else												\

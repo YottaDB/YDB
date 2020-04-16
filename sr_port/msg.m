@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2001-2019 Fidelity National Information		;
+; Copyright (c) 2001-2020 Fidelity National Information		;
 ; Services, Inc. and/or its subsidiaries. All rights reserved.	;
 ;								;
 ; Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	;
@@ -131,16 +131,40 @@
  . . Write !,comment,!,"      ^-----^",!,"Expected: a mnemonic starting with ERR_",!
  . Set undocmnemonic(undocmsgcnt)=$Extract(comment,i1,i2-2)
  For  Use in Quit:$ZEOF  Read msg Do:$Extract(msg,1)?1u
- . New delim,i1,lomsg
+ . new delim,i1,lomsg,flag,mtail,mhead,msgsav
  . Set cnt=cnt+1 If cnt>4095 Do  Quit
  . . Use $Principal Write !!,"Message file format error in ",in,":"
  . . Write !,"Cannot process more than 4095 messages."
  . . Write !,"Overflow occurred at:",!,msg
  . ; Expect a line like:
- . ; MNEMONIC <error message text>/severity/fao=###!/ansi=###/integ-id ! comment
+ . ; MNEMONIC <error message text>/severity/fao=###!/ansi=###/integ-id/flag ! comment
  . ;   or:
- . ; MNEMONIC "error message text"/severity/fao=###!/ansi=###/integ-id ! comment - integ-id is currently optional
-  . For i1=1:1 Quit:$Extract($TRanslate(msg,$Char(9)," "),i1)=" "
+ . ; MNEMONIC "error message text"/severity/fao=###!/ansi=###/integ-id/flag ! comment - integ-id is currently optional
+ . ; as is flag, but if flag is present integ-id must also be, at least as an empty (//) field.
+ . ;
+  . For i1=1:1 Quit:" "=$Extract($TRanslate(msg,$Char(9)," "),i1)
+    . ; We want to start by parsing our msg from the right, so we can strip off the new flag field
+    . ; before moving on to the code which does not understand that.
+    . ; There are four cases for integ & flag:
+    . ;   0 no integ / no flag   ie: "ansi=0$"
+    . ;   1 no integ / flag      ie: "ansi=0//1$"
+    . ;   2 integ    / no flag   ie: "ansi=0/A$"
+    . ;   3 integ    / flag      ie: "ansi=0/A/1$"
+    . ; Cases 0 & 2 are handled by falling into the pre-flag code, so we only care about cases 1 & 3 where
+    . ; we extract the flag and patch the message string to pull off the info the pre-flag code doesn't parse.
+    . set flag=0 ; default
+    . set msgsav=msg
+    . if $length(msg,"//")=2 set flag=$piece(msg,"//",2),msg=$piece(msg,"//",1) ; Case 1
+    . do:$length($piece(msg,"ansi=",2),"/")=3 ; Case 3
+    . . set mhead=$piece(msg,"ansi=",1),mtail=$piece(msg,"ansi=",2),flag=$piece(mtail,"/",3)
+    . . set msg=mhead_"ansi="_$piece(mtail,"/",1)_"/"_$piece(mtail,"/",2)
+    . . quit
+ . Do:(7<flag)!(0>flag)
+ . . Use $Principal Write !!,"Message file format error in ",in,":"
+ . . Write !,"Error message specification:",!,msgsav
+ . . Write !,"Bad flag ("_flag_") encountered: ",msgsav,!
+ . . zhalt 1
+ . . Quit
  . Set outmsg(cnt)=$Extract(msg,1,i1-1)
  . For i1=i1:1 Quit:$Extract(msg,i1)="<"  Quit:$Extract(msg,i1)=""""
  . Set text=""""
@@ -193,7 +217,7 @@
  . . Write !,"Error message specification:",!,msg
  . . Write !,"Format item count (fao) not specified."
  . . Quit
- . Set outmsg(cnt,"code")=(facnum+2048)*65536+((cnt+4096)*8)+severity
+ . Set outmsg(cnt,"code")=(flag*268435456)+((facnum+2048)*65536)+((cnt+4096)*8)+severity
  . For msgcnt=1:1:undocmsgcnt  If outmsg(cnt)=undocmnemonic(msgcnt)  Set undocmnemonic(msgcnt,"code")=cnt-1 Quit
  . If 'vms Use out Write $Char(9),"{ """,outmsg(cnt),""", ",text,", ",fao,", ",ival(ival)," },",!
  . If ansiopen,ansi="none" Set ansi=0 ; Make !/ansi= specification optional (except for first one)

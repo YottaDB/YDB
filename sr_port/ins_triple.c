@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,13 +17,9 @@
 
 void ins_triple(triple *x)
 {
-	triple	*y;
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
-	/* Need to pass a temporary variable "y" (instead of "curtchain->exorder.bl") to the dqins macro as it will
-	 * otherwise result in incorrect queue insertion.
-	 */
-	y = (TREF(curtchain))->exorder.bl;
-	dqins(y,exorder,x);
+	dqnoop(TREF(curtchain));
+	dqrins(TREF(curtchain), exorder, x);
 }

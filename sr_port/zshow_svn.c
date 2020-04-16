@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -296,7 +296,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_HOROLOG:
-			op_horolog(&var);
+			op_zhorolog(&var, FALSE);
 			ZS_VAR_EQU(&x, horolog_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
@@ -548,7 +548,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZHOROLOG:
-			op_zhorolog(&var);
+			op_zhorolog(&var, TRUE);
 			ZS_VAR_EQU(&x, zhorolog_text);
 			mval_write(output, &var, TRUE);
 			if (SV_ALL != one_sv)
@@ -745,7 +745,7 @@ void zshow_svn(zshow_out *output, int one_sv)
 				break;
 		/* CAUTION: fall through */
 		case SV_ZSTRPLLIM:
-			count = TREF(gtm_strpllim);
+			count = stringpool.strpllim;
 			MV_FORCE_MVAL(&var, count);
 			ZS_VAR_EQU(&x, zstrpllim_text);
 			mval_write(output, &var, TRUE);

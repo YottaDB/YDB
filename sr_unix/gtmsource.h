@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2018 Fidelity National Information	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
@@ -704,7 +704,7 @@ void		gtmsource_free_msgbuff(void);
 void		gtmsource_free_tcombuff(void);
 int		gtmsource_changelog(void);
 int		gtmsource_checkhealth(void);
-int		gtmsource_comm_init(void);
+int		gtmsource_comm_init(boolean_t print_addresolve_error);
 int		gtmsource_ctl_close(void);
 int		gtmsource_ctl_init(void);
 int		gtmsource_jnlpool(void);

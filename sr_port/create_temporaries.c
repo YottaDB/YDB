@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2018 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -98,7 +98,7 @@ void create_temporaries(triple *sub, opctype put_oc)
 			s1->operand[0] = *sb1;
 			*sb1 = put_tref(s1);
 			s0 = s0->exorder.fl;
-			dqins(s0->exorder.bl, exorder, s1);
+			dqrins(s0, exorder, s1);
 		}
 		sb1 = &sub->operand[1];
 		sub = sb1->oprval.tref;		/* second env */
@@ -112,7 +112,7 @@ void create_temporaries(triple *sub, opctype put_oc)
 			s1->operand[0] = *sb1;
 			*sb1 = put_tref(s1);
 			s0 = s0->exorder.fl;
-			dqins(s0->exorder.bl, exorder, s1);
+			dqrins(s0, exorder, s1);
 		}
 		sb1 = &sub->operand[1];
 		sub = sb1->oprval.tref;		/* global name */
@@ -133,7 +133,7 @@ void create_temporaries(triple *sub, opctype put_oc)
 			s1->operand[0] = *sb1;
 			*sb1 = put_tref(s1);
 			s0 = s0->exorder.fl;
-			dqins(s0->exorder.bl, exorder, s1);
+			dqrins(s0, exorder, s1);
 		}
 		sb1 = &sub->operand[1];
 	}

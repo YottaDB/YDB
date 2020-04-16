@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -70,10 +70,17 @@ gd_addr *create_dummy_gbldir(void)
 #	endif
 
 	/* The below code might need corresponding changes if ever the gld format changes hence the GDE_LABEL_LITERAL assert */
+<<<<<<< HEAD
 	GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX113"));)
 	NON_GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX013"));)
 	addr = (gd_addr *)malloc(DUMMY_GBLDIR_SIZE + SIZEOF(gd_runtime_t));
 	memset(addr, 0, DUMMY_GBLDIR_SIZE + SIZEOF(gd_runtime_t));
+=======
+	GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX114"));)
+	NON_GTM64_ONLY(assert(!MEMCMP_LIT(GDE_LABEL_LITERAL, "GTCGBDUNX014"));)
+	addr = (gd_addr *)malloc(DUMMY_GBLDIR_SIZE);
+	memset(addr, 0, DUMMY_GBLDIR_SIZE);
+>>>>>>> f33a273c... GT.M V6.3-012
 	addr->max_rec_size = 256;
 	addr->maps = (gd_binding *)((UINTPTR_T)addr + SIZEOF(gd_addr));
 	addr->var_maps_len = DUMMY_GBLDIR_VAR_MAP_SIZE;

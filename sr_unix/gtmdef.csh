@@ -1,11 +1,16 @@
 #################################################################
 #								#
+<<<<<<< HEAD
 # Copyright 2001, 2011 Fidelity Information Services, Inc	#
 #								#
 # Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
+=======
+# Copyright (c) 2001-2020 Fidelity National Information		#
+# Services, Inc. and/or its subsidiaries. All rights reserved.	#
+>>>>>>> f33a273c... GT.M V6.3-012
 #								#
 #	This source code contains the intellectual property	#
 #	of its copyright holder(s), and is made available	#
@@ -34,29 +39,22 @@
 #
 ##############################################################
 
-if ("OS/390" != `uname -s`) then
-	setenv	gtm_gtmdev 	"/usr"		# List of directories containing subdirectories named gtm_topdir which
-else
-	setenv	gtm_gtmdev 	"/gtm"		# List of directories containing subdirectories named gtm_topdir which
-endif
-						# may contain GT.M releases.  "NULL" => subdirectory is home of library
-set	gtm_gtmdev_lcl = ( $gtm_gtmdev )	# Note: this must be a shell variable in order to use subscripts
-						# (see below).
+# The below are defined for backward compatibility. Can be removed once V63011 and prior versions are gone
+setenv	gtm_gtmdev 	"/usr"
+setenv	gtm_topdir	library
+###############################
 
-setenv	gtm_topdir	library			# name of top subdirectory that may contain release subdirectories
-
-setenv	gtm_root	$gtm_gtmdev_lcl[1]/$gtm_topdir	# location of development directory tree
+if (! $?gtm_root) setenv gtm_root /usr/library	# location of development directory tree
 setenv	gtm_com		$gtm_root/com		# location of GT.M csh scripts
 
 source	$gtm_com/versions.csh			# establish the environment variables:
 						#	gtm_curpro (current production release name)
 						#	gtm_verno (current active release name)
 
-set vernam=$gtm_gtmdev_lcl[1]/$gtm_topdir/$gtm_verno
+set vernam=$gtm_root/$gtm_verno
 
-#	Note that gtm_ver and gtm_vrt have identical values on Unix.
-#	On VMS one is a "normal" logical value and the other is "concealed".
 setenv	gtm_ver		$vernam
+<<<<<<< HEAD
 setenv	gtm_vrt		$vernam			# /translate=(concealed) on VMS
 
 setenv	gtm_tools	$gtm_vrt/tools
@@ -64,11 +62,17 @@ setenv	gtm_inc		$gtm_vrt/inc
 
 ####### source	$gtm_tools/synch_env_version.csh	# set up dependent environment variables
 
+=======
+setenv	gtm_vrt		$gtm_ver		# Set only because prior versions need it. Should not be used post V63011
+setenv	gtm_tools	$gtm_ver/tools
+setenv	gtm_inc		$gtm_ver/inc
+setenv	gtm_pro		$gtm_ver/pro		# production version
+setenv	gtm_bta		$gtm_ver/bta		# beta test version
+setenv	gtm_dbg		$gtm_ver/dbg		# debug version
+setenv	gtm_tools	$gtm_ver/tools		# version-controlled GT.M csh scripts
+>>>>>>> f33a273c... GT.M V6.3-012
 setenv	gtm_exe		$gtm_dbg		# the active version (initially debug)
-setenv	gtmsrc_last_exe	$gtm_exe		# initial value for use by gtmsrc.csh
+setenv	gtmsrc_last_exe	$gtm_exe		# Set only because prior versions need it. Should not be needed post V63011
 
-#
-# 	establish default gtmroutines
-#
 setenv	gtmroutines	". $gtm_exe"
 

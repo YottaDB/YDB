@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -321,8 +321,8 @@ void bx_boolop(triple *t, boolean_t jmp_type_one, boolean_t jmp_to_next, boolean
 		dqins(ref1, exorder, ref2);
 		ref0->opcode = OC_PASSTHRU;				/* turn original OC_COMVAL/OC_COMINT into an OC_PASSTHRU */
 		ref0->operand[0] = put_tref(ref2);
-		TRACK_JMP_TARGET(ref0, ref2);					/*  also track it, in case it's a jump target */
-		TRACK_JMP_TARGET(ref2, ref2);					/* ??? not sure about this line */
+		TRACK_JMP_TARGET(ref0, ref2);					/* also track it, in case it's a jump target */
+		TRACK_JMP_TARGET(ref2, ref2);					/* without this there can be a gap in jmplist */
 		if ((OCT_JUMP & oc_tab[(ref1 = bfini->exorder.bl)->opcode].octype)	/* WARNING assignment */
 				&& (INDR_REF == ref1->operand[0].oprclass) && (NO_REF == ref1->operand[0].oprval.indr->oprclass))
 		{	/* unresolved JMP around BOOLFINI goes to OC_COMVAL/OC_COMINT */

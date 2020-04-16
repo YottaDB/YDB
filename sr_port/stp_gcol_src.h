@@ -1013,10 +1013,12 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 			expansion_failed = FALSE;	/* will be set to TRUE by condition handler if can't get memory */
 			assert((stp_incr + stringpool.top - stringpool.base) >= (space_needed + blklen));
 			DBGSTPGCOL((stderr, "incr_factor=%i stp_incr=%i space_needed=%i\n", *incr_factor, stp_incr, space_needed));
-			if ((TREF(gtm_strpllimwarned)) /* previously warned */
-				&& (0 < TREF(gtm_strpllim)) /* watching a stp limit */
-				&& ((stp_incr + stringpool.top - stringpool.base) > TREF(gtm_strpllim))) /* expanding larger */
-					rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STPOFLOW);
+			if ((stringpool.strpllimwarned) /* previously warned */
+				&& ((stp_incr + stringpool.top - stringpool.base) > stringpool.strpllim)) /* expanding larger */
+			{
+				assert(0 < stringpool.strpllim);	/* must have been watching stp limit */
+				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STPOFLOW);
+			}
 			expand_stp((ssize_t)(stp_incr + stringpool.top - stringpool.base));
 #			ifdef DEBUG
 			/* If expansion failed and stp_gcol_ch did an UNWIND and we were already in exit handling code,
@@ -1129,12 +1131,12 @@ void stp_gcol(size_t space_asked)	/* BYPASSOK */
 		lvmon_pull_values(2);				/* Pull values of monitored vars into index 2 */
 		lvmon_compare_value_slots(1, 2);		/* Make sure they are the same */
 	}
-#	endif	/* !STP_MOVE */
-	if ((0 < TREF(gtm_strpllim)) /* monitoring stp limit */
-		&& ((stringpool.top - stringpool.base) > TREF(gtm_strpllim))) /* past the stp limit */
+	if ((0 < stringpool.strpllim && !stringpool.strpllimwarned) /* monitoring stp limit and no prior warned */
+		&& ((stringpool.top - stringpool.base) > stringpool.strpllim)) /* past the stp limit */
 	{
-		TREF(gtm_strpllimwarned) =  TRUE;
+		stringpool.strpllimwarned =  TRUE;
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_STPCRIT);
 	}
+	#	endif	/* !STP_MOVE */
 	return;
 }

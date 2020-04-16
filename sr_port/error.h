@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -39,16 +39,32 @@ typedef struct err_ctl_struct
 
 #define ERROR_RETURN		error_return
 
+/* The message id is a 32 bit number encoded as:
+ *   0ggg1fffffffffff1ccccccccccccsss
+ *   33222222222211111111110000000000
+ *   10987654321098765432109876543210
+ * Where:
+ *   ggg 		Are 3 fla'g' bits
+ *   fffffffffff	Is an 11 bit unsigned number denoting the 'f'acility
+ *   cccccccccccc       Is a 12 bit unsigned number denoting the ordinal 'c'ount value of the message within the facility
+ *   sss                Is a 3 bit unsigned number denoting the message 's'everity
+ *
+ *   Currently the only flag value defined is 001 to denote that the error should be syslogged (GTM-7759)
+ *   It would be possible to define one more flag bit, but probably something would break if a message id
+ *   mapped to a negative integer.
+ */
 #define FCNTL		1
 #define MSGCNTL		27
 #define MSGFAC		16
 #define MSGNBIT		15
 #define MSGSEVERITY	3
 #define MSGNUM		3
+#define MSGMUSTLOG	1
 
 #define FACMASK(fac)		(FCNTL << MSGCNTL | 1 << MSGNBIT | (fac) << MSGFAC)
-#define MSGMASK(msg,fac)	(((msg) & ~FACMASK(fac)) >> MSGSEVERITY)
+#define MSGMASK(msg,fac)	(((msg & 0x0FFFFFFF) & ~FACMASK(fac)) >> MSGSEVERITY)
 #define SEVMASK(msg)		((msg) & 7)
+#define MSGFLAG(msg)		((msg & 0x70000000) >> 28)
 
 /* to change default severity of msg to type */
 #define MAKE_MSG_TYPE(msg, type)  ((msg) & ~SEV_MSK | (type))

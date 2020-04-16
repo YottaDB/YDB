@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -46,8 +46,9 @@ MBSTART {						\
 		rts_error_csa MSGPARMS;			\
 } MBEND
 
-GBLREF gd_region	*gv_cur_region;
-GBLREF sgmnt_addrs	*cs_addrs;
+GBLREF gd_region		*gv_cur_region;
+GBLREF sgmnt_addrs		*cs_addrs;
+GBLREF sgmnt_data_ptr_t        cs_data;
 
 error_def(ERR_AUTODBCREFAIL);
 error_def(ERR_FILECREERR);
@@ -65,7 +66,7 @@ void mucblkini(void)
 	bp1 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
 	bp2 = (blk_hdr_ptr_t)malloc(cs_addrs->hdr->blk_size);
 	bmpsize = BM_SIZE(cs_addrs->hdr->bplmap);
-	if (cs_addrs->do_fullblockwrites)
+	if (cs_data->write_fullblk)
 		bmpsize = (int4)ROUND_UP(bmpsize, cs_addrs->fullblockwrite_len);
 	bmp = (uchar_ptr_t)malloc(bmpsize);
 	DB_LSEEKREAD(udi, udi->fd, (off_t)BLK_ZERO_OFF(cs_addrs->hdr->start_vbn), bmp, bmpsize, status);

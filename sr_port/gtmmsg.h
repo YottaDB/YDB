@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -41,7 +41,7 @@ GBLREF	boolean_t	multi_thread_in_use;		/* TRUE => threads are in use. FALSE => n
 # define GET_MSG_IDX(MSG_ID, CTL, IDX)										\
 {														\
 	assert(NULL != CTL);											\
-	assert((MSG_ID && FACMASK(CTL->facnum)) && (MSGMASK(MSG_ID, CTL->facnum) <= CTL->msg_cnt));		\
+	assert(((MSG_ID & 0x0FFFFFFF) & FACMASK(CTL->facnum)) && (MSGMASK(MSG_ID, CTL->facnum) <= CTL->msg_cnt));		\
 	IDX = MSGMASK(MSG_ID, CTL->facnum) - 1;									\
 }
 

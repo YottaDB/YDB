@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -98,7 +98,7 @@ boolean_t ss_write_block(sgmnt_addrs *csa,
 		size = SIZEOF(blk_hdr);
 	else if (size > blk_size)
 		size = blk_size;
-	if (csa->do_fullblockwrites)
+	if (csd->write_fullblk)
 		size = ROUND_UP(size, csa->fullblockwrite_len);
 	assert(size <= ss_shm_ptr->ss_info.db_blk_size);
 	/* If the database is encrypted, the old_block will be in the encrypted twin buffer. Logic similar to the one

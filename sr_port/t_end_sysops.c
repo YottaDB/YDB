@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2007-2019 Fidelity National Information	*
+ * Copyright (c) 2007-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -193,7 +193,7 @@ void fileheader_sync(gd_region *reg)
 	flush_len = SGMNT_HDR_LEN;
 	if (0 <= high_blk)					/* If not negative, flush at least one master map block */
 		flush_len += ((high_blk / csd->bplmap / DISK_BLOCK_SIZE / BITS_PER_UCHAR) + 1) * DISK_BLOCK_SIZE;
-	if (csa->do_fullblockwrites)
+	if (csd->write_fullblk)
 	{	/* round flush_len up to full block length. This is safe since we know that
 		 * fullblockwrite_len is a factor of the starting data block - see gvcst_init_sysops.c
 		 */
@@ -962,8 +962,13 @@ enum cdb_sc	bg_update_phase1(cw_set_element *cs, trans_num ctn, sgm_info *si)
 	/* Take backup of block in phase2 (outside of crit). */
 	cs->cr = cr;		/* note down "cr" so phase2 can find it easily (given "cs") */
 	/* If this is the first time the the database block has been written, we must write
+<<<<<<< HEAD
 	 * the entire database block if ydb_fullblockwrites = 2 */
 	/* Note that the check for ydb_fullblockwrites happens when we decide to write the block,
+=======
+	 * the entire database block if csd->write_fullblk = 2 */
+	/* Note that the check for csd->write_fullblk happens when we decide to write the block,
+>>>>>>> f33a273c... GT.M V6.3-012
 	 * not here; so if the block is new, mark as needing first write */
 	if (WAS_FREE(cs->blk_prior_state))
 		cs->cr->needs_first_write = TRUE;

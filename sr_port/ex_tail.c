@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -77,7 +77,7 @@ void ex_tail(oprtype *opr, int depth)
 	t1 = bool_return_leftmost_triple(t);
 	bitrip = maketriple(OC_BOOLINIT);
 	DEBUG_ONLY(bitrip->src = t->src);
-	dqins(t1->exorder.bl, exorder, bitrip);
+	dqrins(t1, exorder, bitrip);
 	t2 = t->exorder.fl;
 	assert((OC_COMVAL == t2->opcode) || (OC_COMINT == t2->opcode));
 	assert(&t2->operand[0] == opr);				/* check next operation ensures an expression */

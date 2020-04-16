@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -493,7 +493,7 @@ void mu_extract(void)
 			MEMCPY_LIT(outptr, BIN_HEADER_LABEL);
 			outptr += STR_LIT_LEN(BIN_HEADER_LABEL);
 		}
-		op_horolog(&val);
+		op_zhorolog(&val, FALSE);
 		op_fnzdate(&val, (mval *)&mu_bin_datefmt, &null_str, &null_str, &val);
 		memcpy(outptr, val.str.addr, val.str.len);
 		outptr += val.str.len;
@@ -621,7 +621,7 @@ void mu_extract(void)
 		op_val.str.len = label_len;
 		op_val.str.addr = zwr_go_label_buff;
 		op_write(&op_val);
-		op_horolog(&val);
+		op_zhorolog(&val, FALSE);
 		op_fnzdate(&val, &datefmt, &null_str, &null_str, &val);
 		op_val = val;
 		op_val.mvtype = MV_STR;

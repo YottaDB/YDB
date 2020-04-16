@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2019 Fidelity National Information		#
+# Copyright (c) 2001-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
@@ -150,12 +150,12 @@ set cmdfile="$gtm_log/buildaux_$$"
 rm -f $cmdfile $cmdfile.err
 set outlist = ""
 set dollar = '$'
-set err_check = "if (${dollar}status) touch $cmdfile.err"
+echo "alias err_check 'if (${dollar}status) echo BUILDAUX-E-FAIL : Failed from \\!:1 >>&! '$cmdfile'.err'" >> $cmdfile.csh
 if ($do_buildshr) then
 	set outfile = "${cmdfile}_buildshr.log"
 	set redir=">& $outfile"
 	set outlist = "$outlist $outfile"
-	echo "($gtm_tools/buildshr.csh $1 $2 ${gtm_root}/$1/$2; $err_check) $redir &" >> $cmdfile.csh
+	echo "($gtm_tools/buildshr.csh $1 $2 ${gtm_root}/$1/$2; err_check buildshr.csh) $redir &" >> $cmdfile.csh
 endif
 
 if (! $skip_auxillaries) then
@@ -168,7 +168,7 @@ if (! $skip_auxillaries) then
 		if ($do_buildshr) then
 			echo "wait"									>> $cmdfile.csh
 		endif
-		echo "($gtm_tools/buildaux_gde.csh $gt_image; $err_check) $redir &"			>> $cmdfile.csh
+		echo "($gtm_tools/buildaux_gde.csh $gt_image; err_check buildaux_gde.csh) $redir &"	>> $cmdfile.csh
 	endif
 	set double_quote = '"'
 	set args3 = "$gt_image ${double_quote}${gt_ld_options}${double_quote} $3"
@@ -181,7 +181,7 @@ if (! $skip_auxillaries) then
 			set outfile = "${cmdfile}_buildaux_${exe}.log"
 			set redir=">& $outfile"
 			set outlist = "$outlist $outfile"
-			echo "($gtm_tools/buildaux_${exe}.csh $args3; $err_check) $redir $bg"		>> $cmdfile.csh
+			echo "($gtm_tools/buildaux_${exe}.csh $args3; err_check buildaux_${exe}.csh) $redir $bg" >> $cmdfile.csh
 		endif
 	end
 	# Create the plugin directory, copy the files and set it up so that build.sh can build the needed libraries.
@@ -189,7 +189,7 @@ if (! $skip_auxillaries) then
 		set outfile = "${cmdfile}_buildaux_gtmcrypt.log"
 		set redir=">& $outfile"
 		set outlist = "$outlist $outfile"
-		echo "($gtm_tools/buildaux_gtmcrypt.csh $gt_image; $err_check) $redir &"		>> $cmdfile.csh
+		echo "($gtm_tools/buildaux_gtmcrypt.csh $gt_image; err_check buildaux_gtmcrypt.csh) $redir &"	>> $cmdfile.csh
 	endif
 endif
 
@@ -204,16 +204,18 @@ rm $outlist
 
 if ($stat) then
 	cat $cmdout
+	echo "buildaux-E-$cmdfile.csh : Failed executing $cmdfile.csh"
 	@ buildaux_status++
-else
-	rm $cmdfile.csh
-	rm $cmdout
 endif
 
-if (-e $cmdfile.err) then
+if (-s $cmdfile.err) then
 	cat $cmdfile.err
-	rm -f $cmdfile.err
+	echo "buildaux-E-err : $cmdfile.err found. A script in $cmdfile.csh failed"
 	@ buildaux_status++
+else
+	if (-e $cmdfile.err) rm $cmdfile.err
+	rm $cmdfile.csh
+	rm $cmdout
 endif
 
 exit $buildaux_status

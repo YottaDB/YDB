@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -219,7 +219,6 @@ THREADGBLDEF(lvmon_vars_count,			int)				/* Count of lvmon_vars at lvmon_vars_an
 THREADGBLDEF(lv_null_subs,			int)				/* set in gtm_env_init_sp() */
 THREADGBLDEF(max_lcl_coll_xform_bufsiz,		int)				/* max size of local collation buffer,which extends
 										 * from 32K each time the buffer overflows */
-
 /* Replication variables */
 THREADGBLDEF(replgbl,				replgbl_t)			/* set of global variables needed by the source
 										 * server */
@@ -266,10 +265,15 @@ THREADGBLFPTR(gtm_env_xlate_entry,		int,		())		/* gtm_env_xlate() or ydb_env_xla
 THREADGBLDEF(ydb_environment_init,		boolean_t)			/* indicates a development environment rather
 										 * than a production environment */
 THREADGBLFPTR(gtm_sigusr1_handler,		void, 		(void))		/* SIGUSR1 signal handler function ptr */
+<<<<<<< HEAD
 THREADGBLDEF(ydb_linktmpdir,			mstr)				/* Directory to use for relinkctl files */
 THREADGBLDEF(gtm_strpllim,			int4)				/* if non-zero, sets limit on stringpool */
 THREADGBLDEF(gtm_strpllimwarned,		boolean_t)			/* already hit limit on stringpool  */
 THREADGBLDEF(ydb_trigger_etrap,			mval)				/* $etrap - for use in triggers */
+=======
+THREADGBLDEF(gtm_linktmpdir,			mstr)				/* Directory to use for relinkctl files */
+THREADGBLDEF(gtm_trigger_etrap,			mval)				/* $etrap - for use in triggers */
+>>>>>>> f33a273c... GT.M V6.3-012
 THREADGBLDEF(gtm_trctbl_cur,			trctbl_entry *)			/* Current gtm trace table entry */
 THREADGBLDEF(gtm_trctbl_end,			trctbl_entry *)			/* End of gtm trace table (last entry + 1) */
 THREADGBLDEF(gtm_trctbl_groups,			unsigned int)			/* Trace group mask (max 31 groups) */
@@ -284,6 +288,9 @@ THREADGBLDEF(in_zwrite,				boolean_t)			/* ZWrite is active */
 THREADGBLDEF(is_socketpool,			boolean_t)			/* True when device-to-be-opened is socketpool */
 THREADGBLDEF(ydb_socket_keepalive_idle,		int)				/* Initialized from $ydb_socket_keepalive_idle */
 THREADGBLDEF(in_mupip_integ,			boolean_t)			/* To let DO_DB_HDR_CHECK skip DBFLCORRP */
+THREADGBLDEF(instance_frozen_crit_skipped,	boolean_t)			/* To indicate Instance Freeze is on, CRIT skipped*/
+THREADGBLDEF(integ_cannotskip_crit,		boolean_t)			/* indicates whether a SKIP CRIT is allowed */
+THREADGBLDEF(retry_buffer_returned_null,	boolean_t)			/* If a retried block in integ returned a NULL */
 THREADGBLDEF(lab_lnr,				lnr_tabent **)			/* Passes address from op_rhd_ext to op_extcall etc.
 										 * Points into either lab_proxy or linkage table
 										 */

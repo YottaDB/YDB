@@ -1,7 +1,7 @@
 #!/usr/local/bin/tcsh -f
 #################################################################
 #								#
-# Copyright (c) 2001-2019 Fidelity National Information		#
+# Copyright (c) 2001-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
@@ -37,7 +37,7 @@ else if ("FALSE" == "$supported_list") then
 	exit
 endif
 # Remove all lingering gpg-agent processes because they may have cached passphrases.
-set gpg_agent_pids = `ps -ef | awk '/gpg-agent --homedir \/tmp\/gnupgdir\/'$USER' .*--daemon/ {print $2}'`
+set gpg_agent_pids = `ps -fu $USER | awk '/gpg-agent --homedir \/tmp\/gnupgdir\/'$USER' .*--daemon/ {print $2}'`
 foreach gpg_agent_pid ($gpg_agent_pids)
 	kill $gpg_agent_pid >&! /dev/null
 end
@@ -110,7 +110,13 @@ endif
 source $gtm_tools/set_library_path.csh
 source $gtm_tools/check_utf8_support.csh
 if ("TRUE" == "$is_utf8_support") then
+<<<<<<< HEAD
 	if (! -e $ydb_dist/utf8) mkdir $ydb_dist/utf8
+=======
+	set icuver =  `$gtm_tools/is_icu_symbol_rename.csh`
+	if ("" != "$icuver") setenv gtm_icu_version "$icuver"
+	if (! -e $gtm_dist/utf8) mkdir $gtm_dist/utf8
+>>>>>>> f33a273c... GT.M V6.3-012
 endif
 # Build and install all encryption libraries and executables.
 env LC_ALL=$utflocale $make install algo=$algorithm image=$plugin_build_type thirdparty=$encryption_lib scan=$plugin_build_scan

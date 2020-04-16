@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -85,13 +85,19 @@ void gvcmz_netopen_attempt(struct CLB *c)
 	jnl_process_vector	temp_vect;
 #endif
 
+<<<<<<< HEAD
 	ASSERT_IS_LIBGNPCLIENT;
 	VMS_ONLY(
 		ESTABLISH(gvcmz_netopen_ch); /* our old servers run only on VMS; no need for retry on other OSs */
 		clb = c; /* need this assignment since we can't pass c to gvcmz_netopen_ch */
 	)
 	c->mbf = stringpool.free;
+=======
+
+>>>>>>> f33a273c... GT.M V6.3-012
 	c->mbl = CM_MINBUFSIZE;
+	ENSURE_STP_FREE_SPACE(c->mbl);
+	c->mbf = stringpool.free;
 	ptr = c->mbf;
 	*ptr++ = CMMS_S_INITPROC;
 	assertpro(!second_attempt);
@@ -135,11 +141,6 @@ void gvcmz_netopen_attempt(struct CLB *c)
 		}
 		gvcmz_errmsg(c, FALSE);
 	}
-	VMS_ONLY(
-		REVERT;
-		clb = NULL; /* defensive programming */
-		second_attempt = FALSE; /* we succesfully connected; no need for one more try */
-	)
 }
 
 struct CLB *gvcmz_netopen(struct CLB *c, cmi_descriptor *node, cmi_descriptor *task)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -147,6 +147,7 @@ int lkglvn(boolean_t gblvn)
 		{
 			newtriple(OC_GVSAVTARG);
 			setcurtchain(oldchain);
+			assert(&tmpchain != tmpchain.exorder.bl);
 			dqadd(TREF(expr_start), &tmpchain, exorder);
 			TREF(expr_start) = tmpchain.exorder.bl;
 			triptr = newtriple(OC_GVRECTARG);

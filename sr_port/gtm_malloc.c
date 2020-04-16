@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2008 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,6 +32,7 @@
    module will expand as call backs to the gtm_malloc module since it makes
    little sense to expand the identical module twice.
 */
-
+#define GTM_MALLOC_BUILD	/* so mdq.h won't include unnecessary and probelmatic trigger checking for gtm_malloc */
 #include "caller_id.h"
 #include "gtm_malloc_src.h"
+#undef GTM_MALLOC_BUILD

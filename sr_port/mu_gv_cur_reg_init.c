@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -58,11 +58,11 @@ void mu_gv_cur_reg_free(void)
 	basedb_reg = gv_cur_region;
 	gdhdr = basedb_reg->owning_gd;
 	assert(basedb_reg == gdhdr->regions);
-	assert(gv_cur_region != ftok_sem_reg);	/* ftok_sem_release should have been done BEFORE mu_gv_cur_reg_free */
-	if (gv_cur_region == ftok_sem_reg)	/* Handle case nevertheless in pro */
+	if (gv_cur_region == ftok_sem_reg)	/* ftok_sem_release should be done BEFORE mu_gv_cur_reg_free, but cleanup in pro */
 	{	/* Before resetting gv_cur_region to NULL, also reset ftok_sem_reg to NULL. Not doing so would
 		 * otherwise cause SIG-11 in "ftok_sem_release" (usually invoked as part of exit handling).
 		 */
+		assert(NULL != ftok_sem_reg);
 		ftok_sem_reg = NULL;
 	}
 	gv_cur_region = NULL; /* Now that gv_cur_region is going to be freed, make it inaccessible before starting the free */

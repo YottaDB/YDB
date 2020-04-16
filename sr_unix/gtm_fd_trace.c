@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2015 Fidelity National Information 	*
+ * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
@@ -106,7 +106,7 @@ error_def(ERR_CALLERID);
  */
 #if (defined(DEBUG) || defined(_AIX) || defined(__sparc) || defined(__MVS__) || defined(Linux390)	\
 		|| (defined(__linux__) && (defined(__i386))) || defined(__osf__))
-#	define	GET_CALLER_ID	caller_id()
+#	define	GET_CALLER_ID	caller_id(0)
 #else
 #	define	GET_CALLER_ID	0
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -171,6 +171,7 @@ void jmp_opto(void)
 	triple		*ct, *cur_trip, *jump_trip, *next_trip, *ref_trip, *terminal_trip;
 	void		get_jo_ptrs();
 
+<<<<<<< HEAD
 #	ifdef DEBUG
 	/* If debug and compiler debugging is enabled, run through the triples again to show where we are jus
 	 * before we modify them.
@@ -180,12 +181,17 @@ void jmp_opto(void)
 		PRINTF(" \n\n\n\n************************************ Begin jmp_opto scan *****************************\n");
 	}
 #	endif
+=======
+>>>>>>> f33a273c... GT.M V6.3-012
 	for (clrp1 = &jo_ptr_ray[0], clrtop1 = clrp1 + OPCODE_COUNT; clrp1 < clrtop1; clrp1++)
 		*clrp1 = (unsigned int *)NO_ENTRY;
 	for (clrp2 = &jo_ind_ray[0], clrtop2 = clrp2 + OPCODE_COUNT; clrp2 < clrtop2; clrp2++)
 		*clrp2 = NO_ENTRY;
+	COMPDBG(PRINTF("\n\n\n***************************** Begin jmp_opto scan ******************************\n"););
 	dqloop(&t_orig, exorder, cur_trip)
 	{
+		COMPDBG(PRINTF(" ************************ Triple Start **********************\n"););
+		COMPDBG(cdbg_dump_triple(cur_trip, 0););
 		if (OC_GVSAVTARG == cur_trip->opcode)
 		{	/* Look for an adjacent and therefore superfluous GVRECTARG */
 			for (next_trip = cur_trip->exorder.fl;
@@ -320,15 +326,12 @@ void jmp_opto(void)
 	} /* dqloop */
 #	ifdef DEBUG
 	/* If debug and compiler debugging is enabled, run through the triples again to show what we
-	 * have done to them..
+	 * have done to them.
 	 */
 	if (ydbDebugLevel & GDL_DebugCompiler)
 	{
-		dqloop(&t_orig, exorder, ct)
-		{
-			PRINTF("\n ************************ Triple Start **********************\n");
-			cdbg_dump_triple(ct, 0);
-		}
+		PRINTF(" \n\n\n\n****************************** After jmp_opto scan *****************************\n");
+		cdbg_dump_triple_all();
 	}
 #	endif
 }

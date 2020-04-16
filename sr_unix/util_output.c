@@ -1,6 +1,6 @@
  /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -189,6 +189,7 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 	unsigned int	ch;
 	UINTPTR_T	addr_val;
 	ssize_t		chlen;
+	uint4		stringlength;
 	boolean_t	indirect;
 	qw_num_ptr_t	val_ptr;
 	unsigned char	numa[22];
@@ -325,8 +326,9 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						length = c ? *c++ : 0;
 						break;
 					case 'D':
-					case 'F': /* string with length and addr parameters */
-						GETFAOVALDEF(faocnt, fao, int4, length, 0);
+					case 'F': /* string with length and addr parameters. restrict to 1 MiB length */
+						GETFAOVALDEF(faocnt, fao, uint4, stringlength, 0);
+						length = (MAX_STRLEN > stringlength) ? (int)stringlength : MAX_STRLEN;
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
 						break;
 					case 'S':
@@ -344,11 +346,16 @@ caddr_t util_format(caddr_t message, va_list fao, caddr_t buff, ssize_t size, in
 						break;
 					case 'Z': /* null teminated string */
 						GETFAOVALDEF(faocnt, fao, caddr_t, c, NULL);
+<<<<<<< HEAD
 						length = c ? STRLEN(c) : 0;
 						break;
 					default:
 						assert(FALSE);
 						length = MAXINT4;	/* For static scan */
+=======
+						stringlength = c ? strlen(c) : 0;
+						length = (MAX_STRLEN > stringlength) ? (int)stringlength : MAX_STRLEN;
+>>>>>>> f33a273c... GT.M V6.3-012
 				}
 				/* Since gtmsecshr does not load ICU libraries (since dlopen() with LD_LIBRARY_PATH
 				 * does not work for root setuid executables), avoid calling gtm_wcswidth() and

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -542,7 +542,7 @@ bool	mubfilcpy (backup_reg_list *list)
 					} else
 						size = (((blk_hdr_ptr_t)inbuf)->bsiz + 1) & ~1;
 
-					if (cs_addrs->do_fullblockwrites)
+					if (cs_data->write_fullblk)
 						size = ROUND_UP(size, cs_addrs->fullblockwrite_len);
 					assert((uint4)cs_addrs->hdr->blk_size >= size);
 					offset = BLK_ZERO_OFF(header_cpy->start_vbn) + ((off_t)header_cpy->blk_size * blk_num);

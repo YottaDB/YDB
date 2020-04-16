@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -45,6 +46,17 @@
 	else											\
 		rts_error_csa(CSA_ARG(CSA) VARLSTCNT(6) MNEMONIC, 0,				\
 				ERR_TEXT, 2, RTS_ERROR_STRING(gai_strerror(ERRCODE)));		\
+}
+/* Macro to issue an ERR_GETADDRINFO and continue (no rts_error) */
+#define GTM_PUTMSG_CSA_ADDRINFO(CSA, MNEMONIC, ERRCODE, HOSTINFO)				\
+{												\
+	if (EAI_SYSTEM == ERRCODE)								\
+		gtm_putmsg_csa(CSA_ARG(CSA) VARLSTCNT(8) MNEMONIC, 0, errno, 0,			\
+				ERR_TEXT, 2, LEN_AND_STR(HOSTINFO));				\
+	else											\
+		gtm_putmsg_csa(CSA_ARG(CSA) VARLSTCNT(10) MNEMONIC, 0,				\
+				ERR_TEXT, 2, RTS_ERROR_STRING(gai_strerror(ERRCODE)),		\
+				ERR_TEXT, 2, LEN_AND_STR(HOSTINFO));				\
 }
 /* Same as above, but with a literal string context description. */
 #define RTS_ERROR_ADDRINFO_CTX(CSA, MNEMONIC, ERRCODE, CONTEXT)					\

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -103,8 +103,8 @@ int	dsk_write_nocache(gd_region *reg, block_id blk, sm_uc_ptr_t buff, enum db_ve
 	else
 		assert(GDSV6 == ondsk_blkver);
 #	endif
-	if (csa->do_fullblockwrites) /* See similiar lobic in wcs_wtstart.c */
-		size = (int)ROUND_UP(size, (FULL_DATABASE_WRITE == csa->do_fullblockwrites)
+	if (csd->write_fullblk) /* See similiar logic in wcs_wtstart.c */
+		size = (int)ROUND_UP(size, (FULL_DATABASE_WRITE == csd->write_fullblk)
 				? csd->blk_size : csa->fullblockwrite_len);
 	assert(size <= csd->blk_size);
 	assert(FALSE == reg->read_only);

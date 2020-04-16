@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2008-2019 Fidelity National Information	*
+ * Copyright (c) 2008-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -482,7 +482,7 @@ int gtmrecv_poll_actions1(int *pending_data_len, int *buff_unprocessed, unsigned
 			bad_trans_msg.len  = GTM_BYTESWAP_32(MIN_REPL_MSGLEN);
 			bad_trans_msg.start_seqno = GTM_BYTESWAP_64(curr_conn_state.send_seqno);
 		}
-		REPL_SEND_LOOP(gtmrecv_sock_fd, &bad_trans_msg, bad_trans_msg.len, REPL_POLL_NOWAIT)
+		REPL_SEND_LOOP(gtmrecv_sock_fd, &bad_trans_msg, MIN_REPL_MSGLEN, REPL_POLL_NOWAIT)
 			; /* Empty Body */
 		if (SS_NORMAL == status)
 		{

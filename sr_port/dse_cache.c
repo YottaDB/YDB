@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2003-2019 Fidelity National Information	*
+ * Copyright (c) 2003-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
@@ -30,7 +30,7 @@
 #include "util.h"
 #include "dse.h"
 #include "stringpool.h"			/* for GET_CURR_TIME_IN_DOLLARH_AND_ZDATE macro */
-#include "op.h"				/* for op_fnzdate and op_horolog prototype */
+#include "op.h"				/* for op_fnzdate and op_zhorolog prototype */
 #include "wcs_recover.h"		/* for wcs_recover prototype */
 #include "wcs_phase2_commit_wait.h"
 #include "sleep_cnt.h"			/* for SIGNAL_WRITERS_TO_STOP/RESUME and WAIT_FOR_WRITERS_TO_STOP macro */

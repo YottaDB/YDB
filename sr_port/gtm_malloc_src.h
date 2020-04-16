@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -213,15 +213,7 @@
 #else
 #  define GetSizeIndex(size) (size2Index[(size - 1) / MINTWO])
 #endif
-/* Note we use unsigned char * instead of caddr_t for all references to caller_id so the caller id
- * is always 4 bytes. On Tru64, caddr_t is 8 bytes which will throw off the size of our
- * storage header in debug mode.
- */
-#ifdef GTM_MALLOC_DEBUG
-#  define CALLERID (smCallerId)
-#else
-#  define CALLERID ((unsigned char *)caller_id())
-#endif
+#define CALLERID ((unsigned char *)caller_id(smCallerIdExtraLevels))
 /* Define "routines" to enqueue and dequeue storage elements. Use define so we don't
  * have to depend on each implementation's compiler inlining to get efficient code here.
  */
@@ -334,7 +326,7 @@ GBLREF	ch_ret_type	(*ht_rhash_ch)();		/* Function pointer to hashtab_rehash_ch *
 GBLREF	ch_ret_type	(*jbxm_dump_ch)();		/* Function pointer to jobexam_dump_ch */
 GBLREF	ch_ret_type	(*stpgc_ch)();			/* Function pointer to stp_gcol_ch */
 /* This var allows us to call ourselves but still have callerid info */
-GBLREF	unsigned char	*smCallerId;			/* Caller of top level malloc/free */
+GBLREF	uint4		smCallerIdExtraLevels;		/* Extra stack levels to account for in caller_id */
 GBLREF	volatile int4	fast_lock_count;		/* Stop stale/epoch processing while we have our parts exposed */
 OS_PAGE_SIZE_DECLARE
 #define SIZETABLEDIM MAXTWO/MINTWO
@@ -427,6 +419,8 @@ error_def(ERR_MALLOCMAXUNIX);
 void gtmSmInit(void);
 storElem *findStorElem(int sizeIndex);
 void release_unused_storage(void);
+void *gtm_malloc_main(size_t);
+void gtm_free_main(void *);
 #ifdef DEBUG
 void backfill(unsigned char *ptr, gtm_msize_t len);
 boolean_t backfillChk(unsigned char *ptr, gtm_msize_t len);
@@ -650,7 +644,7 @@ storElem *findStorElem(int sizeIndex)	/* Note renamed to findStorElem_dbg when i
 /* Note, if the below declaration changes, corresponding changes in gtmxc_types.h needs to be done. */
 /* Obtain free storage of the given size */
 /* #GTM_THREAD_SAFE : The below function (gtm_malloc) is thread-safe; serialization is ensured with locks */
-void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in gtm_malloc_dbg.c */
+void *gtm_malloc_main(size_t size)	/* Note renamed to gtm_malloc_dbg when included in gtm_malloc_dbg.c */
 {
 	unsigned char	*retVal;
 	storElem 	*uStor, *qHdr;
@@ -804,25 +798,28 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 			PTHREAD_MUTEX_LOCK_IF_NEEDED(was_holder); /* get thread lock in case threads are in use */
 			gtmSmInit();
 			PTHREAD_MUTEX_UNLOCK_IF_NEEDED(was_holder);	/* release exclusive thread lock if needed */
-			/* Reinvoke gtm_malloc now that we are initialized. Note that this one time (the first
-			 * call to malloc), we will not record the proper caller id in the storage header or in
-			 * the traceback table. The caller will show up as gtm_malloc(). However, all subsequent
-			 * calls will be correct.
+			/* Reinvoke gtm_malloc now that we are initialized.
 			 *
 			 * Note, in a pro build, if the call to gtmSmInit() drives gtm_init_env() which discovers
 			 * we should be be doing debug builds, drive the debug flavor of gtm_malloc instead which
 			 * will do its own initialization if it still needs to (see top of gtmSmInit() above).
 			 */
+<<<<<<< HEAD
 			PRO_ONLY(if (0 != ydbDebugLevel) return (void *)gtm_malloc_dbg(size));
 			return (void *)gtm_malloc(size);
+=======
+			smCallerIdExtraLevels++;
+#			ifndef DEBUG
+			if (gtmDebugLevel & GDL_SmAllMallocDebug)
+				return (void *)gtm_malloc_dbg(size);
+#			endif
+			return (void *)gtm_malloc_main(size);
+>>>>>>> f33a273c... GT.M V6.3-012
 		}
 #	ifndef DEBUG
 	} else
-	{	/* We have a non-DEBUG module but debugging is turned on so redirect the call to the appropriate module.
-		 * Stash the caller id for later use, as we can't be sure whether the call to gtm_malloc_dbg() will add
-		 * a stack frame, disrupting later caller_id() requests.
-		 */
-		smCallerId = (unsigned char *)caller_id();
+	{	/* We have a non-DEBUG module but debugging is turned on so redirect the call to the appropriate module. */
+		smCallerIdExtraLevels++;
 		return (void *)gtm_malloc_dbg(size);
 	}
 #	endif
@@ -831,7 +828,7 @@ void *gtm_malloc(size_t size)	/* Note renamed to gtm_malloc_dbg when included in
 /* Note, if the below declaration changes, corresponding changes in gtmxc_types.h needs to be done. */
 /* Release the free storage at the given address */
 /* #GTM_THREAD_SAFE : The below function (gtm_free) is thread-safe; serialization is ensured with locks */
-void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_malloc_dbg.c */
+void gtm_free_main(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_malloc_dbg.c */
 {
 	storElem 	*uStor, *buddyElem;
 	storExtHdr	*sEHdr;
@@ -1028,10 +1025,8 @@ void gtm_free(void *addr)	/* Note renamed to gtm_free_dbg when included in gtm_m
 	} else
 	{	/* If not a debug module and debugging is enabled, reroute call to
 		 * the debugging version.
-		 * Stash the caller id for later use, as we can't be sure whether the call to gtm_malloc_dbg() will add
-		 * a stack frame, disrupting later caller_id() requests.
 		 */
-		smCallerId = (unsigned char *)caller_id();
+		smCallerIdExtraLevels++;
 		gtm_free_dbg(addr);
 	}
 #	endif
@@ -1478,4 +1473,26 @@ void system_free(void *addr)
 	return;
 }
 
+#endif
+
+#ifndef GTM_MALLOC_DEBUG
+
+/* Tail call optimization eliminates the gtm_malloc/gtm_free stack level in pro, but we have to account for it in debug. */
+#ifdef DEBUG
+#define DEFAULT_EXTRA_LEVELS 1
+#else
+#define DEFAULT_EXTRA_LEVELS 0
+#endif
+
+void *gtm_malloc(size_t size)
+{
+	smCallerIdExtraLevels = DEFAULT_EXTRA_LEVELS;
+	return gtm_malloc_main(size);
+}
+
+void gtm_free(void *addr)
+{
+	smCallerIdExtraLevels = DEFAULT_EXTRA_LEVELS;
+	gtm_free_main(addr);
+}
 #endif

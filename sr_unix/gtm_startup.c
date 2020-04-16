@@ -87,6 +87,7 @@
 #include "jobsp.h" /* For gcall.h */
 #include "gcall.h" /* For ojchildparms() */
 #include "common_startup_init.h"
+#include "trans_numeric.h"
 #ifdef UTF8_SUPPORTED
 #include "utfcgr.h"
 #endif
@@ -153,6 +154,7 @@ void gtm_startup(struct startup_vector *svec)
 	 * while in UNIX, it's all done with environment variables
 	 * hence, various references to data copied from *svec could profitably be referenced directly
 	 */
+<<<<<<< HEAD
 	char			*temp;
 	mstr			log_name;
 	stack_frame 		*frame_pointer_lcl;
@@ -160,6 +162,14 @@ void gtm_startup(struct startup_vector *svec)
 	char			*ptr;
 	int			i, status;
 	mval			noiso_lit, gbllist;
+=======
+	boolean_t	is_defined;
+	char		*temp;
+	int4		temp_gtm_strpllim;
+	mstr		log_name;
+	stack_frame 	*frame_pointer_lcl;
+	static char 	other_mode_buf[] = "OTHER";
+>>>>>>> f33a273c... GT.M V6.3-012
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -198,6 +208,7 @@ void gtm_startup(struct startup_vector *svec)
 	if (NULL != stringpool.top)
 		free(stringpool.base);
 	stp_init(svec->user_strpl_size);
+	assertpro(stringpool.base);
 	rts_stringpool = stringpool;
 	(TREF(tpnotacidtime)).mvtype = MV_NM | MV_INT;	/* gtm_env_init set up a numeric value, now there's a stp: string it */
 	MV_FORCE_STRD(&(TREF(tpnotacidtime)));
@@ -224,6 +235,12 @@ void gtm_startup(struct startup_vector *svec)
 	/* Initialize alignment requirement for the runtime stringpool */
 	/* mstr_native_align = ydb_logical_truth_value(YDBENVINDX_DISABLE_ALIGNSTR, FALSE, NULL) ? FALSE : TRUE; */
 	mstr_native_align = FALSE; /* TODO: remove this line and uncomment the above line */
+	/* See if $gtm_string_pool_limit is set */
+	log_name.addr = GTM_STRPLLIM;
+	log_name.len = SIZEOF(GTM_STRPLLIM) - 1;
+	temp_gtm_strpllim = trans_numeric(&log_name, &is_defined, TRUE);
+	if (0 < temp_gtm_strpllim)
+		stringpool.strpllim = (temp_gtm_strpllim < STP_GCOL_TRIGGER_FLOOR ? STP_GCOL_TRIGGER_FLOOR : 0) + temp_gtm_strpllim;
 	getjobname();
 	getzprocess();
 	getzmode();

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
@@ -278,7 +278,7 @@ bool	mubinccpy (backup_reg_list *list)
 	outbuf = (inc_header *)malloc(SIZEOF(inc_header));
 	MEMCPY_LIT(&outbuf->label[0], INC_HEADER_LABEL_V7);
 	stringpool.free = stringpool.base;
-	op_horolog(&val);
+	op_zhorolog(&val, FALSE);
 	stringpool.free = stringpool.base;
 	op_fnzdate(&val, (mval *)&mu_bin_datefmt, (mval *)&literal_null, (mval *)&literal_null, &val);
 	memcpy(&outbuf->date[0], val.str.addr, val.str.len);

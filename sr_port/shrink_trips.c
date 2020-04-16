@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2003, 2011 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2003-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> f33a273c... GT.M V6.3-012
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -60,13 +65,8 @@ void shrink_trips(void)
 	/* If debug and compiler debugging enabled, run through triples again to show where we are just before we modify them. */
 	if (ydbDebugLevel & GDL_DebugCompiler)
 	{
-		PRINTF(" \n\n\n\n************************************ Begin pre-shrink_trips dump *****************************\n");
-		dqloop(&t_orig, exorder, ct)
-		{
-			PRINTF(" ************************ Triple Start **********************\n");
-			cdbg_dump_triple(ct, 0);
-		}
-		PRINTF(" \n\n\n\n************************************ Begin shrink_trips scan *****************************\n");
+		PRINTF(" \n\n\n\n************************** Before shrink_trips scan ****************************\n");
+		cdbg_dump_triple_all();
 	}
 #	endif
 	first_pass = TRUE;
@@ -131,11 +131,8 @@ void shrink_trips(void)
 	/* If debug and compiler debuggingenabled, run through the triples again to show what we did to them */
 	if (ydbDebugLevel & GDL_DebugCompiler)
 	{
-		dqloop(&t_orig, exorder, ct)
-		{
-			PRINTF(" ************************ Triple Start **********************\n");
-			cdbg_dump_triple(ct, 0);
-		}
+		PRINTF(" \n\n\n\n************************** After shrink_trips scan *****************************\n");
+		cdbg_dump_triple_all();
 	}
 #	endif
 }

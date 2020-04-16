@@ -1,6 +1,6 @@
 #################################################################
 #                                                               #
-# Copyright (c) 2010-2015 Fidelity National Information 	#
+# Copyright (c) 2010-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
@@ -49,11 +49,11 @@ echo "Entering $0:t to build gtm_threadgbl_deftypes.h"
 pushd $gtm_obj
 \rm gtm_threadgbl_deftypes.h >& /dev/null
 if (-e gtm_threadgbl_deftypes.h) then
-    echo "$0:t-E-: Unable to delete old $gtm_obj/gtm_threadgbl_deftypes.h - FAIL"
+    echo "$0:t-E-BUILD: Error Unable to delete old $gtm_obj/gtm_threadgbl_deftypes.h - FAIL"
     exit 1
 endif
 if (! -w $gtm_obj) then
-    echo "$0:t-E-: Unable to write to $gtm_obj/gtm_threadgbl_deftypes.h - FAIL"
+    echo "$0:t-E-BUILD: Error Unable to write to $gtm_obj/gtm_threadgbl_deftypes.h - FAIL"
     exit 1
 endif
 
@@ -63,14 +63,14 @@ endif
 #
 gt_cc_pro -O0 $gtm_src/gtm_threadgbl_deftypes.c $includge >& gtm_threadgbl_deftypes_comp.log
 if (0 != $status) then
-    echo "$0:t-E-: pro build of $gtm_obj/gtm_threadgbl_deftypes failed, see $gtm_obj/gtm_threadgbl_deftypes_comp.log"
+    echo "$0:t-E-BUILD: Error in pro build of $gtm_obj/gtm_threadgbl_deftypes, see $gtm_obj/gtm_threadgbl_deftypes_comp.log"
     popd
     exit 1
 endif
 gt_ld -o gtm_threadgbl_deftypes_pro $gt_ld_options_pro -L$gtm_obj $gt_ld_sysrtns $gt_ld_syslibs \
 	gtm_threadgbl_deftypes.o >& gtm_threadgbl_deftypes_linkmap.txt
 if (0 != $status) then
-    echo "$0:t-E-: pro build link of $gtm_obj/gtm_threadgbl_deftypes failed, see $gtm_obj/gtm_threadgbl_deftypes_linkmap.txt"
+    echo "$0:t-E-BUILD: Error in pro link of $gtm_obj/gtm_threadgbl_deftypes, see $gtm_obj/gtm_threadgbl_deftypes_linkmap.txt"
     popd
     exit 1
 endif
@@ -79,14 +79,14 @@ endif
 #
 gt_cc_dbg $gtm_src/gtm_threadgbl_deftypes.c $includge >& gtm_threadgbl_deftypes_comp_dbg.log
 if (0 != $status) then
-    echo "$0:t-E-: dbg build of $gtm_obj/gtm_threadgbl_deftypes failed, see $gtm_obj/gtm_threadgbl_deftypes_comp_dbg.log"
+    echo "$0:t-E-BUILD: Error in dbg build of $gtm_obj/gtm_threadgbl_deftypes, see $gtm_obj/gtm_threadgbl_deftypes_comp_dbg.log"
     popd
     exit 1
 endif
 gt_ld -o gtm_threadgbl_deftypes_dbg $gt_ld_options_dbg -L$gtm_obj $gt_ld_sysrtns $gt_ld_syslibs \
 	gtm_threadgbl_deftypes.o >& gtm_threadgbl_deftypes_linkmap_dbg.txt
 if (0 != $status) then
-    echo "$0:t-E-: dbg build link of $gtm_obj/gtm_threadgbl_deftypes failed, see $gtm_obj/gtm_threadgbl_deftypes_linkmap_dbg.txt"
+    echo "$0:t-E-BUILD: Error in dbg link of $gtm_obj/gtm_threadgbl_deftypes, see $gtm_obj/gtm_threadgbl_deftypes_linkmap_dbg.txt"
     popd
     exit 1
 endif
@@ -118,7 +118,7 @@ EOF
 # Make sure it is there
 #
 if (! -e $gtm_obj/gtm_threadgbl_deftypes.h) then
-    echo "$0:t-E-: Unable to generate new $gtm_inc/gtm_threadgbl_deftypes.h"
+    echo "$0:t-E-BUILD: Error Unable to generate new $gtm_inc/gtm_threadgbl_deftypes.h"
     popd
     exit 1
 endif
@@ -128,7 +128,7 @@ endif
 #
 set keepold = 0
 if (-e $gtm_inc/gtm_threadgbl_deftypes.h) then
-    \rm -f gtm_threadgbl_deftypes.h.diff
+    \rm -f gtm_threadgbl_deftypes.h.diffpro
     \diff $gtm_inc/gtm_threadgbl_deftypes.h gtm_threadgbl_deftypes.h >& gtm_threadgbl_deftypes.h.diff
     if (0 == $status) then
 	set keepold = 1  # if no diff, keep the old file
@@ -149,7 +149,7 @@ if (! $keepold) then
     if (-e $gtm_inc/gtm_threadgbl_deftypes.h) then
 	\chmod 666 $gtm_inc/gtm_threadgbl_deftypes.h
 	if (0 != $status) then
-	    echo "$0:t-E-: Unable to reset permissions to allow us to replace $gtm_inc/gtm_threadgbl_deftypes.h"
+	    echo "$0:t-E-BUILD: Error Unable to reset permissions to allow us to replace $gtm_inc/gtm_threadgbl_deftypes.h"
 	    popd
 	    exit 1
 	endif
@@ -157,7 +157,7 @@ if (! $keepold) then
     echo "Replacing $gtm_inc/gtm_threadgbl_deftypes.h"
     \mv -f gtm_threadgbl_deftypes.h $gtm_inc  # replace if needed
     if (0 != $status) then
-	echo "$0:t-E-: Unable to replace $gtm_inc/gtm_threadgbl_deftypes.h"
+	echo "$0:t-E-BUILD: Error Unable to replace $gtm_inc/gtm_threadgbl_deftypes.h"
 	popd
 	exit 1
     endif
@@ -173,7 +173,7 @@ set currprofull = $gtm_root/$gtm_curpro/pro
 \cp $gtm_pct/gtmthreadgblasm.m ./
 set savestatus = "$status"
 if ("0" != "$savestatus") then
-    echo "gen_gtm_threadgbl_deftypes.csh-E-: Unable to copy $gtm_tools/gtmthreadgblasm.m to `pwd`/gtmthreadgblasm.m"
+    echo "$0:t-E-BUILD: Error Unable to copy $gtm_tools/gtmthreadgblasm.m to `pwd`/gtmthreadgblasm.m"
     popd
     exit 1
 endif
@@ -184,7 +184,7 @@ foreach image (pro dbg)
 		$currprofull/mumps -run gtmthreadgblasm ${accesstxt} gtm_threadgbl_deftypes_asm_${image}.in \
 			gtm_threadgbl_deftypes_asm_${image}.si || touch gtm_threadgbl_deftypes_asm_${image}.fail
 	if ( -e gtm_threadgbl_deftypes_asm_${image}.fail) then
-	    echo "gen_gtm_threadgbl_deftypes.csh-E-: Failed to create gtm_threadgbl_deftypes_asm_${image}.si"
+	    echo "$0:t-E-BUILD: Error Failed to create gtm_threadgbl_deftypes_asm_${image}.si"
 	    popd
 	    exit 1
 	endif
@@ -201,7 +201,7 @@ foreach image (pro dbg)
 	    \cp -p gtm_threadgbl_deftypes_asm_${image}.si $gtm_inc
 	    set savestatus = $status
 	    if (0 != $savestatus) then
-		echo "gen_gtm_threadgbl_deftypes.csh-E-: Unable to copy gtm_threadgbl_deftypes_asm_${image}.si to $gtm_inc"
+		echo "$0:t-E-BUILD: Error Unable to copy gtm_threadgbl_deftypes_asm_${image}.si to $gtm_inc"
 		popd
 		exit 1
 	    else

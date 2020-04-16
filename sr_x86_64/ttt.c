@@ -1,6 +1,10 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2001-2021 Fidelity National Information	*
+=======
+ * Copyright (c) 2001-2020 Fidelity National Information 	*
+>>>>>>> f33a273c... GT.M V6.3-012
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.*

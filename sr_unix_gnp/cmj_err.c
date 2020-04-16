@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> f33a273c... GT.M V6.3-012
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -20,8 +25,12 @@ void cmj_err(struct CLB *lnk, cmi_reason_t reason, cmi_status_t status)
 {
 	struct NTD *tsk = lnk->ntd;
 
+<<<<<<< HEAD
 	ASSERT_IS_LIBCMISOCKETTCP;
 	CMI_DPRINT(("CMJ_ERR called from 0x%x, reason %d, status %d\n", caller_id(), reason, status));
+=======
+	CMI_DPRINT(("CMJ_ERR called from 0x%x, reason %d, status %d\n", caller_id(0), reason, status));
+>>>>>>> f33a273c... GT.M V6.3-012
 
 	lnk->deferred_event = TRUE;
 	lnk->deferred_reason = reason;

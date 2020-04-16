@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
@@ -14,7 +14,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-
+#include "gtm_string.h"
 #include "compiler.h"
 #include "opcode.h"
 #include "indir_enum.h"

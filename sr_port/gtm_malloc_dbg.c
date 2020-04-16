@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2009 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,14 +33,15 @@
    little sense to expand the identical module twice.
 */
 
+#  define GTM_MALLOC_BUILD	/* so mdq.h won't include unnecessary and probelmatic trigger checking for gtm_malloc */
 #ifndef DEBUG
 
 /* We have a PRO build -- generate a full debug version with debug versions of
    our global names */
 
 #  define gtmSmInit gtmSmInit_dbg
-#  define gtm_malloc gtm_malloc_dbg
-#  define gtm_free gtm_free_dbg
+#  define gtm_malloc_main gtm_malloc_dbg
+#  define gtm_free_main gtm_free_dbg
 #  define findStorElem findStorElem_dbg
 #  define processDeferredFrees processDeferredFrees_dbg
 #  define release_unused_storage release_unused_storage_dbg
@@ -63,18 +65,19 @@
    Note the real versions of these routines are defined and only used/callable from
    the gtm_malloc_src.h include so when we define them here for completeness in a dbg
    build, we change the return signature to not return anything (saves us from having
-   to put a "return" after the GTMASSERTS). These are just "catchalls" in case the
+   to put a "return" after the assertpro). These are just "catchalls" in case the
    expansion functioned incorrectly.
 */
 void gtm_malloc_dbg(size_t size);
 void gtm_free_dbg(void *addr);
 void gtm_malloc_dbg(size_t size)
 {
-	GTMASSERT;
+	assertpro(FALSE && "gtm_malloc_dbg called directly");
 }
 
 void gtm_free_dbg(void *addr)
 {
-	GTMASSERT;
+	assertpro(FALSE && "gtm_free_dbg called directly");
 }
 #endif
+#undef GTM_MALLOC_BUILD

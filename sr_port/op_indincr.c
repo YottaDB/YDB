@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2004, 2012 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2004-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> f33a273c... GT.M V6.3-012
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -13,7 +18,7 @@
  ****************************************************************/
 
 #include "mdef.h"
-
+#include "gtm_string.h"
 #include "toktyp.h"
 #include "compiler.h"
 #include "opcode.h"
@@ -78,6 +83,7 @@ void	op_indincr(mval *dst, mval *increment, mval *target)
 					s->operand[1] = put_tref(src);
 					newtriple(OC_GVSAVTARG);
 					setcurtchain(oldchain);
+					assert(&tmpchain != tmpchain.exorder.bl);
 					dqadd(TREF(expr_start), &tmpchain, exorder);
 					TREF(expr_start) = tmpchain.exorder.bl;
 					triptr = newtriple(OC_GVRECTARG);

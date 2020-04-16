@@ -1,6 +1,6 @@
 /****************************************************************
  *
- * Copyright (c) 2005-2018 Fidelity National Information	*
+ * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -101,10 +101,11 @@ void mur_tp_resolve_time(jnl_tm_t max_lvrec_time)
 		 * tp_resolve_time for this region as the last valid record timestamp in this journal file.
 		 */
 		if (!jctl->properly_closed)
-			reg_tp_resolve_time = max_lvrec_time - jctl->jfh->epoch_interval -
+		{
+			reg_tp_resolve_time = max_lvrec_time - jctl->jfh->epoch_interval - (
 				DEBUG_ONLY((WBTEST_ENABLED(WBTEST_LOWERED_JNLEPOCH))? gtm_wbox_input_test_case_count : )
-					MAX_EPOCH_DELAY;
-		else if (jctl->jfh->is_not_latest_jnl)
+					MAX_EPOCH_DELAY);
+		} else if (jctl->jfh->is_not_latest_jnl)
 			reg_tp_resolve_time = rctl->lvrec_time;
 		else
 			reg_tp_resolve_time = max_lvrec_time;

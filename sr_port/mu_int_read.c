@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -33,6 +33,7 @@
 #include "shmpool.h"		/* Needed for DBG_ENSURE_PTR_WITHIN_SS_BOUNDS */
 #include "db_snapshot.h"
 #include "mupip_exit.h"
+#include "t_qread.h"
 
 GBLREF sgmnt_data		mu_int_data;
 GBLREF int4			mu_int_ovrhd;
@@ -50,6 +51,18 @@ error_def(ERR_DYNUPGRDFAIL);
 error_def(ERR_INTEGERRS);
 error_def(ERR_REGSSFAIL);
 
+uchar_ptr_t mu_int_read_buffer(block_id blk, enum db_ver *ondsk_blkver, uchar_ptr_t *free_buff)
+{
+
+	srch_blk_status		blkhist;
+	sm_uc_ptr_t		read_block;
+	DCL_THREADGBL_ACCESS;
+
+	SETUP_THREADGBL_ACCESS;
+	blkhist.blk_num = blk;
+	read_block = t_qread(blkhist.blk_num, &blkhist.cycle, &blkhist.cr);
+	return (uchar_ptr_t) read_block;
+}
 /* Returns buffer containing the GDS block. "free_buff" is set to point to the start of the malloced buffer
  * so the caller needs to use "free_buff" when doing the "free". This is necessary particularly in case of
  * asyncio=TRUE when the file is opened with O_DIRECT and the malloced buffer is not necessarily aligned

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information 	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,6 +13,7 @@
 #include "mdef.h"
 
 #include "compiler.h"
+#include "opcode.h"
 
 GBLREF	int4		pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
 GBLREF	triple		t_orig;
@@ -34,5 +35,8 @@ triple *setcurtchain(triple *x)
 		 ins_errtriple(pending_errtriplecode);
 		 pending_errtriplecode = 0;
 	}
+	if (x->exorder.fl == x)
+		newtriple(OC_NOOP);	/* some queue operations don't do well with this condition, so prevent it here */
+	assert(x->exorder.fl != x);
 	return y;
 }

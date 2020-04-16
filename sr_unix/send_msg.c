@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -52,6 +52,9 @@ GBLREF	boolean_t		first_syslog;
 static	uint4		nesting_level = 0;
 GBLREF	boolean_t	in_fake_enospc;	/* used by an assert in "send_msg.c" */
 #endif
+
+/* Skip frame for send_msg/send_msg_csa */
+#define PRINT_CALLERID util_out_print(" -- generated from 0x!XJ.", NOFLUSH_OUT, caller_id(1))
 
 void send_msg_va(void *csa, int arg_count, va_list var);
 
