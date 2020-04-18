@@ -528,7 +528,13 @@ if [ -z "$ydb_version" -o "latest" = "$latest" ] ; then
 		# of the case if a patch release for a prior version is released after the most recent mainline release
 		# (e.g. r1.12 as a patch for r1.10 is released after r1.22 is released). Not sorting will cause r1.12
 		# (which will show up as the first line since it is the most recent release) to incorrectly show up as latest.
-                ydb_version=`sed 's/,/\n/g' ${gtm_tmpdir}/tags | grep tag_name | sort -r | head -1 | cut -d'"' -f6`
+		#
+		# Additionally, it is possible that the latest release does not have any tarballs yet (release is about to
+		# happen but release notes are being maintained so it is a release under construction). In that case, we do
+		# not want to consider that as the latest release. We find that out by grepping for releases with tarballs
+		# (hence the ".pro.tgz" grep below) and only pick those releases that contain tarballs (found by "grep -B 1")
+		# before reverse sorting and picking the latest version.
+                ydb_version=`sed 's/,/\n/g' ${gtm_tmpdir}/tags | grep -E "tag_name|.pro.tgz" | grep -B 1 ".pro.tgz" | grep "tag_name" | sort -r | head -1 | cut -d'"' -f6`
             fi ;;
         *)
             if [ -f ${ydb_distrib}/latest ] ; then
