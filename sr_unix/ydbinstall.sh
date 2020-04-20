@@ -393,6 +393,10 @@ if [ "N" = "$ydb_force_install" ]; then
 				# RHEL 7.x is considered supported on 64-bit x86 architecture
 				osallowmajorver="7"
 				osallowminorver="0"
+			elif [ "centos" = "${osid}" ] ; then
+				# CentOS 8.x is considered supported on 64-bit x86 architecture
+				osallowmajorver="8"
+				osallowminorver="0"
 			elif [ "debian" = "${osid}" ] ; then
 				# Only Debian 10 (buster) is considered supported on 64-bit x86 architecture for now.
 				# Note that the stable distribution is "buster" and its unstable variety is "buster/sid".
@@ -584,11 +588,20 @@ else
 			# or Debian then set the platform to rhel or debian (not linux) as there are specific tarballs
 			# for these distributions.
 			#
-			# CentOS and SLES are treated as RHEL to get the correct binary
+			# To get the correct binary for CentOS, RHEL and SLES, we treat OS major version 7 as rhel and later versions as centos
 			if [ "rhel" = "${osid}" -o "centos" = "${osid}" -o "sles" = "${osid}" ] ; then
+				# CentOS-specific releases of YottaDB for x86_64 happened only after r1.26
+				if [ "r1.26" \< "${ydb_version}" ] ; then
+					# If the OS major version is later than 7, treat it as centos. Otherwise, treat it as rhel.
+					osmajorver=`echo $osver | cut -d. -f1`
+					if [ 1 = `expr "$osmajorver" ">" "7"` ] ; then
+						platform="centos"
+					else
+						platform="rhel"
+					fi
 				# RHEL-specific releases of YottaDB for x86_64 happened only starting r1.10 so do this
 				# only if the requested version is not r1.00 (the only YottaDB release prior to r1.10)
-				if [ "r1.00" != ${ydb_version} ] ; then
+				elif [ "r1.00" != ${ydb_version} ] ; then
 					platform="rhel"
 				fi
 			elif [ "debian" = "${osid}" ] ; then
