@@ -98,7 +98,15 @@ enum
 /* Value for tptoken for SimpleThreadAPI calls if NOT in a TP transaction */
 #define	YDB_NOTTP	((uint64_t)0)
 
-/* Macro to create/fill-in a ydb_buffer_t structure from a C string literal (string constant) */
+/* Macro to create/fill-in a ydb_buffer_t structure from a C string literal (string constant).
+ * Note that YDB_LITERAL_TO_BUFFER does a "sizeof(LITERAL)" whereas YDB_STRING_TO_BUFFER does a "strlen()".
+ * Both produce the same output most of the time. There is one exception though and that is if the LITERAL has embedded
+ * null bytes in it (for example, if the LITERAL is a char array). In that case, sizeof() would include the null bytes
+ * too whereas strlen() would not.
+ *	a) If literal has one or more null bytes and you want the null bytes to be included, use YDB_LITERAL_TO_BUFFER macro.
+ *	b) If literal has one or more null bytes and you want the null bytes to not be included, use YDB_STRING_TO_BUFFER macro.
+ *	c) If the literal does not have null bytes, then use YDB_LITERAL_TO_BUFFER or YDB_STRING_TO_BUFFER (both are equivalent).
+ */
 #define	YDB_LITERAL_TO_BUFFER(LITERAL, BUFFERP)					\
 {										\
 	(BUFFERP)->buf_addr = LITERAL;						\
@@ -106,10 +114,7 @@ enum
 }
 
 /* Macro to create/fill-in a ydb_buffer_t structure from a C string (char * pointer).
- * Note that YDB_LITERAL_TO_BUFFER does a "sizeof(LITERAL) - 1" whereas YDB_STRING_TO_BUFFER does a "strlen()".
- * Both produce the same output almost always. There is one exception though and that is if LITERAL has embedded null bytes
- * in it. In that case, sizeof() would include the null bytes too whereas strlen() would not. Hence the need for both versions
- * of the macros.
+ * See comment before YDB_LITERAL_TO_BUFFER macro for when to use YDB_LITERAL_TO_BUFFER vs YDB_STRING_TO_BUFFER macros.
  */
 #define YDB_STRING_TO_BUFFER(STRING, BUFFERP)				\
 {									\

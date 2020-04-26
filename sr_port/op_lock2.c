@@ -151,7 +151,6 @@ int	op_lock2(mval *timeout, unsigned char laflag)	/* timeout is in seconds */
 
 	SETUP_THREADGBL_ACCESS;
 	cm_action = laflag;
-	out_of_time = FALSE;
 	if (CM_ZALLOCATES == cm_action)		/* can't use ? : syntax here because of the way the macros nest */
 		MV_FORCE_NSTIMEOUT(timeout, nsec_timeout, ZALLOCTIMESTR);
 	else
@@ -180,6 +179,7 @@ int	op_lock2_common(uint8 timeout, unsigned char laflag) /* timeout is in nanose
 	SETUP_THREADGBL_ACCESS;
 	gotit = -1;
 	cm_action = laflag;
+	out_of_time = FALSE;
 	if (NO_M_TIMEOUT != timeout)
 	{
 		if (0 == timeout)
