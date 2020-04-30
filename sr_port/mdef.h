@@ -550,6 +550,13 @@ mval *underr_strict(mval *start, ...);
 #define ZTIMEOUTSTR "ZTIMEOUT"
 #define INVOKE_RESTART	rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPRETRY);
 
+#define	FNPC_INDX_INVALID	0xff	/* Initial value of `fnpc_indx` field of mval to indicate it is not usable.
+					 * Note: This value is better set to 0 instead of 0xff in my opinion since code
+					 * that reads this (e.g. "op_fnzp1") already decrements this value by 1 before
+					 * checking for a valid index --- nars -- 2020/04/30.
+					 */
+#define	UTFCGR_INDX_INVALID	0xff
+
 #define MV_FORCE_CANONICAL(X)	((((X)->mvtype & MV_NM) == 0 ? s2n(X) : 0 ) \
 				 ,((X)->mvtype & MV_NUM_APPROX ? (X)->mvtype &= MV_NUM_MASK : 0 ))
 #define MV_IS_NUMERIC(X)	(((X)->mvtype & MV_NM) != 0)
@@ -559,9 +566,11 @@ mval *underr_strict(mval *start, ...);
 #define MV_DEFINED(X)		(((X)->mvtype & (MV_STR | MV_NM)) != 0)
 #define MV_IS_CANONICAL(X)	(((X)->mvtype & MV_NM) ? (((X)->mvtype & MV_NUM_APPROX) == 0) : (boolean_t)val_iscan(X))
 #define	MV_IS_SQLNULL(X)	((X)->mvtype & MV_SQLNULL)
-#define MV_INIT(X)		((X)->mvtype = 0, (X)->fnpc_indx = UTF8_ONLY((X)->utfcgr_indx =) 0xff)
-#define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR, (X)->fnpc_indx = UTF8_ONLY((X)->utfcgr_indx =) 0xff,	\
-				      (X)->str.len = INTCAST(LEN), (X)->str.addr = (char *)ADDR)
+#define MV_INIT(X)		((X)->mvtype = 0, (X)->fnpc_indx = FNPC_INDX_INVALID, (X)->utfcgr_indx = UTFCGR_INDX_INVALID)
+#define MV_INIT_STRING(X, LEN, ADDR) ((X)->mvtype = MV_STR,						\
+					(X)->fnpc_indx = FNPC_INDX_INVALID,				\
+					(X)->utfcgr_indx = UTFCGR_INDX_INVALID,				\
+					(X)->str.len = INTCAST(LEN), (X)->str.addr = (char *)ADDR)
 
 /* The MVTYPE_IS_* macros are similar to the MV_IS_* macros except that the input is an mvtype instead of an "mval *".
  * In the caller, use appropriate macro depending on available input. Preferable to use the MVTYPE_IS_* variant to avoid
@@ -591,27 +600,27 @@ mval *underr_strict(mval *start, ...);
 # ifdef UTF8_SUPPORTED
 #  ifdef GTM64
 #   define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, SIGN, EXPONENT, 0xff, 0xff, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
+	{TYPE, SIGN, EXPONENT, FNPC_INDX_INVALID, UTFCGR_INDX_INVALID, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
 #  else
 #   define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, SIGN, EXPONENT, 0xff, 0xff, 0, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
+	{TYPE, SIGN, EXPONENT, FNPC_INDX_INVALID, UTFCGR_INDX_INVALID, 0, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
 #  endif /* GTM64 */
 # else
 #  define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, SIGN, EXPONENT, 0xff, {MANT_LOW, MANT_HIGH}, {LENGTH, ADDRESS}}
+	{TYPE, SIGN, EXPONENT, FNPC_INDX_INVALID, {MANT_LOW, MANT_HIGH}, {LENGTH, ADDRESS}}
 # endif	/* UTF8 */
 #else	/* end BIGENDIAN -- start LITTLEENDIAN */
 # ifdef UTF8_SUPPORTED
 #  ifdef GTM64
 #    define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, EXPONENT, SIGN, 0xff, 0xff, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
+	{TYPE, EXPONENT, SIGN, FNPC_INDX_INVALID, UTFCGR_INDX_INVALID, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
 #  else
 #    define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, EXPONENT, SIGN, 0xff, 0xff, 0, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
+	{TYPE, EXPONENT, SIGN, FNPC_INDX_INVALID, UTFCGR_INDX_INVALID, 0, {MANT_LOW, MANT_HIGH}, {UTF_LEN, LENGTH, ADDRESS}}
 #  endif /* GTM64 */
 # else
 #  define DEFINE_MVAL_COMMON(TYPE, EXPONENT, SIGN, UTF_LEN, LENGTH, ADDRESS, MANT_LOW, MANT_HIGH) \
-	{TYPE, EXPONENT, SIGN, 0xff, MANT_LOW, MANT_HIGH, LENGTH, ADDRESS}
+	{TYPE, EXPONENT, SIGN, FNPC_INDX_INVALID, MANT_LOW, MANT_HIGH, LENGTH, ADDRESS}
 # endif	/* UTF8 */
 #endif	/* BIGENDIAN/LITTLEENDIAN */
 

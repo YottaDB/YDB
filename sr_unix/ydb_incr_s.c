@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -147,6 +147,9 @@ int ydb_incr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 			} else
 				op_gvname(1, &gvname);			/* Single parm call to get next global */
 			ret_mv = &ret_mval;
+			INIT_MVAL_BEFORE_USE_IN_M_CODE(ret_mv);	/* Do additional initialization of result mval as it could
+								 * be used in database trigger M code (if one gets driven).
+								 */
 			op_gvincr(increment_mv, ret_mv);
 			break;
 		case LYDB_VARREF_ISV:

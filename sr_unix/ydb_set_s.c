@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -131,6 +131,9 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 											LYDBRTNNAME(LYDB_RTN_SET));
 			callg((callgfnptr)op_gvname, &plist);		/* Drive "op_gvname" to create key */
 			SET_MVAL_FROM_YDB_BUFF_T(&set_value, value);	/* Put value to set into mval for "op_gvput" */
+			INIT_MVAL_BEFORE_USE_IN_M_CODE(&set_value);	/* Do additional initialization of result mval as it could
+									 * be used in database trigger M code (if one gets driven).
+									 */
 			op_gvput(&set_value);				/* Save the global value */
 			break;
 		case LYDB_VARREF_ISV:

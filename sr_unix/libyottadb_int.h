@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -389,13 +389,29 @@ MBSTART {															\
 #define	IS_INVALID_YDB_BUFF_T(YDBBUFF)	(((YDBBUFF)->len_alloc < (YDBBUFF)->len_used)				\
 					 || ((NULL == (YDBBUFF)->buf_addr) && (0 != (YDBBUFF)->len_used)))
 
-/* Macro to set a supplied ydb_buffer_t value into an mval */
+/* Macro to set a supplied ydb_buffer_t value into an mval.
+ * This macro is kept simple and initializes only the bare minimum fields in an mval that are needed for
+ * correct SimpleAPI working. If there is the potential for this mval to be used in M code, then one also
+ * needs to invoke the INIT_MVAL_BEFORE_USE_IN_M_CODE macro or else garbage fields in the mval can cause
+ * hard-to-debug issues (e.g. $PIECE behaving incorrectly due to fnpc_indx field being garbage etc.).
+ */
 #define SET_MVAL_FROM_YDB_BUFF_T(MVALP, YDBBUFF)							\
 MBSTART	{												\
 	assert(!IS_INVALID_YDB_BUFF_T(YDBBUFF)); /* caller should have issued error appropriately */	\
 	(MVALP)->mvtype = MV_STR;									\
 	(MVALP)->str.addr = (YDBBUFF)->buf_addr;							\
 	(MVALP)->str.len = (YDBBUFF)->len_used;								\
+} MBEND
+
+#define	INIT_MVAL_BEFORE_USE_IN_M_CODE(MVALP)								\
+MBSTART	{												\
+	/* The below fields are normally not used in SimpleAPI mode but could be if we are inside a	\
+	 * database trigger (which currently only runs in M and not in C) and if $PIECE etc. are used	\
+	 * in the trigger M code, then these fields need to be properly initialized or else we could	\
+	 * see incorrect results from $PIECE for example. Hence the need to initialize these fields.	\
+	 */												\
+	(MVALP)->fnpc_indx = FNPC_INDX_INVALID;								\
+	(MVALP)->utfcgr_indx = UTFCGR_INDX_INVALID;							\
 } MBEND
 
 /* Macro to set a supplied ydb_buffer_t value from a supplied mval.
