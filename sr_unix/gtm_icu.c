@@ -3,7 +3,7 @@
  * Copyright (c) 2006-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -223,7 +223,7 @@ void gtm_icu_init(void)
 	char_ptr_t	err_str;
 	icu_func_t	fptr;
 	int		findx, ver;
-	boolean_t	icu_getversion_found = FALSE, gtm_icu_ver_defined, symbols_renamed;
+	boolean_t	icu_getversion_found = FALSE, ydb_icu_ver_defined, symbols_renamed;
 	UVersionInfo	icu_version;
 	int		iculdflags = ICU_LIBFLAGS;
 	struct stat	libpath_stat;
@@ -236,7 +236,7 @@ void gtm_icu_init(void)
 	struct stat	real_path_stat;		/* To see if the resolved real_path exists or not */
 #	endif
 	intrpt_state_t  prev_intrpt_state;
-	boolean_t	is_ydb_env_match;
+	boolean_t	is_ydb_env_match, is_ydb_env_match_usable;
 	mstr		trans;
 	char		*envname;
 
@@ -267,13 +267,19 @@ void gtm_icu_init(void)
 	 * will be treated as if this environment variable was not set at all and the default behavior (which is to query for
 	 * symbols without appended version numbers) will be used.
 	 */
-	gtm_icu_ver_defined = FALSE;
+	ydb_icu_ver_defined = FALSE;
 	if (SS_NORMAL == ydb_trans_log_name(YDBENVINDX_ICU_VERSION, &trans, icu_ver_buf, SIZEOF(icu_ver_buf),
 											IGNORE_ERRORS_TRUE, &is_ydb_env_match))
 	{	/* $ydb_icu_version is defined. Do edit check on the value before considering it really defined */
-		gtm_icu_ver_defined = parse_ydb_icu_version(trans.addr, trans.len, icusymver, iculibver, is_ydb_env_match);
+		ydb_icu_ver_defined = parse_ydb_icu_version(trans.addr, trans.len, icusymver, iculibver, is_ydb_env_match);
+		is_ydb_env_match_usable = TRUE;
+	} else {
+		/* Neither "ydb_icu_version" nor "gtm_icu_version" env vars have been specified. "is_ydb_env_match" is
+		 * uninitialized at this point.
+		 */
+		is_ydb_env_match_usable = FALSE;
 	}
-	if (gtm_icu_ver_defined)
+	if (ydb_icu_ver_defined)
 	{	/* User explicitly specified an ICU version. So load version specific icu file (e.g. libicuio.so.36) */
 		icu_libname_len = 0;
 		iculibver_len = STRLEN(iculibver);
@@ -307,7 +313,7 @@ void gtm_icu_init(void)
 	if (RESTRICTED(library_load_path))
 	{
 		/* Try the version named symlink */
-		if (gtm_icu_ver_defined)
+		if (ydb_icu_ver_defined)
 		{
 			SNPRINTF(librarypath, LIBRARY_PATH_MAX, GTM_PLUGIN_FMT_FULL, ydb_dist, libname);
 			if (0 != Stat(librarypath, &libpath_stat)) /* Try the default named symlink */
@@ -344,7 +350,7 @@ void gtm_icu_init(void)
 					icusymver[icusymver_len++] = '_';
 				icusymver[icusymver_len++] = pieceptr[1];
 				icusymver[icusymver_len++] = '\0';
-				gtm_icu_ver_defined = TRUE;
+				ydb_icu_ver_defined = TRUE;
 				break;
 			}
 			pieceptr = STRTOK_R(NULL, DOT_CHAR, &strtokptr);
@@ -352,7 +358,7 @@ void gtm_icu_init(void)
 #		endif
 	} else	/* Note: the "else" clause spans an ifdef which calls dlopen() twice on AIX */
 #	ifdef _AIX
-	if (gtm_icu_ver_defined || /* Use the AIX system default when no ICU version specified */
+	if (ydb_icu_ver_defined || /* Use the AIX system default when no ICU version specified */
 			NULL == (handle = dlopen(ICU_LIBNAME_DEF, iculdflags)))
 	{
 		/* AIX has a unique packaging convention in that shared objects are conventionally
@@ -472,7 +478,7 @@ void gtm_icu_init(void)
 #endif
 		if (NULL == fptr)
 		{	/* If ydb_icu_version is defined to a proper value, then try function name with <major_ver>_<minor_ver> */
-			if (gtm_icu_ver_defined && ((0 == findx) || symbols_renamed))
+			if (ydb_icu_ver_defined && ((0 == findx) || symbols_renamed))
 			{
 				memcpy(&icu_final_fname[icu_final_fname_len], icusymver, icusymver_len);
 				icu_final_fname_len += icusymver_len;
@@ -487,9 +493,11 @@ void gtm_icu_init(void)
 			if (NULL == fptr)
 			{
 				COPY_DLLERR_MSG(err_str, err_msg);
-				envname = (char *)(is_ydb_env_match
-							? ydbenvname[YDBENVINDX_ICU_VERSION]
-							: gtmenvname[YDBENVINDX_ICU_VERSION]) + 1;	/* + 1 to skip past '$' */
+				envname = (char *)(!is_ydb_env_match_usable
+							? "ydb_icu_version/gtm_icu_version"
+							: (is_ydb_env_match
+								? ydbenvname[YDBENVINDX_ICU_VERSION]
+								: gtmenvname[YDBENVINDX_ICU_VERSION]) + 1); /* +1 skips past '$' */
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(10)
 					ERR_ICUSYMNOTFOUND, 4, LEN_AND_STR(cur_icu_fname), LEN_AND_STR(envname),
 					ERR_TEXT, 2, LEN_AND_STR(err_msg));
@@ -498,7 +506,7 @@ void gtm_icu_init(void)
 				symbols_renamed = TRUE;
 		} else if (0 == findx)	/* record the fact that the symbols are NOT renamed */
 			symbols_renamed = FALSE;
-		assert((0 == findx) || icu_getversion_found || gtm_icu_ver_defined); /* u_getVersion should have been dlsym'ed */
+		assert((0 == findx) || icu_getversion_found || ydb_icu_ver_defined); /* u_getVersion should have been dlsym'ed */
 		*icu_fptr[findx] = fptr;
 		/* If the current function that is dlsym'ed is u_getVersion, then we use fptr to query for the library's ICU
 		 * version. If it is less than the least ICU version that YottaDB supports we issue an error. If not, we continue
@@ -508,7 +516,7 @@ void gtm_icu_init(void)
 		 * an appropriate value in the environment then the version check would have happened before and there isn't any
 		 * need to repeat it again.
 		 */
-		if (!gtm_icu_ver_defined && (FALSE == icu_getversion_found) && (0 == strcmp(cur_icu_fname, GET_ICU_VERSION_FNAME)))
+		if (!ydb_icu_ver_defined && (FALSE == icu_getversion_found) && (0 == strcmp(cur_icu_fname, GET_ICU_VERSION_FNAME)))
 		{
 			icu_getversion_found = TRUE;
 			memset(icu_version, 0, MAX_ICU_VERSION_LENGTH);
