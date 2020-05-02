@@ -239,6 +239,7 @@ void gtm_icu_init(void)
 	boolean_t	is_ydb_env_match, is_ydb_env_match_usable;
 	mstr		trans;
 	char		*envname;
+	int4		trans_log_name_status;
 
 	assert(!gtm_utf8_mode);
 #	ifdef __MVS__
@@ -268,16 +269,13 @@ void gtm_icu_init(void)
 	 * symbols without appended version numbers) will be used.
 	 */
 	ydb_icu_ver_defined = FALSE;
-	if (SS_NORMAL == ydb_trans_log_name(YDBENVINDX_ICU_VERSION, &trans, icu_ver_buf, SIZEOF(icu_ver_buf),
-											IGNORE_ERRORS_TRUE, &is_ydb_env_match))
+	trans_log_name_status = ydb_trans_log_name(YDBENVINDX_ICU_VERSION, &trans, icu_ver_buf, SIZEOF(icu_ver_buf),
+										IGNORE_ERRORS_TRUE, &is_ydb_env_match);
+	/* "is_ydb_env_match" is not initialized in the SS_NOLOGNAM status */
+	is_ydb_env_match_usable = (SS_NOLOGNAM != trans_log_name_status);
+	if (SS_NORMAL == trans_log_name_status)
 	{	/* $ydb_icu_version is defined. Do edit check on the value before considering it really defined */
 		ydb_icu_ver_defined = parse_ydb_icu_version(trans.addr, trans.len, icusymver, iculibver, is_ydb_env_match);
-		is_ydb_env_match_usable = TRUE;
-	} else {
-		/* Neither "ydb_icu_version" nor "gtm_icu_version" env vars have been specified. "is_ydb_env_match" is
-		 * uninitialized at this point.
-		 */
-		is_ydb_env_match_usable = FALSE;
 	}
 	if (ydb_icu_ver_defined)
 	{	/* User explicitly specified an ICU version. So load version specific icu file (e.g. libicuio.so.36) */

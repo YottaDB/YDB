@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2010 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -32,7 +32,8 @@ LITREF	char	*gtmenvname[YDBENVINDX_MAX_INDEX];
  * gtmenvname[] table if the same index has a non-zero string literal and if so uses that as the environment variable
  * to check if it is defined. This way, ydb* takes precedence over gtm* if both exist.
  * If return is not SS_NOLOGNAM and is_ydb_env_match is non-NULL, *is_ydb_env_match is TRUE if the ydb* env var matched
- *	and FALSE if the gtm* env var matched.
+ *	and FALSE if the gtm* env var matched. If return is SS_NOLOGNAM and is_ydb_env_match is non-NULL, *is_ydb_env_match
+ *	is uninitialized and caller should not rely on this value.
  * In addition, if the gtm* env var exists but the ydb* env var does not, this routine does a "setenv" of the ydb* env var
  *	to have the exact same value as the gtm* env var.
  */
