@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -50,10 +50,13 @@
  * in addition to the other handlers for each trigger frame, the maximums may need to be re-visited.
  */
 #ifdef DEBUG
-#  define CONDSTK_INITIAL_INCR	5	/* Lower initial limit for DEBUG to exercise extensions. Note that values below 5 cause
-					 * issues with nested malloc()s when using certain ydb_dbglvl values. */
+#  define CONDSTK_INITIAL_INCR	8	/* Lower initial limit for DEBUG to exercise condition handler stack extensions.
+					 * Note that even a value of 5 has been seen to cause issues with nested malloc()s
+					 * (see commit message for details on the failure which showed this possibility).
+					 * Hence setting this to 8 for DEBUG and bumping the initial limit to 16 for PRO builds.
+					 */
 #else
-#  define CONDSTK_INITIAL_INCR	8	/* Initial increment value used when expanding condition handler stack */
+#  define CONDSTK_INITIAL_INCR	16	/* Initial increment value used when expanding condition handler stack */
 #endif
 #define CONDSTK_MAX_INCR	128	/* Increment doubles each time expanded till hits this level */
 #define CONDSTK_MAX_STACK	512	/* Actual max is approx 504 due to arithmetic progression */
