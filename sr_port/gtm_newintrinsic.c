@@ -37,7 +37,7 @@ error_def(ERR_STACKOFLOW);
 
 /* Note this module follows the basic pattern of op_newvar which handles the same
    function except for local vars instead of intrinsic vars. */
-int gtm_newintrinsic(mval *intrinsic)
+void gtm_newintrinsic(mval *intrinsic)
 {
 	mv_stent 	*mv_st_ent, *mvst_tmp, *mvst_prev;
 	stack_frame	*fp, *fp_prev, *fp_fix;
@@ -156,5 +156,5 @@ int gtm_newintrinsic(mval *intrinsic)
 		intrinsic->mvtype = MV_STR;
 		intrinsic->str.len = 0;
 	}
-	return shift_size;
+	return;
 }

@@ -52,7 +52,6 @@
 #include "deferred_events.h"
 #include "deferred_events_queue.h"
 
-GBLREF stack_frame	*frame_pointer;
 GBLREF gv_key		*gv_currkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF gd_addr		*gd_header;
@@ -101,8 +100,9 @@ error_def(ERR_ZTWORMHOLE2BIG);
 
 void op_svput(int varnum, mval *v)
 {
-	int	i, ok, state, shift_size;
-	char	*vptr;
+	int	i, ok, state;
+	char	*vptr, lcl_str[256], *tmp;
+	mval	lcl_mval;
 	int4	previous_gtm_strpllim;
 	int4  	event_type, param_val;
 	void (*set_fn)(int4 param);
@@ -187,6 +187,20 @@ void op_svput(int varnum, mval *v)
 				rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_NOZTRAPINTRIG);
 #			endif
 			MV_FORCE_STR(v);
+			/* Save string corresponding to input mval "v" in case the string pointed to by "v->str.addr"
+			 * gets shifted around by the op_newintrinsic()/gtm_newintrinsic() calls below
+			 */
+			lcl_mval = *v;
+			if (SIZEOF(lcl_str) < lcl_mval.str.len)
+			{
+				tmp = (char *)malloc(lcl_mval.str.len);
+				memcpy(tmp, v->str.addr, lcl_mval.str.len);
+				lcl_mval.str.addr = tmp;
+			} else
+			{
+				memcpy(lcl_str, v->str.addr, lcl_mval.str.len);
+				lcl_mval.str.addr = lcl_str;
+			}
 			if (ztrap_new)
 				op_newintrinsic(SV_ZTRAP);
 			if (!v->str.len)
@@ -204,13 +218,17 @@ void op_svput(int varnum, mval *v)
 				}
 				if ((TREF(dollar_etrap)).str.len > 0)
 				{
-					shift_size = gtm_newintrinsic(&(TREF(dollar_etrap)));
-					assert((0 == shift_size) || (0 != (frame_pointer->flags & SFF_INDCE)));
+					gtm_newintrinsic(&(TREF(dollar_etrap)));
 					NULLIFY_TRAP(TREF(dollar_etrap));
-					v = (mval *)(((char *)v) - shift_size);
 				}
 				(TREF(dollar_ztrap)).mvtype = MV_STR;
-				(TREF(dollar_ztrap)).str = v->str;
+				/* Copy the saved string (pointing to C-stack or malloc storage) back to the stringpool
+				 * before copying it to TREF(dollar_ztrap).str
+				 */
+				s2pool(&lcl_mval.str);
+				(TREF(dollar_ztrap)).str = lcl_mval.str;
+				if (SIZEOF(lcl_str) < lcl_mval.str.len)
+					free(tmp);
 			}
 			if (ZTRAP_POP & TREF(ztrap_form))
 				ztrap_save_ctxt();

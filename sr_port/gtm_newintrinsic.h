@@ -12,4 +12,4 @@
  *								*
  ****************************************************************/
 
-int gtm_newintrinsic(mval *intrinsic);
+void gtm_newintrinsic(mval *intrinsic);
