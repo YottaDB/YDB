@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -38,9 +41,26 @@ void op_unlock(void)
 	mlk_pvtblk 	**prior;
 	boolean_t	is_proc_exiting;
 
-	/* if there were any old locks before TSTART, they can't be  unlocked */
+	/* if there were any old locks before TSTART, they can't be unlocked */
 	if (mlk_pvt_root && tp_pointer && tp_pointer->old_locks)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPLOCK);
+	{
+		if (!process_exiting)
+		{
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_TPLOCK);
+		} else
+		{	/* It is possible we come here during process exit handling due to deferred signal handling invoked
+			 * in the middle of "op_tstart()". An example C-stack would be
+			 *	op_tstart
+			 *	  -> malloc
+			 *	    -> deferred_signal_handler
+			 *	      -> deferred_exit_handler
+			 *	        -> gtm_exit_handler
+			 *		  -> op_unlock
+			 * In this case, it is possible we have locks from before the TSTART. But we skip issuing TPLOCK
+			 * error in this case since the process is anyways in exit processing and about to terminate.
+			 */
+		}
+	}
 	lks_this_cmd = 0;
 	op_lkinit();
 	/* must deal with cm */
