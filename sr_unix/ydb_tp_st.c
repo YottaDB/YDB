@@ -131,7 +131,6 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 				assert(0 == dollar_tlevel);
 				break;
 			}
-			assert(1 >= dollar_tlevel);	/* See `dollar_tlevel` use below for why it can be 0 */
 			if (YDB_TP_RESTART != retval)
 			{	/* Outermost TP and error code is not a TPRESTART.
 				 * Return it directly to caller of "ydb_tp_st" but before that roll back the
@@ -140,6 +139,7 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 				 * Note that it is possible "retval" is YDB_TP_ROLLBACK (e.g. if the callback
 				 *	function returned YDB_TP_ROLLBACK).
 				 */
+				assert(1 >= dollar_tlevel);	/* See `dollar_tlevel` use below for why it can be 0 */
 				if (dollar_tlevel)
 				{	/* Rollback could have happened in some cases already (for example
 					 * if "ydb_tp_s_common(LYDB_RTN_TP_COMMIT)" invocation failed with a GBLOFLOW
@@ -170,6 +170,9 @@ int ydb_tp_st(uint64_t tptoken, ydb_buffer_t *errstr, ydb_tp2fnptr_t tpfn, void 
 				 */
 				break;
 			}
+			/* Note: dollar_tlevel could be > 1 at this point but since retval is YDB_TP_RESTART, it is okay
+			 * as the TP restart done below (using LYDB_RTN_TP_RESTART_TLVL0) will bring it back down to 1.
+			 */
 			/* Restart the outermost TP transaction by asking "ydb_tp_s_common" to do the "tp_restart" */
 			retval = ydb_tp_s_common(LYDB_RTN_TP_RESTART_TLVL0, (ydb_basicfnptr_t)NULL,
 						(void *)NULL, (const char *)NULL, (int)0, (ydb_buffer_t *)NULL);
