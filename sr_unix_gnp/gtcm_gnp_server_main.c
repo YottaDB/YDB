@@ -91,9 +91,8 @@
 #include "continue_handler.h"
 #include "have_crit.h"
 
-GBLDEF char **gtmenvp;
+GBLREF char **gtmenvp;
 GBLREF char cli_err_str[];
-
 GBLREF FILE			*gtcm_errfs;
 GBLREF bool			licensed;
 GBLREF boolean_t		run_time;
@@ -110,11 +109,12 @@ GBLREF enum gtmImageTypes	image_type;
 GBLREF IN_PARMS			*cli_lex_in_ptr;
 GBLREF char			cli_token_buf[];
 GBLREF CLI_ENTRY		gtcm_gnp_cmd_ary[];
+GBLREF int4			gtcm_exi_condition;
+
 GBLDEF bool			cm_timeout = FALSE;
 GBLDEF bool			cm_shutdown = FALSE;
 GBLDEF unsigned short		procnum;
 GBLDEF int			gtcm_users = 0;
-GBLDEF int4			gtcm_exi_condition;
 GBLDEF connection_struct 	*curr_entry;
 GBLDEF relque ALIGN_QUAD	action_que;
 GBLDEF struct CLB       	*proc_to_clb[USHRT_MAX + 1];    /* for index 0 */

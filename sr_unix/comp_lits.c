@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -22,8 +22,7 @@ GBLREF mliteral		literal_chain;
 GBLREF spdesc		stringpool;
 GBLREF unsigned short	source_name_len;
 GBLREF mident		routine_name;
-
-GBLDEF uint4		lits_text_size, lits_mval_size;
+GBLREF uint4		lits_text_size, lits_mval_size;
 
 void comp_lits(rhdtyp *rhead)
 {

@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -73,8 +73,8 @@ GBLREF	mstr			default_sysid;
 GBLREF	spdesc			rts_stringpool, stringpool;
 GBLREF	uint4			process_id;
 GBLREF	boolean_t		ydb_dist_ok_to_use;
+GBLREF	CLI_ENTRY		*cmd_ary;
 
-GBLDEF	CLI_ENTRY		*cmd_ary = &dbcertify_cmd_ary[0];	/* Define cmd_ary to be the DBCERTIFY specific cmd table */
 GBLDEF	phase_static_area	*psa_gbl;				/* Global anchor for static area */
 
 int dbcertify_main(int argc, char **argv, char **envp)

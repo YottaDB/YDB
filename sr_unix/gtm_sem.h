@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2008 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -18,7 +18,7 @@
 #define FTOK_SEM_PER_ID 3
 
 
-union   semun {
+typedef union   semun {
 	int     val;
 	struct  semid_ds *buf;
 	u_short *array;
@@ -26,7 +26,7 @@ union   semun {
 	struct seminfo *__buf;		/* buffer for IPC_INFO */
 	void *__pad;
 #endif
-} arg;
+} semun_t;
 
 #endif /* GTM_SEM_INCLUDED */
 

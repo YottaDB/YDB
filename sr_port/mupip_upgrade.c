@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -65,7 +65,7 @@ GBLREF	boolean_t		exit_handler_complete;
 LITREF  char            	ydb_release_name[];
 LITREF  int4           		ydb_release_name_len;
 
-STATICDEF sem_info		*sem_inf;
+GBLDEF	sem_info		*sem_inf;
 
 STATICFNDCL void mupip_upgrade_cleanup(void);
 

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -68,11 +68,10 @@ GBLREF	ch_ret_type			(*ch_at_trigger_init)();
 #ifdef UTF8_SUPPORTED
 GBLREF	u_casemap_t 			gtm_strToTitle_ptr;		/* Function pointer for gtm_strToTitle */
 #endif
+GBLREF	char 				**gtmenvp;
 
 #define GTMCRYPT_ERRLIT			"during GT.M startup"
 #define YDBXC_gblstat			"ydb_xc_gblstat=%s/gtmgblstat.xc"
-
-GBLDEF	char 				**gtmenvp;
 
 error_def(ERR_CRYPTDLNOOPEN);
 error_def(ERR_CRYPTDLNOOPEN2);

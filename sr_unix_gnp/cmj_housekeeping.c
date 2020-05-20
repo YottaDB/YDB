@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -15,7 +15,7 @@
 #include "cmidef.h"
 #include "relqop.h"
 
-GBLDEF struct NTD *ntd_root;
+GBLREF struct NTD *ntd_root;
 
 void cmj_housekeeping(void)
 {

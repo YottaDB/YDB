@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2016 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -29,7 +32,6 @@
 # else
 #  error			"Unsupported Algorithm for Libgcrypt"
 # endif
-STATICDEF int			gcry_already_inited;
 #else
 # error 			"Unsupported encryption library. Reference implementation currently supports OpenSSL and Libgcrypt"
 #endif	/* USE_GCRYPT */

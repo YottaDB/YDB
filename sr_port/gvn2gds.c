@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,11 +43,11 @@
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
+GBLDEF boolean_t	save_transform;
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_NOCANONICNAME);
 
-STATICDEF boolean_t	save_transform;
 STATICDEF gd_region	*gvn2gds_save_gv_cur_region;
 
 /* Restore global variables "gv_cur_region", "gv_target" and "transform" */

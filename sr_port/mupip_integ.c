@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -131,24 +131,24 @@ GBLDEF int			rec_len;
  */
 GBLDEF enc_handles		mu_int_encr_handles;
 GBLDEF boolean_t		ointeg_this_reg;
-GBLDEF util_snapshot_ptr_t	util_ss_ptr;
 GBLDEF boolean_t		preserve_snapshot;
 GBLDEF boolean_t		online_specified;
 
-GBLREF bool			mu_ctrly_occurred;
-GBLREF bool			mu_ctrlc_occurred;
 GBLREF bool			error_mupip;
-GBLREF short			crash_count;
-GBLREF gd_region		*gv_cur_region;
-GBLREF gv_namehead		*gv_target;
-GBLREF gv_key			*gv_altkey;
-GBLREF gv_key			*gv_currkey;
-GBLREF sgmnt_addrs		*cs_addrs;
-GBLREF tp_region		*grlist;
+GBLREF bool			mu_ctrlc_occurred;
+GBLREF bool			mu_ctrly_occurred;
 GBLREF bool			region;
 GBLREF boolean_t		debug_mupip;
+GBLREF gd_region		*gv_cur_region;
+GBLREF gv_key			*gv_altkey;
+GBLREF gv_key			*gv_currkey;
 GBLREF gv_key			*muint_end_key;
 GBLREF gv_key			*muint_start_key;
+GBLREF gv_namehead		*gv_target;
+GBLREF sgmnt_addrs		*cs_addrs;
+GBLREF short			crash_count;
+GBLREF tp_region		*grlist;
+GBLREF util_snapshot_ptr_t	util_ss_ptr;
 
 error_def(ERR_CTRLC);
 error_def(ERR_CTRLY);

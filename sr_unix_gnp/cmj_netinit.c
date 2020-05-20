@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,7 +16,7 @@
 #include "gtm_string.h"
 #include <errno.h>
 
-GBLDEF struct NTD *ntd_root;
+GBLREF struct NTD *ntd_root;
 
 /* CLEAN-UP: 1. replace CMI_CMICHECK with new message
 	2. find correct size and location of MBX_SIZE

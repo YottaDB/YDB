@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -40,7 +40,7 @@
 #define JOB_SOCKET_HANDLE(ADDR)		(((char *)(ADDR)) + SIZEOF(JOB_SOCKET_PREFIX) - 1)
 #define JOB_SOCKET_HANDLE_LEN(LEN)	(LEN - SIZEOF(JOB_SOCKET_PREFIX) + 1)
 
-GBLDEF int job_errno;
+GBLREF int job_errno;
 
 /********************************************************************************************************************
  * Following enum is used to identify the cause of error in the middle process (M) to the main thread (P)

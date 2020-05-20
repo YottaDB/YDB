@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2015 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -39,7 +39,8 @@
 #include "common_startup_init.h"
 #include "gtm_threadgbl_init.h"
 
-int	quiet = 0;
+GBLDEF	int	quiet = 0;
+GBLDEF	int	rc_cpt_sem;     /* semaphore for CPTable */
 
 void	clean_mem(char *name);
 void	database_clean(char *path);

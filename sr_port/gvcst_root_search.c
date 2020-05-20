@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -59,8 +59,8 @@ GBLREF	boolean_t	mupip_jnl_recover;
 # ifdef DEBUG
 GBLREF	boolean_t	is_rcvr_server;
 GBLREF	boolean_t	is_src_server;
-GBLDEF	unsigned char	t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
-GBLDEF	unsigned int	t_tries_dbg;
+GBLREF	unsigned char	t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
+GBLREF	unsigned int	t_tries_dbg;
 # endif
 GBLREF	jnl_gbls_t	jgbl;
 GBLREF	unsigned char	t_fail_hist[CDB_MAX_TRIES];

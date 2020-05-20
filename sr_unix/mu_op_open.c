@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -45,8 +45,7 @@
 
 #define  LOGNAME_LEN 255
 
-GBLDEF	io_desc			*active_device;
-
+GBLREF	io_desc			*active_device;
 GBLREF bool			licensed;
 GBLREF dev_dispatch_struct  	io_dev_dispatch_mupip[];
 GBLREF int4			lkid,lid;
