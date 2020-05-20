@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -97,8 +97,7 @@
 #define intent_open		"for open"	/* FLUSH_DB_IPCS_INFO types */
 #define intent_close		"for close"
 
-GBLDEF CLI_ENTRY	*cmd_ary = NULL; /* GTMSECSHR does not have any command tables so initialize command array to NULL */
-
+GBLREF CLI_ENTRY		*cmd_ary;
 GBLREF	int			gtmsecshr_sockfd;
 GBLREF	struct sockaddr_un	gtmsecshr_sock_name;
 GBLREF	int			gtmsecshr_sockpath_len;
@@ -227,7 +226,7 @@ int main(int argc, char_ptr_t argv[])
 	DCL_THREADGBL_ACCESS;
 
 	GTM_THREADGBL_INIT;
-	assert(MAXPOSINT4 >= GTMSECSHR_MESG_TIMEOUT);
+	/* GTMSECSHR does not have any command tables so initialize "cmd_ary" to NULL by passing in 2nd parameter NULL below */
 	common_startup_init(GTMSECSHR_IMAGE, NULL); /* Side-effect : Sets skip_dbtriggers = TRUE if platorm lacks trigger support */
 	err_init(gtmsecshr_cond_hndlr);
 	gtmsecshr_init(argv, &rundir, &rundir_len);

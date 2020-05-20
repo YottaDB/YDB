@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC. and/or its subsidiaries.*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -56,9 +56,11 @@
 #define	GTM_VER_LIT		"GT.M "
 #define	MAX_VERSION_LEN		16	/* 16 bytes enough to hold V63000A, longest -VERSION= value possible */
 
-static sem_info	*sem_inf;
+GBLREF	boolean_t		exit_handler_active;
+GBLREF	boolean_t		exit_handler_complete;
+GBLREF	sem_info		*sem_inf;
 
-static void mupip_downgrade_cleanup(void);
+STATICFNDCL void mupip_downgrade_cleanup(void);
 
 error_def(ERR_BADDBVER);
 error_def(ERR_DBFILOPERR);

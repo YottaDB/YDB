@@ -3,6 +3,9 @@
  * Copyright (c) 2012-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -41,9 +44,10 @@
 GBLREF gv_namehead	*gv_target;
 GBLREF gv_namehead	*reset_gv_target;
 GBLREF spdesc 		stringpool;
+GBLREF boolean_t	save_transform;
+
 LITREF mval		literal_null;
 
-STATICDEF boolean_t	save_transform;
 STATICDEF boolean_t	transform_direction;
 
 error_def(ERR_COLLATIONUNDEF);

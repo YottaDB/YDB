@@ -62,6 +62,7 @@ void	job_timer_handler(void);
 
 GBLDEF	short			jobcnt		= 0;
 GBLDEF	volatile boolean_t	ojtimeout	= TRUE;
+GBLDEF	int			job_errno;
 
 GBLREF	uint4		dollar_trestart;
 GBLREF	int		dollar_truth;

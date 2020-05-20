@@ -2,7 +2,7 @@
  *								*
  * Copyright 2005, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,10 +58,10 @@
 #include "wbox_test_init.h"
 
 GBLREF	uint4			process_id;
-GBLREF	boolean_t		gtm_utf8_mode;
-GBLREF	CLI_ENTRY		dbcertify_cmd_ary[];
+GBLREF	boolean_t		ydb_dist_ok_to_use;
+GBLREF	CLI_ENTRY		*cmd_ary;
 
-GBLDEF	phase_static_area	*psa_gbl;			/* Global anchor for static area */
+GBLDEF	phase_static_area	*psa_gbl;				/* Global anchor for static area */
 
 int dbcertify_main(int argc, char **argv, char **envp)
 {

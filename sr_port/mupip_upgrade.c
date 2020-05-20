@@ -3,7 +3,7 @@
  * Copyright (c) 2005-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC. and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,7 +62,7 @@
 LITREF  char            	ydb_release_name[];
 LITREF  int4           		ydb_release_name_len;
 
-UNIX_ONLY(static sem_info	*sem_inf;)
+GBLDEF	sem_info		*sem_inf;
 
 UNIX_ONLY(static void mupip_upgrade_cleanup(void);)
 
