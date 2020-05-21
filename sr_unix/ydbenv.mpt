@@ -1,6 +1,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;								;
-; Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	;
+; Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	;
 ; All rights reserved.						;
 ;								;
 ;	This source code contains the intellectual property	;
@@ -215,9 +215,11 @@ set	; Intended to be the most common entry point to this routine (with unset lik
 	. . ; Since every group is surrounded by parentheses all we need to do is check if "(ydbgroup)" exists in "grouplist"
 	. . zsystem:$zfind(grouplist,"("_ydbgroup_")") "chgrp "_ydbgroup_" "_tmp4
 	do ExportEnv("ydb_log",tmp4),ExportEnv("gtm_log",tmp4),ExportEnv("ydb_tmp",tmp4),ExportEnv("gtm_tmp",tmp4)
-	; ydb_etrap is set here, followed by miscellaneous environment variables
+	; ydb_etrap & ydb_procstuckexec are set here, followed by miscellaneous environment variables
 	set tmp1=$select($data(currenv("ydb_etrap")):currenv("ydb_etrap"),$data(currenv("gtm_etrap")):currenv("gtm_etrap"),1:"Write:(0=$STACK) ""Error occurred: "",$ZStatus,!")
 	do ExportEnv("ydb_etrap",tmp1),ExportEnv("gtm_etrap",tmp1)
+	set tmp1=dist_$select("UTF-8"=chset:"/utf8",1:"")
+	do ExportEnv("ydb_procstuckexec",tmp1_"/yottadb -run %YDBPROCSTUCKEXEC"),ExportEnv("gtm_procstuckexec",tmp1_"/yottadb -run %YDBPROCSTUCKEXEC")
 	do:'$zfind($get(currenv("LD_LIBRARY_PATH")),dist) ExportEnv("LD_LIBRARY_PATH",dist_$select($data(currenv("LD_LIBRARY_PATH")):":"_currenv("LD_LIBRARY_PATH"),1:""))
 	if $increment(zstmp)	       ; new search context for search in next line
 	for  set tmp1=$zsearch("$ydb_dist/plugin/*.xc",zstmp) quit:""=tmp1  do
