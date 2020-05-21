@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -23,7 +23,7 @@ GBLREF	boolean_t	caller_func_is_stapi;
  *
  * Parms and return - same as ydb_delete_s() except for the addition of tptoken and errstr.
  */
-void ydb_timer_cancel_t(uint64_t tptoken, ydb_buffer_t *errstr, int timer_id)
+void ydb_timer_cancel_t(uint64_t tptoken, ydb_buffer_t *errstr, intptr_t timer_id)
 {
 	libyottadb_routines	save_active_stapi_rtn;
 	ydb_buffer_t		*save_errstr;

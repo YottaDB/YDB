@@ -348,7 +348,7 @@ void	*ydb_malloc(size_t size);
 int	ydb_message(int status, ydb_buffer_t *msg_buff);
 int	ydb_stdout_stderr_adjust(void);
 int	ydb_thread_is_main(void);
-void	ydb_timer_cancel(int timer_id);
+void	ydb_timer_cancel(intptr_t timer_id);
 int	ydb_timer_start(intptr_t timer_id, unsigned long long limit_nsec, ydb_funcptr_retvoid_t handler, unsigned int hdata_len,
 			void *hdata);
 
@@ -365,8 +365,8 @@ int	ydb_file_is_identical_t(uint64_t tptoken, ydb_buffer_t *errstr, ydb_fileid_p
 int	ydb_file_name_to_id_t(uint64_t tptoken, ydb_buffer_t *errstr, ydb_string_t *filename, ydb_fileid_ptr_t *fileid);
 int	ydb_message_t(uint64_t tptoken, ydb_buffer_t *errstr, int status, ydb_buffer_t *msg_buff);
 int	ydb_stdout_stderr_adjust_t(uint64_t tptoken, ydb_buffer_t *errstr);
-void	ydb_timer_cancel_t(uint64_t tptoken, ydb_buffer_t *errstr, int timer_id);
-int	ydb_timer_start_t(uint64_t tptoken, ydb_buffer_t *errstr, int timer_id, unsigned long long limit_nsec,
+void	ydb_timer_cancel_t(uint64_t tptoken, ydb_buffer_t *errstr, intptr_t timer_id);
+int	ydb_timer_start_t(uint64_t tptoken, ydb_buffer_t *errstr, intptr_t timer_id, unsigned long long limit_nsec,
 					ydb_funcptr_retvoid_t handler, unsigned int hdata_len, void *hdata);
 
 /* Simple API routine declarations */
