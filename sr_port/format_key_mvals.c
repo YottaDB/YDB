@@ -1,6 +1,9 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ * Copyright 2001, 2011 Fidelity Information Services, Inc	*
+ *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -29,11 +32,12 @@
 
 #include "gtm_string.h"
 #include "lv_val.h"		/* needed by "lv_nameinfo.h" */
+#include "op.h"			/* for "op_fnzwrite" prototype */
 
 unsigned char	*format_key_mvals(unsigned char *buff, int size, lvname_info *lvnp)
 {
 	int		cnt;
-	mval		*keys;
+	mval		*keys, dst;
 	int		n, subcnt;
 	unsigned char	*endbuff;
 
@@ -50,27 +54,27 @@ unsigned char	*format_key_mvals(unsigned char *buff, int size, lvname_info *lvnp
 		for (n = 0;  ;  )
 		{
 			keys = lvnp->lv_subs[subcnt++];
+			op_fnzwrite(0, keys, &dst);	/* Store ZWRITE representation of keys in "dst" */
+			/* dst now points to stringpool */
 			MV_FORCE_STR(keys);
-			if (size > (keys)->str.len)
+			if (size > dst.str.len)
 			{
-				memcpy(buff, (keys)->str.addr, (keys)->str.len);
-				buff += (keys)->str.len;
-				size -= (keys)->str.len;
-			}
-			else
+				assert(MVTYPE_IS_STRING(dst.mvtype));
+				memcpy(buff, dst.str.addr, dst.str.len);
+				buff += dst.str.len;
+				size -= dst.str.len;
+			} else
 			{
 				/* copy as much space as we have */
-				memcpy(buff, (keys)->str.addr, size);
+				memcpy(buff, dst.str.addr, size);
 				buff += size;
 				break;
 			}
-
 			if (++n < cnt  &&  size > 0)
 			{
 				*buff++ = ',';
 				size--;
-			}
-			else
+			} else
 			{
 				if (size > 0)
 				{
