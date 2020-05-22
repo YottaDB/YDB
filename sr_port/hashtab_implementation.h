@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -763,24 +763,22 @@ sm_uc_ptr_t COPY_HASHTAB_TO_BUFFER(HASH_TABLE *table, sm_uc_ptr_t buffer, int (*
 }
 
 /**
- * Constructs a hash table from the given buffer.
+ * Constructs a usable hash table from the input "buffer" which points to a hash table structure created at compile time
+ * and stored into M object code as a literal.
  *
- * The buffer is expected to stay alive for the duration of
- *  the life of the hastable; we don't perform an extra copy
- * @param [in] buffer the written hashtable value; note that the caller is responsible for making the buffer
- * 	is large enough for the hash table, hash table entries, and the values the entries point too
- * @param [in] copy_entry_from_buffer function pointed to returns an int representing bits used in the buffer,
- * 	and takes the current hash table entry along with a pointer to the buffer. It should fill out the hash
- * 	table entry
+ * "buffer" is expected to stay alive for the duration of the life of the hastable; we don't perform an extra copy.
+ * "table"  points to a HASH_TABLE structure. It is initialized to be a copy of the HASH_TABLE structure pointed to
+ *	by the first section of "buffer". This separate memory is needed because we want to modify a few fields
+ *	in the HASH_TABLE structure and we cannot do this in case the M object is in a shared library or in
+ *	an autorelink file (i.e. no read/write permissions). Therefore we do this in all cases even when the .o
+ *	file is in process private memory with read-write access. Keeps the code simple.
  */
-HASH_TABLE *ACTIVATE_HASHTAB_IN_BUFFER(sm_uc_ptr_t buffer, int (*copy_entry_from_buffer)(HT_ENT *, sm_uc_ptr_t))
+void ACTIVATE_HASHTAB_IN_BUFFER(sm_uc_ptr_t buffer, HASH_TABLE *table)
 {
-	int i;
-	HT_ENT *cur, *top;
+	int	i;
+	HT_ENT	*cur, *top;
 
-	HASH_TABLE *table = (HASH_TABLE *)buffer;
-	if (TRUE == table->active)
-		return table;
+	memcpy(table, buffer, SIZEOF(HASH_TABLE));
 	buffer += SIZEOF(HASH_TABLE);
 	table->entry_passed_thru = buffer;
 	buffer += ROUND_UP(table->size, BITS_PER_UCHAR);
@@ -788,11 +786,4 @@ HASH_TABLE *ACTIVATE_HASHTAB_IN_BUFFER(sm_uc_ptr_t buffer, int (*copy_entry_from
 	buffer += table->size * SIZEOF(HT_ENT);
 	table->top = (HT_ENT *)buffer;
 	table->active = TRUE;
-	if (NULL != copy_entry_from_buffer)
-	{
-		for(cur = table->base, top = table->top; cur < top; cur++) {
-			buffer += (*copy_entry_from_buffer)(cur, buffer);
-		}
-	}
-	return table;
 }

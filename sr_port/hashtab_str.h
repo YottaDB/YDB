@@ -3,6 +3,9 @@
  * Copyright (c) 2009-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -78,6 +81,6 @@ void reinitialize_hashtab_str(hash_table_str *table);
 void compact_hashtab_str(hash_table_str *table);
 sm_uc_ptr_t copy_hashtab_to_buffer_str(hash_table_str *table, sm_uc_ptr_t buffer,
 		int (*copy_entry_to_buffer)(ht_ent_str *, sm_uc_ptr_t));
-hash_table_str *activate_hashtab_in_buffer_str(sm_uc_ptr_t buffer, int (*copy_entry_from_buffer)(ht_ent_str *, sm_uc_ptr_t));
+void activate_hashtab_in_buffer_str(sm_uc_ptr_t buffer, hash_table_str *table);
 
 #endif /* HASHTAB_STR_H */

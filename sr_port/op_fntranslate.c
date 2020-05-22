@@ -161,8 +161,8 @@ void op_fntranslate(mval *src, mval *srch, mval *rplc, mval *dst)
 
 void op_fntranslate_fast(mval *src, mval *rplc, mval *m_xlate, mval *m_xlate_hash, mval *dst)
 {
-	hash_table_int4	*xlate_hash;  /* translation table to hold all multi-byte character mappings */
-	int4 *xlate;
+	hash_table_int4	*xlate_hash, xlt_hash;  /* translation table to hold all multi-byte character mappings */
+	int4		*xlate;
 
 	MV_FORCE_STR(src);
 	MV_FORCE_LEN(src); /* force BADCHAR if needed */
@@ -170,8 +170,10 @@ void op_fntranslate_fast(mval *src, mval *rplc, mval *m_xlate, mval *m_xlate_has
 	xlate = (int4 *)m_xlate->str.addr;
 	assert(m_xlate->str.len == NUM_CHARS * SIZEOF(int4));
 	if (0 != m_xlate_hash->str.len)
-		xlate_hash = activate_hashtab_in_buffer_int4((sm_uc_ptr_t)m_xlate_hash->str.addr, NULL);
-	else
+	{
+		xlate_hash = &xlt_hash;
+		activate_hashtab_in_buffer_int4((sm_uc_ptr_t)m_xlate_hash->str.addr, xlate_hash);
+	} else
 		xlate_hash = NULL;
 	op_fntranslate_common(src, dst, rplc, xlate, xlate_hash);
 }
