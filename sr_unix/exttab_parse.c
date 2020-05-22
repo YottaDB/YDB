@@ -59,6 +59,7 @@ STATICDEF boolean_t star_found;
 
 STATICFNDCL void *get_memory(size_t n);
 STATICFNDCL char *exttab_scan_space(char *c);
+STATICFNDCL char *exttab_scan_comment(char *c);
 STATICFNDCL char *scan_ident(char *c);
 STATICFNDCL void scan_behavioral_words(char *c, struct extcall_entry_list *entry_ptr);
 STATICFNDCL char *scan_labelref(char *c);
@@ -297,6 +298,26 @@ STATICFNDEF char *exttab_scan_space(char *c)
 	for ( ; ISSPACE_ASCII(*c); c++, ext_source_column++)
 		;
 	return c;
+}
+
+/* Skip comments (start with "//") */
+STATICFNDCL char *exttab_scan_comment(char *c)
+{
+	char *ret;
+
+	ret = c;
+	if ('\0' == *c)
+		return ret;
+	while ('\0' != *(c + 1))
+	{
+		if (('/' == *c) && ('/' == *(c + 1)))
+		{
+			*c = '\0';
+			break;
+		}
+		c++;
+	}
+	return ret;
 }
 
 /* If this is an identifier (alphameric and underscore), then
@@ -609,7 +630,8 @@ struct extcall_package_list *exttab_parse(mval *package)
 		tbp = read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle);
 		if (NULL == tbp)
 			break;
-		tbp = exttab_scan_space(str_buffer);
+		tbp = exttab_scan_comment(str_buffer);
+		tbp = exttab_scan_space(tbp);
 		/* Empty line? */
 		if (!*tbp)
 			continue;
@@ -852,7 +874,8 @@ callin_entry_list *citab_parse(boolean_t internal_use, const char *fname)
 	ext_source_line_num = 0;
 	while (read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle))
 	{
-		if (!*(tbp = exttab_scan_space(str_buffer)))
+		tbp = exttab_scan_comment(str_buffer);
+		if (!*(tbp = exttab_scan_space(tbp)))
 			continue;
 		if (!(end = scan_ident(tbp)))
 			ext_stx_error(ERR_CIRCALLNAME, ext_table_file_name);
