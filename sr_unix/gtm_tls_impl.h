@@ -49,7 +49,11 @@ STATICFNDEF gtmtls_passwd_list_t *gtm_tls_find_pwent(ydbenvindx_t envindx, char 
 																\
 	assert(0 <= SOCKFD);													\
 	flags = fcntl(SOCKFD, F_GETFL);												\
-	assert(0 == (O_NONBLOCK & flags));											\
+	if (-1 == flags) {													\
+		perror("%YDB-E-GETSOCKOPTERR, fcntl on SOCKFD failed");								\
+	} else {														\
+		assert(0 == (O_NONBLOCK & flags));										\
+	}															\
 }
 
 #define DBG_VERIFY_AUTORETRY_SET(TLS_DESC)	assert(SSL_MODE_AUTO_RETRY & SSL_CTX_get_mode((SSL_CTX *)TLS_DESC));
