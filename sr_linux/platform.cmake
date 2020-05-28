@@ -108,6 +108,12 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-char-subscripts")
 if (CMAKE_COMPILER_IS_GNUCC)
+  # In gcc 10.1.0 we noticed the below two warnings show up at link time and not at compile time (see commit message for details).
+  # Those warnings highlighted code that knew what it was doing and it was not easy to restructure the code to avoid the warning.
+  # So disable this warning for now at least. Not yet sure if it is a gcc regression. If so this is a reminder to re-enable
+  # these warnings. If not (i.e. it is a gcc feature), keep this permanently disabled.
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-return-local-addr")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-stringop-overflow")
   # There was a bogus warning involving iosocket_close.c which we could not address and believe to be a GCC bug.
   # Therefore, we have disabled the -Wmaybe-uninitialized warning until that bug plus many others that make this warning
   # largely unusable are fixed.
