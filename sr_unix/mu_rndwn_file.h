@@ -3,6 +3,9 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
+ *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
  *	under a license.  If you do not know the terms of	*
@@ -18,17 +21,22 @@
 
 #define SHMID           2
 
+/* We noticed the "ipcs" utility return duplicate lines (the same line got returned anywhere from 1 to even hundreds of times)
+ * in the following version. Not sure when this will get fixed so as a work around we do the "sort -u" below.
+ *	$ ipcs --version
+ *	ipcs from util-linux 2.35.1
+ */
 #ifdef __linux__
 #define KEY             1
-#define IPCS_CMD_STR		"ipcs -m | grep '^0x'"
-#define IPCS_SEM_CMD_STR	"ipcs -s | grep '^0x'"
+#define IPCS_CMD_STR		"ipcs -m | sort -u | grep '^0x'"
+#define IPCS_SEM_CMD_STR	"ipcs -s | sort -u | grep '^0x'"
 #else
 #define KEY             3
 /* though the extra blank space is required in AIX under certain cases, we
  * are adding it for all UNIX versions to avoid another ifdef for AIX.
  */
-#define IPCS_CMD_STR		"ipcs -m | grep '^m' | sed 's/^m/m /g'"
-#define IPCS_SEM_CMD_STR	"ipcs -s | grep '^s' | sed 's/^s/s /g'"
+#define IPCS_CMD_STR		"ipcs -m | sort -u | grep '^m' | sed 's/^m/m /g'"
+#define IPCS_SEM_CMD_STR	"ipcs -s | sort -u | grep '^s' | sed 's/^s/s /g'"
 #endif /* __linux__ */
 
 #define SGMNTSIZ        10

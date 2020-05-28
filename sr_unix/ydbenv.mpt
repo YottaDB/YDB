@@ -448,7 +448,12 @@ Robustify	; rollback / recover an existing database if needed
 	. else  if 1<$zlength(line,"Dumping fileheader of ") set fhead(region,"fname")=$zpiece(line,"Dumping fileheader of ",2)
 	. else  set fhead(region,$zpiece(line,"""",2))=$zpiece(line,"=",2)
 	use io close "fhead"
-	open "ipcs -s":(shell="/bin/sh":command="ipcs -s":readonly)::"pipe"
+	; We noticed the "ipcs" utility return duplicate lines (the same line got returned anywhere from 1 to even hundreds of times)
+	; in the following version. Not sure when this will get fixed so as a work around we do the "sort -u" below.
+	;	$ ipcs --version
+	;	ipcs from util-linux 2.35.1
+	;
+	open "ipcs -s":(shell="/bin/sh":command="ipcs -s | sort -u":readonly)::"pipe"
 	use "ipcs -s"
 	for  read line quit:$zeof  do
 	. set semkey=$zpiece(line," ",1)
