@@ -869,7 +869,7 @@ callin_entry_list *citab_parse(boolean_t internal_use, const char *fname)
 	}
 	Fopen(ext_table_file_handle, ext_table_file_name, "r");
 	if (!ext_table_file_handle) /* call-in table not found */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(11) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name),
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(12) ERR_CITABOPN, 2, LEN_AND_STR(ext_table_file_name),
 			  ERR_SYSCALL, 5, LEN_AND_LIT("fopen"), CALLFROM, errno);
 	ext_source_line_num = 0;
 	while (read_table(LIT_AND_LEN(str_buffer), ext_table_file_handle))
