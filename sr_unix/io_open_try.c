@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -403,13 +403,14 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 		/* Check the saved error from mknod() for fifo, also saved error from fstat() or stat()
 		   so error handler (if set)  can handle it */
 		if (ff == tl->iod->type  && mknod_err)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_mknod_err);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DEVOPENFAIL, 2, LEN_AND_STR(buf), save_mknod_err);
 		/* Error from either stat() or fstat() function */
 		if (stat_err)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) save_stat_err);
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DEVOPENFAIL, 2, LEN_AND_STR(buf), save_stat_err);
 		/* Error from trying to open a dir */
 		if (dir_err)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_GTMEISDIR, 2, LEN_AND_STR(buf));
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_DEVOPENFAIL, 2, LEN_AND_STR(buf),
+										ERR_GTMEISDIR, 2, LEN_AND_STR(buf));
 		if (timed)
 			start_timer(timer_id, nsec_timeout, wake_alarm, 0, NULL);
 		/* RW permissions for owner and others as determined by umask. */
@@ -500,6 +501,8 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 			}
 			return FALSE;
 		}
+		if (-1 == file_des)
+			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_DEVOPENFAIL, 2, LEN_AND_STR(buf), errno);
 	}
 #	ifdef KEEP_zOS_EBCDIC
 	if (gtmsocket != iod->type)
@@ -520,8 +523,6 @@ boolean_t io_open_try(io_log_name *naml, io_log_name *tl, mval *pp, uint8 nsec_t
 			ICONV_OPEN_CD(iod->input_conv_cd, INSIDE_CH_SET, OUTSIDE_CH_SET);
 	}
 #	endif
-	if (-1 == file_des)
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) errno);
 	if (n_io_dev_types == iod->type)
 	{
 		/* On AIX, /dev/{,*}random are of 'terminal type'.Hence define its type before
