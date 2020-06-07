@@ -1,0 +1,219 @@
+#!/usr/local/bin/tcsh -f
+#
+#################################################################
+#                                                               #
+# Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.       #
+# All rights reserved.                                          #
+#                                                               #
+#       This source code contains the intellectual property     #
+#       of its copyright holder(s), and is made available       #
+#       under a license.  If you do not know the terms of       #
+#       the license, please stop and do not read further.       #
+#                                                               #
+#################################################################
+#
+# Pre-commit hook that does many things (described in comments below)
+#
+set filelist = `git diff --name-only HEAD`
+@ exitstatus = 0
+
+# -----------------------------------------------------------------
+# 1) Regenerates auto-generated files/sections-of-files if needed
+# -----------------------------------------------------------------
+#
+foreach file ($filelist)
+	if ($file == "sr_unix/ttt.txt") then
+		# Regenerate ttt.c. For now sr_x86_64 and sr_armv7l will have the same ttt.c but that might not be true in the future so
+		# have this script go through both directories always (instead of just copying the sr_x86_64/ttt.c onto sr_armv7l/ttt.c).
+		foreach arch (sr_x86_64 sr_armv7l sr_aarch64)
+			if (! -e $arch) then
+				# In case sr_armv7l directory does not exist (possible in a prior git branch), skip.
+				continue
+			endif
+			cd $arch
+			# Switch to gtm_curpro version
+			setenv gtm_dist $gtm_root/$gtm_curpro/pro
+			setenv gtm_tools ../sr_port	# needed for sr_port/copyright.txt to be used
+			mkdir tmpobj
+			unsetenv ydb_routines	# In case it is set in parent shell, do not let that interfere here
+			setenv gtmroutines "tmpobj(../sr_unix ../sr_port)"
+			$gtm_dist/mumps -run tttgen ../sr_unix/ttt.txt ../sr_port/opcode_def.h ../sr_port/vxi.h >& tmpobj/tttgen.out
+			@ status1 = $status
+			cd ..	# Need this cd for below "git add" to work inside a pre-commit hook
+			if ($status1) then
+				echo "TTTGEN-E-FAIL : Below command failed"
+				echo "$gtm_dist/mumps -run tttgen ../sr_unix/ttt.txt ../sr_port/opcode_def.h ../sr_port/vxi.h >& tmpobj/tttgen.out"
+				echo "Output follows"
+				cat $arch/tmpobj/tttgen.out
+				@ exitstatus = 1
+			else
+				git add $arch/ttt.c
+				if ($status) then
+					@ exitstatus = 1
+					echo "GITADD-E-FAIL : Command failed : git add $arch/ttt.c"
+				endif
+			endif
+			rm -rf $arch/tmpobj	# remove .o files generated in tmpobj
+		end
+	endif
+	if ($file:e == "msg") then
+		# Regenerate one of sr_port/{merrors_ctl.c,cmierrors_ctl.c,gdeerrors_ctl.c,cmerrors_ctl.c}
+		foreach arch (sr_port)
+			cd $arch
+			# Switch to gtm_curpro version
+			setenv gtm_dist $gtm_root/$gtm_curpro/pro
+			setenv gtm_tools ../sr_port	# needed for sr_port/copyright.txt to be used
+			mkdir tmpobj
+			unsetenv ydb_routines	# In case it is set in parent shell, do not let that interfere here
+			setenv gtmroutines "tmpobj(../sr_port)"
+			$gtm_dist/mumps -run msg ../$file
+			@ status1 = $status
+			cd ..	# Need this cd for below "git add" to work inside a pre-commit hook
+			if ($status1) then
+				@ exitstatus = 1
+				echo "MSGGEN-E-FAIL : Command failed with status $status1 : $gtm_dist/mumps -run msg ../$file"
+			else
+				set basename = $file:t:r
+				git add $arch/${basename}_ctl.c
+				if ($status) then
+					@ exitstatus = 1
+					echo "GITADD-E-FAIL : Command failed : git add $arch/${basename}_ctl.c"
+				endif
+				#
+				# If the basefile is ydberrrors then we want to create ydberrors.h instead of
+				# ydbydberrors.h
+				if ("ydberrors" == "$basename") then
+				    set ydbfn = "ydberrors"
+				else
+				    set ydbfn = "ydb${basename}"
+				endif
+				git add $arch/${ydbfn}.h
+				if ($status) then
+					@ exitstatus = 1
+					echo "GITADD-E-FAIL : Command failed : git add $arch/${basename}.h"
+				endif
+				if ("merrors" == "$basename") then
+					#
+					# For merrors.msg, msg.m creates 2 additional files that need to be added:
+					#   1. merrors_ansi.h
+					#   2. libydberrors.h
+					#
+					set merrfiles = "${basename}_ansi.h libydberrors.h"
+				else if ("ydberrors" == "$basename") then
+					# For ydberrors.msg, msg.m creates 1 additional file that needs to be added:
+					#   1. libydberrors2.h
+					set merrfiles = "libydberrors2.h"
+				else
+					set merrfiles = ""
+				endif
+				foreach merrfile ($merrfiles)
+					git add $arch/$merrfile
+					if ($status) then
+						@ exitstatus = 1
+						echo "GITADD-E-FAIL : Command failed : git add $arch/$merrfile"
+					endif
+				end
+			endif
+			rm -rf $arch/tmpobj	# remove .o files generated in tmpobj
+		end
+	endif
+	if ($file == "sr_linux/release_name.h") then
+		# Ensure YDB_RELEASE in sr_unix/libyottadb.h is in sync with YDB_ZYRELEASE in sr_linux/release_name.h
+		set ydbzyrelease = `awk '$2 == "YDB_ZYRELEASE" {print $3}' $file`
+		# ydbzyrelease is of the form "r1.23". Convert it to 123 so it can be used in YDB_RELEASE.
+		set ydbrelease = `echo $ydbzyrelease | awk -F'[".r]' '{printf "%s%s\n", $3,$4}'`
+		set file2 = "sr_unix/libyottadb.h"
+		set actual = `awk '($1 == "#define") && ($2 == "YDB_RELEASE") { print $3 }' $file2`
+		if ("$ydbrelease" != "$actual") then
+			set echo
+			set verbose
+			perl -p -i -e 's/^(#define\t\t*YDB_RELEASE\t)\t*'$actual'/$1\t'$ydbrelease'/g' $file2
+			if ($status) then
+				@ exitstatus = 1
+				echo "PERL-E-FAIL : Command failed : perl substitution for YDB_RELEASE in $file2"
+			endif
+			unset echo
+			unset verbose
+			git add $file2
+			if ($status) then
+				@ exitstatus = 1
+				echo "GITADD-E-FAIL : Command failed : git add $file2"
+			endif
+		endif
+	endif
+end
+
+# -----------------------------------------------------------------
+# 2) Enforces YottaDB Copyright in changed modules
+# -----------------------------------------------------------------
+set filelist = `git diff --name-only HEAD`	# recompute "filelist" in case Step (1) had regenerated new files
+set fixlist = ""
+set curyear = `date +%Y`
+foreach file ($filelist)
+	if (! -e $file) then
+		# If file is being deleted as part of this commit, skip copyright check on it
+		continue
+	endif
+	set extension = $file:e
+	# A few file extensions do not have copyright
+	if (("hlp" == $extension) || ("list" == $extension) || ("exp" == $extension) || ("md" == $extension)) then
+		continue
+	endif
+	# A few specific filenames do not have copyright as they are generated
+	if (("GTMDefinedTypesInitRelease.m" == $file:t) || ("GTMDefinedTypesInitDebug.m" == $file:t)) then
+		continue
+	endif
+	# Below is a list of specific files that do not have a copyright so ignore them
+	set skiplist = "COPYING LICENSE README.md sr_port/gdeinitsz.m sr_port/md5hash.c sr_port/md5hash.h"
+	set skiplist = "$skiplist sr_unix/custom_errors_sample.txt sr_unix/gtmgblstat.xc"
+	set skiplist = "$skiplist sr_port/copyright.txt"
+	set skip = 0
+	foreach skipfile ($skiplist)
+		if ($file == $skipfile) then
+			set skip = 1
+			break
+		endif
+	end
+	if ($skip) then
+		continue
+	endif
+	grep 'Copyright (c) .*'$curyear' YottaDB LLC' $file >& /dev/null
+	if ($status != 0) then
+		set fixlist = "$fixlist $file"
+	endif
+end
+if ("" != "$fixlist") then
+	echo "  --> Hook $0 returned non-zero status"
+	echo "  --> Below files are missing YottaDB Copyright notice and/or current year $curyear. Fix and retry commit"
+	foreach file ($fixlist)
+		echo "	$file"
+	end
+	@ exitstatus = 1
+endif
+
+# -----------------------------------------------------------------
+# 3) Remove trailing white space
+# -----------------------------------------------------------------
+set filelist = `git diff --name-only HEAD`	# recompute "filelist" in case Step (1) had regenerated new files
+foreach file ($filelist)
+	if (! -e $file) then
+		# If file is being deleted as part of this commit, skip whitespace conversion on it
+		continue
+	endif
+	if ("sr_port/copyright.txt" == $file) then
+		# Skip this special file
+		continue
+	endif
+	grep -q '[ 	][ 	]*$' $file
+	if ! ($status) then
+		echo $file
+		sed -i 's/[ 	][ 	]*$//' $file
+		git add $file
+		if ($status) then
+			@ exitstatus = 1
+			echo "GITADD-E-FAIL : Command failed after removing trailing whitespace : git add $file"
+		endif
+	endif
+end
+
+exit $exitstatus
