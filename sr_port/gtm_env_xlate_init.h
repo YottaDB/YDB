@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2006 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,10 +17,6 @@
 #define GTM_ENV_XLATE_ROUTINE_NAME "gtm_env_xlate"
 #define YDB_ENV_XLATE_ROUTINE_NAME "ydb_env_xlate"
 #define YDB_GBLDIR_XLATE_ROUTINE_NAME "ydb_gbldir_xlate"
-
-#define YDB_GBLENV_XLATE_DEBUG(fmt, ...) \
-  if (GDL_GldXlateTrace & ydbDebugLevel) \
-    fprintf(stderr, "\n%%YDB-D-GLDXLATE, " fmt "\n", __VA_ARGS__);
 
 void 	gtm_env_xlate_init(void);
 mval	*gtm_env_translate(mval *val1, mval *val2, mval *val_xlated);

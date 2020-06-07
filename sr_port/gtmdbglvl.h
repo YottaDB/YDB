@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -47,7 +47,6 @@
 #define GDL_IgnoreAvailSpace	0x00100000	/* (1048576) Allow gdsfilext/mu_cre_file (UNIX) to ignore available space */
 #define GDL_PrintPMAPStats	0x00200000	/* (2097152) Print process memory map on exit (using pmap or procmap utility) */
 #define GDL_AllowLargeMemcpy	0x00400000	/* (4194304) Bypass the 1GB sanity check in gtm_memcpy_validate_and_execute() */
-#define GDL_GldXlateTrace	0x00800000	/* (8388608) Trace all the gbldir/env translations and be verbose about it */
 #define GDL_UseSystemMalloc	0x80000000	/* (2147483648) Use the system's malloc(), disabling all the above GDL_Sm options */
 
 #define GDL_SmAllMallocDebug	(GDL_Simple | GDL_SmStats | GDL_SmTrace | GDL_SmDumpTrace | GDL_SmAllocVerf			\

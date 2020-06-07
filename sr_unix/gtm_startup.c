@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,8 +42,6 @@
 #include "interlock.h"
 #include "repl_msg.h"
 #include "gtmsource.h"
-#include "gtm_env_xlate_init.h"
-#include "callintogtmxfer.h"
 #include "xfer_enum.h"
 #include "cache.h"
 #include "op.h"
@@ -265,9 +263,7 @@ void gtm_startup(struct startup_vector *svec)
 		cenable();	/* cenable unless the environment indicates otherwise - 2 steps because this can report errors */
 	jobinterrupt_init();
 	getzdir();
-	gtm_env_xlate_init();
-	ydb_gbldir_xlate_init();
-	init_callin_functable();
+	INIT_ENV_AND_GBLDIR_XLATE;
 	dpzgbini();
 	zco_init();
 	/* a base addr of 0 indicates a gtm_init call from an rpc server */

@@ -3,7 +3,7 @@
  * Copyright (c) 2014-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -58,6 +58,16 @@ MBSTART {						\
 	INIT_SIMPLE_TIMEOUT_TIMER_FNPTR;		\
 	INIT_DBINIT_CH_FNPTR;				\
 	INIT_T_CH_FNPTR;				\
+} MBEND
+
+#include "callintogtmxfer.h"
+#include "gtm_env_xlate_init.h"
+
+#define	INIT_ENV_AND_GBLDIR_XLATE			\
+MBSTART {						\
+	gtm_env_xlate_init();				\
+	ydb_gbldir_xlate_init();			\
+	init_callin_functable();			\
 } MBEND
 
 #endif

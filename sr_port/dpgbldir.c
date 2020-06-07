@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -42,15 +42,12 @@
 #include "trans_log_name.h"
 #include "gtm_env_xlate_init.h"
 #include "gtm_threadgbl.h"
-#include "gtmdbglvl.h"
 
-GBLREF	uint4  ydbDebugLevel;
 GBLREF	mstr		env_ydb_gbldir_xlate;
-GBLREF	mstr		env_gtm_env_xlate;
 GBLREF	gd_addr		*gd_header;
 GBLREF	gv_namehead	*gv_target_list;
 
-LITREF	char gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE];
+LITREF	char		gde_labels[GDE_LABEL_NUM][GDE_LABEL_SIZE];
 
 STATICDEF gdr_name	*gdr_name_head;
 STATICDEF gd_addr	*gd_addr_head;
@@ -74,11 +71,11 @@ Prototype:      ?
 Return:         *gd_addr -- a pointer to the global directory structure
 
 Arguments:      mval *v	-- an mval that contains the name of the global
-		directory to be accessed.
-		boolean_t env_translated -- indicate whether the value
-		is a result of any previous env-translation so that any secondary
-		translation can be eventually skipped (if the env and gbldir
-		translation is the same)
+				directory to be accessed.
+		boolean_t env_translated -- indicates whether the value
+				is a result of any previous env-translation so that any secondary
+				translation can be eventually skipped (if the env and gbldir
+				translation is the same).
 
 Side Effects:   NONE
 
@@ -88,6 +85,7 @@ gd_addr *zgbldir(mval *v)
 {
 	return zgbldir_opt(v, FALSE);
 }
+
 gd_addr *zgbldir_opt(mval *v, boolean_t env_translated)
 {
 	gd_addr		*gd_ptr;
@@ -96,73 +94,63 @@ gd_addr *zgbldir_opt(mval *v, boolean_t env_translated)
 	mstr		gbldirenv_mstr, temp_mstr, trnlnm_mstr, *tran_mstr, *tran_name;
 	char		temp_buff[MAX_FN_LEN + 1];
 	uint4		status;
-	boolean_t	skip_translate;
+	boolean_t	need_gbldir_translate, skip_gbldir_translate;
+	DCL_THREADGBL_ACCESS;
 
+	SETUP_THREADGBL_ACCESS;
 	for (name = gdr_name_head;  name;  name = (gdr_name *)name->link)
 		if (v->str.len == name->name.len && !memcmp(v->str.addr, name->name.addr, v->str.len))
 			return name->gd_ptr;
 
-	gbldirenv_mstr.addr = (char *)YDB_GBLDIR;
-	gbldirenv_mstr.len = STRLEN(YDB_GBLDIR);
+	/* Skip gbldir translation if env and gbldir translation is handled in the same way */
+	skip_gbldir_translate = env_translated
+				&& (NULL != RFPTR(ydb_gbldir_xlate_entry))
+				&& (RFPTR(gtm_env_xlate_entry) == RFPTR(ydb_gbldir_xlate_entry));
+	need_gbldir_translate = (env_ydb_gbldir_xlate.len && !skip_gbldir_translate);
 
 	/* v is empty so we want to get the value from environment variable */
 	if (!v->str.len)
 	{
-		/* Translate the logical name (environment variable) ydb_gbldir/gtmgbldir
-		 * which would be done in parse_file but we need to know the its value
-		 * so that we can attempt to go global directory translation
-		 */
-		status = trans_log_name(&gbldirenv_mstr, &trnlnm_mstr, temp_buff, MAX_FN_LEN + 1, dont_sendmsg_on_log2long);
-		YDB_GBLENV_XLATE_DEBUG("zgbldir: lnm=%.*s status=%d trnlnm=%.*s",
-			(int) gbldirenv_mstr.len, gbldirenv_mstr.addr,
-			status,
-			(int) trnlnm_mstr.len, trnlnm_mstr.addr);
-		if (status == SS_LOG2LONG)
-		{
-			/* XXX: this does not solve anything, just makes it happen again later
-			 * in get_name where it is handled hopefully
-			 */
-			YDB_GBLENV_XLATE_DEBUG("zgbldir: BANG, this should not happen: %d", status);
+		gbldirenv_mstr.addr = (char *)YDB_GBLDIR;
+		gbldirenv_mstr.len = STRLEN(YDB_GBLDIR);
+		if (!need_gbldir_translate)
+		{	/* Do not need gbldir translation for sure. Use env var name as is. */
 			temp_mstr.addr = gbldirenv_mstr.addr;
 			temp_mstr.len  = gbldirenv_mstr.len;
 		} else
-		{
-			temp_mstr.addr = trnlnm_mstr.addr;
-			temp_mstr.len  = trnlnm_mstr.len;
-			YDB_GBLENV_XLATE_DEBUG("zgbldir: using the translated val=%.*s temp=%.*s",
-				(int) trnlnm_mstr.len, trnlnm_mstr.addr,
-				(int) temp_mstr.len, temp_mstr.addr);
+		{	/* Translate the logical name (environment variable) ydb_gbldir/gtmgbldir which would be done in
+			 * "parse_file" (invoked inside "get_name" below) but we need to know the its value so that we can
+			 * attempt to do global directory translation.
+			 */
+			status = trans_log_name(&gbldirenv_mstr, &trnlnm_mstr, temp_buff, MAX_FN_LEN + 1, dont_sendmsg_on_log2long);
+			if (SS_LOG2LONG == status)
+			{	/* Note: Env var value was too long. Don't issue error yet.
+				 * Let later call to "get_name" handle it. But skip gbldir translation part now that
+				 * we know input for gbldir translation is not available (too long to fit in buffer).
+				 */
+				need_gbldir_translate = FALSE;
+				temp_mstr.addr = gbldirenv_mstr.addr;
+				temp_mstr.len  = gbldirenv_mstr.len;
+			} else
+			{
+				assert((SS_NOLOGNAM == status) || (SS_NORMAL == status));
+				/* In either of the cases in the above assert, "trnlnm_mstr" is valid and usable */
+				temp_mstr.addr = trnlnm_mstr.addr;
+				temp_mstr.len  = trnlnm_mstr.len;
+			}
 		}
 	} else
 	{
 		temp_mstr.addr = v->str.addr;
 		temp_mstr.len  = v->str.len;
-		YDB_GBLENV_XLATE_DEBUG("zgbldir: using the supplied val=%.*s temp=%.*s",
-			(int) v->str.len, v->str.addr,
-			(int) temp_mstr.len, temp_mstr.addr);
 	}
 	temp_val.str = temp_mstr;
 	temp_val.mvtype = MV_STR;
 	trans_val.str.len = 0;
-	/* Skip gbldir translation if env and gbldir translation
-	 * is handled in the same way
-	 */
-	DCL_THREADGBL_ACCESS;
-	SETUP_THREADGBL_ACCESS;
-	skip_translate = env_translated
-		&& (RFPTR(ydb_gbldir_xlate_entry) != NULL)
-		&& (RFPTR(gtm_env_xlate_entry) == RFPTR(ydb_gbldir_xlate_entry));
-	tran_mstr = (env_ydb_gbldir_xlate.len && !skip_translate)?
-		(&ydb_gbldir_translate(&temp_val, &trans_val)->str) : &temp_mstr;
-	YDB_GBLENV_XLATE_DEBUG("zgbldir: translate=(xlate=%d; env=%d; skip=%d) trans_val=%.*s tran_mstr=%.*s",
-		env_ydb_gbldir_xlate.len > 0, env_translated, skip_translate,
-		(int) trans_val.str.len, trans_val.str.addr,
-		(int) tran_mstr->len, tran_mstr->addr);
+	tran_mstr = need_gbldir_translate
+				? (&ydb_gbldir_translate(&temp_val, &trans_val)->str)
+				: &temp_mstr;
 	tran_name = get_name(tran_mstr);
-	YDB_GBLENV_XLATE_DEBUG("zgbldir: translate=(xlate=%d; env=%d; skip=%d) trans_val=%.*s tran_name=%.*s",
-		env_ydb_gbldir_xlate.len > 0, env_translated, skip_translate,
-		(int) trans_val.str.len, trans_val.str.addr,
-		(int) tran_name->len, tran_name->addr);
 	gd_ptr = gd_load(tran_name);
 	name = (gdr_name *)malloc(SIZEOF(gdr_name));
 	if (name->name.len = v->str.len)	/* Note embedded assignment */

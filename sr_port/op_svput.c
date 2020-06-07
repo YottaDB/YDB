@@ -145,7 +145,7 @@ void op_svput(int varnum, mval *v)
 			{
 				if (0 == v->str.len)
 				{
-					dpzgbini();
+					dpzgbini();	/* Open default gbldir (i.e. SET $ZGBLDIR="") */
 				} else
 				{
 					gd_header = zgbldir(v);

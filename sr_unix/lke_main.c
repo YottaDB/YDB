@@ -64,7 +64,6 @@
 #include "have_crit.h"
 #include "gt_timers_add_safe_hndlrs.h"
 #include "continue_handler.h"
-#include "gtm_env_xlate_init.h"
 
 #ifdef UTF8_SUPPORTED
 # include "gtm_icu_api.h"
@@ -104,9 +103,7 @@ int lke_main(int argc, char *argv[], char **envp)
 	rts_stringpool = stringpool;
 	getjobname();
 	getzdir();
-	gtm_env_xlate_init();
-	ydb_gbldir_xlate_init();
-	init_callin_functable();
+	INIT_ENV_AND_GBLDIR_XLATE;
 	ydb_chk_dist(argv[0]);
 	prealloc_gt_timers();
 	gt_timers_add_safe_hndlrs();

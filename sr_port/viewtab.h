@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -34,8 +34,7 @@ VIEWTAB("FREEBLOCKS",		VTP_DBREGION,			VTK_BLFREE,		MV_NM),
 VIEWTAB("FREEZE",		VTP_DBREGION,			VTK_FREEZE,		MV_NM),
 VIEWTAB("FULL_BOOLEAN",		VTP_NULL,			VTK_FULLBOOL,		MV_STR),
 VIEWTAB("FULL_BOOLWARN",	VTP_NULL,			VTK_FULLBOOLWARN,	MV_STR),
-VIEWTAB("GBLDIRXLATE",		VTP_VALUE | VTP_NULL,		VTK_GBLDIRXLATE,	MV_STR), /* nodoc : GDE related
-												  * undocumented feature */
+VIEWTAB("GBLDIRXLATE",		VTP_VALUE | VTP_NULL,		VTK_GBLDIRXLATE,	MV_STR),
 VIEWTAB("GDSCERT",		VTP_NULL | VTP_VALUE,		VTK_GDSCERT,		MV_STR),
 #ifdef TESTPOLLCRIT
 VIEWTAB("GRABCRIT",		VTP_DBREGION,			VTK_GRABCRIT,		MV_STR),

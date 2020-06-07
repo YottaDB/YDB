@@ -93,7 +93,6 @@ GBLREF boolean_t		dmterm_default;
 GBLREF mstr			extnam_str;
 GBLREF mstr			env_ydb_gbldir_xlate;
 GBLREF mval			dollar_zgbldir;
-GBLREF uint4			ydbDebugLevel;
 
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_GBLNOMAPTOREG);
@@ -284,23 +283,10 @@ void	op_fnview(int numarg, mval *dst, ...)
 			break;
 		case VTK_GBLDIRXLATE:
 			if (arg1 == NULL || arg1->str.len == 0)
-			{
 				arg1 = &dollar_zgbldir;
-				YDB_GBLENV_XLATE_DEBUG("$View: arg1 undefined, using zgbldir=%.*s",
-					(int) arg1->str.len, arg1->str.addr);
-			}
-			if (env_ydb_gbldir_xlate.len > 0)
-			{
-				tmpstr = ydb_gbldir_translate(arg1, &tmpmval)->str;
-				YDB_GBLENV_XLATE_DEBUG("$View: perform translation: arg1=%.*s tmpstr=%.*s",
-					(int) arg1->str.len, arg1->str.addr,
-					(int) tmpstr.len, tmpstr.addr);
-			} else
-			{
-				tmpstr = arg1->str;
-				YDB_GBLENV_XLATE_DEBUG("$View: translation not enabled, passing: arg1=tmpstr=%.*s",
-					(int) tmpstr.len, tmpstr.addr);
-			}
+			tmpstr = (0 < env_ydb_gbldir_xlate.len)
+					? ydb_gbldir_translate(arg1, &tmpmval)->str
+					: arg1->str;
 			s2pool(&tmpstr);
 			dst->str = tmpstr;
 			dst->mvtype = vtp->restype;
