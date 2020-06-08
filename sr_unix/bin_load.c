@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -41,7 +41,6 @@
 #include "mvalconv.h"
 #include "mu_gvis.h"
 #include "gtmmsg.h"
-#include "gtm_utf8.h"
 #include "io.h"
 #include "gtmcrypt.h"
 #include "gv_trigger.h"
@@ -87,7 +86,6 @@ error_def(ERR_MUNOFINISH);
 error_def(ERR_COLLTYPVERSION);
 error_def(ERR_COLLATIONUNDEF);
 error_def(ERR_OLDBINEXTRACT);
-error_def(ERR_LOADINVCHSET);
 error_def(ERR_LDSPANGLOINCMP);
 error_def(ERR_RECLOAD);
 error_def(ERR_GVFAILCORE);
@@ -263,7 +261,7 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	gtm_uint64_t		iter, key_count, rec_count, tmp_rec_count, global_key_count;
 	gtm_uint64_t		first_failed_rec_count, failed_record_count;
 	off_t			last_sn_error_offset = 0, file_offset_base = 0, file_offset = 0;
-	boolean_t		need_xlation, new_gvn, utf8_extract;
+	boolean_t		need_xlation, new_gvn;
 	boolean_t		is_hidden_subscript, ok_to_put = TRUE, putting_a_sn = FALSE, sn_incmp_gbl_already_killed = FALSE;
 	rec_hdr			*rp, *next_rp;
 	mval			v, tmp_mval, *val;
@@ -350,17 +348,6 @@ void bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len)
 	{	/* ignore the level check */
 		FREE_MALLOCS;
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_LDBINFMT);
-		mupip_exit(ERR_LDBINFMT);
-	}
-	/* check if extract was generated in UTF-8 mode */
-	utf8_extract = (0 == MEMCMP_LIT(&ptr[len - BIN_HEADER_LABELSZ], UTF8_NAME)) ? TRUE : FALSE;
-	if ((utf8_extract && !gtm_utf8_mode) || (!utf8_extract && gtm_utf8_mode))
-	{ /* extract CHSET doesn't match $ZCHSET */
-		FREE_MALLOCS;
-		if (utf8_extract)
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("UTF-8"));
-		else
-			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
 		mupip_exit(ERR_LDBINFMT);
 	}
 	if ('4' >= hdr_lvl)

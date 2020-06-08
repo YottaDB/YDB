@@ -2,6 +2,9 @@
  *								*
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ *                                                              *
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries. *
+ * All rights reserved.                                         *
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -46,10 +49,10 @@ void		bin_load(uint4 begin, uint4 end, char *line1_ptr, int line1_len);
 void		go_call_db(int routine, char *parm1, int parm2, int val_off1, int val_len1);
 int		go_get(char **in_ptr, int max_len, uint4 max_rec_size);
 void		go_load(uint4 begin, uint4 end, unsigned char *recbuf, char *line3_ptr, int line3_len, uint4 max_rec_size, int fmt,
-			int utf8_extract, int dos);
+			int dos);
 void		goq_load(void);
 int		get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *line3_len, uint4 *max_rec_size,
-			int *utf8_extract, int *dos);
+			int *utf8_extract, int *dos, boolean_t ignore_chset);
 boolean_t	gtm_regex_perf(const char *rexpr, char *str_buff);
 
 #endif /* LOAD_INCLUDED */

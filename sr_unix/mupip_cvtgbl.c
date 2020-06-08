@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -70,6 +70,7 @@ void mupip_cvtgbl(void)
 	uint4	        begin, cli_status, end, max_rec_size;
 	unsigned char	buff[MAX_ONERROR_VALUE_LEN];
 	unsigned short	fn_len, len;
+	boolean_t	ignore_chset;
 
 	DCL_THREADGBL_ACCESS;
 	SETUP_THREADGBL_ACCESS;
@@ -85,6 +86,7 @@ void mupip_cvtgbl(void)
 	TREF(ok_to_see_statsdb_regs) = TRUE;
 	skip_dbtriggers = TRUE;
 	fn_len = SIZEOF(fn);
+	ignore_chset = FALSE;
 	if (cli_present("STDIN"))
 	{
 		/* Check if both file name and -STDIN specified. */
@@ -170,7 +172,10 @@ void mupip_cvtgbl(void)
 		}
 	} else
 		onerror = ONERROR_PROCEED; /* Default: Proceed on error */
-	file_format = get_load_format(&line1_ptr, &line3_ptr, &line1_len, &line3_len, &max_rec_size, &utf8, &dos); /* from header */
+
+	if (cli_present("IGNORECHSET") == CLI_PRESENT)
+		ignore_chset = TRUE;
+	file_format = get_load_format(&line1_ptr, &line3_ptr, &line1_len, &line3_len, &max_rec_size, &utf8, &dos, ignore_chset); /* from header */
 	if (MU_FMT_GOQ == file_format)
 		mupip_exit(ERR_LDBINFMT);
 	if ((BADZCHSET == utf8) || (0 >= line1_len))
@@ -185,7 +190,7 @@ void mupip_cvtgbl(void)
 	{	/* If the command speficies a format see if it matches the label */
 		len = SIZEOF(buff);
 		if (!cli_get_str("FORMAT", (char *)buff, &len))
-			go_load(begin, end, (unsigned char *)line1_ptr, line3_ptr, line3_len, max_rec_size, file_format, utf8, dos);
+			go_load(begin, end, (unsigned char *)line1_ptr, line3_ptr, line3_len, max_rec_size, file_format, dos);
 		else
 		{
 		        lower_to_upper(buff, buff, len);
@@ -193,7 +198,7 @@ void mupip_cvtgbl(void)
 			{	/* If the label did not determine a format let them specify ZWR and they can sort out the result */
 				if ((MU_FMT_ZWR == file_format) || (MU_FMT_UNRECOG == file_format))
 					go_load(begin, end, (unsigned char *)line1_ptr, line3_ptr, line3_len, max_rec_size,
-						MU_FMT_ZWR, utf8, dos);
+						MU_FMT_ZWR, dos);
 				else
 					mupip_exit(ERR_LDBINFMT);
 			} else if (!STRNCMP_LIT_LEN(buff, "BINARY", len))
@@ -206,7 +211,7 @@ void mupip_cvtgbl(void)
 			{	/* If the label did not determine a format let them specify GO and they can sort out the result */
 				if ((MU_FMT_GO == file_format) || (MU_FMT_UNRECOG == file_format))
 					go_load(begin, end, (unsigned char *)line1_ptr, line3_ptr, line3_len, max_rec_size,
-						MU_FMT_GO, utf8, dos);
+						MU_FMT_GO, dos);
 				else
 					mupip_exit(ERR_LDBINFMT);
 			} else if (!STRNCMP_LIT_LEN(buff, "GOQ", len))
@@ -226,7 +231,7 @@ void mupip_cvtgbl(void)
 		if (MU_FMT_BINARY == file_format)
 			bin_load(begin, end, line1_ptr, line1_len);
 		else if ((MU_FMT_ZWR == file_format) || (MU_FMT_GO == file_format))
-			go_load(begin, end, (unsigned char *)line1_ptr, line3_ptr, line3_len, max_rec_size, file_format, utf8, dos);
+			go_load(begin, end, (unsigned char *)line1_ptr, line3_ptr, line3_len, max_rec_size, file_format, dos);
 		else
 		{
 			assert(MU_FMT_UNRECOG == file_format);
@@ -239,7 +244,7 @@ void mupip_cvtgbl(void)
 /* Make an attempt to discover the input file format based on its content principally the label */
 
 int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *line3_len, uint4 *max_rec_size, int *utf8_extract,
-		int *dos)
+		int *dos, boolean_t ignore_chset)
 {
 	char	*c, *c1, *ctop, *line1, *line2, *line3, *ptr;
 	int	len, line2_len, ret;
@@ -364,7 +369,7 @@ int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *lin
 	if ((MU_FMT_UNRECOG == ret) && *line3_len
 			&& gtm_regex_perf("\\^[%A-Za-z][0-9A-Za-z]*(\\(.*\\))?=(\".*\"|-?([0-9]+|[0-9]*\\.[0-9]+))$", line3))
 		ret = MU_FMT_ZWR;	 /* gvn=val */
-	if (MU_FMT_UNRECOG != ret)
+	if ((MU_FMT_UNRECOG != ret) && (!ignore_chset))
 	{
 		*utf8_extract = gtm_regex_perf("UTF-8", line1);
 		if ((*utf8_extract && !gtm_utf8_mode) || (!*utf8_extract && gtm_utf8_mode))

@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -467,6 +467,7 @@ static	CLI_ENTRY	mup_load_qual[] = {
 	{ "END",           mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_REQ,        1, NON_NEG, VAL_NUM, 0 },
 	{ "FILL_FACTOR",   mupip_cvtgbl, 0, mup_load_ff_parm,      0,                     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_NUM, 0 },
 	{ "FORMAT",        mupip_cvtgbl, 0, mup_load_fmt_parm,     mup_load_fmt_qual,     0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
+	{ "IGNORECHSET",   mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ "ONERROR",       mupip_cvtgbl, 0, mup_load_onerror_parm, mup_load_onerror_qual, 0, 0, VAL_NOT_REQ,    1, NON_NEG, VAL_STR, 0 },
 	{ "STDIN",         mupip_cvtgbl, 0, 0,                     0,                     0, 0, VAL_DISALLOWED, 1, NON_NEG, VAL_N_A, 0 },
 	{ "" }

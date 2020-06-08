@@ -39,7 +39,6 @@
 #include "mupip_put_gvn_fragment.h"
 #include "str2gvkey.h"
 #include "gtmmsg.h"
-#include "gtm_utf8.h"
 #include "gv_trigger.h"
 #include "mu_interactive.h"
 #include "wbox_test_init.h"
@@ -153,7 +152,7 @@ STATICFNDEF boolean_t get_mname_from_key(char *ptr, int key_length, char *key, g
 }
 
 void go_load(uint4 begin, uint4 end, unsigned char *rec_buff, char *line3_ptr, int line3_len, uint4 max_rec_size, int fmt,
-	int utf8_extract, int dos)
+	int dos)
 {
 	boolean_t	format_error = FALSE, hasht_ignored = FALSE, hasht_gbl = FALSE;
 	boolean_t	is_setextract, mu_load_error = FALSE, switch_db, go_format_val_read;
