@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -625,7 +625,7 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 	char		local_options[MAX_OPTIONS_LEN];
 	char		*ptr, *strtokptr;
 
-	if (MAX_OPTIONS_LEN < option_len)
+	if (MAX_OPTIONS_LEN <= option_len)
 	{
 		util_out_print_gtmio("Too many options", FLUSH);
 		return FALSE;
@@ -633,6 +633,7 @@ STATICFNDEF boolean_t process_options(char *option_str, uint4 option_len, boolea
 	memcpy(local_options, option_str, option_len);
 	*isolation = *noisolation = *consistency = *noconsistency = FALSE;
 	ptr = local_options;
+	ptr[option_len] = '\0';	/* Null terminate string before passing to STRTOK_R */
 	for ( ; 0 < option_len; ptr++, option_len--)
 		*ptr = TOUPPER(*ptr);
 	ptr = STRTOK_R(local_options, ",", &strtokptr);
