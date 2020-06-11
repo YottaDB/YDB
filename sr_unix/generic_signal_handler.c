@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -87,6 +87,7 @@ GBLREF	sigset_t		block_sigsent;
 GBLREF	gd_region		*gv_cur_region;
 GBLREF	boolean_t		blocksig_initialized;
 GBLREF	struct sigaction	orig_sig_action[];
+GBLREF	sigset_t		blockalrm;
 #ifdef DEBUG
 GBLREF	boolean_t		in_nondeferrable_signal_handler;
 #endif
@@ -136,6 +137,8 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 {
 	boolean_t		signal_forwarded, is_sigterm;
 	void			(*signal_routine)();
+	int			rc;
+	sigset_t		savemask;
 #	ifdef DEBUG
 	boolean_t		save_in_nondeferrable_signal_handler;
 #	endif
@@ -397,14 +400,17 @@ void generic_signal_handler(int sig, siginfo_t *info, void *context)
 	 * extract them allowing us to see what was going on.
 	 */
 	assert(in_nondeferrable_signal_handler);
-	if (timer_active)
-		sys_canc_timer();
 	FFLUSH(stdout);
-	/* Generate core (if we want one). We want to do this before we go through the rest of handling this signal which would
-	 * potentially modify information we want to see in the core.
-	 */
 	if (!dont_want_core)
-	{
+	{	/* Generate core (if we want one). We want to do this before we go through the rest of handling this signal
+		 * which would potentially modify information we want to see in the core.
+		 */
+		/* Block SIGALRM signal before dumping core. Note that we do exactly the same thing inside "gtm_fork_n_core()"
+		 * but there is a small window of code between here and there and since we are anyways going to dump a core
+		 * at this point, better be safe (by avoiding timer interrupts here that can cause potential issues)
+		 * than worry about unnecessary duplication of the SIGPROCMASK calls.
+		 */
+		SIGPROCMASK(SIG_BLOCK, &blockalrm, &savemask, rc);
 		need_core = TRUE;
 		MULTI_THREAD_AWARE_FORK_N_CORE(signal_forwarded);
 	}
