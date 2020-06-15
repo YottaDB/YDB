@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -16,6 +16,7 @@
 #include "mdef.h"
 
 #include "gtm_unistd.h"
+#include "gtm_stdio.h"
 
 #include "io.h"
 #include "iosp.h"
@@ -23,6 +24,7 @@
 #include "error.h"
 #include "iottdef.h"
 #include "setterm.h"
+#include "gtmio.h"
 
 GBLREF	io_log_name	*io_root_log_name;
 GBLREF	int		process_exiting;
@@ -41,6 +43,7 @@ void io_rundown (int rundown_type)
 
 	if (NULL == io_root_log_name)
 		return;
+	FFLUSH(NULL);
 	for (l = io_root_log_name;  NULL != l; free(l), l = io_root_log_name)
 	{
 		io_root_log_name = l->next;
