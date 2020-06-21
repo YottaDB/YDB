@@ -401,6 +401,7 @@ GBLDEF	fd_set			mutex_wait_on_descs;
 GBLDEF	void			(*call_on_signal)();
 GBLDEF	enum gtmImageTypes	image_type;	/* initialized at startup i.e. in dse.c, lke.c, gtm.c, mupip.c, gtmsecshr.c etc. */
 GBLDEF	unsigned int		invocation_mode = MUMPS_COMPILE; /* how mumps has been invoked */
+GBLDEF	char			*invocation_exe_str = NULL;	/* points to argv[0] (e.g. $ydb_dist/yottadb or $ydb_dist/mumps */
 GBLDEF	char			cli_err_str[MAX_CLI_ERR_STR] = "";   /* Parse Error message buffer */
 GBLDEF	char			*cli_err_str_ptr;
 GBLDEF	boolean_t		gtm_pipe_child;

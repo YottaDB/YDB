@@ -84,11 +84,13 @@ error_def(ERR_TLSINIT);
 
 int gtm_main(int argc, char **argv, char **envp)
 {
-	char			*ptr, *eq, **p;
-	char			gtmlibxc[YDB_PATH_MAX];
-	int             	eof, parse_ret;
-	int			gtmcrypt_errno;
-	int			status;
+	char		*ptr, *eq, **p;
+	char		gtmlibxc[YDB_PATH_MAX];
+	int             eof, parse_ret;
+	int		gtmcrypt_errno;
+	int		status;
+	char		*pathptr;				/* this is similar to code in "dlopen_libyottadb.c" */
+	char		curr_exe_realpath[YDB_PATH_MAX];	/* this is similar to code in "dlopen_libyottadb.c" */
 
 #	ifdef GTM_SOCKET_SSL_SUPPORT
 	char			tlsid_env_name[MAX_TLSID_LEN * 2];
@@ -103,7 +105,9 @@ int gtm_main(int argc, char **argv, char **envp)
 	assert(!(noThreadAPI_active || simpleThreadAPI_active));	/* Neither should be set unless we recursed (never!) */
 	noThreadAPI_active = TRUE;
 	UTF8_ONLY(gtm_strToTitle_ptr = &gtm_strToTitle);
-	ydb_chk_dist(argv[0]);
+	pathptr = realpath(PROCSELF, curr_exe_realpath);	/* this is similar to code in "dlopen_libyottadb.c" */
+	assert(NULL != pathptr);	/* or else "dlopen_libyottadb" would have failed in a similar check */
+	ydb_chk_dist(pathptr);
 	cli_lex_setup(argc, argv);
 	/* put the arguments into buffer, then clean up the token buffer
 	 * cli_gettoken() copies all arguments except the first one argv[0]
@@ -120,7 +124,7 @@ int gtm_main(int argc, char **argv, char **envp)
 	cli_token_buf[0] = '\0';
 	/* insert the "MUMPS " in the parsing buffer the buffer is now:
 	 * cli_lex_in_ptr->in_str == "MUMPS -run somefile"
-	 * we didnot change argv[0]
+	 * we did not change argv[0]
 	*/
 	ptr = cli_lex_in_ptr->in_str;
 	memmove(strlen("MUMPS ") + ptr, ptr, strlen(ptr) + 1);	/* BYPASSOK */
@@ -134,6 +138,7 @@ int gtm_main(int argc, char **argv, char **envp)
 	parse_ret = parse_cmd();
 	if (parse_ret && (EOF != parse_ret))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
+	invocation_exe_str = argv[0];
 	if (cli_present("DIRECT_MODE"))
 	{
 		if (!((ptr = getenv(CHILD_FLAG_ENV)) && strlen(ptr)) && (RESTRICTED(dmode))) /* note assignment */

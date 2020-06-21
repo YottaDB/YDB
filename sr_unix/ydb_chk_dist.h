@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -13,11 +13,11 @@
  *								*
  ****************************************************************/
 
-#ifndef GTM_STARTUP_CHK_H_INCLUDED
-#define GTM_STARTUP_CHK_H_INCLUDED
+#ifndef YDB_STARTUP_CHK_H_INCLUDED
+#define YDB_STARTUP_CHK_H_INCLUDED
 
 #if defined(__linux__)
-#define PROCSELF	"/proc/self/exe"
+#define PROCSELF		"/proc/self/exe"
 #endif
 
 int ydb_chk_dist(char *image);

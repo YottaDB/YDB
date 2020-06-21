@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -62,6 +62,8 @@
 #include "getzdir.h"
 #include "ydb_logicals.h"	/* needed for GBLDIR_ENV use of "ydbenvname" */
 #include "sig_init.h"
+#include "invocation_mode.h"
+#include "ydb_chk_dist.h"
 
 GBLREF	bool			jobpid;	/* job's output files should have the pid appended to them. */
 GBLREF	volatile boolean_t	ojtimeout;
@@ -92,17 +94,17 @@ GBLREF char		ydb_dist[YDB_PATH_MAX];
 GBLREF boolean_t	ydb_dist_ok_to_use;
 LITREF gtmImageName	gtmImageNames[];
 
-#define MAX_MUMPS_EXE_PATH_LEN	8192
-#define MAX_PATH		 128	/* Maximum file path length */
-#define MAX_LAB_LEN		  32	/* Maximum Label string length */
-#define MAX_RTN_LEN		  32	/* Maximum Routine string length */
-#define TEMP_BUFF_SIZE		1024
-#define MAX_NUM_LEN		  10	/* Maximum length number will be when converted to string */
-#define MAX_JOB_QUALS		  12	/* Maximum environ variables set for job qualifiers */
-#define	MUMPS_EXE_STR		"/mumps"
-#define	MUMPS_DIRECT_STR	"-direct"
-#define	JOB_CONTINUE		1
-#define JOB_EXIT		0
+#define MAX_YOTTADB_EXE_PATH_LEN	8192
+#define MAX_PATH			 128	/* Maximum file path length */
+#define MAX_LAB_LEN			  32	/* Maximum Label string length */
+#define MAX_RTN_LEN			  32	/* Maximum Routine string length */
+#define TEMP_BUFF_SIZE			1024
+#define MAX_NUM_LEN			  10	/* Maximum length number will be when converted to string */
+#define MAX_JOB_QUALS			  12	/* Maximum environ variables set for job qualifiers */
+#define	MUMPS_DIRECT_STR		"-direct"
+#define	YOTTADB_EXE_STR			"/yottadb"
+#define	JOB_CONTINUE			1
+#define JOB_EXIT			0
 
 #define KILL_N_REAP(PROCESS_ID, SIGNAL, RET_VAL)					\
 {											\
@@ -343,8 +345,9 @@ STATICFNDEF void local_variable_marshalling(FILE *setup_file_orig)
 int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_return, int pipe_fds[])
 {
 	char			cbuff[TEMP_BUFF_SIZE], pbuff[TEMP_BUFF_SIZE], cmdbuff[TEMP_BUFF_SIZE];
-	char			tbuff[MAX_MUMPS_EXE_PATH_LEN], tbuff2[MAX_MUMPS_EXE_PATH_LEN], fname_buf[MAX_STDIOE_LEN];
-	char			*pgbldir_str;
+	char			tbuff[MAX_YOTTADB_EXE_PATH_LEN], tbuff2[MAX_YOTTADB_EXE_PATH_LEN], fname_buf[MAX_STDIOE_LEN];
+	char			curr_exe_realpath[YDB_PATH_MAX], *pathptr;
+	char			*pgbldir_str, *exe_str;
 	char			*transfer_addr;
 	int4			index, environ_count, string_len, temp;
 	int			wait_status, save_errno, kill_ret;
@@ -717,7 +720,7 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		env_ind = env_ary = (char **)malloc((environ_count + MAX_JOB_QUALS + 1)*SIZEOF(char *));
 
 		string_len = STRLEN("%s=%d") + STRLEN(CHILD_FLAG_ENV) + MAX_NUM_LEN - 4;
-		if (string_len >= MAX_MUMPS_EXE_PATH_LEN)
+		if (string_len >= MAX_YOTTADB_EXE_PATH_LEN)
 		{
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_JOBPARTOOLONG);
 		}
@@ -785,15 +788,52 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 
 		c1 = ydb_dist;
 		string_len = STRLEN(c1);
-		if ((string_len + SIZEOF(MUMPS_EXE_STR)) < SIZEOF(tbuff))
+		assert(MUMPS_COMPILE != invocation_mode); /* We cannot reach runtime if started only for compile */
+		switch(invocation_mode)
 		{
-			memcpy(tbuff, c1, string_len);
+		case MUMPS_RUN:
+		case MUMPS_DIRECT:
+			assert(NULL != invocation_exe_str);
+			/* Base program could be either "mumps" nor "yottadb". Use base program as is for job child */
+			exe_str = (NULL != invocation_exe_str)
+					? invocation_exe_str
+					: realpath(PROCSELF, curr_exe_realpath);	/* Get currently running executable */
+			if (NULL == exe_str)
+			{
+				assert(FALSE);
+				exe_str = YOTTADB_EXE_STR;	/* Handle this code path just in case it is reached */
+			} else
+			{	/* No need to use "$ydb_dist" base name and suffix it with executable name in this case
+				 * as the full path with the executable name is already available. So clear relevant fields.
+				 */
+				string_len = 0;
+			}
+			break;
+		case MUMPS_CALLIN:
+		case MUMPS_UTILTRIGR:
+			/* Base program is neither "mumps" nor "yottadb". Use "yottadb" as the base program for the job child. */
+			exe_str = YOTTADB_EXE_STR;
+			break;
+		default:
+			assert(FALSE);
+			exe_str = YOTTADB_EXE_STR;	/* Handle this code path just in case it is reached */
+			break;
+		}
+		if ((string_len + strlen(exe_str)) < SIZEOF(tbuff))
+		{
+			if (string_len)
+				memcpy(tbuff, c1, string_len);
 			c2 = &tbuff[string_len];
-			strcpy(c2, MUMPS_EXE_STR);
+			strcpy(c2, exe_str);
 		} else
 		{
+			/* If "string_len" is 0, it means MAX_YOTTADB_EXE_PATH_LEN (i.e. 8192 bytes)
+			 * was not enough to store the full path of the executable name derived from the parent.
+			 * This is impossible hence the below assert.
+			 */
+			assert(string_len);
 			rts_error_csa(CSA_ARG(NULL) VARLSTCNT(5) ERR_LOGTOOLONG, 3, string_len, c1,
-				SIZEOF(tbuff) - SIZEOF(MUMPS_EXE_STR));
+				SIZEOF(tbuff) - strlen(exe_str));
 		}
 #		ifdef KEEP_zOS_EBCDIC_	/* use real strcpy to preserve env in native code set */
 #		pragma convlit(suspend)

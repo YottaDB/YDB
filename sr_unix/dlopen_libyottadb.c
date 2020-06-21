@@ -2,7 +2,7 @@
  *								*
  * Copyright 2001, 2014 Fidelity Information Services, Inc	*
  *								*
- * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -31,6 +31,7 @@
 #include <errno.h>
 
 #include "ydb_chk_dist.h"
+#include "invocation_mode.h"
 
 #ifdef DEBUG
 # include <sys/types.h>	/* needed by "assert" macro */
@@ -143,8 +144,11 @@ int dlopen_libyottadb(int argc, char **argv, char **envp, char *main_func)
 	}
 	/* Switch argv[0] to canonical full path of executable returned by the "realpath" call above.
 	 * When argv[0] is later used in "ydb_chk_dist", we need the canonical path to avoid incorrect YDBDISTUNVERIF errors.
+	 * Do not do this switch in case of "gtm_main()" as we need that later to preserve executable name in JOB child.
+	 * "gtm_main()" will do the argv[0] switch at function entry after noting down incoming argv[0].
 	 */
-	argv[0] = curr_exe_realpath;
+	if (strcmp(main_func, "gtm_main"))
+		argv[0] = curr_exe_realpath;
 	status = exe_main(argc, argv, envp);
 	return status;
 }
