@@ -868,9 +868,15 @@ int ojstartchild (job_params_type *jparms, int argcnt, boolean_t *non_exit_retur
 		argv[3] = (char *)0;
 		/* Ignore all SIGHUPs until sig_init() is called. On AIX we have seen SIGHUP from middlechild to grandchild */
 		signal(SIGHUP, SIG_IGN);
-		EXECVE(tbuff, argv, env_ary);
+		/* Need EXECVPE (instead of EXECVE) since it is possible "tbuff" points to an executable without an
+		 * absolute path name and we need to search in $PATH for a matching directory.
+		 */
+		EXECVPE(tbuff, argv, env_ary);
+		assert(FALSE);
 		/* if we got here, error starting the Job */
-		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_LIT("Exec error in Job"), errno);
+		save_errno = errno;
+		SNPRINTF(tbuff2, SIZEOF(tbuff2), "Error from EXECVPE(\"%s\")", tbuff);
+		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(7) ERR_JOBFAIL, 0, ERR_TEXT, 2, LEN_AND_STR(tbuff2), save_errno);
 		REVERT;
 	} else
 	{
