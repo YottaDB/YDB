@@ -32,8 +32,14 @@
 	/* Linux on x86_64 (for now) */
 	boolean_t compswap(sm_global_latch_ptr_t lock, int compval, int newval1);
 #	define COMPSWAP_LOCK(LCK, CMPVAL, NEWVAL)	compswap(LCK, CMPVAL, NEWVAL)
-#	define COMPSWAP_UNLOCK(LCK, CMPVAL, NEWVAL)	(DBG_ASSERT((LCK)->u.parts.latch_pid == CMPVAL) DBG_ASSERT(NEWVAL == 0)	\
-							compswap(LCK, CMPVAL, NEWVAL))
+	/* Note that most of the time CMPVAL would be the same as (LCK)->u.parts.latch_pid in case of a COMPSWAP_UNLOCK call
+	 * since the lock holder will invoke this macro and knows exactly what the CMPVAL is. But it is also possible the
+	 * COMPSWAP_UNLOCK macro is called by a pid that is not the lock holder (e.g. jnl_write_attempt(), prepare_for_gc() etc.)
+	 * but is trying to salvage the lock in case of a dead process. In that case, the CMPVAL value that the salvaging
+	 * process passes in could not be the actual value of the "latch_pid" because there could be multiple processes trying
+	 * the salvage at the same time. Hence we cannot add "DBG_ASSERT((LCK)->u.parts.latch_pid == CMPVAL)" to the below macro.
+	 */
+#	define COMPSWAP_UNLOCK(LCK, CMPVAL, NEWVAL)	(DBG_ASSERT(NEWVAL == 0) compswap(LCK, CMPVAL, NEWVAL))
 
 # endif
 
