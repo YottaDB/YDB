@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -72,7 +72,7 @@ void_ptr_t fgn_getpak(char *package_name, int msgtype)
 	} else
 		lpath = package_name;
 	DEFER_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
-	ret_handle = dlopen(lpath, RTLD_LAZY);
+	ret_handle = dlopen(lpath, RTLD_LAZY | RTLD_GLOBAL);
 	ENABLE_INTERRUPTS(INTRPT_IN_FUNC_WITH_MALLOC, prev_intrpt_state);
 	if (NULL == ret_handle)
 	{
