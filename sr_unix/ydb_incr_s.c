@@ -125,6 +125,9 @@ int ydb_incr_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *s
 			if (!MV_DEFINED(lv_mv))
 				*lv_mv = literal_zero;
 			op_add(lv_mv, increment_mv, lv_mv);
+			s2pool(&(lv_mv->str));	/* Rebuffer in stringpool to avoid lv tree pointing to caller buffer
+						 * that is not guaranteed to stay after this call.
+						 */
 			ret_mval = *lv_mv;
 			ret_mv = &ret_mval;
 			break;

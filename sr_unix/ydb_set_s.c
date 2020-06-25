@@ -113,7 +113,6 @@ int ydb_set_s(const ydb_buffer_t *varname, int subs_used, const ydb_buffer_t *su
 			}
 			SET_MVAL_FROM_YDB_BUFF_T(&dst_lv->v, value);	/* Set value into located/created node */
 			s2pool(&(dst_lv->v.str));			/* Rebuffer in stringpool for protection */
-			RECORD_MSTR_FOR_GC(&(dst_lv->v.str));
 			break;
 		case LYDB_VARREF_GLOBAL:
 			/* Set the given global variable with the given value. We do this by:
