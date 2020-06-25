@@ -3,7 +3,7 @@
  * Copyright (c) 2001-2018 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
+ * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
  *								*
  * Copyright (c) 2017-2018 Stephen L Johnson.			*
@@ -22,10 +22,11 @@
 #define	GTM_ZVERSION		"V6.3-008"
 #define	YDB_ZYRELEASE		"r1.29"		/* changes here should be reflected in YDB_RELEASE in sr_unix/libyottadb.h */
 
-/* Note: YDB_RELEASE_STAMP is set as part of the cmake build process.
+/* This sets YDB_RELEASE_STAMP as part of the cmake build process.
  * Example values are
- *	#define YDB_RELEASE_STAMP	"20180316 15:27"
+ *	#define YDB_RELEASE_STAMP	"20200624 13:40 4b3d1d16 (dirty)"
  */
+# include "release_commit.h"
 
 #if defined(__x86_64__)
 # define YDB_PLATFORM		"Linux x86_64"

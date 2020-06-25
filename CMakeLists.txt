@@ -3,7 +3,7 @@
 # Copyright (c) 2012-2018 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -18,7 +18,8 @@
 # CMake 2.8.4 introduced LINK_DEPENDS target property
 # CMake 2.8.4 introduced generator expressions in custom commands
 # CMake 2.8.5 introduced use of C compiler as the assembler
-cmake_minimum_required(VERSION 2.8.5)
+# CMake 3.0.0 avoids odd dependency issues when generating the git commit hash on CentOS
+cmake_minimum_required(VERSION 3.0.0)
 project(YDB C ASM)
 
 # Max optimization level is -O2
@@ -997,9 +998,13 @@ add_custom_target(place_files ALL DEPENDS ${files_to_place})
 add_custom_target(make_read_only ALL DEPENDS ${targets_to_run} place_files)
 
 #-----------------------------------------------------------------------------
-# Get the current build time and pass it as a macro to a C program (release_name.h)
-string(TIMESTAMP BUILD_TIMESTAMP "%Y%m%d %H:%M")
-
-# Make the build timestamp available to a C program (release_name.h)
-add_definitions("-DYDB_RELEASE_STAMP=\"${BUILD_TIMESTAMP}\"")
-
+# Add git hash to $ZYRELEASE
+# This preprocesses `sr_linux/release_commit.h.in` and outputs to `release_commit.h` in the build directory.
+# The output file will be automatically rebuilt whenever the git commit changes,
+# even if `cmake` is not rerun before running `make`.
+set(PRE_CONFIGURE_FILE "${PROJECT_SOURCE_DIR}/sr_linux/release_commit.h.in")
+set(POST_CONFIGURE_FILE "${PROJECT_BINARY_DIR}/release_commit.h")
+include(${PROJECT_SOURCE_DIR}/cmake/git-watcher.cmake)
+set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES "${PROJECT_BINARY_DIR}/git-state")
+add_dependencies(libmumps check_git_repository)
+add_dependencies(libyottadb check_git_repository)

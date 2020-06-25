@@ -29,6 +29,7 @@ RUN apt-get update && \
     apt-get install -y \
                     file \
                     cmake \
+                    git \
                     tcsh \
                     libconfig-dev \
                     libelf-dev \

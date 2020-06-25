@@ -31,6 +31,17 @@ To quickly get started with running YottaDB, follow the instructions on our [Get
 YottaDB relies on CMake to generate the Makefiles to build binaries from source.
 Refer to the Release Notes for each release for a list of the Supported platforms
 in which we build and test YottaDB binary distributions.
+At least cmake version 3 is required.
+
+```
+# Ubuntu or Debian-like distro
+sudo apt-get install cmake
+# CentOS
+sudo yum install cmake3
+```
+
+On CentOS it will be installed as `cmake3` instead of cmake,
+so use `cmake3` on CentOS wherever `cmake` is referenced below.
 
 Note: Both gcc and Clang/LLVM are supported on x86_64. To use Clang/LLVM you would need to
 install the Clang/LLVM packages for your distribution in addition to the packages
