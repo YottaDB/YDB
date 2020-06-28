@@ -3,7 +3,7 @@
  * Copyright (c) 2010-2019 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -1630,13 +1630,12 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 			 * If so, check if any of those pieces are different. If not, trigger should NOT be invoked.
 			 */
 			ok_to_invoke_trigger = TRUE;
-			trigparms->ztdelim_new = (mval *)&literal_null;
-			if (is_set_trigger)
+			if (trigdsc->delimiter.str.len)
 			{
-				assert(0 == ztupd_mval->mvtype);
-				if (trigdsc->delimiter.str.len)
+				trigparms->ztdelim_new = (mval *)&trigdsc->delimiter;
+				if (is_set_trigger)
 				{
-					trigparms->ztdelim_new = (mval *)&trigdsc->delimiter;
+					assert(0 == ztupd_mval->mvtype);
 					strpiecediff(&trigparms->ztoldval_new->str, &trigparms->ztvalue_new->str,
 						&trigdsc->delimiter.str, trigdsc->numpieces, trigdsc->piecearray,
 						!trigdsc->is_zdelim && gtm_utf8_mode, ztupd_mstr);
@@ -1655,7 +1654,8 @@ int	gvtr_match_n_invoke(gtm_trigger_parms *trigparms, gvtr_invoke_parms_t *gvtr_
 							/* now ztupd_mval->str is protected from stp_gcol */
 					}
 				}
-			}
+			} else
+				trigparms->ztdelim_new = (mval *)&literal_null;
 			if (ok_to_invoke_trigger)
 			{
 				DBGTRIGR((stderr, "gvtr_match_n_invoke: Inside trigger drive block\n"));

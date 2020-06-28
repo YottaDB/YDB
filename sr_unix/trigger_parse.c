@@ -1552,13 +1552,13 @@ boolean_t trigger_parse(char *input, uint4 input_len, char *trigvn, char **value
 		{
 			ERROR_STR_RETURN("Error: Can't have both DELIM and ZDELIM in same entry");
 		}
-		if ((delim_present || zdelim_present) && !set_present)
+		if (pieces_present && !set_present)
 		{
-			ERROR_STR_RETURN("Error: DELIM and ZDELIM need a commands=SET");
+			ERROR_STR_RETURN("Error: PIECES needs a commands=SET to also be specified");
 		}
 		if (pieces_present && (!delim_present && !zdelim_present))
 		{
-			ERROR_STR_RETURN("Error: PIECES need either DELIM or ZDELIM");
+			ERROR_STR_RETURN("Error: PIECES needs either DELIM or ZDELIM to also be specified");
 		}
 		if (MAX_HASH_INDEX_LEN < (trigvn_len + 1 + value_len[GVSUBS_SUB] + 1 + value_len[DELIM_SUB] + 1
 					  + value_len[ZDELIM_SUB] + 1 + value_len[XECUTE_SUB] + 1))
