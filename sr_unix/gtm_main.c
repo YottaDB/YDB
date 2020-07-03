@@ -41,6 +41,7 @@
 #include "gtm_threadgbl_init.h"
 #include "job.h"
 #include "restrict.h"
+#include "release_name.h"
 
 #ifdef UTF8_SUPPORTED
 #include "gtm_icu_api.h"
@@ -139,6 +140,29 @@ int gtm_main(int argc, char **argv, char **envp)
 	if (parse_ret && (EOF != parse_ret))
 		rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) parse_ret, 2, LEN_AND_STR(cli_err_str));
 	invocation_exe_str = argv[0];
+	if (cli_present("VERSION")) {
+		char stamp[SIZEOF(YDB_RELEASE_STAMP)];
+		char *date, *time, *commit, *saveptr;
+
+		puts("YottaDB release:         " YDB_ZYRELEASE);
+		puts("Upstream base version:   GT.M " GTM_ZVERSION);
+		puts("Platform:                " YDB_PLATFORM);
+		// The release stamp has the format "DATE TIME COMMIT"
+		// strtok requires that the string be writable
+		memcpy(stamp, YDB_RELEASE_STAMP, SIZEOF(YDB_RELEASE_STAMP));
+
+		date = STRTOK_R(stamp, " ", &saveptr);
+		assert(NULL != date);
+		time = STRTOK_R(NULL, " ", &saveptr);
+		assert(NULL != time);
+		// everything until the end of the string
+		commit = STRTOK_R(NULL, "\0", &saveptr);
+		assert(NULL != commit);
+		// dates have the format YYYYMMDD
+		printf("Build date/time:         %.4s-%.2s-%.2s %s\n", date, date + 4, date + 6, time);
+		printf("Build commit SHA:        %s\n", commit);
+		EXIT(0);
+	}
 	if (cli_present("DIRECT_MODE"))
 	{
 		if (!((ptr = getenv(CHILD_FLAG_ENV)) && strlen(ptr)) && (RESTRICTED(dmode))) /* note assignment */

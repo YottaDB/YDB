@@ -2,6 +2,9 @@
  *								*
  * Copyright (c) 2001-2017 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+ * 								*
+ * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
+ * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -27,6 +30,7 @@ static readonly CLI_PARM mumps_parm[] = {
 	{""}
 };
 
+// N.B These _must_ be in alphabetical error or `find_entry` will stop early
 static readonly CLI_ENTRY mumps_qual[] = {
 { "ALIGN_STRINGS",	0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, 	VAL_N_A, 0},
 { "CROSS_REFERENCE", 	0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, 	VAL_N_A, 0},
@@ -45,6 +49,7 @@ static readonly CLI_ENTRY mumps_qual[] = {
 { "OBJECT", 		0, 0, 0, 0, 0, 0, VAL_NOT_REQ, 	  1, NEG, 	VAL_STR, 0},
 { "RUN", 		0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, 	VAL_N_A, 0},
 { "SPACE", 		0, 0, 0, 0, 0, 0, VAL_REQ, 	  1, NON_NEG, 	VAL_NUM, 0},
+{ "VERSION", 		0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NON_NEG, 	VAL_N_A, 0},
 { "WARNINGS", 		0, 0, 0, 0, 0, 0, VAL_DISALLOWED, 0, NEG, 	VAL_N_A, 0},
 { "" }
 };
