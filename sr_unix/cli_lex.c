@@ -504,11 +504,14 @@ int	cli_gettoken (int *eof)
 		{	/* Convert arguments into array */
 			max_space = (ptr_top - ptr);
 			cur_arg = cli_lex_in_ptr->argv[arg_no];
-			/* If a qualifier and value pair is present in command line and the value part is having space
-			 * we need to add quotes explicitly here as it would have been removed by shell and it is needed by cli
-			 * to evaluate the value part with spaces as a single unit .i.e. -label=word1 word2 -> -label="word1 word2"
+			/* If qualifier and value pair is present in command line argument and the value part is
+			 * having spaces & no occurence of double quote, we need to explicitly delimit value part with double quotes.
+			 * This is required as we are forming an array of argument list and when cli processes this array, the value with spaces
+			 * needs to be considered as a single unit. Example of the transformation is -label=word1 word2 -> -label="word1 word2".
+			 * Quotes delimiting is done only when there is no occurence of double quotes in the value. As a result we ensure
+			 * delimitation doesn't introduce double quote pairing missmatch.
 			 */
-			if ((NULL != strchr(cur_arg, ' ')) && (NULL != (eq_pos = strchr(cur_arg, '='))))
+			if ((NULL != strchr(cur_arg, ' ')) && (NULL != (eq_pos = strchr(cur_arg, '='))) && (NULL == strchr(cur_arg, '"')))
 			{
 				eq_len = eq_pos - cur_arg + 1;
 				print_len = SNPRINTF(ptr, max_space, "%s%.*s\"%s\"", (1 < arg_no) ? " " : "", eq_len,
