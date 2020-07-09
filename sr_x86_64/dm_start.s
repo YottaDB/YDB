@@ -3,7 +3,7 @@
 # Copyright (c) 2007-2015 Fidelity National Information 	#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
-# Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -20,6 +20,7 @@
 
 	.data
 	.extern	dollar_truth
+	.extern dollar_test_default
 	.extern	xfer_table
 	.extern	frame_pointer
 	.extern	msp
@@ -40,7 +41,8 @@ ENTRY	dm_start
 	movq	%rbx, REG_XFER_TABLE_SAVE_OFF(%rsp)
 	movl    $1, mumps_status(%rip)
 	leaq	xfer_table(%rip), %rbx
-	movl	$1, dollar_truth(%rip)
+	movl	dollar_test_default(%rip), %r11d
+	movl	%r11d, dollar_truth(%rip)
 	ESTABLISH l30, l35
 	movq    restart(%rip), %r11
 	call    *%r11

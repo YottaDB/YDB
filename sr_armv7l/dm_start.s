@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2017 Stephen L Johnson. All rights reserved.	#
@@ -26,6 +26,7 @@
 	.data
 	.extern	frame_pointer
 	.extern	dollar_truth
+	.extern dollar_test_default
 	.extern	xfer_table
 	.extern	msp
 	.extern	mumps_status
@@ -47,6 +48,8 @@ ENTRY dm_start
 	ldr	r7, =xfer_table
 	ldr	r5, =frame_pointer
 	ldr	r0, =dollar_truth
+	ldr	r4, =dollar_test_default
+	ldr	r1, [r4]
 	str	r1, [r0]
 	ESTABLISH
 

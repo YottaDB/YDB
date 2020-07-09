@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 # Copyright (c) 2018 Stephen L Johnson. All rights reserved.	#
@@ -21,6 +21,7 @@
 	.data
 	.extern	frame_pointer
 	.extern	dollar_truth
+	.extern dollar_test_default
 	.extern	xfer_table
 	.extern	msp
 	.extern	mumps_status
@@ -47,8 +48,10 @@ ENTRY dm_start
 	str	w10, [x9]				/* Init mumps_status to 1 */
 	ldr	x23, =xfer_table			/* x23 GTM_REG_XFER_TABLE */
 	ldr	x19, =frame_pointer			/* X19 REG_FRAME_POINTER */
+	ldr	x21, =dollar_test_default
+	ldr	w22, [x21]
 	ldr	x25, =dollar_truth			/* x25 GTM_REG_DOLLAR_TRUTH */
-	str	w10, [x25]				/* Init $T to 1 */
+	str	w22, [x25]				/* Init $T to $dollar_test_default */
 	ESTABLISH
 
 	ldr	x10, =restart

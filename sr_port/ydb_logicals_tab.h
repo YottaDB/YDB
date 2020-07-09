@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
+ * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
  *								*
  *	This source code contains the intellectual property	*
@@ -126,6 +126,7 @@ YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STDXKILL,                   "$ydb_stdxkill", 
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_STRING_POOL_LIMIT,          "$ydb_string_pool_limit",          "$gtm_string_pool_limit")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_SYSID,                      "$ydb_sysid",                      "$gtm_sysid")
 YDBENVINDX_TABLE_ENTRY (YDBENVINDX_TLS_PASSWD_PREFIX,          "$ydb_tls_passwd_",                "$gtmtls_passwd_")
+YDBENVINDX_TABLE_ENTRY (YDBENVINDEX_DOLLAR_TEST,               "$ydb_dollartest",                 "")
 /* Like YDBENVINDX_DIST and YDBENVINDX_DIST_ONLY, we have the below two lines.
  * YDBENVINDX_TMP is used by the wrapper gtmsecshr ($ydb_dist/gtmsecshr). But since that sets ydb_tmp in the environment,
  * the gtmsecshr process that is forked off ($ydb_dist/gtmsecshrdir/gtmsecshr) inherits this env var and so does not need
