@@ -108,7 +108,7 @@ function(GetGitState _working_dir _state)
     # Get the hash for HEAD.
     set(_success "true")
     execute_process(COMMAND
-        "${GIT_EXECUTABLE}" rev-parse --verify HEAD --short
+        "${GIT_EXECUTABLE}" rev-parse --verify HEAD
         WORKING_DIRECTORY "${_working_dir}"
         RESULT_VARIABLE res
         OUTPUT_VARIABLE _hashvar
