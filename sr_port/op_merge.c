@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -70,6 +70,7 @@
 #include "collseq.h"
 #include "alias.h"
 #include "gtmimagename.h"
+#include "gvt_inline.h"
 
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF mv_stent		*mv_chain;

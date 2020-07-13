@@ -2706,7 +2706,7 @@
    | -           | -GV[STATSRESET]                    | Use only with       |
    |             |                                    | -FILEHEADER         |
    |-------------+------------------------------------+---------------------|
-   | -           | -HARD_SPIN_CPUNT=Mutex hard spin   | Use only with       |
+   | -           | -HARD_SPIN_COUNT=Mutex hard spin   | Use only with       |
    |             | count                              | -FILEHEADER         |
    |-------------+------------------------------------+---------------------|
    |             | -HEXL[OCATION]=value               | Use only with       |

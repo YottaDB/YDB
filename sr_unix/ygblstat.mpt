@@ -1,6 +1,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+<<<<<<< HEAD
 ;								;
 ; Copyright (c) 2017-2019 Fidelity National Information		;
+=======
+;                                                               ;
+; Copyright (c) 2017-2020 Fidelity National Information		;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 ; Services, Inc. and/or its subsidiaries. All rights reserved.  ;
 ;								;
 ; Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	;
@@ -110,6 +115,7 @@ ORDERPID(pid,gld,reg)
 
 PROMPTGO
 	; prompt for inputs, execute
+	new d,x
 	set d("io")=$io
 	if '$data(%zdebug) new $etrap set $etrap="zgoto "_$zlevel_":err^"_$text(+0) do
 	. zshow "d":d										; save original $p settings

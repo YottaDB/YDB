@@ -403,6 +403,7 @@ error_def(ERR_BADDBVER);
 error_def(ERR_CRITSEMFAIL);
 error_def(ERR_DBBLKSIZEALIGN);
 error_def(ERR_DBCREINCOMP);
+error_def(ERR_DBFILERDONLY);
 error_def(ERR_DBFILERR);
 error_def(ERR_DBFLCORRP);
 error_def(ERR_DBGLDMISMATCH);
@@ -528,7 +529,15 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 	{
 		if (!open_read_only)
 		{
+#ifdef DEBUG
+			if (WBTEST_ENABLED(WBTEST_OPENFILE_DB))
+			{
+				udi->fd = FD_INVALID;
+				errno = gtm_white_box_test_case_count ? gtm_white_box_test_case_count : EPERM;
+			} else
+#endif
 			OPENFILE_DB(fnptr, O_RDWR, udi, seg);
+			save_errno = errno;
 			/* When opening an auto-create type of reservedDB database file, it is possible
 			 * that it does not (yet) exist. In that case, make a call out to create it. Note that
 			 * a statsdb (which is also an autodb) gets created in "gvcst_init" so skip that here.
@@ -629,6 +638,13 @@ gd_region *dbfilopn(gd_region *reg, boolean_t update_seg_fname_and_return)
 			reg->read_only = TRUE;		/* maintain csa->read_write simultaneously */
 			csa->read_write = FALSE;	/* maintain reg->read_only simultaneously */
 			csa->orig_read_write = FALSE;
+			if (!open_read_only && !((EPERM == save_errno) || (EACCES == save_errno)))
+			{
+				if (!IS_GTM_IMAGE)
+					gtm_putmsg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERDONLY, 3,
+							DB_LEN_STR(reg), (int)0, save_errno);
+				send_msg_csa(CSA_ARG(csa) VARLSTCNT(6) ERR_DBFILERDONLY, 3, DB_LEN_STR(reg), (int)0, save_errno);
+			}
 		}
 		if (!reg->owning_gd->is_dummy_gbldir && (!jnlpool_init_needed || !CUSTOM_ERRORS_AVAILABLE))
 			break;

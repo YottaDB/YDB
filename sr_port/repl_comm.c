@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -338,6 +338,12 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 	{
 		while (TRUE)
 		{
+			if ((WBTEST_ENABLED(WBTEST_REPL_TLS_RECONN)) && is_rcvr_server)
+			{
+				GTM_WHITE_BOX_TEST(WBTEST_REPL_TLS_RECONN, bytes_recvd, -1);
+				if (-1 == bytes_recvd)
+					gtm_wbox_input_test_case_count = 11; /* Do not go to white box again*/
+			}
 			bytes_recvd = GTMTLS_ONLY(repl_tls.enabled ? gtm_tls_recv(repl_tls.sock, (char *)buff, max_recv_len)
 							 : ) recv(sock_fd, (char *)buff, max_recv_len, 0);	/* BYPASSOK */
 			if (((WBTEST_ENABLED(WBTEST_FETCHCOMM_ERR)) || (WBTEST_ENABLED(WBTEST_FETCHCOMM_HISTINFO)))
@@ -376,6 +382,9 @@ int repl_recv(int sock_fd, unsigned char *buff, int *recv_len, int timeout GTMTL
 			}
 			/* handle error */
 			save_errno = repl_tls.enabled ? gtm_tls_errno() : ERRNO;
+			if ((WBTEST_ENABLED(WBTEST_REPL_TLS_RECONN)) &&
+				(ECONNRESET == save_errno))
+				repl_log(stderr, TRUE, TRUE, "WBTEST_REPL_TLS_RECONN induced\n");
 			if (-1 == save_errno)
 			{	/* This indicates an error from TLS/SSL layer and not from a system call.
 				 * Set error status to ERR_TLSIOERROR and let caller handle it appropriately.

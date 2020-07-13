@@ -1,6 +1,7 @@
 /****************************************************************
  *								*
- *	Copyright 2001, 2013 Fidelity Information Services, Inc	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
@@ -20,6 +21,7 @@
 #include "gdsbt.h"
 #include "gdsfhead.h"
 #include "dpgbldir.h"
+#include "gvt_inline.h"
 
 GBLREF	gd_addr		*gd_header;
 

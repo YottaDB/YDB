@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -35,7 +35,7 @@
 #include "utfcgr.h"
 #endif
 
-#ifdef AIX
+#ifdef _AIX
 # define PMAPSTR	"procmap "
 #else
 # define PMAPSTR	"pmap "
@@ -52,7 +52,7 @@ void print_exit_stats(void)
 	DBGMCALC_ONLY(int		mcblkcnt = 0;)
 	DBGMCALC_ONLY(ssize_t		mcblktot = 0;)
 	DBGMCALC_ONLY(mcalloc_hdr	*mcptr;)
-	char				pmap_buf[64] = "pmap ";
+	char				pmap_buf[64] = PMAPSTR;
 	char				systembuff[MAX_FN_LEN];
 	char				*cmdptr;
 

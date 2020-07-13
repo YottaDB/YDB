@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2009 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 5e466fd7... GT.M V6.3-013
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -35,6 +40,7 @@
 #include "gtcmtr_protos.h"
 #include "gdscc.h"
 #include "jnl.h"
+#include "gvt_inline.h"
 
 GBLREF connection_struct *curr_entry;
 GBLREF gv_namehead	*gv_target;
@@ -44,7 +50,14 @@ GBLREF gv_key		*gv_altkey;
 GBLREF sgmnt_addrs	*cs_addrs;
 GBLREF gd_region        *gv_cur_region;
 
+<<<<<<< HEAD
 cm_op_t gtcmtr_zprevious(void)
+=======
+error_def(ERR_UNIMPLOP);
+error_def(ERR_TEXT);
+
+bool gtcmtr_zprevious(void)
+>>>>>>> 5e466fd7... GT.M V6.3-013
 {
 	boolean_t		found;
 	unsigned char		*ptr, regnum;
@@ -54,10 +67,13 @@ cm_op_t gtcmtr_zprevious(void)
 	cm_region_list		*reg_ref;
 	cm_region_head		*cm_reg_head;
 
+<<<<<<< HEAD
 	error_def(ERR_UNIMPLOP);
 	error_def(ERR_TEXT);
 
 	ASSERT_IS_LIBGNPSERVER;
+=======
+>>>>>>> 5e466fd7... GT.M V6.3-013
 	ptr = curr_entry->clb_ptr->mbf;
 	assert(CMMS_Q_PREV == *ptr);
 	ptr++;
@@ -78,7 +94,42 @@ cm_op_t gtcmtr_zprevious(void)
 	if (gv_currkey->prev)
 	{
 		gtcm_bind_name(cm_reg_head, FALSE); /* sets gv_target; do not use gv_target before gtcm_bind_name */
+<<<<<<< HEAD
 		GTCMTR_SUBS2STR_XFORM_IF_NEEDED(gv_target, gv_currkey, old_top);
+=======
+		if (gv_target->collseq || gv_target->nct)
+		{	/* Need to convert subscript representation from client side to string representation
+			 * so any collation transformations can happen on server side.
+			 * First determine if last subscript is a NULL subscript. Code in op_zprevious uses same logic
+			 */
+			is_null = TRUE;
+			kprev = &gv_currkey->base[gv_currkey->prev];
+			for (kcur = kprev, ktop = &gv_currkey->base[old_top] - 1; kcur < ktop; kcur++)
+			{
+				if (STR_SUB_MAXVAL != *kcur)
+				{
+					is_null = FALSE;
+					break;
+				}
+			}
+			if (is_null)
+			{	/* Last subscript of incoming key is a NULL subscript.
+				 * Client would have represented it using a sequence of FF, FF, FF, ...
+				 * Remove the representation temporarily before doing the gv_xform_key.
+				 * Introduce the NULL subscript after the transformation.
+				 * This is because we do NOT allow a null subsc to be transformed to a non null subsc
+				 * 	so no need for that be part of the transformation.
+				 */
+				*kprev = KEY_DELIMITER;
+				gv_currkey->end = gv_currkey->prev;
+			}
+			gv_xform_key(gv_currkey, FALSE);
+			if (is_null)
+			{	/* Insert the NULL subscript at the end just in time for the gvcst_zprevious call. */
+				gvzprevious_append_max_subs_key(gv_currkey, gv_target);
+			}
+		}
+>>>>>>> 5e466fd7... GT.M V6.3-013
 		found = (0 == gv_target->root) ? FALSE : gvcst_zprevious();
 	} else
 	{	/* name level */
@@ -99,8 +150,7 @@ cm_op_t gtcmtr_zprevious(void)
 									 * and two <NUL> delimiters */
 			if ((PRE_V5_MAX_MIDENT_LEN < strlen((char *)gv_altkey->base)) && !curr_entry->client_supports_long_names)
 			{
-				rts_error(VARLSTCNT(6) ERR_UNIMPLOP, 0,
-					ERR_TEXT, 2,
+				rts_error_csa(CSA_ARG(cs_addrs) VARLSTCNT(6) ERR_UNIMPLOP, 0, ERR_TEXT, 2,
 					LEN_AND_LIT("GT.CM client does not support global names greater than 8 characters"));
 			}
 			save_key = gv_currkey;

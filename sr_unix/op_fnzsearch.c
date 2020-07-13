@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -260,7 +260,7 @@ int op_fnzsearch(mval *pattern, mint indx, mint mfunc, mval *ret)
 /* Condition handler for the op_fnzsearch() operation. It takes care of restoring the lv_null_subs value and freeing the glob()
  * buffer, if necessary.
  */
-STATICFNDEF CONDITION_HANDLER(fnzsrch_ch)
+CONDITION_HANDLER(fnzsrch_ch)
 {
 	START_CH(TRUE);
 	/* START_CH() defines prev_intrpt_state */

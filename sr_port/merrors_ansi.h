@@ -89,7 +89,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* GVIS */
 	   0,	/* GVKILLFAIL */
 	   1,	/* GVNAKED */
-	   0,	/* GVNEXTARG */
+	   0,	/* UNUSEDMSG256 */
 	   0,	/* GVORDERFAIL */
 	   0,	/* GVPUTFAIL */
 	   0,	/* PATTABSYNTAX */
@@ -464,7 +464,7 @@ const static readonly int error_ansi[] = {
 	   0,	/* COLLTYPVERSION */
 	   0,	/* LVNULLSUBS */
 	   0,	/* GVREPLERR */
-	   0,	/* UNUSEDMSG631 */
+	   0,	/* DBFILERDONLY */
 	  72,	/* RMWIDTHPOS */
 	  13,	/* OFFSETINV */
 	   0,	/* JOBPARTOOLONG */
@@ -1373,7 +1373,11 @@ const static readonly int error_ansi[] = {
 	   0,	/* GBLNOMAPTOREG */
 	   0,	/* ISSPANGBL */
 	   0,	/* TPNOSUPPORT */
+<<<<<<< HEAD:sr_port/merrors_ansi.h
 	   0,	/* UNUSEDMSG1544 */
+=======
+	   0,	/* EXITSTATUS */
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_i386/merrors_ansi.h
 	   0,	/* ZATRANSERR */
 	   0,	/* FILTERTIMEDOUT */
 	   0,	/* TLSDLLNOOPEN */

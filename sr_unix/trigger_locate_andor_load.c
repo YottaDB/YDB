@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2019 Fidelity National Information	*
+ * Copyright (c) 2011-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -88,7 +88,7 @@ int trigger_locate_andor_load(mstr *trigname, rhdtyp **rtn_vec)
 	mstr			regname, gbl;
 	mident			rtn_name;
 	gd_region		*save_gv_cur_region;
-	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf		save_currkey;
 	gv_namehead		*gvt;
 	gv_namehead		*save_gv_target;
 	gvnh_reg_t		*gvnh_reg;

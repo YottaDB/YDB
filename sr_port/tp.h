@@ -343,18 +343,6 @@ typedef struct ua_list_struct
 
 #define TP_MAX_LEVEL	127			/* Note this is actually MAX + 1 level for TP (actual max 126) */
 
-/* Note gv_orig_key is assigned to tp_pointer->orig_key which then tries to dereference the "begin", "end", "prev", "top"
- * 	fields like it were a gv_currkey pointer. Since these members are 2-byte fields, we need atleast 2 byte alignment.
- * We want to be safer and hence give 4-byte alignment by declaring it as an array of integers.
- * Note that the array stores only ONE key since we need to store gv_currkey at the outermost TSTART only since this needs
- *	to be restored only in case of a TRESTART or TROLLBACK where the objective is to restore it to what the state was
- *	at the outermost TSTART.
- */
-typedef struct gv_orig_key_struct
-{
-	gv_key	gv_orig_key[DBKEYALLOC(MAX_KEY_SZ)];
-}gv_orig_key_array;
-
 #define TRANS_RESTART_HIST_ARRAY_SZ	512 /* See comment (6) in gtm_threadgbl_defs.h as to why this is not inside #ifdef DEBUG */
 #ifdef DEBUG
 /* The following structure stores information pertaining to the most recent invocation of t_retry OR tp_restart. Maintain a 512
@@ -921,23 +909,23 @@ GBLREF	unsigned int	t_tries;
 	}															\
 }
 
-#define SAVE_REGION_INFO(SAVE_KEY, SAVE_TARGET, SAVE_CUR_REG, SAVE_SI_PTR, SAVE_JNLPOOL)	\
+#define SAVE_REGION_INFO(SAVE_KEY_BUF, SAVE_TARGET, SAVE_CUR_REG, SAVE_SI_PTR, SAVE_JNLPOOL)	\
 MBSTART {											\
 	SAVE_TARGET = gv_target;								\
 	SAVE_CUR_REG = gv_cur_region;								\
 	SAVE_SI_PTR = sgm_info_ptr;								\
 	SAVE_JNLPOOL = jnlpool;									\
 	assert(NULL != gv_currkey);								\
-	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(SAVE_KEY));				\
-	memcpy(&SAVE_KEY[0], gv_currkey, SIZEOF(gv_key) + gv_currkey->end);			\
+	assert((SIZEOF(gv_key) + gv_currkey->end + 1) <= SIZEOF(SAVE_KEY_BUF));			\
+	memcpy(SAVE_KEY_BUF.buf, gv_currkey, SIZEOF(gv_key) + gv_currkey->end + 1);		\
 } MBEND
-#define RESTORE_REGION_INFO(SAVE_KEY, SAVE_TARGET, SAVE_CUR_REG, SAVE_SI_PTR, SAVE_JNLPOOL)	\
+#define RESTORE_REGION_INFO(SAVE_KEY_BUF, SAVE_TARGET, SAVE_CUR_REG, SAVE_SI_PTR, SAVE_JNLPOOL)	\
 MBSTART {											\
 	gv_target = SAVE_TARGET;								\
 	sgm_info_ptr = SAVE_SI_PTR;								\
 	/* check no keysize expansion occurred inside gvcst_root_search */			\
-	assert(gv_currkey->top == SAVE_KEY[0].top);						\
-	memcpy(gv_currkey, &SAVE_KEY[0], SIZEOF(gv_key) + SAVE_KEY[0].end);			\
+	assert(gv_currkey->top == SAVE_KEY_BUF.key.top);					\
+	memcpy(gv_currkey, SAVE_KEY_BUF.buf, SIZEOF(gv_key) + SAVE_KEY_BUF.key.end + 1);	\
 	if (NULL != SAVE_CUR_REG)								\
 	{											\
 		TP_CHANGE_REG_IF_NEEDED(SAVE_CUR_REG);						\

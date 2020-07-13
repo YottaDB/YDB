@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -18,6 +18,7 @@
 #include "compiler.h"
 #include "opcode.h"
 #include "fullbool.h"
+#include "mdq.h"
 
 int expr(oprtype *a, int m_type)
 {
@@ -26,6 +27,7 @@ int expr(oprtype *a, int m_type)
 
 	SETUP_THREADGBL_ACCESS;
 	INCREMENT_EXPR_DEPTH;
+	CHKTCHAIN(TREF(curtchain), exorder, TRUE);	/* defined away in mdq.h except with DEBUG_TRIPLES */
 	if (EXPR_FAIL == (rval = eval_expr(a)))		/* NOTE assignment */
 	{
 		DECREMENT_EXPR_DEPTH;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2018 YottaDB LLC and/or its subsidiaries. *
@@ -63,6 +63,10 @@ GBLREF stack_frame	*frame_pointer;
 GBLREF tp_frame		*tp_pointer;
 
 LITDEF char		litconst_space = ' ';
+<<<<<<< HEAD
+=======
+LITREF mval		literal_null;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 
 error_def(ERR_TXTSRCFMT);
 error_def(ERR_SYSCALL);

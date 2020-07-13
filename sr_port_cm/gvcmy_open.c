@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2017 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -38,8 +38,12 @@
 #include "copy.h"
 #include "error.h"
 #include "op.h"
+<<<<<<< HEAD
 #include "gtmimagename.h"
 #include "ydb_getenv.h"
+=======
+#include "gvt_inline.h"
+>>>>>>> 5e466fd7... GT.M V6.3-013
 
 GBLREF spdesc stringpool;
 

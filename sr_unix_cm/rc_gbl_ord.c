@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 5e466fd7... GT.M V6.3-013
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -39,7 +44,11 @@ GBLREF gv_key		*gv_altkey;
 GBLREF gv_namehead	*gv_target;
 GBLREF sgmnt_data	*cs_data;
 GBLREF sgmnt_addrs	*cs_addrs;
+<<<<<<< HEAD
 GBLREF rc_oflow		*rc_overflow;
+=======
+GBLREF rc_oflow	*rc_overflow;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 GBLREF gd_region	*gv_cur_region;
 GBLREF trans_num	rc_read_stamp;
 

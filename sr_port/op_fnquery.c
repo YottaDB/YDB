@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 5e466fd7... GT.M V6.3-013
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -31,8 +36,10 @@
 #include "promodemo.h"	/* for "demote" prototype used in LV_NODE_GET_KEY */
 #include "libyottadb_int.h"
 
-GBLREF spdesc		stringpool;
+GBLREF bool		undef_inhibit;
 GBLREF mv_stent		*mv_chain;
+GBLREF spdesc		stringpool;
+GBLREF symval		*curr_symval;
 GBLREF unsigned char	*msp, *stackwarn, *stacktop;
 
 LITREF	mval		literal_null;
@@ -67,6 +74,7 @@ error_def(ERR_STACKOFLOW);
  */
 void op_fnquery(int sbscnt, mval *dst, ...)
 {
+<<<<<<< HEAD
 	va_list		var;
 
 	VAR_START(var, dst);
@@ -87,6 +95,20 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	int			i, j, nexti;
 	boolean_t		found, is_num, last_sub_null, nullsubs_implies_firstsub, is_str, push_v1, is_simpleapi_mode;
 	boolean_t		is_sqlnull;
+=======
+	boolean_t		found, is_num, is_str, last_sub_null, nullify_term;
+	ht_ent_mname		*tabent;
+	int			i, j, length;
+	lv_val			*lvn, *lvns[MAX_LVSUBSCRIPTS], *v, *ve;
+	lvTree			*lvt;
+	lvTreeNode		**h1, **h2, *history[MAX_LVSUBSCRIPTS], *node, *nullsubsnode, *nullsubsparent, *parent;
+	mname_entry		lvent;
+	mval			*arg1, **argpp, *argp2, **argpp2, *args[MAX_LVSUBSCRIPTS], *lfrsbs, *mv, tmpmv, tmp_sbs,
+				*varname, *v1, *v2;
+	mval			xform_args[MAX_LVSUBSCRIPTS];	/* for lclcol */
+	mstr			format_out;
+	va_list			var, var_dup;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 	DCL_THREADGBL_ACCESS;
 
 	SETUP_THREADGBL_ACCESS;
@@ -97,6 +119,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 	varname = va_arg(var, mval *);
 	v = va_arg(var, lv_val *);
 	assert(v);
+<<<<<<< HEAD
 	assert(LV_IS_BASE_VAR(v));
 	lvt = LV_GET_CHILD(v);
 	is_simpleapi_mode = IS_SIMPLEAPI_MODE;
@@ -107,6 +130,26 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 			dst->mvtype = MV_STR;
 			dst->str.len = 0;
 		}
+=======
+	if (varname->str.len > MAX_MIDENT_LEN)
+		varname->str.len = MAX_MIDENT_LEN;
+	lvent.var_name.len = varname->str.len;
+	lvent.var_name.addr = varname->str.addr;
+	COMPUTE_HASH_MNAME(&lvent);
+	if (tabent = lookup_hashtab_mname(&curr_symval->h_symtab, &lvent))
+	{	/* if the variable exists find out if it has children */
+		ve = (lv_val *)tabent->value;
+		assert(ve);
+		assert(HTENT_VALID_MNAME(tabent, lv_val, ve));
+		assert(LV_IS_BASE_VAR(ve));
+		lvt = LV_GET_CHILD(ve);
+		assert((NULL == lvt) || (LV_GET_CHILD(v) == lvt));
+	} else
+		lvt = NULL;
+	if (NULL == lvt)
+	{	/* no such unsubscripted variable or no descendants */
+		*dst = literal_null;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 		return;
 	}
 	h1 = history;
@@ -128,8 +171,13 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 			}
 			if (is_num = MV_IS_CANONICAL(arg1))
 				MV_FORCE_NUM(arg1);
+<<<<<<< HEAD
 			else if ((nexti == sbscnt) && !is_sqlnull && (0 == arg1->str.len))
 			{	/* The last search argument is a null string. For this situation, there is the possibility
+=======
+			else if ((0 == arg1->str.len) && (i + 1 == sbscnt))
+			{ 	/* The last search argument is a null string. For this situation, there is the possibility
+>>>>>>> 5e466fd7... GT.M V6.3-013
 				 * of a syntax collision if (1) the user had (for example) specified $Q(a(1,3,"") to get
 				 * the first a(1,3,x) node or (2) this is the "next" element that was legitimately returned
 				 * by $Query on the last call. If the element a(1,3,"") actually exists, the code whereby
@@ -142,12 +190,20 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				 * process. Any intervening $QUery calls for other local variables will reset the check.
 				 * SE 2/2004 (D9D08-002352).
 				 */
+<<<<<<< HEAD
 				nullsubs_implies_firstsub = TRUE;
 				last_fnquery_ret = &TREF(last_fnquery_return_varname);
 				if (last_fnquery_ret->str.len
 				    && (last_fnquery_ret->str.len == varname->str.len)
 				    && (0 == memcmp(last_fnquery_ret->str.addr, varname->str.addr, varname->str.len))
 				    && (sbscnt == TREF(last_fnquery_return_subcnt)))
+=======
+				nullify_term = TRUE;
+				if ((TREF(last_fnquery_return_varname)).str.len && (sbscnt == TREF(last_fnquery_return_subcnt))
+					&& ((TREF(last_fnquery_return_varname)).str.len == varname->str.len)
+					&& (0 == memcmp((TREF(last_fnquery_return_varname)).str.addr,
+						varname->str.addr, varname->str.len)))
+>>>>>>> 5e466fd7... GT.M V6.3-013
 				{	/* We have an equivalent varname and same number subscripts */
 					for (j = 0, argpp2 = &args[0], lfrsbs = TADR(last_fnquery_return_sub);
 					     j < i; j++, argpp2++, lfrsbs++)
@@ -246,12 +302,38 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 		node = lvAvlTreeKeyCollatedNext(lvt, arg1);
 		if (NULL != node)
 		{
+<<<<<<< HEAD
 			*h1 = node;
 			found = TRUE;
 		} else	/* if "node" is still NULL, need to start searching for right siblings at the parent level. */
 		{
 			found = FALSE;
 			h1--;
+=======
+			assert(!found);
+			parent = *(h1 - 1);
+			assert(NULL != parent);
+			lvt = LV_GET_CHILD(parent);
+			if (lvt)
+			{
+				found = TRUE;
+				nullsubsnode = TREF(local_collseq_stdnull)
+					?  lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent) : NULL;
+				node = (NULL == nullsubsnode) ? lvAvlTreeFirst(lvt) : nullsubsnode;
+				assert(NULL != node);
+				*h1 = node;
+			} else
+				--h1;
+		} else
+		{	/* Need to find right sibling. "lvt" is tree to search in and "arg1" is key to search for. */
+			node = lvAvlTreeKeyCollatedNext(lvt, arg1);
+			if (NULL != node)
+			{
+				*h1 = node;
+				found = TRUE;
+			} else	/* if "node" is still NULL, need to start searching for right siblings at the parent level. */
+				h1--;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 		}
 	}
 	/* Saved last query result is irrelevant now */
@@ -271,6 +353,7 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 		{
 			for ( ; ; --h1)
 			{
+<<<<<<< HEAD
 				assert(h1 >= &history[0]);
 				if (h1 == &history[0])
 				{
@@ -291,6 +374,18 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 					found = TRUE;
 					break;
 				}
+=======
+<<<<<<< HEAD
+				if (!is_simpleapi_mode)
+				{	/* Array size of zero is the signal there is nothing else */
+					dst->mvtype = MV_STR;
+					dst->str.len = 0;
+				}
+=======
+				*dst = literal_null;
+>>>>>>> 5e466fd7... GT.M V6.3-013
+				return;
+>>>>>>> [#604] [V63013] Merge GT.M V6.3-013 into YottaDB mainline (with conflicts)
 			}
 		}
 		assert(found);
@@ -311,13 +406,36 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 			assert(NULL != node);
 			*++h1 = node;
 		}
+<<<<<<< HEAD
 		if (found)
 			break;
+=======
+	}
+	/* Saved last query result is irrelevant now */
+	TREF(last_fnquery_return_subcnt) = 0;
+	(TREF(last_fnquery_return_varname)).str.len = 0;
+	/* Go down leftmost subtree path (potentially > 1 avl trees) starting from "node" until you find the first DEFINED mval */
+	while (!LV_IS_VAL_DEFINED(node))
+	{
+		lvt = LV_GET_CHILD(node);
+		assert(NULL != lvt);	/* there cannot be an undefined lv node with no children dangling around */
+		nullsubsnode = TREF(local_collseq_stdnull)
+<<<<<<< HEAD
+			? lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent)
+			: NULL;
+=======
+				? lvAvlTreeLookupStr(lvt, (treeKeySubscr *)&literal_null, &nullsubsparent) : NULL;
+>>>>>>> 5e466fd7... GT.M V6.3-013
+		node = (NULL == nullsubsnode) ? lvAvlTreeFirst(lvt) : nullsubsnode;
+		assert(NULL != node);
+		*++h1 = node;
+>>>>>>> [#604] [V63013] Merge GT.M V6.3-013 into YottaDB mainline (with conflicts)
 	}
 	/* Before we start formatting for output, decide whether we will be saving mvals of our subscripts
 	 * as we format. We only do this if the last subscript is a null. Bypassing it otherwise is a time saver.
 	 */
 	last_sub_null = LV_NODE_KEY_IS_NULL_SUBS(node);
+<<<<<<< HEAD
 	/* The actual return of the next node differs significantly depending on whether this is a $QUERY() call from
 	 * generated code or a ydb_node_next_s() call from the simpleAPI. Fork that difference here.
 	 */
@@ -344,6 +462,68 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				memcpy(stringpool.free, varname->str.addr, varname->str.len);
 				(TREF(last_fnquery_return_varname)).str.addr = (char *)stringpool.free;
 				stringpool.free += varname->str.len;
+=======
+	/* format the output string */
+	ENSURE_STP_FREE_SPACE(varname->str.len + 1);
+	PUSH_MV_STENT(MVST_MVAL);
+	v1 = &mv_chain->mv_st_cont.mvs_mval;
+	v1->mvtype = MV_STR;
+	v1->str.len = 0;
+	v1->str.addr = (char *)stringpool.free;
+	PUSH_MV_STENT(MVST_MVAL);
+	v2 = &mv_chain->mv_st_cont.mvs_mval;
+	v2->mvtype = 0;	/* initialize it to 0 to avoid "stp_gcol" from getting confused if it gets invoked before v2 has been
+			 * completely setup. */
+	memcpy(stringpool.free, varname->str.addr, varname->str.len);
+	if (last_sub_null)
+	{
+		(TREF(last_fnquery_return_varname)).str.addr = (char *)stringpool.free;
+		(TREF(last_fnquery_return_varname)).str.len += varname->str.len;
+		(TREF(last_fnquery_return_varname)).mvtype = MV_STR;
+	}
+	stringpool.free += varname->str.len;
+	*stringpool.free++ = '(';
+	for (h2 = &history[1]; h2 <= h1; h2++)
+	{
+		node = *h2;
+		assert(!LV_IS_BASE_VAR(node)); /* guarantees to us that "node" is a "lvTreeNode *" and not "lv_val *" */
+		mv = &tmpmv;
+		LV_NODE_GET_KEY(node, mv); /* Get node key into "mv" depending on the structure type of "node" */
+		if (MV_IS_NUMERIC(mv))
+		{	/* number */
+			if (!IS_STP_SPACE_AVAILABLE(MAX_NUM_SIZE))
+			{
+				v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
+				INVOKE_STP_GCOL(MAX_NUM_SIZE);
+				assert(IS_AT_END_OF_STRINGPOOL(v1->str.addr, v1->str.len));
+			}
+			*v2 = *mv;
+			/* Now that we have ensured enough space in the stringpool, we dont expect any more
+			 * garbage collections or expansions until we are done with the n2s.
+			 */
+			DBG_MARK_STRINGPOOL_UNEXPANDABLE;
+			n2s(v2);
+			/* Now that we are done with any stringpool.free usages, mark as free for expansion */
+			DBG_MARK_STRINGPOOL_EXPANDABLE;
+			if (last_sub_null)
+				TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++) = *v2;
+		} else
+		{	/* string */
+			assert(MV_IS_STRING(mv));
+			v1->str.len = INTCAST((char *)stringpool.free - v1->str.addr);
+			v2->mvtype = 0;	/* initialize it to 0 to avoid "stp_gcol" from getting confused
+					 * if it gets invoked before v2 has been completely setup.
+					 */
+			if (TREF(local_collseq))
+			{
+				ALLOC_XFORM_BUFF(mv->str.len);
+				assert(NULL != TREF(lcl_coll_xform_buff));
+				tmp_sbs.str.addr = TREF(lcl_coll_xform_buff);
+				tmp_sbs.str.len = TREF(max_lcl_coll_xform_bufsiz);
+				do_xform(TREF(local_collseq), XBACK, &mv->str, &tmp_sbs.str, &length);
+				tmp_sbs.str.len = length;
+				v2->str = tmp_sbs.str;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 			} else
 				(TREF(last_fnquery_return_varname)).str.addr = varname->str.addr;
 			(TREF(last_fnquery_return_varname)).str.len = varname->str.len;
@@ -403,9 +583,14 @@ void op_fnquery_va(int sbscnt, mval *dst, va_list var)
 				{
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).mvtype = v2->mvtype;
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))).str.addr =
+<<<<<<< HEAD
 						v2->str.addr;
 					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len =
 						v2->str.len;
+=======
+						(char *)stringpool.free;
+					TAREF1(last_fnquery_return_sub,(TREF(last_fnquery_return_subcnt))++).str.len = v2->str.len;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 				}
 			}
 			/* Save a copy of the mstr in our global subscript structure we'll return to our caller */

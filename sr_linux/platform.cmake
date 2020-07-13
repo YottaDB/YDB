@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2013-2018 Fidelity National Information		#
+# Copyright (c) 2013-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries.	#
@@ -93,6 +93,7 @@ else()
   # independent. So don't add -fPIC
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -fPIC ")
 endif()
+<<<<<<< HEAD
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign")
 # Add flags for warnings that we want and don't want.
 # First enable Wall. That will include a lot of warnings. In them, disable a few. Below is a comment from sr_linux/gtm_env_sp.csh
@@ -198,6 +199,15 @@ endif()
 # On ARM Linux, gcc by default does not include -funwind-tables whereas it does on x86_64 Linux.
 # This is needed to get backtrace() (used by caller_id.c etc.) working correctly.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -funwind-tables")
+=======
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsigned-char -Wmissing-prototypes -Wreturn-type -Wpointer-sign -fno-omit-frame-pointer")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wimplicit -Wall -Wno-parentheses -Wno-unused-value -Wno-unused-function")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-variable -Wno-char-subscripts")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-but-set-variable -fno-builtin")
+if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.8)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-result -Wno-maybe-uninitialized")
+endif()
+>>>>>>> 5e466fd7... GT.M V6.3-013
 
 add_definitions(
   #-DNOLIBGTMSHR #gt_cc_option_DBTABLD=-DNOLIBGTMSHR

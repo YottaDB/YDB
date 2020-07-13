@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2016 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -33,7 +33,6 @@ GBLREF	char		cg_phase;	/* code generation phase */
 GBLREF	command_qualifier	cmd_qlf;
 GBLREF	int4		curr_addr;	/* current address */
 GBLREF	src_line_struct	src_head;
-GBLREF	short		source_line;
 GBLREF int		source_column;
 GBLREF	int4		pending_errtriplecode;	/* if non-zero contains the error code to invoke ins_errtriple with */
 
@@ -80,7 +79,7 @@ void	code_gen(void)
 				old_line = ct->src.line;
 			}
 		}
-		source_line = ct->src.line;
+		TREF(source_line) = ct->src.line;
 		source_column = ct->src.column;
 		if (!(oc_tab[ct->opcode].octype & OCT_CGSKIP))
 			trip_gen(ct);

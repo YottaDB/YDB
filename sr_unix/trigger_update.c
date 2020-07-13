@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -456,7 +456,7 @@ boolean_t trigger_name_search(char *trigger_name, uint4 trigger_name_len, mval *
 	char			*ptr, *ptr2;
 	gd_region		*reg, *reg_top;
 	gd_region		*save_gv_cur_region;
-	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf		save_currkey;
 	gv_namehead		*save_gv_target;
 	gvnh_reg_t		*gvnh_reg;
 	int			len;
@@ -545,7 +545,7 @@ boolean_t check_unique_trigger_name_full(char **values, uint4 *value_len, mval *
 {
 	boolean_t		overall_name_found, this_name_found;
 	gd_region		*reg, *reg_top;
-	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf		save_currkey;
 	gd_region		*save_gv_cur_region;
 	gv_namehead		*save_gv_target;
 	sgm_info		*save_sgm_info_ptr;

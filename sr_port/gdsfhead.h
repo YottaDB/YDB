@@ -323,44 +323,7 @@ gtm_uint64_t verify_queue(que_head_ptr_t qhdr);
 # endif
 
 #define	GVKEY_INIT(GVKEY, KEYSIZE)							\
-MBSTART {										\
-	GBLREF gv_key	*gv_altkey;							\
-	GBLREF gv_key	*gv_currkey;							\
-	gv_key		*new_KEY, *old_KEY;						\
-	int4		keySZ;								\
-	DEBUG_ONLY(DCL_THREADGBL_ACCESS);						\
-											\
-	DEBUG_ONLY(SETUP_THREADGBL_ACCESS);						\
-	old_KEY = GVKEY;								\
-	keySZ = KEYSIZE;								\
-	/* KEYSIZE should have been the output of a DBKEYSIZE command so		\
-	 * should be a multiple of 4. Assert that.					\
-	 */										\
-	assert(ROUND_UP2(keySZ, 4) == keySZ);						\
-	new_KEY = (gv_key *)malloc(SIZEOF(gv_key) - 1 + keySZ);				\
-	assert((DBKEYSIZE(MAX_KEY_SZ) == KEYSIZE)					\
-		|| ((GVKEY != gv_currkey) && (GVKEY != gv_altkey)));			\
-	if ((NULL != old_KEY) && (PREV_KEY_NOT_COMPUTED != old_KEY->end))		\
-	{										\
-		/* Don't call GVKEY_INIT twice for same key. The only exception		\
-		 * is if we are called from COPY_PREV_KEY_TO_GVT_CLUE in a		\
-		 * restartable situation but TREF(donot_commit) should have		\
-		 * been set to a special value then so check that.			\
-		 */									\
-		assert(TREF(donot_commit) | DONOTCOMMIT_COPY_PREV_KEY_TO_GVT_CLUE);	\
-		assert(KEYSIZE >= old_KEY->top);					\
-		assert(old_KEY->top > old_KEY->end);					\
-		memcpy(new_KEY, old_KEY, SIZEOF(gv_key) - 1 + old_KEY->end);		\
-		free(old_KEY);								\
-	} else										\
-	{										\
-		new_KEY->base[0] = '\0';						\
-		new_KEY->end = 0;							\
-		new_KEY->prev = 0;							\
-	}										\
-	new_KEY->top = keySZ;								\
-	GVKEY = new_KEY;								\
-} MBEND
+		((GVKEY) = gvkey_init(GVKEY, KEYSIZE))
 
 #define	GVKEY_FREE_IF_NEEDED(GVKEY)	\
 MBSTART {				\
@@ -2547,7 +2510,7 @@ typedef struct	gd_region_struct
 	int4			jnl_epoch_interval;	/* not used, reserved */
 	int4			jnl_sync_io;		/* not used, reserved */
 	int4			jnl_yield_lmt;		/* not used, reserved */
-	unsigned short		jnl_buffer_size;
+	int4			jnl_buffer_size;
 	bool			jnl_before_image;
 	bool			opening;
 	bool			read_only;
@@ -2563,6 +2526,7 @@ typedef struct	gd_region_struct
 						   */
 	unsigned char		jnl_file_len;
 	unsigned char		jnl_file_name[JNL_NAME_SIZE];
+	char                    align_filler[2];        /* filler to align the sizes */
 	int4			node;
 	int4			sec_size;
 	uint4			is_spanned;		/* This is one of the regions that some spanning global maps to */
@@ -2894,14 +2858,25 @@ typedef struct	gv_key_struct
 	unsigned short	prev;		/* Offset to the start of the previous subscript.
 					 * This is used for global nakeds.
 					 */
-	unsigned char	base[1];	/* Base of the key */
+	unsigned char	base[];		/* Base of the key */
 } gv_key;
 
-/* Define macro that will return the size of an array of "gv_key" structures. This is used to allocate temporary key structures
- * to save/restore gv_currkey (for example). Defining the array as a "gv_key" array instead of a "char" array ensures we
- * get the alignment we want (e.g. gv_key->end can be dereferenced without concerns for alignment issues).
- */
-#define	DBKEYALLOC(KSIZE)	(1 + DIVIDE_ROUND_UP(DBKEYSIZE(KSIZE), SIZEOF(gv_key)))	/* 1 is for "gv_key" structure at start */
+/* Same as above, but with no "base" field. For use in contexts where flexible arrays are disallowed. */
+typedef struct
+{
+	unsigned short	top;
+	unsigned short	end;
+	unsigned short	prev;
+} gv_key_nobase;
+
+typedef union {
+	gv_key_nobase	key;
+	char		buf[SIZEOF(gv_key) + DBKEYSIZE(MAX_KEY_SZ)];
+	struct {
+		char	gv_key_data[SIZEOF(gv_key_nobase)];
+		char	base[DBKEYSIZE(MAX_KEY_SZ)];
+	} split;
+} gv_key_buf;
 
 /* The direction that the newly added record went after a block split at a given level */
 enum split_dir
@@ -2964,7 +2939,8 @@ typedef struct	gv_namehead_struct
 							 * in trigger definitions between originating and replicating instance */
 	GTM64_ONLY(uint4 filler_8byte_align2;)		/* for 8-byte alignment of "clue" member. (targ_alloc relies on this) */
 #	endif
-	gv_key		clue;				/* Clue key, must be last in namehead struct because of hung buffer. */
+	unsigned short	filler_clue_end_align;		/* Avoid padding after clue */
+	gv_key_nobase	clue;				/* Clue key, must be last in struct because of gv_key flexible array. */
 } gv_namehead;
 
 /* Below structure is allocated for every global name that spans across multiple regions in each global directory */
@@ -3086,7 +3062,7 @@ MBSTART {															\
 #define	SPANREG_REGION_LIT	" (region "
 #define	SPANREG_REGION_LITLEN	STR_LIT_LEN(SPANREG_REGION_LIT)
 
-#define INVALID_GV_TARGET (gv_namehead *)-1L
+#define INVALID_GV_TARGET (gv_namehead *)(INTPTR_T)(-1)
 /* Below macro is used to get the "gvnh_reg->gvspan->gvt_array[]" contents taking into account some
  * might be set to INVALID_GV_TARGET (done only in DEBUG mode). In that case, we actually want to return NULL
  * as there is NO gvt defined in that slot.
@@ -3268,46 +3244,7 @@ MBSTART {												\
  * ensuring the below anywhere, it should be okay to remove it then.
  */
 #define	DBG_CHECK_GVTARGET_GVCURRKEY_IN_SYNC(CHECK_CSADDRS)									\
-MBSTART {															\
-	mname_entry		*gvent;												\
-	mstr			*varname;											\
-	int			varlen;												\
-	unsigned short		keyend;												\
-	unsigned char		*keybase;											\
-																\
-	GBLREF int4		gv_keysize;											\
-																\
-	GBLREF gv_key		*gv_currkey;											\
-	GBLREF gv_namehead	*reset_gv_target;										\
-																\
-	assert((NULL != gv_currkey) || (NULL == gv_target));									\
-	/* Make sure gv_currkey->top always reflects the maximum keysize across all dbs that we opened until now */		\
-	assert((NULL == gv_currkey) || (gv_currkey->top == gv_keysize));							\
-	if (!process_exiting)													\
-	{															\
-		keybase = &gv_currkey->base[0];											\
-		if ((NULL != gv_currkey) && (0 != keybase[0]) && (0 != gv_currkey->end)						\
-				&& (INVALID_GV_TARGET == reset_gv_target))							\
-		{														\
-			assert(NULL != gv_target);										\
-			gvent = &gv_target->gvname;										\
-			varname = &gvent->var_name;										\
-			varlen = varname->len;											\
-			assert(varlen);												\
-			assert((0 != keybase[varlen]) || !memcmp(keybase, varname->addr, varlen));				\
-			keyend = gv_currkey->end;										\
-			assert(!keyend || (KEY_DELIMITER == keybase[keyend]));							\
-			assert(!keyend || (KEY_DELIMITER == keybase[keyend - 1]));						\
-			/* Check that gv_target is part of the gv_target_list */						\
-			DBG_CHECK_GVT_IN_GVTARGETLIST(gv_target);								\
-			if (CHECK_CSADDRS)											\
-				DBG_CHECK_GVTARGET_CSADDRS_IN_SYNC;								\
-		}														\
-		/* Do gv_target sanity check too; Do not do this if it is NULL or if it is GT.CM GNP client (gd_csa is NULL) */	\
-		if ((NULL != gv_target) && (NULL != gv_target->gd_csa))								\
-			DBG_CHECK_GVTARGET_INTEGRITY(gv_target);								\
-	}															\
-} MBEND
+		dbg_check_gvtarget_gvcurrkey_in_sync(CHECK_CSADDRS)
 
 /* Do checks on the integrity of various fields in gv_target. targ_alloc initializes these and they are supposed to
  * stay that way. The following code is very similar to that in targ_alloc so needs to be maintained in sync. This
@@ -3315,27 +3252,7 @@ MBSTART {															\
  * should ensure they do not invoke it in case of NULL gd_csa.
  */
 #define	DBG_CHECK_GVTARGET_INTEGRITY(GVT)											\
-MBSTART {															\
-	int			keysize, partial_size;										\
-	GBLREF	boolean_t	dse_running;											\
-																\
-	if (NULL != GVT->gd_csa->nl)												\
-	{	/* csa->nl is cleared when a statsDB is closed due to opt-out so use as flag if DB is open or not */		\
-		keysize = GVT->gd_csa->hdr->max_key_size;									\
-		keysize = DBKEYSIZE(keysize);											\
-		partial_size = SIZEOF(gv_namehead) + 2 * SIZEOF(gv_key) + 3 * keysize;						\
-		/* DSE could change the max_key_size dynamically so account for it in the below assert */			\
-		if (!dse_running)												\
-		{														\
-			assert(GVT->gvname.var_name.addr == (char *)GVT + partial_size);					\
-			assert((char *)GVT->first_rec == ((char *)&GVT->clue + SIZEOF(gv_key) + keysize));			\
-			assert((char *)GVT->last_rec  == ((char *)GVT->first_rec + SIZEOF(gv_key) + keysize));			\
-			assert(GVT->clue.top == keysize);									\
-		}														\
-		assert(GVT->clue.top == GVT->first_rec->top);									\
-		assert(GVT->clue.top == GVT->last_rec->top);									\
-	}															\
-} MBEND
+		dbg_check_gvtarget_integrity(GVT)
 
 /* Do checks on the integrity of GVKEY. If integrity checks fail, it is a restartable situation
  * so set the donotcommit code passed in to verify the restartability.
@@ -3493,6 +3410,7 @@ MBSTART {													\
 #define	PREV_KEY_NOT_COMPUTED	DBKEYSIZE(MAX_KEY_SZ)
 
 #define	COPY_PREV_KEY_TO_GVT_CLUE(GVT, EXPAND_PREV_KEY)							\
+<<<<<<< HEAD
 MBSTART {												\
 	GBLREF gv_key	*gv_altkey;									\
 													\
@@ -3518,42 +3436,15 @@ MBSTART {												\
 		GVT->prev_key->end = PREV_KEY_NOT_COMPUTED;						\
 	}												\
 } MBEND
+=======
+		copy_prev_key_to_gvt_clue(GVT, EXPAND_PREV_KEY)
+>>>>>>> 5e466fd7... GT.M V6.3-013
 
 /* Copy GVKEY to GVT->CLUE. Take care NOT to copy cluekey->top to GVKEY->top as they correspond
  * to the allocation sizes of two different memory locations and should stay untouched.
  */
 #define	COPY_CURR_AND_PREV_KEY_TO_GVTARGET_CLUE(GVT, GVKEY, EXPAND_PREV_KEY)				\
-MBSTART {												\
-	GBLREF gv_key	*gv_altkey;									\
-	int		keyend;										\
-	DCL_THREADGBL_ACCESS;										\
-													\
-	SETUP_THREADGBL_ACCESS;										\
-	keyend = GVKEY->end;										\
-	if (GVT->clue.top <= keyend)									\
-	{	/* Possible only if GVT corresponds to a global that spans multiple			\
-		 * regions. For example, a gvcst_spr_* function could construct a			\
-		 * gv_currkey starting at one spanned region and might have to do a			\
-		 * gvcst_* operation on another spanned region with a max-key-size			\
-		 * that is smaller than gv_currkey->end. In that case, copy only the			\
-		 * portion of gv_currkey that will fit in the gvt of the target region.			\
-		 */											\
-		assert(TREF(spangbl_seen));								\
-		keyend = GVT->clue.top - 1;								\
-		memcpy(GVT->clue.base, GVKEY->base, keyend - 1);					\
-		GVT->clue.base[keyend - 1] = KEY_DELIMITER;						\
-		GVT->clue.base[keyend] = KEY_DELIMITER;							\
-	} else												\
-	{												\
-		assert(KEY_DELIMITER == GVKEY->base[keyend]);						\
-		assert(KEY_DELIMITER == GVKEY->base[keyend - 1]);					\
-		memcpy(GVT->clue.base, GVKEY->base, keyend + 1);					\
-	}												\
-	GVT->clue.end = keyend;										\
-	/* No need to maintain unused GVT->clue.prev */							\
-	COPY_PREV_KEY_TO_GVT_CLUE(GVT, EXPAND_PREV_KEY);						\
-	DBG_CHECK_GVTARGET_INTEGRITY(GVT);								\
-} MBEND
+		copy_curr_and_prev_key_to_gvtarget_clue(GVT, GVKEY, EXPAND_PREV_KEY)
 
 /* Need a special value to indicate the prev_rec.match and prev_rec.offset were not initialized in the
  * index block search history as part of the most recent gvcst_search call. Store an impossible
@@ -3610,6 +3501,7 @@ MBSTART {							\
 /* If SRC_KEY->end == 0, make sure to copy the first byte of SRC_KEY->base */
 #define MEMCPY_KEY(TARG_KEY, SRC_KEY)								\
 MBSTART {											\
+	assert(DBKEYSIZE(MAX_KEY_SZ) >= (SRC_KEY)->end + 1) +0,				\
 	memcpy((TARG_KEY), (SRC_KEY), OFFSETOF(gv_key, base[0]) + (SRC_KEY)->end + 1);		\
 } MBEND
 #define COPY_KEY(TARG_KEY, SRC_KEY)												\
@@ -3680,11 +3572,11 @@ MBSTART {														\
 	gvt = GVT; /* copy into local variable to avoid evaluating input multiple times */				\
 	klen = MIN(gvt->clue.end, gvt->first_rec->end);									\
 	assert(klen);													\
-	assert((0 <= memcmp(gvt->clue.base, gvt->first_rec->base, klen))						\
+	assert((0 <= memcmp(((gv_key *)&(gvt->clue))->base, gvt->first_rec->base, klen))				\
 		|| (GVT_CLUE_FIRST_REC_UNRELIABLE == *((short *)gvt->first_rec->base)));				\
 	klen = MIN(gvt->clue.end, gvt->last_rec->end);									\
 	assert(klen);													\
-	assert(0 <= memcmp(gvt->last_rec->base, gvt->clue.base, klen));							\
+	assert(0 <= memcmp(gvt->last_rec->base, ((gv_key *)&(gvt->clue))->base, klen));					\
 	if (DIR_ROOT != gvt->root)											\
 	{	/* Not a directory tree => a GVT tree, check that first_rec/last_rec have at least gvname in it */	\
 		gvent = &gvt->gvname;											\
@@ -3704,6 +3596,7 @@ MBSTART {														\
 #define	DEBUG_GVT_CLUE_VALIDATE(GVT)
 #endif
 
+<<<<<<< HEAD
 #define	ZPREVIOUS_NULL_SUBS_LEVEL1	2	/* this value should be != FALSE and TRUE and is relied upon by "gvcst_search" */
 
 /* Macro to replace a NULL subscript at the end with the maximum possible subscript that could exist in the
@@ -3783,6 +3676,8 @@ MBSTART {										\
 	GVKEY->base[GVKEY->end] = KEY_DELIMITER;					\
 } MBEND
 
+=======
+>>>>>>> 5e466fd7... GT.M V6.3-013
 /* Bit masks for the update_trans & si->update_trans variables */
 #define	UPDTRNS_DB_UPDATED_MASK		(1 << 0)	/* 1 if this region was updated by this non-TP/TP transaction */
 #define	UPDTRNS_JNL_LOGICAL_MASK	(1 << 1)	/* 1 if logical jnl record was written in this region's
@@ -3861,7 +3756,6 @@ MBSTART {														\
 	assert((CSA)->hdr == (CSD));											\
 	assert((TN) <= (CSD)->max_tn_warn);										\
 	assert((CSD)->max_tn_warn <= (CSD)->max_tn);									\
-	assert((CSA)->now_crit);	/* Must be crit to mess with stuff */						\
 	if ((TN) >= (CSD)->max_tn_warn)											\
 	{														\
 		trans_num trans_left;											\
@@ -3872,6 +3766,7 @@ MBSTART {														\
 					&(CSA)->hdr->max_tn);								\
 			assert(FALSE);	/* should not come here */							\
 		}													\
+		/* from here on messing with CSD out of crit might be slightly off but extremely unlikely & harmless */	\
 		assert((CSD)->max_tn > (TN));										\
 		trans_left = (CSD)->max_tn - (TN);									\
 		send_msg_csa(CSA_ARG(CSA) VARLSTCNT(6) ERR_TNWARN, 4, DB_LEN_STR((CSA)->region), &trans_left,		\
@@ -4609,7 +4504,7 @@ typedef struct redo_root_search_context_struct
 	uint4		update_trans;
 	uint4		t_err;
 	boolean_t	hold_onto_crit;
-	gv_key		currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf	currkey;
 	gv_key		*gv_currkey;
 #	ifdef DEBUG
 	unsigned char	t_fail_hist_dbg[T_FAIL_HIST_DBG_SIZE];
@@ -5228,42 +5123,42 @@ MBSTART {									\
 	else									\
 		IS_HIDDEN = FALSE;						\
 } MBEND
-#define SAVE_GV_CURRKEY(SAVE_KEY)						\
-MBSTART {									\
-	assert(NULL != gv_currkey);						\
-	assert((SIZEOF(gv_key) + gv_currkey->end) <= SIZEOF(SAVE_KEY));		\
-	memcpy(&SAVE_KEY[0], gv_currkey, SIZEOF(gv_key) + gv_currkey->end);	\
+#define SAVE_GV_CURRKEY(SAVE_KEY_BUF)							\
+MBSTART {										\
+	assert(NULL != gv_currkey);							\
+	assert((SIZEOF(gv_key) + gv_currkey->end + 1) <= SIZEOF(SAVE_KEY_BUF));		\
+	memcpy(SAVE_KEY_BUF.buf, gv_currkey, SIZEOF(gv_key) + gv_currkey->end + 1);	\
 } MBEND
-#define RESTORE_GV_CURRKEY(SAVE_KEY)						\
-MBSTART {									\
-	assert(gv_currkey->top == SAVE_KEY[0].top);				\
-	memcpy(gv_currkey, &SAVE_KEY[0], SIZEOF(gv_key) + SAVE_KEY[0].end);	\
+#define RESTORE_GV_CURRKEY(SAVE_KEY_BUF)							\
+MBSTART {											\
+	assert(gv_currkey->top == SAVE_KEY_BUF.key.top);					\
+	memcpy(gv_currkey, SAVE_KEY_BUF.buf, SIZEOF(gv_key) + SAVE_KEY_BUF.key.end + 1);	\
 } MBEND
-#define SAVE_GV_ALTKEY(SAVE_KEY)						\
-MBSTART {									\
-	assert(NULL != gv_altkey);						\
-	assert((SIZEOF(gv_key) + gv_altkey->end) <= SIZEOF(SAVE_KEY));		\
-	memcpy(&SAVE_KEY[0], gv_altkey, SIZEOF(gv_key) + gv_altkey->end);	\
+#define SAVE_GV_ALTKEY(SAVE_KEY_BUF)							\
+MBSTART {										\
+	assert(NULL != gv_altkey);							\
+	assert((SIZEOF(gv_key) + gv_altkey->end + 1) <= SIZEOF(SAVE_KEY_BUF));		\
+	memcpy(SAVE_KEY_BUF.buf, gv_altkey, SIZEOF(gv_key) + gv_altkey->end + 1);	\
 } MBEND
-#define RESTORE_GV_ALTKEY(SAVE_KEY)						\
-MBSTART {									\
-	assert(gv_altkey->top == SAVE_KEY[0].top);				\
-	memcpy(gv_altkey, &SAVE_KEY[0], SIZEOF(gv_key) + SAVE_KEY[0].end);	\
+#define RESTORE_GV_ALTKEY(SAVE_KEY_BUF)							\
+MBSTART {										\
+	assert(gv_altkey->top == SAVE_KEY_BUF.key.top);					\
+	memcpy(gv_altkey, SAVE_KEY_BUF.buf, SIZEOF(gv_key) + SAVE_KEY_BUF.key.end + 1);	\
 } MBEND
-#define SAVE_GV_CURRKEY_LAST_SUBSCRIPT(SAVE_KEY, PREV, OLDEND)				\
+#define SAVE_GV_CURRKEY_LAST_SUBSCRIPT(SAVE_KEY_BUF, PREV, OLDEND)			\
 MBSTART {										\
 	PREV = gv_currkey->prev;							\
 	OLDEND = gv_currkey->end;							\
 	assert('\0' == gv_currkey->base[oldend]);					\
 	if (PREV <= OLDEND)								\
-		memcpy(&SAVE_KEY[0], &gv_currkey->base[PREV], OLDEND - PREV + 1);	\
+		memcpy(SAVE_KEY_BUF.buf, &gv_currkey->base[PREV], OLDEND - PREV + 1);	\
 } MBEND
-#define RESTORE_GV_CURRKEY_LAST_SUBSCRIPT(SAVE_KEY, PREV, OLDEND)			\
+#define RESTORE_GV_CURRKEY_LAST_SUBSCRIPT(SAVE_KEY_BUF, PREV, OLDEND)			\
 MBSTART {										\
 	gv_currkey->prev = PREV;							\
 	gv_currkey->end = OLDEND;							\
 	if (PREV <= OLDEND)								\
-		memcpy(&gv_currkey->base[PREV], &SAVE_KEY[0], OLDEND - PREV + 1);	\
+		memcpy(&gv_currkey->base[PREV], SAVE_KEY_BUF.buf, OLDEND - PREV + 1);	\
 	assert('\0' == gv_currkey->base[OLDEND]);					\
 } MBEND
 
@@ -5409,6 +5304,7 @@ boolean_t	grab_crit_immediate(gd_region *reg, boolean_t ok_for_wcs_recover);
 boolean_t	grab_lock(gd_region *reg, boolean_t is_blocking_wait, uint4 onln_rlbk_action);
 void		gv_init_reg(gd_region *reg);
 enum cdb_sc	gvincr_compute_post_incr(srch_blk_status *bh);
+enum cdb_sc	t_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_struct *cse, cache_rec_ptr_t cr);
 enum cdb_sc	gvincr_recompute_upd_array(srch_blk_status *bh, struct cw_set_element_struct *cse, cache_rec_ptr_t cr);
 boolean_t	mupfndfil(gd_region *reg, mstr *mstr_addr, boolean_t log_error);
 boolean_t	region_init(bool cm_regions);

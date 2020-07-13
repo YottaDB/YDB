@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -35,8 +35,6 @@
 #include "filestruct.h"
 #include "gdscc.h"
 #include "gdsbml.h"
-#include "min_max.h"		/* needed for gdsblkops.h */
-#include "gdsblkops.h"		/* needed for recompute_upd_array routine */
 #include "ccp.h"
 #include "copy.h"
 #include "error.h"
@@ -140,7 +138,6 @@ error_def(ERR_REPLOFFJNLON);
 error_def(ERR_TEXT);
 
 enum cdb_sc	reallocate_bitmap(sgm_info *si, cw_set_element *bml_cse);
-enum cdb_sc	recompute_upd_array(srch_blk_status *hist1, cw_set_element *cse);
 
 boolean_t	tp_crit_all_regions()
 {
@@ -176,13 +173,13 @@ boolean_t	tp_crit_all_regions()
 			tmpcsa = &FILE_INFO(reg)->s_addrs;
 			tmpcsd = tmpcsa->hdr;
 			tmpsi = (sgm_info *)(tmpcsa->sgm_info_ptr);
-			DEBUG_ONLY(
-				/* Track retries in debug mode */
-				if (0 != lcnt)
-				{
-					BG_TRACE_ANY(tmpcsa, tp_crit_retries);
-				}
-			)
+#			ifdef DEBUG
+			/* Track retries in debug mode */
+			if (0 != lcnt)
+			{
+				BG_TRACE_ANY(tmpcsa, tp_crit_retries);
+			}
+#			endif
 			assert(!tmpcsa->hold_onto_crit);
 			if (!tmpcsa->now_crit)
 				grab_crit(reg);	/* In "t_retry", we used "grab_crit_encr_cycle_sync" to ensure encryption
@@ -551,13 +548,13 @@ boolean_t	tp_tend()
 			cnl = csa->nl;
 			csd = cs_data;
 			assert(!si->cr_array_index);
-			DEBUG_ONLY(
-				/* Track retries in debug mode */
-				if (0 != lcnt)
-				{
-					BG_TRACE_ANY(csa, tp_crit_retries);
-				}
-			)
+			#ifdef DEBUG
+			/* Track retries in debug mode */
+			if (0 != lcnt)
+			{
+				BG_TRACE_ANY(csa, tp_crit_retries);
+			}
+#			endif
 			lcl_update_trans = si->update_trans;
 			assert(!(lcl_update_trans & ~UPDTRNS_VALID_MASK));
 			first_cw_set = si->first_cw_set;
@@ -576,6 +573,7 @@ boolean_t	tp_tend()
 			 * restart with a helped out code because the cache recovery will most likely result in a restart of
 			 * the current transaction which we want to avoid if we are in the final retry.
 			 */
+			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			if (!csa->now_crit)
 			{
 				grab_crit(gv_cur_region); /* Step CMT01 (see secshr_db_clnup.c for CMTxx step descriptions) */
@@ -600,7 +598,6 @@ boolean_t	tp_tend()
 				x_lock = FALSE;
 				break;
 			}
-			CHECK_TN(csa, csd, csd->trans_hist.curr_tn);	/* can issue rts_error TNTOOLARGE */
 			if (!is_mm)
 				oldest_hist_tn = OLDEST_HIST_TN(csa);
 			/* We never expect to come here with file_corrupt set to TRUE (in case of an online rollback) because
@@ -854,23 +851,20 @@ boolean_t	tp_tend()
 				{	/* the check below is different from the one for BG (i.e. doesn't have the killtn check)
 					 * because there is no BT equivalent in MM. there is a mmblk_rec which is more or
 					 * less the same as a BT. when the mmblk_rec becomes as fully functional as BT, we
-					 * can use the killtn optimization for MM also.
+					 * can use the killtn optimization for MM also, however we also removed the noisolation
+					 * optimization because it was not working, and getting BG working seemed more pressing at
+					 * the time of this writing
 					 */
 					assert((t1->buffaddr) >= csa->db_addrs[0]);
 					assert((t1->buffaddr) < csa->db_addrs[1]);
 					if (t1->tn <= ((blk_hdr_ptr_t)t1->buffaddr)->tn)
 					{
 						assert(CDB_STAGNATE > t_tries);
-						assert(!cse || !cse->high_tlevel);
-						if (!cse || !cse->recompute_list_head || cse->write_type
-							|| (cdb_sc_normal != recompute_upd_array(t1, cse)) || !++leafmods)
-						{
-							status = cdb_sc_blkmod;
-							TP_TRACE_HIST_MOD(t1->blk_num, t1->blk_target, tp_blkmod_tp_tend, csd,
-								t1->tn, 0, t1->level);
-							DEBUG_ONLY(continue;)
-							PRO_ONLY(goto failed;)
-						}
+						status = cdb_sc_blkmod;
+						TP_TRACE_HIST_MOD(t1->blk_num, t1->blk_target, tp_blkmod_tp_tend, csd,
+							t1->tn, 0, t1->level);
+						DEBUG_ONLY(continue;)
+						PRO_ONLY(goto failed;)
 					}
 				} else
 				{
@@ -913,10 +907,12 @@ boolean_t	tp_tend()
 								else
 								{
 									assert(cse->write_type || cse->recompute_list_head);
+									assert(&(TREF(non_tp_noiso_key_n_value))
+										!= cse->recompute_list_head);
 									leafmods++;
 									if (indexmods || cse->write_type
 											|| (cdb_sc_normal !=
-												recompute_upd_array(t1, cse)))
+											t_recompute_upd_array(t1, cse, NULL)))
 										status = cdb_sc_blkmod;
 								}
 							}
@@ -1025,21 +1021,21 @@ boolean_t	tp_tend()
 					}
 				}
 			} /* for (t1 ... ) */
-			DEBUG_ONLY(
-				if (cdb_sc_normal != status)
-					goto failed;
-				else
-				{	/* Now that we have successfully validated all histories, check that there is no
-					 * gv_target mismatch between history and corresponding cse.
-					 */
-					for (t1 = si->first_tp_hist;  t1 != si->last_tp_hist; t1++)
-					{
-						cse = t1->cse;
-						if (NULL != cse)
-							assert(t1->blk_target == cse->blk_target);
-					}
+#			ifdef DEBUG
+			if (cdb_sc_normal != status)
+				goto failed;
+			else
+			{	/* Now that we have successfully validated all histories, check that there is no
+				 * gv_target mismatch between history and corresponding cse.
+				 */
+				for (t1 = si->first_tp_hist;  t1 != si->last_tp_hist; t1++)
+				{
+					cse = t1->cse;
+					if (NULL != cse)
+						assert(t1->blk_target == cse->blk_target);
 				}
-			)
+			}
+#			endif
 			if (DIVIDE_ROUND_UP(si->num_of_blks, 4) < leafmods)	/* if status == cdb_sc_normal, then leafmods  */
 			{
 				status = cdb_sc_toomanyrecompute;		/* is exactly the number of recomputed blocks */
@@ -1452,7 +1448,6 @@ boolean_t	tp_tend()
 						assert(n_gds_t_op < kill_t_write);
 						if (n_gds_t_op <= cse->mode)
 							continue;
-						DEBUG_ONLY(is_mm = (dba_mm == csd->acc_meth));
 						DBG_ENSURE_OLD_BLOCK_IS_VALID(cse, is_mm, csa, csd);
 						assert(((NULL != old_block) && (old_block->tn < epoch_tn))
 											|| (0 == cse->jnl_freeaddr));
@@ -1928,6 +1923,7 @@ failed_skip_revert:
 	return FALSE;
 }
 
+<<<<<<< HEAD
 /* --------------------------------------------------------------------------------------------
  * This code is very similar to the code in gvcst_put for the non-block-split case. Any changes
  * in either place should be reflected in the other.
@@ -2175,6 +2171,8 @@ enum cdb_sc	recompute_upd_array(srch_blk_status *bh, cw_set_element *cse)
 	return cdb_sc_normal;
 }
 
+=======
+>>>>>>> 5e466fd7... GT.M V6.3-013
 /* This function does not update "bml_cse->tn" (to reflect that the reallocation is valid as of the current database tn).
  * See similar comment before the function definition of "recompute_upd_array". For the same reasons, it is considered
  * ok to do the reallocation since frozen regions are considered relatively rare.

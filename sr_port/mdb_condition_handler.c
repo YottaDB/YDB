@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -84,6 +84,13 @@
 #include "ftok_sems.h"
 #include "gtm_putmsg_list.h"
 #include "ztimeout_routines.h"
+<<<<<<< HEAD
+=======
+# include "iormdef.h"
+# include "ftok_sems.h"
+# include "gtm_putmsg_list.h"
+#include "gvt_inline.h"
+>>>>>>> 5e466fd7... GT.M V6.3-013
 #ifdef GTM_TRIGGER
 # include "gv_trigger.h"
 # include "gtm_trigger.h"

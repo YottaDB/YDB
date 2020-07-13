@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -222,8 +222,13 @@ void zshow_devices(zshow_out *output)
 				case tt:
 					ZS_STR_OUT(&v, terminal_text);
 					tt_ptr = (d_tt_struct*)tiod->dev_sp;
+<<<<<<< HEAD
 					if (!ctrlc_on && io_std_device.out == tiod) /* and standard input */
 					{	ZS_PARM_SP(&v, zshow_nocene);
+=======
+					if (!ctrlc_on && io_std_device->out == tiod) /* and standard input */
+					{	ZS_PARM_SP(&v, zshow_nocena);
+>>>>>>> 5e466fd7... GT.M V6.3-013
 					}
 					if (tt_ptr->enbld_outofbands.mask)
 					{	ZS_PARM_EQU(&v, zshow_ctra);

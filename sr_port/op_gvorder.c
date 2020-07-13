@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -60,8 +60,13 @@ void op_gvorder(mval *v)
 	enum db_acc_method	acc_meth;
 	gd_addr			*gd_targ;
 	gd_binding		*gd_map_start, *map, *map_top;
+<<<<<<< HEAD
 	gd_region		*save_gv_cur_region, *reg;
 	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+=======
+	gd_region		*save_gv_cur_region;
+	gv_key_buf		save_currkey;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 	gv_namehead		*gvt, *save_gv_target;
 	gvnh_reg_t		*gvnh_reg;
 	gvnh_spanreg_t		*gvspan;
@@ -157,8 +162,10 @@ void op_gvorder(mval *v)
 		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end]);
 		assert(KEY_DELIMITER == gv_currkey->base[gv_currkey->end - 1]);
 		SAVE_REGION_INFO(save_currkey, save_gv_target, save_gv_cur_region, save_sgm_info_ptr, save_jnlpool);
-		if (STR_SUB_ESCAPE == save_currkey->base[gv_currkey->end - 2])
-			save_currkey->base[gv_currkey->end - 2] = KEY_DELIMITER;	/* strip the byte added to get past curr */
+		if (STR_SUB_ESCAPE == *(save_currkey.split.base + gv_currkey->end - 2))
+		{	/* strip the byte added to get past curr */
+			*(save_currkey.split.base + gv_currkey->end - 2) = KEY_DELIMITER;
+		}
 		gd_targ = TREF(gd_targ_addr);
 		gd_map_start = gd_targ->maps;
 		map_top = gd_map_start + gd_targ->n_maps;

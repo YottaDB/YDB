@@ -63,6 +63,7 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 	/* Initialize communication stuff */
 	struct addrinfo 	*ai_ptr = NULL, *ai_head = NULL, hints;
 	gtmsource_local_ptr_t   gtmsource_local;
+<<<<<<< HEAD
 	intrpt_state_t  	prev_intrpt_state;
 	struct linger		disable_linger = {0, 0};
 	char			error_string[1024];
@@ -73,6 +74,12 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 	int			port_len;
 	int			errcode;
 	int			tries;
+=======
+	char	*host;
+	char	port_buffer[NI_MAXSERV], hostinfo[SIZEOF(RESOLUTION_FAILURE_PREFIX) + MAX_HOST_NAME_LEN + NI_MAXSERV];
+	int	port_len;
+	int	errcode;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 
 	if (FD_INVALID != gtmsource_sock_fd) /* Initialization done already */
 		return(0);
@@ -82,9 +89,13 @@ int gtmsource_comm_init(boolean_t print_addresolve_error)
 	port_buffer[port_len] = '\0';
 	host = gtmsource_local->secondary_host;
 	CLIENT_HINTS(hints);
+<<<<<<< HEAD
 	for (tries = 0;
 	     (tries < MAX_GETHOST_TRIES) && (EAI_AGAIN == (errcode = dogetaddrinfo(host, port_buffer, &hints, &ai_head)));
 	     tries++);
+=======
+	errcode = getaddrinfo(host, port_buffer, &hints, &ai_head);
+>>>>>>> 5e466fd7... GT.M V6.3-013
 	if ((0 != errcode) && print_addresolve_error)
 	{
 		SNPRINTF(hostinfo, SIZEOF(hostinfo), "%s%s:%s", RESOLUTION_FAILURE_PREFIX, host, port_buffer);

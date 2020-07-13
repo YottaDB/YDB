@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2019 Fidelity National Information	*
+ * Copyright (c) 2013-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -89,6 +89,7 @@
 #define GTMTLS_OP_CLIENT_CA	 	0x00010000
 /* CAfile or CApath processed */
 #define GTMTLS_OP_CA_LOADED	 	0x00020000
+#define GTMTMLS_OP_NOSHUTDOWN		0x00040000
 
 #define GTMTLS_IS_FIPS_MODE(CTX)	(TRUE == CTX->fips_mode)
 #define GTMTLS_RUNTIME_LIB_VERSION(CTX)	(CTX->runtime_version)
@@ -149,12 +150,20 @@ typedef struct gtm_tls_session_struct
  */
 
 /* Returns the most recent error (null-terminated) related to the workings of the SSL/TLS reference implementation. */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	const char		*gtm_tls_get_error(void);
+=======
+extern const char		*gtm_tls_get_error(void);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* If the most recent invocation of the SSL/TLS reference implementation resulted in a system call error, `gtm_tls_errno' returns
  * the value of `errno'. Otherwise, -1 is returned in which case `gtm_tls_get_error' provides more information.
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	int		gtm_tls_errno(void);
+=======
+extern int		gtm_tls_errno(void);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Initializes the SSL/TLS context for a process. Typically invoked only once (unless the previous attempt failed). Attributes
  * necessary to initialize the SSL/TLS context are obtained from the configuration file pointed to by `$ydb_crypt_config'.
@@ -169,7 +178,11 @@ GBLREF	int		gtm_tls_errno(void);
  * application, to create as many SSL/TLS aware sockets as needed. In case of an error, INVALID_TLS_CONTEXT is returned in which
  * case gtm_tls_get_error() provides the necessary error detail.
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	gtm_tls_ctx_t	*gtm_tls_init(int version, int flags);
+=======
+extern gtm_tls_ctx_t	*gtm_tls_init(int version, int flags);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Stores a M program provided password for later use.
  *
@@ -185,7 +198,11 @@ GBLREF	gtm_tls_ctx_t	*gtm_tls_init(int version, int flags);
  *    -1          Failure - use gtm_tls_get_error() to get reason
  */
 
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *obs_passwd);
+=======
+extern int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const char *obs_passwd);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Provides additional information to merge with config file
  *
@@ -198,7 +215,11 @@ GBLREF	int gtm_tls_store_passwd(gtm_tls_ctx_t *tls_ctx, const char *tlsid, const
  * 	-1	Failure - use gtm_tls_get_error() to get reason
  */
 
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	int gtm_tls_add_config(gtm_tls_ctx_t *tls_ctx, const char *idstr, const char *configstr);
+=======
+extern int gtm_tls_add_config(gtm_tls_ctx_t *tls_ctx, const char *idstr, const char *configstr);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Prefetches the password corresponding to a private key.
  *
@@ -220,7 +241,11 @@ GBLREF	int gtm_tls_add_config(gtm_tls_ctx_t *tls_ctx, const char *idstr, const c
  * Note 2: The function honors the GTMTLS_OP_INTERACTIVE_MODE flag passed to the `gtm_tls_init' function. If the application has
  * initialized the SSL/TLS API in a non-interactive mode, the API does not prompt the user for password.
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	void		gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name);
+=======
+extern void		gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Converts a Unix TCP/IP socket into a SSL/TLS aware socket.
  *
@@ -247,8 +272,12 @@ GBLREF	void		gtm_tls_prefetch_passwd(gtm_tls_ctx_t *tls_ctx, char *env_name);
  * Note 2: The function honors the GTMTLS_OP_INTERACTIVE_MODE flag passed to the `gtm_tls_init' function. If the application has
  * initialized the SSL/TLS API in a non-interactive mode, this function does not prompt the user for password.
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *ctx, gtm_tls_socket_t *prev_socket,
 									int sockfd, char *id, int flags);
+=======
+extern gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *ctx, gtm_tls_socket_t *prev_socket, int sockfd, char *id, int flags);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Connects using SSL/TLS aware socket. Assumes the other transport endpoint understands SSL/TLS.
  *
@@ -260,7 +289,11 @@ GBLREF	gtm_tls_socket_t *gtm_tls_socket(gtm_tls_ctx_t *ctx, gtm_tls_socket_t *pr
  *
  * Note: The function makes use of an existing SSL session (if one is available).
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	int		gtm_tls_connect(gtm_tls_socket_t *socket);
+=======
+extern int		gtm_tls_connect(gtm_tls_socket_t *socket);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Accepts an incoming connection using SSL/TLS aware socket. Assumes the other transport endpoint understands SSL/TLS.
  *
@@ -271,7 +304,11 @@ GBLREF	int		gtm_tls_connect(gtm_tls_socket_t *socket);
  * -1, `gtm_tls_errno' and `gtm_tls_get_error' can be used to obtain the necessary error detail.
  *
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	int		gtm_tls_accept(gtm_tls_socket_t *socket);
+=======
+extern int		gtm_tls_accept(gtm_tls_socket_t *socket);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Renegotiates an active SSL/TLS connection. Note: This function does the renegotiation in a blocking fashion and more importantly
  * handles EINTR internally by retrying the renegotiation.
@@ -281,7 +318,11 @@ GBLREF	int		gtm_tls_accept(gtm_tls_socket_t *socket);
  *
  * Return value: none.
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	int		gtm_tls_renegotiate(gtm_tls_socket_t *socket);
+=======
+extern int		gtm_tls_renegotiate(gtm_tls_socket_t *socket);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Process configuration file options for WRITE /TLS("renegotiate") and then calls gtm_tls_renegotiate
  *
@@ -290,8 +331,13 @@ GBLREF	int		gtm_tls_renegotiate(gtm_tls_socket_t *socket);
  *
  * Return value: none.
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	int		gtm_tls_renegotiate_options(gtm_tls_socket_t *socket, int msec_timeout,
 								char *idstr, char *configstr, int tlsid_present);
+=======
+extern int		gtm_tls_renegotiate_options(gtm_tls_socket_t *socket, int msec_timeout, char *idstr, char *configstr,
+							int tlsid_present);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Obtains additional SSL/TLS related information on the peer. This function is typically invoked to log information for diagnostic
  * purposes.
@@ -304,7 +350,11 @@ GBLREF	int		gtm_tls_renegotiate_options(gtm_tls_socket_t *socket, int msec_timeo
  * GTMTLS_WANT_WRITE is returned. In case of -1, `gtm_tls_errno' and `gtm_tls_get_error' can be used to obtain the necessary error
  * detail.
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	int		gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info);
+=======
+extern int		gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *conn_info);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Transmits message securely to the transport endpoint. This function should be invoked ONLY after successful invocations of either
  * `gtm_tls_connect' or `gtm_tls_accept'.
@@ -318,7 +368,11 @@ GBLREF	int		gtm_tls_get_conn_info(gtm_tls_socket_t *socket, gtm_tls_conn_info *c
  * GTMTLS_WANT_READ or GTMTLS_WANT_WRITE is returned. In case of -1, `gtm_tls_errno' and `gtm_tls_get_error' can be used to obtain
  * the necessary error detail.
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	int		gtm_tls_send(gtm_tls_socket_t *socket, char *buf, int send_len);
+=======
+extern int		gtm_tls_send(gtm_tls_socket_t *socket, char *buf, int send_len);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Receives message securely from the transport endpoint. This function should be invoked ONLY after successful invocations of
  * either `gtm_tls_connect' or `gtm_tls_accept'.
@@ -333,7 +387,11 @@ GBLREF	int		gtm_tls_send(gtm_tls_socket_t *socket, char *buf, int send_len);
  * GTMTLS_WANT_READ or GTMTLS_WANT_WRITE is returned. In case of -1, `gtm_tls_errno' and `gtm_tls_get_error' can be used to obtain
  * the necessary error detail.
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	int		gtm_tls_recv(gtm_tls_socket_t *socket, char *buf, int recv_len);
+=======
+extern int		gtm_tls_recv(gtm_tls_socket_t *socket, char *buf, int recv_len);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Returns the number of bytes cached in the SSL/TLS layer and is ready for immediate retrieval with the `gtm_tls_recv'.
  *
@@ -345,7 +403,11 @@ GBLREF	int		gtm_tls_recv(gtm_tls_socket_t *socket, char *buf, int recv_len);
  * or `poll' on the underlying TCP/IP socket indicates that the subsequent `recv' will block, and check if there are any bytes
  * readily available.
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	int		gtm_tls_cachedbytes(gtm_tls_socket_t *socket);
+=======
+extern int		gtm_tls_cachedbytes(gtm_tls_socket_t *socket);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Close the SSL/TLS socket connection.
  *
@@ -359,7 +421,11 @@ GBLREF	int		gtm_tls_cachedbytes(gtm_tls_socket_t *socket);
  * necessary error detail.
  *
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	void		gtm_tls_socket_close(gtm_tls_socket_t *socket);
+=======
+extern void		gtm_tls_socket_close(gtm_tls_socket_t *socket);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Closes an active SSL/TLS session. This frees up the session and thus makes the session not resuable for a future connection.
  * Any subsequent connection will create a new session.
@@ -367,7 +433,11 @@ GBLREF	void		gtm_tls_socket_close(gtm_tls_socket_t *socket);
  * Note: The function takes a pointer to the gtm_tls_socket_t structure. This is because it forces the actual `socket' value to be
  * INVALID_TLS_SOCKET.
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	void		gtm_tls_session_close(gtm_tls_socket_t **socket);
+=======
+extern void		gtm_tls_session_close(gtm_tls_socket_t **socket);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 /* Frees up any memory allocated by the SSL/TLS context. This function should typically be invoked at process exit.
  *
@@ -379,6 +449,10 @@ GBLREF	void		gtm_tls_session_close(gtm_tls_socket_t **socket);
  * Note: The function takes a pointer to the gtm_tls_ctx_t structure. This is because it forces the actual `ctx' value to be
  * INVALID_TLS_CONTEXT.
  */
+<<<<<<< HEAD:sr_unix/ydb_tls_interface.h
 GBLREF	void		gtm_tls_fini(gtm_tls_ctx_t **ctx);
+=======
+extern void		gtm_tls_fini(gtm_tls_ctx_t **ctx);
+>>>>>>> 5e466fd7... GT.M V6.3-013:sr_unix/gtm_tls_interface.h
 
 #endif

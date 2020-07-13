@@ -172,6 +172,7 @@ int gtmsource_est_conn()
 			repl_log(gtmsource_log_fp, TRUE, TRUE, "%d hard connection attempt failed : %s\n", connection_attempts + 1,
 				 STRERROR(errno));
 			repl_close(&gtmsource_sock_fd);
+<<<<<<< HEAD
 		}
 		/* Pause (very briefly as this is a hard spin loop) before trying the connection again then check if any
 		 * interrupting conditions occurred before retrying the connection.
@@ -181,6 +182,21 @@ int gtmsource_est_conn()
 		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 			return (SS_NORMAL);
 		comminit_retval = gtmsource_comm_init(throw_errors);
+=======
+			if (REPL_MAX_CONN_HARD_TRIES_PERIOD > hardtries_period)
+			{
+				SHORT_SLEEP(hardtries_period);
+			}
+			else
+				LONG_SLEEP_MSEC(hardtries_period);
+		}
+		gtmsource_poll_actions(FALSE);
+		if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+			return (SS_NORMAL);
+		/* Check for network resolution issues if the socket is invalid */
+		if (FD_INVALID == gtmsource_sock_fd)
+			comminit_retval = gtmsource_comm_init(throw_errors);
+>>>>>>> [#604] [V63013] Merge GT.M V6.3-013 into YottaDB mainline (with conflicts)
 	} while (++connection_attempts < hardtries_count);
 	gtmsource_poll_actions(FALSE);
 	if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
@@ -230,6 +246,7 @@ int gtmsource_est_conn()
 					throw_errors = TRUE;
 				} else /* Decrease the frequency of showing the connection failure error messages */
 					throw_errors = FALSE;
+<<<<<<< HEAD
 			}
 			/* Pause before trying the connection again then check if any interrupting conditions occurred
 			 * before retrying the connection.
@@ -239,6 +256,16 @@ int gtmsource_est_conn()
 			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
 				return (SS_NORMAL);
 			comminit_retval = gtmsource_comm_init(throw_errors);
+=======
+				LONG_SLEEP(gtmsource_local->connect_parms[GTMSOURCE_CONN_SOFT_TRIES_PERIOD]);
+			}
+			gtmsource_poll_actions(FALSE);
+			if ((GTMSOURCE_CHANGING_MODE == gtmsource_state) || (GTMSOURCE_HANDLE_ONLN_RLBK == gtmsource_state))
+				return (SS_NORMAL);
+			/* Check for network resolution issues if the socket is invalid */
+			if (FD_INVALID == gtmsource_sock_fd)
+				comminit_retval = gtmsource_comm_init(throw_errors);
+>>>>>>> [#604] [V63013] Merge GT.M V6.3-013 into YottaDB mainline (with conflicts)
 			connection_attempts++;
 			if (0 == (connection_attempts % logging_interval) && 0 == (logging_attempts % alert_attempts))
 			{ 	/* Log ALERT message */

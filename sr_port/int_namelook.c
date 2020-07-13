@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 5e466fd7... GT.M V6.3-013
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -32,13 +37,14 @@
 
 int int_namelook(const uint4 offset_tab[], const nametabent *name_tab, char *str, int strlength)
 {
-	unsigned char		temp[NAME_ENTRY_SZ], x;
 	const nametabent	*top, *i;
+	uint4			find;
+	unsigned char		temp[NAME_ENTRY_SZ], x;
 
 	if (strlength > NAME_ENTRY_SZ)
 		return -1;
 	lower_to_upper(&temp[0], (uchar_ptr_t)str, strlength);
-	if ('%' == (x = temp[0]))
+	if ('%' == (x = temp[0]))							/* WARNING assignment */
 		return -1;
 	if (('A' > x) || ('Z' < x)) /* This enforces the boundaries of the offset_tab which is always used
 	 			 * for indexes from A to Z.
@@ -51,8 +57,10 @@ int int_namelook(const uint4 offset_tab[], const nametabent *name_tab, char *str
 	{
 		if ((strlength == i->len) || ((strlength > i->len) && ('*' == i->name[i->len])))
 		{
-			if (!memcmp(&temp[0], i->name, (int4)(i->len)))
+			if (!(find = memcmp(&temp[0], i->name, (int4)(i->len))))	/* WARNING assignment */
 				return (int)(i - name_tab);
+			if (0 > find)
+				return -1;						/* assumes alpha ordering */
 		}
 	}
 	return -1;

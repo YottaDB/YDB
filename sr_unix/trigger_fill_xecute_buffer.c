@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -153,7 +153,7 @@ STATICFNDEF void trigger_fill_xecute_buffer_read_trigger_source(gv_trigger_t *tr
 	gd_region		*save_gv_cur_region;
 	sgm_info		*save_sgm_info_ptr;
 	jnlpool_addrs_ptr_t	save_jnlpool;
-	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf		save_currkey;
 
 	assert(0 < dollar_tlevel);
 	assert(NULL != trigdsc);

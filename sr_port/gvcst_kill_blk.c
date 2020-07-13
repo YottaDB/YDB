@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -217,9 +217,12 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		cse = t_write(blkhist, (unsigned char *)bs1, SIZEOF(blk_hdr) + SIZEOF(rec_hdr), new_block_index, 1,
 			TRUE, FALSE, GDS_WRITE_KILLTN);
 		assert(!dollar_tlevel || !cse->high_tlevel);
-		*cseptr = cse;
-		if (NULL != cse)
+		if (dollar_tlevel)
+		{
+			assert(cse);
+			*cseptr = cse;
 			cse->first_off = 0;
+		}
 		return cdb_sc_normal;
 	}
 	next_rec_shrink = (int)(old_blk_hdr->bsiz + ((sm_uc_ptr_t)del_ptr - (sm_uc_ptr_t)right_ptr));
@@ -330,7 +333,11 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 	}
 	cse = t_write(blkhist, (unsigned char *)bs1, 0, 0, level, first_copy, TRUE, GDS_WRITE_KILLTN);
 	assert(!dollar_tlevel || !cse->high_tlevel);
-	*cseptr = cse;
+	if (dollar_tlevel)
+	{
+		assert(cse);
+		*cseptr = cse;
+	}
 	if (horiz_growth)
 	{
 		old_cse = cse->low_tlevel;
@@ -340,7 +347,7 @@ enum cdb_sc	gvcst_kill_blk(srch_blk_status	*blkhist,
 		assert(!old_cse->undo_next_off[0] && !old_cse->undo_offset[0]);
 		assert(!old_cse->undo_next_off[1] && !old_cse->undo_offset[1]);
 	}
-	if ((NULL != cse)  &&  (0 != cse->first_off))
+	if ((dollar_tlevel)  &&  (0 != cse->first_off))
 	{	/* fix up chains in the block to account for deleted records */
 		prev = NULL;
 		curr = buffer + cse->first_off;

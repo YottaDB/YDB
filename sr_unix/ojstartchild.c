@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -284,7 +284,7 @@ void ojpassvar_hook(void)
 	return;
 }
 
-STATICFNDEF void local_variable_marshalling(FILE *setup_file_orig)
+void local_variable_marshalling(FILE *setup_file_orig)
 {
 	/* Setup buffer to write local variables one at a time */
 	zshow_out	output;

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -45,11 +45,15 @@
 
 #define  LOGNAME_LEN 255
 
+<<<<<<< HEAD
 GBLREF	io_desc			*active_device;
+=======
+GBLREF io_desc			*active_device;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 GBLREF bool			licensed;
 GBLREF dev_dispatch_struct  	io_dev_dispatch_mupip[];
 GBLREF int4			lkid,lid;
-GBLREF	mstr			sys_input, sys_output;
+GBLREF mstr			sys_input, sys_output;
 
 error_def(LP_NOTACQ);			/* bad license 		  */
 error_def(ERR_LOGTOOLONG);

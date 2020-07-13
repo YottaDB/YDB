@@ -30,8 +30,12 @@
  *	rts_stringpool when the compilation is finished.
  */
 GBLREF char		cg_phase;
+<<<<<<< HEAD
 GBLREF int4		curr_fetch_count;
 GBLREF short int	source_line;
+=======
+GBLREF int4		aligned_source_buffer, curr_fetch_count;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 GBLREF spdesc		stringpool,rts_stringpool;
 GBLREF spdesc		indr_stringpool;
 GBLREF triple		*curr_fetch_trip;
@@ -53,7 +57,7 @@ void comp_init(mstr *src, oprtype *dst)
 	cg_phase = CGP_PARSE;
 	TREF(source_error_found) = 0;
 	TREF(last_source_column) = 0;
-	DEBUG_ONLY(source_line = 0;);
+	DEBUG_ONLY(TREF(source_line) = 0;);
 	assert(rts_stringpool.base == stringpool.base);
 	rts_stringpool = stringpool;
 	if (!indr_stringpool.base)

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2022 YottaDB LLC and/or its subsidiaries.	*
@@ -36,152 +36,119 @@ error_def(ERR_RPARENMISSING);
 LITREF unsigned char io_params_size[];
 LITREF dev_ctl_struct dev_param_control[];
 LITDEF nametabent dev_param_names[] =
-{						/* Must be in sync with dev_param_index[], zshow_param_index[] & dev_param_data[] */
-	 {2,"AF*"}
-	,{2,"AL*"}	,{4,"ALLO"}
-	,{2,"AP*"}
-	,{2,"AT*"}
+{	/* Must be in alpha order and in sync with dev_param_index[], zshow_param_index[] and dev_param_data[] */
+	 {4,"ALLO*"}				/* in zshow_param_index */
+	,{2,"AP*"}	,{6,"APPEND"}
+	,{2,"AT*"}	,{6,"ATTACH"}
 
-	,{4,"BIGR*"}
-	,{2,"BL*"}	,{4,"BLOC"}
-	,{4,"BU*"}
+	,{9,"BIGRECORD"}			/* dead VMS placeholder, used in the test system */
+	,{2,"BL*"}	,{4,"BLOC*"}	,{9,"BLOCKSIZE"}
 
-	,{2,"CA"}	,{4,"CANT*"}
-	,{4,"CANO*"}
-	,{2,"CE*"}
-	,{3,"CHA*"}
-	,{3,"CHS*"}
-	,{3,"CLE*"}
-	,{3,"CLI"}
+	,{4,"CANO*"}	,{9,"CANONICAL"}
+	,{2,"CE*"}	,{7,"CENABLE"}
+	,{3,"CHS*"}	,{5,"CHSET"}
+	,{3,"CLE*"}	,{11,"CLEARSCREEN"}
 	,{4,"COMM*"}	,{7,"COMMAND"}
-	,{4,"CONN*"}
-	,{4,"CONT*"}
-	,{4,"CONV*"}
-	,{3,"COP*"}
-	,{2,"CP*"}
-	,{2,"CT*"}	,{4,"CTRA"}
+	,{4,"CONN*"}	,{7,"CONNECT"}
+	,{4,"CONT*"}				/*,{10,"CONTIGUOUS"}*/
+	,{4,"CONV*"}	,{7,"CONVERT"}
+	,{2,"CT*"}	,{4,"CTRA"}	,{5,"CTRAP"}	/*,{5,"CTRAP"}*/
 
-	,{4,"DELE*"}    ,{4,"DELE"}
-	,{4,"DELI*"}
+	,{4,"DELE*"}    ,{6,"DELETE"}
+	,{4,"DELI*"}	,{9,"DELIMITER"}
 	,{4,"DEST*" }	,{7,"DESTROY"}
-	,{3,"DET*"}
-	,{3,"DOU*"}
-	,{3,"DOW*"}
+	,{3,"DET*"}				/*,{6, "DETACH}*/
+	,{3,"DOW*"}				/*,{10,"DOWNSCROLL"}*/
 
-	,{2,"EB*"}	,{4,"EBCD"}
-	,{2,"EC*"}
+	,{2,"EB*"}	,{6,"EBCDIC"}
+	,{2,"EC*"}	,{4,"ECHO"}
 	,{2,"ED*"}	,{4,"EDIT"}
 	,{4,"EMPT*"}	,{7,"EMPTERM"}
-	,{6,"ERASEL*"}
-	,{6,"ERASET*"}
-	,{2,"ES*"}
-	,{3,"EXC*"}	,{4,"EXCE"}
-	,{3,"EXT*"}	,{4,"EXTE"}
-	,{4,"EXTG*"}
+	,{6,"ERASEL*"}	,{9,"ERASELINE*"}
+	,{2,"ES*"}				/*,{6,"ESCAPE*"}*/
+	,{3,"EXC*"}	,{4,"EXCE*"}		/*,{9,"EXCEPTION"}*/
+	,{3,"EXT*"}	,{4,"EXTE*"}		/*,{9,"EXTENSION"}*/
 
+	,{1,"F"}				/* legacy abreviation for FIELD */
 	,{4,"FFLF"}
-	,{1,"F"}	,{3,"FIE*"}	,{5,"FIELD"}
+	,{3,"FIE*"}	,{3,"FIE*"}	,{5,"FIELD"}
 	,{3,"FIF*"}	,{4,"FIFO"}
-	,{3,"FIL*"}
-	,{3,"FIR*"}
+	,{3,"FIL*"}				/*,{6,"FILTER"}*/
 	,{3,"FIX*"}	,{5,"FIXED"}
-	,{3,"FLA*"}
-	,{3,"FLU*"}
-	,{2,"FO"}	,{3,"FOR*"}
+	,{3,"FLA*"}	,{4,"FLAG"}
+	,{3,"FLU*"}	,{5,"FLUSH"}
 	,{3,"FOL*"}	,{6,"FOLLOW"}
 
-	,{1,"G"}	,{2,"GR*"}
+	,{1,"G"}	,{5,"GROUP"}
 
-	,{2,"HE*"}
-	,{3,"HOL*"}
-	,{3,"HOS*"}	,{4,"HOST"}
-	,{2,"HU*"}
+	,{3,"HOL*"}				/* dead VMS placeholder */
+	,{3,"HOS*"}	,{8,"HOSTSYNC"}
+	,{2,"HU*"}	,{9,"HUPENABLE"}
 
 	,{6,"ICHSET"}
 	,{4,"IKEY"}
 	,{4,"INDE*"}	,{11,"INDEPENDENT"}
 	,{8,"INREWIND"}
 	,{6,"INSEEK"}
-	,{2,"IN*"}	,{4,"INSE"}
-	,{3,"IOE*"}
+	,{2,"IN*"}	,{4,"INSE*"}		/*,{6,"INSERT"}*/
+	,{3,"IOE*"}				/*,{7,"IOERROR*"}*/
 
 	,{3,"KEY"}
 
-	,{3,"LAB*"}
-	,{3,"LAS*"}
-	,{2,"LE*"}	,{4,"LENG"}
-	,{2,"LI*"}
-	,{4,"LOGF*"}
-	,{4,"LOGQ*"}
-	,{3,"LOW*"}
+	,{3,"LAB*"}				/* in zshow_param_index */
+	,{2,"LE*"}	,{4,"LENG*"}		/*,{6,"LENGTH"}*/
+	,{2,"LI*"}	,{6,"LISTEN"}
+	,{4,"LOGF*"}				/* dead VMS placeholder */
+	,{4,"LOGQ*"}				/* dead VMS placeholder */
+	,{3,"LOW*"}				/* dead VMS placeholder */
 
 	,{1,"M"}
-        ,{8,"MOREREAD*"}
-	,{3,"MOU*"}
+	,{4,"MORE*"}	,{12,"MOREREADTIME"}
 
-	,{2,"NA*"}
-	,{3,"NEW*"}
-	,{3,"NEX*"}
-	,{6,"NOBIGR*"}
-	,{4,"NOBU*"}
-	,{4,"NOCA*"}
-	,{4,"NOCE*"}	,{6,"NOCENE"}
-	,{6,"NOCONV*"}
-	,{6,"NODELI*"}
+	,{3,"NEW*"}	,{10,"NEWVERSION"}
+	,{4,"NOCA*"}	,{11,"NOCANONICAL"}
+	,{4,"NOCE*"}	,{6,"NOCENA*"}		/*,{9,"NOCENABLE"}*/
+	,{6,"NOCONV*"}	,{9,"NOCONVERT"}
+	,{6,"NODELI*"}	,{11,"NODELIMITER"}
 	,{6,"NODEST*"}	,{9,"NODESTROY"}
-	,{5,"NODOU*"}
-	,{4,"NOEB*"}
+	,{4,"NOEB*"}	,{8,"NOEBCDIC"}
 	,{4,"NOEC*"}	,{6,"NOECHO"}
 	,{4,"NOED*"}	,{6,"NOEDIT"}
 	,{6,"NOEMPT*"}	,{9,"NOEMPTERM"}
-	,{4,"NOES*"}	,{6,"NOESCA"}
-	,{5,"NOEXT*"}
+	,{4,"NOES*"}	,{6,"NOESCA*"}		/*,{8,"NOESCAPE"}*/
 	,{6,"NOFFLF"}
-	,{5,"NOFIL*"}
-	,{5,"NOFIX*"}
-	,{5,"NOFLA*"}
+	,{5,"NOFIL*"}	,{8,"NOFILTER"}
+	,{5,"NOFIX*"}	,{7,"NOFIXED"}
+	,{4,"NOFLA*"}	,{5,"NOFLAG"}
 	,{5,"NOFOL*"}	,{8,"NOFOLLOW"}
-	,{4,"NOHE*"}
-	,{5,"NOHOL*"}
-	,{5,"NOHOS*"}	,{6,"NOHOST"}
-	,{4,"NOHU*"}
-	,{4,"NOIN*"}	,{6,"NOINSE"}
-	,{5,"NOLAB*"}
-	,{5,"NOLOW*"}
-	,{6,"NONOTI*"}
-	,{5,"NOPAG*"}
-	,{6,"NOPASS*"}
-	,{6,"NOPAST*"}
-	,{6,"NOPRIN*"}
-	,{4,"NORC*"}
-	,{6,"NOREAD"}	,{7,"NOREADO*"}
-	,{7,"NOREADS*"}
-	,{5,"NORES*"}
-	,{5,"NORET*"}
-	,{4,"NOSE*"}
-	,{4,"NOST*"}
+	,{5,"NOHOS*"}	,{6,"NOHOST*"}		/*,{10,"NOHOSTSYNC"}*/
+	,{4,"NOHU*"}	,{11,"NOHUPENABLE"}
+	,{4,"NOIN*"}	,{6,"NOINSE*"}		/*,{8,"NOINSERT"}*/
+	,{4,"NOPAG*"}	,{5,"NOPAGE"}
+	,{6,"NOPAST*"}	,{9,"NOPASTHRU"}
+	,{6,"NOREAD"}	,{10,"NOREADONLY"}
+	,{7,"NOREADS*"}	,{10,"NOREADSYNC"}
+	,{4,"NOSE*"}	,{12,"NOSEQUENTAIL"}
+	,{4,"NOST*"}	,{8,"NOSTREAM*"}
 	,{4,"NOTE"}
-	,{5,"NOTER*"}
-	,{4,"NOTI*"}
-	,{5,"NOTRA*"}
-	,{5,"NOTRU*"}
-	,{4,"NOTT*"}	,{6,"NOTTSY"}
+	,{5,"NOTER*"}	,{12,"NOTERMINATOR"}
+	,{4,"NOTI*"}				/* dead VMS placeholder */
+	,{5,"NOTRA*"}				/* dead VMS placeholder */
+	,{5,"NOTRU*"}	,{10,"NOTRUNCATE"}
+	,{4,"NOTT*"}	,{6,"NOTTSY*"}		,{8,"NOTTSYNC"}
 	,{4,"NOTY*"}	,{6,"NOTYPE"}
-	,{4,"NOUR*"}
-	,{4,"NOWA*"}
-	,{4,"NOWC*"}
-	,{4,"NOWR"}	,{5,"NOWRA*"}	,{6,"NOWRAP"}
+	,{4,"NOWA*"}	,{6,"NOWAIT"}
+	,{4,"NOWR"}	,{6,"NOWRAP"}
 	,{7,"NOWRITE*"}
-	,{2,"NU*"}
+	,{2,"NU*"}	,{4,"NULL"}		/* suspect this is only for internal use */
 
-	,{1,"O"}
+	,{1,"O"}				/* legacy abreviation for OWNER */
 	,{6,"OCHSET"}
 	,{4,"OKEY"}
-	,{2,"OP*"}
 	,{9,"OUTREWIND"}
 	,{7,"OUTSEEK"}
-	,{2,"OV*"}
-	,{2,"OW*"}
+	,{2,"OV*"}	,{9,"OVERWRITE"}
+	,{2,"OW*"}				/*,{5,"OWNER"}*/
 
 	,{2,"P1"}
 	,{2,"P2"}
@@ -192,102 +159,92 @@ LITDEF nametabent dev_param_names[] =
 	,{2,"P7"}
 	,{2,"P8"}
 	,{3,"PAD"}
-	,{3,"PAG*"}
+	,{3,"PAG*"}	,{4,"PAGE"}
 	,{4,"PARS*"}	,{5,"PARSE"}
-	,{4,"PASS*"}
-	,{4,"PAST*"}
-	,{4,"PRIO*"}
-	,{4,"PRIN*"}
-	,{3,"PRM*"}	,{6,"PRMMBX"}
-	,{3,"PRO*"}
+	,{4,"PAST*"}	,{7,"PASTHRU*"}
+	,{3,"PRM*"}	,{6,"PRMMBX"}		/* in zshow_param_index */
+	,{3,"PRO*"}	,{10,"PROTECTION"}
 
-	,{3,"QUE*"}
+	,{3,"QUE*"}				/* dead VMS placeholder */
 
-	,{2,"RC*"}	,{4,"RCHK"}
-	,{4,"READ"}	,{5,"READO*"}
-	,{5,"READS*"}
-	,{3,"REC*"}
-	,{3,"REM*"}
-	,{3,"REN*"}
-	,{3,"RES*"}
-	,{3,"RET*"}
-	,{3,"REW*"}
-	,{3,"RFA"}
-	,{3,"RFM"}
+	,{4,"RCHK*"}				/* in zshow_param_index */
+	,{4,"READ"}	,{8,"READONLY"}
+	,{5,"READS*"}	,{8,"READSYNC"}
+	,{3,"REC*"}	,{10,"RECORDSIZE"}
+	,{3,"REN*"}	,{6,"RENAME"}
+	,{3,"REW*"}	,{6,"REWIND"}
+	,{3,"RFA"}				/* dead VMS placeholder */
+	,{3,"RFM"}				/* dead VMS placeholder */
 
-	,{1,"S"}
-	,{3,"SEE*"}
-	,{3,"SEQ*"}
-	,{3,"SET*"}
-	,{2,"SH"}	,{3,"SHA*"}	,{4,"SHAR"}
+	,{1,"S"}				/* legacy abreviation for WORLD */
+	,{3,"SEE*"}	,{4,"SEEK"}
+	,{3,"SEQ*"}	,{10,"SEQUENTIAL"}
+	,{2,"SH"}	,{4,"SHAR*"}		/*{6,"SHARED"}*/
 	,{4,"SHEL*"}	,{5,"SHELL"}
-	,{2,"SK*"}
-	,{2,"SO*"}
-	,{3,"SPA*"}
-	,{3,"SPO*"}
-	,{2,"ST"}	,{3,"STR*"}	,{6,"STREAM"}
+	,{2,"SO*"}	,{6,"SOCKET"}
+	,{3,"SPA*"}				/* dead VMS placeholder */
+	,{3,"SPO*"}				/* dead VMS placeholder */
+	,{2,"ST"}	,{3,"STR*"}		/* legacy abreviations for STREAM*/
 	,{4,"STDE*"}	,{6,"STDERR"}
-	,{2,"SU*"}
+	,{2,"SU*"}				/* dead VMS placeholder */
+	,{6,"STREAM"}
 	,{2,"SY*"}
 
-	,{2,"TE*"}	,{4,"TERM"}
-	,{3,"TIM*"}
-	,{2,"TM*"}
-	,{3,"TRA*"}
-	,{3,"TRU*"}
-	,{2,"TT*"}	,{4,"TTSY"}
-	,{2,"TY*"}	,{4,"TYPE"}
+	,{2,"TE*"}	,{4,"TERM*"}	,{10,"TERMINATOR"}
+	,{3,"TIM*"}				/*,{7,"TIMEOUT"}*/
+	,{3,"TRU*"}	,{8,"TRUNCATE"}
+	,{4,"TTSY*"}	,{6,"TTSYNC"}		/* in zshow_param_index */
+	,{4,"TYPE*"}	,{9,"TYPEAHEAD"}	/* in zshow_param_index */
 
 	,{2,"UI*"}	,{3,"UIC"}
-	,{2,"UN*"}
-	,{2,"UP*"}
-	,{2,"UR*"}
-	,{2,"US*"}
+	,{2,"UP*"}	,{8,"UPSCROLL"}
+	,{2,"UR*"}				/* dead VMS placeholder */
+	,{2,"US*"}				/* dead VMS placeholder */
 
-	,{2,"VA*"}
+	,{2,"VA*"}				/*,{8,"VARIABLE"}*/
 
-	,{1,"W"}
-	,{2,"WA*"}	,{4,"WAIT"}
-	,{2,"WC*"}	,{4,"WCHK"}
+	,{1,"W"}				/* legacy abreviation for WORLD */
+	,{2,"WA*"}	,{4,"WAIT"}		/* in zshow_param_index */
+	,{2,"WC*"}	,{4,"WCHK"}		/* in zshow_param_index */
 	,{2,"WI*"}	,{5,"WIDTH"}
-	,{2,"WO*"}
-	,{2,"WR"}	,{3,"WRA*"}
-	,{5,"WRITE"}
-	,{7,"WRITELB"}
-	,{7,"WRITEOF"}
-	,{7,"WRITEON*"}
-	,{7,"WRITETM"}
+	,{2,"WO*"}				/*,{5,"WORLD"}*/
+	,{2,"WR"}	,{4,"WRAP"}
+	,{5,"WRITE"}				/* legacy abreviation for WRITEONLY */
+	,{7,"WRITELB"}				/* dead VMS placeholder */
+	,{7,"WRITEOF"}				/* dead VMS placeholder */
+	,{9,"WRITEONLY*"}
+	,{7,"WRITETM"}				/* dead VMS placeholder */
 
 	,{1,"X"}
 
 	,{1,"Y"}
 
-	,{2,"ZB*"}
-	,{2,"ZD*"}
-	,{3,"ZEX*"}
-	,{4,"ZFIL*"}
+	,{2,"ZB*"}	,{7,"ZBFSIZE"}
+	,{2,"ZD*"}	,{6,"ZDELAY"}
+	,{3,"ZEX*"}	,{10,"ZEXCEPTION"}
+	,{4,"ZFIL*"}	,{7,"ZFILTER"}
 	,{3,"ZFF"}
-	,{2,"ZI*"}
-	,{4,"ZLEN*"}
-	,{4,"ZLIS*"}
+	,{2,"ZI*"}	,{8,"ZIBFSIZE"}
+	,{4,"ZLEN*"}	,{7,"ZLENGTH"}
+	,{4,"ZLIS*"}	,{7,"ZLISTEN"}
 
 	,{8,"ZNODELAY"} /* ZNO* have to be spelled out fully */
 	,{9,"ZNOFILTER"}
 	,{5,"ZNOFF"}
 	,{7,"ZNOWRAP"}
 
-	,{4,"ZWID*"}
-	,{4,"ZWRA*"}
+	,{4,"ZWID*"}	,{6,"ZWIDTH"}
+	,{4,"ZWRA*"}	,{5,"ZWRAP"}
 };
 
-/* Offset of letter in dev_param_names.  Adding an entry there will push every entry below that letter down by 1*/
+/* Offset of letter in dev_param_names.  Adding e.g. 1 entry there will add 1 to every entry corresponding to subsequent letters */
 LITDEF	uint4 dev_param_index[27] =
 {
 /*	A    B    C    D    E    F    G    H    I    J    K    L    M    N   */
-	0,   5,   9,   26,  34,  49,  65,  67,  72,  81,  81,  82,  90,  93,
+	0,   5,   9,   27,  35,  50,  66,  68,  73,  82,  82,  83,  91,  94,
 
 /*	O    P    Q    R    S    T    U    V    W    X    Y    Z    end	     */
-	161, 169, 188, 189, 202, 222, 232, 238, 239, 254, 255, 256, 270
+	162, 170, 189, 190, 203, 223, 233, 239, 240, 255, 256, 257, 280
 };
 
 /* Offset of string within letter in dev_param_names */
@@ -295,20 +252,20 @@ LITDEF	uint4 dev_param_index[27] =
 /* Ie: a = 0 & z = 25, so (currently) BLOC is the third entry in the 'B' section of dev_param_names[] */
 LITDEF zshow_index zshow_param_index[] =
 {
-/*	ALLO     BLOC    COMMAND   CONV     CTRA     DELE   DEST     EBCD     EDIT    EMPTERM 	EXCE     EXTE     FIELD    */
-	{2,0},   {2,1},   {9,2},  {12,2},  {16,2},  {1,3},  {3,3},  {1,4},   {4,4},   {6,4},   {11,4},   {13,4},  {3,5},
-/*	FIL     FIXED  FOLLOW */
-	{6,5},  {9,5},  {15,5},
-/*  	HOST    ICHSET   INDEPENDENT  INSE     LAB */
-	{3,7},	{0,8},   {2,8},      {7,8},   {1,11},
-/*	LENG     NOCENE   NODEST    NOECHO   NOEDIT   NOEMPTERM NOESCA   NOFOLLOW  NOHOST   NOINSE     */
-	{3,11},  {7,13},  {10,13},  {15,13}, {17,13}, {19,13},  {21,13}, {28,13},  {32,13}, {34,13},
-/*	NOPAST   NOREADS  NOTTSY   NOTYPE   NOWRAP   OCHSET   PAD     PARSE   PAST     PRMMBX   RCHK    */
-	{41,13}, {46,13}, {57,13}, {59,13}, {65,13}, {1,14},  {8,15}, {11,15}, {13,15}, {17,15}, {1,17},
-/*      READ     READS	  REC      SHAR     SHELL    STDERR   STREAM   TERM     TTSY     TYPE    UIC     */
-	{2,17},  {4,17},  {5,17},  {6,18},  {8,18},  {17,18}, {15,18}, {1,19},  {7,19},  {9,19}, {1,20},
-/*      WAIT     WCHK    WIDTH   WRITE  */
-        {2,22},  {4,22}, {6,22}, {10,22}
+/*	ALLO    BLOC     COMMAND CONV     CTRA     DELE    DEST    EBCDIC   EDIT     EMPTERM  EXCE     EXTE */
+	{0,0},  {2,1},   {9,2},  {14,2},  {16,2},  {0,3},  {4,3},  {1,4},   {4,4},   {7,4},   {12,4},  {14,4},
+/*	FIE     FIL     FIXED   FOLLOW   HOST    ICHSET  INDEPENDENT  INSE    LAB      LENG */
+	{4,5},  {7,5},  {9,5},  {15,5},  {1,7},  {0,8},  {3,8},	      {7,8},  {0,11},  {2,11},
+/*	NOCENE   NODEST    NOECHO    NOEDIT    NOEMPTERM NOESCA    NOFOLLOW  NOHOST     NOINSE */
+	{4,13},  {10,13},  {15,13},  {17,13},  {19,13},  {21,13},  {30,13},  {32,13},  {36,13},
+/*	NOPAST   NOREADS  NOTTSY    NOTYPE   NOWRAP */
+	{39,13}, {42,13}, {57,13},  {59,13}, {64,13},
+/*	OCHSET   PAD      PARSE     PAST      PRMMBX    RCHK     READ     READS    REC */
+	{1,14},  {8,15},  {12,15},  {13,15},  {17,15},  {0,17},  {1,17},  {3,17},  {5,17},
+/*      SHAR     SHELL    STDERR    STREAM    TERM      TTSY     TYPE     UIC */
+	{6,18},  {8,18},  {16,18},  {18,18},  {1,19},  {7,19},  {8,19},  {1,20},
+/*      WAIT     WCHK     WIDTH    WRITE */
+        {2,22},  {4,22},  {6,22},  {10,22}
 };
 
 int deviceparameters(oprtype *c, char who_calls)
@@ -327,65 +284,53 @@ int deviceparameters(oprtype *c, char who_calls)
 
 	static readonly unsigned char dev_param_data[] =
 	{							/* must be in sync with dev_param_names[] */
-		 iop_after
-		,iop_allocation	,iop_allocation
-		,iop_append
-		,iop_attach
+		iop_allocation
+		,iop_append ,iop_append
+		,iop_attach ,iop_attach
 
 		,iop_bigrecord
-		,iop_blocksize ,iop_blocksize
-		,iop_burst
+		,iop_blocksize ,iop_blocksize ,iop_blocksize
 
-		,iop_canctlo, iop_canctlo
-		,iop_canonical
-		,iop_cenable
-		,iop_characteristic
-		,iop_chset
-		,iop_clearscreen
-		,iop_cli
+		,iop_canonical ,iop_canonical
+		,iop_cenable ,iop_cenable
+		,iop_chset ,iop_chset
+		,iop_clearscreen ,iop_clearscreen
 		,iop_command ,iop_command
-		,iop_connect
+		,iop_connect ,iop_connect
 		,iop_contiguous
-		,iop_convert
-		,iop_copies
-		,iop_cpulimit
-		,iop_ctrap ,iop_ctrap
+		,iop_convert ,iop_convert
+		,iop_ctrap ,iop_ctrap ,iop_ctrap
 
 		,iop_delete ,iop_delete
-		,iop_delimiter
+		,iop_delimiter ,iop_delimiter
 		,iop_destroy ,iop_destroy
 		,iop_detach
-		,iop_doublespace
 		,iop_downscroll
 
 		,iop_ebcdic ,iop_ebcdic
-		,iop_echo
+		,iop_echo ,iop_echo
 		,iop_editing ,iop_editing
 		,iop_empterm ,iop_empterm
-		,iop_eraseline
-		,iop_erasetape
+		,iop_eraseline ,iop_eraseline
 		,iop_escape
 		,iop_exception ,iop_exception
 		,iop_extension ,iop_extension
-		,iop_extgap
 
+		,iop_field
 		,iop_fflf
 		,iop_field ,iop_field ,iop_field
 		,iop_fifo, iop_fifo
 		,iop_filter
-		,iop_firstpage
 		,iop_fixed ,iop_fixed
-		,iop_flag
-		,iop_flush
-		,iop_form ,iop_form
+		,iop_flag ,iop_flag
+		,iop_flush ,iop_flush
 		,iop_follow ,iop_follow
 
 		,iop_g_protection, iop_g_protection
 
-		,iop_header
 		,iop_hold
 		,iop_hostsync, iop_hostsync
-		,iop_hupenable
+		,iop_hupenable ,iop_hupenable
 
 		,iop_ipchset
 		,iop_input_key
@@ -398,79 +343,58 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_key
 
 		,iop_label
-		,iop_lastpage
 		,iop_length ,iop_length
-		,iop_zlisten			/* Replaces iop_listen. LISTEN is now aliased to ZLISTEN. */
+		,iop_zlisten ,iop_zlisten			/* Replaces iop_listen. LISTEN is now aliased to ZLISTEN. */
 		,iop_logfile
 		,iop_logqueue
 		,iop_lowercase
 
 		,iop_m
-		,iop_morereadtime
-		,iop_mount
+		,iop_morereadtime ,iop_morereadtime
 
-		,iop_name
-		,iop_newversion
-		,iop_next
-		,iop_nobigrecord
-		,iop_noburst
-		,iop_nocanonical
+		,iop_newversion ,iop_newversion
+		,iop_nocanonical ,iop_nocanonical
 		,iop_nocenable ,iop_nocenable
-		,iop_noconvert
-		,iop_nodelimiter
+		,iop_noconvert ,iop_noconvert
+		,iop_nodelimiter ,iop_nodelimiter
 		,iop_nodestroy ,iop_nodestroy
-		,iop_nodoublespace
-		,iop_noebcdic
+		,iop_noebcdic ,iop_noebcdic
 		,iop_noecho ,iop_noecho
 		,iop_noediting ,iop_noediting
 		,iop_noempterm ,iop_noempterm
 		,iop_noescape ,iop_noescape
-		,iop_inhextgap
 		,iop_nofflf
-		,iop_nofilter
-		,iop_nofixed
-		,iop_noflag
+		,iop_nofilter ,iop_nofilter
+		,iop_nofixed ,iop_nofixed
+		,iop_noflag ,iop_noflag
 		,iop_nofollow ,iop_nofollow
-		,iop_noheader
-		,iop_nohold
 		,iop_nohostsync ,iop_nohostsync
-		,iop_nohupenable
+		,iop_nohupenable ,iop_nohupenable
 		,iop_noinsert ,iop_noinsert
-		,iop_nolabel
-		,iop_nolowercase
-		,iop_nonotify
-		,iop_page
-		,iop_nopassall
-		,iop_nopasthru
-		,iop_noprint
-		,iop_nordcheckdata
+		,iop_page ,iop_page
+		,iop_nopasthru ,iop_nopasthru
 		,iop_noreadonly ,iop_noreadonly
-		,iop_noreadsync
-		,iop_norestart
-		,iop_inhretry
-		,iop_nosequential
-		,iop_nostream
+		,iop_noreadsync ,iop_noreadsync
+		,iop_nosequential ,iop_nosequential
+		,iop_nostream ,iop_nostream
 		,iop_note
-		,iop_noterminator
+		,iop_noterminator, iop_noterminator
 		,iop_notify
 		,iop_notrailer
-		,iop_notruncate
-		,iop_nottsync ,iop_nottsync
+		,iop_notruncate ,iop_notruncate
+		,iop_nottsync ,iop_nottsync ,iop_nottsync
 		,iop_notypeahead ,iop_notypeahead
-		,iop_nourgent
-		,iop_nowait
-		,iop_nowtcheckdata
-		,iop_nowrap ,iop_nowrap ,iop_nowrap
+		,iop_nowait ,iop_nowait
+		,iop_nowrap ,iop_nowrap
 		,iop_nowriteonly
-		,iop_nl
+		,iop_nl ,iop_nl
 
 		,iop_o_protection
 		,iop_opchset
 		,iop_output_key
-		,iop_operator
 		,iop_outrewind
 		,iop_outseek
-		,iop_noinsert
+		,iop_noinsert ,iop_noinsert
 		,iop_o_protection
 
 		,iop_p1
@@ -482,55 +406,45 @@ int deviceparameters(oprtype *c, char who_calls)
 		,iop_p7
 		,iop_p8
 		,iop_pad
-		,iop_page
+		,iop_page ,iop_page
 		,iop_parse ,iop_parse
-		,iop_passall
-		,iop_pasthru
-		,iop_priority
-		,iop_print
+		,iop_pasthru ,iop_pasthru
 		,iop_prmmbx ,iop_prmmbx
-		,iop_o_protection
+		,iop_o_protection ,iop_o_protection
 
 		,iop_queue
 
-		,iop_rdcheckdata ,iop_rdcheckdata
+		,iop_rdcheckdata
 		,iop_readonly ,iop_readonly
-		,iop_readsync
-		,iop_recordsize
-		,iop_remote
-		,iop_rename
-		,iop_restart
-		,iop_retry
-		,iop_rewind
+		,iop_readsync ,iop_readsync
+		,iop_recordsize ,iop_recordsize
+		,iop_rename ,iop_rename
+		,iop_rewind ,iop_rewind
 		,iop_rfa
 		,iop_rfm
 
 		,iop_s_protection
-		,iop_seek
-		,iop_sequential
-		,iop_setup
-		,iop_shared ,iop_shared, iop_shared
+		,iop_seek ,iop_seek
+		,iop_sequential ,iop_sequential
+		,iop_shared ,iop_shared
 		,iop_shell ,iop_shell
-		,iop_skipfile
-		,iop_socket
+		,iop_socket ,iop_socket
 		,iop_space
 		,iop_spool
-		,iop_stream, iop_stream, iop_stream
+		,iop_stream, iop_stream
 		,iop_stderr, iop_stderr
+		,iop_stream
 		,iop_submit
 		,iop_s_protection
 
-		,iop_terminator, iop_terminator
+		,iop_terminator, iop_terminator, iop_terminator
 		,iop_timeout
-		,iop_tmpmbx
-		,iop_trailer
-		,iop_truncate
+		,iop_truncate ,iop_truncate
 		,iop_ttsync ,iop_ttsync
 		,iop_typeahead ,iop_typeahead
 
 		,iop_uic ,iop_uic
-		,iop_unload
-		,iop_upscroll
+		,iop_upscroll ,iop_upscroll
 	        ,iop_urgent
 		,iop_user
 
@@ -552,21 +466,22 @@ int deviceparameters(oprtype *c, char who_calls)
 
 		,iop_y
 
-		,iop_zbfsize
-		,iop_zdelay
-		,iop_exception /* for ZEXCEPTION; ZEXC* is a synonym for EXC* */
-		,iop_filter /* for ZFILTER; ZFIL* is a synonym for FIL* */
+		,iop_zbfsize, iop_zbfsize
+		,iop_zdelay, iop_zdelay
+		,iop_exception, iop_exception	/* for ZEXCEPTION which is a synonym for EXCEPTION */
+		,iop_filter, iop_filter		/* for ZFILTER which is a synonym for FILTER */
 		,iop_zff
-		,iop_zibfsize
-		,iop_length /* for ZLENGTH; ZLEN* is a synonym for LE* and LENG */
-		,iop_zlisten
+		,iop_zibfsize, iop_zibfsize
+		,iop_length, iop_length		/* for ZLENGTH which is a synonym for LENGTH */
+		,iop_zlisten, iop_zlisten
 
 		,iop_znodelay
-		,iop_nofilter /* for ZNOFILTER; ZNOFILTER is a synonym for NOFIL* */
+		,iop_nofilter			/* for ZNOFILTER which is a synonym for NOFILTER */
 		,iop_znoff
-		,iop_nowrap /* for ZNOWRAP; ZNOWRAP is a synonym for NOWR, NOWRA*, NOWRAP */
-		,iop_width /* for ZWIDTH; ZWID* is a synonym for WI*, WIDTH */
-		,iop_wrap /* for ZWRAP; ZWRA* is a synonym for WR, and WRA* */
+		,iop_nowrap			/* for ZNOWRAP which is a synonym for NOWRAP */
+
+		,iop_width, iop_width		/* for ZWIDTH which is a synonym for WIDTH */
+		,iop_wrap, iop_wrap		/* for ZWRAP which is a synonym for WRAP */
 	} ;
 	DCL_THREADGBL_ACCESS;
 

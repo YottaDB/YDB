@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries. *
@@ -87,7 +87,7 @@ error_def(ERR_JNLENDIANLITTLE);
  * plus the overhead of storing the journal records.
  */
 #define JNL_BUFFER_MIN		((MAX_LOGI_JNL_REC_SIZE + ROUND_UP(2 * MAX_IO_BLOCK_SIZE, DISK_BLOCK_SIZE)) / DISK_BLOCK_SIZE + 1)
-#define JNL_BUFFER_MAX		32768	/* # of 512-byte blocks = 16Mb journal buffer size */
+#define JNL_BUFFER_MAX		1048576	/* # of 512-byte blocks = 512Mib journal buffer size */
 
 /*	JNL_EXTEND_DEF	allocation size / 10
 #define JNL_EXTEND_DEF_PERC	0.1

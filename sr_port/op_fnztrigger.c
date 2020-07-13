@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2018 Fidelity National Information	*
+ * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -66,7 +66,7 @@ LITREF	mval	literal_one;
 
 STATICDEF boolean_t		save_gv_last_subsc_null, save_gv_some_subsc_null;
 STATICDEF gd_addr		*save_gd_header;
-STATICDEF gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+STATICDEF gv_key_buf		save_currkey;
 STATICDEF gv_key		*save_gv_currkey;
 STATICDEF gv_namehead		*save_gv_target;
 STATICDEF gd_region		*save_gv_cur_region;
@@ -198,7 +198,7 @@ void op_fnztrigger(mval *func, mval *arg1, mval *arg2, mval *dst)
 	save_jnlpool = jnlpool;
 	if (NULL != gv_currkey)
 	{
-		save_gv_currkey = (gv_key *)&save_currkey[0];
+		save_gv_currkey = (gv_key *)&save_currkey.key;
 		MEMCPY_KEY(save_gv_currkey, gv_currkey);
 		save_gv_last_subsc_null = TREF(gv_last_subsc_null);
 		save_gv_some_subsc_null = TREF(gv_some_subsc_null);

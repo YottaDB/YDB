@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -58,7 +58,6 @@ GBLREF stack_frame		*frame_pointer;
 GBLREF uint4			dollar_tlevel;
 GBLREF unsigned char		source_file_name[];
 GBLREF unsigned short		source_name_len;
-GBLREF short int		source_line;
 GBLREF spdesc			indr_stringpool, rts_stringpool, stringpool;
 
 LITREF	mval		literal_notimeout;
@@ -304,9 +303,9 @@ int4	read_source_file (void)
 	if (MAX_SRCLINE < val.str.len)
 	{	/* Emit a warning */
 		extra_ch = *(--cp);					/* save the overflow character */
-		dec_err(VARLSTCNT(4) ERR_LSINSERTED, 3, source_line, source_name_len, source_file_name);
-		if (1 < source_line)
-			source_line--;
+		dec_err(VARLSTCNT(4) ERR_LSINSERTED, 3, TREF(source_line), source_name_len, source_file_name);
+		if (1 < TREF(source_line))
+			(TREF(source_line))--;
 	} else
 		(TREF(source_buffer)).len++;
 	*cp = '\n';							/* insert \n needed in checksum calculation */

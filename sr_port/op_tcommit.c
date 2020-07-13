@@ -68,6 +68,7 @@
 #include "gvcst_protos.h"
 #include "repl_msg.h"			/* for gtmsource.h */
 #include "gtmsource.h"			/* for jnlpool_addrs_ptr_t */
+#include "gvt_inline.h"
 
 #include "db_snapshot.h"
 

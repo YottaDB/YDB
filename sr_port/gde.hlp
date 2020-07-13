@@ -280,7 +280,7 @@
    LOCK                   -LOCK_SPACE
    LOCK Crit Separate     -[NO]LOCK_CRIT_SEPARATE
    MSLT                   -MUTEX_SLOTS
-   Null Subs              -[HO]NULL_SUBSCRIPTS
+   Null Subs              -[NO]NULL_SUBSCRIPTS
    Qdb Rndwn              -[NO]QDBRUNDOWN
    Std Null Coll          -[NO]STDNULLCOLL
    Rec Size               -RECORD_SIZE

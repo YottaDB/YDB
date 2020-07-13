@@ -283,15 +283,24 @@ int f_select(oprtype *a, opctype op)
 	save_state->side_effect_base[save_state->expr_depth] |= (TREF(side_effect_base))[TREF(expr_depth)];
 	if (shifting)
 	{	/* get the tmpchain into the shiftchain and add OC_GVSAVTARG / OC_GVRECTARG */
+		shifting = (((1 < save_state->expr_depth) && TREF(saw_side_effect))	/*see if something abandoned shift */
+			|| ((save_state->expr_start != save_state->expr_start_orig)
+			&& (OC_NOOP != save_state->expr_start->opcode)));
 		SELECT_CLEANUP;
 		assert(&tmpchain == TREF(curtchain));
-		newtriple(OC_GVSAVTARG);
+		newtriple(shifting ? OC_GVSAVTARG : OC_NOOP);	/* must have one of these two at expr_start */
 		setcurtchain(oldchain);
+		assert(NULL != save_state->expr_start);
+		TREF(expr_start) = save_state->expr_start;
 		assert(&t_orig != TREF(expr_start));
 		dqadd(TREF(expr_start), &tmpchain, exorder);
 		TREF(expr_start) = tmpchain.exorder.bl;
-		triptr = newtriple(OC_GVRECTARG);		/* if redundant, later logic throws it out */
-		triptr->operand[0] = put_tref(TREF(expr_start));
+		if (shifting)
+		{	/* only play this game it has not been abandoned */
+			assert(OC_GVSAVTARG == (TREF(expr_start))->opcode);
+			triptr = newtriple(OC_GVRECTARG);
+			triptr->operand[0] = put_tref(TREF(expr_start));
+		}
 #		ifdef DEBUG
 		if (GDL_DebugCompiler & ydbDebugLevel)
 		{

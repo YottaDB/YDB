@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -100,7 +100,7 @@ cw_set_element *t_write (
 		assert(cw_set_depth < CDB_CW_SET_SIZE);
 		assert(index < (int)cw_set_depth);
 		new_cse = TRUE;
-		tp_cse = NULL;/* don't bother returning tp_cse for non-TP; it's almost never needed and it distiguishes the cases */
+		tp_cse = cse;
 	} else
 	{
 		assert(!index || index < sgm_info_ptr->cw_set_depth);

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -51,9 +51,11 @@ bt_rec_ptr_t bt_put(gd_region *reg, block_id block)
 	th_rec_ptr_t		th;
 	trans_num		lcl_tn;
 	uint4			lcnt;
+	node_local_ptr_t	cnl;
 
 	csa = (sgmnt_addrs *)&FILE_INFO(reg)->s_addrs;
 	csd = csa->hdr;
+	cnl = csa->nl;
 	assert(csa->now_crit || csd->clustered);
 	assert(dba_mm != csa->hdr->acc_meth);
 	lcl_tn = csa->ti->curr_tn;
@@ -72,7 +74,7 @@ bt_rec_ptr_t bt_put(gd_region *reg, block_id block)
 				cr = (cache_rec_ptr_t)GDS_ANY_REL2ABS(csa, bt->cache_index);
 				if (cr->dirty)
 				{	/* get it written so it can be reused */
-					BG_TRACE_PRO_ANY(csa, bt_put_flush_dirty);
+					INCR_GVSTATS_COUNTER(csa, cnl, n_bt_scarce, 1);
 					if (FALSE == wcs_get_space(reg, 0, cr))
 					{
 						/* only reason we currently know why wcs_get_space could fail */

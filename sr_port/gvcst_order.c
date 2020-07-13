@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -70,7 +70,7 @@ boolean_t	gvcst_order(void)
 {	/* See gvcst_query.c */
 	boolean_t	found, is_hidden, sn_tpwrapped;
 	boolean_t	est_first_pass;
-	gv_key		save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf	save_currkey;
 	int		end, prev, oldend;
 	int		save_dollar_tlevel;
 	DCL_THREADGBL_ACCESS;

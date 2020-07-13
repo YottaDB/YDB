@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -28,6 +28,7 @@
 #include "muextr.h"
 #include "mupip_size.h"
 #include "mu_getkey.h"
+#include "gvt_inline.h"
 
 GBLDEF gv_key *mu_start_key;
 GBLDEF gv_key *mu_end_key;

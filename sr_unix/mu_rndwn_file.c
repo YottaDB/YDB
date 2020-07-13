@@ -1257,14 +1257,12 @@ boolean_t mu_rndwn_file(gd_region *reg, boolean_t standalone)
 				return FALSE;
 			}
 			if (FROZEN_CHILLED(csa) && !override_present)
-			{	/* If there is an online freeze, we can't do the file writes, so autorelease or give up. */
-				DO_CHILLED_AUTORELEASE(csa, csd);
-				if (FROZEN_CHILLED(csa))
-				{
-					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(reg));
-					MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
-					return FALSE;
-				}
+			{	/* If there is an online freeze, we can't do the file writes.
+				 * Reject any command that requires a write to the frozen database file.
+				 */
+				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_OFRZACTIVE, 2, DB_LEN_STR(reg));
+				MU_RNDWN_FILE_CLNUP(reg, udi, tsd, sem_created, udi->counter_acc_incremented);
+				return FALSE;
 			}
 			/* If there was an online freeze and it was autoreleased, we don't want to take down the shared memory
 			 * and lose the freeze_online state.

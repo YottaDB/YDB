@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2013-2017 Fidelity National Information	*
+ * Copyright (c) 2013-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -26,6 +26,7 @@
 #include "gvcst_protos.h"	/* for gvcst_root_search prototype used in GV_BIND_SUBSREG macro */
 #include "gtmimagename.h"
 #include "io.h"
+#include "gvt_inline.h"
 
 GBLREF gd_region	*gv_cur_region;
 GBLREF gv_key		*gv_currkey;

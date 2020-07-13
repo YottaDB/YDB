@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -40,6 +40,7 @@
 #include "mvalconv.h"
 #include "tp_set_sgm.h"
 #include "min_max.h"
+#include "gvt_inline.h"
 
 GBLREF gd_addr		*gd_header;
 GBLREF gv_key		*gv_currkey;

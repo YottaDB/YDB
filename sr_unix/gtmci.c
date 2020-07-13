@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -966,10 +966,15 @@ int ydb_ci_exec(const char *c_rtn_name, ci_name_descriptor *ci_info, va_list tem
 				case ydb_string_star:
 					mstr_parm = va_arg(temp_var, ydb_string_t *);
 					MV_FORCE_STR(arg_ptr);
+<<<<<<< HEAD
 					if (arg_ptr->str.len > mstr_parm->length)
 						rts_error_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_INVSTRLEN, 2,
 									arg_ptr->str.len, mstr_parm->length);
 					mstr_parm->length = arg_ptr->str.len;
+=======
+					if (mstr_parm->length > arg_ptr->str.len)
+						mstr_parm->length = arg_ptr->str.len;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 					memcpy(mstr_parm->address, arg_ptr->str.addr, mstr_parm->length);
 					break;
 				default:

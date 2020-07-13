@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 5e466fd7... GT.M V6.3-013
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -21,6 +26,7 @@
 #include "gdsbt.h"
 #include "gdsblk.h"
 #include "gdsfhead.h"
+#include "gdscc.h"
 #include "error.h"
 #include "ast.h"
 #include "send_msg.h"
@@ -33,9 +39,10 @@
 GBLREF	boolean_t		created_core;
 GBLREF	boolean_t		need_core;
 GBLREF	boolean_t		dont_want_core;
+GBLREF	cw_set_element		cw_set[];		/* create write set. */
+GBLREF	jnl_gbls_t		jgbl;
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	uint4			dollar_tlevel;
-GBLREF	jnl_gbls_t		jgbl;
 
 error_def(ERR_ASSERT);
 error_def(ERR_GTMASSERT);
@@ -58,31 +65,20 @@ CONDITION_HANDLER(t_ch)
 	 * hold crit.
 	 */
 	START_CH(TRUE);
-	UNIX_ONLY(
-		/* To get as virgin a state as possible in the core, take the core now if we
-		 * would be doing so anyway. This will set created_core so it doesn't happen again.
-		 */
-		if (DUMPABLE)
-		{	/* this is most likely a fatal error, therefore print the error right here as we do not know if
-			 * the send_msg_csa() call in t_commit_cleanup() done below might overlay this primary fatal error.
-			 */
-			PRN_ERROR;
-			if (!SUPPRESS_DUMP)
-			{
-				need_core = TRUE;
-				gtm_fork_n_core();
-			}
-		}
-	)
-	VMS_ONLY (
-		if ((SUCCESS == SEVERITY) || (INFO == SEVERITY))
+	/* To get a state as close as possible to the event in the core, take the core now if we
+	 * would be doing so anyway. This sets created_core so it doesn't happen again.
+	 */
+	if (DUMPABLE)
+	{	/* this is most likely a fatal error, therefore print the error right here as we do not know if
+		* the send_msg_csa() call in t_commit_cleanup() done below might overlay this primary fatal error.
+		*/
+		PRN_ERROR;
+		if (!SUPPRESS_DUMP)
 		{
-			assert(FALSE);
-			CONTINUE;
+			need_core = TRUE;
+			gtm_fork_n_core();
 		}
-	)
-	ENABLE_AST;
-	ENABLE_AST;
+	}
 	/* Reset jgbl.dont_reset_gbl_jrec_time to FALSE if already set by tp_tend and we come here due to an rts_error in wcs_flu.
 	 * However, if it was forward recovery that ended up invoking tp_tend, then we should not reset the variable to FALSE as
 	 * forward recovery keeps it set to TRUE for its entire duration. So, take that into account for the if check.
@@ -93,6 +89,8 @@ CONDITION_HANDLER(t_ch)
 	 * existing function "have_crit".  If the design assumption that all crits held at transaction commit time are
 	 * transaction related holds true, the result is the same and efficiency doesn't matter (too much) in exception handling.
 	 */
+	if (!dollar_tlevel)
+		cw_set[0].recompute_list_head = cw_set[0].recompute_list_tail = NULL;
 	if ((!dollar_tlevel && T_IN_CRIT_OR_COMMIT(cs_addrs))
 		|| (dollar_tlevel && (0 != have_crit(CRIT_HAVE_ANY_REG | CRIT_IN_COMMIT))))
 	{

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2021 YottaDB LLC and/or its subsidiaries. *
@@ -52,6 +52,7 @@
 #include "tp_restart.h"
 #include "is_file_identical.h"
 #include "anticipatory_freeze.h"
+#include "gvt_inline.h"
 
 /* Include prototypes */
 #include "gvcst_kill_blk.h"
@@ -480,7 +481,7 @@ research:
 			assert(gv_altkey->top == gv_keysize);
 			end = gv_currkey->end;
 			assert(end < gv_currkey->top);
-			memcpy(gv_altkey, gv_currkey, SIZEOF(gv_key) + end);
+			memcpy(gv_altkey, gv_currkey, SIZEOF(gv_key) + end + 1);
 			base = &gv_altkey->base[0];
 			if (do_subtree)
 			{

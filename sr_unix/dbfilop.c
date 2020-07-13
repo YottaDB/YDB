@@ -43,6 +43,7 @@
 
 GBLREF	gd_region	*gv_cur_region;
 
+error_def(ERR_DBFILERDONLY);
 error_def(ERR_DBFILOPERR);
 error_def(ERR_DBNOTGDS);
 error_def(ERR_DBOPNERR);
@@ -103,9 +104,17 @@ uint4 dbfilop(file_control *fc)
 			seg = gv_cur_region->dyn.addr;
 			csa->read_write = TRUE;		/* maintain reg->read_only simultaneously */
 			csa->orig_read_write = TRUE;	/* maintain orig_read_write at same time as read_write */
+#ifdef DEBUG
+			if (WBTEST_ENABLED(WBTEST_OPENFILE_DB))
+			{
+				udi->fd = FD_INVALID;
+				errno = gtm_white_box_test_case_count ? gtm_white_box_test_case_count : EPERM;
+			} else
+#endif
 			OPENFILE_DB((char *)seg->fname, O_RDWR, udi, seg);
 			if (FD_INVALID == udi->fd)
 			{
+				save_errno = errno;
 				OPENFILE_DB((char *)seg->fname, O_RDONLY, udi, seg);
 				if (FD_INVALID == udi->fd)
 					return ERR_DBOPNERR;
@@ -116,6 +125,14 @@ uint4 dbfilop(file_control *fc)
 			FSTAT_FILE(udi->fd, &stat_buf, fstat_res);
 			if (-1 == fstat_res)
 				return ERR_DBOPNERR;
+			if (gv_cur_region->read_only && !((EPERM == save_errno) || (EACCES == save_errno)))
+			{
+				if (!IS_GTM_IMAGE)
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBFILERDONLY, 3, LEN_AND_STR(seg->fname),
+							stat_buf.st_mode & 0x1FF, save_errno);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_DBFILERDONLY, 3, LEN_AND_STR(seg->fname),
+						stat_buf.st_mode & 0x1FF, save_errno);
+			}
 #			ifdef __MVS__
 			if (-1 == gtm_zos_tag_to_policy(udi->fd, TAG_BINARY, &realfiletag))
 				TAG_POLICY_SEND_MSG((char_ptr_t)gv_cur_region->dyn.addr->fname, errno, realfiletag, TAG_BINARY);

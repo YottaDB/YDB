@@ -1,7 +1,12 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2016-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 5e466fd7... GT.M V6.3-013
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -9,10 +14,13 @@
  *	the license, please stop and do not read further.	*
  *								*
  ****************************************************************/
+<<<<<<< HEAD
 /* This module is derived from FIS code.
  ****************************************************************
  */
 
+=======
+>>>>>>> 5e466fd7... GT.M V6.3-013
 #include "mdef.h"
 
 #include "mdq.h"
@@ -27,10 +35,11 @@ GBLREF hash_table_str	*complits_hashtab;
 
 boolean_t unuse_literal(mval *x)
 {
+	boolean_t	in_hashtab = FALSE;
+	ht_ent_str	*litent;
 	mliteral	*a = NULL;
 	stringkey	litkey;
-	ht_ent_str	*litent;
-	bool		in_hashtab = FALSE;
+
 	if (complits_hashtab && complits_hashtab->base)
 	{
 		litkey.str = x->str;

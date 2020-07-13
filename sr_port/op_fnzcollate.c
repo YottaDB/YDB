@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2016 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -43,7 +43,7 @@ GBLREF spdesc 	stringpool;
  */
 void op_fnzcollate(mval *src, int col, int reverse, mval *dst)
 {
-	gv_key			save_currkey[DBKEYALLOC(MAX_KEY_SZ)];
+	gv_key_buf		save_currkey;
 	gv_key			*gvkey;
 	unsigned char		*key;
 	unsigned char		buff[MAX_ZWR_KEY_SZ];
@@ -53,11 +53,11 @@ void op_fnzcollate(mval *src, int col, int reverse, mval *dst)
 	MV_FORCE_STR(src);
 	if (0 == reverse)
 	{	/* gvn2gds */
-		gvkey = &save_currkey[0];
+		gvkey = (gv_key *)&save_currkey.key;
 		key = gvn2gds(src, gvkey, col);
 		/* If input has error at some point, copy whatever subscripts
 		 * (+ gblname) have been successfully parsed */
-		COPY_ARG_TO_STRINGPOOL(dst, key, &gvkey->base[0]);
+		COPY_ARG_TO_STRINGPOOL(dst, key, gvkey->base);
 	} else
 	{	/* reverse: gds2gvn */
 		key = gds2gvn(src, &buff[0], col);

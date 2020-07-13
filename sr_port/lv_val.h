@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -509,6 +509,17 @@ MBSTART {							\
 		(*(void (*)(void))TREF(zwrite_output_hook))();	\
 } MBEND
 
+/* Macro used intermittently in code to debug alias code in general. Note this macro must be specified
+ * as a compile option since it is used in macros that do not pull in this alias.h header file.
+ */
+#ifdef DEBUG_ALIAS
+# define DBGALS(x) DBGFPF(x)
+# define DBGALS_ONLY(x) x
+#else
+# define DBGALS(x)
+# define DBGALS_ONLY(x)
+#endif
+
 unsigned char   *format_lvname(lv_val *start, unsigned char *buff, int size);
 lv_val		*lv_getslot(symval *sym);
 lvTree		*lvtree_getslot(symval *sym);
@@ -527,9 +538,14 @@ void	op_clralsvars(lv_val *dst);
 void	op_fndata(lv_val *x, mval *y);
 void	op_fnzdata(lv_val *x, mval *y);
 void	op_fnincr(lv_val *local_var, mval *increment, mval *result);
+<<<<<<< HEAD
 void	op_fnnext(lv_val *src,mval *key,mval *dst);
 void	op_fno2(lv_val *src,mval *key,mval *dst,mval *direct);
 void	op_fnq2(int sbscnt, mval *dst, mval *direct, ...);
+=======
+void	op_fnnext(lv_val *src, mval *key, mval *dst);
+void	op_fno2(lv_val *src, mval *key, mval *dst, mval *direct);
+>>>>>>> 5e466fd7... GT.M V6.3-013
 void	op_fnorder(lv_val *src, mval *key, mval *dst);
 void	op_fnzahandle(lv_val *src, mval *dst);
 void	op_fnzprevious(lv_val *src, mval *key, mval *dst);
@@ -540,7 +556,7 @@ void	op_setals2als(lv_val *src, int dstindx);
 void	op_setalsin2alsct(lv_val *src, lv_val *dst);
 void	op_setalsctin2als(lv_val *src, int dstindx);
 void	op_setalsct2alsct(lv_val *src, lv_val *dst);
-void	op_setfnretin2als(mval *srcmv, int destindx); /* no an lv_val ref but kept here with its friends so it not lonely */
+void	op_setfnretin2als(mval *srcmv, int destindx); /* not an lv_val ref but kept here with its friends so it's not lonely */
 void	op_setfnretin2alsct(mval *srcmv, lv_val *dstlv);
 void	op_zshow(mval *func, int type, lv_val *lvn);
 

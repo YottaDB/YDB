@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -41,6 +41,7 @@
 #include "mvalconv.h"
 #include "tp_set_sgm.h"
 #include "dpgbldir.h"
+#include "gvt_inline.h"
 
 GBLREF	bool		undef_inhibit;
 GBLREF	gd_region	*gv_cur_region;

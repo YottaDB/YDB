@@ -1,0 +1,110 @@
+#################################################################
+#								#
+#	Copyright 2011, 2013 Fidelity Information Services, Inc       #
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+# Do not add any blank lines after this comment
+pro:
+CHK2LEV.m
+CHK2LEV.o
+CHKOP.m
+CHKOP.o
+GENDASH.m
+GENDASH.o
+GENOUT.m
+GENOUT.o
+GTMDefinedTypesInit.m
+GTMDefinedTypesInit.o
+GTMDEFINEDTYPESTODB.m
+GTMDEFINEDTYPESTODB.o
+GTMTHREADGBLASM.m
+GTMTHREADGBLASM.o
+GTMHLPLD.m
+GTMHLPLD.o
+LOADOP.m
+LOADOP.o
+LOADVX.m
+LOADVX.o
+lowerc_cp
+MSG.m
+MSG.o
+TTTGEN.m
+TTTGEN.o
+TTTSCAN.m
+TTTSCAN.o
+V5CBSU.m
+V5CBSU.o
+arch.gtc
+configure
+dbcertify
+dbcertify.debug
+dse.debug
+ftok.debug
+gdedefaults.gtc
+gtcm_gnp_server.debug
+gtcm_pkdisp.debug
+gtcm_play.debug
+gtcm_server.debug
+gtcm_shmclean.debug
+gtm.gtc
+gtmbase.gtc
+gtmcshrc.gtc
+gtmhelp.dmp
+gtminstall
+gtmprofile.gtc
+gtmprofile_preV54000.gtc
+gtmsecshr.debug
+libgtmshr.so.debug
+lke.debug
+map
+mumps.debug
+mumps.gld
+mupip.debug
+obj
+semstat2.debug
+
+pro/gtmsecshrdir:
+
+pro/plugin/gtmcrypt:
+Makefile
+gpgagent.tab
+gtm_tls_impl.h
+gtm_tls_interface.h
+gtmcrypt_dbk_ref.h
+gtmcrypt_interface.h
+gtmcrypt_pk_ref.h
+gtmcrypt_ref.h
+gtmcrypt_sym_ref.h
+gtmcrypt_util.h
+
+pro/utf8:
+CHK2LEV.o
+CHKOP.o
+GENDASH.o
+GENOUT.o
+GTMDefinedTypesInit.m -> ../GTMDefinedTypesInit.m
+GTMDefinedTypesInit.o
+GTMHLPLD.o
+LOADOP.o
+LOADVX.o
+MSG.o
+TTTGEN.o
+TTTSCAN.o
+V5CBSU.m -> ../V5CBSU.m
+V5CBSU.o
+arch.gtc -> ../arch.gtc
+configure -> ../configure
+dbcertify -> ../dbcertify
+gtmhelp.dmp -> ../gtmhelp.dmp
+gtminstall -> ../gtminstall
+gtmsecshr -> ../gtmsecshr
+gtmsecshrdir -> ../gtmsecshrdir
+lowerc_cp -> ../lowerc_cp
+map -> ../map
+mumps.gld -> ../mumps.gld
+obj -> ../obj

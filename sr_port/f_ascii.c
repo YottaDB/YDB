@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2015 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -17,6 +17,7 @@
 #include "op.h"
 #include "opcode.h"
 #include "gtm_utf8.h"
+#include "mdq.h"
 
 GBLREF boolean_t        gtm_utf8_mode;
 
@@ -51,6 +52,11 @@ int f_ascii(oprtype *a, opctype op)
 			op_fnzascii(r->operand[1].oprval.tref->operand[0].oprval.ilit,
 				&r->operand[0].oprval.tref->operand[0].oprval.mlit->v, &tmp_mval);
 		}
+		r->operand[1].oprval.tref->operand[0].oprclass = NO_REF;
+		r->operand[1].oprval.tref->opcode = OC_NOOP;				/* sideline abandoned triples */
+		unuse_literal(&r->operand[0].oprval.tref->operand[0].oprval.mlit->v);	/* knock out abandoned use of a literal */
+		r->operand[0].oprval.tref->operand[0].oprclass = NO_REF;
+		r->operand[0].oprval.tref->opcode = OC_NOOP;
 		*a = put_lit(&tmp_mval);
 		a->oprval.tref->src = r->src;
 		return TRUE;

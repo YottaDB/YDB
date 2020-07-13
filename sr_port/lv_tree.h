@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2011-2018 Fidelity National Information	*
+ * Copyright (c) 2011-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -93,7 +93,7 @@ typedef struct treeNodeStruct
 	struct lvTreeStruct	*sbs_child;	/* pointer to lvTreeStruct storing next level subscripts under this node;
 						 * overloaded as the free list pointer if this "lvTreeNode" is in the free list.
 						 */
-	struct lvTreeStruct	*tree_parent;	/* pointer to lvTreeStruct under whose avl tree this node belongs to */
+	struct lvTreeStruct	*tree_parent;	/* pointer to lvTreeStruct under whose avl tree this node belongs */
 	unsigned short		key_mvtype;	/* will have MV_STR bit set */
 	signed char		balance;	/* height(left) - height(right). Can be -1, 0, or 1 */
 	unsigned char		descent_dir;	/* direction of descent (LEFT = 0, RIGHT = 1) */

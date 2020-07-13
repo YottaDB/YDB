@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2019 Fidelity National Information	*
+ * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -1245,7 +1245,7 @@ STATICFNDEF boolean_t process_pieces(char *piece_str, uint4 *piece_len)
 	return TRUE;
 }
 
-STATICFNDEF boolean_t process_xecute(char *xecute_str, uint4 *xecute_len, boolean_t multi_line)
+boolean_t process_xecute(char *xecute_str, uint4 *xecute_len, boolean_t multi_line)
 {
 	uint4		dst_len;
 	char		dst_string[MAX_SRCLINE];

@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	*
@@ -120,7 +120,7 @@ boolean_t mu_extr_gblout(glist *gl_ptr, mu_extr_stats *st, int format, boolean_t
 	}
 	if (NULL == beg_gv_currkey)
 		beg_gv_currkey = (gv_key *)malloc(SIZEOF(gv_key) + MAX_KEY_SZ);
-	memcpy(beg_gv_currkey->base, gv_currkey->base, (SIZEOF(gv_key) + gv_currkey->end));
+	memcpy(beg_gv_currkey->base, gv_currkey->base, (SIZEOF(gv_key) + gv_currkey->end + 1));
 	gname_size = gv_currkey->end;
 	keytop = &gv_currkey->base[gv_currkey->top];
 	MU_EXTR_STATS_INIT(*st);

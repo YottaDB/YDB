@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2016 Fidelity National Information	*
+ * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -46,7 +46,7 @@ error_def(ERR_SSPREMATEOF);
  */
 GBLREF	sgmnt_addrs		*cs_addrs;
 GBLREF	gd_region		*gv_cur_region;
-GBLDEF	util_snapshot_ptr_t	util_ss_ptr;
+GBLREF	util_snapshot_ptr_t	util_ss_ptr;
 
 void	ss_read_block(snapshot_context_ptr_t lcl_ss_ctx, block_id blk, sm_uc_ptr_t blk_buff_ptr)
 {

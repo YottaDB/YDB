@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	*
@@ -1569,7 +1569,7 @@ int	iorm_readfl (mval *v, int4 width, uint8 nsec_timeout) /* timeout in nanoseco
 										    char_start, (char_start + char_bytes_read));
 								rm_ptr->inbuf_off = rm_ptr->inbuf_pos;	/* mark as read */
 								UTF8_BADCHAR(char_bytes_read, char_start,
-									     char_start + char_bytes_read, 0, NULL);
+									char_start + char_bytes_read, STRLEN("UTF-8"), "UTF-8");
 							}
 							if (ASCII_LF == *char_start)
 							{

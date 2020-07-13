@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2012-2019 Fidelity National Information		#
+# Copyright (c) 2012-2020 Fidelity National Information		#
 # Services, Inc. and/or its subsidiaries. All rights reserved.	#
 #								#
 # Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries.	#
@@ -33,7 +33,15 @@ foreach(lang ${languages})
 endforeach()
 
 # Defaults
+<<<<<<< HEAD
 set(version r135)
+=======
+set(version ${V6.3-013})
+if("${version}" STREQUAL "")
+        set(version V9.9-0)
+endif()
+
+>>>>>>> 5e466fd7... GT.M V6.3-013
 # If CMAKE_BUILD_TYPE is not defined make it a Release build
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Build type" FORCE)
@@ -55,7 +63,9 @@ else()
 endif()
 
 if ( CMAKE_COMPILER_IS_GNUCC )
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -Waddress")
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wall -Wno-unused-result -Wno-parentheses -Wno-unused-value -Wno-unused-variable")
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wno-maybe-uninitialized -Wno-char-subscripts -Wno-unused-but-set-variable")
+    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -Wno-unused-function")
 endif()
 
 # The below option enables the address sanitizer in the build.

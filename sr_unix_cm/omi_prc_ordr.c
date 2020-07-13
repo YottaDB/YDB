@@ -1,9 +1,14 @@
 /****************************************************************
  *								*
+<<<<<<< HEAD
  * Copyright 2001, 2013 Fidelity Information Services, Inc	*
  *								*
  * Copyright (c) 2017 YottaDB LLC and/or its subsidiaries.	*
  * All rights reserved.						*
+=======
+ * Copyright (c) 2001-2020 Fidelity National Information	*
+ * Services, Inc. and/or its subsidiaries. All rights reserved.	*
+>>>>>>> 5e466fd7... GT.M V6.3-013
  *								*
  *	This source code contains the intellectual property	*
  *	of its copyright holder(s), and is made available	*
@@ -114,7 +119,7 @@ int omi_prc_ordr(omi_conn *cptr, char *xend, char *buff, char *bend)
 					REVERT
 					return -OMI_ER_DB_UNRECOVER;
 				}
-				memcpy(gv_currkey, gv_altkey, gv_altkey->end + SIZEOF(gv_key));
+				memcpy(gv_currkey, gv_altkey, gv_altkey->end + SIZEOF(gv_key) + 1);
 				TREF(gv_last_subsc_null) = FALSE;
 			}
 

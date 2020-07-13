@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -61,6 +61,7 @@
 void	job_timer_handler(void);
 
 GBLDEF	short			jobcnt		= 0;
+GBLDEF	int			job_errno;
 GBLDEF	volatile boolean_t	ojtimeout	= TRUE;
 GBLDEF	int			job_errno;
 

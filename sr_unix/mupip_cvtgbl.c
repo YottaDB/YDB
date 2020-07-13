@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2021 YottaDB LLC and/or its subsidiaries.	*
@@ -47,6 +47,19 @@ GBLREF	boolean_t	skip_dbtriggers;
 GBLREF	mstr		sys_input;
 GBLDEF	int		onerror;
 
+<<<<<<< HEAD
+=======
+error_def(ERR_EXTRFMT);
+error_def(ERR_LDBINFMT);
+error_def(ERR_LOADBGSZ);
+error_def(ERR_LOADINVCHSET);
+error_def(ERR_LOADEDBG);
+error_def(ERR_LOADEDSZ);
+error_def(ERR_MAXSTRLEN);
+error_def(ERR_MUNOFINISH);
+error_def(ERR_MUPCLIERR);
+
+>>>>>>> 5e466fd7... GT.M V6.3-013
 #define CHAR_TO_READ_LINE1_BIN	STR_LIT_LEN("d0GDS BINARY")  /* read first 12 characters to check file is binary [d\0GDS BINARY] */
 #define	MAX_ONERROR_VALUE_LEN	STR_LIT_LEN("INTERACTIVE") /* PROCEED, STOP, INTERACTIVE are the choices with INTERACTIVE as max */
 #define	MAX_FORMAT_VALUE_LEN	STR_LIT_LEN("BINARY") /* ZWR, BINARY, GO, GOQ are the choices with BINARY being the longest */
@@ -360,10 +373,85 @@ int get_load_format(char **line1_ptr, char **line3_ptr, int *line1_len, int *lin
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET,
 					2, LEN_AND_LIT("UTF-8"));
 			else
+<<<<<<< HEAD
 				gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
 			*utf8_extract = BADZCHSET;
 		}
 	}
+=======
+			{	/* chances of this are small but we are careful not to overflow buffers */
+				ret = MU_FMT_GOQ;	/* abusing this value to mean not working, as we can't discover GOQ */
+				line2_len = 0;
+				/* There is no second line in this extract file */
+				mupip_error_occurred = TRUE;
+			}
+		}
+		if (0 < line2_len)
+		{	/* we have 2 label lines to work with */
+			line2_len -= *dos;
+			c1 = line2 + line2_len;
+			*c1 = 0;	/* null terminate the line to keep regex in bounds */
+			util_out_print("!AD", TRUE, line2_len, line2);
+			if (gtm_regex_perf("ZWR", line2))
+				ret = MU_FMT_ZWR;		/* settle for any ZWR in the second line of the label */
+			if ((MU_FMT_UNRECOG == ret) &&
+				gtm_regex_perf("(GT.M )?[0-9]{2}[-]([A-Z]{3})[-][0-9]{4}[ ]{1,2}[0-9]{2}[:][0-9]{2}[:][0-9]{2}",
+					line2))
+				ret = MU_FMT_GO;	/* GT.M DD-MON-YEAR  24:60:SS used by MUPIP EXTRACT & %GO */
+			if ((MU_FMT_UNRECOG == ret) && gtm_regex_perf("GLO", line2))
+				ret = MU_FMT_GO;	/* settle for any GLO in the second line of the label */
+			for (c = line2 + line2_len + 1, ctop = c + *line3_len, c1 = line3; c < ctop; c++)
+			{	/* if the first 2 lines were really short, move to other buffer looking for a line 3 terminator */
+				if ('\n' == *c)
+				{	/* found a terminator */
+					*line3_len = c1 - line3;
+					break;
+				} else
+					*c1 = *c;
+			}
+			if (c == ctop)
+			{	/* get all or some of line 3 - the first non-label line */
+				ptr = line3 + *line3_len;
+				if (0 < (len = go_get(&ptr, 0, *max_rec_size)))
+				{
+					*line3_len += (len - *dos);
+					c1 = line3 + *line3_len;
+					*c1 = 0;		/* null terminate the line to keep regex in bounds */
+				} else
+				{	/* chances of this are small but we are careful not to overflow buffers */
+					ret = MU_FMT_GOQ;
+					mupip_error_occurred = TRUE;
+					gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(1) ERR_EXTRFMT);
+				}
+			} else
+			{
+				*line3_len = 0;
+				ret = MU_FMT_GOQ;	/* abusing this value to mean not working, as we can't discover GOQ */
+			}
+			if ((MU_FMT_UNRECOG == ret) && gtm_regex_perf("\\^[%A-Za-z][0-9A-Za-z]*(\\(.*\\))?$", line3))
+				ret = MU_FMT_GO;	/* gvn only */
+			if ((MU_FMT_UNRECOG == ret)
+				&& gtm_regex_perf("\\^[%A-Za-z][0-9A-Za-z]*(\\(.*\\))?=(\".*\"|-?([0-9]+|[0-9]*\\.[0-9]+))$",
+					line3))
+				ret = MU_FMT_ZWR;	 /* gvn=val */
+			if (MU_FMT_UNRECOG != ret)
+			{
+				*utf8_extract = gtm_regex_perf("UTF-8", line1);
+				if ((*utf8_extract && !gtm_utf8_mode) || (!*utf8_extract && gtm_utf8_mode))
+				{	/* extract CHSET doesn't match current $ZCHSET */
+					if (*utf8_extract)
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET,
+							2, LEN_AND_LIT("UTF-8"));
+					else
+						gtm_putmsg_csa(CSA_ARG(NULL) VARLSTCNT(4) ERR_LOADINVCHSET, 2, LEN_AND_LIT("M"));
+					*utf8_extract = BADZCHSET;
+				}
+			}
+		} else
+			return MU_FMT_GOQ;
+	} else
+		return MU_FMT_GOQ;
+>>>>>>> 5e466fd7... GT.M V6.3-013
 	*max_rec_size = (MU_FMT_GO == ret) ? MAX_STRLEN : *max_rec_size;		/* for GO, keys are separate */
 	return MU_FMT_GOQ == ret ? MU_FMT_UNRECOG : ret;				/* turn the GOQs back into unrecognized */
 }

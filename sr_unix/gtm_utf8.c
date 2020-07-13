@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2006-2019 Fidelity National Information	*
+ * Copyright (c) 2006-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -30,12 +30,17 @@ GBLREF	void			(*stx_error_fptr)(int in_error, ...);	/* Function pointer for stx_
 									 */
 GBLREF	void			(*show_source_line_fptr)(boolean_t warn); /* Func ptr for show_source_line() same reason as above */
 
+LITREF mval literal_null;
+
 error_def(ERR_BADCHAR);
 
 /* Return UTF8 length of mstr string in UTF8 characters */
 int utf8_len(mstr* str)
 {
-	return utf8_len_real(err_rts, str);
+	DCL_THREADGBL_ACCESS;
+	SETUP_THREADGBL_ACCESS;
+
+	return utf8_len_real(TREF(compile_time) ? err_stx : err_rts, str);
 }
 
 /* This is the same as "utf8_len" except that it invokes UTF8_BADCHAR_STX macro which does a stx_error instead of rts_error
@@ -55,6 +60,12 @@ int utf8_len_dec(mstr* str)
 	return utf8_len_real(err_dec, str);
 }
 
+/* This is the same as "utf8_len" except that it always returns a length and does not report errors. */
+int utf8_len_silent(mstr* str)
+{
+	return utf8_len_real(err_ignore, str);
+}
+
 /* The routine that does the actual work of determining the length and responding appropriately in the event an invalid
  * UTF8 character is detected.
  */
@@ -65,6 +76,12 @@ STATICFNDEF int utf8_len_real(utf8_err_type err_type, mstr* str)
 	boolean_t	err_raised;
 
 	assert(gtm_utf8_mode);
+	if (&literal_null.str == str)
+	{
+		assert((0 == str->char_len) && (0 == str->len));
+		return 0;
+	}
+	assert((0 <= str->len) && (MAX_STRLEN >= str->len));
 	ptr = str->addr;
 	ptrtop = ptr + str->len;
 	charlen = 0;
@@ -89,6 +106,7 @@ STATICFNDEF int utf8_len_real(utf8_err_type err_type, mstr* str)
 							UTF8_BADCHAR_DEC(0, ptr, ptrtop, 0, NULL);
 							err_raised = TRUE;
 						}
+					case err_ignore:		/* WARNING fall through */
 						bytelen = 1;		/* Assume only one char is broken */
 						break;
 					default:
@@ -219,8 +237,7 @@ void utf8_badchar(int len, unsigned char *str, unsigned char *strtop, int chset_
 	DCL_THREADGBL_ACCESS;
 	SETUP_THREADGBL_ACCESS;
 
-	assert(!TREF(compile_time));
-	utf8_badchar_real(err_rts, len, str, strtop, chset_len, chset);
+	utf8_badchar_real(TREF(compile_time) ? err_stx : err_rts, len, str, strtop, chset_len, chset);
 	return;
 }
 
@@ -232,7 +249,7 @@ void utf8_badchar_stx(int len, unsigned char *str, unsigned char *strtop, int ch
 	DCL_THREADGBL_ACCESS;
 	SETUP_THREADGBL_ACCESS;
 
-	assert(!TREF(compile_time));
+	assert(TREF(compile_time));
 	utf8_badchar_real(err_stx, len, str, strtop, chset_len, chset);
 	return;
 }
@@ -287,7 +304,7 @@ STATICFNDEF void utf8_badchar_real(utf8_err_type err_type, int len, unsigned cha
 		outstr = (unsigned char*)i2asc((uchar_ptr_t)outstr, *strptr);
 		*outstr = ',';
 	}
-	if (0 < len)		/* do not include the last comma */
+	if (str < strptr)		/* do not include the last comma */
 		outstr--;
 	if (err_dec == err_type)
 	{

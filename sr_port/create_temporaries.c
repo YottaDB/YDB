@@ -27,7 +27,6 @@
 #include "funsvn.h"
 #include "mmemory.h"
 #include "advancewindow.h"
-#include "namelook.h"
 #include "cmd.h"
 #include "svnames.h"
 #include "gdsroot.h"

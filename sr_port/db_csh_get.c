@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -35,12 +35,14 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 	sgmnt_data_ptr_t		csd;
 	cache_rec_ptr_t			cr, cr_hash_base;
 	int				blk_hash, lcnt, ocnt, hmax;
+	node_local_ptr_t		cnl;
 #	ifdef DEBUG
 	cache_rec_ptr_t			cr_low, cr_high;
 #	endif
 
 	csa = cs_addrs;
 	csd = csa->hdr;
+	cnl = csa->nl;
 	assert(dba_mm != csd->acc_meth);
 	hmax = csd->bt_buckets;
 	blk_hash = (int)(block % hmax);	/* This can be cast because it is constrained by hmax which currently fits into an int */
@@ -87,6 +89,6 @@ cache_rec_ptr_t	db_csh_get(block_id block) /* block number to look up */
 		/* We rarely expect to come here, hence it is considered better to recompute the maximum value of ocnt (for the
 		 * termination check) instead of storing it in a local variable at the beginning of the do loop */
 	} while (ocnt < (csa->now_crit ? 1 : ENOUGH_TRIES_TO_FALL_BACK));
-	BG_TRACE_PRO_ANY(csa, db_csh_get_too_many_loops);
+	INCR_GVSTATS_COUNTER(csa, cnl, n_buffer_scarce, 1);
 	return (TRUE == csa->now_crit ? (cache_rec_ptr_t)CR_NOTVALID : (cache_rec_ptr_t) NULL);
 }

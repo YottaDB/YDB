@@ -19,13 +19,12 @@
 #include "mdq.h"
 #include "fullbool.h"
 
-error_def(ERR_GVNEXTARG);
 error_def(ERR_LVORDERARG);
 error_def(ERR_VAREXPECTED);
 
 int f_next(oprtype *a, opctype op)
 {
-	triple		*oldchain, *ref, *r;
+	triple		*oldchain, *r, *r1;
 	save_se		save_state;
 	DCL_THREADGBL_ACCESS;
 
@@ -44,15 +43,8 @@ int f_next(oprtype *a, opctype op)
 		ins_triple(r);
 		break;
 	case TK_CIRCUMFLEX:
-		ref = TREF(shift_side_effects) ? TREF(expr_start) : (TREF(curtchain))->exorder.bl;
 		if (!gvn())
 			return FALSE;
-		/* the following assumes OC_LIT and OC_GVNAME are all one gets for an unsubscripted global variable reference */
-		if ((TREF(shift_side_effects) ? TREF(expr_start) : TREF(curtchain))->exorder.bl->exorder.bl->exorder.bl == ref)
-		{
-			stx_error(ERR_GVNEXTARG);
-			return FALSE;
-		}
 		r->opcode = OC_GVNEXT;
 		ins_triple(r);
 		break;

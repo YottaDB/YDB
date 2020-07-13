@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2016 Fidelity National Information	*
+ * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -54,6 +54,12 @@
 /* These fields are defined as globals not because they are used globally but
  * so they will be easily retrievable even in 'pro' cores.
  */
+<<<<<<< HEAD
+=======
+GBLREF siginfo_t	exi_siginfo;
+GBLREF gtm_sigcontext_t	exi_context;
+
+>>>>>>> 5e466fd7... GT.M V6.3-013
 GBLREF	int4			forced_exit_err;
 GBLREF	int4			exi_condition;
 GBLREF	enum gtmImageTypes	image_type;

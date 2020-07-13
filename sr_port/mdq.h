@@ -49,7 +49,7 @@
  * debugging are statically defined.
  */
 #define dqloop(Q, N, I) DQLOOP(Q, N, I)
-#ifdef GTM_MALLOC_BUILD		/* gtm_malloc doesn't deal with triples and the include they require make for trouble */
+#ifdef GTM_MALLOC_BUILD		/* gtm_malloc doesn't deal with triples and the #include they require makes for trouble */
 #define dqinit(Q, N) DQINIT(Q, N)
 #define DQTRIPCHK(Q, N)
 #else
@@ -60,9 +60,15 @@ MBSTART {						\
 	DQINIT(Q, N); 					\
 } MBEND
 #define DQTRIPCHK(Q, N) assert((0 != memcmp(#N, "exorder", 3)) || (OCQ_INVALID != ((triple *)(Q))->opcode))
+#ifdef DEBUG		/*don't turn this on in pro builds, at least without intentionally allowing it by changing this */
+/* #define DEBUG_TRIPLES / * Uncomment this to do triple debugging, which is also tied to gtmdbglvl - as of this writing: 0x4000 */
+#endif
 #endif
 
+<<<<<<< HEAD
 /* #define DEBUG_TRIPLES / * Uncomment this to do triple debugging, which is also tied to ydb_dbglvl, as of this writing: 0x4000 */
+=======
+>>>>>>> 5e466fd7... GT.M V6.3-013
 #ifndef DEBUG_TRIPLES
 #  define dqdel(X, N)		DQDEL(X, N)
 #  define dqdelchain(Q, X, N)	DQDELCHAIN(Q, X, N)
@@ -73,6 +79,7 @@ MBSTART {						\
 #  define dqnoop(Q)
 #else
 #  include "gtmdbglvl.h"
+<<<<<<< HEAD
 GBLREF	uint4		ydbDebugLevel;
 /* Q: head of queue to check; N: the name of queue; B: whether to check main exorder (from curtchain) and any expr_start queue */
 #  define CHKTCHAIN(Q, N, B)								\
@@ -95,6 +102,35 @@ MBSTART {										\
 				chktchain(c);	/* this extra has been rewarding */	\
 		}									\
 	}										\
+=======
+#  include "gtm_string.h"
+GBLREF	uint4		gtmDebugLevel;
+/* Q: head of queue to check; N: the name of queue; B: whether to check main exorder (from curtchain) and any expr_start queue */
+#  define CHKTCHAIN(Q, N, B)									\
+MBSTART {											\
+	triple	*c;										\
+	DCL_THREADGBL_ACCESS;									\
+												\
+	SETUP_THREADGBL_ACCESS;									\
+					/* memcmp() is fast and 3 chars sufficient */		\
+	if ((GDL_DebugCompiler & gtmDebugLevel) && (0 == memcmp(#N, "exorder", 3)))		\
+	{											\
+		if ((triple *)-1 != (triple *)(Q)) /* to avoid post-checking deletes */		\
+			chktchain((triple *)(Q));						\
+		if (B)			/* FALSE 3rd arg disables extra AST checks */		\
+		{										\
+			c = TREF(curtchain);							\
+			if (c != (triple *)(Q))	/* don't bother if redundant */			\
+				chktchain(c);							\
+			c = TREF(expr_start);							\
+			if ((NULL != c) && (c != (triple *)(Q)))				\
+				chktchain(c);							\
+			c = TREF(expr_start_orig);						\
+			if ((NULL != c) && (c != TREF(expr_start)) && (c != (triple *)(Q)))	\
+				chktchain(c);	/* this extra has been rewarding */		\
+		}										\
+	}											\
+>>>>>>> 5e466fd7... GT.M V6.3-013
 } MBEND
 #  define dqdel(X, N)		\
 MBSTART {			\

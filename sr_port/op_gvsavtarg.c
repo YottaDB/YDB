@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -29,6 +29,7 @@
 #include "tp.h"
 #include "dpgbldir.h"
 #include "process_gvt_pending_list.h"
+#include "gvt_inline.h"
 
 GBLREF	gd_region	*gv_cur_region;
 GBLREF	gv_key		*gv_currkey;

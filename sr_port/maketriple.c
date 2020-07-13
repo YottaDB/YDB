@@ -16,16 +16,17 @@
 #include "mdq.h"
 #include "mmemory.h"
 
-GBLREF short int source_line;
 GBLREF int	 source_column;
 
 triple *maketriple(opctype op)
 {
 	triple *x;
+        DCL_THREADGBL_ACCESS;
 
+        SETUP_THREADGBL_ACCESS;
 	x = (triple *)mcalloc(SIZEOF(triple));
 	x->opcode = op;
-	x->src.line = source_line;
+	x->src.line = TREF(source_line);
 	x->src.column = source_column;
 	dqinit(&(x->backptr), que);
 	dqinit(&(x->jmplist), que);

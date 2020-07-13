@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2010-2016 Fidelity National Information	*
+ * Copyright (c) 2010-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -21,6 +21,7 @@
 #include "gtm_iconv.h"
 #include "io.h"
 #include "iosp.h"
+#include "mdq.h"
 #ifdef __MVS__
 #include "gtm_unistd.h"
 #endif
@@ -76,6 +77,7 @@ int f_zchar(oprtype *a, opctype op)
 			i = argp->oprval.tref->operand[0].oprval.ilit;
 			if ((i >= 0) && (i < 256))	/* only true for single byte character set */
 				*c++ = i;
+			dqdel(argp->oprval.tref, exorder);
 		}
 		*c = '\0';
 		v.str.len = INTCAST(c - v.str.addr);

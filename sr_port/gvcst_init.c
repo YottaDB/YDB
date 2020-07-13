@@ -75,6 +75,7 @@
 #include "gtm_semutils.h"
 #include "gtm_sem.h"
 #include "is_file_identical.h"
+#include "gvt_inline.h"
 
 /* Deferred database encryption initialization. Check the key handle and skip if already initialized  */
 #define INIT_DEFERRED_DB_ENCRYPTION_IF_NEEDED(REG, CSA, CSD)								\

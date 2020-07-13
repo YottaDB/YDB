@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -65,6 +65,7 @@
 #include "caller_id.h"
 #endif
 #include "gtmci.h"
+#include "gvt_inline.h"
 
 GBLDEF	int4			n_pvtmods, n_blkmods;
 
@@ -271,7 +272,7 @@ int tp_restart(int newlevel, boolean_t handle_errors_internally)
 					gvname_mstr.len = gvt->gvname.var_name.len;
 				} else
 				{
-					if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, &gvt->clue, TRUE)))
+					if (NULL == (end = format_targ_key(buff, MAX_ZWR_KEY_SZ, (gv_key *)&gvt->clue, TRUE)))
 						end = &buff[MAX_ZWR_KEY_SZ - 1];
 					assert(buff[0] == '^');
 					gvname_mstr.addr = (char*)(buff + 1);

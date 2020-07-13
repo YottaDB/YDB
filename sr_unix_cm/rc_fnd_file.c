@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2019 YottaDB LLC and/or its subsidiaries. *
@@ -40,6 +40,7 @@
 #include "ydb_trans_log_name.h"
 #include "hashtab_mname.h"
 #include "hashtab.h"
+#include "gvt_inline.h"		/* Before gtmio.h, which includes the open->open64 macro on AIX, which we don't want here. */
 #include "gtmio.h"
 #include "have_crit.h"
 
@@ -142,9 +143,9 @@ short rc_fnd_file(rc_xdsid *xdsid)
 			return RC_FILEACCESS;
 		}
 		GVKEYSIZE_INIT_IF_NEEDED;	/* sets up "gv_keysize", "gv_currkey" and "gv_altkey" in sync if not already done */
-		cs_addrs->dir_tree = (gv_namehead *)malloc(SIZEOF(gv_namehead) + 2 * SIZEOF(gv_key) + 3 * (gv_keysize - 1));
+		cs_addrs->dir_tree = (gv_namehead *)malloc(SIZEOF(gv_namehead) + 2 * SIZEOF(gv_key) + 3 * gv_keysize);
 		g = cs_addrs->dir_tree;
-		g->first_rec = (gv_key*)(g->clue.base + gv_keysize);
+		g->first_rec = (gv_key*)(((gv_key *)&(g->clue))->base + gv_keysize);
 		g->last_rec = (gv_key*)(g->first_rec->base + gv_keysize);
 		g->clue.top = g->last_rec->top = g->first_rec->top = gv_keysize;
 		/* No need to initialize g->clue.prev as it is never used */
@@ -269,9 +270,9 @@ short rc_fnd_file(rc_xdsid *xdsid)
 		rel_crit(gv_cur_region);
 		GVKEYSIZE_INIT_IF_NEEDED;
 		keysize = DBKEYSIZE(gv_cur_region->max_key_size);
-		cs_addrs->dir_tree = (gv_namehead *)malloc(SIZEOF(gv_namehead) + 2 * SIZEOF(gv_key) + 3 * (keysize - 1));
+		cs_addrs->dir_tree = (gv_namehead *)malloc(SIZEOF(gv_namehead) + 2 * SIZEOF(gv_key) + 3 * keysize);
 		g = cs_addrs->dir_tree;
-		g->first_rec = (gv_key*)(g->clue.base + keysize);
+		g->first_rec = (gv_key*)(((gv_key *)&(g->clue))->base + keysize);
 		g->last_rec = (gv_key*)(g->first_rec->base + keysize);
 		g->clue.top = g->last_rec->top = g->first_rec->top = keysize;
 		/* No need to initialize g->clue.prev as it is not currently used */

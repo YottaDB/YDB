@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2005-2017 Fidelity National Information	*
+ * Copyright (c) 2005-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -40,6 +40,7 @@
 #include "gtmsource.h"
 #include "repl_shutdcode.h"
 #include "gvcst_protos.h"
+#include "gvt_inline.h"
 
 #include "op.h"
 #include "targ_alloc.h"

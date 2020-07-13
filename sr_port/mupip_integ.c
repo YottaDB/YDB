@@ -54,6 +54,7 @@
 #include "gvcst_protos.h"
 #include "muextr.h"
 #include "mu_getkey.h"
+#include "gvt_inline.h"
 
 #define MAX_UTIL_LEN			96
 #define APPROX_ALL_ERRORS		1000000

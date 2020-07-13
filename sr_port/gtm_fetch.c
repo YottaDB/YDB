@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2009-2017 Fidelity National Information	*
+ * Copyright (c) 2009-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -32,6 +32,7 @@
 #include "gdsfhead.h"
 #include "mvalconv.h"
 #include "alias.h"
+#include "gvt_inline.h"
 #endif
 
 GBLREF stack_frame	*frame_pointer;

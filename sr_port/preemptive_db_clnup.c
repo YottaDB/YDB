@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  *	This source code contains the intellectual property	*
@@ -36,6 +36,7 @@
 #include "t_abort.h"
 #include "dpgbldir.h"
 #include "io.h"
+#include "gvt_inline.h"
 
 GBLREF	gv_namehead		*reset_gv_target;
 GBLREF	gv_namehead		*gv_target;

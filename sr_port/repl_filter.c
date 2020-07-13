@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2019 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2017-2022 YottaDB LLC and/or its subsidiaries. *
@@ -63,6 +63,7 @@
 #ifdef GTM_TRIGGER
 #include "trigger.h"
 #endif
+#include "gvt_inline.h"
 
 /* Do not apply null subscript transformations to LGTRIG and ZTWORM type records */
 #define NULLSUBSC_TRANSFORM_IF_NEEDED(RECTYPE, PTR)					\

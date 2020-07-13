@@ -15,5 +15,5 @@
 /* Note, GDE_LABEL_LITERAL must be maintained in gdeinit.m if changes are made here */
 /* The reference file for 64bittn/vermismatch expects this value so must be kept in sync */
 /* Also change at least the assert in create_dummy_gbldir.c */
-#define GDE_LABEL_LITERAL GTM64_ONLY("GTCGBDUNX114") NON_GTM64_ONLY("GTCGBDUNX014")
+#define GDE_LABEL_LITERAL GTM64_ONLY("GTCGBDUNX115") NON_GTM64_ONLY("GTCGBDUNX015")
 #define DEF_GDR_EXT "*.gld"

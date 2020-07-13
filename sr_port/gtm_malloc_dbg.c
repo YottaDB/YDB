@@ -68,14 +68,15 @@
    to put a "return" after the assertpro). These are just "catchalls" in case the
    expansion functioned incorrectly.
 */
-void gtm_malloc_dbg(size_t size);
-void gtm_free_dbg(void *addr);
-void gtm_malloc_dbg(size_t size)
+void gtm_malloc_dbg(size_t size, int stack_level);
+void gtm_free_dbg(void *addr, int stack_level);
+
+void gtm_malloc_dbg(size_t size, int stack_level)
 {
 	assertpro(FALSE && "gtm_malloc_dbg called directly");
 }
 
-void gtm_free_dbg(void *addr)
+void gtm_free_dbg(void *addr, int stack_level)
 {
 	assertpro(FALSE && "gtm_free_dbg called directly");
 }

@@ -1,0 +1,87 @@
+#################################################################
+#								#
+#	Copyright 2011, 2013 Fidelity Information Services, Inc       #
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+GTM>
+
+GTM>
+
+GTM>
+^X
+
+GTM>
+x=2
+
+GTM>
+^X=1
+
+GTM>
+
+GTM>
+
+
+
+
+Additional information available:
+
+About_GT.M  Commands    Err_Processing          Functions   Integrate_External
+Internationalization    IO_Processing           ISV         Language_Extensions
+M_Lang_Features         Opr_Dbg_Dir_Mode        Program_Cycle
+Triggers    Utility_Routines
+
+Topic?
+
+GTM>
+^X=1
+
+GTM>
+
+ZCHSET= M
+
+Global changes in the gtm.mjl file:
+^a="1"
+^b="2"
+mupip integ returned a 0 status - as expected
+
+GTM>
+M
+GTM>
+
+GTM>
+UTF-8
+GTM>
+
+ZCHSET= UTF-8
+
+
+
+
+Additional information available:
+
+About_GT.M  Commands    Err_Processing          Functions   Integrate_External
+Internationalization    IO_Processing           ISV         Language_Extensions
+M_Lang_Features         Opr_Dbg_Dir_Mode        Program_Cycle
+Triggers    Utility_Routines
+
+Topic?
+
+Global changes in the gtm.mjl file:
+^a="1"
+^b="2"
+mupip integ returned a 0 status - as expected
+Build test the encryption plugin
+Default gtmroutines
+OK Your orders please
+D gtmrocks
+OK
+Null gtmroutines
+OK Your orders please
+D gtmrocks
+OK

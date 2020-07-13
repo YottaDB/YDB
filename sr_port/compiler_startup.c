@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2001-2018 Fidelity National Information	*
+ * Copyright (c) 2001-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	*
@@ -39,7 +39,6 @@
 
 #define HOPELESS_COMPILE 128
 
-GBLREF short int source_line;
 GBLREF int	source_column;
 
 GBLREF boolean_t		mstr_native_align, save_mstr_native_align;
@@ -155,7 +154,7 @@ boolean_t compiler_startup(void)
 	TREF(code_generated) = FALSE;
 	line_count = 1;
 	total_source_len = 0;
-	for (source_line = 1;  errknt <= HOPELESS_COMPILE;  source_line++)
+	for (TREF(source_line) = 1;  errknt <= HOPELESS_COMPILE;  (TREF(source_line))++)
 	{
 		if (-1 == (n = read_source_file()))
 			break;
@@ -166,7 +165,7 @@ boolean_t compiler_startup(void)
 		dqrins(&src_head, que, sl);
 		sl->str.addr = mcalloc(n + 1);		/* +1 for zero termination */
 		sl->str.len = n;
-		sl->line = source_line;
+		sl->line = TREF(source_line);
 		memcpy(sl->str.addr, (TREF(source_buffer)).addr, n + 1);
 		total_source_len += n;
 		cp = (unsigned char *)((TREF(source_buffer)).addr + n - 1);

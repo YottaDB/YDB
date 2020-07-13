@@ -1,6 +1,6 @@
 /****************************************************************
  *								*
- * Copyright (c) 2012-2019 Fidelity National Information	*
+ * Copyright (c) 2012-2020 Fidelity National Information	*
  * Services, Inc. and/or its subsidiaries. All rights reserved.	*
  *								*
  * Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	*
@@ -31,6 +31,7 @@
 #include "jobsp.h"		/* for MAX_PIDSTR_LEN */
 #include "gtm_limits.h"
 
+error_def(ERR_EXITSTATUS);
 error_def(ERR_STUCKACT);
 error_def(ERR_SYSCALL);
 error_def(ERR_TEXT);
@@ -132,18 +133,18 @@ void gtm_c_stack_trace(char *message, pid_t waiting_pid, pid_t blocking_pid, uin
 					if (WIFSIGNALED(wait_stat))
 					{
 						status = WTERMSIG(wait_stat);
-						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-							LEN_AND_LIT("PROCSTUCK terminated by signal"), CALLFROM, status);
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_EXITSTATUS, 6,
+							LEN_AND_LIT("PROCSTUCK terminated by signal"), status, CALLFROM);
 					} else
-						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-							LEN_AND_LIT("PROCSTUCK"), CALLFROM, status);
+						send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_EXITSTATUS, 6,
+							LEN_AND_LIT("PROCSTUCK"), status, CALLFROM);
 				}
 			} else
 			{	/* it's gone rogue' */
 				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(6) ERR_STUCKACT, 4,
 						LEN_AND_LIT("FAILURE"), LEN_AND_STR(command));
-				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_SYSCALL, 5,
-						LEN_AND_LIT("PROCSTUCK did not report status"), CALLFROM, status);
+				send_msg_csa(CSA_ARG(NULL) VARLSTCNT(8) ERR_EXITSTATUS, 6,
+						LEN_AND_LIT("PROCSTUCK did not report status"), status, CALLFROM);
 				assert(FALSE);
 			}
 		}
